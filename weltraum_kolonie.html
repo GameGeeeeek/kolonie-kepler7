@@ -776,6 +776,7 @@
       <div class="tab-panel active" id="tab-basis">
         <div id="colonyDashboard"></div>
         <div id="planetRoleBox"></div>
+        <div id="terraformBox"></div>
         <div id="colonyRenameBox" style="display:flex; gap:8px; margin:0.5rem 0 1rem;">
           <input type="text" id="colonyRenameInput" placeholder="Eigener Name für diese Kolonie…" maxlength="24" style="flex:1;"/>
           <button id="colonyRenameSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
@@ -1318,8 +1319,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.68.0';
+  const VERSION = '7.69.0';
   const PATCHNOTES = [
+    { version:'7.69.0', date:'12.07.2026', changes:[
+      'Neu: Terraforming – jeder Standort (Heimatbasis und Kolonien) kann in 10 Stufen terraformt werden, jede Stufe gibt +5% Produktion dort (bis +50% bei Stufe 10)',
+      'Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit (Stufe 1 ~3 Min., Stufe 10 ~20 Min.), immer nur ein Terraforming gleichzeitig',
+      'Zu finden im Basis-Tab direkt unter der Planeten-Rolle, mit Fortschrittsbalken und Kostenanzeige (mit Ressourcen-Icons)',
+      'Zwei neue Erfolge: "Weltgestalter" (Stufe 1) und "Paradies erschaffen" (Stufe 10)',
+      'Hilfe-Seite entsprechend ergänzt',
+      'Bestehende Spielstände bleiben unverändert – ohne Terraforming startet alles wie bisher'
+    ]},
     { version:'7.68.0', date:'12.07.2026', changes:[
       'Sektorkarte (Systemübersicht): Zoom &amp; Verschieben hinzugefügt – Ziehen zum Pannen, Pinch/Scrollen zum Zoomen, +/–/⟲-Buttons unten rechts',
       'Karte spürbar vergrößert (260px → 340px Höhe) und Beschriftung deutlich größer (Systemname 9px→12px, Detailzeile 7,5px→9,5px), Kreise ebenfalls größer für bessere Lesbarkeit bei den mittlerweile 39 Systemen',
@@ -2499,6 +2508,8 @@
     { key:'level10', name:'Erfahrener Kommandant', desc:'Erreiche Kommandanten-Level 10.', check: s => commanderLevel(s.xp||0) >= 10, progress: s => [Math.min(10,commanderLevel(s.xp||0)), 10] },
     { key:'doctrine', name:'Grundsatzentscheidung', desc:'Wähle eine Doktrin.', check: s => !!s.doctrine, progress: s => [s.doctrine?1:0, 1] },
     { key:'planetrole', name:'Spezialisierung', desc:'Weise einer Kolonie eine Rolle zu.', check: s => Object.keys(s.planetSpecialization||{}).length >= 1, progress: s => [Math.min(1,Object.keys(s.planetSpecialization||{}).length), 1] },
+    { key:'terraform1', name:'Weltgestalter', desc:'Terraforme einen Standort auf Stufe 1.', check: s => Object.values(s.terraforming||{}).some(v=>v>=1), progress: s => [Math.min(1, Object.values(s.terraforming||{}).filter(v=>v>=1).length), 1] },
+    { key:'terraform10', name:'Paradies erschaffen', desc:'Bringe einen Standort auf Terraforming-Stufe 10.', check: s => Object.values(s.terraforming||{}).some(v=>v>=10), progress: s => [Math.min(10, Math.max(0, ...Object.values(s.terraforming||{}), 0)), 10] },
     { key:'allroles', name:'Vielseitiges Imperium', desc:'Nutze alle vier Planeten-Rollen gleichzeitig.', check: s => new Set(Object.values(s.planetSpecialization||{})).size >= 4, progress: s => [new Set(Object.values(s.planetSpecialization||{})).size, 4] },
     { key:'explorer25', name:'Weitgereist', desc:'Entdecke mindestens 25 Planeten.', check: s => Object.keys(s.discovered||{}).length >= 25, progress: s => [Math.min(25,Object.keys(s.discovered||{}).length), 25] },
     { key:'colonizer10', name:'Kolonialmacht', desc:'Kolonisiere mindestens 10 Planeten.', check: s => Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 10, progress: s => [Math.min(10,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 10] },
@@ -2532,6 +2543,8 @@
     fleet: { ships: 1, cruisers: 0, destroyers: 0, frachter: 0, colonyShips: 0, jaeger: 0, schlachtschiff: 0, spaeher: 0, carrier: 0, bomber: 0, superschlachtschiff: 0, missions: [] },
     discovered: {},
     planetBonuses: {},
+    terraforming: {},
+    terraformJob: null,
     colonies: {},
     activeBasePlanet: 'home',
     nextRaidTime: null,
@@ -2937,6 +2950,7 @@
         mineMult *= moonPenalty(planet);
         const role = planetRoleOf(planet);
         if (role && role.key==='mining') mineMult *= 1.25;
+        mineMult *= terraformProdMult(planet);
         rates[def.produces] += (b[def.key]||0) * def.baseRate * mineMult;
       }
       // Forschungslabor produziert Forschungspunkte statt einer Standardressource (kein "produces"-Feld,
@@ -2946,6 +2960,7 @@
         let fpMult = habitatMult * moonPenalty(planet);
         const role = planetRoleOf(planet);
         if (role && role.key==='mining') fpMult *= 1.25;
+        fpMult *= terraformProdMult(planet);
         const laborDef = BUILDING_DEFS.find(d=>d.key==='labor');
         rates.forschungspunkte += b.labor * (laborDef.researchPointRate||0) * fpMult;
       }
@@ -5180,7 +5195,8 @@
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus.' },
-      { title:'Sektorkarte bedienen', body:'Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' }
+      { title:'Sektorkarte bedienen', body:'Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
+      { title:'Terraforming', body:'Jeder Standort (Heimatbasis und Kolonien, nicht Monde) kann terraformt werden – Stufe 0 bis 10, jede Stufe gibt <strong>+5% Produktion</strong> dort (bis zu +50% bei Stufe 10). Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit. Es kann immer nur <strong>ein Terraforming gleichzeitig</strong> laufen. Zu finden im Basis-Tab unter der Planeten-Rolle.' }
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
@@ -6214,6 +6230,8 @@
         if (state.lastWeeklyRewardWeek === undefined) state.lastWeeklyRewardWeek = null;
         if (state.activeResearch === undefined) state.activeResearch = null;
         if (!state.planetBonuses) state.planetBonuses = {};
+        if (!state.terraforming) state.terraforming = {};
+        if (state.terraformJob === undefined) state.terraformJob = null;
         if (!state.levelRewardsClaimed) state.levelRewardsClaimed = {};
         if (!state.rareItems) state.rareItems = {};
         if (!state.inventory) state.inventory = {};
@@ -6445,6 +6463,62 @@
   // (wie eine Bauwarteschlange) statt sofort zu wirken – passt besser zum "Umbauen"-Begriff. Die
   // ERSTE Zuweisung einer noch unspezialisierten Kolonie bleibt sofort (reine Designation, kein Umbau).
   const PLANET_ROLE_SWITCH_DURATION = 900;
+  // ===== Terraforming =====
+  // Pro Planet/Heimatbasis eine Stufe 0-10, jede Stufe gibt +5% Produktion auf diesem Standort
+  // (bis zu +50% bei Stufe 10). Höherstufen kosten exponentiell mehr Ressourcen und brauchen eine mit
+  // der Stufe steigende Umwandlungszeit (jeweils nur EIN Terraforming-Vorhaben gleichzeitig, wie eine
+  // Bauwarteschlange). Greift multiplikativ in die Produktion ein (siehe mineMult in der Produktions-
+  // berechnung) und lässt Ressourcennamen/Balance des restlichen Spiels unangetastet.
+  const TERRAFORM_MAX_LEVEL = 10;
+  const TERRAFORM_PROD_PER_LEVEL = 0.05;
+  function terraformLevel(planetKey){ return (state.terraforming||{})[planetKey||'home'] || 0; }
+  function terraformProdMult(planetKey){ return 1 + terraformLevel(planetKey) * TERRAFORM_PROD_PER_LEVEL; }
+  // Kosten für den Sprung auf die NÄCHSTE Stufe (targetLevel = aktuelle+1). Exponentiell steigend.
+  function terraformCost(nextLevel){
+    const f = Math.pow(1.9, nextLevel - 1);
+    return {
+      erz: Math.round(1200 * f),
+      kristalle: Math.round(700 * f),
+      deuterium: Math.round(300 * f)
+    };
+  }
+  // Umwandlungsdauer in Sekunden – steigt mit der Zielstufe (Stufe 1 ~2 Min., Stufe 10 ~50 Min.).
+  function terraformDuration(nextLevel){ return 90 + nextLevel * 90 + Math.round(Math.pow(1.35, nextLevel) * 12); }
+  function startTerraform(planetKey){
+    planetKey = planetKey || 'home';
+    if (state.terraformJob){ log('Es läuft bereits eine Terraforming-Umwandlung.', 'ti-alert-triangle'); return; }
+    const cur = terraformLevel(planetKey);
+    if (cur >= TERRAFORM_MAX_LEVEL){ log('Dieser Planet ist bereits vollständig terraformt (Stufe 10).', 'ti-alert-triangle'); return; }
+    if (planetKey !== 'home' && !state.colonies[planetKey]){ log('Ungültiger Standort.', 'ti-alert-triangle'); return; }
+    const next = cur + 1;
+    const cost = terraformCost(next);
+    for (const [k,v] of Object.entries(cost)){
+      if ((state.resources[k]||0) < v){ log('Nicht genug Ressourcen für Terraforming Stufe '+next+'.', 'ti-alert-triangle'); return; }
+    }
+    for (const [k,v] of Object.entries(cost)) state.resources[k] -= v;
+    const dur = terraformDuration(next);
+    state.terraformJob = { planet: planetKey, targetLevel: next, endTime: Date.now() + dur*1000, totalDuration: dur };
+    log('Terraforming auf '+displayPlanetName(planetKey)+' gestartet (Ziel: Stufe '+next+').', 'ti-plant');
+    playSound('build');
+    render(); save();
+  }
+  function processTerraformJob(){
+    if (!state.terraformJob) return;
+    if (Date.now() < state.terraformJob.endTime) return;
+    const job = state.terraformJob;
+    state.terraforming[job.planet] = job.targetLevel;
+    state.terraformJob = null;
+    log('Terraforming abgeschlossen: '+displayPlanetName(job.planet)+' erreicht Stufe '+job.targetLevel+' (+'+Math.round(job.targetLevel*TERRAFORM_PROD_PER_LEVEL*100)+'% Produktion).', 'ti-plant');
+    playSound('complete');
+  }
+  // Hilfsfunktion für einen lesbaren Standortnamen (Heimatbasis oder Kolonie/Mond).
+  function displayPlanetName(planetKey){
+    if (planetKey==='home') return 'Heimatbasis';
+    if (typeof isMoonKey==='function' && isMoonKey(planetKey)) return (typeof planetDisplayName==='function' ? planetDisplayName(planetKey) : planetKey);
+    const p = PLANETS.find(x=>x.id===planetKey);
+    return p ? p.name : planetKey;
+  }
+
   function planetRoleOf(planetKey){
     if (!planetKey || planetKey==='home') return null;
     const key = (state.planetSpecialization||{})[planetKey];
@@ -8194,6 +8268,55 @@
             </div>
           `;
           roleBox.querySelectorAll('[data-set-planet-role]').forEach(btn => btn.onclick = () => setPlanetRole(state.activeBasePlanet, btn.getAttribute('data-set-planet-role')));
+        }
+      }
+      // Terraforming – funktioniert auf ALLEN Standorten inkl. Heimatbasis (anders als Rollen), außer
+      // Monden (die haben ihren eigenen Mond-Malus und keine Terraforming-Mechanik).
+      const terraBox = document.getElementById('terraformBox');
+      if (terraBox){
+        const pk = state.activeBasePlanet;
+        if (isMoonKey(pk)){
+          terraBox.innerHTML = '';
+        } else {
+          const lvl = terraformLevel(pk);
+          const job = state.terraformJob && state.terraformJob.planet === pk ? state.terraformJob : null;
+          const otherJob = state.terraformJob && state.terraformJob.planet !== pk ? state.terraformJob : null;
+          let html = `<div class="section-title" style="margin-top:0.5rem; justify-content:space-between;"><span><i class="ti ti-plant" aria-hidden="true"></i>Terraforming: ${planetDisplayName(pk)}</span><button class="help-jump-btn" data-jump-help="kolonien"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>`;
+          html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span class="bname">Stufe ${lvl} / ${TERRAFORM_MAX_LEVEL}</span>
+              <span class="lvl-pill" style="background:rgba(93,202,165,0.18); color:#5dcaa5;">+${Math.round(lvl*TERRAFORM_PROD_PER_LEVEL*100)}% Produktion</span>
+            </div>
+            <div class="progress-outer"><div class="progress-inner" style="width:${(lvl/TERRAFORM_MAX_LEVEL*100).toFixed(0)}%; background:#5dcaa5;"></div></div>`;
+          if (job){
+            const remain = Math.max(0, job.endTime-Date.now());
+            const pct = Math.max(0, Math.min(100, 100-(remain/(job.totalDuration*1000)*100)));
+            html += `<div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span class="bmeta"><i class="ti ti-plant" aria-hidden="true"></i> Umwandlung zu Stufe ${job.targetLevel} läuft…</span>
+                <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
+              </div>
+              <div class="progress-outer" style="margin-top:4px;"><div class="progress-inner" style="width:${pct}%;"></div></div>`;
+          } else if (lvl >= TERRAFORM_MAX_LEVEL){
+            html += `<div class="bmeta" style="margin-top:10px; color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Vollständig terraformt – Maximalstufe erreicht.</div>`;
+          } else {
+            const next = lvl+1;
+            const cost = terraformCost(next);
+            const dur = terraformDuration(next);
+            const costHtml = Object.entries(cost).map(([k,v]) => {
+              const rd = RES_DEFS.find(r=>r.key===k);
+              const enough = (state.resources[k]||0) >= v;
+              return `<span style="display:inline-flex; align-items:center; gap:3px; margin-right:10px; color:${enough?'#c7cbe0':'#e24b4a'};"><i class="ti ${rd?rd.icon:'ti-planet'}" aria-hidden="true" style="color:${rd?rd.color:'#c7cbe0'};"></i>${fmt(v)}</span>`;
+            }).join('');
+            html += `<div style="margin-top:12px;">
+                <div class="bmeta" style="margin-bottom:6px;">Nächste Stufe ${next}: <span style="color:#5dcaa5;">+5% Produktion</span> · Dauer ${fmtDuration(dur)}</div>
+                <div style="margin-bottom:8px; font-size:12px;">${costHtml}</div>
+                <button data-start-terraform="1" ${otherJob?'disabled':''} style="width:100%;"><i class="ti ti-plant" aria-hidden="true" style="margin-right:4px;"></i>${otherJob?'Anderes Terraforming läuft…':'Terraforming starten'}</button>
+              </div>`;
+          }
+          html += `</div>`;
+          terraBox.innerHTML = html;
+          const startBtn = terraBox.querySelector('[data-start-terraform]');
+          if (startBtn) startBtn.onclick = () => startTerraform(pk);
         }
       }
       const colonyRenameInput = document.getElementById('colonyRenameInput');
@@ -10029,6 +10152,7 @@
     const queueProgressed = processQueue();
     const constructionDone = processConstructionQueue();
     const roleChangeDone = processPlanetRoleChanges();
+    processTerraformJob();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
