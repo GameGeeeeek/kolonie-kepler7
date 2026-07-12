@@ -1350,8 +1350,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.77.0';
+  const VERSION = '7.78.0';
   const PATCHNOTES = [
+    { version:'7.78.0', date:'12.07.2026', changes:[
+      'Neu: Eroberte Fraktionssysteme haben jetzt echten Nutzen – jedes kontrollierte System bringt +3 Kredite pro Minute und +1% Produktion auf alle Ressourcen',
+      'Der Produktionsbonus ist bei +15% gedeckelt (ab 15 Systemen)',
+      'Neue Übersichtskarte im Galaxie-Tab: „Deine Systeme" mit Anzahl, Namen und laufendem Gesamtertrag',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.77.0', date:'12.07.2026', changes:[
       'Neu: Fraktionssysteme erobern – du kannst NPC-Fraktionssysteme jetzt direkt angreifen (Galaxie-Tab, Knopf pro bekanntem Fraktionssystem)',
       'Bei Erfolg gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Sektorkarte, du bekommst +40 Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern',
@@ -2928,6 +2934,33 @@
     }
     return null;
   }
+  // ===== Nutzen eroberter Fraktionssysteme =====
+  // Jedes vom Spieler eroberte System (galaxyCache.controlledSystems, Server-autoritativ) bringt
+  // passiv +3 Kredite/min und +1% Produktion (Produktionsbonus gedeckelt bei +15%). Bewusst getrennt
+  // vom Allianz-Bonus systemControlProdMult(), der auf Kolonie-Mehrheiten basiert.
+  const CONQUERED_CREDITS_PER_MIN = 3;
+  const CONQUERED_PROD_PER_SYSTEM = 0.01;
+  const CONQUERED_PROD_CAP = 0.15;
+  function myConqueredSystems(){
+    const ctrl = galaxyCache.controlledSystems;
+    if (!ctrl || !state.player || !state.player.id) return [];
+    return Object.entries(ctrl).filter(([sys,uid]) => uid === state.player.id).map(([sys]) => sys);
+  }
+  function conqueredSystemsProdMult(){
+    const n = myConqueredSystems().length;
+    if (!n) return 1;
+    return 1 + Math.min(CONQUERED_PROD_CAP, n * CONQUERED_PROD_PER_SYSTEM);
+  }
+  // Zahlt die Kredit-Erträge eroberter Systeme aus (ein Zyklus pro Minute), wird im Haupt-Tick gerufen.
+  function processConqueredSystems(){
+    const n = myConqueredSystems().length;
+    if (!n) return;
+    const now = Date.now();
+    if (now < (state.nextConqueredPayout||0)) return;
+    state.nextConqueredPayout = now + 60*1000;
+    state.credits = (state.credits||0) + n * CONQUERED_CREDITS_PER_MIN;
+  }
+
   // Greift ein NPC-Fraktionssystem über den Server an. Bei Erfolg gehört das System danach dem Spieler
   // (erscheint in galaxyCache.controlledSystems), bei Misserfolg gibt es Flottenverluste.
   async function attackFactionSystem(systemId){
@@ -2975,7 +3008,16 @@
       return;
     }
     const sorted = Object.values(factions).sort((a,b)=>(b.systems?.length||0)-(a.systems?.length||0));
-    box.innerHTML = sorted.map(f => {
+    // Übersicht der eigenen eroberten Systeme (falls vorhanden) mit ihrem laufenden Nutzen.
+    const mine = myConqueredSystems();
+    const mineCard = mine.length ? `<div class="card-row" style="border-color:#5dcaa5; margin-bottom:0.5rem;">
+      <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.18); color:#5dcaa5;"><i class="ti ti-flag" aria-hidden="true"></i></div>
+        <div><div class="bname" style="color:#5dcaa5;">Deine Systeme (${mine.length})</div>
+        <div class="bmeta">+${mine.length*CONQUERED_CREDITS_PER_MIN} Kredite/min · +${Math.round(Math.min(CONQUERED_PROD_CAP, mine.length*CONQUERED_PROD_PER_SYSTEM)*100)}% Produktion${mine.length*CONQUERED_PROD_PER_SYSTEM>=CONQUERED_PROD_CAP?' (Max.)':''}</div>
+        <div class="bmeta">${mine.map(id=>{const s=STAR_SYSTEMS.find(x=>x.id===id);return s?s.name:id;}).join(', ')}</div></div>
+      </div>
+    </div>` : '';
+    box.innerHTML = mineCard + sorted.map(f => {
       const count = (f.systems||[]).length;
       const strength = f.strength ? f.strength.toFixed(1) : '?';
       // Angreifbare Systeme dieser Fraktion, die der Spieler schon entdeckt hat (nur bekannte Systeme
@@ -3519,6 +3561,8 @@
     if (state.allianceIsTopRank) for (const k of Object.keys(rates)) rates[k] *= 1.02;
     const territoryMult = systemControlProdMult();
     if (territoryMult !== 1) for (const k of Object.keys(rates)) rates[k] *= territoryMult;
+    const conqueredMult = conqueredSystemsProdMult();
+    if (conqueredMult !== 1) for (const k of Object.keys(rates)) rates[k] *= conqueredMult;
     const megaProdMult = megaProjectProdMult() * (hasArtifactBonus()?1.05:1);
     if (megaProdMult !== 1) for (const k of Object.keys(rates)) rates[k] *= megaProdMult;
     return rates;
@@ -5885,7 +5929,8 @@
     { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
       { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
-      { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' }
+      { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
+      { title:'Nutzen eroberter Systeme', body:'Jedes von dir kontrollierte System bringt laufend <strong>+3 Kredite pro Minute</strong> und <strong>+1% Produktion</strong> auf alle Ressourcen (Produktionsbonus gedeckelt bei +15%, also ab 15 Systemen). Die Übersicht im Galaxie-Tab zeigt deine Systeme und ihren Gesamtertrag.' }
     ]},
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
@@ -11081,6 +11126,7 @@
     processTerraformJob();
     processTypeConvertJob();
     processTradeRoutes();
+    processConqueredSystems();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
