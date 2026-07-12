@@ -995,6 +995,9 @@
           <div class="lvl-pill" style="background:rgba(195,190,245,0.2); color:#c3bef5; font-size:15px;"><span id="commandPointsDisplay">0</span></div>
         </div>
         <div id="officerBox"></div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-box" aria-hidden="true"></i>Schiffsmodule</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Module gibst du pro Standort in Slots – jeder Standort wird einzeln aufgerüstet (kostet Kommandopunkte). Ausgerüstete Module wirken nur an ihrem Standort. Module findest du bei Expeditionen und Sonden.</div>
+        <div id="moduleBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-allianz">
@@ -1330,8 +1333,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.72.0';
+  const VERSION = '7.73.0';
   const PATCHNOTES = [
+    { version:'7.73.0', date:'12.07.2026', changes:[
+      'Neu: Ausrüstbare Schiffsmodule mit vier Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250% Wirkung)',
+      'Vier Modultypen: Panzerung (+Verteidigung), Waffen (+Angriff), Bergbau (+Produktion), Werft (−Bauzeit)',
+      'Module wirken pro Standort: jeder Planet hat eigene Slots, die einzeln mit Kommandopunkten aufgerüstet werden (bis zu 4 pro Standort). Ein ausgerüstetes Modul wirkt nur an seinem Standort',
+      'Module findet man bei Expeditionen und treibenden Sonden – Verwaltung (Slots, Inventar, Ausrüsten/Abnehmen, Standort-Wechsel) im Offiziere-Tab',
+      'Zwei neue Erfolge: "Aufgerüstet" und "Legendäre Ausrüstung"',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.72.0', date:'12.07.2026', changes:[
       'Neu: Offiziere – vier Offiziere, alle gleichzeitig aktiv: Ingenieur (−2% Gebäude-Bauzeit/Stufe), Admiral (+2% Angriffskraft/Stufe), Wissenschaftler (−2% Forschungsdauer/Stufe), Händler (+2% Handelsgewinn/Stufe), jeweils bis Stufe 10 (±20%)',
       'Neue Währung: Kommandopunkte – verdient man fürs Kämpfen (parallel zu Kampfpunkten, im gleichen Maß), dient zum Anheuern/Befördern der Offiziere. Ausgeben senkt NICHT den Punktestand',
@@ -2167,6 +2178,7 @@
     { key:'probe', name:'Antike Sonde entdeckt', icon:'ti-atom-2', color:'#c3bef5',
       desc:'Sensoren orten eine treibende Sonde unbekannten Ursprungs. Eine Untersuchung könnte sich lohnen – oder Zeitverschwendung sein.',
       optA:{ label:'Untersuchen', resolve:()=>{ addXp(25);
+          if (Math.random() < 0.18){ const modName = grantRandomModule(); return 'Sonde geborgen! +25 XP und ein Schiffsmodul: '+modName+'! (Im Offiziere-Tab ausrüsten.)'; }
           if (Math.random() < 0.3){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1; return 'Sonde geborgen! +25 XP und ein seltener Fund: '+ri.name+'!'; }
           return 'Sonde untersucht. +25 XP, aber sonst nichts Verwertbares.'; } },
       optB:{ label:'Ignorieren', resolve:()=>'Die Sonde verschwindet ungenutzt im Dunkel des Alls.' } },
@@ -2601,6 +2613,8 @@
     { key:'terraform10', name:'Paradies erschaffen', desc:'Bringe einen Standort auf Terraforming-Stufe 10.', check: s => Object.values(s.terraforming||{}).some(v=>v>=10), progress: s => [Math.min(10, Math.max(0, ...Object.values(s.terraforming||{}), 0)), 10] },
     { key:'officer1', name:'Erster Offizier', desc:'Heuere einen Offizier an.', check: s => Object.values(s.officers||{}).some(v=>v>=1), progress: s => [Math.min(1, Object.values(s.officers||{}).filter(v=>v>=1).length), 1] },
     { key:'officer_all', name:'Kompletter Stab', desc:'Heuere alle vier Offiziere an.', check: s => Object.values(s.officers||{}).filter(v=>v>=1).length >= 4, progress: s => [Object.values(s.officers||{}).filter(v=>v>=1).length, 4] },
+    { key:'module1', name:'Aufgerüstet', desc:'Rüste ein Schiffsmodul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.length>0), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.length>0).length), 1] },
+    { key:'module_legendary', name:'Legendäre Ausrüstung', desc:'Rüste ein legendäres Modul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.some(k=>k.endsWith(':legendaer'))), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.some(k=>k.endsWith(':legendaer'))).length), 1] },
     { key:'allroles', name:'Vielseitiges Imperium', desc:'Nutze alle vier Planeten-Rollen gleichzeitig.', check: s => new Set(Object.values(s.planetSpecialization||{})).size >= 4, progress: s => [new Set(Object.values(s.planetSpecialization||{})).size, 4] },
     { key:'explorer25', name:'Weitgereist', desc:'Entdecke mindestens 25 Planeten.', check: s => Object.keys(s.discovered||{}).length >= 25, progress: s => [Math.min(25,Object.keys(s.discovered||{}).length), 25] },
     { key:'colonizer10', name:'Kolonialmacht', desc:'Kolonisiere mindestens 10 Planeten.', check: s => Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 10, progress: s => [Math.min(10,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 10] },
@@ -2644,6 +2658,9 @@
     battlePoints: 0,
     commandPoints: 0,
     officers: {},
+    modules: {},
+    moduleSlotLevel: {},
+    equippedModules: {},
     npcKills: 0,
     bossKills: 0,
     xp: 0,
@@ -3048,6 +3065,7 @@
         if (role && role.key==='mining') mineMult *= 1.25;
         mineMult *= terraformProdMult(planet);
         mineMult *= planetTypeProdMult(planet, def.produces);
+        mineMult *= (1 + moduleBonusAt(planet, 'prod'));
         rates[def.produces] += (b[def.key]||0) * def.baseRate * mineMult;
       }
       // Forschungslabor produziert Forschungspunkte statt einer Standardressource (kein "produces"-Feld,
@@ -3059,6 +3077,7 @@
         if (role && role.key==='mining') fpMult *= 1.25;
         fpMult *= terraformProdMult(planet);
         fpMult *= planetTypeProdMult(planet, 'forschungspunkte');
+        fpMult *= (1 + moduleBonusAt(planet, 'prod'));
         const laborDef = BUILDING_DEFS.find(d=>d.key==='labor');
         rates.forschungspunkte += b.labor * (laborDef.researchPointRate||0) * fpMult;
       }
@@ -3252,6 +3271,99 @@
     // (quadriert statt addiert) in der Verteidigung der eigenen Flotte.
     return power;
   }
+  // ===== Schiffsmodule (ausrüstbar, pro Planet, mit Seltenheitsstufen) =====
+  // Jeder Standort (Heimatbasis + Kolonien) hat eigene Ausrüstungs-Slots, die EINZELN aufgewertet
+  // werden (Variante B). Ausgerüstete Module geben dauerhafte Boni NUR auf ihrem Standort. Module haben
+  // eine Seltenheit, die ihren Bonus skaliert. Gefundene Module liegen im gemeinsamen Inventar
+  // (state.modules), ausgerüstet werden sie pro Planet (state.equippedModules[planetKey] = [key,...]).
+  const MODULE_RARITY = {
+    gewoehnlich: { label:'Gewöhnlich', color:'#9aa0b8', mult:1.0 },
+    selten:      { label:'Selten',      color:'#5dcaa5', mult:1.6 },
+    episch:      { label:'Episch',      color:'#af7ce6', mult:2.4 },
+    legendaer:   { label:'Legendär',    color:'#fac775', mult:3.5 }
+  };
+  // Basis-Boni pro Modultyp (werden mit der Seltenheit multipliziert). effect: welcher Bonus, base: Basiswert.
+  const MODULE_DEFS = [
+    { key:'panzerung', name:'Panzerungsmodul', icon:'ti-shield', effect:'def', base:0.05, desc:'Erhöht die Verteidigung dieses Standorts.' },
+    { key:'waffen', name:'Waffenmodul', icon:'ti-sword', effect:'atk', base:0.05, desc:'Erhöht die Angriffskraft der hier stationierten Flotte.' },
+    { key:'bergbau', name:'Bergbaumodul', icon:'ti-pick', effect:'prod', base:0.05, desc:'Erhöht die Produktion dieses Standorts.' },
+    { key:'werft', name:'Werftmodul', icon:'ti-building-factory-2', effect:'buildspeed', base:0.05, desc:'Verkürzt die Bauzeit an diesem Standort.' }
+  ];
+  const MODULE_MAX_SLOT_LEVEL = 4; // max. Slots pro Planet
+  function moduleInstanceInfo(instKey){
+    // Ein Modul-Inventar-Eintrag ist als "typ:seltenheit" kodiert (z.B. "waffen:episch").
+    const [type, rarity] = instKey.split(':');
+    const def = MODULE_DEFS.find(d=>d.key===type);
+    const rar = MODULE_RARITY[rarity];
+    if (!def || !rar) return null;
+    return { type, rarity, def, rar, bonus: def.base * rar.mult };
+  }
+  function moduleSlotCount(planetKey){ return (state.moduleSlotLevel||{})[planetKey||'home'] || 0; }
+  function equippedAt(planetKey){ return (state.equippedModules||{})[planetKey||'home'] || []; }
+  // Summierter Bonus eines Effekts (atk/def/prod/buildspeed) durch ausgerüstete Module an einem Standort.
+  function moduleBonusAt(planetKey, effect){
+    let sum = 0;
+    for (const instKey of equippedAt(planetKey)){
+      const info = moduleInstanceInfo(instKey);
+      if (info && info.def.effect === effect) sum += info.bonus;
+    }
+    return sum;
+  }
+  // Slot-Aufwertung: kostet Kommandopunkte, steigend mit Slot-Level und teurer für die Heimatbasis-... nein,
+  // einheitlich pro Planet. Erster Slot ist am günstigsten.
+  function moduleSlotUpgradeCost(nextSlotLevel){ return Math.round(30 * Math.pow(1.8, nextSlotLevel - 1)); }
+  function upgradeModuleSlot(planetKey){
+    planetKey = planetKey || 'home';
+    if (planetKey !== 'home' && !state.colonies[planetKey]){ log('Ungültiger Standort.', 'ti-alert-triangle'); return; }
+    const cur = moduleSlotCount(planetKey);
+    if (cur >= MODULE_MAX_SLOT_LEVEL){ log('Maximale Slot-Anzahl an diesem Standort erreicht.', 'ti-alert-triangle'); return; }
+    const cost = moduleSlotUpgradeCost(cur+1);
+    if ((state.commandPoints||0) < cost){ log('Nicht genug Kommandopunkte ('+cost+' benötigt).', 'ti-alert-triangle'); return; }
+    state.commandPoints -= cost;
+    state.moduleSlotLevel[planetKey] = cur+1;
+    log('Modul-Slot an '+displayPlanetName(planetKey)+' freigeschaltet (jetzt '+(cur+1)+' Slots, −'+cost+' Kommandopunkte).', 'ti-box');
+    playSound('build');
+    render(); save();
+  }
+  // Ein Modul aus dem Inventar an einem Standort ausrüsten (in einen freien Slot).
+  function equipModule(planetKey, instKey){
+    planetKey = planetKey || 'home';
+    if ((state.modules[instKey]||0) < 1){ log('Dieses Modul ist nicht mehr im Inventar.', 'ti-alert-triangle'); return; }
+    const equipped = equippedAt(planetKey);
+    if (equipped.length >= moduleSlotCount(planetKey)){ log('Keine freien Slots an diesem Standort.', 'ti-alert-triangle'); return; }
+    state.modules[instKey] -= 1;
+    if (state.modules[instKey] <= 0) delete state.modules[instKey];
+    state.equippedModules[planetKey] = [...equipped, instKey];
+    const info = moduleInstanceInfo(instKey);
+    log((info?info.rar.label+' '+info.def.name:'Modul')+' an '+displayPlanetName(planetKey)+' ausgerüstet.', info?info.def.icon:'ti-box');
+    playSound('build');
+    render(); save();
+  }
+  // Ein ausgerüstetes Modul wieder abnehmen (zurück ins Inventar). slotIndex = Position in der Liste.
+  function unequipModule(planetKey, slotIndex){
+    planetKey = planetKey || 'home';
+    const equipped = [...equippedAt(planetKey)];
+    if (slotIndex < 0 || slotIndex >= equipped.length) return;
+    const instKey = equipped.splice(slotIndex, 1)[0];
+    state.equippedModules[planetKey] = equipped;
+    state.modules[instKey] = (state.modules[instKey]||0) + 1;
+    log('Modul abgenommen und ins Inventar zurückgelegt.', 'ti-box');
+    render(); save();
+  }
+  // Vergibt ein zufälliges Modul (nach Seltenheits-Gewichtung) ins Inventar – aufgerufen bei Funden.
+  function grantRandomModule(){
+    const type = MODULE_DEFS[Math.floor(Math.random()*MODULE_DEFS.length)].key;
+    const roll = Math.random();
+    let rarity = 'gewoehnlich';
+    if (roll < 0.05) rarity = 'legendaer';
+    else if (roll < 0.20) rarity = 'episch';
+    else if (roll < 0.50) rarity = 'selten';
+    const instKey = type+':'+rarity;
+    state.modules[instKey] = (state.modules[instKey]||0) + 1;
+    const info = moduleInstanceInfo(instKey);
+    return info ? (info.rar.label+' '+info.def.name) : 'Modul';
+  }
+
   // ===== Offiziere =====
   // Vier unabhängige Offiziere, alle gleichzeitig aktiv. Level 0 (nicht angeheuert) bis 10. Jedes Level
   // gibt +2% seines Effekts (max +20% bei Level 10). Bezahlt mit Kommandopunkten (commandPoints), einer
@@ -3288,7 +3400,7 @@
     state.battlePoints += n;
     state.commandPoints = (state.commandPoints||0) + n;
   }
-  function attackPower(fleet){
+  function attackPower(fleet, planetKey){
     let power = attackPowerRaw(fleet);
     const doc = activeDoctrine();
     if (doc) power *= doc.atkMult;
@@ -3297,6 +3409,7 @@
     power *= megaProjectCombatMult() * (hasArtifactBonus()?1.05:1);
     power *= currentStance().atkMult;
     power *= (1 + officerBonus('admiral'));
+    if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'atk'));
     return Math.round(power);
   }
   function buildingSetFor(planetKey){
@@ -3358,6 +3471,7 @@
     power *= (1 + skillBonusPct('war'));
     power *= megaProjectCombatMult() * (hasArtifactBonus()?1.05:1);
     power *= currentStance().defMult;
+    if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'def'));
     return Math.round(power);
   }
   // Angriffskraft der eigenen Verteidigungsanlagen (nur Waffen-Typen wie Türme/Geschütze – reine
@@ -4206,6 +4320,7 @@
     if (kind === 'building'){
       effBuildTimeEach *= (1 - officerBonus('ingenieur'));
     }
+    effBuildTimeEach *= (1 - moduleBonusAt(planetKey, 'buildspeed'));
     const dur = Math.max(3, Math.round(effBuildTimeEach * qty));
     state.constructionQueue = state.constructionQueue || [];
     const sameQueue = state.constructionQueue.filter(j=>j.kind===kind && j.planet===planetKey);
@@ -5351,7 +5466,8 @@
     ]},
     { key:'offiziere', icon:'ti-user-circle', title:'Offiziere', entries:[
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Gebäude-Bauzeit pro Stufe), <strong>Admiral</strong> (+2% Angriffskraft), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Handelsgewinn beim Schwarzmarkt). Jeder geht von Stufe 0 (nicht angeheuert) bis 10, also bis zu ±20%.' },
-      { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr).' }
+      { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr).' },
+      { title:'Schiffsmodule', body:'Ausrüstbare Module mit vier Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250% Wirkung). Vier Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots, die einzeln mit Kommandopunkten aufgerüstet werden (bis zu 4 Slots). Ein an Standort A ausgerüstetes Modul wirkt nur dort. Module findest du bei Expeditionen und treibenden Sonden. Verwaltung im Offiziere-Tab, unten.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
@@ -6383,6 +6499,9 @@
         if (state.typeConvertJob === undefined) state.typeConvertJob = null;
         if (state.commandPoints === undefined) state.commandPoints = 0;
         if (!state.officers) state.officers = {};
+        if (!state.modules) state.modules = {};
+        if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
+        if (!state.equippedModules) state.equippedModules = {};
         if (!state.levelRewardsClaimed) state.levelRewardsClaimed = {};
         if (!state.rareItems) state.rareItems = {};
         if (!state.inventory) state.inventory = {};
@@ -6970,6 +7089,12 @@
               findText = 'Seltener Fund: '+ri.name+'!';
               findIcon = ri.icon||'ti-diamond';
               reportExtra = { itemFound: ri.name, rare: true };
+            } else if (findRoll < 0.97){
+              const modName = grantRandomModule();
+              addXp(35);
+              findText = 'Ein Schiffsmodul geborgen: '+modName+'! (Im Offiziere-Tab ausrüsten.)';
+              findIcon = 'ti-box';
+              reportExtra = { itemFound: modName };
             } else {
               const shipKey = Math.random()<0.6 ? 'jaeger' : 'cruisers';
               const qty = Math.max(1, Math.round((1+Math.random()*2)*mult));
@@ -9296,6 +9421,84 @@
         }).join('');
         officerBox.querySelectorAll('[data-upgrade-officer]').forEach(btn => btn.onclick = () => upgradeOfficer(btn.getAttribute('data-upgrade-officer')));
       }
+      const moduleBox = document.getElementById('moduleBox');
+      if (moduleBox){
+        const pk = state.activeBasePlanet;
+        const slots = moduleSlotCount(pk);
+        const equipped = equippedAt(pk);
+        const maxedSlots = slots >= MODULE_MAX_SLOT_LEVEL;
+        const slotCost = maxedSlots ? 0 : moduleSlotUpgradeCost(slots+1);
+        const canAffordSlot = (state.commandPoints||0) >= slotCost;
+
+        // Standort-Umschalter (Module sind pro Planet – hier wählt man, welchen Standort man bearbeitet).
+        const allPlanetKeys = ['home', ...Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k))];
+        let html = `<div style="display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
+        html += allPlanetKeys.map(k => {
+          const active = k===pk;
+          const eq = equippedAt(k).length, sl = moduleSlotCount(k);
+          return `<button class="planet-pill ${active?'active':''}" data-module-planet="${k}" style="white-space:nowrap; ${active?'border-color:#c3bef5;':''}"><i class="ti ${k==='home'?'ti-home':(planetTypeInfoFor(PLANETS.find(p=>p.id===k)||{}).icon||'ti-planet')}" aria-hidden="true"></i>${k==='home'?'Heimatbasis':planetDisplayName(k)} <span class="bmeta">(${eq}/${sl})</span></button>`;
+        }).join('');
+        html += `</div>`;
+
+        html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span class="bname"><i class="ti ti-map-pin" aria-hidden="true"></i> ${planetDisplayName(pk)}</span>
+            <span class="lvl-pill">${equipped.length}/${slots} Slots belegt</span>
+          </div>`;
+        // Slot-Darstellung
+        html += `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">`;
+        for (let i=0;i<slots;i++){
+          const instKey = equipped[i];
+          if (instKey){
+            const info = moduleInstanceInfo(instKey);
+            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; min-width:130px; flex:1; border-color:${info?info.rar.color:'#5a5f7a'};">
+              <div style="display:flex; align-items:center; gap:6px;"><i class="ti ${info?info.def.icon:'ti-box'}" aria-hidden="true" style="color:${info?info.rar.color:'#c7cbe0'};"></i><span class="bname" style="font-size:11.5px;">${info?info.def.name:'?'}</span></div>
+              <div class="bmeta" style="color:${info?info.rar.color:'#8489a0'};">${info?info.rar.label:''} · +${info?Math.round(info.bonus*100):0}%</div>
+              <button data-unequip-module="${i}" style="font-size:10px; padding:3px 6px; margin-top:4px;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Abnehmen</button>
+            </div>`;
+          } else {
+            html += `<div class="card-row" style="min-width:130px; flex:1; justify-content:center; border-style:dashed; opacity:0.6;"><span class="bmeta"><i class="ti ti-plus" aria-hidden="true"></i> Freier Slot</span></div>`;
+          }
+        }
+        if (slots===0) html += `<div class="bmeta" style="opacity:0.7;">Noch keine Slots an diesem Standort.</div>`;
+        html += `</div>`;
+        // Slot-Aufwertung
+        if (!maxedSlots){
+          html += `<button data-upgrade-slot="1" ${canAffordSlot?'':'disabled'} style="width:100%;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Slot freischalten (${slots+1}. Slot) · ${slotCost} KP${canAffordSlot?'':' (zu wenig)'}</button>`;
+        } else {
+          html += `<div class="bmeta" style="text-align:center; color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximale Slot-Anzahl erreicht</div>`;
+        }
+        html += `</div>`;
+
+        // Inventar
+        const invKeys = Object.keys(state.modules||{}).filter(k=>(state.modules[k]||0)>0);
+        html += `<div class="section-title" style="margin-top:0.5rem; font-size:13px;"><i class="ti ti-backpack" aria-hidden="true"></i>Modul-Inventar</div>`;
+        if (!invKeys.length){
+          html += `<div class="lb-note"><i class="ti ti-info-circle" aria-hidden="true"></i>Noch keine Module im Inventar. Schick Expeditionen los oder untersuche treibende Sonden.</div>`;
+        } else {
+          html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
+          html += invKeys.sort().map(instKey => {
+            const info = moduleInstanceInfo(instKey);
+            if (!info) return '';
+            const count = state.modules[instKey];
+            const slotsFree = equipped.length < slots;
+            return `<div class="card-row">
+              <div class="left"><div class="bicon" style="background:${info.rar.color}22; color:${info.rar.color};"><i class="ti ${info.def.icon}" aria-hidden="true"></i></div>
+                <div><div class="bname">${info.def.name} <span class="lvl-pill" style="background:${info.rar.color}22; color:${info.rar.color};">${info.rar.label}</span> ${count>1?`<span class="bmeta">×${count}</span>`:''}</div>
+                <div class="bmeta">+${Math.round(info.bonus*100)}% ${info.def.effect==='atk'?'Angriff':info.def.effect==='def'?'Verteidigung':info.def.effect==='prod'?'Produktion':'Bauspeed'} · ${info.def.desc}</div></div>
+              </div>
+              <button data-equip-module="${instKey}" ${slotsFree?'':'disabled'} style="font-size:10.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>${slotsFree?'Ausrüsten':'Keine Slots'}</button>
+            </div>`;
+          }).join('');
+          html += `</div>`;
+        }
+        moduleBox.innerHTML = html;
+        moduleBox.querySelectorAll('[data-module-planet]').forEach(btn => btn.onclick = () => { state.activeBasePlanet = btn.getAttribute('data-module-planet'); render(); });
+        const upSlotBtn = moduleBox.querySelector('[data-upgrade-slot]');
+        if (upSlotBtn) upSlotBtn.onclick = () => upgradeModuleSlot(pk);
+        moduleBox.querySelectorAll('[data-equip-module]').forEach(btn => btn.onclick = () => equipModule(pk, btn.getAttribute('data-equip-module')));
+        moduleBox.querySelectorAll('[data-unequip-module]').forEach(btn => btn.onclick = () => unequipModule(pk, parseInt(btn.getAttribute('data-unequip-module'))));
+      }
     }
 
     if (activeTab === 'galaxie'){
@@ -9303,7 +9506,7 @@
     if (attackFleetBox){
       const attackSel = getAttackSelection(state.activeBasePlanet, cf);
       const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
-      const attackFleetPower = attackPower(attackFleet);
+      const attackFleetPower = attackPower(attackFleet, state.activeBasePlanet);
       const attackFleetDf = deployableFighters(attackFleet);
       const attackAway = computeAwayByType(cf);
       const attackRows = ATTACK_SHIP_KEYS.filter(k => (cf[k]||0) > 0).map(k => {
