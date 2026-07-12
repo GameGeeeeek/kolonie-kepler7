@@ -1313,8 +1313,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.66.3';
+  const VERSION = '7.67.0';
   const PATCHNOTES = [
+    { version:'7.67.0', date:'12.07.2026', changes:[
+      'Lebendige Galaxie jetzt auch optisch auf der Sektorkarte sichtbar, nicht mehr nur als Text im Nachrichten-Feed',
+      'Supernova-Systeme werden dunkel-rot mit 💥-Symbol dargestellt statt normal zu leuchten',
+      'Piratenbasen (🏴‍☠️), gesichtete Alienvölker (👽) und Kriege zwischen NPC-Fraktionen (⚔️) erscheinen direkt am jeweiligen Systemknoten',
+      'Aktive Wurmlöcher werden als animierte, gestrichelte Verbindungslinie zwischen den zwei betroffenen Systemen gezeichnet',
+      'Backend: Piratenbasen, Alienvölker und Kriege bekommen jetzt einen echten Systemort (vorher nur ein Name ohne Ort) – wie bei Supernovas garantiert nie an einem System, in dem ein Spieler zuhause ist',
+      'Hilfe-Seite entsprechend aktualisiert'
+    ]},
     { version:'7.66.3', date:'12.07.2026', changes:[
       'Test-Release Nr. 3 zur Webhook-Verifikation (nach safe.directory-Fix) – keine Spielinhalte geändert'
     ]},
@@ -2429,7 +2437,7 @@
   // ===== Lebendige Galaxie (gemeinsamer Server-Zustand) =====
   // Wird periodisch vom Backend geholt (siehe setInterval unten). Rein clientseitiger Cache, NICHT
   // Teil von state (das ist geteilter, spielerübergreifender Zustand, kein Spielstand-Feld).
-  let galaxyCache = { npcEmpireStrength: 1, marketTrend: 1, activePirateFaction: null, unlockedAlienRaces: [], collapsedSystems: {}, activeWormhole: null, news: [] };
+  let galaxyCache = { npcEmpireStrength: 1, marketTrend: 1, activePirateFaction: null, unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, news: [] };
   async function loadGalaxyState(){
     if (!useBackend()) return;
     try {
@@ -2437,6 +2445,7 @@
       if (!res.ok) return;
       galaxyCache = await res.json();
       renderGalaxyNews();
+      buildGalaxyMap();
     } catch(e){}
   }
   function renderGalaxyNews(){
@@ -5176,8 +5185,8 @@
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
       { title:'Handelsmarkt', body:'Ein gemeinsamer Markttrend (0,75x bis 1,30x) schwankt langsam und beeinflusst die Angebote des Schwarzmarkt-Händlers – in guten Marktphasen bekommt man mehr für seine Ware.' },
-      { title:'Supernovas', body:'Zerstört zeitweise (48 Stunden) ein zufälliges, komplett unbesiedeltes System. Ein System, in dem tatsächlich ein Spieler zuhause ist, wird garantiert nie ausgewählt.' },
-      { title:'Kriege, neue Völker, Piratenbasen, Wurmlöcher', body:'Erscheinen als Nachrichten im Galaxie-Tab und verändern die Erzählung der Galaxie – aktuell ohne tiefe mechanische Kopplung ans eigentliche Spiel (reine Weltgeschichte, kein direkter Gameplay-Effekt).' }
+      { title:'Supernovas', body:'Zerstört zeitweise (48 Stunden) ein zufälliges, komplett unbesiedeltes System. Ein System, in dem tatsächlich ein Spieler zuhause ist, wird garantiert nie ausgewählt. Auf der Sektorkarte als dunkel-roter, kollabierter Systemknoten mit 💥-Symbol sichtbar.' },
+      { title:'Kriege, neue Völker, Piratenbasen, Wurmlöcher', body:'Erscheinen als Nachrichten im Galaxie-Tab UND direkt sichtbar auf der Sektorkarte: ⚔️ markiert einen umkämpften Krieg-Standort, 👽 ein gesichtetes Alienvolk, 🏴‍☠️ eine aktive Piratenbasis, eine gestrichelte violette Linie zwischen zwei Systemen ein offenes Wurmloch. Aktuell ohne tiefe mechanische Kopplung ans eigentliche Spiel (reine, aber jetzt sichtbare Weltgeschichte, kein direkter Gameplay-Effekt außer der Anzeige selbst).' }
     ]},
     { key:'faq', icon:'ti-list-details', title:'Häufige Fragen', entries:[
       { title:'Warum werden meine Jäger im Kampf nicht mitgezählt?', body:'Vermutlich fehlt Hangar-Kapazität. 1 Trägerschiff ermöglicht 6 Jäger. Ohne genug Träger bleiben überzählige Jäger "nicht einsatzbereit" und tragen nichts zur Angriffs- oder Verteidigungskraft bei.' },
@@ -6982,9 +6991,22 @@
         <stop offset="50%" stop-color="#fac775" stop-opacity="0.4"/>
         <stop offset="100%" stop-color="#fac775" stop-opacity="0"/>
       </radialGradient>
+      <radialGradient id="miniSunGlowCollapsed" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#e24b4a" stop-opacity="0.75"/>
+        <stop offset="50%" stop-color="#7a2020" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#7a2020" stop-opacity="0"/>
+      </radialGradient>
     </defs>`;
     for (let i=0;i<45;i++){
       inner += `<circle cx="${(Math.random()*950).toFixed(1)}" cy="${(Math.random()*500).toFixed(1)}" r="${(Math.random()*1+0.3).toFixed(1)}" fill="#fff" opacity="${(Math.random()*0.3+0.1).toFixed(2)}"/>`;
+    }
+    // Wurmloch-Verbindungslinie zuerst zeichnen, damit sie unter den System-Knoten liegt.
+    if (galaxyCache.activeWormhole){
+      const fromSys = STAR_SYSTEMS.find(s=>s.id===galaxyCache.activeWormhole.from);
+      const toSys = STAR_SYSTEMS.find(s=>s.id===galaxyCache.activeWormhole.to);
+      if (fromSys && toSys){
+        inner += `<line x1="${fromSys.gx}" y1="${fromSys.gy}" x2="${toSys.gx}" y2="${toSys.gy}" stroke="#af9ce6" stroke-width="2" stroke-dasharray="5 4" opacity="0.75"><animate attributeName="stroke-dashoffset" from="0" to="18" dur="1.3s" repeatCount="indefinite"/><title>Wurmloch: ${fromSys.name} ↔ ${toSys.name}</title></line>`;
+      }
     }
     for (const s of visibleSystems()){
       const planetsInSys = PLANETS.filter(p=>p.system===s.id);
@@ -6993,14 +7015,26 @@
       const active = activeSystem===s.id;
       const isHome = myHomeSystem===s.id;
       const pct = planetsInSys.length ? discCount/planetsInSys.length : 0;
+      const isCollapsed = !!(galaxyCache.collapsedSystems && galaxyCache.collapsedSystems[s.id]);
+
+      // Galaxie-Ereignis-Badges für dieses System sammeln (Supernova wird separat/prominent behandelt).
+      const badges = [];
+      if (galaxyCache.activePirateFaction && galaxyCache.activePirateFaction.system === s.id) badges.push({ icon:'🏴‍☠️', title:galaxyCache.activePirateFaction.name+' – Piratenbasis' });
+      const alienHere = (galaxyCache.unlockedAlienRaces||[]).find(r=>r.system===s.id);
+      if (alienHere) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
+      if (galaxyCache.activeWar && galaxyCache.activeWar.system === s.id) badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
+      const badgeMarkup = badges.map((b,i) => `<text x="${s.gx+16+i*13}" y="${s.gy-16}" text-anchor="middle" style="font-size:11px;"><title>${b.title}</title>${b.icon}</text>`).join('');
+
       inner += `
         <g class="planet-node" data-system-node="${s.id}">
-          <circle cx="${s.gx}" cy="${s.gy}" r="22" fill="url(#miniSunGlow)" opacity="${0.3+pct*0.7}"/>
-          <circle cx="${s.gx}" cy="${s.gy}" r="13" fill="none" stroke="${active?'#afa9ec':'#5a5f7a'}" stroke-width="${active?2:1}" stroke-dasharray="${pct*81.7} 200"/>
-          <circle cx="${s.gx}" cy="${s.gy}" r="7.5" fill="${isHome?'#e24b4a':'#fff7d6'}" opacity="${active?1:0.85}"/>
-          ${isHome ? `<text x="${s.gx}" y="${s.gy+2.5}" text-anchor="middle" style="font-size:7px; fill:#fff;">🏠</text>` : ''}
+          <title>${s.name}${isCollapsed?' – Supernova-Kollaps, 48h unzugänglich':''}</title>
+          <circle cx="${s.gx}" cy="${s.gy}" r="22" fill="url(#${isCollapsed?'miniSunGlowCollapsed':'miniSunGlow'})" opacity="${isCollapsed?0.9:(0.3+pct*0.7)}"/>
+          <circle cx="${s.gx}" cy="${s.gy}" r="13" fill="none" stroke="${isCollapsed?'#e24b4a':(active?'#afa9ec':'#5a5f7a')}" stroke-width="${active?2:1}" stroke-dasharray="${isCollapsed?'3 3':(pct*81.7)+' 200'}"/>
+          <circle cx="${s.gx}" cy="${s.gy}" r="7.5" fill="${isCollapsed?'#3a1414':(isHome?'#e24b4a':'#fff7d6')}" opacity="${isCollapsed?0.9:(active?1:0.85)}"/>
+          ${isCollapsed ? `<text x="${s.gx}" y="${s.gy+2.5}" text-anchor="middle" style="font-size:8px;">💥</text>` : (isHome ? `<text x="${s.gx}" y="${s.gy+2.5}" text-anchor="middle" style="font-size:7px; fill:#fff;">🏠</text>` : '')}
+          ${badgeMarkup}
           <text class="planet-label" x="${s.gx}" y="${s.gy+26}" text-anchor="middle" style="font-size:9px; font-weight:${active?600:400}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>
-          <text class="planet-label" x="${s.gx}" y="${s.gy+36}" text-anchor="middle" style="font-size:7.5px; fill:#8489a0;">${discCount}/${planetsInSys.length}${colCount?' · '+colCount+' Kol.':''}</text>
+          <text class="planet-label" x="${s.gx}" y="${s.gy+36}" text-anchor="middle" style="font-size:7.5px; fill:#8489a0;">${isCollapsed ? 'Kollabiert' : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))}</text>
         </g>
       `;
     }
