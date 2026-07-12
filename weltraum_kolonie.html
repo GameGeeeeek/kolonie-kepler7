@@ -1350,8 +1350,19 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.78.0';
+  const VERSION = '7.79.0';
   const PATCHNOTES = [
+    { version:'7.79.0', date:'12.07.2026', changes:[
+      'Neu: Fraktions-Diplomatie – bei jeder Fraktion hast du jetzt einen Ruf (-100 bis 100), sichtbar im Galaxie-Tab',
+      'Ruf aufbauen per Tribut (150 Kredite → +5 Ruf); Angriffe auf Fraktionssysteme senken den Ruf um 15',
+      'Ab Ruf 30 (Freundlich) gibt jede Fraktion einen Effekt, ab 70 (Verbündet) die stärkere Stufe',
+      'Aschen-Kartell: 5%/10% bessere Marktpreise beim Kaufen UND Verkaufen',
+      'Void-Marodeure: 25%/50% seltener Piraten-Überfälle',
+      'Eisenlegion: Ressourcen-Lieferung alle 30 Minuten (150/400 Erz + Kristalle)',
+      'Schattenbund: +15/+35 Kredite alle 30 Minuten',
+      'Damit gibt es jetzt zwei Wege mit Fraktionen umzugehen: bekriegen und erobern – oder pflegen und profitieren',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.78.0', date:'12.07.2026', changes:[
       'Neu: Eroberte Fraktionssysteme haben jetzt echten Nutzen – jedes kontrollierte System bringt +3 Kredite pro Minute und +1% Produktion auf alle Ressourcen',
       'Der Produktionsbonus ist bei +15% gedeckelt (ab 15 Systemen)',
@@ -2878,15 +2889,21 @@
       if (!res.ok || !data.ok){ log('Handel fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
       const label = (RES_DEFS.find(r=>r.key===resource)||{label:resource}).label;
       if (action === 'buy'){
-        if ((state.credits||0) < data.credits){ log('Nicht genug Kredite – der Preis ist gestiegen. Handel abgebrochen.', 'ti-alert-triangle'); await loadMarketState(); return; }
-        state.credits -= data.credits;
+        // Kartell-Rabatt: der Server nennt den globalen Preis, der Rabatt wird lokal auf unsere Kosten
+        // angewendet (Ressourcen-/Kredit-Bestände sind ohnehin client-geführt).
+        const discount = marketDiscountPct();
+        const cost = Math.round(data.credits * (1 - discount));
+        if ((state.credits||0) < cost){ log('Nicht genug Kredite – der Preis ist gestiegen. Handel abgebrochen.', 'ti-alert-triangle'); await loadMarketState(); return; }
+        state.credits -= cost;
         state.resources[resource] = (state.resources[resource]||0) + data.amount;
-        log('Gekauft: '+fmt(data.amount)+' '+label+' für '+fmt(data.credits)+' Kredite (Ø '+data.avgPrice.toFixed(2)+').', 'ti-truck');
+        log('Gekauft: '+fmt(data.amount)+' '+label+' für '+fmt(cost)+' Kredite (Ø '+data.avgPrice.toFixed(2)+(discount?', -'+Math.round(discount*100)+'% Kartell-Rabatt':'')+').', 'ti-truck');
       } else {
         if ((state.resources[resource]||0) < data.amount){ log('Ressourcen reichen nicht mehr. Handel abgebrochen.', 'ti-alert-triangle'); return; }
+        const discount = marketDiscountPct();
+        const gain = Math.round(data.credits * (1 + discount));
         state.resources[resource] -= data.amount;
-        state.credits = (state.credits||0) + data.credits;
-        log('Verkauft: '+fmt(data.amount)+' '+label+' für '+fmt(data.credits)+' Kredite (Ø '+data.avgPrice.toFixed(2)+').', 'ti-truck');
+        state.credits = (state.credits||0) + gain;
+        log('Verkauft: '+fmt(data.amount)+' '+label+' für '+fmt(gain)+' Kredite (Ø '+data.avgPrice.toFixed(2)+(discount?', +'+Math.round(discount*100)+'% Kartell-Bonus':'')+').', 'ti-truck');
       }
       // Aktualisierten Preis lokal übernehmen (bis zum nächsten vollen Laden).
       if (state.marketCache && state.marketCache[resource]) state.marketCache[resource].price = data.priceAfter;
@@ -2961,13 +2978,87 @@
     state.credits = (state.credits||0) + n * CONQUERED_CREDITS_PER_MIN;
   }
 
+  // ===== Fraktions-Diplomatie =====
+  // Pro Fraktion ein Ruf-Wert (-100..100, lokal im Spielstand). Angriffe senken ihn, Tribut (Kredite)
+  // erhöht ihn. Ab "Freundlich" (>=30) gibt jede Fraktion einen thematisch passenden Effekt, ab
+  // "Verbündet" (>=70) die stärkere Stufe:
+  //   kartell  – Marktrabatt: bessere Preise beim Kaufen UND Verkaufen (5% / 10%)
+  //   void     – Raid-Schutz: Überfälle werden seltener (-25% / -50% Chance)
+  //   legion   – Ressourcen-Geschenke: periodische Lieferung (alle 30 Min.)
+  //   schatten – Kredit-Geschenke: periodische Zahlung (alle 30 Min.)
+  const REP_MIN = -100, REP_MAX = 100;
+  const TRIBUTE_COST = 150, TRIBUTE_GAIN = 5;
+  const REP_ATTACK_PENALTY = 15;
+  const FACTION_GIFT_INTERVAL_MS = 30*60*1000;
+  const FACTION_DIPLOMACY = {
+    kartell:  { effectLabel:'Marktrabatt', friendly:'5% bessere Marktpreise', allied:'10% bessere Marktpreise' },
+    void:     { effectLabel:'Raid-Schutz', friendly:'25% seltener Überfälle', allied:'50% seltener Überfälle' },
+    legion:   { effectLabel:'Ressourcen-Geschenke', friendly:'Lieferung alle 30 Min. (klein)', allied:'Lieferung alle 30 Min. (groß)' },
+    schatten: { effectLabel:'Kredit-Geschenke', friendly:'+15 Kredite alle 30 Min.', allied:'+35 Kredite alle 30 Min.' }
+  };
+  function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, state.factionRep[fid]||0)); }
+  function repTierOf(rep){
+    if (rep <= -30) return { key:'feindlich', label:'Feindlich', color:'#e24b4a' };
+    if (rep >= 70) return { key:'verbuendet', label:'Verbündet', color:'#5dcaa5' };
+    if (rep >= 30) return { key:'freundlich', label:'Freundlich', color:'#85b7eb' };
+    return { key:'neutral', label:'Neutral', color:'#8489a0' };
+  }
+  function changeFactionRep(fid, delta){
+    state.factionRep[fid] = Math.max(REP_MIN, Math.min(REP_MAX, (state.factionRep[fid]||0) + delta));
+  }
+  // Effektstärke einer Fraktion: 0 = kein Effekt, 1 = freundlich, 2 = verbündet.
+  function factionEffectLevel(fid){
+    const tier = repTierOf(factionRepOf(fid));
+    return tier.key === 'verbuendet' ? 2 : (tier.key === 'freundlich' ? 1 : 0);
+  }
+  // Kartell: Markt-Preisvorteil (Kauf billiger, Verkauf besser). 0 / 0.05 / 0.10
+  function marketDiscountPct(){
+    const lvl = factionEffectLevel('kartell');
+    return lvl === 2 ? 0.10 : (lvl === 1 ? 0.05 : 0);
+  }
+  // Void: Multiplikator auf die Raid-Wahrscheinlichkeit. 1 / 0.75 / 0.5
+  function raidChanceMult(){
+    const lvl = factionEffectLevel('void');
+    return lvl === 2 ? 0.5 : (lvl === 1 ? 0.75 : 1);
+  }
+  function payTribute(fid){
+    if ((state.credits||0) < TRIBUTE_COST){ log('Nicht genug Kredite für einen Tribut ('+TRIBUTE_COST+' nötig).', 'ti-alert-triangle'); return; }
+    if (factionRepOf(fid) >= REP_MAX){ log('Der Ruf bei dieser Fraktion ist bereits maximal.', 'ti-info-circle'); return; }
+    state.credits -= TRIBUTE_COST;
+    changeFactionRep(fid, TRIBUTE_GAIN);
+    const f = (galaxyCache.factions||{})[fid];
+    log('Tribut an '+(f?f.name:fid)+' gezahlt: +'+TRIBUTE_GAIN+' Ruf (jetzt '+factionRepOf(fid)+').', 'ti-flag');
+    playSound('trade');
+    render(); save();
+  }
+  // Periodische Geschenke von Legion (Ressourcen) und Schattenbund (Kredite), wird im Tick gerufen.
+  function processFactionGifts(){
+    const now = Date.now();
+    if (now < (state.nextFactionGift||0)) return;
+    state.nextFactionGift = now + FACTION_GIFT_INTERVAL_MS;
+    const legionLvl = factionEffectLevel('legion');
+    if (legionLvl > 0){
+      const amt = legionLvl === 2 ? 400 : 150;
+      state.resources.erz = (state.resources.erz||0) + amt;
+      state.resources.kristalle = (state.resources.kristalle||0) + Math.round(amt*0.6);
+      log('Die Eisenlegion liefert Nachschub: +'+amt+' Erz, +'+Math.round(amt*0.6)+' Kristalle.', 'ti-box');
+    }
+    const schattenLvl = factionEffectLevel('schatten');
+    if (schattenLvl > 0){
+      const amt = schattenLvl === 2 ? 35 : 15;
+      state.credits = (state.credits||0) + amt;
+      log('Der Schattenbund überweist eine Informationsprämie: +'+amt+' Kredite.', 'ti-diamond');
+    }
+  }
+
   // Greift ein NPC-Fraktionssystem über den Server an. Bei Erfolg gehört das System danach dem Spieler
   // (erscheint in galaxyCache.controlledSystems), bei Misserfolg gibt es Flottenverluste.
   async function attackFactionSystem(systemId){
     if (!useBackend()){ log('Fraktions-Angriffe brauchen eine Serververbindung.', 'ti-alert-triangle'); return; }
     const owner = factionOwning(systemId);
     if (!owner){ log('Dieses System gehört keiner Fraktion.', 'ti-alert-triangle'); return; }
-    if (!confirm('Das System '+systemId+' von den '+owner.name+' angreifen? Bei Misserfolg verlierst du einen Teil deiner Flotte.')) return;
+    if (!confirm('Das System '+systemId+' von den '+owner.name+' angreifen? Bei Misserfolg verlierst du einen Teil deiner Flotte. (Dein Ruf bei dieser Fraktion sinkt um '+REP_ATTACK_PENALTY+'.)')) return;
+    changeFactionRep(owner.id, -REP_ATTACK_PENALTY);
     try {
       const res = await backendFetch('/faction/attack', {
         method:'POST',
@@ -3032,6 +3123,16 @@
             return `<button data-attack-faction-sys="${sysId}" style="font-size:9.5px; padding:3px 7px; background:rgba(226,75,74,0.15);"><i class="ti ti-sword" aria-hidden="true" style="margin-right:2px;"></i>${sys?sys.name:sysId}</button>`;
           }).join('') + `</div>`
         : '';
+      // Diplomatie-Zeile: Ruf, Stufe, aktiver Effekt, Tribut-Button.
+      const rep = factionRepOf(f.id);
+      const tier = repTierOf(rep);
+      const dip = FACTION_DIPLOMACY[f.id];
+      const lvl = factionEffectLevel(f.id);
+      const effectTxt = dip ? (lvl===2 ? dip.allied : (lvl===1 ? dip.friendly : dip.effectLabel+' (ab Ruf 30)')) : '';
+      const dipRow = dip ? `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap;">
+        <div class="bmeta">Ruf: <strong style="color:${tier.color};">${rep} (${tier.label})</strong> · <span style="color:${lvl>0?'#5dcaa5':'#8489a0'};">${effectTxt}</span></div>
+        <button data-tribute="${f.id}" style="font-size:9.5px; padding:3px 8px;"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:2px;"></i>Tribut (${TRIBUTE_COST} Kr. → +${TRIBUTE_GAIN})</button>
+      </div>` : '';
       return `<div class="card-row" style="flex-direction:column; align-items:stretch;">
         <div style="display:flex; align-items:center; justify-content:space-between;">
           <div class="left"><div class="bicon" style="background:${f.color}22; color:${f.color};"><i class="ti ti-flag" aria-hidden="true"></i></div>
@@ -3039,10 +3140,12 @@
             <div class="bmeta">${count} System${count===1?'':'e'} · Militärstärke ${strength}</div></div>
           </div>
         </div>
+        ${dipRow}
         ${sysButtons}
       </div>`;
     }).join('');
     box.querySelectorAll('[data-attack-faction-sys]').forEach(btn => btn.onclick = () => attackFactionSystem(btn.getAttribute('data-attack-faction-sys')));
+    box.querySelectorAll('[data-tribute]').forEach(btn => btn.onclick = () => payTribute(btn.getAttribute('data-tribute')));
   }
   function npcEffectiveDefense(npc){ return Math.round(npc.defense * (1 + npcScalingCount(npc.id)*0.18) * (galaxyCache.npcEmpireStrength||1)); }
   function npcEffectiveLoot(npc){
@@ -3118,6 +3221,8 @@
     credits: 250,
     marketCache: null,
     tradeRoutes: [],
+    factionRep: {},
+    nextFactionGift: 0,
     modules: {},
     moduleSlotLevel: {},
     equippedModules: {},
@@ -4110,7 +4215,8 @@
   }
   function maybeScheduleRaid(){
     if (state.nextRaidTime) return;
-    const chance = 0.35 * (state.research.rfruehwarnung ? Math.max(0.3, 1-((state.research.rfruehwarnung||0)*RESEARCH_DEFS.find(r=>r.key==='rfruehwarnung').effectPerLevel)) : 1);
+    // Void-Diplomatie: guter Ruf bei den Void-Marodeuren macht Überfälle seltener (raidChanceMult 1/0.75/0.5).
+    const chance = 0.35 * (state.research.rfruehwarnung ? Math.max(0.3, 1-((state.research.rfruehwarnung||0)*RESEARCH_DEFS.find(r=>r.key==='rfruehwarnung').effectPerLevel)) : 1) * raidChanceMult();
     if (Math.random() > chance) return;
     const faction = RAID_FACTIONS[Math.floor(Math.random()*RAID_FACTIONS.length)];
     const totalDefense = defensePower();
@@ -5930,7 +6036,8 @@
       { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
-      { title:'Nutzen eroberter Systeme', body:'Jedes von dir kontrollierte System bringt laufend <strong>+3 Kredite pro Minute</strong> und <strong>+1% Produktion</strong> auf alle Ressourcen (Produktionsbonus gedeckelt bei +15%, also ab 15 Systemen). Die Übersicht im Galaxie-Tab zeigt deine Systeme und ihren Gesamtertrag.' }
+      { title:'Nutzen eroberter Systeme', body:'Jedes von dir kontrollierte System bringt laufend <strong>+3 Kredite pro Minute</strong> und <strong>+1% Produktion</strong> auf alle Ressourcen (Produktionsbonus gedeckelt bei +15%, also ab 15 Systemen). Die Übersicht im Galaxie-Tab zeigt deine Systeme und ihren Gesamtertrag.' },
+      { title:'Diplomatie & Ruf', body:'Bei jeder Fraktion hast du einen <strong>Ruf</strong> (-100 bis 100). Angriffe auf ihre Systeme senken ihn um 15, <strong>Tribut zahlen</strong> (150 Kredite → +5 Ruf, im Galaxie-Tab) erhöht ihn. Ab Ruf 30 („Freundlich") gibt jede Fraktion einen Effekt, ab 70 („Verbündet") die stärkere Stufe: <strong>Aschen-Kartell</strong> 5%/10% bessere Marktpreise beim Kaufen und Verkaufen · <strong>Void-Marodeure</strong> 25%/50% seltener Überfälle · <strong>Eisenlegion</strong> Ressourcen-Lieferung alle 30 Min. · <strong>Schattenbund</strong> +15/+35 Kredite alle 30 Min. Du kannst also wählen: eine Fraktion bekriegen und erobern, oder sie pflegen und von ihr profitieren.' }
     ]},
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
@@ -6975,6 +7082,8 @@
         if (!state.officers) state.officers = {};
         if (state.credits === undefined) state.credits = 250;
         if (!state.tradeRoutes) state.tradeRoutes = [];
+        if (!state.factionRep) state.factionRep = {};
+        if (state.nextFactionGift === undefined) state.nextFactionGift = 0;
         if (!state.modules) state.modules = {};
         if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
         if (!state.equippedModules) state.equippedModules = {};
@@ -11127,6 +11236,7 @@
     processTypeConvertJob();
     processTradeRoutes();
     processConqueredSystems();
+    processFactionGifts();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
