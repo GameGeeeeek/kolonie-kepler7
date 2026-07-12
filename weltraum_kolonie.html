@@ -1080,6 +1080,19 @@
         <div class="map-wrap" style="height:140px; margin-bottom:1rem;" id="scoreChartWrap">
           <svg id="scoreHistorySvg" viewBox="0 0 700 140" width="100%" height="100%"></svg>
         </div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-atom" aria-hidden="true"></i>Statistik-Dashboard</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Wirtschafts- und Kampfüberblick. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.</div>
+        <div id="statsTilesBox" style="margin-bottom:1rem;"></div>
+        <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-diamond" aria-hidden="true" style="color:#fac775;"></i> Kredite-Verlauf</div>
+        <div class="map-wrap" style="height:110px; margin-bottom:1rem;">
+          <svg id="creditsHistorySvg" viewBox="0 0 700 110" width="100%" height="100%"></svg>
+        </div>
+        <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-pick" aria-hidden="true" style="color:#d9a06b;"></i> Erz-Produktion pro Sekunde (Verlauf)</div>
+        <div class="map-wrap" style="height:110px; margin-bottom:1rem;">
+          <svg id="prodHistorySvg" viewBox="0 0 700 110" width="100%" height="100%"></svg>
+        </div>
+        <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-bolt" aria-hidden="true" style="color:#5dcaa5;"></i> Aktuelle Produktion pro Sekunde</div>
+        <div id="prodNowBox" style="margin-bottom:1rem;"></div>
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-clock" aria-hidden="true"></i>Letzte Änderungen</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Zeigt Punktänderungen seit dem Öffnen dieses Spiels – grün wenn Punkte dazukommen, rot wenn welche verloren gehen, jeweils mit Begründung.</div>
         <div id="scoreLogBox"></div>
@@ -1353,8 +1366,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.82.0';
+  const VERSION = '7.83.0';
   const PATCHNOTES = [
+    { version:'7.83.0', date:'12.07.2026', changes:[
+      'Neu: Statistik-Dashboard im Punktestand-Tab',
+      'Acht Kennzahlen-Kacheln: Siege, Niederlagen, Siegquote, Kampfpunkte, Expeditionen, eroberte Systeme, Kredite, Frachter auf Routen',
+      'Verlaufsdiagramme für Kredite und Erz-Produktion pro Sekunde (Snapshot alle 5 Minuten, wie beim Punkteverlauf)',
+      'Aktuelle Produktion pro Sekunde aller Ressourcen als Balkenübersicht',
+      'Bestandsspielstände: alte Verlaufs-Snapshots ohne die neuen Felder werden in den Diagrammen sauber übersprungen',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.82.0', date:'12.07.2026', changes:[
       'Neu: Fraktionen schlagen zurück – erobern gelegentlich an ihr Gebiet grenzende Spieler-Systeme zurück',
       'Deine Gesamtverteidigung entscheidet: starke Verteidiger verlieren praktisch nie (Erfolgschance 3% bis max. 50% pro Versuch), Versuche sind selten (Server-Simulation)',
@@ -6203,7 +6224,8 @@
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
       { title:'Nutzen eroberter Systeme', body:'Jedes von dir kontrollierte System bringt laufend <strong>+3 Kredite pro Minute</strong> und <strong>+1% Produktion</strong> auf alle Ressourcen (Produktionsbonus gedeckelt bei +15%, also ab 15 Systemen). Die Übersicht im Galaxie-Tab zeigt deine Systeme und ihren Gesamtertrag. <strong>Achtung:</strong> Fraktionen versuchen gelegentlich, an ihr Gebiet grenzende Systeme <strong>zurückzuerobern</strong>. Ob sie Erfolg haben, hängt von deiner Gesamtverteidigung ab – wer stark verteidigt, verliert praktisch nie (Erfolgschance zwischen 3% und maximal 50% pro Versuch, Versuche sind selten). Deine Heimatsysteme sind davon nie betroffen. Verlierst du ein System, wirst du beim nächsten Kartenabgleich benachrichtigt.' },
       { title:'Diplomatie & Ruf', body:'Bei jeder Fraktion hast du einen <strong>Ruf</strong> (-100 bis 100). Angriffe auf ihre Systeme senken ihn um 15, <strong>Tribut zahlen</strong> (150 Kredite → +5 Ruf, im Galaxie-Tab) erhöht ihn. Ab Ruf 30 („Freundlich") gibt jede Fraktion einen Effekt, ab 70 („Verbündet") die stärkere Stufe: <strong>Aschen-Kartell</strong> 5%/10% bessere Marktpreise beim Kaufen und Verkaufen · <strong>Void-Marodeure</strong> 25%/50% seltener Überfälle · <strong>Eisenlegion</strong> Ressourcen-Lieferung alle 30 Min. · <strong>Schattenbund</strong> +15/+35 Kredite alle 30 Min. Du kannst also wählen: eine Fraktion bekriegen und erobern, oder sie pflegen und von ihr profitieren.' },
-      { title:'Fraktions-Aufträge', body:'Jede Fraktion bietet dir einen <strong>Auftrag</strong> an (im Galaxie-Tab, 24h gültig, danach kommt ein neuer): Ressourcen liefern, Kämpfe gewinnen oder Expeditionen abschließen. Abschluss bringt <strong>+12 bis +15 Ruf und 200–300 Kredite</strong> – der lohnendere Weg, Ruf aufzubauen, verglichen mit Tribut. Nach dem Abschließen gibt es sofort einen neuen Auftrag.' }
+      { title:'Fraktions-Aufträge', body:'Jede Fraktion bietet dir einen <strong>Auftrag</strong> an (im Galaxie-Tab, 24h gültig, danach kommt ein neuer): Ressourcen liefern, Kämpfe gewinnen oder Expeditionen abschließen. Abschluss bringt <strong>+12 bis +15 Ruf und 200–300 Kredite</strong> – der lohnendere Weg, Ruf aufzubauen, verglichen mit Tribut. Nach dem Abschließen gibt es sofort einen neuen Auftrag.' },
+      { title:'Statistik-Dashboard', body:'Im Punktestand-Tab findest du ein <strong>Statistik-Dashboard</strong>: Kennzahlen-Kacheln (Siege, Niederlagen, Siegquote, Kampfpunkte, Expeditionen, eroberte Systeme, Kredite, gebundene Frachter), Verlaufsdiagramme für <strong>Kredite</strong> und <strong>Erz-Produktion</strong> sowie die aktuelle Produktion pro Sekunde aller Ressourcen als Balken. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.' }
     ]},
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
@@ -10655,6 +10677,73 @@
       }
       if (note) note.innerHTML = `<i class="ti ti-info-circle" aria-hidden="true"></i>Snapshot alle 5 Minuten während des Spielens${hist.length?' · '+hist.length+' Datenpunkt'+(hist.length===1?'':'e'):''}.`;
     }
+    // ===== Statistik-Dashboard (Punkte-Tab) =====
+    // Generischer kleiner Linien-Chart nach demselben Muster wie der Punkteverlauf oben. Einträge ohne
+    // das jeweilige Feld (Snapshots aus Versionen vor v7.83) werden übersprungen.
+    function renderMiniChart(svgId, field, color, fmtFn){
+      const svg = document.getElementById(svgId);
+      if (!svg) return;
+      const hist = (state.scoreHistory||[]).filter(h => typeof h[field] === 'number');
+      if (hist.length < 2){
+        svg.innerHTML = `<text x="350" y="55" text-anchor="middle" style="font-size:12px; fill:#7d8199;">Noch nicht genug Verlaufsdaten.</text>`;
+        return;
+      }
+      const W=700, H=110, PAD=10;
+      const vals = hist.map(h=>h[field]);
+      const minV = Math.min(...vals), maxV = Math.max(...vals);
+      const range = Math.max(0.01, maxV-minV);
+      const pts = hist.map((h,i) => [PAD + (i/(hist.length-1))*(W-PAD*2), H-PAD - ((h[field]-minV)/range)*(H-PAD*2)]);
+      const line = pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+      const area = `${PAD},${H-PAD} ${line} ${(W-PAD).toFixed(1)},${H-PAD}`;
+      const gradId = svgId+'Grad';
+      svg.innerHTML = `
+        <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.4"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+        <polygon points="${area}" fill="url(#${gradId})"/>
+        <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3.5" fill="${color}"/>
+        <text x="${PAD}" y="12" style="font-size:9px; fill:#8489a0;">${fmtFn(maxV)}</text>
+        <text x="${PAD}" y="${H-PAD-2}" style="font-size:9px; fill:#8489a0;">${fmtFn(minV)}</text>
+      `;
+    }
+    renderMiniChart('creditsHistorySvg', 'credits', '#fac775', v=>fmt(Math.round(v)));
+    renderMiniChart('prodHistorySvg', 'prodErz', '#d9a06b', v=>v.toFixed(1)+'/s');
+    // Kacheln: Kampf & Imperium in Zahlen.
+    const tilesBox = document.getElementById('statsTilesBox');
+    if (tilesBox){
+      const bs = state.battleStats||{wins:0,losses:0};
+      const total = bs.wins + bs.losses;
+      const winRate = total ? Math.round(bs.wins/total*100) : 0;
+      const tiles = [
+        { label:'Siege', value:fmt(bs.wins), color:'#5dcaa5', icon:'ti-sword' },
+        { label:'Niederlagen', value:fmt(bs.losses), color:'#e24b4a', icon:'ti-shield' },
+        { label:'Siegquote', value:winRate+'%', color:'#85b7eb', icon:'ti-medal' },
+        { label:'Kampfpunkte', value:fmt(state.battlePoints||0), color:'#c3bef5', icon:'ti-star' },
+        { label:'Expeditionen', value:fmt(state.expeditionsCompleted||0), color:'#fac775', icon:'ti-planet' },
+        { label:'Eroberte Systeme', value:fmt(myConqueredSystems().length), color:'#5dcaa5', icon:'ti-flag' },
+        { label:'Kredite', value:fmt(Math.round(state.credits||0)), color:'#fac775', icon:'ti-diamond' },
+        { label:'Frachter auf Routen', value:fmt(frachterBoundToRoutes()), color:'#9fe1cb', icon:'ti-truck' }
+      ];
+      tilesBox.innerHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px;">` +
+        tiles.map(t => `<div class="card-row" style="flex-direction:column; align-items:center; padding:0.6rem; gap:2px;">
+          <div style="font-size:20px; font-weight:600; color:${t.color}; font-variant-numeric:tabular-nums;"><i class="ti ${t.icon}" aria-hidden="true" style="font-size:13px; margin-right:4px;"></i>${t.value}</div>
+          <div class="bmeta">${t.label}</div>
+        </div>`).join('') + `</div>`;
+    }
+    // Aktuelle Produktion pro Sekunde als Balken je Ressource.
+    const prodNowBox = document.getElementById('prodNowBox');
+    if (prodNowBox){
+      const nowRates = ratesPerSecond();
+      const entries = RES_DEFS.filter(r=>r.key!=='forschungspunkte').map(r=>({ def:r, v: nowRates[r.key]||0 }));
+      const fp = { def: RES_DEFS.find(r=>r.key==='forschungspunkte'), v: nowRates.forschungspunkte||0 };
+      if (fp.def) entries.push(fp);
+      const maxRate = Math.max(0.01, ...entries.map(e=>e.v));
+      prodNowBox.innerHTML = entries.map(e => `
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <div class="bmeta" style="width:130px; flex-shrink:0;"><i class="ti ${e.def.icon}" aria-hidden="true" style="color:${e.def.color}; margin-right:4px;"></i>${e.def.label}</div>
+          <div style="flex:1; height:10px; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden;"><div style="width:${Math.round(e.v/maxRate*100)}%; height:100%; background:${e.def.color}; opacity:0.7;"></div></div>
+          <div class="bmeta" style="width:70px; text-align:right; font-variant-numeric:tabular-nums;">${e.v.toFixed(2)}/s</div>
+        </div>`).join('');
+    }
     const scoreLogBox = document.getElementById('scoreLogBox');
     if (scoreLogBox){
       const logEntries = (state.scoreLog||[]).slice().reverse().slice(0, 40);
@@ -11391,9 +11480,12 @@
     if (state.activeEvent && Date.now() >= state.activeEvent.expiresAt){ resolveEvent('B'); }
     // Punktestand-Verlauf: alle 5 Minuten ein Snapshot fürs Diagramm im Punktestand-Tab, auf die
     // letzten 200 Einträge begrenzt (deckt bei 5-Minuten-Takt gut 16+ Stunden Spielzeit ab).
+    // Seit v7.83 werden im selben Takt auch Kredite und Erz-Produktion/s fürs Statistik-Dashboard
+    // mitgeschrieben (ältere Einträge ohne diese Felder werden in den Diagrammen übersprungen).
     if (Date.now() - (state.lastScoreSnapshot||0) >= 300000){
       state.scoreHistory = state.scoreHistory || [];
-      state.scoreHistory.push({ ts: Date.now(), score: computeScore() });
+      const snapRates = ratesPerSecond();
+      state.scoreHistory.push({ ts: Date.now(), score: computeScore(), credits: Math.round(state.credits||0), prodErz: Math.round((snapRates.erz||0)*100)/100 });
       if (state.scoreHistory.length > 200) state.scoreHistory = state.scoreHistory.slice(-200);
       state.lastScoreSnapshot = Date.now();
     }
