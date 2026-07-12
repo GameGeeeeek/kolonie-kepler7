@@ -855,8 +855,13 @@
           <input type="text" id="sectorSearchInput" placeholder="System oder Planet suchen…" style="width:100%;"/>
           <div id="sectorSearchResults" style="display:none; position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#171c34; border:0.5px solid rgba(126,119,221,0.4); border-radius:10px; max-height:260px; overflow-y:auto; z-index:20; box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
         </div>
-        <div class="map-wrap" style="height:260px; margin-bottom:1rem;">
-          <svg id="galaxyMapSvg" viewBox="0 0 950 500" width="100%" height="100%"></svg>
+        <div class="map-wrap" style="height:340px; margin-bottom:1rem; position:relative; touch-action:none;">
+          <svg id="galaxyMapSvg" viewBox="0 0 950 500" width="100%" height="100%" style="cursor:grab;"></svg>
+          <div style="position:absolute; right:8px; bottom:8px; display:flex; flex-direction:column; gap:6px; z-index:5;">
+            <button id="galaxyZoomInBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
+            <button id="galaxyZoomOutBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
+            <button id="galaxyZoomResetBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:14px; background:rgba(13,18,36,0.9);">⟲</button>
+          </div>
         </div>
         <div class="system-nav">
           <button id="systemPrevBtn" title="Vorheriges System"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
@@ -1313,8 +1318,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.67.2';
+  const VERSION = '7.68.0';
   const PATCHNOTES = [
+    { version:'7.68.0', date:'12.07.2026', changes:[
+      'Sektorkarte (Systemübersicht): Zoom &amp; Verschieben hinzugefügt – Ziehen zum Pannen, Pinch/Scrollen zum Zoomen, +/–/⟲-Buttons unten rechts',
+      'Karte spürbar vergrößert (260px → 340px Höhe) und Beschriftung deutlich größer (Systemname 9px→12px, Detailzeile 7,5px→9,5px), Kreise ebenfalls größer für bessere Lesbarkeit bei den mittlerweile 39 Systemen',
+      'Klick zum Systemwechsel funktioniert weiterhin normal, wird aber korrekt unterdrückt, wenn man gerade gezogen/gezoomt hat (kein versehentlicher Systemwechsel beim Verschieben)',
+      'Hilfe-Seite entsprechend aktualisiert'
+    ]},
     { version:'7.67.2', date:'12.07.2026', changes:[
       'Bug behoben: Die Galaxie-Übersichtskarte (Sektorkarte, alle Systeme mit Piratenbasen/Aliens/Supernovas) wurde nur neu gezeichnet, während man sich fälschlich auf dem Galaxie-Tab befand – nicht während man tatsächlich auf der Sektorkarte war, wo die Karte liegt. Dadurch blieb sie gelegentlich leer oder veraltet ("lädt manchmal nicht"). Jetzt zuverlässig, solange man tatsächlich auf der Sektorkarte ist'
     ]},
@@ -5168,7 +5179,8 @@
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
-      { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus.' }
+      { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus.' },
+      { title:'Sektorkarte bedienen', body:'Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' }
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
@@ -6990,6 +7002,16 @@
     requestAnimationFrame(frame);
   }
 
+  // Zoom/Pan-Zustand der Galaxie-Übersichtskarte – bleibt für die restliche Sitzung erhalten
+  // (nicht dauerhaft gespeichert), damit man nicht bei jedem Tab-Wechsel wieder rauszoomt.
+  let galaxyMapViewBox = { x:0, y:0, w:950, h:500 };
+  let galaxyMapDidDrag = false; // unterdrückt einen Klick direkt nach dem Ziehen/Zoomen
+  function clampGalaxyViewBox(){
+    galaxyMapViewBox.w = Math.max(180, Math.min(950, galaxyMapViewBox.w));
+    galaxyMapViewBox.h = galaxyMapViewBox.w * (500/950);
+    galaxyMapViewBox.x = Math.max(-80, Math.min(950-galaxyMapViewBox.w+80, galaxyMapViewBox.x));
+    galaxyMapViewBox.y = Math.max(-60, Math.min(500-galaxyMapViewBox.h+60, galaxyMapViewBox.y));
+  }
   function buildGalaxyMap(){
     const svg = document.getElementById('galaxyMapSvg');
     if (!svg) return;
@@ -7031,24 +7053,31 @@
       const alienHere = (galaxyCache.unlockedAlienRaces||[]).find(r=>r.system===s.id);
       if (alienHere) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
       if (galaxyCache.activeWar && galaxyCache.activeWar.system === s.id) badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
-      const badgeMarkup = badges.map((b,i) => `<text x="${s.gx+16+i*13}" y="${s.gy-16}" text-anchor="middle" style="font-size:11px;"><title>${b.title}</title>${b.icon}</text>`).join('');
+      const badgeMarkup = badges.map((b,i) => `<text x="${s.gx+18+i*15}" y="${s.gy-18}" text-anchor="middle" style="font-size:13px;"><title>${b.title}</title>${b.icon}</text>`).join('');
 
+      // Option B (größere, immer sichtbare Beschriftung statt erst beim Reinzoomen einzublenden) –
+      // Kreise und Schrift spürbar größer als vorher, da 39 Systeme auf engem Raum sonst kaum
+      // lesbar sind.
       inner += `
         <g class="planet-node" data-system-node="${s.id}">
           <title>${s.name}${isCollapsed?' – Supernova-Kollaps, 48h unzugänglich':''}</title>
-          <circle cx="${s.gx}" cy="${s.gy}" r="22" fill="url(#${isCollapsed?'miniSunGlowCollapsed':'miniSunGlow'})" opacity="${isCollapsed?0.9:(0.3+pct*0.7)}"/>
-          <circle cx="${s.gx}" cy="${s.gy}" r="13" fill="none" stroke="${isCollapsed?'#e24b4a':(active?'#afa9ec':'#5a5f7a')}" stroke-width="${active?2:1}" stroke-dasharray="${isCollapsed?'3 3':(pct*81.7)+' 200'}"/>
-          <circle cx="${s.gx}" cy="${s.gy}" r="7.5" fill="${isCollapsed?'#3a1414':(isHome?'#e24b4a':'#fff7d6')}" opacity="${isCollapsed?0.9:(active?1:0.85)}"/>
-          ${isCollapsed ? `<text x="${s.gx}" y="${s.gy+2.5}" text-anchor="middle" style="font-size:8px;">💥</text>` : (isHome ? `<text x="${s.gx}" y="${s.gy+2.5}" text-anchor="middle" style="font-size:7px; fill:#fff;">🏠</text>` : '')}
+          <circle cx="${s.gx}" cy="${s.gy}" r="26" fill="url(#${isCollapsed?'miniSunGlowCollapsed':'miniSunGlow'})" opacity="${isCollapsed?0.9:(0.3+pct*0.7)}"/>
+          <circle cx="${s.gx}" cy="${s.gy}" r="15" fill="none" stroke="${isCollapsed?'#e24b4a':(active?'#afa9ec':'#5a5f7a')}" stroke-width="${active?2.5:1.3}" stroke-dasharray="${isCollapsed?'3 3':(pct*94.2)+' 200'}"/>
+          <circle cx="${s.gx}" cy="${s.gy}" r="9" fill="${isCollapsed?'#3a1414':(isHome?'#e24b4a':'#fff7d6')}" opacity="${isCollapsed?0.9:(active?1:0.85)}"/>
+          ${isCollapsed ? `<text x="${s.gx}" y="${s.gy+3}" text-anchor="middle" style="font-size:10px;">💥</text>` : (isHome ? `<text x="${s.gx}" y="${s.gy+3}" text-anchor="middle" style="font-size:8.5px; fill:#fff;">🏠</text>` : '')}
           ${badgeMarkup}
-          <text class="planet-label" x="${s.gx}" y="${s.gy+26}" text-anchor="middle" style="font-size:9px; font-weight:${active?600:400}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>
-          <text class="planet-label" x="${s.gx}" y="${s.gy+36}" text-anchor="middle" style="font-size:7.5px; fill:#8489a0;">${isCollapsed ? 'Kollabiert' : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))}</text>
+          <text class="planet-label" x="${s.gx}" y="${s.gy+31}" text-anchor="middle" style="font-size:12px; font-weight:${active?700:500}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>
+          <text class="planet-label" x="${s.gx}" y="${s.gy+43}" text-anchor="middle" style="font-size:9.5px; fill:#8489a0;">${isCollapsed ? 'Kollabiert' : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))}</text>
         </g>
       `;
     }
     svg.innerHTML = inner;
+    svg.setAttribute('viewBox', `${galaxyMapViewBox.x.toFixed(1)} ${galaxyMapViewBox.y.toFixed(1)} ${galaxyMapViewBox.w.toFixed(1)} ${galaxyMapViewBox.h.toFixed(1)}`);
     svg.querySelectorAll('[data-system-node]').forEach(node => {
-      node.addEventListener('click', () => { activeSystem = node.getAttribute('data-system-node'); render(); loadPlayersInSystem(); });
+      node.addEventListener('click', () => {
+        if (galaxyMapDidDrag) return; // Klick direkt nach einem Zieh-/Zoom-Vorgang unterdrücken
+        activeSystem = node.getAttribute('data-system-node'); render(); loadPlayersInSystem();
+      });
     });
   }
 
@@ -9870,6 +9899,79 @@
   })();
 
   // Kampf-Wiedergabe-Modal: einmalig verdrahtet, da außerhalb des normalen Tab-Systems.
+  // Zoom/Pan-Bedienung der Galaxie-Übersichtskarte: einmalig initialisiert (nicht bei jedem
+  // buildGalaxyMap()-Aufruf neu gebunden), da svg.innerHTML zwar den Inhalt ersetzt, das <svg>-
+  // Element selbst aber über Renders hinweg dasselbe DOM-Element bleibt.
+  (function initGalaxyMapZoomPan(){
+    const svg = document.getElementById('galaxyMapSvg');
+    if (!svg) return;
+    const DRAG_THRESHOLD = 6;
+    function zoomBy(factor, cx, cy){
+      const rect = svg.getBoundingClientRect();
+      const relX = cx!==undefined ? (cx-rect.left)/rect.width : 0.5;
+      const relY = cy!==undefined ? (cy-rect.top)/rect.height : 0.5;
+      const px = galaxyMapViewBox.x + relX*galaxyMapViewBox.w;
+      const py = galaxyMapViewBox.y + relY*galaxyMapViewBox.h;
+      galaxyMapViewBox.w /= factor; galaxyMapViewBox.h /= factor;
+      galaxyMapViewBox.x = px - relX*galaxyMapViewBox.w;
+      galaxyMapViewBox.y = py - relY*galaxyMapViewBox.h;
+      clampGalaxyViewBox();
+      buildGalaxyMap();
+    }
+    let dragging = false, lastX=0, lastY=0, downX=0, downY=0;
+    svg.addEventListener('mousedown', (e) => { dragging=true; galaxyMapDidDrag=false; lastX=e.clientX; lastY=e.clientY; downX=e.clientX; downY=e.clientY; });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      if (Math.abs(e.clientX-downX)>DRAG_THRESHOLD || Math.abs(e.clientY-downY)>DRAG_THRESHOLD) galaxyMapDidDrag = true;
+      const rect = svg.getBoundingClientRect();
+      const dx = (e.clientX-lastX) * (galaxyMapViewBox.w/rect.width);
+      const dy = (e.clientY-lastY) * (galaxyMapViewBox.h/rect.height);
+      galaxyMapViewBox.x -= dx; galaxyMapViewBox.y -= dy;
+      lastX=e.clientX; lastY=e.clientY;
+      clampGalaxyViewBox(); buildGalaxyMap();
+    });
+    window.addEventListener('mouseup', () => { dragging=false; });
+    svg.addEventListener('wheel', (e) => { e.preventDefault(); zoomBy(e.deltaY<0?1.15:1/1.15, e.clientX, e.clientY); }, {passive:false});
+
+    let touchState = null;
+    svg.addEventListener('touchstart', (e) => {
+      galaxyMapDidDrag = false;
+      if (e.touches.length===1){ touchState = { mode:'pan', x:e.touches[0].clientX, y:e.touches[0].clientY, downX:e.touches[0].clientX, downY:e.touches[0].clientY }; }
+      else if (e.touches.length===2){
+        const dx = e.touches[0].clientX-e.touches[1].clientX, dy = e.touches[0].clientY-e.touches[1].clientY;
+        touchState = { mode:'pinch', dist: Math.hypot(dx,dy), vbw: galaxyMapViewBox.w };
+      }
+    }, {passive:true});
+    svg.addEventListener('touchmove', (e) => {
+      if (!touchState) return;
+      e.preventDefault();
+      if (touchState.mode==='pan' && e.touches.length===1){
+        if (Math.abs(e.touches[0].clientX-touchState.downX)>DRAG_THRESHOLD || Math.abs(e.touches[0].clientY-touchState.downY)>DRAG_THRESHOLD) galaxyMapDidDrag = true;
+        const rect = svg.getBoundingClientRect();
+        const dx = (e.touches[0].clientX-touchState.x) * (galaxyMapViewBox.w/rect.width);
+        const dy = (e.touches[0].clientY-touchState.y) * (galaxyMapViewBox.h/rect.height);
+        galaxyMapViewBox.x -= dx; galaxyMapViewBox.y -= dy;
+        touchState.x = e.touches[0].clientX; touchState.y = e.touches[0].clientY;
+        clampGalaxyViewBox(); buildGalaxyMap();
+      } else if (touchState.mode==='pinch' && e.touches.length===2){
+        galaxyMapDidDrag = true;
+        const dx = e.touches[0].clientX-e.touches[1].clientX, dy = e.touches[0].clientY-e.touches[1].clientY;
+        const dist = Math.hypot(dx,dy);
+        const factor = dist/touchState.dist;
+        galaxyMapViewBox.w = touchState.vbw / factor;
+        clampGalaxyViewBox(); buildGalaxyMap();
+      }
+    }, {passive:false});
+    svg.addEventListener('touchend', () => { touchState = null; });
+
+    const zoomInBtn = document.getElementById('galaxyZoomInBtn');
+    if (zoomInBtn) zoomInBtn.onclick = () => zoomBy(1.4);
+    const zoomOutBtn = document.getElementById('galaxyZoomOutBtn');
+    if (zoomOutBtn) zoomOutBtn.onclick = () => zoomBy(1/1.4);
+    const zoomResetBtn = document.getElementById('galaxyZoomResetBtn');
+    if (zoomResetBtn) zoomResetBtn.onclick = () => { galaxyMapViewBox = { x:0, y:0, w:950, h:500 }; buildGalaxyMap(); };
+  })();
+
   (function initBattleModal(){
     const overlay = document.getElementById('battleModalOverlay');
     const closeBtn = document.getElementById('battleModalCloseBtn');
