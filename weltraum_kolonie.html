@@ -1313,8 +1313,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.67.0';
+  const VERSION = '7.67.1';
   const PATCHNOTES = [
+    { version:'7.67.1', date:'12.07.2026', changes:[
+      'Trümmerfeld-Symbole ("T") auf der Sektorkarte sind jetzt antippbar: zeigt Gesamtmenge und ob/wie schnell es abgebaut wird (je nach stationierten Recyclern) – gilt sowohl für die Heimatbasis als auch für einzelne Planeten',
+      'Trümmerfeld-Info-Logik vereinheitlicht (Dashboard-Karten und Sektorkarte nutzen jetzt dieselbe Funktion, vorher zwei leicht unterschiedliche Kopien)',
+      'Hilfe-Seite entsprechend aktualisiert'
+    ]},
     { version:'7.67.0', date:'12.07.2026', changes:[
       'Lebendige Galaxie jetzt auch optisch auf der Sektorkarte sichtbar, nicht mehr nur als Text im Nachrichten-Feed',
       'Supernova-Systeme werden dunkel-rot mit 💥-Symbol dargestellt statt normal zu leuchten',
@@ -5159,7 +5164,7 @@
     ]},
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
-      { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab.' },
+      { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus.' }
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
@@ -7124,6 +7129,20 @@
     box.innerHTML = html;
     box.querySelectorAll('[data-map-base]').forEach(btn => btn.addEventListener('click', () => findMyColony(btn.getAttribute('data-map-base'))));
   }
+  // Gemeinsame Trümmerfeld-Info-Funktion (Dashboard-Karten UND Sektorkarte nutzen dieselbe Logik).
+  // Gleiche Abbaurate wie collectDebrisWithRecyclers: 8/s pro stationiertem Recycler, sonst kein Abbau.
+  function debrisInfoText(planetKey){
+    const debrisField = state.debrisFields[planetKey];
+    const debrisTotal = debrisField ? Object.values(debrisField).reduce((a,b)=>a+b,0) : 0;
+    if (!debrisTotal) return null;
+    const fleet = planetKey==='home' ? state.fleet : (state.colonies[planetKey] ? state.colonies[planetKey].fleet : null);
+    const recyclerCount = (fleet && fleet.recycler) || 0;
+    if (recyclerCount > 0){
+      const etaSeconds = Math.ceil(debrisTotal/(recyclerCount*8));
+      return 'Trümmerfeld: '+fmt(debrisTotal)+' – '+recyclerCount+'x Recycler stationiert, Abbau in ~'+fmtDuration(etaSeconds);
+    }
+    return 'Trümmerfeld: '+fmt(debrisTotal)+' – kein Recycler stationiert, wird nicht abgebaut';
+  }
   function buildMap(){
     renderMapBaseLinks();
     const svg = document.getElementById('mapSvg');
@@ -7168,7 +7187,7 @@
     // Sonne
     inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="34" fill="url(#sunGlow)"/><circle cx="${SUN_X}" cy="${SUN_Y}" r="13" fill="#fff7d6"/>`;
     if (state.debrisFields.home && Object.keys(state.debrisFields.home).length && activeSystem === myHomeSystem){
-      inner += `<circle cx="${SUN_X+14}" cy="${SUN_Y-24}" r="5" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${SUN_X+14}" y="${SUN_Y-21}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700;">T</text>`;
+      inner += `<g data-map-debris="home"><circle cx="${SUN_X+14}" cy="${SUN_Y-24}" r="6" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${SUN_X+14}" y="${SUN_Y-21}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>`;
     }
 
     // Eigene Heimatbasis (nur im eigenen Heimatsystem)
@@ -7202,7 +7221,7 @@
           <circle class="body" cx="${px}" cy="${py}" r="${r}" fill="${p.color}" opacity="${disc?1:0.55}"/>
           ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-dasharray="2,2"/>`}
           ${isMine ? `<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="6" fill="#5dcaa5" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700;">★</text>` : ''}
-          ${hasDebris ? `<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="6" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700;">T</text>` : ''}
+          ${hasDebris ? `<g data-map-debris="${p.id}"><circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="7" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>` : ''}
           ${hasMoon ? `<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(pos.x+r+2-1.5).toFixed(1)}" cy="${(pos.y+r+2-1).toFixed(1)}" r="3.2" fill="#aeb1c4"/>` : ''}
           <text class="planet-label" x="${px}" y="${(pos.y+r+13).toFixed(1)}" text-anchor="middle" style="${isMine?'fill:#5dcaa5; font-weight:700;':''}">${p.name.split(' ').pop()}${isMine?' (meine)':''}</text>
         </g>
@@ -7275,6 +7294,15 @@
     svg.querySelectorAll('[data-map-npc]').forEach(node => {
       node.addEventListener('click', () => {
         if (confirm((node.getAttribute('data-map-npcname')||'NPC')+' angreifen?')) sendAttackMission(node.getAttribute('data-map-npc'));
+      });
+    });
+    // Trümmerfeld-Badge: eigener Klick-Handler, der NICHT die Erkundungsmission des darunterliegenden
+    // Planeten auslöst (stopPropagation), stattdessen Gesamtmenge + Abbaustatus als Toast zeigt.
+    svg.querySelectorAll('[data-map-debris]').forEach(node => {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const info = debrisInfoText(node.getAttribute('data-map-debris'));
+        if (info) pushToast(info, 'ti-recycle');
       });
     });
   }
@@ -7888,21 +7916,9 @@
           const dAtk = Math.round(attackPower(d.f));
           const dDef = Math.round(defensePower(d.id));
           const role = planetRoleOf(d.id);
-          // Trümmerfeld-Anzeige: Gesamtmenge + geschätzte Abbauzeit anhand stationierter Recycler
-          // (gleiche Rate wie collectDebrisWithRecyclers: 8/s pro Recycler, sonst 1/s passiv).
-          const debrisField = state.debrisFields[d.id];
-          const debrisTotal = debrisField ? Object.values(debrisField).reduce((a,b)=>a+b,0) : 0;
-          const hasDebris = debrisTotal > 0;
-          let debrisTitle = '';
-          if (hasDebris){
-            const recyclerCount = (d.f && d.f.recycler) || 0;
-            if (recyclerCount > 0){
-              const etaSeconds = Math.ceil(debrisTotal/(recyclerCount*8));
-              debrisTitle = 'Trümmerfeld: '+fmt(debrisTotal)+' – '+recyclerCount+'x Recycler stationiert, Abbau in ~'+fmtDuration(etaSeconds);
-            } else {
-              debrisTitle = 'Trümmerfeld: '+fmt(debrisTotal)+' – kein Recycler stationiert, wird nicht abgebaut';
-            }
-          }
+          // Trümmerfeld-Anzeige: Gesamtmenge + geschätzte Abbauzeit (gemeinsame Funktion, siehe debrisInfoText).
+          const debrisTitle = debrisInfoText(d.id) || '';
+          const hasDebris = !!debrisTitle;
           return `
             <div class="dash-colony-card ${targeted?'targeted':''} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${d.name}${role?' – Rolle: '+role.name+' ('+role.detail+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle} – anklicken zum Wechseln">
               ${targeted ? `<span class="dash-attack-badge" title="Wird angegriffen!"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>` : ''}
