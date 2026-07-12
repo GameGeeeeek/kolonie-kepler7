@@ -887,6 +887,7 @@
       </div>
 
       <div class="tab-panel" id="tab-galaxie">
+        <div id="worldBossBox"></div>
         <div class="section-title"><i class="ti ti-flag" aria-hidden="true"></i>NPC-Fraktionen</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Vier Fraktionen teilen die Galaxie unter sich auf: sie expandieren in freie Systeme und erobern sich gegenseitig Gebiete. Ihr Territorium ist auf der Sektorkarte in ihrer Farbe eingefärbt.</div>
         <div id="factionBox" style="margin-bottom:1.5rem;"></div>
@@ -1366,8 +1367,17 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.84.0';
+  const VERSION = '7.85.0';
   const PATCHNOTES = [
+    { version:'7.85.0', date:'12.07.2026', changes:[
+      'Neu: Galaktischer Weltboss – ein gemeinsamer Server-Gegner mit geteiltem HP-Pool, gegen den alle Spieler zusammen kämpfen (oben im Galaxie-Tab)',
+      'Angriff alle 30 Minuten möglich; dein Schaden entspricht deiner Angriffskraft (leicht gestreut, Mindestschaden 50 – auch Anfänger tragen bei)',
+      'Jeder Angriff: +8 Kampfpunkte, +40 Kredite · Todesstoß: +100 Kampfpunkte, +1000 Kredite',
+      'HP-Balken, Bestenliste der Schadensverursacher und Abklingzeit-Anzeige in der Boss-Karte',
+      'Boss-HP skalieren mit der Spielerzahl; unbesiegte Bosse ziehen sich nach 72 Stunden zurück',
+      'Erscheinen, Rückzug und Besiegen werden in den Galaxie-Nachrichten gemeldet',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.84.0', date:'12.07.2026', changes:[
       'Neu: 9 Erfolge für die neuen Systeme – Marktgänger & Großhändler (Markthandel), Logistiker (Handelsroute), Eroberer & Systemherr (Fraktionssysteme), Diplomat (Verbündet mit einer Fraktion), Auftragsjäger (10 Fraktionsaufträge), Stammkunde (Kredit-Shop), Kreditwürdig (5000 Kredite)',
       'Neu: 2 Tagesaufgaben – „1 Handel am Markt abschließen" (+60 Kredite) und „1 Fraktionsauftrag abschließen" (+80 Kredite)',
@@ -3010,6 +3020,7 @@
   }
   function renderGalaxyNews(){
     renderFactions();
+    renderWorldBoss();
     const box = document.getElementById('galaxyNewsBox');
     if (!box) return;
     const news = galaxyCache.news || [];
@@ -3028,6 +3039,64 @@
     }
     return null;
   }
+  // ===== Galaktischer Weltboss =====
+  // Gemeinsamer Server-Gegner mit geteiltem HP-Pool. Angriff mit 30-Min.-Abklingzeit; jeder Angriff
+  // gibt +8 Kampfpunkte/+40 Kredite, der Todesstoß +100/+1000. Der Server bucht die Belohnung in
+  // unseren Spielstand; wir spiegeln sie lokal für sofortige Anzeige.
+  async function attackWorldBoss(){
+    if (!useBackend()){ log('Der Weltboss braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
+    try {
+      const res = await backendFetch('/worldboss/attack', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' });
+      const data = await res.json();
+      if (!res.ok){
+        if (data.cooldownLeftMs){ log('Abklingzeit: nächster Angriff in '+Math.ceil(data.cooldownLeftMs/60000)+' Min. möglich.', 'ti-clock'); }
+        else log('Weltboss-Angriff fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle');
+        return;
+      }
+      state.battlePoints = (state.battlePoints||0) + data.bpGain;
+      state.commandPoints = (state.commandPoints||0) + data.bpGain;
+      state.credits = (state.credits||0) + data.creditGain;
+      if (data.killed){
+        log('WELTBOSS BESIEGT! Dein Todesstoß: '+fmt(data.damage)+' Schaden. +'+data.bpGain+' Kampfpunkte, +'+fmt(data.creditGain)+' Kredite!', 'ti-alien');
+        playSound('win');
+      } else {
+        log('Weltboss getroffen: '+fmt(data.damage)+' Schaden (Boss: '+fmt(data.bossHp)+'/'+fmt(data.bossMaxHp)+' HP). +'+data.bpGain+' Kampfpunkte, +'+data.creditGain+' Kredite.', 'ti-sword');
+        playSound('attack');
+      }
+      await loadGalaxyState();
+      render(); save();
+    } catch(e){ log('Weltboss-Angriff fehlgeschlagen (Verbindungsfehler).', 'ti-alert-triangle'); }
+  }
+  function renderWorldBoss(){
+    const box = document.getElementById('worldBossBox');
+    if (!box) return;
+    const boss = galaxyCache.worldBoss;
+    if (!boss || !useBackend()){ box.innerHTML = ''; return; }
+    const pct = Math.max(0, Math.min(100, Math.round(boss.hp/boss.maxHp*100)));
+    const sys = STAR_SYSTEMS.find(s=>s.id===boss.system);
+    const myDamage = (boss.participants && state.player && boss.participants[state.player.id]) || 0;
+    const lastAtk = (boss.lastAttack && state.player && boss.lastAttack[state.player.id]) || 0;
+    const cdLeft = Math.max(0, lastAtk + 30*60*1000 - Date.now());
+    const top = Object.entries(boss.participants||{}).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    box.innerHTML = `
+      <div class="section-title"><i class="ti ti-alien" aria-hidden="true"></i>Weltboss</div>
+      <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:#e24b4a; margin-bottom:1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div><div class="bname" style="color:#e24b4a;">${boss.name}</div>
+          <div class="bmeta">Gesichtet bei ${sys?sys.name:boss.system} · verschwindet in ${Math.max(0,Math.ceil((boss.expiresAt-Date.now())/3600000))}h</div></div>
+          <button data-attack-boss ${cdLeft>0?'disabled':''} style="background:rgba(226,75,74,0.2); white-space:nowrap;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>${cdLeft>0?'Bereit in '+Math.ceil(cdLeft/60000)+' Min.':'Angreifen'}</button>
+        </div>
+        <div style="height:14px; background:rgba(255,255,255,0.06); border-radius:7px; overflow:hidden; margin-bottom:4px;">
+          <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#e24b4a,#fac775);"></div>
+        </div>
+        <div class="bmeta">${fmt(boss.hp)} / ${fmt(boss.maxHp)} HP (${pct}%) · Dein Schaden bisher: ${fmt(myDamage)}</div>
+        ${top.length ? `<div class="bmeta" style="margin-top:4px;">Bestenliste: ${top.map((e,i)=>(i+1)+'. '+fmt(e[1])+' Schaden').join(' · ')}</div>` : ''}
+        <div class="bmeta" style="margin-top:4px;">Jeder Angriff: +8 Kampfpunkte, +40 Kredite · Todesstoß: +100 Kampfpunkte, +1000 Kredite · Abklingzeit 30 Min.</div>
+      </div>`;
+    const btn = box.querySelector('[data-attack-boss]');
+    if (btn) btn.onclick = () => attackWorldBoss();
+  }
+
   // ===== Nutzen eroberter Fraktionssysteme =====
   // Jedes vom Spieler eroberte System (galaxyCache.controlledSystems, Server-autoritativ) bringt
   // passiv +3 Kredite/min und +1% Produktion (Produktionsbonus gedeckelt bei +15%). Bewusst getrennt
@@ -6253,6 +6322,7 @@
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand.' }
     ]},
     { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
+      { title:'Weltboss', body:'Gelegentlich erscheint ein <strong>galaktischer Weltboss</strong> (oben im Galaxie-Tab, mit Serververbindung): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Du kannst ihn alle 30 Minuten angreifen (Schaden = deine Angriffskraft). Jeder Angriff bringt +8 Kampfpunkte und +40 Kredite, der <strong>Todesstoß</strong> +100 Kampfpunkte und +1000 Kredite. Bleibt er 72 Stunden unbesiegt, zieht er sich zurück. Seine HP skalieren mit der Spielerzahl.' },
       { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
