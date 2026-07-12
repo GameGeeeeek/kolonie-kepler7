@@ -887,6 +887,9 @@
       </div>
 
       <div class="tab-panel" id="tab-galaxie">
+        <div class="section-title"><i class="ti ti-flag" aria-hidden="true"></i>NPC-Fraktionen</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Vier Fraktionen teilen die Galaxie unter sich auf: sie expandieren in freie Systeme und erobern sich gegenseitig Gebiete. Ihr Territorium ist auf der Sektorkarte in ihrer Farbe eingefärbt.</div>
+        <div id="factionBox" style="margin-bottom:1.5rem;"></div>
         <div class="section-title"><i class="ti ti-world" aria-hidden="true"></i>Galaxie-Nachrichten</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Gemeinsame Ereignisse, die für alle Spieler gleich ablaufen – entwickelt sich von selbst weiter, auch ohne dein Zutun.</div>
         <div id="galaxyNewsBox"></div>
@@ -1347,8 +1350,18 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.75.0';
+  const VERSION = '7.76.0';
   const PATCHNOTES = [
+    { version:'7.76.0', date:'12.07.2026', changes:[
+      'Neu: Echte NPC-Fraktionen mit Territorium – vier Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) besitzen Systeme und expandieren selbstständig auf dem Server',
+      'Fraktionen besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete – die politische Lage der Galaxie verändert sich dadurch echt und dauerhaft, auch während du offline bist',
+      'Territorium ist auf der Sektorkarte in Fraktionsfarben eingefärbt (farbiger Ring ums System)',
+      'Neue Fraktions-Übersicht im Galaxie-Tab mit Systemzahl und Militärstärke je Fraktion',
+      'Deine Heimatsysteme sind für die Fraktionen tabu und werden nie erobert',
+      'Backend: die Sektorkarte umfasst jetzt serverseitig alle 41 Systeme (vorher kannte der Server nur 15) mit echter Nachbarschaftsberechnung',
+      'Hilfe-Seite entsprechend ergänzt',
+      'Hinweis: Fraktionen sind nur mit Serververbindung sichtbar. Ein direkter Spieler-Eingriff (NPC-Systeme angreifen/erobern) folgt als nächster Schritt'
+    ]},
     { version:'7.75.0', date:'12.07.2026', changes:[
       'Neu: Handelsrouten – binde Frachter dauerhaft an eine Route für passiven Ertrag (im Markt-Tab)',
       'Drei Routentypen: Kredit-Route (+Kredite pauschal, ohne Server), Markt-Verkaufsroute (verkauft automatisch eine Ressource am Markt, braucht Server), Transportroute (+10% Logistikbonus auf die bewegte Menge)',
@@ -2887,6 +2900,7 @@
     } catch(e){}
   }
   function renderGalaxyNews(){
+    renderFactions();
     const box = document.getElementById('galaxyNewsBox');
     if (!box) return;
     const news = galaxyCache.news || [];
@@ -2894,6 +2908,35 @@
     box.innerHTML = news.slice(0, 12).map(n => {
       const when = new Date(n.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       return `<div class="card-row" style="padding:0.5rem 0.7rem;"><div class="left"><i class="ti ${n.icon}" aria-hidden="true" style="color:#c3bef5; font-size:15px; margin-right:8px;"></i><div><div class="bmeta" style="color:#c7cbe0;">${n.text}</div><div class="bmeta" style="font-size:9px;">${when}</div></div></div></div>`;
+    }).join('');
+  }
+  // Welche NPC-Fraktion besitzt ein System (aus der Backend-Territorium-Simulation)? null = herrenlos.
+  function factionOwning(systemId){
+    const factions = galaxyCache.factions;
+    if (!factions) return null;
+    for (const f of Object.values(factions)){
+      if (Array.isArray(f.systems) && f.systems.includes(systemId)) return f;
+    }
+    return null;
+  }
+  function renderFactions(){
+    const box = document.getElementById('factionBox');
+    if (!box) return;
+    const factions = galaxyCache.factions;
+    if (!factions || !Object.keys(factions).length){
+      box.innerHTML = '<div class="bmeta">Noch keine Fraktionsdaten geladen.</div>';
+      return;
+    }
+    const sorted = Object.values(factions).sort((a,b)=>(b.systems?.length||0)-(a.systems?.length||0));
+    box.innerHTML = sorted.map(f => {
+      const count = (f.systems||[]).length;
+      const strength = f.strength ? f.strength.toFixed(1) : '?';
+      return `<div class="card-row">
+        <div class="left"><div class="bicon" style="background:${f.color}22; color:${f.color};"><i class="ti ti-flag" aria-hidden="true"></i></div>
+          <div><div class="bname" style="color:${f.color};">${f.name}</div>
+          <div class="bmeta">${count} System${count===1?'':'e'} · Militärstärke ${strength}</div></div>
+        </div>
+      </div>`;
     }).join('');
   }
   function npcEffectiveDefense(npc){ return Math.round(npc.defense * (1 + npcScalingCount(npc.id)*0.18) * (galaxyCache.npcEmpireStrength||1)); }
@@ -5776,6 +5819,10 @@
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern.' },
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand.' }
     ]},
+    { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
+      { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
+      { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' }
+    ]},
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Preise erholen sich mit der Zeit langsam zu ihrem Normalwert – teuer gewordene Ressourcen werden also wieder günstiger.' },
@@ -7767,6 +7814,8 @@
       const isHome = myHomeSystem===s.id;
       const pct = planetsInSys.length ? discCount/planetsInSys.length : 0;
       const isCollapsed = !!(galaxyCache.collapsedSystems && galaxyCache.collapsedSystems[s.id]);
+      // NPC-Fraktion, die dieses System besitzt (aus der Backend-Territorium-Simulation).
+      const owner = factionOwning(s.id);
 
       // Galaxie-Ereignis-Badges für dieses System sammeln (Supernova wird separat/prominent behandelt).
       const badges = [];
@@ -7776,19 +7825,23 @@
       if (galaxyCache.activeWar && galaxyCache.activeWar.system === s.id) badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
       const badgeMarkup = badges.map((b,i) => `<text x="${s.gx+18+i*15}" y="${s.gy-18}" text-anchor="middle" style="font-size:13px;"><title>${b.title}</title>${b.icon}</text>`).join('');
 
+      // Fraktions-Territorium: farbiger Außenring + zarte Füllung in Fraktionsfarbe.
+      const factionRing = owner ? `<circle cx="${s.gx}" cy="${s.gy}" r="20" fill="${owner.color}14" stroke="${owner.color}" stroke-width="2" stroke-opacity="0.8"><title>${owner.name} – Territorium</title></circle>` : '';
+
       // Option B (größere, immer sichtbare Beschriftung statt erst beim Reinzoomen einzublenden) –
       // Kreise und Schrift spürbar größer als vorher, da 39 Systeme auf engem Raum sonst kaum
       // lesbar sind.
       inner += `
         <g class="planet-node" data-system-node="${s.id}">
-          <title>${s.name}${isCollapsed?' – Supernova-Kollaps, 48h unzugänglich':''}</title>
+          <title>${s.name}${isCollapsed?' – Supernova-Kollaps, 48h unzugänglich':(owner?' – '+owner.name+' (NPC-Territorium)':'')}</title>
+          ${factionRing}
           <circle cx="${s.gx}" cy="${s.gy}" r="26" fill="url(#${isCollapsed?'miniSunGlowCollapsed':'miniSunGlow'})" opacity="${isCollapsed?0.9:(0.3+pct*0.7)}"/>
           <circle cx="${s.gx}" cy="${s.gy}" r="15" fill="none" stroke="${isCollapsed?'#e24b4a':(active?'#afa9ec':'#5a5f7a')}" stroke-width="${active?2.5:1.3}" stroke-dasharray="${isCollapsed?'3 3':(pct*94.2)+' 200'}"/>
           <circle cx="${s.gx}" cy="${s.gy}" r="9" fill="${isCollapsed?'#3a1414':(isHome?'#e24b4a':'#fff7d6')}" opacity="${isCollapsed?0.9:(active?1:0.85)}"/>
           ${isCollapsed ? `<text x="${s.gx}" y="${s.gy+3}" text-anchor="middle" style="font-size:10px;">💥</text>` : (isHome ? `<text x="${s.gx}" y="${s.gy+3}" text-anchor="middle" style="font-size:8.5px; fill:#fff;">🏠</text>` : '')}
           ${badgeMarkup}
           <text class="planet-label" x="${s.gx}" y="${s.gy+31}" text-anchor="middle" style="font-size:12px; font-weight:${active?700:500}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>
-          <text class="planet-label" x="${s.gx}" y="${s.gy+43}" text-anchor="middle" style="font-size:9.5px; fill:#8489a0;">${isCollapsed ? 'Kollabiert' : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))}</text>
+          <text class="planet-label" x="${s.gx}" y="${s.gy+43}" text-anchor="middle" style="font-size:9.5px; fill:${owner?owner.color:'#8489a0'};">${isCollapsed ? 'Kollabiert' : (owner ? owner.name : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':'')))}</text>
         </g>
       `;
     }
@@ -9824,6 +9877,7 @@
     }
 
     if (activeTab === 'galaxie'){
+    renderGalaxyNews();
     const attackFleetBox = document.getElementById('attackFleetBox');
     if (attackFleetBox){
       const attackSel = getAttackSelection(state.activeBasePlanet, cf);
