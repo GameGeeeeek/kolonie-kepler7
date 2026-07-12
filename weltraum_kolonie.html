@@ -1366,8 +1366,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.83.0';
+  const VERSION = '7.84.0';
   const PATCHNOTES = [
+    { version:'7.84.0', date:'12.07.2026', changes:[
+      'Neu: 9 Erfolge für die neuen Systeme – Marktgänger & Großhändler (Markthandel), Logistiker (Handelsroute), Eroberer & Systemherr (Fraktionssysteme), Diplomat (Verbündet mit einer Fraktion), Auftragsjäger (10 Fraktionsaufträge), Stammkunde (Kredit-Shop), Kreditwürdig (5000 Kredite)',
+      'Neu: 2 Tagesaufgaben – „1 Handel am Markt abschließen" (+60 Kredite) und „1 Fraktionsauftrag abschließen" (+80 Kredite)',
+      'Tagesaufgaben können jetzt auch Kredite als Belohnung geben (ohne Lager-Limit)',
+      'Markt, Diplomatie, Eroberung und Shop sind damit voll ins Belohnungsgefüge eingewoben',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.83.0', date:'12.07.2026', changes:[
       'Neu: Statistik-Dashboard im Punktestand-Tab',
       'Acht Kennzahlen-Kacheln: Siege, Niederlagen, Siegquote, Kampfpunkte, Expeditionen, eroberte Systeme, Kredite, Frachter auf Routen',
@@ -2959,6 +2966,9 @@
       }
       // Aktualisierten Preis lokal übernehmen (bis zum nächsten vollen Laden).
       if (state.marketCache && state.marketCache[resource]) state.marketCache[resource].price = data.priceAfter;
+      state.marketTradesDone = (state.marketTradesDone||0) + 1;
+      if (state.dailyQuests) state.dailyQuests.tradeCount = (state.dailyQuests.tradeCount||0) + 1;
+      checkAchievements();
       playSound('trade');
       render(); save();
     } catch(e){ log('Marktverbindung fehlgeschlagen.', 'ti-alert-triangle'); }
@@ -3071,8 +3081,10 @@
     if (buffKind && shopBuffActive(buffKind)){ log(item.name+' läuft bereits – erst nach Ablauf erneut kaufbar.', 'ti-info-circle'); return; }
     state.credits -= item.cost;
     const extra = item.buy();
+    state.shopPurchases = (state.shopPurchases||0) + 1;
     log(item.name+' gekauft ('+item.cost+' Kredite).'+(extra?' '+extra:''), item.icon);
     playSound('build');
+    checkAchievements();
     render(); save();
   }
   function renderCreditShop(){
@@ -3142,6 +3154,9 @@
     const f = (galaxyCache.factions||{})[fid];
     log('Auftrag für '+(f?f.name:fid)+' abgeschlossen: +'+q.rewardRep+' Ruf, +'+q.rewardCredits+' Kredite.', 'ti-medal');
     playSound('win');
+    state.factionQuestsDone = (state.factionQuestsDone||0) + 1;
+    if (state.dailyQuests) state.dailyQuests.fquestCount = (state.dailyQuests.fquestCount||0) + 1;
+    checkAchievements();
     state.factionQuests[fid] = generateFactionQuest();
     render(); save();
   }
@@ -3360,7 +3375,16 @@
     { key:'allroles', name:'Vielseitiges Imperium', desc:'Nutze alle vier Planeten-Rollen gleichzeitig.', check: s => new Set(Object.values(s.planetSpecialization||{})).size >= 4, progress: s => [new Set(Object.values(s.planetSpecialization||{})).size, 4] },
     { key:'explorer25', name:'Weitgereist', desc:'Entdecke mindestens 25 Planeten.', check: s => Object.keys(s.discovered||{}).length >= 25, progress: s => [Math.min(25,Object.keys(s.discovered||{}).length), 25] },
     { key:'colonizer10', name:'Kolonialmacht', desc:'Kolonisiere mindestens 10 Planeten.', check: s => Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 10, progress: s => [Math.min(10,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 10] },
-    { key:'warvictor', name:'Kriegsheld', desc:'Gewinne 5 Kriegsangriffe gegen eine verfeindete Allianz.', check: s => (s.warVictories||0) >= 5, progress: s => [Math.min(5,s.warVictories||0), 5] }
+    { key:'warvictor', name:'Kriegsheld', desc:'Gewinne 5 Kriegsangriffe gegen eine verfeindete Allianz.', check: s => (s.warVictories||0) >= 5, progress: s => [Math.min(5,s.warVictories||0), 5] },
+    { key:'trade1', name:'Marktgänger', desc:'Schließe deinen ersten Handel am galaktischen Markt ab.', check: s => (s.marketTradesDone||0) >= 1, progress: s => [Math.min(1,s.marketTradesDone||0), 1] },
+    { key:'trade50', name:'Großhändler', desc:'Schließe 50 Handel am galaktischen Markt ab.', check: s => (s.marketTradesDone||0) >= 50, progress: s => [Math.min(50,s.marketTradesDone||0), 50] },
+    { key:'route1', name:'Logistiker', desc:'Richte deine erste Handelsroute ein.', check: s => (s.tradeRoutes||[]).length >= 1, progress: s => [Math.min(1,(s.tradeRoutes||[]).length), 1] },
+    { key:'conquer1', name:'Eroberer', desc:'Erobere dein erstes Fraktionssystem.', check: s => myConqueredSystems().length >= 1, progress: s => [Math.min(1,myConqueredSystems().length), 1] },
+    { key:'conquer5', name:'Systemherr', desc:'Kontrolliere 5 eroberte Systeme gleichzeitig.', check: s => myConqueredSystems().length >= 5, progress: s => [Math.min(5,myConqueredSystems().length), 5] },
+    { key:'allied', name:'Diplomat', desc:'Werde mit einer Fraktion verbündet (Ruf 70+).', check: s => Object.values(s.factionRep||{}).some(r => r >= 70), progress: s => [Math.min(70, Math.max(0, ...Object.values(s.factionRep||{}).map(r=>r||0), 0)), 70] },
+    { key:'fquest10', name:'Auftragsjäger', desc:'Schließe 10 Fraktionsaufträge ab.', check: s => (s.factionQuestsDone||0) >= 10, progress: s => [Math.min(10,s.factionQuestsDone||0), 10] },
+    { key:'shop5', name:'Stammkunde', desc:'Kaufe 5 Mal im Kredit-Shop ein.', check: s => (s.shopPurchases||0) >= 5, progress: s => [Math.min(5,s.shopPurchases||0), 5] },
+    { key:'credits5k', name:'Kreditwürdig', desc:'Besitze 5000 Kredite gleichzeitig.', check: s => (s.credits||0) >= 5000, progress: s => [Math.min(5000,Math.floor(s.credits||0)), 5000] }
   ];
   // Titel: automatisch aus dem prestigeträchtigsten freigeschalteten Erfolg abgeleitet (keine neue
   // Verfolgung nötig, nutzt einfach die bestehenden Erfolge). Reihenfolge = Priorität, oben gewinnt.
@@ -3406,6 +3430,9 @@
     factionRep: {},
     nextFactionGift: 0,
     factionQuests: {},
+    marketTradesDone: 0,
+    factionQuestsDone: 0,
+    shopPurchases: 0,
     modules: {},
     moduleSlotLevel: {},
     equippedModules: {},
@@ -4796,7 +4823,9 @@
   const DAILY_QUEST_DEFS = [
     { key:'battle', name:'10 Kampfpunkte sammeln', icon:'ti-sword', target:10, reward:{erz:400,kristalle:200} },
     { key:'research', name:'1 Forschung abschließen', icon:'ti-flask', target:1, reward:{forschungspunkte:15,deuterium:150} },
-    { key:'build', name:'1 Gebäude oder Schiff fertigstellen', icon:'ti-building-factory-2', target:1, reward:{erz:600,energie:400} }
+    { key:'build', name:'1 Gebäude oder Schiff fertigstellen', icon:'ti-building-factory-2', target:1, reward:{erz:600,energie:400} },
+    { key:'trade', name:'1 Handel am Markt abschließen', icon:'ti-truck', target:1, reward:{credits:60} },
+    { key:'fquest', name:'1 Fraktionsauftrag abschließen', icon:'ti-medal', target:1, reward:{credits:80} }
   ];
   function initDailyQuests(){
     const today = new Date().toDateString();
@@ -4808,6 +4837,8 @@
     if (key==='battle') return Math.max(0, (state.battlePoints||0) - (dq.startBattlePoints||0));
     if (key==='research') return dq.researchCount||0;
     if (key==='build') return dq.buildCount||0;
+    if (key==='trade') return dq.tradeCount||0;
+    if (key==='fquest') return dq.fquestCount||0;
     return 0;
   }
   function claimDailyQuest(key){
@@ -4817,7 +4848,10 @@
     if (dailyQuestProgress(key) < def.target){ log('Noch nicht abgeschlossen.', 'ti-alert-triangle'); return; }
     state.dailyQuests.claimed[key] = true;
     const cap = storageCap();
-    for (const [r,a] of Object.entries(def.reward)) state.resources[r] = Math.min(cap, (state.resources[r]||0)+a);
+    for (const [r,a] of Object.entries(def.reward)){
+      if (r === 'credits'){ state.credits = (state.credits||0) + a; } // Kredite haben kein Lager-Limit
+      else state.resources[r] = Math.min(cap, (state.resources[r]||0)+a);
+    }
     log('Tagesaufgabe abgeschlossen: '+def.name+'! Belohnung erhalten.', 'ti-check');
     playSound('achieve');
     render(); save();
@@ -6225,7 +6259,8 @@
       { title:'Nutzen eroberter Systeme', body:'Jedes von dir kontrollierte System bringt laufend <strong>+3 Kredite pro Minute</strong> und <strong>+1% Produktion</strong> auf alle Ressourcen (Produktionsbonus gedeckelt bei +15%, also ab 15 Systemen). Die Übersicht im Galaxie-Tab zeigt deine Systeme und ihren Gesamtertrag. <strong>Achtung:</strong> Fraktionen versuchen gelegentlich, an ihr Gebiet grenzende Systeme <strong>zurückzuerobern</strong>. Ob sie Erfolg haben, hängt von deiner Gesamtverteidigung ab – wer stark verteidigt, verliert praktisch nie (Erfolgschance zwischen 3% und maximal 50% pro Versuch, Versuche sind selten). Deine Heimatsysteme sind davon nie betroffen. Verlierst du ein System, wirst du beim nächsten Kartenabgleich benachrichtigt.' },
       { title:'Diplomatie & Ruf', body:'Bei jeder Fraktion hast du einen <strong>Ruf</strong> (-100 bis 100). Angriffe auf ihre Systeme senken ihn um 15, <strong>Tribut zahlen</strong> (150 Kredite → +5 Ruf, im Galaxie-Tab) erhöht ihn. Ab Ruf 30 („Freundlich") gibt jede Fraktion einen Effekt, ab 70 („Verbündet") die stärkere Stufe: <strong>Aschen-Kartell</strong> 5%/10% bessere Marktpreise beim Kaufen und Verkaufen · <strong>Void-Marodeure</strong> 25%/50% seltener Überfälle · <strong>Eisenlegion</strong> Ressourcen-Lieferung alle 30 Min. · <strong>Schattenbund</strong> +15/+35 Kredite alle 30 Min. Du kannst also wählen: eine Fraktion bekriegen und erobern, oder sie pflegen und von ihr profitieren.' },
       { title:'Fraktions-Aufträge', body:'Jede Fraktion bietet dir einen <strong>Auftrag</strong> an (im Galaxie-Tab, 24h gültig, danach kommt ein neuer): Ressourcen liefern, Kämpfe gewinnen oder Expeditionen abschließen. Abschluss bringt <strong>+12 bis +15 Ruf und 200–300 Kredite</strong> – der lohnendere Weg, Ruf aufzubauen, verglichen mit Tribut. Nach dem Abschließen gibt es sofort einen neuen Auftrag.' },
-      { title:'Statistik-Dashboard', body:'Im Punktestand-Tab findest du ein <strong>Statistik-Dashboard</strong>: Kennzahlen-Kacheln (Siege, Niederlagen, Siegquote, Kampfpunkte, Expeditionen, eroberte Systeme, Kredite, gebundene Frachter), Verlaufsdiagramme für <strong>Kredite</strong> und <strong>Erz-Produktion</strong> sowie die aktuelle Produktion pro Sekunde aller Ressourcen als Balken. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.' }
+      { title:'Statistik-Dashboard', body:'Im Punktestand-Tab findest du ein <strong>Statistik-Dashboard</strong>: Kennzahlen-Kacheln (Siege, Niederlagen, Siegquote, Kampfpunkte, Expeditionen, eroberte Systeme, Kredite, gebundene Frachter), Verlaufsdiagramme für <strong>Kredite</strong> und <strong>Erz-Produktion</strong> sowie die aktuelle Produktion pro Sekunde aller Ressourcen als Balken. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.' },
+      { title:'Erfolge & Tagesaufgaben zu den neuen Systemen', body:'Markt, Handelsrouten, Diplomatie, Eroberung und Kredit-Shop haben eigene <strong>Erfolge</strong> (z.B. Marktgänger, Großhändler, Logistiker, Eroberer, Systemherr, Diplomat, Auftragsjäger, Stammkunde, Kreditwürdig) und zwei neue <strong>Tagesaufgaben</strong>: „1 Handel am Markt abschließen" (+60 Kredite) und „1 Fraktionsauftrag abschließen" (+80 Kredite).' }
     ]},
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
@@ -7274,6 +7309,9 @@
         if (!state.factionRep) state.factionRep = {};
         if (state.nextFactionGift === undefined) state.nextFactionGift = 0;
         if (!state.factionQuests) state.factionQuests = {};
+        if (state.marketTradesDone === undefined) state.marketTradesDone = 0;
+        if (state.factionQuestsDone === undefined) state.factionQuestsDone = 0;
+        if (state.shopPurchases === undefined) state.shopPurchases = 0;
         if (!state.modules) state.modules = {};
         if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
         if (!state.equippedModules) state.equippedModules = {};
