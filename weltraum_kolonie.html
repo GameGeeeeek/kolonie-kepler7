@@ -1309,8 +1309,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.65.0';
+  const VERSION = '7.65.1';
   const PATCHNOTES = [
+    { version:'7.65.1', date:'12.07.2026', changes:[
+      'Automatische Versions-Aktualisierung: Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung per Toast, wartet bei aktiver Texteingabe), statt dass man ewig unbemerkt auf einer veralteten Version weiterspielt',
+      'Hilfe-Seite entsprechend um diesen neuen Automatisierungs-Punkt ergänzt'
+    ]},
     { version:'7.65.0', date:'12.07.2026', changes:[
       'Neue Hilfe-Seite (Button oben im Header, neben Berichte/Einstellungen): 10 aufklappbare Kategorien mit echten Beispielzahlen – Grundlagen, Flotte & Schiffe, Kampf, Kampf-Wiedergabe, Kolonien & Monde, Forschung & Doktrin, Allianz, Fortschritt, Automatisierung, Häufige Fragen',
       '"Erklärung"-Buttons bei Taktik-Haltung und Verteidigungsanlagen springen direkt zur passenden Hilfe-Sektion',
@@ -5127,7 +5131,8 @@
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
       { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Im Verteidigung-Tab an-/abschaltbar.' },
       { title:'Automatische Reparatur', body:'Behebt Sabotage nach einem verlorenen Überfall sofort gegen 300 Erz + 150 Kristalle, statt 15 Minuten auf das automatische Ende zu warten.' },
-      { title:'Live-Kampf-Wiedergabe', body:'Steuert, ob sich die Kampf-Wiedergabe automatisch öffnet, sobald ein Überfall abläuft, während man aktiv im Spiel ist. Standardmäßig an, im Verteidigung-Tab abschaltbar.' }
+      { title:'Live-Kampf-Wiedergabe', body:'Steuert, ob sich die Kampf-Wiedergabe automatisch öffnet, sobald ein Überfall abläuft, während man aktiv im Spiel ist. Standardmäßig an, im Verteidigung-Tab abschaltbar.' },
+      { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
     { key:'faq', icon:'ti-list-details', title:'Häufige Fragen', entries:[
       { title:'Warum werden meine Jäger im Kampf nicht mitgezählt?', body:'Vermutlich fehlt Hangar-Kapazität. 1 Trägerschiff ermöglicht 6 Jäger. Ohne genug Träger bleiben überzählige Jäger "nicht einsatzbereit" und tragen nichts zur Angriffs- oder Verteidigungskraft bei.' },
@@ -9843,6 +9848,41 @@
   setInterval(maybeScheduleRaid, 300000);
   setInterval(maybeSpawnTrader, 60000);
   window.addEventListener('beforeunload', () => { save(); });
+
+  // ===== Automatische Versions-Prüfung =====
+  // Fragt alle 5 Minuten die live ausgelieferte Seite ab (nicht aus dem Cache) und vergleicht die
+  // darin enthaltene Versionsnummer mit der gerade laufenden. Ist eine neuere Version live, wird
+  // automatisch neu geladen (nach kurzer Vorwarnung per Toast, statt abrupt mitten in einer Eingabe
+  // zu unterbrechen) – ohne Rückfrage, sonst könnte man tage-/wochenlang unbemerkt auf einer
+  // veralteten Version weiterspielen, bis man selbst zufällig mal neu lädt.
+  let autoReloadPending = false;
+  function checkForNewVersionOnServer(){
+    if (autoReloadPending) return;
+    fetch(window.location.href, { cache:'no-store' })
+      .then(res => res.ok ? res.text() : null)
+      .then(text => {
+        if (!text) return;
+        const m = text.match(/const VERSION = '([^']+)'/);
+        const serverVersion = m ? m[1] : null;
+        if (serverVersion && compareVersions(serverVersion, VERSION) > 0) scheduleAutoReload(serverVersion);
+      })
+      .catch(()=>{});
+  }
+  function scheduleAutoReload(newVersion){
+    if (autoReloadPending) return;
+    autoReloadPending = true;
+    const attempt = () => {
+      // Nicht mitten in einer Texteingabe reinreißen (z.B. Chat-Nachricht, Kolonie umbenennen) –
+      // stattdessen kurz später erneut versuchen, statt die Eingabe zu verlieren.
+      const active = document.activeElement;
+      const isTyping = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA');
+      if (isTyping){ setTimeout(attempt, 5000); return; }
+      pushToast('Neue Version ('+newVersion+') gefunden – wird automatisch geladen…', 'ti-refresh');
+      setTimeout(() => { save(); location.reload(); }, 2500);
+    };
+    attempt();
+  }
+  setInterval(checkForNewVersionOnServer, 5*60*1000);
 
   function renderPatchnotes(){
     document.getElementById('versionTag').textContent = 'v'+VERSION;
