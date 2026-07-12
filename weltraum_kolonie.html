@@ -1319,8 +1319,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.70.0';
+  const VERSION = '7.71.0';
   const PATCHNOTES = [
+    { version:'7.71.0', date:'12.07.2026', changes:[
+      'Neu: Typ-Umwandlung ("echtes" Terraforming) – der Planetentyp selbst kann jetzt aufgewertet werden, entlang der Kette Todeswelt → Wüste → Eis → Vulkan → Wasserwelt → Kristall → Erdwelt',
+      'Neuer bester Typ: Erdwelt mit +15% auf ALLE Ressourcen (das Ziel der Umwandlung)',
+      'Jede Umwandlung ist bewusst sehr teuer (Erz/Kristalle/Deuterium/Antimaterie) und dauert lange (30 Min. bis mehrere Stunden), immer nur eine gleichzeitig',
+      'Das bisherige Stufen-Terraforming (+5%/Stufe) bleibt unverändert daneben bestehen – beide Systeme sind unabhängig und stapeln sich',
+      'Nur Planeten in der Umwandlungskette sind umwandelbar (nicht Gasriesen, Asteroiden oder Superplaneten)',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.70.0', date:'12.07.2026', changes:[
       'Neu: 5 zusätzliche Planetentypen mit echten Boni – Vulkanwelt (+15% Erz), Eiswelt (+15% Deuterium), Kristallwelt (+15% Kristalle), Wüstenwelt (+15% Energie) und Todeswelt (+10% Verteidigung, aber −10% Produktion)',
       'Die neuen Typen wurden thematisch passenden bestehenden Planeten zugewiesen (z.B. alle "Kristall"-Planeten sind jetzt Kristallwelten, "Ruinenwelten" sind Todeswelten)',
@@ -2277,23 +2285,51 @@
     eis: { label:'Eiswelt', icon:'ti-droplet', prodBonus:{ deuterium:1.15 }, bonusText:'+15% Deuterium-Produktion' },
     kristall: { label:'Kristallwelt', icon:'ti-diamond', prodBonus:{ kristalle:1.15 }, bonusText:'+15% Kristall-Produktion' },
     wueste: { label:'Wüstenwelt', icon:'ti-sun', prodBonus:{ energie:1.15 }, bonusText:'+15% Energie-Produktion' },
-    todeswelt: { label:'Todeswelt', icon:'ti-skull', prodBonus:{ erz:0.9, kristalle:0.9, deuterium:0.9, energie:0.9, forschungspunkte:0.9 }, defBonus:1.10, bonusText:'+10% Verteidigung, aber −10% Produktion' }
+    todeswelt: { label:'Todeswelt', icon:'ti-skull', prodBonus:{ erz:0.9, kristalle:0.9, deuterium:0.9, energie:0.9, forschungspunkte:0.9 }, defBonus:1.10, bonusText:'+10% Verteidigung, aber −10% Produktion' },
+    // Erdwelt ist das Ziel der Typ-Umwandlung (siehe TERRAFORM_TYPE_CHAIN) – großer Allround-Bonus auf
+    // ALLE Ressourcen. Bewusst das beste Ergebnis und entsprechend teuer zu erreichen.
+    erdwelt: { label:'Erdwelt', icon:'ti-world', prodBonus:{ erz:1.15, kristalle:1.15, deuterium:1.15, energie:1.15, forschungspunkte:1.15 }, bonusText:'+15% auf ALLE Ressourcen' }
   };
+  // Typ-Umwandlung ("echtes" Terraforming): wertet den Planetentyp entlang dieser Kette auf, von der
+  // schlechtesten (Todeswelt) zur besten (Erdwelt). Jeder Schritt ist sehr teuer und dauert lange.
+  // Getrennt vom Stufen-Terraforming (state.terraforming), das zusätzlich +5%/Stufe gibt. Planetentypen,
+  // die NICHT in dieser Kette stehen (Gasriese, Asteroid, Super, Erdähnlich), können nicht umgewandelt
+  // werden – ihre Umwandlung würde ihre Sonderrolle sprengen.
+  const TERRAFORM_TYPE_CHAIN = ['todeswelt','wueste','eis','vulkan','wasserwelt','kristall','erdwelt'];
+  function nextTerraformType(currentType){
+    const idx = TERRAFORM_TYPE_CHAIN.indexOf(currentType);
+    if (idx === -1 || idx >= TERRAFORM_TYPE_CHAIN.length-1) return null;
+    return TERRAFORM_TYPE_CHAIN[idx+1];
+  }
+  // Effektiver Typ eines Planeten: eine per Typ-Umwandlung erreichte Überschreibung hat Vorrang vor dem
+  // fest im PLANETS-Array verdrahteten Basistyp. Zentral, damit Produktion, Verteidigung, Icons und
+  // Labels konsistent denselben Typ sehen.
+  function effectivePlanetType(planetKey){
+    if (!planetKey || planetKey==='home') return null;
+    const ov = (state.planetTypeOverride||{})[planetKey];
+    if (ov) return ov;
+    const p = PLANETS.find(x=>x.id===planetKey);
+    return p ? p.type : null;
+  }
+  // Typ-Info (Icon/Label/Bonus) unter Berücksichtigung einer Umwandlung. Für ein PLANETS-Objekt p.
+  function planetTypeInfoFor(p){
+    if (!p) return {};
+    const t = (state.planetTypeOverride||{})[p.id] || p.type;
+    return PLANET_TYPE_INFO[t] || {};
+  }
   // Produktions-Multiplikator eines Standorts aus seinem Planetentyp (1 = kein Effekt).
   function planetTypeProdMult(planetKey, resKey){
     if (planetKey==='home') return 1;
-    const p = PLANETS.find(x=>x.id===planetKey);
-    if (!p) return 1;
-    const info = PLANET_TYPE_INFO[p.type];
+    const t = effectivePlanetType(planetKey);
+    const info = t && PLANET_TYPE_INFO[t];
     if (info && info.prodBonus && info.prodBonus[resKey] !== undefined) return info.prodBonus[resKey];
     return 1;
   }
   // Verteidigungs-Multiplikator eines Standorts aus seinem Planetentyp (1 = kein Effekt).
   function planetTypeDefMult(planetKey){
     if (planetKey==='home') return 1;
-    const p = PLANETS.find(x=>x.id===planetKey);
-    if (!p) return 1;
-    const info = PLANET_TYPE_INFO[p.type];
+    const t = effectivePlanetType(planetKey);
+    const info = t && PLANET_TYPE_INFO[t];
     return (info && info.defBonus) ? info.defBonus : 1;
   }
   const PLANETS = [
@@ -2579,6 +2615,8 @@
     planetBonuses: {},
     terraforming: {},
     terraformJob: null,
+    planetTypeOverride: {},
+    typeConvertJob: null,
     colonies: {},
     activeBasePlanet: 'home',
     nextRaidTime: null,
@@ -5236,7 +5274,8 @@
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus.' },
       { title:'Sektorkarte bedienen', body:'Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
       { title:'Terraforming', body:'Jeder Standort (Heimatbasis und Kolonien, nicht Monde) kann terraformt werden – Stufe 0 bis 10, jede Stufe gibt <strong>+5% Produktion</strong> dort (bis zu +50% bei Stufe 10). Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit. Es kann immer nur <strong>ein Terraforming gleichzeitig</strong> laufen. Zu finden im Basis-Tab unter der Planeten-Rolle.' },
-      { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab) – lohnt sich, das Kolonisierungsziel danach zu wählen.' }
+      { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
+      { title:'Typ-Umwandlung (echtes Terraforming)', body:'Getrennt vom Stufen-Terraforming kann der <strong>Planetentyp selbst</strong> aufgewertet werden, entlang der Kette Todeswelt → Wüstenwelt → Eiswelt → Vulkanwelt → Wasserwelt → Kristallwelt → <strong>Erdwelt</strong>. Jeder Schritt ist <strong>sehr teuer</strong> (Erz/Kristalle/Deuterium/Antimaterie) und dauert lange (30 Min. bis mehrere Stunden), es kann immer nur eine Umwandlung gleichzeitig laufen. So lässt sich aus einer schlechten Todeswelt über viele Schritte die bestmögliche Erdwelt formen. Zu finden im Basis-Tab unter dem Stufen-Terraforming. Nur Planeten in dieser Kette sind umwandelbar (nicht Gasriesen, Asteroiden oder Superplaneten).' }
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
@@ -6272,6 +6311,8 @@
         if (!state.planetBonuses) state.planetBonuses = {};
         if (!state.terraforming) state.terraforming = {};
         if (state.terraformJob === undefined) state.terraformJob = null;
+        if (!state.planetTypeOverride) state.planetTypeOverride = {};
+        if (state.typeConvertJob === undefined) state.typeConvertJob = null;
         if (!state.levelRewardsClaimed) state.levelRewardsClaimed = {};
         if (!state.rareItems) state.rareItems = {};
         if (!state.inventory) state.inventory = {};
@@ -6503,6 +6544,57 @@
   // (wie eine Bauwarteschlange) statt sofort zu wirken – passt besser zum "Umbauen"-Begriff. Die
   // ERSTE Zuweisung einer noch unspezialisierten Kolonie bleibt sofort (reine Designation, kein Umbau).
   const PLANET_ROLE_SWITCH_DURATION = 900;
+  // ===== Typ-Umwandlung ("echtes" Terraforming: verändert den Planetentyp selbst) =====
+  // Sehr teuer und langwierig. Führt einen Planeten entlang TERRAFORM_TYPE_CHAIN eine Stufe weiter
+  // (schlechtester Typ -> ... -> Erdwelt). Nur Typen in der Kette sind umwandelbar.
+  function typeConvertCost(targetType){
+    // Index in der Kette bestimmt den Preis – je näher an Erde, desto teurer. Bewusst hoch.
+    const idx = TERRAFORM_TYPE_CHAIN.indexOf(targetType);
+    const f = Math.pow(2.2, idx); // idx 1..6
+    return {
+      erz: Math.round(25000 * f),
+      kristalle: Math.round(15000 * f),
+      deuterium: Math.round(8000 * f),
+      antimaterie: Math.round(400 * f)
+    };
+  }
+  function typeConvertDuration(targetType){
+    const idx = TERRAFORM_TYPE_CHAIN.indexOf(targetType);
+    return 1800 + idx * 1800; // 30 Min. bis ~3,5 Std. je nach Zielstufe
+  }
+  function canConvertType(planetKey){
+    if (!planetKey || planetKey==='home') return false;
+    if (planetKey !== 'home' && !state.colonies[planetKey]) return false;
+    if (typeof isMoonKey==='function' && isMoonKey(planetKey)) return false;
+    const cur = effectivePlanetType(planetKey);
+    return !!nextTerraformType(cur);
+  }
+  function startTypeConvert(planetKey){
+    if (state.typeConvertJob){ log('Es läuft bereits eine Typ-Umwandlung.', 'ti-alert-triangle'); return; }
+    if (!canConvertType(planetKey)){ log('Dieser Planetentyp kann nicht (weiter) umgewandelt werden.', 'ti-alert-triangle'); return; }
+    const cur = effectivePlanetType(planetKey);
+    const target = nextTerraformType(cur);
+    const cost = typeConvertCost(target);
+    for (const [k,v] of Object.entries(cost)){
+      if ((state.resources[k]||0) < v){ log('Nicht genug Ressourcen für die Typ-Umwandlung zu '+(PLANET_TYPE_INFO[target].label)+'.', 'ti-alert-triangle'); return; }
+    }
+    for (const [k,v] of Object.entries(cost)) state.resources[k] -= v;
+    const dur = typeConvertDuration(target);
+    state.typeConvertJob = { planet: planetKey, targetType: target, endTime: Date.now() + dur*1000, totalDuration: dur };
+    log('Typ-Umwandlung auf '+displayPlanetName(planetKey)+' gestartet (Ziel: '+PLANET_TYPE_INFO[target].label+').', 'ti-plant');
+    playSound('build');
+    render(); save();
+  }
+  function processTypeConvertJob(){
+    if (!state.typeConvertJob) return;
+    if (Date.now() < state.typeConvertJob.endTime) return;
+    const job = state.typeConvertJob;
+    state.planetTypeOverride[job.planet] = job.targetType;
+    state.typeConvertJob = null;
+    log('Typ-Umwandlung abgeschlossen: '+displayPlanetName(job.planet)+' ist jetzt eine '+PLANET_TYPE_INFO[job.targetType].label+'.', 'ti-world');
+    playSound('complete');
+  }
+
   // ===== Terraforming =====
   // Pro Planet/Heimatbasis eine Stufe 0-10, jede Stufe gibt +5% Produktion auf diesem Standort
   // (bis zu +50% bei Stufe 10). Höherstufen kosten exponentiell mehr Ressourcen und brauchen eine mit
@@ -7269,7 +7361,7 @@
         return `<button class="planet-pill" data-map-base="${pid}"><i class="ti ti-planet" aria-hidden="true"></i>${planetDisplayName(pid)}</button>`;
       }
       const p = PLANETS.find(x=>x.id===pid);
-      const ti = (p && PLANET_TYPE_INFO[p.type]) || {};
+      const ti = planetTypeInfoFor(p);
       return `<button class="planet-pill" data-map-base="${pid}"><i class="ti ${ti.icon||'ti-planet'}" aria-hidden="true"></i>${p?p.name.split(' ').pop():pid}</button>`;
     }).join('');
     box.innerHTML = html;
@@ -7753,7 +7845,7 @@
         const sys = STAR_SYSTEMS.find(s=>s.id===p.system);
         const colonized = !!state.colonies[p.id];
         const discovered = !!state.discovered[p.id];
-        const ti = PLANET_TYPE_INFO[p.type]||{};
+        const ti = planetTypeInfoFor(p);
         return `
           <div class="search-result-row" data-search-planet="${p.id}" data-search-planet-system="${p.system}" style="padding:9px 12px; cursor:pointer; display:flex; align-items:center; gap:8px;">
             <i class="ti ${ti.icon||'ti-planet'}" aria-hidden="true" style="color:${p.color}; flex-shrink:0;"></i>
@@ -8024,7 +8116,7 @@
       <button class="planet-pill ${state.activeBasePlanet==='home'?'active':''}" data-planet-switch="home" style="border-color:rgba(126,119,221,0.4); position:relative;"><i class="ti ${PLANET_TYPE_INFO.erdaehnlich.icon}" aria-hidden="true" style="color:#5dcaa5;"></i>Heimatbasis <i class="ti ti-home" aria-hidden="true" style="color:#c3bef5; font-size:10px; margin-left:2px;"></i></button>
       ${colonyIds.map(pid => {
         if (isMoonKey(pid)) return `<button class="planet-pill ${state.activeBasePlanet===pid?'active':''}" data-planet-switch="${pid}"><i class="ti ti-planet" aria-hidden="true"></i>${planetDisplayName(pid)}${favStar(pid)}</button>`;
-        const p = PLANETS.find(x=>x.id===pid); const ti = PLANET_TYPE_INFO[p.type]||{}; return `<button class="planet-pill ${state.activeBasePlanet===pid?'active':''}" data-planet-switch="${pid}"><i class="ti ${ti.icon||'ti-planet'}" aria-hidden="true"></i>${p.name.split(' ').pop()}${favStar(pid)}</button>`; }).join('')}
+        const p = PLANETS.find(x=>x.id===pid); const ti = planetTypeInfoFor(p); return `<button class="planet-pill ${state.activeBasePlanet===pid?'active':''}" data-planet-switch="${pid}"><i class="ti ${ti.icon||'ti-planet'}" aria-hidden="true"></i>${p.name.split(' ').pop()}${favStar(pid)}</button>`; }).join('')}
     </div>`;
     // planetSwitcher (Basis-Tab) entfällt bewusst: die Dashboard-Karten oben sind seit v7.41.0 selbst
     // anklickbar und übernehmen diese Funktion dort mit mehr Info – in Verteidigung/Flotte/Expedition
@@ -8354,9 +8446,49 @@
               </div>`;
           }
           html += `</div>`;
+
+          // Typ-Umwandlung ("echtes" Terraforming) – nur für Planeten in der Aufwertungskette.
+          const curType = effectivePlanetType(pk);
+          const curInfo = PLANET_TYPE_INFO[curType] || {};
+          const convJob = state.typeConvertJob && state.typeConvertJob.planet === pk ? state.typeConvertJob : null;
+          const otherConvJob = state.typeConvertJob && state.typeConvertJob.planet !== pk ? state.typeConvertJob : null;
+          const nextType = nextTerraformType(curType);
+          if (nextType || convJob || (curType && TERRAFORM_TYPE_CHAIN.includes(curType))){
+            html += `<div class="section-title" style="margin-top:1rem; justify-content:space-between;"><span><i class="ti ti-world" aria-hidden="true"></i>Typ-Umwandlung</span></div>`;
+            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;">
+              <div class="bmeta" style="margin-bottom:8px;">Aktueller Typ: <i class="ti ${curInfo.icon||'ti-planet'}" aria-hidden="true"></i> <strong>${curInfo.label||curType}</strong>${curInfo.bonusText?` <span style="color:#5dcaa5;">(${curInfo.bonusText})</span>`:''}</div>`;
+            if (convJob){
+              const remain = Math.max(0, convJob.endTime-Date.now());
+              const pct = Math.max(0, Math.min(100, 100-(remain/(convJob.totalDuration*1000)*100)));
+              const tInfo = PLANET_TYPE_INFO[convJob.targetType]||{};
+              html += `<div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span class="bmeta"><i class="ti ti-world" aria-hidden="true"></i> Umwandlung zu ${tInfo.label} läuft…</span>
+                  <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
+                </div>
+                <div class="progress-outer" style="margin-top:4px;"><div class="progress-inner" style="width:${pct}%; background:#5dcaa5;"></div></div>`;
+            } else if (!nextType){
+              html += `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Bestmöglicher Typ erreicht (Erdwelt).</div>`;
+            } else {
+              const tInfo = PLANET_TYPE_INFO[nextType]||{};
+              const cost = typeConvertCost(nextType);
+              const dur = typeConvertDuration(nextType);
+              const costHtml2 = Object.entries(cost).map(([k,v]) => {
+                const rd = RES_DEFS.find(r=>r.key===k);
+                const enough = (state.resources[k]||0) >= v;
+                return `<span style="display:inline-flex; align-items:center; gap:3px; margin-right:10px; color:${enough?'#c7cbe0':'#e24b4a'};"><i class="ti ${rd?rd.icon:'ti-planet'}" aria-hidden="true" style="color:${rd?rd.color:'#c7cbe0'};"></i>${fmt(v)}</span>`;
+              }).join('');
+              html += `<div class="bmeta" style="margin-bottom:6px;">Nächster Typ: <i class="ti ${tInfo.icon}" aria-hidden="true"></i> <strong>${tInfo.label}</strong> <span style="color:#5dcaa5;">(${tInfo.bonusText})</span> · Dauer ${fmtDuration(dur)}</div>
+                <div style="margin-bottom:8px; font-size:12px;">${costHtml2}</div>
+                <button data-start-typeconvert="1" ${otherConvJob?'disabled':''} style="width:100%;"><i class="ti ti-world" aria-hidden="true" style="margin-right:4px;"></i>${otherConvJob?'Andere Umwandlung läuft…':'Typ umwandeln (sehr teuer)'}</button>`;
+            }
+            html += `</div>`;
+          }
+
           terraBox.innerHTML = html;
           const startBtn = terraBox.querySelector('[data-start-terraform]');
           if (startBtn) startBtn.onclick = () => startTerraform(pk);
+          const convBtn = terraBox.querySelector('[data-start-typeconvert]');
+          if (convBtn) convBtn.onclick = () => startTypeConvert(pk);
         }
       }
       const colonyRenameInput = document.getElementById('colonyRenameInput');
@@ -9001,7 +9133,7 @@
             <div class="bicon" style="background:${p.color}30; color:${p.color};"><i class="ti ${disc?'ti-planet':'ti-info-circle'}" aria-hidden="true"></i></div>
             <div>
               <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
-              <div class="bmeta"><i class="ti ${(PLANET_TYPE_INFO[p.type]||{}).icon||'ti-planet'}" aria-hidden="true"></i> ${(PLANET_TYPE_INFO[p.type]||{}).label||''}${(PLANET_TYPE_INFO[p.type]||{}).bonusText ? ` <span style="color:#5dcaa5;">(${(PLANET_TYPE_INFO[p.type]||{}).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS), 1)} Treibstoff</div>
+              <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS), 1)} Treibstoff</div>
               ${p.orbit ? `<div class="bmeta">${orbitBonusLabel(p.orbit)}</div>` : ''}
               <div class="bcost">${rewardHtml(p.reward)}</div>
               ${bonus ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Verborgener Bonus: ${bonus.labelText}</div>` : ''}
@@ -10193,6 +10325,7 @@
     const constructionDone = processConstructionQueue();
     const roleChangeDone = processPlanetRoleChanges();
     processTerraformJob();
+    processTypeConvertJob();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
