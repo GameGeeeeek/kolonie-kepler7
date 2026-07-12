@@ -153,7 +153,7 @@
     .battle-scene::before { content:''; position:absolute; inset:0; background-image:radial-gradient(1px 1px at 8% 45%, rgba(255,255,255,0.7), transparent), radial-gradient(1px 1px at 45% 15%, rgba(255,255,255,0.6), transparent), radial-gradient(1px 1px at 92% 40%, rgba(255,255,255,0.7), transparent), radial-gradient(1px 1px at 70% 92%, rgba(255,255,255,0.5), transparent), radial-gradient(1px 1px at 25% 90%, rgba(255,255,255,0.6), transparent); animation: battleStarDrift 14s linear infinite; opacity:0.8; pointer-events:none; }
     @keyframes battleStarDrift { 0%{ background-position:0 0; } 100%{ background-position:-30px 20px; } }
     .battle-scene.shake { animation: battleShake 0.3s ease-in-out; }
-    @keyframes battleShake { 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-3px); } 75%{ transform:translateX(3px); } }
+    @keyframes battleShake { 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(calc(-1 * var(--shake-amp, 3px))); } 75%{ transform:translateX(var(--shake-amp, 3px)); } }
     .battle-scene.climax { animation: battleClimaxPulse 1.4s ease-in-out infinite; }
     @keyframes battleClimaxPulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.025); } }
     .battle-round-counter { position:absolute; top:6px; left:10px; font-size:9px; color:#9296ac; background:rgba(0,0,0,0.35); padding:2px 7px; border-radius:20px; z-index:2; letter-spacing:0.3px; }
@@ -1287,8 +1287,20 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.63.1';
+  const VERSION = '7.64.0';
   const PATCHNOTES = [
+    { version:'7.64.0', date:'12.07.2026', changes:[
+      'Kampf-Wiedergabe: Lebensbalken jetzt farbcodiert (grün/gelb/rot je nach Füllstand)',
+      'Kampf-Wiedergabe: Kamera-Wackeln jetzt proportional zu den tatsächlichen Verlusten der Runde statt binär an/aus',
+      'Kampf-Wiedergabe: Schiffs-Icons nach Klasse gestaffelt – Superschlachtschiff wirkt jetzt spürbar größer als Jäger',
+      'Kampf-Wiedergabe: Zeitlupen-Effekt beim entscheidenden letzten Treffer der Entscheidungsrunde',
+      'Balance: Weicher Lager-Deckel – Produktion über der Kapazität geht nicht mehr komplett verloren, sondern läuft mit 20% Ertrag weiter',
+      'Balance: Rückkehrer-Boost – nach 24+ Stunden Abwesenheit gibt es für die nächsten 24 Stunden +50% Produktion auf alle Ressourcen',
+      'Balance: Heimatbasis-Verteidigungsbonus – die Heimatbasis hat jetzt +20% Verteidigungspunkte gegenüber identisch ausgebauten Kolonien',
+      'Balance: Abnehmender Grenznutzen bei Mega-Einzelflotten – ab 300 Schiffen eines Typs zählen weitere nur noch mit halber Angriffskraft-Wirkung',
+      'Balance: Anti-Farming bei PvP-Duellen – ist der Angreifer beim Punktestand mehr als 3x stärker als das Ziel, sinkt die erbeutete Ressourcenmenge anteilig (nie unter 30%)',
+      'Alle Balance-Änderungen sind ungetestete Design-Annahmen, nicht durch echte Partien validiert – bei Bedarf einfach melden, welche sich falsch anfühlt'
+    ]},
     { version:'7.63.1', date:'12.07.2026', changes:[
       'Test-Release zur Verifikation der automatischen Auslieferung (GitHub → Raspberry Pi via Cron-Job) – keine Spielinhalte geändert'
     ]},
@@ -2864,6 +2876,24 @@
     if (megaProdMult !== 1) for (const k of Object.keys(rates)) rates[k] *= megaProdMult;
     return rates;
   }
+  // Weicher statt harter Lager-Deckel: über der Kapazität geht Produktion nicht mehr komplett
+  // verloren, sondern läuft mit reduziertem Ertrag (20%) weiter. Gilt bewusst nur für laufende
+  // Produktion (die beiden Tick-Stellen unten), NICHT für einmalige Funde/Belohnungen anderswo im
+  // Code – die bleiben hart gedeckelt, das sind bewusste Einmal-Boni, keine Dauerproduktion.
+  const SOFT_CAP_OVERFLOW_RATE = 0.2;
+  function applySoftCappedGain(resources, key, rawGain, cap){
+    const current = resources[key]||0;
+    if (rawGain <= 0){ resources[key] = current; return; }
+    if (current >= cap){
+      resources[key] = current + rawGain*SOFT_CAP_OVERFLOW_RATE;
+    } else if (current + rawGain > cap){
+      const underCapPortion = cap - current;
+      const overflowPortion = rawGain - underCapPortion;
+      resources[key] = cap + overflowPortion*SOFT_CAP_OVERFLOW_RATE;
+    } else {
+      resources[key] = current + rawGain;
+    }
+  }
   function storageCap(){
     let cap = 800 + allFleets().reduce((a,f)=>a+(f.frachter||0),0)*250;
     for (const { planet, buildings: b } of allBuildingSetsWithPlanet()){
@@ -2985,10 +3015,20 @@
     const dampened = RETREAT_THRESHOLD + excess*(1-RETREAT_SAVE_FACTOR);
     return { pct: dampened, retreated: true };
   }
+  // Abnehmender Grenznutzen bei riesigen Einzelflotten: ab 300 Schiffen EINES Typs zählen weitere
+  // nur noch mit halber Wirkung. Verhindert, dass "eine Mega-Flotte eines einzigen Typs bauen"
+  // strikt besser ist als diversifizieren – ergänzt das Kontersystem (das nur bei Überfällen wirkt)
+  // um einen Effekt, der auch bei NPC-Kämpfen und PvP greift.
+  const MEGA_FLEET_THRESHOLD = 300;
+  const MEGA_FLEET_DIMINISH_RATE = 0.5;
+  function diminishingShipCount(count){
+    if (count <= MEGA_FLEET_THRESHOLD) return count;
+    return MEGA_FLEET_THRESHOLD + (count-MEGA_FLEET_THRESHOLD)*MEGA_FLEET_DIMINISH_RATE;
+  }
   function attackPowerRaw(fleet){
     const f = fleet || currentFleet();
     const df = deployableFighters(f);
-    let power = f.cruisers*20 + (f.destroyers||0)*45 + f.ships*5 + df.jaeger*10 + df.bomber*60 + (f.schlachtschiff||0)*90 + (f.carrier||0)*15 + (f.superschlachtschiff||0)*220;
+    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90 + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220;
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
@@ -3026,6 +3066,7 @@
     // nicht über diesen Umweg auch die Verteidigung erhöht (bzw. ein Verteidigungs-Malus sie senkt).
     return Math.round(attackPowerRaw(fleet) * 0.4) + shieldSum;
   }
+  const HOME_DEFENSE_BONUS = 1.20; // +20% nur auf der Heimatbasis, macht "Heimat verteidigen" bewusst wichtiger als Kolonien
   function defensePower(planetKey){
     const setsWithPlanet = planetKey ? [{ planet: planetKey, buildings: buildingSetFor(planetKey) }] : allBuildingSetsWithPlanet();
     let power = 0;
@@ -3034,6 +3075,7 @@
       for (const def of BUILDING_DEFS) if (def.category==='defense') sub += (b[def.key]||0) * (def.defVal + (def.shield||0));
       const role = planetRoleOf(planet);
       if (role && role.key==='fortress') sub *= 1.30;
+      if (planet === 'home') sub *= HOME_DEFENSE_BONUS;
       power += sub * moonPenalty(planet);
     }
     if (planetKey){
@@ -3041,12 +3083,14 @@
       let shipDef = shipDefenseContribution(f);
       const role = planetRoleOf(planetKey);
       if (role && role.key==='fortress') shipDef *= 1.30;
+      if (planetKey === 'home') shipDef *= HOME_DEFENSE_BONUS;
       power += shipDef;
     } else {
       for (const { planet, fleet: f } of allFleetsWithPlanet()){
         let shipDef = shipDefenseContribution(f);
         const role = planetRoleOf(planet);
         if (role && role.key==='fortress') shipDef *= 1.30;
+        if (planet === 'home') shipDef *= HOME_DEFENSE_BONUS;
         power += shipDef;
       }
     }
@@ -4064,8 +4108,17 @@
     // Kriegsbonus: falls das Ziel Mitglied einer Allianz ist, mit der die eigene Allianz im Krieg
     // liegt, gibt ein erfolgreicher Angriff +50% Kampfpunkte und zählt für den Kriegspunktestand.
     let targetAllianceTag = null;
-    try { const targetEntry = await loadPlayerEntry(playerId); targetAllianceTag = targetEntry ? (targetEntry.allianceTag||null) : null; } catch(e){}
+    let targetEntry = null;
+    try { targetEntry = await loadPlayerEntry(playerId); targetAllianceTag = targetEntry ? (targetEntry.allianceTag||null) : null; } catch(e){}
     const isWarAttack = targetAllianceTag && isAtWarWith(targetAllianceTag);
+    // Anti-Farming: ist der Angreifer beim Punktestand deutlich stärker als das Ziel, sinkt die
+    // Beute anteilig – sonst lohnt sich "kleine Spieler ausnehmen" überproportional, was neue
+    // Spieler schnell aus dem Spiel treibt. Ab 3x Punktestand-Unterschied greift die Reduktion,
+    // nie unter 30% Beute (damit Angriffe auf Schwächere nicht komplett witzlos werden).
+    const myScoreForFarmCheck = computeScore();
+    const targetScoreForFarmCheck = targetEntry ? (targetEntry.score||0) : 0;
+    const scoreRatio = targetScoreForFarmCheck > 0 ? myScoreForFarmCheck/targetScoreForFarmCheck : 1;
+    const farmingPenalty = scoreRatio > 3 ? Math.max(0.3, 1-(scoreRatio-3)*0.1) : 1;
     // Ergebnis wird bereits jetzt ermittelt (Server-Kampf bzw. simuliertes Duell), aber erst bei
     // Ankunft der Flotte tatsächlich angewendet – so bleibt die Flugzeit spielmechanisch relevant.
     let pendingResult;
@@ -4074,7 +4127,7 @@
         const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: playerId }) });
         const data = await res.json();
         if (!res.ok){ log(data.error || 'Angriff fehlgeschlagen.', 'ti-alert-triangle'); return; }
-        pendingResult = { source:'backend', success: data.success, stolen: data.stolen||{}, destroyedBuilding: data.destroyedBuilding, attackPowerShown: data.attackPower, defensePowerShown: data.defensePower, isWarAttack, targetAllianceTag };
+        pendingResult = { source:'backend', success: data.success, stolen: data.stolen||{}, destroyedBuilding: data.destroyedBuilding, attackPowerShown: data.attackPower, defensePowerShown: data.defensePower, isWarAttack, targetAllianceTag, farmingPenalty };
       } catch(e){ log('Server für Angriff nicht erreichbar.', 'ti-alert-triangle'); return; }
     } else {
       const entry = await loadPlayerEntry(playerId);
@@ -4089,7 +4142,7 @@
       );
       const chance = Math.max(0.1, Math.min(0.9, myPower/(myPower+theirDefenseEstimate)));
       const success = Math.random() < chance;
-      pendingResult = { source:'sim', success, attackPowerShown: myPower, defensePowerShown: theirDefenseEstimate, isWarAttack, targetAllianceTag };
+      pendingResult = { source:'sim', success, attackPowerShown: myPower, defensePowerShown: theirDefenseEstimate, isWarAttack, targetAllianceTag, farmingPenalty };
     }
     pay({deuterium: fuelCost});
     const fleetName = resolveFleetName();
@@ -4113,8 +4166,9 @@
         const rawStolen = r.stolen || {};
         let rawTotal = Object.values(rawStolen).reduce((a,b)=>a+b,0);
         const cargoScale = rawTotal > 0 ? Math.min(1, (m.cargoCapacity||0)/rawTotal) : 1;
+        const farmPenalty = r.farmingPenalty !== undefined ? r.farmingPenalty : 1;
         const carried = {};
-        for (const [res,amt] of Object.entries(rawStolen)){ const g = Math.floor(amt*cargoScale); state.resources[res] = (state.resources[res]||0)+g; carried[res] = g; }
+        for (const [res,amt] of Object.entries(rawStolen)){ const g = Math.floor(amt*cargoScale*farmPenalty); state.resources[res] = (state.resources[res]||0)+g; carried[res] = g; }
         const lootTxt = Object.entries(carried).map(([res,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===res)||{label:res}).label).join(', ') || 'nichts (Ziel hatte keine Ressourcen)';
         const bpGained = warTag ? Math.round(25*1.5) : 25;
         state.battlePoints += bpGained;
@@ -4591,13 +4645,36 @@
     }
     return { left, right, rounds, attackerWins, finalRightHp, leftWeaponPool, rightWeaponPool };
   }
+  // Lebensbalken-Füllstand setzen UND Farbe passend zum Füllstand anpassen (grün→gelb→rot), statt
+  // durchgehend grün egal wie wenig noch übrig ist.
+  function setBattleHpFill(pct){
+    const hpFill = document.getElementById('battleRightHpFill');
+    if (!hpFill) return;
+    hpFill.style.width = pct+'%';
+    let grad;
+    if (pct > 60) grad = 'linear-gradient(90deg,#5dcaa5,#3fae8a)';
+    else if (pct > 30) grad = 'linear-gradient(90deg,#e0a548,#c98a30)';
+    else grad = 'linear-gradient(90deg,#e24b4a,#c73a3a)';
+    hpFill.style.background = grad;
+  }
+  // Icon-Größe nach Angriffskraft-Klasse gestaffelt – ein Superschlachtschiff soll spürbar größer
+  // wirken als ein Jäger, statt alle Schiffstypen gleich groß darzustellen.
+  function battleShipIconSize(key){
+    const atk = key==='superschlachtschiff' ? 220 : ((SHIP_DEFS.find(d=>d.key===key)||{}).atk || 0);
+    if (atk >= 200) return 27;
+    if (atk >= 80) return 23;
+    if (atk >= 40) return 20;
+    if (atk >= 15) return 18;
+    return 15;
+  }
   function renderBattleFleetIcons(containerId, fleet, remainingCounts){
     const el = document.getElementById(containerId);
     if (!el) return;
     const parts = Object.entries(fleet).filter(([k,v])=>v>0);
     el.innerHTML = parts.map(([k,v]) => {
       const iconKey = k==='superschlachtschiff' ? 'ship_superschlachtschiff' : (SHIP_DEFS.find(d=>d.key===k)||{}).icon;
-      const svg = iconKey && ICONS[iconKey] ? ICONS[iconKey].replace('width="24" height="24"', 'width="18" height="18"') : '';
+      const sz = battleShipIconSize(k);
+      const svg = iconKey && ICONS[iconKey] ? ICONS[iconKey].replace('width="24" height="24"', `width="${sz}" height="${sz}"`) : '';
       const remaining = remainingCounts[k] !== undefined ? remainingCounts[k] : v;
       const dead = remaining <= 0;
       return `<span class="battle-ship-icon ${dead?'destroyed':''}" data-battle-ship="${k}" title="${shipDisplayName(k)}">${svg}</span><span data-battle-ship-count="${k}" style="font-size:10px; color:#c7cbe0; margin:0 6px 0 -1px; align-self:center;">${Math.max(0,remaining)}</span>`;
@@ -4632,7 +4709,10 @@
   // Die Form richtet sich nach der Waffe (weapon.kind): Energiestrahl, Plasma-Ball oder Rakete mit
   // Abgasspur. Nutzt animationend statt gekoppelter setTimeout-Ketten, damit sich bei vielen
   // gleichzeitigen Schüssen keine Zeitverschiebung aufsummiert.
-  function spawnBattleShot(scene, fromPct, toPct, weapon, delayMs, withShake){
+  // Basis-Animationsdauer je Waffentyp (muss zu den CSS-Keyframe-Dauern passen) – wird für die
+  // Zeitlupe beim letzten entscheidenden Treffer der Entscheidungsrunde gebraucht.
+  function battleShotBaseDuration(kind){ return kind==='missile' ? 0.65 : kind==='orb' ? 0.55 : 0.4; }
+  function spawnBattleShot(scene, fromPct, toPct, weapon, delayMs, withShake, slowMo){
     const t = setTimeout(() => {
       if (!scene.isConnected) return;
       const goingRight = toPct > fromPct;
@@ -4656,6 +4736,8 @@
       }
       projectile.style.top = topPct+'%';
       projectile.style.color = weapon.color;
+      const speedMult = slowMo ? 1.9 : 1;
+      if (slowMo) projectile.style.animationDuration = (battleShotBaseDuration(weapon.kind)*speedMult)+'s';
       scene.appendChild(projectile);
       playSound('shot');
       let flightDone = false;
@@ -4672,14 +4754,20 @@
         scene.appendChild(impact);
         playSound('impact');
         spawnBattleDamageNumber(scene, toPct, topPct, weapon);
-        if (withShake) scene.classList.add('shake');
+        if (withShake > 0){
+          // Wackel-Stärke proportional zu den Verlusten dieser Runde – eine Runde mit 2 verlorenen
+          // Schiffen soll spürbar sanfter wackeln als eine mit 40.
+          const amp = Math.min(8, 2 + withShake*0.3);
+          scene.style.setProperty('--shake-amp', amp+'px');
+          scene.classList.add('shake');
+        }
         let impactDone = false;
         const onImpactEnd = () => { if (impactDone) return; impactDone = true; impact.remove(); scene.classList.remove('shake'); };
         impact.addEventListener('animationend', onImpactEnd, { once:true });
         battleTimers.push(setTimeout(onImpactEnd, 500)); // Sicherheitsnetz, falls animationend ausbleibt
       };
       projectile.addEventListener('animationend', onFlightEnd, { once:true });
-      const safetyMs = weapon.kind === 'missile' ? 750 : weapon.kind === 'orb' ? 650 : 500;
+      const safetyMs = (weapon.kind === 'missile' ? 750 : weapon.kind === 'orb' ? 650 : 500) * speedMult;
       battleTimers.push(setTimeout(onFlightEnd, safetyMs)); // Sicherheitsnetz, falls animationend ausbleibt
     }, delayMs);
     battleTimers.push(t);
@@ -4689,18 +4777,19 @@
   // Waffen, die zur tatsächlich vorhandenen Ausrüstung dieser Seite passen (leftPool/rightPool).
   const BATTLE_LEFT_ZONE = [8, 30], BATTLE_RIGHT_ZONE = [70, 92];
   function randIn(zone){ return zone[0] + Math.random()*(zone[1]-zone[0]); }
-  function spawnRoundShots(scene, hasLeftLoss, hasRightLoss, leftPool, rightPool){
+  function spawnRoundShots(scene, leftLossCount, rightLossCount, leftPool, rightPool, slowMo){
+    const hasLeftLoss = leftLossCount > 0, hasRightLoss = rightLossCount > 0;
     const shotCount = 3 + Math.floor(Math.random()*3);
     for (let i=0;i<shotCount;i++){
       const weapon = leftPool[Math.floor(Math.random()*leftPool.length)];
       const isLast = i===shotCount-1;
-      spawnBattleShot(scene, randIn(BATTLE_LEFT_ZONE), randIn(BATTLE_RIGHT_ZONE), weapon, i*130, hasRightLoss && isLast);
+      spawnBattleShot(scene, randIn(BATTLE_LEFT_ZONE), randIn(BATTLE_RIGHT_ZONE), weapon, i*130, hasRightLoss && isLast ? rightLossCount : 0, !!(slowMo && isLast));
     }
     const returnCount = 3 + Math.floor(Math.random()*3);
     for (let i=0;i<returnCount;i++){
       const weapon = rightPool[Math.floor(Math.random()*rightPool.length)];
       const isLast = i===returnCount-1;
-      spawnBattleShot(scene, randIn(BATTLE_RIGHT_ZONE), randIn(BATTLE_LEFT_ZONE), weapon, 60+i*140, hasLeftLoss && isLast);
+      spawnBattleShot(scene, randIn(BATTLE_RIGHT_ZONE), randIn(BATTLE_LEFT_ZONE), weapon, 60+i*140, hasLeftLoss && isLast ? leftLossCount : 0, !!(slowMo && isLast));
     }
   }
   function openBattleReplay(report){
@@ -4806,13 +4895,15 @@
       }
       log.scrollTop = log.scrollHeight;
       const scene = document.getElementById('battleScene');
-      const hasLeftLoss = Object.keys(round.leftDestroyed).length > 0;
-      const hasRightLoss = Object.keys(round.rightDestroyed).length > 0;
+      const leftLossCount = Object.values(round.leftDestroyed).reduce((a,b)=>a+b,0);
+      const rightLossCount = Object.values(round.rightDestroyed).reduce((a,b)=>a+b,0);
+      const hasLeftLoss = leftLossCount > 0;
+      const hasRightLoss = rightLossCount > 0;
       // Rundenanzeige + Kamera-Zoom-Puls in der Entscheidungsrunde für einen dramaturgischen Höhepunkt.
       const counterEl = document.getElementById('battleRoundCounter');
       if (counterEl){ counterEl.style.display = 'block'; counterEl.textContent = 'Runde '+(roundIdx+1)+'/'+seq.rounds.length+' – '+(phaseLabels[round.phase]||round.phase); }
       if (scene) scene.classList.toggle('climax', round.phase === 'entscheidung');
-      if (scene) spawnRoundShots(scene, hasLeftLoss, hasRightLoss, seq.leftWeaponPool, seq.rightWeaponPool);
+      if (scene) spawnRoundShots(scene, leftLossCount, rightLossCount, seq.leftWeaponPool, seq.rightWeaponPool, round.phase === 'entscheidung');
       // Betroffene Schiffs-Icons kurz aufblitzen lassen ("Vorzucken"), bevor die Zahl tatsächlich
       // sinkt – wirkt wie ein Treffer-Warnsignal statt eines plötzlichen Sprungs.
       for (const k of Object.keys(round.leftDestroyed)){
@@ -4852,11 +4943,10 @@
             if (icon){ icon.classList.add('exploding'); setTimeout(() => icon.classList.remove('exploding'), 520); }
           }
         }
-        const hpFill = document.getElementById('battleRightHpFill');
-        if (hpFill) hpFill.style.width = round.rightHpPct+'%';
-      }, (hasLeftLoss || hasRightLoss) ? 950 : 480);
+        setBattleHpFill(round.rightHpPct);
+      }, round.phase === 'entscheidung' ? 1650 : (hasLeftLoss || hasRightLoss) ? 950 : 480);
       roundIdx++;
-      scheduleDelayed(playRound, 1100);
+      scheduleDelayed(playRound, round.phase === 'entscheidung' ? 1900 : 1100);
     };
     playRound();
 
@@ -4874,8 +4964,7 @@
         }
         renderBattleFleetIcons('battleRightIcons', seq.right.fleet, remainingRight);
       }
-      const hpFill = document.getElementById('battleRightHpFill');
-      if (hpFill) hpFill.style.width = seq.finalRightHp+'%';
+      setBattleHpFill(seq.finalRightHp);
       finishBattleReplay(report, seq);
     };
   }
@@ -5985,15 +6074,30 @@
     lastOfflineSummary = null;
     if (seconds < 2) return;
     const capped = Math.min(seconds, 8*3600);
+    // Rückkehrer-Boost: wer mindestens 24h weg war, bekommt für die nächsten 24h spielinterne Zeit
+    // +50% Produktion auf alle Ressourcen – sonst wird der Abstand zu Dauerspielern irgendwann
+    // uneinholbar, und genau das lässt Leute eher ganz aufhören statt zurückzukommen. Wirkt auch
+    // schon auf die Offline-Gutschrift selbst (fühlt sich beim Zurückkommen sofort spürbar an).
+    const RETURNING_PLAYER_THRESHOLD_SEC = 24*3600;
+    let returningBoostGranted = false;
+    if (seconds >= RETURNING_PLAYER_THRESHOLD_SEC){
+      if (!state.buffs) state.buffs = [];
+      const expiresAt = Date.now() + 24*3600*1000;
+      for (const res of ['energie','erz','kristalle','deuterium','antimaterie','forschungspunkte']){
+        state.buffs.push({ kind:'prod', res, mult:1.5, expiresAt, source:'returning-player' });
+      }
+      returningBoostGranted = true;
+    }
     const rates = ratesPerSecond();
     const cap = storageCap();
     const before = { ...state.resources };
-    for (const r of Object.keys(rates)) state.resources[r] = Math.min(cap, state.resources[r] + rates[r]*capped);
+    for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r]*capped, cap);
     const gained = {};
     for (const r of Object.keys(rates)) gained[r] = Math.round((state.resources[r]||0) - (before[r]||0));
     let missionsPending = 0;
     for (const { fleet } of allFleetsWithPlanet()) missionsPending += fleet.missions.filter(m => Date.now() >= m.endTime).length;
     checkMissions(false);
+    if (returningBoostGranted) log('Willkommen zurück! Du warst über 24 Stunden weg – die nächsten 24 Stunden gibt es +50% Produktion auf alle Ressourcen.', 'ti-sparkles');
     if (capped > 5){
       log('Willkommen zurück! Fortschritt für '+Math.floor(capped/60)+' Min. gutgeschrieben.', 'ti-clock');
       lastOfflineSummary = { minutes: Math.floor(capped/60), gained, missionsPending };
@@ -9548,7 +9652,7 @@
     if (saveConflictDetected) return;
     const rates = ratesPerSecond();
     const cap = storageCap();
-    for (const r of Object.keys(rates)) state.resources[r] = Math.min(cap, state.resources[r] + rates[r]);
+    for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r], cap);
     const missionsResolved = checkMissions();
     flashGains(rates);
     maybeDetectRaid();
