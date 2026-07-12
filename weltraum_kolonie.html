@@ -1313,8 +1313,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.67.1';
+  const VERSION = '7.67.2';
   const PATCHNOTES = [
+    { version:'7.67.2', date:'12.07.2026', changes:[
+      'Bug behoben: Die Galaxie-Übersichtskarte (Sektorkarte, alle Systeme mit Piratenbasen/Aliens/Supernovas) wurde nur neu gezeichnet, während man sich fälschlich auf dem Galaxie-Tab befand – nicht während man tatsächlich auf der Sektorkarte war, wo die Karte liegt. Dadurch blieb sie gelegentlich leer oder veraltet ("lädt manchmal nicht"). Jetzt zuverlässig, solange man tatsächlich auf der Sektorkarte ist'
+    ]},
     { version:'7.67.1', date:'12.07.2026', changes:[
       'Trümmerfeld-Symbole ("T") auf der Sektorkarte sind jetzt antippbar: zeigt Gesamtmenge und ob/wie schnell es abgebaut wird (je nach stationierten Recyclern) – gilt sowohl für die Heimatbasis als auch für einzelne Planeten',
       'Trümmerfeld-Info-Logik vereinheitlicht (Dashboard-Karten und Sektorkarte nutzen jetzt dieselbe Funktion, vorher zwei leicht unterschiedliche Kopien)',
@@ -9817,7 +9820,11 @@
     // gelegentliches Einfrieren über längere Spielsitzungen. Jetzt nur noch neu aufbauen, wenn der
     // jeweilige Tab auch tatsächlich aktiv ist (direkte Aufrufe an anderer Stelle, z.B. bei
     // Systemwechsel oder Suche, bleiben davon unberührt und aktualisieren weiterhin sofort).
-    if (activeTab === 'galaxie') buildGalaxyMap();
+    // BUGFIX 12.07.2026: Die Bedingung prüfte fälschlich activeTab==='galaxie' statt 'karte' – die
+    // Übersichtskarte (galaxyMapSvg) liegt aber im karte-Tab, nicht im galaxie-Tab (NPC-Kämpfe/
+    // Händler). Dadurch wurde die Karte nie neu gezeichnet, während man tatsächlich drauf schaute -
+    // erklärt das gemeldete "die obere Karte lädt manchmal nicht".
+    if (activeTab === 'karte') buildGalaxyMap();
     if (activeTab === 'karte') buildMap();
   }
 
