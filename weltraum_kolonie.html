@@ -770,6 +770,7 @@
         <button class="tab-btn" data-tab="galaxie"><i class="ti ti-users" aria-hidden="true"></i>Galaxie</button>
         <button class="tab-btn" data-tab="allianz"><i class="ti ti-flag" aria-hidden="true"></i>Allianz</button>
         <button class="tab-btn" data-tab="offiziere"><i class="ti ti-user-circle" aria-hidden="true"></i>Offiziere</button>
+        <button class="tab-btn" data-tab="markt"><i class="ti ti-truck" aria-hidden="true"></i>Markt</button>
         <button class="tab-btn" data-tab="punkte"><i class="ti ti-star" aria-hidden="true"></i>Punktestand</button>
         <button class="tab-btn" data-tab="fortschritt"><i class="ti ti-award" aria-hidden="true"></i>Fortschritt</button>
       </div>
@@ -986,6 +987,16 @@
         <div class="bmeta" style="margin-top:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i> Tipp: Ziffern 1–9 und 0 wechseln direkt zwischen den Tabs (Basis bis Fortschritt, in Anzeigereihenfolge).</div>
       </div>
 
+
+      <div class="tab-panel" id="tab-markt">
+        <div class="section-title"><i class="ti ti-truck" aria-hidden="true"></i>Galaktischer Markt</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Ein <strong>geteilter Markt</strong> für alle Spieler: Preise reagieren in Echtzeit auf Angebot und Nachfrage. Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Gehandelt wird gegen <strong>Kredite</strong>.</div>
+        <div class="card-row" style="margin-bottom:1rem; border-color:#fac775;">
+          <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.18); color:#fac775;"><i class="ti ti-diamond" aria-hidden="true"></i></div><div><div class="bname">Kredite</div><div class="bmeta">Guthaben für den Markt</div></div></div>
+          <div class="lvl-pill" style="background:rgba(250,199,117,0.2); color:#fac775; font-size:15px;"><span id="creditsDisplay">0</span></div>
+        </div>
+        <div id="marketBox"></div>
+      </div>
 
       <div class="tab-panel" id="tab-offiziere">
         <div class="section-title"><i class="ti ti-user-circle" aria-hidden="true"></i>Offiziere</div>
@@ -1333,8 +1344,18 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.73.0';
+  const VERSION = '7.74.0';
   const PATCHNOTES = [
+    { version:'7.74.0', date:'12.07.2026', changes:[
+      'Neu: Galaktischer Markt – ein für alle Spieler geteilter Marktplatz (über den Server) mit dynamischen Preisen, die auf Angebot und Nachfrage reagieren',
+      'Neue Währung Kredite: Ressourcen jederzeit gegen Kredite kaufen/verkaufen. Kaufen treibt den Preis, Verkaufen drückt ihn – große Trades bekommen Slippage (schlechteren Schnitt)',
+      'Preise erholen sich mit der Zeit langsam zu ihrem Normalwert zurück',
+      'Eigener neuer Tab "Markt" mit Preis-, Trend- und Bestandsanzeige pro Ressource',
+      'Handelbar: Erz, Kristalle, Deuterium, Energie, Antimaterie (Forschungspunkte bewusst nicht)',
+      'Zum Start gibt es 250 Kredite Startguthaben; weitere Kredite verdient man durch Verkaufen',
+      'Hilfe-Seite entsprechend ergänzt',
+      'Hinweis: Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar)'
+    ]},
     { version:'7.73.0', date:'12.07.2026', changes:[
       'Neu: Ausrüstbare Schiffsmodule mit vier Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250% Wirkung)',
       'Vier Modultypen: Panzerung (+Verteidigung), Waffen (+Angriff), Bergbau (+Produktion), Werft (−Bauzeit)',
@@ -2567,6 +2588,129 @@
   // Wird periodisch vom Backend geholt (siehe setInterval unten). Rein clientseitiger Cache, NICHT
   // Teil von state (das ist geteilter, spielerübergreifender Zustand, kein Spielstand-Feld).
   let galaxyCache = { npcEmpireStrength: 1, marketTrend: 1, activePirateFaction: null, unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, news: [] };
+  // ===== Geteilter Marktplatz (Backend) =====
+  const MARKET_RES_KEYS = ['erz','kristalle','deuterium','energie','antimaterie'];
+  // Vom Markt-Tab genutzte, pro Ressource gemerkte Eingabemenge (nur UI-Zustand, nicht gespeichert).
+  const marketTradeAmounts = {};
+  function renderMarket(){
+    const cd = document.getElementById('creditsDisplay');
+    if (cd) cd.textContent = fmt(state.credits||0);
+    const box = document.getElementById('marketBox');
+    if (!box) return;
+    if (!useBackend()){
+      box.innerHTML = '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Der Marktplatz ist nur mit Serververbindung verfügbar (im Gastmodus nicht nutzbar).</div>';
+      return;
+    }
+    if (!state.marketCache){
+      box.innerHTML = '<div class="lb-note"><i class="ti ti-clock" aria-hidden="true"></i>Marktdaten werden geladen…</div>';
+      loadMarketState();
+      return;
+    }
+    box.innerHTML = MARKET_RES_KEYS.map(key => {
+      const rd = RES_DEFS.find(r=>r.key===key) || { label:key, icon:'ti-diamond', color:'#c7cbe0' };
+      const m = state.marketCache[key];
+      if (!m) return '';
+      const price = m.price, base = m.basePrice || price;
+      const pctVsBase = Math.round((price/base - 1)*100);
+      const trendColor = pctVsBase > 3 ? '#e24b4a' : (pctVsBase < -3 ? '#5dcaa5' : '#8489a0');
+      const trendLabel = pctVsBase > 3 ? '▲ teuer' : (pctVsBase < -3 ? '▼ günstig' : '≈ normal');
+      const amt = marketTradeAmounts[key] || 100;
+      const owned = Math.floor(state.resources[key]||0);
+      const buyEst = estimateTradeCredits('buy', key, amt);
+      const sellEst = estimateTradeCredits('sell', key, amt);
+      return `
+        <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="bicon" style="background:${rd.color}22; color:${rd.color};"><i class="ti ${rd.icon}" aria-hidden="true"></i></div>
+              <div>
+                <div class="bname">${rd.label}</div>
+                <div class="bmeta">Preis: <strong style="color:${rd.color};">${price.toFixed(2)}</strong> Kr./Einheit · <span style="color:${trendColor};">${trendLabel} (${pctVsBase>=0?'+':''}${pctVsBase}%)</span></div>
+                <div class="bmeta">Dein Bestand: ${fmt(owned)}</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+            <input type="number" min="1" data-market-amt="${key}" value="${amt}" style="width:90px; padding:5px 8px;"/>
+            <button data-market-buy="${key}" style="flex:1; min-width:110px; background:rgba(226,75,74,0.15);"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>Kaufen (~${fmt(buyEst)} Kr.)</button>
+            <button data-market-sell="${key}" style="flex:1; min-width:110px; background:rgba(93,202,165,0.15);"><i class="ti ti-truck" aria-hidden="true" style="margin-right:3px;"></i>Verkaufen (~${fmt(sellEst)} Kr.)</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    box.querySelectorAll('[data-market-amt]').forEach(inp => inp.oninput = () => {
+      const k = inp.getAttribute('data-market-amt');
+      marketTradeAmounts[k] = Math.max(1, Math.floor(Number(inp.value)||1));
+    });
+    box.querySelectorAll('[data-market-buy]').forEach(btn => btn.onclick = () => {
+      const k = btn.getAttribute('data-market-buy');
+      doMarketTrade('buy', k, marketTradeAmounts[k] || 100);
+    });
+    box.querySelectorAll('[data-market-sell]').forEach(btn => btn.onclick = () => {
+      const k = btn.getAttribute('data-market-sell');
+      doMarketTrade('sell', k, marketTradeAmounts[k] || 100);
+    });
+  }
+
+  async function loadMarketState(){
+    if (!useBackend()) return;
+    try {
+      const res = await backendFetch('/market', { method:'GET' });
+      if (!res.ok) return;
+      const data = await res.json();
+      state.marketCache = data.market || null;
+      if (activeTab === 'markt') renderMarket();
+    } catch(e){}
+  }
+  // Führt einen Handel über das Backend aus. Das Backend ist Autorität über den Preis; wir buchen erst
+  // nach erfolgreicher Antwort die Ressourcen/Kredite lokal.
+  async function doMarketTrade(action, resource, amount){
+    if (!useBackend()){ log('Der Marktplatz braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
+    amount = Math.floor(amount);
+    if (!amount || amount <= 0){ log('Ungültige Menge.', 'ti-alert-triangle'); return; }
+    // Vorab-Prüfung, damit der Spieler nicht unnötig eine Server-Anfrage schickt.
+    if (action === 'buy'){
+      const est = estimateTradeCredits('buy', resource, amount);
+      if ((state.credits||0) < est){ log('Nicht genug Kredite (ca. '+fmt(est)+' nötig).', 'ti-alert-triangle'); return; }
+    } else {
+      if ((state.resources[resource]||0) < amount){ log('Nicht genug '+(RES_DEFS.find(r=>r.key===resource)||{}).label+' zum Verkaufen.', 'ti-alert-triangle'); return; }
+    }
+    try {
+      const res = await backendFetch('/market/trade', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ action, resource, amount })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok){ log('Handel fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
+      const label = (RES_DEFS.find(r=>r.key===resource)||{label:resource}).label;
+      if (action === 'buy'){
+        if ((state.credits||0) < data.credits){ log('Nicht genug Kredite – der Preis ist gestiegen. Handel abgebrochen.', 'ti-alert-triangle'); await loadMarketState(); return; }
+        state.credits -= data.credits;
+        state.resources[resource] = (state.resources[resource]||0) + data.amount;
+        log('Gekauft: '+fmt(data.amount)+' '+label+' für '+fmt(data.credits)+' Kredite (Ø '+data.avgPrice.toFixed(2)+').', 'ti-truck');
+      } else {
+        if ((state.resources[resource]||0) < data.amount){ log('Ressourcen reichen nicht mehr. Handel abgebrochen.', 'ti-alert-triangle'); return; }
+        state.resources[resource] -= data.amount;
+        state.credits = (state.credits||0) + data.credits;
+        log('Verkauft: '+fmt(data.amount)+' '+label+' für '+fmt(data.credits)+' Kredite (Ø '+data.avgPrice.toFixed(2)+').', 'ti-truck');
+      }
+      // Aktualisierten Preis lokal übernehmen (bis zum nächsten vollen Laden).
+      if (state.marketCache && state.marketCache[resource]) state.marketCache[resource].price = data.priceAfter;
+      playSound('trade');
+      render(); save();
+    } catch(e){ log('Marktverbindung fehlgeschlagen.', 'ti-alert-triangle'); }
+  }
+  // Grobe Client-Schätzung der Kredit-Kosten/Erlöse (das Backend rechnet verbindlich).
+  function estimateTradeCredits(action, resource, amount){
+    if (!state.marketCache || !state.marketCache[resource]) return 0;
+    const price = state.marketCache[resource].price;
+    const base = state.marketCache[resource].basePrice || price;
+    const impact = (amount/1000) * 0.04 * base;
+    const priceAfter = action==='buy' ? price+impact : Math.max(0, price-impact);
+    return Math.round((price+priceAfter)/2 * amount);
+  }
+
   async function loadGalaxyState(){
     if (!useBackend()) return;
     try {
@@ -2658,6 +2802,8 @@
     battlePoints: 0,
     commandPoints: 0,
     officers: {},
+    credits: 250,
+    marketCache: null,
     modules: {},
     moduleSlotLevel: {},
     equippedModules: {},
@@ -5464,6 +5610,11 @@
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern.' },
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand.' }
     ]},
+    { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
+      { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
+      { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Preise erholen sich mit der Zeit langsam zu ihrem Normalwert – teuer gewordene Ressourcen werden also wieder günstiger.' },
+      { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' }
+    ]},
     { key:'offiziere', icon:'ti-user-circle', title:'Offiziere', entries:[
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Gebäude-Bauzeit pro Stufe), <strong>Admiral</strong> (+2% Angriffskraft), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Handelsgewinn beim Schwarzmarkt). Jeder geht von Stufe 0 (nicht angeheuert) bis 10, also bis zu ±20%.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr).' },
@@ -6499,6 +6650,7 @@
         if (state.typeConvertJob === undefined) state.typeConvertJob = null;
         if (state.commandPoints === undefined) state.commandPoints = 0;
         if (!state.officers) state.officers = {};
+        if (state.credits === undefined) state.credits = 250;
         if (!state.modules) state.modules = {};
         if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
         if (!state.equippedModules) state.equippedModules = {};
@@ -9387,6 +9539,8 @@
     // Performance: Angriffsflotte-Auswahl und NPC-Liste sind aufwändig (mehrere Schiffstypen bzw.
     // 10 NPCs mit Kampfkraft-/Frachtkapazitäts-Berechnung je Tick) und nur im Galaxie-Tab sichtbar –
     // werden deshalb nur neu berechnet, wenn dieser Tab gerade aktiv ist.
+    if (activeTab === 'markt') renderMarket();
+
     if (activeTab === 'offiziere'){
       const cpDisplay = document.getElementById('commandPointsDisplay');
       if (cpDisplay) cpDisplay.textContent = fmt(state.commandPoints||0);
@@ -10646,6 +10800,8 @@
   setInterval(() => { loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); } }, 15000);
   setInterval(loadGalaxyState, 120000); // Galaxie-Zustand ändert sich langsam (Server-Tick alle 15 Min.), reicht alle 2 Min. zu prüfen
   loadGalaxyState();
+  setInterval(() => { if (activeTab === 'markt') loadMarketState(); }, 30000); // Marktpreise im Markt-Tab alle 30s auffrischen
+  loadMarketState();
 
   // Tastenkürzel: Ziffern 1-9 und 0 wechseln direkt zum jeweiligen Tab (in Anzeigereihenfolge), sofern
   // gerade nicht in ein Text-/Zahlenfeld getippt wird. Reine Komfortfunktion, keine Spiellogik.
