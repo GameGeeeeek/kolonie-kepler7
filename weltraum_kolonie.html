@@ -1100,6 +1100,9 @@
       </div>
 
       <div class="tab-panel" id="tab-fortschritt">
+        <div class="section-title"><i class="ti ti-medal" aria-hidden="true"></i>Galaktische Dominanz</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Endlose Langzeitziele: Stufen ohne Ende, jede mit Titel und Belohnung. Es gibt kein Spielende – nur den nächsten Rang.</div>
+        <div id="dominanceBox" style="margin-bottom:1.5rem;"></div>
         <div class="section-title"><i class="ti ti-award" aria-hidden="true"></i>Kommandanten-Level</div>
         <div id="levelBox"></div>
 
@@ -1367,8 +1370,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.85.0';
+  const VERSION = '7.86.0';
   const PATCHNOTES = [
+    { version:'7.86.0', date:'12.07.2026', changes:[
+      'Neu: Galaktische Dominanz – endlose Langzeitziele im Fortschritt-Tab (bewusst OHNE Siegbedingung: es gibt kein Spielende, nur den nächsten Rang)',
+      'Der Dominanz-Wert wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge',
+      'Stufen-Schwellen wachsen unbegrenzt (Stufe 1: 1.000 · Stufe 5: ~15.000 · Stufe 10: ~50.000 · endlos weiter)',
+      'Rang-Titel: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator → Galaktische Legende 1, 2, 3 …',
+      'Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe), einzeln abholbar',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.85.0', date:'12.07.2026', changes:[
       'Neu: Galaktischer Weltboss – ein gemeinsamer Server-Gegner mit geteiltem HP-Pool, gegen den alle Spieler zusammen kämpfen (oben im Galaxie-Tab)',
       'Angriff alle 30 Minuten möglich; dein Schaden entspricht deiner Angriffskraft (leicht gestreut, Mindestschaden 50 – auch Anfänger tragen bei)',
@@ -3039,6 +3050,77 @@
     }
     return null;
   }
+  // ===== Galaktische Dominanz (endlose Langzeitziele) =====
+  // BEWUSST OHNE SIEGBEDINGUNG: die Stufen-Schwellen wachsen per Formel unbegrenzt weiter, es gibt
+  // kein "Spielende". Der Dominanz-Wert speist sich aus allen Langzeit-Leistungen; jede erreichte
+  // Stufe gibt eine einmalige Belohnung (Kredite + Kommandopunkte, steigend) und einen Rang-Titel.
+  const DOMINANCE_TITLES = ['Rekrut','Pionier','Kommandant','Kriegsherr','Vizeadmiral','Admiral','Großadmiral','Imperator','Galaktische Legende'];
+  function dominanceScore(){
+    return Math.round(
+      computeScore()
+      + myConqueredSystems().length * 500
+      + ((state.battleStats&&state.battleStats.wins)||0) * 50
+      + (state.expeditionsCompleted||0) * 30
+      + (state.prestige||0) * 1500
+      + Object.keys(state.achievements||{}).length * 150
+      + (state.factionQuestsDone||0) * 40
+    );
+  }
+  // Schwelle für Stufe n (1-basiert): wächst überlinear, damit frühe Stufen schnell kommen und späte
+  // echte Langzeitziele sind. Stufe 1: 1000, Stufe 5: ~15k, Stufe 10: ~50k, Stufe 20: ~163k, endlos.
+  function dominanceThreshold(n){ return Math.round(1000 * Math.pow(n, 1.7)); }
+  function dominanceLevelFor(score){
+    let lvl = 0;
+    while (score >= dominanceThreshold(lvl+1)) lvl++;
+    return lvl;
+  }
+  function dominanceTitle(lvl){
+    if (lvl <= 0) return 'Neuling';
+    if (lvl <= DOMINANCE_TITLES.length) return DOMINANCE_TITLES[lvl-1];
+    return 'Galaktische Legende '+(lvl - DOMINANCE_TITLES.length + 1);
+  }
+  function dominanceRewardFor(lvl){ return { credits: 200 + lvl*100, commandPoints: 10 + lvl*5 }; }
+  function claimDominanceReward(){
+    const reached = dominanceLevelFor(dominanceScore());
+    const next = (state.dominanceClaimed||0) + 1;
+    if (next > reached){ log('Die nächste Dominanz-Stufe ist noch nicht erreicht.', 'ti-info-circle'); return; }
+    const rw = dominanceRewardFor(next);
+    state.dominanceClaimed = next;
+    state.credits = (state.credits||0) + rw.credits;
+    state.commandPoints = (state.commandPoints||0) + rw.commandPoints;
+    log('Dominanz-Stufe '+next+' erreicht: „'+dominanceTitle(next)+'"! +'+rw.credits+' Kredite, +'+rw.commandPoints+' Kommandopunkte.', 'ti-medal');
+    playSound('achieve');
+    render(); save();
+  }
+  function renderDominance(){
+    const box = document.getElementById('dominanceBox');
+    if (!box) return;
+    const score = dominanceScore();
+    const reached = dominanceLevelFor(score);
+    const claimed = state.dominanceClaimed||0;
+    const nextLvl = claimed + 1;
+    const nextThresh = dominanceThreshold(nextLvl);
+    const prevThresh = claimed > 0 ? dominanceThreshold(claimed) : 0;
+    const pct = Math.max(0, Math.min(100, Math.round((score - prevThresh) / Math.max(1, nextThresh - prevThresh) * 100)));
+    const claimable = reached > claimed;
+    const rw = dominanceRewardFor(nextLvl);
+    box.innerHTML = `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:#c3bef5;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div><div class="bname" style="color:#c3bef5;">Rang: ${dominanceTitle(claimed)} <span class="lvl-pill">Stufe ${claimed}</span></div>
+          <div class="bmeta">Dominanz-Wert: ${fmt(score)} · nächste Stufe bei ${fmt(nextThresh)}</div></div>
+          <button data-claim-dominance ${claimable?'':'disabled'} style="white-space:nowrap; ${claimable?'background:rgba(195,190,245,0.2);':''}">${claimable?'Stufe '+nextLvl+' abholen':'Noch '+fmt(Math.max(0,nextThresh-score))}</button>
+        </div>
+        <div style="height:10px; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden; margin-bottom:4px;">
+          <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#7f77dd,#c3bef5);"></div>
+        </div>
+        <div class="bmeta">Belohnung für Stufe ${nextLvl}: +${rw.credits} Kredite, +${rw.commandPoints} Kommandopunkte · Titel: „${dominanceTitle(nextLvl)}"</div>
+        <div class="bmeta" style="margin-top:2px;">Der Dominanz-Wert wächst durch Punkte, eroberte Systeme, Siege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge – die Stufen gehen endlos weiter.</div>
+      </div>`;
+    const btn = box.querySelector('[data-claim-dominance]');
+    if (btn) btn.onclick = () => claimDominanceReward();
+  }
+
   // ===== Galaktischer Weltboss =====
   // Gemeinsamer Server-Gegner mit geteiltem HP-Pool. Angriff mit 30-Min.-Abklingzeit; jeder Angriff
   // gibt +8 Kampfpunkte/+40 Kredite, der Todesstoß +100/+1000. Der Server bucht die Belohnung in
@@ -3502,6 +3584,7 @@
     marketTradesDone: 0,
     factionQuestsDone: 0,
     shopPurchases: 0,
+    dominanceClaimed: 0,
     modules: {},
     moduleSlotLevel: {},
     equippedModules: {},
@@ -6347,7 +6430,8 @@
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
-      { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge und Skill-Baum. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe).' }
+      { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge und Skill-Baum. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe).' },
+      { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang (Rekrut → Pionier → … → Imperator → Galaktische Legende 1, 2, 3 …). Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
       { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Im Verteidigung-Tab an-/abschaltbar.' },
@@ -7382,6 +7466,7 @@
         if (state.marketTradesDone === undefined) state.marketTradesDone = 0;
         if (state.factionQuestsDone === undefined) state.factionQuestsDone = 0;
         if (state.shopPurchases === undefined) state.shopPurchases = 0;
+        if (state.dominanceClaimed === undefined) state.dominanceClaimed = 0;
         if (!state.modules) state.modules = {};
         if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
         if (!state.equippedModules) state.equippedModules = {};
@@ -10963,6 +11048,7 @@
     const xpNext = xpForLevel(lvl+1);
     const xpPct = Math.max(0, Math.min(100, ((curXp-xpBase)/(xpNext-xpBase))*100));
     const levelBox = document.getElementById('levelBox');
+    renderDominance();
     if (levelBox) levelBox.innerHTML = `
       <div class="card-row" style="flex-direction:column; align-items:stretch;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
