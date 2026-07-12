@@ -1319,8 +1319,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.69.0';
+  const VERSION = '7.70.0';
   const PATCHNOTES = [
+    { version:'7.70.0', date:'12.07.2026', changes:[
+      'Neu: 5 zusätzliche Planetentypen mit echten Boni – Vulkanwelt (+15% Erz), Eiswelt (+15% Deuterium), Kristallwelt (+15% Kristalle), Wüstenwelt (+15% Energie) und Todeswelt (+10% Verteidigung, aber −10% Produktion)',
+      'Die neuen Typen wurden thematisch passenden bestehenden Planeten zugewiesen (z.B. alle "Kristall"-Planeten sind jetzt Kristallwelten, "Ruinenwelten" sind Todeswelten)',
+      'Der Typ-Bonus wird in der Planetenliste (Sektorkarte-Tab) angezeigt – so wird die Wahl des Kolonisierungsziels strategischer',
+      'Bestehende Typen (erdähnlich, Gasriese, Wasserwelt, Asteroid) bleiben bewusst ohne Bonus, damit sich an der Balance vorhandener Planeten nichts Unerwartetes ändert',
+      'Boni stapeln sich multiplikativ mit Terraforming, Planeten-Rolle und allen anderen Produktionsmultiplikatoren',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.69.0', date:'12.07.2026', changes:[
       'Neu: Terraforming – jeder Standort (Heimatbasis und Kolonien) kann in 10 Stufen terraformt werden, jede Stufe gibt +5% Produktion dort (bis +50% bei Stufe 10)',
       'Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit (Stufe 1 ~3 Min., Stufe 10 ~20 Min.), immer nur ein Terraforming gleichzeitig',
@@ -2260,59 +2268,85 @@
     gasriese: { label:'Gasriese', icon:'ti-atom' },
     wasserwelt: { label:'Wasserwelt', icon:'ti-droplet' },
     asteroid: { label:'Asteroid', icon:'ti-diamond' },
-    super: { label:'★ Superplanet (extrem selten)', icon:'ti-sparkles' }
+    super: { label:'★ Superplanet (extrem selten)', icon:'ti-sparkles' },
+    // Neue Typen mit echtem Produktions-/Verteidigungsbonus. prodBonus: {res: faktor} multipliziert die
+    // jeweilige Ressourcenproduktion auf DIESEM Standort; defBonus multipliziert die Verteidigung dort.
+    // Bestehende Typen oben haben bewusst keine Boni (damit sich an vorhandenen Planeten nichts an der
+    // Balance ändert). Icons/Farben ausschließlich aus der bestätigten Whitelist.
+    vulkan: { label:'Vulkanwelt', icon:'ti-mountain', prodBonus:{ erz:1.15 }, bonusText:'+15% Erz-Produktion' },
+    eis: { label:'Eiswelt', icon:'ti-droplet', prodBonus:{ deuterium:1.15 }, bonusText:'+15% Deuterium-Produktion' },
+    kristall: { label:'Kristallwelt', icon:'ti-diamond', prodBonus:{ kristalle:1.15 }, bonusText:'+15% Kristall-Produktion' },
+    wueste: { label:'Wüstenwelt', icon:'ti-sun', prodBonus:{ energie:1.15 }, bonusText:'+15% Energie-Produktion' },
+    todeswelt: { label:'Todeswelt', icon:'ti-skull', prodBonus:{ erz:0.9, kristalle:0.9, deuterium:0.9, energie:0.9, forschungspunkte:0.9 }, defBonus:1.10, bonusText:'+10% Verteidigung, aber −10% Produktion' }
   };
+  // Produktions-Multiplikator eines Standorts aus seinem Planetentyp (1 = kein Effekt).
+  function planetTypeProdMult(planetKey, resKey){
+    if (planetKey==='home') return 1;
+    const p = PLANETS.find(x=>x.id===planetKey);
+    if (!p) return 1;
+    const info = PLANET_TYPE_INFO[p.type];
+    if (info && info.prodBonus && info.prodBonus[resKey] !== undefined) return info.prodBonus[resKey];
+    return 1;
+  }
+  // Verteidigungs-Multiplikator eines Standorts aus seinem Planetentyp (1 = kein Effekt).
+  function planetTypeDefMult(planetKey){
+    if (planetKey==='home') return 1;
+    const p = PLANETS.find(x=>x.id===planetKey);
+    if (!p) return 1;
+    const info = PLANET_TYPE_INFO[p.type];
+    return (info && info.defBonus) ? info.defBonus : 1;
+  }
   const PLANETS = [
     { id:'vesna', system:'kepler', orbit:1, name:'Trümmerfeld Vesna', type:'asteroid', x:150, y:70, duration:45, reward:{erz:15}, discoveryBonus:{erz:20}, color:'#c9c7bd', colonizeCost:{erz:200} },
     { id:'rhea', system:'kepler', orbit:2, name:'Eismond Rhea', type:'wasserwelt', x:260, y:150, duration:60, reward:{deuterium:12}, discoveryBonus:{deuterium:15}, color:'#a9cdf5', colonizeCost:{erz:150, deuterium:80} },
-    { id:'aion', system:'kepler', orbit:3, name:'Kristallgürtel Aion', type:'asteroid', x:380, y:55, duration:75, reward:{kristalle:10}, discoveryBonus:{kristalle:25}, color:'#c3bef5', colonizeCost:{erz:250, kristalle:100} },
+    { id:'aion', system:'kepler', orbit:3, name:'Kristallgürtel Aion', type:'kristall', x:380, y:55, duration:75, reward:{kristalle:10}, discoveryBonus:{kristalle:25}, color:'#c3bef5', colonizeCost:{erz:250, kristalle:100} },
     { id:'kaska', system:'kepler', orbit:4, name:'Asteroid Kaska-9', type:'asteroid', x:470, y:160, duration:90, reward:{erz:30, kristalle:10}, discoveryBonus:{erz:40}, color:'#fac775', colonizeCost:{erz:350, kristalle:120} },
     { id:'draconis', system:'kepler', orbit:5, name:'Nebel Draconis', type:'gasriese', x:570, y:70, duration:120, reward:{deuterium:25, antimaterie:2}, discoveryBonus:{deuterium:30}, color:'#a9cdf5', colonizeCost:{erz:300, deuterium:150} },
-    { id:'thessa', system:'vega', orbit:1, name:'Ruinenwelt Thessa', type:'erdaehnlich', x:150, y:70, duration:150, reward:{antimaterie:5, kristalle:20}, discoveryBonus:{kristalle:50}, color:'#f3aec6', colonizeCost:{kristalle:300, antimaterie:20} },
+    { id:'thessa', system:'vega', orbit:1, name:'Ruinenwelt Thessa', type:'todeswelt', x:150, y:70, duration:150, reward:{antimaterie:5, kristalle:20}, discoveryBonus:{kristalle:50}, color:'#f3aec6', colonizeCost:{kristalle:300, antimaterie:20} },
     { id:'nyxar', system:'vega', orbit:2, name:'Frostmond Nyxar', type:'wasserwelt', x:260, y:150, duration:170, reward:{deuterium:40, kristalle:15}, discoveryBonus:{deuterium:50}, color:'#a9cdf5', colonizeCost:{erz:400, deuterium:250} },
     { id:'oberon', system:'vega', orbit:3, name:'Gasriese Oberon', type:'gasriese', x:380, y:55, duration:190, reward:{energie:60, antimaterie:6}, discoveryBonus:{energie:80}, color:'#fac775', colonizeCost:{energie:500, antimaterie:40} },
-    { id:'zeta', system:'vega', orbit:4, name:'Kristallkern Zeta', type:'asteroid', x:470, y:160, duration:210, reward:{kristalle:45, antimaterie:8}, discoveryBonus:{kristalle:90}, color:'#c3bef5', colonizeCost:{kristalle:450, antimaterie:50} },
+    { id:'zeta', system:'vega', orbit:4, name:'Kristallkern Zeta', type:'kristall', x:470, y:160, duration:210, reward:{kristalle:45, antimaterie:8}, discoveryBonus:{kristalle:90}, color:'#c3bef5', colonizeCost:{kristalle:450, antimaterie:50} },
     { id:'echo9', system:'vega', orbit:5, name:'Verlorene Kolonie Echo-9', type:'erdaehnlich', x:570, y:70, duration:240, reward:{antimaterie:15, erz:80}, discoveryBonus:{antimaterie:20}, color:'#f3aec6', colonizeCost:{antimaterie:80, erz:600} },
-    { id:'helion', system:'orion', orbit:1, name:'Sonnenkern Helion', type:'gasriese', x:150, y:70, duration:260, reward:{energie:90, kristalle:30}, discoveryBonus:{energie:120}, color:'#fac775', colonizeCost:{energie:700, kristalle:200} },
+    { id:'helion', system:'orion', orbit:1, name:'Sonnenkern Helion', type:'vulkan', x:150, y:70, duration:260, reward:{energie:90, kristalle:30}, discoveryBonus:{energie:120}, color:'#fac775', colonizeCost:{energie:700, kristalle:200} },
     { id:'nocta', system:'orion', orbit:2, name:'Schattenwelt Nocta', type:'erdaehnlich', x:260, y:150, duration:280, reward:{deuterium:70, antimaterie:10}, discoveryBonus:{deuterium:100}, color:'#a9cdf5', colonizeCost:{deuterium:500, antimaterie:60} },
-    { id:'pyra', system:'orion', orbit:3, name:'Vulkanmond Pyra', type:'erdaehnlich', x:380, y:55, duration:300, reward:{erz:150, energie:60}, discoveryBonus:{erz:200}, color:'#e24b4a', colonizeCost:{erz:900, energie:300} },
-    { id:'sereth', system:'orion', orbit:4, name:'Kristallwelt Sereth', type:'asteroid', x:470, y:160, duration:320, reward:{kristalle:100, antimaterie:15}, discoveryBonus:{kristalle:250}, color:'#c3bef5', colonizeCost:{kristalle:800, antimaterie:70} },
+    { id:'pyra', system:'orion', orbit:3, name:'Vulkanmond Pyra', type:'vulkan', x:380, y:55, duration:300, reward:{erz:150, energie:60}, discoveryBonus:{erz:200}, color:'#e24b4a', colonizeCost:{erz:900, energie:300} },
+    { id:'sereth', system:'orion', orbit:4, name:'Kristallwelt Sereth', type:'kristall', x:470, y:160, duration:320, reward:{kristalle:100, antimaterie:15}, discoveryBonus:{kristalle:250}, color:'#c3bef5', colonizeCost:{kristalle:800, antimaterie:70} },
     { id:'tempus', system:'orion', orbit:5, name:'Anomalie Tempus', type:'super', x:570, y:70, duration:350, reward:{antimaterie:60, deuterium:200, kristalle:100}, discoveryBonus:{antimaterie:150}, color:'#f3aec6', colonizeCost:{antimaterie:120, deuterium:400} },
-    { id:'aurora', system:'nebel', orbit:1, name:'Polarwelt Aurora', type:'wasserwelt', x:150, y:70, duration:380, reward:{energie:120, deuterium:80}, discoveryBonus:{energie:150}, color:'#5dcaa5', colonizeCost:{energie:1000, deuterium:400} },
+    { id:'aurora', system:'nebel', orbit:1, name:'Polarwelt Aurora', type:'eis', x:150, y:70, duration:380, reward:{energie:120, deuterium:80}, discoveryBonus:{energie:150}, color:'#5dcaa5', colonizeCost:{energie:1000, deuterium:400} },
     { id:'krypton', system:'nebel', orbit:2, name:'Gasnebel Krypton', type:'gasriese', x:380, y:120, duration:400, reward:{kristalle:130, antimaterie:20}, discoveryBonus:{kristalle:300}, color:'#c3bef5', colonizeCost:{kristalle:1200, antimaterie:100} },
     { id:'obscura', system:'nebel', orbit:3, name:'Dunkelzone Obscura', type:'erdaehnlich', x:570, y:60, duration:420, reward:{antimaterie:40, erz:200}, discoveryBonus:{antimaterie:60}, color:'#791f1f', colonizeCost:{antimaterie:150, erz:1000} },
     { id:'finis', system:'rand', orbit:1, name:'Grenzwelt Finis', type:'asteroid', x:150, y:70, duration:450, reward:{erz:250, kristalle:150}, discoveryBonus:{erz:400}, color:'#fac775', colonizeCost:{erz:1800, kristalle:900} },
-    { id:'abyssos', system:'rand', orbit:2, name:'Tiefenwelt Abyssos', type:'wasserwelt', x:380, y:120, duration:480, reward:{deuterium:180, antimaterie:50}, discoveryBonus:{deuterium:300}, color:'#378add', colonizeCost:{deuterium:1200, antimaterie:200} },
+    { id:'abyssos', system:'rand', orbit:2, name:'Tiefenwelt Abyssos', type:'eis', x:380, y:120, duration:480, reward:{deuterium:180, antimaterie:50}, discoveryBonus:{deuterium:300}, color:'#378add', colonizeCost:{deuterium:1200, antimaterie:200} },
     { id:'omega', system:'rand', orbit:3, name:'Omega-Anomalie', type:'gasriese', x:570, y:60, duration:520, reward:{antimaterie:100, kristalle:300}, discoveryBonus:{antimaterie:150}, color:'#d4537e', colonizeCost:{antimaterie:300, kristalle:1500} },
-    { id:'kruxa', system:'krux', orbit:1, name:'Kruxwelt Alpha', type:'erdaehnlich', x:150, y:70, duration:200, reward:{erz:80, energie:60}, discoveryBonus:{erz:120}, color:'#5dcaa5', colonizeCost:{erz:600, energie:300} },
+    { id:'kruxa', system:'krux', orbit:1, name:'Kruxwelt Alpha', type:'vulkan', x:150, y:70, duration:200, reward:{erz:80, energie:60}, discoveryBonus:{erz:120}, color:'#5dcaa5', colonizeCost:{erz:600, energie:300} },
     { id:'kruxb', system:'krux', orbit:2, name:'Kruxfeld Beta', type:'asteroid', x:380, y:120, duration:230, reward:{kristalle:70, erz:100}, discoveryBonus:{kristalle:150}, color:'#c9c7bd', colonizeCost:{kristalle:700, erz:400} },
     { id:'kruxc', system:'krux', orbit:3, name:'Nebelmond Kruxis', type:'gasriese', x:570, y:60, duration:260, reward:{deuterium:90, antimaterie:12}, discoveryBonus:{deuterium:180}, color:'#a9cdf5', colonizeCost:{deuterium:800, antimaterie:80} },
-    { id:'aethera', system:'aether', orbit:1, name:'Ätherwelt Prime', type:'wasserwelt', x:150, y:70, duration:300, reward:{deuterium:110, energie:80}, discoveryBonus:{deuterium:200}, color:'#378add', colonizeCost:{deuterium:1000, energie:500} },
-    { id:'aetherb', system:'aether', orbit:2, name:'Kristallschwarm Äther', type:'asteroid', x:380, y:120, duration:330, reward:{kristalle:150, antimaterie:20}, discoveryBonus:{kristalle:300}, color:'#c3bef5', colonizeCost:{kristalle:1300, antimaterie:120} },
-    { id:'aetherc', system:'aether', orbit:3, name:'Fernwelt Äther-Omega', type:'erdaehnlich', x:570, y:60, duration:360, reward:{erz:200, kristalle:100}, discoveryBonus:{erz:400}, color:'#fac775', colonizeCost:{erz:2000, kristalle:1000} },
+    { id:'aethera', system:'aether', orbit:1, name:'Ätherwelt Prime', type:'eis', x:150, y:70, duration:300, reward:{deuterium:110, energie:80}, discoveryBonus:{deuterium:200}, color:'#378add', colonizeCost:{deuterium:1000, energie:500} },
+    { id:'aetherb', system:'aether', orbit:2, name:'Kristallschwarm Äther', type:'kristall', x:380, y:120, duration:330, reward:{kristalle:150, antimaterie:20}, discoveryBonus:{kristalle:300}, color:'#c3bef5', colonizeCost:{kristalle:1300, antimaterie:120} },
+    { id:'aetherc', system:'aether', orbit:3, name:'Fernwelt Äther-Omega', type:'vulkan', x:570, y:60, duration:360, reward:{erz:200, kristalle:100}, discoveryBonus:{erz:400}, color:'#fac775', colonizeCost:{erz:2000, kristalle:1000} },
     { id:'vortex1', system:'vortex', orbit:1, name:'Terra Vortex-1', type:'erdaehnlich', x:110, y:60, duration:352, reward:{erz:91, kristalle:55}, discoveryBonus:{erz:127, kristalle:76}, color:'#5dcaa5', colonizeCost:{erz:819, kristalle:491} },
     { id:'vortex2', system:'vortex', orbit:2, name:'Gasriese Vortex-2', type:'gasriese', x:330, y:45, duration:464, reward:{energie:130, antimaterie:39}, discoveryBonus:{energie:182, antimaterie:55}, color:'#a9cdf5', colonizeCost:{energie:1170, antimaterie:351} },
     { id:'vortex3', system:'vortex', orbit:3, name:'Eismond Vortex-3', type:'wasserwelt', x:540, y:65, duration:576, reward:{deuterium:169, kristalle:34}, discoveryBonus:{deuterium:237, kristalle:47}, color:'#a9cdf5', colonizeCost:{deuterium:1521, kristalle:304} },
     { id:'vortex4', system:'vortex', orbit:4, name:'Asteroidengürtel Vortex-4', type:'asteroid', x:150, y:175, duration:688, reward:{erz:146, kristalle:208}, discoveryBonus:{erz:204, kristalle:291}, color:'#fac775', colonizeCost:{erz:1310, kristalle:1872} },
-    { id:'vortex5', system:'vortex', orbit:5, name:'Ruinenwelt Vortex-5', type:'erdaehnlich', x:400, y:190, duration:800, reward:{erz:247, kristalle:148}, discoveryBonus:{erz:346, kristalle:207}, color:'#5dcaa5', colonizeCost:{erz:2223, kristalle:1334} },
+    { id:'vortex5', system:'vortex', orbit:5, name:'Ruinenwelt Vortex-5', type:'todeswelt', x:400, y:190, duration:800, reward:{erz:247, kristalle:148}, discoveryBonus:{erz:346, kristalle:207}, color:'#5dcaa5', colonizeCost:{erz:2223, kristalle:1334} },
     { id:'vortex6', system:'vortex', orbit:6, name:'Regenwelt Vortex-6', type:'wasserwelt', x:610, y:170, duration:912, reward:{deuterium:286, kristalle:57}, discoveryBonus:{deuterium:400, kristalle:80}, color:'#378add', colonizeCost:{deuterium:2574, kristalle:515} },
-    { id:'chronos1', system:'chronos', orbit:1, name:'Ruinenwelt Chronos-1', type:'erdaehnlich', x:110, y:60, duration:352, reward:{erz:91, kristalle:55}, discoveryBonus:{erz:127, kristalle:76}, color:'#5dcaa5', colonizeCost:{erz:819, kristalle:491} },
+    { id:'chronos1', system:'chronos', orbit:1, name:'Ruinenwelt Chronos-1', type:'todeswelt', x:110, y:60, duration:352, reward:{erz:91, kristalle:55}, discoveryBonus:{erz:127, kristalle:76}, color:'#5dcaa5', colonizeCost:{erz:819, kristalle:491} },
     { id:'chronos2', system:'chronos', orbit:2, name:'Gasriese Chronos-2', type:'gasriese', x:330, y:45, duration:464, reward:{energie:130, antimaterie:39}, discoveryBonus:{energie:182, antimaterie:55}, color:'#c3bef5', colonizeCost:{energie:1170, antimaterie:351} },
     { id:'chronos3', system:'chronos', orbit:3, name:'Eismond Chronos-3', type:'wasserwelt', x:540, y:65, duration:576, reward:{deuterium:169, kristalle:34}, discoveryBonus:{deuterium:237, kristalle:47}, color:'#5dcaa5', colonizeCost:{deuterium:1521, kristalle:304} },
     { id:'chronos4', system:'chronos', orbit:4, name:'Bruchzone Chronos-4', type:'asteroid', x:150, y:175, duration:688, reward:{erz:146, kristalle:208}, discoveryBonus:{erz:204, kristalle:291}, color:'#c9c7bd', colonizeCost:{erz:1310, kristalle:1872} },
     { id:'chronos5', system:'chronos', orbit:5, name:'Grünwelt Chronos-5', type:'erdaehnlich', x:400, y:190, duration:800, reward:{erz:247, kristalle:148}, discoveryBonus:{erz:346, kristalle:207}, color:'#f3aec6', colonizeCost:{erz:2223, kristalle:1334} },
     { id:'chronos6', system:'chronos', orbit:6, name:'Regenwelt Chronos-6', type:'wasserwelt', x:610, y:170, duration:912, reward:{deuterium:286, kristalle:57}, discoveryBonus:{deuterium:400, kristalle:80}, color:'#378add', colonizeCost:{deuterium:2574, kristalle:515} },
-    { id:'solmark1', system:'solmark', orbit:1, name:'Kolonie Solmark-1', type:'erdaehnlich', x:110, y:60, duration:352, reward:{erz:91, kristalle:55}, discoveryBonus:{erz:127, kristalle:76}, color:'#791f1f', colonizeCost:{erz:819, kristalle:491} },
+    { id:'solmark1', system:'solmark', orbit:1, name:'Kolonie Solmark-1', type:'wueste', x:110, y:60, duration:352, reward:{erz:91, kristalle:55}, discoveryBonus:{erz:127, kristalle:76}, color:'#791f1f', colonizeCost:{erz:819, kristalle:491} },
     { id:'solmark2', system:'solmark', orbit:2, name:'Wirbelriese Solmark-2', type:'gasriese', x:330, y:45, duration:464, reward:{energie:130, antimaterie:39}, discoveryBonus:{energie:182, antimaterie:55}, color:'#a9cdf5', colonizeCost:{energie:1170, antimaterie:351} },
     { id:'solmark3', system:'solmark', orbit:3, name:'Ozeanwelt Solmark-3', type:'wasserwelt', x:540, y:65, duration:576, reward:{deuterium:169, kristalle:34}, discoveryBonus:{deuterium:237, kristalle:47}, color:'#a9cdf5', colonizeCost:{deuterium:1521, kristalle:304} },
     { id:'solmark4', system:'solmark', orbit:4, name:'Erzfeld Solmark-4', type:'asteroid', x:150, y:175, duration:688, reward:{erz:146, kristalle:208}, discoveryBonus:{erz:204, kristalle:291}, color:'#c3bef5', colonizeCost:{erz:1310, kristalle:1872} },
-    { id:'solmark5', system:'solmark', orbit:5, name:'Fernwelt Solmark-5', type:'erdaehnlich', x:400, y:190, duration:800, reward:{erz:247, kristalle:148}, discoveryBonus:{erz:346, kristalle:207}, color:'#f3aec6', colonizeCost:{erz:2223, kristalle:1334} },
+    { id:'solmark5', system:'solmark', orbit:5, name:'Fernwelt Solmark-5', type:'wueste', x:400, y:190, duration:800, reward:{erz:247, kristalle:148}, discoveryBonus:{erz:346, kristalle:207}, color:'#f3aec6', colonizeCost:{erz:2223, kristalle:1334} },
     { id:'solmark6', system:'solmark', orbit:6, name:'Eismond Solmark-6', type:'wasserwelt', x:610, y:170, duration:912, reward:{deuterium:286, kristalle:57}, discoveryBonus:{deuterium:400, kristalle:80}, color:'#378add', colonizeCost:{deuterium:2574, kristalle:515} },
-    { id:'drachenmark1', system:'drachenmark', orbit:1, name:'Ruinenwelt Drachenmark-1', type:'erdaehnlich', x:110, y:60, duration:352, reward:{erz:91, kristalle:55}, discoveryBonus:{erz:127, kristalle:76}, color:'#5dcaa5', colonizeCost:{erz:819, kristalle:491} },
+    { id:'drachenmark1', system:'drachenmark', orbit:1, name:'Ruinenwelt Drachenmark-1', type:'todeswelt', x:110, y:60, duration:352, reward:{erz:91, kristalle:55}, discoveryBonus:{erz:127, kristalle:76}, color:'#5dcaa5', colonizeCost:{erz:819, kristalle:491} },
     { id:'drachenmark2', system:'drachenmark', orbit:2, name:'Sturmwelt Drachenmark-2', type:'gasriese', x:330, y:45, duration:464, reward:{energie:130, antimaterie:39}, discoveryBonus:{energie:182, antimaterie:55}, color:'#fac775', colonizeCost:{energie:1170, antimaterie:351} },
     { id:'drachenmark3', system:'drachenmark', orbit:3, name:'Frostmond Drachenmark-3', type:'wasserwelt', x:540, y:65, duration:576, reward:{deuterium:169, kristalle:34}, discoveryBonus:{deuterium:237, kristalle:47}, color:'#378add', colonizeCost:{deuterium:1521, kristalle:304} },
     { id:'drachenmark4', system:'drachenmark', orbit:4, name:'Bruchzone Drachenmark-4', type:'asteroid', x:150, y:175, duration:688, reward:{erz:146, kristalle:208}, discoveryBonus:{erz:204, kristalle:291}, color:'#c3bef5', colonizeCost:{erz:1310, kristalle:1872} },
-    { id:'drachenmark5', system:'drachenmark', orbit:5, name:'Ruinenwelt Drachenmark-5', type:'erdaehnlich', x:400, y:190, duration:800, reward:{erz:247, kristalle:148}, discoveryBonus:{erz:346, kristalle:207}, color:'#791f1f', colonizeCost:{erz:2223, kristalle:1334} },
+    { id:'drachenmark5', system:'drachenmark', orbit:5, name:'Ruinenwelt Drachenmark-5', type:'todeswelt', x:400, y:190, duration:800, reward:{erz:247, kristalle:148}, discoveryBonus:{erz:346, kristalle:207}, color:'#791f1f', colonizeCost:{erz:2223, kristalle:1334} },
     { id:'drachenmark6', system:'drachenmark', orbit:6, name:'Regenwelt Drachenmark-6', type:'wasserwelt', x:610, y:170, duration:912, reward:{deuterium:286, kristalle:57}, discoveryBonus:{deuterium:400, kristalle:80}, color:'#a9cdf5', colonizeCost:{deuterium:2574, kristalle:515} },
     { id:'abyss1', system:'abyss', orbit:1, name:'Schattenwelt Abyss-1', type:'erdaehnlich', x:110, y:60, duration:572, reward:{erz:192, kristalle:116}, discoveryBonus:{erz:270, kristalle:162}, color:'#5dcaa5', colonizeCost:{erz:1732, kristalle:1040} },
     { id:'abyss2', system:'abyss', orbit:2, name:'Wirbelriese Abyss-2', type:'gasriese', x:330, y:45, duration:754, reward:{energie:275, antimaterie:82}, discoveryBonus:{energie:385, antimaterie:115}, color:'#a9cdf5', colonizeCost:{energie:2475, antimaterie:742} },
@@ -2323,7 +2357,7 @@
     { id:'nyra1', system:'nyra', orbit:1, name:'Kolonie Nyra-1', type:'erdaehnlich', x:110, y:60, duration:572, reward:{erz:192, kristalle:116}, discoveryBonus:{erz:270, kristalle:162}, color:'#e24b4a', colonizeCost:{erz:1732, kristalle:1040} },
     { id:'nyra2', system:'nyra', orbit:2, name:'Gasriese Nyra-2', type:'gasriese', x:330, y:45, duration:754, reward:{energie:275, antimaterie:82}, discoveryBonus:{energie:385, antimaterie:115}, color:'#c3bef5', colonizeCost:{energie:2475, antimaterie:742} },
     { id:'nyra3', system:'nyra', orbit:3, name:'Ozeanwelt Nyra-3', type:'wasserwelt', x:540, y:65, duration:936, reward:{deuterium:358, kristalle:72}, discoveryBonus:{deuterium:500, kristalle:100}, color:'#378add', colonizeCost:{deuterium:3218, kristalle:644} },
-    { id:'nyra4', system:'nyra', orbit:4, name:'Kristallgürtel Nyra-4', type:'asteroid', x:150, y:175, duration:1118, reward:{erz:308, kristalle:440}, discoveryBonus:{erz:431, kristalle:616}, color:'#c3bef5', colonizeCost:{erz:2772, kristalle:3960} },
+    { id:'nyra4', system:'nyra', orbit:4, name:'Kristallgürtel Nyra-4', type:'kristall', x:150, y:175, duration:1118, reward:{erz:308, kristalle:440}, discoveryBonus:{erz:431, kristalle:616}, color:'#c3bef5', colonizeCost:{erz:2772, kristalle:3960} },
     { id:'nyra5', system:'nyra', orbit:5, name:'Terra Nyra-5', type:'erdaehnlich', x:400, y:190, duration:1300, reward:{erz:522, kristalle:314}, discoveryBonus:{erz:732, kristalle:439}, color:'#e24b4a', colonizeCost:{erz:4702, kristalle:2822} },
     { id:'nyra6', system:'nyra', orbit:6, name:'Eismond Nyra-6', type:'wasserwelt', x:610, y:170, duration:1482, reward:{deuterium:605, kristalle:121}, discoveryBonus:{deuterium:847, kristalle:169}, color:'#378add', colonizeCost:{deuterium:5445, kristalle:1089} },
     { id:'pulsar1', system:'pulsar', orbit:1, name:'Fernwelt Pulsar-1', type:'erdaehnlich', x:110, y:60, duration:572, reward:{erz:192, kristalle:116}, discoveryBonus:{erz:270, kristalle:162}, color:'#f3aec6', colonizeCost:{erz:1732, kristalle:1040} },
@@ -2339,7 +2373,7 @@
     { id:'sigma5', system:'sigma', orbit:5, name:'Fernwelt Sigma-5', type:'erdaehnlich', x:400, y:190, duration:1300, reward:{erz:522, kristalle:314}, discoveryBonus:{erz:732, kristalle:439}, color:'#791f1f', colonizeCost:{erz:4702, kristalle:2822} },
     { id:'sigma6', system:'sigma', orbit:6, name:'Singularität Sigma-Omega', type:'super', x:610, y:170, duration:900, reward:{antimaterie:300, deuterium:500, kristalle:400}, discoveryBonus:{antimaterie:600}, color:'#f3aec6', colonizeCost:{antimaterie:800, deuterium:2500} },
     { id:'zenith1', system:'zenith', orbit:1, name:'Kronwelt Zenith-1', type:'erdaehnlich', x:110, y:60, duration:1600, reward:{erz:650, energie:400}, discoveryBonus:{erz:900}, color:'#fac775', colonizeCost:{erz:5800, energie:3200} },
-    { id:'zenith2', system:'zenith', orbit:3, name:'Kristallkrone Zenith-2', type:'asteroid', x:400, y:190, duration:1800, reward:{kristalle:700, antimaterie:120}, discoveryBonus:{kristalle:1000}, color:'#c3bef5', colonizeCost:{kristalle:6200, antimaterie:900} },
+    { id:'zenith2', system:'zenith', orbit:3, name:'Kristallkrone Zenith-2', type:'kristall', x:400, y:190, duration:1800, reward:{kristalle:700, antimaterie:120}, discoveryBonus:{kristalle:1000}, color:'#c3bef5', colonizeCost:{kristalle:6200, antimaterie:900} },
     { id:'zenith3', system:'zenith', orbit:5, name:'Anomalie Zenith-Kern', type:'super', x:610, y:170, duration:2100, reward:{antimaterie:400, deuterium:700, kristalle:500}, discoveryBonus:{antimaterie:800}, color:'#f3aec6', colonizeCost:{antimaterie:1000, deuterium:3500} },
     { id:'tiefsee1', system:'tiefsee', orbit:2, name:'Frostkern Tiefsee-1', type:'wasserwelt', x:330, y:45, duration:1700, reward:{deuterium:750, kristalle:200}, discoveryBonus:{deuterium:1050}, color:'#378add', colonizeCost:{deuterium:6500, kristalle:1600} },
     { id:'tiefsee2', system:'tiefsee', orbit:4, name:'Nebelriese Tiefsee-2', type:'gasriese', x:150, y:175, duration:1900, reward:{energie:500, antimaterie:150}, discoveryBonus:{energie:750}, color:'#5dcaa5', colonizeCost:{energie:5000, antimaterie:1100} },
@@ -2951,6 +2985,7 @@
         const role = planetRoleOf(planet);
         if (role && role.key==='mining') mineMult *= 1.25;
         mineMult *= terraformProdMult(planet);
+        mineMult *= planetTypeProdMult(planet, def.produces);
         rates[def.produces] += (b[def.key]||0) * def.baseRate * mineMult;
       }
       // Forschungslabor produziert Forschungspunkte statt einer Standardressource (kein "produces"-Feld,
@@ -2961,6 +2996,7 @@
         const role = planetRoleOf(planet);
         if (role && role.key==='mining') fpMult *= 1.25;
         fpMult *= terraformProdMult(planet);
+        fpMult *= planetTypeProdMult(planet, 'forschungspunkte');
         const laborDef = BUILDING_DEFS.find(d=>d.key==='labor');
         rates.forschungspunkte += b.labor * (laborDef.researchPointRate||0) * fpMult;
       }
@@ -3187,6 +3223,7 @@
       for (const def of BUILDING_DEFS) if (def.category==='defense') sub += (b[def.key]||0) * (def.defVal + (def.shield||0));
       const role = planetRoleOf(planet);
       if (role && role.key==='fortress') sub *= 1.30;
+      sub *= planetTypeDefMult(planet);
       if (planet === 'home') sub *= HOME_DEFENSE_BONUS;
       power += sub * moonPenalty(planet);
     }
@@ -3195,6 +3232,7 @@
       let shipDef = shipDefenseContribution(f);
       const role = planetRoleOf(planetKey);
       if (role && role.key==='fortress') shipDef *= 1.30;
+      shipDef *= planetTypeDefMult(planetKey);
       if (planetKey === 'home') shipDef *= HOME_DEFENSE_BONUS;
       power += shipDef;
     } else {
@@ -3202,6 +3240,7 @@
         let shipDef = shipDefenseContribution(f);
         const role = planetRoleOf(planet);
         if (role && role.key==='fortress') shipDef *= 1.30;
+        shipDef *= planetTypeDefMult(planet);
         if (planet === 'home') shipDef *= HOME_DEFENSE_BONUS;
         power += shipDef;
       }
@@ -5196,7 +5235,8 @@
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus.' },
       { title:'Sektorkarte bedienen', body:'Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
-      { title:'Terraforming', body:'Jeder Standort (Heimatbasis und Kolonien, nicht Monde) kann terraformt werden – Stufe 0 bis 10, jede Stufe gibt <strong>+5% Produktion</strong> dort (bis zu +50% bei Stufe 10). Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit. Es kann immer nur <strong>ein Terraforming gleichzeitig</strong> laufen. Zu finden im Basis-Tab unter der Planeten-Rolle.' }
+      { title:'Terraforming', body:'Jeder Standort (Heimatbasis und Kolonien, nicht Monde) kann terraformt werden – Stufe 0 bis 10, jede Stufe gibt <strong>+5% Produktion</strong> dort (bis zu +50% bei Stufe 10). Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit. Es kann immer nur <strong>ein Terraforming gleichzeitig</strong> laufen. Zu finden im Basis-Tab unter der Planeten-Rolle.' },
+      { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab) – lohnt sich, das Kolonisierungsziel danach zu wählen.' }
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
@@ -8961,7 +9001,7 @@
             <div class="bicon" style="background:${p.color}30; color:${p.color};"><i class="ti ${disc?'ti-planet':'ti-info-circle'}" aria-hidden="true"></i></div>
             <div>
               <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
-              <div class="bmeta"><i class="ti ${(PLANET_TYPE_INFO[p.type]||{}).icon||'ti-planet'}" aria-hidden="true"></i> ${(PLANET_TYPE_INFO[p.type]||{}).label||''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS), 1)} Treibstoff</div>
+              <div class="bmeta"><i class="ti ${(PLANET_TYPE_INFO[p.type]||{}).icon||'ti-planet'}" aria-hidden="true"></i> ${(PLANET_TYPE_INFO[p.type]||{}).label||''}${(PLANET_TYPE_INFO[p.type]||{}).bonusText ? ` <span style="color:#5dcaa5;">(${(PLANET_TYPE_INFO[p.type]||{}).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS), 1)} Treibstoff</div>
               ${p.orbit ? `<div class="bmeta">${orbitBonusLabel(p.orbit)}</div>` : ''}
               <div class="bcost">${rewardHtml(p.reward)}</div>
               ${bonus ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Verborgener Bonus: ${bonus.labelText}</div>` : ''}
