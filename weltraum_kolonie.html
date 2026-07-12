@@ -585,10 +585,12 @@
         <button class="login-tab" data-login-tab="register" id="registerTabBtn">Registrieren</button>
       </div>
       <input type="text" id="loginUsername" placeholder="Kommandantenname" autocomplete="username"/>
-      <input type="email" id="loginEmail" placeholder="E-Mail (optional, für Passwort-Reset)" autocomplete="email" style="display:none;"/>
+      <input type="email" id="loginEmail" placeholder="E-Mail (Pflicht – für die Konto-Bestätigung)" autocomplete="email" style="display:none;"/>
       <input type="password" id="loginPassword" placeholder="Passwort" autocomplete="current-password"/>
       <button id="loginSubmitBtn" class="login-submit"><i class="ti ti-login" aria-hidden="true" style="margin-right:6px;"></i>Anmelden</button>
       <div id="loginError" class="login-error"></div>
+      <div id="loginInfo" style="color:#5dcaa5; font-size:12px; text-align:center; margin-top:6px;"></div>
+      <div style="text-align:center; margin-top:6px; display:none;" id="resendVerifyRow"><a href="#" id="resendVerifyLink" style="color:#fac775; font-size:11.5px; text-decoration:underline;">Bestätigungs-E-Mail erneut senden</a></div>
       <div style="text-align:center; margin-top:6px;"><a href="#" id="forgotPasswordLink" style="color:#9296ac; font-size:11.5px; text-decoration:underline;">Passwort vergessen?</a></div>
       <div class="login-note">Deine Zugangsdaten bleiben auf diesem Server – nur du und Spieler mit eigenem Account sehen deinen Fortschritt.</div>
     </div>
@@ -1370,8 +1372,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.86.0';
+  const VERSION = '7.87.0';
   const PATCHNOTES = [
+    { version:'7.87.0', date:'12.07.2026', changes:[
+      'Neu: E-Mail-Bestätigung (Double-Opt-In) – bei neuer Registrierung ist eine E-Mail-Adresse jetzt Pflicht',
+      'Nach der Registrierung kommt eine Bestätigungs-E-Mail mit Link (24h gültig); erst nach dem Klick ist das Konto freigeschaltet und anmeldbar',
+      'Login mit unbestätigtem Konto zeigt eine klare Meldung samt „Bestätigungs-E-Mail erneut senden" (mit Passwort-Prüfung gegen Missbrauch)',
+      'Der Bestätigungslink führt direkt ins Spiel und schaltet das Konto frei',
+      'Bestehende Konten sind NICHT betroffen und bleiben normal nutzbar',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.86.0', date:'12.07.2026', changes:[
       'Neu: Galaktische Dominanz – endlose Langzeitziele im Fortschritt-Tab (bewusst OHNE Siegbedingung: es gibt kein Spielende, nur den nächsten Rang)',
       'Der Dominanz-Wert wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge',
@@ -6364,6 +6374,7 @@
   // werden, sonst wird genau das Problem reproduziert, das diese Seite eigentlich lösen soll.
   const HELP_SECTIONS = [
     { key:'grundlagen', icon:'ti-home', title:'Grundlagen', entries:[
+      { title:'Konto & E-Mail-Bestätigung', body:'Für ein neues Konto ist eine <strong>E-Mail-Adresse Pflicht</strong>. Nach der Registrierung bekommst du eine Bestätigungs-E-Mail mit einem Link (24h gültig) – erst nach dem Klick darauf ist dein Konto freigeschaltet und du kannst dich anmelden. Keine Mail erhalten? Auch im Spam-Ordner nachsehen oder über den Login-Bildschirm eine neue anfordern. Bestehende Konten sind davon nicht betroffen.' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert.' },
       { title:'Lager & weicher Deckel', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Wird die Kapazität erreicht, geht Produktion NICHT komplett verloren: über der Grenze läuft die Produktion mit <strong>20% Ertrag</strong> weiter statt bei 0% zu stoppen. Es lohnt sich trotzdem, regelmäßig auszubauen – 20% ist ein Trostpflaster, kein Ersatz für genug Lagerkapazität.' },
       { title:'Produktions-Multiplikatoren', body:'Habitat-Level (+2% je Level), Bergbau-Planetenrolle (+25%), Forschung, Doktrin, Prestige (+5% je Prestige-Stufe) und Skill-Baum wirken alle gleichzeitig multiplikativ auf die Grundproduktion.' },
@@ -11800,6 +11811,22 @@
       document.getElementById('loginCardNormal').style.display = 'none';
       document.getElementById('loginCardForgot').style.display = 'block';
     });
+    // Bestätigungs-E-Mail erneut anfordern (nutzt die schon eingegebenen Zugangsdaten).
+    document.getElementById('resendVerifyLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errEl = document.getElementById('loginError');
+      const infoEl = document.getElementById('loginInfo');
+      if (!username || !password){ errEl.textContent = 'Bitte Name und Passwort eingeben, dann erneut senden.'; return; }
+      try {
+        const res = await fetch('/api/resend-verification', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ username, password }) });
+        const data = await res.json();
+        if (!res.ok){ errEl.textContent = data.error || 'Erneutes Senden fehlgeschlagen.'; return; }
+        errEl.textContent = '';
+        if (infoEl) infoEl.textContent = data.alreadyVerified ? 'Dein Konto ist bereits bestätigt – du kannst dich anmelden.' : 'Neue Bestätigungs-E-Mail unterwegs. Bitte auch im Spam-Ordner nachsehen.';
+      } catch(err){ errEl.textContent = 'Server nicht erreichbar.'; }
+    });
     document.getElementById('backToLoginLink').addEventListener('click', (e) => {
       e.preventDefault();
       document.getElementById('loginCardForgot').style.display = 'none';
@@ -11845,12 +11872,15 @@
     const username = document.getElementById('loginUsername').value.trim();
     const password = document.getElementById('loginPassword').value;
     const errEl = document.getElementById('loginError');
-    errEl.textContent = '';
+    const infoEl = document.getElementById('loginInfo');
+    const resendRow = document.getElementById('resendVerifyRow');
+    errEl.textContent = ''; if (infoEl) infoEl.textContent = ''; if (resendRow) resendRow.style.display = 'none';
     if (!username || !password){ errEl.textContent = 'Bitte Name und Passwort eingeben.'; return; }
     const btn = document.getElementById('loginSubmitBtn');
     btn.disabled = true;
     try {
       const email = document.getElementById('loginEmail').value.trim();
+      if (loginMode === 'register' && !email){ errEl.textContent = 'Bitte eine E-Mail-Adresse angeben – sie wird für die Konto-Bestätigung gebraucht.'; btn.disabled = false; return; }
       const body = { username, password };
       if (loginMode === 'register' && email) body.email = email;
       const res = await fetch('/api/'+loginMode, {
@@ -11859,7 +11889,21 @@
         body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (!res.ok){ errEl.textContent = data.error || 'Fehler bei der Anmeldung.'; btn.disabled = false; return; }
+      if (!res.ok){
+        errEl.textContent = data.error || 'Fehler bei der Anmeldung.';
+        // Unbestätigtes Konto: Möglichkeit anbieten, die Bestätigungsmail erneut zu schicken.
+        if (data.needsVerification && resendRow) resendRow.style.display = 'block';
+        btn.disabled = false; return;
+      }
+      // Registrierung mit Double-Opt-In: es gibt bewusst KEIN Token - erst die E-Mail bestätigen.
+      if (loginMode === 'register' && data.needsVerification){
+        if (infoEl) infoEl.textContent = 'Fast geschafft! Wir haben dir eine Bestätigungs-E-Mail geschickt. Klicke auf den Link darin, dann kannst du dich hier anmelden.';
+        loginMode = 'login';
+        document.getElementById('loginTabBtn').classList.add('active');
+        document.getElementById('registerTabBtn').classList.remove('active');
+        document.getElementById('loginEmail').style.display = 'none';
+        btn.disabled = false; return;
+      }
       authToken = data.token;
       try { localStorage.setItem(TOKEN_KEY, authToken); } catch(e){}
       state.player.id = data.userId;
@@ -11881,6 +11925,21 @@
     const available = await checkBackend();
     if (!available) return true;
     const params = new URLSearchParams(location.search);
+    if (params.get('verify')){
+      // Konto-Bestätigungslink aus der E-Mail: Token einlösen, Ergebnis anzeigen, dann normal anmelden.
+      wireLoginUI();
+      showLoginOverlay();
+      try {
+        const res = await fetch('/api/verify-email', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ token: params.get('verify') }) });
+        const data = await res.json();
+        const infoEl = document.getElementById('loginInfo');
+        const errEl = document.getElementById('loginError');
+        if (res.ok){ if (infoEl) infoEl.textContent = 'Konto bestätigt, '+(data.username||'Kommandant')+'! Du kannst dich jetzt anmelden.'; }
+        else { if (errEl) errEl.textContent = data.error || 'Bestätigung fehlgeschlagen.'; }
+      } catch(e){}
+      try { history.replaceState(null, '', location.pathname); } catch(e){}
+      return false;
+    }
     if (params.get('reset')){
       wireLoginUI();
       document.getElementById('loginCardNormal').style.display = 'none';
