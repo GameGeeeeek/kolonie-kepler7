@@ -250,7 +250,7 @@
     .tab-badge { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--c-danger); box-shadow:0 0 6px var(--c-danger); animation: badgePulse 1.6s ease-in-out infinite; }
     @keyframes badgePulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
     #headerReportsIcon.reports-glow { animation: iconPulse 1.6s ease-in-out infinite; }
-    #headerReportsBtn.active, #headerProfileBtn.active { background:rgba(var(--primary-rgb), 0.3); border-color:var(--c-primary); }
+    #headerReportsBtn.active, #headerProfileBtn.active, #headerHelpBtn.active { background:rgba(var(--primary-rgb), 0.3); border-color:var(--c-primary); }
     @keyframes iconPulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
     .tab-panel { display:none; opacity:0; }
     .tab-panel.active { display:block; animation: tabIn 0.28s ease forwards; }
@@ -421,6 +421,21 @@
     .rank-row.me { background:rgba(var(--primary-rgb), 0.18); border:0.5px solid var(--c-primary); }
     .rank-num { width:22px; text-align:center; color:#9296ac; font-weight:500; }
     .lb-note { font-size:11px; color:#7d8199; margin-top:8px; display:flex; align-items:center; gap:5px; }
+    .help-category { margin-bottom:10px; border:0.5px solid rgba(255,255,255,0.08); border-radius:12px; overflow:hidden; }
+    .help-category-header { display:flex; align-items:center; gap:10px; padding:0.75rem 0.9rem; cursor:pointer; background:rgba(255,255,255,0.03); }
+    .help-category-header:active { background:rgba(255,255,255,0.06); }
+    .help-category-header .bicon { flex-shrink:0; }
+    .help-category-header .bname { font-size:13px; font-weight:600; flex:1; }
+    .help-category-header .chevron { transition:transform 0.2s ease; color:#7d8199; font-size:13px; }
+    .help-category.open .chevron { transform:rotate(90deg); }
+    .help-category-body { display:none; padding:0.2rem 0.9rem 0.8rem; }
+    .help-category.open .help-category-body { display:block; }
+    .help-entry { margin-bottom:0.9rem; }
+    .help-entry:last-child { margin-bottom:0; }
+    .help-entry-title { font-size:12.5px; font-weight:600; color:#e8e9f0; margin-bottom:3px; }
+    .help-entry-body { font-size:11.5px; color:#a8acc0; line-height:1.5; }
+    .help-entry-body strong { color:#c3bef5; }
+    .help-jump-btn { display:inline-flex; align-items:center; gap:3px; font-size:9.5px; padding:2px 7px; border-radius:20px; background:rgba(var(--primary-rgb),0.18); color:#c3bef5; border:0.5px solid rgba(var(--primary-rgb),0.35); cursor:pointer; vertical-align:middle; margin-left:6px; }
 
     .log { font-size:11.5px; color:#8489a0; margin-top:1rem; min-height:16px; display:flex; align-items:center; gap:6px; }
     .resetrow { margin-top:1.5rem; text-align:right; }
@@ -656,6 +671,7 @@
       <div class="hero">
         <div style="position:absolute; bottom:14px; right:18px; z-index:5; display:flex; gap:6px;">
           <button id="headerReportsBtn" style="font-size:10.5px; padding:5px 9px; position:relative; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Berichte & Nachrichten"><i class="ti ti-mail" aria-hidden="true" id="headerReportsIcon" style="margin-right:3px;"></i>Berichte<span id="reportsBadge" class="tab-badge" style="display:none;"></span></button>
+          <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i>Hilfe</button>
           <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i>Einstellungen</button>
         </div>
         <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true">
@@ -778,7 +794,7 @@
         <div id="planetSwitcherDef"></div>
         <div class="qty-select" id="qtySelectDef"></div>
         <div id="raidScoutBox"></div>
-        <div class="section-title"><i class="ti ti-shield" aria-hidden="true"></i>Verteidigungsanlagen</div>
+        <div class="section-title" style="justify-content:space-between;"><span><i class="ti ti-shield" aria-hidden="true"></i>Verteidigungsanlagen</span><button class="help-jump-btn" data-jump-help="kampf"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
         <div class="buildings" id="defenseBuildings"></div>
         <div id="festungBox"></div>
         <div class="card-row" id="autoReinforceRow" style="cursor:pointer; margin-top:0.75rem;">
@@ -802,7 +818,7 @@
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-target" aria-hidden="true"></i>Doktrin</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Eine strategische Grundsatzentscheidung – nur eine Doktrin kann aktiv sein. Schaltet frei ab Zielerfassungssysteme (erweitert) & Schildmatrix je Stufe 5. Ein späterer Wechsel kostet Ressourcen ("Umschulung").</div>
         <div id="doctrineBox"></div>
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sword" aria-hidden="true"></i>Taktik-Haltung</div>
+        <div class="section-title" style="margin-top:1.5rem; justify-content:space-between;"><span><i class="ti ti-sword" aria-hidden="true"></i>Taktik-Haltung</span><button class="help-jump-btn" data-jump-help="kampf"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Verschiebt Angriffs- und Verteidigungskraft gegenläufig, jederzeit kostenlos wechselbar (im Gegensatz zur Doktrin).</div>
         <div id="stanceBox"></div>
       </div>
@@ -912,6 +928,12 @@
 
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-message" aria-hidden="true"></i>Nachrichten</div>
         <div id="messagesBox"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-hilfe">
+        <div class="section-title"><i class="ti ti-info-circle" aria-hidden="true"></i>Hilfe &amp; Häufige Fragen</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Zum Aufklappen antippen. Bei Unklarheiten hier zuerst nachschauen, bevor im Allianz-Chat gefragt wird.</div>
+        <div id="helpBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-einstellungen">
@@ -1287,8 +1309,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.64.0';
+  const VERSION = '7.65.0';
   const PATCHNOTES = [
+    { version:'7.65.0', date:'12.07.2026', changes:[
+      'Neue Hilfe-Seite (Button oben im Header, neben Berichte/Einstellungen): 10 aufklappbare Kategorien mit echten Beispielzahlen – Grundlagen, Flotte & Schiffe, Kampf, Kampf-Wiedergabe, Kolonien & Monde, Forschung & Doktrin, Allianz, Fortschritt, Automatisierung, Häufige Fragen',
+      '"Erklärung"-Buttons bei Taktik-Haltung und Verteidigungsanlagen springen direkt zur passenden Hilfe-Sektion',
+      'Bug behoben (beim Testen selbst gefunden): Sprung zur Hilfe-Seite scrollte ungeschützt, was in manchen Umgebungen einen Fehler auslösen konnte'
+    ]},
     { version:'7.64.0', date:'12.07.2026', changes:[
       'Kampf-Wiedergabe: Lebensbalken jetzt farbcodiert (grün/gelb/rot je nach Füllstand)',
       'Kampf-Wiedergabe: Kamera-Wackeln jetzt proportional zu den tatsächlichen Verlusten der Runde statt binär an/aus',
@@ -5051,6 +5078,104 @@
       </div>
     `;
   }
+  // ===== Hilfe-Seite =====
+  // Statischer Inhalt, manuell gepflegt – MUSS bei künftigen Mechanik-Änderungen mit aktualisiert
+  // werden, sonst wird genau das Problem reproduziert, das diese Seite eigentlich lösen soll.
+  const HELP_SECTIONS = [
+    { key:'grundlagen', icon:'ti-home', title:'Grundlagen', entries:[
+      { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert.' },
+      { title:'Lager & weicher Deckel', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Wird die Kapazität erreicht, geht Produktion NICHT komplett verloren: über der Grenze läuft die Produktion mit <strong>20% Ertrag</strong> weiter statt bei 0% zu stoppen. Es lohnt sich trotzdem, regelmäßig auszubauen – 20% ist ein Trostpflaster, kein Ersatz für genug Lagerkapazität.' },
+      { title:'Produktions-Multiplikatoren', body:'Habitat-Level (+2% je Level), Bergbau-Planetenrolle (+25%), Forschung, Doktrin, Prestige (+5% je Prestige-Stufe) und Skill-Baum wirken alle gleichzeitig multiplikativ auf die Grundproduktion.' },
+      { title:'Planeten-Rollen', body:'Jeder Planet kann eine Rolle bekommen: Bergbau-Welt (+25% Ressourcenproduktion), Festung (+30% Verteidigungspunkte, Gebäude wie Schiffe), oder neutral ohne Bonus.' }
+    ]},
+    { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
+      { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau.' },
+      { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt.' },
+      { title:'Missionen & Flugzeit', body:'Angriffe, Überfälle, Expeditionen und Kolonisierungen laufen über Missionen mit echter Flugzeit (abhängig von Entfernung und langsamstem Schiff in der Flotte). Während der Flugzeit ist die Flotte unterwegs und zählt nicht zur Verteidigung am Ausgangsplaneten.' }
+    ]},
+    { key:'kampf', icon:'ti-sword', title:'Kampf', entries:[
+      { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
+      { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:9.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
+      { title:'Taktik-Haltung', body:'Im Forschung-Tab frei wählbar, jederzeit kostenlos wechselbar: <strong>Aggressiv</strong> (+10% Angriff, -10% Verteidigung), <strong>Ausgewogen</strong> (neutral) oder <strong>Defensiv</strong> (-10% Angriff, +15% Verteidigung).' },
+      { title:'Rückzugs-Mechanik', body:'Übersteigt die eigene Verlustquote in einem Gefecht 40%, rettet sich die Hälfte des Anteils <em>oberhalb</em> dieser Schwelle rechtzeitig zurück, statt komplett zerstört zu werden. Gilt bei Überfall-Verteidigung, NPC-Angriffen und PvP-Duellen – nicht für Raider-/NPC-Flotten.' },
+      { title:'Heimatbasis-Bonus', body:'Die Heimatbasis hat <strong>+20% Verteidigungspunkte</strong> gegenüber identisch ausgebauten Kolonien. Macht "Heimat verteidigen" bewusst wichtiger.' },
+      { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' }
+    ]},
+    { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich über 8 Runden. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang.' },
+      { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP- und Expeditions-Berichten (mit echter Begegnung). Läuft ein Überfall live ab, während man im Spiel aktiv ist, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
+      { title:'Steuerung', body:'Pause/Weiter hält die Wiedergabe an, Tempo-Umschalter (1x/2x) beschleunigt, "Überspringen" springt direkt zum Endergebnis.' }
+    ]},
+    { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
+      { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
+      { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab.' },
+      { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus.' }
+    ]},
+    { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
+      { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
+      { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.' }
+    ]},
+    { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
+      { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern.' },
+      { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand.' }
+    ]},
+    { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
+      { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
+      { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
+      { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge und Skill-Baum. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe).' }
+    ]},
+    { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
+      { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Im Verteidigung-Tab an-/abschaltbar.' },
+      { title:'Automatische Reparatur', body:'Behebt Sabotage nach einem verlorenen Überfall sofort gegen 300 Erz + 150 Kristalle, statt 15 Minuten auf das automatische Ende zu warten.' },
+      { title:'Live-Kampf-Wiedergabe', body:'Steuert, ob sich die Kampf-Wiedergabe automatisch öffnet, sobald ein Überfall abläuft, während man aktiv im Spiel ist. Standardmäßig an, im Verteidigung-Tab abschaltbar.' }
+    ]},
+    { key:'faq', icon:'ti-list-details', title:'Häufige Fragen', entries:[
+      { title:'Warum werden meine Jäger im Kampf nicht mitgezählt?', body:'Vermutlich fehlt Hangar-Kapazität. 1 Trägerschiff ermöglicht 6 Jäger. Ohne genug Träger bleiben überzählige Jäger "nicht einsatzbereit" und tragen nichts zur Angriffs- oder Verteidigungskraft bei.' },
+      { title:'Warum baut sich mein Trümmerfeld nicht ab?', body:'Es muss mindestens ein Recycler tatsächlich an diesem Planeten stationiert sein. Ohne Recycler passiert gar nichts – kein passiver Abbau über Zeit.' },
+      { title:'Warum verliere ich bei einem erfolgreichen Überfall auch eigene Schiffe?', body:'Die eigene stationierte Flotte nimmt bei einem verlorenen Überfall Verluste in Höhe von der Hälfte der Ressourcen-Verlustquote. Ab 40% Verlustquote greift zusätzlich die Rückzugs-Mechanik dämpfend.' },
+      { title:'Was ist der Unterschied zwischen Heimatbasis und Kolonie bei der Verteidigung?', body:'Bei identischem Ausbau ist die Heimatbasis 20% stärker in der Verteidigung. Kolonien haben keinen solchen Bonus.' },
+      { title:'Warum ist meine PvP-Beute kleiner als erwartet?', body:'Ist der eigene Punktestand mehr als 3x höher als der des Ziels, sinkt die erbeutete Menge anteilig (nie unter 30%). Verhindert, dass das Ausnehmen deutlich schwächerer Spieler überproportional lohnend ist.' },
+      { title:'Wieso wächst meine Angriffskraft kaum noch, obwohl ich immer mehr Schiffe eines Typs baue?', body:'Ab 300 Schiffen eines einzigen Typs zählen weitere nur noch mit halber Wirkung. Eine gemischte Flotte ist ab dieser Größenordnung effizienter.' }
+    ]}
+  ];
+  let helpOpenSections = new Set();
+  function renderHelpBox(jumpToKey){
+    const box = document.getElementById('helpBox');
+    if (!box) return;
+    if (jumpToKey) helpOpenSections.add(jumpToKey);
+    box.innerHTML = HELP_SECTIONS.map(sec => {
+      const isOpen = helpOpenSections.has(sec.key);
+      return `
+        <div class="help-category ${isOpen?'open':''}" data-help-cat="${sec.key}">
+          <div class="help-category-header">
+            <div class="bicon" style="background:rgba(var(--primary-rgb),0.15); color:#c3bef5;"><i class="ti ${sec.icon}" aria-hidden="true"></i></div>
+            <div class="bname">${sec.title}</div>
+            <i class="ti ti-chevron-right chevron" aria-hidden="true"></i>
+          </div>
+          <div class="help-category-body">
+            ${sec.entries.map(e => `<div class="help-entry"><div class="help-entry-title">${e.title}</div><div class="help-entry-body">${e.body}</div></div>`).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+    box.querySelectorAll('[data-help-cat]').forEach(catEl => {
+      catEl.querySelector('.help-category-header').onclick = () => {
+        const key = catEl.getAttribute('data-help-cat');
+        if (helpOpenSections.has(key)) helpOpenSections.delete(key); else helpOpenSections.add(key);
+        renderHelpBox();
+      };
+    });
+    if (jumpToKey){
+      const target = box.querySelector('[data-help-cat="'+jumpToKey+'"]');
+      if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ behavior:'smooth', block:'start' });
+    }
+  }
+  // Springt direkt zur Hilfe-Seite und klappt die passende Kategorie auf – für die kleinen
+  // "?"-Buttons bei komplexeren Features (z.B. Kontersystem, Taktik-Haltung).
+  function jumpToHelp(key){
+    switchTab('hilfe');
+    renderHelpBox(key);
+  }
   function renderReportsBox(){
     const box = document.getElementById('reportsBox');
     if (!box) return;
@@ -7318,8 +7443,11 @@
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
     const hReports = document.getElementById('headerReportsBtn');
     if (hReports) hReports.classList.toggle('active', tab==='berichte');
+    const hHelp = document.getElementById('headerHelpBtn');
+    if (hHelp) hHelp.classList.toggle('active', tab==='hilfe');
     const hProfile = document.getElementById('headerProfileBtn');
     if (hProfile) hProfile.classList.toggle('active', tab==='einstellungen');
+    if (tab === 'hilfe') renderHelpBox();
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
     if (tab === 'allianz'){ loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
@@ -9528,6 +9656,8 @@
     };
     const refreshReportsBtn = document.getElementById('refreshReportsBtn');
     if (refreshReportsBtn) refreshReportsBtn.onclick = () => loadReports();
+    const headerHelpBtn = document.getElementById('headerHelpBtn');
+    if (headerHelpBtn) headerHelpBtn.onclick = () => switchTab('hilfe');
     const headerProfileBtn = document.getElementById('headerProfileBtn');
     if (headerProfileBtn) headerProfileBtn.onclick = () => switchTab('einstellungen');
     const headerReportsBtn = document.getElementById('headerReportsBtn');
@@ -9640,6 +9770,13 @@
     closeBtn.onclick = closeBattleReplay;
     overlay.onclick = (e) => { if (e.target === overlay) closeBattleReplay(); };
   })();
+
+  // Event-Delegation statt einzelner onclick-Bindungen: funktioniert unabhängig davon, ob die
+  // "?"-Buttons Teil des statischen HTML sind oder später neu gerendert werden.
+  document.addEventListener('click', (e) => {
+    const jumpBtn = e.target.closest('[data-jump-help]');
+    if (jumpBtn) jumpToHelp(jumpBtn.getAttribute('data-jump-help'));
+  });
 
   document.getElementById('resetBtn').addEventListener('click', async () => {
     if (!confirm('Kompletten Spielstand wirklich zurücksetzen? Das setzt auch Prestige, Level und Erfolge zurück (anders als der Prestige-Knopf im Fortschritt-Tab).')) return;
