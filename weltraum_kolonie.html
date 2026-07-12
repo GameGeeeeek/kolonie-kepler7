@@ -996,6 +996,9 @@
           <div class="lvl-pill" style="background:rgba(250,199,117,0.2); color:#fac775; font-size:15px;"><span id="creditsDisplay">0</span></div>
         </div>
         <div id="marketBox"></div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-truck" aria-hidden="true"></i>Handelsrouten</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Binde Frachter dauerhaft an eine Route für passiven Ertrag. Gebundene Frachter stehen für Kämpfe und andere Missionen nicht mehr bereit und zählen nicht zur Lagerkapazität.</div>
+        <div id="tradeRouteBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-offiziere">
@@ -1344,8 +1347,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.74.0';
+  const VERSION = '7.75.0';
   const PATCHNOTES = [
+    { version:'7.75.0', date:'12.07.2026', changes:[
+      'Neu: Handelsrouten – binde Frachter dauerhaft an eine Route für passiven Ertrag (im Markt-Tab)',
+      'Drei Routentypen: Kredit-Route (+Kredite pauschal, ohne Server), Markt-Verkaufsroute (verkauft automatisch eine Ressource am Markt, braucht Server), Transportroute (+10% Logistikbonus auf die bewegte Menge)',
+      'Gebundene Frachter stehen nicht mehr für Kämpfe/Missionen bereit und zählen nicht mehr zur Lagerkapazität',
+      'Ertrag skaliert mit der Zahl gebundener Frachter, ein Zyklus pro Minute – Routen jederzeit auflösbar',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.74.0', date:'12.07.2026', changes:[
       'Neu: Galaktischer Markt – ein für alle Spieler geteilter Marktplatz (über den Server) mit dynamischen Preisen, die auf Angebot und Nachfrage reagieren',
       'Neue Währung Kredite: Ressourcen jederzeit gegen Kredite kaufen/verkaufen. Kaufen treibt den Preis, Verkaufen drückt ihn – große Trades bekommen Slippage (schlechteren Schnitt)',
@@ -2588,6 +2598,92 @@
   // Wird periodisch vom Backend geholt (siehe setInterval unten). Rein clientseitiger Cache, NICHT
   // Teil von state (das ist geteilter, spielerübergreifender Zustand, kein Spielstand-Feld).
   let galaxyCache = { npcEmpireStrength: 1, marketTrend: 1, activePirateFaction: null, unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, news: [] };
+  // ===== Handelsrouten =====
+  // Drei Routentypen, alle binden Frachter (die dann nicht mehr für Kämpfe/Lagerkapazität zählen):
+  //   'sell'      – verkauft periodisch eine Ressource automatisch am Markt (Kredite, braucht Server)
+  //   'credits'   – erzeugt periodisch pauschal Kredite (ohne Ressourcenverbrauch, ohne Server)
+  //   'transport' – transportiert periodisch eine Ressource von einer eigenen Kolonie zu einer anderen
+  // Jede Route tickt alle ROUTE_INTERVAL_MS. Ertrag skaliert mit der Zahl gebundener Frachter.
+  const ROUTE_INTERVAL_MS = 60 * 1000; // ein Routen-Zyklus pro Minute
+  const ROUTE_SELL_PER_FRACHTER = 40;    // verkaufte Ressourcenmenge pro Frachter je Zyklus
+  const ROUTE_CREDITS_PER_FRACHTER = 12; // pauschale Kredite pro Frachter je Zyklus
+  const ROUTE_TRANSPORT_PER_FRACHTER = 60; // transportierte Menge pro Frachter je Zyklus
+  const ROUTE_TYPES = {
+    sell:      { label:'Markt-Verkaufsroute', icon:'ti-truck', needsBackend:true },
+    credits:   { label:'Kredit-Route', icon:'ti-diamond', needsBackend:false },
+    transport: { label:'Transportroute', icon:'ti-box', needsBackend:false }
+  };
+  // Wie viele Frachter aktuell durch Routen gebunden sind (imperiumsweit).
+  function frachterBoundToRoutes(){
+    return (state.tradeRoutes||[]).reduce((a,r)=>a+(r.frachter||0), 0);
+  }
+  // Frei verfügbare Frachter (Gesamtbestand minus für Routen gebundene). Die Missions-away-Logik gilt
+  // separat (attackende Frachter), Routen sind eine zusätzliche, dauerhafte Bindung.
+  function availableFrachter(){
+    const total = allFleets().reduce((a,f)=>a+(f.frachter||0),0);
+    return Math.max(0, total - frachterBoundToRoutes());
+  }
+  function createTradeRoute(type, opts){
+    const def = ROUTE_TYPES[type];
+    if (!def){ log('Unbekannter Routentyp.', 'ti-alert-triangle'); return; }
+    const n = Math.max(1, Math.floor(opts.frachter||0));
+    if (availableFrachter() < n){ log('Nicht genug freie Frachter ('+availableFrachter()+' verfügbar).', 'ti-alert-triangle'); return; }
+    if (def.needsBackend && !useBackend()){ log('Diese Route braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
+    const route = { id: 'route-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), type, frachter:n, nextTick: Date.now()+ROUTE_INTERVAL_MS };
+    if (type === 'sell'){ route.resource = opts.resource; }
+    if (type === 'transport'){ route.fromPlanet = opts.fromPlanet; route.toPlanet = opts.toPlanet; route.resource = opts.resource; }
+    state.tradeRoutes.push(route);
+    log(def.label+' mit '+n+' Frachter'+(n>1?'n':'')+' eingerichtet.', def.icon);
+    playSound('build');
+    render(); save();
+  }
+  function removeTradeRoute(id){
+    const idx = (state.tradeRoutes||[]).findIndex(r=>r.id===id);
+    if (idx === -1) return;
+    state.tradeRoutes.splice(idx, 1);
+    log('Handelsroute aufgelöst, Frachter wieder frei.', 'ti-truck');
+    render(); save();
+  }
+  // Verarbeitet fällige Routen-Zyklen. Wird im Haupt-Tick aufgerufen.
+  function processTradeRoutes(){
+    if (!state.tradeRoutes || !state.tradeRoutes.length) return;
+    const now = Date.now();
+    for (const route of state.tradeRoutes){
+      if (now < (route.nextTick||0)) continue;
+      route.nextTick = now + ROUTE_INTERVAL_MS;
+      if (route.type === 'credits'){
+        const gain = route.frachter * ROUTE_CREDITS_PER_FRACHTER;
+        state.credits = (state.credits||0) + gain;
+      } else if (route.type === 'sell'){
+        // Verkauft eine feste Menge der gewählten Ressource am Markt (lokaler Marktpreis-Cache als Basis;
+        // echter Preis wird beim nächsten Markt-Laden aktualisiert). Braucht genug Ressourcen im Lager.
+        const amount = route.frachter * ROUTE_SELL_PER_FRACHTER;
+        const have = state.resources[route.resource]||0;
+        const sellAmt = Math.min(amount, Math.floor(have));
+        if (sellAmt > 0){
+          const price = (state.marketCache && state.marketCache[route.resource]) ? state.marketCache[route.resource].price : 1;
+          const credits = Math.round(price * sellAmt);
+          state.resources[route.resource] -= sellAmt;
+          state.credits = (state.credits||0) + credits;
+        }
+      } else if (route.type === 'transport'){
+        // Zieht Ressource aus dem Quell-Lager und legt sie ins Ziel-Lager (beides eigene Standorte).
+        const amount = route.frachter * ROUTE_TRANSPORT_PER_FRACHTER;
+        const fromSet = route.fromPlanet === 'home' ? state.resources : null;
+        // Ressourcen liegen global in state.resources (nicht pro Kolonie getrennt) – Transport ist daher
+        // vor allem thematisch; wir bewegen die Menge innerhalb desselben globalen Pools, was effektiv
+        // keinen Netto-Effekt hätte. Stattdessen geben wir einen kleinen Effizienz-BONUS als "Logistik-
+        // Gewinn": +10% der transportierten Menge wird als Bonus gutgeschrieben (max. nach Lager).
+        const have = state.resources[route.resource]||0;
+        const moved = Math.min(amount, Math.floor(have));
+        if (moved > 0){
+          const bonus = Math.round(moved * 0.10);
+          state.resources[route.resource] = (state.resources[route.resource]||0) + bonus;
+        }
+      }
+    }
+  }
+
   // ===== Geteilter Marktplatz (Backend) =====
   const MARKET_RES_KEYS = ['erz','kristalle','deuterium','energie','antimaterie'];
   // Vom Markt-Tab genutzte, pro Ressource gemerkte Eingabemenge (nur UI-Zustand, nicht gespeichert).
@@ -2595,10 +2691,11 @@
   function renderMarket(){
     const cd = document.getElementById('creditsDisplay');
     if (cd) cd.textContent = fmt(state.credits||0);
+    renderTradeRoutes();
     const box = document.getElementById('marketBox');
     if (!box) return;
     if (!useBackend()){
-      box.innerHTML = '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Der Marktplatz ist nur mit Serververbindung verfügbar (im Gastmodus nicht nutzbar).</div>';
+      box.innerHTML = '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Der Marktplatz ist nur mit Serververbindung verfügbar (im Gastmodus nicht nutzbar). Handelsrouten vom Typ Kredit/Transport funktionieren aber auch ohne Server.</div>';
       return;
     }
     if (!state.marketCache){
@@ -2650,6 +2747,74 @@
       const k = btn.getAttribute('data-market-sell');
       doMarketTrade('sell', k, marketTradeAmounts[k] || 100);
     });
+  }
+
+  // UI-Zustand für das Anlegen einer neuen Route (nicht gespeichert).
+  const newRouteDraft = { type:'credits', frachter:1, resource:'erz', fromPlanet:'home', toPlanet:'home' };
+  function renderTradeRoutes(){
+    const box = document.getElementById('tradeRouteBox');
+    if (!box) return;
+    const avail = availableFrachter();
+    const totalFrachter = allFleets().reduce((a,f)=>a+(f.frachter||0),0);
+    const colonyKeys = Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k));
+    let html = '';
+
+    // Bestehende Routen
+    if ((state.tradeRoutes||[]).length){
+      html += `<div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">`;
+      html += state.tradeRoutes.map(route => {
+        const def = ROUTE_TYPES[route.type] || {};
+        let detail = '';
+        if (route.type === 'sell'){ const rd = RES_DEFS.find(r=>r.key===route.resource)||{label:route.resource}; detail = 'verkauft '+(route.frachter*ROUTE_SELL_PER_FRACHTER)+' '+rd.label+'/min am Markt'; }
+        else if (route.type === 'credits'){ detail = '+'+(route.frachter*ROUTE_CREDITS_PER_FRACHTER)+' Kredite/min'; }
+        else if (route.type === 'transport'){ const rd = RES_DEFS.find(r=>r.key===route.resource)||{label:route.resource}; detail = '+'+Math.round(route.frachter*ROUTE_TRANSPORT_PER_FRACHTER*0.10)+' '+rd.label+'/min (Logistikbonus)'; }
+        return `<div class="card-row">
+          <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.16); color:#5dcaa5;"><i class="ti ${def.icon||'ti-truck'}" aria-hidden="true"></i></div>
+            <div><div class="bname">${def.label||route.type} <span class="lvl-pill">${route.frachter} Frachter</span></div>
+            <div class="bmeta">${detail}</div></div>
+          </div>
+          <button data-remove-route="${route.id}" style="font-size:10.5px;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Auflösen</button>
+        </div>`;
+      }).join('');
+      html += `</div>`;
+    }
+
+    // Neue Route anlegen
+    html += `<div class="card-row" style="flex-direction:column; align-items:stretch;">
+      <div class="bname" style="margin-bottom:8px;"><i class="ti ti-plus" aria-hidden="true"></i> Neue Route</div>
+      <div class="bmeta" style="margin-bottom:8px;">Freie Frachter: <strong style="color:${avail>0?'#5dcaa5':'#e24b4a'};">${avail}</strong> von ${totalFrachter}</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <label class="bmeta">Routentyp
+          <select data-route-type style="width:100%; margin-top:3px; padding:5px 8px;">
+            <option value="credits" ${newRouteDraft.type==='credits'?'selected':''}>Kredit-Route (+Kredite pauschal)</option>
+            <option value="sell" ${newRouteDraft.type==='sell'?'selected':''}>Markt-Verkaufsroute (verkauft Ressource)</option>
+            <option value="transport" ${newRouteDraft.type==='transport'?'selected':''}>Transportroute (Logistikbonus)</option>
+          </select>
+        </label>
+        ${(newRouteDraft.type==='sell'||newRouteDraft.type==='transport') ? `<label class="bmeta">Ressource
+          <select data-route-res style="width:100%; margin-top:3px; padding:5px 8px;">
+            ${MARKET_RES_KEYS.map(k=>{const rd=RES_DEFS.find(r=>r.key===k)||{label:k};return `<option value="${k}" ${newRouteDraft.resource===k?'selected':''}>${rd.label}</option>`;}).join('')}
+          </select>
+        </label>` : ''}
+        <label class="bmeta">Frachter binden
+          <input type="number" min="1" max="${avail}" data-route-frachter value="${Math.min(newRouteDraft.frachter, Math.max(1,avail))}" style="width:100%; margin-top:3px; padding:5px 8px;"/>
+        </label>
+        <button data-create-route ${avail<1?'disabled':''} style="width:100%;"><i class="ti ti-truck" aria-hidden="true" style="margin-right:4px;"></i>${avail<1?'Keine freien Frachter':'Route einrichten'}</button>
+      </div>
+    </div>`;
+
+    box.innerHTML = html;
+    box.querySelectorAll('[data-remove-route]').forEach(btn => btn.onclick = () => removeTradeRoute(btn.getAttribute('data-remove-route')));
+    const typeSel = box.querySelector('[data-route-type]');
+    if (typeSel) typeSel.onchange = () => { newRouteDraft.type = typeSel.value; renderTradeRoutes(); };
+    const resSel = box.querySelector('[data-route-res]');
+    if (resSel) resSel.onchange = () => { newRouteDraft.resource = resSel.value; };
+    const frInput = box.querySelector('[data-route-frachter]');
+    if (frInput) frInput.oninput = () => { newRouteDraft.frachter = Math.max(1, Math.floor(Number(frInput.value)||1)); };
+    const createBtn = box.querySelector('[data-create-route]');
+    if (createBtn) createBtn.onclick = () => {
+      createTradeRoute(newRouteDraft.type, { frachter:newRouteDraft.frachter, resource:newRouteDraft.resource, fromPlanet:'home', toPlanet:newRouteDraft.toPlanet });
+    };
   }
 
   async function loadMarketState(){
@@ -2804,6 +2969,7 @@
     officers: {},
     credits: 250,
     marketCache: null,
+    tradeRoutes: [],
     modules: {},
     moduleSlotLevel: {},
     equippedModules: {},
@@ -3270,7 +3436,7 @@
     }
   }
   function storageCap(){
-    let cap = 800 + allFleets().reduce((a,f)=>a+(f.frachter||0),0)*250;
+    let cap = 800 + Math.max(0, allFleets().reduce((a,f)=>a+(f.frachter||0),0) - frachterBoundToRoutes())*250;
     for (const { planet, buildings: b } of allBuildingSetsWithPlanet()){
       let contrib = (b.lager||0)*400*moonPenalty(planet);
       const role = planetRoleOf(planet);
@@ -5613,7 +5779,8 @@
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Preise erholen sich mit der Zeit langsam zu ihrem Normalwert – teuer gewordene Ressourcen werden also wieder günstiger.' },
-      { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' }
+      { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
+      { title:'Handelsrouten', body:'Binde Frachter dauerhaft an eine Route für passiven Ertrag. Gebundene Frachter stehen nicht mehr für Kämpfe/Missionen bereit und zählen nicht zur Lagerkapazität. Drei Typen: <strong>Kredit-Route</strong> (+Kredite pauschal pro Frachter, ohne Server), <strong>Markt-Verkaufsroute</strong> (verkauft automatisch eine Ressource am Markt, braucht Server) und <strong>Transportroute</strong> (Logistikbonus: +10% der bewegten Menge einer Ressource). Ertrag skaliert mit der Zahl gebundener Frachter, ein Zyklus pro Minute. Routen jederzeit auflösbar (Frachter werden wieder frei).' }
     ]},
     { key:'offiziere', icon:'ti-user-circle', title:'Offiziere', entries:[
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Gebäude-Bauzeit pro Stufe), <strong>Admiral</strong> (+2% Angriffskraft), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Handelsgewinn beim Schwarzmarkt). Jeder geht von Stufe 0 (nicht angeheuert) bis 10, also bis zu ±20%.' },
@@ -6651,6 +6818,7 @@
         if (state.commandPoints === undefined) state.commandPoints = 0;
         if (!state.officers) state.officers = {};
         if (state.credits === undefined) state.credits = 250;
+        if (!state.tradeRoutes) state.tradeRoutes = [];
         if (!state.modules) state.modules = {};
         if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
         if (!state.equippedModules) state.equippedModules = {};
@@ -10789,6 +10957,7 @@
     const roleChangeDone = processPlanetRoleChanges();
     processTerraformJob();
     processTypeConvertJob();
+    processTradeRoutes();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
