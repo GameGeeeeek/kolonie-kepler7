@@ -1027,6 +1027,14 @@
             <button id="feedbackTypeIdea" style="flex:1; font-size:11.5px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Vorschlag einreichen</button>
           </div>
           <textarea id="feedbackText" rows="3" placeholder="Beschreibe den Bug (was ist passiert, was hast du erwartet?) oder deine Idee …" style="width:100%; resize:vertical; margin-bottom:8px;"></textarea>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+            <button id="feedbackImgBtn" style="font-size:11px;"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:4px;"></i>Screenshot anhängen</button>
+            <input type="file" id="feedbackImgInput" accept="image/png,image/jpeg" style="display:none;"/>
+            <span id="feedbackImgPreviewWrap" style="display:none; align-items:center; gap:6px;">
+              <img id="feedbackImgPreview" alt="Screenshot-Vorschau" style="height:36px; border-radius:6px; border:0.5px solid rgba(126,119,221,0.5);"/>
+              <button id="feedbackImgRemoveBtn" title="Screenshot entfernen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+            </span>
+          </div>
           <button id="feedbackSendBtn"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Absenden</button>
           <div class="bmeta" id="feedbackStatus" style="margin-top:6px;"></div>
         </div>
@@ -1439,8 +1447,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.4.1';
+  const VERSION = '8.5.0';
   const PATCHNOTES = [
+    { version:'8.5.0', date:'13.07.2026', changes:[
+      'Feedback-Formular: Screenshots lassen sich jetzt anhängen (JPG/PNG) - das Bild wird automatisch auf max. 1280px verkleinert, als Vorschau angezeigt und der E-Mail an den Entwickler als Anhang beigelegt'
+    ]},
     { version:'8.4.1', date:'13.07.2026', changes:[
       'Neuer "Bug/Vorschlag"-Knopf in der Kopfzeile (links neben Berichte) - springt direkt zum Feedback-Formular in den Einstellungen und hebt es kurz hervor'
     ]},
@@ -6093,6 +6104,49 @@
   const fbSetType = (t) => { feedbackType = t; if (fbBugBtn) fbBugBtn.classList.toggle('affordable', t==='bug'); if (fbIdeaBtn) fbIdeaBtn.classList.toggle('affordable', t==='idee'); };
   if (fbBugBtn) fbBugBtn.addEventListener('click', () => fbSetType('bug'));
   if (fbIdeaBtn) fbIdeaBtn.addEventListener('click', () => fbSetType('idee'));
+  // Screenshot-Anhang: wird clientseitig auf max. 1280px verkleinert und als JPEG komprimiert,
+  // damit der Upload klein bleibt (Server-Limit) - PNG bleibt PNG, wenn es bereits klein genug ist.
+  let feedbackImage = null;
+  const fbImgBtn = document.getElementById('feedbackImgBtn');
+  const fbImgInput = document.getElementById('feedbackImgInput');
+  const fbImgPreviewWrap = document.getElementById('feedbackImgPreviewWrap');
+  const fbImgPreview = document.getElementById('feedbackImgPreview');
+  const fbImgRemoveBtn = document.getElementById('feedbackImgRemoveBtn');
+  const fbClearImage = () => { feedbackImage = null; if (fbImgInput) fbImgInput.value = ''; if (fbImgPreviewWrap) fbImgPreviewWrap.style.display = 'none'; };
+  if (fbImgBtn) fbImgBtn.addEventListener('click', () => fbImgInput && fbImgInput.click());
+  if (fbImgRemoveBtn) fbImgRemoveBtn.addEventListener('click', fbClearImage);
+  if (fbImgInput) fbImgInput.addEventListener('change', () => {
+    const file = fbImgInput.files && fbImgInput.files[0];
+    const statusEl = document.getElementById('feedbackStatus');
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 1280;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const cw = Math.max(1, Math.round(img.width*scale)), ch = Math.max(1, Math.round(img.height*scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = cw; canvas.height = ch;
+          canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          feedbackImage = canvas.toDataURL('image/jpeg', 0.72);
+        } catch(e){ feedbackImage = String(reader.result||''); }
+        if (!/^data:image\/(jpeg|png);base64,/.test(feedbackImage) || feedbackImage.length > 1500000){
+          // Verkleinerung fehlgeschlagen oder immer noch zu groß: Original nur akzeptieren, wenn klein genug
+          const orig = String(reader.result||'');
+          if (/^data:image\/(jpeg|png);base64,/.test(orig) && orig.length <= 1500000) feedbackImage = orig;
+          else { fbClearImage(); if (statusEl){ statusEl.textContent = 'Screenshot zu groß oder Format nicht unterstützt (JPG/PNG).'; statusEl.style.color = '#f0997b'; } return; }
+        }
+        if (fbImgPreview) fbImgPreview.src = feedbackImage;
+        if (fbImgPreviewWrap) fbImgPreviewWrap.style.display = 'inline-flex';
+        if (statusEl) statusEl.textContent = '';
+      };
+      img.onerror = () => { fbClearImage(); if (statusEl){ statusEl.textContent = 'Bild konnte nicht gelesen werden.'; statusEl.style.color = '#f0997b'; } };
+      img.src = String(reader.result||'');
+    };
+    reader.readAsDataURL(file);
+  });
   const fbSendBtn = document.getElementById('feedbackSendBtn');
   if (fbSendBtn) fbSendBtn.addEventListener('click', async () => {
     const statusEl = document.getElementById('feedbackStatus');
@@ -6102,8 +6156,8 @@
     if (!useBackend()){ statusEl.textContent = 'Feedback-Versand ist nur auf dem eigenen Server verfügbar.'; statusEl.style.color = '#f0997b'; return; }
     fbSendBtn.disabled = true;
     try {
-      const res = await backendFetch('/feedback', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type: feedbackType, text, version: VERSION }) });
-      if (res.ok){ statusEl.textContent = 'Danke! Dein '+(feedbackType==='bug'?'Bug-Report':'Vorschlag')+' wurde an den Entwickler geschickt.'; statusEl.style.color = '#5dcaa5'; textEl.value = ''; playSound('build'); }
+      const res = await backendFetch('/feedback', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(Object.assign({ type: feedbackType, text, version: VERSION }, feedbackImage ? { image: feedbackImage } : {})) });
+      if (res.ok){ statusEl.textContent = 'Danke! Dein '+(feedbackType==='bug'?'Bug-Report':'Vorschlag')+' wurde an den Entwickler geschickt.'; statusEl.style.color = '#5dcaa5'; textEl.value = ''; fbClearImage(); playSound('build'); }
       else { const d = await res.json().catch(()=>({})); statusEl.textContent = d.error || 'Senden fehlgeschlagen - bitte später erneut versuchen.'; statusEl.style.color = '#f0997b'; }
     } catch(e){ statusEl.textContent = 'Server nicht erreichbar.'; statusEl.style.color = '#f0997b'; }
     fbSendBtn.disabled = false;
@@ -6785,7 +6839,7 @@
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+4% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
-      { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind).' },
+      { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt.' },
       { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
