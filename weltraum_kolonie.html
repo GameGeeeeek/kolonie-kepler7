@@ -1408,8 +1408,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.94.0';
+  const VERSION = '7.95.0';
   const PATCHNOTES = [
+    { version:'7.95.0', date:'13.07.2026', changes:[
+      'Neu: Planeten-Ereignisse – alle 2-4 Stunden trifft ein zufälliges lokales Ereignis einen deiner Planeten und wirkt dort 10-15 Minuten (rein passiv, keine Entscheidung nötig)',
+      'Zwölf Varianten, überwiegend positiv: Erzader (+40% Erz), Sonneneruption (+35% Energie), Kristallblüte (+40% Kristalle), Deuterium-Geysir (+40% Deuterium), Antimaterie-Anomalie (+35%), Forschungsfieber (+30% Forschungspunkte), Idealbedingungen (+15% Gesamtproduktion), Ruhiger Orbit (-20% Schiffsbauzeit)',
+      'Vier negative Gegenstücke: Staubsturm (-20% Produktion), Seismische Unruhe (-15% Verteidigung), Sonnenflaute (-25% Energie), Arbeitsunruhen (-20% Erz)',
+      'Aktive Ereignisse erscheinen als Banner mit Restzeit im Basis-Tab des betroffenen Planeten und werden im Log gemeldet; höchstens ein Ereignis pro Planet gleichzeitig',
+      'Damit ist die vierteilige Content-Serie (Ökonomie-Balance, Allianz-Ausbau, Wächter & Schildmodul, Planeten-Mechanik) abgeschlossen',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.94.0', date:'13.07.2026', changes:[
       'Neu: Orbitalstation – jeder Planet (auch die Heimatbasis) kann im Basis-Tab eine Station in 3 Stufen bauen',
       'Beim Bau wählst du einen Fokus: Verteidigungsring (+8% Verteidigung/Stufe), Produktionsring (+4% Produktion/Stufe, lokal) oder Dock-Ring (-6% Schiffsbauzeit/Stufe, +150 Lager/Stufe)',
@@ -3687,7 +3695,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -4133,6 +4141,7 @@
         if (role && role.key==='mining') mineMult *= 1.25;
         const orbP = orbitalStationOf(planet);
         if (orbP && orbP.focus==='prod') mineMult *= 1 + 0.04*orbP.level;
+        mineMult *= planetEventResMult(planet, def.produces);
         mineMult *= terraformProdMult(planet);
         mineMult *= planetTypeProdMult(planet, def.produces);
         mineMult *= (1 + moduleBonusAt(planet, 'prod'));
@@ -4148,6 +4157,7 @@
         if (role && role.key==='science') fpMult *= 1.25;
         const orbFp = orbitalStationOf(planet);
         if (orbFp && orbFp.focus==='prod') fpMult *= 1 + 0.04*orbFp.level;
+        fpMult *= planetEventResMult(planet, 'forschungspunkte');
         fpMult *= terraformProdMult(planet);
         fpMult *= planetTypeProdMult(planet, 'forschungspunkte');
         fpMult *= (1 + moduleBonusAt(planet, 'prod'));
@@ -4528,6 +4538,8 @@
       if (role && role.key==='fortress') sub *= 1.30;
       const orbG = orbitalStationOf(planet);
       if (orbG && orbG.focus==='def') sub *= 1 + 0.08*orbG.level;
+      const evG = planetEventOf(planet);
+      if (evG && evG.def.effect.type==='def') sub *= evG.def.effect.mult;
       sub *= planetTypeDefMult(planet);
       if (planet === 'home') sub *= HOME_DEFENSE_BONUS;
       power += sub * moonPenalty(planet);
@@ -4539,6 +4551,8 @@
       if (role && role.key==='fortress') shipDef *= 1.30;
       const orbF = orbitalStationOf(planetKey);
       if (orbF && orbF.focus==='def') shipDef *= 1 + 0.08*orbF.level;
+      const evF = planetEventOf(planetKey);
+      if (evF && evF.def.effect.type==='def') shipDef *= evF.def.effect.mult;
       shipDef *= planetTypeDefMult(planetKey);
       if (planetKey === 'home') shipDef *= HOME_DEFENSE_BONUS;
       power += shipDef;
@@ -5429,6 +5443,8 @@
       if (role && role.key==='shipyard') effBuildTimeEach *= 0.80;
       const orbD = orbitalStationOf(planetKey);
       if (orbD && orbD.focus==='dock') effBuildTimeEach *= 1 - 0.06*orbD.level;
+      const evD = planetEventOf(planetKey);
+      if (evD && evD.def.effect.type==='shipbuild') effBuildTimeEach *= evD.def.effect.mult;
     }
     if (kind === 'building'){
       effBuildTimeEach *= (1 - officerBonus('ingenieur'));
@@ -6549,7 +6565,8 @@
       { title:'Lager & weicher Deckel', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Wird die Kapazität erreicht, geht Produktion NICHT komplett verloren: über der Grenze läuft die Produktion mit <strong>20% Ertrag</strong> weiter statt bei 0% zu stoppen. Es lohnt sich trotzdem, regelmäßig auszubauen – 20% ist ein Trostpflaster, kein Ersatz für genug Lagerkapazität.' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
-      { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+4% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' }
+      { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+4% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
+      { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' }
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau.' },
@@ -7773,6 +7790,8 @@
         if (state.lastEventTime === undefined) state.lastEventTime = 0;
         if (!state.planetSpecialization) state.planetSpecialization = {};
         if (!state.orbitalStations) state.orbitalStations = {};
+        if (!state.planetEvents) state.planetEvents = {};
+        if (state.nextPlanetEventCheck === undefined) state.nextPlanetEventCheck = 0;
         if (state.warVictories === undefined) state.warVictories = 0;
         if (!state.scoreHistory) state.scoreHistory = [];
         if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
@@ -8015,6 +8034,57 @@
     return { erz: 4000*f, kristalle: 2500*f, deuterium: 800*f };
   }
   function orbitalBuildTime(level){ return 300 * level; } // 5/10/15 Minuten
+  // ===== Planeten-Ereignisse =====
+  // Passive, planeten-lokale Ereignisse (im Gegensatz zu den globalen Entscheidungs-Events oben):
+  // Alle 2-4 Stunden trifft ein zufälliges Ereignis einen zufälligen eigenen Planeten (keine Monde)
+  // und wirkt dort 10-15 Minuten - ohne dass man reagieren muss. Bewusst selten, dafür ein breiter
+  // Pool an Varianten (8 positive, 4 negative), damit sie besonders bleiben.
+  const PLANET_EVENT_MIN_INTERVAL_MS = 2 * 3600000;
+  const PLANET_EVENT_MAX_INTERVAL_MS = 4 * 3600000;
+  const PLANET_EVENT_DEFS = [
+    { key:'erzader', name:'Erzader entdeckt', icon:'ti-pick', color:'#c9c7bd', durMin:15, good:true, effect:{ type:'res', res:'erz', mult:1.40 }, desc:'+40% Erzproduktion' },
+    { key:'eruption', name:'Sonneneruption', icon:'ti-sun', color:'#fac775', durMin:12, good:true, effect:{ type:'res', res:'energie', mult:1.35 }, desc:'+35% Energieproduktion' },
+    { key:'kristallbluete', name:'Kristallblüte', icon:'ti-diamond', color:'#c3bef5', durMin:15, good:true, effect:{ type:'res', res:'kristalle', mult:1.40 }, desc:'+40% Kristallproduktion' },
+    { key:'geysir', name:'Deuterium-Geysir', icon:'ti-droplet', color:'#a9cdf5', durMin:15, good:true, effect:{ type:'res', res:'deuterium', mult:1.40 }, desc:'+40% Deuteriumproduktion' },
+    { key:'anomalie', name:'Antimaterie-Anomalie', icon:'ti-atom', color:'#f3aec6', durMin:12, good:true, effect:{ type:'res', res:'antimaterie', mult:1.35 }, desc:'+35% Antimaterieproduktion' },
+    { key:'forschungsfieber', name:'Forschungsfieber', icon:'ti-flask', color:'#c3bef5', durMin:15, good:true, effect:{ type:'res', res:'forschungspunkte', mult:1.30 }, desc:'+30% Forschungspunkte' },
+    { key:'idealbedingungen', name:'Ideale Bedingungen', icon:'ti-sparkles', color:'#5dcaa5', durMin:10, good:true, effect:{ type:'prodAll', mult:1.15 }, desc:'+15% Gesamtproduktion' },
+    { key:'ruhigerorbit', name:'Ruhiger Orbit', icon:'ti-anchor', color:'#5dcaa5', durMin:15, good:true, effect:{ type:'shipbuild', mult:0.80 }, desc:'-20% Schiffsbauzeit' },
+    { key:'staubsturm', name:'Staubsturm', icon:'ti-refresh', color:'#f0997b', durMin:10, good:false, effect:{ type:'prodAll', mult:0.80 }, desc:'-20% Gesamtproduktion' },
+    { key:'seismik', name:'Seismische Unruhe', icon:'ti-alert-triangle', color:'#e24b4a', durMin:12, good:false, effect:{ type:'def', mult:0.85 }, desc:'-15% Verteidigung' },
+    { key:'sonnenflaute', name:'Sonnenflaute', icon:'ti-bolt', color:'#f0997b', durMin:10, good:false, effect:{ type:'res', res:'energie', mult:0.75 }, desc:'-25% Energieproduktion' },
+    { key:'arbeitsunruhen', name:'Arbeitsunruhen', icon:'ti-users', color:'#e24b4a', durMin:12, good:false, effect:{ type:'res', res:'erz', mult:0.80 }, desc:'-20% Erzproduktion' }
+  ];
+  // Liefert das aktive Ereignis eines Planeten (Definition + Ablaufzeit) oder null; räumt abgelaufene
+  // Einträge dabei gleich lazy weg.
+  function planetEventOf(planetKey){
+    const ev = (state.planetEvents||{})[planetKey];
+    if (!ev) return null;
+    if (ev.until < Date.now()){ delete state.planetEvents[planetKey]; return null; }
+    const def = PLANET_EVENT_DEFS.find(d=>d.key===ev.key);
+    return def ? { def, until: ev.until } : null;
+  }
+  // Multiplikator eines Planeten-Ereignisses auf eine Ressource (inkl. prodAll), 1 wenn keins aktiv.
+  function planetEventResMult(planetKey, resKey){
+    const ev = planetEventOf(planetKey);
+    if (!ev) return 1;
+    if (ev.def.effect.type === 'prodAll') return ev.def.effect.mult;
+    if (ev.def.effect.type === 'res' && ev.def.effect.res === resKey) return ev.def.effect.mult;
+    return 1;
+  }
+  function maybeSpawnPlanetEvent(){
+    const now = Date.now();
+    if (now < (state.nextPlanetEventCheck||0)) return;
+    state.nextPlanetEventCheck = now + PLANET_EVENT_MIN_INTERVAL_MS + Math.random()*(PLANET_EVENT_MAX_INTERVAL_MS-PLANET_EVENT_MIN_INTERVAL_MS);
+    const candidates = ['home', ...Object.keys(state.colonies||{})].filter(pk => !isMoonKey(pk) && !planetEventOf(pk));
+    if (!candidates.length) return;
+    const pk = candidates[Math.floor(Math.random()*candidates.length)];
+    const def = PLANET_EVENT_DEFS[Math.floor(Math.random()*PLANET_EVENT_DEFS.length)];
+    if (!state.planetEvents) state.planetEvents = {};
+    state.planetEvents[pk] = { key: def.key, until: now + def.durMin*60000 };
+    log('Planeten-Ereignis auf '+planetDisplayName(pk)+': '+def.name+' ('+def.desc+', '+def.durMin+' Min.)', def.icon);
+    playSound(def.good ? 'achieve' : 'alarm');
+  }
   function orbitalStationOf(planetKey){ return (state.orbitalStations||{})[planetKey] || null; }
   function orbitalJobFor(planetKey){ return (state.constructionQueue||[]).find(j=>j.kind==='orbital' && j.planet===planetKey) || null; }
   function buildOrbitalStation(focusKey){
@@ -9937,7 +10007,20 @@
         } else {
           const cur = orbitalStationOf(pk);
           const job = orbitalJobFor(pk);
-          let html = `<div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-planet" aria-hidden="true"></i>Orbitalstation: ${planetDisplayName(pk)}</div>`;
+          let html = '';
+          // Aktives Planeten-Ereignis als Banner anzeigen (falls vorhanden)
+          const pev = planetEventOf(pk);
+          if (pev){
+            const remain = Math.max(0, pev.until - Date.now());
+            html += `<div class="card-row" style="flex-direction:row; align-items:center; justify-content:space-between; margin-bottom:0.75rem; border-color:${pev.def.color}; background:${pev.def.color}18;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <i class="ti ${pev.def.icon}" aria-hidden="true" style="color:${pev.def.color}; font-size:18px;"></i>
+                <div><div class="bname" style="font-size:12.5px;">${pev.def.name}</div><div class="bmeta">${pev.def.desc} auf diesem Planeten</div></div>
+              </div>
+              <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
+            </div>`;
+          }
+          html += `<div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-planet" aria-hidden="true"></i>Orbitalstation: ${planetDisplayName(pk)}</div>`;
           if (job){
             const remain = Math.max(0, job.endTime-Date.now());
             const pct = Math.max(0, Math.min(100, 100-(remain/(job.totalDur*1000)*100)));
@@ -12144,6 +12227,7 @@
     processTradeRoutes();
     processConqueredSystems();
     processFactionGifts();
+    maybeSpawnPlanetEvent();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
