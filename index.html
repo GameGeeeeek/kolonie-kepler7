@@ -538,6 +538,7 @@
         <button id="profileAttackBtn" class="attack" style="flex:1;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angreifen</button>
         <button id="profileMsgBtn" style="flex:1;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Nachricht</button>
       </div>
+      <button id="profilePactBtn" style="width:100%; margin-top:8px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten</button>
     </div>
   </div>
 
@@ -929,6 +930,9 @@
 
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-award" aria-hidden="true"></i>Wochenliga</div>
         <div id="weeklyLeagueBox"><div class="bmeta">lädt…</div></div>
+
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-shield" aria-hidden="true"></i>Diplomatie - Nichtangriffspakte</div>
+        <div id="diplomacyBox" style="display:flex; flex-direction:column; gap:9px;"><div class="bmeta">lädt…</div></div>
 
         <div class="section-title" style="margin-top:1.5rem; justify-content:space-between;">
           <span><i class="ti ti-trophy" aria-hidden="true"></i>Bestenliste (alle Spieler dieses Spiels)</span>
@@ -1419,8 +1423,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.98.4';
+  const VERSION = '7.99.0';
   const PATCHNOTES = [
+    { version:'7.99.0', date:'13.07.2026', changes:[
+      'Neu: Spieler-Diplomatie - über das Profil eines Spielers (Bestenliste) lässt sich ein Nichtangriffspakt anbieten (Angebot 48h gültig)',
+      'Ein angenommener Pakt blockiert gegenseitige Angriffe und Spionage für 7 Tage - Pakt-Partner tragen ein Pakt-Abzeichen in der Bestenliste',
+      'Kündigung jederzeit möglich, wirkt aber erst nach 24 Stunden Frist - kein Blitz-Verrat direkt vor einem Angriff',
+      'Neuer Diplomatie-Bereich im Galaxie-Tab: aktive Pakte mit Restlaufzeit und Kündigen-Knopf, eingehende Angebote (Annehmen/Ablehnen) und ausgehende Angebote (Zurückziehen)'
+    ]},
     { version:'7.98.4', date:'13.07.2026', changes:[
       'Bugfix: Der Schieberegler von "Patchnotes per E-Mail" zeigte immer Aus an, auch wenn die Einstellung An war (falsche CSS-Klasse) - Anzeige und Zustand sind jetzt synchron'
     ]},
@@ -5639,6 +5649,8 @@
   // müssen. Ergebnis wird wie bei Angriffen bereits beim Start ermittelt, aber erst bei Ankunft im
   // Bericht offenbart und in state.spyIntel für den nächsten Angriff zwischengespeichert.
   async function sendSpyMission(playerId, name){
+    const pactSpy = activePactWith(playerId);
+    if (pactSpy){ log('Nichtangriffspakt mit '+name+' aktiv - Spionage ist blockiert (läuft noch '+fmtDuration(Math.max(0,((pactSpy.cancelEffectiveAt||pactSpy.expiresAt)-Date.now()))/1000)+').', 'ti-shield'); return; }
     const cf = currentFleet();
     if ((cf.spaeher||0) < 1){ log('Du brauchst ein Spähschiff auf '+planetDisplayName(state.activeBasePlanet)+', um jemanden auszuspähen.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='spy-player').length;
@@ -5669,6 +5681,8 @@
     loadReports();
   }
   async function sendPlayerAttackMission(playerId, name){
+    const pactAtk = activePactWith(playerId);
+    if (pactAtk){ log('Nichtangriffspakt mit '+name+' aktiv - Angriffe sind blockiert (läuft noch '+fmtDuration(Math.max(0,((pactAtk.cancelEffectiveAt||pactAtk.expiresAt)-Date.now()))/1000)+').', 'ti-shield'); return; }
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
@@ -5911,6 +5925,19 @@
     attackBtn.onclick = () => { closePlayerProfile(); attackPlayer(entry.id, entry.name); };
     msgBtn.onclick = () => { closePlayerProfile(); sendMessage(entry.id, entry.name); };
     if (spyBtn) spyBtn.onclick = () => { closePlayerProfile(); sendSpyMission(entry.id, entry.name); };
+    const pactBtn = document.getElementById('profilePactBtn');
+    if (pactBtn){
+      const existingPact = activePactWith(entry.id);
+      pactBtn.style.display = isMe ? 'none' : 'block';
+      if (existingPact){
+        pactBtn.disabled = true;
+        pactBtn.innerHTML = '<i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Pakt aktiv (noch '+fmtDuration(Math.max(0,((existingPact.cancelEffectiveAt||existingPact.expiresAt)-Date.now()))/1000)+')';
+      } else {
+        pactBtn.disabled = false;
+        pactBtn.innerHTML = '<i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten';
+        pactBtn.onclick = () => { closePlayerProfile(); offerPact(entry.id, entry.name); };
+      }
+    }
     document.getElementById('playerProfileOverlay').style.display = 'flex';
   }
   function closePlayerProfile(){
@@ -6718,6 +6745,7 @@
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
+      { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab.' },
       { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Beim ersten Login der neuen Woche wird die Vorwoche abgerechnet und die Belohnung gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 60 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 30 Min., <strong>Silber</strong> 400 + 15 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Wer den Wochenwechsel verpasst, wird anhand des letzten bekannten Stands eingestuft. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
@@ -8319,6 +8347,118 @@
     } else if (after.xp < before.xp){
       log('Veteranen-Rang auf '+planetDisplayName(pk)+' gesunken: nach den schweren Verlusten nur noch "'+after.name+'"'+(after.bonus>0?' (+'+Math.round(after.bonus*100)+'%)':'')+'.', 'ti-alert-triangle');
     }
+  }
+  // ===== Spieler-Diplomatie: Nichtangriffspakte =====
+  // Zwei Spieler können einen Nichtangriffspakt schließen (7 Tage Laufzeit): solange er aktiv ist,
+  // blockieren beide Clients gegenseitige Angriffe und Spionage. Kündigung jederzeit möglich, wirkt
+  // aber erst nach 24h Frist - kein Blitz-Verrat. Läuft über den geteilten Speicher: ein Schlüssel
+  // pro Spieler-Paar (pact:<kleinereId>_<größereId>), Statuswechsel überschreiben den Eintrag.
+  // Angebote verfallen unbeantwortet nach 48h (lazy, ohne Löschung).
+  const PACT_DURATION_MS = 7*24*3600*1000;
+  const PACT_CANCEL_NOTICE_MS = 24*3600*1000;
+  const PACT_OFFER_TTL_MS = 48*3600*1000;
+  let diploCache = [];
+  function pactKeyFor(a, b){ const s = [String(a), String(b)].sort(); return 'pact:'+s[0]+'_'+s[1]; }
+  function pactIsActive(p){
+    if (!p || p.status !== 'active') return false;
+    const now = Date.now();
+    if (p.expiresAt && now > p.expiresAt) return false;
+    if (p.cancelEffectiveAt && now > p.cancelEffectiveAt) return false;
+    return true;
+  }
+  function pactIsOpenOffer(p){
+    return p && p.status === 'offered' && (Date.now() - (p.offeredAt||0)) < PACT_OFFER_TTL_MS;
+  }
+  function activePactWith(otherId){
+    if (!otherId || !state.player.id) return null;
+    const k = pactKeyFor(state.player.id, otherId);
+    const e = diploCache.find(x => x.key === k);
+    return (e && pactIsActive(e.data)) ? e.data : null;
+  }
+  function pactOtherId(p){ return p.a === state.player.id ? p.b : p.a; }
+  function pactOtherName(p){ return (p.names && p.names[pactOtherId(p)]) || 'Unbekannt'; }
+  async function loadDiplomacy(){
+    if (!state.player.id) return;
+    try {
+      const lr = await storageList('pact:', true);
+      const keys = ((lr && lr.keys) || []).filter(k => k.includes(state.player.id));
+      const loaded = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); return (r && r.value) ? { key: k, data: JSON.parse(r.value) } : null; } catch(e){ return null; }
+      }));
+      diploCache = loaded.filter(Boolean);
+      renderDiplomacy();
+    } catch(e){ /* geteilter Speicher optional */ }
+  }
+  async function savePact(p){
+    try { await storageSet(pactKeyFor(p.a, p.b), JSON.stringify(p), true); } catch(e){ log('Diplomatie: geteilter Speicher nicht erreichbar.', 'ti-alert-triangle'); }
+    await loadDiplomacy();
+  }
+  async function offerPact(targetId, targetName){
+    if (!state.player.id || !targetId || targetId === state.player.id) return;
+    const k = pactKeyFor(state.player.id, targetId);
+    const existing = diploCache.find(x => x.key === k);
+    if (existing && (pactIsActive(existing.data) || pactIsOpenOffer(existing.data))){
+      log('Mit '+targetName+' besteht bereits ein aktiver Pakt oder ein offenes Angebot.', 'ti-alert-triangle');
+      return;
+    }
+    const names = {}; names[state.player.id] = state.player.name || 'Kommandant'; names[targetId] = targetName || 'Unbekannt';
+    await savePact({ a: state.player.id, b: targetId, names, status:'offered', offeredBy: state.player.id, offeredAt: Date.now() });
+    log('Nichtangriffspakt-Angebot an '+targetName+' gesendet (48h gültig). Sobald es angenommen wird, sind gegenseitige Angriffe und Spionage 7 Tage lang blockiert.', 'ti-shield');
+    playSound('build');
+  }
+  async function acceptPact(key){
+    const e = diploCache.find(x => x.key === key);
+    if (!e || !pactIsOpenOffer(e.data) || e.data.offeredBy === state.player.id) return;
+    const p = e.data;
+    p.status = 'active'; p.acceptedAt = Date.now(); p.expiresAt = Date.now() + PACT_DURATION_MS;
+    delete p.cancelRequestedBy; delete p.cancelEffectiveAt;
+    await savePact(p);
+    log('Nichtangriffspakt mit '+pactOtherName(p)+' geschlossen - gültig 7 Tage. Gegenseitige Angriffe und Spionage sind blockiert.', 'ti-shield');
+    playSound('achieve');
+    pushReport({ type:'item-found', itemName:'Nichtangriffspakt mit '+pactOtherName(p)+' (7 Tage)', itemIcon:'ti-shield', rare:false, foundAt:'Diplomatie' });
+  }
+  async function declinePact(key){
+    const e = diploCache.find(x => x.key === key);
+    if (!e) return;
+    e.data.status = 'declined';
+    await savePact(e.data);
+    log('Pakt-Angebot abgelehnt bzw. zurückgezogen.', 'ti-shield');
+  }
+  async function cancelPact(key){
+    const e = diploCache.find(x => x.key === key);
+    if (!e || !pactIsActive(e.data)) return;
+    if (e.data.cancelEffectiveAt) return;
+    if (!confirm('Pakt mit '+pactOtherName(e.data)+' kündigen? Er bleibt noch 24 Stunden wirksam und endet dann.')) return;
+    e.data.cancelRequestedBy = state.player.id;
+    e.data.cancelEffectiveAt = Date.now() + PACT_CANCEL_NOTICE_MS;
+    await savePact(e.data);
+    log('Pakt mit '+pactOtherName(e.data)+' gekündigt - endet in 24 Stunden.', 'ti-alert-triangle');
+  }
+  function renderDiplomacy(){
+    const box = document.getElementById('diplomacyBox');
+    if (!box) return;
+    const myId = state.player.id;
+    if (!myId){ box.innerHTML = '<div class="bmeta">Diplomatie ist verfügbar, sobald dein Spielerprofil angelegt ist.</div>'; return; }
+    const actives = diploCache.filter(e => pactIsActive(e.data));
+    const incoming = diploCache.filter(e => pactIsOpenOffer(e.data) && e.data.offeredBy !== myId);
+    const outgoing = diploCache.filter(e => pactIsOpenOffer(e.data) && e.data.offeredBy === myId);
+    let html = '';
+    for (const e of actives){
+      const p = e.data;
+      const remain = (p.cancelEffectiveAt || p.expiresAt) - Date.now();
+      const cancelNote = p.cancelEffectiveAt ? ` <span style="color:#e0a548;">(gekündigt - endet in ${fmtDuration(Math.max(0,(p.cancelEffectiveAt-Date.now()))/1000)})</span>` : '';
+      html += `<div class="card-row"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#5dcaa5;"></i><div><div class="bname">Pakt mit ${pactOtherName(p)}${cancelNote}</div><div class="bmeta">Läuft noch ${fmtDuration(Math.max(0,remain)/1000)} · Angriffe & Spionage gegenseitig blockiert</div></div></div>${p.cancelEffectiveAt?'':`<button data-pact-cancel="${e.key}" style="font-size:10.5px; padding:5px 9px;">Kündigen</button>`}</div>`;
+    }
+    for (const e of incoming){
+      html += `<div class="card-row" style="border-color:#5dcaa5;"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#5dcaa5;"></i><div><div class="bname">Angebot von ${pactOtherName(e.data)}</div><div class="bmeta">Nichtangriffspakt, 7 Tage - gilt ab Annahme</div></div></div><div style="display:flex; gap:6px;"><button class="buy affordable" data-pact-accept="${e.key}" style="font-size:10.5px; padding:5px 9px;">Annehmen</button><button data-pact-decline="${e.key}" style="font-size:10.5px; padding:5px 9px;">Ablehnen</button></div></div>`;
+    }
+    for (const e of outgoing){
+      html += `<div class="card-row"><div class="left"><i class="ti ti-clock" aria-hidden="true" style="color:#9296ac;"></i><div><div class="bname">Angebot an ${pactOtherName(e.data)}</div><div class="bmeta">Wartet auf Antwort (verfällt ${fmtDuration(Math.max(0,(e.data.offeredAt+PACT_OFFER_TTL_MS-Date.now()))/1000)})</div></div></div><button data-pact-decline="${e.key}" style="font-size:10.5px; padding:5px 9px;">Zurückziehen</button></div>`;
+    }
+    box.innerHTML = html || '<div class="bmeta">Keine aktiven Pakte oder Angebote. Öffne das Profil eines Spielers in der Bestenliste, um einen Nichtangriffspakt anzubieten.</div>';
+    box.querySelectorAll('[data-pact-accept]').forEach(b => b.onclick = () => acceptPact(b.getAttribute('data-pact-accept')));
+    box.querySelectorAll('[data-pact-decline]').forEach(b => b.onclick = () => declinePact(b.getAttribute('data-pact-decline')));
+    box.querySelectorAll('[data-pact-cancel]').forEach(b => b.onclick = () => cancelPact(b.getAttribute('data-pact-cancel')));
   }
   function orbitalStationOf(planetKey){ return (state.orbitalStations||{})[planetKey] || null; }
   function orbitalJobFor(planetKey){ return (state.constructionQueue||[]).find(j=>j.kind==='orbital' && j.planet===planetKey) || null; }
@@ -9926,6 +10066,7 @@
         if (snap.length) state.weeklyLeague.boardSnapshot = snap;
       }
       renderWeeklyLeague();
+      loadDiplomacy();
       updateHallOfFame(entries);
       renderFpLeaderboard();
       renderLeaderboardList();
@@ -10005,7 +10146,7 @@
         <div class="rank-row ${isMe?'me':''}" data-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <span class="rank-num">${rank}</span>
-            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+e.allianceTag+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:9px;"><i class="ti ti-award" aria-hidden="true"></i> '+e.title+'</span>':''}</span>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+e.allianceTag+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:9px;"><i class="ti ti-award" aria-hidden="true"></i> '+e.title+'</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:9px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
           </div>
           <div style="display:flex; gap:10px; color:#9296ac; flex-shrink:0; align-items:center;">
             <span><i class="ti ti-rocket" aria-hidden="true"></i> ${e.ships||0}</span>
