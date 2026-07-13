@@ -1485,8 +1485,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.10.1';
+  const VERSION = '8.10.2';
   const PATCHNOTES = [
+    { version:'8.10.2', date:'13.07.2026', changes:[
+      'Bugfix: Die Bau-Vorschau zeigte bei kleinen Produktionswerten (z.B. Fusionsreaktor/Antimaterie auf niedriger Stufe) fälschlich "+0/s → +0/s" an, obwohl die Produktion real war und sich beim Ausbau erhöht hat - zu grobe Rundung. Zeigt jetzt die tatsächlichen Nachkommastellen (z.B. "+0,034/s → +0,051/s")'
+    ]},
     { version:'8.10.1', date:'13.07.2026', changes:[
       'Neuer Abmelden-Knopf direkt in der Kopfzeile, rechts neben Einstellungen - schneller erreichbar als vorher (nur unten in den Einstellungen)'
     ]},
@@ -5230,6 +5233,14 @@
     return builtReport;
   }
 
+  // Für kleine Produktions-Vorschauwerte (z.B. Antimaterie bei niedriger Stufe): die normale fmt()
+  // rundet auf eine Nachkommastelle - bei Werten unter 1/s wird daraus fälschlich "0", obwohl die
+  // Produktion real ist und sich beim Ausbau spürbar erhöht. Nur für diese Vorschau mehr Präzision.
+  function fmtRatePreview(n){
+    if (n >= 10) return fmt(n);
+    if (n >= 1) return (Math.round(n*100)/100).toString();
+    return (Math.round(n*1000)/1000).toString();
+  }
   function fmt(n){
     if (n >= 1000000) return (n/1000000).toFixed(2)+'M';
     if (n >= 1000) return (n/1000).toFixed(1)+'k';
@@ -11072,7 +11083,7 @@
         const rd = RES_DEFS.find(x=>x.key===def.produces);
         const curProd = lvl*def.baseRate*habitatMult*rm;
         const nextProd = (lvl+qty)*def.baseRate*habitatMult*rm;
-        prodLine = `Produktion: +${fmt(curProd)}/s → <span style="color:#5dcaa5;">+${fmt(nextProd)}/s</span> nach Ausbau (${rd.label})`;
+        prodLine = `Produktion: +${fmtRatePreview(curProd)}/s → <span style="color:#5dcaa5;">+${fmtRatePreview(nextProd)}/s</span> nach Ausbau (${rd.label})`;
       } else if (def.key==='habitat'){
         prodLine = `Aktuell: +${Math.min(40,lvl*2)}% Gesamtproduktion → <span style="color:#5dcaa5;">+${Math.min(40,(lvl+qty)*2)}%</span> nach Ausbau (Deckel: +40%)`;
       } else if (def.key==='lager'){
