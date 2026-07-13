@@ -976,6 +976,10 @@
 
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-message" aria-hidden="true"></i>Nachrichten</div>
         <div id="messagesBox"></div>
+
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-bell" aria-hidden="true"></i>Server-Ereignisse</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Grundlage für künftige Push-Benachrichtigungen: Pakt-Angebote, Weltboss-Kills und anfliegende Überfälle, die der Server mitbekommen hat - einstellbar in den Einstellungen.</div>
+        <div id="notificationEventsBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-hilfe">
@@ -1030,6 +1034,22 @@
         <div id="themePicker" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
 
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Hilfe</div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-bell" aria-hidden="true"></i>Server-Ereignis-Benachrichtigungen</div>
+        <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;" id="notifPrefsCard">
+          <div class="bmeta" style="margin-bottom:8px;">Grundlage für Push-Benachrichtigungen (folgen später). Schon jetzt bestimmt das hier, ob und für welche Ereignisse der Server ein Postfach-Ereignis anlegt (Berichte-Tab).</div>
+          <div class="card-row" style="margin-bottom:6px;">
+            <div class="left"><i class="ti ti-bell" aria-hidden="true"></i><div><div class="bname">Benachrichtigt werden</div><div class="bmeta">Hauptschalter - aus schaltet alle Kategorien darunter mit ab</div></div></div>
+            <div class="toggle-switch" id="notifPrefEnabledSwitch"><div class="toggle-knob"></div></div>
+          </div>
+          <div id="notifPrefCategoryRows" style="display:flex; flex-direction:column; gap:6px;">
+            <div class="card-row"><div class="left"><i class="ti ti-message" aria-hidden="true"></i><div class="bname">Nachrichten</div></div><div class="toggle-switch" data-notif-cat="messages"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-shield" aria-hidden="true"></i><div class="bname">Pakt-Angebote</div></div><div class="toggle-switch" data-notif-cat="pact"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-skull" aria-hidden="true"></i><div class="bname">Weltboss-Kills</div></div><div class="toggle-switch" data-notif-cat="weltboss"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div class="bname">Anfliegende Überfälle</div></div><div class="toggle-switch" data-notif-cat="raid"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-mail" aria-hidden="true"></i><div class="bname">Patchnotes</div></div><div class="toggle-switch" data-notif-cat="patchnotes"><div class="toggle-knob"></div></div></div>
+          </div>
+        </div>
+
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-mail" aria-hidden="true"></i>Feedback an den Entwickler</div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;" id="feedbackCard">
           <div class="bmeta" style="margin-bottom:6px;">Bug gefunden oder eine Idee für neue Features? Schreib es direkt hier – die Nachricht geht per E-Mail an den Entwickler.</div>
@@ -1460,8 +1480,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.8.1';
+  const VERSION = '8.9.0';
   const PATCHNOTES = [
+    { version:'8.9.0', date:'13.07.2026', changes:[
+      'Vorstufe für Push-Benachrichtigungen: Der Server erkennt jetzt selbst Pakt-Angebote, Weltboss-Kills und anfliegende Überfälle und legt dafür Postfach-Ereignisse an',
+      'Neuer Bereich "Server-Ereignisse" im Berichte-Tab zeigt diese Ereignisse geräteübergreifend an (z.B. "Pakt-Angebot von X", "Leviathan Stufe 3 besiegt - dein Beitrag: 22%")',
+      'Neue Einstellungen: Hauptschalter "Benachrichtigt werden" plus fünf einzeln abschaltbare Kategorien (Nachrichten, Pakt-Angebote, Weltboss-Kills, Überfälle, Patchnotes) - deaktivierte Kategorien erzeugen serverseitig gar kein Ereignis erst',
+      'Technischer Unterbau: Der Server liest beim Speichern von Pakt- und Weltboss-Daten mit und leitet daraus die Ereignisse ab, ohne dass sich an der bisherigen Spiellogik etwas ändert'
+    ]},
     { version:'8.8.1', date:'13.07.2026', changes:[
       'PWA Teil B (vorgezogen): Service Worker registriert - Kolonie Kepler-7 lässt sich jetzt auch am DESKTOP installieren (Chrome/Edge verlangen dafür zusätzlich zum Manifest einen aktiven Service Worker), nicht mehr nur auf Handy/Tablet',
       'Nebeneffekt: sofortiger App-Start und eine einfache Offline-Hinweisseite, falls die Verbindung mal komplett fehlt - alle Live-Funktionen (Login, Speichern, Bestenliste u.a.) laufen weiterhin ausschließlich live, werden nie gecacht'
@@ -5078,6 +5104,7 @@
       log('Scanner erfasst eine anfliegende Flotte ('+state.incomingRaid.faction+', geschätzte Stärke: '+state.incomingRaid.preview+', ≈'+state.incomingRaid.approxPoints+' Angriffspunkte) – Ziel: '+planetDisplayName(targetPlanet)+'. Verteidigungspunkte dort: '+defensePower(targetPlanet)+'.', 'ti-alert-triangle');
       playScanPing();
       maybeAutoReinforce();
+      scheduleRaidAlertOnServer();
     }
   }
   // Automatische Verstärkung: sobald ein Überfall per Scanner erkannt wird, verlegt bei aktiviertem
@@ -6057,6 +6084,72 @@
     badge.style.display = hasNew ? 'block' : 'none';
   }
   let messagesCache = [];
+  // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true };
+  let notificationEventsCache = [];
+  async function loadNotificationPrefs(){
+    if (!useBackend()) return;
+    try {
+      const res = await backendFetch('/notification-prefs');
+      if (res.ok){ notifPrefsCache = await res.json(); renderNotifPrefs(); }
+    } catch(e){}
+  }
+  async function saveNotificationPrefs(){
+    if (!useBackend()) return;
+    try {
+      const res = await backendFetch('/notification-prefs', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(notifPrefsCache) });
+      if (res.ok) notifPrefsCache = await res.json();
+      renderNotifPrefs();
+    } catch(e){}
+  }
+  function renderNotifPrefs(){
+    const enabledSwitch = document.getElementById('notifPrefEnabledSwitch');
+    if (enabledSwitch) enabledSwitch.classList.toggle('on', !!notifPrefsCache.enabled);
+    document.querySelectorAll('[data-notif-cat]').forEach(el => {
+      const cat = el.getAttribute('data-notif-cat');
+      el.classList.toggle('on', !!notifPrefsCache[cat]);
+      el.style.opacity = notifPrefsCache.enabled ? '1' : '0.4';
+      el.style.pointerEvents = notifPrefsCache.enabled ? 'auto' : 'none';
+    });
+  }
+  const NOTIF_EVENT_INFO = {
+    'pact-offer': { icon:'ti-shield', color:'#5dcaa5', text:(p)=>'Pakt-Angebot von '+(p.fromName||'einem Spieler')+' - im Diplomatie-Bereich (Galaxie-Tab) annehmen oder ablehnen.' },
+    'weltboss-kill': { icon:'ti-skull', color:'#e24b4a', text:(p)=>'Leviathan Stufe '+(p.level||1)+' wurde besiegt - dein Beitrag: '+(p.share||0)+'%.' },
+    'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' }
+  };
+  async function loadNotificationEvents(){
+    if (!useBackend()) return;
+    try {
+      const res = await backendFetch('/notifications');
+      if (res.ok){ const data = await res.json(); notificationEventsCache = data.notifications||[]; renderNotificationEventsBox(); }
+    } catch(e){}
+  }
+  function renderNotificationEventsBox(){
+    const box = document.getElementById('notificationEventsBox');
+    if (!box) return;
+    if (!useBackend()){ box.innerHTML = '<div class="bmeta">Nur mit eigenem Server verfügbar.</div>'; return; }
+    if (!notificationEventsCache.length){ box.innerHTML = '<div class="bmeta">Keine neuen Server-Ereignisse.</div>'; return; }
+    box.innerHTML = notificationEventsCache.map(n => {
+      const info = NOTIF_EVENT_INFO[n.type] || { icon:'ti-bell', color:'#9296ac', text:()=>'Ereignis' };
+      const when = new Date(n.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      return `<div class="card-row"><div class="left"><i class="ti ${info.icon}" aria-hidden="true" style="color:${info.color};"></i><div><div class="bname">${info.text(n.payload||{})}</div><div class="bmeta">${when}</div></div></div><button data-notif-dismiss="${n.id}" style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button></div>`;
+    }).join('');
+    box.querySelectorAll('[data-notif-dismiss]').forEach(b => b.onclick = () => dismissNotificationEvent(b.getAttribute('data-notif-dismiss')));
+  }
+  async function dismissNotificationEvent(id){
+    notificationEventsCache = notificationEventsCache.filter(n => n.id !== id);
+    renderNotificationEventsBox();
+    try { await backendFetch('/notifications/dismiss', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids:[id] }) }); } catch(e){}
+  }
+  // Meldet dem Server einen erkannten Überfall zur Terminierung (rein lokale NPC-Bedrohung, der
+  // Server erfährt sonst nie davon) - nur wenn die Kategorie "Überfall" aktiviert ist.
+  async function scheduleRaidAlertOnServer(){
+    if (!useBackend() || !notifPrefsCache.enabled || !notifPrefsCache.raid) return;
+    if (!state.incomingRaid || !state.nextRaidTime) return;
+    try {
+      await backendFetch('/schedule-raid-alert', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ fireAt: state.nextRaidTime, planet: state.incomingRaid.planet||null }) });
+    } catch(e){}
+  }
   async function loadMessages(){
     if (!useBackend()){
       const box = document.getElementById('messagesBox');
@@ -6223,9 +6316,18 @@
   });
   document.getElementById('tutorialSkipBtn').addEventListener('click', closeTutorial);
   // Pakte einmal beim Start laden, damit die Friedensdividende sofort in die Produktion einfließt
-  setTimeout(() => { try { loadDiplomacy(); loadWorldBoss(); } catch(e){} }, 2500);
+  setTimeout(() => { try { loadDiplomacy(); loadWorldBoss(); loadNotificationPrefs(); loadNotificationEvents(); } catch(e){} }, 2500);
   const showTutorialBtn = document.getElementById('showTutorialBtn');
   if (showTutorialBtn) showTutorialBtn.addEventListener('click', showTutorial);
+  // Server-Ereignis-Benachrichtigungen: Schalter verdrahten
+  const notifEnabledSwitch = document.getElementById('notifPrefEnabledSwitch');
+  if (notifEnabledSwitch) notifEnabledSwitch.addEventListener('click', () => { notifPrefsCache.enabled = !notifPrefsCache.enabled; saveNotificationPrefs(); });
+  document.querySelectorAll('[data-notif-cat]').forEach(el => el.addEventListener('click', () => {
+    if (!notifPrefsCache.enabled) return;
+    const cat = el.getAttribute('data-notif-cat');
+    notifPrefsCache[cat] = !notifPrefsCache[cat];
+    saveNotificationPrefs();
+  }));
   // Feedback-Formular: Bug/Vorschlag an den Entwickler (Backend speichert + schickt E-Mail).
   let feedbackType = 'bug';
   const fbBugBtn = document.getElementById('feedbackTypeBug');
@@ -6968,6 +7070,7 @@
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
+      { title:'Server-Ereignis-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich getrennt steuern, ob und für welche Ereignisse der Server ein Postfach-Ereignis anlegt: Pakt-Angebote, Weltboss-Kills (mit deinem Schadensanteil) und anfliegende Überfälle. Die Ereignisse selbst siehst du im <strong>Berichte-Tab</strong> unter "Server-Ereignisse". Das ist die Grundlage für spätere Push-Benachrichtigungen (kommen noch), funktioniert aber schon jetzt als geräteübergreifendes Postfach - nur mit eigenem Server verfügbar.' },
       { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt.' },
       { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: ab <strong>Prestige 3 und 50.000 Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit fünf Zweigen (je max. Stufe 10, Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset) und Pfadfinder-Instinkt (+2% Expeditions-Belohnung). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste.' },
       { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
@@ -10369,6 +10472,8 @@
     if (hProfile) hProfile.classList.toggle('active', tab==='einstellungen');
     if (tab === 'hilfe') renderHelpBox();
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
+    if (tab === 'berichte'){ loadNotificationEvents(); }
+    if (tab === 'einstellungen'){ loadNotificationPrefs(); }
     if (tab === 'allianz'){ loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     if (tab === 'berichte'){
