@@ -1634,8 +1634,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.21.0';
+  const VERSION = '8.21.1';
   const PATCHNOTES = [
+    { version:'8.21.1', date:'13.07.2026', changes:[
+      'Vorschlag umgesetzt (danke an holyhenning): Bau- und Forschungs-Warteschlange reservieren jetzt mindestens 3 Zeilen als Platzhalter, statt bei leerer Warteschlange komplett zu verschwinden - vorher poppte die Box beim ersten Hinzufügen plötzlich mit voller Höhe auf und schob die Liste darunter weg, was sich wie ein ungewolltes Auto-Scrollen anfühlte'
+    ]},
     { version:'8.21.0', date:'13.07.2026', changes:[
       'Neu: Wenn ein gemeldeter Bug behoben wird, bekommt der meldende Spieler eine Nachricht vom Team und einmalig eine kleine Kredit-Belohnung gutgeschrieben (erscheint automatisch beim nächsten Einloggen bzw. spätestens nach 15 Sekunden, falls schon eingeloggt)'
     ]},
@@ -11624,75 +11627,77 @@
 
     const qBox = document.getElementById('buildQueueBox');
     if (qBox){
-      if (!state.buildQueue || !state.buildQueue.length){
-        qBox.innerHTML = '';
-      } else {
-        // Gesamtkosten-Vorschau: simuliert die kumulierten Level je (Planet+Gebäude)-Kombination beim
-        // Durchlaufen der Warteschlange, damit spätere Einträge desselben Gebäudes korrekt teurer
-        // gerechnet werden als der erste. Reine Schätzung – der tatsächliche Preis beim Bauen kann
-        // leicht abweichen, falls zwischendurch weitere Level manuell gebaut werden.
-        const levelSim = {};
-        const totalQCost = {};
-        for (const q of state.buildQueue){
-          const def = BUILDING_DEFS.find(d=>d.key===q.key);
-          if (!def) continue;
-          const simKey = q.planet+':'+q.key;
-          const curLvl = levelSim[simKey] !== undefined ? levelSim[simKey] : (buildingSetFor(q.planet)[q.key]||0);
-          const c = costFor(def, curLvl);
-          for (const [r,a] of Object.entries(c)) totalQCost[r] = (totalQCost[r]||0)+a;
-          levelSim[simKey] = curLvl+1;
-        }
-        qBox.innerHTML = `
-          <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Bau-Warteschlange (${state.buildQueue.length}/10)</div>
-          <div class="bmeta" style="margin-bottom:0.5rem;">Geschätzte Gesamtkosten: ${costHtml(totalQCost)}</div>
-          <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
-            ${state.buildQueue.map((q,i) => {
-              const def = BUILDING_DEFS.find(d=>d.key===q.key) || {};
-              return `<div class="card-row" style="padding:0.5rem 0.85rem;">
-                <div class="left"><span class="lvl-pill">${i+1}</span><span class="bname" style="font-size:12.5px;">${def.name||q.key}${q.planet!=='home'?' ('+(PLANETS.find(p=>p.id===q.planet)||{}).name+')':''}</span></div>
-                <button data-buildqueue-remove="${i}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
-              </div>`;
-            }).join('')}
-          </div>
-        `;
+      // Feste Mindesthöhe: die Box reserviert immer mindestens 3 Zeilen (leere Platzhalter statt
+      // komplett zu verschwinden), damit das Hinzufügen des ersten Eintrags nicht die Gebäudeliste
+      // darunter wegschiebt - fühlte sich vorher wie ein ungewolltes Auto-Scrollen an
+      // (Vorschlag holyhenning, 13.07.2026). Ab mehr als 3 Einträgen wächst die Box normal weiter.
+      const bq = state.buildQueue || [];
+      const levelSim = {};
+      const totalQCost = {};
+      for (const q of bq){
+        const def = BUILDING_DEFS.find(d=>d.key===q.key);
+        if (!def) continue;
+        const simKey = q.planet+':'+q.key;
+        const curLvl = levelSim[simKey] !== undefined ? levelSim[simKey] : (buildingSetFor(q.planet)[q.key]||0);
+        const c = costFor(def, curLvl);
+        for (const [r,a] of Object.entries(c)) totalQCost[r] = (totalQCost[r]||0)+a;
+        levelSim[simKey] = curLvl+1;
       }
+      const qMinSlots = 3;
+      const qPlaceholders = Math.max(0, qMinSlots - bq.length);
+      qBox.innerHTML = `
+        <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Bau-Warteschlange (${bq.length}/10)</div>
+        <div class="bmeta" style="margin-bottom:0.5rem;">${bq.length ? 'Geschätzte Gesamtkosten: '+costHtml(totalQCost) : 'Noch leer - Gebäude über "Warteschlange" hinzufügen.'}</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
+          ${bq.map((q,i) => {
+            const def = BUILDING_DEFS.find(d=>d.key===q.key) || {};
+            return `<div class="card-row" style="padding:0.5rem 0.85rem;">
+              <div class="left"><span class="lvl-pill">${i+1}</span><span class="bname" style="font-size:12.5px;">${def.name||q.key}${q.planet!=='home'?' ('+(PLANETS.find(p=>p.id===q.planet)||{}).name+')':''}</span></div>
+              <button data-buildqueue-remove="${i}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+            </div>`;
+          }).join('')}
+          ${Array.from({length: qPlaceholders}).map(() => `<div class="card-row" style="padding:0.5rem 0.85rem; opacity:0.35; border-style:dashed;"><span class="bmeta">– frei –</span></div>`).join('')}
+        </div>
+      `;
     }
     const rqBox = document.getElementById('researchQueueBox');
     if (rqBox){
-      if (!state.researchQueue || !state.researchQueue.length){
-        rqBox.innerHTML = '';
-      } else {
-        const rLevelSim = {};
-        const totalRQCost = {};
-        const queueTargetLevels = [];
-        for (const key of state.researchQueue){
-          const r = RESEARCH_DEFS.find(x=>x.key===key);
-          if (!r){ queueTargetLevels.push(null); continue; }
-          const curLvl = rLevelSim[key] !== undefined ? rLevelSim[key] : (state.research[key]||0);
-          const c = researchCostFor(r, curLvl+1);
-          for (const [res,a] of Object.entries(c)) totalRQCost[res] = (totalRQCost[res]||0)+a;
-          rLevelSim[key] = curLvl+1;
-          queueTargetLevels.push(curLvl+1);
-        }
-        rqBox.innerHTML = `
-          <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Forschungs-Warteschlange (${state.researchQueue.length}/10)</div>
-          <div class="bmeta" style="margin-bottom:0.5rem;">Geschätzte Gesamtkosten: ${costHtml(totalRQCost)}</div>
-          <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
-            ${state.researchQueue.map((key,i) => {
-              const r = RESEARCH_DEFS.find(x=>x.key===key) || {};
-              // Bug behoben: zeigte bisher bei mehrfach eingereihter gleicher Forschung überall
-              // "aktuelle Stufe + 1" (z.B. zweimal "Stufe 16" statt 16 dann 17) – nutzt jetzt dieselbe
-              // Stufen-Simulation wie die Kostenberechnung direkt darüber, die die Warteschlangen-
-              // Position korrekt berücksichtigt.
-              const nextLvl = queueTargetLevels[i];
-              return `<div class="card-row" style="padding:0.5rem 0.85rem;">
-                <div class="left"><span class="lvl-pill">${i+1}</span><span class="bname" style="font-size:12.5px;">${r.name||key} → Stufe ${nextLvl}</span></div>
-                <button data-researchqueue-remove="${i}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
-              </div>`;
-            }).join('')}
-          </div>
-        `;
+      // Gleiche Platzhalter-Lösung wie bei der Bau-Warteschlange direkt darüber (siehe Kommentar
+      // dort) - verhindert denselben Layout-Sprung beim ersten Eintrag.
+      const rq = state.researchQueue || [];
+      const rLevelSim = {};
+      const totalRQCost = {};
+      const queueTargetLevels = [];
+      for (const key of rq){
+        const r = RESEARCH_DEFS.find(x=>x.key===key);
+        if (!r){ queueTargetLevels.push(null); continue; }
+        const curLvl = rLevelSim[key] !== undefined ? rLevelSim[key] : (state.research[key]||0);
+        const c = researchCostFor(r, curLvl+1);
+        for (const [res,a] of Object.entries(c)) totalRQCost[res] = (totalRQCost[res]||0)+a;
+        rLevelSim[key] = curLvl+1;
+        queueTargetLevels.push(curLvl+1);
       }
+      const rqMinSlots = 3;
+      const rqPlaceholders = Math.max(0, rqMinSlots - rq.length);
+      rqBox.innerHTML = `
+        <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Forschungs-Warteschlange (${rq.length}/10)</div>
+        <div class="bmeta" style="margin-bottom:0.5rem;">${rq.length ? 'Geschätzte Gesamtkosten: '+costHtml(totalRQCost) : 'Noch leer - Forschung über "Warteschlange" hinzufügen.'}</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
+          ${rq.map((key,i) => {
+            const r = RESEARCH_DEFS.find(x=>x.key===key) || {};
+            // Bug behoben: zeigte bisher bei mehrfach eingereihter gleicher Forschung überall
+            // "aktuelle Stufe + 1" (z.B. zweimal "Stufe 16" statt 16 dann 17) – nutzt jetzt dieselbe
+            // Stufen-Simulation wie die Kostenberechnung direkt darüber, die die Warteschlangen-
+            // Position korrekt berücksichtigt.
+            const nextLvl = queueTargetLevels[i];
+            return `<div class="card-row" style="padding:0.5rem 0.85rem;">
+              <div class="left"><span class="lvl-pill">${i+1}</span><span class="bname" style="font-size:12.5px;">${r.name||key} → Stufe ${nextLvl}</span></div>
+              <button data-researchqueue-remove="${i}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+            </div>`;
+          }).join('')}
+          ${Array.from({length: rqPlaceholders}).map(() => `<div class="card-row" style="padding:0.5rem 0.85rem; opacity:0.35; border-style:dashed;"><span class="bmeta">– frei –</span></div>`).join('')}
+        </div>
+      `;
     }
 
     const qtyHtml = [1,5,10,'max'].map(v => `<button class="qty-btn ${buildQtyMode===v?'active':''}" data-qty="${v}">${v==='max'?'Max':'x'+v}</button>`).join('');
