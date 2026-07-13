@@ -273,6 +273,10 @@
     .dash-colony-icon { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; background:rgba(var(--primary-rgb), 0.18); color:#c3bef5; }
     .dash-role-badge { position:absolute; bottom:-4px; right:-4px; width:14px; height:14px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
     .dash-role-badge i { font-size:8px; margin:0; }
+    .dash-moon-badge { position:absolute; bottom:-4px; left:-4px; width:15px; height:15px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#3a4060; color:#c3bef5; box-shadow:0 0 0 2px #0d1224; cursor:pointer; }
+    .dash-moon-badge i { font-size:8px; margin:0; }
+    .dash-moon-badge.active { background:#7f77dd; color:#0d1224; box-shadow:0 0 0 2px #7f77dd; }
+    .dash-moon-badge:hover { background:#7f77dd; color:#0d1224; }
     .dash-colony-card.targeted .dash-colony-icon { background:rgba(var(--danger-rgb), 0.25); color:#f0997b; }
     .dash-colony-info { min-width:0; flex:1; }
     .dash-colony-name { font-size:11px; color:#c7cbe0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:3px; }
@@ -917,7 +921,11 @@
         <div class="section-title" style="font-size:12px; margin-top:0;"><i class="ti ti-ship" aria-hidden="true"></i>Angriffsflotte zusammenstellen</div>
         <div id="attackFleetBox"></div>
         <div id="pendingAttackBox"></div>
+        <div id="pirateLairBox"></div>
         <div class="npc-list" id="npcList"></div>
+
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-award" aria-hidden="true"></i>Wochenliga</div>
+        <div id="weeklyLeagueBox"><div class="bmeta">lädt…</div></div>
 
         <div class="section-title" style="margin-top:1.5rem; justify-content:space-between;">
           <span><i class="ti ti-trophy" aria-hidden="true"></i>Bestenliste (alle Spieler dieses Spiels)</span>
@@ -1408,8 +1416,43 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.95.0';
+  const VERSION = '7.98.1';
   const PATCHNOTES = [
+    { version:'7.98.1', date:'13.07.2026', changes:[
+      'Kolonisierte Monde sind jetzt direkt an der Karte ihres Planeten anklickbar: kleines Mond-Symbol unten links am Planeten-Icon in der Übersichts-Leiste (leuchtet, wenn der Mond gerade aktiv ist)'
+    ]},
+    { version:'7.98.0', date:'13.07.2026', changes:[
+      'Neu: Veteranen-Flotten - jeder Flotten-Standort sammelt Kampferfahrung durch überlebte Gefechte (NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe, abgewehrte Überfälle; Siege bringen deutlich mehr als Niederlagen)',
+      'Fünf Ränge mit wachsendem Bonus auf Angriffs- UND Verteidigungskraft des Standorts: Rekrut, Erprobt (+2%), Veteran (+4%), Elite (+6%), Legende (+8%)',
+      'Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust = rund 30% XP weg) - ein Rang kann also auch wieder sinken; Auf- und Abstiege werden im Log gemeldet',
+      'Das Veteranen-Abzeichen mit Erfahrung und nächstem Rang wird über der Angriffsflotten-Auswahl im Galaxie-Tab angezeigt'
+    ]},
+    { version:'7.97.2', date:'13.07.2026', changes:[
+      'Bugfix: Das Ausspähen eines anfliegenden Überfalls scheiterte, wenn auf dem gerade angewählten Planeten kein Spähschiff stand - obwohl anderswo welche bereitstanden. Jetzt wird automatisch ein Späher vom besten verfügbaren Standort genommen (bevorzugt aktueller Planet, dann der bedrohte Planet, sonst irgendein Standort)'
+    ]},
+    { version:'7.97.1', date:'13.07.2026', changes:[
+      'Bugfix: Horizontale Wisch-Leisten (Planeten-Rollen, Orbital-Fokus, Expeditionstyp, Modul-Standortwahl) sprangen durch die Sekunden-Aktualisierung ständig an den Anfang zurück - die Scroll-Position bleibt jetzt beim Rendern erhalten',
+      'Der Patchnotes-Mail-Schalter zeigt bei veraltetem eigenen Server jetzt eine klare Meldung (Backend aktualisieren + Server-Prozess neu starten) statt einem allgemeinen Fehler'
+    ]},
+    { version:'7.97.0', date:'13.07.2026', changes:[
+      'Neu: Wochenliga (Galaxie-Tab, über der Bestenliste) - jede Woche zählt nur dein Punktezuwachs seit Montag, nicht dein Gesamtbesitz: faire Chancen auch für neue Spieler',
+      'Alle Spieler werden in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% Platin, dann Gold/Silber/Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber)',
+      'Montags-Belohnung beim ersten Login der neuen Woche: Platin 1.500 Kredite + 60 Min. Produktion aller Ressourcen, Gold 800 + 30 Min., Silber 400 + 15 Min., Bronze 150 Kredite (Produktionsanteile skalieren mit deiner Rate)',
+      'Das Liga-Panel zeigt deine aktuelle Liga, Wochenpunkte, die Top 10 der Woche, einen Countdown bis Sonntagnacht und das Ergebnis der Vorwoche',
+      'Die frühere kleine Top-3-Wochenbelohnung wurde durch die Wochenliga ersetzt (keine Doppel-Belohnung)'
+    ]},
+    { version:'7.96.1', date:'13.07.2026', changes:[
+      'Bugfix: Die Angriffsflotten-Auswahl sprang nach jeder Angriffs-Mission (NPC, Spieler, Piraten) dauerhaft auf 0 und musste komplett neu zusammengestellt werden - jetzt bleibt die Auswahl als Wunsch erhalten und es fliegen automatisch so viele davon mit, wie gerade verfügbar sind',
+      'Die Anzeige der Angriffsflotte zeigt weiterhin ehrlich an, wie viele Schiffe tatsächlich mitfliegen würden (Wunsch-Auswahl gekappt auf verfügbare Schiffe)'
+    ]},
+    { version:'7.96.0', date:'13.07.2026', changes:[
+      'Neu: Piraten-Verstecke – im Galaxie-Tab wartet dauerhaft ein Versteck deiner aktuellen Stufe (1-10), das du mit deiner Angriffsflotte ausheben kannst (echte Flugzeit + Treibstoff)',
+      'Sieg: Beute skaliert mit Stufe und deiner Produktion (Frachter mitnehmen!), dazu Kredite, Kampfpunkte und eine mit der Stufe wachsende Modul-Chance – die nächste Stufe schaltet frei',
+      'Niederlage: 20-35% Flottenverluste, aber die Stufe bleibt erhalten – aufrüsten und erneut versuchen',
+      'Gegnerstärke wächst exponentiell (Stufe 1: 120 bis Stufe 10: ~6.200) – Stufe 10 ist der Endboss mit garantiertem Modul und 500 Bonus-Krediten',
+      'Nach dem Endboss beginnt die Kette von vorn: je abgeschlossenem Durchlauf gibt es dauerhaft +2% Angriffskraft (Deckel +10%)',
+      'Laufende Piraten-Angriffe erscheinen in der Missionsliste und der Flottenpositions-Übersicht und lassen sich wie andere Angriffe zurückrufen'
+    ]},
     { version:'7.95.0', date:'13.07.2026', changes:[
       'Neu: Planeten-Ereignisse – alle 2-4 Stunden trifft ein zufälliges lokales Ereignis einen deiner Planeten und wirkt dort 10-15 Minuten (rein passiv, keine Entscheidung nötig)',
       'Zwölf Varianten, überwiegend positiv: Erzader (+40% Erz), Sonneneruption (+35% Energie), Kristallblüte (+40% Kristalle), Deuterium-Geysir (+40% Deuterium), Antimaterie-Anomalie (+35%), Forschungsfieber (+30% Forschungspunkte), Idealbedingungen (+15% Gesamtproduktion), Ruhiger Orbit (-20% Schiffsbauzeit)',
@@ -3695,7 +3738,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -3948,7 +3991,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='expedition') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='expedition') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -3969,13 +4012,21 @@
       attackFleetSelection[planetKey] = init;
     }
     const sel = attackFleetSelection[planetKey];
-    for (const k of ATTACK_SHIP_KEYS) sel[k] = Math.min(sel[k]||0, avail[k]);
+    // WICHTIG: Die gespeicherte Auswahl wird hier NICHT mehr auf die verfügbaren Schiffe gekappt.
+    // Früher wurde sel dauerhaft reduziert, sobald Schiffe unterwegs waren - dadurch stand die
+    // Auswahl nach jeder Mission auf 0 und musste komplett neu zusammengeklickt werden. Jetzt bleibt
+    // sie als "Wunsch-Auswahl" erhalten; gekappt wird erst beim Zusammenstellen der echten
+    // Angriffsflotte (buildAttackFleet) und in der Anzeige.
     return sel;
   }
   function buildAttackFleet(planetKey, cf){
     const sel = getAttackSelection(planetKey, cf);
+    const away = computeAwayByType(cf);
     const virtual = emptyFleet();
-    for (const k of ATTACK_SHIP_KEYS) virtual[k] = sel[k]||0;
+    for (const k of ATTACK_SHIP_KEYS){
+      const avail = Math.max(0, (cf[k]||0) - (away[k]||0));
+      virtual[k] = Math.min(sel[k]||0, avail);
+    }
     return virtual;
   }
 
@@ -4506,6 +4557,9 @@
     power *= (1 + prestigePerkCount('combat')*0.03);
     power *= (1 + skillBonusPct('war'));
     power *= megaProjectCombatMult() * (hasArtifactBonus()?1.05:1);
+    // Piraten-Ketten-Prestige: +2% Angriffskraft je abgeschlossenem Durchlauf (Deckel +10%).
+    power *= 1 + Math.min(PIRATE_LAIR_PRESTIGE_CAP, state.pirateLairPrestige||0)*0.02;
+    if (planetKey) power *= (1 + veteranRankOf(planetKey).bonus);
     power *= currentStance().atkMult;
     power *= (1 + officerBonus('admiral'));
     if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'atk'));
@@ -4580,7 +4634,7 @@
     power *= (1 + skillBonusPct('war'));
     power *= megaProjectCombatMult() * (hasArtifactBonus()?1.05:1);
     power *= currentStance().defMult;
-    if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'def'));
+    if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'def')) * (1 + veteranRankOf(planetKey).bonus);
     return Math.round(power);
   }
   // Angriffskraft der eigenen Verteidigungsanlagen (nur Waffen-Typen wie Türme/Geschütze – reine
@@ -4805,13 +4859,18 @@
   // in den Anflugweg der feindlichen Flotte begibt statt sie aus sicherer Distanz zu beobachten.
   function scoutIncomingRaid(){
     if (!state.incomingRaid || !state.incomingRaid.detected){ log('Kein erkannter Überfall zum Ausspähen vorhanden.', 'ti-alert-triangle'); return; }
-    // Das Spähschiff kommt jetzt vom aktuell angewählten Planeten (state.activeBasePlanet), nicht mehr
-    // zwingend vom bedrohten Zielplaneten – die Kampf-/Trümmerfeld-Schätzung bezieht sich weiterhin auf
-    // den tatsächlichen Zielplaneten des Überfalls, nur die Herkunft des Spähschiffs ist jetzt frei wählbar.
-    const scoutSourcePlanet = state.activeBasePlanet;
+    // Das Spähschiff wird automatisch vom nächstliegenden sinnvollen Standort genommen: bevorzugt
+    // vom aktuell angewählten Planeten, sonst vom bedrohten Zielplaneten, sonst von irgendeinem
+    // eigenen Standort mit Spähschiff. Vorher scheiterte das Ausspähen, wenn ausgerechnet auf dem
+    // gerade angewählten Planeten kein Späher stand - obwohl anderswo welche bereitstanden.
     const targetPlanet = state.incomingRaid.planet;
-    const f = scoutSourcePlanet==='home' ? state.fleet : (state.colonies[scoutSourcePlanet] ? state.colonies[scoutSourcePlanet].fleet : null);
-    if (!f || (f.spaeher||0) < 1){ log('Du brauchst ein Spähschiff auf '+planetDisplayName(scoutSourcePlanet)+' (aktuell gewählter Planet), um die anfliegende Flotte auszuspähen.', 'ti-alert-triangle'); return; }
+    let scoutSourcePlanet = null, f = null, bestPrio = 99;
+    for (const { planet: pk, fleet: fl } of allFleetsWithPlanet()){
+      if ((fl.spaeher||0) < 1) continue;
+      const prio = pk === state.activeBasePlanet ? 0 : (pk === targetPlanet ? 1 : 2);
+      if (prio < bestPrio){ bestPrio = prio; scoutSourcePlanet = pk; f = fl; }
+    }
+    if (!f){ log('Du brauchst mindestens ein Spähschiff an irgendeinem deiner Standorte, um die anfliegende Flotte auszuspähen.', 'ti-alert-triangle'); return; }
     if (!confirm('Spähschiff von '+planetDisplayName(scoutSourcePlanet)+' auf die anfliegende Flotte ansetzen? Das Schiff geht dabei garantiert verloren, liefert aber einen detaillierten Bericht inkl. Mondbildungs-Chance.')) return;
     f.spaeher -= 1;
     const raiderFleet = state.incomingRaid.fleet;
@@ -4914,6 +4973,7 @@
       const lostText = lostCountsToText(lostRaiderShips);
       const raidDebris = combatDebrisOf(lostRaiderShips);
       log('Verteidigung von '+planetDisplayName(targetPlanet)+' hat den Überfall von '+factionName+' erfolgreich abgewehrt.'+(lostText?' Zerstört: '+lostText+'. Trümmerfeld hinterlassen.':''), 'ti-shield-lock');
+      addVeteranXp(targetPlanet, 12);
       builtReport = { type:'raid', result:'win', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dp, defenseAttackPower:defAtk, defenseBefore:defBreakdown, fleet:raiderFleet, destroyedShips:lostRaiderShips, debris:raidDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
       pushReport(builtReport);
     } else {
@@ -5599,7 +5659,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen" im Galaxie-Tab).', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length;
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const baseDur = pseudoDistanceSeconds(playerId);
@@ -5661,8 +5721,8 @@
     // abgezogen werden (kein Zugriff auf dessen echten Spielstand ohne eigenen Server), daher betrifft
     // das nur die eigene angreifende Flotte. Wird erst unten im jeweils zutreffenden Zweig einmalig
     // ausgelöst, nicht hier oben pauschal (sonst würden Verluste bei einer Niederlage doppelt zählen).
-    const applyWinLoss = () => fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.1, planetKey, m.composition) : {};
-    const applyDefeatLoss = () => fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.3+Math.random()*0.3).pct, planetKey, m.composition) : {};
+    const applyWinLoss = () => { addVeteranXp(planetKey, 20); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.1, planetKey, m.composition) : {}; };
+    const applyDefeatLoss = () => { addVeteranXp(planetKey, 5); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.3+Math.random()*0.3).pct, planetKey, m.composition) : {}; };
     if (r.source === 'backend'){
       if (r.success){
         const rawStolen = r.stolen || {};
@@ -6575,6 +6635,8 @@
       { title:'Missionen & Flugzeit', body:'Angriffe, Überfälle, Expeditionen und Kolonisierungen laufen über Missionen mit echter Flugzeit (abhängig von Entfernung und langsamstem Schiff in der Flotte). Während der Flugzeit ist die Flotte unterwegs und zählt nicht zur Verteidigung am Ausgangsplaneten.' }
     ]},
     { key:'kampf', icon:'ti-sword', title:'Kampf', entries:[
+      { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.' },
+      { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%).' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:9.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
       { title:'Taktik-Haltung', body:'Im Forschung-Tab frei wählbar, jederzeit kostenlos wechselbar: <strong>Aggressiv</strong> (+10% Angriff, -10% Verteidigung), <strong>Ausgewogen</strong> (neutral) oder <strong>Defensiv</strong> (-10% Angriff, +15% Verteidigung).' },
@@ -6590,7 +6652,7 @@
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
-      { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus.' },
+      { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein kolonisierter Mond ist über das kleine Mond-Symbol an der Karte seines Planeten (Übersichts-Leiste oben) direkt anklickbar.' },
       { title:'Sektorkarte bedienen', body:'Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
       { title:'Terraforming', body:'Jeder Standort (Heimatbasis und Kolonien, nicht Monde) kann terraformt werden – Stufe 0 bis 10, jede Stufe gibt <strong>+5% Produktion</strong> dort (bis zu +50% bei Stufe 10). Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit. Es kann immer nur <strong>ein Terraforming gleichzeitig</strong> laufen. Zu finden im Basis-Tab unter der Planeten-Rolle.' },
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
@@ -6642,6 +6704,7 @@
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
+      { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Beim ersten Login der neuen Woche wird die Vorwoche abgerechnet und die Belohnung gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 60 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 30 Min., <strong>Silber</strong> 400 + 15 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Wer den Wochenwechsel verpasst, wird anhand des letzten bekannten Stands eingestuft. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
       { title:'Handelsmarkt', body:'Ein gemeinsamer Markttrend (0,75x bis 1,30x) schwankt langsam und beeinflusst die Angebote des Schwarzmarkt-Händlers – in guten Marktphasen bekommt man mehr für seine Ware.' },
@@ -7665,6 +7728,8 @@
           allianceTag: state.player.allianceTag || '',
           avatarKey: state.player.avatarKey || null,
           score: computeScore(),
+          weekKey: (state.weeklyLeague||{}).weekKey || null,
+          weekScore: myWeekScore(),
           ships: fuzz(allFleets().reduce((a,f)=>a+f.ships,0)),
           cruisers: fuzz(allFleets().reduce((a,f)=>a+f.cruisers,0)),
           destroyers: fuzz(allFleets().reduce((a,f)=>a+(f.destroyers||0),0)),
@@ -7792,6 +7857,10 @@
         if (!state.orbitalStations) state.orbitalStations = {};
         if (!state.planetEvents) state.planetEvents = {};
         if (state.nextPlanetEventCheck === undefined) state.nextPlanetEventCheck = 0;
+        if (!state.pirateLairStage) state.pirateLairStage = 1;
+        if (state.pirateLairPrestige === undefined) state.pirateLairPrestige = 0;
+        if (!state.weeklyLeague) state.weeklyLeague = { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] };
+        if (!state.veteranXp) state.veteranXp = {};
         if (state.warVictories === undefined) state.warVictories = 0;
         if (!state.scoreHistory) state.scoreHistory = [];
         if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
@@ -8085,6 +8154,158 @@
     log('Planeten-Ereignis auf '+planetDisplayName(pk)+': '+def.name+' ('+def.desc+', '+def.durMin+' Min.)', def.icon);
     playSound(def.good ? 'achieve' : 'alarm');
   }
+  // ===== Piraten-Verstecke =====
+  // PvE-Angriffskette im Galaxie-Tab: dauerhaft ein Versteck der aktuellen Stufe (1-10). Sieg schaltet
+  // die nächste Stufe frei, Niederlage kostet Schiffe, aber die Stufe bleibt. Gegnerstärke wächst
+  // exponentiell; Stufe 10 ist der Endboss. Nach Stufe 10: Kette startet neu (Prestige) mit einem
+  // dauerhaften kleinen Angriffsbonus (+2% je Durchlauf, gedeckelt bei +10%).
+  const PIRATE_LAIR_MAX_STAGE = 10;
+  const PIRATE_LAIR_PRESTIGE_CAP = 5;
+  function pirateLairPower(stage){ return Math.round(120 * Math.pow(1.55, stage-1)); }
+  function pirateLairName(stage){
+    const names = ['Schmugglernest','Vorposten der Aschepiraten','Korsaren-Enklave','Versteck der Leerenwölfe','Bastion der Roten Flotte','Sternenräuber-Hort','Festung der Nachtklingen','Zitadelle des Schwarms','Hafen der Verlorenen','Flaggschiff der Void-Korsaren'];
+    return names[Math.min(stage-1, names.length-1)] + ' (Stufe '+stage+')';
+  }
+  // Beute skaliert mit Stufe UND eigener Produktion (~10 Min. Produktion × Stufenfaktor, mit
+  // Untergrenzen für Einsteiger) - dieselbe Philosophie wie beim Legion-Geschenk seit v7.92.
+  function pirateLairLoot(stage){
+    const rates = ratesPerSecond();
+    const f = 1 + stage*0.3;
+    return {
+      erz: Math.max(150*stage, Math.round((rates.erz||0)*600*f)),
+      kristalle: Math.max(90*stage, Math.round((rates.kristalle||0)*600*f)),
+      deuterium: Math.max(40*stage, Math.round((rates.deuterium||0)*600*f))
+    };
+  }
+  // ===== Wochenliga =====
+  // Wöchentliche Wertung (Mo 00:00 bis So 24:00): Gezählt wird nur der Score-ZUWACHS der laufenden
+  // Woche (aktueller Score minus Montags-Snapshot), nicht der Gesamtbesitz. Die Wochenpunkte werden
+  // mit dem Bestenlisten-Eintrag geteilt; alle Clients berechnen daraus dieselbe Wochen-Rangliste.
+  // Beim ersten Login einer neuen Woche wird die Vorwoche anhand des letzten bekannten Stands
+  // abgerechnet (Board-Snapshot, siehe loadLeaderboard) und die Liga-Belohnung gutgeschrieben.
+  // Ersetzt die frühere kleine Top-3-Wochenbelohnung.
+  const LEAGUE_DEFS = [
+    { key:'platin', name:'Platin', color:'#8ecfe8', credits:1500, prodMin:60 },
+    { key:'gold',   name:'Gold',   color:'#fac775', credits:800,  prodMin:30 },
+    { key:'silber', name:'Silber', color:'#c9ccd9', credits:400,  prodMin:15 },
+    { key:'bronze', name:'Bronze', color:'#c98d5f', credits:150,  prodMin:0 }
+  ];
+  // Wochenschlüssel = Datum des Montags dieser Woche (lokale Zeit), z.B. "2026-07-13".
+  function weekKeyOf(ts){
+    const d = new Date(ts);
+    const day = (d.getDay()+6)%7; // Mo=0 ... So=6
+    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate()-day);
+    return monday.getFullYear()+'-'+String(monday.getMonth()+1).padStart(2,'0')+'-'+String(monday.getDate()).padStart(2,'0');
+  }
+  function nextWeekStartTs(){
+    const d = new Date();
+    const day = (d.getDay()+6)%7;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()+(7-day)).getTime();
+  }
+  // Liga aus Platzierung: ab 8 Teilnehmern nach Vierteln (Top 25% Platin usw.), darunter nach
+  // festen Plätzen (1 Platin, 2 Gold, 3 Silber, Rest Bronze).
+  function leagueIndexForRank(rank, total){
+    if (total >= 8){
+      const q = Math.ceil(total*0.25);
+      if (rank <= q) return 0;
+      if (rank <= 2*q) return 1;
+      if (rank <= 3*q) return 2;
+      return 3;
+    }
+    return Math.min(Math.max(0, rank-1), 3);
+  }
+  function myWeekScore(){
+    const wl = state.weeklyLeague || {};
+    return Math.max(0, Math.round(computeScore() - (wl.startScore||0)));
+  }
+  function processWeeklyLeague(){
+    if (!state.weeklyLeague) state.weeklyLeague = { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] };
+    const wl = state.weeklyLeague;
+    const nowKey = weekKeyOf(Date.now());
+    if (wl.weekKey === nowKey) return;
+    // Vorwoche abrechnen - nur wenn es eine gab (nicht beim allerersten Start des Features).
+    if (wl.weekKey){
+      const myId = state.player.id;
+      let list = (wl.boardSnapshot||[]).slice();
+      if (myId && !list.some(e => e.id === myId)) list.push({ id: myId, weekScore: myWeekScore() });
+      if (list.length){
+        list.sort((a,b) => (b.weekScore||0) - (a.weekScore||0));
+        const idx = myId ? list.findIndex(e => e.id === myId) : -1;
+        const rank = idx >= 0 ? idx+1 : list.length;
+        const lg = LEAGUE_DEFS[leagueIndexForRank(rank, list.length)];
+        state.credits = (state.credits||0) + lg.credits;
+        let msg = lg.credits+' Kredite';
+        if (lg.prodMin > 0){
+          const rates = ratesPerSecond();
+          const capW = storageCap();
+          const parts = [];
+          for (const r of ['erz','kristalle','deuterium']){
+            const amt = Math.round((rates[r]||0) * lg.prodMin * 60);
+            if (amt > 0){
+              state.resources[r] = Math.min(capW, (state.resources[r]||0) + amt);
+              parts.push(fmt(amt)+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r));
+            }
+          }
+          if (parts.length) msg += ' + '+parts.join(', ');
+        }
+        wl.lastResult = { weekKey: wl.weekKey, league: lg.key, rank, total: list.length };
+        log('Wochenliga abgerechnet: '+lg.name+'-Liga (Platz '+rank+' von '+list.length+'). Belohnung: '+msg+'.', 'ti-trophy');
+        playSound('achieve');
+        pushReport({ type:'weekly-reward', rank, rewardLabel: lg.name+'-Liga (Platz '+rank+'/'+list.length+'): '+msg });
+      }
+    }
+    wl.weekKey = nowKey;
+    wl.startScore = computeScore();
+    wl.boardSnapshot = [];
+    save();
+  }
+  // Setzt innerHTML einer Box, ohne die horizontale Scroll-Position von markierten Scroll-Leisten
+  // (data-hscroll) zu verlieren. Ohne diesen Erhalt springt jede per Tick neu gerenderte
+  // Wisch-Leiste (Planeten-Rollen, Orbital-Fokus, Expeditionstyp, Modul-Standorte) jede Sekunde
+  // an den Anfang zurück - auf dem Handy fühlt sich das an, als würde sich das Swipen "resetten".
+  function setHtmlPreservingScroll(box, html){
+    if (!box) return;
+    const prev = {};
+    box.querySelectorAll('[data-hscroll]').forEach(el => { if (el.scrollLeft) prev[el.getAttribute('data-hscroll')] = el.scrollLeft; });
+    box.innerHTML = html;
+    box.querySelectorAll('[data-hscroll]').forEach(el => { const v = prev[el.getAttribute('data-hscroll')]; if (v) el.scrollLeft = v; });
+  }
+  // ===== Veteranen-Flotten =====
+  // Jeder Flotten-Standort sammelt Kampferfahrung: überlebte Gefechte bringen Veteranen-XP (Siege
+  // mehr als Niederlagen), schwere Verluste kosten anteilig XP (die Neuen müssen erst wieder lernen).
+  // Der erreichte Rang gibt einen Bonus auf Angriffs- UND Verteidigungskraft der Flotten dieses
+  // Standorts. XP und Rang hängen am Standort, nicht am einzelnen Schiff.
+  const VETERAN_RANKS = [
+    { key:'rekrut',  name:'Rekrut',  xp:0,    bonus:0,    color:'#9296ac' },
+    { key:'erprobt', name:'Erprobt', xp:100,  bonus:0.02, color:'#5dcaa5' },
+    { key:'veteran', name:'Veteran', xp:300,  bonus:0.04, color:'#378add' },
+    { key:'elite',   name:'Elite',   xp:700,  bonus:0.06, color:'#7f77dd' },
+    { key:'legende', name:'Legende', xp:1500, bonus:0.08, color:'#fac775' }
+  ];
+  function veteranXpOf(pk){ return (state.veteranXp||{})[pk]||0; }
+  function veteranRankOf(pk){
+    const xp = veteranXpOf(pk);
+    let r = VETERAN_RANKS[0];
+    for (const v of VETERAN_RANKS) if (xp >= v.xp) r = v;
+    return r;
+  }
+  function nextVeteranRankOf(pk){
+    const xp = veteranXpOf(pk);
+    return VETERAN_RANKS.find(v => v.xp > xp) || null;
+  }
+  function addVeteranXp(pk, amt){
+    if (!pk || !amt) return;
+    if (!state.veteranXp) state.veteranXp = {};
+    const before = veteranRankOf(pk);
+    state.veteranXp[pk] = Math.max(0, Math.round((state.veteranXp[pk]||0) + amt));
+    const after = veteranRankOf(pk);
+    if (after.xp > before.xp){
+      log('Veteranen-Aufstieg auf '+planetDisplayName(pk)+': Die Flotte ist jetzt "'+after.name+'" (+' + Math.round(after.bonus*100) + '% Angriff & Verteidigung).', 'ti-award');
+      playSound('achieve');
+    } else if (after.xp < before.xp){
+      log('Veteranen-Rang auf '+planetDisplayName(pk)+' gesunken: nach den schweren Verlusten nur noch "'+after.name+'"'+(after.bonus>0?' (+'+Math.round(after.bonus*100)+'%)':'')+'.', 'ti-alert-triangle');
+    }
+  }
   function orbitalStationOf(planetKey){ return (state.orbitalStations||{})[planetKey] || null; }
   function orbitalJobFor(planetKey){ return (state.constructionQueue||[]).find(j=>j.kind==='orbital' && j.planet===planetKey) || null; }
   function buildOrbitalStation(focusKey){
@@ -8344,6 +8565,68 @@
             }
           }
           if (showLog !== false) log(planet.name+' ('+planetDisplayName(planetKey)+'): Mission abgeschlossen.'+bonusMsg, 'ti-rocket');
+        } else if (m.type === 'piratelair'){
+          const stage = m.targetId || 1;
+          const lairDef = pirateLairPower(stage);
+          const power = m.power || attackPower(fleet);
+          const chance = Math.max(0.05, Math.min(0.95, power/(power+lairDef)));
+          const success = Math.random() < chance;
+          const flightTime = Math.round(((m.endTime-(m.startTime||m.endTime))/1000) || 0);
+          const lairLabel = pirateLairName(stage);
+          if (success){
+            // Beute: produktions- und stufenskaliert, begrenzt durch mitgeschickten Frachtraum.
+            const attackComposition = m.composition || fleet;
+            const cargoCapacity = (attackComposition.frachter||0) * CARGO_PER_FRACHTER;
+            const rawLoot = pirateLairLoot(stage);
+            let rawLootTotal = 0; for (const g of Object.values(rawLoot)) rawLootTotal += g;
+            const cargoScale = rawLootTotal > 0 ? Math.min(1, cargoCapacity/rawLootTotal) : 1;
+            const lootGiven = {};
+            const capL = storageCap();
+            for (const [r,g] of Object.entries(rawLoot)){ const carried = Math.floor(g*cargoScale); state.resources[r] = Math.min(capL, (state.resources[r]||0)+carried); lootGiven[r] = carried; }
+            const creditsGain = 30 + stage*20;
+            state.credits = (state.credits||0) + creditsGain;
+            const bpGained = 5 + stage*3;
+            awardBattlePoints(bpGained);
+            logScoreChange(bpGained*3, 'Piratenversteck Stufe '+stage+' ausgehoben (+'+bpGained+' Kampfpunkte)', 'ti-sword');
+            addXp(stage*10);
+            // Modul-Chance wächst mit der Stufe; der Endboss lässt garantiert eines fallen.
+            let moduleMsg = '';
+            if (stage >= PIRATE_LAIR_MAX_STAGE || Math.random() < (0.10 + stage*0.02)){
+              const modName = grantRandomModule();
+              moduleMsg = ' Modul erbeutet: '+modName+'!';
+            }
+            addVeteranXp(planetKey, 10 + stage*2);
+            const ownLostLair = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.08, planetKey, m.composition);
+            const ownLostLairText = lostCountsToText(ownLostLair);
+            let stageMsg;
+            if (stage >= PIRATE_LAIR_MAX_STAGE){
+              // Endboss besiegt: Kette startet neu, dauerhafter Prestige-Bonus (+2% Angriff, Deckel +10%).
+              state.pirateLairPrestige = (state.pirateLairPrestige||0) + 1;
+              state.pirateLairStage = 1;
+              const bonusCredits = 500;
+              state.credits += bonusCredits;
+              stageMsg = ' ENDBOSS BESIEGT! +'+bonusCredits+' Bonus-Kredite. Die Kette beginnt von vorn - dauerhafter Angriffsbonus jetzt +'+Math.min(PIRATE_LAIR_PRESTIGE_CAP, state.pirateLairPrestige)*2+'%.';
+              playSound('achieve');
+            } else {
+              state.pirateLairStage = stage + 1;
+              stageMsg = ' Stufe '+(stage+1)+' freigeschaltet.';
+            }
+            const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
+            if (showLog !== false) log('Sieg gegen '+lairLabel+'! +'+creditsGain+' Kredite.'+cargoNote+moduleMsg+(ownLostLairText?' Eigene Verluste: '+ownLostLairText+'.':'')+stageMsg, 'ti-sword');
+            playSound('win');
+            pushReport({ type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:false, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair });
+          } else {
+            const bpGained = stage;
+            awardBattlePoints(bpGained);
+            // Niederlage: spürbare Verluste (20-35%), aber die Stufe bleibt erhalten - man kann es
+            // mit stärkerer Flotte erneut versuchen.
+            addVeteranXp(planetKey, 3);
+            const lostShips = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.20+Math.random()*0.15, planetKey, m.composition);
+            const lostText = lostCountsToText(lostShips);
+            if (showLog !== false) log('Niederlage gegen '+lairLabel+'.'+(lostText?' Verluste: '+lostText+'.':'')+' Das Versteck bleibt auf Stufe '+stage+' - rüste auf und versuche es erneut.', 'ti-alert-triangle');
+            playSound('lose');
+            pushReport({ type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:false, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:lostShips });
+          }
         } else if (m.type === 'attack'){
           const npc = NPCS.find(n => n.id === m.targetId);
           if (!npc) continue;
@@ -8383,6 +8666,7 @@
             // Auch bei einem Sieg nimmt die eigene Flotte jetzt kleinere Verluste (5-15%) statt komplett
             // unversehrt zurückzukehren – Trümmerfeld dafür kommt zum ohnehin schon vorhandenen
             // NPC-Trümmerfeld oben hinzu.
+            addVeteranXp(planetKey, 15);
             const ownLostWin = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.1, planetKey, m.composition);
             const ownLostWinText = lostCountsToText(ownLostWin);
             const ownLossDebrisWin = combatDebrisOf(ownLostWin);
@@ -8394,6 +8678,7 @@
             pushReport({ type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin });
           } else {
             const bpGained = npc.level*2;
+            addVeteranXp(planetKey, 4);
             awardBattlePoints(bpGained);
             logScoreChange(bpGained*3, 'Angriff auf '+npc.name+' verloren (+'+bpGained+' Kampfpunkte Trostpreis)', 'ti-shield');
             // Bei einer Niederlage nimmt die eigene Flotte jetzt echte Verluste (30-60%, gedämpft durch
@@ -8589,6 +8874,10 @@
   // die Verlust-Prozente gezogen werden. Abgezogen wird trotzdem vom Gesamtbestand (fleet), da die
   // mitgeflogenen Schiffe ja Teil davon sind.
   function applyCombatLosses(fleet, shipKeys, lossPct, debrisPlanetKey, sourcePool){
+    // Veteranen-XP schrumpft anteilig mit den Verlusten des Standorts (30% Verlust = ~30% XP weg).
+    if (debrisPlanetKey && (state.veteranXp||{})[debrisPlanetKey]){
+      addVeteranXp(debrisPlanetKey, -Math.round(state.veteranXp[debrisPlanetKey] * Math.min(0.95, Math.max(0, lossPct))));
+    }
     const pool = sourcePool || fleet;
     let debrisWeight = 0;
     const lostCounts = {};
@@ -9283,7 +9572,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length;
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const npc = NPCS.find(n => n.id === npcId);
@@ -9292,9 +9581,30 @@
     if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
     pay({deuterium: fuelCost});
     const fleetName = resolveFleetName();
-    const power = attackPower(attackFleet);
+    const power = attackPower(attackFleet, state.activeBasePlanet);
     cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet });
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen '+npc.name+' gestartet (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-sword');
+    render(); save();
+  }
+
+  function sendPirateLairMission(){
+    const cf = currentFleet();
+    const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
+    const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length;
+    if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
+    if (cf.missions.some(m=>m.type==='piratelair')){ log('Es läuft bereits ein Angriff auf das Piratenversteck von diesem Standort.', 'ti-alert-triangle'); return; }
+    const stage = state.pirateLairStage || 1;
+    // Flugzeit wächst mit der Stufe (tiefere Verstecke liegen weiter draußen).
+    const dur = missionDurationFor(60 + stage*15, attackFleet, ATTACK_SHIP_KEYS);
+    const fuelCost = missionFuelCost(dur, totalSelected);
+    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    pay({deuterium: fuelCost});
+    const fleetName = resolveFleetName();
+    const power = attackPower(attackFleet, state.activeBasePlanet);
+    cf.missions.push({ id: nextMissionId(), type:'piratelair', targetId: stage, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet });
+    log(fleetName+' greift '+pirateLairName(stage)+' an (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff: '+fuelCost+' Deuterium.', 'ti-sword');
     render(); save();
   }
 
@@ -9527,41 +9837,8 @@
     }));
   }
 
-  const WEEKLY_REWARD_POOL = [
-    { type:'resource', res:'kristalle', amt:300 },
-    { type:'resource', res:'deuterium', amt:250 },
-    { type:'resource', res:'erz', amt:500 },
-    { type:'resource', res:'antimaterie', amt:20 },
-    { type:'item', key:'cargo' },
-    { type:'item', key:'xpcache' }
-  ];
-  // Prüft einmal pro Kalenderwoche (beim Laden der Bestenliste), ob der Spieler unter den Top 3 ist,
-  // und vergibt dann eine kleine, zufällige Belohnung (Ressourcen oder Item), inkl. Bericht.
-  function checkWeeklyTopReward(entries){
-    const weekNum = Math.floor(Date.now() / (7*24*3600*1000));
-    if (state.lastWeeklyRewardWeek === weekNum) return;
-    state.lastWeeklyRewardWeek = weekNum;
-    if (!state.player.id){ save(); return; }
-    const rank = entries.findIndex(e => e.id === state.player.id);
-    if (rank < 0 || rank > 2){ save(); return; }
-    const pick = WEEKLY_REWARD_POOL[Math.floor(Math.random()*WEEKLY_REWARD_POOL.length)];
-    const rankMult = rank===0 ? 1.5 : (rank===1 ? 1.2 : 1);
-    let rewardLabel;
-    if (pick.type === 'resource'){
-      const amt = Math.round(pick.amt*rankMult);
-      state.resources[pick.res] = (state.resources[pick.res]||0) + amt;
-      rewardLabel = fmt(amt)+' '+((RES_DEFS.find(r=>r.key===pick.res)||{}).label||pick.res);
-    } else {
-      const qty = rank===0 ? 2 : 1;
-      state.inventory[pick.key] = (state.inventory[pick.key]||0) + qty;
-      const def = ITEM_DEFS.find(i=>i.key===pick.key);
-      rewardLabel = qty+'x '+(def?def.name:pick.key);
-    }
-    pushToast('Wöchentliche Bestenlisten-Belohnung: Platz '+(rank+1)+'! '+rewardLabel, 'ti-trophy');
-    playSound('achieve');
-    pushReport({ type:'weekly-reward', rank: rank+1, rewardLabel });
-    render(); save();
-  }
+  // Die frühere kleine Top-3-Wochenbelohnung wurde in v7.97.0 durch die Wochenliga ersetzt
+  // (siehe processWeeklyLeague / renderWeeklyLeague).
   let lbSearchQuery = '';
   // Verhindert, dass sich mehrere loadLeaderboard()-Aufrufe überlappen (z.B. wenn der 15s-Timer
   // erneut feuert, während die vorherige Anfrage bei langsamer Verbindung noch läuft) – ohne diese
@@ -9628,7 +9905,16 @@
       for (const e of loadedEntries) if (e) entries.push(e);
       entries.sort((a,b) => (b.score||0) - (a.score||0));
       leaderboardCache = entries;
-      checkWeeklyTopReward(entries);
+      // Wochenliga: letzten bekannten Stand der laufenden Woche als Snapshot sichern - beim
+      // Wochenwechsel wird die Vorwoche aus genau diesem Stand abgerechnet (auch wenn einzelne
+      // Spieler ihren Eintrag bis dahin schon mit der neuen Woche überschrieben haben).
+      if (state.weeklyLeague && state.weeklyLeague.weekKey){
+        const wk = state.weeklyLeague.weekKey;
+        const snap = entries.filter(e => e.weekKey === wk && typeof e.weekScore === 'number')
+          .map(e => ({ id: e.id, name: e.name || 'Unbekannt', weekScore: e.weekScore }));
+        if (snap.length) state.weeklyLeague.boardSnapshot = snap;
+      }
+      renderWeeklyLeague();
       updateHallOfFame(entries);
       renderFpLeaderboard();
       renderLeaderboardList();
@@ -9638,6 +9924,49 @@
     } finally {
       leaderboardLoading = false;
     }
+  }
+  // Rendert das Wochenliga-Panel aus dem leaderboardCache: Wochen-Rangliste (nur Einträge der
+  // laufenden Woche), eigene Liga mit Farbabzeichen, Countdown bis Montag 00:00 und das Ergebnis
+  // der Vorwoche. Wird zusammen mit der Bestenliste aktualisiert.
+  function renderWeeklyLeague(){
+    const box = document.getElementById('weeklyLeagueBox');
+    if (!box) return;
+    const wl = state.weeklyLeague || {};
+    const nowKey = weekKeyOf(Date.now());
+    const myId = state.player.id;
+    // Wochen-Rangliste: geteilte Einträge der laufenden Woche; eigener Eintrag notfalls lokal ergänzt.
+    let list = (leaderboardCache||[]).filter(e => e.weekKey === nowKey && typeof e.weekScore === 'number')
+      .map(e => ({ id: e.id, name: e.name || 'Unbekannt', weekScore: e.weekScore }));
+    if (myId && !list.some(e => e.id === myId)) list.push({ id: myId, name: state.player.name || 'Du', weekScore: myWeekScore() });
+    list.sort((a,b) => (b.weekScore||0) - (a.weekScore||0));
+    const myIdx = myId ? list.findIndex(e => e.id === myId) : -1;
+    const myRank = myIdx >= 0 ? myIdx+1 : list.length;
+    const myLg = LEAGUE_DEFS[leagueIndexForRank(myRank, list.length)];
+    const remainMs = Math.max(0, nextWeekStartTs() - Date.now());
+    const lastR = wl.lastResult;
+    const lastLg = lastR ? LEAGUE_DEFS.find(l => l.key === lastR.league) : null;
+    const rows = list.slice(0, 10).map((e,i) => {
+      const lg = LEAGUE_DEFS[leagueIndexForRank(i+1, list.length)];
+      const isMe = e.id === myId;
+      return `<div class="rank-row ${isMe?'me':''}">
+        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+          <span class="rank-num">${i+1}</span>
+          <span class="lvl-pill" style="color:${lg.color}; border-color:${lg.color}; font-size:9px;">${lg.name}</span>
+          <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.name}</span>
+        </div>
+        <span style="color:#9296ac; flex-shrink:0;">${fmt(e.weekScore||0)} Wochenpunkte</span>
+      </div>`;
+    }).join('');
+    box.innerHTML = `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.6rem; border-color:${myLg.color};">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+          <span class="bname"><i class="ti ti-award" aria-hidden="true" style="color:${myLg.color};"></i> Deine Liga: <span style="color:${myLg.color};">${myLg.name}</span> · Platz ${myRank} von ${list.length}</span>
+          <span class="lvl-pill">Woche endet in ${fmtDuration(remainMs/1000)}</span>
+        </div>
+        <div class="bmeta" style="margin-top:4px;">Deine Wochenpunkte: <strong>${fmt(myWeekScore())}</strong> (nur der Punktezuwachs seit Montag zählt). Montags gibt es die Liga-Belohnung: Platin 1.500 Kredite + 60 Min. Produktion, Gold 800 + 30 Min., Silber 400 + 15 Min., Bronze 150 Kredite.</div>
+        ${lastR && lastLg ? `<div class="bmeta" style="margin-top:4px; color:${lastLg.color};"><i class="ti ti-trophy" aria-hidden="true"></i> Vorwoche: ${lastLg.name}-Liga, Platz ${lastR.rank} von ${lastR.total} - Belohnung erhalten.</div>` : ''}
+      </div>
+      <div class="leaderboard">${rows || '<div class="bmeta">Noch keine Wochenpunkte - die Rangliste füllt sich, sobald Spieler diese Woche punkten.</div>'}</div>`;
   }
   // Rendert die Bestenliste aus dem bereits geladenen leaderboardCache, gefiltert nach lbSearchQuery
   // (Name oder Allianz-Tag) – arbeitet ohne erneuten Serverabruf, damit Tippen sofort reagiert. Sucht
@@ -9760,6 +10089,7 @@
               <div class="dash-colony-icon" style="position:relative;">
                 <i class="ti ${icon}" aria-hidden="true"></i>
                 ${role ? `<span class="dash-role-badge" style="background:${role.color};" title="Rolle: ${role.name}"><i class="ti ${role.icon}" aria-hidden="true"></i></span>` : ''}
+                ${(!isMoonKey(d.id) && state.colonies && state.colonies['moon_'+d.id]) ? `<span class="dash-moon-badge ${state.activeBasePlanet==='moon_'+d.id?'active':''}" data-moon-switch="moon_${d.id}" title="${planetDisplayName('moon_'+d.id)} – anklicken, um zum Mond zu wechseln"><i class="ti ti-planet" aria-hidden="true"></i></span>` : ''}
               </div>
               <div class="dash-colony-info">
                 <div class="dash-colony-name">${targeted?'<i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i> ':''}${sabotaged&&!targeted?'<i class="ti ti-bolt" aria-hidden="true" style="color:#e0a548;"></i> ':''}${d.name}</div>
@@ -9979,9 +10309,9 @@
               </div>
             `;
           }
-          roleBox.innerHTML = pendingHtml + `
+          setHtmlPreservingScroll(roleBox, pendingHtml + `
             <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-target" aria-hidden="true"></i>Planeten-Rolle: ${planetDisplayName(state.activeBasePlanet)}</div>
-            <div style="display:flex; gap:8px; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
+            <div data-hscroll="roles" style="display:flex; gap:8px; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
               ${PLANET_ROLES.map(r => {
                 const isActive = currentRole && currentRole.key===r.key;
                 return `
@@ -9993,7 +10323,7 @@
                 `;
               }).join('')}
             </div>
-          `;
+          `);
           roleBox.querySelectorAll('[data-set-planet-role]').forEach(btn => btn.onclick = () => setPlanetRole(state.activeBasePlanet, btn.getAttribute('data-set-planet-role')));
         }
       }
@@ -10033,7 +10363,7 @@
             </div>`;
           } else if (!cur){
             html += `<div class="bmeta" style="margin-bottom:8px;">Baue eine Orbitalstation und wähle ihren Fokus (Stufe 1: ${costHtml(orbitalCost(1))}, ${fmtDuration(orbitalBuildTime(1))} Bauzeit; ausbaubar bis Stufe ${ORBITAL_MAX_LEVEL}).</div>
-            <div style="display:flex; gap:8px; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
+            <div data-hscroll="orbitalfocus" style="display:flex; gap:8px; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
               ${ORBITAL_FOCI.map(f => `
                 <div class="card-row" style="flex-direction:column; align-items:flex-start; min-width:160px;">
                   <div style="display:flex; align-items:center; gap:6px;"><i class="ti ${f.icon}" aria-hidden="true" style="color:${f.color};"></i><span class="bname" style="font-size:12px;">${f.name}</span></div>
@@ -10058,7 +10388,7 @@
               </div>
             </div>`;
           }
-          orbitalBox.innerHTML = html;
+          setHtmlPreservingScroll(orbitalBox, html);
           orbitalBox.querySelectorAll('[data-build-orbital]').forEach(btn => btn.onclick = () => buildOrbitalStation(btn.getAttribute('data-build-orbital')));
           orbitalBox.querySelectorAll('[data-switch-orbital]').forEach(btn => btn.onclick = () => switchOrbitalFocus(btn.getAttribute('data-switch-orbital')));
         }
@@ -10350,6 +10680,24 @@
             </div>
           `;
         }
+        if (m.type === 'piratelair'){
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          const shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ti-skull" aria-hidden="true" style="color:#c3bef5;"></i>${m.fleetName?m.fleetName+' · ':''}Piraten-Angriff: ${pirateLairName(m.targetId||1)}</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
+                  ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
+                </div>
+              </div>
+              <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         const isAttack = m.type === 'attack';
         const target = isAttack ? NPCS.find(n=>n.id===m.targetId) : PLANETS.find(p=>p.id===m.targetId);
         const remaining = Math.max(0, m.endTime-now);
@@ -10401,12 +10749,12 @@
     const combatShips = combatFleetCount(cf);
     const hangarCap = hangarCapacity(cf);
     const df = deployableFighters(cf);
-    const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player').length;
+    const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length;
     const slotsUsedExplore = cf.missions.filter(m=>m.type==='explore').length;
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='expedition') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='expedition') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }
@@ -10565,10 +10913,10 @@
       }).join('');
       const expEscortShipCount = 1 + ESCORT_KEYS.reduce((a,k)=>a+(escortFleet[k]||0),0);
       const expFuelCost = missionFuelCost(dur, expEscortShipCount);
-      expeditionBox.innerHTML = `
+      setHtmlPreservingScroll(expeditionBox, `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
           <div class="bmeta"><i class="ti ti-adjustments" aria-hidden="true"></i> Expeditionstyp:</div>
-          <div style="display:flex; gap:6px; overflow-x:auto; padding:0 12px 2px 0;">
+          <div data-hscroll="exptype" style="display:flex; gap:6px; overflow-x:auto; padding:0 12px 2px 0;">
             ${EXPEDITION_TYPES.map(t => `
               <button data-expedition-type="${t.key}" title="${t.desc}" style="flex-shrink:0; font-size:11px; padding:6px 10px; ${selectedExpeditionType===t.key?'background:rgba(93,202,165,0.25); border-color:#5dcaa5; color:#5dcaa5;':''}">
                 <i class="ti ${t.icon}" aria-hidden="true" style="margin-right:4px;"></i>${t.name}
@@ -10594,7 +10942,7 @@
             <button class="buy ${canSendExp?'affordable':''}" id="sendExpeditionBtn" ${canSendExp?'':'disabled'}><i class="ti ti-map-2" aria-hidden="true" style="margin-right:4px;"></i>Expedition starten</button>
           </div>
         </div>
-      `;
+      `);
       const cfnExp = document.getElementById('customFleetNameInputExp');
       if (cfnExp) cfnExp.oninput = () => { customFleetName = cfnExp.value; };
       document.querySelectorAll('[data-expedition-type]').forEach(btn => btn.onclick = () => {
@@ -10900,7 +11248,7 @@
 
         // Standort-Umschalter (Module sind pro Planet – hier wählt man, welchen Standort man bearbeitet).
         const allPlanetKeys = ['home', ...Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k))];
-        let html = `<div style="display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
+        let html = `<div data-hscroll="modloc" style="display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
         html += allPlanetKeys.map(k => {
           const active = k===pk;
           const eq = equippedAt(k).length, sl = moduleSlotCount(k);
@@ -10960,7 +11308,7 @@
           }).join('');
           html += `</div>`;
         }
-        moduleBox.innerHTML = html;
+        setHtmlPreservingScroll(moduleBox, html);
         moduleBox.querySelectorAll('[data-module-planet]').forEach(btn => btn.onclick = () => { state.activeBasePlanet = btn.getAttribute('data-module-planet'); render(); });
         const upSlotBtn = moduleBox.querySelector('[data-upgrade-slot]');
         if (upSlotBtn) upSlotBtn.onclick = () => upgradeModuleSlot(pk);
@@ -10983,7 +11331,7 @@
         const owned = cf[k]||0;
         const away = attackAway[k]||0;
         const available = Math.max(0, owned - away);
-        const selected = attackSel[k]||0;
+        const selected = Math.min(attackSel[k]||0, available);
         let capNote = '';
         if (k==='jaeger') capNote = selected>attackFleetDf.jaeger ? ` <span style="color:#e24b4a;">(nur ${attackFleetDf.jaeger} passen in den Hangar)</span>` : '';
         if (k==='bomber') capNote = selected>attackFleetDf.bomber ? ` <span style="color:#e24b4a;">(nur ${attackFleetDf.bomber} passen in den Hangar)</span>` : '';
@@ -11007,7 +11355,15 @@
           </div>
         `;
       }).join('');
+      const vetRank = veteranRankOf(state.activeBasePlanet);
+      const vetNext = nextVeteranRankOf(state.activeBasePlanet);
       attackFleetBox.innerHTML = `
+        <div class="card-row" style="margin-bottom:0.5rem; border-color:${vetRank.color};">
+          <div class="left" style="gap:8px;"><i class="ti ti-award" aria-hidden="true" style="color:${vetRank.color}; font-size:18px;"></i>
+            <div><div class="bname" style="font-size:12px;">Veteranenrang: <span style="color:${vetRank.color};">${vetRank.name}</span>${vetRank.bonus>0?' (+'+Math.round(vetRank.bonus*100)+'% Angriff & Verteidigung)':''}</div>
+            <div class="bmeta">${fmt(veteranXpOf(state.activeBasePlanet))} Kampferfahrung${vetNext?' · nächster Rang "'+vetNext.name+'" ab '+fmt(vetNext.xp):' · Höchstrang erreicht'}. Überlebte Gefechte bringen Erfahrung, schwere Verluste kosten welche.</div></div>
+          </div>
+        </div>
         <div class="bmeta" style="margin-bottom:0.5rem;">Wähle aus, welche Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} für den nächsten Angriff eingesetzt werden. Wirkt sich auf Angriffskraft und Flugzeit je Ziel unten aus.</div>
         ${attackRows || `<div class="bmeta" style="padding:0.5rem 0;">Keine Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} verfügbar.</div>`}
         <input type="text" id="customFleetNameInputAttack" placeholder="Flottenname (optional, sonst automatisch)" maxlength="30" style="width:100%; margin-top:0.5rem;" value="${customFleetName}"/>
@@ -11087,10 +11443,37 @@
       }
     }
 
+    const pirateLairBox = document.getElementById('pirateLairBox');
+    if (pirateLairBox){
+      const stage = state.pirateLairStage || 1;
+      const prestige = state.pirateLairPrestige || 0;
+      const lairDef = pirateLairPower(stage);
+      const plAttackFleet = buildAttackFleet(state.activeBasePlanet, cf);
+      const plSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(plAttackFleet[k]||0),0);
+      const plPower = attackPower(plAttackFleet, state.activeBasePlanet);
+      const plChance = plSelected > 0 ? Math.max(0.05, Math.min(0.95, plPower/(plPower+lairDef))) : 0;
+      const plBusy = cf.missions.some(m=>m.type==='piratelair');
+      const plLoot = pirateLairLoot(stage);
+      const plCan = !plBusy && plSelected > 0;
+      const prestigeNote = prestige > 0 ? ` · <span style="color:#fac775;"><i class="ti ti-star" aria-hidden="true"></i> ${Math.min(PIRATE_LAIR_PRESTIGE_CAP,prestige)}× abgeschlossen (+${Math.min(PIRATE_LAIR_PRESTIGE_CAP,prestige)*2}% Angriff dauerhaft)</span>` : '';
+      pirateLairBox.innerHTML = `
+        <div class="section-title" style="margin-top:0.75rem;"><i class="ti ti-skull" aria-hidden="true"></i>Piraten-Versteck <span class="lvl-pill" style="margin-left:6px;">Stufe ${stage}/${PIRATE_LAIR_MAX_STAGE}</span></div>
+        <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:${stage>=PIRATE_LAIR_MAX_STAGE?'#e24b4a':'#7f77dd'};">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span class="bname"><i class="ti ti-skull" aria-hidden="true" style="color:${stage>=PIRATE_LAIR_MAX_STAGE?'#e24b4a':'#c3bef5'};"></i> ${pirateLairName(stage)}${stage>=PIRATE_LAIR_MAX_STAGE?' <span style="color:#e24b4a;">ENDBOSS</span>':''}</span>
+            <span class="lvl-pill">Stärke ${fmt(lairDef)}</span>
+          </div>
+          <div class="bmeta" style="margin-bottom:4px;">Sieg: ~${fmt(plLoot.erz)} Erz, ${fmt(plLoot.kristalle)} Kristalle, ${fmt(plLoot.deuterium)} Deuterium (Frachter nötig!) · +${30+stage*20} Kredite · +${5+stage*3} Kampfpunkte · ${stage>=PIRATE_LAIR_MAX_STAGE?'garantiertes Modul + 500 Bonus-Kredite + Ketten-Neustart mit dauerhaftem Angriffsbonus':Math.round((0.10+stage*0.02)*100)+'% Modul-Chance'}${prestigeNote}</div>
+          <div class="bmeta" style="margin-bottom:6px;">Niederlage: 20-35% Flottenverluste, Stufe bleibt. ${plSelected>0?'Deine Angriffsflotte: Kraft '+fmt(plPower)+' → Siegchance ~'+Math.round(plChance*100)+'%':'Stelle unten eine Angriffsflotte zusammen.'}</div>
+          <button data-attack-lair ${plCan?'':'disabled'}>${plBusy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Versteck angreifen'}</button>
+        </div>`;
+      const lairBtn = pirateLairBox.querySelector('[data-attack-lair]');
+      if (lairBtn) lairBtn.onclick = () => sendPirateLairMission();
+    }
     document.getElementById('npcList').innerHTML = NPCS.map(n => {
       const busy = cf.missions.some(m=>m.type==='attack' && m.targetId===n.id);
       const combatShipsN = combatFleetCount(cf);
-      const slotsFreeN = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player').length < combatShipsN;
+      const slotsFreeN = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length < combatShipsN;
       const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
       const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
       const canSendN = slotsFreeN && !busy && totalSelected > 0;
@@ -11156,6 +11539,10 @@
           } else if (m.type === 'attack-player'){
             icon = 'ti-sword'; color = '#e24b4a';
             label = (m.fleetName?m.fleetName+' → ':'')+'Spieler: '+(m.targetName||'?');
+            shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          } else if (m.type === 'piratelair'){
+            icon = 'ti-skull'; color = '#c3bef5';
+            label = (m.fleetName?m.fleetName+' → ':'')+pirateLairName(m.targetId||1);
             shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
           } else if (m.type === 'spy-player'){
             icon = 'ti-target'; color = '#5dcaa5';
@@ -11826,6 +12213,11 @@
       state.activeBasePlanet = btn.getAttribute('data-planet-switch');
       render(); save();
     });
+    document.querySelectorAll('[data-moon-switch]').forEach(el => el.onclick = (e) => {
+      e.stopPropagation();
+      state.activeBasePlanet = el.getAttribute('data-moon-switch');
+      render(); save();
+    });
     document.querySelectorAll('[data-favorite-toggle]').forEach(el => el.onclick = (e) => {
       e.stopPropagation();
       const pid = el.getAttribute('data-favorite-toggle');
@@ -11972,7 +12364,7 @@
       render();
       try {
         const res = await backendFetch('/email-preferences', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ wantsPatchnotes: next }) });
-        if (!res.ok){ accountWantsPatchnotes = !next; render(); log('Änderung fehlgeschlagen.', 'ti-alert-triangle'); return; }
+        if (!res.ok){ accountWantsPatchnotes = !next; render(); log(res.status===404 ? 'Dein Server kennt diese Einstellung noch nicht - bitte das Backend auf dem Server aktualisieren und den Server-Prozess neu starten.' : 'Änderung fehlgeschlagen.', 'ti-alert-triangle'); return; }
         log(next ? 'Patchnotes-Mails aktiviert.' : 'Patchnotes-Mails deaktiviert.', 'ti-bell');
       } catch(e){ accountWantsPatchnotes = !next; render(); log('Server nicht erreichbar.', 'ti-alert-triangle'); }
     };
@@ -12228,6 +12620,7 @@
     processConqueredSystems();
     processFactionGifts();
     maybeSpawnPlanetEvent();
+    processWeeklyLeague();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
