@@ -330,6 +330,11 @@
     .bicon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; }
     .bname { font-weight:500; font-size:13.5px; display:flex; align-items:center; gap:6px; color:#fff; }
     .fleet-position-panel { position:fixed; right:14px; top:50%; transform:translateY(-50%); width:200px; max-height:74vh; overflow-y:auto; background:rgba(8,10,20,0.92); border:0.5px solid rgba(255,255,255,0.12); border-radius:12px; padding:10px; z-index:50; }
+    .fleet-position-panel { scrollbar-width:thin; scrollbar-color: rgba(var(--primary-rgb),0.55) transparent; }
+    .fleet-position-panel::-webkit-scrollbar { width:6px; }
+    .fleet-position-panel::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius:10px; }
+    .fleet-position-panel::-webkit-scrollbar-thumb { background: rgba(var(--primary-rgb),0.55); border-radius:10px; }
+    .fleet-position-panel::-webkit-scrollbar-thumb:hover { background: var(--c-primary); }
     .fleet-position-panel .fp-title { font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#9296ac; margin-bottom:6px; display:flex; align-items:center; gap:4px; }
     .fp-section { margin-top:14px; padding-top:12px; border-top:0.5px solid rgba(255,255,255,0.08); }
     .fp-section:first-child { margin-top:0; padding-top:0; border-top:none; }
@@ -676,7 +681,7 @@
     </div>
   </div>
 
-  <button class="edge-tab chat-edge-tab" id="chatEdgeTab"><i class="ti ti-message" aria-hidden="true"></i> Chat</button>
+  <button class="edge-tab chat-edge-tab" id="chatEdgeTab" style="position:fixed;"><i class="ti ti-message" aria-hidden="true"></i> Chat<span id="chatUnreadBadge" class="tab-badge" style="display:none; top:6px; right:6px;"></span></button>
   <div class="chat-panel-overlay" id="chatPanelOverlay"></div>
   <div class="chat-panel" id="chatPanel">
     <div class="chat-panel-tabs">
@@ -1530,8 +1535,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.11.1';
+  const VERSION = '8.11.2';
   const PATCHNOTES = [
+    { version:'8.11.2', date:'13.07.2026', changes:[
+      'Der Flottenpositions-Sidebar hat jetzt den gleichen schlanken, themenfarbenen Scrollbalken wie die Wischleisten',
+      'Neu: Der Chat-Reiter zeigt einen roten Punkt an, sobald jemand in Allianz- oder globalem Chat geschrieben hat - läuft automatisch im Hintergrund'
+    ]},
     { version:'8.11.1', date:'13.07.2026', changes:[
       'Neu: Automatische Update-Erkennung - ein lange offen gelassener Tab merkt jetzt von selbst, wenn eine neue Version bereitsteht (Prüfung beim Zurückwechseln in den Tab + alle 10 Minuten) und zeigt ein dezentes Banner mit Neu-laden-Knopf, statt dass ein manuelles Neuladen nötig ist'
     ]},
@@ -3976,7 +3985,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -6488,6 +6497,8 @@
   // (der häufigste reale Fall: Tab liegt offen, in der Zwischenzeit gab es ein Update).
   setTimeout(checkLiveVersionUpdate, 15000);
   setInterval(() => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); }, 600000);
+  setInterval(() => { if (document.visibilityState === 'visible') checkChatUnread(); }, 60000);
+  setTimeout(checkChatUnread, 4000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); });
   const liveUpdateReloadBtn = document.getElementById('liveUpdateReloadBtn');
   if (liveUpdateReloadBtn) liveUpdateReloadBtn.addEventListener('click', () => location.reload());
@@ -7252,6 +7263,7 @@
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
+      { title:'Chat-Benachrichtigung', body:'Der Chat-Reiter am linken Bildschirmrand zeigt einen roten Punkt, sobald in Allianz- oder globalem Chat eine neue Nachricht eingetroffen ist, seit du zuletzt geöffnet hattest - läuft automatisch im Hintergrund, ohne dass der Chat offen sein muss.' },
       { title:'Automatische Update-Erkennung', body:'Bleibt die Kolonie lange im selben Tab geöffnet (z.B. als installierte App), prüft sie im Hintergrund von selbst, ob eine neue Version bereitsteht - beim Zurückwechseln in den Tab und danach alle 10 Minuten. Erscheint ein grünes Banner "Update verfügbar", bringt "Neu laden" die neue Version inklusive vollständiger Patchnotes; ein Neuladen kostet keinen Fortschritt.' },
       { title:'Push-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich der Knopf "Push auf diesem Gerät" aktivieren (Browser fragt einmalig um Erlaubnis) - danach schickt der Server für Nachrichten, Pakt-Angebote, Weltboss-Kills, anfliegende Überfälle und Patchnotes echte Benachrichtigungen an dieses Gerät, auch wenn die Seite geschlossen ist. Fünf Kategorien lassen sich einzeln abschalten. Alle Ereignisse landen zusätzlich als geräteübergreifendes Postfach im <strong>Berichte-Tab</strong> unter "Server-Ereignisse" - nur mit eigenem Server verfügbar.' },
       { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt.' },
@@ -8081,6 +8093,34 @@
       loadGlobalChat();
     } catch(e){ log('Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
   }
+  // ===== Ungelesen-Erkennung für den Chat-Reiter =====
+  // Die Nachrichten-Keys enthalten bereits den Zeitstempel als Präfix (Date.now()+'-'+random) - eine
+  // leichte storageList()-Abfrage genügt also, um den Zeitpunkt der jeweils neuesten Nachricht zu
+  // kennen, ohne jede einzelne Nachricht abrufen zu müssen. So kann regelmäßig im Hintergrund
+  // geprüft werden, ob es seit dem letzten Öffnen des Chats etwas Neues gibt.
+  function latestTsFromChatKeys(keys, prefix){
+    let max = 0;
+    for (const k of keys){
+      const ts = parseInt(k.slice(prefix.length).split('-')[0], 10);
+      if (ts > max) max = ts;
+    }
+    return max;
+  }
+  async function checkChatUnread(){
+    if (!hasCloudStorage() && !useBackend()) return;
+    try {
+      let maxTs = 0;
+      const tag = myAllianceTag();
+      if (tag){
+        const r = await storageList('alliance:'+tag+':msg:', true);
+        maxTs = Math.max(maxTs, latestTsFromChatKeys((r&&r.keys)||[], 'alliance:'+tag+':msg:'));
+      }
+      const rg = await storageList('globalchat:msg:', true);
+      maxTs = Math.max(maxTs, latestTsFromChatKeys((rg&&rg.keys)||[], 'globalchat:msg:'));
+      const badge = document.getElementById('chatUnreadBadge');
+      if (badge) badge.style.display = (maxTs > (state.lastSeenChatTime||0)) ? 'block' : 'none';
+    } catch(e){}
+  }
 
   function allAllianceStructures(){ return ALLIANCE_TECH_DEFS.concat(ALLIANCE_BUILDING_DEFS); }
   function findAllianceStructure(key){ return allAllianceStructures().find(x=>x.key===key); }
@@ -8501,6 +8541,7 @@
         if (!state.dailyHistory) state.dailyHistory = [];
         if (!state.notifiedPactOffers) state.notifiedPactOffers = [];
         if (!state.claimedBossKills) state.claimedBossKills = [];
+        if (state.lastSeenChatTime === undefined) state.lastSeenChatTime = 0;
         if (!state.ascension) state.ascension = { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0 } };
         if (!state.ascension.tree) state.ascension.tree = { prod:0, speed:0, combat:0, start:0, expedition:0 };
         if (state.warVictories === undefined) state.warVictories = 0;
@@ -13533,15 +13574,23 @@
     const inputRowAlliance = document.getElementById('chatPanelAllianceInputRow');
     const inputRowGlobal = document.getElementById('chatPanelGlobalInputRow');
     if (!tab || !panel) return;
+    function markChatSeen(){
+      state.lastSeenChatTime = Date.now();
+      const badge = document.getElementById('chatUnreadBadge');
+      if (badge) badge.style.display = 'none';
+      save();
+    }
     function openPanel(){
       panel.classList.add('open');
       overlay.classList.add('open');
       loadAllianceMessages();
       loadGlobalChat();
+      markChatSeen();
     }
     function closePanel(){
       panel.classList.remove('open');
       overlay.classList.remove('open');
+      markChatSeen(); // deckt auch eigene, während des Offenseins gesendete Nachrichten ab
     }
     tab.onclick = openPanel;
     closeBtn.onclick = closePanel;
