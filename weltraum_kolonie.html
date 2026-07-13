@@ -1227,9 +1227,26 @@
             </div>
           </div>
           <div id="bannerPickerWrap" style="display:none;">
-            <div class="bmeta" style="margin-top:10px;">Allianz-Banner (für alle Mitglieder sichtbar):</div>
+            <div class="bmeta" style="margin-top:10px;">Allianz-Banner (für alle Mitglieder sichtbar) <span id="bannerPickerHint" style="color:#6b6f85;"></span>:</div>
             <div id="bannerPicker" class="banner-picker"></div>
           </div>
+        </div>
+
+        <div id="allianceAdminSettingsWrap" style="display:none; margin-bottom:1.5rem;">
+          <div class="section-title"><i class="ti ti-lock" aria-hidden="true"></i>Administration</div>
+          <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+            <div class="bmeta">Beitrittsmodus – bestimmt, ob neue Spieler sofort beitreten können oder erst eine Bewerbung schicken müssen, die ein Admin annehmen muss.</div>
+            <div style="display:flex; gap:6px;">
+              <button id="joinModeOpenBtn" style="flex:1; font-size:11px;"><i class="ti ti-door-exit" aria-hidden="true" style="margin-right:4px;"></i>Offen für alle</button>
+              <button id="joinModeApplicationBtn" style="flex:1; font-size:11px;"><i class="ti ti-lock" aria-hidden="true" style="margin-right:4px;"></i>Nur auf Bewerbung</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="allianceApplicationsWrap" style="display:none;">
+          <div class="section-title"><i class="ti ti-user" aria-hidden="true"></i>Offene Bewerbungen</div>
+          <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Nur für Admins sichtbar. Annehmen macht die Person sofort zum Mitglied, Ablehnen verwirft die Bewerbung (erneute Bewerbung jederzeit möglich).</div>
+          <div class="leaderboard" id="allianceApplicationsBox"><div class="bmeta">lädt…</div></div>
         </div>
 
         <div id="allianceDominanceBox" style="margin-bottom:1.5rem;"></div>
@@ -1640,8 +1657,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.21.5';
+  const VERSION = '8.22.0';
   const PATCHNOTES = [
+    { version:'8.22.0', date:'13.07.2026', changes:[
+      'Sicherheitslücke behoben: Bisher konnte JEDES Allianzmitglied den Allianz-Banner (Farbe) ändern und theoretisch auch andere sicherheitsrelevante Allianz-Daten manipulieren, da die Admin-Beschränkung nur in der Anzeige, nicht auf dem Server geprüft wurde. Jetzt serverseitig durchgesetzt: nur Admins dürfen Banner, Allianz-Einstellungen und Mitgliederrollen (befördern/entfernen) ändern - Versuche ohne Admin-Rechte werden vom Server abgelehnt, egal wie sie ausgelöst werden',
+      'Neu: Bewerbungssystem für Allianzen - Admins können im Administration-Bereich zwischen "Offen für alle" (Sofort-Beitritt wie bisher) und "Nur auf Bewerbung" umschalten. Bei geschlossenen Allianzen landet ein Beitrittswunsch als Bewerbung, die nur Admins sehen und annehmen/ablehnen können (auch das serverseitig abgesichert, nicht nur normale Mitglieder können fremde Bewerbungen nicht mehr einsehen)'
+    ]},
     { version:'8.21.5', date:'13.07.2026', changes:[
       'Online-Anzeige (grüner/grauer Punkt) gab es bisher nur in der Bestenliste im Punktestand-Tab - jetzt auch im schmalen Status-Seitenpanel rechts ("Bestenliste"-Abschnitt), das den gleichen leaderboardCache nutzt'
     ]},
@@ -7761,7 +7782,8 @@
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.' }
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
-      { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern.' },
+      { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin annehmen oder ablehnen muss (Bereich "Offene Bewerbungen", nur für Admins sichtbar).' },
+      { title:'Admin-Rechte', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: den Allianz-Banner (Farbe) ändern, den Beitrittsmodus (offen/Bewerbung) umstellen, Mitglieder befördern oder entfernen, und über Bewerbungen entscheiden. Diese Beschränkung wird serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne Admin-Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
       { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf) für alle Mitglieder. Kombiniert sich mit einem eigenen Fraktions-Marktrabatt, insgesamt gedeckelt bei 20%.' },
       { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' }
@@ -8087,6 +8109,9 @@
   }
 
   let currentAllianceBanner = null;
+  // Beitrittsmodus der eigenen Allianz - 'open' (Standard, Sofort-Beitritt) oder 'application'
+  // (Bewerbung nötig, nur Admins können annehmen). Wird beim Laden der Allianz-Infos gesetzt.
+  let currentAllianceJoinMode = 'open';
   async function loadAllianceBanner(){
     const tag = myAllianceTag();
     if (!tag){ currentAllianceBanner = null; renderBannerPicker(); return; }
@@ -8110,9 +8135,15 @@
     if (!wrap || !picker) return;
     const tag = myAllianceTag();
     wrap.style.display = tag ? 'block' : 'none';
+    // Nur Admins dürfen den Banner ändern (serverseitig durchgesetzt - siehe checkAllianceKeyPermission
+    // im Backend). Nicht-Admins sehen den aktuellen Banner nur noch, ohne anklickbare Buttons, damit
+    // kein Klick ins Leere läuft (403) und sofort klar ist, warum nichts passiert.
+    const amIAdmin = state.player.allianceRole === 'admin';
     if (tag){
-      picker.innerHTML = BANNER_DEFS.map(b => `<button class="banner-option ${currentAllianceBanner===b.key?'active':''}" data-banner="${b.key}" style="background:${b.css};"></button>`).join('');
-      document.querySelectorAll('[data-banner]').forEach(btn => btn.addEventListener('click', () => setAllianceBanner(btn.getAttribute('data-banner'))));
+      const hint = document.getElementById('bannerPickerHint');
+      if (hint) hint.textContent = amIAdmin ? '' : '(nur Admins können den Banner ändern)';
+      picker.innerHTML = BANNER_DEFS.map(b => `<button class="banner-option ${currentAllianceBanner===b.key?'active':''}" data-banner="${b.key}" style="background:${b.css}; ${amIAdmin?'':'cursor:default; opacity:'+(currentAllianceBanner===b.key?'1':'0.4')+';'}" ${amIAdmin?'':'disabled'}></button>`).join('');
+      if (amIAdmin) document.querySelectorAll('[data-banner]').forEach(btn => btn.addEventListener('click', () => setAllianceBanner(btn.getAttribute('data-banner'))));
     }
     if (avatarEl){
       const b = BANNER_DEFS.find(x=>x.key===currentAllianceBanner);
@@ -8246,41 +8277,160 @@
 
   // Echtes Allianz-Mitgliedssystem, aufgebaut auf dem bereits vorhandenen generischen geteilten
   // Speicher (storageList mit Präfix) – ohne dass dafür eigene Server-Endpunkte nötig sind:
-  //   alliance:<TAG>:info            -> { tag, creatorId, creatorName, createdAt }
+  //   alliance:<TAG>:info            -> { tag, creatorId, creatorName, createdAt, joinMode:'open'|'application' }
   //   alliance:<TAG>:role:<playerId> -> { playerId, name, role:'admin'|'member'|'left', joinedAt }
+  //   alliance:<TAG>:applications:<playerId> -> { playerId, name, appliedAt, status:'pending'|'accepted'|'rejected' }
   //   alliance:<TAG>:msg:<id>        -> { authorId, authorName, text, ts }
-  // Wer eine Allianz zuerst gründet (Tag existiert noch nicht), wird automatisch Admin.
+  // Wer eine Allianz zuerst gründet (Tag existiert noch nicht), wird automatisch Admin. Alle
+  // sicherheitsrelevanten Schreibvorgänge (Banner, info, role, applications) werden zusätzlich
+  // serverseitig geprüft (siehe checkAllianceKeyPermission im Backend) - diese Client-Logik hier
+  // sorgt nur für die richtige UX, ist aber NICHT die eigentliche Absicherung.
   async function joinOrCreateAlliance(tag){
     if (!tag){ return; }
     try {
-      const oldTag = myAllianceTag();
-      if (oldTag && oldTag !== tag){
-        try { await storageSet('alliance:'+oldTag+':role:'+state.player.id, JSON.stringify({ playerId: state.player.id, name: state.player.name||'Kommandant', role:'left', joinedAt: Date.now() }), true); } catch(e){}
-      }
       const infoRes = await storageGet('alliance:'+tag+':info', true);
-      let role = 'member';
-      if (!infoRes || !infoRes.value){
-        await storageSet('alliance:'+tag+':info', JSON.stringify({ tag, creatorId: state.player.id, creatorName: state.player.name||'Kommandant', createdAt: Date.now() }), true);
-        role = 'admin';
-        log('Allianz ['+tag+'] gegründet – du bist Admin.', 'ti-flag');
-      } else {
+      const exists = !!(infoRes && infoRes.value);
+      let info = null;
+      if (exists){ try { info = JSON.parse(infoRes.value); } catch(e){} }
+
+      let prevRole = null;
+      if (exists){
         try {
           const myRoleRes = await storageGet('alliance:'+tag+':role:'+state.player.id, true);
           if (myRoleRes && myRoleRes.value){
             const prev = JSON.parse(myRoleRes.value);
-            if (prev.role && prev.role !== 'left') role = prev.role;
+            if (prev.role && prev.role !== 'left') prevRole = prev.role;
           }
         } catch(e){}
+      }
+
+      // Geschlossene Allianz (nur auf Bewerbung) und noch kein Mitglied: Bewerbung statt Sofort-Beitritt.
+      if (exists && info && info.joinMode === 'application' && !prevRole){
+        await applyToAlliance(tag);
+        return;
+      }
+
+      const oldTag = myAllianceTag();
+      if (oldTag && oldTag !== tag){
+        try { await storageSet('alliance:'+oldTag+':role:'+state.player.id, JSON.stringify({ playerId: state.player.id, name: state.player.name||'Kommandant', role:'left', joinedAt: Date.now() }), true); } catch(e){}
+      }
+
+      let role = 'member';
+      if (!exists){
+        await storageSet('alliance:'+tag+':info', JSON.stringify({ tag, creatorId: state.player.id, creatorName: state.player.name||'Kommandant', createdAt: Date.now(), joinMode: 'open' }), true);
+        role = 'admin';
+        log('Allianz ['+tag+'] gegründet – du bist Admin.', 'ti-flag');
+      } else {
+        if (prevRole) role = prevRole;
         log('Allianz ['+tag+'] beigetreten.', 'ti-flag');
       }
       await storageSet('alliance:'+tag+':role:'+state.player.id, JSON.stringify({ playerId: state.player.id, name: state.player.name||'Kommandant', role, joinedAt: Date.now() }), true);
       state.player.allianceTag = tag;
       state.player.allianceRole = role;
       render(); save();
-      loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceDominance();
+      loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceDominance(); loadAllianceAdminSettings();
     } catch(e){
       log('Allianz-Aktion aktuell nicht möglich (Server nicht erreichbar).', 'ti-alert-triangle');
     }
+  }
+  // Bewerbung bei einer Allianz mit Beitrittsmodus "application" - liegt beim Admin zur Entscheidung,
+  // siehe loadAllianceApplications()/decideApplication() weiter unten.
+  async function applyToAlliance(tag){
+    try {
+      await storageSet('alliance:'+tag+':applications:'+state.player.id, JSON.stringify({ playerId: state.player.id, name: state.player.name||'Kommandant', appliedAt: Date.now(), status:'pending' }), true);
+      log('Bewerbung bei ['+tag+'] eingereicht – ein Admin muss sie noch annehmen.', 'ti-flag');
+    } catch(e){
+      log('Bewerbung konnte nicht gesendet werden.', 'ti-alert-triangle');
+    }
+  }
+  // Lädt info.joinMode der eigenen Allianz und rendert den Admin-Einstellungsbereich (Umschalter +
+  // Bewerbungsliste) - beides bleibt für Nicht-Admins per style.display:none unsichtbar, zusätzlich
+  // zur serverseitigen Sperre beim Lesen/Schreiben.
+  async function loadAllianceAdminSettings(){
+    const tag = myAllianceTag();
+    const settingsWrap = document.getElementById('allianceAdminSettingsWrap');
+    const appsWrap = document.getElementById('allianceApplicationsWrap');
+    const amIAdmin = tag && state.player.allianceRole === 'admin';
+    if (settingsWrap) settingsWrap.style.display = amIAdmin ? 'block' : 'none';
+    if (appsWrap) appsWrap.style.display = amIAdmin ? 'block' : 'none';
+    if (!amIAdmin) return;
+    try {
+      const infoRes = await storageGet('alliance:'+tag+':info', true);
+      const info = (infoRes && infoRes.value) ? JSON.parse(infoRes.value) : {};
+      currentAllianceJoinMode = info.joinMode === 'application' ? 'application' : 'open';
+    } catch(e){ currentAllianceJoinMode = 'open'; }
+    renderAllianceJoinModeButtons();
+    loadAllianceApplications();
+  }
+  function renderAllianceJoinModeButtons(){
+    const openBtn = document.getElementById('joinModeOpenBtn');
+    const appBtn = document.getElementById('joinModeApplicationBtn');
+    if (openBtn) openBtn.className = currentAllianceJoinMode === 'open' ? 'primary' : '';
+    if (appBtn) appBtn.className = currentAllianceJoinMode === 'application' ? 'primary' : '';
+  }
+  async function setAllianceJoinMode(mode){
+    if (state.player.allianceRole !== 'admin') return;
+    const tag = myAllianceTag();
+    if (!tag) return;
+    try {
+      const infoRes = await storageGet('alliance:'+tag+':info', true);
+      const info = (infoRes && infoRes.value) ? JSON.parse(infoRes.value) : { tag };
+      info.joinMode = mode;
+      await storageSet('alliance:'+tag+':info', JSON.stringify(info), true);
+      currentAllianceJoinMode = mode;
+      renderAllianceJoinModeButtons();
+      log('Beitrittsmodus auf "'+(mode==='application'?'Nur auf Bewerbung':'Offen für alle')+'" gestellt.', 'ti-flag');
+    } catch(e){ log('Beitrittsmodus konnte nicht geändert werden.', 'ti-alert-triangle'); }
+  }
+  let allianceApplicationsCache = [];
+  async function loadAllianceApplications(){
+    const box = document.getElementById('allianceApplicationsBox');
+    if (!box) return;
+    const tag = myAllianceTag();
+    if (!tag || state.player.allianceRole !== 'admin') return;
+    box.innerHTML = `<div class="bmeta">lädt…</div>`;
+    try {
+      const listRes = await storageList('alliance:'+tag+':applications:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys.slice(0, 60) : [];
+      const loaded = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); if (r && r.value){ const a = JSON.parse(r.value); if (!a.status || a.status==='pending') return a; } } catch(e){}
+        return null;
+      }));
+      const apps = loaded.filter(Boolean).sort((a,b)=>(a.appliedAt||0)-(b.appliedAt||0));
+      allianceApplicationsCache = apps;
+      if (!apps.length){ box.innerHTML = `<div class="bmeta">Keine offenen Bewerbungen.</div>`; return; }
+      box.innerHTML = apps.map(a => `
+        <div class="rank-row">
+          <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+            <i class="ti ti-user" aria-hidden="true"></i>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.name||'Unbekannt'}</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button data-accept-app="${a.playerId}" style="font-size:10px; padding:5px 8px; background:rgba(93,202,165,0.2);" title="Annehmen"><i class="ti ti-check" aria-hidden="true"></i></button>
+            <button data-reject-app="${a.playerId}" style="font-size:10px; padding:5px 8px;" title="Ablehnen"><i class="ti ti-x" aria-hidden="true"></i></button>
+          </div>
+        </div>
+      `).join('');
+      box.querySelectorAll('[data-accept-app]').forEach(btn => btn.addEventListener('click', () => decideApplication(btn.getAttribute('data-accept-app'), true)));
+      box.querySelectorAll('[data-reject-app]').forEach(btn => btn.addEventListener('click', () => decideApplication(btn.getAttribute('data-reject-app'), false)));
+    } catch(e){ box.innerHTML = `<div class="bmeta">Bewerbungen aktuell nicht verfügbar.</div>`; }
+  }
+  async function decideApplication(playerId, accept){
+    if (state.player.allianceRole !== 'admin') return;
+    const tag = myAllianceTag();
+    if (!tag) return;
+    const app = allianceApplicationsCache.find(a=>a.playerId===playerId);
+    try {
+      if (accept){
+        await storageSet('alliance:'+tag+':role:'+playerId, JSON.stringify({ playerId, name: (app&&app.name)||'Mitglied', role:'member', joinedAt: Date.now() }), true);
+        log((app&&app.name||'Bewerber')+' wurde in die Allianz aufgenommen.', 'ti-check');
+      } else {
+        log((app&&app.name||'Bewerber')+'s Bewerbung abgelehnt.', 'ti-x');
+      }
+      await storageSet('alliance:'+tag+':applications:'+playerId, JSON.stringify(Object.assign({}, app||{playerId}, { status: accept?'accepted':'rejected' })), true);
+      loadAllianceApplications();
+      if (accept) loadAllianceMembers();
+    } catch(e){ log('Aktion fehlgeschlagen.', 'ti-alert-triangle'); }
   }
   async function leaveAllianceProperly(){
     const tag = myAllianceTag();
@@ -8291,6 +8441,10 @@
     state.player.allianceTag = '';
     state.player.allianceRole = '';
     document.getElementById('allianceInput').value = '';
+    const settingsWrap = document.getElementById('allianceAdminSettingsWrap');
+    const appsWrap = document.getElementById('allianceApplicationsWrap');
+    if (settingsWrap) settingsWrap.style.display = 'none';
+    if (appsWrap) appsWrap.style.display = 'none';
     render(); save(); loadAlliances(); loadAllianceBanner();
     log('Allianz verlassen.', 'ti-door-exit');
   }
@@ -11262,7 +11416,7 @@
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
     if (tab === 'berichte'){ loadNotificationEvents(); }
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
-    if (tab === 'allianz'){ loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); }
+    if (tab === 'allianz'){ loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     if (tab === 'berichte'){
       loadReports();
@@ -14124,6 +14278,10 @@
         leaveAllianceProperly();
       };
     }
+    const joinModeOpenBtn = document.getElementById('joinModeOpenBtn');
+    if (joinModeOpenBtn) joinModeOpenBtn.onclick = () => setAllianceJoinMode('open');
+    const joinModeApplicationBtn = document.getElementById('joinModeApplicationBtn');
+    if (joinModeApplicationBtn) joinModeApplicationBtn.onclick = () => setAllianceJoinMode('application');
     const refreshLbBtn = document.getElementById('refreshLbBtn');
     if (refreshLbBtn) refreshLbBtn.onclick = () => loadLeaderboard();
     const allianceMsgSendBtn = document.getElementById('chatPanelAllianceSendBtn');
