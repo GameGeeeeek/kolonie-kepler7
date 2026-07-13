@@ -1530,8 +1530,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.17.0';
+  const VERSION = '8.17.1';
   const PATCHNOTES = [
+    { version:'8.17.1', date:'13.07.2026', changes:[
+      'Galaxie-Übersicht erneut überarbeitet: das Tabellen-Raster von eben ist wieder raus, stattdessen jetzt eine echte Spiralgalaxie - Systeme sitzen entlang dreier Spiralarme um ein leuchtendes Zentrum, organisch verteilt statt in Zeilen/Spalten',
+      'Positionen sind deterministisch (aus der System-ID abgeleitet), bleiben also bei jedem Neuladen exakt gleich, springen aber nicht mehr starr im Gitter',
+      'Alle Infos weiterhin erhalten: Wurmloch-Verbindungslinie, Fraktions-Territorium, eigene Kontrolle, Piraten-/Alien-/Kriegs-Symbole, Supernova-Kollaps'
+    ]},
     { version:'8.17.0', date:'13.07.2026', changes:[
       'Galaxie-Übersicht überarbeitet: Systeme stehen jetzt in einem geordneten Raster (Zeilen/Spalten) statt frei schwebend als "Sternhaufen" - angelehnt an klassische Weltraum-Strategiespiele',
       'Kompakte Zeilen-Darstellung statt großer leuchtender Kreise: Status-Punkt, Systemname und Kurzinfo (erkundet/Kolonien bzw. Fraktion) in einer schlanken Karte je System',
@@ -10237,21 +10242,31 @@
     galaxyMapViewBox.x = Math.max(-80, Math.min(950-galaxyMapViewBox.w+80, galaxyMapViewBox.x));
     galaxyMapViewBox.y = Math.max(-60, Math.min(500-galaxyMapViewBox.h+60, galaxyMapViewBox.y));
   }
-  // Raster-Positionierung der Systeme (AstroEmpires-artig: geordnete Zeilen/Spalten statt frei
-  // schwebender "Sternhaufen"). Die ursprüngliche, organische (gx/gy) Position dient nur noch als
-  // Sortierschlüssel, damit ehemals benachbarte Systeme auch im Raster tendenziell nah beieinander
-  // bleiben - die tatsächliche Zeichenposition kommt komplett aus dem Raster.
-  function galaxyGridLayout(systems){
-    const cols = 7;
-    const marginX = 62, marginY = 38;
-    const cellW = (950 - marginX*2) / (cols-1);
-    const rows = Math.ceil(systems.length / cols);
-    const cellH = (500 - marginY*2) / Math.max(1, rows-1);
+  // Spiralgalaxie-Positionierung: Systeme sitzen entlang mehrerer Spiralarme um ein helles Zentrum,
+  // mit organischer Streuung statt starrer Gitterlinien - soll wie eine echte Galaxie wirken, nicht
+  // wie eine Tabelle. Die Positionen sind deterministisch aus der System-ID abgeleitet (kein echter
+  // Zufall), damit sie bei jedem Neu-Rendern exakt gleich bleiben und nicht "springen".
+  function hashStringToFloat(str){
+    let h = 0;
+    for (let i=0; i<str.length; i++){ h = (h*31 + str.charCodeAt(i)) >>> 0; }
+    return (h % 10000) / 10000;
+  }
+  function galaxySpiralLayout(systems){
+    const cx = 478, cy = 250;
+    const armCount = 3;
+    const maxRadius = 205;
     const ordered = [...systems].sort((a,b) => (a.gy-b.gy) || (a.gx-b.gx));
+    const n = Math.max(1, ordered.length);
     const pos = {};
     ordered.forEach((s,i) => {
-      const col = i % cols, row = Math.floor(i/cols);
-      pos[s.id] = { x: marginX + col*cellW, y: marginY + row*cellH };
+      const t = i/n; // 0..1 Fortschritt entlang der Spirale (Zentrum -> Rand)
+      const arm = i % armCount;
+      const baseAngle = t*Math.PI*3.2 + arm*(2*Math.PI/armCount);
+      const jitterA = (hashStringToFloat(s.id+'a') - 0.5) * 0.55;
+      const jitterR = (hashStringToFloat(s.id+'r') - 0.5) * 34;
+      const angle = baseAngle + jitterA;
+      const radius = Math.max(18, 26 + t*maxRadius + jitterR);
+      pos[s.id] = { x: cx + Math.cos(angle)*radius*2.05, y: cy + Math.sin(angle)*radius*0.92 };
     });
     return pos;
   }
@@ -10274,29 +10289,43 @@
       inner += `<circle cx="${(Math.random()*950).toFixed(1)}" cy="${(Math.random()*500).toFixed(1)}" r="${(Math.random()*1+0.3).toFixed(1)}" fill="#fff" opacity="${(Math.random()*0.2+0.08).toFixed(2)}"/>`;
     }
     const visSys = visibleSystems();
-    const gridPos = galaxyGridLayout(visSys);
-    // Wurmloch-Verbindungslinie zuerst zeichnen, damit sie unter den System-Knoten liegt.
+    const spiralPos = galaxySpiralLayout(visSys);
+    const CX = 478, CY = 250;
+    // Leuchtendes Galaxie-Zentrum + angedeutete Spiralarme (rein atmosphärisch) - macht auf den
+    // ersten Blick klar, dass hier eine Galaxie und kein Gitter dargestellt wird.
+    inner += `<circle cx="${CX}" cy="${CY}" r="70" fill="url(#miniSunGlow)" opacity="0.5"/><circle cx="${CX}" cy="${CY}" r="16" fill="#fff7d6" opacity="0.85"/>`;
+    for (let arm=0; arm<3; arm++){
+      let path = '';
+      for (let step=0; step<=20; step++){
+        const t = step/20;
+        const angle = t*Math.PI*3.2 + arm*(2*Math.PI/3);
+        const radius = 26 + t*205;
+        const px = (CX + Math.cos(angle)*radius*2.05).toFixed(1);
+        const py = (CY + Math.sin(angle)*radius*0.92).toFixed(1);
+        path += (step===0?'M':'L')+px+' '+py+' ';
+      }
+      inner += `<path d="${path}" fill="none" stroke="#af9ce6" stroke-width="10" opacity="0.05"/>`;
+    }
+    // Wurmloch-Verbindungslinie über den Spiralarmen zeichnen, aber unter den System-Knoten.
     if (galaxyCache.activeWormhole){
-      const fromPos = gridPos[galaxyCache.activeWormhole.from];
-      const toPos = gridPos[galaxyCache.activeWormhole.to];
+      const fromPos = spiralPos[galaxyCache.activeWormhole.from];
+      const toPos = spiralPos[galaxyCache.activeWormhole.to];
       const fromSys = STAR_SYSTEMS.find(s=>s.id===galaxyCache.activeWormhole.from);
       const toSys = STAR_SYSTEMS.find(s=>s.id===galaxyCache.activeWormhole.to);
       if (fromPos && toPos && fromSys && toSys){
         inner += `<line x1="${fromPos.x}" y1="${fromPos.y}" x2="${toPos.x}" y2="${toPos.y}" stroke="#af9ce6" stroke-width="2" stroke-dasharray="5 4" opacity="0.75"><animate attributeName="stroke-dashoffset" from="0" to="18" dur="1.3s" repeatCount="indefinite"/><title>Wurmloch: ${fromSys.name} ↔ ${toSys.name}</title></line>`;
       }
     }
-    // Kompakte Tabellen-/Rasterzeilen statt großer leuchtender Kreise - angelehnt an klassische
-    // Weltraum-Strategiespiele mit Gitter-Sektorkarte statt frei schwebender Sternhaufen-Optik.
-    const CELL_W = 108, CELL_H = 34;
     for (const s of visSys){
-      const pos = gridPos[s.id];
+      const pos = spiralPos[s.id];
       if (!pos) continue;
-      const x = pos.x, y = pos.y;
+      const x = pos.x.toFixed(1), y = pos.y.toFixed(1);
       const planetsInSys = PLANETS.filter(p=>p.system===s.id);
       const discCount = planetsInSys.filter(p=>state.discovered[p.id]).length;
       const colCount = planetsInSys.filter(p=>state.colonies[p.id]).length;
       const active = activeSystem===s.id;
       const isHome = myHomeSystem===s.id;
+      const pct = planetsInSys.length ? discCount/planetsInSys.length : 0;
       const isCollapsed = !!(galaxyCache.collapsedSystems && galaxyCache.collapsedSystems[s.id]);
       const owner = factionOwning(s.id);
       const controlledByMe = !!(galaxyCache.controlledSystems && galaxyCache.controlledSystems[s.id]);
@@ -10306,23 +10335,25 @@
       const alienHere = (galaxyCache.unlockedAlienRaces||[]).find(r=>r.system===s.id);
       if (alienHere) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
       if (galaxyCache.activeWar && galaxyCache.activeWar.system === s.id) badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
-      const badgeMarkup = badges.map((b,i) => `<text x="${x+CELL_W/2-9-i*13}" y="${y-9}" text-anchor="middle" style="font-size:10px;"><title>${b.title}</title>${b.icon}</text>`).join('');
+      const badgeMarkup = badges.map((b,i) => `<text x="${pos.x+11+i*13}" y="${pos.y-11}" text-anchor="middle" style="font-size:11px;"><title>${b.title}</title>${b.icon}</text>`).join('');
 
-      const dotColor = isCollapsed ? '#e24b4a' : (isHome ? '#e24b4a' : (controlledByMe ? '#5dcaa5' : (owner ? owner.color : '#8489a0')));
-      const rowFill = active ? 'rgba(175,169,236,0.16)' : 'rgba(255,255,255,0.025)';
-      const rowStroke = isCollapsed ? '#e24b4a' : (active ? '#afa9ec' : 'rgba(255,255,255,0.09)');
+      const factionRing = controlledByMe
+        ? `<circle cx="${x}" cy="${y}" r="16" fill="#5dcaa514" stroke="#5dcaa5" stroke-width="2" stroke-opacity="0.9"><title>Von dir kontrolliert</title></circle>`
+        : (owner ? `<circle cx="${x}" cy="${y}" r="16" fill="${owner.color}14" stroke="${owner.color}" stroke-width="1.6" stroke-opacity="0.8"><title>${owner.name} – Territorium</title></circle>` : '');
       const statusText = isCollapsed ? 'Kollabiert' : (controlledByMe ? '★ Kontrolle' : (owner ? owner.name : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))));
       const statusColor = isCollapsed ? '#e24b4a' : (controlledByMe ? '#5dcaa5' : (owner ? owner.color : '#8489a0'));
 
       inner += `
         <g class="galaxy-node" data-system-node="${s.id}" style="cursor:pointer;">
           <title>${s.name}${isCollapsed?' – Supernova-Kollaps, 48h unzugänglich':(owner?' – '+owner.name+' (NPC-Territorium)':'')}</title>
-          <rect x="${(x-CELL_W/2).toFixed(1)}" y="${(y-CELL_H/2).toFixed(1)}" width="${CELL_W}" height="${CELL_H}" rx="5" fill="${rowFill}" stroke="${rowStroke}" stroke-width="${active||isCollapsed?1.6:1}"/>
-          <circle cx="${(x-CELL_W/2+11).toFixed(1)}" cy="${y}" r="6" fill="${dotColor}" opacity="${isCollapsed?0.95:(active?1:0.8)}"/>
-          ${isCollapsed ? `<text x="${(x-CELL_W/2+11).toFixed(1)}" y="${(y+2.5).toFixed(1)}" text-anchor="middle" style="font-size:7px;">💥</text>` : (isHome ? `<text x="${(x-CELL_W/2+11).toFixed(1)}" y="${(y+2.5).toFixed(1)}" text-anchor="middle" style="font-size:6.5px;">🏠</text>` : '')}
+          ${factionRing}
+          <circle cx="${x}" cy="${y}" r="17" fill="url(#${isCollapsed?'miniSunGlowCollapsed':'miniSunGlow'})" opacity="${isCollapsed?0.9:(0.35+pct*0.6)}"/>
+          <circle cx="${x}" cy="${y}" r="9.5" fill="none" stroke="${isCollapsed?'#e24b4a':(active?'#afa9ec':'#5a5f7a')}" stroke-width="${active?2:1.1}" stroke-dasharray="${isCollapsed?'2.5 2.5':(pct*59.7)+' 200'}"/>
+          <circle cx="${x}" cy="${y}" r="5.5" fill="${isCollapsed?'#3a1414':(isHome?'#e24b4a':'#fff7d6')}" opacity="${isCollapsed?0.9:(active?1:0.85)}"/>
+          ${isCollapsed ? `<text x="${x}" y="${(pos.y+2.5).toFixed(1)}" text-anchor="middle" style="font-size:7px;">💥</text>` : (isHome ? `<text x="${x}" y="${(pos.y+2.5).toFixed(1)}" text-anchor="middle" style="font-size:6.5px; fill:#fff;">🏠</text>` : '')}
           ${badgeMarkup}
-          <text class="planet-label" x="${(x-CELL_W/2+21).toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="start" style="font-size:9.5px; font-weight:${active?700:500}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>
-          <text class="planet-label" x="${(x-CELL_W/2+21).toFixed(1)}" y="${(y+9).toFixed(1)}" text-anchor="start" style="font-size:7.8px; fill:${statusColor};">${statusText}</text>
+          <text class="planet-label" x="${x}" y="${(pos.y+21).toFixed(1)}" text-anchor="middle" style="font-size:9px; font-weight:${active?700:500}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>
+          <text class="planet-label" x="${x}" y="${(pos.y+31).toFixed(1)}" text-anchor="middle" style="font-size:7.5px; fill:${statusColor};">${statusText}</text>
         </g>
       `;
     }
