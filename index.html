@@ -1451,10 +1451,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.7.1';
+  const VERSION = '8.7.2';
   const PATCHNOTES = [
+    { version:'8.7.2', date:'13.07.2026', changes:[
+      'Volles Lager stoppt die Produktion jetzt komplett: Ist die Kapazität einer Ressource erreicht, ist deren Output 0 (vorher lief sie mit 20% Überlauf-Ertrag weiter)',
+      'Die Ressourcen-Karte zeigt bei vollem Lager deutlich "+0/s (Lager voll)" statt der theoretischen Rate',
+      'Bereits vorhandener Überstand über der Kapazität geht dabei NICHT verloren - es kommt nur nichts mehr dazu, bis wieder Platz ist'
+    ]},
     { version:'8.7.1', date:'13.07.2026', changes:[
-      'Lager-Warnung präzisiert: Bei erreichter/überschrittener Kapazität heißt es jetzt "Lager voll" (Produktion läuft nur noch stark reduziert), "Lager fast voll" nur noch zwischen 90% und 100% - beide Gruppen werden getrennt aufgezählt'
+      'Lager-Warnung präzisiert: Bei erreichter/überschrittener Kapazität heißt es jetzt "Lager voll", "Lager fast voll" nur noch zwischen 90% und 100% - beide Gruppen werden getrennt aufgezählt'
     ]},
     { version:'8.7.0', date:'13.07.2026', changes:[
       'Balance-Pass Richtung x8 (transparent erklärt): Das Late-Game-Produktionswachstum lag bei Vollausbau bei x9,3 global bzw. x17,6 auf dem besten Planeten - drei gezielte Anpassungen bringen es auf ~x7,6 / ~x13,9. Früh- und Mittelspiel sind praktisch unberührt',
@@ -4365,11 +4370,11 @@
     if (globalBonus > 0) for (const k of Object.keys(rates)) rates[k] *= (1 + globalBonus);
     return rates;
   }
-  // Weicher statt harter Lager-Deckel: über der Kapazität geht Produktion nicht mehr komplett
-  // verloren, sondern läuft mit reduziertem Ertrag (20%) weiter. Gilt bewusst nur für laufende
-  // Produktion (die beiden Tick-Stellen unten), NICHT für einmalige Funde/Belohnungen anderswo im
-  // Code – die bleiben hart gedeckelt, das sind bewusste Einmal-Boni, keine Dauerproduktion.
-  const SOFT_CAP_OVERFLOW_RATE = 0.2;
+  // Harter Lager-Deckel (v8.7.2, vorher 20% Überlauf-Ertrag): Ist das Lager einer Ressource voll,
+  // stoppt deren laufende Produktion komplett (Output 0). Bereits vorhandener Überstand (z.B. aus
+  // Einmal-Belohnungen oder aus der Zeit des weichen Deckels) bleibt unangetastet und wird NICHT
+  // weggekappt - es kommt nur nichts mehr dazu, bis wieder Platz ist.
+  const SOFT_CAP_OVERFLOW_RATE = 0;
   function applySoftCappedGain(resources, key, rawGain, cap){
     const current = resources[key]||0;
     if (rawGain <= 0){ resources[key] = current; return; }
@@ -6935,7 +6940,7 @@
       { title:'E-Mail ändern', body:'In den Einstellungen unter „E-Mail" kannst du deine Adresse jederzeit ändern (Passwort-Bestätigung nötig). Die neue Adresse wird erst aktiv, nachdem du den Bestätigungslink geklickt hast, der dorthin geschickt wird – deine bisherige Adresse bleibt bis dahin gültig, damit du nicht ausgesperrt wirst.' },
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert.' },
-      { title:'Lager & weicher Deckel', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Wird die Kapazität erreicht, geht Produktion NICHT komplett verloren: über der Grenze läuft die Produktion mit <strong>20% Ertrag</strong> weiter statt bei 0% zu stoppen. Es lohnt sich trotzdem, regelmäßig auszubauen – 20% ist ein Trostpflaster, kein Ersatz für genug Lagerkapazität.' },
+      { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, stoppt deren Produktion komplett</strong> (Anzeige: +0/s, Lager voll) - baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung). Bereits vorhandener Überstand über der Kapazität (z.B. aus Belohnungen) geht dabei nicht verloren, es kommt nur nichts dazu, bis wieder Platz ist.' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
@@ -10666,7 +10671,7 @@
         <div class="rescard-info">
           <div class="label">${d.label}</div>
           <div class="value">${fmt(state.resources[d.key])} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(cap)}</span></div>
-          <div class="rate">+${fmt(rates[d.key])}/s</div>
+          <div class="rate">${(cap>0 && (state.resources[d.key]||0) >= cap && rates[d.key] > 0) ? '<span style="color:#e0a548;">+0/s (Lager voll)</span>' : '+'+fmt(rates[d.key])+'/s'}</div>
         </div>
         <div class="float-gain">+0</div>
       </div>
@@ -12306,7 +12311,7 @@
         if (titleEl) titleEl.textContent = fullRes.length ? 'Lager voll' : 'Lager fast voll';
         const lbl = (arr) => arr.map(r => (RES_DEFS.find(x=>x.key===r)||{}).label||r).join(', ');
         let msg = '';
-        if (fullRes.length) msg += lbl(fullRes)+' – Lager voll, Produktion läuft nur noch stark reduziert weiter.';
+        if (fullRes.length) msg += lbl(fullRes)+' – Lager voll, die Produktion dieser Ressourcen ist GESTOPPT.';
         if (nearFullRes.length) msg += (msg?' ':'')+lbl(nearFullRes)+' – Lager bald voll.';
         msg += ' Mehr Lagerkapazität ausbauen oder Ressourcen verbrauchen (Bauen, Schiffe, Forschung).';
         document.getElementById('storageWarningDesc').textContent = msg;
