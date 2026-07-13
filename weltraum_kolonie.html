@@ -812,17 +812,6 @@
 
       <div class="resbar" id="resbar"></div>
       <div id="dailyQuestBar" style="margin-bottom:0.75rem;"></div>
-      <div class="event-banner" id="liveUpdateBanner" style="display:none; border-color:rgba(93,202,165,0.5); background:rgba(93,202,165,0.1);">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <i class="ti ti-sparkles" aria-hidden="true" style="font-size:20px; color:#5dcaa5;"></i>
-          <div style="flex:1; min-width:0;">
-            <div style="font-weight:600; font-size:13px; color:#5dcaa5;" id="liveUpdateTitle">Update verfügbar</div>
-            <div style="font-size:11.5px; color:#c7cbe0; margin-top:2px;">Eine neue Version ist bereit - lade neu, um sie zu erhalten (dein Fortschritt bleibt erhalten).</div>
-          </div>
-          <button id="liveUpdateReloadBtn" style="font-size:11px; padding:6px 10px; flex-shrink:0;"><i class="ti ti-refresh" aria-hidden="true" style="margin-right:3px;"></i>Neu laden</button>
-          <button id="liveUpdateDismissBtn" style="font-size:11px; padding:6px 8px; flex-shrink:0;"><i class="ti ti-x" aria-hidden="true"></i></button>
-        </div>
-      </div>
       <div class="event-banner" id="storageWarningBanner" style="display:none; border-color:rgba(224,165,72,0.5); background:rgba(224,165,72,0.1);">
         <div style="display:flex; align-items:center; gap:8px;">
           <i class="ti ti-alert-triangle" aria-hidden="true" style="font-size:20px; color:#e0a548;"></i>
@@ -1535,8 +1524,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.11.2';
+  const VERSION = '8.11.3';
   const PATCHNOTES = [
+    { version:'8.11.3', date:'13.07.2026', changes:[
+      'Update-Erkennung wieder verpflichtend: Wird im Hintergrund eine neue Version gefunden, erscheint automatisch das volle Update-Fenster mit den echten Patchnotes - lässt sich nicht mehr wegklicken, nur "Seite neu laden" führt weiter'
+    ]},
     { version:'8.11.2', date:'13.07.2026', changes:[
       'Der Flottenpositions-Sidebar hat jetzt den gleichen schlanken, themenfarbenen Scrollbalken wie die Wischleisten',
       'Neu: Der Chat-Reiter zeigt einen roten Punkt an, sobald jemand in Allianz- oder globalem Chat geschrieben hat - läuft automatisch im Hintergrund'
@@ -4080,10 +4072,10 @@
     return 0;
   }
 
-  function showUpdateNotice(entries){
+  function showUpdateNotice(entries, forced){
     const overlay = document.getElementById('updateNoticeOverlay');
     if (!overlay || !entries.length) return;
-    document.getElementById('updateNoticeTitle').textContent = 'Neue Version: v'+VERSION;
+    document.getElementById('updateNoticeTitle').textContent = 'Neue Version: v'+entries[0].version;
     document.getElementById('updateNoticeBody').innerHTML = entries.map(p => `
       <div>
         <div style="font-weight:500; font-size:13px; color:#fff; margin-bottom:6px; display:flex; align-items:center; gap:6px;"><span class="lvl-pill">v${p.version}</span><span class="bmeta" style="margin:0;">${p.date}</span></div>
@@ -4092,6 +4084,15 @@
         </ul>
       </div>
     `).join('');
+    // "Erzwungen": eine live erkannte, noch nicht geladene Version - Weiterspielen/Schließen wird
+    // ausgeblendet, es bleibt nur "Seite neu laden". Beim normalen Aufruf nach dem Laden (die
+    // bereits laufende Version ist ja schon aktiv) bleiben beide Optionen wie gewohnt verfügbar.
+    const closeBtn = document.getElementById('updateCloseBtn');
+    const dismissBtn = document.getElementById('updateDismissBtn');
+    const subEl = overlay.querySelector('.login-sub');
+    if (closeBtn) closeBtn.style.display = forced ? 'none' : '';
+    if (dismissBtn) dismissBtn.style.display = forced ? 'none' : '';
+    if (subEl) subEl.textContent = forced ? 'Bitte lade neu, um weiterzuspielen (dein Fortschritt bleibt erhalten)' : 'Deine Kolonie wurde aktualisiert';
     overlay.style.display = 'flex';
   }
 
@@ -4099,9 +4100,10 @@
   // lange offen gelassener Tab (v.a. als installierte PWA, die der Browser seltener von selbst
   // neu lädt) von selbst merkt, dass eine neue Version bereitsteht - vorher passierte das nur
   // beim nächsten manuellen Neuladen.
-  let liveUpdateDismissedVersion = null;
   let lastLiveUpdateCheck = 0;
+  let liveUpdateShown = false;
   async function checkLiveVersionUpdate(){
+    if (liveUpdateShown) return; // Overlay steht schon (erzwungen) - nichts weiter zu tun
     const now = Date.now();
     if (now - lastLiveUpdateCheck < 90000) return; // höchstens alle 90s, auch bei häufigem Tab-Wechsel
     lastLiveUpdateCheck = now;
@@ -4113,11 +4115,21 @@
       if (!m) return;
       const liveVersion = m[1];
       if (compareVersions(liveVersion, VERSION) <= 0) return;
-      if (liveUpdateDismissedVersion === liveVersion) return;
-      const titleEl = document.getElementById('liveUpdateTitle');
-      if (titleEl) titleEl.textContent = 'Update verfügbar: v'+liveVersion;
-      const banner = document.getElementById('liveUpdateBanner');
-      if (banner) banner.style.display = 'block';
+      // Echte Patchnotes aus dem frisch abgerufenen, aber noch NICHT ausgeführten Dokument
+      // extrahieren - sicher, weil es dieselbe, von uns selbst gehostete Datei ist (nicht
+      // Fremdinhalt), nur eben eine neuere Version davon. Anker: der PATCHNOTES-Array-Literal
+      // beginnt und endet mit fest im Code stehenden, eindeutigen Markierungen.
+      const startMarker = 'const PATCHNOTES = [';
+      const startIdx = text.indexOf(startMarker);
+      const endIdx = text.indexOf('\n  ];', startIdx);
+      if (startIdx === -1 || endIdx === -1) return;
+      const arrayText = '[' + text.slice(startIdx + startMarker.length, endIdx) + ']';
+      let allEntries;
+      try { allEntries = new Function('return (' + arrayText + ')')(); } catch(e){ return; }
+      const entries = allEntries.filter(p => compareVersions(p.version, VERSION) > 0);
+      if (!entries.length) return;
+      liveUpdateShown = true;
+      showUpdateNotice(entries, true);
     } catch(e){ /* Netzwerk kurz weg o.ä. - beim nächsten Intervall erneut versuchen */ }
   }
   function checkForUpdateNotice(){
@@ -6500,16 +6512,7 @@
   setInterval(() => { if (document.visibilityState === 'visible') checkChatUnread(); }, 60000);
   setTimeout(checkChatUnread, 4000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); });
-  const liveUpdateReloadBtn = document.getElementById('liveUpdateReloadBtn');
-  if (liveUpdateReloadBtn) liveUpdateReloadBtn.addEventListener('click', () => location.reload());
-  const liveUpdateDismissBtn = document.getElementById('liveUpdateDismissBtn');
-  if (liveUpdateDismissBtn) liveUpdateDismissBtn.addEventListener('click', () => {
-    const titleEl = document.getElementById('liveUpdateTitle');
-    const m = titleEl ? titleEl.textContent.match(/v([\d.]+)/) : null;
-    if (m) liveUpdateDismissedVersion = m[1];
-    const banner = document.getElementById('liveUpdateBanner');
-    if (banner) banner.style.display = 'none';
-  });
+
   const showTutorialBtn = document.getElementById('showTutorialBtn');
   if (showTutorialBtn) showTutorialBtn.addEventListener('click', showTutorial);
   // Server-Ereignis-Benachrichtigungen: Schalter verdrahten
@@ -7264,7 +7267,7 @@
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
       { title:'Chat-Benachrichtigung', body:'Der Chat-Reiter am linken Bildschirmrand zeigt einen roten Punkt, sobald in Allianz- oder globalem Chat eine neue Nachricht eingetroffen ist, seit du zuletzt geöffnet hattest - läuft automatisch im Hintergrund, ohne dass der Chat offen sein muss.' },
-      { title:'Automatische Update-Erkennung', body:'Bleibt die Kolonie lange im selben Tab geöffnet (z.B. als installierte App), prüft sie im Hintergrund von selbst, ob eine neue Version bereitsteht - beim Zurückwechseln in den Tab und danach alle 10 Minuten. Erscheint ein grünes Banner "Update verfügbar", bringt "Neu laden" die neue Version inklusive vollständiger Patchnotes; ein Neuladen kostet keinen Fortschritt.' },
+      { title:'Automatische Update-Erkennung', body:'Bleibt die Kolonie lange im selben Tab geöffnet (z.B. als installierte App), prüft sie im Hintergrund von selbst, ob eine neue Version bereitsteht - beim Zurückwechseln in den Tab und danach alle 10 Minuten. Wird eine gefunden, erscheint automatisch das Update-Fenster mit den vollständigen Patchnotes; es lässt sich nicht wegklicken, nur über "Seite neu laden" geht es weiter (dein Fortschritt bleibt dabei erhalten).' },
       { title:'Push-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich der Knopf "Push auf diesem Gerät" aktivieren (Browser fragt einmalig um Erlaubnis) - danach schickt der Server für Nachrichten, Pakt-Angebote, Weltboss-Kills, anfliegende Überfälle und Patchnotes echte Benachrichtigungen an dieses Gerät, auch wenn die Seite geschlossen ist. Fünf Kategorien lassen sich einzeln abschalten. Alle Ereignisse landen zusätzlich als geräteübergreifendes Postfach im <strong>Berichte-Tab</strong> unter "Server-Ereignisse" - nur mit eigenem Server verfügbar.' },
       { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt.' },
       { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: ab <strong>Prestige 3 und 50.000 Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit fünf Zweigen (je max. Stufe 10, Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset) und Pfadfinder-Instinkt (+2% Expeditions-Belohnung). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste.' },
@@ -14056,7 +14059,7 @@
   const updateReloadBtn = document.getElementById('updateReloadBtn');
   if (updateReloadBtn) updateReloadBtn.addEventListener('click', () => location.reload());
   const updateNoticeOverlayEl = document.getElementById('updateNoticeOverlay');
-  if (updateNoticeOverlayEl) updateNoticeOverlayEl.addEventListener('click', (e) => { if (e.target === updateNoticeOverlayEl) closeUpdateNotice(); });
+  if (updateNoticeOverlayEl) updateNoticeOverlayEl.addEventListener('click', (e) => { if (e.target === updateNoticeOverlayEl && !liveUpdateShown) closeUpdateNotice(); });
 
   const fpPanelEl = document.getElementById('fleetPositionPanel');
   const fpBackdropEl = document.getElementById('fpBackdrop');
