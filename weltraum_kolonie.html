@@ -1535,8 +1535,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.18.1';
+  const VERSION = '8.18.2';
   const PATCHNOTES = [
+    { version:'8.18.2', date:'13.07.2026', changes:[
+      'Performance: Skillbaum, Erfolge, Forschungs-Meilensteine und Händler-Anzeige wurden bisher bei JEDEM Bildschirm-Update neu berechnet, egal welcher Tab gerade offen war - laufen jetzt nur noch, wenn ihr jeweiliger Tab tatsächlich sichtbar ist'
+    ]},
     { version:'8.18.1', date:'13.07.2026', changes:[
       'Mobile-Feinschliff Teil 2: die kleinsten Text-Badges im Spiel (Kampf-Rundenzähler, Feed-Zeitstempel, Bestenlisten-Abzeichen für Titel/Aufstieg/Pakt, Hilfe-Sprungmarken, einige Allianz-Knöpfe) sind jetzt 1px größer und dadurch leichter lesbar - Kartenbeschriftungen in SVG-Grafiken bewusst unverändert gelassen, da die mit der Grafik mitskalieren'
     ]},
@@ -13479,6 +13482,10 @@
       if (pBtn) pBtn.onclick = doPrestige;
     }
 
+    // Performance: Skillbaum, Erfolge, Forschungs-Meilensteine und Händler sind nur in ihren
+    // jeweiligen Tabs sichtbar - werden deshalb nur bei aktivem Tab neu berechnet, statt bei
+    // JEDEM render()-Aufruf (auch wenn ein völlig anderer Tab offen ist).
+    if (activeTab === 'fortschritt' || activeTab === 'forschung' || activeTab === 'galaxie'){
     const skillTreeBox = document.getElementById('skillTreeBox');
     if (skillTreeBox){
       const avail = skillPointsAvailable();
@@ -13573,6 +13580,7 @@
         if (tb) tb.onclick = acceptTrade;
       }
     }
+    } // Ende Fortschritt/Forschung/Galaxie-Perf-Guard
 
     document.getElementById('heroResearch').textContent = Object.values(state.research).filter(Boolean).length+'/'+RESEARCH_DEFS.length;
     document.getElementById('heroFleet').textContent = cf.ships+' Schiff'+(cf.ships===1?'':'e')+' · '+cf.cruisers+' Kreuzer ('+planetDisplayName(state.activeBasePlanet)+')';
