@@ -1412,8 +1412,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.97.1';
+  const VERSION = '7.97.2';
   const PATCHNOTES = [
+    { version:'7.97.2', date:'13.07.2026', changes:[
+      'Bugfix: Das Ausspähen eines anfliegenden Überfalls scheiterte, wenn auf dem gerade angewählten Planeten kein Spähschiff stand - obwohl anderswo welche bereitstanden. Jetzt wird automatisch ein Späher vom besten verfügbaren Standort genommen (bevorzugt aktueller Planet, dann der bedrohte Planet, sonst irgendein Standort)'
+    ]},
     { version:'7.97.1', date:'13.07.2026', changes:[
       'Bugfix: Horizontale Wisch-Leisten (Planeten-Rollen, Orbital-Fokus, Expeditionstyp, Modul-Standortwahl) sprangen durch die Sekunden-Aktualisierung ständig an den Anfang zurück - die Scroll-Position bleibt jetzt beim Rendern erhalten',
       'Der Patchnotes-Mail-Schalter zeigt bei veraltetem eigenen Server jetzt eine klare Meldung (Backend aktualisieren + Server-Prozess neu starten) statt einem allgemeinen Fehler'
@@ -4842,13 +4845,18 @@
   // in den Anflugweg der feindlichen Flotte begibt statt sie aus sicherer Distanz zu beobachten.
   function scoutIncomingRaid(){
     if (!state.incomingRaid || !state.incomingRaid.detected){ log('Kein erkannter Überfall zum Ausspähen vorhanden.', 'ti-alert-triangle'); return; }
-    // Das Spähschiff kommt jetzt vom aktuell angewählten Planeten (state.activeBasePlanet), nicht mehr
-    // zwingend vom bedrohten Zielplaneten – die Kampf-/Trümmerfeld-Schätzung bezieht sich weiterhin auf
-    // den tatsächlichen Zielplaneten des Überfalls, nur die Herkunft des Spähschiffs ist jetzt frei wählbar.
-    const scoutSourcePlanet = state.activeBasePlanet;
+    // Das Spähschiff wird automatisch vom nächstliegenden sinnvollen Standort genommen: bevorzugt
+    // vom aktuell angewählten Planeten, sonst vom bedrohten Zielplaneten, sonst von irgendeinem
+    // eigenen Standort mit Spähschiff. Vorher scheiterte das Ausspähen, wenn ausgerechnet auf dem
+    // gerade angewählten Planeten kein Späher stand - obwohl anderswo welche bereitstanden.
     const targetPlanet = state.incomingRaid.planet;
-    const f = scoutSourcePlanet==='home' ? state.fleet : (state.colonies[scoutSourcePlanet] ? state.colonies[scoutSourcePlanet].fleet : null);
-    if (!f || (f.spaeher||0) < 1){ log('Du brauchst ein Spähschiff auf '+planetDisplayName(scoutSourcePlanet)+' (aktuell gewählter Planet), um die anfliegende Flotte auszuspähen.', 'ti-alert-triangle'); return; }
+    let scoutSourcePlanet = null, f = null, bestPrio = 99;
+    for (const { planet: pk, fleet: fl } of allFleetsWithPlanet()){
+      if ((fl.spaeher||0) < 1) continue;
+      const prio = pk === state.activeBasePlanet ? 0 : (pk === targetPlanet ? 1 : 2);
+      if (prio < bestPrio){ bestPrio = prio; scoutSourcePlanet = pk; f = fl; }
+    }
+    if (!f){ log('Du brauchst mindestens ein Spähschiff an irgendeinem deiner Standorte, um die anfliegende Flotte auszuspähen.', 'ti-alert-triangle'); return; }
     if (!confirm('Spähschiff von '+planetDisplayName(scoutSourcePlanet)+' auf die anfliegende Flotte ansetzen? Das Schiff geht dabei garantiert verloren, liefert aber einen detaillierten Bericht inkl. Mondbildungs-Chance.')) return;
     f.spaeher -= 1;
     const raiderFleet = state.incomingRaid.fleet;
