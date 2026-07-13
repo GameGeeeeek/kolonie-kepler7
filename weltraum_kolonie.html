@@ -324,6 +324,16 @@
 
     .buildings, .fleet, .research-list, .planet-list, .npc-list, .leaderboard { display:flex; flex-direction:column; gap:9px; }
     .card-row { background: rgba(255,255,255,0.045); border: 0.5px solid rgba(255,255,255,0.09); border-radius:14px; padding: 0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
+    .summary-bar { background: linear-gradient(135deg, rgba(var(--primary-rgb),0.22), rgba(var(--primary-rgb),0.08)); border: 1px solid rgba(var(--primary-rgb),0.5); border-radius: 12px; padding: 9px 11px; margin-bottom: 10px; }
+    .summary-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; }
+    .summary-title { font-size: 11px; font-weight: 600; color: #c3bef5; display:flex; align-items:center; gap:5px; }
+    .summary-chips { display:flex; gap:6px; flex-wrap:wrap; }
+    .chip { display:flex; align-items:center; gap:4px; background: rgba(255,255,255,0.08); border-radius:8px; padding:3px 8px 3px 6px; font-size:10.5px; color:#e9ecf5; }
+    .chip .chip-n { font-weight:700; color:#fac775; }
+    .quick-actions { display:flex; gap:6px; margin-bottom:10px; }
+    .quick-actions button { flex:1; font-size:10.5px; padding:7px 4px; border-radius:8px; }
+    .quick-actions button.primary { background: rgba(93,202,165,0.15); border-color: rgba(93,202,165,0.4); color:#9fe1cb; }
+    .quick-actions button.danger { background: rgba(226,75,74,0.12); border-color: rgba(226,75,74,0.35); color:#f0997b; }
     .card-row:hover { background: rgba(255,255,255,0.07); border-color:rgba(var(--primary-rgb), 0.35); }
     .search-result-row:hover { background: rgba(var(--primary-rgb), 0.15); }
     .card-row .left { display:flex; align-items:center; gap:11px; min-width:0; }
@@ -587,6 +597,7 @@
         <button id="profileAttackBtn" class="attack" style="flex:1;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angreifen</button>
         <button id="profileMsgBtn" style="flex:1;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Nachricht</button>
       </div>
+      <div class="bmeta" id="profileAttackFleetSummary" style="margin-top:6px;"></div>
       <button id="profilePactBtn" style="width:100%; margin-top:8px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten</button>
       <button id="profileAllianceInviteBtn" style="width:100%; margin-top:8px; display:none;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Zur Allianz einladen</button>
     </div>
@@ -1538,8 +1549,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.19.1';
+  const VERSION = '8.19.2';
   const PATCHNOTES = [
+    { version:'8.19.2', date:'13.07.2026', changes:[
+      'UI-Verbesserung "Angriffsflotte zusammenstellen": Zusammenfassungs-Leiste oben zeigt jetzt sofort die aktuelle Auswahl (Chips je Schiffstyp + Angriffskraft) auf einen Blick, statt durch alle Schiffstypen scrollen zu müssen',
+      'Neue Schnellwahl-Buttons "Alle Kampfschiffe" / "Nichts" oben in der Angriffsflotten-Auswahl',
+      'Der "Angreifen"-Knopf im Spielerprofil sowie der direkte "Spieler angreifen"-Knopf und der Karten-Bestätigungsdialog zeigen jetzt genau an, mit welcher Flotte tatsächlich angegriffen wird, bevor man klickt'
+    ]},
     { version:'8.19.1', date:'13.07.2026', changes:[
       'Neu: Spionage gegen andere Spieler setzt jetzt voraus, dass du mindestens einen Planeten in ihrem Heimatsystem erkundet hast - "man muss erst wissen, wo jemand wohnt"',
       'Neu: Angriffe auf andere Spieler sind komplett blockiert, wenn dein Punktestand mehr als 5x so hoch ist wie der des Ziels (die bestehende Beute-Reduzierung ab 3x bleibt zusätzlich bestehen) - Schutz für schwächere Spieler vor grundlosem Farmen'
@@ -6664,6 +6680,22 @@
     msgBtn.style.display = (isMe || !useBackend()) ? 'none' : 'flex';
     if (spyBtn) spyBtn.style.display = isMe ? 'none' : 'flex';
     attackBtn.onclick = () => { closePlayerProfile(); attackPlayer(entry.id, entry.name); };
+    // Zeigt direkt am Angreifen-Knopf, welche Flotte tatsächlich losfliegen würde - Rückmeldung war,
+    // dass unklar sei, welche Schiffe bei einem Angriff eingesetzt werden.
+    const profileFleetSummaryEl = document.getElementById('profileAttackFleetSummary');
+    if (profileFleetSummaryEl && !isMe){
+      const previewFleet = buildAttackFleet(state.activeBasePlanet, currentFleet());
+      const previewPower = attackPower(previewFleet, state.activeBasePlanet);
+      const previewParts = ATTACK_SHIP_KEYS.filter(k => (previewFleet[k]||0) > 0).map(k => {
+        const def = k==='superschlachtschiff' ? { name:'Superschlachtschiff' } : SHIP_DEFS.find(d=>d.key===k);
+        return previewFleet[k]+' '+def.name;
+      });
+      profileFleetSummaryEl.innerHTML = previewParts.length
+        ? `<i class="ti ti-ship" aria-hidden="true"></i> Wird mit ${previewParts.join(', ')} angegriffen · Angriffskraft ${previewPower}`
+        : `<i class="ti ti-alert-triangle" aria-hidden="true"></i> Keine Angriffsflotte ausgewählt (Galaxie-Tab → "Angriffsflotte zusammenstellen")`;
+    } else if (profileFleetSummaryEl){
+      profileFleetSummaryEl.innerHTML = '';
+    }
     msgBtn.onclick = () => { closePlayerProfile(); sendMessage(entry.id, entry.name); };
     if (spyBtn) spyBtn.onclick = () => { closePlayerProfile(); sendSpyMission(entry.id, entry.name); };
     const inviteBtn = document.getElementById('profileAllianceInviteBtn');
@@ -10493,7 +10525,9 @@
     } catch(e){}
   }
   function mapPlayerClick(userId, username){
-    if (confirm(username+' angreifen? Deine ausgewählte Angriffsflotte fliegt hin (Flugzeit abhängig von Entfernung), Ergebnis kommt erst bei Ankunft. ("Abbrechen" für Nachricht senden)')) attackPlayer(userId, username);
+    const previewFleetForMap = buildAttackFleet(state.activeBasePlanet, currentFleet());
+    const previewPartsForMap = ATTACK_SHIP_KEYS.filter(k => (previewFleetForMap[k]||0) > 0).map(k => previewFleetForMap[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ') || 'keine Schiffe (erst im Galaxie-Tab auswählen)';
+    if (confirm(username+' angreifen? Wird mit '+previewPartsForMap+' angegriffen (Flugzeit abhängig von Entfernung), Ergebnis kommt erst bei Ankunft. ("Abbrechen" für Nachricht senden)')) attackPlayer(userId, username);
     else sendMessage(userId, username);
   }
 
@@ -12738,6 +12772,12 @@
       }).join('');
       const vetRank = veteranRankOf(state.activeBasePlanet);
       const vetNext = nextVeteranRankOf(state.activeBasePlanet);
+      // Zusammenfassungs-Chips: zeigen die aktuelle Auswahl auf einen Blick, ohne durch alle
+      // Schiffstypen scrollen zu müssen (häufige Rückmeldung: unklar, welche Flotte losgeschickt wird).
+      const summaryChips = ATTACK_SHIP_KEYS.filter(k => (attackFleet[k]||0) > 0).map(k => {
+        const def = k==='superschlachtschiff' ? { name:'Superschlachtschiff', icon:'ship_superschlachtschiff' } : SHIP_DEFS.find(d=>d.key===k);
+        return `<div class="chip"><span style="width:14px; height:14px; display:inline-flex;">${ICONS[def.icon]?ICONS[def.icon].replace('width="24" height="24"','width="14" height="14"'):''}</span><span class="chip-n">${attackFleet[k]}</span> ${def.name}</div>`;
+      }).join('');
       attackFleetBox.innerHTML = `
         <div class="card-row" style="margin-bottom:0.5rem; border-color:${vetRank.color};">
           <div class="left" style="gap:8px;"><i class="ti ti-award" aria-hidden="true" style="color:${vetRank.color}; font-size:18px;"></i>
@@ -12745,13 +12785,23 @@
             <div class="bmeta">${fmt(veteranXpOf(state.activeBasePlanet))} Kampferfahrung${vetNext?' · nächster Rang "'+vetNext.name+'" ab '+fmt(vetNext.xp):' · Höchstrang erreicht'}. Überlebte Gefechte bringen Erfahrung, schwere Verluste kosten welche.</div></div>
           </div>
         </div>
+        <div class="summary-bar">
+          <div class="summary-top">
+            <div class="summary-title"><i class="ti ti-check" aria-hidden="true"></i> Aktuelle Auswahl</div>
+            <span style="font-size:12px; font-weight:700; color:#e24b4a;"><i class="ti ti-sword" aria-hidden="true"></i> ${attackFleetPower}</span>
+          </div>
+          <div class="summary-chips">${summaryChips || '<span class="bmeta">Noch nichts ausgewählt.</span>'}</div>
+        </div>
+        <div class="quick-actions">
+          <button id="atkSelAllBtn" class="primary"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Alle Kampfschiffe</button>
+          <button id="atkSelClearBtn" class="danger"><i class="ti ti-x" aria-hidden="true" style="margin-right:4px;"></i>Nichts</button>
+        </div>
         <div class="bmeta" style="margin-bottom:0.5rem;">Wähle aus, welche Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} für den nächsten Angriff eingesetzt werden. Wirkt sich auf Angriffskraft und Flugzeit je Ziel unten aus.</div>
         ${attackRows || `<div class="bmeta" style="padding:0.5rem 0;">Keine Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} verfügbar.</div>`}
         <input type="text" id="customFleetNameInputAttack" placeholder="Flottenname (optional, sonst automatisch)" maxlength="30" style="width:100%; margin-top:0.5rem;" value="${customFleetName}"/>
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:4px; margin-top:0.5rem; background:rgba(226,75,74,0.08); border-color:rgba(226,75,74,0.3);">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:15px; font-weight:600; color:#e24b4a;"><i class="ti ti-sword" aria-hidden="true"></i> Angriffskraft: ${attackFleetPower}</span>
-            ${attackRows ? `<button id="atkSelClearBtn" style="font-size:10px; padding:5px 9px;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Alle entfernen</button>` : ''}
           </div>
         </div>
       `;
@@ -12790,6 +12840,13 @@
         for (const k of ATTACK_SHIP_KEYS) sel[k] = 0;
         render();
       };
+      const atkSelAllBtn = document.getElementById('atkSelAllBtn');
+      if (atkSelAllBtn) atkSelAllBtn.onclick = () => {
+        const sel = getAttackSelection(state.activeBasePlanet, cf);
+        const away = computeAwayByType(cf);
+        for (const k of ATTACK_SHIP_KEYS) sel[k] = Math.max(0, (cf[k]||0) - (away[k]||0));
+        render();
+      };
     }
 
     // Direkter "Spieler angreifen"-Knopf: erscheint, sobald über den "Direkt Angriff"-Smart-Button
@@ -12810,7 +12867,7 @@
               <button data-cancel-pending-attack style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
             <button class="buy ${canSendPending?'affordable':''}" id="pendingAttackBtn" ${canSendPending?'':'disabled'}><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Spieler angreifen</button>
-            ${!canSendPending ? `<div class="bmeta">Wähle oben mindestens ein Kampfschiff für die Angriffsflotte aus.</div>` : ''}
+            ${!canSendPending ? `<div class="bmeta">Wähle oben mindestens ein Kampfschiff für die Angriffsflotte aus.</div>` : `<div class="bmeta">Wird mit ${ATTACK_SHIP_KEYS.filter(k=>(attackFleetForTarget[k]||0)>0).map(k=>attackFleetForTarget[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ')} angegriffen · Angriffskraft ${attackPower(attackFleetForTarget, state.activeBasePlanet)}</div>`}
           </div>
         `;
         const pendingBtn = document.getElementById('pendingAttackBtn');
