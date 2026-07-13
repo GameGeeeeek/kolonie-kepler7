@@ -1634,8 +1634,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.20.2';
+  const VERSION = '8.20.3';
   const PATCHNOTES = [
+    { version:'8.20.3', date:'13.07.2026', changes:[
+      'Schiffe und Verteidigungsgebäude zeigen jetzt dauerhaft ("Voraussetzung: ...") an, welche Forschung sie voraussetzen - vorher verschwand diese Info, sobald die Voraussetzung erfüllt war und man sie später nochmal nachschlagen wollte'
+    ]},
     { version:'8.20.2', date:'13.07.2026', changes:[
       'Forschungsbeschreibungen ergänzt: Fusionsantrieb, Zielerfassungssysteme, Erweiterte Zielsysteme, Panzerplatten, Schildmatrix und Spionageabwehr zeigen jetzt direkt in ihrer Karte, welche Schiffe/Verteidigungsgebäude sie freischalten - vorher stand das nur umgekehrt beim jeweiligen Schiff/Gebäude ("Benötigt: ..."), nicht bei der Forschung selbst'
     ]},
@@ -11743,6 +11746,11 @@
       if (specialItemKey){
         specialItemLine = `<div class="bmeta" style="${specialItemHave<qty?'color:#e24b4a;':''}"><i class="ti ${specialItemDef?specialItemDef.icon:'ti-diamond'}" aria-hidden="true"></i> Verbraucht ${qty}x ${specialItemDef?specialItemDef.name:specialItemKey} (vorhanden: ${specialItemHave})${specialItemHave<qty?' – nicht genug!':''} · sehr seltener Fund bei Erkundungsmissionen</div>`;
       }
+      let defReqLine = '';
+      if (def.category==='defense' && (def.requires||[]).length){
+        const defReqNames = def.requires.map(k=>(RESEARCH_DEFS.find(r=>r.key===k)||{}).name).join(', ');
+        defReqLine = `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${defReqNames}</div>`;
+      }
       const scorePoints = qty*10;
       return `
         <div class="card-row">
@@ -11753,6 +11761,7 @@
               <div class="prodline">${prodLine}</div>
               ${malusLine}
               ${specialItemLine}
+              ${defReqLine}
               <div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${(def.buildTime||20)*qty}s`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte</div>
             </div>
           </div>
@@ -12301,6 +12310,7 @@
       else if (def.key==='recycler') meta = '+8 Ressourcen/s Trümmerfeld-Sammlung am stationierten Planeten · passiv';
       else if (def.key==='forscher') meta = `Angriffspunkte 0 – für Langzeit-Expeditionen, muss von Kampfschiffen eskortiert werden · ${slotsUsedExpedition}/${count} Expeditions-Slots belegt`;
       const reqNames = (def.requires||[]).filter(k=>(state.research[k]||0)<1).map(k=>(RESEARCH_DEFS.find(r=>r.key===k)||{}).name).join(', ');
+      const allReqNames = (def.requires||[]).map(k=>(RESEARCH_DEFS.find(r=>r.key===k)||{}).name).join(', ');
       const drive = DRIVE_INFO[def.drive] || {};
       const driveLine = `<i class="ti ${drive.icon||'ti-bolt'}" aria-hidden="true" style="color:${drive.color||'#9296ac'};"></i> ${drive.name||'Antrieb'} · Geschwindigkeit ${def.speed||'–'} · Treibstoff: ${miniResIcon(drive.fuel||'deuterium')}${(RES_DEFS.find(r=>r.key===(drive.fuel||'deuterium'))||{}).label||'Deuterium'}`;
       const perShipDefContrib = Math.round((def.atk||0)*0.4) + (def.shield||0);
@@ -12315,6 +12325,7 @@
               <div class="bmeta">${meta}</div>
               <div class="bmeta">${combatStatsLine}</div>
               <div class="bmeta">${driveLine}</div>
+              ${allReqNames ? `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${allReqNames}</div>` : ''}
               ${unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${Math.round(def.buildTime*shipQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1))}s${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${shipScorePoints} Punkte (${SHIP_SCORE_WEIGHTS[def.key]||0}/Schiff)</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
             </div>
           </div>
