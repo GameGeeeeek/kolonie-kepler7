@@ -1535,8 +1535,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.18.3';
+  const VERSION = '8.18.4';
   const PATCHNOTES = [
+    { version:'8.18.4', date:'13.07.2026', changes:[
+      'Absicherung nach dem Hotfix von eben: Ein echter Ladefehler zeigt jetzt eine ehrliche Meldung ("Fehler beim Laden - bitte neu laden") statt der irreführenden "Neue Kolonie gestartet" - damit ein ähnlicher Fehler in Zukunft sofort als das erkennbar ist, was er ist, statt wie Datenverlust auszusehen'
+    ]},
     { version:'8.18.3', date:'13.07.2026', changes:[
       'Kritischer Hotfix: Ein doppeltes Komma bei den neuen Sternensystemen (v8.18.0) hat eine Lücke im Planeten-Verzeichnis erzeugt und beim Laden/Anzeigen für ALLE Spieler zu Abstürzen geführt - dabei sah es fälschlich so aus, als sei der Spielstand weg. Die Daten waren die ganze Zeit sicher auf dem Server gespeichert, nur das Laden ist gescheitert. Bitte die Seite jetzt neu laden.'
     ]},
@@ -8800,7 +8803,15 @@
         document.getElementById('loadstate').textContent = 'Spielstand automatisch geladen (zuletzt gespeichert '+savedAgo+')';
         if (lastOfflineSummary || loginBonus) setTimeout(() => showWelcomeBackModal(lastOfflineSummary, loginBonus), 400);
       } else { state.lastSeenVersion = VERSION; checkDailyLogin(); initDailyQuests(); document.getElementById('loadstate').textContent = 'Neue Kolonie gestartet – wird ab jetzt automatisch gespeichert'; }
-    } catch(e){ document.getElementById('loadstate').textContent = 'Neue Kolonie gestartet – wird ab jetzt automatisch gespeichert'; }
+    } catch(e){
+      // Diesen Fehler NIE stillschweigend verschlucken: ein Ladefehler bei einem BESTEHENDEN
+      // Spielstand sah für Spieler zuvor exakt wie "Fortschritt komplett weg" aus, obwohl die
+      // Daten die ganze Zeit unversehrt auf dem Server lagen (siehe v8.18.3-Hotfix). Immer in die
+      // Konsole loggen, damit ein echter Ladefehler beim nächsten Mal sofort auffindbar ist, und
+      // eine andere Meldung zeigen als beim tatsächlichen Neustart eines Kontos ohne Speicherstand.
+      console.error('Kepler-7: Fehler beim Laden des Spielstands - Daten bleiben serverseitig erhalten:', e);
+      document.getElementById('loadstate').textContent = 'Fehler beim Laden deines Spielstands - bitte Seite neu laden. Falls das wiederholt passiert, Bug/Vorschlag-Knopf nutzen (deine Daten sind serverseitig sicher).';
+    }
     if (!state.player.id){ state.player.id = uid(); }
     if (!state.player.name){ state.player.name = 'Kommandant-'+state.player.id.slice(0,4); }
     setTimeout(()=>{ document.getElementById('loadstate').textContent=''; }, 4000);
