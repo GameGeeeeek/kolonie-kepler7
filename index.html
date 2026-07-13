@@ -1640,8 +1640,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.21.4';
+  const VERSION = '8.21.5';
   const PATCHNOTES = [
+    { version:'8.21.5', date:'13.07.2026', changes:[
+      'Online-Anzeige (grüner/grauer Punkt) gab es bisher nur in der Bestenliste im Punktestand-Tab - jetzt auch im schmalen Status-Seitenpanel rechts ("Bestenliste"-Abschnitt), das den gleichen leaderboardCache nutzt'
+    ]},
     { version:'8.21.4', date:'13.07.2026', changes:[
       'Bug behoben (danke an holyhenning für den Report): Bei der Orbitalstations-Fokuswahl (und ebenso bei der Planeten-Rollen-Auswahl) konnte die letzte Karte je nach genauer Bildschirmbreite fast vollständig hinter dem rechten Rand verschwinden - inklusive ihres Bauen/Wählen-Buttons, ohne erkennbaren Hinweis zum Wegwischen. Karten sind jetzt breiten-proportional statt fest breit, dadurch schneidet die nächste Karte auf jedem Bildschirm zuverlässig sichtbar an'
     ]},
@@ -8852,6 +8855,12 @@
           allianceTag: state.player.allianceTag || '',
           avatarKey: state.player.avatarKey || null,
           score: computeScore(),
+          // Online-Anzeige in der Bestenliste: kein echter Verbindungsstatus (das Spiel hat keine
+          // Websockets, nur Polling), sondern ein Zeitstempel, der bei jedem regulären Speichern
+          // mitgeschickt wird. save() läuft u.a. per setInterval alle 10s IMMER, solange der Tab
+          // offen ist (auch inaktiv) - ein "frischer" Zeitstempel ist also ein guter Näherungswert
+          // für "gerade online". Siehe ONLINE_THRESHOLD_MS bei renderLeaderboardList().
+          lastSeen: Date.now(),
           weekKey: (state.weeklyLeague||{}).weekKey || null,
           weekScore: myWeekScore(),
           pirateLairStage: state.pirateLairStage||1,
@@ -11376,7 +11385,9 @@
     }
     box.innerHTML = leaderboardCache.slice(0,5).map((e,i) => {
       const isMe = e.name === state.player.name && e.bp === state.battlePoints;
-      return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span><span class="fp-lb-name">${e.name||'Unbekannt'}${e.allianceTag?' <span style="color:#7d8199;">['+e.allianceTag+']</span>':''}</span><span>${e.score||0}</span></div>`;
+      const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
+      const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 3px rgba(93,202,165,0.7)':'none'};"></span>`;
+      return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name">${e.name||'Unbekannt'}${e.allianceTag?' <span style="color:#7d8199;">['+e.allianceTag+']</span>':''}</span><span>${e.score||0}</span></div>`;
     }).join('');
     box.querySelectorAll('[data-fp-profile]').forEach(row => row.addEventListener('click', () => {
       const id = row.getAttribute('data-fp-profile');
@@ -11522,6 +11533,10 @@
   // Rendert die Bestenliste aus dem bereits geladenen leaderboardCache, gefiltert nach lbSearchQuery
   // (Name oder Allianz-Tag) – arbeitet ohne erneuten Serverabruf, damit Tippen sofort reagiert. Sucht
   // nur innerhalb der bereits geladenen Top 30, nicht der gesamten Spielerbasis (Performance-Grund).
+  // "Online", solange der letzte gemeldete Zeitstempel nicht älter als das - großzügig bemessen,
+  // damit ein im Hintergrund gedrosselter Browser-Tab (manche Browser verlangsamen Timer inaktiver
+  // Tabs) nicht fälschlich als offline erscheint. Kein echter Verbindungsstatus, siehe doSave().
+  const ONLINE_THRESHOLD_MS = 90000;
   function renderLeaderboardList(){
     const box = document.getElementById('leaderboard');
     if (!box) return;
@@ -11541,10 +11556,13 @@
     box.innerHTML = top.map((e,i) => {
       const isMe = e.name === state.player.name && e.bp === state.battlePoints;
       const rank = leaderboardCache.indexOf(e)+1;
+      const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
+      const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 4px rgba(93,202,165,0.7)':'none'};"></span>`;
       return `
         <div class="rank-row ${isMe?'me':''}" data-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <span class="rank-num">${rank}</span>
+            ${onlineDot}
             <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+e.allianceTag+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+e.title+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
           </div>
           <div style="display:flex; gap:10px; color:#9296ac; flex-shrink:0; align-items:center;">
