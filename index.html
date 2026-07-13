@@ -1141,6 +1141,8 @@
         </div>
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sword" aria-hidden="true"></i>Kampfbilanz &amp; Tages-Historie</div>
         <div id="battleStatsBox" style="margin-bottom:1rem;"></div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sparkles" aria-hidden="true"></i>Aufstieg &amp; Meta-Baum</div>
+        <div id="ascensionBox" style="margin-bottom:1rem;"></div>
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-atom" aria-hidden="true"></i>Statistik-Dashboard</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Wirtschafts- und Kampfüberblick. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.</div>
         <div id="statsTilesBox" style="margin-bottom:1rem;"></div>
@@ -1449,8 +1451,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.5.1';
+  const VERSION = '8.6.0';
   const PATCHNOTES = [
+    { version:'8.6.0', date:'13.07.2026', changes:[
+      'Neu: Aufstiegs-System (Transzendenz) im Fortschritt-Tab - der große Reset über dem Prestige, verfügbar ab Prestige 3 + 50.000 Punkten',
+      'Der Aufstieg setzt ALLES zurück (auch Prestige-Stufen und -Boni) und wandelt den Fortschritt in Sternenessenz um (aus Punkten, Prestige und Kampfpunkten, mind. 5)',
+      'Permanenter Meta-Baum mit 5 Zweigen (je max. Stufe 10, Stufe n kostet n Essenz): +2% Produktion, -2% Bau-/Forschungs-/Flugzeit, +2% Angriffskraft, Startpaket nach jedem Reset, +2% Expeditions-Belohnung - diese Boni überleben JEDEN Reset',
+      'Jeder Aufstieg bringt 5000 Punkte und ein goldenes A-Abzeichen in Bestenliste und Spielerprofil',
+      'Bugfix: Nach einem Prestige-Reset konnte das Spiel wegen des fehlenden Fähigkeitenbaum-Felds einfrieren (latenter Fehler seit Einführung des Fähigkeitenbaums) - beide Resets legen jetzt alle Felder sauber an'
+    ]},
     { version:'8.5.1', date:'13.07.2026', changes:[
       'Feedback-Formular: Die gewählte Kategorie (Bug melden / Vorschlag einreichen) ist jetzt deutlich farblich hervorgehoben (gefüllter violetter Knopf)'
     ]},
@@ -3594,7 +3603,7 @@
     legion:   { effectLabel:'Ressourcen-Geschenke', friendly:'Lieferung alle 30 Min. (klein)', allied:'Lieferung alle 30 Min. (groß)' },
     schatten: { effectLabel:'Kredit-Geschenke', friendly:'+15 Kredite alle 30 Min.', allied:'+35 Kredite alle 30 Min.' }
   };
-  function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, state.factionRep[fid]||0)); }
+  function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, (state.factionRep||{})[fid]||0)); }
   function repTierOf(rep){
     if (rep <= -30) return { key:'feindlich', label:'Feindlich', color:'#e24b4a' };
     if (rep >= 70) return { key:'verbuendet', label:'Verbündet', color:'#5dcaa5' };
@@ -3829,7 +3838,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -4336,6 +4345,7 @@
     if (hasArtifactBonus()) globalBonus += 0.05;
     // Friedensdividende: +5% Produktion je aktivem Nichtangriffspakt, gedeckelt bei +10% (2 Pakte).
     globalBonus += Math.min(2, activePactCount())*0.05;
+    globalBonus += ascBonus('prod')*0.02;
     if (globalBonus > 0) for (const k of Object.keys(rates)) rates[k] *= (1 + globalBonus);
     return rates;
   }
@@ -4417,6 +4427,7 @@
     mult *= fleetSpeedMultiplier(f, relevantKeys);
     if (state.allianceResearch && state.allianceResearch.a_speed) mult *= 0.90;
     mult *= Math.max(0.5, 1 - prestigePerkCount('speed')*0.03);
+    mult *= Math.max(0.5, 1 - ascBonus('speed')*0.02);
     mult *= Math.max(0.5, 1 - skillBonusPct('log'));
     return sec * mult;
   }
@@ -4648,6 +4659,7 @@
     const doc = activeDoctrine();
     if (doc) power *= doc.atkMult;
     power *= (1 + prestigePerkCount('combat')*0.03);
+    power *= (1 + ascBonus('combat')*0.02);
     power *= (1 + skillBonusPct('war'));
     power *= megaProjectCombatMult() * (hasArtifactBonus()?1.05:1);
     // Piraten-Ketten-Prestige: +2% Angriffskraft je abgeschlossenem Durchlauf (Deckel +10%).
@@ -4724,6 +4736,7 @@
     const doc = activeDoctrine();
     if (doc) power *= doc.defMult;
     power *= (1 + prestigePerkCount('combat')*0.03);
+    power *= (1 + ascBonus('combat')*0.02);
     power *= (1 + skillBonusPct('war'));
     power *= megaProjectCombatMult() * (hasArtifactBonus()?1.05:1);
     power *= currentStance().defMult;
@@ -4745,6 +4758,7 @@
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
     power *= (1 + prestigePerkCount('combat')*0.03);
+    power *= (1 + ascBonus('combat')*0.02);
     power *= (1 + skillBonusPct('war'));
     return Math.round(power);
   }
@@ -5185,7 +5199,7 @@
   }
   function computeScore(){
     const buildLvl = allBuildingSets().reduce((sum,b) => sum + Object.values(b).reduce((a,v)=>a+v,0), 0);
-    return Math.floor(buildLvl*10 + computeShipScoreTotal() + computeResearchScoreTotal() + computeExpansionScoreTotal() + state.battlePoints*3 + (state.prestige||0)*500);
+    return Math.floor(buildLvl*10 + computeShipScoreTotal() + computeResearchScoreTotal() + computeExpansionScoreTotal() + state.battlePoints*3 + (state.prestige||0)*500 + ((state.ascension&&state.ascension.count)||0)*5000);
   }
   // Bricht den Punktestand in seine Bestandteile herunter, damit man sieht, WORAUS er sich
   // zusammensetzt (für den Punktestand-Tab).
@@ -5203,7 +5217,8 @@
       { label:'Forschungsstufen (gesamt '+researchLevelSum+')', points:Math.floor(researchLevelSum*8), icon:'ti-flask', detail:researchLevelSum+' Stufen × 8 Punkte = '+(researchLevelSum*8) },
       { label:'Kolonien & Monde ('+colonyCount+' Kolonien, '+moonCount+' Monde)', points:Math.floor(computeExpansionScoreTotal()), icon:'ti-planet', detail:colonyCount+' × 200 + '+moonCount+' × 150 = '+computeExpansionScoreTotal() },
       { label:'Kampfpunkte ('+state.battlePoints+')', points:Math.floor(state.battlePoints*3), icon:'ti-sword', detail:state.battlePoints+' × 3 Punkte = '+(state.battlePoints*3) },
-      { label:'Prestige ('+(state.prestige||0)+')', points:Math.floor((state.prestige||0)*500), icon:'ti-medal', detail:(state.prestige||0)+' × 500 Punkte = '+((state.prestige||0)*500) }
+      { label:'Prestige ('+(state.prestige||0)+')', points:Math.floor((state.prestige||0)*500), icon:'ti-medal', detail:(state.prestige||0)+' × 500 Punkte = '+((state.prestige||0)*500) },
+      { label:'Aufstieg ('+((state.ascension&&state.ascension.count)||0)+')', points:((state.ascension&&state.ascension.count)||0)*5000, icon:'ti-sparkles', detail:((state.ascension&&state.ascension.count)||0)+' × 5000 Punkte = '+(((state.ascension&&state.ascension.count)||0)*5000) }
     ];
   }
   // Kurzes Verlaufsprotokoll für Punktänderungen (grün = Zugewinn, rot = Verlust), jeweils mit
@@ -5249,7 +5264,7 @@
     log: { name:'Logistik', icon:'ti-rocket', color:'#85b7eb' }
   };
   function skillBonusPct(branch){
-    return SKILL_TREE.filter(n => n.branch===branch && state.skillTree[n.key]).reduce((a,n)=>a+n.bonus,0);
+    return SKILL_TREE.filter(n => n.branch===branch && (state.skillTree||{})[n.key]).reduce((a,n)=>a+n.bonus,0);
   }
   function skillPointsSpent(){ return SKILL_TREE.filter(n=>state.skillTree[n.key]).reduce((a,n)=>a+n.cost,0); }
   function skillPointsAvailable(){ return Math.max(0, commanderLevel(state.xp||0) - skillPointsSpent()); }
@@ -5444,11 +5459,76 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
+      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
     };
     const perkDef = perkKey ? PRESTIGE_PERKS.find(p=>p.key===perkKey) : null;
     log('Prestige-Stufe '+newPrestige+' erreicht! +'+(newPrestige*5)+'% dauerhafter Produktionsbonus.'+(perkDef?' Zusätzlich gewählt: '+perkDef.name+'.':''), 'ti-infinity');
+    checkAchievements();
+    render(); save();
+  }
+  // ===== Aufstieg (Transzendenz): zweites Prestige oberhalb des normalen Prestiges =====
+  // Härterer Reset: setzt ALLES zurück, auch Prestige-Zähler und Prestige-Perks. Dafür gibt es
+  // Sternenessenz (aus Punktzahl, Prestige-Stufen und Kampfpunkten), die einzige Währung, die
+  // jeden Reset überlebt. Sie fließt in den permanenten Meta-Baum (Fortschritt-Tab).
+  const ASCENSION_MIN_PRESTIGE = 3;
+  const ASCENSION_MIN_SCORE = 50000;
+  const ASCENSION_TREE_DEFS = [
+    { key:'prod', name:'Ewige Industrie', icon:'ti-building-factory-2', desc:'+2% Produktion je Stufe (dauerhaft, additiv zu den globalen Boni)' },
+    { key:'speed', name:'Zeitdilatation', icon:'ti-clock', desc:'-2% Bau-, Forschungs- und Flugzeit je Stufe (dauerhaft)' },
+    { key:'combat', name:'Kriegsgedächtnis', icon:'ti-sword', desc:'+2% Angriffskraft je Stufe (dauerhaft)' },
+    { key:'start', name:'Sternensaat', icon:'ti-rocket', desc:'Startpaket nach jedem Reset: je Stufe +400 Erz & Kristalle, +300 Energie, +150 Deuterium, +100 Kredite' },
+    { key:'expedition', name:'Pfadfinder-Instinkt', icon:'ti-map-2', desc:'+2% Expeditions-Belohnungen je Stufe (dauerhaft)' }
+  ];
+  const ASCENSION_NODE_MAX = 10;
+  function ascBonus(key){ return (state.ascension && state.ascension.tree && state.ascension.tree[key]) || 0; }
+  function canAscend(){ return (state.prestige||0) >= ASCENSION_MIN_PRESTIGE && computeScore() >= ASCENSION_MIN_SCORE; }
+  function essenceGainNow(){ return Math.max(5, Math.floor(computeScore()/5000) + (state.prestige||0)*3 + Math.floor((state.battlePoints||0)/200)); }
+  function buyAscensionNode(key){
+    const asc = state.ascension;
+    if (!asc || !ASCENSION_TREE_DEFS.some(d=>d.key===key)) return;
+    const lvl = asc.tree[key]||0;
+    if (lvl >= ASCENSION_NODE_MAX){ log('Dieser Zweig ist bereits auf Maximalstufe.', 'ti-alert-triangle'); return; }
+    const cost = lvl + 1;
+    if ((asc.essence||0) < cost){ log('Nicht genug Sternenessenz: Stufe '+(lvl+1)+' kostet '+cost+' Essenz.', 'ti-alert-triangle'); return; }
+    asc.essence -= cost;
+    asc.tree[key] = lvl + 1;
+    const def = ASCENSION_TREE_DEFS.find(d=>d.key===key);
+    log(def.name+' auf Stufe '+asc.tree[key]+' verbessert ('+cost+' Essenz).', 'ti-sparkles');
+    playSound('research');
+    render(); save();
+  }
+  function doAscension(){
+    if (!canAscend()){ log('Aufstieg erst ab Prestige '+ASCENSION_MIN_PRESTIGE+' und '+fmt(ASCENSION_MIN_SCORE)+' Punkten möglich.', 'ti-alert-triangle'); return; }
+    const gain = essenceGainNow();
+    if (!confirm('AUFSTIEG: Dies setzt ALLES zurück - auch Prestige-Stufen und Prestige-Boni! Du erhältst dafür '+gain+' Sternenessenz für den permanenten Meta-Baum. Fortfahren?')) return;
+    if (!confirm('Wirklich sicher? Der Aufstieg ist endgültig. ('+gain+' Sternenessenz warten.)')) return;
+    const keepId = state.player.id, keepName = state.player.name, keepTag = state.player.allianceTag, keepAvatar = state.player.avatarKey;
+    const keepXp = state.xp, keepAch = state.achievements, keepRare = state.rareItems, keepUnlocked = state.unlocked, keepClaimed = state.levelRewardsClaimed, keepInventory = state.inventory, keepAllianceRes = state.allianceResearch, keepAllianceContrib = state.allianceContributed;
+    const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
+    const keepBossClaims = state.claimedBossKills || [];
+    const asc = state.ascension || { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0} };
+    asc.count = (asc.count||0) + 1;
+    asc.essence = (asc.essence||0) + gain;
+    const startLvl = (asc.tree && asc.tree.start) || 0;
+    state = {
+      resources:{energie:10 + startLvl*300, erz:10 + startLvl*400, kristalle:startLvl*400, deuterium:startLvl*150, antimaterie:0, forschungspunkte:0},
+      buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0},
+      research:{}, activeResearch:null,
+      fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
+      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, battlePoints:0, npcKills:0, bossKills:0,
+      xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
+      rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
+      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
+      prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
+      credits: startLvl*100,
+      claimedBossKills: keepBossClaims,
+      ascension: asc,
+      player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
+    };
+    log('AUFSTIEG '+asc.count+' vollzogen! +'+gain+' Sternenessenz (gesamt: '+asc.essence+'). Verteile sie im Meta-Baum (Fortschritt-Tab) - diese Boni überleben jeden Reset.', 'ti-sparkles');
+    playSound('achieve');
     checkAchievements();
     render(); save();
   }
@@ -6002,7 +6082,7 @@
     document.getElementById('profileModalStats').innerHTML = `
       <div class="card-row"><div class="left"><i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i><span class="bname">Punktzahl</span></div><span class="lvl-pill">${entry.score||0}${cmp(myStats.score, entry.score)}</span></div>
       <div class="card-row"><div class="left"><i class="ti ti-sword" aria-hidden="true" style="color:#f0997b;"></i><span class="bname">Kampfpunkte</span></div><span class="lvl-pill">${entry.bp||0}${cmp(myStats.bp, entry.bp)}</span></div>
-      <div class="card-row"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i><span class="bname">Level</span></div><span class="lvl-pill">${entry.level||'?'}${entry.prestige?' · P'+entry.prestige:''}</span></div>
+      <div class="card-row"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i><span class="bname">Level</span></div><span class="lvl-pill">${entry.level||'?'}${entry.prestige?' · P'+entry.prestige:''}${entry.ascensionCount?' · A'+entry.ascensionCount:''}</span></div>
       <div class="card-row"><div class="left"><i class="ti ti-rocket" aria-hidden="true" style="color:#85b7eb;"></i><span class="bname">Flotte</span></div><span class="lvl-pill">${entry.ships||0} Schiffe · ${entry.cruisers||0} Kreuzer · ${entry.destroyers||0} Zerstörer</span></div>
       ${entry.defensePower!==undefined ? `<div class="card-row"><div class="left"><i class="ti ti-shield-lock" aria-hidden="true" style="color:#378add;"></i><span class="bname">Verteidigungspunkte</span></div><span class="lvl-pill">${fmt(entry.defensePower)}${cmp(myStats.defensePower, entry.defensePower)}</span></div>` : ''}
       ${entry.buildLvl!==undefined ? `<div class="card-row"><div class="left"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i><span class="bname">Gebäude-Level</span></div><span class="lvl-pill">${fmt(entry.buildLvl)}${entry.colonyCount?' · '+entry.colonyCount+' Kolonien':''}${cmp(myStats.buildLvl, entry.buildLvl)}</span></div>` : ''}
@@ -6845,6 +6925,7 @@
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+4% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
       { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt.' },
+      { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: ab <strong>Prestige 3 und 50.000 Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit fünf Zweigen (je max. Stufe 10, Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset) und Pfadfinder-Instinkt (+2% Expeditions-Belohnung). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste.' },
       { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
@@ -7953,6 +8034,7 @@
           weekKey: (state.weeklyLeague||{}).weekKey || null,
           weekScore: myWeekScore(),
           pirateLairStage: state.pirateLairStage||1,
+          ascensionCount: (state.ascension&&state.ascension.count)||0,
           ships: fuzz(allFleets().reduce((a,f)=>a+f.ships,0)),
           cruisers: fuzz(allFleets().reduce((a,f)=>a+f.cruisers,0)),
           destroyers: fuzz(allFleets().reduce((a,f)=>a+(f.destroyers||0),0)),
@@ -8088,6 +8170,8 @@
         if (!state.dailyHistory) state.dailyHistory = [];
         if (!state.notifiedPactOffers) state.notifiedPactOffers = [];
         if (!state.claimedBossKills) state.claimedBossKills = [];
+        if (!state.ascension) state.ascension = { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0 } };
+        if (!state.ascension.tree) state.ascension.tree = { prod:0, speed:0, combat:0, start:0, expedition:0 };
         if (state.warVictories === undefined) state.warVictories = 0;
         if (!state.scoreHistory) state.scoreHistory = [];
         if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
@@ -9236,7 +9320,7 @@
           // Rückwärtskompatibel: ältere, bereits unterwegs befindliche Expeditionen ohne gespeicherten
           // Typ nutzen die bisherigen Standard-Werte (0.35 Begegnungschance, normale Beute).
           const encounterChance = m.encounterChance!==undefined ? m.encounterChance : 0.35;
-          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult();
+          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02);
           const encountered = Math.random() < encounterChance;
           let outcome = 'success';
           if (encountered){
@@ -10532,7 +10616,7 @@
         <div class="rank-row ${isMe?'me':''}" data-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <span class="rank-num">${rank}</span>
-            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+e.allianceTag+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:9px;"><i class="ti ti-award" aria-hidden="true"></i> '+e.title+'</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:9px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+e.allianceTag+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:9px;"><i class="ti ti-award" aria-hidden="true"></i> '+e.title+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:9px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:9px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
           </div>
           <div style="display:flex; gap:10px; color:#9296ac; flex-shrink:0; align-items:center;">
             <span><i class="ti ti-rocket" aria-hidden="true"></i> ${e.ships||0}</span>
@@ -12289,6 +12373,35 @@
           <span style="font-size:15px; font-weight:600; color:${b.points>0?'#5dcaa5':'#7d8199'};">${b.points>0?'+':''}${fmt(b.points)}</span>
         </div>
       `).join('');
+    }
+    const ascensionBox = document.getElementById('ascensionBox');
+    if (ascensionBox){
+      const asc = state.ascension || { count:0, essence:0, tree:{} };
+      const ready = canAscend();
+      const treeRows = ASCENSION_TREE_DEFS.map(d => {
+        const lvl = (asc.tree && asc.tree[d.key]) || 0;
+        const cost = lvl + 1;
+        const maxed = lvl >= ASCENSION_NODE_MAX;
+        const canBuy = !maxed && (asc.essence||0) >= cost;
+        return `<div class="card-row">
+          <div class="left"><i class="ti ${d.icon}" aria-hidden="true" style="color:#fac775;"></i><div><div class="bname">${d.name} <span class="lvl-pill">Stufe ${lvl}/${ASCENSION_NODE_MAX}</span></div><div class="bmeta">${d.desc}</div></div></div>
+          ${maxed ? '<span class="lvl-pill" style="color:#5dcaa5; border-color:#5dcaa5;">MAX</span>' : `<button class="buy ${canBuy?'affordable':''}" data-asc-buy="${d.key}" ${canBuy?'':'disabled'}>+1 (${cost} <i class="ti ti-sparkles" aria-hidden="true" style="font-size:10px;"></i>)</button>`}
+        </div>`;
+      }).join('');
+      ascensionBox.innerHTML = `
+        <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:9px; border-color:#fac775;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+            <span class="bname"><i class="ti ti-sparkles" aria-hidden="true" style="color:#fac775;"></i> Aufstiege: ${asc.count||0} · Sternenessenz: ${asc.essence||0}</span>
+            ${asc.count||asc.essence ? '' : '<span class="bmeta">Noch nie aufgestiegen</span>'}
+          </div>
+          <div class="bmeta" style="margin:6px 0;">Der Aufstieg ist der große Reset über dem Prestige: ALLES wird zurückgesetzt - auch Prestige-Stufen und Prestige-Boni. Dafür gibt es <strong>Sternenessenz</strong> für den permanenten Meta-Baum unten, dessen Boni <strong>jeden Reset überleben</strong>. Voraussetzung: Prestige ${ASCENSION_MIN_PRESTIGE} + ${fmt(ASCENSION_MIN_SCORE)} Punkte.</div>
+          <div class="bmeta" style="margin-bottom:8px;">${ready ? 'Bereit! Aktueller Ertrag: <strong style="color:#fac775;">'+essenceGainNow()+' Sternenessenz</strong> (aus Punkten, Prestige und Kampfpunkten).' : 'Noch nicht bereit: Prestige '+(state.prestige||0)+'/'+ASCENSION_MIN_PRESTIGE+' · Punkte '+fmt(computeScore())+'/'+fmt(ASCENSION_MIN_SCORE)+'.'}</div>
+          <button id="doAscensionBtn" class="${ready?'affordable':''}" ${ready?'':'disabled'}><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Aufsteigen${ready?' (+'+essenceGainNow()+' Essenz)':''}</button>
+        </div>
+        ${treeRows}`;
+      const ascBtn = document.getElementById('doAscensionBtn');
+      if (ascBtn) ascBtn.onclick = doAscension;
+      ascensionBox.querySelectorAll('[data-asc-buy]').forEach(b => b.onclick = () => buyAscensionNode(b.getAttribute('data-asc-buy')));
     }
     const battleStatsBox = document.getElementById('battleStatsBox');
     if (battleStatsBox){
