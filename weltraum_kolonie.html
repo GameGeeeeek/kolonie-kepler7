@@ -1116,6 +1116,8 @@
         <div class="map-wrap" style="height:140px; margin-bottom:1rem;" id="scoreChartWrap">
           <svg id="scoreHistorySvg" viewBox="0 0 700 140" width="100%" height="100%"></svg>
         </div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sword" aria-hidden="true"></i>Kampfbilanz &amp; Tages-Historie</div>
+        <div id="battleStatsBox" style="margin-bottom:1rem;"></div>
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-atom" aria-hidden="true"></i>Statistik-Dashboard</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Wirtschafts- und Kampfüberblick. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.</div>
         <div id="statsTilesBox" style="margin-bottom:1rem;"></div>
@@ -1424,8 +1426,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.0.0';
+  const VERSION = '8.1.0';
   const PATCHNOTES = [
+    { version:'8.1.0', date:'13.07.2026', changes:[
+      'Neu: Tagesbilanz - beim ersten Login eines neuen Tages fasst das Spiel den Vortag zusammen (Punktezuwachs, Siege/Niederlagen, Kredite, aktuelle Wochenpunkte) als Log-Eintrag und Toast',
+      'Neu: Kampfbilanz im Fortschritt-Tab - Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm der letzten 14 Tage (grün Siege, rot Niederlagen, antippen für Details)',
+      'Neu: Eingehende Pakt-Angebote melden sich jetzt automatisch (Toast, Sound und bei aktivierten Browser-Benachrichtigungen im Hintergrund als Systembenachrichtigung) - kein Angebot verpasst mehr sein 48h-Fenster unbemerkt'
+    ]},
     { version:'8.0.0', date:'13.07.2026', changes:[
       'Diplomatie-Ausbau: Friedensdividende - jeder aktive Nichtangriffspakt bringt +5% Produktion (gedeckelt bei +10%, additiv zu den globalen Boni). Wer Frieden hält, wirtschaftet besser',
       'Pakt-Einträge im Diplomatie-Bereich zeigen jetzt, auf welcher Piraten-Versteck-Stufe der Partner gerade jagt',
@@ -3769,7 +3776,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -6692,7 +6699,8 @@
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+4% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
-      { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' }
+      { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
+      { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau.' },
@@ -7929,6 +7937,9 @@
         if (state.pirateLairPrestige === undefined) state.pirateLairPrestige = 0;
         if (!state.weeklyLeague) state.weeklyLeague = { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] };
         if (!state.veteranXp) state.veteranXp = {};
+        if (state.dayStats === undefined) state.dayStats = null;
+        if (!state.dailyHistory) state.dailyHistory = [];
+        if (!state.notifiedPactOffers) state.notifiedPactOffers = [];
         if (state.warVictories === undefined) state.warVictories = 0;
         if (!state.scoreHistory) state.scoreHistory = [];
         if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
@@ -8327,6 +8338,36 @@
     wl.boardSnapshot = [];
     save();
   }
+  // ===== Tagesbilanz =====
+  // Beim ersten Tick eines neuen Kalendertags wird der Vortag bilanziert (Punktezuwachs, Kämpfe,
+  // Kredite) und als Eintrag in die Tages-Historie geschrieben (max. 14 Tage, füttert die
+  // Kampf-Statistik im Fortschritt-Tab). Zusätzlich gibt es die Bilanz als Toast + Log beim Login.
+  function dayKeyOf(ts){ const d = new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function processDailySummary(){
+    const today = dayKeyOf(Date.now());
+    const ds = state.dayStats;
+    if (ds && ds.day === today) return;
+    if (ds && ds.day){
+      const scoreGain = Math.max(0, Math.round(computeScore() - (ds.scoreStart||0)));
+      const wins = Math.max(0, ((state.battleStats||{}).wins||0) - (ds.winsStart||0));
+      const losses = Math.max(0, ((state.battleStats||{}).losses||0) - (ds.lossesStart||0));
+      const creditsGain = Math.round((state.credits||0) - (ds.creditsStart||0));
+      if (!state.dailyHistory) state.dailyHistory = [];
+      state.dailyHistory.push({ day: ds.day, scoreGain, wins, losses, creditsGain });
+      while (state.dailyHistory.length > 14) state.dailyHistory.shift();
+      // Bilanz nur zeigen, wenn am Vortag überhaupt etwas passiert ist
+      if (scoreGain > 0 || wins > 0 || losses > 0 || creditsGain !== 0){
+        const parts = ['+'+fmt(scoreGain)+' Punkte'];
+        if (wins || losses) parts.push(wins+' Siege / '+losses+' Niederlagen');
+        if (creditsGain !== 0) parts.push((creditsGain>0?'+':'')+fmt(creditsGain)+' Kredite');
+        parts.push('Wochenpunkte aktuell: '+fmt(myWeekScore()));
+        log('Tagesbilanz '+ds.day+': '+parts.join(' · '), 'ti-star');
+        pushToast('Tagesbilanz: '+parts[0]+(wins||losses?' · '+wins+'S/'+losses+'N':''), 'ti-star');
+      }
+    }
+    state.dayStats = { day: today, scoreStart: computeScore(), winsStart: (state.battleStats||{}).wins||0, lossesStart: (state.battleStats||{}).losses||0, creditsStart: state.credits||0 };
+    save();
+  }
   // Setzt innerHTML einer Box, ohne die horizontale Scroll-Position von markierten Scroll-Leisten
   // (data-hscroll) zu verlieren. Ohne diesen Erhalt springt jede per Tick neu gerenderte
   // Wisch-Leiste (Planeten-Rollen, Orbital-Fokus, Expeditionstyp, Modul-Standorte) jede Sekunde
@@ -8413,6 +8454,18 @@
         try { const r = await storageGet(k, true); return (r && r.value) ? { key: k, data: JSON.parse(r.value) } : null; } catch(e){ return null; }
       }));
       diploCache = loaded.filter(Boolean);
+      // Neue eingehende Pakt-Angebote melden (Toast + ggf. Browser-Benachrichtigung via log-Mechanik)
+      if (!state.notifiedPactOffers) state.notifiedPactOffers = [];
+      for (const e of diploCache){
+        if (!pactIsOpenOffer(e.data) || e.data.offeredBy === state.player.id) continue;
+        const marker = e.key+':'+(e.data.offeredAt||0);
+        if (state.notifiedPactOffers.includes(marker)) continue;
+        state.notifiedPactOffers.push(marker);
+        while (state.notifiedPactOffers.length > 20) state.notifiedPactOffers.shift();
+        log('Neues Pakt-Angebot von '+pactOtherName(e.data)+' - im Diplomatie-Bereich (Galaxie-Tab) annehmen oder ablehnen.', 'ti-shield');
+        pushToast('Pakt-Angebot von '+pactOtherName(e.data)+' erhalten!', 'ti-shield');
+        playSound('achieve');
+      }
       renderDiplomacy();
     } catch(e){ /* geteilter Speicher optional */ }
   }
@@ -11897,6 +11950,33 @@
         </div>
       `).join('');
     }
+    const battleStatsBox = document.getElementById('battleStatsBox');
+    if (battleStatsBox){
+      const bs = state.battleStats || { wins:0, losses:0 };
+      const total = bs.wins + bs.losses;
+      const winRate = total > 0 ? Math.round(bs.wins/total*100) : 0;
+      const hist = (state.dailyHistory||[]).slice(-14);
+      const maxFights = Math.max(1, ...hist.map(h => h.wins + h.losses));
+      const bars = hist.map(h => {
+        const hW = Math.round((h.wins/maxFights)*46);
+        const hL = Math.round((h.losses/maxFights)*46);
+        return `<div style="display:flex; flex-direction:column; align-items:center; gap:2px; flex:1; min-width:14px;" title="${h.day}: ${h.wins} Siege, ${h.losses} Niederlagen, +${fmt(h.scoreGain)} Punkte">
+          <div style="display:flex; align-items:flex-end; gap:1px; height:48px;">
+            <div style="width:5px; height:${Math.max(h.wins?3:0,hW)}px; background:#5dcaa5; border-radius:2px 2px 0 0;"></div>
+            <div style="width:5px; height:${Math.max(h.losses?3:0,hL)}px; background:#e24b4a; border-radius:2px 2px 0 0;"></div>
+          </div>
+          <div style="font-size:8px; color:#7d8199;">${h.day.slice(8)}</div>
+        </div>`;
+      }).join('');
+      battleStatsBox.innerHTML = `
+        <div class="card-row" style="flex-direction:column; align-items:stretch;">
+          <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            <span class="bname"><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> ${fmt(bs.wins)} Siege · <span style="color:#e24b4a;">${fmt(bs.losses)} Niederlagen</span></span>
+            <span class="lvl-pill">Siegquote ${winRate}%</span>
+          </div>
+          ${hist.length ? `<div class="bmeta" style="margin-bottom:4px;">Kämpfe der letzten ${hist.length} Tage (grün Siege, rot Niederlagen - Balken antippen für Details):</div><div style="display:flex; gap:3px; align-items:flex-end;">${bars}</div>` : '<div class="bmeta">Die Tages-Historie füllt sich ab morgen: jeden Tag wird automatisch bilanziert, was du erreicht hast (Punkte, Kämpfe, Kredite).</div>'}
+        </div>`;
+    }
     const scoreHistorySvg = document.getElementById('scoreHistorySvg');
     if (scoreHistorySvg){
       const hist = state.scoreHistory||[];
@@ -12808,6 +12888,7 @@
     processFactionGifts();
     maybeSpawnPlanetEvent();
     processWeeklyLeague();
+    processDailySummary();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
