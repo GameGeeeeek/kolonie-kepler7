@@ -539,6 +539,7 @@
         <button id="profileMsgBtn" style="flex:1;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Nachricht</button>
       </div>
       <button id="profilePactBtn" style="width:100%; margin-top:8px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten</button>
+      <button id="profileAllianceInviteBtn" style="width:100%; margin-top:8px; display:none;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Zur Allianz einladen</button>
     </div>
   </div>
 
@@ -1423,8 +1424,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.99.0';
+  const VERSION = '8.0.0';
   const PATCHNOTES = [
+    { version:'8.0.0', date:'13.07.2026', changes:[
+      'Diplomatie-Ausbau: Friedensdividende - jeder aktive Nichtangriffspakt bringt +5% Produktion (gedeckelt bei +10%, additiv zu den globalen Boni). Wer Frieden hält, wirtschaftet besser',
+      'Pakt-Einträge im Diplomatie-Bereich zeigen jetzt, auf welcher Piraten-Versteck-Stufe der Partner gerade jagt',
+      'Neu im Spielerprofil: "Zur Allianz einladen" - schickt dem Spieler eine Einladungs-Nachricht mit deinem Allianz-Tag (nur mit eigenem Server, nur sichtbar wenn er nicht schon bei euch ist)',
+      'Pakte werden jetzt schon beim Spielstart geladen, damit die Friedensdividende sofort wirkt (vorher erst beim Öffnen des Galaxie-Tabs)'
+    ]},
     { version:'7.99.0', date:'13.07.2026', changes:[
       'Neu: Spieler-Diplomatie - über das Profil eines Spielers (Bestenliste) lässt sich ein Nichtangriffspakt anbieten (Angebot 48h gültig)',
       'Ein angenommener Pakt blockiert gegenseitige Angriffe und Spionage für 7 Tage - Pakt-Partner tragen ein Pakt-Abzeichen in der Bestenliste',
@@ -4267,6 +4274,8 @@
     globalBonus += (conqueredSystemsProdMult() - 1);
     globalBonus += (megaProjectProdMult() - 1);
     if (hasArtifactBonus()) globalBonus += 0.05;
+    // Friedensdividende: +5% Produktion je aktivem Nichtangriffspakt, gedeckelt bei +10% (2 Pakte).
+    globalBonus += Math.min(2, activePactCount())*0.05;
     if (globalBonus > 0) for (const k of Object.keys(rates)) rates[k] *= (1 + globalBonus);
     return rates;
   }
@@ -5925,6 +5934,20 @@
     attackBtn.onclick = () => { closePlayerProfile(); attackPlayer(entry.id, entry.name); };
     msgBtn.onclick = () => { closePlayerProfile(); sendMessage(entry.id, entry.name); };
     if (spyBtn) spyBtn.onclick = () => { closePlayerProfile(); sendSpyMission(entry.id, entry.name); };
+    const inviteBtn = document.getElementById('profileAllianceInviteBtn');
+    if (inviteBtn){
+      const myTag = myAllianceTag();
+      const showInvite = !isMe && useBackend() && myTag && (entry.allianceTag||'') !== myTag;
+      inviteBtn.style.display = showInvite ? 'block' : 'none';
+      if (showInvite) inviteBtn.onclick = async () => {
+        closePlayerProfile();
+        try {
+          const res = await backendFetch('/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ toUserId: entry.id, text: 'Einladung: Tritt unserer Allianz ['+myTag+'] bei! Trage dazu im Allianz-Tab einfach den Tag "'+myTag+'" ein.' }) });
+          if (res.ok) log('Allianz-Einladung an '+entry.name+' gesendet.', 'ti-mail');
+          else log('Einladung konnte nicht gesendet werden.', 'ti-alert-triangle');
+        } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
+      };
+    }
     const pactBtn = document.getElementById('profilePactBtn');
     if (pactBtn){
       const existingPact = activePactWith(entry.id);
@@ -5989,6 +6012,8 @@
     renderTutorialStep();
   });
   document.getElementById('tutorialSkipBtn').addEventListener('click', closeTutorial);
+  // Pakte einmal beim Start laden, damit die Friedensdividende sofort in die Produktion einfließt
+  setTimeout(() => { try { loadDiplomacy(); } catch(e){} }, 2500);
   const showTutorialBtn = document.getElementById('showTutorialBtn');
   if (showTutorialBtn) showTutorialBtn.addEventListener('click', showTutorial);
   // Klassifiziert einen Bericht als Sieg/Niederlage für die Kampf-Statistik (nur echte Kämpfe,
@@ -6745,7 +6770,7 @@
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
-      { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab.' },
+      { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (gedeckelt bei +10%, additiv zu den anderen globalen Boni). Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
       { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Beim ersten Login der neuen Woche wird die Vorwoche abgerechnet und die Belohnung gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 60 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 30 Min., <strong>Silber</strong> 400 + 15 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Wer den Wochenwechsel verpasst, wird anhand des letzten bekannten Stands eingestuft. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
@@ -7772,6 +7797,7 @@
           score: computeScore(),
           weekKey: (state.weeklyLeague||{}).weekKey || null,
           weekScore: myWeekScore(),
+          pirateLairStage: state.pirateLairStage||1,
           ships: fuzz(allFleets().reduce((a,f)=>a+f.ships,0)),
           cruisers: fuzz(allFleets().reduce((a,f)=>a+f.cruisers,0)),
           destroyers: fuzz(allFleets().reduce((a,f)=>a+(f.destroyers||0),0)),
@@ -8377,6 +8403,7 @@
   }
   function pactOtherId(p){ return p.a === state.player.id ? p.b : p.a; }
   function pactOtherName(p){ return (p.names && p.names[pactOtherId(p)]) || 'Unbekannt'; }
+  function activePactCount(){ return diploCache.filter(e => pactIsActive(e.data)).length; }
   async function loadDiplomacy(){
     if (!state.player.id) return;
     try {
@@ -8443,11 +8470,17 @@
     const incoming = diploCache.filter(e => pactIsOpenOffer(e.data) && e.data.offeredBy !== myId);
     const outgoing = diploCache.filter(e => pactIsOpenOffer(e.data) && e.data.offeredBy === myId);
     let html = '';
+    if (actives.length){
+      const divPct = Math.min(2, actives.length)*5;
+      html += `<div class="bmeta" style="margin-bottom:2px;"><i class="ti ti-sparkles" aria-hidden="true" style="color:#5dcaa5;"></i> Friedensdividende aktiv: <strong>+${divPct}% Produktion</strong> (+5% je Pakt, max. +10%)</div>`;
+    }
     for (const e of actives){
       const p = e.data;
       const remain = (p.cancelEffectiveAt || p.expiresAt) - Date.now();
       const cancelNote = p.cancelEffectiveAt ? ` <span style="color:#e0a548;">(gekündigt - endet in ${fmtDuration(Math.max(0,(p.cancelEffectiveAt-Date.now()))/1000)})</span>` : '';
-      html += `<div class="card-row"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#5dcaa5;"></i><div><div class="bname">Pakt mit ${pactOtherName(p)}${cancelNote}</div><div class="bmeta">Läuft noch ${fmtDuration(Math.max(0,remain)/1000)} · Angriffe & Spionage gegenseitig blockiert</div></div></div>${p.cancelEffectiveAt?'':`<button data-pact-cancel="${e.key}" style="font-size:10.5px; padding:5px 9px;">Kündigen</button>`}</div>`;
+      const partnerEntry = (leaderboardCache||[]).find(x => x.id === pactOtherId(p));
+      const partnerNote = partnerEntry && partnerEntry.pirateLairStage ? ` · Partner-Piratenjagd: Stufe ${partnerEntry.pirateLairStage}/10` : '';
+      html += `<div class="card-row"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#5dcaa5;"></i><div><div class="bname">Pakt mit ${pactOtherName(p)}${cancelNote}</div><div class="bmeta">Läuft noch ${fmtDuration(Math.max(0,remain)/1000)} · Angriffe & Spionage gegenseitig blockiert${partnerNote}</div></div></div>${p.cancelEffectiveAt?'':`<button data-pact-cancel="${e.key}" style="font-size:10.5px; padding:5px 9px;">Kündigen</button>`}</div>`;
     }
     for (const e of incoming){
       html += `<div class="card-row" style="border-color:#5dcaa5;"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#5dcaa5;"></i><div><div class="bname">Angebot von ${pactOtherName(e.data)}</div><div class="bmeta">Nichtangriffspakt, 7 Tage - gilt ab Annahme</div></div></div><div style="display:flex; gap:6px;"><button class="buy affordable" data-pact-accept="${e.key}" style="font-size:10.5px; padding:5px 9px;">Annehmen</button><button data-pact-decline="${e.key}" style="font-size:10.5px; padding:5px 9px;">Ablehnen</button></div></div>`;
