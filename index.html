@@ -1427,8 +1427,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.2.0';
+  const VERSION = '8.3.0';
   const PATCHNOTES = [
+    { version:'8.3.0', date:'13.07.2026', changes:[
+      'Überfall-Spionage überarbeitet: Das Spähschiff hat jetzt eine echte Flugzeit zur anfliegenden Flotte (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt)',
+      'Das Überfall-Banner zeigt einen Countdown, wann das Spähschiff die feindliche Flotte erreicht - und nach der Ankunft die exakte Kampfkraft der Angreifer statt der groben Stärke-Stufe',
+      'Die Späh-Karte zeigt den laufenden Spähflug mit Rest-Sekunden; schlägt die Flotte vor Ankunft ein, verfällt der Bericht (Hinweis im Log)'
+    ]},
     { version:'8.2.0', date:'13.07.2026', changes:[
       'Neu: Weltboss "Leviathan der Leere" (Galaxie-Tab) - ein gemeinsamer Boss für ALLE Spieler mit globalem HP-Pool (Start: Stufe 1, 50.000 HP)',
       'Jeder Angriff zieht deine Angriffskraft x0,8-1,2 als Schaden ab; keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe)',
@@ -4922,8 +4927,26 @@
       if (prio < bestPrio){ bestPrio = prio; scoutSourcePlanet = pk; f = fl; }
     }
     if (!f){ log('Du brauchst mindestens ein Spähschiff an irgendeinem deiner Standorte, um die anfliegende Flotte auszuspähen.', 'ti-alert-triangle'); return; }
-    if (!confirm('Spähschiff von '+planetDisplayName(scoutSourcePlanet)+' auf die anfliegende Flotte ansetzen? Das Schiff geht dabei garantiert verloren, liefert aber einen detaillierten Bericht inkl. Mondbildungs-Chance.')) return;
+    if (state.incomingRaid.scoutArrival && !state.incomingRaid.scouted){ log('Es ist bereits ein Spähschiff zur anfliegenden Flotte unterwegs.', 'ti-alert-triangle'); return; }
+    // Echte Flugzeit: das Spähschiff muss die anfliegende Flotte erst erreichen. Die Flugzeit ist
+    // durch die halbe Restzeit bis zum Einschlag gedeckelt, damit der Bericht immer VOR dem
+    // Überfall eintrifft (bei knapper Vorwarnzeit fliegt der Späher entsprechend riskanter/schneller).
+    const restSec = Math.max(1, (state.nextRaidTime - Date.now())/1000);
+    const scoutDur = Math.min(missionDurationFor(60, { spaeher: 1 }, ['spaeher']), Math.max(8, restSec*0.5));
+    if (!confirm('Spähschiff von '+planetDisplayName(scoutSourcePlanet)+' auf die anfliegende Flotte ansetzen? Flugzeit ~'+Math.round(scoutDur)+'s, der Bericht kommt bei Ankunft. Das Schiff geht dabei garantiert verloren.')) return;
     f.spaeher -= 1;
+    state.incomingRaid.scoutArrival = Date.now() + scoutDur*1000;
+    state.incomingRaid.scoutSource = scoutSourcePlanet;
+    log('Spähschiff von '+planetDisplayName(scoutSourcePlanet)+' gestartet - erreicht die anfliegende Flotte ('+state.incomingRaid.faction+') in ~'+Math.round(scoutDur)+'s.', 'ti-target');
+    playSound('build');
+    render(); save();
+  }
+  // Ankunft des Spähschiffs bei der anfliegenden Flotte: jetzt entsteht der detaillierte Bericht
+  // (echte Flottenzusammensetzung, Kampfkraft, Trümmerfeld-/Mondbildungs-Schätzung).
+  function resolveRaidScout(){
+    if (!state.incomingRaid || state.incomingRaid.scouted) return;
+    const targetPlanet = state.incomingRaid.planet;
+    const scoutSourcePlanet = state.incomingRaid.scoutSource || state.activeBasePlanet;
     const raiderFleet = state.incomingRaid.fleet;
     const raiderPower = state.incomingRaid.power;
     const defAtk = defenseAttackPower(targetPlanet);
@@ -4939,9 +4962,13 @@
     const willCrossThreshold = projectedTotal >= MOON_FORMATION_THRESHOLD;
     pushReport({ type:'raid-scout', faction:state.incomingRaid.faction, targetPlanet, fromPlanet:planetDisplayName(scoutSourcePlanet), fleet: raiderFleet, attackPower: Math.round(raiderPower), defenseAttackPower: defAtk, estDebris, projectedTotal, willCrossThreshold, moonThreshold: MOON_FORMATION_THRESHOLD, moonChancePerCheck: Math.round(MOON_FORMATION_CHANCE*1000)/10 });
     state.incomingRaid.scouted = true;
-    log('Spähschiff von '+planetDisplayName(scoutSourcePlanet)+' auf die anfliegende Flotte ('+state.incomingRaid.faction+') angesetzt – dabei verloren gegangen. Ausführlicher Bericht erstellt.', 'ti-target');
+    state.incomingRaid.scoutArrival = null;
+    log('Spähschiff hat die anfliegende Flotte ('+state.incomingRaid.faction+') erreicht - Kampfkraft '+fmt(Math.round(raiderPower))+' Angriffspunkte. Ausführlicher Bericht erstellt (Schiff dabei verloren gegangen).', 'ti-target');
     playSound('research');
     render(); save();
+  }
+  function processRaidScout(){
+    if (state.incomingRaid && state.incomingRaid.scoutArrival && !state.incomingRaid.scouted && Date.now() >= state.incomingRaid.scoutArrival) resolveRaidScout();
   }
   // Jede Scanner-Stufe gewährt zusätzliche Vorwarnzeit, innerhalb derer der Überfall erkannt wird.
   function raidDetectionLead(){ return (state.research.rscanner||0) * 90 + ((state.allianceResearch && state.allianceResearch.a_scanner) ? 90 : 0); } // Sekunden Vorwarnzeit pro Stufe (+ Allianz-Bonus)
@@ -5058,6 +5085,9 @@
       log(factionName+'-Überfall auf '+planetDisplayName(targetPlanet)+' erfolgreich! Rund '+Math.round(lossPct*100)+'% der Ressourcen verloren. '+victim.name+' dort läuft 15 Min. mit -40% Produktion (sabotiert).'+ownLossText, 'ti-alert-triangle');
       builtReport = { type:'raid', result:'loss', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dp, defenseBefore:defBreakdown, lossPct:Math.round(lossPct*100), sabotagedBuilding:victim.name, fleet:raiderFleet, ownLostShips:ownLostShipsForReport, ownLossDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
       pushReport(builtReport);
+    }
+    if (state.incomingRaid && state.incomingRaid.scoutArrival && !state.incomingRaid.scouted){
+      log('Der Spähbericht kam zu spät - die feindliche Flotte ist bereits eingeschlagen, bevor das Spähschiff sie erreichte.', 'ti-alert-triangle');
     }
     state.nextRaidTime = null;
     state.incomingRaid = null;
@@ -6722,6 +6752,7 @@
     { key:'kampf', icon:'ti-sword', title:'Kampf', entries:[
       { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.' },
       { title:'Weltboss: Leviathan der Leere', body:'Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
+      { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%).' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:9.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
@@ -11996,7 +12027,14 @@
       // Tooltip versteckt) – volle Detailzahl (genaue Angriffspunkte) bleibt zusätzlich im Tooltip.
       const fullDetail = state.incomingRaid ? ('Ziel: '+planetDisplayName(state.incomingRaid.planet||'home')+' · '+state.incomingRaid.faction+' · Stärke: '+state.incomingRaid.preview+' (≈'+(state.incomingRaid.approxPoints||Math.round(state.incomingRaid.power/10)*10)+' Angriffspunkte)') : '';
       raidBadge.title = fullDetail;
-      const shortTarget = state.incomingRaid ? (' · '+planetDisplayName(state.incomingRaid.planet||'home')+' · Stärke: '+state.incomingRaid.preview) : '';
+      let shortTarget = state.incomingRaid ? (' · '+planetDisplayName(state.incomingRaid.planet||'home')+' · Stärke: '+state.incomingRaid.preview) : '';
+      if (state.incomingRaid && state.incomingRaid.scouted){
+        // Nach erfolgreicher Spionage ist die exakte Kampfkraft bekannt und ersetzt die grobe Stufe.
+        shortTarget = ' · '+planetDisplayName(state.incomingRaid.planet||'home')+' · Kampfkraft: '+Math.round(state.incomingRaid.power).toLocaleString('de-DE');
+      } else if (state.incomingRaid && state.incomingRaid.scoutArrival){
+        const sRemain = Math.max(0, state.incomingRaid.scoutArrival - Date.now());
+        shortTarget += ' · Späher trifft in '+Math.ceil(sRemain/1000)+'s ein';
+      }
       document.getElementById('raidTimerText').textContent = 'Überfall in '+mm+':'+ss+shortTarget;
       const raidScoutInlineBtn = document.getElementById('raidScoutInlineBtn');
       if (raidScoutInlineBtn) raidScoutInlineBtn.onclick = scoutIncomingRaid;
@@ -12026,14 +12064,26 @@
         const scoutPlanet = state.activeBasePlanet;
         const scoutFleet = scoutPlanet==='home' ? state.fleet : (state.colonies[scoutPlanet] ? state.colonies[scoutPlanet].fleet : null);
         const haveSpaeher = scoutFleet ? (scoutFleet.spaeher||0) : 0;
-        raidScoutBox.innerHTML = `
-          <div class="card-row" style="margin-bottom:0.75rem; border-color:rgba(226,75,74,0.4);">
-            <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-target" aria-hidden="true"></i></div><div><div class="bname">Anfliegende Flotte ausspähen</div><div class="bmeta">Spähschiff von ${planetDisplayName(scoutPlanet)} (aktuell gewählt) – detaillierter Bericht inkl. Mondbildungs-Chance, Schiff geht dabei garantiert verloren${haveSpaeher<1?' (keins hier verfügbar)':''}</div></div></div>
-            <button id="scoutRaidBtn" class="${haveSpaeher>=1?'affordable':''}" ${haveSpaeher>=1?'':'disabled'}>Ansetzen</button>
-          </div>
-        `;
-        const scoutBtn = document.getElementById('scoutRaidBtn');
-        if (scoutBtn) scoutBtn.onclick = scoutIncomingRaid;
+        if (state.incomingRaid.scoutArrival && !state.incomingRaid.scouted){
+          const sRemain = Math.max(0, state.incomingRaid.scoutArrival - Date.now());
+          raidScoutBox.innerHTML = `
+            <div class="card-row" style="margin-bottom:0.75rem; border-color:rgba(226,75,74,0.4);">
+              <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-target" aria-hidden="true"></i></div><div><div class="bname">Spähschiff unterwegs zur anfliegenden Flotte</div><div class="bmeta">Von ${planetDisplayName(state.incomingRaid.scoutSource||scoutPlanet)} gestartet - Bericht mit Kampfkraft &amp; Flottenzusammensetzung bei Ankunft</div></div></div>
+              <span class="lvl-pill">${Math.ceil(sRemain/1000)}s</span>
+            </div>
+          `;
+        } else if (state.incomingRaid.scouted){
+          raidScoutBox.innerHTML = '';
+        } else {
+          raidScoutBox.innerHTML = `
+            <div class="card-row" style="margin-bottom:0.75rem; border-color:rgba(226,75,74,0.4);">
+              <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-target" aria-hidden="true"></i></div><div><div class="bname">Anfliegende Flotte ausspähen</div><div class="bmeta">Spähschiff von ${planetDisplayName(scoutPlanet)} (aktuell gewählt) – fliegt zur Flotte (echte Flugzeit, Countdown im Überfall-Banner), Bericht inkl. Kampfkraft &amp; Mondbildungs-Chance bei Ankunft. Schiff geht dabei garantiert verloren${haveSpaeher<1?' (keins hier verfügbar)':''}</div></div></div>
+              <button id="scoutRaidBtn" class="${haveSpaeher>=1?'affordable':''}" ${haveSpaeher>=1?'':'disabled'}>Ansetzen</button>
+            </div>
+          `;
+          const scoutBtn = document.getElementById('scoutRaidBtn');
+          if (scoutBtn) scoutBtn.onclick = scoutIncomingRaid;
+        }
       } else {
         raidScoutBox.innerHTML = '';
       }
@@ -13075,6 +13125,7 @@
     maybeSpawnPlanetEvent();
     processWeeklyLeague();
     processDailySummary();
+    processRaidScout();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
