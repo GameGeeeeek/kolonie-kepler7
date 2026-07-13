@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Kolonie Kepler-7</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0d1a'/%3E%3Ccircle cx='16' cy='17' r='10' fill='%238f86ea'/%3E%3Ccircle cx='16' cy='17' r='10' fill='none' stroke='%23c3bef5' stroke-width='1' opacity='0.5'/%3E%3Cellipse cx='16' cy='17' rx='15' ry='5.5' fill='none' stroke='%23f3aec6' stroke-width='3' transform='rotate(-18 16 17)'/%3E%3Ccircle cx='12.5' cy='13' r='2.4' fill='%23ffffff' opacity='0.85'/%3E%3C/svg%3E">
   <!-- PWA: installierbar auf Homescreen (Standalone-Vollbild, eigenes Icon). Manifest + Icons werden
@@ -120,7 +120,11 @@
         linear-gradient(180deg,#0a0d1a,#0d1224);
     }
     .shell canvas { position:absolute; inset:0; width:100%; height:100%; }
-    .shell-inner { position:relative; z-index:1; padding:1.25rem; }
+    /* iPhone-Notch/Dynamic-Island: viewport-fit=cover (siehe <meta name="viewport">) lässt den Inhalt
+       jetzt bis unter den Notch reichen, statt den Bereich ungenutzt schwarz zu lassen - dafür braucht
+       der oberste Inhalt einen Sicherheitsabstand, sonst rutscht er optisch darunter. env(...) ist auf
+       Geräten ohne Notch einfach 0, ändert dort also nichts. */
+    .shell-inner { position:relative; z-index:1; padding:calc(1.25rem + env(safe-area-inset-top)) calc(1.25rem + env(safe-area-inset-right)) calc(1.25rem + env(safe-area-inset-bottom)) calc(1.25rem + env(safe-area-inset-left)); }
 
     /* Feste Tabs am Bildschirmrand (Chat links, Flottenstatus rechts), unabhängig vom aktuell
        gewählten Spiel-Tab immer erreichbar. writing-mode statt rotate-Transform, da eine echte 2D-
@@ -1630,8 +1634,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.20.0';
+  const VERSION = '8.20.1';
   const PATCHNOTES = [
+    { version:'8.20.1', date:'13.07.2026', changes:[
+      'Bug behoben (iPhone): Notch/Dynamic-Island wurde nicht genutzt, oben blieb ein schwarzer Rand statt des Spiels - viewport-fit=cover ergänzt und der oberste Inhaltsbereich bekommt jetzt automatisch Sicherheitsabstand zum Notch (auf Geräten ohne Notch ändert sich nichts)'
+    ]},
     { version:'8.20.0', date:'13.07.2026', changes:[
       'Neu (optional, Einstellungen): Drei Übersichtlichkeits-Layouts für die dichtesten Tabs (Punktestand, Fortschritt) - Sprungmarken (Klick-Leiste springt zu einem Abschnitt), Aufklappbare Abschnitte (einzeln ein-/ausklappbar, gemerkt) und Zweispaltiges Layout (kurze Abschnitte nebeneinander auf breiten Bildschirmen). Alle drei standardmäßig AUS, das bisherige Layout bleibt für alle unverändert der Standard - wer will, schaltet frei zu',
       'Weitere Tabs (Galaxie u.a.) folgen bei Bedarf in einem separaten Schritt'
