@@ -1036,7 +1036,11 @@
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Hilfe</div>
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-bell" aria-hidden="true"></i>Server-Ereignis-Benachrichtigungen</div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;" id="notifPrefsCard">
-          <div class="bmeta" style="margin-bottom:8px;">Grundlage für Push-Benachrichtigungen (folgen später). Schon jetzt bestimmt das hier, ob und für welche Ereignisse der Server ein Postfach-Ereignis anlegt (Berichte-Tab).</div>
+          <div class="bmeta" style="margin-bottom:8px;">Bestimmt, ob und für welche Ereignisse der Server ein Postfach-Ereignis (Berichte-Tab) UND eine echte Push-Benachrichtigung an dieses Gerät schickt.</div>
+          <div class="card-row" style="margin-bottom:6px; border-color:rgba(93,202,165,0.4);">
+            <div class="left"><i class="ti ti-bell" aria-hidden="true" style="color:#5dcaa5;"></i><div><div class="bname">Push auf diesem Gerät</div><div class="bmeta" id="pushStatusText">Status wird geprüft…</div></div></div>
+            <button id="pushToggleBtn" style="font-size:11px; padding:6px 12px;">…</button>
+          </div>
           <div class="card-row" style="margin-bottom:6px;">
             <div class="left"><i class="ti ti-bell" aria-hidden="true"></i><div><div class="bname">Benachrichtigt werden</div><div class="bmeta">Hauptschalter - aus schaltet alle Kategorien darunter mit ab</div></div></div>
             <div class="toggle-switch" id="notifPrefEnabledSwitch"><div class="toggle-knob"></div></div>
@@ -1480,8 +1484,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.9.0';
+  const VERSION = '8.10.0';
   const PATCHNOTES = [
+    { version:'8.10.0', date:'13.07.2026', changes:[
+      'Echte Push-Benachrichtigungen sind da: "Push auf diesem Gerät" in den Einstellungen aktivieren, dann kommen Nachrichten, Pakt-Angebote, Weltboss-Kills, Überfälle und Patchnotes als Systembenachrichtigung an - auch bei geschlossener Seite',
+      'Neu: Nachrichten lösen jetzt ebenfalls ein Postfach-Ereignis und einen Push aus (war bisher nur Pakt/Weltboss/Überfall)',
+      'Push lässt sich je Gerät einzeln aktivieren/deaktivieren, die fünf Kategorien-Schalter aus v8.9.0 bestimmen weiterhin, wofür überhaupt ein Ereignis entsteht'
+    ]},
     { version:'8.9.0', date:'13.07.2026', changes:[
       'Vorstufe für Push-Benachrichtigungen: Der Server erkennt jetzt selbst Pakt-Angebote, Weltboss-Kills und anfliegende Überfälle und legt dafür Postfach-Ereignisse an',
       'Neuer Bereich "Server-Ereignisse" im Berichte-Tab zeigt diese Ereignisse geräteübergreifend an (z.B. "Pakt-Angebot von X", "Leviathan Stufe 3 besiegt - dein Beitrag: 22%")',
@@ -6143,6 +6152,65 @@
   }
   // Meldet dem Server einen erkannten Überfall zur Terminierung (rein lokale NPC-Bedrohung, der
   // Server erfährt sonst nie davon) - nur wenn die Kategorie "Überfall" aktiviert ist.
+  // ===== Push-Benachrichtigungen: An-/Abmelden dieses Geräts =====
+  // VAPID-Public-Key kommt Base64url-kodiert vom Server, PushManager.subscribe() braucht ihn aber
+  // als Uint8Array - Standard-Konvertierung laut MDN.
+  function urlBase64ToUint8Array(base64String){
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+  async function getPushSubscriptionState(){
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported';
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      return sub ? 'subscribed' : 'unsubscribed';
+    } catch(e){ return 'unsupported'; }
+  }
+  async function renderPushStatus(){
+    const statusEl = document.getElementById('pushStatusText');
+    const btn = document.getElementById('pushToggleBtn');
+    if (!statusEl || !btn) return;
+    if (!useBackend()){ statusEl.textContent = 'Nur mit eigenem Server verfügbar.'; btn.style.display = 'none'; return; }
+    const state2 = await getPushSubscriptionState();
+    btn.style.display = 'block';
+    if (state2 === 'unsupported'){ statusEl.textContent = 'Dieser Browser unterstützt keine Push-Benachrichtigungen.'; btn.style.display = 'none'; }
+    else if (state2 === 'subscribed'){ statusEl.textContent = 'Aktiv - dieses Gerät bekommt Benachrichtigungen.'; btn.textContent = 'Deaktivieren'; btn.onclick = disablePushOnThisDevice; }
+    else { statusEl.textContent = 'Noch nicht aktiviert.'; btn.textContent = 'Aktivieren'; btn.onclick = enablePushOnThisDevice; }
+  }
+  async function enablePushOnThisDevice(){
+    const statusEl = document.getElementById('pushStatusText');
+    try {
+      if (Notification.permission === 'denied'){ if (statusEl) statusEl.textContent = 'Benachrichtigungen sind im Browser blockiert - bitte in den Browser-Einstellungen erlauben.'; return; }
+      const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+      if (perm !== 'granted'){ if (statusEl) statusEl.textContent = 'Berechtigung nicht erteilt.'; return; }
+      const keyRes = await fetch('/api/push/public-key');
+      const { publicKey } = await keyRes.json();
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+      const subJson = sub.toJSON();
+      await backendFetch('/push/subscribe', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ endpoint: subJson.endpoint, keys: subJson.keys }) });
+      log('Push-Benachrichtigungen für dieses Gerät aktiviert.', 'ti-bell');
+      playSound('build');
+    } catch(e){ if (statusEl) statusEl.textContent = 'Aktivieren fehlgeschlagen: '+(e.message||'unbekannter Fehler'); }
+    renderPushStatus();
+  }
+  async function disablePushOnThisDevice(){
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub){
+        await backendFetch('/push/unsubscribe', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ endpoint: sub.endpoint }) });
+        await sub.unsubscribe();
+      }
+      log('Push-Benachrichtigungen für dieses Gerät deaktiviert.', 'ti-bell');
+    } catch(e){}
+    renderPushStatus();
+  }
   async function scheduleRaidAlertOnServer(){
     if (!useBackend() || !notifPrefsCache.enabled || !notifPrefsCache.raid) return;
     if (!state.incomingRaid || !state.nextRaidTime) return;
@@ -7070,7 +7138,7 @@
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
-      { title:'Server-Ereignis-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich getrennt steuern, ob und für welche Ereignisse der Server ein Postfach-Ereignis anlegt: Pakt-Angebote, Weltboss-Kills (mit deinem Schadensanteil) und anfliegende Überfälle. Die Ereignisse selbst siehst du im <strong>Berichte-Tab</strong> unter "Server-Ereignisse". Das ist die Grundlage für spätere Push-Benachrichtigungen (kommen noch), funktioniert aber schon jetzt als geräteübergreifendes Postfach - nur mit eigenem Server verfügbar.' },
+      { title:'Push-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich der Knopf "Push auf diesem Gerät" aktivieren (Browser fragt einmalig um Erlaubnis) - danach schickt der Server für Nachrichten, Pakt-Angebote, Weltboss-Kills, anfliegende Überfälle und Patchnotes echte Benachrichtigungen an dieses Gerät, auch wenn die Seite geschlossen ist. Fünf Kategorien lassen sich einzeln abschalten. Alle Ereignisse landen zusätzlich als geräteübergreifendes Postfach im <strong>Berichte-Tab</strong> unter "Server-Ereignisse" - nur mit eigenem Server verfügbar.' },
       { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt.' },
       { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: ab <strong>Prestige 3 und 50.000 Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit fünf Zweigen (je max. Stufe 10, Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset) und Pfadfinder-Instinkt (+2% Expeditions-Belohnung). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste.' },
       { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
@@ -10473,7 +10541,7 @@
     if (tab === 'hilfe') renderHelpBox();
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
     if (tab === 'berichte'){ loadNotificationEvents(); }
-    if (tab === 'einstellungen'){ loadNotificationPrefs(); }
+    if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
     if (tab === 'allianz'){ loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     if (tab === 'berichte'){

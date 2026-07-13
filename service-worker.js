@@ -72,3 +72,32 @@ self.addEventListener('fetch', (event) => {
     )
   );
 });
+
+// ===== Push-Benachrichtigungen =====
+// Payload kommt vom Server als JSON: { title, body, type, payload, time }.
+self.addEventListener('push', (event) => {
+  let data = { title: 'Kolonie Kepler-7', body: 'Es gibt Neuigkeiten.' };
+  try { if (event.data) data = event.data.json(); } catch (e) {}
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Kolonie Kepler-7', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: data.type || 'kepler7-generic', // gleicher Typ ersetzt die vorherige Benachrichtigung statt zu stapeln
+      data: data
+    })
+  );
+});
+
+// Klick auf die Benachrichtigung: vorhandenes Fenster fokussieren, sonst neues öffnen.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow('/');
+    })
+  );
+});
