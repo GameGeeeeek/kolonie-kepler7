@@ -1634,8 +1634,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.21.2';
+  const VERSION = '8.21.3';
   const PATCHNOTES = [
+    { version:'8.21.3', date:'13.07.2026', changes:[
+      'Fokus-Verlust-Bug (v8.21.2) systematisch nachgeprüft und an vier weiteren Stellen behoben, die denselben Fehler hatten: Handelsrouten-Frachtermenge, Fraktions-Tributmenge, Angriffsflotten-Flottenname (Galaxie-Tab) und Expeditions-Flottenname wurden ebenfalls jeden Sekunden-Tick neu aufgebaut und verloren beim Tippen den Fokus. Der Baukorb (Schiffswerft) hatte zusätzlich einen versteckten Fall: sein isTypingIn-Aufruf schützte bisher nur vor einer Rückkopplungsschleife im eigenen Eingabefeld, nicht vor dem Tick selbst',
+      'Neue interne Regel für künftige Boxen mit Eingabefeldern: Jede periodisch neu gebaute Box mit input/textarea bekommt von Anfang an den isTypingIn()-Schutz, statt erst nach einem Bug-Report'
+    ]},
     { version:'8.21.2', date:'13.07.2026', changes:[
       'Bug behoben (danke an holyhenning für den Report): Im Marktplatz sprang der Cursor beim Tippen der Handelsmenge nach spätestens 1 Sekunde aus dem Feld ("man musste schnell sein") - die Box wurde bei jedem Haupt-Tick komplett neu aufgebaut und dabei auch das gerade fokussierte Mengenfeld ersetzt. Wird jetzt wie bei anderen Eingabefeldern übersprungen, solange aktiv getippt wird'
     ]},
@@ -3591,6 +3595,10 @@
   function renderTradeRoutes(){
     const box = document.getElementById('tradeRouteBox');
     if (!box) return;
+    // Gleicher Fehler wie bei renderMarket() direkt daneben (siehe dortiger Kommentar): wird jeden
+    // Sekunden-Tick neu aufgerufen und enthält das Frachter-Mengenfeld für neue Handelsrouten -
+    // ohne diesen Schutz würde Tippen dort denselben Fokus-Verlust verursachen.
+    if (isTypingIn('tradeRouteBox')) return;
     const avail = availableFrachter();
     const totalFrachter = allFleets().reduce((a,f)=>a+(f.frachter||0),0);
     const colonyKeys = Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k));
@@ -4158,6 +4166,10 @@
     ensureFactionQuests();
     const box = document.getElementById('factionBox');
     if (!box) return;
+    // Gleicher Fehler wie bei renderMarket()/renderTradeRoutes(): enthält Tribut-Mengenfelder
+    // (data-contrib-input) und wird über renderGalaxyNews() bei aktivem Galaxie-Tab jeden
+    // Sekunden-Tick neu aufgebaut - ohne diesen Schutz würde Tippen den Fokus verlieren.
+    if (isTypingIn('factionBox')) return;
     const factions = galaxyCache.factions;
     if (!factions || !Object.keys(factions).length){
       box.innerHTML = '<div class="bmeta">Noch keine Fraktionsdaten geladen.</div>';
@@ -12441,7 +12453,9 @@
     }
 
     const expeditionBox = document.getElementById('expeditionBox');
-    if (expeditionBox){
+    if (expeditionBox && !isTypingIn('expeditionBox')){
+      // Gleicher Fehler wie bei attackFleetBox/factionBox/tradeRouteBox/marketBox: enthält das
+      // Flottenname-Feld (customFleetNameInputExp) und wird jeden Sekunden-Tick neu aufgebaut.
       const expAway = computeAwayByType(cf);
       // Forschungsschiffe: Verfügbarkeit über die Slot-Zählung (aktive Expeditionsmissionen), nicht über
       // die Komposition – jede Expedition speichert aktuell den vollen Forschungsschiff-Bestand in ihrer
@@ -12647,7 +12661,12 @@
     // in einem Schritt (technisch weiterhin ein queueConstruction-Auftrag pro Typ, aber gemeinsam
     // ausgelöst und gemeinsam bezahlt).
     const shipBasketBox = document.getElementById('shipBasketBox');
-    if (shipBasketBox){
+    if (shipBasketBox && !isTypingIn('shipBasketBox')){
+      // Bug behoben: der bestehende isTypingIn-Aufruf weiter unten im oninput-Handler schützte nur
+      // vor einer Rückkopplungsschleife (Handler ruft selbst render() auf), NICHT vor dem
+      // eigentlichen Rebuild durch den 1-Sekunden-Haupt-Tick - derselbe Fokus-Verlust-Fehler wie
+      // bei marketBox/tradeRouteBox/factionBox/attackFleetBox/expeditionBox war hier also weiterhin
+      // vorhanden.
       const basketDefs = SHIP_DEFS.filter(d => shipRequirementsMet(d));
       const totalCost = {};
       let anyQty = false;
@@ -12894,7 +12913,10 @@
     if (activeTab === 'galaxie'){
     renderGalaxyNews();
     const attackFleetBox = document.getElementById('attackFleetBox');
-    if (attackFleetBox){
+    if (attackFleetBox && !isTypingIn('attackFleetBox')){
+      // Gleicher Fehler wie bei renderMarket()/renderTradeRoutes()/renderFactions(): enthält das
+      // Flottenname-Feld (customFleetNameInputAttack) und wird bei aktivem Galaxie-Tab jeden
+      // Sekunden-Tick neu aufgebaut - ohne diesen Schutz würde Tippen den Fokus verlieren.
       const attackSel = getAttackSelection(state.activeBasePlanet, cf);
       const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
       const attackFleetPower = attackPower(attackFleet, state.activeBasePlanet);
