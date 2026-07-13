@@ -1538,8 +1538,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.19.0';
+  const VERSION = '8.19.1';
   const PATCHNOTES = [
+    { version:'8.19.1', date:'13.07.2026', changes:[
+      'Neu: Spionage gegen andere Spieler setzt jetzt voraus, dass du mindestens einen Planeten in ihrem Heimatsystem erkundet hast - "man muss erst wissen, wo jemand wohnt"',
+      'Neu: Angriffe auf andere Spieler sind komplett blockiert, wenn dein Punktestand mehr als 5x so hoch ist wie der des Ziels (die bestehende Beute-Reduzierung ab 3x bleibt zusätzlich bestehen) - Schutz für schwächere Spieler vor grundlosem Farmen'
+    ]},
     { version:'8.19.0', date:'13.07.2026', changes:[
       'Neues Gebäude: Verteidigungsbunker (Verteidigung-Tab, ab Schildmatrix-Forschung) - 135 Verteidigungspunkte, damit das stärkste reguläre Verteidigungsgebäude vor der Kristallfestung',
       'Neue Schiffsklasse: Spionagekreuzer (Werft, ab Spionageabwehr-Forschung) - Geschwindigkeit 320 statt 220 beim Spähschiff, deutlich schnellere Spionage-Missionen über große Entfernungen, zählt zusammen mit Spähschiffen zum gemeinsamen Spionage-Slot-Pool und kann Aufklärung auch ganz ohne Spähschiff durchführen',
@@ -6258,6 +6262,13 @@
     if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
     const entry = await loadPlayerEntry(playerId);
     if (!entry){ log('Spielerdaten nicht verfügbar.', 'ti-alert-triangle'); return; }
+    // Spionage setzt voraus, dass du bereits mindestens einen Planeten im Heimatsystem des Ziels
+    // erkundet hast (normale Erkundungsschiff-Mission) - "man muss erst wissen, wo jemand wohnt".
+    // Ältere Accounts ohne gespeichertes homeSystem sind von der Sperre ausgenommen.
+    if (entry.homeSystem && !PLANETS.some(p => p.system === entry.homeSystem && state.discovered && state.discovered[p.id])){
+      log('Du musst erst einen Planeten im Heimatsystem von '+name+' erkundet haben, bevor du dort spionieren kannst (Erkundungsschiff zu einem Planeten in diesem System schicken).', 'ti-alert-triangle');
+      return;
+    }
     pay({deuterium: fuelCost});
     const fleetName = resolveFleetName();
     cf.missions.push({ id: nextMissionId(), type:'spy-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, pendingIntel: entry });
@@ -6305,6 +6316,14 @@
     const myScoreForFarmCheck = computeScore();
     const targetScoreForFarmCheck = targetEntry ? (targetEntry.score||0) : 0;
     const scoreRatio = targetScoreForFarmCheck > 0 ? myScoreForFarmCheck/targetScoreForFarmCheck : 1;
+    // Schutz für schwache Spieler: ab 5x Punktestand-Unterschied ist der Angriff komplett blockiert
+    // (nicht nur mit reduzierter Beute wie bei der Anti-Farming-Regel ab 3x) - verhindert, dass sehr
+    // weit entwickelte Accounts neue Spieler grundlos plattmachen können.
+    const ATTACK_BLOCK_RATIO = 5;
+    if (targetScoreForFarmCheck > 0 && scoreRatio >= ATTACK_BLOCK_RATIO){
+      log('Du bist zu mächtig für einen Angriff auf '+name+' (mehr als '+ATTACK_BLOCK_RATIO+'x Punktestand-Unterschied) - such dir ein Ziel auf Augenhöhe.', 'ti-shield');
+      return;
+    }
     const farmingPenalty = scoreRatio > 3 ? Math.max(0.3, 1-(scoreRatio-3)*0.1) : 1;
     // Ergebnis wird bereits jetzt ermittelt (Server-Kampf bzw. simuliertes Duell), aber erst bei
     // Ankunft der Flotte tatsächlich angewendet – so bleibt die Flugzeit spielmechanisch relevant.
@@ -7500,6 +7519,7 @@
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau.' },
       { title:'Spionagekreuzer – schnellste Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und eignet sich damit besonders für Spionage über große Entfernungen. Er zählt zusammen mit Spähschiffen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Spionage-Einsatz) und kann eine Spionagemission auch ganz ohne Spähschiff starten.' },
+      { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
       { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt.' },
       { title:'Missionen & Flugzeit', body:'Angriffe, Überfälle, Expeditionen und Kolonisierungen laufen über Missionen mit echter Flugzeit (abhängig von Entfernung und langsamstem Schiff in der Flotte). Während der Flugzeit ist die Flotte unterwegs und zählt nicht zur Verteidigung am Ausgangsplaneten.' }
@@ -7511,6 +7531,7 @@
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%).' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Nur die spezielle, itemgebundene Kristallfestung (150) übertrifft ihn.' },
+      { title:'Schutz für schwächere Spieler', body:'Ist dein Punktestand mehr als <strong>3x</strong> so hoch wie der eines Ziels, sinkt deine Beute bei einem erfolgreichen Angriff anteilig (nie unter 30%). Ab <strong>5x</strong> Unterschied ist der Angriff komplett blockiert - du kannst dann gar nicht mehr angreifen, egal wie stark deine Flotte ist. Verhindert, dass weit entwickelte Accounts neue Spieler grundlos plattmachen.' },
       { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:10.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
       { title:'Taktik-Haltung', body:'Im Forschung-Tab frei wählbar, jederzeit kostenlos wechselbar: <strong>Aggressiv</strong> (+10% Angriff, -10% Verteidigung), <strong>Ausgewogen</strong> (neutral) oder <strong>Defensiv</strong> (-10% Angriff, +15% Verteidigung).' },
       { title:'Rückzugs-Mechanik', body:'Übersteigt die eigene Verlustquote in einem Gefecht 40%, rettet sich die Hälfte des Anteils <em>oberhalb</em> dieser Schwelle rechtzeitig zurück, statt komplett zerstört zu werden. Gilt bei Überfall-Verteidigung, NPC-Angriffen und PvP-Duellen – nicht für Raider-/NPC-Flotten.' },
