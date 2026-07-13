@@ -324,6 +324,21 @@
 
     .buildings, .fleet, .research-list, .planet-list, .npc-list, .leaderboard { display:flex; flex-direction:column; gap:9px; }
     .card-row { background: rgba(255,255,255,0.045); border: 0.5px solid rgba(255,255,255,0.09); border-radius:14px; padding: 0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
+
+    /* ===== Optionale Übersichtlichkeits-Layouts (Einstellungen) - standardmäßig alle aus, aktuelles
+       Layout bleibt unverändert der Standard. Wirkt aktuell nur in den Tabs "Punktestand" und
+       "Fortschritt" (dichteste Tabs) - Ausweitung auf weitere Tabs bei Bedarf separat. ===== */
+    .jumpnav { display:flex; gap:6px; flex-wrap:wrap; background:rgba(255,255,255,0.03); border:0.5px solid rgba(255,255,255,0.07); border-radius:10px; padding:8px; margin-bottom:14px; }
+    .jumpnav a { font-size:10px; padding:4px 9px; border-radius:7px; background:rgba(255,255,255,0.06); color:#9fa3ba; white-space:nowrap; text-decoration:none; }
+    .jumpnav a:hover { background:rgba(var(--primary-rgb),0.18); color:#fff; }
+    .prog-chevron { display:none; margin-left:auto; font-size:12px; transition:transform 0.15s ease; }
+    .ui-accordion-on .prog-sec-header { cursor:pointer; }
+    .ui-accordion-on .prog-chevron { display:inline-block; }
+    .ui-accordion-on .prog-section.collapsed .prog-chevron { transform:rotate(90deg); }
+    .ui-accordion-on .prog-section.collapsed .prog-sec-body { display:none; }
+    @media (min-width:760px){
+      .ui-twocol-on .prog-twocol-group { display:grid; grid-template-columns:1fr 1fr; gap:0 20px; align-items:start; }
+    }
     .summary-bar { background: linear-gradient(135deg, rgba(var(--primary-rgb),0.22), rgba(var(--primary-rgb),0.08)); border: 1px solid rgba(var(--primary-rgb),0.5); border-radius: 12px; padding: 9px 11px; margin-bottom: 10px; }
     .summary-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; }
     .summary-title { font-size: 11px; font-weight: 600; color: #c3bef5; display:flex; align-items:center; gap:5px; }
@@ -1093,6 +1108,21 @@
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sparkles" aria-hidden="true"></i>Farbthema</div>
         <div id="themePicker" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
 
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Übersichtlichkeit</div>
+        <div class="bmeta" style="margin-bottom:8px;">Optionale Layouts für die dichtesten Tabs (Punktestand, Fortschritt) - alle standardmäßig aus, das bisherige Layout bleibt unverändert der Standard.</div>
+        <div class="card-row" id="uiJumpNavToggleRow" style="cursor:pointer;">
+          <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-map-pin" aria-hidden="true"></i></div><div><div class="bname">Sprungmarken</div><div class="bmeta">Klick-Leiste oben, springt direkt zu einem Abschnitt</div></div></div>
+          <div class="toggle-switch" id="uiJumpNavSwitch"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="card-row" id="uiCollapsibleToggleRow" style="cursor:pointer; margin-top:8px;">
+          <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-chevron-right" aria-hidden="true"></i></div><div><div class="bname">Aufklappbare Abschnitte</div><div class="bmeta">Abschnitte einzeln ein-/ausklappen, gemerkt pro Abschnitt</div></div></div>
+          <div class="toggle-switch" id="uiCollapsibleSwitch"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="card-row" id="uiTwoColToggleRow" style="cursor:pointer; margin-top:8px;">
+          <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-adjustments" aria-hidden="true"></i></div><div><div class="bname">Zweispaltiges Layout</div><div class="bmeta">Kurze Abschnitte nebeneinander (nur auf breiten Bildschirmen)</div></div></div>
+          <div class="toggle-switch" id="uiTwoColSwitch"><div class="toggle-knob"></div></div>
+        </div>
+
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Hilfe</div>
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-bell" aria-hidden="true"></i>Server-Ereignis-Benachrichtigungen</div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;" id="notifPrefsCard">
@@ -1221,69 +1251,120 @@
       </div>
 
       <div class="tab-panel" id="tab-punkte">
+        <div class="jumpnav" id="jumpnav-punkte" style="display:none;"></div>
         <div style="text-align:center; padding:1.25rem 0; margin-bottom:1rem; background:rgba(126,119,221,0.1); border-radius:14px; border:0.5px solid rgba(126,119,221,0.3);">
           <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-star" aria-hidden="true" style="margin-right:4px;"></i>Aktueller Punktestand</div>
           <div style="font-size:38px; font-weight:500; color:#c3bef5; font-variant-numeric:tabular-nums;" id="scoreTotalValue">0</div>
         </div>
-        <div class="section-title"><i class="ti ti-star" aria-hidden="true"></i>Zusammensetzung</div>
-        <div id="scoreBreakdownBox"></div>
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-arrow-up" aria-hidden="true"></i>Verlauf</div>
-        <div class="lb-note" style="margin-bottom:0.75rem;" id="scoreChartNote"><i class="ti ti-info-circle" aria-hidden="true"></i>Snapshot alle 5 Minuten während des Spielens.</div>
-        <div class="map-wrap" style="height:140px; margin-bottom:1rem;" id="scoreChartWrap">
-          <svg id="scoreHistorySvg" viewBox="0 0 700 140" width="100%" height="100%"></svg>
+        <div class="prog-section" data-sec="zusammensetzung">
+          <div class="section-title prog-sec-header" data-sec-toggle="zusammensetzung"><i class="ti ti-star" aria-hidden="true"></i>Zusammensetzung<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div id="scoreBreakdownBox"></div>
+          </div>
         </div>
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sword" aria-hidden="true"></i>Kampfbilanz &amp; Tages-Historie</div>
-        <div id="battleStatsBox" style="margin-bottom:1rem;"></div>
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sparkles" aria-hidden="true"></i>Aufstieg &amp; Meta-Baum</div>
-        <div id="ascensionBox" style="margin-bottom:1rem;"></div>
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-atom" aria-hidden="true"></i>Statistik-Dashboard</div>
-        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Wirtschafts- und Kampfüberblick. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.</div>
-        <div id="statsTilesBox" style="margin-bottom:1rem;"></div>
-        <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-diamond" aria-hidden="true" style="color:#fac775;"></i> Kredite-Verlauf</div>
-        <div class="map-wrap" style="height:110px; margin-bottom:1rem;">
-          <svg id="creditsHistorySvg" viewBox="0 0 700 110" width="100%" height="100%"></svg>
+        <div class="prog-section" data-sec="verlauf">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="verlauf"><i class="ti ti-arrow-up" aria-hidden="true"></i>Verlauf<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div class="lb-note" style="margin-bottom:0.75rem;" id="scoreChartNote"><i class="ti ti-info-circle" aria-hidden="true"></i>Snapshot alle 5 Minuten während des Spielens.</div>
+            <div class="map-wrap" style="height:140px; margin-bottom:1rem;" id="scoreChartWrap">
+              <svg id="scoreHistorySvg" viewBox="0 0 700 140" width="100%" height="100%"></svg>
+            </div>
+          </div>
         </div>
-        <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-pick" aria-hidden="true" style="color:#d9a06b;"></i> Erz-Produktion pro Sekunde (Verlauf)</div>
-        <div class="map-wrap" style="height:110px; margin-bottom:1rem;">
-          <svg id="prodHistorySvg" viewBox="0 0 700 110" width="100%" height="100%"></svg>
+        <div class="prog-section" data-sec="kampfbilanz">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="kampfbilanz"><i class="ti ti-sword" aria-hidden="true"></i>Kampfbilanz &amp; Tages-Historie<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div id="battleStatsBox" style="margin-bottom:1rem;"></div>
+          </div>
         </div>
-        <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-bolt" aria-hidden="true" style="color:#5dcaa5;"></i> Aktuelle Produktion pro Sekunde</div>
-        <div id="prodNowBox" style="margin-bottom:1rem;"></div>
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-clock" aria-hidden="true"></i>Letzte Änderungen</div>
-        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Zeigt Punktänderungen seit dem Öffnen dieses Spiels – grün wenn Punkte dazukommen, rot wenn welche verloren gehen, jeweils mit Begründung.</div>
-        <div id="scoreLogBox"></div>
+        <div class="prog-section" data-sec="aufstieg">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="aufstieg"><i class="ti ti-sparkles" aria-hidden="true"></i>Aufstieg &amp; Meta-Baum<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div id="ascensionBox" style="margin-bottom:1rem;"></div>
+          </div>
+        </div>
+        <div class="prog-section" data-sec="statistik">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="statistik"><i class="ti ti-atom" aria-hidden="true"></i>Statistik-Dashboard<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Wirtschafts- und Kampfüberblick. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.</div>
+            <div id="statsTilesBox" style="margin-bottom:1rem;"></div>
+            <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-diamond" aria-hidden="true" style="color:#fac775;"></i> Kredite-Verlauf</div>
+            <div class="map-wrap" style="height:110px; margin-bottom:1rem;">
+              <svg id="creditsHistorySvg" viewBox="0 0 700 110" width="100%" height="100%"></svg>
+            </div>
+            <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-pick" aria-hidden="true" style="color:#d9a06b;"></i> Erz-Produktion pro Sekunde (Verlauf)</div>
+            <div class="map-wrap" style="height:110px; margin-bottom:1rem;">
+              <svg id="prodHistorySvg" viewBox="0 0 700 110" width="100%" height="100%"></svg>
+            </div>
+            <div class="bmeta" style="margin-bottom:4px;"><i class="ti ti-bolt" aria-hidden="true" style="color:#5dcaa5;"></i> Aktuelle Produktion pro Sekunde</div>
+            <div id="prodNowBox" style="margin-bottom:1rem;"></div>
+          </div>
+        </div>
+        <div class="prog-section" data-sec="letzteaenderungen">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="letzteaenderungen"><i class="ti ti-clock" aria-hidden="true"></i>Letzte Änderungen<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Zeigt Punktänderungen seit dem Öffnen dieses Spiels – grün wenn Punkte dazukommen, rot wenn welche verloren gehen, jeweils mit Begründung.</div>
+            <div id="scoreLogBox"></div>
+          </div>
+        </div>
       </div>
 
       <div class="tab-panel" id="tab-fortschritt">
-        <div class="section-title"><i class="ti ti-medal" aria-hidden="true"></i>Galaktische Dominanz</div>
-        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Endlose Langzeitziele: Stufen ohne Ende, jede mit Titel und Belohnung. Es gibt kein Spielende – nur den nächsten Rang.</div>
-        <div id="dominanceBox" style="margin-bottom:1.5rem;"></div>
-        <div class="section-title"><i class="ti ti-award" aria-hidden="true"></i>Kommandanten-Level</div>
-        <div id="levelBox"></div>
+        <div class="jumpnav" id="jumpnav-fortschritt" style="display:none;"></div>
+        <div class="prog-section" data-sec="dominanz">
+          <div class="section-title prog-sec-header" data-sec-toggle="dominanz"><i class="ti ti-medal" aria-hidden="true"></i>Galaktische Dominanz<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Endlose Langzeitziele: Stufen ohne Ende, jede mit Titel und Belohnung. Es gibt kein Spielende – nur den nächsten Rang.</div>
+            <div id="dominanceBox" style="margin-bottom:1.5rem;"></div>
+          </div>
+        </div>
+        <div class="prog-section" data-sec="level">
+          <div class="section-title prog-sec-header" data-sec-toggle="level"><i class="ti ti-award" aria-hidden="true"></i>Kommandanten-Level<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div id="levelBox"></div>
+          </div>
+        </div>
 
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-backpack" aria-hidden="true"></i>Inventar</div>
-        <div id="inventoryBox"></div>
+        <div class="prog-twocol-group">
+          <div class="prog-section" data-sec="inventar">
+            <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="inventar"><i class="ti ti-backpack" aria-hidden="true"></i>Inventar<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+            <div class="prog-sec-body"><div id="inventoryBox"></div></div>
+          </div>
+          <div class="prog-section" data-sec="effekte">
+            <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="effekte"><i class="ti ti-bolt" aria-hidden="true"></i>Aktive Effekte<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+            <div class="prog-sec-body"><div id="buffsBox"></div></div>
+          </div>
+          <div class="prog-section" data-sec="items">
+            <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="items"><i class="ti ti-diamond" aria-hidden="true"></i>Seltene Items<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+            <div class="prog-sec-body"><div id="rareItemsBox"></div></div>
+          </div>
+          <div class="prog-section" data-sec="megaprojekte">
+            <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="megaprojekte"><i class="ti ti-sun" aria-hidden="true"></i>Mega-Projekte<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+            <div class="prog-sec-body"><div id="megaProjectsBox"></div></div>
+          </div>
+          <div class="prog-section" data-sec="artefakt">
+            <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="artefakt"><i class="ti ti-sparkles" aria-hidden="true"></i>Artefakt-Set: Erbe der Alten<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+            <div class="prog-sec-body"><div id="artifactSetBox"></div></div>
+          </div>
+          <div class="prog-section" data-sec="prestige">
+            <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="prestige"><i class="ti ti-infinity" aria-hidden="true"></i>Prestige<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+            <div class="prog-sec-body"><div id="prestigeBox"></div></div>
+          </div>
+        </div>
 
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-bolt" aria-hidden="true"></i>Aktive Effekte</div>
-        <div id="buffsBox"></div>
+        <div class="prog-section" data-sec="faehigkeitsbaum">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="faehigkeitsbaum"><i class="ti ti-award" aria-hidden="true"></i>Fähigkeitsbaum<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div id="skillTreeBox"></div>
+          </div>
+        </div>
 
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-diamond" aria-hidden="true"></i>Seltene Items</div>
-        <div id="rareItemsBox"></div>
-
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sun" aria-hidden="true"></i>Mega-Projekte</div>
-        <div id="megaProjectsBox"></div>
-
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sparkles" aria-hidden="true"></i>Artefakt-Set: Erbe der Alten</div>
-        <div id="artifactSetBox"></div>
-
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-infinity" aria-hidden="true"></i>Prestige</div>
-        <div id="prestigeBox"></div>
-
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-award" aria-hidden="true"></i>Fähigkeitsbaum</div>
-        <div id="skillTreeBox"></div>
-
-        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-medal" aria-hidden="true"></i>Erfolge</div>
-        <div class="research-list" id="achievementsList"></div>
+        <div class="prog-section" data-sec="erfolge">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="erfolge"><i class="ti ti-medal" aria-hidden="true"></i>Erfolge<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div class="research-list" id="achievementsList"></div>
+          </div>
+        </div>
       </div>
 
       <div class="tab-panel" id="tab-update">
@@ -1549,8 +1630,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.19.2';
+  const VERSION = '8.20.0';
   const PATCHNOTES = [
+    { version:'8.20.0', date:'13.07.2026', changes:[
+      'Neu (optional, Einstellungen): Drei Übersichtlichkeits-Layouts für die dichtesten Tabs (Punktestand, Fortschritt) - Sprungmarken (Klick-Leiste springt zu einem Abschnitt), Aufklappbare Abschnitte (einzeln ein-/ausklappbar, gemerkt) und Zweispaltiges Layout (kurze Abschnitte nebeneinander auf breiten Bildschirmen). Alle drei standardmäßig AUS, das bisherige Layout bleibt für alle unverändert der Standard - wer will, schaltet frei zu',
+      'Weitere Tabs (Galaxie u.a.) folgen bei Bedarf in einem separaten Schritt'
+    ]},
     { version:'8.19.2', date:'13.07.2026', changes:[
       'UI-Verbesserung "Angriffsflotte zusammenstellen": Zusammenfassungs-Leiste oben zeigt jetzt sofort die aktuelle Auswahl (Chips je Schiffstyp + Angriffskraft) auf einen Blick, statt durch alle Schiffstypen scrollen zu müssen',
       'Neue Schnellwahl-Buttons "Alle Kampfschiffe" / "Nichts" oben in der Angriffsflotten-Auswahl',
@@ -7532,6 +7617,7 @@
   // werden, sonst wird genau das Problem reproduziert, das diese Seite eigentlich lösen soll.
   const HELP_SECTIONS = [
     { key:'grundlagen', icon:'ti-home', title:'Grundlagen', entries:[
+      { title:'Übersichtlichkeit (optional)', body:'In den <strong>Einstellungen</strong> lassen sich drei Layout-Optionen für die dichtesten Tabs (Punktestand, Fortschritt) einzeln aktivieren, alle standardmäßig aus: <strong>Sprungmarken</strong> (Klick-Leiste oben springt direkt zu einem Abschnitt), <strong>Aufklappbare Abschnitte</strong> (jeder Abschnitt einzeln ein-/ausklappbar, gemerkt) und <strong>Zweispaltiges Layout</strong> (kurze Abschnitte nebeneinander, nur auf breiteren Bildschirmen sichtbar). Das bisherige Layout bleibt unverändert der Standard.' },
       { title:'Konto & E-Mail-Bestätigung', body:'Für ein neues Konto ist eine <strong>E-Mail-Adresse Pflicht</strong>. Nach der Registrierung bekommst du eine Bestätigungs-E-Mail mit einem Link (24h gültig) – erst nach dem Klick darauf ist dein Konto freigeschaltet und du kannst dich anmelden. Keine Mail erhalten? Auch im Spam-Ordner nachsehen oder über den Login-Bildschirm eine neue anfordern. Bestehende Konten sind davon nicht betroffen.' },
       { title:'E-Mail ändern', body:'In den Einstellungen unter „E-Mail" kannst du deine Adresse jederzeit ändern (Passwort-Bestätigung nötig). Die neue Adresse wird erst aktiv, nachdem du den Bestätigungslink geklickt hast, der dorthin geschickt wird – deine bisherige Adresse bleibt bis dahin gültig, damit du nicht ausgesperrt wirst.' },
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
@@ -8747,6 +8833,12 @@
         if (!state.themeKey) state.themeKey = 'standard';
         applyTheme(state.themeKey);
         if (state.autoReinforceOn === undefined) state.autoReinforceOn = false;
+        // Optionale Übersichtlichkeits-Layouts (Einstellungen) - alle standardmäßig aus, damit sich
+        // am bisherigen Layout für niemanden ungefragt etwas ändert.
+        if (state.uiJumpNav === undefined) state.uiJumpNav = false;
+        if (state.uiCollapsibleSections === undefined) state.uiCollapsibleSections = false;
+        if (state.uiTwoColumn === undefined) state.uiTwoColumn = false;
+        if (!state.collapsedSections) state.collapsedSections = {};
         if (!state.favoritePlanets) state.favoritePlanets = {};
         if (state.lastLoginDate === undefined) state.lastLoginDate = null;
         if (state.loginStreak === undefined) state.loginStreak = 0;
@@ -13415,6 +13507,13 @@
     const soundLabel = document.getElementById('soundStateLabel');
     if (soundLabel) soundLabel.textContent = state.soundOn ? 'An' : 'Aus';
 
+    const uiJumpNavSwitch = document.getElementById('uiJumpNavSwitch');
+    if (uiJumpNavSwitch) uiJumpNavSwitch.classList.toggle('on', !!state.uiJumpNav);
+    const uiCollapsibleSwitch = document.getElementById('uiCollapsibleSwitch');
+    if (uiCollapsibleSwitch) uiCollapsibleSwitch.classList.toggle('on', !!state.uiCollapsibleSections);
+    const uiTwoColSwitch = document.getElementById('uiTwoColSwitch');
+    if (uiTwoColSwitch) uiTwoColSwitch.classList.toggle('on', !!state.uiTwoColumn);
+
     const autoExploreSwitch = document.getElementById('autoExploreSwitch');
     if (autoExploreSwitch) autoExploreSwitch.classList.toggle('on', !!state.autoExploreOn);
     const autoExploreLabel = document.getElementById('autoExploreLabel');
@@ -13692,6 +13791,61 @@
       }
     }
     } // Ende Fortschritt/Forschung/Galaxie-Perf-Guard
+
+    // ===== Optionale Übersichtlichkeits-Layouts (Einstellungen) =====
+    // Body-Klassen spiegeln die drei Einstellungen wider; CSS greift nur, wenn die jeweilige Klasse
+    // gesetzt ist - Standard bleibt für niemanden ungefragt verändert.
+    document.body.classList.toggle('ui-jumpnav-on', !!state.uiJumpNav);
+    document.body.classList.toggle('ui-accordion-on', !!state.uiCollapsibleSections);
+    document.body.classList.toggle('ui-twocol-on', !!state.uiTwoColumn);
+    if (activeTab === 'punkte' || activeTab === 'fortschritt'){
+      const PROG_SECTIONS = {
+        punkte: [
+          { key:'zusammensetzung', label:'Zusammensetzung', icon:'ti-star' },
+          { key:'verlauf', label:'Verlauf', icon:'ti-arrow-up' },
+          { key:'kampfbilanz', label:'Kampfbilanz', icon:'ti-sword' },
+          { key:'aufstieg', label:'Aufstieg', icon:'ti-sparkles' },
+          { key:'statistik', label:'Statistik', icon:'ti-atom' },
+          { key:'letzteaenderungen', label:'Änderungen', icon:'ti-clock' }
+        ],
+        fortschritt: [
+          { key:'dominanz', label:'Dominanz', icon:'ti-medal' },
+          { key:'level', label:'Level', icon:'ti-award' },
+          { key:'inventar', label:'Inventar', icon:'ti-backpack' },
+          { key:'effekte', label:'Effekte', icon:'ti-bolt' },
+          { key:'items', label:'Items', icon:'ti-diamond' },
+          { key:'megaprojekte', label:'Mega-Projekte', icon:'ti-sun' },
+          { key:'artefakt', label:'Artefakt-Set', icon:'ti-sparkles' },
+          { key:'prestige', label:'Prestige', icon:'ti-infinity' },
+          { key:'faehigkeitsbaum', label:'Fähigkeitsbaum', icon:'ti-award' },
+          { key:'erfolge', label:'Erfolge', icon:'ti-medal' }
+        ]
+      };
+      const jumpBox = document.getElementById('jumpnav-'+activeTab);
+      if (jumpBox){
+        jumpBox.style.display = state.uiJumpNav ? 'flex' : 'none';
+        if (state.uiJumpNav){
+          jumpBox.innerHTML = PROG_SECTIONS[activeTab].map(s => `<a href="#" data-jump-to="${s.key}"><i class="ti ${s.icon}" aria-hidden="true"></i> ${s.label}</a>`).join('');
+          jumpBox.querySelectorAll('[data-jump-to]').forEach(a => a.onclick = (ev) => {
+            ev.preventDefault();
+            const key = a.getAttribute('data-jump-to');
+            if (state.uiCollapsibleSections) state.collapsedSections[key] = false;
+            const target = document.querySelector(`.prog-section[data-sec="${key}"]`);
+            if (target){ target.classList.remove('collapsed'); target.scrollIntoView({ behavior:'smooth', block:'start' }); }
+          });
+        }
+      }
+      document.querySelectorAll(`#tab-${activeTab} .prog-section`).forEach(sec => {
+        const key = sec.getAttribute('data-sec');
+        sec.classList.toggle('collapsed', state.uiCollapsibleSections && !!state.collapsedSections[key]);
+        const header = sec.querySelector('.prog-sec-header');
+        if (header) header.onclick = () => {
+          if (!state.uiCollapsibleSections) return;
+          state.collapsedSections[key] = !state.collapsedSections[key];
+          sec.classList.toggle('collapsed', !!state.collapsedSections[key]);
+        };
+      });
+    }
 
     document.getElementById('heroResearch').textContent = Object.values(state.research).filter(Boolean).length+'/'+RESEARCH_DEFS.length;
     document.getElementById('heroFleet').textContent = cf.ships+' Schiff'+(cf.ships===1?'':'e')+' · '+cf.cruisers+' Kreuzer ('+planetDisplayName(state.activeBasePlanet)+')';
@@ -13976,6 +14130,12 @@
     };
     const soundToggleBtn = document.getElementById('soundToggleRow');
     if (soundToggleBtn) soundToggleBtn.onclick = () => { state.soundOn = !state.soundOn; render(); save(); };
+    const uiJumpNavToggleBtn = document.getElementById('uiJumpNavToggleRow');
+    if (uiJumpNavToggleBtn) uiJumpNavToggleBtn.onclick = () => { state.uiJumpNav = !state.uiJumpNav; render(); save(); };
+    const uiCollapsibleToggleBtn = document.getElementById('uiCollapsibleToggleRow');
+    if (uiCollapsibleToggleBtn) uiCollapsibleToggleBtn.onclick = () => { state.uiCollapsibleSections = !state.uiCollapsibleSections; render(); save(); };
+    const uiTwoColToggleBtn = document.getElementById('uiTwoColToggleRow');
+    if (uiTwoColToggleBtn) uiTwoColToggleBtn.onclick = () => { state.uiTwoColumn = !state.uiTwoColumn; render(); save(); };
     const notifToggleBtn = document.getElementById('notifToggleRow');
     if (notifToggleBtn) notifToggleBtn.onclick = async () => {
       if (!state.notifOn){
