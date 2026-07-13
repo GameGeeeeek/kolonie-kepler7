@@ -1460,8 +1460,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.8.0';
+  const VERSION = '8.8.1';
   const PATCHNOTES = [
+    { version:'8.8.1', date:'13.07.2026', changes:[
+      'PWA Teil B (vorgezogen): Service Worker registriert - Kolonie Kepler-7 lässt sich jetzt auch am DESKTOP installieren (Chrome/Edge verlangen dafür zusätzlich zum Manifest einen aktiven Service Worker), nicht mehr nur auf Handy/Tablet',
+      'Nebeneffekt: sofortiger App-Start und eine einfache Offline-Hinweisseite, falls die Verbindung mal komplett fehlt - alle Live-Funktionen (Login, Speichern, Bestenliste u.a.) laufen weiterhin ausschließlich live, werden nie gecacht'
+    ]},
     { version:'8.8.0', date:'13.07.2026', changes:[
       'Kolonie Kepler-7 ist jetzt als App installierbar: "Zum Startbildschirm hinzufügen" gibt ein eigenes Icon und startet die App im Vollbild ohne Browser-Leiste',
       'Erster Schritt eines mehrteiligen PWA-Ausbaus - als Nächstes folgen Offline-Caching und (perspektivisch) Push-Benachrichtigungen'
@@ -13733,6 +13737,15 @@
     const ready = await initAuth();
     if (ready){ await load(); render(); loadLeaderboard(); loadReports(); loadMessages(); if (myAllianceTag()) loadAllianceWars(); if (!state.tutorialSeen) showTutorial(); }
   })();
+  // PWA: Service Worker registrieren (macht die App zusätzlich zum Manifest auch am DESKTOP
+  // installierbar - Chrome/Edge verlangen dafür einen aktiven Service Worker, mobile Browser
+  // begnügen sich meist mit dem Manifest allein). Läuft bewusst erst nach dem eigentlichen
+  // Spielstart und schluckt Fehler still - ein fehlender Service Worker darf das Spiel nie blockieren.
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+    });
+  }
 })();
 </script>
 </body>
