@@ -1407,8 +1407,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.92.0';
+  const VERSION = '7.93.0';
   const PATCHNOTES = [
+    { version:'7.93.0', date:'13.07.2026', changes:[
+      'Neu: zwei weitere Planeten-Rollen – jede Kolonie hat jetzt sechs Spezialisierungen zur Wahl',
+      'Forschungs-Welt: +25% Forschungspunkte auf dieser Kolonie, -10% Forschungszeit imperiumsweit (nicht stapelbar mit weiteren Forschungs-Welten)',
+      'Logistik-Welt: +15% Ertrag aller Handelsrouten imperiumsweit (nicht stapelbar), zusätzlich +250 Extra-Lagerkapazität je dort stationiertem Frachter',
+      'Das Erfolgs-Ziel „Vielseitiges Imperium" (4 verschiedene Rollen gleichzeitig) bleibt mit den neuen Rollen leichter kombinierbar',
+      'Hilfe-Seite entsprechend aktualisiert'
+    ]},
     { version:'7.92.0', date:'12.07.2026', changes:[
       'Großer Ökonomie-Balance-Pass: die Produktion wuchs durch 16 sich gegenseitig multiplizierende Boni viel zu schnell (Late-Game bis ×25) – jetzt gestaffelt gebremst: ca. -25% früh, -32% Mid-Game, -52% Late-Game',
       'Habitat-Bonus gedeckelt bei +40% (Level 20), Kommandanten-Level-Bonus gedeckelt bei +30% – beide waren unbegrenzt',
@@ -2862,6 +2869,8 @@
   function processTradeRoutes(){
     if (!state.tradeRoutes || !state.tradeRoutes.length) return;
     const now = Date.now();
+    // Logistik-Welt (Rolle): +15% Ertrag auf Kredit- und Verkaufsrouten, imperiumsweit, nicht stapelbar.
+    const logisticsMult = hasRoleAnywhere('logistics') ? 1.15 : 1;
     for (const route of state.tradeRoutes){
       if (now < (route.nextTick||0)) continue;
       route.nextTick = now + ROUTE_INTERVAL_MS;
@@ -2871,13 +2880,13 @@
         const upkeep = route.frachter * ROUTE_CREDITS_UPKEEP_ERZ_PER_FRACHTER;
         if ((state.resources.erz||0) >= upkeep){
           state.resources.erz -= upkeep;
-          const gain = creditsRouteYield(route.frachter);
+          const gain = Math.round(creditsRouteYield(route.frachter) * logisticsMult);
           state.credits = (state.credits||0) + gain;
         }
       } else if (route.type === 'sell'){
         // Verkauft eine feste Menge der gewählten Ressource am Markt (lokaler Marktpreis-Cache als Basis;
         // echter Preis wird beim nächsten Markt-Laden aktualisiert). Braucht genug Ressourcen im Lager.
-        const amount = route.frachter * ROUTE_SELL_PER_FRACHTER;
+        const amount = Math.round(route.frachter * ROUTE_SELL_PER_FRACHTER * logisticsMult);
         const have = state.resources[route.resource]||0;
         const sellAmt = Math.min(amount, Math.floor(have));
         if (sellAmt > 0){
@@ -3972,6 +3981,7 @@
     let labMult = Math.max(0.25, 1 - labs*0.06);
     if (state.allianceResearch && state.allianceResearch.a_res) labMult *= 0.85;
     if (state.allianceResearch && state.allianceResearch.ab_forschungszentrum) labMult *= 0.90;
+    if (hasRoleAnywhere('science')) labMult *= 0.90; // Forschungs-Welt: -10% Forschungszeit (imperiumsweit, nicht stapelbar)
     labMult *= (1 - officerBonus('wissenschaftler'));
     return Math.round(r.baseDuration * Math.pow(r.durationMult, targetLevel-1) * labMult);
   }
@@ -4125,6 +4135,7 @@
         let fpMult = habitatMult * moonPenalty(planet);
         const role = planetRoleOf(planet);
         if (role && role.key==='mining') fpMult *= 1.25;
+        if (role && role.key==='science') fpMult *= 1.25;
         fpMult *= terraformProdMult(planet);
         fpMult *= planetTypeProdMult(planet, 'forschungspunkte');
         fpMult *= (1 + moduleBonusAt(planet, 'prod'));
@@ -4186,6 +4197,12 @@
       let contrib = (b.lager||0)*400*moonPenalty(planet);
       const role = planetRoleOf(planet);
       if (role && role.key==='trade') contrib *= 1.30;
+      // Logistik-Welt: jeder DORT stationierte Frachter gibt +250 Extra-Lager (zusätzlich zu den
+      // normalen 250, die jeder freie Frachter ohnehin bringt) - Frachter auf Routen zählen nicht.
+      if (role && role.key==='logistics'){
+        const f = planet==='home' ? state.fleet : (state.colonies[planet] ? state.colonies[planet].fleet : null);
+        if (f) contrib += (f.frachter||0)*250;
+      }
       cap += contrib;
     }
     const lvl = state.research.rlager||0;
@@ -6506,7 +6523,7 @@
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert.' },
       { title:'Lager & weicher Deckel', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Wird die Kapazität erreicht, geht Produktion NICHT komplett verloren: über der Grenze läuft die Produktion mit <strong>20% Ertrag</strong> weiter statt bei 0% zu stoppen. Es lohnt sich trotzdem, regelmäßig auszubauen – 20% ist ein Trostpflaster, kein Ersatz für genug Lagerkapazität.' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
-      { title:'Planeten-Rollen', body:'Jeder Planet kann eine Rolle bekommen: Bergbau-Welt (+25% Ressourcenproduktion), Festung (+30% Verteidigungspunkte, Gebäude wie Schiffe), oder neutral ohne Bonus.' }
+      { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' }
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau.' },
@@ -7941,8 +7958,16 @@
     { key:'mining', name:'Bergbau-Welt', icon:'ti-pick', desc:'Rohstoffproduktion auf dieser Kolonie deutlich gesteigert.', detail:'+25% Ressourcenproduktion', color:'#fac775' },
     { key:'fortress', name:'Festungs-Welt', icon:'ti-shield-lock', desc:'Verteidigungsanlagen dieser Kolonie massiv verstärkt.', detail:'+30% Verteidigungspunkte', color:'#378add' },
     { key:'shipyard', name:'Werft-Welt', icon:'ti-ship', desc:'Optimierte Fertigungsstraßen für Schiffsbau auf dieser Kolonie.', detail:'-20% Bauzeit für Schiffe', color:'#5dcaa5' },
-    { key:'trade', name:'Handels-Welt', icon:'ti-box', desc:'Ausgebaute Lagerkomplexe auf dieser Kolonie.', detail:'+30% Lagerkapazität (dieser Kolonie)', color:'#c3bef5' }
+    { key:'trade', name:'Handels-Welt', icon:'ti-box', desc:'Ausgebaute Lagerkomplexe auf dieser Kolonie.', detail:'+30% Lagerkapazität (dieser Kolonie)', color:'#c3bef5' },
+    { key:'science', name:'Forschungs-Welt', icon:'ti-flask', desc:'Wissenschaftliche Einrichtungen dieser Kolonie arbeiten Hand in Hand.', detail:'+25% Forschungspunkte hier · -10% Forschungszeit (imperiumsweit, nicht stapelbar)', color:'#c3bef5' },
+    { key:'logistics', name:'Logistik-Welt', icon:'ti-truck', desc:'Umschlagplatz mit ausgebauten Docks und Verladekränen.', detail:'+15% Handelsrouten-Ertrag (imperiumsweit, nicht stapelbar) · +250 Extra-Lager je hier stationiertem Frachter', color:'#9fe1cb' }
   ];
+  // Prüft, ob IRGENDEIN Planet des Imperiums die angegebene Rolle hat - für imperiumsweite
+  // Rollen-Effekte (Forschungs-Welt-Zeitbonus, Logistik-Welt-Routenbonus). Bewusst nicht stapelbar:
+  // eine Welt der Rolle genügt, mehrere bringen den Effekt nicht mehrfach.
+  function hasRoleAnywhere(roleKey){
+    return Object.values(state.planetSpecialization||{}).includes(roleKey);
+  }
   const PLANET_ROLE_SWITCH_COST = { erz:1200, kristalle:800 };
   // Ein WECHSEL einer bereits spezialisierten Welt zu einer anderen Rolle braucht jetzt echte Umbauzeit
   // (wie eine Bauwarteschlange) statt sofort zu wirken – passt besser zum "Umbauen"-Begriff. Die
