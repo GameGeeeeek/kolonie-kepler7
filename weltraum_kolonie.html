@@ -1059,6 +1059,8 @@
           </div>
         </div>
 
+        <div id="allianceDominanceBox" style="margin-bottom:1.5rem;"></div>
+
         <div class="section-title"><i class="ti ti-flag" aria-hidden="true"></i>Allianz-Rangliste</div>
         <div class="leaderboard" id="allianceList"><div class="bmeta">lädt…</div></div>
 
@@ -1404,8 +1406,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.89.0';
+  const VERSION = '7.90.0';
   const PATCHNOTES = [
+    { version:'7.90.0', date:'12.07.2026', changes:[
+      'Allianz-Ausbau: das Handelsabkommen (a_trade) wirkte bisher nur auf den alten Zufallshändler und ist jetzt repariert – gibt +8% Preisvorteil am galaktischen Markt für alle Mitglieder (kombinierbar mit Fraktions-Rabatt, gedeckelt bei 20%)',
+      'Neu: Allianz-Dominanz – ein gemeinsames Langzeitziel aus der Summe aller persönlichen Dominanz-Werte der Mitglieder, mit eigenen Stufen und Belohnungen (jeder holt sich seine einzeln ab)',
+      'Neu: Kriegspunkte-Bestenliste – jeder Allianzkrieg zeigt jetzt, welche eigenen Mitglieder am meisten beigetragen haben',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.89.0', date:'12.07.2026', changes:[
       'Balance-Pass: Kredit-Route entschärft (war ein Perpetuum mobile – Frachter kosteten nur einmalig 100 Erz, amortisierten sich in ~9 Min. und warfen danach unbegrenzt Gewinn ab)',
       'Kredit-Route: nur noch EINE gleichzeitig, gedeckelt auf max. 15 Frachter',
@@ -2729,7 +2737,7 @@
     { key:'a_def', name:'Gemeinsamer Verteidigungspakt', desc:'+15% Verteidigung für alle Allianzmitglieder', cost:6000, resKey:'kristalle', icon:'ti-shield-lock' },
     { key:'a_atk', name:'Vereinte Flottendoktrin', desc:'+10% Angriffspunkte für alle Allianzmitglieder', cost:7000, resKey:'deuterium', icon:'ti-sword' },
     { key:'a_res', name:'Wissensaustausch', desc:'-15% Forschungszeit für alle Allianzmitglieder', cost:9000, resKey:'antimaterie', icon:'ti-flask' },
-    { key:'a_trade', name:'Handelsabkommen', desc:'+20% Ertrag aus Schwarzmarkt-Handel für alle Allianzmitglieder', cost:5000, resKey:'kristalle', icon:'ti-truck' },
+    { key:'a_trade', name:'Handelsabkommen', desc:'+8% Preisvorteil am galaktischen Markt (Kauf & Verkauf) für alle Allianzmitglieder', cost:5000, resKey:'kristalle', icon:'ti-truck' },
     { key:'a_storage', name:'Gemeinsame Lagerlogistik', desc:'+15% Lagerkapazität für alle Allianzmitglieder', cost:6000, resKey:'erz', icon:'ti-building-community' },
     { key:'a_speed', name:'Antriebssynchronisation', desc:'-10% Missionsdauer (Erkundung/Angriff/Expedition/Verlegung) für alle Allianzmitglieder', cost:8500, resKey:'deuterium', icon:'ti-clock' },
     { key:'a_scanner', name:'Allianz-Aufklärungsnetz', desc:'Alle Mitglieder erkennen Überfälle 90s früher (wie eine zusätzliche Scanner-Stufe), selbst ohne eigene Scanner-Forschung', cost:10000, resKey:'antimaterie', icon:'ti-target' },
@@ -3428,7 +3436,12 @@
   // Kartell: Markt-Preisvorteil (Kauf billiger, Verkauf besser). 0 / 0.05 / 0.10
   function marketDiscountPct(){
     const lvl = factionEffectLevel('kartell');
-    return lvl === 2 ? 0.10 : (lvl === 1 ? 0.05 : 0);
+    let pct = lvl === 2 ? 0.10 : (lvl === 1 ? 0.05 : 0);
+    // Allianz-Handelsabkommen (a_trade) wirkte früher nur auf den alten Zufallshändler; gilt seit
+    // v7.90 zusätzlich auf den galaktischen Markt. Additiv zum Fraktionsrabatt, insgesamt gedeckelt
+    // bei 20%, damit sich Diplomatie- und Allianz-Boni nicht zu einem Freifahrtschein aufaddieren.
+    if (state.allianceResearch && state.allianceResearch.a_trade) pct += 0.08;
+    return Math.min(0.20, pct);
   }
   // Void: Multiplikator auf die Raid-Wahrscheinlichkeit. 1 / 0.75 / 0.5
   function raidChanceMult(){
@@ -3665,6 +3678,8 @@
     factionQuestsDone: 0,
     shopPurchases: 0,
     dominanceClaimed: 0,
+    allianceDominanceClaimed: 0,
+    allianceDominanceTotal: 0,
     modules: {},
     moduleSlotLevel: {},
     equippedModules: {},
@@ -6485,7 +6500,9 @@
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern.' },
-      { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand.' }
+      { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
+      { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf) für alle Mitglieder. Kombiniert sich mit einem eigenen Fraktions-Marktrabatt, insgesamt gedeckelt bei 20%.' },
+      { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' }
     ]},
     { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
       { title:'Weltboss', body:'Gelegentlich erscheint ein <strong>galaktischer Weltboss</strong> (oben im Galaxie-Tab, mit Serververbindung): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Du kannst ihn alle 30 Minuten angreifen (Schaden = deine Angriffskraft). Jeder Angriff bringt +8 Kampfpunkte und +40 Kredite, der <strong>Todesstoß</strong> +100 Kampfpunkte und +1000 Kredite. Bleibt er 72 Stunden unbesiegt, zieht er sich zurück. Seine HP skalieren mit der Spielerzahl.' },
@@ -6996,7 +7013,7 @@
       state.player.allianceTag = tag;
       state.player.allianceRole = role;
       render(); save();
-      loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages();
+      loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceDominance();
     } catch(e){
       log('Allianz-Aktion aktuell nicht möglich (Server nicht erreichbar).', 'ti-alert-triangle');
     }
@@ -7108,16 +7125,23 @@
         let myScore = 0, theirScore = 0;
         try { const r1 = await storageGet('alliance:'+tag+':warscore:'+enemyTag, true); myScore = r1 && r1.value ? (JSON.parse(r1.value).score||0) : 0; } catch(e){}
         try { const r2 = await storageGet('alliance:'+enemyTag+':warscore:'+tag, true); theirScore = r2 && r2.value ? (JSON.parse(r2.value).score||0) : 0; } catch(e){}
+        const top = await loadWarTopContributors(tag, enemyTag);
+        const topHtml = top.length
+          ? `<div class="bmeta" style="margin-top:4px; padding-left:24px;"><i class="ti ti-medal" aria-hidden="true" style="color:#fac775; margin-right:3px;"></i>Top: ${top.map((t,i)=>(i+1)+'. '+t.name+' ('+t.score+')').join(' · ')}</div>`
+          : '';
         rows.push(`
-          <div class="rank-row">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i>
-              <span style="font-weight:500;">Krieg gegen [${enemyTag}]</span>
+          <div class="rank-row" style="flex-direction:column; align-items:stretch;">
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i>
+                <span style="font-weight:500;">Krieg gegen [${enemyTag}]</span>
+              </div>
+              <div style="display:flex; gap:12px; align-items:center;">
+                <span class="bmeta">${myScore} : ${theirScore}</span>
+                ${amIAdmin ? `<button data-make-peace="${enemyTag}" style="font-size:10px; padding:5px 8px;"><i class="ti ti-flag" aria-hidden="true"></i> Frieden</button>` : ''}
+              </div>
             </div>
-            <div style="display:flex; gap:12px; align-items:center;">
-              <span class="bmeta">${myScore} : ${theirScore}</span>
-              ${amIAdmin ? `<button data-make-peace="${enemyTag}" style="font-size:10px; padding:5px 8px;"><i class="ti ti-flag" aria-hidden="true"></i> Frieden</button>` : ''}
-            </div>
+            ${topHtml}
           </div>
         `);
       }
@@ -7164,7 +7188,25 @@
       const r = await storageGet('alliance:'+tag+':warscore:'+enemyTag, true);
       const cur = r && r.value ? (JSON.parse(r.value).score||0) : 0;
       await storageSet('alliance:'+tag+':warscore:'+enemyTag, JSON.stringify({ score: cur+points }), true);
+      // Individuellen Beitrag zusätzlich festhalten, für die Top-Kämpfer-Anzeige je Krieg.
+      const ck = 'alliance:'+tag+':warcontrib:'+enemyTag+':'+state.player.id;
+      const cr = await storageGet(ck, true);
+      const curMine = cr && cr.value ? (JSON.parse(cr.value).score||0) : 0;
+      await storageSet(ck, JSON.stringify({ score: curMine+points, name: state.player.name }), true);
     } catch(e){}
+  }
+  // Liefert die Top-3-Kämpfer der eigenen Allianz in einem bestimmten Krieg (nach Kampfpunkten
+  // gegen diesen Gegner), fürs Kriegs-Panel im Allianz-Tab.
+  async function loadWarTopContributors(tag, enemyTag){
+    try {
+      const listRes = await storageList('alliance:'+tag+':warcontrib:'+enemyTag+':', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys.slice(0, 60) : [];
+      const docs = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){}
+        return null;
+      }));
+      return docs.filter(d=>d && d.score>0).sort((a,b)=>b.score-a.score).slice(0,3);
+    } catch(e){ return []; }
   }
   async function loadAllianceMessages(){
     const box = document.getElementById('chatPanelAllianceBox');
@@ -7276,6 +7318,84 @@
       renderAllianceTechBox();
       renderAllianceBuildingBox();
     } catch(e){ /* Allianz-Techs optional, Spiel läuft ohne */ }
+  }
+
+  // ===== Gemeinsames Allianz-Dominanz-Ziel =====
+  // Nutzt denselben "jeder schreibt seinen Wert in einen eigenen Shared-Key, wir summieren beim Lesen"
+  // Mechanismus wie die Allianz-Tech-Beiträge oben. Jedes Mitglied schreibt beim Öffnen des Allianz-
+  // Tabs seinen aktuellen persönlichen Dominanz-Wert (dominanceScore(), aus v7.86) in einen eigenen
+  // Schlüssel; die Summe aller Mitglieder ergibt die Allianz-Dominanz. Stufen sind bewusst deutlich
+  // größer skaliert als die persönlichen (Team-Ziel), Belohnung wird pro Spieler lokal geclaimt -
+  // dasselbe Muster wie bei der persönlichen Dominanz, nur gespeist aus der Allianz-Summe.
+  function allianceDominanceThreshold(n){ return Math.round(5000 * Math.pow(n, 1.6)); }
+  function allianceDominanceLevelFor(score){
+    let lvl = 0;
+    while (score >= allianceDominanceThreshold(lvl+1)) lvl++;
+    return lvl;
+  }
+  function allianceDominanceRewardFor(lvl){ return { credits: 300 + lvl*150, commandPoints: 15 + lvl*8 }; }
+  async function loadAllianceDominance(){
+    const tag = myAllianceTag();
+    if (!tag) return;
+    try {
+      // Eigenen aktuellen Wert hochladen.
+      await storageSet('alliance:'+tag+':dominance:'+state.player.id, JSON.stringify({ score: dominanceScore(), name: state.player.name }), true);
+      // Alle Mitgliedsbeiträge summieren.
+      const listRes = await storageList('alliance:'+tag+':dominance:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys.slice(0, 60) : [];
+      const docs = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){}
+        return null;
+      }));
+      let total = 0;
+      for (const d of docs){ if (d && typeof d.score === 'number') total += d.score; }
+      state.allianceDominanceTotal = total;
+      renderAllianceDominanceBox();
+    } catch(e){ /* optional, Spiel läuft ohne */ }
+  }
+  function claimAllianceDominanceReward(){
+    const total = state.allianceDominanceTotal||0;
+    const reached = allianceDominanceLevelFor(total);
+    const claimed = state.allianceDominanceClaimed||0;
+    const next = claimed + 1;
+    if (next > reached){ log('Die nächste Allianz-Dominanz-Stufe ist noch nicht erreicht.', 'ti-info-circle'); return; }
+    const rw = allianceDominanceRewardFor(next);
+    state.allianceDominanceClaimed = next;
+    state.credits = (state.credits||0) + rw.credits;
+    state.commandPoints = (state.commandPoints||0) + rw.commandPoints;
+    log('Allianz-Dominanz-Stufe '+next+' erreicht! +'+rw.credits+' Kredite, +'+rw.commandPoints+' Kommandopunkte.', 'ti-medal');
+    playSound('achieve');
+    render(); save();
+  }
+  function renderAllianceDominanceBox(){
+    const box = document.getElementById('allianceDominanceBox');
+    if (!box) return;
+    const tag = myAllianceTag();
+    if (!tag){ box.innerHTML = ''; return; }
+    const total = state.allianceDominanceTotal||0;
+    const reached = allianceDominanceLevelFor(total);
+    const claimed = state.allianceDominanceClaimed||0;
+    const nextLvl = claimed + 1;
+    const nextThresh = allianceDominanceThreshold(nextLvl);
+    const prevThresh = claimed > 0 ? allianceDominanceThreshold(claimed) : 0;
+    const pct = Math.max(0, Math.min(100, Math.round((total - prevThresh) / Math.max(1, nextThresh - prevThresh) * 100)));
+    const claimable = reached > claimed;
+    const rw = allianceDominanceRewardFor(nextLvl);
+    box.innerHTML = `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:#c3bef5;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div><div class="bname" style="color:#c3bef5;">Allianz-Dominanz <span class="lvl-pill">Stufe ${claimed}</span></div>
+          <div class="bmeta">Gemeinsam: ${fmt(total)} · nächste Stufe bei ${fmt(nextThresh)}</div></div>
+          <button data-claim-alliance-dominance ${claimable?'':'disabled'} style="white-space:nowrap; ${claimable?'background:rgba(195,190,245,0.2);':''}">${claimable?'Stufe '+nextLvl+' abholen':'Noch '+fmt(Math.max(0,nextThresh-total))}</button>
+        </div>
+        <div style="height:10px; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden; margin-bottom:4px;">
+          <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#7f77dd,#c3bef5);"></div>
+        </div>
+        <div class="bmeta">Belohnung für Stufe ${nextLvl}: +${rw.credits} Kredite, +${rw.commandPoints} Kommandopunkte (jedes Mitglied kann einzeln abholen)</div>
+        <div class="bmeta" style="margin-top:2px;">Speist sich aus dem persönlichen Dominanz-Wert aller Allianzmitglieder zusammen. Größeres Team = schneller neue Stufen.</div>
+      </div>`;
+    const btn = box.querySelector('[data-claim-alliance-dominance]');
+    if (btn) btn.onclick = () => claimAllianceDominanceReward();
   }
 
   async function contributeToAllianceTech(techKey, amount){
@@ -7550,6 +7670,8 @@
         if (state.factionQuestsDone === undefined) state.factionQuestsDone = 0;
         if (state.shopPurchases === undefined) state.shopPurchases = 0;
         if (state.dominanceClaimed === undefined) state.dominanceClaimed = 0;
+        if (state.allianceDominanceClaimed === undefined) state.allianceDominanceClaimed = 0;
+        if (state.allianceDominanceTotal === undefined) state.allianceDominanceTotal = 0;
         if (!state.modules) state.modules = {};
         if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
         if (!state.equippedModules) state.equippedModules = {};
@@ -9056,7 +9178,7 @@
     if (hProfile) hProfile.classList.toggle('active', tab==='einstellungen');
     if (tab === 'hilfe') renderHelpBox();
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
-    if (tab === 'allianz'){ loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); }
+    if (tab === 'allianz'){ loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     if (tab === 'berichte'){
       loadReports();
