@@ -273,8 +273,8 @@
     .dash-colony-icon { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; background:rgba(var(--primary-rgb), 0.18); color:#c3bef5; }
     .dash-role-badge { position:absolute; bottom:-4px; right:-4px; width:14px; height:14px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
     .dash-role-badge i { font-size:8px; margin:0; }
-    .dash-moon-badge { position:absolute; top:-7px; right:-7px; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#3a4060; color:#c3bef5; box-shadow:0 0 0 2px #0d1224; cursor:pointer; }
-    .dash-moon-badge i { font-size:11px; margin:0; }
+    .dash-moon-badge { position:absolute; bottom:-7px; left:-7px; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#3a4060; color:#c3bef5; box-shadow:0 0 0 2px #0d1224; cursor:pointer; font-size:13px; line-height:1; }
+    .pill-moon-btn { font-size:11px; line-height:1; }
     .pill-moon-btn { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#3a4060; color:#c3bef5; margin-left:5px; cursor:pointer; flex-shrink:0; }
     .pill-moon-btn i { font-size:10px; margin:0; }
     .pill-moon-btn.active, .pill-moon-btn:hover { background:#7f77dd; color:#0d1224; }
@@ -1419,8 +1419,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.98.2';
+  const VERSION = '7.98.3';
   const PATCHNOTES = [
+    { version:'7.98.3', date:'13.07.2026', changes:[
+      'Das Mond-Symbol ist jetzt eine Mondsichel (☾) und sitzt an der Übersichts-Karte unten links am Planeten-Icon, damit es den Planetennamen nicht mehr verdeckt'
+    ]},
     { version:'7.98.2', date:'13.07.2026', changes:[
       'Monde haben keine eigene Karte/Pille mehr in den Übersichten - sie sind jetzt überall über ein Mond-Symbol direkt am zugehörigen Planeten erreichbar (Übersichts-Karten, Planeten-Umschalter in Verteidigung/Flotte/Expedition, Status-Leiste)',
       'Das Mond-Symbol an der Planeten-Karte ist größer und sitzt jetzt oben rechts am Planeten-Icon (leuchtet violett, wenn der Mond aktiv ist)',
@@ -10041,7 +10044,7 @@
 
     const colonyIds = Object.keys(state.colonies||{}).sort((a,b) => (state.favoritePlanets[b]?1:0) - (state.favoritePlanets[a]?1:0));
     const favStar = (pid) => `<i class="ti ti-star" data-favorite-toggle="${pid}" aria-hidden="true" title="Favorit" style="margin-left:5px; color:${state.favoritePlanets[pid]?'#fac775':'#6b6f85'};"></i>`;
-    const pillMoonBtn = (pid) => (state.colonies && state.colonies['moon_'+pid]) ? `<span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+pid?'active':''}" data-moon-switch="moon_${pid}" title="${planetDisplayName('moon_'+pid)} – zum Mond wechseln"><i class="ti ti-planet" aria-hidden="true"></i></span>` : '';
+    const pillMoonBtn = (pid) => (state.colonies && state.colonies['moon_'+pid]) ? `<span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+pid?'active':''}" data-moon-switch="moon_${pid}" title="${planetDisplayName('moon_'+pid)} – zum Mond wechseln">☾</span>` : '';
     const planetSwitchHtml = !colonyIds.length ? '' : `<div class="planet-switch">
       <button class="planet-pill ${state.activeBasePlanet==='home'?'active':''}" data-planet-switch="home" style="border-color:rgba(126,119,221,0.4); position:relative;"><i class="ti ${PLANET_TYPE_INFO.erdaehnlich.icon}" aria-hidden="true" style="color:#5dcaa5;"></i>Heimatbasis <i class="ti ti-home" aria-hidden="true" style="color:#c3bef5; font-size:10px; margin-left:2px;"></i>${pillMoonBtn('home')}</button>
       ${colonyIds.filter(pid => !isMoonKey(pid)).map(pid => {
@@ -10096,7 +10099,7 @@
               <div class="dash-colony-icon" style="position:relative;">
                 <i class="ti ${icon}" aria-hidden="true"></i>
                 ${role ? `<span class="dash-role-badge" style="background:${role.color};" title="Rolle: ${role.name}"><i class="ti ${role.icon}" aria-hidden="true"></i></span>` : ''}
-                ${(!isMoonKey(d.id) && state.colonies && state.colonies['moon_'+d.id]) ? `<span class="dash-moon-badge ${state.activeBasePlanet==='moon_'+d.id?'active':''}" data-moon-switch="moon_${d.id}" title="${planetDisplayName('moon_'+d.id)} – anklicken, um zum Mond zu wechseln"><i class="ti ti-planet" aria-hidden="true"></i></span>` : ''}
+                ${(!isMoonKey(d.id) && state.colonies && state.colonies['moon_'+d.id]) ? `<span class="dash-moon-badge ${state.activeBasePlanet==='moon_'+d.id?'active':''}" data-moon-switch="moon_${d.id}" title="${planetDisplayName('moon_'+d.id)} – anklicken, um zum Mond zu wechseln">☾</span>` : ''}
               </div>
               <div class="dash-colony-info">
                 <div class="dash-colony-name">${targeted?'<i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i> ':''}${sabotaged&&!targeted?'<i class="ti ti-bolt" aria-hidden="true" style="color:#e0a548;"></i> ':''}${d.name}</div>
@@ -11148,7 +11151,7 @@
           <div class="left">
             <div class="bicon" style="background:${p.color}30; color:${p.color};"><i class="ti ${disc?'ti-planet':'ti-info-circle'}" aria-hidden="true"></i></div>
             <div>
-              <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}${(state.moons&&state.moons[p.id]) ? (state.colonies['moon_'+p.id] ? ` <span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+p.id?'active':''}" data-moon-switch="moon_${p.id}" title="${planetDisplayName('moon_'+p.id)} – zum Mond wechseln" style="vertical-align:middle;"><i class="ti ti-planet" aria-hidden="true"></i></span>` : ' <span class="lvl-pill" title="Dieser Planet hat einen Mond (noch nicht kolonisiert – siehe Mond-Liste unten)">Mond</span>') : ''}</div>
+              <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}${(state.moons&&state.moons[p.id]) ? (state.colonies['moon_'+p.id] ? ` <span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+p.id?'active':''}" data-moon-switch="moon_${p.id}" title="${planetDisplayName('moon_'+p.id)} – zum Mond wechseln" style="vertical-align:middle;">☾</span>` : ' <span class="lvl-pill" title="Dieser Planet hat einen Mond (noch nicht kolonisiert – siehe Mond-Liste unten)">Mond</span>') : ''}</div>
               <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS), 1)} Treibstoff</div>
               ${p.orbit ? `<div class="bmeta">${orbitBonusLabel(p.orbit)}</div>` : ''}
               <div class="bcost">${rewardHtml(p.reward)}</div>
