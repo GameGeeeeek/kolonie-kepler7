@@ -780,6 +780,7 @@
       <div class="tab-panel active" id="tab-basis">
         <div id="colonyDashboard"></div>
         <div id="planetRoleBox"></div>
+        <div id="orbitalStationBox"></div>
         <div id="terraformBox"></div>
         <div id="colonyRenameBox" style="display:flex; gap:8px; margin:0.5rem 0 1rem;">
           <input type="text" id="colonyRenameInput" placeholder="Eigener Name für diese Kolonie…" maxlength="24" style="flex:1;"/>
@@ -1407,8 +1408,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.93.0';
+  const VERSION = '7.94.0';
   const PATCHNOTES = [
+    { version:'7.94.0', date:'13.07.2026', changes:[
+      'Neu: Orbitalstation – jeder Planet (auch die Heimatbasis) kann im Basis-Tab eine Station in 3 Stufen bauen',
+      'Beim Bau wählst du einen Fokus: Verteidigungsring (+8% Verteidigung/Stufe), Produktionsring (+4% Produktion/Stufe, lokal) oder Dock-Ring (-6% Schiffsbauzeit/Stufe, +150 Lager/Stufe)',
+      'Ausbau behält den Fokus; Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort',
+      'Bewusst teuer nach dem Ökonomie-Pass: ab 4000 Erz / 2500 Kristalle / 800 Deuterium, verdoppelt sich je Stufe, 5-15 Minuten Bauzeit über die Bau-Warteschlange',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.93.0', date:'13.07.2026', changes:[
       'Neu: zwei weitere Planeten-Rollen – jede Kolonie hat jetzt sechs Spezialisierungen zur Wahl',
       'Forschungs-Welt: +25% Forschungspunkte auf dieser Kolonie, -10% Forschungszeit imperiumsweit (nicht stapelbar mit weiteren Forschungs-Welten)',
@@ -3679,7 +3687,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -4123,6 +4131,8 @@
         mineMult *= moonPenalty(planet);
         const role = planetRoleOf(planet);
         if (role && role.key==='mining') mineMult *= 1.25;
+        const orbP = orbitalStationOf(planet);
+        if (orbP && orbP.focus==='prod') mineMult *= 1 + 0.04*orbP.level;
         mineMult *= terraformProdMult(planet);
         mineMult *= planetTypeProdMult(planet, def.produces);
         mineMult *= (1 + moduleBonusAt(planet, 'prod'));
@@ -4136,6 +4146,8 @@
         const role = planetRoleOf(planet);
         if (role && role.key==='mining') fpMult *= 1.25;
         if (role && role.key==='science') fpMult *= 1.25;
+        const orbFp = orbitalStationOf(planet);
+        if (orbFp && orbFp.focus==='prod') fpMult *= 1 + 0.04*orbFp.level;
         fpMult *= terraformProdMult(planet);
         fpMult *= planetTypeProdMult(planet, 'forschungspunkte');
         fpMult *= (1 + moduleBonusAt(planet, 'prod'));
@@ -4203,6 +4215,8 @@
         const f = planet==='home' ? state.fleet : (state.colonies[planet] ? state.colonies[planet].fleet : null);
         if (f) contrib += (f.frachter||0)*250;
       }
+      const orbS = orbitalStationOf(planet);
+      if (orbS && orbS.focus==='dock') contrib += 150*orbS.level;
       cap += contrib;
     }
     const lvl = state.research.rlager||0;
@@ -4512,6 +4526,8 @@
       for (const def of BUILDING_DEFS) if (def.category==='defense') sub += (b[def.key]||0) * (def.defVal + (def.shield||0));
       const role = planetRoleOf(planet);
       if (role && role.key==='fortress') sub *= 1.30;
+      const orbG = orbitalStationOf(planet);
+      if (orbG && orbG.focus==='def') sub *= 1 + 0.08*orbG.level;
       sub *= planetTypeDefMult(planet);
       if (planet === 'home') sub *= HOME_DEFENSE_BONUS;
       power += sub * moonPenalty(planet);
@@ -4521,6 +4537,8 @@
       let shipDef = shipDefenseContribution(f);
       const role = planetRoleOf(planetKey);
       if (role && role.key==='fortress') shipDef *= 1.30;
+      const orbF = orbitalStationOf(planetKey);
+      if (orbF && orbF.focus==='def') shipDef *= 1 + 0.08*orbF.level;
       shipDef *= planetTypeDefMult(planetKey);
       if (planetKey === 'home') shipDef *= HOME_DEFENSE_BONUS;
       power += shipDef;
@@ -5409,6 +5427,8 @@
     if (kind === 'ship'){
       const role = planetRoleOf(planetKey);
       if (role && role.key==='shipyard') effBuildTimeEach *= 0.80;
+      const orbD = orbitalStationOf(planetKey);
+      if (orbD && orbD.focus==='dock') effBuildTimeEach *= 1 - 0.06*orbD.level;
     }
     if (kind === 'building'){
       effBuildTimeEach *= (1 - officerBonus('ingenieur'));
@@ -5471,6 +5491,11 @@
         const b = job.planet==='home' ? state.buildings : (state.colonies[job.planet] ? state.colonies[job.planet].buildings : null);
         if (b) b[job.key] = (b[job.key]||0) + job.qty;
         logScoreChange(job.qty*10, job.label+' fertiggestellt', 'ti-building-factory-2');
+      } else if (job.kind === 'orbital'){
+        // job.key = Fokus. Stufe wird beim Einreihen als job.qty mitgegeben (Ziel-Level).
+        if (!state.orbitalStations) state.orbitalStations = {};
+        state.orbitalStations[job.planet] = { level: job.qty, focus: job.key };
+        logScoreChange(40*job.qty, job.label+' fertiggestellt', 'ti-planet');
       }
       log(job.label+' fertiggestellt auf '+planetDisplayName(job.planet)+'.', job.icon||'ti-check');
       playSound('build');
@@ -6523,7 +6548,8 @@
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert.' },
       { title:'Lager & weicher Deckel', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Wird die Kapazität erreicht, geht Produktion NICHT komplett verloren: über der Grenze läuft die Produktion mit <strong>20% Ertrag</strong> weiter statt bei 0% zu stoppen. Es lohnt sich trotzdem, regelmäßig auszubauen – 20% ist ein Trostpflaster, kein Ersatz für genug Lagerkapazität.' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
-      { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' }
+      { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
+      { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+4% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' }
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau.' },
@@ -7746,6 +7772,7 @@
         if (state.activeEvent === undefined) state.activeEvent = null;
         if (state.lastEventTime === undefined) state.lastEventTime = 0;
         if (!state.planetSpecialization) state.planetSpecialization = {};
+        if (!state.orbitalStations) state.orbitalStations = {};
         if (state.warVictories === undefined) state.warVictories = 0;
         if (!state.scoreHistory) state.scoreHistory = [];
         if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
@@ -7973,6 +8000,58 @@
   // (wie eine Bauwarteschlange) statt sofort zu wirken – passt besser zum "Umbauen"-Begriff. Die
   // ERSTE Zuweisung einer noch unspezialisierten Kolonie bleibt sofort (reine Designation, kein Umbau).
   const PLANET_ROLE_SWITCH_DURATION = 900;
+  // ===== Orbitalstation =====
+  // Pro Planet (auch Heimatbasis, keine Monde) in 3 Stufen ausbaubar. Beim ersten Bau wird ein Fokus
+  // gewählt, der die Wirkung bestimmt; ein späterer Fokus-Wechsel kostet die halben Baukosten der
+  // aktuellen Stufe und wirkt sofort (kein Rückbau, nur Umrüstung der Ringmodule).
+  const ORBITAL_FOCI = [
+    { key:'def', name:'Verteidigungsring', icon:'ti-shield', desc:'+8% Verteidigung je Stufe', color:'#378add' },
+    { key:'prod', name:'Produktionsring', icon:'ti-sun', desc:'+4% Produktion je Stufe (dieser Planet)', color:'#fac775' },
+    { key:'dock', name:'Dock-Ring', icon:'ti-anchor', desc:'-6% Schiffsbauzeit je Stufe · +150 Lager je Stufe', color:'#5dcaa5' }
+  ];
+  const ORBITAL_MAX_LEVEL = 3;
+  function orbitalCost(level){
+    const f = Math.pow(2, level-1);
+    return { erz: 4000*f, kristalle: 2500*f, deuterium: 800*f };
+  }
+  function orbitalBuildTime(level){ return 300 * level; } // 5/10/15 Minuten
+  function orbitalStationOf(planetKey){ return (state.orbitalStations||{})[planetKey] || null; }
+  function orbitalJobFor(planetKey){ return (state.constructionQueue||[]).find(j=>j.kind==='orbital' && j.planet===planetKey) || null; }
+  function buildOrbitalStation(focusKey){
+    const pk = state.activeBasePlanet;
+    if (isMoonKey(pk)){ log('Orbitalstationen können nur um Planeten gebaut werden, nicht um Monde.', 'ti-alert-triangle'); return; }
+    if (orbitalJobFor(pk)){ log('Auf '+planetDisplayName(pk)+' ist bereits eine Orbitalstation in Bau.', 'ti-alert-triangle'); return; }
+    const cur = orbitalStationOf(pk);
+    const nextLevel = cur ? cur.level+1 : 1;
+    if (nextLevel > ORBITAL_MAX_LEVEL){ log('Die Orbitalstation dort hat schon die höchste Stufe.', 'ti-info-circle'); return; }
+    const focus = cur ? cur.focus : focusKey; // Ausbau behält den gewählten Fokus
+    const fdef = ORBITAL_FOCI.find(f=>f.key===focus);
+    if (!fdef){ log('Bitte zuerst einen Fokus wählen.', 'ti-alert-triangle'); return; }
+    const cost = orbitalCost(nextLevel);
+    if (!canAfford(cost)){ log('Nicht genug Ressourcen für die Orbitalstation (Stufe '+nextLevel+').', 'ti-alert-triangle'); return; }
+    pay(cost);
+    // buildTimeEach konstant 300 übergeben, qty = Ziel-Level -> Gesamtdauer 300s × Level (5/10/15 Min).
+    queueConstruction('orbital', pk, focus, nextLevel, 300, 'Orbitalstation Stufe '+nextLevel+' ('+fdef.name+')', 'ti-planet', cost);
+    render(); save();
+  }
+  function switchOrbitalFocus(focusKey){
+    const pk = state.activeBasePlanet;
+    const cur = orbitalStationOf(pk);
+    if (!cur){ return; }
+    if (cur.focus === focusKey){ log('Dieser Fokus ist bereits aktiv.', 'ti-info-circle'); return; }
+    if (orbitalJobFor(pk)){ log('Warte, bis der laufende Ausbau abgeschlossen ist.', 'ti-alert-triangle'); return; }
+    const fdef = ORBITAL_FOCI.find(f=>f.key===focusKey);
+    if (!fdef) return;
+    // Halbe Baukosten der aktuellen Stufe, wirkt sofort (Umrüstung statt Neubau).
+    const base = orbitalCost(cur.level);
+    const cost = { erz: Math.round(base.erz/2), kristalle: Math.round(base.kristalle/2), deuterium: Math.round(base.deuterium/2) };
+    if (!canAfford(cost)){ log('Nicht genug Ressourcen für die Umrüstung.', 'ti-alert-triangle'); return; }
+    pay(cost);
+    cur.focus = focusKey;
+    log('Orbitalstation über '+planetDisplayName(pk)+' auf '+fdef.name+' umgerüstet.', 'ti-planet');
+    playSound('build');
+    render(); save();
+  }
   // ===== Typ-Umwandlung ("echtes" Terraforming: verändert den Planetentyp selbst) =====
   // Sehr teuer und langwierig. Führt einen Planeten entlang TERRAFORM_TYPE_CHAIN eine Stufe weiter
   // (schlechtester Typ -> ... -> Erdwelt). Nur Typen in der Kette sind umwandelbar.
@@ -9846,6 +9925,59 @@
             </div>
           `;
           roleBox.querySelectorAll('[data-set-planet-role]').forEach(btn => btn.onclick = () => setPlanetRole(state.activeBasePlanet, btn.getAttribute('data-set-planet-role')));
+        }
+      }
+      // Orbitalstation – auf allen Planeten inkl. Heimatbasis (keine Monde). 3 Stufen, ein wählbarer
+      // Fokus (Verteidigung/Produktion/Docks), später gegen halbe Baukosten umrüstbar.
+      const orbitalBox = document.getElementById('orbitalStationBox');
+      if (orbitalBox){
+        const pk = state.activeBasePlanet;
+        if (isMoonKey(pk)){
+          orbitalBox.innerHTML = '';
+        } else {
+          const cur = orbitalStationOf(pk);
+          const job = orbitalJobFor(pk);
+          let html = `<div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-planet" aria-hidden="true"></i>Orbitalstation: ${planetDisplayName(pk)}</div>`;
+          if (job){
+            const remain = Math.max(0, job.endTime-Date.now());
+            const pct = Math.max(0, Math.min(100, 100-(remain/(job.totalDur*1000)*100)));
+            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:#7f77dd; margin-bottom:1rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="bname"><i class="ti ti-planet" aria-hidden="true"></i> ${job.label}</span>
+                <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
+              </div>
+              <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+            </div>`;
+          } else if (!cur){
+            html += `<div class="bmeta" style="margin-bottom:8px;">Baue eine Orbitalstation und wähle ihren Fokus (Stufe 1: ${costHtml(orbitalCost(1))}, ${fmtDuration(orbitalBuildTime(1))} Bauzeit; ausbaubar bis Stufe ${ORBITAL_MAX_LEVEL}).</div>
+            <div style="display:flex; gap:8px; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
+              ${ORBITAL_FOCI.map(f => `
+                <div class="card-row" style="flex-direction:column; align-items:flex-start; min-width:160px;">
+                  <div style="display:flex; align-items:center; gap:6px;"><i class="ti ${f.icon}" aria-hidden="true" style="color:${f.color};"></i><span class="bname" style="font-size:12px;">${f.name}</span></div>
+                  <div class="bmeta" style="margin:4px 0;">${f.desc}</div>
+                  <button data-build-orbital="${f.key}" style="align-self:stretch; font-size:10.5px;">Bauen</button>
+                </div>
+              `).join('')}
+            </div>`;
+          } else {
+            const fdef = ORBITAL_FOCI.find(f=>f.key===cur.focus) || ORBITAL_FOCI[0];
+            const nextLevel = cur.level + 1;
+            const half = orbitalCost(cur.level);
+            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:${fdef.color};">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span class="bname"><i class="ti ${fdef.icon}" aria-hidden="true" style="color:${fdef.color};"></i> ${fdef.name} <span class="lvl-pill">Stufe ${cur.level}/${ORBITAL_MAX_LEVEL}</span></span>
+              </div>
+              <div class="bmeta" style="margin-bottom:6px;">${fdef.desc} – aktuell wirksam: ${cur.focus==='def' ? '+'+(cur.level*8)+'% Verteidigung' : cur.focus==='prod' ? '+'+(cur.level*4)+'% Produktion' : '-'+(cur.level*6)+'% Schiffsbauzeit, +'+(cur.level*150)+' Lager'}</div>
+              ${nextLevel <= ORBITAL_MAX_LEVEL ? `<button data-build-orbital="${cur.focus}" style="margin-bottom:6px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Ausbau auf Stufe ${nextLevel} (${costHtml(orbitalCost(nextLevel))}, ${fmtDuration(orbitalBuildTime(nextLevel))})</button>` : `<div class="badge-done" style="text-align:center; margin-bottom:6px;"><i class="ti ti-check" aria-hidden="true"></i>Maximale Stufe erreicht</div>`}
+              <div class="bmeta" style="margin-bottom:4px;">Fokus umrüsten (sofort, halbe Baukosten der aktuellen Stufe):</div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                ${ORBITAL_FOCI.filter(f=>f.key!==cur.focus).map(f => `<button data-switch-orbital="${f.key}" style="font-size:10.5px; flex:1;"><i class="ti ${f.icon}" aria-hidden="true" style="margin-right:3px;"></i>${f.name}</button>`).join('')}
+              </div>
+            </div>`;
+          }
+          orbitalBox.innerHTML = html;
+          orbitalBox.querySelectorAll('[data-build-orbital]').forEach(btn => btn.onclick = () => buildOrbitalStation(btn.getAttribute('data-build-orbital')));
+          orbitalBox.querySelectorAll('[data-switch-orbital]').forEach(btn => btn.onclick = () => switchOrbitalFocus(btn.getAttribute('data-switch-orbital')));
         }
       }
       // Terraforming – funktioniert auf ALLEN Standorten inkl. Heimatbasis (anders als Rollen), außer
