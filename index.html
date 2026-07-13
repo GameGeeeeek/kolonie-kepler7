@@ -807,6 +807,17 @@
 
       <div class="resbar" id="resbar"></div>
       <div id="dailyQuestBar" style="margin-bottom:0.75rem;"></div>
+      <div class="event-banner" id="liveUpdateBanner" style="display:none; border-color:rgba(93,202,165,0.5); background:rgba(93,202,165,0.1);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <i class="ti ti-sparkles" aria-hidden="true" style="font-size:20px; color:#5dcaa5;"></i>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600; font-size:13px; color:#5dcaa5;" id="liveUpdateTitle">Update verfügbar</div>
+            <div style="font-size:11.5px; color:#c7cbe0; margin-top:2px;">Eine neue Version ist bereit - lade neu, um sie zu erhalten (dein Fortschritt bleibt erhalten).</div>
+          </div>
+          <button id="liveUpdateReloadBtn" style="font-size:11px; padding:6px 10px; flex-shrink:0;"><i class="ti ti-refresh" aria-hidden="true" style="margin-right:3px;"></i>Neu laden</button>
+          <button id="liveUpdateDismissBtn" style="font-size:11px; padding:6px 8px; flex-shrink:0;"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+      </div>
       <div class="event-banner" id="storageWarningBanner" style="display:none; border-color:rgba(224,165,72,0.5); background:rgba(224,165,72,0.1);">
         <div style="display:flex; align-items:center; gap:8px;">
           <i class="ti ti-alert-triangle" aria-hidden="true" style="font-size:20px; color:#e0a548;"></i>
@@ -1519,8 +1530,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.11.0';
+  const VERSION = '8.11.1';
   const PATCHNOTES = [
+    { version:'8.11.1', date:'13.07.2026', changes:[
+      'Neu: Automatische Update-Erkennung - ein lange offen gelassener Tab merkt jetzt von selbst, wenn eine neue Version bereitsteht (Prüfung beim Zurückwechseln in den Tab + alle 10 Minuten) und zeigt ein dezentes Banner mit Neu-laden-Knopf, statt dass ein manuelles Neuladen nötig ist'
+    ]},
     { version:'8.11.0', date:'13.07.2026', changes:[
       'Mobil-Optimierungspass: Eingabefelder (Login, Namensfelder, Feedback, Suche) zoomen am iPhone nicht mehr automatisch beim Antippen (Safari-Eigenheit bei Schrift unter 16px)',
       'Die Haupt-Tableiste ist auf schmalen Screens jetzt eine Wischleiste statt mehrzeilig umzubrechen',
@@ -4072,6 +4086,31 @@
     overlay.style.display = 'flex';
   }
 
+  // Aktive Update-Prüfung: läuft periodisch UND wenn der Tab wieder sichtbar wird, damit ein
+  // lange offen gelassener Tab (v.a. als installierte PWA, die der Browser seltener von selbst
+  // neu lädt) von selbst merkt, dass eine neue Version bereitsteht - vorher passierte das nur
+  // beim nächsten manuellen Neuladen.
+  let liveUpdateDismissedVersion = null;
+  let lastLiveUpdateCheck = 0;
+  async function checkLiveVersionUpdate(){
+    const now = Date.now();
+    if (now - lastLiveUpdateCheck < 90000) return; // höchstens alle 90s, auch bei häufigem Tab-Wechsel
+    lastLiveUpdateCheck = now;
+    try {
+      const res = await fetch(location.pathname + '?_v=' + now, { cache: 'no-store' });
+      if (!res.ok) return;
+      const text = await res.text();
+      const m = text.match(/const VERSION = '([\d.]+)'/);
+      if (!m) return;
+      const liveVersion = m[1];
+      if (compareVersions(liveVersion, VERSION) <= 0) return;
+      if (liveUpdateDismissedVersion === liveVersion) return;
+      const titleEl = document.getElementById('liveUpdateTitle');
+      if (titleEl) titleEl.textContent = 'Update verfügbar: v'+liveVersion;
+      const banner = document.getElementById('liveUpdateBanner');
+      if (banner) banner.style.display = 'block';
+    } catch(e){ /* Netzwerk kurz weg o.ä. - beim nächsten Intervall erneut versuchen */ }
+  }
   function checkForUpdateNotice(){
     if (state.lastSeenVersion === VERSION) return;
     let entries;
@@ -6444,6 +6483,22 @@
   document.getElementById('tutorialSkipBtn').addEventListener('click', closeTutorial);
   // Pakte einmal beim Start laden, damit die Friedensdividende sofort in die Produktion einfließt
   setTimeout(() => { try { loadDiplomacy(); loadWorldBoss(); loadNotificationPrefs(); loadNotificationEvents(); } catch(e){} }, 2500);
+  // Live-Update-Prüfung: einmal kurz nach dem Start, danach alle 10 Minuten während der Tab
+  // sichtbar ist, sowie sofort wenn der Tab nach einer Weile im Hintergrund wieder sichtbar wird
+  // (der häufigste reale Fall: Tab liegt offen, in der Zwischenzeit gab es ein Update).
+  setTimeout(checkLiveVersionUpdate, 15000);
+  setInterval(() => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); }, 600000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); });
+  const liveUpdateReloadBtn = document.getElementById('liveUpdateReloadBtn');
+  if (liveUpdateReloadBtn) liveUpdateReloadBtn.addEventListener('click', () => location.reload());
+  const liveUpdateDismissBtn = document.getElementById('liveUpdateDismissBtn');
+  if (liveUpdateDismissBtn) liveUpdateDismissBtn.addEventListener('click', () => {
+    const titleEl = document.getElementById('liveUpdateTitle');
+    const m = titleEl ? titleEl.textContent.match(/v([\d.]+)/) : null;
+    if (m) liveUpdateDismissedVersion = m[1];
+    const banner = document.getElementById('liveUpdateBanner');
+    if (banner) banner.style.display = 'none';
+  });
   const showTutorialBtn = document.getElementById('showTutorialBtn');
   if (showTutorialBtn) showTutorialBtn.addEventListener('click', showTutorial);
   // Server-Ereignis-Benachrichtigungen: Schalter verdrahten
@@ -7197,6 +7252,7 @@
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und Umbauzeit.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe und wirkt sofort. Kosten verdoppeln sich je Stufe (ab 4000 Erz / 2500 Kristalle / 800 Deuterium), Bauzeit 5–15 Minuten.' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
+      { title:'Automatische Update-Erkennung', body:'Bleibt die Kolonie lange im selben Tab geöffnet (z.B. als installierte App), prüft sie im Hintergrund von selbst, ob eine neue Version bereitsteht - beim Zurückwechseln in den Tab und danach alle 10 Minuten. Erscheint ein grünes Banner "Update verfügbar", bringt "Neu laden" die neue Version inklusive vollständiger Patchnotes; ein Neuladen kostet keinen Fortschritt.' },
       { title:'Push-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich der Knopf "Push auf diesem Gerät" aktivieren (Browser fragt einmalig um Erlaubnis) - danach schickt der Server für Nachrichten, Pakt-Angebote, Weltboss-Kills, anfliegende Überfälle und Patchnotes echte Benachrichtigungen an dieses Gerät, auch wenn die Seite geschlossen ist. Fünf Kategorien lassen sich einzeln abschalten. Alle Ereignisse landen zusätzlich als geräteübergreifendes Postfach im <strong>Berichte-Tab</strong> unter "Server-Ereignisse" - nur mit eigenem Server verfügbar.' },
       { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt.' },
       { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: ab <strong>Prestige 3 und 50.000 Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit fünf Zweigen (je max. Stufe 10, Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset) und Pfadfinder-Instinkt (+2% Expeditions-Belohnung). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste.' },
