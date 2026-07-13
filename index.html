@@ -261,6 +261,15 @@
     @keyframes tw { 0%,100% { opacity:0.25; } 50% { opacity:0.9; } }
 
     .tabs { display:flex; gap:6px; margin-bottom:1.1rem; flex-wrap:wrap; }
+    /* Auf schmalen Screens würden viele Tabs mehrzeilig umbrechen und oben viel Platz fressen -
+       stattdessen eine Wischleiste (nutzt denselben Scrollbalken-Stil wie [data-hscroll] oben). */
+    @media (max-width: 700px) {
+      .tabs { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin; scrollbar-color: rgba(var(--primary-rgb),0.55) transparent; padding-bottom:4px; }
+      .tabs::-webkit-scrollbar { height:6px; }
+      .tabs::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius:10px; }
+      .tabs::-webkit-scrollbar-thumb { background: rgba(var(--primary-rgb),0.55); border-radius:10px; }
+      .tab-btn { flex-shrink:0; }
+    }
     .tab-btn { background:rgba(255,255,255,0.05); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:10px; padding:8px 14px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
     .tab-btn.active { background:rgba(var(--primary-rgb), 0.25); border-color:var(--c-primary); color:#fff; box-shadow:0 0 12px rgba(var(--primary-rgb), 0.25); }
     .tab-badge { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--c-danger); box-shadow:0 0 6px var(--c-danger); animation: badgePulse 1.6s ease-in-out infinite; }
@@ -376,6 +385,11 @@
     .toast i { color:#afa9ec; font-size:15px; flex-shrink:0; }
     .lvl-pill { font-size:10.5px; font-weight:500; padding:1px 8px; border-radius:10px; background:rgba(255,255,255,0.1); color:#c7cbe0; font-variant-numeric:tabular-nums; display:inline-block; min-width:1.2em; text-align:center; }
     .bmeta { font-size:11.5px; color:#9296ac; margin-top:2px; }
+    @media (max-width: 700px) {
+      .lvl-pill { font-size:11px; }
+      .bmeta { font-size:12px; }
+      .header-btn-label { display:none; }
+    }
     .bcost { font-size:11.5px; color:#8489a0; margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
     .bcost .costitem { display:flex; align-items:center; gap:3px; }
     .bcost .short { color:#e2647a; }
@@ -384,11 +398,24 @@
     button:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
     button:active:not(:disabled) { transform: scale(0.97); }
     button:disabled { opacity:0.4; cursor:default; }
+    /* Mindest-Touchziele am Handy: viele kleine Icon-/Aktions-Buttons haben nur 4-7px Padding -
+       auf Touch-Geräten schwer zu treffen. Hebt die Mindesthöhe an, ohne die dichte Desktop-Optik
+       zu verändern. Die Mondsichel-Pille ist mit 18px besonders klein und bekommt extra Platz. */
+    @media (max-width: 700px) {
+      button { min-height: 36px; }
+      .pill-moon-btn { width:28px; height:28px; font-size:13px; }
+    }
     button.buy.affordable { background: rgba(var(--secondary-rgb), 0.22); border-color:var(--c-secondary-dark); box-shadow:0 0 0 0 rgba(var(--secondary-dark-rgb), 0.5); animation: affordPulse 2.2s ease-in-out infinite; }
     @keyframes affordPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--secondary-dark-rgb), 0.35); } 50% { box-shadow:0 0 0 5px rgba(var(--secondary-dark-rgb), 0); } }
     button.attack { background: rgba(var(--danger-rgb), 0.22); border-color:var(--c-danger); }
     button.primary { background: rgba(55,138,221,0.28); border-color:#378add; }
-    input[type=text] { background: rgba(255,255,255,0.06); border:0.5px solid rgba(255,255,255,0.18); color:#fff; border-radius:9px; padding:8px 11px; font-size:13px; }
+    input[type=text], input[type=email], input[type=password], input[type=number], textarea { background: rgba(255,255,255,0.06); border:0.5px solid rgba(255,255,255,0.18); color:#fff; border-radius:9px; padding:8px 11px; font-size:13px; font-family:inherit; }
+    /* iOS Safari zoomt beim Fokussieren automatisch rein, wenn ein Eingabefeld unter 16px Schrift
+       hat - auf schmalen Screens (also praktisch immer am Handy) daher auf 16px angehoben, damit
+       die Tastatur nicht bei jedem Tippen ein Reinzoomen auslöst. Am Desktop bleibt es bei 13px. */
+    @media (max-width: 700px) {
+      input[type=text], input[type=email], input[type=password], input[type=number], textarea { font-size:16px; }
+    }
 
     .progress-outer { width:100%; height:6px; background: rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin-top:9px; }
     .progress-inner { height:100%; background: linear-gradient(90deg,#378ADD,var(--c-secondary)); border-radius:4px; transition: width 0.3s linear; box-shadow:0 0 8px rgba(var(--secondary-rgb), 0.5); }
@@ -697,11 +724,11 @@
     <div class="shell-inner">
 
       <div class="hero">
-        <div style="position:absolute; bottom:14px; right:18px; z-index:5; display:flex; gap:6px;">
-          <button id="headerFeedbackBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Bug melden oder Vorschlag einreichen"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:3px;"></i>Bug/Vorschlag</button>
-          <button id="headerReportsBtn" style="font-size:10.5px; padding:5px 9px; position:relative; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Berichte & Nachrichten"><i class="ti ti-mail" aria-hidden="true" id="headerReportsIcon" style="margin-right:3px;"></i>Berichte<span id="reportsBadge" class="tab-badge" style="display:none;"></span></button>
-          <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i>Hilfe</button>
-          <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i>Einstellungen</button>
+        <div style="position:absolute; bottom:14px; right:18px; z-index:5; display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; max-width:calc(100vw - 36px);">
+          <button id="headerFeedbackBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Bug melden oder Vorschlag einreichen"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Bug/Vorschlag</span></button>
+          <button id="headerReportsBtn" style="font-size:10.5px; padding:5px 9px; position:relative; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Berichte & Nachrichten"><i class="ti ti-mail" aria-hidden="true" id="headerReportsIcon" style="margin-right:3px;"></i><span class="header-btn-label">Berichte</span><span id="reportsBadge" class="tab-badge" style="display:none;"></span></button>
+          <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Hilfe</span></button>
+          <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Einstellungen</span></button>
           <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
         </div>
         <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true">
@@ -1492,8 +1519,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.10.3';
+  const VERSION = '8.11.0';
   const PATCHNOTES = [
+    { version:'8.11.0', date:'13.07.2026', changes:[
+      'Mobil-Optimierungspass: Eingabefelder (Login, Namensfelder, Feedback, Suche) zoomen am iPhone nicht mehr automatisch beim Antippen (Safari-Eigenheit bei Schrift unter 16px)',
+      'Die Haupt-Tableiste ist auf schmalen Screens jetzt eine Wischleiste statt mehrzeilig umzubrechen',
+      'Kleine Aktions-Buttons (u.a. die Mondsichel) haben am Handy größere Tippflächen',
+      'Häufige Meta-Texte (Pillen, Beschreibungszeilen) sind am Handy etwas größer',
+      'Die Kopfzeilen-Knöpfe (Bug/Vorschlag, Berichte, Hilfe, Einstellungen, Abmelden) zeigen am Handy nur noch Icons statt Text, damit die Zeile nicht überläuft'
+    ]},
     { version:'8.10.3', date:'13.07.2026', changes:[
       'Die horizontalen Wisch-Leisten (Planeten-Rolle, Orbitalstation-Fokus, Expeditionstyp, Modul-Standort) haben jetzt einen schlanken, themenfarbenen Scrollbalken statt des klobigen Browser-Standards'
     ]},
