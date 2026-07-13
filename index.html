@@ -942,8 +942,13 @@
           <button id="systemNextBtn" title="Nächstes System"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
         </div>
         <div class="planet-switch" id="mapBaseLinks" style="margin-bottom:0.75rem;"></div>
-        <div class="map-wrap">
-          <svg id="mapSvg" viewBox="0 0 700 230" width="100%" height="100%"></svg>
+        <div class="map-wrap" style="height:260px; position:relative; touch-action:none;">
+          <svg id="mapSvg" viewBox="0 0 700 230" width="100%" height="100%" style="cursor:grab;"></svg>
+          <div style="position:absolute; right:8px; bottom:8px; display:flex; flex-direction:column; gap:6px; z-index:5;">
+            <button id="mapZoomInBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
+            <button id="mapZoomOutBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
+            <button id="mapZoomResetBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:14px; background:rgba(13,18,36,0.9);">⟲</button>
+          </div>
         </div>
         <div class="planet-list" id="planetList"></div>
         <div id="moonListWrap"></div>
@@ -1530,8 +1535,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.17.1';
+  const VERSION = '8.18.0';
   const PATCHNOTES = [
+    { version:'8.18.0', date:'13.07.2026', changes:[
+      'Galaxie erweitert: 8 neue Sternensysteme mit insgesamt 34 neuen Planeten - setzt die bisherige Schwierigkeitskurve fort (jetzt bis zu ~19 Minuten Erkundungsdauer für die entlegensten Funde), inklusive eines neuen seltenen Superplaneten',
+      'Die untere Einzelsystem-Karte ist jetzt genauso zoom- und verschiebbar wie die obere Galaxie-Übersicht: Ziehen, Pinch-Geste/Scrollen, oder die +/–/⟲-Buttons',
+      'Dabei zusätzlich abgesichert: Ziehen/Zoomen auf der unteren Karte löst keine versehentlichen Erkundungsmissionen mehr aus (Klicks werden nur nach echten, driftfreien Klicks ausgeführt)'
+    ]},
     { version:'8.17.1', date:'13.07.2026', changes:[
       'Galaxie-Übersicht erneut überarbeitet: das Tabellen-Raster von eben ist wieder raus, stattdessen jetzt eine echte Spiralgalaxie - Systeme sitzen entlang dreier Spiralarme um ein leuchtendes Zentrum, organisch verteilt statt in Zeilen/Spalten',
       'Positionen sind deterministisch (aus der System-ID abgeleitet), bleiben also bei jedem Neuladen exakt gleich, springen aber nicht mehr starr im Gitter',
@@ -2928,6 +2938,14 @@
     { id:'sys_halvar_weite', name:'Halvar-Weite', gx:757.8, gy:322.9 },
     { id:'sys_sernova_feld', name:'Sernova-Feld', gx:628.0, gy:429.2 },
     { id:'sys_dunwich_passage', name:'Dunwich-Passage', gx:352.7, gy:470.5 },
+    { id:'sys_pandora_saum', name:'Pandora-Saum', gx:800.0, gy:60.0 },
+    { id:'sys_tychos_kluft', name:'Tychos-Kluft', gx:807.3, gy:207.0 },
+    { id:'sys_ashen_bogen', name:'Ashen-Bogen', gx:814.6, gy:354.0 },
+    { id:'sys_valeska_spirale', name:'Valeska-Spirale', gx:821.9, gy:461.0 },
+    { id:'sys_boreas_schwelle', name:'Boreas-Schwelle', gx:829.2, gy:88.0 },
+    { id:'sys_indra_tiefe', name:'Indra-Tiefe', gx:836.5, gy:195.0 },
+    { id:'sys_calyx_grat', name:'Calyx-Grat', gx:843.8, gy:342.0 },
+    { id:'sys_meridian_kern', name:'Meridian-Kern', gx:851.1, gy:489.0 },
     { id:'zenith', name:'Zenith-Anomalie', gx:671.2, gy:219.1, hidden:true },
     { id:'tiefsee', name:'Tiefsee-Nebel', gx:279.1, gy:230.3, hidden:true }
   ];
@@ -3149,7 +3167,41 @@
     { id:'nyxtiefe', system:'sys_dunwich_passage', orbit:1, name:'Asteroid Nyxtiefe', type:'asteroid', x:150, y:70, duration:602, reward:{erz:96}, discoveryBonus:{erz:134}, color:'#c9c7bd', colonizeCost:{kristalle:1152, antimaterie:576} },
     { id:'orrawacht', system:'sys_dunwich_passage', orbit:2, name:'Eiswelt Orrawacht', type:'wasserwelt', x:260, y:150, duration:616, reward:{kristalle:78, antimaterie:39}, discoveryBonus:{kristalle:109}, color:'#a9cdf5', colonizeCost:{deuterium:1174, erz:587} },
     { id:'ceresklippe', system:'sys_dunwich_passage', orbit:3, name:'Gasriese Ceresklippe', type:'gasriese', x:380, y:55, duration:630, reward:{deuterium:100}, discoveryBonus:{deuterium:140}, color:'#fac775', colonizeCost:{antimaterie:1195, kristalle:598} },
-    { id:'drachgard', system:'sys_dunwich_passage', orbit:4, name:'Kolonie Drachgard', type:'erdaehnlich', x:470, y:160, duration:644, reward:{antimaterie:81, kristalle:41}, discoveryBonus:{antimaterie:113}, color:'#f3aec6', colonizeCost:{erz:1217, deuterium:608} },
+    { id:'drachgard', system:'sys_dunwich_passage', orbit:4, name:'Kolonie Drachgard', type:'erdaehnlich', x:470, y:160, duration:644, reward:{antimaterie:81, kristalle:41}, discoveryBonus:{antimaterie:113}, color:'#f3aec6', colonizeCost:{erz:1217, deuterium:608} },,
+    { id:'n0pando', system:'sys_pandora_saum', orbit:1, name:'Kolonie Thal', type:'erdaehnlich', x:150, y:70, duration:671, reward:{kristalle:116}, discoveryBonus:{kristalle:162}, color:'#5dcaa5', colonizeCost:{kristalle:1218, deuterium:603} },
+    { id:'n1pando', system:'sys_pandora_saum', orbit:2, name:'Gasriese Korr', type:'gasriese', x:260, y:150, duration:684, reward:{deuterium:118}, discoveryBonus:{deuterium:165}, color:'#a9cdf5', colonizeCost:{deuterium:1239, energie:614} },
+    { id:'n2pando', system:'sys_pandora_saum', orbit:3, name:'Ozeanwelt Venn', type:'wasserwelt', x:380, y:55, duration:699, reward:{energie:121, erz:64}, discoveryBonus:{energie:169}, color:'#378add', colonizeCost:{energie:1270, antimaterie:629} },
+    { id:'n3pando', system:'sys_pandora_saum', orbit:4, name:'Asteroid Ashra', type:'asteroid', x:470, y:160, duration:716, reward:{antimaterie:123, kristalle:65}, discoveryBonus:{antimaterie:172}, color:'#c9c7bd', colonizeCost:{antimaterie:1292, erz:640} },
+    { id:'n4tycho', system:'sys_tychos_kluft', orbit:1, name:'Vulkanmond Drel', type:'vulkan', x:150, y:70, duration:727, reward:{erz:125}, discoveryBonus:{erz:175}, color:'#e24b4a', colonizeCost:{erz:1312, kristalle:650} },
+    { id:'n5tycho', system:'sys_tychos_kluft', orbit:2, name:'Eiswelt Sova', type:'eis', x:260, y:150, duration:740, reward:{kristalle:128}, discoveryBonus:{kristalle:179}, color:'#a9cdf5', colonizeCost:{kristalle:1344, deuterium:666} },
+    { id:'n6tycho', system:'sys_tychos_kluft', orbit:3, name:'Kristallfeld Kirn', type:'kristall', x:380, y:55, duration:755, reward:{deuterium:130, antimaterie:69}, discoveryBonus:{deuterium:182}, color:'#c3bef5', colonizeCost:{deuterium:1365, energie:676} },
+    { id:'n7tycho', system:'sys_tychos_kluft', orbit:4, name:'Wüstenwelt Talos', type:'wueste', x:470, y:160, duration:772, reward:{energie:133, erz:70}, discoveryBonus:{energie:186}, color:'#fac775', colonizeCost:{energie:1396, antimaterie:692} },
+    { id:'n8ashen', system:'sys_ashen_bogen', orbit:1, name:'Ruinenwelt Vray', type:'todeswelt', x:150, y:70, duration:783, reward:{antimaterie:135}, discoveryBonus:{antimaterie:189}, color:'#791f1f', colonizeCost:{antimaterie:1418, erz:702} },
+    { id:'n9ashen', system:'sys_ashen_bogen', orbit:2, name:'Kolonie Norn', type:'erdaehnlich', x:260, y:150, duration:796, reward:{erz:137}, discoveryBonus:{erz:192}, color:'#5dcaa5', colonizeCost:{erz:1438, kristalle:712} },
+    { id:'n10ashen', system:'sys_ashen_bogen', orbit:3, name:'Gasriese Ecliss', type:'gasriese', x:380, y:55, duration:811, reward:{kristalle:140, energie:74}, discoveryBonus:{kristalle:196}, color:'#a9cdf5', colonizeCost:{kristalle:1470, deuterium:728} },
+    { id:'n11ashen', system:'sys_ashen_bogen', orbit:4, name:'Ozeanwelt Maren', type:'wasserwelt', x:470, y:160, duration:828, reward:{deuterium:143, antimaterie:75}, discoveryBonus:{deuterium:200}, color:'#378add', colonizeCost:{deuterium:1502, energie:744} },
+    { id:'n12ashen', system:'sys_ashen_bogen', orbit:5, name:'Asteroid Ostra', type:'asteroid', x:570, y:60, duration:847, reward:{energie:146, erz:77}, discoveryBonus:{energie:204}, color:'#c9c7bd', colonizeCost:{energie:1533, antimaterie:759} },
+    { id:'n13vales', system:'sys_valeska_spirale', orbit:1, name:'Vulkanmond Fenn', type:'vulkan', x:150, y:70, duration:858, reward:{antimaterie:148}, discoveryBonus:{antimaterie:207}, color:'#e24b4a', colonizeCost:{antimaterie:1554, erz:770} },
+    { id:'n14vales', system:'sys_valeska_spirale', orbit:2, name:'Eiswelt Ildra', type:'eis', x:260, y:150, duration:871, reward:{erz:150}, discoveryBonus:{erz:210}, color:'#a9cdf5', colonizeCost:{erz:1575, kristalle:780} },
+    { id:'n15vales', system:'sys_valeska_spirale', orbit:3, name:'Kristallfeld Rovek', type:'kristall', x:380, y:55, duration:886, reward:{kristalle:153, energie:81}, discoveryBonus:{kristalle:214}, color:'#c3bef5', colonizeCost:{kristalle:1606, deuterium:796} },
+    { id:'n16vales', system:'sys_valeska_spirale', orbit:4, name:'Wüstenwelt Senna', type:'wueste', x:470, y:160, duration:903, reward:{deuterium:156, antimaterie:82}, discoveryBonus:{deuterium:218}, color:'#fac775', colonizeCost:{deuterium:1638, energie:811} },
+    { id:'n17borea', system:'sys_boreas_schwelle', orbit:1, name:'Ruinenwelt Thalos', type:'todeswelt', x:150, y:70, duration:914, reward:{energie:158}, discoveryBonus:{energie:221}, color:'#791f1f', colonizeCost:{energie:1659, antimaterie:822} },
+    { id:'n18borea', system:'sys_boreas_schwelle', orbit:2, name:'Kolonie Vesk', type:'erdaehnlich', x:260, y:150, duration:927, reward:{antimaterie:160}, discoveryBonus:{antimaterie:224}, color:'#5dcaa5', colonizeCost:{antimaterie:1680, erz:832} },
+    { id:'n19borea', system:'sys_boreas_schwelle', orbit:3, name:'Gasriese Croma', type:'gasriese', x:380, y:55, duration:942, reward:{erz:162, deuterium:86}, discoveryBonus:{erz:227}, color:'#a9cdf5', colonizeCost:{erz:1701, kristalle:842} },
+    { id:'n20borea', system:'sys_boreas_schwelle', orbit:4, name:'Ozeanwelt Nyla', type:'wasserwelt', x:470, y:160, duration:959, reward:{kristalle:165, energie:87}, discoveryBonus:{kristalle:231}, color:'#378add', colonizeCost:{kristalle:1732, deuterium:858} },
+    { id:'n21indra', system:'sys_indra_tiefe', orbit:1, name:'Asteroid Ithar', type:'asteroid', x:150, y:70, duration:970, reward:{deuterium:167}, discoveryBonus:{deuterium:234}, color:'#c9c7bd', colonizeCost:{deuterium:1754, energie:868} },
+    { id:'n22indra', system:'sys_indra_tiefe', orbit:2, name:'Vulkanmond Corvan', type:'vulkan', x:260, y:150, duration:983, reward:{energie:169}, discoveryBonus:{energie:237}, color:'#e24b4a', colonizeCost:{energie:1774, antimaterie:879} },
+    { id:'n23indra', system:'sys_indra_tiefe', orbit:3, name:'Eiswelt Selis', type:'eis', x:380, y:55, duration:998, reward:{antimaterie:172, kristalle:91}, discoveryBonus:{antimaterie:241}, color:'#a9cdf5', colonizeCost:{antimaterie:1806, erz:894} },
+    { id:'n24indra', system:'sys_indra_tiefe', orbit:4, name:'Kristallfeld Drask', type:'kristall', x:470, y:160, duration:1015, reward:{erz:175, deuterium:92}, discoveryBonus:{erz:245}, color:'#c3bef5', colonizeCost:{erz:1838, kristalle:910} },
+    { id:'n25indra', system:'sys_indra_tiefe', orbit:5, name:'Wüstenwelt Molva', type:'wueste', x:570, y:60, duration:1034, reward:{kristalle:178, energie:94}, discoveryBonus:{kristalle:249}, color:'#fac775', colonizeCost:{kristalle:1869, deuterium:926} },
+    { id:'n26calyx', system:'sys_calyx_grat', orbit:1, name:'Ruinenwelt Fenris', type:'todeswelt', x:150, y:70, duration:1045, reward:{deuterium:180}, discoveryBonus:{deuterium:252}, color:'#791f1f', colonizeCost:{deuterium:1890, energie:936} },
+    { id:'n27calyx', system:'sys_calyx_grat', orbit:2, name:'Kolonie Aquil', type:'erdaehnlich', x:260, y:150, duration:1058, reward:{energie:182}, discoveryBonus:{energie:255}, color:'#5dcaa5', colonizeCost:{energie:1911, antimaterie:946} },
+    { id:'n28calyx', system:'sys_calyx_grat', orbit:3, name:'Gasriese Yren', type:'gasriese', x:380, y:55, duration:1073, reward:{antimaterie:185, kristalle:98}, discoveryBonus:{antimaterie:259}, color:'#a9cdf5', colonizeCost:{antimaterie:1942, erz:962} },
+    { id:'n29calyx', system:'sys_calyx_grat', orbit:4, name:'Ozeanwelt Zovek', type:'wasserwelt', x:470, y:160, duration:1090, reward:{erz:188, deuterium:99}, discoveryBonus:{erz:263}, color:'#378add', colonizeCost:{erz:1974, kristalle:978} },
+    { id:'n30merid', system:'sys_meridian_kern', orbit:1, name:'Asteroid Thal', type:'asteroid', x:150, y:70, duration:1101, reward:{kristalle:190}, discoveryBonus:{kristalle:266}, color:'#c9c7bd', colonizeCost:{kristalle:1995, deuterium:988} },
+    { id:'n31merid', system:'sys_meridian_kern', orbit:2, name:'Vulkanmond Korr', type:'vulkan', x:260, y:150, duration:1114, reward:{deuterium:192}, discoveryBonus:{deuterium:269}, color:'#e24b4a', colonizeCost:{deuterium:2016, energie:998} },
+    { id:'n32merid', system:'sys_meridian_kern', orbit:3, name:'Eiswelt Venn', type:'eis', x:380, y:55, duration:1129, reward:{energie:195, erz:103}, discoveryBonus:{energie:273}, color:'#a9cdf5', colonizeCost:{energie:2048, antimaterie:1014} },
+    { id:'n33merid', system:'sys_meridian_kern', orbit:4, name:'Anomalie Drel', type:'super', x:470, y:160, duration:1146, reward:{antimaterie:358, kristalle:409, deuterium:458}, discoveryBonus:{antimaterie:521}, color:'#f3aec6', colonizeCost:{antimaterie:1834, kristalle:2407} },
   ];
 
   const ALLIANCE_TECH_DEFS = [
@@ -7446,7 +7498,7 @@
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Monde haben keine eigene Karte mehr: Ein kolonisierter Mond ist überall über das Mond-Symbol am zugehörigen Planeten erreichbar (Übersichts-Karten, Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste) und wird auch in der Sektorkarten-Planetenliste beim Planeten angezeigt.' },
-      { title:'Sektorkarte bedienen', body:'Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
+      { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
       { title:'Terraforming', body:'Jeder Standort (Heimatbasis und Kolonien, nicht Monde) kann terraformt werden – Stufe 0 bis 10, jede Stufe gibt <strong>+5% Produktion</strong> dort (bis zu +50% bei Stufe 10). Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit. Es kann immer nur <strong>ein Terraforming gleichzeitig</strong> laufen. Zu finden im Basis-Tab unter der Planeten-Rolle.' },
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
       { title:'Typ-Umwandlung (echtes Terraforming)', body:'Getrennt vom Stufen-Terraforming kann der <strong>Planetentyp selbst</strong> aufgewertet werden, entlang der Kette Todeswelt → Wüstenwelt → Eiswelt → Vulkanwelt → Wasserwelt → Kristallwelt → <strong>Erdwelt</strong>. Jeder Schritt ist <strong>sehr teuer</strong> (Erz/Kristalle/Deuterium/Antimaterie) und dauert lange (30 Min. bis mehrere Stunden), es kann immer nur eine Umwandlung gleichzeitig laufen. So lässt sich aus einer schlechten Todeswelt über viele Schritte die bestmögliche Erdwelt formen. Zu finden im Basis-Tab unter dem Stufen-Terraforming. Nur Planeten in dieser Kette sind umwandelbar (nicht Gasriesen, Asteroiden oder Superplaneten).' }
@@ -10235,6 +10287,14 @@
   // Zoom/Pan-Zustand der Galaxie-Übersichtskarte – bleibt für die restliche Sitzung erhalten
   // (nicht dauerhaft gespeichert), damit man nicht bei jedem Tab-Wechsel wieder rauszoomt.
   let galaxyMapViewBox = { x:0, y:0, w:950, h:500 };
+  let mapViewBox = { x:0, y:0, w:700, h:230 };
+  let mapDidDrag = false; // unterdrückt einen Klick (Erkundungsmission!) direkt nach dem Ziehen/Zoomen
+  function clampMapViewBox(){
+    mapViewBox.w = Math.max(130, Math.min(700, mapViewBox.w));
+    mapViewBox.h = mapViewBox.w * (230/700);
+    mapViewBox.x = Math.max(-60, Math.min(700-mapViewBox.w+60, mapViewBox.x));
+    mapViewBox.y = Math.max(-40, Math.min(230-mapViewBox.h+40, mapViewBox.y));
+  }
   let galaxyMapDidDrag = false; // unterdrückt einen Klick direkt nach dem Ziehen/Zoomen
   function clampGalaxyViewBox(){
     galaxyMapViewBox.w = Math.max(180, Math.min(950, galaxyMapViewBox.w));
@@ -10630,16 +10690,18 @@
       }
     }
     svg.innerHTML = inner;
+    svg.setAttribute('viewBox', `${mapViewBox.x.toFixed(1)} ${mapViewBox.y.toFixed(1)} ${mapViewBox.w.toFixed(1)} ${mapViewBox.h.toFixed(1)}`);
     svg.querySelectorAll('[data-planet]').forEach(node => {
       const pid = node.getAttribute('data-planet');
       if (pid === '__home__') return;
-      node.addEventListener('click', () => sendExploreMission(pid));
+      node.addEventListener('click', () => { if (mapDidDrag) return; sendExploreMission(pid); });
     });
     svg.querySelectorAll('[data-map-player]').forEach(node => {
-      node.addEventListener('click', () => mapPlayerClick(node.getAttribute('data-map-player'), node.getAttribute('data-map-name')));
+      node.addEventListener('click', () => { if (mapDidDrag) return; mapPlayerClick(node.getAttribute('data-map-player'), node.getAttribute('data-map-name')); });
     });
     svg.querySelectorAll('[data-map-npc]').forEach(node => {
       node.addEventListener('click', () => {
+        if (mapDidDrag) return;
         if (confirm((node.getAttribute('data-map-npcname')||'NPC')+' angreifen?')) sendAttackMission(node.getAttribute('data-map-npc'));
       });
     });
@@ -10648,6 +10710,7 @@
     svg.querySelectorAll('[data-map-debris]').forEach(node => {
       node.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (mapDidDrag) return;
         const info = debrisInfoText(node.getAttribute('data-map-debris'));
         if (info) pushToast(info, 'ti-recycle');
       });
@@ -13943,6 +14006,80 @@
     if (zoomOutBtn) zoomOutBtn.onclick = () => zoomBy(1/1.4);
     const zoomResetBtn = document.getElementById('galaxyZoomResetBtn');
     if (zoomResetBtn) zoomResetBtn.onclick = () => { galaxyMapViewBox = { x:0, y:0, w:950, h:500 }; buildGalaxyMap(); };
+  })();
+
+  // Zoom/Pan für die untere Systemansicht (mapSvg) - exakt dasselbe Verhalten wie bei der oberen
+  // Galaxie-Karte (Maus-Drag, Mausrad, Pinch-Zoom, +/-/Reset-Knöpfe), nur auf den eigenen
+  // mapViewBox-Zustand und buildMap() bezogen. Klicks auf Planeten lösen echte Erkundungsmissionen
+  // aus, daher der mapDidDrag-Schutz gegen versehentliche Missionen direkt nach dem Ziehen/Zoomen.
+  (function initSystemMapZoomPan(){
+    const svg = document.getElementById('mapSvg');
+    if (!svg) return;
+    const DRAG_THRESHOLD = 6;
+    function zoomBy(factor, cx, cy){
+      const rect = svg.getBoundingClientRect();
+      const relX = cx!==undefined ? (cx-rect.left)/rect.width : 0.5;
+      const relY = cy!==undefined ? (cy-rect.top)/rect.height : 0.5;
+      const px = mapViewBox.x + relX*mapViewBox.w;
+      const py = mapViewBox.y + relY*mapViewBox.h;
+      mapViewBox.w /= factor; mapViewBox.h /= factor;
+      mapViewBox.x = px - relX*mapViewBox.w;
+      mapViewBox.y = py - relY*mapViewBox.h;
+      clampMapViewBox();
+      buildMap();
+    }
+    let dragging = false, lastX=0, lastY=0, downX=0, downY=0;
+    svg.addEventListener('mousedown', (e) => { dragging=true; mapDidDrag=false; lastX=e.clientX; lastY=e.clientY; downX=e.clientX; downY=e.clientY; });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      if (Math.abs(e.clientX-downX)>DRAG_THRESHOLD || Math.abs(e.clientY-downY)>DRAG_THRESHOLD) mapDidDrag = true;
+      const rect = svg.getBoundingClientRect();
+      const dx = (e.clientX-lastX) * (mapViewBox.w/rect.width);
+      const dy = (e.clientY-lastY) * (mapViewBox.h/rect.height);
+      mapViewBox.x -= dx; mapViewBox.y -= dy;
+      lastX=e.clientX; lastY=e.clientY;
+      clampMapViewBox(); buildMap();
+    });
+    window.addEventListener('mouseup', () => { dragging=false; });
+    svg.addEventListener('wheel', (e) => { e.preventDefault(); zoomBy(e.deltaY<0?1.15:1/1.15, e.clientX, e.clientY); }, {passive:false});
+
+    let touchState = null;
+    svg.addEventListener('touchstart', (e) => {
+      mapDidDrag = false;
+      if (e.touches.length===1){ touchState = { mode:'pan', x:e.touches[0].clientX, y:e.touches[0].clientY, downX:e.touches[0].clientX, downY:e.touches[0].clientY }; }
+      else if (e.touches.length===2){
+        const dx = e.touches[0].clientX-e.touches[1].clientX, dy = e.touches[0].clientY-e.touches[1].clientY;
+        touchState = { mode:'pinch', dist: Math.hypot(dx,dy), vbw: mapViewBox.w };
+      }
+    }, {passive:true});
+    svg.addEventListener('touchmove', (e) => {
+      if (!touchState) return;
+      e.preventDefault();
+      if (touchState.mode==='pan' && e.touches.length===1){
+        if (Math.abs(e.touches[0].clientX-touchState.downX)>DRAG_THRESHOLD || Math.abs(e.touches[0].clientY-touchState.downY)>DRAG_THRESHOLD) mapDidDrag = true;
+        const rect = svg.getBoundingClientRect();
+        const dx = (e.touches[0].clientX-touchState.x) * (mapViewBox.w/rect.width);
+        const dy = (e.touches[0].clientY-touchState.y) * (mapViewBox.h/rect.height);
+        mapViewBox.x -= dx; mapViewBox.y -= dy;
+        touchState.x = e.touches[0].clientX; touchState.y = e.touches[0].clientY;
+        clampMapViewBox(); buildMap();
+      } else if (touchState.mode==='pinch' && e.touches.length===2){
+        mapDidDrag = true;
+        const dx = e.touches[0].clientX-e.touches[1].clientX, dy = e.touches[0].clientY-e.touches[1].clientY;
+        const dist = Math.hypot(dx,dy);
+        const factor = dist/touchState.dist;
+        mapViewBox.w = touchState.vbw / factor;
+        clampMapViewBox(); buildMap();
+      }
+    }, {passive:false});
+    svg.addEventListener('touchend', () => { touchState = null; });
+
+    const mapZoomInBtn = document.getElementById('mapZoomInBtn');
+    if (mapZoomInBtn) mapZoomInBtn.onclick = () => zoomBy(1.4);
+    const mapZoomOutBtn = document.getElementById('mapZoomOutBtn');
+    if (mapZoomOutBtn) mapZoomOutBtn.onclick = () => zoomBy(1/1.4);
+    const mapZoomResetBtn = document.getElementById('mapZoomResetBtn');
+    if (mapZoomResetBtn) mapZoomResetBtn.onclick = () => { mapViewBox = { x:0, y:0, w:700, h:230 }; buildMap(); };
   })();
 
   (function initBattleModal(){
