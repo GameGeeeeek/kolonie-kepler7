@@ -1336,7 +1336,7 @@
     { key:'gauss', name:'Gauss-Kanone', icon:'ti-target', produces:null, baseRate:0, baseCost:{deuterium:120, antimaterie:15}, costMult:1.32, bg:'rgba(126,119,221,0.18)', fg:'#afa9ec', effectDesc:'Verteidigung', category:'defense', defVal:65, atkVal:36, buildTime:80, requires:['rschildmatrix'] },
     { key:'railgun', name:'Railgun-Batterie', icon:'ti-target', produces:null, baseRate:0, baseCost:{erz:250, deuterium:100, kristalle:60}, costMult:1.28, bg:'rgba(250,199,117,0.2)', fg:'#fac775', effectDesc:'Verteidigung', category:'defense', defVal:85, atkVal:48, buildTime:70, requires:['rschildmatrix'] },
     { key:'voidbarriere', name:'Void-Barriere', icon:'ti-atom', produces:null, baseRate:0, baseCost:{antimaterie:25, deuterium:200, kristalle:150}, costMult:1.34, bg:'rgba(126,119,221,0.22)', fg:'#c3bef5', effectDesc:'Verteidigung', category:'defense', defVal:110, atkVal:0, buildTime:95, requires:['rschildmatrix'] },
-    { key:'labor', name:'Forschungslabor', icon:'ti-microscope', produces:null, baseRate:0, baseCost:{energie:150, kristalle:80}, costMult:1.28, bg:'rgba(175,169,236,0.18)', fg:'#c3bef5', effectDesc:'Forschungszeit & Forschungspunkte', researchPointRate:0.19, category:'utility' },
+    { key:'labor', name:'Forschungslabor', icon:'ti-microscope', produces:null, baseRate:0, baseCost:{energie:150, kristalle:80}, costMult:1.28, bg:'rgba(175,169,236,0.18)', fg:'#c3bef5', effectDesc:'Forschungszeit & Forschungspunkte', researchPointRate:0.14, category:'utility' },
     { key:'festung', name:'Kristallfestung', icon:'ti-building-castle', produces:null, baseRate:0, baseCost:{erz:1200, kristalle:900, deuterium:400}, costMult:1.35, bg:'rgba(126,119,221,0.22)', fg:'#c3bef5', effectDesc:'Verteidigung', category:'defense', defVal:150, atkVal:80, special:true, unlockItem:'kristallherz' }
   ];
 
@@ -1451,8 +1451,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.7.2';
+  const VERSION = '8.7.3';
   const PATCHNOTES = [
+    { version:'8.7.3', date:'13.07.2026', changes:[
+      'Balance: Forschung aufeinander abgestimmt - war zu schnell, zu günstig und lieferte zu viele Forschungspunkte',
+      'Forschungsdauer-Verkürzung durch Labore gedeckelt bei 65% statt 75% (Boden erst bei ~15 statt ~13 Laboren erreicht) - wenige Labore ändern kaum etwas, viele Labore bremsen spürbar',
+      'Forschungspunkte-Ertrag je Labor gesenkt (0,19 → 0,14 pro Sekunde und Stufe)',
+      'Forschungspunkte-Kosten aller 19 Forschungen angehoben (+40%), Kostenwachstum pro Stufe leicht verschärft (+0,02) - trifft vor allem hohe Stufen, frühe Stufen kaum'
+    ]},
     { version:'8.7.2', date:'13.07.2026', changes:[
       'Volles Lager stoppt die Produktion jetzt komplett: Ist die Kapazität einer Ressource erreicht, ist deren Output 0 (vorher lief sie mit 20% Überlauf-Ertrag weiter)',
       'Die Ressourcen-Karte zeigt bei vollem Lager deutlich "+0/s (Lager voll)" statt der theoretischen Rate',
@@ -2545,25 +2551,25 @@
   ];
 
   const RESEARCH_DEFS = [
-    { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:8}, costMult:1.18, baseDuration:20, durationMult:1.14, desc:'Energieproduktion', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
-    { key:'rerz', name:'Tiefenbohrer', baseCost:{energie:60, kristalle:15, forschungspunkte:8}, costMult:1.18, baseDuration:20, durationMult:1.14, desc:'Erzproduktion', effectRes:'erz', effectPerLevel:0.025, maxLevel:20, requires:[] },
-    { key:'rkristall', name:'Kristallgitter-Optimierung', baseCost:{erz:80, deuterium:20, forschungspunkte:9}, costMult:1.18, baseDuration:25, durationMult:1.14, desc:'Kristallproduktion', effectRes:'kristalle', effectPerLevel:0.025, maxLevel:20, requires:[] },
-    { key:'rdeuterium', name:'Kryo-Extraktion', baseCost:{erz:100, kristalle:30, forschungspunkte:10}, costMult:1.18, baseDuration:30, durationMult:1.14, desc:'Deuteriumproduktion', effectRes:'deuterium', effectPerLevel:0.025, maxLevel:20, requires:[] },
-    { key:'rsolar2', name:'Photonenkollektoren', baseCost:{erz:180, kristalle:60, forschungspunkte:16}, costMult:1.2, baseDuration:60, durationMult:1.15, desc:'Energieproduktion (vertieft)', effectRes:'energie', effectPerLevel:0.02, maxLevel:20, requires:['rsolar'] },
-    { key:'rerz2', name:'Plasmabohrer', baseCost:{energie:200, kristalle:70, forschungspunkte:16}, costMult:1.2, baseDuration:60, durationMult:1.15, desc:'Erzproduktion (vertieft)', effectRes:'erz', effectPerLevel:0.02, maxLevel:20, requires:['rerz'] },
-    { key:'rantimaterie', name:'Quantenstabilisierung', baseCost:{deuterium:60, antimaterie:5, forschungspunkte:20}, costMult:1.22, baseDuration:70, durationMult:1.15, desc:'Antimaterieproduktion', effectRes:'antimaterie', effectPerLevel:0.025, maxLevel:20, requires:['rdeuterium'] },
-    { key:'rlager', name:'Verstärkte Frachtcontainer', baseCost:{erz:150, kristalle:60, forschungspunkte:12}, costMult:1.2, baseDuration:40, durationMult:1.14, desc:'Lagerkapazität', effectRes:null, effectPerLevel:0.03, maxLevel:20, requires:['rkristall'] },
-    { key:'rfusion', name:'Fusionsantrieb', baseCost:{kristalle:120, deuterium:80, forschungspunkte:26}, costMult:1.22, baseDuration:90, durationMult:1.16, desc:'Missionsdauer verkürzen', effectRes:null, effectPerLevel:0.018, maxLevel:20, requires:['rsolar2','rerz2'] },
-    { key:'rkampf', name:'Zielerfassungssysteme', baseCost:{kristalle:100, antimaterie:10, forschungspunkte:22}, costMult:1.22, baseDuration:80, durationMult:1.15, desc:'Angriffspunkte', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:['rantimaterie'] },
-    { key:'rkristall2', name:'Nanoschliff-Kristalle', baseCost:{erz:220, deuterium:90, forschungspunkte:22}, costMult:1.2, baseDuration:80, durationMult:1.15, desc:'Kristallproduktion (vertieft)', effectRes:'kristalle', effectPerLevel:0.02, maxLevel:20, requires:['rkristall','rlager'] },
-    { key:'rbauplan', name:'Effiziente Baupläne', baseCost:{kristalle:200, antimaterie:15, forschungspunkte:28}, costMult:1.24, baseDuration:100, durationMult:1.16, desc:'Gebäudekosten senken', effectRes:null, effectPerLevel:0.015, maxLevel:20, requires:['rfusion'] },
-    { key:'rpanzer', name:'Panzerplatten', baseCost:{erz:120, kristalle:40, forschungspunkte:14}, costMult:1.2, baseDuration:50, durationMult:1.14, desc:'Verteidigung', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:[] },
-    { key:'rschildmatrix', name:'Schildmatrix', baseCost:{kristalle:150, deuterium:70, forschungspunkte:20}, costMult:1.22, baseDuration:70, durationMult:1.15, desc:'Verteidigung (vertieft)', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:['rpanzer'] },
-    { key:'rkampf2', name:'Erweiterte Zielsysteme', baseCost:{kristalle:180, antimaterie:20, forschungspunkte:26}, costMult:1.22, baseDuration:90, durationMult:1.15, desc:'Angriffspunkte (vertieft)', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:['rkampf'] },
-    { key:'rfruehwarnung', name:'Frühwarnsystem', baseCost:{erz:200, energie:150, forschungspunkte:16}, costMult:1.2, baseDuration:60, durationMult:1.14, desc:'Weniger Überfall-Risiko', effectRes:null, effectPerLevel:0.025, maxLevel:20, requires:['rpanzer'] },
-    { key:'rscanner', name:'Langstrecken-Scanner', baseCost:{energie:180, kristalle:60, forschungspunkte:20}, costMult:1.22, baseDuration:70, durationMult:1.15, desc:'Überfälle werden erst dadurch frühzeitig erkennbar (+90s Vorwarnzeit je Stufe). Ohne diese Forschung bleiben Überfälle bis zum Einschlag komplett unsichtbar.', effectRes:null, effectPerLevel:90, maxLevel:20, requires:[] },
-    { key:'rnotfall', name:'Notfallprotokolle', baseCost:{deuterium:120, antimaterie:15, forschungspunkte:20}, costMult:1.2, baseDuration:70, durationMult:1.14, desc:'Weniger Verlust bei Überfällen', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:['rschildmatrix'] },
-    { key:'rspyshield', name:'Spionageabwehr', baseCost:{energie:150, kristalle:90, deuterium:40, forschungspunkte:22}, costMult:1.24, baseDuration:75, durationMult:1.16, desc:'Verschleiert die eigenen Flottendaten für fremde Spähschiffe (±8% Ungenauigkeit je Stufe auf alle ausspähbaren Werte). Macht gegnerische Spionageberichte über die eigene Flotte zunehmend unzuverlässig.', effectRes:null, effectPerLevel:0.08, maxLevel:10, requires:['rscanner'] }
+    { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.14, desc:'Energieproduktion', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
+    { key:'rerz', name:'Tiefenbohrer', baseCost:{energie:60, kristalle:15, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.14, desc:'Erzproduktion', effectRes:'erz', effectPerLevel:0.025, maxLevel:20, requires:[] },
+    { key:'rkristall', name:'Kristallgitter-Optimierung', baseCost:{erz:80, deuterium:20, forschungspunkte:13}, costMult:1.2, baseDuration:25, durationMult:1.14, desc:'Kristallproduktion', effectRes:'kristalle', effectPerLevel:0.025, maxLevel:20, requires:[] },
+    { key:'rdeuterium', name:'Kryo-Extraktion', baseCost:{erz:100, kristalle:30, forschungspunkte:14}, costMult:1.2, baseDuration:30, durationMult:1.14, desc:'Deuteriumproduktion', effectRes:'deuterium', effectPerLevel:0.025, maxLevel:20, requires:[] },
+    { key:'rsolar2', name:'Photonenkollektoren', baseCost:{erz:180, kristalle:60, forschungspunkte:22}, costMult:1.22, baseDuration:60, durationMult:1.15, desc:'Energieproduktion (vertieft)', effectRes:'energie', effectPerLevel:0.02, maxLevel:20, requires:['rsolar'] },
+    { key:'rerz2', name:'Plasmabohrer', baseCost:{energie:200, kristalle:70, forschungspunkte:22}, costMult:1.22, baseDuration:60, durationMult:1.15, desc:'Erzproduktion (vertieft)', effectRes:'erz', effectPerLevel:0.02, maxLevel:20, requires:['rerz'] },
+    { key:'rantimaterie', name:'Quantenstabilisierung', baseCost:{deuterium:60, antimaterie:5, forschungspunkte:28}, costMult:1.24, baseDuration:70, durationMult:1.15, desc:'Antimaterieproduktion', effectRes:'antimaterie', effectPerLevel:0.025, maxLevel:20, requires:['rdeuterium'] },
+    { key:'rlager', name:'Verstärkte Frachtcontainer', baseCost:{erz:150, kristalle:60, forschungspunkte:17}, costMult:1.22, baseDuration:40, durationMult:1.14, desc:'Lagerkapazität', effectRes:null, effectPerLevel:0.03, maxLevel:20, requires:['rkristall'] },
+    { key:'rfusion', name:'Fusionsantrieb', baseCost:{kristalle:120, deuterium:80, forschungspunkte:36}, costMult:1.24, baseDuration:90, durationMult:1.16, desc:'Missionsdauer verkürzen', effectRes:null, effectPerLevel:0.018, maxLevel:20, requires:['rsolar2','rerz2'] },
+    { key:'rkampf', name:'Zielerfassungssysteme', baseCost:{kristalle:100, antimaterie:10, forschungspunkte:31}, costMult:1.24, baseDuration:80, durationMult:1.15, desc:'Angriffspunkte', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:['rantimaterie'] },
+    { key:'rkristall2', name:'Nanoschliff-Kristalle', baseCost:{erz:220, deuterium:90, forschungspunkte:31}, costMult:1.22, baseDuration:80, durationMult:1.15, desc:'Kristallproduktion (vertieft)', effectRes:'kristalle', effectPerLevel:0.02, maxLevel:20, requires:['rkristall','rlager'] },
+    { key:'rbauplan', name:'Effiziente Baupläne', baseCost:{kristalle:200, antimaterie:15, forschungspunkte:39}, costMult:1.26, baseDuration:100, durationMult:1.16, desc:'Gebäudekosten senken', effectRes:null, effectPerLevel:0.015, maxLevel:20, requires:['rfusion'] },
+    { key:'rpanzer', name:'Panzerplatten', baseCost:{erz:120, kristalle:40, forschungspunkte:20}, costMult:1.22, baseDuration:50, durationMult:1.14, desc:'Verteidigung', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:[] },
+    { key:'rschildmatrix', name:'Schildmatrix', baseCost:{kristalle:150, deuterium:70, forschungspunkte:28}, costMult:1.24, baseDuration:70, durationMult:1.15, desc:'Verteidigung (vertieft)', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:['rpanzer'] },
+    { key:'rkampf2', name:'Erweiterte Zielsysteme', baseCost:{kristalle:180, antimaterie:20, forschungspunkte:36}, costMult:1.24, baseDuration:90, durationMult:1.15, desc:'Angriffspunkte (vertieft)', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:['rkampf'] },
+    { key:'rfruehwarnung', name:'Frühwarnsystem', baseCost:{erz:200, energie:150, forschungspunkte:22}, costMult:1.22, baseDuration:60, durationMult:1.14, desc:'Weniger Überfall-Risiko', effectRes:null, effectPerLevel:0.025, maxLevel:20, requires:['rpanzer'] },
+    { key:'rscanner', name:'Langstrecken-Scanner', baseCost:{energie:180, kristalle:60, forschungspunkte:28}, costMult:1.24, baseDuration:70, durationMult:1.15, desc:'Überfälle werden erst dadurch frühzeitig erkennbar (+90s Vorwarnzeit je Stufe). Ohne diese Forschung bleiben Überfälle bis zum Einschlag komplett unsichtbar.', effectRes:null, effectPerLevel:90, maxLevel:20, requires:[] },
+    { key:'rnotfall', name:'Notfallprotokolle', baseCost:{deuterium:120, antimaterie:15, forschungspunkte:28}, costMult:1.22, baseDuration:70, durationMult:1.14, desc:'Weniger Verlust bei Überfällen', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:['rschildmatrix'] },
+    { key:'rspyshield', name:'Spionageabwehr', baseCost:{energie:150, kristalle:90, deuterium:40, forschungspunkte:31}, costMult:1.26, baseDuration:75, durationMult:1.16, desc:'Verschleiert die eigenen Flottendaten für fremde Spähschiffe (±8% Ungenauigkeit je Stufe auf alle ausspähbaren Werte). Macht gegnerische Spionageberichte über die eigene Flotte zunehmend unzuverlässig.', effectRes:null, effectPerLevel:0.08, maxLevel:10, requires:['rscanner'] }
   ];
   // Doktrinen: eine strategische Grundsatzentscheidung im Spätspiel, die sich gegenseitig ausschließt
   // (immer nur eine aktiv). Schaltet frei, sobald rkampf2 UND rschildmatrix Stufe 5 erreicht haben –
@@ -4160,7 +4166,7 @@
   function techUnlockedGeneric(requires){ return (requires||[]).every(k => (state.research[k]||0) >= 1); }
   function researchDuration(r, targetLevel){
     const labs = allBuildingSets().reduce((a,b)=>a+(b.labor||0),0);
-    let labMult = Math.max(0.25, 1 - labs*0.06);
+    let labMult = Math.max(0.35, 1 - labs*0.045);
     if (state.allianceResearch && state.allianceResearch.a_res) labMult *= 0.85;
     if (state.allianceResearch && state.allianceResearch.ab_forschungszentrum) labMult *= 0.90;
     if (hasRoleAnywhere('science')) labMult *= 0.90; // Forschungs-Welt: -10% Forschungszeit (imperiumsweit, nicht stapelbar)
@@ -6982,6 +6988,7 @@
       { title:'Typ-Umwandlung (echtes Terraforming)', body:'Getrennt vom Stufen-Terraforming kann der <strong>Planetentyp selbst</strong> aufgewertet werden, entlang der Kette Todeswelt → Wüstenwelt → Eiswelt → Vulkanwelt → Wasserwelt → Kristallwelt → <strong>Erdwelt</strong>. Jeder Schritt ist <strong>sehr teuer</strong> (Erz/Kristalle/Deuterium/Antimaterie) und dauert lange (30 Min. bis mehrere Stunden), es kann immer nur eine Umwandlung gleichzeitig laufen. So lässt sich aus einer schlechten Todeswelt über viele Schritte die bestmögliche Erdwelt formen. Zu finden im Basis-Tab unter dem Stufen-Terraforming. Nur Planeten in dieser Kette sind umwandelbar (nicht Gasriesen, Asteroiden oder Superplaneten).' }
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
+      { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 65% (ab ca. 15 Laboren erreicht), damit Forschung nicht beliebig schnell wird. Forschungspunkte-Kosten steigen wie alle anderen Forschungskosten mit jeder Stufe.' },
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.' }
     ]},
