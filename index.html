@@ -1524,8 +1524,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.11.3';
+  const VERSION = '8.12.0';
   const PATCHNOTES = [
+    { version:'8.12.0', date:'13.07.2026', changes:[
+      'Balance: Forschungspunkte strukturell vom Wirtschafts-Schneeball entkoppelt - sie bekommen jetzt keine Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni mehr (andere Ressourcen bleiben davon unberührt)',
+      'Grund: Die Forschungs-KOSTEN wachsen nur mit der Forschungsstufe, während die Punkte-PRODUKTION bisher mit der gesamten Wirtschaft mitwuchs - im späten Spiel wurden Forschungspunkte dadurch trivial im Überfluss verdient, lange bevor die Forschung selbst fertig war',
+      'Jetzt hängt die Forschungspunkte-Produktion nur noch an direkten, lokalen Investitionen (Labor-Anzahl, Habitat, Kolonie-Rolle, Module) - im Test bei Stufe 20 nahezu perfekt im Gleichgewicht mit der Bauzeit statt weit voraus'
+    ]},
     { version:'8.11.3', date:'13.07.2026', changes:[
       'Update-Erkennung wieder verpflichtend: Wird im Hintergrund eine neue Version gefunden, erscheint automatisch das volle Update-Fenster mit den echten Patchnotes - lässt sich nicht mehr wegklicken, nur "Seite neu laden" führt weiter'
     ]},
@@ -4506,7 +4511,12 @@
     // Balance-Pass v8.7: Prestige-Produktionsbonus gedeckelt bei +40% (greift ab Stufe 9) - wer
     // darüber hinaus will, nutzt den Aufstieg (Meta-Baum). Kommandanten-Cap +30% wie gehabt.
     const metaMult = (1 + Math.min(0.40, (state.prestige||0)*0.05)) * (1 + Math.min(0.30, commanderLevel(state.xp||0)*0.01));
-    for (const k of Object.keys(rates)) rates[k] *= metaMult;
+    // Balance-Pass v8.12: Forschungspunkte bekommen NICHT den Prestige-/Kommandanten-Bonus - sonst
+    // wächst die Punkte-Produktion mit der gesamten Wirtschafts-Entwicklung, während die Forschungs-
+    // KOSTEN nur mit der Forschungsstufe wachsen. Das ließ Forschungspunkte im Endgame beliebig
+    // schneller entstehen, als man sie überhaupt verbauen konnte. Punkte hängen jetzt nur noch an
+    // direkten, lokalen Investitionen (Labor-Anzahl, Habitat, Kolonie-Rolle, Module).
+    for (const k of Object.keys(rates)) if (k !== 'forschungspunkte') rates[k] *= metaMult;
     const now = Date.now();
     for (const buff of (state.buffs||[])){
       if (buff.expiresAt < now) continue;
@@ -4536,7 +4546,9 @@
     // bleibt spürbar, aber die Summe kann nicht mehr unbegrenzt wachsen - auch nicht durch
     // künftige Features, die hier einzahlen.
     globalBonus = Math.min(1.0, globalBonus);
-    if (globalBonus > 0) for (const k of Object.keys(rates)) rates[k] *= (1 + globalBonus);
+    // Aus demselben Grund (siehe oben) bleibt auch die additive Bonus-Gruppe (Allianz, Saison,
+    // Perks, Skills, Territorium, Aufstieg u.a.) für Forschungspunkte außen vor.
+    if (globalBonus > 0) for (const k of Object.keys(rates)) if (k !== 'forschungspunkte') rates[k] *= (1 + globalBonus);
     return rates;
   }
   // Harter Lager-Deckel (v8.7.2, vorher 20% Überlauf-Ertrag): Ist das Lager einer Ressource voll,
@@ -7306,7 +7318,7 @@
       { title:'Typ-Umwandlung (echtes Terraforming)', body:'Getrennt vom Stufen-Terraforming kann der <strong>Planetentyp selbst</strong> aufgewertet werden, entlang der Kette Todeswelt → Wüstenwelt → Eiswelt → Vulkanwelt → Wasserwelt → Kristallwelt → <strong>Erdwelt</strong>. Jeder Schritt ist <strong>sehr teuer</strong> (Erz/Kristalle/Deuterium/Antimaterie) und dauert lange (30 Min. bis mehrere Stunden), es kann immer nur eine Umwandlung gleichzeitig laufen. So lässt sich aus einer schlechten Todeswelt über viele Schritte die bestmögliche Erdwelt formen. Zu finden im Basis-Tab unter dem Stufen-Terraforming. Nur Planeten in dieser Kette sind umwandelbar (nicht Gasriesen, Asteroiden oder Superplaneten).' }
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
-      { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 65% (ab ca. 15 Laboren erreicht), damit Forschung nicht beliebig schnell wird. Forschungspunkte-Kosten steigen wie alle anderen Forschungskosten mit jeder Stufe.' },
+      { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 65% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.' }
     ]},
