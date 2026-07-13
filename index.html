@@ -1530,8 +1530,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.16.0';
+  const VERSION = '8.17.0';
   const PATCHNOTES = [
+    { version:'8.17.0', date:'13.07.2026', changes:[
+      'Galaxie-Übersicht überarbeitet: Systeme stehen jetzt in einem geordneten Raster (Zeilen/Spalten) statt frei schwebend als "Sternhaufen" - angelehnt an klassische Weltraum-Strategiespiele',
+      'Kompakte Zeilen-Darstellung statt großer leuchtender Kreise: Status-Punkt, Systemname und Kurzinfo (erkundet/Kolonien bzw. Fraktion) in einer schlanken Karte je System',
+      'Alle bisherigen Infos bleiben erhalten: Wurmloch-Verbindungslinie, Fraktions-Territorium, eigene Kontrolle, Piraten-/Alien-/Kriegs-Symbole, Supernova-Kollaps'
+    ]},
     { version:'8.16.0', date:'13.07.2026', changes:[
       'Aktive Wurmlöcher sind jetzt auch sichtbar, wenn direkt in eines der beiden beteiligten Systeme hineingezoomt wird - vorher nur als Verbindungslinie in der Galaxie-Übersicht erkennbar. Zeigt ein kleines animiertes Portal-Symbol in der Systemansicht sowie einen Hinweis in der Kopfzeile ("🌀 Wurmloch → Zielsystem")'
     ]},
@@ -10232,6 +10237,24 @@
     galaxyMapViewBox.x = Math.max(-80, Math.min(950-galaxyMapViewBox.w+80, galaxyMapViewBox.x));
     galaxyMapViewBox.y = Math.max(-60, Math.min(500-galaxyMapViewBox.h+60, galaxyMapViewBox.y));
   }
+  // Raster-Positionierung der Systeme (AstroEmpires-artig: geordnete Zeilen/Spalten statt frei
+  // schwebender "Sternhaufen"). Die ursprüngliche, organische (gx/gy) Position dient nur noch als
+  // Sortierschlüssel, damit ehemals benachbarte Systeme auch im Raster tendenziell nah beieinander
+  // bleiben - die tatsächliche Zeichenposition kommt komplett aus dem Raster.
+  function galaxyGridLayout(systems){
+    const cols = 7;
+    const marginX = 62, marginY = 38;
+    const cellW = (950 - marginX*2) / (cols-1);
+    const rows = Math.ceil(systems.length / cols);
+    const cellH = (500 - marginY*2) / Math.max(1, rows-1);
+    const ordered = [...systems].sort((a,b) => (a.gy-b.gy) || (a.gx-b.gx));
+    const pos = {};
+    ordered.forEach((s,i) => {
+      const col = i % cols, row = Math.floor(i/cols);
+      pos[s.id] = { x: marginX + col*cellW, y: marginY + row*cellH };
+    });
+    return pos;
+  }
   function buildGalaxyMap(){
     const svg = document.getElementById('galaxyMapSvg');
     if (!svg) return;
@@ -10247,58 +10270,59 @@
         <stop offset="100%" stop-color="#7a2020" stop-opacity="0"/>
       </radialGradient>
     </defs>`;
-    for (let i=0;i<45;i++){
-      inner += `<circle cx="${(Math.random()*950).toFixed(1)}" cy="${(Math.random()*500).toFixed(1)}" r="${(Math.random()*1+0.3).toFixed(1)}" fill="#fff" opacity="${(Math.random()*0.3+0.1).toFixed(2)}"/>`;
+    for (let i=0;i<25;i++){
+      inner += `<circle cx="${(Math.random()*950).toFixed(1)}" cy="${(Math.random()*500).toFixed(1)}" r="${(Math.random()*1+0.3).toFixed(1)}" fill="#fff" opacity="${(Math.random()*0.2+0.08).toFixed(2)}"/>`;
     }
+    const visSys = visibleSystems();
+    const gridPos = galaxyGridLayout(visSys);
     // Wurmloch-Verbindungslinie zuerst zeichnen, damit sie unter den System-Knoten liegt.
     if (galaxyCache.activeWormhole){
+      const fromPos = gridPos[galaxyCache.activeWormhole.from];
+      const toPos = gridPos[galaxyCache.activeWormhole.to];
       const fromSys = STAR_SYSTEMS.find(s=>s.id===galaxyCache.activeWormhole.from);
       const toSys = STAR_SYSTEMS.find(s=>s.id===galaxyCache.activeWormhole.to);
-      if (fromSys && toSys){
-        inner += `<line x1="${fromSys.gx}" y1="${fromSys.gy}" x2="${toSys.gx}" y2="${toSys.gy}" stroke="#af9ce6" stroke-width="2" stroke-dasharray="5 4" opacity="0.75"><animate attributeName="stroke-dashoffset" from="0" to="18" dur="1.3s" repeatCount="indefinite"/><title>Wurmloch: ${fromSys.name} ↔ ${toSys.name}</title></line>`;
+      if (fromPos && toPos && fromSys && toSys){
+        inner += `<line x1="${fromPos.x}" y1="${fromPos.y}" x2="${toPos.x}" y2="${toPos.y}" stroke="#af9ce6" stroke-width="2" stroke-dasharray="5 4" opacity="0.75"><animate attributeName="stroke-dashoffset" from="0" to="18" dur="1.3s" repeatCount="indefinite"/><title>Wurmloch: ${fromSys.name} ↔ ${toSys.name}</title></line>`;
       }
     }
-    for (const s of visibleSystems()){
+    // Kompakte Tabellen-/Rasterzeilen statt großer leuchtender Kreise - angelehnt an klassische
+    // Weltraum-Strategiespiele mit Gitter-Sektorkarte statt frei schwebender Sternhaufen-Optik.
+    const CELL_W = 108, CELL_H = 34;
+    for (const s of visSys){
+      const pos = gridPos[s.id];
+      if (!pos) continue;
+      const x = pos.x, y = pos.y;
       const planetsInSys = PLANETS.filter(p=>p.system===s.id);
       const discCount = planetsInSys.filter(p=>state.discovered[p.id]).length;
       const colCount = planetsInSys.filter(p=>state.colonies[p.id]).length;
       const active = activeSystem===s.id;
       const isHome = myHomeSystem===s.id;
-      const pct = planetsInSys.length ? discCount/planetsInSys.length : 0;
       const isCollapsed = !!(galaxyCache.collapsedSystems && galaxyCache.collapsedSystems[s.id]);
-      // NPC-Fraktion, die dieses System besitzt (aus der Backend-Territorium-Simulation).
       const owner = factionOwning(s.id);
-      // Vom Spieler erobertes System?
       const controlledByMe = !!(galaxyCache.controlledSystems && galaxyCache.controlledSystems[s.id]);
 
-      // Galaxie-Ereignis-Badges für dieses System sammeln (Supernova wird separat/prominent behandelt).
       const badges = [];
       if (galaxyCache.activePirateFaction && galaxyCache.activePirateFaction.system === s.id) badges.push({ icon:'🏴‍☠️', title:galaxyCache.activePirateFaction.name+' – Piratenbasis' });
       const alienHere = (galaxyCache.unlockedAlienRaces||[]).find(r=>r.system===s.id);
       if (alienHere) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
       if (galaxyCache.activeWar && galaxyCache.activeWar.system === s.id) badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
-      const badgeMarkup = badges.map((b,i) => `<text x="${s.gx+18+i*15}" y="${s.gy-18}" text-anchor="middle" style="font-size:13px;"><title>${b.title}</title>${b.icon}</text>`).join('');
+      const badgeMarkup = badges.map((b,i) => `<text x="${x+CELL_W/2-9-i*13}" y="${y-9}" text-anchor="middle" style="font-size:10px;"><title>${b.title}</title>${b.icon}</text>`).join('');
 
-      // Fraktions-Territorium: farbiger Außenring + zarte Füllung in Fraktionsfarbe.
-      // Ein vom Spieler erobertes System bekommt einen grünen "kontrolliert"-Ring (überschreibt Fraktion).
-      const factionRing = controlledByMe
-        ? `<circle cx="${s.gx}" cy="${s.gy}" r="20" fill="#5dcaa514" stroke="#5dcaa5" stroke-width="2.5" stroke-opacity="0.9"><title>Von dir kontrolliert</title></circle>`
-        : (owner ? `<circle cx="${s.gx}" cy="${s.gy}" r="20" fill="${owner.color}14" stroke="${owner.color}" stroke-width="2" stroke-opacity="0.8"><title>${owner.name} – Territorium</title></circle>` : '');
+      const dotColor = isCollapsed ? '#e24b4a' : (isHome ? '#e24b4a' : (controlledByMe ? '#5dcaa5' : (owner ? owner.color : '#8489a0')));
+      const rowFill = active ? 'rgba(175,169,236,0.16)' : 'rgba(255,255,255,0.025)';
+      const rowStroke = isCollapsed ? '#e24b4a' : (active ? '#afa9ec' : 'rgba(255,255,255,0.09)');
+      const statusText = isCollapsed ? 'Kollabiert' : (controlledByMe ? '★ Kontrolle' : (owner ? owner.name : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))));
+      const statusColor = isCollapsed ? '#e24b4a' : (controlledByMe ? '#5dcaa5' : (owner ? owner.color : '#8489a0'));
 
-      // Option B (größere, immer sichtbare Beschriftung statt erst beim Reinzoomen einzublenden) –
-      // Kreise und Schrift spürbar größer als vorher, da 39 Systeme auf engem Raum sonst kaum
-      // lesbar sind.
       inner += `
-        <g class="planet-node" data-system-node="${s.id}">
+        <g class="galaxy-node" data-system-node="${s.id}" style="cursor:pointer;">
           <title>${s.name}${isCollapsed?' – Supernova-Kollaps, 48h unzugänglich':(owner?' – '+owner.name+' (NPC-Territorium)':'')}</title>
-          ${factionRing}
-          <circle cx="${s.gx}" cy="${s.gy}" r="26" fill="url(#${isCollapsed?'miniSunGlowCollapsed':'miniSunGlow'})" opacity="${isCollapsed?0.9:(0.3+pct*0.7)}"/>
-          <circle cx="${s.gx}" cy="${s.gy}" r="15" fill="none" stroke="${isCollapsed?'#e24b4a':(active?'#afa9ec':'#5a5f7a')}" stroke-width="${active?2.5:1.3}" stroke-dasharray="${isCollapsed?'3 3':(pct*94.2)+' 200'}"/>
-          <circle cx="${s.gx}" cy="${s.gy}" r="9" fill="${isCollapsed?'#3a1414':(isHome?'#e24b4a':'#fff7d6')}" opacity="${isCollapsed?0.9:(active?1:0.85)}"/>
-          ${isCollapsed ? `<text x="${s.gx}" y="${s.gy+3}" text-anchor="middle" style="font-size:10px;">💥</text>` : (isHome ? `<text x="${s.gx}" y="${s.gy+3}" text-anchor="middle" style="font-size:8.5px; fill:#fff;">🏠</text>` : '')}
+          <rect x="${(x-CELL_W/2).toFixed(1)}" y="${(y-CELL_H/2).toFixed(1)}" width="${CELL_W}" height="${CELL_H}" rx="5" fill="${rowFill}" stroke="${rowStroke}" stroke-width="${active||isCollapsed?1.6:1}"/>
+          <circle cx="${(x-CELL_W/2+11).toFixed(1)}" cy="${y}" r="6" fill="${dotColor}" opacity="${isCollapsed?0.95:(active?1:0.8)}"/>
+          ${isCollapsed ? `<text x="${(x-CELL_W/2+11).toFixed(1)}" y="${(y+2.5).toFixed(1)}" text-anchor="middle" style="font-size:7px;">💥</text>` : (isHome ? `<text x="${(x-CELL_W/2+11).toFixed(1)}" y="${(y+2.5).toFixed(1)}" text-anchor="middle" style="font-size:6.5px;">🏠</text>` : '')}
           ${badgeMarkup}
-          <text class="planet-label" x="${s.gx}" y="${s.gy+31}" text-anchor="middle" style="font-size:12px; font-weight:${active?700:500}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>
-          <text class="planet-label" x="${s.gx}" y="${s.gy+43}" text-anchor="middle" style="font-size:9.5px; fill:${controlledByMe?'#5dcaa5':(owner?owner.color:'#8489a0')};">${isCollapsed ? 'Kollabiert' : (controlledByMe ? '★ Deine Kontrolle' : (owner ? owner.name : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))))}</text>
+          <text class="planet-label" x="${(x-CELL_W/2+21).toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="start" style="font-size:9.5px; font-weight:${active?700:500}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>
+          <text class="planet-label" x="${(x-CELL_W/2+21).toFixed(1)}" y="${(y+9).toFixed(1)}" text-anchor="start" style="font-size:7.8px; fill:${statusColor};">${statusText}</text>
         </g>
       `;
     }
