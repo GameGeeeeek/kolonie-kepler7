@@ -767,7 +767,7 @@
         <div style="display:flex; align-items:center; gap:8px;">
           <i class="ti ti-alert-triangle" aria-hidden="true" style="font-size:20px; color:#e0a548;"></i>
           <div style="flex:1; min-width:0;">
-            <div style="font-weight:600; font-size:13px; color:#e0a548;">Lager fast voll</div>
+            <div style="font-weight:600; font-size:13px; color:#e0a548;" id="storageWarningTitle">Lager fast voll</div>
             <div id="storageWarningDesc" style="font-size:11.5px; color:#c7cbe0; margin-top:2px;"></div>
           </div>
         </div>
@@ -1451,8 +1451,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.7.0';
+  const VERSION = '8.7.1';
   const PATCHNOTES = [
+    { version:'8.7.1', date:'13.07.2026', changes:[
+      'Lager-Warnung präzisiert: Bei erreichter/überschrittener Kapazität heißt es jetzt "Lager voll" (Produktion läuft nur noch stark reduziert), "Lager fast voll" nur noch zwischen 90% und 100% - beide Gruppen werden getrennt aufgezählt'
+    ]},
     { version:'8.7.0', date:'13.07.2026', changes:[
       'Balance-Pass Richtung x8 (transparent erklärt): Das Late-Game-Produktionswachstum lag bei Vollausbau bei x9,3 global bzw. x17,6 auf dem besten Planeten - drei gezielte Anpassungen bringen es auf ~x7,6 / ~x13,9. Früh- und Mittelspiel sind praktisch unberührt',
       'Prestige-Produktionsbonus bei +40% gedeckelt (greift erst ab Prestige-Stufe 9; Stufen 1-8 unverändert) - für mehr gibt es den Aufstieg',
@@ -12290,13 +12293,23 @@
       }
     }
 
-    const nearFullRes = ['erz','kristalle','deuterium','antimaterie','energie','forschungspunkte'].filter(r => cap>0 && (state.resources[r]||0) >= cap*0.90 && (rates[r]||0) > 0);
+    // Zwei Stufen: "voll" (Kapazität erreicht/überschritten - Produktion läuft nur noch mit dem
+    // Überlauf-Restsatz) und "fast voll" (ab 90%). Der Banner-Titel richtet sich nach der höheren Stufe.
+    const watchRes = ['erz','kristalle','deuterium','antimaterie','energie','forschungspunkte'].filter(r => cap>0 && (rates[r]||0) > 0);
+    const fullRes = watchRes.filter(r => (state.resources[r]||0) >= cap);
+    const nearFullRes = watchRes.filter(r => (state.resources[r]||0) >= cap*0.90 && (state.resources[r]||0) < cap);
     const storageWarningBanner = document.getElementById('storageWarningBanner');
     if (storageWarningBanner){
-      if (nearFullRes.length){
+      if (fullRes.length || nearFullRes.length){
         storageWarningBanner.style.display = 'block';
-        const labels = nearFullRes.map(r => (RES_DEFS.find(x=>x.key===r)||{}).label||r).join(', ');
-        document.getElementById('storageWarningDesc').textContent = labels+' – Lager bald voll, weitere Produktion geht verloren. Mehr Lagerkapazität ausbauen oder Ressourcen verbrauchen (Bauen, Schiffe, Forschung).';
+        const titleEl = document.getElementById('storageWarningTitle');
+        if (titleEl) titleEl.textContent = fullRes.length ? 'Lager voll' : 'Lager fast voll';
+        const lbl = (arr) => arr.map(r => (RES_DEFS.find(x=>x.key===r)||{}).label||r).join(', ');
+        let msg = '';
+        if (fullRes.length) msg += lbl(fullRes)+' – Lager voll, Produktion läuft nur noch stark reduziert weiter.';
+        if (nearFullRes.length) msg += (msg?' ':'')+lbl(nearFullRes)+' – Lager bald voll.';
+        msg += ' Mehr Lagerkapazität ausbauen oder Ressourcen verbrauchen (Bauen, Schiffe, Forschung).';
+        document.getElementById('storageWarningDesc').textContent = msg;
       } else {
         storageWarningBanner.style.display = 'none';
       }
