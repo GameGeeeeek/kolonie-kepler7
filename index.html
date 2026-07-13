@@ -845,6 +845,7 @@
         <div id="colonyRenameBox" style="display:flex; gap:8px; margin:0.5rem 0 1rem;">
           <input type="text" id="colonyRenameInput" placeholder="Eigener Name für diese Kolonie…" maxlength="24" style="flex:1;"/>
           <button id="colonyRenameSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
+          <button id="colonyAbandonBtn" style="display:none; background:rgba(226,75,74,0.18); border-color:var(--c-danger); flex-shrink:0;" title="Kolonie aufgeben"><i class="ti ti-alert-triangle" aria-hidden="true"></i></button>
         </div>
         <div class="qty-select" id="qtySelect"></div>
         <div id="buildQueueBox"></div>
@@ -1529,8 +1530,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.14.1';
+  const VERSION = '8.15.0';
   const PATCHNOTES = [
+    { version:'8.15.0', date:'13.07.2026', changes:[
+      'Neu: Kolonien lassen sich aufgeben (Basis-Tab, roter Knopf neben dem Umbenennen-Feld) - gibt einen Kolonie-Slot frei, z.B. um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen',
+      'Gebäude und stationierte Flotte gehen dabei verloren, ein zugehöriger kolonisierter Mond wird automatisch mit aufgegeben; blockiert, solange noch Missionen von dort unterwegs sind; der Planet bleibt entdeckt und ist später erneut kolonisierbar'
+    ]},
     { version:'8.14.1', date:'13.07.2026', changes:[
       'Kolonial-Logistik überarbeitet: Statt Kolonisierungskosten zu senken, erhöht die Forschung jetzt direkt das Kolonie-Limit - ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere dazu (bei Maximalstufe 20 insgesamt 11 Kolonien). Monde zählen nicht mit'
     ]},
@@ -4474,6 +4479,34 @@
     else { state.colonyNames[planetKey] = trimmed; log('Kolonie umbenannt zu "'+trimmed+'".', 'ti-check'); }
     render(); save();
   }
+  // Kolonie aufgeben: gibt einen Kolonie-Slot frei (relevant seit dem Kolonie-Limit durch
+  // Kolonial-Logistik) - z.B. um eine schwache Frühkolonie gegen einen besseren Planeten zu
+  // tauschen. Endgültig: Gebäude und stationierte Flotte gehen verloren, der Planet bleibt aber
+  // entdeckt und kann später erneut kolonisiert werden. Ein zugehöriger kolonisierter Mond geht
+  // automatisch mit verloren, da er sonst unerreichbar würde (Umschalt-Knöpfe hängen am Elternplaneten).
+  function abandonColony(planetKey){
+    if (planetKey === 'home'){ log('Die Heimatbasis kann nicht aufgegeben werden.', 'ti-alert-triangle'); return; }
+    if (!state.colonies[planetKey]){ log('Keine Kolonie zum Aufgeben ausgewählt.', 'ti-alert-triangle'); return; }
+    const fleetHere = state.colonies[planetKey].fleet;
+    if (fleetHere && (fleetHere.missions||[]).length > 0){ log('Diese Kolonie hat noch Missionen unterwegs - erst zurückkehren lassen, bevor sie aufgegeben werden kann.', 'ti-alert-triangle'); return; }
+    const alreadyMoon = isMoonKey(planetKey);
+    const moonKey = 'moon_'+planetKey;
+    const hasColonizedMoon = !alreadyMoon && !!state.colonies[moonKey];
+    const displayName = planetDisplayName(planetKey);
+    const warnMoon = hasColonizedMoon ? ' Der zugehörige Mond ('+planetDisplayName(moonKey)+') geht dabei ebenfalls verloren.' : '';
+    if (!confirm('Kolonie '+displayName+' wirklich aufgeben? Alle dortigen Gebäude und die stationierte Flotte gehen unwiderruflich verloren.'+warnMoon+' Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.')) return;
+    delete state.colonies[planetKey];
+    if (hasColonizedMoon) delete state.colonies[moonKey];
+    if (state.colonyNames){ delete state.colonyNames[planetKey]; if (hasColonizedMoon) delete state.colonyNames[moonKey]; }
+    if (state.planetSpecialization) delete state.planetSpecialization[planetKey];
+    if (state.orbitalStations) delete state.orbitalStations[planetKey];
+    if (state.terraforming) delete state.terraforming[planetKey];
+    if (state.favoritePlanets) delete state.favoritePlanets[planetKey];
+    if (state.activeBasePlanet === planetKey || state.activeBasePlanet === moonKey) state.activeBasePlanet = 'home';
+    log(displayName+' aufgegeben.'+warnMoon, 'ti-alert-triangle');
+    playSound('build');
+    render(); save();
+  }
   function allBuildingSets(){
     return allBuildingSetsWithPlanet().map(x=>x.buildings);
   }
@@ -7399,6 +7432,7 @@
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
       { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 45% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
+      { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
       { title:'Zwei neue, eigenständige Forschungszweige', body:'<strong>Diplomatie-Protokolle</strong> erhöht die Friedensdividende aus aktiven Nichtangriffspakten zusätzlich zum Grundbonus. <strong>Kolonial-Logistik</strong> erhöht das Kolonie-Limit: Ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere hinzu (bei Maximalstufe 20 also 11 Kolonien). Monde zählen nicht mit. Beide Forschungen sind von Anfang an verfügbar, unabhängig von der übrigen Technologie-Kette.' },
       { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss.' },
@@ -11587,6 +11621,12 @@
       }
       const colonyRenameSaveBtn = document.getElementById('colonyRenameSaveBtn');
       if (colonyRenameSaveBtn) colonyRenameSaveBtn.onclick = () => renameColony(state.activeBasePlanet, colonyRenameInput.value);
+      const colonyAbandonBtn = document.getElementById('colonyAbandonBtn');
+      if (colonyAbandonBtn){
+        const isRealColony = state.activeBasePlanet !== 'home' && !!state.colonies[state.activeBasePlanet];
+        colonyAbandonBtn.style.display = isRealColony ? 'flex' : 'none';
+        colonyAbandonBtn.onclick = () => abandonColony(state.activeBasePlanet);
+      }
     }
     if (activeTab === 'verteidigung') document.getElementById('defenseBuildings').innerHTML = constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense') + BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join('');
 
