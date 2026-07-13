@@ -1634,8 +1634,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.21.1';
+  const VERSION = '8.21.2';
   const PATCHNOTES = [
+    { version:'8.21.2', date:'13.07.2026', changes:[
+      'Bug behoben (danke an holyhenning für den Report): Im Marktplatz sprang der Cursor beim Tippen der Handelsmenge nach spätestens 1 Sekunde aus dem Feld ("man musste schnell sein") - die Box wurde bei jedem Haupt-Tick komplett neu aufgebaut und dabei auch das gerade fokussierte Mengenfeld ersetzt. Wird jetzt wie bei anderen Eingabefeldern übersprungen, solange aktiv getippt wird'
+    ]},
     { version:'8.21.1', date:'13.07.2026', changes:[
       'Vorschlag umgesetzt (danke an holyhenning): Bau- und Forschungs-Warteschlange reservieren jetzt mindestens 3 Zeilen als Platzhalter, statt bei leerer Warteschlange komplett zu verschwinden - vorher poppte die Box beim ersten Hinzufügen plötzlich mit voller Höhe auf und schob die Liste darunter weg, was sich wie ein ungewolltes Auto-Scrollen anfühlte'
     ]},
@@ -3522,6 +3525,12 @@
     renderCreditShop();
     const box = document.getElementById('marketBox');
     if (!box) return;
+    // Bug behoben (danke an holyhenning für den Report): renderMarket() lief bisher bei jedem
+    // 1-Sekunden-Haupt-Tick durch und hat dabei die komplette Box inkl. Mengenfeld per innerHTML
+    // neu aufgebaut - wer beim Tippen nicht "schnell genug" war, verlor mitten im Tippen den Fokus,
+    // weitere Tastatureingaben gingen ins Leere. isTypingIn() (gleiches Muster wie bei Allianz-Boxen,
+    // Umsiedlung, Schiffskorb, Avatar) überspringt den Re-Render, solange im Mengenfeld getippt wird.
+    if (isTypingIn('marketBox')) return;
     if (!useBackend()){
       box.innerHTML = '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Der Marktplatz ist nur mit Serververbindung verfügbar (im Gastmodus nicht nutzbar). Handelsrouten vom Typ Kredit/Transport funktionieren aber auch ohne Server.</div>';
       return;
