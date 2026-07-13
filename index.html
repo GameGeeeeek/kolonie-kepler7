@@ -1634,8 +1634,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.20.4';
+  const VERSION = '8.21.0';
   const PATCHNOTES = [
+    { version:'8.21.0', date:'13.07.2026', changes:[
+      'Neu: Wenn ein gemeldeter Bug behoben wird, bekommt der meldende Spieler eine Nachricht vom Team und einmalig eine kleine Kredit-Belohnung gutgeschrieben (erscheint automatisch beim nächsten Einloggen bzw. spätestens nach 15 Sekunden, falls schon eingeloggt)'
+    ]},
     { version:'8.20.4', date:'13.07.2026', changes:[
       'Bug behoben (danke an holyhenning für den Report): Die Habitat-Kuppel ließ sich über die eigentliche Maximalstufe 20 hinaus ausbauen - der Effekt ist seit einem früheren Balance-Pass zwar bei Stufe 20 gedeckelt, der Bau selbst wurde das aber nie verhindert, sodass man für wirkungslose Stufen weiterzahlen konnte. Betrifft jetzt Sofort-Bau und Warteschlange gleichermaßen; bereits über Stufe 20 gebaute Kuppeln funktionieren unverändert weiter (keine Rückstufung), lassen sich aber nicht mehr weiter ausbauen'
     ]},
@@ -5697,6 +5700,25 @@
     if (n >= 1000) return (n/1000).toFixed(1)+'k';
     return Math.floor(n*10)/10;
   }
+  // Holt ausstehende Belohnungen (z.B. Bugfix-Dankeschön vom Team) ab und schreibt sie in den
+  // eigenen Spielstand. Bewusst über den normalen, authentifizierten Speicherzyklus statt einer
+  // direkten Server-seitigen Änderung des Spielstands - so gibt es keinen Konflikt mit einem
+  // laufenden Auto-Save (siehe saveGameStateVersioned).
+  async function claimPendingRewards(){
+    if (!useBackend()) return;
+    try {
+      for (let i = 0; i < 10; i++){
+        const res = await backendFetch('/pending-rewards/claim', { method:'POST' });
+        if (!res.ok) break;
+        const data = await res.json();
+        if (!data.reward) break;
+        const r = data.reward;
+        if (r.credits) state.credits = (state.credits||0) + r.credits;
+        log('Dankeschön vom Team: +'+fmt(r.credits)+' Kredite für deinen Bug-Report!', 'ti-award');
+        save();
+      }
+    } catch(e){ /* still, kein Problem - wird beim nächsten Login erneut versucht */ }
+  }
   function log(msg, icon){
     document.getElementById('log').innerHTML = (icon?`<i class="ti ${icon}" aria-hidden="true"></i>`:'') + msg;
     pushToast(msg, icon);
@@ -7651,7 +7673,7 @@
       { title:'Chat-Benachrichtigung', body:'Der Chat-Reiter am linken Bildschirmrand zeigt einen roten Punkt, sobald in Allianz- oder globalem Chat eine neue Nachricht eingetroffen ist, seit du zuletzt geöffnet hattest - läuft automatisch im Hintergrund, ohne dass der Chat offen sein muss.' },
       { title:'Automatische Update-Erkennung', body:'Bleibt die Kolonie lange im selben Tab geöffnet (z.B. als installierte App), prüft sie im Hintergrund von selbst, ob eine neue Version bereitsteht - beim Zurückwechseln in den Tab und danach alle 10 Minuten. Wird eine gefunden, erscheint automatisch das Update-Fenster mit den vollständigen Patchnotes; es lässt sich nicht wegklicken, nur über "Seite neu laden" geht es weiter (dein Fortschritt bleibt dabei erhalten).' },
       { title:'Push-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich der Knopf "Push auf diesem Gerät" aktivieren (Browser fragt einmalig um Erlaubnis) - danach schickt der Server für Nachrichten, Pakt-Angebote, Weltboss-Kills, anfliegende Überfälle und Patchnotes echte Benachrichtigungen an dieses Gerät, auch wenn die Seite geschlossen ist. Fünf Kategorien lassen sich einzeln abschalten. Alle Ereignisse landen zusätzlich als geräteübergreifendes Postfach im <strong>Berichte-Tab</strong> unter "Server-Ereignisse" - nur mit eigenem Server verfügbar.' },
-      { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt.' },
+      { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt. Wird dein gemeldeter Bug behoben, bekommst du dafür eine Nachricht vom Team und einmalig eine kleine <strong>Kredit-Belohnung</strong> - erscheint automatisch beim nächsten Einloggen.' },
       { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: ab <strong>Prestige 3 und 50.000 Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit fünf Zweigen (je max. Stufe 10, Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset) und Pfadfinder-Instinkt (+2% Expeditions-Belohnung). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste.' },
       { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
     ]},
@@ -14475,7 +14497,7 @@
     if (missionsResolved || queueProgressed || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
   }, 1000);
   setInterval(save, 10000);
-  setInterval(() => { loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); } }, 15000);
+  setInterval(() => { loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); } }, 15000);
   setInterval(loadGalaxyState, 120000); // Galaxie-Zustand ändert sich langsam (Server-Tick alle 15 Min.), reicht alle 2 Min. zu prüfen
   loadGalaxyState();
   setInterval(() => { if (activeTab === 'markt') loadMarketState(); }, 30000); // Marktpreise im Markt-Tab alle 30s auffrischen
@@ -14790,7 +14812,7 @@
 
   (async () => {
     const ready = await initAuth();
-    if (ready){ await load(); render(); loadLeaderboard(); loadReports(); loadMessages(); if (myAllianceTag()) loadAllianceWars(); if (!state.tutorialSeen) showTutorial(); }
+    if (ready){ await load(); render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) loadAllianceWars(); if (!state.tutorialSeen) showTutorial(); }
   })();
   // PWA: Service Worker registrieren (macht die App zusätzlich zum Manifest auch am DESKTOP
   // installierbar - Chrome/Edge verlangen dafür einen aktiven Service Worker, mobile Browser
