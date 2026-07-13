@@ -1530,8 +1530,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.15.2';
+  const VERSION = '8.16.0';
   const PATCHNOTES = [
+    { version:'8.16.0', date:'13.07.2026', changes:[
+      'Aktive Wurmlöcher sind jetzt auch sichtbar, wenn direkt in eines der beiden beteiligten Systeme hineingezoomt wird - vorher nur als Verbindungslinie in der Galaxie-Übersicht erkennbar. Zeigt ein kleines animiertes Portal-Symbol in der Systemansicht sowie einen Hinweis in der Kopfzeile ("🌀 Wurmloch → Zielsystem")'
+    ]},
     { version:'8.15.2', date:'13.07.2026', changes:[
       'Bugfix: In der visuellen Sonnensystem-Ansicht (Kreisdarstellung mit "Deine Basis") fehlte das kleine Mond-Symbol bei der Heimatbasis, obwohl es bei allen anderen Planeten mit Mond angezeigt wird - die Heimatbasis wird technisch separat gezeichnet und hatte das Symbol nie bekommen'
     ]},
@@ -10419,7 +10422,16 @@
     const nameEl = document.getElementById('systemNavName');
     if (nameEl) nameEl.textContent = curSys.name + (myHomeSystem===curSys.id ? ' 🏠' : '');
     const metaEl = document.getElementById('systemNavMeta');
-    if (metaEl) metaEl.textContent = discAll+'/'+sysPlanetsAll.length+' erkundet · System '+(idx+1)+'/'+visSys.length;
+    if (metaEl){
+      let metaText = discAll+'/'+sysPlanetsAll.length+' erkundet · System '+(idx+1)+'/'+visSys.length;
+      const wh = galaxyCache.activeWormhole;
+      if (wh && (wh.from === activeSystem || wh.to === activeSystem)){
+        const otherSysId = wh.from === activeSystem ? wh.to : wh.from;
+        const otherSys = STAR_SYSTEMS.find(s=>s.id===otherSysId);
+        metaText += ' · 🌀 Wurmloch → '+(otherSys?otherSys.name:'unbekanntes System');
+      }
+      metaEl.textContent = metaText;
+    }
     const prevBtn = document.getElementById('systemPrevBtn');
     if (prevBtn) prevBtn.onclick = () => switchToSystem(visSys[(idx-1+visSys.length)%visSys.length].id);
     const nextBtn = document.getElementById('systemNextBtn');
@@ -10449,6 +10461,19 @@
       inner += `<ellipse cx="${SUN_X}" cy="${SUN_Y}" rx="58" ry="17" fill="none" stroke="#e24b4a" stroke-opacity="0.15" stroke-dasharray="1,4"/>`;
     }
 
+    // Wurmloch-Portal: sichtbar, wenn das aktuell gezoomte System einer der beiden Endpunkte ist -
+    // die verbindende Linie selbst ergibt hier keinen Sinn (das andere System ist nicht im Bild),
+    // daher ein eigenes kleines Portal-Symbol mit Tooltip zum Ziel.
+    if (galaxyCache.activeWormhole && (galaxyCache.activeWormhole.from === activeSystem || galaxyCache.activeWormhole.to === activeSystem)){
+      const otherSysId = galaxyCache.activeWormhole.from === activeSystem ? galaxyCache.activeWormhole.to : galaxyCache.activeWormhole.from;
+      const otherSys = STAR_SYSTEMS.find(s=>s.id===otherSysId);
+      const whX = 665, whY = 28;
+      inner += `<g><title>Wurmloch nach ${otherSys?otherSys.name:'unbekanntem System'}</title>
+        <circle cx="${whX}" cy="${whY}" r="14" fill="none" stroke="#af9ce6" stroke-width="2" stroke-dasharray="3 3" opacity="0.85"><animateTransform attributeName="transform" type="rotate" from="0 ${whX} ${whY}" to="360 ${whX} ${whY}" dur="4s" repeatCount="indefinite"/></circle>
+        <circle cx="${whX}" cy="${whY}" r="7" fill="#af9ce6" opacity="0.5"><animate attributeName="r" values="6;9;6" dur="1.8s" repeatCount="indefinite"/></circle>
+        <text x="${whX}" y="${whY+24}" text-anchor="middle" style="font-size:8px; fill:#c3bef5;">Wurmloch</text>
+      </g>`;
+    }
     // Sonne
     inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="34" fill="url(#sunGlow)"/><circle cx="${SUN_X}" cy="${SUN_Y}" r="13" fill="#fff7d6"/>`;
     if (state.debrisFields.home && Object.keys(state.debrisFields.home).length && activeSystem === myHomeSystem){
