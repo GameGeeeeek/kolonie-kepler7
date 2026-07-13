@@ -1404,8 +1404,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.88.0';
+  const VERSION = '7.89.0';
   const PATCHNOTES = [
+    { version:'7.89.0', date:'12.07.2026', changes:[
+      'Balance-Pass: Kredit-Route entschärft (war ein Perpetuum mobile – Frachter kosteten nur einmalig 100 Erz, amortisierten sich in ~9 Min. und warfen danach unbegrenzt Gewinn ab)',
+      'Kredit-Route: nur noch EINE gleichzeitig, gedeckelt auf max. 15 Frachter',
+      'Ertrag wächst jetzt mit abnehmendem Grenzertrag (Wurzel-Kurve) statt linear – bei 15 Frachtern ~23 Kredite/min statt vorher 180/min',
+      'Kredit-Route kostet jetzt laufend Erz als Unterhalt (2 Erz/Frachter/Zyklus) – ohne genug Erzproduktion bleibt sie stumm',
+      'Markt-Verkaufsroute und Transportroute unverändert (durch Ressourcenbestand bereits natürlich gedeckelt)',
+      'Hilfe-Seite entsprechend ergänzt'
+    ]},
     { version:'7.88.0', date:'12.07.2026', changes:[
       'Neu: E-Mails im "Void Signal"-Design – Kontobestätigung und Passwort-Reset sehen jetzt aus wie eine Funkmeldung aus dem Spiel (statt Klartext)',
       'Neu: E-Mail-Adresse in den Kontoeinstellungen änderbar (Passwort-Bestätigung nötig, neue Adresse wird erst nach Klick auf den Bestätigungslink aktiv)',
@@ -2774,7 +2782,16 @@
   // Jede Route tickt alle ROUTE_INTERVAL_MS. Ertrag skaliert mit der Zahl gebundener Frachter.
   const ROUTE_INTERVAL_MS = 60 * 1000; // ein Routen-Zyklus pro Minute
   const ROUTE_SELL_PER_FRACHTER = 40;    // verkaufte Ressourcenmenge pro Frachter je Zyklus
-  const ROUTE_CREDITS_PER_FRACHTER = 12; // pauschale Kredite pro Frachter je Zyklus
+  // Kredit-Route (Balance-Pass v7.89): war vorher linear (12×Frachter, ohne Unterhalt) und damit ein
+  // reines Perpetuum mobile - Frachter kosten nur einmalig 100 Erz und amortisierten sich in ~9 Min.,
+  // danach unbegrenzt Gewinn. Jetzt: nur EINE Kredit-Route gleichzeitig, gedeckelt auf max. 15 Frachter,
+  // Ertrag wächst mit Wurzel-Kurve (abnehmender Grenzertrag) statt linear, UND kostet laufend Erz pro
+  // Zyklus (kein Selbstläufer mehr - braucht aktive Erzproduktion zum Unterhalt).
+  const ROUTE_CREDITS_BASE = 4;
+  const ROUTE_CREDITS_EXPONENT = 0.65;
+  const ROUTE_CREDITS_MAX_FRACHTER = 15;
+  const ROUTE_CREDITS_UPKEEP_ERZ_PER_FRACHTER = 2;
+  function creditsRouteYield(n){ return Math.round(ROUTE_CREDITS_BASE * Math.pow(n, ROUTE_CREDITS_EXPONENT)); }
   const ROUTE_TRANSPORT_PER_FRACHTER = 60; // transportierte Menge pro Frachter je Zyklus
   const ROUTE_TYPES = {
     sell:      { label:'Markt-Verkaufsroute', icon:'ti-truck', needsBackend:true },
@@ -2795,6 +2812,10 @@
     const def = ROUTE_TYPES[type];
     if (!def){ log('Unbekannter Routentyp.', 'ti-alert-triangle'); return; }
     const n = Math.max(1, Math.floor(opts.frachter||0));
+    if (type === 'credits'){
+      if ((state.tradeRoutes||[]).some(r=>r.type==='credits')){ log('Es kann immer nur eine Kredit-Route gleichzeitig geben. Löse die bestehende zuerst auf, um eine größere anzulegen.', 'ti-alert-triangle'); return; }
+      if (n > ROUTE_CREDITS_MAX_FRACHTER){ log('Eine Kredit-Route kann höchstens '+ROUTE_CREDITS_MAX_FRACHTER+' Frachter binden.', 'ti-alert-triangle'); return; }
+    }
     if (availableFrachter() < n){ log('Nicht genug freie Frachter ('+availableFrachter()+' verfügbar).', 'ti-alert-triangle'); return; }
     if (def.needsBackend && !useBackend()){ log('Diese Route braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
     const route = { id: 'route-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), type, frachter:n, nextTick: Date.now()+ROUTE_INTERVAL_MS };
@@ -2820,8 +2841,14 @@
       if (now < (route.nextTick||0)) continue;
       route.nextTick = now + ROUTE_INTERVAL_MS;
       if (route.type === 'credits'){
-        const gain = route.frachter * ROUTE_CREDITS_PER_FRACHTER;
-        state.credits = (state.credits||0) + gain;
+        // Unterhalt zuerst prüfen: ohne genug Erz gibt es diesen Zyklus keine Kredite (kein
+        // Perpetuum mobile mehr - die Route braucht laufend Erzproduktion).
+        const upkeep = route.frachter * ROUTE_CREDITS_UPKEEP_ERZ_PER_FRACHTER;
+        if ((state.resources.erz||0) >= upkeep){
+          state.resources.erz -= upkeep;
+          const gain = creditsRouteYield(route.frachter);
+          state.credits = (state.credits||0) + gain;
+        }
       } else if (route.type === 'sell'){
         // Verkauft eine feste Menge der gewählten Ressource am Markt (lokaler Marktpreis-Cache als Basis;
         // echter Preis wird beim nächsten Markt-Laden aktualisiert). Braucht genug Ressourcen im Lager.
@@ -2935,7 +2962,7 @@
         const def = ROUTE_TYPES[route.type] || {};
         let detail = '';
         if (route.type === 'sell'){ const rd = RES_DEFS.find(r=>r.key===route.resource)||{label:route.resource}; detail = 'verkauft '+(route.frachter*ROUTE_SELL_PER_FRACHTER)+' '+rd.label+'/min am Markt'; }
-        else if (route.type === 'credits'){ detail = '+'+(route.frachter*ROUTE_CREDITS_PER_FRACHTER)+' Kredite/min'; }
+        else if (route.type === 'credits'){ detail = '~'+creditsRouteYield(route.frachter)+' Kredite/min (Unterhalt: '+(route.frachter*ROUTE_CREDITS_UPKEEP_ERZ_PER_FRACHTER)+' Erz/min)'; }
         else if (route.type === 'transport'){ const rd = RES_DEFS.find(r=>r.key===route.resource)||{label:route.resource}; detail = '+'+Math.round(route.frachter*ROUTE_TRANSPORT_PER_FRACHTER*0.10)+' '+rd.label+'/min (Logistikbonus)'; }
         return `<div class="card-row">
           <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.16); color:#5dcaa5;"><i class="ti ${def.icon||'ti-truck'}" aria-hidden="true"></i></div>
@@ -2949,26 +2976,29 @@
     }
 
     // Neue Route anlegen
+    const hasCreditsRoute = (state.tradeRoutes||[]).some(r=>r.type==='credits');
+    const maxForType = newRouteDraft.type==='credits' ? Math.min(avail, ROUTE_CREDITS_MAX_FRACHTER) : avail;
     html += `<div class="card-row" style="flex-direction:column; align-items:stretch;">
       <div class="bname" style="margin-bottom:8px;"><i class="ti ti-plus" aria-hidden="true"></i> Neue Route</div>
       <div class="bmeta" style="margin-bottom:8px;">Freie Frachter: <strong style="color:${avail>0?'#5dcaa5':'#e24b4a'};">${avail}</strong> von ${totalFrachter}</div>
       <div style="display:flex; flex-direction:column; gap:8px;">
         <label class="bmeta">Routentyp
           <select data-route-type style="width:100%; margin-top:3px; padding:5px 8px;">
-            <option value="credits" ${newRouteDraft.type==='credits'?'selected':''}>Kredit-Route (+Kredite pauschal)</option>
+            <option value="credits" ${newRouteDraft.type==='credits'?'selected':''} ${hasCreditsRoute?'disabled':''}>Kredit-Route (max. ${ROUTE_CREDITS_MAX_FRACHTER} Frachter, abnehmender Ertrag, kostet Erz-Unterhalt)${hasCreditsRoute?' – bereits aktiv':''}</option>
             <option value="sell" ${newRouteDraft.type==='sell'?'selected':''}>Markt-Verkaufsroute (verkauft Ressource)</option>
             <option value="transport" ${newRouteDraft.type==='transport'?'selected':''}>Transportroute (Logistikbonus)</option>
           </select>
         </label>
+        ${newRouteDraft.type==='credits' ? `<div class="bmeta">Nur EINE Kredit-Route gleichzeitig. Ertrag bei ${Math.min(newRouteDraft.frachter,maxForType)} Frachtern: ~${creditsRouteYield(Math.min(newRouteDraft.frachter,maxForType))} Kredite/min, kostet ${Math.min(newRouteDraft.frachter,maxForType)*ROUTE_CREDITS_UPKEEP_ERZ_PER_FRACHTER} Erz/min Unterhalt.</div>` : ''}
         ${(newRouteDraft.type==='sell'||newRouteDraft.type==='transport') ? `<label class="bmeta">Ressource
           <select data-route-res style="width:100%; margin-top:3px; padding:5px 8px;">
             ${MARKET_RES_KEYS.map(k=>{const rd=RES_DEFS.find(r=>r.key===k)||{label:k};return `<option value="${k}" ${newRouteDraft.resource===k?'selected':''}>${rd.label}</option>`;}).join('')}
           </select>
         </label>` : ''}
         <label class="bmeta">Frachter binden
-          <input type="number" min="1" max="${avail}" data-route-frachter value="${Math.min(newRouteDraft.frachter, Math.max(1,avail))}" style="width:100%; margin-top:3px; padding:5px 8px;"/>
+          <input type="number" min="1" max="${maxForType}" data-route-frachter value="${Math.min(newRouteDraft.frachter, Math.max(1,maxForType))}" style="width:100%; margin-top:3px; padding:5px 8px;"/>
         </label>
-        <button data-create-route ${avail<1?'disabled':''} style="width:100%;"><i class="ti ti-truck" aria-hidden="true" style="margin-right:4px;"></i>${avail<1?'Keine freien Frachter':'Route einrichten'}</button>
+        <button data-create-route ${(avail<1||(newRouteDraft.type==='credits'&&hasCreditsRoute))?'disabled':''} style="width:100%;"><i class="ti ti-truck" aria-hidden="true" style="margin-right:4px;"></i>${avail<1?'Keine freien Frachter':(newRouteDraft.type==='credits'&&hasCreditsRoute?'Kredit-Route bereits aktiv':'Route einrichten')}</button>
       </div>
     </div>`;
 
@@ -6472,7 +6502,7 @@
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Preise erholen sich mit der Zeit langsam zu ihrem Normalwert – teuer gewordene Ressourcen werden also wieder günstiger.' },
       { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
-      { title:'Handelsrouten', body:'Binde Frachter dauerhaft an eine Route für passiven Ertrag. Gebundene Frachter stehen nicht mehr für Kämpfe/Missionen bereit und zählen nicht zur Lagerkapazität. Drei Typen: <strong>Kredit-Route</strong> (+Kredite pauschal pro Frachter, ohne Server), <strong>Markt-Verkaufsroute</strong> (verkauft automatisch eine Ressource am Markt, braucht Server) und <strong>Transportroute</strong> (Logistikbonus: +10% der bewegten Menge einer Ressource). Ertrag skaliert mit der Zahl gebundener Frachter, ein Zyklus pro Minute. Routen jederzeit auflösbar (Frachter werden wieder frei).' },
+      { title:'Handelsrouten', body:'Binde Frachter dauerhaft an eine Route für passiven Ertrag. Gebundene Frachter stehen nicht mehr für Kämpfe/Missionen bereit und zählen nicht zur Lagerkapazität. Drei Typen: <strong>Kredit-Route</strong> (nur EINE gleichzeitig, max. 15 Frachter, Ertrag wächst mit abnehmendem Grenzertrag statt linear, kostet laufend Erz als Unterhalt), <strong>Markt-Verkaufsroute</strong> (verkauft automatisch eine Ressource am Markt, braucht Server) und <strong>Transportroute</strong> (Logistikbonus: +10% der bewegten Menge einer Ressource, beliebig viele möglich). Ein Zyklus pro Minute. Routen jederzeit auflösbar (Frachter werden wieder frei).' },
       { title:'Kredit-Shop', body:'Im Markt-Tab kannst du Kredite ausgeben für: <strong>Produktions-Schub</strong> (+25% alle Ressourcen, 1h, 400 Kr.) · <strong>Söldnerflotte</strong> (+20% Angriffskraft, 2h, 600 Kr.) · <strong>Schildgenerator-Miete</strong> (+25% Verteidigung, 2h, 500 Kr.) · <strong>Modul-Blaupause</strong> (zufälliges Schiffsmodul, 800 Kr.). Laufende Shop-Buffs können nicht gestapelt werden – erst nach Ablauf erneut kaufbar. Blaupausen sind beliebig oft kaufbar.' }
     ]},
     { key:'offiziere', icon:'ti-user-circle', title:'Offiziere', entries:[
