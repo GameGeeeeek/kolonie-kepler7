@@ -1409,8 +1409,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '7.96.0';
+  const VERSION = '7.96.1';
   const PATCHNOTES = [
+    { version:'7.96.1', date:'13.07.2026', changes:[
+      'Bugfix: Die Angriffsflotten-Auswahl sprang nach jeder Angriffs-Mission (NPC, Spieler, Piraten) dauerhaft auf 0 und musste komplett neu zusammengestellt werden - jetzt bleibt die Auswahl als Wunsch erhalten und es fliegen automatisch so viele davon mit, wie gerade verfügbar sind',
+      'Die Anzeige der Angriffsflotte zeigt weiterhin ehrlich an, wie viele Schiffe tatsächlich mitfliegen würden (Wunsch-Auswahl gekappt auf verfügbare Schiffe)'
+    ]},
     { version:'7.96.0', date:'13.07.2026', changes:[
       'Neu: Piraten-Verstecke – im Galaxie-Tab wartet dauerhaft ein Versteck deiner aktuellen Stufe (1-10), das du mit deiner Angriffsflotte ausheben kannst (echte Flugzeit + Treibstoff)',
       'Sieg: Beute skaliert mit Stufe und deiner Produktion (Frachter mitnehmen!), dazu Kredite, Kampfpunkte und eine mit der Stufe wachsende Modul-Chance – die nächste Stufe schaltet frei',
@@ -3978,13 +3982,21 @@
       attackFleetSelection[planetKey] = init;
     }
     const sel = attackFleetSelection[planetKey];
-    for (const k of ATTACK_SHIP_KEYS) sel[k] = Math.min(sel[k]||0, avail[k]);
+    // WICHTIG: Die gespeicherte Auswahl wird hier NICHT mehr auf die verfügbaren Schiffe gekappt.
+    // Früher wurde sel dauerhaft reduziert, sobald Schiffe unterwegs waren - dadurch stand die
+    // Auswahl nach jeder Mission auf 0 und musste komplett neu zusammengeklickt werden. Jetzt bleibt
+    // sie als "Wunsch-Auswahl" erhalten; gekappt wird erst beim Zusammenstellen der echten
+    // Angriffsflotte (buildAttackFleet) und in der Anzeige.
     return sel;
   }
   function buildAttackFleet(planetKey, cf){
     const sel = getAttackSelection(planetKey, cf);
+    const away = computeAwayByType(cf);
     const virtual = emptyFleet();
-    for (const k of ATTACK_SHIP_KEYS) virtual[k] = sel[k]||0;
+    for (const k of ATTACK_SHIP_KEYS){
+      const avail = Math.max(0, (cf[k]||0) - (away[k]||0));
+      virtual[k] = Math.min(sel[k]||0, avail);
+    }
     return virtual;
   }
 
@@ -11119,7 +11131,7 @@
         const owned = cf[k]||0;
         const away = attackAway[k]||0;
         const available = Math.max(0, owned - away);
-        const selected = attackSel[k]||0;
+        const selected = Math.min(attackSel[k]||0, available);
         let capNote = '';
         if (k==='jaeger') capNote = selected>attackFleetDf.jaeger ? ` <span style="color:#e24b4a;">(nur ${attackFleetDf.jaeger} passen in den Hangar)</span>` : '';
         if (k==='bomber') capNote = selected>attackFleetDf.bomber ? ` <span style="color:#e24b4a;">(nur ${attackFleetDf.bomber} passen in den Hangar)</span>` : '';
