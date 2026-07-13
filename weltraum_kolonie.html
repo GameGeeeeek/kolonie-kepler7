@@ -925,6 +925,8 @@
         <div class="section-title" style="font-size:12px; margin-top:0;"><i class="ti ti-ship" aria-hidden="true"></i>Angriffsflotte zusammenstellen</div>
         <div id="attackFleetBox"></div>
         <div id="pendingAttackBox"></div>
+        <div class="section-title"><i class="ti ti-skull" aria-hidden="true"></i>Weltboss - gemeinsame Jagd aller Spieler</div>
+        <div id="worldBossBox"><div class="bmeta">lädt…</div></div>
         <div id="pirateLairBox"></div>
         <div class="npc-list" id="npcList"></div>
 
@@ -1425,8 +1427,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.1.1';
+  const VERSION = '8.2.0';
   const PATCHNOTES = [
+    { version:'8.2.0', date:'13.07.2026', changes:[
+      'Neu: Weltboss "Leviathan der Leere" (Galaxie-Tab) - ein gemeinsamer Boss für ALLE Spieler mit globalem HP-Pool (Start: Stufe 1, 50.000 HP)',
+      'Jeder Angriff zieht deine Angriffskraft x0,8-1,2 als Schaden ab; keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe)',
+      'Beim Kill: Belohnung für jeden Beteiligten proportional zum Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), Top-Schädiger +50% Bonus',
+      '10 Minuten nach dem Kill erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP x1,6) - eine endlose gemeinsame Jagd',
+      'Die Boss-Karte zeigt HP-Balken, Top-3-Schadensbeiträge und deinen eigenen Beitrag; laufende Boss-Angriffe erscheinen in Missionsliste und Flottenübersicht'
+    ]},
     { version:'8.1.1', date:'13.07.2026', changes:[
       'Bugfix: Das Mond-Symbol an der Übersichts-Karte überlagerte das Trümmerfeld-Symbol - die Mondsichel sitzt jetzt als kleiner Knopf direkt hinter dem Planetennamen (wie in den Umschalter-Leisten), kollisionsfrei und weiterhin anklickbar'
     ]},
@@ -3778,7 +3787,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -4031,7 +4040,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='expedition') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -5705,7 +5714,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen" im Galaxie-Tab).', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const baseDur = pseudoDistanceSeconds(playerId);
@@ -6022,7 +6031,7 @@
   });
   document.getElementById('tutorialSkipBtn').addEventListener('click', closeTutorial);
   // Pakte einmal beim Start laden, damit die Friedensdividende sofort in die Produktion einfließt
-  setTimeout(() => { try { loadDiplomacy(); } catch(e){} }, 2500);
+  setTimeout(() => { try { loadDiplomacy(); loadWorldBoss(); } catch(e){} }, 2500);
   const showTutorialBtn = document.getElementById('showTutorialBtn');
   if (showTutorialBtn) showTutorialBtn.addEventListener('click', showTutorial);
   // Klassifiziert einen Bericht als Sieg/Niederlage für die Kampf-Statistik (nur echte Kämpfe,
@@ -6712,6 +6721,7 @@
     ]},
     { key:'kampf', icon:'ti-sword', title:'Kampf', entries:[
       { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.' },
+      { title:'Weltboss: Leviathan der Leere', body:'Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%).' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:9.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
@@ -7942,6 +7952,7 @@
         if (state.dayStats === undefined) state.dayStats = null;
         if (!state.dailyHistory) state.dailyHistory = [];
         if (!state.notifiedPactOffers) state.notifiedPactOffers = [];
+        if (!state.claimedBossKills) state.claimedBossKills = [];
         if (state.warVictories === undefined) state.warVictories = 0;
         if (!state.scoreHistory) state.scoreHistory = [];
         if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
@@ -8548,6 +8559,119 @@
     box.querySelectorAll('[data-pact-decline]').forEach(b => b.onclick = () => declinePact(b.getAttribute('data-pact-decline')));
     box.querySelectorAll('[data-pact-cancel]').forEach(b => b.onclick = () => cancelPact(b.getAttribute('data-pact-cancel')));
   }
+  // ===== Galaxie-Weltboss: Leviathan der Leere =====
+  // Ein gemeinsamer Boss für ALLE Spieler im geteilten Speicher (ein Schlüssel). Jeder Angriff zieht
+  // Schaden vom globalen HP-Pool ab; beim Kill bekommt jeder Beteiligte eine Belohnung proportional
+  // zu seinem Schadensanteil (der Top-Schädiger +50% Bonus). 10 Minuten nach dem Kill spawnt der
+  // nächste Boss automatisch stärker (Stufe +1, HP ×1,6) - der erste Client, der das sieht, schreibt
+  // ihn. Bei exakt gleichzeitigen Treffern kann durch Last-write-wins minimal Schaden verloren gehen
+  // (bewusst akzeptiert, kein Server nötig).
+  const WORLDBOSS_KEY = 'worldboss:current';
+  const WORLDBOSS_BASE_HP = 50000;
+  const WORLDBOSS_RESPAWN_DELAY_MS = 10*60*1000;
+  let worldBossCache = null;
+  function worldBossHpFor(level){ return Math.round(WORLDBOSS_BASE_HP * Math.pow(1.6, Math.max(0, level-1))); }
+  function worldBossName(level){ return 'Leviathan der Leere - Stufe '+level; }
+  async function saveWorldBoss(b){ try { await storageSet(WORLDBOSS_KEY, JSON.stringify(b), true); worldBossCache = b; } catch(e){} }
+  function newWorldBoss(level){
+    return { bossId: 'wb'+level+'_'+Date.now(), level, maxHp: worldBossHpFor(level), hp: worldBossHpFor(level), spawnedAt: Date.now(), contributions: {}, defeatedAt: null };
+  }
+  async function loadWorldBoss(){
+    try {
+      let b = null;
+      try { const r = await storageGet(WORLDBOSS_KEY, true); if (r && r.value) b = JSON.parse(r.value); } catch(e){}
+      if (!b || !b.bossId){
+        b = newWorldBoss(1);
+        await saveWorldBoss(b);
+      } else if (b.defeatedAt && Date.now() - b.defeatedAt > WORLDBOSS_RESPAWN_DELAY_MS){
+        b = newWorldBoss((b.level||1) + 1);
+        await saveWorldBoss(b);
+        log('Ein neuer Leviathan der Leere ist erschienen (Stufe '+b.level+', '+fmt(b.maxHp)+' HP) - die gemeinsame Jagd geht weiter!', 'ti-skull');
+      }
+      worldBossCache = b;
+      maybeClaimWorldBossReward(b);
+      renderWorldBoss();
+    } catch(e){ /* geteilter Speicher optional */ }
+  }
+  // Belohnung nach dem Kill: proportional zum Schadensanteil, einmalig pro Boss (claimedBossKills).
+  function maybeClaimWorldBossReward(b){
+    if (!b || !b.defeatedAt || !state.player.id) return;
+    const my = (b.contributions||{})[state.player.id];
+    if (!my || !my.dmg) return;
+    if (!state.claimedBossKills) state.claimedBossKills = [];
+    if (state.claimedBossKills.includes(b.bossId)) return;
+    state.claimedBossKills.push(b.bossId);
+    while (state.claimedBossKills.length > 20) state.claimedBossKills.shift();
+    const total = Object.values(b.contributions).reduce((a,x)=>a+(x.dmg||0), 0) || 1;
+    const share = my.dmg / total;
+    const maxDmg = Math.max(...Object.values(b.contributions).map(x=>x.dmg||0));
+    const isTop = my.dmg >= maxDmg;
+    let credits = Math.round((500 + b.level*250) * (0.3 + 0.7*share) * (isTop ? 1.5 : 1));
+    const bp = Math.round((10 + b.level*5) * (0.3 + 0.7*share));
+    state.credits = (state.credits||0) + credits;
+    awardBattlePoints(bp);
+    logScoreChange(bp*3, 'Leviathan Stufe '+b.level+' erlegt (Beitrag '+Math.round(share*100)+'%)', 'ti-skull');
+    let moduleMsg = '';
+    if (Math.random() < 0.15 + share*0.35){ const mod = grantRandomModule(); moduleMsg = ' Modul erbeutet: '+mod+'!'; }
+    log('Weltboss besiegt! Dein Anteil: '+Math.round(share*100)+'% Schaden'+(isTop?' (Top-Schädiger, +50% Bonus!)':'')+'. Belohnung: '+credits+' Kredite, '+bp+' Kampfpunkte.'+moduleMsg, 'ti-skull');
+    playSound('achieve');
+    pushReport({ type:'item-found', itemName:'Weltboss-Belohnung: '+credits+' Kredite + '+bp+' Kampfpunkte ('+Math.round(share*100)+'% Beitrag'+(isTop?', Top-Schädiger':'')+')', itemIcon:'ti-skull', rare:isTop, foundAt: worldBossName(b.level) });
+    save();
+  }
+  function sendWorldBossMission(){
+    const b = worldBossCache;
+    if (!b || b.defeatedAt){ log('Aktuell ist kein lebender Weltboss verfügbar.', 'ti-alert-triangle'); return; }
+    const cf = currentFleet();
+    const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
+    const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
+    if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
+    if (cf.missions.some(m=>m.type==='worldboss')){ log('Es läuft bereits ein Angriff auf den Weltboss von diesem Standort.', 'ti-alert-triangle'); return; }
+    const dur = missionDurationFor(90 + b.level*10, attackFleet, ATTACK_SHIP_KEYS);
+    const fuelCost = missionFuelCost(dur, totalSelected);
+    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    pay({deuterium: fuelCost});
+    const fleetName = resolveFleetName();
+    const power = attackPower(attackFleet, state.activeBasePlanet);
+    cf.missions.push({ id: nextMissionId(), type:'worldboss', targetId: b.bossId, bossLevel: b.level, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet });
+    log(fleetName+' greift den '+worldBossName(b.level)+' an (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff: '+fuelCost+' Deuterium.', 'ti-skull');
+    render(); save();
+  }
+  function renderWorldBoss(){
+    const box = document.getElementById('worldBossBox');
+    if (!box) return;
+    const b = worldBossCache;
+    if (!b){ box.innerHTML = '<div class="bmeta">Weltboss lädt…</div>'; return; }
+    const cf = currentFleet();
+    const myId = state.player.id;
+    const my = myId ? (b.contributions||{})[myId] : null;
+    const pct = Math.max(0, Math.min(100, (b.hp/b.maxHp)*100));
+    const top3 = Object.values(b.contributions||{}).sort((a,x)=>(x.dmg||0)-(a.dmg||0)).slice(0,3);
+    const busy = cf.missions.some(m=>m.type==='worldboss');
+    if (b.defeatedAt){
+      const respawnIn = Math.max(0, b.defeatedAt + WORLDBOSS_RESPAWN_DELAY_MS - Date.now());
+      box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#5dcaa5;">
+        <div class="bname"><i class="ti ti-skull" aria-hidden="true" style="color:#5dcaa5;"></i> ${worldBossName(b.level)} - BESIEGT!</div>
+        <div class="bmeta">Der nächste Leviathan (Stufe ${b.level+1}, ${fmt(worldBossHpFor(b.level+1))} HP) erscheint in ~${fmtDuration(respawnIn/1000)}.</div>
+      </div>`;
+      return;
+    }
+    box.innerHTML = `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#e24b4a;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span class="bname"><i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i> ${worldBossName(b.level)}</span>
+          <span class="lvl-pill">${fmt(Math.max(0,Math.round(b.hp)))} / ${fmt(b.maxHp)} HP</span>
+        </div>
+        <div class="progress-outer" style="margin-bottom:6px;"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+        <div class="bmeta" style="margin-bottom:4px;">Gemeinsamer Boss aller Spieler: Jeder Angriff (Angriffsflotte, echte Flugzeit) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab. Der Boss schlägt zurück (${8+b.level}-${15+b.level}% Verluste). Beim Kill: Belohnung nach Schadensanteil, Top-Schädiger +50%.</div>
+        ${top3.length ? `<div class="bmeta" style="margin-bottom:4px;">Top-Schaden: ${top3.map((t,i)=>(i+1)+'. '+(t.name||'?')+' ('+fmt(t.dmg)+')').join(' · ')}</div>` : ''}
+        ${my ? `<div class="bmeta" style="margin-bottom:6px; color:#5dcaa5;">Dein Beitrag: ${fmt(my.dmg)} Schaden</div>` : ''}
+        <button data-attack-worldboss ${busy?'disabled':''}>${busy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Leviathan angreifen'}</button>
+      </div>`;
+    const btn = box.querySelector('[data-attack-worldboss]');
+    if (btn) btn.onclick = () => sendWorldBossMission();
+  }
   function orbitalStationOf(planetKey){ return (state.orbitalStations||{})[planetKey] || null; }
   function orbitalJobFor(planetKey){ return (state.constructionQueue||[]).find(j=>j.kind==='orbital' && j.planet===planetKey) || null; }
   function buildOrbitalStation(focusKey){
@@ -8807,6 +8931,44 @@
             }
           }
           if (showLog !== false) log(planet.name+' ('+planetDisplayName(planetKey)+'): Mission abgeschlossen.'+bonusMsg, 'ti-rocket');
+        } else if (m.type === 'worldboss'){
+          const bLevel = m.bossLevel || 1;
+          const power = m.power || attackPower(fleet);
+          const dmg = Math.round(power * (0.8 + Math.random()*0.4));
+          // Boss schlägt zurück: Verluste steigen mit der Stufe (8+L% bis 15+L%), keine Niederlage.
+          const lossPct = (0.08 + bLevel*0.01) + Math.random()*0.07;
+          const lostWb = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, Math.min(0.5, lossPct), planetKey, m.composition);
+          const lostWbText = lostCountsToText(lostWb);
+          addVeteranXp(planetKey, 8 + bLevel);
+          const bpWb = 3 + bLevel;
+          awardBattlePoints(bpWb);
+          // HP-Abzug asynchron gegen den geteilten Speicher (frisch lesen, Schaden anwenden, schreiben).
+          (async () => {
+            try {
+              let b = null;
+              try { const r = await storageGet(WORLDBOSS_KEY, true); if (r && r.value) b = JSON.parse(r.value); } catch(e){}
+              if (!b || b.bossId !== m.targetId || b.defeatedAt){
+                state.credits = (state.credits||0) + 50;
+                if (showLog !== false) log('Der Leviathan war bei Ankunft bereits gefallen - deine Flotte kehrt um (+50 Kredite Spesen).', 'ti-skull');
+                worldBossCache = b; renderWorldBoss();
+                return;
+              }
+              b.hp = Math.max(0, (b.hp||0) - dmg);
+              if (!b.contributions) b.contributions = {};
+              const me = b.contributions[state.player.id] || { name: state.player.name || 'Kommandant', dmg: 0 };
+              me.dmg = (me.dmg||0) + dmg;
+              me.name = state.player.name || me.name;
+              b.contributions[state.player.id] = me;
+              const killed = b.hp <= 0;
+              if (killed) b.defeatedAt = Date.now();
+              await saveWorldBoss(b);
+              if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(dmg)+' Schaden!'+(killed?' LETZTER SCHLAG - der Leviathan fällt!':' Rest-HP: '+fmt(Math.round(b.hp))+'.')+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
+              playSound(killed ? 'achieve' : 'win');
+              pushReport({ type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(power), defensePower: b.maxHp, chancePct: 100, hasWeakness:false, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: bpWb, ownLostShips: lostWb });
+              if (killed) maybeClaimWorldBossReward(b);
+              renderWorldBoss();
+            } catch(e){}
+          })();
         } else if (m.type === 'piratelair'){
           const stage = m.targetId || 1;
           const lairDef = pirateLairPower(stage);
@@ -9811,7 +9973,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const npc = NPCS.find(n => n.id === npcId);
@@ -9831,7 +9993,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     if (cf.missions.some(m=>m.type==='piratelair')){ log('Es läuft bereits ein Angriff auf das Piratenversteck von diesem Standort.', 'ti-alert-triangle'); return; }
     const stage = state.pirateLairStage || 1;
@@ -10155,6 +10317,7 @@
       }
       renderWeeklyLeague();
       loadDiplomacy();
+      loadWorldBoss();
       updateHallOfFame(entries);
       renderFpLeaderboard();
       renderLeaderboardList();
@@ -10921,6 +11084,24 @@
             </div>
           `;
         }
+        if (m.type === 'worldboss'){
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          const shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i>${m.fleetName?m.fleetName+' · ':''}Weltboss-Angriff: ${worldBossName(m.bossLevel||1)}</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
+                  ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
+                </div>
+              </div>
+              <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         if (m.type === 'piratelair'){
           const remaining = Math.max(0, m.endTime-now);
           const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
@@ -10990,12 +11171,12 @@
     const combatShips = combatFleetCount(cf);
     const hangarCap = hangarCapacity(cf);
     const df = deployableFighters(cf);
-    const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length;
+    const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
     const slotsUsedExplore = cf.missions.filter(m=>m.type==='explore').length;
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='expedition') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }
@@ -11714,7 +11895,7 @@
     document.getElementById('npcList').innerHTML = NPCS.map(n => {
       const busy = cf.missions.some(m=>m.type==='attack' && m.targetId===n.id);
       const combatShipsN = combatFleetCount(cf);
-      const slotsFreeN = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair').length < combatShipsN;
+      const slotsFreeN = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length < combatShipsN;
       const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
       const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
       const canSendN = slotsFreeN && !busy && totalSelected > 0;
@@ -11780,6 +11961,10 @@
           } else if (m.type === 'attack-player'){
             icon = 'ti-sword'; color = '#e24b4a';
             label = (m.fleetName?m.fleetName+' → ':'')+'Spieler: '+(m.targetName||'?');
+            shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          } else if (m.type === 'worldboss'){
+            icon = 'ti-skull'; color = '#e24b4a';
+            label = (m.fleetName?m.fleetName+' → ':'')+worldBossName(m.bossLevel||1);
             shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
           } else if (m.type === 'piratelair'){
             icon = 'ti-skull'; color = '#c3bef5';
