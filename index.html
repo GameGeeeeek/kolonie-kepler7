@@ -1657,8 +1657,20 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.22.0';
+  const VERSION = '8.22.1';
   const PATCHNOTES = [
+    { version:'8.22.1', date:'13.07.2026', changes:[
+      'Bug behoben: "Spielstand zurücksetzen" (Fortschritt-Tab) ersetzte den kompletten Spielstand durch ein unvollständiges Objekt statt fehlende Felder auf ihre Startwerte zu setzen - dadurch konnte die Oberfläche direkt nach dem Zurücksetzen abstürzen (z.B. bei Klick auf einen Favoriten-Stern oder beim Wechsel in den Fortschritt-/Forschungs-/Galaxie-Tab) und blieb bis zum nächsten Neuladen eingefroren. Betrifft auch Prestige und Aufstieg (Transzendenz) - alle drei nutzen jetzt dieselbe Auffüll-Logik wie ein normales Laden',
+      'Bug behoben: Prestige (nicht Aufstieg) erhielt bisher bereits eingelöste Weltboss-Kill-Belohnungen nicht - killte man den Leviathan und prestigte im selben 10-Minuten-Respawn-Fenster, ließ sich die Belohnung ein zweites Mal einlösen. Außerdem fehlte das Kredit-Guthaben im Prestige-Reset komplett (wurde zu 0 statt auf den Startwert 250 gesetzt)',
+      'Bug behoben: Auf einem Mond stationierte Schiffe verteidigten mit voller statt der dokumentierten 70%-Mond-Stärke (Verteidigungsgebäude waren bereits korrekt gedämpft, die Flotte nicht)',
+      'Bug behoben: Frachter, die einer Handelsroute zugewiesen waren, standen gleichzeitig noch als Kapazität für Angriffsflotten zur Verfügung (und umgekehrt) - beide Bindungen prüfen sich jetzt gegenseitig',
+      'Bug behoben: Die Kredit-Erschwinglichkeitsprüfung beim Markt-Kauf ignorierte den eigenen Kartell-/Allianz-Rabatt und lehnte dadurch manche eigentlich leistbaren Käufe fälschlich ab',
+      'Bug behoben: Verluste durch einen gescheiterten Fraktionssystem-Angriff wurden immer nur der Heimatbasis-Flotte angelastet statt anteilig über alle Standorte verteilt',
+      'Verbessert: Beim gemeinsamen Weltboss wird direkt vor dem Speichern des Treffers nochmal geprüft, ob ihn inzwischen jemand anders bereits besiegt hat - verkleinert das Zeitfenster, in dem ein bereits gefallener Boss durch einen leicht verspäteten Treffer fälschlich wieder als "lebendig" erscheinen konnte',
+      'Bug behoben: Nach einer Beförderung/einem Rauswurf durch einen Allianz-Admin bekam der betroffene Spieler seine neue Rolle lokal nie mitgeteilt - Admin-Rechte wirkten dadurch faktisch nicht, ein Rauswurf blieb beim Betroffenen unbemerkt bestehen. Wird jetzt beim Öffnen des Allianz-Tabs sowie periodisch abgeglichen',
+      'Performance: Die Sektorkarten-Planeten-/Mondliste wird jetzt wie die Galaxiekarte selbst nur noch neu aufgebaut, wenn der Sektorkarte-Tab tatsächlich aktiv ist, statt bei jedem 1-Sekunden-Tick unabhängig vom sichtbaren Tab',
+      'Verbessert: Der Autosave schreibt nicht mehr, bevor der gespeicherte Spielstand vollständig vom Server geladen wurde - verhindert ein theoretisches Überschreiben des echten Spielstands mit dem frischen Startzustand bei sehr langsamer Verbindung'
+    ]},
     { version:'8.22.0', date:'13.07.2026', changes:[
       'Sicherheitslücke behoben: Bisher konnte JEDES Allianzmitglied den Allianz-Banner (Farbe) ändern und theoretisch auch andere sicherheitsrelevante Allianz-Daten manipulieren, da die Admin-Beschränkung nur in der Anzeige, nicht auf dem Server geprüft wurde. Jetzt serverseitig durchgesetzt: nur Admins dürfen Banner, Allianz-Einstellungen und Mitgliederrollen (befördern/entfernen) ändern - Versuche ohne Admin-Rechte werden vom Server abgelehnt, egal wie sie ausgelöst werden',
       'Neu: Bewerbungssystem für Allianzen - Admins können im Administration-Bereich zwischen "Offen für alle" (Sofort-Beitritt wie bisher) und "Nur auf Bewerbung" umschalten. Bei geschlossenen Allianzen landet ein Beitrittswunsch als Bewerbung, die nur Admins sehen und annehmen/ablehnen können (auch das serverseitig abgesichert, nicht nur normale Mitglieder können fremde Bewerbungen nicht mehr einsehen)'
@@ -3476,7 +3488,10 @@
   // separat (attackende Frachter), Routen sind eine zusätzliche, dauerhafte Bindung.
   function availableFrachter(){
     const total = allFleets().reduce((a,f)=>a+(f.frachter||0),0);
-    return Math.max(0, total - frachterBoundToRoutes());
+    // Frachter, die gerade auf einer Mission unterwegs sind, ebenfalls als gebunden zählen - sonst
+    // ließe sich derselbe Frachter für eine neue Route UND einen laufenden Flug gleichzeitig nutzen.
+    const away = allFleetsWithPlanet().reduce((a,{fleet:f})=>a+(computeAwayByType(f).frachter||0), 0);
+    return Math.max(0, total - frachterBoundToRoutes() - away);
   }
   function createTradeRoute(type, opts){
     const def = ROUTE_TYPES[type];
@@ -3716,7 +3731,9 @@
     if (!amount || amount <= 0){ log('Ungültige Menge.', 'ti-alert-triangle'); return; }
     // Vorab-Prüfung, damit der Spieler nicht unnötig eine Server-Anfrage schickt.
     if (action === 'buy'){
-      const est = estimateTradeCredits('buy', resource, amount);
+      // Rabatt (Kartell/Allianz) auch in der Vorab-Schätzung berücksichtigen - sonst wurden leistbare
+      // Käufe fälschlich als "zu teuer" abgelehnt, weil nur die ungerabattete Schätzung verglichen wurde.
+      const est = Math.round(estimateTradeCredits('buy', resource, amount) * (1 - marketDiscountPct()));
       if ((state.credits||0) < est){ log('Nicht genug Kredite (ca. '+fmt(est)+' nötig).', 'ti-alert-triangle'); return; }
     } else {
       if ((state.resources[resource]||0) < amount){ log('Nicht genug '+(RES_DEFS.find(r=>r.key===resource)||{}).label+' zum Verkaufen.', 'ti-alert-triangle'); return; }
@@ -4183,8 +4200,20 @@
         playSound('win');
       } else {
         const lostTxt = Object.entries(data.lost||{}).map(([k,v])=>v+'× '+((SHIP_DEFS.find(d=>d.key===k)||{}).name||k)).join(', ') || 'keine';
-        // Flottenverluste auch lokal anwenden (Server hat sie schon in unserem Spielstand gebucht).
-        for (const [k,v] of Object.entries(data.lost||{})){ if (state.fleet[k]!==undefined) state.fleet[k] = Math.max(0, (state.fleet[k]||0) - v); }
+        // Flottenverluste auch lokal anwenden (Server hat sie schon in unserem Spielstand gebucht). Der
+        // Server kennt keine Standort-Aufteilung (es wird nur systemId geschickt), die Verluste wurden
+        // daher zuvor immer ausschließlich der Heimatbasis angelastet - bei koloniebasierter Flotte lief
+        // das ins Leere (state.fleet[k] war schon 0). Jetzt werden die Verluste über alle Standorte
+        // (Heimat zuerst, dann Kolonien) abgezogen, bis die gemeldete Menge aufgebraucht ist.
+        for (const [k,v] of Object.entries(data.lost||{})){
+          let remaining = v;
+          for (const f of allFleets()){
+            if (remaining <= 0) break;
+            const take = Math.min(f[k]||0, remaining);
+            f[k] = Math.max(0, (f[k]||0) - take);
+            remaining -= take;
+          }
+        }
         state.battlePoints = (state.battlePoints||0) + 5;
         state.commandPoints = (state.commandPoints||0) + 5;
         log('Angriff auf '+systemId+' gescheitert. Verluste: '+lostTxt+'. (Angriffskraft '+data.attackPower+' vs. Verteidigung '+data.factionDefense+')', 'ti-shield');
@@ -4398,6 +4427,11 @@
   const STORE_KEY = 'kepler7-save-v3';
   let gameSaveVersion = 0;
   let saveConflictDetected = false;
+  // Wird erst true, NACHDEM der initiale load() abgeschlossen ist (siehe Bootstrap ganz unten und
+  // submitLogin()). Verhindert, dass der Autosave-Intervall (alle 10s) bei langsamer Verbindung den
+  // noch unveränderten Frisches-Spiel-Default-State auf den Server schreibt, bevor der echte
+  // gespeicherte Spielstand überhaupt geladen wurde - das hätte den echten Spielstand überschrieben.
+  let bootDataReady = false;
   let activeTab = 'basis';
   let buildQtyMode = 1;
   // Baukorb: mehrere Schiffstypen gleichzeitig mit gewünschter Stückzahl vormerken und in einem Schritt
@@ -4649,7 +4683,13 @@
   function getAttackSelection(planetKey, cf){
     const away = computeAwayByType(cf);
     const avail = {};
-    for (const k of ATTACK_SHIP_KEYS) avail[k] = Math.max(0, (cf[k]||0) - (away[k]||0));
+    for (const k of ATTACK_SHIP_KEYS){
+      let a = Math.max(0, (cf[k]||0) - (away[k]||0));
+      // Frachter, die einer Handelsroute zugewiesen sind, stehen einer Angriffsflotte nicht zusätzlich
+      // zur Verfügung (sonst ließe sich derselbe Frachter für beides gleichzeitig nutzen).
+      if (k === 'frachter') a = Math.max(0, a - frachterBoundToRoutes());
+      avail[k] = a;
+    }
     if (!attackFleetSelection[planetKey]){
       const init = {};
       for (const k of ATTACK_SHIP_KEYS) init[k] = avail[k];
@@ -4668,7 +4708,8 @@
     const away = computeAwayByType(cf);
     const virtual = emptyFleet();
     for (const k of ATTACK_SHIP_KEYS){
-      const avail = Math.max(0, (cf[k]||0) - (away[k]||0));
+      let avail = Math.max(0, (cf[k]||0) - (away[k]||0));
+      if (k === 'frachter') avail = Math.max(0, avail - frachterBoundToRoutes());
       virtual[k] = Math.min(sel[k]||0, avail);
     }
     return virtual;
@@ -5305,6 +5346,7 @@
       if (evF && evF.def.effect.type==='def') shipDef *= evF.def.effect.mult;
       shipDef *= planetTypeDefMult(planetKey);
       if (planetKey === 'home') shipDef *= HOME_DEFENSE_BONUS;
+      shipDef *= moonPenalty(planetKey);
       power += shipDef;
     } else {
       for (const { planet, fleet: f } of allFleetsWithPlanet()){
@@ -5313,6 +5355,7 @@
         if (role && role.key==='fortress') shipDef *= 1.30;
         shipDef *= planetTypeDefMult(planet);
         if (planet === 'home') shipDef *= HOME_DEFENSE_BONUS;
+        shipDef *= moonPenalty(planet);
         power += shipDef;
       }
     }
@@ -6070,6 +6113,124 @@
       confirmPrestigeWithPerk(null);
     }
   }
+  // Füllt fehlende state-Felder mit denselben Defaults, die load() beim normalen Boot aus einem alten
+  // Spielstand ergänzt - aber ohne Server-Roundtrip. Wird nach jedem harten state-Reset aufgerufen
+  // (Reset-Button, Prestige, Aufstieg), damit dort nie undefined-Felder übrig bleiben, die render()
+  // oder ein Klick-Handler ohne Seiten-Reload zum Absturz bringen (Bug: Reset-Button ersetzte state
+  // komplett, ohne die Migrations-Defaults von load() zu durchlaufen).
+  function applyStateDefaults(){
+    if (state.expeditionsCompleted === undefined) state.expeditionsCompleted = 0;
+    if (!state.themeKey) state.themeKey = 'standard';
+    if (state.autoReinforceOn === undefined) state.autoReinforceOn = false;
+    if (state.uiJumpNav === undefined) state.uiJumpNav = false;
+    if (state.uiCollapsibleSections === undefined) state.uiCollapsibleSections = false;
+    if (state.uiTwoColumn === undefined) state.uiTwoColumn = false;
+    if (!state.collapsedSections) state.collapsedSections = {};
+    if (!state.favoritePlanets) state.favoritePlanets = {};
+    if (state.lastLoginDate === undefined) state.lastLoginDate = null;
+    if (state.loginStreak === undefined) state.loginStreak = 0;
+    if (state.autoRepairOn === undefined) state.autoRepairOn = false;
+    if (state.autoWatchLiveRaid === undefined) state.autoWatchLiveRaid = true;
+    if (!state.battleStats) state.battleStats = { wins: 0, losses: 0 };
+    if (!state.combatStance) state.combatStance = 'ausgewogen';
+    if (!state.prestigePerks) state.prestigePerks = [];
+    if (!state.skillTree) state.skillTree = {};
+    if (state.dailyQuests === undefined) state.dailyQuests = null;
+    if (state.allianceIsTopRank === undefined) state.allianceIsTopRank = false;
+    if (!state.colonyNames) state.colonyNames = {};
+    if (!state.megaProjects) state.megaProjects = {};
+    if (!state.pendingRoleChange) state.pendingRoleChange = {};
+    if (state.lastNameChangeAt === undefined) state.lastNameChangeAt = null;
+    if (!state.debrisFieldTrackers) state.debrisFieldTrackers = {};
+    if (state.resources.forschungspunkte === undefined) state.resources.forschungspunkte = 0;
+    for (const def of SHIP_DEFS) if (state.fleet[def.key] === undefined) state.fleet[def.key] = 0;
+    if (!state.fleet.missions) state.fleet.missions = [];
+    for (const pid of Object.keys(state.colonies||{})){
+      if (!state.colonies[pid].fleet) state.colonies[pid].fleet = emptyFleet();
+      for (const def of SHIP_DEFS) if (state.colonies[pid].fleet[def.key] === undefined) state.colonies[pid].fleet[def.key] = 0;
+      if (!state.colonies[pid].fleet.missions) state.colonies[pid].fleet.missions = [];
+    }
+    if (!state.constructionQueue) state.constructionQueue = [];
+    if (!state.debrisFields) state.debrisFields = {};
+    if (!state.moons) state.moons = {};
+    if (!state.npcScaling) state.npcScaling = {};
+    if (!state.scoreLog) state.scoreLog = [];
+    if (state.activeResearch === undefined) state.activeResearch = null;
+    if (!state.planetBonuses) state.planetBonuses = {};
+    if (!state.terraforming) state.terraforming = {};
+    if (state.terraformJob === undefined) state.terraformJob = null;
+    if (!state.planetTypeOverride) state.planetTypeOverride = {};
+    if (state.typeConvertJob === undefined) state.typeConvertJob = null;
+    if (state.commandPoints === undefined) state.commandPoints = 0;
+    if (!state.officers) state.officers = {};
+    if (state.credits === undefined) state.credits = 250;
+    if (!state.tradeRoutes) state.tradeRoutes = [];
+    if (!state.factionRep) state.factionRep = {};
+    if (state.nextFactionGift === undefined) state.nextFactionGift = 0;
+    if (!state.factionQuests) state.factionQuests = {};
+    if (state.marketTradesDone === undefined) state.marketTradesDone = 0;
+    if (state.factionQuestsDone === undefined) state.factionQuestsDone = 0;
+    if (state.shopPurchases === undefined) state.shopPurchases = 0;
+    if (state.dominanceClaimed === undefined) state.dominanceClaimed = 0;
+    if (state.allianceDominanceClaimed === undefined) state.allianceDominanceClaimed = 0;
+    if (state.allianceDominanceTotal === undefined) state.allianceDominanceTotal = 0;
+    if (!state.modules) state.modules = {};
+    if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
+    if (!state.equippedModules) state.equippedModules = {};
+    if (!state.levelRewardsClaimed) state.levelRewardsClaimed = {};
+    if (!state.rareItems) state.rareItems = {};
+    if (!state.inventory) state.inventory = {};
+    if (!state.buffs) state.buffs = [];
+    if (!state.unlocked) state.unlocked = { superschlachtschiff:false, festung:false };
+    if (state.unlocked.superschlachtschiff === undefined) state.unlocked.superschlachtschiff = false;
+    if (state.unlocked.festung === undefined) state.unlocked.festung = false;
+    if (state.mineDebuff === undefined) state.mineDebuff = null;
+    if (state.doctrine === undefined) state.doctrine = null;
+    if (state.activeEvent === undefined) state.activeEvent = null;
+    if (state.lastEventTime === undefined) state.lastEventTime = 0;
+    if (!state.planetSpecialization) state.planetSpecialization = {};
+    if (!state.orbitalStations) state.orbitalStations = {};
+    if (!state.planetEvents) state.planetEvents = {};
+    if (state.nextPlanetEventCheck === undefined) state.nextPlanetEventCheck = 0;
+    if (!state.pirateLairStage) state.pirateLairStage = 1;
+    if (state.pirateLairPrestige === undefined) state.pirateLairPrestige = 0;
+    if (!state.weeklyLeague) state.weeklyLeague = { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] };
+    if (!state.veteranXp) state.veteranXp = {};
+    if (state.dayStats === undefined) state.dayStats = null;
+    if (!state.dailyHistory) state.dailyHistory = [];
+    if (!state.notifiedPactOffers) state.notifiedPactOffers = [];
+    if (!state.claimedBossKills) state.claimedBossKills = [];
+    if (state.lastSeenChatTime === undefined) state.lastSeenChatTime = 0;
+    if (!state.researchMilestones) state.researchMilestones = {};
+    if (!state.ascension) state.ascension = { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0 } };
+    if (!state.ascension.tree) state.ascension.tree = { prod:0, speed:0, combat:0, start:0, expedition:0 };
+    if (state.warVictories === undefined) state.warVictories = 0;
+    if (!state.scoreHistory) state.scoreHistory = [];
+    if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
+    if (state.incomingRaid === undefined) state.incomingRaid = null;
+    if (state.nextRaidTime === undefined) state.nextRaidTime = null;
+    if (!state.colonies) state.colonies = {};
+    if (!state.activeBasePlanet) state.activeBasePlanet = 'home';
+    if (state.npcKills === undefined) state.npcKills = 0;
+    if (state.bossKills === undefined) state.bossKills = 0;
+    if (state.xp === undefined) state.xp = 0;
+    if (state.prestige === undefined) state.prestige = 0;
+    if (!state.achievements) state.achievements = {};
+    if (!state.buildQueue) state.buildQueue = [];
+    if (!state.researchQueue) state.researchQueue = [];
+    if (!state.allianceResearch) state.allianceResearch = {};
+    if (!state.allianceContributed) state.allianceContributed = {};
+    if (state.trader === undefined) state.trader = null;
+    if (state.nextTraderCheck === undefined) state.nextTraderCheck = 0;
+    if (state.soundOn === undefined) state.soundOn = true;
+    if (state.notifOn === undefined) state.notifOn = false;
+    if (!state.player.allianceTag) state.player.allianceTag = '';
+    if (state.player.allianceRole === undefined) state.player.allianceRole = '';
+    for (const def of BUILDING_DEFS) if (state.buildings[def.key] === undefined) state.buildings[def.key] = 0;
+    for (const pid of Object.keys(state.colonies)){
+      for (const def of BUILDING_DEFS) if (state.colonies[pid].buildings[def.key] === undefined) state.colonies[pid].buildings[def.key] = 0;
+    }
+  }
   function confirmPrestigeWithPerk(perkKey){
     document.getElementById('prestigePerkOverlay').style.display = 'none';
     const keepId = state.player.id, keepName = state.player.name, keepTag = state.player.allianceTag, keepAvatar = state.player.avatarKey;
@@ -6077,6 +6238,7 @@
     const keepXp = state.xp, keepAch = state.achievements, keepRare = state.rareItems, keepUnlocked = state.unlocked, keepClaimed = state.levelRewardsClaimed, keepInventory = state.inventory, keepAllianceRes = state.allianceResearch, keepAllianceContrib = state.allianceContributed;
     const keepPerks = perkKey ? (state.prestigePerks||[]).concat([perkKey]) : (state.prestigePerks||[]);
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
+    const keepBossClaims = state.claimedBossKills || [];
     state = {
       resources:{energie:10,erz:10,kristalle:0,deuterium:0,antimaterie:0,forschungspunkte:0},
       buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0},
@@ -6087,8 +6249,10 @@
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
+      credits: 250, claimedBossKills: keepBossClaims,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
     };
+    applyStateDefaults();
     const perkDef = perkKey ? PRESTIGE_PERKS.find(p=>p.key===perkKey) : null;
     log('Prestige-Stufe '+newPrestige+' erreicht! +'+(newPrestige*5)+'% dauerhafter Produktionsbonus.'+(perkDef?' Zusätzlich gewählt: '+perkDef.name+'.':''), 'ti-infinity');
     checkAchievements();
@@ -6153,6 +6317,7 @@
       ascension: asc,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
     };
+    applyStateDefaults();
     log('AUFSTIEG '+asc.count+' vollzogen! +'+gain+' Sternenessenz (gesamt: '+asc.essence+'). Verteile sie im Meta-Baum (Fortschritt-Tab) - diese Boni überleben jeden Reset.', 'ti-sparkles');
     playSound('achieve');
     checkAchievements();
@@ -8448,6 +8613,31 @@
     render(); save(); loadAlliances(); loadAllianceBanner();
     log('Allianz verlassen.', 'ti-door-exit');
   }
+  // Gleicht die eigene, lokale Rolle (state.player.allianceRole - steuert ALLE Admin-Berechtigungs-
+  // Checks im Client) mit dem geteilten Rollen-Datensatz ab. Bug: promoteMember()/kickMember() schrieben
+  // bisher nur den geteilten Datensatz DES BETROFFENEN Spielers, ohne dass dessen eigener Client davon
+  // je erfährt - eine Beförderung wirkte lokal nie, ein Kick blieb lokal unbemerkt bestehen. Wird beim
+  // Öffnen des Allianz-Tabs aufgerufen.
+  async function syncOwnAllianceRole(){
+    const tag = myAllianceTag();
+    if (!tag || !state.player.id) return;
+    try {
+      const r = await storageGet('alliance:'+tag+':role:'+state.player.id, true);
+      const rec = (r && r.value) ? JSON.parse(r.value) : null;
+      if (!rec || rec.role === 'left'){
+        if (state.player.allianceTag || state.player.allianceRole){
+          state.player.allianceTag = '';
+          state.player.allianceRole = '';
+          log('Du bist nicht mehr Mitglied von ['+tag+'] (entfernt oder ausgetreten).', 'ti-door-exit');
+          render(); save();
+        }
+      } else if (rec.role && rec.role !== state.player.allianceRole){
+        state.player.allianceRole = rec.role;
+        log('Deine Allianz-Rolle wurde aktualisiert: '+(rec.role==='admin'?'Admin':'Mitglied')+'.', 'ti-flag');
+        render(); save();
+      }
+    } catch(e){}
+  }
   async function loadAllianceMembers(){
     const box = document.getElementById('allianceMembersBox');
     if (!box) return;
@@ -8992,6 +9182,7 @@
   }
   async function doSave(){
     if (saveConflictDetected) return;
+    if (!bootDataReady) return;
     state.lastTick = Date.now();
     try {
       await saveGameStateVersioned(JSON.stringify(state));
@@ -10180,6 +10371,19 @@
               b.contributions[state.player.id] = me;
               const killed = b.hp <= 0;
               if (killed) b.defeatedAt = Date.now();
+              // Direkt vor dem Schreiben nochmal frisch lesen, um das Last-write-wins-Zeitfenster zu
+              // verkleinern: hat ein anderer, schneller schreibender Spieler den Boss inzwischen bereits
+              // erlegt, NICHT mehr mit unserer (jetzt veralteten) Kopie überschreiben - sonst könnte ein
+              // bereits gefallener Boss fälschlich wieder "lebendig" werden.
+              if (!killed){
+                let latest = null;
+                try { const r2 = await storageGet(WORLDBOSS_KEY, true); if (r2 && r2.value) latest = JSON.parse(r2.value); } catch(e){}
+                if (latest && latest.bossId === b.bossId && latest.defeatedAt){
+                  if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(dmg)+' Schaden, aber der Leviathan ist inzwischen bereits gefallen.'+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
+                  worldBossCache = latest; renderWorldBoss();
+                  return;
+                }
+              }
               await saveWorldBoss(b);
               if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(dmg)+' Schaden!'+(killed?' LETZTER SCHLAG - der Leviathan fällt!':' Rest-HP: '+fmt(Math.round(b.hp))+'.')+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
               playSound(killed ? 'achieve' : 'win');
@@ -11416,7 +11620,7 @@
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
     if (tab === 'berichte'){ loadNotificationEvents(); }
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
-    if (tab === 'allianz'){ loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); }
+    if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     if (tab === 'berichte'){
       loadReports();
@@ -12894,6 +13098,10 @@
       };
     }
 
+    // Performance: die Sektorkarten-Listen (Planeten/Monde) sind pro Planet mehrfach berechnungsintensiv
+    // (Flugzeit/Treibstoff/Kolonisierungskosten) und nur im Karte-Tab sichtbar - werden deshalb wie die
+    // Galaxiekarte selbst nur neu aufgebaut, wenn dieser Tab gerade aktiv ist.
+    if (activeTab === 'karte'){
     document.getElementById('planetList').innerHTML = PLANETS.filter(p=>p.system===activeSystem).map(p => {
       const disc = state.discovered[p.id];
       const colonized = !!state.colonies[p.id];
@@ -12970,6 +13178,7 @@
         `;
         moonWrap.querySelectorAll('[data-colonize-moon]').forEach(btn => btn.onclick = () => colonizeMoon(btn.getAttribute('data-colonize-moon')));
       }
+    }
     }
 
     // Performance: Angriffsflotte-Auswahl und NPC-Liste sind aufwändig (mehrere Schiffstypen bzw.
@@ -14660,6 +14869,10 @@
     if (!confirm('Kompletten Spielstand wirklich zurücksetzen? Das setzt auch Prestige, Level und Erfolge zurück (anders als der Prestige-Knopf im Fortschritt-Tab).')) return;
     const keepId = state.player.id, keepName = state.player.name, keepTag = state.player.allianceTag, keepAvatar = state.player.avatarKey;
     state = { resources:{energie:10,erz:10,kristalle:0,deuterium:0,antimaterie:0,forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, allianceResearch:{}, allianceContributed:{}, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
+    // Füllt alle Felder auf, die diese verkürzte Reset-Liste nicht enthält (z.B. credits, skillTree,
+    // favoritePlanets, collapsedSections, ascension, doctrine, ...) - sonst blieben sie `undefined` und
+    // render()/Klick-Handler stürzten ohne Seiten-Reload ab (siehe applyStateDefaults()).
+    applyStateDefaults();
     await save(); render(); log('Spielstand zurückgesetzt.', 'ti-refresh');
   });
 
@@ -14718,7 +14931,7 @@
     if (missionsResolved || queueProgressed || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
   }, 1000);
   setInterval(save, 10000);
-  setInterval(() => { loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); } }, 15000);
+  setInterval(() => { loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) syncOwnAllianceRole(); } }, 15000);
   setInterval(loadGalaxyState, 120000); // Galaxie-Zustand ändert sich langsam (Server-Tick alle 15 Min.), reicht alle 2 Min. zu prüfen
   loadGalaxyState();
   setInterval(() => { if (activeTab === 'markt') loadMarketState(); }, 30000); // Marktpreise im Markt-Tab alle 30s auffrischen
@@ -14928,6 +15141,7 @@
       hideLoginOverlay();
       showLogoutBtn();
       await load();
+      bootDataReady = true;
       state.player.id = data.userId;
       try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
       render();
@@ -15033,7 +15247,7 @@
 
   (async () => {
     const ready = await initAuth();
-    if (ready){ await load(); render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) loadAllianceWars(); if (!state.tutorialSeen) showTutorial(); }
+    if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) loadAllianceWars(); if (!state.tutorialSeen) showTutorial(); }
   })();
   // PWA: Service Worker registrieren (macht die App zusätzlich zum Manifest auch am DESKTOP
   // installierbar - Chrome/Edge verlangen dafür einen aktiven Service Worker, mobile Browser
