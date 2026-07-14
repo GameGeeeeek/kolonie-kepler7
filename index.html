@@ -1248,10 +1248,11 @@
               <div class="bmeta" style="margin-bottom:6px;">Vorstellungstext (in der Allianz-Rangliste sichtbar):</div>
               <textarea id="allianceDescriptionInput" maxlength="200" placeholder="z.B. Suchen aktive Spieler, PvE-Fokus..." style="width:100%; min-height:56px; resize:vertical;"></textarea>
             </div>
-            <div style="display:flex; align-items:center; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span class="bmeta" style="white-space:nowrap;">Mitgliederlimit:</span>
               <input type="number" id="allianceMemberLimitInput" min="1" max="200" style="width:70px;"/>
               <button id="saveAllianceSettingsBtn" style="font-size:11px;"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
+              <div class="bmeta" id="allianceMemberLimitHint" style="width:100%; color:#6b6f85;"></div>
             </div>
             <div style="border-top:0.5px solid rgba(255,255,255,0.09); padding-top:10px;">
               <button id="disbandAllianceBtn" style="font-size:11px; background:rgba(226,75,74,0.15); border-color:rgba(226,75,74,0.4); color:#ffb4b4;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Allianz auflösen</button>
@@ -1699,8 +1700,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.23.4';
+  const VERSION = '8.24.0';
   const PATCHNOTES = [
+    { version:'8.24.0', date:'13.07.2026', changes:[
+      'Allianz-Wirtschaft neu kalibriert: Alle 17 bestehenden Allianz-Technologien/-Gebäude kosten jetzt das 40- bis 50-fache (100.000-900.000 statt 5.000-18.000) - waren für eine aktive Allianz in Stunden erledigt, obwohl ein einzelnes normales Gebäude auf Stufe 30 schon ~12.000 einer Ressource kostet, pro Spieler, pro Gebäude. Allianz-Ziele sind jetzt etwas für Wochen aktiven gemeinsamen Beitrag statt ein Checkbox-Item der ersten Tage',
+      'Neu: Mitgliederlimit ist jetzt an eine eigene Forschungskette "Allianz-Expansion" gekoppelt (5 Stufen, in der Allianz-Forschung) - Basis 10, bis zu 50 bei voller Ausbaustufe. Der Admin kann das Limit weiterhin selbst einstellen, aber nie über das durch Forschung freigeschaltete Maximum hinaus (serverseitig hart durchgesetzt)',
+      'Sicherheitslücke behoben: Allianz-Beiträge (contrib) und Freischaltungen (unlocked) hatten noch gar keinen Schreibschutz - jeder eingeloggte Spieler, auch außerhalb der Allianz, konnte beliebige Fantasie-Beiträge für fremde Spieler eintragen oder Technologien direkt als freigeschaltet markieren. Jetzt: nur echte Mitglieder dürfen beitragen, und nur zum eigenen Beitrags-Datensatz',
+      'Bestehende Allianzen: Der bisherige (zu günstig erkaufte) Forschungs-/Gebäude-Fortschritt wurde vom Entwickler zurückgesetzt - Mitgliedschaft, Rollen, Banner und alles andere blieb dabei unberührt'
+    ]},
     { version:'8.23.4', date:'13.07.2026', changes:[
       'Bug behoben (danke an holyhenning für den Report): Die Mitgliederzahl in der Allianz-Rangliste konnte niedriger sein als die tatsächliche Mitgliederzahl - sie kam aus den Bestenlisten-Einträgen, die auf die Top 30 Spieler DES GESAMTEN SPIELS begrenzt sind. Ein Mitglied mit niedrigerem Punktestand außerhalb dieser globalen Top 30 wurde dadurch bei keiner Allianz mitgezählt. Zählt jetzt stattdessen die echten Rollen-Datensätze - vollständig und unabhängig von der Gesamtspielerzahl'
     ]},
@@ -3471,26 +3478,41 @@
     { id:'n33merid', system:'sys_meridian_kern', orbit:4, name:'Anomalie Drel', type:'super', x:470, y:160, duration:1146, reward:{antimaterie:358, kristalle:409, deuterium:458}, discoveryBonus:{antimaterie:521}, color:'#f3aec6', colonizeCost:{antimaterie:1834, kristalle:2407} },
   ];
 
+  // Kosten am 13.07.2026 grundlegend neu kalibriert (Faktor ×40 Tier-1, ×50 Tier-2 gegenüber den
+  // ursprünglichen Werten) - die alten Kosten (5.000-18.000, einmalig, auf die ganze Allianz gepoolt)
+  // waren für eine aktive Gruppe in Stunden erledigt, obwohl ein einzelnes normales Gebäude auf
+  // Stufe 30 schon ~12.000 einer Ressource kostet - PRO Spieler, PRO Gebäude. Damit Allianz-Ziele
+  // etwas Langfristiges bleiben (Wochen statt Stunden aktiver Beitrag), nicht ein Checkbox-Item der
+  // ersten Tage. Bestehende Allianzen: siehe reset_alliance_progress.js im Backend-Repo.
   const ALLIANCE_TECH_DEFS = [
-    { key:'a_prod', name:'Kollektive Effizienz', desc:'+10% Gesamtproduktion für alle Allianzmitglieder', cost:8000, resKey:'erz', icon:'ti-plant' },
-    { key:'a_def', name:'Gemeinsamer Verteidigungspakt', desc:'+15% Verteidigung für alle Allianzmitglieder', cost:6000, resKey:'kristalle', icon:'ti-shield-lock' },
-    { key:'a_atk', name:'Vereinte Flottendoktrin', desc:'+10% Angriffspunkte für alle Allianzmitglieder', cost:7000, resKey:'deuterium', icon:'ti-sword' },
-    { key:'a_res', name:'Wissensaustausch', desc:'-15% Forschungszeit für alle Allianzmitglieder', cost:9000, resKey:'antimaterie', icon:'ti-flask' },
-    { key:'a_trade', name:'Handelsabkommen', desc:'+8% Preisvorteil am galaktischen Markt (Kauf & Verkauf) für alle Allianzmitglieder', cost:5000, resKey:'kristalle', icon:'ti-truck' },
-    { key:'a_storage', name:'Gemeinsame Lagerlogistik', desc:'+15% Lagerkapazität für alle Allianzmitglieder', cost:6000, resKey:'erz', icon:'ti-building-community' },
-    { key:'a_speed', name:'Antriebssynchronisation', desc:'-10% Missionsdauer (Erkundung/Angriff/Expedition/Verlegung) für alle Allianzmitglieder', cost:8500, resKey:'deuterium', icon:'ti-clock' },
-    { key:'a_scanner', name:'Allianz-Aufklärungsnetz', desc:'Alle Mitglieder erkennen Überfälle 90s früher (wie eine zusätzliche Scanner-Stufe), selbst ohne eigene Scanner-Forschung', cost:10000, resKey:'antimaterie', icon:'ti-target' },
-    { key:'a_atk2', name:'Elite-Flottendoktrin', desc:'+15% zusätzliche Angriffspunkte für alle Allianzmitglieder (Tier 2)', cost:15000, resKey:'deuterium', icon:'ti-sword', requires:['a_atk'] },
-    { key:'a_def2', name:'Bollwerk-Protokoll', desc:'+20% zusätzliche Verteidigung für alle Allianzmitglieder (Tier 2)', cost:14000, resKey:'kristalle', icon:'ti-shield-lock', requires:['a_def'] }
+    { key:'a_prod', name:'Kollektive Effizienz', desc:'+10% Gesamtproduktion für alle Allianzmitglieder', cost:320000, resKey:'erz', icon:'ti-plant' },
+    { key:'a_def', name:'Gemeinsamer Verteidigungspakt', desc:'+15% Verteidigung für alle Allianzmitglieder', cost:240000, resKey:'kristalle', icon:'ti-shield-lock' },
+    { key:'a_atk', name:'Vereinte Flottendoktrin', desc:'+10% Angriffspunkte für alle Allianzmitglieder', cost:280000, resKey:'deuterium', icon:'ti-sword' },
+    { key:'a_res', name:'Wissensaustausch', desc:'-15% Forschungszeit für alle Allianzmitglieder', cost:360000, resKey:'antimaterie', icon:'ti-flask' },
+    { key:'a_trade', name:'Handelsabkommen', desc:'+8% Preisvorteil am galaktischen Markt (Kauf & Verkauf) für alle Allianzmitglieder', cost:200000, resKey:'kristalle', icon:'ti-truck' },
+    { key:'a_storage', name:'Gemeinsame Lagerlogistik', desc:'+15% Lagerkapazität für alle Allianzmitglieder', cost:240000, resKey:'erz', icon:'ti-building-community' },
+    { key:'a_speed', name:'Antriebssynchronisation', desc:'-10% Missionsdauer (Erkundung/Angriff/Expedition/Verlegung) für alle Allianzmitglieder', cost:340000, resKey:'deuterium', icon:'ti-clock' },
+    { key:'a_scanner', name:'Allianz-Aufklärungsnetz', desc:'Alle Mitglieder erkennen Überfälle 90s früher (wie eine zusätzliche Scanner-Stufe), selbst ohne eigene Scanner-Forschung', cost:400000, resKey:'antimaterie', icon:'ti-target' },
+    { key:'a_atk2', name:'Elite-Flottendoktrin', desc:'+15% zusätzliche Angriffspunkte für alle Allianzmitglieder (Tier 2)', cost:750000, resKey:'deuterium', icon:'ti-sword', requires:['a_atk'] },
+    { key:'a_def2', name:'Bollwerk-Protokoll', desc:'+20% zusätzliche Verteidigung für alle Allianzmitglieder (Tier 2)', cost:700000, resKey:'kristalle', icon:'ti-shield-lock', requires:['a_def'] },
+    // Allianz-Expansion: einzige Möglichkeit, das Mitgliederlimit über die Basis von 10 hinaus zu
+    // erhöhen (siehe allianceMemberLimitMax im Backend, gleiche Bonus-Tabelle). Das Admin-Eingabefeld
+    // fürs Limit kann nie mehr freischalten, als hier tatsächlich erforscht wurde - unabhängig davon,
+    // welchen Wert der Admin einträgt (serverseitig hart begrenzt).
+    { key:'a_expand1', name:'Allianz-Expansion I', desc:'+5 Mitgliederlimit (Basis 10 → 15)', cost:60000, resKey:'erz', icon:'ti-users' },
+    { key:'a_expand2', name:'Allianz-Expansion II', desc:'+5 Mitgliederlimit (→ 20)', cost:150000, resKey:'kristalle', icon:'ti-users', requires:['a_expand1'] },
+    { key:'a_expand3', name:'Allianz-Expansion III', desc:'+8 Mitgliederlimit (→ 28)', cost:350000, resKey:'deuterium', icon:'ti-users', requires:['a_expand2'] },
+    { key:'a_expand4', name:'Allianz-Expansion IV', desc:'+8 Mitgliederlimit (→ 36)', cost:800000, resKey:'antimaterie', icon:'ti-users', requires:['a_expand3'] },
+    { key:'a_expand5', name:'Allianz-Expansion V', desc:'+14 Mitgliederlimit (→ 50, aktuelles Maximum)', cost:2500000, resKey:'antimaterie', icon:'ti-users', requires:['a_expand4'] }
   ];
   const ALLIANCE_BUILDING_DEFS = [
-    { key:'ab_hq', name:'Allianz-Hauptquartier', desc:'+5% XP-Gewinn für alle Allianzmitglieder', cost:10000, resKey:'erz', icon:'ti-building-castle' },
-    { key:'ab_werft', name:'Gemeinsame Flottenwerft', desc:'+8% Angriffspunkte zusätzlich für alle Allianzmitglieder', cost:12000, resKey:'kristalle', icon:'ti-anchor' },
-    { key:'ab_bollwerk', name:'Grenzbollwerk', desc:'-20% zusätzlicher Ressourcenverlust bei NPC-Überfällen für alle Allianzmitglieder', cost:9000, resKey:'deuterium', icon:'ti-building-fortress' },
-    { key:'ab_lager', name:'Zentrallager', desc:'+10% Lagerkapazität zusätzlich für alle Allianzmitglieder', cost:8000, resKey:'erz', icon:'ti-box' },
-    { key:'ab_expedition', name:'Expeditionslogistik', desc:'-15% Treibstoffkosten für alle Missionen aller Allianzmitglieder', cost:11000, resKey:'deuterium', icon:'ti-map-2' },
-    { key:'ab_forschungszentrum', name:'Allianz-Forschungszentrum', desc:'-10% zusätzliche Forschungszeit für alle Allianzmitglieder (Tier 2)', cost:16000, resKey:'antimaterie', icon:'ti-microscope', requires:['ab_hq'] },
-    { key:'ab_flotte2', name:'Kampfflotten-Akademie', desc:'+10% zusätzliche Angriffspunkte für alle Allianzmitglieder (Tier 2)', cost:18000, resKey:'kristalle', icon:'ti-rocket', requires:['ab_werft'] }
+    { key:'ab_hq', name:'Allianz-Hauptquartier', desc:'+5% XP-Gewinn für alle Allianzmitglieder', cost:400000, resKey:'erz', icon:'ti-building-castle' },
+    { key:'ab_werft', name:'Gemeinsame Flottenwerft', desc:'+8% Angriffspunkte zusätzlich für alle Allianzmitglieder', cost:480000, resKey:'kristalle', icon:'ti-anchor' },
+    { key:'ab_bollwerk', name:'Grenzbollwerk', desc:'-20% zusätzlicher Ressourcenverlust bei NPC-Überfällen für alle Allianzmitglieder', cost:360000, resKey:'deuterium', icon:'ti-building-fortress' },
+    { key:'ab_lager', name:'Zentrallager', desc:'+10% Lagerkapazität zusätzlich für alle Allianzmitglieder', cost:320000, resKey:'erz', icon:'ti-box' },
+    { key:'ab_expedition', name:'Expeditionslogistik', desc:'-15% Treibstoffkosten für alle Missionen aller Allianzmitglieder', cost:440000, resKey:'deuterium', icon:'ti-map-2' },
+    { key:'ab_forschungszentrum', name:'Allianz-Forschungszentrum', desc:'-10% zusätzliche Forschungszeit für alle Allianzmitglieder (Tier 2)', cost:800000, resKey:'antimaterie', icon:'ti-microscope', requires:['ab_hq'] },
+    { key:'ab_flotte2', name:'Kampfflotten-Akademie', desc:'+10% zusätzliche Angriffspunkte für alle Allianzmitglieder (Tier 2)', cost:900000, resKey:'kristalle', icon:'ti-rocket', requires:['ab_werft'] }
   ];
 
   const NPCS = [
@@ -8029,7 +8051,7 @@
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
       { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen oder zurückstufen (auch andere Admins zu Offizier/Mitglied), und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
-      { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz hat ein Mitgliederlimit (Admin-einstellbar, Standard 20) - ist es erreicht, sind weder Sofort-Beitritt noch Bewerbung möglich. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
+      { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz startet mit einem Mitgliederlimit von <strong>10</strong>. Höher geht es nur über die Allianz-Forschung "Allianz-Expansion" (5 Stufen, in der Allianz-Forschung, dieselbe Kette wie andere Allianz-Techs) - bis zu 50 bei voller Ausbaustufe. Der Admin kann das Limit innerhalb dieses durch Forschung freigeschalteten Maximums frei einstellen, aber nie darüber (serverseitig hart begrenzt, egal was eingetragen wird). Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
       { title:'Allianz auflösen', body:'Nur Admins können eine Allianz unwiderruflich auflösen (Administration-Bereich) - alle Mitglieder werden entfernt, der Tag wird danach für eine Neugründung durch irgendjemanden frei.' },
       { title:'Aktivitätsprotokoll', body:'Admins und Offiziere sehen im Administration-Bereich ein Protokoll der letzten Beförderungen, Rauswürfe, Einstellungsänderungen und Bewerbungsentscheidungen - für Transparenz bei mehreren Admins/Offizieren in derselben Allianz.' },
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
@@ -8632,6 +8654,16 @@
   // Lädt info.joinMode der eigenen Allianz und rendert den Admin-Einstellungsbereich (Umschalter +
   // Bewerbungsliste) - beides bleibt für Nicht-Admins per style.display:none unsichtbar, zusätzlich
   // zur serverseitigen Sperre beim Lesen/Schreiben.
+  // Spiegelt exakt dieselbe Bonus-Tabelle wie allianceMemberLimitMax() im Backend - rein für die
+  // UI (Eingabefeld-Obergrenze, Hinweistext). Die tatsächliche Durchsetzung passiert serverseitig
+  // beim Beitritt selbst, das hier ist nur Komfort/Anzeige.
+  const ALLIANCE_EXPANSION_BONUSES = { a_expand1:5, a_expand2:5, a_expand3:8, a_expand4:8, a_expand5:14 };
+  function allianceMemberLimitMax(){
+    let limit = 10;
+    const unlocked = state.allianceResearch || {};
+    for (const [k,bonus] of Object.entries(ALLIANCE_EXPANSION_BONUSES)) if (unlocked[k]) limit += bonus;
+    return limit;
+  }
   async function loadAllianceAdminSettings(){
     const tag = myAllianceTag();
     const settingsWrap = document.getElementById('allianceAdminSettingsWrap');
@@ -8656,8 +8688,14 @@
     if (amIAdmin){
       const descInput = document.getElementById('allianceDescriptionInput');
       const limitInput = document.getElementById('allianceMemberLimitInput');
+      const limitHint = document.getElementById('allianceMemberLimitHint');
+      const maxLimit = allianceMemberLimitMax();
       if (descInput && document.activeElement !== descInput) descInput.value = info.description || '';
-      if (limitInput && document.activeElement !== limitInput) limitInput.value = info.memberLimit || 20;
+      if (limitInput && document.activeElement !== limitInput){
+        limitInput.max = maxLimit;
+        limitInput.value = Math.min(info.memberLimit || 10, maxLimit);
+      }
+      if (limitHint) limitHint.textContent = 'Aktuelles Maximum durch Forschung: '+maxLimit+' (Allianz-Expansion in der Allianz-Forschung erhöhen)';
     }
     loadAllianceApplications();
     loadAllianceAuditLog();
@@ -8689,7 +8727,11 @@
     const tag = myAllianceTag();
     if (!tag) return;
     const description = (document.getElementById('allianceDescriptionInput').value||'').trim().slice(0,200);
-    const limit = Math.max(1, Math.min(200, parseInt(document.getElementById('allianceMemberLimitInput').value,10) || 20));
+    // Kann durch Forschung nie überschritten werden (serverseitig ohnehin hart gedeckelt, siehe
+    // allianceMemberLimitMax im Backend) - hier zusätzlich clientseitig geclampt, damit das
+    // Eingabefeld gar nicht erst einen unerreichbaren Wert suggeriert.
+    const maxLimit = allianceMemberLimitMax();
+    const limit = Math.max(1, Math.min(maxLimit, parseInt(document.getElementById('allianceMemberLimitInput').value,10) || 10));
     try {
       const infoRes = await storageGet('alliance:'+tag+':info', true);
       const info = (infoRes && infoRes.value) ? JSON.parse(infoRes.value) : { tag };
