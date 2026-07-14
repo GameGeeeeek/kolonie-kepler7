@@ -247,7 +247,15 @@
        gar nicht sichtbar) - ohne erkennbaren Anschnitt der nächsten Karte als Wisch-Hinweis. Eine
        breiten-proportionale Größe (statt fest) garantiert auf jedem Bildschirm zuverlässig einen
        sichtbaren Teil der nächsten Karte. */
-    [data-hscroll] > .card-row { flex: 0 0 62%; max-width: 190px; min-width: 150px; }
+    /* Bug behoben (Samsung Internet, Bug-Report holyhenning): manche Browser-Versionen unterstützen
+       die CSS-Eigenschaft "gap" in Flexbox-Layouts unzuverlässig oder gar nicht - der Kartenabstand
+       in den Wisch-Leisten wurde dadurch ignoriert und die Karten überlappten sich, der "Umbauen"-
+       Button ragte in die nächste Karte hinein. margin-right funktioniert dagegen in jedem Browser
+       identisch, seit CSS1 - deshalb hier bewusst KEIN "gap" mehr, auch wenn moderne Browser das
+       inzwischen unterstützen. Der Container selbst behält daher ebenfalls kein gap (siehe die
+       einzelnen data-hscroll-Stellen im Code, "gap" wurde dort entfernt). */
+    [data-hscroll] > .card-row { flex: 0 0 62%; max-width: 190px; min-width: 150px; margin-right: 8px; }
+    [data-hscroll] > button { margin-right: 6px; }
     .hstat { flex-shrink:0; }
     .raid-banner { display:flex; align-items:center; gap:6px; background:rgba(var(--danger-rgb), 0.22); border:0.5px solid var(--c-danger); border-radius:10px; padding:6px 12px; margin-bottom:0.6rem; color:#ffb4b4; font-size:11.5px; font-weight:500; animation: raidPulse 1.8s ease-in-out infinite; }
     .raid-banner i { font-size:18px; flex-shrink:0; }
@@ -1708,8 +1716,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.26.1';
+  const VERSION = '8.26.2';
   const PATCHNOTES = [
+    { version:'8.26.2', date:'13.07.2026', changes:[
+      'Bug behoben (Samsung Internet, danke an holyhenning für den Report): In den vier Wisch-Leisten (Planeten-Rolle, Orbitalstation-Fokus, Expeditionstyp, Modul-Standort) überlappten sich die Karten/Buttons teils, der "Umbauen"-Button ragte in die nächste Rolle hinein - manche Browser-Versionen unterstützen die CSS-Eigenschaft "gap" in Flexbox-Layouts unzuverlässig. Kartenabstand läuft jetzt über margin statt gap, funktioniert damit in jedem Browser identisch'
+    ]},
     { version:'8.26.1', date:'13.07.2026', changes:[
       'Erledigte (abgeholte) Tagesmissionen werden jetzt ausgeblendet statt dauerhaft mit grünem Häkchen sichtbar zu bleiben - tauchen erst mit dem täglichen Reset um Mitternacht wieder auf. Sind alle erledigt, zeigt die Leiste stattdessen einen kurzen Hinweis'
     ]},
@@ -12768,7 +12779,7 @@
           }
           setHtmlPreservingScroll(roleBox, pendingHtml + `
             <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-target" aria-hidden="true"></i>Planeten-Rolle: ${planetDisplayName(state.activeBasePlanet)}</div>
-            <div data-hscroll="roles" style="display:flex; gap:8px; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
+            <div data-hscroll="roles" style="display:flex; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
               ${PLANET_ROLES.map(r => {
                 const isActive = currentRole && currentRole.key===r.key;
                 return `
@@ -12820,7 +12831,7 @@
             </div>`;
           } else if (!cur){
             html += `<div class="bmeta" style="margin-bottom:8px;">Baue eine Orbitalstation und wähle ihren Fokus (Stufe 1: ${costHtml(orbitalCost(1))}, ${fmtDuration(orbitalBuildTime(1))} Bauzeit; ausbaubar bis Stufe ${ORBITAL_MAX_LEVEL}).</div>
-            <div data-hscroll="orbitalfocus" style="display:flex; gap:8px; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
+            <div data-hscroll="orbitalfocus" style="display:flex; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
               ${ORBITAL_FOCI.map(f => `
                 <div class="card-row" style="flex-direction:column; align-items:flex-start;">
                   <div style="display:flex; align-items:center; gap:6px;"><i class="ti ${f.icon}" aria-hidden="true" style="color:${f.color};"></i><span class="bname" style="font-size:12px;">${f.name}</span></div>
@@ -13405,7 +13416,7 @@
       setHtmlPreservingScroll(expeditionBox, `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
           <div class="bmeta"><i class="ti ti-adjustments" aria-hidden="true"></i> Expeditionstyp:</div>
-          <div data-hscroll="exptype" style="display:flex; gap:6px; overflow-x:auto; padding:0 12px 2px 0;">
+          <div data-hscroll="exptype" style="display:flex; overflow-x:auto; padding:0 12px 2px 0;">
             ${EXPEDITION_TYPES.map(t => `
               <button data-expedition-type="${t.key}" title="${t.desc}" style="flex-shrink:0; font-size:11px; padding:6px 10px; ${selectedExpeditionType===t.key?'background:rgba(93,202,165,0.25); border-color:#5dcaa5; color:#5dcaa5;':''}">
                 <i class="ti ${t.icon}" aria-hidden="true" style="margin-right:4px;"></i>${t.name}
@@ -13749,7 +13760,7 @@
 
         // Standort-Umschalter (Module sind pro Planet – hier wählt man, welchen Standort man bearbeitet).
         const allPlanetKeys = ['home', ...Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k))];
-        let html = `<div data-hscroll="modloc" style="display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
+        let html = `<div data-hscroll="modloc" style="display:flex; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
         html += allPlanetKeys.map(k => {
           const active = k===pk;
           const eq = equippedAt(k).length, sl = moduleSlotCount(k);
