@@ -479,11 +479,7 @@
     .prodline { font-size:11.5px; color:#7d8199; margin-top:2px; }
     .colonized-badge { font-size:10.5px; color:var(--c-secondary); display:flex; align-items:center; gap:4px; }
 
-    /* Bug behoben (Bug-Report holyhenning): die x1/x5/x10/Max-Buttons standen nur ganz oben im Tab,
-       bei einer langen Gebäude-/Schiffsliste (v.a. Flotte) musste man beim Ändern der Menge immer
-       wieder zurück nach oben scrollen. "sticky" hält die Leiste jetzt sichtbar, während man durch
-       die Liste scrollt - kein sonstiges fixes Element oben im Spiel, mit dem sie kollidieren könnte. */
-    .qty-select { display:flex; gap:6px; margin-bottom:1rem; position:sticky; top:0; z-index:15; background:#060812; padding:6px 0; }
+    .qty-select { display:flex; gap:6px; margin-bottom:1rem; }
     .qty-btn { background:rgba(255,255,255,0.05); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:9px; padding:5px 11px; font-size:11.5px; cursor:pointer; }
     .qty-btn.active { background:rgba(var(--secondary-rgb), 0.22); border-color:var(--c-secondary-dark); color:#fff; }
 
@@ -895,9 +891,11 @@
           <button id="colonyRenameSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
           <button id="colonyAbandonBtn" style="display:none; background:rgba(226,75,74,0.18); border-color:var(--c-danger); flex-shrink:0;" title="Kolonie aufgeben"><i class="ti ti-alert-triangle" aria-hidden="true"></i></button>
         </div>
-        <div class="qty-select" id="qtySelect"></div>
         <div id="buildQueueBox"></div>
         <div class="section-title"><i class="ti ti-building-factory-2" aria-hidden="true"></i>Gebäude</div>
+        <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning: Buttons waren zu
+             weit von den eigentlichen Gebäuden entfernt). -->
+        <div class="qty-select" id="qtySelect"></div>
         <div class="buildings" id="buildings"></div>
       </div>
 
@@ -907,9 +905,10 @@
           <div style="font-size:38px; font-weight:500; color:#f0997b; font-variant-numeric:tabular-nums;" id="defenseCentralValue">0</div>
         </div>
         <div id="planetSwitcherDef"></div>
-        <div class="qty-select" id="qtySelectDef"></div>
         <div id="raidScoutBox"></div>
         <div class="section-title" style="justify-content:space-between;"><span><i class="ti ti-shield" aria-hidden="true"></i>Verteidigungsanlagen</span><button class="help-jump-btn" data-jump-help="kampf"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
+        <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning). -->
+        <div class="qty-select" id="qtySelectDef"></div>
         <div class="buildings" id="defenseBuildings"></div>
         <div id="festungBox"></div>
         <div class="card-row" id="autoReinforceRow" style="cursor:pointer; margin-top:0.75rem;">
@@ -943,7 +942,6 @@
 
       <div class="tab-panel" id="tab-flotte">
         <div id="planetSwitcherFleet" class="planet-switch"></div>
-        <div class="qty-select" id="qtySelectFleet"></div>
         <div style="text-align:center; padding:1.5rem 0; margin-bottom:1rem; background:rgba(226,75,74,0.08); border-radius:14px; border:0.5px solid rgba(226,75,74,0.25);">
           <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angriffspunkte (aktueller Planet)</div>
           <div style="font-size:38px; font-weight:500; color:#e24b4a; font-variant-numeric:tabular-nums;" id="attackCentralValue">0</div>
@@ -954,6 +952,9 @@
         <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i>Flotte verlegen</div>
         <div id="relocateBox"></div>
         <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-ship" aria-hidden="true"></i>Schiffswerft</div>
+        <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning: bei der Flotte lag
+             besonders viel dazwischen - Angriffspunkte, Missionen, Flottenverlegung). -->
+        <div class="qty-select" id="qtySelectFleet"></div>
         <div class="fleet" id="fleet"></div>
         <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Baukorb (mehrere Schiffstypen zusammen bauen)</div>
         <div id="shipBasketBox"></div>
@@ -1720,8 +1721,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.26.3';
+  const VERSION = '8.26.4';
   const PATCHNOTES = [
+    { version:'8.26.4', date:'13.07.2026', changes:[
+      'Korrektur zu v8.26.3 (Feedback holyhenning): Die x1/x5/x10/Max-Mengenauswahl bleibt doch nicht sticky, sondern steht jetzt direkt vor der jeweiligen Liste (Gebäude, Verteidigungsanlagen, Schiffswerft) statt ganz oben im Tab - bei der Flotte war das vorher am weitesten weg (Angriffspunkte-Anzeige, Missionen und Flottenverlegung lagen dazwischen)'
+    ]},
     { version:'8.26.3', date:'13.07.2026', changes:[
       'Verbessert (danke an holyhenning für den Vorschlag): Die x1/x5/x10/Max-Mengenauswahl (Gebäude, Verteidigung, Flotte) bleibt jetzt beim Scrollen sichtbar ("sticky"), statt nur ganz oben im Tab zu stehen - bei einer langen Schiffs-/Gebäudeliste musste man vorher jedes Mal zurück nach oben scrollen, um die Menge zu ändern'
     ]},
