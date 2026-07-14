@@ -1700,8 +1700,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.24.0';
+  const VERSION = '8.25.0';
   const PATCHNOTES = [
+    { version:'8.25.0', date:'13.07.2026', changes:[
+      'Allianz-Technologien und -Gebäude sind jetzt gestuft (bis Stufe 20) statt binär - jede Stufe steigert den Effekt um einen Anteil des bisherigen Gesamtbonus (Stufe 20 = voller alter Bonus), die Kosten verdoppeln sich pro Stufe. Stufe 1 kostet ein Zehntel der bisherigen Gesamtkosten und ist damit für eine aktive Allianz schnell erreichbar, während die letzten Stufen (18-20) zu echten Langzeit-/Elite-Zielen werden. Betrifft alle 17 normalen Allianz-Techs/-Gebäude, NICHT die Allianz-Expansion-Kette (bleibt bei ihren 5 festen Stufen)',
+      'Bestehende Allianzen: Der Forschungs-/Gebäude-Fortschritt wurde vom Entwickler erneut zurückgesetzt (wegen der neuen Kostenstruktur) - Mitgliedschaft, Rollen und Banner blieben unberührt'
+    ]},
     { version:'8.24.0', date:'13.07.2026', changes:[
       'Allianz-Wirtschaft neu kalibriert: Alle 17 bestehenden Allianz-Technologien/-Gebäude kosten jetzt das 40- bis 50-fache (100.000-900.000 statt 5.000-18.000) - waren für eine aktive Allianz in Stunden erledigt, obwohl ein einzelnes normales Gebäude auf Stufe 30 schon ~12.000 einer Ressource kostet, pro Spieler, pro Gebäude. Allianz-Ziele sind jetzt etwas für Wochen aktiven gemeinsamen Beitrag statt ein Checkbox-Item der ersten Tage',
       'Neu: Mitgliederlimit ist jetzt an eine eigene Forschungskette "Allianz-Expansion" gekoppelt (5 Stufen, in der Allianz-Forschung) - Basis 10, bis zu 50 bei voller Ausbaustufe. Der Admin kann das Limit weiterhin selbst einstellen, aber nie über das durch Forschung freigeschaltete Maximum hinaus (serverseitig hart durchgesetzt)',
@@ -3484,21 +3488,36 @@
   // Stufe 30 schon ~12.000 einer Ressource kostet - PRO Spieler, PRO Gebäude. Damit Allianz-Ziele
   // etwas Langfristiges bleiben (Wochen statt Stunden aktiver Beitrag), nicht ein Checkbox-Item der
   // ersten Tage. Bestehende Allianzen: siehe reset_alliance_progress.js im Backend-Repo.
+  // Kosten am 13.07.2026 grundlegend neu kalibriert (Faktor ×40 Tier-1, ×50 Tier-2 gegenüber den
+  // ursprünglichen Werten) - die alten Kosten (5.000-18.000, einmalig, auf die ganze Allianz gepoolt)
+  // waren für eine aktive Gruppe in Stunden erledigt, obwohl ein einzelnes normales Gebäude auf
+  // Stufe 30 schon ~12.000 einer Ressource kostet - PRO Spieler, PRO Gebäude. Damit Allianz-Ziele
+  // etwas Langfristiges bleiben (Wochen statt Stunden aktiver Beitrag), nicht ein Checkbox-Item der
+  // ersten Tage. Bestehende Allianzen: siehe reset_alliance_progress.js im Backend-Repo.
+  //
+  // Am selben Tag zu einem 20-stufigen System ausgebaut: "cost" ist jetzt die Stufe-1-Kosten
+  // (= altes Gesamt-Kosten/10, damit die erste Stufe schnell erreichbar bleibt), costMult:2.0 lässt
+  // die Kosten pro Stufe verdoppeln (Stufe 20 kostet damit das ~500.000-fache von Stufe 1 - bewusst
+  // ein langer Schwanz, bei dem die letzten paar Stufen echte Elite-/Langzeitziele sind, die die
+  // wenigsten Allianzen je erreichen, während die ersten Stufen für aktive Allianzen in
+  // überschaubarer Zeit machbar bleiben). Der Gesamtbonus (siehe desc) bleibt wie im alten binären
+  // System, verteilt sich jetzt aber gleichmäßig auf alle 20 Stufen (perLevel = Gesamtbonus/20) -
+  // siehe allianceTechFrac() weiter unten für die tatsächliche Effekt-Berechnung.
   const ALLIANCE_TECH_DEFS = [
-    { key:'a_prod', name:'Kollektive Effizienz', desc:'+10% Gesamtproduktion für alle Allianzmitglieder', cost:320000, resKey:'erz', icon:'ti-plant' },
-    { key:'a_def', name:'Gemeinsamer Verteidigungspakt', desc:'+15% Verteidigung für alle Allianzmitglieder', cost:240000, resKey:'kristalle', icon:'ti-shield-lock' },
-    { key:'a_atk', name:'Vereinte Flottendoktrin', desc:'+10% Angriffspunkte für alle Allianzmitglieder', cost:280000, resKey:'deuterium', icon:'ti-sword' },
-    { key:'a_res', name:'Wissensaustausch', desc:'-15% Forschungszeit für alle Allianzmitglieder', cost:360000, resKey:'antimaterie', icon:'ti-flask' },
-    { key:'a_trade', name:'Handelsabkommen', desc:'+8% Preisvorteil am galaktischen Markt (Kauf & Verkauf) für alle Allianzmitglieder', cost:200000, resKey:'kristalle', icon:'ti-truck' },
-    { key:'a_storage', name:'Gemeinsame Lagerlogistik', desc:'+15% Lagerkapazität für alle Allianzmitglieder', cost:240000, resKey:'erz', icon:'ti-building-community' },
-    { key:'a_speed', name:'Antriebssynchronisation', desc:'-10% Missionsdauer (Erkundung/Angriff/Expedition/Verlegung) für alle Allianzmitglieder', cost:340000, resKey:'deuterium', icon:'ti-clock' },
-    { key:'a_scanner', name:'Allianz-Aufklärungsnetz', desc:'Alle Mitglieder erkennen Überfälle 90s früher (wie eine zusätzliche Scanner-Stufe), selbst ohne eigene Scanner-Forschung', cost:400000, resKey:'antimaterie', icon:'ti-target' },
-    { key:'a_atk2', name:'Elite-Flottendoktrin', desc:'+15% zusätzliche Angriffspunkte für alle Allianzmitglieder (Tier 2)', cost:750000, resKey:'deuterium', icon:'ti-sword', requires:['a_atk'] },
-    { key:'a_def2', name:'Bollwerk-Protokoll', desc:'+20% zusätzliche Verteidigung für alle Allianzmitglieder (Tier 2)', cost:700000, resKey:'kristalle', icon:'ti-shield-lock', requires:['a_def'] },
-    // Allianz-Expansion: einzige Möglichkeit, das Mitgliederlimit über die Basis von 10 hinaus zu
-    // erhöhen (siehe allianceMemberLimitMax im Backend, gleiche Bonus-Tabelle). Das Admin-Eingabefeld
-    // fürs Limit kann nie mehr freischalten, als hier tatsächlich erforscht wurde - unabhängig davon,
-    // welchen Wert der Admin einträgt (serverseitig hart begrenzt).
+    { key:'a_prod', name:'Kollektive Effizienz', desc:'+0,5% Gesamtproduktion je Stufe (max. +10% bei Stufe 20) für alle Allianzmitglieder', cost:32000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'erz', icon:'ti-plant' },
+    { key:'a_def', name:'Gemeinsamer Verteidigungspakt', desc:'+0,75% Verteidigung je Stufe (max. +15% bei Stufe 20) für alle Allianzmitglieder', cost:24000, costMult:2.0, maxLevel:20, totalBonus:0.15, resKey:'kristalle', icon:'ti-shield-lock' },
+    { key:'a_atk', name:'Vereinte Flottendoktrin', desc:'+0,5% Angriffspunkte je Stufe (max. +10% bei Stufe 20) für alle Allianzmitglieder', cost:28000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'deuterium', icon:'ti-sword' },
+    { key:'a_res', name:'Wissensaustausch', desc:'-0,75% Forschungszeit je Stufe (max. -15% bei Stufe 20) für alle Allianzmitglieder', cost:36000, costMult:2.0, maxLevel:20, totalBonus:0.15, resKey:'antimaterie', icon:'ti-flask' },
+    { key:'a_trade', name:'Handelsabkommen', desc:'+0,4% Preisvorteil am galaktischen Markt je Stufe (max. +8% bei Stufe 20) für alle Allianzmitglieder', cost:20000, costMult:2.0, maxLevel:20, totalBonus:0.08, resKey:'kristalle', icon:'ti-truck' },
+    { key:'a_storage', name:'Gemeinsame Lagerlogistik', desc:'+0,75% Lagerkapazität je Stufe (max. +15% bei Stufe 20) für alle Allianzmitglieder', cost:24000, costMult:2.0, maxLevel:20, totalBonus:0.15, resKey:'erz', icon:'ti-building-community' },
+    { key:'a_speed', name:'Antriebssynchronisation', desc:'-0,5% Missionsdauer je Stufe (max. -10% bei Stufe 20) für alle Allianzmitglieder', cost:34000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'deuterium', icon:'ti-clock' },
+    { key:'a_scanner', name:'Allianz-Aufklärungsnetz', desc:'+4,5s Überfall-Vorwarnzeit je Stufe (max. +90s bei Stufe 20) für alle Allianzmitglieder', cost:40000, costMult:2.0, maxLevel:20, totalBonus:90, resKey:'antimaterie', icon:'ti-target' },
+    { key:'a_atk2', name:'Elite-Flottendoktrin', desc:'+0,75% zusätzliche Angriffspunkte je Stufe (max. +15% bei Stufe 20, Tier 2) für alle Allianzmitglieder', cost:75000, costMult:2.0, maxLevel:20, totalBonus:0.15, resKey:'deuterium', icon:'ti-sword', requires:['a_atk'] },
+    { key:'a_def2', name:'Bollwerk-Protokoll', desc:'+1% zusätzliche Verteidigung je Stufe (max. +20% bei Stufe 20, Tier 2) für alle Allianzmitglieder', cost:70000, costMult:2.0, maxLevel:20, totalBonus:0.20, resKey:'kristalle', icon:'ti-shield-lock', requires:['a_def'] },
+    // Allianz-Expansion: bewusst NICHT Teil des 20-Stufen-Systems - bleibt die eigene, bereits
+    // 5-stufige Kette zur Erhöhung des Mitgliederlimits über die Basis von 10 hinaus (siehe
+    // allianceMemberLimitMax im Backend, gleiche Bonus-Tabelle). Das Admin-Eingabefeld fürs Limit
+    // kann nie mehr freischalten, als hier tatsächlich erforscht wurde.
     { key:'a_expand1', name:'Allianz-Expansion I', desc:'+5 Mitgliederlimit (Basis 10 → 15)', cost:60000, resKey:'erz', icon:'ti-users' },
     { key:'a_expand2', name:'Allianz-Expansion II', desc:'+5 Mitgliederlimit (→ 20)', cost:150000, resKey:'kristalle', icon:'ti-users', requires:['a_expand1'] },
     { key:'a_expand3', name:'Allianz-Expansion III', desc:'+8 Mitgliederlimit (→ 28)', cost:350000, resKey:'deuterium', icon:'ti-users', requires:['a_expand2'] },
@@ -3506,14 +3525,36 @@
     { key:'a_expand5', name:'Allianz-Expansion V', desc:'+14 Mitgliederlimit (→ 50, aktuelles Maximum)', cost:2500000, resKey:'antimaterie', icon:'ti-users', requires:['a_expand4'] }
   ];
   const ALLIANCE_BUILDING_DEFS = [
-    { key:'ab_hq', name:'Allianz-Hauptquartier', desc:'+5% XP-Gewinn für alle Allianzmitglieder', cost:400000, resKey:'erz', icon:'ti-building-castle' },
-    { key:'ab_werft', name:'Gemeinsame Flottenwerft', desc:'+8% Angriffspunkte zusätzlich für alle Allianzmitglieder', cost:480000, resKey:'kristalle', icon:'ti-anchor' },
-    { key:'ab_bollwerk', name:'Grenzbollwerk', desc:'-20% zusätzlicher Ressourcenverlust bei NPC-Überfällen für alle Allianzmitglieder', cost:360000, resKey:'deuterium', icon:'ti-building-fortress' },
-    { key:'ab_lager', name:'Zentrallager', desc:'+10% Lagerkapazität zusätzlich für alle Allianzmitglieder', cost:320000, resKey:'erz', icon:'ti-box' },
-    { key:'ab_expedition', name:'Expeditionslogistik', desc:'-15% Treibstoffkosten für alle Missionen aller Allianzmitglieder', cost:440000, resKey:'deuterium', icon:'ti-map-2' },
-    { key:'ab_forschungszentrum', name:'Allianz-Forschungszentrum', desc:'-10% zusätzliche Forschungszeit für alle Allianzmitglieder (Tier 2)', cost:800000, resKey:'antimaterie', icon:'ti-microscope', requires:['ab_hq'] },
-    { key:'ab_flotte2', name:'Kampfflotten-Akademie', desc:'+10% zusätzliche Angriffspunkte für alle Allianzmitglieder (Tier 2)', cost:900000, resKey:'kristalle', icon:'ti-rocket', requires:['ab_werft'] }
+    { key:'ab_hq', name:'Allianz-Hauptquartier', desc:'+0,25% XP-Gewinn je Stufe (max. +5% bei Stufe 20) für alle Allianzmitglieder', cost:40000, costMult:2.0, maxLevel:20, totalBonus:0.05, resKey:'erz', icon:'ti-building-castle' },
+    { key:'ab_werft', name:'Gemeinsame Flottenwerft', desc:'+0,4% zusätzliche Angriffspunkte je Stufe (max. +8% bei Stufe 20) für alle Allianzmitglieder', cost:48000, costMult:2.0, maxLevel:20, totalBonus:0.08, resKey:'kristalle', icon:'ti-anchor' },
+    { key:'ab_bollwerk', name:'Grenzbollwerk', desc:'-1% zusätzlicher Ressourcenverlust bei NPC-Überfällen je Stufe (max. -20% bei Stufe 20) für alle Allianzmitglieder', cost:36000, costMult:2.0, maxLevel:20, totalBonus:0.20, resKey:'deuterium', icon:'ti-building-fortress' },
+    { key:'ab_lager', name:'Zentrallager', desc:'+0,5% zusätzliche Lagerkapazität je Stufe (max. +10% bei Stufe 20) für alle Allianzmitglieder', cost:32000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'erz', icon:'ti-box' },
+    { key:'ab_expedition', name:'Expeditionslogistik', desc:'-0,75% Treibstoffkosten je Stufe (max. -15% bei Stufe 20) für alle Missionen aller Allianzmitglieder', cost:44000, costMult:2.0, maxLevel:20, totalBonus:0.15, resKey:'deuterium', icon:'ti-map-2' },
+    { key:'ab_forschungszentrum', name:'Allianz-Forschungszentrum', desc:'-0,5% zusätzliche Forschungszeit je Stufe (max. -10% bei Stufe 20, Tier 2) für alle Allianzmitglieder', cost:80000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'antimaterie', icon:'ti-microscope', requires:['ab_hq'] },
+    { key:'ab_flotte2', name:'Kampfflotten-Akademie', desc:'+0,5% zusätzliche Angriffspunkte je Stufe (max. +10% bei Stufe 20, Tier 2) für alle Allianzmitglieder', cost:90000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'kristalle', icon:'ti-rocket', requires:['ab_werft'] }
   ];
+  // Effekt-Berechnung für die gestuften Allianz-Techs/-Gebäude (nicht für a_expand1-5, die bleiben
+  // binär/tierbasiert wie bisher). allianceTechLevel liest die aktuelle Stufe (0 = gar nicht
+  // erforscht), allianceTechFrac gibt den Anteil (0..1) des in "totalBonus" hinterlegten
+  // Gesamtbonus zurück, den man bei dieser Stufe bereits hat - die eigentlichen Verbrauchsstellen
+  // (Produktion, Verteidigung, Angriff, Lager, ...) multiplizieren/addieren damit weiter unten im Code.
+  function allianceTechLevel(key){ return (state.allianceResearch && state.allianceResearch[key]) || 0; }
+  function allianceTechFrac(key){
+    const t = findAllianceStructure(key);
+    const maxLvl = (t && t.maxLevel) || 20;
+    return allianceTechLevel(key) / maxLvl;
+  }
+  // Kosten für EINE bestimmte Stufe (1-indiziert) bzw. kumulierte Kosten, um eine Stufe zu erreichen -
+  // dieselbe geometrische Reihe wie bei normalen Gebäuden (costFor), nur mit fixem Multiplikator 2.0
+  // statt dem Forschungsbauplan-Rabatt (Allianz-Beiträge werden nicht durch persönliche Forschung
+  // günstiger, das wäre bei einem geteilten Ziel unpassend).
+  function allianceTechCostForLevel(t, level){ return Math.round(t.cost * Math.pow(t.costMult||2.0, level-1)); }
+  function allianceTechCumulativeCost(t, level){
+    let total = 0;
+    for (let i=1;i<=level;i++) total += allianceTechCostForLevel(t, i);
+    return total;
+  }
+
 
   const NPCS = [
     { id:'raider1', name:'Void-Marodeure', level:1, defense:30, duration:40, loot:{erz:40, energie:20}, weakness:'jaeger', system:'kepler' },
@@ -4218,7 +4259,7 @@
     // Allianz-Handelsabkommen (a_trade) wirkte früher nur auf den alten Zufallshändler; gilt seit
     // v7.90 zusätzlich auf den galaktischen Markt. Additiv zum Fraktionsrabatt, insgesamt gedeckelt
     // bei 20%, damit sich Diplomatie- und Allianz-Boni nicht zu einem Freifahrtschein aufaddieren.
-    if (state.allianceResearch && state.allianceResearch.a_trade) pct += 0.08;
+    if (state.allianceResearch) pct += 0.08 * allianceTechFrac('a_trade');
     return Math.min(0.20, pct);
   }
   // Void: Multiplikator auf die Raid-Wahrscheinlichkeit. 1 / 0.75 / 0.5
@@ -4806,7 +4847,7 @@
   function canAfford(cost){ return Object.entries(cost).every(([r,amt]) => (state.resources[r]||0) >= amt); }
   function missionFuelCost(durationSec, shipCount){
     let cost = Math.max(5, Math.round(durationSec * 0.4 * Math.sqrt(Math.max(1, shipCount))));
-    if (state.allianceResearch && state.allianceResearch.ab_expedition) cost = Math.round(cost*0.85);
+    if (state.allianceResearch) cost = Math.round(cost*(1-0.15*allianceTechFrac('ab_expedition')));
     const doc = activeDoctrine();
     if (doc) cost = Math.round(cost*doc.fuelMult);
     return Math.max(1, cost);
@@ -4823,8 +4864,8 @@
   function researchDuration(r, targetLevel){
     const labs = allBuildingSets().reduce((a,b)=>a+(b.labor||0),0);
     let labMult = Math.max(0.55, 1 - labs*0.045);
-    if (state.allianceResearch && state.allianceResearch.a_res) labMult *= 0.85;
-    if (state.allianceResearch && state.allianceResearch.ab_forschungszentrum) labMult *= 0.90;
+    if (state.allianceResearch) labMult *= (1-0.15*allianceTechFrac('a_res'));
+    if (state.allianceResearch) labMult *= (1-0.10*allianceTechFrac('ab_forschungszentrum'));
     if (hasRoleAnywhere('science')) labMult *= 0.90; // Forschungs-Welt: -10% Forschungszeit (imperiumsweit, nicht stapelbar)
     labMult *= (1 - officerBonus('wissenschaftler'));
     return Math.round(r.baseDuration * Math.pow(r.durationMult, targetLevel-1) * labMult);
@@ -5047,7 +5088,7 @@
     // alleine aus dieser Gruppe; jetzt: 1+(0.10+0.15+0.15+0.15+0.02+…) - jeder Bonus bleibt spürbar,
     // aber sie potenzieren sich nicht mehr gegenseitig.
     let globalBonus = 0;
-    if (state.allianceResearch && state.allianceResearch.a_prod) globalBonus += 0.10;
+    if (state.allianceResearch) globalBonus += 0.10 * allianceTechFrac('a_prod');
     globalBonus += (seasonalProdMult() - 1);
     globalBonus += prestigePerkCount('prod')*0.03;
     globalBonus += skillBonusPct('eco');
@@ -5104,8 +5145,8 @@
     }
     const lvl = state.research.rlager||0;
     if (lvl) cap *= (1 + lvl*RESEARCH_DEFS.find(r=>r.key==='rlager').effectPerLevel);
-    if (state.allianceResearch && state.allianceResearch.a_storage) cap *= 1.15;
-    if (state.allianceResearch && state.allianceResearch.ab_lager) cap *= 1.10;
+    if (state.allianceResearch) cap *= (1+0.15*allianceTechFrac('a_storage'));
+    if (state.allianceResearch) cap *= (1+0.10*allianceTechFrac('ab_lager'));
     for (const [pid, bonus] of Object.entries(state.planetBonuses||{})){
       if (state.colonies[pid] && bonus.type==='storage_boost') cap += bonus.flat;
     }
@@ -5144,7 +5185,7 @@
     let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
     mult *= Math.pow(0.97, f.spaeher||0);
     mult *= fleetSpeedMultiplier(f, relevantKeys);
-    if (state.allianceResearch && state.allianceResearch.a_speed) mult *= 0.90;
+    if (state.allianceResearch) mult *= (1-0.10*allianceTechFrac('a_speed'));
     mult *= Math.max(0.5, 1 - prestigePerkCount('speed')*0.03);
     mult *= Math.max(0.5, 1 - ascBonus('speed')*0.02);
     mult *= Math.max(0.5, 1 - skillBonusPct('log'));
@@ -5233,10 +5274,10 @@
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
-    if (state.allianceResearch && state.allianceResearch.a_atk) power *= 1.10;
-    if (state.allianceResearch && state.allianceResearch.a_atk2) power *= 1.15;
-    if (state.allianceResearch && state.allianceResearch.ab_werft) power *= 1.08;
-    if (state.allianceResearch && state.allianceResearch.ab_flotte2) power *= 1.10;
+    if (state.allianceResearch) power *= (1+0.10*allianceTechFrac('a_atk'));
+    if (state.allianceResearch) power *= (1+0.15*allianceTechFrac('a_atk2'));
+    if (state.allianceResearch) power *= (1+0.08*allianceTechFrac('ab_werft'));
+    if (state.allianceResearch) power *= (1+0.10*allianceTechFrac('ab_flotte2'));
     // Prestige-Kampf-Perk bewusst NICHT hier, sondern erst unten in attackPower() – attackPowerRaw()
     // wird auch von shipDefenseContribution() für die Verteidigungsberechnung genutzt, und
     // defensePower() wendet denselben Perk-Bonus separat nochmal an. Hier stünde er sonst doppelt
@@ -5452,8 +5493,8 @@
     const now = Date.now();
     for (const buff of (state.buffs||[])){ if (buff.kind==='def' && buff.expiresAt > now) power *= buff.mult; }
     power *= planetBonusMultiplier('def', null);
-    if (state.allianceResearch && state.allianceResearch.a_def) power *= 1.15;
-    if (state.allianceResearch && state.allianceResearch.a_def2) power *= 1.20;
+    if (state.allianceResearch) power *= (1+0.15*allianceTechFrac('a_def'));
+    if (state.allianceResearch) power *= (1+0.20*allianceTechFrac('a_def2'));
     const doc = activeDoctrine();
     if (doc) power *= doc.defMult;
     power *= (1 + prestigePerkCount('combat')*0.03);
@@ -5749,7 +5790,7 @@
     if (state.incomingRaid && state.incomingRaid.scoutArrival && !state.incomingRaid.scouted && Date.now() >= state.incomingRaid.scoutArrival) resolveRaidScout();
   }
   // Jede Scanner-Stufe gewährt zusätzliche Vorwarnzeit, innerhalb derer der Überfall erkannt wird.
-  function raidDetectionLead(){ return (state.research.rscanner||0) * 90 + ((state.allianceResearch && state.allianceResearch.a_scanner) ? 90 : 0); } // Sekunden Vorwarnzeit pro Stufe (+ Allianz-Bonus)
+  function raidDetectionLead(){ return (state.research.rscanner||0) * 90 + Math.round(90 * allianceTechFrac('a_scanner')); } // Sekunden Vorwarnzeit pro Stufe (+ gestufter Allianz-Bonus)
   function maybeDetectRaid(){
     if (!state.incomingRaid || state.incomingRaid.detected) return;
     const lead = raidDetectionLead();
@@ -5837,7 +5878,7 @@
       let lossPct = Math.max(0.05, Math.min(isSuper?0.5:0.35, raiderPower/(raiderPower+dp*2)));
       const nfLvl = state.research.rnotfall||0;
       if (nfLvl) lossPct *= Math.max(0.5, 1-nfLvl*RESEARCH_DEFS.find(r=>r.key==='rnotfall').effectPerLevel);
-      if (state.allianceResearch && state.allianceResearch.ab_bollwerk) lossPct *= 0.8;
+      if (state.allianceResearch) lossPct *= (1-0.20*allianceTechFrac('ab_bollwerk'));
       lossPct *= Math.max(0.4, 1 - moduleBonusAt(targetPlanet, 'raidloss'));
       let totalLost = 0;
       for (const r of Object.keys(state.resources)){ const lost = state.resources[r]*lossPct; totalLost += lost; state.resources[r] = Math.max(0, state.resources[r] - lost); }
@@ -6045,7 +6086,7 @@
     { level:20, rareItem:'kristallherz', amt:1, label:'1 Kristallherz' }
   ];
   function addXp(amount){
-    if (state.allianceResearch && state.allianceResearch.ab_hq) amount = Math.round(amount*1.05);
+    if (state.allianceResearch) amount = Math.round(amount*(1+0.05*allianceTechFrac('ab_hq')));
     const before = commanderLevel(state.xp||0);
     state.xp = (state.xp||0) + amount;
     const after = commanderLevel(state.xp);
@@ -6526,7 +6567,7 @@
     const t = state.trader;
     if ((state.resources[t.give]||0) < t.giveAmt){ log('Nicht genug Ressourcen für diesen Handel.', 'ti-alert-triangle'); return; }
     state.resources[t.give] -= t.giveAmt;
-    const tradeMult = ((state.allianceResearch && state.allianceResearch.a_trade) ? 1.2 : 1) * (1 + officerBonus('haendler'));
+    const tradeMult = (1 + 0.20*allianceTechFrac('a_trade')) * (1 + officerBonus('haendler'));
     state.resources[t.get] = (state.resources[t.get]||0) + Math.round(t.getAmt*tradeMult);
     state.trader = null;
     log('Handel abgeschlossen.', 'ti-truck');
@@ -8056,7 +8097,8 @@
       { title:'Aktivitätsprotokoll', body:'Admins und Offiziere sehen im Administration-Bereich ein Protokoll der letzten Beförderungen, Rauswürfe, Einstellungsänderungen und Bewerbungsentscheidungen - für Transparenz bei mehreren Admins/Offizieren in derselben Allianz.' },
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
       { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf) für alle Mitglieder. Kombiniert sich mit einem eigenen Fraktions-Marktrabatt, insgesamt gedeckelt bei 20%.' },
-      { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' }
+      { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' },
+      { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste.' }
     ]},
     { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
       { title:'Weltboss', body:'Gelegentlich erscheint ein <strong>galaktischer Weltboss</strong> (oben im Galaxie-Tab, mit Serververbindung): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Du kannst ihn alle 30 Minuten angreifen (Schaden = deine Angriffskraft). Jeder Angriff bringt +8 Kampfpunkte und +40 Kredite, der <strong>Todesstoß</strong> +100 Kampfpunkte und +1000 Kredite. Bleibt er 72 Stunden unbesiegt, zieht er sich zurück. Seine HP skalieren mit der Spielerzahl.' },
@@ -9268,11 +9310,22 @@
         const ur = await storageGet('alliance:'+tag+':unlocked', true);
         if (ur && ur.value) unlockedDoc = JSON.parse(ur.value);
       } catch(e){}
+      let unlockedChanged = false;
       for (const t of allAllianceStructures()){
-        if ((totals[t.key]||0) >= t.cost && !unlockedDoc[t.key]){
-          unlockedDoc[t.key] = true;
-          try { await storageSet('alliance:'+tag+':unlocked', JSON.stringify(unlockedDoc), true); } catch(e){}
+        if (t.maxLevel){
+          // Gestufte Techs/Gebäude: Stufe wird aus der kumulierten Beitragssumme abgeleitet (wie viele
+          // Stufen-Schwellen wurden bereits überschritten), nicht mehr binär. Kann bei jedem Aufruf
+          // neu berechnet werden - rein deterministisch aus totals[t.key], kein Zustand verloren.
+          let lvl = 0;
+          while (lvl < t.maxLevel && (totals[t.key]||0) >= allianceTechCumulativeCost(t, lvl+1)) lvl++;
+          if ((unlockedDoc[t.key]||0) !== lvl){ unlockedDoc[t.key] = lvl; unlockedChanged = true; }
+        } else {
+          // Allianz-Expansion (a_expand1-5): weiterhin binär wie bisher, einmalige Schwelle.
+          if ((totals[t.key]||0) >= t.cost && !unlockedDoc[t.key]){ unlockedDoc[t.key] = true; unlockedChanged = true; }
         }
+      }
+      if (unlockedChanged){
+        try { await storageSet('alliance:'+tag+':unlocked', JSON.stringify(unlockedDoc), true); } catch(e){}
       }
       state.allianceTechTotals = totals;
       state.allianceResearch = unlockedDoc;
@@ -9385,7 +9438,6 @@
     if (!tag) return `<div class="bmeta">Vergib oben einen Allianz-Tag, um gemeinsam beizutragen.</div>`;
     const totals = state.allianceTechTotals || {};
     return defs.map(t => {
-      const done = !!state.allianceResearch[t.key];
       const reqMet = !t.requires || t.requires.every(k=>state.allianceResearch[k]);
       if (!reqMet){
         const reqNames = t.requires.map(k => (findAllianceStructure(k)||{}).name || k).join(', ');
@@ -9402,24 +9454,58 @@
         `;
       }
       const total = totals[t.key]||0;
-      const pct = Math.min(100, (total/t.cost)*100);
       const rd = RES_DEFS.find(r=>r.key===t.resKey);
       const myContrib = state.allianceContributed[t.key]||0;
+
+      if (!t.maxLevel){
+        // Allianz-Expansion (a_expand1-5): unverändert binär, einmalige Schwelle.
+        const done = !!state.allianceResearch[t.key];
+        const pct = Math.min(100, (total/t.cost)*100);
+        return `
+          <div class="card-row ${done?'research-done':''}" style="flex-direction:column; align-items:stretch;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="left" style="gap:9px;"><div class="bicon" style="width:34px; height:34px; background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ${t.icon}" aria-hidden="true"></i></div><span class="bname">${t.name}</span></div>
+              ${done ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Aktiv</span>` : `<span class="bmeta">${miniResIcon(t.resKey)} ${fmt(total)}/${fmt(t.cost)} ${rd.label}</span>`}
+            </div>
+            <div class="bmeta">${t.desc}</div>
+            ${done ? '' : `
+              <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+              <div style="display:flex; gap:6px; align-items:center; margin-top:6px;">
+                <input type="text" inputmode="numeric" placeholder="Menge ${rd.label}" data-contrib-input="${t.key}" style="flex:1; font-size:12px;"/>
+                <button data-contrib-max="${t.key}" data-contrib-max-amt="${Math.max(0, Math.min(Math.floor(state.resources[t.resKey]||0), Math.ceil(t.cost-total)))}" style="font-size:10px; padding:6px 8px;">Max</button>
+                <button data-contrib-btn="${t.key}" style="font-size:11px; padding:6px 10px;">Beitragen</button>
+              </div>
+              <div class="bmeta" style="margin-top:2px;">${miniResIcon(t.resKey)} Dein Beitrag bisher: ${fmt(myContrib)} ${rd.label}</div>
+            `}
+          </div>
+        `;
+      }
+
+      // Gestufte Techs/Gebäude (die 17 normalen): Fortschritt bezieht sich immer auf die NÄCHSTE
+      // Stufe, nicht auf ein einmaliges Gesamtziel - Bonus wächst mit jeder erreichten Stufe weiter.
+      const level = allianceTechLevel(t.key);
+      const maxed = level >= t.maxLevel;
+      const cumulativeForCurrent = allianceTechCumulativeCost(t, level);
+      const nextLevelCost = maxed ? 0 : allianceTechCumulativeCost(t, level+1);
+      const intoLevel = total - cumulativeForCurrent;
+      const neededForLevel = maxed ? 0 : (nextLevelCost - cumulativeForCurrent);
+      const pct = maxed ? 100 : Math.min(100, (intoLevel/neededForLevel)*100);
       return `
-        <div class="card-row ${done?'research-done':''}" style="flex-direction:column; align-items:stretch;">
+        <div class="card-row ${maxed?'research-done':''}" style="flex-direction:column; align-items:stretch;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="left" style="gap:9px;"><div class="bicon" style="width:34px; height:34px; background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ${t.icon}" aria-hidden="true"></i></div><span class="bname">${t.name}</span></div>
-            ${done ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Aktiv</span>` : `<span class="bmeta">${miniResIcon(t.resKey)} ${fmt(total)}/${fmt(t.cost)} ${rd.label}</span>`}
+            <span class="lvl-pill" style="${level>0?'background:rgba(126,119,221,0.25); color:#c3bef5;':''}">${maxed?'Stufe '+t.maxLevel+' (max.)':'Stufe '+level+'/'+t.maxLevel}</span>
           </div>
           <div class="bmeta">${t.desc}</div>
-          ${done ? '' : `
+          ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Voll ausgebaut</div>` : `
+            <div class="bmeta">${miniResIcon(t.resKey)} ${fmt(intoLevel)}/${fmt(neededForLevel)} ${rd.label} bis Stufe ${level+1}</div>
             <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
             <div style="display:flex; gap:6px; align-items:center; margin-top:6px;">
               <input type="text" inputmode="numeric" placeholder="Menge ${rd.label}" data-contrib-input="${t.key}" style="flex:1; font-size:12px;"/>
-              <button data-contrib-max="${t.key}" data-contrib-max-amt="${Math.max(0, Math.min(Math.floor(state.resources[t.resKey]||0), Math.ceil(t.cost-total)))}" style="font-size:10px; padding:6px 8px;">Max</button>
+              <button data-contrib-max="${t.key}" data-contrib-max-amt="${Math.max(0, Math.min(Math.floor(state.resources[t.resKey]||0), Math.ceil(nextLevelCost-total)))}" style="font-size:10px; padding:6px 8px;">Max</button>
               <button data-contrib-btn="${t.key}" style="font-size:11px; padding:6px 10px;">Beitragen</button>
             </div>
-            <div class="bmeta" style="margin-top:2px;">${miniResIcon(t.resKey)} Dein Beitrag bisher: ${fmt(myContrib)} ${rd.label}</div>
+            <div class="bmeta" style="margin-top:2px;">${miniResIcon(t.resKey)} Dein Beitrag bisher gesamt: ${fmt(myContrib)} ${rd.label}</div>
           `}
         </div>
       `;
