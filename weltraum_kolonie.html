@@ -1151,6 +1151,7 @@
             <div class="card-row"><div class="left"><i class="ti ti-skull" aria-hidden="true"></i><div class="bname">Weltboss-Kills</div></div><div class="toggle-switch" data-notif-cat="weltboss"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div class="bname">Anfliegende Überfälle</div></div><div class="toggle-switch" data-notif-cat="raid"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-mail" aria-hidden="true"></i><div class="bname">Patchnotes</div></div><div class="toggle-switch" data-notif-cat="patchnotes"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-user" aria-hidden="true"></i><div class="bname">Allianz-Bewerbungen</div><div class="bmeta">Nur relevant für Allianz-Admins/Offiziere</div></div><div class="toggle-switch" data-notif-cat="application"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
 
@@ -1217,7 +1218,7 @@
               <div class="avatar" id="allianceAvatar" style="background:rgba(212,83,126,0.25); color:#f4c0d1;"><i class="ti ti-flag" aria-hidden="true"></i></div>
               <div>
                 <div class="bname" id="allianceNameDisplay">Keine Allianz</div>
-                <div class="bmeta">Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen</div>
+                <div class="bmeta" id="allianceMetaLine">Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen</div>
               </div>
             </div>
             <div style="display:flex; gap:8px;">
@@ -1226,6 +1227,7 @@
               <button id="leaveAllianceBtn" style="display:none;"><i class="ti ti-door-exit" aria-hidden="true" style="margin-right:4px;"></i>Verlassen</button>
             </div>
           </div>
+          <div class="bmeta" id="allianceDescriptionDisplay" style="margin-top:8px; display:none;"></div>
           <div id="bannerPickerWrap" style="display:none;">
             <div class="bmeta" style="margin-top:10px;">Allianz-Banner (für alle Mitglieder sichtbar) <span id="bannerPickerHint" style="color:#6b6f85;"></span>:</div>
             <div id="bannerPicker" class="banner-picker"></div>
@@ -1234,19 +1236,39 @@
 
         <div id="allianceAdminSettingsWrap" style="display:none; margin-bottom:1.5rem;">
           <div class="section-title"><i class="ti ti-lock" aria-hidden="true"></i>Administration</div>
-          <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
-            <div class="bmeta">Beitrittsmodus – bestimmt, ob neue Spieler sofort beitreten können oder erst eine Bewerbung schicken müssen, die ein Admin annehmen muss.</div>
-            <div style="display:flex; gap:6px;">
-              <button id="joinModeOpenBtn" style="flex:1; font-size:11px;"><i class="ti ti-door-exit" aria-hidden="true" style="margin-right:4px;"></i>Offen für alle</button>
-              <button id="joinModeApplicationBtn" style="flex:1; font-size:11px;"><i class="ti ti-lock" aria-hidden="true" style="margin-right:4px;"></i>Nur auf Bewerbung</button>
+          <div class="card-row" style="flex-direction:column; align-items:stretch; gap:12px;">
+            <div>
+              <div class="bmeta" style="margin-bottom:6px;">Beitrittsmodus – bestimmt, ob neue Spieler sofort beitreten können oder erst eine Bewerbung schicken müssen, die ein Admin/Offizier annehmen muss.</div>
+              <div style="display:flex; gap:6px;">
+                <button id="joinModeOpenBtn" style="flex:1; font-size:11px;"><i class="ti ti-door-exit" aria-hidden="true" style="margin-right:4px;"></i>Offen für alle</button>
+                <button id="joinModeApplicationBtn" style="flex:1; font-size:11px;"><i class="ti ti-lock" aria-hidden="true" style="margin-right:4px;"></i>Nur auf Bewerbung</button>
+              </div>
+            </div>
+            <div>
+              <div class="bmeta" style="margin-bottom:6px;">Vorstellungstext (in der Allianz-Rangliste sichtbar):</div>
+              <textarea id="allianceDescriptionInput" maxlength="200" placeholder="z.B. Suchen aktive Spieler, PvE-Fokus..." style="width:100%; min-height:56px; resize:vertical;"></textarea>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="bmeta" style="white-space:nowrap;">Mitgliederlimit:</span>
+              <input type="number" id="allianceMemberLimitInput" min="1" max="200" style="width:70px;"/>
+              <button id="saveAllianceSettingsBtn" style="font-size:11px;"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
+            </div>
+            <div style="border-top:0.5px solid rgba(255,255,255,0.09); padding-top:10px;">
+              <button id="disbandAllianceBtn" style="font-size:11px; background:rgba(226,75,74,0.15); border-color:rgba(226,75,74,0.4); color:#ffb4b4;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Allianz auflösen</button>
             </div>
           </div>
         </div>
 
         <div id="allianceApplicationsWrap" style="display:none;">
           <div class="section-title"><i class="ti ti-user" aria-hidden="true"></i>Offene Bewerbungen</div>
-          <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Nur für Admins sichtbar. Annehmen macht die Person sofort zum Mitglied, Ablehnen verwirft die Bewerbung (erneute Bewerbung jederzeit möglich).</div>
+          <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Nur für Admins/Offiziere sichtbar. Annehmen macht die Person sofort zum Mitglied, Ablehnen verwirft die Bewerbung (erneute Bewerbung jederzeit möglich).</div>
           <div class="leaderboard" id="allianceApplicationsBox"><div class="bmeta">lädt…</div></div>
+        </div>
+
+        <div id="allianceAuditLogWrap" style="display:none;">
+          <div class="section-title"><i class="ti ti-list-details" aria-hidden="true"></i>Aktivitätsprotokoll</div>
+          <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Nur für Admins/Offiziere sichtbar. Zeigt die letzten Admin-Aktionen (Beförderungen, Rauswürfe, Einstellungsänderungen).</div>
+          <div class="leaderboard" id="allianceAuditLogBox"><div class="bmeta">lädt…</div></div>
         </div>
 
         <div id="allianceDominanceBox" style="margin-bottom:1.5rem;"></div>
@@ -1490,6 +1512,26 @@
     }
     try { localStorage.setItem(LOCAL_PREFIX+key, value); return { key, value, shared }; } catch(e){ return null; }
   }
+  // Wie storageSet(), aber bei einer serverseitigen ABLEHNUNG (403 - z.B. Allianz-Rauswurf-Sperrfrist,
+  // Mitgliederlimit erreicht) wird der tatsächliche Fehlertext geworfen, statt wie storageSet() still
+  // auf lokalen Speicher zurückzufallen. Ein 403 ist hier eine echte, absichtliche Ablehnung, kein
+  // Offline-Fall - der Spieler muss den Grund erfahren, statt fälschlich "beigetreten" zu sehen,
+  // obwohl der Server es abgelehnt hat. Nur für die paar Stellen gedacht, wo genau das wichtig ist
+  // (Allianz beitreten/bewerben) - der Rest der App nutzt weiterhin die resiliente storageSet().
+  async function storageSetStrict(key, value, shared){
+    if (!useBackend()) throw new Error('Nur mit Serververbindung nutzbar.');
+    const res = await backendFetch('/storage/'+encodeURIComponent(key)+'?shared='+(shared?'true':'false'), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value })
+    });
+    if (!res.ok){
+      let msg = 'Aktion nicht möglich.';
+      try { const data = await res.json(); if (data && data.error) msg = data.error; } catch(e){}
+      throw new Error(msg);
+    }
+    return await res.json();
+  }
   async function storageList(prefix, shared){
     if (useBackend()){
       try {
@@ -1657,8 +1699,19 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.22.1';
+  const VERSION = '8.23.0';
   const PATCHNOTES = [
+    { version:'8.23.0', date:'13.07.2026', changes:[
+      'Neu: Offizier-Rolle für Allianzen - darf Banner ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden, aber nicht die Allianz-Einstellungen ändern oder Admins/andere Offiziere anrühren (Admin ernennt Offiziere in der Mitgliederliste)',
+      'Neu: Mitgliederlimit pro Allianz (Admin-einstellbar, Standard 20) - serverseitig durchgesetzt',
+      'Neu: 24-Stunden-Sperrfrist nach einem Rauswurf, bevor erneuter Beitritt oder eine neue Bewerbung möglich ist (freiwilliges Verlassen ist davon nicht betroffen)',
+      'Neu: Allianz auflösen (nur Admin) - entfernt alle Mitglieder und gibt den Tag für eine Neugründung frei',
+      'Neu: Aktivitätsprotokoll für Admins/Offiziere - zeigt die letzten Beförderungen, Rauswürfe, Einstellungsänderungen und Bewerbungsentscheidungen',
+      'Neu: Push-Benachrichtigung für Admins/Offiziere bei neuer Bewerbung (Einstellungen-Tab, Kategorie "Allianz-Bewerbungen")',
+      'Neu: Allianz-Vorstellungstext (Admin-einstellbar, bis 200 Zeichen), sichtbar für alle Mitglieder und als Tooltip in der Allianz-Rangliste',
+      'Verbessert: Allianz-Rangliste zeigt jetzt pro Allianz ein Schloss- oder Tür-Symbol (Beitrittsmodus) sowie Mitgliederzahl/-limit',
+      'Bugfix: Serverseitige Ablehnungen beim Allianz-Beitritt/Bewerben (Sperrfrist, Mitgliederlimit) wurden bisher von storageSet() verschluckt und fielen still auf lokalen Speicher zurück - der Spieler sah fälschlich "beigetreten", obwohl der Server abgelehnt hatte. Diese beiden Schreibvorgänge zeigen jetzt den echten Grund an'
+    ]},
     { version:'8.22.1', date:'13.07.2026', changes:[
       'Bug behoben: "Spielstand zurücksetzen" (Fortschritt-Tab) ersetzte den kompletten Spielstand durch ein unvollständiges Objekt statt fehlende Felder auf ihre Startwerte zu setzen - dadurch konnte die Oberfläche direkt nach dem Zurücksetzen abstürzen (z.B. bei Klick auf einen Favoriten-Stern oder beim Wechsel in den Fortschritt-/Forschungs-/Galaxie-Tab) und blieb bis zum nächsten Neuladen eingefroren. Betrifft auch Prestige und Aufstieg (Transzendenz) - alle drei nutzen jetzt dieselbe Auffüll-Logik wie ein normales Laden',
       'Bug behoben: Prestige (nicht Aufstieg) erhielt bisher bereits eingelöste Weltboss-Kill-Belohnungen nicht - killte man den Leviathan und prestigte im selben 10-Minuten-Respawn-Fenster, ließ sich die Belohnung ein zweites Mal einlösen. Außerdem fehlte das Kredit-Guthaben im Prestige-Reset komplett (wurde zu 0 statt auf den Startwert 250 gesetzt)',
@@ -6822,7 +6875,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -7947,8 +8000,11 @@
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.' }
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
-      { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin annehmen oder ablehnen muss (Bereich "Offene Bewerbungen", nur für Admins sichtbar).' },
-      { title:'Admin-Rechte', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: den Allianz-Banner (Farbe) ändern, den Beitrittsmodus (offen/Bewerbung) umstellen, Mitglieder befördern oder entfernen, und über Bewerbungen entscheiden. Diese Beschränkung wird serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne Admin-Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
+      { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
+      { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen, und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
+      { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz hat ein Mitgliederlimit (Admin-einstellbar, Standard 20) - ist es erreicht, sind weder Sofort-Beitritt noch Bewerbung möglich. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
+      { title:'Allianz auflösen', body:'Nur Admins können eine Allianz unwiderruflich auflösen (Administration-Bereich) - alle Mitglieder werden entfernt, der Tag wird danach für eine Neugründung durch irgendjemanden frei.' },
+      { title:'Aktivitätsprotokoll', body:'Admins und Offiziere sehen im Administration-Bereich ein Protokoll der letzten Beförderungen, Rauswürfe, Einstellungsänderungen und Bewerbungsentscheidungen - für Transparenz bei mehreren Admins/Offizieren in derselben Allianz.' },
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
       { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf) für alle Mitglieder. Kombiniert sich mit einem eigenen Fraktions-Marktrabatt, insgesamt gedeckelt bei 20%.' },
       { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' }
@@ -8279,18 +8335,22 @@
   let currentAllianceJoinMode = 'open';
   async function loadAllianceBanner(){
     const tag = myAllianceTag();
-    if (!tag){ currentAllianceBanner = null; renderBannerPicker(); return; }
+    if (!tag){ currentAllianceBanner = null; renderBannerPicker(); renderAllianceDescription(null); return; }
     try {
       const r = await storageGet('alliance:'+tag+':banner', true);
       currentAllianceBanner = r && r.value ? r.value : null;
     } catch(e){ currentAllianceBanner = null; }
     renderBannerPicker();
+    try {
+      const infoRes = await storageGet('alliance:'+tag+':info', true);
+      renderAllianceDescription((infoRes && infoRes.value) ? JSON.parse(infoRes.value) : null);
+    } catch(e){ renderAllianceDescription(null); }
   }
   async function setAllianceBanner(key){
     const tag = myAllianceTag();
     if (!tag) return;
     currentAllianceBanner = key;
-    try { await storageSet('alliance:'+tag+':banner', key, true); } catch(e){}
+    try { await storageSet('alliance:'+tag+':banner', key, true); logAllianceAudit('banner_change', BANNER_DEFS.find(b=>b.key===key)?.key||key); } catch(e){}
     renderBannerPicker();
   }
   function renderBannerPicker(){
@@ -8300,15 +8360,16 @@
     if (!wrap || !picker) return;
     const tag = myAllianceTag();
     wrap.style.display = tag ? 'block' : 'none';
-    // Nur Admins dürfen den Banner ändern (serverseitig durchgesetzt - siehe checkAllianceKeyPermission
-    // im Backend). Nicht-Admins sehen den aktuellen Banner nur noch, ohne anklickbare Buttons, damit
-    // kein Klick ins Leere läuft (403) und sofort klar ist, warum nichts passiert.
-    const amIAdmin = state.player.allianceRole === 'admin';
+    // Admins UND Offiziere dürfen den Banner ändern (serverseitig durchgesetzt - siehe
+    // checkAllianceKeyPermission im Backend). Normale Mitglieder sehen den aktuellen Banner nur noch,
+    // ohne anklickbare Buttons, damit kein Klick ins Leere läuft (403) und sofort klar ist, warum
+    // nichts passiert.
+    const amIOfficerPlus = state.player.allianceRole === 'admin' || state.player.allianceRole === 'officer';
     if (tag){
       const hint = document.getElementById('bannerPickerHint');
-      if (hint) hint.textContent = amIAdmin ? '' : '(nur Admins können den Banner ändern)';
-      picker.innerHTML = BANNER_DEFS.map(b => `<button class="banner-option ${currentAllianceBanner===b.key?'active':''}" data-banner="${b.key}" style="background:${b.css}; ${amIAdmin?'':'cursor:default; opacity:'+(currentAllianceBanner===b.key?'1':'0.4')+';'}" ${amIAdmin?'':'disabled'}></button>`).join('');
-      if (amIAdmin) document.querySelectorAll('[data-banner]').forEach(btn => btn.addEventListener('click', () => setAllianceBanner(btn.getAttribute('data-banner'))));
+      if (hint) hint.textContent = amIOfficerPlus ? '' : '(nur Admins/Offiziere können den Banner ändern)';
+      picker.innerHTML = BANNER_DEFS.map(b => `<button class="banner-option ${currentAllianceBanner===b.key?'active':''}" data-banner="${b.key}" style="background:${b.css}; ${amIOfficerPlus?'':'cursor:default; opacity:'+(currentAllianceBanner===b.key?'1':'0.4')+';'}" ${amIOfficerPlus?'':'disabled'}></button>`).join('');
+      if (amIOfficerPlus) document.querySelectorAll('[data-banner]').forEach(btn => btn.addEventListener('click', () => setAllianceBanner(btn.getAttribute('data-banner'))));
     }
     if (avatarEl){
       const b = BANNER_DEFS.find(x=>x.key===currentAllianceBanner);
@@ -8385,6 +8446,13 @@
           const ur = await storageGet('alliance:'+g.tag+':unlocked', true);
           g.unlockedCount = ur && ur.value ? Object.keys(JSON.parse(ur.value)).length : 0;
         } catch(e){ g.unlockedCount = 0; }
+        try {
+          const ir = await storageGet('alliance:'+g.tag+':info', true);
+          const info = (ir && ir.value) ? JSON.parse(ir.value) : {};
+          g.joinMode = info.joinMode === 'application' ? 'application' : 'open';
+          g.memberLimit = info.memberLimit || 20;
+          g.description = info.description || '';
+        } catch(e){ g.joinMode = 'open'; g.memberLimit = 20; g.description = ''; }
       }
       await updateAllianceHistory(list);
       // Vormachtstellung: die aktuell stärkste Allianz (nach Gesamtpunktzahl) gibt ihren Mitgliedern
@@ -8394,17 +8462,20 @@
       state.allianceIsTopRank = !!(myTag && list[0] && list[0].tag === myTag);
       box.innerHTML = list.map((g,i) => {
         const trend = g.trendPrevScore===undefined ? '' : g.score > g.trendPrevScore ? '<span style="color:#5dcaa5; font-weight:700;">▲</span>' : g.score < g.trendPrevScore ? '<span style="color:#e24b4a; font-weight:700;">▼</span>' : '<span style="color:#7d8199;">–</span>';
+        const full = g.members >= g.memberLimit;
+        const joinTitle = g.tag===myTag ? 'Deine Allianz' : full ? 'Mitgliederlimit erreicht' : g.joinMode==='application' ? 'Klicken zum Bewerben (nur auf Bewerbung)' : 'Klicken zum Beitreten';
         return `
-        <div class="rank-row ${g.tag===myTag?'me':''}" data-join-alliance="${g.tag}" style="cursor:${g.tag===myTag?'default':'pointer'};" title="${g.tag===myTag?'Deine Allianz':'Klicken zum Beitreten'}">
+        <div class="rank-row ${g.tag===myTag?'me':''}" data-join-alliance="${g.tag}" style="cursor:${g.tag===myTag?'default':'pointer'};" title="${joinTitle}${g.description?' · '+g.description:''}">
           <div style="display:flex; align-items:center; gap:10px;">
             <span class="rank-num">${i+1}</span>
             <i class="ti ti-flag" aria-hidden="true" style="color:#f4c0d1;"></i>
             <span style="font-weight:500;">[${g.tag}]</span>
+            <i class="ti ${g.joinMode==='application'?'ti-lock':'ti-door-exit'}" aria-hidden="true" style="color:#6b6f85; font-size:12px;" title="${g.joinMode==='application'?'Nur auf Bewerbung':'Offen für alle'}"></i>
             ${i===0?'<span class="lvl-pill" title="Vormachtstellung: +2% Produktion für Mitglieder"><i class="ti ti-award" aria-hidden="true"></i> Vormacht</span>':''}
             ${g.tag===myTag?'<span class="lvl-pill">deine Allianz</span>':''}
           </div>
           <div style="display:flex; gap:12px; color:#9296ac; align-items:center;">
-            <span title="Mitglieder"><i class="ti ti-users" aria-hidden="true"></i> ${g.members}</span>
+            <span title="Mitglieder/Limit"><i class="ti ti-users" aria-hidden="true"></i> ${g.members}/${g.memberLimit}</span>
             <span title="Freigeschaltete Allianz-Technologien und -Gebäude"><i class="ti ti-flask" aria-hidden="true"></i> ${g.unlockedCount}/${totalStructures}</span>
             <span title="Verlauf seit letzter Prüfung (mind. 1 Tag)">${trend}</span>
             <span style="color:#fff; font-weight:500;">${g.score}</span>
@@ -8482,14 +8553,21 @@
 
       let role = 'member';
       if (!exists){
-        await storageSet('alliance:'+tag+':info', JSON.stringify({ tag, creatorId: state.player.id, creatorName: state.player.name||'Kommandant', createdAt: Date.now(), joinMode: 'open' }), true);
+        await storageSet('alliance:'+tag+':info', JSON.stringify({ tag, creatorId: state.player.id, creatorName: state.player.name||'Kommandant', createdAt: Date.now(), joinMode: 'open', memberLimit: 20 }), true);
         role = 'admin';
-        log('Allianz ['+tag+'] gegründet – du bist Admin.', 'ti-flag');
-      } else {
-        if (prevRole) role = prevRole;
-        log('Allianz ['+tag+'] beigetreten.', 'ti-flag');
+      } else if (prevRole){
+        role = prevRole;
       }
-      await storageSet('alliance:'+tag+':role:'+state.player.id, JSON.stringify({ playerId: state.player.id, name: state.player.name||'Kommandant', role, joinedAt: Date.now() }), true);
+      // Strikt statt storageSet(): eine serverseitige Ablehnung (Rauswurf-Sperrfrist, Mitgliederlimit)
+      // muss dem Spieler ehrlich angezeigt werden, statt dass storageSet() still auf lokalen Speicher
+      // zurückfällt und fälschlich "beigetreten" suggeriert.
+      try {
+        await storageSetStrict('alliance:'+tag+':role:'+state.player.id, JSON.stringify({ playerId: state.player.id, name: state.player.name||'Kommandant', role, joinedAt: Date.now() }), true);
+      } catch(strictErr){
+        log(strictErr.message || 'Beitritt nicht möglich.', 'ti-alert-triangle');
+        return;
+      }
+      log(role==='admin' ? 'Allianz ['+tag+'] gegründet – du bist Admin.' : 'Allianz ['+tag+'] beigetreten.', 'ti-flag');
       state.player.allianceTag = tag;
       state.player.allianceRole = role;
       render(); save();
@@ -8498,14 +8576,14 @@
       log('Allianz-Aktion aktuell nicht möglich (Server nicht erreichbar).', 'ti-alert-triangle');
     }
   }
-  // Bewerbung bei einer Allianz mit Beitrittsmodus "application" - liegt beim Admin zur Entscheidung,
-  // siehe loadAllianceApplications()/decideApplication() weiter unten.
+  // Bewerbung bei einer Allianz mit Beitrittsmodus "application" - liegt beim Admin/Offizier zur
+  // Entscheidung, siehe loadAllianceApplications()/decideApplication() weiter unten.
   async function applyToAlliance(tag){
     try {
-      await storageSet('alliance:'+tag+':applications:'+state.player.id, JSON.stringify({ playerId: state.player.id, name: state.player.name||'Kommandant', appliedAt: Date.now(), status:'pending' }), true);
-      log('Bewerbung bei ['+tag+'] eingereicht – ein Admin muss sie noch annehmen.', 'ti-flag');
+      await storageSetStrict('alliance:'+tag+':applications:'+state.player.id, JSON.stringify({ playerId: state.player.id, name: state.player.name||'Kommandant', appliedAt: Date.now(), status:'pending' }), true);
+      log('Bewerbung bei ['+tag+'] eingereicht – ein Admin/Offizier muss sie noch annehmen.', 'ti-flag');
     } catch(e){
-      log('Bewerbung konnte nicht gesendet werden.', 'ti-alert-triangle');
+      log(e.message || 'Bewerbung konnte nicht gesendet werden.', 'ti-alert-triangle');
     }
   }
   // Lädt info.joinMode der eigenen Allianz und rendert den Admin-Einstellungsbereich (Umschalter +
@@ -8515,17 +8593,31 @@
     const tag = myAllianceTag();
     const settingsWrap = document.getElementById('allianceAdminSettingsWrap');
     const appsWrap = document.getElementById('allianceApplicationsWrap');
-    const amIAdmin = tag && state.player.allianceRole === 'admin';
+    const logWrap = document.getElementById('allianceAuditLogWrap');
+    const myRole = state.player.allianceRole;
+    const amIAdmin = tag && myRole === 'admin';
+    const amIOfficerPlus = tag && (myRole === 'admin' || myRole === 'officer');
+    // Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit, Auflösen) bleiben Admin-exklusiv;
+    // Bewerbungen und Protokoll sind für Admins UND Offiziere sichtbar (serverseitig ebenso geprüft).
     if (settingsWrap) settingsWrap.style.display = amIAdmin ? 'block' : 'none';
-    if (appsWrap) appsWrap.style.display = amIAdmin ? 'block' : 'none';
-    if (!amIAdmin) return;
+    if (appsWrap) appsWrap.style.display = amIOfficerPlus ? 'block' : 'none';
+    if (logWrap) logWrap.style.display = amIOfficerPlus ? 'block' : 'none';
+    if (!amIOfficerPlus) return;
+    let info = {};
     try {
       const infoRes = await storageGet('alliance:'+tag+':info', true);
-      const info = (infoRes && infoRes.value) ? JSON.parse(infoRes.value) : {};
-      currentAllianceJoinMode = info.joinMode === 'application' ? 'application' : 'open';
-    } catch(e){ currentAllianceJoinMode = 'open'; }
+      info = (infoRes && infoRes.value) ? JSON.parse(infoRes.value) : {};
+    } catch(e){}
+    currentAllianceJoinMode = info.joinMode === 'application' ? 'application' : 'open';
     renderAllianceJoinModeButtons();
+    if (amIAdmin){
+      const descInput = document.getElementById('allianceDescriptionInput');
+      const limitInput = document.getElementById('allianceMemberLimitInput');
+      if (descInput && document.activeElement !== descInput) descInput.value = info.description || '';
+      if (limitInput && document.activeElement !== limitInput) limitInput.value = info.memberLimit || 20;
+    }
     loadAllianceApplications();
+    loadAllianceAuditLog();
   }
   function renderAllianceJoinModeButtons(){
     const openBtn = document.getElementById('joinModeOpenBtn');
@@ -8545,14 +8637,79 @@
       currentAllianceJoinMode = mode;
       renderAllianceJoinModeButtons();
       log('Beitrittsmodus auf "'+(mode==='application'?'Nur auf Bewerbung':'Offen für alle')+'" gestellt.', 'ti-flag');
+      logAllianceAudit('joinmode_change', mode==='application'?'Nur auf Bewerbung':'Offen für alle');
     } catch(e){ log('Beitrittsmodus konnte nicht geändert werden.', 'ti-alert-triangle'); }
+  }
+  // Beschreibung + Mitgliederlimit zusammen speichern (ein Klick statt zwei getrennter Aktionen).
+  async function saveAllianceSettings(){
+    if (state.player.allianceRole !== 'admin') return;
+    const tag = myAllianceTag();
+    if (!tag) return;
+    const description = (document.getElementById('allianceDescriptionInput').value||'').trim().slice(0,200);
+    const limit = Math.max(1, Math.min(200, parseInt(document.getElementById('allianceMemberLimitInput').value,10) || 20));
+    try {
+      const infoRes = await storageGet('alliance:'+tag+':info', true);
+      const info = (infoRes && infoRes.value) ? JSON.parse(infoRes.value) : { tag };
+      info.description = description;
+      info.memberLimit = limit;
+      await storageSet('alliance:'+tag+':info', JSON.stringify(info), true);
+      log('Allianz-Einstellungen gespeichert.', 'ti-check');
+      logAllianceAudit('settings_change', 'Limit '+limit+', Beschreibung aktualisiert');
+      loadAlliances(); renderAllianceDescription(info);
+    } catch(e){ log('Einstellungen konnten nicht gespeichert werden.', 'ti-alert-triangle'); }
+  }
+  function renderAllianceDescription(info){
+    const el = document.getElementById('allianceDescriptionDisplay');
+    if (!el) return;
+    if (info && info.description){ el.textContent = info.description; el.style.display = 'block'; }
+    else { el.style.display = 'none'; }
+  }
+  // Löst die eigene Allianz auf: markiert info.disbanded, setzt ALLE aktiven Mitglieder (inkl. sich
+  // selbst) auf role:'left' zurück. Ohne diesen zweiten Schritt würde die alte Admin-Rolle eine
+  // Neugründung unter demselben Tag blockieren (allianceHasAdmin() im Backend prüft aktive
+  // Rolleneinträge, nicht info.disbanded).
+  async function disbandAlliance(){
+    if (state.player.allianceRole !== 'admin') return;
+    const tag = myAllianceTag();
+    if (!tag) return;
+    if (!confirm('Allianz "'+tag+'" wirklich unwiderruflich auflösen? Alle Mitglieder werden entfernt, der Tag wird danach für eine Neugründung frei.')) return;
+    try {
+      const infoRes = await storageGet('alliance:'+tag+':info', true);
+      const info = (infoRes && infoRes.value) ? JSON.parse(infoRes.value) : { tag };
+      info.disbanded = true;
+      info.disbandedAt = Date.now();
+      await storageSet('alliance:'+tag+':info', JSON.stringify(info), true);
+      const listRes = await storageList('alliance:'+tag+':role:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
+      for (const k of keys){
+        try {
+          const r = await storageGet(k, true);
+          if (!r || !r.value) continue;
+          const m = JSON.parse(r.value);
+          if (m.role && m.role !== 'left') await storageSet(k, JSON.stringify(Object.assign({}, m, { role:'left' })), true);
+        } catch(e){}
+      }
+      state.player.allianceTag = '';
+      state.player.allianceRole = '';
+      document.getElementById('allianceInput').value = '';
+      const settingsWrap = document.getElementById('allianceAdminSettingsWrap');
+      const appsWrap = document.getElementById('allianceApplicationsWrap');
+      const logWrap = document.getElementById('allianceAuditLogWrap');
+      if (settingsWrap) settingsWrap.style.display = 'none';
+      if (appsWrap) appsWrap.style.display = 'none';
+      if (logWrap) logWrap.style.display = 'none';
+      render(); save();
+      log('Allianz ['+tag+'] aufgelöst.', 'ti-trash');
+      loadAlliances(); loadAllianceBanner();
+    } catch(e){ log('Allianz konnte nicht aufgelöst werden.', 'ti-alert-triangle'); }
   }
   let allianceApplicationsCache = [];
   async function loadAllianceApplications(){
     const box = document.getElementById('allianceApplicationsBox');
     if (!box) return;
     const tag = myAllianceTag();
-    if (!tag || state.player.allianceRole !== 'admin') return;
+    const myRole = state.player.allianceRole;
+    if (!tag || (myRole !== 'admin' && myRole !== 'officer')) return;
     box.innerHTML = `<div class="bmeta">lädt…</div>`;
     try {
       const listRes = await storageList('alliance:'+tag+':applications:', true);
@@ -8581,7 +8738,8 @@
     } catch(e){ box.innerHTML = `<div class="bmeta">Bewerbungen aktuell nicht verfügbar.</div>`; }
   }
   async function decideApplication(playerId, accept){
-    if (state.player.allianceRole !== 'admin') return;
+    const myRole = state.player.allianceRole;
+    if (myRole !== 'admin' && myRole !== 'officer') return;
     const tag = myAllianceTag();
     if (!tag) return;
     const app = allianceApplicationsCache.find(a=>a.playerId===playerId);
@@ -8593,9 +8751,42 @@
         log((app&&app.name||'Bewerber')+'s Bewerbung abgelehnt.', 'ti-x');
       }
       await storageSet('alliance:'+tag+':applications:'+playerId, JSON.stringify(Object.assign({}, app||{playerId}, { status: accept?'accepted':'rejected' })), true);
+      logAllianceAudit(accept?'application_accept':'application_reject', (app&&app.name)||playerId);
       loadAllianceApplications();
       if (accept) loadAllianceMembers();
     } catch(e){ log('Aktion fehlgeschlagen.', 'ti-alert-triangle'); }
+  }
+  async function loadAllianceAuditLog(){
+    const box = document.getElementById('allianceAuditLogBox');
+    if (!box) return;
+    const tag = myAllianceTag();
+    const myRole = state.player.allianceRole;
+    if (!tag || (myRole !== 'admin' && myRole !== 'officer')) return;
+    box.innerHTML = `<div class="bmeta">lädt…</div>`;
+    const actionLabels = {
+      kick: 'hat', promote_officer: 'hat', promote_admin: 'hat', banner_change: 'hat Banner geändert:',
+      joinmode_change: 'hat Beitrittsmodus geändert:', settings_change: 'hat Einstellungen geändert:',
+      application_accept: 'hat Bewerbung angenommen:', application_reject: 'hat Bewerbung abgelehnt:'
+    };
+    const actionVerb = {
+      kick: 'entfernt', promote_officer: 'zum Offizier befördert', promote_admin: 'zum Admin befördert'
+    };
+    try {
+      const listRes = await storageList('alliance:'+tag+':auditlog:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys.slice(-30).reverse() : [];
+      const loaded = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){}
+        return null;
+      }));
+      const entries = loaded.filter(Boolean).sort((a,b)=>(b.time||0)-(a.time||0));
+      if (!entries.length){ box.innerHTML = `<div class="bmeta">Noch keine Einträge.</div>`; return; }
+      box.innerHTML = entries.map(e => {
+        const when = new Date(e.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+        const verb = actionVerb[e.action];
+        const text = verb ? (e.actorName||'Jemand')+' hat '+(e.targetName||'')+' '+verb : (e.actorName||'Jemand')+' '+(actionLabels[e.action]||e.action)+' '+(e.targetName||'');
+        return `<div class="bmeta" style="padding:6px 0; border-bottom:0.5px solid rgba(255,255,255,0.06);">${text} <span style="color:#6b6f85;">· ${when}</span></div>`;
+      }).join('');
+    } catch(e){ box.innerHTML = `<div class="bmeta">Protokoll aktuell nicht verfügbar.</div>`; }
   }
   async function leaveAllianceProperly(){
     const tag = myAllianceTag();
@@ -8608,8 +8799,10 @@
     document.getElementById('allianceInput').value = '';
     const settingsWrap = document.getElementById('allianceAdminSettingsWrap');
     const appsWrap = document.getElementById('allianceApplicationsWrap');
+    const logWrap = document.getElementById('allianceAuditLogWrap');
     if (settingsWrap) settingsWrap.style.display = 'none';
     if (appsWrap) appsWrap.style.display = 'none';
+    if (logWrap) logWrap.style.display = 'none';
     render(); save(); loadAlliances(); loadAllianceBanner();
     log('Allianz verlassen.', 'ti-door-exit');
   }
@@ -8654,29 +8847,46 @@
         return null;
       }));
       for (const m of loadedMembers) if (m) members.push(m);
-      members.sort((a,b) => (a.role==='admin'?0:1) - (b.role==='admin'?0:1) || (a.joinedAt||0)-(b.joinedAt||0));
+      const roleOrder = { admin:0, officer:1, member:2 };
+      members.sort((a,b) => (roleOrder[a.role]??3) - (roleOrder[b.role]??3) || (a.joinedAt||0)-(b.joinedAt||0));
       const amIAdmin = state.player.allianceRole === 'admin';
+      const amIOfficer = state.player.allianceRole === 'officer';
       if (!members.length){ box.innerHTML = `<div class="bmeta">Keine Mitglieder gefunden.</div>`; return; }
-      box.innerHTML = members.map(m => `
+      const roleIcon = { admin:'ti-medal', officer:'ti-shield' };
+      const roleColor = { admin:'#fac775', officer:'#7fb8e0' };
+      const roleLabel = { admin:'Admin', officer:'Offizier', member:'Mitglied' };
+      box.innerHTML = members.map(m => {
+        const icon = roleIcon[m.role] || 'ti-user';
+        const color = roleColor[m.role] || '#9296ac';
+        let actions = '';
+        if (m.playerId !== state.player.id){
+          const btns = [];
+          if (amIAdmin){
+            if (m.role === 'member') btns.push(`<button data-promote-officer="${m.playerId}" title="Zum Offizier befördern" style="font-size:10px; padding:5px 8px;"><i class="ti ti-shield" aria-hidden="true"></i></button>`);
+            if (m.role === 'officer') btns.push(`<button data-promote-admin="${m.playerId}" title="Zum Admin befördern" style="font-size:10px; padding:5px 8px;"><i class="ti ti-medal" aria-hidden="true"></i></button>`);
+            btns.push(`<button data-kick-member="${m.playerId}" title="Entfernen" style="font-size:10px; padding:5px 8px;"><i class="ti ti-user-x" aria-hidden="true"></i></button>`);
+          } else if (amIOfficer && m.role === 'member'){
+            btns.push(`<button data-kick-member="${m.playerId}" title="Entfernen" style="font-size:10px; padding:5px 8px;"><i class="ti ti-user-x" aria-hidden="true"></i></button>`);
+          }
+          if (btns.length) actions = `<div style="display:flex; gap:6px;">${btns.join('')}</div>`;
+        }
+        return `
         <div class="rank-row ${m.playerId===state.player.id?'me':''}">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-            <i class="ti ${m.role==='admin'?'ti-medal':'ti-user'}" aria-hidden="true" style="color:${m.role==='admin'?'#fac775':'#9296ac'};"></i>
+            <i class="ti ${icon}" aria-hidden="true" style="color:${color};"></i>
             <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.name||'Unbekannt'}</span>
-            <span class="lvl-pill" style="${m.role==='admin'?'background:rgba(250,199,117,0.25); color:#fac775;':''}">${m.role==='admin'?'Admin':'Mitglied'}</span>
+            <span class="lvl-pill" style="${m.role!=='member'?'background:'+color+'40; color:'+color+';':''}">${roleLabel[m.role]||'Mitglied'}</span>
           </div>
-          ${(amIAdmin && m.playerId!==state.player.id) ? `
-            <div style="display:flex; gap:6px;">
-              ${m.role!=='admin' ? `<button data-promote-member="${m.playerId}" style="font-size:10px; padding:5px 8px;"><i class="ti ti-medal" aria-hidden="true"></i></button>` : ''}
-              <button data-kick-member="${m.playerId}" style="font-size:10px; padding:5px 8px;"><i class="ti ti-user-x" aria-hidden="true"></i></button>
-            </div>
-          ` : ''}
+          ${actions}
         </div>
-      `).join('');
-      box.querySelectorAll('[data-promote-member]').forEach(btn => btn.addEventListener('click', () => promoteMember(btn.getAttribute('data-promote-member'))));
+      `;
+      }).join('');
+      box.querySelectorAll('[data-promote-officer]').forEach(btn => btn.addEventListener('click', () => setMemberRole(btn.getAttribute('data-promote-officer'), 'officer')));
+      box.querySelectorAll('[data-promote-admin]').forEach(btn => btn.addEventListener('click', () => setMemberRole(btn.getAttribute('data-promote-admin'), 'admin')));
       box.querySelectorAll('[data-kick-member]').forEach(btn => btn.addEventListener('click', () => kickMember(btn.getAttribute('data-kick-member'))));
     } catch(e){ box.innerHTML = `<div class="bmeta">Mitgliederliste aktuell nicht verfügbar.</div>`; }
   }
-  async function promoteMember(playerId){
+  async function setMemberRole(playerId, role){
     if (state.player.allianceRole !== 'admin') return;
     const tag = myAllianceTag();
     if (!tag) return;
@@ -8684,24 +8894,40 @@
       const r = await storageGet('alliance:'+tag+':role:'+playerId, true);
       if (!r || !r.value) return;
       const m = JSON.parse(r.value);
-      m.role = 'admin';
+      m.role = role;
       await storageSet('alliance:'+tag+':role:'+playerId, JSON.stringify(m), true);
-      log(m.name+' zum Admin befördert.', 'ti-medal');
+      log(m.name+(role==='admin'?' zum Admin':' zum Offizier')+' befördert.', 'ti-medal');
+      logAllianceAudit(role==='admin'?'promote_admin':'promote_officer', m.name);
       loadAllianceMembers();
     } catch(e){ log('Beförderung fehlgeschlagen.', 'ti-alert-triangle'); }
   }
   async function kickMember(playerId){
-    if (state.player.allianceRole !== 'admin') return;
+    const myRole = state.player.allianceRole;
+    if (myRole !== 'admin' && myRole !== 'officer') return;
     const tag = myAllianceTag();
     if (!tag) return;
-    if (!confirm('Dieses Mitglied wirklich aus der Allianz entfernen?')) return;
+    if (!confirm('Dieses Mitglied wirklich aus der Allianz entfernen? Ein Wiederbeitritt/Bewerbung ist erst nach 24 Stunden wieder möglich.')) return;
     try {
       const r = await storageGet('alliance:'+tag+':role:'+playerId, true);
       const name = (r && r.value) ? (JSON.parse(r.value).name||'Mitglied') : 'Mitglied';
-      await storageSet('alliance:'+tag+':role:'+playerId, JSON.stringify({ playerId, name, role:'left', joinedAt: Date.now() }), true);
+      // kickedAt (statt nur role:'left' wie beim freiwilligen Verlassen) markiert einen echten
+      // Rauswurf - löst serverseitig die 24h-Sperrfrist für Wiederbeitritt/Bewerbung aus.
+      await storageSet('alliance:'+tag+':role:'+playerId, JSON.stringify({ playerId, name, role:'left', joinedAt: Date.now(), kickedAt: Date.now() }), true);
       log(name+' aus der Allianz entfernt.', 'ti-user-x');
+      logAllianceAudit('kick', name);
       loadAllianceMembers();
     } catch(e){ log('Entfernen fehlgeschlagen.', 'ti-alert-triangle'); }
+  }
+  // Aktivitätsprotokoll für Admins/Offiziere - siehe loadAllianceAuditLog() weiter unten für die
+  // Anzeige. Schreibfehler werden bewusst verschluckt (rein informativ, darf nie die eigentliche
+  // Aktion blockieren, die immer schon vorher erfolgreich war).
+  async function logAllianceAudit(action, targetName){
+    const tag = myAllianceTag();
+    if (!tag) return;
+    try {
+      const id = Date.now()+'-'+Math.random().toString(36).slice(2,7);
+      await storageSet('alliance:'+tag+':auditlog:'+id, JSON.stringify({ actorName: state.player.name||'Kommandant', action, targetName: targetName||null, time: Date.now() }), true);
+    } catch(e){}
   }
   // Allianz-Kriege: Krieg wird gegenseitig in beiden Allianz-Kriegslisten eingetragen (shared storage),
   // damit beide Seiten ihn sehen. Ein gemeinsamer Kriegspunktestand pro Kriegspaar zählt erfolgreiche
@@ -14491,6 +14717,10 @@
     if (joinModeOpenBtn) joinModeOpenBtn.onclick = () => setAllianceJoinMode('open');
     const joinModeApplicationBtn = document.getElementById('joinModeApplicationBtn');
     if (joinModeApplicationBtn) joinModeApplicationBtn.onclick = () => setAllianceJoinMode('application');
+    const saveAllianceSettingsBtn = document.getElementById('saveAllianceSettingsBtn');
+    if (saveAllianceSettingsBtn) saveAllianceSettingsBtn.onclick = () => saveAllianceSettings();
+    const disbandAllianceBtn = document.getElementById('disbandAllianceBtn');
+    if (disbandAllianceBtn) disbandAllianceBtn.onclick = () => disbandAlliance();
     const refreshLbBtn = document.getElementById('refreshLbBtn');
     if (refreshLbBtn) refreshLbBtn.onclick = () => loadLeaderboard();
     const allianceMsgSendBtn = document.getElementById('chatPanelAllianceSendBtn');
