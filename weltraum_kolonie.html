@@ -1699,8 +1699,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.23.0';
+  const VERSION = '8.23.1';
   const PATCHNOTES = [
+    { version:'8.23.1', date:'13.07.2026', changes:[
+      'Bug behoben (danke an holyhenning für den Report): Löschte man IRGENDEINEN Eintrag aus der Schiffswerft-/Verteidigungs-/Gebäude-Bauwarteschlange, wurde der Baufortschritt des gerade laufenden (ersten) Auftrags komplett zurückgesetzt und begann von vorn - selbst wenn gar nicht dieser Auftrag gelöscht wurde. Der bereits laufende Auftrag bleibt jetzt unangetastet, nur die noch nicht gestarteten nachfolgenden Aufträge rücken auf'
+    ]},
     { version:'8.23.0', date:'13.07.2026', changes:[
       'Neu: Offizier-Rolle für Allianzen - darf Banner ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden, aber nicht die Allianz-Einstellungen ändern oder Admins/andere Offiziere anrühren (Admin ernennt Offiziere in der Mitgliederliste)',
       'Neu: Mitgliederlimit pro Allianz (Admin-einstellbar, Standard 20) - serverseitig durchgesetzt',
@@ -6569,13 +6572,28 @@
   }
   // Ordnet die verbleibenden Aufträge einer (Art, Planet)-Warteschlange neu an, nachdem einer
   // davon abgebrochen wurde – die übrigen rücken lückenlos nach.
+  // Bug behoben (danke an holyhenning für den Report): der erste (aktuell laufende) Auftrag wurde
+  // hier bisher IMMER auf "startet jetzt neu" gesetzt, egal ob er selbst abgebrochen wurde oder nur
+  // ein späterer Eintrag - dadurch verlor ein schon halb fertiges Schiff/Gebäude seinen kompletten
+  // Baufortschritt, sobald man IRGENDEINEN Eintrag aus derselben Warteschlange löschte. Der bereits
+  // laufende erste Auftrag bleibt jetzt unangetastet (startTime schon in der Vergangenheit, noch
+  // nicht fertig) - nur wenn ER SELBST der abgebrochene war, startet der neue erste sofort.
   function recalcConstructionQueueTiming(kind, planetKey){
     const jobs = (state.constructionQueue||[]).filter(j=>j.kind===kind && j.planet===planetKey).sort((a,b)=>a.startTime-b.startTime);
-    let cursor = Date.now();
-    for (const j of jobs){
-      j.startTime = cursor;
-      j.endTime = cursor + j.totalDur*1000;
-      cursor = j.endTime;
+    if (!jobs.length) return;
+    const now = Date.now();
+    let cursor;
+    if (jobs[0].startTime <= now && jobs[0].endTime > now){
+      cursor = jobs[0].endTime; // bereits laufend - Fortschritt erhalten
+    } else {
+      jobs[0].startTime = now;
+      jobs[0].endTime = now + jobs[0].totalDur*1000;
+      cursor = jobs[0].endTime;
+    }
+    for (let i=1;i<jobs.length;i++){
+      jobs[i].startTime = cursor;
+      jobs[i].endTime = cursor + jobs[i].totalDur*1000;
+      cursor = jobs[i].endTime;
     }
   }
   // Bricht einen laufenden Bauauftrag (Schiff oder Gebäude) ab und erstattet die vollen Kosten zurück,
