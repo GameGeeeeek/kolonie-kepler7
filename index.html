@@ -1593,7 +1593,7 @@
     { key:'gauss', name:'Gauss-Kanone', icon:'ti-target', produces:null, baseRate:0, baseCost:{deuterium:120, antimaterie:15}, costMult:1.32, bg:'rgba(126,119,221,0.18)', fg:'#afa9ec', effectDesc:'Verteidigung', category:'defense', defVal:65, atkVal:36, buildTime:80, requires:['rschildmatrix'] },
     { key:'railgun', name:'Railgun-Batterie', icon:'ti-target', produces:null, baseRate:0, baseCost:{erz:250, deuterium:100, kristalle:60}, costMult:1.28, bg:'rgba(250,199,117,0.2)', fg:'#fac775', effectDesc:'Verteidigung', category:'defense', defVal:85, atkVal:48, buildTime:70, requires:['rschildmatrix'] },
     { key:'voidbarriere', name:'Void-Barriere', icon:'ti-atom', produces:null, baseRate:0, baseCost:{antimaterie:25, deuterium:200, kristalle:150}, costMult:1.34, bg:'rgba(126,119,221,0.22)', fg:'#c3bef5', effectDesc:'Verteidigung', category:'defense', defVal:110, atkVal:0, buildTime:95, requires:['rschildmatrix'] },
-    { key:'labor', name:'Forschungslabor', icon:'ti-microscope', produces:null, baseRate:0, baseCost:{energie:150, kristalle:80}, costMult:1.28, bg:'rgba(175,169,236,0.18)', fg:'#c3bef5', effectDesc:'Forschungszeit & Forschungspunkte', researchPointRate:0.14, category:'utility' },
+    { key:'labor', name:'Forschungslabor', icon:'ti-microscope', produces:null, baseRate:0, baseCost:{energie:150, kristalle:80}, costMult:1.28, bg:'rgba(175,169,236,0.18)', fg:'#c3bef5', effectDesc:'Forschungszeit & Forschungspunkte', researchPointRate:0.07, category:'utility' },
     { key:'festung', name:'Kristallfestung', icon:'ti-building-castle', produces:null, baseRate:0, baseCost:{erz:1200, kristalle:900, deuterium:400}, costMult:1.35, bg:'rgba(126,119,221,0.22)', fg:'#c3bef5', effectDesc:'Verteidigung', category:'defense', defVal:150, atkVal:80, special:true, unlockItem:'kristallherz' },
     { key:'bunker', name:'Verteidigungsbunker', icon:'ti-shield-lock', produces:null, baseRate:0, baseCost:{erz:900, kristalle:400, deuterium:350, antimaterie:20}, costMult:1.33, bg:'rgba(126,119,221,0.2)', fg:'#afa9ec', effectDesc:'Verteidigung', category:'defense', defVal:135, atkVal:0, buildTime:105, requires:['rschildmatrix'] },
     // Tresor: schützt bei einem erfolgreichen NPC-Überfall einen FESTEN Sockelbetrag jeder Ressource
@@ -1721,8 +1721,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.26.5';
+  const VERSION = '8.26.6';
   const PATCHNOTES = [
+    { version:'8.26.6', date:'13.07.2026', changes:[
+      'Forschungslabor-Anzeige zeigt jetzt die konkrete Zeitersparnis in Minuten/Sekunden (Beispiel: 10-Minuten-Forschung) statt nur einer Prozentzahl. Dabei einen Anzeigefehler behoben: gezeigt wurden -6%/Stufe mit Deckel 75%, tatsächlich gilt -4,5%/Stufe mit Deckel 45% (über alle Planeten zusammengezählt, nicht nur den aktuellen)',
+      'Forschungspunkte-Generierung des Labors halbiert (0,14 → 0,07 je Stufe): bei hoher Laborstufe kamen mehr Forschungspunkte pro Sekunde rein, als einzelne Forschungen insgesamt kosten (11-39) - die Ressource war dadurch praktisch bedeutungslos'
+    ]},
     { version:'8.26.5', date:'13.07.2026', changes:[
       'Tresor zeigt jetzt konkret an, wie viel er aktuell/nach Ausbau je Ressource vor Überfall-Verlust schützt, statt nur einer allgemeinen Bezeichnung',
       'Bugfix (beim Schreiben der Tresor-Beschreibung aufgefallen): Die Voraussetzungs-Prüfung für Gebäude war fest an "Kategorie Verteidigung" gekoppelt - der Tresor (Kategorie Nutzgebäude) konnte dadurch von Anfang an gebaut werden, ganz ohne die eigentlich nötige Notfallprotokolle-Forschung. Gilt jetzt für jede Gebäude-Kategorie mit einer Voraussetzung'
@@ -12720,7 +12724,19 @@
         const fpMult = habitatMultLabor * moonPenalty(state.activeBasePlanet) * (roleLabor && roleLabor.key==='mining' ? 1.25 : 1);
         const curFp = lvl*def.researchPointRate*fpMult;
         const nextFp = (lvl+qty)*def.researchPointRate*fpMult;
-        prodLine = `Aktuell: -${Math.min(75,lvl*6)}% Forschungszeit, +${fmt(curFp)} Forschungspunkte/s → <span style="color:#5dcaa5;">-${Math.min(75,(lvl+qty)*6)}% Forschungszeit, +${fmt(nextFp)} Forschungspunkte/s</span> nach Ausbau`;
+        // Bug behoben (danke an holyhenning für den Report): zeigte bisher -6%/Stufe mit Deckel 75%,
+        // die tatsächliche Formel in researchDuration() ist aber -4,5%/Stufe mit Deckel 45% UND
+        // zählt die Laborstufen über ALLE Planeten zusammen, nicht nur den aktuellen. Jetzt korrekt
+        // berechnet und zusätzlich als konkrete Zeitersparnis (Minuten/Sekunden) bei einer
+        // beispielhaften 10-Minuten-Forschung gezeigt, statt nur einer abstrakten Prozentzahl.
+        const totalLabsNow = allBuildingSets().reduce((a,b)=>a+(b.labor||0),0);
+        const totalLabsNext = totalLabsNow - lvl + (lvl+qty);
+        const labMultNow = Math.max(0.55, 1 - totalLabsNow*0.045);
+        const labMultNext = Math.max(0.55, 1 - totalLabsNext*0.045);
+        const REF_DUR = 600; // 10 Minuten Beispiel-Forschungsdauer, rein zur Veranschaulichung
+        const savedNow = fmtDuration(Math.round(REF_DUR*(1-labMultNow)));
+        const savedNext = fmtDuration(Math.round(REF_DUR*(1-labMultNext)));
+        prodLine = `Forschungszeit (alle Planeten zusammen): -${Math.round((1-labMultNow)*100)}% - spart bei 10 Min. Forschung ${savedNow} → <span style="color:#5dcaa5;">-${Math.round((1-labMultNext)*100)}% (${savedNext})</span> nach Ausbau · +${fmt(curFp)} Forschungspunkte/s → <span style="color:#5dcaa5;">+${fmt(nextFp)} Forschungspunkte/s</span>`;
       } else if (def.category==='defense'){
         // "Schild"-Wert war zuvor immer NaN (def.shield war nirgends gesetzt) und wurde entfernt.
         // Angriff zeigt jetzt den echten atkVal statt einer fest auf 0 kodierten Zahl.
