@@ -1699,8 +1699,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.23.1';
+  const VERSION = '8.23.2';
   const PATCHNOTES = [
+    { version:'8.23.2', date:'13.07.2026', changes:[
+      'Bug behoben (danke an holyhenning für den Report): Stand dieselbe Forschung sowohl gerade aktiv in Arbeit als auch noch einmal in der Warteschlange (z.B. zweimal hintereinander dieselbe Stufe hochgezogen), zeigte die Warteschlange eine zu niedrige Zielstufe an - sie berücksichtigte nur den letzten abgeschlossenen Stand, nicht die Stufe, auf die die laufende Forschung gerade hinarbeitet'
+    ]},
     { version:'8.23.1', date:'13.07.2026', changes:[
       'Bug behoben (danke an holyhenning für den Report): Löschte man IRGENDEINEN Eintrag aus der Schiffswerft-/Verteidigungs-/Gebäude-Bauwarteschlange, wurde der Baufortschritt des gerade laufenden (ersten) Auftrags komplett zurückgesetzt und begann von vorn - selbst wenn gar nicht dieser Auftrag gelöscht wurde. Der bereits laufende Auftrag bleibt jetzt unangetastet, nur die noch nicht gestarteten nachfolgenden Aufträge rücken auf'
     ]},
@@ -12316,6 +12319,14 @@
       // dort) - verhindert denselben Layout-Sprung beim ersten Eintrag.
       const rq = state.researchQueue || [];
       const rLevelSim = {};
+      // Bug behoben (danke an holyhenning für den Report): Lief eine Forschung gerade aktiv (bereits
+      // aus der Warteschlange entnommen, siehe tryStartQueuedResearch) UND stand dieselbe Forschung
+      // noch einmal in der Warteschlange (z.B. zweimal hintereinander dieselbe Stufe hochgezogen),
+      // rechnete die Anzeige mit state.research[key] - der noch nicht abgeschlossenen, alten Stufe -
+      // statt mit der Zielstufe der laufenden Forschung. Zeigte dadurch eine zu niedrige Stufe an.
+      if (state.activeResearch && state.activeResearch.key){
+        rLevelSim[state.activeResearch.key] = state.activeResearch.targetLevel;
+      }
       const totalRQCost = {};
       const queueTargetLevels = [];
       for (const key of rq){
