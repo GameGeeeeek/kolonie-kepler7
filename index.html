@@ -1721,8 +1721,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.27.0';
+  const VERSION = '8.27.1';
   const PATCHNOTES = [
+    { version:'8.27.1', date:'13.07.2026', changes:[
+      'Berechnungen systematisch durchgeprüft, zwei weitere Funde derselben Formel-Familie behoben: Wochenliga-Produktionsbonus (Platin: 60 Minuten eigene Produktion, einmalig pro Woche) auf ein Fünftel reduziert (12/6/3 statt 60/30/15 Minuten) - bei einer entwickelten Wirtschaft wäre das sonst in die Millionen gegangen',
+      'Defensive Korrektur: Verteidigungspunkte-Berechnung war nicht gegen ein fehlendes defVal-Feld abgesichert (aktuell kein Gebäude betroffen, aber ein künftig ergänztes Verteidigungsgebäude ohne dieses Feld hätte die komplette Verteidigungsberechnung auf NaN kippen lassen)'
+    ]},
     { version:'8.27.0', date:'13.07.2026', changes:[
       'Balance korrigiert (danke an holyhenning für den Report - vermutlich das Eisenlegion-Fraktionsgeschenk, nicht die Expedition selbst, beide erzeugen ähnliche Meldungen): Referenzfenster war 20 bzw. 8 Minuten eigene Erzproduktion, bei einer entwickelten Wirtschaft ergab das riesige Einzelbeträge (gemeldet: 600.000 Erz). Nach dem Wunsch "seltener mega, dafür mehr kleinere Funde" umgestellt: Geschenk kommt jetzt alle 15 statt 30 Minuten (öfter), mit deutlich kleinerem Referenzfenster (2,5 bzw. 1 Minute) - unterm Strich auch insgesamt weniger Menge pro Stunde'
     ]},
@@ -5462,7 +5466,7 @@
     let power = 0;
     for (const { planet, buildings: b } of setsWithPlanet){
       let sub = 0;
-      for (const def of BUILDING_DEFS) if (def.category==='defense') sub += (b[def.key]||0) * (def.defVal + (def.shield||0));
+      for (const def of BUILDING_DEFS) if (def.category==='defense') sub += (b[def.key]||0) * ((def.defVal||0) + (def.shield||0));
       const role = planetRoleOf(planet);
       if (role && role.key==='fortress') sub *= 1.30;
       const orbG = orbitalStationOf(planet);
@@ -8170,7 +8174,7 @@
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (gedeckelt bei +10%, additiv zu den anderen globalen Boni). Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
-      { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Beim ersten Login der neuen Woche wird die Vorwoche abgerechnet und die Belohnung gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 60 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 30 Min., <strong>Silber</strong> 400 + 15 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Wer den Wochenwechsel verpasst, wird anhand des letzten bekannten Stands eingestuft. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
+      { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Beim ersten Login der neuen Woche wird die Vorwoche abgerechnet und die Belohnung gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 12 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 6 Min., <strong>Silber</strong> 400 + 3 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Wer den Wochenwechsel verpasst, wird anhand des letzten bekannten Stands eingestuft. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
       { title:'Handelsmarkt', body:'Ein gemeinsamer Markttrend (0,75x bis 1,30x) schwankt langsam und beeinflusst die Angebote des Schwarzmarkt-Händlers – in guten Marktphasen bekommt man mehr für seine Ware.' },
@@ -10164,10 +10168,14 @@
   // Beim ersten Login einer neuen Woche wird die Vorwoche anhand des letzten bekannten Stands
   // abgerechnet (Board-Snapshot, siehe loadLeaderboard) und die Liga-Belohnung gutgeschrieben.
   // Ersetzt die frühere kleine Top-3-Wochenbelohnung.
+  // prodMin (Minuten eigener Produktion als Wochen-Bonus) am 13.07.2026 um Faktor 5 reduziert -
+  // dieselbe Formel-Familie wie bei Piratennestern/Eisenlegion-Geschenk (siehe deren Kommentare),
+  // hier sogar am extremsten (60 Minuten, wenn auch nur einmal pro Woche). Bei einer entwickelten
+  // Wirtschaft (z.B. 500 Erz/s) hätte Platin bisher 1,8 Mio. Erz allein aus diesem Posten bedeutet.
   const LEAGUE_DEFS = [
-    { key:'platin', name:'Platin', color:'#8ecfe8', credits:1500, prodMin:60 },
-    { key:'gold',   name:'Gold',   color:'#fac775', credits:800,  prodMin:30 },
-    { key:'silber', name:'Silber', color:'#c9ccd9', credits:400,  prodMin:15 },
+    { key:'platin', name:'Platin', color:'#8ecfe8', credits:1500, prodMin:12 },
+    { key:'gold',   name:'Gold',   color:'#fac775', credits:800,  prodMin:6 },
+    { key:'silber', name:'Silber', color:'#c9ccd9', credits:400,  prodMin:3 },
     { key:'bronze', name:'Bronze', color:'#c98d5f', credits:150,  prodMin:0 }
   ];
   // Wochenschlüssel = Datum des Montags dieser Woche (lokale Zeit), z.B. "2026-07-13".
