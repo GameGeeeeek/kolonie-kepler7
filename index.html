@@ -1582,7 +1582,14 @@
     { key:'voidbarriere', name:'Void-Barriere', icon:'ti-atom', produces:null, baseRate:0, baseCost:{antimaterie:25, deuterium:200, kristalle:150}, costMult:1.34, bg:'rgba(126,119,221,0.22)', fg:'#c3bef5', effectDesc:'Verteidigung', category:'defense', defVal:110, atkVal:0, buildTime:95, requires:['rschildmatrix'] },
     { key:'labor', name:'Forschungslabor', icon:'ti-microscope', produces:null, baseRate:0, baseCost:{energie:150, kristalle:80}, costMult:1.28, bg:'rgba(175,169,236,0.18)', fg:'#c3bef5', effectDesc:'Forschungszeit & Forschungspunkte', researchPointRate:0.14, category:'utility' },
     { key:'festung', name:'Kristallfestung', icon:'ti-building-castle', produces:null, baseRate:0, baseCost:{erz:1200, kristalle:900, deuterium:400}, costMult:1.35, bg:'rgba(126,119,221,0.22)', fg:'#c3bef5', effectDesc:'Verteidigung', category:'defense', defVal:150, atkVal:80, special:true, unlockItem:'kristallherz' },
-    { key:'bunker', name:'Verteidigungsbunker', icon:'ti-shield-lock', produces:null, baseRate:0, baseCost:{erz:900, kristalle:400, deuterium:350, antimaterie:20}, costMult:1.33, bg:'rgba(126,119,221,0.2)', fg:'#afa9ec', effectDesc:'Verteidigung', category:'defense', defVal:135, atkVal:0, buildTime:105, requires:['rschildmatrix'] }
+    { key:'bunker', name:'Verteidigungsbunker', icon:'ti-shield-lock', produces:null, baseRate:0, baseCost:{erz:900, kristalle:400, deuterium:350, antimaterie:20}, costMult:1.33, bg:'rgba(126,119,221,0.2)', fg:'#afa9ec', effectDesc:'Verteidigung', category:'defense', defVal:135, atkVal:0, buildTime:105, requires:['rschildmatrix'] },
+    // Tresor: schützt bei einem erfolgreichen NPC-Überfall einen FESTEN Sockelbetrag jeder Ressource
+    // vor dem prozentualen Verlust (siehe resolveRaid) - anders als die bestehenden Verlust-Minderer
+    // (rnotfall-Forschung, Allianz-Grenzbollwerk, Module), die den PROZENTSATZ selbst senken, sorgt
+    // der Tresor dafür, dass unabhängig vom Prozentsatz nie ALLES verloren geht, gerade bei kleinen
+    // Lagerbeständen. Baubar ab Werksstufe der Notfallprotokolle, damit er nicht schon ganz am Anfang
+    // die Überfall-Bedrohung trivialisiert.
+    { key:'tresor', name:'Tresor', icon:'ti-lock', produces:null, baseRate:0, baseCost:{erz:600, kristalle:500, deuterium:200}, costMult:1.35, bg:'rgba(250,199,117,0.18)', fg:'#fac775', effectDesc:'Ressourcenschutz bei Überfällen', category:'utility', defVal:0, atkVal:0, buildTime:70, requires:['rnotfall'], safeAmountPerLevel:400 }
   ];
 
   function crosshairIcon(color, tier){
@@ -1668,6 +1675,7 @@
     labor: `<svg viewBox="0 0 42 42" width="24" height="24"><rect x="14" y="4" width="6" height="16" rx="1" fill="#c3bef5"/><path d="M14 16 L8 34 A4 4 0 0 0 12 38 H22 A4 4 0 0 0 26 34 L20 16 Z" fill="none" stroke="#afa9ec" stroke-width="2"/><path d="M11 27 H23 L26 34 A4 4 0 0 1 22 38 H12 A4 4 0 0 1 8 34 Z" fill="#7f77dd" opacity="0.4"/><circle cx="17" cy="31" r="1.6" fill="#e1f5ee"/></svg>`,
     festung: `<svg viewBox="0 0 42 42" width="24" height="24"><rect x="8" y="18" width="26" height="18" fill="#3c3489"/><rect x="8" y="12" width="5" height="6" fill="#3c3489"/><rect x="18" y="10" width="6" height="8" fill="#3c3489"/><rect x="29" y="12" width="5" height="6" fill="#3c3489"/><polygon points="21,2 27,14 15,14" fill="#c3bef5"/></svg>`,
     bunker: `<svg viewBox="0 0 42 42" width="24" height="24"><path d="M6 20 L21 8 L36 20 V34 H6 Z" fill="#3c3489"/><path d="M6 20 L21 8 L36 20" fill="none" stroke="#afa9ec" stroke-width="2"/><rect x="17" y="21" width="8" height="13" rx="1.5" fill="#c3bef5"/><circle cx="21" cy="26" r="1.6" fill="#3c3489"/></svg>`,
+    tresor: `<svg viewBox="0 0 42 42" width="24" height="24"><rect x="6" y="6" width="30" height="30" rx="3" fill="#8a6a1c"/><circle cx="21" cy="21" r="10" fill="#fac775"/><circle cx="21" cy="21" r="5.5" fill="#8a6a1c"/><rect x="19.5" y="21" width="6" height="1.6" fill="#fac775"/><rect x="30" y="18" width="4" height="6" rx="1" fill="#fac775"/></svg>`,
     ship_superschlachtschiff: `<svg viewBox="0 0 42 42" width="24" height="24"><polygon points="21,2 32,11 32,31 21,40 10,31 10,11" fill="#4a1b0c"/><polygon points="21,2 32,11 10,11" fill="#d85a30"/><circle cx="21" cy="13" r="3" fill="#f0997b"/><circle cx="21" cy="21" r="4.2" fill="#e24b4a"/><circle cx="21" cy="29" r="3" fill="#f0997b"/><rect x="4" y="17" width="6" height="10" fill="#3a1008"/><rect x="32" y="17" width="6" height="10" fill="#3a1008"/><rect x="18" y="34" width="6" height="6" fill="#a32d2d"/></svg>`
   };
 
@@ -1700,8 +1708,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.25.1';
+  const VERSION = '8.26.0';
   const PATCHNOTES = [
+    { version:'8.26.0', date:'13.07.2026', changes:[
+      'Weltboss: Abklingzeit auf 24 Stunden umgestellt (1x täglich statt alle 30 Min.) - dafür kannst du jetzt auswählen, welche deiner Planeten ihre Flotten zum Angriff beisteuern (praktisch, um eine Kolonie bewusst ungeschwächt zur Verteidigung zu behalten)',
+      'Neues Gebäude: Tresor (benötigt Notfallprotokolle-Forschung) - schützt einen festen Sockelbetrag jeder Ressource komplett vor Verlust bei einem erfolgreichen NPC-Überfall, egal wie hoch der prozentuale Verlust ausfällt. Wirkt über alle Planeten gepoolt, da Ressourcen gemeinsam verwaltet werden',
+      'Defensive Korrektur: Forschungsstufen, die aus irgendeinem Grund (z.B. sehr alter Spielstand) über der heutigen Maximalstufe liegen, werden beim Laden automatisch auf das aktuelle Limit begrenzt'
+    ]},
     { version:'8.25.1', date:'13.07.2026', changes:[
       'Drei Bugs im Allianz-System behoben (eigene Code-Durchsicht): Freischaltungen wurden nicht gegen die tatsächlich geleisteten Beiträge geprüft - ein Mitglied hätte theoretisch jede Stufe (inkl. Mitgliederlimit-Erhöhungen) ohne jeden Beitrag setzen können, jetzt serverseitig validiert',
       'Der letzte verbliebene Admin kann eine Allianz nicht mehr einfach verlassen, solange noch andere Mitglieder da sind - vorher konnte das die Allianz dauerhaft ohne jede Führung zurücklassen',
@@ -4037,13 +4050,23 @@
   // Gemeinsamer Server-Gegner mit geteiltem HP-Pool. Angriff mit 30-Min.-Abklingzeit; jeder Angriff
   // gibt +8 Kampfpunkte/+40 Kredite, der Todesstoß +100/+1000. Der Server bucht die Belohnung in
   // unseren Spielstand; wir spiegeln sie lokal für sofortige Anzeige.
+  // Welche eigenen Planeten am Weltboss-Angriff teilnehmen - der Spieler kann z.B. eine Kolonie
+  // bewusst aus dem Angriff heraushalten, um sie zur Verteidigung ungeschwächt zu behalten. Fehlt ein
+  // Planet in dieser Auswahl (z.B. neu hinzugekommene Kolonie), gilt er standardmäßig als teilnehmend.
+  let worldBossPlanetSelection = {};
+  function worldBossSelectedPlanets(){
+    const keys = ['home'].concat(Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k)));
+    return keys.filter(k => worldBossPlanetSelection[k] !== false);
+  }
   async function attackWorldBoss(){
     if (!useBackend()){ log('Der Weltboss braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
+    const planets = worldBossSelectedPlanets();
+    if (!planets.length){ log('Wähle mindestens einen Planeten für den Angriff aus.', 'ti-alert-triangle'); return; }
     try {
-      const res = await backendFetch('/worldboss/attack', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' });
+      const res = await backendFetch('/worldboss/attack', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ planets }) });
       const data = await res.json();
       if (!res.ok){
-        if (data.cooldownLeftMs){ log('Abklingzeit: nächster Angriff in '+Math.ceil(data.cooldownLeftMs/60000)+' Min. möglich.', 'ti-clock'); }
+        if (data.cooldownLeftMs){ log('Abklingzeit: nächster Angriff in '+fmtDuration(data.cooldownLeftMs/1000)+' möglich.', 'ti-clock'); }
         else log('Weltboss-Angriff fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle');
         return;
       }
@@ -4070,25 +4093,41 @@
     const sys = STAR_SYSTEMS.find(s=>s.id===boss.system);
     const myDamage = (boss.participants && state.player && boss.participants[state.player.id]) || 0;
     const lastAtk = (boss.lastAttack && state.player && boss.lastAttack[state.player.id]) || 0;
-    const cdLeft = Math.max(0, lastAtk + 30*60*1000 - Date.now());
+    const cdLeft = Math.max(0, lastAtk + 24*60*60*1000 - Date.now());
     const top = Object.entries(boss.participants||{}).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    const planetKeys = ['home'].concat(Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k)));
     box.innerHTML = `
       <div class="section-title"><i class="ti ti-alien" aria-hidden="true"></i>Weltboss</div>
       <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:#e24b4a; margin-bottom:1.25rem;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <div><div class="bname" style="color:#e24b4a;">${boss.name}</div>
           <div class="bmeta">Gesichtet bei ${sys?sys.name:boss.system} · verschwindet in ${Math.max(0,Math.ceil((boss.expiresAt-Date.now())/3600000))}h</div></div>
-          <button data-attack-boss ${cdLeft>0?'disabled':''} style="background:rgba(226,75,74,0.2); white-space:nowrap;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>${cdLeft>0?'Bereit in '+Math.ceil(cdLeft/60000)+' Min.':'Angreifen'}</button>
+          <button data-attack-boss ${cdLeft>0?'disabled':''} style="background:rgba(226,75,74,0.2); white-space:nowrap;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>${cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'Angreifen'}</button>
         </div>
         <div style="height:14px; background:rgba(255,255,255,0.06); border-radius:7px; overflow:hidden; margin-bottom:4px;">
           <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#e24b4a,#fac775);"></div>
         </div>
         <div class="bmeta">${fmt(boss.hp)} / ${fmt(boss.maxHp)} HP (${pct}%) · Dein Schaden bisher: ${fmt(myDamage)}</div>
         ${top.length ? `<div class="bmeta" style="margin-top:4px;">Bestenliste: ${top.map((e,i)=>(i+1)+'. '+fmt(e[1])+' Schaden').join(' · ')}</div>` : ''}
-        <div class="bmeta" style="margin-top:4px;">Jeder Angriff: +8 Kampfpunkte, +40 Kredite · Todesstoß: +100 Kampfpunkte, +1000 Kredite · Abklingzeit 30 Min.</div>
+        <div class="bmeta" style="margin-top:4px;">Jeder Angriff: +8 Kampfpunkte, +40 Kredite · Todesstoß: +100 Kampfpunkte, +1000 Kredite · Abklingzeit 24h (1x täglich)</div>
+        ${planetKeys.length>1 ? `
+        <div style="margin-top:8px; border-top:0.5px solid rgba(255,255,255,0.09); padding-top:8px;">
+          <div class="bmeta" style="margin-bottom:6px;">Welche Planeten greifen mit an (Flottenstärke wird zusammengezählt):</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            ${planetKeys.map(pk => {
+              const on = worldBossPlanetSelection[pk] !== false;
+              return `<button data-worldboss-planet-toggle="${pk}" style="font-size:10.5px; padding:5px 9px; ${on?'background:rgba(226,75,74,0.22); border-color:rgba(226,75,74,0.5);':'opacity:0.5;'}"><i class="ti ${on?'ti-check':'ti-x'}" aria-hidden="true" style="margin-right:3px;"></i>${planetDisplayName(pk)}</button>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
       </div>`;
     const btn = box.querySelector('[data-attack-boss]');
     if (btn) btn.onclick = () => attackWorldBoss();
+    box.querySelectorAll('[data-worldboss-planet-toggle]').forEach(b => b.addEventListener('click', () => {
+      const pk = b.getAttribute('data-worldboss-planet-toggle');
+      worldBossPlanetSelection[pk] = worldBossPlanetSelection[pk] === false ? true : false;
+      renderWorldBoss();
+    }));
   }
 
   // ===== Nutzen eroberter Fraktionssysteme =====
@@ -5885,8 +5924,22 @@
       if (nfLvl) lossPct *= Math.max(0.5, 1-nfLvl*RESEARCH_DEFS.find(r=>r.key==='rnotfall').effectPerLevel);
       if (state.allianceResearch) lossPct *= (1-0.20*allianceTechFrac('ab_bollwerk'));
       lossPct *= Math.max(0.4, 1 - moduleBonusAt(targetPlanet, 'raidloss'));
+      // Tresor (danke an holyhenning für den Vorschlag): schützt einen FESTEN Sockelbetrag jeder
+      // Ressource komplett vor dem Verlust, unabhängig von lossPct - nur der Überschuss darüber
+      // hinaus unterliegt dem prozentualen Verlust wie bisher. Ressourcen sind global gepoolt (nicht
+      // pro Planet), daher zählt die Summe aller Tresore über alle Planeten, nicht nur ein Tresor auf
+      // genau dem angegriffenen Planeten - sonst würde ein Tresor auf der Heimatbasis nichts nützen,
+      // sobald stattdessen eine Kolonie angegriffen wird.
+      let tresorLvl = (state.buildings.tresor)||0;
+      for (const c of Object.values(state.colonies||{})) if (c && c.buildings) tresorLvl += (c.buildings.tresor||0);
+      const safeAmount = tresorLvl * (BUILDING_DEFS.find(d=>d.key==='tresor').safeAmountPerLevel);
       let totalLost = 0;
-      for (const r of Object.keys(state.resources)){ const lost = state.resources[r]*lossPct; totalLost += lost; state.resources[r] = Math.max(0, state.resources[r] - lost); }
+      for (const r of Object.keys(state.resources)){
+        const vulnerable = Math.max(0, state.resources[r] - safeAmount);
+        const lost = vulnerable*lossPct;
+        totalLost += lost;
+        state.resources[r] = Math.max(0, state.resources[r] - lost);
+      }
       const producers = BUILDING_DEFS.filter(d=>d.produces);
       const victim = producers[Math.floor(Math.random()*producers.length)];
       state.mineDebuff = { key: victim.key, planet: targetPlanet, pct: 0.4, until: Date.now()+15*60000 };
@@ -6276,6 +6329,14 @@
     if (state.lastNameChangeAt === undefined) state.lastNameChangeAt = null;
     if (!state.debrisFieldTrackers) state.debrisFieldTrackers = {};
     if (state.resources.forschungspunkte === undefined) state.resources.forschungspunkte = 0;
+    // Defensive Korrektur (Bug-Report: "Forschung über Maximalstufe hinaus möglich"): der reguläre
+    // Weg (startResearch/tryStartQueuedResearch) prüft maxLevel bereits korrekt und lässt keine neue
+    // Überschreitung mehr zu - diese Korrektur fängt nur ALTE, bereits über dem heutigen Limit
+    // liegende Werte im Spielstand ab (z.B. aus einer Version mit anderem/fehlendem maxLevel, oder
+    // durch manuelle Bearbeitung der Speicherdatei).
+    for (const r of RESEARCH_DEFS){
+      if (r.maxLevel && (state.research[r.key]||0) > r.maxLevel) state.research[r.key] = r.maxLevel;
+    }
     for (const def of SHIP_DEFS) if (state.fleet[def.key] === undefined) state.fleet[def.key] = 0;
     if (!state.fleet.missions) state.fleet.missions = [];
     for (const pid of Object.keys(state.colonies||{})){
@@ -8064,6 +8125,7 @@
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Nur die spezielle, itemgebundene Kristallfestung (150) übertrifft ihn.' },
       { title:'Schutz für schwächere Spieler', body:'Ist dein Punktestand mehr als <strong>3x</strong> so hoch wie der eines Ziels, sinkt deine Beute bei einem erfolgreichen Angriff anteilig (nie unter 30%). Ab <strong>5x</strong> Unterschied ist der Angriff komplett blockiert - du kannst dann gar nicht mehr angreifen, egal wie stark deine Flotte ist. Verhindert, dass weit entwickelte Accounts neue Spieler grundlos plattmachen.' },
       { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:10.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
+      { title:'Tresor: Ressourcenschutz bei Überfällen', body:'Ein erfolgreicher NPC-Überfall stiehlt normalerweise 5-50% jeder Ressource (abhängig von Angriffs-/Verteidigungskraft, weiter gesenkt durch Notfallprotokolle-Forschung, Allianz-Grenzbollwerk und Module). Der <strong>Tresor</strong> (Gebäude, benötigt Notfallprotokolle-Forschung) schützt zusätzlich einen <strong>festen Sockelbetrag</strong> jeder Ressource komplett vor diesem Verlust, unabhängig vom Prozentsatz - nur der Überschuss darüber hinaus ist noch gefährdet. Da Ressourcen über alle Planeten hinweg gemeinsam verwaltet werden, zählt die Summe aller deiner Tresore, egal welcher Planet gerade angegriffen wird.' },
       { title:'Taktik-Haltung', body:'Im Forschung-Tab frei wählbar, jederzeit kostenlos wechselbar: <strong>Aggressiv</strong> (+10% Angriff, -10% Verteidigung), <strong>Ausgewogen</strong> (neutral) oder <strong>Defensiv</strong> (-10% Angriff, +15% Verteidigung).' },
       { title:'Rückzugs-Mechanik', body:'Übersteigt die eigene Verlustquote in einem Gefecht 40%, rettet sich die Hälfte des Anteils <em>oberhalb</em> dieser Schwelle rechtzeitig zurück, statt komplett zerstört zu werden. Gilt bei Überfall-Verteidigung, NPC-Angriffen und PvP-Duellen – nicht für Raider-/NPC-Flotten.' },
       { title:'Heimatbasis-Bonus', body:'Die Heimatbasis hat <strong>+20% Verteidigungspunkte</strong> gegenüber identisch ausgebauten Kolonien. Macht "Heimat verteidigen" bewusst wichtiger.' },
@@ -8106,7 +8168,7 @@
       { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste.' }
     ]},
     { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
-      { title:'Weltboss', body:'Gelegentlich erscheint ein <strong>galaktischer Weltboss</strong> (oben im Galaxie-Tab, mit Serververbindung): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Du kannst ihn alle 30 Minuten angreifen (Schaden = deine Angriffskraft). Jeder Angriff bringt +8 Kampfpunkte und +40 Kredite, der <strong>Todesstoß</strong> +100 Kampfpunkte und +1000 Kredite. Bleibt er 72 Stunden unbesiegt, zieht er sich zurück. Seine HP skalieren mit der Spielerzahl.' },
+      { title:'Weltboss', body:'Gelegentlich erscheint ein <strong>galaktischer Weltboss</strong> (oben im Galaxie-Tab, mit Serververbindung): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Du kannst ihn <strong>einmal pro Tag</strong> angreifen (Schaden = deine Angriffskraft der ausgewählten Planeten). Hast du mehrere Planeten, kannst du direkt über der Angriffsleiste auswählen, welche Planeten ihre Flotten beisteuern - z.B. um eine Kolonie bewusst ungeschwächt zur Verteidigung zu behalten. Jeder Angriff bringt +8 Kampfpunkte und +40 Kredite, der <strong>Todesstoß</strong> +100 Kampfpunkte und +1000 Kredite. Bleibt er 72 Stunden unbesiegt, zieht er sich zurück. Seine HP skalieren mit der Spielerzahl.' },
       { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
