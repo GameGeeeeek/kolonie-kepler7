@@ -1699,8 +1699,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.23.2';
+  const VERSION = '8.23.3';
   const PATCHNOTES = [
+    { version:'8.23.3', date:'13.07.2026', changes:[
+      'Neu: Admins können jetzt auch andere Admins zurückstufen (zu Offizier oder direkt zu Mitglied) - die Berechtigung dafür gab es serverseitig schon, es fehlten nur die Buttons in der Mitgliederliste. Ebenso neu: Offiziere lassen sich direkt zu Mitglied zurückstufen (bisher nur Beförderung zum Admin möglich). Beide Herabstufungen verlangen eine Bestätigung und erscheinen im Aktivitätsprotokoll'
+    ]},
     { version:'8.23.2', date:'13.07.2026', changes:[
       'Bug behoben (danke an holyhenning für den Report): Stand dieselbe Forschung sowohl gerade aktiv in Arbeit als auch noch einmal in der Warteschlange (z.B. zweimal hintereinander dieselbe Stufe hochgezogen), zeigte die Warteschlange eine zu niedrige Zielstufe an - sie berücksichtigte nur den letzten abgeschlossenen Stand, nicht die Stufe, auf die die laufende Forschung gerade hinarbeitet'
     ]},
@@ -8022,7 +8025,7 @@
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
-      { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen, und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
+      { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen oder zurückstufen (auch andere Admins zu Offizier/Mitglied), und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
       { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz hat ein Mitgliederlimit (Admin-einstellbar, Standard 20) - ist es erreicht, sind weder Sofort-Beitritt noch Bewerbung möglich. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
       { title:'Allianz auflösen', body:'Nur Admins können eine Allianz unwiderruflich auflösen (Administration-Bereich) - alle Mitglieder werden entfernt, der Tag wird danach für eine Neugründung durch irgendjemanden frei.' },
       { title:'Aktivitätsprotokoll', body:'Admins und Offiziere sehen im Administration-Bereich ein Protokoll der letzten Beförderungen, Rauswürfe, Einstellungsänderungen und Bewerbungsentscheidungen - für Transparenz bei mehreren Admins/Offizieren in derselben Allianz.' },
@@ -8785,12 +8788,14 @@
     if (!tag || (myRole !== 'admin' && myRole !== 'officer')) return;
     box.innerHTML = `<div class="bmeta">lädt…</div>`;
     const actionLabels = {
-      kick: 'hat', promote_officer: 'hat', promote_admin: 'hat', banner_change: 'hat Banner geändert:',
+      kick: 'hat', promote_officer: 'hat', promote_admin: 'hat', demote_officer: 'hat', demote_member: 'hat',
+      banner_change: 'hat Banner geändert:',
       joinmode_change: 'hat Beitrittsmodus geändert:', settings_change: 'hat Einstellungen geändert:',
       application_accept: 'hat Bewerbung angenommen:', application_reject: 'hat Bewerbung abgelehnt:'
     };
     const actionVerb = {
-      kick: 'entfernt', promote_officer: 'zum Offizier befördert', promote_admin: 'zum Admin befördert'
+      kick: 'entfernt', promote_officer: 'zum Offizier befördert', promote_admin: 'zum Admin befördert',
+      demote_officer: 'zu Offizier zurückgestuft', demote_member: 'zu Mitglied zurückgestuft'
     };
     try {
       const listRes = await storageList('alliance:'+tag+':auditlog:', true);
@@ -8884,7 +8889,11 @@
           const btns = [];
           if (amIAdmin){
             if (m.role === 'member') btns.push(`<button data-promote-officer="${m.playerId}" title="Zum Offizier befördern" style="font-size:10px; padding:5px 8px;"><i class="ti ti-shield" aria-hidden="true"></i></button>`);
-            if (m.role === 'officer') btns.push(`<button data-promote-admin="${m.playerId}" title="Zum Admin befördern" style="font-size:10px; padding:5px 8px;"><i class="ti ti-medal" aria-hidden="true"></i></button>`);
+            if (m.role === 'officer'){
+              btns.push(`<button data-promote-admin="${m.playerId}" title="Zum Admin befördern" style="font-size:10px; padding:5px 8px;"><i class="ti ti-medal" aria-hidden="true"></i></button>`);
+              btns.push(`<button data-demote-member="${m.playerId}" title="Zu Mitglied zurückstufen" style="font-size:10px; padding:5px 8px;"><i class="ti ti-arrow-up" aria-hidden="true" style="transform:rotate(180deg); display:inline-block;"></i></button>`);
+            }
+            if (m.role === 'admin') btns.push(`<button data-demote-officer="${m.playerId}" title="Zu Offizier zurückstufen" style="font-size:10px; padding:5px 8px;"><i class="ti ti-arrow-up" aria-hidden="true" style="transform:rotate(180deg); display:inline-block;"></i></button>`);
             btns.push(`<button data-kick-member="${m.playerId}" title="Entfernen" style="font-size:10px; padding:5px 8px;"><i class="ti ti-user-x" aria-hidden="true"></i></button>`);
           } else if (amIOfficer && m.role === 'member'){
             btns.push(`<button data-kick-member="${m.playerId}" title="Entfernen" style="font-size:10px; padding:5px 8px;"><i class="ti ti-user-x" aria-hidden="true"></i></button>`);
@@ -8904,6 +8913,8 @@
       }).join('');
       box.querySelectorAll('[data-promote-officer]').forEach(btn => btn.addEventListener('click', () => setMemberRole(btn.getAttribute('data-promote-officer'), 'officer')));
       box.querySelectorAll('[data-promote-admin]').forEach(btn => btn.addEventListener('click', () => setMemberRole(btn.getAttribute('data-promote-admin'), 'admin')));
+      box.querySelectorAll('[data-demote-officer]').forEach(btn => btn.addEventListener('click', () => setMemberRole(btn.getAttribute('data-demote-officer'), 'officer')));
+      box.querySelectorAll('[data-demote-member]').forEach(btn => btn.addEventListener('click', () => setMemberRole(btn.getAttribute('data-demote-member'), 'member')));
       box.querySelectorAll('[data-kick-member]').forEach(btn => btn.addEventListener('click', () => kickMember(btn.getAttribute('data-kick-member'))));
     } catch(e){ box.innerHTML = `<div class="bmeta">Mitgliederliste aktuell nicht verfügbar.</div>`; }
   }
@@ -8911,16 +8922,22 @@
     if (state.player.allianceRole !== 'admin') return;
     const tag = myAllianceTag();
     if (!tag) return;
+    let isDemotion = false;
     try {
       const r = await storageGet('alliance:'+tag+':role:'+playerId, true);
       if (!r || !r.value) return;
       const m = JSON.parse(r.value);
+      const oldRole = m.role;
+      const roleOrder = { admin:3, officer:2, member:1 };
+      isDemotion = (roleOrder[role]||0) < (roleOrder[oldRole]||0);
+      if (isDemotion && !confirm(m.name+' von '+(oldRole==='admin'?'Admin':'Offizier')+' zu '+(role==='officer'?'Offizier':'Mitglied')+' zurückstufen?')) return;
       m.role = role;
       await storageSet('alliance:'+tag+':role:'+playerId, JSON.stringify(m), true);
-      log(m.name+(role==='admin'?' zum Admin':' zum Offizier')+' befördert.', 'ti-medal');
-      logAllianceAudit(role==='admin'?'promote_admin':'promote_officer', m.name);
+      const roleLabelDe = { admin:'Admin', officer:'Offizier', member:'Mitglied' };
+      log(m.name+(isDemotion?' zu '+roleLabelDe[role]+' zurückgestuft.':' zum '+roleLabelDe[role]+' befördert.'), isDemotion?'ti-arrow-up':'ti-medal');
+      logAllianceAudit(isDemotion?'demote_'+role:'promote_'+role, m.name);
       loadAllianceMembers();
-    } catch(e){ log('Beförderung fehlgeschlagen.', 'ti-alert-triangle'); }
+    } catch(e){ log(isDemotion?'Zurückstufen fehlgeschlagen.':'Beförderung fehlgeschlagen.', 'ti-alert-triangle'); }
   }
   async function kickMember(playerId){
     const myRole = state.player.allianceRole;
