@@ -1708,8 +1708,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.26.0';
+  const VERSION = '8.26.1';
   const PATCHNOTES = [
+    { version:'8.26.1', date:'13.07.2026', changes:[
+      'Erledigte (abgeholte) Tagesmissionen werden jetzt ausgeblendet statt dauerhaft mit grünem Häkchen sichtbar zu bleiben - tauchen erst mit dem täglichen Reset um Mitternacht wieder auf. Sind alle erledigt, zeigt die Leiste stattdessen einen kurzen Hinweis'
+    ]},
     { version:'8.26.0', date:'13.07.2026', changes:[
       'Weltboss: Abklingzeit auf 24 Stunden umgestellt (1x täglich statt alle 30 Min.) - dafür kannst du jetzt auswählen, welche deiner Planeten ihre Flotten zum Angriff beisteuern (praktisch, um eine Kolonie bewusst ungeschwächt zur Verteidigung zu behalten)',
       'Neues Gebäude: Tresor (benötigt Notfallprotokolle-Forschung) - schützt einen festen Sockelbetrag jeder Ressource komplett vor Verlust bei einem erfolgreichen NPC-Überfall, egal wie hoch der prozentuale Verlust ausfällt. Wirkt über alle Planeten gepoolt, da Ressourcen gemeinsam verwaltet werden',
@@ -14184,16 +14187,23 @@
 
     const dailyQuestBar = document.getElementById('dailyQuestBar');
     if (dailyQuestBar && state.dailyQuests){
-      dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap;">${DAILY_QUEST_DEFS.map(d => {
-        const prog = Math.min(d.target, dailyQuestProgress(d.key));
-        const done = prog >= d.target;
-        const claimed = !!state.dailyQuests.claimed[d.key];
-        return `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; cursor:${done&&!claimed?'pointer':'default'}; background:${claimed?'rgba(93,202,165,0.15)':done?'rgba(250,199,117,0.18)':'rgba(255,255,255,0.06)'}; border:1px solid ${claimed?'rgba(93,202,165,0.4)':done?'rgba(250,199,117,0.5)':'rgba(255,255,255,0.1)'};" ${done&&!claimed?`data-claim-quest="${d.key}"`:''} title="${d.name}">
-          <i class="ti ${claimed?'ti-check':d.icon}" aria-hidden="true" style="color:${claimed?'#5dcaa5':done?'#fac775':'#9296ac'};"></i>
-          <span style="font-size:10.5px;">${d.name} (${prog}/${d.target})</span>
-        </div>`;
-      }).join('')}</div>`;
-      dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
+      // Erledigte (abgeholte) Tagesmissionen werden jetzt ausgeblendet statt nur grün markiert zu
+      // bleiben - sie tauchen erst wieder auf, wenn initDailyQuests() beim Tageswechsel (Mitternacht)
+      // einen frischen state.dailyQuests mit leerem claimed{} anlegt.
+      const openQuests = DAILY_QUEST_DEFS.filter(d => !state.dailyQuests.claimed[d.key]);
+      if (!openQuests.length){
+        dailyQuestBar.innerHTML = `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:rgba(93,202,165,0.15); border:1px solid rgba(93,202,165,0.4);"><i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i><span style="font-size:10.5px;">Alle Tagesmissionen erledigt - morgen gibt's neue</span></div>`;
+      } else {
+        dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap;">${openQuests.map(d => {
+          const prog = Math.min(d.target, dailyQuestProgress(d.key));
+          const done = prog >= d.target;
+          return `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; cursor:${done?'pointer':'default'}; background:${done?'rgba(250,199,117,0.18)':'rgba(255,255,255,0.06)'}; border:1px solid ${done?'rgba(250,199,117,0.5)':'rgba(255,255,255,0.1)'};" ${done?`data-claim-quest="${d.key}"`:''} title="${d.name}">
+            <i class="ti ${d.icon}" aria-hidden="true" style="color:${done?'#fac775':'#9296ac'};"></i>
+            <span style="font-size:10.5px;">${d.name} (${prog}/${d.target})</span>
+          </div>`;
+        }).join('')}</div>`;
+        dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
+      }
     }
 
     const seasonalBadge = document.getElementById('seasonalBadge');
