@@ -1721,8 +1721,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.26.7';
+  const VERSION = '8.26.8';
   const PATCHNOTES = [
+    { version:'8.26.8', date:'13.07.2026', changes:[
+      'Balance korrigiert (danke an holyhenning für den Report): Piratennest-Beute (u.a. "Vorposten der Aschepiraten") skalierte mit 10 Minuten der eigenen Produktion - bei einer entwickelten Wirtschaft konnte das absurde Größenordnungen erreichen (gemeldet: 220.000 Kristalle aus einem einzelnen Fund). Auf 2 Minuten reduziert (5x weniger), Untergrenzen für Einsteiger unverändert'
+    ]},
     { version:'8.26.7', date:'13.07.2026', changes:[
       'Bug behoben (danke an holyhenning für den Report): Der 24h-Cooldown für den Weltboss aus v8.26.0 lief nie tatsächlich, weil es zwei komplett getrennte renderWorldBoss()-Funktionen im Code gab - die zweite (das tatsächlich aktive, missionsbasierte "Leviathan der Leere"-System mit echter Flugzeit) überschrieb die erste unbemerkt. Die Planeten-Auswahl aus v8.26.0 war dadurch ebenfalls nie sichtbar (unnötig, da das echte System längst eine eigene Flottenauswahl über "Angriffsflotte zusammenstellen" hat). Der 24h-Cooldown ist jetzt korrekt im tatsächlich aktiven System eingebaut, inklusive sichtbarem Countdown am Angreifen-Button. Der tote Code-Pfad wurde entfernt'
     ]},
@@ -10127,15 +10130,18 @@
     const names = ['Schmugglernest','Vorposten der Aschepiraten','Korsaren-Enklave','Versteck der Leerenwölfe','Bastion der Roten Flotte','Sternenräuber-Hort','Festung der Nachtklingen','Zitadelle des Schwarms','Hafen der Verlorenen','Flaggschiff der Void-Korsaren'];
     return names[Math.min(stage-1, names.length-1)] + ' (Stufe '+stage+')';
   }
-  // Beute skaliert mit Stufe UND eigener Produktion (~10 Min. Produktion × Stufenfaktor, mit
-  // Untergrenzen für Einsteiger) - dieselbe Philosophie wie beim Legion-Geschenk seit v7.92.
+  // Beute skaliert mit Stufe UND eigener Produktion (mit Untergrenzen für Einsteiger).
+  // Bug/Balance behoben (danke an holyhenning für den Report): Referenzfenster war bisher 10 Minuten
+  // eigene Produktion × Stufenfaktor - bei einer entwickelten Wirtschaft (~229 Kristall/s würden genau
+  // die gemeldeten 220.000 erklären) explodierte das ins Absurde. Auf 2 Minuten reduziert (5x weniger),
+  // Untergrenzen für Einsteiger bleiben unverändert.
   function pirateLairLoot(stage){
     const rates = ratesPerSecond();
     const f = 1 + stage*0.3;
     return {
-      erz: Math.max(150*stage, Math.round((rates.erz||0)*600*f)),
-      kristalle: Math.max(90*stage, Math.round((rates.kristalle||0)*600*f)),
-      deuterium: Math.max(40*stage, Math.round((rates.deuterium||0)*600*f))
+      erz: Math.max(150*stage, Math.round((rates.erz||0)*120*f)),
+      kristalle: Math.max(90*stage, Math.round((rates.kristalle||0)*120*f)),
+      deuterium: Math.max(40*stage, Math.round((rates.deuterium||0)*120*f))
     };
   }
   // ===== Wochenliga =====
