@@ -1699,8 +1699,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.23.3';
+  const VERSION = '8.23.4';
   const PATCHNOTES = [
+    { version:'8.23.4', date:'13.07.2026', changes:[
+      'Bug behoben (danke an holyhenning für den Report): Die Mitgliederzahl in der Allianz-Rangliste konnte niedriger sein als die tatsächliche Mitgliederzahl - sie kam aus den Bestenlisten-Einträgen, die auf die Top 30 Spieler DES GESAMTEN SPIELS begrenzt sind. Ein Mitglied mit niedrigerem Punktestand außerhalb dieser globalen Top 30 wurde dadurch bei keiner Allianz mitgezählt. Zählt jetzt stattdessen die echten Rollen-Datensätze - vollständig und unabhängig von der Gesamtspielerzahl'
+    ]},
     { version:'8.23.3', date:'13.07.2026', changes:[
       'Neu: Admins können jetzt auch andere Admins zurückstufen (zu Offizier oder direkt zu Mitglied) - die Berechtigung dafür gab es serverseitig schon, es fehlten nur die Buttons in der Mitgliederliste. Ebenso neu: Offiziere lassen sich direkt zu Mitglied zurückstufen (bisher nur Beförderung zum Admin möglich). Beide Herabstufungen verlangen eine Bestätigung und erscheinen im Aktivitätsprotokoll'
     ]},
@@ -8470,6 +8473,22 @@
           const ur = await storageGet('alliance:'+g.tag+':unlocked', true);
           g.unlockedCount = ur && ur.value ? Object.keys(JSON.parse(ur.value)).length : 0;
         } catch(e){ g.unlockedCount = 0; }
+        // Bug behoben (danke an holyhenning für den Report): g.members kam bisher NUR aus den
+        // Bestenlisten-Einträgen weiter oben - die aber auf die Top 30 Spieler DES GESAMTEN SPIELS
+        // begrenzt sind (keys.slice(0,30)). Ein Mitglied mit niedrigerem Punktestand, das es nicht in
+        // diese globalen Top 30 schafft, wurde dadurch bei KEINER Allianz mitgezählt, egal wie aktiv
+        // es war - "3 von 4 Mitgliedern angezeigt" typischerweise genau dieser Fall. Zählt jetzt
+        // stattdessen die echten Rollen-Datensätze (dieselbe Quelle wie die Mitgliederliste selbst,
+        // siehe loadAllianceMembers) - vollständig und korrekt unabhängig von der Spielerzahl.
+        try {
+          const rr = await storageList('alliance:'+g.tag+':role:', true);
+          const roleKeys = (rr && rr.keys) ? rr.keys : [];
+          const roleVals = await Promise.all(roleKeys.map(async k => {
+            try { const r = await storageGet(k, true); if (r && r.value){ const m = JSON.parse(r.value); if (m.role && m.role !== 'left') return true; } } catch(e){}
+            return false;
+          }));
+          g.members = roleVals.filter(Boolean).length || g.members;
+        } catch(e){ /* Bestenlisten-Wert bleibt als Rückfallebene erhalten */ }
         try {
           const ir = await storageGet('alliance:'+g.tag+':info', true);
           const info = (ir && ir.value) ? JSON.parse(ir.value) : {};
