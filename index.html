@@ -1721,8 +1721,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.26.4';
+  const VERSION = '8.26.5';
   const PATCHNOTES = [
+    { version:'8.26.5', date:'13.07.2026', changes:[
+      'Tresor zeigt jetzt konkret an, wie viel er aktuell/nach Ausbau je Ressource vor Überfall-Verlust schützt, statt nur einer allgemeinen Bezeichnung',
+      'Bugfix (beim Schreiben der Tresor-Beschreibung aufgefallen): Die Voraussetzungs-Prüfung für Gebäude war fest an "Kategorie Verteidigung" gekoppelt - der Tresor (Kategorie Nutzgebäude) konnte dadurch von Anfang an gebaut werden, ganz ohne die eigentlich nötige Notfallprotokolle-Forschung. Gilt jetzt für jede Gebäude-Kategorie mit einer Voraussetzung'
+    ]},
     { version:'8.26.4', date:'13.07.2026', changes:[
       'Korrektur zu v8.26.3 (Feedback holyhenning): Die x1/x5/x10/Max-Mengenauswahl bleibt doch nicht sticky, sondern steht jetzt direkt vor der jeweiligen Liste (Gebäude, Verteidigungsanlagen, Schiffswerft) statt ganz oben im Tab - bei der Flotte war das vorher am weitesten weg (Angriffspunkte-Anzeige, Missionen und Flottenverlegung lagen dazwischen)'
     ]},
@@ -6679,7 +6683,7 @@
     const b = item.planet === 'home' ? state.buildings : (state.colonies[item.planet] ? state.colonies[item.planet].buildings : null);
     if (!b){ state.buildQueue.shift(); return true; }
     const def = BUILDING_DEFS.find(d=>d.key===item.key);
-    if (def.category==='defense' && !techUnlockedGeneric(def.requires)){ state.buildQueue.shift(); return true; }
+    if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){ state.buildQueue.shift(); return true; }
     const lvl = b[item.key]||0;
     if (def.maxLevel && lvl >= def.maxLevel){ log(def.name+' (Warteschlange) hat bereits die Maximalstufe ('+def.maxLevel+') erreicht - Eintrag übersprungen.', 'ti-alert-triangle'); state.buildQueue.shift(); return true; }
     const cost = costFor(def, lvl);
@@ -8150,7 +8154,7 @@
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Nur die spezielle, itemgebundene Kristallfestung (150) übertrifft ihn.' },
       { title:'Schutz für schwächere Spieler', body:'Ist dein Punktestand mehr als <strong>3x</strong> so hoch wie der eines Ziels, sinkt deine Beute bei einem erfolgreichen Angriff anteilig (nie unter 30%). Ab <strong>5x</strong> Unterschied ist der Angriff komplett blockiert - du kannst dann gar nicht mehr angreifen, egal wie stark deine Flotte ist. Verhindert, dass weit entwickelte Accounts neue Spieler grundlos plattmachen.' },
       { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:10.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
-      { title:'Tresor: Ressourcenschutz bei Überfällen', body:'Ein erfolgreicher NPC-Überfall stiehlt normalerweise 5-50% jeder Ressource (abhängig von Angriffs-/Verteidigungskraft, weiter gesenkt durch Notfallprotokolle-Forschung, Allianz-Grenzbollwerk und Module). Der <strong>Tresor</strong> (Gebäude, benötigt Notfallprotokolle-Forschung) schützt zusätzlich einen <strong>festen Sockelbetrag</strong> jeder Ressource komplett vor diesem Verlust, unabhängig vom Prozentsatz - nur der Überschuss darüber hinaus ist noch gefährdet. Da Ressourcen über alle Planeten hinweg gemeinsam verwaltet werden, zählt die Summe aller deiner Tresore, egal welcher Planet gerade angegriffen wird.' },
+      { title:'Tresor: Ressourcenschutz bei Überfällen', body:'Ein erfolgreicher NPC-Überfall stiehlt normalerweise 5-50% jeder Ressource (abhängig von Angriffs-/Verteidigungskraft, weiter gesenkt durch Notfallprotokolle-Forschung, Allianz-Grenzbollwerk und Module). Der <strong>Tresor</strong> (Gebäude, benötigt Notfallprotokolle-Forschung) schützt zusätzlich <strong>400 jeder Ressource pro Stufe</strong> komplett vor diesem Verlust, unabhängig vom Prozentsatz - nur der Überschuss darüber hinaus ist noch gefährdet. Da Ressourcen über alle Planeten hinweg gemeinsam verwaltet werden, zählt die Summe aller deiner Tresore, egal welcher Planet gerade angegriffen wird.' },
       { title:'Taktik-Haltung', body:'Im Forschung-Tab frei wählbar, jederzeit kostenlos wechselbar: <strong>Aggressiv</strong> (+10% Angriff, -10% Verteidigung), <strong>Ausgewogen</strong> (neutral) oder <strong>Defensiv</strong> (-10% Angriff, +15% Verteidigung).' },
       { title:'Rückzugs-Mechanik', body:'Übersteigt die eigene Verlustquote in einem Gefecht 40%, rettet sich die Hälfte des Anteils <em>oberhalb</em> dieser Schwelle rechtzeitig zurück, statt komplett zerstört zu werden. Gilt bei Überfall-Verteidigung, NPC-Angriffen und PvP-Duellen – nicht für Raider-/NPC-Flotten.' },
       { title:'Heimatbasis-Bonus', body:'Die Heimatbasis hat <strong>+20% Verteidigungspunkte</strong> gegenüber identisch ausgebauten Kolonien. Macht "Heimat verteidigen" bewusst wichtiger.' },
@@ -12669,7 +12673,7 @@
           </div>
         `;
       }
-      if (def.category==='defense' && !techUnlockedGeneric(def.requires)){
+      if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){
         const reqNames = (def.requires||[]).map(k=>(RESEARCH_DEFS.find(r=>r.key===k)||{}).name).join(', ');
         return `
           <div class="card-row research-locked">
@@ -12705,6 +12709,9 @@
         prodLine = `Aktuell: +${Math.min(40,lvl*2)}% Gesamtproduktion → <span style="color:#5dcaa5;">+${Math.min(40,(lvl+qty)*2)}%</span> nach Ausbau (Deckel: +40%)`;
       } else if (def.key==='lager'){
         prodLine = `Aktuell: +${lvl*400} Lagerkapazität → <span style="color:#5dcaa5;">+${(lvl+qty)*400}</span> nach Ausbau`;
+      } else if (def.key==='tresor'){
+        const per = def.safeAmountPerLevel;
+        prodLine = `<i class="ti ti-lock" aria-hidden="true"></i> Schützt aktuell ${fmt(lvl*per)} jeder Ressource komplett vor Überfall-Verlust → <span style="color:#5dcaa5;">${fmt((lvl+qty)*per)}</span> nach Ausbau (gilt über alle Planeten zusammen, da Ressourcen gemeinsam verwaltet werden)`;
       } else if (def.key==='labor'){
         // Labor hat zwei Effekte: Forschungszeit-Verkürzung UND Forschungspunkte-Produktion (seit
         // v7.54.0) – beide gehören in die Vorschau, sonst wirkt die neue Ressource wie aus dem Nichts.
@@ -12730,7 +12737,7 @@
         specialItemLine = `<div class="bmeta" style="${specialItemHave<qty?'color:#e24b4a;':''}"><i class="ti ${specialItemDef?specialItemDef.icon:'ti-diamond'}" aria-hidden="true"></i> Verbraucht ${qty}x ${specialItemDef?specialItemDef.name:specialItemKey} (vorhanden: ${specialItemHave})${specialItemHave<qty?' – nicht genug!':''} · sehr seltener Fund bei Erkundungsmissionen</div>`;
       }
       let defReqLine = '';
-      if (def.category==='defense' && (def.requires||[]).length){
+      if ((def.requires||[]).length){
         const defReqNames = def.requires.map(k=>(RESEARCH_DEFS.find(r=>r.key===k)||{}).name).join(', ');
         defReqLine = `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${defReqNames}</div>`;
       }
@@ -14884,7 +14891,7 @@
     document.querySelectorAll('[data-build]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-build');
       const def = BUILDING_DEFS.find(d => d.key === key);
-      if (def.category==='defense' && !techUnlockedGeneric(def.requires)){ log('Voraussetzung nicht erfüllt: '+(def.requires||[]).map(k=>(RESEARCH_DEFS.find(r=>r.key===k)||{}).name).join(', '), 'ti-alert-triangle'); return; }
+      if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){ log('Voraussetzung nicht erfüllt: '+(def.requires||[]).map(k=>(RESEARCH_DEFS.find(r=>r.key===k)||{}).name).join(', '), 'ti-alert-triangle'); return; }
       const b = currentBuildings();
       const lvl = b[key]||0;
       if (def.maxLevel && lvl >= def.maxLevel){ log(def.name+' hat bereits die Maximalstufe ('+def.maxLevel+') erreicht.', 'ti-alert-triangle'); return; }
