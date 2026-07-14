@@ -1721,8 +1721,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.26.9';
+  const VERSION = '8.27.0';
   const PATCHNOTES = [
+    { version:'8.27.0', date:'13.07.2026', changes:[
+      'Balance korrigiert (danke an holyhenning für den Report - vermutlich das Eisenlegion-Fraktionsgeschenk, nicht die Expedition selbst, beide erzeugen ähnliche Meldungen): Referenzfenster war 20 bzw. 8 Minuten eigene Erzproduktion, bei einer entwickelten Wirtschaft ergab das riesige Einzelbeträge (gemeldet: 600.000 Erz). Nach dem Wunsch "seltener mega, dafür mehr kleinere Funde" umgestellt: Geschenk kommt jetzt alle 15 statt 30 Minuten (öfter), mit deutlich kleinerem Referenzfenster (2,5 bzw. 1 Minute) - unterm Strich auch insgesamt weniger Menge pro Stunde'
+    ]},
     { version:'8.26.9', date:'13.07.2026', changes:[
       'Orbitalring-Kosten vervierfacht (Stufe 1: 16.000 Erz/10.000 Kristalle/3.200 Deuterium statt bisher 4.000/2.500/800) - waren für den gebotenen Bonus zu günstig',
       'Neu: 2-Stunden-Cooldown zwischen Planeten-Rollen-Wechseln (zusätzlich zur bisherigen 15-Minuten-Umbauzeit) und zwischen Orbitalring-Fokus-Wechseln (bisher komplett ungebremst, nur durch Ressourcenkosten begrenzt) - verhindert schnelles Hin-und-Her-Wechseln'
@@ -4233,11 +4236,11 @@
   const REP_MIN = -100, REP_MAX = 100;
   const TRIBUTE_COST = 150, TRIBUTE_GAIN = 5;
   const REP_ATTACK_PENALTY = 15;
-  const FACTION_GIFT_INTERVAL_MS = 30*60*1000;
+  const FACTION_GIFT_INTERVAL_MS = 15*60*1000; // 15 statt 30 Min. - öfter, dafür kleinere Einzelbeträge (siehe processFactionGifts)
   const FACTION_DIPLOMACY = {
     kartell:  { effectLabel:'Marktrabatt', friendly:'5% bessere Marktpreise', allied:'10% bessere Marktpreise' },
     void:     { effectLabel:'Raid-Schutz', friendly:'25% seltener Überfälle', allied:'50% seltener Überfälle' },
-    legion:   { effectLabel:'Ressourcen-Geschenke', friendly:'Lieferung alle 30 Min. (klein)', allied:'Lieferung alle 30 Min. (groß)' },
+    legion:   { effectLabel:'Ressourcen-Geschenke', friendly:'Lieferung alle 15 Min. (klein)', allied:'Lieferung alle 15 Min. (groß)' },
     schatten: { effectLabel:'Kredit-Geschenke', friendly:'+15 Kredite alle 30 Min.', allied:'+35 Kredite alle 30 Min.' }
   };
   function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, (state.factionRep||{})[fid]||0)); }
@@ -4287,11 +4290,15 @@
     state.nextFactionGift = now + FACTION_GIFT_INTERVAL_MS;
     const legionLvl = factionEffectLevel('legion');
     if (legionLvl > 0){
-      // Balance-Pass v7.92: skaliert mit der eigenen Erzproduktion statt fixer 150/400 - vorher war
-      // das Geschenk früh im Spiel gewaltig (19k Erz/Tag) und später bedeutungslos. Jetzt entspricht
-      // es immer ~8 bzw. ~20 Minuten eigener Produktion (mit Untergrenze, damit Neulinge etwas haben).
+      // Balance-Pass v7.92 (skaliert mit eigener Erzproduktion statt fixer Beträge) + Korrektur
+      // 13.07.2026 (danke an holyhenning für den Report): Referenzfenster war 20 bzw. 8 Minuten eigene
+      // Produktion - bei einer entwickelten Wirtschaft ergab das riesige Einzelbeträge (gemeldet:
+      // 600.000 Erz). Nach Wunsch "seltener mega, dafür mehr kleinere Funde" umgestellt: Geschenk kommt
+      // jetzt alle 15 statt 30 Minuten (öfter), dafür mit deutlich kleinerem Referenzfenster (2,5 bzw.
+      // 1 Minute statt 20 bzw. 8 Minuten - 8x kleiner pro Geschenk, unterm Strich trotzdem weniger
+      // Gesamtmenge pro Stunde als vorher).
       const erzRate = ratesPerSecond().erz || 0;
-      const amt = legionLvl === 2 ? Math.max(200, Math.round(erzRate * 1200)) : Math.max(80, Math.round(erzRate * 480));
+      const amt = legionLvl === 2 ? Math.max(60, Math.round(erzRate * 150)) : Math.max(25, Math.round(erzRate * 60));
       state.resources.erz = (state.resources.erz||0) + amt;
       state.resources.kristalle = (state.resources.kristalle||0) + Math.round(amt*0.6);
       log('Die Eisenlegion liefert Nachschub: +'+amt+' Erz, +'+Math.round(amt*0.6)+' Kristalle.', 'ti-box');
@@ -8132,7 +8139,7 @@
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
       { title:'Nutzen eroberter Systeme', body:'Jedes von dir kontrollierte System bringt laufend <strong>+3 Kredite pro Minute</strong> und <strong>+1% Produktion</strong> auf alle Ressourcen (Produktionsbonus gedeckelt bei +15%, also ab 15 Systemen). Die Übersicht im Galaxie-Tab zeigt deine Systeme und ihren Gesamtertrag. <strong>Achtung:</strong> Fraktionen versuchen gelegentlich, an ihr Gebiet grenzende Systeme <strong>zurückzuerobern</strong>. Ob sie Erfolg haben, hängt von deiner Gesamtverteidigung ab – wer stark verteidigt, verliert praktisch nie (Erfolgschance zwischen 3% und maximal 50% pro Versuch, Versuche sind selten). Deine Heimatsysteme sind davon nie betroffen. Verlierst du ein System, wirst du beim nächsten Kartenabgleich benachrichtigt.' },
-      { title:'Diplomatie & Ruf', body:'Bei jeder Fraktion hast du einen <strong>Ruf</strong> (-100 bis 100). Angriffe auf ihre Systeme senken ihn um 15, <strong>Tribut zahlen</strong> (150 Kredite → +5 Ruf, im Galaxie-Tab) erhöht ihn. Ab Ruf 30 („Freundlich") gibt jede Fraktion einen Effekt, ab 70 („Verbündet") die stärkere Stufe: <strong>Aschen-Kartell</strong> 5%/10% bessere Marktpreise beim Kaufen und Verkaufen · <strong>Void-Marodeure</strong> 25%/50% seltener Überfälle · <strong>Eisenlegion</strong> Ressourcen-Lieferung alle 30 Min. · <strong>Schattenbund</strong> +15/+35 Kredite alle 30 Min. Du kannst also wählen: eine Fraktion bekriegen und erobern, oder sie pflegen und von ihr profitieren.' },
+      { title:'Diplomatie & Ruf', body:'Bei jeder Fraktion hast du einen <strong>Ruf</strong> (-100 bis 100). Angriffe auf ihre Systeme senken ihn um 15, <strong>Tribut zahlen</strong> (150 Kredite → +5 Ruf, im Galaxie-Tab) erhöht ihn. Ab Ruf 30 („Freundlich") gibt jede Fraktion einen Effekt, ab 70 („Verbündet") die stärkere Stufe: <strong>Aschen-Kartell</strong> 5%/10% bessere Marktpreise beim Kaufen und Verkaufen · <strong>Void-Marodeure</strong> 25%/50% seltener Überfälle · <strong>Eisenlegion</strong> Ressourcen-Lieferung alle 15 Min. · <strong>Schattenbund</strong> +15/+35 Kredite alle 30 Min. Du kannst also wählen: eine Fraktion bekriegen und erobern, oder sie pflegen und von ihr profitieren.' },
       { title:'Fraktions-Aufträge', body:'Jede Fraktion bietet dir einen <strong>Auftrag</strong> an (im Galaxie-Tab, 24h gültig, danach kommt ein neuer): Ressourcen liefern, Kämpfe gewinnen oder Expeditionen abschließen. Abschluss bringt <strong>+12 bis +15 Ruf und 200–300 Kredite</strong> – der lohnendere Weg, Ruf aufzubauen, verglichen mit Tribut. Nach dem Abschließen gibt es sofort einen neuen Auftrag.' },
       { title:'Statistik-Dashboard', body:'Im Punktestand-Tab findest du ein <strong>Statistik-Dashboard</strong>: Kennzahlen-Kacheln (Siege, Niederlagen, Siegquote, Kampfpunkte, Expeditionen, eroberte Systeme, Kredite, gebundene Frachter), Verlaufsdiagramme für <strong>Kredite</strong> und <strong>Erz-Produktion</strong> sowie die aktuelle Produktion pro Sekunde aller Ressourcen als Balken. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.' },
       { title:'Erfolge & Tagesaufgaben zu den neuen Systemen', body:'Markt, Handelsrouten, Diplomatie, Eroberung und Kredit-Shop haben eigene <strong>Erfolge</strong> (z.B. Marktgänger, Großhändler, Logistiker, Eroberer, Systemherr, Diplomat, Auftragsjäger, Stammkunde, Kreditwürdig) und zwei neue <strong>Tagesaufgaben</strong>: „1 Handel am Markt abschließen" (+60 Kredite) und „1 Fraktionsauftrag abschließen" (+80 Kredite).' }
