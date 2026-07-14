@@ -1721,8 +1721,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.26.6';
+  const VERSION = '8.26.7';
   const PATCHNOTES = [
+    { version:'8.26.7', date:'13.07.2026', changes:[
+      'Bug behoben (danke an holyhenning für den Report): Der 24h-Cooldown für den Weltboss aus v8.26.0 lief nie tatsächlich, weil es zwei komplett getrennte renderWorldBoss()-Funktionen im Code gab - die zweite (das tatsächlich aktive, missionsbasierte "Leviathan der Leere"-System mit echter Flugzeit) überschrieb die erste unbemerkt. Die Planeten-Auswahl aus v8.26.0 war dadurch ebenfalls nie sichtbar (unnötig, da das echte System längst eine eigene Flottenauswahl über "Angriffsflotte zusammenstellen" hat). Der 24h-Cooldown ist jetzt korrekt im tatsächlich aktiven System eingebaut, inklusive sichtbarem Countdown am Angreifen-Button. Der tote Code-Pfad wurde entfernt'
+    ]},
     { version:'8.26.6', date:'13.07.2026', changes:[
       'Forschungslabor-Anzeige zeigt jetzt die konkrete Zeitersparnis in Minuten/Sekunden (Beispiel: 10-Minuten-Forschung) statt nur einer Prozentzahl. Dabei einen Anzeigefehler behoben: gezeigt wurden -6%/Stufe mit Deckel 75%, tatsächlich gilt -4,5%/Stufe mit Deckel 45% (über alle Planeten zusammengezählt, nicht nur den aktuellen)',
       'Forschungspunkte-Generierung des Labors halbiert (0,14 → 0,07 je Stufe): bei hoher Laborstufe kamen mehr Forschungspunkte pro Sekunde rein, als einzelne Forschungen insgesamt kosten (11-39) - die Ressource war dadurch praktisch bedeutungslos'
@@ -4077,90 +4080,6 @@
       </div>`;
     const btn = box.querySelector('[data-claim-dominance]');
     if (btn) btn.onclick = () => claimDominanceReward();
-  }
-
-  // ===== Galaktischer Weltboss =====
-  // Gemeinsamer Server-Gegner mit geteiltem HP-Pool. Angriff mit 30-Min.-Abklingzeit; jeder Angriff
-  // gibt +8 Kampfpunkte/+40 Kredite, der Todesstoß +100/+1000. Der Server bucht die Belohnung in
-  // unseren Spielstand; wir spiegeln sie lokal für sofortige Anzeige.
-  // Welche eigenen Planeten am Weltboss-Angriff teilnehmen - der Spieler kann z.B. eine Kolonie
-  // bewusst aus dem Angriff heraushalten, um sie zur Verteidigung ungeschwächt zu behalten. Fehlt ein
-  // Planet in dieser Auswahl (z.B. neu hinzugekommene Kolonie), gilt er standardmäßig als teilnehmend.
-  let worldBossPlanetSelection = {};
-  function worldBossSelectedPlanets(){
-    const keys = ['home'].concat(Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k)));
-    return keys.filter(k => worldBossPlanetSelection[k] !== false);
-  }
-  async function attackWorldBoss(){
-    if (!useBackend()){ log('Der Weltboss braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
-    const planets = worldBossSelectedPlanets();
-    if (!planets.length){ log('Wähle mindestens einen Planeten für den Angriff aus.', 'ti-alert-triangle'); return; }
-    try {
-      const res = await backendFetch('/worldboss/attack', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ planets }) });
-      const data = await res.json();
-      if (!res.ok){
-        if (data.cooldownLeftMs){ log('Abklingzeit: nächster Angriff in '+fmtDuration(data.cooldownLeftMs/1000)+' möglich.', 'ti-clock'); }
-        else log('Weltboss-Angriff fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle');
-        return;
-      }
-      state.battlePoints = (state.battlePoints||0) + data.bpGain;
-      state.commandPoints = (state.commandPoints||0) + data.bpGain;
-      state.credits = (state.credits||0) + data.creditGain;
-      if (data.killed){
-        log('WELTBOSS BESIEGT! Dein Todesstoß: '+fmt(data.damage)+' Schaden. +'+data.bpGain+' Kampfpunkte, +'+fmt(data.creditGain)+' Kredite!', 'ti-alien');
-        playSound('win');
-      } else {
-        log('Weltboss getroffen: '+fmt(data.damage)+' Schaden (Boss: '+fmt(data.bossHp)+'/'+fmt(data.bossMaxHp)+' HP). +'+data.bpGain+' Kampfpunkte, +'+data.creditGain+' Kredite.', 'ti-sword');
-        playSound('attack');
-      }
-      await loadGalaxyState();
-      render(); save();
-    } catch(e){ log('Weltboss-Angriff fehlgeschlagen (Verbindungsfehler).', 'ti-alert-triangle'); }
-  }
-  function renderWorldBoss(){
-    const box = document.getElementById('worldBossBox');
-    if (!box) return;
-    const boss = galaxyCache.worldBoss;
-    if (!boss || !useBackend()){ box.innerHTML = ''; return; }
-    const pct = Math.max(0, Math.min(100, Math.round(boss.hp/boss.maxHp*100)));
-    const sys = STAR_SYSTEMS.find(s=>s.id===boss.system);
-    const myDamage = (boss.participants && state.player && boss.participants[state.player.id]) || 0;
-    const lastAtk = (boss.lastAttack && state.player && boss.lastAttack[state.player.id]) || 0;
-    const cdLeft = Math.max(0, lastAtk + 24*60*60*1000 - Date.now());
-    const top = Object.entries(boss.participants||{}).sort((a,b)=>b[1]-a[1]).slice(0,3);
-    const planetKeys = ['home'].concat(Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k)));
-    box.innerHTML = `
-      <div class="section-title"><i class="ti ti-alien" aria-hidden="true"></i>Weltboss</div>
-      <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:#e24b4a; margin-bottom:1.25rem;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <div><div class="bname" style="color:#e24b4a;">${boss.name}</div>
-          <div class="bmeta">Gesichtet bei ${sys?sys.name:boss.system} · verschwindet in ${Math.max(0,Math.ceil((boss.expiresAt-Date.now())/3600000))}h</div></div>
-          <button data-attack-boss ${cdLeft>0?'disabled':''} style="background:rgba(226,75,74,0.2); white-space:nowrap;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>${cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'Angreifen'}</button>
-        </div>
-        <div style="height:14px; background:rgba(255,255,255,0.06); border-radius:7px; overflow:hidden; margin-bottom:4px;">
-          <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#e24b4a,#fac775);"></div>
-        </div>
-        <div class="bmeta">${fmt(boss.hp)} / ${fmt(boss.maxHp)} HP (${pct}%) · Dein Schaden bisher: ${fmt(myDamage)}</div>
-        ${top.length ? `<div class="bmeta" style="margin-top:4px;">Bestenliste: ${top.map((e,i)=>(i+1)+'. '+fmt(e[1])+' Schaden').join(' · ')}</div>` : ''}
-        <div class="bmeta" style="margin-top:4px;">Jeder Angriff: +8 Kampfpunkte, +40 Kredite · Todesstoß: +100 Kampfpunkte, +1000 Kredite · Abklingzeit 24h (1x täglich)</div>
-        ${planetKeys.length>1 ? `
-        <div style="margin-top:8px; border-top:0.5px solid rgba(255,255,255,0.09); padding-top:8px;">
-          <div class="bmeta" style="margin-bottom:6px;">Welche Planeten greifen mit an (Flottenstärke wird zusammengezählt):</div>
-          <div style="display:flex; flex-wrap:wrap; gap:6px;">
-            ${planetKeys.map(pk => {
-              const on = worldBossPlanetSelection[pk] !== false;
-              return `<button data-worldboss-planet-toggle="${pk}" style="font-size:10.5px; padding:5px 9px; ${on?'background:rgba(226,75,74,0.22); border-color:rgba(226,75,74,0.5);':'opacity:0.5;'}"><i class="ti ${on?'ti-check':'ti-x'}" aria-hidden="true" style="margin-right:3px;"></i>${planetDisplayName(pk)}</button>`;
-            }).join('')}
-          </div>
-        </div>` : ''}
-      </div>`;
-    const btn = box.querySelector('[data-attack-boss]');
-    if (btn) btn.onclick = () => attackWorldBoss();
-    box.querySelectorAll('[data-worldboss-planet-toggle]').forEach(b => b.addEventListener('click', () => {
-      const pk = b.getAttribute('data-worldboss-planet-toggle');
-      worldBossPlanetSelection[pk] = worldBossPlanetSelection[pk] === false ? true : false;
-      renderWorldBoss();
-    }));
   }
 
   // ===== Nutzen eroberter Fraktionssysteme =====
@@ -8201,7 +8120,7 @@
       { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste.' }
     ]},
     { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
-      { title:'Weltboss', body:'Gelegentlich erscheint ein <strong>galaktischer Weltboss</strong> (oben im Galaxie-Tab, mit Serververbindung): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Du kannst ihn <strong>einmal pro Tag</strong> angreifen (Schaden = deine Angriffskraft der ausgewählten Planeten). Hast du mehrere Planeten, kannst du direkt über der Angriffsleiste auswählen, welche Planeten ihre Flotten beisteuern - z.B. um eine Kolonie bewusst ungeschwächt zur Verteidigung zu behalten. Jeder Angriff bringt +8 Kampfpunkte und +40 Kredite, der <strong>Todesstoß</strong> +100 Kampfpunkte und +1000 Kredite. Bleibt er 72 Stunden unbesiegt, zieht er sich zurück. Seine HP skalieren mit der Spielerzahl.' },
+      { title:'Weltboss: Leviathan der Leere', body:'Gelegentlich erscheint der <strong>Leviathan der Leere</strong> (oben im Galaxie-Tab): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Angriff läuft wie eine normale Angriffsmission: Du stellst deine Angriffsflotte zusammen (Bereich "Angriffsflotte zusammenstellen") und schickst sie los - mit echter Flugzeit und Treibstoffkosten (Deuterium). Am Ziel zieht deine Angriffskraft (×0,8-1,2 Streuung) Schaden ab, der Leviathan schlägt zurück (8-15%+ Flottenverluste, steigt mit seiner Stufe). <strong>Einmal pro Tag</strong> pro Spieler angreifbar - die Sperre bleibt auch bestehen, wenn der aktuelle Leviathan besiegt wird und ein neuer erscheint. Beim Kill: Belohnung (Kredite + Kampfpunkte) nach Schadensanteil, Top-Schädiger bekommt +50% Bonus. Nach einem Kill erscheint nach einer Weile automatisch die nächste, stärkere Stufe.' },
       { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
@@ -10571,6 +10490,13 @@
   function sendWorldBossMission(){
     const b = worldBossCache;
     if (!b || b.defeatedAt){ log('Aktuell ist kein lebender Weltboss verfügbar.', 'ti-alert-triangle'); return; }
+    // 24h-Cooldown, personenbezogen (danke an holyhenning für den Hinweis - fehlte bisher komplett,
+    // ein Spieler konnte so oft angreifen, wie Flotte/Treibstoff hergaben). Bewusst im EIGENEN
+    // Spielstand statt am geteilten Boss-Objekt gespeichert, damit die Sperre auch über einen
+    // Boss-Respawn hinweg bestehen bleibt (sonst könnte man durch schnelles gemeinsames Erlegen
+    // mehrerer Bosse am selben Tag die Sperre umgehen).
+    const cdLeft = Math.max(0, (state.worldBossLastAttack||0) + 24*60*60*1000 - Date.now());
+    if (cdLeft > 0){ log('Weltboss-Angriff einmal pro Tag: nächster Angriff in '+fmtDuration(cdLeft/1000)+' möglich.', 'ti-clock'); return; }
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
@@ -10585,6 +10511,7 @@
     const fleetName = resolveFleetName();
     const power = attackPower(attackFleet, state.activeBasePlanet);
     cf.missions.push({ id: nextMissionId(), type:'worldboss', targetId: b.bossId, bossLevel: b.level, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet });
+    state.worldBossLastAttack = Date.now();
     log(fleetName+' greift den '+worldBossName(b.level)+' an (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff: '+fuelCost+' Deuterium.', 'ti-skull');
     render(); save();
   }
@@ -10599,6 +10526,7 @@
     const pct = Math.max(0, Math.min(100, (b.hp/b.maxHp)*100));
     const top3 = Object.values(b.contributions||{}).sort((a,x)=>(x.dmg||0)-(a.dmg||0)).slice(0,3);
     const busy = cf.missions.some(m=>m.type==='worldboss');
+    const cdLeft = Math.max(0, (state.worldBossLastAttack||0) + 24*60*60*1000 - Date.now());
     if (b.defeatedAt){
       const respawnIn = Math.max(0, b.defeatedAt + WORLDBOSS_RESPAWN_DELAY_MS - Date.now());
       box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#5dcaa5;">
@@ -10614,10 +10542,10 @@
           <span class="lvl-pill">${fmt(Math.max(0,Math.round(b.hp)))} / ${fmt(b.maxHp)} HP</span>
         </div>
         <div class="progress-outer" style="margin-bottom:6px;"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
-        <div class="bmeta" style="margin-bottom:4px;">Gemeinsamer Boss aller Spieler: Jeder Angriff (Angriffsflotte, echte Flugzeit) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab. Der Boss schlägt zurück (${8+b.level}-${15+b.level}% Verluste). Beim Kill: Belohnung nach Schadensanteil, Top-Schädiger +50%.</div>
+        <div class="bmeta" style="margin-bottom:4px;">Gemeinsamer Boss aller Spieler: Jeder Angriff (Angriffsflotte, echte Flugzeit) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab. Der Boss schlägt zurück (${8+b.level}-${15+b.level}% Verluste). Beim Kill: Belohnung nach Schadensanteil, Top-Schädiger +50%. <strong>Einmal pro Tag</strong> pro Spieler angreifbar.</div>
         ${top3.length ? `<div class="bmeta" style="margin-bottom:4px;">Top-Schaden: ${top3.map((t,i)=>(i+1)+'. '+(t.name||'?')+' ('+fmt(t.dmg)+')').join(' · ')}</div>` : ''}
         ${my ? `<div class="bmeta" style="margin-bottom:6px; color:#5dcaa5;">Dein Beitrag: ${fmt(my.dmg)} Schaden</div>` : ''}
-        <button data-attack-worldboss ${busy?'disabled':''}>${busy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Leviathan angreifen'}</button>
+        <button data-attack-worldboss ${(busy||cdLeft>0)?'disabled':''}>${busy?'Angriff läuft ...':cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Leviathan angreifen'}</button>
       </div>`;
     const btn = box.querySelector('[data-attack-worldboss]');
     if (btn) btn.onclick = () => sendWorldBossMission();
