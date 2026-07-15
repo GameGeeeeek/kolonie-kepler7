@@ -1239,6 +1239,19 @@
           </div>
         </div>
 
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-users" aria-hidden="true"></i>Freunde einladen</div>
+        <div class="bmeta" style="margin-bottom:8px;">Dein Einladungscode ist einfach dein Kommandantenname. Teilst du ihn mit einem neuen Spieler und er löst ihn ein, bekommt ihr beide einen Bonus - nur mit eigenem Server verfügbar.</div>
+        <div id="referralOwnCodeRow" style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+          <div class="bmeta">Dein Code:</div>
+          <div class="lvl-pill" id="referralOwnCodeText" style="font-size:12.5px;"></div>
+          <button id="referralCopyBtn" style="font-size:10.5px; padding:5px 9px;">Kopieren</button>
+        </div>
+        <div id="referralRedeemRow" style="display:none; gap:8px; flex-wrap:wrap;">
+          <input type="text" id="referralCodeInput" placeholder="Einladungscode (Name des Einladenden)" maxlength="18" style="flex:1; min-width:200px;"/>
+          <button id="referralRedeemBtn"><i class="ti ti-award" aria-hidden="true" style="margin-right:4px;"></i>Einlösen (+500 Erz/Kristalle)</button>
+        </div>
+        <div id="referralAlreadyRedeemed" style="display:none;" class="bmeta"></div>
+
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-adjustments" aria-hidden="true"></i>Sound &amp; Benachrichtigungen</div>
         <div class="card-row" id="soundToggleRow" style="cursor:pointer;">
           <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.18); color:#5dcaa5;"><i class="ti ti-volume" aria-hidden="true" id="soundIcon"></i></div><div><div class="bname">Sound</div><div class="bmeta" id="soundStateLabel">Aus</div></div></div>
@@ -1868,8 +1881,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.34.8';
+  const VERSION = '8.35.0';
   const PATCHNOTES = [
+    { version:'8.35.0', date:'13.07.2026', changes:[
+      'Neu: Freunde einladen. Der eigene Kommandantenname ist gleichzeitig der Einladungscode (kein separater Code nötig) - ein neuer Spieler gibt ihn einmalig in den Einstellungen ein und bekommt 500 Erz + 500 Kristalle, der Einladende bekommt 50 Kredite. Einmal pro Konto einlösbar, kein Eigen-Referral möglich. Läuft serverseitig, nur mit eigenem Server verfügbar'
+    ]},
     { version:'8.34.8', date:'13.07.2026', changes:[
       'Kampf-Wiedergabe weiter optisch aufgewertet:',
       '1) Bewegliche Hintergrund-Tiefe: der Sternenhintergrund driftet jetzt langsam statt komplett statisch zu sein',
@@ -7995,7 +8011,8 @@
   const NOTIF_EVENT_INFO = {
     'pact-offer': { icon:'ti-shield', color:'#5dcaa5', text:(p)=>'Pakt-Angebot von '+(p.fromName||'einem Spieler')+' - im Diplomatie-Bereich (Galaxie-Tab) annehmen oder ablehnen.' },
     'weltboss-kill': { icon:'ti-skull', color:'#e24b4a', text:(p)=>'Leviathan Stufe '+(p.level||1)+' wurde besiegt - dein Beitrag: '+(p.share||0)+'%.' },
-    'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' }
+    'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' },
+    'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' }
   };
   async function loadNotificationEvents(){
     if (!useBackend()) return;
@@ -9287,6 +9304,7 @@
       { title:'Konto & E-Mail-Bestätigung', body:'Für ein neues Konto ist eine <strong>E-Mail-Adresse Pflicht</strong>. Nach der Registrierung bekommst du eine Bestätigungs-E-Mail mit einem Link (24h gültig) – erst nach dem Klick darauf ist dein Konto freigeschaltet und du kannst dich anmelden. Keine Mail erhalten? Auch im Spam-Ordner nachsehen oder über den Login-Bildschirm eine neue anfordern. Bestehende Konten sind davon nicht betroffen.' },
       { title:'E-Mail ändern', body:'In den Einstellungen unter „E-Mail" kannst du deine Adresse jederzeit ändern (Passwort-Bestätigung nötig). Die neue Adresse wird erst aktiv, nachdem du den Bestätigungslink geklickt hast, der dorthin geschickt wird – deine bisherige Adresse bleibt bis dahin gültig, damit du nicht ausgesperrt wirst.' },
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
+      { title:'Freunde einladen', body:'Dein Kommandantenname ist gleichzeitig dein Einladungscode - kein separater Code nötig. Ein neuer Spieler gibt einmalig deinen Namen in den Einstellungen ein: er bekommt <strong>500 Erz + 500 Kristalle</strong>, du bekommst <strong>50 Kredite</strong>. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert.' },
       { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
@@ -15971,6 +15989,26 @@
       }
     }
     if (document.activeElement !== document.getElementById('nameInput')) document.getElementById('nameInput').value = state.player.name || '';
+    const referralOwnCodeRow = document.getElementById('referralOwnCodeRow');
+    if (referralOwnCodeRow) referralOwnCodeRow.style.display = useBackend() ? 'flex' : 'none';
+    const referralOwnCodeText = document.getElementById('referralOwnCodeText');
+    if (referralOwnCodeText) referralOwnCodeText.textContent = state.player.name || '';
+    const referralRedeemRow = document.getElementById('referralRedeemRow');
+    const referralAlreadyRedeemed = document.getElementById('referralAlreadyRedeemed');
+    if (referralRedeemRow && referralAlreadyRedeemed){
+      if (!useBackend()){
+        referralRedeemRow.style.display = 'none';
+        referralAlreadyRedeemed.style.display = 'block';
+        referralAlreadyRedeemed.textContent = 'Einlösen ist nur mit eigenem Server verfügbar.';
+      } else if (state.referralRedeemed){
+        referralRedeemRow.style.display = 'none';
+        referralAlreadyRedeemed.style.display = 'block';
+        referralAlreadyRedeemed.innerHTML = '<i class="ti ti-check" aria-hidden="true"></i> Bereits eingelöst'+(state.referredBy?' (Code von '+state.referredBy+')':'')+'.';
+      } else {
+        referralRedeemRow.style.display = 'flex';
+        referralAlreadyRedeemed.style.display = 'none';
+      }
+    }
     const cooldownNote = document.getElementById('nameChangeCooldownNote');
     if (cooldownNote){
       const remainMs = (state.lastNameChangeAt||0) + 7*86400000 - Date.now();
@@ -16588,6 +16626,29 @@
     if (allianceWarDeclareBtn && allianceWarTagInput){
       allianceWarDeclareBtn.onclick = () => declareWar(allianceWarTagInput.value);
     }
+    const referralCopyBtn = document.getElementById('referralCopyBtn');
+    if (referralCopyBtn) referralCopyBtn.onclick = async () => {
+      try { await navigator.clipboard.writeText(state.player.name || ''); log('Einladungscode kopiert.', 'ti-check'); }
+      catch(e){ log('Kopieren nicht möglich - Code manuell markieren.', 'ti-alert-triangle'); }
+    };
+    const referralRedeemBtn = document.getElementById('referralRedeemBtn');
+    if (referralRedeemBtn) referralRedeemBtn.onclick = async () => {
+      const code = document.getElementById('referralCodeInput').value.trim();
+      if (!code){ log('Bitte einen Einladungscode eingeben.', 'ti-alert-triangle'); return; }
+      try {
+        const res = await backendFetch('/referral/redeem', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ referrerUsername: code }) });
+        const data = await res.json();
+        if (!res.ok){ log(data.error||'Einlösen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+        state.referralRedeemed = true;
+        state.referredBy = data.referrerName;
+        if (data.newResources) state.resources = data.newResources;
+        if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+        log('Einladungscode von '+data.referrerName+' eingelöst! +500 Erz, +500 Kristalle.', 'ti-award');
+        playSound('achieve');
+        await save();
+        render();
+      } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
+    };
     const addEmailBtn = document.getElementById('addEmailBtn');
     if (addEmailBtn) addEmailBtn.onclick = async () => {
       const email = document.getElementById('addEmailInput').value.trim();
