@@ -1747,8 +1747,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.31.5';
+  const VERSION = '8.31.6';
   const PATCHNOTES = [
+    { version:'8.31.6', date:'13.07.2026', changes:[
+      'Forschungswarteschlange lässt sich jetzt nachträglich umsortieren (Pfeil-Buttons an jedem Eintrag) - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei automatisch garantiert korrekt, und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde'
+    ]},
     { version:'8.31.5', date:'13.07.2026', changes:[
       'Desktop-Verbreiterung nochmal erhöht: Hauptbereich wächst jetzt bis maximal 1300px statt 1100px (weiterhin ab 1400px Fensterbreite, weiterhin garantierter Sicherheitsabstand zum Flotten-Status-Panel bei jeder Fensterbreite)'
     ]},
@@ -6620,6 +6623,48 @@
     log('Zur Forschungs-Warteschlange hinzugefügt.', 'ti-list-details');
     render(); save();
   }
+  // Prüft eine VORGESCHLAGENE Reihenfolge der Warteschlange auf gültige Voraussetzungen. Da jeder
+  // Eintrag nur den Forschungs-Schlüssel speichert (kein festes Ziel-Level - tryStartQueuedResearch
+  // berechnet das Level immer erst zur Laufzeit aus dem dann aktuellen Stand), kann die Stufenreihenfolge
+  // INNERHALB derselben Forschung durch Umsortieren gar nicht verletzt werden - Stufe 5 wird immer erst
+  // verarbeitet, nachdem Stufe 4 (der vorherige Warteschlangen-Eintrag mit demselben Schlüssel)
+  // abgeschlossen ist, unabhängig von der Position im Array. Was Umsortieren SEHR WOHL verletzen kann,
+  // sind Voraussetzungen ZWISCHEN unterschiedlichen Forschungen (z.B. Forschung B braucht Forschung A
+  // Stufe 5) - genau das prüft diese Funktion, indem sie den Fortschritt aller Forschungen entlang der
+  // vorgeschlagenen Reihenfolge simuliert.
+  function validateResearchQueueOrder(queue){
+    const simLevels = {};
+    for (const r of RESEARCH_DEFS) simLevels[r.key] = state.research[r.key]||0;
+    for (let i=0;i<queue.length;i++){
+      const key = queue[i];
+      const r = RESEARCH_DEFS.find(x=>x.key===key);
+      if (!r) continue;
+      const reqOk = (r.requires||[]).every(req => {
+        if (typeof req === 'string') return (simLevels[req]||0) >= 1;
+        return (simLevels[req.key]||0) >= req.level;
+      });
+      if (!reqOk) return { ok:false, invalidIndex:i };
+      simLevels[key] = (simLevels[key]||0) + 1;
+    }
+    return { ok:true, invalidIndex:-1 };
+  }
+  // Verschiebt einen Warteschlangen-Eintrag um eine Position (direction: -1 hoch, +1 runter). Bricht
+  // ab und erklärt warum, wenn die neue Reihenfolge eine Voraussetzung verletzen würde.
+  function moveResearchQueueItem(index, direction){
+    const q = state.researchQueue||[];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= q.length) return;
+    const proposed = q.slice();
+    const tmp = proposed[index]; proposed[index] = proposed[newIndex]; proposed[newIndex] = tmp;
+    const check = validateResearchQueueOrder(proposed);
+    if (!check.ok){
+      const blockedName = (RESEARCH_DEFS.find(r=>r.key===proposed[check.invalidIndex])||{}).name || proposed[check.invalidIndex];
+      log('Umsortieren nicht möglich: '+blockedName+' hätte an dieser Stelle seine Voraussetzung noch nicht erfüllt.', 'ti-alert-triangle');
+      return;
+    }
+    state.researchQueue = proposed;
+    render(); save();
+  }
   function tryStartQueuedResearch(){
     if (state.activeResearch) return false;
     if (!state.researchQueue || !state.researchQueue.length) return false;
@@ -8598,7 +8643,7 @@
       { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
       { title:'Zwei neue, eigenständige Forschungszweige', body:'<strong>Diplomatie-Protokolle</strong> erhöht die Friedensdividende aus aktiven Nichtangriffspakten zusätzlich zum Grundbonus. <strong>Kolonial-Logistik</strong> erhöht das Kolonie-Limit: Ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere hinzu (bei Maximalstufe 20 also 11 Kolonien). Monde zählen nicht mit. Beide Forschungen sind von Anfang an verfügbar, unabhängig von der übrigen Technologie-Kette.' },
-      { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss.' },
+      { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss. Mit den Pfeil-Buttons an jedem Eintrag lässt sich die Reihenfolge nachträglich anpassen - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei immer automatisch korrekt (Stufe 5 kann nie vor Stufe 4 verarbeitet werden), und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde.' },
       { title:'Forschungs-Meilensteine', body:'Vier Forschungsgruppen (Wirtschaft, Krieg, Logistik/Spionage, Diplomatie) sowie ein Gesamt-Meilenstein belohnen zusammenhängenden Fortschritt: erreichen alle Forschungen einer Gruppe gemeinsam Stufe 10 bzw. Maximalstufe, gibt es Sternenessenz und Kredite. Die Essenz ist die einzige Währung, die jeden Prestige- und Aufstiegs-Reset überlebt - Forschungs-Fortschritt bleibt so auch über Neuanfänge hinweg wertvoll.' },
       { title:'Forschungsdauer: ein Langzeitziel', body:'Die komplette Forschung (19 Techs, 370 Stufen) ist bewusst ein Projekt für Wochen, nicht für einen Nachmittag: Bei guter Laborausstattung (15+) dauert sie insgesamt rund <strong>einen Monat</strong>, ganz ohne Labore rund <strong>zwei Monate</strong>. Frühe Forschungsstufen bleiben dabei fast unverändert schnell (Stufe 1 in Sekunden) - erst ab den höheren Stufen jeder Forschung wächst die Dauer spürbar, das späte Spiel bleibt also ein echtes Langzeitziel statt an einem Wochenende erledigt zu sein.' },
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
@@ -13196,7 +13241,11 @@
             const nextLvl = queueTargetLevels[i];
             return `<div class="card-row" style="padding:0.5rem 0.85rem;">
               <div class="left"><span class="lvl-pill">${i+1}</span><span class="bname" style="font-size:12.5px;">${r.name||key} → Stufe ${nextLvl}</span></div>
-              <button data-researchqueue-remove="${i}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+              <div style="display:flex; gap:4px;">
+                <button data-researchqueue-up="${i}" ${i===0?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach oben"><i class="ti ti-arrow-up" aria-hidden="true"></i></button>
+                <button data-researchqueue-down="${i}" ${i===rq.length-1?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach unten"><i class="ti ti-arrow-up" aria-hidden="true" style="transform:rotate(180deg); display:inline-block;"></i></button>
+                <button data-researchqueue-remove="${i}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+              </div>
             </div>`;
           }).join('')}
           ${Array.from({length: rqPlaceholders}).map(() => `<div class="card-row" style="padding:0.5rem 0.85rem; opacity:0.35; border-style:dashed;"><span class="bmeta">– frei –</span></div>`).join('')}
@@ -15589,6 +15638,8 @@
       state.researchQueue.splice(parseInt(btn.getAttribute('data-researchqueue-remove'),10), 1);
       render(); save();
     });
+    document.querySelectorAll('[data-researchqueue-up]').forEach(btn => btn.onclick = () => moveResearchQueueItem(parseInt(btn.getAttribute('data-researchqueue-up'),10), -1));
+    document.querySelectorAll('[data-researchqueue-down]').forEach(btn => btn.onclick = () => moveResearchQueueItem(parseInt(btn.getAttribute('data-researchqueue-down'),10), 1));
     document.querySelectorAll('[data-unlock]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-unlock');
       const def = BUILDING_DEFS.find(d=>d.key===key) || { unlockItem: key==='superschlachtschiff' ? 'antimateriekern' : null };
