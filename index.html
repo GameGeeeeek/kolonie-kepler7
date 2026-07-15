@@ -1719,8 +1719,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.9';
+  const VERSION = '8.28.10';
   const PATCHNOTES = [
+    { version:'8.28.10', date:'13.07.2026', changes:[
+      'Bug behoben (Fortsetzung von v8.28.9, danke an holyhenning für den erneuten Report): der Ausloggen-Bug trat bei MEHR als 3 schnellen Verkäufen hintereinander wieder auf - Ursache war, dass bei vielen gleichzeitigen Markt-Anfragen deren Antworten in vertauschter Reihenfolge ankommen konnten und eine spät eintreffende Antwort die bereits korrekte Versionsnummer wieder mit einem veralteten Wert überschrieb. Jetzt doppelt abgesichert: die Versionsnummer kann nur noch steigen, nie sinken, und Markt-Anfragen laufen nicht mehr überlappend (ein Klick während eine vorherige Anfrage noch läuft wird ignoriert statt eine zweite parallele Anfrage zu starten)'
+    ]},
     { version:'8.28.9', date:'13.07.2026', changes:[
       'Bug behoben (danke an holyhenning für den Report): Mehrere Marktverkäufe (oder andere Server-Aktionen wie PvP-Angriffe, Fraktionsangriffe, Weltboss) kurz hintereinander konnten fälschlich zum Ausloggen mit "anderes Gerät aktiv" führen. Die betroffenen Endpunkte melden ihre neue Spielstand-Version jetzt sofort zurück, zusätzlich läuft die Wiederholungslogik beim Speichern jetzt bis zu 3x statt nur 1x, bevor überhaupt ein echter Konflikt angenommen wird'
     ]},
@@ -3960,8 +3963,15 @@
   }
   // Führt einen Handel über das Backend aus. Das Backend ist Autorität über den Preis; wir buchen erst
   // nach erfolgreicher Antwort die Ressourcen/Kredite lokal.
+  // Verhindert überlappende Markt-Anfragen (Bug-Report holyhenning: bei vielen sehr schnell
+  // aufeinanderfolgenden Verkäufen konnten mehrere Anfragen gleichzeitig unterwegs sein und ihre
+  // Antworten in vertauschter Reihenfolge zurückkommen). Läuft bereits eine Anfrage, wird ein
+  // weiterer Klick ignoriert statt eine zweite, parallele Anfrage zu starten - zusätzlich zur
+  // Größer-als-Absicherung bei gameSaveVersion (siehe unten) doppelt abgesichert.
+  let marketTradeInFlight = false;
   async function doMarketTrade(action, resource, amount){
     if (!useBackend()){ log('Der Marktplatz braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
+    if (marketTradeInFlight){ log('Vorherige Markt-Anfrage läuft noch - bitte kurz warten.', 'ti-alert-triangle'); return; }
     amount = Math.floor(amount);
     if (!amount || amount <= 0){ log('Ungültige Menge.', 'ti-alert-triangle'); return; }
     // Nur noch eine grobe Vorab-Schätzung fürs UI (schneller Fehlerhinweis ohne Serverfahrt) - die
@@ -3973,6 +3983,7 @@
     } else {
       if ((state.resources[resource]||0) < amount){ log('Nicht genug '+(RES_DEFS.find(r=>r.key===resource)||{}).label+' zum Verkaufen.', 'ti-alert-triangle'); return; }
     }
+    marketTradeInFlight = true;
     try {
       const res = await backendFetch('/market/trade', {
         method:'POST',
@@ -3987,10 +3998,14 @@
       state.resources[resource] = data.newResourceAmount;
       // Bug behoben (danke an holyhenning für den Report): der Server erhöht bei jeder Aktion, die
       // den Spielstand direkt schreibt, dessen interne Versionsnummer - ohne diese Zeile hätte der
-      // Client das bei mehreren schnellen Verkäufen hintereinander nicht mitbekommen, wäre beim
-      // nächsten regulären Speichern mit einer veralteten Versionsnummer aufgelaufen und fälschlich
-      // als "anderes Gerät aktiv" ausgeloggt worden.
-      if (typeof data.saveVersion === 'number') gameSaveVersion = data.saveVersion;
+      // Client das nicht mitbekommen, wäre beim nächsten regulären Speichern mit einer veralteten
+      // Versionsnummer aufgelaufen und fälschlich als "anderes Gerät aktiv" ausgeloggt worden.
+      // Zweiter Teil des Bugs (trat erst bei MEHR als 3 schnellen Verkäufen auf): jede Anfrage läuft
+      // als eigener HTTP-Request, bei vielen davon kurz hintereinander können die ANTWORTEN in einer
+      // anderen Reihenfolge ankommen, als sie gesendet wurden (Netzwerk-Latenz-Schwankungen). Ohne den
+      // Größer-als-Vergleich hätte eine spät eintreffende Antwort zu einem FRÜHER gesendeten Verkauf
+      // die bereits korrekt aktuelle Versionsnummer wieder mit einem veralteten Wert überschrieben.
+      if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
       if (action === 'buy'){
         log('Gekauft: '+fmt(data.amount)+' '+label+' für '+fmt(data.credits)+' Kredite (Ø '+data.avgPrice.toFixed(2)+(data.discount?', -'+Math.round(data.discount*100)+'% Kartell-Rabatt':'')+').', 'ti-truck');
       } else {
@@ -4004,6 +4019,7 @@
       playSound('trade');
       render(); save();
     } catch(e){ log('Marktverbindung fehlgeschlagen.', 'ti-alert-triangle'); }
+    finally { marketTradeInFlight = false; }
   }
   // Grobe Client-Schätzung der Kredit-Kosten/Erlöse (das Backend rechnet verbindlich).
   function estimateTradeCredits(action, resource, amount){
@@ -4368,7 +4384,7 @@
       const data = await res.json();
       if (!res.ok){ log('Angriff fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
       // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
-      if (typeof data.saveVersion === 'number') gameSaveVersion = data.saveVersion;
+      if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
       if (data.success){
         // Der Server hat unseren Spielstand serverseitig angepasst (battlePoints, credits). Wir spiegeln
         // die belohnten Werte lokal, damit die Anzeige sofort stimmt (loadGalaxyState lädt danach die
@@ -6946,7 +6962,7 @@
         const data = await res.json();
         if (!res.ok){ log(data.error || 'Angriff fehlgeschlagen.', 'ti-alert-triangle'); return; }
         // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
-        if (typeof data.saveVersion === 'number') gameSaveVersion = data.saveVersion;
+        if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
         pendingResult = { source:'backend', success: data.success, stolen: data.stolen||{}, destroyedBuilding: data.destroyedBuilding, attackPowerShown: data.attackPower, defensePowerShown: data.defensePower, isWarAttack, targetAllianceTag, farmingPenalty };
       } catch(e){ log('Server für Angriff nicht erreichbar.', 'ti-alert-triangle'); return; }
     } else {
@@ -10940,7 +10956,7 @@
               // Siehe Kommentar bei doMarketTrade: der Server erhöht die Spielstand-Versionsnummer bei
               // dieser Aktion mit, ohne Synchronisation hier würde ein späterer regulärer Speicherversuch
               // fälschlich als Versionskonflikt erkannt (besonders bei mehreren Missionen kurz hintereinander).
-              if (typeof data.saveVersion === 'number') gameSaveVersion = data.saveVersion;
+              if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
               if (data.arrivedTooLate){
                 if (showLog !== false) log(data.onCooldown ? 'Weltboss-Angriff einmal pro Tag: die Abklingzeit war bei Ankunft noch aktiv (+50 Kredite Spesen).' : 'Der Leviathan war bei Ankunft bereits gefallen - deine Flotte kehrt um (+50 Kredite Spesen).', 'ti-skull');
               } else {
