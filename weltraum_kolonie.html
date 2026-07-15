@@ -212,6 +212,21 @@
     .battle-impact { position:absolute; top:48%; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; background:radial-gradient(circle, #fff, currentColor 55%, transparent 75%); opacity:0; pointer-events:none; }
     .battle-impact.play { animation: battleImpactBurst 0.4s ease-out forwards; }
     @keyframes battleImpactBurst { 0%{ transform:scale(0.25); opacity:1; } 100%{ transform:scale(2.3); opacity:0; } }
+    /* Mündungsblitz am Schuss-Ursprung (13.07.2026, Feature-Wunsch) - kurzer, kleiner Aufblitzer
+       BEVOR das Projektil sichtbar losfliegt, macht den Feuerpunkt selbst sichtbar statt dass
+       Schüsse einfach mitten in der Szene "erscheinen". */
+    .battle-muzzle-flash { position:absolute; top:48%; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:radial-gradient(circle, #fff, currentColor 50%, transparent 70%); opacity:0; pointer-events:none; }
+    .battle-muzzle-flash.play { animation: battleMuzzleFlash 0.18s ease-out forwards; }
+    @keyframes battleMuzzleFlash { 0%{ transform:scale(0.3); opacity:1; } 100%{ transform:scale(1.6); opacity:0; } }
+    /* Bildschirm-Farbwisch beim Sieg-/Niederlage-Reveal (13.07.2026) - kurzer, dezenter Farbschein
+       über der ganzen Szene, synchron zum großen SIEG/NIEDERLAGE-Banner. */
+    .battle-scene.result-flash-win::before, .battle-scene.result-flash-loss::before {
+      content:''; position:absolute; inset:0; pointer-events:none; z-index:5;
+      animation: battleResultFlash 0.9s ease-out forwards;
+    }
+    .battle-scene.result-flash-win::before { background:radial-gradient(ellipse at 50% 50%, rgba(93,202,165,0.35), transparent 70%); }
+    .battle-scene.result-flash-loss::before { background:radial-gradient(ellipse at 50% 50%, rgba(226,75,74,0.32), transparent 70%); }
+    @keyframes battleResultFlash { 0%{ opacity:0; } 15%{ opacity:1; } 100%{ opacity:0; } }
     .battle-side { flex:1; min-width:0; }
     .battle-side-label { font-size:10.5px; color:#9296ac; text-align:center; margin-bottom:6px; font-weight:600; }
     .battle-side-sublabel { font-size:8.5px; color:#7a7e94; text-align:center; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px; }
@@ -1776,8 +1791,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.34.2';
+  const VERSION = '8.34.3';
   const PATCHNOTES = [
+    { version:'8.34.3', date:'13.07.2026', changes:[
+      'Kampf-Wiedergabe optisch und akustisch erweitert: jede Waffenart (Energiestrahl, Plasma, Rakete) hat jetzt einen eigenen, zum visuellen Effekt passenden Sound für Schuss UND Einschlag statt eines einzigen generischen Tons für alle',
+      'Neuer Explosions-Sound, sobald ein Schiffstyp in einer Runde komplett zerstört wird',
+      'Neuer Mündungsblitz am Feuerpunkt jedes Schusses, kurz bevor das Projektil sichtbar losfliegt',
+      'Sieg/Niederlage-Moment bekommt jetzt einen passenden Klang-Stinger (aufsteigender Dreiklang bei Sieg, absteigende dunklere Töne bei Niederlage) und einen kurzen grünen bzw. roten Bildschirm-Farbwisch, synchron zum großen Banner'
+    ]},
     { version:'8.34.2', date:'13.07.2026', changes:[
       'Live-Kampf-Wiedergabe öffnet sich jetzt auch automatisch bei eigenen Angriffen (NPC-Kämpfe, Piratennest, Weltboss, PvP), sobald sie live abgeschlossen werden während man im Spiel aktiv ist - vorher galt das nur für eingehende Überfälle, eigene Angriffe musste man manuell im Bericht über "Zuschauen" aufrufen. Dieselbe bestehende Einstellung ("Live-Kampf-Wiedergabe" im Verteidigung-Tab) steuert jetzt beides zusammen',
       'Dokumentations-Bugfix: Hilfetext zu Planetentypen war veraltet - Erdwelt-Bonus stand noch mit dem alten Wert (15% statt 6% je Ressource), Wasserwelt fehlte komplett (hat +20% Lagerkapazität)'
@@ -7177,15 +7198,68 @@
       if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
       const o = audioCtx.createOscillator();
       const g = audioCtx.createGain();
-      const freqs = { build:440, research:660, win:880, raid:220, achieve:1046, trade:550, shot:1200, impact:150 };
+      const freqs = { build:440, research:660, win:880, raid:220, achieve:1046, trade:550, shot:1200, impact:150, explosion:90 };
       o.frequency.value = freqs[kind]||440;
-      o.type = (kind==='raid'||kind==='impact') ? 'sawtooth' : 'sine';
-      g.gain.value = kind==='shot' ? 0.03 : kind==='impact' ? 0.05 : 0.06;
+      o.type = (kind==='raid'||kind==='impact'||kind==='explosion') ? 'sawtooth' : 'sine';
+      g.gain.value = kind==='shot' ? 0.03 : kind==='impact' ? 0.05 : kind==='explosion' ? 0.07 : 0.06;
       o.connect(g); g.connect(audioCtx.destination);
       o.start();
-      const dur = kind==='shot' ? 0.08 : kind==='impact' ? 0.18 : 0.35;
+      const dur = kind==='shot' ? 0.08 : kind==='impact' ? 0.18 : kind==='explosion' ? 0.4 : 0.35;
       g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
       o.stop(audioCtx.currentTime+dur+0.01);
+    } catch(e){}
+  }
+  // Waffentyp-spezifischer Schuss-/Einschlagston (13.07.2026, Feature-Wunsch: Kampf-Wiedergabe optisch
+  // UND akustisch erweitern) - vorher spielte JEDE Waffe denselben generischen "shot"/"impact"-Ton,
+  // obwohl die Wiedergabe visuell längst zwischen Energiestrahl/Plasma-Ball/Rakete unterscheidet.
+  // Nutzt Frequenz-Sweeps (statt eines festen Tons) für mehr Charakter je Waffenart: Strahl = kurzer,
+  // hoher Zap-Sweep nach unten, Plasma = langsamer wabernder Sweep, Rakete = tiefes Wummern mit
+  // Nachhall beim Einschlag.
+  function playWeaponSound(weaponKind, isImpact){
+    if (!state.soundOn) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
+      if (weaponKind === 'orb'){
+        o.type = 'sine';
+        if (isImpact){ o.frequency.setValueAtTime(320,now); o.frequency.exponentialRampToValueAtTime(80,now+0.22); g.gain.setValueAtTime(0.05,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.24); o.start(now); o.stop(now+0.25); }
+        else { o.frequency.setValueAtTime(180,now); o.frequency.linearRampToValueAtTime(260,now+0.12); g.gain.setValueAtTime(0.025,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.14); o.start(now); o.stop(now+0.15); }
+      } else if (weaponKind === 'missile'){
+        o.type = 'sawtooth';
+        if (isImpact){ o.frequency.setValueAtTime(140,now); o.frequency.exponentialRampToValueAtTime(35,now+0.35); g.gain.setValueAtTime(0.08,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.4); o.start(now); o.stop(now+0.41); }
+        else { o.frequency.setValueAtTime(90,now); o.frequency.linearRampToValueAtTime(60,now+0.3); g.gain.setValueAtTime(0.02,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.32); o.start(now); o.stop(now+0.33); }
+      } else {
+        o.type = isImpact ? 'sawtooth' : 'square';
+        if (isImpact){ o.frequency.setValueAtTime(200,now); o.frequency.exponentialRampToValueAtTime(60,now+0.15); g.gain.setValueAtTime(0.045,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.16); o.start(now); o.stop(now+0.17); }
+        else { o.frequency.setValueAtTime(1500,now); o.frequency.exponentialRampToValueAtTime(700,now+0.06); g.gain.setValueAtTime(0.025,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.07); o.start(now); o.stop(now+0.08); }
+      }
+    } catch(e){}
+  }
+  // Sieg-/Niederlage-Stinger für die Kampf-Wiedergabe (13.07.2026) - vorher blieb der große SIEG/
+  // NIEDERLAGE-Banner-Moment komplett stumm. Sieg: aufsteigender Dreiklang. Niederlage: absteigende,
+  // dunklere Töne.
+  function playBattleResultSound(won){
+    if (!state.soundOn) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const notes = won ? [523,659,784] : [392,330,261];
+      notes.forEach((freq, i) => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = won ? 'sine' : 'triangle';
+        o.frequency.value = freq;
+        o.connect(g); g.connect(audioCtx.destination);
+        const t0 = now + i*(won?0.11:0.16);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(0.08, t0+0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t0+(won?0.4:0.5));
+        o.start(t0);
+        o.stop(t0+(won?0.42:0.52));
+      });
     } catch(e){}
   }
 
@@ -8468,10 +8542,18 @@
       }
       projectile.style.top = topPct+'%';
       projectile.style.color = weapon.color;
+      // Mündungsblitz am Feuerpunkt, kurz bevor das Projektil selbst sichtbar losfliegt.
+      const muzzle = document.createElement('div');
+      muzzle.className = 'battle-muzzle-flash play';
+      muzzle.style.left = fromPct+'%';
+      muzzle.style.top = topPct+'%';
+      muzzle.style.color = weapon.color;
+      scene.appendChild(muzzle);
+      battleTimers.push(setTimeout(() => muzzle.remove(), 200));
       const speedMult = slowMo ? 1.9 : 1;
       if (slowMo) projectile.style.animationDuration = (battleShotBaseDuration(weapon.kind)*speedMult)+'s';
       scene.appendChild(projectile);
-      playSound('shot');
+      playWeaponSound(weapon.kind, false);
       let flightDone = false;
       const onFlightEnd = () => {
         if (flightDone) return;
@@ -8484,7 +8566,7 @@
         impact.style.top = topPct+'%';
         impact.style.color = weapon.color;
         scene.appendChild(impact);
-        playSound('impact');
+        playWeaponSound(weapon.kind, true);
         spawnBattleDamageNumber(scene, toPct, topPct, weapon);
         if (withShake > 0){
           // Wackel-Stärke proportional zu den Verlusten dieser Runde – eine Runde mit 2 verlorenen
@@ -8527,7 +8609,7 @@
   function openBattleReplay(report){
     clearBattleTimers();
     const scene0 = document.getElementById('battleScene');
-    if (scene0){ scene0.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float').forEach(el => el.remove()); scene0.classList.remove('shake'); scene0.classList.remove('climax'); }
+    if (scene0){ scene0.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash').forEach(el => el.remove()); scene0.classList.remove('shake'); scene0.classList.remove('climax'); scene0.classList.remove('result-flash-win'); scene0.classList.remove('result-flash-loss'); }
     const bigResult0 = document.getElementById('battleBigResult');
     if (bigResult0) bigResult0.classList.remove('play');
     const seq = buildBattleSequence(report);
@@ -8660,6 +8742,7 @@
         const leftJustDied = Object.keys(round.leftDestroyed).filter(k => remainingLeft[k] <= 0);
         renderBattleFleetIcons('battleLeftIcons', seq.left.fleet, remainingLeft);
         // Explosions-Effekt für Schiffstypen, die diese Runde komplett auf 0 gefallen sind.
+        if (leftJustDied.length) playSound('explosion');
         for (const k of leftJustDied){
           const icon = document.querySelector('#battleLeftIcons [data-battle-ship="'+k+'"]');
           if (icon){ icon.classList.add('exploding'); setTimeout(() => icon.classList.remove('exploding'), 520); }
@@ -8670,6 +8753,7 @@
           }
           const rightJustDied = Object.keys(round.rightDestroyed).filter(k => remainingRight[k] <= 0);
           renderBattleFleetIcons('battleRightIcons', seq.right.fleet, remainingRight);
+          if (rightJustDied.length) playSound('explosion');
           for (const k of rightJustDied){
             const icon = document.querySelector('#battleRightIcons [data-battle-ship="'+k+'"]');
             if (icon){ icon.classList.add('exploding'); setTimeout(() => icon.classList.remove('exploding'), 520); }
@@ -8703,8 +8787,13 @@
   function finishBattleReplay(report, seq){
     clearBattleTimers();
     const scene = document.getElementById('battleScene');
-    if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); }
+    if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); }
     const won = report.result === 'win' || report.result === 'defended';
+    playBattleResultSound(won);
+    if (scene){
+      scene.classList.add(won ? 'result-flash-win' : 'result-flash-loss');
+      battleTimers.push(setTimeout(() => { scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); }, 950));
+    }
     // Großes SIEG/NIEDERLAGE-Overlay kurz einblenden, bevor die Detail-Zusammenfassung erscheint.
     const bigResult = document.getElementById('battleBigResult');
     if (bigResult){
@@ -8748,7 +8837,7 @@
     clearBattleTimers();
     document.getElementById('battleModalOverlay').classList.remove('open');
     const scene = document.getElementById('battleScene');
-    if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); }
+    if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); }
     const bigResult = document.getElementById('battleBigResult');
     if (bigResult) bigResult.classList.remove('play');
     const skipBtn = document.getElementById('battleSkipBtn');
@@ -8832,7 +8921,7 @@
       { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
-      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich über 8 Runden. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang.' },
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich über 8 Runden mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger und die Szene färbt sich kurz grün bzw. rot ein.' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP- und Expeditions-Berichten (mit echter Begegnung). Läuft ein Kampf live ab, während man im Spiel aktiv ist - eigener Angriff oder eingehender Überfall -, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
       { title:'Steuerung', body:'Pause/Weiter hält die Wiedergabe an, Tempo-Umschalter (1x/2x) beschleunigt, "Überspringen" springt direkt zum Endergebnis.' }
     ]},
