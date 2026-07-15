@@ -941,7 +941,7 @@
           <div class="toggle-switch" id="autoRepairSwitch"><div class="toggle-knob"></div></div>
         </div>
         <div class="card-row" id="autoWatchLiveRaidRow" style="cursor:pointer; margin-top:0.5rem;">
-          <div class="left"><div class="bicon" style="background:rgba(127,119,221,0.18); color:#c3bef5;"><i class="ti ti-sword" aria-hidden="true"></i></div><div><div class="bname">Live-Kampf-Wiedergabe</div><div class="bmeta" id="autoWatchLiveRaidLabel">An – öffnet die Kampf-Wiedergabe automatisch, sobald ein Überfall abläuft, während du gerade im Spiel bist</div></div></div>
+          <div class="left"><div class="bicon" style="background:rgba(127,119,221,0.18); color:#c3bef5;"><i class="ti ti-sword" aria-hidden="true"></i></div><div><div class="bname">Live-Kampf-Wiedergabe</div><div class="bmeta" id="autoWatchLiveRaidLabel">An – öffnet die Kampf-Wiedergabe automatisch, sobald ein Kampf abläuft (eigener Angriff oder eingehender Überfall), während du gerade im Spiel bist</div></div></div>
           <div class="toggle-switch" id="autoWatchLiveRaidSwitch"><div class="toggle-knob"></div></div>
         </div>
       </div>
@@ -1776,8 +1776,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.34.1';
+  const VERSION = '8.34.2';
   const PATCHNOTES = [
+    { version:'8.34.2', date:'13.07.2026', changes:[
+      'Live-Kampf-Wiedergabe öffnet sich jetzt auch automatisch bei eigenen Angriffen (NPC-Kämpfe, Piratennest, Weltboss, PvP), sobald sie live abgeschlossen werden während man im Spiel aktiv ist - vorher galt das nur für eingehende Überfälle, eigene Angriffe musste man manuell im Bericht über "Zuschauen" aufrufen. Dieselbe bestehende Einstellung ("Live-Kampf-Wiedergabe" im Verteidigung-Tab) steuert jetzt beides zusammen',
+      'Dokumentations-Bugfix: Hilfetext zu Planetentypen war veraltet - Erdwelt-Bonus stand noch mit dem alten Wert (15% statt 6% je Ressource), Wasserwelt fehlte komplett (hat +20% Lagerkapazität)'
+    ]},
     { version:'8.34.1', date:'13.07.2026', changes:[
       'Heimatbasis ist jetzt auch terraformbar (war seit dem Terraforming-Umbau in v8.29.0 ausgeschlossen) - startet implizit als Erdähnlich (kein Bonus, wie jeder andere Planet dieses Typs) und kann wie jede Kolonie zu Todeswelt/Wüstenwelt/Eiswelt/Vulkanwelt/Wasserwelt/Kristallwelt/Erdwelt terraformt werden. Auf der Sektorkarte zeigt die Heimatbasis während des laufenden Terraformings denselben gestrichelten Fortschritts-Ring wie Kolonien, behält aber ihre eigene violette Markierung statt der Kolonie-Typenfarbe'
     ]},
@@ -7620,14 +7624,18 @@
           log((m.fleetName||'Flotte')+': Angriff auf '+name+' erfolgreich! Erbeutet: '+lootTxt+'.'+cargoNote+(data.destroyedBuilding?' Ein Verteidigungsgebäude wurde zerstört.':'')+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
-        pushReport({ type:'player-attack', result:'win', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet });
+        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
       } else {
         awardBattlePoints(3);
         logScoreChange(3*3, 'Angriff auf '+name+' verloren (+3 Kampfpunkte Trostpreis)', 'ti-shield');
         const ownLostLossBackend = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossBackend);
         if (showLog !== false) log((m.fleetName||'Flotte')+': Angriff auf '+name+' gescheitert.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')', 'ti-shield');
-        pushReport({ type:'player-attack', result:'loss', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet });
+        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
       }
     } else {
       // Simulierter Modus (kein eigener Server): ebenfalls erst bei Ankunft berechnet statt beim
@@ -7653,14 +7661,18 @@
           log((m.fleetName||'Flotte')+': Duell gegen '+name+' gewonnen! +'+gained+' Kampfpunkte'+statLine+'.'+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' Kein echter Ressourcenverlust für den Gegner (kein eigener Server aktiv).'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
-        pushReport({ type:'player-attack', result:'win', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinSim, debris:combatDebrisOf(ownLostWinSim), fleet:m.composition||fleet });
+        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinSim, debris:combatDebrisOf(ownLostWinSim), fleet:m.composition||fleet };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
       } else {
         awardBattlePoints(3);
         logScoreChange(3*3, 'Duell gegen '+name+' verloren (+3 Kampfpunkte Trostpreis)', 'ti-shield');
         const ownLostLossSim = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossSim);
         if (showLog !== false) log((m.fleetName||'Flotte')+': Duell gegen '+name+' verloren. +3 Kampfpunkte für den Versuch'+statLine+'.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':''), 'ti-shield');
-        pushReport({ type:'player-attack', result:'loss', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossSim, debris:combatDebrisOf(ownLostLossSim), fleet:m.composition||fleet });
+        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossSim, debris:combatDebrisOf(ownLostLossSim), fleet:m.composition||fleet };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
       }
     }
     checkAchievements();
@@ -8117,6 +8129,17 @@
     }
     if (!useBackend()) return;
     try { await backendFetch('/reports', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ report }) }); } catch(e){}
+  }
+  // Auto-Wiedergabe für AUSGEHENDE Angriffe des Spielers (13.07.2026, Feature-Wunsch: die animierte
+  // Kampf-Wiedergabe soll standardmäßig erscheinen, wenn man selbst angreift, nicht nur bei
+  // eingehenden Überfällen - vorher musste man dafür manuell im Bericht auf "Zuschauen" klicken,
+  // obwohl der Angriff gerade eben, während man im Spiel war, abgeschlossen wurde). Nutzt dieselbe
+  // Einstellung wie bei Überfällen (state.autoWatchLiveRaid) - ein einziger Schalter für "zeig mir
+  // Kämpfe live, während ich zuschaue", unabhängig davon ob ich angreife oder angegriffen werde.
+  function maybeAutoWatchBattle(report){
+    if (report && state.autoWatchLiveRaid && typeof document !== 'undefined' && document.visibilityState !== 'hidden'){
+      battleTimers.push(setTimeout(() => openBattleReplay(report), 400));
+    }
   }
   function shipDisplayName(key){
     if (key === 'superschlachtschiff') return 'Superschlachtschiff';
@@ -8810,7 +8833,7 @@
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
       { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich über 8 Runden. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang.' },
-      { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP- und Expeditions-Berichten (mit echter Begegnung). Läuft ein Überfall live ab, während man im Spiel aktiv ist, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
+      { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP- und Expeditions-Berichten (mit echter Begegnung). Läuft ein Kampf live ab, während man im Spiel aktiv ist - eigener Angriff oder eingehender Überfall -, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
       { title:'Steuerung', body:'Pause/Weiter hält die Wiedergabe an, Tempo-Umschalter (1x/2x) beschleunigt, "Überspringen" springt direkt zum Endergebnis.' }
     ]},
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
@@ -8819,7 +8842,7 @@
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Monde haben keine eigene Karte mehr: Ein kolonisierter Mond ist überall über das Mond-Symbol am zugehörigen Planeten erreichbar (Übersichts-Karten, Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste) und wird auch in der Sektorkarten-Planetenliste beim Planeten angezeigt.' },
       { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
       { title:'Terraforming', body:'Jede Kolonie UND die Heimatbasis (nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Die Zielwahl selbst ist auf JEDEM Standort jederzeit möglich, auch während anderswo bereits eine Stufe läuft - nur das tatsächliche Bezahlen/Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt, so lässt sich für mehrere Standorte vorausplanen. Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie). Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen und der Standort trägt den neuen Typ dauerhaft. Bei Kolonien ändert sich dabei sofort die Farbe auf der Sektorkarte; die Heimatbasis behält ihre eigene Markierung (violetter Stern), zeigt aber während des laufenden Terraformings denselben gestrichelten Fortschritts-Ring wie Kolonien. Insgesamt deutlich teurer als früher. Erdwelt (Bonus auf ALLE Ressourcen statt nur einer) kostet zusätzlich 80% mehr als jeder Spezialist - eine reine Fokus-Kolonie profitiert trotzdem meist mehr vom passenden Spezialisten. Zu finden im Basis-Tab.' },
-      { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
+      { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie, <strong>Wasserwelt</strong> +20% Lagerkapazität. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Generalist: +6% auf ALLE Ressourcen (kumuliert 30%), kostet aber 80% mehr als jeder Spezialist. Erdähnliche Welten, Gasriesen, Asteroiden und Superplaneten haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
       { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die 20-stufige Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum, ebenfalls 24 Std. je Stufe: Gefechtsanalyse 6.000 FP, Erfahrene Besatzungen 12.000 FP, Legendäre Kommandeure 20.000 FP - nur eine Ausbildung gleichzeitig) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 20 Forschungszweige Stufe 20 haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
@@ -11668,7 +11691,9 @@
                 addVeteranXp(planetKey, 8 + bLevel);
                 if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(data.damage)+' Schaden!'+(data.killed?' LETZTER SCHLAG - der Leviathan fällt!':' Rest-HP: '+fmt(Math.round(data.bossHp))+'.')+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
                 playSound(data.killed ? 'achieve' : 'win');
-                pushReport({ type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:!!data.hasWeakness, weaknessType:data.weaknessType, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} });
+                const __battleReport = { type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:!!data.hasWeakness, weaknessType:data.weaknessType, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
               }
               // Frischen (server-geschriebenen) Boss-Zustand laden - zeigt den aktuellen HP-Stand an
               // und beansprucht bei einem Kill automatisch die anteilige Belohnung (siehe loadWorldBoss,
@@ -11734,7 +11759,9 @@
             const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
             if (showLog !== false) log('Sieg gegen '+lairLabel+'! +'+creditsGain+' Kredite.'+cargoNote+moduleMsg+(ownLostLairText?' Eigene Verluste: '+ownLostLairText+'.':'')+stageMsg, 'ti-sword');
             playSound('win');
-            pushReport({ type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair });
+            const __battleReport = { type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
           } else {
             const bpGained = stage;
             awardBattlePoints(bpGained);
@@ -11745,7 +11772,9 @@
             const lostText = lostCountsToText(lostShips);
             if (showLog !== false) log('Niederlage gegen '+lairLabel+'.'+(lostText?' Verluste: '+lostText+'.':'')+' Das Versteck bleibt auf Stufe '+stage+' - rüste auf und versuche es erneut.', 'ti-alert-triangle');
             playSound('lose');
-            pushReport({ type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:lostShips });
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:lostShips };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
           }
         } else if (m.type === 'attack'){
           const npc = NPCS.find(n => n.id === m.targetId);
@@ -11801,7 +11830,9 @@
             const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
             if (showLog !== false) log('Sieg gegen '+npc.name+'! ('+planetDisplayName(planetKey)+')'+(hasWeakness?' Schwachstelle ausgenutzt.':'')+' Trümmerfeld hinterlassen.'+cargoNote+(ownLostWinText?' Eigene Verluste: '+ownLostWinText+'.':'')+' '+npc.name+' wird ab jetzt härter und lohnender.', 'ti-sword');
             playSound('win');
-            pushReport({ type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin });
+            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
           } else {
             const bpGained = npc.level*2;
             addVeteranXp(planetKey, 4);
@@ -11815,7 +11846,9 @@
             const ownLostLossText = lostCountsToText(ownLostLoss);
             const ownLossDebrisLoss = combatDebrisOf(ownLostLoss);
             if (showLog !== false) log('Angriff auf '+npc.name+' gescheitert. Flotte kehrt nach '+planetDisplayName(planetKey)+' zurück.'+(ownLostLossText?' Verluste: '+ownLostLossText+'. Trümmerfeld hinterlassen.':'')+(retreatNpc.retreated?' Ein Teil der Flotte konnte sich rechtzeitig zurückziehen.':''), 'ti-shield');
-            pushReport({ type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss });
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
+            pushReport(__battleReport);
+            maybeAutoWatchBattle(__battleReport);
           }
           checkAchievements();
         } else if (m.type === 'expedition'){
@@ -15523,7 +15556,7 @@
     const autoWatchLiveRaidSwitch = document.getElementById('autoWatchLiveRaidSwitch');
     if (autoWatchLiveRaidSwitch) autoWatchLiveRaidSwitch.classList.toggle('on', !!state.autoWatchLiveRaid);
     const autoWatchLiveRaidLabel = document.getElementById('autoWatchLiveRaidLabel');
-    if (autoWatchLiveRaidLabel) autoWatchLiveRaidLabel.textContent = state.autoWatchLiveRaid ? 'An – öffnet die Kampf-Wiedergabe automatisch, sobald ein Überfall abläuft, während du gerade im Spiel bist' : 'Aus – Überfälle laufen im Hintergrund ab, Wiedergabe nur über den Bericht im Nachhinein';
+    if (autoWatchLiveRaidLabel) autoWatchLiveRaidLabel.textContent = state.autoWatchLiveRaid ? 'An – öffnet die Kampf-Wiedergabe automatisch, sobald ein Kampf abläuft (eigener Angriff oder eingehender Überfall), während du gerade im Spiel bist' : 'Aus – Kämpfe laufen im Hintergrund ab, Wiedergabe nur über den Bericht im Nachhinein';
 
     const notifIcon = document.getElementById('notifIcon');
     if (notifIcon) notifIcon.className = 'ti '+(state.notifOn?'ti-bell':'ti-bell');
