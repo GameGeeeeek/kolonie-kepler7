@@ -1719,8 +1719,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.15';
+  const VERSION = '8.29.0';
   const PATCHNOTES = [
+    { version:'8.29.0', date:'13.07.2026', changes:[
+      'Terraforming komplett neu gebaut: die beiden bisherigen getrennten Systeme (typloses Stufensystem + separate Typ-Umwandlung entlang einer festen Kette) sind zu einem verschmolzen. Man wählt jetzt zuerst frei einen Zieltyp (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt), danach läuft die Umwandlung in 10 Stufen ab - jede Stufe ein eigener, mehrstündiger Vorgang (3,6 bis 8,8 Std.) mit exponentiell steigenden Kosten. Jede einzelne Stufe gewährt nur einen kleinen Anteil des vollen Zieltyp-Bonus, erst bei Stufe 10 ist die Umwandlung abgeschlossen',
+      'Terraforming insgesamt deutlich teurer: alle 10 Stufen zu einem Zieltyp kosten jetzt zusammen ca. 3 Mio. Erz (plus Kristalle, Deuterium und neu auch Antimaterie) - vorher kostete das alte typlose Stufensystem allein ca. 816.000 Erz für einen reinen Flatbonus ohne Typänderung',
+      'Neu: jeder terraformte Planet zeigt seinen aktuellen Typ jetzt auch farblich auf der Sektorkarte - jeder Planetentyp hat eine eigene, feste Farbe (vorher hatte praktisch jeder einzelne Planet eine mehr oder weniger zufällige eigene Farbe, auch innerhalb desselben Typs). Ändert sich sofort sichtbar nach abgeschlossenem Terraforming, ein laufendes Terraforming zeigt einen gestrichelten Ring in der Zielfarbe',
+      'Wasserwelt hat jetzt einen eigenen Bonus (+20% Lagerkapazität) - war bisher der einzige terraformbare Typ ganz ohne jeden Effekt',
+      'Terraforming auf der Heimatbasis entfernt (ergab mit dem neuen typbasierten System keinen Sinn mehr - die Heimatbasis hat keinen Planetentyp)',
+      'Migration bestehender Spielstände: alte, rein numerische Terraforming-Stufen bleiben als Fortschritt erhalten, geben aber erst wieder einen Bonus, sobald nachträglich ein Zieltyp gewählt wird. Ein exakt zum Umstellungszeitpunkt laufender alter Terraforming- oder Typ-Umwandlungs-Auftrag wird storniert und die eingesetzten Ressourcen vollständig zurückerstattet'
+    ]},
     { version:'8.28.15', date:'13.07.2026', changes:[
       'Lager-Deckel konsequent auf ALLE Ressourcen-Quellen ausgeweitet: bisher hatte nur die laufende Produktion einen harten Deckel, während Einmal-Belohnungen (Kommandanten-Level-Aufstieg, Handelsrouten-Bonus, Schwarzmarkt-Handel, Frachtcontainer-Item, Planeten-Erkundung/Entdeckung, PvP-/NPC-Kampf-Beute, Trümmerfeld-Abbau, Schiffs-/Gebäude-Verschrottungs-Erstattung) den Deckel ungeprüft überschreiten konnten. Jetzt gilt überall: ist das Lager voll, geht der Überschuss verloren, egal woher die Ressourcen stammen'
     ]},
@@ -3354,37 +3362,34 @@
     return STAR_SYSTEMS.filter(s => !s.hidden || (state.discoveredSystems && state.discoveredSystems[s.id]));
   }
 
+  // Farbe: EINE feste Farbe je Typ (nicht mehr je einzelnem Planeten wie vorher) - macht den Typ auf
+  // der Sektorkarte auf einen Blick erkennbar, unabhängig von welchem konkreten Planeten. Wird auch
+  // für terraformte Planeten verwendet (siehe effectivePlanetType in der Kartendarstellung).
   const PLANET_TYPE_INFO = {
-    erdaehnlich: { label:'Erdähnlich', icon:'ti-world' },
-    gasriese: { label:'Gasriese', icon:'ti-atom' },
-    wasserwelt: { label:'Wasserwelt', icon:'ti-droplet' },
-    asteroid: { label:'Asteroid', icon:'ti-diamond' },
-    super: { label:'★ Superplanet (extrem selten)', icon:'ti-sparkles' },
+    erdaehnlich: { label:'Erdähnlich', icon:'ti-world', color:'#5dcaa5' },
+    gasriese: { label:'Gasriese', icon:'ti-atom', color:'#d9975a' },
+    wasserwelt: { label:'Wasserwelt', icon:'ti-droplet', color:'#4a9fe0', storageBonus:1.20, bonusText:'+20% Lagerkapazität' },
+    asteroid: { label:'Asteroid', icon:'ti-diamond', color:'#9b9890' },
+    super: { label:'★ Superplanet (extrem selten)', icon:'ti-sparkles', color:'#f3aec6' },
     // Neue Typen mit echtem Produktions-/Verteidigungsbonus. prodBonus: {res: faktor} multipliziert die
     // jeweilige Ressourcenproduktion auf DIESEM Standort; defBonus multipliziert die Verteidigung dort.
     // Bestehende Typen oben haben bewusst keine Boni (damit sich an vorhandenen Planeten nichts an der
     // Balance ändert). Icons/Farben ausschließlich aus der bestätigten Whitelist.
-    vulkan: { label:'Vulkanwelt', icon:'ti-mountain', prodBonus:{ erz:1.15 }, bonusText:'+15% Erz-Produktion' },
-    eis: { label:'Eiswelt', icon:'ti-droplet', prodBonus:{ deuterium:1.15 }, bonusText:'+15% Deuterium-Produktion' },
-    kristall: { label:'Kristallwelt', icon:'ti-diamond', prodBonus:{ kristalle:1.15 }, bonusText:'+15% Kristall-Produktion' },
-    wueste: { label:'Wüstenwelt', icon:'ti-sun', prodBonus:{ energie:1.15 }, bonusText:'+15% Energie-Produktion' },
-    todeswelt: { label:'Todeswelt', icon:'ti-skull', prodBonus:{ erz:0.9, kristalle:0.9, deuterium:0.9, energie:0.9, forschungspunkte:0.9 }, defBonus:1.10, bonusText:'+10% Verteidigung, aber −10% Produktion' },
-    // Erdwelt ist das Ziel der Typ-Umwandlung (siehe TERRAFORM_TYPE_CHAIN) – großer Allround-Bonus auf
-    // ALLE Ressourcen. Bewusst das beste Ergebnis und entsprechend teuer zu erreichen.
-    erdwelt: { label:'Erdwelt', icon:'ti-world', prodBonus:{ erz:1.15, kristalle:1.15, deuterium:1.15, energie:1.15, forschungspunkte:1.15 }, bonusText:'+15% auf ALLE Ressourcen' }
+    vulkan: { label:'Vulkanwelt', icon:'ti-mountain', color:'#e0503f', prodBonus:{ erz:1.15 }, bonusText:'+15% Erz-Produktion' },
+    eis: { label:'Eiswelt', icon:'ti-droplet', color:'#bfe6f5', prodBonus:{ deuterium:1.15 }, bonusText:'+15% Deuterium-Produktion' },
+    kristall: { label:'Kristallwelt', icon:'ti-diamond', color:'#b39ef0', prodBonus:{ kristalle:1.15 }, bonusText:'+15% Kristall-Produktion' },
+    wueste: { label:'Wüstenwelt', icon:'ti-sun', color:'#e0b45a', prodBonus:{ energie:1.15 }, bonusText:'+15% Energie-Produktion' },
+    todeswelt: { label:'Todeswelt', icon:'ti-skull', color:'#6b2a2a', prodBonus:{ erz:0.9, kristalle:0.9, deuterium:0.9, energie:0.9, forschungspunkte:0.9 }, defBonus:1.10, bonusText:'+10% Verteidigung, aber −10% Produktion' },
+    // Erdwelt ist das anspruchsvollste Terraforming-Ziel – großer Allround-Bonus auf ALLE Ressourcen.
+    // Bewusst das beste Ergebnis und entsprechend teuer zu erreichen.
+    erdwelt: { label:'Erdwelt', icon:'ti-world', color:'#3ecf8e', prodBonus:{ erz:1.15, kristalle:1.15, deuterium:1.15, energie:1.15, forschungspunkte:1.15 }, bonusText:'+15% auf ALLE Ressourcen' }
   };
-  // Typ-Umwandlung ("echtes" Terraforming): wertet den Planetentyp entlang dieser Kette auf, von der
-  // schlechtesten (Todeswelt) zur besten (Erdwelt). Jeder Schritt ist sehr teuer und dauert lange.
-  // Getrennt vom Stufen-Terraforming (state.terraforming), das zusätzlich +5%/Stufe gibt. Planetentypen,
-  // die NICHT in dieser Kette stehen (Gasriese, Asteroid, Super, Erdähnlich), können nicht umgewandelt
-  // werden – ihre Umwandlung würde ihre Sonderrolle sprengen.
-  const TERRAFORM_TYPE_CHAIN = ['todeswelt','wueste','eis','vulkan','wasserwelt','kristall','erdwelt'];
-  function nextTerraformType(currentType){
-    const idx = TERRAFORM_TYPE_CHAIN.indexOf(currentType);
-    if (idx === -1 || idx >= TERRAFORM_TYPE_CHAIN.length-1) return null;
-    return TERRAFORM_TYPE_CHAIN[idx+1];
-  }
-  // Effektiver Typ eines Planeten: eine per Typ-Umwandlung erreichte Überschreibung hat Vorrang vor dem
+  // Terraformbare Zieltypen: freie Wahl, keine feste Reihenfolge mehr (Balance-Wunsch 13.07.2026,
+  // vorher eine feste Kette von der schlechtesten zur besten Welt). Typen NICHT in dieser Liste
+  // (Gasriese, Asteroid, Super, Erdähnlich) können nicht als Ziel gewählt werden – ihre Umwandlung
+  // würde ihre Sonderrolle sprengen.
+  const TERRAFORM_TARGET_TYPES = ['todeswelt','wueste','eis','vulkan','wasserwelt','kristall','erdwelt'];
+  // Effektiver Typ eines Planeten: eine per Terraforming erreichte Überschreibung hat Vorrang vor dem
   // fest im PLANETS-Array verdrahteten Basistyp. Zentral, damit Produktion, Verteidigung, Icons und
   // Labels konsistent denselben Typ sehen.
   function effectivePlanetType(planetKey){
@@ -5155,7 +5160,7 @@
         const orbP = orbitalStationOf(planet);
         if (orbP && orbP.focus==='prod') mineMult *= 1 + 0.03*orbP.level;
         mineMult *= planetEventResMult(planet, def.produces);
-        mineMult *= terraformProdMult(planet);
+        mineMult *= terraformProdMult(planet, def.produces);
         mineMult *= planetTypeProdMult(planet, def.produces);
         mineMult *= (1 + moduleBonusAt(planet, 'prod'));
         rates[def.produces] += (b[def.key]||0) * def.baseRate * mineMult;
@@ -5171,7 +5176,7 @@
         const orbFp = orbitalStationOf(planet);
         if (orbFp && orbFp.focus==='prod') fpMult *= 1 + 0.03*orbFp.level;
         fpMult *= planetEventResMult(planet, 'forschungspunkte');
-        fpMult *= terraformProdMult(planet);
+        fpMult *= terraformProdMult(planet, 'forschungspunkte');
         fpMult *= planetTypeProdMult(planet, 'forschungspunkte');
         fpMult *= (1 + moduleBonusAt(planet, 'prod'));
         const laborDef = BUILDING_DEFS.find(d=>d.key==='labor');
@@ -5256,6 +5261,11 @@
       }
       const orbS = orbitalStationOf(planet);
       if (orbS && orbS.focus==='dock') contrib += 150*orbS.level;
+      // Wasserwelt-Terraforming (voll abgeschlossen oder anteilig während der Umwandlung, siehe
+      // terraformStorageMult) gibt zusätzliches Lager auf diesem Standort.
+      const typeInfo = planet!=='home' ? PLANET_TYPE_INFO[effectivePlanetType(planet)] : null;
+      if (typeInfo && typeInfo.storageBonus) contrib *= typeInfo.storageBonus;
+      contrib *= terraformStorageMult(planet);
       cap += contrib;
     }
     const lvl = state.research.rlager||0;
@@ -5587,7 +5597,7 @@
       if (orbG && orbG.focus==='def') sub *= 1 + 0.08*orbG.level;
       const evG = planetEventOf(planet);
       if (evG && evG.def.effect.type==='def') sub *= evG.def.effect.mult;
-      sub *= planetTypeDefMult(planet);
+      sub *= planetTypeDefMult(planet) * terraformDefMult(planet);
       if (planet === 'home') sub *= HOME_DEFENSE_BONUS;
       power += sub * moonPenalty(planet);
     }
@@ -5600,7 +5610,7 @@
       if (orbF && orbF.focus==='def') shipDef *= 1 + 0.08*orbF.level;
       const evF = planetEventOf(planetKey);
       if (evF && evF.def.effect.type==='def') shipDef *= evF.def.effect.mult;
-      shipDef *= planetTypeDefMult(planetKey);
+      shipDef *= planetTypeDefMult(planetKey) * terraformDefMult(planetKey);
       if (planetKey === 'home') shipDef *= HOME_DEFENSE_BONUS;
       shipDef *= moonPenalty(planetKey);
       power += shipDef;
@@ -5609,7 +5619,7 @@
         let shipDef = shipDefenseContribution(f);
         const role = planetRoleOf(planet);
         if (role && role.key==='fortress') shipDef *= 1.30;
-        shipDef *= planetTypeDefMult(planet);
+        shipDef *= planetTypeDefMult(planet) * terraformDefMult(planet);
         if (planet === 'home') shipDef *= HOME_DEFENSE_BONUS;
         shipDef *= moonPenalty(planet);
         power += shipDef;
@@ -6452,9 +6462,37 @@
     if (state.activeResearch === undefined) state.activeResearch = null;
     if (!state.planetBonuses) state.planetBonuses = {};
     if (!state.terraforming) state.terraforming = {};
+    // Migration 13.07.2026: Terraforming komplett neu gebaut (freie Zielwahl statt fester Kette,
+    // verschmolzen mit dem alten typlosen Stufensystem). Altes state.terraforming[key] war eine reine
+    // Zahl (Stufe ohne Zieltyp) - wird zu {targetType:null, level: alteStufe} migriert. Der
+    // Stufenfortschritt bleibt erhalten (kein Ressourcenverlust), gibt aber erst wieder einen Bonus,
+    // sobald nachträglich ein Zieltyp gewählt wird (der alte Bonus war typlos, das neue System
+    // braucht zwingend ein Ziel).
+    for (const pk of Object.keys(state.terraforming)){
+      if (typeof state.terraforming[pk] === 'number') state.terraforming[pk] = { targetType: null, level: state.terraforming[pk] };
+    }
+    // Ein exakt zum Umstellungszeitpunkt laufender alter Terraforming-Auftrag (ohne targetType) kann
+    // mit der neuen Kostenstruktur nicht sauber fortgesetzt werden - wird storniert, Ressourcen voll
+    // zurückerstattet (seltener Rand-Fall).
+    if (state.terraformJob && state.terraformJob.targetType === undefined){
+      const refundCost = terraformCost(state.terraformJob.targetLevel);
+      gainResources(refundCost);
+      log('Terraforming wurde auf ein neues System umgestellt - dein laufender Auftrag wurde storniert und die Ressourcen zurückerstattet. Bitte wähle einen Zieltyp und starte neu.', 'ti-info-circle');
+      state.terraformJob = null;
+    }
     if (state.terraformJob === undefined) state.terraformJob = null;
     if (!state.planetTypeOverride) state.planetTypeOverride = {};
-    if (state.typeConvertJob === undefined) state.typeConvertJob = null;
+    // Die alte, separate Typ-Umwandlung (state.typeConvertJob) gibt es nicht mehr getrennt - ist im
+    // neuen System Teil von state.terraforming. Ein eventuell noch laufender alter Job wird ebenfalls
+    // storniert und erstattet (andere, jetzt nicht mehr existierende Kostenstruktur).
+    if (state.typeConvertJob){
+      const legacyChain = ['todeswelt','wueste','eis','vulkan','wasserwelt','kristall','erdwelt'];
+      const legacyIdx = Math.max(1, legacyChain.indexOf(state.typeConvertJob.targetType));
+      const legacyF = Math.pow(2.2, legacyIdx);
+      gainResources({ erz: Math.round(25000*legacyF), kristalle: Math.round(15000*legacyF), deuterium: Math.round(8000*legacyF), antimaterie: Math.round(400*legacyF) });
+      log('Die alte Typ-Umwandlung wurde durch das neue Terraforming-System ersetzt - dein laufender Auftrag wurde storniert und die Ressourcen zurückerstattet.', 'ti-info-circle');
+      state.typeConvertJob = null;
+    }
     if (state.commandPoints === undefined) state.commandPoints = 0;
     if (!state.officers) state.officers = {};
     if (state.credits === undefined) state.credits = 250;
@@ -8259,9 +8297,8 @@
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Monde haben keine eigene Karte mehr: Ein kolonisierter Mond ist überall über das Mond-Symbol am zugehörigen Planeten erreichbar (Übersichts-Karten, Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste) und wird auch in der Sektorkarten-Planetenliste beim Planeten angezeigt.' },
       { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
-      { title:'Terraforming', body:'Jeder Standort (Heimatbasis und Kolonien, nicht Monde) kann terraformt werden – Stufe 0 bis 10, jede Stufe gibt <strong>+5% Produktion</strong> dort (bis zu +50% bei Stufe 10). Höhere Stufen kosten exponentiell mehr Erz/Kristalle/Deuterium und brauchen eine mit der Stufe steigende Umwandlungszeit. Es kann immer nur <strong>ein Terraforming gleichzeitig</strong> laufen. Zu finden im Basis-Tab unter der Planeten-Rolle.' },
+      { title:'Terraforming', body:'Jede Kolonie (nicht die Heimatbasis, nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie) - es kann immer nur eine Stufe gleichzeitig laufen. Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen, der Planet trägt den neuen Typ dauerhaft und wird auf der Sektorkarte sofort in der passenden Farbe des neuen Typs dargestellt. Insgesamt deutlich teurer als früher. Zu finden im Basis-Tab.' },
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
-      { title:'Typ-Umwandlung (echtes Terraforming)', body:'Getrennt vom Stufen-Terraforming kann der <strong>Planetentyp selbst</strong> aufgewertet werden, entlang der Kette Todeswelt → Wüstenwelt → Eiswelt → Vulkanwelt → Wasserwelt → Kristallwelt → <strong>Erdwelt</strong>. Jeder Schritt ist <strong>sehr teuer</strong> (Erz/Kristalle/Deuterium/Antimaterie) und dauert lange (30 Min. bis mehrere Stunden), es kann immer nur eine Umwandlung gleichzeitig laufen. So lässt sich aus einer schlechten Todeswelt über viele Schritte die bestmögliche Erdwelt formen. Zu finden im Basis-Tab unter dem Stufen-Terraforming. Nur Planeten in dieser Kette sind umwandelbar (nicht Gasriesen, Asteroiden oder Superplaneten).' }
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
       { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 45% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
@@ -9933,9 +9970,23 @@
         if (state.activeResearch === undefined) state.activeResearch = null;
         if (!state.planetBonuses) state.planetBonuses = {};
         if (!state.terraforming) state.terraforming = {};
+        for (const pk of Object.keys(state.terraforming)){
+          if (typeof state.terraforming[pk] === 'number') state.terraforming[pk] = { targetType: null, level: state.terraforming[pk] };
+        }
+        if (state.terraformJob && state.terraformJob.targetType === undefined){
+          const refundCost = terraformCost(state.terraformJob.targetLevel);
+          gainResources(refundCost);
+          state.terraformJob = null;
+        }
         if (state.terraformJob === undefined) state.terraformJob = null;
         if (!state.planetTypeOverride) state.planetTypeOverride = {};
-        if (state.typeConvertJob === undefined) state.typeConvertJob = null;
+        if (state.typeConvertJob){
+          const legacyChain = ['todeswelt','wueste','eis','vulkan','wasserwelt','kristall','erdwelt'];
+          const legacyIdx = Math.max(1, legacyChain.indexOf(state.typeConvertJob.targetType));
+          const legacyF = Math.pow(2.2, legacyIdx);
+          gainResources({ erz: Math.round(25000*legacyF), kristalle: Math.round(15000*legacyF), deuterium: Math.round(8000*legacyF), antimaterie: Math.round(400*legacyF) });
+          state.typeConvertJob = null;
+        }
         if (state.commandPoints === undefined) state.commandPoints = 0;
         if (!state.officers) state.officers = {};
         if (state.credits === undefined) state.credits = 250;
@@ -10767,93 +10818,95 @@
     playSound('build');
     render(); save();
   }
-  // ===== Typ-Umwandlung ("echtes" Terraforming: verändert den Planetentyp selbst) =====
-  // Sehr teuer und langwierig. Führt einen Planeten entlang TERRAFORM_TYPE_CHAIN eine Stufe weiter
-  // (schlechtester Typ -> ... -> Erdwelt). Nur Typen in der Kette sind umwandelbar.
-  function typeConvertCost(targetType){
-    // Index in der Kette bestimmt den Preis – je näher an Erde, desto teurer. Bewusst hoch.
-    const idx = TERRAFORM_TYPE_CHAIN.indexOf(targetType);
-    const f = Math.pow(2.2, idx); // idx 1..6
+  // ===== Terraforming (13.07.2026 neu gebaut) =====
+  // Vorher zwei getrennte Systeme: ein typloses Stufensystem (nur Produktions-Flatbonus) und eine
+  // separate, sehr teure Typ-Umwandlung entlang einer FESTEN Kette (schlechtester -> bester Typ).
+  // Jetzt verschmolzen: man wählt EINMAL frei einen Zieltyp (keine feste Reihenfolge mehr), danach
+  // läuft die Umwandlung in 10 Stufen ab - jede Stufe ein eigener, mehrstündiger Vorgang (wie eine
+  // Bauwarteschlange, jeweils nur EIN Terraforming-Vorhaben gleichzeitig). Jede einzelne Stufe
+  // gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; bei Stufe 10 ist die Umwandlung
+  // abgeschlossen, der Planet trägt den neuen Typ dauerhaft (inkl. neuer Farbe auf der Sektorkarte,
+  // siehe buildMap) und effectivePlanetType()/planetTypeProdMult() übernehmen den vollen Bonus direkt
+  // - terraformProdMult() gibt ab dann bewusst keinen zusätzlichen Bonus mehr (keine Doppelzählung).
+  // Insgesamt deutlich teurer als das alte, zieltyp-lose Stufensystem.
+  const TERRAFORM_MAX_LEVEL = 10;
+  function terraformStateOf(planetKey){ return (state.terraforming||{})[planetKey||'home'] || null; }
+  function terraformLevel(planetKey){ const t = terraformStateOf(planetKey); return t ? (t.level||0) : 0; }
+  function terraformTargetType(planetKey){ const t = terraformStateOf(planetKey); return t ? t.targetType : null; }
+  // Produktions-/Forschungs-Multiplikator aus LAUFENDEM Terraforming (Anteil am Zieltyp-Bonus,
+  // proportional zur erreichten Stufe). Ist die Umwandlung schon voll abgeschlossen (Stufe 10),
+  // übernimmt bereits effectivePlanetType()/planetTypeProdMult() den vollen Bonus - hier dann bewusst
+  // 1 (kein Effekt), sonst würde der Bonus doppelt gezählt.
+  function terraformProdMult(planetKey, resKey){
+    const t = terraformStateOf(planetKey);
+    if (!t || !t.targetType || t.level >= TERRAFORM_MAX_LEVEL) return 1;
+    const info = PLANET_TYPE_INFO[t.targetType];
+    if (!info || !info.prodBonus || info.prodBonus[resKey] === undefined) return 1;
+    const fullBonusAmount = info.prodBonus[resKey] - 1; // z.B. 0.15, oder -0.1 bei der Todeswelt-Malus
+    return 1 + fullBonusAmount * (t.level / TERRAFORM_MAX_LEVEL);
+  }
+  // Verteidigungs-Multiplikator aus laufendem Terraforming, analoges Prinzip (aktuell nur Todeswelt).
+  function terraformDefMult(planetKey){
+    const t = terraformStateOf(planetKey);
+    if (!t || !t.targetType || t.level >= TERRAFORM_MAX_LEVEL) return 1;
+    const info = PLANET_TYPE_INFO[t.targetType];
+    if (!info || !info.defBonus) return 1;
+    return 1 + (info.defBonus - 1) * (t.level / TERRAFORM_MAX_LEVEL);
+  }
+  // Lager-Multiplikator aus laufendem Terraforming, analoges Prinzip (aktuell nur Wasserwelt).
+  function terraformStorageMult(planetKey){
+    const t = terraformStateOf(planetKey);
+    if (!t || !t.targetType || t.level >= TERRAFORM_MAX_LEVEL) return 1;
+    const info = PLANET_TYPE_INFO[t.targetType];
+    if (!info || !info.storageBonus) return 1;
+    return 1 + (info.storageBonus - 1) * (t.level / TERRAFORM_MAX_LEVEL);
+  }
+  // Kosten für den Sprung auf die NÄCHSTE Stufe (targetLevel = aktuelle+1). Deutlich teurer als das
+  // alte Stufensystem (Balance-Wunsch 13.07.2026) - inkl. Antimaterie-Kosten (vorher nur bei der
+  // separaten Typ-Umwandlung), da eine echte Typveränderung mehr wiegen soll als reine
+  // Produktionssteigerung. Bei Stufe 10 ca. 1,5 Mio. Erz - bewusst ein spätes Endgame-Investment.
+  function terraformCost(nextLevel){
+    const f = Math.pow(2.0, nextLevel - 1);
     return {
-      erz: Math.round(25000 * f),
-      kristalle: Math.round(15000 * f),
-      deuterium: Math.round(8000 * f),
-      antimaterie: Math.round(400 * f)
+      erz: Math.round(3000 * f),
+      kristalle: Math.round(1800 * f),
+      deuterium: Math.round(900 * f),
+      antimaterie: Math.round(15 * f)
     };
   }
-  function typeConvertDuration(targetType){
-    const idx = TERRAFORM_TYPE_CHAIN.indexOf(targetType);
-    return 1800 + idx * 1800; // 30 Min. bis ~3,5 Std. je nach Zielstufe
-  }
-  function canConvertType(planetKey){
+  // Umwandlungsdauer in Sekunden - "mehrere Stunden" je Stufe, wächst mit der Zielstufe (Stufe 1 ~3,5
+  // Std., Stufe 10 ~7 Std.).
+  function terraformDuration(nextLevel){ return 3*3600 + nextLevel * 1800 + Math.round(Math.pow(1.25, nextLevel) * 300); }
+  function canStartTerraform(planetKey){
     if (!planetKey || planetKey==='home') return false;
     if (planetKey !== 'home' && !state.colonies[planetKey]) return false;
     if (typeof isMoonKey==='function' && isMoonKey(planetKey)) return false;
-    const cur = effectivePlanetType(planetKey);
-    return !!nextTerraformType(cur);
+    return true;
   }
-  function startTypeConvert(planetKey){
-    if (state.typeConvertJob){ log('Es läuft bereits eine Typ-Umwandlung.', 'ti-alert-triangle'); return; }
-    if (!canConvertType(planetKey)){ log('Dieser Planetentyp kann nicht (weiter) umgewandelt werden.', 'ti-alert-triangle'); return; }
-    const cur = effectivePlanetType(planetKey);
-    const target = nextTerraformType(cur);
-    const cost = typeConvertCost(target);
-    for (const [k,v] of Object.entries(cost)){
-      if ((state.resources[k]||0) < v){ log('Nicht genug Ressourcen für die Typ-Umwandlung zu '+(PLANET_TYPE_INFO[target].label)+'.', 'ti-alert-triangle'); return; }
-    }
-    for (const [k,v] of Object.entries(cost)) state.resources[k] -= v;
-    const dur = typeConvertDuration(target);
-    state.typeConvertJob = { planet: planetKey, targetType: target, endTime: Date.now() + dur*1000, totalDuration: dur };
-    log('Typ-Umwandlung auf '+displayPlanetName(planetKey)+' gestartet (Ziel: '+PLANET_TYPE_INFO[target].label+').', 'ti-plant');
-    playSound('build');
-    render(); save();
-  }
-  function processTypeConvertJob(){
-    if (!state.typeConvertJob) return;
-    if (Date.now() < state.typeConvertJob.endTime) return;
-    const job = state.typeConvertJob;
-    state.planetTypeOverride[job.planet] = job.targetType;
-    state.typeConvertJob = null;
-    log('Typ-Umwandlung abgeschlossen: '+displayPlanetName(job.planet)+' ist jetzt eine '+PLANET_TYPE_INFO[job.targetType].label+'.', 'ti-world');
-    playSound('complete');
-  }
-
-  // ===== Terraforming =====
-  // Pro Planet/Heimatbasis eine Stufe 0-10, jede Stufe gibt +5% Produktion auf diesem Standort
-  // (bis zu +50% bei Stufe 10). Höherstufen kosten exponentiell mehr Ressourcen und brauchen eine mit
-  // der Stufe steigende Umwandlungszeit (jeweils nur EIN Terraforming-Vorhaben gleichzeitig, wie eine
-  // Bauwarteschlange). Greift multiplikativ in die Produktion ein (siehe mineMult in der Produktions-
-  // berechnung) und lässt Ressourcennamen/Balance des restlichen Spiels unangetastet.
-  const TERRAFORM_MAX_LEVEL = 10;
-  const TERRAFORM_PROD_PER_LEVEL = 0.05;
-  function terraformLevel(planetKey){ return (state.terraforming||{})[planetKey||'home'] || 0; }
-  function terraformProdMult(planetKey){ return 1 + terraformLevel(planetKey) * TERRAFORM_PROD_PER_LEVEL; }
-  // Kosten für den Sprung auf die NÄCHSTE Stufe (targetLevel = aktuelle+1). Exponentiell steigend.
-  function terraformCost(nextLevel){
-    const f = Math.pow(1.9, nextLevel - 1);
-    return {
-      erz: Math.round(1200 * f),
-      kristalle: Math.round(700 * f),
-      deuterium: Math.round(300 * f)
-    };
-  }
-  // Umwandlungsdauer in Sekunden – steigt mit der Zielstufe (Stufe 1 ~2 Min., Stufe 10 ~50 Min.).
-  function terraformDuration(nextLevel){ return 90 + nextLevel * 90 + Math.round(Math.pow(1.35, nextLevel) * 12); }
-  function startTerraform(planetKey){
+  // Startet die nächste Stufe. targetType wird beim ALLERERSTEN Start (Stufe 0) festgelegt und kann
+  // danach nicht mehr gewechselt werden, ohne bereits investierten Fortschritt für den ursprünglichen
+  // Zieltyp zu verlieren - ein Wechsel ist nur möglich, solange noch keine Stufe abgeschlossen ist.
+  function startTerraform(planetKey, targetType){
     planetKey = planetKey || 'home';
-    if (state.terraformJob){ log('Es läuft bereits eine Terraforming-Umwandlung.', 'ti-alert-triangle'); return; }
-    const cur = terraformLevel(planetKey);
-    if (cur >= TERRAFORM_MAX_LEVEL){ log('Dieser Planet ist bereits vollständig terraformt (Stufe 10).', 'ti-alert-triangle'); return; }
-    if (planetKey !== 'home' && !state.colonies[planetKey]){ log('Ungültiger Standort.', 'ti-alert-triangle'); return; }
-    const next = cur + 1;
+    if (state.terraformJob){ log('Es läuft bereits eine Terraforming-Stufe.', 'ti-alert-triangle'); return; }
+    if (!canStartTerraform(planetKey)){ log('Ungültiger Standort für Terraforming.', 'ti-alert-triangle'); return; }
+    if (!TERRAFORM_TARGET_TYPES.includes(targetType)){ log('Dieser Zieltyp kann nicht per Terraforming erreicht werden.', 'ti-alert-triangle'); return; }
+    const existing = terraformStateOf(planetKey);
+    if (existing && existing.targetType && existing.targetType !== targetType && existing.level > 0){
+      log('Es läuft bereits eine Umwandlung Richtung '+(PLANET_TYPE_INFO[existing.targetType]||{}).label+' - erst abschließen, um einen anderen Zieltyp zu wählen.', 'ti-alert-triangle');
+      return;
+    }
+    const curLevel = existing ? (existing.level||0) : 0;
+    if (curLevel >= TERRAFORM_MAX_LEVEL){ log('Dieser Planet ist bereits vollständig terraformt.', 'ti-alert-triangle'); return; }
+    const next = curLevel + 1;
     const cost = terraformCost(next);
     for (const [k,v] of Object.entries(cost)){
-      if ((state.resources[k]||0) < v){ log('Nicht genug Ressourcen für Terraforming Stufe '+next+'.', 'ti-alert-triangle'); return; }
+      if ((state.resources[k]||0) < v){ log('Nicht genug Ressourcen für Terraforming-Stufe '+next+' zu '+PLANET_TYPE_INFO[targetType].label+'.', 'ti-alert-triangle'); return; }
     }
     for (const [k,v] of Object.entries(cost)) state.resources[k] -= v;
     const dur = terraformDuration(next);
-    state.terraformJob = { planet: planetKey, targetLevel: next, endTime: Date.now() + dur*1000, totalDuration: dur };
-    log('Terraforming auf '+displayPlanetName(planetKey)+' gestartet (Ziel: Stufe '+next+').', 'ti-plant');
+    state.terraformJob = { planet: planetKey, targetType, targetLevel: next, endTime: Date.now() + dur*1000, totalDuration: dur };
+    log('Terraforming auf '+displayPlanetName(planetKey)+' gestartet: Stufe '+next+'/'+TERRAFORM_MAX_LEVEL+' Richtung '+PLANET_TYPE_INFO[targetType].label+' ('+fmtDuration(dur)+').', 'ti-plant');
     playSound('build');
     render(); save();
   }
@@ -10861,9 +10914,17 @@
     if (!state.terraformJob) return;
     if (Date.now() < state.terraformJob.endTime) return;
     const job = state.terraformJob;
-    state.terraforming[job.planet] = job.targetLevel;
+    if (!state.terraforming) state.terraforming = {};
+    state.terraforming[job.planet] = { targetType: job.targetType, level: job.targetLevel };
     state.terraformJob = null;
-    log('Terraforming abgeschlossen: '+displayPlanetName(job.planet)+' erreicht Stufe '+job.targetLevel+' (+'+Math.round(job.targetLevel*TERRAFORM_PROD_PER_LEVEL*100)+'% Produktion).', 'ti-plant');
+    const info = PLANET_TYPE_INFO[job.targetType];
+    if (job.targetLevel >= TERRAFORM_MAX_LEVEL){
+      if (!state.planetTypeOverride) state.planetTypeOverride = {};
+      state.planetTypeOverride[job.planet] = job.targetType;
+      log('Terraforming abgeschlossen: '+displayPlanetName(job.planet)+' ist jetzt eine '+info.label+'!', 'ti-world');
+    } else {
+      log('Terraforming-Stufe '+job.targetLevel+'/'+TERRAFORM_MAX_LEVEL+' auf '+displayPlanetName(job.planet)+' erreicht (Richtung '+info.label+').', 'ti-plant');
+    }
     playSound('complete');
   }
   // Hilfsfunktion für einen lesbaren Standortnamen (Heimatbasis oder Kolonie/Mond).
@@ -11904,12 +11965,21 @@
       const pos = planetOrbitXY(p);
       const px = pos.x.toFixed(1), py = pos.y.toFixed(1);
       const r = p.type==='super' ? 14 : 11;
+      // Farbe kommt aus dem effektiven Typ (berücksichtigt eine abgeschlossene Terraforming-
+      // Umwandlung) statt aus der historisch eher zufälligen Einzelplaneten-Farbe - macht den Typ auf
+      // der Karte konsistent erkennbar und ändert sich sofort sichtbar nach abgeschlossenem
+      // Terraforming (Balance-/Feature-Wunsch 13.07.2026).
+      const effType = effectivePlanetType(p.id) || p.type;
+      const bodyColor = (PLANET_TYPE_INFO[effType] && PLANET_TYPE_INFO[effType].color) || p.color;
+      const tfState = terraformStateOf(p.id);
+      const tfInProgress = tfState && tfState.targetType && tfState.level > 0 && tfState.level < TERRAFORM_MAX_LEVEL;
       inner += `
         <g class="planet-node" data-planet="${p.id}">
           ${highlightActive && colonyHighlight.key===p.id ? `<circle class="find-highlight pulse" cx="${px}" cy="${py}" r="8"/>` : ''}
           ${p.type==='super' ? `<circle cx="${px}" cy="${py}" r="${r+5}" fill="none" stroke="#f3aec6" stroke-opacity="0.5"><animate attributeName="r" values="${r+4};${r+8};${r+4}" dur="2.4s" repeatCount="indefinite"/></circle>` : ''}
           ${isMine ? `<circle cx="${px}" cy="${py}" r="${r+4}" fill="none" stroke="#5dcaa5" stroke-width="2"/><circle cx="${px}" cy="${py}" r="${r+4}" fill="none" stroke="#5dcaa5" stroke-opacity="0.4"><animate attributeName="r" values="${r+3};${r+7};${r+3}" dur="2.6s" repeatCount="indefinite"/></circle>` : ''}
-          <circle class="body" cx="${px}" cy="${py}" r="${r}" fill="${p.color}" opacity="${disc?1:0.55}"/>
+          <circle class="body" cx="${px}" cy="${py}" r="${r}" fill="${bodyColor}" opacity="${disc?1:0.55}"/>
+          ${tfInProgress ? `<circle cx="${px}" cy="${py}" r="${r+2}" fill="none" stroke="${(PLANET_TYPE_INFO[tfState.targetType]||{}).color||'#5dcaa5'}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.8"><title>Terraforming Stufe ${tfState.level}/${TERRAFORM_MAX_LEVEL} Richtung ${(PLANET_TYPE_INFO[tfState.targetType]||{}).label||''}</title></circle>` : ''}
           ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-dasharray="2,2"/>`}
           ${isMine ? `<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="6" fill="#5dcaa5" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700;">★</text>` : ''}
           ${hasDebris ? `<g data-map-debris="${p.id}"><circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="7" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>` : ''}
@@ -13016,34 +13086,43 @@
         }
       }
       // Terraforming – funktioniert auf ALLEN Standorten inkl. Heimatbasis (anders als Rollen), außer
-      // Monden (die haben ihren eigenen Mond-Malus und keine Terraforming-Mechanik).
+      // Monden (die haben ihren eigenen Mond-Malus und keine Terraforming-Mechanik). Heimatbasis kann
+      // keinen Zieltyp wählen (hat keinen Planetentyp im eigentlichen Sinn) - zeigt nichts an.
       const terraBox = document.getElementById('terraformBox');
       if (terraBox){
         const pk = state.activeBasePlanet;
-        if (isMoonKey(pk)){
+        if (isMoonKey(pk) || pk==='home'){
           terraBox.innerHTML = '';
         } else {
+          const tfState = terraformStateOf(pk);
           const lvl = terraformLevel(pk);
+          const targetType = terraformTargetType(pk);
           const job = state.terraformJob && state.terraformJob.planet === pk ? state.terraformJob : null;
           const otherJob = state.terraformJob && state.terraformJob.planet !== pk ? state.terraformJob : null;
+          const curType = effectivePlanetType(pk);
+          const curInfo = PLANET_TYPE_INFO[curType] || {};
           let html = `<div class="section-title" style="margin-top:0.5rem; justify-content:space-between;"><span><i class="ti ti-plant" aria-hidden="true"></i>Terraforming: ${planetDisplayName(pk)}</span><button class="help-jump-btn" data-jump-help="kolonien"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>`;
           html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <span class="bname">Stufe ${lvl} / ${TERRAFORM_MAX_LEVEL}</span>
-              <span class="lvl-pill" style="background:rgba(93,202,165,0.18); color:#5dcaa5;">+${Math.round(lvl*TERRAFORM_PROD_PER_LEVEL*100)}% Produktion</span>
-            </div>
-            <div class="progress-outer"><div class="progress-inner" style="width:${(lvl/TERRAFORM_MAX_LEVEL*100).toFixed(0)}%; background:#5dcaa5;"></div></div>`;
+            <div class="bmeta" style="margin-bottom:8px;">Aktueller Typ: <i class="ti ${curInfo.icon||'ti-planet'}" aria-hidden="true" style="color:${curInfo.color||'#c7cbe0'};"></i> <strong>${curInfo.label||curType}</strong>${curInfo.bonusText?` <span style="color:#5dcaa5;">(${curInfo.bonusText})</span>`:''}</div>`;
+
           if (job){
+            // Eine Stufe läuft gerade.
             const remain = Math.max(0, job.endTime-Date.now());
             const pct = Math.max(0, Math.min(100, 100-(remain/(job.totalDuration*1000)*100)));
-            html += `<div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
-                <span class="bmeta"><i class="ti ti-plant" aria-hidden="true"></i> Umwandlung zu Stufe ${job.targetLevel} läuft…</span>
+            const tInfo = PLANET_TYPE_INFO[job.targetType]||{};
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span class="bname">Stufe ${job.targetLevel} / ${TERRAFORM_MAX_LEVEL}</span>
+                <span class="lvl-pill" style="background:rgba(93,202,165,0.18); color:#5dcaa5;">Richtung ${tInfo.label}</span>
+              </div>
+              <div class="progress-outer"><div class="progress-inner" style="width:${((job.targetLevel-1)/TERRAFORM_MAX_LEVEL*100).toFixed(0)}%; background:${tInfo.color||'#5dcaa5'};"></div></div>
+              <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span class="bmeta"><i class="ti ti-plant" aria-hidden="true"></i> Umwandlung läuft…</span>
                 <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
               </div>
               <div class="progress-outer" style="margin-top:4px;"><div class="progress-inner" style="width:${pct}%;"></div></div>`;
-          } else if (lvl >= TERRAFORM_MAX_LEVEL){
-            html += `<div class="bmeta" style="margin-top:10px; color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Vollständig terraformt – Maximalstufe erreicht.</div>`;
-          } else {
+          } else if (targetType && lvl > 0 && lvl < TERRAFORM_MAX_LEVEL){
+            // Zieltyp gewählt, mitten in der Umwandlung, aktuell keine Stufe aktiv - nächste Stufe anbieten.
+            const tInfo = PLANET_TYPE_INFO[targetType]||{};
             const next = lvl+1;
             const cost = terraformCost(next);
             const dur = terraformDuration(next);
@@ -13052,56 +13131,35 @@
               const enough = (state.resources[k]||0) >= v;
               return `<span style="display:inline-flex; align-items:center; gap:3px; margin-right:10px; color:${enough?'#c7cbe0':'#e24b4a'};"><i class="ti ${rd?rd.icon:'ti-planet'}" aria-hidden="true" style="color:${rd?rd.color:'#c7cbe0'};"></i>${fmt(v)}</span>`;
             }).join('');
-            html += `<div style="margin-top:12px;">
-                <div class="bmeta" style="margin-bottom:6px;">Nächste Stufe ${next}: <span style="color:#5dcaa5;">+5% Produktion</span> · Dauer ${fmtDuration(dur)}</div>
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span class="bname">Stufe ${lvl} / ${TERRAFORM_MAX_LEVEL}</span>
+                <span class="lvl-pill" style="background:rgba(93,202,165,0.18); color:#5dcaa5;">Richtung <i class="ti ${tInfo.icon}" aria-hidden="true"></i> ${tInfo.label}</span>
+              </div>
+              <div class="progress-outer"><div class="progress-inner" style="width:${(lvl/TERRAFORM_MAX_LEVEL*100).toFixed(0)}%; background:${tInfo.color||'#5dcaa5'};"></div></div>
+              <div style="margin-top:12px;">
+                <div class="bmeta" style="margin-bottom:6px;">Nächste Stufe ${next}: Dauer ${fmtDuration(dur)}</div>
                 <div style="margin-bottom:8px; font-size:12px;">${costHtml}</div>
-                <button data-start-terraform="1" ${otherJob?'disabled':''} style="width:100%;"><i class="ti ti-plant" aria-hidden="true" style="margin-right:4px;"></i>${otherJob?'Anderes Terraforming läuft…':'Terraforming starten'}</button>
+                <button data-continue-terraform="1" ${otherJob?'disabled':''} style="width:100%;"><i class="ti ti-plant" aria-hidden="true" style="margin-right:4px;"></i>${otherJob?'Anderes Terraforming läuft…':'Nächste Stufe starten'}</button>
               </div>`;
+          } else if (targetType && lvl >= TERRAFORM_MAX_LEVEL){
+            html += `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Vollständig zu ${(PLANET_TYPE_INFO[targetType]||{}).label} terraformt.</div>`;
+          }
+
+          if (!job && (lvl === 0 || lvl >= TERRAFORM_MAX_LEVEL)){
+            // Kein Zieltyp gewählt (Stufe 0) oder vorheriges Ziel abgeschlossen - Auswahl anbieten.
+            const options = TERRAFORM_TARGET_TYPES.filter(t => t !== curType);
+            html += `<div class="bmeta" style="margin:${lvl>=TERRAFORM_MAX_LEVEL?'10px':'0'} 0 8px;">${lvl>=TERRAFORM_MAX_LEVEL?'Erneut terraformen zu einem anderen Typ:':'Zieltyp wählen, um mit dem Terraforming zu beginnen:'}</div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                ${options.map(t => { const ti = PLANET_TYPE_INFO[t]; return `<button data-pick-terraform-target="${t}" ${otherJob?'disabled':''} style="font-size:10.5px; flex:1; min-width:120px;" title="${ti.bonusText||''}"><i class="ti ${ti.icon}" aria-hidden="true" style="margin-right:3px; color:${ti.color};"></i>${ti.label}</button>`; }).join('')}
+              </div>
+              <div class="bmeta" style="margin-top:6px; font-size:11px;">10 Stufen à mehrere Stunden, insgesamt teuer - jede Stufe gewährt nur einen kleinen Anteil des vollen Bonus, erst bei Stufe 10 ist die Umwandlung (inkl. neuer Farbe auf der Sektorkarte) abgeschlossen.</div>`;
           }
           html += `</div>`;
 
-          // Typ-Umwandlung ("echtes" Terraforming) – nur für Planeten in der Aufwertungskette.
-          const curType = effectivePlanetType(pk);
-          const curInfo = PLANET_TYPE_INFO[curType] || {};
-          const convJob = state.typeConvertJob && state.typeConvertJob.planet === pk ? state.typeConvertJob : null;
-          const otherConvJob = state.typeConvertJob && state.typeConvertJob.planet !== pk ? state.typeConvertJob : null;
-          const nextType = nextTerraformType(curType);
-          if (nextType || convJob || (curType && TERRAFORM_TYPE_CHAIN.includes(curType))){
-            html += `<div class="section-title" style="margin-top:1rem; justify-content:space-between;"><span><i class="ti ti-world" aria-hidden="true"></i>Typ-Umwandlung</span></div>`;
-            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;">
-              <div class="bmeta" style="margin-bottom:8px;">Aktueller Typ: <i class="ti ${curInfo.icon||'ti-planet'}" aria-hidden="true"></i> <strong>${curInfo.label||curType}</strong>${curInfo.bonusText?` <span style="color:#5dcaa5;">(${curInfo.bonusText})</span>`:''}</div>`;
-            if (convJob){
-              const remain = Math.max(0, convJob.endTime-Date.now());
-              const pct = Math.max(0, Math.min(100, 100-(remain/(convJob.totalDuration*1000)*100)));
-              const tInfo = PLANET_TYPE_INFO[convJob.targetType]||{};
-              html += `<div style="display:flex; justify-content:space-between; align-items:center;">
-                  <span class="bmeta"><i class="ti ti-world" aria-hidden="true"></i> Umwandlung zu ${tInfo.label} läuft…</span>
-                  <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
-                </div>
-                <div class="progress-outer" style="margin-top:4px;"><div class="progress-inner" style="width:${pct}%; background:#5dcaa5;"></div></div>`;
-            } else if (!nextType){
-              html += `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Bestmöglicher Typ erreicht (Erdwelt).</div>`;
-            } else {
-              const tInfo = PLANET_TYPE_INFO[nextType]||{};
-              const cost = typeConvertCost(nextType);
-              const dur = typeConvertDuration(nextType);
-              const costHtml2 = Object.entries(cost).map(([k,v]) => {
-                const rd = RES_DEFS.find(r=>r.key===k);
-                const enough = (state.resources[k]||0) >= v;
-                return `<span style="display:inline-flex; align-items:center; gap:3px; margin-right:10px; color:${enough?'#c7cbe0':'#e24b4a'};"><i class="ti ${rd?rd.icon:'ti-planet'}" aria-hidden="true" style="color:${rd?rd.color:'#c7cbe0'};"></i>${fmt(v)}</span>`;
-              }).join('');
-              html += `<div class="bmeta" style="margin-bottom:6px;">Nächster Typ: <i class="ti ${tInfo.icon}" aria-hidden="true"></i> <strong>${tInfo.label}</strong> <span style="color:#5dcaa5;">(${tInfo.bonusText})</span> · Dauer ${fmtDuration(dur)}</div>
-                <div style="margin-bottom:8px; font-size:12px;">${costHtml2}</div>
-                <button data-start-typeconvert="1" ${otherConvJob?'disabled':''} style="width:100%;"><i class="ti ti-world" aria-hidden="true" style="margin-right:4px;"></i>${otherConvJob?'Andere Umwandlung läuft…':'Typ umwandeln (sehr teuer)'}</button>`;
-            }
-            html += `</div>`;
-          }
-
           terraBox.innerHTML = html;
-          const startBtn = terraBox.querySelector('[data-start-terraform]');
-          if (startBtn) startBtn.onclick = () => startTerraform(pk);
-          const convBtn = terraBox.querySelector('[data-start-typeconvert]');
-          if (convBtn) convBtn.onclick = () => startTypeConvert(pk);
+          const continueBtn = terraBox.querySelector('[data-continue-terraform]');
+          if (continueBtn) continueBtn.onclick = () => startTerraform(pk, targetType);
+          terraBox.querySelectorAll('[data-pick-terraform-target]').forEach(btn => btn.onclick = () => startTerraform(pk, btn.getAttribute('data-pick-terraform-target')));
         }
       }
       const colonyRenameInput = document.getElementById('colonyRenameInput');
@@ -15609,7 +15667,6 @@
     const constructionDone = processConstructionQueue();
     const roleChangeDone = processPlanetRoleChanges();
     processTerraformJob();
-    processTypeConvertJob();
     processTradeRoutes();
     processConqueredSystems();
     processFactionGifts();
