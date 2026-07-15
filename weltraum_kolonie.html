@@ -1721,8 +1721,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.27.2';
+  const VERSION = '8.28.0';
   const PATCHNOTES = [
+    { version:'8.28.0', date:'13.07.2026', changes:[
+      'Angriffs- und Verteidigungskraft grundlegend umgebaut: dieselbe Formel-Familie, die bei der Produktion schon einmal behoben wurde (viele kleine Boni multiplizierten sich pur miteinander, bei einem weit entwickelten Spieler bis zum 8-9-fachen). Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Verteidigungstechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt und Artefakt-Bonus werden jetzt zu einer additiven Gruppe zusammengefasst und gemeinsam bei +100% gedeckelt - dieselbe Logik wie beim Produktions-Bonus. Doktrin, Stance, Forschung und ortsgebundene Boni (Rolle, Orbitalring, Heimatbonus) bleiben bewusst multiplikativ, da sie aktive Entscheidungen statt "nebenbei stapelnder" Boni sind. Wirkung bei üblicher Entwicklung eher gering, verhindert aber unbegrenztes Aufschaukeln bei sehr weit entwickelten Spielern/Allianzen - und schließt dieselbe Lücke, die bei künftigen neuen Kampf-Boni sonst erneut aufgetreten wäre'
+    ]},
     { version:'8.27.2', date:'13.07.2026', changes:[
       'Ökonomie weiter durchgeprüft: Tagesaufgaben-Ressourcenbelohnung nutzte dieselbe Formel-Familie wie die bereits behobenen Fälle (Piratennester, Eisenlegion-Geschenk, Wochenliga) - 30 Minuten eigene Produktion je Aufgabe, bis zu 5x täglich. Auf 5 Minuten reduziert. Markt-Handelsmechanik geprüft: sauber designt (Preis bewegt sich mit Slippage bei jedem Trade), kein Exploit gefunden'
     ]},
@@ -5435,16 +5438,29 @@
     let power = attackPowerRaw(fleet);
     const doc = activeDoctrine();
     if (doc) power *= doc.atkMult;
-    power *= (1 + prestigePerkCount('combat')*0.03);
-    power *= (1 + ascBonus('combat')*0.02);
-    power *= (1 + skillBonusPct('war'));
-    power *= megaProjectCombatMult() * (hasArtifactBonus()?1.05:1);
-    // Piraten-Ketten-Prestige: +2% Angriffskraft je abgeschlossenem Durchlauf (Deckel +10%).
-    power *= 1 + Math.min(PIRATE_LAIR_PRESTIGE_CAP, state.pirateLairPrestige||0)*0.02;
-    if (planetKey) power *= (1 + veteranRankOf(planetKey).bonus);
     power *= currentStance().atkMult;
-    power *= (1 + officerBonus('admiral'));
-    if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'atk'));
+    // Additive Bonus-Gruppe (Balance-Pass 13.07.2026, analog zur Produktion - siehe deren Kommentar
+    // bei ratesPerSecond): die folgenden Boni multiplizierten sich vorher pur miteinander und konnten
+    // bei einem weit entwickelten Spieler auf das 4-5-fache aufschaukeln, ohne jeden Deckel - genau
+    // das Problem, das bei der Produktion schon einmal behoben wurde. Doktrin und Stance bleiben
+    // bewusst multiplikativ (aktive Spieler-Entscheidung, kein "nebenbei stapelnder" Bonus wie diese
+    // hier - Analogie zu Habitat/Mond-Malus/Planeten-Rolle bei der Produktion).
+    let combatBonus = 0;
+    combatBonus += prestigePerkCount('combat')*0.03;
+    combatBonus += ascBonus('combat')*0.02;
+    combatBonus += skillBonusPct('war');
+    combatBonus += (megaProjectCombatMult()-1);
+    if (hasArtifactBonus()) combatBonus += 0.05;
+    // Piraten-Ketten-Prestige: +2% Angriffskraft je abgeschlossenem Durchlauf (eigener Deckel +10%,
+    // zusätzlich zum Gesamtdeckel der Gruppe).
+    combatBonus += Math.min(PIRATE_LAIR_PRESTIGE_CAP, state.pirateLairPrestige||0)*0.02;
+    if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
+    combatBonus += officerBonus('admiral');
+    if (planetKey) combatBonus += moduleBonusAt(planetKey, 'atk');
+    // Gruppe bei +100% gedeckelt (identisch zur Produktion) - jeder Einzelbonus bleibt spürbar, die
+    // Summe kann aber nicht mehr unbegrenzt wachsen, auch nicht durch künftige Features.
+    combatBonus = Math.min(1.0, combatBonus);
+    power *= (1 + combatBonus);
     const nowAtk = Date.now();
     for (const buff of (state.buffs||[])){ if (buff.kind==='atk' && buff.expiresAt > nowAtk) power *= buff.mult; }
     return Math.round(power);
@@ -5510,16 +5526,28 @@
     const now = Date.now();
     for (const buff of (state.buffs||[])){ if (buff.kind==='def' && buff.expiresAt > now) power *= buff.mult; }
     power *= planetBonusMultiplier('def', null);
-    if (state.allianceResearch) power *= (1+0.15*allianceTechFrac('a_def'));
-    if (state.allianceResearch) power *= (1+0.20*allianceTechFrac('a_def2'));
     const doc = activeDoctrine();
     if (doc) power *= doc.defMult;
-    power *= (1 + prestigePerkCount('combat')*0.03);
-    power *= (1 + ascBonus('combat')*0.02);
-    power *= (1 + skillBonusPct('war'));
-    power *= megaProjectCombatMult() * (hasArtifactBonus()?1.05:1);
     power *= currentStance().defMult;
-    if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'def')) * (1 + veteranRankOf(planetKey).bonus);
+    // Additive Bonus-Gruppe (Balance-Pass 13.07.2026, analog zu attackPower/Produktion) - dieselben
+    // Boni wie bei der Angriffskraft, plus die beiden Allianz-Verteidigungstechs (waren vorher
+    // eigenständig multiplikativ, jetzt Teil derselben gedeckelten Gruppe). Doktrin, Stance,
+    // Forschung und die strukturellen ortsgebundenen Boni oben (Rolle, Orbitalring, Planetenereignis,
+    // Planetentyp, Heimatbonus, Mond-Malus) bleiben bewusst multiplikativ.
+    let combatBonus = 0;
+    if (state.allianceResearch){
+      combatBonus += 0.15*allianceTechFrac('a_def');
+      combatBonus += 0.20*allianceTechFrac('a_def2');
+    }
+    combatBonus += prestigePerkCount('combat')*0.03;
+    combatBonus += ascBonus('combat')*0.02;
+    combatBonus += skillBonusPct('war');
+    combatBonus += (megaProjectCombatMult()-1);
+    if (hasArtifactBonus()) combatBonus += 0.05;
+    if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
+    if (planetKey) combatBonus += moduleBonusAt(planetKey, 'def');
+    combatBonus = Math.min(1.0, combatBonus);
+    power *= (1 + combatBonus);
     return Math.round(power);
   }
   // Angriffskraft der eigenen Verteidigungsanlagen (nur Waffen-Typen wie Türme/Geschütze – reine
@@ -8097,6 +8125,7 @@
       { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%).' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
+      { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln.' },
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Nur die spezielle, itemgebundene Kristallfestung (150) übertrifft ihn.' },
       { title:'Schutz für schwächere Spieler', body:'Ist dein Punktestand mehr als <strong>3x</strong> so hoch wie der eines Ziels, sinkt deine Beute bei einem erfolgreichen Angriff anteilig (nie unter 30%). Ab <strong>5x</strong> Unterschied ist der Angriff komplett blockiert - du kannst dann gar nicht mehr angreifen, egal wie stark deine Flotte ist. Verhindert, dass weit entwickelte Accounts neue Spieler grundlos plattmachen.' },
       { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:10.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
