@@ -1917,8 +1917,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.35.7';
+  const VERSION = '8.35.8';
   const PATCHNOTES = [
+    { version:'8.35.8', date:'13.07.2026', changes:[
+      'Bug behoben: Terraforming-Zieltyp-Boni waren nur über das title-Attribut sichtbar (reiner Hover-Tooltip) - auf Handys/Touch-Geräten ohne Maus dadurch gar nicht einsehbar. Bonus-Text steht jetzt direkt sichtbar unter jedem Zieltyp-Button',
+      'Bug behoben: gelegentliches Flackern der Terraforming-Box - die Fortschrittsbalken hatten eine CSS-Übergangsanimation, die bei mehreren Neu-Rendern kurz hintereinander (z.B. Haupt-Tick + eigene Spieleraktion fast gleichzeitig) sichtbar aufblitzen konnte'
+    ]},
     { version:'8.35.7', date:'13.07.2026', changes:[
       'Onboarding weiter ausgebaut: ausführlichere Spielbeschreibung vorm Login/Registrieren, Hinweis dass Kolonie Kepler-7 aus Liebe zu klassischen Browserspielen entstanden ist (ein Herzensprojekt, das sich stetig weiterentwickelt), sowie drei handgefertigte Teaser-Illustrationen (Kolonie, Flottenkampf, Galaxie) im Look des Spiels - horizontal durchblätterbar, damit sie auf dem Handy nicht gequetscht wirken'
     ]},
@@ -14515,12 +14519,12 @@
                 <span class="bname">Stufe ${job.targetLevel} / ${TERRAFORM_MAX_LEVEL}</span>
                 <span class="lvl-pill" style="background:rgba(93,202,165,0.18); color:#5dcaa5;">Richtung ${tInfo.label}</span>
               </div>
-              <div class="progress-outer"><div class="progress-inner" style="width:${((job.targetLevel-1)/TERRAFORM_MAX_LEVEL*100).toFixed(0)}%; background:${tInfo.color||'#5dcaa5'};"></div></div>
+              <div class="progress-outer"><div class="progress-inner" style="width:${((job.targetLevel-1)/TERRAFORM_MAX_LEVEL*100).toFixed(0)}%; background:${tInfo.color||'#5dcaa5'}; transition:none;"></div></div>
               <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
                 <span class="bmeta"><i class="ti ti-plant" aria-hidden="true"></i> Umwandlung läuft…</span>
                 <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
               </div>
-              <div class="progress-outer" style="margin-top:4px;"><div class="progress-inner" style="width:${pct}%;"></div></div>`;
+              <div class="progress-outer" style="margin-top:4px;"><div class="progress-inner" style="width:${pct}%; transition:none;"></div></div>`;
           } else if (targetType && lvl < TERRAFORM_MAX_LEVEL){
             // Zieltyp gewählt (auch bei Stufe 0, noch nichts bezahlt), aktuell keine Stufe aktiv -
             // nächste Stufe anbieten. Bug behoben (13.07.2026): der Start-Button bleibt bewusst nur
@@ -14539,7 +14543,7 @@
                 <span class="bname">Stufe ${lvl} / ${TERRAFORM_MAX_LEVEL}</span>
                 <span class="lvl-pill" style="background:rgba(93,202,165,0.18); color:#5dcaa5;">Richtung <i class="ti ${tInfo.icon}" aria-hidden="true"></i> ${tInfo.label}</span>
               </div>
-              <div class="progress-outer"><div class="progress-inner" style="width:${(lvl/TERRAFORM_MAX_LEVEL*100).toFixed(0)}%; background:${tInfo.color||'#5dcaa5'};"></div></div>
+              <div class="progress-outer"><div class="progress-inner" style="width:${(lvl/TERRAFORM_MAX_LEVEL*100).toFixed(0)}%; background:${tInfo.color||'#5dcaa5'}; transition:none;"></div></div>
               <div style="margin-top:12px;">
                 <div class="bmeta" style="margin-bottom:6px;">Nächste Stufe ${next}: Dauer ${fmtDuration(dur)}</div>
                 <div style="margin-bottom:8px; font-size:12px;">${costHtml}</div>
@@ -14556,7 +14560,7 @@
             const options = TERRAFORM_TARGET_TYPES.filter(t => t !== curType);
             html += `<div class="bmeta" style="margin:${(targetType&&lvl>0)?'10px':'0'} 0 8px;">${lvl>=TERRAFORM_MAX_LEVEL?'Erneut terraformen zu einem anderen Typ:':(targetType?'Anderes Ziel wählen:':'Zieltyp wählen, um mit dem Terraforming zu beginnen:')}</div>
               <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                ${options.map(t => { const ti = PLANET_TYPE_INFO[t]; return `<button data-pick-terraform-target="${t}" style="font-size:10.5px; flex:1; min-width:120px;" title="${ti.bonusText||''}"><i class="ti ${ti.icon}" aria-hidden="true" style="margin-right:3px; color:${ti.color};"></i>${ti.label}</button>`; }).join('')}
+                ${options.map(t => { const ti = PLANET_TYPE_INFO[t]; return `<button data-pick-terraform-target="${t}" style="font-size:10.5px; flex:1; min-width:120px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 6px;"><span><i class="ti ${ti.icon}" aria-hidden="true" style="margin-right:3px; color:${ti.color};"></i>${ti.label}</span>${ti.bonusText?`<span style="font-size:9px; color:#8489a0; font-weight:400;">${ti.bonusText}</span>`:''}</button>`; }).join('')}
               </div>
               <div class="bmeta" style="margin-top:6px; font-size:11px;">10 Stufen à mehrere Stunden, insgesamt teuer - jede Stufe gewährt nur einen kleinen Anteil des vollen Bonus, erst bei Stufe 10 ist die Umwandlung (inkl. neuer Farbe auf der Sektorkarte) abgeschlossen. Die Zielwahl selbst ist immer möglich, auch während anderswo eine Stufe läuft - nur das tatsächliche Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt.</div>`;
           }
