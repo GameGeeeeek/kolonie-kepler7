@@ -1719,8 +1719,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.29.3';
+  const VERSION = '8.30.0';
   const PATCHNOTES = [
+    { version:'8.30.0', date:'13.07.2026', changes:[
+      'Bau-Warteschlange komplett umgebaut: Schiffe und Verteidigungsgebäude werden jetzt auch OHNE ausreichende Ressourcen im Moment der Bestellung sofort eingereiht - Bezahlung und tatsächlicher Baustart passieren automatisch, sobald genug Ressourcen vorhanden UND die Baustelle frei sind',
+      'Vorziehen bezahlbarer Aufträge: ist ein früherer Auftrag in derselben Warteschlange (noch) nicht bezahlbar, wird ein späterer, bereits bezahlbarer Auftrag automatisch vorgezogen und sofort gestartet - der frühere bleibt liegen und blockiert nicht mehr die ganze Warteschlange (gilt pro Art+Planet, z.B. Schiffswerft oder Verteidigungsbau)',
+      'Dasselbe Prinzip auch für die Gebäude-Wunschliste (normale, nicht-Verteidigungs-Gebäude): prüft jetzt alle Einträge statt nur den ersten',
+      'Abbrechen eines noch unbezahlten (wartenden) Auftrags entfernt ihn einfach aus der Warteschlange, ohne Rückerstattung (es wurde ja noch nichts bezahlt) - ein bereits bezahlter/aktiver Auftrag wird wie bisher voll erstattet'
+    ]},
     { version:'8.29.3', date:'13.07.2026', changes:[
       'Rollenboni von Handels-Welt und Logistik-Welt vertauscht: Handels-Welt gibt jetzt +15% Handelsrouten-Ertrag (imperiumsweit) und +250 Extra-Lager je dort stationiertem Frachter, Logistik-Welt gibt jetzt +30% Lagerkapazität dieser Kolonie. Namen, Icons und Farben der beiden Rollen bleiben unverändert, nur die Boni haben die Seite gewechselt - alle Beschreibungen und Hilfe-Texte entsprechend angepasst'
     ]},
@@ -6484,6 +6490,14 @@
       if (!state.colonies[pid].fleet.missions) state.colonies[pid].fleet.missions = [];
     }
     if (!state.constructionQueue) state.constructionQueue = [];
+    // Migration 13.07.2026 (neues Warteschlangen-System: aufgeschobene Bezahlung + Vorziehen
+    // bezahlbarer Aufträge): bestehende Aufträge aus dem alten System hatten schon eine gesetzte
+    // startTime/endTime und waren bereits bezahlt, kannten aber das neue "paid"-Feld noch nicht -
+    // ohne diese Migration würde activateQueuedJobs versuchen, sie beim nächsten Tick fälschlich
+    // ERNEUT zu belasten. Erkennungsmerkmal: startTime ist gesetzt (alte Aufträge hatten das immer).
+    for (const j of state.constructionQueue){
+      if (j.paid === undefined) j.paid = !!j.startTime;
+    }
     if (!state.debrisFields) state.debrisFields = {};
     if (!state.moons) state.moons = {};
     if (!state.npcScaling) state.npcScaling = {};
@@ -6815,38 +6829,57 @@
     log('Zur Warteschlange hinzugefügt.', 'ti-list-details');
     render(); save();
   }
+  // Wunschliste für normale Gebäude (nicht Verteidigung/Schiffe, die über die echte Bauwarteschlange
+  // laufen) - wartet, bis Ressourcen verfügbar sind, wendet dann sofort an (kein eigener Bautimer).
+  // Balance-/Feature-Wunsch 13.07.2026: prüft jetzt ALLE Einträge in Reihenfolge statt nur den
+  // ersten - ein hinten liegender, bereits bezahlbarer Eintrag wird vorgezogen, wenn ein früherer
+  // (noch) nicht bezahlbar ist, statt die ganze Liste zu blockieren.
   function processQueue(){
     if (!state.buildQueue || !state.buildQueue.length) return false;
-    const item = state.buildQueue[0];
-    const b = item.planet === 'home' ? state.buildings : (state.colonies[item.planet] ? state.colonies[item.planet].buildings : null);
-    if (!b){ state.buildQueue.shift(); return true; }
-    const def = BUILDING_DEFS.find(d=>d.key===item.key);
-    if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){ state.buildQueue.shift(); return true; }
-    const lvl = b[item.key]||0;
-    if (def.maxLevel && lvl >= def.maxLevel){ log(def.name+' (Warteschlange) hat bereits die Maximalstufe ('+def.maxLevel+') erreicht - Eintrag übersprungen.', 'ti-alert-triangle'); state.buildQueue.shift(); return true; }
-    const cost = costFor(def, lvl);
-    const specialItem = SPECIAL_UNIT_ITEMS[item.key];
-    if (specialItem && (state.rareItems[specialItem]||0) < 1){ return false; } // wartet, bis genug seltenes Item vorhanden ist
-    if (canAfford(cost)){
+    for (let i=0;i<state.buildQueue.length;i++){
+      const item = state.buildQueue[i];
+      const b = item.planet === 'home' ? state.buildings : (state.colonies[item.planet] ? state.colonies[item.planet].buildings : null);
+      if (!b){ state.buildQueue.splice(i,1); return true; }
+      const def = BUILDING_DEFS.find(d=>d.key===item.key);
+      if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){ state.buildQueue.splice(i,1); return true; }
+      const lvl = b[item.key]||0;
+      if (def.maxLevel && lvl >= def.maxLevel){ log(def.name+' (Warteschlange) hat bereits die Maximalstufe ('+def.maxLevel+') erreicht - Eintrag übersprungen.', 'ti-alert-triangle'); state.buildQueue.splice(i,1); return true; }
+      const cost = costFor(def, lvl);
+      const specialItem = SPECIAL_UNIT_ITEMS[item.key];
+      if (specialItem && (state.rareItems[specialItem]||0) < 1) continue; // liegen lassen, nächster Kandidat
+      if (def.category === 'defense'){
+        // Verteidigungsgebäude: nicht hier bezahlen, sondern unbezahlt in die echte Bauwarteschlange
+        // verschieben - activateQueuedJobs übernimmt Bezahlung und Start automatisch, sobald bezahlbar
+        // (verhindert Doppelbezahlung, da queueConstruction die Bezahlung jetzt selbst übernimmt).
+        if (specialItem) state.rareItems[specialItem] -= 1;
+        state.buildQueue.splice(i,1);
+        queueConstruction('building', item.planet, item.key, 1, def.buildTime||20, def.name, def.icon, cost);
+        return true;
+      }
+      if (!canAfford(cost)) continue; // liegen lassen, nächster Kandidat - blockiert nicht mehr die ganze Liste
       pay(cost);
       if (specialItem) state.rareItems[specialItem] -= 1;
-      state.buildQueue.shift();
-      if (def.category === 'defense'){
-        queueConstruction('building', item.planet, item.key, 1, def.buildTime||20, def.name, def.icon, cost);
-      } else {
-        b[item.key] = lvl+1;
-        log(def.name+' (Warteschlange) auf Level '+b[item.key]+' ausgebaut.', def.icon);
-        playSound('build');
-      }
+      state.buildQueue.splice(i,1);
+      b[item.key] = lvl+1;
+      log(def.name+' (Warteschlange) auf Level '+b[item.key]+' ausgebaut.', def.icon);
+      playSound('build');
       return true;
     }
     return false;
   }
 
-  // Bauaufträge (Schiffe bzw. Verteidigungsgebäude) laufen jetzt SEQUENZIELL statt parallel: ein
-  // neuer Auftrag startet erst, sobald der zuletzt eingereihte Auftrag DERSELBEN Art (Schiffswerft
-  // bzw. Verteidigungsbau) an DIESEM Planeten fertig ist – wie eine echte Werft/Baustelle mit nur
-  // einer aktiven Baustelle gleichzeitig.
+  // Bauaufträge (Schiffe bzw. Verteidigungsgebäude) laufen SEQUENZIELL statt parallel: ein neuer
+  // Auftrag startet erst, sobald der zuletzt eingereihte Auftrag DERSELBEN Art (Schiffswerft bzw.
+  // Verteidigungsbau) an DIESEM Planeten fertig ist – wie eine echte Werft/Baustelle mit nur einer
+  // aktiven Baustelle gleichzeitig.
+  // Balance-/Feature-Wunsch 13.07.2026: Aufträge werden jetzt IMMER eingereiht, auch ohne
+  // ausreichende Ressourcen im Moment des Einreihens - Bezahlung und tatsächlicher Start passieren
+  // erst automatisch, sobald sowohl die Baustelle frei ist ALS AUCH genug Ressourcen vorhanden sind
+  // (siehe activateQueuedJobs). Ist ein früherer Auftrag in derselben Warteschlange (noch) nicht
+  // bezahlbar, wird ein späterer, bereits bezahlbarer Auftrag vorgezogen und sofort gestartet - der
+  // frühere bleibt liegen und wird bei jedem weiteren Tick erneut versucht, blockiert aber nicht mehr
+  // die ganze Warteschlange. "Super"-Einheiten verbrauchen ihr seltenes Item weiterhin sofort beim
+  // Einreihen (unverändert, siehe Aufrufstellen) - nur die normalen Ressourcenkosten sind betroffen.
   function queueConstruction(kind, planetKey, key, qty, buildTimeEach, label, icon, cost){
     let effBuildTimeEach = buildTimeEach;
     if (kind === 'ship'){
@@ -6863,66 +6896,71 @@
     effBuildTimeEach *= (1 - moduleBonusAt(planetKey, 'buildspeed'));
     const dur = Math.max(3, Math.round(effBuildTimeEach * qty));
     state.constructionQueue = state.constructionQueue || [];
-    const sameQueue = state.constructionQueue.filter(j=>j.kind===kind && j.planet===planetKey);
-    const queueStart = sameQueue.length ? Math.max(...sameQueue.map(j=>j.endTime)) : Date.now();
     const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
     // Falls es sich um eine "Super"-Einheit handelt (siehe SPECIAL_UNIT_ITEMS), wurde bereits beim
     // Einreihen ein seltenes Item pro Stück verbraucht – das merken wir uns hier, damit es bei einem
     // späteren Abbruch (cancelConstruction) korrekt zurückerstattet werden kann.
     const specialItemKey = SPECIAL_UNIT_ITEMS[key];
-    state.constructionQueue.push({ id, kind, planet: planetKey, key, qty, startTime: queueStart, totalDur: dur, endTime: queueStart+dur*1000, label, icon, cost: cost||{}, specialItemKey: specialItemKey||null, specialItemQty: specialItemKey?qty:0 });
-    const totalWaitSec = Math.round((queueStart+dur*1000-Date.now())/1000);
-    const waitMsg = queueStart>Date.now() ? ' (davor noch '+Math.round((queueStart-Date.now())/1000)+'s Warteschlange)' : '';
-    log(label+' in Konstruktion auf '+planetDisplayName(planetKey)+' – fertig in '+totalWaitSec+'s'+waitMsg+'.', icon||'ti-pick');
+    state.constructionQueue.push({ id, kind, planet: planetKey, key, qty, paid:false, startTime:null, endTime:null, totalDur: dur, label, icon, cost: cost||{}, specialItemKey: specialItemKey||null, specialItemQty: specialItemKey?qty:0 });
+    log(label+' zur Warteschlange auf '+planetDisplayName(planetKey)+' hinzugefügt (~'+dur+'s Bauzeit, sobald an der Reihe und bezahlbar).', icon||'ti-pick');
   }
-  // Ordnet die verbleibenden Aufträge einer (Art, Planet)-Warteschlange neu an, nachdem einer
-  // davon abgebrochen wurde – die übrigen rücken lückenlos nach.
-  // Bug behoben (danke an holyhenning für den Report): der erste (aktuell laufende) Auftrag wurde
-  // hier bisher IMMER auf "startet jetzt neu" gesetzt, egal ob er selbst abgebrochen wurde oder nur
-  // ein späterer Eintrag - dadurch verlor ein schon halb fertiges Schiff/Gebäude seinen kompletten
-  // Baufortschritt, sobald man IRGENDEINEN Eintrag aus derselben Warteschlange löschte. Der bereits
-  // laufende erste Auftrag bleibt jetzt unangetastet (startTime schon in der Vergangenheit, noch
-  // nicht fertig) - nur wenn ER SELBST der abgebrochene war, startet der neue erste sofort.
-  function recalcConstructionQueueTiming(kind, planetKey){
-    const jobs = (state.constructionQueue||[]).filter(j=>j.kind===kind && j.planet===planetKey).sort((a,b)=>a.startTime-b.startTime);
-    if (!jobs.length) return;
+  // Aktiviert wartende Aufträge: für jede (Art, Planet)-Gruppe ohne aktuell laufenden Auftrag wird der
+  // ERSTE bezahlbare wartende Auftrag in Warteschlangen-Reihenfolge bezahlt und gestartet - ein davor
+  // liegender, noch nicht bezahlbarer Auftrag wird dabei übersprungen (bleibt liegen, wird beim
+  // nächsten Tick erneut versucht). Läuft vor processConstructionQueue() im Haupt-Tick.
+  function activateQueuedJobs(){
+    if (!state.constructionQueue || !state.constructionQueue.length) return false;
     const now = Date.now();
-    let cursor;
-    if (jobs[0].startTime <= now && jobs[0].endTime > now){
-      cursor = jobs[0].endTime; // bereits laufend - Fortschritt erhalten
-    } else {
-      jobs[0].startTime = now;
-      jobs[0].endTime = now + jobs[0].totalDur*1000;
-      cursor = jobs[0].endTime;
+    const groups = {};
+    for (const j of state.constructionQueue){
+      const gk = j.kind+'|'+j.planet;
+      (groups[gk] = groups[gk]||[]).push(j);
     }
-    for (let i=1;i<jobs.length;i++){
-      jobs[i].startTime = cursor;
-      jobs[i].endTime = cursor + jobs[i].totalDur*1000;
-      cursor = jobs[i].endTime;
+    let any = false;
+    for (const jobs of Object.values(groups)){
+      if (jobs.some(j=>j.paid && j.endTime > now)) continue; // Baustelle dieser Gruppe schon belegt
+      for (const job of jobs){
+        if (job.paid) continue;
+        if (!canAfford(job.cost)) continue; // liegen lassen, nicht blockieren - nächster Kandidat
+        pay(job.cost);
+        job.paid = true;
+        job.startTime = now;
+        job.endTime = now + job.totalDur*1000;
+        log(job.label+' wird jetzt gebaut auf '+planetDisplayName(job.planet)+' (fertig in '+fmtDuration(job.totalDur)+').', job.icon||'ti-pick');
+        any = true;
+        break; // nur ein Auftrag pro Gruppe pro Tick - nur eine aktive Baustelle gleichzeitig
+      }
     }
+    return any;
   }
-  // Bricht einen laufenden Bauauftrag (Schiff oder Gebäude) ab und erstattet die vollen Kosten zurück,
-  // da noch nichts fertiggestellt wurde. Bei "Super"-Einheiten wird auch das verbrauchte seltene Item
-  // zurückerstattet.
+  // Bricht einen Bauauftrag (Schiff oder Gebäude) ab. War er bereits bezahlt/aktiv, werden die vollen
+  // Kosten zurückerstattet (noch nichts fertiggestellt). War er noch unbezahlt (wartete auf Ressourcen
+  // oder eine freie Baustelle), gibt es nichts zu erstatten - es wurde ja noch nichts abgebucht. Bei
+  // "Super"-Einheiten wird das beim Einreihen verbrauchte seltene Item in jedem Fall zurückerstattet.
   function cancelConstruction(id){
     if (!state.constructionQueue) return;
     const job = state.constructionQueue.find(j=>j.id===id);
     if (!job) return;
-    const itemNote = job.specialItemKey ? ' und '+job.specialItemQty+'x '+(RARE_ITEMS.find(r=>r.key===job.specialItemKey)||{name:job.specialItemKey}).name : '';
-    if (!confirm(job.label+' wirklich abbrechen? Die vollen Kosten'+itemNote+' werden zurückerstattet.')) return;
-    gainResources(job.cost||{});
+    const itemNote = job.specialItemKey ? (job.paid?' und ':'')+job.specialItemQty+'x '+(RARE_ITEMS.find(r=>r.key===job.specialItemKey)||{name:job.specialItemKey}).name : '';
+    const confirmMsg = job.paid
+      ? job.label+' wirklich abbrechen? Die vollen Kosten'+itemNote+' werden zurückerstattet.'
+      : job.label+' wirklich aus der Warteschlange entfernen?'+(itemNote?' '+itemNote+' wird zurückerstattet.':' Es wurden noch keine Ressourcen bezahlt.');
+    if (!confirm(confirmMsg)) return;
+    if (job.paid) gainResources(job.cost||{});
     if (job.specialItemKey) state.rareItems[job.specialItemKey] = (state.rareItems[job.specialItemKey]||0) + (job.specialItemQty||0);
     state.constructionQueue = state.constructionQueue.filter(j=>j.id!==id);
-    recalcConstructionQueueTiming(job.kind, job.planet);
-    log(job.label+' abgebrochen – Ressourcen'+itemNote+' zurückerstattet, nachfolgende Aufträge rücken auf.', 'ti-x');
+    log(job.label+(job.paid?' abgebrochen – Ressourcen'+itemNote+' zurückerstattet':' aus der Warteschlange entfernt'+(itemNote?' ('+itemNote+' zurückerstattet)':''))+'.', 'ti-x');
     render(); save();
   }
   function processConstructionQueue(){
     if (!state.constructionQueue || !state.constructionQueue.length) return false;
     const now = Date.now();
-    const done = state.constructionQueue.filter(j=>now>=j.endTime);
+    // Nur bezahlte/aktive Aufträge können "fertig" sein - unbezahlte haben endTime:null und müssen
+    // explizit ausgeschlossen werden (sonst würde die Zahlenkoerzierung von null sie fälschlich sofort
+    // als fertig ODER, beim Behalten-Filter, komplett aus der Warteschlange entfernen).
+    const done = state.constructionQueue.filter(j=>j.paid && now>=j.endTime);
     if (!done.length) return false;
-    state.constructionQueue = state.constructionQueue.filter(j=>now<j.endTime);
+    state.constructionQueue = state.constructionQueue.filter(j=>!j.paid || now<j.endTime);
     for (const job of done){
       if (job.kind === 'ship'){
         const f = job.planet==='home' ? state.fleet : (state.colonies[job.planet] ? state.colonies[job.planet].fleet : null);
@@ -6951,17 +6989,25 @@
     if (!jobs.length) return '';
     const now = Date.now();
     const html = jobs.map(j => {
-      const remain = Math.max(0, j.endTime - now);
-      const waiting = now < j.startTime;
+      const waiting = !j.paid;
+      const remain = waiting ? 0 : Math.max(0, j.endTime - now);
       const total = Math.max(1, (j.totalDur||1)) * 1000;
       const pct = waiting ? 0 : Math.max(0, Math.min(100, 100-((j.endTime-now)/total*100)));
+      // Unbezahlte Aufträge: unterscheiden, ob es an Ressourcen fehlt oder nur an einer freien
+      // Baustelle (ein anderer Auftrag derselben Art+Planet läuft gerade) - beides "wartet", aber der
+      // Grund ist unterschiedlich interessant für den Spieler.
+      let waitLabel = '';
+      if (waiting){
+        const missing = canAfford(j.cost) ? null : Object.entries(j.cost).find(([r,a]) => (state.resources[r]||0) < a);
+        waitLabel = missing ? 'wartet auf Ressourcen ('+(RES_DEFS.find(r=>r.key===missing[0])||{}).label+')' : 'wartet auf freie Baustelle';
+      }
       return `
         <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:${waiting?'rgba(125,129,153,0.4)':'#5dcaa5'};">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span class="bname"><i class="ti ${j.icon||'ti-pick'}" aria-hidden="true"></i> ${j.label}${waiting?' <span class="lvl-pill">wartet in Warteschlange</span>':''}</span>
+            <span class="bname"><i class="ti ${j.icon||'ti-pick'}" aria-hidden="true"></i> ${j.label}${waiting?' <span class="lvl-pill">'+waitLabel+'</span>':''}</span>
             <div style="display:flex; align-items:center; gap:8px;">
-              <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
-              <button data-cancel-construction="${j.id}" title="Bau abbrechen (volle Rückerstattung)" style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+              <span class="lvl-pill">${waiting ? '~'+fmtDuration(j.totalDur) : fmtDuration(remain/1000)}</span>
+              <button data-cancel-construction="${j.id}" title="${waiting?'Aus Warteschlange entfernen':'Bau abbrechen (volle Rückerstattung)'}" style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
           </div>
           <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; ${waiting?'background:#7d8199;':''}"></div></div>
@@ -8284,6 +8330,7 @@
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+30% Lagerbeitrag dieser Kolonie). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und 15 Minuten Umbauzeit. Zusätzlich gilt pro Planet ein <strong>2-Stunden-Cooldown</strong> zwischen Rollenwechseln, um schnelles Hin-und-Her-Wechseln zu verhindern.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe, wirkt sofort und unterliegt ebenfalls einem <strong>2-Stunden-Cooldown</strong> pro Station. Kosten verdoppeln sich je Stufe (ab 16.000 Erz / 10.000 Kristalle / 3.200 Deuterium), Bauzeit 5–15 Minuten.' },
+      { title:'Bau-Warteschlange (Schiffe & Verteidigungsgebäude)', body:'Schiffe und Verteidigungsgebäude werden auch OHNE ausreichende Ressourcen im Moment der Bestellung sofort in die Warteschlange aufgenommen - Bezahlung und tatsächlicher Baustart passieren automatisch, sobald genug Ressourcen vorhanden UND die Baustelle frei ist (nur ein aktiver Bau je Art/Planet gleichzeitig). Ist ein früherer Auftrag in derselben Warteschlange (noch) nicht bezahlbar, wird ein späterer, bereits bezahlbarer Auftrag automatisch vorgezogen und sofort gestartet - der frühere bleibt liegen und wird bei jedem weiteren Tick erneut versucht, blockiert aber nicht mehr die ganze Warteschlange. So werden Ressourcen effizient genutzt. Dasselbe Prinzip gilt auch für die Gebäude-Wunschliste (Knopf "Warteschlange" bei normalen Gebäuden).' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
       { title:'Chat-Benachrichtigung', body:'Der Chat-Reiter am linken Bildschirmrand zeigt einen roten Punkt, sobald in Allianz- oder globalem Chat eine neue Nachricht eingetroffen ist, seit du zuletzt geöffnet hattest - läuft automatisch im Hintergrund, ohne dass der Chat offen sein muss.' },
       { title:'Automatische Update-Erkennung', body:'Bleibt die Kolonie lange im selben Tab geöffnet (z.B. als installierte App), prüft sie im Hintergrund von selbst, ob eine neue Version bereitsteht - beim Zurückwechseln in den Tab und danach alle 10 Minuten. Wird eine gefunden, erscheint automatisch das Update-Fenster mit den vollständigen Patchnotes; es lässt sich nicht wegklicken, nur über "Seite neu laden" geht es weiter (dein Fortschritt bleibt dabei erhalten).' },
@@ -9987,6 +10034,9 @@
         }
         if (!state.constructionQueue) state.constructionQueue = [];
         for (const j of state.constructionQueue){
+          if (j.paid === undefined) j.paid = !!j.startTime;
+        }
+        for (const j of state.constructionQueue){
           if (!j.totalDur) j.totalDur = Math.max(1, Math.round((j.endTime-(j.startTime||Date.now()))/1000));
           if (!j.startTime) j.startTime = Math.max(0, j.endTime - j.totalDur*1000);
         }
@@ -10817,8 +10867,8 @@
     const fdef = ORBITAL_FOCI.find(f=>f.key===focus);
     if (!fdef){ log('Bitte zuerst einen Fokus wählen.', 'ti-alert-triangle'); return; }
     const cost = orbitalCost(nextLevel);
-    if (!canAfford(cost)){ log('Nicht genug Ressourcen für die Orbitalstation (Stufe '+nextLevel+').', 'ti-alert-triangle'); return; }
-    pay(cost);
+    // Kein Vorab-canAfford/pay mehr (verhindert Doppelbezahlung - queueConstruction übernimmt die
+    // Bezahlung jetzt selbst, sobald bezahlbar, siehe activateQueuedJobs).
     // buildTimeEach konstant 300 übergeben, qty = Ziel-Level -> Gesamtdauer 300s × Level (5/10/15 Min).
     queueConstruction('orbital', pk, focus, nextLevel, 300, 'Orbitalstation Stufe '+nextLevel+' ('+fdef.name+')', 'ti-planet', cost);
     render(); save();
@@ -13850,7 +13900,8 @@
             `).join('')}
           </div>
           <div class="bmeta">Gesamtkosten: ${anyQty ? costHtml(totalCost) : '– noch keine Menge eingetragen –'}</div>
-          <button class="buy ${affordable?'affordable':''}" id="shipBasketBuildBtn" ${affordable?'':'disabled'} style="align-self:flex-start;"><i class="ti ti-ship" aria-hidden="true" style="margin-right:4px;"></i>Baukorb bauen</button>
+          ${(anyQty && !affordable) ? `<div class="bmeta" style="color:#f0997b;"><i class="ti ti-clock" aria-hidden="true"></i> Wird eingereiht und startet automatisch, sobald genug Ressourcen vorhanden sind.</div>` : ''}
+          <button class="buy ${affordable?'affordable':''}" id="shipBasketBuildBtn" ${anyQty?'':'disabled'} style="align-self:flex-start;"><i class="ti ti-ship" aria-hidden="true" style="margin-right:4px;"></i>Baukorb ${affordable?'bauen':'einreihen'}</button>
         </div>
       `;
       shipBasketBox.querySelectorAll('.basket-amount').forEach(inp => inp.oninput = () => {
@@ -13860,13 +13911,17 @@
       });
       const basketBuildBtn = document.getElementById('shipBasketBuildBtn');
       if (basketBuildBtn) basketBuildBtn.onclick = () => {
-        if (!canAfford(totalCost)) return;
-        pay(totalCost);
+        // Kein Vorab-canAfford/pay mehr (Balance-/Feature-Wunsch 13.07.2026) - jedes Schiff im Korb
+        // wird immer eingereiht, auch ohne ausreichende Ressourcen für den GESAMTEN Korb. Bezahlung
+        // und Start passieren pro Schiffstyp einzeln in activateQueuedJobs, sobald bezahlbar.
+        let any = false;
         for (const d of basketDefs){
           const qty = shipBasket[d.key]||0;
           if (qty <= 0) continue;
           queueConstruction('ship', state.activeBasePlanet, d.key, qty, d.buildTime, d.name+' (+'+qty+', Baukorb)', 'ti-rocket', shipCostForRange(d, cf[d.key]||0, qty));
+          any = true;
         }
+        if (!any) return;
         shipBasket = {};
         render(); save();
       };
@@ -15129,16 +15184,22 @@
       if (specialItem && buildQtyMode === 'max') qty = Math.max(0, Math.min(qty, state.rareItems[specialItem]||0));
       if (qty < 1){ log('Nicht genug '+(RARE_ITEMS.find(r=>r.key===specialItem)||{name:specialItem}).name+' vorhanden.', 'ti-alert-triangle'); return; }
       const cost = costForRange(def, lvl, qty);
-      if (!canAfford(cost)) return;
       if (specialItem){
         const have = state.rareItems[specialItem]||0;
         if (have < qty){ log('Nicht genug '+(RARE_ITEMS.find(r=>r.key===specialItem)||{name:specialItem}).name+' (benötigt: '+qty+', vorhanden: '+have+') – seltener Fund bei Erkundungsmissionen nötig.', 'ti-alert-triangle'); return; }
       }
-      pay(cost);
-      if (specialItem) state.rareItems[specialItem] -= qty;
       if (def.category === 'defense'){
+        // Verteidigungsgebäude: kein Vorab-canAfford mehr (Balance-/Feature-Wunsch 13.07.2026) - wird
+        // immer eingereiht, Bezahlung und Start passieren automatisch sobald bezahlbar (siehe
+        // activateQueuedJobs). Seltenes Item wird weiterhin sofort beim Einreihen verbraucht.
+        if (specialItem) state.rareItems[specialItem] -= qty;
         queueConstruction('building', state.activeBasePlanet, key, qty, def.buildTime||20, def.name+' (+'+qty+')', def.icon, cost);
       } else {
+        // Normale (nicht-Verteidigungs-)Gebäude bleiben unverändert sofort anwendbar (keine Bauzeit,
+        // kein Warteschlangen-Konzept) - dafür weiterhin eine echte Bezahlbarkeits-Prüfung nötig.
+        if (!canAfford(cost)) return;
+        pay(cost);
+        if (specialItem) state.rareItems[specialItem] -= qty;
         b[key] = lvl+qty;
         addXp(qty*5);
         logScoreChange(qty*10, def.name+' um '+qty+' Level ausgebaut', def.icon);
@@ -15212,8 +15273,8 @@
       const count = cf[key]||0;
       const qty = buildQtyMode === 'max' ? Math.max(1, maxAffordableShipQty(def, count, 50)) : buildQtyMode;
       const cost = shipCostForRange(def, count, qty);
-      if (!canAfford(cost)) return;
-      pay(cost);
+      // Kein Vorab-canAfford/pay mehr (Balance-/Feature-Wunsch 13.07.2026) - wird immer eingereiht,
+      // Bezahlung und Start passieren automatisch sobald bezahlbar (siehe activateQueuedJobs).
       queueConstruction('ship', state.activeBasePlanet, key, qty, def.buildTime, def.name+' (+'+qty+')', 'ti-rocket', cost);
       render(); save();
     });
@@ -15235,7 +15296,13 @@
       const have = state.rareItems.antimateriekern||0;
       if (have < qty){ log('Nicht genug Antimateriekern (benötigt: '+qty+', vorhanden: '+have+') – seltener Fund bei Erkundungsmissionen nötig.', 'ti-alert-triangle'); return; }
       const cost = shipCostForRange({costFn:superschlachtschiffCost}, count, qty);
-      if (canAfford(cost)){ pay(cost); state.rareItems.antimateriekern -= qty; queueConstruction('ship', state.activeBasePlanet, 'superschlachtschiff', qty, 240, 'Superschlachtschiff (+'+qty+')', 'ti-sword', cost); render(); save(); }
+      // Kein Vorab-canAfford/pay für die NORMALEN Ressourcenkosten mehr (Balance-/Feature-Wunsch
+      // 13.07.2026) - wird immer eingereiht, Bezahlung und Start passieren automatisch sobald
+      // bezahlbar. Das seltene Item (Antimateriekern) bleibt weiterhin sofort beim Einreihen nötig/
+      // verbraucht (unverändert, siehe Prüfung oben).
+      state.rareItems.antimateriekern -= qty;
+      queueConstruction('ship', state.activeBasePlanet, 'superschlachtschiff', qty, 240, 'Superschlachtschiff (+'+qty+')', 'ti-sword', cost);
+      render(); save();
     };
     const saveNameBtn = document.getElementById('saveNameBtn');
     if (saveNameBtn) saveNameBtn.onclick = () => {
@@ -15697,6 +15764,7 @@
       state.lastScoreSnapshot = Date.now();
     }
     const queueProgressed = processQueue();
+    const jobsActivated = activateQueuedJobs();
     const constructionDone = processConstructionQueue();
     const roleChangeDone = processPlanetRoleChanges();
     processTerraformJob();
@@ -15712,7 +15780,7 @@
     const researchQueued = tryStartQueuedResearch();
     const autoExplored = tryAutoExplore();
     render();
-    if (missionsResolved || queueProgressed || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
+    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
   }, 1000);
   setInterval(save, 10000);
   setInterval(() => { loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) syncOwnAllianceRole(); } }, 15000);
