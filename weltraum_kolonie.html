@@ -1719,8 +1719,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.29.0';
+  const VERSION = '8.29.1';
   const PATCHNOTES = [
+    { version:'8.29.1', date:'13.07.2026', changes:[
+      'Erdwelt-Terraforming balanciert: gab bisher +15% auf ALLE 5 Ressourcen, bei gleichen Kosten wie jeder Spezialist (nur +15% auf eine Ressource) damit strikt überlegen - entwertete jede andere Wahl komplett. Bonus auf 6% je Ressource gesenkt (30% kumuliert) UND Kosten um 80% erhöht - Erdwelt bleibt der beste Generalist, aber eine reine Fokus-Kolonie profitiert meist mehr vom passenden Spezialisten'
+    ]},
     { version:'8.29.0', date:'13.07.2026', changes:[
       'Terraforming komplett neu gebaut: die beiden bisherigen getrennten Systeme (typloses Stufensystem + separate Typ-Umwandlung entlang einer festen Kette) sind zu einem verschmolzen. Man wählt jetzt zuerst frei einen Zieltyp (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt), danach läuft die Umwandlung in 10 Stufen ab - jede Stufe ein eigener, mehrstündiger Vorgang (3,6 bis 8,8 Std.) mit exponentiell steigenden Kosten. Jede einzelne Stufe gewährt nur einen kleinen Anteil des vollen Zieltyp-Bonus, erst bei Stufe 10 ist die Umwandlung abgeschlossen',
       'Terraforming insgesamt deutlich teurer: alle 10 Stufen zu einem Zieltyp kosten jetzt zusammen ca. 3 Mio. Erz (plus Kristalle, Deuterium und neu auch Antimaterie) - vorher kostete das alte typlose Stufensystem allein ca. 816.000 Erz für einen reinen Flatbonus ohne Typänderung',
@@ -3382,7 +3385,12 @@
     todeswelt: { label:'Todeswelt', icon:'ti-skull', color:'#6b2a2a', prodBonus:{ erz:0.9, kristalle:0.9, deuterium:0.9, energie:0.9, forschungspunkte:0.9 }, defBonus:1.10, bonusText:'+10% Verteidigung, aber −10% Produktion' },
     // Erdwelt ist das anspruchsvollste Terraforming-Ziel – großer Allround-Bonus auf ALLE Ressourcen.
     // Bewusst das beste Ergebnis und entsprechend teuer zu erreichen.
-    erdwelt: { label:'Erdwelt', icon:'ti-world', color:'#3ecf8e', prodBonus:{ erz:1.15, kristalle:1.15, deuterium:1.15, energie:1.15, forschungspunkte:1.15 }, bonusText:'+15% auf ALLE Ressourcen' }
+    // Erdwelt-Bonus bewusst gesenkt (13.07.2026, war 15% je Ressource): bei 5 Ressourcen wäre das
+    // kumuliert 75% gewesen - bei gleichen Kosten wie jeder Spezialist (nur 15% auf EINE Ressource)
+    // strikt überlegen und entwertete jede andere Wahl komplett. Jetzt 6% je Ressource (30% kumuliert)
+    // - bleibt der beste Generalist, aber kein Selbstläufer mehr. Zusätzlich kostet Erdwelt als
+    // anspruchsvollstes Ziel spürbar mehr als jeder Spezialist (siehe terraformCost).
+    erdwelt: { label:'Erdwelt', icon:'ti-world', color:'#3ecf8e', prodBonus:{ erz:1.06, kristalle:1.06, deuterium:1.06, energie:1.06, forschungspunkte:1.06 }, bonusText:'+6% auf ALLE Ressourcen' }
   };
   // Terraformbare Zieltypen: freie Wahl, keine feste Reihenfolge mehr (Balance-Wunsch 13.07.2026,
   // vorher eine feste Kette von der schlechtesten zur besten Welt). Typen NICHT in dieser Liste
@@ -8297,7 +8305,7 @@
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Monde haben keine eigene Karte mehr: Ein kolonisierter Mond ist überall über das Mond-Symbol am zugehörigen Planeten erreichbar (Übersichts-Karten, Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste) und wird auch in der Sektorkarten-Planetenliste beim Planeten angezeigt.' },
       { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
-      { title:'Terraforming', body:'Jede Kolonie (nicht die Heimatbasis, nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie) - es kann immer nur eine Stufe gleichzeitig laufen. Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen, der Planet trägt den neuen Typ dauerhaft und wird auf der Sektorkarte sofort in der passenden Farbe des neuen Typs dargestellt. Insgesamt deutlich teurer als früher. Zu finden im Basis-Tab.' },
+      { title:'Terraforming', body:'Jede Kolonie (nicht die Heimatbasis, nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie) - es kann immer nur eine Stufe gleichzeitig laufen. Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen, der Planet trägt den neuen Typ dauerhaft und wird auf der Sektorkarte sofort in der passenden Farbe des neuen Typs dargestellt. Insgesamt deutlich teurer als früher. Erdwelt (Bonus auf ALLE Ressourcen statt nur einer) kostet zusätzlich 80% mehr als jeder Spezialist - eine reine Fokus-Kolonie profitiert trotzdem meist mehr vom passenden Spezialisten. Zu finden im Basis-Tab.' },
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
@@ -10864,14 +10872,18 @@
   // Kosten für den Sprung auf die NÄCHSTE Stufe (targetLevel = aktuelle+1). Deutlich teurer als das
   // alte Stufensystem (Balance-Wunsch 13.07.2026) - inkl. Antimaterie-Kosten (vorher nur bei der
   // separaten Typ-Umwandlung), da eine echte Typveränderung mehr wiegen soll als reine
-  // Produktionssteigerung. Bei Stufe 10 ca. 1,5 Mio. Erz - bewusst ein spätes Endgame-Investment.
-  function terraformCost(nextLevel){
+  // Produktionssteigerung. Bei Stufe 10 ca. 1,5 Mio. Erz für einen Spezialisten - bewusst ein spätes
+  // Endgame-Investment. Erdwelt (bester Generalist, Bonus auf ALLE Ressourcen statt nur einer) kostet
+  // zusätzlich 80% mehr - sonst wäre Erdwelt trotz gesenktem Bonus (siehe PLANET_TYPE_INFO) immer
+  // noch die überlegene Wahl bei gleichen Kosten wie jeder Spezialist.
+  function terraformCost(nextLevel, targetType){
     const f = Math.pow(2.0, nextLevel - 1);
+    const typeMult = targetType === 'erdwelt' ? 1.8 : 1.0;
     return {
-      erz: Math.round(3000 * f),
-      kristalle: Math.round(1800 * f),
-      deuterium: Math.round(900 * f),
-      antimaterie: Math.round(15 * f)
+      erz: Math.round(3000 * f * typeMult),
+      kristalle: Math.round(1800 * f * typeMult),
+      deuterium: Math.round(900 * f * typeMult),
+      antimaterie: Math.round(15 * f * typeMult)
     };
   }
   // Umwandlungsdauer in Sekunden - "mehrere Stunden" je Stufe, wächst mit der Zielstufe (Stufe 1 ~3,5
@@ -10899,7 +10911,7 @@
     const curLevel = existing ? (existing.level||0) : 0;
     if (curLevel >= TERRAFORM_MAX_LEVEL){ log('Dieser Planet ist bereits vollständig terraformt.', 'ti-alert-triangle'); return; }
     const next = curLevel + 1;
-    const cost = terraformCost(next);
+    const cost = terraformCost(next, targetType);
     for (const [k,v] of Object.entries(cost)){
       if ((state.resources[k]||0) < v){ log('Nicht genug Ressourcen für Terraforming-Stufe '+next+' zu '+PLANET_TYPE_INFO[targetType].label+'.', 'ti-alert-triangle'); return; }
     }
@@ -13124,7 +13136,7 @@
             // Zieltyp gewählt, mitten in der Umwandlung, aktuell keine Stufe aktiv - nächste Stufe anbieten.
             const tInfo = PLANET_TYPE_INFO[targetType]||{};
             const next = lvl+1;
-            const cost = terraformCost(next);
+            const cost = terraformCost(next, targetType);
             const dur = terraformDuration(next);
             const costHtml = Object.entries(cost).map(([k,v]) => {
               const rd = RES_DEFS.find(r=>r.key===k);
