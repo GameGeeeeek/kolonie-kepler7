@@ -1719,8 +1719,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.29.1';
+  const VERSION = '8.29.2';
   const PATCHNOTES = [
+    { version:'8.29.2', date:'13.07.2026', changes:[
+      'Bug behoben: das Kolonie-Limit ließ sich umgehen, indem man mehr Kolonieschiffe losschickte, als noch Plätze frei waren - die Prüfung zählte nur schon etablierte Kolonien, nicht bereits unterwegs befindliche Kolonisierungsmissionen. Bei z.B. 20 gleichzeitig losgeschickten Kolonieschiffen bestand jede einzelne Kolonisierung die Prüfung, solange noch keine der vorherigen angekommen war. Zählt jetzt auch unterwegs befindliche Missionen mit'
+    ]},
     { version:'8.29.1', date:'13.07.2026', changes:[
       'Erdwelt-Terraforming balanciert: gab bisher +15% auf ALLE 5 Ressourcen, bei gleichen Kosten wie jeder Spezialist (nur +15% auf eine Ressource) damit strikt überlegen - entwertete jede andere Wahl komplett. Bonus auf 6% je Ressource gesenkt (30% kumuliert) UND Kosten um 80% erhöht - Erdwelt bleibt der beste Generalist, aber eine reine Fokus-Kolonie profitiert meist mehr vom passenden Spezialisten'
     ]},
@@ -5691,6 +5694,18 @@
   // nicht mit, die hängen an eigenen Debrisfeld-Bedingungen).
   function maxColoniesAllowed(){ return 1 + Math.floor((state.research.rkolonisation||0)/2); }
   function currentColonyCount(){ return Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k)).length; }
+  // Bug behoben (13.07.2026, Report: bei 20 gleichzeitig losgeschickten Kolonieschiffen wurde das
+  // Kolonie-Limit umgangen): currentColonyCount() zählt nur schon ETABLIERTE Kolonien. Die Prüfung
+  // beim Losschicken lief bisher nur gegen diesen Wert - jede einzelne Kolonisierung bestand die
+  // Prüfung, solange noch keine der vorher losgeschickten angekommen war, weil keine davon den
+  // Zähler schon erhöht hatte. Zählt jetzt zusätzlich alle bereits unterwegs befindlichen (noch nicht
+  // angekommenen) Kolonisierungsmissionen mit, die bei Ankunft ebenfalls eine neue Kolonie ergeben
+  // würden - Mond-Kolonisierung zählt bewusst nicht mit (eigenes, unabhängiges Limit).
+  function pendingColonyCount(){
+    let n = 0;
+    for (const { fleet } of allFleetsWithPlanet()) n += fleet.missions.filter(m=>m.type==='colonize').length;
+    return n;
+  }
   function colonizeCostFor(planetId){
     const planet = PLANETS.find(p=>p.id===planetId);
     const bonus = state.planetBonuses[planetId];
@@ -5703,7 +5718,7 @@
   function colonizePlanet(planetId){
     if (!state.discovered[planetId]){ log('Planet muss zuerst erkundet werden.', 'ti-alert-triangle'); return; }
     if (state.colonies[planetId]){ log('Planet ist bereits kolonisiert.', 'ti-alert-triangle'); return; }
-    if (currentColonyCount() >= maxColoniesAllowed()){ log('Kolonie-Limit erreicht ('+currentColonyCount()+'/'+maxColoniesAllowed()+'). Kolonial-Logistik weiter erforschen, um mehr Kolonien zu erlauben (+1 je 2 Stufen).', 'ti-alert-triangle'); return; }
+    if (currentColonyCount() + pendingColonyCount() >= maxColoniesAllowed()){ log('Kolonie-Limit erreicht (inkl. bereits unterwegs befindlicher Kolonieschiffe: '+(currentColonyCount()+pendingColonyCount())+'/'+maxColoniesAllowed()+'). Kolonial-Logistik weiter erforschen, um mehr Kolonien zu erlauben (+1 je 2 Stufen).', 'ti-alert-triangle'); return; }
     const cf = currentFleet();
     if ((cf.colonyShips||0) < 1){ log('Du brauchst ein Kolonieschiff, stationiert auf dem aktuell gewählten Planeten, um zu kolonisieren.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='colonize'||m.type==='colonize-moon').length;
@@ -13866,7 +13881,7 @@
       const colFuel = missionFuelCost(colDur, 1);
       const colonizeBusy = cf.missions.some(m=>m.type==='colonize' && m.targetId===p.id);
       const colonizeCostTotal = Object.assign({}, colCost, { deuterium:(colCost.deuterium||0)+colFuel });
-      const colonyLimitReached = currentColonyCount() >= maxColoniesAllowed();
+      const colonyLimitReached = currentColonyCount() + pendingColonyCount() >= maxColoniesAllowed();
       const canColonize = disc && !colonized && !colonizeBusy && !colonyLimitReached && canAfford(colonizeCostTotal) && (cf.colonyShips||0) >= 1;
       const missingShip = disc && !colonized && (cf.colonyShips||0) < 1;
       const bonus = state.planetBonuses[p.id];
@@ -13882,7 +13897,7 @@
               ${bonus ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Verborgener Bonus: ${bonus.labelText}</div>` : ''}
               ${disc && !colonized ? `<div class="bcost">Kolonisierung: ${costHtml(colCost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${colDur.toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${colFuel} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +200 Punkte</div>` : ''}
               ${missingShip ? `<div class="bmeta" style="color:#f0997b;">Benötigt 1 Kolonieschiff (Flotte-Tab)</div>` : ''}
-              ${(disc && !colonized && colonyLimitReached) ? `<div class="bmeta" style="color:#f0997b;">Kolonie-Limit erreicht (${currentColonyCount()}/${maxColoniesAllowed()}) - Kolonial-Logistik weiter erforschen</div>` : ''}
+              ${(disc && !colonized && colonyLimitReached) ? `<div class="bmeta" style="color:#f0997b;">Kolonie-Limit erreicht (inkl. unterwegs: ${currentColonyCount()+pendingColonyCount()}/${maxColoniesAllowed()}) - Kolonial-Logistik weiter erforschen</div>` : ''}
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
