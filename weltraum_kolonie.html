@@ -1721,8 +1721,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.4';
+  const VERSION = '8.28.5';
   const PATCHNOTES = [
+    { version:'8.28.5', date:'13.07.2026', changes:[
+      'Sicherheitslücke behoben: Markt-Rabatt (Kartell-Ruf + Allianz-Handelsabkommen) und die eigentliche Kredit-/Ressourcen-Verbuchung wurden bisher clientseitig berechnet - der Server nannte nur den Preis, den Rest übernahm der Browser. Damit war der Rabatt frei manipulierbar (z.B. über Entwicklertools), unabhängig davon, wie oft die Preisformel selbst angepasst wird. Handel läuft jetzt vollständig serverseitig: der Server liest/prüft/schreibt den echten Spielstand direkt',
+      'Rabattdeckel (Kartell-Ruf + Allianz-Handelsabkommen zusammen) von 20% auf 12% gesenkt'
+    ]},
     { version:'8.28.4', date:'13.07.2026', changes:[
       'Markt (Backend): Wer zu viel verkauft, drückt den Preis jetzt viel weiter (Minimum ~15% statt ~35% des Normalwerts) und die Erholung dauert deutlich länger (mehrere Tage statt ~1 Tag bis fast vollständig erholt). Käufe unverändert'
     ]},
@@ -3949,10 +3953,10 @@
     if (!useBackend()){ log('Der Marktplatz braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
     amount = Math.floor(amount);
     if (!amount || amount <= 0){ log('Ungültige Menge.', 'ti-alert-triangle'); return; }
-    // Vorab-Prüfung, damit der Spieler nicht unnötig eine Server-Anfrage schickt.
+    // Nur noch eine grobe Vorab-Schätzung fürs UI (schneller Fehlerhinweis ohne Serverfahrt) - die
+    // eigentliche Prüfung und Verbuchung übernimmt jetzt der Server (siehe Kommentar im Backend:
+    // Rabatt/Kredit-Abzug wurden vorher clientseitig berechnet und waren dadurch manipulierbar).
     if (action === 'buy'){
-      // Rabatt (Kartell/Allianz) auch in der Vorab-Schätzung berücksichtigen - sonst wurden leistbare
-      // Käufe fälschlich als "zu teuer" abgelehnt, weil nur die ungerabattete Schätzung verglichen wurde.
       const est = Math.round(estimateTradeCredits('buy', resource, amount) * (1 - marketDiscountPct()));
       if ((state.credits||0) < est){ log('Nicht genug Kredite (ca. '+fmt(est)+' nötig).', 'ti-alert-triangle'); return; }
     } else {
@@ -3967,22 +3971,13 @@
       const data = await res.json();
       if (!res.ok || !data.ok){ log('Handel fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
       const label = (RES_DEFS.find(r=>r.key===resource)||{label:resource}).label;
+      // Server ist jetzt die Autorität: neue Gesamtwerte direkt übernehmen statt selbst nachzurechnen.
+      state.credits = data.newCredits;
+      state.resources[resource] = data.newResourceAmount;
       if (action === 'buy'){
-        // Kartell-Rabatt: der Server nennt den globalen Preis, der Rabatt wird lokal auf unsere Kosten
-        // angewendet (Ressourcen-/Kredit-Bestände sind ohnehin client-geführt).
-        const discount = marketDiscountPct();
-        const cost = Math.round(data.credits * (1 - discount));
-        if ((state.credits||0) < cost){ log('Nicht genug Kredite – der Preis ist gestiegen. Handel abgebrochen.', 'ti-alert-triangle'); await loadMarketState(); return; }
-        state.credits -= cost;
-        state.resources[resource] = (state.resources[resource]||0) + data.amount;
-        log('Gekauft: '+fmt(data.amount)+' '+label+' für '+fmt(cost)+' Kredite (Ø '+data.avgPrice.toFixed(2)+(discount?', -'+Math.round(discount*100)+'% Kartell-Rabatt':'')+').', 'ti-truck');
+        log('Gekauft: '+fmt(data.amount)+' '+label+' für '+fmt(data.credits)+' Kredite (Ø '+data.avgPrice.toFixed(2)+(data.discount?', -'+Math.round(data.discount*100)+'% Kartell-Rabatt':'')+').', 'ti-truck');
       } else {
-        if ((state.resources[resource]||0) < data.amount){ log('Ressourcen reichen nicht mehr. Handel abgebrochen.', 'ti-alert-triangle'); return; }
-        const discount = marketDiscountPct();
-        const gain = Math.round(data.credits * (1 + discount));
-        state.resources[resource] -= data.amount;
-        state.credits = (state.credits||0) + gain;
-        log('Verkauft: '+fmt(data.amount)+' '+label+' für '+fmt(gain)+' Kredite (Ø '+data.avgPrice.toFixed(2)+(discount?', +'+Math.round(discount*100)+'% Kartell-Bonus':'')+').', 'ti-truck');
+        log('Verkauft: '+fmt(data.amount)+' '+label+' für '+fmt(data.credits)+' Kredite (Ø '+data.avgPrice.toFixed(2)+(data.discount?', +'+Math.round(data.discount*100)+'% Kartell-Bonus':'')+').', 'ti-truck');
       }
       // Aktualisierten Preis lokal übernehmen (bis zum nächsten vollen Laden).
       if (state.marketCache && state.marketCache[resource]) state.marketCache[resource].price = data.priceAfter;
@@ -8185,7 +8180,7 @@
       { title:'Allianz auflösen', body:'Nur Admins können eine Allianz unwiderruflich auflösen (Administration-Bereich) - alle Mitglieder werden entfernt, der Tag wird danach für eine Neugründung durch irgendjemanden frei. Der letzte verbliebene Admin kann die Allianz nicht einfach verlassen, solange noch andere Mitglieder da sind (das würde die Allianz dauerhaft führungslos zurücklassen) - stattdessen zuerst jemanden befördern oder die Allianz auflösen.' },
       { title:'Aktivitätsprotokoll', body:'Admins und Offiziere sehen im Administration-Bereich ein Protokoll der letzten Beförderungen, Rauswürfe, Einstellungsänderungen und Bewerbungsentscheidungen - für Transparenz bei mehreren Admins/Offizieren in derselben Allianz.' },
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
-      { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf) für alle Mitglieder. Kombiniert sich mit einem eigenen Fraktions-Marktrabatt, insgesamt gedeckelt bei 20%.' },
+      { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt bis zu +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf, wächst mit der Stufe) für alle Mitglieder. Kombiniert sich mit einem eigenen Fraktions-Marktrabatt, insgesamt gedeckelt bei 12%.' },
       { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' },
       { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste.' }
     ]},
