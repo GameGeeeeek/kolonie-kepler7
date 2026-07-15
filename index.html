@@ -1721,8 +1721,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.27.1';
+  const VERSION = '8.27.2';
   const PATCHNOTES = [
+    { version:'8.27.2', date:'13.07.2026', changes:[
+      'Ökonomie weiter durchgeprüft: Tagesaufgaben-Ressourcenbelohnung nutzte dieselbe Formel-Familie wie die bereits behobenen Fälle (Piratennester, Eisenlegion-Geschenk, Wochenliga) - 30 Minuten eigene Produktion je Aufgabe, bis zu 5x täglich. Auf 5 Minuten reduziert. Markt-Handelsmechanik geprüft: sauber designt (Preis bewegt sich mit Slippage bei jedem Trade), kein Exploit gefunden'
+    ]},
     { version:'8.27.1', date:'13.07.2026', changes:[
       'Berechnungen systematisch durchgeprüft, zwei weitere Funde derselben Formel-Familie behoben: Wochenliga-Produktionsbonus (Platin: 60 Minuten eigene Produktion, einmalig pro Woche) auf ein Fünftel reduziert (12/6/3 statt 60/30/15 Minuten) - bei einer entwickelten Wirtschaft wäre das sonst in die Millionen gegangen',
       'Defensive Korrektur: Verteidigungspunkte-Berechnung war nicht gegen ein fehlendes defVal-Feld abgesichert (aktuell kein Gebäude betroffen, aber ein künftig ergänztes Verteidigungsgebäude ohne dieses Feld hätte die komplette Verteidigungsberechnung auf NaN kippen lassen)'
@@ -6195,14 +6198,16 @@
     if (dailyQuestProgress(key) < def.target){ log('Noch nicht abgeschlossen.', 'ti-alert-triangle'); return; }
     state.dailyQuests.claimed[key] = true;
     const cap = storageCap();
-    // Balance-Pass v7.92: Ressourcen-Belohnungen skalieren mit der eigenen Produktion (entsprechen
-    // jeweils ~30 Minuten Produktion der Ressource), mit dem alten Fixwert als Untergrenze für
-    // Einsteiger. Kredite bleiben fix (eigenes, bereits ausbalanciertes System).
+    // Balance-Pass v7.92, korrigiert 13.07.2026 (gleiche Formel-Familie wie Piratennester/
+    // Eisenlegion-Geschenk/Wochenliga, siehe deren Kommentare): war 30 Minuten Produktion je
+    // Ressource, auf 5 Minuten reduziert - bei bis zu 5 Tagesaufgaben täglich hätte sich das bei
+    // einer entwickelten Wirtschaft ebenfalls stark aufsummiert. Alter Fixwert bleibt Untergrenze
+    // für Einsteiger. Kredite bleiben fix (eigenes, bereits ausbalanciertes System).
     const questRates = ratesPerSecond();
     for (const [r,a] of Object.entries(def.reward)){
       if (r === 'credits'){ state.credits = (state.credits||0) + a; } // Kredite haben kein Lager-Limit
       else {
-        const scaled = Math.max(a, Math.round((questRates[r]||0) * 1800));
+        const scaled = Math.max(a, Math.round((questRates[r]||0) * 300));
         state.resources[r] = Math.min(cap, (state.resources[r]||0)+scaled);
       }
     }
