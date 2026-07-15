@@ -1734,8 +1734,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.31.0';
+  const VERSION = '8.31.1';
   const PATCHNOTES = [
+    { version:'8.31.1', date:'13.07.2026', changes:[
+      'Exotische Forschung deutlich teurer gemacht (Quantenkommunikation 3.000→8.000, Adaptive Legierungen 6.000→15.000, Tiefenraum-Kartierung 10.000→25.000 Forschungspunkte) und läuft jetzt 24 Stunden statt sofort zu wirken - Kosten fallen beim Start an, Ergebnis erst nach Ablauf der Frist, nur ein Vorhaben gleichzeitig'
+    ]},
     { version:'8.31.0', date:'13.07.2026', changes:[
       'Vier neue Verwendungen für Forschungspunkte ergänzt (vorher ausschließlich für die 20 Forschungszweige nutzbar - war die Kette ausgebaut, verpuffte überschüssige Produktion ungenutzt):',
       'Forschungs-Sprint: 800 Forschungspunkte gegen +25% Produktion einer gewählten Ressource für 20 Minuten (nur einer gleichzeitig aktiv)',
@@ -3221,25 +3224,41 @@
 
   // --- 1) Exotische Forschung: seltene, teure Einmal-Unlocks REIN auf Forschungspunkte-Basis ---
   const EXOTIC_RESEARCH = [
-    { key:'quantenkomm', name:'Quantenkommunikation', icon:'ti-atom-2', cost:3000, desc:'+5% Forschungspunkte-Produktion (dauerhaft)' },
-    { key:'legierungen', name:'Adaptive Legierungen', icon:'ti-mountain', cost:6000, desc:'+3% Produktion aller Ressourcen (dauerhaft)' },
-    { key:'tiefenraum', name:'Tiefenraum-Kartierung', icon:'ti-map-2', cost:10000, desc:'-5% Missionsdauer für alle Flüge (dauerhaft)' }
+    { key:'quantenkomm', name:'Quantenkommunikation', icon:'ti-atom-2', cost:8000, desc:'+5% Forschungspunkte-Produktion (dauerhaft)' },
+    { key:'legierungen', name:'Adaptive Legierungen', icon:'ti-mountain', cost:15000, desc:'+3% Produktion aller Ressourcen (dauerhaft)' },
+    { key:'tiefenraum', name:'Tiefenraum-Kartierung', icon:'ti-map-2', cost:25000, desc:'-5% Missionsdauer für alle Flüge (dauerhaft)' }
   ];
+  const EXOTIC_RESEARCH_DURATION_MS = 24*3600*1000;
   function hasExoticResearch(key){ return !!(state.exoticResearch && state.exoticResearch[key]); }
   function exoticFpProdMult(){ return hasExoticResearch('quantenkomm') ? 1.05 : 1; }
-  function unlockExoticResearch(key){
+  // Balance-Wunsch 13.07.2026: deutlich teurer gemacht UND läuft jetzt 24 Stunden statt sofort zu
+  // wirken - Bezahlung passiert beim Start (wie bei Mega-Projekten), das Ergebnis erst nach Ablauf
+  // der Frist. Nur ein Vorhaben gleichzeitig, analog zu Terraforming/Typ-Umwandlung.
+  function startExoticResearch(key){
     const def = EXOTIC_RESEARCH.find(e=>e.key===key);
     if (!def) return;
     if (hasExoticResearch(key)){ log('Bereits erforscht.', 'ti-alert-triangle'); return; }
+    if (state.exoticResearchJob){ log('Es läuft bereits eine exotische Forschung.', 'ti-alert-triangle'); return; }
     if ((state.resources.forschungspunkte||0) < def.cost){ log('Nicht genug Forschungspunkte (benötigt: '+fmt(def.cost)+').', 'ti-alert-triangle'); return; }
-    if (!confirm(def.name+' für '+fmt(def.cost)+' Forschungspunkte erforschen? Einmalig, kann nicht rückgängig gemacht werden.')) return;
+    if (!confirm(def.name+' für '+fmt(def.cost)+' Forschungspunkte erforschen? Dauert 24 Stunden, Kosten fallen sofort an, einmalig, kann nicht rückgängig gemacht werden.')) return;
     state.resources.forschungspunkte -= def.cost;
+    state.exoticResearchJob = { key, endTime: Date.now()+EXOTIC_RESEARCH_DURATION_MS, totalDuration: EXOTIC_RESEARCH_DURATION_MS };
+    log('Exotische Forschung gestartet: '+def.name+' (fertig in '+fmtDuration(EXOTIC_RESEARCH_DURATION_MS/1000)+').', 'ti-atom-2');
+    playSound('build');
+    render(); save();
+  }
+  function processExoticResearchJob(){
+    if (!state.exoticResearchJob) return;
+    if (Date.now() < state.exoticResearchJob.endTime) return;
+    const job = state.exoticResearchJob;
+    const def = EXOTIC_RESEARCH.find(e=>e.key===job.key);
+    state.exoticResearchJob = null;
+    if (!def) return;
     if (!state.exoticResearch) state.exoticResearch = {};
-    state.exoticResearch[key] = true;
+    state.exoticResearch[job.key] = true;
     logScoreChange(200, def.name+' erforscht', 'ti-atom-2');
     log('Exotische Forschung abgeschlossen: '+def.name+'! '+def.desc, 'ti-atom-2');
     playSound('achieve');
-    render(); save();
   }
 
   // --- 2) Veteranen-Ausbildung: permanenter, kleiner Kampfbonus, gestaffelt in 3 Stufen ---
@@ -6621,6 +6640,7 @@
     if (!state.colonyNames) state.colonyNames = {};
     if (!state.megaProjects) state.megaProjects = {};
     if (!state.exoticResearch) state.exoticResearch = {};
+    if (state.exoticResearchJob === undefined) state.exoticResearchJob = null;
     if (!state.veteranTraining) state.veteranTraining = {};
     if (!state.pendingRoleChange) state.pendingRoleChange = {};
     if (state.lastNameChangeAt === undefined) state.lastNameChangeAt = null;
@@ -8530,7 +8550,7 @@
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
-      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die 20-stufige Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene Einmal-Unlocks rein auf Forschungspunkte-Basis: Quantenkommunikation +5% Forschungspunkte-Produktion, Adaptive Legierungen +3% alle Ressourcen, Tiefenraum-Kartierung -5% Missionsdauer), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 20 Forschungszweige Stufe 20 haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
+      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die 20-stufige Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 20 Forschungszweige Stufe 20 haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
       { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 45% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
       { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
@@ -10174,6 +10194,7 @@
         if (!state.colonyNames) state.colonyNames = {};
         if (!state.megaProjects) state.megaProjects = {};
     if (!state.exoticResearch) state.exoticResearch = {};
+    if (state.exoticResearchJob === undefined) state.exoticResearchJob = null;
     if (!state.veteranTraining) state.veteranTraining = {};
         if (!state.pendingRoleChange) state.pendingRoleChange = {};
         if (state.lastNameChangeAt === undefined) state.lastNameChangeAt = null;
@@ -10464,6 +10485,7 @@
     if (proj.unlockItem) state.rareItems[proj.unlockItem] -= 1;
     if (!state.megaProjects) state.megaProjects = {};
     if (!state.exoticResearch) state.exoticResearch = {};
+    if (state.exoticResearchJob === undefined) state.exoticResearchJob = null;
     if (!state.veteranTraining) state.veteranTraining = {};
     state.megaProjects[key] = true;
     logScoreChange(500, proj.name+' errichtet', 'ti-sparkles');
@@ -13565,19 +13587,33 @@
 
     const exoticResearchBox = document.getElementById('exoticResearchBox');
     if (exoticResearchBox){
+      const job = state.exoticResearchJob;
       exoticResearchBox.innerHTML = EXOTIC_RESEARCH.map(e => {
         const done = hasExoticResearch(e.key);
+        const running = job && job.key === e.key;
+        const otherRunning = job && job.key !== e.key;
         const have = state.resources.forschungspunkte||0;
-        const affordable = !done && have >= e.cost;
-        return `<div class="card-row" style="${done?'border-color:#5dcaa5;':''}">
-          <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(195,190,245,0.15)'}; color:${done?'#5dcaa5':'#c3bef5'};"><i class="ti ${e.icon}" aria-hidden="true"></i></div>
-            <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${e.name}</div>
-            <div class="bmeta">${e.desc}${done?'':' · '+fmt(e.cost)+' Forschungspunkte'}</div></div>
+        const affordable = !done && !job && have >= e.cost;
+        let rightHtml;
+        if (done) rightHtml = '';
+        else if (running){
+          const remain = Math.max(0, job.endTime - Date.now());
+          rightHtml = `<span class="lvl-pill">${fmtDuration(remain/1000)}</span>`;
+        } else {
+          rightHtml = `<button class="buy ${affordable?'affordable':''}" data-unlock-exotic="${e.key}" ${affordable?'':'disabled'}>Erforschen</button>`;
+        }
+        return `<div class="card-row" style="flex-direction:column; align-items:stretch; ${done?'border-color:#5dcaa5;':(running?'border-color:#c3bef5;':'')}">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(195,190,245,0.15)'}; color:${done?'#5dcaa5':'#c3bef5'};"><i class="ti ${e.icon}" aria-hidden="true"></i></div>
+              <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${e.name}</div>
+              <div class="bmeta">${e.desc}${done?'':' · '+fmt(e.cost)+' Forschungspunkte · 24 Std.'+(otherRunning?' · <span style="color:#8489a0;">andere Forschung läuft</span>':'')}</div></div>
+            </div>
+            ${rightHtml}
           </div>
-          ${done?'':`<button class="buy ${affordable?'affordable':''}" data-unlock-exotic="${e.key}" ${affordable?'':'disabled'}>Erforschen</button>`}
+          ${running?`<div class="progress-outer" style="margin-top:8px;"><div class="progress-inner" style="width:${Math.max(0,Math.min(100,100-((job.endTime-Date.now())/job.totalDuration*100)))}%; background:#c3bef5;"></div></div>`:''}
         </div>`;
       }).join('');
-      exoticResearchBox.querySelectorAll('[data-unlock-exotic]').forEach(btn => btn.onclick = () => unlockExoticResearch(btn.getAttribute('data-unlock-exotic')));
+      exoticResearchBox.querySelectorAll('[data-unlock-exotic]').forEach(btn => btn.onclick = () => startExoticResearch(btn.getAttribute('data-unlock-exotic')));
     }
 
     const veteranTrainingBox = document.getElementById('veteranTrainingBox');
@@ -15997,6 +16033,7 @@
     const constructionDone = processConstructionQueue();
     const roleChangeDone = processPlanetRoleChanges();
     processTerraformJob();
+    processExoticResearchJob();
     processTradeRoutes();
     processConqueredSystems();
     maybeSpawnPlanetEvent();
