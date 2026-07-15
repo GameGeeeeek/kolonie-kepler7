@@ -1719,8 +1719,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.6';
+  const VERSION = '8.28.7';
   const PATCHNOTES = [
+    { version:'8.28.7', date:'13.07.2026', changes:[
+      'Piratenüberfall-Bericht zeigt jetzt die konkreten verlorenen Ressourcenmengen an, nicht mehr nur den Prozentsatz (wie beim PvP-Angriffsbericht schon länger üblich)'
+    ]},
     { version:'8.28.6', date:'13.07.2026', changes:[
       'Manuelles Mitgliederlimit für Admins entfernt - das Limit ergibt sich jetzt ausschließlich aus der Allianz-Expansion-Forschung (Basis 10, bis 50 bei voller Ausbaustufe), kein Eingabefeld mehr in den Allianz-Einstellungen'
     ]},
@@ -5949,10 +5952,12 @@
       for (const c of Object.values(state.colonies||{})) if (c && c.buildings) tresorLvl += (c.buildings.tresor||0);
       const safeAmount = tresorLvl * (BUILDING_DEFS.find(d=>d.key==='tresor').safeAmountPerLevel);
       let totalLost = 0;
+      const lostResources = {};
       for (const r of Object.keys(state.resources)){
         const vulnerable = Math.max(0, state.resources[r] - safeAmount);
         const lost = vulnerable*lossPct;
         totalLost += lost;
+        if (lost > 0) lostResources[r] = Math.round(lost);
         state.resources[r] = Math.max(0, state.resources[r] - lost);
       }
       const producers = BUILDING_DEFS.filter(d=>d.produces);
@@ -5976,7 +5981,7 @@
       }
       logScoreChange(-Math.round(totalLost/25), (isSuper?'Superangriff':factionName+'-Überfall')+' auf '+planetDisplayName(targetPlanet)+' – ~'+Math.round(lossPct*100)+'% Ressourcen verloren', 'ti-alert-triangle');
       log(factionName+'-Überfall auf '+planetDisplayName(targetPlanet)+' erfolgreich! Rund '+Math.round(lossPct*100)+'% der Ressourcen verloren. '+victim.name+' dort läuft 15 Min. mit -40% Produktion (sabotiert).'+ownLossText, 'ti-alert-triangle');
-      builtReport = { type:'raid', result:'loss', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dp, defenseBefore:defBreakdown, lossPct:Math.round(lossPct*100), sabotagedBuilding:victim.name, fleet:raiderFleet, ownLostShips:ownLostShipsForReport, ownLossDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
+      builtReport = { type:'raid', result:'loss', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dp, defenseBefore:defBreakdown, lossPct:Math.round(lossPct*100), lostResources, sabotagedBuilding:victim.name, fleet:raiderFleet, ownLostShips:ownLostShipsForReport, ownLossDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
       pushReport(builtReport);
     }
     if (state.incomingRaid && state.incomingRaid.scoutArrival && !state.incomingRaid.scouted){
@@ -8312,7 +8317,7 @@
             body += debrisReportLine(r.debris);
           }
         } else {
-          if (r.lossPct) body += '<br>Ressourcenverlust: ~'+r.lossPct+'%';
+          if (r.lossPct) body += '<br>Ressourcenverlust: ~'+r.lossPct+'%'+(r.lostResources && Object.keys(r.lostResources).length ? ' ('+rewardHtml(r.lostResources)+')' : '');
           if (r.sabotagedBuilding) body += '<br>Sabotiert: '+r.sabotagedBuilding+' (-40% Produktion für 15 Min.)';
           if (r.ownLostShips && Object.keys(r.ownLostShips).length){
             body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Flottenverluste: '+lostCountsToText(r.ownLostShips);
