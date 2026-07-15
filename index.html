@@ -1719,8 +1719,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.14';
+  const VERSION = '8.28.15';
   const PATCHNOTES = [
+    { version:'8.28.15', date:'13.07.2026', changes:[
+      'Lager-Deckel konsequent auf ALLE Ressourcen-Quellen ausgeweitet: bisher hatte nur die laufende Produktion einen harten Deckel, während Einmal-Belohnungen (Kommandanten-Level-Aufstieg, Handelsrouten-Bonus, Schwarzmarkt-Handel, Frachtcontainer-Item, Planeten-Erkundung/Entdeckung, PvP-/NPC-Kampf-Beute, Trümmerfeld-Abbau, Schiffs-/Gebäude-Verschrottungs-Erstattung) den Deckel ungeprüft überschreiten konnten. Jetzt gilt überall: ist das Lager voll, geht der Überschuss verloren, egal woher die Ressourcen stammen'
+    ]},
     { version:'8.28.14', date:'13.07.2026', changes:[
       'Fraktions-Tribut weiter angepasst: Ruf-Gewinn von 5 auf 3 gesenkt UND eine Abklingzeit von 2 Stunden je Fraktion ergänzt - bisher gab es gar keine Sperre, man konnte beliebig oft hintereinander klicken und den Ruf sofort maximieren'
     ]},
@@ -3811,7 +3814,7 @@
         const moved = Math.min(amount, Math.floor(have));
         if (moved > 0){
           const bonus = Math.round(moved * 0.10);
-          state.resources[route.resource] = (state.resources[route.resource]||0) + bonus;
+          gainResources({ [route.resource]: bonus });
         }
       }
     }
@@ -4951,6 +4954,20 @@
     return Math.max(1, cost);
   }
   function pay(cost){ for (const [r,amt] of Object.entries(cost)) state.resources[r] -= amt; }
+  // Zentrale Gutschreibungs-Funktion für Ressourcen-Gewinne aus JEDER Quelle (Belohnungen, Beute,
+  // Erstattungen, Handelsrouten-Bonus, Entdeckungen, Überfälle, ...) - respektiert konsequent den
+  // Lager-Deckel: ist das Lager voll, geht der Überschuss verloren, unabhängig davon woher die
+  // Ressource stammt (Balance-Wunsch 13.07.2026). Ersetzt die vielen einzelnen
+  // "state.resources[r] += x"-Stellen im Code, die den Deckel bisher nicht beachtet haben - nur die
+  // laufende Produktion (ratesPerSecond/Offline-Nachholung) hatte bislang einen harten Deckel,
+  // Einmal-Gutschriften liefen ungeprüft daran vorbei.
+  function gainResources(gains){
+    const cap = storageCap();
+    for (const [r,amt] of Object.entries(gains)){
+      if (!amt) continue;
+      state.resources[r] = Math.min(cap, (state.resources[r]||0) + amt);
+    }
+  }
 
   function techUnlocked(r){
     return (r.requires||[]).every(req => {
@@ -6234,7 +6251,7 @@
       for (const rew of LEVEL_REWARDS){
         if (rew.level <= after && !state.levelRewardsClaimed[rew.level]){
           state.levelRewardsClaimed[rew.level] = true;
-          if (rew.res) state.resources[rew.res] = (state.resources[rew.res]||0) + rew.amt;
+          if (rew.res) gainResources({ [rew.res]: rew.amt });
           if (rew.rareItem) state.rareItems[rew.rareItem] = (state.rareItems[rew.rareItem]||0) + rew.amt;
           if (rew.ships) for (const [sk,sv] of Object.entries(rew.ships)) state.fleet[sk] = (state.fleet[sk]||0) + sv;
           log('Level-Belohnung erhalten: '+rew.label, 'ti-sparkles');
@@ -6717,7 +6734,7 @@
     if ((state.resources[t.give]||0) < t.giveAmt){ log('Nicht genug Ressourcen für diesen Handel.', 'ti-alert-triangle'); return; }
     state.resources[t.give] -= t.giveAmt;
     const tradeMult = (1 + 0.20*allianceTechFrac('a_trade')) * (1 + officerBonus('haendler'));
-    state.resources[t.get] = (state.resources[t.get]||0) + Math.round(t.getAmt*tradeMult);
+    gainResources({ [t.get]: Math.round(t.getAmt*tradeMult) });
     state.trader = null;
     log('Handel abgeschlossen.', 'ti-truck');
     playSound('trade');
@@ -6826,7 +6843,7 @@
     if (!job) return;
     const itemNote = job.specialItemKey ? ' und '+job.specialItemQty+'x '+(RARE_ITEMS.find(r=>r.key===job.specialItemKey)||{name:job.specialItemKey}).name : '';
     if (!confirm(job.label+' wirklich abbrechen? Die vollen Kosten'+itemNote+' werden zurückerstattet.')) return;
-    for (const [r,amt] of Object.entries(job.cost||{})) state.resources[r] = (state.resources[r]||0) + amt;
+    gainResources(job.cost||{});
     if (job.specialItemKey) state.rareItems[job.specialItemKey] = (state.rareItems[job.specialItemKey]||0) + (job.specialItemQty||0);
     state.constructionQueue = state.constructionQueue.filter(j=>j.id!==id);
     recalcConstructionQueueTiming(job.kind, job.planet);
@@ -7027,7 +7044,13 @@
         // farmingPenaltyFor im Backend) - wurde hier vorher NOCHMAL angewendet, ein Angreifer mit
         // deutlich höherem Punktestand bekam dadurch versehentlich weniger Beute als vorgesehen.
         const carried = {};
-        for (const [res,amt] of Object.entries(rawStolen)){ const g = Math.floor(amt*cargoScale); state.resources[res] = (state.resources[res]||0)+g; carried[res] = g; }
+        const cargoCap = storageCap();
+        for (const [res,amt] of Object.entries(rawStolen)){
+          const g = Math.floor(amt*cargoScale);
+          const before = state.resources[res]||0;
+          state.resources[res] = Math.min(cargoCap, before+g);
+          carried[res] = state.resources[res]-before;
+        }
         const lootTxt = Object.entries(carried).map(([res,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===res)||{label:res}).label).join(', ') || 'nichts (Ziel hatte keine Ressourcen)';
         const bpGained = warTag ? Math.round(25*1.5) : 25;
         awardBattlePoints(bpGained);
@@ -8190,7 +8213,7 @@
       { title:'E-Mail ändern', body:'In den Einstellungen unter „E-Mail" kannst du deine Adresse jederzeit ändern (Passwort-Bestätigung nötig). Die neue Adresse wird erst aktiv, nachdem du den Bestätigungslink geklickt hast, der dorthin geschickt wird – deine bisherige Adresse bleibt bis dahin gültig, damit du nicht ausgesperrt wirst.' },
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert.' },
-      { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, stoppt deren Produktion komplett</strong> (Anzeige: +0/s, Lager voll) - baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung). Bereits vorhandener Überstand über der Kapazität (z.B. aus Belohnungen) geht dabei nicht verloren, es kommt nur nichts dazu, bis wieder Platz ist.' },
+      { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+30% Lagerbeitrag dieser Kolonie), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Frachter). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und 15 Minuten Umbauzeit. Zusätzlich gilt pro Planet ein <strong>2-Stunden-Cooldown</strong> zwischen Rollenwechseln, um schnelles Hin-und-Her-Wechseln zu verhindern.' },
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe, wirkt sofort und unterliegt ebenfalls einem <strong>2-Stunden-Cooldown</strong> pro Station. Kosten verdoppeln sich je Stufe (ab 16.000 Erz / 10.000 Kristalle / 3.200 Deuterium), Bauzeit 5–15 Minuten.' },
@@ -10103,7 +10126,7 @@
     { key:'cargo', name:'Frachtcontainer', icon:'ti-box', desc:'Enthält 100-400 Einheiten einer zufälligen Ressource.', chance:0.05, activate: () => {
         const res = RES_DEFS[Math.floor(Math.random()*RES_DEFS.length)].key;
         const amt = Math.round(100+Math.random()*300);
-        state.resources[res] = (state.resources[res]||0)+amt;
+        gainResources({ [res]: amt });
         return 'Frachtcontainer geöffnet: +'+fmt(amt)+' '+RES_DEFS.find(r=>r.key===res).label+'!';
     }}
   ];
@@ -10942,11 +10965,11 @@
         if (m.type === 'explore'){
           const planet = PLANETS.find(p => p.id === m.targetId);
           if (!planet) continue;
-          for (const [r,amt] of Object.entries(planet.reward)) state.resources[r] += amt;
+          gainResources(planet.reward);
           let bonusMsg = '';
           if (!state.discovered[planet.id]){
             state.discovered[planet.id] = true;
-            for (const [r,amt] of Object.entries(planet.discoveryBonus)) state.resources[r] += amt;
+            gainResources(planet.discoveryBonus);
             revealPlanetBonus(planet.id);
             bonusMsg = ' Neuentdeckung! Verborgener Bonus enthüllt: '+state.planetBonuses[planet.id].labelText;
           }
@@ -11105,7 +11128,13 @@
             for (const [r,amt] of Object.entries(effLoot)){ const g = Math.floor(amt*factor); rawLoot[r] = g; rawLootTotal += g; }
             const cargoScale = rawLootTotal > 0 ? Math.min(1, cargoCapacity/rawLootTotal) : 1;
             const lootGiven = {};
-            for (const [r,g] of Object.entries(rawLoot)){ const carried = Math.floor(g*cargoScale); state.resources[r] += carried; lootGiven[r] = carried; }
+            const npcCargoCap = storageCap();
+            for (const [r,g] of Object.entries(rawLoot)){
+              const carried = Math.floor(g*cargoScale);
+              const before = state.resources[r]||0;
+              state.resources[r] = Math.min(npcCargoCap, before+carried);
+              lootGiven[r] = state.resources[r]-before;
+            }
             const bpGained = npc.level*10;
             awardBattlePoints(bpGained);
             logScoreChange(bpGained*3, 'Sieg gegen '+npc.name+' (+'+bpGained+' Kampfpunkte)', 'ti-sword');
@@ -11462,11 +11491,13 @@
         if (leftover <= 0) break;
         const take = Math.min(field[r], leftover);
         if (take <= 0) continue;
-        state.resources[r] = (state.resources[r]||0) + take;
+        const debrisCap = storageCap();
+        const beforeR = state.resources[r]||0;
+        state.resources[r] = Math.min(debrisCap, beforeR + take);
         field[r] -= take;
         leftover -= take;
         any = true;
-        if (tracker){ tracker.totalCollected[r] = (tracker.totalCollected[r]||0) + take; }
+        if (tracker){ tracker.totalCollected[r] = (tracker.totalCollected[r]||0) + (state.resources[r]-beforeR); }
       }
       for (const r of Object.keys(field)) if (field[r] <= 0.01) delete field[r];
       if (!Object.keys(field).length){
@@ -12039,7 +12070,8 @@
     const refund = {};
     for (const [r,a] of Object.entries(cost)) refund[r] = Math.floor(a*SCRAP_REFUND_PCT);
     cf[key] = count - qty;
-    for (const [r,a] of Object.entries(refund)) state.resources[r] = (state.resources[r]||0) + a;
+    const scrapCap1 = storageCap();
+    for (const [r,a] of Object.entries(refund)){ const before = state.resources[r]||0; state.resources[r] = Math.min(scrapCap1, before+a); refund[r] = state.resources[r]-before; }
     const scrapWeight = SHIP_SCORE_WEIGHTS[key];
     if (scrapWeight) logScoreChange(-qty*scrapWeight, qty+'x '+def.name+' verschrottet', 'ti-recycle');
     log(qty+'x '+def.name+' verschrottet. Erhalten: '+rewardHtml(refund), 'ti-recycle');
@@ -12055,7 +12087,8 @@
     const refund = {};
     for (const [r,a] of Object.entries(cost)) refund[r] = Math.floor(a*SCRAP_REFUND_PCT);
     b[key] = lvl-1;
-    for (const [r,a] of Object.entries(refund)) state.resources[r] = (state.resources[r]||0) + a;
+    const scrapCap2 = storageCap();
+    for (const [r,a] of Object.entries(refund)){ const before = state.resources[r]||0; state.resources[r] = Math.min(scrapCap2, before+a); refund[r] = state.resources[r]-before; }
     logScoreChange(-10, def.name+' um 1 Stufe abgerissen', 'ti-recycle');
     log(def.name+' um 1 Stufe abgerissen (jetzt Lv. '+(lvl-1)+'). Erhalten: '+rewardHtml(refund), 'ti-recycle');
     render(); save();
