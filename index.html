@@ -1609,6 +1609,7 @@
       accountMaskedEmail = me.maskedEmail||'';
       accountPendingEmail = me.pendingEmail||null;
       accountWantsPatchnotes = me.wantsPatchnotes !== false;
+      accountUsername = me.username||'';
     } catch(e){}
   }
 
@@ -1616,6 +1617,11 @@
   let accountMaskedEmail = '';
   let accountPendingEmail = null;
   let accountWantsPatchnotes = true;
+  // Unveränderlicher Registrierungs-Benutzername (13.07.2026, Bugfix-Fund) - getrennt vom änderbaren
+  // "Kommandantenname" (state.player.name, alle 30 Tage änderbar). Der Einladungscode MUSS den
+  // unveränderlichen Namen nutzen, da die Backend-Suche (db.users) nur darüber funktioniert - eine
+  // Namensänderung würde sonst den bisherigen Einladungscode/Link stillschweigend ungültig machen.
+  let accountUsername = '';
 
   async function checkBackend(){
     if (backendAvailable !== null) return backendAvailable;
@@ -1884,8 +1890,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.35.1';
+  const VERSION = '8.35.2';
   const PATCHNOTES = [
+    { version:'8.35.2', date:'13.07.2026', changes:[
+      'Kommandantenname jetzt alle 30 Tage änderbar (vorher alle 7 Tage)',
+      'Bug behoben: die Einladungscode-/Link-Anzeige in den Einstellungen zeigte den änderbaren Kommandantennamen statt des unveränderlichen Registrierungsnamens - nach einer Namensänderung wäre der zuvor geteilte Code/Link stillschweigend ungültig geworden, da die Server-Suche nur über den unveränderlichen Namen funktioniert. Zeigt jetzt korrekt den unveränderlichen Namen'
+    ]},
     { version:'8.35.1', date:'13.07.2026', changes:[
       'Freunde einladen: neue Option per Link statt nur per eingetipptem Namen. "Einladungs-Link kopieren" in den Einstellungen erzeugt einen Link mit ?ref=Name - klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird der Einladungs-Bonus automatisch im Hintergrund eingelöst (der Ersteller des Links bekommt die Einladungsbelohnung). Der Link bleibt auch dann gemerkt, wenn der Server beim allerersten Laden kurzzeitig nicht erreichbar ist'
     ]},
@@ -15996,9 +16006,9 @@
     }
     if (document.activeElement !== document.getElementById('nameInput')) document.getElementById('nameInput').value = state.player.name || '';
     const referralOwnCodeRow = document.getElementById('referralOwnCodeRow');
-    if (referralOwnCodeRow) referralOwnCodeRow.style.display = useBackend() ? 'flex' : 'none';
+    if (referralOwnCodeRow) referralOwnCodeRow.style.display = (useBackend() && accountUsername) ? 'flex' : 'none';
     const referralOwnCodeText = document.getElementById('referralOwnCodeText');
-    if (referralOwnCodeText) referralOwnCodeText.textContent = state.player.name || '';
+    if (referralOwnCodeText) referralOwnCodeText.textContent = accountUsername || '';
     const referralRedeemRow = document.getElementById('referralRedeemRow');
     const referralAlreadyRedeemed = document.getElementById('referralAlreadyRedeemed');
     if (referralRedeemRow && referralAlreadyRedeemed){
@@ -16017,10 +16027,10 @@
     }
     const cooldownNote = document.getElementById('nameChangeCooldownNote');
     if (cooldownNote){
-      const remainMs = (state.lastNameChangeAt||0) + 7*86400000 - Date.now();
+      const remainMs = (state.lastNameChangeAt||0) + 30*86400000 - Date.now();
       if (remainMs > 0){
         const days = Math.ceil(remainMs/86400000);
-        cooldownNote.innerHTML = '<i class="ti ti-clock" aria-hidden="true"></i> Nächste Namensänderung in '+days+' Tag'+(days===1?'':'en')+' möglich (max. 1x pro 7 Tage).';
+        cooldownNote.innerHTML = '<i class="ti ti-clock" aria-hidden="true"></i> Nächste Namensänderung in '+days+' Tag'+(days===1?'':'en')+' möglich (max. 1x pro 30 Tage).';
       } else {
         cooldownNote.textContent = '';
       }
@@ -16574,14 +16584,14 @@
     };
     const saveNameBtn = document.getElementById('saveNameBtn');
     if (saveNameBtn) saveNameBtn.onclick = () => {
-      // Cooldown: Namensänderung nur alle 7 Tage möglich (verhindert häufiges Hin- und Herwechseln,
+      // Cooldown: Namensänderung nur alle 30 Tage möglich (verhindert häufiges Hin- und Herwechseln,
       // z.B. um andere Spieler auf der Bestenliste zu verwirren).
-      const NAME_CHANGE_COOLDOWN = 7*86400000;
+      const NAME_CHANGE_COOLDOWN = 30*86400000;
       const lastChange = state.lastNameChangeAt||0;
       const remain = lastChange + NAME_CHANGE_COOLDOWN - Date.now();
       if (remain > 0){
         const days = Math.ceil(remain/86400000);
-        log('Kommandantenname kann erst in '+days+' Tag'+(days===1?'':'en')+' wieder geändert werden (max. 1x pro 7 Tage).', 'ti-alert-triangle');
+        log('Kommandantenname kann erst in '+days+' Tag'+(days===1?'':'en')+' wieder geändert werden (max. 1x pro 30 Tage).', 'ti-alert-triangle');
         return;
       }
       const val = document.getElementById('nameInput').value.trim();
@@ -16634,12 +16644,12 @@
     }
     const referralCopyBtn = document.getElementById('referralCopyBtn');
     if (referralCopyBtn) referralCopyBtn.onclick = async () => {
-      try { await navigator.clipboard.writeText(state.player.name || ''); log('Einladungscode kopiert.', 'ti-check'); }
+      try { await navigator.clipboard.writeText(accountUsername || ''); log('Einladungscode kopiert.', 'ti-check'); }
       catch(e){ log('Kopieren nicht möglich - Code manuell markieren.', 'ti-alert-triangle'); }
     };
     const referralCopyLinkBtn = document.getElementById('referralCopyLinkBtn');
     if (referralCopyLinkBtn) referralCopyLinkBtn.onclick = async () => {
-      const link = location.origin + location.pathname + '?ref=' + encodeURIComponent(state.player.name || '');
+      const link = location.origin + location.pathname + '?ref=' + encodeURIComponent(accountUsername || '');
       try { await navigator.clipboard.writeText(link); log('Einladungs-Link kopiert.', 'ti-check'); }
       catch(e){ log('Kopieren nicht möglich: '+link, 'ti-alert-triangle'); }
     };
@@ -17293,7 +17303,7 @@
       await load();
       bootDataReady = true;
       state.player.id = data.userId;
-      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
+      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
       render();
       loadLeaderboard();
       loadReports();
@@ -17391,6 +17401,7 @@
           accountMaskedEmail = me.maskedEmail||'';
           accountPendingEmail = me.pendingEmail||null;
           accountWantsPatchnotes = me.wantsPatchnotes !== false;
+          accountUsername = me.username||'';
           if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; }
           if (!state.player.name) state.player.name = me.username;
           showLogoutBtn();
