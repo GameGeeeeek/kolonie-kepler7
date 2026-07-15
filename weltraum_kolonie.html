@@ -1455,6 +1455,13 @@
             <div class="research-list" id="achievementsList"></div>
           </div>
         </div>
+
+        <div class="prog-section" data-sec="unterstuetzer">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="unterstuetzer"><span aria-hidden="true" style="margin-right:2px;">☕</span>Unterstützer<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div id="kofiTopSupporterBox"></div>
+          </div>
+        </div>
       </div>
 
       <div class="tab-panel" id="tab-update">
@@ -1514,6 +1521,25 @@
   }
   function hasCloudStorage(){ return typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function'; }
   function useBackend(){ return backendAvailable === true && !!authToken; }
+
+  // Ko-fi-Top-Unterstützer (13.07.2026): rein informativ, kein Login nötig - fragt höchstens alle
+  // 10 Minuten neu ab, dazwischen wird die zwischengespeicherte Antwort einfach erneut gerendert.
+  // undefined = noch nicht geladen, null = geladen, aber noch kein Unterstützer, {name,total} = da.
+  let kofiTopSupporterCache;
+  let kofiTopSupporterLastFetch = 0;
+  async function loadKofiTopSupporterIfNeeded(){
+    const now = Date.now();
+    if (kofiTopSupporterCache !== undefined && now - kofiTopSupporterLastFetch < 10*60*1000) return;
+    if (!(await checkBackend())) return;
+    kofiTopSupporterLastFetch = now;
+    try {
+      const res = await fetch('/api/kofi-top-supporter');
+      if (!res.ok) return;
+      const data = await res.json();
+      kofiTopSupporterCache = data.topSupporter || null;
+      render();
+    } catch(e){}
+  }
 
   async function backendFetch(path, options){
     const opts = options || {};
@@ -1748,8 +1774,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.31.9';
+  const VERSION = '8.32.0';
   const PATCHNOTES = [
+    { version:'8.32.0', date:'13.07.2026', changes:[
+      'Neue Sektion "☕ Unterstützer" am Ende des Fortschritt-Tabs: zeigt den aktuellen Top-Unterstützer von Ko-fi als kleines Dankeschön (Backend-Webhook-Integration, respektiert anonyme Spenden - die erscheinen nie mit Namen)'
+    ]},
     { version:'8.31.9', date:'13.07.2026', changes:[
       'Kaffee-Button verlinkt jetzt direkt auf die Ko-fi-Rangliste der Top-Unterstützer statt auf die normale Spendenseite - kleines Dankeschön für Spender, spenden geht von dort weiterhin genauso'
     ]},
@@ -15370,6 +15399,21 @@
     renderAllianceTechBox();
     renderAllianceBuildingBox();
     renderReportsBox();
+    const kofiBox = document.getElementById('kofiTopSupporterBox');
+    if (kofiBox){
+      if (kofiTopSupporterCache === undefined){
+        kofiBox.innerHTML = `<div class="bmeta">Lädt…</div>`;
+      } else if (!kofiTopSupporterCache){
+        kofiBox.innerHTML = `<div class="bmeta">Noch kein Top-Unterstützer – <a href="https://ko-fi.com/gamegeeeeek" target="_blank" rel="noopener" style="color:#c3bef5;">sei der/die Erste!</a></div>`;
+      } else {
+        kofiBox.innerHTML = `<div class="card-row" style="border-color:rgba(250,199,117,0.4);">
+          <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.18); color:#fac775; font-size:18px;">☕</div>
+            <div><div class="bname">${kofiTopSupporterCache.name}</div><div class="bmeta">Aktueller Top-Unterstützer – vielen Dank für die Unterstützung!</div></div>
+          </div>
+        </div>`;
+      }
+      loadKofiTopSupporterIfNeeded();
+    }
     const rareItemsBox = document.getElementById('rareItemsBox');
     if (rareItemsBox){
       const items = Object.entries(state.rareItems||{}).filter(([k,v])=>v>0);
@@ -15561,7 +15605,8 @@
           { key:'artefakt', label:'Artefakt-Set', icon:'ti-sparkles' },
           { key:'prestige', label:'Prestige', icon:'ti-infinity' },
           { key:'faehigkeitsbaum', label:'Fähigkeitsbaum', icon:'ti-award' },
-          { key:'erfolge', label:'Erfolge', icon:'ti-medal' }
+          { key:'erfolge', label:'Erfolge', icon:'ti-medal' },
+          { key:'unterstuetzer', label:'Unterstützer', icon:'ti-sparkles' }
         ]
       };
       const jumpBox = document.getElementById('jumpnav-'+activeTab);
