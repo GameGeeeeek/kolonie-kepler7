@@ -1734,8 +1734,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.31.1';
+  const VERSION = '8.31.2';
   const PATCHNOTES = [
+    { version:'8.31.2', date:'13.07.2026', changes:[
+      'Veteranen-Ausbildung deutlich teurer gemacht (Gefechtsanalyse 2.000→6.000, Erfahrene Besatzungen 4.000→12.000, Legendäre Kommandeure 7.000→20.000 Forschungspunkte) und läuft jetzt 24 Stunden je Stufe statt sofort zu wirken - Kosten fallen beim Start an, Ergebnis erst nach Ablauf der Frist, nur eine Ausbildung gleichzeitig'
+    ]},
     { version:'8.31.1', date:'13.07.2026', changes:[
       'Exotische Forschung deutlich teurer gemacht (Quantenkommunikation 3.000→8.000, Adaptive Legierungen 6.000→15.000, Tiefenraum-Kartierung 10.000→25.000 Forschungspunkte) und läuft jetzt 24 Stunden statt sofort zu wirken - Kosten fallen beim Start an, Ergebnis erst nach Ablauf der Frist, nur ein Vorhaben gleichzeitig'
     ]},
@@ -3263,26 +3266,43 @@
 
   // --- 2) Veteranen-Ausbildung: permanenter, kleiner Kampfbonus, gestaffelt in 3 Stufen ---
   const VETERAN_TRAINING = [
-    { key:'vet1', name:'Gefechtsanalyse', cost:2000, bonus:0.02, requires:null, desc:'+2% Angriffs-/Verteidigungspunkte' },
-    { key:'vet2', name:'Erfahrene Besatzungen', cost:4000, bonus:0.02, requires:'vet1', desc:'+2% weitere Angriffs-/Verteidigungspunkte' },
-    { key:'vet3', name:'Legendäre Kommandeure', cost:7000, bonus:0.03, requires:'vet2', desc:'+3% weitere Angriffs-/Verteidigungspunkte' }
+    { key:'vet1', name:'Gefechtsanalyse', cost:6000, bonus:0.02, requires:null, desc:'+2% Angriffs-/Verteidigungspunkte' },
+    { key:'vet2', name:'Erfahrene Besatzungen', cost:12000, bonus:0.02, requires:'vet1', desc:'+2% weitere Angriffs-/Verteidigungspunkte' },
+    { key:'vet3', name:'Legendäre Kommandeure', cost:20000, bonus:0.03, requires:'vet2', desc:'+3% weitere Angriffs-/Verteidigungspunkte' }
   ];
+  const VETERAN_TRAINING_DURATION_MS = 24*3600*1000;
   function hasVeteranTraining(key){ return !!(state.veteranTraining && state.veteranTraining[key]); }
   function veteranCombatBonus(){ return VETERAN_TRAINING.filter(v=>hasVeteranTraining(v.key)).reduce((a,v)=>a+v.bonus,0); }
-  function buyVeteranTraining(key){
+  // Balance-Wunsch 13.07.2026: deutlich teurer gemacht UND läuft jetzt 24 Stunden statt sofort zu
+  // wirken - Bezahlung passiert beim Start, das Ergebnis erst nach Ablauf der Frist. Nur eine
+  // Ausbildung gleichzeitig, analog zur Exotischen Forschung.
+  function startVeteranTraining(key){
     const def = VETERAN_TRAINING.find(v=>v.key===key);
     if (!def) return;
     if (hasVeteranTraining(key)){ log('Bereits ausgebildet.', 'ti-alert-triangle'); return; }
     if (def.requires && !hasVeteranTraining(def.requires)){ log('Voraussetzung fehlt: '+(VETERAN_TRAINING.find(v=>v.key===def.requires)||{}).name, 'ti-alert-triangle'); return; }
+    if (state.veteranTrainingJob){ log('Es läuft bereits eine Veteranen-Ausbildung.', 'ti-alert-triangle'); return; }
     if ((state.resources.forschungspunkte||0) < def.cost){ log('Nicht genug Forschungspunkte (benötigt: '+fmt(def.cost)+').', 'ti-alert-triangle'); return; }
-    if (!confirm(def.name+' für '+fmt(def.cost)+' Forschungspunkte ausbilden? Einmalig, kann nicht rückgängig gemacht werden.')) return;
+    if (!confirm(def.name+' für '+fmt(def.cost)+' Forschungspunkte ausbilden? Dauert 24 Stunden, Kosten fallen sofort an, einmalig, kann nicht rückgängig gemacht werden.')) return;
     state.resources.forschungspunkte -= def.cost;
+    state.veteranTrainingJob = { key, endTime: Date.now()+VETERAN_TRAINING_DURATION_MS, totalDuration: VETERAN_TRAINING_DURATION_MS };
+    log('Veteranen-Ausbildung gestartet: '+def.name+' (fertig in '+fmtDuration(VETERAN_TRAINING_DURATION_MS/1000)+').', 'ti-medal');
+    playSound('build');
+    render(); save();
+  }
+  function processVeteranTrainingJob(){
+    if (!state.veteranTrainingJob) return;
+    if (Date.now() < state.veteranTrainingJob.endTime) return;
+    const job = state.veteranTrainingJob;
+    const def = VETERAN_TRAINING.find(v=>v.key===job.key);
+    state.veteranTrainingJob = null;
+    if (!def) return;
     if (!state.veteranTraining) state.veteranTraining = {};
-    state.veteranTraining[key] = true;
+    if (state.veteranTrainingJob === undefined) state.veteranTrainingJob = null;
+    state.veteranTraining[job.key] = true;
     logScoreChange(150, def.name+' ausgebildet', 'ti-medal');
     log('Veteranen-Ausbildung abgeschlossen: '+def.name+'! '+def.desc, 'ti-medal');
     playSound('achieve');
-    render(); save();
   }
 
   // --- 3) Forschungs-Sprint: Forschungspunkte gegen einen temporären Produktionsboost eintauschen ---
@@ -6642,6 +6662,7 @@
     if (!state.exoticResearch) state.exoticResearch = {};
     if (state.exoticResearchJob === undefined) state.exoticResearchJob = null;
     if (!state.veteranTraining) state.veteranTraining = {};
+    if (state.veteranTrainingJob === undefined) state.veteranTrainingJob = null;
     if (!state.pendingRoleChange) state.pendingRoleChange = {};
     if (state.lastNameChangeAt === undefined) state.lastNameChangeAt = null;
     if (!state.debrisFieldTrackers) state.debrisFieldTrackers = {};
@@ -8550,7 +8571,7 @@
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
-      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die 20-stufige Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 20 Forschungszweige Stufe 20 haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
+      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die 20-stufige Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum, ebenfalls 24 Std. je Stufe: Gefechtsanalyse 6.000 FP, Erfahrene Besatzungen 12.000 FP, Legendäre Kommandeure 20.000 FP - nur eine Ausbildung gleichzeitig) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 20 Forschungszweige Stufe 20 haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
       { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 45% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
       { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
@@ -10196,6 +10217,7 @@
     if (!state.exoticResearch) state.exoticResearch = {};
     if (state.exoticResearchJob === undefined) state.exoticResearchJob = null;
     if (!state.veteranTraining) state.veteranTraining = {};
+    if (state.veteranTrainingJob === undefined) state.veteranTrainingJob = null;
         if (!state.pendingRoleChange) state.pendingRoleChange = {};
         if (state.lastNameChangeAt === undefined) state.lastNameChangeAt = null;
         if (!state.debrisFieldTrackers) state.debrisFieldTrackers = {};
@@ -10487,6 +10509,7 @@
     if (!state.exoticResearch) state.exoticResearch = {};
     if (state.exoticResearchJob === undefined) state.exoticResearchJob = null;
     if (!state.veteranTraining) state.veteranTraining = {};
+    if (state.veteranTrainingJob === undefined) state.veteranTrainingJob = null;
     state.megaProjects[key] = true;
     logScoreChange(500, proj.name+' errichtet', 'ti-sparkles');
     log('Mega-Projekt fertiggestellt: '+proj.name+'! '+proj.desc, 'ti-sparkles');
@@ -13618,20 +13641,34 @@
 
     const veteranTrainingBox = document.getElementById('veteranTrainingBox');
     if (veteranTrainingBox){
+      const vJob = state.veteranTrainingJob;
       veteranTrainingBox.innerHTML = VETERAN_TRAINING.map(v => {
         const done = hasVeteranTraining(v.key);
         const reqOk = !v.requires || hasVeteranTraining(v.requires);
+        const running = vJob && vJob.key === v.key;
+        const otherRunning = vJob && vJob.key !== v.key;
         const have = state.resources.forschungspunkte||0;
-        const affordable = !done && reqOk && have >= v.cost;
-        return `<div class="card-row" style="${done?'border-color:#5dcaa5;':''}">
-          <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(226,75,74,0.12)'}; color:${done?'#5dcaa5':'#e24b4a'};"><i class="ti ti-medal" aria-hidden="true"></i></div>
-            <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${v.name}</div>
-            <div class="bmeta">${v.desc}${done?'':' · '+fmt(v.cost)+' Forschungspunkte'+(reqOk?'':' · benötigt '+(VETERAN_TRAINING.find(x=>x.key===v.requires)||{}).name+' zuerst')}</div></div>
+        const affordable = !done && reqOk && !vJob && have >= v.cost;
+        let rightHtml;
+        if (done) rightHtml = '';
+        else if (running){
+          const remain = Math.max(0, vJob.endTime - Date.now());
+          rightHtml = `<span class="lvl-pill">${fmtDuration(remain/1000)}</span>`;
+        } else {
+          rightHtml = `<button class="buy ${affordable?'affordable':''}" data-buy-veteran="${v.key}" ${affordable?'':'disabled'}>Ausbilden</button>`;
+        }
+        return `<div class="card-row" style="flex-direction:column; align-items:stretch; ${done?'border-color:#5dcaa5;':(running?'border-color:#e24b4a;':'')}">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(226,75,74,0.12)'}; color:${done?'#5dcaa5':'#e24b4a'};"><i class="ti ti-medal" aria-hidden="true"></i></div>
+              <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${v.name}</div>
+              <div class="bmeta">${v.desc}${done?'':' · '+fmt(v.cost)+' Forschungspunkte · 24 Std.'+(reqOk?'':' · benötigt '+(VETERAN_TRAINING.find(x=>x.key===v.requires)||{}).name+' zuerst')+(otherRunning?' · <span style="color:#8489a0;">andere Ausbildung läuft</span>':'')}</div></div>
+            </div>
+            ${rightHtml}
           </div>
-          ${done?'':`<button class="buy ${affordable?'affordable':''}" data-buy-veteran="${v.key}" ${affordable?'':'disabled'}>Ausbilden</button>`}
+          ${running?`<div class="progress-outer" style="margin-top:8px;"><div class="progress-inner" style="width:${Math.max(0,Math.min(100,100-((vJob.endTime-Date.now())/vJob.totalDuration*100)))}%; background:#e24b4a;"></div></div>`:''}
         </div>`;
       }).join('');
-      veteranTrainingBox.querySelectorAll('[data-buy-veteran]').forEach(btn => btn.onclick = () => buyVeteranTraining(btn.getAttribute('data-buy-veteran')));
+      veteranTrainingBox.querySelectorAll('[data-buy-veteran]').forEach(btn => btn.onclick = () => startVeteranTraining(btn.getAttribute('data-buy-veteran')));
     }
     } // Ende Forschung-Tab-Guard
 
@@ -16034,6 +16071,7 @@
     const roleChangeDone = processPlanetRoleChanges();
     processTerraformJob();
     processExoticResearchJob();
+    processVeteranTrainingJob();
     processTradeRoutes();
     processConqueredSystems();
     maybeSpawnPlanetEvent();
