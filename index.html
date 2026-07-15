@@ -1719,8 +1719,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.10';
+  const VERSION = '8.28.11';
   const PATCHNOTES = [
+    { version:'8.28.11', date:'13.07.2026', changes:[
+      'Bug behoben: Bei einem PvP-Angriff wurde der Kampf bisher sofort beim Losschicken berechnet (inkl. Ressourcen-/Gebäudeverlust beim Ziel) - die angezeigte Flugzeit war rein kosmetisch, der Bericht war schon da, bevor die Flotte überhaupt ankam. Der Kampf wird jetzt erst bei tatsächlicher Ankunft ausgelöst, genau wie beim Weltboss und Piratenversteck',
+      'Nebenbei einen zweiten Bug behoben: der Anti-Farming-Abschlag bei ungleichen Punktestand-Verhältnissen wurde doppelt angewendet (einmal schon serverseitig in der Beute eingerechnet, dann clientseitig nochmal auf denselben Wert) - Angreifer mit deutlich höherem Punktestand bekamen dadurch unbeabsichtigt noch weniger Beute als vorgesehen'
+    ]},
     { version:'8.28.10', date:'13.07.2026', changes:[
       'Bug behoben (Fortsetzung von v8.28.9, danke an holyhenning für den erneuten Report): der Ausloggen-Bug trat bei MEHR als 3 schnellen Verkäufen hintereinander wieder auf - Ursache war, dass bei vielen gleichzeitigen Markt-Anfragen deren Antworten in vertauschter Reihenfolge ankommen konnten und eine spät eintreffende Antwort die bereits korrekte Versionsnummer wieder mit einem veralteten Wert überschrieb. Jetzt doppelt abgesichert: die Versionsnummer kann nur noch steigen, nie sinken, und Markt-Anfragen laufen nicht mehr überlappend (ein Klick während eine vorherige Anfrage noch läuft wird ignoriert statt eine zweite parallele Anfrage zu starten)'
     ]},
@@ -6933,6 +6937,9 @@
     const cargoCapacity = (attackFleet.frachter||0) * CARGO_PER_FRACHTER;
     // Kriegsbonus: falls das Ziel Mitglied einer Allianz ist, mit der die eigene Allianz im Krieg
     // liegt, gibt ein erfolgreicher Angriff +50% Kampfpunkte und zählt für den Kriegspunktestand.
+    // Beim Dispatch ermittelt (wie die Flottenzusammensetzung "eingefroren", nicht bei Ankunft neu
+    // geprüft) - ein während der Flugzeit geschlossener/beendeter Krieg ändert also nichts mehr an
+    // dieser bereits gestarteten Mission.
     let targetAllianceTag = null;
     let targetEntry = null;
     try { targetEntry = await loadPlayerEntry(playerId); targetAllianceTag = targetEntry ? (targetEntry.allianceTag||null) : null; } catch(e){}
@@ -6940,7 +6947,9 @@
     // Anti-Farming: ist der Angreifer beim Punktestand deutlich stärker als das Ziel, sinkt die
     // Beute anteilig – sonst lohnt sich "kleine Spieler ausnehmen" überproportional, was neue
     // Spieler schnell aus dem Spiel treibt. Ab 3x Punktestand-Unterschied greift die Reduktion,
-    // nie unter 30% Beute (damit Angriffe auf Schwächere nicht komplett witzlos werden).
+    // nie unter 30% Beute (damit Angriffe auf Schwächere nicht komplett witzlos werden). Der Server
+    // berechnet diesen Faktor bei Ankunft ohnehin selbst und unabhängig (siehe farmingPenaltyFor im
+    // Backend) - diese Prüfung hier ist nur das "darf ich überhaupt starten"-Tor beim Dispatch.
     const myScoreForFarmCheck = computeScore();
     const targetScoreForFarmCheck = targetEntry ? (targetEntry.score||0) : 0;
     const scoreRatio = targetScoreForFarmCheck > 0 ? myScoreForFarmCheck/targetScoreForFarmCheck : 1;
@@ -6952,59 +6961,47 @@
       log('Du bist zu mächtig für einen Angriff auf '+name+' (mehr als '+ATTACK_BLOCK_RATIO+'x Punktestand-Unterschied) - such dir ein Ziel auf Augenhöhe.', 'ti-shield');
       return;
     }
-    const farmingPenalty = scoreRatio > 3 ? Math.max(0.3, 1-(scoreRatio-3)*0.1) : 1;
-    // Ergebnis wird bereits jetzt ermittelt (Server-Kampf bzw. simuliertes Duell), aber erst bei
-    // Ankunft der Flotte tatsächlich angewendet – so bleibt die Flugzeit spielmechanisch relevant.
-    let pendingResult;
-    if (useBackend()){
-      try {
-        const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: playerId }) });
-        const data = await res.json();
-        if (!res.ok){ log(data.error || 'Angriff fehlgeschlagen.', 'ti-alert-triangle'); return; }
-        // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
-        if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
-        pendingResult = { source:'backend', success: data.success, stolen: data.stolen||{}, destroyedBuilding: data.destroyedBuilding, attackPowerShown: data.attackPower, defensePowerShown: data.defensePower, isWarAttack, targetAllianceTag, farmingPenalty };
-      } catch(e){ log('Server für Angriff nicht erreichbar.', 'ti-alert-triangle'); return; }
-    } else {
-      const entry = await loadPlayerEntry(playerId);
-      if (!entry){ log('Spielerdaten nicht verfügbar.', 'ti-alert-triangle'); return; }
-      const myPower = attackPower(attackFleet);
-      // Seit v7.43 laden Spieler ihre echten Verteidigungspunkte (Gebäude + Flotte + Forschung) mit
-      // hoch – falls vorhanden, deutlich genauer als die alte grobe Schätzung nur aus Schiffszahlen.
-      const theirDefenseEstimate = entry.defensePower!==undefined ? entry.defensePower : (
-        (entry.cruisers||0)*20 + (entry.ships||0)*5 + (entry.destroyers||0)*45
-        + (entry.jaeger||0)*10 + (entry.bomber||0)*60 + (entry.schlachtschiff||0)*90
-        + (entry.carrier||0)*15 + (entry.superschlachtschiff||0)*220 + (entry.waechter||0)*17 + 40
-      );
-      const chance = Math.max(0.1, Math.min(0.9, myPower/(myPower+theirDefenseEstimate)));
-      const success = Math.random() < chance;
-      pendingResult = { source:'sim', success, attackPowerShown: myPower, defensePowerShown: theirDefenseEstimate, isWarAttack, targetAllianceTag, farmingPenalty };
-    }
+    // Bug behoben (13.07.2026): der Kampf (inkl. Ressourcen-/Gebäudeverlust beim Ziel) wurde bisher
+    // SOFORT beim Losschicken serverseitig berechnet und angewendet - die Flugzeit war rein
+    // kosmetisch, das Opfer verlor Ressourcen, bevor die angreifende Flotte überhaupt eingetroffen
+    // war. Der Server-Kampf wird jetzt erst bei tatsächlicher Ankunft ausgelöst (siehe
+    // resolvePlayerAttackMission), genau wie beim Weltboss und Piratenversteck.
     pay({deuterium: fuelCost});
     const fleetName = resolveFleetName();
-    cf.missions.push({ id: nextMissionId(), type:'attack-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, composition: attackFleet, cargoCapacity, pendingResult });
+    cf.missions.push({ id: nextMissionId(), type:'attack-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, composition: attackFleet, cargoCapacity, isWarAttack, targetAllianceTag });
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen Spieler '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-sword');
     render(); save();
   }
-  function resolvePlayerAttackMission(m, planetKey, showLog, fleet){
-    const r = m.pendingResult || {};
+  async function resolvePlayerAttackMission(m, planetKey, showLog, fleet){
     const name = m.targetName || 'Unbekannt';
-    const warTag = r.isWarAttack ? r.targetAllianceTag : null;
+    const warTag = m.isWarAttack ? m.targetAllianceTag : null;
     // Eigene Flottenverluste bei PvP-Angriffen: klein bei Sieg, größer bei Niederlage – wie bei
     // Überfällen und NPC-Kämpfen (siehe applyCombatLosses). Der GEGNER-Flotte kann technisch nichts
     // abgezogen werden (kein Zugriff auf dessen echten Spielstand ohne eigenen Server), daher betrifft
-    // das nur die eigene angreifende Flotte. Wird erst unten im jeweils zutreffenden Zweig einmalig
-    // ausgelöst, nicht hier oben pauschal (sonst würden Verluste bei einer Niederlage doppelt zählen).
+    // das nur die eigene angreifende Flotte.
     const applyWinLoss = () => { addVeteranXp(planetKey, 20); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.1, planetKey, m.composition) : {}; };
     const applyDefeatLoss = () => { addVeteranXp(planetKey, 5); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.3+Math.random()*0.3).pct, planetKey, m.composition) : {}; };
-    if (r.source === 'backend'){
-      if (r.success){
-        const rawStolen = r.stolen || {};
-        let rawTotal = Object.values(rawStolen).reduce((a,b)=>a+b,0);
+    if (useBackend()){
+      // Bug behoben (13.07.2026): der Kampf wurde bisher SOFORT beim Losschicken berechnet - das Opfer
+      // verlor Ressourcen, bevor die angreifende Flotte überhaupt eingetroffen war. Der eigentliche
+      // Server-Kampf läuft jetzt erst hier, bei tatsächlicher Ankunft.
+      let data;
+      try {
+        const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: m.targetId }) });
+        data = await res.json();
+        if (!res.ok){ if (showLog !== false) log('Angriff auf '+name+' konnte nicht ausgewertet werden: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
+      } catch(e){ if (showLog !== false) log('Server für Angriffsauswertung nicht erreichbar - Flotte kehrt ohne Ergebnis zurück.', 'ti-alert-triangle'); return; }
+      // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
+      if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+      if (data.success){
+        const rawStolen = data.stolen || {};
+        const rawTotal = Object.values(rawStolen).reduce((a,b)=>a+b,0);
         const cargoScale = rawTotal > 0 ? Math.min(1, (m.cargoCapacity||0)/rawTotal) : 1;
-        const farmPenalty = r.farmingPenalty !== undefined ? r.farmingPenalty : 1;
+        // Bug behoben: der Anti-Farming-Abschlag steckt bereits serverseitig in data.stolen (siehe
+        // farmingPenaltyFor im Backend) - wurde hier vorher NOCHMAL angewendet, ein Angreifer mit
+        // deutlich höherem Punktestand bekam dadurch versehentlich weniger Beute als vorgesehen.
         const carried = {};
-        for (const [res,amt] of Object.entries(rawStolen)){ const g = Math.floor(amt*cargoScale*farmPenalty); state.resources[res] = (state.resources[res]||0)+g; carried[res] = g; }
+        for (const [res,amt] of Object.entries(rawStolen)){ const g = Math.floor(amt*cargoScale); state.resources[res] = (state.resources[res]||0)+g; carried[res] = g; }
         const lootTxt = Object.entries(carried).map(([res,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===res)||{label:res}).label).join(', ') || 'nichts (Ziel hatte keine Ressourcen)';
         const bpGained = warTag ? Math.round(25*1.5) : 25;
         awardBattlePoints(bpGained);
@@ -7014,21 +7011,32 @@
         const ownLostWinBackend = applyWinLoss();
         const ownLossTxt = lostCountsToText(ownLostWinBackend);
         if (showLog !== false){
-          log((m.fleetName||'Flotte')+': Angriff auf '+name+' erfolgreich! Erbeutet: '+lootTxt+'.'+cargoNote+(r.destroyedBuilding?' Ein Verteidigungsgebäude wurde zerstört.':'')+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' (Angriffspunkte '+r.attackPowerShown+' vs. Verteidigungspunkte '+r.defensePowerShown+')'+(warTag?' Kriegsangriff!':''), 'ti-sword');
+          log((m.fleetName||'Flotte')+': Angriff auf '+name+' erfolgreich! Erbeutet: '+lootTxt+'.'+cargoNote+(data.destroyedBuilding?' Ein Verteidigungsgebäude wurde zerstört.':'')+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
-        pushReport({ type:'player-attack', result:'win', targetName:name, attackPower:r.attackPowerShown, defensePower:r.defensePowerShown, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet });
+        pushReport({ type:'player-attack', result:'win', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet });
       } else {
         awardBattlePoints(3);
         logScoreChange(3*3, 'Angriff auf '+name+' verloren (+3 Kampfpunkte Trostpreis)', 'ti-shield');
         const ownLostLossBackend = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossBackend);
-        if (showLog !== false) log((m.fleetName||'Flotte')+': Angriff auf '+name+' gescheitert.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':'')+' (Angriffspunkte '+r.attackPowerShown+' vs. Verteidigungspunkte '+r.defensePowerShown+')', 'ti-shield');
-        pushReport({ type:'player-attack', result:'loss', targetName:name, attackPower:r.attackPowerShown, defensePower:r.defensePowerShown, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet });
+        if (showLog !== false) log((m.fleetName||'Flotte')+': Angriff auf '+name+' gescheitert.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')', 'ti-shield');
+        pushReport({ type:'player-attack', result:'loss', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet });
       }
     } else {
-      const statLine = ' (Angriffspunkte '+r.attackPowerShown+' vs. geschätzte Verteidigungspunkte von '+name+': '+r.defensePowerShown+')';
-      if (r.success){
+      // Simulierter Modus (kein eigener Server): ebenfalls erst bei Ankunft berechnet statt beim
+      // Losschicken, für dasselbe konsistente Verhalten.
+      const entry = await loadPlayerEntry(m.targetId);
+      const myPower = attackPower(m.composition||fleet);
+      const theirDefenseEstimate = entry && entry.defensePower!==undefined ? entry.defensePower : (entry ? (
+        (entry.cruisers||0)*20 + (entry.ships||0)*5 + (entry.destroyers||0)*45
+        + (entry.jaeger||0)*10 + (entry.bomber||0)*60 + (entry.schlachtschiff||0)*90
+        + (entry.carrier||0)*15 + (entry.superschlachtschiff||0)*220 + (entry.waechter||0)*17 + 40
+      ) : 100);
+      const chance = Math.max(0.1, Math.min(0.9, myPower/(myPower+theirDefenseEstimate)));
+      const success = Math.random() < chance;
+      const statLine = ' (Angriffspunkte '+myPower+' vs. geschätzte Verteidigungspunkte von '+name+': '+theirDefenseEstimate+')';
+      if (success){
         const gained = Math.round((15 + Math.floor(Math.random()*20)) * (warTag?1.5:1));
         awardBattlePoints(gained);
         logScoreChange(gained*3, 'Duell gegen '+name+' gewonnen (+'+gained+' Kampfpunkte)'+(warTag?' [Krieg]':''), 'ti-sword');
@@ -7039,18 +7047,19 @@
           log((m.fleetName||'Flotte')+': Duell gegen '+name+' gewonnen! +'+gained+' Kampfpunkte'+statLine+'.'+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' Kein echter Ressourcenverlust für den Gegner (kein eigener Server aktiv).'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
-        pushReport({ type:'player-attack', result:'win', targetName:name, attackPower:r.attackPowerShown, defensePower:r.defensePowerShown, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinSim, debris:combatDebrisOf(ownLostWinSim), fleet:m.composition||fleet });
+        pushReport({ type:'player-attack', result:'win', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinSim, debris:combatDebrisOf(ownLostWinSim), fleet:m.composition||fleet });
       } else {
         awardBattlePoints(3);
         logScoreChange(3*3, 'Duell gegen '+name+' verloren (+3 Kampfpunkte Trostpreis)', 'ti-shield');
         const ownLostLossSim = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossSim);
         if (showLog !== false) log((m.fleetName||'Flotte')+': Duell gegen '+name+' verloren. +3 Kampfpunkte für den Versuch'+statLine+'.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':''), 'ti-shield');
-        pushReport({ type:'player-attack', result:'loss', targetName:name, attackPower:r.attackPowerShown, defensePower:r.defensePowerShown, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossSim, debris:combatDebrisOf(ownLostLossSim), fleet:m.composition||fleet });
+        pushReport({ type:'player-attack', result:'loss', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossSim, debris:combatDebrisOf(ownLostLossSim), fleet:m.composition||fleet });
       }
     }
     checkAchievements();
     loadReports();
+    render(); save();
   }
   async function attackPlayer(playerId, name){ return sendPlayerAttackMission(playerId, name); }
 
@@ -11219,7 +11228,7 @@
             if (showLog !== false) log('Zielort für '+(m.fleetName||'Flottenverlegung')+' nicht mehr gültig – Schiffe kehren nach '+planetDisplayName(planetKey)+' zurück.', 'ti-alert-triangle');
           }
         } else if (m.type === 'attack-player'){
-          resolvePlayerAttackMission(m, planetKey, showLog, fleet);
+          resolvePlayerAttackMission(m, planetKey, showLog, fleet).catch(()=>{});
         } else if (m.type === 'spy-player'){
           resolveSpyMission(m, planetKey, showLog);
         } else if (m.type === 'colonize'){
