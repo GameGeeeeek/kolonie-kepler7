@@ -745,6 +745,14 @@
       <div class="bmeta" id="profileAttackFleetSummary" style="margin-top:6px;"></div>
       <button id="profilePactBtn" style="width:100%; margin-top:8px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten</button>
       <button id="profileAllianceInviteBtn" style="width:100%; margin-top:8px; display:none;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Zur Allianz einladen</button>
+      <button id="profileReportBtn" style="width:100%; margin-top:8px; font-size:11px; padding:6px; opacity:0.75;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Spieler melden</button>
+      <div id="reportPlayerFormRow" style="display:none; margin-top:10px; gap:8px; flex-direction:column;">
+        <textarea id="reportPlayerReasonInput" placeholder="Kurz begründen, worum es geht (z.B. unangemessener Name)…" maxlength="500" rows="3" style="width:100%; resize:vertical;"></textarea>
+        <div style="display:flex; gap:8px;">
+          <button id="reportPlayerCancelBtn" style="flex:1;">Abbrechen</button>
+          <button id="reportPlayerSubmitBtn" class="attack" style="flex:1;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Melden</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1891,8 +1899,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.35.3';
+  const VERSION = '8.35.4';
   const PATCHNOTES = [
+    { version:'8.35.4', date:'13.07.2026', changes:[
+      'Moderation vorbereitet: Wortfilter prüft Spielername (bei Registrierung, serverseitig durchgesetzt) sowie Allianz-Tag/-Name (bei Gründung, serverseitig durchgesetzt) auf eindeutig unangemessene Begriffe. Kommandantenname wird zusätzlich clientseitig geprüft (dieses Feld läuft rein im Spielstand, keine serverseitige Durchsetzung möglich)',
+      'Neu: "Spieler melden" im Spielerprofil - kurze Begründung reicht, landet als Meldung beim Admin-Konto',
+      'Backend: Admin-Sperrfunktion für Konten (inkl. sofortiger Wirkung auf bereits bestehende Anmeldungen, nicht erst beim nächsten Login-Versuch)'
+    ]},
     { version:'8.35.3', date:'13.07.2026', changes:[
       'Neu: "Kolonie teilen"-Button im Punktestand-Tab. Erzeugt ein teilbares Bild (Avatar, Name, Level, Punktestand, Kolonien/Monde/Flotte/Kampfpunkte) im Spiel-Design - öffnet auf dem Handy meist direkt das systemeigene Teilen-Menü, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser ohne Server-Kontakt'
     ]},
@@ -6798,6 +6811,22 @@
     return m+'m '+(s%60)+'s';
   }
   function commanderLevel(xp){ return Math.floor(Math.sqrt((xp||0)/50)); }
+  // Wortfilter (13.07.2026, Feature-Wunsch: Moderation vorbereiten) - identische Logik zum Backend
+  // (BANNED_TERMS/containsBannedTerm in server.js). Für den Kommandantennamen dient das nur der
+  // sofortigen Rückmeldung (das Feld wird serverseitig nicht geprüft, da rein im Spielstand
+  // liegend); für Allianzname/-Tag ergänzt es die echte serverseitige Prüfung um eine schnellere
+  // Fehlermeldung ohne Server-Umweg.
+  const BANNED_TERMS = [
+    'hurensohn', 'wichser', 'fotze', 'nazi', 'hitler', 'ss-', 'kanake', 'neger', 'nigger',
+    'schwuchtel', 'missgeburt', 'untermensch', 'fuck', 'nutte', 'bimbo', 'zigeuner'
+  ];
+  function containsBannedTerm(text){
+    if (!text) return false;
+    const normalized = String(text).toLowerCase()
+      .replace(/0/g,'o').replace(/1/g,'i').replace(/3/g,'e').replace(/4/g,'a').replace(/5/g,'s').replace(/@/g,'a')
+      .replace(/[^a-zäöüß]/g,'');
+    return BANNED_TERMS.some(term => normalized.includes(term));
+  }
   function xpForLevel(lvl){ return lvl*lvl*50; }
   // Kommandant-Fähigkeitsbaum: pro erreichtem Level gibt's zusätzlich zum bisherigen automatischen
   // +1%/Level-Bonus (metaMult) einen Fähigkeitspunkt, den man gezielt in einen von drei Zweigen
@@ -8255,6 +8284,19 @@
         pactBtn.onclick = () => { closePlayerProfile(); offerPact(entry.id, entry.name); };
       }
     }
+    // Melden (13.07.2026, Feature-Wunsch: Moderation vorbereiten) - Formular bei jedem neuen Profil
+    // zurückgesetzt/ausgeblendet, Zielname am Button selbst gemerkt (data-Attribut, robuster als eine
+    // Modul-Variable, falls das Profil zwischendurch für einen anderen Spieler neu geöffnet wird).
+    const reportBtn = document.getElementById('profileReportBtn');
+    const reportFormRow = document.getElementById('reportPlayerFormRow');
+    if (reportFormRow) reportFormRow.style.display = 'none';
+    const reportReasonInput = document.getElementById('reportPlayerReasonInput');
+    if (reportReasonInput) reportReasonInput.value = '';
+    if (reportBtn){
+      reportBtn.style.display = (isMe || !useBackend()) ? 'none' : 'block';
+      reportBtn.setAttribute('data-report-target', entry.name || '');
+      reportBtn.onclick = () => { if (reportFormRow) reportFormRow.style.display = 'flex'; };
+    }
     document.getElementById('playerProfileOverlay').style.display = 'flex';
   }
   function closePlayerProfile(){
@@ -9438,6 +9480,7 @@
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (gedeckelt bei +10%, additiv zu den anderen globalen Boni). Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
+      { title:'Spieler melden', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du unangemessenes Verhalten (z.B. einen anstößigen Namen) melden - kurze Begründung reicht. Spieler-/Allianznamen werden außerdem automatisch beim Anlegen auf eindeutig unangemessene Begriffe geprüft. Nur mit eigenem Server verfügbar.' },
       { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Beim ersten Login der neuen Woche wird die Vorwoche abgerechnet und die Belohnung gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 12 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 6 Min., <strong>Silber</strong> 400 + 3 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Wer den Wochenwechsel verpasst, wird anhand des letzten bekannten Stands eingestuft. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
@@ -16726,6 +16769,7 @@
         return;
       }
       const val = document.getElementById('nameInput').value.trim();
+      if (containsBannedTerm(val)){ log('Dieser Name ist nicht erlaubt. Bitte wähle einen anderen.', 'ti-alert-triangle'); return; }
       if (val){ state.player.name = val.slice(0,18); state.lastNameChangeAt = Date.now(); }
       render(); save(); loadLeaderboard(); log('Kommandantenname gespeichert.', 'ti-check');
     };
@@ -16733,6 +16777,7 @@
     if (saveAllianceBtn) saveAllianceBtn.onclick = () => {
       const tag = document.getElementById('allianceInput').value.trim().toUpperCase().slice(0,4);
       if (!tag){ if (state.player.allianceTag) leaveAllianceProperly(); return; }
+      if (containsBannedTerm(tag)){ log('Dieser Allianz-Tag ist nicht erlaubt.', 'ti-alert-triangle'); return; }
       if (tag === myAllianceTag()) return;
       joinOrCreateAlliance(tag);
     };
@@ -16777,6 +16822,28 @@
     if (referralCopyBtn) referralCopyBtn.onclick = async () => {
       try { await navigator.clipboard.writeText(accountUsername || ''); log('Einladungscode kopiert.', 'ti-check'); }
       catch(e){ log('Kopieren nicht möglich - Code manuell markieren.', 'ti-alert-triangle'); }
+    };
+    const reportPlayerCancelBtn = document.getElementById('reportPlayerCancelBtn');
+    if (reportPlayerCancelBtn) reportPlayerCancelBtn.onclick = () => {
+      const row = document.getElementById('reportPlayerFormRow');
+      if (row) row.style.display = 'none';
+    };
+    const reportPlayerSubmitBtn = document.getElementById('reportPlayerSubmitBtn');
+    if (reportPlayerSubmitBtn) reportPlayerSubmitBtn.onclick = async () => {
+      const reportBtnEl = document.getElementById('profileReportBtn');
+      const targetUsername = reportBtnEl ? reportBtnEl.getAttribute('data-report-target') : '';
+      const reason = (document.getElementById('reportPlayerReasonInput')||{}).value || '';
+      if (reason.trim().length < 3){ log('Bitte kurz begründen, worum es geht.', 'ti-alert-triangle'); return; }
+      reportPlayerSubmitBtn.disabled = true;
+      try {
+        const res = await backendFetch('/report-player', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUsername, reason }) });
+        const data = await res.json();
+        if (!res.ok){ log(data.error||'Meldung fehlgeschlagen.', 'ti-alert-triangle'); return; }
+        log('Meldung gesendet - danke, dass du zu einer sauberen Community beiträgst.', 'ti-check');
+        const row = document.getElementById('reportPlayerFormRow');
+        if (row) row.style.display = 'none';
+      } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
+      finally { reportPlayerSubmitBtn.disabled = false; }
     };
     const shareColonyBtn = document.getElementById('shareColonyBtn');
     if (shareColonyBtn) shareColonyBtn.onclick = shareColonyImage;
