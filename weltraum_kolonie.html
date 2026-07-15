@@ -1719,8 +1719,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.8';
+  const VERSION = '8.28.9';
   const PATCHNOTES = [
+    { version:'8.28.9', date:'13.07.2026', changes:[
+      'Bug behoben (danke an holyhenning für den Report): Mehrere Marktverkäufe (oder andere Server-Aktionen wie PvP-Angriffe, Fraktionsangriffe, Weltboss) kurz hintereinander konnten fälschlich zum Ausloggen mit "anderes Gerät aktiv" führen. Die betroffenen Endpunkte melden ihre neue Spielstand-Version jetzt sofort zurück, zusätzlich läuft die Wiederholungslogik beim Speichern jetzt bis zu 3x statt nur 1x, bevor überhaupt ein echter Konflikt angenommen wird'
+    ]},
     { version:'8.28.8', date:'13.07.2026', changes:[
       'Sicherheitslücke behoben: Weltboss-Missionsabschluss (Schaden, Tötung, Beiträge, Flottenverluste, Kredite/Kampfpunkte) lief bisher komplett clientseitig und schrieb ungeprüft in den geteilten Boss-Zustand. Läuft jetzt vollständig serverseitig - inklusive dem 24h-Cooldown, der bisher nur clientseitig geprüft wurde und umgehbar gewesen wäre',
       'Sicherheitslücke behoben: Nichtangriffspakt-Datensätze waren komplett offen beschreibbar, ein fingierter "aktiver" Pakt hätte den Friedensdividende-Produktionsbonus ergeben. Nur die zwei tatsächlich beteiligten Parteien dürfen jetzt schreiben, Annehmen erfordert ein echtes vorheriges Angebot der Gegenseite'
@@ -3982,6 +3985,12 @@
       // Server ist jetzt die Autorität: neue Gesamtwerte direkt übernehmen statt selbst nachzurechnen.
       state.credits = data.newCredits;
       state.resources[resource] = data.newResourceAmount;
+      // Bug behoben (danke an holyhenning für den Report): der Server erhöht bei jeder Aktion, die
+      // den Spielstand direkt schreibt, dessen interne Versionsnummer - ohne diese Zeile hätte der
+      // Client das bei mehreren schnellen Verkäufen hintereinander nicht mitbekommen, wäre beim
+      // nächsten regulären Speichern mit einer veralteten Versionsnummer aufgelaufen und fälschlich
+      // als "anderes Gerät aktiv" ausgeloggt worden.
+      if (typeof data.saveVersion === 'number') gameSaveVersion = data.saveVersion;
       if (action === 'buy'){
         log('Gekauft: '+fmt(data.amount)+' '+label+' für '+fmt(data.credits)+' Kredite (Ø '+data.avgPrice.toFixed(2)+(data.discount?', -'+Math.round(data.discount*100)+'% Kartell-Rabatt':'')+').', 'ti-truck');
       } else {
@@ -4358,6 +4367,8 @@
       });
       const data = await res.json();
       if (!res.ok){ log('Angriff fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
+      // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
+      if (typeof data.saveVersion === 'number') gameSaveVersion = data.saveVersion;
       if (data.success){
         // Der Server hat unseren Spielstand serverseitig angepasst (battlePoints, credits). Wir spiegeln
         // die belohnten Werte lokal, damit die Anzeige sofort stimmt (loadGalaxyState lädt danach die
@@ -6934,6 +6945,8 @@
         const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: playerId }) });
         const data = await res.json();
         if (!res.ok){ log(data.error || 'Angriff fehlgeschlagen.', 'ti-alert-triangle'); return; }
+        // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
+        if (typeof data.saveVersion === 'number') gameSaveVersion = data.saveVersion;
         pendingResult = { source:'backend', success: data.success, stolen: data.stolen||{}, destroyedBuilding: data.destroyedBuilding, attackPowerShown: data.attackPower, defensePowerShown: data.defensePower, isWarAttack, targetAllianceTag, farmingPenalty };
       } catch(e){ log('Server für Angriff nicht erreichbar.', 'ti-alert-triangle'); return; }
     } else {
@@ -9674,10 +9687,15 @@
   // gespeicherten Spielstand des Angreifers als Nebeneffekt (z.B. Kampfpunkte), OHNE dass der
   // Client davon erfährt. Dadurch wird die client-seitige gameSaveVersion beim NÄCHSTEN normalen
   // Speichern fälschlich als veraltet erkannt (409) und der Spieler ausgeloggt – obwohl gar keine
-  // echte gleichzeitige Bearbeitung durch eine zweite Sitzung vorliegt. Fix: bei 409 zuerst einmal
-  // die tatsächliche Server-Version nachladen und den Speicherversuch automatisch wiederholen.
-  // Nur wenn das AUCH fehlschlägt, handelt es sich um einen echten Konflikt.
-  async function saveGameStateVersioned(value, isRetry){
+  // echte gleichzeitige Bearbeitung durch eine zweite Sitzung vorliegt. Hauptfix: die betroffenen
+  // Endpunkte (Markt, Weltboss, PvP-Angriff, Fraktionsangriff) melden jetzt ihre neue Versionsnummer
+  // zurück, der Client übernimmt sie sofort (siehe doMarketTrade u.a.) - der Fall hier sollte dadurch
+  // kaum noch auftreten. Als zusätzliches Sicherheitsnetz: bei 409 bis zu 3x (statt bisher 1x) die
+  // tatsächliche Server-Version nachladen und erneut versuchen. Nur wenn das AUCH fehlschlägt,
+  // handelt es sich um einen echten Konflikt (z.B. ein zweites Gerät, das wirklich gleichzeitig
+  // schreibt).
+  async function saveGameStateVersioned(value, retryCount){
+    retryCount = retryCount || 0;
     if (!useBackend()){
       return await storageSet(STORE_KEY, value, false);
     }
@@ -9688,12 +9706,12 @@
         body: JSON.stringify({ value, expectedVersion: gameSaveVersion })
       });
       if (res.status === 409){
-        if (isRetry) { handleSaveConflict(); return null; }
+        if (retryCount >= 3) { handleSaveConflict(); return null; }
         try {
           const fresh = await storageGet(STORE_KEY, false);
           if (fresh && fresh.version !== undefined){
             gameSaveVersion = fresh.version;
-            return await saveGameStateVersioned(value, true);
+            return await saveGameStateVersioned(value, retryCount+1);
           }
         } catch(e){}
         handleSaveConflict();
@@ -10919,6 +10937,10 @@
               }
               state.credits = data.newCredits;
               state.battlePoints = data.newBattlePoints;
+              // Siehe Kommentar bei doMarketTrade: der Server erhöht die Spielstand-Versionsnummer bei
+              // dieser Aktion mit, ohne Synchronisation hier würde ein späterer regulärer Speicherversuch
+              // fälschlich als Versionskonflikt erkannt (besonders bei mehreren Missionen kurz hintereinander).
+              if (typeof data.saveVersion === 'number') gameSaveVersion = data.saveVersion;
               if (data.arrivedTooLate){
                 if (showLog !== false) log(data.onCooldown ? 'Weltboss-Angriff einmal pro Tag: die Abklingzeit war bei Ankunft noch aktiv (+50 Kredite Spesen).' : 'Der Leviathan war bei Ankunft bereits gefallen - deine Flotte kehrt um (+50 Kredite Spesen).', 'ti-skull');
               } else {
