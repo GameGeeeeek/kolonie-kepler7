@@ -1774,8 +1774,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.32.0';
+  const VERSION = '8.32.1';
   const PATCHNOTES = [
+    { version:'8.32.1', date:'13.07.2026', changes:[
+      'Bug behoben: die Erfolge "Weltgestalter" (Terraforming Stufe 1) und "Paradies erschaffen" (Terraforming Stufe 10) konnten seit dem Terraforming-Umbau (v8.29.0) nie mehr freigeschaltet werden - state.terraforming[planet] wurde damals von einer reinen Zahl zu einem Objekt {targetType, level} umgestellt, die Erfolge verglichen aber weiterhin direkt gegen die Zahl. Beide Erfolge lesen jetzt korrekt das neue Format (und sicherheitshalber weiterhin auch das alte)'
+    ]},
     { version:'8.32.0', date:'13.07.2026', changes:[
       'Neue Sektion "☕ Unterstützer" am Ende des Fortschritt-Tabs: zeigt den aktuellen Top-Unterstützer von Ko-fi als kleines Dankeschön (Backend-Webhook-Integration, respektiert anonyme Spenden - die erscheinen nie mit Namen)'
     ]},
@@ -4821,8 +4824,8 @@
     { key:'level10', name:'Erfahrener Kommandant', desc:'Erreiche Kommandanten-Level 10.', check: s => commanderLevel(s.xp||0) >= 10, progress: s => [Math.min(10,commanderLevel(s.xp||0)), 10] },
     { key:'doctrine', name:'Grundsatzentscheidung', desc:'Wähle eine Doktrin.', check: s => !!s.doctrine, progress: s => [s.doctrine?1:0, 1] },
     { key:'planetrole', name:'Spezialisierung', desc:'Weise einer Kolonie eine Rolle zu.', check: s => Object.keys(s.planetSpecialization||{}).length >= 1, progress: s => [Math.min(1,Object.keys(s.planetSpecialization||{}).length), 1] },
-    { key:'terraform1', name:'Weltgestalter', desc:'Terraforme einen Standort auf Stufe 1.', check: s => Object.values(s.terraforming||{}).some(v=>v>=1), progress: s => [Math.min(1, Object.values(s.terraforming||{}).filter(v=>v>=1).length), 1] },
-    { key:'terraform10', name:'Paradies erschaffen', desc:'Bringe einen Standort auf Terraforming-Stufe 10.', check: s => Object.values(s.terraforming||{}).some(v=>v>=10), progress: s => [Math.min(10, Math.max(0, ...Object.values(s.terraforming||{}), 0)), 10] },
+    { key:'terraform1', name:'Weltgestalter', desc:'Terraforme einen Standort auf Stufe 1.', check: s => Object.values(s.terraforming||{}).some(v=>(typeof v==='number'?v:(v&&v.level)||0)>=1), progress: s => [Math.min(1, Object.values(s.terraforming||{}).filter(v=>(typeof v==='number'?v:(v&&v.level)||0)>=1).length), 1] },
+    { key:'terraform10', name:'Paradies erschaffen', desc:'Bringe einen Standort auf Terraforming-Stufe 10.', check: s => Object.values(s.terraforming||{}).some(v=>(typeof v==='number'?v:(v&&v.level)||0)>=10), progress: s => [Math.min(10, Math.max(0, ...Object.values(s.terraforming||{}).map(v=>(typeof v==='number'?v:(v&&v.level)||0)), 0)), 10] },
     { key:'officer1', name:'Erster Offizier', desc:'Heuere einen Offizier an.', check: s => Object.values(s.officers||{}).some(v=>v>=1), progress: s => [Math.min(1, Object.values(s.officers||{}).filter(v=>v>=1).length), 1] },
     { key:'officer_all', name:'Kompletter Stab', desc:'Heuere alle vier Offiziere an.', check: s => Object.values(s.officers||{}).filter(v=>v>=1).length >= 4, progress: s => [Object.values(s.officers||{}).filter(v=>v>=1).length, 4] },
     { key:'module1', name:'Aufgerüstet', desc:'Rüste ein Schiffsmodul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.length>0), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.length>0).length), 1] },
