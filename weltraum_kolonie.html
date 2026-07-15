@@ -108,6 +108,18 @@
         #060812;
     }
     #game-root { font-family: system-ui, sans-serif; color: #e9ecf5; max-width: 780px; margin: 0 auto; }
+    /* Desktop-Verbreiterung (Feature-Wunsch 13.07.2026): auf großen Monitoren blieb bisher viel
+       Fläche links/rechts ungenutzt, da #game-root immer bei 780px gedeckelt war. Ab 1400px Viewport
+       wächst der Hauptbereich jetzt mit, bis max. 1100px - "calc(100vw - 470px)" reserviert dabei
+       bewusst genug Platz auf JEDER Seite für das rechte Sidebar-Panel (200px breit + 14px Rand +
+       Luft), damit es bei keiner Fensterbreite überlappt. Unterhalb von 1400px bleibt alles exakt
+       beim bisherigen 780px-Verhalten - die bestehende Sidebar-Logik (aktiviert ab 1219px, siehe
+       .fleet-position-panel) bleibt in ihrem bisherigen Bereich unangetastet.
+       Karten (SVG, viewBox+width:100%) und auto-fill/auto-fit-Grids skalieren dadurch automatisch
+       mit, ohne dass ihr Code angepasst werden musste. */
+    @media (min-width: 1400px) {
+      #game-root { max-width: min(1100px, calc(100vw - 470px)); }
+    }
 
     .shell {
       position:relative; border-radius:20px; overflow:hidden; border:0.5px solid rgba(255,255,255,0.08);
@@ -306,6 +318,7 @@
     @keyframes tabIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 
     .resbar { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:1.5rem; }
+    @media (min-width: 1400px) { .resbar { grid-template-columns: repeat(6, 1fr); } }
     @media (max-width: 620px) { .resbar { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 380px) { .resbar { grid-template-columns: repeat(2, 1fr); } }
     .rescard { position:relative; overflow:hidden; background:rgba(255,255,255,0.05); border:0.5px solid rgba(255,255,255,0.09); border-radius:12px; padding: 0.8rem 0.9rem; display:flex; align-items:center; gap:10px; transition:border-color 0.2s ease; }
@@ -1734,8 +1747,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.31.3';
+  const VERSION = '8.31.4';
   const PATCHNOTES = [
+    { version:'8.31.4', date:'13.07.2026', changes:[
+      'Desktop-Layout verbreitert: auf großen Monitoren (ab ca. 1400px Fensterbreite) wächst der Hauptbereich jetzt über die bisherigen 780px hinaus (bis max. 1100px) statt viel Fläche links/rechts ungenutzt zu lassen. Ressourcenleiste zeigt bei dieser Breite alle 6 Ressourcen in einer Zeile statt in zwei Dreierreihen. Karten und Karten-Raster passen sich dabei automatisch mit an. Das rechte Flotten-Status-Panel behält garantiert genug Abstand, keine Überlappung bei jeder Fensterbreite. Unterhalb von 1400px unverändert'
+    ]},
     { version:'8.31.3', date:'13.07.2026', changes:[
       'Orbitalstationen jetzt sichtbar auf der Sektorkarte: jeder Planet mit einer Orbitalstation zeigt einen Ring in der Farbe des gewählten Fokus (Verteidigung/Produktion/Dock). Stufe 1 ein einzelner dünner Ring, Stufe 2 zwei Ringe, Stufe 3 drei Ringe mit kleinen Modul-Knoten und leichtem Leuchtpuls - die Ausbaustufe ist damit auf einen Blick erkennbar, ohne das Baumenü zu öffnen. Gilt auch für die Heimatbasis'
     ]},
