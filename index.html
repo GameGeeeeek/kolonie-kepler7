@@ -1774,8 +1774,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.32.4';
+  const VERSION = '8.32.5';
   const PATCHNOTES = [
+    { version:'8.32.5', date:'13.07.2026', changes:[
+      'Zehn neue, schwere Endgame-Erfolge ergänzt, die viel abverlangen: Fähigkeitsmeister (kompletter Skilltree), Kriegsveteran (alle Veteranen-Ausbildungsstufen), Exotischer Vordenker (alle Exotischen Forschungen), Paradies-Architekt (ein Planet vollständig zur Erdwelt terraformt), Vollständige Expansion (alle 11 Kolonie-Plätze bei maximaler Kolonial-Logistik), Forschungs-Meister (alle 20 Forschungszweige maximiert), Wächter des Wissens (Forschungs-Nexus errichtet), Architekt der Sterne (alle drei Mega-Projekte), Zyklus-Meister (Prestige-Stufe 10) und Transzendiert (erster Aufstieg)',
+      'Erfolge können jetzt eine individuelle, größere Belohnung definieren statt der bisherigen einheitlichen kleinen Prämie - die neuen schweren Erfolge geben deutlich mehr Ressourcen, Kredite und XP, gestaffelt nach Schwierigkeit. Alle bisherigen Erfolge geben weiterhin exakt dieselbe Belohnung wie zuvor'
+    ]},
     { version:'8.32.4', date:'13.07.2026', changes:[
       'Alle 30 Erfolge auf Bugs überprüft (Report nach den Terraforming-Erfolg-Fixes): Bug gefunden und behoben bei "Vielseitiges Imperium" - sprach noch von "allen vier" Planeten-Rollen und verlangte nur 4, das Spiel hat aber inzwischen sechs Rollen (Bergbau, Festung, Werft, Handel, Forschung, Logistik). Verlangt jetzt korrekt alle sechs gleichzeitig. Bereits freigeschaltete Erfolge bleiben davon unberührt - Erfolge werden nie nachträglich wieder entzogen. Alle anderen Erfolge geprüft und für korrekt befunden (Zähler-Felder werden tatsächlich hochgezählt, Datenformate stimmen mit den zugrunde liegenden Strukturen überein)'
     ]},
@@ -4851,7 +4855,20 @@
     { key:'allied', name:'Diplomat', desc:'Werde mit einer Fraktion verbündet (Ruf 70+).', check: s => Object.values(s.factionRep||{}).some(r => r >= 70), progress: s => [Math.min(70, Math.max(0, ...Object.values(s.factionRep||{}).map(r=>r||0), 0)), 70] },
     { key:'fquest10', name:'Auftragsjäger', desc:'Schließe 10 Fraktionsaufträge ab.', check: s => (s.factionQuestsDone||0) >= 10, progress: s => [Math.min(10,s.factionQuestsDone||0), 10] },
     { key:'shop5', name:'Stammkunde', desc:'Kaufe 5 Mal im Kredit-Shop ein.', check: s => (s.shopPurchases||0) >= 5, progress: s => [Math.min(5,s.shopPurchases||0), 5] },
-    { key:'credits5k', name:'Kreditwürdig', desc:'Besitze 5000 Kredite gleichzeitig.', check: s => (s.credits||0) >= 5000, progress: s => [Math.min(5000,Math.floor(s.credits||0)), 5000] }
+    { key:'credits5k', name:'Kreditwürdig', desc:'Besitze 5000 Kredite gleichzeitig.', check: s => (s.credits||0) >= 5000, progress: s => [Math.min(5000,Math.floor(s.credits||0)), 5000] },
+    // ===== Schwere Endgame-Erfolge (13.07.2026) - deutlich größere Belohnung, gestaffelt nach
+    // Schwierigkeit. "Hart" (Mitte/Ende Spiel, erreichbar mit gezieltem Fokus) vs. "Sehr hart" (echtes
+    // Endgame, erfordert massive, langfristige Investition oder mehrere abgeschlossene Reset-Zyklen). =====
+    { key:'skilltreemax', name:'Fähigkeitsmeister', desc:'Schalte alle 9 Fähigkeitsbaum-Knoten frei.', check: s => SKILL_TREE.every(n => (s.skillTree||{})[n.key]), progress: s => [SKILL_TREE.filter(n=>(s.skillTree||{})[n.key]).length, SKILL_TREE.length], reward:{erz:2500,kristalle:1500,deuterium:800,credits:100}, xpReward:150 },
+    { key:'allveteran', name:'Kriegsveteran', desc:'Schließe alle drei Stufen der Veteranen-Ausbildung ab.', check: s => VETERAN_TRAINING.every(v => (s.veteranTraining||{})[v.key]), progress: s => [VETERAN_TRAINING.filter(v=>(s.veteranTraining||{})[v.key]).length, VETERAN_TRAINING.length], reward:{erz:2500,kristalle:1500,deuterium:800,credits:100}, xpReward:150 },
+    { key:'allexotic', name:'Exotischer Vordenker', desc:'Schließe alle drei Exotischen Forschungen ab.', check: s => EXOTIC_RESEARCH.every(e => (s.exoticResearch||{})[e.key]), progress: s => [EXOTIC_RESEARCH.filter(e=>(s.exoticResearch||{})[e.key]).length, EXOTIC_RESEARCH.length], reward:{erz:2500,kristalle:1500,deuterium:800,credits:100}, xpReward:150 },
+    { key:'erdweltmaster', name:'Paradies-Architekt', desc:'Terraforme einen Standort vollständig zur Erdwelt.', check: s => Object.values(s.planetTypeOverride||{}).includes('erdwelt'), progress: s => [Object.values(s.planetTypeOverride||{}).includes('erdwelt')?1:0, 1], reward:{erz:8000,kristalle:5000,deuterium:2500,antimaterie:80,credits:300}, xpReward:300 },
+    { key:'allcolonyslots', name:'Vollständige Expansion', desc:'Belege alle 11 möglichen Kolonie-Plätze (erfordert Kolonial-Logistik auf Maximalstufe).', check: s => (s.research.rkolonisation||0) >= 20 && Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 11, progress: s => [Math.min(11,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 11], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
+    { key:'allresearchmax', name:'Forschungs-Meister', desc:'Bringe alle 20 Forschungszweige auf Maximalstufe.', check: s => RESEARCH_DEFS.every(r => (s.research[r.key]||0) >= r.maxLevel), progress: s => [RESEARCH_DEFS.filter(r=>(s.research[r.key]||0)>=r.maxLevel).length, RESEARCH_DEFS.length], reward:{erz:12000,kristalle:8000,deuterium:4000,antimaterie:150,credits:500}, xpReward:500 },
+    { key:'forschungsnexus', name:'Wächter des Wissens', desc:'Errichte den Forschungs-Nexus (erfordert alle Forschungszweige auf Maximalstufe).', check: s => !!((s.megaProjects||{}).forschungsnexus), progress: s => [((s.megaProjects||{}).forschungsnexus)?1:0, 1], reward:{erz:10000,kristalle:7000,deuterium:3500,antimaterie:150,credits:500}, xpReward:500 },
+    { key:'allmegaprojects', name:'Architekt der Sterne', desc:'Errichte alle drei Mega-Projekte (Dyson-Schwarm, Void-Reaktor, Forschungs-Nexus).', check: s => MEGA_PROJECTS.every(p => !!((s.megaProjects||{})[p.key])), progress: s => [MEGA_PROJECTS.filter(p=>!!((s.megaProjects||{})[p.key])).length, MEGA_PROJECTS.length], reward:{erz:20000,kristalle:14000,deuterium:7000,antimaterie:300,credits:1000}, xpReward:800 },
+    { key:'prestige10', name:'Zyklus-Meister', desc:'Erreiche Prestige-Stufe 10.', check: s => (s.prestige||0) >= 10, progress: s => [Math.min(10,s.prestige||0), 10], reward:{erz:15000,kristalle:10000,deuterium:5000,antimaterie:200,credits:750}, xpReward:600 },
+    { key:'ascended', name:'Transzendiert', desc:'Führe deinen ersten Aufstieg (Transzendenz) durch.', check: s => ((s.ascension&&s.ascension.count)||0) >= 1, progress: s => [Math.min(1,(s.ascension&&s.ascension.count)||0), 1], reward:{erz:25000,kristalle:18000,deuterium:9000,antimaterie:400,credits:1500}, xpReward:1000 }
   ];
   // Titel: automatisch aus dem prestigeträchtigsten freigeschalteten Erfolg abgeleitet (keine neue
   // Verfolgung nötig, nutzt einfach die bestehenden Erfolge). Reihenfolge = Priorität, oben gewinnt.
@@ -6580,11 +6597,20 @@
       if (!state.achievements[a.key] && a.check(state)){
         state.achievements[a.key] = true;
         // Kleine Ressourcen-Prämie beim Freischalten, damit Erfolge nicht rein kosmetisch bleiben.
+        // Schwere, späte Erfolge können über a.reward/a.xpReward eine deutlich größere, individuelle
+        // Belohnung definieren (13.07.2026) - Standard bleibt für alle bisherigen Erfolge unverändert.
         const cap = storageCap();
-        const reward = { erz: 250, kristalle: 150, deuterium: 100 };
-        for (const [r,amt] of Object.entries(reward)) state.resources[r] = Math.min(cap, (state.resources[r]||0)+amt);
-        addXp(50);
-        log('Erfolg freigeschaltet: '+a.name+' (+250 Erz, +150 Kristalle, +100 Deuterium, +50 XP)', 'ti-medal');
+        const reward = a.reward || { erz: 250, kristalle: 150, deuterium: 100 };
+        const rewardParts = [];
+        for (const [r,amt] of Object.entries(reward)){
+          if (r === 'credits'){ state.credits = (state.credits||0) + amt; rewardParts.push('+'+fmt(amt)+' Kredite'); continue; }
+          state.resources[r] = Math.min(cap, (state.resources[r]||0)+amt);
+          rewardParts.push('+'+fmt(amt)+' '+(RES_DEFS.find(x=>x.key===r)||{label:r}).label);
+        }
+        const xpReward = a.xpReward || 50;
+        addXp(xpReward);
+        rewardParts.push('+'+xpReward+' XP');
+        log('Erfolg freigeschaltet: '+a.name+' ('+rewardParts.join(', ')+')', 'ti-medal');
         playSound('achieve');
       }
     }
