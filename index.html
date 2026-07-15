@@ -1719,8 +1719,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.7';
+  const VERSION = '8.28.8';
   const PATCHNOTES = [
+    { version:'8.28.8', date:'13.07.2026', changes:[
+      'Sicherheitslücke behoben: Weltboss-Missionsabschluss (Schaden, Tötung, Beiträge, Flottenverluste, Kredite/Kampfpunkte) lief bisher komplett clientseitig und schrieb ungeprüft in den geteilten Boss-Zustand. Läuft jetzt vollständig serverseitig - inklusive dem 24h-Cooldown, der bisher nur clientseitig geprüft wurde und umgehbar gewesen wäre',
+      'Sicherheitslücke behoben: Nichtangriffspakt-Datensätze waren komplett offen beschreibbar, ein fingierter "aktiver" Pakt hätte den Friedensdividende-Produktionsbonus ergeben. Nur die zwei tatsächlich beteiligten Parteien dürfen jetzt schreiben, Annehmen erfordert ein echtes vorheriges Angebot der Gegenseite'
+    ]},
     { version:'8.28.7', date:'13.07.2026', changes:[
       'Piratenüberfall-Bericht zeigt jetzt die konkreten verlorenen Ressourcenmengen an, nicht mehr nur den Prozentsatz (wie beim PvP-Angriffsbericht schon länger üblich)'
     ]},
@@ -10899,53 +10903,39 @@
           if (showLog !== false) log(planet.name+' ('+planetDisplayName(planetKey)+'): Mission abgeschlossen.'+bonusMsg, 'ti-rocket');
         } else if (m.type === 'worldboss'){
           const bLevel = m.bossLevel || 1;
-          const power = m.power || attackPower(fleet);
-          const dmg = Math.round(power * (0.8 + Math.random()*0.4));
-          // Boss schlägt zurück: Verluste steigen mit der Stufe (8+L% bis 15+L%), keine Niederlage.
-          const lossPct = (0.08 + bLevel*0.01) + Math.random()*0.07;
-          const lostWb = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, Math.min(0.5, lossPct), planetKey, m.composition);
-          const lostWbText = lostCountsToText(lostWb);
-          addVeteranXp(planetKey, 8 + bLevel);
-          const bpWb = 3 + bLevel;
-          awardBattlePoints(bpWb);
-          // HP-Abzug asynchron gegen den geteilten Speicher (frisch lesen, Schaden anwenden, schreiben).
+          // Bug/Sicherheitslücke behoben (13.07.2026): Schaden, Verluste und Kredite/Kampfpunkte
+          // wurden bisher komplett clientseitig berechnet und der geteilte Boss-Zustand ungeprüft
+          // überschrieben - jeder hätte den gemeinsamen Boss beliebig manipulieren (sofort "töten",
+          // gefälschte Beitragswerte eintragen) und sich dabei echte Belohnungen verschaffen können.
+          // Der Server liest jetzt die tatsächliche Mission aus dem echten Spielstand, berechnet
+          // Schaden/Verluste selbst und schreibt das Ergebnis direkt zurück.
           (async () => {
             try {
-              let b = null;
-              try { const r = await storageGet(WORLDBOSS_KEY, true); if (r && r.value) b = JSON.parse(r.value); } catch(e){}
-              if (!b || b.bossId !== m.targetId || b.defeatedAt){
-                state.credits = (state.credits||0) + 50;
-                if (showLog !== false) log('Der Leviathan war bei Ankunft bereits gefallen - deine Flotte kehrt um (+50 Kredite Spesen).', 'ti-skull');
-                worldBossCache = b; renderWorldBoss();
+              const res = await backendFetch('/worldboss/resolve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ missionId: m.id, planetKey }) });
+              const data = await res.json();
+              if (!res.ok || !data.ok){
+                if (showLog !== false) log('Weltboss-Mission konnte nicht ausgewertet werden: '+(data.error||'unbekannt'), 'ti-alert-triangle');
                 return;
               }
-              b.hp = Math.max(0, (b.hp||0) - dmg);
-              if (!b.contributions) b.contributions = {};
-              const me = b.contributions[state.player.id] || { name: state.player.name || 'Kommandant', dmg: 0 };
-              me.dmg = (me.dmg||0) + dmg;
-              me.name = state.player.name || me.name;
-              b.contributions[state.player.id] = me;
-              const killed = b.hp <= 0;
-              if (killed) b.defeatedAt = Date.now();
-              // Direkt vor dem Schreiben nochmal frisch lesen, um das Last-write-wins-Zeitfenster zu
-              // verkleinern: hat ein anderer, schneller schreibender Spieler den Boss inzwischen bereits
-              // erlegt, NICHT mehr mit unserer (jetzt veralteten) Kopie überschreiben - sonst könnte ein
-              // bereits gefallener Boss fälschlich wieder "lebendig" werden.
-              if (!killed){
-                let latest = null;
-                try { const r2 = await storageGet(WORLDBOSS_KEY, true); if (r2 && r2.value) latest = JSON.parse(r2.value); } catch(e){}
-                if (latest && latest.bossId === b.bossId && latest.defeatedAt){
-                  if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(dmg)+' Schaden, aber der Leviathan ist inzwischen bereits gefallen.'+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
-                  worldBossCache = latest; renderWorldBoss();
-                  return;
-                }
+              state.credits = data.newCredits;
+              state.battlePoints = data.newBattlePoints;
+              if (data.arrivedTooLate){
+                if (showLog !== false) log(data.onCooldown ? 'Weltboss-Angriff einmal pro Tag: die Abklingzeit war bei Ankunft noch aktiv (+50 Kredite Spesen).' : 'Der Leviathan war bei Ankunft bereits gefallen - deine Flotte kehrt um (+50 Kredite Spesen).', 'ti-skull');
+              } else {
+                // Verluste lokal nachziehen (Server hat sie bereits im gespeicherten Spielstand
+                // abgezogen; der nächste reguläre Speichervorgang gleicht alles endgültig ab, siehe
+                // Versions-Konflikt-Behandlung in saveGameStateVersioned).
+                for (const [k,n] of Object.entries(data.lostShips||{})) fleet[k] = Math.max(0, (fleet[k]||0)-n);
+                const lostWbText = lostCountsToText(data.lostShips||{});
+                addVeteranXp(planetKey, 8 + bLevel);
+                if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(data.damage)+' Schaden!'+(data.killed?' LETZTER SCHLAG - der Leviathan fällt!':' Rest-HP: '+fmt(Math.round(data.bossHp))+'.')+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
+                playSound(data.killed ? 'achieve' : 'win');
+                pushReport({ type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:false, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} });
               }
-              await saveWorldBoss(b);
-              if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(dmg)+' Schaden!'+(killed?' LETZTER SCHLAG - der Leviathan fällt!':' Rest-HP: '+fmt(Math.round(b.hp))+'.')+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
-              playSound(killed ? 'achieve' : 'win');
-              pushReport({ type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(power), defensePower: b.maxHp, chancePct: 100, hasWeakness:false, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: bpWb, ownLostShips: lostWb });
-              if (killed) maybeClaimWorldBossReward(b);
-              renderWorldBoss();
+              // Frischen (server-geschriebenen) Boss-Zustand laden - zeigt den aktuellen HP-Stand an
+              // und beansprucht bei einem Kill automatisch die anteilige Belohnung (siehe loadWorldBoss).
+              await loadWorldBoss();
+              render(); save();
             } catch(e){}
           })();
         } else if (m.type === 'piratelair'){
