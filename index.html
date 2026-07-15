@@ -1828,8 +1828,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.34.6';
+  const VERSION = '8.34.7';
   const PATCHNOTES = [
+    { version:'8.34.7', date:'13.07.2026', changes:[
+      'Bug behoben (Report: "Gegner hatte in Runde 9 schon 0 Schiffe"): die Verlust-Verteilung über die 12 Runden konnte eine Seite bei Totalvernichtung schon deutlich vor der letzten Runde komplett auf 0 Schiffe bringen - Schüsse, Alpha-Salven und Einzelschiff-Duelle liefen aber unverändert bis zum Ende weiter, als hätte die Seite noch Schiffe. Ein bereits vollständig zerstörter Gegner (oder die eigene Flotte) feuert jetzt in den restlichen Runden keine Schüsse mehr ab, und Duelle nennen nur noch Schiffe, die zu diesem Zeitpunkt tatsächlich noch existieren'
+    ]},
     { version:'8.34.6', date:'13.07.2026', changes:[
       'Kampf-Wiedergabe deutlich komplexer gestaltet (auf allen vier gewünschten Ebenen):',
       'Taktische Tiefe: Rundenstruktur auf 12 Runden erweitert mit zwei neuen Phasen (Flankenmanöver direkt nach dem Anflug, Rückzugsgefecht vor dem Nachspiel - während des Flankenmanövers feuern beide Seiten aus deutlich weiter außen liegenden Winkeln); Einzelschiff-Duelle im Kampfprotokoll nennen jetzt konkrete eigene (und falls bekannt gegnerische) Schiffe statt nur abstrakt "beide Seiten"',
@@ -8567,10 +8570,20 @@
     const defenseEntries = right.buildings ? Object.entries(right.buildings).filter(([k,v])=>v>0) : [];
 
     const rounds = [];
+    // Laufender Flottenbestand während des Aufbaus (13.07.2026, Bugfix: eine Seite konnte durch die
+    // Verlust-Gewichtung schon mehrere Runden vor Kampfende komplett auf 0 fallen, während Duelle und
+    // Schüsse unverändert bis zur letzten Runde so weiterliefen, als wäre die Seite noch aktiv) -
+    // wird bei jeder Runde aktualisiert und für Duell-Auswahl UND leftAlive/rightAlive genutzt.
+    const runningLeft = { ...left.fleet };
+    const runningRight = right.fleet ? { ...right.fleet } : null;
     for (let i=0;i<ROUNDS;i++){
       const leftDestroyed = {}, rightDestroyed = {};
       for (const k of Object.keys(leftSchedule)){ const take = leftSchedule[k][i]; if (take>0) leftDestroyed[k] = take; }
       for (const k of Object.keys(rightSchedule)){ const take = rightSchedule[k][i]; if (take>0) rightDestroyed[k] = take; }
+      // leftAlive/rightAlive: Bestand VOR den Verlusten dieser Runde - entscheidet, ob diese Seite in
+      // dieser Runde überhaupt noch feuern kann (siehe spawnRoundShots-Aufruf in playRound).
+      const leftAlive = Object.values(runningLeft).some(v => v > 0);
+      const rightAlive = runningRight ? Object.values(runningRight).some(v => v > 0) : true;
       const phase = phaseOf(i);
       let lines = [];
       lines.push(pickFlavor(BATTLE_LOG_TEMPLATES[phase], usedLines));
@@ -8593,12 +8606,14 @@
       }
       // Einzelschiff-Duell (13.07.2026, Feature-Wunsch: mehr taktische Tiefe) - nennt konkret ein
       // eigenes (und, falls bekannt, ein gegnerisches) Schiff statt immer nur abstrakt "beide Seiten".
-      // Nicht bei Anflug/Rückzug/Nachspiel (ruhigere Phasen ohne aktives Gefecht).
-      if (['flankenmanoever','gefecht','entscheidung'].includes(phase) && Math.random() < 0.55){
-        const leftPresent = Object.keys(left.fleet).filter(k => (left.fleet[k]||0) > 0);
+      // Nicht bei Anflug/Rückzug/Nachspiel (ruhigere Phasen ohne aktives Gefecht). Nutzt den LAUFENDEN
+      // Bestand (runningLeft/runningRight), nicht die statische Ausgangsflotte - sonst könnten Duelle
+      // ein Schiff nennen, das zu diesem Zeitpunkt längst zerstört ist.
+      if (leftAlive && ['flankenmanoever','gefecht','entscheidung'].includes(phase) && Math.random() < 0.55){
+        const leftPresent = Object.keys(runningLeft).filter(k => (runningLeft[k]||0) > 0);
         if (leftPresent.length){
           const myShip = leftPresent[Math.floor(Math.random()*leftPresent.length)];
-          const rightPresent = right.fleet ? Object.keys(right.fleet).filter(k => (right.fleet[k]||0) > 0) : [];
+          const rightPresent = (runningRight && rightAlive) ? Object.keys(runningRight).filter(k => (runningRight[k]||0) > 0) : [];
           if (rightPresent.length){
             const theirShip = rightPresent[Math.floor(Math.random()*rightPresent.length)];
             lines.push(shipDisplayName(myShip)+' visiert '+shipDisplayName(theirShip)+' der Gegenseite an.');
@@ -8607,8 +8622,12 @@
           }
         }
       }
+      // Laufenden Bestand NACH dieser Runde aktualisieren - Grundlage für leftAlive/rightAlive und
+      // Duell-Auswahl der NÄCHSTEN Runde.
+      for (const [k,v] of Object.entries(leftDestroyed)) runningLeft[k] = Math.max(0, (runningLeft[k]||0) - v);
+      if (runningRight) for (const [k,v] of Object.entries(rightDestroyed)) runningRight[k] = Math.max(0, (runningRight[k]||0) - v);
       const rightHpPct = Math.round(100 - (100-finalRightHp) * ((i+1)/ROUNDS));
-      rounds.push({ lines, leftDestroyed, rightDestroyed, rightHpPct, phase, mentionedBuildingKey });
+      rounds.push({ lines, leftDestroyed, rightDestroyed, rightHpPct, phase, mentionedBuildingKey, leftAlive, rightAlive });
     }
     return { left, right, rounds, attackerWins, finalRightHp, leftWeaponPool, rightWeaponPool };
   }
@@ -8810,7 +8829,7 @@
   // sonst engeren Frontallinie.
   const BATTLE_LEFT_FLANK_ZONE = [1, 18], BATTLE_RIGHT_FLANK_ZONE = [82, 99];
   function randIn(zone){ return zone[0] + Math.random()*(zone[1]-zone[0]); }
-  function spawnRoundShots(scene, leftLossCount, rightLossCount, leftPool, rightPool, slowMo, alphaSide, flanking){
+  function spawnRoundShots(scene, leftLossCount, rightLossCount, leftPool, rightPool, slowMo, alphaSide, flanking, leftAlive, rightAlive){
     const hasLeftLoss = leftLossCount > 0, hasRightLoss = rightLossCount > 0;
     const leftZone = flanking ? BATTLE_LEFT_FLANK_ZONE : BATTLE_LEFT_ZONE;
     const rightZone = flanking ? BATTLE_RIGHT_FLANK_ZONE : BATTLE_RIGHT_ZONE;
@@ -8819,14 +8838,20 @@
     // daher immer ein echter Treffer) - macht die Wiedergabe unvorhersehbarer statt dass jeder
     // einzelne Schuss zwangsläufig einschlägt.
     const MISS_CHANCE = 0.22;
-    const shotCount = 3 + Math.floor(Math.random()*3);
+    // Bugfix (13.07.2026, Report: "Gegner hatte in Runde 9 schon 0 Schiffe"): leftAlive/rightAlive
+    // (Standard true, falls nicht übergeben - Rückwärtskompatibilität) verhindert, dass eine Seite
+    // ohne verbleibende Schiffe trotzdem weiterfeuert. Undefined-Check statt reinem falsy-Check, da
+    // rightAlive bei abstrakten Gegnern (kein bekanntes right.fleet) bewusst immer true ist.
+    const leftCanFire = leftAlive !== false;
+    const rightCanFire = rightAlive !== false;
+    const shotCount = leftCanFire ? 3 + Math.floor(Math.random()*3) : 0;
     for (let i=0;i<shotCount;i++){
       const weapon = leftPool[Math.floor(Math.random()*leftPool.length)];
       const isLast = i===shotCount-1;
       const miss = !isLast && Math.random() < MISS_CHANCE;
       spawnBattleShot(scene, randIn(leftZone), randIn(rightZone), weapon, i*130, hasRightLoss && isLast ? rightLossCount : 0, !!(slowMo && isLast), false, miss);
     }
-    const returnCount = 3 + Math.floor(Math.random()*3);
+    const returnCount = rightCanFire ? 3 + Math.floor(Math.random()*3) : 0;
     for (let i=0;i<returnCount;i++){
       const weapon = rightPool[Math.floor(Math.random()*rightPool.length)];
       const isLast = i===returnCount-1;
@@ -8836,11 +8861,12 @@
     // Alpha-Salve (13.07.2026, Feature-Wunsch): einmalige, größere Sonderattacke schwerer Schiffe
     // (Schlachtschiff/Superschlachtschiff) - bevorzugt einen Strahl-Typ (Railgun, deren eigene
     // Waffe), fliegt etwas später als die regulären Schüsse dieser Runde und schlägt sichtbar
-    // kräftiger ein (eigene CSS-Klasse, siehe .battle-shot.alpha).
-    if (alphaSide === 'left'){
+    // kräftiger ein (eigene CSS-Klasse, siehe .battle-shot.alpha). Ebenfalls an leftCanFire/
+    // rightCanFire gekoppelt - eine bereits ausgelöschte Seite feuert keine Alpha-Salve mehr ab.
+    if (alphaSide === 'left' && leftCanFire){
       const beamWeapon = leftPool.find(w=>w.kind==='beam') || leftPool[0];
       spawnBattleShot(scene, randIn(BATTLE_LEFT_ZONE), 50, beamWeapon, shotCount*130+140, 0, false, true);
-    } else if (alphaSide === 'right'){
+    } else if (alphaSide === 'right' && rightCanFire){
       const beamWeapon = rightPool.find(w=>w.kind==='beam') || rightPool[0];
       spawnBattleShot(scene, randIn(BATTLE_RIGHT_ZONE), 50, beamWeapon, 60+returnCount*140+140, 0, false, true);
     }
@@ -8984,7 +9010,7 @@
         if (leftHasHeavy){ alphaSide = 'left'; alphaFired = true; }
         else if (rightHasHeavy){ alphaSide = 'right'; alphaFired = true; }
       }
-      if (scene) spawnRoundShots(scene, leftLossCount, rightLossCount, seq.leftWeaponPool, seq.rightWeaponPool, round.phase === 'entscheidung', alphaSide, round.phase === 'flankenmanoever');
+      if (scene) spawnRoundShots(scene, leftLossCount, rightLossCount, seq.leftWeaponPool, seq.rightWeaponPool, round.phase === 'entscheidung', alphaSide, round.phase === 'flankenmanoever', round.leftAlive, round.rightAlive);
       // Betroffene Schiffs-Icons kurz aufblitzen lassen ("Vorzucken"), bevor die Zahl tatsächlich
       // sinkt – wirkt wie ein Treffer-Warnsignal statt eines plötzlichen Sprungs.
       for (const k of Object.keys(round.leftDestroyed)){
