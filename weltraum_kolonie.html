@@ -1243,6 +1243,7 @@
       <div class="tab-panel" id="tab-offiziere">
         <div class="section-title"><i class="ti ti-user-circle" aria-hidden="true"></i>Offiziere</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Vier Offiziere, alle gleichzeitig aktiv. Anheuern und Befördern kostet <strong>Kommandopunkte</strong> – die verdienst du fürs Kämpfen (parallel zu Kampfpunkten, ohne deinen Punktestand zu senken).</div>
+        <div id="combatBonusCapBox" style="margin-bottom:1rem;"></div>
         <div class="card-row" style="margin-bottom:1rem; border-color:#c3bef5;">
           <div class="left"><div class="bicon" style="background:rgba(195,190,245,0.18); color:#c3bef5;"><i class="ti ti-medal" aria-hidden="true"></i></div><div><div class="bname">Kommandopunkte</div><div class="bmeta">Verfügbar zum Ausgeben</div></div></div>
           <div class="lvl-pill" style="background:rgba(195,190,245,0.2); color:#c3bef5; font-size:15px;"><span id="commandPointsDisplay">0</span></div>
@@ -1775,8 +1776,18 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.33.0';
+  const VERSION = '8.34.0';
   const PATCHNOTES = [
+    { version:'8.34.0', date:'13.07.2026', changes:[
+      'Kampfsystem-Analyse umgesetzt (Pro/Contra-Review + fünf Verbesserungen):',
+      '1) Kampfbonus-Deckel jetzt sichtbar: neue Übersicht im Offiziere-Tab zeigt Angriffs- und Verteidigungsbonus als "X% von 100%" - vorher unsichtbar, weitere Investition konnte wirkungslos verpuffen ohne dass man es merkte',
+      '2) Balance-Konsistenz-Fix: Allianz-Angriffstechs (Vereinte/Elite-Flottendoktrin, Gemeinsame Flottenwerft, Kampfflotten-Akademie) waren bisher multiplikativ und ungedeckelt, während die Allianz-Verteidigungstechs bereits im gedeckelten Bonus-Topf steckten - jetzt konsistent behandelt, beide Seiten im selben Deckel',
+      '3) Echte Verteidigungsspezialisierung: Kampfschiffe haben jetzt einen von der Angriffskraft unabhängigen Verteidigungswert. Jäger/Bomber/Träger/Zerstörer offensiv ausgerichtet (fragiler), Wächter/Schlachtschiff/Superschlachtschiff gepanzerte Verteidigungsspezialisten. Vorher war Verteidigung praktisch nur 40% der Angriffskraft - Angriffs- und Verteidigungsflotte waren strukturell fast identisch',
+      '4) Kontersystem auf Piraten-Verstecke und Weltboss ausgeweitet: rotierende Schwäche je Stufe/Level gegen einen bestimmten Schiffstyp (+25% Kampfkraft, +10% Chance, +25% Beute bei Erfolg) - vorher hatten nur reguläre NPC-Kämpfe eine Schwäche-Mechanik, Piratennest und Weltboss waren reiner Zahlenvergleich',
+      '5) Flottenvielfalt-Bonus ergänzt: +2% Angriffs- UND Verteidigungskraft je zusätzlichem genutztem Kampfschifftyp (gedeckelt bei 5 Typen, +8%) - wirkt bei jeder Flottengröße, ergänzt den bestehenden Grenznutzen-Effekt (der erst ab 300 Schiffen eines Typs greift) um einen auch im mittleren Spiel wirksamen Diversifizierungs-Anreiz',
+      'Dokumentations-Bugfix: Hilfetext zum Kontersystem behauptete fälschlich, es wirke nicht bei PvP - der Code zeigt, dass es dort sehr wohl wirkt (Schere-Stein-Papier zwischen Jäger/Bomber/Kreuzer/Zerstörer)',
+      'Nebenbei behoben: Wächter fehlte komplett in der Backend-Angriffskraftberechnung (Vorbestehende Lücke), Großer Frachter fehlte bei der Weltboss-Verlustberechnung'
+    ]},
     { version:'8.33.0', date:'13.07.2026', changes:[
       'Frachtersystem auf zwei Typen erweitert: Kleiner Frachter (bisheriger Frachter, unverändert - 70 Energie/100 Erz, 35s Bauzeit, Verbrennungsantrieb, Geschwindigkeit 80, 300 Frachtraum, von Anfang an verfügbar) und neuer Großer Frachter (800 Erz/400 Kristalle/200 Deuterium, 120s Bauzeit, Impulsantrieb, Geschwindigkeit 50 - langsamer, für seltene statt zeitkritische Einsätze, 1.500 Frachtraum, braucht Fusionsantrieb Stufe 5)',
       'Großer Frachter gibt +1000 statt +250 Lagerkapazität je Schiff (passiv), Handelswelt-Rollenbonus gilt jetzt für beide Typen entsprechend gestaffelt',
@@ -5157,14 +5168,14 @@
     // 50 Schlachtschiffe in rund 2 Std. bauen (50×160s), deutlich zu schnell für die Feuerkraft, die
     // das bringt. Reine Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer,
     // Forschungsschiff, Recycler, Erkundungsschiffe) bleiben bewusst unverändert.
-    { key:'jaeger', name:'Jäger', icon:'ship_jaeger', atk:10, costFn:jaegerCost, buildTime:50, requires:[], drive:'verbrennung', speed:90 },
+    { key:'jaeger', name:'Jäger', icon:'ship_jaeger', atk:10, costFn:jaegerCost, buildTime:50, requires:[], drive:'verbrennung', speed:90, defWeight:0.7 },
     { key:'recycler', name:'Recycler', icon:'ship_recycler', atk:0, costFn:recyclerCost, buildTime:30, requires:[], drive:'verbrennung', speed:65 },
-    { key:'carrier', name:'Trägerschiff', icon:'ship_carrier', atk:15, costFn:carrierCost, buildTime:200, requires:['rkampf'], drive:'impuls', speed:40 },
+    { key:'carrier', name:'Trägerschiff', icon:'ship_carrier', atk:15, costFn:carrierCost, buildTime:200, requires:['rkampf'], drive:'impuls', speed:40, defWeight:0.8 },
     { key:'cruisers', name:'Kreuzer', icon:'ship_cruiser', atk:20, costFn:cruiserCost, buildTime:90, requires:['rkampf'], drive:'impuls', speed:70 },
-    { key:'waechter', name:'Wächter', icon:'ship_waechter', atk:8, shield:14, costFn:waechterCost, buildTime:100, requires:['rkampf'], drive:'impuls', speed:60 },
-    { key:'destroyers', name:'Zerstörer', icon:'ship_destroyer', atk:45, costFn:destroyerCost, buildTime:140, requires:['rkampf'], drive:'impuls', speed:55 },
-    { key:'bomber', name:'Bomber', icon:'ship_bomber', atk:60, costFn:bomberCost, buildTime:180, requires:['rkampf2'], drive:'impuls', speed:50 },
-    { key:'schlachtschiff', name:'Schlachtschiff', icon:'ship_schlachtschiff', atk:90, costFn:schlachtschiffCost, buildTime:320, requires:['rkampf2'], drive:'hyperraum', speed:45 },
+    { key:'waechter', name:'Wächter', icon:'ship_waechter', atk:8, shield:14, costFn:waechterCost, buildTime:100, requires:['rkampf'], drive:'impuls', speed:60, defWeight:2.0 },
+    { key:'destroyers', name:'Zerstörer', icon:'ship_destroyer', atk:45, costFn:destroyerCost, buildTime:140, requires:['rkampf'], drive:'impuls', speed:55, defWeight:0.9 },
+    { key:'bomber', name:'Bomber', icon:'ship_bomber', atk:60, costFn:bomberCost, buildTime:180, requires:['rkampf2'], drive:'impuls', speed:50, defWeight:0.5 },
+    { key:'schlachtschiff', name:'Schlachtschiff', icon:'ship_schlachtschiff', atk:90, costFn:schlachtschiffCost, buildTime:320, requires:['rkampf2'], drive:'hyperraum', speed:45, defWeight:1.3 },
     { key:'frachter', name:'Kleiner Frachter', icon:'ship_frachter', atk:0, costFn:frachterCost, buildTime:35, requires:[], drive:'verbrennung', speed:80 },
     // Großer Frachter (13.07.2026, Feature-Wunsch): zweiter Transporter-Typ neben dem Kleinen
     // Frachter, für spätere, seltenere Großeinsätze statt häufiger Kurzstrecken. Bewusst langsamer
@@ -5180,6 +5191,7 @@
   ];
   const SUPER_SPEED = 35; // Superschlachtschiff, hyperraum
   const SUPERSCHLACHTSCHIFF_SHIELD = 110; // Superschlachtschiff, siehe SHIP_DEFS-Schildlogik unten
+  const SUPERSCHLACHTSCHIFF_DEF_WEIGHT = 1.3; // schwerer Panzerkreuzer, analog zum regulären Schlachtschiff (13.07.2026)
   // Schildpunkte: dritte Kampf-Stat neben Angriffspunkten (Schaden, den eine Einheit austeilt) und
   // Verteidigungspunkten (wie schwer eine Basis insgesamt zu erobern ist). Kampfschiffe/-gebäude
   // bekommen spürbare Schilde (die selbst zur Gesamtverteidigung beitragen), reine Wirtschafts-
@@ -5729,6 +5741,20 @@
     if (count <= MEGA_FLEET_THRESHOLD) return count;
     return MEGA_FLEET_THRESHOLD + (count-MEGA_FLEET_THRESHOLD)*MEGA_FLEET_DIMINISH_RATE;
   }
+  // Flotten-Diversitäts-Bonus (13.07.2026, Feature-Wunsch): die Diminishing-Returns-Mechanik oben
+  // greift erst ab 300 Schiffen eines Typs - relevant nur für sehr weit entwickelte Accounts. Dieser
+  // Bonus wirkt dagegen bei JEDER Flottengröße: +2% Kampfkraft je zusätzlichem, genutztem
+  // Kampfschifftyp (über den ersten hinaus), gedeckelt bei 5 Typen (+8%). Multiplikativ wie Doktrin/
+  // Stance (bewusste Zusammenstellungs-Entscheidung, kein "nebenbei stapelnder" Bonus).
+  const FLEET_DIVERSITY_COMBAT_KEYS = ['jaeger','cruisers','destroyers','bomber','schlachtschiff','superschlachtschiff','carrier','waechter'];
+  const FLEET_DIVERSITY_BONUS_PER_TYPE = 0.02;
+  const FLEET_DIVERSITY_MAX_TYPES = 5;
+  function fleetDiversityMult(fleet){
+    if (!fleet) return 1;
+    const distinctTypes = FLEET_DIVERSITY_COMBAT_KEYS.filter(k => (fleet[k]||0) > 0).length;
+    const bonusTypes = Math.max(0, Math.min(FLEET_DIVERSITY_MAX_TYPES, distinctTypes) - 1);
+    return 1 + bonusTypes*FLEET_DIVERSITY_BONUS_PER_TYPE;
+  }
   function attackPowerRaw(fleet){
     const f = fleet || currentFleet();
     const df = deployableFighters(f);
@@ -5736,10 +5762,12 @@
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
-    if (state.allianceResearch) power *= (1+0.10*allianceTechFrac('a_atk'));
-    if (state.allianceResearch) power *= (1+0.15*allianceTechFrac('a_atk2'));
-    if (state.allianceResearch) power *= (1+0.08*allianceTechFrac('ab_werft'));
-    if (state.allianceResearch) power *= (1+0.10*allianceTechFrac('ab_flotte2'));
+    // Allianz-Angriffstechs (a_atk, a_atk2, ab_werft, ab_flotte2) NICHT mehr hier - siehe attackPower()
+    // weiter unten (13.07.2026, Balance-Konsistenz-Fix). Waren vorher multiplikativ und ungedeckelt,
+    // während die Verteidigungs-Allianztechs (a_def/a_def2) bereits in der gedeckelten additiven
+    // Bonus-Gruppe steckten - asymmetrisch ohne ersichtlichen Grund. Zusätzlicher Grund für den Umzug:
+    // attackPowerRaw() wird auch von shipDefenseContribution() für die Verteidigungsberechnung genutzt
+    // (attackPowerRaw(fleet)*0.4) - Allianz-ANGRIFFSTECHS sollen dort nicht einfließen.
     // Prestige-Kampf-Perk bewusst NICHT hier, sondern erst unten in attackPower() – attackPowerRaw()
     // wird auch von shipDefenseContribution() für die Verteidigungsberechnung genutzt, und
     // defensePower() wendet denselben Perk-Bonus separat nochmal an. Hier stünde er sonst doppelt
@@ -5876,33 +5904,45 @@
     state.battlePoints += n;
     state.commandPoints = (state.commandPoints||0) + n;
   }
-  function attackPower(fleet, planetKey){
-    let power = attackPowerRaw(fleet);
-    const doc = activeDoctrine();
-    if (doc) power *= doc.atkMult;
-    power *= currentStance().atkMult;
-    // Additive Bonus-Gruppe (Balance-Pass 13.07.2026, analog zur Produktion - siehe deren Kommentar
-    // bei ratesPerSecond): die folgenden Boni multiplizierten sich vorher pur miteinander und konnten
-    // bei einem weit entwickelten Spieler auf das 4-5-fache aufschaukeln, ohne jeden Deckel - genau
-    // das Problem, das bei der Produktion schon einmal behoben wurde. Doktrin und Stance bleiben
-    // bewusst multiplikativ (aktive Spieler-Entscheidung, kein "nebenbei stapelnder" Bonus wie diese
-    // hier - Analogie zu Habitat/Mond-Malus/Planeten-Rolle bei der Produktion).
+  // Ungedeckelter Angriffsbonus-Rohwert (13.07.2026, für die UI-Anzeige "X% von 100%" extrahiert) -
+  // dieselbe Summe, die attackPower() danach bei +100% deckelt. Eigene Funktion, damit die Anzeige
+  // (siehe combatBonusDisplayHtml) exakt dieselbe Logik nutzt wie die tatsächliche Berechnung, statt
+  // sie ein zweites Mal (potenziell abweichend) zu duplizieren.
+  function attackCombatBonusRaw(planetKey){
     let combatBonus = 0;
+    if (state.allianceResearch){
+      combatBonus += 0.10*allianceTechFrac('a_atk');
+      combatBonus += 0.15*allianceTechFrac('a_atk2');
+      combatBonus += 0.08*allianceTechFrac('ab_werft');
+      combatBonus += 0.10*allianceTechFrac('ab_flotte2');
+    }
     combatBonus += prestigePerkCount('combat')*0.03;
     combatBonus += ascBonus('combat')*0.02;
     combatBonus += skillBonusPct('war');
     combatBonus += (megaProjectCombatMult()-1);
     combatBonus += veteranCombatBonus();
     if (hasArtifactBonus()) combatBonus += 0.05;
-    // Piraten-Ketten-Prestige: +2% Angriffskraft je abgeschlossenem Durchlauf (eigener Deckel +10%,
-    // zusätzlich zum Gesamtdeckel der Gruppe).
     combatBonus += Math.min(PIRATE_LAIR_PRESTIGE_CAP, state.pirateLairPrestige||0)*0.02;
     if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
     combatBonus += officerBonus('admiral');
     if (planetKey) combatBonus += moduleBonusAt(planetKey, 'atk');
+    return combatBonus;
+  }
+  function attackPower(fleet, planetKey){
+    let power = attackPowerRaw(fleet);
+    const doc = activeDoctrine();
+    if (doc) power *= doc.atkMult;
+    power *= currentStance().atkMult;
+    power *= fleetDiversityMult(fleet);
+    // Additive Bonus-Gruppe (Balance-Pass 13.07.2026, analog zur Produktion - siehe deren Kommentar
+    // bei ratesPerSecond): die folgenden Boni multiplizierten sich vorher pur miteinander und konnten
+    // bei einem weit entwickelten Spieler auf das 4-5-fache aufschaukeln, ohne jeden Deckel - genau
+    // das Problem, das bei der Produktion schon einmal behoben wurde. Doktrin und Stance bleiben
+    // bewusst multiplikativ (aktive Spieler-Entscheidung, kein "nebenbei stapelnder" Bonus wie diese
+    // hier - Analogie zu Habitat/Mond-Malus/Planeten-Rolle bei der Produktion).
     // Gruppe bei +100% gedeckelt (identisch zur Produktion) - jeder Einzelbonus bleibt spürbar, die
     // Summe kann aber nicht mehr unbegrenzt wachsen, auch nicht durch künftige Features.
-    combatBonus = Math.min(1.0, combatBonus);
+    const combatBonus = Math.min(1.0, attackCombatBonusRaw(planetKey));
     power *= (1 + combatBonus);
     const nowAtk = Date.now();
     for (const buff of (state.buffs||[])){ if (buff.kind==='atk' && buff.expiresAt > nowAtk) power *= buff.mult; }
@@ -5915,14 +5955,57 @@
   }
   function shipDefenseContribution(fleet){
     if (!fleet) return 0;
-    let shieldSum = 0;
-    for (const def of SHIP_DEFS) shieldSum += (fleet[def.key]||0) * (def.shield||0);
-    shieldSum += (fleet.superschlachtschiff||0) * SUPERSCHLACHTSCHIFF_SHIELD;
-    // Nutzt bewusst die "rohe" (Doktrin-unabhängige) Angriffskraft, damit ein Offensiv-Doktrin-Bonus
-    // nicht über diesen Umweg auch die Verteidigung erhöht (bzw. ein Verteidigungs-Malus sie senkt).
-    return Math.round(attackPowerRaw(fleet) * 0.4) + shieldSum;
+    // Echte Verteidigungsspezialisierung (13.07.2026, Feature-Wunsch): vorher war die Verteidigung
+    // jedes Schiffs reinrechnerisch 40% seines Angriffswerts plus Schild - Angriffs- und
+    // Verteidigungsflotte waren strukturell fast identisch, "baue eine Verteidigungsflotte" war keine
+    // echte taktische Entscheidung. defWeight (Standard 1.0, wirkt NUR hier auf die Verteidigung, NIE
+    // auf die Angriffskraft) verschiebt den 40%-Basiswert gezielt nach oben/unten: Jäger/Bomber/Träger/
+    // Zerstörer werden fragiler (offensiv ausgerichtet), Wächter/Schlachtschiff/Superschlachtschiff
+    // werden zu echten Panzerungs-Spezialisten. Schiffe ohne explizites defWeight verhalten sich exakt
+    // wie vorher (keine Regression). Jäger/Bomber nutzen wie bei attackPowerRaw die "einsatzbereite"
+    // (hangar-begrenzte) Anzahl, nicht die rohe Flottenzahl. rkampf/rkampf2-Forschung wirkt weiterhin
+    // wie zuvor auf den angriffskraft-abgeleiteten Anteil (war vorher über attackPowerRaw() automatisch
+    // enthalten) - bewusst NICHT die "rohe" Doktrin-unabhängige Angriffskraft nutzen, siehe unten.
+    const df = deployableFighters(fleet);
+    let atkDerivedSum = 0, shieldSum = 0;
+    for (const def of SHIP_DEFS){
+      let count = fleet[def.key]||0;
+      if (def.key === 'jaeger') count = df.jaeger;
+      if (def.key === 'bomber') count = df.bomber;
+      if (!count) continue;
+      const weight = def.defWeight !== undefined ? def.defWeight : 1;
+      atkDerivedSum += diminishingShipCount(count) * (def.atk||0) * weight;
+      shieldSum += count * (def.shield||0);
+    }
+    const superCount = fleet.superschlachtschiff||0;
+    if (superCount){
+      atkDerivedSum += diminishingShipCount(superCount) * 220 * SUPERSCHLACHTSCHIFF_DEF_WEIGHT;
+      shieldSum += superCount * SUPERSCHLACHTSCHIFF_SHIELD;
+    }
+    const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
+    if (kLvl) atkDerivedSum *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
+    if (k2Lvl) atkDerivedSum *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
+    return Math.round(atkDerivedSum * 0.4) + shieldSum;
   }
   const HOME_DEFENSE_BONUS = 1.20; // +20% nur auf der Heimatbasis, macht "Heimat verteidigen" bewusst wichtiger als Kolonien
+  // Ungedeckelter Verteidigungsbonus-Rohwert (13.07.2026, analog zu attackCombatBonusRaw) - dieselbe
+  // Summe, die defensePower() danach bei +100% deckelt.
+  function defenseCombatBonusRaw(planetKey){
+    let combatBonus = 0;
+    if (state.allianceResearch){
+      combatBonus += 0.15*allianceTechFrac('a_def');
+      combatBonus += 0.20*allianceTechFrac('a_def2');
+    }
+    combatBonus += prestigePerkCount('combat')*0.03;
+    combatBonus += ascBonus('combat')*0.02;
+    combatBonus += skillBonusPct('war');
+    combatBonus += (megaProjectCombatMult()-1);
+    combatBonus += veteranCombatBonus();
+    if (hasArtifactBonus()) combatBonus += 0.05;
+    if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
+    if (planetKey) combatBonus += moduleBonusAt(planetKey, 'def');
+    return combatBonus;
+  }
   function defensePower(planetKey){
     const setsWithPlanet = planetKey ? [{ planet: planetKey, buildings: buildingSetFor(planetKey) }] : allBuildingSetsWithPlanet();
     let power = 0;
@@ -5941,7 +6024,7 @@
     }
     if (planetKey){
       const f = planetKey==='home' ? state.fleet : (state.colonies[planetKey] ? state.colonies[planetKey].fleet : null);
-      let shipDef = shipDefenseContribution(f);
+      let shipDef = shipDefenseContribution(f) * fleetDiversityMult(f);
       const role = planetRoleOf(planetKey);
       if (role && role.key==='fortress') shipDef *= 1.30;
       const orbF = orbitalStationOf(planetKey);
@@ -5954,7 +6037,7 @@
       power += shipDef;
     } else {
       for (const { planet, fleet: f } of allFleetsWithPlanet()){
-        let shipDef = shipDefenseContribution(f);
+        let shipDef = shipDefenseContribution(f) * fleetDiversityMult(f);
         const role = planetRoleOf(planet);
         if (role && role.key==='fortress') shipDef *= 1.30;
         shipDef *= planetTypeDefMult(planet) * terraformDefMult(planet);
@@ -5977,20 +6060,7 @@
     // eigenständig multiplikativ, jetzt Teil derselben gedeckelten Gruppe). Doktrin, Stance,
     // Forschung und die strukturellen ortsgebundenen Boni oben (Rolle, Orbitalring, Planetenereignis,
     // Planetentyp, Heimatbonus, Mond-Malus) bleiben bewusst multiplikativ.
-    let combatBonus = 0;
-    if (state.allianceResearch){
-      combatBonus += 0.15*allianceTechFrac('a_def');
-      combatBonus += 0.20*allianceTechFrac('a_def2');
-    }
-    combatBonus += prestigePerkCount('combat')*0.03;
-    combatBonus += ascBonus('combat')*0.02;
-    combatBonus += skillBonusPct('war');
-    combatBonus += (megaProjectCombatMult()-1);
-    combatBonus += veteranCombatBonus();
-    if (hasArtifactBonus()) combatBonus += 0.05;
-    if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
-    if (planetKey) combatBonus += moduleBonusAt(planetKey, 'def');
-    combatBonus = Math.min(1.0, combatBonus);
+    const combatBonus = Math.min(1.0, defenseCombatBonusRaw(planetKey));
     power *= (1 + combatBonus);
     return Math.round(power);
   }
@@ -6323,7 +6393,7 @@
       // daher hier ALLE relevanten Schlüssel mit Default 0 setzen statt nur die vorhandenen.
       const avail = { ships:0, cruisers:0, destroyers:0, jaeger:0, bomber:0, schlachtschiff:0, carrier:0, superschlachtschiff:0 };
       let anyPositive = false;
-      for (const k of ATTACK_SHIP_KEYS){ if (k==='frachter') continue; const n = Math.max(0, (fleet[k]||0) - (away[k]||0)); avail[k] = n; if (n>0) anyPositive = true; }
+      for (const k of ATTACK_SHIP_KEYS){ if (k==='frachter' || k==='frachtergross') continue; const n = Math.max(0, (fleet[k]||0) - (away[k]||0)); avail[k] = n; if (n>0) anyPositive = true; }
       if (!anyPositive) continue;
       const power = attackPower(avail);
       if (power > bestPower){ bestPower = power; best = { planet, fleet, avail }; }
@@ -8712,7 +8782,8 @@
       { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
-      { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Zwei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, und <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet.' },
+      { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Zwei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, und <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet. Kampfschiffe haben jetzt zusätzlich eine echte <strong>Verteidigungsspezialisierung</strong>, unabhängig von der Angriffskraft: Jäger/Bomber/Träger/Zerstörer sind offensiv ausgerichtet und dadurch fragiler in der Verteidigung, Wächter und Schlachtschiff (inkl. Superschlachtschiff) sind gepanzerte Verteidigungsspezialisten. Eine reine Angriffsflotte verteidigt sich also spürbar schlechter als eine gemischte oder auf Wächter/Schlachtschiffe setzende Flotte.' },
+      { title:'Flottenvielfalt & Kampfbonus-Deckel', body:'<strong>Flottenvielfalt:</strong> Der Einsatz mehrerer verschiedener Kampfschifftypen (statt nur eines Typs) gibt +2% Angriffs- UND Verteidigungskraft je zusätzlichem genutztem Typ, gedeckelt bei 5 Typen (+8%). Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
       { title:'Spionagekreuzer – schnellste Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und eignet sich damit besonders für Spionage über große Entfernungen. Er zählt zusammen mit Spähschiffen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Spionage-Einsatz) und kann eine Spionagemission auch ganz ohne Spähschiff starten.' },
       { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
@@ -8723,12 +8794,12 @@
       { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.' },
       { title:'Weltboss: Leviathan der Leere', body:'Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
       { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
-      { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%).' },
+      { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln.' },
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Nur die spezielle, itemgebundene Kristallfestung (150) übertrifft ihn.' },
       { title:'Schutz für schwächere Spieler', body:'Ist dein Punktestand mehr als <strong>3x</strong> so hoch wie der eines Ziels, sinkt deine Beute bei einem erfolgreichen Angriff anteilig (nie unter 30%). Ab <strong>5x</strong> Unterschied ist der Angriff komplett blockiert - du kannst dann gar nicht mehr angreifen, egal wie stark deine Flotte ist. Verhindert, dass weit entwickelte Accounts neue Spieler grundlos plattmachen.' },
-      { title:'Kontersystem <span class="lb-note" style="display:inline; font-size:10.5px; color:#5dcaa5;">(nur bei Überfällen)</span>', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt nur bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind – nicht bei NPC-Kämpfen oder PvP.' },
+      { title:'Kontersystem (Schere-Stein-Papier)', body:'Jäger sind stark gegen Bomber, Bomber stark gegen Kreuzer/Zerstörer, Kreuzer/Zerstörer stark gegen Jäger. Im Vorteil: <strong>+25%</strong> Angriffskraft-Anteil. Im Nachteil: <strong>-15%</strong>. Wirkt bei Überfällen (angreifende Raider gegen deine stationierte Flotte) und bei echten Spieler-Angriffen (PvP), wo beide Flottenzusammensetzungen bekannt sind. Bei regulären NPC-Kämpfen gilt stattdessen die einfachere <strong>Schwäche</strong>-Mechanik (siehe Piraten-Verstecke/Weltboss) - dort ist nur EIN bestimmter Schiffstyp wirksam, kein volles Schere-Stein-Papier.' },
       { title:'Tresor: Ressourcenschutz bei Überfällen', body:'Ein erfolgreicher NPC-Überfall stiehlt normalerweise 5-50% jeder Ressource (abhängig von Angriffs-/Verteidigungskraft, weiter gesenkt durch Notfallprotokolle-Forschung, Allianz-Grenzbollwerk und Module). Der <strong>Tresor</strong> (Gebäude, benötigt Notfallprotokolle-Forschung) schützt zusätzlich <strong>400 jeder Ressource pro Stufe</strong> komplett vor diesem Verlust, unabhängig vom Prozentsatz - nur der Überschuss darüber hinaus ist noch gefährdet. Da Ressourcen über alle Planeten hinweg gemeinsam verwaltet werden, zählt die Summe aller deiner Tresore, egal welcher Planet gerade angegriffen wird.' },
       { title:'Taktik-Haltung', body:'Im Forschung-Tab frei wählbar, jederzeit kostenlos wechselbar: <strong>Aggressiv</strong> (+10% Angriff, -10% Verteidigung), <strong>Ausgewogen</strong> (neutral) oder <strong>Defensiv</strong> (-10% Angriff, +15% Verteidigung).' },
       { title:'Rückzugs-Mechanik', body:'Übersteigt die eigene Verlustquote in einem Gefecht 40%, rettet sich die Hälfte des Anteils <em>oberhalb</em> dieser Schwelle rechtzeitig zurück, statt komplett zerstört zu werden. Gilt bei Überfall-Verteidigung, NPC-Angriffen und PvP-Duellen – nicht für Raider-/NPC-Flotten.' },
@@ -10811,6 +10882,20 @@
   // dauerhaften kleinen Angriffsbonus (+2% je Durchlauf, gedeckelt bei +10%).
   const PIRATE_LAIR_MAX_STAGE = 10;
   const PIRATE_LAIR_PRESTIGE_CAP = 5;
+  // Rotierende Schwäche je Stufe (13.07.2026, Feature-Wunsch: Kontersystem auf mehr Kontexte
+  // ausweiten - vorher hatte nur die reguläre NPC-Liste Schwächen, Piratennest und Weltboss waren
+  // reiner Zahlenvergleich ohne taktische Tiefe). Dieselbe Bonusstärke wie bei regulären NPCs
+  // (+25% Kampfkraft, +10% Chance, +25% Beute bei Erfolg mit passendem Schiffstyp).
+  const PIRATE_LAIR_WEAKNESS = ['jaeger','cruiser','bomber','destroyer','jaeger','schlachtschiff','cruiser','bomber','destroyer','jaeger'];
+  function pirateLairWeakness(stage){ return PIRATE_LAIR_WEAKNESS[(stage-1) % PIRATE_LAIR_WEAKNESS.length]; }
+  function fleetHasShipType(fleet, type){
+    if (type==='jaeger') return (fleet.jaeger||0) > 0;
+    if (type==='bomber') return (fleet.bomber||0) > 0;
+    if (type==='cruiser') return (fleet.cruisers||0) > 0;
+    if (type==='destroyer') return (fleet.destroyers||0) > 0;
+    if (type==='schlachtschiff') return (fleet.schlachtschiff||0) > 0;
+    return false;
+  }
   function pirateLairPower(stage){ return Math.round(120 * Math.pow(1.55, stage-1)); }
   function pirateLairName(stage){
     const names = ['Schmugglernest','Vorposten der Aschepiraten','Korsaren-Enklave','Versteck der Leerenwölfe','Bastion der Roten Flotte','Sternenräuber-Hort','Festung der Nachtklingen','Zitadelle des Schwarms','Hafen der Verlorenen','Flaggschiff der Void-Korsaren'];
@@ -11581,7 +11666,7 @@
                 addVeteranXp(planetKey, 8 + bLevel);
                 if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(data.damage)+' Schaden!'+(data.killed?' LETZTER SCHLAG - der Leviathan fällt!':' Rest-HP: '+fmt(Math.round(data.bossHp))+'.')+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
                 playSound(data.killed ? 'achieve' : 'win');
-                pushReport({ type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:false, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} });
+                pushReport({ type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:!!data.hasWeakness, weaknessType:data.weaknessType, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} });
               }
               // Frischen (server-geschriebenen) Boss-Zustand laden - zeigt den aktuellen HP-Stand an
               // und beansprucht bei einem Kill automatisch die anteilige Belohnung (siehe loadWorldBoss,
@@ -11596,16 +11681,21 @@
         } else if (m.type === 'piratelair'){
           const stage = m.targetId || 1;
           const lairDef = pirateLairPower(stage);
-          const power = m.power || attackPower(fleet);
-          const chance = Math.max(0.05, Math.min(0.95, power/(power+lairDef)));
+          const attackComposition = m.composition || fleet;
+          const lairWeakness = pirateLairWeakness(stage);
+          const lairHasWeakness = fleetHasShipType(attackComposition, lairWeakness);
+          let power = m.power || attackPower(fleet);
+          if (lairHasWeakness) power *= 1.25;
+          const chance = Math.max(0.05, Math.min(0.95, power/(power+lairDef))) * (lairHasWeakness?1.1:1);
           const success = Math.random() < chance;
           const flightTime = Math.round(((m.endTime-(m.startTime||m.endTime))/1000) || 0);
           const lairLabel = pirateLairName(stage);
           if (success){
             // Beute: produktions- und stufenskaliert, begrenzt durch mitgeschickten Frachtraum.
-            const attackComposition = m.composition || fleet;
             const cargoCapacity = fleetCargoCapacity(attackComposition);
-            const rawLoot = pirateLairLoot(stage);
+            const lootMult = lairHasWeakness ? 1.25 : 1;
+            const rawLootBase = pirateLairLoot(stage);
+            const rawLoot = {}; for (const [r,g] of Object.entries(rawLootBase)) rawLoot[r] = Math.round(g*lootMult);
             let rawLootTotal = 0; for (const g of Object.values(rawLoot)) rawLootTotal += g;
             const cargoScale = rawLootTotal > 0 ? Math.min(1, cargoCapacity/rawLootTotal) : 1;
             const lootGiven = {};
@@ -11642,7 +11732,7 @@
             const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
             if (showLog !== false) log('Sieg gegen '+lairLabel+'! +'+creditsGain+' Kredite.'+cargoNote+moduleMsg+(ownLostLairText?' Eigene Verluste: '+ownLostLairText+'.':'')+stageMsg, 'ti-sword');
             playSound('win');
-            pushReport({ type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:false, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair });
+            pushReport({ type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair });
           } else {
             const bpGained = stage;
             awardBattlePoints(bpGained);
@@ -11653,7 +11743,7 @@
             const lostText = lostCountsToText(lostShips);
             if (showLog !== false) log('Niederlage gegen '+lairLabel+'.'+(lostText?' Verluste: '+lostText+'.':'')+' Das Versteck bleibt auf Stufe '+stage+' - rüste auf und versuche es erneut.', 'ti-alert-triangle');
             playSound('lose');
-            pushReport({ type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:false, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:lostShips });
+            pushReport({ type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:lostShips });
           }
         } else if (m.type === 'attack'){
           const npc = NPCS.find(n => n.id === m.targetId);
@@ -14567,6 +14657,34 @@
     if (activeTab === 'offiziere'){
       const cpDisplay = document.getElementById('commandPointsDisplay');
       if (cpDisplay) cpDisplay.textContent = fmt(state.commandPoints||0);
+      // Kampfbonus-Deckel-Anzeige (13.07.2026, Feature-Wunsch): macht sichtbar, wie nah man am +100%-
+      // Deckel der additiven Kampfbonus-Gruppe ist (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte,
+      // Veteranen-Ausbildung, Artefakt-Set, Offizier, Module, Allianz-Techs, ggf. Veteranenrang/
+      // Piratenketten-Prestige) - vorher komplett unsichtbar, weitere Investition konnte wirkungslos
+      // verpuffen ohne dass der Spieler das merkte. Bezieht sich auf die aktuell aktive Basis.
+      const combatBonusCapBox = document.getElementById('combatBonusCapBox');
+      if (combatBonusCapBox){
+        const pk = state.activeBasePlanet;
+        const atkRaw = attackCombatBonusRaw(pk);
+        const defRaw = defenseCombatBonusRaw(pk);
+        const capRow = (label, raw, color) => {
+          const pct = Math.min(100, Math.round(raw*100));
+          const capped = raw >= 1.0;
+          return `<div style="margin-bottom:${label==='Angriffsbonus'?'10px':'0'};">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="bmeta">${label}${capped?' <span style="color:#e0a548;">(Deckel erreicht!)</span>':''}</span>
+              <span class="lvl-pill" style="background:rgba(${color},0.18); color:rgb(${color});">${pct}% von 100%</span>
+            </div>
+            <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:rgb(${color});"></div></div>
+          </div>`;
+        };
+        combatBonusCapBox.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch;">
+          <div class="bname" style="margin-bottom:8px; font-size:12.5px;"><i class="ti ti-sword" aria-hidden="true"></i> Kampfbonus-Übersicht (${planetDisplayName(pk)})</div>
+          ${capRow('Angriffsbonus', atkRaw, '226,75,74')}
+          ${capRow('Verteidigungsbonus', defRaw, '93,202,165')}
+          <div class="bmeta" style="margin-top:8px; font-size:11px;">Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module und Allianz-Techs speisen zusammen diesen gedeckelten Topf - bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.</div>
+        </div>`;
+      }
       const officerBox = document.getElementById('officerBox');
       if (officerBox){
         officerBox.innerHTML = OFFICERS.map(o => {
