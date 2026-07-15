@@ -227,6 +227,22 @@
     .battle-scene.result-flash-win::before { background:radial-gradient(ellipse at 50% 50%, rgba(93,202,165,0.35), transparent 70%); }
     .battle-scene.result-flash-loss::before { background:radial-gradient(ellipse at 50% 50%, rgba(226,75,74,0.32), transparent 70%); }
     @keyframes battleResultFlash { 0%{ opacity:0; } 15%{ opacity:1; } 100%{ opacity:0; } }
+    /* Kritische Treffer (13.07.2026, Feature-Wunsch: Wiedergabe komplexer/spannender gestalten) -
+       gelegentlicher Volltreffer mit größerem Einschlag, kurzem weißem Bildschirmblitz und größerer,
+       goldener Schadenszahl statt der normalgroßen weißen. */
+    .battle-impact.critical { width:26px; height:26px; margin:-13px 0 0 -13px; }
+    .battle-scene.crit-flash::before {
+      content:''; position:absolute; inset:0; pointer-events:none; z-index:6; background:rgba(255,255,255,0.5);
+      animation: battleCritFlash 0.22s ease-out forwards;
+    }
+    @keyframes battleCritFlash { 0%{ opacity:0.9; } 100%{ opacity:0; } }
+    .battle-dmg-float.critical { font-size:15px; font-weight:700; color:#fac775 !important; text-shadow:0 0 6px rgba(250,199,117,0.6); }
+    /* Alpha-Salve: einmalige, größere Sonderattacke schwerer Schiffe (Schlachtschiff/Superschlachtschiff)
+       - breiterer, kräftigerer Strahl statt der normalen Schuss-Breite. */
+    .battle-shot.alpha { height:4px; margin-top:-2px; filter:drop-shadow(0 0 3px currentColor); }
+    /* Formations-Auflockerung ab schweren Verlusten - größerer Abstand zwischen den verbleibenden
+       Schiffs-Icons, wirkt wie eine angeschlagene, nicht mehr geschlossene Formation. */
+    .battle-ship-icons.loose { gap:9px; }
     .battle-side { flex:1; min-width:0; }
     .battle-side-label { font-size:10.5px; color:#9296ac; text-align:center; margin-bottom:6px; font-weight:600; }
     .battle-side-sublabel { font-size:8.5px; color:#7a7e94; text-align:center; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px; }
@@ -237,7 +253,7 @@
     .battle-ship-icon.pre-hit { animation: battlePreHit 0.5s ease-in-out; }
     @keyframes battlePreHit { 0%,100%{ filter:none; } 30%,70%{ filter:brightness(2) drop-shadow(0 0 4px #ff6b5e); } }
     .battle-ship-icon.exploding::after {
-      content:''; position:absolute; top:50%; left:50%; width:6px; height:6px; margin:-3px 0 0 -3px;
+      content:''; position:absolute; top:50%; left:50%; width:30%; height:30%; margin:-15% 0 0 -15%;
       border-radius:50%; background:radial-gradient(circle, #fff, #fac775 45%, #e24b4a 70%, transparent 80%);
       animation: battleShipExplode 0.5s ease-out forwards; pointer-events:none;
     }
@@ -1791,8 +1807,18 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.34.4';
+  const VERSION = '8.34.5';
   const PATCHNOTES = [
+    { version:'8.34.5', date:'13.07.2026', changes:[
+      'Kampf-Wiedergabe um sieben Elemente erweitert (komplexer & spannender):',
+      '1) Kritische Treffer: ~12% Zufallschance pro Einschlag - größerer Einschlag, kurzer weißer Bildschirmblitz, eigener Sound, größere goldene Schadenszahl',
+      '2) Alpha-Salve: einmalige, größere Sonderattacke schwerer Schiffe (Schlachtschiff/Superschlachtschiff) in der Entscheidungsrunde',
+      '3) Spannungs-Ping direkt vor der Entscheidungsrunde, kündigt den bereits vorhandenen Kamera-Zoom-Puls jetzt auch akustisch an',
+      '4) Explosionsgröße skaliert jetzt automatisch mit der Schiffsklasse (relative statt fester Pixelgröße) - schwere Schiffe explodieren sichtbar größer als kleine',
+      '5) Formations-Auflockerung: ab 50% Flottenverlust rücken die verbleibenden Schiffs-Icons sichtbar auseinander statt in derselben engen Reihe zu bleiben',
+      '6) Leises Hintergrund-Ambiente, dessen Intensität mit der Rundenphase steigt - im Anflug kaum hörbar, zur Entscheidungsrunde hin am dichtesten',
+      '7) Kurzfazit am Ende: welcher eigene Schiffstyp hatte den größten Anteil an der eingesetzten Kampfkraft (rein kosmetisch, ändert nichts am Ausgang)'
+    ]},
     { version:'8.34.4', date:'13.07.2026', changes:[
       'Bug behoben: Großer Frachter und Wächter fehlten in der Waffen-Zuordnungstabelle der Kampf-Wiedergabe - bekamen dadurch keinen eigenen, passenden Schuss-Effekt/-Sound (fielen beim Waffen-Pool einfach unter den Tisch). Beide jetzt ergänzt'
     ]},
@@ -7265,6 +7291,70 @@
       });
     } catch(e){}
   }
+  // Kritischer Treffer (13.07.2026, Feature-Wunsch: Wiedergabe komplexer/spannender) - scharfer,
+  // heller Doppelklang statt des normalen Einschlagtons, hebt den Moment akustisch klar ab.
+  function playCriticalHitSound(){
+    if (!state.soundOn) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      [ [1800,0], [2400,0.06] ].forEach(([freq, delay]) => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'square';
+        o.frequency.value = freq;
+        o.connect(g); g.connect(audioCtx.destination);
+        const t0 = now+delay;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(0.06, t0+0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, t0+0.15);
+        o.start(t0);
+        o.stop(t0+0.16);
+      });
+    } catch(e){}
+  }
+  // Spannungs-Ping vor der Entscheidungsrunde (13.07.2026) - kurzer, radarartiger Ping-Ton, der die
+  // bereits vorhandene Kamera-Zoom-Klimax akustisch ankündigt statt dass sie nur visuell einsetzt.
+  function playTensionPingSound(){
+    if (!state.soundOn) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(700, now);
+      o.frequency.exponentialRampToValueAtTime(1400, now+0.5);
+      o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(0.04, now+0.05);
+      g.gain.linearRampToValueAtTime(0.02, now+0.35);
+      g.gain.exponentialRampToValueAtTime(0.001, now+0.55);
+      o.start(now);
+      o.stop(now+0.56);
+    } catch(e){}
+  }
+  // Leises Hintergrund-Ambiente (13.07.2026) - ein einziger, sehr leiser Dauerton pro Runde (kein
+  // durchgehender Loop, um die Web-Audio-Ressourcen einfach zu halten), dessen Lautstärke mit der
+  // Rundenphase steigt - im Anflug kaum hörbar, zur Entscheidungsrunde hin am dichtesten.
+  function playAmbientHum(intensity){
+    if (!state.soundOn) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.value = 55;
+      o.connect(g); g.connect(audioCtx.destination);
+      const peak = 0.008 + intensity*0.014;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(peak, now+0.3);
+      g.gain.linearRampToValueAtTime(0.0001, now+1.05);
+      o.start(now);
+      o.stop(now+1.1);
+    } catch(e){}
+  }
 
   // 3 Sekunden lange Alarmsirene (auf-/abschwellende Frequenz), ertönt sobald ein Überfall
   // tatsächlich stattfindet – unabhängig davon, ob er abgewehrt wird oder nicht.
@@ -8502,14 +8592,15 @@
   }
   // Schwebende Schadenszahl an der Einschlagstelle – reine Dramaturgie, keine echten Spielwerte
   // (die tatsächlichen Verluste stehen bereits als Zahlen an den Flotten-Icons und im Protokoll).
-  function spawnBattleDamageNumber(scene, xPct, yPct, weapon){
-    const dmgVal = weapon.kind==='missile' ? 300+Math.round(Math.random()*400) : weapon.kind==='orb' ? 150+Math.round(Math.random()*250) : 60+Math.round(Math.random()*180);
+  function spawnBattleDamageNumber(scene, xPct, yPct, weapon, critical){
+    let dmgVal = weapon.kind==='missile' ? 300+Math.round(Math.random()*400) : weapon.kind==='orb' ? 150+Math.round(Math.random()*250) : 60+Math.round(Math.random()*180);
+    if (critical) dmgVal = Math.round(dmgVal*2.2);
     const el = document.createElement('div');
-    el.className = 'battle-dmg-float';
-    el.textContent = '-'+fmt(dmgVal);
+    el.className = 'battle-dmg-float'+(critical?' critical':'');
+    el.textContent = '-'+fmt(dmgVal)+(critical?'!':'');
     el.style.left = xPct+'%';
     el.style.top = yPct+'%';
-    el.style.color = weapon.color;
+    if (!critical) el.style.color = weapon.color;
     scene.appendChild(el);
     battleTimers.push(setTimeout(() => el.remove(), 950));
   }
@@ -8521,7 +8612,7 @@
   // Basis-Animationsdauer je Waffentyp (muss zu den CSS-Keyframe-Dauern passen) – wird für die
   // Zeitlupe beim letzten entscheidenden Treffer der Entscheidungsrunde gebraucht.
   function battleShotBaseDuration(kind){ return kind==='missile' ? 0.65 : kind==='orb' ? 0.55 : 0.4; }
-  function spawnBattleShot(scene, fromPct, toPct, weapon, delayMs, withShake, slowMo){
+  function spawnBattleShot(scene, fromPct, toPct, weapon, delayMs, withShake, slowMo, isAlpha){
     const t = setTimeout(() => {
       if (!scene.isConnected) return;
       const goingRight = toPct > fromPct;
@@ -8539,7 +8630,7 @@
         projectile.style.left = fromPct+'%';
         projectile.style.setProperty('--to', toPct+'%');
       } else {
-        projectile.className = 'battle-shot '+dirCls+(weapon.cls?' '+weapon.cls:'');
+        projectile.className = 'battle-shot '+dirCls+(weapon.cls?' '+weapon.cls:'')+(isAlpha?' alpha':'');
         projectile.style.left = (goingRight?fromPct:toPct)+'%';
         projectile.style.width = Math.abs(toPct-fromPct)+'%';
       }
@@ -8563,14 +8654,24 @@
         flightDone = true;
         projectile.remove();
         if (!scene.isConnected) return;
+        // Kritischer Treffer: ~12% Zufallschance, nie bei bereits verstärkten Alpha-Salven (die sind
+        // schon ihr eigener Höhepunkt) - größerer Einschlag, kurzer weißer Bildschirmblitz, eigener
+        // Sound, größere goldene Schadenszahl statt der normalen.
+        const critical = !isAlpha && Math.random() < 0.12;
         const impact = document.createElement('div');
-        impact.className = 'battle-impact play';
+        impact.className = 'battle-impact play'+(critical?' critical':'');
         impact.style.left = toPct+'%';
         impact.style.top = topPct+'%';
         impact.style.color = weapon.color;
         scene.appendChild(impact);
-        playWeaponSound(weapon.kind, true);
-        spawnBattleDamageNumber(scene, toPct, topPct, weapon);
+        if (critical){
+          playCriticalHitSound();
+          scene.classList.add('crit-flash');
+          battleTimers.push(setTimeout(() => scene.classList.remove('crit-flash'), 250));
+        } else {
+          playWeaponSound(weapon.kind, true);
+        }
+        spawnBattleDamageNumber(scene, toPct, topPct, weapon, critical);
         if (withShake > 0){
           // Wackel-Stärke proportional zu den Verlusten dieser Runde – eine Runde mit 2 verlorenen
           // Schiffen soll spürbar sanfter wackeln als eine mit 40.
@@ -8594,7 +8695,7 @@
   // Waffen, die zur tatsächlich vorhandenen Ausrüstung dieser Seite passen (leftPool/rightPool).
   const BATTLE_LEFT_ZONE = [8, 30], BATTLE_RIGHT_ZONE = [70, 92];
   function randIn(zone){ return zone[0] + Math.random()*(zone[1]-zone[0]); }
-  function spawnRoundShots(scene, leftLossCount, rightLossCount, leftPool, rightPool, slowMo){
+  function spawnRoundShots(scene, leftLossCount, rightLossCount, leftPool, rightPool, slowMo, alphaSide){
     const hasLeftLoss = leftLossCount > 0, hasRightLoss = rightLossCount > 0;
     const shotCount = 3 + Math.floor(Math.random()*3);
     for (let i=0;i<shotCount;i++){
@@ -8607,6 +8708,17 @@
       const weapon = rightPool[Math.floor(Math.random()*rightPool.length)];
       const isLast = i===returnCount-1;
       spawnBattleShot(scene, randIn(BATTLE_RIGHT_ZONE), randIn(BATTLE_LEFT_ZONE), weapon, 60+i*140, hasLeftLoss && isLast ? leftLossCount : 0, !!(slowMo && isLast));
+    }
+    // Alpha-Salve (13.07.2026, Feature-Wunsch): einmalige, größere Sonderattacke schwerer Schiffe
+    // (Schlachtschiff/Superschlachtschiff) - bevorzugt einen Strahl-Typ (Railgun, deren eigene
+    // Waffe), fliegt etwas später als die regulären Schüsse dieser Runde und schlägt sichtbar
+    // kräftiger ein (eigene CSS-Klasse, siehe .battle-shot.alpha).
+    if (alphaSide === 'left'){
+      const beamWeapon = leftPool.find(w=>w.kind==='beam') || leftPool[0];
+      spawnBattleShot(scene, randIn(BATTLE_LEFT_ZONE), 50, beamWeapon, shotCount*130+140, 0, false, true);
+    } else if (alphaSide === 'right'){
+      const beamWeapon = rightPool.find(w=>w.kind==='beam') || rightPool[0];
+      spawnBattleShot(scene, randIn(BATTLE_RIGHT_ZONE), 50, beamWeapon, 60+returnCount*140+140, 0, false, true);
     }
   }
   function openBattleReplay(report){
@@ -8700,6 +8812,14 @@
 
     let roundIdx = 0;
     const phaseLabels = { anflug:'Anflug', gefecht:'Gefecht', entscheidung:'Entscheidung', nachspiel:'Nachspiel' };
+    // Alpha-Salve (13.07.2026): einmal pro Kampf, ausgelöst von der Seite mit schweren Schiffen
+    // (Schlachtschiff/Superschlachtschiff), falls vorhanden - alphaFired verhindert Mehrfachauslösung.
+    const leftHasHeavy = (seq.left.fleet.schlachtschiff||0) > 0 || (seq.left.fleet.superschlachtschiff||0) > 0;
+    const rightHasHeavy = hasRightFleet && ((seq.right.fleet.schlachtschiff||0) > 0 || (seq.right.fleet.superschlachtschiff||0) > 0);
+    let alphaFired = false;
+    // Formations-Auflockerung: Ausgangs-Gesamtgröße je Seite, um später den Verlust-Anteil zu prüfen.
+    const leftStartTotal = Object.values(seq.left.fleet).reduce((a,b)=>a+b,0);
+    const rightStartTotal = hasRightFleet ? Object.values(seq.right.fleet).reduce((a,b)=>a+b,0) : 0;
     const playRound = () => {
       if (roundIdx >= seq.rounds.length){ finishBattleReplay(report, seq); return; }
       const round = seq.rounds[roundIdx];
@@ -8716,11 +8836,24 @@
       const rightLossCount = Object.values(round.rightDestroyed).reduce((a,b)=>a+b,0);
       const hasLeftLoss = leftLossCount > 0;
       const hasRightLoss = rightLossCount > 0;
+      // Hintergrund-Ambiente: Intensität steigt mit fortschreitender Runde, am dichtesten bei der
+      // Entscheidungsrunde - macht den Spannungsaufbau auch akustisch spürbar, nicht nur visuell.
+      playAmbientHum(seq.rounds.length > 1 ? roundIdx/(seq.rounds.length-1) : 0);
+      // Spannungs-Ping direkt vor der Entscheidungsrunde, kündigt den bereits vorhandenen Kamera-
+      // Zoom-Puls akustisch an.
+      if (round.phase === 'entscheidung') playTensionPingSound();
       // Rundenanzeige + Kamera-Zoom-Puls in der Entscheidungsrunde für einen dramaturgischen Höhepunkt.
       const counterEl = document.getElementById('battleRoundCounter');
       if (counterEl){ counterEl.style.display = 'block'; counterEl.textContent = 'Runde '+(roundIdx+1)+'/'+seq.rounds.length+' – '+(phaseLabels[round.phase]||round.phase); }
       if (scene) scene.classList.toggle('climax', round.phase === 'entscheidung');
-      if (scene) spawnRoundShots(scene, leftLossCount, rightLossCount, seq.leftWeaponPool, seq.rightWeaponPool, round.phase === 'entscheidung');
+      // Alpha-Salve: feuert genau einmal, in der Entscheidungsrunde, von der Seite mit schweren
+      // Schiffen (bevorzugt der Angreiferseite, falls beide welche haben).
+      let alphaSide = null;
+      if (!alphaFired && round.phase === 'entscheidung'){
+        if (leftHasHeavy){ alphaSide = 'left'; alphaFired = true; }
+        else if (rightHasHeavy){ alphaSide = 'right'; alphaFired = true; }
+      }
+      if (scene) spawnRoundShots(scene, leftLossCount, rightLossCount, seq.leftWeaponPool, seq.rightWeaponPool, round.phase === 'entscheidung', alphaSide);
       // Betroffene Schiffs-Icons kurz aufblitzen lassen ("Vorzucken"), bevor die Zahl tatsächlich
       // sinkt – wirkt wie ein Treffer-Warnsignal statt eines plötzlichen Sprungs.
       for (const k of Object.keys(round.leftDestroyed)){
@@ -8761,6 +8894,17 @@
             const icon = document.querySelector('#battleRightIcons [data-battle-ship="'+k+'"]');
             if (icon){ icon.classList.add('exploding'); setTimeout(() => icon.classList.remove('exploding'), 520); }
           }
+        }
+        // Formations-Auflockerung (13.07.2026, Feature-Wunsch): ab 50% Verlust wirkt die Formation
+        // sichtbar angeschlagen - größerer Abstand zwischen den verbleibenden Schiffs-Icons, statt
+        // einer unverändert engen Reihe egal wie dezimiert die Flotte ist.
+        const leftRemainTotal = Object.values(remainingLeft).reduce((a,b)=>a+b,0);
+        const leftIconsEl = document.getElementById('battleLeftIcons');
+        if (leftIconsEl) leftIconsEl.classList.toggle('loose', leftStartTotal > 0 && leftRemainTotal/leftStartTotal <= 0.5);
+        if (hasRightFleet){
+          const rightRemainTotal = Object.values(remainingRight).reduce((a,b)=>a+b,0);
+          const rightIconsEl = document.getElementById('battleRightIcons');
+          if (rightIconsEl) rightIconsEl.classList.toggle('loose', rightStartTotal > 0 && rightRemainTotal/rightStartTotal <= 0.5);
         }
         setBattleHpFill(round.rightHpPct);
       }, round.phase === 'entscheidung' ? 1650 : (hasLeftLoss || hasRightLoss) ? 950 : 480);
@@ -8816,6 +8960,23 @@
     const totalRightLoss = Object.values(seq.right.losses||{}).reduce((a,b)=>a+b,0);
     if (totalRightLoss>0) summary += '<br>'+seq.right.label+' verliert insgesamt: '+lostCountsToText(seq.right.losses);
     if (report.debris || report.ownLossDebris){ summary += debrisReportLine(report.debris||report.ownLossDebris); }
+    // "Meiste Wirkung"-Kurzfazit (13.07.2026, Feature-Wunsch): welcher eigene Schiffstyp hatte den
+    // größten Anteil an der eingesetzten Kampfkraft (Anzahl × Angriffswert)? Rein kosmetisch aus der
+    // tatsächlichen Flottenzusammensetzung abgeleitet, verändert nichts am Kampfausgang. Nur bei
+    // Berichtstypen, wo "links" tatsächlich die eigene Flotte ist (nicht bei Überfällen - dort ist
+    // links die angreifende NPC-Fraktion, die eigene Verteidigung steht rechts).
+    if (report.type !== 'raid'){
+      let topContribKey = null, topContribValue = 0;
+      for (const [k,v] of Object.entries(seq.left.fleet)){
+        if (!v) continue;
+        const atk = k==='superschlachtschiff' ? 220 : ((SHIP_DEFS.find(d=>d.key===k)||{}).atk||0);
+        const contrib = v*atk;
+        if (contrib > topContribValue){ topContribValue = contrib; topContribKey = k; }
+      }
+      if (topContribKey && topContribValue > 0){
+        summary += '<br><span class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> '+shipDisplayName(topContribKey)+' hatten den größten Anteil an der eingesetzten Kampfkraft.</span>';
+      }
+    }
     // Hinweis, falls das (echte, bereits entstandene) Trümmerfeld am Zielplaneten die Schwelle zur
     // Mondbildung erreicht bzw. sich ihr nähert – nutzt den tatsächlichen aktuellen Spielstand.
     if (report.type === 'raid' && report.targetPlanet && state.debrisFields[report.targetPlanet]){
@@ -8924,7 +9085,7 @@
       { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
-      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich über 8 Runden mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger und die Szene färbt sich kurz grün bzw. rot ein.' },
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich über 8 Runden mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger und die Szene färbt sich kurz grün bzw. rot ein. Gelegentliche <strong>kritische Treffer</strong> (größerer Einschlag, weißer Bildschirmblitz, goldene Schadenszahl), eine einmalige <strong>Alpha-Salve</strong> schwerer Schiffe (Schlachtschiff/Superschlachtschiff) in der Entscheidungsrunde, ein <strong>Spannungs-Ping</strong> kurz davor, leises <strong>Hintergrund-Ambiente</strong> das zur Entscheidungsrunde hin dichter wird, eine sichtbar <strong>auflockernde Formation</strong> ab 50% Verlusten sowie ein Kurzfazit, welcher eigene Schiffstyp den größten Anteil an der Kampfkraft hatte.' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP- und Expeditions-Berichten (mit echter Begegnung). Läuft ein Kampf live ab, während man im Spiel aktiv ist - eigener Angriff oder eingehender Überfall -, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
       { title:'Steuerung', body:'Pause/Weiter hält die Wiedergabe an, Tempo-Umschalter (1x/2x) beschleunigt, "Überspringen" springt direkt zum Endergebnis.' }
     ]},
