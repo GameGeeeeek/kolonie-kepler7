@@ -1726,8 +1726,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.30.4';
+  const VERSION = '8.30.5';
   const PATCHNOTES = [
+    { version:'8.30.5', date:'13.07.2026', changes:[
+      'Zufallsereignisse mit Ressourcenbelohnung (Asteroiden-Fund, Handelskonvoi, Notruf) auf maximal 2000 Ressourcen pro Auslösung begrenzt - Report: ein einzelner Asteroiden-Fund hatte weit über 1 Mio. Erz eingebracht, obwohl die Formel eigentlich nur 250-700 vorsieht. Ursache nicht abschließend rekonstruierbar, die neue harte Obergrenze verhindert einen solchen Ausreißer aber garantiert unabhängig von der genauen Ursache'
+    ]},
     { version:'8.30.4', date:'13.07.2026', changes:[
       'Bug behoben: die neuen geprägten Tab-Icons (v8.30.2) waren versehentlich alle grau/weiß statt in ihrer im Entwurf gezeigten, jeweils eigenen Farbe - jedes der 12 Haupt-Tab-Icons hat jetzt seine eigene, feste Farbe'
     ]},
@@ -3258,7 +3261,12 @@
       desc:'Ein rohstoffreicher Asteroid treibt in Reichweite. Ein Bergungstrupp könnte sich lohnen.',
       optA:{ label:'Bergungstrupp schicken', cost:{deuterium:150},
         resolve:()=>{ const amt = 250+Math.floor(Math.random()*450); const res = Math.random()<0.5?'erz':'kristalle';
-          const cap = storageCap(); const before = state.resources[res]||0; state.resources[res] = Math.min(cap, before+amt); const gained = state.resources[res]-before;
+          // Harte Obergrenze 2000 (Balance-Wunsch 13.07.2026, Report: über 1 Mio. Erz aus einem
+          // Event, das eigentlich nur 250-700 geben soll - Ursache nicht abschließend geklärt,
+          // dieser Deckel verhindert das GARANTIERT, unabhängig von der Ursache).
+          const cap = storageCap(); const before = state.resources[res]||0;
+          const clampedAmt = Math.min(2000, amt);
+          state.resources[res] = Math.min(cap, before+clampedAmt); const gained = state.resources[res]-before;
           return '+'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+' geborgen!'; } },
       optB:{ label:'Ignorieren', resolve:()=>'Der Asteroid zieht ungenutzt vorbei.' } },
     { key:'probe', name:'Antike Sonde entdeckt', icon:'ti-atom-2', color:'#c3bef5',
@@ -3279,14 +3287,19 @@
     { key:'trader', name:'Handelskonvoi', icon:'ti-truck', color:'#5dcaa5',
       desc:'Ein fliegender Händler bietet einen einmaligen Sondertausch zu ungewöhnlich gutem Kurs an.',
       optA:{ label:'Handeln (300 Erz → Kristalle)', cost:{erz:300},
-        resolve:()=>{ const amt = 380+Math.floor(Math.random()*100); const cap = storageCap(); const before = state.resources.kristalle||0; state.resources.kristalle = Math.min(cap, before+amt); const gained = state.resources.kristalle-before;
+        resolve:()=>{ const amt = 380+Math.floor(Math.random()*100);
+          const cap = storageCap(); const before = state.resources.kristalle||0;
+          const clampedAmt = Math.min(2000, amt);
+          state.resources.kristalle = Math.min(cap, before+clampedAmt); const gained = state.resources.kristalle-before;
           return 'Getauscht: 300 Erz → +'+fmt(gained)+' Kristalle.'; } },
       optB:{ label:'Ablehnen', resolve:()=>'Der Konvoi zieht weiter.' } },
     { key:'distress', name:'Notruf empfangen', icon:'ti-alert-triangle', color:'#e0a548',
       desc:'Ein schwaches Notrufsignal erreicht die Kolonie. Eine Rettungsmission bindet Treibstoff, verspricht aber eine Belohnung falls jemand dort noch zu retten ist.',
       optA:{ label:'Rettungsflotte schicken', cost:{deuterium:250},
         resolve:()=>{ if (Math.random() < 0.65){ const amt = 200+Math.floor(Math.random()*500); const res = ['erz','kristalle','deuterium'][Math.floor(Math.random()*3)];
-            const cap = storageCap(); const before = state.resources[res]||0; state.resources[res] = Math.min(cap, before+amt); const gained = state.resources[res]-before; addXp(15);
+            const cap = storageCap(); const before = state.resources[res]||0;
+            const clampedAmt = Math.min(2000, amt);
+            state.resources[res] = Math.min(cap, before+clampedAmt); const gained = state.resources[res]-before; addXp(15);
             return 'Überlebende geborgen! +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+' als Dank, +15 XP.'; }
           return 'Die Rettungsflotte findet nur ein leeres Wrack – keine Belohnung, aber Erfahrung gesammelt.'; } },
       optB:{ label:'Ignorieren', resolve:()=>'Das Signal verstummt. Man wird es nie erfahren.' } }
