@@ -1747,8 +1747,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.31.6';
+  const VERSION = '8.31.7';
   const PATCHNOTES = [
+    { version:'8.31.7', date:'13.07.2026', changes:[
+      'Grund-Bauzeit aller Kampfschiffe verdoppelt (Jäger, Trägerschiff, Kreuzer, Wächter, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) - Report: 50 Schlachtschiffe ließen sich in ca. 2 Stunden bauen, deutlich zu schnell für die gebotene Feuerkraft. Jetzt ca. 4,4 Stunden für dieselbe Menge. Reine Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler, Erkundungsschiffe) unverändert'
+    ]},
     { version:'8.31.6', date:'13.07.2026', changes:[
       'Forschungswarteschlange lässt sich jetzt nachträglich umsortieren (Pfeil-Buttons an jedem Eintrag) - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei automatisch garantiert korrekt, und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde'
     ]},
@@ -5076,14 +5079,18 @@
   };
   const SHIP_DEFS = [
     { key:'ships', name:'Erkundungsschiffe', icon:'ship_explorer', atk:5, costFn:shipCost, buildTime:15, requires:[], drive:'verbrennung', speed:100 },
-    { key:'jaeger', name:'Jäger', icon:'ship_jaeger', atk:10, costFn:jaegerCost, buildTime:25, requires:[], drive:'verbrennung', speed:90 },
+    // Kampfschiffe (13.07.2026, Balance-Wunsch): Grund-Bauzeit verdoppelt - vorher liessen sich z.B.
+    // 50 Schlachtschiffe in rund 2 Std. bauen (50×160s), deutlich zu schnell für die Feuerkraft, die
+    // das bringt. Reine Nutzschiffe (Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer,
+    // Forschungsschiff, Recycler, Erkundungsschiffe) bleiben bewusst unverändert.
+    { key:'jaeger', name:'Jäger', icon:'ship_jaeger', atk:10, costFn:jaegerCost, buildTime:50, requires:[], drive:'verbrennung', speed:90 },
     { key:'recycler', name:'Recycler', icon:'ship_recycler', atk:0, costFn:recyclerCost, buildTime:30, requires:[], drive:'verbrennung', speed:65 },
-    { key:'carrier', name:'Trägerschiff', icon:'ship_carrier', atk:15, costFn:carrierCost, buildTime:100, requires:['rkampf'], drive:'impuls', speed:40 },
-    { key:'cruisers', name:'Kreuzer', icon:'ship_cruiser', atk:20, costFn:cruiserCost, buildTime:45, requires:['rkampf'], drive:'impuls', speed:70 },
-    { key:'waechter', name:'Wächter', icon:'ship_waechter', atk:8, shield:14, costFn:waechterCost, buildTime:50, requires:['rkampf'], drive:'impuls', speed:60 },
-    { key:'destroyers', name:'Zerstörer', icon:'ship_destroyer', atk:45, costFn:destroyerCost, buildTime:70, requires:['rkampf'], drive:'impuls', speed:55 },
-    { key:'bomber', name:'Bomber', icon:'ship_bomber', atk:60, costFn:bomberCost, buildTime:90, requires:['rkampf2'], drive:'impuls', speed:50 },
-    { key:'schlachtschiff', name:'Schlachtschiff', icon:'ship_schlachtschiff', atk:90, costFn:schlachtschiffCost, buildTime:160, requires:['rkampf2'], drive:'hyperraum', speed:45 },
+    { key:'carrier', name:'Trägerschiff', icon:'ship_carrier', atk:15, costFn:carrierCost, buildTime:200, requires:['rkampf'], drive:'impuls', speed:40 },
+    { key:'cruisers', name:'Kreuzer', icon:'ship_cruiser', atk:20, costFn:cruiserCost, buildTime:90, requires:['rkampf'], drive:'impuls', speed:70 },
+    { key:'waechter', name:'Wächter', icon:'ship_waechter', atk:8, shield:14, costFn:waechterCost, buildTime:100, requires:['rkampf'], drive:'impuls', speed:60 },
+    { key:'destroyers', name:'Zerstörer', icon:'ship_destroyer', atk:45, costFn:destroyerCost, buildTime:140, requires:['rkampf'], drive:'impuls', speed:55 },
+    { key:'bomber', name:'Bomber', icon:'ship_bomber', atk:60, costFn:bomberCost, buildTime:180, requires:['rkampf2'], drive:'impuls', speed:50 },
+    { key:'schlachtschiff', name:'Schlachtschiff', icon:'ship_schlachtschiff', atk:90, costFn:schlachtschiffCost, buildTime:320, requires:['rkampf2'], drive:'hyperraum', speed:45 },
     { key:'frachter', name:'Frachter', icon:'ship_frachter', atk:0, costFn:frachterCost, buildTime:35, requires:[], drive:'verbrennung', speed:80 },
     { key:'spaeher', name:'Spähschiff', icon:'ship_spaeher', atk:0, costFn:spaeherCost, buildTime:35, requires:['rfusion'], drive:'hyperraum', speed:220 },
     { key:'spionageschiff', name:'Spionagekreuzer', icon:'ship_spionageschiff', atk:0, costFn:spionageschiffCost, buildTime:50, requires:['rspyshield'], drive:'hyperraum', speed:320 },
@@ -15717,7 +15724,7 @@
       // bezahlbar. Das seltene Item (Antimateriekern) bleibt weiterhin sofort beim Einreihen nötig/
       // verbraucht (unverändert, siehe Prüfung oben).
       state.rareItems.antimateriekern -= qty;
-      queueConstruction('ship', state.activeBasePlanet, 'superschlachtschiff', qty, 240, 'Superschlachtschiff (+'+qty+')', 'ti-sword', cost);
+      queueConstruction('ship', state.activeBasePlanet, 'superschlachtschiff', qty, 480, 'Superschlachtschiff (+'+qty+')', 'ti-sword', cost);
       render(); save();
     };
     const saveNameBtn = document.getElementById('saveNameBtn');
