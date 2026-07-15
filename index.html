@@ -1719,8 +1719,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.28.11';
+  const VERSION = '8.28.12';
   const PATCHNOTES = [
+    { version:'8.28.12', date:'13.07.2026', changes:[
+      'Ausloggen-Bug grundsätzlich behoben: trat nach v8.28.10 immer noch ab ca. 10 schnellen Verkäufen auf. Ursache war, dass Markt/Weltboss/PvP-Angriff/Fraktionsangriff nach dem eigentlichen Server-Aufruf jeweils zusätzlich einen kompletten Spielstand-Speichervorgang ausgelöst haben, obwohl die wichtigen Werte (Kredite, Ressourcen, Kampfpunkte) vom jeweiligen Endpunkt bereits serverseitig geschrieben wurden. Bei vielen schnellen Aktionen hintereinander entstand dadurch ein Wettlauf konkurrierender Speicherversuche, den selbst mehrfache Wiederholungsversuche irgendwann nicht mehr einholen konnten. Diese vier Aktionen lösen jetzt keinen zusätzlichen Speichervorgang mehr aus - der reguläre Speicher-Timer (alle 10 Sekunden) sichert die übrigen, rein lokalen Werte ohnehin bald. Sollte jetzt unabhängig von der Klick-Anzahl nicht mehr auftreten'
+    ]},
     { version:'8.28.11', date:'13.07.2026', changes:[
       'Bug behoben: Bei einem PvP-Angriff wurde der Kampf bisher sofort beim Losschicken berechnet (inkl. Ressourcen-/Gebäudeverlust beim Ziel) - die angezeigte Flugzeit war rein kosmetisch, der Bericht war schon da, bevor die Flotte überhaupt ankam. Der Kampf wird jetzt erst bei tatsächlicher Ankunft ausgelöst, genau wie beim Weltboss und Piratenversteck',
       'Nebenbei einen zweiten Bug behoben: der Anti-Farming-Abschlag bei ungleichen Punktestand-Verhältnissen wurde doppelt angewendet (einmal schon serverseitig in der Beute eingerechnet, dann clientseitig nochmal auf denselben Wert) - Angreifer mit deutlich höherem Punktestand bekamen dadurch unbeabsichtigt noch weniger Beute als vorgesehen'
@@ -4021,7 +4024,14 @@
       if (state.dailyQuests) state.dailyQuests.tradeCount = (state.dailyQuests.tradeCount||0) + 1;
       checkAchievements();
       playSound('trade');
-      render(); save();
+      // Bug behoben (erneuter Report nach v8.28.10, trat ab >10 Verkäufen wieder auf): kein
+      // zusätzlicher voller save()-Aufruf mehr hier - der Trade-Endpoint hat Kredite/Ressourcen
+      // bereits serverseitig geschrieben, ein weiterer Speichervorgang bei JEDEM einzelnen Verkauf
+      // erzeugte bei vielen schnellen Klicks hintereinander immer wieder neue, konkurrierende
+      // Speicherversuche - genug davon konnten selbst die 3-fache Wiederholungslogik überholen. Der
+      // reguläre 10s-Timer (setInterval(save, 10000)) sichert die übrigen, rein lokalen Felder
+      // (marketTradesDone, dailyQuests.tradeCount) ohnehin bald von selbst.
+      render();
     } catch(e){ log('Marktverbindung fehlgeschlagen.', 'ti-alert-triangle'); }
     finally { marketTradeInFlight = false; }
   }
@@ -4420,7 +4430,10 @@
         playSound('lose');
       }
       await loadGalaxyState();
-      render(); save();
+      // Kein zusätzlicher save()-Aufruf hier (siehe ausführlicher Kommentar bei doMarketTrade) -
+      // Kredite/Kampfpunkte sind bereits serverseitig persistiert, der reguläre 10s-Timer holt den
+      // Rest (z.B. commandPoints, das der Server nicht kennt) nach.
+      render();
     } catch(e){ log('Angriff fehlgeschlagen (Verbindungsfehler).', 'ti-alert-triangle'); }
   }
 
@@ -7059,7 +7072,11 @@
     }
     checkAchievements();
     loadReports();
-    render(); save();
+    // Kein zusätzlicher save()-Aufruf hier (siehe ausführlicher Kommentar bei doMarketTrade) - im
+    // Server-Pfad sind Kredite/Ressourcen/Kampfpunkte bereits serverseitig persistiert, der reguläre
+    // 10s-Timer holt den Rest nach. Im simulierten Offline-Pfad greift die Versions-Konflikt-Logik
+    // ohnehin nicht (kein Server), dort besteht also nie das Risiko, das diese Änderung behebt.
+    render();
   }
   async function attackPlayer(playerId, name){ return sendPlayerAttackMission(playerId, name); }
 
@@ -10980,9 +10997,13 @@
                 pushReport({ type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:false, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} });
               }
               // Frischen (server-geschriebenen) Boss-Zustand laden - zeigt den aktuellen HP-Stand an
-              // und beansprucht bei einem Kill automatisch die anteilige Belohnung (siehe loadWorldBoss).
+              // und beansprucht bei einem Kill automatisch die anteilige Belohnung (siehe loadWorldBoss,
+              // das bei einem Kill über maybeClaimWorldBossReward bereits selbst speichert).
               await loadWorldBoss();
-              render(); save();
+              // Kein zusätzlicher save()-Aufruf hier (siehe ausführlicher Kommentar bei doMarketTrade) -
+              // Kredite/Kampfpunkte sind bereits serverseitig persistiert, der reguläre 10s-Timer holt
+              // den Rest nach.
+              render();
             } catch(e){}
           })();
         } else if (m.type === 'piratelair'){
