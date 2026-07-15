@@ -174,7 +174,24 @@
     .battle-modal { width:100%; max-width:440px; max-height:88vh; overflow-y:auto; background:#0d1224; border:0.5px solid rgba(var(--primary-rgb), 0.35); border-radius:16px; padding:1.1rem; box-shadow:0 20px 60px rgba(0,0,0,0.55); }
     .battle-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
     .battle-modal-title { font-size:14px; font-weight:700; }
-    .battle-scene { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; background:radial-gradient(ellipse at 50% 40%, rgba(var(--primary-rgb),0.14), transparent 70%), radial-gradient(ellipse at 50% 40%, #1c2140, #080a14 75%), radial-gradient(1px 1px at 12% 22%, #fff, transparent), radial-gradient(1px 1px at 78% 18%, #fff, transparent), radial-gradient(1px 1px at 34% 78%, #fff, transparent), radial-gradient(1.5px 1.5px at 90% 65%, #fff, transparent), radial-gradient(1px 1px at 55% 40%, #fff, transparent), radial-gradient(1px 1px at 20% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 65% 85%, #fff, transparent); background-repeat:no-repeat; border-radius:12px; padding:0.85rem 0.6rem; margin-bottom:0.75rem; min-height:130px; overflow:hidden; transition:transform 0.4s ease; }
+    .battle-scene { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; background:radial-gradient(ellipse at 50% 40%, rgba(var(--primary-rgb),0.14), transparent 70%), radial-gradient(ellipse at 50% 40%, #1c2140, #080a14 75%); background-repeat:no-repeat; border-radius:12px; padding:0.85rem 0.6rem; margin-bottom:0.75rem; min-height:130px; overflow:hidden; transition:transform 0.4s ease, box-shadow 1.3s ease; }
+    /* Bewegliche Hintergrund-Tiefe (13.07.2026, Feature-Wunsch: optisch aufwerten) - die Sterne liegen
+       jetzt auf einer eigenen Ebene (statt fest im Haupt-Hintergrund) und driften langsam hin und her,
+       gibt der Szene mehr Räumlichkeit als ein komplett statischer Sternenhimmel. */
+    .battle-scene::after {
+      content:''; position:absolute; inset:-12px; pointer-events:none; z-index:-1;
+      background: radial-gradient(1px 1px at 12% 22%, #fff, transparent), radial-gradient(1px 1px at 78% 18%, #fff, transparent), radial-gradient(1px 1px at 34% 78%, #fff, transparent), radial-gradient(1.5px 1.5px at 90% 65%, #fff, transparent), radial-gradient(1px 1px at 55% 40%, #fff, transparent), radial-gradient(1px 1px at 20% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 65% 85%, #fff, transparent);
+      animation: battleStarDrift 26s ease-in-out infinite;
+    }
+    @keyframes battleStarDrift { 0%,100%{ transform:translate(0,0); } 50%{ transform:translate(-9px,5px); } }
+    /* Phasen-abhängige Szenen-Stimmung (13.07.2026) - dezenter Innenschein je Kampfphase, sanft
+       überblendet statt hart umzuschalten (siehe transition oben auf .battle-scene). */
+    .battle-scene.phase-anflug { box-shadow: inset 0 0 55px rgba(80,90,150,0.22); }
+    .battle-scene.phase-flankenmanoever { box-shadow: inset 0 0 55px rgba(175,156,230,0.18); }
+    .battle-scene.phase-gefecht { box-shadow: inset 0 0 55px rgba(226,140,80,0.10); }
+    .battle-scene.phase-entscheidung { box-shadow: inset 0 0 65px rgba(226,75,74,0.24); }
+    .battle-scene.phase-rueckzug { box-shadow: inset 0 0 55px rgba(90,95,120,0.20); }
+    .battle-scene.phase-nachspiel { box-shadow: inset 0 0 45px rgba(60,70,105,0.16); }
     .battle-scene::before { content:''; position:absolute; inset:0; background-image:radial-gradient(1px 1px at 8% 45%, rgba(255,255,255,0.7), transparent), radial-gradient(1px 1px at 45% 15%, rgba(255,255,255,0.6), transparent), radial-gradient(1px 1px at 92% 40%, rgba(255,255,255,0.7), transparent), radial-gradient(1px 1px at 70% 92%, rgba(255,255,255,0.5), transparent), radial-gradient(1px 1px at 25% 90%, rgba(255,255,255,0.6), transparent); animation: battleStarDrift 14s linear infinite; opacity:0.8; pointer-events:none; }
     @keyframes battleStarDrift { 0%{ background-position:0 0; } 100%{ background-position:-30px 20px; } }
     .battle-scene.shake { animation: battleShake 0.3s ease-in-out; }
@@ -227,6 +244,15 @@
     .battle-scene.result-flash-win::before { background:radial-gradient(ellipse at 50% 50%, rgba(93,202,165,0.35), transparent 70%); }
     .battle-scene.result-flash-loss::before { background:radial-gradient(ellipse at 50% 50%, rgba(226,75,74,0.32), transparent 70%); }
     @keyframes battleResultFlash { 0%{ opacity:0; } 15%{ opacity:1; } 100%{ opacity:0; } }
+    /* Partikel-Burst beim Sieg/Niederlage-Finale (13.07.2026, Feature-Wunsch: optisch aufwerten) -
+       kleine Bruchstücke fliegen vom Zentrum nach außen, ergänzt den bereits vorhandenen Farbwisch
+       um ein aufwändigeres Finale statt nur einer flächigen Einfärbung. */
+    .battle-result-particle { position:absolute; top:50%; left:50%; width:4px; height:4px; border-radius:50%; pointer-events:none; z-index:4; opacity:0; }
+    .battle-result-particle.play { animation: battleResultParticleBurst 0.85s ease-out forwards; }
+    @keyframes battleResultParticleBurst {
+      0% { opacity:1; transform:translate(-50%,-50%) translate(0,0) scale(1); }
+      100% { opacity:0; transform:translate(-50%,-50%) translate(var(--burst-x), var(--burst-y)) scale(0.3); }
+    }
     /* Kritische Treffer (13.07.2026, Feature-Wunsch: Wiedergabe komplexer/spannender gestalten) -
        gelegentlicher Volltreffer mit größerem Einschlag, kurzem weißem Bildschirmblitz und größerer,
        goldener Schadenszahl statt der normalgroßen weißen. */
@@ -258,13 +284,27 @@
       85% { opacity:0.4; }
       100% { opacity:0; transform:translate(var(--drift-x), var(--drift-y)) rotate(var(--drift-r)); }
     }
-    .battle-side { flex:1; min-width:0; }
+    .battle-side { flex:1; min-width:0; position:relative; z-index:1; }
     .battle-side-label { font-size:10.5px; color:#9296ac; text-align:center; margin-bottom:6px; font-weight:600; }
     .battle-side-sublabel { font-size:8.5px; color:#7a7e94; text-align:center; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px; }
     .battle-ship-icons { display:flex; flex-wrap:wrap; gap:3px; justify-content:center; }
     .battle-ship-icon { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; transition:opacity 0.4s ease, transform 0.4s ease; }
     .battle-ship-icon.destroyed { opacity:0.12; transform:scale(0.55); filter:grayscale(1); }
     .battle-ship-icon { position:relative; }
+    /* Schiffs-Idle-Bewegung (13.07.2026, Feature-Wunsch: optisch aufwerten) - sehr dezentes,
+       durchgehendes Schweben zwischen Treffern, damit die Formation nicht komplett starr wirkt.
+       Nutzt --stagger-y als Basis-Offset (siehe Formations-Staffelung weiter unten), damit sich
+       Idle-Bewegung und Staffel-Versatz addieren statt sich gegenseitig zu überschreiben. Zerstörte
+       Schiffe (bereits erstarrtes Wrack) bekommen keine Idle-Bewegung mehr.
+       Zufällige --idle-delay (per Icon inline gesetzt) verhindert perfekt synchrones Wippen aller
+       Schiffe im Gleichtakt. */
+    .battle-ship-icon:not(.destroyed) { animation: battleShipIdle 3.2s ease-in-out infinite; animation-delay: var(--idle-delay, 0s); }
+    @keyframes battleShipIdle { 0%,100%{ transform:translateY(var(--stagger-y,0px)); } 50%{ transform:translateY(calc(var(--stagger-y,0px) - 1.8px)); } }
+    /* Eintritts-Animation (13.07.2026) - Schiffe gleiten beim ersten Aufbau der Szene (vor Runde 1)
+       sanft ein, statt sofort komplett und regungslos dazustehen. Läuft nur beim allerersten Render
+       (siehe renderBattleFleetIcons isIntro-Parameter), nicht bei den Runden-Updates danach. */
+    .battle-ship-icon.entering { animation: battleShipEnter 0.5s ease-out backwards; animation-delay: var(--enter-delay, 0s); }
+    @keyframes battleShipEnter { 0%{ opacity:0; transform:translateY(var(--stagger-y,0px)) scale(0.4); } 100%{ opacity:1; transform:translateY(var(--stagger-y,0px)) scale(1); } }
     .battle-ship-icon.pre-hit { animation: battlePreHit 0.5s ease-in-out; }
     @keyframes battlePreHit { 0%,100%{ filter:none; } 30%,70%{ filter:brightness(2) drop-shadow(0 0 4px #ff6b5e); } }
     /* Angeschlagen-Zustand (13.07.2026, Feature-Wunsch: sichtbarer Schaden vor Zerstörung) - dezentes,
@@ -285,7 +325,7 @@
     .battle-abstract-icon { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:22px; background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.15); }
     .battle-hp-bar { width:80px; height:6px; border-radius:4px; background:rgba(255,255,255,0.1); overflow:hidden; margin-left:auto; margin-right:auto; }
     .battle-hp-bar-fill { height:100%; background:linear-gradient(90deg,#5dcaa5,#3fae8a); transition:width 0.5s ease; }
-    .battle-vs { flex-shrink:0; font-size:16px; color:var(--c-secondary); padding:0 4px; }
+    .battle-vs { flex-shrink:0; font-size:16px; color:var(--c-secondary); padding:0 4px; position:relative; z-index:1; }
     .battle-log { background:rgba(255,255,255,0.03); border-radius:10px; padding:0.6rem 0.75rem; max-height:180px; overflow-y:auto; margin-bottom:0.75rem; display:flex; flex-direction:column; gap:5px; }
     .battle-log-line { font-size:11.5px; color:#c7cbe0; opacity:0; animation: battleLogFadeIn 0.35s ease forwards; }
     @keyframes battleLogFadeIn { from{ opacity:0; transform:translateY(4px); } to{ opacity:1; transform:translateY(0); } }
@@ -1828,8 +1868,17 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.34.7';
+  const VERSION = '8.34.8';
   const PATCHNOTES = [
+    { version:'8.34.8', date:'13.07.2026', changes:[
+      'Kampf-Wiedergabe weiter optisch aufgewertet:',
+      '1) Bewegliche Hintergrund-Tiefe: der Sternenhintergrund driftet jetzt langsam statt komplett statisch zu sein',
+      '2) Phasen-abhängige Szenen-Stimmung: dezenter Farbschein je Kampfphase, sanft überblendet',
+      '3) Formations-Staffelung: Schiffe stehen jetzt in einer leicht versetzten Formation statt einer flachen Reihe',
+      '4) Eintritts-Animation: Flotten gleiten zu Kampfbeginn sanft ein statt sofort komplett dazustehen',
+      '5) Partikel-Burst beim Sieg/Niederlage-Finale, ergänzt den bereits vorhandenen Farbwisch',
+      '6) Schiffs-Idle-Bewegung: sehr dezentes, durchgehendes Schweben zwischen Treffern statt einer komplett starren Formation'
+    ]},
     { version:'8.34.7', date:'13.07.2026', changes:[
       'Bug behoben (Report: "Gegner hatte in Runde 9 schon 0 Schiffe"): die Verlust-Verteilung über die 12 Runden konnte eine Seite bei Totalvernichtung schon deutlich vor der letzten Runde komplett auf 0 Schiffe bringen - Schüsse, Alpha-Salven und Einzelschiff-Duelle liefen aber unverändert bis zum Ende weiter, als hätte die Seite noch Schiffe. Ein bereits vollständig zerstörter Gegner (oder die eigene Flotte) feuert jetzt in den restlichen Runden keine Schüsse mehr ab, und Duelle nennen nur noch Schiffe, die zu diesem Zeitpunkt tatsächlich noch existieren'
     ]},
@@ -8653,17 +8702,24 @@
     if (atk >= 15) return 18;
     return 15;
   }
-  function renderBattleFleetIcons(containerId, fleet, remainingCounts){
+  function renderBattleFleetIcons(containerId, fleet, remainingCounts, isIntro){
     const el = document.getElementById(containerId);
     if (!el) return;
     const parts = Object.entries(fleet).filter(([k,v])=>v>0);
-    el.innerHTML = parts.map(([k,v]) => {
+    el.innerHTML = parts.map(([k,v], idx) => {
       const iconKey = k==='superschlachtschiff' ? 'ship_superschlachtschiff' : (SHIP_DEFS.find(d=>d.key===k)||{}).icon;
       const sz = battleShipIconSize(k);
       const svg = iconKey && ICONS[iconKey] ? ICONS[iconKey].replace('width="24" height="24"', `width="${sz}" height="${sz}"`) : '';
       const remaining = remainingCounts[k] !== undefined ? remainingCounts[k] : v;
       const dead = remaining <= 0;
-      return `<span class="battle-ship-icon ${dead?'destroyed':''}" data-battle-ship="${k}" title="${shipDisplayName(k)}">${svg}</span><span data-battle-ship-count="${k}" style="font-size:10px; color:#c7cbe0; margin:0 6px 0 -1px; align-self:center;">${Math.max(0,remaining)}</span>`;
+      // Formations-Staffelung (13.07.2026, Feature-Wunsch: optisch aufwerten) - wechselnder leichter
+      // Höhenversatz statt einer komplett flachen Reihe, wirkt geordneter/formationsartiger. Als
+      // CSS-Variable statt festem Inline-Transform gesetzt, damit sich Idle-Bewegung (siehe CSS) und
+      // ggf. Eintritts-Animation korrekt damit kombinieren, statt sich gegenseitig zu überschreiben.
+      const staggerY = idx%3===0 ? -2 : idx%3===1 ? 2 : 0;
+      const idleDelay = (Math.random()*2.4).toFixed(2);
+      const introStyle = isIntro ? `--enter-delay:${(idx*0.04).toFixed(2)}s;` : '';
+      return `<span class="battle-ship-icon ${dead?'destroyed':''}${isIntro?' entering':''}" data-battle-ship="${k}" title="${shipDisplayName(k)}" style="--stagger-y:${staggerY}px; --idle-delay:${idleDelay}s; ${introStyle}">${svg}</span><span data-battle-ship-count="${k}" style="font-size:10px; color:#c7cbe0; margin:0 6px 0 -1px; align-self:center;">${Math.max(0,remaining)}</span>`;
     }).join('');
   }
   // Angeschlagen-Zustand (13.07.2026, Feature-Wunsch: sichtbarer Schaden vor Zerstörung) - markiert
@@ -8719,6 +8775,25 @@
     p.style.setProperty('--drift-r', (Math.random()*180-90)+'deg');
     scene.appendChild(p);
     battleTimers.push(setTimeout(() => p.remove(), 4600));
+  }
+  // Partikel-Burst beim Sieg/Niederlage-Finale (13.07.2026, Feature-Wunsch: optisch aufwerten) -
+  // mehrere Bruchstücke fliegen radial vom Zentrum nach außen, ergänzt den bereits vorhandenen
+  // Farbwisch um ein aufwändigeres Finale.
+  function spawnVictoryParticleBurst(scene, won){
+    const color = won ? '#5dcaa5' : '#e24b4a';
+    const count = 14;
+    for (let i=0;i<count;i++){
+      const p = document.createElement('div');
+      p.className = 'battle-result-particle play';
+      p.style.background = color;
+      const angle = (i/count)*Math.PI*2 + Math.random()*0.3;
+      const dist = 40 + Math.random()*55;
+      p.style.setProperty('--burst-x', (Math.cos(angle)*dist)+'px');
+      p.style.setProperty('--burst-y', (Math.sin(angle)*dist)+'px');
+      p.style.animationDelay = (Math.random()*0.15)+'s';
+      scene.appendChild(p);
+      battleTimers.push(setTimeout(() => p.remove(), 1100));
+    }
   }
   // Ein einzelnes Projektil: fliegt von fromPct% zu toPct% (horizontal, % der Szenenbreite),
   // erzeugt beim Auftreffen einen kurzen Einschlag-Effekt + optionales leichtes Wackeln der Szene.
@@ -8874,7 +8949,7 @@
   function openBattleReplay(report){
     clearBattleTimers();
     const scene0 = document.getElementById('battleScene');
-    if (scene0){ scene0.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash, .battle-debris-particle').forEach(el => el.remove()); scene0.classList.remove('shake'); scene0.classList.remove('climax'); scene0.classList.remove('result-flash-win'); scene0.classList.remove('result-flash-loss'); }
+    if (scene0){ scene0.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash, .battle-debris-particle, .battle-result-particle').forEach(el => el.remove()); scene0.classList.remove('shake'); scene0.classList.remove('climax'); scene0.classList.remove('result-flash-win'); scene0.classList.remove('result-flash-loss'); scene0.classList.remove('phase-anflug','phase-flankenmanoever','phase-gefecht','phase-entscheidung','phase-rueckzug','phase-nachspiel'); }
     const bigResult0 = document.getElementById('battleBigResult');
     if (bigResult0) bigResult0.classList.remove('play');
     const seq = buildBattleSequence(report);
@@ -8912,12 +8987,12 @@
 
     const remainingLeft = {};
     for (const [k,v] of Object.entries(seq.left.fleet)) remainingLeft[k] = v;
-    renderBattleFleetIcons('battleLeftIcons', seq.left.fleet, remainingLeft);
+    renderBattleFleetIcons('battleLeftIcons', seq.left.fleet, remainingLeft, true);
     if (hasRightBuildings) renderBattleBuildingIcons('battleRightBuildings', seq.right.buildings);
     const remainingRight = {};
     if (hasRightFleet){
       for (const [k,v] of Object.entries(seq.right.fleet)) remainingRight[k] = v;
-      renderBattleFleetIcons('battleRightIcons', seq.right.fleet, remainingRight);
+      renderBattleFleetIcons('battleRightIcons', seq.right.fleet, remainingRight, true);
     }
     document.getElementById('battleLog').innerHTML = '';
     document.getElementById('battleResultBanner').style.display = 'none';
@@ -9003,6 +9078,13 @@
       const counterEl = document.getElementById('battleRoundCounter');
       if (counterEl){ counterEl.style.display = 'block'; counterEl.textContent = 'Runde '+(roundIdx+1)+'/'+seq.rounds.length+' – '+(phaseLabels[round.phase]||round.phase); }
       if (scene) scene.classList.toggle('climax', round.phase === 'entscheidung');
+      // Phasen-abhängige Szenen-Stimmung (13.07.2026, Feature-Wunsch: optisch aufwerten) - alte
+      // Phasen-Klasse entfernen, neue setzen; die CSS-Transition auf .battle-scene sorgt für einen
+      // sanften Übergang statt eines harten Umschaltens.
+      if (scene){
+        scene.classList.remove('phase-anflug','phase-flankenmanoever','phase-gefecht','phase-entscheidung','phase-rueckzug','phase-nachspiel');
+        scene.classList.add('phase-'+round.phase);
+      }
       // Alpha-Salve: feuert genau einmal, in der Entscheidungsrunde, von der Seite mit schweren
       // Schiffen (bevorzugt der Angreiferseite, falls beide welche haben).
       let alphaSide = null;
@@ -9093,12 +9175,13 @@
   function finishBattleReplay(report, seq){
     clearBattleTimers();
     const scene = document.getElementById('battleScene');
-    if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash, .battle-debris-particle').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); }
+    if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash, .battle-debris-particle, .battle-result-particle').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); scene.classList.remove('phase-anflug','phase-flankenmanoever','phase-gefecht','phase-entscheidung','phase-rueckzug','phase-nachspiel'); }
     const won = report.result === 'win' || report.result === 'defended';
     playBattleResultSound(won);
     if (scene){
       scene.classList.add(won ? 'result-flash-win' : 'result-flash-loss');
       battleTimers.push(setTimeout(() => { scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); }, 950));
+      spawnVictoryParticleBurst(scene, won);
     }
     // Großes SIEG/NIEDERLAGE-Overlay kurz einblenden, bevor die Detail-Zusammenfassung erscheint.
     const bigResult = document.getElementById('battleBigResult');
@@ -9160,7 +9243,7 @@
     clearBattleTimers();
     document.getElementById('battleModalOverlay').classList.remove('open');
     const scene = document.getElementById('battleScene');
-    if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash, .battle-debris-particle').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); }
+    if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash, .battle-debris-particle, .battle-result-particle').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); scene.classList.remove('phase-anflug','phase-flankenmanoever','phase-gefecht','phase-entscheidung','phase-rueckzug','phase-nachspiel'); }
     const bigResult = document.getElementById('battleBigResult');
     if (bigResult) bigResult.classList.remove('play');
     const skipBtn = document.getElementById('battleSkipBtn');
@@ -9244,7 +9327,7 @@
       { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
-      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes über <strong>12 Runden</strong> (Anflug → Flankenmanöver → Gefecht → Entscheidung → Rückzugsgefecht → Nachspiel) – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger und die Szene färbt sich kurz grün bzw. rot ein. Gelegentliche <strong>kritische Treffer</strong> (größerer Einschlag, weißer Bildschirmblitz, goldene Schadenszahl) und <strong>Beinahe-Treffer</strong> (Fehlschüsse, kein Schaden), eine einmalige <strong>Alpha-Salve</strong> schwerer Schiffe (Schlachtschiff/Superschlachtschiff) in der Entscheidungsrunde, <strong>Einzelschiff-Duelle</strong> im Kampfprotokoll (nennt konkrete Schiffe statt nur "beide Seiten"), ein <strong>Spannungs-Ping</strong> vor der Entscheidungsrunde, leises <strong>Hintergrund-Ambiente</strong> das dichter wird, sichtbarer <strong>Schadenszustand</strong> bei Schiffstypen unter 25% Bestand, eine <strong>auflockernde Formation</strong> ab 50% Verlusten, <strong>Trümmerpartikel</strong> im Hintergrund die sich über den Kampf aufbauen, sowie ein Kurzfazit, welcher eigene Schiffstyp den größten Anteil an der Kampfkraft hatte.' },
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes über <strong>12 Runden</strong> (Anflug → Flankenmanöver → Gefecht → Entscheidung → Rückzugsgefecht → Nachspiel) – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger, die Szene färbt sich kurz grün bzw. rot ein und Bruchstücke fliegen als Partikel-Burst nach außen. Gelegentliche <strong>kritische Treffer</strong> (größerer Einschlag, weißer Bildschirmblitz, goldene Schadenszahl) und <strong>Beinahe-Treffer</strong> (Fehlschüsse, kein Schaden), eine einmalige <strong>Alpha-Salve</strong> schwerer Schiffe (Schlachtschiff/Superschlachtschiff) in der Entscheidungsrunde, <strong>Einzelschiff-Duelle</strong> im Kampfprotokoll (nennt konkrete Schiffe statt nur "beide Seiten"), ein <strong>Spannungs-Ping</strong> vor der Entscheidungsrunde, leises <strong>Hintergrund-Ambiente</strong> das dichter wird, sichtbarer <strong>Schadenszustand</strong> bei Schiffstypen unter 25% Bestand, eine <strong>auflockernde Formation</strong> ab 50% Verlusten, <strong>Trümmerpartikel</strong> im Hintergrund die sich über den Kampf aufbauen, sowie ein Kurzfazit, welcher eigene Schiffstyp den größten Anteil an der Kampfkraft hatte. Zusätzlich: langsam driftender Sternenhintergrund, phasenabhängige Szenen-Stimmung (Farbschein je Kampfphase), Schiffe in gestaffelter Formation mit leichter Idle-Bewegung statt einer starren Reihe, und ein sanftes Eintreten der Flotten zu Kampfbeginn.' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP- und Expeditions-Berichten (mit echter Begegnung). Läuft ein Kampf live ab, während man im Spiel aktiv ist - eigener Angriff oder eingehender Überfall -, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
       { title:'Steuerung', body:'Pause/Weiter hält die Wiedergabe an, Tempo-Umschalter (1x/2x) beschleunigt, "Überspringen" springt direkt zum Endergebnis.' }
     ]},
