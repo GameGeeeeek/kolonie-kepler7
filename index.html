@@ -945,6 +945,14 @@
         <div class="section-title" style="margin-top:1.5rem; justify-content:space-between;"><span><i class="ti ti-sword" aria-hidden="true"></i>Taktik-Haltung</span><button class="help-jump-btn" data-jump-help="kampf"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Verschiebt Angriffs- und Verteidigungskraft gegenläufig, jederzeit kostenlos wechselbar (im Gegensatz zur Doktrin).</div>
         <div id="stanceBox"></div>
+        <div class="section-title" style="margin-top:1.5rem; justify-content:space-between;"><span><i class="ti ti-atom-2" aria-hidden="true"></i>Weitere Verwendungen für Forschungspunkte</span><button class="help-jump-btn" data-jump-help="forschung"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Sind alle 20 Forschungszweige weit ausgebaut, lohnt sich überschüssige Forschungspunkte-Produktion hier weiter.</div>
+        <div class="section-title" style="margin-top:0.5rem; font-size:13px;"><i class="ti ti-flask" aria-hidden="true"></i>Forschungs-Sprint (temporärer Boost)</div>
+        <div id="researchSprintBox"></div>
+        <div class="section-title" style="margin-top:1rem; font-size:13px;"><i class="ti ti-atom-2" aria-hidden="true"></i>Exotische Forschung (Einmal-Unlocks)</div>
+        <div id="exoticResearchBox"></div>
+        <div class="section-title" style="margin-top:1rem; font-size:13px;"><i class="ti ti-medal" aria-hidden="true"></i>Veteranen-Ausbildung (Kampfbonus)</div>
+        <div id="veteranTrainingBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-flotte">
@@ -1726,8 +1734,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.30.5';
+  const VERSION = '8.31.0';
   const PATCHNOTES = [
+    { version:'8.31.0', date:'13.07.2026', changes:[
+      'Vier neue Verwendungen für Forschungspunkte ergänzt (vorher ausschließlich für die 20 Forschungszweige nutzbar - war die Kette ausgebaut, verpuffte überschüssige Produktion ungenutzt):',
+      'Forschungs-Sprint: 800 Forschungspunkte gegen +25% Produktion einer gewählten Ressource für 20 Minuten (nur einer gleichzeitig aktiv)',
+      'Exotische Forschung: drei seltene Einmal-Unlocks rein auf Forschungspunkte-Basis - Quantenkommunikation (+5% Forschungspunkte-Produktion), Adaptive Legierungen (+3% alle Ressourcen), Tiefenraum-Kartierung (-5% Missionsdauer)',
+      'Veteranen-Ausbildung: drei gestaffelte Stufen für insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom bestehenden XP-basierten Skillbaum',
+      'Forschungs-Nexus: neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 20 Forschungszweige Stufe 20 erreicht haben - +15% Forschungspunkte-Produktion und +5% Produktion aller Ressourcen',
+      'Alle vier zu finden im Forschung-Tab (Forschungs-Sprint, Exotische Forschung, Veteranen-Ausbildung) bzw. Fortschritt-Tab (Forschungs-Nexus bei den Mega-Projekten)'
+    ]},
     { version:'8.30.5', date:'13.07.2026', changes:[
       'Zufallsereignisse mit Ressourcenbelohnung (Asteroiden-Fund, Handelskonvoi, Notruf) auf maximal 2000 Ressourcen pro Auslösung begrenzt - Report: ein einzelner Asteroiden-Fund hatte weit über 1 Mio. Erz eingebracht, obwohl die Formel eigentlich nur 250-700 vorsieht. Ursache nicht abschließend rekonstruierbar, die neue harte Obergrenze verhindert einen solchen Ausreißer aber garantiert unabhängig von der genauen Ursache'
     ]},
@@ -3194,6 +3210,78 @@
     { key:'rdiplomatie', name:'Diplomatie-Protokolle', baseCost:{energie:80, kristalle:40, forschungspunkte:15}, costMult:1.2, baseDuration:25, durationMult:1.45, desc:'Erhöht die Friedensdividende aus aktiven Nichtangriffspakten - eigenständiger Forschungszweig, unabhängig von der übrigen Technologie-Kette.', effectRes:null, effectPerLevel:0.0015, maxLevel:20, requires:[] },
     { key:'rkolonisation', name:'Kolonial-Logistik', baseCost:{erz:100, kristalle:50, forschungspunkte:15}, costMult:1.2, baseDuration:25, durationMult:1.45, desc:'Erhöht das Kolonie-Limit: 1 Kolonie ist immer erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere dazu - eigenständiger Forschungszweig, unabhängig von der übrigen Technologie-Kette.', effectRes:null, effectPerLevel:0, maxLevel:20, requires:[] }
   ];
+  // Prüft, ob ALLE Forschungszweige ihre Maximalstufe (20) erreicht haben - Voraussetzung für den
+  // Forschungs-Nexus (siehe MEGA_PROJECTS).
+  function allResearchMaxed(){ return RESEARCH_DEFS.every(r => (state.research[r.key]||0) >= r.maxLevel); }
+
+  // ===== Weitere Verwendungen für Forschungspunkte (13.07.2026) =====
+  // Bisher landeten Forschungspunkte ausschließlich in den 20 Forschungszweigen oben - war die Kette
+  // einmal komplett ausgebaut, verpuffte jede weitere Produktion ungenutzt. Vier neue, unabhängige
+  // Verwendungen geben Forschungspunkten auch im späten Spielverlauf einen Zweck.
+
+  // --- 1) Exotische Forschung: seltene, teure Einmal-Unlocks REIN auf Forschungspunkte-Basis ---
+  const EXOTIC_RESEARCH = [
+    { key:'quantenkomm', name:'Quantenkommunikation', icon:'ti-atom-2', cost:3000, desc:'+5% Forschungspunkte-Produktion (dauerhaft)' },
+    { key:'legierungen', name:'Adaptive Legierungen', icon:'ti-mountain', cost:6000, desc:'+3% Produktion aller Ressourcen (dauerhaft)' },
+    { key:'tiefenraum', name:'Tiefenraum-Kartierung', icon:'ti-map-2', cost:10000, desc:'-5% Missionsdauer für alle Flüge (dauerhaft)' }
+  ];
+  function hasExoticResearch(key){ return !!(state.exoticResearch && state.exoticResearch[key]); }
+  function exoticFpProdMult(){ return hasExoticResearch('quantenkomm') ? 1.05 : 1; }
+  function unlockExoticResearch(key){
+    const def = EXOTIC_RESEARCH.find(e=>e.key===key);
+    if (!def) return;
+    if (hasExoticResearch(key)){ log('Bereits erforscht.', 'ti-alert-triangle'); return; }
+    if ((state.resources.forschungspunkte||0) < def.cost){ log('Nicht genug Forschungspunkte (benötigt: '+fmt(def.cost)+').', 'ti-alert-triangle'); return; }
+    if (!confirm(def.name+' für '+fmt(def.cost)+' Forschungspunkte erforschen? Einmalig, kann nicht rückgängig gemacht werden.')) return;
+    state.resources.forschungspunkte -= def.cost;
+    if (!state.exoticResearch) state.exoticResearch = {};
+    state.exoticResearch[key] = true;
+    logScoreChange(200, def.name+' erforscht', 'ti-atom-2');
+    log('Exotische Forschung abgeschlossen: '+def.name+'! '+def.desc, 'ti-atom-2');
+    playSound('achieve');
+    render(); save();
+  }
+
+  // --- 2) Veteranen-Ausbildung: permanenter, kleiner Kampfbonus, gestaffelt in 3 Stufen ---
+  const VETERAN_TRAINING = [
+    { key:'vet1', name:'Gefechtsanalyse', cost:2000, bonus:0.02, requires:null, desc:'+2% Angriffs-/Verteidigungspunkte' },
+    { key:'vet2', name:'Erfahrene Besatzungen', cost:4000, bonus:0.02, requires:'vet1', desc:'+2% weitere Angriffs-/Verteidigungspunkte' },
+    { key:'vet3', name:'Legendäre Kommandeure', cost:7000, bonus:0.03, requires:'vet2', desc:'+3% weitere Angriffs-/Verteidigungspunkte' }
+  ];
+  function hasVeteranTraining(key){ return !!(state.veteranTraining && state.veteranTraining[key]); }
+  function veteranCombatBonus(){ return VETERAN_TRAINING.filter(v=>hasVeteranTraining(v.key)).reduce((a,v)=>a+v.bonus,0); }
+  function buyVeteranTraining(key){
+    const def = VETERAN_TRAINING.find(v=>v.key===key);
+    if (!def) return;
+    if (hasVeteranTraining(key)){ log('Bereits ausgebildet.', 'ti-alert-triangle'); return; }
+    if (def.requires && !hasVeteranTraining(def.requires)){ log('Voraussetzung fehlt: '+(VETERAN_TRAINING.find(v=>v.key===def.requires)||{}).name, 'ti-alert-triangle'); return; }
+    if ((state.resources.forschungspunkte||0) < def.cost){ log('Nicht genug Forschungspunkte (benötigt: '+fmt(def.cost)+').', 'ti-alert-triangle'); return; }
+    if (!confirm(def.name+' für '+fmt(def.cost)+' Forschungspunkte ausbilden? Einmalig, kann nicht rückgängig gemacht werden.')) return;
+    state.resources.forschungspunkte -= def.cost;
+    if (!state.veteranTraining) state.veteranTraining = {};
+    state.veteranTraining[key] = true;
+    logScoreChange(150, def.name+' ausgebildet', 'ti-medal');
+    log('Veteranen-Ausbildung abgeschlossen: '+def.name+'! '+def.desc, 'ti-medal');
+    playSound('achieve');
+    render(); save();
+  }
+
+  // --- 3) Forschungs-Sprint: Forschungspunkte gegen einen temporären Produktionsboost eintauschen ---
+  const RESEARCH_SPRINT_COST = 800;
+  const RESEARCH_SPRINT_MULT = 1.25;
+  const RESEARCH_SPRINT_DURATION_MS = 20*60*1000;
+  function activeResearchSprint(){ return (state.buffs||[]).find(b=>b.kind==='researchSprint' && b.expiresAt>Date.now()) || null; }
+  function startResearchSprint(res){
+    if (activeResearchSprint()){ log('Es läuft bereits ein Forschungs-Sprint.', 'ti-alert-triangle'); return; }
+    if ((state.resources.forschungspunkte||0) < RESEARCH_SPRINT_COST){ log('Nicht genug Forschungspunkte (benötigt: '+RESEARCH_SPRINT_COST+').', 'ti-alert-triangle'); return; }
+    state.resources.forschungspunkte -= RESEARCH_SPRINT_COST;
+    state.buffs = state.buffs || [];
+    state.buffs.push({ kind:'researchSprint', res, mult:RESEARCH_SPRINT_MULT, expiresAt: Date.now()+RESEARCH_SPRINT_DURATION_MS });
+    log('Forschungs-Sprint gestartet: +'+Math.round((RESEARCH_SPRINT_MULT-1)*100)+'% '+(RES_DEFS.find(r=>r.key===res)||{}).label+'-Produktion für '+fmtDuration(RESEARCH_SPRINT_DURATION_MS/1000)+'.', 'ti-flask');
+    playSound('build');
+    render(); save();
+  }
+
   // ===== Forschungs-Meilensteine =====
   // Gruppen verwandter Forschungen, die bei gemeinsamem Fortschritt eine Belohnung in Sternenessenz
   // auslösen - der einzigen Währung, die Prestige UND Aufstieg überlebt. Macht "die Forschung
@@ -4670,7 +4758,7 @@
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
     scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
-    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
+    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
     research: {},
@@ -5255,6 +5343,8 @@
         fpMult *= terraformProdMult(planet, 'forschungspunkte');
         fpMult *= planetTypeProdMult(planet, 'forschungspunkte');
         fpMult *= (1 + moduleBonusAt(planet, 'prod'));
+        fpMult *= exoticFpProdMult();
+        fpMult *= megaProjectFpProdMult();
         const laborDef = BUILDING_DEFS.find(d=>d.key==='labor');
         rates.forschungspunkte += b.labor * (laborDef.researchPointRate||0) * fpMult;
       }
@@ -5275,6 +5365,7 @@
     for (const buff of (state.buffs||[])){
       if (buff.expiresAt < now) continue;
       if (buff.kind === 'prod') rates[buff.res] *= buff.mult;
+      if (buff.kind === 'researchSprint') rates[buff.res] *= buff.mult;
       if (buff.kind === 'prod_all') for (const k of Object.keys(rates)) rates[k] *= buff.mult;
     }
     for (const k of Object.keys(rates)) rates[k] *= planetBonusMultiplier('prod', k);
@@ -5292,6 +5383,7 @@
     globalBonus += (systemControlProdMult() - 1);
     globalBonus += (conqueredSystemsProdMult() - 1);
     globalBonus += (megaProjectProdMult() - 1);
+    if (hasExoticResearch('legierungen')) globalBonus += 0.03;
     if (hasArtifactBonus()) globalBonus += 0.05;
     // Friedensdividende: +5% Produktion je aktivem Nichtangriffspakt, gedeckelt bei +10% (2 Pakte).
     globalBonus += Math.min(2, activePactCount())*(0.05 + (state.research.rdiplomatie||0)*0.0015);
@@ -5392,6 +5484,7 @@
     mult *= Math.max(0.5, 1 - prestigePerkCount('speed')*0.03);
     mult *= Math.max(0.5, 1 - ascBonus('speed')*0.02);
     mult *= Math.max(0.5, 1 - skillBonusPct('log'));
+    if (hasExoticResearch('tiefenraum')) mult *= 0.95;
     return sec * mult;
   }
   function hangarCapacity(fleet){ const f = fleet || currentFleet(); return (f.carrier||0)*6; }
@@ -5633,6 +5726,7 @@
     combatBonus += ascBonus('combat')*0.02;
     combatBonus += skillBonusPct('war');
     combatBonus += (megaProjectCombatMult()-1);
+    combatBonus += veteranCombatBonus();
     if (hasArtifactBonus()) combatBonus += 0.05;
     // Piraten-Ketten-Prestige: +2% Angriffskraft je abgeschlossenem Durchlauf (eigener Deckel +10%,
     // zusätzlich zum Gesamtdeckel der Gruppe).
@@ -5726,6 +5820,7 @@
     combatBonus += ascBonus('combat')*0.02;
     combatBonus += skillBonusPct('war');
     combatBonus += (megaProjectCombatMult()-1);
+    combatBonus += veteranCombatBonus();
     if (hasArtifactBonus()) combatBonus += 0.05;
     if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
     if (planetKey) combatBonus += moduleBonusAt(planetKey, 'def');
@@ -6525,6 +6620,8 @@
     if (state.allianceIsTopRank === undefined) state.allianceIsTopRank = false;
     if (!state.colonyNames) state.colonyNames = {};
     if (!state.megaProjects) state.megaProjects = {};
+    if (!state.exoticResearch) state.exoticResearch = {};
+    if (!state.veteranTraining) state.veteranTraining = {};
     if (!state.pendingRoleChange) state.pendingRoleChange = {};
     if (state.lastNameChangeAt === undefined) state.lastNameChangeAt = null;
     if (!state.debrisFieldTrackers) state.debrisFieldTrackers = {};
@@ -6678,7 +6775,7 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
+      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: 250, claimedBossKills: keepBossClaims,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
@@ -6741,7 +6838,7 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
+      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
       prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: startLvl*100,
       claimedBossKills: keepBossClaims,
@@ -8433,6 +8530,7 @@
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Typ: +15% auf ALLE Ressourcen. Erdähnliche Welten, Gasriesen, Wasserwelten und Asteroiden haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
+      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die 20-stufige Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene Einmal-Unlocks rein auf Forschungspunkte-Basis: Quantenkommunikation +5% Forschungspunkte-Produktion, Adaptive Legierungen +3% alle Ressourcen, Tiefenraum-Kartierung -5% Missionsdauer), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 20 Forschungszweige Stufe 20 haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
       { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 45% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
       { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
@@ -10075,6 +10173,8 @@
         if (state.allianceIsTopRank === undefined) state.allianceIsTopRank = false;
         if (!state.colonyNames) state.colonyNames = {};
         if (!state.megaProjects) state.megaProjects = {};
+    if (!state.exoticResearch) state.exoticResearch = {};
+    if (!state.veteranTraining) state.veteranTraining = {};
         if (!state.pendingRoleChange) state.pendingRoleChange = {};
         if (state.lastNameChangeAt === undefined) state.lastNameChangeAt = null;
         if (!state.debrisFieldTrackers) state.debrisFieldTrackers = {};
@@ -10337,22 +10437,34 @@
   // dieselben Bonus-Ansatzpunkte wie Prestige-Perks/Fähigkeitsbaum, um konsistent zu bleiben.
   const MEGA_PROJECTS = [
     { key:'dysonschwarm', name:'Dyson-Schwarm-Kollektor', desc:'+8% Ressourcenproduktion (dauerhaft)', icon:'ti-sun', cost:{erz:50000,kristalle:35000,deuterium:20000,antimaterie:2000}, unlockItem:'altetech' },
-    { key:'voidreaktor', name:'Void-Reaktor', desc:'+10% Angriffs-/Verteidigungspunkte (dauerhaft)', icon:'ti-atom', cost:{erz:60000,kristalle:45000,deuterium:30000,antimaterie:3000}, unlockItem:'altetech' }
+    { key:'voidreaktor', name:'Void-Reaktor', desc:'+10% Angriffs-/Verteidigungspunkte (dauerhaft)', icon:'ti-atom', cost:{erz:60000,kristalle:45000,deuterium:30000,antimaterie:3000}, unlockItem:'altetech' },
+    { key:'forschungsnexus', name:'Forschungs-Nexus', desc:'+15% Forschungspunkte-Produktion und +5% Produktion aller Ressourcen (dauerhaft)', icon:'ti-flask', cost:{forschungspunkte:50000}, unlockItem:null, requiresAllResearchMaxed:true }
   ];
   function hasMegaProject(key){ return !!(state.megaProjects && state.megaProjects[key]); }
-  function megaProjectProdMult(){ return hasMegaProject('dysonschwarm') ? 1.08 : 1; }
+  function megaProjectProdMult(){
+    let m = 1;
+    if (hasMegaProject('dysonschwarm')) m += 0.08;
+    if (hasMegaProject('forschungsnexus')) m += 0.05;
+    return m;
+  }
   function megaProjectCombatMult(){ return hasMegaProject('voidreaktor') ? 1.10 : 1; }
+  function megaProjectFpProdMult(){ return hasMegaProject('forschungsnexus') ? 1.15 : 1; }
   function buildMegaProject(key){
     const proj = MEGA_PROJECTS.find(p=>p.key===key);
     if (!proj) return;
     if (hasMegaProject(key)){ log('Bereits errichtet.', 'ti-alert-triangle'); return; }
-    const have = state.rareItems[proj.unlockItem]||0;
-    if (have < 1){ log('Benötigt 1x '+(RARE_ITEMS.find(r=>r.key===proj.unlockItem)||{}).name+' (seltener Fund bei Erkundungsmissionen).', 'ti-alert-triangle'); return; }
+    if (proj.requiresAllResearchMaxed && !allResearchMaxed()){ log(proj.name+' benötigt alle Forschungszweige auf Maximalstufe (20).', 'ti-alert-triangle'); return; }
+    if (proj.unlockItem){
+      const have = state.rareItems[proj.unlockItem]||0;
+      if (have < 1){ log('Benötigt 1x '+(RARE_ITEMS.find(r=>r.key===proj.unlockItem)||{}).name+' (seltener Fund bei Erkundungsmissionen).', 'ti-alert-triangle'); return; }
+    }
     if (!canAfford(proj.cost)){ log('Nicht genug Ressourcen für '+proj.name+'.', 'ti-alert-triangle'); return; }
-    if (!confirm(proj.name+' errichten für '+Object.entries(proj.cost).map(([r,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===r)||{}).label).join(', ')+' + 1x '+(RARE_ITEMS.find(r=>r.key===proj.unlockItem)||{}).name+'? Einmalig, kann nicht rückgängig gemacht werden.')) return;
+    if (!confirm(proj.name+' errichten für '+Object.entries(proj.cost).map(([r,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===r)||{}).label).join(', ')+(proj.unlockItem?' + 1x '+(RARE_ITEMS.find(r=>r.key===proj.unlockItem)||{}).name:'')+'? Einmalig, kann nicht rückgängig gemacht werden.')) return;
     pay(proj.cost);
-    state.rareItems[proj.unlockItem] -= 1;
+    if (proj.unlockItem) state.rareItems[proj.unlockItem] -= 1;
     if (!state.megaProjects) state.megaProjects = {};
+    if (!state.exoticResearch) state.exoticResearch = {};
+    if (!state.veteranTraining) state.veteranTraining = {};
     state.megaProjects[key] = true;
     logScoreChange(500, proj.name+' errichtet', 'ti-sparkles');
     log('Mega-Projekt fertiggestellt: '+proj.name+'! '+proj.desc, 'ti-sparkles');
@@ -13426,6 +13538,65 @@
         render(); save();
       });
     }
+
+    const researchSprintBox = document.getElementById('researchSprintBox');
+    if (researchSprintBox){
+      const activeSprint = activeResearchSprint();
+      if (activeSprint){
+        const remain = Math.max(0, activeSprint.expiresAt - Date.now());
+        researchSprintBox.innerHTML = `<div class="card-row" style="border-color:#5dcaa5;">
+          <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-flask" aria-hidden="true"></i></div>
+            <div><div class="bname">Sprint aktiv: +${Math.round((RESEARCH_SPRINT_MULT-1)*100)}% ${(RES_DEFS.find(r=>r.key===activeSprint.res)||{}).label}</div>
+            <div class="bmeta">Noch ${fmtDuration(remain/1000)}</div></div>
+          </div>
+        </div>`;
+      } else {
+        const have = state.resources.forschungspunkte||0;
+        const affordable = have >= RESEARCH_SPRINT_COST;
+        researchSprintBox.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch;">
+          <div class="bmeta" style="margin-bottom:8px;">${fmt(RESEARCH_SPRINT_COST)} Forschungspunkte → +${Math.round((RESEARCH_SPRINT_MULT-1)*100)}% Produktion einer gewählten Ressource für ${fmtDuration(RESEARCH_SPRINT_DURATION_MS/1000)} (vorhanden: ${fmt(have)}).</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            ${RES_DEFS.map(r => `<button data-start-sprint="${r.key}" ${affordable?'':'disabled'} style="font-size:10.5px; flex:1; min-width:100px;"><i class="ti ${r.icon}" aria-hidden="true" style="margin-right:3px; color:${r.fg||r.color||''};"></i>${r.label}</button>`).join('')}
+          </div>
+        </div>`;
+        researchSprintBox.querySelectorAll('[data-start-sprint]').forEach(btn => btn.onclick = () => startResearchSprint(btn.getAttribute('data-start-sprint')));
+      }
+    }
+
+    const exoticResearchBox = document.getElementById('exoticResearchBox');
+    if (exoticResearchBox){
+      exoticResearchBox.innerHTML = EXOTIC_RESEARCH.map(e => {
+        const done = hasExoticResearch(e.key);
+        const have = state.resources.forschungspunkte||0;
+        const affordable = !done && have >= e.cost;
+        return `<div class="card-row" style="${done?'border-color:#5dcaa5;':''}">
+          <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(195,190,245,0.15)'}; color:${done?'#5dcaa5':'#c3bef5'};"><i class="ti ${e.icon}" aria-hidden="true"></i></div>
+            <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${e.name}</div>
+            <div class="bmeta">${e.desc}${done?'':' · '+fmt(e.cost)+' Forschungspunkte'}</div></div>
+          </div>
+          ${done?'':`<button class="buy ${affordable?'affordable':''}" data-unlock-exotic="${e.key}" ${affordable?'':'disabled'}>Erforschen</button>`}
+        </div>`;
+      }).join('');
+      exoticResearchBox.querySelectorAll('[data-unlock-exotic]').forEach(btn => btn.onclick = () => unlockExoticResearch(btn.getAttribute('data-unlock-exotic')));
+    }
+
+    const veteranTrainingBox = document.getElementById('veteranTrainingBox');
+    if (veteranTrainingBox){
+      veteranTrainingBox.innerHTML = VETERAN_TRAINING.map(v => {
+        const done = hasVeteranTraining(v.key);
+        const reqOk = !v.requires || hasVeteranTraining(v.requires);
+        const have = state.resources.forschungspunkte||0;
+        const affordable = !done && reqOk && have >= v.cost;
+        return `<div class="card-row" style="${done?'border-color:#5dcaa5;':''}">
+          <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(226,75,74,0.12)'}; color:${done?'#5dcaa5':'#e24b4a'};"><i class="ti ti-medal" aria-hidden="true"></i></div>
+            <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${v.name}</div>
+            <div class="bmeta">${v.desc}${done?'':' · '+fmt(v.cost)+' Forschungspunkte'+(reqOk?'':' · benötigt '+(VETERAN_TRAINING.find(x=>x.key===v.requires)||{}).name+' zuerst')}</div></div>
+          </div>
+          ${done?'':`<button class="buy ${affordable?'affordable':''}" data-buy-veteran="${v.key}" ${affordable?'':'disabled'}>Ausbilden</button>`}
+        </div>`;
+      }).join('');
+      veteranTrainingBox.querySelectorAll('[data-buy-veteran]').forEach(btn => btn.onclick = () => buyVeteranTraining(btn.getAttribute('data-buy-veteran')));
+    }
     } // Ende Forschung-Tab-Guard
 
     const now = Date.now();
@@ -15013,15 +15184,16 @@
     if (megaProjectsBox){
       megaProjectsBox.innerHTML = MEGA_PROJECTS.map(p => {
         const built = hasMegaProject(p.key);
-        const have = state.rareItems[p.unlockItem]||0;
-        const itemDef = RARE_ITEMS.find(r=>r.key===p.unlockItem)||{};
-        const affordable = !built && have>=1 && canAfford(p.cost);
+        const have = p.unlockItem ? (state.rareItems[p.unlockItem]||0) : 1;
+        const itemDef = p.unlockItem ? (RARE_ITEMS.find(r=>r.key===p.unlockItem)||{}) : null;
+        const reqOk = !p.requiresAllResearchMaxed || allResearchMaxed();
+        const affordable = !built && reqOk && have>=1 && canAfford(p.cost);
         return `<div class="card-row" style="flex-direction:column; align-items:stretch; ${built?'border-color:#5dcaa5;':''}">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.18); color:#fac775;"><i class="ti ${p.icon}" aria-hidden="true"></i></div><div><div class="bname">${built?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${p.name}</div><div class="bmeta">${p.desc}</div></div></div>
             ${built?'':`<button class="buy ${affordable?'affordable':''}" data-buy-mega="${p.key}" ${affordable?'':'disabled'}>Errichten</button>`}
           </div>
-          ${built?'':`<div class="bmeta">Kosten: ${costHtml(p.cost)} + 1x ${itemDef.name||p.unlockItem} (vorhanden: ${have})</div>`}
+          ${built?'':`<div class="bmeta">Kosten: ${costHtml(p.cost)}${itemDef?' + 1x '+(itemDef.name||p.unlockItem)+' (vorhanden: '+have+')':''}${p.requiresAllResearchMaxed?(reqOk?' · <span style="color:#5dcaa5;">alle Forschungen maximiert ✓</span>':' · <span style="color:#f0997b;">benötigt alle Forschungszweige auf Stufe 20</span>'):''}</div>`}
         </div>`;
       }).join('');
       megaProjectsBox.querySelectorAll('[data-buy-mega]').forEach(btn => btn.onclick = () => buildMegaProject(btn.getAttribute('data-buy-mega')));
