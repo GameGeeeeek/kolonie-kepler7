@@ -1296,6 +1296,14 @@
 
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-message" aria-hidden="true"></i>Nachrichten</div>
         <div id="messagesBox"></div>
+        <div id="messageComposeRow" style="display:none; margin-top:10px; gap:8px; flex-direction:column;">
+          <div class="bmeta" id="messageComposeTarget"></div>
+          <textarea id="messageComposeText" placeholder="Nachricht schreiben…" maxlength="500" rows="3" style="width:100%; resize:vertical;"></textarea>
+          <div style="display:flex; gap:8px;">
+            <button id="messageComposeCancelBtn" style="flex:1;">Abbrechen</button>
+            <button id="messageComposeSendBtn" class="attack" style="flex:1;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Senden</button>
+          </div>
+        </div>
 
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-bell" aria-hidden="true"></i>Server-Ereignisse</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Grundlage für künftige Push-Benachrichtigungen: Pakt-Angebote, Weltboss-Kills und anfliegende Überfälle, die der Server mitbekommen hat - einstellbar in den Einstellungen.</div>
@@ -2001,8 +2009,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.36.6';
+  const VERSION = '8.36.7';
   const PATCHNOTES = [
+    { version:'8.36.7', date:'13.07.2026', changes:[
+      'Private Nachrichten ausgebaut: der bisherige Browser-Dialog beim Schreiben/Antworten ist einem richtigen Formular im Berichte-Tab gewichen',
+      'Bug behoben: der "Antworten"-Button bei erhaltenen Nachrichten erschien nie (Feldname-Verwechslung zwischen Frontend und Backend) - jetzt korrekt sichtbar und nutzbar'
+    ]},
     { version:'8.36.6', date:'13.07.2026', changes:[
       'Neues Saisonal-Event: Sommer-Bonus (+10% Ressourcenproduktion, Juni-August, wiederkehrend jedes Jahr) - kombiniert sich mit dem bestehenden Wochenend-Bonus (an einem Sommer-Wochenende zusammen +26,5%)'
     ]},
@@ -8327,20 +8339,46 @@
             <span class="bmeta">${when}</span>
           </div>
           <div class="bmeta" style="margin-top:4px; color:#c7cbe0;">${m.text.replace(/</g,'&lt;')}</div>
-          ${m.fromId ? `<button data-reply-msg="${m.fromId}" data-reply-name="${(m.fromName||'').replace(/"/g,'')}" style="align-self:flex-start; margin-top:6px; font-size:10.5px; padding:4px 9px;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:3px;"></i>Antworten</button>` : ''}
+          ${m.fromUserId ? `<button data-reply-msg="${m.fromUserId}" data-reply-name="${(m.fromName||'').replace(/"/g,'')}" style="align-self:flex-start; margin-top:6px; font-size:10.5px; padding:4px 9px;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:3px;"></i>Antworten</button>` : ''}
         </div>
       `;
     }).join('');
-    box.querySelectorAll('[data-reply-msg]').forEach(btn => btn.onclick = () => sendMessage(btn.getAttribute('data-reply-msg'), btn.getAttribute('data-reply-name')));
+    box.querySelectorAll('[data-reply-msg]').forEach(btn => btn.onclick = () => openMessageCompose(btn.getAttribute('data-reply-msg'), btn.getAttribute('data-reply-name')));
   }
-  async function sendMessage(toUserId, toName){
-    const text = prompt('Nachricht an '+toName+':');
-    if (!text || !text.trim()) return;
+  // Nachrichten-Schreiben (13.07.2026, Feature-Wunsch: bestehendes System ausbauen) - ersetzt den
+  // bisherigen Browser-prompt() durch ein richtiges Inline-Formular im Berichte-Tab. Von zwei Stellen
+  // aus erreichbar: "Antworten" bei einer erhaltenen Nachricht, und "Nachricht" im Spielerprofil
+  // (springt dafür automatisch in den Berichte-Tab, da das Formular dort lebt statt dupliziert zu
+  // werden).
+  let messageComposeTargetId = null;
+  function openMessageCompose(toUserId, toName){
+    switchTab('berichte');
+    messageComposeTargetId = toUserId;
+    const row = document.getElementById('messageComposeRow');
+    const targetLabel = document.getElementById('messageComposeTarget');
+    const textEl = document.getElementById('messageComposeText');
+    if (targetLabel) targetLabel.innerHTML = '<i class="ti ti-mail" aria-hidden="true"></i> Nachricht an '+(toName||'Spieler');
+    if (textEl) textEl.value = '';
+    if (row){ row.style.display = 'flex'; setTimeout(() => row.scrollIntoView({ behavior:'smooth', block:'center' }), 150); }
+  }
+  function closeMessageCompose(){
+    messageComposeTargetId = null;
+    const row = document.getElementById('messageComposeRow');
+    if (row) row.style.display = 'none';
+  }
+  async function submitMessageCompose(){
+    const textEl = document.getElementById('messageComposeText');
+    const text = textEl ? textEl.value.trim() : '';
+    if (!messageComposeTargetId){ log('Kein Empfänger ausgewählt.', 'ti-alert-triangle'); return; }
+    if (!text){ log('Bitte eine Nachricht eingeben.', 'ti-alert-triangle'); return; }
+    const sendBtn = document.getElementById('messageComposeSendBtn');
+    if (sendBtn) sendBtn.disabled = true;
     try {
-      const res = await backendFetch('/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ toUserId, text: text.trim() }) });
-      if (res.ok){ log('Nachricht an '+toName+' gesendet.', 'ti-mail'); }
+      const res = await backendFetch('/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ toUserId: messageComposeTargetId, text }) });
+      if (res.ok){ log('Nachricht gesendet.', 'ti-mail'); closeMessageCompose(); }
       else { log('Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
     } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
+    finally { if (sendBtn) sendBtn.disabled = false; }
   }
   function formatRelativeTime(ts){
     if (!ts) return 'unbekannt';
@@ -8402,7 +8440,7 @@
     } else if (profileFleetSummaryEl){
       profileFleetSummaryEl.innerHTML = '';
     }
-    msgBtn.onclick = () => { closePlayerProfile(); sendMessage(entry.id, entry.name); };
+    msgBtn.onclick = () => { closePlayerProfile(); openMessageCompose(entry.id, entry.name); };
     if (spyBtn) spyBtn.onclick = () => { closePlayerProfile(); sendSpyMission(entry.id, entry.name); };
     const inviteBtn = document.getElementById('profileAllianceInviteBtn');
     if (inviteBtn){
@@ -9753,6 +9791,7 @@
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (gedeckelt bei +10%, additiv zu den anderen globalen Boni). Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
       { title:'Spieler melden', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du unangemessenes Verhalten (z.B. einen anstößigen Namen) melden - kurze Begründung reicht. Spieler-/Allianznamen werden außerdem automatisch beim Anlegen auf eindeutig unangemessene Begriffe geprüft. Nur mit eigenem Server verfügbar.' },
+      { title:'Private Nachrichten', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) oder direkt bei einer erhaltenen Nachricht im Berichte-Tab ("Antworten") kannst du einem einzelnen Spieler schreiben - unabhängig von Allianz und ohne den öffentlichen Chat. Erhaltene Nachrichten stehen im Berichte-Tab, die letzten 60 werden aufgehoben. Nur mit eigenem Server verfügbar.' },
       { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Beim ersten Login der neuen Woche wird die Vorwoche abgerechnet und die Belohnung gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 12 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 6 Min., <strong>Silber</strong> 400 + 3 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Wer den Wochenwechsel verpasst, wird anhand des letzten bekannten Stands eingestuft. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
@@ -13379,7 +13418,7 @@
     const previewFleetForMap = buildAttackFleet(state.activeBasePlanet, currentFleet());
     const previewPartsForMap = ATTACK_SHIP_KEYS.filter(k => (previewFleetForMap[k]||0) > 0).map(k => previewFleetForMap[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ') || 'keine Schiffe (erst im Galaxie-Tab auswählen)';
     if (confirm(username+' angreifen? Wird mit '+previewPartsForMap+' angegriffen (Flugzeit abhängig von Entfernung), Ergebnis kommt erst bei Ankunft. ("Abbrechen" für Nachricht senden)')) attackPlayer(userId, username);
-    else sendMessage(userId, username);
+    else openMessageCompose(userId, username);
   }
 
   const SUN_X = 350, SUN_Y = 115;
@@ -14321,7 +14360,7 @@
     }).join('');
     document.querySelectorAll('[data-spy]').forEach(btn => btn.addEventListener('click', (ev) => { ev.stopPropagation(); sendSpyMission(btn.getAttribute('data-spy'), btn.getAttribute('data-spyname')); }));
     document.querySelectorAll('[data-duel]').forEach(btn => btn.addEventListener('click', (ev) => { ev.stopPropagation(); attackPlayer(btn.getAttribute('data-duel'), btn.getAttribute('data-duelname')); }));
-    document.querySelectorAll('[data-msg]').forEach(btn => btn.addEventListener('click', (ev) => { ev.stopPropagation(); sendMessage(btn.getAttribute('data-msg'), btn.getAttribute('data-msgname')); }));
+    document.querySelectorAll('[data-msg]').forEach(btn => btn.addEventListener('click', (ev) => { ev.stopPropagation(); openMessageCompose(btn.getAttribute('data-msg'), btn.getAttribute('data-msgname')); }));
     document.querySelectorAll('[data-profile]').forEach(row => row.addEventListener('click', () => {
       const id = row.getAttribute('data-profile');
       if (!id) return;
@@ -17117,6 +17156,10 @@
     if (allianceWarDeclareBtn && allianceWarTagInput){
       allianceWarDeclareBtn.onclick = () => declareWar(allianceWarTagInput.value);
     }
+    const messageComposeCancelBtn = document.getElementById('messageComposeCancelBtn');
+    if (messageComposeCancelBtn) messageComposeCancelBtn.onclick = closeMessageCompose;
+    const messageComposeSendBtn = document.getElementById('messageComposeSendBtn');
+    if (messageComposeSendBtn) messageComposeSendBtn.onclick = submitMessageCompose;
     const reportPlayerCancelBtn = document.getElementById('reportPlayerCancelBtn');
     if (reportPlayerCancelBtn) reportPlayerCancelBtn.onclick = () => {
       const row = document.getElementById('reportPlayerFormRow');
