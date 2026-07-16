@@ -2356,8 +2356,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.49.1';
+  const VERSION = '8.50.0';
   const PATCHNOTES = [
+    { version:'8.50.0', date:'16.07.2026', changes:[
+      'Treibstoff nach Antriebsart: Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken jetzt tatsächlich Antimaterie statt Deuterium - bisher wurde das nur im Flotte-Tab angezeigt, real zahlten alle Missionen ausschließlich Deuterium. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen (Gesamtkosten unverändert, nur die Aufteilung ist neu). Betrifft Angriffe, Expeditionen (Forschungsschiff!), Spionage, Weltboss, Piratenversteck, Piraten-Abfangen und Flottenverlegungen - alle Kosten-Vorschauen und Logmeldungen zeigen die Aufteilung mit an'
+    ]},
     { version:'8.49.1', date:'16.07.2026', changes:[
       'Bugfix Spielerprofil: die "bin ich das?"-Erkennung im Profil-Popup (Angriff/Nachricht/Spähen-Buttons) verglich noch Name+Kampfpunkte statt der Spieler-ID - derselbe Fehler, der in der Bestenliste bereits in 8.48.1 behoben wurde, war hier an einer vierten Stelle übersehen worden'
     ]},
@@ -6452,6 +6455,38 @@
     if (doc) cost *= doc.fuelMult;
     return Math.max(1, Math.round(cost));
   }
+  // Treibstoff-Split nach Antriebsart (16.07.2026, Feature-Wunsch): Schiffe mit Hyperraumtriebwerk
+  // tanken laut DRIVE_INFO Antimaterie - bisher wurde das nur ANGEZEIGT (Flotte-Tab), real zahlten
+  // aber alle Missionen ausschließlich Deuterium. Jetzt zahlen gemischte Flotten anteilig nach
+  // Schiffszahl: die Gesamtkosten kommen unverändert aus missionFuelCost (Formel bleibt eine
+  // einzige Wurzel über die Gesamtzahl, siehe Verband-Bugfix oben), aufgeteilt wird erst danach -
+  // Deuterium-Anteil = Nicht-Hyperraum-Schiffe, Antimaterie-Anteil = Hyperraum-Schiffe.
+  function shipFuelType(shipKey){
+    if (shipKey === 'superschlachtschiff') return 'antimaterie'; // Hyperraum, steht nicht in SHIP_DEFS
+    const def = SHIP_DEFS.find(d=>d.key===shipKey);
+    return (DRIVE_INFO[(def||{}).drive]||{}).fuel || 'deuterium';
+  }
+  function missionFuelCostSplit(durationSec, composition){
+    let total = 0, anti = 0;
+    for (const [k,v] of Object.entries(composition||{})){
+      if (typeof v !== 'number' || v <= 0) continue; // überspringt z.B. das missions-Array in Flotten-Objekten
+      total += v;
+      if (shipFuelType(k) === 'antimaterie') anti += v;
+    }
+    const cost = missionFuelCost(durationSec, total);
+    const antiCost = total > 0 ? Math.round(cost * anti / total) : 0;
+    const fuel = {};
+    if (cost - antiCost > 0) fuel.deuterium = cost - antiCost;
+    if (antiCost > 0) fuel.antimaterie = antiCost;
+    if (!Object.keys(fuel).length) fuel.deuterium = cost; // Mindestkosten auch bei leerer Zusammensetzung
+    return fuel;
+  }
+  function fuelCostText(fuel){
+    return Object.entries(fuel).map(([r,a])=>a+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r)).join(' + ');
+  }
+  function fuelCostIconHtml(fuel){
+    return Object.entries(fuel).map(([r,a])=>miniResIcon(r)+' '+a).join(' + ');
+  }
   function pay(cost){ for (const [r,amt] of Object.entries(cost)) state.resources[r] -= amt; }
   // Zentrale Gutschreibungs-Funktion für Ressourcen-Gewinne aus JEDER Quelle (Belohnungen, Beute,
   // Erstattungen, Handelsrouten-Bonus, Entdeckungen, Überfälle, ...) - respektiert konsequent den
@@ -7319,17 +7354,17 @@
     const planet = PLANETS.find(p=>p.id===planetId);
     const cost = colonizeCostFor(planetId);
     const dur = missionDurationFor(planet.duration, { colonyShips:1 }, ['colonyShips']);
-    const fuelCost = missionFuelCost(dur, 1);
+    const fuel = missionFuelCostSplit(dur, { colonyShips:1 });
     const totalCost = Object.assign({}, cost);
-    totalCost.deuterium = (totalCost.deuterium||0) + fuelCost;
-    if (!canAfford(totalCost)){ log('Nicht genug Ressourcen (inkl. '+fuelCost+' Treibstoff Flugkosten) zur Kolonisierung.', 'ti-alert-triangle'); return; }
+    for (const [fr,fa] of Object.entries(fuel)) totalCost[fr] = (totalCost[fr]||0) + fa;
+    if (!canAfford(totalCost)){ log('Nicht genug Ressourcen (inkl. '+fuelCostText(fuel)+' Treibstoff Flugkosten) zur Kolonisierung.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
     pay(totalCost);
     cf.colonyShips -= 1;
     const fleetName = resolveFleetName();
     cf.missions.push({ id: nextMissionId(), type:'colonize', targetId: planetId, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName });
     trackEvent('colonize_started');
-    log(fleetName+': Kolonieschiff unterwegs nach '+planet.name+' (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-planet');
+    log(fleetName+': Kolonieschiff unterwegs nach '+planet.name+' (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-planet');
     render(); save();
   }
   // Monde: günstiger zu kolonisieren als ein richtiger Planet, dafür mit MOON_PENALTY
@@ -7365,16 +7400,16 @@
     if (slotsUsed >= cf.colonyShips){ log('Alle Kolonieschiffe dort sind bereits unterwegs.', 'ti-alert-triangle'); return; }
     const cost = moonColonizeCostFor(parentKey);
     const dur = missionDurationFor(moonBaseDuration(parentKey), { colonyShips:1 }, ['colonyShips']);
-    const fuelCost = missionFuelCost(dur, 1);
+    const fuel = missionFuelCostSplit(dur, { colonyShips:1 });
     const totalCost = Object.assign({}, cost);
-    totalCost.deuterium = (totalCost.deuterium||0) + fuelCost;
-    if (!canAfford(totalCost)){ log('Nicht genug Ressourcen (inkl. '+fuelCost+' Treibstoff Flugkosten) zur Kolonisierung.', 'ti-alert-triangle'); return; }
+    for (const [fr,fa] of Object.entries(fuel)) totalCost[fr] = (totalCost[fr]||0) + fa;
+    if (!canAfford(totalCost)){ log('Nicht genug Ressourcen (inkl. '+fuelCostText(fuel)+' Treibstoff Flugkosten) zur Kolonisierung.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
     pay(totalCost);
     cf.colonyShips -= 1;
     const fleetName = resolveFleetName();
     cf.missions.push({ id: nextMissionId(), type:'colonize-moon', targetId: parentKey, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName });
-    log(fleetName+': Kolonieschiff unterwegs zum Mond bei '+planetDisplayName(parentKey)+' (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-planet');
+    log(fleetName+': Kolonieschiff unterwegs zum Mond bei '+planetDisplayName(parentKey)+' (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-planet');
     render(); save();
   }
 
@@ -7805,10 +7840,10 @@
     const dur = state.activeBasePlanet === raid.planetKey ? 20 : relocationDuration(state.activeBasePlanet, raid.planetKey, relevantKeys[0]);
     const remainMs = raid.endTime - Date.now();
     if (dur*1000 >= remainMs){ log('Die Flugzeit (~'+Math.round(dur)+'s) reicht nicht mehr, um die Piraten rechtzeitig abzufangen (nur noch '+Math.round(remainMs/1000)+'s bis sie abziehen).', 'ti-alert-triangle'); return; }
-    const fuelCost = missionFuelCost(dur, totalSelected);
-    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium): benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    const fuel = missionFuelCostSplit(dur, attackFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
-    pay({deuterium: fuelCost});
+    pay(fuel);
     const fleetName = resolveFleetName();
     const power = attackPower(attackFleet, state.activeBasePlanet);
     cf.missions.push({ id: nextMissionId(), type:'intercept-pirates', targetId: raid.planetKey, startTime: Date.now(), endTime: Date.now()+dur*1000, power, fleetName, composition: attackFleet });
@@ -8967,8 +9002,10 @@
     if (slotsUsed >= scoutCapacity){ log('Alle Spähschiffe/Spionagekreuzer dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const baseDur = pseudoDistanceSeconds(playerId);
     const dur = missionDurationFor(baseDur, { spaeher: cf.spaeher||0, spionageschiff: cf.spionageschiff||0 }, ['spaeher','spionageschiff']);
-    const fuelCost = missionFuelCost(dur, 1);
-    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    // Spähschiff wie Spionagekreuzer fliegen mit Hyperraumtriebwerk - Treibstoff ist hier also
+    // Antimaterie, nicht Deuterium (siehe missionFuelCostSplit).
+    const fuel = missionFuelCostSplit(dur, (cf.spaeher||0) > 0 ? { spaeher:1 } : { spionageschiff:1 });
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Mission: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     const entry = await loadPlayerEntry(playerId);
     if (!entry){ log('Spielerdaten nicht verfügbar.', 'ti-alert-triangle'); return; }
     // Spionage setzt voraus, dass du bereits mindestens einen Planeten im Heimatsystem des Ziels
@@ -8979,10 +9016,10 @@
       return;
     }
     if (fleetLimitBlocks()) return;
-    pay({deuterium: fuelCost});
+    pay(fuel);
     const fleetName = resolveFleetName();
     cf.missions.push({ id: nextMissionId(), type:'spy-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, pendingIntel: entry });
-    log(fleetName+' (Spähschiff) von '+planetDisplayName(state.activeBasePlanet)+' Richtung '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-target');
+    log(fleetName+' (Spähschiff) von '+planetDisplayName(state.activeBasePlanet)+' Richtung '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-target');
     render(); save();
   }
   function resolveSpyMission(m, planetKey, showLog){
@@ -9010,8 +9047,8 @@
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const baseDur = pseudoDistanceSeconds(playerId);
     const dur = missionDurationFor(baseDur, attackFleet, ATTACK_SHIP_KEYS);
-    const fuelCost = missionFuelCost(dur, totalSelected);
-    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    const fuel = missionFuelCostSplit(dur, attackFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Mission: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     const cargoCapacity = fleetCargoCapacity(attackFleet);
     // Kriegsbonus: falls das Ziel Mitglied einer Allianz ist, mit der die eigene Allianz im Krieg
     // liegt, gibt ein erfolgreicher Angriff +50% Kampfpunkte und zählt für den Kriegspunktestand.
@@ -9045,11 +9082,11 @@
     // war. Der Server-Kampf wird jetzt erst bei tatsächlicher Ankunft ausgelöst (siehe
     // resolvePlayerAttackMission), genau wie beim Weltboss und Piratenversteck.
     if (fleetLimitBlocks()) return;
-    pay({deuterium: fuelCost});
+    pay(fuel);
     const fleetName = resolveFleetName();
     cf.missions.push({ id: nextMissionId(), type:'attack-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, composition: attackFleet, cargoCapacity, isWarAttack, targetAllianceTag });
     trackEvent('attack_sent');
-    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen Spieler '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-sword');
+    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen Spieler '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }
   async function resolvePlayerAttackMission(m, planetKey, showLog, fleet){
@@ -10839,7 +10876,7 @@
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
       { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt.' },
       { title:'Missionen & Flugzeit', body:'Angriffe, Überfälle, Expeditionen und Kolonisierungen laufen über Missionen mit echter Flugzeit (abhängig von Entfernung und langsamstem Schiff in der Flotte). Während der Flugzeit ist die Flotte unterwegs und zählt nicht zur Verteidigung am Ausgangsplaneten.' },
-      { title:'Treibstoffkosten (Deuterium)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Deuterium als Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
+      { title:'Treibstoffkosten (Deuterium & Antimaterie)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). <strong>Welche Ressource verbraucht wird, hängt vom Antrieb ab:</strong> Schiffe mit Verbrennungs- oder Impulstriebwerk tanken Deuterium, Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken Antimaterie. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen. Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
       { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren und Spionage - <strong>Flottenverlegungen zwischen eigenen Planeten zählen bewusst nicht mit</strong>, da reine interne Logistik. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
       { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine verlassene Flotte. Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe.' },
       { title:'Fragmente & kosmetische Avatare', body:'Statt eines vollen seltenen Materials (Antimateriekern, Kristallherz, Alte Technologie) kann auch ein <strong>Fragment</strong> davon gefunden werden - häufiger, aber schwächer. Sind <strong>4 Fragmente</strong> desselben Typs im Inventar (Fortschritt-Tab), lassen sie sich per Knopfdruck zu 1x dem vollen Material zusammensetzen. Ebenfalls über Expeditionen erhältlich: drei <strong>exklusive Avatare</strong> (Nova, Void, Phoenix), die sonst nirgends wählbar sind - einmal gefunden dauerhaft freigeschaltet und in den Einstellungen auswählbar. Ist ein kosmetischer Fund bereits freigeschaltet, gibt es stattdessen Ersatz-Ressourcen, kein doppelter Nutzen.' }
@@ -13564,15 +13601,15 @@
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     if (cf.missions.some(m=>m.type==='worldboss')){ log('Es läuft bereits ein Angriff auf den Weltboss von diesem Standort.', 'ti-alert-triangle'); return; }
     const dur = missionDurationFor(90 + b.level*10, attackFleet, ATTACK_SHIP_KEYS);
-    const fuelCost = missionFuelCost(dur, totalSelected);
-    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    const fuel = missionFuelCostSplit(dur, attackFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Mission: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
-    pay({deuterium: fuelCost});
+    pay(fuel);
     const fleetName = resolveFleetName();
     const power = attackPower(attackFleet, state.activeBasePlanet);
     cf.missions.push({ id: nextMissionId(), type:'worldboss', targetId: b.bossId, bossLevel: b.level, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet });
     state.worldBossLastAttack = Date.now();
-    log(fleetName+' greift den '+worldBossName(b.level)+' an (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff: '+fuelCost+' Deuterium.', 'ti-skull');
+    log(fleetName+' greift den '+worldBossName(b.level)+' an (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff: '+fuelCostText(fuel)+'.', 'ti-skull');
     render(); save();
   }
   function renderWorldBoss(){
@@ -14478,17 +14515,17 @@
     // skipFuelCharge (Bugfix 16.07.2026, Treibstoff-Audit): wird von relocateFleetGroup gesetzt, die
     // den Treibstoff bereits EINMAL für den gesamten Verband berechnet und bezahlt hat - hier also
     // nicht noch einmal pro Einzeltyp berechnen/abziehen (siehe dortiger Kommentar für den Hintergrund).
-    let fuelCost = 0;
+    let fuel = null;
     if (!skipFuelCharge){
-      fuelCost = missionFuelCost(dur, amount);
-      if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Verlegung: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
-      pay({deuterium: fuelCost});
+      fuel = missionFuelCostSplit(dur, { [shipKey]: amount });
+      if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Verlegung: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+      pay(fuel);
     }
     fromFleet[shipKey] -= amount;
     fromFleet.missions = fromFleet.missions || [];
     const fleetName = forcedFleetName || nextFleetName();
     fromFleet.missions.push({ id: nextMissionId(), type:'relocate', shipKey, qty: amount, targetId: toPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName });
-    if (!skipFuelCharge) log(fleetName+': '+amount+'x '+(def?def.name:shipKey)+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-arrows-shuffle');
+    if (!skipFuelCharge) log(fleetName+': '+amount+'x '+(def?def.name:shipKey)+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-arrows-shuffle');
     if (!forcedDur) { render(); save(); }
   }
   // Flottenverband: mehrere Schiffstypen gleichzeitig verlegen statt jeden einzeln – alle kommen
@@ -14515,14 +14552,13 @@
     // eine gleich große Flotte eines einzigen Typs, obwohl Angriffs-/Expeditionsmissionen die
     // Gesamtschiffszahl schon immer in einem einzigen Aufruf übergeben haben - eine Inkonsistenz
     // zwischen den Missionsarten.
-    const totalAmount = keys.reduce((a,k)=>a+amounts[k], 0);
-    const totalFuel = missionFuelCost(groupDur, totalAmount);
-    if (!canAfford({deuterium: totalFuel})){ log('Nicht genug Treibstoff (Deuterium) für den Verband: benötigt '+totalFuel+'.', 'ti-alert-triangle'); return; }
-    pay({deuterium: totalFuel});
+    const totalFuel = missionFuelCostSplit(groupDur, amounts);
+    if (!canAfford(totalFuel)){ log('Nicht genug Treibstoff für den Verband: benötigt '+fuelCostText(totalFuel)+'.', 'ti-alert-triangle'); return; }
+    pay(totalFuel);
     const fleetName = resolveFleetName();
     const summary = keys.map(k => amounts[k]+'x '+(shipDefOrSuper(k)||{name:k}).name).join(', ');
     for (const k of keys) relocateShips(fromPlanet, toPlanet, k, amounts[k], groupDur, fleetName, true);
-    log(fleetName+' (Verband): '+summary+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(groupDur)+'s Flugzeit, gemeinsame Ankunft). Treibstoff verbraucht: '+totalFuel+' Deuterium.', 'ti-arrows-shuffle');
+    log(fleetName+' (Verband): '+summary+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(groupDur)+'s Flugzeit, gemeinsame Ankunft). Treibstoff verbraucht: '+fuelCostText(totalFuel)+'.', 'ti-arrows-shuffle');
     render(); save();
   }
 
@@ -15535,14 +15571,14 @@
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const npc = NPCS.find(n => n.id === npcId);
     const dur = missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS);
-    const fuelCost = missionFuelCost(dur, totalSelected);
-    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    const fuel = missionFuelCostSplit(dur, attackFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Mission: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
-    pay({deuterium: fuelCost});
+    pay(fuel);
     const fleetName = resolveFleetName();
     const power = attackPower(attackFleet, state.activeBasePlanet);
     cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet });
-    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen '+npc.name+' gestartet (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-sword');
+    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen '+npc.name+' gestartet (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }
 
@@ -15557,14 +15593,14 @@
     const stage = state.pirateLairStage || 1;
     // Flugzeit wächst mit der Stufe (tiefere Verstecke liegen weiter draußen).
     const dur = missionDurationFor(60 + stage*15, attackFleet, ATTACK_SHIP_KEYS);
-    const fuelCost = missionFuelCost(dur, totalSelected);
-    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    const fuel = missionFuelCostSplit(dur, attackFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Mission: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
-    pay({deuterium: fuelCost});
+    pay(fuel);
     const fleetName = resolveFleetName();
     const power = attackPower(attackFleet, state.activeBasePlanet);
     cf.missions.push({ id: nextMissionId(), type:'piratelair', targetId: stage, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet });
-    log(fleetName+' greift '+pirateLairName(stage)+' an (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff: '+fuelCost+' Deuterium.', 'ti-sword');
+    log(fleetName+' greift '+pirateLairName(stage)+' an (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }
 
@@ -15714,13 +15750,14 @@
       const def = k==='superschlachtschiff' ? {name:'Superschlachtschiff'} : SHIP_DEFS.find(d=>d.key===k);
       return escortFleet[k]+'x '+def.name;
     }).join(', ') || 'keine Eskorte';
-    const escortShipCount = 1 + ESCORT_KEYS.reduce((a,k)=>a+(escortFleet[k]||0),0);
-    const fuelCost = missionFuelCost(dur, escortShipCount);
-    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Expedition: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    // escortFleet enthält das Forschungsschiff (forscher:1, Hyperraum -> Antimaterie) plus Eskorte -
+    // entspricht exakt der bisherigen Schiffszahl (1 + Eskorte) für die Kostenformel.
+    const fuel = missionFuelCostSplit(dur, escortFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Expedition: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
-    pay({deuterium: fuelCost});
+    pay(fuel);
     cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: et.encounterChance, rewardMult: et.rewardMult });
-    log(fleetName+' ('+et.name+') von '+planetDisplayName(state.activeBasePlanet)+' in unerforschten Raum aufgebrochen. Eskorte: '+escortSummary+' (Kampfkraft '+Math.round(escortPower)+'). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-map-2');
+    log(fleetName+' ('+et.name+') von '+planetDisplayName(state.activeBasePlanet)+' in unerforschten Raum aufgebrochen. Eskorte: '+escortSummary+' (Kampfkraft '+Math.round(escortPower)+'). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-map-2');
     render(); save();
   }
 
@@ -17180,8 +17217,7 @@
           </div>
         `;
       }).join('');
-      const expEscortShipCount = 1 + ESCORT_KEYS.reduce((a,k)=>a+(escortFleet[k]||0),0);
-      const expFuelCost = missionFuelCost(dur, expEscortShipCount);
+      const expFuel = missionFuelCostSplit(dur, escortFleet);
       setHtmlPreservingScroll(expeditionBox, `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
           <div class="bmeta"><i class="ti ti-adjustments" aria-hidden="true"></i> Expeditionstyp:</div>
@@ -17205,7 +17241,7 @@
             <span class="bmeta"><i class="ti ti-map-2" aria-hidden="true"></i> Forschungsschiffe verfügbar: ${forscherAvailable} von ${cf.forscher||0}</span>
             <span class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Dauer: ca. ${Math.round(dur/60)} Min.</span>
           </div>
-          <div class="bmeta">${miniResIcon('deuterium')} Treibstoff: ~${expFuelCost}${!canAfford({deuterium:expFuelCost})?' <span style="color:#e24b4a;">(nicht genug)</span>':''}${(state.expeditionsCompleted||0)>=10?' · <span style="color:#5dcaa5;">Erfahrene Crew: +'+Math.round((expeditionExperienceMult()-1)*100)+'% Beute</span>':''}</div>
+          <div class="bmeta">Treibstoff: ~${fuelCostIconHtml(expFuel)}${!canAfford(expFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}${(state.expeditionsCompleted||0)>=10?' · <span style="color:#5dcaa5;">Erfahrene Crew: +'+Math.round((expeditionExperienceMult()-1)*100)+'% Beute</span>':''}</div>
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:16px; font-weight:600; color:#5dcaa5;"><i class="ti ti-sword" aria-hidden="true"></i> Eskort-Kampfkraft: ${Math.round(escortPower)}</span>
             <button class="buy ${canSendExp?'affordable':''}" id="sendExpeditionBtn" ${canSendExp?'':'disabled'}><i class="ti ti-map-2" aria-hidden="true" style="margin-right:4px;"></i>Expedition starten</button>
@@ -17283,14 +17319,14 @@
                 ${availableHere.map(d => {
                   const count = sourceEntry.fleet[d.key]||0;
                   const dur = relocationDuration(relocateSourcePlanet, state.activeBasePlanet, d.key);
-                  const fuelCost = missionFuelCost(dur, count);
+                  const fuel = missionFuelCostSplit(dur, { [d.key]: count });
                   return `
                     <div class="card-row" style="padding:0.6rem 0.8rem;">
                       <div class="left">
                         <div class="bicon" style="width:32px; height:32px; background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${d.key}" width="26" height="26" style="display:block;"></canvas></div>
                         <div>
                           <div class="bname" style="font-size:12.5px;">${d.name} <span class="lvl-pill">${count} vorhanden</span></div>
-                          <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ~${Math.round(dur)}s Flugzeit · ${miniResIcon('deuterium')} ~${fuelCost} Treibstoff (bei ${count})</div>
+                          <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ~${Math.round(dur)}s Flugzeit · ~${fuelCostIconHtml(fuel)} Treibstoff (bei ${count})</div>
                         </div>
                       </div>
                       <div style="display:flex; align-items:center; gap:6px;">
@@ -17834,7 +17870,7 @@
       const wins = npcScalingCount(n.id);
       const chance = Math.round(Math.max(0.05, Math.min(0.95, power/(power+effDefense)))*100);
       const flightTime = missionDurationFor(n.duration, attackFleet, ATTACK_SHIP_KEYS);
-      const atkFuelCost = missionFuelCost(flightTime, totalSelected);
+      const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
       return `
         <div class="card-row">
@@ -17843,7 +17879,7 @@
             <div>
               <div class="bname">${n.name} <span class="lvl-pill">Stufe ${n.level}</span>${wins?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;"><i class="ti ti-arrow-up" aria-hidden="true"></i> ${wins}x besiegt</span>`:''}</div>
               <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
-              <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${flightTime.toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${atkFuelCost} Treibstoff${!canAfford({deuterium:atkFuelCost})?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
+              <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${flightTime.toFixed(0)}s Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
               <div class="bmeta" style="${atkCargoCapacity<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität: ${fmt(atkCargoCapacity)}${atkCargoCapacity<=0?' – ohne Frachter geht die Beute verloren!':''}</div>
               <div class="bcost">${rewardHtml(effLoot)}</div>
             </div>
