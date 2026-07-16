@@ -2337,8 +2337,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.44.0';
+  const VERSION = '8.44.1';
   const PATCHNOTES = [
+    { version:'8.44.1', date:'16.07.2026', changes:[
+      'Bugfix (danke für den Report mit Screenshot): Heimatbasis auf der Sektorkarte konnte je nach zugewiesenem Orbit-Slot direkt in der Sonne bzw. deren Leuchten liegen - die Umlaufbahn der Heimatbasis war eine sehr flache Ellipse, bei senkrechten Winkeln landete sie nur 17px vom Sonnenzentrum entfernt (deutlich innerhalb des 34px-Glow-Radius). Nur 2 von 8 möglichen Positionen waren wirklich sicher. Jetzt ein echter Kreis mit einheitlichem Sicherheitsabstand bei jeder möglichen Position'
+    ]},
     { version:'8.44.0', date:'16.07.2026', changes:[
       'Galaxie deutlich erweitert: alle bestehenden Sternsysteme (außer den beiden versteckten Endgame-Anomalien Zenith/Tiefsee) haben jetzt 5-10 Planeten statt vorher teils nur 2-4, plus 20 komplett neue Sonnensysteme mit eigenen Namen, über das gesamte Schwierigkeitsspektrum verteilt (von sehr leicht für neue Spieler bis anspruchsvoller als die bisher schwersten regulären Systeme). Insgesamt jetzt 499 statt 185 Planeten in 69 statt 49 Systemen. Planetentyp-Verteilung dabei bewusst ausbalanciert (vorher stark durch Wasserwelt/Gasriese/Erdähnlich/Asteroid dominiert, jetzt liegen alle neun natürlichen Typen zwischen 8-12%), Superplaneten bleiben mit nur 3% alle Planeten extrem selten und sinnvoll über verschiedene Systeme verteilt statt geklumpt'
     ]},
@@ -14401,9 +14404,17 @@
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
   }
   function homeSlotXY(slot){
-    const rx = 58, ry = 17;
+    // Bugfix (danke an den Bug-Report mit Screenshot): war vorher eine sehr flache Ellipse
+    // (rx:58, ry:17) - bei senkrechten Slot-Winkeln (90°/270°) landete die Heimatbasis dadurch nur
+    // 17px vom Sonnenzentrum entfernt, deutlich INNERHALB des Sonnen-Glow-Radius (34px) und wirkte
+    // wie in die Sonne hineingerendert. Nur 2 von 8 möglichen Slots (0°/180°, rein horizontal) waren
+    // wirklich sicher, die übrigen 6 überlappten leicht bis stark. Jetzt ein echter Kreis (r:50) statt
+    // einer Ellipse - garantiert bei JEDEM Slot-Winkel denselben, ausreichenden Sicherheitsabstand zum
+    // Glow (50-10 Basis-Radius = 40px Rand, 6px Puffer zum Glow), bleibt aber weiterhin deutlich
+    // näher an der Sonne als der erste echte Planeten-Orbit (rx:85).
+    const r = 50;
     const rad = ((slot||0) * 45) * Math.PI/180;
-    return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
+    return { x: SUN_X + r*Math.cos(rad), y: SUN_Y + r*Math.sin(rad) };
   }
   function npcMarkerXY(){
     const rx = 78, ry = 24;
