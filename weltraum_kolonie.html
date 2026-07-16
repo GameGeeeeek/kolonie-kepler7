@@ -652,6 +652,17 @@
     .qty-select { display:flex; gap:6px; margin-bottom:1rem; }
     .qty-btn { background:rgba(255,255,255,0.05); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:9px; padding:5px 11px; font-size:11.5px; cursor:pointer; }
     .qty-btn.active { background:rgba(var(--secondary-rgb), 0.22); border-color:var(--c-secondary-dark); color:#fff; }
+    /* Analytics-Dashboard (16.07.2026, optische/funktionale Überarbeitung auf Feature-Wunsch) - eigene
+       Chart.js-Diagramme statt reiner CSS-Balken. Container-Höhen fest, damit Chart.js' responsive
+       Breitenanpassung (maintainAspectRatio:false) sauber greift; auf schmalen Bildschirmen etwas
+       niedriger, damit nicht zu viel gescrollt werden muss. */
+    .analytics-chart-box { position:relative; height:230px; margin-bottom:1.3rem; }
+    .analytics-chart-box.tall { height:340px; }
+    @media (max-width:480px) {
+      .analytics-chart-box { height:190px; }
+      .analytics-chart-box.tall { height:280px; }
+    }
+    .analytics-summary-pill { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,0.05); border:0.5px solid rgba(255,255,255,0.1); border-radius:20px; padding:6px 13px; font-size:12px; color:#c7cbe0; }
 
     .map-wrap { position:relative; border-radius:14px; overflow:hidden; background:radial-gradient(ellipse at 15% 20%, #171c34, #0a0d1a 70%); margin-bottom:1rem; height:230px; }
     .system-nav { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:1rem; background:rgba(255,255,255,0.04); border:0.5px solid rgba(255,255,255,0.09); border-radius:12px; padding:8px 6px; }
@@ -2325,8 +2336,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.41.1';
+  const VERSION = '8.42.0';
   const PATCHNOTES = [
+    { version:'8.42.0', date:'16.07.2026', changes:[
+      'Analytics-Dashboard (Admin-Bereich) komplett überarbeitet: moderne, interaktive Chart.js-Diagramme statt reiner CSS-Balken, mit Tooltips beim Überfahren, ein-/ausblendbaren Datenreihen (Legende anklicken), flüssigen Animationen und einheitlichem Spiel-Design. Neue Zeitraum-Auswahl (24 Std. / 7 Tage / 30 Tage / Gesamt) - dafür speichert das Backend jetzt zusätzlich stündliche Aggregate (bisher nur tägliche), damit die 24-Stunden-Ansicht echte Stundenwerte statt eines einzelnen Tagespunkts zeigt. Weiterhin reine Aggregate ohne Einzelverfolgung, Stunden-Daten werden nach 72 Std. bereinigt'
+    ]},
     { version:'8.41.1', date:'16.07.2026', changes:[
       'Flottenentsendelimit jetzt direkt im rechten Seitenmenü sichtbar (Bereich "Flottenposition"), z.B. "(3/6)" - zeigt auf einen Blick, wie viele Flottenmissionen aktuell laufen und wie viele noch möglich sind, ohne extra in den Flotte-Tab wechseln zu müssen. Färbt sich rot ein, sobald das Limit erreicht ist. Flottenverlegungen zwischen eigenen Planeten zählen wie überall sonst im Spiel bewusst nicht mit'
     ]},
@@ -8947,49 +8961,173 @@
     } else {
       if (reportsList) reportsList.style.display = 'none';
       if (analyticsView) analyticsView.style.display = 'block';
-      if (sub) sub.textContent = 'Nutzungsstatistik (letzte 14 Tage)';
+      if (sub) sub.textContent = 'Nutzungsstatistik';
       loadAdminAnalytics();
     }
   }
-  // Analytics-Dashboard (13.07.2026, Feature-Wunsch: echte Nutzungsdaten statt Vermutung) - simples
-  // Balken-Diagramm für tägliche aktive Nutzer + sortierte Ereignisliste, komplett mit CSS/divs statt
-  // einer Chart-Bibliothek (bei 14 Datenpunkten unnötig).
+  // Analytics-Dashboard (13.07.2026 Grundversion, 16.07.2026 optisch/funktional überarbeitet auf
+  // Feature-Wunsch: modernere Diagramme statt reiner CSS-Balken, Zeitraum-Auswahl, Tooltips,
+  // ein-/ausblendbare Datenreihen, Animationen). Nutzt Chart.js (per CDN, lazy geladen - nur die
+  // Handvoll Personen, die je den Admin-Bereich öffnen, laden die Bibliothek überhaupt herunter,
+  // nicht jeder Spielbesuch). Zeitraum-Parameter geht direkt an das Backend (siehe dortige
+  // granularity: 'hour'/'day' Unterscheidung) statt clientseitig zu filtern, da 24h echte
+  // Stunden-Aggregate braucht, die serverseitig separat vorgehalten werden.
+  const ANALYTICS_PALETTE = ['#7f77dd','#5dcaa5','#e0a548','#85b7eb','#f0997b','#c3bef5','#fac775','#9fe1cb','#af9ce6','#78c2e0'];
+  let analyticsRange = '7d';
+  let analyticsUsersChart = null;
+  let analyticsEventsChart = null;
+  let chartJsLoadPromise = null;
+  function loadChartJs(){
+    if (window.Chart) return Promise.resolve();
+    if (chartJsLoadPromise) return chartJsLoadPromise;
+    chartJsLoadPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js';
+      script.onload = () => resolve();
+      script.onerror = () => { chartJsLoadPromise = null; reject(new Error('Chart.js konnte nicht geladen werden.')); };
+      document.head.appendChild(script);
+    });
+    return chartJsLoadPromise;
+  }
+  function analyticsTooltipStyle(){
+    return {
+      backgroundColor:'#0d1224', borderColor:'rgba(127,119,221,0.4)', borderWidth:1,
+      titleColor:'#fff', bodyColor:'#c7cbe0', padding:10, cornerRadius:8,
+      titleFont:{ size:12, weight:'600' }, bodyFont:{ size:11.5 }, displayColors:true, boxPadding:4
+    };
+  }
+  function formatAnalyticsLabel(label, granularity){
+    if (granularity === 'hour') return label.slice(11,13)+':00';
+    const parts = label.split('-');
+    return parts[2]+'.'+parts[1]+'.';
+  }
   async function loadAdminAnalytics(){
     const el = document.getElementById('adminAnalyticsView');
     if (!el) return;
-    el.innerHTML = '<div class="bmeta">lädt…</div>';
-    try {
-      const res = await backendFetch('/admin/analytics?days=14');
-      const data = await res.json();
-      if (!res.ok){ el.innerHTML = '<div class="bmeta">'+(data.error||'Fehler beim Laden.')+'</div>'; return; }
-      const days = data.days || [];
-      const maxUsers = Math.max(1, ...days.map(d => d.uniqueUsers));
-      const totalEvents = {};
-      for (const d of days) for (const [k,v] of Object.entries(d.events)) totalEvents[k] = (totalEvents[k]||0) + v;
-      const sortedEvents = Object.entries(totalEvents).sort((a,b) => b[1]-a[1]).slice(0, 15);
-      const barsHtml = days.map(d => {
-        const pct = Math.max(4, (d.uniqueUsers/maxUsers)*100);
-        const shortDate = d.date.slice(5).replace('-', '.');
-        return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-          <span style="width:38px; font-size:10px; color:#9296ac; flex-shrink:0;">${shortDate}</span>
-          <div style="flex:1; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden; height:16px;">
-            <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#7f77dd,#afa9ec); border-radius:5px;"></div>
-          </div>
-          <span style="width:22px; font-size:10.5px; color:#c7cbe0; text-align:right; flex-shrink:0;">${d.uniqueUsers}</span>
-        </div>`;
-      }).join('');
-      const eventsHtml = sortedEvents.length ? sortedEvents.map(([name,count]) => `
-        <div class="card-row" style="padding:0.5rem 0.85rem;">
-          <span class="bname" style="font-size:12px; font-family:monospace;">${name}</span>
-          <span class="lvl-pill">${count}</span>
-        </div>`).join('') : '<div class="bmeta">Noch keine Ereignisse aufgezeichnet.</div>';
+    // Grundgerüst (Zeitraum-Knöpfe + feste Canvas-Elemente) nur beim allerersten Aufbau erzeugen -
+    // bei jedem erneuten Öffnen des Analytics-Tabs oder Zeitraum-Wechsel wird nur noch der Chart-
+    // Inhalt aktualisiert (destroy+recreate), nicht das ganze innerHTML neu gebaut. Der Container
+    // bleibt zwischen Tab-Wechseln im Admin-Bereich per display:none/block erhalten (kein Neuaufbau
+    // nötig), daher reicht ein einmaliges dataset-Flag.
+    if (!el.dataset.analyticsBuilt){
+      el.dataset.analyticsBuilt = '1';
       el.innerHTML = `
-        <div class="section-title" style="font-size:13px;"><i class="ti ti-users" aria-hidden="true"></i>Tägliche aktive Spieler</div>
-        <div style="margin-bottom:1rem;">${barsHtml}</div>
-        <div class="section-title" style="font-size:13px;"><i class="ti ti-list-details" aria-hidden="true"></i>Häufigste Ereignisse (Summe über 14 Tage)</div>
-        <div style="display:flex; flex-direction:column; gap:6px;">${eventsHtml}</div>
+        <div style="display:flex; gap:6px; margin-bottom:1rem; flex-wrap:wrap;">
+          ${[['24h','24 Std.'],['7d','7 Tage'],['30d','30 Tage'],['all','Gesamt']].map(([v,label]) => `<button class="qty-btn ${analyticsRange===v?'active':''}" data-analytics-range="${v}">${label}</button>`).join('')}
+        </div>
+        <div id="analyticsSummaryRow" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:1.1rem;"><div class="bmeta">lädt…</div></div>
+        <div class="section-title" style="font-size:13px;"><i class="ti ti-users" aria-hidden="true"></i>Aktive Spieler &amp; Ereignisse</div>
+        <div class="analytics-chart-box"><canvas id="analyticsUsersCanvas"></canvas></div>
+        <div class="section-title" style="font-size:13px;"><i class="ti ti-list-details" aria-hidden="true"></i>Häufigste Ereignisse</div>
+        <div id="analyticsEventsEmpty" class="bmeta" style="display:none;">Noch keine Ereignisse in diesem Zeitraum aufgezeichnet.</div>
+        <div class="analytics-chart-box tall" id="analyticsEventsBoxWrap"><canvas id="analyticsEventsCanvas"></canvas></div>
       `;
-    } catch(e){ el.innerHTML = '<div class="bmeta">Server nicht erreichbar.</div>'; }
+      el.querySelectorAll('[data-analytics-range]').forEach(btn => btn.onclick = () => {
+        if (analyticsRange === btn.getAttribute('data-analytics-range')) return;
+        analyticsRange = btn.getAttribute('data-analytics-range');
+        el.querySelectorAll('[data-analytics-range]').forEach(b => b.classList.toggle('active', b===btn));
+        fetchAndRenderAnalytics();
+      });
+    }
+    try { await loadChartJs(); }
+    catch(e){
+      const summaryRow = document.getElementById('analyticsSummaryRow');
+      if (summaryRow) summaryRow.innerHTML = '<div class="bmeta" style="color:#e24b4a;">Diagramm-Bibliothek konnte nicht geladen werden (CDN nicht erreichbar).</div>';
+      return;
+    }
+    fetchAndRenderAnalytics();
+  }
+  async function fetchAndRenderAnalytics(){
+    const summaryRow = document.getElementById('analyticsSummaryRow');
+    if (summaryRow) summaryRow.innerHTML = '<div class="bmeta">lädt…</div>';
+    try {
+      const res = await backendFetch('/admin/analytics?range='+analyticsRange);
+      const data = await res.json();
+      if (!res.ok){ if (summaryRow) summaryRow.innerHTML = '<div class="bmeta">'+(data.error||'Fehler beim Laden.')+'</div>'; return; }
+      renderAnalyticsCharts(data);
+    } catch(e){ if (summaryRow) summaryRow.innerHTML = '<div class="bmeta">Server nicht erreichbar.</div>'; }
+  }
+  function renderAnalyticsCharts(data){
+    const points = data.points || [];
+    const granularity = data.granularity || 'day';
+    const labels = points.map(p => formatAnalyticsLabel(p.label, granularity));
+    const userCounts = points.map(p => p.uniqueUsers);
+    const eventTotals = points.map(p => Object.values(p.events).reduce((a,v)=>a+v,0));
+
+    const avgUsers = userCounts.length ? Math.round(userCounts.reduce((a,v)=>a+v,0)/userCounts.length) : 0;
+    const maxUsers = userCounts.length ? Math.max(...userCounts) : 0;
+    const totalEventsSum = eventTotals.reduce((a,v)=>a+v,0);
+    const summaryRow = document.getElementById('analyticsSummaryRow');
+    if (summaryRow){
+      // Kein exakter "Unique Spieler über den ganzen Zeitraum"-Wert möglich (jeder Bucket zählt nur
+      // innerhalb sich selbst eindeutig, ein Spieler an mehreren Tagen aktiv zählt pro Tag erneut) -
+      // daher bewusst Durchschnitt + Spitzenwert statt einer irreführenden Pseudo-Summe.
+      summaryRow.innerHTML = `
+        <span class="analytics-summary-pill"><i class="ti ti-users" aria-hidden="true" style="color:#5dcaa5;"></i>Ø ${avgUsers} aktive Spieler</span>
+        <span class="analytics-summary-pill"><i class="ti ti-arrow-up" aria-hidden="true" style="color:#5dcaa5;"></i>Spitze ${maxUsers}</span>
+        <span class="analytics-summary-pill"><i class="ti ti-bolt" aria-hidden="true" style="color:#7f77dd;"></i>${fmt(totalEventsSum)} Ereignisse gesamt</span>
+      `;
+    }
+
+    const usersCanvas = document.getElementById('analyticsUsersCanvas');
+    if (usersCanvas){
+      if (analyticsUsersChart) analyticsUsersChart.destroy();
+      analyticsUsersChart = new Chart(usersCanvas, {
+        type:'line',
+        data:{ labels, datasets:[
+          { label:'Aktive Spieler', data:userCounts, borderColor:'#5dcaa5', backgroundColor:'rgba(93,202,165,0.15)', fill:true, tension:0.3, yAxisID:'y', pointRadius:2.5, pointHoverRadius:5, pointBackgroundColor:'#5dcaa5' },
+          { label:'Ereignisse gesamt', data:eventTotals, borderColor:'#7f77dd', backgroundColor:'rgba(127,119,221,0.15)', fill:true, tension:0.3, yAxisID:'y1', pointRadius:2.5, pointHoverRadius:5, pointBackgroundColor:'#7f77dd' }
+        ]},
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          interaction:{ mode:'index', intersect:false },
+          animation:{ duration:700, easing:'easeOutQuart' },
+          plugins:{
+            legend:{ position:'top', labels:{ color:'#c7cbe0', usePointStyle:true, boxWidth:8, font:{ size:11 } } },
+            tooltip: analyticsTooltipStyle()
+          },
+          scales:{
+            x:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#9296ac', font:{ size:10.5 }, maxRotation:0, autoSkip:true, maxTicksLimit:12 } },
+            y:{ position:'left', beginAtZero:true, grid:{ color:'rgba(255,255,255,0.06)' }, ticks:{ color:'#5dcaa5', font:{ size:10.5 }, precision:0 }, title:{ display:true, text:'Spieler', color:'#5dcaa5', font:{ size:10.5 } } },
+            y1:{ position:'right', beginAtZero:true, grid:{ display:false }, ticks:{ color:'#7f77dd', font:{ size:10.5 }, precision:0 }, title:{ display:true, text:'Ereignisse', color:'#7f77dd', font:{ size:10.5 } } }
+          }
+        }
+      });
+    }
+
+    const totalPerEvent = {};
+    for (const p of points) for (const [k,v] of Object.entries(p.events)) totalPerEvent[k] = (totalPerEvent[k]||0) + v;
+    const sortedEvents = Object.entries(totalPerEvent).sort((a,b) => b[1]-a[1]).slice(0, 15);
+    const eventsEmptyEl = document.getElementById('analyticsEventsEmpty');
+    const eventsBoxWrap = document.getElementById('analyticsEventsBoxWrap');
+    const eventsCanvas = document.getElementById('analyticsEventsCanvas');
+    if (analyticsEventsChart){ analyticsEventsChart.destroy(); analyticsEventsChart = null; }
+    if (!sortedEvents.length){
+      if (eventsEmptyEl) eventsEmptyEl.style.display = 'block';
+      if (eventsBoxWrap) eventsBoxWrap.style.display = 'none';
+    } else {
+      if (eventsEmptyEl) eventsEmptyEl.style.display = 'none';
+      if (eventsBoxWrap) eventsBoxWrap.style.display = 'block';
+      if (eventsCanvas){
+        analyticsEventsChart = new Chart(eventsCanvas, {
+          type:'bar',
+          data:{ labels: sortedEvents.map(e=>e[0]), datasets:[{
+            label:'Ereignisse', data: sortedEvents.map(e=>e[1]),
+            backgroundColor: sortedEvents.map((_,i) => ANALYTICS_PALETTE[i % ANALYTICS_PALETTE.length]),
+            borderRadius:6, maxBarThickness:26
+          }]},
+          options:{
+            indexAxis:'y', responsive:true, maintainAspectRatio:false,
+            animation:{ duration:650, easing:'easeOutQuart' },
+            plugins:{ legend:{ display:false }, tooltip: analyticsTooltipStyle() },
+            scales:{
+              x:{ beginAtZero:true, grid:{ color:'rgba(255,255,255,0.06)' }, ticks:{ color:'#9296ac', font:{ size:10.5 }, precision:0 } },
+              y:{ grid:{ display:false }, ticks:{ color:'#c7cbe0', font:{ size:10.5, family:'monospace' } } }
+            }
+          }
+        });
+      }
+    }
   }
   async function loadAdminReports(){
     const listEl = document.getElementById('adminReportsList');
