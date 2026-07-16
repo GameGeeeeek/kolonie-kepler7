@@ -2355,8 +2355,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.47.0';
+  const VERSION = '8.48.0';
   const PATCHNOTES = [
+    { version:'8.48.0', date:'16.07.2026', changes:[
+      'Treibstoffkosten geprüft und neu ausbalanciert (Prüf-/Balance-Wunsch): Bugfix - bei der Verlegung eines gemischten Flottenverbands (mehrere Schiffstypen gleichzeitig) wurde der Treibstoff bisher pro Schiffstyp einzeln berechnet und aufsummiert statt einmal für die Gesamtschiffszahl, was durch die Wurzelfunktion in der Formel bis zu doppelt so hohe Kosten verursachte wie bei einer gleich großen Flotte eines einzigen Typs - jetzt korrekt einmalig für die Gesamtzahl berechnet. Außerdem doppeltes Runden (Basis-, Allianz- und Doktrin-Multiplikator wurden bisher nacheinander einzeln gerundet) zu einer einzigen finalen Rundung zusammengefasst. Restliche Prüfpunkte ohne Befund: Allianz-Rabatt und Doktrin-Multiplikator korrekt verknüpft, keine negativen/fehlerhaften Werte bei langen Flugstrecken oder durch Geschwindigkeitsboni möglich (diese senken die Kosten weiterhin bewusst mit, da Treibstoff an die tatsächliche Flugzeit gekoppelt ist). Balance: Treibstoffkosten pro Schiff unabhängig vom Prüfergebnis um 20% erhöht (Basis-Multiplikator in der bestehenden Formel angehoben), gilt gleichermaßen für alle Schiffstypen und alle Missionsarten'
+    ]},
     { version:'8.47.0', date:'16.07.2026', changes:[
       'Expeditionen erweitert (Feature-Wunsch): fünf Seltenheitsstufen (Gewöhnlich/Ungewöhnlich/Selten/Episch/Legendär) für alle Item-, Material-, Modul- und Sonderfunde, klar farbig gekennzeichnet in Bericht und Inventar. Drei neue Verbrauchsgegenstände: Forschungsbeschleuniger (beschleunigt laufende Forschung), Bautrupp-Express (beschleunigt den nächstfertigen Bauauftrag) und Antriebsmatrix (20% kürzere Reisezeit für neue Missionen, 15 Min.). Neu: Fragmente der drei seltenen Materialien (4 Fragmente = 1x das volle Material, per Knopfdruck im Fortschritt-Tab kombinierbar) sowie drei exklusive, nur per Expeditionsfund freischaltbare Avatare (Nova, Void, Phoenix). Event-Items (z.B. Ereignis-Kapsel) sind nur während aktiver saisonaler Beute-Events im Fundpool. Neue eigenständige Forschung "Expeditionsanalytik" erhöht zusammen mit der Expeditionsstufe (Kurz/Standard/Tiefenraum), der Eskortstärke und aktiven Beute-Events die Chance auf seltenere Funde - wirkt nicht auf die reine Ressourcenmenge. Der Expeditionsbericht zeigt jetzt Fundart und Seltenheitsstufe im Klartext'
     ]},
@@ -6395,12 +6398,27 @@
     });
   }
   function canAfford(cost){ return Object.entries(cost).every(([r,amt]) => (state.resources[r]||0) >= amt); }
+  // Treibstoffkosten-Audit (16.07.2026, Prüf- und Balance-Wunsch): die Formel selbst (linear zur
+  // tatsächlichen Flugzeit NACH allen Geschwindigkeitsboni, mit der Wurzel der Schiffszahl skaliert)
+  // war strukturell korrekt - Allianz-Rabatt (ab_expedition) und Doktrin-Multiplikator (fuelMult)
+  // beide korrekt benannt/verknüpft, keine negativen/NaN-Ergebnisse durch die Math.max-Untergrenzen
+  // bei Dauer UND Schiffszahl möglich. Zwei echte Fundstellen behoben:
+  // 1) Rundungsfehler: bisher wurde NACH jedem einzelnen Multiplikator (Basis, Allianz, Doktrin)
+  //    separat gerundet - drei Rundungen in Folge können sich zu einer kleinen, unnötigen Abweichung
+  //    aufaddieren. Jetzt nur noch EINE finale Rundung ganz am Ende.
+  // 2) Schiffstyp-Inkonsistenz bei der Flottenverband-Verlegung: siehe Bugfix-Kommentar bei
+  //    relocateFleetGroup - dort wurde der Treibstoff bis zu 2x zu hoch berechnet.
+  // Bewusst NICHT geändert: die Formel unterscheidet grundsätzlich nicht nach Schiffstyp (nur nach
+  // Gesamtzahl) - das ist Spieldesign, kein Fehler, und bleibt hier unangetastet, ebenso wie die
+  // (beabsichtigte) Kopplung an die Flugzeit, wodurch Geschwindigkeitsboni Treibstoff automatisch
+  // mitsenken. Balance-Wunsch: Treibstoffkosten pro Schiff um 20% erhöht (Basis-Multiplikator 0.4 ->
+  // 0.48) - gilt für alle Schiffstypen gleichermaßen, da die Formel ohnehin nicht unterscheidet.
   function missionFuelCost(durationSec, shipCount){
-    let cost = Math.max(5, Math.round(durationSec * 0.4 * Math.sqrt(Math.max(1, shipCount))));
-    if (state.allianceResearch) cost = Math.round(cost*(1-0.15*allianceTechFrac('ab_expedition')));
+    let cost = Math.max(5, durationSec * 0.48 * Math.sqrt(Math.max(1, shipCount)));
+    if (state.allianceResearch) cost *= (1-0.15*allianceTechFrac('ab_expedition'));
     const doc = activeDoctrine();
-    if (doc) cost = Math.round(cost*doc.fuelMult);
-    return Math.max(1, cost);
+    if (doc) cost *= doc.fuelMult;
+    return Math.max(1, Math.round(cost));
   }
   function pay(cost){ for (const [r,amt] of Object.entries(cost)) state.resources[r] -= amt; }
   // Zentrale Gutschreibungs-Funktion für Ressourcen-Gewinne aus JEDER Quelle (Belohnungen, Beute,
@@ -10655,6 +10673,7 @@
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
       { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt.' },
       { title:'Missionen & Flugzeit', body:'Angriffe, Überfälle, Expeditionen und Kolonisierungen laufen über Missionen mit echter Flugzeit (abhängig von Entfernung und langsamstem Schiff in der Flotte). Während der Flugzeit ist die Flotte unterwegs und zählt nicht zur Verteidigung am Ausgangsplaneten.' },
+      { title:'Treibstoffkosten (Deuterium)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Deuterium als Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
       { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren und Spionage - <strong>Flottenverlegungen zwischen eigenen Planeten zählen bewusst nicht mit</strong>, da reine interne Logistik. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
       { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine verlassene Flotte. Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe.' },
       { title:'Fragmente & kosmetische Avatare', body:'Statt eines vollen seltenen Materials (Antimateriekern, Kristallherz, Alte Technologie) kann auch ein <strong>Fragment</strong> davon gefunden werden - häufiger, aber schwächer. Sind <strong>4 Fragmente</strong> desselben Typs im Inventar (Fortschritt-Tab), lassen sie sich per Knopfdruck zu 1x dem vollen Material zusammensetzen. Ebenfalls über Expeditionen erhältlich: drei <strong>exklusive Avatare</strong> (Nova, Void, Phoenix), die sonst nirgends wählbar sind - einmal gefunden dauerhaft freigeschaltet und in den Einstellungen auswählbar. Ist ein kosmetischer Fund bereits freigeschaltet, gibt es stattdessen Ersatz-Ressourcen, kein doppelter Nutzen.' }
@@ -14227,7 +14246,7 @@
     if (speed) mult *= (100/speed);
     return baseSec * mult;
   }
-  function relocateShips(fromPlanet, toPlanet, shipKey, amount, forcedDur, forcedFleetName){
+  function relocateShips(fromPlanet, toPlanet, shipKey, amount, forcedDur, forcedFleetName, skipFuelCharge){
     if (!amount || amount <= 0){ log('Ungültige Anzahl.', 'ti-alert-triangle'); return; }
     if (fromPlanet === toPlanet){ log('Ausgangs- und Zielort sind identisch.', 'ti-alert-triangle'); return; }
     const fromFleet = fromPlanet==='home' ? state.fleet : (state.colonies[fromPlanet] ? state.colonies[fromPlanet].fleet : null);
@@ -14235,14 +14254,20 @@
     if ((fromFleet[shipKey]||0) < amount){ log('Nicht genug Schiffe dieses Typs am Ausgangsort.', 'ti-alert-triangle'); return; }
     const def = shipDefOrSuper(shipKey);
     const dur = forcedDur || relocationDuration(fromPlanet, toPlanet, shipKey);
-    const fuelCost = missionFuelCost(dur, amount);
-    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Verlegung: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
-    pay({deuterium: fuelCost});
+    // skipFuelCharge (Bugfix 16.07.2026, Treibstoff-Audit): wird von relocateFleetGroup gesetzt, die
+    // den Treibstoff bereits EINMAL für den gesamten Verband berechnet und bezahlt hat - hier also
+    // nicht noch einmal pro Einzeltyp berechnen/abziehen (siehe dortiger Kommentar für den Hintergrund).
+    let fuelCost = 0;
+    if (!skipFuelCharge){
+      fuelCost = missionFuelCost(dur, amount);
+      if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Verlegung: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+      pay({deuterium: fuelCost});
+    }
     fromFleet[shipKey] -= amount;
     fromFleet.missions = fromFleet.missions || [];
     const fleetName = forcedFleetName || nextFleetName();
     fromFleet.missions.push({ id: nextMissionId(), type:'relocate', shipKey, qty: amount, targetId: toPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName });
-    log(fleetName+': '+amount+'x '+(def?def.name:shipKey)+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-arrows-shuffle');
+    if (!skipFuelCharge) log(fleetName+': '+amount+'x '+(def?def.name:shipKey)+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-arrows-shuffle');
     if (!forcedDur) { render(); save(); }
   }
   // Flottenverband: mehrere Schiffstypen gleichzeitig verlegen statt jeden einzeln – alle kommen
@@ -14262,13 +14287,21 @@
     let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
     mult *= fleetSpeedMultiplier(amounts, keys);
     const groupDur = baseSec * mult;
-    let totalFuel = 0;
-    for (const k of keys) totalFuel += missionFuelCost(groupDur, amounts[k]);
+    // Bugfix (16.07.2026, Treibstoff-Audit): Treibstoff wird jetzt EINMAL für die GESAMTE Schiffszahl
+    // des Verbands berechnet statt wie zuvor pro Schiffstyp einzeln summiert. Der alte Weg summierte
+    // missionFuelCost() getrennt je Typ - durch die Wurzelfunktion darin (sqrt ist subadditiv:
+    // sqrt(a)+sqrt(b) >= sqrt(a+b)) kostete ein gemischter Verband dadurch bis zu doppelt so viel wie
+    // eine gleich große Flotte eines einzigen Typs, obwohl Angriffs-/Expeditionsmissionen die
+    // Gesamtschiffszahl schon immer in einem einzigen Aufruf übergeben haben - eine Inkonsistenz
+    // zwischen den Missionsarten.
+    const totalAmount = keys.reduce((a,k)=>a+amounts[k], 0);
+    const totalFuel = missionFuelCost(groupDur, totalAmount);
     if (!canAfford({deuterium: totalFuel})){ log('Nicht genug Treibstoff (Deuterium) für den Verband: benötigt '+totalFuel+'.', 'ti-alert-triangle'); return; }
+    pay({deuterium: totalFuel});
     const fleetName = resolveFleetName();
     const summary = keys.map(k => amounts[k]+'x '+(shipDefOrSuper(k)||{name:k}).name).join(', ');
-    for (const k of keys) relocateShips(fromPlanet, toPlanet, k, amounts[k], groupDur, fleetName);
-    log(fleetName+' (Verband): '+summary+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(groupDur)+'s Flugzeit, gemeinsame Ankunft).', 'ti-arrows-shuffle');
+    for (const k of keys) relocateShips(fromPlanet, toPlanet, k, amounts[k], groupDur, fleetName, true);
+    log(fleetName+' (Verband): '+summary+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(groupDur)+'s Flugzeit, gemeinsame Ankunft). Treibstoff verbraucht: '+totalFuel+' Deuterium.', 'ti-arrows-shuffle');
     render(); save();
   }
 
