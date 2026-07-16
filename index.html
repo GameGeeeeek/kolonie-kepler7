@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Kolonie Kepler-7</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0d1a'/%3E%3Ccircle cx='16' cy='17' r='10' fill='%238f86ea'/%3E%3Ccircle cx='16' cy='17' r='10' fill='none' stroke='%23c3bef5' stroke-width='1' opacity='0.5'/%3E%3Cellipse cx='16' cy='17' rx='15' ry='5.5' fill='none' stroke='%23f3aec6' stroke-width='3' transform='rotate(-18 16 17)'/%3E%3Ccircle cx='12.5' cy='13' r='2.4' fill='%23ffffff' opacity='0.85'/%3E%3C/svg%3E">
   <!-- PWA: installierbar auf Homescreen (Standalone-Vollbild, eigenes Icon). Manifest + Icons werden
@@ -2001,8 +2001,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.36.4';
+  const VERSION = '8.36.5';
   const PATCHNOTES = [
+    { version:'8.36.5', date:'13.07.2026', changes:[
+      'Bug behoben: Chat-Panel auf dem Handy - die Eingabezeile konnte hinter der virtuellen Tastatur verschwinden (Panel nutzte die volle Layout-Viewport-Höhe, viele mobile Browser passen fixierte Elemente daran nicht automatisch an). Passt die Panel-Höhe jetzt aktiv an den tatsächlich sichtbaren Bereich an, sobald die Tastatur öffnet'
+    ]},
     { version:'8.36.4', date:'13.07.2026', changes:[
       'Bug behoben: Logout-Icon in der Kopfzeile saß etwas höher als die anderen Header-Buttons (fehlende Zentrierung bei reinen Icon-Buttons ohne Text)',
       'Neu: selbst gehostetes Analytics im Admin-Bereich (Einstellungen → Admin-Bereich → Analytics) - tägliche aktive Spieler und häufigste Aktionen der letzten 14 Tage, komplett auf dem eigenen Server, keine Drittanbieter, reine Tages-Aggregate ohne Einzelverfolgung'
@@ -17313,6 +17316,7 @@
     function openPanel(){
       panel.classList.add('open');
       overlay.classList.add('open');
+      panel.style.height = window.visualViewport ? window.visualViewport.height + 'px' : '';
       loadAllianceMessages();
       loadGlobalChat();
       markChatSeen();
@@ -17320,6 +17324,7 @@
     function closePanel(){
       panel.classList.remove('open');
       overlay.classList.remove('open');
+      panel.style.height = ''; // zurück auf CSS-Standard (top:0/bottom:0), kein Rest-Inline-Style
       markChatSeen(); // deckt auch eigene, während des Offenseins gesendete Nachrichten ab
     }
     tab.onclick = openPanel;
@@ -17335,6 +17340,21 @@
       boxGlobal.style.display = 'block'; boxAlliance.style.display = 'none';
       inputRowGlobal.style.display = 'flex'; inputRowAlliance.style.display = 'none';
     };
+    // Bug behoben (13.07.2026, Melde-Wunsch: "Chat bug auf dem Handy") - das Panel nutzt
+    // position:fixed mit top:0/bottom:0 (volle Layout-Viewport-Höhe). Öffnet die virtuelle Tastatur
+    // auf dem Handy, schrumpft der SICHTBARE Bereich, aber viele Browser (v.a. iOS Safari) passen
+    // fixierte Elemente daran nicht automatisch an - die Eingabezeile ganz unten im Panel konnte
+    // dadurch hinter der Tastatur verschwinden. Der viewport-Meta-Tag (interactive-widget=
+    // resizes-content) behebt das bereits in modernen Chrome/Android-Versionen; dieser Teil hier ist
+    // die zusätzliche Absicherung über die VisualViewport-API für Browser ohne diese Unterstützung.
+    if (window.visualViewport){
+      const adjustPanelHeight = () => {
+        if (!panel.classList.contains('open')) return;
+        panel.style.height = window.visualViewport.height + 'px';
+      };
+      window.visualViewport.addEventListener('resize', adjustPanelHeight);
+      window.visualViewport.addEventListener('scroll', adjustPanelHeight);
+    }
   })();
 
   // Kampf-Wiedergabe-Modal: einmalig verdrahtet, da außerhalb des normalen Tab-Systems.
