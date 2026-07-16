@@ -2356,8 +2356,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.51.1';
+  const VERSION = '8.52.0';
   const PATCHNOTES = [
+    { version:'8.52.0', date:'16.07.2026', changes:[
+      'Großer Wirtschafts-Balance-Pass: Die Produktion wächst mit Heimat + 10 Kolonien auf grob das 400-fache des Frühspiels (11 Standorte x Gebäudestufen x Bonus-Stapel), während viele Kosten konstant blieben - ein Superschlachtschiff kostete im Endgame unter 1 Sekunde Produktion, ein Mega-Projekt ~1 Minute. Zwei neue Skalierungen gleichen das aus, Frühspieler (0-1 Kolonien) zahlen praktisch unverändert',
+      'Neu: Imperiums-Skalierung - Mega-Projekte, Orbitalstationen, exotische Forschung und Veteranen-Ausbildung kosten +25% je Standort über dem ersten (Kolonien und Monde zählen mit; bei Heimat + 10 Kolonien x3,5). Alle Anzeigen zeigen die skalierten Preise; Kolonisierungskosten skalierten bereits vorher separat (+35% je Kolonie)',
+      'Neu: Schiffs-Mengenskalierung - jedes Schiff kostet +0,4% je bereits vorhandenem Schiff desselben Typs (imperiumsweit gezählt, Verteilen auf Kolonien umgeht nichts), gedeckelt bei +100%. Kampfverluste senken den Bestand, der Nachbau wird dadurch wieder günstiger. Alle Kauf-UIs (x1/x5/x10/Max, Baukorb, Auto-Verstärkung) rechnen automatisch mit den gestaffelten Preisen',
+      'Unverändert bleiben bewusst: Gebäude- und Forschungskosten (bereits geometrisch steigend und damit selbstregulierend), Terraforming (verdoppelt sich je Stufe), Treibstoff (an Flugzeit/Flottengröße gekoppelt) und der Credit-Shop (eigene Währung)'
+    ]},
     { version:'8.51.1', date:'16.07.2026', changes:[
       'Kritischer Bugfix Aufstieg/Meta-Baum: ein Prestige (und auch der komplette Spielstand-Reset) löschte bisher die gesamte Sternenessenz, den Aufstiegs-Zähler und alle Meta-Baum-Stufen, obwohl diese laut Hilfe jeden Reset überleben sollen - da der Aufstieg das Prestige auf 0 zurücksetzt und der nächste Aufstieg wieder Prestige 3 verlangt, traf der Verlust nach dem ersten Aufstieg jeden. Aufstiegs-Fortschritt übersteht jetzt beide Reset-Arten',
       'Bugfix Sternensaat: das Startpaket des Meta-Baum-Zweigs ("nach jedem Reset") wurde bisher nur beim Aufstieg selbst ausgezahlt - greift jetzt wie beschrieben auch nach Prestige und komplettem Reset'
@@ -4147,9 +4153,11 @@
     if (!def) return;
     if (hasExoticResearch(key)){ log('Bereits erforscht.', 'ti-alert-triangle'); return; }
     if (state.exoticResearchJob){ log('Es läuft bereits eine exotische Forschung.', 'ti-alert-triangle'); return; }
-    if ((state.resources.forschungspunkte||0) < def.cost){ log('Nicht genug Forschungspunkte (benötigt: '+fmt(def.cost)+').', 'ti-alert-triangle'); return; }
-    if (!confirm(def.name+' für '+fmt(def.cost)+' Forschungspunkte erforschen? Dauert 24 Stunden, Kosten fallen sofort an, einmalig, kann nicht rückgängig gemacht werden.')) return;
-    state.resources.forschungspunkte -= def.cost;
+    // Imperiums-Skalierung: Kosten wachsen mit der Standortzahl (siehe empireCostFactor).
+    const cost = Math.ceil(def.cost * empireCostFactor());
+    if ((state.resources.forschungspunkte||0) < cost){ log('Nicht genug Forschungspunkte (benötigt: '+fmt(cost)+').', 'ti-alert-triangle'); return; }
+    if (!confirm(def.name+' für '+fmt(cost)+' Forschungspunkte erforschen? Dauert 24 Stunden, Kosten fallen sofort an, einmalig, kann nicht rückgängig gemacht werden.')) return;
+    state.resources.forschungspunkte -= cost;
     state.exoticResearchJob = { key, endTime: Date.now()+EXOTIC_RESEARCH_DURATION_MS, totalDuration: EXOTIC_RESEARCH_DURATION_MS };
     log('Exotische Forschung gestartet: '+def.name+' (fertig in '+fmtDuration(EXOTIC_RESEARCH_DURATION_MS/1000)+').', 'ti-atom-2');
     playSound('build');
@@ -4187,9 +4195,11 @@
     if (hasVeteranTraining(key)){ log('Bereits ausgebildet.', 'ti-alert-triangle'); return; }
     if (def.requires && !hasVeteranTraining(def.requires)){ log('Voraussetzung fehlt: '+(VETERAN_TRAINING.find(v=>v.key===def.requires)||{}).name, 'ti-alert-triangle'); return; }
     if (state.veteranTrainingJob){ log('Es läuft bereits eine Veteranen-Ausbildung.', 'ti-alert-triangle'); return; }
-    if ((state.resources.forschungspunkte||0) < def.cost){ log('Nicht genug Forschungspunkte (benötigt: '+fmt(def.cost)+').', 'ti-alert-triangle'); return; }
-    if (!confirm(def.name+' für '+fmt(def.cost)+' Forschungspunkte ausbilden? Dauert 24 Stunden, Kosten fallen sofort an, einmalig, kann nicht rückgängig gemacht werden.')) return;
-    state.resources.forschungspunkte -= def.cost;
+    // Imperiums-Skalierung: Kosten wachsen mit der Standortzahl (siehe empireCostFactor).
+    const cost = Math.ceil(def.cost * empireCostFactor());
+    if ((state.resources.forschungspunkte||0) < cost){ log('Nicht genug Forschungspunkte (benötigt: '+fmt(cost)+').', 'ti-alert-triangle'); return; }
+    if (!confirm(def.name+' für '+fmt(cost)+' Forschungspunkte ausbilden? Dauert 24 Stunden, Kosten fallen sofort an, einmalig, kann nicht rückgängig gemacht werden.')) return;
+    state.resources.forschungspunkte -= cost;
     state.veteranTrainingJob = { key, endTime: Date.now()+VETERAN_TRAINING_DURATION_MS, totalDuration: VETERAN_TRAINING_DURATION_MS };
     log('Veteranen-Ausbildung gestartet: '+def.name+' (fertig in '+fmtDuration(VETERAN_TRAINING_DURATION_MS/1000)+').', 'ti-medal');
     playSound('build');
@@ -6309,24 +6319,40 @@
   // Forschung, die mit jeder Stufe teurer werden. Der Parameter n bleibt aus Kompatibilitätsgründen
   // in der Signatur (wird von shipCostForRange/maxAffordableShipQty weiterhin durchgereicht), fließt
   // aber nicht mehr in die Berechnung ein.
-  function shipCost(n){ return { energie: 80, erz: 60 }; }
-  function cruiserCost(n){ return { erz: 120, kristalle: 40 }; }
+  // Mengenskalierung Schiffe (16.07.2026, Balance-Pass): +0,4% Kosten je bereits vorhandenem Schiff
+  // desselben Typs, gedeckelt bei +100% (das ~250. Schiff kostet das Doppelte). Der n-Parameter der
+  // costFn-Signatur (Bestand am Bau-Standort + laufender Zähler beim Mehrfachkauf, siehe
+  // shipCostForRange) existierte schon immer, wurde aber von allen Kostenfunktionen ignoriert.
+  // Der Bestand der ÜBRIGEN Standorte wird hier zentral dazugezählt, damit das Verteilen der
+  // Flotte auf viele Kolonien die Skalierung nicht umgeht. Alle Kauf-UIs (x1/x5/x10/Max,
+  // Baukorb, Auto-Verstärkung) rechnen automatisch mit, da sie dieselben Funktionen nutzen.
+  function scaledShipCost(base, shipKey, n){
+    const localNow = (currentFleet()[shipKey]) || 0;
+    const globalNow = allFleets().reduce((a,f)=>a+(f[shipKey]||0),0);
+    const nth = Math.max(0, globalNow - localNow) + Math.max(0, n||0);
+    const factor = 1 + Math.min(1.0, nth * 0.004);
+    const c = {};
+    for (const [r,a] of Object.entries(base)) c[r] = Math.ceil(a * factor);
+    return c;
+  }
+  function shipCost(n){ return scaledShipCost({ energie: 80, erz: 60 }, 'ships', n); }
+  function cruiserCost(n){ return scaledShipCost({ erz: 120, kristalle: 40 }, 'cruisers', n); }
   // Wächter: reine Verteidigungsklasse (erstes Schiff mit echtem Schildwert, siehe shipDefenseContribution).
   // Erzlastig (Panzerung) statt kristall-/deuteriumlastig wie Angriffsschiffe.
-  function waechterCost(n){ return { erz: 180, kristalle: 30, energie: 40 }; }
-  function destroyerCost(n){ return { erz: 200, kristalle: 90, deuterium: 30 }; }
-  function frachterCost(n){ return { energie: 70, erz: 100 }; }
-  function frachterGrossCost(n){ return { erz: 800, kristalle: 400, deuterium: 200 }; }
-  function colonyShipCost(n){ return { erz: 300, kristalle: 150, deuterium: 100 }; }
-  function jaegerCost(n){ return { erz: 50, energie: 30 }; }
-  function schlachtschiffCost(n){ return { erz: 400, kristalle: 250, deuterium: 150, antimaterie: 10 }; }
-  function spaeherCost(n){ return { energie: 90, deuterium: 50 }; }
-  function spionageschiffCost(n){ return { energie: 140, kristalle: 40, deuterium: 90 }; }
-  function carrierCost(n){ return { erz: 500, kristalle: 300, deuterium: 200 }; }
-  function bomberCost(n){ return { erz: 220, kristalle: 120, deuterium: 60 }; }
-  function superschlachtschiffCost(n){ return { erz: 1500, kristalle: 1100, deuterium: 700, antimaterie: 120 }; }
-  function recyclerCost(n){ return { erz: 160, energie: 90 }; }
-  function forscherCost(n){ return { energie: 150, deuterium: 120, kristalle: 60 }; }
+  function waechterCost(n){ return scaledShipCost({ erz: 180, kristalle: 30, energie: 40 }, 'waechter', n); }
+  function destroyerCost(n){ return scaledShipCost({ erz: 200, kristalle: 90, deuterium: 30 }, 'destroyers', n); }
+  function frachterCost(n){ return scaledShipCost({ energie: 70, erz: 100 }, 'frachter', n); }
+  function frachterGrossCost(n){ return scaledShipCost({ erz: 800, kristalle: 400, deuterium: 200 }, 'frachtergross', n); }
+  function colonyShipCost(n){ return scaledShipCost({ erz: 300, kristalle: 150, deuterium: 100 }, 'colonyShips', n); }
+  function jaegerCost(n){ return scaledShipCost({ erz: 50, energie: 30 }, 'jaeger', n); }
+  function schlachtschiffCost(n){ return scaledShipCost({ erz: 400, kristalle: 250, deuterium: 150, antimaterie: 10 }, 'schlachtschiff', n); }
+  function spaeherCost(n){ return scaledShipCost({ energie: 90, deuterium: 50 }, 'spaeher', n); }
+  function spionageschiffCost(n){ return scaledShipCost({ energie: 140, kristalle: 40, deuterium: 90 }, 'spionageschiff', n); }
+  function carrierCost(n){ return scaledShipCost({ erz: 500, kristalle: 300, deuterium: 200 }, 'carrier', n); }
+  function bomberCost(n){ return scaledShipCost({ erz: 220, kristalle: 120, deuterium: 60 }, 'bomber', n); }
+  function superschlachtschiffCost(n){ return scaledShipCost({ erz: 1500, kristalle: 1100, deuterium: 700, antimaterie: 120 }, 'superschlachtschiff', n); }
+  function recyclerCost(n){ return scaledShipCost({ erz: 160, energie: 90 }, 'recycler', n); }
+  function forscherCost(n){ return scaledShipCost({ energie: 150, deuterium: 120, kristalle: 60 }, 'forscher', n); }
 
   // Drei Antriebsklassen bestimmen die Basisgeschwindigkeit eines Schiffs. Bei Missionen zählt
   // immer die Geschwindigkeit des LANGSAMSTEN beteiligten Schiffstyps (wie ein Konvoi).
@@ -7319,6 +7345,22 @@
 
   function colonyCountScaling(){
     return 1 + Object.keys(state.colonies||{}).length * 0.35;
+  }
+  // Imperiums-Skalierung (16.07.2026, Balance-Pass): einmalige Groß-Anschaffungen (Mega-Projekte,
+  // Orbitalstationen, exotische Forschung, Veteranen-Ausbildung) skalieren mit der Standortzahl,
+  // analog zur bestehenden colonyCountScaling bei Kolonisierungen. Hintergrund: die Produktion
+  // wächst mit Heimat + 10 Kolonien auf grob das 400-fache des Frühspiels, während diese
+  // Flat-Kosten bisher konstant blieben - ein Mega-Projekt kostete dann nur noch ~1 Minute
+  // Produktion. Bei vollem Imperium (10 Kolonien) ergibt sich x3,5; Frühspieler mit 0-1 Kolonien
+  // zahlen praktisch unverändert. Monde zählen als Standorte mit (sie produzieren ebenfalls).
+  function empireCostFactor(){
+    return 1 + Object.keys(state.colonies||{}).length * 0.25;
+  }
+  function scaleCostByEmpire(cost){
+    const f = empireCostFactor();
+    const c = {};
+    for (const [r,a] of Object.entries(cost)) c[r] = Math.ceil(a * f);
+    return c;
   }
   // Kolonial-Logistik: statt Kosten zu senken, erhöht diese Forschung das Kolonie-LIMIT direkt -
   // 1 Basis-Kolonie ist immer erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere dazu (Monde zählen
@@ -10902,9 +10944,10 @@
       { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. Meldest du dich einen Tag <strong>nicht</strong> an, fällt der Fortschritt zurück auf Tag 1 - die Gesamtzahl der (nicht zwingend aufeinanderfolgenden) Logins zählt separat als "Tage in Folge" weiter, solange keine Lücke entsteht. Die komplette Vorschau mit allen 7 Tagen und der aktuellen Streak steht im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
       { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
+      { title:'Imperiums-Skalierung der Kosten', body:'Zwei Kostenarten wachsen mit der Größe deines Imperiums, damit sie auch mit vielen Kolonien spürbar bleiben: <strong>1) Groß-Anschaffungen</strong> (Mega-Projekte, Orbitalstationen, exotische Forschung, Veteranen-Ausbildung) kosten <strong>+25% je Standort</strong> über dem ersten (Kolonien und Monde zählen mit) – bei Heimat + 10 Kolonien also das 3,5-fache. Alle angezeigten Preise sind bereits die skalierten Werte. <strong>2) Schiffe</strong> kosten <strong>+0,4% je bereits vorhandenem Schiff desselben Typs</strong> (imperiumsweit über alle Standorte gezählt), gedeckelt bei +100% – das ~250. Schiff eines Typs kostet also das Doppelte. Verluste im Kampf senken den Bestand und machen den Nachbau entsprechend wieder günstiger. Kolonisierungskosten skalieren wie bisher separat (+35% je bestehender Kolonie).' },
       { title:'Saison-Events', body:'Rein datumsbasierte Boni, die für alle Spieler gleichzeitig laufen (kein Zufall, kein Server nötig) – ein kleines Badge neben \"Kolonie Kepler-7\" zeigt an, welche gerade aktiv sind (antippen für Details). Vier Kategorien, jede einzeln gedeckelt, damit seltene Überlappungen nicht unbegrenzt eskalieren: <strong>Ressourcenproduktion (Deckel +25%)</strong> – Wochenend-Bonus (Sa+So, +15%), die vier Jahreszeiten-Events (+6% bis +10% je nach Saison), Tag-und-Nacht-Gleiche und Sonnenwende (je +4%, nur am exakten Tag), Neujahr (+5%) und das jährliche Jubiläum am 10. Juli (+8%). <strong>Einzelressource (Deckel +15%)</strong> – an jedem Werktag ist eine andere Ressource dran (Montag Erz, Dienstag Kristalle, Mittwoch Energie, Donnerstag Deuterium), je +5%. <strong>Mondkolonien (Deckel +20%)</strong> – bei astronomischem Vollmond (rechnerisch ermittelt, ca. 1×/Monat) +8% Produktion, aber nur auf Mondkolonien. <strong>Beute (Deckel +20%)</strong> – Freitag (Kopfgeldtag, +6%) und die Perseiden-Meteorschauer Mitte August (+8%) erhöhen die Beute bei NPC-Angriffen und Expeditionen.' },
       { title:'Planeten-Rollen', body:'Jede Kolonie kann eine von sechs Rollen bekommen (Basis-Tab): <strong>Bergbau-Welt</strong> (+25% Ressourcenproduktion dort), <strong>Festungs-Welt</strong> (+30% Verteidigungspunkte dort), <strong>Werft-Welt</strong> (-20% Schiffs-Bauzeit dort), <strong>Handels-Welt</strong> (+15% Handelsrouten-Ertrag imperiumsweit – nicht stapelbar, plus +250 Extra-Lager je dort stationiertem Kleinem Frachter bzw. +1.000 je Großem Frachter), <strong>Forschungs-Welt</strong> (+25% Forschungspunkte dort, -10% Forschungszeit imperiumsweit – nicht stapelbar) oder <strong>Logistik-Welt</strong> (+30% Lagerbeitrag dieser Kolonie). Die erste Zuweisung ist sofort, ein Wechsel kostet Ressourcen und 15 Minuten Umbauzeit. Zusätzlich gilt pro Planet ein <strong>2-Stunden-Cooldown</strong> zwischen Rollenwechseln, um schnelles Hin-und-Her-Wechseln zu verhindern.' },
-      { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe, wirkt sofort und unterliegt ebenfalls einem <strong>2-Stunden-Cooldown</strong> pro Station. Kosten verdoppeln sich je Stufe (ab 16.000 Erz / 10.000 Kristalle / 3.200 Deuterium), Bauzeit 5–15 Minuten. Auf der <strong>Sektorkarte</strong> wird jede Orbitalstation als sichtbarer Ring um den Planeten dargestellt, in der Farbe des gewählten Fokus - Stufe 1 ein einzelner dünner Ring, Stufe 2 zwei Ringe, Stufe 3 drei Ringe mit kleinen Modul-Knoten und leichtem Leuchtpuls. So ist die Ausbaustufe auf einen Blick erkennbar, ohne das Baumenü zu öffnen.' },
+      { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 3 Stufen bauen (Basis-Tab). Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe, wirkt sofort und unterliegt ebenfalls einem <strong>2-Stunden-Cooldown</strong> pro Station. Kosten verdoppeln sich je Stufe (Basis 16.000 Erz / 10.000 Kristalle / 3.200 Deuterium, zusätzlich Imperiums-Skalierung: +25% je weiterem Standort), Bauzeit 5–15 Minuten. Auf der <strong>Sektorkarte</strong> wird jede Orbitalstation als sichtbarer Ring um den Planeten dargestellt, in der Farbe des gewählten Fokus - Stufe 1 ein einzelner dünner Ring, Stufe 2 zwei Ringe, Stufe 3 drei Ringe mit kleinen Modul-Knoten und leichtem Leuchtpuls. So ist die Ausbaustufe auf einen Blick erkennbar, ohne das Baumenü zu öffnen.' },
       { title:'Bau-Warteschlange (Schiffe & Verteidigungsgebäude)', body:'Schiffe und Verteidigungsgebäude werden auch OHNE ausreichende Ressourcen im Moment der Bestellung sofort in die Warteschlange aufgenommen - Bezahlung und tatsächlicher Baustart passieren automatisch, sobald genug Ressourcen vorhanden UND die Baustelle frei ist (nur ein aktiver Bau je Art/Planet gleichzeitig). Ist ein früherer Auftrag in derselben Warteschlange (noch) nicht bezahlbar, wird ein späterer, bereits bezahlbarer Auftrag automatisch vorgezogen und sofort gestartet - der frühere bleibt liegen und wird bei jedem weiteren Tick erneut versucht, blockiert aber nicht mehr die ganze Warteschlange. So werden Ressourcen effizient genutzt. Dasselbe Prinzip gilt auch für die Gebäude-Wunschliste (Knopf "Warteschlange" bei normalen Gebäuden).' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
       { title:'Chat-Benachrichtigung', body:'Der Chat-Reiter am linken Bildschirmrand zeigt einen roten Punkt, sobald in Allianz- oder globalem Chat eine neue Nachricht eingetroffen ist, seit du zuletzt geöffnet hattest - läuft automatisch im Hintergrund, ohne dass der Chat offen sein muss.' },
@@ -10960,7 +11003,7 @@
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie, <strong>Wasserwelt</strong> +20% Lagerkapazität. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Generalist: +6% auf ALLE Ressourcen (kumuliert 30%), kostet aber 80% mehr als jeder Spezialist. Erdähnliche Welten, Gasriesen, Asteroiden und Superplaneten haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
-      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum, ebenfalls 24 Std. je Stufe: Gefechtsanalyse 6.000 FP, Erfahrene Besatzungen 12.000 FP, Legendäre Kommandeure 20.000 FP - nur eine Ausbildung gleichzeitig) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 22 Forschungszweige ihre jeweilige Maximalstufe erreicht haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
+      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum, ebenfalls 24 Std. je Stufe: Gefechtsanalyse 6.000 FP, Erfahrene Besatzungen 12.000 FP, Legendäre Kommandeure 20.000 FP - nur eine Ausbildung gleichzeitig; alle FP-Angaben sind Basiswerte, die Imperiums-Skalierung von +25% je weiterem Standort kommt hinzu) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 22 Forschungszweige ihre jeweilige Maximalstufe erreicht haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
       { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 45% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
       { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
@@ -13116,9 +13159,11 @@
       const have = state.rareItems[proj.unlockItem]||0;
       if (have < 1){ log('Benötigt 1x '+(RARE_ITEMS.find(r=>r.key===proj.unlockItem)||{}).name+' (seltener Fund bei Erkundungsmissionen).', 'ti-alert-triangle'); return; }
     }
-    if (!canAfford(proj.cost)){ log('Nicht genug Ressourcen für '+proj.name+'.', 'ti-alert-triangle'); return; }
-    if (!confirm(proj.name+' errichten für '+Object.entries(proj.cost).map(([r,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===r)||{}).label).join(', ')+(proj.unlockItem?' + 1x '+(RARE_ITEMS.find(r=>r.key===proj.unlockItem)||{}).name:'')+'? Einmalig, kann nicht rückgängig gemacht werden.')) return;
-    pay(proj.cost);
+    // Imperiums-Skalierung: Kosten wachsen mit der Standortzahl (siehe empireCostFactor).
+    const scaledCost = scaleCostByEmpire(proj.cost);
+    if (!canAfford(scaledCost)){ log('Nicht genug Ressourcen für '+proj.name+'.', 'ti-alert-triangle'); return; }
+    if (!confirm(proj.name+' errichten für '+Object.entries(scaledCost).map(([r,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===r)||{}).label).join(', ')+(proj.unlockItem?' + 1x '+(RARE_ITEMS.find(r=>r.key===proj.unlockItem)||{}).name:'')+'? Einmalig, kann nicht rückgängig gemacht werden.')) return;
+    pay(scaledCost);
     if (proj.unlockItem) state.rareItems[proj.unlockItem] -= 1;
     if (!state.megaProjects) state.megaProjects = {};
     if (!state.exoticResearch) state.exoticResearch = {};
@@ -13187,7 +13232,9 @@
   // Verteidigung/Stufe, +3% Produktion/Stufe) im Vergleich zu anderen Investitionen zu günstig.
   function orbitalCost(level){
     const f = Math.pow(2, level-1);
-    return { erz: 16000*f, kristalle: 10000*f, deuterium: 3200*f };
+    // Imperiums-Skalierung direkt hier, damit Neubau, Ausbau, Fokus-Umrüstung (halbe Kosten) und
+    // sämtliche Anzeigen automatisch denselben Preis rechnen (siehe empireCostFactor).
+    return scaleCostByEmpire({ erz: 16000*f, kristalle: 10000*f, deuterium: 3200*f });
   }
   function orbitalBuildTime(level){ return 300 * level; } // 5/10/15 Minuten
   // ===== Planeten-Ereignisse =====
@@ -16850,7 +16897,8 @@
         const running = job && job.key === e.key;
         const otherRunning = job && job.key !== e.key;
         const have = state.resources.forschungspunkte||0;
-        const affordable = !done && !job && have >= e.cost;
+        const eCost = Math.ceil(e.cost * empireCostFactor());
+        const affordable = !done && !job && have >= eCost;
         let rightHtml;
         if (done) rightHtml = '';
         else if (running){
@@ -16863,7 +16911,7 @@
           <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(195,190,245,0.15)'}; color:${done?'#5dcaa5':'#c3bef5'};"><i class="ti ${e.icon}" aria-hidden="true"></i></div>
               <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${e.name}</div>
-              <div class="bmeta">${e.desc}${done?'':' · '+fmt(e.cost)+' Forschungspunkte · 24 Std.'+(otherRunning?' · <span style="color:#8489a0;">andere Forschung läuft</span>':'')}</div></div>
+              <div class="bmeta">${e.desc}${done?'':' · '+fmt(eCost)+' Forschungspunkte · 24 Std.'+(otherRunning?' · <span style="color:#8489a0;">andere Forschung läuft</span>':'')}</div></div>
             </div>
             ${rightHtml}
           </div>
@@ -16882,7 +16930,8 @@
         const running = vJob && vJob.key === v.key;
         const otherRunning = vJob && vJob.key !== v.key;
         const have = state.resources.forschungspunkte||0;
-        const affordable = !done && reqOk && !vJob && have >= v.cost;
+        const vCost = Math.ceil(v.cost * empireCostFactor());
+        const affordable = !done && reqOk && !vJob && have >= vCost;
         let rightHtml;
         if (done) rightHtml = '';
         else if (running){
@@ -16895,7 +16944,7 @@
           <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(226,75,74,0.12)'}; color:${done?'#5dcaa5':'#e24b4a'};"><i class="ti ti-medal" aria-hidden="true"></i></div>
               <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${v.name}</div>
-              <div class="bmeta">${v.desc}${done?'':' · '+fmt(v.cost)+' Forschungspunkte · 24 Std.'+(reqOk?'':' · benötigt '+(VETERAN_TRAINING.find(x=>x.key===v.requires)||{}).name+' zuerst')+(otherRunning?' · <span style="color:#8489a0;">andere Ausbildung läuft</span>':'')}</div></div>
+              <div class="bmeta">${v.desc}${done?'':' · '+fmt(vCost)+' Forschungspunkte · 24 Std.'+(reqOk?'':' · benötigt '+(VETERAN_TRAINING.find(x=>x.key===v.requires)||{}).name+' zuerst')+(otherRunning?' · <span style="color:#8489a0;">andere Ausbildung läuft</span>':'')}</div></div>
             </div>
             ${rightHtml}
           </div>
@@ -18688,13 +18737,14 @@
         const have = p.unlockItem ? (state.rareItems[p.unlockItem]||0) : 1;
         const itemDef = p.unlockItem ? (RARE_ITEMS.find(r=>r.key===p.unlockItem)||{}) : null;
         const reqOk = !p.requiresAllResearchMaxed || allResearchMaxed();
-        const affordable = !built && reqOk && have>=1 && canAfford(p.cost);
+        const pCost = scaleCostByEmpire(p.cost);
+        const affordable = !built && reqOk && have>=1 && canAfford(pCost);
         return `<div class="card-row" style="flex-direction:column; align-items:stretch; ${built?'border-color:#5dcaa5;':''}">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.18); color:#fac775;"><i class="ti ${p.icon}" aria-hidden="true"></i></div><div><div class="bname">${built?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${p.name}</div><div class="bmeta">${p.desc}</div></div></div>
             ${built?'':`<button class="buy ${affordable?'affordable':''}" data-buy-mega="${p.key}" ${affordable?'':'disabled'}>Errichten</button>`}
           </div>
-          ${built?'':`<div class="bmeta">Kosten: ${costHtml(p.cost)}${itemDef?' + 1x '+(itemDef.name||p.unlockItem)+' (vorhanden: '+have+')':''}${p.requiresAllResearchMaxed?(reqOk?' · <span style="color:#5dcaa5;">alle Forschungen maximiert ✓</span>':' · <span style="color:#f0997b;">benötigt alle Forschungszweige auf Stufe 20</span>'):''}</div>`}
+          ${built?'':`<div class="bmeta">Kosten: ${costHtml(pCost)}${itemDef?' + 1x '+(itemDef.name||p.unlockItem)+' (vorhanden: '+have+')':''}${p.requiresAllResearchMaxed?(reqOk?' · <span style="color:#5dcaa5;">alle Forschungen maximiert ✓</span>':' · <span style="color:#f0997b;">benötigt alle Forschungszweige auf Stufe 20</span>'):''}</div>`}
         </div>`;
       }).join('');
       megaProjectsBox.querySelectorAll('[data-buy-mega]').forEach(btn => btn.onclick = () => buildMegaProject(btn.getAttribute('data-buy-mega')));
