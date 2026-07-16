@@ -2247,7 +2247,16 @@
       const R = Math.min(w,h)/2 - 1, cx = w/2, cy = h/2;
       ctx.save();
       ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
-      ctx.drawImage(tex, cx-R, cy-R, R*2, R*2);
+      // Bugfix (Bugreport 16.07.2026, "strahlenförmige Flammen"): die Textur ist als 2:1-Streifen
+      // angelegt (X-Achse = voller 360°-Rundumblick um die Kugel, siehe buildPlanetTexture), war hier
+      // aber fälschlich auf ein Quadrat gestaucht (Höhe UND Breite auf R*2) - dadurch wirkte die
+      // eigentlich für einen Rundumblick gedachte Musterfrequenz verdoppelt und erzeugte das
+      // strahlenförmige Artefakt statt einer glaubwürdigen Kugeloberfläche. Jetzt Seitenverhältnis
+      // beibehalten (Höhe -> Durchmesser skaliert) und nur der mittlere, quadratische Ausschnitt
+      // gezeigt (= die sichtbare Vorderseite einer Kugel), statt die volle Breite hineinzuzwängen.
+      const scale = (R*2) / tex.height;
+      const drawW = tex.width * scale;
+      ctx.drawImage(tex, cx - drawW/2, cy - R, drawW, R*2);
       const limb=ctx.createRadialGradient(cx,cy,R*0.5,cx,cy,R);
       limb.addColorStop(0,'rgba(0,0,0,0)'); limb.addColorStop(1,'rgba(0,8,20,0.45)');
       ctx.fillStyle=limb; ctx.fillRect(cx-R,cy-R,R*2,R*2);
@@ -2268,7 +2277,20 @@
     const PLANET_TEXTURE_DATAURL_CACHE = {};
     function getPlanetTextureDataUrl(typeKey){
       if (!(typeKey in PLANET_TEXTURE_DATAURL_CACHE)){
-        try { PLANET_TEXTURE_DATAURL_CACHE[typeKey] = getPlanetTexture(typeKey).toDataURL(); }
+        try {
+          const tex = getPlanetTexture(typeKey);
+          // Gleicher Bugfix wie bei drawPlanetMiniIcon: die Textur ist ein 2:1-Streifen (voller
+          // 360°-Rundumblick auf der X-Achse), NICHT 1:1. Vor dem Export als Data-URL erst auf einen
+          // quadratischen Mittelausschnitt zuschneiden statt sie später beim Einbetten per <image
+          // width/height> verzerren zu lassen - sonst dasselbe "strahlenförmige" Artefakt wie im
+          // Bugreport 16.07.2026.
+          const size = tex.height;
+          const off = document.createElement('canvas'); off.width = size; off.height = size;
+          const octx = off.getContext('2d');
+          if (!octx) throw new Error('kein 2D-Context');
+          octx.drawImage(tex, (tex.width-size)/2, 0, size, size, 0, 0, size, size);
+          PLANET_TEXTURE_DATAURL_CACHE[typeKey] = off.toDataURL();
+        }
         catch(e){ PLANET_TEXTURE_DATAURL_CACHE[typeKey] = null; }
       }
       return PLANET_TEXTURE_DATAURL_CACHE[typeKey];
@@ -2303,8 +2325,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.40.1';
+  const VERSION = '8.40.2';
   const PATCHNOTES = [
+    { version:'8.40.2', date:'16.07.2026', changes:[
+      'Bugfix (danke an Sascha für den Report): Planeten-Texturen zeigten in der Sektorkarte-Orbitansicht und den Kolonie-Kacheln ein strahlenförmiges "Flammen"-Artefakt statt einer glaubwürdigen Kugeloberfläche. Ursache: die Textur ist als 2:1-Streifen angelegt (volle 360°-Ansicht auf der Breite), wurde beim Einbau aber fälschlich auf ein Quadrat gestaucht statt das Seitenverhältnis beizubehalten - dadurch wirkte die Musterfrequenz verdoppelt. Jetzt wird korrekt nur der mittlere, quadratische Ausschnitt gezeigt (= Vorderseite der Kugel), an allen betroffenen Stellen (Planetenliste, Mondliste, Kolonie-Kacheln, Orbit-Karte)'
+    ]},
     { version:'8.40.1', date:'16.07.2026', changes:[
       'Grafikstil-Nachzügler: die texturierten Planeten (siehe v8.39.0) fehlten noch an zwei Stellen, wo Planeten ebenfalls auftauchen - der Sektorkarte-Orbitansicht (kreisende Planeten um die Sonne) und den Kolonie-Kacheln im Basis-Tab. Beide zeigen jetzt dieselbe typgerechte Textur wie die Planetenliste. Heimatbasis behält bewusst ihr Haus-Symbol (keine "Planeten"-Textur, da konzeptionell die eigene Basis statt ein kolonisierter Planet)'
     ]},
