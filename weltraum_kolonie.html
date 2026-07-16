@@ -796,16 +796,21 @@
   </div>
 
   <div id="adminPanelOverlay" class="login-overlay" style="display:none;">
-    <div class="login-card" style="text-align:left; position:relative; max-width:520px;">
+    <div class="login-card" style="text-align:left; position:relative; max-width:560px;">
       <button id="adminPanelCloseBtn" style="position:absolute; top:14px; right:14px; padding:5px 9px; font-size:11px;"><i class="ti ti-x" aria-hidden="true"></i></button>
       <div class="login-header">
         <i class="ti ti-shield-lock" aria-hidden="true" style="font-size:26px; color:#7f77dd;"></i>
         <div>
           <div class="login-title">Admin-Bereich</div>
-          <div class="login-sub">Gemeldete Spieler</div>
+          <div class="login-sub" id="adminPanelSub">Gemeldete Spieler</div>
         </div>
       </div>
+      <div style="display:flex; gap:6px; margin-bottom:12px;">
+        <button id="adminTabReportsBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Meldungen</button>
+        <button id="adminTabAnalyticsBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-atom" aria-hidden="true" style="margin-right:4px;"></i>Analytics</button>
+      </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
+      <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
     </div>
   </div>
 
@@ -984,7 +989,7 @@
           <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Hilfe</span></button>
           <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Einstellungen</span></button>
           <a href="https://ko-fi.com/gamegeeeeek/leaderboard" target="_blank" rel="noopener" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); border-radius:9px; border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; text-decoration:none; cursor:pointer; display:inline-flex; align-items:center; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;" title="Top-Unterstützer ansehen oder dem Entwickler einen Kaffee spendieren (Ko-fi)"><span aria-hidden="true" style="margin-right:3px;">☕</span><span class="header-btn-label">Kaffee</span></a>
-          <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
+          <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); align-items:center; justify-content:center;" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
         </div>
         <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true">
           <defs>
@@ -1996,8 +2001,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.36.3';
+  const VERSION = '8.36.4';
   const PATCHNOTES = [
+    { version:'8.36.4', date:'13.07.2026', changes:[
+      'Bug behoben: Logout-Icon in der Kopfzeile saß etwas höher als die anderen Header-Buttons (fehlende Zentrierung bei reinen Icon-Buttons ohne Text)',
+      'Neu: selbst gehostetes Analytics im Admin-Bereich (Einstellungen → Admin-Bereich → Analytics) - tägliche aktive Spieler und häufigste Aktionen der letzten 14 Tage, komplett auf dem eigenen Server, keine Drittanbieter, reine Tages-Aggregate ohne Einzelverfolgung'
+    ]},
     { version:'8.36.3', date:'13.07.2026', changes:[
       'Übersichtlichkeit weiter verbessert: Kopfzeile - Level und Punktestand stehen jetzt zuerst in der Stat-Leiste (vorher am Ende, oft erst nach Wischen sichtbar). Tab-Leiste - dezente Trennlinien zwischen den vier bereits bestehenden thematischen Gruppen (Aufbau/Erkundung/Sozial/Meta) ergänzt, macht die Struktur auf den ersten Blick erkennbar, ohne die Reihenfolge selbst zu ändern'
     ]},
@@ -6447,6 +6456,7 @@
     cf.colonyShips -= 1;
     const fleetName = resolveFleetName();
     cf.missions.push({ id: nextMissionId(), type:'colonize', targetId: planetId, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName });
+    trackEvent('colonize_started');
     log(fleetName+': Kolonieschiff unterwegs nach '+planet.name+' (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-planet');
     render(); save();
   }
@@ -8016,6 +8026,7 @@
     pay({deuterium: fuelCost});
     const fleetName = resolveFleetName();
     cf.missions.push({ id: nextMissionId(), type:'attack-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, composition: attackFleet, cargoCapacity, isWarAttack, targetAllianceTag });
+    trackEvent('attack_sent');
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen Spieler '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-sword');
     render(); save();
   }
@@ -8446,10 +8457,70 @@
   }
   async function openAdminPanel(){
     document.getElementById('adminPanelOverlay').style.display = 'flex';
-    await loadAdminReports();
+    switchAdminTab('reports');
   }
   function closeAdminPanel(){
     document.getElementById('adminPanelOverlay').style.display = 'none';
+  }
+  function switchAdminTab(tab){
+    const reportsList = document.getElementById('adminReportsList');
+    const analyticsView = document.getElementById('adminAnalyticsView');
+    const sub = document.getElementById('adminPanelSub');
+    const reportsBtn = document.getElementById('adminTabReportsBtn');
+    const analyticsBtn = document.getElementById('adminTabAnalyticsBtn');
+    if (reportsBtn) reportsBtn.classList.toggle('fb-type-active', tab==='reports');
+    if (analyticsBtn) analyticsBtn.classList.toggle('fb-type-active', tab==='analytics');
+    if (tab === 'reports'){
+      if (reportsList) reportsList.style.display = 'flex';
+      if (analyticsView) analyticsView.style.display = 'none';
+      if (sub) sub.textContent = 'Gemeldete Spieler';
+      loadAdminReports();
+    } else {
+      if (reportsList) reportsList.style.display = 'none';
+      if (analyticsView) analyticsView.style.display = 'block';
+      if (sub) sub.textContent = 'Nutzungsstatistik (letzte 14 Tage)';
+      loadAdminAnalytics();
+    }
+  }
+  // Analytics-Dashboard (13.07.2026, Feature-Wunsch: echte Nutzungsdaten statt Vermutung) - simples
+  // Balken-Diagramm für tägliche aktive Nutzer + sortierte Ereignisliste, komplett mit CSS/divs statt
+  // einer Chart-Bibliothek (bei 14 Datenpunkten unnötig).
+  async function loadAdminAnalytics(){
+    const el = document.getElementById('adminAnalyticsView');
+    if (!el) return;
+    el.innerHTML = '<div class="bmeta">lädt…</div>';
+    try {
+      const res = await backendFetch('/admin/analytics?days=14');
+      const data = await res.json();
+      if (!res.ok){ el.innerHTML = '<div class="bmeta">'+(data.error||'Fehler beim Laden.')+'</div>'; return; }
+      const days = data.days || [];
+      const maxUsers = Math.max(1, ...days.map(d => d.uniqueUsers));
+      const totalEvents = {};
+      for (const d of days) for (const [k,v] of Object.entries(d.events)) totalEvents[k] = (totalEvents[k]||0) + v;
+      const sortedEvents = Object.entries(totalEvents).sort((a,b) => b[1]-a[1]).slice(0, 15);
+      const barsHtml = days.map(d => {
+        const pct = Math.max(4, (d.uniqueUsers/maxUsers)*100);
+        const shortDate = d.date.slice(5).replace('-', '.');
+        return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <span style="width:38px; font-size:10px; color:#9296ac; flex-shrink:0;">${shortDate}</span>
+          <div style="flex:1; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden; height:16px;">
+            <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#7f77dd,#afa9ec); border-radius:5px;"></div>
+          </div>
+          <span style="width:22px; font-size:10.5px; color:#c7cbe0; text-align:right; flex-shrink:0;">${d.uniqueUsers}</span>
+        </div>`;
+      }).join('');
+      const eventsHtml = sortedEvents.length ? sortedEvents.map(([name,count]) => `
+        <div class="card-row" style="padding:0.5rem 0.85rem;">
+          <span class="bname" style="font-size:12px; font-family:monospace;">${name}</span>
+          <span class="lvl-pill">${count}</span>
+        </div>`).join('') : '<div class="bmeta">Noch keine Ereignisse aufgezeichnet.</div>';
+      el.innerHTML = `
+        <div class="section-title" style="font-size:13px;"><i class="ti ti-users" aria-hidden="true"></i>Tägliche aktive Spieler</div>
+        <div style="margin-bottom:1rem;">${barsHtml}</div>
+        <div class="section-title" style="font-size:13px;"><i class="ti ti-list-details" aria-hidden="true"></i>Häufigste Ereignisse (Summe über 14 Tage)</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">${eventsHtml}</div>
+      `;
+    } catch(e){ el.innerHTML = '<div class="bmeta">Server nicht erreichbar.</div>'; }
   }
   async function loadAdminReports(){
     const listEl = document.getElementById('adminReportsList');
@@ -10217,6 +10288,7 @@
         return;
       }
       log(role==='admin' ? 'Allianz ['+tag+'] gegründet – du bist Admin.' : 'Allianz ['+tag+'] beigetreten.', 'ti-flag');
+      trackEvent(role==='admin' ? 'alliance_created' : 'alliance_joined');
       state.player.allianceTag = tag;
       state.player.allianceRole = role;
       render(); save();
@@ -13123,6 +13195,7 @@
   async function shareColonyImage(){
     const btn = document.getElementById('shareColonyBtn');
     if (btn) btn.disabled = true;
+    trackEvent('share_colony_clicked');
     try {
       const blob = await generateColonyShareImage();
       if (!blob){ log('Bild konnte nicht erzeugt werden.', 'ti-alert-triangle'); return; }
@@ -13900,8 +13973,18 @@
     render(); save();
   }
 
+  // Analytics (13.07.2026, Feature-Wunsch: echte Nutzungsdaten statt Vermutung aus Code-Lesen) -
+  // fire-and-forget, blockiert nie das eigentliche Spiel und scheitert absichtlich still (kein
+  // eigener Server, Offline, o.ä. sollen nie eine Fehlermeldung auslösen). Läuft komplett auf dem
+  // eigenen Server, keine Drittanbieter.
+  function trackEvent(name){
+    if (!useBackend()) return;
+    try { backendFetch('/analytics/event', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ event:name }) }).catch(()=>{}); }
+    catch(e){}
+  }
   function switchTab(tab){
     activeTab = tab;
+    trackEvent('tab_view:'+tab);
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab')===tab));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
     const hReports = document.getElementById('headerReportsBtn');
@@ -17052,6 +17135,10 @@
     if (openAdminPanelBtn) openAdminPanelBtn.onclick = openAdminPanel;
     const adminPanelCloseBtn = document.getElementById('adminPanelCloseBtn');
     if (adminPanelCloseBtn) adminPanelCloseBtn.onclick = closeAdminPanel;
+    const adminTabReportsBtn = document.getElementById('adminTabReportsBtn');
+    if (adminTabReportsBtn) adminTabReportsBtn.onclick = () => switchAdminTab('reports');
+    const adminTabAnalyticsBtn = document.getElementById('adminTabAnalyticsBtn');
+    if (adminTabAnalyticsBtn) adminTabAnalyticsBtn.onclick = () => switchAdminTab('analytics');
     const shareColonyBtn = document.getElementById('shareColonyBtn');
     if (shareColonyBtn) shareColonyBtn.onclick = shareColonyImage;
     const referralCopyLinkBtn = document.getElementById('referralCopyLinkBtn');
@@ -17743,6 +17830,7 @@
     } catch(e){}
   }
   function applyReferralRedeemResult(data){
+    trackEvent('referral_link_used');
     state.referredBy = data.referrerName;
     if (data.status === 'paid'){
       state.referralRedeemed = true;
