@@ -1577,6 +1577,8 @@
 
         <div id="allianceDominanceBox" style="margin-bottom:1.5rem;"></div>
 
+        <div id="allianceBaseBox" style="margin-bottom:1.5rem;"></div>
+
         <div class="section-title"><i class="ti ti-flag" aria-hidden="true"></i>Allianz-Rangliste</div>
         <div class="leaderboard" id="allianceList"><div class="bmeta">lädt…</div></div>
 
@@ -2356,8 +2358,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.52.0';
+  const VERSION = '8.53.0';
   const PATCHNOTES = [
+    { version:'8.53.0', date:'16.07.2026', changes:[
+      'Neu: Allianzbasis - das gemeinsame Endgame-Großprojekt jeder Allianz. Der Admin gründet die Basis einmalig in einem frei gewählten Sternsystem (dauerhafte, strategische Entscheidung - die Basis kann nie verlegt werden), danach tragen alle Mitglieder gemeinsam Ressourcen bei (Allianz-Tab)',
+      '10 Ausbaustufen mit stark steigenden Kosten (Stufe 1: 1 Mio. Erz / 600k Kristalle / 300k Deuterium / 30k Antimaterie, danach Verdopplung je Stufe) und Bauzeiten (ab 8 Std., je Stufe x1,5 - Stufe 10 allein ~19 Tage). Die Bauzeit läuft seit der Gründung parallel zu den Beiträgen',
+      'Boni für alle Mitglieder: +1% Produktion & Verteidigung je Stufe, Meilensteine: Stufe 2/6 je +5% Lagerkapazität, Stufe 3/7 je -4% Gebäude-Bauzeit, Stufe 5/9 je -4% Forschungszeit, Stufe 4 -10% Flugzeit für Missionen ins Basis-System (Allianzgebiet), Stufe 8 -8% Treibstoffkosten, Stufe 10 (Monument) zusätzlich +4% Produktion & Verteidigung - alles innerhalb der bestehenden, gedeckelten Bonus-Gruppen',
+      'Die Basis ist auf der Sektorkarte ihres Systems als eigene Groß-Struktur sichtbar und wächst optisch mit jeder Ausbaustufe: Kernstation, Andockmodule, Ringe, Solarflügel, Verteidigungstürme, rotierender Verkehrsorbit, pulsierender Außenring und zuletzt die goldene Monument-Krone. Antippen springt direkt in den Allianz-Tab'
+    ]},
     { version:'8.52.0', date:'16.07.2026', changes:[
       'Großer Wirtschafts-Balance-Pass: Die Produktion wächst mit Heimat + 10 Kolonien auf grob das 400-fache des Frühspiels (11 Standorte x Gebäudestufen x Bonus-Stapel), während viele Kosten konstant blieben - ein Superschlachtschiff kostete im Endgame unter 1 Sekunde Produktion, ein Mega-Projekt ~1 Minute. Zwei neue Skalierungen gleichen das aus, Frühspieler (0-1 Kolonien) zahlen praktisch unverändert',
       'Neu: Imperiums-Skalierung - Mega-Projekte, Orbitalstationen, exotische Forschung und Veteranen-Ausbildung kosten +25% je Standort über dem ersten (Kolonien und Monde zählen mit; bei Heimat + 10 Kolonien x3,5). Alle Anzeigen zeigen die skalierten Preise; Kolonisierungskosten skalierten bereits vorher separat (+35% je Kolonie)',
@@ -6506,6 +6514,7 @@
   function missionFuelCost(durationSec, shipCount){
     let cost = Math.max(5, durationSec * 0.48 * Math.sqrt(Math.max(1, shipCount)));
     if (state.allianceResearch) cost *= (1-0.15*allianceTechFrac('ab_expedition'));
+    cost *= allianceBaseFuelMult();
     const doc = activeDoctrine();
     if (doc) cost *= doc.fuelMult;
     return Math.max(1, Math.round(cost));
@@ -6572,6 +6581,7 @@
     if (state.allianceResearch) labMult *= (1-0.10*allianceTechFrac('ab_forschungszentrum'));
     if (hasRoleAnywhere('science')) labMult *= 0.90; // Forschungs-Welt: -10% Forschungszeit (imperiumsweit, nicht stapelbar)
     labMult *= (1 - officerBonus('wissenschaftler'));
+    labMult *= allianceBaseResearchTimeMult();
     return Math.round(r.baseDuration * Math.pow(r.durationMult, targetLevel-1) * labMult);
   }
   function researchCostFor(r, targetLevel){
@@ -6819,6 +6829,7 @@
     // Friedensdividende: +5% Produktion je aktivem Nichtangriffspakt, gedeckelt bei +10% (2 Pakte).
     globalBonus += Math.min(2, activePactCount())*(0.05 + (state.research.rdiplomatie||0)*0.0015);
     globalBonus += ascBonus('prod')*0.02;
+    globalBonus += allianceBaseProdBonus();
     // Balance-Pass v8.7: Die additive Bonus-Gruppe ist bei +100% gedeckelt. Jeder Einzelbonus
     // bleibt spürbar, aber die Summe kann nicht mehr unbegrenzt wachsen - auch nicht durch
     // künftige Features, die hier einzahlen.
@@ -6877,6 +6888,7 @@
     if (lvl) cap *= (1 + lvl*RESEARCH_DEFS.find(r=>r.key==='rlager').effectPerLevel);
     if (state.allianceResearch) cap *= (1+0.15*allianceTechFrac('a_storage'));
     if (state.allianceResearch) cap *= (1+0.10*allianceTechFrac('ab_lager'));
+    cap *= (1 + allianceBaseStorageBonus());
     for (const [pid, bonus] of Object.entries(state.planetBonuses||{})){
       if (state.colonies[pid] && bonus.type==='storage_boost') cap += bonus.flat;
     }
@@ -6909,7 +6921,7 @@
     { key:'speed', name:'Navigationsexperte', icon:'ti-rocket', desc:'-3% Flugzeit aller Missionen' }
   ];
   function prestigePerkCount(key){ return (state.prestigePerks||[]).filter(k=>k===key).length; }
-  function missionDurationFor(sec, fleet, relevantKeys){
+  function missionDurationFor(sec, fleet, relevantKeys, targetSystem){
     const f = fleet || currentFleet();
     const lvl = state.research.rfusion||0;
     let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
@@ -6922,6 +6934,9 @@
     if (hasExoticResearch('tiefenraum')) mult *= 0.95;
     const now = Date.now();
     for (const buff of (state.buffs||[])){ if (buff.kind==='speed' && buff.expiresAt > now) mult *= buff.mult; }
+    // Allianzbasis ab Stufe 4: -10% Flugzeit für Missionen ins Basis-System (nur wenn der Aufrufer
+    // das Zielsystem kennt und mitgibt - Missionsarten ohne echtes Zielsystem bleiben unberührt).
+    mult *= allianceBaseFlightMult(targetSystem);
     return sec * mult;
   }
   function hangarCapacity(fleet){ const f = fleet || currentFleet(); return (f.carrier||0)*6; }
@@ -7260,6 +7275,7 @@
     combatBonus += skillBonusPct('war');
     combatBonus += (megaProjectCombatMult()-1);
     combatBonus += veteranCombatBonus();
+    combatBonus += allianceBaseDefBonus();
     if (hasArtifactBonus()) combatBonus += 0.05;
     if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
     if (planetKey) combatBonus += moduleBonusAt(planetKey, 'def');
@@ -7424,7 +7440,7 @@
     if (slotsUsed >= cf.colonyShips){ log('Alle Kolonieschiffe dort sind bereits unterwegs.', 'ti-alert-triangle'); return; }
     const planet = PLANETS.find(p=>p.id===planetId);
     const cost = colonizeCostFor(planetId);
-    const dur = missionDurationFor(planet.duration, { colonyShips:1 }, ['colonyShips']);
+    const dur = missionDurationFor(planet.duration, { colonyShips:1 }, ['colonyShips'], planet.system);
     const fuel = missionFuelCostSplit(dur, { colonyShips:1 });
     const totalCost = Object.assign({}, cost);
     for (const [fr,fa] of Object.entries(fuel)) totalCost[fr] = (totalCost[fr]||0) + fa;
@@ -8353,6 +8369,7 @@
     if (state.referredBy === undefined) state.referredBy = null;
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
     if (state.pirateDebrisRaid === undefined) state.pirateDebrisRaid = null;
+    if (state.allianceBase === undefined) state.allianceBase = null;
     if (!state.themeKey) state.themeKey = 'standard';
     if (state.autoReinforceOn === undefined) state.autoReinforceOn = false;
     if (state.uiJumpNav === undefined) state.uiJumpNav = false;
@@ -8931,6 +8948,7 @@
     }
     if (kind === 'building'){
       effBuildTimeEach *= (1 - officerBonus('ingenieur'));
+      effBuildTimeEach *= allianceBaseBuildTimeMult();
     }
     effBuildTimeEach *= (1 - moduleBonusAt(planetKey, 'buildspeed'));
     const dur = Math.max(3, Math.round(effBuildTimeEach * qty));
@@ -11016,6 +11034,7 @@
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.' }
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
+      { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten verdoppeln sich je Stufe (Stufe 1: 1 Mio. Erz / 600k Kristalle / 300k Deuterium / 30k Antimaterie - Stufe 10 allein kostet das 512-fache), und jede Stufe hat eine <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage), die seit der Gründung parallel zu den Beiträgen läuft - schnelles Vollspenden überspringt also keine Bauzeit. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Station sichtbar - mit jeder Stufe kommen sichtbar Ringe, Solarflügel, Verteidigungstürme und zuletzt die goldene Monument-Krone dazu.' },
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
       { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen oder zurückstufen (auch andere Admins zu Offizier/Mitglied), und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
       { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz startet mit einem Mitgliederlimit von <strong>10</strong>. Höher geht es nur über die Allianz-Forschung "Allianz-Expansion" (5 Stufen, in der Allianz-Forschung, dieselbe Kette wie andere Allianz-Techs) - bis zu 50 bei voller Ausbaustufe. Das Limit ergibt sich automatisch aus der erreichten Forschungsstufe, es lässt sich nicht manuell einstellen. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
@@ -11647,7 +11666,7 @@
       state.player.allianceTag = tag;
       state.player.allianceRole = role;
       render(); save();
-      loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceDominance(); loadAllianceAdminSettings();
+      loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceDominance(); loadAllianceAdminSettings();
     } catch(e){
       log('Allianz-Aktion aktuell nicht möglich (Server nicht erreichbar).', 'ti-alert-triangle');
     }
@@ -12324,6 +12343,7 @@
       state.allianceResearch = unlockedDoc;
       renderAllianceTechBox();
       renderAllianceBuildingBox();
+      renderAllianceBaseBox();
     } catch(e){ /* Allianz-Techs optional, Spiel läuft ohne */ }
   }
 
@@ -12405,6 +12425,138 @@
       </div>`;
     const btn = box.querySelector('[data-claim-alliance-dominance]');
     if (btn) btn.onclick = () => claimAllianceDominanceReward();
+  }
+
+  // ===== Allianzbasis =====
+  // Zentrales Endgame-Großprojekt jeder Allianz: der Admin gründet die Basis EINMALIG in einem
+  // selbst gewählten Sternsystem (dauerhaft, nicht verlegbar - strategische Entscheidung), danach
+  // tragen alle Mitglieder Ressourcen bei (gleiches contrib-Dokument wie die Allianz-Techs, Schlüssel
+  // base_erz/base_kristalle/base_deuterium/base_antimaterie - jeder schreibt nur sein eigenes
+  // Dokument, daher keine Backend-Sonderrechte nötig). Die Stufe wird rein DETERMINISTISCH aus zwei
+  // Bedingungen abgeleitet und nirgends gespeichert (keine Race-Conditions zwischen Clients):
+  // 1) Ressourcen: die kumulierten Beiträge decken die Kosten aller Stufen bis N.
+  // 2) Bauzeit: seit der Gründung ist die kumulierte Bauzeit aller Stufen bis N vergangen -
+  //    die Bautrupps arbeiten parallel zum Spendensammeln, schnelles Vollspenden überspringt
+  //    also keine Bauzeit (Stufe 10 braucht so oder so mehrere Wochen).
+  const ALLIANCE_BASE_MAX_LEVEL = 10;
+  const ALLIANCE_BASE_BASE_COST = { erz: 1000000, kristalle: 600000, deuterium: 300000, antimaterie: 30000 };
+  const ALLIANCE_BASE_COST_MULT = 2.0;      // Kosten je Stufe verdoppeln sich
+  const ALLIANCE_BASE_BUILD_H_L1 = 8;       // Bauzeit Stufe 1 in Stunden
+  const ALLIANCE_BASE_BUILD_MULT = 1.5;     // Bauzeit-Wachstum je Stufe (St. 10 allein ~19 Tage)
+  // Meilenstein-Leiter: je Stufe +1% Produktion & Verteidigung für ALLE Mitglieder (additiv in den
+  // bestehenden, bei +100% gedeckelten Bonus-Gruppen), dazu feste Freischaltungen:
+  const ALLIANCE_BASE_STAGES = [
+    { level:1,  text:'Basis errichtet · +1% Produktion & +1% Verteidigung je Stufe (alle Mitglieder)' },
+    { level:2,  text:'+5% Lagerkapazität' },
+    { level:3,  text:'-4% Gebäude-Bauzeit' },
+    { level:4,  text:'-10% Flugzeit für Missionen ins Basis-System (Allianzgebiet)' },
+    { level:5,  text:'-4% Forschungszeit' },
+    { level:6,  text:'weitere +5% Lagerkapazität (gesamt +10%)' },
+    { level:7,  text:'weitere -4% Gebäude-Bauzeit (gesamt -8%)' },
+    { level:8,  text:'-8% Treibstoffkosten für alle Missionen' },
+    { level:9,  text:'weitere -4% Forschungszeit (gesamt -8%)' },
+    { level:10, text:'Monument der Allianz · zusätzlich +4% Produktion & +4% Verteidigung' }
+  ];
+  function allianceBaseLevelCost(level){
+    const f = Math.pow(ALLIANCE_BASE_COST_MULT, level-1);
+    const c = {};
+    for (const [r,a] of Object.entries(ALLIANCE_BASE_BASE_COST)) c[r] = Math.round(a*f);
+    return c;
+  }
+  function allianceBaseCumCost(level){
+    const c = { erz:0, kristalle:0, deuterium:0, antimaterie:0 };
+    for (let l=1;l<=level;l++){ const lc = allianceBaseLevelCost(l); for (const r of Object.keys(c)) c[r] += lc[r]; }
+    return c;
+  }
+  function allianceBaseBuildSecondsCum(level){
+    let s = 0;
+    for (let l=1;l<=level;l++) s += ALLIANCE_BASE_BUILD_H_L1*3600*Math.pow(ALLIANCE_BASE_BUILD_MULT, l-1);
+    return Math.round(s);
+  }
+  function allianceBaseTotals(){
+    const t = state.allianceTechTotals || {};
+    return { erz:t.base_erz||0, kristalle:t.base_kristalle||0, deuterium:t.base_deuterium||0, antimaterie:t.base_antimaterie||0 };
+  }
+  function allianceBaseLevel(){
+    const base = state.allianceBase;
+    if (!base || !base.foundedAt || !myAllianceTag()) return 0;
+    const tot = allianceBaseTotals();
+    let lvl = 0;
+    for (let l=1;l<=ALLIANCE_BASE_MAX_LEVEL;l++){
+      const cum = allianceBaseCumCost(l);
+      const resOk = Object.entries(cum).every(([r,a]) => (tot[r]||0) >= a);
+      const timeOk = Date.now() >= base.foundedAt + allianceBaseBuildSecondsCum(l)*1000;
+      if (resOk && timeOk) lvl = l; else break;
+    }
+    return lvl;
+  }
+  // Boni der Basis - alle speisen die bestehenden additiven, gedeckelten Gruppen bzw. Multiplikator-
+  // Ketten und bleiben damit im Rahmen der dokumentierten Balance-Konventionen.
+  function allianceBaseProdBonus(){ const l = allianceBaseLevel(); return l*0.01 + (l>=10?0.04:0); }
+  function allianceBaseDefBonus(){ const l = allianceBaseLevel(); return l*0.01 + (l>=10?0.04:0); }
+  function allianceBaseStorageBonus(){ const l = allianceBaseLevel(); return (l>=2?0.05:0) + (l>=6?0.05:0); }
+  function allianceBaseBuildTimeMult(){ const l = allianceBaseLevel(); return 1 - ((l>=3?0.04:0) + (l>=7?0.04:0)); }
+  function allianceBaseResearchTimeMult(){ const l = allianceBaseLevel(); return 1 - ((l>=5?0.04:0) + (l>=9?0.04:0)); }
+  function allianceBaseFuelMult(){ return allianceBaseLevel()>=8 ? 0.92 : 1; }
+  function allianceBaseFlightMult(targetSystem){
+    const base = state.allianceBase;
+    if (!base || !targetSystem) return 1;
+    return (allianceBaseLevel()>=4 && targetSystem===base.sector) ? 0.90 : 1;
+  }
+  async function loadAllianceBase(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ return; }
+    try {
+      const r = await storageGet('alliance:'+tag+':base', true);
+      state.allianceBase = (r && r.value) ? JSON.parse(r.value) : null;
+      renderAllianceBaseBox();
+    } catch(e){}
+  }
+  async function foundAllianceBase(sectorId){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ log('Die Allianzbasis braucht eine Allianz und den Server-Modus.', 'ti-alert-triangle'); return; }
+    if (state.player.allianceRole !== 'admin'){ log('Nur der Allianz-Admin kann den Bauplatz der Allianzbasis festlegen.', 'ti-alert-triangle'); return; }
+    if (state.allianceBase && state.allianceBase.foundedAt){ log('Die Allianzbasis wurde bereits gegründet - der Standort ist dauerhaft.', 'ti-alert-triangle'); return; }
+    const sys = STAR_SYSTEMS.find(s=>s.id===sectorId);
+    if (!sys){ log('Unbekanntes Sternsystem.', 'ti-alert-triangle'); return; }
+    if (!confirm('Allianzbasis im System '+sys.name+' gründen? Diese Entscheidung ist DAUERHAFT - die Basis kann nie verlegt werden. Danach können alle Mitglieder Ressourcen beitragen.')) return;
+    const doc = { sector: sectorId, foundedAt: Date.now(), foundedBy: state.player.id, foundedByName: state.player.name };
+    try {
+      await storageSet('alliance:'+tag+':base', JSON.stringify(doc), true);
+      state.allianceBase = doc;
+      log('Allianzbasis im System '+sys.name+' gegründet! Alle Mitglieder können jetzt im Allianz-Tab beitragen.', 'ti-building-fortress');
+      playSound('achieve');
+    } catch(e){ log('Gründung fehlgeschlagen (Verbindungsfehler).', 'ti-alert-triangle'); }
+    render(); save();
+  }
+  async function contributeToAllianceBase(resKey, amount){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ log('Die Allianzbasis braucht eine Allianz und den Server-Modus.', 'ti-alert-triangle'); return; }
+    if (!state.allianceBase || !state.allianceBase.foundedAt){ log('Die Allianzbasis wurde noch nicht gegründet.', 'ti-alert-triangle'); return; }
+    if (allianceBaseLevel() >= ALLIANCE_BASE_MAX_LEVEL){ log('Die Allianzbasis hat bereits die Maximalstufe erreicht.', 'ti-info-circle'); return; }
+    amount = Math.floor(amount);
+    if (!amount || amount <= 0){ log('Ungültige Menge.', 'ti-alert-triangle'); return; }
+    if ((state.resources[resKey]||0) < amount){ log('Nicht genug Ressourcen für diesen Beitrag.', 'ti-alert-triangle'); return; }
+    // Nicht mehr annehmen, als bis zur Maximalstufe überhaupt gebraucht wird.
+    const maxCum = allianceBaseCumCost(ALLIANCE_BASE_MAX_LEVEL);
+    const tot = allianceBaseTotals();
+    const still = Math.max(0, (maxCum[resKey]||0) - (tot[resKey]||0));
+    amount = Math.min(amount, still);
+    if (amount <= 0){ log('Diese Ressource ist für die Basis bereits vollständig gedeckt.', 'ti-info-circle'); return; }
+    state.resources[resKey] -= amount;
+    const contribKey = 'base_'+resKey;
+    state.allianceContributed[contribKey] = (state.allianceContributed[contribKey]||0) + amount;
+    try {
+      const key = 'alliance:'+tag+':contrib:'+state.player.id;
+      let doc = {};
+      try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
+      doc[contribKey] = (doc[contribKey]||0) + amount;
+      await storageSet(key, JSON.stringify(doc), true);
+    } catch(e){}
+    log(fmt(amount)+' '+(RES_DEFS.find(r=>r.key===resKey)||{}).label+' zur Allianzbasis beigetragen.', 'ti-building-fortress');
+    playSound('trade');
+    await loadAllianceTechData();
+    render(); save();
   }
 
   async function contributeToAllianceTech(techKey, amount){
@@ -12529,6 +12681,157 @@
     if (!box || isTypingIn('allianceTechBox')) return;
     box.innerHTML = allianceStructureListHtml(ALLIANCE_TECH_DEFS);
     wireAllianceContribButtons();
+  }
+  // Pseudo-3D-SVG-Modell der Allianzbasis. Wächst sichtbar mit jeder Stufe: Kernstation (immer) ->
+  // Andockmodule (2) -> innerer Ring (3) -> Ringknoten (4) -> zweiter, gekippter Ring (5) ->
+  // Solarflügel (6) -> Verteidigungstürme (7) -> rotierender Verkehrsorbit (8) -> pulsierender
+  // Außenring (9) -> goldene Monument-Krone (10). idSuffix hält Gradient-IDs eindeutig, wenn das
+  // Modell gleichzeitig auf der Sektorkarte UND als Vorschau im Allianz-Tab gerendert wird.
+  function allianceBaseModelSvg(level, idSuffix){
+    const gid = 'abGlow'+(idSuffix||'');
+    const kid = 'abCore'+(idSuffix||'');
+    const glowColor = level>=10 ? '#fac775' : '#c3bef5';
+    let s = `<defs>
+      <radialGradient id="${gid}" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="${glowColor}" stop-opacity="0.55"/>
+        <stop offset="100%" stop-color="${glowColor}" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="${kid}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#d9d5fa"/>
+        <stop offset="45%" stop-color="#8f88e8"/>
+        <stop offset="100%" stop-color="#4d4894"/>
+      </linearGradient>
+    </defs>`;
+    s += `<circle cx="0" cy="0" r="${16 + level*1.6}" fill="url(#${gid})"/>`;
+    if (level>=9){
+      s += `<circle cx="0" cy="0" r="${20 + level}" fill="none" stroke="${glowColor}" stroke-opacity="0.5" stroke-width="1.2">
+        <animate attributeName="stroke-opacity" values="0.5;0.15;0.5" dur="2.6s" repeatCount="indefinite"/>
+      </circle>`;
+    }
+    if (level>=8){
+      s += `<g><circle cx="0" cy="0" r="${17 + level*0.8}" fill="none" stroke="#85b7eb" stroke-opacity="0.55" stroke-width="0.8" stroke-dasharray="3,6"/>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="24s" repeatCount="indefinite"/></g>`;
+    }
+    if (level>=5) s += `<ellipse cx="0" cy="0" rx="${13+level*0.6}" ry="${(13+level*0.6)*0.38}" fill="none" stroke="#afa9ec" stroke-opacity="0.7" stroke-width="1" transform="rotate(-24)"/>`;
+    if (level>=3){
+      const r3 = 10 + level*0.4;
+      s += `<ellipse cx="0" cy="0" rx="${r3}" ry="${r3*0.42}" fill="none" stroke="#c3bef5" stroke-opacity="0.85" stroke-width="1.3" transform="rotate(18)"/>`;
+      if (level>=4){
+        for (const a of [15, 105, 195, 285]){
+          const rad = a*Math.PI/180;
+          s += `<circle cx="${(Math.cos(rad)*r3).toFixed(1)}" cy="${(Math.sin(rad)*r3*0.42).toFixed(1)}" r="1.6" fill="#e8e5ff" transform="rotate(18)"/>`;
+        }
+      }
+    }
+    if (level>=6){
+      s += `<rect x="-15" y="-2.2" width="7.5" height="4.4" rx="0.8" fill="#37589c" stroke="#85b7eb" stroke-width="0.5" transform="rotate(-8)"/>
+            <rect x="7.5" y="-2.2" width="7.5" height="4.4" rx="0.8" fill="#37589c" stroke="#85b7eb" stroke-width="0.5" transform="rotate(-8)"/>`;
+    }
+    if (level>=7){
+      for (const [tx,ty] of [[-8,-8],[8,-8],[-8,8],[8,8]]){
+        s += `<polygon points="${tx},${ty-3} ${tx+2.4},${ty+2} ${tx-2.4},${ty+2}" fill="#e24b4a" stroke="#f0997b" stroke-width="0.5" opacity="0.9"/>`;
+      }
+    }
+    if (level>=2){
+      s += `<rect x="-11" y="-2" width="5" height="4" rx="1" fill="#6a63bd"/><rect x="6" y="-2" width="5" height="4" rx="1" fill="#6a63bd"/>`;
+    }
+    // Kernstation: schattiertes Oktaeder mit Lichtkante + Antenne (immer sichtbar)
+    s += `<polygon points="0,-8 6.5,-3 6.5,3 0,8 -6.5,3 -6.5,-3" fill="url(#${kid})" stroke="#e8e5ff" stroke-width="0.7"/>
+          <polygon points="0,-8 6.5,-3 0,-1 -6.5,-3" fill="#ffffff" opacity="0.28"/>
+          <line x1="0" y1="-8" x2="0" y2="-13" stroke="#c3bef5" stroke-width="0.8"/>
+          <circle cx="0" cy="-13.6" r="1.1" fill="#5dcaa5"><animate attributeName="opacity" values="1;0.25;1" dur="1.8s" repeatCount="indefinite"/></circle>`;
+    if (level>=10){
+      s += `<path d="M -6,-16 L -3,-20 L 0,-16.5 L 3,-20 L 6,-16" fill="none" stroke="#fac775" stroke-width="1.3" stroke-linecap="round"/>
+            <circle cx="0" cy="0" r="9" fill="none" stroke="#fac775" stroke-opacity="0.75" stroke-width="0.8"/>`;
+    }
+    return s;
+  }
+  function renderAllianceBaseBox(){
+    const box = document.getElementById('allianceBaseBox');
+    if (!box || isTypingIn('allianceBaseBox')) return;
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ box.innerHTML = ''; return; }
+    const base = state.allianceBase;
+    const titleHtml = `<div class="section-title"><i class="ti ti-building-fortress" aria-hidden="true"></i>Allianzbasis</div>`;
+    if (!base || !base.foundedAt){
+      const amAdmin = state.player.allianceRole === 'admin';
+      const sysOptions = STAR_SYSTEMS.map(sys=>`<option value="${sys.id}">${sys.name}</option>`).join('');
+      box.innerHTML = titleHtml + `
+        <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+          <div class="bmeta">Das gemeinsame Endgame-Großprojekt eurer Allianz: eine zentrale Basis in einem frei gewählten Sternsystem. 10 Ausbaustufen, jede schaltet dauerhafte Boni für ALLE Mitglieder frei. Der Standort ist nach der Gründung <strong>dauerhaft</strong> und auf der Sektorkarte für euch sichtbar.</div>
+          ${amAdmin ? `
+            <div style="display:flex; gap:8px; align-items:center;">
+              <select id="allianceBaseSectorSelect" style="flex:1;">${sysOptions}</select>
+              <button class="buy affordable" id="allianceBaseFoundBtn"><i class="ti ti-building-fortress" aria-hidden="true" style="margin-right:4px;"></i>Gründen</button>
+            </div>
+            <div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Die Wahl des Systems ist endgültig - die Basis kann nie verlegt werden.</div>
+          ` : `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Euer Allianz-Admin muss zuerst den Bauplatz festlegen.</div>`}
+        </div>`;
+      const fb = document.getElementById('allianceBaseFoundBtn');
+      if (fb) fb.onclick = () => foundAllianceBase(document.getElementById('allianceBaseSectorSelect').value);
+      return;
+    }
+    const lvl = allianceBaseLevel();
+    const sys = STAR_SYSTEMS.find(s=>s.id===base.sector);
+    const tot = allianceBaseTotals();
+    const maxed = lvl >= ALLIANCE_BASE_MAX_LEVEL;
+    const nextCum = maxed ? null : allianceBaseCumCost(lvl+1);
+    // Bauzeit-Status der nächsten Stufe (läuft parallel zu den Beiträgen, ab Gründung gezählt)
+    const nextTimeReadyAt = maxed ? 0 : base.foundedAt + allianceBaseBuildSecondsCum(lvl+1)*1000;
+    const timeLeft = maxed ? 0 : Math.max(0, nextTimeReadyAt - Date.now());
+    const resDone = !maxed && Object.entries(nextCum).every(([r,a]) => (tot[r]||0) >= a);
+    const barsHtml = maxed ? '' : ['erz','kristalle','deuterium','antimaterie'].map(rk => {
+      const need = nextCum[rk]||0, haveR = Math.min(tot[rk]||0, need);
+      const pct = need > 0 ? Math.min(100, haveR/need*100) : 100;
+      const open = Math.max(0, need - (tot[rk]||0));
+      const maxAmt = Math.max(0, Math.min(Math.floor(state.resources[rk]||0), Math.max(0, allianceBaseCumCost(ALLIANCE_BASE_MAX_LEVEL)[rk] - (tot[rk]||0))));
+      return `
+        <div style="display:flex; flex-direction:column; gap:3px;">
+          <div style="display:flex; justify-content:space-between;"><span class="bmeta">${miniResIcon(rk)} ${(RES_DEFS.find(x=>x.key===rk)||{}).label||rk}</span><span class="bmeta">${fmt(haveR)}/${fmt(need)}${open>0?'':' ✓'}</span></div>
+          <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="text" inputmode="numeric" placeholder="Menge" data-ab-contrib-input="${rk}" style="flex:1; font-size:12px;"/>
+            <button data-ab-contrib="${rk}" style="font-size:10px; padding:5px 8px;">Beitragen</button>
+            <button data-ab-contrib-max="${rk}" data-ab-max-amt="${maxAmt}" style="font-size:10px; padding:5px 8px;">Max</button>
+          </div>
+        </div>`;
+    }).join('');
+    const stagesHtml = ALLIANCE_BASE_STAGES.map(st => {
+      const reached = lvl >= st.level;
+      const isNext = !reached && st.level === lvl+1;
+      return `<div class="bmeta" style="${reached?'color:#5dcaa5;':(isNext?'color:#e8e5ff;':'')}">${reached?'<i class="ti ti-check" aria-hidden="true"></i>':(isNext?'<i class="ti ti-chevron-right" aria-hidden="true"></i>':'<i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85;"></i>')} Stufe ${st.level}: ${st.text}</div>`;
+    }).join('');
+    const myContribSum = ['erz','kristalle','deuterium','antimaterie'].reduce((a,rk)=>a+(state.allianceContributed['base_'+rk]||0),0);
+    box.innerHTML = titleHtml + `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; gap:10px; ${lvl>=10?'border-color:#fac775;':''}">
+        <div style="display:flex; gap:14px; align-items:center;">
+          <svg viewBox="-30 -30 60 60" width="84" height="84" style="flex-shrink:0;">${allianceBaseModelSvg(Math.max(1,lvl), 'Prev')}</svg>
+          <div style="flex:1;">
+            <div class="bname">Allianzbasis [${tag}] <span class="lvl-pill" style="${lvl>=10?'background:rgba(250,199,117,0.25); color:#fac775;':''}">Stufe ${lvl}${maxed?' · MAX':''}</span></div>
+            <div class="bmeta"><i class="ti ti-planet" aria-hidden="true"></i> System: <strong style="color:#fff;">${sys?sys.name:base.sector}</strong> (dauerhaft) · gegründet von ${base.foundedByName||'Admin'}</div>
+            ${lvl>0 ? `<div class="bmeta" style="color:#5dcaa5;">Aktive Boni: +${lvl + (lvl>=10?4:0)}% Produktion & Verteidigung${allianceBaseStorageBonus()>0?' · +'+Math.round(allianceBaseStorageBonus()*100)+'% Lager':''}${allianceBaseBuildTimeMult()<1?' · -'+Math.round((1-allianceBaseBuildTimeMult())*100)+'% Bauzeit':''}${allianceBaseResearchTimeMult()<1?' · -'+Math.round((1-allianceBaseResearchTimeMult())*100)+'% Forschungszeit':''}${lvl>=4?' · -10% Flugzeit ins Basis-System':''}${lvl>=8?' · -8% Treibstoff':''}</div>` : `<div class="bmeta">Noch im Aufbau zur ersten Stufe.</div>`}
+          </div>
+        </div>
+        ${maxed ? `<div class="bmeta" style="color:#fac775;"><i class="ti ti-sparkles" aria-hidden="true"></i> Das Monument eurer Allianz ist vollendet - Maximalstufe erreicht.</div>` : `
+          <div class="bname" style="font-size:13px;">Ausbau auf Stufe ${lvl+1}</div>
+          ${resDone && timeLeft>0 ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-clock" aria-hidden="true"></i> Ressourcen vollständig - Bautrupps arbeiten noch ${fmtDuration(timeLeft/1000)} (Bauzeit läuft seit der Gründung parallel mit).</div>` : ''}
+          ${!resDone && timeLeft<=0 ? `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Bauzeit für diese Stufe bereits verstrichen - es fehlen nur noch die Ressourcen.</div>` : ''}
+          ${!resDone && timeLeft>0 ? `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Bauzeit dieser Stufe: noch ${fmtDuration(timeLeft/1000)} (läuft parallel zu den Beiträgen).</div>` : ''}
+          ${barsHtml}
+        `}
+        <div class="bmeta">Dein Gesamtbeitrag zur Basis: ${fmt(myContribSum)} Ressourcen</div>
+        <details><summary class="bmeta" style="cursor:pointer;">Ausbaustufen & Boni anzeigen</summary><div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">${stagesHtml}</div></details>
+      </div>`;
+    box.querySelectorAll('[data-ab-contrib]').forEach(btn => btn.onclick = () => {
+      const rk = btn.getAttribute('data-ab-contrib');
+      const input = box.querySelector('[data-ab-contrib-input="'+rk+'"]');
+      const amt = parseInt((input && input.value || '').replace(/[^\d]/g,''), 10);
+      contributeToAllianceBase(rk, amt);
+    });
+    box.querySelectorAll('[data-ab-contrib-max]').forEach(btn => btn.onclick = () => {
+      const rk = btn.getAttribute('data-ab-contrib-max');
+      contributeToAllianceBase(rk, parseInt(btn.getAttribute('data-ab-max-amt'),10)||0);
+    });
   }
   function renderAllianceBuildingBox(){
     const box = document.getElementById('allianceBuildingBox');
@@ -14608,6 +14911,7 @@
     let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
     const speed = shipKey==='superschlachtschiff' ? SUPER_SPEED : (SHIP_DEFS.find(d=>d.key===shipKey)||{}).speed;
     if (speed) mult *= (100/speed);
+    mult *= allianceBaseFlightMult(planetSystemOf(toPlanet));
     return baseSec * mult;
   }
   function relocateShips(fromPlanet, toPlanet, shipKey, amount, forcedDur, forcedFleetName, skipFuelCharge){
@@ -14650,6 +14954,7 @@
     const lvl = state.research.rfusion||0;
     let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
     mult *= fleetSpeedMultiplier(amounts, keys);
+    mult *= allianceBaseFlightMult(planetSystemOf(toPlanet));
     const groupDur = baseSec * mult;
     // Bugfix (16.07.2026, Treibstoff-Audit): Treibstoff wird jetzt EINMAL für die GESAMTE Schiffszahl
     // des Verbands berechnet statt wie zuvor pro Schiffstyp einzeln summiert. Der alte Weg summierte
@@ -15380,6 +15685,19 @@
         `;
       }
     }
+    // Allianzbasis: unübersehbare Groß-Struktur in ihrem gewählten System (nur für Mitglieder der
+    // eigenen Allianz sichtbar). Das SVG-Modell wächst mit jeder Ausbaustufe (siehe
+    // allianceBaseModelSvg), Position bewusst abseits der Sonne im linken oberen Kartenbereich.
+    if (myAllianceTag() && state.allianceBase && state.allianceBase.foundedAt && state.allianceBase.sector === activeSystem){
+      const abLvl = allianceBaseLevel();
+      inner += `
+        <g transform="translate(74,44)" data-alliance-base="1" style="cursor:pointer;">
+          <title>Allianzbasis [${myAllianceTag()}] · Stufe ${abLvl}${abLvl>=10?' (Monument)':''}</title>
+          ${allianceBaseModelSvg(Math.max(1,abLvl), 'Map')}
+        </g>
+        <text class="planet-label" x="74" y="76" text-anchor="middle" style="fill:${abLvl>=10?'#fac775':'#c3bef5'};">Allianzbasis [${myAllianceTag()}] · St. ${abLvl}</text>
+      `;
+    }
     svg.innerHTML = inner;
     svg.setAttribute('viewBox', `${mapViewBox.x.toFixed(1)} ${mapViewBox.y.toFixed(1)} ${mapViewBox.w.toFixed(1)} ${mapViewBox.h.toFixed(1)}`);
     svg.querySelectorAll('[data-planet]').forEach(node => {
@@ -15389,6 +15707,15 @@
     });
     svg.querySelectorAll('[data-map-player]').forEach(node => {
       node.addEventListener('click', () => { if (mapDidDrag) return; mapPlayerClick(node.getAttribute('data-map-player'), node.getAttribute('data-map-name')); });
+    });
+    svg.querySelectorAll('[data-alliance-base]').forEach(node => {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (mapDidDrag) return;
+        const abL = allianceBaseLevel();
+        pushToast('Allianzbasis ['+myAllianceTag()+'] · Stufe '+abL+' - Details & Beiträge im Allianz-Tab.', 'ti-building-fortress');
+        switchTab('allianz');
+      });
     });
     svg.querySelectorAll('[data-map-npc]').forEach(node => {
       node.addEventListener('click', () => {
@@ -15547,7 +15874,7 @@
     if (!fleet){ endAutoExploreTour('origin-lost'); return false; }
     const planet = PLANETS.find(p=>p.id===targetId);
     if (!planet) return false;
-    const dur = missionDurationFor(planet.duration, fleet, EXPLORE_SHIP_KEYS);
+    const dur = missionDurationFor(planet.duration, fleet, EXPLORE_SHIP_KEYS, planet.system);
     const fuelCost = missionFuelCost(dur, 1);
     if (!canAfford({deuterium: fuelCost})) return false; // nächster Tick versucht es automatisch erneut
     pay({deuterium: fuelCost});
@@ -15656,7 +15983,7 @@
     if (slotsUsed >= cf.ships){ log('Keine freien Erkundungsschiffe auf '+planetDisplayName(state.activeBasePlanet)+' verfügbar.', 'ti-alert-triangle'); return; }
     if (cf.missions.some(m => m.type==='explore' && m.targetId === planetId)){ log('Bereits eine Mission zu diesem Ziel unterwegs.', 'ti-alert-triangle'); return; }
     const planet = PLANETS.find(p => p.id === planetId);
-    const dur = missionDurationFor(planet.duration, cf, EXPLORE_SHIP_KEYS);
+    const dur = missionDurationFor(planet.duration, cf, EXPLORE_SHIP_KEYS, planet.system);
     const fuelCost = missionFuelCost(dur, 1);
     if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
@@ -15676,7 +16003,7 @@
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const npc = NPCS.find(n => n.id === npcId);
-    const dur = missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS);
+    const dur = missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS, npc.system);
     const fuel = missionFuelCostSplit(dur, attackFleet);
     if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Mission: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
@@ -15894,7 +16221,7 @@
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
     if (tab === 'berichte'){ loadNotificationEvents(); }
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
-    if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); }
+    if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     if (tab === 'berichte'){
       loadReports();
@@ -17567,7 +17894,7 @@
       const slotsFree = cf.missions.filter(m=>m.type==='explore').length < cf.ships;
       const canSend = slotsFree && !busy;
       const colCost = disc ? colonizeCostFor(p.id) : p.colonizeCost;
-      const colDur = missionDurationFor(p.duration, { colonyShips:1 }, ['colonyShips']);
+      const colDur = missionDurationFor(p.duration, { colonyShips:1 }, ['colonyShips'], p.system);
       const colFuel = missionFuelCost(colDur, 1);
       const colonizeBusy = cf.missions.some(m=>m.type==='colonize' && m.targetId===p.id);
       const colonizeCostTotal = Object.assign({}, colCost, { deuterium:(colCost.deuterium||0)+colFuel });
@@ -17581,7 +17908,7 @@
             <div class="bicon" style="background:${p.color}30; color:${p.color}; border-radius:50%;">${disc ? `<canvas data-planet-icon="${(state.planetTypeOverride||{})[p.id] || p.type}" width="26" height="26" style="display:block;"></canvas>` : `<i class="ti ti-info-circle" aria-hidden="true"></i>`}</div>
             <div>
               <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}${(state.moons&&state.moons[p.id]) ? (state.colonies['moon_'+p.id] ? ` <span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+p.id?'active':''}" data-moon-switch="moon_${p.id}" title="${planetDisplayName('moon_'+p.id)} – zum Mond wechseln" style="vertical-align:middle;">☾</span>` : ' <span class="lvl-pill" title="Dieser Planet hat einen Mond (noch nicht kolonisiert – siehe Mond-Liste unten)">Mond</span>') : ''}</div>
-              <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS), 1)} Treibstoff</div>
+              <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system), 1)} Treibstoff</div>
               ${p.orbit ? `<div class="bmeta">${orbitBonusLabel(p.orbit)}</div>` : ''}
               <div class="bcost">${rewardHtml(p.reward)}</div>
               ${bonus ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Verborgener Bonus: ${bonus.labelText}</div>` : ''}
@@ -17980,7 +18307,7 @@
       const effLoot = npcEffectiveLoot(n);
       const wins = npcScalingCount(n.id);
       const chance = Math.round(Math.max(0.05, Math.min(0.95, power/(power+effDefense)))*100);
-      const flightTime = missionDurationFor(n.duration, attackFleet, ATTACK_SHIP_KEYS);
+      const flightTime = missionDurationFor(n.duration, attackFleet, ATTACK_SHIP_KEYS, n.system);
       const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
       const npcFleetPreview = npcFleetFor(n).fleet;
@@ -18704,6 +19031,7 @@
       }
     }
     renderAllianceTechBox();
+    renderAllianceBaseBox();
     renderAllianceBuildingBox();
     renderReportsBox();
     const kofiBox = document.getElementById('kofiTopSupporterBox');
@@ -20048,7 +20376,7 @@
 
   (async () => {
     const ready = await initAuth();
-    if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) loadAllianceWars(); if (!state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
+    if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()){ loadAllianceWars(); if (useBackend()){ loadAllianceTechData(); loadAllianceBase(); } } if (!state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
   })();
   // PWA: Service Worker registrieren (macht die App zusätzlich zum Manifest auch am DESKTOP
   // installierbar - Chrome/Edge verlangen dafür einen aktiven Service Worker, mobile Browser
