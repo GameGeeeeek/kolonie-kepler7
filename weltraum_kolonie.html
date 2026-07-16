@@ -1254,9 +1254,10 @@
         <div class="planet-list" id="planetList"></div>
         <div id="moonListWrap"></div>
         <div class="card-row" id="autoExploreRow" style="cursor:pointer; margin-top:0.75rem;">
-          <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.18); color:#5dcaa5;"><i class="ti ti-target" aria-hidden="true"></i></div><div><div class="bname">Automatische Erkundung</div><div class="bmeta" id="autoExploreLabel">Aus – benötigt 1 Spähschiff</div></div></div>
+          <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.18); color:#5dcaa5;"><i class="ti ti-target" aria-hidden="true"></i></div><div><div class="bname">Automatische Erkundung</div><div class="bmeta" id="autoExploreLabel">Aus – benötigt 1 Erkundungsschiff</div></div></div>
           <div class="toggle-switch" id="autoExploreSwitch"><div class="toggle-knob"></div></div>
         </div>
+        <div id="autoExploreTourBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-galaxie">
@@ -2336,8 +2337,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.42.1';
+  const VERSION = '8.43.0';
   const PATCHNOTES = [
+    { version:'8.43.0', date:'16.07.2026', changes:[
+      'Automatische Erkundung komplett überarbeitet (Feature-Wunsch): statt bisher mehrerer paralleler Erkundungsschiffe zu zufälligen Zielen fliegt jetzt genau EIN Erkundungsschiff eine durchgehende Rundreise - nächstgelegenes unentdecktes Ziel zuerst, danach automatisch weiter zum jeweils nächsten, bis alles erreichbare erkundet ist. Neue Statusbox direkt unter dem Schalter zeigt jederzeit Ausgangsplanet, aktuelles Ziel mit Countdown, Vorschau des nächsten Ziels und Gesamtfortschritt (z.B. "5/12"). Nach dem letzten Ziel kehrt das Schiff automatisch zum Ausgangsplaneten zurück und die Rundreise endet. Reicht der Treibstoff für den nächsten Abschnitt nicht, wartet die Rundreise automatisch statt abzubrechen. Abschalten mitten in der Rundreise bricht das aktuelle Ziel nicht ab, sondern lässt es fertig anfliegen, bevor das Schiff zurückkehrt. Nebenbei einen Bug behoben: der Schalter prüfte bisher fälschlich den Bestand an Spähschiffen (die eigentlich für Spionage gedacht sind) statt der tatsächlich verbrauchten Erkundungsschiffe'
+    ]},
     { version:'8.42.1', date:'16.07.2026', changes:[
       'Balancing: Energieproduktion gesenkt (zwei unabhängige Spielermeldungen: Energie zu üppig vorhanden). Solarkraftwerk hatte als einziges Produktionsgebäude gleichzeitig den höchsten Ertrag pro Stufe UND die günstigste Kostensteigerung - dieser unbegründete Doppelvorteil ist jetzt entfernt: Ertrag pro Stufe -20% (0,375 → 0,3), Kostensteigerung auf Erzmine-Niveau angeglichen (1,15 → 1,17, dadurch wird jede weitere Stufe im späteren Spielverlauf spürbar teurer statt wie bisher am günstigsten von allen). Solarkraftwerk bleibt weiterhin das ertragreichste Produktionsgebäude, da Energie die meisten anderen Ausgaben trägt. Bereits gebaute Solarkraftwerke sind von der Änderung betroffen (kein Ressourcen-Ausgleich, wie bei Balance-Anpassungen üblich)'
     ]},
@@ -5689,7 +5693,7 @@
     lastSeenReportTime: 0,
     lastSeenExpeditionTime: 0,
     lastExpeditionEventTime: 0,
-    autoExploreOn: false, autoReinforceOn: false,
+    autoExploreOn: false, autoExploreTour: null, autoReinforceOn: false,
     fleetCounter: 0,
     trader: null,
     nextTraderCheck: 0,
@@ -6080,6 +6084,14 @@
     if (state.activeBasePlanet === 'home') return state.fleet;
     const col = state.colonies[state.activeBasePlanet];
     return col ? col.fleet : state.fleet;
+  }
+  // Wie currentFleet(), aber für einen beliebigen Planeten statt zwingend den aktuell aktiven -
+  // gebraucht von der Auto-Erkundungs-Rundreise (v8.43.0), deren Ursprungsplanet unabhängig davon
+  // bleiben muss, welchen Planeten der Spieler gerade betrachtet.
+  function fleetAtPlanet(key){
+    if (key === 'home') return state.fleet;
+    const col = state.colonies[key];
+    return col ? col.fleet : null;
   }
   function allFleetsWithPlanet(){
     const list = [{ planet:'home', fleet: state.fleet }];
@@ -7765,6 +7777,7 @@
       state.terraformJob = null;
     }
     if (state.terraformJob === undefined) state.terraformJob = null;
+    if (state.autoExploreTour === undefined) state.autoExploreTour = null;
     if (!state.planetTypeOverride) state.planetTypeOverride = {};
     // Die alte, separate Typ-Umwandlung (state.typeConvertJob) gibt es nicht mehr getrennt - ist im
     // neuen System Teil von state.terraforming. Ein eventuell noch laufender alter Job wird ebenfalls
@@ -10292,6 +10305,7 @@
     ]},
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
+      { title:'Automatische Erkundung', body:'Schalter auf der Sektorkarte (mindestens 1 Erkundungsschiff nötig): sobald aktiviert, reserviert genau <strong>ein</strong> Erkundungsschiff vom gerade aktiven Planeten und fliegt eine durchgehende Rundreise - erst das nächstgelegene unentdeckte Ziel, danach automatisch weiter zum jeweils nächsten, bis alle erreichbaren Planeten erkundet sind. Direkt unter dem Schalter zeigt eine eigene Box jederzeit den Ausgangsplaneten, das aktuelle Ziel mit Countdown, eine Vorschau des nächsten Ziels und den Gesamtfortschritt (z.B. "5/12"). Reicht der Treibstoff (Deuterium) für den nächsten Abschnitt nicht, wartet die Rundreise automatisch und versucht es beim nächsten Ressourcenzuwachs erneut - ohne manuelles Eingreifen. Sind alle Ziele erledigt, fliegt das Schiff zurück zum Ausgangsplaneten und die Rundreise endet automatisch. Der Schalter lässt sich jederzeit wieder ausschalten - eine laufende Rundreise wird dadurch nicht abrupt abgebrochen, sondern das aktuelle Ziel noch fertig angeflogen, bevor das Schiff zurückkehrt. Manuelles Erkunden einzelner Planeten bleibt parallel dazu möglich, solange noch ein freies Erkundungsschiff übrig ist.' },
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Monde haben keine eigene Karte mehr: Ein kolonisierter Mond ist überall über das Mond-Symbol am zugehörigen Planeten erreichbar (Übersichts-Karten, Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste) und wird auch in der Sektorkarten-Planetenliste beim Planeten angezeigt.' },
       { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert.' },
@@ -12013,6 +12027,7 @@
           state.terraformJob = null;
         }
         if (state.terraformJob === undefined) state.terraformJob = null;
+        if (state.autoExploreTour === undefined) state.autoExploreTour = null;
         if (!state.planetTypeOverride) state.planetTypeOverride = {};
         if (state.typeConvertJob){
           const legacyChain = ['todeswelt','wueste','eis','vulkan','wasserwelt','kristall','erdwelt'];
@@ -13120,6 +13135,12 @@
       fleet.missions = fleet.missions.filter(m => now < m.endTime);
       for (const m of done){
         if (m.type === 'explore'){
+          if (m.tourReturn){
+            // Rückkehr-Bein der Auto-Erkundungs-Rundreise: kein echtes Erkundungsziel, nur Abschluss.
+            if (showLog !== false) log('Auto-Erkunder zurück auf '+planetDisplayName(planetKey)+' – Rundreise abgeschlossen.', 'ti-rocket');
+            endAutoExploreTour();
+            continue;
+          }
           const planet = PLANETS.find(p => p.id === m.targetId);
           if (!planet) continue;
           gainResources(planet.reward);
@@ -13154,6 +13175,7 @@
             }
           }
           if (showLog !== false) log(planet.name+' ('+planetDisplayName(planetKey)+'): Mission abgeschlossen.'+bonusMsg, 'ti-rocket');
+          if (m.tourLeg) advanceAutoExploreTour();
         } else if (m.type === 'worldboss'){
           const bLevel = m.bossLevel || 1;
           // Bug/Sicherheitslücke behoben (13.07.2026): Schaden, Verluste und Kredite/Kampfpunkte
@@ -14458,36 +14480,154 @@
     render(); save();
   }
 
-  function totalSpaeherOwned(){ return allFleets().reduce((a,f)=>a+(f.spaeher||0),0); }
-  // Bug-Fix: bisher wurde pro Tick (1x/Sekunde) nur EIN einziges Erkundungsschiff losgeschickt,
-  // selbst wenn mehrere Schiffe und unentdeckte Planeten verfügbar waren – die Funktion brach nach
-  // dem ersten erfolgreichen Versand sofort ab. Jetzt wird JEDE Basis durchgegangen und so lange
-  // weiter losgeschickt, bis entweder keine freien Erkundungsschiffe, kein Treibstoff oder keine
-  // unentdeckten Ziele mehr übrig sind.
-  function tryAutoExplore(){
-    if (!state.autoExploreOn) return false;
-    if (totalSpaeherOwned() < 1){ state.autoExploreOn = false; log('Automatische Erkundung deaktiviert – kein Spähschiff mehr vorhanden.', 'ti-alert-triangle'); return false; }
-    let sentAny = false;
-    for (const { planet: pKey, fleet } of allFleetsWithPlanet()){
-      let guard = 0;
-      while (guard < 50){
-        guard++;
-        const slotsUsed = fleet.missions.filter(m=>m.type==='explore').length;
-        if (slotsUsed >= (fleet.ships||0)) break;
-        const undiscovered = PLANETS.filter(p => !state.discovered[p.id] && !fleet.missions.some(m=>m.type==='explore'&&m.targetId===p.id));
-        if (!undiscovered.length) break;
-        const target = undiscovered[Math.floor(Math.random()*undiscovered.length)];
-        const dur = missionDurationFor(target.duration, fleet, EXPLORE_SHIP_KEYS);
-        const fuelCost = missionFuelCost(dur, 1);
-        if ((state.resources.deuterium||0) < fuelCost) break;
-        const prevActive = state.activeBasePlanet;
-        state.activeBasePlanet = pKey;
-        sendExploreMission(target.id);
-        state.activeBasePlanet = prevActive;
-        sentAny = true;
-      }
+  // Automatische Erkundung – komplett überarbeitet (16.07.2026, Feature-Wunsch: nachvollziehbare
+  // Ein-Schiff-Rundreise statt mehrerer paralleler Einzelmissionen). Bisher schickte diese Funktion
+  // JEDE verfügbare Kapazität an Erkundungsschiffen gleichzeitig los (mehrere parallele Missionen zu
+  // zufälligen Zielen) - unübersichtlich, und der Aktivierungs-Schalter prüfte dabei fälschlich den
+  // Bestand an "Spähschiff" (spaeher, eigentlich für Spionage gedacht) statt der tatsächlich
+  // verbrauchten "Erkundungsschiffe" (ships) - ein Spieler mit Erkundungsschiffen aber ohne
+  // Spähschiff konnte die Funktion nie aktivieren, umgekehrt ließ sie sich mit einem Spähschiff aber
+  // ohne echte Erkundungsschiffe aktivieren, ohne dass je etwas losgeschickt wurde.
+  //
+  // Neues Modell: genau EIN Erkundungsschiff wird vom aktuell aktiven Planeten (Ursprung) reserviert
+  // und fliegt eine durchgehende Rundreise - ein Ziel nach dem anderen (nächstgelegenes zuerst, nach
+  // Flugdauer sortiert, da echte Planet-zu-Planet-Distanzen im Datenmodell nicht existieren), bis
+  // alle unentdeckten Planeten erkundet sind, und kehrt danach automatisch zum Ursprung zurück.
+  // state.autoExploreTour trägt den Rundreise-Zustand (Ursprung, Fortschritt, nächstes Ziel als
+  // Vorschau, Phase); das jeweils AKTUELLE Ziel samt Timer steckt in der laufenden Mission selbst
+  // (fleet.missions-Eintrag am Ursprung, markiert mit tourLeg bzw. tourReturn) - keine doppelte
+  // Zeit-Buchführung.
+  function totalExplorerShipsOwned(){ return allFleets().reduce((a,f)=>a+(f.ships||0),0); }
+  function sortedUndiscoveredPlanets(){
+    return PLANETS.filter(p => !state.discovered[p.id]).sort((a,b) => a.duration - b.duration);
+  }
+  function startAutoExploreTour(){
+    if (state.autoExploreTour) return;
+    const originPlanet = state.activeBasePlanet;
+    const fleet = fleetAtPlanet(originPlanet);
+    if (!fleet || (fleet.ships||0) < 1){
+      log('Du brauchst mindestens 1 Erkundungsschiff auf '+planetDisplayName(originPlanet)+', um die automatische Erkundung zu starten.', 'ti-alert-triangle');
+      state.autoExploreOn = false;
+      return;
     }
-    return sentAny;
+    const targets = sortedUndiscoveredPlanets();
+    if (!targets.length){
+      log('Es gibt keine unentdeckten Planeten mehr zu erkunden.', 'ti-info-circle');
+      state.autoExploreOn = false;
+      return;
+    }
+    state.autoExploreTour = { originPlanet, visitedCount:0, totalTargets: targets.length, nextTargetId: targets[1] ? targets[1].id : null, phase:'exploring', lastLegDuration: 0 };
+    launchAutoExploreLeg(targets[0].id);
+  }
+  function launchAutoExploreLeg(targetId){
+    const tour = state.autoExploreTour;
+    if (!tour) return false;
+    const fleet = fleetAtPlanet(tour.originPlanet);
+    if (!fleet){ endAutoExploreTour('origin-lost'); return false; }
+    const planet = PLANETS.find(p=>p.id===targetId);
+    if (!planet) return false;
+    const dur = missionDurationFor(planet.duration, fleet, EXPLORE_SHIP_KEYS);
+    const fuelCost = missionFuelCost(dur, 1);
+    if (!canAfford({deuterium: fuelCost})) return false; // nächster Tick versucht es automatisch erneut
+    pay({deuterium: fuelCost});
+    tour.lastLegDuration = dur;
+    fleet.missions.push({ id: nextMissionId(), type:'explore', targetId, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourLeg:true });
+    render(); save();
+    return true;
+  }
+  function launchAutoExploreReturnLeg(){
+    const tour = state.autoExploreTour;
+    if (!tour) return false;
+    const fleet = fleetAtPlanet(tour.originPlanet);
+    if (!fleet){ endAutoExploreTour('origin-lost'); return false; }
+    // Keine echten Planet-zu-Planet-Distanzen vorhanden - der Rückweg wird als genauso lang wie der
+    // zuletzt geflogene Hinweg angenommen (symmetrische Näherung).
+    const dur = tour.lastLegDuration || 300;
+    const fuelCost = missionFuelCost(dur, 1);
+    if (!canAfford({deuterium: fuelCost})) return false;
+    pay({deuterium: fuelCost});
+    fleet.missions.push({ id: nextMissionId(), type:'explore', targetId: tour.originPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourReturn:true });
+    render(); save();
+    return true;
+  }
+  function beginAutoExploreReturn(){
+    const tour = state.autoExploreTour;
+    if (!tour) return;
+    tour.phase = 'returning';
+    tour.nextTargetId = null;
+    launchAutoExploreReturnLeg();
+  }
+  // Wird von checkMissions() aufgerufen, nachdem ein reguläres Erkundungs-Bein (tourLeg) ausgewertet
+  // wurde - wählt das nächste Ziel oder startet die Rückkehr, falls fertig oder der Schalter
+  // inzwischen ausgeschaltet wurde (dann wird die laufende Rundreise nicht abrupt abgebrochen,
+  // sondern sauber zu Ende gebracht: kein weiteres neues Ziel, aber Rückflug zum Ursprung).
+  function advanceAutoExploreTour(){
+    const tour = state.autoExploreTour;
+    if (!tour) return;
+    tour.visitedCount++;
+    if (!state.autoExploreOn){ beginAutoExploreReturn(); return; }
+    const remaining = sortedUndiscoveredPlanets();
+    if (!remaining.length){ beginAutoExploreReturn(); return; }
+    tour.nextTargetId = remaining[1] ? remaining[1].id : null;
+    launchAutoExploreLeg(remaining[0].id);
+  }
+  function endAutoExploreTour(reason){
+    const tour = state.autoExploreTour;
+    state.autoExploreTour = null;
+    state.autoExploreOn = false;
+    if (reason === 'origin-lost') log('Automatische Erkundung beendet – Ausgangsplanet nicht mehr verfügbar.', 'ti-alert-triangle');
+    else if (tour) log('Automatische Erkundungs-Rundreise abgeschlossen: '+tour.visitedCount+' von '+tour.totalTargets+' Planeten erkundet, Schiff zurück auf '+planetDisplayName(tour.originPlanet)+'.', 'ti-flag');
+  }
+  // Läuft jeden Tick (siehe Hauptschleife) - startet bei Bedarf eine neue Rundreise oder stößt das
+  // nächste Bein an, falls gerade kein aktives Bein läuft (z.B. weil der letzte Versuch am
+  // Treibstoff scheiterte - dann wird es hier automatisch erneut versucht, ohne dass der Spieler
+  // manuell eingreifen muss).
+  function tryAutoExplore(){
+    if (!state.autoExploreOn && !state.autoExploreTour) return false;
+    if (!state.autoExploreTour){ startAutoExploreTour(); return !!state.autoExploreTour; }
+    const tour = state.autoExploreTour;
+    const fleet = fleetAtPlanet(tour.originPlanet);
+    if (!fleet){ endAutoExploreTour('origin-lost'); return false; }
+    if (fleet.missions.some(m => m.tourLeg || m.tourReturn)) return false; // Bein läuft bereits
+    if (tour.phase === 'returning') return launchAutoExploreReturnLeg();
+    const remaining = sortedUndiscoveredPlanets();
+    if (!remaining.length){ beginAutoExploreReturn(); return true; }
+    return launchAutoExploreLeg(remaining[0].id);
+  }
+  // Statusanzeige der laufenden Auto-Erkundungs-Rundreise (Feature-Wunsch 16.07.2026): Ursprung,
+  // aktuelles Ziel samt Countdown, Vorschau des nächsten Ziels und Gesamtfortschritt - macht den
+  // Ablauf jederzeit nachvollziehbar, ohne dass die Flottenübersicht geöffnet werden muss.
+  function renderAutoExploreTourBox(){
+    const box = document.getElementById('autoExploreTourBox');
+    if (!box) return;
+    const tour = state.autoExploreTour;
+    if (!tour){ box.innerHTML = ''; return; }
+    const fleet = fleetAtPlanet(tour.originPlanet);
+    const activeLeg = fleet ? fleet.missions.find(m => m.tourLeg || m.tourReturn) : null;
+    const originName = planetDisplayName(tour.originPlanet);
+    const nextName = tour.nextTargetId ? ((PLANETS.find(p=>p.id===tour.nextTargetId)||{}).name || null) : null;
+    const pct = tour.totalTargets > 0 ? Math.max(0, Math.min(100, Math.round((tour.visitedCount/tour.totalTargets)*100))) : 0;
+    let currentHtml;
+    if (activeLeg){
+      const remain = Math.max(0, activeLeg.endTime - Date.now());
+      const targetName = activeLeg.tourReturn ? originName : ((PLANETS.find(p=>p.id===activeLeg.targetId)||{}).name || '?');
+      currentHtml = `<div class="bmeta"><i class="ti ${activeLeg.tourReturn?'ti-home':'ti-rocket'}" aria-hidden="true"></i> ${activeLeg.tourReturn?'Rückkehr nach':'Unterwegs zu'} <strong style="color:#fff;">${targetName}</strong> · ${fmtDuration(remain/1000)}</div>`;
+    } else {
+      currentHtml = `<div class="bmeta"><i class="ti ti-hourglass" aria-hidden="true"></i> Wartet auf Treibstoff (Deuterium) für den nächsten Abschnitt…</div>`;
+    }
+    box.innerHTML = `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:0.5rem; border-color:rgba(93,202,165,0.35);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="bname"><i class="ti ti-route" aria-hidden="true" style="color:#5dcaa5;"></i> Auto-Erkundungsroute</span>
+          <span class="lvl-pill">${tour.visitedCount}/${tour.totalTargets}</span>
+        </div>
+        <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:#5dcaa5;"></div></div>
+        <div class="bmeta">Gestartet von <strong style="color:#fff;">${originName}</strong></div>
+        ${currentHtml}
+        ${(nextName && tour.phase==='exploring') ? `<div class="bmeta"><i class="ti ti-arrow-right" aria-hidden="true"></i> Als Nächstes: ${nextName}</div>` : ''}
+        ${tour.phase==='returning' ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Alle erreichbaren Planeten erkundet – kehrt zum Ursprung zurück.</div>` : ''}
+      </div>
+    `;
   }
   function sendExploreMission(planetId){
     const cf = currentFleet();
@@ -17320,9 +17460,10 @@
     if (uiTwoColSwitch) uiTwoColSwitch.classList.toggle('on', !!state.uiTwoColumn);
 
     const autoExploreSwitch = document.getElementById('autoExploreSwitch');
-    if (autoExploreSwitch) autoExploreSwitch.classList.toggle('on', !!state.autoExploreOn);
+    if (autoExploreSwitch) autoExploreSwitch.classList.toggle('on', !!state.autoExploreOn || !!state.autoExploreTour);
     const autoExploreLabel = document.getElementById('autoExploreLabel');
-    if (autoExploreLabel) autoExploreLabel.textContent = state.autoExploreOn ? 'An – nutzt '+totalSpaeherOwned()+' Spähschiff(e) im Bestand' : 'Aus – benötigt 1 Spähschiff';
+    if (autoExploreLabel) autoExploreLabel.textContent = (state.autoExploreOn || state.autoExploreTour) ? 'An – nutzt '+totalExplorerShipsOwned()+' Erkundungsschiff(e) im Bestand' : 'Aus – benötigt 1 Erkundungsschiff';
+    renderAutoExploreTourBox();
 
     const autoReinforceSwitch = document.getElementById('autoReinforceSwitch');
     if (autoReinforceSwitch) autoReinforceSwitch.classList.toggle('on', !!state.autoReinforceOn);
@@ -17996,13 +18137,17 @@
     };
     const autoExploreBtn = document.getElementById('autoExploreRow');
     if (autoExploreBtn) autoExploreBtn.onclick = () => {
-      if (!state.autoExploreOn){
-        if (totalSpaeherOwned() < 1){ log('Du brauchst mindestens 1 Spähschiff, um die automatische Erkundung zu aktivieren.', 'ti-alert-triangle'); return; }
+      if (!state.autoExploreOn && !state.autoExploreTour){
+        if (totalExplorerShipsOwned() < 1){ log('Du brauchst mindestens 1 Erkundungsschiff, um die automatische Erkundung zu aktivieren.', 'ti-alert-triangle'); return; }
         state.autoExploreOn = true;
-        log('Automatische Erkundung aktiviert – ein Spähschiff koordiniert ab jetzt selbstständig Erkundungsmissionen zu unbekannten Planeten (kostet weiterhin Treibstoff).', 'ti-target');
+        log('Automatische Erkundung aktiviert – ein Erkundungsschiff fliegt jetzt selbstständig von '+planetDisplayName(state.activeBasePlanet)+' aus alle unbekannten Planeten nacheinander an und kehrt danach zurück (kostet weiterhin Treibstoff).', 'ti-target');
+        startAutoExploreTour();
       } else {
+        // Schaltet nur den Automatismus ab - eine bereits laufende Rundreise wird nicht abrupt
+        // abgebrochen (das aktuelle Bein fliegt regulär zu Ende), sondern kehrt danach sauber zum
+        // Ursprung zurück statt ein weiteres Ziel anzufliegen (siehe advanceAutoExploreTour).
         state.autoExploreOn = false;
-        log('Automatische Erkundung deaktiviert.', 'ti-target');
+        log(state.autoExploreTour ? 'Automatische Erkundung deaktiviert – aktuelles Bein wird noch zu Ende geflogen, danach kehrt das Schiff zurück.' : 'Automatische Erkundung deaktiviert.', 'ti-target');
       }
       render(); save();
     };
