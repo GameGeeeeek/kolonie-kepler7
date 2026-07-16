@@ -1985,6 +1985,264 @@
     ship_forscher: `<svg viewBox="0 0 100 100" width="24" height="24">${ICON_DEFS}<g filter="url(#ig)"><polygon points="82,50 44,42 22,46 22,54 44,58" fill="url(#gViolet)"/><rect x="46" y="26" width="4" height="16" fill="url(#gSteel)"/><circle cx="48" cy="24" r="4" fill="url(#gSky)"/></g></svg>`
   };
 
+  // Phase 2 der Grafik-Umstellung (siehe Vorschau-Datei): diese drei Verteidigungsgebäude bekommen
+    // statt des flachen SVG-Icons eine kleine animierte Canvas-Grafik (40x40) im bicon-Slot. Bewusst
+    // KEIN requestAnimationFrame-Loop hier - defenseBuildings wird bei jedem Sekunden-Tick neu gebaut,
+    // solange der Verteidigung-Tab aktiv ist (siehe activeTab-Guard), das reicht als "Animation" und
+    // vermeidet, dass sich bei jedem Rebuild ein weiterer Loop auf die (dann bereits ersetzten,
+    // verwaisten) alten Canvas-Elemente stapelt.
+    const DEFENSE_CANVAS_KEYS = ['turm','schild','raketen'];
+    function drawDefenseMiniIcon(key, canvas){
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const t = Date.now();
+      ctx.clearRect(0,0,40,40);
+      if (key === 'turm'){
+        const swing = Math.sin(t*0.0006)*0.35;
+        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.ellipse(20,33,13,3,0,0,Math.PI*2); ctx.fill();
+        const bg = ctx.createLinearGradient(0,14,0,32); bg.addColorStop(0,'#5b6570'); bg.addColorStop(1,'#252b32');
+        ctx.beginPath(); ctx.moveTo(9,32); ctx.lineTo(14,18); ctx.lineTo(26,18); ctx.lineTo(31,32); ctx.closePath();
+        ctx.fillStyle=bg; ctx.fill(); ctx.strokeStyle='rgba(6,9,14,0.8)'; ctx.lineWidth=0.8; ctx.stroke();
+        ctx.beginPath(); ctx.fillStyle='#3a424b'; ctx.arc(20,17,5,0,Math.PI*2); ctx.fill();
+        ctx.save(); ctx.translate(20+Math.cos(swing)*0.6,13); ctx.rotate(swing*0.3);
+        ctx.fillStyle='#2a2f36'; ctx.fillRect(-1.6,-9,3.2,9); ctx.restore();
+        const phase = (t+300)%2600;
+        if (phase<160){ const a=1-phase/160; ctx.save(); ctx.shadowColor='rgba(255,220,150,0.9)'; ctx.shadowBlur=6;
+          ctx.beginPath(); ctx.fillStyle=`rgba(255,225,165,${a})`; ctx.arc(20+Math.sin(swing)*8,3,1.6+a,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+      } else if (key === 'schild'){
+        const flicker = 0.5+0.3*Math.sin(t*0.0025);
+        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.ellipse(20,34,11,3,0,0,Math.PI*2); ctx.fill();
+        const bg = ctx.createLinearGradient(0,20,0,32); bg.addColorStop(0,'#57616c'); bg.addColorStop(1,'#252b32');
+        ctx.beginPath(); ctx.moveTo(12,32); ctx.lineTo(14,22); ctx.lineTo(26,22); ctx.lineTo(28,32); ctx.closePath();
+        ctx.fillStyle=bg; ctx.fill();
+        ctx.save(); ctx.beginPath(); ctx.arc(20,22,11,Math.PI,Math.PI*2); ctx.clip();
+        const domeGrad = ctx.createRadialGradient(20,16,1,20,22,11);
+        domeGrad.addColorStop(0,`rgba(150,215,255,${flicker*0.3})`); domeGrad.addColorStop(1,`rgba(150,215,255,${flicker*0.05})`);
+        ctx.fillStyle=domeGrad; ctx.fillRect(9,11,22,11);
+        ctx.restore();
+        ctx.beginPath(); ctx.arc(20,22,11,Math.PI,Math.PI*2);
+        ctx.strokeStyle=`rgba(170,220,255,${flicker*0.7})`; ctx.lineWidth=1.2; ctx.stroke();
+      } else if (key === 'raketen'){
+        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.ellipse(20,34,10,3,0,0,Math.PI*2); ctx.fill();
+        const bg = ctx.createLinearGradient(0,13,0,32); bg.addColorStop(0,'#545e69'); bg.addColorStop(1,'#242a31');
+        ctx.beginPath(); ctx.moveTo(14,32); ctx.lineTo(16,15); ctx.lineTo(24,15); ctx.lineTo(26,32); ctx.closePath();
+        ctx.fillStyle=bg; ctx.fill(); ctx.strokeStyle='rgba(6,9,14,0.8)'; ctx.lineWidth=0.7; ctx.stroke();
+        const phase = (t+900)%3600;
+        if (phase>280 && phase<1900){
+          const lp=(phase-280)/1620, my=17-lp*22;
+          ctx.beginPath(); ctx.fillStyle=`rgba(255,200,140,${(1-lp*0.4)*0.6})`; ctx.arc(20,my+2.4,1.1,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#c7ced4'; ctx.beginPath(); ctx.moveTo(20,my-2.4); ctx.lineTo(18.4,my); ctx.lineTo(21.6,my); ctx.closePath(); ctx.fill();
+        }
+      }
+    }
+    // Zeichnet alle gerade im DOM vorhandenen Mini-Icons neu (nach jedem Rebuild von defenseBuildings
+    // aufzurufen, da innerHTML die vorherigen Canvas-Elemente komplett ersetzt).
+    function refreshDefenseMiniIcons(){
+      DEFENSE_CANVAS_KEYS.forEach(key => drawDefenseMiniIcon(key, document.getElementById('defIcon_'+key)));
+    }
+
+    // Phase 2 der Grafik-Umstellung, Fortsetzung: Schiffe bekommen dieselbe Behandlung wie die drei
+    // Verteidigungsgebäude - kleine Canvas-Grafik statt flachem Icon, synchron bei jedem Rebuild neu
+    // gezeichnet (kein eigener requestAnimationFrame-Loop, siehe drawDefenseMiniIcon-Kommentar für die
+    // Begründung). Rumpf-Koordinaten (0-100 Koordinatenraum, wie die SVG-Icons) sind bewusst identisch
+    // zu den entsprechenden Einträgen im ICONS-Objekt übernommen - dieselbe Silhouette, nur als Canvas-
+    // Pfad statt SVG-Polygon gezeichnet, damit Icon- und Mini-Canvas-Darstellung (z.B. beim Wechsel
+    // zwischen gesperrt/freigeschaltet) optisch zusammenpassen.
+    const SHIP_GRAD_STOPS = {
+      cyan:['#c9e6f2','#4da8d6','#123a52'], red:['#eec2c1','#c0504f','#5a1414'], amber:['#f2dcb0','#d99a54','#8f4a12'],
+      gold:['#f0e4b8','#d1ad5c','#7a5a18'], green:['#c9ecd8','#5dcaa5','#1a5c46'], violet:['#e5daf7','#a48bd9','#5a3e88'],
+      steel:['#e2e0da','#9f9c93','#4a483f'], sky:['#eaf3f8','#a9d4e8','#3a5f78']
+    };
+    const SHIP_HULL_DEFS = {
+      ships: { pts:[[82,50],[44,42],[24,46],[24,54],[44,58]], grad:'cyan', accent:{x:60,y:50,r:4,color:'#dceeff'} },
+      jaeger: { pts:[[86,50],[40,36],[18,44],[18,56],[40,64]], grad:'red', accent:{x:58,y:50,r:2.6,color:'#ffd8c8',pulse:true} },
+      cruisers: { pts:[[88,50],[50,38],[20,32],[12,44],[20,50],[12,56],[20,68],[50,62]], grad:'red', dots:[[22,34,3.4],[22,66,3.4]] },
+      destroyers: { pts:[[88,50],[46,40],[16,44],[16,56],[46,60]], grad:'red', rects:[[60,46,16,8]] },
+      schlachtschiff: { pts:[[90,50],[55,36],[14,32],[8,50],[14,68],[55,64]], grad:'red', dots:[[40,42,4],[40,58,4],[58,50,5]] },
+      superschlachtschiff: { pts:[[92,50],[55,34],[12,30],[4,50],[12,70],[55,66]], grad:'gold', dots:[[40,40,4.4],[40,60,4.4],[60,50,5.6]] },
+      waechter: { pts:[[84,50],[48,38],[20,40],[20,60],[48,62]], grad:'steel', dome:true },
+      bomber: { pts:[[86,50],[44,40],[20,44],[20,56],[44,60]], grad:'amber', pods:[[42,66,10,5]] },
+      carrier: { pts:[[18,38],[80,38],[80,62],[18,62]], grad:'sky', hangar:true },
+      frachter: { pts:[[80,50],[48,42],[24,44],[24,56],[48,58]], grad:'amber', rects:[[42,60,18,12]] },
+      frachtergross: { pts:[[86,50],[50,40],[18,42],[18,58],[50,60]], grad:'gold', rects:[[30,62,16,14],[50,62,16,14]] },
+      colonyShips: { pts:[[80,50],[46,40],[22,44],[22,56],[46,60]], grad:'green', accent:{x:52,y:50,r:11,color:'rgba(169,212,232,0.85)'} },
+      recycler: { pts:[[78,50],[46,42],[24,46],[24,54],[46,58]], grad:'gold', claw:true },
+      spaeher: { pts:[[86,50],[42,40],[20,46],[20,54],[42,60]], grad:'cyan', accent:{x:30,y:34,r:5,color:'rgba(169,212,232,0.8)'} },
+      spionageschiff: { pts:[[88,50],[42,38],[18,44],[18,56],[42,62]], grad:'violet', accent:{x:32,y:30,r:8,ry:4,color:'rgba(169,212,232,0.75)'} },
+      forscher: { pts:[[82,50],[44,42],[22,46],[22,54],[44,58]], grad:'violet', antenna:true }
+    };
+    function drawShipMiniIcon(key, canvas){
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const cfg = SHIP_HULL_DEFS[key];
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+      if (!cfg) return;
+      const s = Math.min(w,h)/100;
+      const P = (x,y) => [x*s, y*s];
+      const stops = SHIP_GRAD_STOPS[cfg.grad];
+      const pts = cfg.pts.map(p=>P(p[0],p[1]));
+      const xs = pts.map(p=>p[0]);
+      const grad = ctx.createLinearGradient(Math.min(...xs),0,Math.max(...xs),0);
+      grad.addColorStop(0, stops[0]); grad.addColorStop(0.5, stops[1]); grad.addColorStop(1, stops[2]);
+      ctx.beginPath();
+      pts.forEach(([x,y],i)=>{ i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+      ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+      ctx.strokeStyle='rgba(6,9,14,0.7)'; ctx.lineWidth=Math.max(0.5,s*0.8); ctx.stroke();
+      (cfg.dots||[]).forEach(([x,y,r])=>{ const [px,py]=P(x,y); ctx.beginPath(); ctx.fillStyle='#4c5661'; ctx.arc(px,py,r*s,0,Math.PI*2); ctx.fill(); });
+      (cfg.rects||[]).forEach(([x,y,rw,rh])=>{ const [px,py]=P(x,y); ctx.fillStyle=SHIP_GRAD_STOPS.steel[1]; ctx.fillRect(px,py,rw*s,rh*s); });
+      if (cfg.pods){ const [x,y,rw,rh]=cfg.pods[0]; const [px,py]=P(x,y); ctx.beginPath(); ctx.fillStyle=SHIP_GRAD_STOPS.steel[1]; ctx.ellipse(px,py,rw*s,rh*s,0,0,Math.PI*2); ctx.fill(); }
+      if (cfg.dome){
+        ctx.beginPath(); ctx.fillStyle='rgba(77,168,214,0.32)';
+        ctx.arc(P(50,45)[0], P(50,45)[1], 22*s, 0, Math.PI*2); ctx.fill();
+      }
+      if (cfg.hangar){
+        ctx.strokeStyle='rgba(14,42,56,0.5)'; ctx.lineWidth=Math.max(0.5,s*0.8);
+        [26,36,46,56].forEach(gx=>{ const [x1,y1]=P(gx,44), [x2,y2]=P(gx,56); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); });
+      }
+      if (cfg.claw){
+        const [px,py]=P(24,50); ctx.beginPath(); ctx.strokeStyle=SHIP_GRAD_STOPS.steel[1]; ctx.lineWidth=Math.max(1,s*2);
+        ctx.arc(px-6*s,py,10*s,Math.PI*0.6,Math.PI*1.4); ctx.stroke();
+      }
+      if (cfg.antenna){
+        const [ax,ay]=P(48,26); const [bx,by]=P(48,42);
+        ctx.strokeStyle=SHIP_GRAD_STOPS.steel[1]; ctx.lineWidth=Math.max(0.6,s); ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+        ctx.beginPath(); ctx.fillStyle=SHIP_GRAD_STOPS.sky[1]; ctx.arc(ax,ay,4*s,0,Math.PI*2); ctx.fill();
+      }
+      if (cfg.accent){
+        const t = Date.now();
+        const [ax,ay] = P(cfg.accent.x, cfg.accent.y);
+        const alpha = cfg.accent.pulse ? (0.5+0.4*Math.sin(t*0.006)) : 0.85;
+        ctx.save(); ctx.globalAlpha = alpha;
+        ctx.beginPath(); ctx.fillStyle = cfg.accent.color;
+        if (cfg.accent.ry) ctx.ellipse(ax,ay,cfg.accent.r*s,cfg.accent.ry*s,0,0,Math.PI*2);
+        else ctx.arc(ax,ay,cfg.accent.r*s,0,Math.PI*2);
+        ctx.fill(); ctx.restore();
+      }
+    }
+    function refreshShipMiniIcons(root){
+      const scope = root || document;
+      scope.querySelectorAll('canvas[data-ship-icon]').forEach(c => drawShipMiniIcon(c.getAttribute('data-ship-icon'), c));
+    }
+
+    // Phase 2 der Grafik-Umstellung, Fortsetzung: Planeten bekommen eine kleine gerenderte Kugel statt
+    // des flachen ti-planet-Icons. Texturen werden PRO TYP nur einmal berechnet (Rauschen ist teuer)
+    // und danach für jede Instanz dieses Typs wiederverwendet - PLANET_TEXTURE_CACHE hält sie fest.
+    // Farbrampen an die tatsächlichen PLANET_TYPE_INFO-Farben angelehnt (siehe Vorschau-Datei).
+    function makeNoise2D(seed){
+      function hash(x,y){ const h = Math.sin(x*127.1 + y*311.7 + seed*57.31) * 43758.5453123; return h - Math.floor(h); }
+      function smooth(t){ return t*t*(3-2*t); }
+      return function(x,y){
+        const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
+        const a=hash(xi,yi), b=hash(xi+1,yi), c=hash(xi,yi+1), d=hash(xi+1,yi+1);
+        const u=smooth(xf), v=smooth(yf);
+        const top=a+(b-a)*u, bot=c+(d-c)*u;
+        return top+(bot-top)*v;
+      };
+    }
+    function fbm2(noiseFn,x,y,octaves,lac,gain){
+      let sum=0, amp=1, freq=1, norm=0;
+      for(let i=0;i<octaves;i++){ sum+=noiseFn(x*freq,y*freq)*amp; norm+=amp; amp*=gain; freq*=lac; }
+      return sum/norm;
+    }
+    function rampColorP(v, stops){
+      for(let i=0;i<stops.length-1;i++){
+        const s0=stops[i], s1=stops[i+1];
+        if(v>=s0[0] && v<=s1[0]){
+          const t=(v-s0[0])/((s1[0]-s0[0])||1);
+          return [ s0[1][0]+(s1[1][0]-s0[1][0])*t, s0[1][1]+(s1[1][1]-s0[1][1])*t, s0[1][2]+(s1[1][2]-s0[1][2])*t ];
+        }
+      }
+      return stops[stops.length-1][1];
+    }
+    function buildPlanetTexture(width,height,seed,opts){
+      const off=document.createElement('canvas'); off.width=width; off.height=height;
+      const octx=off.getContext('2d');
+      if (!octx) return off;
+      const img=octx.createImageData(width,height);
+      const noiseA=makeNoise2D(seed), noiseB=makeNoise2D(seed+53.7), detailNoise=makeNoise2D(seed+191.3);
+      const wrapR=opts.wrapR||3, rowShiftX=opts.rowShiftX||0.28, rowShiftY=opts.rowShiftY||0.06;
+      const stretchX=opts.stretchX||1, stretchY=opts.stretchY||1;
+      const octaves=opts.octaves||4, lac=opts.lac||2.1, gain=opts.gain||0.52;
+      for(let y=0;y<height;y++){
+        const rowN=y/height;
+        for(let x=0;x<width;x++){
+          const angle=x/width*Math.PI*2;
+          const nx=Math.cos(angle)*wrapR*stretchX + rowN*rowShiftX*10;
+          const ny=Math.sin(angle)*wrapR*stretchY + rowN*rowShiftY*10;
+          let v=fbm2(noiseA,nx,ny,octaves,lac,gain); v=Math.min(1,Math.max(0,v));
+          let v2=fbm2(noiseB,nx*1.7,ny*1.7,3,2.3,0.5); v2=Math.min(1,Math.max(0,v2));
+          const jitter=(detailNoise(x*0.4,y*0.4)-0.5)*0.06;
+          const vv=Math.min(1,Math.max(0,v+jitter));
+          const rgb = opts.colorize ? opts.colorize(vv,v2,rowN) : rampColorP(vv, opts.ramp);
+          const idx=(y*width+x)*4;
+          img.data[idx]=rgb[0]; img.data[idx+1]=rgb[1]; img.data[idx+2]=rgb[2]; img.data[idx+3]=255;
+        }
+      }
+      octx.putImageData(img,0,0);
+      return off;
+    }
+    const PLANET_TEXTURE_BUILDERS = {
+      erdaehnlich: () => buildPlanetTexture(90,45,4.21,{ wrapR:2.6, rowShiftX:0.3, rowShiftY:0.08, octaves:5, lac:2.15, gain:0.52,
+        ramp:[[0,[6,20,42]],[0.40,[9,48,84]],[0.48,[22,95,140]],[0.52,[64,150,150]],[0.56,[70,150,90]],[0.64,[110,150,70]],[0.74,[140,120,85]],[0.85,[165,150,130]],[0.93,[225,230,235]],[1,[255,255,255]]] }),
+      wueste: () => buildPlanetTexture(90,45,101.4,{wrapR:2.2,rowShiftX:0.3,rowShiftY:0.1,octaves:4,
+        ramp:[[0,[110,78,44]],[0.4,[162,126,76]],[0.55,[212,180,90]],[0.7,[224,180,90]],[0.85,[176,132,80]],[1,[134,90,48]]]}),
+      vulkan: () => buildPlanetTexture(90,45,404.5,{wrapR:2.2,rowShiftX:0.3,rowShiftY:0.09,octaves:4,
+        colorize:(v,v2)=>{ const base=rampColorP(v,[[0,[10,4,2]],[0.5,[60,20,10]],[1,[224,80,63]]]); const ridge=1-Math.abs(v2*2-1);
+          if(ridge>0.76){ const gl=(ridge-0.76)/0.24; return [base[0]+(255-base[0])*gl*0.9, base[1]+(160-base[1])*gl*0.9, base[2]+(60-base[2])*gl*0.9]; } return base; }}),
+      eis: () => buildPlanetTexture(90,45,303.7,{wrapR:2.4,rowShiftX:0.25,rowShiftY:0.08,octaves:4,
+        ramp:[[0,[110,150,180]],[0.4,[160,196,215]],[0.62,[191,230,245]],[0.82,[240,248,252]],[1,[210,236,246]]]}),
+      kristall: () => buildPlanetTexture(90,45,512.9,{wrapR:2.3,rowShiftX:0.27,rowShiftY:0.09,octaves:4,
+        ramp:[[0,[38,20,64]],[0.42,[90,60,150]],[0.6,[140,105,210]],[0.78,[179,158,240]],[0.92,[220,205,250]],[1,[245,240,255]]]}),
+      wasserwelt: () => buildPlanetTexture(90,45,617.2,{wrapR:2.5,rowShiftX:0.3,rowShiftY:0.09,octaves:5,
+        ramp:[[0,[6,26,52]],[0.55,[16,60,110]],[0.72,[35,100,168]],[0.85,[74,159,224]],[0.94,[150,205,240]],[1,[230,245,252]]]}),
+      gasriese: () => buildPlanetTexture(90,45,202.9,{wrapR:1.6,stretchX:0.4,stretchY:1.6,rowShiftX:0.05,rowShiftY:0.02,octaves:3,lac:2.4,gain:0.5,
+        colorize:(v,v2,rowN)=>{ const bandV=Math.sin(rowN*Math.PI*8+v*2.4)*0.5+0.5;
+          const hue=rampColorP(bandV,[[0,[230,210,180]],[0.33,[217,151,90]],[0.66,[178,110,60]],[1,[130,80,45]]]);
+          const dark=0.55+v*0.45; return [hue[0]*dark,hue[1]*dark,hue[2]*dark]; }}),
+      todeswelt: () => buildPlanetTexture(90,45,808.6,{wrapR:2.2,rowShiftX:0.28,rowShiftY:0.09,octaves:4,
+        colorize:(v,v2)=>{ const base=rampColorP(v,[[0,[8,4,4]],[0.5,[50,24,24]],[1,[107,42,42]]]); const ridge=1-Math.abs(v2*2-1);
+          if(ridge>0.8){ const gl=(ridge-0.8)/0.2; return [base[0]+(160-base[0])*gl*0.6, base[1]*(1-gl*0.4), base[2]*(1-gl*0.4)]; } return base; }}),
+      asteroid: () => buildPlanetTexture(90,45,919.4,{wrapR:2.8,rowShiftX:0.32,rowShiftY:0.1,octaves:4,
+        ramp:[[0,[40,38,35]],[0.4,[85,82,76]],[0.62,[125,121,112]],[0.8,[155,151,141]],[1,[180,176,166]]]}),
+      super: () => buildPlanetTexture(90,45,1077.3,{wrapR:2.4,rowShiftX:0.26,rowShiftY:0.09,octaves:4,
+        ramp:[[0,[70,20,50]],[0.4,[180,80,140]],[0.6,[230,140,190]],[0.8,[245,190,220]],[1,[255,235,245]]]})
+    };
+    const PLANET_TEXTURE_CACHE = {};
+    function getPlanetTexture(typeKey){
+      if (!PLANET_TEXTURE_CACHE[typeKey]){
+        const builder = PLANET_TEXTURE_BUILDERS[typeKey] || PLANET_TEXTURE_BUILDERS.erdaehnlich;
+        PLANET_TEXTURE_CACHE[typeKey] = builder();
+      }
+      return PLANET_TEXTURE_CACHE[typeKey];
+    }
+    function drawPlanetMiniIcon(typeKey, canvas){
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+      const tex = getPlanetTexture(typeKey);
+      const R = Math.min(w,h)/2 - 1, cx = w/2, cy = h/2;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
+      ctx.drawImage(tex, cx-R, cy-R, R*2, R*2);
+      const limb=ctx.createRadialGradient(cx,cy,R*0.5,cx,cy,R);
+      limb.addColorStop(0,'rgba(0,0,0,0)'); limb.addColorStop(1,'rgba(0,8,20,0.45)');
+      ctx.fillStyle=limb; ctx.fillRect(cx-R,cy-R,R*2,R*2);
+      const shade=ctx.createLinearGradient(cx-R,0,cx+R,0);
+      shade.addColorStop(0,'rgba(0,0,0,0)'); shade.addColorStop(0.55,'rgba(0,0,0,0)'); shade.addColorStop(1,'rgba(2,6,12,0.65)');
+      ctx.fillStyle=shade; ctx.fillRect(cx-R,cy-R,R*2,R*2);
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(cx,cy,R+0.4,0,Math.PI*2); ctx.strokeStyle='rgba(150,180,200,0.35)'; ctx.lineWidth=1; ctx.stroke();
+    }
+    function refreshPlanetMiniIcons(root){
+      const scope = root || document;
+      scope.querySelectorAll('canvas[data-planet-icon]').forEach(c => drawPlanetMiniIcon(c.getAttribute('data-planet-icon'), c));
+    }
+
   const AVATAR_DEFS = [
     { key:'rocket', bg:'#378add', svg:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2 C15 6 17 10 17 14 A5 5 0 1 1 7 14 C7 10 9 6 12 2 Z" fill="#fff"/></svg>' },
     { key:'alien', bg:'#5dcaa5', svg:'<svg viewBox="0 0 24 24" width="20" height="20"><ellipse cx="12" cy="11" rx="7" ry="9" fill="#fff"/><ellipse cx="9" cy="10" rx="1.6" ry="2.4" fill="#0a0d1a"/><ellipse cx="15" cy="10" rx="1.6" ry="2.4" fill="#0a0d1a"/></svg>' },
@@ -2014,8 +2272,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.38.0';
+  const VERSION = '8.39.0';
   const PATCHNOTES = [
+    { version:'8.39.0', date:'16.07.2026', changes:[
+      'Grafikstil Phase 2: alle 15 Schiffstypen zeigen jetzt eine kleine animierte Rumpf-Grafik statt des flachen Icons - überall wo Schiffe in Listen auftauchen (Flotte-Tab, Eskorte-Auswahl für Expeditionen, Flotte verlegen, Baukorb, Angriffsflotten-Auswahl)',
+      'Alle Planetentypen (inkl. Erdähnlich, Wüstenwelt, Vulkanwelt, Eiswelt, Kristallwelt, Gasriese, Wasserwelt, Todeswelt, Asteroid, Superplanet) zeigen in der Sektorkarte-Liste und der Mondliste jetzt eine kleine gerenderte Kugel mit typgerechter Oberflächenfarbe statt des generischen Planeten-Icons',
+      'Technisch: Planeten-Texturen werden pro Typ einmalig berechnet und danach für jede Instanz wiederverwendet (kein spürbarer Mehraufwand). Weder Schiffe noch Planeten laufen über einen eigenen Animations-Loop - beide zeichnen sich neu, sobald ihre Liste ohnehin neu aufgebaut wird',
+      'Damit ist die geplante Grafik-Umstellung (Icons, Verteidigungsgebäude, Schiffe, Planeten) abgeschlossen'
+    ]},
     { version:'8.38.0', date:'16.07.2026', changes:[
       'Komplett neuer Grafikstil für alle 47 Icons (Gebäude, Schiffe, Forschung, Verteidigung): matte Gradient-Farbverläufe statt flacher Einzelfarben, dezente Glow-Effekte, teils animierte Details (pulsierende Lichter, Energiefluss) - reiner Grafik-Umbau, keine Auswirkung auf Werte/Balance',
       'Verteidigungsturm, Schildgenerator und Raketensilo zeigen im Verteidigung-Tab jetzt statt eines flachen Icons eine kleine animierte Grafik (Turm schwenkt & feuert gelegentlich, Schild flackert, Silo öffnet ab und zu die Luke) - aktualisiert sich mit jedem Sekunden-Tick, solange der Tab offen ist',
@@ -14702,62 +14966,6 @@
     document.getElementById('qtySelectFleet').innerHTML = qtyHtml;
 
     const activeB = currentBuildings();
-    // Phase 2 der Grafik-Umstellung (siehe Vorschau-Datei): diese drei Verteidigungsgebäude bekommen
-    // statt des flachen SVG-Icons eine kleine animierte Canvas-Grafik (40x40) im bicon-Slot. Bewusst
-    // KEIN requestAnimationFrame-Loop hier - defenseBuildings wird bei jedem Sekunden-Tick neu gebaut,
-    // solange der Verteidigung-Tab aktiv ist (siehe activeTab-Guard), das reicht als "Animation" und
-    // vermeidet, dass sich bei jedem Rebuild ein weiterer Loop auf die (dann bereits ersetzten,
-    // verwaisten) alten Canvas-Elemente stapelt.
-    const DEFENSE_CANVAS_KEYS = ['turm','schild','raketen'];
-    function drawDefenseMiniIcon(key, canvas){
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const t = Date.now();
-      ctx.clearRect(0,0,40,40);
-      if (key === 'turm'){
-        const swing = Math.sin(t*0.0006)*0.35;
-        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.ellipse(20,33,13,3,0,0,Math.PI*2); ctx.fill();
-        const bg = ctx.createLinearGradient(0,14,0,32); bg.addColorStop(0,'#5b6570'); bg.addColorStop(1,'#252b32');
-        ctx.beginPath(); ctx.moveTo(9,32); ctx.lineTo(14,18); ctx.lineTo(26,18); ctx.lineTo(31,32); ctx.closePath();
-        ctx.fillStyle=bg; ctx.fill(); ctx.strokeStyle='rgba(6,9,14,0.8)'; ctx.lineWidth=0.8; ctx.stroke();
-        ctx.beginPath(); ctx.fillStyle='#3a424b'; ctx.arc(20,17,5,0,Math.PI*2); ctx.fill();
-        ctx.save(); ctx.translate(20+Math.cos(swing)*0.6,13); ctx.rotate(swing*0.3);
-        ctx.fillStyle='#2a2f36'; ctx.fillRect(-1.6,-9,3.2,9); ctx.restore();
-        const phase = (t+300)%2600;
-        if (phase<160){ const a=1-phase/160; ctx.save(); ctx.shadowColor='rgba(255,220,150,0.9)'; ctx.shadowBlur=6;
-          ctx.beginPath(); ctx.fillStyle=`rgba(255,225,165,${a})`; ctx.arc(20+Math.sin(swing)*8,3,1.6+a,0,Math.PI*2); ctx.fill(); ctx.restore(); }
-      } else if (key === 'schild'){
-        const flicker = 0.5+0.3*Math.sin(t*0.0025);
-        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.ellipse(20,34,11,3,0,0,Math.PI*2); ctx.fill();
-        const bg = ctx.createLinearGradient(0,20,0,32); bg.addColorStop(0,'#57616c'); bg.addColorStop(1,'#252b32');
-        ctx.beginPath(); ctx.moveTo(12,32); ctx.lineTo(14,22); ctx.lineTo(26,22); ctx.lineTo(28,32); ctx.closePath();
-        ctx.fillStyle=bg; ctx.fill();
-        ctx.save(); ctx.beginPath(); ctx.arc(20,22,11,Math.PI,Math.PI*2); ctx.clip();
-        const domeGrad = ctx.createRadialGradient(20,16,1,20,22,11);
-        domeGrad.addColorStop(0,`rgba(150,215,255,${flicker*0.3})`); domeGrad.addColorStop(1,`rgba(150,215,255,${flicker*0.05})`);
-        ctx.fillStyle=domeGrad; ctx.fillRect(9,11,22,11);
-        ctx.restore();
-        ctx.beginPath(); ctx.arc(20,22,11,Math.PI,Math.PI*2);
-        ctx.strokeStyle=`rgba(170,220,255,${flicker*0.7})`; ctx.lineWidth=1.2; ctx.stroke();
-      } else if (key === 'raketen'){
-        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.ellipse(20,34,10,3,0,0,Math.PI*2); ctx.fill();
-        const bg = ctx.createLinearGradient(0,13,0,32); bg.addColorStop(0,'#545e69'); bg.addColorStop(1,'#242a31');
-        ctx.beginPath(); ctx.moveTo(14,32); ctx.lineTo(16,15); ctx.lineTo(24,15); ctx.lineTo(26,32); ctx.closePath();
-        ctx.fillStyle=bg; ctx.fill(); ctx.strokeStyle='rgba(6,9,14,0.8)'; ctx.lineWidth=0.7; ctx.stroke();
-        const phase = (t+900)%3600;
-        if (phase>280 && phase<1900){
-          const lp=(phase-280)/1620, my=17-lp*22;
-          ctx.beginPath(); ctx.fillStyle=`rgba(255,200,140,${(1-lp*0.4)*0.6})`; ctx.arc(20,my+2.4,1.1,0,Math.PI*2); ctx.fill();
-          ctx.fillStyle='#c7ced4'; ctx.beginPath(); ctx.moveTo(20,my-2.4); ctx.lineTo(18.4,my); ctx.lineTo(21.6,my); ctx.closePath(); ctx.fill();
-        }
-      }
-    }
-    // Zeichnet alle gerade im DOM vorhandenen Mini-Icons neu (nach jedem Rebuild von defenseBuildings
-    // aufzurufen, da innerHTML die vorherigen Canvas-Elemente komplett ersetzt).
-    function refreshDefenseMiniIcons(){
-      DEFENSE_CANVAS_KEYS.forEach(key => drawDefenseMiniIcon(key, document.getElementById('defIcon_'+key)));
-    }
     function buildingRowHtml(def){
       if (def.special && !state.unlocked[def.key]){
         const have = state.rareItems[def.unlockItem]||0;
@@ -15525,7 +15733,7 @@
       return `
         <div class="card-row ${!unlocked?'research-locked':''}">
           <div class="left">
-            <div class="bicon" style="background:rgba(255,255,255,0.08);">${ICONS[def.icon]}</div>
+            <div class="bicon" style="background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${def.key}" width="26" height="26" style="display:block;"></canvas></div>
             <div>
               <div class="bname">${def.name} <span class="lvl-pill">${count}</span>${pendingQty?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">+${pendingQty} im Bau</span>`:''}</div>
               <div class="bmeta">${meta}</div>
@@ -15575,6 +15783,7 @@
     `;
 
     document.getElementById('fleet').innerHTML = constructionProgressCards(j=>j.kind==='ship' && j.planet===state.activeBasePlanet) + shipRows + superBlock;
+    refreshShipMiniIcons(document.getElementById('fleet'));
 
     const debrisBox = document.getElementById('debrisBox');
     if (debrisBox){
@@ -15617,7 +15826,7 @@
       const dur = missionDurationFor(EXPEDITION_BASE_DURATION*selectedEt.durationMult, escortFleet, EXPEDITION_SHIP_KEYS);
       const canSendExp = forscherAvailable > 0;
       const escortRows = ESCORT_KEYS.filter(k => (cf[k]||0) > 0).map(k => {
-        const def = k==='superschlachtschiff' ? { name:'Superschlachtschiff', icon:'ship_superschlachtschiff', atk:220 } : SHIP_DEFS.find(d=>d.key===k);
+        const def = k==='superschlachtschiff' ? { key:'superschlachtschiff', name:'Superschlachtschiff', icon:'ship_superschlachtschiff', atk:220 } : SHIP_DEFS.find(d=>d.key===k);
         const owned = cf[k]||0;
         const away = expAway[k]||0;
         const available = Math.max(0, owned - away);
@@ -15629,7 +15838,7 @@
         return `
           <div class="card-row" style="padding:0.6rem 0.8rem;">
             <div class="left" style="gap:9px;">
-              <div class="bicon" style="width:30px; height:30px; background:rgba(255,255,255,0.06);">${ICONS[def.icon]}</div>
+              <div class="bicon" style="width:30px; height:30px; background:rgba(255,255,255,0.06);"><canvas data-ship-icon="${def.key}" width="26" height="26" style="display:block;"></canvas></div>
               <div>
                 <div class="bname" style="font-size:12.5px;">${def.name}</div>
                 <div class="bmeta">verfügbar: ${available} von ${owned}${awayNote} · Angriffspunkte je Schiff: ${def.atk}${capNote}</div>
@@ -15677,6 +15886,7 @@
           </div>
         </div>
       `);
+      refreshShipMiniIcons(expeditionBox);
       const cfnExp = document.getElementById('customFleetNameInputExp');
       if (cfnExp) cfnExp.oninput = () => { customFleetName = cfnExp.value; };
       document.querySelectorAll('[data-expedition-type]').forEach(btn => btn.onclick = () => {
@@ -15751,7 +15961,7 @@
                   return `
                     <div class="card-row" style="padding:0.6rem 0.8rem;">
                       <div class="left">
-                        <div class="bicon" style="width:32px; height:32px; background:rgba(255,255,255,0.08);">${ICONS[d.icon]||''}</div>
+                        <div class="bicon" style="width:32px; height:32px; background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${d.key}" width="26" height="26" style="display:block;"></canvas></div>
                         <div>
                           <div class="bname" style="font-size:12.5px;">${d.name} <span class="lvl-pill">${count} vorhanden</span></div>
                           <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ~${Math.round(dur)}s Flugzeit · ${miniResIcon('deuterium')} ~${fuelCost} Treibstoff (bei ${count})</div>
@@ -15776,6 +15986,7 @@
             `}
           </div>
         `;
+        refreshShipMiniIcons(relocateBox);
         relocateBox.querySelectorAll('[data-reloc-source]').forEach(btn => btn.onclick = () => {
           relocateSourcePlanet = btn.getAttribute('data-reloc-source');
           render();
@@ -15837,7 +16048,7 @@
           <div style="display:flex; flex-direction:column; gap:6px;">
             ${basketDefs.map(d => `
               <div class="card-row" style="padding:0.5rem 0.7rem;">
-                <div class="left"><div class="bicon" style="width:30px; height:30px; background:rgba(255,255,255,0.08);">${ICONS[d.icon]||''}</div><div class="bname" style="font-size:12px;">${d.name}</div></div>
+                <div class="left"><div class="bicon" style="width:30px; height:30px; background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${d.key}" width="26" height="26" style="display:block;"></canvas></div><div class="bname" style="font-size:12px;">${d.name}</div></div>
                 <input type="text" inputmode="numeric" class="basket-amount" data-basket-ship="${d.key}" value="${shipBasket[d.key]||0}" style="width:60px; text-align:center;"/>
               </div>
             `).join('')}
@@ -15847,6 +16058,7 @@
           <button class="buy ${affordable?'affordable':''}" id="shipBasketBuildBtn" ${anyQty?'':'disabled'} style="align-self:flex-start;"><i class="ti ti-ship" aria-hidden="true" style="margin-right:4px;"></i>Baukorb ${affordable?'bauen':'einreihen'}</button>
         </div>
       `;
+      refreshShipMiniIcons(shipBasketBox);
       shipBasketBox.querySelectorAll('.basket-amount').forEach(inp => inp.oninput = () => {
         const k = inp.getAttribute('data-basket-ship');
         shipBasket[k] = Math.max(0, Math.floor(Number(inp.value||0)));
@@ -15893,7 +16105,7 @@
       return `
         <div class="card-row">
           <div class="left">
-            <div class="bicon" style="background:${p.color}30; color:${p.color};"><i class="ti ${disc?'ti-planet':'ti-info-circle'}" aria-hidden="true"></i></div>
+            <div class="bicon" style="background:${p.color}30; color:${p.color};">${disc ? `<canvas data-planet-icon="${(state.planetTypeOverride||{})[p.id] || p.type}" width="26" height="26" style="display:block;"></canvas>` : `<i class="ti ti-info-circle" aria-hidden="true"></i>`}</div>
             <div>
               <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}${(state.moons&&state.moons[p.id]) ? (state.colonies['moon_'+p.id] ? ` <span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+p.id?'active':''}" data-moon-switch="moon_${p.id}" title="${planetDisplayName('moon_'+p.id)} – zum Mond wechseln" style="vertical-align:middle;">☾</span>` : ' <span class="lvl-pill" title="Dieser Planet hat einen Mond (noch nicht kolonisiert – siehe Mond-Liste unten)">Mond</span>') : ''}</div>
               <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS), 1)} Treibstoff</div>
@@ -15912,6 +16124,7 @@
         </div>
       `;
     }).join('');
+    refreshPlanetMiniIcons(document.getElementById('planetList'));
 
     const moonKeys = Object.keys(state.moons||{});
     const moonWrap = document.getElementById('moonListWrap');
@@ -15935,7 +16148,7 @@
               return `
                 <div class="card-row">
                   <div class="left">
-                    <div class="bicon" style="background:rgba(200,200,210,0.18); color:#c9c7bd;"><i class="ti ti-planet" aria-hidden="true"></i></div>
+                    <div class="bicon" style="background:rgba(200,200,210,0.18); color:#c9c7bd;"><canvas data-planet-icon="asteroid" width="26" height="26" style="display:block;"></canvas></div>
                     <div>
                       <div class="bname">${planetDisplayName(moonKey)}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
                       <div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Mond: produziert, verteidigt und lagert nur ${Math.round(MOON_PENALTY*100)}% eines normalen Planeten – dafür günstiger zu kolonisieren</div>
@@ -15949,6 +16162,7 @@
             }).join('')}
           </div>
         `;
+        refreshPlanetMiniIcons(moonWrap);
         moonWrap.querySelectorAll('[data-colonize-moon]').forEach(btn => btn.onclick = () => colonizeMoon(btn.getAttribute('data-colonize-moon')));
       }
     }
@@ -16114,7 +16328,7 @@
       const attackFleetDf = deployableFighters(attackFleet);
       const attackAway = computeAwayByType(cf);
       const attackRows = ATTACK_SHIP_KEYS.filter(k => (cf[k]||0) > 0).map(k => {
-        const def = k==='superschlachtschiff' ? { name:'Superschlachtschiff', icon:'ship_superschlachtschiff', atk:220 } : SHIP_DEFS.find(d=>d.key===k);
+        const def = k==='superschlachtschiff' ? { key:'superschlachtschiff', name:'Superschlachtschiff', icon:'ship_superschlachtschiff', atk:220 } : SHIP_DEFS.find(d=>d.key===k);
         const owned = cf[k]||0;
         const away = attackAway[k]||0;
         const available = Math.max(0, owned - away);
@@ -16126,7 +16340,7 @@
         return `
           <div class="card-row" style="padding:0.55rem 0.75rem;">
             <div class="left" style="gap:9px;">
-              <div class="bicon" style="width:28px; height:28px; background:rgba(255,255,255,0.06);">${ICONS[def.icon]}</div>
+              <div class="bicon" style="width:28px; height:28px; background:rgba(255,255,255,0.06);"><canvas data-ship-icon="${def.key}" width="24" height="24" style="display:block;"></canvas></div>
               <div>
                 <div class="bname" style="font-size:12px;">${def.name}</div>
                 <div class="bmeta">verfügbar: ${available} von ${owned}${awayNote} · Angriffspunkte je Schiff: ${def.atk}${capNote}</div>
@@ -16177,6 +16391,7 @@
           </div>
         </div>
       `;
+      refreshShipMiniIcons(attackFleetBox);
       const cfnAttack = document.getElementById('customFleetNameInputAttack');
       if (cfnAttack) cfnAttack.oninput = () => { customFleetName = cfnAttack.value; };
       attackFleetBox.querySelectorAll('[data-atksel-inc]').forEach(btn => btn.onclick = () => {
