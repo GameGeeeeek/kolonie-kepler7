@@ -448,7 +448,7 @@
     .dash-colony-card { position:relative; display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.05); border:0.5px solid rgba(255,255,255,0.09); border-radius:10px; padding:6px 10px 6px 6px; max-width:172px; min-width:0; overflow:hidden; }
     .dash-colony-card.targeted { background:rgba(var(--danger-rgb), 0.14); border-color:rgba(var(--danger-rgb), 0.55); }
     .dash-colony-card.active-base { background:rgba(var(--primary-rgb), 0.2); border-color:var(--c-primary); }
-    .dash-colony-icon { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; background:rgba(var(--primary-rgb), 0.18); color:#c3bef5; }
+    .dash-colony-icon { width:28px; height:28px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; background:rgba(var(--primary-rgb), 0.18); color:#c3bef5; }
     .dash-role-badge { position:absolute; bottom:-4px; right:-4px; width:14px; height:14px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
     .dash-role-badge i { font-size:8px; margin:0; }
     .pill-moon-btn { font-size:11px; line-height:1; }
@@ -505,7 +505,7 @@
     .card-row:hover { background: rgba(255,255,255,0.07); border-color:rgba(var(--primary-rgb), 0.35); }
     .search-result-row:hover { background: rgba(var(--primary-rgb), 0.15); }
     .card-row .left { display:flex; align-items:center; gap:11px; min-width:0; }
-    .bicon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; }
+    .bicon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; overflow:hidden; }
     .bname { font-weight:500; font-size:13.5px; display:flex; align-items:center; gap:6px; color:#fff; }
     .fleet-position-panel { position:fixed; right:14px; top:50%; transform:translateY(-50%); width:200px; max-height:74vh; overflow-y:auto; background:rgba(8,10,20,0.92); border:0.5px solid rgba(255,255,255,0.12); border-radius:12px; padding:10px; z-index:50; }
     .fleet-position-panel { scrollbar-width:thin; scrollbar-color: rgba(var(--primary-rgb),0.55) transparent; }
@@ -2325,8 +2325,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.40.3';
+  const VERSION = '8.40.4';
   const PATCHNOTES = [
+    { version:'8.40.4', date:'16.07.2026', changes:[
+      'Bugfix (danke an Sascha für den Report): Planeten-Icons in Kolonie-Kacheln, Planetenliste und Mondliste hatten als Container nur eine leicht abgerundete Ecke (kein echter Kreis) ohne harte Begrenzung - die eigentliche Kreis-Zeichnung selbst war zwar sauber, aber ohne Sicherheitsnetz auf Container-Ebene konnte es je nach Bildschirm/Skalierung zu sichtbaren eckigen Rändern kommen. Container sind jetzt echte Kreise mit hartem Zuschnitt (border-radius:50% + overflow:hidden), zusätzlich als generelle Absicherung für alle Icon-Boxen im Spiel ergänzt'
+    ]},
     { version:'8.40.3', date:'16.07.2026', changes:[
       'Bugfix (danke an Sascha für den Report): "Diese Kolonie terraformt bereits" erschien fälschlich auf Kolonien mit alten, migrierten Terraforming-Stufen aus der Zeit vor dem Terraforming-Umbau (v8.29.0) - dort war absichtlich kein Zieltyp gesetzt (targetType:null), nur die alte Stufenzahl blieb erhalten, bis nachträglich ein Ziel gewählt wird. Die Sperrprüfung berücksichtigte diesen Fall nicht und blockierte genau die dafür vorgesehene Zielwahl, obwohl nirgends tatsächlich etwas lief (kein aktiver Auftrag, keine Fortschrittsanzeige). Betraf nur einzelne Kolonien mit dieser speziellen Alt-Datenkonstellation, laufendes echtes Terraforming wird weiterhin korrekt blockiert'
     ]},
@@ -16215,7 +16218,7 @@
       return `
         <div class="card-row">
           <div class="left">
-            <div class="bicon" style="background:${p.color}30; color:${p.color};">${disc ? `<canvas data-planet-icon="${(state.planetTypeOverride||{})[p.id] || p.type}" width="26" height="26" style="display:block;"></canvas>` : `<i class="ti ti-info-circle" aria-hidden="true"></i>`}</div>
+            <div class="bicon" style="background:${p.color}30; color:${p.color}; border-radius:50%;">${disc ? `<canvas data-planet-icon="${(state.planetTypeOverride||{})[p.id] || p.type}" width="26" height="26" style="display:block;"></canvas>` : `<i class="ti ti-info-circle" aria-hidden="true"></i>`}</div>
             <div>
               <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}${(state.moons&&state.moons[p.id]) ? (state.colonies['moon_'+p.id] ? ` <span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+p.id?'active':''}" data-moon-switch="moon_${p.id}" title="${planetDisplayName('moon_'+p.id)} – zum Mond wechseln" style="vertical-align:middle;">☾</span>` : ' <span class="lvl-pill" title="Dieser Planet hat einen Mond (noch nicht kolonisiert – siehe Mond-Liste unten)">Mond</span>') : ''}</div>
               <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS), 1)} Treibstoff</div>
@@ -16258,7 +16261,7 @@
               return `
                 <div class="card-row">
                   <div class="left">
-                    <div class="bicon" style="background:rgba(200,200,210,0.18); color:#c9c7bd;"><canvas data-planet-icon="asteroid" width="26" height="26" style="display:block;"></canvas></div>
+                    <div class="bicon" style="background:rgba(200,200,210,0.18); color:#c9c7bd; border-radius:50%;"><canvas data-planet-icon="asteroid" width="26" height="26" style="display:block;"></canvas></div>
                     <div>
                       <div class="bname">${planetDisplayName(moonKey)}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
                       <div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Mond: produziert, verteidigt und lagert nur ${Math.round(MOON_PENALTY*100)}% eines normalen Planeten – dafür günstiger zu kolonisieren</div>
