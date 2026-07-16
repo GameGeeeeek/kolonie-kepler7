@@ -2355,8 +2355,22 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.48.0';
+  const VERSION = '8.48.1';
   const PATCHNOTES = [
+    { version:'8.48.1', date:'16.07.2026', changes:[
+      'Bugfix Wochenliga: die Produktions-Zeitgutschrift (z.B. "12 Min. Produktion aller Ressourcen" bei Platin) wurde bisher nur für Erz/Kristalle/Deuterium ausgezahlt, Energie/Antimaterie/Forschungspunkte gingen trotz anderslautendem Hilfetext leer aus - jetzt korrekt alle 6 Ressourcen',
+      'Bugfix Fraktionssystem-Angriff: der Ruf-Abzug (-15) wurde bisher sofort nach dem Bestätigungsdialog angewendet, noch bevor die Server-Antwort feststand - bei Serverfehler oder Verbindungsabbruch blieb der Ruf-Verlust ohne jeden Angriff bestehen. Wird jetzt erst nach bestätigter Server-Antwort abgezogen',
+      'Bugfix Trümmerfeld-Abbau: bei vollem Lager wurde die vom Recycler "abgebaute" Menge trotzdem voll vom Trümmerfeld abgezogen, obwohl real 0 gutgeschrieben wurde - Ressourcen verschwanden ersatzlos. Feld wird jetzt nur noch um den tatsächlichen Zuwachs reduziert, der Rest bleibt liegen bis wieder Lagerplatz frei ist',
+      'Bugfix Freunde-einladen: die Verknüpfung mit dem Einladenden ging bei einem Prestige oder Aufstieg vor Erreichen von Kommandanten-Level 5 unwiderruflich verloren, wodurch die automatische Gutschrift nie mehr ausgelöst werden konnte - übersteht jetzt beide Reset-Arten',
+      'Bugfix simuliertes PvP-Duell (ohne eigenen Server): Modul- und Veteranenrang-Bonus des Standorts flossen bei der tatsächlichen Kampfauflösung nicht ein, obwohl die Angriffs-Vorschau im Spielerprofil sie korrekt anzeigte - Angriffskraft stimmt jetzt mit der Vorschau überein',
+      'Bugfix Handelsrouten: Großer Frachter wurde bei der Berechnung freier/gebundener Frachter nicht mitgezählt - wer nur Große Frachter besaß, sah "0 von 0 frei" und konnte keine Route anlegen',
+      'Bugfix Sektorkarte: eine Erkundungsmission vom sichtbaren Heimatsystem in ein fremdes System wurde nie als Flugbahn-Linie angezeigt (zwei sich überschneidende Bedingungen schlossen diesen Fall komplett aus)',
+      'Bugfix Bestenliste: die "bin ich das?"-Erkennung verglich bisher Name+Kampfpunkte statt der Spieler-ID - bei zwei Spielern mit gleichem Namen und Punktestand (z.B. zwei Neulinge mit je 0 Kampfpunkten) wurden Angriffs-/Späh-Buttons für den falschen, fremden Spieler ausgeblendet',
+      'Bugfix Flotte-Tab: fehlender Fallback beim Missions-Rendering konnte die Oberfläche dauerhaft abstürzen lassen, falls das Ziel einer laufenden Angriffs-/Erkundungsmission zwischenzeitlich aus der Definitionsliste verschwunden war',
+      'Bugfix Allianz: Mitgliederliste und Dominanz-Summe waren auf 60 geladene Datensätze gedeckelt (zählt jeden Spieler, der je der Allianz angehörte, nicht nur aktive Mitglieder) - bei hoher Fluktuation konnten dadurch aktuelle Mitglieder/Beiträge fehlen. Jetzt vollständig geladen, analog zur bereits korrekten Allianz-Übersicht',
+      'Verbessert: Haupt-Tick prüft jetzt ebenfalls, ob der Spielstand bereits vollständig geladen ist, bevor er Ressourcen/Missionen verarbeitet (bisher nur beim Speichern selbst geprüft)',
+      'Kleinere Korrekturen: veralteter Terraforming-Dauer-Kommentar aktualisiert, fehlender Fallback bei einer Verteidigungswert-Vorschau ergänzt, Zufallsereignis-Banner blendet sich jetzt auch bei einem nicht mehr existierenden Ereignis-Typ korrekt aus, totes No-op-Statement entfernt'
+    ]},
     { version:'8.48.0', date:'16.07.2026', changes:[
       'Treibstoffkosten geprüft und neu ausbalanciert (Prüf-/Balance-Wunsch): Bugfix - bei der Verlegung eines gemischten Flottenverbands (mehrere Schiffstypen gleichzeitig) wurde der Treibstoff bisher pro Schiffstyp einzeln berechnet und aufsummiert statt einmal für die Gesamtschiffszahl, was durch die Wurzelfunktion in der Formel bis zu doppelt so hohe Kosten verursachte wie bei einer gleich großen Flotte eines einzigen Typs - jetzt korrekt einmalig für die Gesamtzahl berechnet. Außerdem doppeltes Runden (Basis-, Allianz- und Doktrin-Multiplikator wurden bisher nacheinander einzeln gerundet) zu einer einzigen finalen Rundung zusammengefasst. Restliche Prüfpunkte ohne Befund: Allianz-Rabatt und Doktrin-Multiplikator korrekt verknüpft, keine negativen/fehlerhaften Werte bei langen Flugstrecken oder durch Geschwindigkeitsboni möglich (diese senken die Kosten weiterhin bewusst mit, da Treibstoff an die tatsächliche Flugzeit gekoppelt ist). Balance: Treibstoffkosten pro Schiff unabhängig vom Prüfergebnis um 20% erhöht (Basis-Multiplikator in der bestehenden Formel angehoben), gilt gleichermaßen für alle Schiffstypen und alle Missionsarten'
     ]},
@@ -4170,7 +4184,6 @@
     state.veteranTrainingJob = null;
     if (!def) return;
     if (!state.veteranTraining) state.veteranTraining = {};
-    if (state.veteranTrainingJob === undefined) state.veteranTrainingJob = null;
     state.veteranTraining[job.key] = true;
     logScoreChange(150, def.name+' ausgebildet', 'ti-medal');
     log('Veteranen-Ausbildung abgeschlossen: '+def.name+'! '+def.desc, 'ti-medal');
@@ -5131,10 +5144,17 @@
   // Frei verfügbare Frachter (Gesamtbestand minus für Routen gebundene). Die Missions-away-Logik gilt
   // separat (attackende Frachter), Routen sind eine zusätzliche, dauerhafte Bindung.
   function availableFrachter(){
-    const total = allFleets().reduce((a,f)=>a+(f.frachter||0),0);
+    // Bugfix: Großer Frachter (frachtergross) wurde hier bisher nicht mitgezählt - ein Spieler mit
+    // ausschließlich Großen Frachtern sah "0 von 0 frei" und konnte überhaupt keine Handelsroute
+    // anlegen, obwohl real ungenutzte Frachterkapazität vorhanden war. Beide Typen binden sich
+    // gleichermaßen an Routen (route.frachter ist typ-agnostisch, siehe createTradeRoute).
+    const total = allFleets().reduce((a,f)=>a+(f.frachter||0)+(f.frachtergross||0),0);
     // Frachter, die gerade auf einer Mission unterwegs sind, ebenfalls als gebunden zählen - sonst
     // ließe sich derselbe Frachter für eine neue Route UND einen laufenden Flug gleichzeitig nutzen.
-    const away = allFleetsWithPlanet().reduce((a,{fleet:f})=>a+(computeAwayByType(f).frachter||0), 0);
+    const away = allFleetsWithPlanet().reduce((a,{fleet:f})=>{
+      const awayByType = computeAwayByType(f);
+      return a + (awayByType.frachter||0) + (awayByType.frachtergross||0);
+    }, 0);
     return Math.max(0, total - frachterBoundToRoutes() - away);
   }
   function createTradeRoute(type, opts){
@@ -5806,7 +5826,6 @@
     const owner = factionOwning(systemId);
     if (!owner){ log('Dieses System gehört keiner Fraktion.', 'ti-alert-triangle'); return; }
     if (!confirm('Das System '+systemId+' von den '+owner.name+' angreifen? Bei Misserfolg verlierst du einen Teil deiner Flotte. (Dein Ruf bei dieser Fraktion sinkt um '+REP_ATTACK_PENALTY+'.)')) return;
-    changeFactionRep(owner.id, -REP_ATTACK_PENALTY);
     try {
       const res = await backendFetch('/faction/attack', {
         method:'POST',
@@ -5815,6 +5834,11 @@
       });
       const data = await res.json();
       if (!res.ok){ log('Angriff fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
+      // Ruf-Abzug erst NACH bestätigter Server-Antwort anwenden (Bugfix: vorher wurde er sofort nach
+      // dem Bestätigungsdialog abgezogen, ohne Rollback bei Serverfehler/Verbindungsabbruch - der
+      // Spieler verlor Ruf, obwohl gar kein Angriff stattgefunden hatte). Gilt weiterhin unabhängig
+      // vom Angriffsausgang (data.success true/false), wie im Bestätigungsdialog angekündigt.
+      changeFactionRep(owner.id, -REP_ATTACK_PENALTY);
       // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
       if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
       if (data.success){
@@ -8091,6 +8115,8 @@
   // komplett, ohne die Migrations-Defaults von load() zu durchlaufen).
   function applyStateDefaults(){
     if (state.expeditionsCompleted === undefined) state.expeditionsCompleted = 0;
+    if (state.referredBy === undefined) state.referredBy = null;
+    if (state.referralRedeemed === undefined) state.referralRedeemed = false;
     if (!state.themeKey) state.themeKey = 'standard';
     if (state.autoReinforceOn === undefined) state.autoReinforceOn = false;
     if (state.uiJumpNav === undefined) state.uiJumpNav = false;
@@ -8261,6 +8287,7 @@
     const keepPerks = perkKey ? (state.prestigePerks||[]).concat([perkKey]) : (state.prestigePerks||[]);
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
+    const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
     state = {
       resources:{energie:10,erz:10,kristalle:0,deuterium:0,antimaterie:0,forschungspunkte:0},
       buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0},
@@ -8272,6 +8299,7 @@
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: 250, claimedBossKills: keepBossClaims,
+      referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
     };
     applyStateDefaults();
@@ -8320,6 +8348,7 @@
     const keepXp = state.xp, keepAch = state.achievements, keepRare = state.rareItems, keepUnlocked = state.unlocked, keepClaimed = state.levelRewardsClaimed, keepInventory = state.inventory, keepAllianceRes = state.allianceResearch, keepAllianceContrib = state.allianceContributed;
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
+    const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
     const asc = state.ascension || { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0} };
     asc.count = (asc.count||0) + 1;
     asc.essence = (asc.essence||0) + gain;
@@ -8336,6 +8365,7 @@
       prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: startLvl*100,
       claimedBossKills: keepBossClaims,
+      referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
       ascension: asc,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
     };
@@ -8960,7 +8990,10 @@
       // Simulierter Modus (kein eigener Server): ebenfalls erst bei Ankunft berechnet statt beim
       // Losschicken, für dasselbe konsistente Verhalten.
       const entry = await loadPlayerEntry(m.targetId);
-      const myPower = attackPower(m.composition||fleet);
+      // Bugfix: fehlte hier bisher planetKey - dadurch flossen Modul-/Veteranenrang-Bonus des
+      // Standorts (die die Vorschau im Spielerprofil bereits korrekt einrechnet) in die eigentliche
+      // Kampfauflösung nicht mit ein, der Spieler gewann seltener als vorher versprochen.
+      const myPower = attackPower(m.composition||fleet, planetKey);
       const theirDefenseEstimate = entry && entry.defensePower!==undefined ? entry.defensePower : (entry ? (
         (entry.cruisers||0)*20 + (entry.ships||0)*5 + (entry.destroyers||0)*45
         + (entry.jaeger||0)*10 + (entry.bomber||0)*60 + (entry.schlachtschiff||0)*90
@@ -11636,7 +11669,11 @@
     box.innerHTML = `<div class="bmeta">lädt…</div>`;
     try {
       const listRes = await storageList('alliance:'+tag+':role:', true);
-      const keys = (listRes && listRes.keys) ? listRes.keys.slice(0, 60) : [];
+      // Bugfix: die frühere 60er-Deckelung zählt jeden Spieler, der JE dieser Allianz angehört hat
+      // (auch längst ausgetretene mit role:'left'), nicht nur aktive Mitglieder - bei hoher
+      // Fluktuation konnten dadurch aktuelle Mitglieder aus der Liste fallen. Vollständig laden, wie
+      // loadAlliances() es für die Mitgliederzählung bereits tut.
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
       const members = [];
       // Parallel statt sequenziell (siehe loadAlliances weiter oben für die Begründung).
       const loadedMembers = await Promise.all(keys.map(async k => {
@@ -12035,7 +12072,9 @@
       await storageSet('alliance:'+tag+':dominance:'+state.player.id, JSON.stringify({ score: dominanceScore(), name: state.player.name }), true);
       // Alle Mitgliedsbeiträge summieren.
       const listRes = await storageList('alliance:'+tag+':dominance:', true);
-      const keys = (listRes && listRes.keys) ? listRes.keys.slice(0, 60) : [];
+      // Bugfix: 60er-Deckelung konnte bei vielen (auch ehemaligen) Mitgliedern echte Beiträge aus
+      // der Summe ausschließen - vollständig laden für einen korrekten Gesamtwert.
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
       const docs = await Promise.all(keys.map(async k => {
         try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){}
         return null;
@@ -13074,7 +13113,7 @@
           const rates = ratesPerSecond();
           const capW = storageCap();
           const parts = [];
-          for (const r of ['erz','kristalle','deuterium']){
+          for (const r of ['energie','erz','kristalle','deuterium','antimaterie','forschungspunkte']){
             const amt = Math.round((rates[r]||0) * lg.prodMin * 60);
             if (amt > 0){
               state.resources[r] = Math.min(capW, (state.resources[r]||0) + amt);
@@ -13528,8 +13567,8 @@
       antimaterie: Math.round(15 * f * typeMult)
     };
   }
-  // Umwandlungsdauer in Sekunden - "mehrere Stunden" je Stufe, wächst mit der Zielstufe (Stufe 1 ~3,5
-  // Std., Stufe 10 ~7 Std.).
+  // Umwandlungsdauer in Sekunden - "mehrere Stunden" je Stufe, wächst mit der Zielstufe (Stufe 1 ~3,6
+  // Std., Stufe 10 ~8,8 Std. - Kommentar korrigiert, stimmte nicht mehr mit der Formel überein).
   function terraformDuration(nextLevel){ return 3*3600 + nextLevel * 1800 + Math.round(Math.pow(1.25, nextLevel) * 300); }
   function canStartTerraform(planetKey){
     if (!planetKey) return false;
@@ -14323,10 +14362,19 @@
         const debrisCap = storageCap();
         const beforeR = state.resources[r]||0;
         state.resources[r] = Math.min(debrisCap, beforeR + take);
-        field[r] -= take;
-        leftover -= take;
-        any = true;
-        if (tracker){ tracker.totalCollected[r] = (tracker.totalCollected[r]||0) + (state.resources[r]-beforeR); }
+        // Bugfix: Bei vollem Lager kam von `take` teilweise oder gar nichts im Ressourcenbestand an
+        // (siehe Math.min oben), das Trümmerfeld wurde aber trotzdem um die volle `take`-Menge
+        // reduziert - überschüssige Ressourcen verschwanden ersatzlos. Feld/Rest jetzt nur um den
+        // tatsächlichen Zuwachs reduzieren, der Überschuss bleibt im Feld liegen (wird abgebaut,
+        // sobald wieder Lagerplatz frei ist).
+        const actualGain = state.resources[r] - beforeR;
+        field[r] -= actualGain;
+        leftover -= actualGain;
+        if (actualGain > 0) any = true;
+        if (tracker && actualGain > 0){ tracker.totalCollected[r] = (tracker.totalCollected[r]||0) + actualGain; }
+        // Ist das Lager für DIESE Ressource voll (actualGain < take), bleibt `leftover` unverändert
+        // erhalten und wird beim nächsten Ressourcentyp im selben Feld weiterverwendet, statt
+        // ungenutzt zu verfallen.
       }
       for (const r of Object.keys(field)) if (field[r] <= 0.01) delete field[r];
       if (!Object.keys(field).length){
@@ -14976,9 +15024,15 @@
         if (!p) continue;
         const originPlanet = originKey==='home' ? null : PLANETS.find(pl=>pl.id===originKey);
         const originInView = originKey==='home' ? (activeSystem === myHomeSystem) : (originPlanet && originPlanet.system===activeSystem);
-        if (p.system !== activeSystem && !originInView) continue;
-        if (p.system !== activeSystem && originInView) continue;
-        const targetPos = planetOrbitXY(p);
+        const targetInView = p.system === activeSystem;
+        // Bugfix: Die beiden früheren `continue`-Bedingungen deckten zusammen JEDEN Fall von
+        // "Ziel nicht im aktuellen System" ab, unabhängig vom Wert von originInView - eine Erkundung
+        // vom sichtbaren Heimatsystem in ein fremdes System wurde dadurch nie als Linie angezeigt.
+        // Jetzt: nur überspringen, wenn WEDER Ziel NOCH Ursprung im aktuellen View liegen; ist nur
+        // eines der beiden sichtbar, wird für das jeweils andere (analog zu originX/Y unten) die
+        // Sonne als Platzhalterposition genutzt.
+        if (!targetInView && !originInView) continue;
+        const targetPos = targetInView ? planetOrbitXY(p) : { x: SUN_X, y: SUN_Y };
         let originX, originY;
         if (originKey === 'home'){ const hc = homeSlotXY(myHomeSlot); originX = hc.x; originY = hc.y; }
         else if (originInView){ const oc = planetOrbitXY(originPlanet); originX = oc.x; originY = oc.y; }
@@ -15634,7 +15688,10 @@
       return;
     }
     box.innerHTML = leaderboardCache.slice(0,5).map((e,i) => {
-      const isMe = e.name === state.player.name && e.bp === state.battlePoints;
+      // Bugfix: vorheriger Vergleich über Name+Kampfpunkte konnte bei zwei Spielern mit identischem
+      // Anzeigenamen und gleichem Punktestand (z.B. zwei Neulinge mit je 0 Kampfpunkten) den
+      // FALSCHEN, fremden Eintrag als "ich" markieren und dessen Angriffs-/Späh-Buttons ausblenden.
+      const isMe = !!(state.player.id && e.id === state.player.id);
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
       const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 3px rgba(93,202,165,0.7)':'none'};"></span>`;
       return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name">${e.name||'Unbekannt'}${e.allianceTag?' <span style="color:#7d8199;">['+e.allianceTag+']</span>':''}</span><span>${e.score||0}</span></div>`;
@@ -15804,7 +15861,10 @@
       return;
     }
     box.innerHTML = top.map((e,i) => {
-      const isMe = e.name === state.player.name && e.bp === state.battlePoints;
+      // Bugfix: vorheriger Vergleich über Name+Kampfpunkte konnte bei zwei Spielern mit identischem
+      // Anzeigenamen und gleichem Punktestand (z.B. zwei Neulinge mit je 0 Kampfpunkten) den
+      // FALSCHEN, fremden Eintrag als "ich" markieren und dessen Angriffs-/Späh-Buttons ausblenden.
+      const isMe = !!(state.player.id && e.id === state.player.id);
       const rank = leaderboardCache.indexOf(e)+1;
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
       const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 4px rgba(93,202,165,0.7)':'none'};"></span>`;
@@ -16106,7 +16166,7 @@
       } else if (def.category==='defense'){
         // "Schild"-Wert war zuvor immer NaN (def.shield war nirgends gesetzt) und wurde entfernt.
         // Angriff zeigt jetzt den echten atkVal statt einer fest auf 0 kodierten Zahl.
-        prodLine = `<i class="ti ti-sword" aria-hidden="true"></i> Angriff: ${lvl*(def.atkVal||0)} → <span style="color:#5dcaa5;">${(lvl+qty)*(def.atkVal||0)}</span> · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigung: ${lvl*def.defVal} → <span style="color:#5dcaa5;">${(lvl+qty)*def.defVal}</span>`;
+        prodLine = `<i class="ti ti-sword" aria-hidden="true"></i> Angriff: ${lvl*(def.atkVal||0)} → <span style="color:#5dcaa5;">${(lvl+qty)*(def.atkVal||0)}</span> · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigung: ${lvl*(def.defVal||0)} → <span style="color:#5dcaa5;">${(lvl+qty)*(def.defVal||0)}</span>`;
       }
       let malusLine = '';
       if (state.mineDebuff && state.mineDebuff.key===def.key && (state.mineDebuff.planet||'home')===state.activeBasePlanet && state.mineDebuff.until > Date.now()){
@@ -16690,15 +16750,18 @@
           `;
         }
         const isAttack = m.type === 'attack';
-        const target = isAttack ? NPCS.find(n=>n.id===m.targetId) : PLANETS.find(p=>p.id===m.targetId);
+        // Bugfix: ohne ||{} -Fallback crashte render() dauerhaft, sobald targetId keinen Treffer mehr
+        // in NPCS/PLANETS fand (z.B. Update während laufender Mission) - analog zu den bereits
+        // abgesicherten Nachbar-Codezweigen im selben Bereich.
+        const target = (isAttack ? NPCS.find(n=>n.id===m.targetId) : PLANETS.find(p=>p.id===m.targetId)) || {};
         const remaining = Math.max(0, m.endTime-now);
-        const totalDur = isAttack ? missionDurationFor(target.duration, cf, ATTACK_SHIP_KEYS) : missionDurationFor(target.duration, cf, EXPLORE_SHIP_KEYS);
+        const totalDur = isAttack ? missionDurationFor(target.duration||60, cf, ATTACK_SHIP_KEYS) : missionDurationFor(target.duration||60, cf, EXPLORE_SHIP_KEYS);
         const pct = 100 - (remaining/(totalDur*1000)*100);
         const shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
         return `
           <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <div class="bname"><i class="ti ${isAttack?'ti-sword':'ti-rocket'}" aria-hidden="true" style="color:${isAttack?'#e24b4a':'#378add'};"></i>${m.fleetName?m.fleetName+' · ':''}${isAttack?'Angriff: ':''}${target.name}</div>
+              <div class="bname"><i class="ti ${isAttack?'ti-sword':'ti-rocket'}" aria-hidden="true" style="color:${isAttack?'#e24b4a':'#378add'};"></i>${m.fleetName?m.fleetName+' · ':''}${isAttack?'Angriff: ':''}${target.name||m.targetId}</div>
               <div style="display:flex; align-items:center; gap:6px;">
                 <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
                 ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
@@ -17803,6 +17866,11 @@
           optBBtn.textContent = def.optB.label;
           optABtn.onclick = () => resolveEvent('A');
           optBBtn.onclick = () => resolveEvent('B');
+        } else {
+          // Bugfix: ohne diesen else-Zweig blieb das Banner in seinem zuletzt gesetzten display-Wert
+          // hängen, falls state.activeEvent.key keiner RANDOM_EVENTS-Definition mehr entspricht (z.B.
+          // ein aus einem alten Spielstand übernommenes, inzwischen entferntes Ereignis).
+          eventBanner.style.display = 'none';
         }
       } else {
         eventBanner.style.display = 'none';
@@ -19125,6 +19193,10 @@
 
   setInterval(() => {
     if (saveConflictDetected) return;
+    // Bugfix: der Tick lief bisher auch VOR bootDataReady (nur save() selbst prüfte das) - lief also
+    // kurz auf dem noch nicht geladenen Platzhalter-State (Ressourcenproduktion, Missionsauflösung,
+    // Raid-Erkennung auf leerem Spielstand), bevor load() ihn überschreibt.
+    if (!bootDataReady) return;
     const rates = ratesPerSecond();
     const cap = storageCap();
     for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r], cap);
