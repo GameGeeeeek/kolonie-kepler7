@@ -2358,8 +2358,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.53.2';
+  const VERSION = '8.54.0';
   const PATCHNOTES = [
+    { version:'8.54.0', date:'16.07.2026', changes:[
+      'Allianzbasis: Krieg, Verteidigung & Zerstörung - die Basis kann jetzt von Mitgliedern fremder Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, echte Flugzeit, 8 Std. Abklingzeit je Spieler). Hülle: 12.000 Punkte je Ausbaustufe, mit Hüllen-Leiste in der Basis-Übersicht',
+      'Verteidigung: Mitglieder können ihre zusammengestellte Angriffsflotte zur Basis ENTSENDEN (echte Flugzeit) - dort stationierte Schiffe verteidigen die Basis gemeinsam (Verteidigungs-Sockel 600 je Stufe + Schiffswerte aller Mitglieder), erleiden bei Angriffen aber auch Verluste. Jederzeit zurückrufbar',
+      'Zerstörung & Reparatur: fällt die Hülle auf 0, ist die Basis zerstört - ALLE Boni deaktiviert, auf der Karte brennende Trümmer. Die Reparatur kostet 30% der kumulierten Baukosten der aktuellen Stufe (gemeinsame Beiträge, danach ist die Basis sofort wieder voll einsatzbereit). Leichte Schäden repariert die Basis von selbst (3% der Maximal-Hülle je Stunde ohne Treffer)',
+      'Angreifer erhalten Kampfpunkte (Treffer +15, Zerstörung +60, Fehlschlag +4 Trost) und erleiden auch bei Erfolg Flottenverluste; Kampfberichte für beide Seiten, Angriffe zählen in die Kampfstatistik. Verteidiger werden per Alarm, Log und Bericht informiert (Kriegszustand wird alle 5 Minuten abgeglichen)',
+      'Allianzbasis auf der Sektorkarte weiter in die Kartenmitte gerückt (vorher zu weit am linken Rand)'
+    ]},
     { version:'8.53.2', date:'16.07.2026', changes:[
       'Balance Allianzbasis: deutlich teurer - Basiskosten verdoppelt (Stufe 1 jetzt 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie) und das Kosten-Wachstum je Stufe von x2,0 auf x2,2 angehoben. Stufe 10 allein kostet damit rund das 1.200-fache der Basiskosten (vorher 512-fach), das Gesamtprojekt kumuliert etwa das 4-fache von vorher. Bereits geleistete Beiträge bleiben voll angerechnet; Bauzeiten unverändert'
     ]},
@@ -6449,7 +6456,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -8376,6 +8383,10 @@
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
     if (state.pirateDebrisRaid === undefined) state.pirateDebrisRaid = null;
     if (state.allianceBase === undefined) state.allianceBase = null;
+    if (state.allianceBaseWar === undefined) state.allianceBaseWar = null;
+    if (!state.shipsAtAllianceBase) state.shipsAtAllianceBase = {};
+    if (!state.processedBaseAttackIds) state.processedBaseAttackIds = [];
+    if (state.lastAllianceBaseAttackAt === undefined) state.lastAllianceBaseAttackAt = 0;
     if (!state.themeKey) state.themeKey = 'standard';
     if (state.autoReinforceOn === undefined) state.autoReinforceOn = false;
     if (state.uiJumpNav === undefined) state.uiJumpNav = false;
@@ -9149,7 +9160,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen" im Galaxie-Tab).', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='attack-alliance-base').length;
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const baseDur = pseudoDistanceSeconds(playerId);
@@ -10034,6 +10045,7 @@
     if (r.type === 'expedition' && r.encountered) return r.result === 'defended' ? 'win' : 'loss';
     // 'escaped' (Piraten nie abgefangen) ist kein Kampf und zählt daher bewusst nicht in die Statistik.
     if (r.type === 'pirate-debris-raid' && (r.result === 'win' || r.result === 'loss')) return r.result;
+    if (r.type === 'alliance-base-attack') return (r.result === 'win' || r.result === 'destroyed') ? 'win' : 'loss';
     return null;
   }
   async function pushReport(report){
@@ -11040,7 +11052,7 @@
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.' }
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
-      { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat eine <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage), die seit der Gründung parallel zu den Beiträgen läuft - schnelles Vollspenden überspringt also keine Bauzeit. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone.' },
+      { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat eine <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage), die seit der Gründung parallel zu den Beiträgen läuft - schnelles Vollspenden überspringt also keine Bauzeit. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. <strong>Krieg um die Basis:</strong> Die Basis kann von Mitgliedern FREMDER Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, 8 Std. Abklingzeit je Spieler). Ihre Hülle hat 12.000 Punkte je Stufe; die Verteidigung besteht aus einem Sockel (600 je Stufe) plus allen von Mitgliedern <strong>zur Basis entsandten Schiffen</strong> (Button im Allianz-Tab, echte Flugzeit, jederzeit zurückrufbar - stationierte Schiffe erleiden bei Angriffen Verluste). Leichte Schäden repariert die Basis selbst (3%/Std.); fällt die Hülle auf 0, ist die Basis <strong>ZERSTÖRT</strong>: alle Boni sind deaktiviert, bis die Allianz die hohen Reparaturkosten (30% der kumulierten Baukosten) gemeinsam aufgebracht hat. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone.' },
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
       { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen oder zurückstufen (auch andere Admins zu Offizier/Mitglied), und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
       { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz startet mit einem Mitgliederlimit von <strong>10</strong>. Höher geht es nur über die Allianz-Forschung "Allianz-Expansion" (5 Stufen, in der Allianz-Forschung, dieselbe Kette wie andere Allianz-Techs) - bis zu 50 bei voller Ausbaustufe. Das Limit ergibt sich automatisch aus der erreichten Forschungsstufe, es lässt sich nicht manuell einstellen. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
@@ -11193,6 +11205,21 @@
             body += debrisReportLine(r.ownLossDebris);
           }
         }
+      } else if (r.type === 'alliance-base-attack'){
+        title = (r.result==='destroyed'?'💥 ':'')+'Angriff auf die Allianzbasis von ['+(r.targetTag||'?')+']';
+        body = '<strong>'+(r.result==='destroyed' ? 'DIE BASIS WURDE ZERSTÖRT! Schaden: '+fmt(r.damage||0)+'.' : (r.result==='win' ? 'Treffer! '+fmt(r.damage||0)+' Schaden an der Basis (Hülle danach: '+fmt(r.hullAfter||0)+'/'+fmt(r.hullMax||0)+').' : 'Abgewehrt - die Verteidigung ('+fmt(r.defensePower||0)+') hielt stand (Erfolgschance ~'+(r.chancePct||0)+'%).'))+'</strong>';
+        body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt')+' · Angriffskraft: '+fmt(r.attackPower||0)+' vs. Verteidigung '+fmt(r.defensePower||0);
+        body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        body += '<br>Kampfpunkte: +'+(r.battlePoints||0);
+        if (r.ownLostShips && Object.keys(r.ownLostShips).length){
+          body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
+          body += debrisReportLine(r.debris);
+        }
+      } else if (r.type === 'alliance-base-defense'){
+        title = (r.result==='destroyed'?'💥 ':'⚔ ')+'Angriff auf EURE Allianzbasis';
+        body = '<strong>'+(r.result==='destroyed' ? 'Die Allianzbasis wurde von ['+(r.attackerTag||'??')+'] ZERSTÖRT! Alle Boni sind bis zur Reparatur deaktiviert.' : '['+(r.attackerTag||'??')+'] hat die Allianzbasis angegriffen - '+fmt(r.damage||0)+' Hüllenschaden.')+'</strong>';
+        if (r.lostText) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Deine stationierten Verluste: '+r.lostText;
+        body += '<br>Details und Reparatur im Allianz-Tab.';
       } else if (r.type === 'pirate-debris-raid'){
         if (r.result === 'escaped'){
           title = 'Piraten-Trümmerräuber entkommen – '+planetDisplayName(r.targetPlanet);
@@ -12501,16 +12528,19 @@
   }
   // Boni der Basis - alle speisen die bestehenden additiven, gedeckelten Gruppen bzw. Multiplikator-
   // Ketten und bleiben damit im Rahmen der dokumentierten Balance-Konventionen.
-  function allianceBaseProdBonus(){ const l = allianceBaseLevel(); return l*0.01 + (l>=10?0.04:0); }
-  function allianceBaseDefBonus(){ const l = allianceBaseLevel(); return l*0.01 + (l>=10?0.04:0); }
-  function allianceBaseStorageBonus(){ const l = allianceBaseLevel(); return (l>=2?0.05:0) + (l>=6?0.05:0); }
-  function allianceBaseBuildTimeMult(){ const l = allianceBaseLevel(); return 1 - ((l>=3?0.04:0) + (l>=7?0.04:0)); }
-  function allianceBaseResearchTimeMult(){ const l = allianceBaseLevel(); return 1 - ((l>=5?0.04:0) + (l>=9?0.04:0)); }
-  function allianceBaseFuelMult(){ return allianceBaseLevel()>=8 ? 0.92 : 1; }
+  // Effektive Stufe fuer BONI: eine zerstoerte Basis (siehe basewar-Kriegssystem unten) liefert
+  // keinerlei Boni, bis sie repariert ist - die echte Ausbaustufe bleibt dabei erhalten.
+  function allianceBaseBonusLevel(){ return allianceBaseDestroyed() ? 0 : allianceBaseLevel(); }
+  function allianceBaseProdBonus(){ const l = allianceBaseBonusLevel(); return l*0.01 + (l>=10?0.04:0); }
+  function allianceBaseDefBonus(){ const l = allianceBaseBonusLevel(); return l*0.01 + (l>=10?0.04:0); }
+  function allianceBaseStorageBonus(){ const l = allianceBaseBonusLevel(); return (l>=2?0.05:0) + (l>=6?0.05:0); }
+  function allianceBaseBuildTimeMult(){ const l = allianceBaseBonusLevel(); return 1 - ((l>=3?0.04:0) + (l>=7?0.04:0)); }
+  function allianceBaseResearchTimeMult(){ const l = allianceBaseBonusLevel(); return 1 - ((l>=5?0.04:0) + (l>=9?0.04:0)); }
+  function allianceBaseFuelMult(){ return allianceBaseBonusLevel()>=8 ? 0.92 : 1; }
   function allianceBaseFlightMult(targetSystem){
     const base = state.allianceBase;
     if (!base || !targetSystem) return 1;
-    return (allianceBaseLevel()>=4 && targetSystem===base.sector) ? 0.90 : 1;
+    return (allianceBaseBonusLevel()>=4 && targetSystem===base.sector) ? 0.90 : 1;
   }
   async function loadAllianceBase(){
     const tag = myAllianceTag();
@@ -12519,6 +12549,7 @@
       const r = await storageGet('alliance:'+tag+':base', true);
       state.allianceBase = (r && r.value) ? JSON.parse(r.value) : null;
       renderAllianceBaseBox();
+      loadAllianceBaseWar();
     } catch(e){}
   }
   async function foundAllianceBase(sectorId){
@@ -12565,6 +12596,273 @@
     log(fmt(amount)+' '+(RES_DEFS.find(r=>r.key===resKey)||{}).label+' zur Allianzbasis beigetragen.', 'ti-building-fortress');
     playSound('trade');
     await loadAllianceTechData();
+    render(); save();
+  }
+
+  // ===== Allianzbasis: Angriff, Verteidigung, Zerstörung & Reparatur =====
+  // Die Basis kann von Mitgliedern ANDERER Allianzen angegriffen werden. Geteilter Kriegszustand
+  // liegt in alliance:<TAG>:basewar (vom Angreifer fortgeschrieben - der generische Speicher lässt
+  // alliance-Unterschlüssel ohne Sonderregel bewusst offen, siehe Backend). Verteidigung: jedes
+  // Mitglied stationiert eigene Schiffe über sein EIGENES Dokument alliance:<TAG>:basedef:<playerId>
+  // (gleiches Ein-Autor-Muster wie die Beiträge). Verluste der Verteidiger wendet jeder Besitzer
+  // selbst an, sobald er einen neuen Angriffs-Eintrag sieht (deterministisch je Eintrag-ID).
+  const ALLIANCE_BASE_HP_PER_LEVEL = 12000;
+  const ALLIANCE_BASE_DEF_PER_LEVEL = 600;    // Eigenverteidigung der Basis je Stufe (ohne Flotten)
+  const ALLIANCE_BASE_ATTACK_COOLDOWN_MS = 8*3600*1000; // je Spieler
+  const ALLIANCE_BASE_DAMAGE_DECAY_PER_H = 0.03; // Selbstreparatur: 3% der Max-HP je Stunde ohne Treffer
+  const ALLIANCE_BASE_REPAIR_FRACTION = 0.30; // Reparatur nach Zerstörung: 30% der kumulierten Baukosten
+  function allianceBaseMaxHp(level){ return ALLIANCE_BASE_HP_PER_LEVEL * Math.max(1, level); }
+  // Effektiver Schaden inkl. Selbstreparatur - rein deterministisch aus dem geteilten Dokument
+  // ableitbar, damit alle Clients ohne zusätzliche Schreibzugriffe denselben Wert sehen.
+  function allianceBaseEffDamage(warDoc, level){
+    if (!warDoc || !warDoc.damage) return 0;
+    if (warDoc.destroyedAt) return allianceBaseMaxHp(level); // zerstört: kein Selbstheilen
+    const hSince = Math.max(0, (Date.now() - (warDoc.lastDamageAt||0)) / 3600000);
+    return Math.max(0, warDoc.damage - allianceBaseMaxHp(level)*ALLIANCE_BASE_DAMAGE_DECAY_PER_H*hSince);
+  }
+  function allianceBaseDestroyed(){ return !!(state.allianceBaseWar && state.allianceBaseWar.destroyedAt); }
+  function allianceBaseRepairCost(){
+    const lvl = Math.max(1, allianceBaseLevel());
+    const cum = allianceBaseCumCost(lvl);
+    const c = {};
+    for (const [r,a] of Object.entries(cum)) c[r] = Math.round(a * ALLIANCE_BASE_REPAIR_FRACTION);
+    return c;
+  }
+  async function loadAllianceBaseWar(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    try {
+      const r = await storageGet('alliance:'+tag+':basewar', true);
+      state.allianceBaseWar = (r && r.value) ? JSON.parse(r.value) : null;
+      await processIncomingBaseAttacks();
+      // Eigene Verteidigungs-Summe (alle stationierten Flotten der Mitglieder) für die Anzeige laden.
+      state.allianceBaseDefSum = await loadBaseDefenseSum(tag);
+      renderAllianceBaseBox();
+    } catch(e){}
+  }
+  async function loadBaseDefenseSum(tag){
+    try {
+      const listRes = await storageList('alliance:'+tag+':basedef:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
+      const docs = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){}
+        return null;
+      }));
+      let def = 0; const combined = {};
+      for (const d of docs){ if (!d) continue; for (const [k,v] of Object.entries(d)) if (typeof v==='number' && v>0) combined[k]=(combined[k]||0)+v; }
+      def = shipDefenseContribution(combined);
+      return { defense: Math.round(def), fleet: combined };
+    } catch(e){ return null; }
+  }
+  async function publishAllianceBaseDefense(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    try { await storageSet('alliance:'+tag+':basedef:'+state.player.id, JSON.stringify(state.shipsAtAllianceBase||{}), true); } catch(e){}
+  }
+  // Verteidiger-Seite: neue Angriffs-Einträge genau einmal verarbeiten - eigene stationierte
+  // Schiffe erleiden die im Eintrag festgehaltene Verlustquote, Bericht + Log entstehen lokal.
+  async function processIncomingBaseAttacks(){
+    const war = state.allianceBaseWar;
+    if (!war || !Array.isArray(war.attacks)) return;
+    state.processedBaseAttackIds = state.processedBaseAttackIds || [];
+    let changed = false;
+    for (const atk of war.attacks){
+      if (!atk.id || state.processedBaseAttackIds.includes(atk.id)) continue;
+      state.processedBaseAttackIds.push(atk.id);
+      const mine = state.shipsAtAllianceBase || {};
+      const hadShips = Object.values(mine).some(v=>v>0);
+      let lostTxt = null;
+      if (hadShips && atk.defLossPct > 0){
+        const lost = {};
+        for (const [k,v] of Object.entries(mine)){
+          if (typeof v !== 'number' || v<=0) continue;
+          const l = Math.min(v, Math.round(v*atk.defLossPct));
+          if (l>0){ mine[k] = v-l; lost[k] = l; }
+        }
+        lostTxt = lostCountsToText(lost);
+        changed = true;
+      }
+      log('⚔ Die Allianzbasis wurde von ['+(atk.attackerTag||'??')+'] angegriffen! Schaden: '+fmt(atk.damage||0)+(atk.destroyed?' - DIE BASIS WURDE ZERSTÖRT!':'')+(lostTxt?' Deine stationierten Verluste: '+lostTxt+'.':''), 'ti-alert-triangle');
+      pushReport({ type:'alliance-base-defense', result: atk.destroyed?'destroyed':'hit', attackerTag: atk.attackerTag, attackerName: atk.attackerName, damage: atk.damage, ownLostShips: null, lostText: lostTxt, ts: atk.ts });
+      playSound('raid');
+      if (atk.destroyed) playAlarmSound();
+    }
+    state.processedBaseAttackIds = state.processedBaseAttackIds.slice(-60);
+    if (changed){ await publishAllianceBaseDefense(); }
+    save();
+  }
+  // Mitglieder entsenden Kampfschiffe zur Basis (echte Flugzeit, danach dort stationiert und aus
+  // den eigenen Flotten heraus - wie eine Verlegung, nur an einen Allianz- statt Eigenstandort).
+  function sendDefendBaseMission(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ log('Verteidigung der Allianzbasis braucht eine Allianz und den Server-Modus.', 'ti-alert-triangle'); return; }
+    const base = state.allianceBase;
+    if (!base || !base.foundedAt){ log('Deine Allianz hat noch keine Basis.', 'ti-alert-triangle'); return; }
+    const cf = currentFleet();
+    const defFleet = buildAttackFleet(state.activeBasePlanet, cf);
+    const total = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(defFleet[k]||0),0);
+    if (total < 1){ log('Wähle zuerst Schiffe aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    const sameSys = planetSystemOf(state.activeBasePlanet) === base.sector;
+    const dur = missionDurationFor(sameSys ? 90 : 420, defFleet, ATTACK_SHIP_KEYS, base.sector);
+    const fuel = missionFuelCostSplit(dur, defFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    pay(fuel);
+    // Schiffe verlassen die Flotte sofort (Verlegungs-Muster) - Rückholung über den Rückruf-Button.
+    for (const k of ATTACK_SHIP_KEYS){ if (defFleet[k]>0) cf[k] = Math.max(0, (cf[k]||0) - defFleet[k]); }
+    cf.missions.push({ id: nextMissionId(), type:'defend-base', startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName: resolveFleetName(), composition: defFleet });
+    log('Verteidigungsflotte zur Allianzbasis entsandt (~'+Math.round(dur)+'s Flugzeit). Treibstoff: '+fuelCostText(fuel)+'.', 'ti-shield');
+    render(); save();
+  }
+  function recallBaseDefense(){
+    const mine = state.shipsAtAllianceBase || {};
+    if (!Object.values(mine).some(v=>v>0)){ log('Du hast keine Schiffe an der Allianzbasis stationiert.', 'ti-info-circle'); return; }
+    const base = state.allianceBase;
+    const cf = currentFleet();
+    const sameSys = base && planetSystemOf(state.activeBasePlanet) === base.sector;
+    const dur = missionDurationFor(sameSys ? 90 : 420, mine, ATTACK_SHIP_KEYS);
+    const comp = {...mine};
+    state.shipsAtAllianceBase = {};
+    publishAllianceBaseDefense();
+    cf.missions.push({ id: nextMissionId(), type:'defend-base-return', startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName: resolveFleetName(), composition: comp });
+    log('Stationierte Schiffe von der Allianzbasis zurückgerufen (~'+Math.round(dur)+'s Rückflug).', 'ti-shield');
+    render(); save();
+  }
+  // Angriff auf die Basis einer FREMDEN Allianz.
+  async function sendAllianceBaseAttackMission(targetTagRaw){
+    const tag = myAllianceTag();
+    const targetTag = (targetTagRaw||'').trim().toUpperCase();
+    if (!tag || !useBackend()){ log('Basis-Angriffe brauchen eine eigene Allianz und den Server-Modus.', 'ti-alert-triangle'); return; }
+    if (!targetTag || targetTag === tag){ log('Gib den Tag einer FREMDEN Allianz an.', 'ti-alert-triangle'); return; }
+    const cdLeft = Math.max(0, (state.lastAllianceBaseAttackAt||0) + ALLIANCE_BASE_ATTACK_COOLDOWN_MS - Date.now());
+    if (cdLeft > 0){ log('Nächster Basis-Angriff erst wieder in '+fmtDuration(cdLeft/1000)+' möglich (8-Std.-Abklingzeit je Spieler).', 'ti-clock'); return; }
+    const cf = currentFleet();
+    const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
+    const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='attack-alliance-base').length;
+    if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
+    // Ziel-Basis prüfen (existiert + mindestens Stufe 1)
+    let targetBase = null;
+    try { const r = await storageGet('alliance:'+targetTag+':base', true); if (r && r.value) targetBase = JSON.parse(r.value); } catch(e){}
+    if (!targetBase || !targetBase.foundedAt){ log('Die Allianz ['+targetTag+'] hat keine (auffindbare) Allianzbasis.', 'ti-alert-triangle'); return; }
+    const sameSys = planetSystemOf(state.activeBasePlanet) === targetBase.sector;
+    const dur = missionDurationFor(sameSys ? 120 : 480, attackFleet, ATTACK_SHIP_KEYS);
+    const fuel = missionFuelCostSplit(dur, attackFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    if (!confirm('Die Allianzbasis von ['+targetTag+'] angreifen? Deine Flotte erleidet auch bei Erfolg Verluste.')) return;
+    pay(fuel);
+    state.lastAllianceBaseAttackAt = Date.now();
+    const power = attackPower(attackFleet, state.activeBasePlanet);
+    cf.missions.push({ id: nextMissionId(), type:'attack-alliance-base', targetId: targetTag, startTime: Date.now(), endTime: Date.now()+dur*1000, power, fleetName: resolveFleetName(), composition: attackFleet });
+    log('Angriffsflotte gegen die Allianzbasis von ['+targetTag+'] gestartet (~'+Math.round(dur)+'s Flugzeit). Treibstoff: '+fuelCostText(fuel)+'.', 'ti-sword');
+    render(); save();
+  }
+  // Auflösung bei Ankunft (asynchron wie resolvePlayerAttackMission): Verteidigung der Zielbasis
+  // laden, Kampf berechnen, Schaden in das basewar-Dokument der Ziel-Allianz schreiben.
+  async function resolveAllianceBaseAttack(m, planetKey, fleet){
+    const targetTag = m.targetId;
+    let base = null, war = null;
+    try { const r = await storageGet('alliance:'+targetTag+':base', true); if (r && r.value) base = JSON.parse(r.value); } catch(e){}
+    if (!base || !base.foundedAt){ log('Die Allianzbasis von ['+targetTag+'] war bei Ankunft nicht mehr auffindbar.', 'ti-anchor'); return; }
+    try { const r = await storageGet('alliance:'+targetTag+':basewar', true); if (r && r.value) war = JSON.parse(r.value); } catch(e){}
+    war = war || { damage:0, lastDamageAt:0, destroyedAt:null, destroyedCount:0, attacks:[] };
+    // Stufe der Ziel-Basis aus deren Beiträgen ableiten (contrib-Lesen ist offen).
+    let targetLevel = 1;
+    try {
+      const listRes = await storageList('alliance:'+targetTag+':contrib:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
+      const docs = await Promise.all(keys.map(async k => { try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){} return null; }));
+      const tot = { erz:0, kristalle:0, deuterium:0, antimaterie:0 };
+      for (const d of docs){ if (!d) continue; for (const rk of Object.keys(tot)) tot[rk] += d['base_'+rk]||0; }
+      targetLevel = 0;
+      for (let l=1;l<=ALLIANCE_BASE_MAX_LEVEL;l++){
+        const cum = allianceBaseCumCost(l);
+        if (Object.entries(cum).every(([r,a]) => (tot[r]||0) >= a) && Date.now() >= base.foundedAt + allianceBaseBuildSecondsCum(l)*1000) targetLevel = l; else break;
+      }
+    } catch(e){}
+    if (targetLevel < 1){ log('Die Allianzbasis von ['+targetTag+'] ist noch im Aufbau (Stufe 0) - kein gültiges Angriffsziel.', 'ti-anchor'); return; }
+    if (war.destroyedAt){ log('Die Allianzbasis von ['+targetTag+'] liegt bereits in Trümmern.', 'ti-anchor'); return; }
+    const defSum = await loadBaseDefenseSum(targetTag);
+    const defense = ALLIANCE_BASE_DEF_PER_LEVEL*targetLevel + ((defSum && defSum.defense)||0);
+    const power = m.power || attackPower(fleet, planetKey);
+    const chance = Math.max(0.10, Math.min(0.92, power/(power+defense)));
+    const success = Math.random() < chance;
+    const maxHp = allianceBaseMaxHp(targetLevel);
+    const effDmgBefore = allianceBaseEffDamage(war, targetLevel);
+    let dealt = 0, destroyed = false;
+    if (success){
+      dealt = Math.round(power * (0.8 + Math.random()*0.4));
+      const newDamage = Math.min(maxHp, effDmgBefore + dealt);
+      war.damage = newDamage; war.lastDamageAt = Date.now();
+      if (newDamage >= maxHp){ destroyed = true; war.destroyedAt = Date.now(); war.destroyedCount = (war.destroyedCount||0) + 1; }
+    } else {
+      dealt = Math.round(power * 0.15);
+      war.damage = Math.min(maxHp, effDmgBefore + dealt); war.lastDamageAt = Date.now();
+    }
+    // Verteidiger-Verlustquote für die stationierten Flotten (wenden die Besitzer selbst an).
+    const defLossPct = success ? Math.max(0.08, Math.min(0.35, power/(power+defense*1.5))) : Math.max(0.03, Math.min(0.12, power/(power+defense*3)));
+    war.attacks = war.attacks || [];
+    war.attacks.unshift({ id: Date.now()+'-'+Math.random().toString(36).slice(2,8), ts: Date.now(), attackerTag: myAllianceTag(), attackerName: state.player.name, power: Math.round(power), damage: dealt, defLossPct: Math.round(defLossPct*100)/100, destroyed });
+    war.attacks = war.attacks.slice(0, 25);
+    try { await storageSet('alliance:'+targetTag+':basewar', JSON.stringify(war), true); } catch(e){}
+    // Eigene Verluste (auch bei Erfolg - man beisst sich an einer Festung die Zähne aus).
+    const ownLossPct = success ? 0.10+Math.random()*0.12 : 0.25+Math.random()*0.20;
+    const retreatB = applyRetreatDampening(ownLossPct);
+    const ownLost = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, retreatB.pct, planetKey, m.composition);
+    const ownLostText = lostCountsToText(ownLost);
+    const bp = destroyed ? 60 : (success ? 15 : 4);
+    awardBattlePoints(bp);
+    logScoreChange(bp*3, (destroyed?'Allianzbasis von ['+targetTag+'] ZERSTÖRT':'Angriff auf Allianzbasis ['+targetTag+']')+' (+'+bp+' Kampfpunkte)', 'ti-sword');
+    log((success?'Angriff auf die Allianzbasis von ['+targetTag+'] erfolgreich - '+fmt(dealt)+' Schaden!':'Angriff auf die Allianzbasis von ['+targetTag+'] abgewehrt (Verteidigung '+fmt(defense)+').')+(destroyed?' DIE BASIS WURDE ZERSTÖRT!':'')+(ownLostText?' Eigene Verluste: '+ownLostText+'.':''), destroyed?'ti-skull':'ti-sword');
+    pushReport({ type:'alliance-base-attack', result: destroyed?'destroyed':(success?'win':'loss'), targetTag, damage: dealt, hullAfter: Math.round(maxHp - war.damage), hullMax: maxHp, defensePower: defense, attackPower: Math.round(power), chancePct: Math.round(chance*100), fleet: m.composition||fleet, ownLostShips: ownLost, debris: combatDebrisOf(ownLost), battlePoints: bp, fromPlanet: planetDisplayName(planetKey) });
+    playSound(success?'win':'raid');
+  }
+  // Reparatur nach Zerstörung: Beiträge über die eigenen contrib-Dokumente (baserepair_<res>).
+  // Benötigt werden je Zerstörung 30% der kumulierten Baukosten der aktuellen Stufe; sobald die
+  // Summen reichen, setzt der nächste beitragende Client den Kriegszustand zurück.
+  function allianceBaseRepairNeeded(){
+    const war = state.allianceBaseWar;
+    if (!war || !war.destroyedAt) return null;
+    const per = allianceBaseRepairCost();
+    const count = Math.max(1, war.destroyedCount||1);
+    const t = state.allianceTechTotals || {};
+    const need = {}, have = {};
+    for (const [r,a] of Object.entries(per)){ need[r] = a*count; have[r] = t['baserepair_'+r]||0; }
+    return { need, have, per };
+  }
+  async function contributeToAllianceBaseRepair(resKey, amount){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    const rep = allianceBaseRepairNeeded();
+    if (!rep){ log('Die Allianzbasis ist nicht zerstört.', 'ti-info-circle'); return; }
+    amount = Math.floor(amount);
+    const still = Math.max(0, rep.need[resKey] - rep.have[resKey]);
+    amount = Math.min(amount, still);
+    if (!amount || amount <= 0){ log('Diese Ressource ist für die Reparatur bereits gedeckt.', 'ti-info-circle'); return; }
+    if ((state.resources[resKey]||0) < amount){ log('Nicht genug Ressourcen.', 'ti-alert-triangle'); return; }
+    state.resources[resKey] -= amount;
+    const contribKey = 'baserepair_'+resKey;
+    state.allianceContributed[contribKey] = (state.allianceContributed[contribKey]||0) + amount;
+    try {
+      const key = 'alliance:'+tag+':contrib:'+state.player.id;
+      let doc = {};
+      try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
+      doc[contribKey] = (doc[contribKey]||0) + amount;
+      await storageSet(key, JSON.stringify(doc), true);
+    } catch(e){}
+    log(fmt(amount)+' '+(RES_DEFS.find(r=>r.key===resKey)||{}).label+' zur Reparatur der Allianzbasis beigetragen.', 'ti-building-fortress');
+    playSound('trade');
+    await loadAllianceTechData();
+    // Reparatur vollständig? Dann Kriegszustand zurücksetzen (Basis wieder aktiv, Schaden 0).
+    const after = allianceBaseRepairNeeded();
+    if (after && Object.keys(after.need).every(r => after.have[r] >= after.need[r])){
+      const war = state.allianceBaseWar || {};
+      war.destroyedAt = null; war.damage = 0; war.lastDamageAt = Date.now();
+      try { await storageSet('alliance:'+tag+':basewar', JSON.stringify(war), true); state.allianceBaseWar = war; } catch(e){}
+      log('Die Allianzbasis wurde vollständig repariert und ist wieder einsatzbereit!', 'ti-building-fortress');
+      playSound('achieve');
+    }
     render(); save();
   }
 
@@ -12820,7 +13118,7 @@
           <div style="flex:1;">
             <div class="bname">Allianzbasis [${tag}] <span class="lvl-pill" style="${lvl>=10?'background:rgba(250,199,117,0.25); color:#fac775;':''}">Stufe ${lvl}${maxed?' · MAX':''}</span></div>
             <div class="bmeta"><i class="ti ti-planet" aria-hidden="true"></i> System: <strong style="color:#fff;">${sys?sys.name:base.sector}</strong> (dauerhaft) · gegründet von ${base.foundedByName||'Admin'}</div>
-            ${lvl>0 ? `<div class="bmeta" style="color:#5dcaa5;">Aktive Boni: +${lvl + (lvl>=10?4:0)}% Produktion & Verteidigung${allianceBaseStorageBonus()>0?' · +'+Math.round(allianceBaseStorageBonus()*100)+'% Lager':''}${allianceBaseBuildTimeMult()<1?' · -'+Math.round((1-allianceBaseBuildTimeMult())*100)+'% Bauzeit':''}${allianceBaseResearchTimeMult()<1?' · -'+Math.round((1-allianceBaseResearchTimeMult())*100)+'% Forschungszeit':''}${lvl>=4?' · -10% Flugzeit ins Basis-System':''}${lvl>=8?' · -8% Treibstoff':''}</div>` : `<div class="bmeta">Noch im Aufbau zur ersten Stufe.</div>`}
+            ${allianceBaseDestroyed() ? `<div class="bmeta" style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> ZERSTÖRT - alle Boni deaktiviert, bis die Reparatur abgeschlossen ist (siehe unten).</div>` : (lvl>0 ? `<div class="bmeta" style="color:#5dcaa5;">Aktive Boni: +${lvl + (lvl>=10?4:0)}% Produktion & Verteidigung${allianceBaseStorageBonus()>0?' · +'+Math.round(allianceBaseStorageBonus()*100)+'% Lager':''}${allianceBaseBuildTimeMult()<1?' · -'+Math.round((1-allianceBaseBuildTimeMult())*100)+'% Bauzeit':''}${allianceBaseResearchTimeMult()<1?' · -'+Math.round((1-allianceBaseResearchTimeMult())*100)+'% Forschungszeit':''}${lvl>=4?' · -10% Flugzeit ins Basis-System':''}${lvl>=8?' · -8% Treibstoff':''}</div>` : `<div class="bmeta">Noch im Aufbau zur ersten Stufe.</div>`)}
           </div>
         </div>
         ${maxed ? `<div class="bmeta" style="color:#fac775;"><i class="ti ti-sparkles" aria-hidden="true"></i> Das Monument eurer Allianz ist vollendet - Maximalstufe erreicht.</div>` : `
@@ -12832,6 +13130,7 @@
         `}
         <div class="bmeta">Dein Gesamtbeitrag zur Basis: ${fmt(myContribSum)} Ressourcen</div>
         <details><summary class="bmeta" style="cursor:pointer;">Ausbaustufen & Boni anzeigen</summary><div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">${stagesHtml}</div></details>
+        ${allianceBaseWarSectionHtml(lvl)}
       </div>`;
     box.querySelectorAll('[data-ab-contrib]').forEach(btn => btn.onclick = () => {
       const rk = btn.getAttribute('data-ab-contrib');
@@ -12843,6 +13142,79 @@
       const rk = btn.getAttribute('data-ab-contrib-max');
       contributeToAllianceBase(rk, parseInt(btn.getAttribute('data-ab-max-amt'),10)||0);
     });
+    box.querySelectorAll('[data-ab-repair]').forEach(btn => btn.onclick = () => {
+      const rk = btn.getAttribute('data-ab-repair');
+      const input = box.querySelector('[data-ab-repair-input="'+rk+'"]');
+      const amt = parseInt((input && input.value || '').replace(/[^\d]/g,''), 10);
+      contributeToAllianceBaseRepair(rk, amt);
+    });
+    box.querySelectorAll('[data-ab-repair-max]').forEach(btn => btn.onclick = () => {
+      const rk = btn.getAttribute('data-ab-repair-max');
+      contributeToAllianceBaseRepair(rk, parseInt(btn.getAttribute('data-ab-max-amt'),10)||0);
+    });
+    const defBtn = box.querySelector('#abDefendBtn');
+    if (defBtn) defBtn.onclick = () => sendDefendBaseMission();
+    const recallBtn = box.querySelector('#abRecallBtn');
+    if (recallBtn) recallBtn.onclick = () => recallBaseDefense();
+    const atkBtn = box.querySelector('#abAttackBtn');
+    if (atkBtn) atkBtn.onclick = () => {
+      const input = box.querySelector('#abAttackTagInput');
+      sendAllianceBaseAttackMission(input ? input.value : '');
+    };
+  }
+  // Kriegs-Abschnitt der Basis-Box: Hüllen-Leiste, Zerstört-Zustand mit Reparatur,
+  // Verteidigungs-Stationierung und Angriff auf fremde Basen.
+  function allianceBaseWarSectionHtml(lvl){
+    if (lvl < 1) return '';
+    const war = state.allianceBaseWar;
+    const maxHp = allianceBaseMaxHp(lvl);
+    const dmg = Math.round(allianceBaseEffDamage(war, lvl));
+    const hull = Math.max(0, maxHp - dmg);
+    const destroyed = allianceBaseDestroyed();
+    const hullPct = Math.max(0, Math.min(100, hull/maxHp*100));
+    let s = `<div class="bname" style="font-size:13px; margin-top:4px;"><i class="ti ti-shield" aria-hidden="true"></i> Basis-Verteidigung</div>`;
+    if (destroyed){
+      const rep = allianceBaseRepairNeeded();
+      s += `<div class="bmeta" style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> <strong>DIE BASIS LIEGT IN TRÜMMERN!</strong> Alle Boni sind deaktiviert, bis die Reparatur abgeschlossen ist (30% der kumulierten Baukosten).</div>`;
+      if (rep){
+        s += ['erz','kristalle','deuterium','antimaterie'].map(rk => {
+          const need = rep.need[rk]||0, haveR = Math.min(rep.have[rk]||0, need);
+          const pct = need>0 ? Math.min(100, haveR/need*100) : 100;
+          const maxAmt = Math.max(0, Math.min(Math.floor(state.resources[rk]||0), Math.max(0, need-(rep.have[rk]||0))));
+          return `
+            <div style="display:flex; flex-direction:column; gap:3px;">
+              <div style="display:flex; justify-content:space-between;"><span class="bmeta">${miniResIcon(rk)} Reparatur ${(RES_DEFS.find(x=>x.key===rk)||{}).label||rk}</span><span class="bmeta">${fmt(haveR)}/${fmt(need)}</span></div>
+              <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:#e24b4a;"></div></div>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input type="text" inputmode="numeric" placeholder="Menge" data-ab-repair-input="${rk}" style="flex:1; font-size:12px;"/>
+                <button data-ab-repair="${rk}" style="font-size:10px; padding:5px 8px;">Reparieren</button>
+                <button data-ab-repair-max="${rk}" data-ab-max-amt="${maxAmt}" style="font-size:10px; padding:5px 8px;">Max</button>
+              </div>
+            </div>`;
+        }).join('');
+      }
+    } else {
+      s += `<div style="display:flex; justify-content:space-between;"><span class="bmeta">Hülle</span><span class="bmeta">${fmt(hull)}/${fmt(maxHp)}${dmg>0?' (repariert sich langsam selbst)':''}</span></div>
+        <div class="progress-outer"><div class="progress-inner" style="width:${hullPct}%; background:${hullPct>50?'#5dcaa5':(hullPct>25?'#e0a548':'#e24b4a')};"></div></div>`;
+    }
+    const defSum = state.allianceBaseDefSum;
+    const mine = state.shipsAtAllianceBase || {};
+    const mineCount = Object.values(mine).reduce((a,v)=>a+(v||0),0);
+    s += `<div class="bmeta">Stationierte Verteidigung (alle Mitglieder): <strong style="color:#fff;">${defSum?fmt(defSum.defense):'?'} Verteidigungspunkte</strong> + ${fmt(ALLIANCE_BASE_DEF_PER_LEVEL*lvl)} Basis-Sockel${defSum&&Object.keys(defSum.fleet||{}).length?'<br>'+fleetIconRowHtml(defSum.fleet):''}</div>`;
+    s += `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+      <button id="abDefendBtn" style="font-size:11px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Ausgewählte Angriffsflotte zur Verteidigung entsenden</button>
+      ${mineCount>0?`<button id="abRecallBtn" style="font-size:11px;">Eigene ${mineCount} Schiffe zurückrufen</button>`:''}
+    </div>`;
+    if (mineCount>0) s += `<div class="bmeta">Deine stationierten Schiffe: ${fleetIconRowHtml(mine)}</div>`;
+    // Angriff auf fremde Basis
+    const cdLeft = Math.max(0, (state.lastAllianceBaseAttackAt||0) + ALLIANCE_BASE_ATTACK_COOLDOWN_MS - Date.now());
+    s += `<div class="bname" style="font-size:13px; margin-top:4px;"><i class="ti ti-sword" aria-hidden="true"></i> Fremde Allianzbasis angreifen</div>
+      <div class="bmeta">Nutzt deine zusammengestellte Angriffsflotte. Die Basis-Verteidigung (Sockel + stationierte Flotten der Gegner) entscheidet über Erfolg und Verluste. Abklingzeit: 8 Std. je Spieler.</div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="text" id="abAttackTagInput" placeholder="Allianz-Tag (z.B. XYZ)" maxlength="6" style="flex:1; font-size:12px; text-transform:uppercase;"/>
+        <button id="abAttackBtn" class="attack" style="font-size:11px;" ${cdLeft>0?'disabled':''}>${cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'Angreifen'}</button>
+      </div>`;
+    return s;
   }
   function renderAllianceBuildingBox(){
     const box = document.getElementById('allianceBuildingBox');
@@ -14009,7 +14381,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='attack-alliance-base').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     if (cf.missions.some(m=>m.type==='worldboss')){ log('Es läuft bereits ein Angriff auf den Weltboss von diesem Standort.', 'ti-alert-triangle'); return; }
     const dur = missionDurationFor(90 + b.level*10, attackFleet, ATTACK_SHIP_KEYS);
@@ -14530,6 +14902,24 @@
             raid.interceptArrival = null;
             raid.interceptSource = null;
           }
+        } else if (m.type === 'defend-base'){
+          // Ankunft an der eigenen Allianzbasis: Schiffe werden dort stationiert (waren beim
+          // Losschicken bereits aus der Flotte entnommen, Verlegungs-Muster).
+          state.shipsAtAllianceBase = state.shipsAtAllianceBase || {};
+          for (const [k,v] of Object.entries(m.composition||{})){
+            if (typeof v === 'number' && v > 0) state.shipsAtAllianceBase[k] = (state.shipsAtAllianceBase[k]||0) + v;
+          }
+          publishAllianceBaseDefense();
+          if (showLog !== false) log('Verteidigungsflotte an der Allianzbasis stationiert.', 'ti-shield');
+        } else if (m.type === 'defend-base-return'){
+          for (const [k,v] of Object.entries(m.composition||{})){
+            if (typeof v === 'number' && v > 0) fleet[k] = (fleet[k]||0) + v;
+          }
+          if (showLog !== false) log('Zurückgerufene Basis-Verteidigung ist wieder bei '+planetDisplayName(planetKey)+' eingetroffen.', 'ti-shield');
+        } else if (m.type === 'attack-alliance-base'){
+          // Asynchrone Auflösung (lädt Ziel-Basis/-Verteidigung vom Server), Muster wie
+          // resolvePlayerAttackMission: Fire-and-forget, Bericht entsteht bei Abschluss.
+          resolveAllianceBaseAttack(m, planetKey, fleet);
         } else if (m.type === 'attack'){
           const npc = NPCS.find(n => n.id === m.targetId);
           if (!npc) continue;
@@ -15701,12 +16091,19 @@
     // allianceBaseModelSvg), Position bewusst abseits der Sonne im linken oberen Kartenbereich.
     if (myAllianceTag() && state.allianceBase && state.allianceBase.foundedAt && state.allianceBase.sector === activeSystem){
       const abLvl = allianceBaseLevel();
+      const abDestroyed = allianceBaseDestroyed();
+      // Position bewusst im oberen linken Kartenviertel zwischen den Orbits statt ganz am Rand.
       inner += `
-        <g transform="translate(74,44)" data-alliance-base="1" style="cursor:pointer;">
-          <title>Allianzbasis [${myAllianceTag()}] · Stufe ${abLvl}${abLvl>=10?' (Monument)':''}</title>
-          ${allianceBaseModelSvg(Math.max(1,abLvl), 'Map')}
+        <g transform="translate(165,52)" data-alliance-base="1" style="cursor:pointer;">
+          <title>Allianzbasis [${myAllianceTag()}] · Stufe ${abLvl}${abDestroyed?' (ZERSTÖRT)':(abLvl>=10?' (Monument)':'')}</title>
+          <g ${abDestroyed?'opacity="0.4"':''}>${allianceBaseModelSvg(Math.max(1,abLvl), 'Map')}</g>
+          ${abDestroyed?`
+            <path d="M -8,-8 L 8,8 M 8,-8 L -8,8" stroke="#e24b4a" stroke-width="1.6" stroke-linecap="round"/>
+            <circle r="4" cx="-6" cy="2" fill="#e24b4a" opacity="0.4"><animate attributeName="opacity" values="0.4;0.1;0.4" dur="1.2s" repeatCount="indefinite"/></circle>
+            <circle r="3" cx="7" cy="-4" fill="#f0997b" opacity="0.35"><animate attributeName="opacity" values="0.35;0.1;0.35" dur="1.7s" repeatCount="indefinite"/></circle>
+          `:''}
         </g>
-        <text class="planet-label" x="74" y="76" text-anchor="middle" style="fill:${abLvl>=10?'#fac775':'#c3bef5'};">Allianzbasis [${myAllianceTag()}] · St. ${abLvl}</text>
+        <text class="planet-label" x="165" y="86" text-anchor="middle" style="fill:${abDestroyed?'#e24b4a':(abLvl>=10?'#fac775':'#c3bef5')};">Allianzbasis [${myAllianceTag()}] · ${abDestroyed?'ZERSTÖRT':'St. '+abLvl}</text>
       `;
     }
     svg.innerHTML = inner;
@@ -16010,7 +16407,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='attack-alliance-base').length;
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const npc = NPCS.find(n => n.id === npcId);
@@ -16034,7 +16431,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='attack-alliance-base').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     if (cf.missions.some(m=>m.type==='piratelair')){ log('Es läuft bereits ein Angriff auf das Piratenversteck von diesem Standort.', 'ti-alert-triangle'); return; }
     const stage = state.pirateLairStage || 1;
@@ -17435,6 +17832,23 @@
             </div>
           `;
         }
+        if (m.type === 'defend-base' || m.type === 'defend-base-return' || m.type === 'attack-alliance-base'){
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          const shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          const isBaseAtk = m.type === 'attack-alliance-base';
+          const lbl = isBaseAtk ? 'Angriff: Allianzbasis ['+(m.targetId||'?')+']' : (m.type==='defend-base' ? 'Verlegung zur Allianzbasis (Verteidigung)' : 'Rückkehr von der Allianzbasis');
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ${isBaseAtk?'ti-sword':'ti-shield'}" aria-hidden="true" style="color:${isBaseAtk?'#e24b4a':'#85b7eb'};"></i>${m.fleetName?m.fleetName+' · ':''}${lbl}</div>
+                <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
+              </div>
+              <div class="progress-outer"><div class="progress-inner ${isBaseAtk?'attackbar':''}" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         const isAttack = m.type === 'attack';
         // Bugfix: ohne ||{} -Fallback crashte render() dauerhaft, sobald targetId keinen Treffer mehr
         // in NPCS/PLANETS fand (z.B. Update während laufender Mission) - analog zu den bereits
@@ -17501,7 +17915,7 @@
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }
@@ -18393,6 +18807,14 @@
           } else if (m.type === 'intercept-pirates'){
             icon = 'ti-anchor'; color = '#e24b4a';
             label = (m.fleetName?m.fleetName+' → ':'')+'Piraten abfangen bei '+planetDisplayName(m.targetId);
+            shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          } else if (m.type === 'defend-base' || m.type === 'defend-base-return'){
+            icon = 'ti-shield'; color = '#85b7eb';
+            label = (m.fleetName?m.fleetName+' → ':'')+(m.type==='defend-base'?'Allianzbasis (Verteidigung)':'Rückkehr von der Allianzbasis');
+            shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          } else if (m.type === 'attack-alliance-base'){
+            icon = 'ti-sword'; color = '#e24b4a';
+            label = (m.fleetName?m.fleetName+' → ':'')+'Angriff: Allianzbasis ['+(m.targetId||'?')+']';
             shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
           } else {
             const target = PLANETS.find(p=>p.id===m.targetId);
@@ -20004,6 +20426,9 @@
   });
   setInterval(maybeScheduleRaid, 300000);
   setInterval(maybeSchedulePirateDebrisRaid, 300000);
+  // Allianzbasis-Kriegszustand alle 5 Minuten nachladen, damit Verteidiger Angriffe zeitnah
+  // mitbekommen (Verluste anwenden, Alarm) - laeuft nur mit Allianz + Server-Modus (Guard intern).
+  setInterval(loadAllianceBaseWar, 300000);
   setInterval(maybeSpawnTrader, 60000);
   window.addEventListener('beforeunload', () => { save(); });
 
