@@ -1154,6 +1154,7 @@
         </div>
         <div id="planetSwitcherDef"></div>
         <div id="raidScoutBox"></div>
+        <div id="pirateDebrisRaidBox"></div>
         <div class="section-title" style="justify-content:space-between;"><span><i class="ti ti-shield" aria-hidden="true"></i>Verteidigungsanlagen</span><button class="help-jump-btn" data-jump-help="kampf"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
         <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning). -->
         <div class="qty-select" id="qtySelectDef"></div>
@@ -2355,8 +2356,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.48.1';
+  const VERSION = '8.49.0';
   const PATCHNOTES = [
+    { version:'8.49.0', date:'16.07.2026', changes:[
+      'Neu: Piraten-Trümmerräuber - gelegentlich taucht bei einem deiner Trümmerfelder eine kleine Piratenflotte auf (überwiegend Recycler mit schwachem Begleitschutz) und baut es ab. Die normale Verteidigung greift hier bewusst nicht automatisch - du musst aktiv eine Flotte vom aktuell gewählten Standort losschicken, um sie rechtzeitig abzufangen (Button im Verteidigung-Tab, solange die Piraten aktiv sind). Gelingt das nicht binnen 10 Minuten, ziehen sie mit einem Teil der Beute ab'
+    ]},
     { version:'8.48.1', date:'16.07.2026', changes:[
       'Bugfix Wochenliga: die Produktions-Zeitgutschrift (z.B. "12 Min. Produktion aller Ressourcen" bei Platin) wurde bisher nur für Erz/Kristalle/Deuterium ausgezahlt, Energie/Antimaterie/Forschungspunkte gingen trotz anderslautendem Hilfetext leer aus - jetzt korrekt alle 6 Ressourcen',
       'Bugfix Fraktionssystem-Angriff: der Ruf-Abzug (-15) wurde bisher sofort nach dem Bestätigungsdialog angewendet, noch bevor die Server-Antwort feststand - bei Serverfehler oder Verbindungsabbruch blieb der Ruf-Verlust ohne jeden Angriff bestehen. Wird jetzt erst nach bestätigter Server-Antwort abgezogen',
@@ -6057,6 +6061,7 @@
     colonies: {},
     activeBasePlanet: 'home',
     nextRaidTime: null,
+    pirateDebrisRaid: null,
     battlePoints: 0,
     commandPoints: 0,
     officers: {},
@@ -6369,7 +6374,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -7692,6 +7697,124 @@
     return builtReport;
   }
 
+  // ===== Piraten-Trümmerräuber =====
+  // Eigenständiges, kleines PvE-System: gelegentlich taucht eine Piratenflotte auf, die NICHT die
+  // Basis angreift, sondern ein bestehendes Trümmerfeld abbaut und mit der Beute verschwindet. Die
+  // normale Verteidigung (Gebäude, stationierte Flotte) wirkt hier bewusst NICHT automatisch - der
+  // Spieler muss aktiv eine eigene Flotte losschicken, um die Räuber abzufangen, bevor sie entkommen.
+  // Die Flotte besteht überwiegend aus Recyclern (die "arbeiten") und nur einem kleinen, schwachen
+  // Begleitschutz, damit ein Abfangversuch mit fast jeder eigenen Kampfflotte aussichtsreich ist -
+  // die Hürde ist das rechtzeitige, aktive Reagieren, nicht die reine Kampfkraft.
+  const PIRATE_DEBRIS_RAID_CHECK_CHANCE = 0.15; // Chance pro 5-Minuten-Prüfung, wenn ein Ziel existiert
+  const PIRATE_DEBRIS_RAID_MIN_FIELD = 300; // Trümmerfeld muss mindestens so groß sein, um ein Ziel zu sein
+  const PIRATE_DEBRIS_RAID_DURATION_SEC = 600; // 10 Min. bis die Piraten mit der Beute abziehen
+  const PIRATE_DEBRIS_RECYCLER_RATE = 6; // Abbaurate pro Piraten-Recycler und Sekunde (Spieler: 8)
+  const PIRATE_DEBRIS_ESCORT_POOL = ['jaeger','cruisers'];
+  function pirateDebrisRaidCandidates(){
+    return Object.entries(state.debrisFields||{})
+      .filter(([, field]) => Object.values(field||{}).reduce((a,b)=>a+b,0) >= PIRATE_DEBRIS_RAID_MIN_FIELD)
+      .map(([pk]) => pk);
+  }
+  // Würfelt eine kleine Piratenflotte: 2-6 Recycler (arbeiten am Feld) + 1-3 leichte Begleitschiffe
+  // (Jäger/Kreuzer, bewusst schwach - siehe Kommentar oben). power berücksichtigt nur den Begleitschutz,
+  // Recycler tragen keine Angriffskraft bei.
+  function generatePirateDebrisFleet(){
+    const recyclerCount = 2 + Math.floor(Math.random()*5);
+    const fleet = { recycler: recyclerCount };
+    const numEscort = 1 + Math.floor(Math.random()*3);
+    for (let i=0; i<numEscort; i++){
+      const t = PIRATE_DEBRIS_ESCORT_POOL[Math.floor(Math.random()*PIRATE_DEBRIS_ESCORT_POOL.length)];
+      fleet[t] = (fleet[t]||0) + 1;
+    }
+    const power = Object.entries(fleet).reduce((a,[k,v]) => {
+      const def = RAIDER_SHIP_POOL.find(s=>s.key===k);
+      return a + v*(def?def.atk:0);
+    }, 0);
+    return { fleet, power };
+  }
+  function maybeSchedulePirateDebrisRaid(){
+    if (state.pirateDebrisRaid) return; // schon eine Piratenflotte unterwegs
+    if (Math.random() > PIRATE_DEBRIS_RAID_CHECK_CHANCE) return;
+    const candidates = pirateDebrisRaidCandidates();
+    if (!candidates.length) return;
+    const targetPlanet = candidates[Math.floor(Math.random()*candidates.length)];
+    const { fleet, power } = generatePirateDebrisFleet();
+    const now = Date.now();
+    state.pirateDebrisRaid = {
+      planetKey: targetPlanet,
+      fleet, power,
+      startTime: now,
+      endTime: now + PIRATE_DEBRIS_RAID_DURATION_SEC*1000,
+      interceptArrival: null,
+      interceptSource: null
+    };
+    log('Eine Piratenflotte ist bei '+planetDisplayName(targetPlanet)+' aufgetaucht und baut das dortige Trümmerfeld ab! Schicke eine Flotte los, um sie abzufangen, bevor sie mit der Beute entkommt ('+fmtDuration(PIRATE_DEBRIS_RAID_DURATION_SEC)+').', 'ti-anchor');
+    pushToast('Piraten plündern das Trümmerfeld bei '+planetDisplayName(targetPlanet)+'!', 'ti-anchor');
+    playSound('raid');
+    render(); save();
+  }
+  // Läuft die Zeit ab, ohne dass die Piraten abgefangen wurden, ziehen sie mit einem Teil des
+  // Trümmerfelds ab (begrenzt durch Recycler-Kapazität × Dauer, wie beim eigenen collectDebrisWithRecyclers).
+  function resolvePirateDebrisRaidEscape(){
+    const raid = state.pirateDebrisRaid;
+    if (!raid) return;
+    const field = state.debrisFields[raid.planetKey];
+    const takenBreakdown = {};
+    let takenTotal = 0;
+    if (field){
+      let remaining = (raid.fleet.recycler||0) * PIRATE_DEBRIS_RECYCLER_RATE * PIRATE_DEBRIS_RAID_DURATION_SEC;
+      for (const r of Object.keys(field)){
+        if (remaining <= 0) break;
+        const take = Math.min(field[r], remaining);
+        if (take <= 0) continue;
+        field[r] -= take;
+        remaining -= take;
+        takenBreakdown[r] = Math.round(take);
+        takenTotal += take;
+      }
+      for (const r of Object.keys(field)) if (field[r] <= 0.01) delete field[r];
+      if (!Object.keys(field).length) delete state.debrisFields[raid.planetKey];
+    }
+    log('Die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' ist mit ihrer Beute entkommen'+(takenTotal>0?' ('+fmt(Math.round(takenTotal))+' Ressourcen aus dem Trümmerfeld)':'')+' - nicht rechtzeitig abgefangen.', 'ti-anchor');
+    pushReport({ type:'pirate-debris-raid', result:'escaped', targetPlanet: raid.planetKey, taken: takenBreakdown, fleet: raid.fleet });
+    state.pirateDebrisRaid = null;
+    render(); save();
+  }
+  function processPirateDebrisRaid(){
+    const raid = state.pirateDebrisRaid;
+    if (!raid) return;
+    if (Date.now() >= raid.endTime) resolvePirateDebrisRaidEscape();
+  }
+  // Schickt eine Abfangflotte vom aktuell gewählten Standort los. Die Flugzeit muss innerhalb der
+  // verbleibenden Zeit liegen, sonst wird der Versand abgelehnt (aktives, rechtzeitiges Reagieren ist
+  // hier bewusst die eigentliche Hürde, nicht die Kampfkraft).
+  function sendInterceptPirateMission(){
+    const raid = state.pirateDebrisRaid;
+    if (!raid){ log('Keine Piratenflotte zum Abfangen vorhanden.', 'ti-alert-triangle'); return; }
+    if (raid.interceptArrival){ log('Es ist bereits eine Flotte unterwegs, um die Piraten abzufangen.', 'ti-alert-triangle'); return; }
+    const cf = currentFleet();
+    const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
+    const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff aus, um die Piraten abzufangen (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates').length;
+    if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
+    const relevantKeys = ATTACK_SHIP_KEYS.filter(k=>(attackFleet[k]||0) > 0);
+    const dur = state.activeBasePlanet === raid.planetKey ? 20 : relocationDuration(state.activeBasePlanet, raid.planetKey, relevantKeys[0]);
+    const remainMs = raid.endTime - Date.now();
+    if (dur*1000 >= remainMs){ log('Die Flugzeit (~'+Math.round(dur)+'s) reicht nicht mehr, um die Piraten rechtzeitig abzufangen (nur noch '+Math.round(remainMs/1000)+'s bis sie abziehen).', 'ti-alert-triangle'); return; }
+    const fuelCost = missionFuelCost(dur, totalSelected);
+    if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium): benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    pay({deuterium: fuelCost});
+    const fleetName = resolveFleetName();
+    const power = attackPower(attackFleet, state.activeBasePlanet);
+    cf.missions.push({ id: nextMissionId(), type:'intercept-pirates', targetId: raid.planetKey, startTime: Date.now(), endTime: Date.now()+dur*1000, power, fleetName, composition: attackFleet });
+    raid.interceptArrival = Date.now()+dur*1000;
+    raid.interceptSource = state.activeBasePlanet;
+    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' fängt die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' ab (Angriffskraft '+power+', Ankunft in ~'+Math.round(dur)+'s).', 'ti-sword');
+    render(); save();
+  }
+
   // Für kleine Produktions-Vorschauwerte (z.B. Antimaterie bei niedriger Stufe): die normale fmt()
   // rundet auf eine Nachkommastelle - bei Werten unter 1/s wird daraus fälschlich "0", obwohl die
   // Produktion real ist und sich beim Ausbau spürbar erhöht. Nur für diese Vorschau mehr Präzision.
@@ -8117,6 +8240,7 @@
     if (state.expeditionsCompleted === undefined) state.expeditionsCompleted = 0;
     if (state.referredBy === undefined) state.referredBy = null;
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
+    if (state.pirateDebrisRaid === undefined) state.pirateDebrisRaid = null;
     if (!state.themeKey) state.themeKey = 'standard';
     if (state.autoReinforceOn === undefined) state.autoReinforceOn = false;
     if (state.uiJumpNav === undefined) state.uiJumpNav = false;
@@ -8293,7 +8417,7 @@
       buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0},
       research:{}, activeResearch:null,
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
-      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, battlePoints:0, npcKills:0, bossKills:0,
+      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
@@ -8358,7 +8482,7 @@
       buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0},
       research:{}, activeResearch:null,
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
-      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, battlePoints:0, npcKills:0, bossKills:0,
+      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
@@ -9757,6 +9881,8 @@
     if (r.type === 'raid') return r.result === 'win' ? 'win' : 'loss';
     if (r.type === 'npc-attack' || r.type === 'player-attack') return r.result === 'win' ? 'win' : 'loss';
     if (r.type === 'expedition' && r.encountered) return r.result === 'defended' ? 'win' : 'loss';
+    // 'escaped' (Piraten nie abgefangen) ist kein Kampf und zählt daher bewusst nicht in die Statistik.
+    if (r.type === 'pirate-debris-raid' && (r.result === 'win' || r.result === 'loss')) return r.result;
     return null;
   }
   async function pushReport(report){
@@ -10716,6 +10842,7 @@
       { title:'Weltboss: Leviathan der Leere', body:'Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
       { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
+      { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (die Flugzeit muss innerhalb der verbleibenden Zeit liegen), bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab.' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln.' },
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Nur die spezielle, itemgebundene Kristallfestung (150) übertrifft ihn.' },
@@ -10906,6 +11033,18 @@
             body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Flottenverluste: '+lostCountsToText(r.ownLostShips);
             body += debrisReportLine(r.ownLossDebris);
           }
+        }
+      } else if (r.type === 'pirate-debris-raid'){
+        if (r.result === 'escaped'){
+          title = 'Piraten-Trümmerräuber entkommen – '+planetDisplayName(r.targetPlanet);
+          const takenTxt = r.taken && Object.keys(r.taken).length ? rewardHtml(r.taken) : 'nichts (Feld war fast leer)';
+          body = 'Nicht rechtzeitig abgefangen. Erbeutet: '+takenTxt;
+        } else {
+          title = (won?'Piraten abgefangen':'Abfangversuch gescheitert')+' – '+planetDisplayName(r.targetPlanet);
+          body = 'Deine Angriffspunkte: '+r.attackPower+' vs. Begleitschutz-Kampfkraft: '+r.defensePower;
+          body += '<br>Piratenflotte: '+fleetBreakdownHtml(r.fleet);
+          if (won && r.destroyedShips && Object.keys(r.destroyedShips).length) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstört: '+lostCountsToText(r.destroyedShips);
+          if (!won && r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips);
         }
       } else if (r.type === 'debris-cleared'){
         title = 'Trümmerfeld abgebaut: '+planetDisplayName(r.targetPlanet);
@@ -13899,6 +14038,42 @@
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
+        } else if (m.type === 'intercept-pirates'){
+          // Abfangversuch gegen die Piraten-Trümmerräuber (siehe maybeSchedulePirateDebrisRaid).
+          const raid = state.pirateDebrisRaid;
+          if (!raid || raid.planetKey !== m.targetId){
+            if (showLog !== false) log('Die Piratenflotte war bei Ankunft bereits weg.', 'ti-anchor');
+            continue;
+          }
+          const power = m.power || attackPower(fleet, planetKey);
+          // Begleitschutz ist bewusst schwach (siehe generatePirateDebrisFleet) - Mindestchance 55%,
+          // damit fast jede aktiv losgeschickte Kampfflotte gute Erfolgsaussichten hat.
+          const chance = Math.max(0.55, Math.min(0.97, power/(power+raid.power*0.6)));
+          const success = Math.random() < chance;
+          if (success){
+            const lostPirates = applyCombatLosses(raid.fleet, Object.keys(raid.fleet), Math.max(0.5, Math.min(1, power/(power+raid.power*0.3))), planetKey);
+            const lostPiratesText = lostCountsToText(lostPirates);
+            const bpGained = 8;
+            awardBattlePoints(bpGained);
+            logScoreChange(bpGained*3, 'Piraten-Trümmerräuber bei '+planetDisplayName(raid.planetKey)+' abgefangen (+'+bpGained+' Kampfpunkte)', 'ti-sword');
+            addVeteranXp(planetKey, 6);
+            if (showLog !== false) log('Piratenflotte bei '+planetDisplayName(raid.planetKey)+' abgefangen und vertrieben!'+(lostPiratesText?' Zerstört: '+lostPiratesText+'.':'')+' Das Trümmerfeld bleibt erhalten.', 'ti-sword');
+            playSound('win');
+            const __battleReport = { type:'pirate-debris-raid', result:'win', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, destroyedShips: lostPirates, fromPlanet: planetDisplayName(planetKey), flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: bpGained };
+            pushReport(__battleReport);
+            state.pirateDebrisRaid = null;
+          } else {
+            const ownLostIntercept = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.10+Math.random()*0.1, planetKey, m.composition);
+            const ownLostInterceptText = lostCountsToText(ownLostIntercept);
+            addVeteranXp(planetKey, 2);
+            if (showLog !== false) log('Abfangversuch gegen die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' gescheitert - sie setzen die Plünderung fort.'+(ownLostInterceptText?' Verluste: '+ownLostInterceptText+'.':''), 'ti-shield');
+            playSound('lose');
+            const __battleReport = { type:'pirate-debris-raid', result:'loss', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, ownLostShips: ownLostIntercept, fromPlanet: planetDisplayName(planetKey), flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: 0 };
+            pushReport(__battleReport);
+            // Ein neuer Versuch bleibt möglich, solange noch Zeit bis raid.endTime bleibt.
+            raid.interceptArrival = null;
+            raid.interceptSource = null;
+          }
         } else if (m.type === 'attack'){
           const npc = NPCS.find(n => n.id === m.targetId);
           if (!npc) continue;
@@ -16749,6 +16924,24 @@
             </div>
           `;
         }
+        if (m.type === 'intercept-pirates'){
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          const shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ti-anchor" aria-hidden="true" style="color:#e24b4a;"></i>${m.fleetName?m.fleetName+' · ':''}Abfangen: Piraten-Trümmerräuber bei ${planetDisplayName(m.targetId)}</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
+                  ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
+                </div>
+              </div>
+              <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         const isAttack = m.type === 'attack';
         // Bugfix: ohne ||{} -Fallback crashte render() dauerhaft, sobald targetId keinen Treffer mehr
         // in NPCS/PLANETS fand (z.B. Update während laufender Mission) - analog zu den bereits
@@ -16810,12 +17003,12 @@
     const hangarCap = hangarCapacity(cf);
     if (activeTab === 'flotte' || activeTab === 'expedition'){
     const df = deployableFighters(cf);
-    const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
+    const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates').length;
     const slotsUsedExplore = cf.missions.filter(m=>m.type==='explore').length;
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }
@@ -17703,6 +17896,10 @@
             icon = 'ti-target'; color = '#5dcaa5';
             label = (m.fleetName?m.fleetName+' → ':'')+'Spionage: '+(m.targetName||'?');
             shipsTooltip = '';
+          } else if (m.type === 'intercept-pirates'){
+            icon = 'ti-anchor'; color = '#e24b4a';
+            label = (m.fleetName?m.fleetName+' → ':'')+'Piraten abfangen bei '+planetDisplayName(m.targetId);
+            shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
           } else {
             const target = PLANETS.find(p=>p.id===m.targetId);
             label = (m.fleetName?m.fleetName+' → ':'')+(target?target.name:'Erkundungsziel');
@@ -17784,6 +17981,42 @@
         }
       } else {
         raidScoutBox.innerHTML = '';
+      }
+    }
+
+    const pirateDebrisRaidBox = document.getElementById('pirateDebrisRaidBox');
+    if (pirateDebrisRaidBox){
+      const pdr = state.pirateDebrisRaid;
+      if (pdr){
+        const remain = Math.max(0, pdr.endTime - Date.now());
+        const fleetTooltip = fleetIconRowHtml(pdr.fleet);
+        if (pdr.interceptArrival){
+          const arrRemain = Math.max(0, pdr.interceptArrival - Date.now());
+          pirateDebrisRaidBox.innerHTML = `
+            <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem; border-color:rgba(226,75,74,0.4);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-anchor" aria-hidden="true"></i></div><div><div class="bname">Piraten-Trümmerräuber bei ${planetDisplayName(pdr.planetKey)}</div><div class="bmeta">Abfangflotte von ${planetDisplayName(pdr.interceptSource)} unterwegs, Ankunft in ${Math.ceil(arrRemain/1000)}s</div></div></div>
+                <span class="lvl-pill">Piraten weg in ${fmtDuration(remain/1000)}</span>
+              </div>
+              <div style="margin-top:6px;">${fleetTooltip}</div>
+            </div>
+          `;
+        } else {
+          const haveCombatShips = ATTACK_SHIP_KEYS.some(k=>(cf[k]||0) > 0);
+          pirateDebrisRaidBox.innerHTML = `
+            <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem; border-color:rgba(226,75,74,0.4);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-anchor" aria-hidden="true"></i></div><div><div class="bname">Piraten-Trümmerräuber bei ${planetDisplayName(pdr.planetKey)}</div><div class="bmeta">Baut dort gerade das Trümmerfeld ab - schwacher Begleitschutz, aber du musst aktiv abfangen (Angriffsflotte-Auswahl im Galaxie-Tab, Versand vom aktuell gewählten Standort). Sie ziehen in ${fmtDuration(remain/1000)} ab.</div></div></div>
+                <button id="interceptPiratesBtn" class="${haveCombatShips?'affordable':''}" ${haveCombatShips?'':'disabled'}><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Abfangen</button>
+              </div>
+              <div style="margin-top:6px;">${fleetTooltip}</div>
+            </div>
+          `;
+          const interceptBtn = document.getElementById('interceptPiratesBtn');
+          if (interceptBtn) interceptBtn.onclick = sendInterceptPirateMission;
+        }
+      } else {
+        pirateDebrisRaidBox.innerHTML = '';
       }
     }
 
@@ -19183,7 +19416,7 @@
   document.getElementById('resetBtn').addEventListener('click', async () => {
     if (!confirm('Kompletten Spielstand wirklich zurücksetzen? Das setzt auch Prestige, Level und Erfolge zurück (anders als der Prestige-Knopf im Fortschritt-Tab).')) return;
     const keepId = state.player.id, keepName = state.player.name, keepTag = state.player.allianceTag, keepAvatar = state.player.avatarKey;
-    state = { resources:{energie:10,erz:10,kristalle:0,deuterium:0,antimaterie:0,forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, allianceResearch:{}, allianceContributed:{}, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
+    state = { resources:{energie:10,erz:10,kristalle:0,deuterium:0,antimaterie:0,forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, allianceResearch:{}, allianceContributed:{}, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
     // Füllt alle Felder auf, die diese verkürzte Reset-Liste nicht enthält (z.B. credits, skillTree,
     // favoritePlanets, collapsedSections, ascension, doctrine, ...) - sonst blieben sie `undefined` und
     // render()/Klick-Handler stürzten ohne Seiten-Reload ab (siehe applyStateDefaults()).
@@ -19201,6 +19434,7 @@
     const cap = storageCap();
     for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r], cap);
     const missionsResolved = checkMissions();
+    processPirateDebrisRaid();
     flashGains(rates);
     maybeDetectRaid();
     if (state.nextRaidTime && Date.now() >= state.nextRaidTime){
@@ -19268,6 +19502,7 @@
     if (idx>=0 && idx<TAB_SHORTCUT_ORDER.length){ switchTab(TAB_SHORTCUT_ORDER[idx]); }
   });
   setInterval(maybeScheduleRaid, 300000);
+  setInterval(maybeSchedulePirateDebrisRaid, 300000);
   setInterval(maybeSpawnTrader, 60000);
   window.addEventListener('beforeunload', () => { save(); });
 
