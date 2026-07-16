@@ -489,6 +489,9 @@
     .ui-accordion-on .prog-chevron { display:inline-block; }
     .ui-accordion-on .prog-section.collapsed .prog-chevron { transform:rotate(90deg); }
     .ui-accordion-on .prog-section.collapsed .prog-sec-body { display:none; }
+    /* Generisches Akkordeon fuer alle uebrigen Tabs (Abschnitts-Ueberschriften direkt im Panel) */
+    .ui-accordion-on .tab-panel > .section-title { cursor:pointer; }
+    .ui-accordion-on .tab-panel > .section-title.sec-collapsed .prog-chevron { transform:rotate(90deg); }
     @media (min-width:760px){
       .ui-twocol-on .prog-twocol-group { display:grid; grid-template-columns:1fr 1fr; gap:0 20px; align-items:start; }
     }
@@ -1409,13 +1412,13 @@
 <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sparkles" aria-hidden="true"></i>Farbthema</div>
         <div id="themePicker" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
 <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Übersichtlichkeit</div>
-        <div class="bmeta" style="margin-bottom:8px;">Optionale Layouts für die dichtesten Tabs (Punktestand, Fortschritt, Einstellungen) - alle standardmäßig aus, das bisherige Layout bleibt unverändert der Standard.</div>
+        <div class="bmeta" style="margin-bottom:8px;">Optionale Layouts - alle standardmäßig aus, das bisherige Layout bleibt unverändert der Standard. Aufklappbare Abschnitte wirken in ALLEN Tabs; Sprungmarken und Zweispaltig in den dichtesten Tabs (Punktestand, Fortschritt, Einstellungen).</div>
         <div class="card-row" id="uiJumpNavToggleRow" style="cursor:pointer;">
           <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-map-pin" aria-hidden="true"></i></div><div><div class="bname">Sprungmarken</div><div class="bmeta">Klick-Leiste oben, springt direkt zu einem Abschnitt</div></div></div>
           <div class="toggle-switch" id="uiJumpNavSwitch"><div class="toggle-knob"></div></div>
         </div>
         <div class="card-row" id="uiCollapsibleToggleRow" style="cursor:pointer; margin-top:8px;">
-          <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-chevron-right" aria-hidden="true"></i></div><div><div class="bname">Aufklappbare Abschnitte</div><div class="bmeta">Abschnitte einzeln ein-/ausklappen, gemerkt pro Abschnitt</div></div></div>
+          <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-chevron-right" aria-hidden="true"></i></div><div><div class="bname">Aufklappbare Abschnitte</div><div class="bmeta">Abschnitte in allen Tabs einzeln ein-/ausklappen, gemerkt pro Abschnitt</div></div></div>
           <div class="toggle-switch" id="uiCollapsibleSwitch"><div class="toggle-knob"></div></div>
         </div>
         <div class="card-row" id="uiTwoColToggleRow" style="cursor:pointer; margin-top:8px;">
@@ -2358,8 +2361,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.55.0';
+  const VERSION = '8.55.1';
   const PATCHNOTES = [
+    { version:'8.55.1', date:'16.07.2026', changes:[
+      'Aufklappbare Abschnitte wirken jetzt in ALLEN Tabs (Nutzer-Hinweis: die Einstellung galt bisher nur für Punktestand, Fortschritt und Einstellungen - überall sonst waren Überschriften ohne Funktion). Jede Abschnitts-Überschrift in Basis, Verteidigung, Forschung, Flotte, Expedition, Karte, Galaxie, Markt, Offiziere, Allianz und Berichte lässt sich einzeln zu- und aufklappen (Chevron-Pfeil zeigt den Zustand, gemerkt pro Abschnitt). Buttons in Überschriften (z.B. "Erklärung") funktionieren weiterhin normal, und vom Spiel bewusst versteckte Bereiche (z.B. Admin-Boxen) bleiben beim Aufklappen korrekt versteckt'
+    ]},
     { version:'8.55.0', date:'16.07.2026', changes:[
       'Allianzbasis: automatische System-Nachrichten im Allianz-Chat (Absender "Allianzbasis") bei allen wichtigen Ereignissen - Baubeginn/Gründung, jede erreichte Ausbaustufe (mit dem neuen Bonus im Text), Angriffe (mit Angreifer-Tag und Schaden), Zerstörung und abgeschlossene Reparatur. Jedes Ereignis wird genau einmal gemeldet, egal wie viele Mitglieder online sind',
       'Allianzbasis kostet jetzt zusätzlich Energie: 2 Mio. je Basiskosten-Einheit als fünfte Ressource neben Erz/Kristallen/Deuterium/Antimaterie (gleiches Stufen-Wachstum x2,2, fließt auch in die Reparaturkosten ein). Hinweis für bereits gegründete Basen: die Stufen-Schwellen enthalten jetzt Energie - fehlende Energie-Beiträge einfach nachreichen'
@@ -19772,6 +19778,47 @@
           sec.classList.toggle('collapsed', !!state.collapsedSections[key]);
         };
       });
+    }
+    // Generisches Akkordeon fuer ALLE uebrigen Tabs (16.07.2026, Nutzer-Wunsch: die Einstellung
+    // wirkte bisher nur in Punktestand/Fortschritt/Einstellungen): jede direkt im Tab-Panel
+    // liegende Abschnitts-Ueberschrift wird klappbar - eingeklappt versteckt sie alle folgenden
+    // Geschwister-Elemente bis zur naechsten Ueberschrift. Der urspruengliche display-Wert jedes
+    // Elements wird dabei gemerkt und beim Aufklappen wiederhergestellt, damit vom Spiel bewusst
+    // versteckte Boxen (z.B. Admin-Bereiche) nicht zwangs-eingeblendet werden.
+    if (activeTab && !['punkte','fortschritt','einstellungen'].includes(activeTab)){
+      const panel = document.getElementById('tab-'+activeTab);
+      if (panel){
+        const titles = Array.from(panel.children).filter(el => el.classList && el.classList.contains('section-title'));
+        titles.forEach((title, idx) => {
+          const key = 'tab-'+activeTab+':'+idx;
+          if (state.uiCollapsibleSections && !title.querySelector('.prog-chevron')){
+            const chev = document.createElement('i');
+            chev.className = 'ti ti-chevron-right prog-chevron';
+            chev.setAttribute('aria-hidden','true');
+            title.appendChild(chev);
+          }
+          const isCollapsed = state.uiCollapsibleSections && !!state.collapsedSections[key];
+          title.classList.toggle('sec-collapsed', isCollapsed);
+          let el = title.nextElementSibling;
+          while (el && !(el.classList && el.classList.contains('section-title'))){
+            if (isCollapsed){
+              if (el.dataset.accPrevDisplay === undefined) el.dataset.accPrevDisplay = el.style.display || '';
+              el.style.display = 'none';
+            } else if (el.dataset.accPrevDisplay !== undefined){
+              el.style.display = el.dataset.accPrevDisplay;
+              delete el.dataset.accPrevDisplay;
+            }
+            el = el.nextElementSibling;
+          }
+          title.onclick = (ev) => {
+            if (!state.uiCollapsibleSections) return;
+            // Buttons/Links in der Ueberschrift (z.B. "Erklaerung") duerfen nicht mit-klappen.
+            if (ev.target.closest('button') || ev.target.closest('a')) return;
+            state.collapsedSections[key] = !state.collapsedSections[key];
+            render(); save();
+          };
+        });
+      }
     }
 
     document.getElementById('heroResearch').textContent = Object.values(state.research).filter(Boolean).length+'/'+RESEARCH_DEFS.length;
