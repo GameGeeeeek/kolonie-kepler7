@@ -2361,8 +2361,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.55.1';
+  const VERSION = '8.55.2';
   const PATCHNOTES = [
+    { version:'8.55.2', date:'16.07.2026', changes:[
+      'Bugfix Orbitalstation (danke an holyhenning für den Report): ein Ausbau-Auftrag, der noch auf Ressourcen wartet (also noch gar nicht bezahlt und gestartet ist), zeigte in der Orbitalstation-Box dauerhaft "0s" an und sah wie ein hängender Bau aus. Die Box zeigt jetzt klar "wartet" samt der konkret fehlenden Ressource und Menge - inklusive deutlicher Warnung, falls die benötigte Menge dein aktuelles Lager-Limit übersteigt (seit der Imperiums-Kostenskalierung möglich; ein solcher Auftrag könnte sonst nie starten: Lager ausbauen oder abbrechen). Neu: Abbrechen-Button direkt in der Orbitalstation-Box (voller Rückerstattung bei bereits laufendem Bau; wartende Aufträge haben noch nichts bezahlt)'
+    ]},
     { version:'8.55.1', date:'16.07.2026', changes:[
       'Aufklappbare Abschnitte wirken jetzt in ALLEN Tabs (Nutzer-Hinweis: die Einstellung galt bisher nur für Punktestand, Fortschritt und Einstellungen - überall sonst waren Überschriften ohne Funktion). Jede Abschnitts-Überschrift in Basis, Verteidigung, Forschung, Flotte, Expedition, Karte, Galaxie, Markt, Offiziere, Allianz und Berichte lässt sich einzeln zu- und aufklappen (Chevron-Pfeil zeigt den Zustand, gemerkt pro Abschnitt). Buttons in Überschriften (z.B. "Erklärung") funktionieren weiterhin normal, und vom Spiel bewusst versteckte Bereiche (z.B. Admin-Boxen) bleiben beim Aufklappen korrekt versteckt'
     ]},
@@ -17417,14 +17420,35 @@
           }
           html += `<div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-planet" aria-hidden="true"></i>Orbitalstation: ${planetDisplayName(pk)}</div>`;
           if (job){
-            const remain = Math.max(0, job.endTime-Date.now());
-            const pct = Math.max(0, Math.min(100, 100-(remain/(job.totalDur*1000)*100)));
-            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:#7f77dd; margin-bottom:1rem;">
+            // Bugfix (Spieler-Report holyhenning, 16.07.2026): unbezahlte Auftraege (endTime null,
+            // warten auf Ressourcen/Baustelle) zeigten hier dauerhaft "0s" und sahen aus wie ein
+            // haengender Bau. Jetzt wird der Wartezustand samt fehlender Ressource klar benannt -
+            // inklusive Warnung, wenn die Kosten das aktuelle Lager-Limit uebersteigen (seit der
+            // Imperiums-Skalierung moeglich; der Auftrag koennte sonst NIE bezahlbar werden) - und
+            // einem Abbrechen-Button direkt in der Box.
+            const jobWaiting = !job.paid;
+            const remain = jobWaiting ? 0 : Math.max(0, job.endTime-Date.now());
+            const pct = jobWaiting ? 0 : Math.max(0, Math.min(100, 100-(remain/(job.totalDur*1000)*100)));
+            let waitHtml = '';
+            if (jobWaiting){
+              const missing = canAfford(job.cost||{}) ? null : Object.entries(job.cost||{}).find(([r,a]) => (state.resources[r]||0) < a);
+              if (missing){
+                const overCap = missing[1] > storageCap();
+                waitHtml = `<div class="bmeta" style="color:${overCap?'#e24b4a':'#e0a548'};"><i class="ti ti-clock" aria-hidden="true"></i> Wartet auf Ressourcen: ${miniResIcon(missing[0])} ${fmt(missing[1])} ${(RES_DEFS.find(r=>r.key===missing[0])||{}).label||missing[0]} benötigt${overCap?' - <strong>übersteigt dein Lager-Limit ('+fmt(storageCap())+')!</strong> Lager ausbauen oder Auftrag abbrechen':''}</div>`;
+              } else {
+                waitHtml = `<div class="bmeta" style="color:#e0a548;"><i class="ti ti-clock" aria-hidden="true"></i> Wartet auf eine freie Baustelle.</div>`;
+              }
+            }
+            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:${jobWaiting?'rgba(125,129,153,0.4)':'#7f77dd'}; margin-bottom:1rem;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span class="bname"><i class="ti ti-planet" aria-hidden="true"></i> ${job.label}</span>
-                <span class="lvl-pill">${fmtDuration(remain/1000)}</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="lvl-pill">${jobWaiting ? 'wartet' : fmtDuration(remain/1000)}</span>
+                  <button data-orbital-cancel="${job.id}" title="${jobWaiting?'Aus Warteschlange entfernen':'Bau abbrechen (volle Rückerstattung)'}" style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+                </div>
               </div>
-              <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+              ${waitHtml}
+              <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; ${jobWaiting?'background:#7d8199;':''}"></div></div>
             </div>`;
           } else if (!cur){
             html += `<div class="bmeta" style="margin-bottom:8px;">Baue eine Orbitalstation und wähle ihren Fokus (Stufe 1: ${costHtml(orbitalCost(1))}, ${fmtDuration(orbitalBuildTime(1))} Bauzeit; ausbaubar bis Stufe ${ORBITAL_MAX_LEVEL}).</div>
@@ -17456,6 +17480,7 @@
           setHtmlPreservingScroll(orbitalBox, html);
           orbitalBox.querySelectorAll('[data-build-orbital]').forEach(btn => btn.onclick = () => buildOrbitalStation(btn.getAttribute('data-build-orbital')));
           orbitalBox.querySelectorAll('[data-switch-orbital]').forEach(btn => btn.onclick = () => switchOrbitalFocus(btn.getAttribute('data-switch-orbital')));
+          orbitalBox.querySelectorAll('[data-orbital-cancel]').forEach(btn => btn.onclick = () => cancelConstruction(btn.getAttribute('data-orbital-cancel')));
         }
       }
       // Terraforming – funktioniert auf allen Kolonien UND der Heimatbasis, außer Monden (eigener
