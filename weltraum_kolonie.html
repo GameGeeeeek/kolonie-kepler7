@@ -2356,8 +2356,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.49.0';
+  const VERSION = '8.49.1';
   const PATCHNOTES = [
+    { version:'8.49.1', date:'16.07.2026', changes:[
+      'Bugfix Spielerprofil: die "bin ich das?"-Erkennung im Profil-Popup (Angriff/Nachricht/Spähen-Buttons) verglich noch Name+Kampfpunkte statt der Spieler-ID - derselbe Fehler, der in der Bestenliste bereits in 8.48.1 behoben wurde, war hier an einer vierten Stelle übersehen worden'
+    ]},
     { version:'8.49.0', date:'16.07.2026', changes:[
       'Neu: Piraten-Trümmerräuber - gelegentlich taucht bei einem deiner Trümmerfelder eine kleine Piratenflotte auf (überwiegend Recycler mit schwachem Begleitschutz) und baut es ab. Die normale Verteidigung greift hier bewusst nicht automatisch - du musst aktiv eine Flotte vom aktuell gewählten Standort losschicken, um sie rechtzeitig abzufangen (Button im Verteidigung-Tab, solange die Piraten aktiv sind). Gelingt das nicht binnen 10 Minuten, ziehen sie mit einem Teil der Beute ab'
     ]},
@@ -9420,7 +9423,11 @@
       <div class="card-row"><div class="left"><i class="ti ti-alien" aria-hidden="true" style="color:#e24b4a;"></i><span class="bname">NPC-Siege</span></div><span class="lvl-pill">${entry.npcKills||0}${cmp(myStats.npcKills, entry.npcKills)}</span></div>
     `;
     document.getElementById('profileModalLastSeen').innerHTML = `<i class="ti ti-clock" aria-hidden="true"></i> Zuletzt aktiv: ${formatRelativeTime(entry.updated)}`;
-    const isMe = entry.name === state.player.name && entry.bp === state.battlePoints;
+    // Bugfix: isMe verglich bisher Name+Kampfpunkte statt der Spieler-ID - zwei Spieler mit gleichem
+    // Namen und gleichem BP-Stand (z.B. beide frisch mit 0) erkannten sich fälschlich gegenseitig als
+    // "sich selbst", wodurch Angriff/Nachricht/Spähen-Buttons für einen echten, fremden Spieler
+    // ausgeblendet wurden. isMeForCompare (oben, per ID) ist bereits korrekt - hier wiederverwendet.
+    const isMe = isMeForCompare;
     const attackBtn = document.getElementById('profileAttackBtn');
     const msgBtn = document.getElementById('profileMsgBtn');
     const spyBtn = document.getElementById('profileSpyBtn');
