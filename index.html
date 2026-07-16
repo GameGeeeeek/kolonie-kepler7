@@ -2009,8 +2009,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.36.7';
+  const VERSION = '8.36.8';
   const PATCHNOTES = [
+    { version:'8.36.8', date:'16.07.2026', changes:[
+      'Performance: Flotte- und Expedition-Tab bauen ihre Inhalte (Schiffsliste, Missionen, Trümmerfeld, Verlegen, Baukorb, Expeditionsbox) jetzt nur noch neu, wenn der jeweilige Tab tatsächlich aktiv ist - vorher wurden diese beiden Tabs als einzige bei jedem Sekunden-Tick unabhängig vom gerade angezeigten Tab komplett neu berechnet'
+    ]},
     { version:'8.36.7', date:'13.07.2026', changes:[
       'Private Nachrichten ausgebaut: der bisherige Browser-Dialog beim Schreiben/Antworten ist einem richtigen Formular im Berichte-Tab gewichen',
       'Bug behoben: der "Antworten"-Button bei erhaltenen Nachrichten erschien nie (Feldname-Verwechslung zwischen Frontend und Backend) - jetzt korrekt sichtbar und nutzbar'
@@ -15086,6 +15089,7 @@
 
     const now = Date.now();
     const cf = currentFleet();
+    if (activeTab === 'flotte'){
     const activeM = document.getElementById('missionsActive');
     const nonExpeditionMissions = cf.missions.filter(m => m.type !== 'expedition');
     if (!nonExpeditionMissions.length){
@@ -15221,7 +15225,9 @@
         `;
       }).join('');
     }
+    } // Ende Flotte-Missionen-Guard (Performance: nur im Flotte-Tab sichtbar)
 
+    if (activeTab === 'expedition'){
     const expeditionsActiveEl = document.getElementById('expeditionsActive');
     if (expeditionsActiveEl){
       const expMissions = cf.missions.filter(m => m.type === 'expedition');
@@ -15247,10 +15253,15 @@
         }).join('');
       }
     }
+    } // Ende Expedition-Missionen-Guard (Performance: nur im Expedition-Tab sichtbar)
     document.querySelectorAll('[data-recall]').forEach(btn => btn.onclick = () => recallMission(state.activeBasePlanet, btn.getAttribute('data-recall')));
 
+    // Performance: Schiffsliste (fleet), Truemmerfeld (debrisBox) und Expeditionsbox (expeditionBox) teilen sich
+    // Variablen (u.a. slotsUsedExpedition) zwischen Flotte- und Expedition-Tab und werden deshalb
+    // gemeinsam geschuetzt, statt einzeln pro Tab - siehe TODO-Merkzettel zur Performance-Untersuchung.
     const combatShips = combatFleetCount(cf);
     const hangarCap = hangarCapacity(cf);
+    if (activeTab === 'flotte' || activeTab === 'expedition'){
     const df = deployableFighters(cf);
     const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length;
     const slotsUsedExplore = cf.missions.filter(m=>m.type==='explore').length;
@@ -15495,7 +15506,9 @@
       const expBtn = document.getElementById('sendExpeditionBtn');
       if (expBtn) expBtn.onclick = sendExpeditionMission;
     }
+    } // Ende Flotte/Expedition-Schiffsliste-Guard
 
+    if (activeTab === 'flotte'){
     const relocateBox = document.getElementById('relocateBox');
     if (relocateBox && !isTypingIn('relocateBox')){
       const others = allFleetsWithPlanet().filter(x=>x.planet!==state.activeBasePlanet);
@@ -15579,11 +15592,13 @@
         };
       }
     }
+    } // Ende Flotte-Verlegung-Guard (Performance: Verlegen-Box nur im Flotte-Tab sichtbar/relevant)
 
     // Baukorb: Übersicht über alle Schiffstypen mit erfüllten Voraussetzungen, je mit einem
     // Mengenfeld. Zeigt die Gesamtkosten über alle eingetragenen Mengen und baut beim Klick alles
     // in einem Schritt (technisch weiterhin ein queueConstruction-Auftrag pro Typ, aber gemeinsam
     // ausgelöst und gemeinsam bezahlt).
+    if (activeTab === 'flotte'){
     const shipBasketBox = document.getElementById('shipBasketBox');
     if (shipBasketBox && !isTypingIn('shipBasketBox')){
       // Bug behoben: der bestehende isTypingIn-Aufruf weiter unten im oninput-Handler schützte nur
@@ -15641,6 +15656,7 @@
         render(); save();
       };
     }
+    } // Ende Flotte-Baukorb-Guard (Performance: Baukorb nur im Flotte-Tab sichtbar/relevant)
 
     // Performance: die Sektorkarten-Listen (Planeten/Monde) sind pro Planet mehrfach berechnungsintensiv
     // (Flugzeit/Treibstoff/Kolonisierungskosten) und nur im Karte-Tab sichtbar - werden deshalb wie die
