@@ -2356,8 +2356,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.50.0';
+  const VERSION = '8.51.0';
   const PATCHNOTES = [
+    { version:'8.51.0', date:'16.07.2026', changes:[
+      'Echte NPC-Flotten: NPC-Gegner im Galaxie-Tab haben jetzt eine konkrete Flottenzusammensetzung (Gesamt-Angriffskraft entspricht ihrem Verteidigungswert), die in der Angriffsvorschau mit Schiffs-Icons angezeigt wird und beim Losschicken eingefroren wird - der Kampf läuft exakt gegen das, was man gesehen hat. Nach jedem Sieg formiert sich der Gegner neu und stärker',
+      'Trümmerfelder bei NPC-Siegen entstehen jetzt aus den tatsächlich zerstörten Gegner-Schiffen (dieselbe Gewichtungsformel wie bei allen anderen Kämpfen: zerstörte Schiffe x Punktewert x 8, davon 60% Erz / 30% Kristalle) statt aus der bisherigen Pauschale - je überlegener der Angriff, desto mehr der NPC-Flotte wird zerstört (40-90%), der Rest flieht. NPC-Trümmerfelder fallen dadurch deutlich größer aus als bisher, vergleichbar mit abgewehrten Überfällen',
+      'Kampfberichte gegen NPCs zeigen jetzt die gegnerische Flotte und die zerstörten Gegner-Schiffe; die Kampf-Wiedergabe zeigt auf der Gegnerseite echte Schiffs-Icons mit Verlusten statt des abstrakten Alien-Symbols'
+    ]},
     { version:'8.50.0', date:'16.07.2026', changes:[
       'Treibstoff nach Antriebsart: Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken jetzt tatsächlich Antimaterie statt Deuterium - bisher wurde das nur im Flotte-Tab angezeigt, real zahlten alle Missionen ausschließlich Deuterium. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen (Gesamtkosten unverändert, nur die Aufteilung ist neu). Betrifft Angriffe, Expeditionen (Forschungsschiff!), Spionage, Weltboss, Piratenversteck, Piraten-Abfangen und Flottenverlegungen - alle Kosten-Vorschauen und Logmeldungen zeigen die Aufteilung mit an'
     ]},
@@ -5978,6 +5983,26 @@
     box.querySelectorAll('[data-quest-complete]').forEach(btn => btn.onclick = () => completeFactionQuest(btn.getAttribute('data-quest-complete')));
   }
   function npcEffectiveDefense(npc){ return Math.round(npc.defense * (1 + npcScalingCount(npc.id)*0.18) * (galaxyCache.npcEmpireStrength||1)); }
+  // Echte NPC-Flotten (16.07.2026, Feature-Wunsch): jeder NPC hat statt eines rein abstrakten
+  // Verteidigungswerts eine konkrete Flottenzusammensetzung, deren Gesamt-Angriffskraft ungefähr
+  // seiner effektiven Verteidigung entspricht. Deterministisch aus NPC-ID + Skalierungszähler
+  // geseedet (mulberry32), damit Galaxie-Vorschau und spätere Kampfauflösung/Berichte dieselbe
+  // Flotte zeigen, ohne sie im Spielstand ablegen zu müssen - nach jedem Sieg (Skalierung +1)
+  // formiert sich der Gegner sichtbar neu und stärker. Die Erfolgschancen-Formel nutzt weiterhin
+  // npcEffectiveDefense; die Flotte bestimmt Anzeige, zerstörte Schiffe und damit das Trümmerfeld.
+  function npcFleetFor(npc){
+    let seed = 0;
+    const seedStr = npc.id + ':' + npcScalingCount(npc.id);
+    for (let i = 0; i < seedStr.length; i++) seed = (Math.imul(seed, 31) + seedStr.charCodeAt(i)) | 0;
+    let t = seed >>> 0;
+    const rng = () => {
+      t += 0x6D2B79F5;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+    return generateRaiderFleet(npcEffectiveDefense(npc), rng);
+  }
   function npcEffectiveLoot(npc){
     const mult = (1 + npcScalingCount(npc.id)*0.15) * seasonalLootMult();
     const out = {};
@@ -7437,14 +7462,17 @@
   // die Stückzahl je Typ wird zufällig auf die Zielstärke verteilt. Die tatsächlich erreichte
   // Gesamtstärke (kann leicht von der Zielstärke abweichen) wird mit zurückgegeben und danach als
   // die "echte" Angriffsstärke für die Kampfauflösung verwendet, damit Anzeige und Wirkung übereinstimmen.
-  function generateRaiderFleet(targetPower){
+  // rng: optionale Zufallsquelle (Signatur wie Math.random) - npcFleetFor übergibt hier einen
+  // deterministisch geseedeten Generator, damit dieselbe NPC-Flotte reproduzierbar entsteht.
+  function generateRaiderFleet(targetPower, rng){
+    rng = rng || Math.random;
     const safeTarget = Math.max(5, targetPower);
     let pool = RAIDER_SHIP_POOL.filter(s => s.atk <= Math.max(20, safeTarget*0.6));
     if (!pool.length) pool = [RAIDER_SHIP_POOL[0]];
     const minAtk = Math.min(...pool.map(s=>s.atk));
     const maxTypesByBudget = Math.max(1, Math.floor(safeTarget/minAtk));
-    const shuffled = [...pool].sort(()=>Math.random()-0.5);
-    const numTypes = Math.max(1, Math.min(shuffled.length, maxTypesByBudget, 1+Math.floor(Math.random()*3)));
+    const shuffled = [...pool].sort(()=>rng()-0.5);
+    const numTypes = Math.max(1, Math.min(shuffled.length, maxTypesByBudget, 1+Math.floor(rng()*3)));
     const chosen = shuffled.slice(0, numTypes);
     const fleet = {};
     let remaining = safeTarget;
@@ -7456,7 +7484,7 @@
       guard++;
       const affordable = chosen.filter(t => t.atk <= remaining + minAtk*0.5);
       const pickPool = affordable.length ? affordable : chosen;
-      const type = pickPool[Math.floor(Math.random()*pickPool.length)];
+      const type = pickPool[Math.floor(rng()*pickPool.length)];
       fleet[type.key] = (fleet[type.key]||0) + 1;
       remaining -= type.atk;
     }
@@ -10138,7 +10166,12 @@
       attackerWins = r.result !== 'win'; // Raid-"win" bedeutet: Verteidigung (rechts) hat gewonnen
     } else if (r.type === 'npc-attack'){
       left = { label: 'Deine Flotte', fleet: {...(r.fleet||{})}, losses: {...(r.ownLostShips||{})}, accentColor: null };
-      right = { label: r.npcName||'Gegner', abstractIcon:'ti-alien', power: r.defensePower, buildings:null, fleet:null, losses:{} };
+      // Seit den echten NPC-Flotten (16.07.2026) zeigt die Gegnerseite die konkreten Schiffe samt
+      // Verlusten. Fallback auf das abstrakte Alien-Icon für ältere Berichte sowie für
+      // Piratenversteck-/Weltboss-Berichte, die denselben Typ ohne npcFleet nutzen.
+      right = r.npcFleet
+        ? { label: r.npcName||'Gegner', fleet: {...r.npcFleet}, losses: {...(r.destroyedNpcShips||{})}, power: r.defensePower, buildings:null }
+        : { label: r.npcName||'Gegner', abstractIcon:'ti-alien', power: r.defensePower, buildings:null, fleet:null, losses:{} };
       attackerWins = r.result === 'win';
     } else if (r.type === 'expedition'){
       left = { label: 'Deine Eskorte', fleet: {...(r.fleet||{})}, losses: {...(r.ownLostShips||{})}, accentColor: null };
@@ -10888,6 +10921,7 @@
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
       { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (die Flugzeit muss innerhalb der verbleibenden Zeit liegen), bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab.' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
+      { title:'Echte NPC-Flotten', body:'NPC-Gegner im Galaxie-Tab haben eine <strong>konkrete Flottenzusammensetzung</strong> (in der Angriffsvorschau sichtbar), deren Gesamt-Angriffskraft ihrem Verteidigungswert entspricht. Bei einem Sieg wird ein Teil dieser Flotte zerstört – je überlegener dein Angriff, desto mehr (40–90%), der Rest flieht. <strong>Das Trümmerfeld entsteht aus den tatsächlich zerstörten Gegner-Schiffen</strong> (dieselbe Formel wie bei allen anderen Kämpfen) statt aus einer Pauschale – schwere Gegner-Schiffe hinterlassen entsprechend mehr Trümmer. Nach jedem Sieg formiert sich der Gegner neu und stärker (Skalierung).' },
       { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln.' },
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Nur die spezielle, itemgebundene Kristallfestung (150) übertrifft ihn.' },
       { title:'Schutz für schwächere Spieler', body:'Ist dein Punktestand mehr als <strong>3x</strong> so hoch wie der eines Ziels, sinkt deine Beute bei einem erfolgreichen Angriff anteilig (nie unter 30%). Ab <strong>5x</strong> Unterschied ist der Angriff komplett blockiert - du kannst dann gar nicht mehr angreifen, egal wie stark deine Flotte ist. Verhindert, dass weit entwickelte Accounts neue Spieler grundlos plattmachen.' },
@@ -11130,6 +11164,10 @@
         body = '<strong>'+(r.result==='win'?reasonWin:reasonLoss)+'</strong>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt')+' · <i class="ti ti-clock" aria-hidden="true"></i> Flugzeit: '+fmtDuration(r.flightTime||0);
         body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        if (r.npcFleet && Object.keys(r.npcFleet).length){
+          body += '<br>Gegnerische Flotte: '+fleetBreakdownHtml(r.npcFleet);
+          if (r.destroyedNpcShips && Object.keys(r.destroyedNpcShips).length) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstörte Gegner-Schiffe: '+lostCountsToText(r.destroyedNpcShips)+' (Rest ist geflohen)';
+        }
         if (r.weaknessType){
           const weaknessNameMap = { cruiser:'Kreuzer', destroyer:'Zerstörer', jaeger:'Jäger', bomber:'Bomber', schlachtschiff:'Schlachtschiff' };
           body += '<br>Schwachstelle des Gegners: '+(weaknessNameMap[r.weaknessType]||shipDisplayName(r.weaknessType))+(r.hasWeakness?' (ausgenutzt, +25% Angriffskraft)':' (nicht mitgeführt)');
@@ -14157,9 +14195,16 @@
             addXp(npc.level*8);
             if (!state.npcScaling) state.npcScaling = {};
             state.npcScaling[npc.id] = (state.npcScaling[npc.id]||0) + 1;
-            const debrisAmt = Math.round((effDefense + power*0.3) * 0.4);
-            const npcDebris = { erz: Math.round(debrisAmt*0.6), kristalle: Math.round(debrisAmt*0.3) };
-            addDebris(planetKey, npcDebris);
+            // Echte NPC-Flotten (16.07.2026): das Trümmerfeld entsteht jetzt aus den tatsächlich
+            // zerstörten NPC-Schiffen (dieselbe SHIP_SCORE_WEIGHTS-Formel wie überall via
+            // applyCombatLosses) statt aus der alten Pauschale (effDefense+power*0.3)*0.4. Wie viel
+            // der NPC-Flotte fällt, hängt von der eigenen Überlegenheit ab - der Rest flieht.
+            // m.npcFleet ist beim Losschicken eingefroren; Fallback für ältere, noch fliegende Missionen.
+            const npcFleet = m.npcFleet || npcFleetFor(npc).fleet;
+            const npcLossPct = Math.max(0.4, Math.min(0.9, power/(power+effDefense)));
+            const npcFleetRemains = {...npcFleet};
+            const destroyedNpcShips = applyCombatLosses(npcFleetRemains, Object.keys(npcFleet), npcLossPct, planetKey);
+            const npcDebris = combatDebrisOf(destroyedNpcShips) || { erz:0, kristalle:0 };
             // Auch bei einem Sieg nimmt die eigene Flotte jetzt kleinere Verluste (5-15%) statt komplett
             // unversehrt zurückzukehren – Trümmerfeld dafür kommt zum ohnehin schon vorhandenen
             // NPC-Trümmerfeld oben hinzu.
@@ -14170,9 +14215,10 @@
             // Für den Bericht: NPC-Trümmer und eigene Verlust-Trümmer zu einer Gesamtsumme zusammenzählen.
             const totalDebrisWin = { erz: npcDebris.erz + (ownLossDebrisWin?ownLossDebrisWin.erz:0), kristalle: npcDebris.kristalle + (ownLossDebrisWin?ownLossDebrisWin.kristalle:0) };
             const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
-            if (showLog !== false) log('Sieg gegen '+npc.name+'! ('+planetDisplayName(planetKey)+')'+(hasWeakness?' Schwachstelle ausgenutzt.':'')+' Trümmerfeld hinterlassen.'+cargoNote+(ownLostWinText?' Eigene Verluste: '+ownLostWinText+'.':'')+' '+npc.name+' wird ab jetzt härter und lohnender.', 'ti-sword');
+            const destroyedNpcText = lostCountsToText(destroyedNpcShips);
+            if (showLog !== false) log('Sieg gegen '+npc.name+'! ('+planetDisplayName(planetKey)+')'+(hasWeakness?' Schwachstelle ausgenutzt.':'')+(destroyedNpcText?' Zerstörte Gegner-Schiffe: '+destroyedNpcText+'.':'')+' Trümmerfeld hinterlassen.'+cargoNote+(ownLostWinText?' Eigene Verluste: '+ownLostWinText+'.':'')+' '+npc.name+' wird ab jetzt härter und lohnender.', 'ti-sword');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin };
+            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -14188,7 +14234,7 @@
             const ownLostLossText = lostCountsToText(ownLostLoss);
             const ownLossDebrisLoss = combatDebrisOf(ownLostLoss);
             if (showLog !== false) log('Angriff auf '+npc.name+' gescheitert. Flotte kehrt nach '+planetDisplayName(planetKey)+' zurück.'+(ownLostLossText?' Verluste: '+ownLostLossText+'. Trümmerfeld hinterlassen.':'')+(retreatNpc.retreated?' Ein Teil der Flotte konnte sich rechtzeitig zurückziehen.':''), 'ti-shield');
-            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, npcFleet: m.npcFleet || npcFleetFor(npc).fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
@@ -15577,7 +15623,10 @@
     pay(fuel);
     const fleetName = resolveFleetName();
     const power = attackPower(attackFleet, state.activeBasePlanet);
-    cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet });
+    // NPC-Flotte beim Losschicken einfrieren: die Auflösung bei Ankunft kämpft exakt gegen die
+    // Zusammensetzung, die der Spieler in der Vorschau gesehen hat - auch falls sich Skalierung
+    // oder globaler Schwierigkeitsgrad während des Flugs ändern.
+    cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet, npcFleet: npcFleetFor(npc).fleet });
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen '+npc.name+' gestartet (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }
@@ -17872,6 +17921,7 @@
       const flightTime = missionDurationFor(n.duration, attackFleet, ATTACK_SHIP_KEYS);
       const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
+      const npcFleetPreview = npcFleetFor(n).fleet;
       return `
         <div class="card-row">
           <div class="left">
@@ -17879,6 +17929,7 @@
             <div>
               <div class="bname">${n.name} <span class="lvl-pill">Stufe ${n.level}</span>${wins?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;"><i class="ti ti-arrow-up" aria-hidden="true"></i> ${wins}x besiegt</span>`:''}</div>
               <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
+              <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
               <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${flightTime.toFixed(0)}s Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
               <div class="bmeta" style="${atkCargoCapacity<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität: ${fmt(atkCargoCapacity)}${atkCargoCapacity<=0?' – ohne Frachter geht die Beute verloren!':''}</div>
               <div class="bcost">${rewardHtml(effLoot)}</div>
