@@ -2356,8 +2356,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.51.0';
+  const VERSION = '8.51.1';
   const PATCHNOTES = [
+    { version:'8.51.1', date:'16.07.2026', changes:[
+      'Kritischer Bugfix Aufstieg/Meta-Baum: ein Prestige (und auch der komplette Spielstand-Reset) löschte bisher die gesamte Sternenessenz, den Aufstiegs-Zähler und alle Meta-Baum-Stufen, obwohl diese laut Hilfe jeden Reset überleben sollen - da der Aufstieg das Prestige auf 0 zurücksetzt und der nächste Aufstieg wieder Prestige 3 verlangt, traf der Verlust nach dem ersten Aufstieg jeden. Aufstiegs-Fortschritt übersteht jetzt beide Reset-Arten',
+      'Bugfix Sternensaat: das Startpaket des Meta-Baum-Zweigs ("nach jedem Reset") wurde bisher nur beim Aufstieg selbst ausgezahlt - greift jetzt wie beschrieben auch nach Prestige und komplettem Reset'
+    ]},
     { version:'8.51.0', date:'16.07.2026', changes:[
       'Echte NPC-Flotten: NPC-Gegner im Galaxie-Tab haben jetzt eine konkrete Flottenzusammensetzung (Gesamt-Angriffskraft entspricht ihrem Verteidigungswert), die in der Angriffsvorschau mit Schiffs-Icons angezeigt wird und beim Losschicken eingefroren wird - der Kampf läuft exakt gegen das, was man gesehen hat. Nach jedem Sieg formiert sich der Gegner neu und stärker',
       'Trümmerfelder bei NPC-Siegen entstehen jetzt aus den tatsächlich zerstörten Gegner-Schiffen (dieselbe Gewichtungsformel wie bei allen anderen Kämpfen: zerstörte Schiffe x Punktewert x 8, davon 60% Erz / 30% Kristalle) statt aus der bisherigen Pauschale - je überlegener der Angriff, desto mehr der NPC-Flotte wird zerstört (40-90%), der Rest flieht. NPC-Trümmerfelder fallen dadurch deutlich größer aus als bisher, vergleichbar mit abgewehrten Überfällen',
@@ -8478,8 +8482,16 @@
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
+    // Bugfix: state.ascension wurde beim Prestige bisher NICHT übernommen - applyStateDefaults()
+    // setzte danach Sternenessenz, Aufstiegs-Zähler und den kompletten Meta-Baum auf 0, obwohl die
+    // Hilfe ausdrücklich verspricht, dass diese Boni JEDEN Reset überleben. Da der Aufstieg das
+    // Prestige auf 0 zurücksetzt und der nächste Aufstieg wieder Prestige 3 verlangt, traf der
+    // Verlust jeden Spieler nach dem ersten Aufstieg garantiert. Außerdem greift das
+    // Sternensaat-Startpaket ("nach jedem Reset") jetzt auch hier, nicht nur beim Aufstieg selbst.
+    const keepAscension = state.ascension;
+    const prestigeStartLvl = (keepAscension && keepAscension.tree && keepAscension.tree.start) || 0;
     state = {
-      resources:{energie:10,erz:10,kristalle:0,deuterium:0,antimaterie:0,forschungspunkte:0},
+      resources:{energie:10 + prestigeStartLvl*300, erz:10 + prestigeStartLvl*400, kristalle:prestigeStartLvl*400, deuterium:prestigeStartLvl*150, antimaterie:0, forschungspunkte:0},
       buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0},
       research:{}, activeResearch:null,
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
@@ -8488,8 +8500,9 @@
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
-      credits: 250, claimedBossKills: keepBossClaims,
+      credits: 250 + prestigeStartLvl*100, claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
+      ascension: keepAscension,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
     };
     applyStateDefaults();
@@ -19508,9 +19521,14 @@
   });
 
   document.getElementById('resetBtn').addEventListener('click', async () => {
-    if (!confirm('Kompletten Spielstand wirklich zurücksetzen? Das setzt auch Prestige, Level und Erfolge zurück (anders als der Prestige-Knopf im Fortschritt-Tab).')) return;
+    if (!confirm('Kompletten Spielstand wirklich zurücksetzen? Das setzt auch Prestige, Level und Erfolge zurück (anders als der Prestige-Knopf im Fortschritt-Tab). Nur Sternenessenz und Meta-Baum aus Aufstiegen bleiben erhalten.')) return;
     const keepId = state.player.id, keepName = state.player.name, keepTag = state.player.allianceTag, keepAvatar = state.player.avatarKey;
-    state = { resources:{energie:10,erz:10,kristalle:0,deuterium:0,antimaterie:0,forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, allianceResearch:{}, allianceContributed:{}, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
+    // Sternenessenz/Meta-Baum überleben laut Hilfe JEDEN Reset - auch diesen (Bugfix: wurde hier
+    // bisher nicht übernommen und von applyStateDefaults auf 0 gesetzt). Sternensaat-Startpaket
+    // ("nach jedem Reset") greift hier ebenfalls.
+    const keepAscension = state.ascension;
+    const resetStartLvl = (keepAscension && keepAscension.tree && keepAscension.tree.start) || 0;
+    state = { resources:{energie:10 + resetStartLvl*300, erz:10 + resetStartLvl*400, kristalle:resetStartLvl*400, deuterium:resetStartLvl*150, antimaterie:0, forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, allianceResearch:{}, allianceContributed:{}, credits: 250 + resetStartLvl*100, ascension: keepAscension, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
     // Füllt alle Felder auf, die diese verkürzte Reset-Liste nicht enthält (z.B. credits, skillTree,
     // favoritePlanets, collapsedSections, ascension, doctrine, ...) - sonst blieben sie `undefined` und
     // render()/Klick-Handler stürzten ohne Seiten-Reload ab (siehe applyStateDefaults()).
