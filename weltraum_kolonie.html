@@ -720,7 +720,7 @@
   <div class="fleet-position-panel" id="fleetPositionPanel">
     <button class="fp-close-btn" id="fpCloseBtn"><i class="ti ti-x" aria-hidden="true"></i></button>
     <div class="fp-section">
-      <div class="fp-title"><i class="ti ti-map-pin" aria-hidden="true"></i>Flottenposition</div>
+      <div class="fp-title"><i class="ti ti-map-pin" aria-hidden="true"></i>Flottenposition <span id="fpFleetCount"></span></div>
       <div id="fleetPositionList"></div>
     </div>
     <div class="fp-section">
@@ -2325,8 +2325,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.41.0';
+  const VERSION = '8.41.1';
   const PATCHNOTES = [
+    { version:'8.41.1', date:'16.07.2026', changes:[
+      'Flottenentsendelimit jetzt direkt im rechten Seitenmenü sichtbar (Bereich "Flottenposition"), z.B. "(3/6)" - zeigt auf einen Blick, wie viele Flottenmissionen aktuell laufen und wie viele noch möglich sind, ohne extra in den Flotte-Tab wechseln zu müssen. Färbt sich rot ein, sobald das Limit erreicht ist. Flottenverlegungen zwischen eigenen Planeten zählen wie überall sonst im Spiel bewusst nicht mit'
+    ]},
     { version:'8.41.0', date:'16.07.2026', changes:[
       'Angriffsablauf vereinfacht (Feature-Wunsch): Klick auf einen gegnerischen Planeten auf der Sektorkarte, den "Angreifen"-Knopf im Spielerprofil oder das Schwert-Symbol in der Bestenliste führen jetzt alle direkt zur Flottenauswahl (Galaxie-Tab, Ziel bereits markiert) statt vorher einen Bestätigungsdialog zu zeigen und sofort mit einer eventuell noch gar nicht ausgewählten Flotte anzugreifen. Die "Spieler angreifen"-Schaltfläche dort dient selbst als Bestätigung - unnötige Zwischenschritte entfallen, ein Angriff braucht jetzt spürbar weniger Klicks'
     ]},
@@ -14943,6 +14946,16 @@
 
     const fpColonyCountEl = document.getElementById('fpColonyCount');
     if (fpColonyCountEl) fpColonyCountEl.textContent = '('+currentColonyCount()+'/'+maxColoniesAllowed()+')';
+    // Flottenentsendelimit direkt im Seitenmenü sichtbar (Feature-Wunsch 16.07.2026) - Spieler sehen
+    // auf einen Blick, wie viele Flottenmissionen aktuell laufen und wie viele noch möglich sind, ohne
+    // extra in den Flotte-Tab wechseln zu müssen. Färbt sich bei Erreichen des Limits auffällig ein,
+    // analog zu anderen "voll"-Zuständen im Spiel.
+    const fpFleetCountEl = document.getElementById('fpFleetCount');
+    if (fpFleetCountEl){
+      const usedFleets = activeFleetMissionCount(), maxFleets = maxConcurrentFleets();
+      fpFleetCountEl.textContent = '('+usedFleets+'/'+maxFleets+')';
+      fpFleetCountEl.style.color = usedFleets >= maxFleets ? '#e24b4a' : '';
+    }
     const fpColonyList = document.getElementById('fpColonyList');
     if (fpColonyList){
       fpColonyList.innerHTML = `
