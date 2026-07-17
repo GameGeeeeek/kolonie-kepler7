@@ -2374,8 +2374,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.59.2';
+  const VERSION = '8.59.3';
   const PATCHNOTES = [
+    { version:'8.59.3', date:'17.07.2026', changes:[
+      'Balance: Artefakt-Set "Erbe der Alten" (permanenter +5%-Bonus auf Produktion, Angriff und Verteidigung) war praktisch kostenlos - Antimateriekern, Kristallherz und Alte Technologie mussten nur gleichzeitig im Inventar liegen, blieben danach unangetastet für Superschlachtschiff/Kristallfestung nutzbar. Jetzt werden alle drei Items beim Einlösen verbraucht, dazu kommt ein spürbarer, mit der Koloniezahl skalierender Ressourcenpreis (analog zu den Mega-Projekten)'
+    ]},
     { version:'8.59.2', date:'17.07.2026', changes:[
       'Balance: Kristallfestung deutlich verstärkt (150 → 350 Verteidigung, 80 → 190 Angriff je Stufe) - der Wert stand bisher in keinem Verhältnis zur Seltenheit des dafür nötigen Kristallherzens (0,6% Fundchance je Erkundung, dieselbe Seltenheit wie der Antimateriekern des Superschlachtschiffs) und lag kaum über dem frei baubaren Verteidigungsbunker (135, kein seltenes Item nötig)'
     ]},
@@ -14281,14 +14284,27 @@
     playSound('achieve');
     render(); save();
   }
-  // Artefakt-Kette: keine neuen Items, sondern ein Set-Bonus für alle drei bereits vorhandenen
-  // seltenen Funde gleichzeitig im Inventar (werden dabei NICHT verbraucht, bleiben für
-  // Superschlachtschiff/Kristallfestung weiter nutzbar) – einmalig einlösbar, dauerhafter Bonus.
+  // Artefakt-Kette: Set-Bonus für alle drei seltensten Funde des Spiels gleichzeitig im Inventar.
+  // Balance-Korrektur (Spieler-Feedback Sascha, 17.07.2026): die Items wurden bisher NICHT
+  // verbraucht - man behielt sie zusätzlich für Superschlachtschiff/Kristallfestung nutzbar und
+  // zahlte effektiv nichts für einen dauerhaften Dreifach-Bonus. Jetzt: echte Opportunitätskosten
+  // wie bei den Mega-Projekten - die Items werden verbraucht (1x Superschlachtschiff bzw. 1x
+  // Kristallfestungs-Stufe weniger möglich) UND es kommt ein imperiumsskalierter Ressourcenpreis
+  // dazu (scaleCostByEmpire, wie bei den Mega-Projekten).
+  const ARTIFACT_SET_COST = { erz:45000, kristalle:32000, deuterium:18000, antimaterie:1800 };
   function hasArtifactSet(){ return (state.rareItems.antimateriekern||0)>=1 && (state.rareItems.kristallherz||0)>=1 && (state.rareItems.altetech||0)>=1; }
   function hasArtifactBonus(){ return !!(state.achievements && state.achievements.artifactset); }
   function claimArtifactSet(){
     if (hasArtifactBonus()){ log('Bereits abgeschlossen.', 'ti-alert-triangle'); return; }
-    if (!hasArtifactSet()){ log('Du benötigst je 1x Antimateriekern, Kristallherz und Alte Technologie gleichzeitig im Inventar (werden nicht verbraucht).', 'ti-alert-triangle'); return; }
+    if (!hasArtifactSet()){ log('Du benötigst je 1x Antimateriekern, Kristallherz und Alte Technologie gleichzeitig im Inventar.', 'ti-alert-triangle'); return; }
+    const scaledCost = scaleCostByEmpire(ARTIFACT_SET_COST);
+    const costLabel = Object.entries(scaledCost).map(([r,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===r)||{}).label).join(', ');
+    if (!canAfford(scaledCost)){ log('Nicht genug Ressourcen für das Artefakt-Set ('+costLabel+').', 'ti-alert-triangle'); return; }
+    if (!confirm('Artefakt-Set "Erbe der Alten" einlösen für '+costLabel+' + je 1x Antimateriekern, Kristallherz und Alte Technologie (werden dabei VERBRAUCHT)? Einmalig, kann nicht rückgängig gemacht werden.')) return;
+    pay(scaledCost);
+    state.rareItems.antimateriekern -= 1;
+    state.rareItems.kristallherz -= 1;
+    state.rareItems.altetech -= 1;
     state.achievements.artifactset = true;
     logScoreChange(1000, 'Artefakt-Set "Erbe der Alten" vervollständigt', 'ti-sparkles');
     log('Artefakt-Set vervollständigt! Permanenter Bonus: +5% auf Produktion, Angriff und Verteidigung.', 'ti-sparkles');
@@ -20427,13 +20443,16 @@
       const need = ['antimateriekern','kristallherz','altetech'];
       const bonusActive = hasArtifactBonus();
       const haveAll = hasArtifactSet();
+      const artifactScaledCost = scaleCostByEmpire(ARTIFACT_SET_COST);
+      const artifactAffordable = haveAll && canAfford(artifactScaledCost);
       artifactSetBox.innerHTML = `
         <div class="card-row" style="flex-direction:column; align-items:stretch; ${bonusActive?'border-color:#5dcaa5;':''}">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="left"><div class="bicon" style="background:rgba(237,147,177,0.18); color:#f3aec6;"><i class="ti ti-sparkles" aria-hidden="true"></i></div><div><div class="bname">${bonusActive?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}Erbe der Alten</div><div class="bmeta">+5% dauerhaft auf Produktion, Angriff und Verteidigung</div></div></div>
-            ${bonusActive?'':`<button class="buy ${haveAll?'affordable':''}" id="claimArtifactSetBtn" ${haveAll?'':'disabled'}>Einlösen</button>`}
+            ${bonusActive?'':`<button class="buy ${artifactAffordable?'affordable':''}" id="claimArtifactSetBtn" ${artifactAffordable?'':'disabled'}>Einlösen</button>`}
           </div>
-          ${bonusActive?'':`<div class="bmeta">Benötigt gleichzeitig im Inventar (werden nicht verbraucht): ${need.map(k=>{const d=RARE_ITEMS.find(r=>r.key===k)||{}; const have=state.rareItems[k]||0; return `<span style="color:${have>=1?'#5dcaa5':'#e24b4a'};">${d.name||k} (${have}x)</span>`;}).join(', ')}</div>`}
+          ${bonusActive?'':`<div class="bmeta">Kosten: ${costHtml(artifactScaledCost)}</div>
+          <div class="bmeta">Benötigt gleichzeitig im Inventar (werden beim Einlösen VERBRAUCHT): ${need.map(k=>{const d=RARE_ITEMS.find(r=>r.key===k)||{}; const have=state.rareItems[k]||0; return `<span style="color:${have>=1?'#5dcaa5':'#e24b4a'};">${d.name||k} (${have}x)</span>`;}).join(', ')}</div>`}
         </div>
       `;
       const claimBtn = document.getElementById('claimArtifactSetBtn');
