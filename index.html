@@ -2392,8 +2392,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.60.0';
+  const VERSION = '8.60.1';
   const PATCHNOTES = [
+    { version:'8.60.1', date:'17.07.2026', changes:[
+      'Bugfix: ein per "Verband versenden" losgeschickter Verband erschien in der Flottenposition (rechter Slider) und der Missionsliste im Flotte-Tab als ein separater Eintrag PRO enthaltenem Schiffstyp statt als eine zusammengehörige Flotte - bei einem Verband mit vielen Schiffstypen wirkte das wie ein Dutzend einzelner Missionen. Beide Anzeigen fassen die Schiffstypen jetzt zu einem einzigen Eintrag zusammen; der Rückruf-Knopf holt dabei den gesamten Verband auf einmal zurück'
+    ]},
     { version:'8.60.0', date:'17.07.2026', changes:[
       'Neu: Allianz-Spendenrangliste - erfasst automatisch jede Ressourcen-Spende an Allianzbasis, Allianz-Techs/-Geb\u00e4ude und t\u00e4gliche Allianz-Eins\u00e4tze. Top-3 der laufenden Woche plus eigene Platzierung/Wochenspende/Allianz-Gesamtspende/Anteil in Prozent im rechten Seitenmen\u00fc, komplette Rangliste per Klick',
       'W\u00f6chentliche Auswertung (Reset montags 00:00 Uhr): die drei besten Spender bekommen automatisch eine kleine Belohnung (Platz 1: Kredite + Forschungspunkte, Platz 2: Ressourcenpaket, Platz 3: Produktions-Booster), alle Mitglieder erhalten einen zusammenfassenden Bericht im Allianz-Chat',
@@ -17289,6 +17292,20 @@
     log((m.fleetName||'Flotte')+' zurückgerufen und wieder bei '+planetDisplayName(originPlanet)+' einsatzbereit.', 'ti-refresh');
     render(); save();
   }
+  // Ruft einen kompletten Verband zurück (mehrere relocate-Missionen mit gleicher groupId, siehe
+  // relocateFleetGroup) - Gegenstück zu recallMission() für die zusammengefasste Verband-Anzeige,
+  // damit ein Klick alle enthaltenen Schiffstypen auf einmal zurückholt statt nur einen.
+  function recallMissionGroup(originPlanet, groupId){
+    const fleet = originPlanet==='home' ? state.fleet : (state.colonies[originPlanet] ? state.colonies[originPlanet].fleet : null);
+    if (!fleet || !fleet.missions) return;
+    const members = fleet.missions.filter(x => x.type==='relocate' && (x.groupId||x.id)===groupId);
+    if (!members.length) return;
+    if (!confirm((members[0].fleetName||'Dieser Verband')+' wirklich zurückrufen? Die Verlegung wird ohne Ergebnis abgebrochen, verbrauchter Treibstoff wird nicht erstattet.')) return;
+    for (const m of members) fleet[m.shipKey] = (fleet[m.shipKey]||0) + m.qty;
+    fleet.missions = fleet.missions.filter(x => !(x.type==='relocate' && (x.groupId||x.id)===groupId));
+    log((members[0].fleetName||'Verband')+' zurückgerufen und wieder bei '+planetDisplayName(originPlanet)+' einsatzbereit.', 'ti-refresh');
+    render(); save();
+  }
   const SCRAP_REFUND_PCT = 0.4; // Anteil der ursprünglichen Kosten, der beim Verschrotten/Abreißen zurückerstattet wird
   function shipDefOrSuper(key){
     if (key === 'superschlachtschiff') return { key:'superschlachtschiff', name:'Superschlachtschiff', costFn: superschlachtschiffCost };
@@ -18816,23 +18833,41 @@
       fleetLimitBadge.textContent = usedFl+'/'+maxFl+' Flotten';
       fleetLimitBadge.style.color = usedFl>=maxFl ? '#e24b4a' : '#9296ac';
     }
-    const nonExpeditionMissions = cf.missions.filter(m => m.type !== 'expedition');
+    const nonExpeditionMissionsRaw = cf.missions.filter(m => m.type !== 'expedition');
+    // Verband-Gruppierung (Bugfix, Spieler-Feedback 17.07.2026): relocateFleetGroup() erzeugt
+    // technisch weiterhin eine 'relocate'-Mission PRO Schiffstyp (gleiche groupId, siehe dort) - ein
+    // Verband mit z.B. 12 Schiffstypen erschien dadurch als 12 einzelne Listeneinträge statt als
+    // EINE Flotte. Hier zu einem einzigen Anzeige-Eintrag je groupId zusammengefasst; alle anderen
+    // Missionsarten bleiben unverändert einzeln.
+    const relocateGroupsFl = new Map();
+    const nonExpeditionMissions = [];
+    for (const m of nonExpeditionMissionsRaw){
+      if (m.type === 'relocate'){
+        const gid = m.groupId || m.id;
+        let g = relocateGroupsFl.get(gid);
+        if (!g){ g = { type:'relocate-group', groupId: gid, fleetName: m.fleetName, targetId: m.targetId, endTime: m.endTime, startTime: m.startTime, parts: [] }; relocateGroupsFl.set(gid, g); nonExpeditionMissions.push(g); }
+        g.parts.push({ shipKey: m.shipKey, qty: m.qty });
+      } else {
+        nonExpeditionMissions.push(m);
+      }
+    }
     if (!nonExpeditionMissions.length){
       activeM.innerHTML = `<div class="bmeta" style="padding:0.5rem 0;">Keine aktiven Missionen von ${planetDisplayName(state.activeBasePlanet)}.</div>`;
     } else {
       activeM.innerHTML = nonExpeditionMissions.map(m => {
-        if (m.type === 'relocate'){
-          const def = shipDefOrSuper(m.shipKey);
+        if (m.type === 'relocate-group'){
           const remaining = Math.max(0, m.endTime-now);
           const totalDur = Math.max(1, (m.endTime-m.startTime)/1000);
           const pct = 100 - (remaining/(totalDur*1000)*100);
+          const partsLabel = m.parts.map(p => p.qty+'x '+(shipDefOrSuper(p.shipKey)||{}).name).join(', ');
+          const composition = {}; for (const p of m.parts) composition[p.shipKey] = (composition[p.shipKey]||0) + p.qty;
           return `
-            <div class="card-row" style="flex-direction:column; align-items:stretch;">
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${fleetBreakdownHtml(composition)}">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div class="bname"><i class="ti ti-arrows-shuffle" aria-hidden="true" style="color:#5dcaa5;"></i>${m.fleetName?m.fleetName+' · ':''}${m.qty}x ${def?def.name:m.shipKey} → ${planetDisplayName(m.targetId)}</div>
+                <div class="bname"><i class="ti ti-arrows-shuffle" aria-hidden="true" style="color:#5dcaa5;"></i>${m.fleetName?m.fleetName+' · ':''}${partsLabel} → ${planetDisplayName(m.targetId)}</div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
-                  ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
+                  <button data-recall-group="${m.groupId}" title="Verband zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>
                 </div>
               </div>
               <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
@@ -19036,6 +19071,7 @@
     }
     } // Ende Expedition-Missionen-Guard (Performance: nur im Expedition-Tab sichtbar)
     document.querySelectorAll('[data-recall]').forEach(btn => btn.onclick = () => recallMission(state.activeBasePlanet, btn.getAttribute('data-recall')));
+    document.querySelectorAll('[data-recall-group]').forEach(btn => btn.onclick = () => recallMissionGroup(state.activeBasePlanet, btn.getAttribute('data-recall-group')));
 
     // Performance: Schiffsliste (fleet), Truemmerfeld (debrisBox) und Expeditionsbox (expeditionBox) teilen sich
     // Variablen (u.a. slotsUsedExpedition) zwischen Flotte- und Expedition-Tab und werden deshalb
@@ -19902,8 +19938,27 @@
     renderFpAllianceDonation();
     const fpList = document.getElementById('fleetPositionList');
     if (fpList){
+      const allMissionsRaw = [];
+      for (const { planet: originKey, fleet } of allFleetsWithPlanet()) for (const m of fleet.missions) allMissionsRaw.push({ m, originKey });
+      // Verband-Gruppierung (Bugfix, Spieler-Feedback 17.07.2026): siehe identischer Kommentar bei der
+      // Flotte-Tab-Missionsliste - relocateFleetGroup() erzeugt weiterhin eine Mission je Schiffstyp
+      // (gleiche groupId), hier zu einem einzigen Eintrag je groupId zusammengefasst.
+      const relocateGroupsFp = new Map();
       const allMissions = [];
-      for (const { planet: originKey, fleet } of allFleetsWithPlanet()) for (const m of fleet.missions) allMissions.push({ m, originKey });
+      for (const entry of allMissionsRaw){
+        if (entry.m.type === 'relocate'){
+          const gid = entry.m.groupId || entry.m.id;
+          let g = relocateGroupsFp.get(gid);
+          if (!g){
+            g = { originKey: entry.originKey, m: { type:'relocate-group', fleetName: entry.m.fleetName, targetId: entry.m.targetId, endTime: entry.m.endTime, startTime: entry.m.startTime, parts: [] } };
+            relocateGroupsFp.set(gid, g);
+            allMissions.push(g);
+          }
+          g.m.parts.push({ shipKey: entry.m.shipKey, qty: entry.m.qty });
+        } else {
+          allMissions.push(entry);
+        }
+      }
       if (!allMissions.length){
         fpList.innerHTML = `<div class="fleet-position-item" style="color:#7d8199;">Alle Schiffe stationiert, keine Missionen unterwegs.</div>`;
       } else {
@@ -19921,10 +19976,12 @@
             icon = 'ti-map-2'; color = '#5dcaa5';
             label = (m.fleetName?m.fleetName+' · ':'')+'Expedition (Eskorte '+Math.round(m.escortPower||0)+')';
             shipsTooltip = m.escortComposition ? 'Eskorte: '+fleetBreakdownHtml(m.escortComposition) : '';
-          } else if (m.type === 'relocate'){
+          } else if (m.type === 'relocate-group'){
             icon = 'ti-arrows-shuffle'; color = '#5dcaa5';
-            label = (m.fleetName?m.fleetName+' · ':'')+m.qty+'x '+(shipDefOrSuper(m.shipKey)||{}).name+' → '+planetDisplayName(m.targetId);
-            shipsTooltip = '';
+            const partsLabel = m.parts.map(p => p.qty+'x '+(shipDefOrSuper(p.shipKey)||{}).name).join(', ');
+            label = (m.fleetName?m.fleetName+' · ':'')+partsLabel+' → '+planetDisplayName(m.targetId);
+            const composition = {}; for (const p of m.parts) composition[p.shipKey] = (composition[p.shipKey]||0) + p.qty;
+            shipsTooltip = 'Unterwegs: '+fleetBreakdownHtml(composition);
           } else if (m.type === 'attack-player'){
             icon = 'ti-sword'; color = '#e24b4a';
             label = (m.fleetName?m.fleetName+' → ':'')+'Spieler: '+(m.targetName||'?');
