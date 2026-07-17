@@ -1324,6 +1324,7 @@
         <div class="section-title" style="font-size:12px; margin-top:0;"><i class="ti ti-ship" aria-hidden="true"></i>Angriffsflotte zusammenstellen</div>
         <div id="attackFleetBox"></div>
         <div id="pendingAttackBox"></div>
+        <div id="pendingMoonSiegeBox"></div>
         <div class="section-title"><i class="ti ti-skull" aria-hidden="true"></i>Weltboss - gemeinsame Jagd aller Spieler</div>
         <div id="worldBossBox"><div class="bmeta">lädt…</div></div>
         <div id="pirateLairBox"></div>
@@ -1976,7 +1977,11 @@
     // NÄCHSTEN Stufe für jede bereits vorhandene - bei allen anderen Gebäuden ohne dieses Feld bleibt
     // die Bauzeit unverändert flach wie bisher (rückwärtskompatibel). maxLevel:4 gemäß Spielerbeispiel
     // (Stufe 1 eigenes System, 2/3/4 wachsender Sektor-Radius, siehe ABHORCHPOSTEN_RANGE_BY_LEVEL).
-    { key:'abhorchposten', name:'Abhorchposten', icon:'ti-map-pin', produces:null, baseRate:0, baseCost:{energie:8000, kristalle:6000, deuterium:3000, antimaterie:150}, costMult:1.9, bg:'rgba(175,169,236,0.18)', fg:'#c3bef5', effectDesc:'Flottenüberwachung', category:'defense', defVal:0, atkVal:0, buildTime:1800, buildTimePerLevelMult:2.4, maxLevel:4, moonOnly:true }
+    { key:'abhorchposten', name:'Abhorchposten', icon:'ti-map-pin', produces:null, baseRate:0, baseCost:{energie:8000, kristalle:6000, deuterium:3000, antimaterie:150}, costMult:1.9, bg:'rgba(175,169,236,0.18)', fg:'#c3bef5', effectDesc:'Flottenüberwachung', category:'defense', defVal:0, atkVal:0, buildTime:1800, buildTimePerLevelMult:2.4, maxLevel:4, moonOnly:true },
+    // Mondschildgenerator: zweites exklusives Mond-Gebäude, diesmal als Verteidigung gegen den
+    // Mondzerstörer (siehe resolveMoonSiege) - siegeDefensePerLevel senkt die Zerstörungschance direkt
+    // (neues, nur hier verwendetes Feld), gedeckelt in der Formel selbst, nicht hier.
+    { key:'mondschild', name:'Mondschildgenerator', icon:'ti-shield-lock', produces:null, baseRate:0, baseCost:{kristalle:5000, deuterium:3000, antimaterie:100}, costMult:1.5, bg:'rgba(55,138,221,0.16)', fg:'#85b7eb', effectDesc:'Mondzerstörer-Abwehr', category:'defense', defVal:0, atkVal:0, buildTime:900, moonOnly:true, siegeDefensePerLevel:0.04 }
   ];
 
   function crosshairIcon(color, tier){
@@ -2063,6 +2068,11 @@
     ship_schlachtschiff: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="90,50 55,36 14,32 8,50 14,68 55,64" fill="url(#gRed)"/><circle cx="40" cy="42" r="4" fill="#4c5661"/><circle cx="40" cy="58" r="4" fill="#4c5661"/><circle cx="58" cy="50" r="5" fill="#4c5661"/></g></svg>`,
     ship_leerenjaeger: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="92,50 60,30 22,38 6,50 22,62 60,70" fill="url(#gViolet)"/><polygon points="60,30 48,14 34,36" fill="url(#gViolet)" opacity="0.85"/><polygon points="60,70 48,86 34,64" fill="url(#gViolet)" opacity="0.85"/><circle cx="46" cy="50" r="7" fill="#0d0a20"/><circle cx="46" cy="50" r="4" fill="#c3bef5"><animate attributeName="opacity" values="1;0.4;1" dur="1.6s" repeatCount="indefinite"/></circle></g></svg>`,
     ship_superschlachtschiff: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="92,50 55,34 12,30 4,50 12,70 55,66" fill="url(#gGold)"/><circle cx="40" cy="40" r="4.4" fill="#4c5661"/><circle cx="40" cy="60" r="4.4" fill="#4c5661"/><circle cx="60" cy="50" r="5.6" fill="#4c5661"/></g><line x1="20" y1="50" x2="80" y2="50" stroke="#5a1414" stroke-width="2" opacity="0.5"/></svg>`,
+    // Mondzerstörer: bewusst das massivste, düsterste Silhouette im Spiel (breiter als jedes andere
+    // Schiff, fast schwarzer Rumpf statt eines der geteilten Gradient-Farbtöne) mit einem pulsierenden
+    // roten "Mondbrecher"-Kern statt Cockpit-Fenstern - soll auf einen Blick als das bedrohliche
+    // Endgame-Prestigeschiff erkennbar sein, nicht als weitere Variante der üblichen Kampfschiffe.
+    ship_mondzerstoerer: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="96,50 58,28 20,24 2,50 20,76 58,72" fill="#23262f"/><polygon points="58,28 44,10 30,32" fill="#181a21"/><polygon points="58,72 44,90 30,68" fill="#181a21"/></g><circle cx="46" cy="50" r="10" fill="#3a1414"/><circle cx="46" cy="50" r="5.5" fill="#e24b4a"><animate attributeName="opacity" values="1;0.35;1" dur="2s" repeatCount="indefinite"/></circle><circle cx="26" cy="50" r="2.4" fill="#6b6f85"/><circle cx="70" cy="50" r="2.4" fill="#6b6f85"/></svg>`,
     ship_waechter: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="84,50 48,38 20,40 20,60 48,62" fill="url(#gSteel)"/></g><path d="M30 30 Q50 20 70 30 L70 50 Q50 62 30 50 Z" fill="url(#gCyan)" opacity="0.35"><animate attributeName="opacity" values="0.2;0.5;0.2" dur="2.4s" repeatCount="indefinite"/></path></svg>`,
     ship_bomber: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="86,50 44,40 20,44 20,56 44,60" fill="url(#gAmber)"/><ellipse cx="42" cy="66" rx="10" ry="5" fill="url(#gSteel)"/></g></svg>`,
     ship_carrier: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="18" y="38" width="62" height="24" rx="4" fill="url(#gSky)"/></g><line x1="26" y1="44" x2="26" y2="56" stroke="#0e2a38" stroke-width="1.6" opacity="0.5"/><line x1="36" y1="44" x2="36" y2="56" stroke="#0e2a38" stroke-width="1.6" opacity="0.5"/><line x1="46" y1="44" x2="46" y2="56" stroke="#0e2a38" stroke-width="1.6" opacity="0.5"/><line x1="56" y1="44" x2="56" y2="56" stroke="#0e2a38" stroke-width="1.6" opacity="0.5"/></svg>`,
@@ -2403,8 +2413,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.64.0';
+  const VERSION = '8.65.0';
   const PATCHNOTES = [
+    { version:'8.65.0', date:'17.07.2026', changes:[
+      'Neu: Mondzerstörer - zweites exklusives Mond-Feature (Spieler-Wunsch "Mondzerstörer als Endgame-Schiff"). Extrem teures, extrem langsames Endgame-Schiff (Geschwindigkeit weit unter allen anderen Schiffen, entsprechend lange Flugzeit und hoher Treibstoffverbrauch); Voraussetzung Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die härteste Forschungsanforderung im Spiel) sowie ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Kann immer nur ein einziges Exemplar gleichzeitig besessen/eingesetzt werden',
+      'Mondbelagerung: mit einsatzbereitem Mondzerstörer lässt sich über die Bestenliste ein fremder, kolonisierter Mond eines anderen Spielers gezielt belagern - bei Erfolg wird dieser Mond dauerhaft und unwiederbringlich zerstört (bei allen dortigen Gebäuden/Verteidigung). Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes; Mondzerstörer braucht danach 48 Std. Abklingzeit, unabhängig vom Ausgang',
+      'Neue Mond-Verteidigung: Mondschildgenerator (neues Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken gemeinsam die Zerstörungschance durch einen gegnerischen Mondzerstörer; ein aktiver Allianz-Beitritt gibt zusätzlich einen kleinen Verteidigungsbonus',
+      'Wie bei Allianzkriegen üblich in diesem Spiel: die Mondbelagerung wird vom angreifenden Client berechnet und dem Verteidiger geteilt mitgeteilt (keine serverseitige Kampfprüfung) - dasselbe, bereits an anderer Stelle verwendete Vertrauensmodell, hier auf eine besonders folgenschwere Einzelaktion gegen einen konkreten Spieler ausgeweitet'
+    ]},
     { version:'8.64.0', date:'17.07.2026', changes:[
       'Neu: Abhorchposten - erstes exklusives Mond-Gebäude (Spieler-Wunsch "Monde um einzigartige Gebäude erweitern"), baubar nur auf einem kolonisierten Mond (Verteidigung-Tab). Erkennt fremde Flottenbewegungen (Erkundung, Kolonisierung, Verlegungen, NPC-Angriffe) im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2-4 wachsend 1/2/3 Sektoren (Deckel 6 Sektoren, neu eingeführtes Distanz-Konzept zwischen Sternsystemen). Zeigt Spielername, Start-/Zielsystem und Restflugzeit; Missionsart ab Stufe 3, Schiffszusammensetzung ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür existieren im Spiel grundsätzlich keine echten Positionsdaten des Gegners). Kosten und vor allem Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden (neues buildTimePerLevelMult-Feld)',
       'Technische Grundlage: jeder Client veröffentlicht ab jetzt beim regulären Speichern (wie schon die Bestenliste) eine Zusammenfassung seiner eigenen unterwegs befindlichen Flotten für die Abhorchposten-Erkennung anderer Spieler - dieselben geteilten, nicht einzeln zugriffsbeschränkten Daten wie überall sonst im Spiel (Bestenliste, Allianzdaten)'
@@ -4279,6 +4295,11 @@
     // gesamte Leere-Inhaltskette freischaltet (Leeren-NPCs ab Stufe 1, Orbitalstation 4-5 ab
     // Stufe 3, Leerenjäger ab Stufe 5) und nebenbei die Antimaterie-Produktion steigert.
     { key:'rleere', name:'Leerentechnologie', baseCost:{erz:40000, kristalle:25000, antimaterie:1500, forschungspunkte:4000}, costMult:1.35, baseDuration:3600, durationMult:1.35, desc:'Endgame-Zweig: schaltet die Leere-Inhalte frei (NPCs, Orbitalstufe 4-5, Leerenjäger) · Antimaterieproduktion', effectRes:'antimaterie', effectPerLevel:0.02, maxLevel:10, requires:[{key:'rkampf2',level:10},{key:'rantimaterie',level:10}] },
+    // Mondstabilität (Spieler-Wunsch "Mondzerstörer als Endgame-Schiff"): eigener Verteidigungs-Zweig
+    // gegen den Mondzerstörer, senkt die Zerstörungschance direkt in resolveMoonSiege() (kein
+    // generischer effectRes-Automatismus, wie bei rpanzer/rschildmatrix wird der Effekt bespoke am
+    // Einsatzort ausgelesen).
+    { key:'rmondstabil', name:'Mondstabilität', baseCost:{erz:8000, kristalle:6000, deuterium:3000, forschungspunkte:500}, costMult:1.3, baseDuration:900, durationMult:1.35, desc:'Senkt die Zerstörungschance eigener Monde durch einen gegnerischen Mondzerstörer', effectRes:null, effectPerLevel:0.02, maxLevel:15, requires:[{key:'rschildmatrix',level:5}] },
     { key:'rbauplan', name:'Effiziente Baupläne', baseCost:{kristalle:200, antimaterie:15, forschungspunkte:39}, costMult:1.26, baseDuration:100, durationMult:1.47, desc:'Gebäudekosten senken', effectRes:null, effectPerLevel:0.015, maxLevel:20, requires:[{key:'rfusion',level:5}] },
     { key:'rpanzer', name:'Panzerplatten', baseCost:{erz:120, kristalle:40, forschungspunkte:20}, costMult:1.22, baseDuration:50, durationMult:1.45, desc:'Verteidigung · Schaltet ab Stufe 1 frei: Schildgenerator, Ionenschild, Plasmawerfer, Raketensilo', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:[] },
     { key:'rschildmatrix', name:'Schildmatrix', baseCost:{kristalle:150, deuterium:70, forschungspunkte:28}, costMult:1.24, baseDuration:70, durationMult:1.46, desc:'Verteidigung (vertieft) · Schaltet ab Stufe 1 frei: Gauss-Kanone, Railgun-Batterie, Void-Barriere, Verteidigungsbunker', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:[{key:'rpanzer',level:5}] },
@@ -6549,6 +6570,13 @@
   function recyclerCost(n){ return scaledShipCost({ erz: 160, energie: 90 }, 'recycler', n); }
   function forscherCost(n){ return scaledShipCost({ energie: 150, deuterium: 120, kristalle: 60 }, 'forscher', n); }
   function leerenjaegerCost(n){ return scaledShipCost({ erz: 2600, kristalle: 1900, deuterium: 1200, antimaterie: 300 }, 'leerenjaeger', n); }
+  // Mondzerstörer (17.07.2026, Spieler-Wunsch "Mondzerstörer als Endgame-Schiff"): das mit Abstand
+  // teuerste Schiff im Spiel, bewusst deutlich über Superschlachtschiff (220 Angriff) angesiedelt -
+  // setzt die geometrische Endgame-Kurve Schlachtschiff(90)→Leerenjäger(140)→Superschlachtschiff(220)
+  // fort, aber mit sehr hohem defWeight (2.5, sogar über dem reinen Verteidigungsspezialisten Wächter
+  // mit 2.0) statt reiner Schadensmaximierung - "extrem hohe Hüllenpunkte" wird über diesen bereits
+  // bestehenden Zäh-statt-Schaden-Dial abgebildet (siehe shipDefenseContribution).
+  function mondzerstoererCost(n){ return scaledShipCost({ erz: 22000, kristalle: 16000, deuterium: 11000, antimaterie: 2800 }, 'mondzerstoerer', n); }
 
   // Drei Antriebsklassen bestimmen die Basisgeschwindigkeit eines Schiffs. Bei Missionen zählt
   // immer die Geschwindigkeit des LANGSAMSTEN beteiligten Schiffstyps (wie ein Konvoi).
@@ -6575,6 +6603,15 @@
     // Schlachtschiff (90) und Superschlachtschiff (220). Verbraucht je 1 Leerensplitter pro Schiff
     // (SPECIAL_UNIT_ITEMS), gebaut erst ab Leerentechnologie Stufe 5.
     { key:'leerenjaeger', name:'Leerenjäger', icon:'ship_leerenjaeger', atk:140, costFn:leerenjaegerCost, buildTime:420, requires:[{key:'rleere',level:5}], drive:'hyperraum', speed:75, defWeight:1.1 },
+    // Mondzerstörer: das ultimative Endgame-Schiff (Spieler-Wunsch), gebaut erst nach maximierter
+    // Leerentechnologie UND maximiertem Kampfsystem, dazu einmalig ALLE vier seltenen Items zum
+    // Freischalten (siehe hasMondzerstoererUnlock/unlockMondzerstoerer, Muster wie beim Artefakt-Set).
+    // Absichtlich sehr langsam (speed:15, langsamer als selbst der Recycler mit 65) - das treibt über
+    // die bestehende, rein dauer-basierte Treibstoffkosten-Formel automatisch auch den Verbrauch
+    // deutlich hoch, ohne ein neues Pro-Schiff-Treibstofffeld erfinden zu müssen. Bewusst NICHT Teil
+    // von ATTACK_SHIP_KEYS - wird ausschließlich über die eigene Mondbelagerungs-Mission eingesetzt
+    // (siehe sendMoonSiegeMission), nie in eine normale Angriffsflotte gemischt.
+    { key:'mondzerstoerer', name:'Mondzerstörer', icon:'ship_mondzerstoerer', atk:300, costFn:mondzerstoererCost, buildTime:864000, requires:[{key:'rleere',level:10},{key:'rkampf2',level:20}], drive:'hyperraum', speed:15, defWeight:2.5, unlockItems:['antimateriekern','kristallherz','altetech','leerensplitter'], maxOwned:1 },
     { key:'frachter', name:'Kleiner Frachter', icon:'ship_frachter', atk:0, costFn:frachterCost, buildTime:35, requires:[], drive:'verbrennung', speed:80 },
     // Großer Frachter (13.07.2026, Feature-Wunsch): zweiter Transporter-Typ neben dem Kleinen
     // Frachter, für spätere, seltenere Großeinsätze statt häufiger Kurzstrecken. Bewusst langsamer
@@ -8781,9 +8818,10 @@
     if (!state.inventory) state.inventory = {};
     if (!state.fragments) state.fragments = {};
     if (!state.buffs) state.buffs = [];
-    if (!state.unlocked) state.unlocked = { superschlachtschiff:false, festung:false };
+    if (!state.unlocked) state.unlocked = { superschlachtschiff:false, festung:false, mondzerstoerer:false };
     if (state.unlocked.superschlachtschiff === undefined) state.unlocked.superschlachtschiff = false;
     if (state.unlocked.festung === undefined) state.unlocked.festung = false;
+    if (state.unlocked.mondzerstoerer === undefined) state.unlocked.mondzerstoerer = false;
     if (state.mineDebuff === undefined) state.mineDebuff = null;
     if (state.doctrine === undefined) state.doctrine = null;
     if (state.activeEvent === undefined) state.activeEvent = null;
@@ -11328,6 +11366,7 @@
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (Deckel bei 6 Sektoren). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
+      { title:'Mondzerstörer & Mondbelagerung', body:'Endgame-Schiff (Flotte-Tab), das einen fremden, kolonisierten Mond dauerhaft zerstören kann. Voraussetzung: Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die höchste Forschungshürde im Spiel), danach ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Extrem teuer, extrem langsam (weit unter der Geschwindigkeit jedes anderen Schiffs, entsprechend lange Flugzeit und hoher Treibstoffverbrauch) und immer nur als einzelnes Exemplar besitzbar. Ein Ziel wählst du direkt über die Bestenliste (Schädel-Symbol bei einem fremden Spieler) - dort erscheinen dessen kolonisierte Monde zur Auswahl. Die Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes: eigene Gebäude/Flotte am Mond, der neue Mondschildgenerator (Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken sie zusätzlich; ein aktiver Allianz-Beitritt gibt dem Ziel ebenfalls einen kleinen Bonus. Nach jeder Belagerung - egal ob erfolgreich oder abgewehrt - braucht der Mondzerstörer 48 Std. Abklingzeit. Wie beim Allianzkrieg üblich, berechnet der angreifende Client das Ergebnis und teilt es dem Ziel über geteilten Speicher mit (keine serverseitige Kampfprüfung).' },
       { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert. Die Galaxie-Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen ~67 Systemen gleichzeitig - der ⟲-Button zoomt bei Bedarf auf die volle Übersicht heraus. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne, sobald man in das System hineinzoomt.' },
       { title:'Terraforming', body:'Jede Kolonie UND die Heimatbasis (nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Die Zielwahl selbst ist auf JEDEM Standort jederzeit möglich, auch während anderswo bereits eine Stufe läuft - nur das tatsächliche Bezahlen/Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt, so lässt sich für mehrere Standorte vorausplanen. Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie). Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen und der Standort trägt den neuen Typ dauerhaft. Bei Kolonien UND der Heimatbasis ändert sich dabei sofort die Textur auf der Sektorkarte; die Heimatbasis behält zusätzlich ihren eigenen violetten Ring als Kennzeichnung, zeigt aber während des laufenden Terraformings denselben gestrichelten Fortschritts-Ring wie Kolonien. Insgesamt deutlich teurer als früher. Erdwelt (Bonus auf ALLE Ressourcen statt nur einer) kostet zusätzlich 80% mehr als jeder Spezialist - eine reine Fokus-Kolonie profitiert trotzdem meist mehr vom passenden Spezialisten. Zu finden im Basis-Tab.' },
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie, <strong>Wasserwelt</strong> +20% Lagerkapazität. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Generalist: +6% auf ALLE Ressourcen (kumuliert 30%), kostet aber 80% mehr als jeder Spezialist. Erdähnliche Welten, Gasriesen, Asteroiden und Superplaneten haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
@@ -11724,6 +11763,21 @@
     pendingAttackTarget = { id: playerId, name: name || 'Unbekannt' };
     render();
     log('Ziel markiert: '+(name||'Unbekannt')+'. Wähle deine Angriffsflotte und klicke dann auf "Spieler angreifen".', 'ti-sword');
+  }
+  let pendingMoonSiegeTarget = null; // { id, name }
+  let pendingMoonSiegeMoons = null; // Array oder null (noch nicht geladen)
+  async function goToMoonSiege(playerId, name){
+    switchTab('galaxie');
+    pendingMoonSiegeTarget = { id: playerId, name: name || 'Unbekannt' };
+    pendingMoonSiegeMoons = null;
+    render();
+    log('Lade Mondliste von '+(name||'Unbekannt')+'…', 'ti-skull');
+    try {
+      const r = await storageGet('moondefense:'+playerId, true);
+      const doc = (r && r.value) ? JSON.parse(r.value) : null;
+      pendingMoonSiegeMoons = (doc && Array.isArray(doc.moons)) ? doc.moons : [];
+    } catch(e){ pendingMoonSiegeMoons = []; }
+    render();
   }
   async function deleteReport(id){
     try {
@@ -14184,6 +14238,9 @@
         // Bestenliste bei jedem regulären Speichern mitveröffentlicht - volle Rohdaten, die einzelne
         // Abhorchposten-Stufe des BEOBACHTERS entscheidet später, wie viel davon angezeigt wird.
         await storageSet('missions:'+state.player.id, JSON.stringify({ id: state.player.id, name: state.player.name || 'Kommandant', missions: summarizeOwnMissionsForBroadcast(), updated: Date.now() }), true);
+        // Mondzerstörer-Zielauswahl (Spieler-Wunsch "Mondzerstörer als Endgame-Schiff"): eigene Monde
+        // veröffentlichen, analog zu den Flottenbewegungen oben.
+        await storageSet('moondefense:'+state.player.id, JSON.stringify({ id: state.player.id, name: state.player.name || 'Kommandant', moons: summarizeOwnMoonsForBroadcast(), updated: Date.now() }), true);
       }
     } catch(e){ /* geteilter Speicher optional, Spiel läuft auch ohne */ }
     return saveResult;
@@ -14309,9 +14366,10 @@
         if (!state.inventory) state.inventory = {};
         if (!state.fragments) state.fragments = {};
         if (!state.buffs) state.buffs = [];
-        if (!state.unlocked) state.unlocked = { superschlachtschiff:false, festung:false };
+        if (!state.unlocked) state.unlocked = { superschlachtschiff:false, festung:false, mondzerstoerer:false };
         if (state.unlocked.superschlachtschiff === undefined) state.unlocked.superschlachtschiff = false;
         if (state.unlocked.festung === undefined) state.unlocked.festung = false;
+        if (state.unlocked.mondzerstoerer === undefined) state.unlocked.mondzerstoerer = false;
         if (state.mineDebuff === undefined) state.mineDebuff = null;
         if (state.doctrine === undefined) state.doctrine = null;
         if (state.activeEvent === undefined) state.activeEvent = null;
@@ -15882,6 +15940,9 @@
           // Asynchrone Auflösung (lädt Ziel-Basis/-Verteidigung vom Server), Muster wie
           // resolvePlayerAttackMission: Fire-and-forget, Bericht entsteht bei Abschluss.
           resolveAllianceBaseAttack(m, planetKey, fleet);
+        } else if (m.type === 'moon-siege'){
+          // Asynchrone Auflösung, gleiches Fire-and-forget-Muster wie attack-alliance-base.
+          resolveMoonSiege(m, planetKey, fleet);
         } else if (m.type === 'attack'){
           const npc = NPCS.find(n => n.id === m.targetId);
           if (!npc) continue;
@@ -16330,6 +16391,129 @@
       }
     }
     return out;
+  }
+  // Veröffentlicht die eigenen kolonisierten Monde für die Mondzerstörer-Zielauswahl (Spieler-Wunsch
+  // "Mondzerstörer als Endgame-Schiff") - ein Angreifer muss ein konkretes Mond-Ziel eines Spielers
+  // auswählen können, dafür braucht es (wie bei den Flottenbewegungen) einen geteilten Überblick.
+  // shieldLevel/allianceTag fließen direkt in resolveMoonSiege() als Verteidigungsfaktoren ein.
+  function summarizeOwnMoonsForBroadcast(){
+    const out = [];
+    for (const key of Object.keys(state.colonies||{})){
+      if (!isMoonKey(key)) continue;
+      const b = state.colonies[key].buildings||{};
+      out.push({
+        moonKey: key,
+        name: planetDisplayName(key),
+        system: planetSystemOf(key),
+        defense: Math.round(defensePower(key)),
+        shieldLevel: b.mondschild||0,
+        stabilityLevel: state.research.rmondstabil||0,
+        allianceTag: state.player.allianceTag||''
+      });
+    }
+    return out;
+  }
+  // Mondbelagerung (Spieler-Wunsch "Mondzerstörer als Endgame-Schiff"): folgt bewusst demselben
+  // Muster wie der Allianzbasis-Krieg (resolveAllianceBaseAttack/processIncomingBaseAttacks) - der
+  // Angreifer-Client berechnet das Ergebnis und schreibt es in den geteilten Speicher des Ziels, das
+  // Opfer übernimmt es beim nächsten Laden ungeprüft. Dasselbe Vertrauensmodell wie überall sonst bei
+  // geteilten PvP-nahen Daten in diesem Spiel (keine echte Server-Autorität) - bewusste, vom Spieler
+  // bestätigte Design-Entscheidung, siehe Rückfrage vor der Umsetzung.
+  const MOON_SIEGE_COOLDOWN_MS = 48*3600*1000; // 48 Std. je Angreifer, unabhängig vom Ausgang
+  async function sendMoonSiegeMission(targetPlayerId, targetMoonKey){
+    if (!useBackend()){ log('Mondbelagerungen brauchen den Server-Modus.', 'ti-alert-triangle'); return; }
+    const cf = currentFleet();
+    if ((cf.mondzerstoerer||0) < 1){ log('Du benötigst einen einsatzbereiten Mondzerstörer an diesem Standort.', 'ti-alert-triangle'); return; }
+    if (cf.missions.some(m=>m.type==='moon-siege')){ log('Dein Mondzerstörer ist bereits unterwegs.', 'ti-alert-triangle'); return; }
+    const cdLeft = Math.max(0, (state.lastMoonSiegeAt||0) + MOON_SIEGE_COOLDOWN_MS - Date.now());
+    if (cdLeft > 0){ log('Nächste Mondbelagerung erst wieder in '+fmtDuration(cdLeft/1000)+' möglich (48-Std.-Abklingzeit je Mondzerstörer).', 'ti-clock'); return; }
+    let targetDoc = null;
+    try { const r = await storageGet('moondefense:'+targetPlayerId, true); if (r && r.value) targetDoc = JSON.parse(r.value); } catch(e){}
+    const targetMoon = targetDoc && Array.isArray(targetDoc.moons) ? targetDoc.moons.find(mo=>mo.moonKey===targetMoonKey) : null;
+    if (!targetMoon){ log('Dieses Mond-Ziel ist nicht (mehr) auffindbar.', 'ti-alert-triangle'); return; }
+    const sameSys = planetSystemOf(state.activeBasePlanet) === targetMoon.system;
+    const compo = { mondzerstoerer: 1 };
+    const dur = missionDurationFor(sameSys ? 600 : 2400, compo, ['mondzerstoerer'], targetMoon.system);
+    const fuel = missionFuelCostSplit(dur, compo);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    if (!confirm('Mondbelagerung gegen '+targetMoon.name+' ('+(targetDoc.name||'Unbekannt')+') starten? Der Mondzerstörer ist danach für 48 Std. nicht erneut einsatzbereit - unabhängig davon, ob die Belagerung gelingt.')) return;
+    pay(fuel);
+    state.lastMoonSiegeAt = Date.now();
+    cf.missions.push({ id: nextMissionId(), type:'moon-siege', targetId: targetPlayerId, targetMoonKey, targetMoonName: targetMoon.name, targetPlayerName: targetDoc.name||'Unbekannt', startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName: resolveFleetName(), composition: compo });
+    log('Mondzerstörer gegen '+targetMoon.name+' ('+(targetDoc.name||'Unbekannt')+') gestartet (~'+Math.round(dur)+'s Flugzeit). Treibstoff: '+fuelCostText(fuel)+'.', 'ti-sword');
+    render(); save();
+  }
+  // Auflösung bei Ankunft (asynchron wie resolveAllianceBaseAttack): frische Zielwerte laden,
+  // Zerstörungschance würfeln, Ergebnis in moondefense:<targetId> (Ziel entfernen) und
+  // moonsiegelog:<targetId> (Ereignis für das Opfer) schreiben.
+  async function resolveMoonSiege(m, planetKey, fleet){
+    const targetId = m.targetId;
+    let targetDoc = null;
+    try { const r = await storageGet('moondefense:'+targetId, true); if (r && r.value) targetDoc = JSON.parse(r.value); } catch(e){}
+    const targetMoon = targetDoc && Array.isArray(targetDoc.moons) ? targetDoc.moons.find(mo=>mo.moonKey===m.targetMoonKey) : null;
+    if (!targetMoon){ log('Mondbelagerung gegen '+(m.targetMoonName||'unbekanntes Ziel')+': der Mond war bei Ankunft nicht mehr auffindbar (bereits zerstört, aufgegeben oder verteidigt?).', 'ti-anchor'); return; }
+    const power = 300 * (0.85 + Math.random()*0.3);
+    // Verteidigung: Basis-Verteidigungswert des Mondes (Gebäude + stationierte Flotte) + Mondschild
+    // + Mondstabilität-Forschung + kleiner Allianz-Bonus (Spieler-Wunsch "Allianzverteidigung") -
+    // gedeckelt auf maximal 50% Zerstörungschance, egal wie schwach die Verteidigung ist ("nie
+    // garantiert", Spieler-Wunsch), und mindestens 3%, damit ein Angriff nie komplett wirkungslos ist.
+    const reduction = Math.min(0.75, (targetMoon.shieldLevel||0)*0.04 + (targetMoon.stabilityLevel||0)*0.02 + (targetMoon.allianceTag?0.05:0));
+    const baseChance = power / (power + Math.max(1, targetMoon.defense||0)*2.2);
+    const chance = Math.max(0.03, Math.min(0.5, baseChance * (1-reduction)));
+    const destroyed = Math.random() < chance;
+    const bp = destroyed ? 150 : 20;
+    awardBattlePoints(bp);
+    try {
+      const r = await storageGet('moondefense:'+targetId, true);
+      const fresh = (r && r.value) ? JSON.parse(r.value) : targetDoc;
+      if (fresh && Array.isArray(fresh.moons)){
+        if (destroyed) fresh.moons = fresh.moons.filter(mo=>mo.moonKey!==m.targetMoonKey);
+        await storageSet('moondefense:'+targetId, JSON.stringify(fresh), true);
+      }
+      let log2 = null;
+      try { const r2 = await storageGet('moonsiegelog:'+targetId, true); log2 = (r2 && r2.value) ? JSON.parse(r2.value) : null; } catch(e){}
+      log2 = log2 || { events: [] };
+      log2.events = log2.events || [];
+      log2.events.unshift({ id: Date.now()+'-'+Math.random().toString(36).slice(2,8), ts: Date.now(), attackerName: state.player.name, moonKey: m.targetMoonKey, moonName: targetMoon.name, destroyed, chancePct: Math.round(chance*100) });
+      log2.events = log2.events.slice(0, 25);
+      await storageSet('moonsiegelog:'+targetId, JSON.stringify(log2), true);
+    } catch(e){}
+    logScoreChange(bp*3, (destroyed?'Mond '+targetMoon.name+' ZERSTÖRT':'Mondbelagerung gegen '+targetMoon.name+' abgewehrt')+' (+'+bp+' Kampfpunkte)', 'ti-sword');
+    log((destroyed?'Mondbelagerung erfolgreich - '+targetMoon.name+' ('+(m.targetPlayerName||'Unbekannt')+') wurde ZERSTÖRT!':'Mondbelagerung gegen '+targetMoon.name+' ('+(m.targetPlayerName||'Unbekannt')+') abgewehrt (Erfolgschance war nur '+Math.round(chance*100)+'%).'), destroyed?'ti-skull':'ti-sword');
+    pushReport({ type:'moon-siege', result: destroyed?'destroyed':'failed', targetMoonName: targetMoon.name, targetPlayerName: m.targetPlayerName, chancePct: Math.round(chance*100), battlePoints: bp, fromPlanet: planetDisplayName(planetKey) });
+    playSound(destroyed?'win':'raid');
+  }
+  // Opfer-Seite: neue Belagerungs-Ereignisse gegen die EIGENEN Monde genau einmal verarbeiten -
+  // bei Erfolg wird die Kolonie (Mond) tatsächlich und dauerhaft entfernt (state.moons/state.colonies).
+  async function checkIncomingMoonSieges(){
+    if (!useBackend() || !state.player.id) return;
+    // Kein eigener Mond -> kann gar nicht Ziel gewesen sein, Aufruf spart sich den Netzwerk-Request.
+    if (!Object.keys(state.colonies||{}).some(isMoonKey)) return;
+    let doc = null;
+    try { const r = await storageGet('moonsiegelog:'+state.player.id, true); doc = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){ return; }
+    if (!doc || !Array.isArray(doc.events) || !doc.events.length) return;
+    state.processedMoonSiegeIds = state.processedMoonSiegeIds || [];
+    let changed = false;
+    for (const ev of doc.events){
+      if (!ev.id || state.processedMoonSiegeIds.includes(ev.id)) continue;
+      state.processedMoonSiegeIds.push(ev.id);
+      if (ev.destroyed && state.colonies[ev.moonKey]){
+        const parentKey = moonParentKey(ev.moonKey);
+        delete state.colonies[ev.moonKey];
+        if (state.moons) delete state.moons[parentKey];
+        if (state.activeBasePlanet === ev.moonKey) state.activeBasePlanet = 'home';
+        changed = true;
+        pushReport({ type:'moon-siege-defense', result:'destroyed', attackerName: ev.attackerName, moonName: ev.moonName, ts: ev.ts });
+        log('💥 '+ev.moonName+' wurde von einem Mondzerstörer ('+(ev.attackerName||'unbekannter Angreifer')+') ZERSTÖRT! Der Mond ist dauerhaft verloren.', 'ti-alert-triangle');
+        playAlarmSound();
+      } else if (!ev.destroyed) {
+        pushReport({ type:'moon-siege-defense', result:'survived', attackerName: ev.attackerName, moonName: ev.moonName, ts: ev.ts });
+        log('Ein Mondzerstörer ('+(ev.attackerName||'unbekannter Angreifer')+') hat '+ev.moonName+' erfolglos belagert - dein Mond hat standgehalten!', 'ti-shield');
+      }
+    }
+    state.processedMoonSiegeIds = state.processedMoonSiegeIds.slice(-60);
+    if (changed){ render(); save(); }
   }
   // Nicht in state (kein Speicherbedarf, rein transienter Anzeige-Cache) - wie state.allianceDonationCache
   // an anderer Stelle: async laden, in einem Modul-Cache ablegen, dann synchron rendern.
@@ -18216,7 +18400,7 @@
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
     if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
-    if (tab === 'verteidigung'){ loadDetectedFleets(); }
+    if (tab === 'verteidigung'){ loadDetectedFleets(); checkIncomingMoonSieges(); }
     if (tab === 'berichte'){
       loadReports();
       loadMessages();
@@ -18531,6 +18715,7 @@
             ${(!isMe && e.id) ? `<button data-spy="${e.id}" data-spyname="${(e.name||'Unbekannt').replace(/"/g,'')}" title="Spähschiff zur Aufklärung schicken – deckt echte Flottenstärke auf" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-target" aria-hidden="true"></i></button>` : ''}
             ${(!isMe && e.id) ? `<button data-duel="${e.id}" data-duelname="${(e.name||'Unbekannt').replace(/"/g,'')}" title="Angriff vorbereiten – führt direkt zur Flottenauswahl" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-sword" aria-hidden="true"></i></button>` : ''}
             ${(!isMe && e.id && useBackend()) ? `<button data-msg="${e.id}" data-msgname="${(e.name||'Unbekannt').replace(/"/g,'')}" title="Nachricht senden" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-mail" aria-hidden="true"></i></button>` : ''}
+            ${(!isMe && e.id && useBackend() && (currentFleet().mondzerstoerer||0)>=1) ? `<button data-siege="${e.id}" data-siegename="${(e.name||'Unbekannt').replace(/"/g,'')}" title="Mit dem Mondzerstörer einen Mond belagern" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-skull" aria-hidden="true"></i></button>` : ''}
           </div>
         </div>
       `;
@@ -18538,6 +18723,7 @@
     document.querySelectorAll('[data-spy]').forEach(btn => btn.addEventListener('click', (ev) => { ev.stopPropagation(); sendSpyMission(btn.getAttribute('data-spy'), btn.getAttribute('data-spyname')); }));
     document.querySelectorAll('[data-duel]').forEach(btn => btn.addEventListener('click', (ev) => { ev.stopPropagation(); goToAttackPlayer(btn.getAttribute('data-duel'), btn.getAttribute('data-duelname')); }));
     document.querySelectorAll('[data-msg]').forEach(btn => btn.addEventListener('click', (ev) => { ev.stopPropagation(); openMessageCompose(btn.getAttribute('data-msg'), btn.getAttribute('data-msgname')); }));
+    document.querySelectorAll('[data-siege]').forEach(btn => btn.addEventListener('click', (ev) => { ev.stopPropagation(); goToMoonSiege(btn.getAttribute('data-siege'), btn.getAttribute('data-siegename')); }));
     document.querySelectorAll('[data-profile]').forEach(row => row.addEventListener('click', () => {
       const id = row.getAttribute('data-profile');
       if (!id) return;
@@ -19510,6 +19696,20 @@
             </div>
           `;
         }
+        if (m.type === 'moon-siege'){
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i>${m.fleetName?m.fleetName+' · ':''}Mondbelagerung: ${m.targetMoonName||'?'} (${m.targetPlayerName||'?'})</div>
+                <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
+              </div>
+              <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         const isAttack = m.type === 'attack';
         // Bugfix: ohne ||{} -Fallback crashte render() dauerhaft, sobald targetId keinen Treffer mehr
         // in NPCS/PLANETS fand (z.B. Update während laufender Mission) - analog zu den bereits
@@ -19589,11 +19789,34 @@
 
     const shipRows = SHIP_DEFS.map(def => {
       const count = cf[def.key]||0;
+      const pendingQty = pendingHere.filter(j=>j.key===def.key).reduce((a,j)=>a+j.qty,0);
+      // Mehrere seltene Items gleichzeitig zum einmaligen Freischalten (aktuell nur Mondzerstörer) -
+      // dasselbe Muster wie das Artefakt-Set (hasArtifactSet/claimArtifactSet), nur hier als
+      // dauerhafter Baufreigabe-Schalter statt eines Sofort-Bonus. Ohne Freischaltung erscheint eine
+      // gesperrte Karte statt der normalen Bauzeile (analog zu BUILDING_DEFS' special-Feld).
+      if (def.unlockItems && !state.unlocked[def.key]){
+        const haveAll = def.unlockItems.every(it => (state.rareItems[it]||0) >= 1);
+        const itemList = def.unlockItems.map(it => (RARE_ITEMS.find(r=>r.key===it)||{}).name||it).join(', ');
+        return `
+          <div class="card-row research-locked">
+            <div class="left">
+              <div class="bicon" style="background:rgba(226,75,74,0.12);"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
+              <div>
+                <div class="bname">${def.name} <span class="lvl-pill">gesperrt</span></div>
+                <div class="bmeta">Ultimatives Endgame-Schiff (Angriff ${def.atk}, extrem zäh) · benötigt je 1x ${itemList} GLEICHZEITIG im Inventar (werden beim Freischalten verbraucht)</div>
+              </div>
+            </div>
+            <button class="buy ${haveAll?'affordable':''}" data-unlock="${def.key}" ${haveAll?'':'disabled'}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>Freischalten</button>
+          </div>
+        `;
+      }
       const shipQty = buildQtyMode === 'max' ? Math.max(1, maxAffordableShipQty(def, count, 50)) : buildQtyMode;
       const cost = shipCostForRange(def, count, shipQty);
       const ok = canAfford(cost);
       const unlocked = shipRequirementsMet(def);
-      const pendingQty = pendingHere.filter(j=>j.key===def.key).reduce((a,j)=>a+j.qty,0);
+      // Nie-mehr-als-N-Exemplare (aktuell nur Mondzerstörer, maxOwned:1) - gebaute UND bereits in der
+      // Warteschlange befindliche Exemplare zählen zusammen gegen die Obergrenze.
+      const atOwnedCap = def.maxOwned && (count + pendingQty) >= def.maxOwned;
       let meta = '';
       const awayNote = (key) => (awayByType[key]||0) > 0 ? ` · <span style="color:#e24b4a;">${awayByType[key]} unterwegs (angreift/expediert)</span>` : '';
       if (def.key==='ships') meta = `Angriffspunkte 5 · ${slotsUsedExplore}/${count} Erkundungs-Slots belegt`;
@@ -19611,6 +19834,7 @@
       else if (def.key==='colonyShips') meta = 'Wird bei Kolonisierung verbraucht (1 Stück pro Kolonie)';
       else if (def.key==='recycler') meta = '+8 Ressourcen/s Trümmerfeld-Sammlung am stationierten Planeten · passiv';
       else if (def.key==='forscher') meta = `Angriffspunkte 0 – für Langzeit-Expeditionen, muss von Kampfschiffen eskortiert werden · ${slotsUsedExpedition}/${count} Expeditions-Slots belegt`;
+      else if (def.key==='mondzerstoerer') meta = `Angriffspunkte ${def.atk} · ultimatives Endgame-Schiff, ausschließlich für die Mondbelagerung (Verteidigung-Tab bei einem Mond) · kann nie mehr als ${def.maxOwned} gleichzeitig existieren (gebaut + in Auftrag)${awayNote('mondzerstoerer')}`;
       const reqNameFor = req => typeof req === 'string' ? (RESEARCH_DEFS.find(r=>r.key===req)||{}).name : (RESEARCH_DEFS.find(r=>r.key===req.key)||{}).name+' Stufe '+req.level;
       const reqNames = (def.requires||[]).filter(req => typeof req === 'string' ? (state.research[req]||0)<1 : (state.research[req.key]||0)<req.level).map(reqNameFor).join(', ');
       const allReqNames = (def.requires||[]).map(reqNameFor).join(', ');
@@ -19631,10 +19855,11 @@
               ${SPECIAL_UNIT_ITEMS[def.key] ? `<div class="bmeta" style="${(state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0)<shipQty?'color:#e24b4a;':''}"><i class="ti ti-diamond" aria-hidden="true"></i> Verbraucht ${shipQty}x ${(RARE_ITEMS.find(r=>r.key===SPECIAL_UNIT_ITEMS[def.key])||{}).name||''} (vorhanden: ${state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0})</div>` : ''}
               ${allReqNames ? `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${allReqNames}</div>` : ''}
               ${unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${Math.round(def.buildTime*shipQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1))}s${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${shipScorePoints} Punkte (${SHIP_SCORE_WEIGHTS[def.key]||0}/Schiff)</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+              ${atOwnedCap ? `<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Maximalbestand (${def.maxOwned}) erreicht - erst nach Verlust/Verschrottung des vorhandenen Exemplars erneut baubar.</div>` : ''}
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
-            <button class="buy ${(unlocked&&ok)?'affordable':''}" data-buyship="${def.key}" ${(unlocked&&ok)?'':'disabled'}><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Bauen (+${shipQty})</button>
+            <button class="buy ${(unlocked&&ok&&!atOwnedCap)?'affordable':''}" data-buyship="${def.key}" ${(unlocked&&ok&&!atOwnedCap)?'':'disabled'}><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Bauen (+${shipQty})</button>
             ${count>0 ? `<button data-scrapship="${def.key}" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-recycle" aria-hidden="true" style="margin-right:3px;"></i>Verschrotten (-${Math.min(shipQty,count)})</button>` : ''}
           </div>
         </div>
@@ -20391,6 +20616,46 @@
       }
     }
 
+    // Mondbelagerung: erscheint, sobald über "Mond belagern" (Bestenliste) ein Ziel-Spieler markiert
+    // wurde - zeigt dessen aktuell kolonisierte Monde (aus moondefense:<id> geladen) zur Auswahl.
+    const pendingMoonSiegeBox = document.getElementById('pendingMoonSiegeBox');
+    if (pendingMoonSiegeBox){
+      if (!pendingMoonSiegeTarget){
+        pendingMoonSiegeBox.innerHTML = '';
+      } else {
+        const haveShip = (cf.mondzerstoerer||0) >= 1;
+        const alreadyOut = cf.missions.some(m=>m.type==='moon-siege');
+        const cdLeft = Math.max(0, (state.lastMoonSiegeAt||0) + MOON_SIEGE_COOLDOWN_MS - Date.now());
+        pendingMoonSiegeBox.innerHTML = `
+          <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px; background:rgba(226,75,74,0.1); border-color:rgba(226,75,74,0.4); margin-top:0.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="bmeta"><i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i> Mondbelagerung gegen: <strong style="color:#fff;">${pendingMoonSiegeTarget.name}</strong></div>
+              <button data-cancel-pending-siege style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+            </div>
+            ${!haveShip ? `<div class="bmeta" style="color:#f0997b;">Du benötigst einen einsatzbereiten Mondzerstörer am aktiven Standort (Flotte-Tab).</div>`
+              : alreadyOut ? `<div class="bmeta" style="color:#f0997b;">Dein Mondzerstörer ist bereits auf einer Belagerung unterwegs.</div>`
+              : cdLeft>0 ? `<div class="bmeta" style="color:#f0997b;">Abklingzeit: noch ${fmtDuration(cdLeft/1000)}.</div>`
+              : pendingMoonSiegeMoons===null ? `<div class="bmeta">lädt Mondliste…</div>`
+              : !pendingMoonSiegeMoons.length ? `<div class="bmeta">Keine (auffindbaren) Monde bei diesem Spieler.</div>`
+              : pendingMoonSiegeMoons.map(mo => `
+                  <div class="card-row" style="padding:0.5rem 0.7rem;">
+                    <div class="left"><div class="bname" style="font-size:12px;">${mo.name}</div><div class="bmeta">Verteidigung: ${fmt(mo.defense||0)}${mo.shieldLevel?' · Mondschild Stufe '+mo.shieldLevel:''}${mo.stabilityLevel?' · Mondstabilität Stufe '+mo.stabilityLevel:''}${mo.allianceTag?' · Allianz ['+mo.allianceTag+']':''}</div></div>
+                    <button class="buy affordable" data-siege-moon="${mo.moonKey}" style="font-size:10.5px; padding:5px 8px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>Belagern</button>
+                  </div>
+                `).join('')}
+          </div>
+        `;
+        pendingMoonSiegeBox.querySelectorAll('[data-siege-moon]').forEach(btn => btn.onclick = () => {
+          const moonKey = btn.getAttribute('data-siege-moon');
+          const target = pendingMoonSiegeTarget;
+          pendingMoonSiegeTarget = null; pendingMoonSiegeMoons = null;
+          sendMoonSiegeMission(target.id, moonKey);
+        });
+        const cancelSiegeBtn = pendingMoonSiegeBox.querySelector('[data-cancel-pending-siege]');
+        if (cancelSiegeBtn) cancelSiegeBtn.onclick = () => { pendingMoonSiegeTarget = null; pendingMoonSiegeMoons = null; render(); };
+      }
+    }
+
     const pirateLairBox = document.getElementById('pirateLairBox');
     if (pirateLairBox){
       const stage = state.pirateLairStage || 1;
@@ -20540,6 +20805,10 @@
             icon = 'ti-sword'; color = '#e24b4a';
             label = (m.fleetName?m.fleetName+' → ':'')+'Angriff: Allianzbasis ['+(m.targetId||'?')+']';
             shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          } else if (m.type === 'moon-siege'){
+            icon = 'ti-skull'; color = '#e24b4a';
+            label = (m.fleetName?m.fleetName+' → ':'')+'Mondbelagerung: '+(m.targetMoonName||'?')+' ('+(m.targetPlayerName||'?')+')';
+            shipsTooltip = '';
           } else {
             const target = PLANETS.find(p=>p.id===m.targetId);
             label = (m.fleetName?m.fleetName+' → ':'')+(target?target.name:'Erkundungsziel');
@@ -21583,7 +21852,18 @@
     document.querySelectorAll('[data-researchqueue-down]').forEach(btn => btn.onclick = () => moveResearchQueueItem(parseInt(btn.getAttribute('data-researchqueue-down'),10), 1));
     document.querySelectorAll('[data-unlock]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-unlock');
-      const def = BUILDING_DEFS.find(d=>d.key===key) || { unlockItem: key==='superschlachtschiff' ? 'antimateriekern' : null };
+      const def = BUILDING_DEFS.find(d=>d.key===key) || SHIP_DEFS.find(d=>d.key===key) || { unlockItem: key==='superschlachtschiff' ? 'antimateriekern' : null };
+      if (def.unlockItems){
+        // Mehrere seltene Items gleichzeitig (aktuell nur Mondzerstörer) - dasselbe Muster wie das
+        // Artefakt-Set: alle gleichzeitig vorhanden UND werden alle gemeinsam verbraucht.
+        if (def.unlockItems.some(it => (state.rareItems[it]||0) < 1)){ log('Nicht alle benötigten seltenen Items gleichzeitig vorhanden.', 'ti-alert-triangle'); return; }
+        for (const it of def.unlockItems) state.rareItems[it] -= 1;
+        state.unlocked[key] = true;
+        log((def.name||key)+' freigeschaltet!', 'ti-lock-open');
+        playSound('achieve');
+        render(); save();
+        return;
+      }
       const item = def.unlockItem;
       if ((state.rareItems[item]||0) < 1){ log('Item nicht vorhanden.', 'ti-alert-triangle'); return; }
       state.rareItems[item] -= 1;
@@ -21626,9 +21906,19 @@
       const key = btn.getAttribute('data-buyship');
       const def = SHIP_DEFS.find(d=>d.key===key);
       if (!def || !shipRequirementsMet(def)) return;
+      if (def.unlockItems && !state.unlocked[key]){ log(def.name+' muss zuerst freigeschaltet werden.', 'ti-alert-triangle'); return; }
       const cf = currentFleet();
       const count = cf[key]||0;
+      if (def.maxOwned){
+        const pendingQtyNow = (state.constructionQueue||[]).filter(j=>j.kind==='ship' && j.key===key).reduce((a,j)=>a+j.qty,0);
+        if (count + pendingQtyNow >= def.maxOwned){ log(def.name+' hat bereits den Maximalbestand ('+def.maxOwned+') erreicht.', 'ti-alert-triangle'); return; }
+      }
       let qty = buildQtyMode === 'max' ? Math.max(1, maxAffordableShipQty(def, count, 50)) : buildQtyMode;
+      if (def.maxOwned){
+        const pendingQtyNow = (state.constructionQueue||[]).filter(j=>j.kind==='ship' && j.key===key).reduce((a,j)=>a+j.qty,0);
+        qty = Math.max(0, Math.min(qty, def.maxOwned - count - pendingQtyNow));
+        if (qty < 1){ log(def.name+' hat bereits den Maximalbestand ('+def.maxOwned+') erreicht.', 'ti-alert-triangle'); return; }
+      }
       // "Super"-Einheiten in SHIP_DEFS (z.B. Leerenjäger): verbrauchen je 1 seltenes Item pro Schiff -
       // gleiche Logik wie beim Superschlachtschiff-Sonderblock, Rueckerstattung bei Abbruch laeuft
       // ueber queueConstruction/cancelConstruction automatisch mit.
@@ -22635,7 +22925,7 @@
 
   (async () => {
     const ready = await initAuth();
-    if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()){ loadAllianceWars(); if (useBackend()){ loadAllianceTechData(); loadAllianceBase(); loadAllianceDonationRanking(); } } if (!state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
+    if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); checkIncomingMoonSieges(); if (myAllianceTag()){ loadAllianceWars(); if (useBackend()){ loadAllianceTechData(); loadAllianceBase(); loadAllianceDonationRanking(); } } if (!state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
   })();
   // PWA: Service Worker registrieren (macht die App zusätzlich zum Manifest auch am DESKTOP
   // installierbar - Chrome/Edge verlangen dafür einen aktiven Service Worker, mobile Browser
