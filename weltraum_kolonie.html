@@ -147,6 +147,23 @@
       --fs-body-lg: 14px;
       --fs-heading: 16px;
       --fs-title: 20px;
+      /* Grafik-Runde 2 (17.07.2026, Spieler-Wunsch "futuristischer/detaillierter/ernster, alles
+         vereinheitlichen"): HUD-Konsolen-Look statt weicher App-Optik. --c-info ist keine neue
+         Akzentfarbe, sondern benennt nur das Blau, das schon vorher unbenannt in .progress-inner/
+         button.primary als rgba(55,138,221,...) stand. Die vier --glow-* Werte sind die einzige
+         wirklich neue visuelle Zutat: konsequent auf bereits semantisch eingefärbte Elemente
+         angewendet (buy.affordable=grün, attack=rot, research-done=grün usw.), NICHT auf Toasts/Log,
+         da dort keine Erfolg/Warnung/Fehler-Klassifizierung existiert und ein nachträgliches
+         Einsortieren aller log()-Aufrufe im Code zu riskant für diesen Durchgang wäre. */
+      --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+      --corner: 10px;
+      --c-info:#378add;
+      --info-rgb: 55,138,221;
+      --warning-rgb: 224,165,72;
+      --glow-info: 0 0 10px rgba(var(--info-rgb),0.5);
+      --glow-warn: 0 0 10px rgba(var(--warning-rgb),0.5);
+      --glow-crit: 0 0 10px rgba(var(--danger-rgb),0.5);
+      --glow-ok: 0 0 10px rgba(var(--secondary-rgb),0.5);
     }
     html, body {
       margin:0; padding:0; min-height:100%;
@@ -181,6 +198,24 @@
         radial-gradient(ellipse 600px 450px at 60% 45%, rgba(240,153,123,0.08), transparent 65%),
         linear-gradient(180deg,#0a0d1a,#0d1224);
     }
+    /* Grafik-Runde 2, Vorschlag "technisches Grid" + "Scanlines": zwei sehr blasse Zusatzebenen
+       unter dem eigentlichen Inhalt (z-index:0, #game-root-Inhalt bleibt bei z-index:1 wie zuvor).
+       Beide additiv zu den bestehenden Farbwolken oben, kein Ersatz. Scanline-Drift respektiert
+       prefers-reduced-motion; das Fluchtliniengitter ist rein statisch. */
+    .shell::before {
+      content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size:38px 38px;
+      mask-image: radial-gradient(ellipse 90% 70% at 50% 15%, #000 30%, transparent 92%);
+      -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 15%, #000 30%, transparent 92%);
+    }
+    .shell::after {
+      content:''; position:absolute; inset:0; z-index:0; pointer-events:none; opacity:0.4;
+      background:repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 3px);
+      animation: shellScan 9s linear infinite;
+    }
+    @media (prefers-reduced-motion: reduce) { .shell::after { animation:none; } }
+    @keyframes shellScan { 0%{ transform:translateY(0); } 100%{ transform:translateY(42px); } }
     #bgstars { position:absolute; inset:0; width:100%; height:100%; }
     /* iPhone-Notch/Dynamic-Island: viewport-fit=cover (siehe <meta name="viewport">) lässt den Inhalt
        jetzt bis unter den Notch reichen, statt den Bereich ungenutzt schwarz zu lassen - dafür braucht
@@ -428,8 +463,8 @@
     .recycler-active { animation: recycleSpin 2.5s linear infinite; display:inline-block; }
     .hstat { background:var(--elev-2); border:0.5px solid rgba(255,255,255,0.12); border-radius:10px; padding:5px 10px; font-size:11px; display:flex; align-items:center; gap:6px; white-space:nowrap; font-variant-numeric:tabular-nums; cursor:default; }
     .hstat-text { display:flex; flex-direction:column; line-height:1.2; }
-    .hstat-label { font-size:8px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.3px; }
-    .hstat-value { font-size:11.5px; font-weight:500; color:#e9ecf5; font-variant-numeric:tabular-nums; }
+    .hstat-label { font-size:8px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.3px; font-family:var(--font-mono); }
+    .hstat-value { font-size:var(--fs-small); font-weight:500; color:#e9ecf5; font-variant-numeric:tabular-nums; font-family:var(--font-mono); }
     .bcost, .bmeta, .bname { font-variant-numeric:tabular-nums; }
 
     .orbit-ring { fill:none; stroke:#d4537e; stroke-opacity:0.5; stroke-width:2; }
@@ -513,7 +548,7 @@
     .float-gain.show { animation: floatup 0.9s ease-out forwards; }
     @keyframes floatup { 0% { opacity:0.9; transform:translateY(4px);} 100% { opacity:0; transform:translateY(-14px);} }
 
-    .section-title { font-size:14px; font-weight:500; margin: 0 0 0.75rem; display:flex; align-items:center; gap:6px; color:#c7cbe0; padding-left:9px; border-left:3px solid var(--c-primary); }
+    .section-title { font-size:var(--fs-body-lg); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin: 0 0 0.75rem; display:flex; align-items:center; gap:6px; color:#c7cbe0; padding-left:9px; border-left:2px solid var(--c-primary); font-family:var(--font-mono); }
 
     .buildings, .fleet, .research-list, .planet-list, .npc-list, .leaderboard { display:flex; flex-direction:column; gap:9px; }
     .card-row { background: var(--elev-1); border: 0.5px solid var(--line-1); border-radius:14px; padding: 0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
@@ -543,13 +578,13 @@
     .chip .chip-n { font-weight:700; color:var(--gold); }
     .quick-actions { display:flex; gap:6px; margin-bottom:10px; }
     .quick-actions button { flex:1; font-size:10.5px; padding:7px 4px; border-radius:8px; }
-    .quick-actions button.primary { background: rgba(93,202,165,0.15); border-color: rgba(93,202,165,0.4); color:#9fe1cb; }
+    .quick-actions button.primary { background: rgba(93,202,165,0.15); border-color: rgba(93,202,165,0.4); color:#9fe1cb; box-shadow:var(--glow-ok); }
     .quick-actions button.danger { background: rgba(226,75,74,0.12); border-color: rgba(226,75,74,0.35); color:#f0997b; }
     .card-row:hover { background: var(--elev-2); border-color:rgba(var(--primary-rgb), 0.35); }
     .search-result-row:hover { background: rgba(var(--primary-rgb), 0.15); }
     .card-row .left { display:flex; align-items:center; gap:11px; min-width:0; }
     .bicon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; overflow:hidden; }
-    .bname { font-weight:500; font-size:13.5px; display:flex; align-items:center; gap:6px; color:#fff; }
+    .bname { font-weight:600; font-size:var(--fs-body-lg); letter-spacing:0.01em; display:flex; align-items:center; gap:6px; color:#fff; font-family:var(--font-mono); }
     .fleet-position-panel { position:fixed; right:14px; top:50%; transform:translateY(-50%); width:200px; max-height:74vh; overflow-y:auto; background:rgba(8,10,20,0.92); border:0.5px solid rgba(255,255,255,0.12); border-radius:12px; padding:10px; z-index:50; }
     .fleet-position-panel { scrollbar-width:thin; scrollbar-color: rgba(var(--primary-rgb),0.55) transparent; }
     .fleet-position-panel::-webkit-scrollbar { width:6px; }
@@ -644,14 +679,18 @@
     .toast span { white-space:normal; overflow-wrap:break-word; }
     .toast.show { opacity:1; transform:translateY(0) scale(1); }
     .toast i { color:#afa9ec; font-size:15px; flex-shrink:0; }
-    .lvl-pill { font-size:10.5px; font-weight:500; padding:1px 8px; border-radius:10px; background:var(--elev-3); color:#c7cbe0; font-variant-numeric:tabular-nums; display:inline-block; min-width:1.2em; text-align:center; }
-    .bmeta { font-size:11.5px; color:var(--ink-dim); margin-top:2px; }
+    /* Vorschlag "segmentierte Stufenanzeige" (CSS-only, Blast-Radius bewusst klein gehalten): statt
+       das HTML in den vielen render*()-Funktionen auf echte Segment-Balken umzustellen, bekommt die
+       bestehende Pille ein feines Streifenmuster + schärfere Ecken + Mono-Ziffern - liest sich wie
+       eine kleine Signalanzeige, ohne dass ein einziger Aufrufort im JS geändert werden musste. */
+    .lvl-pill { font-size:var(--fs-small); font-weight:600; padding:1px 8px; border-radius:3px; background:repeating-linear-gradient(90deg, var(--elev-3) 0px, var(--elev-3) 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px); border:0.5px solid var(--line-2); color:#c7cbe0; font-variant-numeric:tabular-nums; font-family:var(--font-mono); display:inline-block; min-width:1.2em; text-align:center; }
+    .bmeta { font-size:var(--fs-small); color:var(--ink-dim); margin-top:2px; font-family:var(--font-mono); }
     @media (max-width: 700px) {
       .lvl-pill { font-size:11px; }
       .bmeta { font-size:12px; }
       .header-btn-label { display:none; }
     }
-    .bcost { font-size:11.5px; color:#8489a0; margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .bcost { font-size:var(--fs-small); color:#8489a0; margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); }
     .bcost .costitem { display:flex; align-items:center; gap:3px; }
     .bcost .short { color:#e2647a; }
 
@@ -668,8 +707,8 @@
     }
     button.buy.affordable { background: rgba(var(--secondary-rgb), 0.22); border-color:var(--c-secondary-dark); box-shadow:0 0 0 0 rgba(var(--secondary-dark-rgb), 0.5); animation: affordPulse 2.2s ease-in-out infinite; }
     @keyframes affordPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--secondary-dark-rgb), 0.35); } 50% { box-shadow:0 0 0 5px rgba(var(--secondary-dark-rgb), 0); } }
-    button.attack { background: rgba(var(--danger-rgb), 0.22); border-color:var(--c-danger); }
-    button.primary { background: rgba(55,138,221,0.28); border-color:#378add; }
+    button.attack { background: rgba(var(--danger-rgb), 0.22); border-color:var(--c-danger); box-shadow:var(--glow-crit); }
+    button.primary { background: rgba(55,138,221,0.28); border-color:var(--c-info); box-shadow:var(--glow-info); }
     input[type=text], input[type=email], input[type=password], input[type=number], textarea { background: var(--elev-2); border:0.5px solid rgba(255,255,255,0.18); color:#fff; border-radius:9px; padding:8px 11px; font-size:13px; font-family:inherit; }
     /* iOS Safari zoomt beim Fokussieren automatisch rein, wenn ein Eingabefeld unter 16px Schrift
        hat - auf schmalen Screens (also praktisch immer am Handy) daher auf 16px angehoben, damit
@@ -680,9 +719,12 @@
 
     .progress-outer { width:100%; height:6px; background: var(--elev-2); border-radius:4px; overflow:hidden; margin-top:9px; }
     .progress-inner { height:100%; background: linear-gradient(90deg,#378ADD,var(--c-secondary)); border-radius:4px; transition: width 0.3s linear; box-shadow:0 0 8px rgba(var(--secondary-rgb), 0.5); }
-    .progress-inner.attackbar { background: linear-gradient(90deg,var(--c-danger),#f0997b); }
+    /* Bug entdeckt+behoben (Grafik-Runde 2): attackbar hatte bisher trotz rotem Verlauf den grünen
+       box-shadow-Glow von .progress-inner geerbt (dort für rgba(--secondary-rgb) fest verdrahtet) -
+       Angriffsbalken leuchteten also grün statt rot. */
+    .progress-inner.attackbar { background: linear-gradient(90deg,var(--c-danger),#f0997b); box-shadow:var(--glow-crit); }
 
-    .research-done { border-color:var(--c-secondary-dark) !important; background:rgba(var(--secondary-dark-rgb), 0.14) !important; }
+    .research-done { border-color:var(--c-secondary-dark) !important; background:rgba(var(--secondary-dark-rgb), 0.14) !important; box-shadow:var(--glow-ok) !important; }
     .research-locked { opacity:0.5; }
     .badge-done { font-size:10.5px; color:var(--c-secondary); display:flex; align-items:center; gap:4px; }
 
@@ -728,6 +770,30 @@
     .missions-active { display:flex; flex-direction:column; gap:8px; margin-bottom:1rem; }
 
     .profile-card { background: var(--elev-1); border:0.5px solid var(--line-1); border-radius:14px; padding:1rem 1.1rem; margin-bottom:1.25rem; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    /* Grafik-Runde 2, Vorschlag "HUD-Panels": ersetzt die runden Ecken der wiederverwendeten
+       Karten-/Dialog-Container durch einen einzelnen diagonalen Eckenschnitt (oben-links/unten-rechts)
+       + kleine Eckklammern an den beiden verbleibenden rechten-Winkel-Ecken. Absichtlich nur EIN
+       Diagonal-Paar geschnitten statt aller vier Ecken: bei allen vier Ecken müssten die Eckklammern
+       exakt in den Schnitt hinein positioniert werden (negative Versätze fallen sonst außerhalb des
+       clip-path-Bereichs und werden unsichtbar) - mit nur zwei rechtwinkligen Ecken ist die Klammer-
+       Positionierung eindeutig und ohne Verifikations-Screenshot sicher richtig herzuleiten. Diese
+       Regel steht bewusst NACH den einzelnen .card-row/.profile-card/... Deklarationen, damit sie
+       deren border-radius zuverlässig überschreibt (gleiche Selektor-Spezifität, spätere Regel gewinnt). */
+    .card-row, .profile-card, .toast, .battle-modal, .login-card {
+      position:relative; border-radius:0;
+      clip-path: polygon(var(--corner) 0, 100% 0, 100% calc(100% - var(--corner)), calc(100% - var(--corner)) 100%, 0 100%, 0 var(--corner));
+    }
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before,
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after {
+      content:''; position:absolute; width:9px; height:9px; pointer-events:none;
+      border:1.5px solid rgba(var(--primary-rgb),0.7);
+    }
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before {
+      top:0; right:0; border-left:none; border-bottom:none;
+    }
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after {
+      bottom:0; left:0; border-right:none; border-top:none;
+    }
     .profile-left { display:flex; align-items:center; gap:12px; }
     .avatar { width:46px; height:46px; border-radius:50%; background:rgba(var(--primary-rgb), 0.25); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:500; color:var(--lilac); flex-shrink:0; overflow:hidden; }
     .avatar-picker { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
@@ -2289,6 +2355,26 @@
         else ctx.arc(ax,ay,cfg.accent.r*s,0,Math.PI*2);
         ctx.fill(); ctx.restore();
       }
+      // Grafik-Runde 2, Vorschlag "mehr Schattierungstiefe": rein additive Zeichenschritte innerhalb
+      // des bestehenden Rumpf-Pfads (kein neuer Formendatensatz pro Hülle nötig) - ein schmaler
+      // heller Streifen entlang der Längsachse (Specular) und eine dezente Randverdunklung oben/unten
+      // (Ambient Occlusion), damit die flache Vektorform mehr wie ein schattiertes Objekt wirkt.
+      ctx.save();
+      ctx.beginPath();
+      pts.forEach(([x,y],i)=>{ i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+      ctx.closePath(); ctx.clip();
+      const specX0 = Math.min(...xs), specX1 = Math.max(...xs);
+      const specGrad = ctx.createLinearGradient(specX0,0,specX1,0);
+      specGrad.addColorStop(0,'rgba(255,255,255,0)'); specGrad.addColorStop(0.42,'rgba(255,255,255,0.22)');
+      specGrad.addColorStop(0.5,'rgba(255,255,255,0.32)'); specGrad.addColorStop(0.58,'rgba(255,255,255,0.1)');
+      specGrad.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle = specGrad; ctx.fillRect(specX0,0,specX1-specX0,h);
+      const ys = pts.map(p=>p[1]);
+      const aoY0 = Math.min(...ys), aoY1 = Math.max(...ys);
+      const aoGrad = ctx.createLinearGradient(0,aoY0,0,aoY1);
+      aoGrad.addColorStop(0,'rgba(0,0,0,0.22)'); aoGrad.addColorStop(0.5,'rgba(0,0,0,0)'); aoGrad.addColorStop(1,'rgba(0,0,0,0.28)');
+      ctx.fillStyle = aoGrad; ctx.fillRect(0,aoY0,w,aoY1-aoY0);
+      ctx.restore();
     }
     function refreshShipMiniIcons(root){
       const scope = root || document;
@@ -2413,6 +2499,13 @@
       const shade=ctx.createLinearGradient(cx-R,0,cx+R,0);
       shade.addColorStop(0,'rgba(0,0,0,0)'); shade.addColorStop(0.55,'rgba(0,0,0,0)'); shade.addColorStop(1,'rgba(2,6,12,0.65)');
       ctx.fillStyle=shade; ctx.fillRect(cx-R,cy-R,R*2,R*2);
+      // Grafik-Runde 2, Vorschlag "mehr Schattierungstiefe": zusätzliches Randlicht (rim light) auf
+      // der der Schattenseite (rechts, siehe shade oben) gegenüberliegenden Seite - typischer
+      // Atmosphäre-Effekt bei Planeten-Renderings, den es hier bisher nicht gab.
+      const rim=ctx.createLinearGradient(cx-R,0,cx+R,0);
+      rim.addColorStop(0,'rgba(210,230,255,0.28)'); rim.addColorStop(0.12,'rgba(210,230,255,0.08)');
+      rim.addColorStop(0.3,'rgba(210,230,255,0)'); rim.addColorStop(1,'rgba(210,230,255,0)');
+      ctx.fillStyle=rim; ctx.fillRect(cx-R,cy-R,R*2,R*2);
       ctx.restore();
       ctx.beginPath(); ctx.arc(cx,cy,R+0.4,0,Math.PI*2); ctx.strokeStyle='rgba(150,180,200,0.35)'; ctx.lineWidth=1; ctx.stroke();
     }
@@ -2482,8 +2575,17 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.78.0';
+  const VERSION = '8.79.0';
   const PATCHNOTES = [
+    { version:'8.79.0', date:'17.07.2026', changes:[
+      'Grafik-Overhaul Teil 2 (Spieler-Wunsch "futuristischer, mehr Detail, ernstere Grafik, alles vereinheitlichen"): Karten/Dialoge (Zeilen, Profilkarte, Toasts, Kampf-Fenster, Login) haben jetzt geschnittene HUD-Ecken statt runder Kanten, mit kleinen Eckklammern an den verbleibenden rechten Winkeln',
+      'Zahlen, Bezeichnungen und Überschriften laufen jetzt auf einer Mono-Schrift (Systemschriftart, kein Download nötig) statt der bisherigen Fließschrift - liest sich wie eine Instrumentenanzeige',
+      'Dezentes technisches Fluchtlinien-Gitter + langsam wandernde Scanlines im Hintergrund, respektiert "reduzierte Bewegung"-Einstellung',
+      'Statusfarben (Erfolg/Warnung/Kritisch/Info) leuchten jetzt konsequent auf Kauf-/Angriff-Buttons, abgeschlossener Forschung und Fortschrittsbalken - dabei einen echten Bug gefunden und behoben: der Angriffs-Fortschrittsbalken leuchtete bisher trotz rotem Verlauf grün',
+      'Schiffs- und Planeten-Miniaturen (Flotten-/Sektorkarten-Icons) haben jetzt mehr Tiefenschattierung: Glanzstreifen + Rand-Verdunklung bei Schiffen, zusätzliches Randlicht bei Planeten',
+      'Stufen-Pille bei Gebäuden/Forschung/Schiffen wirkt jetzt wie eine kleine Signalanzeige (feines Streifenmuster, schärfere Ecken) statt einer weichen Pille',
+      'Umfang bewusst begrenzt (siehe Chat-Verlauf): Toast-/Log-Meldungen bekommen den neuen Rahmen-Look, aber keine automatische Erfolg/Warnung/Fehler-Einfärbung (würde eine Durchsicht potenziell hunderter Meldungsstellen erfordern); generische Buttons bekommen die Glow-Sprache, aber keinen Eckenschnitt (Risiko bei sehr kleinen Icon-Buttons ohne Einzelprüfung); dynamisch per Code eingefärbte Balken (z.B. Hüllen-HP) bleiben unverändert'
+    ]},
     { version:'8.78.0', date:'17.07.2026', changes:[
       'Grafik-Overhaul Teil 1 (Spieler-Wunsch): zentrale Farb-Token für Lila/Gold/gedämpftes Grau (--lilac/--gold/--ink-dim) sowie eine dreistufige Oberflächen-Skala (--elev-1/2/3 für Kartenhintergründe, --line-1/2 für Ränder) im Haupt-Stil-Block eingeführt - reine Benennung/Konsolidierung, keine Farbwerte geändert, rein visuell unverändert',
       'Sechsstufige Typografie-Skala als CSS-Variablen (--fs-caption bis --fs-title) vorbereitet, Anwendung auf die wiederverwendeten Kernklassen folgt in einem separaten Schritt'
