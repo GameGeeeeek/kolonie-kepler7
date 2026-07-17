@@ -2374,8 +2374,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.59.3';
+  const VERSION = '8.59.4';
   const PATCHNOTES = [
+    { version:'8.59.4', date:'17.07.2026', changes:[
+      'Bugfix (Spieler-Feedback Sascha): Flottenverlegungen zwischen eigenen Planeten zählten bisher GAR NICHT gegen das Flottenentsendelimit - beliebig viele Verlegungen liefen parallel zu Angriffen/Expeditionen, ohne das Limit je zu spüren. Jetzt zählt jede Verlegung mit; ein per "Verband versenden" gemeinsam losgeschickter Verband (mehrere Schiffstypen, gemeinsame Ankunft) belegt dabei bewusst nur EINEN Flottenslot, keinen je enthaltenem Schiffstyp'
+    ]},
     { version:'8.59.3', date:'17.07.2026', changes:[
       'Balance: Artefakt-Set "Erbe der Alten" (permanenter +5%-Bonus auf Produktion, Angriff und Verteidigung) war praktisch kostenlos - Antimateriekern, Kristallherz und Alte Technologie mussten nur gleichzeitig im Inventar liegen, blieben danach unangetastet für Superschlachtschiff/Kristallfestung nutzbar. Jetzt werden alle drei Items beim Einlösen verbraucht, dazu kommt ein spürbarer, mit der Koloniezahl skalierender Ressourcenpreis (analog zu den Mega-Projekten)'
     ]},
@@ -7502,14 +7505,25 @@
   // unbegrenzt viele Flotten parallel einsetzen können (bisher nur durch Schiffszahl/Hangarplätze
   // je Missionsart einzeln begrenzt, nicht in der Summe).
   function maxConcurrentFleets(){ return 2 + (state.research.rflottenkoord||0); }
-  // Zählt alle gerade unterwegs befindlichen Flottenmissionen außer 'relocate' (Verlegen zwischen
-  // eigenen Planeten zählt bewusst NICHT mit - reine interne Logistik, keine Machtprojektion nach
-  // außen). Wie bei pendingColonyCount() über allFleetsWithPlanet(), damit Missionen von JEDEM
-  // eigenen Planeten/Mond mitgezählt werden, nicht nur vom gerade aktiven.
+  // Zählt alle gerade unterwegs befindlichen Flottenmissionen. Bugfix (Spieler-Feedback Sascha,
+  // 17.07.2026): 'relocate' (Verlegen zwischen eigenen Planeten) zählte bisher GAR NICHT mit - man
+  // konnte beliebig viele Verlegungen parallel losschicken, ohne das Limit je zu spüren. Jetzt zählt
+  // jede Verlegung mit, aber ein per "Verband versenden" (relocateFleetGroup) gemeinsam losgeschickter
+  // Verband - technisch weiterhin eine Mission PRO Schiffstyp, alle mit derselben groupId - zählt
+  // bewusst nur als EIN Slot (für den Spieler ist es eine einzige Flotte), nicht einer je Schiffstyp.
+  // Einzeln verlegte Schiffstypen (ohne Verband-Button) bekommen ihre eigene groupId und zählen
+  // dementsprechend auch einzeln. Wie bei pendingColonyCount() über allFleetsWithPlanet(), damit
+  // Missionen von JEDEM eigenen Planeten/Mond mitgezählt werden, nicht nur vom gerade aktiven.
   function activeFleetMissionCount(){
     let n = 0;
-    for (const { fleet } of allFleetsWithPlanet()) n += fleet.missions.filter(m=>m.type!=='relocate').length;
-    return n;
+    const relocateGroupIds = new Set();
+    for (const { fleet } of allFleetsWithPlanet()){
+      for (const m of fleet.missions){
+        if (m.type === 'relocate') relocateGroupIds.add(m.groupId || m.id);
+        else n++;
+      }
+    }
+    return n + relocateGroupIds.size;
   }
   // Gemeinsame Prüfung für alle Missions-Start-Funktionen: true = Limit erreicht, blockiert und
   // loggt bereits die Meldung (damit an jeder der zehn Versand-Stellen nur eine Zeile nötig ist).
@@ -15826,12 +15840,17 @@
     mult *= allianceBaseFlightMult(planetSystemOf(toPlanet));
     return baseSec * mult;
   }
-  function relocateShips(fromPlanet, toPlanet, shipKey, amount, forcedDur, forcedFleetName, skipFuelCharge){
+  function relocateShips(fromPlanet, toPlanet, shipKey, amount, forcedDur, forcedFleetName, skipFuelCharge, groupId){
     if (!amount || amount <= 0){ log('Ungültige Anzahl.', 'ti-alert-triangle'); return; }
     if (fromPlanet === toPlanet){ log('Ausgangs- und Zielort sind identisch.', 'ti-alert-triangle'); return; }
     const fromFleet = fromPlanet==='home' ? state.fleet : (state.colonies[fromPlanet] ? state.colonies[fromPlanet].fleet : null);
     if (!fromFleet){ log('Zielort ungültig.', 'ti-alert-triangle'); return; }
     if ((fromFleet[shipKey]||0) < amount){ log('Nicht genug Schiffe dieses Typs am Ausgangsort.', 'ti-alert-triangle'); return; }
+    // Flottenslot-Limit: bei einem Verband (relocateFleetGroup) übergibt der Aufrufer bereits eine
+    // groupId und hat das Limit dort schon EINMAL für den ganzen Verband geprüft - hier also nicht
+    // noch einmal je Einzeltyp prüfen. Bei einer eigenständigen Einzeltyp-Verlegung (kein groupId
+    // übergeben) greift die Prüfung direkt hier.
+    if (!groupId && fleetLimitBlocks()) return;
     const def = shipDefOrSuper(shipKey);
     const dur = forcedDur || relocationDuration(fromPlanet, toPlanet, shipKey);
     // skipFuelCharge (Bugfix 16.07.2026, Treibstoff-Audit): wird von relocateFleetGroup gesetzt, die
@@ -15846,7 +15865,11 @@
     fromFleet[shipKey] -= amount;
     fromFleet.missions = fromFleet.missions || [];
     const fleetName = forcedFleetName || nextFleetName();
-    fromFleet.missions.push({ id: nextMissionId(), type:'relocate', shipKey, qty: amount, targetId: toPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName });
+    const id = nextMissionId();
+    // Bugfix (Spieler-Feedback Sascha, 17.07.2026): groupId macht aus mehreren Einzeltyp-Missionen
+    // EINEN Flottenslot (siehe activeFleetMissionCount) - ohne übergebene groupId (eigenständige
+    // Einzeltyp-Verlegung) ist die Mission ihre eigene Gruppe (id als groupId).
+    fromFleet.missions.push({ id, type:'relocate', shipKey, qty: amount, targetId: toPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, groupId: groupId || id });
     if (!skipFuelCharge) log(fleetName+': '+amount+'x '+(def?def.name:shipKey)+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-arrows-shuffle');
     if (!forcedDur) { render(); save(); }
   }
@@ -15861,6 +15884,10 @@
     const fromFleet = fromPlanet==='home' ? state.fleet : (state.colonies[fromPlanet] ? state.colonies[fromPlanet].fleet : null);
     if (!fromFleet){ log('Zielort ungültig.', 'ti-alert-triangle'); return; }
     for (const k of keys){ if ((fromFleet[k]||0) < amounts[k]){ log('Nicht genug '+(shipDefOrSuper(k)||{name:k}).name+' am Ausgangsort.', 'ti-alert-triangle'); return; } }
+    // Bugfix (Spieler-Feedback Sascha, 17.07.2026): ein Verband belegt genau EINEN Flottenslot, nicht
+    // einen je enthaltenem Schiffstyp - Prüfung deshalb hier EINMAL für den ganzen Verband, die
+    // einzelnen relocateShips()-Aufrufe unten bekommen dieselbe groupId und prüfen selbst nicht mehr.
+    if (fleetLimitBlocks()) return;
     const sameSystem = planetSystemOf(fromPlanet) === planetSystemOf(toPlanet);
     const baseSec = sameSystem ? 90 : 420;
     const lvl = state.research.rfusion||0;
@@ -15879,8 +15906,9 @@
     if (!canAfford(totalFuel)){ log('Nicht genug Treibstoff für den Verband: benötigt '+fuelCostText(totalFuel)+'.', 'ti-alert-triangle'); return; }
     pay(totalFuel);
     const fleetName = resolveFleetName();
+    const groupId = nextMissionId();
     const summary = keys.map(k => amounts[k]+'x '+(shipDefOrSuper(k)||{name:k}).name).join(', ');
-    for (const k of keys) relocateShips(fromPlanet, toPlanet, k, amounts[k], groupDur, fleetName, true);
+    for (const k of keys) relocateShips(fromPlanet, toPlanet, k, amounts[k], groupDur, fleetName, true, groupId);
     log(fleetName+' (Verband): '+summary+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(groupDur)+'s Flugzeit, gemeinsame Ankunft). Treibstoff verbraucht: '+fuelCostText(totalFuel)+'.', 'ti-arrows-shuffle');
     render(); save();
   }
