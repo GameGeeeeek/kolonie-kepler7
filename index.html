@@ -469,7 +469,8 @@
     .dash-moon-badge:hover { background:#7f77dd; color:#0d1224; }
     .dash-colony-card.targeted .dash-colony-icon { background:rgba(var(--danger-rgb), 0.25); color:#f0997b; }
     .dash-colony-info { min-width:0; flex:1; }
-    .dash-colony-name { font-size:11px; color:#c7cbe0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:3px; }
+    .dash-colony-name { font-size:11px; color:#c7cbe0; display:flex; align-items:center; gap:3px; }
+    .dash-colony-name-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .dash-colony-level { font-size:12.5px; font-weight:500; color:#fff; white-space:nowrap; }
     .dash-colony-stats { font-size:10px; color:#9296ac; white-space:normal; display:flex; flex-wrap:wrap; align-items:center; gap:2px 5px; margin-top:1px; }
     .dash-colony-stats i { font-size:10px; margin-right:1px; }
@@ -2446,8 +2447,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.74.1';
+  const VERSION = '8.74.2';
   const PATCHNOTES = [
+    { version:'8.74.2', date:'17.07.2026', changes:[
+      'Bugfix (Folgemeldung zu 8.74.1, per Screenshot bestätigt): der Mond-Heimatbasis-Fix erzeugte fälschlich eine doppelte Karte "Mond von Heimatbasis" im Basis-Dashboard, obwohl der Heimatbasis-Mond dort längst korrekt über sein ☾-Symbol erreichbar war - behoben',
+      'Bugfix: das ☾-Mond-Symbol an Dashboard-Karten mit langem Planetennamen (z.B. "Ruinenwelt Drachenmark-5") wurde durch das Kartenlayout unsichtbar abgeschnitten, während es bei kurzen Namen wie "Heimatbasis" normal sichtbar blieb - der eigentliche Grund für "Mond bei Basis nicht auswählbar". Name und Mond-Symbol teilen sich jetzt sauber den verfügbaren Platz, das Symbol bleibt immer sichtbar'
+    ]},
     { version:'8.74.1', date:'17.07.2026', changes:[
       'Bugfix (Spieler-Meldung "Mond auf Drachenmark ist bei Basis nicht auswählbar"): ein kolonisierter Mond, dessen Elternplanet NICHT kolonisiert ist (durchaus möglich - Mondkolonisierung setzt keinen kolonisierten Planeten voraus und zählt nicht gegen das Kolonie-Limit), tauchte im Basis-Tab-Umschalter (Dashboard-Karten, Pillen-Reihe, Seitenmenü-Liste) NIRGENDS auf, da sein Mond-Symbol bisher nur an der - dann gar nicht existierenden - Karte des Elternplaneten hing. Solche Monde bekommen jetzt an allen drei Stellen einen eigenen, direkt anklickbaren Eintrag'
     ]},
@@ -20194,7 +20199,11 @@
     // colonizeMoon()/Mondbelagerungslimit-Ausnahme) hängen sonst NIRGENDS in dieser Pillen-Reihe, da
     // ihr Mond-Badge (pillMoonBtn) nur an der - dann gar nicht existierenden - Elternplaneten-Pille
     // hängt. Bugfix 17.07.2026 (Spieler-Meldung "Mond auf Drachenmark nicht auswählbar"): eigene Pille.
-    const orphanMoonIds = colonyIds.filter(pid => isMoonKey(pid) && !state.colonies[moonParentKey(pid)]);
+    // moonParentKey('moon_home') ergibt 'home', aber 'home' ist NIE ein Schlüssel in state.colonies (die
+    // Heimatbasis-Daten liegen direkt in state.buildings/state.fleet) - ohne die Ausnahme würde der
+    // Heimatbasis-Mond IMMER fälschlich als "verwaist" gelten und zusätzlich zum korrekten, angehängten
+    // Badge eine doppelte Standalone-Karte "Mond von Heimatbasis" erzeugen (Bugfix 17.07.2026).
+    const orphanMoonIds = colonyIds.filter(pid => isMoonKey(pid) && moonParentKey(pid) !== 'home' && !state.colonies[moonParentKey(pid)]);
     const orphanMoonPillsHtml = orphanMoonIds.map(pid => `<button class="planet-pill ${state.activeBasePlanet===pid?'active':''}" data-planet-switch="${pid}">☾ ${planetDisplayName(pid)}</button>`).join('');
     const planetSwitchHtml = (!colonyIds.length) ? '' : `<div class="planet-switch">
       <button class="planet-pill ${state.activeBasePlanet==='home'?'active':''}" data-planet-switch="home" style="border-color:rgba(126,119,221,0.4); position:relative;"><i class="ti ${PLANET_TYPE_INFO.erdaehnlich.icon}" aria-hidden="true" style="color:#5dcaa5;"></i>Heimatbasis <i class="ti ti-home" aria-hidden="true" style="color:#c3bef5; font-size:10px; margin-left:2px;"></i>${pillMoonBtn('home')}</button>
@@ -20272,7 +20281,7 @@
                 ${role ? `<span class="dash-role-badge" style="background:${role.color};" title="Rolle: ${role.name}"><i class="ti ${role.icon}" aria-hidden="true"></i></span>` : ''}
               </div>
               <div class="dash-colony-info">
-                <div class="dash-colony-name">${targeted?'<i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i> ':''}${sabotaged&&!targeted?'<i class="ti ti-bolt" aria-hidden="true" style="color:#e0a548;"></i> ':''}${d.name}${(!isMoonKey(d.id) && state.colonies && state.colonies['moon_'+d.id]) ? ` <span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+d.id?'active':''}" data-moon-switch="moon_${d.id}" title="${planetDisplayName('moon_'+d.id)} – zum Mond wechseln" style="vertical-align:middle;">☾</span>` : ''}</div>
+                <div class="dash-colony-name"><span class="dash-colony-name-text">${targeted?'<i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i> ':''}${sabotaged&&!targeted?'<i class="ti ti-bolt" aria-hidden="true" style="color:#e0a548;"></i> ':''}${d.name}</span>${(!isMoonKey(d.id) && state.colonies && state.colonies['moon_'+d.id]) ? `<span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+d.id?'active':''}" data-moon-switch="moon_${d.id}" title="${planetDisplayName('moon_'+d.id)} – zum Mond wechseln" style="vertical-align:middle;">☾</span>` : ''}</div>
                 <div class="dash-colony-level">${lvlSum} Lv.${role?` <span style="color:${role.color};">· ${role.name}</span>`:''}</div>
                 <div class="dash-colony-stats" title="Angriffskraft ${dAtk} · Verteidigungspunkte ${dDef} · ${shipCount} Schiffe stationiert"><i class="ti ti-sword" aria-hidden="true"></i>${fmt(dAtk)} <i class="ti ti-shield-lock" aria-hidden="true"></i>${fmt(dDef)} <i class="ti ti-rocket" aria-hidden="true"></i>${shipCount}</div>
               </div>
