@@ -2374,8 +2374,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.58.0';
+  const VERSION = '8.59.0';
   const PATCHNOTES = [
+    { version:'8.59.0', date:'17.07.2026', changes:[
+      'Exklusive Allianz-Einsätze (ab Allianzbasis-Stufe 3): jede Allianz erhält täglich einen gemeinsamen Einsatz - Versorgungskonvoi (Erz), Kristall-Kontingent (Kristalle), Treibstoff-Depot (Deuterium), Kampfoperation (gemeinsame Siege) oder Forschungsvorstoß (Expeditionen); Einsatz und Ziel sind für alle Mitglieder identisch und skalieren mit der Basis-Stufe',
+      'Einsatz-Belohnung für jeden Beteiligten: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich 1 Leerensplitter - abgeholt wird im Allianz-Tab, sobald das Team-Ziel erreicht ist (nur mit eigenem Beitrag)',
+      'Kampf- und Expeditions-Einsätze zählen automatisch über die bestehenden Statistiken - kein manuelles Melden nötig',
+      'Neuer Erfolg "Einsatzbereit" für den ersten abgeschlossenen Allianz-Einsatz; eine zerstörte Allianzbasis pausiert den Einsatzbetrieb bis zur Reparatur'
+    ]},
     { version:'8.58.0', date:'17.07.2026', changes:[
       'Neues Endgame-Ereignis Leerenriss (ab Leerentechnologie 1): über einem eigenen Planeten öffnet sich gelegentlich ein Riss in die Leere, der innerhalb von 45 Minuten mit einer Kampfflotte geschlossen werden muss (Box im Verteidigung-Tab, echte Flugzeit + Treibstoff) - Erfolg bringt 3-5 Leerensplitter, Antimaterie und +12 Kampfpunkte; kollabiert er ungeschlossen, gehen 10% der gelagerten Antimaterie verloren',
       'Neues Terraforming-Ziel Leerenwelt (ab Leerentechnologie 5, Kostenfaktor 2,5): +25% Antimaterie- und +10% Forschungspunkte-Produktion auf dem umgeformten Planeten',
@@ -6152,6 +6158,7 @@
     { key:'allexotic', name:'Exotischer Vordenker', desc:'Schließe alle drei Exotischen Forschungen ab.', check: s => EXOTIC_RESEARCH.every(e => (s.exoticResearch||{})[e.key]), progress: s => [EXOTIC_RESEARCH.filter(e=>(s.exoticResearch||{})[e.key]).length, EXOTIC_RESEARCH.length], reward:{erz:2500,kristalle:1500,deuterium:800,credits:100}, xpReward:150 },
     { key:'erdweltmaster', name:'Paradies-Architekt', desc:'Terraforme einen Standort vollständig zur Erdwelt.', check: s => Object.values(s.planetTypeOverride||{}).includes('erdwelt'), progress: s => [Object.values(s.planetTypeOverride||{}).includes('erdwelt')?1:0, 1], reward:{erz:8000,kristalle:5000,deuterium:2500,antimaterie:80,credits:300}, xpReward:300 },
     { key:'leerenweltmaster', name:'Leerengestalter', desc:'Terraforme einen Standort vollständig zur Leerenwelt.', check: s => Object.values(s.planetTypeOverride||{}).includes('leerenwelt'), progress: s => [Object.values(s.planetTypeOverride||{}).includes('leerenwelt')?1:0, 1], reward:{erz:20000,kristalle:14000,deuterium:8000,antimaterie:400,credits:800}, xpReward:600 },
+    { key:'allianzeinsatz', name:'Einsatzbereit', desc:'Schließe einen Allianz-Einsatz der Allianzbasis ab.', check: s => (s.allianceMissionsDone||0) >= 1, progress: s => [Math.min(1, s.allianceMissionsDone||0), 1], reward:{credits:400}, xpReward:200 },
     { key:'allcolonyslots', name:'Vollständige Expansion', desc:'Belege alle 11 möglichen Kolonie-Plätze (erfordert Kolonial-Logistik auf Maximalstufe).', check: s => (s.research.rkolonisation||0) >= 20 && Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 11, progress: s => [Math.min(11,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 11], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
     { key:'allresearchmax', name:'Forschungs-Meister', desc:'Bringe alle 22 Forschungszweige auf ihre jeweilige Maximalstufe.', check: s => RESEARCH_DEFS.every(r => (s.research[r.key]||0) >= r.maxLevel), progress: s => [RESEARCH_DEFS.filter(r=>(s.research[r.key]||0)>=r.maxLevel).length, RESEARCH_DEFS.length], reward:{erz:12000,kristalle:8000,deuterium:4000,antimaterie:150,credits:500}, xpReward:500 },
     { key:'forschungsnexus', name:'Wächter des Wissens', desc:'Errichte den Forschungs-Nexus (erfordert alle Forschungszweige auf Maximalstufe).', check: s => !!((s.megaProjects||{}).forschungsnexus), progress: s => [((s.megaProjects||{}).forschungsnexus)?1:0, 1], reward:{erz:10000,kristalle:7000,deuterium:3500,antimaterie:150,credits:500}, xpReward:500 },
@@ -8522,6 +8529,8 @@
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
     if (state.pirateDebrisRaid === undefined) state.pirateDebrisRaid = null;
     if (state.voidRift === undefined) state.voidRift = null;
+    if (state.allianceMissionDay === undefined) state.allianceMissionDay = null;
+    if (state.allianceMissionsDone === undefined) state.allianceMissionsDone = 0;
     if (state.allianceBase === undefined) state.allianceBase = null;
     if (state.allianceBaseWar === undefined) state.allianceBaseWar = null;
     if (!state.shipsAtAllianceBase) state.shipsAtAllianceBase = {};
@@ -11198,6 +11207,7 @@
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
       { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Energie / 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat eine <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage), die seit der Gründung parallel zu den Beiträgen läuft - schnelles Vollspenden überspringt also keine Bauzeit. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. <strong>Krieg um die Basis:</strong> Die Basis kann von Mitgliedern FREMDER Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, 8 Std. Abklingzeit je Spieler). Ihre Hülle hat 12.000 Punkte je Stufe; die Verteidigung besteht aus einem Sockel (600 je Stufe) plus allen von Mitgliedern <strong>zur Basis entsandten Schiffen</strong> (Button im Allianz-Tab, echte Flugzeit, jederzeit zurückrufbar - stationierte Schiffe erleiden bei Angriffen Verluste). Leichte Schäden repariert die Basis selbst (3%/Std.); fällt die Hülle auf 0, ist die Basis <strong>ZERSTÖRT</strong>: alle Boni sind deaktiviert, bis die Allianz die hohen Reparaturkosten (30% der kumulierten Baukosten) gemeinsam aufgebracht hat. Bei allen wichtigen Basis-Ereignissen (Baubeginn, erreichte Ausbaustufe, Angriff, Zerstörung, abgeschlossene Reparatur) erscheint automatisch eine <strong>System-Nachricht im Allianz-Chat</strong>, damit alle Mitglieder informiert sind. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone.' },
+      { title:'Allianz-Einsätze (ab Basis-Stufe 3)', body:'Ab Allianzbasis-Stufe 3 erhält eure Allianz jeden Tag einen gemeinsamen <strong>Allianz-Einsatz</strong> (im Allianz-Tab unterhalb der Basis): <strong>Versorgungskonvoi</strong> (Erz liefern), <strong>Kristall-Kontingent</strong>, <strong>Treibstoff-Depot</strong> (Deuterium), <strong>Kampfoperation</strong> (gemeinsam Kämpfe gewinnen - NPCs, Piraten, Abwehr und Leerenrisse zählen automatisch) oder <strong>Forschungsvorstoß</strong> (gemeinsam Expeditionen abschließen). Einsatz und Tagesziel sind für alle Mitglieder identisch und skalieren mit der Basis-Stufe. Ist das Team-Ziel erreicht, holt sich <strong>jeder, der beigetragen hat</strong>, die Belohnung ab: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich <strong>1 Leerensplitter</strong>. Kampf-/Expeditions-Fortschritt wird beim Öffnen des Allianz-Tabs übertragen. Eine zerstörte Basis pausiert den Einsatzbetrieb bis zur Reparatur.' },
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
       { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen oder zurückstufen (auch andere Admins zu Offizier/Mitglied), und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
       { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz startet mit einem Mitgliederlimit von <strong>10</strong>. Höher geht es nur über die Allianz-Forschung "Allianz-Expansion" (5 Stufen, in der Allianz-Forschung, dieselbe Kette wie andere Allianz-Techs) - bis zu 50 bei voller Ausbaustufe. Das Limit ergibt sich automatisch aus der erreichten Forschungsstufe, es lässt sich nicht manuell einstellen. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
@@ -12654,7 +12664,7 @@
   const ALLIANCE_BASE_STAGES = [
     { level:1,  text:'Basis errichtet · +1% Produktion & +1% Verteidigung je Stufe (alle Mitglieder)' },
     { level:2,  text:'+5% Lagerkapazität' },
-    { level:3,  text:'-4% Gebäude-Bauzeit' },
+    { level:3,  text:'-4% Gebäude-Bauzeit · schaltet die täglichen Allianz-Einsätze frei' },
     { level:4,  text:'-10% Flugzeit für Missionen ins Basis-System (Allianzgebiet)' },
     { level:5,  text:'-4% Forschungszeit' },
     { level:6,  text:'weitere +5% Lagerkapazität (gesamt +10%)' },
@@ -12721,6 +12731,7 @@
       renderAllianceBaseBox();
       loadAllianceBaseWar();
       maybeAnnounceBaseLevel();
+      loadAllianceMissionTeam();
     } catch(e){}
   }
   // Automatische System-Nachricht in den Allianz-Chat (Absender "Allianzbasis") - informiert ALLE
@@ -12802,6 +12813,150 @@
     await loadAllianceTechData();
     await maybeAnnounceBaseLevel();
     render(); save();
+  }
+
+  // ===== Exklusive Allianz-Einsätze (17.07.2026) =====
+  // Ab Allianzbasis-Stufe 3 (eine zerstörte Basis pausiert sie wie alle Boni) erhält die Allianz
+  // einen gemeinsamen TAGES-EINSATZ: deterministisch aus Allianz-Tag + Datum abgeleitet, alle
+  // Mitglieder sehen also ohne zusätzlichen Server-Zustand denselben Einsatz. Fortschritt läuft
+  // über EIGENE Ein-Autor-Dokumente je Spieler (alliance:<TAG>:missionprog:<playerId>, täglich
+  // überschrieben) - dasselbe race-freie Muster wie Basis-Beiträge und -Verteidigung. Kampf-/
+  // Expeditions-Einsätze messen über die vorhandenen Lebenszeit-Zähler (battleStats.wins,
+  // expeditionsCompleted) mit Tages-Basiswert statt neuer Hooks - wie die Fraktions-Aufträge.
+  // Belohnungen sind bewusst FLACH (Kredite/Kampfpunkte/XP statt "N Minuten Produktion").
+  const ALLIANCE_MISSION_MIN_LEVEL = 3;
+  const ALLIANCE_MISSION_TYPES = [
+    { key:'konvoi-erz', name:'Versorgungskonvoi', icon:'ti-truck', res:'erz', goal: lvl => 120000*lvl, desc: g => 'Liefert gemeinsam '+fmt(g)+' Erz an die Basis-Logistik.' },
+    { key:'konvoi-kristalle', name:'Kristall-Kontingent', icon:'ti-diamond', res:'kristalle', goal: lvl => 80000*lvl, desc: g => 'Liefert gemeinsam '+fmt(g)+' Kristalle für die Stationssysteme.' },
+    { key:'konvoi-deuterium', name:'Treibstoff-Depot', icon:'ti-droplet', res:'deuterium', goal: lvl => 40000*lvl, desc: g => 'Füllt gemeinsam '+fmt(g)+' Deuterium in die Basistanks.' },
+    { key:'jagd', name:'Kampfoperation', icon:'ti-sword', counter:'wins', goal: lvl => 5 + 2*lvl, desc: g => 'Gewinnt zusammen '+g+' Kämpfe (NPCs, Piraten, Abwehr, Leerenrisse - jeder Sieg zählt).' },
+    { key:'vorstoss', name:'Forschungsvorstoß', icon:'ti-map-2', counter:'expeditions', goal: lvl => 3 + lvl, desc: g => 'Schließt zusammen '+g+' Expeditionen ab.' }
+  ];
+  function allianceMissionDayKey(){ return new Date().toISOString().slice(0,10); }
+  function allianceMissionFor(tag){
+    const lvl = allianceBaseBonusLevel();
+    if (!tag || lvl < ALLIANCE_MISSION_MIN_LEVEL) return null;
+    const dayKey = allianceMissionDayKey();
+    const def = ALLIANCE_MISSION_TYPES[Math.floor(hashStringToFloat(tag+':einsatz:'+dayKey) * ALLIANCE_MISSION_TYPES.length)];
+    return { dayKey, def, goal: def.goal(lvl), lvl };
+  }
+  // Lokaler Tages-Zustand: Basiswerte der Lebenszeit-Zähler, eigener Lieferbeitrag, Abhol-Status.
+  function ensureAllianceMissionState(dayKey){
+    if (!state.allianceMissionDay || state.allianceMissionDay.dayKey !== dayKey){
+      state.allianceMissionDay = { dayKey, startWins: (state.battleStats&&state.battleStats.wins)||0, startExpeditions: state.expeditionsCompleted||0, contributed: 0, claimed: false };
+    }
+    return state.allianceMissionDay;
+  }
+  function myAllianceMissionValue(mission){
+    const d = ensureAllianceMissionState(mission.dayKey);
+    if (mission.def.res) return d.contributed||0;
+    if (mission.def.counter === 'wins') return Math.max(0, ((state.battleStats&&state.battleStats.wins)||0) - (d.startWins||0));
+    return Math.max(0, (state.expeditionsCompleted||0) - (d.startExpeditions||0));
+  }
+  async function publishAllianceMissionProgress(mission){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend() || !mission) return;
+    try { await storageSet('alliance:'+tag+':missionprog:'+state.player.id, JSON.stringify({ dayKey: mission.dayKey, value: myAllianceMissionValue(mission), name: state.player.name||'?' }), true); } catch(e){}
+  }
+  let allianceMissionTeam = null; // { dayKey, total, players:[{name,value}] } - nur Anzeige-Cache
+  async function loadAllianceMissionTeam(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ allianceMissionTeam = null; return; }
+    const mission = allianceMissionFor(tag);
+    if (!mission){ allianceMissionTeam = null; return; }
+    await publishAllianceMissionProgress(mission);
+    try {
+      const listRes = await storageList('alliance:'+tag+':missionprog:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
+      const docs = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){}
+        return null;
+      }));
+      const players = docs.filter(d => d && d.dayKey === mission.dayKey && (d.value||0) > 0).map(d => ({ name: d.name||'?', value: d.value||0 }));
+      allianceMissionTeam = { dayKey: mission.dayKey, total: players.reduce((a,p)=>a+p.value,0), players: players.sort((a,b)=>b.value-a.value) };
+      renderAllianceBaseBox();
+    } catch(e){}
+  }
+  async function contributeToAllianceMission(amount){
+    const tag = myAllianceTag();
+    const mission = allianceMissionFor(tag);
+    if (!mission || !mission.def.res){ log('Aktuell läuft kein Liefer-Einsatz.', 'ti-alert-triangle'); return; }
+    amount = Math.floor(amount);
+    if (!amount || amount <= 0){ log('Ungültige Menge.', 'ti-alert-triangle'); return; }
+    const d = ensureAllianceMissionState(mission.dayKey);
+    const resLabel = (RES_DEFS.find(r=>r.key===mission.def.res)||{}).label||mission.def.res;
+    if ((state.resources[mission.def.res]||0) < amount){ log('Nicht genug '+resLabel+' für diesen Beitrag.', 'ti-alert-triangle'); return; }
+    // Nicht mehr annehmen, als zum Tagesziel fehlt (Team-Summe kann leicht veraltet sein -
+    // ein kleiner Überhang durch parallele Beiträge ist unkritisch, nur Verschwendung vermeiden).
+    const teamTotal = (allianceMissionTeam && allianceMissionTeam.dayKey===mission.dayKey) ? allianceMissionTeam.total : 0;
+    amount = Math.min(amount, Math.max(0, mission.goal - teamTotal));
+    if (amount <= 0){ log('Das Tagesziel ist bereits erreicht - hol die Belohnung ab!', 'ti-info-circle'); return; }
+    state.resources[mission.def.res] -= amount;
+    d.contributed = (d.contributed||0) + amount;
+    log(fmt(amount)+' '+resLabel+' zum Allianz-Einsatz beigetragen.', 'ti-target');
+    playSound('trade');
+    await loadAllianceMissionTeam();
+    render(); save();
+  }
+  function allianceMissionReward(lvl){
+    const r = { credits: 300 + 80*lvl, battlePoints: 10, xp: 120 };
+    if (lvl >= 8) r.leerensplitter = 1;
+    return r;
+  }
+  async function claimAllianceMissionReward(){
+    const tag = myAllianceTag();
+    const mission = allianceMissionFor(tag);
+    if (!mission) return;
+    const d = ensureAllianceMissionState(mission.dayKey);
+    if (d.claimed){ log('Die Einsatz-Belohnung wurde heute bereits abgeholt.', 'ti-info-circle'); return; }
+    const myVal = myAllianceMissionValue(mission);
+    if (myVal <= 0){ log('Nur wer selbst zum Einsatz beigetragen hat, erhält die Belohnung.', 'ti-alert-triangle'); return; }
+    await loadAllianceMissionTeam();
+    if (!allianceMissionTeam || allianceMissionTeam.total < mission.goal){ log('Das Tagesziel ist noch nicht erreicht.', 'ti-alert-triangle'); return; }
+    d.claimed = true;
+    const rew = allianceMissionReward(mission.lvl);
+    state.credits = (state.credits||0) + rew.credits;
+    awardBattlePoints(rew.battlePoints);
+    addXp(rew.xp);
+    if (rew.leerensplitter) state.rareItems.leerensplitter = (state.rareItems.leerensplitter||0) + rew.leerensplitter;
+    state.allianceMissionsDone = (state.allianceMissionsDone||0) + 1;
+    log('Allianz-Einsatz "'+mission.def.name+'" abgeschlossen: +'+rew.credits+' Kredite, +'+rew.battlePoints+' Kampfpunkte, +'+rew.xp+' XP'+(rew.leerensplitter?', +1 Leerensplitter':'')+'!', 'ti-target');
+    playSound('achieve');
+    render(); save();
+  }
+  // Einsatz-Abschnitt der Basis-Box (unterhalb des Kriegs-Abschnitts).
+  function allianceMissionSectionHtml(lvl){
+    if (lvl < 1) return '';
+    let s = `<div class="bname" style="font-size:13px; margin-top:4px;"><i class="ti ti-target" aria-hidden="true"></i> Allianz-Einsätze <span class="lvl-pill">ab Stufe ${ALLIANCE_MISSION_MIN_LEVEL}</span></div>`;
+    if (allianceBaseBonusLevel() < ALLIANCE_MISSION_MIN_LEVEL){
+      s += `<div class="bmeta"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85;"></i> ${allianceBaseDestroyed() ? 'Solange die Basis zerstört ist, ruht der Einsatzbetrieb - erst reparieren.' : 'Ab Ausbaustufe '+ALLIANCE_MISSION_MIN_LEVEL+' erhält eure Allianz jeden Tag einen exklusiven Gemeinschafts-Einsatz mit Belohnung für alle Beteiligten.'}</div>`;
+      return s;
+    }
+    const mission = allianceMissionFor(myAllianceTag());
+    if (!mission) return s;
+    const d = ensureAllianceMissionState(mission.dayKey);
+    const myVal = myAllianceMissionValue(mission);
+    const teamTotal = Math.max(myVal, (allianceMissionTeam && allianceMissionTeam.dayKey===mission.dayKey) ? allianceMissionTeam.total : 0);
+    const pct = Math.min(100, teamTotal/mission.goal*100);
+    const done = teamTotal >= mission.goal;
+    const rew = allianceMissionReward(mission.lvl);
+    s += `<div class="bmeta"><i class="ti ${mission.def.icon}" aria-hidden="true" style="color:#c3bef5;"></i> <strong style="color:#e8e5ff;">${mission.def.name}</strong> (Tages-Einsatz): ${mission.def.desc(mission.goal)}</div>`;
+    s += `<div style="display:flex; justify-content:space-between;"><span class="bmeta">Team-Fortschritt${done?' ✓':''}</span><span class="bmeta">${fmt(teamTotal)}/${fmt(mission.goal)} · dein Anteil: ${fmt(myVal)}</span></div>`;
+    s += `<div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>`;
+    s += `<div class="bmeta">Belohnung je Beteiligtem: +${rew.credits} Kredite · +${rew.battlePoints} Kampfpunkte · +${rew.xp} XP${rew.leerensplitter?' · +1 Leerensplitter':''}</div>`;
+    if (d.claimed){
+      s += `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Belohnung heute abgeholt - morgen wartet ein neuer Einsatz.</div>`;
+    } else if (done){
+      s += `<div><button class="buy affordable" id="abMissionClaimBtn"><i class="ti ti-award" aria-hidden="true" style="margin-right:4px;"></i>Belohnung abholen</button>${myVal<=0?'<span class="bmeta" style="margin-left:8px; color:#f0997b;">nur mit eigenem Beitrag</span>':''}</div>`;
+    } else if (mission.def.res){
+      s += `<div style="display:flex; gap:6px; align-items:center;">
+        <input type="text" inputmode="numeric" placeholder="Menge" id="abMissionInput" style="flex:1; font-size:12px;"/>
+        <button id="abMissionContribBtn" style="font-size:10px; padding:5px 8px;">Beitragen</button>
+      </div>`;
+    } else {
+      s += `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Zählt automatisch - der Fortschritt aller Mitglieder wird beim Öffnen des Allianz-Tabs übertragen.</div>`;
+    }
+    return s;
   }
 
   // ===== Allianzbasis: Angriff, Verteidigung, Zerstörung & Reparatur =====
@@ -13362,6 +13517,7 @@
         <div class="bmeta">Dein Gesamtbeitrag zur Basis: ${fmt(myContribSum)} Ressourcen</div>
         <details><summary class="bmeta" style="cursor:pointer;">Ausbaustufen & Boni anzeigen</summary><div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">${stagesHtml}</div></details>
         ${allianceBaseWarSectionHtml(lvl)}
+        ${allianceMissionSectionHtml(lvl)}
       </div>`;
     box.querySelectorAll('[data-ab-contrib]').forEach(btn => btn.onclick = () => {
       const rk = btn.getAttribute('data-ab-contrib');
@@ -13392,6 +13548,13 @@
       const input = box.querySelector('#abAttackTagInput');
       sendAllianceBaseAttackMission(input ? input.value : '');
     };
+    const missionContribBtn = box.querySelector('#abMissionContribBtn');
+    if (missionContribBtn) missionContribBtn.onclick = () => {
+      const input = box.querySelector('#abMissionInput');
+      contributeToAllianceMission(parseInt((input && input.value || '').replace(/[^\d]/g,''), 10));
+    };
+    const missionClaimBtn = box.querySelector('#abMissionClaimBtn');
+    if (missionClaimBtn) missionClaimBtn.onclick = () => claimAllianceMissionReward();
   }
   // Kriegs-Abschnitt der Basis-Box: Hüllen-Leiste, Zerstört-Zustand mit Reparatur,
   // Verteidigungs-Stationierung und Angriff auf fremde Basen.
