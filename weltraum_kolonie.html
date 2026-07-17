@@ -543,6 +543,22 @@
        registerShareMoment() (Prestige/Aufstieg/Mond/Boss-Kill/...). */
     .milestone-confetti-piece { position:fixed; width:5px; height:9px; pointer-events:none; z-index:301; opacity:0; }
 
+    /* Grafik-Runde 9, Vorschlag 36 "Erfolge-Freischaltung": kleines, festes Badge statt Partikel-Burst
+       - siehe playAchievementPop(). Deutlich zurückhaltender als .milestone-confetti-piece. */
+    .ach-pop-badge {
+      position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:302; width:46px; height:46px;
+      background:linear-gradient(135deg, rgba(13,18,36,0.96), #0a0f1c); border:1px solid var(--c-info);
+      display:flex; align-items:center; justify-content:center; font-size:19px; color:var(--gold);
+      clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+      box-shadow:var(--glow-info); pointer-events:none; opacity:1; transition:opacity 0.4s ease;
+      animation:achPopIn 0.5s cubic-bezier(0.2,0.8,0.3,1.4);
+    }
+    .ach-pop-badge.fade { opacity:0; }
+    .ach-pop-ring { position:absolute; inset:-6px; border-radius:50%; border:1.5px solid var(--c-info); opacity:0; animation:achPopRing 0.7s ease-out; }
+    @keyframes achPopIn { 0%{ transform:translateX(-50%) scale(0.4); opacity:0; } 60%{ transform:translateX(-50%) scale(1.15); } 100%{ transform:translateX(-50%) scale(1); opacity:1; } }
+    @keyframes achPopRing { 0%{ opacity:0.8; transform:scale(0.6); } 100%{ opacity:0; transform:scale(1.8); } }
+    @media (prefers-reduced-motion: reduce) { .ach-pop-badge { animation:none; } .ach-pop-ring { animation:none; display:none; } }
+
     .tabs { display:flex; gap:6px; margin-bottom:1.1rem; flex-wrap:wrap; }
     /* Auf schmalen Screens würden viele Tabs mehrzeilig umbrechen und oben viel Platz fressen -
        stattdessen eine Wischleiste (nutzt denselben Scrollbalken-Stil wie [data-hscroll] oben). */
@@ -581,6 +597,12 @@
     @media (max-width: 380px) { .resbar { grid-template-columns: repeat(2, 1fr); } }
     .rescard { position:relative; overflow:hidden; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:12px; padding: 0.8rem 0.9rem; display:flex; align-items:center; gap:10px; transition:border-color 0.2s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
     .rescard:hover { border-color:rgba(var(--primary-rgb), 0.3); }
+    /* Grafik-Runde 9, Vorschlag 37 "Touch-Feedback": kurzer Hintergrund-Aufblitz statt Ripple-Kreis
+       (siehe Begründung im JS) - gilt für .card-row genauso wie .rescard, daher hier zentral statt
+       doppelt definiert. */
+    .touch-tap-flash { animation: touchTapFlash 0.4s ease-out; }
+    @keyframes touchTapFlash { 0%{ background:rgba(var(--info-rgb),0.16); } 100%{ background:var(--elev-1); } }
+    @media (prefers-reduced-motion: reduce) { .touch-tap-flash { animation:none; } }
     .rescard-info { min-width:0; flex:1; }
     .rescard .icon-badge { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
     .rescard .label { font-size:11px; color:#a8adc4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -860,6 +882,17 @@
     .system-nav-name { font-size:14px; font-weight:600; color:#f2f3f8; }
     .system-nav-meta { font-size:11px; color:#8489a0; margin-top:1px; }
     .map-wrap svg { width:100%; height:100%; }
+    /* Grafik-Runde 9, Vorschlag 35 "Sektorkarte als Radar-Display": bewusst NICHT Teil des SVG-Inhalts
+       (der bei jedem buildMap()-Aufruf komplett per innerHTML ersetzt wird, siehe Kommentar dort, und
+       dessen viewBox sich beim Zoomen/Verschieben ändert - ein Radar-Overlay INNERHALB des SVG würde
+       beim Zoomen falsch mitskalieren/wandern, wie ein Instrument, das Teil der Landschaft wäre statt
+       fest am Bildschirm zu kleben). Stattdessen eigenes, unabhängiges CSS-Overlay als Geschwister-
+       Element - pointer-events:none, blockiert also weder Drag-Pan noch Planeten-Klicks. */
+    .map-radar-overlay { position:absolute; inset:0; pointer-events:none; z-index:2; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .map-radar-sweep { position:relative; width:220px; height:220px; border-radius:50%; flex-shrink:0; background-image:repeating-radial-gradient(circle, transparent 0, transparent 34px, rgba(92,225,255,0.05) 35px); }
+    .map-radar-sweep::before { content:''; position:absolute; inset:0; border-radius:50%; background:conic-gradient(from 0deg, rgba(92,225,255,0.16), transparent 55deg); animation:mapRadarSpin 5s linear infinite; }
+    @keyframes mapRadarSpin { to { transform:rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .map-radar-sweep::before { animation:none; } }
     .planet-node { cursor:pointer; }
     .planet-node circle.body { transition: filter 0.15s; }
     .planet-node:hover circle.body { filter: brightness(1.25); }
@@ -1501,6 +1534,7 @@
         <div class="planet-switch" id="mapBaseLinks" style="margin-bottom:0.75rem;"></div>
         <div class="map-wrap" style="height:260px; position:relative; touch-action:none;">
           <svg id="mapSvg" viewBox="0 0 700 230" width="100%" height="100%" style="cursor:grab;"></svg>
+          <div class="map-radar-overlay" aria-hidden="true"><div class="map-radar-sweep"></div></div>
           <div style="position:absolute; right:8px; bottom:8px; display:flex; flex-direction:column; gap:6px; z-index:5;">
             <button id="mapZoomInBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
             <button id="mapZoomOutBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
@@ -2714,8 +2748,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.85.0';
+  const VERSION = '8.86.0';
   const PATCHNOTES = [
+    { version:'8.86.0', date:'17.07.2026', changes:[
+      'Sektorkarte hat jetzt ein rotierendes Radar-Sweep-Overlay - rein dekorativ, unabhängig vom Zoomen/Verschieben der eigentlichen Karte',
+      'Erfolge-Freischaltung zeigt jetzt einen kurzen Pop+Ring-Moment (deutlich zurückhaltender als die große Konfetti-Feier bei seltenen Meilensteinen)',
+      'Karten (Ressourcen/Übersicht) geben auf Touch-Geräten jetzt einen kurzen Hintergrund-Aufblitz beim Antippen - vorher hatten sie dort gar kein Feedback (der Maus-Tilt-Effekt greift auf Touch bewusst nicht)',
+      'Alle neuen Effekte respektieren "reduzierte Bewegung"'
+    ]},
     { version:'8.85.0', date:'17.07.2026', changes:[
       'Grafik-Overhaul "High-End": alle Schiffs-/Planeten-/Verteidigungs-Canvas-Icons zeichnen jetzt in devicePixelRatio-facher Auflösung - auf Retina-/hochauflösenden Bildschirmen spürbar schärfer statt leicht weich (echter, vorher unbemerkter Befund)',
       'Ein dezenter roter Rand-Schein pulsiert jetzt um die gesamte Oberfläche, solange ein ERKANNTER Überfall auf die Heimatbasis unterwegs ist (nur bei bereits aufgedeckten Überfällen, keine zusätzliche Information gegenüber dem bestehenden Warn-Badge)',
@@ -9463,6 +9503,7 @@
         rewardParts.push('+'+xpReward+' XP');
         log('Erfolg freigeschaltet: '+a.name+' ('+rewardParts.join(', ')+')', 'ti-medal');
         playSound('achieve');
+        playAchievementPop();
       }
     }
   }
@@ -19497,6 +19538,19 @@
       ], { duration:1100+Math.random()*500, easing:'cubic-bezier(0.2,0.6,0.4,1)' }).onfinish = () => p.remove();
     }
   }
+  // Grafik-Runde 9, Vorschlag 36 "Erfolge-Freischaltung": bewusst spürbar zurückhaltender als
+  // playMilestoneConfetti() (36 Partikel, Vollbild) - normale Erfolge sind viel häufiger als die
+  // seltenen "großen Momente", die Hierarchie zwischen beiden muss erhalten bleiben. Kein DOM-Ziel im
+  // Erfolge-Tab nötig (der ist beim Freischalten oft gar nicht geöffnet) - eigenes, fest positioniertes
+  // Badge statt Partikel-Burst.
+  function playAchievementPop(){
+    if (typeof document === 'undefined') return;
+    const el = document.createElement('div');
+    el.className = 'ach-pop-badge';
+    el.innerHTML = '<i class="ti ti-medal" aria-hidden="true"></i><span class="ach-pop-ring"></span>';
+    document.body.appendChild(el);
+    setTimeout(() => { el.classList.add('fade'); setTimeout(() => el.remove(), 400); }, 1400);
+  }
   const SHARE_CARD_TYPES = [
     { key:'profil', name:'Profil', gen: generateProfileCard, avail: () => true },
     { key:'flotte', name:'Flotte', gen: generateFleetCard, avail: () => true },
@@ -25009,6 +25063,20 @@
         { transform:`translate(calc(-50% + ${(Math.cos(angle)*dist).toFixed(1)}px), calc(-50% + ${(Math.sin(angle)*dist).toFixed(1)}px)) scale(0.3)`, opacity:0 }
       ], { duration:420+Math.random()*180, easing:'ease-out' }).onfinish = () => p.remove();
     }
+  });
+
+  // Grafik-Runde 9, Vorschlag 37 "Touch-Feedback": der Karten-Tilt (Vorschlag 26) ist bewusst nur bei
+  // "pointer: fine" (echte Maus) aktiv - .buy-Buttons haben durch den Partikel-Burst weiter oben schon
+  // Touch-Feedback (click feuert auch bei Tap), aber .card-row/.rescard selbst haben auf Touch-Geräten
+  // bislang GAR kein Feedback. Bewusst ein einfacher Hintergrund-Aufblitz statt eines expandierenden
+  // Ripple-Kreises: ein Ripple bräuchte overflow:hidden auf .card-row, das aber an vielen Stellen im
+  // Code verwendet wird und dort möglicherweise absichtlich überstehende Kindelemente (Badges,
+  // Tooltips) hat - ein pauschales overflow:hidden wäre ein unnötiges Risiko für einen kleinen Effekt.
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' || (prefersReducedMotionMq && prefersReducedMotionMq.matches)) return;
+    const card = e.target.closest('.card-row, .rescard');
+    if (!card) return;
+    card.classList.remove('touch-tap-flash'); void card.offsetWidth; card.classList.add('touch-tap-flash');
   });
 
   document.getElementById('resetBtn').addEventListener('click', async () => {
