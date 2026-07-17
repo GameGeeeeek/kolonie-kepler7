@@ -2438,8 +2438,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.72.0';
+  const VERSION = '8.72.1';
   const PATCHNOTES = [
+    { version:'8.72.1', date:'17.07.2026', changes:[
+      'Balance-Review der neuen Schiffsklassen-Module: Zielcomputer (Angriff) und Panzerung/Verstärkte Hülle (Verteidigungsbeitrag) waren als eigene, ungedeckelte Multiplikatoren umgesetzt statt - wie bei allen bestehenden stapelnden Kampf-Boni im Spiel üblich - in eine gedeckelte Gruppe zu fließen. Jetzt lokal bei +100% gedeckelt (gleiche Ziel-Obergrenze wie die bestehende Kampf-Bonus-Gruppe), bewusst weiterhin NICHT in diese eingespeist, da der Bonus klassenspezifisch bleiben muss und sonst fälschlich auch andere Schiffstypen derselben Flotte verstärken würde. Mit den aktuellen Werten (max. 3 Slots, alle Mythisch) wäre die alte, ungedeckelte Version ohnehin nicht über +75% hinausgekommen - reine Vorsichtsmaßnahme für künftige, stärkere Module, keine akute Überstärke',
+      'Aufgeräumt: die seit der Wochen-/Großprojekt-Erweiterung ungenutzte Konstante ALLIANCE_MISSION_MIN_LEVEL entfernt (durch die Kadenz-Konfiguration ALLIANCE_MISSION_CADENCES ersetzt, aber als toter Restcode stehen geblieben)'
+    ]},
     { version:'8.72.0', date:'17.07.2026', changes:[
       'Neu: Allianz-Flottenanstriche (Teil 5 und Abschluss von "Allianzmissionen mit exklusiven Belohnungen") - vier exklusive Farbschemata für die Flotten-Icons (Golden, Smaragdgrün, Violett, Kristallweiß), ausschließlich über abgeschlossene Großprojekte erhältlich. Verwaltung im Fortschritt-Tab (neuer Bereich "Allianz-Flottenanstriche" unter den Ehrentiteln) - ein aktivierter Anstrich färbt die Schiffs-Icons überall im Spiel um (Flotte, Expeditionen, Angriffsflotten-Auswahl, ...), rein kosmetisch ohne Spielauswirkung',
       'Damit ist die komplette "Allianzmissionen mit exklusiven Belohnungen"-Reihe umgesetzt: Schiffsklassen-Module, Wochen-/Großprojekte mit Fairness-Skalierung und Mindestbeitrags-Schwelle, Allianzpunkte & Allianz-Projekte, Ehrentitel, exklusiver Booster & seltene Materialien, und jetzt Flottenanstriche'
@@ -7462,7 +7466,14 @@
   function attackPowerRaw(fleet){
     const f = fleet || currentFleet();
     const df = deployableFighters(f);
-    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90*(1+shipModuleBonusFor('schlachtschiff','atk')) + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8;
+    // Zielcomputer-Modulbonus lokal bei +100% gedeckelt (Balance-Review 17.07.2026) - dieselbe
+    // Ziel-Obergrenze wie die geteilte attackCombatBonusRaw()-Gruppe, aber bewusst NICHT in diese
+    // eingespeist: der Bonus gilt nur für Schlachtschiffe, ein Eintrag in der geteilten, flotten-
+    // weiten Gruppe würde ihn fälschlich auch auf andere Schiffstypen derselben Flotte anwenden.
+    // Bei maximalem Stapeln (3 Slots, alle Mythisch, alle "Zielcomputer") wären es ungedeckelt +75% -
+    // schon unter der Deckelung, der Cap dient vor allem als Schutz vor künftig stärkeren Modulen.
+    const schlachtschiffAtkMult = 1 + Math.min(1.0, shipModuleBonusFor('schlachtschiff','atk'));
+    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90*schlachtschiffAtkMult + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8;
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
@@ -7819,9 +7830,12 @@
       // Klassenweite Hülle-/Schild-Module (Schiffsklassen-Modulsystem): 'hull' verstärkt den
       // Verteidigungsbeitrag, 'shield' gibt zusätzliche Schildpunkte. Schiffe ohne eigenen shield-Basiswert
       // (z.B. Schlachtschiff) erhalten stattdessen Schildpunkte proportional zu ihrem Angriffswert -
-      // sie haben regulär keinen shield-Stat, den ein reiner %-Bonus verstärken könnte.
+      // sie haben regulär keinen shield-Stat, den ein reiner %-Bonus verstärken könnte. hullBonus lokal
+      // bei +100% gedeckelt (Balance-Review 17.07.2026, dieselbe Begründung wie beim Zielcomputer in
+      // attackPowerRaw() - klassenspezifisch, kann nicht in die geteilte defenseCombatBonusRaw()-Gruppe
+      // einfließen, ohne andere Schiffstypen derselben Flotte fälschlich mitzuverstärken).
       const cls = shipClassKeyFor(def.key);
-      const hullBonus = cls ? shipModuleBonusFor(cls, 'hull') : 0;
+      const hullBonus = cls ? Math.min(1.0, shipModuleBonusFor(cls, 'hull')) : 0;
       const shieldBonus = cls ? shipModuleBonusFor(cls, 'shield') : 0;
       atkDerivedSum += diminishingShipCount(count) * (def.atk||0) * weight * (1+hullBonus);
       shieldSum += count * (def.shield ? def.shield*(1+shieldBonus) : (def.atk||0)*shieldBonus*0.5);
@@ -13683,7 +13697,6 @@
   // wer nichts beigetragen hat, geht leer aus, wie im Feature-Wunsch gefordert ("wer nicht beigetragen
   // hat, bekommt nichts"). Wer die Allianz vor Abschluss verlässt, kann gar nicht mehr claimen (die
   // Funktion braucht den AKTUELLEN Allianz-Tag, um den Einsatz überhaupt zu finden).
-  const ALLIANCE_MISSION_MIN_LEVEL = 3; // Rückwärtskompatibilität für den alten Namen, siehe Kadenz 'daily'.
   const ALLIANCE_MISSION_TYPES = [
     { key:'konvoi-erz', name:'Versorgungskonvoi', icon:'ti-truck', res:'erz', goal: lvl => 120000*lvl, desc: g => 'Liefert gemeinsam '+fmt(g)+' Erz an die Basis-Logistik.' },
     { key:'konvoi-kristalle', name:'Kristall-Kontingent', icon:'ti-diamond', res:'kristalle', goal: lvl => 80000*lvl, desc: g => 'Liefert gemeinsam '+fmt(g)+' Kristalle für die Stationssysteme.' },
