@@ -2392,8 +2392,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.60.1';
+  const VERSION = '8.60.2';
   const PATCHNOTES = [
+    { version:'8.60.2', date:'17.07.2026', changes:[
+      'Superschlachtschiff hat jetzt einen kleinen Eigenhangar (2 Jäger-/Bomber-Plätze je Schiff) - bewusst zurückhaltend bemessen (Trägerschiff: 6), damit das Flaggschiff eine winzige Eigen-Eskorte tragen kann, ohne die Trägerschiff-Klasse für größere Jäger-/Bomber-Flotten zu entwerten'
+    ]},
     { version:'8.60.1', date:'17.07.2026', changes:[
       'Bugfix: ein per "Verband versenden" losgeschickter Verband erschien in der Flottenposition (rechter Slider) und der Missionsliste im Flotte-Tab als ein separater Eintrag PRO enthaltenem Schiffstyp statt als eine zusammengehörige Flotte - bei einem Verband mit vielen Schiffstypen wirkte das wie ein Dutzend einzelner Missionen. Beide Anzeigen fassen die Schiffstypen jetzt zu einem einzigen Eintrag zusammen; der Rückruf-Knopf holt dabei den gesamten Verband auf einmal zurück'
     ]},
@@ -7069,7 +7072,11 @@
     mult *= allianceBaseFlightMult(targetSystem);
     return sec * mult;
   }
-  function hangarCapacity(fleet){ const f = fleet || currentFleet(); return (f.carrier||0)*6; }
+  // Kleiner Eigenhangar des Superschlachtschiffs (17.07.2026, Feature-Wunsch): bewusst zurückhaltend
+  // bemessen (2 statt der 6 eines dedizierten Trägerschiffs) - das Flaggschiff kann eine winzige
+  // Eigen-Eskorte tragen, ohne die Trägerschiff-Klasse für größere Jäger-/Bomber-Flotten zu entwerten.
+  const SUPER_HANGAR_SLOTS = 2;
+  function hangarCapacity(fleet){ const f = fleet || currentFleet(); return (f.carrier||0)*6 + (f.superschlachtschiff||0)*SUPER_HANGAR_SLOTS; }
   function deployableFighters(fleet){
     const f = fleet || currentFleet();
     const cap = hangarCapacity(f);
@@ -11205,7 +11212,7 @@
       { title:'Spionagekreuzer – schnellste Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und eignet sich damit besonders für Spionage über große Entfernungen. Er zählt zusammen mit Spähschiffen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Spionage-Einsatz) und kann eine Spionagemission auch ganz ohne Spähschiff starten.' },
       { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
-      { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt.' },
+      { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt. Das <strong>Superschlachtschiff</strong> bringt zusätzlich einen kleinen Eigenhangar mit (2 Plätze je Schiff) - genug für eine winzige Eigen-Eskorte, aber kein Ersatz für dedizierte Träger bei größeren Jäger-/Bomber-Flotten.' },
       { title:'Missionen & Flugzeit', body:'Angriffe, Überfälle, Expeditionen und Kolonisierungen laufen über Missionen mit echter Flugzeit (abhängig von Entfernung und langsamstem Schiff in der Flotte). Während der Flugzeit ist die Flotte unterwegs und zählt nicht zur Verteidigung am Ausgangsplaneten.' },
       { title:'Treibstoffkosten (Deuterium & Antimaterie)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). <strong>Welche Ressource verbraucht wird, hängt vom Antrieb ab:</strong> Schiffe mit Verbrennungs- oder Impulstriebwerk tanken Deuterium, Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken Antimaterie. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen. Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
       { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren und Spionage - <strong>Flottenverlegungen zwischen eigenen Planeten zählen bewusst nicht mit</strong>, da reine interne Logistik. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
@@ -19167,7 +19174,7 @@
           <div class="bicon" style="background:rgba(121,31,31,0.35);">${ICONS.ship_superschlachtschiff}</div>
           <div>
             <div class="bname">Superschlachtschiff <span class="lvl-pill">${cf.superschlachtschiff||0}</span>${superPendingQty?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">+${superPendingQty} im Bau</span>`:''}</div>
-            <div class="bmeta">Angriffspunkte 220 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Endgame-Flaggschiff${(awayByType.superschlachtschiff||0)>0?' · <span style="color:#e24b4a;">'+awayByType.superschlachtschiff+' unterwegs</span>':''}</div>
+            <div class="bmeta">Angriffspunkte 220 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Endgame-Flaggschiff · eigener Hangar für ${SUPER_HANGAR_SLOTS} Jäger/Bomber je Schiff (Gesamtkapazität ${hangarCap})${(awayByType.superschlachtschiff||0)>0?' · <span style="color:#e24b4a;">'+awayByType.superschlachtschiff+' unterwegs</span>':''}</div>
             <div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Angriff: 220 · <i class="ti ti-shield" aria-hidden="true"></i> Schild: ${SUPERSCHLACHTSCHIFF_SHIELD} · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigungsbeitrag: ${Math.round(220*0.4)+SUPERSCHLACHTSCHIFF_SHIELD} (je stationiertem Schiff)</div>
             <div class="bmeta" style="${superHaveItem<superQty?'color:#e24b4a;':''}"><i class="ti ti-atom-2" aria-hidden="true"></i> Verbraucht ${superQty}x Antimateriekern (vorhanden: ${superHaveItem})${superHaveItem<superQty?' – nicht genug!':''} · sehr seltener Fund bei Erkundungsmissionen</div>
             <div class="bcost">${costHtml(superC)} · <i class="ti ti-clock" aria-hidden="true"></i> ${Math.round(240*superQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1))}s${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${SHIP_SCORE_WEIGHTS.superschlachtschiff*superQty} Punkte (${SHIP_SCORE_WEIGHTS.superschlachtschiff}/Schiff)</div>
