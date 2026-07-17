@@ -1613,6 +1613,8 @@
 
         <div id="allianceBaseBox" style="margin-bottom:1.5rem;"></div>
 
+        <div id="allianceMusterBox" style="margin-bottom:1.5rem;"></div>
+
         <div class="section-title"><i class="ti ti-flag" aria-hidden="true"></i>Allianz-Rangliste</div>
         <div class="leaderboard" id="allianceList"><div class="bmeta">lädt…</div></div>
 
@@ -2418,8 +2420,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.66.3';
+  const VERSION = '8.67.0';
   const PATCHNOTES = [
+    { version:'8.67.0', date:'17.07.2026', changes:[
+      'Neu: Koordinierte Allianzbasis-Angriffe (Spieler-Wunsch) - Admins/Offiziere können jetzt einen geplanten Großangriff gegen eine fremde Allianzbasis starten, mit wählbarer Sammelzeit (30 Min./1 Std./2 Std.) und optionaler Nachricht. Während der Sammelphase schließen sich Mitglieder freiwillig mit ihrer zusammengestellten Angriffsflotte an (Rückzug jederzeit während der Sammelphase möglich) - live sichtbar sind Teilnehmerzahl, Gesamtschiffe und Gesamt-Angriffskraft',
+      'Nach Ablauf der Sammelzeit fliegt der gesamte Flottenverband gemeinsam los und trifft geschlossen am Ziel ein. Die verteidigende Allianz erhält sofort eine Warnung (Angreifer-Tag + Ankunftszeit) und kann in dieser Zeit wie gewohnt Verteidigungsflotten entsenden und Ressourcen spenden',
+      'Die Schlacht läuft nach derselben Formel wie ein einzelner Basis-Angriff, nur mit der aggregierten Gesamtstärke - Ergebnis landet in derselben Basis-Verteidigungs-Historie (Verluste/Berichte der Verteidiger laufen automatisch über den bestehenden Mechanismus). Belohnung und eigene Verluste verteilen sich anteilig zum eigenen Beitrag; 24-Std.-Schutzphase je Ziel-Basis nach jedem koordinierten Angriff',
+      'Wie beim bestehenden Allianzkrieg: rein client-berechnet und über geteilten Speicher abgestimmt (kein echter Server-Kampfrichter) - Echtzeit-Push an gerade inaktive Verteidiger gibt es technisch nicht, die Warnung erscheint zuverlässig beim nächsten Öffnen des Spiels'
+    ]},
     { version:'8.66.3', date:'17.07.2026', changes:[
       'Neue Rang-Namen bei der Galaktischen Dominanz (Spieler-Wunsch): "Galaktische Legende" zählte bisher für immer weiter hoch (Stufe 20 z.B. "Galaktische Legende 12") - nach Stufe 20 gibt es jetzt zwei weitere Rang-Namen, "Sternenherrscher" (Stufe 21-32) und "Kosmischer Souverän" (Stufe 33-44), bevor ab Stufe 45 der letzte Rang wieder endlos weiterzählt. Bereits erreichte Ränge bis Stufe 20 bleiben unverändert'
     ]},
@@ -8740,6 +8748,13 @@
     if (!state.shipsAtAllianceBase) state.shipsAtAllianceBase = {};
     if (!state.processedBaseAttackIds) state.processedBaseAttackIds = [];
     if (state.lastAllianceBaseAttackAt === undefined) state.lastAllianceBaseAttackAt = 0;
+    // Koordinierte Allianzbasis-Angriffe (Spieler-Wunsch "Allianzbasis-Angriffe"): Sammelphase +
+    // gemeinsamer Flottenverband statt einzelner Spieler-Angriffe (siehe createAllianceMusterAttack).
+    if (state.allianceMusterAttack === undefined) state.allianceMusterAttack = null;
+    if (state.allianceMusterContribution === undefined) state.allianceMusterContribution = null;
+    if (state.allianceIncomingMuster === undefined) state.allianceIncomingMuster = null;
+    if (!state.claimedMusterAttackIds) state.claimedMusterAttackIds = [];
+    if (!state.seenIncomingMusterIds) state.seenIncomingMusterIds = [];
     if (state.lastShareMoment === undefined) state.lastShareMoment = null;
     if (!state.themeKey) state.themeKey = 'standard';
     if (state.autoReinforceOn === undefined) state.autoReinforceOn = false;
@@ -11426,6 +11441,7 @@
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
       { title:'Allianz-Spendenrangliste', body:'Im rechten Seitenmen\u00fc (Button "Status" am Bildschirmrand) zeigt der Abschnitt "Allianz-Spenden" die <strong>Top 3 der laufenden Woche</strong> plus deine eigene Platzierung, deine Wochenspende, die Allianz-Gesamtspende und deinen prozentualen Anteil. \u00dcber "Komplette Rangliste anzeigen" siehst du alle Mitglieder sortiert. <strong>Gez\u00e4hlt wird jede Ressourcen-Spende</strong> an gemeinsame Allianz-Projekte: Allianzbasis, Allianz-Techs/-Geb\u00e4ude und die t\u00e4glichen Allianz-Eins\u00e4tze. Die Wertung setzt sich <strong>montags 00:00 Uhr</strong> zur\u00fcck; die Top 3 der abgelaufenen Woche erhalten automatisch eine kleine Belohnung (Kredite/Forschungspunkte, ein Ressourcenpaket bzw. einen Produktions-Booster), und alle Mitglieder bekommen einen zusammenfassenden Bericht im Allianz-Chat.' },
       { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Energie / 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat danach eine eigene <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage): die Uhr für eine Stufe startet erst, sobald ihre Ressourcen VOLLSTÄNDIG beisammen sind, nicht schon bei der Gründung. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. <strong>Krieg um die Basis:</strong> Die Basis kann von Mitgliedern FREMDER Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, 8 Std. Abklingzeit je Spieler). Ihre Hülle hat 12.000 Punkte je Stufe; die Verteidigung besteht aus einem Sockel (600 je Stufe) plus allen von Mitgliedern <strong>zur Basis entsandten Schiffen</strong> (Button im Allianz-Tab, echte Flugzeit, jederzeit zurückrufbar - stationierte Schiffe erleiden bei Angriffen Verluste). Leichte Schäden repariert die Basis selbst (3%/Std.); fällt die Hülle auf 0, ist die Basis <strong>ZERSTÖRT</strong>: alle Boni sind deaktiviert, bis die Allianz die hohen Reparaturkosten (30% der kumulierten Baukosten) gemeinsam aufgebracht hat. Bei allen wichtigen Basis-Ereignissen (Baubeginn, erreichte Ausbaustufe, Angriff, Zerstörung, abgeschlossene Reparatur) erscheint automatisch eine <strong>System-Nachricht im Allianz-Chat</strong>, damit alle Mitglieder informiert sind. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone. Da die Kartenansicht standardmäßig dein eigenes Heimatsystem zeigt (nicht zwangsläufig das der Basis), bringt dich der Link "auf der Karte anzeigen" direkt neben der Systemangabe in der Basis-Box zum richtigen System.' },
+      { title:'Koordinierte Allianzbasis-Angriffe', body:'Erweitert den Basis-Krieg um eine geplante Großschlacht: nur <strong>Admins/Offiziere</strong> können einen koordinierten Angriff starten (Allianz-Tab, Ziel-Tag + Sammelzeit 30 Min./1 Std./2 Std. + optionale Nachricht). Während der Sammelphase kann JEDES Mitglied freiwillig seine im Galaxie-Tab zusammengestellte Angriffsflotte anschließen (Schiffe sind bis zum Abschluss gebunden, ein Rückzug ist nur während der laufenden Sammelphase möglich - die Schiffe kehren dann sofort zurück). Sichtbar sind laufend Teilnehmerzahl, Gesamtschiffe und Gesamt-Angriffskraft. Nach Ablauf der Sammelzeit fliegt der GESAMTE Verband gemeinsam los und trifft geschlossen am Ziel ein - die verteidigende Allianz bekommt sofort eine Warnung mit Angreifer-Tag und Ankunftszeit, kann in dieser Zeit Verteidigungsflotten entsenden und Ressourcen spenden (dieselben Werkzeuge wie beim normalen Basis-Krieg). Die Schlacht läuft nach derselben Formel wie ein einzelner Basis-Angriff, nur mit der aggregierten Gesamtstärke des Verbands; Ergebnis (Schaden, Erfolg/Zerstörung) landet in derselben Basis-Verteidigungs-Historie. Jede Ziel-Basis hat danach <strong>24 Std. Schutz</strong> vor dem nächsten koordinierten Angriff. Belohnung (Kredite, Forschungspunkte, Kampfpunkte) und Verluste verteilen sich anteilig zum eigenen Beitrag an der Gesamt-Angriffskraft - wer nicht mitgeflogen ist, bekommt nichts.' },
       { title:'Allianz-Einsätze (ab Basis-Stufe 3)', body:'Ab Allianzbasis-Stufe 3 erhält eure Allianz jeden Tag einen gemeinsamen <strong>Allianz-Einsatz</strong> (im Allianz-Tab unterhalb der Basis): <strong>Versorgungskonvoi</strong> (Erz liefern), <strong>Kristall-Kontingent</strong>, <strong>Treibstoff-Depot</strong> (Deuterium), <strong>Kampfoperation</strong> (gemeinsam Kämpfe gewinnen - NPCs, Piraten, Abwehr und Leerenrisse zählen automatisch) oder <strong>Forschungsvorstoß</strong> (gemeinsam Expeditionen abschließen). Einsatz und Tagesziel sind für alle Mitglieder identisch und skalieren mit der Basis-Stufe. Ist das Team-Ziel erreicht, holt sich <strong>jeder, der beigetragen hat</strong>, die Belohnung ab: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich <strong>1 Leerensplitter</strong>. Kampf-/Expeditions-Fortschritt wird beim Öffnen des Allianz-Tabs übertragen. Eine zerstörte Basis pausiert den Einsatzbetrieb bis zur Reparatur.' },
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
       { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen oder zurückstufen (auch andere Admins zu Offizier/Mitglied), und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
@@ -13074,6 +13090,11 @@
       const r = await storageGet('alliance:'+tag+':base', true);
       state.allianceBase = (r && r.value) ? JSON.parse(r.value) : null;
       renderAllianceBaseBox();
+      // Reihenfolge wichtig: refreshAllianceMusterAttack() kann HIER erst die neue Verband-Attacke in
+      // alliance:<TAG>:basewar schreiben (falls die Ankunft gerade jetzt aufgelöst wird) - erst DANACH
+      // gerufen sieht loadAllianceBaseWar()/processIncomingBaseAttacks() den frischen Eintrag noch in
+      // DERSELBEN Sitzung (eigene Verluste/Bericht sofort statt erst beim nächsten Nachladen).
+      await refreshAllianceMusterAttack();
       loadAllianceBaseWar();
       await maybeMarkAllianceBaseResourcesReady();
       maybeAnnounceBaseLevel();
@@ -13731,6 +13752,336 @@
     pushReport({ type:'alliance-base-attack', result: destroyed?'destroyed':(success?'win':'loss'), targetTag, damage: dealt, hullAfter: Math.round(maxHp - war.damage), hullMax: maxHp, defensePower: defense, attackPower: Math.round(power), chancePct: Math.round(chance*100), fleet: m.composition||fleet, ownLostShips: ownLost, debris: combatDebrisOf(ownLost), battlePoints: bp, fromPlanet: planetDisplayName(planetKey) });
     playSound(success?'win':'raid');
   }
+  // ===== Koordinierte Allianzbasis-Angriffe (Spieler-Wunsch "Allianzbasis-Angriffe") =====
+  // Erweitert den obigen Einzelspieler-Angriff um eine Sammelphase: Admin/Offizier plant einen
+  // Angriff, Mitglieder schließen freiwillig ihre Angriffsflotte an, nach Ablauf der Sammelzeit
+  // fliegt der GESAMTE Verband gemeinsam los und trifft gleichsam am Ziel ein. Folgt demselben
+  // client-berechneten, geteilten Vertrauensmodell wie der Rest des Allianzkriegs-Systems (keine
+  // echte Server-Autorität) - hier auf ein Ereignis mit größerer Tragweite (ganze Allianzen)
+  // ausgeweitet, siehe Rückfrage vor der Umsetzung. Echtzeit-Koordination (Live-Push an inaktive
+  // Spieler) gibt es in diesem Spiel technisch nicht - der Countdown läuft real weiter, auch wenn
+  // niemand online ist, und wird ausgewertet, sobald irgendein Mitglied als Nächstes das Spiel öffnet
+  // (exakt wie beim bestehenden Allianzkrieg/Basis-Ausbau).
+  //
+  // Speicherformat, EIN Autor je Dokument (verhindert Wettlaufsituationen bei gleichzeitigem Schreiben):
+  // - alliance:<TAG>:musterattack          - nur vom planenden Admin/Offizier geschrieben (Ankündigung
+  //   + Phasenübergänge, jeweils mit frischem Nachlesen vor dem Schreiben, wie maybeAnnounceBaseLevel)
+  // - alliance:<TAG>:musterjoin:<id>:<pid>  - je EIN eigenes Dokument pro beitretendem Mitglied
+  // - alliance:<TARGETTAG>:incomingmuster   - Zeiger-Dokument im Ziel-Namensraum, macht den Angriff für
+  //   die verteidigende Allianz auffindbar (die den Angreifer-Tag vorher nicht kennt) + trägt die
+  //   Abklingzeit für neue Angriffe gegen dieses Ziel
+  const ALLIANCE_MUSTER_DURATIONS = [30*60, 60*60, 120*60]; // Sekunden: 30 Min / 1 Std / 2 Std
+  const ALLIANCE_MUSTER_COOLDOWN_MS = 24*3600*1000; // je Ziel-Allianzbasis, unabhängig vom Ausgang
+  function amIAllianceMusterLeader(){ return state.player.allianceRole === 'admin' || state.player.allianceRole === 'officer'; }
+  async function createAllianceMusterAttack(targetTagRaw, museterSeconds, message){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ log('Koordinierte Angriffe brauchen eine eigene Allianz und den Server-Modus.', 'ti-alert-triangle'); return; }
+    if (!amIAllianceMusterLeader()){ log('Nur Admins/Offiziere können einen koordinierten Angriff starten.', 'ti-alert-triangle'); return; }
+    const targetTag = (targetTagRaw||'').trim().toUpperCase();
+    if (!targetTag || targetTag === tag){ log('Gib den Tag einer FREMDEN Allianz an.', 'ti-alert-triangle'); return; }
+    if (!ALLIANCE_MUSTER_DURATIONS.includes(museterSeconds)){ log('Ungültige Sammelzeit.', 'ti-alert-triangle'); return; }
+    let mine = null;
+    try { const r = await storageGet('alliance:'+tag+':musterattack', true); if (r && r.value) mine = JSON.parse(r.value); } catch(e){}
+    if (mine && (mine.phase==='gathering' || mine.phase==='enroute')){ log('Es läuft bereits ein koordinierter Angriff eurer Allianz (gegen ['+mine.targetTag+']).', 'ti-alert-triangle'); return; }
+    let targetBase = null;
+    try { const r = await storageGet('alliance:'+targetTag+':base', true); if (r && r.value) targetBase = JSON.parse(r.value); } catch(e){}
+    if (!targetBase || !targetBase.foundedAt){ log('Die Allianz ['+targetTag+'] hat keine (auffindbare) Allianzbasis.', 'ti-alert-triangle'); return; }
+    let incoming = null;
+    try { const r = await storageGet('alliance:'+targetTag+':incomingmuster', true); if (r && r.value) incoming = JSON.parse(r.value); } catch(e){}
+    if (incoming){
+      if (incoming.phase === 'enroute'){ log('Gegen ['+targetTag+'] ist bereits ein koordinierter Angriff unterwegs.', 'ti-alert-triangle'); return; }
+      const cdLeft = Math.max(0, (incoming.lastAttackAt||0) + ALLIANCE_MUSTER_COOLDOWN_MS - Date.now());
+      if (cdLeft > 0){ log('Die Allianzbasis von ['+targetTag+'] steht noch '+fmtDuration(cdLeft/1000)+' unter Schutz (Abklingzeit nach dem letzten koordinierten Angriff).', 'ti-clock'); return; }
+    }
+    const id = nextMissionId();
+    const now = Date.now();
+    const doc = {
+      id, targetTag, createdBy: state.player.id, createdByName: state.player.name||'Kommandant',
+      message: (message||'').replace(/[<>]/g,'').slice(0,140),
+      createdAt: now, museterEndsAt: now + museterSeconds*1000,
+      phase: 'gathering', dispatch: null, result: null
+    };
+    try { await storageSet('alliance:'+tag+':musterattack', JSON.stringify(doc), true); } catch(e){ log('Fehler beim Planen des Angriffs.', 'ti-alert-triangle'); return; }
+    state.allianceMusterAttack = doc;
+    musterParticipantsCache = { musterAttackId: id, parts: [] };
+    log('Koordinierter Angriff gegen ['+targetTag+'] geplant - Sammelphase '+fmtDuration(museterSeconds)+'.', 'ti-sword');
+    await postAllianceBaseNews('⚔ '+(state.player.name||'Ein Kommandant')+' plant einen koordinierten Angriff gegen die Allianzbasis von ['+targetTag+']! Sammelphase: '+fmtDuration(museterSeconds)+' - schließt eure Angriffsflotten im Allianz-Tab an.'+(doc.message?' Nachricht: „'+doc.message+'"':''));
+    render(); save();
+  }
+  async function joinAllianceMusterAttack(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    const doc = state.allianceMusterAttack;
+    if (!doc || doc.phase !== 'gathering' || doc.museterEndsAt <= Date.now()){ log('Gerade keine offene Sammelphase für einen koordinierten Angriff.', 'ti-alert-triangle'); return; }
+    if (state.allianceMusterContribution && state.allianceMusterContribution.musterAttackId === doc.id){ log('Du hast diesem Angriff bereits eine Flotte angeschlossen.', 'ti-alert-triangle'); return; }
+    const cf = currentFleet();
+    const composition = buildAttackFleet(state.activeBasePlanet, cf);
+    // Bugfix (Test): buildAttackFleet()/emptyFleet() liefert ein "missions:[]"-Feld im Objekt mit -
+    // ein rohes Object.values-reduce ohne Typ-Filter würde bei diesem leeren Array (immer "truthy")
+    // auf String-Verkettung statt Zahlenaddition umschalten (b||0 wird zu [] statt 0).
+    const totalShips = Object.values(composition).reduce((a,b)=>a+(typeof b==='number'?b:0),0);
+    if (totalShips < 1){ log('Wähle mindestens ein Kampfschiff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (!confirm('Deine zusammengestellte Angriffsflotte ('+totalShips+' Schiffe von '+planetDisplayName(state.activeBasePlanet)+') dem koordinierten Angriff gegen ['+doc.targetTag+'] anschließen? Die Schiffe sind bis zum Abschluss des Angriffs gebunden (Rückzug nur, solange die Sammelphase noch läuft).')) return;
+    const power = attackPower(composition, state.activeBasePlanet);
+    for (const [k,v] of Object.entries(composition)){ if (v>0) cf[k] = Math.max(0, (cf[k]||0)-v); }
+    const joinDoc = { name: state.player.name||'Kommandant', composition, power, originPlanet: state.activeBasePlanet, shipCount: totalShips, joinedAt: Date.now(), cancelled: false };
+    try {
+      const fresh = await storageGet('alliance:'+tag+':musterattack', true);
+      const freshDoc = (fresh && fresh.value) ? JSON.parse(fresh.value) : doc;
+      if (!freshDoc || freshDoc.phase !== 'gathering' || freshDoc.id !== doc.id){
+        for (const [k,v] of Object.entries(composition)){ if (v>0) cf[k] = (cf[k]||0)+v; }
+        log('Die Sammelphase ist gerade zu Ende gegangen - versuch es beim nächsten Angriff erneut.', 'ti-alert-triangle');
+        render(); save();
+        return;
+      }
+      await storageSet('alliance:'+tag+':musterjoin:'+doc.id+':'+state.player.id, JSON.stringify(joinDoc), true);
+    } catch(e){
+      for (const [k,v] of Object.entries(composition)){ if (v>0) cf[k] = (cf[k]||0)+v; }
+      log('Fehler beim Anschließen - Schiffe wurden nicht abgezogen.', 'ti-alert-triangle');
+      render(); save();
+      return;
+    }
+    state.allianceMusterContribution = { musterAttackId: doc.id, targetTag: doc.targetTag, composition, power, originPlanet: state.activeBasePlanet, joinedAt: Date.now() };
+    log('Deine Flotte ('+totalShips+' Schiffe, '+fmt(power)+' Angriffskraft) schließt sich dem koordinierten Angriff gegen ['+doc.targetTag+'] an.', 'ti-sword');
+    await refreshAllianceMusterParticipants(true);
+    render(); save();
+  }
+  async function cancelAllianceMusterContribution(){
+    const contrib = state.allianceMusterContribution;
+    const tag = myAllianceTag();
+    if (!contrib || !tag || !useBackend()) return;
+    const doc = state.allianceMusterAttack;
+    if (!doc || doc.id !== contrib.musterAttackId || doc.phase !== 'gathering' || doc.museterEndsAt <= Date.now()){
+      log('Ein Rückzug ist nur während der laufenden Sammelphase möglich.', 'ti-alert-triangle'); return;
+    }
+    if (!confirm('Deine Flotte vom koordinierten Angriff gegen ['+contrib.targetTag+'] zurückziehen? Die Schiffe kehren sofort zurück.')) return;
+    try { await storageSet('alliance:'+tag+':musterjoin:'+contrib.musterAttackId+':'+state.player.id, JSON.stringify({ cancelled:true }), true); } catch(e){ log('Fehler beim Zurückziehen.', 'ti-alert-triangle'); return; }
+    const originFleet = contrib.originPlanet==='home' ? state.fleet : (state.colonies[contrib.originPlanet] ? state.colonies[contrib.originPlanet].fleet : null);
+    if (originFleet){ for (const [k,v] of Object.entries(contrib.composition||{})){ if (typeof v==='number' && v>0) originFleet[k] = (originFleet[k]||0)+v; } }
+    log('Flotte vom koordinierten Angriff gegen ['+contrib.targetTag+'] zurückgezogen - alle Schiffe sind zurück.', 'ti-arrows-shuffle');
+    state.allianceMusterContribution = null;
+    await refreshAllianceMusterParticipants(true);
+    render(); save();
+  }
+  // Modul-Cache (kein Speicherbedarf, rein transienter Anzeige-Cache, analog zu abhorchCache) - alle
+  // Teilnehmer-Beiträge zur laufenden Sammelphase, aus den Einzeldokumenten aggregiert. Bugfix: ohne
+  // TTL blieb der Cache für die Dauer der GESAMTEN Sammelphase auf dem Stand des allerersten Aufrufs
+  // eingefroren, sobald einmal (auch nicht-forciert) für diese musterAttackId geladen wurde - neue
+  // Beitritte anderer Mitglieder wurden dann nie mehr sichtbar. Jetzt zusätzlich nach 8s veraltet.
+  const MUSTER_PARTICIPANTS_TTL_MS = 8000;
+  let musterParticipantsCache = null; // { musterAttackId, fetchedAt, parts:[{name,composition,power,originPlanet,shipCount}] }
+  async function refreshAllianceMusterParticipants(force){
+    const doc = state.allianceMusterAttack;
+    if (!doc){ musterParticipantsCache = null; return; }
+    if (!force && musterParticipantsCache && musterParticipantsCache.musterAttackId === doc.id && (Date.now()-musterParticipantsCache.fetchedAt) < MUSTER_PARTICIPANTS_TTL_MS) return;
+    const tag = myAllianceTag();
+    try {
+      const listRes = await storageList('alliance:'+tag+':musterjoin:'+doc.id+':', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
+      const loaded = await Promise.all(keys.map(async k => { try { const r = await storageGet(k, true); return r && r.value ? JSON.parse(r.value) : null; } catch(e){ return null; } }));
+      musterParticipantsCache = { musterAttackId: doc.id, fetchedAt: Date.now(), parts: loaded.filter(p=>p && !p.cancelled) };
+    } catch(e){ musterParticipantsCache = musterParticipantsCache || { musterAttackId: doc.id, fetchedAt: Date.now(), parts: [] }; }
+  }
+  // Sammelphase abgelaufen -> Gesamtflotte aggregieren, Abflug fixieren. Race-tolerant: vor dem
+  // Schreiben frisch nachlesen und die Phase prüfen (analog maybeAnnounceBaseLevel) - ein doppelter
+  // Übergang durch zwei gleichzeitig aktive Mitglieder ist unkritisch (zweiter Versuch bricht ab).
+  async function checkAllianceMusterDispatch(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    let doc = null;
+    try { const r = await storageGet('alliance:'+tag+':musterattack', true); doc = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){ return; }
+    state.allianceMusterAttack = doc;
+    if (!doc || doc.phase !== 'gathering' || doc.museterEndsAt > Date.now()) return;
+    await refreshAllianceMusterParticipants(true);
+    const parts = (musterParticipantsCache && musterParticipantsCache.musterAttackId===doc.id) ? musterParticipantsCache.parts : [];
+    if (!parts.length){
+      try {
+        const r = await storageGet('alliance:'+tag+':musterattack', true);
+        const fresh = (r && r.value) ? JSON.parse(r.value) : doc;
+        if (fresh.phase === 'gathering'){
+          fresh.phase = 'resolved'; fresh.result = { noParticipants:true, resolvedAt: Date.now() };
+          await storageSet('alliance:'+tag+':musterattack', JSON.stringify(fresh), true);
+          state.allianceMusterAttack = fresh;
+        }
+      } catch(e){}
+      return;
+    }
+    const totalComposition = {};
+    let totalPower = 0, totalShips = 0;
+    for (const p of parts){
+      for (const [k,v] of Object.entries(p.composition||{})) if (typeof v==='number' && v>0) totalComposition[k] = (totalComposition[k]||0)+v;
+      totalPower += p.power||0; totalShips += p.shipCount||0;
+    }
+    let targetBase = null;
+    try { const r = await storageGet('alliance:'+doc.targetTag+':base', true); targetBase = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){}
+    const targetSector = targetBase ? targetBase.sector : null;
+    const myBase = state.allianceBase;
+    const sameSys = !!(myBase && targetSector && myBase.sector === targetSector);
+    const dur = missionDurationFor(sameSys ? 120 : 480, totalComposition, ATTACK_SHIP_KEYS, targetSector);
+    const now = Date.now();
+    const dispatch = { departedAt: now, arrivalAt: now+dur*1000, totalComposition, totalPower: Math.round(totalPower), totalShips, participantCount: parts.length };
+    try {
+      const r = await storageGet('alliance:'+tag+':musterattack', true);
+      const fresh = (r && r.value) ? JSON.parse(r.value) : doc;
+      if (fresh.phase !== 'gathering'){ state.allianceMusterAttack = fresh; return; }
+      fresh.phase = 'enroute'; fresh.dispatch = dispatch;
+      await storageSet('alliance:'+tag+':musterattack', JSON.stringify(fresh), true);
+      state.allianceMusterAttack = fresh;
+      await storageSet('alliance:'+doc.targetTag+':incomingmuster', JSON.stringify({ attackerTag: tag, musterAttackId: doc.id, phase:'enroute', dispatchedAt: now, arrivalAt: dispatch.arrivalAt, lastAttackAt: now, totalShips, resolvedAt: null }), true);
+      await postAllianceBaseNews('⚔ Koordinierter Angriff gegen ['+doc.targetTag+'] gestartet! '+parts.length+' Kommandanten, '+fmt(totalShips)+' Schiffe, '+fmt(Math.round(totalPower))+' Angriffskraft. Ankunft in ~'+fmtDuration(dur)+'.');
+    } catch(e){}
+  }
+  // Kampf-Auflösung: identische Formel wie resolveAllianceBaseAttack (Einzelspieler), nur mit der
+  // aggregierten Gesamt-Angriffskraft des Verbands. Schreibt das Ergebnis in das BESTEHENDE
+  // alliance:<TARGETTAG>:basewar-Dokument - die gesamte Verteidiger-Infrastruktur (Verlust-Anwendung
+  // je Mitglied, persönlicher Bericht, Allianz-Chat-Ankündigung, Alarm) läuft dadurch automatisch mit,
+  // ohne eigenen neuen Code (siehe processIncomingBaseAttacks/announceBaseAttack).
+  async function resolveAllianceMusterAttack(attackerTag){
+    let doc = null;
+    try { const r = await storageGet('alliance:'+attackerTag+':musterattack', true); doc = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){ return; }
+    if (!doc || doc.phase !== 'enroute' || !doc.dispatch || doc.dispatch.arrivalAt > Date.now()) return;
+    const targetTag = doc.targetTag;
+    let base = null, war = null;
+    try { const r = await storageGet('alliance:'+targetTag+':base', true); base = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){}
+    if (!base || !base.foundedAt){ await finalizeMusterAttackDoc(attackerTag, doc, { success:false, damage:0, destroyed:false, defensePower:0, ownLossPct:0.05, note:'target-gone' }); return; }
+    try { const r = await storageGet('alliance:'+targetTag+':basewar', true); war = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){}
+    war = war || { damage:0, lastDamageAt:0, destroyedAt:null, destroyedCount:0, attacks:[] };
+    let targetLevel = 1;
+    try {
+      const listRes = await storageList('alliance:'+targetTag+':contrib:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
+      const docs = await Promise.all(keys.map(async k => { try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){} return null; }));
+      const tot = { energie:0, erz:0, kristalle:0, deuterium:0, antimaterie:0 };
+      for (const d of docs){ if (!d) continue; for (const rk of Object.keys(tot)) tot[rk] += d['base_'+rk]||0; }
+      targetLevel = allianceBaseLevelFromDoc(base, tot);
+    } catch(e){}
+    if (targetLevel < 1){ await finalizeMusterAttackDoc(attackerTag, doc, { success:false, damage:0, destroyed:false, defensePower:0, ownLossPct:0.05, note:'target-not-built' }); return; }
+    if (war.destroyedAt){ await finalizeMusterAttackDoc(attackerTag, doc, { success:false, damage:0, destroyed:false, defensePower:0, ownLossPct:0.05, note:'target-already-destroyed' }); return; }
+    const defSum = await loadBaseDefenseSum(targetTag);
+    const defense = ALLIANCE_BASE_DEF_PER_LEVEL*targetLevel + ((defSum && defSum.defense)||0);
+    const power = doc.dispatch.totalPower;
+    const chance = Math.max(0.10, Math.min(0.92, power/(power+defense)));
+    const success = Math.random() < chance;
+    const maxHp = allianceBaseMaxHp(targetLevel);
+    const effDmgBefore = allianceBaseEffDamage(war, targetLevel);
+    let dealt = 0, destroyed = false;
+    if (success){
+      dealt = Math.round(power * (0.8 + Math.random()*0.4));
+      const newDamage = Math.min(maxHp, effDmgBefore + dealt);
+      war.damage = newDamage; war.lastDamageAt = Date.now();
+      if (newDamage >= maxHp){ destroyed = true; war.destroyedAt = Date.now(); war.destroyedCount = (war.destroyedCount||0)+1; }
+    } else {
+      dealt = Math.round(power * 0.15);
+      war.damage = Math.min(maxHp, effDmgBefore + dealt); war.lastDamageAt = Date.now();
+    }
+    const defLossPct = success ? Math.max(0.08, Math.min(0.35, power/(power+defense*1.5))) : Math.max(0.03, Math.min(0.12, power/(power+defense*3)));
+    war.attacks = war.attacks || [];
+    war.attacks.unshift({ id: nextMissionId(), ts: Date.now(), attackerTag, attackerName: '['+attackerTag+']-Verband ('+doc.dispatch.participantCount+' Kommandanten)', power: Math.round(power), damage: dealt, defLossPct: Math.round(defLossPct*100)/100, destroyed, isMusterAttack:true });
+    war.attacks = war.attacks.slice(0, 25);
+    try { await storageSet('alliance:'+targetTag+':basewar', JSON.stringify(war), true); } catch(e){}
+    const ownLossPct = applyRetreatDampening(success ? 0.10+Math.random()*0.12 : 0.25+Math.random()*0.20).pct;
+    await finalizeMusterAttackDoc(attackerTag, doc, { success, damage:dealt, destroyed, defensePower:Math.round(defense), ownLossPct, chancePct: Math.round(chance*100) });
+    try { await postAllianceBaseNews((success?'⚔ Koordinierter Angriff gegen ['+targetTag+'] erfolgreich - '+fmt(dealt)+' Schaden!':'Koordinierter Angriff gegen ['+targetTag+'] wurde abgewehrt.')+(destroyed?' DIE GEGNERISCHE ALLIANZBASIS WURDE ZERSTÖRT!':'')); } catch(e){}
+  }
+  async function finalizeMusterAttackDoc(attackerTag, doc, result){
+    try {
+      const r = await storageGet('alliance:'+attackerTag+':musterattack', true);
+      const fresh = (r && r.value) ? JSON.parse(r.value) : doc;
+      if (fresh.phase !== 'enroute') return;
+      fresh.phase = 'resolved';
+      fresh.result = Object.assign({ resolvedAt: Date.now() }, result);
+      await storageSet('alliance:'+attackerTag+':musterattack', JSON.stringify(fresh), true);
+      if (myAllianceTag() === attackerTag) state.allianceMusterAttack = fresh;
+    } catch(e){}
+    try {
+      const r2 = await storageGet('alliance:'+doc.targetTag+':incomingmuster', true);
+      const freshIncoming = (r2 && r2.value) ? JSON.parse(r2.value) : null;
+      if (freshIncoming && freshIncoming.musterAttackId === doc.id){ freshIncoming.phase = 'resolved'; freshIncoming.resolvedAt = Date.now(); await storageSet('alliance:'+doc.targetTag+':incomingmuster', JSON.stringify(freshIncoming), true); }
+    } catch(e){}
+  }
+  // Verteidiger-Seite: eingehenden Angriff einmalig ankündigen (Log + Ton), sobald der gegnerische
+  // Verband abfliegt - Ankunftszeit steht bereits im Zeiger-Dokument. Löst bei Bedarf auch selbst die
+  // Auflösung aus (falls die angreifende Allianz gerade niemanden online hat).
+  async function checkIncomingAllianceMuster(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    let incoming = null;
+    try { const r = await storageGet('alliance:'+tag+':incomingmuster', true); incoming = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){ return; }
+    state.allianceIncomingMuster = incoming;
+    if (!incoming || incoming.phase !== 'enroute') return;
+    state.seenIncomingMusterIds = state.seenIncomingMusterIds || [];
+    if (!state.seenIncomingMusterIds.includes(incoming.musterAttackId)){
+      state.seenIncomingMusterIds.push(incoming.musterAttackId);
+      state.seenIncomingMusterIds = state.seenIncomingMusterIds.slice(-20);
+      const remain = Math.max(0, incoming.arrivalAt - Date.now());
+      log('⚠ WARNUNG! Eure Allianzbasis wird von einem Flottenverband der Allianz ['+incoming.attackerTag+'] angegriffen! Ankunft in '+fmtDuration(remain/1000)+'.', 'ti-alert-triangle');
+      playAlarmSound();
+      save();
+    }
+    if (incoming.arrivalAt <= Date.now()) await resolveAllianceMusterAttack(incoming.attackerTag);
+  }
+  // Angreifer-Seite, pro Teilnehmer: eigene Belohnung + Überlebende (anteilig zur Gesamt-Verlustquote
+  // des Verbands) genau einmal nach Hause holen, sobald der eigene Angriff als 'resolved' markiert ist.
+  async function claimMusterAttackOutcome(){
+    const contrib = state.allianceMusterContribution;
+    if (!contrib) return;
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    let doc = state.allianceMusterAttack;
+    if (!doc || doc.id !== contrib.musterAttackId){
+      try { const r = await storageGet('alliance:'+tag+':musterattack', true); doc = (r && r.value) ? JSON.parse(r.value) : null; state.allianceMusterAttack = doc; } catch(e){ return; }
+    }
+    if (!doc || doc.id !== contrib.musterAttackId || doc.phase !== 'resolved' || !doc.result) return;
+    state.claimedMusterAttackIds = state.claimedMusterAttackIds || [];
+    if (state.claimedMusterAttackIds.includes(doc.id)){ state.allianceMusterContribution = null; save(); return; }
+    state.claimedMusterAttackIds.push(doc.id);
+    state.claimedMusterAttackIds = state.claimedMusterAttackIds.slice(-30);
+    const res = doc.result;
+    if (res.noParticipants){ state.allianceMusterContribution = null; save(); return; }
+    const originFleet = contrib.originPlanet==='home' ? state.fleet : (state.colonies[contrib.originPlanet] ? state.colonies[contrib.originPlanet].fleet : null);
+    const lostParts = [];
+    if (originFleet){
+      for (const [k,v] of Object.entries(contrib.composition||{})){
+        if (typeof v !== 'number' || v<=0) continue;
+        const lost = Math.min(v, Math.round(v*(res.ownLossPct||0)));
+        const survivors = v - lost;
+        if (survivors>0) originFleet[k] = (originFleet[k]||0) + survivors;
+        if (lost>0) lostParts.push(lost+'x '+(shipDefOrSuper(k)||{name:k}).name);
+      }
+    }
+    const share = (doc.dispatch && doc.dispatch.totalPower>0) ? Math.min(1, (contrib.power||0)/doc.dispatch.totalPower) : 0;
+    const bp = Math.round((res.destroyed?150:(res.success?60:15)) * (0.5+share*1.5));
+    const credits = Math.round((res.destroyed?400:(res.success?150:40)) * (0.5+share*1.5));
+    const fp = Math.round((res.destroyed?200:(res.success?80:20)) * (0.5+share*1.5));
+    awardBattlePoints(bp);
+    state.credits = (state.credits||0) + credits;
+    state.resources.forschungspunkte = (state.resources.forschungspunkte||0) + fp;
+    const lostText = lostParts.join(', ');
+    logScoreChange(bp*3, 'Koordinierter Angriff gegen ['+doc.targetTag+']'+(res.destroyed?' - Basis ZERSTÖRT':(res.success?' erfolgreich':' abgewehrt'))+' (+'+bp+' Kampfpunkte)', 'ti-sword');
+    log('Koordinierter Angriff gegen ['+doc.targetTag+'] abgeschlossen: '+(res.destroyed?'Basis ZERSTÖRT! ':(res.success?'Erfolgreich, ':'Abgewehrt, '))+fmt(res.damage||0)+' Schaden verursacht. Deine Belohnung: +'+credits+' Kredite, +'+fp+' Forschungspunkte, +'+bp+' Kampfpunkte.'+(lostText?' Eigene Verluste: '+lostText+'.':' Alle eigenen Schiffe zurückgekehrt.'), res.destroyed?'ti-skull':'ti-sword');
+    pushReport({ type:'alliance-muster-attack', result: res.destroyed?'destroyed':(res.success?'win':'loss'), targetTag: doc.targetTag, damage: res.damage, defensePower: res.defensePower, chancePct: res.chancePct, myPower: contrib.power, myShare: Math.round(share*100), totalPower: doc.dispatch?doc.dispatch.totalPower:0, totalShips: doc.dispatch?doc.dispatch.totalShips:0, participantCount: doc.dispatch?doc.dispatch.participantCount:0, credits, forschungspunkte: fp, battlePoints: bp, ownLostText: lostText||null });
+    playSound(res.destroyed||res.success?'win':'raid');
+    state.allianceMusterContribution = null;
+    render(); save();
+  }
+  // Zentrale Aktualisierung: von loadAllianceBase() aus bei Boot/Tab-Wechsel/Intervall aufgerufen -
+  // deckt beide Rollen ab (eigene Allianz als Angreifer UND als mögliches Angriffsziel).
+  async function refreshAllianceMusterAttack(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ state.allianceMusterAttack = null; state.allianceIncomingMuster = null; musterParticipantsCache = null; return; }
+    try { const r = await storageGet('alliance:'+tag+':musterattack', true); state.allianceMusterAttack = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){}
+    await checkAllianceMusterDispatch();
+    await checkAllianceMusterArrivalIfMine();
+    await checkIncomingAllianceMuster();
+    await claimMusterAttackOutcome();
+    if (state.allianceMusterAttack && state.allianceMusterAttack.phase === 'gathering') await refreshAllianceMusterParticipants(false);
+    renderAllianceMusterBox();
+  }
+  async function checkAllianceMusterArrivalIfMine(){
+    const tag = myAllianceTag();
+    const doc = state.allianceMusterAttack;
+    if (tag && doc && doc.phase === 'enroute' && doc.dispatch && doc.dispatch.arrivalAt <= Date.now()) await resolveAllianceMusterAttack(tag);
+  }
   // Reparatur nach Zerstörung: Beiträge über die eigenen contrib-Dokumente (baserepair_<res>).
   // Benötigt werden je Zerstörung 30% der kumulierten Baukosten der aktuellen Stufe; sobald die
   // Summen reichen, setzt der nächste beitragende Client den Kriegszustand zurück.
@@ -14146,6 +14497,103 @@
         <button id="abAttackBtn" class="attack" style="font-size:11px;" ${cdLeft>0?'disabled':''}>${cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'Angreifen'}</button>
       </div>`;
     return s;
+  }
+  // Koordinierte Allianzbasis-Angriffe: eigenständige Box (Sammelphase/Verband/Auflösung + Warnung
+  // bei einem eingehenden gegnerischen Verband) - bewusst getrennt von der Basis-Box oben, da beide
+  // Rollen (Angreifer und mögliches Ziel) unabhängig voneinander gleichzeitig relevant sein können.
+  function renderAllianceMusterBox(){
+    const box = document.getElementById('allianceMusterBox');
+    if (!box || isTypingIn('allianceMusterBox')) return;
+    const tag = myAllianceTag();
+    if (!tag || !useBackend() || !state.allianceBase){ box.innerHTML = ''; return; }
+    let html = `<div class="section-title"><i class="ti ti-users" aria-hidden="true"></i>Koordinierter Allianzbasis-Angriff</div>`;
+    // ---- Verteidiger-Warnung (eingehender Verband gegen die EIGENE Basis) ----
+    const incoming = state.allianceIncomingMuster;
+    if (incoming && incoming.phase === 'enroute'){
+      const remain = Math.max(0, incoming.arrivalAt - Date.now());
+      html += `
+        <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; background:rgba(226,75,74,0.12); border-color:rgba(226,75,74,0.5); margin-bottom:0.75rem;">
+          <div class="bname" style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> WARNUNG! Eure Allianzbasis wird angegriffen</div>
+          <div class="bmeta">Angreifende Allianz: <strong style="color:#fff;">[${incoming.attackerTag}]</strong> · geschätzte Flottenstärke: ${fmt(incoming.totalShips||0)} Schiffe</div>
+          <div class="bmeta">Ankunft in: <strong style="color:#e24b4a;">${fmtDuration(remain/1000)}</strong></div>
+          <div class="bmeta">Entsendet jetzt Verteidigungsflotten und spendet Ressourcen zur Reparatur/Verstärkung weiter unten bei der Allianzbasis!</div>
+        </div>`;
+    }
+    // ---- Eigener Angriff (Sammelphase / Verband unterwegs / Ergebnis) ----
+    const doc = state.allianceMusterAttack;
+    const canLead = amIAllianceMusterLeader();
+    if (!doc || doc.phase === 'resolved'){
+      if (doc && doc.phase === 'resolved'){
+        const res = doc.result||{};
+        html += `
+          <div class="card-row" style="flex-direction:column; align-items:stretch; gap:4px; margin-bottom:0.75rem;">
+            <div class="bname">Letzter koordinierter Angriff gegen [${doc.targetTag}]</div>
+            ${res.noParticipants ? `<div class="bmeta">Niemand hat sich der Sammelphase angeschlossen - der Angriff ist verfallen.</div>` : `
+              <div class="bmeta">${res.destroyed?'<span style="color:#e24b4a;">Basis ZERSTÖRT!</span>':(res.success?'<span style="color:#5dcaa5;">Erfolgreich</span>':'<span style="color:#f0997b;">Abgewehrt</span>')} · ${fmt(res.damage||0)} Schaden · ${doc.dispatch?doc.dispatch.participantCount:0} Kommandanten, ${fmt(doc.dispatch?doc.dispatch.totalShips:0)} Schiffe</div>
+            `}
+          </div>`;
+      }
+      if (canLead){
+        const durOptions = ALLIANCE_MUSTER_DURATIONS.map(s => `<option value="${s}">${fmtDuration(s)}</option>`).join('');
+        html += `
+          <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+            <div class="bmeta">Plant einen koordinierten Angriff: alle Mitglieder können während der Sammelphase freiwillig ihre Angriffsflotte anschließen. Danach fliegt der GESAMTE Verband gemeinsam los und trifft gleichzeitig am Ziel ein.</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input type="text" id="musterTargetTagInput" placeholder="Ziel-Allianz-Tag" maxlength="6" style="flex:1; font-size:12px; text-transform:uppercase;"/>
+              <select id="musterDurationSelect" style="font-size:12px;">${durOptions}</select>
+            </div>
+            <input type="text" id="musterMessageInput" placeholder="Nachricht/Strategie (optional)" maxlength="140" style="font-size:12px;"/>
+            <button id="musterCreateBtn" class="attack" style="align-self:flex-start;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angriff planen</button>
+          </div>`;
+      } else {
+        html += `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Gerade kein koordinierter Angriff geplant. Nur Admins/Offiziere können einen starten.</div>`;
+      }
+      box.innerHTML = html;
+      wireAllianceMusterBoxEvents(box);
+      return;
+    }
+    if (doc.phase === 'gathering'){
+      const remain = Math.max(0, doc.museterEndsAt - Date.now());
+      const parts = (musterParticipantsCache && musterParticipantsCache.musterAttackId===doc.id) ? musterParticipantsCache.parts : [];
+      const totalShips = parts.reduce((a,p)=>a+(p.shipCount||0),0);
+      const totalPower = parts.reduce((a,p)=>a+(p.power||0),0);
+      const myJoined = state.allianceMusterContribution && state.allianceMusterContribution.musterAttackId === doc.id;
+      html += `
+        <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; border-color:rgba(93,202,165,0.4);">
+          <div class="bname"><i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> Sammelphase gegen [${doc.targetTag}] <span class="lvl-pill">${fmtDuration(remain/1000)}</span></div>
+          <div class="bmeta">Geplant von ${doc.createdByName}${doc.message?' · Nachricht: „'+doc.message+'"':''}</div>
+          <div class="bmeta">Teilnehmer: <strong style="color:#fff;">${parts.length}</strong> · Gesamtschiffe: <strong style="color:#fff;">${fmt(totalShips)}</strong> · Gesamt-Angriffskraft: <strong style="color:#fff;">${fmt(totalPower)}</strong></div>
+          ${parts.length ? `<details><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>`<div class="bmeta">${p.name}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft</div>`).join('')}</div></details>` : ''}
+          ${myJoined
+            ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Deine Flotte ist angeschlossen (${fmt(state.allianceMusterContribution.power)} Angriffskraft).</div><button id="musterCancelBtn" style="align-self:flex-start; font-size:11px;">Beitrag zurückziehen</button>`
+            : `<div class="bmeta">Nutzt deine im Galaxie-Tab zusammengestellte Angriffsflotte des aktuellen Standorts.</div><button id="musterJoinBtn" class="attack" style="align-self:flex-start;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Flotte anschließen</button>`}
+        </div>`;
+      box.innerHTML = html;
+      wireAllianceMusterBoxEvents(box);
+      return;
+    }
+    // phase === 'enroute'
+    const remainArr = Math.max(0, doc.dispatch.arrivalAt - Date.now());
+    html += `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; border-color:rgba(226,75,74,0.4);">
+        <div class="bname"><i class="ti ti-rocket" aria-hidden="true" style="color:#e24b4a;"></i> Verband unterwegs gegen [${doc.targetTag}] <span class="lvl-pill">${fmtDuration(remainArr/1000)}</span></div>
+        <div class="bmeta">${doc.dispatch.participantCount} Kommandanten, ${fmt(doc.dispatch.totalShips)} Schiffe, ${fmt(doc.dispatch.totalPower)} Angriffskraft - trifft geschlossen am Ziel ein.</div>
+      </div>`;
+    box.innerHTML = html;
+    wireAllianceMusterBoxEvents(box);
+  }
+  function wireAllianceMusterBoxEvents(box){
+    const createBtn = box.querySelector('#musterCreateBtn');
+    if (createBtn) createBtn.onclick = () => {
+      const targetTag = box.querySelector('#musterTargetTagInput').value;
+      const durSec = parseInt(box.querySelector('#musterDurationSelect').value, 10);
+      const message = box.querySelector('#musterMessageInput').value;
+      createAllianceMusterAttack(targetTag, durSec, message);
+    };
+    const joinBtn = box.querySelector('#musterJoinBtn');
+    if (joinBtn) joinBtn.onclick = () => joinAllianceMusterAttack();
+    const cancelBtn = box.querySelector('#musterCancelBtn');
+    if (cancelBtn) cancelBtn.onclick = () => cancelAllianceMusterContribution();
   }
   function renderAllianceBuildingBox(){
     const box = document.getElementById('allianceBuildingBox');
@@ -21635,6 +22083,7 @@
     }
     renderAllianceTechBox();
     renderAllianceBaseBox();
+    renderAllianceMusterBox();
     renderAllianceBuildingBox();
     renderReportsBox();
     const kofiBox = document.getElementById('kofiTopSupporterBox');
@@ -22688,6 +23137,9 @@
   // mitbekommen (Verluste anwenden, Alarm) - laeuft nur mit Allianz + Server-Modus (Guard intern).
   setInterval(loadAllianceBaseWar, 300000);
   setInterval(loadAllianceDonationRanking, 300000);
+  // Koordinierte Allianzbasis-Angriffe alle 5 Minuten nachladen (Guard intern) - deckt Phasenübergänge
+  // und die Verteidiger-Warnung zeitnah ab, auch wenn der Spieler gerade nicht im Allianz-Tab ist.
+  setInterval(refreshAllianceMusterAttack, 300000);
   setInterval(maybeSpawnTrader, 60000);
   window.addEventListener('beforeunload', () => { save(); });
 
