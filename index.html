@@ -1646,6 +1646,10 @@
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sparkles" aria-hidden="true"></i>Permanente Allianzprojekte</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Endgame-Ziele für vollständig ausgebaute Allianzbasen - sieben Projekte mit je 100 Ausbaustufen, dauerhaft weiter ausbaubar.</div>
         <div class="research-list" id="allianceEndgameBox"></div>
+
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sun" aria-hidden="true"></i>Weltprojekte</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Seltene, einmalige Mega-Projekte mit enormen Kosten - verleihen der Allianz einzigartige, dauerhafte Vorteile.</div>
+        <div class="research-list" id="allianceWorldBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-punkte">
@@ -2442,8 +2446,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.73.0';
+  const VERSION = '8.74.0';
   const PATCHNOTES = [
+    { version:'8.74.0', date:'17.07.2026', changes:[
+      'Neu: Weltprojekte (Spieler-Wunsch "Allianzsystem erweitern", Teil 2) - sechs seltene, EINMALIGE Mega-Projekte mit enormen Einzelkosten, im Allianz-Tab unterhalb der permanenten Allianzprojekte: Dyson-Sphäre (+5% Produktion), Intergalaktisches Sprungtor (-10% Flugzeit), Gigantische Sternenwerft (-10% Bauzeit Schiffe & Gebäude), Wurmlochgenerator (-10% Treibstoffkosten), Allianz-Ringwelt (+10% Lagerkapazität) und Galaktisches Archiv (verleiht JEDEM aktuellen und künftigen Allianzmitglied dauerhaft den exklusiven Ehrentitel „Archivar der Allianz")',
+      'Nur EIN Weltprojekt gleichzeitig in Arbeit - deutlich strenger als die 7 normalen Allianzprojekte (bis zu 2 aktiv), da "besonders selten" laut Feature-Wunsch. Ein abgeschlossenes Weltprojekt fällt automatisch aus dem Aktiv-Slot, damit die Allianz ohne Zwischenschritt das nächste starten kann, und bleibt dauerhaft als vollendetes Prestigeobjekt sichtbar'
+    ]},
     { version:'8.73.0', date:'17.07.2026', changes:[
       'Neu: Permanente Allianzprojekte (Spieler-Wunsch "Allianzsystem erweitern") - sobald die Allianzbasis die Maximalstufe erreicht hat, schalten sich sieben dauerhafte Endgame-Projekte mit je 100 Ausbaustufen frei: Galaktische Forschung (-Forschungsdauer), Allianz-Flottenwerft (-Bauzeit für Schiffe & Gebäude), Galaktisches Handelsnetzwerk (+Marktrabatt), Verteidigungsnetzwerk (+Verteidigung), Logistiknetzwerk (-Flugzeiten), Expeditionsprogramm (+Fundchance) und Terraforming-Initiative (-Terraforming-Kosten & -Dauer)',
       'Es können immer nur bis zu 2 Projekte gleichzeitig aktiv sein und Beiträge annehmen - Admins/Offiziere wählen im Allianz-Tab aus, welche. Alle Mitglieder tragen weiterhin Ressourcen bei wie bei den bestehenden Allianz-Technologien/-Gebäuden (gleiche Infrastruktur wiederverwendet: Fortschrittsbalken, eigener Beitrag, Spenden zählen automatisch für die bestehende wöchentliche Allianz-Spendenrangliste)',
@@ -5408,6 +5416,23 @@
     { key:'ep_terraforming', name:'Terraforming-Initiative', desc:'-0,15% Terraforming-Kosten UND -0,2% -Dauer je Stufe (max. -15%/-20% bei Stufe 100) für alle Allianzmitglieder', cost:75000, costMult:1.09, maxLevel:100, resKey:'erz', icon:'ti-planet', activeGated:true }
   ];
   const ALLIANCE_ENDGAME_MAX_ACTIVE = 2; // wie viele Projekte gleichzeitig Beiträge annehmen dürfen
+  // ===== Weltprojekte (17.07.2026, Feature-Wunsch "Allianzsystem erweitern", Teil 2) =====
+  // Sechs seltene, EINMALIGE Mega-Projekte (kein Stufensystem wie oben) mit riesigen
+  // Einzelkosten ("mehrere Wochen oder Monate", laut Feature-Wunsch) - nutzt denselben binären
+  // Schwellenwert-Mechanismus wie die bestehende Allianz-Expansion (a_expand1-5, kein maxLevel-Feld),
+  // ist also über allAllianceStructures()/contributeToAllianceTech/allianceStructureListHtml bereits
+  // vollständig funktionsfähig. Eigene Aktiv-Auswahl (state.allianceActiveWorldProjects, max. 1
+  // gleichzeitig - "besonders selten" laut Feature-Wunsch, daher strenger als die 7 normalen
+  // Allianzprojekte oben) über worldProject:true, siehe activeGated-Zweig in contributeToAllianceTech().
+  const ALLIANCE_WORLD_PROJECT_DEFS = [
+    { key:'wp_dyson', name:'Dyson-Sphäre', desc:'Einmalig, dauerhaft +5% Gesamtproduktion für alle Allianzmitglieder (fließt in die bestehende gedeckelte Produktions-Bonus-Gruppe ein).', cost:3000000000, resKey:'energie', icon:'ti-sun', activeGated:true, worldProject:true },
+    { key:'wp_sprungtor', name:'Intergalaktisches Sprungtor', desc:'Einmalig, dauerhaft -10% Flugzeit aller Missionen für alle Allianzmitglieder.', cost:150000000, resKey:'antimaterie', icon:'ti-door-exit', activeGated:true, worldProject:true },
+    { key:'wp_sternenwerft', name:'Gigantische Sternenwerft', desc:'Einmalig, dauerhaft -10% Bauzeit für Schiffe UND Gebäude für alle Allianzmitglieder.', cost:3500000000, resKey:'erz', icon:'ti-building-factory-2', activeGated:true, worldProject:true },
+    { key:'wp_wurmloch', name:'Wurmlochgenerator', desc:'Einmalig, dauerhaft -10% Treibstoffkosten für alle Missionen aller Allianzmitglieder.', cost:2000000000, resKey:'deuterium', icon:'ti-recycle', activeGated:true, worldProject:true },
+    { key:'wp_archiv', name:'Galaktisches Archiv', desc:'Verleiht JEDEM aktuellen und künftigen Allianzmitglied dauerhaft den exklusiven Ehrentitel „Archivar der Allianz" - über keine andere Quelle im Spiel erhältlich.', cost:3000000, resKey:'forschungspunkte', icon:'ti-microscope', activeGated:true, worldProject:true },
+    { key:'wp_ringwelt', name:'Allianz-Ringwelt', desc:'Einmalig, dauerhaft +10% Lagerkapazität für alle Allianzmitglieder.', cost:3000000000, resKey:'kristalle', icon:'ti-planet', activeGated:true, worldProject:true }
+  ];
+  const ALLIANCE_WORLD_MAX_ACTIVE = 1; // "besonders selten" - nur ein Weltprojekt gleichzeitig in Arbeit
   // Effekt-Berechnung für die gestuften Allianz-Techs/-Gebäude (nicht für a_expand1-5, die bleiben
   // binär/tierbasiert wie bisher). allianceTechLevel liest die aktuelle Stufe (0 = gar nicht
   // erforscht), allianceTechFrac gibt den Anteil (0..1) des in "totalBonus" hinterlegten
@@ -6979,6 +7004,7 @@
   function missionFuelCost(durationSec, shipCount){
     let cost = Math.max(5, durationSec * 0.48 * Math.sqrt(Math.max(1, shipCount)));
     if (state.allianceResearch) cost *= (1-0.15*allianceTechFrac('ab_expedition'));
+    if (state.allianceResearch && state.allianceResearch['wp_wurmloch']) cost *= 0.90; // Weltprojekt "Wurmlochgenerator"
     cost *= allianceBaseFuelMult();
     const doc = activeDoctrine();
     if (doc) cost *= doc.fuelMult;
@@ -7296,6 +7322,7 @@
     globalBonus += Math.min(2, activePactCount())*(0.05 + (state.research.rdiplomatie||0)*0.0015);
     globalBonus += ascBonus('prod')*0.02;
     globalBonus += allianceBaseProdBonus();
+    if (state.allianceResearch && state.allianceResearch['wp_dyson']) globalBonus += 0.05; // Weltprojekt "Dyson-Sphäre"
     // Balance-Pass v8.7: Die additive Bonus-Gruppe ist bei +100% gedeckelt. Jeder Einzelbonus
     // bleibt spürbar, aber die Summe kann nicht mehr unbegrenzt wachsen - auch nicht durch
     // künftige Features, die hier einzahlen.
@@ -7354,6 +7381,7 @@
     if (lvl) cap *= (1 + lvl*RESEARCH_DEFS.find(r=>r.key==='rlager').effectPerLevel);
     if (state.allianceResearch) cap *= (1+0.15*allianceTechFrac('a_storage'));
     if (state.allianceResearch) cap *= (1+0.10*allianceTechFrac('ab_lager'));
+    if (state.allianceResearch && state.allianceResearch['wp_ringwelt']) cap *= 1.10; // Weltprojekt "Allianz-Ringwelt"
     cap *= (1 + allianceBaseStorageBonus());
     for (const [pid, bonus] of Object.entries(state.planetBonuses||{})){
       if (state.colonies[pid] && bonus.type==='storage_boost') cap += bonus.flat;
@@ -7395,6 +7423,7 @@
     mult *= fleetSpeedMultiplier(f, relevantKeys);
     if (state.allianceResearch) mult *= (1-0.10*allianceTechFrac('a_speed'));
     if (state.allianceResearch) mult *= (1-0.15*allianceTechFrac('ep_logistik')); // Permanentes Allianzprojekt "Logistiknetzwerk"
+    if (state.allianceResearch && state.allianceResearch['wp_sprungtor']) mult *= 0.90; // Weltprojekt "Intergalaktisches Sprungtor"
     mult *= Math.max(0.5, 1 - prestigePerkCount('speed')*0.03);
     mult *= Math.max(0.5, 1 - ascBonus('speed')*0.02);
     mult *= Math.max(0.5, 1 - skillBonusPct('log'));
@@ -9086,6 +9115,7 @@
     if (!state.allianceSkins) state.allianceSkins = [];
     if (state.equippedAllianceSkin === undefined) state.equippedAllianceSkin = null;
     if (!state.allianceActiveProjects) state.allianceActiveProjects = [];
+    if (!state.allianceActiveWorldProjects) state.allianceActiveWorldProjects = [];
     if (state.allianceBase === undefined) state.allianceBase = null;
     if (state.allianceBaseWar === undefined) state.allianceBaseWar = null;
     if (!state.shipsAtAllianceBase) state.shipsAtAllianceBase = {};
@@ -9702,6 +9732,7 @@
     // Boni oben, da der Feature-Wunsch explizit "Schnellere Schiffsbauzeiten" UND allgemein "Ausbau
     // einer riesigen Werft" nennt.
     if (state.allianceResearch) effBuildTimeEach *= (1 - 0.20*allianceTechFrac('ep_werft'));
+    if (state.allianceResearch && state.allianceResearch['wp_sternenwerft']) effBuildTimeEach *= 0.90; // Weltprojekt "Gigantische Sternenwerft"
     const dur = Math.max(3, Math.round(effBuildTimeEach * qty));
     state.constructionQueue = state.constructionQueue || [];
     const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
@@ -11808,6 +11839,7 @@
       { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' },
       { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste.' },
       { title:'Permanente Allianzprojekte: 100 Stufen für vollständig ausgebaute Basen', body:'Sobald die Allianzbasis <strong>Stufe 10 (Maximalstufe)</strong> erreicht hat, schalten sich im Allianz-Tab unterhalb der Allianz-Gebäude sieben permanente Projekte frei, jedes mit <strong>100 Ausbaustufen</strong> (deutlich sanfteres Kostenwachstum als bei den 20-stufigen Technologien - ein Langzeitziel für Monate, kein Endpunkt): <strong>Galaktische Forschung</strong> (-Forschungsdauer), <strong>Allianz-Flottenwerft</strong> (-Bauzeit für Schiffe UND Gebäude), <strong>Galaktisches Handelsnetzwerk</strong> (+Marktrabatt, Deckel dafür von 20% auf 30% angehoben), <strong>Verteidigungsnetzwerk</strong> (+Verteidigungspunkte, fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein), <strong>Logistiknetzwerk</strong> (-Flugzeiten aller Missionen), <strong>Expeditionsprogramm</strong> (+Fundchance bei Expeditionen) und <strong>Terraforming-Initiative</strong> (-Terraforming-Kosten UND -Dauer). Es können immer nur <strong>bis zu 2 Projekte gleichzeitig aktiv</strong> sein und Beiträge annehmen - nur Admins/Offiziere entscheiden, welche. Beiträge zählen wie bei allen anderen Allianz-Zielen automatisch für die wöchentliche Allianz-Spendenrangliste.' },
+      { title:'Weltprojekte: seltene Mega-Projekte', body:'Zusätzlich zu den 100-stufigen Allianzprojekten gibt es sechs <strong>Weltprojekte</strong> - einmalige Mega-Bauwerke mit enormen Einzelkosten ("mehrere Wochen bis Monate" gemeinsamer Beiträge), ebenfalls erst ab voll ausgebauter Allianzbasis: <strong>Dyson-Sphäre</strong> (+5% Produktion), <strong>Intergalaktisches Sprungtor</strong> (-10% Flugzeit), <strong>Gigantische Sternenwerft</strong> (-10% Bauzeit), <strong>Wurmlochgenerator</strong> (-10% Treibstoffkosten), <strong>Allianz-Ringwelt</strong> (+10% Lagerkapazität) und <strong>Galaktisches Archiv</strong> (verleiht der gesamten Allianz - auch künftigen Mitgliedern - dauerhaft den exklusiven Ehrentitel „Archivar der Allianz", einsehbar im Fortschritt-Tab). Anders als bei den normalen Allianzprojekten kann immer nur <strong>EIN einziges</strong> Weltprojekt gleichzeitig in Arbeit sein - nach Fertigstellung wird automatisch der Aktiv-Slot frei für das nächste. Ein vollendetes Weltprojekt bleibt für immer als Prestigeobjekt der Allianz sichtbar.' },
       { title:'Territorien-Kontrolle', body:'Ein Sternsystem gibt <strong>+5% Produktion</strong>, wenn du dich dort gerade befindest UND das System <strong>voll kontrollierst</strong> - das heißt: JEDER dort kolonisierte Planet gehört entweder dir/deiner Allianz, oder er ist unkolonisiert. Gehört auch nur ein einziger Planet im System einem anderen Spieler oder einer anderen Allianz, entfällt der Bonus für das gesamte System, für alle Seiten - volle Kontrolle über ein System ist dadurch strategisch deutlich wertvoller als das bloße Vorhandensein dort. Auch ein einzelner Spieler ohne Allianz kann ein System allein voll kontrollieren, wenn ihm dort alle kolonisierten Planeten gehören. Die Übersicht im Galaxie-Tab zeigt die zuletzt bekannten voll kontrollierten Systeme (basiert auf den geteilten Bestenlisten-Daten, aktualisiert sich beim regulären Speichern).' }
     ]},
     { key:'leere', icon:'ti-atom-2', title:'Endgame: Die Leere', entries:[
@@ -13120,7 +13152,7 @@
     } catch(e){}
   }
 
-  function allAllianceStructures(){ return ALLIANCE_TECH_DEFS.concat(ALLIANCE_BUILDING_DEFS, ALLIANCE_ENDGAME_PROJECT_DEFS); }
+  function allAllianceStructures(){ return ALLIANCE_TECH_DEFS.concat(ALLIANCE_BUILDING_DEFS, ALLIANCE_ENDGAME_PROJECT_DEFS, ALLIANCE_WORLD_PROJECT_DEFS); }
   function findAllianceStructure(key){ return allAllianceStructures().find(x=>x.key===key); }
 
   async function loadAllianceTechData(){
@@ -13175,9 +13207,23 @@
       state.allianceTechTotals = totals;
       state.allianceResearch = unlockedDoc;
       await loadAllianceActiveProjects();
+      await loadAllianceActiveWorldProjects();
+      // Ein soeben abgeschlossenes Weltprojekt automatisch aus der Aktiv-Liste nehmen, damit die
+      // Allianz ohne manuellen Zwischenschritt gleich das nächste starten kann (siehe
+      // ALLIANCE_WORLD_MAX_ACTIVE=1 - ohne diesen Schritt bliebe der einzige Aktiv-Slot blockiert).
+      // Bewusst NICHT über setActiveAllianceWorldProjects() (das ist admin/offizier-gated und würde
+      // für normale Mitglieder bei jedem Laden eine Fehlermeldung loggen) - direktes, stilles
+      // Überschreiben, jeder Client kommt hier unabhängig zum selben, deterministischen Ergebnis.
+      const stillActiveWorld = (state.allianceActiveWorldProjects||[]).filter(k => !unlockedDoc[k]);
+      if (stillActiveWorld.length !== (state.allianceActiveWorldProjects||[]).length){
+        state.allianceActiveWorldProjects = stillActiveWorld;
+        try { await storageSet('alliance:'+tag+':worldactive', JSON.stringify({ active: stillActiveWorld }), true); } catch(e){}
+      }
+      grantAllianceArchivTitleIfUnlocked();
       renderAllianceTechBox();
       renderAllianceBuildingBox();
       renderAllianceEndgameBox();
+      renderAllianceWorldProjectsBox();
       renderAllianceBaseBox();
     } catch(e){ /* Allianz-Techs optional, Spiel läuft ohne */ }
   }
@@ -13903,7 +13949,10 @@
     { key:'grossadmiral_allianz', name:'Großadmiral der Allianz', color:'#fac775', icon:'ti-medal' },
     { key:'leerenwaechter', name:'Leerenwächter', color:'#af7ce6', icon:'ti-shield-lock' },
     { key:'kriegsherr_des_monats', name:'Kriegsherr des Monats', color:'#e24b4a', icon:'ti-sword' },
-    { key:'legende_der_allianz', name:'Legende der Allianz', color:'#5dcaa5', icon:'ti-trophy' }
+    { key:'legende_der_allianz', name:'Legende der Allianz', color:'#5dcaa5', icon:'ti-trophy' },
+    // exclusiveSource:true - NICHT Teil des zufälligen Großprojekt-Fundpools (siehe
+    // grantAllianceMissionTitle unten), einzige Quelle ist das Weltprojekt "Galaktisches Archiv".
+    { key:'archivar_der_allianz', name:'Archivar der Allianz', color:'#8fd9e8', icon:'ti-microscope', exclusiveSource:true }
   ];
   function findAllianceTitle(key){ return ALLIANCE_TITLE_DEFS.find(t=>t.key===key); }
   // Vergibt beim Großprojekt-Abschluss einen zufälligen, noch nicht besessenen Titel - sobald alle
@@ -13911,7 +13960,7 @@
   // automatisch als Anzeige-Titel gesetzt, falls noch keiner gewählt war.
   function grantAllianceMissionTitle(){
     const owned = state.allianceTitles || (state.allianceTitles = []);
-    const available = ALLIANCE_TITLE_DEFS.filter(t => !owned.includes(t.key));
+    const available = ALLIANCE_TITLE_DEFS.filter(t => !owned.includes(t.key) && !t.exclusiveSource);
     if (!available.length) return null;
     const t = available[Math.floor(Math.random()*available.length)];
     owned.push(t.key);
@@ -13923,6 +13972,19 @@
     state.equippedAllianceTitle = key || null;
     log(key ? 'Titel „'+(findAllianceTitle(key)||{}).name+'" wird jetzt angezeigt.' : 'Anzeige-Titel entfernt.', 'ti-award');
     render(); save();
+  }
+  // Weltprojekt "Galaktisches Archiv": sobald abgeschlossen (state.allianceResearch.wp_archiv truthy,
+  // von loadAllianceTechData() gesetzt), bekommt JEDES Mitglied den exklusiven Titel automatisch beim
+  // nächsten Laden - auch wer der Allianz erst NACH Abschluss beitritt ("künftige Mitglieder" laut
+  // Feature-Wunsch). Rein lokale Prüfung, kein weiterer Server-Zustand nötig.
+  function grantAllianceArchivTitleIfUnlocked(){
+    if (!state.allianceResearch || !state.allianceResearch['wp_archiv']) return;
+    const owned = state.allianceTitles || (state.allianceTitles = []);
+    if (owned.includes('archivar_der_allianz')) return;
+    owned.push('archivar_der_allianz');
+    if (!state.equippedAllianceTitle) state.equippedAllianceTitle = 'archivar_der_allianz';
+    log('Das Galaktische Archiv deiner Allianz ist vollendet - du erhältst den exklusiven Ehrentitel „Archivar der Allianz"!', 'ti-microscope');
+    playSound('achieve');
   }
   function renderAllianceTitlesBox(){
     const box = document.getElementById('allianceTitlesBox');
@@ -14726,7 +14788,10 @@
     // Permanente Allianzprojekte (activeGated:true) nehmen nur Beiträge an, solange sie vom
     // Admin/Offizier aktiv geschaltet sind (siehe ALLIANCE_ENDGAME_MAX_ACTIVE) - alle bestehenden
     // Techs/Gebäude haben kein activeGated und sind von dieser Prüfung unberührt.
-    if (t.activeGated && !(state.allianceActiveProjects||[]).includes(techKey)){ log('Dieses Allianzprojekt ist gerade nicht aktiv geschaltet.', 'ti-alert-triangle'); return; }
+    if (t.activeGated){
+      const activeList = t.worldProject ? (state.allianceActiveWorldProjects||[]) : (state.allianceActiveProjects||[]);
+      if (!activeList.includes(techKey)){ log('Dieses '+(t.worldProject?'Weltprojekt':'Allianzprojekt')+' ist gerade nicht aktiv geschaltet.', 'ti-alert-triangle'); return; }
+    }
     if ((state.resources[t.resKey]||0) < amount || amount <= 0){ log('Nicht genug Ressourcen für diesen Beitrag.', 'ti-alert-triangle'); return; }
     state.resources[t.resKey] -= amount;
     state.allianceContributed[techKey] = (state.allianceContributed[techKey]||0) + amount;
@@ -14766,6 +14831,29 @@
       const names = keys.map(k => (findAllianceStructure(k)||{}).name || k).join(', ') || 'keins';
       log('Aktive Allianzprojekte: '+names+'.', 'ti-flask');
       postAllianceBaseNews('🏗 '+(state.player.name||'Ein Mitglied')+' hat die aktiven Allianzprojekte auf '+names+' gesetzt.');
+      render(); save();
+    } catch(e){}
+  }
+  async function loadAllianceActiveWorldProjects(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ state.allianceActiveWorldProjects = []; return; }
+    try {
+      const r = await storageGet('alliance:'+tag+':worldactive', true);
+      const doc = (r && r.value) ? JSON.parse(r.value) : { active:[] };
+      state.allianceActiveWorldProjects = Array.isArray(doc.active) ? doc.active : [];
+    } catch(e){}
+  }
+  async function setActiveAllianceWorldProjects(keys){
+    if (!amIAllianceMusterLeader()){ log('Nur Admins/Offiziere können Weltprojekte aktivieren.', 'ti-alert-triangle'); return; }
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    keys = keys.slice(0, ALLIANCE_WORLD_MAX_ACTIVE);
+    try {
+      await storageSet('alliance:'+tag+':worldactive', JSON.stringify({ active: keys }), true);
+      state.allianceActiveWorldProjects = keys;
+      const names = keys.map(k => (findAllianceStructure(k)||{}).name || k).join(', ') || 'keins';
+      log('Aktives Weltprojekt: '+names+'.', 'ti-sparkles');
+      postAllianceBaseNews('🌌 '+(state.player.name||'Ein Mitglied')+' hat das Weltprojekt "'+names+'" gestartet.');
       render(); save();
     } catch(e){}
   }
@@ -14839,6 +14927,68 @@
       if (cur.includes(key)){ setActiveAllianceProjects(cur.filter(k=>k!==key)); return; }
       if (cur.length >= ALLIANCE_ENDGAME_MAX_ACTIVE){ log('Maximal '+ALLIANCE_ENDGAME_MAX_ACTIVE+' Projekte gleichzeitig aktiv - erst eines deaktivieren.', 'ti-alert-triangle'); return; }
       setActiveAllianceProjects([...cur, key]);
+    });
+  }
+  // Weltprojekte - binäre Einmal-Schwelle statt Stufen (wie a_expand1-5), daher eigene, einfachere
+  // Render-Logik als bei den 100-stufigen Allianzprojekten oben. Ein abgeschlossenes Weltprojekt
+  // bleibt dauerhaft als Prestigeobjekt sichtbar (research-done), auch wenn es aus der Aktiv-Liste
+  // entfernt wurde.
+  function renderAllianceWorldProjectsBox(){
+    const box = document.getElementById('allianceWorldBox');
+    if (!box || isTypingIn('allianceWorldBox')) return;
+    const tag = myAllianceTag();
+    if (!tag){ box.innerHTML = `<div class="bmeta">Vergib oben einen Allianz-Tag, um gemeinsam beizutragen.</div>`; return; }
+    if (allianceBaseLevel() < ALLIANCE_BASE_MAX_LEVEL){
+      box.innerHTML = `<div class="bmeta"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85;"></i> Weltprojekte schalten sich frei, sobald die Allianzbasis die Maximalstufe (${ALLIANCE_BASE_MAX_LEVEL}) erreicht hat - aktuell Stufe ${allianceBaseLevel()}.</div>`;
+      return;
+    }
+    const active = state.allianceActiveWorldProjects || [];
+    const totals = state.allianceTechTotals || {};
+    const amLeader = amIAllianceMusterLeader();
+    let html = `<div class="bmeta" style="margin-bottom:8px;">Nur EIN Weltprojekt gleichzeitig in Arbeit - Admins/Offiziere starten das nächste. Jedes ist einmalig und dauerhaft, ohne weitere Ausbaustufen.</div>`;
+    html += ALLIANCE_WORLD_PROJECT_DEFS.map(t => {
+      const done = !!state.allianceResearch[t.key];
+      const isActive = active.includes(t.key);
+      const total = totals[t.key]||0;
+      const rd = RES_DEFS.find(r=>r.key===t.resKey);
+      const myContrib = state.allianceContributed[t.key]||0;
+      const pct = Math.min(100, (total/t.cost)*100);
+      let s = `<div class="card-row ${done?'research-done':''}" style="flex-direction:column; align-items:stretch; ${isActive&&!done?'border-color:#5dcaa5;':(done?'':'opacity:0.7;')}">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="left" style="gap:9px;"><div class="bicon" style="width:34px; height:34px; background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ${t.icon}" aria-hidden="true"></i></div><span class="bname">${t.name}</span></div>
+          ${done ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Vollendet</span>` : (isActive ? `<span class="lvl-pill" style="background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> aktiv</span>` : `<span class="lvl-pill">inaktiv</span>`)}
+        </div>
+        <div class="bmeta">${t.desc}</div>`;
+      if (!done){
+        if (amLeader){
+          s += `<button data-toggle-world-project="${t.key}" style="margin-top:6px; align-self:flex-start; font-size:10px; padding:5px 8px;">${isActive?'Deaktivieren':'Aktivieren'}</button>`;
+        }
+        if (!isActive){
+          s += `<div class="bmeta" style="margin-top:4px;"><i class="ti ti-info-circle" aria-hidden="true"></i> Nicht aktiv - nimmt aktuell keine Beiträge an.</div>`;
+        } else {
+          s += `
+            <div class="bmeta" style="margin-top:4px;">${miniResIcon(t.resKey)} ${fmt(total)}/${fmt(t.cost)} ${rd.label}</div>
+            <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+            <div style="display:flex; gap:6px; align-items:center; margin-top:6px;">
+              <input type="text" inputmode="numeric" placeholder="Menge ${rd.label}" data-contrib-input="${t.key}" style="flex:1; font-size:12px;"/>
+              <button data-contrib-max="${t.key}" data-contrib-max-amt="${Math.max(0, Math.min(Math.floor(state.resources[t.resKey]||0), Math.ceil(t.cost-total)))}" style="font-size:10px; padding:6px 8px;">Max</button>
+              <button data-contrib-btn="${t.key}" style="font-size:11px; padding:6px 10px;">Beitragen</button>
+            </div>
+            <div class="bmeta" style="margin-top:2px;">${miniResIcon(t.resKey)} Dein Beitrag bisher: ${fmt(myContrib)} ${rd.label}</div>
+          `;
+        }
+      }
+      s += `</div>`;
+      return s;
+    }).join('');
+    box.innerHTML = html;
+    wireAllianceContribButtons();
+    box.querySelectorAll('[data-toggle-world-project]').forEach(btn => btn.onclick = () => {
+      const key = btn.getAttribute('data-toggle-world-project');
+      const cur = state.allianceActiveWorldProjects || [];
+      if (cur.includes(key)){ setActiveAllianceWorldProjects(cur.filter(k=>k!==key)); return; }
+      if (cur.length >= ALLIANCE_WORLD_MAX_ACTIVE){ log('Nur '+ALLIANCE_WORLD_MAX_ACTIVE+' Weltprojekt gleichzeitig aktiv - erst deaktivieren.', 'ti-alert-triangle'); return; }
+      setActiveAllianceWorldProjects([...cur, key]);
     });
   }
 
@@ -22890,6 +23040,7 @@
     renderAllianceMusterBox();
     renderAllianceBuildingBox();
     renderAllianceEndgameBox();
+    renderAllianceWorldProjectsBox();
     renderReportsBox();
     const kofiBox = document.getElementById('kofiTopSupporterBox');
     if (kofiBox){
