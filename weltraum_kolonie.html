@@ -2392,8 +2392,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.63.0';
+  const VERSION = '8.63.1';
   const PATCHNOTES = [
+    { version:'8.63.1', date:'17.07.2026', changes:[
+      'Bugfix (Spieler-Report mit Screenshot): Die Heimatbasis konnte auf der Einzelsystem-Karte einen Planeten fast vollständig überlagern (Namen/Marker verschmolzen sichtbar ineinander) - die Heimatbasis sitzt auf einem einfachen Kreis um die Sonne, Planeten dagegen auf abgeflachten Ellipsen, und je nach Heimat-Slot-Winkel UND der individuellen Orbit-Position eines Planeten in genau diesem System konnten sich beide Bahnen fast exakt kreuzen. Die Heimatbasis weicht jetzt automatisch radial nach außen aus, sobald eine echte Überlappung mit der Sonne oder einem vorhandenen Planeten erkannt wird - Missions-Flugbahnen (z.B. Auto-Erkunder) starten konsistent vom selben, korrigierten Punkt'
+    ]},
     { version:'8.63.0', date:'17.07.2026', changes:[
       'Galaxie-Übersicht überarbeitet (Spieler-Feedback: Karte war "sehr schwer erkennbar", zwang sofort zum Zoomen): startet jetzt fokussiert auf die Nachbarschaft des aktiven Systems statt sofort mit allen ~67 Systemen auf einmal (⟲-Button zoomt bei Bedarf auf die volle Übersicht); Systemnamen werden nur noch für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, der Rest zeigt Namen und Status beim Antippen bzw. sobald man näher heranzoomt; die zweite Statuszeile unter jedem Namen ist weg (Info steckt weiterhin im Fortschrittsring plus Tooltip) - beides zusammen verhindert das Label-Gewirr bei dieser Systemdichte',
       'Jedes Sternsystem hat jetzt einen eigenen, rein optischen Sonnentyp (6 Varianten: Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) statt überall derselben gelben Sonne - sichtbar sowohl als kleiner Punkt in der Galaxie-Übersicht als auch als große Sonne der Einzelsystem-Ansicht',
@@ -17226,6 +17229,10 @@
 
     const sysPlanets = PLANETS.filter(p=>p.system===activeSystem);
     const orbitsPresent = [...new Set(sysPlanets.map(p=>p.orbit||3))].sort((a,b)=>a-b);
+    // Rohe Heimatposition als Fallback (z.B. Missionslinien, wenn das Heimatsystem gerade nicht
+    // angezeigt wird) - wird unten durch die kollisionsvermeidende Position ersetzt, sobald das
+    // Heimatsystem tatsächlich sichtbar ist (siehe "Eigene Heimatbasis" weiter unten).
+    let homeMarkerPos = homeSlotXY(myHomeSlot);
 
     // Sonnentyp dieses Systems (siehe SUN_TYPES/sunTypeFor) - dieselbe Zuordnung wie in der Galaxie-
     // Übersicht, damit die große Sonne hier zum kleinen Punkt dort passt.
@@ -17280,7 +17287,34 @@
     // Eigene Heimatbasis (nur im eigenen Heimatsystem)
     const highlightActive = colonyHighlight && colonyHighlight.until > Date.now();
     if (activeSystem === myHomeSystem){
-      const hc = homeSlotXY(myHomeSlot);
+      // Bugfix (Spieler-Report mit Screenshot): homeSlotXY() setzt die Heimatbasis auf einen reinen
+      // Kreis (Radius 50) um die Sonne, während Planeten auf abgeflachten Ellipsen sitzen (ry variiert
+      // je Orbit zwischen ~25 und ~85) - je nach Heimat-Slot-Winkel UND der zufälligen Orbit-Position
+      // eines Planeten in genau diesem System konnten beide Kreis-/Ellipsenbahnen sich fast exakt
+      // kreuzen und die Marker (samt Namen) sichtbar überlappen ("Prime" direkt auf der Heimatbasis).
+      // Statt die gesamte Positionsberechnung umzubauen: die Heimatbasis bei einer echten Kollision
+      // schrittweise radial nach außen schieben (gleicher Winkel bleibt erhalten, differenziert also
+      // weiterhin mehrere Spieler im selben Heimatsystem), bis sie sowohl von der Sonne als auch von
+      // jedem tatsächlich vorhandenen Planeten genug Abstand hat. homeMarkerPos wird unten (Missions-
+      // Flugbahnen) wiederverwendet, damit die "Auto-Erkunder"-Linie exakt am selben Punkt startet
+      // wie der sichtbare Marker, statt an der unverschobenen Rohposition.
+      const MIN_SEP_FROM_PLANET = 34, MIN_SEP_FROM_SUN = 34*activeSunType.r + 20;
+      let hc = homeSlotXY(myHomeSlot);
+      {
+        const homeAngle = Math.atan2(hc.y-SUN_Y, hc.x-SUN_X);
+        let homeRadius = Math.hypot(hc.x-SUN_X, hc.y-SUN_Y);
+        for (let attempt=0; attempt<10; attempt++){
+          const tooCloseToSun = homeRadius < MIN_SEP_FROM_SUN;
+          const tooCloseToPlanet = sysPlanets.some(p => {
+            const pp = planetOrbitXY(p);
+            return Math.hypot(hc.x-pp.x, hc.y-pp.y) < MIN_SEP_FROM_PLANET;
+          });
+          if (!tooCloseToSun && !tooCloseToPlanet) break;
+          homeRadius += 12;
+          hc = { x: SUN_X + homeRadius*Math.cos(homeAngle), y: SUN_Y + homeRadius*Math.sin(homeAngle) };
+        }
+      }
+      homeMarkerPos = hc;
       const homeHasMoon = state.moons && state.moons.home;
       const hcx = hc.x.toFixed(1), hcy = hc.y.toFixed(1);
       const homeOrbS = orbitalStationOf('home');
@@ -17420,7 +17454,7 @@
         if (!targetInView && !originInView) continue;
         const targetPos = targetInView ? planetOrbitXY(p) : { x: SUN_X, y: SUN_Y };
         let originX, originY;
-        if (originKey === 'home'){ const hc = homeSlotXY(myHomeSlot); originX = hc.x; originY = hc.y; }
+        if (originKey === 'home'){ originX = homeMarkerPos.x; originY = homeMarkerPos.y; }
         else if (originInView){ const oc = planetOrbitXY(originPlanet); originX = oc.x; originY = oc.y; }
         else { originX = SUN_X; originY = SUN_Y; }
         const totalDur = Math.max(1000, m.endTime - (m.startTime || (m.endTime - missionDurationFor(p.duration, fleet, EXPLORE_SHIP_KEYS)*1000)));
