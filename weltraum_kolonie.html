@@ -2447,8 +2447,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.74.3';
+  const VERSION = '8.75.0';
   const PATCHNOTES = [
+    { version:'8.75.0', date:'17.07.2026', changes:[
+      'Neu: Bauzeit für Allianzgebäude (Spieler-Wunsch) - die 7 Allianzgebäude (Allianz-Hauptquartier, Gemeinsame Flottenwerft, Grenzbollwerk, Zentrallager, Expeditionslogistik, Allianz-Forschungszentrum, Kampfflotten-Akademie) schalten eine neue Stufe nicht mehr sofort frei, sobald die Ressourcen beisammen sind, sondern erst nach einer echten Bauzeit danach (analog zur Allianzbasis) - Stufe 1 dauert 3 Std., jede weitere Stufe ×1,35 länger. Jedes Gebäude baut unabhängig von den anderen, Beiträge bleiben während einer laufenden Bauzeit weiterhin sinnvoll (sparen die nächste Stufe vor). Allianz-Technologien sowie die permanenten Allianzprojekte/Weltprojekte sind davon nicht betroffen'
+    ]},
     { version:'8.74.3', date:'17.07.2026', changes:[
       'Nachrüstung "Allianzsystem erweitern": die ursprünglich verlangten, aber noch fehlenden Spenden-UI-Elemente ergänzt - Permanente Allianzprojekte und Weltprojekte zeigen jetzt zusätzlich eine projektinterne Rangliste der größten Spender (Top 3) sowie eine geschätzte Fertigstellungszeit, hochgerechnet aus der Beitragsrate seit Aktivierung des Projekts'
     ]},
@@ -5397,15 +5400,97 @@
     { key:'a_expand4', name:'Allianz-Expansion IV', desc:'+8 Mitgliederlimit (→ 36)', cost:800000, resKey:'antimaterie', icon:'ti-users', requires:['a_expand3'] },
     { key:'a_expand5', name:'Allianz-Expansion V', desc:'+14 Mitgliederlimit (→ 50, aktuelles Maximum)', cost:2500000, resKey:'antimaterie', icon:'ti-users', requires:['a_expand4'] }
   ];
+  // hasBuildTime (17.07.2026, Spieler-Wunsch "Bauzeit hinzu bei Allianzgebäude"): anders als die
+  // Allianz-Technologien oben schaltet sich eine Stufe hier NICHT sofort frei, sobald die Ressourcen
+  // beisammen sind - analog zur Allianzbasis (allianceBaseProgress) läuft danach noch eine echte
+  // Bauzeit (siehe ALLIANCE_BUILDING_BUILD_H_L1/_MULT weiter unten), bevor die Stufe zählt. Bewusst
+  // NUR bei den Gebäuden, nicht bei ALLIANCE_TECH_DEFS (reine Forschungsabkommen ohne "Bauplatz") oder
+  // den Endgame-/Weltprojekten (haben mit ETA/Spenderrangliste bereits eine eigene Zeit-Dimension).
   const ALLIANCE_BUILDING_DEFS = [
-    { key:'ab_hq', name:'Allianz-Hauptquartier', desc:'+0,25% XP-Gewinn je Stufe (max. +5% bei Stufe 20) für alle Allianzmitglieder', cost:40000, costMult:2.0, maxLevel:20, totalBonus:0.05, resKey:'erz', icon:'ti-building-castle' },
-    { key:'ab_werft', name:'Gemeinsame Flottenwerft', desc:'+0,4% zusätzliche Angriffspunkte je Stufe (max. +8% bei Stufe 20) für alle Allianzmitglieder', cost:48000, costMult:2.0, maxLevel:20, totalBonus:0.08, resKey:'kristalle', icon:'ti-anchor' },
-    { key:'ab_bollwerk', name:'Grenzbollwerk', desc:'-1% zusätzlicher Ressourcenverlust bei NPC-Überfällen je Stufe (max. -20% bei Stufe 20) für alle Allianzmitglieder', cost:36000, costMult:2.0, maxLevel:20, totalBonus:0.20, resKey:'deuterium', icon:'ti-building-fortress' },
-    { key:'ab_lager', name:'Zentrallager', desc:'+0,5% zusätzliche Lagerkapazität je Stufe (max. +10% bei Stufe 20) für alle Allianzmitglieder', cost:32000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'erz', icon:'ti-box' },
-    { key:'ab_expedition', name:'Expeditionslogistik', desc:'-0,75% Treibstoffkosten je Stufe (max. -15% bei Stufe 20) für alle Missionen aller Allianzmitglieder', cost:44000, costMult:2.0, maxLevel:20, totalBonus:0.15, resKey:'deuterium', icon:'ti-map-2' },
-    { key:'ab_forschungszentrum', name:'Allianz-Forschungszentrum', desc:'-0,5% zusätzliche Forschungszeit je Stufe (max. -10% bei Stufe 20, Tier 2) für alle Allianzmitglieder', cost:80000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'antimaterie', icon:'ti-microscope', requires:['ab_hq'] },
-    { key:'ab_flotte2', name:'Kampfflotten-Akademie', desc:'+0,5% zusätzliche Angriffspunkte je Stufe (max. +10% bei Stufe 20, Tier 2) für alle Allianzmitglieder', cost:90000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'kristalle', icon:'ti-rocket', requires:['ab_werft'] }
+    { key:'ab_hq', name:'Allianz-Hauptquartier', desc:'+0,25% XP-Gewinn je Stufe (max. +5% bei Stufe 20) für alle Allianzmitglieder', cost:40000, costMult:2.0, maxLevel:20, totalBonus:0.05, resKey:'erz', icon:'ti-building-castle', hasBuildTime:true },
+    { key:'ab_werft', name:'Gemeinsame Flottenwerft', desc:'+0,4% zusätzliche Angriffspunkte je Stufe (max. +8% bei Stufe 20) für alle Allianzmitglieder', cost:48000, costMult:2.0, maxLevel:20, totalBonus:0.08, resKey:'kristalle', icon:'ti-anchor', hasBuildTime:true },
+    { key:'ab_bollwerk', name:'Grenzbollwerk', desc:'-1% zusätzlicher Ressourcenverlust bei NPC-Überfällen je Stufe (max. -20% bei Stufe 20) für alle Allianzmitglieder', cost:36000, costMult:2.0, maxLevel:20, totalBonus:0.20, resKey:'deuterium', icon:'ti-building-fortress', hasBuildTime:true },
+    { key:'ab_lager', name:'Zentrallager', desc:'+0,5% zusätzliche Lagerkapazität je Stufe (max. +10% bei Stufe 20) für alle Allianzmitglieder', cost:32000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'erz', icon:'ti-box', hasBuildTime:true },
+    { key:'ab_expedition', name:'Expeditionslogistik', desc:'-0,75% Treibstoffkosten je Stufe (max. -15% bei Stufe 20) für alle Missionen aller Allianzmitglieder', cost:44000, costMult:2.0, maxLevel:20, totalBonus:0.15, resKey:'deuterium', icon:'ti-map-2', hasBuildTime:true },
+    { key:'ab_forschungszentrum', name:'Allianz-Forschungszentrum', desc:'-0,5% zusätzliche Forschungszeit je Stufe (max. -10% bei Stufe 20, Tier 2) für alle Allianzmitglieder', cost:80000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'antimaterie', icon:'ti-microscope', requires:['ab_hq'], hasBuildTime:true },
+    { key:'ab_flotte2', name:'Kampfflotten-Akademie', desc:'+0,5% zusätzliche Angriffspunkte je Stufe (max. +10% bei Stufe 20, Tier 2) für alle Allianzmitglieder', cost:90000, costMult:2.0, maxLevel:20, totalBonus:0.10, resKey:'kristalle', icon:'ti-rocket', requires:['ab_werft'], hasBuildTime:true }
   ];
+  // Bauzeit-Formel analog zur Allianzbasis (ALLIANCE_BASE_BUILD_H_L1/_MULT), aber mit kürzerer
+  // Stufe-1-Zeit und sanfterem Wachstum - die Gebäude haben 20 statt 10 Stufen, mit 1.5x wie bei der
+  // Basis wären die letzten Stufen astronomisch. Bei 3h/1.35x landet Stufe 20 bei ~39 Tagen BAUZEIT
+  // ALLEIN für diese eine Stufe - passt zur bereits bestehenden Hilfetext-Aussage, dass Stufe 18-20
+  // "echte Langzeit-/Elite-Ziele" sind (siehe HELP_SECTIONS "Allianz-Technologien & -Gebäude: 20 Stufen").
+  // Jedes der 7 Gebäude baut unabhängig (eigene readyAtByLevel-Kette, siehe allianceBuildingReadyDoc),
+  // nicht wie die Basis mit nur einem gemeinsamen Bau-Slot - Beiträge zu mehreren Gebäuden gleichzeitig
+  // sind wie bisher möglich, nur das STUFE-ERREICHEN pro Gebäude ist jetzt zeitlich gestreckt.
+  const ALLIANCE_BUILDING_BUILD_H_L1 = 3;
+  const ALLIANCE_BUILDING_BUILD_MULT = 1.35;
+  function allianceBuildingLevelBuildSeconds(level){ return Math.round(ALLIANCE_BUILDING_BUILD_H_L1*3600*Math.pow(ALLIANCE_BUILDING_BUILD_MULT, level-1)); }
+  // Wie allianceBaseProgress, aber generisch für ein einzelnes Gebäude: braucht sowohl die
+  // Ressourcen-Schwelle (aus totals[t.key], wie bei den normalen Techs) als auch einen "Ressourcen
+  // waren zu diesem Zeitpunkt komplett"-Marker PRO Stufe (readyAtByLevel, separates geteiltes
+  // Dokument alliance:<TAG>:buildready - siehe maybeMarkAllianceBuildingResourcesReady). Sequentielle
+  // Kette: Baubeginn einer Stufe = max(eigener Ready-Zeitpunkt, Fertigstellung der Vorstufe), da ein
+  // einzelnes Gebäude nur an EINER Stufe gleichzeitig baut (andere Gebäude sind davon unberührt).
+  function allianceBuildingProgress(t, totals, readyAtByLevel){
+    readyAtByLevel = readyAtByLevel || {};
+    let completedAt = 0, lvl = 0;
+    for (let l=1; l<=t.maxLevel; l++){
+      const resOk = (totals[t.key]||0) >= allianceTechCumulativeCost(t, l);
+      const readyAt = readyAtByLevel[l];
+      if (!resOk || !readyAt) return { lvl, nextBuildStart:0, nextBuildComplete:0 };
+      const buildStart = Math.max(readyAt, completedAt);
+      const buildComplete = buildStart + allianceBuildingLevelBuildSeconds(l)*1000;
+      if (Date.now() >= buildComplete){ lvl = l; completedAt = buildComplete; }
+      else return { lvl, nextBuildStart:buildStart, nextBuildComplete:buildComplete };
+    }
+    return { lvl, nextBuildStart:0, nextBuildComplete:0 };
+  }
+  // Höchste Stufe, für die bereits ein Bauzeit-Startzeitpunkt vermerkt ist (unabhängig davon, ob die
+  // Bauzeit selbst schon abgelaufen ist) - Pendant zu allianceBaseMarkedLevel, nur pro Gebäude.
+  function allianceBuildingMarkedLevel(t, readyAtByLevel){
+    readyAtByLevel = readyAtByLevel || {};
+    let m = 0;
+    for (let l=1; l<=t.maxLevel; l++){ if (readyAtByLevel[l]) m = l; else break; }
+    return m;
+  }
+  // Setzt EINMALIG pro Gebäude+Stufe den Zeitpunkt, ab dem die Ressourcen für die jeweils NÄCHSTE
+  // Stufe vollständig beisammen waren - erst ab diesem Moment zählt deren Bauzeit (Pendant zu
+  // maybeMarkAllianceBaseResourcesReady, alle 7 Gebäude in einem gemeinsamen Dokument). Markiert bei
+  // Bedarf mehrere Stufen auf einmal (while-Schleife statt nur der nächsten) - ein einzelner großer
+  // Beitrag kann die Ressourcenschwelle mehrerer Stufen gleichzeitig überspringen, alle bekommen dann
+  // denselben "jetzt"-Zeitstempel, bauen wegen der sequentiellen Kette in allianceBuildingProgress
+  // aber weiterhin strikt nacheinander. Race-tolerantes Read-Modify-Write wie beim Basis-Pendant.
+  async function maybeMarkAllianceBuildingResourcesReady(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    const totals = state.allianceTechTotals || {};
+    const localDoc = state.allianceBuildReady || {};
+    // Lokal vorprüfen, um bei "nichts zu tun" (der Normalfall bei jedem Aufruf) den Netzwerk-Umweg
+    // über storageGet/storageSet komplett zu sparen - das läuft nach jedem einzelnen Beitrag.
+    const candidates = ALLIANCE_BUILDING_DEFS.filter(t => {
+      const markedLvl = allianceBuildingMarkedLevel(t, localDoc[t.key]);
+      return markedLvl < t.maxLevel && (totals[t.key]||0) >= allianceTechCumulativeCost(t, markedLvl+1);
+    });
+    if (!candidates.length) return;
+    try {
+      const r = await storageGet('alliance:'+tag+':buildready', true);
+      const fresh = (r && r.value) ? JSON.parse(r.value) : {};
+      let changed = false;
+      for (const t of candidates){
+        if (!fresh[t.key]) fresh[t.key] = {};
+        let markedLvl = allianceBuildingMarkedLevel(t, fresh[t.key]);
+        while (markedLvl < t.maxLevel && (totals[t.key]||0) >= allianceTechCumulativeCost(t, markedLvl+1)){
+          markedLvl++;
+          if (!fresh[t.key][markedLvl]){ fresh[t.key][markedLvl] = Date.now(); changed = true; }
+        }
+      }
+      if (changed){
+        await storageSet('alliance:'+tag+':buildready', JSON.stringify(fresh), true);
+        state.allianceBuildReady = fresh;
+      }
+    } catch(e){}
+  }
   // ===== Permanente Allianzprojekte (17.07.2026, Feature-Wunsch "Allianzsystem erweitern") =====
   // Endgame-Fortsetzung für Allianzen, die die Allianzbasis bereits voll ausgebaut haben (Stufe 10):
   // sieben Projekte mit je 100 Ausbaustufen, deutlich sanfterem Kostenwachstum als die 20-stufigen
@@ -11848,7 +11933,7 @@
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
       { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt bis zu +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf, wächst mit der Stufe) für alle Mitglieder. Kombiniert sich mit einem eigenen Fraktions-Marktrabatt, insgesamt gedeckelt bei 12%.' },
       { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' },
-      { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste.' },
+      { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste. Die 7 <strong>Allianz-Gebäude</strong> (nicht die Technologien) schalten eine erreichte Stufe zusätzlich erst nach einer echten <strong>Bauzeit</strong> frei, analog zur Allianzbasis - Stufe 1 dauert 3 Std., jede weitere ×1,35 länger. Jedes Gebäude baut unabhängig von den anderen, die Bauzeit beginnt erst, sobald die Ressourcen für die jeweilige Stufe vollständig beisammen sind.' },
       { title:'Permanente Allianzprojekte: 100 Stufen für vollständig ausgebaute Basen', body:'Sobald die Allianzbasis <strong>Stufe 10 (Maximalstufe)</strong> erreicht hat, schalten sich im Allianz-Tab unterhalb der Allianz-Gebäude sieben permanente Projekte frei, jedes mit <strong>100 Ausbaustufen</strong> (deutlich sanfteres Kostenwachstum als bei den 20-stufigen Technologien - ein Langzeitziel für Monate, kein Endpunkt): <strong>Galaktische Forschung</strong> (-Forschungsdauer), <strong>Allianz-Flottenwerft</strong> (-Bauzeit für Schiffe UND Gebäude), <strong>Galaktisches Handelsnetzwerk</strong> (+Marktrabatt, Deckel dafür von 20% auf 30% angehoben), <strong>Verteidigungsnetzwerk</strong> (+Verteidigungspunkte, fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein), <strong>Logistiknetzwerk</strong> (-Flugzeiten aller Missionen), <strong>Expeditionsprogramm</strong> (+Fundchance bei Expeditionen) und <strong>Terraforming-Initiative</strong> (-Terraforming-Kosten UND -Dauer). Es können immer nur <strong>bis zu 2 Projekte gleichzeitig aktiv</strong> sein und Beiträge annehmen - nur Admins/Offiziere entscheiden, welche. Beiträge zählen wie bei allen anderen Allianz-Zielen automatisch für die wöchentliche Allianz-Spendenrangliste. Jedes aktive Projekt zeigt zusätzlich eine <strong>projektinterne Rangliste der größten Spender</strong> (Top 3) sowie, sobald genug Datenbasis vorliegt (mind. 1 Std. seit Aktivierung), eine <strong>geschätzte Fertigstellungszeit</strong> für die nächste Stufe, hochgerechnet aus der bisherigen Beitragsrate.' },
       { title:'Weltprojekte: seltene Mega-Projekte', body:'Zusätzlich zu den 100-stufigen Allianzprojekten gibt es sechs <strong>Weltprojekte</strong> - einmalige Mega-Bauwerke mit enormen Einzelkosten ("mehrere Wochen bis Monate" gemeinsamer Beiträge), ebenfalls erst ab voll ausgebauter Allianzbasis: <strong>Dyson-Sphäre</strong> (+5% Produktion), <strong>Intergalaktisches Sprungtor</strong> (-10% Flugzeit), <strong>Gigantische Sternenwerft</strong> (-10% Bauzeit), <strong>Wurmlochgenerator</strong> (-10% Treibstoffkosten), <strong>Allianz-Ringwelt</strong> (+10% Lagerkapazität) und <strong>Galaktisches Archiv</strong> (verleiht der gesamten Allianz - auch künftigen Mitgliedern - dauerhaft den exklusiven Ehrentitel „Archivar der Allianz", einsehbar im Fortschritt-Tab). Anders als bei den normalen Allianzprojekten kann immer nur <strong>EIN einziges</strong> Weltprojekt gleichzeitig in Arbeit sein - nach Fertigstellung wird automatisch der Aktiv-Slot frei für das nächste. Ein vollendetes Weltprojekt bleibt für immer als Prestigeobjekt der Allianz sichtbar. Auch hier zeigt die aktive Baustelle die größten Spender und eine geschätzte Fertigstellungszeit.' },
       { title:'Territorien-Kontrolle', body:'Ein Sternsystem gibt <strong>+5% Produktion</strong>, wenn du dich dort gerade befindest UND das System <strong>voll kontrollierst</strong> - das heißt: JEDER dort kolonisierte Planet gehört entweder dir/deiner Allianz, oder er ist unkolonisiert. Gehört auch nur ein einziger Planet im System einem anderen Spieler oder einer anderen Allianz, entfällt der Bonus für das gesamte System, für alle Seiten - volle Kontrolle über ein System ist dadurch strategisch deutlich wertvoller als das bloße Vorhandensein dort. Auch ein einzelner Spieler ohne Allianz kann ein System allein voll kontrollieren, wenn ihm dort alle kolonisierten Planeten gehören. Die Übersicht im Galaxie-Tab zeigt die zuletzt bekannten voll kontrollierten Systeme (basiert auf den geteilten Bestenlisten-Daten, aktualisiert sich beim regulären Speichern).' }
@@ -13209,6 +13294,14 @@
         const ur = await storageGet('alliance:'+tag+':unlocked', true);
         if (ur && ur.value) unlockedDoc = JSON.parse(ur.value);
       } catch(e){}
+      // Bauzeit-Marker für Allianzgebäude (17.07.2026) - ein geteiltes Dokument für alle 7 Gebäude
+      // zusammen (wie alliance:<TAG>:unlocked), pro Gebäude eine eigene readyAtByLevel-Kette.
+      let buildReadyDoc = {};
+      try {
+        const br = await storageGet('alliance:'+tag+':buildready', true);
+        if (br && br.value) buildReadyDoc = JSON.parse(br.value);
+      } catch(e){}
+      state.allianceBuildReady = buildReadyDoc;
       let unlockedChanged = false;
       for (const t of allAllianceStructures()){
         // Bug behoben (danke an die eigene Code-Durchsicht): Voraussetzung wurde bisher nur beim
@@ -13222,7 +13315,12 @@
           if ((unlockedDoc[t.key]||(t.maxLevel?0:false)) !== zero){ unlockedDoc[t.key] = zero; unlockedChanged = true; }
           continue;
         }
-        if (t.maxLevel){
+        if (t.hasBuildTime){
+          // Allianzgebäude: Stufe braucht zusätzlich zur Ressourcenschwelle eine abgelaufene Bauzeit
+          // (siehe allianceBuildingProgress) - eigener Zweig statt der reinen Ressourcen-Schleife unten.
+          const lvl = allianceBuildingProgress(t, totals, buildReadyDoc[t.key]).lvl;
+          if ((unlockedDoc[t.key]||0) !== lvl){ unlockedDoc[t.key] = lvl; unlockedChanged = true; }
+        } else if (t.maxLevel){
           // Gestufte Techs/Gebäude: Stufe wird aus der kumulierten Beitragssumme abgeleitet (wie viele
           // Stufen-Schwellen wurden bereits überschritten), nicht mehr binär. Kann bei jedem Aufruf
           // neu berechnet werden - rein deterministisch aus totals[t.key], kein Zustand verloren.
@@ -13239,6 +13337,7 @@
       }
       state.allianceTechTotals = totals;
       state.allianceResearch = unlockedDoc;
+      await maybeMarkAllianceBuildingResourcesReady();
       await loadAllianceActiveProjects();
       await loadAllianceActiveWorldProjects();
       // Ein soeben abgeschlossenes Weltprojekt automatisch aus der Aktiv-Liste nehmen, damit die
@@ -15147,6 +15246,19 @@
       const intoLevel = total - cumulativeForCurrent;
       const neededForLevel = maxed ? 0 : (nextLevelCost - cumulativeForCurrent);
       const pct = maxed ? 100 : Math.min(100, (intoLevel/neededForLevel)*100);
+      // Bauzeit-Statuszeile für Allianzgebäude (hasBuildTime) - Ressourcen-Fortschritt und Beitrags-
+      // Formular bleiben unverändert (weiterhin sinnvoll, spart künftige Bauzeit vor), nur eine
+      // zusätzliche Zeile informiert über den Baufortschritt der NÄCHSTEN Stufe.
+      let buildStatusHtml = '';
+      if (t.hasBuildTime && !maxed){
+        const prog = allianceBuildingProgress(t, totals, (state.allianceBuildReady||{})[t.key]);
+        const resReadyForNext = total >= nextLevelCost;
+        if (resReadyForNext && prog.nextBuildComplete > Date.now()){
+          buildStatusHtml = `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Bauzeit für Stufe ${level+1} läuft - noch ${fmtDuration((prog.nextBuildComplete-Date.now())/1000)}</div>`;
+        } else if (!resReadyForNext){
+          buildStatusHtml = `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Sammelt zuerst die Ressourcen für diese Stufe - die Bauzeit (${fmtDuration(allianceBuildingLevelBuildSeconds(level+1))}) beginnt erst, sobald alle Ressourcen beisammen sind.</div>`;
+        }
+      }
       return `
         <div class="card-row ${maxed?'research-done':''}" style="flex-direction:column; align-items:stretch;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -15157,6 +15269,7 @@
           ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Voll ausgebaut</div>` : `
             <div class="bmeta">${miniResIcon(t.resKey)} ${fmt(intoLevel)}/${fmt(neededForLevel)} ${rd.label} bis Stufe ${level+1}</div>
             <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+            ${buildStatusHtml}
             <div style="display:flex; gap:6px; align-items:center; margin-top:6px;">
               <input type="text" inputmode="numeric" placeholder="Menge ${rd.label}" data-contrib-input="${t.key}" style="flex:1; font-size:12px;"/>
               <button data-contrib-max="${t.key}" data-contrib-max-amt="${Math.max(0, Math.min(Math.floor(state.resources[t.resKey]||0), Math.ceil(nextLevelCost-total)))}" style="font-size:10px; padding:6px 8px;">Max</button>
