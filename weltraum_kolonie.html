@@ -2392,8 +2392,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.60.2';
+  const VERSION = '8.60.3';
   const PATCHNOTES = [
+    { version:'8.60.3', date:'17.07.2026', changes:[
+      'Bugfix: Jäger/Bomber, die über die Hangar-Kapazität der mitgeschickten Träger/Superschlachtschiffe hinausgingen, trugen zwar schon 0 Angriffskraft bei, wurden aber trotzdem physisch mit auf Angriffe und Expeditionen geschickt - kosteten unnötig Treibstoff und liefen unnötig Verlustrisiko für keinerlei Nutzen. Angriffs- und Expeditionsflotten werden jetzt automatisch auf die tatsächliche Hangar-Kapazität der Auswahl gekappt, überzählige Jäger/Bomber bleiben zuhause',
+      'Neuer Hinweis beim Verlegen von Jägern/Bombern: zeigt an, wenn der Hangar am Zielort nicht ausreicht (Hangar ist ortsgebunden - verlegte Jäger "nehmen ihn nicht mit") - blockiert die Verlegung bewusst nicht, da Vorräte für einen künftigen Träger-Standort eine legitime Strategie sind'
+    ]},
     { version:'8.60.2', date:'17.07.2026', changes:[
       'Superschlachtschiff hat jetzt einen kleinen Eigenhangar (2 Jäger-/Bomber-Plätze je Schiff) - bewusst zurückhaltend bemessen (Trägerschiff: 6), damit das Flaggschiff eine winzige Eigen-Eskorte tragen kann, ohne die Trägerschiff-Klasse für größere Jäger-/Bomber-Flotten zu entwerten'
     ]},
@@ -6566,7 +6570,7 @@
     const virtual = emptyFleet();
     virtual.forscher = (cf.forscher||0) > 0 ? 1 : 0;
     for (const k of ESCORT_KEYS) virtual[k] = sel[k]||0;
-    return virtual;
+    return capFighterSelection(virtual);
   }
 
   // Schiffe, die bereits auf einer anderen Angriffs-/Expeditionsmission unterwegs sind, dürfen nicht
@@ -6619,7 +6623,21 @@
       if (k === 'frachter') avail = Math.max(0, avail - frachterBoundToRoutes());
       virtual[k] = Math.min(sel[k]||0, avail);
     }
-    return virtual;
+    return capFighterSelection(virtual);
+  }
+  // Bugfix (Spieler-Feedback 17.07.2026): Jäger/Bomber, die über die Hangar-Kapazität der in DIESER
+  // Mission mitgeschickten Träger/Superschlachtschiffe hinausgehen, trugen zwar schon 0 Angriffskraft
+  // bei (deployableFighters() in attackPowerRaw), wurden aber trotzdem PHYSISCH mitgeschickt - kosteten
+  // also unnötig Treibstoff (skaliert mit der Gesamt-Schiffszahl) und liefen unnötig Verlustrisiko,
+  // für exakt null Nutzen. Die Warnung "nur X passen in den Hangar" stand zwar schon in der Auswahl-UI,
+  // wurde aber nicht durchgesetzt. Kappt jetzt die tatsächlich losgeschickte Komposition genau auf das,
+  // was die eigene Hangar-Kapazität DIESER Auswahl trägt (Kappung bewusst NUR gegen die selbst
+  // mitgeschickten Träger/Superschlachtschiffe - daheimgebliebene Träger helfen unterwegs nichts).
+  function capFighterSelection(fleet){
+    const df = deployableFighters(fleet);
+    fleet.jaeger = df.jaeger;
+    fleet.bomber = df.bomber;
+    return fleet;
   }
 
   function shipRequirementsMet(def){
@@ -19350,6 +19368,12 @@
         const sourceEntry = others.find(o=>o.planet===relocateSourcePlanet);
         const shipOptions = SHIP_DEFS.concat([{ key:'superschlachtschiff', name:'Superschlachtschiff', icon:'ship_superschlachtschiff' }]);
         const availableHere = shipOptions.filter(d => (sourceEntry.fleet[d.key]||0) > 0);
+        // Hangar-Hinweis (Spieler-Feedback 17.07.2026): der Hangar ist ortsgebunden (an die dort
+        // stationierten Träger/Superschlachtschiffe, siehe hangarCapacity) - verlegte Jäger/Bomber
+        // "nehmen ihren Hangar nicht mit". Rein informativ, blockiert die Verlegung bewusst NICHT
+        // (Vorräte an einem künftigen Träger-Standort anzulegen ist eine legitime Strategie).
+        const targetFleetForHangar = state.activeBasePlanet==='home' ? state.fleet : (state.colonies[state.activeBasePlanet] ? state.colonies[state.activeBasePlanet].fleet : null);
+        const destHangarFree = targetFleetForHangar ? Math.max(0, hangarCapacity(targetFleetForHangar) - deployableFighters(targetFleetForHangar).jaeger - deployableFighters(targetFleetForHangar).bomber) : 0;
         relocateBox.innerHTML = `
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:10px;">
             <div class="bmeta">Schiffe nach <strong>${planetDisplayName(state.activeBasePlanet)}</strong> verlegen (braucht Flugzeit, abhängig von Antrieb & Entfernung). Erst Quelle wählen:</div>
@@ -19369,6 +19393,7 @@
                         <div>
                           <div class="bname" style="font-size:12.5px;">${d.name} <span class="lvl-pill">${count} vorhanden</span></div>
                           <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ~${Math.round(dur)}s Flugzeit · ~${fuelCostIconHtml(fuel)} Treibstoff (bei ${count})</div>
+                          ${(d.key==='jaeger'||d.key==='bomber') && count>destHangarFree ? `<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Hangar bei ${planetDisplayName(state.activeBasePlanet)} hat nur noch ${destHangarFree} freie Plätze - der Rest kommt an, bleibt aber einsatzunfähig bis mehr Träger dort stehen.</div>` : ''}
                         </div>
                       </div>
                       <div style="display:flex; align-items:center; gap:6px;">
