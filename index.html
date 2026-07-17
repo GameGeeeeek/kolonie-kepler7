@@ -2392,8 +2392,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.60.4';
+  const VERSION = '8.60.5';
   const PATCHNOTES = [
+    { version:'8.60.5', date:'17.07.2026', changes:[
+      'Bugfix (Spieler-Report Sascha): Das Artefakt-Set "Erbe der Alten" ließ sich einlösen (Ressourcen/Items weg, Bonus aktiv), verschwand nach einem Neuladen der Seite aber manchmal wieder - bei einem fehlgeschlagenen Speichervorgang (Versionskonflikt, kurzer Verbindungsabbruch) blieb die Änderung rein lokal, ohne dass der Spieler davon erfuhr. Das Einlösen wartet jetzt die Speicherbestätigung ab und rollt bei Fehlschlag alles zurück (Ressourcen/Items bleiben unangetastet, klare Fehlermeldung zum erneuten Versuch) statt einen nicht dauerhaften Erfolg vorzugaukeln'
+    ]},
     { version:'8.60.4', date:'17.07.2026', changes:[
       'Bugfix (Spieler-Report Sascha): Die Allianz-Spendenrangliste im rechten Seitenmenü zeigte nach dem Spenden weiterhin "Noch keine Spenden diese Woche" an, obwohl die Spende bereits gespeichert war - die Sidebar zeichnete nur aus einem Cache, der erst beim nächsten Öffnen des Allianz-Tabs oder alle 5 Minuten aktualisiert wurde. Eine Spende aktualisiert die Rangliste jetzt sofort'
     ]},
@@ -13948,16 +13951,21 @@
     return null;
   }
   let saveChain = Promise.resolve();
+  // save() ist überall im Spiel bewusst "fire and forget" (Rückgabewert wird fast nie genutzt).
+  // doSave() gibt seit dem Bugfix unten trotzdem das echte Ergebnis zurück (Erfolg = das Objekt aus
+  // saveGameStateVersioned, Fehlschlag = null/undefined) - Aufrufer, denen eine bestätigte
+  // Persistenz wichtig ist (siehe claimArtifactSet), können `await save()` darauf prüfen.
   function save(){
-    saveChain = saveChain.then(() => doSave()).catch(()=>{});
+    saveChain = saveChain.then(() => doSave()).catch(()=>null);
     return saveChain;
   }
   async function doSave(){
-    if (saveConflictDetected) return;
-    if (!bootDataReady) return;
+    if (saveConflictDetected) return null;
+    if (!bootDataReady) return null;
     state.lastTick = Date.now();
+    let saveResult = null;
     try {
-      await saveGameStateVersioned(JSON.stringify(state));
+      saveResult = await saveGameStateVersioned(JSON.stringify(state));
     } catch(e){ console.error(e); }
     try {
       if (state.player.id){
@@ -14014,6 +14022,7 @@
         }), true);
       }
     } catch(e){ /* geteilter Speicher optional, Spiel läuft auch ohne */ }
+    return saveResult;
   }
 
   async function load(){
@@ -14563,7 +14572,7 @@
   const ARTIFACT_SET_COST = { erz:45000, kristalle:32000, deuterium:18000, antimaterie:1800 };
   function hasArtifactSet(){ return (state.rareItems.antimateriekern||0)>=1 && (state.rareItems.kristallherz||0)>=1 && (state.rareItems.altetech||0)>=1; }
   function hasArtifactBonus(){ return !!(state.achievements && state.achievements.artifactset); }
-  function claimArtifactSet(){
+  async function claimArtifactSet(){
     if (hasArtifactBonus()){ log('Bereits abgeschlossen.', 'ti-alert-triangle'); return; }
     if (!hasArtifactSet()){ log('Du benötigst je 1x Antimateriekern, Kristallherz und Alte Technologie gleichzeitig im Inventar.', 'ti-alert-triangle'); return; }
     const scaledCost = scaleCostByEmpire(ARTIFACT_SET_COST);
@@ -14575,10 +14584,29 @@
     state.rareItems.kristallherz -= 1;
     state.rareItems.altetech -= 1;
     state.achievements.artifactset = true;
+    render();
+    // Bugfix (Spieler-Report Sascha, 17.07.2026): "Einlösen" wirkte sofort erfolgreich (Ressourcen/
+    // Items weg, Bonus aktiv), aber bei einem fehlgeschlagenen Speichervorgang (Versionskonflikt nach
+    // 3 Server-Retries, kurzer Verbindungsabbruch) blieb die Änderung rein lokal im Speicher und war
+    // nach einem Neuladen der Seite wieder weg - ohne dass der Spieler je erfuhr, dass es nicht
+    // dauerhaft war. save() gibt seit diesem Fix das echte Ergebnis zurück statt reinem "fire and
+    // forget" - bei Fehlschlag hier alles zurückrollen, statt einen nicht dauerhaften Erfolg
+    // vorzugaukeln.
+    const saveResult = await save();
+    if (!saveResult){
+      for (const [r,a] of Object.entries(scaledCost)) state.resources[r] = (state.resources[r]||0) + a;
+      state.rareItems.antimateriekern += 1;
+      state.rareItems.kristallherz += 1;
+      state.rareItems.altetech += 1;
+      delete state.achievements.artifactset;
+      log('Speichern fehlgeschlagen - das Artefakt-Set wurde NICHT eingelöst (Ressourcen/Items unverändert). Bitte Verbindung prüfen und erneut versuchen.', 'ti-alert-triangle');
+      render();
+      return;
+    }
     logScoreChange(1000, 'Artefakt-Set "Erbe der Alten" vervollständigt', 'ti-sparkles');
     log('Artefakt-Set vervollständigt! Permanenter Bonus: +5% auf Produktion, Angriff und Verteidigung.', 'ti-sparkles');
     playSound('achieve');
-    render(); save();
+    render();
   }
   // "Super"-Einheiten (durch ein seltenes Item freigeschaltete Spezialeinheiten) verbrauchen PRO
   // gebautem Exemplar zusätzlich zu den normalen Ressourcen ein weiteres Exemplar desselben seltenen
