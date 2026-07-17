@@ -2451,8 +2451,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.77.0';
+  const VERSION = '8.77.1';
   const PATCHNOTES = [
+    { version:'8.77.1', date:'17.07.2026', changes:[
+      'Bugfix (eigene Icon-Whitelist-Prüfung nachträglich gemacht, danke an die eigene Code-Durchsicht): das neue "Geschenk senden"-Symbol bei Pakt-Geschenken (ti-gift) existiert gar nicht in der eingebetteten Icon-Schrift und blieb daher unsichtbar - durch ti-award (Pokal-Symbol) ersetzt, das tatsächlich vorhanden ist'
+    ]},
     { version:'8.77.0', date:'17.07.2026', changes:[
       'Diplomatie deutlich ausgebaut (Spieler-Wunsch): Nichtangriffspakte lassen sich jetzt mit Zustimmung beider Seiten auf "Handelsabkommen" (Stufe 2) und "Frühwarnpartnerschaft" (Stufe 3) anheben',
       'Neu: ab Pakt-Stufe 2 einmal täglich ein gedeckeltes Ressourcengeschenk an den Paktpartner möglich (Deckel: 5 Minuten Eigenproduktion)',
@@ -16929,7 +16932,7 @@
     p.pendingGifts.push({ id:'gift-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), from: state.player.id, to: pactOtherId(p), resKey, amount, sentAt: Date.now() });
     if (p.pendingGifts.length > 10) p.pendingGifts = p.pendingGifts.slice(-10);
     await savePact(p);
-    log((RES_DEFS.find(r=>r.key===resKey)||{}).label+'-Geschenk ('+fmt(amount)+') an '+pactOtherName(p)+' gesendet.', 'ti-gift');
+    log((RES_DEFS.find(r=>r.key===resKey)||{}).label+'-Geschenk ('+fmt(amount)+') an '+pactOtherName(p)+' gesendet.', 'ti-award');
     playSound('trade');
     render(); save();
   }
@@ -16945,8 +16948,8 @@
       for (const g of mine){
         gainResources({ [g.resKey]: g.amount });
         state.claimedPactGifts.push(g.id);
-        log((RES_DEFS.find(r=>r.key===g.resKey)||{}).label+'-Geschenk ('+fmt(g.amount)+') von '+pactOtherName(p)+' erhalten!', 'ti-gift');
-        pushToast('Pakt-Geschenk erhalten!', 'ti-gift');
+        log((RES_DEFS.find(r=>r.key===g.resKey)||{}).label+'-Geschenk ('+fmt(g.amount)+') von '+pactOtherName(p)+' erhalten!', 'ti-award');
+        pushToast('Pakt-Geschenk erhalten!', 'ti-award');
       }
       while (state.claimedPactGifts.length > 40) state.claimedPactGifts.shift();
       p.pendingGifts = (p.pendingGifts||[]).filter(g => g.to !== state.player.id);
@@ -17081,7 +17084,7 @@
           <select data-pact-gift-res="${e.key}" style="font-size:10.5px; padding:4px 6px;">
             ${MARKET_RES_KEYS.map(k=>{const rd=RES_DEFS.find(r=>r.key===k)||{label:k}; return `<option value="${k}">${rd.label} (max. ${fmt(pactGiftMaxAmount(k))})</option>`;}).join('')}
           </select>
-          <button data-pact-gift-send="${e.key}" ${pactGiftOnCooldown(p)?'disabled':''} style="font-size:10px; padding:4px 8px;"><i class="ti ti-gift" aria-hidden="true" style="margin-right:3px;"></i>${pactGiftOnCooldown(p)?'Heute schon geschenkt':'Geschenk senden'}</button>
+          <button data-pact-gift-send="${e.key}" ${pactGiftOnCooldown(p)?'disabled':''} style="font-size:10px; padding:4px 8px;"><i class="ti ti-award" aria-hidden="true" style="margin-right:3px;"></i>${pactGiftOnCooldown(p)?'Heute schon geschenkt':'Geschenk senden'}</button>
         </div>` : ''}
       </div>`;
     }
