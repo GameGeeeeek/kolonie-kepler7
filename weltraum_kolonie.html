@@ -1166,6 +1166,7 @@
         <div id="planetSwitcherDef"></div>
         <div id="raidScoutBox"></div>
         <div id="pirateDebrisRaidBox"></div>
+        <div id="voidRiftBox"></div>
         <div class="section-title" style="justify-content:space-between;"><span><i class="ti ti-shield" aria-hidden="true"></i>Verteidigungsanlagen</span><button class="help-jump-btn" data-jump-help="kampf"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
         <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning). -->
         <div class="qty-select" id="qtySelectDef"></div>
@@ -2373,8 +2374,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.57.0';
+  const VERSION = '8.58.0';
   const PATCHNOTES = [
+    { version:'8.58.0', date:'17.07.2026', changes:[
+      'Neues Endgame-Ereignis Leerenriss (ab Leerentechnologie 1): über einem eigenen Planeten öffnet sich gelegentlich ein Riss in die Leere, der innerhalb von 45 Minuten mit einer Kampfflotte geschlossen werden muss (Box im Verteidigung-Tab, echte Flugzeit + Treibstoff) - Erfolg bringt 3-5 Leerensplitter, Antimaterie und +12 Kampfpunkte; kollabiert er ungeschlossen, gehen 10% der gelagerten Antimaterie verloren',
+      'Neues Terraforming-Ziel Leerenwelt (ab Leerentechnologie 5, Kostenfaktor 2,5): +25% Antimaterie- und +10% Forschungspunkte-Produktion auf dem umgeformten Planeten',
+      'Neuer Erfolg "Leerengestalter" für die erste eigene Leerenwelt',
+      'Hilfe-Sektion "Endgame: Die Leere" um Leerenriss und Leerenwelt ergänzt'
+    ]},
     { version:'8.57.0', date:'17.07.2026', changes:[
       'Großes Endgame-Update "Die Leere erwacht": neuer Forschungszweig Leerentechnologie (10 Stufen, verlangt Zielerfassung erw. 10 + Quantenstabilisierung 10; je Stufe +2% Antimaterieproduktion) schaltet nacheinander die komplette Leere-Inhaltskette frei',
       'Neue einzigartige Ressource: Leerensplitter - nicht produzierbar, nur erbeutbar (Leere-NPCs: 2/4/7, Weltboss-Kill: +2, Piratenketten-Endboss: +5, jeweils ab Leerentechnologie 1; Expeditions-Fragmente als Nebenquelle: 4 Fragmente = 1 Splitter)',
@@ -4566,13 +4573,16 @@
     // strikt überlegen und entwertete jede andere Wahl komplett. Jetzt 6% je Ressource (30% kumuliert)
     // - bleibt der beste Generalist, aber kein Selbstläufer mehr. Zusätzlich kostet Erdwelt als
     // anspruchsvollstes Ziel spürbar mehr als jeder Spezialist (siehe terraformCost).
-    erdwelt: { label:'Erdwelt', icon:'ti-world', color:'#3ecf8e', prodBonus:{ erz:1.06, kristalle:1.06, deuterium:1.06, energie:1.06, forschungspunkte:1.06 }, bonusText:'+6% auf ALLE Ressourcen' }
+    erdwelt: { label:'Erdwelt', icon:'ti-world', color:'#3ecf8e', prodBonus:{ erz:1.06, kristalle:1.06, deuterium:1.06, energie:1.06, forschungspunkte:1.06 }, bonusText:'+6% auf ALLE Ressourcen' },
+    // Endgame-Terraforming-Ziel (17.07.2026, "Die Leere erwacht" Teil 2): nur mit Leerentechnologie
+    // Stufe 5 waehlbar, teuerstes Ziel (typeMult 2.5), dafuer der staerkste Spezialst-Bonus.
+    leerenwelt: { label:'Leerenwelt', icon:'ti-atom-2', color:'#7f77dd', prodBonus:{ antimaterie:1.25, forschungspunkte:1.10 }, bonusText:'+25% Antimaterie, +10% Forschungspunkte' }
   };
   // Terraformbare Zieltypen: freie Wahl, keine feste Reihenfolge mehr (Balance-Wunsch 13.07.2026,
   // vorher eine feste Kette von der schlechtesten zur besten Welt). Typen NICHT in dieser Liste
   // (Gasriese, Asteroid, Super, Erdähnlich) können nicht als Ziel gewählt werden – ihre Umwandlung
   // würde ihre Sonderrolle sprengen.
-  const TERRAFORM_TARGET_TYPES = ['todeswelt','wueste','eis','vulkan','wasserwelt','kristall','erdwelt'];
+  const TERRAFORM_TARGET_TYPES = ['todeswelt','wueste','eis','vulkan','wasserwelt','kristall','erdwelt','leerenwelt'];
   // Effektiver Typ eines Planeten: eine per Terraforming erreichte Überschreibung hat Vorrang vor dem
   // fest im PLANETS-Array verdrahteten Basistyp. Zentral, damit Produktion, Verteidigung, Icons und
   // Labels konsistent denselben Typ sehen.
@@ -6141,6 +6151,7 @@
     { key:'allveteran', name:'Kriegsveteran', desc:'Schließe alle drei Stufen der Veteranen-Ausbildung ab.', check: s => VETERAN_TRAINING.every(v => (s.veteranTraining||{})[v.key]), progress: s => [VETERAN_TRAINING.filter(v=>(s.veteranTraining||{})[v.key]).length, VETERAN_TRAINING.length], reward:{erz:2500,kristalle:1500,deuterium:800,credits:100}, xpReward:150 },
     { key:'allexotic', name:'Exotischer Vordenker', desc:'Schließe alle drei Exotischen Forschungen ab.', check: s => EXOTIC_RESEARCH.every(e => (s.exoticResearch||{})[e.key]), progress: s => [EXOTIC_RESEARCH.filter(e=>(s.exoticResearch||{})[e.key]).length, EXOTIC_RESEARCH.length], reward:{erz:2500,kristalle:1500,deuterium:800,credits:100}, xpReward:150 },
     { key:'erdweltmaster', name:'Paradies-Architekt', desc:'Terraforme einen Standort vollständig zur Erdwelt.', check: s => Object.values(s.planetTypeOverride||{}).includes('erdwelt'), progress: s => [Object.values(s.planetTypeOverride||{}).includes('erdwelt')?1:0, 1], reward:{erz:8000,kristalle:5000,deuterium:2500,antimaterie:80,credits:300}, xpReward:300 },
+    { key:'leerenweltmaster', name:'Leerengestalter', desc:'Terraforme einen Standort vollständig zur Leerenwelt.', check: s => Object.values(s.planetTypeOverride||{}).includes('leerenwelt'), progress: s => [Object.values(s.planetTypeOverride||{}).includes('leerenwelt')?1:0, 1], reward:{erz:20000,kristalle:14000,deuterium:8000,antimaterie:400,credits:800}, xpReward:600 },
     { key:'allcolonyslots', name:'Vollständige Expansion', desc:'Belege alle 11 möglichen Kolonie-Plätze (erfordert Kolonial-Logistik auf Maximalstufe).', check: s => (s.research.rkolonisation||0) >= 20 && Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 11, progress: s => [Math.min(11,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 11], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
     { key:'allresearchmax', name:'Forschungs-Meister', desc:'Bringe alle 22 Forschungszweige auf ihre jeweilige Maximalstufe.', check: s => RESEARCH_DEFS.every(r => (s.research[r.key]||0) >= r.maxLevel), progress: s => [RESEARCH_DEFS.filter(r=>(s.research[r.key]||0)>=r.maxLevel).length, RESEARCH_DEFS.length], reward:{erz:12000,kristalle:8000,deuterium:4000,antimaterie:150,credits:500}, xpReward:500 },
     { key:'forschungsnexus', name:'Wächter des Wissens', desc:'Errichte den Forschungs-Nexus (erfordert alle Forschungszweige auf Maximalstufe).', check: s => !!((s.megaProjects||{}).forschungsnexus), progress: s => [((s.megaProjects||{}).forschungsnexus)?1:0, 1], reward:{erz:10000,kristalle:7000,deuterium:3500,antimaterie:150,credits:500}, xpReward:500 },
@@ -6517,7 +6528,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -7999,7 +8010,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff aus, um die Piraten abzufangen (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='void-rift').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const relevantKeys = ATTACK_SHIP_KEYS.filter(k=>(attackFleet[k]||0) > 0);
     const dur = state.activeBasePlanet === raid.planetKey ? 20 : relocationDuration(state.activeBasePlanet, raid.planetKey, relevantKeys[0]);
@@ -8015,6 +8026,72 @@
     raid.interceptArrival = Date.now()+dur*1000;
     raid.interceptSource = state.activeBasePlanet;
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' fängt die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' ab (Angriffskraft '+power+', Ankunft in ~'+Math.round(dur)+'s).', 'ti-sword');
+    render(); save();
+  }
+
+  // ── Leerenriss-Ereignis (17.07.2026, Endgame "Die Leere erwacht" Teil 2) ──
+  // Ab Leerentechnologie 1 kann sich über einem eigenen Planeten ein instabiler Riss in die Leere
+  // öffnen. Wird er rechtzeitig mit einer Kampfflotte geschlossen, gibt es Leerensplitter und
+  // Antimaterie - kollabiert er unbeachtet, reißt die Rückkopplung 10% der gelagerten Antimaterie
+  // mit sich. Bewusst dasselbe aktive Reaktionsmuster wie die Piraten-Trümmerräuber, aber als
+  // Endgame-Variante mit echter Kampfhürde (normale Kraft-Formel) statt Mindestchance.
+  const VOID_RIFT_DURATION_SEC = 45*60;
+  const VOID_RIFT_CHECK_CHANCE = 0.25;
+  function maybeSpawnVoidRift(){
+    if ((state.research.rleere||0) < 1) return;
+    if (state.voidRift) return;
+    if (Math.random() > VOID_RIFT_CHECK_CHANCE) return;
+    const owned = ['home', ...Object.keys(state.colonies||{})];
+    const planetKey = owned[Math.floor(Math.random()*owned.length)];
+    const power = Math.round(1200 + computeScore()*0.02 + (state.research.rleere||0)*600);
+    const now = Date.now();
+    state.voidRift = { planetKey, power, startTime: now, endTime: now + VOID_RIFT_DURATION_SEC*1000, attackArrival: null, attackSource: null };
+    log('Ein Leerenriss hat sich über '+planetDisplayName(planetKey)+' geöffnet! Schließe ihn mit einer Kampfflotte, bevor er kollabiert ('+fmtDuration(VOID_RIFT_DURATION_SEC)+') - Belohnung: Leerensplitter und Antimaterie.', 'ti-atom-2');
+    pushToast('Leerenriss über '+planetDisplayName(planetKey)+'!', 'ti-atom-2');
+    playSound('raid');
+    render(); save();
+  }
+  function resolveVoidRiftCollapse(){
+    const rift = state.voidRift;
+    if (!rift) return;
+    const lostAm = Math.floor((state.resources.antimaterie||0) * 0.10);
+    if (lostAm > 0) state.resources.antimaterie -= lostAm;
+    log('Der Leerenriss über '+planetDisplayName(rift.planetKey)+' ist kollabiert'+(lostAm>0?' - die Rückkopplung hat '+fmt(lostAm)+' Antimaterie aus den Speichern gerissen':'')+'.', 'ti-atom-2');
+    pushReport({ type:'void-rift', result:'collapsed', targetPlanet: rift.planetKey, riftPower: rift.power, lostAntimaterie: lostAm });
+    state.voidRift = null;
+    render(); save();
+  }
+  function processVoidRift(){
+    const rift = state.voidRift;
+    if (!rift) return;
+    if (Date.now() >= rift.endTime) resolveVoidRiftCollapse();
+  }
+  // Schickt eine Kampfflotte zum Schließen des Risses - gleiches Versand-Muster wie
+  // sendInterceptPirateMission (Flugzeit muss vor dem Kollaps liegen, Treibstoff nach Antriebsart).
+  function sendVoidRiftMission(){
+    const rift = state.voidRift;
+    if (!rift){ log('Kein offener Leerenriss vorhanden.', 'ti-alert-triangle'); return; }
+    if (rift.attackArrival){ log('Es ist bereits eine Flotte unterwegs, um den Riss zu schließen.', 'ti-alert-triangle'); return; }
+    const cf = currentFleet();
+    const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
+    const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff aus, um den Leerenriss zu schließen (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='void-rift').length;
+    if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
+    const relevantKeys = ATTACK_SHIP_KEYS.filter(k=>(attackFleet[k]||0) > 0);
+    const dur = state.activeBasePlanet === rift.planetKey ? 20 : relocationDuration(state.activeBasePlanet, rift.planetKey, relevantKeys[0]);
+    const remainMs = rift.endTime - Date.now();
+    if (dur*1000 >= remainMs){ log('Die Flugzeit (~'+Math.round(dur)+'s) reicht nicht mehr, um den Riss rechtzeitig zu erreichen (kollabiert in '+Math.round(remainMs/1000)+'s).', 'ti-alert-triangle'); return; }
+    const fuel = missionFuelCostSplit(dur, attackFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    pay(fuel);
+    const fleetName = resolveFleetName();
+    const power = attackPower(attackFleet, state.activeBasePlanet);
+    cf.missions.push({ id: nextMissionId(), type:'void-rift', targetId: rift.planetKey, startTime: Date.now(), endTime: Date.now()+dur*1000, power, fleetName, composition: attackFleet });
+    rift.attackArrival = Date.now()+dur*1000;
+    rift.attackSource = state.activeBasePlanet;
+    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' fliegt zum Leerenriss über '+planetDisplayName(rift.planetKey)+' (Angriffskraft '+power+', Ankunft in ~'+Math.round(dur)+'s).', 'ti-sword');
     render(); save();
   }
 
@@ -8444,6 +8521,7 @@
     if (state.referredBy === undefined) state.referredBy = null;
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
     if (state.pirateDebrisRaid === undefined) state.pirateDebrisRaid = null;
+    if (state.voidRift === undefined) state.voidRift = null;
     if (state.allianceBase === undefined) state.allianceBase = null;
     if (state.allianceBaseWar === undefined) state.allianceBaseWar = null;
     if (!state.shipsAtAllianceBase) state.shipsAtAllianceBase = {};
@@ -8634,7 +8712,7 @@
       buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0},
       research:{}, activeResearch:null,
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
-      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, battlePoints:0, npcKills:0, bossKills:0,
+      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
@@ -8702,7 +8780,7 @@
       buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0},
       research:{}, activeResearch:null,
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
-      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, battlePoints:0, npcKills:0, bossKills:0,
+      discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
@@ -10111,6 +10189,7 @@
     if (r.type === 'expedition' && r.encountered) return r.result === 'defended' ? 'win' : 'loss';
     // 'escaped' (Piraten nie abgefangen) ist kein Kampf und zählt daher bewusst nicht in die Statistik.
     if (r.type === 'pirate-debris-raid' && (r.result === 'win' || r.result === 'loss')) return r.result;
+    if (r.type === 'void-rift' && (r.result === 'win' || r.result === 'loss')) return r.result;
     if (r.type === 'alliance-base-attack') return (r.result === 'win' || r.result === 'destroyed') ? 'win' : 'loss';
     return null;
   }
@@ -11134,7 +11213,9 @@
       { title:'Einstieg über die Leerentechnologie', body:'Der Endgame-Zweig <strong>Leerentechnologie</strong> (Forschung-Tab, Kategorie Diplomatie/Spezial) verlangt Zielerfassungssysteme (erw.) Stufe 10 und Quantenstabilisierung Stufe 10. Jede Stufe gibt +2% Antimaterieproduktion und schaltet nacheinander die Leere-Inhalte frei: <strong>Stufe 1</strong> macht die drei Leere-Gegner sichtbar, <strong>Stufe 3</strong> erlaubt die Orbitalstufen 4-5, <strong>Stufe 5</strong> schaltet den Leerenjäger frei.' },
       { title:'Leerensplitter - die Endgame-Ressource', body:'Leerensplitter sind ein seltenes Material (Fortschritt-Tab, Seltene Items), das NICHT produzierbar ist. Quellen: Siege gegen die drei <strong>Leere-NPCs</strong> (2/4/7 Splitter), jeder <strong>Weltboss-Kill</strong> (+2) und der <strong>Piratenketten-Endboss</strong> (+5) - jeweils erst ab Leerentechnologie Stufe 1. Zusätzlich können bei Expeditionen Leerensplitter-<strong>Fragmente</strong> auftauchen (4 Fragmente = 1 Splitter). Der Aufstiegs-Zweig "Blick in die Leere" erhöht jede Ausbeute um +4% je Stufe. Verwendung: 1x je gebautem Leerenjäger, 3x für Orbitalstufe 4, 5x für Orbitalstufe 5.' },
       { title:'Die Leere-Gegner', body:'Drei hochstufige Gegner jenseits von Nyra: <strong>Leeren-Vorhut</strong> (Stufe 30, Verteidigung 8.000), <strong>Leeren-Armada</strong> (Stufe 35, 12.500) und der Endboss <strong>Das Herz der Leere</strong> (Stufe 40, 20.000). Sie folgen den normalen NPC-Regeln (Skalierung nach Siegen, Schwächen-System - zwei davon sind schwach gegen den Leerenjäger selbst, einer gegen das Superschlachtschiff) und tragen die höchste Beute des Spiels.' },
-      { title:'Leerenjäger', body:'Zweite Endgame-Schiffsklasse zwischen Schlachtschiff (90) und Superschlachtschiff (220): <strong>140 Angriffspunkte</strong>, Hyperraumantrieb (Antimaterie-Treibstoff), Geschwindigkeit 75 - deutlich flinker als das Superschlachtschiff (35). Verbraucht beim Bau je <strong>1 Leerensplitter</strong> zusätzlich zu den Ressourcenkosten. Kein seltener Erkundungsfund nötig - der Weg führt über die Leere-Inhalte selbst.' }
+      { title:'Leerenjäger', body:'Zweite Endgame-Schiffsklasse zwischen Schlachtschiff (90) und Superschlachtschiff (220): <strong>140 Angriffspunkte</strong>, Hyperraumantrieb (Antimaterie-Treibstoff), Geschwindigkeit 75 - deutlich flinker als das Superschlachtschiff (35). Verbraucht beim Bau je <strong>1 Leerensplitter</strong> zusätzlich zu den Ressourcenkosten. Kein seltener Erkundungsfund nötig - der Weg führt über die Leere-Inhalte selbst.' },
+      { title:'Leerenriss-Ereignisse', body:'Ab Leerentechnologie 1 kann sich über einem deiner Planeten ein <strong>Leerenriss</strong> öffnen (Meldung + Box im Verteidigung-Tab). Du hast 45 Minuten, ihn mit einer Kampfflotte zu schließen - die Erfolgschance folgt der normalen Kampfformel gegen die Leere-Energie des Risses (skaliert mit Punktestand und Leerentechnologie-Stufe). <strong>Erfolg:</strong> 3-5 Leerensplitter (profitiert vom Aufstiegs-Zweig "Blick in die Leere"), dazu Antimaterie (40% der Leere-Energie, bis zur Lagergrenze) und +12 Kampfpunkte. <strong>Misserfolg:</strong> spürbare Flottenverluste, aber ein neuer Versuch bleibt möglich, solange der Riss offen ist. <strong>Kollabiert der Riss ungeschlossen</strong>, reißt er 10% deiner gelagerten Antimaterie mit sich.' },
+      { title:'Terraforming-Ziel Leerenwelt', body:'Ab Leerentechnologie 5 steht beim Terraforming das Ziel <strong>Leerenwelt</strong> zur Wahl (Kostenfaktor 2,5 - das teuerste Terraforming-Ziel): <strong>+25% Antimaterie- und +10% Forschungspunkte-Produktion</strong> auf dem umgeformten Planeten. Die erste eigene Leerenwelt bringt den Erfolg "Leerengestalter".' }
     ]},
     { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
       { title:'Weltboss: Leviathan der Leere', body:'Gelegentlich erscheint der <strong>Leviathan der Leere</strong> (oben im Galaxie-Tab): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Angriff läuft wie eine normale Angriffsmission: Du stellst deine Angriffsflotte zusammen (Bereich "Angriffsflotte zusammenstellen") und schickst sie los - mit echter Flugzeit und Treibstoffkosten (Deuterium). Am Ziel zieht deine Angriffskraft (×0,8-1,2 Streuung) Schaden ab, der Leviathan schlägt zurück (8-15%+ Flottenverluste, steigt mit seiner Stufe). <strong>Einmal pro Tag</strong> pro Spieler angreifbar - die Sperre bleibt auch bestehen, wenn der aktuelle Leviathan besiegt wird und ein neuer erscheint. Beim Kill: Belohnung (Kredite + Kampfpunkte) nach Schadensanteil, Top-Schädiger bekommt +50% Bonus. Nach einem Kill erscheint nach einer Weile automatisch die nächste, stärkere Stufe.' },
@@ -11303,6 +11384,16 @@
           body += '<br>Piratenflotte: '+fleetBreakdownHtml(r.fleet);
           if (won && r.destroyedShips && Object.keys(r.destroyedShips).length) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstört: '+lostCountsToText(r.destroyedShips);
           if (!won && r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips);
+        }
+      } else if (r.type === 'void-rift'){
+        if (r.result === 'collapsed'){
+          title = 'Leerenriss kollabiert – '+planetDisplayName(r.targetPlanet);
+          body = 'Der Riss wurde nicht rechtzeitig geschlossen.'+((r.lostAntimaterie||0)>0?' Die Rückkopplung hat <strong>'+fmt(r.lostAntimaterie)+' Antimaterie</strong> aus den Speichern gerissen.':' Diesmal ohne Folgen - die Antimaterie-Speicher waren leer.');
+        } else {
+          title = (won?'Leerenriss geschlossen':'Leerenriss-Einsatz gescheitert')+' – '+planetDisplayName(r.targetPlanet);
+          body = 'Deine Angriffspunkte: '+r.attackPower+' vs. Leere-Energie: '+r.defensePower+' (Chance '+(r.chancePct||0)+'%)';
+          if (won) body += '<br><i class="ti ti-diamond" aria-hidden="true" style="color:#c3bef5;"></i> Geborgen: <strong>'+(r.shards||0)+'x Leerensplitter</strong>'+(r.loot&&r.loot.antimaterie?' + '+fmt(r.loot.antimaterie)+' Antimaterie':'');
+          if (r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips);
         }
       } else if (r.type === 'debris-cleared'){
         title = 'Trümmerfeld abgebaut: '+planetDisplayName(r.targetPlanet);
@@ -12878,7 +12969,7 @@
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
     if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
-    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='attack-alliance-base').length;
+    const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='void-rift'||m.type==='attack-alliance-base').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     // Ziel-Basis prüfen (existiert + mindestens Stufe 1)
     let targetBase = null;
@@ -14687,7 +14778,7 @@
   // noch die überlegene Wahl bei gleichen Kosten wie jeder Spezialist.
   function terraformCost(nextLevel, targetType){
     const f = Math.pow(2.0, nextLevel - 1);
-    const typeMult = targetType === 'erdwelt' ? 1.8 : 1.0;
+    const typeMult = targetType === 'leerenwelt' ? 2.5 : (targetType === 'erdwelt' ? 1.8 : 1.0);
     return {
       erz: Math.round(3000 * f * typeMult),
       kristalle: Math.round(1800 * f * typeMult),
@@ -14715,6 +14806,7 @@
   function selectTerraformTarget(planetKey, targetType){
     if (!canStartTerraform(planetKey)){ log('Ungültiger Standort für Terraforming.', 'ti-alert-triangle'); return; }
     if (!TERRAFORM_TARGET_TYPES.includes(targetType)){ log('Dieser Zieltyp kann nicht per Terraforming erreicht werden.', 'ti-alert-triangle'); return; }
+    if (targetType === 'leerenwelt' && (state.research.rleere||0) < 5){ log('Die Leerenwelt-Umwandlung benötigt die Forschung Leerentechnologie auf Stufe 5.', 'ti-lock'); return; }
     const existing = terraformStateOf(planetKey);
     // Bugfix (Bugreport 16.07.2026, "Diese Kolonie terraformt bereits" erscheint faelschlich): die
     // Pruefung darf NUR blockieren, wenn wirklich ein Zieltyp gesetzt ist - nicht bei migrierten alten
@@ -15068,6 +15160,49 @@
             // Ein neuer Versuch bleibt möglich, solange noch Zeit bis raid.endTime bleibt.
             raid.interceptArrival = null;
             raid.interceptSource = null;
+          }
+        } else if (m.type === 'void-rift'){
+          // Leerenriss schließen (siehe maybeSpawnVoidRift): echte Kampfhürde - die Chance folgt
+          // der normalen Kraft-Formel gegen die Leere-Energie des Risses, keine Mindestchance wie
+          // bei den bewusst schwachen Piraten-Trümmerräubern.
+          const rift = state.voidRift;
+          if (!rift || rift.planetKey !== m.targetId){
+            if (showLog !== false) log('Der Leerenriss war bei Ankunft bereits kollabiert.', 'ti-atom-2');
+            continue;
+          }
+          const riftPower = m.power || attackPower(fleet, planetKey);
+          const riftChance = Math.max(0.15, Math.min(0.95, riftPower/(riftPower+rift.power)));
+          const riftSuccess = Math.random() < riftChance;
+          const riftFlightTime = Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0);
+          if (riftSuccess){
+            const shardGain = Math.max(1, Math.round((3 + Math.floor(Math.random()*3)) * (1 + ascBonus('leere')*0.04)));
+            state.rareItems.leerensplitter = (state.rareItems.leerensplitter||0) + shardGain;
+            const amBefore = state.resources.antimaterie||0;
+            // Math.max: ein bereits über der Lagergrenze liegender Bestand darf durch die Beute-
+            // Deckelung nie SINKEN (die Klammer allein würde ihn sonst auf die Grenze stutzen).
+            state.resources.antimaterie = Math.max(amBefore, Math.min(storageCap(), amBefore + Math.round(rift.power*0.4)));
+            const amGained = state.resources.antimaterie - amBefore;
+            const bpGained = 12;
+            awardBattlePoints(bpGained);
+            logScoreChange(bpGained*3, 'Leerenriss über '+planetDisplayName(rift.planetKey)+' geschlossen (+'+bpGained+' Kampfpunkte)', 'ti-atom-2');
+            addVeteranXp(planetKey, 8);
+            const ownLostRift = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.07, planetKey, m.composition);
+            const ownLostRiftText = lostCountsToText(ownLostRift);
+            if (showLog !== false) log('Leerenriss über '+planetDisplayName(rift.planetKey)+' geschlossen! +'+shardGain+'x Leerensplitter (gesamt: '+state.rareItems.leerensplitter+')'+(amGained>0?', +'+fmt(amGained)+' Antimaterie':'')+'.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':''), 'ti-diamond');
+            playSound('win');
+            const __battleReport = { type:'void-rift', result:'win', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), chancePct: Math.round(riftChance*100), shards: shardGain, loot: amGained>0?{ antimaterie: amGained }:null, fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), flightTime: riftFlightTime, battlePoints: bpGained };
+            pushReport(__battleReport);
+            state.voidRift = null;
+          } else {
+            const ownLostRift = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.15+Math.random()*0.15), planetKey, m.composition);
+            const ownLostRiftText = lostCountsToText(ownLostRift);
+            addVeteranXp(planetKey, 3);
+            if (showLog !== false) log('Die Flotte konnte den Leerenriss über '+planetDisplayName(rift.planetKey)+' nicht schließen - die Leere-Energie hat sie zurückgeschlagen.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':'')+' Ein neuer Versuch ist möglich, solange der Riss offen ist.', 'ti-alert-triangle');
+            playSound('lose');
+            const __battleReport = { type:'void-rift', result:'loss', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), chancePct: Math.round(riftChance*100), fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), flightTime: riftFlightTime, battlePoints: 0 };
+            pushReport(__battleReport);
+            rift.attackArrival = null;
+            rift.attackSource = null;
           }
         } else if (m.type === 'defend-base'){
           // Ankunft an der eigenen Allianzbasis: Schiffe werden dort stationiert (waren beim
@@ -16004,6 +16139,7 @@
     if (r.type === 'player-attack') return { won: r.result==='win', vs: r.targetName||'Spieler', atk: r.attackPower, def: r.defensePower, loot: r.loot, bp: r.battlePoints };
     if (r.type === 'alliance-base-attack') return { won: r.result!=='loss', vs: 'Allianzbasis ['+(r.targetTag||'?')+']', atk: r.attackPower, def: r.defensePower, loot: null, bp: r.battlePoints, extra: r.result==='destroyed' ? 'BASIS ZERST\u00D6RT!' : null };
     if (r.type === 'pirate-debris-raid') return { won: r.result==='win', vs: 'Piraten-Tr\u00FCmmerr\u00E4uber', atk: r.attackPower, def: r.defensePower, loot: null, bp: r.battlePoints };
+    if (r.type === 'void-rift') return { won: r.result==='win', vs: 'Leerenriss', atk: r.attackPower, def: r.defensePower, loot: r.loot, bp: r.battlePoints };
     if (r.type === 'raid') return { won: r.result==='win', vs: r.faction||'Angreifer', atk: r.defensePower, def: r.attackPower, loot: null, bp: 0, defenderView: true };
     return null;
   }
@@ -17992,7 +18128,7 @@
             // Zielwahl (Picker): kein Zieltyp gewählt, oder Stufe 0 (Ziel jederzeit änderbar, noch
             // nichts investiert), oder vorheriges Ziel abgeschlossen. NIEMALS durch otherJob gesperrt -
             // die reine Auswahl ist immer möglich, egal ob anderswo gerade eine Stufe läuft.
-            const options = TERRAFORM_TARGET_TYPES.filter(t => t !== curType);
+            const options = TERRAFORM_TARGET_TYPES.filter(t => t !== curType && (t !== 'leerenwelt' || (state.research.rleere||0) >= 5));
             html += `<div class="bmeta" style="margin:${(targetType&&lvl>0)?'10px':'0'} 0 8px;">${lvl>=TERRAFORM_MAX_LEVEL?'Erneut terraformen zu einem anderen Typ:':(targetType?'Anderes Ziel wählen:':'Zieltyp wählen, um mit dem Terraforming zu beginnen:')}</div>
               <div style="display:flex; flex-wrap:wrap; gap:6px;">
                 ${options.map(t => { const ti = PLANET_TYPE_INFO[t]; return `<button data-pick-terraform-target="${t}" style="font-size:10.5px; flex:1; min-width:120px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 6px;"><span><i class="ti ${ti.icon}" aria-hidden="true" style="margin-right:3px; color:${ti.color};"></i>${ti.label}</span>${ti.bonusText?`<span style="font-size:9px; color:#8489a0; font-weight:400;">${ti.bonusText}</span>`:''}</button>`; }).join('')}
@@ -18367,6 +18503,24 @@
             </div>
           `;
         }
+        if (m.type === 'void-rift'){
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          const shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ti-atom-2" aria-hidden="true" style="color:#a89ef0;"></i>${m.fleetName?m.fleetName+' · ':''}Leerenriss schließen bei ${planetDisplayName(m.targetId)}</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
+                  ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
+                </div>
+              </div>
+              <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         if (m.type === 'defend-base' || m.type === 'defend-base-return' || m.type === 'attack-alliance-base'){
           const remaining = Math.max(0, m.endTime-now);
           const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
@@ -18445,12 +18599,12 @@
     const hangarCap = hangarCapacity(cf);
     if (activeTab === 'flotte' || activeTab === 'expedition'){
     const df = deployableFighters(cf);
-    const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates').length;
+    const slotsUsedAttack = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='void-rift').length;
     const slotsUsedExplore = cf.missions.filter(m=>m.type==='explore').length;
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='worldboss' || m.type==='expedition' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }
@@ -19345,6 +19499,10 @@
             icon = 'ti-anchor'; color = '#e24b4a';
             label = (m.fleetName?m.fleetName+' → ':'')+'Piraten abfangen bei '+planetDisplayName(m.targetId);
             shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          } else if (m.type === 'void-rift'){
+            icon = 'ti-atom-2'; color = '#a89ef0';
+            label = (m.fleetName?m.fleetName+' → ':'')+'Leerenriss schließen bei '+planetDisplayName(m.targetId);
+            shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
           } else if (m.type === 'defend-base' || m.type === 'defend-base-return'){
             icon = 'ti-shield'; color = '#85b7eb';
             label = (m.fleetName?m.fleetName+' → ':'')+(m.type==='defend-base'?'Allianzbasis (Verteidigung)':'Rückkehr von der Allianzbasis');
@@ -19470,6 +19628,39 @@
         }
       } else {
         pirateDebrisRaidBox.innerHTML = '';
+      }
+    }
+
+    const voidRiftBox = document.getElementById('voidRiftBox');
+    if (voidRiftBox){
+      const vr = state.voidRift;
+      if (vr){
+        const vrRemain = Math.max(0, vr.endTime - Date.now());
+        if (vr.attackArrival){
+          const vrArrRemain = Math.max(0, vr.attackArrival - Date.now());
+          voidRiftBox.innerHTML = `
+            <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem; border-color:rgba(127,119,221,0.45);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="left"><div class="bicon" style="background:rgba(127,119,221,0.18); color:#a89ef0;"><i class="ti ti-atom-2" aria-hidden="true"></i></div><div><div class="bname">Leerenriss über ${planetDisplayName(vr.planetKey)}</div><div class="bmeta">Flotte von ${planetDisplayName(vr.attackSource)} unterwegs, Ankunft in ${Math.ceil(vrArrRemain/1000)}s</div></div></div>
+                <span class="lvl-pill">Kollaps in ${fmtDuration(vrRemain/1000)}</span>
+              </div>
+            </div>
+          `;
+        } else {
+          const vrHaveCombatShips = ATTACK_SHIP_KEYS.some(k=>(cf[k]||0) > 0);
+          voidRiftBox.innerHTML = `
+            <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem; border-color:rgba(127,119,221,0.45);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="left"><div class="bicon" style="background:rgba(127,119,221,0.18); color:#a89ef0;"><i class="ti ti-atom-2" aria-hidden="true"></i></div><div><div class="bname">Leerenriss über ${planetDisplayName(vr.planetKey)}</div><div class="bmeta">Leere-Energie ${fmt(vr.power)} - schließe den Riss mit einer Kampfflotte (Angriffsflotte-Auswahl im Galaxie-Tab, Versand vom aktuell gewählten Standort). Erfolg: 3-5 Leerensplitter + Antimaterie. Kollabiert er ungeschlossen, gehen 10% deiner gelagerten Antimaterie verloren. Kollaps in ${fmtDuration(vrRemain/1000)}.</div></div></div>
+                <button id="closeVoidRiftBtn" class="${vrHaveCombatShips?'affordable':''}" ${vrHaveCombatShips?'':'disabled'}><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Schließen</button>
+              </div>
+            </div>
+          `;
+          const vrBtn = document.getElementById('closeVoidRiftBtn');
+          if (vrBtn) vrBtn.onclick = sendVoidRiftMission;
+        }
+      } else {
+        voidRiftBox.innerHTML = '';
       }
     }
 
@@ -20928,7 +21119,7 @@
     // ("nach jedem Reset") greift hier ebenfalls.
     const keepAscension = state.ascension;
     const resetStartLvl = (keepAscension && keepAscension.tree && keepAscension.tree.start) || 0;
-    state = { resources:{energie:10 + resetStartLvl*300, erz:10 + resetStartLvl*400, kristalle:resetStartLvl*400, deuterium:resetStartLvl*150, antimaterie:0, forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, allianceResearch:{}, allianceContributed:{}, credits: 250 + resetStartLvl*100, ascension: keepAscension, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
+    state = { resources:{energie:10 + resetStartLvl*300, erz:10 + resetStartLvl*400, kristalle:resetStartLvl*400, deuterium:resetStartLvl*150, antimaterie:0, forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, allianceResearch:{}, allianceContributed:{}, credits: 250 + resetStartLvl*100, ascension: keepAscension, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
     // Füllt alle Felder auf, die diese verkürzte Reset-Liste nicht enthält (z.B. credits, skillTree,
     // favoritePlanets, collapsedSections, ascension, doctrine, ...) - sonst blieben sie `undefined` und
     // render()/Klick-Handler stürzten ohne Seiten-Reload ab (siehe applyStateDefaults()).
@@ -20947,6 +21138,7 @@
     for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r], cap);
     const missionsResolved = checkMissions();
     processPirateDebrisRaid();
+    processVoidRift();
     flashGains(rates);
     maybeDetectRaid();
     if (state.nextRaidTime && Date.now() >= state.nextRaidTime){
@@ -21015,6 +21207,7 @@
   });
   setInterval(maybeScheduleRaid, 300000);
   setInterval(maybeSchedulePirateDebrisRaid, 300000);
+  setInterval(maybeSpawnVoidRift, 1800000);
   // Allianzbasis-Kriegszustand alle 5 Minuten nachladen, damit Verteidiger Angriffe zeitnah
   // mitbekommen (Verluste anwenden, Alarm) - laeuft nur mit Allianz + Server-Modus (Guard intern).
   setInterval(loadAllianceBaseWar, 300000);
