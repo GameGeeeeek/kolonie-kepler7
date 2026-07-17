@@ -507,6 +507,23 @@
     .twinkle { animation: tw 2.6s ease-in-out infinite; }
     @keyframes tw { 0%,100% { opacity:0.25; } 50% { opacity:0.9; } }
 
+    /* Grafik-Runde "Maximum", Vorschlag 28 "Planeten-Terminator": eine dunkle Ellipse, per clip-path
+       auf die Planeten-Kreisfläche begrenzt und dann um deren Mittelpunkt rotiert - erzeugt eine
+       wandernde Tag/Nacht-Schattengrenze rein aus vorhandener SVG-Geometrie, kein neues Asset. */
+    .planet-terminator { transform-origin: 590px 75px; animation: planetTerminatorSpin 16s linear infinite; }
+    @keyframes planetTerminatorSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .planet-terminator { animation:none; transform:rotate(35deg); } }
+
+    /* Grafik-Runde "Maximum", Vorschlag 27 "Partikel-Feedback": kurzer Energie-Burst beim Klick auf
+       .buy-Buttons (bereits bestehende, überall verwendete Klasse für Bau-/Kauf-/Bestätigen-Aktionen -
+       keine neue Markup-Konvention nötig). fixed-Positionierung, damit die Partikel unabhängig vom
+       Elternelement exakt an der Klickposition erscheinen. */
+    .click-burst-particle { position:fixed; width:4px; height:4px; border-radius:50%; background:var(--c-secondary); pointer-events:none; z-index:300; opacity:0; }
+
+    /* Grafik-Runde "Maximum", Vorschlag 29 "Meilenstein-Feier": Konfetti-Overlay, ausgelöst von
+       registerShareMoment() (Prestige/Aufstieg/Mond/Boss-Kill/...). */
+    .milestone-confetti-piece { position:fixed; width:5px; height:9px; pointer-events:none; z-index:301; opacity:0; }
+
     .tabs { display:flex; gap:6px; margin-bottom:1.1rem; flex-wrap:wrap; }
     /* Auf schmalen Screens würden viele Tabs mehrzeilig umbrechen und oben viel Platz fressen -
        stattdessen eine Wischleiste (nutzt denselben Scrollbalken-Stil wie [data-hscroll] oben). */
@@ -543,7 +560,7 @@
     @media (min-width: 1400px) { .resbar { grid-template-columns: repeat(6, 1fr); } }
     @media (max-width: 620px) { .resbar { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 380px) { .resbar { grid-template-columns: repeat(2, 1fr); } }
-    .rescard { position:relative; overflow:hidden; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:12px; padding: 0.8rem 0.9rem; display:flex; align-items:center; gap:10px; transition:border-color 0.2s ease; }
+    .rescard { position:relative; overflow:hidden; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:12px; padding: 0.8rem 0.9rem; display:flex; align-items:center; gap:10px; transition:border-color 0.2s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
     .rescard:hover { border-color:rgba(var(--primary-rgb), 0.3); }
     .rescard-info { min-width:0; flex:1; }
     .rescard .icon-badge { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
@@ -583,7 +600,7 @@
     .section-title { font-size:var(--fs-body-lg); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin: 0 0 0.75rem; display:flex; align-items:center; gap:6px; color:#c7cbe0; padding-left:9px; border-left:2px solid var(--c-primary); font-family:var(--font-mono); }
 
     .buildings, .fleet, .research-list, .planet-list, .npc-list, .leaderboard { display:flex; flex-direction:column; gap:9px; }
-    .card-row { background: var(--elev-1); border: 0.5px solid var(--line-1); border-radius:14px; padding: 0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
+    .card-row { background: var(--elev-1); border: 0.5px solid var(--line-1); border-radius:14px; padding: 0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:background 0.15s ease, border-color 0.15s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
 
     /* ===== Optionale Übersichtlichkeits-Layouts (Einstellungen) - standardmäßig alle aus, aktuelles
        Layout bleibt unverändert der Standard. Wirkt aktuell nur in den Tabs "Punktestand" und
@@ -1250,6 +1267,9 @@
           <ellipse class="orbit-ring" cx="590" cy="75" rx="98" ry="20" transform="rotate(-16 590 75)"/>
           <circle cx="590" cy="75" r="58" fill="url(#planetGrad)"/>
           <ellipse cx="590" cy="88" rx="58" ry="13" fill="#1d9e75" opacity="0.3"/>
+          <g class="planet-terminator" style="clip-path:circle(58px at 590px 75px);" aria-hidden="true">
+            <ellipse cx="622" cy="75" rx="70" ry="70" fill="#0a0618" opacity="0.55"/>
+          </g>
           <g class="moon moon1"><circle cx="660" cy="75" r="5" fill="#f0997b"/></g>
           <g class="moon moon2"><circle cx="590" cy="30" r="4" fill="#5dcaa5"/></g>
           <g transform="translate(110,145) rotate(-22)">
@@ -2656,8 +2676,17 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.83.0';
+  const VERSION = '8.84.0';
   const PATCHNOTES = [
+    { version:'8.84.0', date:'17.07.2026', changes:[
+      'Grafik-Overhaul "Maximum" (Spieler-Wunsch "maximale Grafik, high end"): Sternenfeld-Hintergrund hat jetzt drei Tiefenebenen mit seitlicher Drift statt einer flachen Ebene, dazu zwei sehr blasse driftende Nebelflecken',
+      'Ressourcenwerte zählen jetzt sichtbar hoch/runter statt zu springen - dabei einen echten, nie bemerkten Bug gefunden und behoben: die "+N"-Einflug-Anzeige bei Produktion war bisher praktisch unsichtbar, weil die Ressourcenkarten bei jedem Sekunden-Tick komplett neu aufgebaut wurden, noch bevor der Browser die Anzeige einmal zeichnen konnte',
+      'Karten neigen sich jetzt leicht in Richtung Mauszeiger (nur bei Geräten mit echter Maus, nicht auf Touch)',
+      'Kurzer Energie-Partikel-Burst beim Klick auf Bau-/Kauf-/Bestätigen-Buttons',
+      'Heimatplaneten-Darstellung im Dashboard hat jetzt eine langsam wandernde Tag/Nacht-Schattengrenze statt eines statischen Farbverlaufs',
+      'Große Meilenstein-Momente (Prestige, Aufstieg, Mondbildung, Weltboss-Kill, Piratenketten-Endboss, neue Allianzbasis-Stufen) lösen jetzt zusätzlich zum Hinweis-Toast einen kurzen Konfetti-Moment aus',
+      'Alle neuen Bewegungseffekte respektieren "reduzierte Bewegung" (Betriebssystem-Einstellung)'
+    ]},
     { version:'8.83.0', date:'17.07.2026', changes:[
       'Vier neue Farbthemen (Spieler-Wunsch "mehr Farbthemen"): Arktis, Bernstein, Stahl, Indigo - zusammen mit den bestehenden 5 jetzt 9 auswählbare Paletten in den Einstellungen unter "Farbthema"',
       'Bewusste Design-Entscheidung: keines der neuen Themen nutzt Rot/Rot-Orange als Hauptfarbe, da die feste Gefahrenfarbe überall im Spiel genau dort liegt - ein rotes Thema würde ständig mit echten Gefahren-/Fehlermeldungen verwechselbar wirken'
@@ -18921,27 +18950,66 @@
     g.innerHTML = svg;
   }
 
+  // Grafik-Runde "Maximum", Vorschlag 24 "Parallax-Sternenfeld + Nebel": vorher EINE flache Ebene
+  // reiner Twinkle-Punkte ohne jede Bewegung/Tiefe. Jetzt drei Tiefenebenen (fern/mittel/nah, je
+  // eigene Größe/Twinkle-Geschwindigkeit/seitliche Drift-Amplitude) - Gesamt-Partikelzahl bleibt wie
+  // vorher an (Fläche/9000) gekoppelt, nur auf die drei Ebenen verteilt, also keine höhere Systemlast.
+  // Dazu zwei sehr blasse, langsam driftende Nebelflecken (reine Radial-Gradients statt ctx.filter -
+  // canvas-Blur-Filter haben auf älteren Safari-Versionen historisch Probleme gemacht, siehe der
+  // frühere Bugfix zum Farbthema-Hintergrund wegen zu moderner CSS-Syntax; Gradients sind universell
+  // unterstützt). Seitliche Drift entfällt
+  // bei reduzierter Bewegung, das Twinkeln (reines Opazitäts-Pulsen, keine Positionsänderung) bleibt
+  // wie schon in der Originalversion bestehen (respektierte vorher schon keine Bewegungspräferenz,
+  // da reine Opazitätsänderung ohne Positionsänderung nicht unter "Bewegung" im Vestibular-Sinne fällt).
   function initBgCanvas(){
     const canvas = document.getElementById('bgstars');
     const shell = canvas.parentElement;
-    let stars = [];
+    const reduceMotion = typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let layers = [];
+    let nebulae = [];
     function resize(){
       canvas.width = shell.clientWidth; canvas.height = shell.clientHeight;
-      stars = [];
-      const count = Math.floor((canvas.width*canvas.height)/9000);
-      for (let i=0;i<count;i++){
-        stars.push({ x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*1.2+0.2, phase:Math.random()*Math.PI*2, speed:0.4+Math.random()*0.6 });
-      }
+      const totalCount = Math.floor((canvas.width*canvas.height)/9000);
+      const specs = [
+        { share:0.5,  rMin:0.2, rMax:0.7, speed:0.3, drift:6 },
+        { share:0.32, rMin:0.5, rMax:1.0, speed:0.5, drift:14 },
+        { share:0.18, rMin:0.8, rMax:1.5, speed:0.8, drift:26 }
+      ];
+      layers = specs.map(spec => {
+        const count = Math.max(1, Math.round(totalCount*spec.share));
+        const stars = [];
+        for (let i=0;i<count;i++){
+          stars.push({ x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:spec.rMin+Math.random()*(spec.rMax-spec.rMin), phase:Math.random()*Math.PI*2, twSpeed:0.4+Math.random()*0.6 });
+        }
+        return { stars, speed:spec.speed, drift:spec.drift };
+      });
+      const maxDim = Math.max(canvas.width, canvas.height);
+      nebulae = [
+        { x:canvas.width*0.2, y:canvas.height*0.3, r:maxDim*0.35, color:'127,119,221', driftPhase:0 },
+        { x:canvas.width*0.75, y:canvas.height*0.7, r:maxDim*0.3, color:'55,138,221', driftPhase:2.4 }
+      ];
     }
     window.addEventListener('resize', resize);
     resize();
     const ctx = canvas.getContext('2d');
     function frame(t){
       ctx.clearRect(0,0,canvas.width,canvas.height);
-      for (const s of stars){
-        const alpha = 0.25 + 0.55*Math.abs(Math.sin(t*0.001*s.speed + s.phase));
-        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
-        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+      for (const neb of nebulae){
+        const ndx = reduceMotion ? 0 : Math.sin(t*0.00006 + neb.driftPhase)*30;
+        const ndy = reduceMotion ? 0 : Math.cos(t*0.00005 + neb.driftPhase)*20;
+        const g = ctx.createRadialGradient(neb.x+ndx, neb.y+ndy, 0, neb.x+ndx, neb.y+ndy, neb.r);
+        g.addColorStop(0, `rgba(${neb.color},0.05)`);
+        g.addColorStop(1, `rgba(${neb.color},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+      }
+      for (const layer of layers){
+        const dx = reduceMotion ? 0 : Math.sin(t*0.00008*layer.speed)*layer.drift;
+        for (const s of layer.stars){
+          const alpha = 0.25 + 0.55*Math.abs(Math.sin(t*0.001*s.twSpeed + s.phase));
+          ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+          ctx.beginPath(); ctx.arc(s.x+dx, s.y, s.r, 0, Math.PI*2); ctx.fill();
+        }
       }
       requestAnimationFrame(frame);
     }
@@ -19352,6 +19420,29 @@
   function registerShareMoment(title, subtitle, emoji){
     state.lastShareMoment = { title: String(title).slice(0,40), subtitle: subtitle ? String(subtitle).slice(0,70) : null, emoji: emoji||'\uD83C\uDFC6', ts: Date.now(), score: Math.floor(computeScore()), level: commanderLevel(state.xp||0) };
     pushToast('\uD83D\uDCF8 Teilbarer Moment: '+title+' - Karte im Punktestand-Tab!', 'ti-sparkles');
+    playMilestoneConfetti();
+  }
+  // Grafik-Runde "Maximum", Vorschlag 29 "Meilenstein-Feier": registerShareMoment() ist bereits der
+  // EINE zentrale Aufrufpunkt f\u00FCr alle "gro\u00DFen Momente" (Prestige, Aufstieg, Mondbildung, Weltboss-
+  // Kill, Piratenketten-Endboss, neue Allianzbasis-Stufen) - kein Sweep \u00FCber einzelne Trigger-Stellen
+  // n\u00F6tig, ein einziger Hook hier deckt sie alle ab. Kurzer Vollbild-Konfetti-Burst statt nur Toast.
+  function playMilestoneConfetti(){
+    if (typeof document === 'undefined') return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const colors = ['#fac775','#5ce1ff','#7f77dd','#5dcaa5','#e0a548'];
+    const cx = window.innerWidth/2, cy = window.innerHeight*0.35;
+    for (let i=0;i<36;i++){
+      const p = document.createElement('div');
+      p.className = 'milestone-confetti-piece';
+      p.style.background = colors[i%colors.length];
+      p.style.left = cx+'px'; p.style.top = cy+'px';
+      document.body.appendChild(p);
+      const angle = Math.random()*Math.PI*2, dist = 80+Math.random()*220;
+      p.animate([
+        { transform:'translate(-50%,-50%) rotate(0deg)', opacity:1 },
+        { transform:`translate(calc(-50% + ${(Math.cos(angle)*dist).toFixed(1)}px), calc(-50% + ${(Math.sin(angle)*dist+60).toFixed(1)}px)) rotate(${(360+Math.random()*360).toFixed(0)}deg)`, opacity:0 }
+      ], { duration:1100+Math.random()*500, easing:'cubic-bezier(0.2,0.6,0.4,1)' }).onfinish = () => p.remove();
+    }
   }
   const SHARE_CARD_TYPES = [
     { key:'profil', name:'Profil', gen: generateProfileCard, avail: () => true },
@@ -20705,6 +20796,28 @@
       el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     });
   }
+  // Grafik-Runde "Maximum", Vorschlag 25: letzter tatsächlich angezeigter Wert je Ressource, damit
+  // render() weiss, von wo aus hochgezählt werden muss (siehe resBarOk-Zweig weiter unten).
+  const lastResRenderVal = {};
+  const resValAnimFrames = new WeakMap();
+  const prefersReducedMotionMq = (typeof window!=='undefined' && window.matchMedia) ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function animateResValue(el, from, to, cap){
+    if (resValAnimFrames.has(el)) cancelAnimationFrame(resValAnimFrames.get(el));
+    if (prefersReducedMotionMq && prefersReducedMotionMq.matches){
+      el.innerHTML = fmt(to)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
+      return;
+    }
+    const dur = 380, t0 = performance.now();
+    function step(t){
+      const p = Math.min(1, (t-t0)/dur);
+      const eased = 1-Math.pow(1-p,3);
+      const val = from + (to-from)*eased;
+      el.innerHTML = fmt(val)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
+      if (p<1) resValAnimFrames.set(el, requestAnimationFrame(step));
+      else resValAnimFrames.delete(el);
+    }
+    resValAnimFrames.set(el, requestAnimationFrame(step));
+  }
 
   function renderFpLeaderboard(){
     const box = document.getElementById('fpLeaderboard');
@@ -20929,17 +21042,43 @@
     const rates = ratesPerSecond();
 
     const cap = storageCap();
-    document.getElementById('resbar').innerHTML = RES_DEFS.map(d => `
-      <div class="rescard" data-res="${d.key}">
-        <div class="icon-badge" style="background:${d.bg};">${RES_ICONS[d.key]}</div>
-        <div class="rescard-info">
-          <div class="label">${d.label}</div>
-          <div class="value">${fmt(state.resources[d.key])} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(cap)}</span></div>
-          <div class="rate">${(cap>0 && (state.resources[d.key]||0) >= cap && rates[d.key] > 0) ? '<span style="color:#e0a548;">+0/s (Lager voll)</span>' : '+'+fmt(rates[d.key])+'/s'}</div>
+    // Grafik-Runde "Maximum", Vorschlag 25 "Animierte Zahlen-Counter": vorher wurde #resbar bei
+    // JEDEM Sekunden-Tick komplett per innerHTML neu aufgebaut - dabei kam ein bestehender, nie
+    // bemerkter Bug ans Licht: flashGains() (die "+N"-Einflug-Anzeige) lief im selben Tick VOR
+    // diesem Rebuild, ihre DOM-Änderungen wurden also noch vor dem ersten Browser-Paint durch den
+    // Rebuild wieder gelöscht - die Einflug-Zahl war faktisch nie sichtbar. Jetzt: Struktur wird nur
+    // EINMAL gebaut (RES_DEFS ändert sich nie zur Laufzeit), danach werden nur noch Werte in den
+    // bestehenden Knoten aktualisiert - dadurch bleiben die .float-gain-Elemente über Ticks hinweg
+    // erhalten (Bugfix als Nebeneffekt) UND die große Zahl kann jetzt sanft hoch-/runterzählen statt
+    // zu springen. Fallback auf vollen Rebuild, falls Struktur/Reihenfolge doch nicht passt.
+    const resBarEl = document.getElementById('resbar');
+    const resBarOk = resBarEl.children.length === RES_DEFS.length &&
+      RES_DEFS.every((d,i) => resBarEl.children[i] && resBarEl.children[i].getAttribute('data-res') === d.key);
+    if (!resBarOk){
+      resBarEl.innerHTML = RES_DEFS.map(d => `
+        <div class="rescard" data-res="${d.key}">
+          <div class="icon-badge" style="background:${d.bg};">${RES_ICONS[d.key]}</div>
+          <div class="rescard-info">
+            <div class="label">${d.label}</div>
+            <div class="value">${fmt(state.resources[d.key])} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(cap)}</span></div>
+            <div class="rate">${(cap>0 && (state.resources[d.key]||0) >= cap && rates[d.key] > 0) ? '<span style="color:#e0a548;">+0/s (Lager voll)</span>' : '+'+fmt(rates[d.key])+'/s'}</div>
+          </div>
+          <div class="float-gain">+0</div>
         </div>
-        <div class="float-gain">+0</div>
-      </div>
-    `).join('');
+      `).join('');
+      RES_DEFS.forEach(d => { lastResRenderVal[d.key] = state.resources[d.key]||0; });
+    } else {
+      RES_DEFS.forEach((d,i) => {
+        const card = resBarEl.children[i];
+        const rateEl = card.querySelector('.rate');
+        const valEl = card.querySelector('.value');
+        const newVal = state.resources[d.key]||0;
+        rateEl.innerHTML = (cap>0 && newVal >= cap && rates[d.key] > 0) ? '<span style="color:#e0a548;">+0/s (Lager voll)</span>' : '+'+fmt(rates[d.key])+'/s';
+        const oldVal = lastResRenderVal[d.key]!==undefined ? lastResRenderVal[d.key] : newVal;
+        if (Math.abs(newVal-oldVal) > 0.001) animateResValue(valEl, oldVal, newVal, cap); else valEl.innerHTML = fmt(newVal)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
+        lastResRenderVal[d.key] = newVal;
+      });
+    }
 
     const colonyIds = Object.keys(state.colonies||{}).sort((a,b) => (state.favoritePlanets[b]?1:0) - (state.favoritePlanets[a]?1:0));
     const favStar = (pid) => `<i class="ti ti-star" data-favorite-toggle="${pid}" aria-hidden="true" title="Favorit" style="margin-left:5px; color:${state.favoritePlanets[pid]?'#fac775':'#6b6f85'};"></i>`;
@@ -24768,6 +24907,49 @@
   document.addEventListener('click', (e) => {
     const jumpBtn = e.target.closest('[data-jump-help]');
     if (jumpBtn) jumpToHelp(jumpBtn.getAttribute('data-jump-help'));
+  });
+
+  // Grafik-Runde "Maximum", Vorschlag 26 "Karten-Tilt": EIN delegierter pointermove-Listener statt
+  // einzelner Listener pro Karte - Karten werden bei vielen Boxen bei jedem Tick per innerHTML neu
+  // gebaut (siehe CLAUDE.md-Architekturhinweis), direkt angehängte Listener würden dabei verloren
+  // gehen. Reagiert nur auf Geräte mit echtem Zeiger (Touch hat kein Hover, dort bleibt es aus).
+  if (typeof window!=='undefined' && window.matchMedia && window.matchMedia('(pointer: fine)').matches && !(prefersReducedMotionMq && prefersReducedMotionMq.matches)){
+    let tiltEl = null;
+    document.addEventListener('pointermove', (e) => {
+      const card = e.target.closest('.card-row, .rescard');
+      if (card !== tiltEl){
+        if (tiltEl) tiltEl.style.transform = '';
+        tiltEl = card;
+      }
+      if (!card) return;
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left)/r.width - 0.5;
+      const y = (e.clientY - r.top)/r.height - 0.5;
+      card.style.transform = `perspective(500px) rotateX(${(-y*4).toFixed(1)}deg) rotateY(${(x*4).toFixed(1)}deg)`;
+    });
+    document.addEventListener('pointerleave', () => { if (tiltEl){ tiltEl.style.transform=''; tiltEl=null; } }, true);
+  }
+
+  // Grafik-Runde "Maximum", Vorschlag 27 "Partikel-Feedback": .buy ist bereits die überall verwendete
+  // Klasse für Bau-/Kauf-/Bestätigen-Buttons (Gebäude, Schiffe, Forschung, Pakt-Annahme, Erfolge
+  // abholen, ...) - kein Sweep über einzelne Button-IDs nötig. Deaktivierte Buttons feuern in Browsern
+  // ohnehin kein click-Event, brauchen also keine extra Prüfung hier.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.buy');
+    if (!btn || (prefersReducedMotionMq && prefersReducedMotionMq.matches)) return;
+    const r = btn.getBoundingClientRect();
+    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+    for (let i=0;i<8;i++){
+      const p = document.createElement('div');
+      p.className = 'click-burst-particle';
+      p.style.left = cx+'px'; p.style.top = cy+'px';
+      document.body.appendChild(p);
+      const angle = Math.random()*Math.PI*2, dist = 16+Math.random()*22;
+      p.animate([
+        { transform:'translate(-50%,-50%) scale(1)', opacity:1 },
+        { transform:`translate(calc(-50% + ${(Math.cos(angle)*dist).toFixed(1)}px), calc(-50% + ${(Math.sin(angle)*dist).toFixed(1)}px)) scale(0.3)`, opacity:0 }
+      ], { duration:420+Math.random()*180, easing:'ease-out' }).onfinish = () => p.remove();
+    }
   });
 
   document.getElementById('resetBtn').addEventListener('click', async () => {
