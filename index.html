@@ -2446,8 +2446,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.74.0';
+  const VERSION = '8.74.1';
   const PATCHNOTES = [
+    { version:'8.74.1', date:'17.07.2026', changes:[
+      'Bugfix (Spieler-Meldung "Mond auf Drachenmark ist bei Basis nicht auswählbar"): ein kolonisierter Mond, dessen Elternplanet NICHT kolonisiert ist (durchaus möglich - Mondkolonisierung setzt keinen kolonisierten Planeten voraus und zählt nicht gegen das Kolonie-Limit), tauchte im Basis-Tab-Umschalter (Dashboard-Karten, Pillen-Reihe, Seitenmenü-Liste) NIRGENDS auf, da sein Mond-Symbol bisher nur an der - dann gar nicht existierenden - Karte des Elternplaneten hing. Solche Monde bekommen jetzt an allen drei Stellen einen eigenen, direkt anklickbaren Eintrag'
+    ]},
     { version:'8.74.0', date:'17.07.2026', changes:[
       'Neu: Weltprojekte (Spieler-Wunsch "Allianzsystem erweitern", Teil 2) - sechs seltene, EINMALIGE Mega-Projekte mit enormen Einzelkosten, im Allianz-Tab unterhalb der permanenten Allianzprojekte: Dyson-Sphäre (+5% Produktion), Intergalaktisches Sprungtor (-10% Flugzeit), Gigantische Sternenwerft (-10% Bauzeit Schiffe & Gebäude), Wurmlochgenerator (-10% Treibstoffkosten), Allianz-Ringwelt (+10% Lagerkapazität) und Galaktisches Archiv (verleiht JEDEM aktuellen und künftigen Allianzmitglied dauerhaft den exklusiven Ehrentitel „Archivar der Allianz")',
       'Nur EIN Weltprojekt gleichzeitig in Arbeit - deutlich strenger als die 7 normalen Allianzprojekte (bis zu 2 aktiv), da "besonders selten" laut Feature-Wunsch. Ein abgeschlossenes Weltprojekt fällt automatisch aus dem Aktiv-Slot, damit die Allianz ohne Zwischenschritt das nächste starten kann, und bleibt dauerhaft als vollendetes Prestigeobjekt sichtbar'
@@ -20187,10 +20190,17 @@
 
     const colonyIds = Object.keys(state.colonies||{}).sort((a,b) => (state.favoritePlanets[b]?1:0) - (state.favoritePlanets[a]?1:0));
     const favStar = (pid) => `<i class="ti ti-star" data-favorite-toggle="${pid}" aria-hidden="true" title="Favorit" style="margin-left:5px; color:${state.favoritePlanets[pid]?'#fac775':'#6b6f85'};"></i>`;
-    const planetSwitchHtml = !colonyIds.length ? '' : `<div class="planet-switch">
+    // Verwaiste Monde (kolonisiert, aber ihr Elternplanet nicht - durchaus möglich, siehe
+    // colonizeMoon()/Mondbelagerungslimit-Ausnahme) hängen sonst NIRGENDS in dieser Pillen-Reihe, da
+    // ihr Mond-Badge (pillMoonBtn) nur an der - dann gar nicht existierenden - Elternplaneten-Pille
+    // hängt. Bugfix 17.07.2026 (Spieler-Meldung "Mond auf Drachenmark nicht auswählbar"): eigene Pille.
+    const orphanMoonIds = colonyIds.filter(pid => isMoonKey(pid) && !state.colonies[moonParentKey(pid)]);
+    const orphanMoonPillsHtml = orphanMoonIds.map(pid => `<button class="planet-pill ${state.activeBasePlanet===pid?'active':''}" data-planet-switch="${pid}">☾ ${planetDisplayName(pid)}</button>`).join('');
+    const planetSwitchHtml = (!colonyIds.length) ? '' : `<div class="planet-switch">
       <button class="planet-pill ${state.activeBasePlanet==='home'?'active':''}" data-planet-switch="home" style="border-color:rgba(126,119,221,0.4); position:relative;"><i class="ti ${PLANET_TYPE_INFO.erdaehnlich.icon}" aria-hidden="true" style="color:#5dcaa5;"></i>Heimatbasis <i class="ti ti-home" aria-hidden="true" style="color:#c3bef5; font-size:10px; margin-left:2px;"></i>${pillMoonBtn('home')}</button>
       ${colonyIds.filter(pid => !isMoonKey(pid)).map(pid => {
         const p = PLANETS.find(x=>x.id===pid); const ti = planetTypeInfoFor(p); return `<button class="planet-pill ${state.activeBasePlanet===pid?'active':''}" data-planet-switch="${pid}"><i class="ti ${ti.icon||'ti-planet'}" aria-hidden="true"></i>${p.name.split(' ').pop()}${favStar(pid)}${pillMoonBtn(pid)}</button>`; }).join('')}
+      ${orphanMoonPillsHtml}
     </div>`;
     // planetSwitcher (Basis-Tab) entfällt bewusst: die Dashboard-Karten oben sind seit v7.41.0 selbst
     // anklickbar und übernehmen diese Funktion dort mit mehr Info – in Verteidigung/Flotte/Expedition
@@ -20217,6 +20227,7 @@
       fpColonyList.innerHTML = `
         <button class="fp-colony-btn ${state.activeBasePlanet==='home'?'active':''}" data-fp-colony-switch="home"><i class="ti ti-home" aria-hidden="true"></i>Heimatbasis${pillMoonBtn('home')}</button>
         ${colonyIds.filter(pid => !isMoonKey(pid)).map(pid => { const p = PLANETS.find(x=>x.id===pid); return `<button class="fp-colony-btn ${state.activeBasePlanet===pid?'active':''}" data-fp-colony-switch="${pid}"><i class="ti ti-planet" aria-hidden="true"></i>${p.name.split(' ').pop()}${pillMoonBtn(pid)}</button>`; }).join('')}
+        ${orphanMoonIds.map(pid => `<button class="fp-colony-btn ${state.activeBasePlanet===pid?'active':''}" data-fp-colony-switch="${pid}">☾ ${planetDisplayName(pid)}</button>`).join('')}
         ${!colonyIds.length ? '<div class="bmeta" style="font-size:10.5px;">Noch keine Kolonien.</div>' : ''}
       `;
       document.querySelectorAll('[data-fp-colony-switch]').forEach(btn => btn.onclick = () => {
@@ -20227,7 +20238,14 @@
 
     // Monde bekommen keine eigene Karte mehr - sie sind über das Mond-Symbol an der Karte ihres
     // Planeten erreichbar (siehe dash-moon-badge weiter unten).
-    const dashSets = [{ id:'home', name:'Heimatbasis', b: state.buildings, f: state.fleet }, ...colonyIds.filter(pid => !isMoonKey(pid)).map(pid => ({ id:pid, name: PLANETS.find(p=>p.id===pid).name, b: state.colonies[pid].buildings, f: state.colonies[pid].fleet }))];
+    const dashSets = [
+      { id:'home', name:'Heimatbasis', b: state.buildings, f: state.fleet },
+      ...colonyIds.filter(pid => !isMoonKey(pid)).map(pid => ({ id:pid, name: PLANETS.find(p=>p.id===pid).name, b: state.colonies[pid].buildings, f: state.colonies[pid].fleet })),
+      // Verwaiste Monde bekommen eine eigene Karte (siehe orphanMoonIds oben) - ihr data-planet-icon
+      // ist über isMoonKey(d.id) bereits automatisch "asteroid", der innere Mond-Badge-Check
+      // (!isMoonKey(d.id) && ...) greift für sie korrekt NICHT (die Karte IST schon der Mond).
+      ...orphanMoonIds.map(pid => ({ id:pid, name: planetDisplayName(pid), b: state.colonies[pid].buildings, f: state.colonies[pid].fleet }))
+    ];
     const raidTargetId = (state.incomingRaid && state.incomingRaid.detected) ? state.incomingRaid.planet : null;
     const sabotagedPlanetId = (state.mineDebuff && state.mineDebuff.until > Date.now()) ? (state.mineDebuff.planet||'home') : null;
     document.getElementById('colonyDashboard').innerHTML = `
