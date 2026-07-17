@@ -2415,8 +2415,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.65.2';
+  const VERSION = '8.65.3';
   const PATCHNOTES = [
+    { version:'8.65.3', date:'17.07.2026', changes:[
+      'Abhorchposten und Mondschildgenerator zeigten in der Verteidigung-Gebäudeliste die generische "Angriff: 0 → 0 · Verteidigung: 0 → 0"-Zeile - bei beiden Gebäuden bedeutungslos, da ihre echte Wirkung nicht über Angriffs-/Verteidigungspunkte läuft. Zeigen jetzt stattdessen ihren tatsächlichen Effekt: Abhorchposten die Reichweite in Sektoren, Mondschildgenerator die Senkung der Mondzerstörer-Zerstörungschance in Prozent'
+    ]},
     { version:'8.65.2', date:'17.07.2026', changes:[
       'Bugfix (Spieler-Report mit Screenshot): Abhorchposten und Mondschildgenerator zeigten in der Verteidigung-Gebäudeliste das Wort "undefined" statt eines Icons (durch den festen Symbolbereich meist nur als abgeschnittenes "defin" sichtbar) - beiden fehlte, anders als allen anderen Verteidigungsgebäuden, ein eigenes Icon in der aktuellen Grafik-Umstellung. Beide haben jetzt ein passendes animiertes Icon (Abhorchposten: rotierende Antennenschüssel, Mondschildgenerator: pulsierender Schild mit Halbmond-Motiv)',
       'Mondzerstörer-Kartentext im Flotte-Tab deutlich ausführlicher (Spieler-Wunsch): erklärt jetzt direkt die Mondbelagerungs-Mechanik (Ziel über die Bestenliste, gedeckelte Erfolgschance, 48-Std.-Abklingzeit) sowie die Forschungs-Voraussetzung (Leerentechnologie + Kampftechnik II), statt nur Angriffswert und die benötigten seltenen Items zu nennen'
@@ -19024,6 +19027,22 @@
         const savedNow = fmtDuration(Math.round(REF_DUR*(1-labMultNow)));
         const savedNext = fmtDuration(Math.round(REF_DUR*(1-labMultNext)));
         prodLine = `Forschungszeit (alle Planeten zusammen): -${Math.round((1-labMultNow)*100)}% - spart bei 10 Min. Forschung ${savedNow} → <span style="color:#5dcaa5;">-${Math.round((1-labMultNext)*100)}% (${savedNext})</span> nach Ausbau · +${fmt(curFp)} Forschungspunkte/s → <span style="color:#5dcaa5;">+${fmt(nextFp)} Forschungspunkte/s</span>`;
+      } else if (def.key==='abhorchposten'){
+        // Angriff/Verteidigung sind bei diesem Gebäude immer 0 (siehe BUILDING_DEFS) - die generische
+        // Verteidigungs-Zeile wäre hier bedeutungslos. Zeigt stattdessen die tatsächliche Wirkung:
+        // Reichweite in Sektoren (siehe abhorchpostenRangeSectors) sowie ab welcher Stufe Missionsart
+        // bzw. Schiffszusammensetzung erfasster Flotten sichtbar werden.
+        const curSectors = abhorchpostenRangeSectors(lvl);
+        const nextSectors = abhorchpostenRangeSectors(lvl+qty);
+        const curRangeText = lvl<=0 ? 'inaktiv' : (lvl===1 ? 'nur eigenes System' : curSectors+' Sektor(en)');
+        const nextRangeText = (lvl+qty)===1 ? 'nur eigenes System' : nextSectors+' Sektor(en)';
+        prodLine = `Reichweite: ${curRangeText} → <span style="color:#5dcaa5;">${nextRangeText}</span> nach Ausbau · erkennt fremde Flottenbewegungen (Missionsart ab Stufe 3, Schiffszusammensetzung ab Stufe 4)`;
+      } else if (def.key==='mondschild'){
+        // Ebenfalls Angriff/Verteidigung immer 0 - echte Wirkung ist die Senkung der
+        // Mondzerstörer-Zerstörungschance (siehe resolveMoonSiege, siegeDefensePerLevel).
+        const curPct = Math.round(lvl*def.siegeDefensePerLevel*100);
+        const nextPct = Math.round((lvl+qty)*def.siegeDefensePerLevel*100);
+        prodLine = `Senkt die Zerstörungschance durch einen gegnerischen Mondzerstörer um ${curPct}% → <span style="color:#5dcaa5;">${nextPct}%</span> nach Ausbau`;
       } else if (def.category==='defense'){
         // "Schild"-Wert war zuvor immer NaN (def.shield war nirgends gesetzt) und wurde entfernt.
         // Angriff zeigt jetzt den echten atkVal statt einer fest auf 0 kodierten Zahl.
