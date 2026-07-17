@@ -2423,8 +2423,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.68.0';
+  const VERSION = '8.69.0';
   const PATCHNOTES = [
+    { version:'8.69.0', date:'17.07.2026', changes:[
+      'Neu: Wochenprojekt und Großprojekt (Spieler-Wunsch, Teil 2 von "Allianzmissionen mit exklusiven Belohnungen") - zusätzlich zum bestehenden Tages-Einsatz gibt es ab Allianzbasis-Stufe 6 ein Wochenprojekt und ab Stufe 10 ein monatliches Großprojekt, beide deutlich größer im Ziel und in der Belohnung. Beide garantieren beim Abschluss zusätzlich ein hochwertiges Modul (Wochenprojekt: mind. Episch, Großprojekt: mind. Legendär mit kleiner Mythisch-Chance) - die bislang einzige Quelle für diese Seltenheitsstufen',
+      'Neu: Allianzpunkte - eine geteilte Allianz-Währung, die die ganze Allianz bei jedem abgeschlossenen Einsatz (Tag/Woche/Monat) gemeinsam verdient. Ausgegeben werden sie für neue "Allianz-Projekte" (aktuell: Kriegsrat, +1% Angriffs- UND Verteidigungspunkte je Stufe bis Stufe 10, für die ganze Allianz) - Kauf nur durch Admins/Offiziere, im Allianz-Tab unterhalb der Einsätze',
+      'Fairness-Skalierung: alle Einsatzziele skalieren jetzt zusätzlich mit der aktiven Mitgliederzahl der Allianz (Referenz 10 Mitglieder), damit kleine Allianzen nicht strukturell benachteiligt sind - eine 5-Mitglieder-Allianz bekommt kleinere Ziele als eine 30-Mitglieder-Allianz',
+      'Belohnungs-Fairness: die Einsatz-Belohnung gibt es jetzt erst ab einem Mindestbeitrag (1% des Team-Ziels) statt schon ab jedem beliebigen (auch verschwindend kleinen) Beitrag - wer nicht mitgeholfen hat, geht weiterhin leer aus, wie schon bisher',
+      'Bugfix: Beim Beitragen zu einem Allianz-Einsatz wurde ein eingegebener Betrag, der die eigenen Ressourcen überstieg, fälschlich komplett abgelehnt ("nicht genug Ressourcen") statt automatisch auf die tatsächlich noch fehlende Menge gekappt zu werden - "möglichst viel beitragen" (mehr eintippen, als man besitzt) schlug dadurch unnötig fehl'
+    ]},
     { version:'8.68.0', date:'17.07.2026', changes:[
       'Neu: Schiffsklassen-Module (Spieler-Wunsch, Teil 1 von "Allianzmissionen mit exklusiven Belohnungen") - ein zweites, komplett getrenntes Modulsystem im Offiziere-Tab. Anders als die bestehenden Standort-Module wirken diese Boni klassenweit: EIN Modul für "Schlachtschiffe" verstärkt JEDES Schlachtschiff in der Flotte, egal wo es stationiert ist. Vier Klassen mit eigenen Slots: Schlachtschiffe (Verbesserte Panzerung, Zielcomputer, Schildverstärker), Frachter (Erweiterter Frachtraum, Treibstoffoptimierung, Verbesserte Triebwerke), Aufklärungsschiffe (Langstreckensensoren, Tarnmodul, Verbesserte Scanner) und Mondzerstörer (Reaktorkern-Upgrade, Präzisionslaser, Verstärkte Hülle, Antriebsoptimierung)',
       'Neue 5. Seltenheitsstufe "Mythisch" für BEIDE Modulsysteme (Standort- und Schiffsklassen-Module). Episch/Legendär/Mythisch der neuen Schiffsklassen-Module sind bewusst noch nicht über normale Fundquellen erhältlich - vorerst nur bis "Selten" über die neue "Schiffsklassen-Blaupause" im Kredit-Shop (3500 Kr.). Die stärkeren Stufen sind für die geplanten Allianzmissionen reserviert, wie im Feature-Wunsch beschrieben',
@@ -5362,6 +5369,96 @@
     return total;
   }
 
+  // ===== Allianzpunkte & Allianz-Projekte (17.07.2026, Teil 2 von "Allianzmissionen mit exklusiven
+  // Belohnungen") - eine geteilte Allianz-Währung, verdient EINMAL pro abgeschlossenem Einsatz
+  // (Tages-/Wochen-/Großprojekt, siehe awardAlliancePointsIfNeeded weiter unten), nicht pro
+  // Spieler-Beitrag. Ausgegeben wird sie gemeinsam für dauerhafte Allianz-Projekte - jeder
+  // Admin/Offizier kann für die ganze Allianz kaufen (gleiche Rechte wie bei der
+  // Verband-Angriffsplanung, siehe amIAllianceMusterLeader). Geteiltes Dokument
+  // alliance:<TAG>:points mit Read-Fresh-dann-Schreiben (race-tolerant, gleiches Muster wie
+  // maybeAnnounceBaseLevel/Verband-Phasenübergänge) - ein seltenes doppeltes Gutschreiben bei exakt
+  // zeitgleichem Abschluss ist eine bewusst akzeptierte, sehr unwahrscheinliche Krux dieser
+  // Architektur (kein echter Transaktions-Server), analog zu den bestehenden geteilten Dokumenten.
+  const ALLIANCE_PROJECT_DEFS = [
+    { key:'ap_kriegsrat', name:'Kriegsrat', icon:'ti-sword', desc:'+1% Angriffs- UND Verteidigungspunkte je Stufe (max. Stufe 10) für alle Allianzmitglieder - fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein', maxLevel:10, perLevel:0.01, costForLevel: lvl => 40 + lvl*30 }
+  ];
+  function findAllianceProject(key){ return ALLIANCE_PROJECT_DEFS.find(d=>d.key===key); }
+  function allianceProjectLevel(key){ return (state.alliancePoints && state.alliancePoints.projects && state.alliancePoints.projects[key]) || 0; }
+  function allianceProjectBonus(key){
+    const def = findAllianceProject(key);
+    return def ? allianceProjectLevel(key) * def.perLevel : 0;
+  }
+  async function loadAlliancePoints(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ state.alliancePoints = null; return; }
+    try {
+      const r = await storageGet('alliance:'+tag+':points', true);
+      state.alliancePoints = (r && r.value) ? JSON.parse(r.value) : { total:0, projects:{}, awardedPeriods:{} };
+    } catch(e){}
+  }
+  async function awardAlliancePointsIfNeeded(cadence, periodKey, amount){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend() || !amount) return;
+    try {
+      const r = await storageGet('alliance:'+tag+':points', true);
+      const doc = (r && r.value) ? JSON.parse(r.value) : { total:0, projects:{}, awardedPeriods:{} };
+      doc.awardedPeriods = doc.awardedPeriods || {};
+      doc.awardedPeriods[cadence] = doc.awardedPeriods[cadence] || [];
+      if (doc.awardedPeriods[cadence].includes(periodKey)){ state.alliancePoints = doc; return; }
+      doc.total = (doc.total||0) + amount;
+      doc.awardedPeriods[cadence].push(periodKey);
+      doc.awardedPeriods[cadence] = doc.awardedPeriods[cadence].slice(-50);
+      await storageSet('alliance:'+tag+':points', JSON.stringify(doc), true);
+      state.alliancePoints = doc;
+      postAllianceBaseNews('🏆 '+ALLIANCE_MISSION_CADENCES[cadence].label+' abgeschlossen - die Allianz erhält +'+amount+' Allianzpunkte!');
+    } catch(e){}
+  }
+  async function buyAllianceProject(key){
+    if (!amIAllianceMusterLeader()){ log('Nur Admins/Offiziere können Allianz-Projekte kaufen.', 'ti-alert-triangle'); return; }
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    const def = findAllianceProject(key);
+    if (!def) return;
+    try {
+      const r = await storageGet('alliance:'+tag+':points', true);
+      const doc = (r && r.value) ? JSON.parse(r.value) : { total:0, projects:{}, awardedPeriods:{} };
+      doc.projects = doc.projects || {};
+      const cur = doc.projects[key]||0;
+      if (cur >= def.maxLevel){ log('Maximalstufe bereits erreicht.', 'ti-alert-triangle'); return; }
+      const cost = def.costForLevel(cur+1);
+      if ((doc.total||0) < cost){ log('Nicht genug Allianzpunkte ('+cost+' benötigt, '+(doc.total||0)+' vorhanden).', 'ti-alert-triangle'); return; }
+      doc.total -= cost;
+      doc.projects[key] = cur+1;
+      await storageSet('alliance:'+tag+':points', JSON.stringify(doc), true);
+      state.alliancePoints = doc;
+      log('"'+def.name+'" auf Stufe '+(cur+1)+' ausgebaut (−'+cost+' Allianzpunkte).', def.icon);
+      postAllianceBaseNews('⚙ '+(state.player.name||'Ein Mitglied')+' hat "'+def.name+'" auf Stufe '+(cur+1)+' ausgebaut (Allianz-Projekt).');
+      playSound('build');
+      render(); save();
+    } catch(e){}
+  }
+  function allianceProjectSectionHtml(){
+    const tag = myAllianceTag();
+    if (!tag) return '';
+    const points = state.alliancePoints;
+    const total = points ? (points.total||0) : 0;
+    let s = `<div class="bname" style="font-size:13px; margin-top:10px;"><i class="ti ti-award" aria-hidden="true"></i> Allianz-Projekte <span class="lvl-pill" style="background:rgba(127,184,224,0.18); color:#7fb8e0;">${fmt(total)} Allianzpunkte</span></div>`;
+    s += `<div class="bmeta" style="margin-bottom:4px;">Verdient durch abgeschlossene Einsätze oben (Tages-/Wochen-/Großprojekt), ausgegeben für dauerhafte Boni der ganzen Allianz. Kauf nur durch Admins/Offiziere.</div>`;
+    s += ALLIANCE_PROJECT_DEFS.map(def => {
+      const lvl = allianceProjectLevel(def.key);
+      const maxed = lvl >= def.maxLevel;
+      const cost = maxed ? 0 : def.costForLevel(lvl+1);
+      const canAfford = amIAllianceMusterLeader() && total >= cost;
+      return `<div class="card-row" style="margin-bottom:6px;">
+        <div class="left"><div class="bicon"><i class="ti ${def.icon}" aria-hidden="true"></i></div>
+          <div><div class="bname">${def.name} <span class="lvl-pill">Stufe ${lvl}/${def.maxLevel}</span></div>
+          <div class="bmeta">${def.desc}</div></div>
+        </div>
+        ${maxed ? `<span class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximal</span>` : `<button data-buy-project="${def.key}" ${canAfford?'':'disabled'} style="font-size:10.5px;">${cost} AP</button>`}
+      </div>`;
+    }).join('');
+    return s;
+  }
 
   const NPCS = [
     { id:'raider1', name:'Void-Marodeure', level:1, defense:30, duration:40, loot:{erz:40, energie:20}, weakness:'jaeger', system:'kepler' },
@@ -7644,6 +7741,7 @@
     if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
     combatBonus += officerBonus('admiral');
     if (planetKey) combatBonus += moduleBonusAt(planetKey, 'atk');
+    combatBonus += allianceProjectBonus('ap_kriegsrat');
     return combatBonus;
   }
   function attackPower(fleet, planetKey){
@@ -7730,6 +7828,7 @@
     if (hasArtifactBonus()) combatBonus += 0.05;
     if (planetKey) combatBonus += veteranRankOf(planetKey).bonus;
     if (planetKey) combatBonus += moduleBonusAt(planetKey, 'def');
+    combatBonus += allianceProjectBonus('ap_kriegsrat');
     return combatBonus;
   }
   function defensePower(planetKey){
@@ -8900,7 +8999,10 @@
     if (state.pirateDebrisRaid === undefined) state.pirateDebrisRaid = null;
     if (state.voidRift === undefined) state.voidRift = null;
     if (state.allianceMissionDay === undefined) state.allianceMissionDay = null;
+    if (state.allianceMissionWeek === undefined) state.allianceMissionWeek = null;
+    if (state.allianceMissionMonth === undefined) state.allianceMissionMonth = null;
     if (state.allianceMissionsDone === undefined) state.allianceMissionsDone = 0;
+    if (state.alliancePoints === undefined) state.alliancePoints = null;
     if (state.allianceBase === undefined) state.allianceBase = null;
     if (state.allianceBaseWar === undefined) state.allianceBaseWar = null;
     if (!state.shipsAtAllianceBase) state.shipsAtAllianceBase = {};
@@ -11603,7 +11705,8 @@
       { title:'Allianz-Spendenrangliste', body:'Im rechten Seitenmen\u00fc (Button "Status" am Bildschirmrand) zeigt der Abschnitt "Allianz-Spenden" die <strong>Top 3 der laufenden Woche</strong> plus deine eigene Platzierung, deine Wochenspende, die Allianz-Gesamtspende und deinen prozentualen Anteil. \u00dcber "Komplette Rangliste anzeigen" siehst du alle Mitglieder sortiert. <strong>Gez\u00e4hlt wird jede Ressourcen-Spende</strong> an gemeinsame Allianz-Projekte: Allianzbasis, Allianz-Techs/-Geb\u00e4ude und die t\u00e4glichen Allianz-Eins\u00e4tze. Die Wertung setzt sich <strong>montags 00:00 Uhr</strong> zur\u00fcck; die Top 3 der abgelaufenen Woche erhalten automatisch eine kleine Belohnung (Kredite/Forschungspunkte, ein Ressourcenpaket bzw. einen Produktions-Booster), und alle Mitglieder bekommen einen zusammenfassenden Bericht im Allianz-Chat.' },
       { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Energie / 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat danach eine eigene <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage): die Uhr für eine Stufe startet erst, sobald ihre Ressourcen VOLLSTÄNDIG beisammen sind, nicht schon bei der Gründung. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. <strong>Krieg um die Basis:</strong> Die Basis kann von Mitgliedern FREMDER Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, 8 Std. Abklingzeit je Spieler). Ihre Hülle hat 12.000 Punkte je Stufe; die Verteidigung besteht aus einem Sockel (600 je Stufe) plus allen von Mitgliedern <strong>zur Basis entsandten Schiffen</strong> (Button im Allianz-Tab, echte Flugzeit, jederzeit zurückrufbar - stationierte Schiffe erleiden bei Angriffen Verluste). Leichte Schäden repariert die Basis selbst (3%/Std.); fällt die Hülle auf 0, ist die Basis <strong>ZERSTÖRT</strong>: alle Boni sind deaktiviert, bis die Allianz die hohen Reparaturkosten (30% der kumulierten Baukosten) gemeinsam aufgebracht hat. Bei allen wichtigen Basis-Ereignissen (Baubeginn, erreichte Ausbaustufe, Angriff, Zerstörung, abgeschlossene Reparatur) erscheint automatisch eine <strong>System-Nachricht im Allianz-Chat</strong>, damit alle Mitglieder informiert sind. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone. Da die Kartenansicht standardmäßig dein eigenes Heimatsystem zeigt (nicht zwangsläufig das der Basis), bringt dich der Link "auf der Karte anzeigen" direkt neben der Systemangabe in der Basis-Box zum richtigen System.' },
       { title:'Koordinierte Allianzbasis-Angriffe', body:'Erweitert den Basis-Krieg um eine geplante Großschlacht: nur <strong>Admins/Offiziere</strong> können einen koordinierten Angriff starten (Allianz-Tab, Ziel-Tag + Sammelzeit 30 Min./1 Std./2 Std. + optionale Nachricht). Während der Sammelphase kann JEDES Mitglied freiwillig seine im Galaxie-Tab zusammengestellte Angriffsflotte anschließen (Schiffe sind bis zum Abschluss gebunden, ein Rückzug ist nur während der laufenden Sammelphase möglich - die Schiffe kehren dann sofort zurück). Sichtbar sind laufend Teilnehmerzahl, Gesamtschiffe und Gesamt-Angriffskraft. Nach Ablauf der Sammelzeit fliegt der GESAMTE Verband gemeinsam los und trifft geschlossen am Ziel ein - die verteidigende Allianz bekommt sofort eine Warnung mit Angreifer-Tag und Ankunftszeit, kann in dieser Zeit Verteidigungsflotten entsenden und Ressourcen spenden (dieselben Werkzeuge wie beim normalen Basis-Krieg). Die Schlacht läuft nach derselben Formel wie ein einzelner Basis-Angriff, nur mit der aggregierten Gesamtstärke des Verbands; Ergebnis (Schaden, Erfolg/Zerstörung) landet in derselben Basis-Verteidigungs-Historie. Jede Ziel-Basis hat danach <strong>24 Std. Schutz</strong> vor dem nächsten koordinierten Angriff. Belohnung (Kredite, Forschungspunkte, Kampfpunkte) und Verluste verteilen sich anteilig zum eigenen Beitrag an der Gesamt-Angriffskraft - wer nicht mitgeflogen ist, bekommt nichts.' },
-      { title:'Allianz-Einsätze (ab Basis-Stufe 3)', body:'Ab Allianzbasis-Stufe 3 erhält eure Allianz jeden Tag einen gemeinsamen <strong>Allianz-Einsatz</strong> (im Allianz-Tab unterhalb der Basis): <strong>Versorgungskonvoi</strong> (Erz liefern), <strong>Kristall-Kontingent</strong>, <strong>Treibstoff-Depot</strong> (Deuterium), <strong>Kampfoperation</strong> (gemeinsam Kämpfe gewinnen - NPCs, Piraten, Abwehr und Leerenrisse zählen automatisch) oder <strong>Forschungsvorstoß</strong> (gemeinsam Expeditionen abschließen). Einsatz und Tagesziel sind für alle Mitglieder identisch und skalieren mit der Basis-Stufe. Ist das Team-Ziel erreicht, holt sich <strong>jeder, der beigetragen hat</strong>, die Belohnung ab: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich <strong>1 Leerensplitter</strong>. Kampf-/Expeditions-Fortschritt wird beim Öffnen des Allianz-Tabs übertragen. Eine zerstörte Basis pausiert den Einsatzbetrieb bis zur Reparatur.' },
+      { title:'Allianz-Einsätze: Tag/Woche/Monat (ab Basis-Stufe 3/6/10)', body:'Drei parallele Kadenzen desselben Prinzips (im Allianz-Tab unterhalb der Basis): <strong>Tages-Einsatz</strong> (ab Stufe 3), <strong>Wochenprojekt</strong> (ab Stufe 6, ~5× größeres Ziel, ~4× Belohnung, garantiert zusätzlich mind. ein <strong>Episches</strong> Modul) und <strong>Großprojekt</strong> (ab Stufe 10, ~18× größeres Ziel, ~12× Belohnung, garantiert mind. ein <strong>Legendäres</strong> Modul mit kleiner Chance auf <strong>Mythisch</strong> - bislang die einzige Quelle für diese beiden Seltenheitsstufen). Jeder Einsatz ist zufällig einer von fünf Typen: <strong>Versorgungskonvoi</strong> (Erz liefern), <strong>Kristall-Kontingent</strong>, <strong>Treibstoff-Depot</strong> (Deuterium), <strong>Kampfoperation</strong> (gemeinsam Kämpfe gewinnen - NPCs, Piraten, Abwehr und Leerenrisse zählen automatisch) oder <strong>Forschungsvorstoß</strong> (gemeinsam Expeditionen abschließen). Einsatz und Ziel sind für alle Mitglieder identisch und skalieren zusätzlich mit der <strong>aktiven Mitgliederzahl</strong> der Allianz (Referenz 10 Mitglieder), damit kleine Allianzen nicht benachteiligt sind. Ist das Team-Ziel erreicht, holt sich jeder mit <strong>mindestens 1% eigenem Beitrag zum Ziel</strong> die Belohnung ab: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich Leerensplitter. Wer nicht (ausreichend) beigetragen hat, geht leer aus - auch wer die Allianz vor Abschluss verlässt. Kampf-/Expeditions-Fortschritt wird beim Öffnen des Allianz-Tabs übertragen. Eine zerstörte Basis pausiert den Einsatzbetrieb bis zur Reparatur.' },
+      { title:'Allianzpunkte & Allianz-Projekte', body:'Jeder abgeschlossene Einsatz (Tag/Woche/Monat) füllt zusätzlich einen gemeinsamen Vorrat an <strong>Allianzpunkten</strong> - unabhängig von der persönlichen Belohnung, einmal pro Einsatz für die ganze Allianz. Admins/Offiziere geben diese Punkte im Allianz-Tab für <strong>Allianz-Projekte</strong> aus: dauerhafte Boni für alle Mitglieder, aktuell <strong>Kriegsrat</strong> (+1% Angriffs- UND Verteidigungspunkte je Stufe, bis Stufe 10, fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein).' },
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
       { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen oder zurückstufen (auch andere Admins zu Offizier/Mitglied), und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
       { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz startet mit einem Mitgliederlimit von <strong>10</strong>. Höher geht es nur über die Allianz-Forschung "Allianz-Expansion" (5 Stufen, in der Allianz-Forschung, dieselbe Kette wie andere Allianz-Techs) - bis zu 50 bei voller Ausbaustufe. Das Limit ergibt sich automatisch aus der erreichten Forschungsstufe, es lässt sich nicht manuell einstellen. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
@@ -13260,7 +13363,11 @@
       loadAllianceBaseWar();
       await maybeMarkAllianceBaseResourcesReady();
       maybeAnnounceBaseLevel();
-      loadAllianceMissionTeam();
+      await refreshAllianceMemberCountCache();
+      await loadAlliancePoints();
+      loadAllianceMissionTeam('daily');
+      loadAllianceMissionTeam('weekly');
+      loadAllianceMissionTeam('monthly');
     } catch(e){}
   }
   // Automatische System-Nachricht in den Allianz-Chat (Absender "Allianzbasis") - informiert ALLE
@@ -13529,16 +13636,21 @@
     if (btn) btn.onclick = openAllianceDonationModal;
   }
 
-  // ===== Exklusive Allianz-Einsätze (17.07.2026) =====
-  // Ab Allianzbasis-Stufe 3 (eine zerstörte Basis pausiert sie wie alle Boni) erhält die Allianz
-  // einen gemeinsamen TAGES-EINSATZ: deterministisch aus Allianz-Tag + Datum abgeleitet, alle
-  // Mitglieder sehen also ohne zusätzlichen Server-Zustand denselben Einsatz. Fortschritt läuft
-  // über EIGENE Ein-Autor-Dokumente je Spieler (alliance:<TAG>:missionprog:<playerId>, täglich
-  // überschrieben) - dasselbe race-freie Muster wie Basis-Beiträge und -Verteidigung. Kampf-/
-  // Expeditions-Einsätze messen über die vorhandenen Lebenszeit-Zähler (battleStats.wins,
-  // expeditionsCompleted) mit Tages-Basiswert statt neuer Hooks - wie die Fraktions-Aufträge.
-  // Belohnungen sind bewusst FLACH (Kredite/Kampfpunkte/XP statt "N Minuten Produktion").
-  const ALLIANCE_MISSION_MIN_LEVEL = 3;
+  // ===== Exklusive Allianz-Einsätze (17.07.2026, Teil 2 erweitert um Wochenprojekt/Großprojekt) =====
+  // Ab Allianzbasis-Stufe 3 (eine zerstörte Basis pausiert sie wie alle Boni) erhält die Allianz einen
+  // gemeinsamen Einsatz je Kadenz (Tag/Woche/Monat): deterministisch aus Allianz-Tag + Periode
+  // abgeleitet, alle Mitglieder sehen also ohne zusätzlichen Server-Zustand denselben Einsatz.
+  // Fortschritt läuft über EIGENE Ein-Autor-Dokumente je Spieler und Kadenz
+  // (alliance:<TAG>:missionprog[_weekly|_monthly]:<playerId>, je Periode überschrieben) - dasselbe
+  // race-freie Muster wie Basis-Beiträge und -Verteidigung. Kampf-/Expeditions-Einsätze messen über
+  // die vorhandenen Lebenszeit-Zähler (battleStats.wins, expeditionsCompleted) mit Perioden-Basiswert
+  // statt neuer Hooks - wie die Fraktions-Aufträge. Ziele skalieren zusätzlich mit der aktiven
+  // Mitgliederzahl (siehe allianceMissionFairnessMult), damit kleine Allianzen nicht strukturell
+  // benachteiligt sind. Belohnung nur mit Mindestbeitrag (ALLIANCE_MISSION_MIN_CONTRIB_FRACTION) -
+  // wer nichts beigetragen hat, geht leer aus, wie im Feature-Wunsch gefordert ("wer nicht beigetragen
+  // hat, bekommt nichts"). Wer die Allianz vor Abschluss verlässt, kann gar nicht mehr claimen (die
+  // Funktion braucht den AKTUELLEN Allianz-Tag, um den Einsatz überhaupt zu finden).
+  const ALLIANCE_MISSION_MIN_LEVEL = 3; // Rückwärtskompatibilität für den alten Namen, siehe Kadenz 'daily'.
   const ALLIANCE_MISSION_TYPES = [
     { key:'konvoi-erz', name:'Versorgungskonvoi', icon:'ti-truck', res:'erz', goal: lvl => 120000*lvl, desc: g => 'Liefert gemeinsam '+fmt(g)+' Erz an die Basis-Logistik.' },
     { key:'konvoi-kristalle', name:'Kristall-Kontingent', icon:'ti-diamond', res:'kristalle', goal: lvl => 80000*lvl, desc: g => 'Liefert gemeinsam '+fmt(g)+' Kristalle für die Stationssysteme.' },
@@ -13546,23 +13658,65 @@
     { key:'jagd', name:'Kampfoperation', icon:'ti-sword', counter:'wins', goal: lvl => 5 + 2*lvl, desc: g => 'Gewinnt zusammen '+g+' Kämpfe (NPCs, Piraten, Abwehr, Leerenrisse - jeder Sieg zählt).' },
     { key:'vorstoss', name:'Forschungsvorstoß', icon:'ti-map-2', counter:'expeditions', goal: lvl => 3 + lvl, desc: g => 'Schließt zusammen '+g+' Expeditionen ab.' }
   ];
-  function allianceMissionDayKey(){ return new Date().toISOString().slice(0,10); }
-  function allianceMissionFor(tag){
-    const lvl = allianceBaseBonusLevel();
-    if (!tag || lvl < ALLIANCE_MISSION_MIN_LEVEL) return null;
-    const dayKey = allianceMissionDayKey();
-    const def = ALLIANCE_MISSION_TYPES[Math.floor(hashStringToFloat(tag+':einsatz:'+dayKey) * ALLIANCE_MISSION_TYPES.length)];
-    return { dayKey, def, goal: def.goal(lvl), lvl };
+  // Drei Kadenzen, dieselbe Maschinerie darunter. goalMult/rewardMult skalieren Ziel und Belohnung
+  // gegenüber dem Tages-Einsatz hoch, apReward speist die neue geteilte Allianzpunkte-Währung,
+  // bonusModuleTier garantiert bei Wochen-/Großprojekt zusätzlich ein hochwertiges Modul (episch bzw.
+  // legendär/mythisch) - das macht "die stärksten Module nur über hochstufige Allianzmissionen" wahr.
+  const ALLIANCE_MISSION_CADENCES = {
+    daily:   { label:'Tages-Einsatz',  labelPlural:'Allianz-Einsätze', icon:'ti-target',   periodKey: () => new Date().toISOString().slice(0,10), goalMult:1,  rewardMult:1,  minLevel:3,  apReward: lvl => 2+Math.floor(lvl/4), progSuffix:'missionprog',         stateKey:'allianceMissionDay',   bonusModuleTier:null },
+    weekly:  { label:'Wochenprojekt',  labelPlural:'Wochenprojekte',   icon:'ti-map-2',     periodKey: () => weekKeyOf(Date.now()),                 goalMult:5,  rewardMult:4,  minLevel:6,  apReward: lvl => 12+lvl,              progSuffix:'missionprog_weekly',  stateKey:'allianceMissionWeek',  bonusModuleTier:'episch' },
+    monthly: { label:'Großprojekt',    labelPlural:'Großprojekte',     icon:'ti-sparkles',  periodKey: () => new Date().toISOString().slice(0,7),   goalMult:18, rewardMult:12, minLevel:10, apReward: lvl => 50+3*lvl,            progSuffix:'missionprog_monthly', stateKey:'allianceMissionMonth', bonusModuleTier:'legendaer' }
+  };
+  const ALLIANCE_MISSION_MIN_CONTRIB_FRACTION = 0.01; // mind. 1% des Team-Ziels selbst beigetragen, um die Belohnung zu erhalten
+  // Fairness-Skalierung (Spieler-Wunsch): Ziele dürfen kleine Allianzen nicht strukturell
+  // benachteiligen. Referenzgröße 10 Mitglieder (Basis-Mitgliederlimit vor Allianz-Expansion) - eine
+  // 5-Mitglieder-Allianz bekommt 50% des Ziels, eine 30-Mitglieder-Allianz 300%, gedeckelt auf
+  // [0.3, 3.0], damit weder sehr kleine noch riesige Allianzen absurde Ziele bekommen.
+  const ALLIANCE_MISSION_FAIRNESS_BASELINE = 10;
+  let allianceMemberCountCache = null; // { tag, count, fetchedAt } - vermeidet einen Storage-List-Aufruf pro Zielberechnung
+  const ALLIANCE_MEMBER_COUNT_TTL_MS = 10*60*1000;
+  async function refreshAllianceMemberCountCache(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ allianceMemberCountCache = null; return; }
+    if (allianceMemberCountCache && allianceMemberCountCache.tag===tag && (Date.now()-allianceMemberCountCache.fetchedAt) < ALLIANCE_MEMBER_COUNT_TTL_MS) return;
+    try {
+      const listRes = await storageList('alliance:'+tag+':role:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys : [];
+      const flags = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); if (r && r.value){ const m = JSON.parse(r.value); return !!(m.role && m.role !== 'left'); } } catch(e){}
+        return false;
+      }));
+      allianceMemberCountCache = { tag, count: Math.max(1, flags.filter(Boolean).length), fetchedAt: Date.now() };
+    } catch(e){}
   }
-  // Lokaler Tages-Zustand: Basiswerte der Lebenszeit-Zähler, eigener Lieferbeitrag, Abhol-Status.
-  function ensureAllianceMissionState(dayKey){
-    if (!state.allianceMissionDay || state.allianceMissionDay.dayKey !== dayKey){
-      state.allianceMissionDay = { dayKey, startWins: (state.battleStats&&state.battleStats.wins)||0, startExpeditions: state.expeditionsCompleted||0, contributed: 0, claimed: false };
+  function allianceActiveMemberCount(){
+    const tag = myAllianceTag();
+    if (allianceMemberCountCache && allianceMemberCountCache.tag===tag) return allianceMemberCountCache.count;
+    return ALLIANCE_MISSION_FAIRNESS_BASELINE; // Fallback, bis der echte Wert geladen ist - neutral (Multiplikator 1)
+  }
+  function allianceMissionFairnessMult(){
+    return Math.max(0.3, Math.min(3.0, allianceActiveMemberCount() / ALLIANCE_MISSION_FAIRNESS_BASELINE));
+  }
+  function allianceMissionFor(tag, cadence){
+    const cd = ALLIANCE_MISSION_CADENCES[cadence];
+    const lvl = allianceBaseBonusLevel();
+    if (!tag || lvl < cd.minLevel) return null;
+    const periodKey = cd.periodKey();
+    const def = ALLIANCE_MISSION_TYPES[Math.floor(hashStringToFloat(tag+':einsatz:'+cadence+':'+periodKey) * ALLIANCE_MISSION_TYPES.length)];
+    const goal = Math.round(def.goal(lvl) * cd.goalMult * allianceMissionFairnessMult());
+    return { cadence, periodKey, def, goal, lvl };
+  }
+  // Lokaler Perioden-Zustand je Kadenz: Basiswerte der Lebenszeit-Zähler, eigener Beitrag, Abhol-Status.
+  function ensureAllianceMissionState(mission){
+    const cd = ALLIANCE_MISSION_CADENCES[mission.cadence];
+    const cur = state[cd.stateKey];
+    if (!cur || cur.periodKey !== mission.periodKey){
+      state[cd.stateKey] = { periodKey: mission.periodKey, startWins: (state.battleStats&&state.battleStats.wins)||0, startExpeditions: state.expeditionsCompleted||0, contributed: 0, claimed: false };
     }
-    return state.allianceMissionDay;
+    return state[cd.stateKey];
   }
   function myAllianceMissionValue(mission){
-    const d = ensureAllianceMissionState(mission.dayKey);
+    const d = ensureAllianceMissionState(mission);
     if (mission.def.res) return d.contributed||0;
     if (mission.def.counter === 'wins') return Math.max(0, ((state.battleStats&&state.battleStats.wins)||0) - (d.startWins||0));
     return Math.max(0, (state.expeditionsCompleted||0) - (d.startExpeditions||0));
@@ -13570,103 +13724,142 @@
   async function publishAllianceMissionProgress(mission){
     const tag = myAllianceTag();
     if (!tag || !useBackend() || !mission) return;
-    try { await storageSet('alliance:'+tag+':missionprog:'+state.player.id, JSON.stringify({ dayKey: mission.dayKey, value: myAllianceMissionValue(mission), name: state.player.name||'?' }), true); } catch(e){}
+    const cd = ALLIANCE_MISSION_CADENCES[mission.cadence];
+    try { await storageSet('alliance:'+tag+':'+cd.progSuffix+':'+state.player.id, JSON.stringify({ periodKey: mission.periodKey, value: myAllianceMissionValue(mission), name: state.player.name||'?' }), true); } catch(e){}
   }
-  let allianceMissionTeam = null; // { dayKey, total, players:[{name,value}] } - nur Anzeige-Cache
-  async function loadAllianceMissionTeam(){
+  let allianceMissionTeams = { daily:null, weekly:null, monthly:null }; // je Kadenz: { periodKey, total, players:[{name,value}] } - nur Anzeige-Cache
+  async function loadAllianceMissionTeam(cadence){
     const tag = myAllianceTag();
-    if (!tag || !useBackend()){ allianceMissionTeam = null; return; }
-    const mission = allianceMissionFor(tag);
-    if (!mission){ allianceMissionTeam = null; return; }
+    if (!tag || !useBackend()){ allianceMissionTeams[cadence] = null; return; }
+    const mission = allianceMissionFor(tag, cadence);
+    if (!mission){ allianceMissionTeams[cadence] = null; return; }
     await publishAllianceMissionProgress(mission);
+    const cd = ALLIANCE_MISSION_CADENCES[cadence];
     try {
-      const listRes = await storageList('alliance:'+tag+':missionprog:', true);
+      const listRes = await storageList('alliance:'+tag+':'+cd.progSuffix+':', true);
       const keys = (listRes && listRes.keys) ? listRes.keys : [];
       const docs = await Promise.all(keys.map(async k => {
         try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){}
         return null;
       }));
-      const players = docs.filter(d => d && d.dayKey === mission.dayKey && (d.value||0) > 0).map(d => ({ name: d.name||'?', value: d.value||0 }));
-      allianceMissionTeam = { dayKey: mission.dayKey, total: players.reduce((a,p)=>a+p.value,0), players: players.sort((a,b)=>b.value-a.value) };
+      const players = docs.filter(d => d && d.periodKey === mission.periodKey && (d.value||0) > 0).map(d => ({ name: d.name||'?', value: d.value||0 }));
+      const total = players.reduce((a,p)=>a+p.value,0);
+      allianceMissionTeams[cadence] = { periodKey: mission.periodKey, total, players: players.sort((a,b)=>b.value-a.value) };
+      if (total >= mission.goal) await awardAlliancePointsIfNeeded(cadence, mission.periodKey, cd.apReward(mission.lvl));
       renderAllianceBaseBox();
     } catch(e){}
   }
-  async function contributeToAllianceMission(amount){
+  async function contributeToAllianceMission(amount, cadence){
     const tag = myAllianceTag();
-    const mission = allianceMissionFor(tag);
+    const mission = allianceMissionFor(tag, cadence);
     if (!mission || !mission.def.res){ log('Aktuell läuft kein Liefer-Einsatz.', 'ti-alert-triangle'); return; }
     amount = Math.floor(amount);
     if (!amount || amount <= 0){ log('Ungültige Menge.', 'ti-alert-triangle'); return; }
-    const d = ensureAllianceMissionState(mission.dayKey);
+    const d = ensureAllianceMissionState(mission);
     const resLabel = (RES_DEFS.find(r=>r.key===mission.def.res)||{}).label||mission.def.res;
-    if ((state.resources[mission.def.res]||0) < amount){ log('Nicht genug '+resLabel+' für diesen Beitrag.', 'ti-alert-triangle'); return; }
-    // Nicht mehr annehmen, als zum Tagesziel fehlt (Team-Summe kann leicht veraltet sein -
-    // ein kleiner Überhang durch parallele Beiträge ist unkritisch, nur Verschwendung vermeiden).
-    const teamTotal = (allianceMissionTeam && allianceMissionTeam.dayKey===mission.dayKey) ? allianceMissionTeam.total : 0;
+    // Erst auf die tatsächlich noch fehlende Menge kappen (Team-Summe kann leicht veraltet sein - ein
+    // kleiner Überhang durch parallele Beiträge ist unkritisch, nur Verschwendung vermeiden), DANN erst
+    // gegen den Kontostand prüfen - Bugfix: vorher lief die Prüfung auf der rohen Eingabemenge, sodass
+    // "möglichst viel beitragen" (mehr eingeben, als man besitzt) fälschlich mit "nicht genug Ressourcen"
+    // abgewiesen wurde, obwohl der tatsächlich nötige (kleinere) Betrag längst affordable gewesen wäre.
+    const teamTotal = (allianceMissionTeams[cadence] && allianceMissionTeams[cadence].periodKey===mission.periodKey) ? allianceMissionTeams[cadence].total : 0;
     amount = Math.min(amount, Math.max(0, mission.goal - teamTotal));
-    if (amount <= 0){ log('Das Tagesziel ist bereits erreicht - hol die Belohnung ab!', 'ti-info-circle'); return; }
+    if (amount <= 0){ log('Das Ziel ist bereits erreicht - hol die Belohnung ab!', 'ti-info-circle'); return; }
+    if ((state.resources[mission.def.res]||0) < amount){ log('Nicht genug '+resLabel+' für diesen Beitrag.', 'ti-alert-triangle'); return; }
     state.resources[mission.def.res] -= amount;
     d.contributed = (d.contributed||0) + amount;
-    log(fmt(amount)+' '+resLabel+' zum Allianz-Einsatz beigetragen.', 'ti-target');
+    log(fmt(amount)+' '+resLabel+' zum '+ALLIANCE_MISSION_CADENCES[cadence].label+' beigetragen.', 'ti-target');
     playSound('trade');
     await recordAllianceDonation(amount);
-    await loadAllianceMissionTeam();
+    await loadAllianceMissionTeam(cadence);
     render(); save();
   }
-  function allianceMissionReward(lvl){
-    const r = { credits: 300 + 80*lvl, battlePoints: 10, xp: 120 };
-    if (lvl >= 8) r.leerensplitter = 1;
+  function allianceMissionReward(lvl, cadence){
+    const cd = ALLIANCE_MISSION_CADENCES[cadence];
+    const r = { credits: Math.round((300 + 80*lvl)*cd.rewardMult), battlePoints: Math.round(10*cd.rewardMult), xp: Math.round(120*cd.rewardMult) };
+    if (lvl >= 8) r.leerensplitter = cadence==='daily' ? 1 : Math.ceil(cd.rewardMult/4);
     return r;
   }
-  async function claimAllianceMissionReward(){
+  // Garantiertes Bonus-Modul für Wochen-/Großprojekt-Abschluss (siehe bonusModuleTier oben) - unabhängig
+  // vom normalen, auf niedrige Stufen gewichteten Zufalls-Fund (grantRandomModule/grantRandomShipModule).
+  // Würfelt zufällig zwischen Standort- und Schiffsklassen-Modulsystem, beim Großprojekt zusätzlich eine
+  // kleine Chance auf "Mythisch" statt "Legendär" - bislang die einzige erreichbare Quelle dafür.
+  function grantAllianceMissionBonusModule(minTier){
+    const useShipModule = Math.random() < 0.5;
+    const rarity = (minTier==='legendaer' && Math.random()<0.08) ? 'mythisch' : minTier;
+    if (useShipModule){
+      const def = SHIP_MODULE_DEFS[Math.floor(Math.random()*SHIP_MODULE_DEFS.length)];
+      const instKey = def.key+':'+rarity;
+      state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
+      const info = shipModuleInstanceInfo(instKey);
+      return info ? (info.rar.label+' '+info.def.name+' (Schiffsklasse)') : 'Schiffsklassen-Modul';
+    }
+    const type = MODULE_DEFS[Math.floor(Math.random()*MODULE_DEFS.length)].key;
+    const instKey = type+':'+rarity;
+    state.modules[instKey] = (state.modules[instKey]||0) + 1;
+    const info = moduleInstanceInfo(instKey);
+    return info ? (info.rar.label+' '+info.def.name+' (Standort)') : 'Modul';
+  }
+  async function claimAllianceMissionReward(cadence){
     const tag = myAllianceTag();
-    const mission = allianceMissionFor(tag);
+    const mission = allianceMissionFor(tag, cadence);
     if (!mission) return;
-    const d = ensureAllianceMissionState(mission.dayKey);
-    if (d.claimed){ log('Die Einsatz-Belohnung wurde heute bereits abgeholt.', 'ti-info-circle'); return; }
+    const cd = ALLIANCE_MISSION_CADENCES[cadence];
+    const d = ensureAllianceMissionState(mission);
+    if (d.claimed){ log('Die Belohnung wurde für diesen '+cd.label+' bereits abgeholt.', 'ti-info-circle'); return; }
     const myVal = myAllianceMissionValue(mission);
-    if (myVal <= 0){ log('Nur wer selbst zum Einsatz beigetragen hat, erhält die Belohnung.', 'ti-alert-triangle'); return; }
-    await loadAllianceMissionTeam();
-    if (!allianceMissionTeam || allianceMissionTeam.total < mission.goal){ log('Das Tagesziel ist noch nicht erreicht.', 'ti-alert-triangle'); return; }
+    const minRequired = Math.max(1, Math.ceil(mission.goal * ALLIANCE_MISSION_MIN_CONTRIB_FRACTION));
+    if (myVal < minRequired){ log('Du brauchst mindestens '+fmt(minRequired)+' eigenen Beitrag ('+Math.round(ALLIANCE_MISSION_MIN_CONTRIB_FRACTION*100)+'% des Ziels), um die Belohnung zu erhalten.', 'ti-alert-triangle'); return; }
+    await loadAllianceMissionTeam(cadence);
+    const team = allianceMissionTeams[cadence];
+    if (!team || team.periodKey !== mission.periodKey || team.total < mission.goal){ log('Das Ziel ist noch nicht erreicht.', 'ti-alert-triangle'); return; }
     d.claimed = true;
-    const rew = allianceMissionReward(mission.lvl);
+    const rew = allianceMissionReward(mission.lvl, cadence);
     state.credits = (state.credits||0) + rew.credits;
     awardBattlePoints(rew.battlePoints);
     addXp(rew.xp);
     if (rew.leerensplitter) state.rareItems.leerensplitter = (state.rareItems.leerensplitter||0) + rew.leerensplitter;
     state.allianceMissionsDone = (state.allianceMissionsDone||0) + 1;
-    log('Allianz-Einsatz "'+mission.def.name+'" abgeschlossen: +'+rew.credits+' Kredite, +'+rew.battlePoints+' Kampfpunkte, +'+rew.xp+' XP'+(rew.leerensplitter?', +1 Leerensplitter':'')+'!', 'ti-target');
+    let bonusMsg = '';
+    if (cd.bonusModuleTier) bonusMsg = ', +1 '+grantAllianceMissionBonusModule(cd.bonusModuleTier);
+    log(cd.label+' "'+mission.def.name+'" abgeschlossen: +'+rew.credits+' Kredite, +'+rew.battlePoints+' Kampfpunkte, +'+rew.xp+' XP'+(rew.leerensplitter?', +'+rew.leerensplitter+' Leerensplitter':'')+bonusMsg+'!', 'ti-target');
     playSound('achieve');
     render(); save();
   }
-  // Einsatz-Abschnitt der Basis-Box (unterhalb des Kriegs-Abschnitts).
-  function allianceMissionSectionHtml(lvl){
+  // Einsatz-Abschnitt der Basis-Box (unterhalb des Kriegs-Abschnitts) - einmal je Kadenz gerufen.
+  function allianceMissionSectionHtml(lvl, cadence){
+    const cd = ALLIANCE_MISSION_CADENCES[cadence];
     if (lvl < 1) return '';
-    let s = `<div class="bname" style="font-size:13px; margin-top:4px;"><i class="ti ti-target" aria-hidden="true"></i> Allianz-Einsätze <span class="lvl-pill">ab Stufe ${ALLIANCE_MISSION_MIN_LEVEL}</span></div>`;
-    if (allianceBaseBonusLevel() < ALLIANCE_MISSION_MIN_LEVEL){
-      s += `<div class="bmeta"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85;"></i> ${allianceBaseDestroyed() ? 'Solange die Basis zerstört ist, ruht der Einsatzbetrieb - erst reparieren.' : 'Ab Ausbaustufe '+ALLIANCE_MISSION_MIN_LEVEL+' erhält eure Allianz jeden Tag einen exklusiven Gemeinschafts-Einsatz mit Belohnung für alle Beteiligten.'}</div>`;
+    const idSuffix = '_'+cadence;
+    let s = `<div class="bname" style="font-size:13px; margin-top:4px;"><i class="ti ${cd.icon}" aria-hidden="true"></i> ${cd.labelPlural} <span class="lvl-pill">ab Stufe ${cd.minLevel}</span></div>`;
+    if (allianceBaseBonusLevel() < cd.minLevel){
+      s += `<div class="bmeta"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85;"></i> ${allianceBaseDestroyed() ? 'Solange die Basis zerstört ist, ruht der Einsatzbetrieb - erst reparieren.' : 'Ab Ausbaustufe '+cd.minLevel+' erhält eure Allianz ein "'+cd.label+'" mit Belohnung für alle Beteiligten.'}</div>`;
       return s;
     }
-    const mission = allianceMissionFor(myAllianceTag());
+    const tag = myAllianceTag();
+    const mission = allianceMissionFor(tag, cadence);
     if (!mission) return s;
-    const d = ensureAllianceMissionState(mission.dayKey);
+    const d = ensureAllianceMissionState(mission);
     const myVal = myAllianceMissionValue(mission);
-    const teamTotal = Math.max(myVal, (allianceMissionTeam && allianceMissionTeam.dayKey===mission.dayKey) ? allianceMissionTeam.total : 0);
+    const team = allianceMissionTeams[cadence];
+    const teamTotal = Math.max(myVal, (team && team.periodKey===mission.periodKey) ? team.total : 0);
     const pct = Math.min(100, teamTotal/mission.goal*100);
     const done = teamTotal >= mission.goal;
-    const rew = allianceMissionReward(mission.lvl);
-    s += `<div class="bmeta"><i class="ti ${mission.def.icon}" aria-hidden="true" style="color:#c3bef5;"></i> <strong style="color:#e8e5ff;">${mission.def.name}</strong> (Tages-Einsatz): ${mission.def.desc(mission.goal)}</div>`;
+    const rew = allianceMissionReward(mission.lvl, cadence);
+    const minRequired = Math.max(1, Math.ceil(mission.goal * ALLIANCE_MISSION_MIN_CONTRIB_FRACTION));
+    s += `<div class="bmeta"><i class="ti ${mission.def.icon}" aria-hidden="true" style="color:#c3bef5;"></i> <strong style="color:#e8e5ff;">${mission.def.name}</strong> (${cd.label}): ${mission.def.desc(mission.goal)}</div>`;
     s += `<div style="display:flex; justify-content:space-between;"><span class="bmeta">Team-Fortschritt${done?' ✓':''}</span><span class="bmeta">${fmt(teamTotal)}/${fmt(mission.goal)} · dein Anteil: ${fmt(myVal)}</span></div>`;
     s += `<div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>`;
-    s += `<div class="bmeta">Belohnung je Beteiligtem: +${rew.credits} Kredite · +${rew.battlePoints} Kampfpunkte · +${rew.xp} XP${rew.leerensplitter?' · +1 Leerensplitter':''}</div>`;
+    s += `<div class="bmeta">Belohnung je Beteiligtem (mind. ${fmt(minRequired)} eigener Beitrag nötig): +${rew.credits} Kredite · +${rew.battlePoints} Kampfpunkte · +${rew.xp} XP${rew.leerensplitter?' · +'+rew.leerensplitter+' Leerensplitter':''}${cd.bonusModuleTier?' · +1 Modul ('+MODULE_RARITY[cd.bonusModuleTier].label+'+)':''}</div>`;
+    s += `<div class="bmeta" style="color:#7fb8e0;"><i class="ti ti-award" aria-hidden="true"></i> Für die Allianz: +${cd.apReward(mission.lvl)} Allianzpunkte bei Abschluss.</div>`;
     if (d.claimed){
-      s += `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Belohnung heute abgeholt - morgen wartet ein neuer Einsatz.</div>`;
+      s += `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Belohnung abgeholt - der nächste ${cd.label} startet automatisch.</div>`;
     } else if (done){
-      s += `<div><button class="buy affordable" id="abMissionClaimBtn"><i class="ti ti-award" aria-hidden="true" style="margin-right:4px;"></i>Belohnung abholen</button>${myVal<=0?'<span class="bmeta" style="margin-left:8px; color:#f0997b;">nur mit eigenem Beitrag</span>':''}</div>`;
+      s += `<div><button class="buy affordable" id="abMissionClaimBtn${idSuffix}"><i class="ti ti-award" aria-hidden="true" style="margin-right:4px;"></i>Belohnung abholen</button>${myVal<minRequired?`<span class="bmeta" style="margin-left:8px; color:#f0997b;">mind. ${fmt(minRequired)} eigener Beitrag nötig</span>`:''}</div>`;
     } else if (mission.def.res){
       s += `<div style="display:flex; gap:6px; align-items:center;">
-        <input type="text" inputmode="numeric" placeholder="Menge" id="abMissionInput" style="flex:1; font-size:12px;"/>
-        <button id="abMissionContribBtn" style="font-size:10px; padding:5px 8px;">Beitragen</button>
+        <input type="text" inputmode="numeric" placeholder="Menge" id="abMissionInput${idSuffix}" style="flex:1; font-size:12px;"/>
+        <button id="abMissionContribBtn${idSuffix}" style="font-size:10px; padding:5px 8px;">Beitragen</button>
       </div>`;
     } else {
       s += `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Zählt automatisch - der Fortschritt aller Mitglieder wird beim Öffnen des Allianz-Tabs übertragen.</div>`;
@@ -14565,7 +14758,10 @@
         <div class="bmeta">Dein Gesamtbeitrag zur Basis: ${fmt(myContribSum)} Ressourcen</div>
         <details><summary class="bmeta" style="cursor:pointer;">Ausbaustufen & Boni anzeigen</summary><div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">${stagesHtml}</div></details>
         ${allianceBaseWarSectionHtml(lvl)}
-        ${allianceMissionSectionHtml(lvl)}
+        ${allianceMissionSectionHtml(lvl,'daily')}
+        ${allianceMissionSectionHtml(lvl,'weekly')}
+        ${allianceMissionSectionHtml(lvl,'monthly')}
+        ${allianceProjectSectionHtml()}
       </div>`;
     box.querySelectorAll('[data-ab-contrib]').forEach(btn => btn.onclick = () => {
       const rk = btn.getAttribute('data-ab-contrib');
@@ -14596,13 +14792,16 @@
       const input = box.querySelector('#abAttackTagInput');
       sendAllianceBaseAttackMission(input ? input.value : '');
     };
-    const missionContribBtn = box.querySelector('#abMissionContribBtn');
-    if (missionContribBtn) missionContribBtn.onclick = () => {
-      const input = box.querySelector('#abMissionInput');
-      contributeToAllianceMission(parseInt((input && input.value || '').replace(/[^\d]/g,''), 10));
-    };
-    const missionClaimBtn = box.querySelector('#abMissionClaimBtn');
-    if (missionClaimBtn) missionClaimBtn.onclick = () => claimAllianceMissionReward();
+    ['daily','weekly','monthly'].forEach(cadence => {
+      const missionContribBtn = box.querySelector('#abMissionContribBtn_'+cadence);
+      if (missionContribBtn) missionContribBtn.onclick = () => {
+        const input = box.querySelector('#abMissionInput_'+cadence);
+        contributeToAllianceMission(parseInt((input && input.value || '').replace(/[^\d]/g,''), 10), cadence);
+      };
+      const missionClaimBtn = box.querySelector('#abMissionClaimBtn_'+cadence);
+      if (missionClaimBtn) missionClaimBtn.onclick = () => claimAllianceMissionReward(cadence);
+    });
+    box.querySelectorAll('[data-buy-project]').forEach(btn => btn.onclick = () => buyAllianceProject(btn.getAttribute('data-buy-project')));
     const jumpMapBtn = box.querySelector('#abJumpMapBtn');
     if (jumpMapBtn) jumpMapBtn.onclick = (e) => { e.preventDefault(); activeSystem = base.sector; switchTab('karte'); };
   }
