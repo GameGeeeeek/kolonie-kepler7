@@ -2374,8 +2374,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.59.0';
+  const VERSION = '8.59.1';
   const PATCHNOTES = [
+    { version:'8.59.1', date:'17.07.2026', changes:[
+      'Bugfix (Spieler-Report Lumekx): Man flog nach Updates bzw. bei kurzen Server-Aussetzern immer wieder lokal aus der eigenen Allianz und musste neu beitreten. Ursache: Der regelmäßige Rollen-Abgleich wertete JEDEN fehlgeschlagenen Server-Abruf (Neustart nach Update, Timeout, Verbindungsfehler) fälschlich als "kein Mitglied mehr". Jetzt gilt nur noch eine eindeutige Server-Antwort "Datensatz existiert nicht" als Rauswurf - Fehler und Offline-Phasen ändern an der Mitgliedschaft nichts mehr'
+    ]},
     { version:'8.59.0', date:'17.07.2026', changes:[
       'Exklusive Allianz-Einsätze (ab Allianzbasis-Stufe 3): jede Allianz erhält täglich einen gemeinsamen Einsatz - Versorgungskonvoi (Erz), Kristall-Kontingent (Kristalle), Treibstoff-Depot (Deuterium), Kampfoperation (gemeinsame Siege) oder Forschungsvorstoß (Expeditionen); Einsatz und Ziel sind für alle Mitglieder identisch und skalieren mit der Basis-Stufe',
       'Einsatz-Belohnung für jeden Beteiligten: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich 1 Leerensplitter - abgeholt wird im Allianz-Tab, sobald das Team-Ziel erreicht ist (nur mit eigenem Beitrag)',
@@ -12152,22 +12155,36 @@
   async function syncOwnAllianceRole(){
     const tag = myAllianceTag();
     if (!tag || !state.player.id) return;
+    // Bugfix (Spieler-Report Lumekx, 17.07.2026): storageGet() liefert null sowohl bei einem
+    // echten "Datensatz existiert nicht" (404) als auch bei JEDEM Netzwerk-/Serverfehler (fällt
+    // dann still auf den lokalen Speicher zurück, wo das Rollen-Dokument nie liegt). Da dieser
+    // Abgleich alle 15s läuft, warf jeder kurze Server-Aussetzer - typisch direkt nach einem
+    // Update/Server-Neustart - den Spieler lokal aus der Allianz, obwohl die Mitgliedschaft auf
+    // dem Server intakt war. Deshalb hier direkt backendFetch: NUR ein autoritatives 404 des
+    // Servers gilt als "kein Mitglied"; Fehler, Timeouts und Offline-Betrieb treffen keine Aussage.
+    if (!useBackend()) return;
+    let rec = null;
     try {
-      const r = await storageGet('alliance:'+tag+':role:'+state.player.id, true);
-      const rec = (r && r.value) ? JSON.parse(r.value) : null;
-      if (!rec || rec.role === 'left'){
-        if (state.player.allianceTag || state.player.allianceRole){
-          state.player.allianceTag = '';
-          state.player.allianceRole = '';
-          log('Du bist nicht mehr Mitglied von ['+tag+'] (entfernt oder ausgetreten).', 'ti-door-exit');
-          render(); save();
-        }
-      } else if (rec.role && rec.role !== state.player.allianceRole){
-        state.player.allianceRole = rec.role;
-        log('Deine Allianz-Rolle wurde aktualisiert: '+(rec.role==='admin'?'Admin':'Mitglied')+'.', 'ti-flag');
+      const res = await backendFetch('/storage/'+encodeURIComponent('alliance:'+tag+':role:'+state.player.id)+'?shared=true');
+      if (res.ok){
+        const r = await res.json();
+        rec = (r && r.value) ? JSON.parse(r.value) : null;
+      } else if (res.status !== 404){
+        return; // Serverfehler (5xx, 401, ...): keine Aussage über die Mitgliedschaft
+      }
+    } catch(e){ return; } // Netzwerkfehler/ungültige Antwort: keine Aussage
+    if (!rec || rec.role === 'left'){
+      if (state.player.allianceTag || state.player.allianceRole){
+        state.player.allianceTag = '';
+        state.player.allianceRole = '';
+        log('Du bist nicht mehr Mitglied von ['+tag+'] (entfernt oder ausgetreten).', 'ti-door-exit');
         render(); save();
       }
-    } catch(e){}
+    } else if (rec.role && rec.role !== state.player.allianceRole){
+      state.player.allianceRole = rec.role;
+      log('Deine Allianz-Rolle wurde aktualisiert: '+(rec.role==='admin'?'Admin':'Mitglied')+'.', 'ti-flag');
+      render(); save();
+    }
   }
   async function loadAllianceMembers(){
     const box = document.getElementById('allianceMembersBox');
