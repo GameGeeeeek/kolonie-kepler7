@@ -229,11 +229,21 @@
        hinausschieben und dadurch abgeschnitten wirken lassen konnte. */
     .edge-tab {
       position:fixed; top:50%; transform:translateY(-50%); writing-mode:vertical-rl; text-orientation:mixed;
-      background:#3c3489; color:#fff; border:none; padding:14px 9px; font-size:12px; font-weight:600;
-      cursor:pointer; z-index:50; box-shadow:0 2px 10px rgba(0,0,0,0.4); line-height:1.8;
+      background:rgba(13,18,36,0.96); color:var(--c-info); border:1px solid var(--line-1); border-left:none;
+      font-family:var(--font-mono); letter-spacing:0.05em; padding:14px 8px; font-size:11px; font-weight:600;
+      cursor:pointer; z-index:50; box-shadow:0 2px 10px rgba(0,0,0,0.4), var(--glow-info); line-height:1.8;
+      text-shadow:0 0 8px rgba(var(--info-rgb),0.5);
     }
-    .chat-edge-tab { left:0; border-radius:0 10px 10px 0; display:block; }
-    .fp-edge-tab { right:0; border-radius:10px 0 0 10px; background:#791f1f; display:none; }
+    /* Grafik-Runde 4, Vorschlag "Rand-Tabs": geschnittene Außenkante statt rundem Rand, passend zum
+       HUD-Eckenschnitt der Karten/Dialoge - hier nur an der äußeren (dem Bildschirmrand abgewandten)
+       Kante, da die beiden anderen Ecken am Viewport-Rand ohnehin unsichtbar wären. */
+    .chat-edge-tab { left:0; clip-path:polygon(0 0, 100% 8px, 100% calc(100% - 8px), 0 100%); display:block; }
+    .fp-edge-tab {
+      right:0; clip-path:polygon(0 8px, 100% 0, 100% 100%, 0 calc(100% - 8px));
+      background:rgba(13,18,36,0.96); color:var(--c-danger); border:1px solid rgba(var(--danger-rgb),0.4); border-right:none;
+      box-shadow:0 2px 10px rgba(0,0,0,0.4), var(--glow-crit); text-shadow:0 0 8px rgba(var(--danger-rgb),0.5);
+      display:none;
+    }
     @media (max-width: 1219px) { .fp-edge-tab { display:block; } }
     .chat-panel-overlay {
       position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:60; display:none;
@@ -702,10 +712,24 @@
     .login-tab { flex:1; background:transparent; border:none; color:var(--ink-dim); padding:8px; border-radius:8px; font-size:12.5px; cursor:pointer; }
     .login-tab.active { background:rgba(var(--primary-rgb), 0.3); color:#fff; }
     .login-card input { width:100%; box-sizing:border-box; margin-bottom:10px; padding:10px 12px; font-size:13px; }
-    .login-submit { width:100%; padding:11px; background:rgba(var(--primary-rgb), 0.35); border-color:var(--c-primary); font-size:13px; font-weight:500; margin-top:4px; }
+    /* Grafik-Runde 4, Vorschlag "Eckenschnitt für große CTAs": bewusst nur auf .login-submit
+       angewendet statt auf generische button-Elemente (Risiko bei sehr kleinen Icon-Buttons) -
+       .login-submit ist immer vollbreit und groß genug für eine sichere Eckklammer-Platzierung,
+       deckt dabei viele echte Haupt-Aktionen ab (Anmelden/Registrieren, Update-Bestätigung,
+       Willkommen-zurück, Passwort-Link anfordern, Prestige-Bonus wählen, ...). */
+    .login-submit { width:100%; padding:11px; background:rgba(var(--primary-rgb), 0.35); border-color:var(--c-primary); font-size:13px; font-weight:500; margin-top:4px; position:relative; border-radius:0; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+    .login-submit::before, .login-submit::after { content:''; position:absolute; width:7px; height:7px; pointer-events:none; border:1.5px solid rgba(var(--primary-rgb),0.8); }
+    .login-submit::before { top:0; right:0; border-left:none; border-bottom:none; }
+    .login-submit::after { bottom:0; left:0; border-right:none; border-top:none; }
     .login-error { color:var(--c-danger); font-size:12px; margin-top:10px; min-height:14px; }
     .login-note { color:#7d8199; font-size:10.5px; margin-top:14px; line-height:1.4; }
     .toast { background:rgba(13,18,36,0.96); border:0.5px solid rgba(var(--primary-rgb), 0.4); border-radius:12px; padding:10px 16px; font-size:12.5px; color:#e9ecf5; display:flex; align-items:flex-start; gap:8px; box-shadow:0 8px 24px rgba(0,0,0,0.35); opacity:0; transform:translateY(-14px) scale(0.96); transition:opacity 0.3s ease, transform 0.3s ease; max-width:420px; }
+    /* Schweregrad-Varianten (siehe log()/pushToast() weiter unten) - ueberschreiben nur Rand + Glow,
+       nicht den Grundaufbau (Eckenschnitt/Klammern kommen weiterhin aus der HUD-Sammelregel). */
+    .toast.toast-info { border-color:rgba(var(--info-rgb),0.5); box-shadow:0 8px 24px rgba(0,0,0,0.35), var(--glow-info); }
+    .toast.toast-warn { border-color:rgba(var(--warning-rgb),0.5); box-shadow:0 8px 24px rgba(0,0,0,0.35), var(--glow-warn); }
+    .toast.toast-crit { border-color:rgba(var(--danger-rgb),0.5); box-shadow:0 8px 24px rgba(0,0,0,0.35), var(--glow-crit); }
+    .toast.toast-ok { border-color:rgba(var(--secondary-rgb),0.5); box-shadow:0 8px 24px rgba(0,0,0,0.35), var(--glow-ok); }
     .toast span { white-space:normal; overflow-wrap:break-word; }
     .toast.show { opacity:1; transform:translateY(0) scale(1); }
     .toast i { color:#afa9ec; font-size:15px; flex-shrink:0; }
@@ -809,36 +833,44 @@
        Positionierung eindeutig und ohne Verifikations-Screenshot sicher richtig herzuleiten. Diese
        Regel steht bewusst NACH den einzelnen .card-row/.profile-card/... Deklarationen, damit sie
        deren border-radius zuverlässig überschreibt (gleiche Selektor-Spezifität, spätere Regel gewinnt). */
-    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard {
+    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard, .rank-row {
       position:relative; border-radius:0;
       clip-path: polygon(var(--corner) 0, 100% 0, 100% calc(100% - var(--corner)), calc(100% - var(--corner)) 100%, 0 100%, 0 var(--corner));
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before,
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after {
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before,
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after {
       content:''; position:absolute; width:9px; height:9px; pointer-events:none;
       border:1.5px solid rgba(var(--primary-rgb),0.7);
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before {
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before {
       top:0; right:0; border-left:none; border-bottom:none;
     }
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after {
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after {
       bottom:0; left:0; border-right:none; border-top:none;
     }
     .profile-left { display:flex; align-items:center; gap:12px; }
     .avatar { width:46px; height:46px; border-radius:50%; background:rgba(var(--primary-rgb), 0.25); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:500; color:var(--lilac); flex-shrink:0; overflow:hidden; }
     .avatar-picker { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
-    .toggle-switch { width:44px; height:24px; border-radius:12px; background:var(--elev-3); position:relative; flex-shrink:0; transition:background 0.2s ease; }
-    .toggle-switch.on { background:var(--c-secondary-dark); }
-    .toggle-knob { width:18px; height:18px; border-radius:50%; background:#fff; position:absolute; top:3px; left:3px; transition:left 0.2s ease; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
-    .toggle-switch.on .toggle-knob { left:23px; }
+    /* Grafik-Runde 4, Vorschlag "HUD-Toggle": schmaler geclippter Schieberegler statt runder Pille,
+       Knopf leuchtet in der Sekundärfarbe statt weiß gefüllt zu sein - passt zur restlichen
+       Konsolen-Formsprache (Eckenschnitt, Glow) statt einem iOS-typischen Schalter. */
+    .toggle-switch { width:44px; height:20px; border-radius:0; background:var(--elev-3); border:1px solid var(--line-2); position:relative; flex-shrink:0; transition:background 0.2s ease, border-color 0.2s ease;
+      clip-path: polygon(4px 0, 100% 0, 100% 100%, 4px 100%, 0 calc(100% - 4px), 0 4px); }
+    .toggle-switch.on { background:rgba(var(--secondary-rgb),0.22); border-color:var(--c-secondary-dark); }
+    .toggle-knob { width:15px; height:14px; background:#9296ac; position:absolute; top:2px; left:3px; transition:left 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+      clip-path: polygon(3px 0, 100% 0, 100% 100%, 3px 100%, 0 calc(100% - 3px), 0 3px); }
+    .toggle-switch.on .toggle-knob { left:25px; background:var(--c-secondary); box-shadow:var(--glow-ok); }
     .avatar-option { width:36px; height:36px; border-radius:50%; background:var(--elev-2); border:2px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
     .avatar-option.active { border-color:var(--c-primary); background:rgba(var(--primary-rgb), 0.25); }
     .banner-picker { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
     .banner-option { width:56px; height:36px; border-radius:8px; cursor:pointer; border:2px solid transparent; padding:0; overflow:hidden; }
     .banner-option.active { border-color:var(--c-primary); }
-    .rank-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-radius:10px; background:var(--elev-1); font-size:12.5px; }
+    .rank-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; background:var(--elev-1); font-size:12.5px; }
+    /* border-radius bewusst nicht mehr hier gesetzt - die HUD-Eckenschnitt-Sammelregel weiter unten
+       (.card-row, .profile-card, ..., .rank-row) übernimmt das jetzt; stünde hier noch border-radius,
+       würde es die dortige border-radius:0 wegen späterer Textposition ueberschreiben. */
     .rank-row.me { background:rgba(var(--primary-rgb), 0.18); border:0.5px solid var(--c-primary); }
-    .rank-num { width:22px; text-align:center; color:var(--ink-dim); font-weight:500; }
+    .rank-num { width:22px; text-align:center; color:var(--c-info); font-weight:600; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
     .lb-note { font-size:11px; color:#7d8199; margin-top:8px; display:flex; align-items:center; gap:5px; }
     .help-category { margin-bottom:10px; border:0.5px solid rgba(255,255,255,0.08); border-radius:12px; overflow:hidden; }
     .help-category-header { display:flex; align-items:center; gap:10px; padding:0.75rem 0.9rem; cursor:pointer; background:var(--elev-1); }
@@ -2610,8 +2642,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.80.0';
+  const VERSION = '8.81.0';
   const PATCHNOTES = [
+    { version:'8.81.0', date:'17.07.2026', changes:[
+      'Grafik-Overhaul Teil 4 (Spieler-Wunsch): Bestenlisten-Zeilen (Allianz-Rangliste, Wochenliga, Punktestand) haben jetzt den HUD-Eckenschnitt, Rang-Nummern laufen auf Mono',
+      'Rand-Tabs (Chat links, Flottenstatus rechts) von massiver Vollfarbe auf HUD-Look umgestellt: angeschnittene Außenkante, Mono-Beschriftung, Info- bzw. Kritisch-Glow',
+      'Login/Registrieren-Button (und alle Dialoge, die denselben Button-Stil nutzen: Update-Hinweis, Willkommen-zurück, Passwort-Link, Prestige-Bonus) hat jetzt ebenfalls den HUD-Eckenschnitt - bewusst nur dieser eine, immer vollbreite Button-Typ, keine kleinen Icon-Buttons',
+      'Ein/Aus-Schalter (z.B. Einstellungen) sind jetzt schmale geclippte HUD-Schieberegler statt runder iOS-Pillen, leuchtender Knopf bei "an"',
+      'Toast-Meldungen können jetzt optional nach Schweregrad eingefärbt werden (info/warnung/kritisch/erfolg) - Infrastruktur steht, bislang nur eine Aufrufstelle (Allianz-Kriegserklärung) exemplarisch nachgerüstet; ein blindes automatisches Einsortieren aller bestehenden Meldungen wurde bewusst NICHT gemacht, da eine Stichprobe zeigte, dass die verwendeten Icons keine verlässliche Rückschluss auf den Schweregrad erlauben'
+    ]},
     { version:'8.80.0', date:'17.07.2026', changes:[
       'Grafik-Overhaul Teil 3 (Spieler-Wunsch): Ressourcenkarten (Energie/Erz/Kristalle/...) haben jetzt denselben HUD-Eckenschnitt wie Karten/Dialoge - waren bisher die letzten großen, noch runden Kacheln',
       'Kampf-Wiedergabe: Schiffs-Icons bekommen im Moment des Treffer-Aufblitzens jetzt kurz eine Zielerfassungs-Eckklammer (Info-Glow), Schadenszahlen laufen auf der Mono-Schrift statt der Fließschrift',
@@ -9121,15 +9160,23 @@
       }
     } catch(e){ /* still, kein Problem - wird beim nächsten Login erneut versucht */ }
   }
-  function log(msg, icon){
+  // Grafik-Runde 4, Vorschlag "Toast-Schweregrad": optionaler dritter Parameter 'info'|'warn'|'crit'|'ok'.
+  // Ohne Angabe (weiterhin der Normalfall an den meisten der ca. 300+ Aufrufstellen) bleibt das
+  // Aussehen exakt wie zuvor (keine Klasse -> keine Farbaenderung) - ein blindes automatisches
+  // Einsortieren aller bestehenden Aufrufe anhand ihres Icons wurde bewusst NICHT gemacht: eine
+  // Stichprobe zeigte, dass z.B. 'ti-alert-triangle' als generisches Icon fuer sehr viele neutrale
+  // Meldungen verwendet wird, nicht speziell fuer Warnungen - eine Icon->Typ-Zuordnung waere also an
+  // vielen Stellen falsch gewesen. Stattdessen: Infrastruktur fertig, einzelne eindeutige
+  // Aufrufstellen (siehe declareAllianceWar) schrittweise nachgetragen.
+  function log(msg, icon, type){
     document.getElementById('log').innerHTML = (icon?`<i class="ti ${icon}" aria-hidden="true"></i>`:'') + msg;
-    pushToast(msg, icon);
+    pushToast(msg, icon, type);
   }
-  function pushToast(msg, icon){
+  function pushToast(msg, icon, type){
     const container = document.getElementById('toastContainer');
     if (container){
       const el = document.createElement('div');
-      el.className = 'toast';
+      el.className = 'toast' + (type ? ' toast-'+type : '');
       el.innerHTML = `${icon?`<i class="ti ${icon}" aria-hidden="true"></i>`:''}<span>${msg}</span>`;
       container.appendChild(el);
       requestAnimationFrame(()=> el.classList.add('show'));
@@ -13426,7 +13473,7 @@
       if (!mine.includes(enemyTag)){ mine.push(enemyTag); await storageSet('alliance:'+tag+':wars', JSON.stringify({ enemies: mine }), true); }
       const theirs = await getWarList(enemyTag);
       if (!theirs.includes(tag)){ theirs.push(tag); await storageSet('alliance:'+enemyTag+':wars', JSON.stringify({ enemies: theirs }), true); }
-      log('Krieg gegen Allianz ['+enemyTag+'] erklärt!', 'ti-skull');
+      log('Krieg gegen Allianz ['+enemyTag+'] erklärt!', 'ti-skull', 'crit');
       const input = document.getElementById('allianceWarTagInput');
       if (input) input.value = '';
       loadAllianceWars();
