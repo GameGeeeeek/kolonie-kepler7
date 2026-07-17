@@ -1160,6 +1160,7 @@
 
       <div class="tab-panel active" id="tab-basis">
         <div id="colonyDashboard"></div>
+        <div id="relocateAllQuickBox"></div>
         <div id="planetRoleBox"></div>
         <div id="orbitalStationBox"></div>
         <div id="terraformBox"></div>
@@ -1238,6 +1239,7 @@
         <div class="section-title"><i class="ti ti-rocket" aria-hidden="true"></i>Aktive Missionen<span id="fleetLimitBadge" class="lvl-pill" style="margin-left:8px; font-size:10px;"></span></div>
         <div class="missions-active" id="missionsActive"></div>
         <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i>Flotte verlegen</div>
+        <div id="relocateAllBox"></div>
         <div id="relocateBox"></div>
         <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-ship" aria-hidden="true"></i>Schiffswerft</div>
         <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning: bei der Flotte lag
@@ -2415,8 +2417,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.65.3';
+  const VERSION = '8.66.0';
   const PATCHNOTES = [
+    { version:'8.66.0', date:'17.07.2026', changes:[
+      'Neu: Schnellbuttons "Alle Flotten hierhin verlegen" und "Alle Flotten zum Heimatplaneten verlegen" (Spieler-Wunsch) - sammeln mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) an einem Ort, statt jede Verlegung einzeln anzustoßen. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit. Bereits unterwegs befindliche Schiffe (Angriffe, Spionage, andere Verlegungen usw.) werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen',
+      'Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Flottenslots vorhanden sind - die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und können per erneutem Klick nachgeholt werden, sobald wieder ein Slot frei ist',
+      'Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) sowie im Basis-Tab direkt unter der Standort-Übersicht'
+    ]},
     { version:'8.65.3', date:'17.07.2026', changes:[
       'Abhorchposten und Mondschildgenerator zeigten in der Verteidigung-Gebäudeliste die generische "Angriff: 0 → 0 · Verteidigung: 0 → 0"-Zeile - bei beiden Gebäuden bedeutungslos, da ihre echte Wirkung nicht über Angriffs-/Verteidigungspunkte läuft. Zeigen jetzt stattdessen ihren tatsächlichen Effekt: Abhorchposten die Reichweite in Sektoren, Mondschildgenerator die Senkung der Mondzerstörer-Zerstörungschance in Prozent'
     ]},
@@ -11345,7 +11352,8 @@
       { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt. Das <strong>Superschlachtschiff</strong> bringt zusätzlich einen kleinen Eigenhangar mit (2 Plätze je Schiff) - genug für eine winzige Eigen-Eskorte, aber kein Ersatz für dedizierte Träger bei größeren Jäger-/Bomber-Flotten.' },
       { title:'Missionen & Flugzeit', body:'Angriffe, Überfälle, Expeditionen und Kolonisierungen laufen über Missionen mit echter Flugzeit (abhängig von Entfernung und langsamstem Schiff in der Flotte). Während der Flugzeit ist die Flotte unterwegs und zählt nicht zur Verteidigung am Ausgangsplaneten.' },
       { title:'Treibstoffkosten (Deuterium & Antimaterie)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). <strong>Welche Ressource verbraucht wird, hängt vom Antrieb ab:</strong> Schiffe mit Verbrennungs- oder Impulstriebwerk tanken Deuterium, Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken Antimaterie. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen. Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
-      { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren und Spionage - <strong>Flottenverlegungen zwischen eigenen Planeten zählen bewusst nicht mit</strong>, da reine interne Logistik. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
+      { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren, Spionage UND Flottenverlegungen zwischen eigenen Planeten - ein per "Verband versenden" gemeinsam losgeschickter Verband zählt dabei nur als EIN Slot, unabhängig davon, wie viele Schiffstypen er enthält. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
+      { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
       { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine verlassene Flotte. Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe.' },
       { title:'Fragmente & kosmetische Avatare', body:'Statt eines vollen seltenen Materials (Antimateriekern, Kristallherz, Alte Technologie) kann auch ein <strong>Fragment</strong> davon gefunden werden - häufiger, aber schwächer. Sind <strong>4 Fragmente</strong> desselben Typs im Inventar (Fortschritt-Tab), lassen sie sich per Knopfdruck zu 1x dem vollen Material zusammensetzen. Ebenfalls über Expeditionen erhältlich: drei <strong>exklusive Avatare</strong> (Nova, Void, Phoenix), die sonst nirgends wählbar sind - einmal gefunden dauerhaft freigeschaltet und in den Einstellungen auswählbar. Ist ein kosmetischer Fund bereits freigeschaltet, gibt es stattdessen Ersatz-Ressourcen, kein doppelter Nutzen.' }
     ]},
@@ -16680,6 +16688,84 @@
     log(fleetName+' (Verband): '+summary+' von '+planetDisplayName(fromPlanet)+' nach '+planetDisplayName(toPlanet)+' unterwegs (~'+Math.round(groupDur)+'s Flugzeit, gemeinsame Ankunft). Treibstoff verbraucht: '+fuelCostText(totalFuel)+'.', 'ti-arrows-shuffle');
     render(); save();
   }
+  // Schnellbutton "Alle Flotten hierhin/heim verlegen" (Spieler-Wunsch): sammelt in einem Rutsch alle
+  // Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel -
+  // technisch weiterhin EIN relocateFleetGroup()-Aufruf PRO Quell-Standort (jeder zählt als eigener
+  // Flottenslot, siehe activeFleetMissionCount/fleetLimitBlocks). Schiffe, die bereits unterwegs sind
+  // (egal ob Angriff, Spionage, Verlegung o.ä.), zählen hier automatisch NICHT mit - fromFleet[key]
+  // spiegelt immer nur die tatsächlich noch stationierten, verfügbaren Schiffe wider.
+  function planAllFleetsRelocation(targetPlanet){
+    const shipOptions = SHIP_DEFS.concat([{ key:'superschlachtschiff', name:'Superschlachtschiff' }]);
+    const batches = [];
+    for (const { planet, fleet } of allFleetsWithPlanet()){
+      if (planet === targetPlanet) continue;
+      const amounts = {};
+      let any = false;
+      for (const d of shipOptions){
+        const q = fleet[d.key]||0;
+        if (q > 0){ amounts[d.key] = q; any = true; }
+      }
+      if (!any) continue;
+      const keys = Object.keys(amounts);
+      const sameSystem = planetSystemOf(planet) === planetSystemOf(targetPlanet);
+      const baseSec = sameSystem ? 90 : 420;
+      const lvl = state.research.rfusion||0;
+      let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
+      mult *= fleetSpeedMultiplier(amounts, keys);
+      mult *= allianceBaseFlightMult(planetSystemOf(targetPlanet));
+      const dur = baseSec * mult;
+      const fuel = missionFuelCostSplit(dur, amounts);
+      const totalShips = keys.reduce((a,k)=>a+amounts[k],0);
+      batches.push({ planet, amounts, dur, fuel, totalShips });
+    }
+    return batches;
+  }
+  function relocateAllFleetsTo(targetPlanet){
+    const batches = planAllFleetsRelocation(targetPlanet);
+    if (!batches.length){ log('Keine Schiffe an anderen Standorten zum Verlegen vorhanden.', 'ti-alert-triangle'); return; }
+    const freeSlots = Math.max(0, maxConcurrentFleets() - activeFleetMissionCount());
+    if (freeSlots <= 0){ log('Flottenentsendelimit erreicht ('+activeFleetMissionCount()+'/'+maxConcurrentFleets()+') - keine freien Flottenslots für eine Sammelverlegung.', 'ti-alert-triangle'); return; }
+    // Reicht das Limit nicht für ALLE Standorte, werden nur so viele mitgenommen wie Slots frei sind -
+    // der Rest bleibt stehen und wird in der Sicherheitsabfrage explizit aufgeführt (kein Teilausfall
+    // ohne Vorwarnung), ein zweiter Klick nach Rückkehr/Ablauf einer Mission holt sie nach.
+    const included = batches.slice(0, freeSlots);
+    const skipped = batches.slice(freeSlots);
+    const totalFuel = {};
+    for (const b of included) for (const [r,a] of Object.entries(b.fuel)) totalFuel[r] = (totalFuel[r]||0)+a;
+    const totalShips = included.reduce((a,b)=>a+b.totalShips,0);
+    const maxDur = included.reduce((a,b)=>Math.max(a,b.dur),0);
+    if (!canAfford(totalFuel)){ log('Nicht genug Treibstoff für die Sammelverlegung: benötigt '+fuelCostText(totalFuel)+'.', 'ti-alert-triangle'); return; }
+    let msg = 'Alle Flotten verlegen\n\nSie sind dabei, alle verfügbaren Flotten auf '+planetDisplayName(targetPlanet)+' zu verlegen.\n\n'
+      + '- Anzahl der Flotten: '+included.length+'\n'
+      + '- Gesamtanzahl Schiffe: '+fmt(totalShips)+'\n'
+      + '- Treibstoffkosten: '+fuelCostText(totalFuel)+'\n'
+      + '- Flugzeit: ~'+fmtDuration(maxDur);
+    if (skipped.length){
+      msg += '\n\nFlottenentsendelimit erreicht - '+skipped.length+' weitere Standort(e) werden NICHT mitverlegt (später erneut versuchen): '+skipped.map(b=>planetDisplayName(b.planet)).join(', ');
+    }
+    if (!confirm(msg)) return;
+    for (const b of included) relocateFleetGroup(b.planet, targetPlanet, b.amounts);
+    log('Sammelverlegung gestartet: '+included.length+' Flotte(n) unterwegs nach '+planetDisplayName(targetPlanet)+'.'+(skipped.length?' ('+skipped.length+' Standort(e) übersprungen, Flottenentsendelimit erreicht.)':''), 'ti-arrows-shuffle');
+  }
+  function relocateAllFleetsHere(){ relocateAllFleetsTo(state.activeBasePlanet); }
+  function relocateAllFleetsHome(){
+    if (state.activeBasePlanet === 'home'){ log('Du bist bereits auf der Heimatbasis.', 'ti-alert-triangle'); return; }
+    relocateAllFleetsTo('home');
+  }
+  function relocateAllQuickButtonsHtml(){
+    const atHome = state.activeBasePlanet === 'home';
+    const hereDisabled = !planAllFleetsRelocation(state.activeBasePlanet).length;
+    const homeDisabled = atHome || !planAllFleetsRelocation('home').length;
+    return `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px; background:rgba(93,202,165,0.08); border-color:rgba(93,202,165,0.3); margin-bottom:0.75rem;">
+        <div class="bmeta"><i class="ti ti-rocket" aria-hidden="true" style="color:#5dcaa5;"></i> Schnellbuttons: sammelt alle verfügbaren Flotten von jedem anderen Standort (Heimatbasis, Kolonien, Monde) an einem Ort - spart das einzelne Verlegen bei vielen Standorten. Bereits unterwegs befindliche Schiffe (Angriffe, Spionage, andere Verlegungen usw.) werden nie mitgenommen.</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="buy ${hereDisabled?'':'affordable'}" data-reloc-all-here ${hereDisabled?'disabled':''} style="flex:1; min-width:200px;"><i class="ti ti-arrows-shuffle" aria-hidden="true" style="margin-right:4px;"></i>Alle Flotten hierhin verlegen</button>
+          <button class="buy ${homeDisabled?'':'affordable'}" data-reloc-all-home ${homeDisabled?'disabled':''} style="flex:1; min-width:200px;"><i class="ti ti-home" aria-hidden="true" style="margin-right:4px;"></i>Alle Flotten zum Heimatplaneten verlegen</button>
+        </div>
+      </div>
+    `;
+  }
 
   function collectDebrisWithRecyclers(){
     let any = false;
@@ -18839,6 +18925,8 @@
       </div>
     `;
     refreshPlanetMiniIcons(document.getElementById('colonyDashboard'));
+    const relocateAllQuickBox = document.getElementById('relocateAllQuickBox');
+    if (relocateAllQuickBox) relocateAllQuickBox.innerHTML = relocateAllQuickButtonsHtml();
 
     const qBox = document.getElementById('buildQueueBox');
     if (qBox){
@@ -20080,6 +20168,8 @@
     } // Ende Flotte/Expedition-Schiffsliste-Guard
 
     if (activeTab === 'flotte'){
+    const relocateAllBox = document.getElementById('relocateAllBox');
+    if (relocateAllBox) relocateAllBox.innerHTML = relocateAllQuickButtonsHtml();
     const relocateBox = document.getElementById('relocateBox');
     if (relocateBox && !isTypingIn('relocateBox')){
       const others = allFleetsWithPlanet().filter(x=>x.planet!==state.activeBasePlanet);
@@ -21934,6 +22024,8 @@
     });
     document.querySelectorAll('[data-colonize]').forEach(btn => btn.onclick = () => colonizePlanet(btn.getAttribute('data-colonize')));
     document.querySelectorAll('[data-colonize-moon]').forEach(btn => btn.onclick = () => colonizeMoon(btn.getAttribute('data-colonize-moon')));
+    document.querySelectorAll('[data-reloc-all-here]').forEach(btn => btn.onclick = () => relocateAllFleetsHere());
+    document.querySelectorAll('[data-reloc-all-home]').forEach(btn => btn.onclick = () => relocateAllFleetsHome());
     document.querySelectorAll('[data-research]').forEach(btn => btn.onclick = () => startResearch(btn.getAttribute('data-research')));
     document.querySelectorAll('[data-send]').forEach(btn => btn.onclick = () => sendExploreMission(btn.getAttribute('data-send')));
     document.querySelectorAll('[data-attack]').forEach(btn => btn.onclick = () => sendAttackMission(btn.getAttribute('data-attack')));
