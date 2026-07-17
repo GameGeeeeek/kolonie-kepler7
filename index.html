@@ -1613,7 +1613,9 @@
         <div style="text-align:center; padding:1.25rem 0; margin-bottom:1rem; background:rgba(126,119,221,0.1); border-radius:14px; border:0.5px solid rgba(126,119,221,0.3);">
           <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-star" aria-hidden="true" style="margin-right:4px;"></i>Aktueller Punktestand</div>
           <div style="font-size:38px; font-weight:500; color:#c3bef5; font-variant-numeric:tabular-nums;" id="scoreTotalValue">0</div>
-          <button id="shareColonyBtn" style="margin-top:10px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Kolonie teilen</button>
+          <div id="shareTypeChips" style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-top:10px;"></div>
+          <div id="shareFormatChips" style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-top:6px;"></div>
+          <button id="shareColonyBtn" style="margin-top:8px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Karte teilen</button>
         </div>
         <div class="prog-section" data-sec="zusammensetzung">
           <div class="section-title prog-sec-header" data-sec-toggle="zusammensetzung"><i class="ti ti-star" aria-hidden="true"></i>Zusammensetzung<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
@@ -2361,8 +2363,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.55.2';
+  const VERSION = '8.56.0';
   const PATCHNOTES = [
+    { version:'8.56.0', date:'16.07.2026', changes:[
+      'Teilen-Funktion stark ausgebaut: aus "Kolonie teilen" wird eine Karten-Galerie im Punktestand-Tab mit fünf Karten-Typen - Profil, Flottenparade (die eigene Flotte als Formation aus Schiffs-Symbolen), Allianz (mit dem Stationsmodell der Allianzbasis in aktueller Ausbaustufe und Beitritts-Aufruf), Wochen-Rückblick (Tagesbilanz als Balkendiagramm mit Punkte-/Siege-/Kredit-Summen) und Meilenstein-Momente',
+      'Profilkarte aufgewertet: Spielertitel, Prestige-/Aufstiegs-Abzeichen, goldener Avatar-Rahmen ab dem ersten Aufstieg, Bestenlisten-Platzierung, Allianz-Tag und Punkteverlaufs-Kurve',
+      'Drei Formate wählbar: Beitrag (1080x1350), Story (1080x1920) und Querformat (1200x630, Profilkarte) für Link-Vorschauen',
+      'Kampfberichte haben jetzt einen eigenen Teilen-Button - erzeugt eine Sieg/Niederlage-Karte mit Gegner, Kampfwerten, Verlusten und Beute',
+      'Automatische Meilenstein-Momente: bei Prestige, Aufstieg, Mondbildung, Weltboss-Kill, Piratenketten-Endboss und neuen Allianzbasis-Stufen erscheint ein Hinweis-Toast, und der Moment steht als teilbare Karte bereit',
+      'Jede geteilte Karte trägt jetzt deinen persönlichen Einladungs-Link (?ref=Name) im Fußbereich - wer darüber einsteigt, zählt automatisch als deine Einladung samt Bonus'
+    ]},
     { version:'8.55.2', date:'16.07.2026', changes:[
       'Bugfix Orbitalstation (danke an holyhenning für den Report): ein Ausbau-Auftrag, der noch auf Ressourcen wartet (also noch gar nicht bezahlt und gestartet ist), zeigte in der Orbitalstation-Box dauerhaft "0s" an und sah wie ein hängender Bau aus. Die Box zeigt jetzt klar "wartet" samt der konkret fehlenden Ressource und Menge - inklusive deutlicher Warnung, falls die benötigte Menge dein aktuelles Lager-Limit übersteigt (seit der Imperiums-Kostenskalierung möglich; ein solcher Auftrag könnte sonst nie starten: Lager ausbauen oder abbrechen). Neu: Abbrechen-Button direkt in der Orbitalstation-Box (voller Rückerstattung bei bereits laufendem Bau; wartende Aufträge haben noch nichts bezahlt)'
     ]},
@@ -8400,6 +8410,7 @@
     if (!state.shipsAtAllianceBase) state.shipsAtAllianceBase = {};
     if (!state.processedBaseAttackIds) state.processedBaseAttackIds = [];
     if (state.lastAllianceBaseAttackAt === undefined) state.lastAllianceBaseAttackAt = 0;
+    if (state.lastShareMoment === undefined) state.lastShareMoment = null;
     if (!state.themeKey) state.themeKey = 'standard';
     if (state.autoReinforceOn === undefined) state.autoReinforceOn = false;
     if (state.uiJumpNav === undefined) state.uiJumpNav = false;
@@ -8597,6 +8608,7 @@
     applyStateDefaults();
     const perkDef = perkKey ? PRESTIGE_PERKS.find(p=>p.key===perkKey) : null;
     log('Prestige-Stufe '+newPrestige+' erreicht! +'+(newPrestige*5)+'% dauerhafter Produktionsbonus.'+(perkDef?' Zusätzlich gewählt: '+perkDef.name+'.':''), 'ti-infinity');
+    registerShareMoment('Prestige '+newPrestige+' erreicht!', '+'+(newPrestige*5)+'% dauerhafter Produktionsbonus', '\u267E\uFE0F');
     checkAchievements();
     render(); save();
   }
@@ -8663,6 +8675,7 @@
     };
     applyStateDefaults();
     log('AUFSTIEG '+asc.count+' vollzogen! +'+gain+' Sternenessenz (gesamt: '+asc.essence+'). Verteile sie im Meta-Baum (Fortschritt-Tab) - diese Boni überleben jeden Reset.', 'ti-sparkles');
+    registerShareMoment('AUFSTIEG '+asc.count+' vollzogen!', '+'+gain+' Sternenessenz für den ewigen Meta-Baum', '\u2728');
     playSound('achieve');
     checkAchievements();
     render(); save();
@@ -11360,7 +11373,9 @@
         body += '<br>'+r.outcome;
       }
       if (['raid','npc-attack','player-attack'].includes(r.type) || (r.type==='expedition' && r.encountered && r.fleet)){
-        actionsHtml += `<div style="margin-top:8px;"><button data-watch-battle="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>Zuschauen</button></div>`;
+        actionsHtml += `<div style="margin-top:8px; display:flex; gap:6px;"><button data-watch-battle="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>Zuschauen</button>${battleCardData(r)?`<button data-share-battle="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:3px;"></i>Teilen</button>`:''}</div>`;
+      } else if (battleCardData(r)){
+        actionsHtml += `<div style="margin-top:8px;"><button data-share-battle="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:3px;"></i>Teilen</button></div>`;
       }
       const specialGreenTypes = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout'];
       const expeditionPositive = r.type==='expedition' && (r.result==='success' || r.result==='defended');
@@ -11391,6 +11406,10 @@
       `;
     }).join('');
     document.querySelectorAll('[data-delete-report]').forEach(btn => btn.addEventListener('click', () => deleteReport(btn.getAttribute('data-delete-report'))));
+    document.querySelectorAll('[data-share-battle]').forEach(btn => btn.addEventListener('click', () => {
+      const rep = reportsCache.find(x => x.id === btn.getAttribute('data-share-battle'));
+      if (rep) shareBattleReportImage(rep);
+    }));
     document.querySelectorAll('[data-watch-battle]').forEach(btn => btn.addEventListener('click', () => {
       const rep = reportsCache.find(x => x.id === btn.getAttribute('data-watch-battle'));
       if (rep) openBattleReplay(rep);
@@ -12596,6 +12615,7 @@
       state.allianceBase = fresh;
       const stage = ALLIANCE_BASE_STAGES.find(s=>s.level===lvl);
       await postAllianceBaseNews('Ausbaustufe '+lvl+' erreicht! '+(stage?stage.text:'')+(lvl>=ALLIANCE_BASE_MAX_LEVEL?' Das Monument ist vollendet!':''));
+      registerShareMoment('Allianzbasis Stufe '+lvl+'!', stage?stage.text.slice(0,70):null, '\uD83C\uDFF0');
     } catch(e){}
   }
   async function foundAllianceBase(sectorId){
@@ -14437,6 +14457,7 @@
     let moduleMsg = '';
     if (Math.random() < 0.15 + share*0.35){ const mod = grantRandomModule(); moduleMsg = ' Modul erbeutet: '+mod+'!'; }
     log('Weltboss besiegt! Dein Anteil: '+Math.round(share*100)+'% Schaden'+(isTop?' (Top-Schädiger, +50% Bonus!)':'')+'. Belohnung: '+credits+' Kredite, '+bp+' Kampfpunkte.'+moduleMsg, 'ti-skull');
+    registerShareMoment('Weltboss besiegt!', Math.round(share*100)+'% Schadensanteil'+(isTop?' - Top-Schädiger!':''), '\uD83D\uDC80');
     playSound('achieve');
     pushReport({ type:'item-found', itemName:'Weltboss-Belohnung: '+credits+' Kredite + '+bp+' Kampfpunkte ('+Math.round(share*100)+'% Beitrag'+(isTop?', Top-Schädiger':'')+')', itemIcon:'ti-skull', rare:isTop, foundAt: worldBossName(b.level) });
     save();
@@ -14911,6 +14932,7 @@
             if (stage >= PIRATE_LAIR_MAX_STAGE){
               // Endboss besiegt: Kette startet neu, dauerhafter Prestige-Bonus (+2% Angriff, Deckel +10%).
               state.pirateLairPrestige = (state.pirateLairPrestige||0) + 1;
+              registerShareMoment('Piraten-Endboss besiegt!', 'Durchlauf '+state.pirateLairPrestige+' der Piratenkette abgeschlossen', '\uD83C\uDFF4\u200D\u2620\uFE0F');
               state.pirateLairStage = 1;
               const bonusCredits = 500;
               state.credits += bonusCredits;
@@ -15368,6 +15390,7 @@
     if (!state.moons) state.moons = {};
     state.moons[planetKey] = { formedAt: Date.now() };
     log('Aus einem gewaltigen Trümmerfeld bei '+planetDisplayName(planetKey)+' hat sich ein Mond gebildet!', 'ti-planet');
+    registerShareMoment('Ein Mond ist entstanden!', 'Aus den Trümmern bei '+planetDisplayName(planetKey), '\uD83C\uDF11');
     playSound('achieve');
   }
   function planetSystemOf(key){
@@ -15559,69 +15582,56 @@
       img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
     });
   }
-  async function generateColonyShareImage(){
-    const W = 1080, H = 1350;
+  // ===== Teilbare Karten (16.07.2026 stark ausgebaut, Feature-Wunsch) =====
+  // Framework fuer mehrere Karten-Typen (Profil, Flotte, Allianz, Woche, Meilenstein, Kampfbericht)
+  // in mehreren Formaten (Beitrag 1080x1350, Story 1080x1920, Quer 1200x630 - Quer nur Profil).
+  // Alle Karten entstehen komplett clientseitig per Canvas; der Footer traegt den Einladungs-Link
+  // (?ref=Name), damit jede geteilte Karte als echte Einladung mit Bonus zaehlt.
+  const SHARE_FORMATS = {
+    post:  { key:'post',  W:1080, H:1350, name:'Beitrag' },
+    story: { key:'story', W:1080, H:1920, name:'Story' },
+    quer:  { key:'quer',  W:1200, H:630,  name:'Quer' }
+  };
+  let shareCardType = 'profil';
+  let shareCardFormat = 'post';
+  function shareCanvasBase(W, H){
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
-
-    // Hintergrund: dunkler Weltraum-Verlauf + Sterne, passend zum Spiel-Farbschema.
     const grad = ctx.createRadialGradient(W/2, H*0.32, 50, W/2, H*0.32, H*0.95);
     grad.addColorStop(0, '#1c2140');
     grad.addColorStop(1, '#080a14');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
-    for (let i=0; i<170; i++){
+    const starCount = Math.round(W*H/8600);
+    for (let i=0; i<starCount; i++){
       const x = Math.random()*W, y = Math.random()*H, r = Math.random()*1.7+0.3;
       ctx.fillStyle = 'rgba(255,255,255,'+(0.25+Math.random()*0.5).toFixed(2)+')';
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
     }
-
     ctx.textAlign = 'center';
+    return { canvas, ctx };
+  }
+  function shareRefLink(){
+    const host = location.host || 'gamegeeeeek.de';
+    return (typeof accountUsername === 'string' && accountUsername) ? host+'/?ref='+encodeURIComponent(accountUsername) : host;
+  }
+  function drawShareHeader(ctx, W, y, text){
     ctx.fillStyle = '#9296ac';
     ctx.font = '600 30px system-ui, sans-serif';
-    ctx.fillText('KOLONIE KEPLER-7', W/2, 92);
-
-    // Avatar: farbiger Kreis in der Banner-/Avatar-Farbe des Spielers, SVG-Symbol darüber.
-    const avatarDef = AVATAR_DEFS.find(a => a.key === state.player.avatarKey) || AVATAR_DEFS[0];
-    const avR = 95, avCy = 270;
-    ctx.beginPath(); ctx.arc(W/2, avCy, avR, 0, Math.PI*2);
-    ctx.fillStyle = avatarDef.bg; ctx.fill();
-    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.stroke();
-    try {
-      const avImg = await loadSvgAsImage(avatarDef.svg);
-      ctx.save();
-      ctx.beginPath(); ctx.arc(W/2, avCy, avR, 0, Math.PI*2); ctx.clip();
-      const s = avR*1.15;
-      ctx.drawImage(avImg, W/2-s/2, avCy-s/2, s, s);
-      ctx.restore();
-    } catch(e){}
-
-    ctx.fillStyle = '#e8e9f0';
-    ctx.font = '600 48px system-ui, sans-serif';
-    ctx.fillText((state.player.name || 'Kommandant').slice(0, 18), W/2, avCy+avR+62);
-    const lvl = commanderLevel(state.xp||0);
+    ctx.fillText(text || 'KOLONIE KEPLER-7', W/2, y);
+  }
+  function drawShareFooter(ctx, W, H, cta){
+    ctx.fillStyle = '#7f77dd';
+    ctx.font = '600 30px system-ui, sans-serif';
+    ctx.fillText(cta || 'Baue deine eigene Kolonie:', W/2, H-90);
     ctx.fillStyle = '#c3bef5';
-    ctx.font = '400 27px system-ui, sans-serif';
-    ctx.fillText('Kommandanten-Level '+lvl, W/2, avCy+avR+104);
-
-    ctx.fillStyle = '#9296ac';
-    ctx.font = '600 22px system-ui, sans-serif';
-    ctx.fillText('PUNKTESTAND', W/2, avCy+avR+186);
-    ctx.fillStyle = '#c3bef5';
-    ctx.font = '600 104px system-ui, sans-serif';
-    ctx.fillText(fmt(Math.floor(computeScore())), W/2, avCy+avR+286);
-
-    // Vier Stat-Karten in einer Reihe: Kolonien, Monde, Flotte, Kampfpunkte.
-    const { colonyCount, moonCount } = expansionCounts();
-    const fleetTotal = allFleets().reduce((sum, f) => sum + Object.keys(SHIP_SCORE_WEIGHTS).reduce((a, k) => a + (f[k]||0), 0), 0);
-    const cards = [
-      { label:'Kolonien', value: fmt(colonyCount) },
-      { label:'Monde', value: fmt(moonCount) },
-      { label:'Flotte', value: fmt(fleetTotal) },
-      { label:'Kampfpunkte', value: fmt(state.battlePoints||0) }
-    ];
-    const cardY = avCy+avR+360, cardW = 220, cardH = 150, gap = 26;
+    ctx.font = '400 28px system-ui, sans-serif';
+    ctx.fillText(shareRefLink(), W/2, H-46);
+  }
+  function drawStatCardsRow(ctx, W, cards, cardY, cardW, cardH){
+    cardW = cardW || 220; cardH = cardH || 150;
+    const gap = 26;
     const totalW = cards.length*cardW + (cards.length-1)*gap;
     let cx = (W-totalW)/2;
     for (const c of cards){
@@ -15637,25 +15647,363 @@
       ctx.fillText(c.label, cx+cardW/2, cardY+108);
       cx += cardW+gap;
     }
-
-    // Footer: Einladung zum Mitspielen mit der tatsächlichen Domain, unter der das Spiel läuft.
-    ctx.fillStyle = '#7f77dd';
-    ctx.font = '600 30px system-ui, sans-serif';
-    ctx.fillText('Baue deine eigene Kolonie:', W/2, H-90);
+  }
+  // Punkteverlauf (scoreHistory, 5-Minuten-Snapshots ~16 Std.) als kleine Kurve.
+  function drawScoreSparkline(ctx, x, y, w, h){
+    const hist = (state.scoreHistory||[]).slice(-80);
+    if (hist.length < 3) return false;
+    const vals = hist.map(e=>e.score||0);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const span = Math.max(1, max-min);
+    ctx.strokeStyle = '#5dcaa5';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    vals.forEach((v,i) => {
+      const px = x + (i/(vals.length-1))*w;
+      const py = y + h - ((v-min)/span)*h;
+      if (i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+    return true;
+  }
+  function drawAvatarCircle(ctx, cx, cy, r, golden){
+    const avatarDef = AVATAR_DEFS.find(a => a.key === state.player.avatarKey) || AVATAR_DEFS[0];
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fillStyle = avatarDef.bg; ctx.fill();
+    ctx.lineWidth = golden ? 7 : 4;
+    ctx.strokeStyle = golden ? '#fac775' : 'rgba(255,255,255,0.25)';
+    ctx.stroke();
+    return loadSvgAsImage(avatarDef.svg).then(avImg => {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.clip();
+      const s = r*1.15*2/2;
+      ctx.drawImage(avImg, cx-r*1.15/2, cy-r*1.15/2, r*1.15, r*1.15);
+      ctx.restore();
+    }).catch(()=>{});
+  }
+  // --- Profilkarte (aufgewertet: Titel, Prestige-/Aufstiegs-Schmuck, Rang + Allianz-Tag,
+  // Punkteverlaufs-Kurve; im Quer-Format eigenes kompaktes Layout fuer Link-Vorschauen). ---
+  async function generateProfileCard(fmt){
+    const { W, H } = fmt;
+    const { canvas, ctx } = shareCanvasBase(W, H);
+    const ascCount = (state.ascension && state.ascension.count) || 0;
+    const lvl = commanderLevel(state.xp||0);
+    const titleDef = playerTitle(state.achievements);
+    const tag = myAllianceTag();
+    const lbIdx = (leaderboardCache||[]).findIndex(e => e.id === state.player.id);
+    const rankLine = lbIdx >= 0 ? 'Platz '+(lbIdx+1)+' von '+leaderboardCache.length : null;
+    const badge = (state.prestige?'P'+state.prestige:'') + (state.prestige&&ascCount?' · ':'') + (ascCount?'A'+ascCount:'');
+    if (fmt.key === 'quer'){
+      // Kompaktes Querformat: Avatar links, Zahlen rechts.
+      drawShareHeader(ctx, W, 64);
+      await drawAvatarCircle(ctx, 240, H/2, 120, ascCount>0);
+      ctx.fillStyle = '#e8e9f0';
+      ctx.font = '600 42px system-ui, sans-serif';
+      ctx.fillText((state.player.name||'Kommandant').slice(0,18), 240, H/2+180);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#9296ac'; ctx.font = '600 22px system-ui, sans-serif';
+      ctx.fillText('PUNKTESTAND', 470, 200);
+      ctx.fillStyle = '#c3bef5'; ctx.font = '600 88px system-ui, sans-serif';
+      ctx.fillText(fmtShare(Math.floor(computeScore())), 470, 290);
+      ctx.fillStyle = '#c3bef5'; ctx.font = '400 27px system-ui, sans-serif';
+      ctx.fillText('Kommandanten-Level '+lvl+(badge?'  ·  '+badge:''), 470, 345);
+      if (titleDef){ ctx.fillStyle = '#fac775'; ctx.fillText('\u201E'+titleDef.title+'\u201C', 470, 388); }
+      if (rankLine || tag){ ctx.fillStyle = '#9296ac'; ctx.fillText([rankLine, tag?'['+tag+']':null].filter(Boolean).join('  ·  '), 470, titleDef?431:388); }
+      ctx.textAlign = 'center';
+      drawShareFooter(ctx, W, H);
+      return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    }
+    const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
+    drawShareHeader(ctx, W, 92+oy);
+    const avR = 95, avCy = 270+oy;
+    await drawAvatarCircle(ctx, W/2, avCy, avR, ascCount>0);
+    ctx.fillStyle = '#e8e9f0';
+    ctx.font = '600 48px system-ui, sans-serif';
+    ctx.fillText((state.player.name || 'Kommandant').slice(0, 18), W/2, avCy+avR+62);
     ctx.fillStyle = '#c3bef5';
-    ctx.font = '400 28px system-ui, sans-serif';
-    ctx.fillText(location.host || 'gamegeeeeek.de', W/2, H-46);
-
+    ctx.font = '400 27px system-ui, sans-serif';
+    ctx.fillText('Kommandanten-Level '+lvl+(badge?'  ·  '+badge:''), W/2, avCy+avR+104);
+    let extraY = 0;
+    if (titleDef){
+      ctx.fillStyle = '#fac775';
+      ctx.font = '400 26px system-ui, sans-serif';
+      ctx.fillText('\u201E'+titleDef.title+'\u201C', W/2, avCy+avR+140);
+      extraY = 36;
+    }
+    if (rankLine || tag){
+      ctx.fillStyle = '#9296ac';
+      ctx.font = '400 25px system-ui, sans-serif';
+      ctx.fillText([rankLine, tag?'['+tag+']':null].filter(Boolean).join('  ·  '), W/2, avCy+avR+140+extraY);
+      extraY += 36;
+    }
+    ctx.fillStyle = '#9296ac';
+    ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillText('PUNKTESTAND', W/2, avCy+avR+186+extraY);
+    ctx.fillStyle = '#c3bef5';
+    ctx.font = '600 104px system-ui, sans-serif';
+    ctx.fillText(fmtShare(Math.floor(computeScore())), W/2, avCy+avR+286+extraY);
+    if (drawScoreSparkline(ctx, W/2-220, avCy+avR+306+extraY, 440, 46)){
+      ctx.fillStyle = '#5dcaa5';
+      ctx.font = '400 19px system-ui, sans-serif';
+      ctx.fillText('Punkteverlauf (letzte Stunden)', W/2, avCy+avR+382+extraY);
+    }
+    const { colonyCount, moonCount } = expansionCounts();
+    const fleetTotal = allFleets().reduce((sum, f) => sum + Object.keys(SHIP_SCORE_WEIGHTS).reduce((a, k) => a + (f[k]||0), 0), 0);
+    drawStatCardsRow(ctx, W, [
+      { label:'Kolonien', value: fmtShare(colonyCount) },
+      { label:'Monde', value: fmtShare(moonCount) },
+      { label:'Flotte', value: fmtShare(fleetTotal) },
+      { label:'Kampfpunkte', value: fmtShare(state.battlePoints||0) }
+    ], avCy+avR+426+extraY);
+    drawShareFooter(ctx, W, H);
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   }
-  async function shareColonyImage(){
-    const btn = document.getElementById('shareColonyBtn');
-    if (btn) btn.disabled = true;
-    trackEvent('share_colony_clicked');
+  // fmt() gibt fuer <1000 Zahlen mit Nachkommastelle zurueck - fuer Karten immer glatt formatieren.
+  function fmtShare(n){ return n >= 1000 ? fmt(n) : String(Math.floor(n)); }
+  // --- Flottenparade: die eigene Flotte als Formation aus den Schiffs-Icons. ---
+  async function generateFleetCard(fmt){
+    const { W, H } = fmt;
+    const { canvas, ctx } = shareCanvasBase(W, H);
+    const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
+    drawShareHeader(ctx, W, 92+oy);
+    ctx.fillStyle = '#e8e9f0';
+    ctx.font = '600 52px system-ui, sans-serif';
+    ctx.fillText('Flotte von '+(state.player.name||'Kommandant').slice(0,16), W/2, 175+oy);
+    const order = ['superschlachtschiff','schlachtschiff','carrier','bomber','destroyers','cruisers','waechter','jaeger','frachtergross','frachter','recycler','spionageschiff','spaeher','forscher','colonyShips','ships'];
+    const totals = {};
+    for (const f of allFleets()) for (const k of order) totals[k] = (totals[k]||0) + (f[k]||0);
+    const present = order.filter(k => totals[k] > 0);
+    const perRow = 4, cell = 225, iconS = 118;
+    let y = 265+oy;
+    for (let i=0; i<present.length && i<16; i+=perRow){
+      const row = present.slice(i, i+perRow);
+      let x = (W - row.length*cell)/2 + cell/2;
+      for (const k of row){
+        const iconKey = k==='superschlachtschiff' ? 'ship_superschlachtschiff' : (SHIP_DEFS.find(d=>d.key===k)||{}).icon;
+        try {
+          if (iconKey && ICONS[iconKey]){
+            const img = await loadSvgAsImage(ICONS[iconKey]);
+            ctx.drawImage(img, x-iconS/2, y, iconS, iconS);
+          }
+        } catch(e){}
+        ctx.fillStyle = '#e8e9f0';
+        ctx.font = '600 34px system-ui, sans-serif';
+        ctx.fillText(fmtShare(totals[k])+'\u00D7', x, y+iconS+40);
+        ctx.fillStyle = '#9296ac';
+        ctx.font = '400 19px system-ui, sans-serif';
+        ctx.fillText((shipDefOrSuper(k)||{name:k}).name, x, y+iconS+70);
+        x += cell;
+      }
+      y += cell;
+    }
+    const fleetTotal = present.reduce((a,k)=>a+totals[k],0);
+    drawStatCardsRow(ctx, W, [
+      { label:'Schiffe gesamt', value: fmtShare(fleetTotal) },
+      { label:'Angriffskraft', value: fmtShare(Math.round(attackPower())) },
+      { label:'Kampfpunkte', value: fmtShare(state.battlePoints||0) }
+    ], Math.min(y+20, H-330), 280, 150);
+    drawShareFooter(ctx, W, H);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  }
+  // --- Allianz-Karte: Tag, Basis-Modell in aktueller Ausbaustufe, Kennzahlen, Beitritts-CTA. ---
+  async function generateAllianceCard(fmt){
+    const { W, H } = fmt;
+    const { canvas, ctx } = shareCanvasBase(W, H);
+    const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
+    const tag = myAllianceTag();
+    drawShareHeader(ctx, W, 92+oy);
+    ctx.fillStyle = '#e8e9f0';
+    ctx.font = '600 88px system-ui, sans-serif';
+    ctx.fillText('['+tag+']', W/2, 210+oy);
+    const baseLvl = allianceBaseLevel();
+    if (state.allianceBase && state.allianceBase.foundedAt){
+      try {
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 60 60">'+allianceBaseModelSvg(Math.max(1,baseLvl), 'ShareCard')+'</svg>';
+        const img = await loadSvgAsImage(svg);
+        ctx.drawImage(img, W/2-260, 260+oy, 520, 520);
+      } catch(e){}
+      ctx.fillStyle = '#c3bef5';
+      ctx.font = '600 40px system-ui, sans-serif';
+      ctx.fillText('Allianzbasis \u00B7 Stufe '+baseLvl+(baseLvl>=10?' (Monument)':''), W/2, 830+oy);
+      const sys = STAR_SYSTEMS.find(s=>s.id===state.allianceBase.sector);
+      ctx.fillStyle = '#9296ac';
+      ctx.font = '400 26px system-ui, sans-serif';
+      ctx.fillText('System '+(sys?sys.name:state.allianceBase.sector), W/2, 872+oy);
+    } else {
+      ctx.fillStyle = '#9296ac';
+      ctx.font = '400 30px system-ui, sans-serif';
+      ctx.fillText('Eine aufstrebende Allianz sucht Verst\u00E4rkung!', W/2, 420+oy);
+    }
+    drawStatCardsRow(ctx, W, [
+      { label:'Basis-Stufe', value: String(baseLvl) },
+      { label:'Kriegssiege', value: fmtShare(state.warVictories||0) },
+      { label:'Dominanz-Stufe', value: fmtShare(state.allianceDominanceClaimed||0) }
+    ], 930+oy, 280, 150);
+    drawShareFooter(ctx, W, H, 'Tritt ['+tag+'] bei:');
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  }
+  // --- Wochen-Rueckblick: Tagesbilanz-Historie als Balken + Summen. ---
+  async function generateWeeklyCard(fmt){
+    const { W, H } = fmt;
+    const { canvas, ctx } = shareCanvasBase(W, H);
+    const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
+    drawShareHeader(ctx, W, 92+oy);
+    ctx.fillStyle = '#e8e9f0';
+    ctx.font = '600 60px system-ui, sans-serif';
+    ctx.fillText('Meine Woche auf Kepler-7', W/2, 190+oy);
+    ctx.fillStyle = '#c3bef5';
+    ctx.font = '400 28px system-ui, sans-serif';
+    ctx.fillText((state.player.name||'Kommandant').slice(0,18), W/2, 240+oy);
+    const days = (state.dailyHistory||[]).slice(-7);
+    if (days.length){
+      const maxGain = Math.max(1, ...days.map(d=>d.scoreGain||0));
+      const chartW = 720, chartH = 330, bx = (W-chartW)/2, by = 330+oy;
+      const bw = chartW/days.length*0.62, gap = chartW/days.length;
+      days.forEach((d,i) => {
+        const h = Math.max(8, (d.scoreGain||0)/maxGain*chartH);
+        ctx.fillStyle = '#7f77dd';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(bx+i*gap+(gap-bw)/2, by+chartH-h, bw, h, 8); else ctx.rect(bx+i*gap+(gap-bw)/2, by+chartH-h, bw, h);
+        ctx.fill();
+        ctx.fillStyle = '#9296ac';
+        ctx.font = '400 20px system-ui, sans-serif';
+        ctx.fillText((d.day||'').slice(5).replace('-','.'), bx+i*gap+gap/2, by+chartH+34);
+        ctx.fillStyle = '#c3bef5';
+        ctx.font = '600 22px system-ui, sans-serif';
+        ctx.fillText('+'+fmtShare(d.scoreGain||0), bx+i*gap+gap/2, by+chartH-h-12);
+      });
+      const sumGain = days.reduce((a,d)=>a+(d.scoreGain||0),0);
+      const sumWins = days.reduce((a,d)=>a+(d.wins||0),0);
+      const sumLoss = days.reduce((a,d)=>a+(d.losses||0),0);
+      const sumCred = days.reduce((a,d)=>a+(d.creditsGain||0),0);
+      drawStatCardsRow(ctx, W, [
+        { label:'Punkte-Zuwachs', value: '+'+fmtShare(sumGain) },
+        { label:'Siege', value: fmtShare(sumWins) },
+        { label:'Niederlagen', value: fmtShare(sumLoss) },
+        { label:'Kredite', value: (sumCred>=0?'+':'')+fmtShare(sumCred) }
+      ], by+chartH+90);
+    } else {
+      ctx.fillStyle = '#9296ac';
+      ctx.font = '400 30px system-ui, sans-serif';
+      ctx.fillText('Noch keine Tagesbilanz vorhanden - schau morgen wieder rein!', W/2, 450+oy);
+    }
+    drawShareFooter(ctx, W, H);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  }
+  // --- Meilenstein-Karte: der zuletzt registrierte grosse Moment (siehe registerShareMoment). ---
+  async function generateMilestoneCard(fmt){
+    const m = state.lastShareMoment;
+    const { W, H } = fmt;
+    const { canvas, ctx } = shareCanvasBase(W, H);
+    const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
+    drawShareHeader(ctx, W, 92+oy);
+    ctx.font = '600 170px system-ui, sans-serif';
+    ctx.fillText(m.emoji || '\uD83C\uDFC6', W/2, 400+oy);
+    ctx.fillStyle = '#fac775';
+    ctx.font = '600 64px system-ui, sans-serif';
+    ctx.fillText(m.title, W/2, 540+oy);
+    if (m.subtitle){
+      ctx.fillStyle = '#c3bef5';
+      ctx.font = '400 32px system-ui, sans-serif';
+      ctx.fillText(m.subtitle, W/2, 600+oy);
+    }
+    ctx.fillStyle = '#9296ac';
+    ctx.font = '400 27px system-ui, sans-serif';
+    ctx.fillText((state.player.name||'Kommandant').slice(0,18)+' \u00B7 '+new Date(m.ts).toLocaleDateString('de-DE'), W/2, 664+oy);
+    drawStatCardsRow(ctx, W, [
+      { label:'Punktestand', value: fmtShare(m.score||Math.floor(computeScore())) },
+      { label:'Kommandanten-Level', value: String(m.level||commanderLevel(state.xp||0)) },
+      { label:'Kampfpunkte', value: fmtShare(state.battlePoints||0) }
+    ], 760+oy, 280, 150);
+    drawShareFooter(ctx, W, H);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  }
+  // --- Kampfbericht-Karte (Teilen-Button direkt am Bericht). ---
+  function battleCardData(r){
+    if (r.type === 'npc-attack') return { won: r.result==='win', vs: r.npcName||'NPC', atk: r.attackPower, def: r.defensePower, loot: r.loot, bp: r.battlePoints };
+    if (r.type === 'player-attack') return { won: r.result==='win', vs: r.targetName||'Spieler', atk: r.attackPower, def: r.defensePower, loot: r.loot, bp: r.battlePoints };
+    if (r.type === 'alliance-base-attack') return { won: r.result!=='loss', vs: 'Allianzbasis ['+(r.targetTag||'?')+']', atk: r.attackPower, def: r.defensePower, loot: null, bp: r.battlePoints, extra: r.result==='destroyed' ? 'BASIS ZERST\u00D6RT!' : null };
+    if (r.type === 'pirate-debris-raid') return { won: r.result==='win', vs: 'Piraten-Tr\u00FCmmerr\u00E4uber', atk: r.attackPower, def: r.defensePower, loot: null, bp: r.battlePoints };
+    if (r.type === 'raid') return { won: r.result==='win', vs: r.faction||'Angreifer', atk: r.defensePower, def: r.attackPower, loot: null, bp: 0, defenderView: true };
+    return null;
+  }
+  async function generateBattleCard(fmt, r){
+    const d = battleCardData(r) || { won:false, vs:'Gegner', atk:0, def:0 };
+    const { W, H } = fmt;
+    const { canvas, ctx } = shareCanvasBase(W, H);
+    const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
+    drawShareHeader(ctx, W, 92+oy);
+    ctx.fillStyle = d.won ? '#5dcaa5' : '#e24b4a';
+    ctx.font = '600 110px system-ui, sans-serif';
+    ctx.fillText(d.won ? 'SIEG' : 'NIEDERLAGE', W/2, 260+oy);
+    if (d.extra){
+      ctx.fillStyle = '#fac775';
+      ctx.font = '600 44px system-ui, sans-serif';
+      ctx.fillText(d.extra, W/2, 330+oy);
+    }
+    ctx.fillStyle = '#e8e9f0';
+    ctx.font = '600 44px system-ui, sans-serif';
+    ctx.fillText((state.player.name||'Kommandant').slice(0,14)+'  \u2694  '+String(d.vs).slice(0,20), W/2, 420+oy);
+    ctx.fillStyle = '#9296ac';
+    ctx.font = '400 30px system-ui, sans-serif';
+    ctx.fillText((d.defenderView?'Verteidigung ':'Angriffskraft ')+fmtShare(d.atk||0)+'  vs.  '+fmtShare(d.def||0), W/2, 480+oy);
+    let y = 560+oy;
+    if (r.destroyedNpcShips && Object.keys(r.destroyedNpcShips).length){
+      ctx.fillStyle = '#5dcaa5'; ctx.font = '400 28px system-ui, sans-serif';
+      ctx.fillText('Zerst\u00F6rt: '+lostCountsToText(r.destroyedNpcShips), W/2, y); y += 44;
+    }
+    if (r.ownLostShips && Object.keys(r.ownLostShips).length){
+      ctx.fillStyle = '#f0997b'; ctx.font = '400 28px system-ui, sans-serif';
+      ctx.fillText('Eigene Verluste: '+String(lostCountsToText(r.ownLostShips)).slice(0,60), W/2, y); y += 44;
+    }
+    if (d.loot){
+      const lootTxt = Object.entries(d.loot).filter(([,a])=>a>0).map(([k,a])=>fmtShare(a)+' '+((RES_DEFS.find(x=>x.key===k)||{}).label||k)).join(', ');
+      if (lootTxt){ ctx.fillStyle = '#fac775'; ctx.font = '400 28px system-ui, sans-serif'; ctx.fillText('Beute: '+lootTxt.slice(0,70), W/2, y); y += 44; }
+    }
+    drawStatCardsRow(ctx, W, [
+      { label:'Kampfpunkte', value: '+'+fmtShare(d.bp||0) },
+      { label:'Siege gesamt', value: fmtShare((state.battleStats&&state.battleStats.wins)||0) },
+      { label:'Punktestand', value: fmtShare(Math.floor(computeScore())) }
+    ], Math.max(y+40, 700+oy), 280, 150);
+    drawShareFooter(ctx, W, H);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  }
+  // Registriert einen teilbaren "grossen Moment" (Prestige, Aufstieg, Mond, Boss-Kill, ...) und
+  // weist per Toast auf die Karte im Punktestand-Tab hin.
+  function registerShareMoment(title, subtitle, emoji){
+    state.lastShareMoment = { title: String(title).slice(0,40), subtitle: subtitle ? String(subtitle).slice(0,70) : null, emoji: emoji||'\uD83C\uDFC6', ts: Date.now(), score: Math.floor(computeScore()), level: commanderLevel(state.xp||0) };
+    pushToast('\uD83D\uDCF8 Teilbarer Moment: '+title+' - Karte im Punktestand-Tab!', 'ti-sparkles');
+  }
+  const SHARE_CARD_TYPES = [
+    { key:'profil', name:'Profil', gen: generateProfileCard, avail: () => true },
+    { key:'flotte', name:'Flotte', gen: generateFleetCard, avail: () => true },
+    { key:'allianz', name:'Allianz', gen: generateAllianceCard, avail: () => !!myAllianceTag() },
+    { key:'woche', name:'Woche', gen: generateWeeklyCard, avail: () => true },
+    { key:'moment', name:'Moment', gen: generateMilestoneCard, avail: () => !!state.lastShareMoment }
+  ];
+  function renderShareCardBar(){
+    const typeBox = document.getElementById('shareTypeChips');
+    const fmtBox = document.getElementById('shareFormatChips');
+    if (!typeBox || !fmtBox) return;
+    const avail = SHARE_CARD_TYPES.filter(t => t.avail());
+    if (!avail.some(t=>t.key===shareCardType)) shareCardType = 'profil';
+    typeBox.innerHTML = avail.map(t => `<button data-share-type="${t.key}" class="${shareCardType===t.key?'affordable buy':''}" style="font-size:11px; padding:5px 10px;">${t.name}</button>`).join('');
+    const fmts = Object.values(SHARE_FORMATS).filter(f => f.key !== 'quer' || shareCardType === 'profil');
+    if (!fmts.some(f=>f.key===shareCardFormat)) shareCardFormat = 'post';
+    fmtBox.innerHTML = fmts.map(f => `<button data-share-format="${f.key}" class="${shareCardFormat===f.key?'affordable buy':''}" style="font-size:11px; padding:5px 10px;">${f.name}</button>`).join('');
+    typeBox.querySelectorAll('[data-share-type]').forEach(b => b.onclick = () => { shareCardType = b.getAttribute('data-share-type'); renderShareCardBar(); });
+    fmtBox.querySelectorAll('[data-share-format]').forEach(b => b.onclick = () => { shareCardFormat = b.getAttribute('data-share-format'); renderShareCardBar(); });
+  }
+  async function generateColonyShareImage(){
+    const t = SHARE_CARD_TYPES.find(x=>x.key===shareCardType) || SHARE_CARD_TYPES[0];
+    const fmt2 = SHARE_FORMATS[shareCardFormat] || SHARE_FORMATS.post;
+    return t.gen(fmt2);
+  }
+  async function shareCardBlobFlow(blobPromise, filename){
     try {
-      const blob = await generateColonyShareImage();
+      const blob = await blobPromise;
       if (!blob){ log('Bild konnte nicht erzeugt werden.', 'ti-alert-triangle'); return; }
-      const file = new File([blob], 'kolonie-kepler7.png', { type:'image/png' });
+      const file = new File([blob], filename || 'kolonie-kepler7.png', { type:'image/png' });
       // Web Share API mit Datei bevorzugt (v.a. mobil - direkter Weg in TikTok/Instagram/WhatsApp
       // usw.), sonst Download-Fallback.
       if (navigator.canShare && navigator.canShare({ files:[file] })){
@@ -15671,7 +16019,17 @@
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       log('Bild heruntergeladen.', 'ti-check');
     } catch(e){ log('Bild konnte nicht erzeugt werden.', 'ti-alert-triangle'); }
+  }
+  async function shareColonyImage(){
+    const btn = document.getElementById('shareColonyBtn');
+    if (btn) btn.disabled = true;
+    trackEvent('share_colony_clicked');
+    try { await shareCardBlobFlow(generateColonyShareImage(), 'kolonie-kepler7.png'); }
     finally { if (btn) btn.disabled = false; }
+  }
+  async function shareBattleReportImage(r){
+    trackEvent('share_battle_clicked');
+    await shareCardBlobFlow(generateBattleCard(SHARE_FORMATS.post, r), 'kepler7-kampf.png');
   }
 
   // Zoom/Pan-Zustand der Galaxie-Übersichtskarte – bleibt für die restliche Sitzung erhalten
@@ -19133,6 +19491,7 @@
     document.getElementById('profileScore').textContent = computeScore();
 
     const scoreTotalEl = document.getElementById('scoreTotalValue');
+    renderShareCardBar();
     if (scoreTotalEl) scoreTotalEl.textContent = fmt(computeScore());
     const scoreBreakdownBox = document.getElementById('scoreBreakdownBox');
     if (scoreBreakdownBox){
