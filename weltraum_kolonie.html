@@ -1190,6 +1190,7 @@
         <div class="qty-select" id="qtySelectDef"></div>
         <div class="buildings" id="defenseBuildings"></div>
         <div id="festungBox"></div>
+        <div id="abhorchpostenBox"></div>
         <div class="card-row" id="autoReinforceRow" style="cursor:pointer; margin-top:0.75rem;">
           <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-shield-lock" aria-hidden="true"></i></div><div><div class="bname">Automatische Verstärkung</div><div class="bmeta" id="autoReinforceLabel">Aus – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten</div></div></div>
           <div class="toggle-switch" id="autoReinforceSwitch"><div class="toggle-knob"></div></div>
@@ -1965,7 +1966,17 @@
     // der Tresor dafür, dass unabhängig vom Prozentsatz nie ALLES verloren geht, gerade bei kleinen
     // Lagerbeständen. Baubar ab Werksstufe der Notfallprotokolle, damit er nicht schon ganz am Anfang
     // die Überfall-Bedrohung trivialisiert.
-    { key:'tresor', name:'Tresor', icon:'ti-lock', produces:null, baseRate:0, baseCost:{erz:600, kristalle:500, deuterium:200}, costMult:1.35, bg:'rgba(250,199,117,0.18)', fg:'#fac775', effectDesc:'Ressourcenschutz bei Überfällen', category:'utility', defVal:0, atkVal:0, buildTime:70, requires:['rnotfall'], safeAmountPerLevel:400 }
+    { key:'tresor', name:'Tresor', icon:'ti-lock', produces:null, baseRate:0, baseCost:{erz:600, kristalle:500, deuterium:200}, costMult:1.35, bg:'rgba(250,199,117,0.18)', fg:'#fac775', effectDesc:'Ressourcenschutz bei Überfällen', category:'utility', defVal:0, atkVal:0, buildTime:70, requires:['rnotfall'], safeAmountPerLevel:400 },
+    // Abhorchposten: exklusives Mond-Gebäude (Spieler-Wunsch "Monde um einzigartige Gebäude
+    // erweitern"), daher moonOnly:true (siehe buildingRowHtml/data-build-Handler). Läuft bewusst über
+    // die 'defense'-Kategorie mit, obwohl er selbst 0 Verteidigung/Angriff beiträgt (defVal/atkVal:0) -
+    // nur diese Kategorie hat im Spiel überhaupt eine echte Bauzeit/Warteschlange statt Sofortbau, und
+    // der Spieler-Wunsch verlangt ausdrücklich "Jede Ausbaustufe erhöht Bauzeit... deutlich". Dafür
+    // neu: buildTimePerLevelMult (optionales Feld, nur hier gesetzt) verdoppelt die Bauzeit der
+    // NÄCHSTEN Stufe für jede bereits vorhandene - bei allen anderen Gebäuden ohne dieses Feld bleibt
+    // die Bauzeit unverändert flach wie bisher (rückwärtskompatibel). maxLevel:4 gemäß Spielerbeispiel
+    // (Stufe 1 eigenes System, 2/3/4 wachsender Sektor-Radius, siehe ABHORCHPOSTEN_RANGE_BY_LEVEL).
+    { key:'abhorchposten', name:'Abhorchposten', icon:'ti-map-pin', produces:null, baseRate:0, baseCost:{energie:8000, kristalle:6000, deuterium:3000, antimaterie:150}, costMult:1.9, bg:'rgba(175,169,236,0.18)', fg:'#c3bef5', effectDesc:'Flottenüberwachung', category:'defense', defVal:0, atkVal:0, buildTime:1800, buildTimePerLevelMult:2.4, maxLevel:4, moonOnly:true }
   ];
 
   function crosshairIcon(color, tier){
@@ -2392,8 +2403,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.63.1';
+  const VERSION = '8.64.0';
   const PATCHNOTES = [
+    { version:'8.64.0', date:'17.07.2026', changes:[
+      'Neu: Abhorchposten - erstes exklusives Mond-Gebäude (Spieler-Wunsch "Monde um einzigartige Gebäude erweitern"), baubar nur auf einem kolonisierten Mond (Verteidigung-Tab). Erkennt fremde Flottenbewegungen (Erkundung, Kolonisierung, Verlegungen, NPC-Angriffe) im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2-4 wachsend 1/2/3 Sektoren (Deckel 6 Sektoren, neu eingeführtes Distanz-Konzept zwischen Sternsystemen). Zeigt Spielername, Start-/Zielsystem und Restflugzeit; Missionsart ab Stufe 3, Schiffszusammensetzung ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür existieren im Spiel grundsätzlich keine echten Positionsdaten des Gegners). Kosten und vor allem Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden (neues buildTimePerLevelMult-Feld)',
+      'Technische Grundlage: jeder Client veröffentlicht ab jetzt beim regulären Speichern (wie schon die Bestenliste) eine Zusammenfassung seiner eigenen unterwegs befindlichen Flotten für die Abhorchposten-Erkennung anderer Spieler - dieselben geteilten, nicht einzeln zugriffsbeschränkten Daten wie überall sonst im Spiel (Bestenliste, Allianzdaten)'
+    ]},
     { version:'8.63.1', date:'17.07.2026', changes:[
       'Bugfix (Spieler-Report mit Screenshot): Die Heimatbasis konnte auf der Einzelsystem-Karte einen Planeten fast vollständig überlagern (Namen/Marker verschmolzen sichtbar ineinander) - die Heimatbasis sitzt auf einem einfachen Kreis um die Sonne, Planeten dagegen auf abgeflachten Ellipsen, und je nach Heimat-Slot-Winkel UND der individuellen Orbit-Position eines Planeten in genau diesem System konnten sich beide Bahnen fast exakt kreuzen. Die Heimatbasis weicht jetzt automatisch radial nach außen aus, sobald eine echte Überlappung mit der Sonne oder einem vorhandenen Planeten erkannt wird - Missions-Flugbahnen (z.B. Auto-Erkunder) starten konsistent vom selben, korrigierten Punkt'
     ]},
@@ -4619,6 +4634,24 @@
   // in Übersichtskarte und System-Navigation auf.
   function visibleSystems(){
     return STAR_SYSTEMS.filter(s => !s.hidden || (state.discoveredSystems && state.discoveredSystems[s.id]));
+  }
+  // Echte Entfernung zwischen zwei Sternsystemen (Spieler-Wunsch "Abhorchposten mit Sektor-
+  // Reichweite") - bisher kannte das Spiel überall nur "gleiches System" vs. "anderes System"
+  // (z.B. Flugzeiten), nirgends eine echte Distanz. Nutzt die einzigen vorhandenen Koordinaten
+  // (gx/gy, sonst nur zur Sortierung der Spiralgalaxie-Anzeige verwendet) als Basis für ein neues
+  // "Sektor"-Konzept: SECTOR_UNIT_DISTANCE ist so kalibriert (≈1,5× der medianen Abstand zum
+  // nächsten Nachbarsystem über alle 69 Systeme), dass "1 Sektor" typischerweise eine Handvoll
+  // wirklich benachbarter Systeme einschließt, nicht nur den einen nächsten oder gleich die halbe
+  // Galaxie.
+  const SECTOR_UNIT_DISTANCE = 65;
+  function systemDistance(sysIdA, sysIdB){
+    if (sysIdA === sysIdB) return 0;
+    const a = STAR_SYSTEMS.find(s=>s.id===sysIdA), b = STAR_SYSTEMS.find(s=>s.id===sysIdB);
+    if (!a || !b) return Infinity;
+    return Math.hypot(a.gx-b.gx, a.gy-b.gy);
+  }
+  function systemSectorDistance(sysIdA, sysIdB){
+    return systemDistance(sysIdA, sysIdB) / SECTOR_UNIT_DISTANCE;
   }
 
   // Farbe: EINE feste Farbe je Typ (nicht mehr je einzelnem Planeten wie vorher) - macht den Typ auf
@@ -9178,7 +9211,7 @@
         // (verhindert Doppelbezahlung, da queueConstruction die Bezahlung jetzt selbst übernimmt).
         if (specialItem) state.rareItems[specialItem] -= 1;
         state.buildQueue.splice(i,1);
-        queueConstruction('building', item.planet, item.key, 1, def.buildTime||20, def.name, def.icon, cost);
+        queueConstruction('building', item.planet, item.key, 1, buildingLevelDuration(def, lvl), def.name, def.icon, cost);
         return true;
       }
       if (!canAfford(cost)) continue; // liegen lassen, nächster Kandidat - blockiert nicht mehr die ganze Liste
@@ -9205,6 +9238,13 @@
   // frühere bleibt liegen und wird bei jedem weiteren Tick erneut versucht, blockiert aber nicht mehr
   // die ganze Warteschlange. "Super"-Einheiten verbrauchen ihr seltenes Item weiterhin sofort beim
   // Einreihen (unverändert, siehe Aufrufstellen) - nur die normalen Ressourcenkosten sind betroffen.
+  // Bauzeit für GENAU EINE weitere Stufe eines Gebäudes ausgehend von seiner aktuellen Stufe (0-
+  // indiziert: Stufe 1 wird bei currentLvl=0 gebaut usw.) - für die allermeisten Gebäude unverändert
+  // flach (def.buildTime, kein buildTimePerLevelMult gesetzt), für den Abhorchposten (Spieler-Wunsch
+  // "Jede Ausbaustufe erhöht Bauzeit... deutlich") wächst sie multiplikativ mit jeder Stufe.
+  function buildingLevelDuration(def, currentLvl){
+    return (def.buildTime||20) * Math.pow(def.buildTimePerLevelMult||1, currentLvl);
+  }
   function queueConstruction(kind, planetKey, key, qty, buildTimeEach, label, icon, cost){
     let effBuildTimeEach = buildTimeEach;
     if (kind === 'ship'){
@@ -11287,6 +11327,7 @@
       { title:'Automatische Erkundung', body:'Schalter auf der Sektorkarte (mindestens 1 Erkundungsschiff nötig): sobald aktiviert, reserviert genau <strong>ein</strong> Erkundungsschiff vom gerade aktiven Planeten und fliegt eine durchgehende Rundreise - erst das nächstgelegene unentdeckte Ziel, danach automatisch weiter zum jeweils nächsten, bis alle erreichbaren Planeten erkundet sind. Direkt unter dem Schalter zeigt eine eigene Box jederzeit den Ausgangsplaneten, das aktuelle Ziel mit Countdown, eine Vorschau des nächsten Ziels und den Gesamtfortschritt (z.B. "5/12"). Reicht der Treibstoff (Deuterium) für den nächsten Abschnitt nicht, wartet die Rundreise automatisch und versucht es beim nächsten Ressourcenzuwachs erneut - ohne manuelles Eingreifen. Sind alle Ziele erledigt, fliegt das Schiff zurück zum Ausgangsplaneten und die Rundreise endet automatisch. Der Schalter lässt sich jederzeit wieder ausschalten - eine laufende Rundreise wird dadurch nicht abrupt abgebrochen, sondern das aktuelle Ziel noch fertig angeflogen, bevor das Schiff zurückkehrt. Manuelles Erkunden einzelner Planeten bleibt parallel dazu möglich, solange noch ein freies Erkundungsschiff übrig ist.' },
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
+      { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (Deckel bei 6 Sektoren). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
       { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert. Die Galaxie-Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen ~67 Systemen gleichzeitig - der ⟲-Button zoomt bei Bedarf auf die volle Übersicht heraus. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne, sobald man in das System hineinzoomt.' },
       { title:'Terraforming', body:'Jede Kolonie UND die Heimatbasis (nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Die Zielwahl selbst ist auf JEDEM Standort jederzeit möglich, auch während anderswo bereits eine Stufe läuft - nur das tatsächliche Bezahlen/Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt, so lässt sich für mehrere Standorte vorausplanen. Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie). Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen und der Standort trägt den neuen Typ dauerhaft. Bei Kolonien UND der Heimatbasis ändert sich dabei sofort die Textur auf der Sektorkarte; die Heimatbasis behält zusätzlich ihren eigenen violetten Ring als Kennzeichnung, zeigt aber während des laufenden Terraformings denselben gestrichelten Fortschritts-Ring wie Kolonien. Insgesamt deutlich teurer als früher. Erdwelt (Bonus auf ALLE Ressourcen statt nur einer) kostet zusätzlich 80% mehr als jeder Spezialist - eine reine Fokus-Kolonie profitiert trotzdem meist mehr vom passenden Spezialisten. Zu finden im Basis-Tab.' },
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie, <strong>Wasserwelt</strong> +20% Lagerkapazität. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Generalist: +6% auf ALLE Ressourcen (kumuliert 30%), kostet aber 80% mehr als jeder Spezialist. Erdähnliche Welten, Gasriesen, Asteroiden und Superplaneten haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
@@ -14139,6 +14180,10 @@
           title: (playerTitle(state.achievements)||{}).title||null,
           updated: Date.now()
         }), true);
+        // Abhorchposten-Broadcast (Spieler-Wunsch "Monde um einzigartige Gebäude erweitern"): wie die
+        // Bestenliste bei jedem regulären Speichern mitveröffentlicht - volle Rohdaten, die einzelne
+        // Abhorchposten-Stufe des BEOBACHTERS entscheidet später, wie viel davon angezeigt wird.
+        await storageSet('missions:'+state.player.id, JSON.stringify({ id: state.player.id, name: state.player.name || 'Kommandant', missions: summarizeOwnMissionsForBroadcast(), updated: Date.now() }), true);
       }
     } catch(e){ /* geteilter Speicher optional, Spiel läuft auch ohne */ }
     return saveResult;
@@ -16229,6 +16274,131 @@
     const p = PLANETS.find(x=>x.id===key);
     return p ? p.system : (myHomeSystem || activeSystem);
   }
+  // Zielsystem einer Mission, sofern real bekannt (Spieler-Wunsch "Abhorchposten") - PvP-Missionen
+  // (attack-player/spy-player) und Allianzbasis-Angriffe/-Verteidigung sind bewusst ausgenommen: für
+  // PvP gibt es im ganzen Spiel schon heute keine echten Positionsdaten der Gegenseite
+  // (pseudoDistanceSeconds ist nur ein Hash-Gimmick), und eine Allianzbasis-Zielauflösung würde einen
+  // zusätzlichen Netzwerk-Request mitten in der synchronen Broadcast-Erstellung erfordern. Weltboss/
+  // Piratenversteck/Expedition sind ebenfalls kein reales Sternsystem im Spiel - auch ausgenommen.
+  function missionDestinationSystem(m){
+    switch (m.type){
+      case 'explore': case 'colonize': { const p = PLANETS.find(x=>x.id===m.targetId); return p ? p.system : null; }
+      case 'colonize-moon': return planetSystemOf(m.targetId);
+      case 'relocate': return planetSystemOf(m.targetId);
+      case 'attack': { const npc = NPCS.find(n=>n.id===m.targetId); return npc ? npc.system : null; }
+      default: return null;
+    }
+  }
+  // Abhorchposten-Reichweite je Stufe in "Sektoren" (siehe systemSectorDistance) - Stufe 1 erfasst nur
+  // das eigene System (0 Sektoren), 2-4 wachsen wie vom Spieler vorgeschlagen. Deckel bei 6 Sektoren
+  // (Balance-Wunsch), auch falls später weitere Stufen dazukommen sollten.
+  const ABHORCHPOSTEN_RANGE_SECTORS = { 1:0, 2:1, 3:2, 4:3 };
+  const ABHORCHPOSTEN_MAX_SECTORS = 6;
+  function abhorchpostenRangeSectors(level){
+    return Math.min(ABHORCHPOSTEN_MAX_SECTORS, ABHORCHPOSTEN_RANGE_SECTORS[level] || 0);
+  }
+  // Alle eigenen Monde mit einem aktiven Abhorchposten, je mit System und Reichweite.
+  function myAbhorchposten(){
+    const list = [];
+    for (const key of Object.keys(state.colonies||{})){
+      if (!isMoonKey(key)) continue;
+      const lvl = (state.colonies[key].buildings||{}).abhorchposten || 0;
+      if (lvl > 0) list.push({ moonKey:key, level: lvl, system: planetSystemOf(key), range: abhorchpostenRangeSectors(lvl) });
+    }
+    return list;
+  }
+  // Fasst alle eigenen, gerade unterwegs befindlichen Missionen für den Abhorchposten-Broadcast
+  // zusammen (siehe doSave() - wird bei jedem regulären Speichern mitveröffentlicht, wie die
+  // Bestenliste). Volle Rohdaten werden veröffentlicht; wie viel davon ein BEOBACHTER tatsächlich
+  // angezeigt bekommt, entscheidet dessen EIGENE Abhorchposten-Stufe (siehe renderAbhorchpostenBox).
+  function summarizeOwnMissionsForBroadcast(){
+    const out = [];
+    for (const { planet: originKey, fleet } of allFleetsWithPlanet()){
+      for (const m of (fleet.missions||[])){
+        if (!m.endTime || m.endTime <= Date.now()) continue;
+        const destSystem = missionDestinationSystem(m);
+        if (!destSystem) continue;
+        const originSystem = planetSystemOf(originKey);
+        out.push({
+          type: m.type,
+          originSystem, destSystem,
+          startTime: m.startTime || (m.endTime - 1000),
+          endTime: m.endTime,
+          fleetName: m.fleetName || 'Flotte',
+          composition: m.composition || (m.shipKey ? { [m.shipKey]: m.qty||0 } : null)
+        });
+      }
+    }
+    return out;
+  }
+  // Nicht in state (kein Speicherbedarf, rein transienter Anzeige-Cache) - wie state.allianceDonationCache
+  // an anderer Stelle: async laden, in einem Modul-Cache ablegen, dann synchron rendern.
+  let abhorchCache = null; // { detected: [...], loadedAt }
+  async function loadDetectedFleets(){
+    const posts = myAbhorchposten();
+    if (!posts.length || !useBackend()){ abhorchCache = { detected: [], loadedAt: Date.now() }; renderAbhorchpostenBox(); return; }
+    try {
+      const listRes = await storageList('missions:', true);
+      const myKey = 'missions:'+state.player.id;
+      const keys = (listRes && listRes.keys) ? listRes.keys.filter(k => k !== myKey).slice(0, 60) : [];
+      const loaded = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); return r && r.value ? JSON.parse(r.value) : null; } catch(e){ return null; }
+      }));
+      const now = Date.now();
+      const detected = [];
+      for (const entry of loaded){
+        if (!entry || !Array.isArray(entry.missions)) continue;
+        for (const m of entry.missions){
+          if (!m.endTime || m.endTime <= now) continue;
+          // Bester erfassender Posten für DIESE Mission - sowohl Start- als auch Zielsystem zählen,
+          // da eine Flotte an einem der beiden vorbeikommt (keine echte Flugbahn-Interpolation nötig).
+          let bestLevel = 0;
+          for (const post of posts){
+            const dOrigin = systemSectorDistance(post.system, m.originSystem);
+            const dDest = systemSectorDistance(post.system, m.destSystem);
+            if (dOrigin <= post.range || dDest <= post.range) bestLevel = Math.max(bestLevel, post.level);
+          }
+          if (bestLevel > 0) detected.push(Object.assign({ playerName: entry.name||'Unbekannt', detectLevel: bestLevel }, m));
+        }
+      }
+      detected.sort((a,b)=>a.endTime-b.endTime);
+      abhorchCache = { detected, loadedAt: now };
+    } catch(e){ abhorchCache = { detected: [], loadedAt: Date.now() }; }
+    renderAbhorchpostenBox();
+  }
+  function renderAbhorchpostenBox(){
+    const box = document.getElementById('abhorchpostenBox');
+    if (!box) return;
+    const posts = myAbhorchposten();
+    if (!posts.length){ box.innerHTML = ''; return; }
+    const bestPost = posts.reduce((a,b)=>b.level>a.level?b:a, posts[0]);
+    const cache = abhorchCache;
+    const rows = cache ? cache.detected : [];
+    const missionTypeLabel = { explore:'Erkundung', colonize:'Kolonisierung', 'colonize-moon':'Mond-Kolonisierung', relocate:'Verlegung', attack:'Angriff (NPC)' };
+    box.innerHTML = `
+      <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-map-pin" aria-hidden="true"></i>Abhorchposten <span class="lvl-pill">Stufe ${bestPost.level}${posts.length>1?' · '+posts.length+' Monde':''}</span></div>
+      <div class="bmeta">Erfasst fremde Flottenbewegungen innerhalb von ${abhorchpostenRangeSectors(bestPost.level)} Sektor(en) um ${posts.map(p=>planetDisplayName(p.moonKey)).join(', ')}${bestPost.level<3?' - Missionstyp ab Stufe 3, Schiffszusammensetzung ab Stufe 4.':(bestPost.level<4?' - Schiffszusammensetzung ab Stufe 4.':'.')}</div>
+      ${!rows.length ? `<div class="bmeta">${cache?'Keine fremden Flotten in Reichweite erfasst.':'lädt…'}</div>` : rows.map(r => {
+        const originName = (STAR_SYSTEMS.find(s=>s.id===r.originSystem)||{}).name || r.originSystem;
+        const destName = (STAR_SYSTEMS.find(s=>s.id===r.destSystem)||{}).name || r.destSystem;
+        const remaining = Math.max(0, Math.round((r.endTime-Date.now())/1000));
+        const typeText = r.detectLevel>=3 ? (missionTypeLabel[r.type]||r.type) : 'unbekannter Missionstyp';
+        const compText = r.detectLevel>=4 && r.composition ? Object.entries(r.composition).filter(([,q])=>q>0).map(([k,q])=>q+'x '+(SHIP_DEFS.find(d=>d.key===k)||{name:k}).name).join(', ') : null;
+        return `
+          <div class="card-row">
+            <div class="left">
+              <div class="bicon" style="background:rgba(175,169,236,0.16); color:#c3bef5;"><i class="ti ti-ship" aria-hidden="true"></i></div>
+              <div>
+                <div class="bname">${r.playerName} <span class="lvl-pill">${typeText}</span></div>
+                <div class="bmeta">${originName} → ${destName} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(remaining)} verbleibend</div>
+                ${compText ? `<div class="bmeta" style="color:#5dcaa5;">${compText}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    `;
+  }
   // Flugzeit für eine Flottenverlegung: kurz innerhalb desselben Sternsystems, deutlich länger
   // zwischen verschiedenen Systemen. Wie bei anderen Missionen bestimmt die Geschwindigkeit des
   // verlegten Schiffstyps zusätzlich die Dauer (Fusionsantrieb-Forschung wirkt ebenfalls).
@@ -18046,6 +18216,7 @@
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
     if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
+    if (tab === 'verteidigung'){ loadDetectedFleets(); }
     if (tab === 'berichte'){
       loadReports();
       loadMessages();
@@ -18565,6 +18736,23 @@
 
     const activeB = currentBuildings();
     function buildingRowHtml(def){
+      // Mond-exklusive Gebäude (Spieler-Wunsch "Monde um einzigartige Gebäude erweitern"): erstes
+      // deklaratives moonOnly-Flag auf einem BUILDING_DEFS-Eintrag - bisher liefen alle Planet/Mond-
+      // Einschränkungen (Orbitalstation, Terraforming) über Ad-hoc-isMoonKey()-Prüfungen in mehreren
+      // Funktionen gleichzeitig, hier reicht ein einziges Flag + eine Stelle.
+      if (def.moonOnly && !isMoonKey(state.activeBasePlanet)){
+        return `
+          <div class="card-row research-locked">
+            <div class="left">
+              <div class="bicon" style="background:${def.bg};"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
+              <div>
+                <div class="bname">${def.name} <span class="lvl-pill">nur auf Monden</span></div>
+                <div class="bmeta">Dieses Gebäude kann nur auf einem kolonisierten Mond errichtet werden - zum Mond wechseln (☾-Symbol), falls vorhanden.</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
       if (def.special && !state.unlocked[def.key]){
         const have = state.rareItems[def.unlockItem]||0;
         const canUnlock = have >= 1;
@@ -18923,7 +19111,7 @@
         colonyAbandonBtn.onclick = () => abandonColony(state.activeBasePlanet);
       }
     }
-    if (activeTab === 'verteidigung'){ document.getElementById('defenseBuildings').innerHTML = constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense') + BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join(''); refreshDefenseMiniIcons(); }
+    if (activeTab === 'verteidigung'){ document.getElementById('defenseBuildings').innerHTML = constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense') + BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join(''); refreshDefenseMiniIcons(); renderAbhorchpostenBox(); }
 
     // Performance: Forschungsliste (18 Technologien mit Kosten-/Dauer-Berechnung je Tick) nur im
     // Forschung-Tab sichtbar – wird deshalb nur bei aktivem Tab neu berechnet.
@@ -21334,6 +21522,7 @@
     document.querySelectorAll('[data-build]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-build');
       const def = BUILDING_DEFS.find(d => d.key === key);
+      if (def.moonOnly && !isMoonKey(state.activeBasePlanet)){ log(def.name+' kann nur auf einem Mond errichtet werden.', 'ti-alert-triangle'); return; }
       if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){ log('Voraussetzung nicht erfüllt: '+(def.requires||[]).map(k=>(RESEARCH_DEFS.find(r=>r.key===k)||{}).name).join(', '), 'ti-alert-triangle'); return; }
       const b = currentBuildings();
       const lvl = b[key]||0;
@@ -21354,7 +21543,12 @@
         // immer eingereiht, Bezahlung und Start passieren automatisch sobald bezahlbar (siehe
         // activateQueuedJobs). Seltenes Item wird weiterhin sofort beim Einreihen verbraucht.
         if (specialItem) state.rareItems[specialItem] -= qty;
-        queueConstruction('building', state.activeBasePlanet, key, qty, def.buildTime||20, def.name+' (+'+qty+')', def.icon, cost);
+        // Bei buildTimePerLevelMult (aktuell nur Abhorchposten) wächst die Bauzeit JEDE Stufe
+        // innerhalb des Batches weiter - Summe der Einzelstufen-Zeiten, als Durchschnitt je Stufe an
+        // queueConstruction übergeben (das multipliziert intern wieder mit qty, siehe dort).
+        let totalDur = 0;
+        for (let i=0;i<qty;i++) totalDur += buildingLevelDuration(def, lvl+i);
+        queueConstruction('building', state.activeBasePlanet, key, qty, totalDur/qty, def.name+' (+'+qty+')', def.icon, cost);
       } else {
         // Normale (nicht-Verteidigungs-)Gebäude bleiben unverändert sofort anwendbar (keine Bauzeit,
         // kein Warteschlangen-Konzept) - dafür weiterhin eine echte Bezahlbarkeits-Prüfung nötig.
