@@ -2418,8 +2418,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.66.2';
+  const VERSION = '8.66.3';
   const PATCHNOTES = [
+    { version:'8.66.3', date:'17.07.2026', changes:[
+      'Neue Rang-Namen bei der Galaktischen Dominanz (Spieler-Wunsch): "Galaktische Legende" zählte bisher für immer weiter hoch (Stufe 20 z.B. "Galaktische Legende 12") - nach Stufe 20 gibt es jetzt zwei weitere Rang-Namen, "Sternenherrscher" (Stufe 21-32) und "Kosmischer Souverän" (Stufe 33-44), bevor ab Stufe 45 der letzte Rang wieder endlos weiterzählt. Bereits erreichte Ränge bis Stufe 20 bleiben unverändert'
+    ]},
     { version:'8.66.2', date:'17.07.2026', changes:[
       'Bugfix (allgemeiner Fehler-Check): Die Auto-Erkundungsrundreise-Box (Sektorkarte-Tab) nutzte drei Icons (Sanduhr, Route, Pfeil), die im eingebetteten Icon-Font des Spiels gar nicht enthalten sind und dadurch leer/unsichtbar blieben - ersetzt durch drei Icons aus dem tatsächlich verfügbaren Symbolsatz (Uhr, Karte, Chevron)'
     ]},
@@ -5786,7 +5789,13 @@
   // BEWUSST OHNE SIEGBEDINGUNG: die Stufen-Schwellen wachsen per Formel unbegrenzt weiter, es gibt
   // kein "Spielende". Der Dominanz-Wert speist sich aus allen Langzeit-Leistungen; jede erreichte
   // Stufe gibt eine einmalige Belohnung (Kredite + Kommandopunkte, steigend) und einen Rang-Titel.
-  const DOMINANCE_TITLES = ['Rekrut','Pionier','Kommandant','Kriegsherr','Vizeadmiral','Admiral','Großadmiral','Imperator','Galaktische Legende'];
+  const DOMINANCE_TITLES = ['Rekrut','Pionier','Kommandant','Kriegsherr','Vizeadmiral','Admiral','Großadmiral','Imperator'];
+  // Nach Imperator (Spieler-Wunsch: "mal ein neuer Name ab Level 20" statt für immer derselben
+  // hochzählenden "Galaktische Legende N") - drei weitere Rang-Namen, je 12 Stufen lang (dieselbe
+  // Spanne, die "Galaktische Legende" bisher allein abdeckte), danach zählt der letzte Name endlos
+  // weiter hoch (es gibt bewusst kein Spielende, siehe dominanceThreshold).
+  const DOMINANCE_LEGEND_TIERS = ['Galaktische Legende','Sternenherrscher','Kosmischer Souverän'];
+  const DOMINANCE_LEGEND_SPAN = 12;
   function dominanceScore(){
     return Math.round(
       computeScore()
@@ -5809,7 +5818,10 @@
   function dominanceTitle(lvl){
     if (lvl <= 0) return 'Neuling';
     if (lvl <= DOMINANCE_TITLES.length) return DOMINANCE_TITLES[lvl-1];
-    return 'Galaktische Legende '+(lvl - DOMINANCE_TITLES.length + 1);
+    const legendLvl = lvl - DOMINANCE_TITLES.length; // 1-basiert innerhalb der Legenden-Ränge
+    const tierIndex = Math.min(DOMINANCE_LEGEND_TIERS.length - 1, Math.floor((legendLvl-1) / DOMINANCE_LEGEND_SPAN));
+    const numberInTier = legendLvl - tierIndex*DOMINANCE_LEGEND_SPAN;
+    return DOMINANCE_LEGEND_TIERS[tierIndex]+' '+numberInTier;
   }
   function dominanceRewardFor(lvl){ return { credits: 200 + lvl*100, commandPoints: 10 + lvl*5 }; }
   function claimDominanceReward(){
@@ -11461,7 +11473,7 @@
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
       { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge und Skill-Baum. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum.' },
-      { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang (Rekrut → Pionier → … → Imperator → Galaktische Legende 1, 2, 3 …). Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
+      { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator (Stufe 1-8), dann Galaktische Legende 1-12 (Stufe 9-20), Sternenherrscher 1-12 (Stufe 21-32), Kosmischer Souverän 1-12 (Stufe 33-44) und ab Stufe 45 zählt "Kosmischer Souverän" endlos weiter hoch. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
       { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Im Verteidigung-Tab an-/abschaltbar.' },
