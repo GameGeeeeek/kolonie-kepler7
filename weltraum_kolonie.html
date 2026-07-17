@@ -216,6 +216,12 @@
     }
     @media (prefers-reduced-motion: reduce) { .shell::after { animation:none; } }
     @keyframes shellScan { 0%{ transform:translateY(0); } 100%{ transform:translateY(42px); } }
+    /* Grafik-Runde "High-End", Vorschlag 31 "Bedrohungs-Vignette": box-shadow statt drittem
+       Pseudo-Element - .shell::before/::after sind schon für Grid+Scanlines vergeben. Nur aktiv bei
+       ERKANNTEM Überfall (siehe render(), gleiche Bedingung wie das bestehende Raid-Timer-Badge). */
+    .shell.raid-threat { animation: shellRaidPulse 1.8s ease-in-out infinite; }
+    @keyframes shellRaidPulse { 0%,100%{ box-shadow: inset 0 0 60px 10px rgba(226,75,74,0.28); } 50%{ box-shadow: inset 0 0 85px 16px rgba(226,75,74,0.45); } }
+    @media (prefers-reduced-motion: reduce) { .shell.raid-threat { animation:none; box-shadow: inset 0 0 65px 12px rgba(226,75,74,0.32); } }
     #bgstars { position:absolute; inset:0; width:100%; height:100%; }
     /* iPhone-Notch/Dynamic-Island: viewport-fit=cover (siehe <meta name="viewport">) lässt den Inhalt
        jetzt bis unter den Notch reichen, statt den Bereich ungenutzt schwarz zu lassen - dafür braucht
@@ -377,7 +383,15 @@
       animation: battleCritFlash 0.22s ease-out forwards;
     }
     @keyframes battleCritFlash { 0%{ opacity:0.9; } 100%{ opacity:0; } }
-    .battle-dmg-float.critical { font-size:15px; font-weight:700; color:var(--gold) !important; text-shadow:0 0 6px rgba(250,199,117,0.6); }
+    .battle-dmg-float.critical { position:absolute; font-size:15px; font-weight:700; color:var(--gold) !important; text-shadow:0 0 6px rgba(250,199,117,0.6); }
+    /* Grafik-Runde "High-End", Vorschlag 33 "Farbversatz-Flash": kurzer Rot/Cyan-Versatz nur bei
+       kritischen Treffern, baut auf der schon vorhandenen .critical-Zahl auf. */
+    .battle-dmg-float.critical::before, .battle-dmg-float.critical::after { content:attr(data-text); position:absolute; left:0; top:0; pointer-events:none; }
+    .battle-dmg-float.critical::before { color:#ff3860; animation: dmgChromaR 0.5s ease-out forwards; }
+    .battle-dmg-float.critical::after { color:#3ad6ff; animation: dmgChromaL 0.5s ease-out forwards; }
+    @keyframes dmgChromaR { 0%{ transform:translateX(0); opacity:0.65; } 40%{ transform:translateX(2px); opacity:0.45; } 100%{ transform:translateX(2px); opacity:0; } }
+    @keyframes dmgChromaL { 0%{ transform:translateX(0); opacity:0.65; } 40%{ transform:translateX(-2px); opacity:0.45; } 100%{ transform:translateX(-2px); opacity:0; } }
+    @media (prefers-reduced-motion: reduce) { .battle-dmg-float.critical::before, .battle-dmg-float.critical::after { display:none; } }
     /* Alpha-Salve: einmalige, größere Sonderattacke schwerer Schiffe (Schlachtschiff/Superschlachtschiff)
        - breiterer, kräftigerer Strahl statt der normalen Schuss-Breite. */
     .battle-shot.alpha { height:4px; margin-top:-2px; filter:drop-shadow(0 0 3px currentColor); }
@@ -399,8 +413,13 @@
     .battle-side { flex:1; min-width:0; position:relative; z-index:1; }
     .battle-side-label { font-size:10.5px; color:var(--ink-dim); text-align:center; margin-bottom:6px; font-weight:600; }
     .battle-side-sublabel { font-size:8.5px; color:#7a7e94; text-align:center; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px; }
-    .battle-ship-icons { display:flex; flex-wrap:wrap; gap:3px; justify-content:center; }
-    .battle-ship-icon { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; transition:opacity 0.4s ease, transform 0.4s ease; }
+    /* Grafik-Runde "High-End", Vorschlag 32 "3D-Flottenformation": baut auf der bestehenden
+       Formations-Staffelung (--stagger-y, siehe Kommentar weiter unten) auf - dieselbe idx%3-
+       Gruppierung bekommt jetzt zusätzlich eine --stagger-z-Tiefe, per perspective auf dem Container
+       sichtbar gemacht. Bewusst nur Z-Versatz, kein rotateX der ganzen Formation - bleibt bei
+       Zeilenumbruch (viele Schiffstypen) weiterhin lesbar statt zu kippen. */
+    .battle-ship-icons { display:flex; flex-wrap:wrap; gap:3px; justify-content:center; perspective:280px; }
+    .battle-ship-icon { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; transition:opacity 0.4s ease, transform 0.4s ease; transform-style:preserve-3d; }
     .battle-ship-icon.destroyed { opacity:0.12; transform:scale(0.55); filter:grayscale(1); }
     .battle-ship-icon { position:relative; }
     /* Schiffs-Idle-Bewegung (13.07.2026, Feature-Wunsch: optisch aufwerten) - sehr dezentes,
@@ -411,12 +430,12 @@
        Zufällige --idle-delay (per Icon inline gesetzt) verhindert perfekt synchrones Wippen aller
        Schiffe im Gleichtakt. */
     .battle-ship-icon:not(.destroyed) { animation: battleShipIdle 3.2s ease-in-out infinite; animation-delay: var(--idle-delay, 0s); }
-    @keyframes battleShipIdle { 0%,100%{ transform:translateY(var(--stagger-y,0px)); } 50%{ transform:translateY(calc(var(--stagger-y,0px) - 1.8px)); } }
+    @keyframes battleShipIdle { 0%,100%{ transform:translateY(var(--stagger-y,0px)) translateZ(var(--stagger-z,0px)); } 50%{ transform:translateY(calc(var(--stagger-y,0px) - 1.8px)) translateZ(var(--stagger-z,0px)); } }
     /* Eintritts-Animation (13.07.2026) - Schiffe gleiten beim ersten Aufbau der Szene (vor Runde 1)
        sanft ein, statt sofort komplett und regungslos dazustehen. Läuft nur beim allerersten Render
        (siehe renderBattleFleetIcons isIntro-Parameter), nicht bei den Runden-Updates danach. */
     .battle-ship-icon.entering { animation: battleShipEnter 0.5s ease-out backwards; animation-delay: var(--enter-delay, 0s); }
-    @keyframes battleShipEnter { 0%{ opacity:0; transform:translateY(var(--stagger-y,0px)) scale(0.4); } 100%{ opacity:1; transform:translateY(var(--stagger-y,0px)) scale(1); } }
+    @keyframes battleShipEnter { 0%{ opacity:0; transform:translateY(var(--stagger-y,0px)) translateZ(var(--stagger-z,0px)) scale(0.4); } 100%{ opacity:1; transform:translateY(var(--stagger-y,0px)) translateZ(var(--stagger-z,0px)) scale(1); } }
     .battle-ship-icon.pre-hit { animation: battlePreHit 0.5s ease-in-out; }
     @keyframes battlePreHit { 0%,100%{ filter:none; } 30%,70%{ filter:brightness(2) drop-shadow(0 0 4px #ff6b5e); } }
     /* Grafik-Runde 3, Vorschlag "Ziel-Reticle": kurze Eckklammer-Zielerfassung um das Schiffs-Icon,
@@ -2373,8 +2392,27 @@
     }
     // Zeichnet alle gerade im DOM vorhandenen Mini-Icons neu (nach jedem Rebuild von defenseBuildings
     // aufzurufen, da innerHTML die vorherigen Canvas-Elemente komplett ersetzt).
+    // Grafik-Runde "High-End", Vorschlag 30 "Schärfere Canvas-Icons auf Retina-Displays": vorher
+    // wurde nirgends devicePixelRatio berücksichtigt - die Canvas-Backing-Stores hatten exakt die
+    // Pixelzahl ihres width/height-Attributs (meist 24-26px), auf hochauflösenden Bildschirmen also
+    // spürbar weicher als die umliegende CSS-Oberfläche. Skaliert den Backing-Store EINMALIG hoch
+    // (idempotent per data-dpr-done-Markierung) und hält die sichtbare CSS-Größe über style.width/
+    // height fest - drawShipMiniIcon/drawPlanetMiniIcon/drawDefenseMiniIcon selbst bleiben unverändert,
+    // da sie ohnehin schon relativ zu canvas.width/height zeichnen (s = Math.min(w,h)/100), nicht zu
+    // einer festen Pixelzahl.
+    function ensureCanvasDpr(canvas){
+      if (!canvas || canvas.dataset.dprDone) return;
+      const dpr = (typeof window!=='undefined' && window.devicePixelRatio) || 1;
+      canvas.dataset.dprDone = '1';
+      if (dpr <= 1) return;
+      const cssW = canvas.width, cssH = canvas.height;
+      canvas.style.width = cssW+'px';
+      canvas.style.height = cssH+'px';
+      canvas.width = Math.round(cssW*dpr);
+      canvas.height = Math.round(cssH*dpr);
+    }
     function refreshDefenseMiniIcons(){
-      DEFENSE_CANVAS_KEYS.forEach(key => drawDefenseMiniIcon(key, document.getElementById('defIcon_'+key)));
+      DEFENSE_CANVAS_KEYS.forEach(key => { const c = document.getElementById('defIcon_'+key); ensureCanvasDpr(c); drawDefenseMiniIcon(key, c); });
     }
 
     // Phase 2 der Grafik-Umstellung, Fortsetzung: Schiffe bekommen dieselbe Behandlung wie die drei
@@ -2480,7 +2518,7 @@
     function refreshShipMiniIcons(root){
       const scope = root || document;
       const skinFilter = activeFleetSkinFilter();
-      scope.querySelectorAll('canvas[data-ship-icon]').forEach(c => { drawShipMiniIcon(c.getAttribute('data-ship-icon'), c); c.style.filter = skinFilter; });
+      scope.querySelectorAll('canvas[data-ship-icon]').forEach(c => { ensureCanvasDpr(c); drawShipMiniIcon(c.getAttribute('data-ship-icon'), c); c.style.filter = skinFilter; });
     }
 
     // Phase 2 der Grafik-Umstellung, Fortsetzung: Planeten bekommen eine kleine gerenderte Kugel statt
@@ -2612,7 +2650,7 @@
     }
     function refreshPlanetMiniIcons(root){
       const scope = root || document;
-      scope.querySelectorAll('canvas[data-planet-icon]').forEach(c => drawPlanetMiniIcon(c.getAttribute('data-planet-icon'), c));
+      scope.querySelectorAll('canvas[data-planet-icon]').forEach(c => { ensureCanvasDpr(c); drawPlanetMiniIcon(c.getAttribute('data-planet-icon'), c); });
     }
     // Für die SVG-Orbit-Karte (Sektorkarte-Ansicht mit Umlaufbahnen): SVG kennt kein <canvas> als
     // Kindelement mit Nachbearbeitung wie das HTML-Icon-System oben, daher hier stattdessen die bereits
@@ -2676,8 +2714,16 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.84.0';
+  const VERSION = '8.85.0';
   const PATCHNOTES = [
+    { version:'8.85.0', date:'17.07.2026', changes:[
+      'Grafik-Overhaul "High-End": alle Schiffs-/Planeten-/Verteidigungs-Canvas-Icons zeichnen jetzt in devicePixelRatio-facher Auflösung - auf Retina-/hochauflösenden Bildschirmen spürbar schärfer statt leicht weich (echter, vorher unbemerkter Befund)',
+      'Ein dezenter roter Rand-Schein pulsiert jetzt um die gesamte Oberfläche, solange ein ERKANNTER Überfall auf die Heimatbasis unterwegs ist (nur bei bereits aufgedeckten Überfällen, keine zusätzliche Information gegenüber dem bestehenden Warn-Badge)',
+      'Kampf-Wiedergabe: Schiffs-Formationen bekommen jetzt zusätzlich zur bestehenden Höhen-Staffelung eine Tiefen-Staffelung (3D-Perspektive) für einen räumlicheren Eindruck',
+      'Kritische Treffer in der Kampf-Wiedergabe haben jetzt einen kurzen Rot/Cyan-Farbversatz auf der Schadenszahl',
+      'Bewusst NICHT umgesetzt (siehe Vorschau-Vorschlag): ein WebGL-Shader-Nebelhintergrund - Aufwand/Akkukosten stehen in keinem Verhältnis zum kaum sichtbaren Zugewinn gegenüber dem bestehenden Canvas-Nebel',
+      'Alle neuen Effekte respektieren "reduzierte Bewegung"'
+    ]},
     { version:'8.84.0', date:'17.07.2026', changes:[
       'Grafik-Overhaul "Maximum" (Spieler-Wunsch "maximale Grafik, high end"): Sternenfeld-Hintergrund hat jetzt drei Tiefenebenen mit seitlicher Drift statt einer flachen Ebene, dazu zwei sehr blasse driftende Nebelflecken',
       'Ressourcenwerte zählen jetzt sichtbar hoch/runter statt zu springen - dabei einen echten, nie bemerkten Bug gefunden und behoben: die "+N"-Einflug-Anzeige bei Produktion war bisher praktisch unsichtbar, weil die Ressourcenkarten bei jedem Sekunden-Tick komplett neu aufgebaut wurden, noch bevor der Browser die Anzeige einmal zeichnen konnte',
@@ -11682,9 +11728,12 @@
       // CSS-Variable statt festem Inline-Transform gesetzt, damit sich Idle-Bewegung (siehe CSS) und
       // ggf. Eintritts-Animation korrekt damit kombinieren, statt sich gegenseitig zu überschreiben.
       const staggerY = idx%3===0 ? -2 : idx%3===1 ? 2 : 0;
+      // Grafik-Runde "High-End", Vorschlag 32: gleiche idx%3-Gruppierung wie staggerY, jetzt
+      // zusätzlich mit Tiefen-Versatz (siehe --stagger-z in den battleShipIdle/-Enter-Keyframes).
+      const staggerZ = idx%3===0 ? 8 : idx%3===1 ? -6 : 0;
       const idleDelay = (Math.random()*2.4).toFixed(2);
       const introStyle = isIntro ? `--enter-delay:${(idx*0.04).toFixed(2)}s;` : '';
-      return `<span class="battle-ship-icon ${dead?'destroyed':''}${isIntro?' entering':''}" data-battle-ship="${k}" title="${shipDisplayName(k)}" style="--stagger-y:${staggerY}px; --idle-delay:${idleDelay}s; ${introStyle}">${svg}</span><span data-battle-ship-count="${k}" style="font-size:10px; color:#c7cbe0; margin:0 6px 0 -1px; align-self:center;">${Math.max(0,remaining)}</span>`;
+      return `<span class="battle-ship-icon ${dead?'destroyed':''}${isIntro?' entering':''}" data-battle-ship="${k}" title="${shipDisplayName(k)}" style="--stagger-y:${staggerY}px; --stagger-z:${staggerZ}px; --idle-delay:${idleDelay}s; ${introStyle}">${svg}</span><span data-battle-ship-count="${k}" style="font-size:10px; color:#c7cbe0; margin:0 6px 0 -1px; align-self:center;">${Math.max(0,remaining)}</span>`;
     }).join('');
   }
   // Angeschlagen-Zustand (13.07.2026, Feature-Wunsch: sichtbarer Schaden vor Zerstörung) - markiert
@@ -11719,6 +11768,10 @@
     const el = document.createElement('div');
     el.className = 'battle-dmg-float'+(critical?' critical':'');
     el.textContent = '-'+fmt(dmgVal)+(critical?'!':'');
+    // Grafik-Runde "High-End", Vorschlag 33 "Farbversatz-Flash": data-text spiegelt den Zahlentext für
+    // die ::before/::after-Duplikate (content:attr(data-text)) - der eigentliche Text bleibt in
+    // textContent, CSS kennt ihn zur Autorenzeit nicht.
+    if (critical) el.setAttribute('data-text', el.textContent);
     el.style.left = xPct+'%';
     el.style.top = yPct+'%';
     if (!critical) el.style.color = weapon.color;
@@ -23282,6 +23335,12 @@
       }
     }
     const raidBadge = document.getElementById('heroRaidTimer');
+    // Grafik-Runde "High-End", Vorschlag 31 "Bedrohungs-Vignette": dieselbe bereits etablierte
+    // Bedingung wie das Raid-Timer-Badge direkt darunter (nur bei ERKANNTEM Überfall, siehe
+    // state.incomingRaid.detected - ein noch unentdeckter geplanter Überfall bleibt weiterhin
+    // verborgen, die Vignette leakt also keine Information, die der Spieler sonst nicht hätte).
+    const shellEl = document.querySelector('.shell');
+    if (shellEl) shellEl.classList.toggle('raid-threat', !!(state.nextRaidTime && state.nextRaidTime > Date.now() && state.incomingRaid && state.incomingRaid.detected));
     if (state.nextRaidTime && state.nextRaidTime > Date.now() && state.incomingRaid && state.incomingRaid.detected){
       const remain = state.nextRaidTime - Date.now();
       const mm = String(Math.floor(remain/60000)).padStart(2,'0');
