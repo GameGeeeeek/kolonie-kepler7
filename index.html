@@ -1548,6 +1548,9 @@
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-box" aria-hidden="true"></i>Schiffsmodule</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Module gibst du pro Standort in Slots – jeder Standort wird einzeln aufgerüstet (kostet Kommandopunkte). Ausgerüstete Module wirken nur an ihrem Standort. Module findest du bei Expeditionen und Sonden.</div>
         <div id="moduleBox"></div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-truck" aria-hidden="true"></i>Schiffsklassen-Module</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Diese Module wirken klassenweit – auf JEDES Schiff einer Klasse, egal wo in deiner Flotte es steht (statt ortsgebunden wie die Standort-Module oben). Jede Schiffsklasse hat eigene Slots. Die stärksten Seltenheitsstufen sind exklusiv über hochstufige Allianzmissionen erhältlich.</div>
+        <div id="shipModuleBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-allianz">
@@ -2420,8 +2423,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.67.0';
+  const VERSION = '8.68.0';
   const PATCHNOTES = [
+    { version:'8.68.0', date:'17.07.2026', changes:[
+      'Neu: Schiffsklassen-Module (Spieler-Wunsch, Teil 1 von "Allianzmissionen mit exklusiven Belohnungen") - ein zweites, komplett getrenntes Modulsystem im Offiziere-Tab. Anders als die bestehenden Standort-Module wirken diese Boni klassenweit: EIN Modul für "Schlachtschiffe" verstärkt JEDES Schlachtschiff in der Flotte, egal wo es stationiert ist. Vier Klassen mit eigenen Slots: Schlachtschiffe (Verbesserte Panzerung, Zielcomputer, Schildverstärker), Frachter (Erweiterter Frachtraum, Treibstoffoptimierung, Verbesserte Triebwerke), Aufklärungsschiffe (Langstreckensensoren, Tarnmodul, Verbesserte Scanner) und Mondzerstörer (Reaktorkern-Upgrade, Präzisionslaser, Verstärkte Hülle, Antriebsoptimierung)',
+      'Neue 5. Seltenheitsstufe "Mythisch" für BEIDE Modulsysteme (Standort- und Schiffsklassen-Module). Episch/Legendär/Mythisch der neuen Schiffsklassen-Module sind bewusst noch nicht über normale Fundquellen erhältlich - vorerst nur bis "Selten" über die neue "Schiffsklassen-Blaupause" im Kredit-Shop (3500 Kr.). Die stärkeren Stufen sind für die geplanten Allianzmissionen reserviert, wie im Feature-Wunsch beschrieben',
+      'Die Boni greifen direkt in die bestehenden Formeln ein: Angriffskraft, Verteidigungsbeitrag/Schildpunkte, Frachtkapazität, Treibstoffverbrauch und Geschwindigkeit je Schiffstyp, sowie Schadenswert und Erfolgschance des Mondzerstörers bei Mondbelagerungen - jeweils nur für Schiffe der jeweils betroffenen Klasse, auch in gemischten Flotten'
+    ]},
     { version:'8.67.0', date:'17.07.2026', changes:[
       'Neu: Koordinierte Allianzbasis-Angriffe (Spieler-Wunsch) - Admins/Offiziere können jetzt einen geplanten Großangriff gegen eine fremde Allianzbasis starten, mit wählbarer Sammelzeit (30 Min./1 Std./2 Std.) und optionaler Nachricht. Während der Sammelphase schließen sich Mitglieder freiwillig mit ihrer zusammengestellten Angriffsflotte an (Rückzug jederzeit während der Sammelphase möglich) - live sichtbar sind Teilnehmerzahl, Gesamtschiffe und Gesamt-Angriffskraft',
       'Nach Ablauf der Sammelzeit fliegt der gesamte Flottenverband gemeinsam los und trifft geschlossen am Ziel ein. Die verteidigende Allianz erhält sofort eine Warnung (Angreifer-Tag + Ankunftszeit) und kann in dieser Zeit wie gewohnt Verteidigungsflotten entsenden und Ressourcen spenden',
@@ -5911,7 +5919,13 @@
     { key:'schild', name:'Schildgenerator-Miete', icon:'ti-shield', cost:500, desc:'+25% Verteidigung für 2 Stunden',
       buy(){ state.buffs = state.buffs||[]; state.buffs.push({ kind:'def', mult:1.25, expiresAt: Date.now()+2*60*60*1000, source:'shop' }); } },
     { key:'blaupause', name:'Modul-Blaupause', icon:'ti-box', cost:2000, desc:'Ein zufälliges Schiffsmodul (Seltenheit zufällig, einbaubar im Offiziere-Tab)',
-      buy(){ const name = grantRandomModule(); return 'Erhalten: '+name; } }
+      buy(){ const name = grantRandomModule(); return 'Erhalten: '+name; } },
+    // Schiffsklassen-Blaupause (17.07.2026): einzige Vor-Allianzmissionen-Bezugsquelle für das neue,
+    // klassenweite Modulsystem - bewusst auf 'selten' gedeckelt (siehe grantRandomShipModule), Episch/
+    // Legendär/Mythisch bleiben so, wie im Feature-Wunsch beschrieben, hochstufigen Allianzmissionen
+    // vorbehalten, sobald diese existieren.
+    { key:'blaupauseKlasse', name:'Schiffsklassen-Blaupause', icon:'ti-truck', cost:3500, desc:'Ein zufälliges Schiffsklassen-Modul (max. Seltenheit "Selten", einbaubar im Offiziere-Tab)',
+      buy(){ const name = grantRandomShipModule('selten'); return 'Erhalten: '+name; } }
   ];
   // Ein Shop-Buff derselben Art kann nicht gestapelt werden, solange er läuft (verhindert Mehrfachkauf-Stacking).
   function shopBuffActive(kind){
@@ -6692,7 +6706,7 @@
   // Gesamt-Frachtraum einer Flottenzusammenstellung über BEIDE Frachtertypen hinweg - zentrale
   // Funktion statt die Formel an jeder Stelle (Spielerangriffe, Bosse, Piratennest, NPCs) einzeln zu
   // wiederholen (13.07.2026, beim Ergänzen des Großen Frachters).
-  function fleetCargoCapacity(fleet){ return (fleet.frachter||0)*CARGO_PER_FRACHTER + (fleet.frachtergross||0)*CARGO_PER_FRACHTER_GROSS; }
+  function fleetCargoCapacity(fleet){ const cargoMult = 1+shipModuleBonusFor('frachter','cargo'); return (fleet.frachter||0)*CARGO_PER_FRACHTER*cargoMult + (fleet.frachtergross||0)*CARGO_PER_FRACHTER_GROSS*cargoMult; }
   const EXPEDITION_SHIP_KEYS = ['forscher','jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger'];
   const ESCORT_KEYS = EXPEDITION_SHIP_KEYS.filter(k=>k!=='forscher');
   let expeditionEscortSelection = {};
@@ -6826,7 +6840,7 @@
       total += v;
       if (shipFuelType(k) === 'antimaterie') anti += v;
     }
-    const cost = missionFuelCost(durationSec, total);
+    const cost = Math.round(missionFuelCost(durationSec, total) * fleetFuelModuleMult(composition));
     const antiCost = total > 0 ? Math.round(cost * anti / total) : 0;
     const fuel = {};
     if (cost - antiCost > 0) fuel.deuterium = cost - antiCost;
@@ -7194,7 +7208,7 @@
     let slowest = null;
     for (const key of relevantKeys){
       if ((fleet[key]||0) > 0){
-        const speed = key==='superschlachtschiff' ? SUPER_SPEED : (SHIP_DEFS.find(d=>d.key===key)||{}).speed;
+        const speed = effectiveShipSpeed(key);
         if (speed && (slowest===null || speed < slowest)) slowest = speed;
       }
     }
@@ -7325,7 +7339,7 @@
   function attackPowerRaw(fleet){
     const f = fleet || currentFleet();
     const df = deployableFighters(f);
-    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90 + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8;
+    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90*(1+shipModuleBonusFor('schlachtschiff','atk')) + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8;
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
@@ -7350,7 +7364,11 @@
     gewoehnlich: { label:'Gewöhnlich', color:'#9aa0b8', mult:1.0 },
     selten:      { label:'Selten',      color:'#5dcaa5', mult:1.6 },
     episch:      { label:'Episch',      color:'#af7ce6', mult:2.4 },
-    legendaer:   { label:'Legendär',    color:'#fac775', mult:3.5 }
+    legendaer:   { label:'Legendär',    color:'#fac775', mult:3.5 },
+    // Mythisch (17.07.2026, Feature-Wunsch): 5. Stufe, bewusst NICHT im normalen Fundpool
+    // (grantRandomModule()/grantRandomShipModule() würfeln sie nie) - ausschließlich als Belohnung
+    // für hochstufige Allianzmissionen vorgesehen, sobald diese existieren.
+    mythisch:    { label:'Mythisch',    color:'#ff5da2', mult:5.0 }
   };
   // Basis-Boni pro Modultyp (werden mit der Seltenheit multipliziert). effect: welcher Bonus, base: Basiswert.
   const MODULE_DEFS = [
@@ -7433,6 +7451,139 @@
     state.modules[instKey] = (state.modules[instKey]||0) + 1;
     const info = moduleInstanceInfo(instKey);
     return info ? (info.rar.label+' '+info.def.name) : 'Modul';
+  }
+
+  // ===== Schiffsklassen-Module (klassenweite Boni, getrennt vom Standort-Modulsystem oben) =====
+  // Spieler-Wunsch 17.07.2026 (Allianzmissionen mit exklusiven Belohnungen): Boni gelten NICHT pro
+  // Standort, sondern für JEDES Schiff einer Klasse, egal wo in der Flotte es steht. Teilt sich die
+  // Seltenheitsstufen (MODULE_RARITY) mit dem Standort-System, hat aber eigene Slots (pro Klasse
+  // einzeln aufwertbar, state.shipModuleSlotLevel[klasse]) und ein eigenes Inventar (state.shipModules).
+  // Episch/Legendär/Mythisch sind bewusst (noch) nicht über grantRandomShipModule() im normalen
+  // Fundpool - siehe SHIP_MODULE_ACQUIRE_MAX_RARITY - und werden erst mit den geplanten
+  // Allianzmissionen als echte Belohnungsquelle für die stärksten Stufen erreichbar.
+  const SHIP_CLASS_DEFS = [
+    { key:'schlachtschiff',  name:'Schlachtschiffe',       icon:'ship_schlachtschiff',  shipKeys:['schlachtschiff'] },
+    { key:'frachter',        name:'Frachter',              icon:'ship_frachter',        shipKeys:['frachter','frachtergross'] },
+    { key:'aufklaerer',      name:'Aufklärungsschiffe',    icon:'ship_spaeher',         shipKeys:['ships','spaeher'] },
+    { key:'mondzerstoerer',  name:'Mondzerstörer',         icon:'ship_mondzerstoerer',  shipKeys:['mondzerstoerer'] }
+  ];
+  function shipClassKeyFor(shipKey){
+    const cls = SHIP_CLASS_DEFS.find(c=>c.shipKeys.includes(shipKey));
+    return cls ? cls.key : null;
+  }
+  // effect: 'atk' (attackPowerRaw), 'hull' (Verteidigungsbeitrag in shipDefenseContribution), 'shield'
+  // (Schildpunkte, siehe dort), 'cargo' (fleetCargoCapacity), 'fuel' (missionFuelCostSplit, negativ =
+  // Ersparnis), 'speed' (effectiveShipSpeed), 'siegechance' (nur Mondzerstörer, resolveMoonSiege).
+  const SHIP_MODULE_DEFS = [
+    { key:'ss_panzerung',      klasse:'schlachtschiff', name:'Verbesserte Panzerung',  icon:'ti-shield',      effect:'hull',        base:0.10, desc:'Erhöht den Verteidigungsbeitrag von Schlachtschiffen.' },
+    { key:'ss_zielcomputer',   klasse:'schlachtschiff', name:'Zielcomputer',           icon:'ti-target',      effect:'atk',         base:0.05, desc:'Erhöht die Angriffskraft von Schlachtschiffen.' },
+    { key:'ss_schildverstaerker', klasse:'schlachtschiff', name:'Schildverstärker',    icon:'ti-shield-lock', effect:'shield',      base:0.08, desc:'Erhöht die Schildpunkte von Schlachtschiffen.' },
+    { key:'fr_frachtraum',     klasse:'frachter',       name:'Erweiterter Frachtraum', icon:'ti-truck',       effect:'cargo',       base:0.20, desc:'Erhöht die Frachtkapazität von Frachtern.' },
+    { key:'fr_treibstoff',     klasse:'frachter',       name:'Treibstoffoptimierung',  icon:'ti-droplet',     effect:'fuel',        base:0.10, desc:'Verringert den Treibstoffverbrauch von Frachterflotten.' },
+    { key:'fr_triebwerke',     klasse:'frachter',       name:'Verbesserte Triebwerke', icon:'ti-rocket',      effect:'speed',       base:0.10, desc:'Erhöht die Geschwindigkeit von Frachtern.' },
+    { key:'au_sensoren',       klasse:'aufklaerer',     name:'Langstreckensensoren',   icon:'ti-map-2',       effect:'speed',       base:0.10, desc:'Erhöht die Geschwindigkeit von Aufklärungsschiffen.' },
+    { key:'au_tarnmodul',      klasse:'aufklaerer',     name:'Tarnmodul',              icon:'ti-atom-2',      effect:'fuel',        base:0.10, desc:'Verringert den Treibstoffverbrauch von Aufklärungsschiffen.' },
+    { key:'au_scanner',        klasse:'aufklaerer',     name:'Verbesserte Scanner',    icon:'ti-world',       effect:'hull',        base:0.10, desc:'Erhöht die Überlebenschance von Aufklärungsschiffen.' },
+    { key:'mz_reaktorkern',    klasse:'mondzerstoerer', name:'Reaktorkern-Upgrade',    icon:'ti-bolt',        effect:'atk',         base:0.05, desc:'Erhöht die Angriffskraft des Mondzerstörers bei Belagerungen.' },
+    { key:'mz_praezisionslaser', klasse:'mondzerstoerer', name:'Präzisionslaser',      icon:'ti-target',      effect:'siegechance', base:0.05, desc:'Erhöht die Erfolgschance von Mondbelagerungen.' },
+    { key:'mz_huelle',         klasse:'mondzerstoerer', name:'Verstärkte Hülle',       icon:'ti-shield',      effect:'hull',        base:0.10, desc:'Erhöht den Verteidigungsbeitrag des Mondzerstörers.' },
+    { key:'mz_antrieb',        klasse:'mondzerstoerer', name:'Antriebsoptimierung',    icon:'ti-rocket',      effect:'speed',       base:0.15, desc:'Erhöht die Geschwindigkeit des Mondzerstörers.' }
+  ];
+  const SHIP_MODULE_MAX_SLOT_LEVEL = 3; // etwas knapper als das Standort-System (4) - wirkt klassenweit statt nur an einem Ort
+  function shipModuleInstanceInfo(instKey){
+    const [key, rarity] = instKey.split(':');
+    const def = SHIP_MODULE_DEFS.find(d=>d.key===key);
+    const rar = MODULE_RARITY[rarity];
+    if (!def || !rar) return null;
+    return { key, rarity, def, rar, bonus: def.base * rar.mult };
+  }
+  function shipModuleSlotCount(klasse){ return (state.shipModuleSlotLevel||{})[klasse] || 0; }
+  function equippedShipModulesAt(klasse){ return (state.equippedShipModules||{})[klasse] || []; }
+  // Summierter Bonus eines Effekts für eine Schiffsklasse durch alle dort ausgerüsteten Module.
+  function shipModuleBonusFor(klasse, effect){
+    let sum = 0;
+    for (const instKey of equippedShipModulesAt(klasse)){
+      const info = shipModuleInstanceInfo(instKey);
+      if (info && info.def.effect === effect) sum += info.bonus;
+    }
+    return sum;
+  }
+  function shipModuleSlotUpgradeCost(nextSlotLevel){ return Math.round(90 * Math.pow(1.9, nextSlotLevel - 1)); }
+  function upgradeShipModuleSlot(klasse){
+    if (!SHIP_CLASS_DEFS.some(c=>c.key===klasse)){ log('Ungültige Schiffsklasse.', 'ti-alert-triangle'); return; }
+    const cur = shipModuleSlotCount(klasse);
+    if (cur >= SHIP_MODULE_MAX_SLOT_LEVEL){ log('Maximale Slot-Anzahl für diese Schiffsklasse erreicht.', 'ti-alert-triangle'); return; }
+    const cost = shipModuleSlotUpgradeCost(cur+1);
+    if ((state.commandPoints||0) < cost){ log('Nicht genug Kommandopunkte ('+cost+' benötigt).', 'ti-alert-triangle'); return; }
+    state.commandPoints -= cost;
+    state.shipModuleSlotLevel[klasse] = cur+1;
+    const clsName = (SHIP_CLASS_DEFS.find(c=>c.key===klasse)||{}).name || klasse;
+    log('Schiffsklassen-Modul-Slot für '+clsName+' freigeschaltet (jetzt '+(cur+1)+' Slots, −'+cost+' Kommandopunkte).', 'ti-box');
+    playSound('build');
+    render(); save();
+  }
+  function equipShipModule(klasse, instKey){
+    if ((state.shipModules[instKey]||0) < 1){ log('Dieses Modul ist nicht mehr im Inventar.', 'ti-alert-triangle'); return; }
+    const equipped = equippedShipModulesAt(klasse);
+    if (equipped.length >= shipModuleSlotCount(klasse)){ log('Keine freien Slots für diese Schiffsklasse.', 'ti-alert-triangle'); return; }
+    state.shipModules[instKey] -= 1;
+    if (state.shipModules[instKey] <= 0) delete state.shipModules[instKey];
+    state.equippedShipModules[klasse] = [...equipped, instKey];
+    const info = shipModuleInstanceInfo(instKey);
+    const clsName = (SHIP_CLASS_DEFS.find(c=>c.key===klasse)||{}).name || klasse;
+    log((info?info.rar.label+' '+info.def.name:'Modul')+' für '+clsName+' ausgerüstet.', info?info.def.icon:'ti-box');
+    playSound('build');
+    render(); save();
+  }
+  function unequipShipModule(klasse, slotIndex){
+    const equipped = [...equippedShipModulesAt(klasse)];
+    if (slotIndex < 0 || slotIndex >= equipped.length) return;
+    const instKey = equipped.splice(slotIndex, 1)[0];
+    state.equippedShipModules[klasse] = equipped;
+    state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
+    log('Schiffsklassen-Modul abgenommen und ins Inventar zurückgelegt.', 'ti-box');
+    render(); save();
+  }
+  // Vergibt ein zufälliges Schiffsklassen-Modul, gedeckelt auf maxRarity (Standardquellen vor
+  // Allianzmissionen bleiben so auf 'selten' begrenzt - siehe Kommentar am Block-Anfang).
+  const SHIP_MODULE_RARITY_ORDER = ['gewoehnlich','selten','episch','legendaer','mythisch'];
+  function grantRandomShipModule(maxRarity){
+    const def = SHIP_MODULE_DEFS[Math.floor(Math.random()*SHIP_MODULE_DEFS.length)];
+    const capIdx = maxRarity ? SHIP_MODULE_RARITY_ORDER.indexOf(maxRarity) : SHIP_MODULE_RARITY_ORDER.length-1;
+    const roll = Math.random();
+    let idx = 0;
+    if (roll < 0.05) idx = 3;
+    else if (roll < 0.20) idx = 2;
+    else if (roll < 0.50) idx = 1;
+    idx = Math.min(idx, Math.max(0, capIdx));
+    const rarity = SHIP_MODULE_RARITY_ORDER[idx];
+    const instKey = def.key+':'+rarity;
+    state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
+    const info = shipModuleInstanceInfo(instKey);
+    return info ? (info.rar.label+' '+info.def.name) : 'Schiffsklassen-Modul';
+  }
+  // Geschwindigkeit eines Schiffstyps inkl. klassenweitem Geschwindigkeits-Modulbonus (ersetzt die
+  // rohe SHIP_DEFS-Geschwindigkeit überall dort, wo einzelne Schiffstypen verglichen werden).
+  function effectiveShipSpeed(shipKey){
+    let speed = shipKey==='superschlachtschiff' ? SUPER_SPEED : (SHIP_DEFS.find(d=>d.key===shipKey)||{}).speed;
+    if (!speed) return speed;
+    const cls = shipClassKeyFor(shipKey);
+    if (cls) speed *= (1 + shipModuleBonusFor(cls, 'speed'));
+    return speed;
+  }
+  // Gewichteter Treibstoff-Multiplikator einer Flottenzusammensetzung nach Klassen-Modulen mit
+  // 'fuel'-Effekt (Frachter: Treibstoffoptimierung, Aufklärer: Tarnmodul) - gewichtet nach Anteil der
+  // jeweiligen Klasse an der Gesamtschiffszahl, analog zu fleetDiversityMult()/counterMultiplier().
+  function fleetFuelModuleMult(composition){
+    let total = 0, weighted = 0;
+    for (const [k,v] of Object.entries(composition||{})){
+      if (typeof v !== 'number' || v <= 0) continue;
+      total += v;
+      const cls = shipClassKeyFor(k);
+      const bonus = cls ? shipModuleBonusFor(cls, 'fuel') : 0;
+      weighted += v * Math.max(0.1, 1-bonus);
+    }
+    return total > 0 ? weighted/total : 1;
   }
 
   // ===== Offiziere =====
@@ -7541,8 +7692,15 @@
       if (def.key === 'bomber') count = df.bomber;
       if (!count) continue;
       const weight = def.defWeight !== undefined ? def.defWeight : 1;
-      atkDerivedSum += diminishingShipCount(count) * (def.atk||0) * weight;
-      shieldSum += count * (def.shield||0);
+      // Klassenweite Hülle-/Schild-Module (Schiffsklassen-Modulsystem): 'hull' verstärkt den
+      // Verteidigungsbeitrag, 'shield' gibt zusätzliche Schildpunkte. Schiffe ohne eigenen shield-Basiswert
+      // (z.B. Schlachtschiff) erhalten stattdessen Schildpunkte proportional zu ihrem Angriffswert -
+      // sie haben regulär keinen shield-Stat, den ein reiner %-Bonus verstärken könnte.
+      const cls = shipClassKeyFor(def.key);
+      const hullBonus = cls ? shipModuleBonusFor(cls, 'hull') : 0;
+      const shieldBonus = cls ? shipModuleBonusFor(cls, 'shield') : 0;
+      atkDerivedSum += diminishingShipCount(count) * (def.atk||0) * weight * (1+hullBonus);
+      shieldSum += count * (def.shield ? def.shield*(1+shieldBonus) : (def.atk||0)*shieldBonus*0.5);
     }
     const superCount = fleet.superschlachtschiff||0;
     if (superCount){
@@ -8866,6 +9024,9 @@
     if (!state.modules) state.modules = {};
     if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
     if (!state.equippedModules) state.equippedModules = {};
+    if (!state.shipModuleSlotLevel) state.shipModuleSlotLevel = {};
+    if (!state.shipModules) state.shipModules = {};
+    if (!state.equippedShipModules) state.equippedShipModules = {};
     if (!state.levelRewardsClaimed) state.levelRewardsClaimed = {};
     if (!state.rareItems) state.rareItems = {};
     if (!state.inventory) state.inventory = {};
@@ -11478,12 +11639,13 @@
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen (mit 20% Abschlag auf den Durchschnittspreis) und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Wer viel verkauft, drückt den Preis spürbar - bis auf rund 15% des Normalwerts. Preise erholen sich mit der Zeit: durch Käufe erhöhte Preise recht zügig, durch Verkäufe gedrückte Preise dagegen sehr langsam (mehrere Tage statt Stunden bis zur fast vollständigen Erholung). Ein großer Verkauf hat also eine lange spürbare Wirkung auf den Preis, ein großer Kauf nicht.' },
       { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
       { title:'Handelsrouten', body:'Binde Kleine Frachter dauerhaft an eine Route für passiven Ertrag (nur Kleine Frachter, Große Frachter können nicht gebunden werden). Gebundene Frachter stehen nicht mehr für Kämpfe/Missionen bereit und zählen nicht zur Lagerkapazität. Drei Typen: <strong>Kredit-Route</strong> (nur EINE gleichzeitig, max. 15 Frachter, Ertrag wächst mit abnehmendem Grenzertrag statt linear, kostet laufend Erz als Unterhalt), <strong>Markt-Verkaufsroute</strong> (verkauft automatisch eine Ressource am Markt, braucht Server) und <strong>Transportroute</strong> (Logistikbonus: +10% der bewegten Menge einer Ressource, beliebig viele möglich). Ein Zyklus pro Minute. Routen jederzeit auflösbar (Frachter werden wieder frei).' },
-      { title:'Kredit-Shop', body:'Im Markt-Tab kannst du Kredite ausgeben für: <strong>Produktions-Schub</strong> (+25% alle Ressourcen, 1h, 400 Kr.) · <strong>Söldnerflotte</strong> (+20% Angriffskraft, 2h, 600 Kr.) · <strong>Schildgenerator-Miete</strong> (+25% Verteidigung, 2h, 500 Kr.) · <strong>Modul-Blaupause</strong> (zufälliges Schiffsmodul, 2000 Kr.). Laufende Shop-Buffs können nicht gestapelt werden – erst nach Ablauf erneut kaufbar. Blaupausen sind beliebig oft kaufbar.' }
+      { title:'Kredit-Shop', body:'Im Markt-Tab kannst du Kredite ausgeben für: <strong>Produktions-Schub</strong> (+25% alle Ressourcen, 1h, 400 Kr.) · <strong>Söldnerflotte</strong> (+20% Angriffskraft, 2h, 600 Kr.) · <strong>Schildgenerator-Miete</strong> (+25% Verteidigung, 2h, 500 Kr.) · <strong>Modul-Blaupause</strong> (zufälliges Standort-Schiffsmodul, 2000 Kr.) · <strong>Schiffsklassen-Blaupause</strong> (zufälliges klassenweites Modul, max. Seltenheit "Selten", 3500 Kr.). Laufende Shop-Buffs können nicht gestapelt werden – erst nach Ablauf erneut kaufbar. Blaupausen sind beliebig oft kaufbar.' }
     ]},
     { key:'offiziere', icon:'ti-user-circle', title:'Offiziere', entries:[
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Gebäude-Bauzeit pro Stufe), <strong>Admiral</strong> (+2% Angriffskraft), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Handelsgewinn beim Schwarzmarkt). Jeder geht von Stufe 0 (nicht angeheuert) bis 10, also bis zu ±20%.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr).' },
-      { title:'Schiffsmodule', body:'Ausrüstbare Module mit vier Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250% Wirkung). Fünf Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei einem erfolgreichen Überfall). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots, die einzeln mit Kommandopunkten aufgerüstet werden (bis zu 4 Slots). Ein an Standort A ausgerüstetes Modul wirkt nur dort. Module findest du bei Expeditionen, treibenden Sonden und im Kredit-Shop. Verwaltung im Offiziere-Tab, unten.' }
+      { title:'Schiffsmodule (Standort)', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Fünf Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei einem erfolgreichen Überfall). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots, die einzeln mit Kommandopunkten aufgerüstet werden (bis zu 4 Slots). Ein an Standort A ausgerüstetes Modul wirkt nur dort. Module findest du bei Expeditionen, treibenden Sonden und im Kredit-Shop. Mythische Module sind (noch) nicht über diese Quellen erhältlich - vorgesehen für hochstufige Allianzmissionen. Verwaltung im Offiziere-Tab.' },
+      { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Vor Allianzmissionen nur bis "Selten" über die Schiffsklassen-Blaupause im Kredit-Shop erhältlich – Episch/Legendär/Mythisch sind für hochstufige Allianzmissionen reserviert. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
@@ -14848,6 +15010,9 @@
         if (!state.modules) state.modules = {};
         if (!state.moduleSlotLevel) state.moduleSlotLevel = {};
         if (!state.equippedModules) state.equippedModules = {};
+        if (!state.shipModuleSlotLevel) state.shipModuleSlotLevel = {};
+        if (!state.shipModules) state.shipModules = {};
+        if (!state.equippedShipModules) state.equippedShipModules = {};
         if (!state.levelRewardsClaimed) state.levelRewardsClaimed = {};
         if (!state.rareItems) state.rareItems = {};
         if (!state.inventory) state.inventory = {};
@@ -16940,14 +17105,14 @@
     try { const r = await storageGet('moondefense:'+targetId, true); if (r && r.value) targetDoc = JSON.parse(r.value); } catch(e){}
     const targetMoon = targetDoc && Array.isArray(targetDoc.moons) ? targetDoc.moons.find(mo=>mo.moonKey===m.targetMoonKey) : null;
     if (!targetMoon){ log('Mondbelagerung gegen '+(m.targetMoonName||'unbekanntes Ziel')+': der Mond war bei Ankunft nicht mehr auffindbar (bereits zerstört, aufgegeben oder verteidigt?).', 'ti-anchor'); return; }
-    const power = 300 * (0.85 + Math.random()*0.3);
+    const power = 300 * (0.85 + Math.random()*0.3) * (1+shipModuleBonusFor('mondzerstoerer','atk'));
     // Verteidigung: Basis-Verteidigungswert des Mondes (Gebäude + stationierte Flotte) + Mondschild
     // + Mondstabilität-Forschung + kleiner Allianz-Bonus (Spieler-Wunsch "Allianzverteidigung") -
     // gedeckelt auf maximal 50% Zerstörungschance, egal wie schwach die Verteidigung ist ("nie
     // garantiert", Spieler-Wunsch), und mindestens 3%, damit ein Angriff nie komplett wirkungslos ist.
     const reduction = Math.min(0.75, (targetMoon.shieldLevel||0)*0.04 + (targetMoon.stabilityLevel||0)*0.02 + (targetMoon.allianceTag?0.05:0));
     const baseChance = power / (power + Math.max(1, targetMoon.defense||0)*2.2);
-    const chance = Math.max(0.03, Math.min(0.5, baseChance * (1-reduction)));
+    const chance = Math.max(0.03, Math.min(0.5, baseChance * (1-reduction) + shipModuleBonusFor('mondzerstoerer','siegechance')));
     const destroyed = Math.random() < chance;
     const bp = destroyed ? 150 : 20;
     awardBattlePoints(bp);
@@ -21051,6 +21216,86 @@
         if (upSlotBtn) upSlotBtn.onclick = () => upgradeModuleSlot(pk);
         moduleBox.querySelectorAll('[data-equip-module]').forEach(btn => btn.onclick = () => equipModule(pk, btn.getAttribute('data-equip-module')));
         moduleBox.querySelectorAll('[data-unequip-module]').forEach(btn => btn.onclick = () => unequipModule(pk, parseInt(btn.getAttribute('data-unequip-module'))));
+      }
+      const shipModuleBox = document.getElementById('shipModuleBox');
+      if (shipModuleBox){
+        const klasse = state.activeShipModuleClass || 'schlachtschiff';
+        const clsDef = SHIP_CLASS_DEFS.find(c=>c.key===klasse) || SHIP_CLASS_DEFS[0];
+        const slots = shipModuleSlotCount(klasse);
+        const equipped = equippedShipModulesAt(klasse);
+        const maxedSlots = slots >= SHIP_MODULE_MAX_SLOT_LEVEL;
+        const slotCost = maxedSlots ? 0 : shipModuleSlotUpgradeCost(slots+1);
+        const canAffordSlot = (state.commandPoints||0) >= slotCost;
+
+        // Klassen-Umschalter (Module wirken klassenweit - hier wählt man, welche Klasse man bearbeitet).
+        let html = `<div data-hscroll="shipmodcls" style="display:flex; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
+        html += SHIP_CLASS_DEFS.map(c => {
+          const active = c.key===klasse;
+          const eq = equippedShipModulesAt(c.key).length, sl = shipModuleSlotCount(c.key);
+          return `<button class="planet-pill ${active?'active':''}" data-shipmodule-class="${c.key}" style="white-space:nowrap; ${active?'border-color:#c3bef5;':''}"><span style="width:16px; height:16px; display:inline-flex; margin-right:3px; vertical-align:middle;">${ICONS[c.icon]||''}</span>${c.name} <span class="bmeta">(${eq}/${sl})</span></button>`;
+        }).join('');
+        html += `</div>`;
+
+        html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span class="bname"><span style="width:16px; height:16px; display:inline-flex; margin-right:3px; vertical-align:middle;">${ICONS[clsDef.icon]||''}</span>${clsDef.name}</span>
+            <span class="lvl-pill">${equipped.length}/${slots} Slots belegt</span>
+          </div>`;
+        html += `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">`;
+        for (let i=0;i<slots;i++){
+          const instKey = equipped[i];
+          if (instKey){
+            const info = shipModuleInstanceInfo(instKey);
+            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; min-width:130px; flex:1; border-color:${info?info.rar.color:'#5a5f7a'};">
+              <div style="display:flex; align-items:center; gap:6px;"><i class="ti ${info?info.def.icon:'ti-box'}" aria-hidden="true" style="color:${info?info.rar.color:'#c7cbe0'};"></i><span class="bname" style="font-size:11.5px;">${info?info.def.name:'?'}</span></div>
+              <div class="bmeta" style="color:${info?info.rar.color:'#8489a0'};">${info?info.rar.label:''} · +${info?Math.round(info.bonus*100):0}%</div>
+              <button data-unequip-shipmodule="${i}" style="font-size:10px; padding:3px 6px; margin-top:4px;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Abnehmen</button>
+            </div>`;
+          } else {
+            html += `<div class="card-row" style="min-width:130px; flex:1; justify-content:center; border-style:dashed; opacity:0.6;"><span class="bmeta"><i class="ti ti-plus" aria-hidden="true"></i> Freier Slot</span></div>`;
+          }
+        }
+        if (slots===0) html += `<div class="bmeta" style="opacity:0.7;">Noch keine Slots für diese Klasse.</div>`;
+        html += `</div>`;
+        if (!maxedSlots){
+          html += `<button data-upgrade-shipmodule-slot="1" ${canAffordSlot?'':'disabled'} style="width:100%;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Slot freischalten (${slots+1}. Slot) · ${slotCost} KP${canAffordSlot?'':' (zu wenig)'}</button>`;
+        } else {
+          html += `<div class="bmeta" style="text-align:center; color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximale Slot-Anzahl erreicht</div>`;
+        }
+        html += `</div>`;
+
+        const invKeys = Object.keys(state.shipModules||{}).filter(k=>{
+          if ((state.shipModules[k]||0) <= 0) return false;
+          const def = SHIP_MODULE_DEFS.find(d=>d.key===k.split(':')[0]);
+          return def && def.klasse === klasse;
+        });
+        html += `<div class="section-title" style="margin-top:0.5rem; font-size:13px;"><i class="ti ti-backpack" aria-hidden="true"></i>Modul-Inventar (${clsDef.name})</div>`;
+        if (!invKeys.length){
+          html += `<div class="lb-note"><i class="ti ti-info-circle" aria-hidden="true"></i>Noch keine Module dieser Klasse im Inventar. Erhältlich über die Schiffsklassen-Blaupause im Kredit-Shop (max. "Selten") oder später über Allianzmissionen (höhere Seltenheiten).</div>`;
+        } else {
+          html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
+          html += invKeys.sort().map(instKey => {
+            const info = shipModuleInstanceInfo(instKey);
+            if (!info) return '';
+            const count = state.shipModules[instKey];
+            const slotsFree = equipped.length < slots;
+            const effectLabel = { atk:'Angriff', hull:'Verteidigung', shield:'Schild', cargo:'Frachtkapazität', fuel:'Treibstoffersparnis', speed:'Geschwindigkeit', siegechance:'Belagerungs-Erfolgschance' }[info.def.effect] || info.def.effect;
+            return `<div class="card-row">
+              <div class="left"><div class="bicon" style="background:${info.rar.color}22; color:${info.rar.color};"><i class="ti ${info.def.icon}" aria-hidden="true"></i></div>
+                <div><div class="bname">${info.def.name} <span class="lvl-pill" style="background:${info.rar.color}22; color:${info.rar.color};">${info.rar.label}</span> ${count>1?`<span class="bmeta">×${count}</span>`:''}</div>
+                <div class="bmeta">+${Math.round(info.bonus*100)}% ${effectLabel} · ${info.def.desc}</div></div>
+              </div>
+              <button data-equip-shipmodule="${instKey}" ${slotsFree?'':'disabled'} style="font-size:10.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>${slotsFree?'Ausrüsten':'Keine Slots'}</button>
+            </div>`;
+          }).join('');
+          html += `</div>`;
+        }
+        setHtmlPreservingScroll(shipModuleBox, html);
+        shipModuleBox.querySelectorAll('[data-shipmodule-class]').forEach(btn => btn.onclick = () => { state.activeShipModuleClass = btn.getAttribute('data-shipmodule-class'); render(); });
+        const upShipSlotBtn = shipModuleBox.querySelector('[data-upgrade-shipmodule-slot]');
+        if (upShipSlotBtn) upShipSlotBtn.onclick = () => upgradeShipModuleSlot(klasse);
+        shipModuleBox.querySelectorAll('[data-equip-shipmodule]').forEach(btn => btn.onclick = () => equipShipModule(klasse, btn.getAttribute('data-equip-shipmodule')));
+        shipModuleBox.querySelectorAll('[data-unequip-shipmodule]').forEach(btn => btn.onclick = () => unequipShipModule(klasse, parseInt(btn.getAttribute('data-unequip-shipmodule'))));
       }
     }
 
