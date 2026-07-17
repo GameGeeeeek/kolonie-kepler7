@@ -753,6 +753,10 @@
       <div class="fp-title"><i class="ti ti-trophy" aria-hidden="true"></i>Bestenliste</div>
       <div id="fpLeaderboard"></div>
     </div>
+    <div class="fp-section">
+      <div class="fp-title"><i class="ti ti-award" aria-hidden="true"></i>Allianz-Spenden (Woche)</div>
+      <div id="fpAllianceDonationBox"></div>
+    </div>
   </div>
 
   <button class="edge-tab fp-edge-tab" id="fpToggleBtn" aria-label="Flottenposition, Kolonien und Bestenliste anzeigen"><i class="ti ti-list-details" aria-hidden="true"></i> Status</button>
@@ -833,6 +837,20 @@
           <button id="reportPlayerSubmitBtn" class="attack" style="flex:1;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Melden</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="allianceDonationRankingOverlay" class="login-overlay" style="display:none;">
+    <div class="login-card" style="text-align:left; position:relative; max-width:560px;">
+      <button id="allianceDonationCloseBtn" style="position:absolute; top:14px; right:14px; padding:5px 9px; font-size:11px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+      <div class="login-header">
+        <i class="ti ti-trophy" aria-hidden="true" style="font-size:26px; color:#fac775;"></i>
+        <div>
+          <div class="login-title">Allianz-Spendenrangliste</div>
+          <div class="login-sub">Diese Woche &middot; setzt sich montags 00:00 Uhr zurueck</div>
+        </div>
+      </div>
+      <div id="allianceDonationModalBody" style="display:flex; flex-direction:column; gap:6px; max-height:60vh; overflow-y:auto;"></div>
     </div>
   </div>
 
@@ -2374,8 +2392,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.59.4';
+  const VERSION = '8.60.0';
   const PATCHNOTES = [
+    { version:'8.60.0', date:'17.07.2026', changes:[
+      'Neu: Allianz-Spendenrangliste - erfasst automatisch jede Ressourcen-Spende an Allianzbasis, Allianz-Techs/-Geb\u00e4ude und t\u00e4gliche Allianz-Eins\u00e4tze. Top-3 der laufenden Woche plus eigene Platzierung/Wochenspende/Allianz-Gesamtspende/Anteil in Prozent im rechten Seitenmen\u00fc, komplette Rangliste per Klick',
+      'W\u00f6chentliche Auswertung (Reset montags 00:00 Uhr): die drei besten Spender bekommen automatisch eine kleine Belohnung (Platz 1: Kredite + Forschungspunkte, Platz 2: Ressourcenpaket, Platz 3: Produktions-Booster), alle Mitglieder erhalten einen zusammenfassenden Bericht im Allianz-Chat',
+      'T\u00e4gliche Login-Benachrichtigung erweitert: das automatisch erscheinende Willkommen-zur\u00fcck-Fenster zeigt jetzt zus\u00e4tzlich eine Vorschau auf die Belohnung des n\u00e4chsten Tages und den Hinweis, dass ein ausgelassener Tag die Login-Serie zur\u00fcck auf Tag 1 setzt'
+    ]},
     { version:'8.59.4', date:'17.07.2026', changes:[
       'Bugfix (Spieler-Feedback Sascha): Flottenverlegungen zwischen eigenen Planeten zählten bisher GAR NICHT gegen das Flottenentsendelimit - beliebig viele Verlegungen liefen parallel zu Angriffen/Expeditionen, ohne das Limit je zu spüren. Jetzt zählt jede Verlegung mit; ein per "Verband versenden" gemeinsam losgeschickter Verband (mehrere Schiffstypen, gemeinsame Ankunft) belegt dabei bewusst nur EINEN Flottenslot, keinen je enthaltenem Schiffstyp'
     ]},
@@ -8568,6 +8591,9 @@
     if (!state.collapsedSections) state.collapsedSections = {};
     if (!state.favoritePlanets) state.favoritePlanets = {};
     if (state.lastLoginDate === undefined) state.lastLoginDate = null;
+    if (state.allianceDonationWeek === undefined) state.allianceDonationWeek = null;
+    if (!state.allianceDonationClaimed) state.allianceDonationClaimed = {};
+    if (state.allianceDonationCache === undefined) state.allianceDonationCache = null;
     if (state.loginStreak === undefined) state.loginStreak = 0;
     if (state.autoRepairOn === undefined) state.autoRepairOn = false;
     if (state.autoWatchLiveRaid === undefined) state.autoWatchLiveRaid = true;
@@ -11229,6 +11255,7 @@
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.' }
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
+      { title:'Allianz-Spendenrangliste', body:'Im rechten Seitenmen\u00fc (Button "Status" am Bildschirmrand) zeigt der Abschnitt "Allianz-Spenden" die <strong>Top 3 der laufenden Woche</strong> plus deine eigene Platzierung, deine Wochenspende, die Allianz-Gesamtspende und deinen prozentualen Anteil. \u00dcber "Komplette Rangliste anzeigen" siehst du alle Mitglieder sortiert. <strong>Gez\u00e4hlt wird jede Ressourcen-Spende</strong> an gemeinsame Allianz-Projekte: Allianzbasis, Allianz-Techs/-Geb\u00e4ude und die t\u00e4glichen Allianz-Eins\u00e4tze. Die Wertung setzt sich <strong>montags 00:00 Uhr</strong> zur\u00fcck; die Top 3 der abgelaufenen Woche erhalten automatisch eine kleine Belohnung (Kredite/Forschungspunkte, ein Ressourcenpaket bzw. einen Produktions-Booster), und alle Mitglieder bekommen einen zusammenfassenden Bericht im Allianz-Chat.' },
       { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Energie / 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat eine <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage), die seit der Gründung parallel zu den Beiträgen läuft - schnelles Vollspenden überspringt also keine Bauzeit. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. <strong>Krieg um die Basis:</strong> Die Basis kann von Mitgliedern FREMDER Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, 8 Std. Abklingzeit je Spieler). Ihre Hülle hat 12.000 Punkte je Stufe; die Verteidigung besteht aus einem Sockel (600 je Stufe) plus allen von Mitgliedern <strong>zur Basis entsandten Schiffen</strong> (Button im Allianz-Tab, echte Flugzeit, jederzeit zurückrufbar - stationierte Schiffe erleiden bei Angriffen Verluste). Leichte Schäden repariert die Basis selbst (3%/Std.); fällt die Hülle auf 0, ist die Basis <strong>ZERSTÖRT</strong>: alle Boni sind deaktiviert, bis die Allianz die hohen Reparaturkosten (30% der kumulierten Baukosten) gemeinsam aufgebracht hat. Bei allen wichtigen Basis-Ereignissen (Baubeginn, erreichte Ausbaustufe, Angriff, Zerstörung, abgeschlossene Reparatur) erscheint automatisch eine <strong>System-Nachricht im Allianz-Chat</strong>, damit alle Mitglieder informiert sind. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone.' },
       { title:'Allianz-Einsätze (ab Basis-Stufe 3)', body:'Ab Allianzbasis-Stufe 3 erhält eure Allianz jeden Tag einen gemeinsamen <strong>Allianz-Einsatz</strong> (im Allianz-Tab unterhalb der Basis): <strong>Versorgungskonvoi</strong> (Erz liefern), <strong>Kristall-Kontingent</strong>, <strong>Treibstoff-Depot</strong> (Deuterium), <strong>Kampfoperation</strong> (gemeinsam Kämpfe gewinnen - NPCs, Piraten, Abwehr und Leerenrisse zählen automatisch) oder <strong>Forschungsvorstoß</strong> (gemeinsam Expeditionen abschließen). Einsatz und Tagesziel sind für alle Mitglieder identisch und skalieren mit der Basis-Stufe. Ist das Team-Ziel erreicht, holt sich <strong>jeder, der beigetragen hat</strong>, die Belohnung ab: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich <strong>1 Leerensplitter</strong>. Kampf-/Expeditions-Fortschritt wird beim Öffnen des Allianz-Tabs übertragen. Eine zerstörte Basis pausiert den Einsatzbetrieb bis zur Reparatur.' },
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
@@ -11901,7 +11928,7 @@
       state.player.allianceTag = tag;
       state.player.allianceRole = role;
       render(); save();
-      loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceDominance(); loadAllianceAdminSettings();
+      loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking();
     } catch(e){
       log('Allianz-Aktion aktuell nicht möglich (Server nicht erreichbar).', 'ti-alert-triangle');
     }
@@ -12847,9 +12874,187 @@
     } catch(e){}
     log(fmt(amount)+' '+(RES_DEFS.find(r=>r.key===resKey)||{}).label+' zur Allianzbasis beigetragen.', 'ti-building-fortress');
     playSound('trade');
+    await recordAllianceDonation(amount);
     await loadAllianceTechData();
     await maybeAnnounceBaseLevel();
     render(); save();
+  }
+
+  // ===== Allianz-Spendenrangliste (17.07.2026) =====
+  // Zaehlt alle Ressourcen-Spenden an gemeinsame Allianz-Projekte (Basis, Allianz-Techs/-Gebaeude,
+  // taegliche Allianz-Einsaetze - jedes kuenftige Gemeinschaftsprojekt reiht sich automatisch ein,
+  // solange es recordAllianceDonation() aufruft) in einem woechentlichen, pro Spieler eigenen
+  // Dokument (alliance:<TAG>:donation:<weekKey>:<playerId> - race-freies Ein-Autor-Muster wie
+  // contrib:/basedef:/missionprog:). weekKeyOf()/nextWeekStartTs() stammen von der bestehenden
+  // globalen Wochenliga (siehe processWeeklyLeague) - Montag 00:00 als gemeinsamer Wochenschluessel,
+  // keine serverseitige Cron-Aufgabe noetig. Alte Wochenschluessel bleiben als eigener Praefix
+  // stehen (kein Ueberschreiben), daher ist die Abrechnung der Vorwoche eine simple Listenabfrage
+  // ohne Snapshot-Mechanismus.
+  const ALLIANCE_DONATION_REWARDS = [
+    { credits:300, forschungspunkte:300 },                   // Platz 1: kleine "Premiumwaehrung" + Forschungspunkte
+    { erz:8000, kristalle:5000, deuterium:3000 },              // Platz 2: Ressourcenpaket
+    { item:'boost_prod' }                                      // Platz 3: kleiner Produktions-Booster (Verbrauchsgegenstand)
+  ];
+  async function recordAllianceDonation(amount){
+    if (!amount || amount <= 0) return;
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    const wk = weekKeyOf(Date.now());
+    if (!state.allianceDonationWeek || state.allianceDonationWeek.weekKey !== wk) state.allianceDonationWeek = { weekKey: wk, total: 0 };
+    state.allianceDonationWeek.total += amount;
+    try { await storageSet('alliance:'+tag+':donation:'+wk+':'+state.player.id, JSON.stringify({ total: state.allianceDonationWeek.total, name: state.player.name||'Kommandant' }), true); } catch(e){}
+    renderFpAllianceDonation();
+  }
+  async function postAllianceDonationNews(text){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
+    try {
+      await storageSet('alliance:'+tag+':msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: '\uD83C\uDFC6 Spendenwertung', text: String(text).slice(0,400), ts: Date.now() }), true);
+      loadAllianceMessages();
+    } catch(e){}
+  }
+  async function fetchAllianceDonationList(tag, weekKey){
+    const prefix = 'alliance:'+tag+':donation:'+weekKey+':';
+    const listRes = await storageList(prefix, true);
+    const keys = (listRes && listRes.keys) ? listRes.keys : [];
+    const docs = await Promise.all(keys.map(async k => {
+      try {
+        const r = await storageGet(k, true);
+        if (r && r.value){ const d = JSON.parse(r.value); return { id: k.slice(prefix.length), name: d.name||'Unbekannt', total: d.total||0 }; }
+      } catch(e){}
+      return null;
+    }));
+    return docs.filter(Boolean).sort((a,b)=>b.total-a.total);
+  }
+  // Rechnet eine abgelaufene Wochenwertung ab: eigene Top-3-Belohnung (jeder Client prueft seinen
+  // EIGENEN Rang selbst, claimed-Markierung lokal - race-frei, kein "wer meldet zuerst" noetig) und
+  // EINMALIGER Allianz-Bericht im Chat (Toleranz-Level-Race wie bei maybeAnnounceBaseLevel: ein
+  // seltener doppelter Post durch Zeitgleichheit ist unkritisch, kein Datenverlust).
+  async function settleAllianceDonationWeek(tag, weekKey){
+    try {
+      const list = await fetchAllianceDonationList(tag, weekKey);
+      if (!list.length) return;
+      const myIdx = list.findIndex(e => e.id === state.player.id);
+      if (myIdx >= 0 && myIdx < 3){
+        if (!state.allianceDonationClaimed) state.allianceDonationClaimed = {};
+        if (!state.allianceDonationClaimed[weekKey]){
+          state.allianceDonationClaimed[weekKey] = true;
+          const rew = ALLIANCE_DONATION_REWARDS[myIdx];
+          const cap = storageCap();
+          const parts = [];
+          if (rew.credits){ state.credits = (state.credits||0) + rew.credits; parts.push(rew.credits+' Kredite'); }
+          if (rew.forschungspunkte){ const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+rew.forschungspunkte); parts.push(fmt(state.resources.forschungspunkte-before)+' Forschungspunkte'); }
+          for (const rk of ['erz','kristalle','deuterium','antimaterie']){
+            if (rew[rk]){ const before = state.resources[rk]||0; state.resources[rk] = Math.min(cap, before+rew[rk]); parts.push(fmt(state.resources[rk]-before)+' '+(RES_DEFS.find(x=>x.key===rk)||{}).label); }
+          }
+          if (rew.item){ state.inventory[rew.item] = (state.inventory[rew.item]||0) + 1; const it = ITEM_DEFS.find(x=>x.key===rew.item); parts.push('1x '+(it?it.name:rew.item)); }
+          log('Allianz-Spendenwertung der Vorwoche: Platz '+(myIdx+1)+'! Belohnung: '+parts.join(', ')+'.', 'ti-trophy');
+          pushToast('Spendenwertung Platz '+(myIdx+1)+'! '+parts.join(', '), 'ti-trophy');
+          playSound('achieve');
+          save();
+        }
+      }
+      const settleKey = 'alliance:'+tag+':donationweek:'+weekKey;
+      let already = null;
+      try { const r = await storageGet(settleKey, true); already = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){}
+      if (!already || !already.announced){
+        const top3 = list.slice(0,3);
+        try { await storageSet(settleKey, JSON.stringify({ announced:true, top3, totalAll: list.reduce((a,e)=>a+e.total,0) }), true); } catch(e){}
+        const medals = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
+        const top3Text = top3.map((e,i)=>medals[i]+' '+e.name+' \u2013 '+fmt(e.total)+' Ressourcen').join(' \u00b7 ');
+        await postAllianceDonationNews('W\u00f6chentliche Allianz-Spendenwertung: '+top3Text+'. Vielen Dank f\u00fcr eure Unterst\u00fctzung! Die Belohnungen wurden automatisch gutgeschrieben.');
+      }
+    } catch(e){}
+  }
+  async function loadAllianceDonationRanking(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    const wk = weekKeyOf(Date.now());
+    const prevWk = state.allianceDonationWeek ? state.allianceDonationWeek.weekKey : null;
+    if (prevWk && prevWk !== wk) await settleAllianceDonationWeek(tag, prevWk);
+    if (!state.allianceDonationWeek || state.allianceDonationWeek.weekKey !== wk){ state.allianceDonationWeek = { weekKey: wk, total: 0 }; save(); }
+    try {
+      const list = await fetchAllianceDonationList(tag, wk);
+      state.allianceDonationCache = { weekKey: wk, list, totalAll: list.reduce((a,e)=>a+e.total,0) };
+    } catch(e){}
+    renderFpAllianceDonation();
+    renderAllianceDonationModalBody();
+  }
+  function openAllianceDonationModal(){
+    const overlay = document.getElementById('allianceDonationRankingOverlay');
+    if (!overlay) return;
+    // Reihenfolge wichtig: erst sichtbar machen, DANN rendern - renderAllianceDonationModalBody()
+    // bricht bei geschlossenem Overlay bewusst früh ab (Performance-Guard gegen unnötiges
+    // Neuzeichnen bei jedem 5-Minuten-Intervall-Reload), würde also hier sonst nichts befüllen.
+    overlay.style.display = 'flex';
+    renderAllianceDonationModalBody();
+  }
+  function closeAllianceDonationModal(){
+    const overlay = document.getElementById('allianceDonationRankingOverlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+  function renderAllianceDonationModalBody(){
+    const body = document.getElementById('allianceDonationModalBody');
+    if (!body) return;
+    const overlay = document.getElementById('allianceDonationRankingOverlay');
+    if (overlay && overlay.style.display !== 'flex') return;
+    const cache = state.allianceDonationCache;
+    if (!cache || !cache.list.length){ body.innerHTML = '<div class="bmeta">Noch keine Spenden diese Woche.</div>'; return; }
+    const medals = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
+    body.innerHTML = cache.list.map((e,i) => `
+      <div class="card-row" style="${e.id===state.player.id?'border-color:#c3bef5;':''}">
+        <div class="left"><span style="width:26px; display:inline-block; text-align:center; flex-shrink:0;">${i<3?medals[i]:(i+1)+'.'}</span><span class="bname" style="font-size:12.5px;">${e.name}</span></div>
+        <span class="lvl-pill">${fmt(e.total)}</span>
+      </div>
+    `).join('');
+  }
+  // Kompakte Top-3-Ansicht im rechten Slider (fleetPositionPanel) + eigene Kennzahlen: Platzierung,
+  // eigene Wochenspende, Allianz-Gesamtspende, eigener Anteil in Prozent, Fortschritt bis zur
+  // naechsten Allianzbasis-Stufe (liest die bereits vorhandene, dauerhafte Basis-Fortschrittslogik
+  // - KEIN separater Zaehler, um nicht zwei Wahrheiten fuer denselben Fortschritt zu fuehren).
+  function renderFpAllianceDonation(){
+    const box = document.getElementById('fpAllianceDonationBox');
+    if (!box) return;
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){
+      box.innerHTML = '<div class="bmeta" style="font-size:10.5px;">Nur mit Allianz und Serververbindung verf\u00fcgbar.</div>';
+      return;
+    }
+    const cache = state.allianceDonationCache;
+    let baseProgressLine = '';
+    if (state.allianceBase && state.allianceBase.foundedAt){
+      const lvl = allianceBaseLevel();
+      if (lvl >= ALLIANCE_BASE_MAX_LEVEL){
+        baseProgressLine = 'Allianzbasis: Maximalstufe erreicht';
+      } else {
+        const nextCum = allianceBaseCumCost(lvl+1);
+        const tot = allianceBaseTotals();
+        const doneRes = Object.keys(nextCum).filter(r => (tot[r]||0) >= nextCum[r]).length;
+        baseProgressLine = 'Basis-Ausbau Stufe '+(lvl+1)+': '+doneRes+'/'+Object.keys(nextCum).length+' Ressourcen gedeckt';
+      }
+    }
+    if (!cache || !cache.list.length){
+      box.innerHTML = '<div class="bmeta" style="font-size:10.5px;">Noch keine Spenden diese Woche.</div>'
+        + '<button id="fpDonationRankBtn" style="width:100%; margin-top:6px; font-size:10px;">Komplette Rangliste anzeigen</button>'
+        + (baseProgressLine ? '<div class="bmeta" style="font-size:10px; margin-top:6px;">'+baseProgressLine+'</div>' : '');
+      const btn0 = document.getElementById('fpDonationRankBtn'); if (btn0) btn0.onclick = openAllianceDonationModal;
+      return;
+    }
+    const medals = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
+    const top3Html = cache.list.slice(0,3).map((e,i) => `<div class="fp-lb-row ${e.id===state.player.id?'me':''}"><span class="fp-lb-rank">${medals[i]}</span><span class="fp-lb-name">${e.name}</span><span>${fmt(e.total)}</span></div>`).join('');
+    const myIdx = cache.list.findIndex(e=>e.id===state.player.id);
+    const myTotal = myIdx>=0 ? cache.list[myIdx].total : 0;
+    const myPct = cache.totalAll>0 ? Math.round(myTotal/cache.totalAll*100) : 0;
+    box.innerHTML = top3Html
+      + '<button id="fpDonationRankBtn" style="width:100%; margin-top:6px; font-size:10px;">Komplette Rangliste anzeigen</button>'
+      + '<div class="bmeta" style="font-size:10px; margin-top:6px; line-height:1.6;">'
+      + 'Dein Platz: '+(myIdx>=0 ? (myIdx+1)+'/'+cache.list.length : '\u2013')+' \u00b7 Deine Wochenspende: '+fmt(myTotal)+'<br>'
+      + 'Allianz gesamt: '+fmt(cache.totalAll)+' \u00b7 Dein Anteil: '+myPct+'%'
+      + (baseProgressLine ? '<br>'+baseProgressLine : '')
+      + '</div>';
+    const btn = document.getElementById('fpDonationRankBtn');
+    if (btn) btn.onclick = openAllianceDonationModal;
   }
 
   // ===== Exklusive Allianz-Einsätze (17.07.2026) =====
@@ -12932,6 +13137,7 @@
     d.contributed = (d.contributed||0) + amount;
     log(fmt(amount)+' '+resLabel+' zum Allianz-Einsatz beigetragen.', 'ti-target');
     playSound('trade');
+    await recordAllianceDonation(amount);
     await loadAllianceMissionTeam();
     render(); save();
   }
@@ -13306,6 +13512,7 @@
     } catch(e){}
     log(amount+' '+RES_DEFS.find(r=>r.key===t.resKey).label+' zu "'+t.name+'" beigetragen.', 'ti-flask');
     playSound('trade');
+    await recordAllianceDonation(amount);
     await loadAllianceTechData();
     render(); save();
   }
@@ -13804,6 +14011,9 @@
         if (!state.collapsedSections) state.collapsedSections = {};
         if (!state.favoritePlanets) state.favoritePlanets = {};
         if (state.lastLoginDate === undefined) state.lastLoginDate = null;
+    if (state.allianceDonationWeek === undefined) state.allianceDonationWeek = null;
+    if (!state.allianceDonationClaimed) state.allianceDonationClaimed = {};
+    if (state.allianceDonationCache === undefined) state.allianceDonationCache = null;
         if (state.loginStreak === undefined) state.loginStreak = 0;
         if (state.autoRepairOn === undefined) state.autoRepairOn = false;
         if (state.autoWatchLiveRaid === undefined) state.autoWatchLiveRaid = true;
@@ -14109,6 +14319,14 @@
       if (loginBonus.ship) parts.push(loginBonus.ship.amount+'x '+loginBonus.ship.name);
       const bonusLine = parts.join(', ');
       html += `<div class="card-row" style="background:rgba(93,202,165,0.1); border-color:rgba(93,202,165,0.3);"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i><span class="bname" style="font-size:12.5px;">Täglicher Bonus – Tag ${loginBonus.dayInCycle} von 7 (${loginBonus.streak} Tage in Folge)</span></div><span class="lvl-pill" style="font-size:10px;">${bonusLine}</span></div>`;
+      const nextDayInCycle = (loginBonus.dayInCycle % DAILY_LOGIN_REWARDS.length) + 1;
+      const nextDef = DAILY_LOGIN_REWARDS[nextDayInCycle-1];
+      const nextParts = [];
+      if (nextDef.resources) for (const [r,a] of Object.entries(nextDef.resources)) nextParts.push(fmt(a)+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r));
+      if (nextDef.credits) nextParts.push(nextDef.credits+' Kredite');
+      if (nextDef.item){ const it = ITEM_DEFS.find(x=>x.key===nextDef.item); if (it) nextParts.push('1x '+it.name); }
+      if (nextDef.ship) nextParts.push(nextDef.ship.amount+'x '+nextDef.ship.name);
+      html += `<div class="bmeta" style="margin-top:-6px; margin-bottom:4px;">Morgen erwartet dich: ${nextParts.join(', ')}. Ein ausgelassener Tag setzt die Serie wieder auf Tag 1 zurück.</div>`;
     }
     body.innerHTML = html || '<div class="bmeta">Nichts Neues während deiner Abwesenheit.</div>';
     document.getElementById('welcomeBackOverlay').style.display = 'flex';
@@ -17505,7 +17723,7 @@
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
     if (tab === 'berichte'){ loadNotificationEvents(); }
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
-    if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); }
+    if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     if (tab === 'berichte'){
       loadReports();
@@ -19681,6 +19899,7 @@
     if (dcv) dcv.textContent = defensePower(state.activeBasePlanet);
 
     renderFpLeaderboard();
+    renderFpAllianceDonation();
     const fpList = document.getElementById('fleetPositionList');
     if (fpList){
       const allMissions = [];
@@ -20955,6 +21174,8 @@
     if (openAdminPanelBtn) openAdminPanelBtn.onclick = openAdminPanel;
     const adminPanelCloseBtn = document.getElementById('adminPanelCloseBtn');
     if (adminPanelCloseBtn) adminPanelCloseBtn.onclick = closeAdminPanel;
+    const allianceDonationCloseBtn = document.getElementById('allianceDonationCloseBtn');
+    if (allianceDonationCloseBtn) allianceDonationCloseBtn.onclick = closeAllianceDonationModal;
     const adminTabReportsBtn = document.getElementById('adminTabReportsBtn');
     if (adminTabReportsBtn) adminTabReportsBtn.onclick = () => switchAdminTab('reports');
     const adminTabAnalyticsBtn = document.getElementById('adminTabAnalyticsBtn');
@@ -21441,6 +21662,7 @@
   // Allianzbasis-Kriegszustand alle 5 Minuten nachladen, damit Verteidiger Angriffe zeitnah
   // mitbekommen (Verluste anwenden, Alarm) - laeuft nur mit Allianz + Server-Modus (Guard intern).
   setInterval(loadAllianceBaseWar, 300000);
+  setInterval(loadAllianceDonationRanking, 300000);
   setInterval(maybeSpawnTrader, 60000);
   window.addEventListener('beforeunload', () => { save(); });
 
@@ -21824,7 +22046,7 @@
 
   (async () => {
     const ready = await initAuth();
-    if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()){ loadAllianceWars(); if (useBackend()){ loadAllianceTechData(); loadAllianceBase(); } } if (!state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
+    if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()){ loadAllianceWars(); if (useBackend()){ loadAllianceTechData(); loadAllianceBase(); loadAllianceDonationRanking(); } } if (!state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
   })();
   // PWA: Service Worker registrieren (macht die App zusätzlich zum Manifest auch am DESKTOP
   // installierbar - Chrome/Edge verlangen dafür einen aktiven Service Worker, mobile Browser
