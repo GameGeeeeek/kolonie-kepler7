@@ -3015,8 +3015,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.101.0';
+  const VERSION = '8.101.1';
   const PATCHNOTES = [
+    { version:'8.101.1', date:'18.07.2026', changes:[
+      'Event-Item-Pool (nur während aktiver Beute-Events wie Wochenende/Kopfgeldtag/Jahreszeiten im Fundpool) von 1 auf 7 Varianten erweitert: neu sind Festbanner-Kiste, Jubiläumstruhe, Event-Funken, Festvorrat, Feuerwerksrakete und Glückstalisman (garantiert ein seltenes Material) - bisher gab es in jedem dieser Zeitfenster immer nur dieselbe eine "Ereignis-Kapsel"',
+      'Kleinerer Fix: der bestehenden "Ereignis-Kapsel" fehlte das Beschreibungsfeld, das die Inventar-Detailansicht anzeigt - stand dort bisher buchstäblich "undefined"'
+    ]},
     { version:'8.101.0', date:'18.07.2026', changes:[
       'Zufallsereignisse (90-Sekunden-Pop-ups) nochmal von 20 auf 60 Varianten erweitert (Spieler-Wunsch "nochmal 40 pro hinzufügen"): weitere Weltraum-Phänomene, Wracks, NPC-Begegnungen, Handelskontakte und Entdeckungen im selben Kosten-/Beute-Rahmen wie bisher',
       'Expeditions-Sonderfunde ebenfalls von 20 auf 60 Varianten erweitert - alle mit derselben "mult"-Erfahrungsskalierung wie die bestehenden, kein Balance-Sprung, nur mehr Abwechslung. Beide Pools damit dreimal so groß wie zu Tagesbeginn'
@@ -18407,12 +18411,46 @@
   // hier landen bewusst NUR im Expeditions-Fundpool, wenn gerade ein saisonales Beute-Event läuft
   // (seasonalLootMult() > 1, siehe SEASONAL_EVENTS mit kind:'loot' - Kopfgeldtag/Perseiden usw.).
   const EVENT_ITEM_DEFS = [
-    { key:'eventkapsel', name:'Ereignis-Kapsel', icon:'ti-box', rarity:'ungewoehnlich', activate: () => {
+    { key:'eventkapsel', name:'Ereignis-Kapsel', icon:'ti-box', desc:'Enthält 200-500 Einheiten einer zufälligen Ressource und gewährt +20 XP.', rarity:'ungewoehnlich', activate: () => {
         const res = RES_DEFS[Math.floor(Math.random()*RES_DEFS.length)].key;
         const amt = Math.round(200+Math.random()*300);
         gainResources({ [res]: amt });
         addXp(20);
         return 'Ereignis-Kapsel geöffnet: +'+fmt(amt)+' '+RES_DEFS.find(r=>r.key===res).label+' und +20 XP!';
+    }},
+    // 18.07.2026 (Spieler-Wunsch "mehr Content"): von 1 auf 7 Varianten erweitert - bisher bekam man
+    // in JEDEM aktiven Beute-Event (Wochenende, Kopfgeldtag, Jahreszeiten...) immer nur dasselbe eine
+    // Item. Nebenbei den fehlenden "desc" beim bestehenden Eintrag ergänzt (die Inventar-Detailansicht
+    // zeigt it.desc an - ohne das Feld stand dort buchstäblich "undefined").
+    { key:'festbanner', name:'Festbanner-Kiste', icon:'ti-flag', desc:'Enthält 100-250 Einheiten einer zufälligen Ressource.', rarity:'gewoehnlich', activate: () => {
+        const res = RES_DEFS[Math.floor(Math.random()*RES_DEFS.length)].key;
+        const amt = Math.round(100+Math.random()*150);
+        gainResources({ [res]: amt });
+        return 'Festbanner-Kiste geöffnet: +'+fmt(amt)+' '+RES_DEFS.find(r=>r.key===res).label+'!';
+    }},
+    { key:'jubilaeumstruhe', name:'Jubiläumstruhe', icon:'ti-trophy', desc:'Enthält 150-350 Einheiten von zwei verschiedenen Ressourcen.', rarity:'selten', activate: () => {
+        const keys = RES_DEFS.map(r=>r.key); const i1 = Math.floor(Math.random()*keys.length); let i2 = Math.floor(Math.random()*keys.length);
+        if (i2 === i1) i2 = (i1+1)%keys.length;
+        const amt1 = Math.round(150+Math.random()*200); const amt2 = Math.round(150+Math.random()*200);
+        gainResources({ [keys[i1]]: amt1, [keys[i2]]: amt2 });
+        return 'Jubiläumstruhe geöffnet: +'+fmt(amt1)+' '+RES_DEFS.find(r=>r.key===keys[i1]).label+' und +'+fmt(amt2)+' '+RES_DEFS.find(r=>r.key===keys[i2]).label+'!';
+    }},
+    { key:'eventfunken', name:'Event-Funken', icon:'ti-sparkles', desc:'+15% Gesamtproduktion für 10 Minuten.', rarity:'ungewoehnlich', activate: () => {
+        state.buffs.push({ kind:'prod_all', mult:1.15, expiresAt: Date.now()+10*60000 });
+        return 'Event-Funken aktiviert: +15% Gesamtproduktion für 10 Minuten!';
+    }},
+    { key:'festvorrat', name:'Festvorrat', icon:'ti-backpack', desc:'Enthält 150-350 Einheiten Deuterium und 150-350 Einheiten Energie.', rarity:'gewoehnlich', activate: () => {
+        const amt1 = Math.round(150+Math.random()*200); const amt2 = Math.round(150+Math.random()*200);
+        gainResources({ deuterium: amt1, energie: amt2 });
+        return 'Festvorrat geöffnet: +'+fmt(amt1)+' Deuterium und +'+fmt(amt2)+' Energie!';
+    }},
+    { key:'feuerwerksrakete', name:'Feuerwerksrakete', icon:'ti-rocket', desc:'+20% Angriffskraft für 20 Minuten.', rarity:'selten', activate: () => {
+        state.buffs.push({ kind:'atk', mult:1.2, expiresAt: Date.now()+20*60000 });
+        return 'Feuerwerksrakete gezündet: +20% Angriffskraft für 20 Minuten!';
+    }},
+    { key:'glueckstalisman', name:'Glückstalisman', icon:'ti-star', desc:'Gewährt garantiert ein seltenes Material.', rarity:'episch', activate: () => {
+        const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+        return 'Glückstalisman eingelöst: '+ri.name+' erhalten!';
     }}
   ];
   // Mega-Projekte: extrem teure Einmal-Bauten für Endgame-Spieler, benötigen zusätzlich zu den
