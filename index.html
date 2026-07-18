@@ -593,8 +593,17 @@
 
     .resbar { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:1.5rem; }
     @media (min-width: 1400px) { .resbar { grid-template-columns: repeat(6, 1fr); } }
-    @media (max-width: 620px) { .resbar { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 380px) { .resbar { grid-template-columns: repeat(2, 1fr); } }
+    /* Grafik-Runde 10, "Breakpoints konsolidieren": die frühere @media(max-width:620px)-Regel setzte
+       exakt denselben Wert wie der oben stehende Standard (3 Spalten) - für JEDE Breite zwischen der
+       jetzigen 480px-Schwelle und 1400px war sie beweisbar wirkungslos (der Standard griff ohnehin
+       schon), also ersatzlos entfernt statt nur umbenannt. Die vorherige 380px-Schwelle ist jetzt 480px
+       - vereinheitlicht mit den anderen "kleines Telefon"-Regeln weiter unten (Karten-Umbruch,
+       Hero-Titel-Schrift, Diagramm-Höhe), die schon vorher 480px nutzten. Bewusst NICHT angetastet:
+       700/760/1219/1400px - das sind architektonisch begründete, an anderer Stelle im Code explizit
+       kommentierte Schwellen (z.B. "genug Platz für das rechte Sidebar-Panel" bei 1219/1400px); die
+       ohne echte Mehrgeräte-Sichttests zusammenzulegen wäre ein unnötiges Risiko für einen rein
+       kosmetischen Aufräum-Task gewesen. */
+    @media (max-width: 480px) { .resbar { grid-template-columns: repeat(2, 1fr); } }
     .rescard { position:relative; overflow:hidden; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:12px; padding: 0.8rem 0.9rem; display:flex; align-items:center; gap:10px; transition:border-color 0.2s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
     .rescard:hover { border-color:rgba(var(--primary-rgb), 0.3); }
     /* Grafik-Runde 9, Vorschlag 37 "Touch-Feedback": kurzer Hintergrund-Aufblitz statt Ripple-Kreis
@@ -609,7 +618,10 @@
     .rescard .value { font-size:17px; font-weight:500; line-height:1.25; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rescard .rate { font-size:10px; color:#7d8199; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .dash-colony-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:1rem; }
-    .dash-colony-card { position:relative; display:flex; align-items:center; gap:8px; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:10px; padding:6px 10px 6px 6px; max-width:172px; min-width:0; overflow:hidden; }
+    .dash-colony-card { position:relative; display:flex; align-items:center; gap:8px; background:var(--elev-1); border:0.5px solid var(--line-1); padding:6px 10px 6px 6px; max-width:172px; min-width:0; overflow:hidden; }
+    /* Grafik-Runde 10, Vorschlag "Rest fertigstellen": border-radius bewusst nicht mehr hier gesetzt -
+       die HUD-Eckenschnitt-Sammelregel weiter unten übernimmt das jetzt (letzte verbliebene runde
+       Karte im Dashboard). */
     .dash-colony-card.targeted { background:rgba(var(--danger-rgb), 0.14); border-color:rgba(var(--danger-rgb), 0.55); }
     .dash-colony-card.active-base { background:rgba(var(--primary-rgb), 0.2); border-color:var(--c-primary); }
     .dash-colony-icon { width:28px; height:28px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; background:rgba(var(--primary-rgb), 0.18); color:var(--lilac); }
@@ -695,7 +707,9 @@
     .fleet-position-item .fp-name { display:flex; align-items:center; gap:5px; font-weight:500; }
     .fleet-position-item .fp-timer { color:#7d8199; font-size:10px; font-variant-numeric:tabular-nums; }
 
-    @media (max-width: 400px) {
+    /* Grafik-Runde 10, "Breakpoints konsolidieren": 400px -> 480px, vereinheitlicht mit den anderen
+       "kleines Telefon"-Regeln (siehe ausführliche Begründung bei .resbar weiter oben). */
+    @media (max-width: 480px) {
       .card-row { flex-wrap: wrap; }
       .card-row > *:last-child { flex: 1 1 100%; }
     }
@@ -916,19 +930,19 @@
        Positionierung eindeutig und ohne Verifikations-Screenshot sicher richtig herzuleiten. Diese
        Regel steht bewusst NACH den einzelnen .card-row/.profile-card/... Deklarationen, damit sie
        deren border-radius zuverlässig überschreibt (gleiche Selektor-Spezifität, spätere Regel gewinnt). */
-    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard, .rank-row {
+    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard, .rank-row, .dash-colony-card {
       position:relative; border-radius:0;
       clip-path: polygon(var(--corner) 0, 100% 0, 100% calc(100% - var(--corner)), calc(100% - var(--corner)) 100%, 0 100%, 0 var(--corner));
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before,
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after {
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before,
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after {
       content:''; position:absolute; width:9px; height:9px; pointer-events:none;
       border:1.5px solid rgba(var(--primary-rgb),0.7);
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before {
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before {
       top:0; right:0; border-left:none; border-bottom:none;
     }
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after {
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after {
       bottom:0; left:0; border-right:none; border-top:none;
     }
     .profile-left { display:flex; align-items:center; gap:12px; }
@@ -2748,8 +2762,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.86.0';
+  const VERSION = '8.87.0';
   const PATCHNOTES = [
+    { version:'8.87.0', date:'17.07.2026', changes:[
+      'Letzte Kolonie-Pillen-Karte im Dashboard (.dash-colony-card) hat jetzt ebenfalls den HUD-Eckenschnitt - damit tragen alle wiederkehrenden Kartentypen im Spiel jetzt dieselbe Formsprache',
+      'Eigenständiges Skript check-icons.js hinzugefügt (Teil des Pflicht-Pre-Commit-Checks laut CLAUDE.md): prüft automatisch ti-*-Icons gegen die Font-Whitelist UND icon:-Werte in den Gebäude-/Forschungs-/Schiffslisten gegen das ICONS-Objekt',
+      'Responsive Breakpoints aufgeräumt: eine komplett wirkungslose Regel entfernt (setzte denselben Wert wie der Standard ohnehin schon), drei vereinzelte "kleines Telefon"-Schwellen (380/400px) auf den bereits etablierten 480px-Wert vereinheitlicht - von 8 auf 5 unterschiedliche Breakpoint-Werte. Bewusst NICHT angetastet: 700/760/1219/1400px, das sind architektonisch begründete, an anderer Stelle im Code dokumentierte Schwellen (z.B. für das Sidebar-Panel) - die ohne echte Mehrgeräte-Sichttests zusammenzulegen wäre ein unnötiges Risiko gewesen'
+    ]},
     { version:'8.86.0', date:'17.07.2026', changes:[
       'Sektorkarte hat jetzt ein rotierendes Radar-Sweep-Overlay - rein dekorativ, unabhängig vom Zoomen/Verschieben der eigentlichen Karte',
       'Erfolge-Freischaltung zeigt jetzt einen kurzen Pop+Ring-Moment (deutlich zurückhaltender als die große Konfetti-Feier bei seltenen Meilensteinen)',
