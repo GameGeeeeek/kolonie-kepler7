@@ -2989,8 +2989,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.96.2';
+  const VERSION = '8.96.3';
   const PATCHNOTES = [
+    { version:'8.96.3', date:'18.07.2026', changes:[
+      'Weltprojekte (Spieler-Wunsch: "auch Kristallherz/Antimateriekern/Alte Technologie spenden müssen"): jedes der 6 Weltprojekte benötigt jetzt zusätzlich zu den Ressourcen 3x eines seltenen persönlichen Fund-Items (Antimateriekern, Kristallherz oder Alte Technologie) - eine eigene Spenden-Zeile mit Fortschrittsbalken, Mengenfeld und Max-Button erscheint direkt in der Weltprojekt-Box, sobald das Projekt aktiv geschaltet ist',
+      'Bugfix (durch den neuen Spenden-Button aufgedeckt, betraf ALLE Allianz-Beitrag-Buttons, nicht nur die neuen): ein Klick auf "Spenden" bzw. "Max" konnte mehrfach auslösen, wenn die zugehörige Box eine Weile nicht neu aufgebaut wurde - jeder Aufruf der gemeinsamen Verkabelungsfunktion hatte einen weiteren Klick-Handler auf denselben Button gehängt, statt den alten zu ersetzen. Dadurch konnte eine einzelne Spende mehrfach abgebucht werden. Jetzt wird der Handler beim Verkabeln ersetzt statt gestapelt'
+    ]},
     { version:'8.96.2', date:'18.07.2026', changes:[
       'Bugfix (Spieler-Meldung "macht merkwürdige Bewegungen"): das Stationsdiorama saß bisher innerhalb der Allianzbasis-Box, die sich wegen laufender Countdown-Timer/Ressourcenbalken jede Sekunde komplett neu aufbaut - dabei wurde auch das Diorama-DOM jede Sekunde zerstört und neu erzeugt, was Blinklichter/Drehung sichtbar ruckeln bzw. neu starten ließ. Diorama läuft jetzt in einem eigenen Container, der nur bei einer echten Änderung (Ausbaustufe/Banner/Fortschritt) neu aufgebaut wird - alle Animationen laufen seither ungestört durch',
       'Neu: Allianzmitglieder sehen die eigene Allianzbasis jetzt auch als Symbol (🏰) direkt in der Galaxie-Übersicht am richtigen Sternsystem - genau wie das 🏠-Symbol für das eigene Heimatsystem, per Klick sofort erreichbar, ohne erst über den Link in der Allianzbasis-Box gehen zu müssen'
@@ -6237,13 +6241,22 @@
   // vollständig funktionsfähig. Eigene Aktiv-Auswahl (state.allianceActiveWorldProjects, max. 1
   // gleichzeitig - "besonders selten" laut Feature-Wunsch, daher strenger als die 7 normalen
   // Allianzprojekte oben) über worldProject:true, siehe activeGated-Zweig in contributeToAllianceTech().
+  // Spieler-Wunsch "bei Allianz-Projekten sollen auch Kristallherz/Antimateriekern/Alte Technologie
+  // gespendet werden müssen": bewusst NUR bei den Weltprojekten (nicht bei den 100-stufigen
+  // Großprojekten oben - dort wäre bei 0,5-0,6% Fundchance je Erkundung pro Stufe ein seltenes Item
+  // nötig, das ist bei 100 Stufen nicht spielbar). Weltprojekte sind ohnehin einmalige, seltene
+  // Mega-Vorhaben ("mehrere Wochen oder Monate") - eine zusätzliche, von der GANZEN Allianz gemeinsam
+  // aufzubringende Materialschwelle (rareItem/rareAmt) passt narrativ und bleibt technisch einfach
+  // (ein zusätzlicher Schwellenwert statt eines neuen Stufensystems). Items stammen aus dem
+  // PERSÖNLICHEN Inventar jedes Spendenden (state.rareItems, dieselbe Quelle wie Superschlachtschiff/
+  // Kristallfestung/Artefakt-Set) - siehe contributeRareToAllianceProject().
   const ALLIANCE_WORLD_PROJECT_DEFS = [
-    { key:'wp_dyson', name:'Dyson-Sphäre', desc:'Einmalig, dauerhaft +5% Gesamtproduktion für alle Allianzmitglieder (fließt in die bestehende gedeckelte Produktions-Bonus-Gruppe ein).', cost:3000000000, resKey:'energie', icon:'ti-sun', activeGated:true, worldProject:true },
-    { key:'wp_sprungtor', name:'Intergalaktisches Sprungtor', desc:'Einmalig, dauerhaft -10% Flugzeit aller Missionen für alle Allianzmitglieder.', cost:150000000, resKey:'antimaterie', icon:'ti-door-exit', activeGated:true, worldProject:true },
-    { key:'wp_sternenwerft', name:'Gigantische Sternenwerft', desc:'Einmalig, dauerhaft -10% Bauzeit für Schiffe UND Gebäude für alle Allianzmitglieder.', cost:3500000000, resKey:'erz', icon:'ti-building-factory-2', activeGated:true, worldProject:true },
-    { key:'wp_wurmloch', name:'Wurmlochgenerator', desc:'Einmalig, dauerhaft -10% Treibstoffkosten für alle Missionen aller Allianzmitglieder.', cost:2000000000, resKey:'deuterium', icon:'ti-recycle', activeGated:true, worldProject:true },
-    { key:'wp_archiv', name:'Galaktisches Archiv', desc:'Verleiht JEDEM aktuellen und künftigen Allianzmitglied dauerhaft den exklusiven Ehrentitel „Archivar der Allianz" - über keine andere Quelle im Spiel erhältlich.', cost:3000000, resKey:'forschungspunkte', icon:'ti-microscope', activeGated:true, worldProject:true },
-    { key:'wp_ringwelt', name:'Allianz-Ringwelt', desc:'Einmalig, dauerhaft +10% Lagerkapazität für alle Allianzmitglieder.', cost:3000000000, resKey:'kristalle', icon:'ti-planet', activeGated:true, worldProject:true }
+    { key:'wp_dyson', name:'Dyson-Sphäre', desc:'Einmalig, dauerhaft +5% Gesamtproduktion für alle Allianzmitglieder (fließt in die bestehende gedeckelte Produktions-Bonus-Gruppe ein). Benötigt zusätzlich 3x Antimateriekern aus dem persönlichen Inventar der Spendenden.', cost:3000000000, resKey:'energie', icon:'ti-sun', activeGated:true, worldProject:true, rareItem:'antimateriekern', rareAmt:3 },
+    { key:'wp_sprungtor', name:'Intergalaktisches Sprungtor', desc:'Einmalig, dauerhaft -10% Flugzeit aller Missionen für alle Allianzmitglieder. Benötigt zusätzlich 3x Alte Technologie aus dem persönlichen Inventar der Spendenden.', cost:150000000, resKey:'antimaterie', icon:'ti-door-exit', activeGated:true, worldProject:true, rareItem:'altetech', rareAmt:3 },
+    { key:'wp_sternenwerft', name:'Gigantische Sternenwerft', desc:'Einmalig, dauerhaft -10% Bauzeit für Schiffe UND Gebäude für alle Allianzmitglieder. Benötigt zusätzlich 3x Antimateriekern aus dem persönlichen Inventar der Spendenden.', cost:3500000000, resKey:'erz', icon:'ti-building-factory-2', activeGated:true, worldProject:true, rareItem:'antimateriekern', rareAmt:3 },
+    { key:'wp_wurmloch', name:'Wurmlochgenerator', desc:'Einmalig, dauerhaft -10% Treibstoffkosten für alle Missionen aller Allianzmitglieder. Benötigt zusätzlich 3x Kristallherz aus dem persönlichen Inventar der Spendenden.', cost:2000000000, resKey:'deuterium', icon:'ti-recycle', activeGated:true, worldProject:true, rareItem:'kristallherz', rareAmt:3 },
+    { key:'wp_archiv', name:'Galaktisches Archiv', desc:'Verleiht JEDEM aktuellen und künftigen Allianzmitglied dauerhaft den exklusiven Ehrentitel „Archivar der Allianz" - über keine andere Quelle im Spiel erhältlich. Benötigt zusätzlich 3x Alte Technologie aus dem persönlichen Inventar der Spendenden.', cost:3000000, resKey:'forschungspunkte', icon:'ti-microscope', activeGated:true, worldProject:true, rareItem:'altetech', rareAmt:3 },
+    { key:'wp_ringwelt', name:'Allianz-Ringwelt', desc:'Einmalig, dauerhaft +10% Lagerkapazität für alle Allianzmitglieder. Benötigt zusätzlich 3x Kristallherz aus dem persönlichen Inventar der Spendenden.', cost:3000000000, resKey:'kristalle', icon:'ti-planet', activeGated:true, worldProject:true, rareItem:'kristallherz', rareAmt:3 }
   ];
   const ALLIANCE_WORLD_MAX_ACTIVE = 1; // "besonders selten" - nur ein Weltprojekt gleichzeitig in Arbeit
   // Effekt-Berechnung für die gestuften Allianz-Techs/-Gebäude (nicht für a_expand1-5, die bleiben
@@ -13008,7 +13021,7 @@
       { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' },
       { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste. Die 7 <strong>Allianz-Gebäude</strong> (nicht die Technologien) schalten eine erreichte Stufe zusätzlich erst nach einer echten <strong>Bauzeit</strong> frei, analog zur Allianzbasis - Stufe 1 dauert 3 Std., jede weitere ×1,35 länger. Jedes Gebäude baut unabhängig von den anderen, die Bauzeit beginnt erst, sobald die Ressourcen für die jeweilige Stufe vollständig beisammen sind.' },
       { title:'Permanente Allianzprojekte: 100 Stufen für vollständig ausgebaute Basen', body:'Sobald die Allianzbasis <strong>Stufe 10 (Maximalstufe)</strong> erreicht hat, schalten sich im Allianz-Tab unterhalb der Allianz-Gebäude sieben permanente Projekte frei, jedes mit <strong>100 Ausbaustufen</strong> (deutlich sanfteres Kostenwachstum als bei den 20-stufigen Technologien - ein Langzeitziel für Monate, kein Endpunkt): <strong>Galaktische Forschung</strong> (-Forschungsdauer), <strong>Allianz-Flottenwerft</strong> (-Bauzeit für Schiffe UND Gebäude), <strong>Galaktisches Handelsnetzwerk</strong> (+Marktrabatt, Deckel dafür von 20% auf 30% angehoben), <strong>Verteidigungsnetzwerk</strong> (+Verteidigungspunkte, fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein), <strong>Logistiknetzwerk</strong> (-Flugzeiten aller Missionen), <strong>Expeditionsprogramm</strong> (+Fundchance bei Expeditionen) und <strong>Terraforming-Initiative</strong> (-Terraforming-Kosten UND -Dauer). Es können immer nur <strong>bis zu 2 Projekte gleichzeitig aktiv</strong> sein und Beiträge annehmen - nur Admins/Offiziere entscheiden, welche. Beiträge zählen wie bei allen anderen Allianz-Zielen automatisch für die wöchentliche Allianz-Spendenrangliste. Jedes aktive Projekt zeigt zusätzlich eine <strong>projektinterne Rangliste der größten Spender</strong> (Top 3) sowie, sobald genug Datenbasis vorliegt (mind. 1 Std. seit Aktivierung), eine <strong>geschätzte Fertigstellungszeit</strong> für die nächste Stufe, hochgerechnet aus der bisherigen Beitragsrate.' },
-      { title:'Weltprojekte: seltene Mega-Projekte', body:'Zusätzlich zu den 100-stufigen Allianzprojekten gibt es sechs <strong>Weltprojekte</strong> - einmalige Mega-Bauwerke mit enormen Einzelkosten ("mehrere Wochen bis Monate" gemeinsamer Beiträge), ebenfalls erst ab voll ausgebauter Allianzbasis: <strong>Dyson-Sphäre</strong> (+5% Produktion), <strong>Intergalaktisches Sprungtor</strong> (-10% Flugzeit), <strong>Gigantische Sternenwerft</strong> (-10% Bauzeit), <strong>Wurmlochgenerator</strong> (-10% Treibstoffkosten), <strong>Allianz-Ringwelt</strong> (+10% Lagerkapazität) und <strong>Galaktisches Archiv</strong> (verleiht der gesamten Allianz - auch künftigen Mitgliedern - dauerhaft den exklusiven Ehrentitel „Archivar der Allianz", einsehbar im Fortschritt-Tab). Anders als bei den normalen Allianzprojekten kann immer nur <strong>EIN einziges</strong> Weltprojekt gleichzeitig in Arbeit sein - nach Fertigstellung wird automatisch der Aktiv-Slot frei für das nächste. Ein vollendetes Weltprojekt bleibt für immer als Prestigeobjekt der Allianz sichtbar. Auch hier zeigt die aktive Baustelle die größten Spender und eine geschätzte Fertigstellungszeit.' },
+      { title:'Weltprojekte: seltene Mega-Projekte', body:'Zusätzlich zu den 100-stufigen Allianzprojekten gibt es sechs <strong>Weltprojekte</strong> - einmalige Mega-Bauwerke mit enormen Einzelkosten ("mehrere Wochen bis Monate" gemeinsamer Beiträge), ebenfalls erst ab voll ausgebauter Allianzbasis: <strong>Dyson-Sphäre</strong> (+5% Produktion), <strong>Intergalaktisches Sprungtor</strong> (-10% Flugzeit), <strong>Gigantische Sternenwerft</strong> (-10% Bauzeit), <strong>Wurmlochgenerator</strong> (-10% Treibstoffkosten), <strong>Allianz-Ringwelt</strong> (+10% Lagerkapazität) und <strong>Galaktisches Archiv</strong> (verleiht der gesamten Allianz - auch künftigen Mitgliedern - dauerhaft den exklusiven Ehrentitel „Archivar der Allianz", einsehbar im Fortschritt-Tab). Anders als bei den normalen Allianzprojekten kann immer nur <strong>EIN einziges</strong> Weltprojekt gleichzeitig in Arbeit sein - nach Fertigstellung wird automatisch der Aktiv-Slot frei für das nächste. Ein vollendetes Weltprojekt bleibt für immer als Prestigeobjekt der Allianz sichtbar. Auch hier zeigt die aktive Baustelle die größten Spender und eine geschätzte Fertigstellungszeit. <strong>Zusätzlich zu den Ressourcen</strong> braucht jedes Weltprojekt noch 3x ein seltenes Fund-Item aus dem PERSÖNLICHEN Inventar (Beute aus Erkundungen): Dyson-Sphäre und Sternenwerft je 3x <strong>Antimateriekern</strong>, Sprungtor und Archiv je 3x <strong>Alte Technologie</strong>, Wurmlochgenerator und Ringwelt je 3x <strong>Kristallherz</strong> - diese Items spendet man über eine eigene Zeile direkt in der Weltprojekt-Box (nicht über den normalen Ressourcen-Beitrag).' },
       { title:'Territorien-Kontrolle', body:'Ein Sternsystem gibt <strong>+5% Produktion</strong>, wenn du dich dort gerade befindest UND das System <strong>voll kontrollierst</strong> - das heißt: JEDER dort kolonisierte Planet gehört entweder dir/deiner Allianz, oder er ist unkolonisiert. Gehört auch nur ein einziger Planet im System einem anderen Spieler oder einer anderen Allianz, entfällt der Bonus für das gesamte System, für alle Seiten - volle Kontrolle über ein System ist dadurch strategisch deutlich wertvoller als das bloße Vorhandensein dort. Auch ein einzelner Spieler ohne Allianz kann ein System allein voll kontrollieren, wenn ihm dort alle kolonisierten Planeten gehören. Die Übersicht im Galaxie-Tab zeigt die zuletzt bekannten voll kontrollierten Systeme (basiert auf den geteilten Bestenlisten-Daten, aktualisiert sich beim regulären Speichern).' }
     ]},
     { key:'leere', icon:'ti-atom-2', title:'Endgame: Die Leere', entries:[
@@ -14475,8 +14488,13 @@
           while (lvl < t.maxLevel && (totals[t.key]||0) >= allianceTechCumulativeCost(t, lvl+1)) lvl++;
           if ((unlockedDoc[t.key]||0) !== lvl){ unlockedDoc[t.key] = lvl; unlockedChanged = true; }
         } else {
-          // Allianz-Expansion (a_expand1-5): weiterhin binär wie bisher, einmalige Schwelle.
-          if ((totals[t.key]||0) >= t.cost && !unlockedDoc[t.key]){ unlockedDoc[t.key] = true; unlockedChanged = true; }
+          // Allianz-Expansion (a_expand1-5): weiterhin binär wie bisher, einmalige Schwelle. Bei
+          // Weltprojekten mit rareItem/rareAmt (Spieler-Wunsch "auch Kristallherz/Antimateriekern/Alte
+          // Technologie spenden müssen") zusätzlich die seltene-Material-Schwelle - totals[t.key+'__rare']
+          // wird über contributeRareToAllianceProject() genau wie die normale Ressourcen-Summe befüllt,
+          // läuft also automatisch durch dieselbe Aggregation oben mit.
+          const rareDone = !t.rareItem || (totals[t.key+'__rare']||0) >= t.rareAmt;
+          if ((totals[t.key]||0) >= t.cost && rareDone && !unlockedDoc[t.key]){ unlockedDoc[t.key] = true; unlockedChanged = true; }
         }
       }
       if (unlockedChanged){
@@ -16088,6 +16106,39 @@
     await loadAllianceTechData();
     render(); save();
   }
+  // Spendet seltene Items (Antimateriekern/Kristallherz/Alte Technologie, state.rareItems - dieselbe
+  // persönliche Quelle wie Superschlachtschiff/Kristallfestung/Artefakt-Set) zur zusätzlichen
+  // Materialschwelle eines Weltprojekts (Spieler-Wunsch). Läuft über einen synthetischen
+  // Beitrags-Schlüssel techKey+'__rare' im selben Dokument wie die normalen Ressourcen-Beiträge - der
+  // bereits bestehende Aggregations-Code in loadAllianceTechData() summiert ihn automatisch mit,
+  // keine neue Speicher-/Ladelogik nötig. Bewusst NICHT in recordAllianceDonation() eingerechnet - die
+  // Spendenrangliste misst Ressourcenwert, ein Item-Zähler (z.B. "3") würde sie verzerren; der
+  // Materialfortschritt hat mit der eigenen Anzeige im Weltprojekt-Eintrag schon eine Rangliste.
+  async function contributeRareToAllianceProject(techKey, amount){
+    const tag = myAllianceTag();
+    if (!tag){ log('Du brauchst einen Allianz-Tag, um beizutragen.', 'ti-alert-triangle'); return; }
+    const t = findAllianceStructure(techKey);
+    if (!t || !t.rareItem) return;
+    if (t.activeGated){
+      const activeList = t.worldProject ? (state.allianceActiveWorldProjects||[]) : (state.allianceActiveProjects||[]);
+      if (!activeList.includes(techKey)){ log('Dieses '+(t.worldProject?'Weltprojekt':'Allianzprojekt')+' ist gerade nicht aktiv geschaltet.', 'ti-alert-triangle'); return; }
+    }
+    if ((state.rareItems[t.rareItem]||0) < amount || amount <= 0){ log('Nicht genug '+(RARE_ITEMS.find(r=>r.key===t.rareItem)||{}).name+' im Inventar.', 'ti-alert-triangle'); return; }
+    state.rareItems[t.rareItem] -= amount;
+    const rareContribKey = techKey+'_rare';
+    state.allianceContributed[rareContribKey] = (state.allianceContributed[rareContribKey]||0) + amount;
+    try {
+      const key = 'alliance:'+tag+':contrib:'+state.player.id;
+      let doc = {};
+      try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
+      doc[techKey+'__rare'] = (doc[techKey+'__rare']||0) + amount;
+      await storageSet(key, JSON.stringify(doc), true);
+    } catch(e){}
+    log(amount+'x '+(RARE_ITEMS.find(r=>r.key===t.rareItem)||{}).name+' zu "'+t.name+'" beigetragen.', 'ti-diamond');
+    playSound('trade');
+    await loadAllianceTechData();
+    render(); save();
+  }
   // Welche der sieben permanenten Allianzprojekte gerade aktiv (beitragbar) sind - geteiltes
   // Dokument, vom Admin/Offizier gesetzt (einfaches Überschreiben statt Read-Fresh-Race-Schutz, da
   // eine Aktivierungs-Entscheidung selten und bewusst ist, kein häufig konkurrierender Zähler).
@@ -16321,6 +16372,28 @@
             <div class="bmeta" style="margin-top:2px;">${miniResIcon(t.resKey)} Dein Beitrag bisher: ${fmt(myContrib)} ${rd.label}</div>
             ${topDonors.length ? `<div class="bmeta" style="margin-top:4px;"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i> Größte Spender: ${topDonors.map((d,i)=>(i+1)+'. '+escapeHtml(d.name)+' ('+fmt(d.amt)+')').join(' · ')}</div>` : ''}
           `;
+          // Spieler-Wunsch "auch Kristallherz/Antimateriekern/Alte Technologie spenden müssen": bewusst
+          // NUR hier bei den Weltprojekten, nicht bei den 100-stufigen Großprojekten (siehe
+          // ALLIANCE_WORLD_PROJECT_DEFS-Kommentar). Zweite, unabhängige Fortschrittsanzeige aus dem
+          // PERSÖNLICHEN Inventar jedes Spendenden statt Ressourcen - contributeRareToAllianceProject().
+          if (t.rareItem){
+            const rareTotal = totals[t.key+'__rare']||0;
+            const rareDef = RARE_ITEMS.find(r=>r.key===t.rareItem);
+            const rarePct = Math.min(100, (rareTotal/t.rareAmt)*100);
+            const myRareContrib = state.allianceContributed[t.key+'_rare']||0;
+            s += `
+              <div style="margin-top:8px; padding-top:8px; border-top:0.5px solid rgba(255,255,255,0.08);">
+                <div style="display:flex; justify-content:space-between;"><span class="bmeta"><i class="ti ${rareDef.icon}" aria-hidden="true"></i> Seltenes Material</span><span class="bmeta">${fmt(rareTotal)}/${fmt(t.rareAmt)} ${rareDef.name}</span></div>
+                <div class="progress-outer"><div class="progress-inner" style="width:${rarePct}%; background:#5dcaa5;"></div></div>
+                <div style="display:flex; gap:6px; align-items:center; margin-top:6px;">
+                  <input type="text" inputmode="numeric" placeholder="Menge ${rareDef.name}" data-contrib-rare-input="${t.key}" style="flex:1; font-size:12px;"/>
+                  <button data-contrib-rare-max="${t.key}" data-contrib-rare-max-amt="${Math.max(0, Math.min(state.rareItems[t.rareItem]||0, t.rareAmt-rareTotal))}" style="font-size:10px; padding:6px 8px;">Max</button>
+                  <button data-contrib-rare-btn="${t.key}" style="font-size:11px; padding:6px 10px;">Spenden</button>
+                </div>
+                <div class="bmeta" style="margin-top:2px;">Du hast: ${fmt(state.rareItems[t.rareItem]||0)} ${rareDef.name} · dein Beitrag bisher: ${fmt(myRareContrib)}</div>
+              </div>
+            `;
+          }
         }
       }
       s += `</div>`;
@@ -16429,14 +16502,23 @@
       `;
     }).join('');
   }
+  // Bugfix (beim Testen des neuen Seltenes-Material-Beitrags entdeckt, betraf aber schon vorher ALLE
+  // vier Beitrags-Buttonarten): diese Funktion läuft global über document.querySelectorAll und wird
+  // von VIER verschiedenen Render-Funktionen aufgerufen (Technologien/Gebäude/Großprojekte/
+  // Weltprojekte) - läuft in einem Tick nur EINE davon neu (die anderen Boxen bleiben wegen
+  // isTypingIn() unangetastet, wenn man gerade in einem ihrer Felder tippt), bekamen deren bereits
+  // bestehende, unveränderte Buttons trotzdem einen ZUSÄTZLICHEN addEventListener obendrauf - ein
+  // einzelner Klick löste dadurch mehrfach aus (Beobachtet: 2 angefordert, 4 tatsächlich abgebucht).
+  // .onclick = statt .addEventListener() behebt das, da eine Zuweisung immer nur GENAU einen Handler
+  // hält statt sich anzusammeln.
   function wireAllianceContribButtons(){
-    document.querySelectorAll('[data-contrib-btn]').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-contrib-btn]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-contrib-btn');
       const input = document.querySelector(`[data-contrib-input="${key}"]`);
       const amount = Math.floor(Number(input.value));
       if (amount > 0) contributeToAllianceTech(key, amount);
-    }));
-    document.querySelectorAll('[data-contrib-max]').forEach(btn => btn.addEventListener('click', () => {
+    });
+    document.querySelectorAll('[data-contrib-max]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-contrib-max');
       const input = document.querySelector(`[data-contrib-input="${key}"]`);
       if (input){
@@ -16445,7 +16527,23 @@
         // automatische Tick (alle 1s) überschreibt den gerade gesetzten Wert wieder mit leer.
         input.focus();
       }
-    }));
+    });
+    // Seltene-Material-Spenden bei Weltprojekten (rareItem/rareAmt) - dieselbe Wiring-Struktur wie
+    // oben, nur gegen contributeRareToAllianceProject() statt contributeToAllianceTech().
+    document.querySelectorAll('[data-contrib-rare-btn]').forEach(btn => btn.onclick = () => {
+      const key = btn.getAttribute('data-contrib-rare-btn');
+      const input = document.querySelector(`[data-contrib-rare-input="${key}"]`);
+      const amount = Math.floor(Number(input.value));
+      if (amount > 0) contributeRareToAllianceProject(key, amount);
+    });
+    document.querySelectorAll('[data-contrib-rare-max]').forEach(btn => btn.onclick = () => {
+      const key = btn.getAttribute('data-contrib-rare-max');
+      const input = document.querySelector(`[data-contrib-rare-input="${key}"]`);
+      if (input){
+        input.value = btn.getAttribute('data-contrib-rare-max-amt');
+        input.focus();
+      }
+    });
   }
   function renderAllianceTechBox(){
     const box = document.getElementById('allianceTechBox');
