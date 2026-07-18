@@ -2009,6 +2009,7 @@
 
         <div id="allianceDominanceBox" style="margin-bottom:1.5rem;"></div>
 
+        <div id="allianceBaseHeroBox"></div>
         <div id="allianceBaseBox" style="margin-bottom:1.5rem;"></div>
 
         <div id="allianceMusterBox" style="margin-bottom:1.5rem;"></div>
@@ -2988,8 +2989,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.96.1';
+  const VERSION = '8.96.2';
   const PATCHNOTES = [
+    { version:'8.96.2', date:'18.07.2026', changes:[
+      'Bugfix (Spieler-Meldung "macht merkwürdige Bewegungen"): das Stationsdiorama saß bisher innerhalb der Allianzbasis-Box, die sich wegen laufender Countdown-Timer/Ressourcenbalken jede Sekunde komplett neu aufbaut - dabei wurde auch das Diorama-DOM jede Sekunde zerstört und neu erzeugt, was Blinklichter/Drehung sichtbar ruckeln bzw. neu starten ließ. Diorama läuft jetzt in einem eigenen Container, der nur bei einer echten Änderung (Ausbaustufe/Banner/Fortschritt) neu aufgebaut wird - alle Animationen laufen seither ungestört durch',
+      'Neu: Allianzmitglieder sehen die eigene Allianzbasis jetzt auch als Symbol (🏰) direkt in der Galaxie-Übersicht am richtigen Sternsystem - genau wie das 🏠-Symbol für das eigene Heimatsystem, per Klick sofort erreichbar, ohne erst über den Link in der Allianzbasis-Box gehen zu müssen'
+    ]},
     { version:'8.96.1', date:'18.07.2026', changes:[
       'Stationsdiorama (Spieler-Wunsch "Maximum grafisch rausholen"): deutlich mehr Detail - der Hintergrund färbt sich jetzt mit dem gewählten Allianz-Banner ein (zieht die Identität aus der Banner-Auswahl direkt ins Diorama), dazu ein rotierender Radar-Sweep (dieselbe Technik wie auf der Sektorkarte), Glanzsterne mit Vierpunkt-Flare, eine Lineal-Tickmarke am Rand, kleine HUD-Eck-Readouts (Allianz-Tag/Ausbaustufe) und statische Scanlines - dieselbe Cockpit-Overlay-Bildsprache wie bei den Teilen-Karten, dazu ein zweiter, gegenläufig rotierender Akzentring um die Station',
       'Bugfix: die Rotation lief bisher unruhig, weil die Box durch die laufenden Countdown-Anzeigen jede Sekunde komplett neu aufgebaut wird und dabei jede CSS-Animation neu gestartet wäre - der Drehwinkel wird jetzt bei jedem Aufbau aus der echten Uhrzeit nachgerechnet, wodurch die Drehung trotzdem nahtlos wirkt'
@@ -14013,6 +14018,9 @@
     if (appsWrap) appsWrap.style.display = 'none';
     if (logWrap) logWrap.style.display = 'none';
     if (chronicleWrap) chronicleWrap.style.display = 'none';
+    const heroBox = document.getElementById('allianceBaseHeroBox');
+    if (heroBox) heroBox.innerHTML = '';
+    lastAbHeroSig = null;
     render(); save(); loadAlliances(); loadAllianceBanner();
     log('Allianz verlassen.', 'ti-door-exit');
   }
@@ -16519,6 +16527,8 @@
     const base = state.allianceBase;
     const titleHtml = `<div class="section-title"><i class="ti ti-building-fortress" aria-hidden="true"></i>Allianzbasis</div>`;
     if (!base || !base.foundedAt){
+      const heroBoxEmpty = document.getElementById('allianceBaseHeroBox');
+      if (heroBoxEmpty){ heroBoxEmpty.innerHTML = ''; lastAbHeroSig = null; }
       const amAdmin = state.player.allianceRole === 'admin';
       const sysOptions = STAR_SYSTEMS.map(sys=>`<option value="${sys.id}">${sys.name}</option>`).join('');
       box.innerHTML = titleHtml + `
@@ -16572,7 +16582,8 @@
       return `<div class="bmeta" style="${reached?'color:#5dcaa5;':(isNext?'color:#e8e5ff;':'')}">${reached?'<i class="ti ti-check" aria-hidden="true"></i>':(isNext?'<i class="ti ti-chevron-right" aria-hidden="true"></i>':'<i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85;"></i>')} Stufe ${st.level}: ${st.text}</div>`;
     }).join('');
     const myContribSum = ['energie','erz','kristalle','deuterium','antimaterie'].reduce((a,rk)=>a+(state.allianceContributed['base_'+rk]||0),0);
-    box.innerHTML = titleHtml + allianceBaseHeroHtml(lvl, tag, sys, base) + allianceBaseSystemsStripHtml(lvl) + `
+    renderAllianceBaseHero(lvl, tag, sys, base);
+    box.innerHTML = titleHtml + `
       <div class="card-row" style="flex-direction:column; align-items:stretch; gap:10px; ${lvl>=10?'border-color:#fac775;':''}">
         <div style="display:flex; gap:14px; align-items:center;">
           <div style="flex:1;">
@@ -16636,12 +16647,38 @@
       if (missionClaimBtn) missionClaimBtn.onclick = () => claimAllianceMissionReward(cadence);
     });
     box.querySelectorAll('[data-buy-project]').forEach(btn => btn.onclick = () => buyAllianceProject(btn.getAttribute('data-buy-project')));
-    const jumpToMap = (e) => { e.preventDefault(); activeSystem = base.sector; switchTab('karte'); };
     const jumpMapBtn = box.querySelector('#abJumpMapBtn');
-    if (jumpMapBtn) jumpMapBtn.onclick = jumpToMap;
-    const jumpMapBtn2 = box.querySelector('#abJumpMapBtn2');
+    if (jumpMapBtn) jumpMapBtn.onclick = (e) => { e.preventDefault(); activeSystem = base.sector; switchTab('karte'); };
+  }
+  // Signatur des zuletzt gerenderten Stationsdioramas (siehe renderAllianceBaseHero) - null solange
+  // noch nichts gerendert wurde bzw. nach dem Verlassen einer Allianz.
+  let lastAbHeroSig = null;
+  // Stationsdiorama in einem EIGENEN Container, unabhängig von #allianceBaseBox aktualisiert (Bugfix,
+  // Spieler-Meldung "macht merkwürdige Bewegungen"): #allianceBaseBox baut sich wegen laufender
+  // Countdown-Timer/Ressourcenbalken jede Sekunde komplett per innerHTML neu auf - lag das Diorama MIT
+  // darin, wurde sein komplettes DOM (samt aller CSS-/SMIL-Animationen) jede Sekunde zerstört und neu
+  // erzeugt, was trotz der Zeit-synchronisierten animation-delay-Werte für die Rotation zu sichtbar
+  // ruckelnden/neu startenden Blinklichtern führte (die SMIL-<animate>-Elemente in
+  // allianceBaseModelSvg() haben keine Delay-Korrektur). Fix: eigener Container, der nur bei einer
+  // ECHTEN Änderung (Stufe/Tag/System/Banner) neu aufgebaut wird - bleibt sonst unangetastet, die
+  // Animationen laufen ungestört weiter.
+  function renderAllianceBaseHero(lvl, tag, sys, base){
+    const heroBox = document.getElementById('allianceBaseHeroBox');
+    if (!heroBox) return;
+    // Die Modul-Übersichtsleiste hängt zusätzlich vom Ausbaufortschritt von Technologien/Gebäuden/
+    // Großprojekten/Weltprojekten ab - muss mit in die Signatur, sonst bliebe die Leiste nach einem
+    // Tick-übergreifend zwischengespeicherten Diorama auf einem veralteten Stand hängen, obwohl sich
+    // Fortschritt tatsächlich geändert hat.
+    const sig = lvl+'|'+tag+'|'+(sys?sys.id:base.sector)+'|'+currentAllianceBanner+'|'
+      +allianceStructurePct(ALLIANCE_TECH_DEFS)+'|'+allianceStructurePct(ALLIANCE_BUILDING_DEFS)+'|'
+      +allianceStructurePct(ALLIANCE_ENDGAME_PROJECT_DEFS)+'|'+allianceStructurePct(ALLIANCE_WORLD_PROJECT_DEFS);
+    if (sig === lastAbHeroSig) return;
+    lastAbHeroSig = sig;
+    heroBox.innerHTML = allianceBaseHeroHtml(lvl, tag, sys, base) + allianceBaseSystemsStripHtml(lvl);
+    const jumpToMap = (e) => { e.preventDefault(); activeSystem = base.sector; switchTab('karte'); };
+    const jumpMapBtn2 = heroBox.querySelector('#abJumpMapBtn2');
     if (jumpMapBtn2) jumpMapBtn2.onclick = jumpToMap;
-    box.querySelectorAll('[data-ab-jump]').forEach(btn => btn.onclick = () => {
+    heroBox.querySelectorAll('[data-ab-jump]').forEach(btn => btn.onclick = () => {
       const target = document.getElementById(btn.getAttribute('data-ab-jump'));
       if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
     });
@@ -20776,7 +20813,15 @@
       const owner = factionOwning(s.id);
       const controlledByMe = !!(galaxyCache.controlledSystems && galaxyCache.controlledSystems[s.id]);
 
+      // Allianzbasis-Markierung (Spieler-Wunsch: "jedes Allianzmitglied soll bei der Sektorübersicht
+      // Allianz-Sektor stehen haben, damit man schnell zur Allianzbasis zugreifen kann") - spiegelt
+      // exakt dieselbe 🏠-Hausmarkierung fürs eigene Heimatsystem, nur fürs Sternsystem der (bereits
+      // gegründeten) Allianzbasis. Nutzt die bereits vorhandene badges-Infrastruktur (Piraten/Aliens/
+      // Krieg-Symbole), keine neue Positionierungslogik nötig - Systemname bleibt wie bei isHome
+      // dauerhaft sichtbar statt nur im Hover.
+      const isAllianceBase = !!(state.allianceBase && state.allianceBase.foundedAt && myAllianceTag() && s.id === state.allianceBase.sector);
       const badges = [];
+      if (isAllianceBase) badges.push({ icon:'🏰', title:'Allianzbasis ['+myAllianceTag()+'] - hier klicken zum Wechseln' });
       if (galaxyCache.activePirateFaction && galaxyCache.activePirateFaction.system === s.id) badges.push({ icon:'🏴‍☠️', title:galaxyCache.activePirateFaction.name+' – Piratenbasis' });
       const alienHere = (galaxyCache.unlockedAlienRaces||[]).find(r=>r.system===s.id);
       if (alienHere) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
@@ -20797,7 +20842,7 @@
       // dauerhaft sichtbar für Heimat, aktives System, dessen direkte Nachbarn sowie generell sobald
       // man nah genug herangezoomt hat; alle anderen zeigen ihren Namen nur noch im Hover-Tooltip.
       const nearActive = activePos && Math.hypot(pos.x-activePos.x, pos.y-activePos.y) < 110;
-      const showLabel = active || isHome || nearActive || zoomedIn;
+      const showLabel = active || isHome || isAllianceBase || nearActive || zoomedIn;
       const binaryCompanion = sunType.binary ? `<circle cx="${(pos.x+4*sunType.r).toFixed(1)}" cy="${(pos.y-3*sunType.r).toFixed(1)}" r="${(2.6*sunType.r).toFixed(1)}" fill="${sunType.core}" opacity="0.85"/>` : '';
       const pulsarRing = sunType.pulsar ? `<circle cx="${x}" cy="${y}" r="${(13*sunType.r).toFixed(1)}" fill="none" stroke="${sunType.glow}" stroke-width="1" stroke-dasharray="2 5" opacity="0.7"><animateTransform attributeName="transform" type="rotate" from="0 ${x} ${y}" to="360 ${x} ${y}" dur="2.2s" repeatCount="indefinite"/></circle>` : '';
 
