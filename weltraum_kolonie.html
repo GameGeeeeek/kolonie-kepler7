@@ -94,7 +94,7 @@
      Version tat) - doppelte SVG-IDs für <filter>/<linearGradient> führen bei mehreren gleichzeitig
      sichtbaren Icons zu unzuverlässigem Rendering (Bugreport: Icon-Grundformen blieben unsichtbar,
      nur separate <animate>-Elemente außerhalb des gefilterten <g> waren zu sehen - siehe Patchnotes). -->
-<svg width="0" height="0" style="position:absolute; overflow:hidden;" aria-hidden="true">
+<svg id="sharedIconDefsSvg" width="0" height="0" style="position:absolute; overflow:hidden;" aria-hidden="true">
   <defs>
     <filter id="ig" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <linearGradient id="gAmber" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f2dcb0"/><stop offset="45%" stop-color="#d99a54"/><stop offset="100%" stop-color="#8f4a12"/></linearGradient>
@@ -2771,8 +2771,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.91.1';
+  const VERSION = '8.91.2';
   const PATCHNOTES = [
+    { version:'8.91.2', date:'18.07.2026', changes:[
+      'Bugfix (Spieler-Meldung): Schiffs-Icons auf der Flotten-Teilen-Karte sowie das Avatar-Symbol auf allen Teilen-Karten fehlten komplett - lagen als nackter, farbiger Kreis/leerer Bereich vor. Ursache: den SVG-Icons fehlte das für eigenständige Bild-Dokumente nötige xmlns-Attribut, zusätzlich referenzierten viele von ihnen gemeinsame Farbverlauf-Definitionen, die außerhalb der normalen Seite nicht verfügbar waren. Beides jetzt zentral in der Lade-Funktion behoben, betrifft automatisch auch die Allianzbasis-Grafik und alle künftigen Icon-Verwendungen in Teilen-Karten'
+    ]},
     { version:'8.91.1', date:'18.07.2026', changes:[
       'Teilen-Karten (Spieler-Wunsch, nachgelegt "immernoch zu langweilig"): deutlich mehr Detail hinzugefügt - Planet mit Orbit-Ringen und Radar-Sweep-Bögen füllen jetzt die vorher leeren Flächen, Lineal-Tickmarken am Rand, Glanzsterne mit Vierpunkt-Flare, statische Scanlines sowie kleine HUD-Readout-Zeilen (Sektor/Datum oben, Übertragungscode/Signalstatus unten) wie ein Kamera-/Cockpit-Overlay',
       'Betrifft wieder alle Kartentypen gleichermaßen; im breiten Querformat (nur bei der Profilkarte wählbar) bleibt die untere Statuszeile weg, damit sie nicht mit dem dort anders platzierten Avatar kollidiert'
@@ -19375,12 +19378,41 @@
   // erzeugt eine Bild-Zusammenfassung (Avatar, Name, Level, Punktestand, Kolonien/Monde/Flotte/
   // Kampfpunkte) im Farbschema des Spiels, zum Teilen auf sozialen Netzwerken. Läuft komplett
   // clientseitig (Canvas), kein Server-Roundtrip nötig.
+  // Bugfix (Spieler-Meldung "Schiffs-Icons fehlen auf der Teilen-Karte"): zwei Ursachen gefunden, die
+  // BEIDE gleichzeitig zutreffen und nur zusammen behoben werden müssen:
+  //   1) Fast alle ICONS-Einträge (u.a. ALLE Schiffs-Icons) haben KEIN xmlns-Attribut am <svg>-Tag -
+  //      als Fragment INNERHALB der HTML-Seite kein Problem (der HTML-Parser erkennt SVG-Inhalt auch
+  //      ohne xmlns automatisch), aber als eigenständiges data:image/svg+xml-Dokument für den Canvas-
+  //      Export MUSS es einer strikten XML-Namespace-Regel folgen - ohne xmlns schlägt das Laden als
+  //      <img> komplett fehl (per Test verifiziert: img.onerror statt img.onload).
+  //   2) Viele ICONS-Einträge referenzieren zusätzlich die gemeinsamen Gradient-/Filter-IDs (gCyan,
+  //      gRed, ig, ...) aus dem EINEN zentralen <defs>-Block am Dateianfang (#sharedIconDefsSvg) statt
+  //      sie selbst mitzubringen - im normalen DOM kein Problem, weil der Block dort immer vorhanden
+  //      ist, im isolierten Bilddokument laufen url(#gCyan) etc. aber ins Leere.
+  // Fix für beides zentral hier in loadSvgAsImage(), damit jeder Aufrufer (Schiffs-Icons, Avatare,
+  // Allianzbasis-Modell) automatisch profitiert, ohne dass jede Aufrufstelle einzeln angepasst werden muss.
+  let sharedIconDefsCache = null;
+  function sharedIconDefsMarkup(){
+    if (sharedIconDefsCache === null){
+      const defsEl = document.getElementById('sharedIconDefsSvg');
+      sharedIconDefsCache = (defsEl && defsEl.querySelector('defs')) ? defsEl.querySelector('defs').outerHTML : '';
+    }
+    return sharedIconDefsCache;
+  }
   function loadSvgAsImage(svgString){
+    let fixed = svgString;
+    if (!/<svg[^>]*\bxmlns=/.test(fixed)){
+      fixed = fixed.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    const defsMarkup = sharedIconDefsMarkup();
+    if (defsMarkup && !fixed.includes('<defs')){
+      fixed = fixed.replace(/^(<svg[^>]*>)/, '$1'+defsMarkup);
+    }
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
       img.onerror = reject;
-      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(fixed)));
     });
   }
   // ===== Teilbare Karten (16.07.2026 stark ausgebaut, Feature-Wunsch) =====
