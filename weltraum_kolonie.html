@@ -3023,8 +3023,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.103.2';
+  const VERSION = '8.104.0';
   const PATCHNOTES = [
+    { version:'8.104.0', date:'18.07.2026', changes:[
+      'Tägliche Missionen von 8 auf 11 mögliche Typen erweitert (Spieler-Wunsch): neu sind "1 Item aus dem Inventar aktivieren", "1 Zufallsereignis lösen" und "1 Tribut an eine Fraktion zahlen" - gleiche Belohnungsgrößenordnung wie die bestehenden acht, funktioniert automatisch mit dem bestehenden Rotations-/Tausch-System'
+    ]},
     { version:'8.103.2', date:'18.07.2026', changes:[
       'Balance-Korrektur Allianz-Raid (nach Balance-Audit): der Angriffs-Cooldown war mit 3 Std. deutlich kürzer als der 24-Std.-Cooldown beim Weltboss und es gab GAR KEINEN Cooldown fürs Neu-Ausrufen - ein starker Solospieler in einer kleinen Allianz hätte so theoretisch ~8x am Tag kassieren können statt 1x wie beim Weltboss, was die bewusst kleinere Belohnung pro Kill über die Häufigkeit wieder ausgeglichen hätte. Angriffs-Cooldown jetzt 8 Std., neue 6-Std.-Abklingzeit fürs Ausrufen eines neuen Raids nach Sieg oder Verfall'
     ]},
@@ -5928,6 +5931,7 @@
     playSound(choice==='A' ? 'win' : 'click');
     pushReport({ type:'random-event', eventName:def.name, icon:def.icon, choice: opt.label, outcome: msg });
     state.activeEvent = null;
+    if (state.dailyQuests) state.dailyQuests.randomEventCount = (state.dailyQuests.randomEventCount||0) + 1;
     render(); save();
   }
   // ===== Saison-Event-Kalender (18.07.2026, Spieler-Wunsch "Event Kalender und Event Schiffe") =====
@@ -7879,6 +7883,7 @@
     changeFactionRep(fid, TRIBUTE_GAIN);
     state.tributeLastPaid = state.tributeLastPaid || {};
     state.tributeLastPaid[fid] = Date.now();
+    if (state.dailyQuests) state.dailyQuests.tributeCount = (state.dailyQuests.tributeCount||0) + 1;
     const f = (galaxyCache.factions||{})[fid];
     log('Tribut an '+(f?f.name:fid)+' gezahlt: +'+TRIBUTE_GAIN+' Ruf (jetzt '+factionRepOf(fid)+').', 'ti-flag');
     playSound('trade');
@@ -10696,7 +10701,12 @@
     { key:'fquest', name:'1 Fraktionsauftrag abschließen', icon:'ti-medal', target:1, reward:{credits:80} },
     { key:'expedition', name:'1 Expedition abschließen', icon:'ti-map-2', target:1, reward:{forschungspunkte:20,deuterium:100} },
     { key:'npc', name:'3 NPC-Kämpfe gewinnen', icon:'ti-target', target:3, reward:{erz:500,kristalle:250} },
-    { key:'explore', name:'1 neuen Planeten entdecken', icon:'ti-planet', target:1, reward:{credits:70} }
+    { key:'explore', name:'1 neuen Planeten entdecken', icon:'ti-planet', target:1, reward:{credits:70} },
+    // 18.07.2026 (Spieler-Wunsch "Tägliche Missionen Variation erweitern"): von 8 auf 11 Typen
+    // erweitert, gleiche Belohnungsgrößenordnung wie die bestehenden acht.
+    { key:'item', name:'1 Item aus dem Inventar aktivieren', icon:'ti-backpack', target:1, reward:{credits:70} },
+    { key:'randomevent', name:'1 Zufallsereignis lösen', icon:'ti-bolt', target:1, reward:{erz:350,kristalle:150} },
+    { key:'tribute', name:'1 Tribut an eine Fraktion zahlen', icon:'ti-flag', target:1, reward:{credits:90} }
   ];
   const DAILY_QUEST_ACTIVE_COUNT = 5;
   const DAILY_QUEST_REROLL_COST = 15;
@@ -10722,7 +10732,7 @@
       date: today, activeKeys,
       startBattlePoints: state.battlePoints||0, startExpeditions: state.expeditionsCompleted||0,
       startNpcKills: state.npcKills||0, startDiscovered: Object.keys(state.discovered||{}).length,
-      researchCount:0, buildCount:0, tradeCount:0, fquestCount:0, claimed:{}
+      researchCount:0, buildCount:0, tradeCount:0, fquestCount:0, itemCount:0, randomEventCount:0, tributeCount:0, claimed:{}
     };
   }
   function dailyQuestProgress(key){
@@ -10735,6 +10745,9 @@
     if (key==='expedition') return Math.max(0, (state.expeditionsCompleted||0) - (dq.startExpeditions||0));
     if (key==='npc') return Math.max(0, (state.npcKills||0) - (dq.startNpcKills||0));
     if (key==='explore') return Math.max(0, Object.keys(state.discovered||{}).length - (dq.startDiscovered||0));
+    if (key==='item') return dq.itemCount||0;
+    if (key==='randomevent') return dq.randomEventCount||0;
+    if (key==='tribute') return dq.tributeCount||0;
     return 0;
   }
   function claimDailyQuest(key){
@@ -13760,7 +13773,7 @@
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Vor Allianzmissionen nur bis "Selten" über die Schiffsklassen-Blaupause im Kredit-Shop erhältlich – Episch/Legendär/Mythisch sind für hochstufige Allianzmissionen reserviert. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
-      { title:'Tagesaufgaben', body:'Täglich werden 5 von 8 möglichen Aufgaben zufällig ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
+      { title:'Tagesaufgaben', body:'Täglich werden 5 von 11 möglichen Aufgaben zufällig ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
       { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong>. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie.' },
@@ -18645,6 +18658,7 @@
     const msg = item.activate();
     log(msg, item.icon);
     playSound('achieve');
+    if (state.dailyQuests) state.dailyQuests.itemCount = (state.dailyQuests.itemCount||0) + 1;
     render(); save();
   }
   const RARE_ITEMS = [
