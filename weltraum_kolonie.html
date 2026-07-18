@@ -3015,8 +3015,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.99.0';
+  const VERSION = '8.99.1';
   const PATCHNOTES = [
+    { version:'8.99.1', date:'18.07.2026', changes:[
+      'Zwei neue Erfolge: "Ereignis-Pilot" (erstes Event-Schiff freigeschaltet) und "Event-Sammler" (alle bisherigen Event-Schiffe freigeschaltet, mit Belohnung) - prüfen dynamisch gegen den Event-Kalender, wachsen also automatisch mit, sollten künftig weitere Events dazukommen',
+      'Expeditions-Sonderfunde von 3 auf 6 Varianten erweitert (Spieler-Wunsch "weitere Ideen"): neu sind "Treibende Fracht" (Kredite), "Notsignal" (temporärer Produktionsbuff) und "Alte Sternenkarte" (Chance, ein verborgenes System zu enthüllen) - gleiche Wertigkeit wie die bestehenden drei, kein Balance-Sprung, nur mehr Abwechslung bei häufigen Expeditionen',
+      'Zufallsereignisse (90-Sekunden-Pop-ups) von 5 auf 8 Varianten erweitert: neu sind "Treibendes Wrack" (Ressourcen, kleine Chance auf Schiffsmodul), "Piratenkundschafter" (Kampferfahrung + Kristalle) und "Instabiles Wurmloch" (Antimaterie) - wiederholten sich bei regelmäßigem Spielen bisher zu schnell'
+    ]},
     { version:'8.99.0', date:'18.07.2026', changes:[
       'Event-Kalender auf sechs Events erweitert (Spieler-Wunsch "mehr Ideen"): drei neue Themen mit jeweils eigener, spielmechanisch relevanter Nische statt reiner Statvarianten',
       '"Leerenriss-Welle" bringt den Riftwächter - nutzt dieselbe Schwachstelle wie der Leerenjäger gegen Leere-Gegner (+25% Angriffskraft), aber schon ohne die Leerenjäger-Forschungsvoraussetzung baubar: ein früherer, alternativer Zugang zum bestehenden Leere-Bonus, kein neuer',
@@ -5415,7 +5420,37 @@
             state.resources[res] = Math.min(cap, before+clampedAmt); const gained = state.resources[res]-before; addXp(15);
             return 'Überlebende geborgen! +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+' als Dank, +15 XP.'; }
           return 'Die Rettungsflotte findet nur ein leeres Wrack – keine Belohnung, aber Erfahrung gesammelt.'; } },
-      optB:{ label:'Ignorieren', resolve:()=>'Das Signal verstummt. Man wird es nie erfahren.' } }
+      optB:{ label:'Ignorieren', resolve:()=>'Das Signal verstummt. Man wird es nie erfahren.' } },
+    // 18.07.2026 (Spieler-Wunsch "mehr Ideen"): drei weitere Varianten fuer mehr Abwechslung - bisher
+    // nur 5, wiederholen sich bei regelmaessigem Spielen schnell (Pop-up alle paar Minuten).
+    { key:'wreck', name:'Treibendes Wrack entdeckt', icon:'ti-box', color:'#c9c7bd',
+      desc:'Ein havariertes Schiffswrack treibt in Reichweite. Ein Bergungstrupp könnte brauchbare Teile finden – vielleicht sogar mehr.',
+      optA:{ label:'Bergungstrupp schicken', cost:{deuterium:120},
+        resolve:()=>{ const amt = 200+Math.floor(Math.random()*400); const res = Math.random()<0.5?'erz':'kristalle';
+          const cap = storageCap(); const before = state.resources[res]||0;
+          const clampedAmt = Math.min(2000, amt);
+          state.resources[res] = Math.min(cap, before+clampedAmt); const gained = state.resources[res]-before;
+          if (Math.random() < 0.15){ const modName = grantRandomModule(); return 'Wrack geborgen: +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+' und ein intaktes Schiffsmodul: '+modName+'! (Im Offiziere-Tab ausrüsten.)'; }
+          return 'Wrack geborgen: +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+'.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Wrack treibt ungenutzt vorbei.' } },
+    { key:'scout', name:'Piratenkundschafter gesichtet', icon:'ti-skull', color:'#e24b4a',
+      desc:'Ein einzelnes, schwach bewaffnetes Kundschafterschiff der Piraten patrouilliert am Rand des Sensorfelds. Abfangen bringt Kampferfahrung, ist aber nicht ganz risikofrei.',
+      optA:{ label:'Abfangen', cost:{deuterium:80},
+        resolve:()=>{ addXp(20);
+          if (Math.random() < 0.7){ const amt = 150+Math.floor(Math.random()*300);
+            const cap = storageCap(); const before = state.resources.kristalle||0;
+            state.resources.kristalle = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.kristalle-before;
+            return 'Kundschafter abgefangen! +'+fmt(gained)+' Kristalle erbeutet, +20 XP.'; }
+          return 'Der Kundschafter entkommt knapp – zumindest die Übung zählt. +20 XP.'; } },
+      optB:{ label:'Ausweichen', resolve:()=>'Der Kundschafter zieht vorbei, ohne etwas zu bemerken.' } },
+    { key:'wormhole', name:'Instabiles Wurmloch', icon:'ti-door-exit', color:'#af9ce6',
+      desc:'Ein kurzlebiges Wurmloch öffnet sich in Sensorreichweite. Ein riskanter Durchflug könnte an einen ressourcenreichen Ort führen.',
+      optA:{ label:'Hindurchfliegen', cost:{deuterium:200},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*250);
+          const cap = storageCap(); const before = state.resources.antimaterie||0;
+          state.resources.antimaterie = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.antimaterie-before; addXp(25);
+          return 'Durchflug erfolgreich: +'+fmt(gained)+' Antimaterie geborgen, +25 XP.'; } },
+      optB:{ label:'Meiden', resolve:()=>'Das Wurmloch kollabiert ungenutzt.' } }
   ];
   function maybeSpawnRandomEvent(){
     if (state.activeEvent) return;
@@ -7628,7 +7663,12 @@
     { key:'prestige10', name:'Zyklus-Meister', desc:'Erreiche Prestige-Stufe 10.', check: s => (s.prestige||0) >= 10, progress: s => [Math.min(10,s.prestige||0), 10], reward:{erz:15000,kristalle:10000,deuterium:5000,antimaterie:200,credits:750}, xpReward:600 },
     { key:'ascended', name:'Transzendiert', desc:'Führe deinen ersten Aufstieg (Transzendenz) durch.', check: s => ((s.ascension&&s.ascension.count)||0) >= 1, progress: s => [Math.min(1,(s.ascension&&s.ascension.count)||0), 1], reward:{erz:25000,kristalle:18000,deuterium:9000,antimaterie:400,credits:1500}, xpReward:1000 },
     { key:'dailyquest1', name:'Erste Tagesmission', desc:'Schließe an einem Tag alle Tagesaufgaben ab.', check: s => (s.dailyQuestStreak||0) >= 1, progress: s => [Math.min(1,s.dailyQuestStreak||0), 1] },
-    { key:'dailyquest7', name:'Wochenroutine', desc:'Schließe 7 Tage in Folge alle Tagesaufgaben ab.', check: s => (s.dailyQuestStreak||0) >= 7, progress: s => [Math.min(7,s.dailyQuestStreak||0), 7], reward:{erz:2000,kristalle:1200,deuterium:600,credits:200}, xpReward:150 }
+    { key:'dailyquest7', name:'Wochenroutine', desc:'Schließe 7 Tage in Folge alle Tagesaufgaben ab.', check: s => (s.dailyQuestStreak||0) >= 7, progress: s => [Math.min(7,s.dailyQuestStreak||0), 7], reward:{erz:2000,kristalle:1200,deuterium:600,credits:200}, xpReward:150 },
+    // Event-Schiffe (18.07.2026): dynamisch gegen EVENT_CALENDAR geprüft statt einer festen Liste -
+    // wächst automatisch mit, sollten künftig weitere Events dazukommen, ganz wie bei 'allresearch'/
+    // 'officer_all' schon üblich.
+    { key:'eventship1', name:'Ereignis-Pilot', desc:'Schalte dein erstes Event-Schiff frei.', check: s => EVENT_CALENDAR.some(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.some(e=>(s.unlocked||{})[e.shipKey])?1:0, 1] },
+    { key:'eventship_all', name:'Event-Sammler', desc:'Schalte alle bisherigen Event-Schiffe frei.', check: s => EVENT_CALENDAR.every(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.filter(e=>(s.unlocked||{})[e.shipKey]).length, EVENT_CALENDAR.length], reward:{erz:6000,kristalle:4000,deuterium:2000,credits:250}, xpReward:250 }
   ];
   // Titel: automatisch aus dem prestigeträchtigsten freigeschalteten Erfolg abgeleitet (keine neue
   // Verfolgung nötig, nutzt einfach die bestehenden Erfolge). Reihenfolge = Priorität, oben gewinnt.
@@ -22146,7 +22186,23 @@
         return { text:'Eine Anomalie vermessen: +'+Math.round(60*mult)+' XP für die Crew.', icon:'ti-atom-2' }; } },
     { key:'artifact', name:'Fremdes Artefakt geborgen', icon:'ti-diamond',
       resolve:(mult) => { const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1; addXp(40);
-        return { text:'Ein fremdes Artefakt geborgen: '+ri.name+'! +40 XP.', icon:ri.icon||'ti-diamond' }; } }
+        return { text:'Ein fremdes Artefakt geborgen: '+ri.name+'! +40 XP.', icon:ri.icon||'ti-diamond' }; } },
+    // 18.07.2026 (Spieler-Wunsch "mehr Ideen"): drei weitere Varianten fuer mehr Abwechslung im
+    // gleichverteilten Auswahl-Pool (bisher nur 3, bei potenziell hunderten Expeditionen pro Sitzung
+    // wiederholte sich das schnell) - dieselbe Wertigkeit wie die drei bestehenden, kein Balance-Sprung.
+    { key:'cargo', name:'Treibende Fracht geborgen', icon:'ti-box',
+      resolve:(mult) => { const amt = Math.round((120+Math.random()*180)*mult); state.credits = (state.credits||0)+amt; addXp(25);
+        return { text:'Treibende Fracht geborgen: +'+fmt(amt)+' Kredite.', icon:'ti-box' }; } },
+    { key:'signal', name:'Notsignal geortet und verstärkt', icon:'ti-shield',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'prod_all', mult:1.2, expiresAt: Date.now()+Math.round(600000*mult) }); addXp(Math.round(20*mult));
+        return { text:'Ein verstärktes Notsignal aktiviert kurzzeitig alle Produktionssysteme: +20% Gesamtproduktion für 10 Minuten.', icon:'ti-shield' }; } },
+    { key:'starmap', name:'Alte Sternenkarte entziffert', icon:'ti-map-2',
+      resolve:(mult) => { addXp(Math.round(30*mult));
+        const hiddenUndiscovered = STAR_SYSTEMS.filter(s=>s.hidden && !(state.discoveredSystems && state.discoveredSystems[s.id]));
+        if (hiddenUndiscovered.length && Math.random()<0.35){ const sys = hiddenUndiscovered[Math.floor(Math.random()*hiddenUndiscovered.length)];
+          if (!state.discoveredSystems) state.discoveredSystems = {}; state.discoveredSystems[sys.id] = true;
+          return { text:'Eine alte Sternenkarte entziffert: das verborgene System '+sys.name+' wurde enthüllt! +'+Math.round(30*mult)+' XP.', icon:'ti-map-2' }; }
+        return { text:'Eine alte Sternenkarte entziffert, aber ohne neue Erkenntnisse. +'+Math.round(30*mult)+' XP.', icon:'ti-map-2' }; } }
   ];
   // Erfahrene Forschungsschiffe: mit jeder erfolgreich abgeschlossenen Expedition (kein Totalverlust)
   // steigt die Beute leicht, bis zu einem Deckel – repräsentiert eine erfahrenere Crew/Ausrüstung.
