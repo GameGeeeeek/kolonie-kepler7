@@ -2762,8 +2762,15 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.88.0';
+  const VERSION = '8.89.0';
   const PATCHNOTES = [
+    { version:'8.89.0', date:'18.07.2026', changes:[
+      'Tagesaufgaben deutlich ausgebaut (Spieler-Wunsch): statt immer derselben 5 werden jetzt täglich 5 von 8 Vorlagen zufällig gezogen - 3 neue Aufgabentypen dazugekommen (Expedition abschließen, NPC-Kämpfe gewinnen, neuen Planeten entdecken)',
+      'Neu: wer an einem Tag ALLE Tagesaufgaben abholt, erhält einen zusätzlichen, mit der Serienlänge steigenden Kredit-Bonus (gedeckelt bei 10 Tagen Serie) sowie einen neuen Fortschrittszähler; 2 neue Erfolge dafür ("Erste Tagesmission", "Wochenroutine" ab 7 Tagen in Folge)',
+      'Neu: zusätzlich zur Wochenliga gibt es jetzt am Wochenwechsel einen separaten Kredit-Bonus für jeden Tag der Vorwoche, an dem alle Tagesaufgaben erledigt wurden',
+      'Neu: offene (noch nicht abgeholte) Tagesaufgaben können jetzt gegen eine andere, gerade nicht aktive Vorlage getauscht werden (kostet Kommandopunkte)',
+      'Bereits abgeholte Tagesaufgaben bleiben jetzt sichtbar (abgehakt, abgedunkelt) statt aus der Leiste zu verschwinden'
+    ]},
     { version:'8.88.0', date:'18.07.2026', changes:[
       'Offiziere deutlich ausgebaut (Spieler-Wunsch): Admiral wirkt jetzt auch (mit halber Rate) auf die Verteidigung statt nur auf den Angriff; Ingenieur beschleunigt jetzt auch den Schiffsbau, nicht mehr nur Gebäude; Händler erhöht jetzt zusätzlich den Ertrag von Kredit-/Verkaufs-Handelsrouten, nicht mehr nur die seltenen Schwarzmarkt-Angebote',
       'Neu: ab Offiziers-Stufe 5 einmalig (dauerhaft, kein späterer Wechsel) zwischen den Spezialisierungen "Wirkung" (+50% Wirkung auf Stufe 6-10) und "Sparsamkeit" (−25% Kosten auf Stufe 6-10) wählbar',
@@ -7140,7 +7147,9 @@
     { key:'forschungsnexus', name:'Wächter des Wissens', desc:'Errichte den Forschungs-Nexus (erfordert alle Forschungszweige auf Maximalstufe).', check: s => !!((s.megaProjects||{}).forschungsnexus), progress: s => [((s.megaProjects||{}).forschungsnexus)?1:0, 1], reward:{erz:10000,kristalle:7000,deuterium:3500,antimaterie:150,credits:500}, xpReward:500 },
     { key:'allmegaprojects', name:'Architekt der Sterne', desc:'Errichte alle drei Mega-Projekte (Dyson-Schwarm, Void-Reaktor, Forschungs-Nexus).', check: s => MEGA_PROJECTS.every(p => !!((s.megaProjects||{})[p.key])), progress: s => [MEGA_PROJECTS.filter(p=>!!((s.megaProjects||{})[p.key])).length, MEGA_PROJECTS.length], reward:{erz:20000,kristalle:14000,deuterium:7000,antimaterie:300,credits:1000}, xpReward:800 },
     { key:'prestige10', name:'Zyklus-Meister', desc:'Erreiche Prestige-Stufe 10.', check: s => (s.prestige||0) >= 10, progress: s => [Math.min(10,s.prestige||0), 10], reward:{erz:15000,kristalle:10000,deuterium:5000,antimaterie:200,credits:750}, xpReward:600 },
-    { key:'ascended', name:'Transzendiert', desc:'Führe deinen ersten Aufstieg (Transzendenz) durch.', check: s => ((s.ascension&&s.ascension.count)||0) >= 1, progress: s => [Math.min(1,(s.ascension&&s.ascension.count)||0), 1], reward:{erz:25000,kristalle:18000,deuterium:9000,antimaterie:400,credits:1500}, xpReward:1000 }
+    { key:'ascended', name:'Transzendiert', desc:'Führe deinen ersten Aufstieg (Transzendenz) durch.', check: s => ((s.ascension&&s.ascension.count)||0) >= 1, progress: s => [Math.min(1,(s.ascension&&s.ascension.count)||0), 1], reward:{erz:25000,kristalle:18000,deuterium:9000,antimaterie:400,credits:1500}, xpReward:1000 },
+    { key:'dailyquest1', name:'Erste Tagesmission', desc:'Schließe an einem Tag alle Tagesaufgaben ab.', check: s => (s.dailyQuestStreak||0) >= 1, progress: s => [Math.min(1,s.dailyQuestStreak||0), 1] },
+    { key:'dailyquest7', name:'Wochenroutine', desc:'Schließe 7 Tage in Folge alle Tagesaufgaben ab.', check: s => (s.dailyQuestStreak||0) >= 7, progress: s => [Math.min(7,s.dailyQuestStreak||0), 7], reward:{erz:2000,kristalle:1200,deuterium:600,credits:200}, xpReward:150 }
   ];
   // Titel: automatisch aus dem prestigeträchtigsten freigeschalteten Erfolg abgeleitet (keine neue
   // Verfolgung nötig, nutzt einfach die bestehenden Erfolge). Reihenfolge = Priorität, oben gewinnt.
@@ -9623,21 +9632,49 @@
     log(r.name+' (Stufe '+ar.targetLevel+') abgebrochen – 50% zurückerstattet: '+refundText+'.', 'ti-x');
     render(); save();
   }
-  // Tagesaufgaben: 3 feste kleine Ziele, täglich zurückgesetzt (ergänzt den Login-Streak). Kampf-
-  // Fortschritt wird als Kampfpunkte-Zuwachs seit Tagesbeginn gemessen (kein Hook an jeder einzelnen
-  // Kampf-Auflösung nötig), Forschung/Bau über einfache Tageszähler, die an den bestehenden
-  // Abschluss-Funktionen hochgezählt werden.
+  // Tagesaufgaben (Spieler-Wunsch "rotierender Pool"): Pool von 8 Vorlagen, täglich werden
+  // DAILY_QUEST_ACTIVE_COUNT (5) zufällig gezogen statt immer derselben 5 (ergänzt den Login-Streak).
+  // Fortschritt wird - wo möglich - als Zuwachs eines bereits vorhandenen LEBENSZEIT-Zählers seit
+  // Tagesbeginn gemessen (battle/expedition/npc/explore - kein neuer Hook an jeder einzelnen
+  // Abschluss-Stelle nötig, exakt das Muster, das battle schon vorher genutzt hat), Forschung/Bau/
+  // Handel/Fraktionsauftrag weiterhin über einfache Tageszähler an den bestehenden Abschluss-
+  // Funktionen.
   const DAILY_QUEST_DEFS = [
     { key:'battle', name:'10 Kampfpunkte sammeln', icon:'ti-sword', target:10, reward:{erz:400,kristalle:200} },
     { key:'research', name:'1 Forschung abschließen', icon:'ti-flask', target:1, reward:{forschungspunkte:15,deuterium:150} },
     { key:'build', name:'1 Gebäude oder Schiff fertigstellen', icon:'ti-building-factory-2', target:1, reward:{erz:600,energie:400} },
     { key:'trade', name:'1 Handel am Markt abschließen', icon:'ti-truck', target:1, reward:{credits:60} },
-    { key:'fquest', name:'1 Fraktionsauftrag abschließen', icon:'ti-medal', target:1, reward:{credits:80} }
+    { key:'fquest', name:'1 Fraktionsauftrag abschließen', icon:'ti-medal', target:1, reward:{credits:80} },
+    { key:'expedition', name:'1 Expedition abschließen', icon:'ti-map-2', target:1, reward:{forschungspunkte:20,deuterium:100} },
+    { key:'npc', name:'3 NPC-Kämpfe gewinnen', icon:'ti-target', target:3, reward:{erz:500,kristalle:250} },
+    { key:'explore', name:'1 neuen Planeten entdecken', icon:'ti-planet', target:1, reward:{credits:70} }
   ];
+  const DAILY_QUEST_ACTIVE_COUNT = 5;
+  const DAILY_QUEST_REROLL_COST = 15;
   function initDailyQuests(){
     const today = new Date().toDateString();
     if (state.dailyQuests && state.dailyQuests.date === today) return;
-    state.dailyQuests = { date: today, startBattlePoints: state.battlePoints||0, researchCount:0, buildCount:0, claimed:{} };
+    // Streak/Wochenzähler (Spieler-Wunsch "Erfolg + Streak-Bonus"): wird beim TAGESWECHSEL anhand des
+    // GESTERIGEN Standes ausgewertet, nicht beim Abholen selbst - so zählt es auch dann korrekt, wenn
+    // die letzte Aufgabe des Tages erst nach Mitternacht (aber noch am "gestrigen" Client-Datum)
+    // abgeholt wurde. Kein Streak-Verlust bei einer mehrtägigen Pause NACH einem vollständigen Tag -
+    // nur ein unvollständiger Tag setzt zurück, ein einfach übersprungener Tag lässt die Serie ruhen
+    // statt sie rückwirkend zu bestrafen.
+    if (state.dailyQuests){
+      const prevActive = state.dailyQuests.activeKeys || DAILY_QUEST_DEFS.slice(0,DAILY_QUEST_ACTIVE_COUNT).map(d=>d.key);
+      const allClaimed = prevActive.length>0 && prevActive.every(k => state.dailyQuests.claimed[k]);
+      if (allClaimed) state.dailyQuestStreak = (state.dailyQuestStreak||0)+1;
+      else state.dailyQuestStreak = 0;
+    }
+    const pool = DAILY_QUEST_DEFS.map(d=>d.key);
+    for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    const activeKeys = pool.slice(0, DAILY_QUEST_ACTIVE_COUNT);
+    state.dailyQuests = {
+      date: today, activeKeys,
+      startBattlePoints: state.battlePoints||0, startExpeditions: state.expeditionsCompleted||0,
+      startNpcKills: state.npcKills||0, startDiscovered: Object.keys(state.discovered||{}).length,
+      researchCount:0, buildCount:0, tradeCount:0, fquestCount:0, claimed:{}
+    };
   }
   function dailyQuestProgress(key){
     const dq = state.dailyQuests || {};
@@ -9646,6 +9683,9 @@
     if (key==='build') return dq.buildCount||0;
     if (key==='trade') return dq.tradeCount||0;
     if (key==='fquest') return dq.fquestCount||0;
+    if (key==='expedition') return Math.max(0, (state.expeditionsCompleted||0) - (dq.startExpeditions||0));
+    if (key==='npc') return Math.max(0, (state.npcKills||0) - (dq.startNpcKills||0));
+    if (key==='explore') return Math.max(0, Object.keys(state.discovered||{}).length - (dq.startDiscovered||0));
     return 0;
   }
   function claimDailyQuest(key){
@@ -9670,6 +9710,37 @@
     }
     log('Tagesaufgabe abgeschlossen: '+def.name+'! Belohnung erhalten.', 'ti-check');
     playSound('achieve');
+    // Spieler-Wunsch "Erfolg + Streak-Bonus": zusätzlicher, bewusst kleiner und gedeckelter Bonus
+    // (max. 10x Multiplikator), sobald ALLE heutigen Aufgaben abgeholt sind - separate, absichtlich
+    // bescheidenere Formel als die 5-Minuten-Produktionsskalierung oben, um nicht dieselbe
+    // Formel-Familie noch einmal zu recyceln.
+    const activeKeys = state.dailyQuests.activeKeys||[];
+    if (activeKeys.length && activeKeys.every(k => state.dailyQuests.claimed[k])){
+      const streakMult = Math.min((state.dailyQuestStreak||0)+1, 10);
+      const bonusCredits = 40*streakMult;
+      state.credits = (state.credits||0) + bonusCredits;
+      state.dailyQuestWeeklyCount = (state.dailyQuestWeeklyCount||0)+1;
+      log('Alle Tagesmissionen erledigt! Bonus: +'+bonusCredits+' Kredite.', 'ti-trophy', 'ok');
+      checkAchievements();
+    }
+    render(); save();
+  }
+  // Spieler-Wunsch "Reroll-Option": tauscht eine noch offene (nicht abgeholte) Tagesaufgabe gegen eine
+  // andere, gerade nicht aktive Vorlage aus dem Pool - z.B. wenn "1 Forschung abschließen" gezogen
+  // wurde, aber gerade keine Forschung läuft/möglich ist. Kostet Kommandopunkte (dieselbe Währung wie
+  // Offiziere/Module), kein Cooldown nötig, da die Kosten selbst die Bremse sind.
+  function rerollDailyQuest(key){
+    if (!state.dailyQuests || state.dailyQuests.claimed[key]) return;
+    const idx = (state.dailyQuests.activeKeys||[]).indexOf(key);
+    if (idx < 0) return;
+    if ((state.commandPoints||0) < DAILY_QUEST_REROLL_COST){ log('Nicht genug Kommandopunkte zum Neu-Würfeln ('+DAILY_QUEST_REROLL_COST+' benötigt).', 'ti-alert-triangle'); return; }
+    const unused = DAILY_QUEST_DEFS.map(d=>d.key).filter(k => !state.dailyQuests.activeKeys.includes(k));
+    if (!unused.length){ log('Keine andere Tagesaufgabe im Vorrat verfügbar.', 'ti-alert-triangle'); return; }
+    state.commandPoints -= DAILY_QUEST_REROLL_COST;
+    const newKey = unused[Math.floor(Math.random()*unused.length)];
+    state.dailyQuests.activeKeys[idx] = newKey;
+    const def = DAILY_QUEST_DEFS.find(d=>d.key===newKey);
+    log('Tagesaufgabe getauscht gegen: '+def.name+' (−'+DAILY_QUEST_REROLL_COST+' Kommandopunkte).', 'ti-refresh');
     render(); save();
   }
   function processResearch(){
@@ -9960,6 +10031,8 @@
     if (!state.activeBasePlanet) state.activeBasePlanet = 'home';
     if (state.npcKills === undefined) state.npcKills = 0;
     if (state.bossKills === undefined) state.bossKills = 0;
+    if (state.dailyQuestStreak === undefined) state.dailyQuestStreak = 0;
+    if (state.dailyQuestWeeklyCount === undefined) state.dailyQuestWeeklyCount = 0;
     if (state.xp === undefined) state.xp = 0;
     if (state.prestige === undefined) state.prestige = 0;
     if (!state.achievements) state.achievements = {};
@@ -12588,6 +12661,7 @@
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Vor Allianzmissionen nur bis "Selten" über die Schiffsklassen-Blaupause im Kredit-Shop erhältlich – Episch/Legendär/Mythisch sind für hochstufige Allianzmissionen reserviert. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
+      { title:'Tagesaufgaben', body:'Täglich werden 5 von 8 möglichen Aufgaben zufällig ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben bleiben abgehakt sichtbar, statt zu verschwinden. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
       { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong>. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie.' },
@@ -16571,6 +16645,8 @@
         if (!state.activeBasePlanet) state.activeBasePlanet = 'home';
         if (state.npcKills === undefined) state.npcKills = 0;
         if (state.bossKills === undefined) state.bossKills = 0;
+        if (state.dailyQuestStreak === undefined) state.dailyQuestStreak = 0;
+        if (state.dailyQuestWeeklyCount === undefined) state.dailyQuestWeeklyCount = 0;
         if (state.xp === undefined) state.xp = 0;
         if (state.prestige === undefined) state.prestige = 0;
         if (!state.achievements) state.achievements = {};
@@ -17230,10 +17306,22 @@
         playSound('achieve');
         pushReport({ type:'weekly-reward', rank, rewardLabel: lg.name+'-Liga (Platz '+rank+'/'+list.length+'): '+msg });
       }
+      // Spieler-Wunsch "Wochenquest zusätzlich zur Wochenliga": zusätzlicher, separater Bonus für
+      // jeden Tag dieser (jetzt endenden) Woche, an dem alle Tagesaufgaben erledigt wurden - nutzt
+      // bewusst denselben Wochenwechsel-Zeitpunkt wie die Liga oben statt eines eigenen Claim-Systems,
+      // da hier schon die passende "Vorwoche abrechnen"-Stelle existiert. Gedeckelt bei 7 (mehr volle
+      // Tage kann eine Woche ohnehin nicht haben).
+      const fullDays = Math.min(7, state.dailyQuestWeeklyCount||0);
+      if (fullDays > 0){
+        const questBonusCredits = fullDays * 50;
+        state.credits = (state.credits||0) + questBonusCredits;
+        log('Wochenquest abgerechnet: an '+fullDays+' Tagen dieser Woche alle Tagesaufgaben erledigt. Bonus: +'+questBonusCredits+' Kredite.', 'ti-medal', 'ok');
+      }
     }
     wl.weekKey = nowKey;
     wl.startScore = computeScore();
     wl.boardSnapshot = [];
+    state.dailyQuestWeeklyCount = 0;
     save();
   }
   // ===== Tagesbilanz =====
@@ -23674,23 +23762,29 @@
 
     const dailyQuestBar = document.getElementById('dailyQuestBar');
     if (dailyQuestBar && state.dailyQuests){
-      // Erledigte (abgeholte) Tagesmissionen werden jetzt ausgeblendet statt nur grün markiert zu
-      // bleiben - sie tauchen erst wieder auf, wenn initDailyQuests() beim Tageswechsel (Mitternacht)
-      // einen frischen state.dailyQuests mit leerem claimed{} anlegt.
-      const openQuests = DAILY_QUEST_DEFS.filter(d => !state.dailyQuests.claimed[d.key]);
-      if (!openQuests.length){
-        dailyQuestBar.innerHTML = `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:rgba(93,202,165,0.15); border:1px solid rgba(93,202,165,0.4);"><i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i><span style="font-size:10.5px;">Alle Tagesmissionen erledigt - morgen gibt's neue</span></div>`;
-      } else {
-        dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap;">${openQuests.map(d => {
-          const prog = Math.min(d.target, dailyQuestProgress(d.key));
-          const done = prog >= d.target;
-          return `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; cursor:${done?'pointer':'default'}; background:${done?'rgba(250,199,117,0.18)':'rgba(255,255,255,0.06)'}; border:1px solid ${done?'rgba(250,199,117,0.5)':'rgba(255,255,255,0.1)'};" ${done?`data-claim-quest="${d.key}"`:''} title="${d.name}">
-            <i class="ti ${d.icon}" aria-hidden="true" style="color:${done?'#fac775':'#9296ac'};"></i>
+      // Spieler-Wunsch "erledigte Aufgaben sichtbar lassen": abgeholte Tagesmissionen bleiben jetzt als
+      // abgehakte Pille stehen (statt zu verschwinden) - macht "5/5 erledigt" auf einen Blick sichtbar
+      // sichtbar statt nur eine leere Leiste zu zeigen. Reihenfolge folgt state.dailyQuests.activeKeys
+      // (der heute gezogenen Auswahl aus dem rotierenden Pool), nicht mehr der festen DAILY_QUEST_DEFS-
+      // Reihenfolge.
+      const activeDefs = (state.dailyQuests.activeKeys||[]).map(k => DAILY_QUEST_DEFS.find(d=>d.key===k)).filter(Boolean);
+      const allClaimed = activeDefs.length>0 && activeDefs.every(d => state.dailyQuests.claimed[d.key]);
+      dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${activeDefs.map(d => {
+        const claimed = !!state.dailyQuests.claimed[d.key];
+        const prog = Math.min(d.target, dailyQuestProgress(d.key));
+        const done = prog >= d.target;
+        const bg = claimed ? 'rgba(93,202,165,0.12)' : done ? 'rgba(250,199,117,0.18)' : 'rgba(255,255,255,0.06)';
+        const border = claimed ? 'rgba(93,202,165,0.4)' : done ? 'rgba(250,199,117,0.5)' : 'rgba(255,255,255,0.1)';
+        return `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; opacity:${claimed?'0.6':'1'}; background:${bg}; border:1px solid ${border};" title="${d.name}">
+          <span style="cursor:${done&&!claimed?'pointer':'default'}; display:flex; align-items:center; gap:5px;" ${done&&!claimed?`data-claim-quest="${d.key}"`:''}>
+            <i class="ti ${claimed?'ti-check':d.icon}" aria-hidden="true" style="color:${claimed?'#5dcaa5':done?'#fac775':'#9296ac'};"></i>
             <span style="font-size:10.5px;">${d.name} (${prog}/${d.target})</span>
-          </div>`;
-        }).join('')}</div>`;
-        dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
-      }
+          </span>
+          ${(!claimed && !done) ? `<i class="ti ti-refresh" data-reroll-quest="${d.key}" title="Gegen andere Tagesaufgabe tauschen (${DAILY_QUEST_REROLL_COST} KP)" style="cursor:pointer; color:#7a7e94; font-size:11px; margin-left:2px;"></i>` : ''}
+        </div>`;
+      }).join('')}${allClaimed ? `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:rgba(93,202,165,0.15); border:1px solid rgba(93,202,165,0.4);"><i class="ti ti-trophy" aria-hidden="true" style="color:#5dcaa5;"></i><span style="font-size:10.5px;">Alle Tagesmissionen erledigt${state.dailyQuestStreak?' · '+state.dailyQuestStreak+'-Tage-Serie':''} - morgen gibt's neue</span></div>` : ''}</div>`;
+      dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
+      dailyQuestBar.querySelectorAll('[data-reroll-quest]').forEach(el => el.onclick = (ev) => { ev.stopPropagation(); rerollDailyQuest(el.getAttribute('data-reroll-quest')); });
     }
 
     const seasonalBadge = document.getElementById('seasonalBadge');
