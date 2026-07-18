@@ -930,21 +930,55 @@
        Positionierung eindeutig und ohne Verifikations-Screenshot sicher richtig herzuleiten. Diese
        Regel steht bewusst NACH den einzelnen .card-row/.profile-card/... Deklarationen, damit sie
        deren border-radius zuverlässig überschreibt (gleiche Selektor-Spezifität, spätere Regel gewinnt). */
-    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard, .rank-row, .dash-colony-card {
+    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard, .rank-row, .dash-colony-card, .profile-hero-card, .alliance-hero-card {
       position:relative; border-radius:0;
       clip-path: polygon(var(--corner) 0, 100% 0, 100% calc(100% - var(--corner)), calc(100% - var(--corner)) 100%, 0 100%, 0 var(--corner));
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before,
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after {
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before,
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after {
       content:''; position:absolute; width:9px; height:9px; pointer-events:none;
       border:1.5px solid rgba(var(--primary-rgb),0.7);
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before {
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before {
       top:0; right:0; border-left:none; border-bottom:none;
     }
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after {
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after {
       bottom:0; left:0; border-right:none; border-top:none;
     }
+    /* Runde 1 "Profilkarte überarbeiten" (Spieler-Wunsch): eigenständige HUD-Karte statt generischem
+       .login-card-Dialog - eigener Hintergrund (Farbwolken+Sterne, dieselbe Idee wie shareCanvasBase()
+       bei den Teilen-Karten, hier als reines CSS statt Canvas, da es interaktiv/live ist), größerer
+       Avatar, Eintritts-Animation. Tritt der .profile-card/.login-card-Gruppe oben bei, damit der
+       Eckenschnitt automatisch mitkommt statt dupliziert zu werden. */
+    .profile-hero-card { overflow-y:auto; overflow-x:hidden; padding:0; max-height:calc(100vh - 40px); animation:profileHeroIn 0.35s cubic-bezier(0.2,0.8,0.3,1.1); }
+    @keyframes profileHeroIn { 0%{ opacity:0; transform:scale(0.96) translateY(6px); } 100%{ opacity:1; transform:scale(1) translateY(0); } }
+    @media (prefers-reduced-motion: reduce){ .profile-hero-card { animation:none; } }
+    .profile-hero-bg { position:relative; padding:22px 20px 16px; background:
+        radial-gradient(ellipse 220px 140px at 20% 15%, rgba(var(--primary-rgb),0.28), transparent 60%),
+        radial-gradient(ellipse 200px 130px at 85% 20%, rgba(var(--info-rgb),0.22), transparent 60%),
+        radial-gradient(ellipse 180px 120px at 55% 95%, rgba(var(--secondary-rgb),0.16), transparent 60%),
+        linear-gradient(160deg,#161c38,#0a0d1a);
+      overflow:hidden;
+    }
+    .profile-hero-bg::before{ content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size:24px 24px; mask-image:radial-gradient(ellipse 90% 80% at 50% 20%, #000 30%, transparent 92%); -webkit-mask-image:radial-gradient(ellipse 90% 80% at 50% 20%, #000 30%, transparent 92%); }
+    .profile-hero-star { position:absolute; width:2px; height:2px; border-radius:50%; background:#fff; opacity:0.55; }
+    .profile-hero-top { position:relative; display:flex; align-items:center; gap:14px; }
+    .profile-hero-avatar-wrap { position:relative; width:72px; height:72px; flex-shrink:0; }
+    .profile-hero-avatar-wrap .avatar { width:72px; height:72px; font-size:26px; }
+    .profile-hero-tier-pill { position:relative; display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; padding:2px 8px; margin-top:6px; border-radius:3px; }
+    /* Rahmen-Stufen: bewusst aus bereits vorhandenem Fortschritt abgeleitet (Level/Prestige/Ascension/
+       Ranglistenplatz), kein neues Freischalt-Tracking - siehe computePlayerFrameTier(). */
+    .frame-ring { position:absolute; inset:-6px; border-radius:50%; pointer-events:none; border:3px solid var(--frame-color); box-shadow:0 0 10px rgba(var(--frame-rgb),0.55); }
+    .frame-ring.frame-platin, .frame-ring.frame-diamant { animation:frameRingPulse 2.4s ease-in-out infinite; }
+    .frame-ring.frame-legendaer { animation:frameRingLegend 3.2s ease-in-out infinite; }
+    @keyframes frameRingPulse { 0%,100%{ opacity:0.75; box-shadow:0 0 8px rgba(var(--frame-rgb),0.45); } 50%{ opacity:1; box-shadow:0 0 16px rgba(var(--frame-rgb),0.85); } }
+    @keyframes frameRingLegend { 0%,100%{ box-shadow:0 0 10px rgba(var(--frame-rgb),0.55); filter:hue-rotate(0deg); } 50%{ box-shadow:0 0 20px rgba(var(--frame-rgb),0.9); filter:hue-rotate(18deg); } }
+    @media (prefers-reduced-motion: reduce){ .frame-ring.frame-platin, .frame-ring.frame-diamant, .frame-ring.frame-legendaer { animation:none; } }
+    .profile-hero-stats { position:relative; display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:6px; padding:14px 18px; }
+    .profile-hero-stat { font-family:var(--font-mono); text-align:center; padding:8px 4px; background:var(--elev-1); border:1px solid var(--line-1); }
+    .profile-hero-stat b { display:block; font-size:14.5px; color:var(--ink); font-weight:600; }
+    .profile-hero-stat span { font-size:9px; color:#7d8199; text-transform:uppercase; letter-spacing:0.03em; }
+    .profile-hero-body { padding:0 20px 18px; }
     .profile-left { display:flex; align-items:center; gap:12px; }
     .avatar { width:46px; height:46px; border-radius:50%; background:rgba(var(--primary-rgb), 0.25); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:500; color:var(--lilac); flex-shrink:0; overflow:hidden; }
     .avatar-picker { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
@@ -1067,31 +1101,40 @@
   </div>
 
   <div id="playerProfileOverlay" class="login-overlay" style="display:none;">
-    <div class="login-card" style="text-align:left; position:relative;">
-      <button id="profileCloseBtn" style="position:absolute; top:14px; right:14px; padding:5px 9px; font-size:11px;"><i class="ti ti-x" aria-hidden="true"></i></button>
-      <div class="login-header">
-        <div class="avatar" id="profileModalAvatar" style="width:52px; height:52px; font-size:20px;">?</div>
-        <div>
-          <div class="login-title" id="profileModalName">Kommandant</div>
-          <div class="login-sub" id="profileModalAlliance">Keine Allianz</div>
+    <div class="profile-hero-card" style="text-align:left; max-width:420px;">
+      <div class="profile-hero-bg" id="profileHeroBg">
+        <button id="profileCloseBtn" style="position:absolute; top:14px; right:14px; padding:5px 9px; font-size:11px; z-index:2;"><i class="ti ti-x" aria-hidden="true"></i></button>
+        <div class="profile-hero-top">
+          <div class="profile-hero-avatar-wrap">
+            <div class="avatar" id="profileModalAvatar">?</div>
+            <div id="profileModalFrameRing"></div>
+          </div>
+          <div style="min-width:0;">
+            <div style="font-size:17px; font-weight:700;" id="profileModalName">Kommandant</div>
+            <div class="bmeta" id="profileModalAlliance">Keine Allianz</div>
+            <div id="profileModalTierPill"></div>
+          </div>
         </div>
       </div>
-      <div id="profileModalStats" style="display:flex; flex-direction:column; gap:8px; margin:1rem 0;"></div>
-      <div class="bmeta" id="profileModalLastSeen" style="margin-bottom:1rem;"><i class="ti ti-clock" aria-hidden="true"></i> Zuletzt aktiv: unbekannt</div>
-      <div style="display:flex; gap:8px;">
-        <button id="profileSpyBtn" style="flex:1;"><i class="ti ti-target" aria-hidden="true" style="margin-right:4px;"></i>Ausspähen</button>
-        <button id="profileAttackBtn" class="attack" style="flex:1;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angreifen</button>
-        <button id="profileMsgBtn" style="flex:1;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Nachricht</button>
-      </div>
-      <div class="bmeta" id="profileAttackFleetSummary" style="margin-top:6px;"></div>
-      <button id="profilePactBtn" style="width:100%; margin-top:8px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten</button>
-      <button id="profileAllianceInviteBtn" style="width:100%; margin-top:8px; display:none;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Zur Allianz einladen</button>
-      <button id="profileReportBtn" style="width:100%; margin-top:8px; font-size:11px; padding:6px; opacity:0.75;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Spieler melden</button>
-      <div id="reportPlayerFormRow" style="display:none; margin-top:10px; gap:8px; flex-direction:column;">
-        <textarea id="reportPlayerReasonInput" placeholder="Kurz begründen, worum es geht (z.B. unangemessener Name)…" maxlength="500" rows="3" style="width:100%; resize:vertical;"></textarea>
+      <div class="profile-hero-stats" id="profileHeroStats"></div>
+      <div class="profile-hero-body">
+        <div id="profileModalStats" style="display:flex; flex-direction:column; gap:8px; margin-bottom:0.75rem;"></div>
+        <div class="bmeta" id="profileModalLastSeen" style="margin-bottom:1rem;"><i class="ti ti-clock" aria-hidden="true"></i> Zuletzt aktiv: unbekannt</div>
         <div style="display:flex; gap:8px;">
-          <button id="reportPlayerCancelBtn" style="flex:1;">Abbrechen</button>
-          <button id="reportPlayerSubmitBtn" class="attack" style="flex:1;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Melden</button>
+          <button id="profileSpyBtn" style="flex:1;"><i class="ti ti-target" aria-hidden="true" style="margin-right:4px;"></i>Ausspähen</button>
+          <button id="profileAttackBtn" class="attack" style="flex:1;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angreifen</button>
+          <button id="profileMsgBtn" style="flex:1;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Nachricht</button>
+        </div>
+        <div class="bmeta" id="profileAttackFleetSummary" style="margin-top:6px;"></div>
+        <button id="profilePactBtn" style="width:100%; margin-top:8px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten</button>
+        <button id="profileAllianceInviteBtn" style="width:100%; margin-top:8px; display:none;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Zur Allianz einladen</button>
+        <button id="profileReportBtn" style="width:100%; margin-top:8px; font-size:11px; padding:6px; opacity:0.75;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Spieler melden</button>
+        <div id="reportPlayerFormRow" style="display:none; margin-top:10px; gap:8px; flex-direction:column;">
+          <textarea id="reportPlayerReasonInput" placeholder="Kurz begründen, worum es geht (z.B. unangemessener Name)…" maxlength="500" rows="3" style="width:100%; resize:vertical;"></textarea>
+          <div style="display:flex; gap:8px;">
+            <button id="reportPlayerCancelBtn" style="flex:1;">Abbrechen</button>
+            <button id="reportPlayerSubmitBtn" class="attack" style="flex:1;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Melden</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2796,8 +2839,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.92.0';
+  const VERSION = '8.93.0';
   const PATCHNOTES = [
+    { version:'8.93.0', date:'18.07.2026', changes:[
+      'Spielerprofil (Runde 1 der angekündigten Profilbild/Banner-Überarbeitung) grafisch komplett neu: großer "Hero"-Kartenkopf mit animiertem Sternenhintergrund und Farbwolken statt der bisherigen schlichten Kopfzeile, Avatar deutlich größer',
+      'Neu: 6-stufiges Rahmen-System um den Avatar (Bronze/Silber/Gold/Platin/Diamant/Legendär), das sich automatisch aus bereits vorhandenen Werten ergibt (Level, Prestige, Aufstiegsanzahl, Bestenlisten-Platz) - kein Freischalt-Fortschritt geht dabei verloren, jeder Bestandsspieler hat rückwirkend die passende Stufe. Platin/Diamant/Legendär bekommen einen zusätzlichen Puls-/Glüh-Effekt am Rahmen',
+      'Neu: vier Kennzahlen-Kacheln direkt unter Namen und Rahmen (Kolonien, Monde, Erfolge, Forschungs-Summe) sowie eine Erfolgsquote-Zeile (Siege/Niederlagen) bei Spielern mit Kampfhistorie - dafür senden Bestenlisten-Einträge ab sofort 5 zusätzliche Felder mit; alte Einträge ohne diese Felder blenden die jeweilige Kachel einfach aus statt einen Fehler zu zeigen',
+      'Bugfix: Profilkarte konnte auf niedrigen Fensterhöhen so hoch werden, dass der Schließen-Knopf oben aus dem sichtbaren Bereich rutschte und nicht mehr erreichbar war - die Karte scrollt jetzt bei Bedarf intern statt sich am Bildschirmrand centriert abzuschneiden'
+    ]},
     { version:'8.92.0', date:'18.07.2026', changes:[
       'Profilbild-Auswahl (Spieler-Wunsch) von 8 auf 16 freie Motive verdoppelt: neu u.a. Schwert, Kristall, Atom, Flamme, Nebelspirale, Satellit, Mondsichel und Flagge - die 3 exklusiven Expeditionsfunde (Nova, Void, Phoenix) bleiben unverändert',
       'Allianz-Banner (Spieler-Wunsch) von 6 auf 13 Optionen erweitert: 4 weitere einfarbige Verläufe (Türkis, Bronze, Stahl, Indigo) sowie 3 andersartige Muster (Dreifarb-Verlauf "Sonnenaufgang", radialer Verlauf "Nebel", diagonale Streifen)'
@@ -7224,6 +7273,29 @@
     for (const t of TITLE_MAP){ if (achievements && achievements[t.achievement]) return t; }
     return null;
   }
+  // Runde 1 "Profilkarte überarbeiten" (Spieler-Wunsch "freischaltbare Profilrahmen"): sechs Stufen,
+  // bewusst AUS BEREITS VORHANDENEM FORTSCHRITT abgeleitet (Level/Prestige/Ascension/Ranglistenplatz)
+  // statt eines neuen Freischalt-Trackings - funktioniert dadurch rückwirkend für jeden Spieler sofort
+  // korrekt, kein Migrations-/Nachhol-Problem. Reihenfolge = Priorität, oben gewinnt (höchste Stufe).
+  const FRAME_TIERS = [
+    { key:'legendaer', name:'Legendär', color:'#f0997b', rgb:'240,153,123' },
+    { key:'diamant', name:'Diamant', color:'#9fe1cb', rgb:'159,225,203' },
+    { key:'platin', name:'Platin', color:'#cfe7ff', rgb:'207,231,255' },
+    { key:'gold', name:'Gold', color:'#fac775', rgb:'250,199,117' },
+    { key:'silber', name:'Silber', color:'#c7ccd6', rgb:'199,204,214' },
+    { key:'bronze', name:'Bronze', color:'#c08a4a', rgb:'192,138,74' }
+  ];
+  // d: { level, prestige, ascensionCount, rank } - rank optional (null/undefined wenn unbekannt, z.B.
+  // eigenes Profil ohne geladene Bestenliste).
+  function computePlayerFrameTier(d){
+    if (d.rank === 1) return FRAME_TIERS[0];
+    if ((d.ascensionCount||0) >= 1) return FRAME_TIERS[1];
+    if ((d.prestige||0) >= 5) return FRAME_TIERS[2];
+    if (d.rank && d.rank <= 10) return FRAME_TIERS[3];
+    if ((d.prestige||0) >= 1) return FRAME_TIERS[4];
+    if ((d.level||0) >= 10) return FRAME_TIERS[5];
+    return null;
+  }
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
@@ -11172,6 +11244,36 @@
     else { avatarEl.textContent = (entry.name||'?').slice(0,2).toUpperCase(); avatarEl.style.background = 'rgba(126,119,221,0.25)'; }
     document.getElementById('profileModalName').textContent = entry.name || 'Unbekannt';
     document.getElementById('profileModalAlliance').textContent = (entry.allianceTag ? 'Allianz ['+entry.allianceTag+']' : 'Keine Allianz') + (entry.title ? ' · '+entry.title : '') + (entry.allianceTitle ? ' · '+entry.allianceTitle : '');
+    // Runde 1 "Profilkarte überarbeiten": Hintergrund-Sternenfeld pro Öffnung neu verstreut (Modal wird
+    // nur bei echtem Öffnen neu befüllt, nicht im Haupt-Tick - kein Performance-Thema), plus Rahmen-
+    // Stufe + Kennzahlen-Kacheln.
+    const heroBg = document.getElementById('profileHeroBg');
+    if (heroBg){
+      heroBg.querySelectorAll('.profile-hero-star').forEach(s=>s.remove());
+      for (let i=0;i<14;i++){
+        const s = document.createElement('div');
+        s.className = 'profile-hero-star';
+        s.style.left = (Math.random()*100)+'%'; s.style.top = (Math.random()*100)+'%';
+        s.style.opacity = (0.3+Math.random()*0.5).toFixed(2);
+        heroBg.appendChild(s);
+      }
+    }
+    const rankIdx = (leaderboardCache||[]).findIndex(e=>e.id===entry.id);
+    const tier = computePlayerFrameTier({ level:entry.level, prestige:entry.prestige, ascensionCount:entry.ascensionCount, rank: rankIdx>=0 ? rankIdx+1 : null });
+    const ringEl = document.getElementById('profileModalFrameRing');
+    if (ringEl) ringEl.innerHTML = tier ? `<div class="frame-ring frame-${tier.key}" style="--frame-color:${tier.color}; --frame-rgb:${tier.rgb};"></div>` : '';
+    const tierPillEl = document.getElementById('profileModalTierPill');
+    if (tierPillEl) tierPillEl.innerHTML = tier ? `<span class="profile-hero-tier-pill" style="color:${tier.color}; background:rgba(${tier.rgb},0.14); border:1px solid rgba(${tier.rgb},0.4);"><i class="ti ti-award" aria-hidden="true"></i> ${tier.name}</span>` : '';
+    const heroStatsEl = document.getElementById('profileHeroStats');
+    if (heroStatsEl){
+      const hs = [
+        { label:'Kolonien', value: entry.colonyCount },
+        { label:'Monde', value: entry.moonCount },
+        { label:'Erfolge', value: entry.achievementsCount },
+        { label:'Forschung', value: entry.researchTotal }
+      ].filter(x => x.value !== undefined);
+      heroStatsEl.innerHTML = hs.map(x => `<div class="profile-hero-stat"><b>${fmt(x.value)}</b><span>${x.label}</span></div>`).join('');
+    }
     const isMeForCompare = entry.id === state.player.id;
     // Vergleichszeile: zeigt die eigenen Werte daneben, mit Pfeil-Indikator ob man selbst höher
     // oder niedriger liegt. Nur bei fremden Profilen, nicht beim eigenen.
@@ -11182,14 +11284,17 @@
       if (mine < theirs) return ' <span style="color:#e24b4a;">(du: '+fmt(mine)+' ▼)</span>';
       return ' <span style="color:#9296ac;">(du: '+fmt(mine)+' =)</span>';
     };
+    const totalBattles = (entry.battleWins||0) + (entry.battleLosses||0);
+    const winRate = totalBattles>0 ? Math.round((entry.battleWins||0)/totalBattles*100) : null;
     document.getElementById('profileModalStats').innerHTML = `
-      <div class="card-row"><div class="left"><i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i><span class="bname">Punktzahl</span></div><span class="lvl-pill">${entry.score||0}${cmp(myStats.score, entry.score)}</span></div>
+      <div class="card-row"><div class="left"><i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i><span class="bname">Punktzahl</span></div><span class="lvl-pill">${entry.score||0}${cmp(myStats.score, entry.score)}${rankIdx>=0?' · Platz '+(rankIdx+1):''}</span></div>
       <div class="card-row"><div class="left"><i class="ti ti-sword" aria-hidden="true" style="color:#f0997b;"></i><span class="bname">Kampfpunkte</span></div><span class="lvl-pill">${entry.bp||0}${cmp(myStats.bp, entry.bp)}</span></div>
       <div class="card-row"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i><span class="bname">Level</span></div><span class="lvl-pill">${entry.level||'?'}${entry.prestige?' · P'+entry.prestige:''}${entry.ascensionCount?' · A'+entry.ascensionCount:''}</span></div>
       <div class="card-row"><div class="left"><i class="ti ti-rocket" aria-hidden="true" style="color:#85b7eb;"></i><span class="bname">Flotte</span></div><span class="lvl-pill">${entry.ships||0} Schiffe · ${entry.cruisers||0} Kreuzer · ${entry.destroyers||0} Zerstörer</span></div>
       ${entry.defensePower!==undefined ? `<div class="card-row"><div class="left"><i class="ti ti-shield-lock" aria-hidden="true" style="color:#378add;"></i><span class="bname">Verteidigungspunkte</span></div><span class="lvl-pill">${fmt(entry.defensePower)}${cmp(myStats.defensePower, entry.defensePower)}</span></div>` : ''}
       ${entry.buildLvl!==undefined ? `<div class="card-row"><div class="left"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i><span class="bname">Gebäude-Level</span></div><span class="lvl-pill">${fmt(entry.buildLvl)}${entry.colonyCount?' · '+entry.colonyCount+' Kolonien':''}${cmp(myStats.buildLvl, entry.buildLvl)}</span></div>` : ''}
       <div class="card-row"><div class="left"><i class="ti ti-alien" aria-hidden="true" style="color:#e24b4a;"></i><span class="bname">NPC-Siege</span></div><span class="lvl-pill">${entry.npcKills||0}${cmp(myStats.npcKills, entry.npcKills)}</span></div>
+      ${totalBattles>0 ? `<div class="card-row"><div class="left"><i class="ti ti-target" aria-hidden="true" style="color:#9fe1cb;"></i><span class="bname">Erfolgsquote</span></div><span class="lvl-pill">${winRate}% <span style="color:#7d8199;">(${entry.battleWins||0}S / ${entry.battleLosses||0}N)</span></span></div>` : ''}
     `;
     document.getElementById('profileModalLastSeen').innerHTML = `<i class="ti ti-clock" aria-hidden="true"></i> Zuletzt aktiv: ${formatRelativeTime(entry.updated)}`;
     // Bugfix: isMe verglich bisher Name+Kampfpunkte statt der Spieler-ID - zwei Spieler mit gleichem
@@ -12623,6 +12728,7 @@
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Freunde einladen', body:'Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.' },
       { title:'Kolonie teilen', body:'Der Button "Kolonie teilen" (Punktestand-Tab) erzeugt ein Bild mit Avatar, Level, Punktestand und den wichtigsten Eckdaten (Kolonien, Monde, Flotte, Kampfpunkte) - zum Teilen auf sozialen Netzwerken. Auf dem Handy öffnet sich meist direkt das Teilen-Menü des Betriebssystems, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser, ohne Server-Kontakt.' },
+      { title:'Rahmen-Stufen im Spielerprofil', body:'Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>Silber</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert.' },
       { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. Meldest du dich einen Tag <strong>nicht</strong> an, fällt der Fortschritt zurück auf Tag 1 - die Gesamtzahl der (nicht zwingend aufeinanderfolgenden) Logins zählt separat als "Tage in Folge" weiter, solange keine Lücke entsteht. Die komplette Vorschau mit allen 7 Tagen und der aktuellen Streak steht im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
       { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
@@ -16569,6 +16675,14 @@
           // computeSystemControllers() einfach nirgends mit.
           ownedPlanets: Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k)),
           title: (playerTitle(state.achievements)||{}).title||null,
+          // Runde 1 "Profilkarte überarbeiten" (Spieler-Wunsch): drei zusätzliche Kennzahlen für die
+          // erweiterte Profilkarte - alle simple Summen aus bereits vorhandenen state-Feldern, kein
+          // neues Tracking. Kampfsiege/-niederlagen kommen aus dem schon bestehenden battleStats.
+          moonCount: expansionCounts().moonCount,
+          researchTotal: Object.values(state.research||{}).reduce((a,lvl)=>a+(lvl||0), 0),
+          achievementsCount: Object.keys(state.achievements||{}).length,
+          battleWins: (state.battleStats&&state.battleStats.wins)||0,
+          battleLosses: (state.battleStats&&state.battleStats.losses)||0,
           updated: Date.now()
         }), true);
         // Abhorchposten-Broadcast (Spieler-Wunsch "Monde um einzigartige Gebäude erweitern"): wie die
