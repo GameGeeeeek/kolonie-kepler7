@@ -2996,8 +2996,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.96.4';
+  const VERSION = '8.97.0';
   const PATCHNOTES = [
+    { version:'8.97.0', date:'18.07.2026', changes:[
+      'Performance (Hintergrund-Optimierung, keine sichtbare Änderung am Spielverhalten): reine Anzeige-Aktualisierungen (Bestenliste, Berichte, Nachrichten, Galaxie-Zustand, Allianzbasis-Kriegszustand/Spenden-Rangliste, Versions-Check) pausieren jetzt, wenn der Tab im Hintergrund liegt oder das Handy gesperrt ist - spart Server-Anfragen und Akku. Spielmechanik-Timer (Piraten-/Leerenriss-Ereignisse, Händler, koordinierte Allianzangriffe) laufen bewusst unverändert weiter, auch im Hintergrund',
+      'Performance: acht Anzeige-Boxen (u.a. Dominanz, Galaxie-News, Kampfberichte, Allianz-Ehrentitel/-Flottenanstriche, Tageslogin, Allianz-Spenden-Rangliste, Bestenliste) bauen ihren Inhalt nicht mehr bei jedem Sekunden-Tick komplett neu auf, sondern nur noch, wenn sich die angezeigten Daten wirklich geändert haben - spürbar weniger unnötige Arbeit auf schwächeren Geräten, gleiches Prinzip wie beim Allianzbasis-Diorama-Fix zuvor. Boxen mit echten Countdown-Anzeigen (Erkundungstour, Abhorchposten, Fraktions-Tribut) bleiben bewusst unverändert, da sie jede Sekunde live weiterzählen müssen'
+    ]},
     { version:'8.96.4', date:'18.07.2026', changes:[
       'Bugfix (Spieler-Meldung "Allianz Station ist weg, ich denke sie driftet rum"): das rotierende Stationsdiorama nutzte für die Drehachse das Schlüsselwort "center" statt fester Koordinaten - manche mobilen Safari/WebKit-Browser (u.a. iPhone) berechnen diesen Bezugspunkt bei CSS-Drehungen auf SVG-Elementen fehlerhaft gegen die volle Pixelgröße der Box statt gegen die eigene Bildkoordinate, wodurch die Station weit aus dem sichtbaren Rahmen herausschwang und zeitweise komplett verschwand. In Chromium/Desktop-Browsern war das nicht sichtbar. Drehachse jetzt auf feste Koordinaten (0,0) umgestellt - browserübergreifend robust, keine sichtbare Änderung an Desktop-Darstellung'
     ]},
@@ -6882,13 +6886,21 @@
       buildGalaxyMap();
     } catch(e){}
   }
+  // Läuft über renderGalaxyNews() bei jedem Sekunden-Tick, wenn der Galaxie-Tab aktiv ist - die News
+  // ändern sich aber nur, wenn loadGalaxyState() (alle 2 Min.) neue Einträge bringt. Signatur-Vergleich
+  // (gleiches Muster wie beim Allianzbasis-Diorama) überspringt den unnötigen innerHTML-Neuaufbau,
+  // solange sich nichts geändert hat.
+  let lastGalaxyNewsSig = null;
   function renderGalaxyNews(){
     renderFactions();
     renderWorldBoss();
     const box = document.getElementById('galaxyNewsBox');
     if (!box) return;
     const news = galaxyCache.news || [];
-    if (!news.length){ box.innerHTML = '<div class="bmeta">Noch keine galaktischen Ereignisse.</div>'; return; }
+    if (!news.length){ if (lastGalaxyNewsSig !== 'empty'){ box.innerHTML = '<div class="bmeta">Noch keine galaktischen Ereignisse.</div>'; lastGalaxyNewsSig = 'empty'; } return; }
+    const newsSig = news.slice(0,12).map(n=>n.time+'|'+n.text).join(';');
+    if (newsSig === lastGalaxyNewsSig) return;
+    lastGalaxyNewsSig = newsSig;
     box.innerHTML = news.slice(0, 12).map(n => {
       const when = new Date(n.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       return `<div class="card-row" style="padding:0.5rem 0.7rem;"><div class="left"><i class="ti ${n.icon}" aria-hidden="true" style="color:#c3bef5; font-size:15px; margin-right:8px;"></i><div><div class="bmeta" style="color:#c7cbe0;">${n.text}</div><div class="bmeta" style="font-size:10px;">${when}</div></div></div></div>`;
@@ -6954,12 +6966,19 @@
     playSound('achieve');
     render(); save();
   }
+  // dominanceScore() speist sich aus Gebäuden/Schiffen/Forschung/Prestige etc. - ändert sich nur bei
+  // diskreten Spielereignissen (Bau fertig, Sieg, ...), nicht kontinuierlich wie die Ressourcenanzeige.
+  // Signatur-Vergleich spart daher den innerHTML-Neuaufbau in den meisten der 1x/Sek.-Ticks.
+  let lastDominanceSig = null;
   function renderDominance(){
     const box = document.getElementById('dominanceBox');
     if (!box) return;
     const score = dominanceScore();
     const reached = dominanceLevelFor(score);
     const claimed = state.dominanceClaimed||0;
+    const dominanceSig = score+'|'+claimed;
+    if (dominanceSig === lastDominanceSig) return;
+    lastDominanceSig = dominanceSig;
     const nextLvl = claimed + 1;
     const nextThresh = dominanceThreshold(nextLvl);
     const prevThresh = claimed > 0 ? dominanceThreshold(claimed) : 0;
@@ -13143,10 +13162,17 @@
     switchTab('hilfe');
     renderHelpBox(key);
   }
+  // Berichte sind nach Erstellung unveränderlich - reportsCache.length+IDs plus die Kampf-Statistik-
+  // Kopfzeile reichen als Signatur, um den (potenziell langen) innerHTML-Neuaufbau jede Sekunde zu
+  // überspringen, solange sich nichts geändert hat (gleiches Muster wie renderGalaxyNews/renderDominance).
+  let lastReportsSig = null;
   function renderReportsBox(){
     const box = document.getElementById('reportsBox');
     if (!box) return;
     const statsHtml = battleStatsHtml();
+    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id).join(',');
+    if (reportsSig === lastReportsSig) return;
+    lastReportsSig = reportsSig;
     if (!useBackend()){
       box.innerHTML = statsHtml + `<div class="bmeta">Berichte sind nur verfügbar, wenn das Spiel über einen eigenen Server läuft.</div>`;
       return;
@@ -15040,12 +15066,16 @@
   // eigene Wochenspende, Allianz-Gesamtspende, eigener Anteil in Prozent, Fortschritt bis zur
   // naechsten Allianzbasis-Stufe (liest die bereits vorhandene, dauerhafte Basis-Fortschrittslogik
   // - KEIN separater Zaehler, um nicht zwei Wahrheiten fuer denselben Fortschritt zu fuehren).
+  let lastFpAllianceDonationSig = null;
   function renderFpAllianceDonation(){
     const box = document.getElementById('fpAllianceDonationBox');
     if (!box) return;
     const tag = myAllianceTag();
     if (!tag || !useBackend()){
-      box.innerHTML = '<div class="bmeta" style="font-size:10.5px;">Nur mit Allianz und Serververbindung verf\u00fcgbar.</div>';
+      if (lastFpAllianceDonationSig !== 'none'){
+        box.innerHTML = '<div class="bmeta" style="font-size:10.5px;">Nur mit Allianz und Serververbindung verf\u00fcgbar.</div>';
+        lastFpAllianceDonationSig = 'none';
+      }
       return;
     }
     const cache = state.allianceDonationCache;
@@ -15061,6 +15091,12 @@
         baseProgressLine = 'Basis-Ausbau Stufe '+(lvl+1)+': '+doneRes+'/'+Object.keys(nextCum).length+' Ressourcen gedeckt';
       }
     }
+    // cache.list (Wochenspenden-Rangliste) \u00e4ndert sich nur, wenn loadAllianceDonationRanking() (alle
+    // 5 Min., Guard bereits durch die Sichtbarkeits-Pr\u00fcfung oben) neue Daten bringt - Signatur-Vergleich
+    // spart den innerHTML-Neuaufbau in den meisten Sekunden-Ticks.
+    const fpDonationSig = tag+'|'+baseProgressLine+'|'+(cache ? cache.totalAll+'|'+cache.list.map(e=>e.id+':'+e.total).join(',') : 'nocache');
+    if (fpDonationSig === lastFpAllianceDonationSig) return;
+    lastFpAllianceDonationSig = fpDonationSig;
     if (!cache || !cache.list.length){
       box.innerHTML = '<div class="bmeta" style="font-size:10.5px;">Noch keine Spenden diese Woche.</div>'
         + '<button id="fpDonationRankBtn" style="width:100%; margin-top:6px; font-size:10px;">Komplette Rangliste anzeigen</button>'
@@ -15294,11 +15330,15 @@
     log('Das Galaktische Archiv deiner Allianz ist vollendet - du erhältst den exklusiven Ehrentitel „Archivar der Allianz"!', 'ti-microscope');
     playSound('achieve');
   }
+  let lastAllianceTitlesSig = null;
   function renderAllianceTitlesBox(){
     const box = document.getElementById('allianceTitlesBox');
     if (!box) return;
     const owned = state.allianceTitles || [];
     const equipped = state.equippedAllianceTitle;
+    const titlesSig = owned.join(',')+'|'+equipped;
+    if (titlesSig === lastAllianceTitlesSig) return;
+    lastAllianceTitlesSig = titlesSig;
     let html = '';
     if (equipped && findAllianceTitle(equipped)){
       const t = findAllianceTitle(equipped);
@@ -15360,11 +15400,15 @@
     const s = state.equippedAllianceSkin ? findAllianceSkin(state.equippedAllianceSkin) : null;
     return s ? s.filter : '';
   }
+  let lastAllianceSkinsSig = null;
   function renderAllianceSkinsBox(){
     const box = document.getElementById('allianceSkinsBox');
     if (!box) return;
     const owned = state.allianceSkins || [];
     const equipped = state.equippedAllianceSkin;
+    const skinsSig = owned.join(',')+'|'+equipped;
+    if (skinsSig === lastAllianceSkinsSig) return;
+    lastAllianceSkinsSig = skinsSig;
     let html = '';
     if (!equipped){
       html += `<div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Kein Flottenanstrich aktiv (Standardfarben).</div>`;
@@ -17511,10 +17555,13 @@
     if (def.credits) return 'ti-diamond';
     return 'ti-box';
   }
+  let lastDailyLoginSig = null;
   function renderDailyLoginBox(){
     const box = document.getElementById('dailyLoginBox');
     if (!box) return;
     const streak = state.loginStreak||1;
+    if (streak === lastDailyLoginSig) return;
+    lastDailyLoginSig = streak;
     const dayInCycle = ((streak-1) % DAILY_LOGIN_REWARDS.length) + 1;
     const nextDayInCycle = (dayInCycle % DAILY_LOGIN_REWARDS.length) + 1;
     const nextDef = DAILY_LOGIN_REWARDS[nextDayInCycle-1];
@@ -22101,13 +22148,19 @@
     resValAnimFrames.set(el, requestAnimationFrame(step));
   }
 
+  let lastFpLeaderboardSig = null;
   function renderFpLeaderboard(){
     const box = document.getElementById('fpLeaderboard');
     if (!box) return;
     if (!leaderboardCache.length){
-      box.innerHTML = `<div class="bmeta" style="font-size:10.5px;">Noch keine Einträge.</div>`;
+      if (lastFpLeaderboardSig !== 'empty'){ box.innerHTML = `<div class="bmeta" style="font-size:10.5px;">Noch keine Einträge.</div>`; lastFpLeaderboardSig = 'empty'; }
       return;
     }
+    // Online-Punkt hängt von Date.now() ab - auf ein 30-Sekunden-Zeitfenster gerundet in der Signatur,
+    // damit er noch regelmäßig auffrischt, aber nicht jede Sekunde einen vollen Neuaufbau auslöst.
+    const fpLbSig = Math.floor(Date.now()/30000)+'|'+leaderboardCache.slice(0,5).map(e=>e.id+':'+e.score+':'+e.lastSeen).join(',');
+    if (fpLbSig === lastFpLeaderboardSig) return;
+    lastFpLeaderboardSig = fpLbSig;
     box.innerHTML = leaderboardCache.slice(0,5).map((e,i) => {
       // Bugfix: vorheriger Vergleich über Name+Kampfpunkte konnte bei zwei Spielern mit identischem
       // Anzeigenamen und gleichem Punktestand (z.B. zwei Neulinge mit je 0 Kampfpunkten) den
@@ -26356,8 +26409,12 @@
     if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
   }, 1000);
   setInterval(save, 10000);
-  setInterval(() => { loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) syncOwnAllianceRole(); } }, 15000);
-  setInterval(loadGalaxyState, 120000); // Galaxie-Zustand ändert sich langsam (Server-Tick alle 15 Min.), reicht alle 2 Min. zu prüfen
+  // Reine Anzeige-Aktualisierungen (kein Spielmechanik-Timing, das im Hintergrund weiterlaufen müsste)
+  // - Sichtbarkeits-Check spart Server-Anfragen/Akku, wenn der Tab im Hintergrund liegt oder das Handy
+  // gesperrt ist, analog zum bereits bestehenden Muster bei checkLiveVersionUpdate/checkChatUnread oben.
+  // Beim nächsten sichtbaren Intervall-Tick wird einfach normal nachgeladen, kein Datenverlust.
+  setInterval(() => { if (document.visibilityState !== 'visible') return; loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) syncOwnAllianceRole(); } }, 15000);
+  setInterval(() => { if (document.visibilityState === 'visible') loadGalaxyState(); }, 120000); // Galaxie-Zustand ändert sich langsam (Server-Tick alle 15 Min.), reicht alle 2 Min. zu prüfen
   loadGalaxyState();
   setInterval(() => { if (activeTab === 'markt') loadMarketState(); }, 30000); // Marktpreise im Markt-Tab alle 30s auffrischen
   loadMarketState();
@@ -26377,8 +26434,11 @@
   setInterval(maybeSpawnVoidRift, 1800000);
   // Allianzbasis-Kriegszustand alle 5 Minuten nachladen, damit Verteidiger Angriffe zeitnah
   // mitbekommen (Verluste anwenden, Alarm) - laeuft nur mit Allianz + Server-Modus (Guard intern).
-  setInterval(loadAllianceBaseWar, 300000);
-  setInterval(loadAllianceDonationRanking, 300000);
+  // Reine Anzeige-Aktualisierung (siehe Sichtbarkeits-Hinweis oben) - bewusst NICHT bei
+  // maybeScheduleRaid/maybeSpawnTrader/refreshAllianceMusterAttack angewendet, da deren Timing
+  // eine echte Spielmechanik ist, die auch im Hintergrund-Tab real weiterlaufen soll.
+  setInterval(() => { if (document.visibilityState === 'visible') loadAllianceBaseWar(); }, 300000);
+  setInterval(() => { if (document.visibilityState === 'visible') loadAllianceDonationRanking(); }, 300000);
   // Koordinierte Allianzbasis-Angriffe alle 5 Minuten nachladen (Guard intern) - deckt Phasenübergänge
   // und die Verteidiger-Warnung zeitnah ab, auch wenn der Spieler gerade nicht im Allianz-Tab ist.
   setInterval(refreshAllianceMusterAttack, 300000);
@@ -26418,7 +26478,7 @@
     };
     attempt();
   }
-  setInterval(checkForNewVersionOnServer, 5*60*1000);
+  setInterval(() => { if (document.visibilityState === 'visible') checkForNewVersionOnServer(); }, 5*60*1000);
 
   function renderPatchnotes(){
     document.getElementById('versionTag').textContent = 'v'+VERSION;
