@@ -1024,13 +1024,29 @@
         radial-gradient(ellipse 220px 150px at 76% 78%, rgba(var(--info-rgb),0.16), transparent 60%),
         linear-gradient(160deg,#12172c,#080a14);
     }
-    .ab-hero-stage { position:relative; height:190px; overflow:hidden; }
-    .ab-hero-stage::before{ content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size:24px 24px; mask-image:radial-gradient(ellipse 92% 88% at 50% 42%, #000 30%, transparent 92%); -webkit-mask-image:radial-gradient(ellipse 92% 88% at 50% 42%, #000 30%, transparent 92%); pointer-events:none; }
-    .ab-hero-stage svg { width:100%; height:100%; display:block; }
+    .ab-hero-stage { position:relative; height:225px; overflow:hidden; }
+    /* Vier gestapelte Ebenen (Spieler-Wunsch "Maximum grafisch rausholen"), jede mit explizitem
+       z-index statt sich auf ::before/::after-Malreihenfolge zu verlassen - robuster bei mehreren
+       Ebenen: 0 Banner-Farbwäsche (dieselbe Wahl wie im kleinen Banner-Picker, siehe currentAllianceBanner
+       - zieht die schon bestehende Allianz-Identität aus Runde 2 in dieses neue Diorama hinein statt
+       einer weiteren, unabhängigen Bildsprache), 1 Grid-Textur + Radar-Sweep (dieselbe conic-gradient-
+       Technik wie .map-radar-sweep auf der Sektorkarte), 2 das SVG (Sterne+Station+Flares+HUD-Text),
+       3 statische Scanlines (dieselbe Technik wie .shell::after / die Teilen-Karten). */
+    .ab-hero-banner-wash { position:absolute; inset:0; z-index:0; opacity:0.4; background-size:cover; background-position:center; transition:background 0.3s ease; }
+    .ab-hero-grid { position:absolute; inset:0; z-index:1; background-image:linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size:24px 24px; mask-image:radial-gradient(ellipse 92% 88% at 50% 42%, #000 30%, transparent 92%); -webkit-mask-image:radial-gradient(ellipse 92% 88% at 50% 42%, #000 30%, transparent 92%); pointer-events:none; }
+    .ab-hero-radar { position:absolute; z-index:1; left:50%; top:48%; width:210px; height:210px; margin:-105px 0 0 -105px; border-radius:50%; pointer-events:none; background-image:repeating-radial-gradient(circle, transparent 0, transparent 22px, rgba(var(--info-rgb),0.05) 23px); }
+    .ab-hero-radar::before { content:''; position:absolute; inset:0; border-radius:50%; background:conic-gradient(from 0deg, rgba(var(--info-rgb),0.18), transparent 55deg); animation:abHeroRadarSpin 6s linear infinite; animation-delay:var(--radar-delay,0s); }
+    @keyframes abHeroRadarSpin { from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+    .ab-hero-stage svg { position:relative; z-index:2; width:100%; height:100%; display:block; }
+    .ab-hero-scanlines { position:absolute; inset:0; z-index:3; pointer-events:none; opacity:0.3; background:repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 1px, transparent 1px, transparent 3px); }
     .ab-hero-model { transform-origin:center; animation:abHeroSpin 46s linear infinite; }
+    .ab-hero-ring { transform-origin:center; animation:abHeroSpin 70s linear infinite reverse; }
     @keyframes abHeroSpin { from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce){ .ab-hero-model { animation:none; } }
+    @media (prefers-reduced-motion: reduce){ .ab-hero-model, .ab-hero-ring, .ab-hero-radar::before { animation:none; } }
     .ab-hero-star { fill:#fff; }
+    .ab-hero-flare { stroke:#fff; }
+    .ab-hero-tick { stroke:rgba(255,255,255,0.25); stroke-width:0.3; }
+    .ab-hero-hud-text { font-family:var(--font-mono); fill:rgba(255,255,255,0.45); font-size:2px; letter-spacing:0.06em; }
     .ab-hero-caption { position:relative; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px; background:rgba(6,8,18,0.55); border-top:0.5px solid var(--line-1); font-family:var(--font-mono); font-size:10.5px; color:#9296ac; }
     .ab-hero-caption a { color:var(--c-info); text-decoration:none; white-space:nowrap; }
     .ab-hero-caption a:hover { text-decoration:underline; }
@@ -2972,8 +2988,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.96.0';
+  const VERSION = '8.96.1';
   const PATCHNOTES = [
+    { version:'8.96.1', date:'18.07.2026', changes:[
+      'Stationsdiorama (Spieler-Wunsch "Maximum grafisch rausholen"): deutlich mehr Detail - der Hintergrund färbt sich jetzt mit dem gewählten Allianz-Banner ein (zieht die Identität aus der Banner-Auswahl direkt ins Diorama), dazu ein rotierender Radar-Sweep (dieselbe Technik wie auf der Sektorkarte), Glanzsterne mit Vierpunkt-Flare, eine Lineal-Tickmarke am Rand, kleine HUD-Eck-Readouts (Allianz-Tag/Ausbaustufe) und statische Scanlines - dieselbe Cockpit-Overlay-Bildsprache wie bei den Teilen-Karten, dazu ein zweiter, gegenläufig rotierender Akzentring um die Station',
+      'Bugfix: die Rotation lief bisher unruhig, weil die Box durch die laufenden Countdown-Anzeigen jede Sekunde komplett neu aufgebaut wird und dabei jede CSS-Animation neu gestartet wäre - der Drehwinkel wird jetzt bei jedem Aufbau aus der echten Uhrzeit nachgerechnet, wodurch die Drehung trotzdem nahtlos wirkt'
+    ]},
     { version:'8.96.0', date:'18.07.2026', changes:[
       'Allianzbasis (Spieler-Wunsch "interaktive Ansicht mit Bezug zur Sektorkarte") hat jetzt oben im Allianz-Tab ein großes, animiertes Stationsdiorama statt nur der kleinen 84px-Vorschau - langsam rotierend, mit Sternenfeld (Dichte wächst mit der Ausbaustufe) und HUD-Rahmen',
       'Bewusst KEIN neu erfundener 3D-Look: das Diorama zeigt exakt dasselbe wachsende Stationsmodell, das schon auf der Sektorkarte und den Teilen-Karten zu sehen ist - inklusive direktem Link "dieselbe Station live auf der Sektorkarte ansehen", der zur Karte springt und ins richtige System zoomt',
@@ -16640,20 +16660,72 @@
     }
     return s;
   }
+  // "Glanzsterne" mit Vierpunkt-Flare - dieselbe Optik wie bei den Teilen-Karten (drawShareHeader,
+  // siehe flareSpots dort), hier nur zwei feste statt zufällige Positionen (kleinerer Rahmen als eine
+  // Teilen-Karte, mehr würde unruhig wirken).
+  function allianceBaseHeroFlares(){
+    return [[-38,-22],[37,19]].map(([x,y]) => `
+      <g class="ab-hero-flare" opacity="0.5">
+        <line x1="${x-2.4}" y1="${y}" x2="${x+2.4}" y2="${y}" stroke-width="0.25"/>
+        <line x1="${x}" y1="${y-2.4}" x2="${x}" y2="${y+2.4}" stroke-width="0.25"/>
+        <circle cx="${x}" cy="${y}" r="0.5" fill="#fff" stroke="none"/>
+      </g>`).join('');
+  }
+  // Lineal-Tickmarken am linken Rand - dieselbe Idee wie bei den Teilen-Karten, verstärkt den
+  // "Instrumenten"-Charakter des Diaporamas.
+  function allianceBaseHeroTicks(){
+    let s = '';
+    for (let y=-30; y<=30; y+=6) s += `<line class="ab-hero-tick" x1="-49" y1="${y}" x2="${y%12===0?-46:-47.5}" y2="${y}"/>`;
+    return s;
+  }
+  // Kleine HUD-Readout-Zeilen oben in den Ecken, wie bei den Teilen-Karten ("SEC · KEPLER-7" / Datum) -
+  // dieselbe Cockpit-Overlay-Sprache, hier mit Allianz-Tag und Ausbaustufe statt Sektor/Datum.
+  function allianceBaseHeroHudText(tag, lvl){
+    return `
+      <text class="ab-hero-hud-text" x="-48" y="-28" text-anchor="start">SEC · [${escapeHtml(tag)}]</text>
+      <text class="ab-hero-hud-text" x="48" y="-28" text-anchor="end">STUFE ${lvl}</text>`;
+  }
+  // Färbt den Hintergrund des Diaporamas mit demselben Bannermuster ein, das im Picker weiter unten
+  // gewählt ist (currentAllianceBanner/BANNER_DEFS, Runde 2 der Profilbild/Banner-Überarbeitung) -
+  // zieht die schon bestehende Allianz-Identität ins neue Diorama, statt einer weiteren, unabhängigen
+  // Bildsprache. Fällt auf einen neutralen Verlauf zurück, solange noch kein Banner gewählt wurde.
+  function allianceBaseHeroWashCss(){
+    const b = BANNER_DEFS.find(x=>x.key===currentAllianceBanner);
+    return b ? b.css : 'linear-gradient(160deg,#20263f,#0d1020)';
+  }
   // Großes, animiertes Stationsdiorama oben in der Allianzbasis-Box (Spieler-Wunsch "interaktive
-  // Ansicht mit Bezug zur Sektorkarte"): zeigt bewusst DASSELBE allianceBaseModelSvg()-Modell wie die
-  // Sektorkarte (idSuffix 'Map') und die Teilen-Karten (idSuffix 'ShareCard') - nur groß, mit eigenem
-  // Sternenhintergrund und langsamer Rotation (.ab-hero-model, CSS @keyframes abHeroSpin) - statt einer
-  // neu erfundenen Bildsprache. Der Link führt direkt zur Sektorkarte, wo dasselbe Modell (idSuffix
-  // 'Map') im richtigen System erscheint.
+  // Ansicht mit Bezug zur Sektorkarte", nachgelegt "Maximum grafisch rausholen"): zeigt bewusst
+  // DASSELBE allianceBaseModelSvg()-Modell wie die Sektorkarte (idSuffix 'Map') und die Teilen-Karten
+  // (idSuffix 'ShareCard') - nur groß, mit Banner-Farbwäsche, Radar-Sweep, Sternenfeld, Glanzsternen,
+  // Tickmarken, HUD-Text, Scanlines und langsamer Rotation (.ab-hero-model) - dieselben Bausteine, die
+  // an anderer Stelle im Spiel (Sektorkarte-Radar, Teilen-Karten) schon etabliert sind, statt einer neu
+  // erfundenen Bildsprache. Der Link führt direkt zur Sektorkarte, wo dasselbe Modell im richtigen
+  // System erscheint.
   function allianceBaseHeroHtml(lvl, tag, sys, base){
+    // renderAllianceBaseBox() baut die ganze Box (samt Countdown-Timern) bei JEDEM Tick (1x/Sek.) neu
+    // per innerHTML auf - eine normale CSS-Animation würde dadurch jede Sekunde von vorne beginnen und
+    // wie ein Ruckeln aussehen statt einer langsamen Drehung. Fix: animation-delay wird bei jedem
+    // Aufbau NEU aus der aktuellen Uhrzeit berechnet (negativer Delay = "so tun, als liefe die
+    // Animation schon seit diesem Zeitpunkt") - die Drehung wirkt dadurch trotz Neuaufbau nahtlos.
+    const nowS = Date.now()/1000;
+    const spinDelay = (-(nowS % 46)).toFixed(2);
+    const ringDelay = (-(nowS % 70)).toFixed(2);
+    const radarDelay = (-(nowS % 6)).toFixed(2);
     return `
       <div class="ab-hero">
         <div class="ab-hero-stage">
+          <div class="ab-hero-banner-wash" style="background:${allianceBaseHeroWashCss()};"></div>
+          <div class="ab-hero-grid"></div>
+          <div class="ab-hero-radar" style="--radar-delay:${radarDelay}s;"></div>
           <svg viewBox="-50 -32 100 64" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
             ${allianceBaseHeroStars(lvl)}
-            <g class="ab-hero-model">${allianceBaseModelSvg(Math.max(1,lvl), 'Hero')}</g>
+            ${allianceBaseHeroFlares()}
+            <circle class="ab-hero-ring" style="animation-delay:${ringDelay}s;" cx="0" cy="0" r="${22+Math.min(10,lvl)}" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="0.4" stroke-dasharray="2 3"/>
+            <g class="ab-hero-model" style="animation-delay:${spinDelay}s;">${allianceBaseModelSvg(Math.max(1,lvl), 'Hero')}</g>
+            ${allianceBaseHeroTicks()}
+            ${allianceBaseHeroHudText(tag, lvl)}
           </svg>
+          <div class="ab-hero-scanlines"></div>
         </div>
         <div class="ab-hero-caption">
           <span><i class="ti ti-building-fortress" aria-hidden="true"></i> [${escapeHtml(tag)}] · Stufe ${lvl}${lvl>=ALLIANCE_BASE_MAX_LEVEL?' · MAX':''} · System ${escapeHtml(sys?sys.name:base.sector)}</span>
