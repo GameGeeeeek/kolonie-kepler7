@@ -994,8 +994,27 @@
     .avatar-option { width:36px; height:36px; border-radius:50%; background:var(--elev-2); border:2px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
     .avatar-option.active { border-color:var(--c-primary); background:rgba(var(--primary-rgb), 0.25); }
     .banner-picker { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-    .banner-option { width:56px; height:36px; border-radius:8px; cursor:pointer; border:2px solid transparent; padding:0; overflow:hidden; }
+    .banner-option { width:56px; height:36px; border-radius:8px; cursor:pointer; border:2px solid transparent; padding:0; overflow:hidden; position:relative; }
     .banner-option.active { border-color:var(--c-primary); }
+    .banner-option.locked { cursor:not-allowed; opacity:0.4; }
+    .banner-option.locked::after { content:'🔒'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:13px; background:rgba(6,8,18,0.45); }
+    /* Runde 2 der Profilbild/Banner-Überarbeitung: der Allianz-Banner war bisher nur eine Farbe auf
+       dem winzigen 46px-Avatar-Kreis - jetzt ein echter großer Kartenkopf, dieselbe Bildsprache wie
+       .profile-hero-card (Grid-Textur, Glühsterne), aber mit dem gewählten Banner als Vollflächen-
+       Hintergrund statt eines einzelnen Farbverlaufs. Sterne/Glanz skalieren bewusst mit
+       allianceBaseLevel() statt einem neuen Freischalt-Tracking - dieselbe Design-Regel wie bei den
+       Rahmen-Stufen. */
+    .alliance-hero-card { padding:0; overflow:hidden; }
+    .alliance-hero-banner { position:relative; min-height:104px; padding:18px 20px 16px; display:flex; align-items:flex-end; gap:14px; overflow:hidden; }
+    .alliance-hero-banner::before { content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size:22px 22px; mask-image:radial-gradient(ellipse 100% 100% at 50% 20%, #000 40%, transparent 96%); -webkit-mask-image:radial-gradient(ellipse 100% 100% at 50% 20%, #000 40%, transparent 96%); }
+    .alliance-hero-banner::after { content:''; position:absolute; inset:0; background:linear-gradient(0deg, rgba(6,8,18,0.55), transparent 65%); }
+    .alliance-hero-star { position:absolute; width:2px; height:2px; border-radius:50%; background:#fff; opacity:0.65; }
+    .alliance-hero-level-pill { position:absolute; top:12px; right:14px; z-index:1; font-family:var(--font-mono); font-size:10px; letter-spacing:0.03em; padding:3px 8px; background:rgba(6,8,18,0.5); border:1px solid rgba(255,255,255,0.22); border-radius:3px; }
+    .alliance-hero-logo-wrap { position:relative; z-index:1; width:60px; height:60px; flex-shrink:0; }
+    .alliance-hero-logo-wrap .avatar { width:60px; height:60px; font-size:22px; background:rgba(6,8,18,0.4); border:2px solid rgba(255,255,255,0.3); color:#fff; }
+    .alliance-hero-name { position:relative; z-index:1; font-size:18px; font-weight:700; text-shadow:0 1px 6px rgba(0,0,0,0.65); }
+    .alliance-hero-meta { position:relative; z-index:1; font-size:11.5px; color:#e2e4f0; text-shadow:0 1px 5px rgba(0,0,0,0.7); }
+    .alliance-hero-body { padding:14px 20px 18px; }
     .rank-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; background:var(--elev-1); font-size:12.5px; }
     /* border-radius bewusst nicht mehr hier gesetzt - die HUD-Eckenschnitt-Sammelregel weiter unten
        (.card-row, .profile-card, ..., .rank-row) übernimmt das jetzt; stünde hier noch border-radius,
@@ -1872,25 +1891,28 @@
       </div>
 
       <div class="tab-panel" id="tab-allianz">
-        <div class="profile-card" style="flex-direction:column; align-items:stretch;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-            <div class="profile-left">
-              <div class="avatar" id="allianceAvatar" style="background:rgba(212,83,126,0.25); color:#f4c0d1;"><i class="ti ti-flag" aria-hidden="true"></i></div>
-              <div>
-                <div class="bname" id="allianceNameDisplay">Keine Allianz</div>
-                <div class="bmeta" id="allianceMetaLine">Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen</div>
-              </div>
+        <div class="alliance-hero-card">
+          <div class="alliance-hero-banner" id="allianceHeroBanner">
+            <div class="alliance-hero-level-pill" id="allianceHeroLevelPill" style="display:none;"></div>
+            <div class="alliance-hero-logo-wrap">
+              <div class="avatar" id="allianceAvatar"><i class="ti ti-flag" aria-hidden="true"></i></div>
             </div>
-            <div style="display:flex; gap:8px;">
+            <div style="min-width:0;">
+              <div class="alliance-hero-name" id="allianceNameDisplay">Keine Allianz</div>
+              <div class="alliance-hero-meta" id="allianceMetaLine">Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen</div>
+            </div>
+          </div>
+          <div class="alliance-hero-body">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <input type="text" id="allianceInput" placeholder="Allianz-Tag (4)" maxlength="4" style="width:110px;"/>
               <button id="saveAllianceBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Setzen</button>
               <button id="leaveAllianceBtn" style="display:none;"><i class="ti ti-door-exit" aria-hidden="true" style="margin-right:4px;"></i>Verlassen</button>
             </div>
-          </div>
-          <div class="bmeta" id="allianceDescriptionDisplay" style="margin-top:8px; display:none;"></div>
-          <div id="bannerPickerWrap" style="display:none;">
-            <div class="bmeta" style="margin-top:10px;">Allianz-Banner (für alle Mitglieder sichtbar) <span id="bannerPickerHint" style="color:#6b6f85;"></span>:</div>
-            <div id="bannerPicker" class="banner-picker"></div>
+            <div class="bmeta" id="allianceDescriptionDisplay" style="margin-top:8px; display:none;"></div>
+            <div id="bannerPickerWrap" style="display:none;">
+              <div class="bmeta" style="margin-top:10px;">Allianz-Banner (für alle Mitglieder sichtbar) <span id="bannerPickerHint" style="color:#6b6f85;"></span>:</div>
+              <div id="bannerPicker" class="banner-picker"></div>
+            </div>
           </div>
         </div>
 
@@ -2824,9 +2846,11 @@
     { key:'bronze', css:'linear-gradient(135deg,#c9973f,#7a5a18)' },
     { key:'stahl', css:'linear-gradient(135deg,#8496ac,#4f5d70)' },
     { key:'indigo', css:'linear-gradient(135deg,#5a5fc7,#2e3178)' },
-    { key:'sonnenaufgang', css:'linear-gradient(135deg,#f0997b,#d4537e,#7f77dd)' },
-    { key:'nebel', css:'radial-gradient(circle at 30% 30%,#af9ce6,#3c3489)' },
-    { key:'streifen', css:'repeating-linear-gradient(45deg,#378add,#378add 10px,#185fa5 10px,#185fa5 20px)' }
+    // Freischaltbar über den Ausbau der Allianzbasis (allianceBaseLevel(), max. Stufe 10) statt eines
+    // neuen Fortschrittssystems - dieselbe "aus Vorhandenem ableiten"-Regel wie bei den Rahmen-Stufen.
+    { key:'sonnenaufgang', css:'linear-gradient(135deg,#f0997b,#d4537e,#7f77dd)', unlock:4 },
+    { key:'nebel', css:'radial-gradient(circle at 30% 30%,#af9ce6,#3c3489)', unlock:7 },
+    { key:'streifen', css:'repeating-linear-gradient(45deg,#378add,#378add 10px,#185fa5 10px,#185fa5 20px)', unlock:10 }
   ];
   function avatarSvg(key){ const a = AVATAR_DEFS.find(x=>x.key===key); return a ? a.svg : null; }
 
@@ -2839,8 +2863,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.93.0';
+  const VERSION = '8.94.0';
   const PATCHNOTES = [
+    { version:'8.94.0', date:'18.07.2026', changes:[
+      'Allianz-Banner (Runde 2 der Profilbild/Banner-Überarbeitung) ist jetzt ein echter großer Kartenkopf oben im Allianz-Tab statt nur eine Farbe auf dem winzigen 46px-Kreis - mit Grid-Textur, Glühsternen und dem größeren Allianz-Symbol davor, dieselbe Bildsprache wie die neue Profilkarte',
+      'Sterndichte im Banner-Kopf sowie eine sichtbare "Basis Stufe"-Anzeige skalieren automatisch mit der bereits vorhandenen Allianzbasis-Ausbaustufe - keine neue Fortschrittsanzeige nötig',
+      'Neu: 3 der 13 Bannermuster (Sonnenaufgang, Nebel, Streifen) sind ab sofort erst ab Allianzbasis-Stufe 4/7/10 wählbar - für alle Mitglieder inkl. Admins/Offiziere gesperrt, bis die Allianz dort ausgebaut ist, mit Schloss-Symbol und Erklärung beim Versuch, ein gesperrtes Muster zu wählen',
+      'Bugfix: eine alte, fragile Codestelle im Haupt-Tick suchte den Allianz-Untertitel über eine CSS-Klasse statt über seine ID und wäre durch die neue Kopfzeilen-Struktur auf jeden Tick mit einem Fehler abgebrochen - jetzt über die ID adressiert'
+    ]},
     { version:'8.93.0', date:'18.07.2026', changes:[
       'Spielerprofil (Runde 1 der angekündigten Profilbild/Banner-Überarbeitung) grafisch komplett neu: großer "Hero"-Kartenkopf mit animiertem Sternenhintergrund und Farbwolken statt der bisherigen schlichten Kopfzeile, Avatar deutlich größer',
       'Neu: 6-stufiges Rahmen-System um den Avatar (Bronze/Silber/Gold/Platin/Diamant/Legendär), das sich automatisch aus bereits vorhandenen Werten ergibt (Level, Prestige, Aufstiegsanzahl, Bestenlisten-Platz) - kein Freischalt-Fortschritt geht dabei verloren, jeder Bestandsspieler hat rückwirkend die passende Stufe. Platin/Diamant/Legendär bekommen einen zusätzlichen Puls-/Glüh-Effekt am Rahmen',
@@ -12818,6 +12848,7 @@
       { title:'Allianz-Kriegsschub & seltene Materialien', body:'Wochen- und Großprojekte legen bei Abschluss zusätzlich den exklusiven <strong>Allianz-Kriegsschub</strong> ins Inventar (+40% Angriffskraft UND +40% Verteidigung für 30 Minuten - deutlich stärker als jeder reguläre Booster, über keine andere Quelle erhältlich). Aktivierbar im Fortschritt-Tab unter "Inventar". Großprojekte geben zusätzlich eines der seltenen Endgame-Materialien (Antimateriekern, Kristallherz, Alte Technologie) - dieselben Materialien, die u.a. für die Mondzerstörer-Freischaltung benötigt werden.' },
       { title:'Allianz-Flottenanstriche', body:'Jedes abgeschlossene <strong>Großprojekt</strong> vergibt zusätzlich ein zufälliges, noch nicht besessenes Farbschema für deine Flotten-Icons aus einem Pool von vier (Golden, Smaragdgrün, Violett, Kristallweiß) - rein kosmetisch, aber ausschließlich über diesen Weg erhältlich. Aktivierbar im <strong>Fortschritt-Tab</strong> (Bereich "Allianz-Flottenanstriche", unter den Ehrentiteln) - ein aktivierter Anstrich färbt die Schiffs-Icons überall im Spiel um.' },
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
+      { title:'Allianz-Banner', body:'Oben im Allianz-Tab steht ein großer Banner-Kopf mit Allianz-Tag und -Symbol - für alle Mitglieder sichtbar, wählbar nur von Admins/Offizieren aus 13 Mustern (einfarbige Verläufe sowie ein Dreifarb-, ein radialer und ein Streifen-Muster). Sterndichte im Hintergrund und eine kleine "Basis Stufe"-Anzeige richten sich automatisch nach dem Ausbau der Allianzbasis. Die drei aufwendigeren Muster (Dreifarb-Verlauf, radialer Verlauf, Streifen) sind erst ab Allianzbasis-Stufe 4/7/10 wählbar - vorher erscheinen sie mit Schloss-Symbol gesperrt, auch für Admins/Offiziere.' },
       { title:'Rollen: Admin, Offizier, Mitglied', body:'Wer eine Allianz zuerst gründet, wird automatisch Admin. Nur Admins dürfen: die Allianz-Einstellungen (Beitrittsmodus, Beschreibung, Mitgliederlimit) ändern, jemanden zum Admin oder Offizier ernennen oder zurückstufen (auch andere Admins zu Offizier/Mitglied), und die Allianz auflösen. <strong>Offiziere</strong> dürfen zusätzlich zu normalen Mitgliedern: den Banner (Farbe) ändern, normale Mitglieder befördern/entfernen und über Bewerbungen entscheiden - aber nicht die Einstellungen ändern oder Admins/andere Offiziere anrühren. Diese Beschränkungen werden serverseitig durchgesetzt, nicht nur in der Anzeige versteckt - ein Versuch ohne die nötigen Rechte schlägt immer fehl, egal wie er ausgelöst wird.' },
       { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz startet mit einem Mitgliederlimit von <strong>10</strong>. Höher geht es nur über die Allianz-Forschung "Allianz-Expansion" (5 Stufen, in der Allianz-Forschung, dieselbe Kette wie andere Allianz-Techs) - bis zu 50 bei voller Ausbaustufe. Das Limit ergibt sich automatisch aus der erreichten Forschungsstufe, es lässt sich nicht manuell einstellen. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
       { title:'Allianz auflösen', body:'Nur Admins können eine Allianz unwiderruflich auflösen (Administration-Bereich) - alle Mitglieder werden entfernt, der Tag wird danach für eine Neugründung durch irgendjemanden frei. Der letzte verbliebene Admin kann die Allianz nicht einfach verlassen, solange noch andere Mitglieder da sind (das würde die Allianz dauerhaft führungslos zurücklassen) - stattdessen zuerst jemanden befördern oder die Allianz auflösen.' },
@@ -13251,6 +13282,11 @@
   async function setAllianceBanner(key){
     const tag = myAllianceTag();
     if (!tag) return;
+    const def = BANNER_DEFS.find(b=>b.key===key);
+    if (def && def.unlock && allianceBaseLevel() < def.unlock){
+      pushToast('Dieses Banner-Muster schaltet sich erst ab Allianzbasis-Stufe '+def.unlock+' frei (aktuell Stufe '+allianceBaseLevel()+').', 'ti-lock', 'warn');
+      return;
+    }
     currentAllianceBanner = key;
     try { await storageSet('alliance:'+tag+':banner', key, true); logAllianceAudit('banner_change', BANNER_DEFS.find(b=>b.key===key)?.key||key); } catch(e){}
     renderBannerPicker();
@@ -13258,24 +13294,53 @@
   function renderBannerPicker(){
     const wrap = document.getElementById('bannerPickerWrap');
     const picker = document.getElementById('bannerPicker');
-    const avatarEl = document.getElementById('allianceAvatar');
+    const heroBanner = document.getElementById('allianceHeroBanner');
+    const levelPill = document.getElementById('allianceHeroLevelPill');
     if (!wrap || !picker) return;
     const tag = myAllianceTag();
     wrap.style.display = tag ? 'block' : 'none';
     // Admins UND Offiziere dürfen den Banner ändern (serverseitig durchgesetzt - siehe
     // checkAllianceKeyPermission im Backend). Normale Mitglieder sehen den aktuellen Banner nur noch,
     // ohne anklickbare Buttons, damit kein Klick ins Leere läuft (403) und sofort klar ist, warum
-    // nichts passiert.
+    // nichts passiert. Muster mit .unlock (siehe BANNER_DEFS) bleiben zusätzlich für ALLE gesperrt,
+    // bis die Allianzbasis die nötige Stufe erreicht hat - auch für Admins/Offiziere.
     const amIOfficerPlus = state.player.allianceRole === 'admin' || state.player.allianceRole === 'officer';
+    const baseLvl = allianceBaseLevel();
     if (tag){
       const hint = document.getElementById('bannerPickerHint');
       if (hint) hint.textContent = amIOfficerPlus ? '' : '(nur Admins/Offiziere können den Banner ändern)';
-      picker.innerHTML = BANNER_DEFS.map(b => `<button class="banner-option ${currentAllianceBanner===b.key?'active':''}" data-banner="${b.key}" style="background:${b.css}; ${amIOfficerPlus?'':'cursor:default; opacity:'+(currentAllianceBanner===b.key?'1':'0.4')+';'}" ${amIOfficerPlus?'':'disabled'}></button>`).join('');
+      picker.innerHTML = BANNER_DEFS.map(b => {
+        const locked = b.unlock && baseLvl < b.unlock;
+        const cls = ['banner-option', currentAllianceBanner===b.key?'active':'', locked?'locked':''].filter(Boolean).join(' ');
+        const title = locked ? `Ab Allianzbasis-Stufe ${b.unlock} (aktuell ${baseLvl})` : '';
+        const dim = (!amIOfficerPlus && currentAllianceBanner!==b.key) ? 'opacity:0.4;' : '';
+        return `<button class="${cls}" data-banner="${b.key}" title="${title}" style="background:${b.css}; ${amIOfficerPlus?'':'cursor:default;'} ${dim}" ${amIOfficerPlus?'':'disabled'}></button>`;
+      }).join('');
       if (amIOfficerPlus) document.querySelectorAll('[data-banner]').forEach(btn => btn.addEventListener('click', () => setAllianceBanner(btn.getAttribute('data-banner'))));
     }
-    if (avatarEl){
+    if (heroBanner){
       const b = BANNER_DEFS.find(x=>x.key===currentAllianceBanner);
-      avatarEl.style.background = b ? b.css : 'rgba(212,83,126,0.25)';
+      heroBanner.style.background = b ? b.css : 'linear-gradient(160deg,#20263f,#0d1020)';
+      heroBanner.querySelectorAll('.alliance-hero-star').forEach(s=>s.remove());
+      if (tag){
+        const starCount = Math.max(3, Math.min(18, 3 + Math.round(baseLvl*1.5)));
+        for (let i=0;i<starCount;i++){
+          const s = document.createElement('div');
+          s.className = 'alliance-hero-star';
+          s.style.left = (Math.random()*94+3)+'%';
+          s.style.top = (Math.random()*70+6)+'%';
+          s.style.opacity = (0.35+Math.random()*0.5).toFixed(2);
+          heroBanner.appendChild(s);
+        }
+      }
+    }
+    if (levelPill){
+      if (tag && state.allianceBase && state.allianceBase.foundedAt){
+        levelPill.style.display = 'block';
+        levelPill.textContent = 'Basis Stufe '+baseLvl;
+      } else {
+        levelPill.style.display = 'none';
+      }
     }
   }
   // Territorien (überarbeitet, siehe TODO-Merkzettel): kontrolliert wird ein System nur noch, wenn
@@ -14522,6 +14587,7 @@
       const r = await storageGet('alliance:'+tag+':base', true);
       state.allianceBase = (r && r.value) ? JSON.parse(r.value) : null;
       renderAllianceBaseBox();
+      renderBannerPicker();
       // Reihenfolge wichtig: refreshAllianceMusterAttack() kann HIER erst die neue Verband-Attacke in
       // alliance:<TAG>:basewar schreiben (falls die Ankunft gerade jetzt aufgelöst wird) - erst DANACH
       // gerufen sieht loadAllianceBaseWar()/processIncomingBaseAttacks() den frischen Eintrag noch in
@@ -24564,9 +24630,10 @@
     updateExpeditionBadge();
     if (document.activeElement !== document.getElementById('allianceInput')) document.getElementById('allianceInput').value = state.player.allianceTag || '';
     const allianceNameEl = document.getElementById('allianceNameDisplay');
-    if (allianceNameEl){
+    const allianceMetaEl = document.getElementById('allianceMetaLine');
+    if (allianceNameEl && allianceMetaEl){
       const tag = myAllianceTag();
-      allianceNameEl.parentElement.querySelector('.bmeta').textContent = tag ? 'Gemeinsame Technologien mit allen Mitgliedern des Tags' : 'Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen';
+      allianceMetaEl.textContent = tag ? 'Gemeinsame Technologien mit allen Mitgliedern des Tags' : 'Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen';
       allianceNameEl.textContent = tag ? '['+tag+']' : 'Keine Allianz';
     }
 
