@@ -2762,8 +2762,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.89.1';
+  const VERSION = '8.90.0';
   const PATCHNOTES = [
+    { version:'8.90.0', date:'18.07.2026', changes:[
+      'Sicherheitshärtung vor mehr Spielern: eine zentrale escapeHtml()-Funktion eingeführt und an weit über 30 Stellen nachgerüstet, an denen von ANDEREN Spielern frei wählbarer Text (Kommandantenname, Allianz-Tag/-Beschreibung, Chat, private Nachrichten, Melde-Grund, Kampfbericht-Namen u.v.m.) bisher ungefiltert in die Seite eingefügt wurde - unter anderem log()/pushToast() (die zentrale Melde-Funktion für praktisch alle Spielmeldungen) sowie das Admin-Melde-Panel selbst',
+      'Betrifft nur die Darstellung, keine Spielmechanik - wer bisher normale Namen/Texte verwendet hat, bemerkt keinen Unterschied'
+    ]},
     { version:'8.89.1', date:'18.07.2026', changes:[
       'Tagesaufgaben-Anzeige (Spieler-Wunsch, revidiert): abgeholte Aufgaben werden wieder ausgeblendet statt abgehakt stehen zu bleiben - sind alle erledigt, zeigt eine eigene Banner-Pille die Serienlänge bis zum nächsten Tag'
     ]},
@@ -9373,6 +9377,17 @@
     if (n >= 1000) return (n/1000).toFixed(1)+'k';
     return Math.floor(n*10)/10;
   }
+  // Sicherheitsnetz gegen gespeichertes XSS (Spieler-Wunsch, vor mehr Spielern nachgezogen): zentrale
+  // Escape-Funktion für JEDEN von anderen Spielern gesetzten Freitext, der per innerHTML dargestellt
+  // wird (Kommandantenname, Allianz-Tag/-Beschreibung, Meldungsgrund, Kampfbericht-Namen, ...) - vorher
+  // wurde das an einzelnen Stellen ad-hoc (und uneinheitlich) mit .replace(/</g,...) gemacht, an vielen
+  // anderen Stellen gar nicht. Escaped alle 5 HTML-Sonderzeichen, damit der String sowohl als Textinhalt
+  // als auch innerhalb eines doppelt ODER einfach gequoteten Attributs sicher ist.
+  function escapeHtml(str){
+    return String(str===undefined||str===null?'':str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
   // Holt ausstehende Belohnungen (z.B. Bugfix-Dankeschön vom Team) ab und schreibt sie in den
   // eigenen Spielstand. Bewusst über den normalen, authentifizierten Speicherzyklus statt einer
   // direkten Server-seitigen Änderung des Spielstands - so gibt es keinen Konflikt mit einem
@@ -9400,8 +9415,12 @@
   // Meldungen verwendet wird, nicht speziell fuer Warnungen - eine Icon->Typ-Zuordnung waere also an
   // vielen Stellen falsch gewesen. Stattdessen: Infrastruktur fertig, einzelne eindeutige
   // Aufrufstellen (siehe declareAllianceWar) schrittweise nachgetragen.
+  // msg wird IMMER escaped, bevor es in log()/pushToast() innerHTML landet - kein Aufrufer im ganzen
+  // Spiel übergibt hier absichtlich echtes HTML (geprüft), viele Aufrufer bauen msg aber aus
+  // Spieler-/Allianznamen zusammen ("Angriff auf X", "Koordinierter Angriff gegen [TAG]", ...), die von
+  // ANDEREN Spielern gesetzt werden. Zentral hier zu escapen deckt auch künftige Aufrufer automatisch ab.
   function log(msg, icon, type){
-    document.getElementById('log').innerHTML = (icon?`<i class="ti ${icon}" aria-hidden="true"></i>`:'') + msg;
+    document.getElementById('log').innerHTML = (icon?`<i class="ti ${icon}" aria-hidden="true"></i>`:'') + escapeHtml(msg);
     pushToast(msg, icon, type);
   }
   function pushToast(msg, icon, type){
@@ -9409,7 +9428,7 @@
     if (container){
       const el = document.createElement('div');
       el.className = 'toast' + (type ? ' toast-'+type : '');
-      el.innerHTML = `${icon?`<i class="ti ${icon}" aria-hidden="true"></i>`:''}<span>${msg}</span>`;
+      el.innerHTML = `${icon?`<i class="ti ${icon}" aria-hidden="true"></i>`:''}<span>${escapeHtml(msg)}</span>`;
       container.appendChild(el);
       requestAnimationFrame(()=> el.classList.add('show'));
       setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>{ if (el.parentNode) el.parentNode.removeChild(el); }, 400); }, 4200);
@@ -11042,11 +11061,11 @@
       return `
         <div class="card-row" style="flex-direction:column; align-items:stretch;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span class="bname"><i class="ti ti-user" aria-hidden="true"></i> ${m.fromName}</span>
+            <span class="bname"><i class="ti ti-user" aria-hidden="true"></i> ${escapeHtml(m.fromName)}</span>
             <span class="bmeta">${when}</span>
           </div>
-          <div class="bmeta" style="margin-top:4px; color:#c7cbe0;">${m.text.replace(/</g,'&lt;')}</div>
-          ${m.fromUserId ? `<button data-reply-msg="${m.fromUserId}" data-reply-name="${(m.fromName||'').replace(/"/g,'')}" style="align-self:flex-start; margin-top:6px; font-size:10.5px; padding:4px 9px;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:3px;"></i>Antworten</button>` : ''}
+          <div class="bmeta" style="margin-top:4px; color:#c7cbe0;">${escapeHtml(m.text)}</div>
+          ${m.fromUserId ? `<button data-reply-msg="${m.fromUserId}" data-reply-name="${escapeHtml(m.fromName||'')}" style="align-self:flex-start; margin-top:6px; font-size:10.5px; padding:4px 9px;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:3px;"></i>Antworten</button>` : ''}
         </div>
       `;
     }).join('');
@@ -11064,7 +11083,7 @@
     const row = document.getElementById('messageComposeRow');
     const targetLabel = document.getElementById('messageComposeTarget');
     const textEl = document.getElementById('messageComposeText');
-    if (targetLabel) targetLabel.innerHTML = '<i class="ti ti-mail" aria-hidden="true"></i> Nachricht an '+(toName||'Spieler');
+    if (targetLabel) targetLabel.innerHTML = '<i class="ti ti-mail" aria-hidden="true"></i> Nachricht an '+escapeHtml(toName||'Spieler');
     if (textEl) textEl.value = '';
     if (row){ row.style.display = 'flex'; setTimeout(() => row.scrollIntoView({ behavior:'smooth', block:'center' }), 150); }
   }
@@ -11414,13 +11433,13 @@
       listEl.innerHTML = reports.map(r => `
         <div class="card-row" style="flex-direction:column; align-items:stretch;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span class="bname">${r.targetName}</span>
+            <span class="bname">${escapeHtml(r.targetName)}</span>
             ${r.targetBanned ? '<span class="lvl-pill" style="background:rgba(226,75,74,0.18); color:#e24b4a;">Gesperrt</span>' : ''}
           </div>
-          <div class="bmeta" style="margin-bottom:6px;">Gemeldet von ${r.reporterName} · ${formatRelativeTime(r.time)}</div>
-          <div style="font-size:12.5px; color:#c7cbe0; margin-bottom:8px;">${r.reason}</div>
+          <div class="bmeta" style="margin-bottom:6px;">Gemeldet von ${escapeHtml(r.reporterName)} · ${formatRelativeTime(r.time)}</div>
+          <div style="font-size:12.5px; color:#c7cbe0; margin-bottom:8px;">${escapeHtml(r.reason)}</div>
           <div style="display:flex; gap:6px;">
-            <button data-admin-ban="${r.targetName}" data-currently-banned="${r.targetBanned?'1':'0'}" style="flex:1; font-size:11px;">${r.targetBanned ? 'Entsperren' : 'Sperren'}</button>
+            <button data-admin-ban="${escapeHtml(r.targetName)}" data-currently-banned="${r.targetBanned?'1':'0'}" style="flex:1; font-size:11px;">${r.targetBanned ? 'Entsperren' : 'Sperren'}</button>
             <button data-admin-dismiss="${r.id}" style="flex:1; font-size:11px;">Meldung entfernen</button>
           </div>
         </div>`).join('');
@@ -11816,7 +11835,7 @@
       attackerWins = r.result === 'defended';
     } else {
       left = { label: 'Deine Flotte', fleet: {...(r.fleet||{})}, losses: {...(r.ownLostShips||{})}, accentColor: null };
-      right = { label: r.targetName||'Gegner', abstractIcon:'ti-user', power: r.defensePower, buildings:null, fleet:null, losses:{} };
+      right = { label: escapeHtml(r.targetName)||'Gegner', abstractIcon:'ti-user', power: r.defensePower, buildings:null, fleet:null, losses:{} };
       attackerWins = r.result === 'win';
     }
     // Waffen-Pools: nur Waffen zeigen, die zur tatsächlich vorhandenen Ausrüstung passen (Schiffe
@@ -12754,12 +12773,12 @@
       const won = r.result === 'win';
       let title = '', body = '', actionsHtml = '';
       if (r.type === 'attack-sent'){
-        title = (won?'Sieg':'Niederlage')+' – Angriff auf '+r.targetName;
+        title = (won?'Sieg':'Niederlage')+' – Angriff auf '+escapeHtml(r.targetName);
         body = 'Deine Angriffspunkte: '+r.attackPower+' vs. Verteidigungspunkte: '+r.defensePower;
         if (won && r.stolen) body += '<br>Erbeutet: '+rewardHtml(r.stolen);
         if (r.defenseBefore) body += '<br>Verteidigung des Ziels: '+defenseBreakdownHtml(r.defenseBefore, r.destroyedBuilding);
       } else if (r.type === 'attack-received'){
-        title = (won?'Erfolgreich abgewehrt':'Überfallen')+' – von '+r.attackerName;
+        title = (won?'Erfolgreich abgewehrt':'Überfallen')+' – von '+escapeHtml(r.attackerName);
         body = 'Angreifer-Angriffspunkte: '+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
         body += '<br>Angegriffen mit: '+fleetBreakdownHtml(r.fleet);
         if (r.defenseBefore) body += '<br>Deine Verteidigung: '+defenseBreakdownHtml(r.defenseBefore, r.destroyedBuilding);
@@ -12783,7 +12802,7 @@
           }
         }
       } else if (r.type === 'alliance-base-attack'){
-        title = (r.result==='destroyed'?'💥 ':'')+'Angriff auf die Allianzbasis von ['+(r.targetTag||'?')+']';
+        title = (r.result==='destroyed'?'💥 ':'')+'Angriff auf die Allianzbasis von ['+escapeHtml(r.targetTag||'?')+']';
         body = '<strong>'+(r.result==='destroyed' ? 'DIE BASIS WURDE ZERSTÖRT! Schaden: '+fmt(r.damage||0)+'.' : (r.result==='win' ? 'Treffer! '+fmt(r.damage||0)+' Schaden an der Basis (Hülle danach: '+fmt(r.hullAfter||0)+'/'+fmt(r.hullMax||0)+').' : 'Abgewehrt - die Verteidigung ('+fmt(r.defensePower||0)+') hielt stand (Erfolgschance ~'+(r.chancePct||0)+'%).'))+'</strong>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt')+' · Angriffskraft: '+fmt(r.attackPower||0)+' vs. Verteidigung '+fmt(r.defensePower||0);
         body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
@@ -12794,7 +12813,7 @@
         }
       } else if (r.type === 'alliance-base-defense'){
         title = (r.result==='destroyed'?'💥 ':'⚔ ')+'Angriff auf EURE Allianzbasis';
-        body = '<strong>'+(r.result==='destroyed' ? 'Die Allianzbasis wurde von ['+(r.attackerTag||'??')+'] ZERSTÖRT! Alle Boni sind bis zur Reparatur deaktiviert.' : '['+(r.attackerTag||'??')+'] hat die Allianzbasis angegriffen - '+fmt(r.damage||0)+' Hüllenschaden.')+'</strong>';
+        body = '<strong>'+(r.result==='destroyed' ? 'Die Allianzbasis wurde von ['+escapeHtml(r.attackerTag||'??')+'] ZERSTÖRT! Alle Boni sind bis zur Reparatur deaktiviert.' : '['+escapeHtml(r.attackerTag||'??')+'] hat die Allianzbasis angegriffen - '+fmt(r.damage||0)+' Hüllenschaden.')+'</strong>';
         if (r.lostText) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Deine stationierten Verluste: '+r.lostText;
         body += '<br>Details und Reparatur im Allianz-Tab.';
       } else if (r.type === 'pirate-debris-raid'){
@@ -12878,9 +12897,9 @@
           body += debrisReportLine(r.debris);
         }
       } else if (r.type === 'player-attack'){
-        title = (r.warTag?'⚔ ':'')+'Angriff auf Spieler '+r.targetName;
+        title = (r.warTag?'⚔ ':'')+'Angriff auf Spieler '+escapeHtml(r.targetName);
         body = '<strong>'+(r.result==='win' ? 'Erfolgreich! Angriffskraft ('+r.attackPower+') war überlegen (vs. Verteidigungspunkte '+r.defensePower+').' : 'Gescheitert. Angriffskraft ('+r.attackPower+') reichte nicht (vs. Verteidigungspunkte '+r.defensePower+').')+'</strong>';
-        if (r.warTag) body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+r.warTag+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
+        if (r.warTag) body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
         if (r.simulated) body += '<br><span class="bmeta">Simuliertes Duell (kein eigener Server aktiv) – kein echter Ressourcenverlust beim Gegner.</span>';
         if (r.loot){
@@ -12893,7 +12912,7 @@
           body += debrisReportLine(r.debris);
         }
       } else if (r.type === 'spy-report'){
-        title = 'Aufklärung: '+r.targetName;
+        title = 'Aufklärung: '+escapeHtml(r.targetName);
         const shipLine = Object.keys(SHIP_SCORE_WEIGHTS)
           .filter(k => (r.ships && r.ships[k]||0) > 0).map(k => (r.ships[k])+'x '+shipDisplayName(k)).join(', ') || 'keine bekannten Schiffe';
         body = '<strong>Flotte aufgedeckt:</strong> '+shipLine;
@@ -12923,8 +12942,8 @@
         if (r.targetId){
           actionsHtml = `
             <div style="display:flex; gap:6px; margin-top:8px;">
-              <button data-spy-again="${r.targetId}" data-spy-again-name="${(r.targetName||'').replace(/"/g,'')}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-target" aria-hidden="true" style="margin-right:3px;"></i>Erneut spionieren</button>
-              <button data-goto-attack="${r.targetId}" data-goto-attack-name="${(r.targetName||'').replace(/"/g,'')}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>Direkt Angriff</button>
+              <button data-spy-again="${r.targetId}" data-spy-again-name="${escapeHtml(r.targetName||'')}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-target" aria-hidden="true" style="margin-right:3px;"></i>Erneut spionieren</button>
+              <button data-goto-attack="${r.targetId}" data-goto-attack-name="${escapeHtml(r.targetName||'')}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>Direkt Angriff</button>
             </div>
           `;
         }
@@ -13200,11 +13219,11 @@
         const full = g.members >= g.memberLimit;
         const joinTitle = g.tag===myTag ? 'Deine Allianz' : full ? 'Mitgliederlimit erreicht' : g.joinMode==='application' ? 'Klicken zum Bewerben (nur auf Bewerbung)' : 'Klicken zum Beitreten';
         return `
-        <div class="rank-row ${g.tag===myTag?'me':''}" data-join-alliance="${g.tag}" style="cursor:${g.tag===myTag?'default':'pointer'};" title="${joinTitle}${g.description?' · '+g.description:''}">
+        <div class="rank-row ${g.tag===myTag?'me':''}" data-join-alliance="${escapeHtml(g.tag)}" style="cursor:${g.tag===myTag?'default':'pointer'};" title="${escapeHtml(joinTitle)}${g.description?' · '+escapeHtml(g.description):''}">
           <div style="display:flex; align-items:center; gap:10px;">
             <span class="rank-num">${i+1}</span>
             <i class="ti ti-flag" aria-hidden="true" style="color:#f4c0d1;"></i>
-            <span style="font-weight:500;">[${g.tag}]</span>
+            <span style="font-weight:500;">[${escapeHtml(g.tag)}]</span>
             <i class="ti ${g.joinMode==='application'?'ti-lock':'ti-door-exit'}" aria-hidden="true" style="color:#6b6f85; font-size:12px;" title="${g.joinMode==='application'?'Nur auf Bewerbung':'Offen für alle'}"></i>
             ${i===0?'<span class="lvl-pill" title="Vormachtstellung: +2% Produktion für Mitglieder"><i class="ti ti-award" aria-hidden="true"></i> Vormacht</span>':''}
             ${g.tag===myTag?'<span class="lvl-pill">deine Allianz</span>':''}
@@ -13484,7 +13503,7 @@
         <div class="rank-row">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <i class="ti ti-user" aria-hidden="true"></i>
-            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.name||'Unbekannt'}</span>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(a.name||'Unbekannt')}</span>
           </div>
           <div style="display:flex; gap:6px;">
             <button data-accept-app="${a.playerId}" style="font-size:10px; padding:5px 8px; background:rgba(93,202,165,0.2);" title="Annehmen"><i class="ti ti-check" aria-hidden="true"></i></button>
@@ -13544,7 +13563,8 @@
       box.innerHTML = entries.map(e => {
         const when = new Date(e.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
         const verb = actionVerb[e.action];
-        const text = verb ? (e.actorName||'Jemand')+' hat '+(e.targetName||'')+' '+verb : (e.actorName||'Jemand')+' '+(actionLabels[e.action]||e.action)+' '+(e.targetName||'');
+        const actorName = escapeHtml(e.actorName||'Jemand'), targetName = escapeHtml(e.targetName||'');
+        const text = verb ? actorName+' hat '+targetName+' '+verb : actorName+' '+(actionLabels[e.action]||e.action)+' '+targetName;
         return `<div class="bmeta" style="padding:6px 0; border-bottom:0.5px solid rgba(255,255,255,0.06);">${text} <span style="color:#6b6f85;">· ${when}</span></div>`;
       }).join('');
     } catch(e){ box.innerHTML = `<div class="bmeta">Protokoll aktuell nicht verfügbar.</div>`; }
@@ -13675,7 +13695,7 @@
         <div class="rank-row ${m.playerId===state.player.id?'me':''}">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <i class="ti ${icon}" aria-hidden="true" style="color:${color};"></i>
-            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.name||'Unbekannt'}</span>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(m.name||'Unbekannt')}</span>
             <span class="lvl-pill" style="${m.role!=='member'?'background:'+color+'40; color:'+color+';':''}">${roleLabel[m.role]||'Mitglied'}</span>
           </div>
           ${actions}
@@ -13770,18 +13790,18 @@
         try { const r2 = await storageGet('alliance:'+enemyTag+':warscore:'+tag, true); theirScore = r2 && r2.value ? (JSON.parse(r2.value).score||0) : 0; } catch(e){}
         const top = await loadWarTopContributors(tag, enemyTag);
         const topHtml = top.length
-          ? `<div class="bmeta" style="margin-top:4px; padding-left:24px;"><i class="ti ti-medal" aria-hidden="true" style="color:#fac775; margin-right:3px;"></i>Top: ${top.map((t,i)=>(i+1)+'. '+t.name+' ('+t.score+')').join(' · ')}</div>`
+          ? `<div class="bmeta" style="margin-top:4px; padding-left:24px;"><i class="ti ti-medal" aria-hidden="true" style="color:#fac775; margin-right:3px;"></i>Top: ${top.map((t,i)=>(i+1)+'. '+escapeHtml(t.name)+' ('+t.score+')').join(' · ')}</div>`
           : '';
         rows.push(`
           <div class="rank-row" style="flex-direction:column; align-items:stretch;">
             <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
               <div style="display:flex; align-items:center; gap:10px;">
                 <i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i>
-                <span style="font-weight:500;">Krieg gegen [${enemyTag}]</span>
+                <span style="font-weight:500;">Krieg gegen [${escapeHtml(enemyTag)}]</span>
               </div>
               <div style="display:flex; gap:12px; align-items:center;">
                 <span class="bmeta">${myScore} : ${theirScore}</span>
-                ${amIAdmin ? `<button data-make-peace="${enemyTag}" style="font-size:10px; padding:5px 8px;"><i class="ti ti-flag" aria-hidden="true"></i> Frieden</button>` : ''}
+                ${amIAdmin ? `<button data-make-peace="${escapeHtml(enemyTag)}" style="font-size:10px; padding:5px 8px;"><i class="ti ti-flag" aria-hidden="true"></i> Frieden</button>` : ''}
               </div>
             </div>
             ${topHtml}
@@ -13871,7 +13891,7 @@
       box.innerHTML = msgs.slice(-25).map(m => `
         <div style="padding:6px 0; border-top:0.5px solid rgba(255,255,255,0.06);">
           <div style="display:flex; justify-content:space-between; gap:8px;">
-            <span style="font-size:11.5px; font-weight:500; color:#c3bef5;">${(m.authorName||'Unbekannt').replace(/</g,'')}</span>
+            <span style="font-size:11.5px; font-weight:500; color:#c3bef5;">${escapeHtml(m.authorName||'Unbekannt')}</span>
             <span class="bmeta">${formatRelativeTime(m.ts)}</span>
           </div>
           <div style="font-size:12.5px; color:#e2e4f0; margin-top:2px;">${(m.text||'').replace(/</g,'&lt;')}</div>
@@ -13908,7 +13928,7 @@
       box.innerHTML = msgs.slice(-30).map(m => `
         <div style="padding:6px 0; border-top:0.5px solid rgba(255,255,255,0.06);">
           <div style="display:flex; justify-content:space-between; gap:8px;">
-            <span style="font-size:11.5px; font-weight:500; color:#5dcaa5;">${(m.authorName||'Unbekannt').replace(/</g,'')}${m.authorAllianceTag?' <span style="color:#9296ac; font-weight:400;">['+m.authorAllianceTag+']</span>':''}</span>
+            <span style="font-size:11.5px; font-weight:500; color:#5dcaa5;">${escapeHtml(m.authorName||'Unbekannt')}${m.authorAllianceTag?' <span style="color:#9296ac; font-weight:400;">['+escapeHtml(m.authorAllianceTag)+']</span>':''}</span>
             <span class="bmeta">${formatRelativeTime(m.ts)}</span>
           </div>
           <div style="font-size:12.5px; color:#e2e4f0; margin-top:2px;">${(m.text||'').replace(/</g,'&lt;')}</div>
@@ -14549,7 +14569,7 @@
     const medals = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
     body.innerHTML = cache.list.map((e,i) => `
       <div class="card-row" style="${e.id===state.player.id?'border-color:#c3bef5;':''}">
-        <div class="left"><span style="width:26px; display:inline-block; text-align:center; flex-shrink:0;">${i<3?medals[i]:(i+1)+'.'}</span><span class="bname" style="font-size:12.5px;">${e.name}</span></div>
+        <div class="left"><span style="width:26px; display:inline-block; text-align:center; flex-shrink:0;">${i<3?medals[i]:(i+1)+'.'}</span><span class="bname" style="font-size:12.5px;">${escapeHtml(e.name)}</span></div>
         <span class="lvl-pill">${fmt(e.total)}</span>
       </div>
     `).join('');
@@ -14587,7 +14607,7 @@
       return;
     }
     const medals = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
-    const top3Html = cache.list.slice(0,3).map((e,i) => `<div class="fp-lb-row ${e.id===state.player.id?'me':''}"><span class="fp-lb-rank">${medals[i]}</span><span class="fp-lb-name">${e.name}</span><span>${fmt(e.total)}</span></div>`).join('');
+    const top3Html = cache.list.slice(0,3).map((e,i) => `<div class="fp-lb-row ${e.id===state.player.id?'me':''}"><span class="fp-lb-rank">${medals[i]}</span><span class="fp-lb-name">${escapeHtml(e.name)}</span><span>${fmt(e.total)}</span></div>`).join('');
     const myIdx = cache.list.findIndex(e=>e.id===state.player.id);
     const myTotal = myIdx>=0 ? cache.list[myIdx].total : 0;
     const myPct = cache.totalAll>0 ? Math.round(myTotal/cache.totalAll*100) : 0;
@@ -15801,7 +15821,7 @@
             <button data-contrib-btn="${t.key}" style="font-size:11px; padding:6px 10px;">Beitragen</button>
           </div>
           <div class="bmeta" style="margin-top:2px;">${miniResIcon(t.resKey)} Dein Beitrag bisher gesamt: ${fmt(myContrib)} ${rd.label}</div>
-          ${topDonors.length ? `<div class="bmeta" style="margin-top:4px;"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i> Größte Spender: ${topDonors.map((d,i)=>(i+1)+'. '+d.name+' ('+fmt(d.amt)+')').join(' · ')}</div>` : ''}
+          ${topDonors.length ? `<div class="bmeta" style="margin-top:4px;"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i> Größte Spender: ${topDonors.map((d,i)=>(i+1)+'. '+escapeHtml(d.name)+' ('+fmt(d.amt)+')').join(' · ')}</div>` : ''}
         `;
       }
       s += `</div>`;
@@ -15865,7 +15885,7 @@
               <button data-contrib-btn="${t.key}" style="font-size:11px; padding:6px 10px;">Beitragen</button>
             </div>
             <div class="bmeta" style="margin-top:2px;">${miniResIcon(t.resKey)} Dein Beitrag bisher: ${fmt(myContrib)} ${rd.label}</div>
-            ${topDonors.length ? `<div class="bmeta" style="margin-top:4px;"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i> Größte Spender: ${topDonors.map((d,i)=>(i+1)+'. '+d.name+' ('+fmt(d.amt)+')').join(' · ')}</div>` : ''}
+            ${topDonors.length ? `<div class="bmeta" style="margin-top:4px;"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i> Größte Spender: ${topDonors.map((d,i)=>(i+1)+'. '+escapeHtml(d.name)+' ('+fmt(d.amt)+')').join(' · ')}</div>` : ''}
           `;
         }
       }
@@ -16131,8 +16151,8 @@
         <div style="display:flex; gap:14px; align-items:center;">
           <svg viewBox="-30 -30 60 60" width="84" height="84" style="flex-shrink:0;">${allianceBaseModelSvg(Math.max(1,lvl), 'Prev')}</svg>
           <div style="flex:1;">
-            <div class="bname">Allianzbasis [${tag}] <span class="lvl-pill" style="${lvl>=10?'background:rgba(250,199,117,0.25); color:#fac775;':''}">Stufe ${lvl}${maxed?' · MAX':''}</span></div>
-            <div class="bmeta"><i class="ti ti-planet" aria-hidden="true"></i> System: <strong style="color:#fff;">${sys?sys.name:base.sector}</strong> (dauerhaft) · gegründet von ${base.foundedByName||'Admin'} · <a href="#" id="abJumpMapBtn" style="color:#c3bef5;">auf der Karte anzeigen</a></div>
+            <div class="bname">Allianzbasis [${escapeHtml(tag)}] <span class="lvl-pill" style="${lvl>=10?'background:rgba(250,199,117,0.25); color:#fac775;':''}">Stufe ${lvl}${maxed?' · MAX':''}</span></div>
+            <div class="bmeta"><i class="ti ti-planet" aria-hidden="true"></i> System: <strong style="color:#fff;">${sys?sys.name:base.sector}</strong> (dauerhaft) · gegründet von ${escapeHtml(base.foundedByName||'Admin')} · <a href="#" id="abJumpMapBtn" style="color:#c3bef5;">auf der Karte anzeigen</a></div>
             ${allianceBaseDestroyed() ? `<div class="bmeta" style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> ZERSTÖRT - alle Boni deaktiviert, bis die Reparatur abgeschlossen ist (siehe unten).</div>` : (lvl>0 ? `<div class="bmeta" style="color:#5dcaa5;">Aktive Boni: +${lvl + (lvl>=10?4:0)}% Produktion & Verteidigung${allianceBaseStorageBonus()>0?' · +'+Math.round(allianceBaseStorageBonus()*100)+'% Lager':''}${allianceBaseBuildTimeMult()<1?' · -'+Math.round((1-allianceBaseBuildTimeMult())*100)+'% Bauzeit':''}${allianceBaseResearchTimeMult()<1?' · -'+Math.round((1-allianceBaseResearchTimeMult())*100)+'% Forschungszeit':''}${lvl>=4?' · -10% Flugzeit ins Basis-System':''}${lvl>=8?' · -8% Treibstoff':''}</div>` : `<div class="bmeta">Noch im Aufbau zur ersten Stufe.</div>`)}
           </div>
         </div>
@@ -16264,7 +16284,7 @@
       html += `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; background:rgba(226,75,74,0.12); border-color:rgba(226,75,74,0.5); margin-bottom:0.75rem;">
           <div class="bname" style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> WARNUNG! Eure Allianzbasis wird angegriffen</div>
-          <div class="bmeta">Angreifende Allianz: <strong style="color:#fff;">[${incoming.attackerTag}]</strong> · geschätzte Flottenstärke: ${fmt(incoming.totalShips||0)} Schiffe</div>
+          <div class="bmeta">Angreifende Allianz: <strong style="color:#fff;">[${escapeHtml(incoming.attackerTag)}]</strong> · geschätzte Flottenstärke: ${fmt(incoming.totalShips||0)} Schiffe</div>
           <div class="bmeta">Ankunft in: <strong style="color:#e24b4a;">${fmtDuration(remain/1000)}</strong></div>
           <div class="bmeta">Entsendet jetzt Verteidigungsflotten und spendet Ressourcen zur Reparatur/Verstärkung weiter unten bei der Allianzbasis!</div>
         </div>`;
@@ -16277,7 +16297,7 @@
         const res = doc.result||{};
         html += `
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:4px; margin-bottom:0.75rem;">
-            <div class="bname">Letzter koordinierter Angriff gegen [${doc.targetTag}]</div>
+            <div class="bname">Letzter koordinierter Angriff gegen [${escapeHtml(doc.targetTag)}]</div>
             ${res.noParticipants ? `<div class="bmeta">Niemand hat sich der Sammelphase angeschlossen - der Angriff ist verfallen.</div>` : `
               <div class="bmeta">${res.destroyed?'<span style="color:#e24b4a;">Basis ZERSTÖRT!</span>':(res.success?'<span style="color:#5dcaa5;">Erfolgreich</span>':'<span style="color:#f0997b;">Abgewehrt</span>')} · ${fmt(res.damage||0)} Schaden · ${doc.dispatch?doc.dispatch.participantCount:0} Kommandanten, ${fmt(doc.dispatch?doc.dispatch.totalShips:0)} Schiffe</div>
             `}
@@ -16310,10 +16330,10 @@
       const myJoined = state.allianceMusterContribution && state.allianceMusterContribution.musterAttackId === doc.id;
       html += `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; border-color:rgba(93,202,165,0.4);">
-          <div class="bname"><i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> Sammelphase gegen [${doc.targetTag}] <span class="lvl-pill">${fmtDuration(remain/1000)}</span></div>
-          <div class="bmeta">Geplant von ${doc.createdByName}${doc.message?' · Nachricht: „'+doc.message+'"':''}</div>
+          <div class="bname"><i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> Sammelphase gegen [${escapeHtml(doc.targetTag)}] <span class="lvl-pill">${fmtDuration(remain/1000)}</span></div>
+          <div class="bmeta">Geplant von ${escapeHtml(doc.createdByName)}${doc.message?' · Nachricht: „'+escapeHtml(doc.message)+'"':''}</div>
           <div class="bmeta">Teilnehmer: <strong style="color:#fff;">${parts.length}</strong> · Gesamtschiffe: <strong style="color:#fff;">${fmt(totalShips)}</strong> · Gesamt-Angriffskraft: <strong style="color:#fff;">${fmt(totalPower)}</strong></div>
-          ${parts.length ? `<details><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>`<div class="bmeta">${p.name}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft</div>`).join('')}</div></details>` : ''}
+          ${parts.length ? `<details><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>`<div class="bmeta">${escapeHtml(p.name)}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft</div>`).join('')}</div></details>` : ''}
           ${myJoined
             ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Deine Flotte ist angeschlossen (${fmt(state.allianceMusterContribution.power)} Angriffskraft).</div><button id="musterCancelBtn" style="align-self:flex-start; font-size:11px;">Beitrag zurückziehen</button>`
             : `<div class="bmeta">Nutzt deine im Galaxie-Tab zusammengestellte Angriffsflotte des aktuellen Standorts.</div><button id="musterJoinBtn" class="attack" style="align-self:flex-start;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Flotte anschließen</button>`}
@@ -16326,7 +16346,7 @@
     const remainArr = Math.max(0, doc.dispatch.arrivalAt - Date.now());
     html += `
       <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; border-color:rgba(226,75,74,0.4);">
-        <div class="bname"><i class="ti ti-rocket" aria-hidden="true" style="color:#e24b4a;"></i> Verband unterwegs gegen [${doc.targetTag}] <span class="lvl-pill">${fmtDuration(remainArr/1000)}</span></div>
+        <div class="bname"><i class="ti ti-rocket" aria-hidden="true" style="color:#e24b4a;"></i> Verband unterwegs gegen [${escapeHtml(doc.targetTag)}] <span class="lvl-pill">${fmtDuration(remainArr/1000)}</span></div>
         <div class="bmeta">${doc.dispatch.participantCount} Kommandanten, ${fmt(doc.dispatch.totalShips)} Schiffe, ${fmt(doc.dispatch.totalPower)} Angriffskraft - trifft geschlossen am Ziel ein.</div>
       </div>`;
     box.innerHTML = html;
@@ -17801,7 +17821,7 @@
         </div>
         <div class="progress-outer" style="margin-bottom:6px;"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
         <div class="bmeta" style="margin-bottom:4px;">Gemeinsamer Boss aller Spieler: Jeder Angriff (Angriffsflotte, echte Flugzeit) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab. Der Boss schlägt zurück (${8+b.level}-${15+b.level}% Verluste). Beim Kill: Belohnung nach Schadensanteil, Top-Schädiger +50%. <strong>Einmal pro Tag</strong> pro Spieler angreifbar.</div>
-        ${top3.length ? `<div class="bmeta" style="margin-bottom:4px;">Top-Schaden: ${top3.map((t,i)=>(i+1)+'. '+(t.name||'?')+' ('+fmt(t.dmg)+')').join(' · ')}</div>` : ''}
+        ${top3.length ? `<div class="bmeta" style="margin-bottom:4px;">Top-Schaden: ${top3.map((t,i)=>(i+1)+'. '+escapeHtml(t.name||'?')+' ('+fmt(t.dmg)+')').join(' · ')}</div>` : ''}
         ${my ? `<div class="bmeta" style="margin-bottom:6px; color:#5dcaa5;">Dein Beitrag: ${fmt(my.dmg)} Schaden</div>` : ''}
         <button data-attack-worldboss ${(busy||cdLeft>0)?'disabled':''}>${busy?'Angriff läuft ...':cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Leviathan angreifen'}</button>
       </div>`;
@@ -18996,7 +19016,7 @@
             <div class="left">
               <div class="bicon" style="background:rgba(175,169,236,0.16); color:#c3bef5;"><i class="ti ti-ship" aria-hidden="true"></i></div>
               <div>
-                <div class="bname">${r.playerName} <span class="lvl-pill">${typeText}</span></div>
+                <div class="bname">${escapeHtml(r.playerName)} <span class="lvl-pill">${typeText}</span></div>
                 <div class="bmeta">${originName} → ${destName} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(remaining)} verbleibend</div>
                 ${compText ? `<div class="bmeta" style="color:#5dcaa5;">${compText}</div>` : ''}
               </div>
@@ -21138,7 +21158,7 @@
       const isMe = !!(state.player.id && e.id === state.player.id);
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
       const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 3px rgba(93,202,165,0.7)':'none'};"></span>`;
-      return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name">${e.name||'Unbekannt'}${e.allianceTag?' <span style="color:#7d8199;">['+e.allianceTag+']</span>':''}</span><span>${e.score||0}</span></div>`;
+      return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style="color:#7d8199;">['+escapeHtml(e.allianceTag)+']</span>':''}</span><span>${e.score||0}</span></div>`;
     }).join('');
     box.querySelectorAll('[data-fp-profile]').forEach(row => row.addEventListener('click', () => {
       const id = row.getAttribute('data-fp-profile');
@@ -21187,7 +21207,7 @@
     box.innerHTML = past.map(r => {
       const [y,m] = r.month.split('-');
       const label = monthNames[parseInt(m,10)-1]+' '+y;
-      return `<div class="card-row"><div class="left"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i><div><span class="bname">${r.name}${r.allianceTag?' ['+r.allianceTag+']':''}</span><div class="bmeta">${label}</div></div></div><span class="lvl-pill">${fmt(r.score)}</span></div>`;
+      return `<div class="card-row"><div class="left"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i><div><span class="bname">${escapeHtml(r.name)}${r.allianceTag?' ['+escapeHtml(r.allianceTag)+']':''}</span><div class="bmeta">${label}</div></div></div><span class="lvl-pill">${fmt(r.score)}</span></div>`;
     }).join('');
   }
   async function loadLeaderboard(){
@@ -21265,7 +21285,7 @@
         <div style="display:flex; align-items:center; gap:10px; min-width:0;">
           <span class="rank-num">${i+1}</span>
           <span class="lvl-pill" style="color:${lg.color}; border-color:${lg.color}; font-size:10px;">${lg.name}</span>
-          <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.name}</span>
+          <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name)}</span>
         </div>
         <span style="color:#9296ac; flex-shrink:0;">${fmt(e.weekScore||0)} Wochenpunkte</span>
       </div>`;
@@ -21301,7 +21321,7 @@
       return;
     }
     if (!top.length){
-      box.innerHTML = `<div class="bmeta">Keine Treffer für "${lbSearchQuery}" in den aktuell geladenen Top 30.</div>`;
+      box.innerHTML = `<div class="bmeta">Keine Treffer für "${escapeHtml(lbSearchQuery)}" in den aktuell geladenen Top 30.</div>`;
       return;
     }
     box.innerHTML = top.map((e,i) => {
@@ -21317,16 +21337,16 @@
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <span class="rank-num">${rank}</span>
             ${onlineDot}
-            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+e.allianceTag+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+e.title+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+escapeHtml(e.allianceTag)+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+escapeHtml(e.title)+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
           </div>
           <div style="display:flex; gap:10px; color:#9296ac; flex-shrink:0; align-items:center;">
             <span><i class="ti ti-rocket" aria-hidden="true"></i> ${e.ships||0}</span>
             <span><i class="ti ti-sword" aria-hidden="true"></i> ${e.bp||0}</span>
             <span style="color:#fff; font-weight:500;">${e.score||0}</span>
-            ${(!isMe && e.id) ? `<button data-spy="${e.id}" data-spyname="${(e.name||'Unbekannt').replace(/"/g,'')}" title="Spähschiff zur Aufklärung schicken – deckt echte Flottenstärke auf" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-target" aria-hidden="true"></i></button>` : ''}
-            ${(!isMe && e.id) ? `<button data-duel="${e.id}" data-duelname="${(e.name||'Unbekannt').replace(/"/g,'')}" title="Angriff vorbereiten – führt direkt zur Flottenauswahl" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-sword" aria-hidden="true"></i></button>` : ''}
-            ${(!isMe && e.id && useBackend()) ? `<button data-msg="${e.id}" data-msgname="${(e.name||'Unbekannt').replace(/"/g,'')}" title="Nachricht senden" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-mail" aria-hidden="true"></i></button>` : ''}
-            ${(!isMe && e.id && useBackend() && (currentFleet().mondzerstoerer||0)>=1) ? `<button data-siege="${e.id}" data-siegename="${(e.name||'Unbekannt').replace(/"/g,'')}" title="Mit dem Mondzerstörer einen Mond belagern" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-skull" aria-hidden="true"></i></button>` : ''}
+            ${(!isMe && e.id) ? `<button data-spy="${e.id}" data-spyname="${escapeHtml(e.name||'Unbekannt')}" title="Spähschiff zur Aufklärung schicken – deckt echte Flottenstärke auf" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-target" aria-hidden="true"></i></button>` : ''}
+            ${(!isMe && e.id) ? `<button data-duel="${e.id}" data-duelname="${escapeHtml(e.name||'Unbekannt')}" title="Angriff vorbereiten – führt direkt zur Flottenauswahl" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-sword" aria-hidden="true"></i></button>` : ''}
+            ${(!isMe && e.id && useBackend()) ? `<button data-msg="${e.id}" data-msgname="${escapeHtml(e.name||'Unbekannt')}" title="Nachricht senden" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-mail" aria-hidden="true"></i></button>` : ''}
+            ${(!isMe && e.id && useBackend() && (currentFleet().mondzerstoerer||0)>=1) ? `<button data-siege="${e.id}" data-siegename="${escapeHtml(e.name||'Unbekannt')}" title="Mit dem Mondzerstörer einen Mond belagern" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-skull" aria-hidden="true"></i></button>` : ''}
           </div>
         </div>
       `;
@@ -23402,7 +23422,7 @@
         pendingMoonSiegeBox.innerHTML = `
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px; background:rgba(226,75,74,0.1); border-color:rgba(226,75,74,0.4); margin-top:0.5rem;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <div class="bmeta"><i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i> Mondbelagerung gegen: <strong style="color:#fff;">${pendingMoonSiegeTarget.name}</strong></div>
+              <div class="bmeta"><i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i> Mondbelagerung gegen: <strong style="color:#fff;">${escapeHtml(pendingMoonSiegeTarget.name)}</strong></div>
               <button data-cancel-pending-siege style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
             ${!haveShip ? `<div class="bmeta" style="color:#f0997b;">Du benötigst einen einsatzbereiten Mondzerstörer am aktiven Standort (Flotte-Tab).</div>`
@@ -23412,7 +23432,7 @@
               : !pendingMoonSiegeMoons.length ? `<div class="bmeta">Keine (auffindbaren) Monde bei diesem Spieler.</div>`
               : pendingMoonSiegeMoons.map(mo => `
                   <div class="card-row" style="padding:0.5rem 0.7rem;">
-                    <div class="left"><div class="bname" style="font-size:12px;">${mo.name}</div><div class="bmeta">Verteidigung: ${fmt(mo.defense||0)}${mo.shieldLevel?' · Mondschild Stufe '+mo.shieldLevel:''}${mo.stabilityLevel?' · Mondstabilität Stufe '+mo.stabilityLevel:''}${mo.allianceTag?' · Allianz ['+mo.allianceTag+']':''}</div></div>
+                    <div class="left"><div class="bname" style="font-size:12px;">${mo.name}</div><div class="bmeta">Verteidigung: ${fmt(mo.defense||0)}${mo.shieldLevel?' · Mondschild Stufe '+mo.shieldLevel:''}${mo.stabilityLevel?' · Mondstabilität Stufe '+mo.stabilityLevel:''}${mo.allianceTag?' · Allianz ['+escapeHtml(mo.allianceTag)+']':''}</div></div>
                     <button class="buy affordable" data-siege-moon="${mo.moonKey}" style="font-size:10.5px; padding:5px 8px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>Belagern</button>
                   </div>
                 `).join('')}
@@ -24033,7 +24053,7 @@
           <div class="card-row" style="padding:0.5rem 0.8rem; border-color:${e.delta>0?'rgba(29,158,117,0.4)':'rgba(226,75,74,0.4)'};">
             <div class="left" style="gap:8px;">
               <i class="ti ${e.icon}" aria-hidden="true" style="color:${e.delta>0?'#5dcaa5':'#e24b4a'};"></i>
-              <span class="bmeta" style="color:#e2e4f0; font-size:12px;">${e.reason}</span>
+              <span class="bmeta" style="color:#e2e4f0; font-size:12px;">${escapeHtml(e.reason)}</span>
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
               <span class="bmeta">${formatRelativeTime(e.ts)}</span>
@@ -24292,7 +24312,7 @@
       } else {
         kofiBox.innerHTML = `<div class="card-row" style="border-color:rgba(250,199,117,0.4);">
           <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.18); color:#fac775; font-size:18px;">☕</div>
-            <div><div class="bname">${kofiTopSupporterCache.name}</div><div class="bmeta">Aktueller Top-Unterstützer – vielen Dank für die Unterstützung!</div></div>
+            <div><div class="bname">${escapeHtml(kofiTopSupporterCache.name)}</div><div class="bmeta">Aktueller Top-Unterstützer – vielen Dank für die Unterstützung!</div></div>
           </div>
         </div>`;
       }
