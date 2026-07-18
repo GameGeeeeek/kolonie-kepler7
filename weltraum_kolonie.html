@@ -3015,8 +3015,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.99.1';
+  const VERSION = '8.100.0';
   const PATCHNOTES = [
+    { version:'8.100.0', date:'18.07.2026', changes:[
+      'Zufallsereignisse (90-Sekunden-Pop-ups) von 8 auf 20 Varianten erweitert (Spieler-Wunsch "mindestens 20 pro"): neu u.a. verlassener Frachter, Eiskomet, Meteoritenschauer, verschlüsseltes Forschungssignal, Flüchtlingsschiff, Geisterschiff-Signal, alte Navigationsbake (Flugzeit-Bonus), fremde Handelsflotte, Räuberbande, Kristalladern, experimentelles Antriebsmodul und Flüstern aus der Leere - gleicher Kosten-/Beute-Rahmen wie die bestehenden Varianten',
+      'Expeditions-Sonderfunde von 6 auf 20 Varianten erweitert: neu u.a. Wrackteile, Kometeneis, Forschungsdepot, Flüchtlingskonvoi, Geisterwrack, Navigationsdaten, Handelskontakt, Räuberversteck, Kristallader, Antriebsmodul, Echo aus der Leere, beschleunigter Bauauftrag (analog zur bestehenden Forschungsbeschleunigung), Verteidigungs- und Angriffsbuffs - alle mit derselben "mult"-Erfahrungsskalierung wie die bestehenden sechs, kein Balance-Sprung'
+    ]},
     { version:'8.99.1', date:'18.07.2026', changes:[
       'Zwei neue Erfolge: "Ereignis-Pilot" (erstes Event-Schiff freigeschaltet) und "Event-Sammler" (alle bisherigen Event-Schiffe freigeschaltet, mit Belohnung) - prüfen dynamisch gegen den Event-Kalender, wachsen also automatisch mit, sollten künftig weitere Events dazukommen',
       'Expeditions-Sonderfunde von 3 auf 6 Varianten erweitert (Spieler-Wunsch "weitere Ideen"): neu sind "Treibende Fracht" (Kredite), "Notsignal" (temporärer Produktionsbuff) und "Alte Sternenkarte" (Chance, ein verborgenes System zu enthüllen) - gleiche Wertigkeit wie die bestehenden drei, kein Balance-Sprung, nur mehr Abwechslung bei häufigen Expeditionen',
@@ -5450,7 +5454,107 @@
           const cap = storageCap(); const before = state.resources.antimaterie||0;
           state.resources.antimaterie = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.antimaterie-before; addXp(25);
           return 'Durchflug erfolgreich: +'+fmt(gained)+' Antimaterie geborgen, +25 XP.'; } },
-      optB:{ label:'Meiden', resolve:()=>'Das Wurmloch kollabiert ungenutzt.' } }
+      optB:{ label:'Meiden', resolve:()=>'Das Wurmloch kollabiert ungenutzt.' } },
+    // 18.07.2026 (Spieler-Wunsch "mehr Zufallsereignisse, mindestens 20"): von 8 auf 20 Varianten
+    // erweitert. Gleiche Wertigkeit/Kostenrahmen wie die bestehenden acht (Kosten ~80-250 einer
+    // Ressource, Belohnung ~150-700 einer anderen bzw. XP/Buff in bekannter Größenordnung) - reine
+    // Abwechslung, kein Balance-Sprung.
+    { key:'derelict_hauler', name:'Verlassener Frachter treibt vorbei', icon:'ti-truck', color:'#5dcaa5',
+      desc:'Ein antriebsloser Frachter treibt führerlos im All. Ein Bergungstrupp könnte die Ladung sichern.',
+      optA:{ label:'Ladung sichern', cost:{deuterium:130},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*250); state.credits = (state.credits||0)+amt; addXp(15);
+          return 'Ladung gesichert: +'+fmt(amt)+' Kredite, +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Der Frachter treibt führerlos weiter.' } },
+    { key:'ice_comet', name:'Komet mit Eisvorkommen', icon:'ti-droplet', color:'#7bc4f0',
+      desc:'Ein Komet mit gefrorenem Wassereis kreuzt die Sensorreichweite. Eine Bergung liefert wertvolles Rohmaterial für die Deuterium-Synthese.',
+      optA:{ label:'Eis bergen', cost:{energie:180},
+        resolve:()=>{ const amt = 180+Math.floor(Math.random()*320);
+          const cap = storageCap(); const before = state.resources.deuterium||0;
+          state.resources.deuterium = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.deuterium-before;
+          return 'Eis geborgen: +'+fmt(gained)+' Deuterium.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Der Komet zieht ungenutzt vorbei.' } },
+    { key:'dust_cloud', name:'Kleiner Meteoritenschauer', icon:'ti-mountain', color:'#e0a548',
+      desc:'Ein loser Meteoritenschauer nähert sich den Außenanlagen. Schutzschilde hochfahren kostet Energie, verhindert aber Ausfälle - wer nichts tut, riskiert kurze Einbußen, könnte aber auch Glück haben.',
+      optA:{ label:'Schutzschilde hochfahren', cost:{energie:150},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*250);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Schilde halten - nebenbei sogar +'+fmt(gained)+' Erz aus abgefangenen Trümmern geborgen.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>{ if (Math.random() < 0.45){ state.buffs = state.buffs||[]; state.buffs.push({ kind:'prod', res:'erz', mult:0.7, expiresAt: Date.now()+300000 });
+          return 'Der Schauer trifft die Erzförderung - -30% Erz-Produktion für 5 Minuten.'; }
+          return 'Der Schauer verfehlt die Anlagen knapp.'; } } },
+    { key:'coded_transmission', name:'Verschlüsseltes Forschungssignal', icon:'ti-microscope', color:'#9be8c9',
+      desc:'Ein verschlüsseltes Signal mit wissenschaftlichen Rohdaten wird aufgefangen. Entschlüsseln kostet Energie für die Rechenleistung, liefert aber verwertbare Forschungsdaten.',
+      optA:{ label:'Entschlüsseln', cost:{energie:220},
+        resolve:()=>{ const amt = 40+Math.floor(Math.random()*60);
+          const cap = storageCap(); const before = state.resources.forschungspunkte||0;
+          state.resources.forschungspunkte = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.forschungspunkte-before; addXp(10);
+          return 'Signal entschlüsselt: +'+fmt(gained)+' Forschungspunkte, +10 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Signal verstummt ungenutzt.' } },
+    { key:'refugee_ship', name:'Flüchtlingsschiff bittet um Hilfe', icon:'ti-users', color:'#f3aec6',
+      desc:'Ein überfülltes ziviles Schiff bittet um Versorgung. Aushelfen kostet Ressourcen, bringt aber Dank und Erfahrung - wer ablehnt, geht leer aus.',
+      optA:{ label:'Versorgen', cost:{erz:200,deuterium:100},
+        resolve:()=>{ const amt = 100+Math.floor(Math.random()*150); state.credits = (state.credits||0)+amt; addXp(20);
+          return 'Geflüchtete versorgt: +'+fmt(amt)+' Kredite Dankspende, +20 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Das Schiff zieht ohne Hilfe weiter.' } },
+    { key:'ghost_signal', name:'Geisterschiff-Signal', icon:'ti-alien', color:'#af9ce6',
+      desc:'Ein pulsierendes, nicht identifizierbares Signal geht von einem treibenden Wrack aus. Eine Untersuchung ist riskant, könnte aber Seltenes zutage fördern.',
+      optA:{ label:'Untersuchen', cost:{deuterium:150},
+        resolve:()=>{ addXp(20);
+          if (Math.random() < 0.22){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+            return 'Untersucht: ein seltener Fund tritt zutage - '+ri.name+'! +20 XP.'; }
+          return 'Untersucht, aber das Signal verstummt ohne weitere Erkenntnisse. +20 XP.'; } },
+      optB:{ label:'Meiden', resolve:()=>'Das Signal bleibt unerforscht zurück.' } },
+    { key:'ancient_beacon', name:'Alte Bake sendet Koordinaten', icon:'ti-map-pin', color:'#f0997b',
+      desc:'Eine uralte Navigationsbake sendet frische Koordinaten aus. Ein Abgleich könnte die eigenen Flugrouten optimieren.',
+      optA:{ label:'Koordinaten abgleichen', cost:{deuterium:100},
+        resolve:()=>{ state.buffs = state.buffs||[]; state.buffs.push({ kind:'speed', mult:0.85, expiresAt: Date.now()+900000 }); addXp(15);
+          return 'Koordinaten abgeglichen: -15% Flugzeit aller Missionen für 15 Minuten, +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Bake verstummt ungenutzt.' } },
+    { key:'passing_merchant', name:'Fremde Handelsflotte kreuzt', icon:'ti-ship', color:'#fac775',
+      desc:'Eine fremde Handelsflotte bietet einen kurzen Tausch an - dieses Mal Kristalle gegen Erz.',
+      optA:{ label:'Handeln (300 Kristalle → Erz)', cost:{kristalle:300},
+        resolve:()=>{ const amt = 380+Math.floor(Math.random()*100);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Getauscht: 300 Kristalle → +'+fmt(gained)+' Erz.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Die Flotte zieht weiter.' } },
+    { key:'raider_ambush', name:'Räuberbande lauert im Asteroidenfeld', icon:'ti-sword', color:'#e24b4a',
+      desc:'Eine kleine Räuberbande hat sich in einem Asteroidenfeld verschanzt. Ein Angriff bringt Kampferfahrung und Beute, ist aber nicht risikofrei.',
+      optA:{ label:'Angreifen', cost:{deuterium:100},
+        resolve:()=>{ addXp(25);
+          if (Math.random() < 0.6){ const amt = 200+Math.floor(Math.random()*350);
+            const cap = storageCap(); const before = state.resources.kristalle||0;
+            state.resources.kristalle = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.kristalle-before;
+            return 'Räuber vertrieben! +'+fmt(gained)+' Kristalle erbeutet, +25 XP.'; }
+          return 'Die Räuber fliehen rechtzeitig - zumindest die Übung zählt. +25 XP.'; } },
+      optB:{ label:'Ausweichen', resolve:()=>'Das Asteroidenfeld wird großräumig umflogen.' } },
+    { key:'crystal_vein', name:'Reiche Kristalladern entdeckt', icon:'ti-diamond', color:'#c3bef5',
+      desc:'Sensoren orten eine ungewöhnlich reiche Kristallader in einem nahen Asteroiden. Der Abbau lohnt sich.',
+      optA:{ label:'Abbauen', cost:{energie:200},
+        resolve:()=>{ const amt = 250+Math.floor(Math.random()*400);
+          const cap = storageCap(); const before = state.resources.kristalle||0;
+          state.resources.kristalle = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.kristalle-before;
+          return 'Ader abgebaut: +'+fmt(gained)+' Kristalle.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Ader bleibt ungenutzt zurück.' } },
+    { key:'engine_wreck', name:'Experimentelles Antriebsmodul gefunden', icon:'ti-rocket', color:'#8fd6c4',
+      desc:'In einem Trümmerfeld liegt ein noch intaktes, experimentelles Antriebsmodul. Eine Bergung könnte sich richtig lohnen.',
+      optA:{ label:'Bergen', cost:{deuterium:180},
+        resolve:()=>{ addXp(20);
+          if (Math.random() < 0.15){ const name = grantRandomShipModule('selten'); return 'Antriebsmodul geborgen: '+name+'! (Im Offiziere-Tab einbaubar.) +20 XP.'; }
+          const amt = 200+Math.floor(Math.random()*300);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Modul lässt sich nicht mehr retten, aber die Restteile bringen +'+fmt(gained)+' Erz. +20 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Wrack bleibt ungenutzt zurück.' } },
+    { key:'void_whisper', name:'Flüstern aus der Leere', icon:'ti-atom', color:'#8f88e8',
+      desc:'Ein kaum wahrnehmbares Flüstern aus dem Void-Rauschen erreicht die Sensoren. Ein genaues Abhören ist mysteriös, aber möglicherweise lohnend.',
+      optA:{ label:'Abhören', cost:{deuterium:160},
+        resolve:()=>{ addXp(25);
+          if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+            return 'Im Rauschen verbirgt sich ein seltener Fund: '+ri.name+'! +25 XP.'; }
+          return 'Das Flüstern verstummt ohne erkennbaren Sinn. +25 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Flüstern verklingt ungehört.' } }
   ];
   function maybeSpawnRandomEvent(){
     if (state.activeEvent) return;
@@ -22202,7 +22306,68 @@
         if (hiddenUndiscovered.length && Math.random()<0.35){ const sys = hiddenUndiscovered[Math.floor(Math.random()*hiddenUndiscovered.length)];
           if (!state.discoveredSystems) state.discoveredSystems = {}; state.discoveredSystems[sys.id] = true;
           return { text:'Eine alte Sternenkarte entziffert: das verborgene System '+sys.name+' wurde enthüllt! +'+Math.round(30*mult)+' XP.', icon:'ti-map-2' }; }
-        return { text:'Eine alte Sternenkarte entziffert, aber ohne neue Erkenntnisse. +'+Math.round(30*mult)+' XP.', icon:'ti-map-2' }; } }
+        return { text:'Eine alte Sternenkarte entziffert, aber ohne neue Erkenntnisse. +'+Math.round(30*mult)+' XP.', icon:'ti-map-2' }; } },
+    // 18.07.2026 (Spieler-Wunsch "mehr Expeditions-Sonderfunde, mindestens 20"): von 6 auf 20 Varianten
+    // erweitert. Gleiche Wertigkeit wie die bestehenden sechs (Belohnung skaliert wie überall hier mit
+    // dem übergebenen "mult"-Erfahrungsfaktor) - reine Abwechslung, kein Balance-Sprung.
+    { key:'derelict', name:'Treibende Wrackteile geborgen', icon:'ti-box',
+      resolve:(mult) => { const amt = Math.round((300+Math.random()*300)*mult); const res = Math.random()<0.5?'erz':'kristalle';
+        const cap = storageCap(); const before = state.resources[res]||0; state.resources[res] = Math.min(cap, before+amt); const gained = state.resources[res]-before;
+        addXp(Math.round(20*mult)); return { text:'Wrackteile geborgen: +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+'.', icon:'ti-box' }; } },
+    { key:'comet_ice', name:'Kometeneis gewonnen', icon:'ti-droplet',
+      resolve:(mult) => { const amt = Math.round((200+Math.random()*350)*mult);
+        const cap = storageCap(); const before = state.resources.deuterium||0; state.resources.deuterium = Math.min(cap, before+amt); const gained = state.resources.deuterium-before;
+        addXp(Math.round(20*mult)); return { text:'Kometeneis gewonnen: +'+fmt(gained)+' Deuterium.', icon:'ti-droplet' }; } },
+    { key:'research_cache', name:'Verlassenes Forschungsdepot geplündert', icon:'ti-microscope',
+      resolve:(mult) => { const amt = Math.round((60+Math.random()*80)*mult);
+        const cap = storageCap(); const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+amt); const gained = state.resources.forschungspunkte-before;
+        addXp(Math.round(25*mult)); return { text:'Forschungsdepot geplündert: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-microscope' }; } },
+    { key:'refugee_convoy', name:'Notleidenden Konvoi versorgt', icon:'ti-users',
+      resolve:(mult) => { const amt = Math.round((150+Math.random()*200)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(30*mult));
+        return { text:'Ein notleidender Konvoi wurde versorgt: +'+fmt(amt)+' Kredite Dankspende.', icon:'ti-users' }; } },
+    { key:'ghost_wreck', name:'Geisterwrack durchsucht', icon:'ti-alien',
+      resolve:(mult) => { addXp(Math.round(30*mult));
+        if (Math.random() < 0.25){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          return { text:'Geisterwrack durchsucht: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-alien' }; }
+        return { text:'Geisterwrack durchsucht, aber ohne verwertbaren Fund.', icon:'ti-alien' }; } },
+    { key:'beacon_data', name:'Alte Navigationsdaten geborgen', icon:'ti-map-pin',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'speed', mult:0.85, expiresAt: Date.now()+Math.round(900000*mult) }); addXp(Math.round(20*mult));
+        return { text:'Alte Navigationsdaten geborgen: -15% Flugzeit aller Missionen für 15 Minuten.', icon:'ti-map-pin' }; } },
+    { key:'merchant_contact', name:'Handelskontakt geknüpft', icon:'ti-ship',
+      resolve:(mult) => { const amt = Math.round((250+Math.random()*300)*mult);
+        const cap = storageCap(); const before = state.resources.kristalle||0; state.resources.kristalle = Math.min(cap, before+amt); const gained = state.resources.kristalle-before;
+        addXp(Math.round(20*mult)); return { text:'Handelskontakt geknüpft: +'+fmt(gained)+' Kristalle.', icon:'ti-ship' }; } },
+    { key:'raider_cache', name:'Räuberversteck ausgehoben', icon:'ti-sword',
+      resolve:(mult) => { const amt = Math.round((300+Math.random()*400)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        addXp(Math.round(35*mult)); return { text:'Ein Räuberversteck ausgehoben: +'+fmt(gained)+' Erz erbeutet.', icon:'ti-sword' }; } },
+    { key:'crystal_deposit', name:'Reiche Kristallader gefunden', icon:'ti-diamond',
+      resolve:(mult) => { const amt = Math.round((300+Math.random()*350)*mult);
+        const cap = storageCap(); const before = state.resources.kristalle||0; state.resources.kristalle = Math.min(cap, before+amt); const gained = state.resources.kristalle-before;
+        addXp(Math.round(25*mult)); return { text:'Eine reiche Kristallader gefunden: +'+fmt(gained)+' Kristalle.', icon:'ti-diamond' }; } },
+    { key:'drive_module', name:'Antriebsmodul geborgen', icon:'ti-rocket',
+      resolve:(mult) => { addXp(Math.round(30*mult));
+        if (Math.random() < 0.15){ const name = grantRandomShipModule('selten'); return { text:'Antriebsmodul geborgen: '+name+'! (Im Offiziere-Tab einbaubar.)', icon:'ti-rocket' }; }
+        const amt = Math.round((200+Math.random()*250)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        return { text:'Modul nicht mehr zu retten, aber Restteile bringen +'+fmt(gained)+' Erz.', icon:'ti-rocket' }; } },
+    { key:'void_echo', name:'Echo aus der Leere vermessen', icon:'ti-atom',
+      resolve:(mult) => { addXp(Math.round(35*mult));
+        if (Math.random() < 0.18){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          return { text:'Ein Echo aus der Leere vermessen: seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-atom' }; }
+        return { text:'Ein Echo aus der Leere vermessen, ohne greifbares Ergebnis.', icon:'ti-atom' }; } },
+    { key:'construction_insight', name:'Konstruktionsdaten ausgewertet', icon:'ti-list-details',
+      resolve:(mult) => { addXp(Math.round(40*mult));
+        const job = (state.constructionQueue||[]).find(j=>j.paid && j.endTime && j.endTime>Date.now());
+        if (job){ const saved = Math.round((job.endTime-Date.now())*0.25); job.endTime -= saved;
+          return { text:'Konstruktionsdaten ausgewertet: laufender Bauauftrag um '+Math.round(saved/1000)+'s beschleunigt.', icon:'ti-list-details' }; }
+        return { text:'Konstruktionsdaten ausgewertet, aber ohne aktiven Bauauftrag ohne Effekt.', icon:'ti-list-details' }; } },
+    { key:'shield_cache', name:'Verteidigungsdepot entdeckt', icon:'ti-shield-lock',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'def', mult:1.25, expiresAt: Date.now()+Math.round(1800000*mult) }); addXp(Math.round(25*mult));
+        return { text:'Ein Verteidigungsdepot entdeckt: +25% Verteidigung für 30 Minuten.', icon:'ti-shield-lock' }; } },
+    { key:'training_grounds', name:'Verlassenes Trainingsgelände erkundet', icon:'ti-target',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'atk', mult:1.2, expiresAt: Date.now()+Math.round(1800000*mult) }); addXp(Math.round(25*mult));
+        return { text:'Ein verlassenes Trainingsgelände erkundet: +20% Angriffskraft für 30 Minuten.', icon:'ti-target' }; } }
   ];
   // Erfahrene Forschungsschiffe: mit jeder erfolgreich abgeschlossenen Expedition (kein Totalverlust)
   // steigt die Beute leicht, bis zu einem Deckel – repräsentiert eine erfahrenere Crew/Ausrüstung.
