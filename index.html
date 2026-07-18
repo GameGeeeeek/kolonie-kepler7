@@ -1124,9 +1124,18 @@
       <div style="display:flex; gap:6px; margin-bottom:12px;">
         <button id="adminTabReportsBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Meldungen</button>
         <button id="adminTabAnalyticsBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-atom" aria-hidden="true" style="margin-right:4px;"></i>Analytics</button>
+        <button id="adminTabBroadcastBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-building-broadcast-tower" aria-hidden="true" style="margin-right:4px;"></i>Ankündigung</button>
       </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
       <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
+      <div id="adminBroadcastView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Sendet eine Nachricht an <strong>alle Spieler</strong> - erscheint im globalen Chat (Reiter "Global") mit deutlich hervorgehobenem Absender, inklusive der bereits vorhandenen Ungelesen-Markierung am Chat-Symbol.</div>
+        <textarea id="adminBroadcastInput" maxlength="300" placeholder="Ankündigungstext (max. 300 Zeichen)…" style="width:100%; min-height:90px; resize:vertical; font-size:13px;"></textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <span class="bmeta" id="adminBroadcastCount">0/300</span>
+          <button id="adminBroadcastSendBtn" class="login-submit" style="width:auto; padding:8px 16px;"><i class="ti ti-building-broadcast-tower" aria-hidden="true" style="margin-right:5px;"></i>An alle Spieler senden</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2762,8 +2771,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.90.0';
+  const VERSION = '8.91.0';
   const PATCHNOTES = [
+    { version:'8.91.0', date:'18.07.2026', changes:[
+      'Admin-Bereich: neuer Reiter "Ankündigung" - Nachricht an alle Spieler senden, erscheint im globalen Chat mit hervorgehobenem Absender inklusive der bestehenden Ungelesen-Markierung am Chat-Symbol',
+      'Teilen-Karten ("Kolonie teilen", Punktestand-Tab) grafisch komplett neu: HUD-Eckenschnitt-Rahmen mit Eckklammern, technisches Grid und Farbwolken im Hintergrund statt eines einzelnen weichen Verlaufs, Mono-Schrift, Glüh-Effekte auf Kennzahlen und Punkteverlauf, Instrumentenring mit Peilstrichen um den Avatar - dieselbe Bildsprache wie der Rest der Oberfläche seit den Grafik-Runden dieser Session. Die Akzentfarben folgen jetzt dem gewählten Farbthema, die Instrumentenfarbe (Rahmen/Rand) bleibt bewusst konstant',
+      'Betrifft alle Kartentypen (Profil, Flotte, Allianz, Woche, Moment, Kampfbericht) gleichermaßen, da sie dieselben Zeichenfunktionen teilen'
+    ]},
     { version:'8.90.0', date:'18.07.2026', changes:[
       'Sicherheitshärtung vor mehr Spielern: eine zentrale escapeHtml()-Funktion eingeführt und an weit über 30 Stellen nachgerüstet, an denen von ANDEREN Spielern frei wählbarer Text (Kommandantenname, Allianz-Tag/-Beschreibung, Chat, private Nachrichten, Melde-Grund, Kampfbericht-Namen u.v.m.) bisher ungefiltert in die Seite eingefügt wurde - unter anderem log()/pushToast() (die zentrale Melde-Funktion für praktisch alle Spielmeldungen) sowie das Admin-Melde-Panel selbst',
       'Betrifft nur die Darstellung, keine Spielmechanik - wer bisher normale Namen/Texte verwendet hat, bemerkt keinen Unterschied'
@@ -11239,22 +11253,47 @@
   function switchAdminTab(tab){
     const reportsList = document.getElementById('adminReportsList');
     const analyticsView = document.getElementById('adminAnalyticsView');
+    const broadcastView = document.getElementById('adminBroadcastView');
     const sub = document.getElementById('adminPanelSub');
     const reportsBtn = document.getElementById('adminTabReportsBtn');
     const analyticsBtn = document.getElementById('adminTabAnalyticsBtn');
+    const broadcastBtn = document.getElementById('adminTabBroadcastBtn');
     if (reportsBtn) reportsBtn.classList.toggle('fb-type-active', tab==='reports');
     if (analyticsBtn) analyticsBtn.classList.toggle('fb-type-active', tab==='analytics');
+    if (broadcastBtn) broadcastBtn.classList.toggle('fb-type-active', tab==='broadcast');
+    if (reportsList) reportsList.style.display = tab==='reports' ? 'flex' : 'none';
+    if (analyticsView) analyticsView.style.display = tab==='analytics' ? 'block' : 'none';
+    if (broadcastView) broadcastView.style.display = tab==='broadcast' ? 'block' : 'none';
     if (tab === 'reports'){
-      if (reportsList) reportsList.style.display = 'flex';
-      if (analyticsView) analyticsView.style.display = 'none';
       if (sub) sub.textContent = 'Gemeldete Spieler';
       loadAdminReports();
+    } else if (tab === 'broadcast'){
+      if (sub) sub.textContent = 'Nachricht an alle Spieler';
     } else {
-      if (reportsList) reportsList.style.display = 'none';
-      if (analyticsView) analyticsView.style.display = 'block';
       if (sub) sub.textContent = 'Nutzungsstatistik';
       loadAdminAnalytics();
     }
+  }
+  // Admin-Ankündigung an alle Spieler (Spieler-Wunsch): nutzt bewusst KEINEN neuen Backend-Endpunkt,
+  // sondern den bereits vorhandenen globalen Chat-Kanal (globalchat:msg:) - jeder Spieler liest den
+  // ohnehin, inklusive der schon vorhandenen automatischen Ungelesen-Markierung am Chat-Symbol. Der
+  // Text durchläuft dieselbe escapeHtml()-Absicherung wie jede andere Chat-Nachricht (siehe
+  // loadGlobalChat), ein auffälliger Absendername genügt, um die Nachricht optisch abzuheben.
+  async function sendAdminBroadcast(){
+    const input = document.getElementById('adminBroadcastInput');
+    const text = input ? input.value.trim() : '';
+    if (!text){ log('Ankündigungstext fehlt.', 'ti-alert-triangle'); return; }
+    const btn = document.getElementById('adminBroadcastSendBtn');
+    if (btn) btn.disabled = true;
+    const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
+    try {
+      await storageSet('globalchat:msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: '📢 Team-Ankündigung', authorAllianceTag: null, text: text.slice(0,300), ts: Date.now() }), true);
+      log('Ankündigung an alle Spieler gesendet.', 'ti-check', 'ok');
+      if (input) input.value = '';
+      const countEl = document.getElementById('adminBroadcastCount');
+      if (countEl) countEl.textContent = '0/300';
+    } catch(e){ log('Ankündigung konnte nicht gesendet werden.', 'ti-alert-triangle'); }
+    finally { if (btn) btn.disabled = false; }
   }
   // Analytics-Dashboard (13.07.2026 Grundversion, 16.07.2026 optisch/funktional überarbeitet auf
   // Feature-Wunsch: modernere Diagramme statt reiner CSS-Balken, Zeitraum-Auswahl, Tooltips,
@@ -13894,7 +13933,7 @@
             <span style="font-size:11.5px; font-weight:500; color:#c3bef5;">${escapeHtml(m.authorName||'Unbekannt')}</span>
             <span class="bmeta">${formatRelativeTime(m.ts)}</span>
           </div>
-          <div style="font-size:12.5px; color:#e2e4f0; margin-top:2px;">${(m.text||'').replace(/</g,'&lt;')}</div>
+          <div style="font-size:12.5px; color:#e2e4f0; margin-top:2px;">${escapeHtml(m.text||'')}</div>
         </div>
       `).join('');
       box.scrollTop = box.scrollHeight;
@@ -13931,7 +13970,7 @@
             <span style="font-size:11.5px; font-weight:500; color:#5dcaa5;">${escapeHtml(m.authorName||'Unbekannt')}${m.authorAllianceTag?' <span style="color:#9296ac; font-weight:400;">['+escapeHtml(m.authorAllianceTag)+']</span>':''}</span>
             <span class="bmeta">${formatRelativeTime(m.ts)}</span>
           </div>
-          <div style="font-size:12.5px; color:#e2e4f0; margin-top:2px;">${(m.text||'').replace(/</g,'&lt;')}</div>
+          <div style="font-size:12.5px; color:#e2e4f0; margin-top:2px;">${escapeHtml(m.text||'')}</div>
         </div>
       `).join('');
       box.scrollTop = box.scrollHeight;
@@ -19352,67 +19391,167 @@
   };
   let shareCardType = 'profil';
   let shareCardFormat = 'post';
+  // Grafik-Höherstufung (Spieler-Wunsch "high-end Aussehen, Aushängeschild des Spiels"): die Teilen-
+  // Karten bekommen dieselbe HUD-Bildsprache wie der Rest der Oberfläche seit den Grafik-Runden dieser
+  // Session - Eckenschnitt-Rahmen samt Eckklammern (exakt dasselbe Polygon wie --corner/.card-row im
+  // echten UI), Mono-Schrift für Zahlen/Labels, Glow auf Kennzahlen, technisches Grid + Farbwolken im
+  // Hintergrund statt eines einzelnen weichen Radial-Verlaufs. Die Instrumentenfarbe bleibt bewusst das
+  // feste Info-Blau (#378add, wie --c-info überall im Spiel) - nur die Akzentfarben (Wolken, Avatar-
+  // Ring) folgen dem vom Spieler gewählten Farbthema, damit die Karte wirklich "seine" Kolonie zeigt.
+  const SHARE_FONT_MONO = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
+  function shareThemeColors(){
+    const t = THEME_PRESETS.find(p=>p.key===(state.themeKey||'standard')) || THEME_PRESETS[0];
+    return { primary:t.primary, primaryRgb:t.primaryRgb, secondary:t.secondary, secondaryRgb:t.secondaryRgb, info:'#378add', infoRgb:'55,138,221' };
+  }
+  // Repliziert exakt das clip-path-Polygon aus dem echten UI (var(--corner) 0, 100% 0, 100% calc(100% -
+  // var(--corner)), ...): Ecken oben-links und unten-rechts gekappt, oben-rechts/unten-links eckig.
+  function hudCutPath(ctx, x, y, w, h, cut){
+    ctx.beginPath();
+    ctx.moveTo(x+cut, y);
+    ctx.lineTo(x+w, y);
+    ctx.lineTo(x+w, y+h-cut);
+    ctx.lineTo(x+w-cut, y+h);
+    ctx.lineTo(x, y+h);
+    ctx.lineTo(x, y+cut);
+    ctx.closePath();
+  }
+  // Kleine L-Eckklammern an den beiden NICHT gekappten Ecken - Pendant zu .card-row::before/::after.
+  function hudCorners(ctx, x, y, w, h, size, color){
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x+w-size, y); ctx.lineTo(x+w, y); ctx.lineTo(x+w, y+size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y+h-size); ctx.lineTo(x, y+h); ctx.lineTo(x+size, y+h); ctx.stroke();
+    ctx.restore();
+  }
   function shareCanvasBase(W, H){
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
-    const grad = ctx.createRadialGradient(W/2, H*0.32, 50, W/2, H*0.32, H*0.95);
-    grad.addColorStop(0, '#1c2140');
-    grad.addColorStop(1, '#080a14');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-    const starCount = Math.round(W*H/8600);
+    const theme = shareThemeColors();
+    const cut = Math.round(Math.min(W,H)*0.032);
+
+    hudCutPath(ctx, 0, 0, W, H, cut);
+    ctx.save();
+    ctx.clip();
+
+    const base = ctx.createLinearGradient(0, 0, 0, H);
+    base.addColorStop(0, '#0d1224'); base.addColorStop(1, '#0a0d1a');
+    ctx.fillStyle = base; ctx.fillRect(0, 0, W, H);
+    const blobs = [
+      { x:W*0.18, y:H*0.08, r:H*0.42, c:'rgba('+theme.primaryRgb+',0.20)' },
+      { x:W*0.90, y:H*0.14, r:H*0.30, c:'rgba('+theme.infoRgb+',0.16)' },
+      { x:W*0.10, y:H*0.94, r:H*0.32, c:'rgba('+theme.secondaryRgb+',0.14)' },
+      { x:W*0.86, y:H*0.88, r:H*0.28, c:'rgba('+theme.primaryRgb+',0.10)' }
+    ];
+    for (const b of blobs){
+      const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      g.addColorStop(0, b.c); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+
+    // Technisches Grid, zur Kartenmitte hin ausgeblendet - dieselbe Idee wie .shell::before im echten UI.
+    ctx.save();
+    const gridR = ctx.createRadialGradient(W/2, H*0.35, H*0.1, W/2, H*0.35, H*0.85);
+    gridR.addColorStop(0, 'rgba(255,255,255,0.055)'); gridR.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = gridR; ctx.lineWidth = 1;
+    const step = Math.round(W/26);
+    for (let gx=0; gx<=W; gx+=step){ ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+    for (let gy=0; gy<=H; gy+=step){ ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+    ctx.restore();
+
+    const starCount = Math.round(W*H/9000);
     for (let i=0; i<starCount; i++){
-      const x = Math.random()*W, y = Math.random()*H, r = Math.random()*1.7+0.3;
-      ctx.fillStyle = 'rgba(255,255,255,'+(0.25+Math.random()*0.5).toFixed(2)+')';
+      const x = Math.random()*W, y = Math.random()*H, r = Math.random()*1.6+0.3;
+      ctx.fillStyle = 'rgba(255,255,255,'+(0.2+Math.random()*0.45).toFixed(2)+')';
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
     }
+
+    const vig = ctx.createRadialGradient(W/2, H/2, H*0.35, W/2, H/2, H*0.75);
+    vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,0.45)');
+    ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+
+    ctx.restore(); // Ende Clip
+
+    // Rahmenlinie + Eckklammern außerhalb des Clips, damit der Strich nicht angeschnitten wird.
+    hudCutPath(ctx, 1, 1, W-2, H-2, cut);
+    ctx.strokeStyle = 'rgba('+theme.infoRgb+',0.55)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    hudCorners(ctx, 14, 14, W-28, H-28, Math.round(W*0.028), 'rgba('+theme.primaryRgb+',0.85)');
+
     ctx.textAlign = 'center';
-    return { canvas, ctx };
+    return { canvas, ctx, theme, cut };
   }
   function shareRefLink(){
     const host = location.host || 'gamegeeeeek.de';
     return (typeof accountUsername === 'string' && accountUsername) ? host+'/?ref='+encodeURIComponent(accountUsername) : host;
   }
   function drawShareHeader(ctx, W, y, text){
-    ctx.fillStyle = '#9296ac';
-    ctx.font = '600 30px system-ui, sans-serif';
-    ctx.fillText(text || 'KOLONIE KEPLER-7', W/2, y);
+    const label = (text || 'KOLONIE KEPLER-7').toUpperCase();
+    ctx.save();
+    ctx.font = '600 22px '+SHARE_FONT_MONO;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
+    const tw = ctx.measureText(label).width;
+    const tickW = 34;
+    ctx.strokeStyle = 'rgba(55,138,221,0.6)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(W/2-tw/2-tickW-10, y-7); ctx.lineTo(W/2-tw/2-10, y-7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W/2+tw/2+10, y-7); ctx.lineTo(W/2+tw/2+10+tickW, y-7); ctx.stroke();
+    ctx.fillStyle = '#378add';
+    ctx.fillText(label, W/2, y);
+    ctx.restore();
   }
   function drawShareFooter(ctx, W, H, cta){
-    ctx.fillStyle = '#7f77dd';
-    ctx.font = '600 30px system-ui, sans-serif';
-    ctx.fillText(cta || 'Baue deine eigene Kolonie:', W/2, H-90);
-    ctx.fillStyle = '#c3bef5';
-    ctx.font = '400 28px system-ui, sans-serif';
-    ctx.fillText(shareRefLink(), W/2, H-46);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(W/2-160, H-132); ctx.lineTo(W/2+160, H-132); ctx.stroke();
+    ctx.fillStyle = '#e8e9f0';
+    ctx.font = '600 28px '+SHARE_FONT_MONO;
+    ctx.fillText((cta || 'Baue deine eigene Kolonie:').toUpperCase(), W/2, H-90);
+    ctx.fillStyle = '#378add';
+    ctx.font = '400 26px '+SHARE_FONT_MONO;
+    ctx.fillText(shareRefLink(), W/2, H-48);
+    ctx.restore();
   }
   function drawStatCardsRow(ctx, W, cards, cardY, cardW, cardH){
     cardW = cardW || 220; cardH = cardH || 150;
-    const gap = 26;
+    const gap = 22;
     const totalW = cards.length*cardW + (cards.length-1)*gap;
     let cx = (W-totalW)/2;
+    const cut = Math.round(Math.min(cardW, cardH)*0.16);
     for (const c of cards){
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(cx, cardY, cardW, cardH, 16); else ctx.rect(cx, cardY, cardW, cardH);
+      hudCutPath(ctx, cx, cardY, cardW, cardH, cut);
+      ctx.fillStyle = 'rgba(255,255,255,0.045)';
       ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1;
+      ctx.stroke();
+      hudCorners(ctx, cx, cardY, cardW, cardH, Math.round(cardW*0.12), 'rgba(55,138,221,0.7)');
+      ctx.save();
+      ctx.shadowColor = 'rgba(55,138,221,0.55)'; ctx.shadowBlur = 14;
       ctx.fillStyle = '#e8e9f0';
-      ctx.font = '600 40px system-ui, sans-serif';
-      ctx.fillText(c.value, cx+cardW/2, cardY+70);
+      ctx.font = '600 38px '+SHARE_FONT_MONO;
+      ctx.fillText(c.value, cx+cardW/2, cardY+68);
+      ctx.restore();
       ctx.fillStyle = '#9296ac';
-      ctx.font = '400 20px system-ui, sans-serif';
-      ctx.fillText(c.label, cx+cardW/2, cardY+108);
+      ctx.font = '400 16px '+SHARE_FONT_MONO;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '1px';
+      ctx.fillText(c.label.toUpperCase(), cx+cardW/2, cardY+106);
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
       cx += cardW+gap;
     }
   }
-  // Punkteverlauf (scoreHistory, 5-Minuten-Snapshots ~16 Std.) als kleine Kurve.
+  // Punkteverlauf (scoreHistory, 5-Minuten-Snapshots ~16 Std.) als kleine Kurve mit Glow + Glühpunkt am
+  // aktuellen Wert, dezente Gitterlinien im Hintergrund fürs "Daten-Readout"-Gefühl.
   function drawScoreSparkline(ctx, x, y, w, h){
     const hist = (state.scoreHistory||[]).slice(-80);
     if (hist.length < 3) return false;
     const vals = hist.map(e=>e.score||0);
     const min = Math.min(...vals), max = Math.max(...vals);
     const span = Math.max(1, max-min);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+    for (let i=0; i<=2; i++){ const gy=y+h*i/2; ctx.beginPath(); ctx.moveTo(x,gy); ctx.lineTo(x+w,gy); ctx.stroke(); }
+    let lastX = x, lastY = y+h;
+    ctx.save();
+    ctx.shadowColor = 'rgba(93,202,165,0.7)'; ctx.shadowBlur = 8;
     ctx.strokeStyle = '#5dcaa5';
     ctx.lineWidth = 4;
     ctx.beginPath();
@@ -19420,21 +19559,46 @@
       const px = x + (i/(vals.length-1))*w;
       const py = y + h - ((v-min)/span)*h;
       if (i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      lastX = px; lastY = py;
     });
     ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.shadowColor = 'rgba(93,202,165,0.9)'; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#5dcaa5';
+    ctx.beginPath(); ctx.arc(lastX, lastY, 5, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
     return true;
   }
+  // Avatar mit Instrumentenring (vier Peilstriche, radar-artig wie das Sektorkarten-Radar-Overlay aus
+  // Grafik R9) statt eines schlichten Kreisrands.
   function drawAvatarCircle(ctx, cx, cy, r, golden){
     const avatarDef = AVATAR_DEFS.find(a => a.key === state.player.avatarKey) || AVATAR_DEFS[0];
+    const theme = shareThemeColors();
+    const ringColor = golden ? '#fac775' : theme.primary;
+    const ringRgb = golden ? '250,199,117' : theme.primaryRgb;
+    ctx.save();
+    ctx.strokeStyle = 'rgba('+ringRgb+',0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, r+16, 0, Math.PI*2); ctx.stroke();
+    for (let a=0; a<4; a++){
+      const ang = a*(Math.PI/2);
+      const x1 = cx+Math.cos(ang)*(r+10), y1 = cy+Math.sin(ang)*(r+10);
+      const x2 = cx+Math.cos(ang)*(r+22), y2 = cy+Math.sin(ang)*(r+22);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    ctx.restore();
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
     ctx.fillStyle = avatarDef.bg; ctx.fill();
+    ctx.save();
+    ctx.shadowColor = ringColor; ctx.shadowBlur = golden ? 18 : 10;
     ctx.lineWidth = golden ? 7 : 4;
-    ctx.strokeStyle = golden ? '#fac775' : 'rgba(255,255,255,0.25)';
+    ctx.strokeStyle = ringColor;
     ctx.stroke();
+    ctx.restore();
     return loadSvgAsImage(avatarDef.svg).then(avImg => {
       ctx.save();
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.clip();
-      const s = r*1.15*2/2;
       ctx.drawImage(avImg, cx-r*1.15/2, cy-r*1.15/2, r*1.15, r*1.15);
       ctx.restore();
     }).catch(()=>{});
@@ -19456,14 +19620,14 @@
       drawShareHeader(ctx, W, 64);
       await drawAvatarCircle(ctx, 240, H/2, 120, ascCount>0);
       ctx.fillStyle = '#e8e9f0';
-      ctx.font = '600 42px system-ui, sans-serif';
+      ctx.font = '600 42px '+SHARE_FONT_MONO;
       ctx.fillText((state.player.name||'Kommandant').slice(0,18), 240, H/2+180);
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#9296ac'; ctx.font = '600 22px system-ui, sans-serif';
+      ctx.fillStyle = '#9296ac'; ctx.font = '600 22px '+SHARE_FONT_MONO;
       ctx.fillText('PUNKTESTAND', 470, 200);
-      ctx.fillStyle = '#c3bef5'; ctx.font = '600 88px system-ui, sans-serif';
+      ctx.fillStyle = '#c3bef5'; ctx.font = '600 88px '+SHARE_FONT_MONO;
       ctx.fillText(fmtShare(Math.floor(computeScore())), 470, 290);
-      ctx.fillStyle = '#c3bef5'; ctx.font = '400 27px system-ui, sans-serif';
+      ctx.fillStyle = '#c3bef5'; ctx.font = '400 27px '+SHARE_FONT_MONO;
       ctx.fillText('Kommandanten-Level '+lvl+(badge?'  ·  '+badge:''), 470, 345);
       if (titleDef){ ctx.fillStyle = '#fac775'; ctx.fillText('\u201E'+titleDef.title+'\u201C', 470, 388); }
       if (rankLine || tag){ ctx.fillStyle = '#9296ac'; ctx.fillText([rankLine, tag?'['+tag+']':null].filter(Boolean).join('  ·  '), 470, titleDef?431:388); }
@@ -19476,33 +19640,33 @@
     const avR = 95, avCy = 270+oy;
     await drawAvatarCircle(ctx, W/2, avCy, avR, ascCount>0);
     ctx.fillStyle = '#e8e9f0';
-    ctx.font = '600 48px system-ui, sans-serif';
+    ctx.font = '600 48px '+SHARE_FONT_MONO;
     ctx.fillText((state.player.name || 'Kommandant').slice(0, 18), W/2, avCy+avR+62);
     ctx.fillStyle = '#c3bef5';
-    ctx.font = '400 27px system-ui, sans-serif';
+    ctx.font = '400 27px '+SHARE_FONT_MONO;
     ctx.fillText('Kommandanten-Level '+lvl+(badge?'  ·  '+badge:''), W/2, avCy+avR+104);
     let extraY = 0;
     if (titleDef){
       ctx.fillStyle = '#fac775';
-      ctx.font = '400 26px system-ui, sans-serif';
+      ctx.font = '400 26px '+SHARE_FONT_MONO;
       ctx.fillText('\u201E'+titleDef.title+'\u201C', W/2, avCy+avR+140);
       extraY = 36;
     }
     if (rankLine || tag){
       ctx.fillStyle = '#9296ac';
-      ctx.font = '400 25px system-ui, sans-serif';
+      ctx.font = '400 25px '+SHARE_FONT_MONO;
       ctx.fillText([rankLine, tag?'['+tag+']':null].filter(Boolean).join('  ·  '), W/2, avCy+avR+140+extraY);
       extraY += 36;
     }
     ctx.fillStyle = '#9296ac';
-    ctx.font = '600 22px system-ui, sans-serif';
+    ctx.font = '600 22px '+SHARE_FONT_MONO;
     ctx.fillText('PUNKTESTAND', W/2, avCy+avR+186+extraY);
     ctx.fillStyle = '#c3bef5';
-    ctx.font = '600 104px system-ui, sans-serif';
+    ctx.font = '600 104px '+SHARE_FONT_MONO;
     ctx.fillText(fmtShare(Math.floor(computeScore())), W/2, avCy+avR+286+extraY);
     if (drawScoreSparkline(ctx, W/2-220, avCy+avR+306+extraY, 440, 46)){
       ctx.fillStyle = '#5dcaa5';
-      ctx.font = '400 19px system-ui, sans-serif';
+      ctx.font = '400 19px '+SHARE_FONT_MONO;
       ctx.fillText('Punkteverlauf (letzte Stunden)', W/2, avCy+avR+382+extraY);
     }
     const { colonyCount, moonCount } = expansionCounts();
@@ -19525,7 +19689,7 @@
     const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
     drawShareHeader(ctx, W, 92+oy);
     ctx.fillStyle = '#e8e9f0';
-    ctx.font = '600 52px system-ui, sans-serif';
+    ctx.font = '600 52px '+SHARE_FONT_MONO;
     ctx.fillText('Flotte von '+(state.player.name||'Kommandant').slice(0,16), W/2, 175+oy);
     const order = ['superschlachtschiff','schlachtschiff','carrier','bomber','destroyers','cruisers','waechter','jaeger','frachtergross','frachter','recycler','spionageschiff','spaeher','forscher','colonyShips','ships'];
     const totals = {};
@@ -19545,10 +19709,10 @@
           }
         } catch(e){}
         ctx.fillStyle = '#e8e9f0';
-        ctx.font = '600 34px system-ui, sans-serif';
+        ctx.font = '600 34px '+SHARE_FONT_MONO;
         ctx.fillText(fmtShare(totals[k])+'\u00D7', x, y+iconS+40);
         ctx.fillStyle = '#9296ac';
-        ctx.font = '400 19px system-ui, sans-serif';
+        ctx.font = '400 19px '+SHARE_FONT_MONO;
         ctx.fillText((shipDefOrSuper(k)||{name:k}).name, x, y+iconS+70);
         x += cell;
       }
@@ -19571,7 +19735,7 @@
     const tag = myAllianceTag();
     drawShareHeader(ctx, W, 92+oy);
     ctx.fillStyle = '#e8e9f0';
-    ctx.font = '600 88px system-ui, sans-serif';
+    ctx.font = '600 88px '+SHARE_FONT_MONO;
     ctx.fillText('['+tag+']', W/2, 210+oy);
     const baseLvl = allianceBaseLevel();
     if (state.allianceBase && state.allianceBase.foundedAt){
@@ -19581,15 +19745,15 @@
         ctx.drawImage(img, W/2-260, 260+oy, 520, 520);
       } catch(e){}
       ctx.fillStyle = '#c3bef5';
-      ctx.font = '600 40px system-ui, sans-serif';
+      ctx.font = '600 40px '+SHARE_FONT_MONO;
       ctx.fillText('Allianzbasis \u00B7 Stufe '+baseLvl+(baseLvl>=10?' (Monument)':''), W/2, 830+oy);
       const sys = STAR_SYSTEMS.find(s=>s.id===state.allianceBase.sector);
       ctx.fillStyle = '#9296ac';
-      ctx.font = '400 26px system-ui, sans-serif';
+      ctx.font = '400 26px '+SHARE_FONT_MONO;
       ctx.fillText('System '+(sys?sys.name:state.allianceBase.sector), W/2, 872+oy);
     } else {
       ctx.fillStyle = '#9296ac';
-      ctx.font = '400 30px system-ui, sans-serif';
+      ctx.font = '400 30px '+SHARE_FONT_MONO;
       ctx.fillText('Eine aufstrebende Allianz sucht Verst\u00E4rkung!', W/2, 420+oy);
     }
     drawStatCardsRow(ctx, W, [
@@ -19607,10 +19771,10 @@
     const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
     drawShareHeader(ctx, W, 92+oy);
     ctx.fillStyle = '#e8e9f0';
-    ctx.font = '600 60px system-ui, sans-serif';
+    ctx.font = '600 60px '+SHARE_FONT_MONO;
     ctx.fillText('Meine Woche auf Kepler-7', W/2, 190+oy);
     ctx.fillStyle = '#c3bef5';
-    ctx.font = '400 28px system-ui, sans-serif';
+    ctx.font = '400 28px '+SHARE_FONT_MONO;
     ctx.fillText((state.player.name||'Kommandant').slice(0,18), W/2, 240+oy);
     const days = (state.dailyHistory||[]).slice(-7);
     if (days.length){
@@ -19624,10 +19788,10 @@
         if (ctx.roundRect) ctx.roundRect(bx+i*gap+(gap-bw)/2, by+chartH-h, bw, h, 8); else ctx.rect(bx+i*gap+(gap-bw)/2, by+chartH-h, bw, h);
         ctx.fill();
         ctx.fillStyle = '#9296ac';
-        ctx.font = '400 20px system-ui, sans-serif';
+        ctx.font = '400 20px '+SHARE_FONT_MONO;
         ctx.fillText((d.day||'').slice(5).replace('-','.'), bx+i*gap+gap/2, by+chartH+34);
         ctx.fillStyle = '#c3bef5';
-        ctx.font = '600 22px system-ui, sans-serif';
+        ctx.font = '600 22px '+SHARE_FONT_MONO;
         ctx.fillText('+'+fmtShare(d.scoreGain||0), bx+i*gap+gap/2, by+chartH-h-12);
       });
       const sumGain = days.reduce((a,d)=>a+(d.scoreGain||0),0);
@@ -19642,7 +19806,7 @@
       ], by+chartH+90);
     } else {
       ctx.fillStyle = '#9296ac';
-      ctx.font = '400 30px system-ui, sans-serif';
+      ctx.font = '400 30px '+SHARE_FONT_MONO;
       ctx.fillText('Noch keine Tagesbilanz vorhanden - schau morgen wieder rein!', W/2, 450+oy);
     }
     drawShareFooter(ctx, W, H);
@@ -19655,18 +19819,18 @@
     const { canvas, ctx } = shareCanvasBase(W, H);
     const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
     drawShareHeader(ctx, W, 92+oy);
-    ctx.font = '600 170px system-ui, sans-serif';
+    ctx.font = '600 170px '+SHARE_FONT_MONO;
     ctx.fillText(m.emoji || '\uD83C\uDFC6', W/2, 400+oy);
     ctx.fillStyle = '#fac775';
-    ctx.font = '600 64px system-ui, sans-serif';
+    ctx.font = '600 64px '+SHARE_FONT_MONO;
     ctx.fillText(m.title, W/2, 540+oy);
     if (m.subtitle){
       ctx.fillStyle = '#c3bef5';
-      ctx.font = '400 32px system-ui, sans-serif';
+      ctx.font = '400 32px '+SHARE_FONT_MONO;
       ctx.fillText(m.subtitle, W/2, 600+oy);
     }
     ctx.fillStyle = '#9296ac';
-    ctx.font = '400 27px system-ui, sans-serif';
+    ctx.font = '400 27px '+SHARE_FONT_MONO;
     ctx.fillText((state.player.name||'Kommandant').slice(0,18)+' \u00B7 '+new Date(m.ts).toLocaleDateString('de-DE'), W/2, 664+oy);
     drawStatCardsRow(ctx, W, [
       { label:'Punktestand', value: fmtShare(m.score||Math.floor(computeScore())) },
@@ -19693,31 +19857,31 @@
     const oy = fmt.key === 'story' ? Math.round((H-1350)/2) - 40 : 0;
     drawShareHeader(ctx, W, 92+oy);
     ctx.fillStyle = d.won ? '#5dcaa5' : '#e24b4a';
-    ctx.font = '600 110px system-ui, sans-serif';
+    ctx.font = '600 110px '+SHARE_FONT_MONO;
     ctx.fillText(d.won ? 'SIEG' : 'NIEDERLAGE', W/2, 260+oy);
     if (d.extra){
       ctx.fillStyle = '#fac775';
-      ctx.font = '600 44px system-ui, sans-serif';
+      ctx.font = '600 44px '+SHARE_FONT_MONO;
       ctx.fillText(d.extra, W/2, 330+oy);
     }
     ctx.fillStyle = '#e8e9f0';
-    ctx.font = '600 44px system-ui, sans-serif';
+    ctx.font = '600 44px '+SHARE_FONT_MONO;
     ctx.fillText((state.player.name||'Kommandant').slice(0,14)+'  \u2694  '+String(d.vs).slice(0,20), W/2, 420+oy);
     ctx.fillStyle = '#9296ac';
-    ctx.font = '400 30px system-ui, sans-serif';
+    ctx.font = '400 30px '+SHARE_FONT_MONO;
     ctx.fillText((d.defenderView?'Verteidigung ':'Angriffskraft ')+fmtShare(d.atk||0)+'  vs.  '+fmtShare(d.def||0), W/2, 480+oy);
     let y = 560+oy;
     if (r.destroyedNpcShips && Object.keys(r.destroyedNpcShips).length){
-      ctx.fillStyle = '#5dcaa5'; ctx.font = '400 28px system-ui, sans-serif';
+      ctx.fillStyle = '#5dcaa5'; ctx.font = '400 28px '+SHARE_FONT_MONO;
       ctx.fillText('Zerst\u00F6rt: '+lostCountsToText(r.destroyedNpcShips), W/2, y); y += 44;
     }
     if (r.ownLostShips && Object.keys(r.ownLostShips).length){
-      ctx.fillStyle = '#f0997b'; ctx.font = '400 28px system-ui, sans-serif';
+      ctx.fillStyle = '#f0997b'; ctx.font = '400 28px '+SHARE_FONT_MONO;
       ctx.fillText('Eigene Verluste: '+String(lostCountsToText(r.ownLostShips)).slice(0,60), W/2, y); y += 44;
     }
     if (d.loot){
       const lootTxt = Object.entries(d.loot).filter(([,a])=>a>0).map(([k,a])=>fmtShare(a)+' '+((RES_DEFS.find(x=>x.key===k)||{}).label||k)).join(', ');
-      if (lootTxt){ ctx.fillStyle = '#fac775'; ctx.font = '400 28px system-ui, sans-serif'; ctx.fillText('Beute: '+lootTxt.slice(0,70), W/2, y); y += 44; }
+      if (lootTxt){ ctx.fillStyle = '#fac775'; ctx.font = '400 28px '+SHARE_FONT_MONO; ctx.fillText('Beute: '+lootTxt.slice(0,70), W/2, y); y += 44; }
     }
     drawStatCardsRow(ctx, W, [
       { label:'Kampfpunkte', value: '+'+fmtShare(d.bp||0) },
@@ -24871,6 +25035,15 @@
     if (adminTabReportsBtn) adminTabReportsBtn.onclick = () => switchAdminTab('reports');
     const adminTabAnalyticsBtn = document.getElementById('adminTabAnalyticsBtn');
     if (adminTabAnalyticsBtn) adminTabAnalyticsBtn.onclick = () => switchAdminTab('analytics');
+    const adminTabBroadcastBtn = document.getElementById('adminTabBroadcastBtn');
+    if (adminTabBroadcastBtn) adminTabBroadcastBtn.onclick = () => switchAdminTab('broadcast');
+    const adminBroadcastSendBtn = document.getElementById('adminBroadcastSendBtn');
+    if (adminBroadcastSendBtn) adminBroadcastSendBtn.onclick = sendAdminBroadcast;
+    const adminBroadcastInput = document.getElementById('adminBroadcastInput');
+    if (adminBroadcastInput) adminBroadcastInput.oninput = () => {
+      const countEl = document.getElementById('adminBroadcastCount');
+      if (countEl) countEl.textContent = adminBroadcastInput.value.length+'/300';
+    };
     const shareColonyBtn = document.getElementById('shareColonyBtn');
     if (shareColonyBtn) shareColonyBtn.onclick = shareColonyImage;
     const referralCopyLinkBtn = document.getElementById('referralCopyLinkBtn');
