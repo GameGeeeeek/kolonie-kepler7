@@ -930,19 +930,19 @@
        Positionierung eindeutig und ohne Verifikations-Screenshot sicher richtig herzuleiten. Diese
        Regel steht bewusst NACH den einzelnen .card-row/.profile-card/... Deklarationen, damit sie
        deren border-radius zuverlässig überschreibt (gleiche Selektor-Spezifität, spätere Regel gewinnt). */
-    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard, .rank-row, .dash-colony-card, .profile-hero-card, .alliance-hero-card {
+    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard, .rank-row, .dash-colony-card, .profile-hero-card, .alliance-hero-card, .ab-hero {
       position:relative; border-radius:0;
       clip-path: polygon(var(--corner) 0, 100% 0, 100% calc(100% - var(--corner)), calc(100% - var(--corner)) 100%, 0 100%, 0 var(--corner));
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before,
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after {
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before, .ab-hero::before,
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after, .ab-hero::after {
       content:''; position:absolute; width:9px; height:9px; pointer-events:none;
       border:1.5px solid rgba(var(--primary-rgb),0.7);
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before {
+    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before, .ab-hero::before {
       top:0; right:0; border-left:none; border-bottom:none;
     }
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after {
+    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after, .ab-hero::after {
       bottom:0; left:0; border-right:none; border-top:none;
     }
     /* Runde 1 "Profilkarte überarbeiten" (Spieler-Wunsch): eigenständige HUD-Karte statt generischem
@@ -1015,6 +1015,33 @@
     .alliance-hero-name { position:relative; z-index:1; font-size:18px; font-weight:700; text-shadow:0 1px 6px rgba(0,0,0,0.65); }
     .alliance-hero-meta { position:relative; z-index:1; font-size:11.5px; color:#e2e4f0; text-shadow:0 1px 5px rgba(0,0,0,0.7); }
     .alliance-hero-body { padding:14px 20px 18px; }
+    /* Allianzbasis-Stationsansicht (Spieler-Wunsch "interaktive Ansicht mit Bezug zur Sektorkarte"):
+       zeigt bewusst DASSELBE Modell wie allianceBaseModelSvg() auf der Sektorkarte und den Teilen-
+       Karten - nur größer und mit eigenem Hintergrund/Rotation - statt einer neu erfundenen Bildsprache.
+       So sieht jeder Besucher sofort: das hier UND das Symbol auf der Karte sind dieselbe Station. */
+    .ab-hero { position:relative; overflow:hidden; margin-bottom:10px; background:
+        radial-gradient(ellipse 260px 170px at 28% 22%, rgba(var(--primary-rgb),0.24), transparent 60%),
+        radial-gradient(ellipse 220px 150px at 76% 78%, rgba(var(--info-rgb),0.16), transparent 60%),
+        linear-gradient(160deg,#12172c,#080a14);
+    }
+    .ab-hero-stage { position:relative; height:190px; overflow:hidden; }
+    .ab-hero-stage::before{ content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size:24px 24px; mask-image:radial-gradient(ellipse 92% 88% at 50% 42%, #000 30%, transparent 92%); -webkit-mask-image:radial-gradient(ellipse 92% 88% at 50% 42%, #000 30%, transparent 92%); pointer-events:none; }
+    .ab-hero-stage svg { width:100%; height:100%; display:block; }
+    .ab-hero-model { transform-origin:center; animation:abHeroSpin 46s linear infinite; }
+    @keyframes abHeroSpin { from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce){ .ab-hero-model { animation:none; } }
+    .ab-hero-star { fill:#fff; }
+    .ab-hero-caption { position:relative; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px; background:rgba(6,8,18,0.55); border-top:0.5px solid var(--line-1); font-family:var(--font-mono); font-size:10.5px; color:#9296ac; }
+    .ab-hero-caption a { color:var(--c-info); text-decoration:none; white-space:nowrap; }
+    .ab-hero-caption a:hover { text-decoration:underline; }
+    .ab-systems { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; margin:10px 0 4px; }
+    .ab-sys-badge { display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--elev-1); border:1px solid var(--line-1); cursor:pointer; text-align:left; }
+    .ab-sys-badge:hover { border-color:var(--c-info); }
+    .ab-sys-badge .bicon { width:28px; height:28px; font-size:13px; flex-shrink:0; }
+    .ab-sys-badge-name { font-size:11px; color:var(--ink); font-weight:500; }
+    .ab-sys-badge-val { font-family:var(--font-mono); font-size:10.5px; color:var(--c-info); }
+    .ab-sys-badge.locked { opacity:0.5; cursor:default; }
+    .ab-sys-badge.locked .ab-sys-badge-val { color:#6b6f85; }
     .rank-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; background:var(--elev-1); font-size:12.5px; }
     /* border-radius bewusst nicht mehr hier gesetzt - die HUD-Eckenschnitt-Sammelregel weiter unten
        (.card-row, .profile-card, ..., .rank-row) übernimmt das jetzt; stünde hier noch border-radius,
@@ -2945,8 +2972,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.95.1';
+  const VERSION = '8.96.0';
   const PATCHNOTES = [
+    { version:'8.96.0', date:'18.07.2026', changes:[
+      'Allianzbasis (Spieler-Wunsch "interaktive Ansicht mit Bezug zur Sektorkarte") hat jetzt oben im Allianz-Tab ein großes, animiertes Stationsdiorama statt nur der kleinen 84px-Vorschau - langsam rotierend, mit Sternenfeld (Dichte wächst mit der Ausbaustufe) und HUD-Rahmen',
+      'Bewusst KEIN neu erfundener 3D-Look: das Diorama zeigt exakt dasselbe wachsende Stationsmodell, das schon auf der Sektorkarte und den Teilen-Karten zu sehen ist - inklusive direktem Link "dieselbe Station live auf der Sektorkarte ansehen", der zur Karte springt und ins richtige System zoomt',
+      'Neu: eine Modul-Übersichtsleiste mit vier Kacheln (Technologien, Gebäude, Großprojekte, Weltprojekte) zeigt den echten Ausbaufortschritt jedes Bereichs auf einen Blick und springt per Klick zum jeweiligen Abschnitt weiter unten - Großprojekte/Weltprojekte bleiben sichtbar gesperrt, bis die Basis Maximalstufe erreicht hat (deckt sich mit der bestehenden Freischalt-Bedingung)',
+      'Technischer Hinweis: eine vollständige "3D-Kameraansicht" mit fliegenden Shuttles und Reparatur-Drohnen ist in dieser Ein-Datei-Vanilla-JS-Engine ohne 3D-Framework nicht realistisch umsetzbar - das Diorama nutzt stattdessen dieselbe 2,5D-SVG/CSS-Technik wie Sektorkarte und Teilen-Karten'
+    ]},
     { version:'8.95.1', date:'18.07.2026', changes:[
       'Allianz-Banner (Spieler-Feedback: "richtige Banner entwerfen, nicht einfach nur Farben") sind jetzt echte gezeichnete Szenen statt einzelner Farbverläufe: u.a. Ringplanet, Kampfflotte im Alarm-Rot, Ozeanwelt mit Außenposten, Sonnenkorona, Eiswelt mit Polarlicht, Asteroidenfeld, Werftformation mit Schiffssilhouetten, Anomalie/Portal, Sonnenaufgang über dem Planetenhorizont, echte Nebelschwaden statt Radialverlauf und ein Hyperraumsprung mit Schiff und Bewegungslinien - alles als eingebettetes SVG, keine externen Bild-Dateien nötig',
       'Betrifft sowohl die kleinen Auswahl-Kacheln als auch den großen Banner-Kopf im Allianz-Tab gleichermaßen'
@@ -12931,7 +12964,7 @@
     ]},
     { key:'allianz', icon:'ti-users', title:'Allianz', entries:[
       { title:'Allianz-Spendenrangliste', body:'Im rechten Seitenmen\u00fc (Button "Status" am Bildschirmrand) zeigt der Abschnitt "Allianz-Spenden" die <strong>Top 3 der laufenden Woche</strong> plus deine eigene Platzierung, deine Wochenspende, die Allianz-Gesamtspende und deinen prozentualen Anteil. \u00dcber "Komplette Rangliste anzeigen" siehst du alle Mitglieder sortiert. <strong>Gez\u00e4hlt wird jede Ressourcen-Spende</strong> an gemeinsame Allianz-Projekte: Allianzbasis, Allianz-Techs/-Geb\u00e4ude und die t\u00e4glichen Allianz-Eins\u00e4tze. Die Wertung setzt sich <strong>montags 00:00 Uhr</strong> zur\u00fcck; die Top 3 der abgelaufenen Woche erhalten automatisch eine kleine Belohnung (Kredite/Forschungspunkte, ein Ressourcenpaket bzw. einen Produktions-Booster), und alle Mitglieder bekommen einen zusammenfassenden Bericht im Allianz-Chat.' },
-      { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Energie / 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat danach eine eigene <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage): die Uhr für eine Stufe startet erst, sobald ihre Ressourcen VOLLSTÄNDIG beisammen sind, nicht schon bei der Gründung. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. <strong>Krieg um die Basis:</strong> Die Basis kann von Mitgliedern FREMDER Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, 8 Std. Abklingzeit je Spieler). Ihre Hülle hat 12.000 Punkte je Stufe; die Verteidigung besteht aus einem Sockel (600 je Stufe) plus allen von Mitgliedern <strong>zur Basis entsandten Schiffen</strong> (Button im Allianz-Tab, echte Flugzeit, jederzeit zurückrufbar - stationierte Schiffe erleiden bei Angriffen Verluste). Leichte Schäden repariert die Basis selbst (3%/Std.); fällt die Hülle auf 0, ist die Basis <strong>ZERSTÖRT</strong>: alle Boni sind deaktiviert, bis die Allianz die hohen Reparaturkosten (30% der kumulierten Baukosten) gemeinsam aufgebracht hat. Bei allen wichtigen Basis-Ereignissen (Baubeginn, erreichte Ausbaustufe, Angriff, Zerstörung, abgeschlossene Reparatur) erscheint automatisch eine <strong>System-Nachricht im Allianz-Chat</strong>, damit alle Mitglieder informiert sind. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone. Da die Kartenansicht standardmäßig dein eigenes Heimatsystem zeigt (nicht zwangsläufig das der Basis), bringt dich der Link "auf der Karte anzeigen" direkt neben der Systemangabe in der Basis-Box zum richtigen System.' },
+      { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Energie / 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat danach eine eigene <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage): die Uhr für eine Stufe startet erst, sobald ihre Ressourcen VOLLSTÄNDIG beisammen sind, nicht schon bei der Gründung. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. <strong>Krieg um die Basis:</strong> Die Basis kann von Mitgliedern FREMDER Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, 8 Std. Abklingzeit je Spieler). Ihre Hülle hat 12.000 Punkte je Stufe; die Verteidigung besteht aus einem Sockel (600 je Stufe) plus allen von Mitgliedern <strong>zur Basis entsandten Schiffen</strong> (Button im Allianz-Tab, echte Flugzeit, jederzeit zurückrufbar - stationierte Schiffe erleiden bei Angriffen Verluste). Leichte Schäden repariert die Basis selbst (3%/Std.); fällt die Hülle auf 0, ist die Basis <strong>ZERSTÖRT</strong>: alle Boni sind deaktiviert, bis die Allianz die hohen Reparaturkosten (30% der kumulierten Baukosten) gemeinsam aufgebracht hat. Bei allen wichtigen Basis-Ereignissen (Baubeginn, erreichte Ausbaustufe, Angriff, Zerstörung, abgeschlossene Reparatur) erscheint automatisch eine <strong>System-Nachricht im Allianz-Chat</strong>, damit alle Mitglieder informiert sind. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone. Da die Kartenansicht standardmäßig dein eigenes Heimatsystem zeigt (nicht zwangsläufig das der Basis), bringt dich der Link "auf der Karte anzeigen" direkt neben der Systemangabe in der Basis-Box zum richtigen System. Ganz oben im Allianz-Tab zeigt zusätzlich ein großes, animiertes <strong>Stationsdiorama</strong> dasselbe wachsende Modell in groß (langsam rotierend, mit Sternenfeld) - darunter eine <strong>Modul-Übersichtsleiste</strong> mit vier klickbaren Kacheln (Technologien, Gebäude, Großprojekte, Weltprojekte), die den echten Ausbaufortschritt jedes Bereichs zeigt und direkt zum jeweiligen Abschnitt springt.' },
       { title:'Koordinierte Allianzbasis-Angriffe', body:'Erweitert den Basis-Krieg um eine geplante Großschlacht: nur <strong>Admins/Offiziere</strong> können einen koordinierten Angriff starten (Allianz-Tab, Ziel-Tag + Sammelzeit 30 Min./1 Std./2 Std. + optionale Nachricht). Während der Sammelphase kann JEDES Mitglied freiwillig seine im Galaxie-Tab zusammengestellte Angriffsflotte anschließen (Schiffe sind bis zum Abschluss gebunden, ein Rückzug ist nur während der laufenden Sammelphase möglich - die Schiffe kehren dann sofort zurück). Sichtbar sind laufend Teilnehmerzahl, Gesamtschiffe und Gesamt-Angriffskraft. Nach Ablauf der Sammelzeit fliegt der GESAMTE Verband gemeinsam los und trifft geschlossen am Ziel ein - die verteidigende Allianz bekommt sofort eine Warnung mit Angreifer-Tag und Ankunftszeit, kann in dieser Zeit Verteidigungsflotten entsenden und Ressourcen spenden (dieselben Werkzeuge wie beim normalen Basis-Krieg). Die Schlacht läuft nach derselben Formel wie ein einzelner Basis-Angriff, nur mit der aggregierten Gesamtstärke des Verbands; Ergebnis (Schaden, Erfolg/Zerstörung) landet in derselben Basis-Verteidigungs-Historie. Jede Ziel-Basis hat danach <strong>24 Std. Schutz</strong> vor dem nächsten koordinierten Angriff. Belohnung (Kredite, Forschungspunkte, Kampfpunkte) und Verluste verteilen sich anteilig zum eigenen Beitrag an der Gesamt-Angriffskraft - wer nicht mitgeflogen ist, bekommt nichts.' },
       { title:'Allianz-Einsätze: Tag/Woche/Monat (ab Basis-Stufe 3/6/10)', body:'Drei parallele Kadenzen desselben Prinzips (im Allianz-Tab unterhalb der Basis): <strong>Tages-Einsatz</strong> (ab Stufe 3), <strong>Wochenprojekt</strong> (ab Stufe 6, ~5× größeres Ziel, ~4× Belohnung, garantiert zusätzlich mind. ein <strong>Episches</strong> Modul) und <strong>Großprojekt</strong> (ab Stufe 10, ~18× größeres Ziel, ~12× Belohnung, garantiert mind. ein <strong>Legendäres</strong> Modul mit kleiner Chance auf <strong>Mythisch</strong> - bislang die einzige Quelle für diese beiden Seltenheitsstufen). Jeder Einsatz ist zufällig einer von fünf Typen: <strong>Versorgungskonvoi</strong> (Erz liefern), <strong>Kristall-Kontingent</strong>, <strong>Treibstoff-Depot</strong> (Deuterium), <strong>Kampfoperation</strong> (gemeinsam Kämpfe gewinnen - NPCs, Piraten, Abwehr und Leerenrisse zählen automatisch) oder <strong>Forschungsvorstoß</strong> (gemeinsam Expeditionen abschließen). Einsatz und Ziel sind für alle Mitglieder identisch und skalieren zusätzlich mit der <strong>aktiven Mitgliederzahl</strong> der Allianz (Referenz 10 Mitglieder), damit kleine Allianzen nicht benachteiligt sind. Ist das Team-Ziel erreicht, holt sich jeder mit <strong>mindestens 1% eigenem Beitrag zum Ziel</strong> die Belohnung ab: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich Leerensplitter. Wer nicht (ausreichend) beigetragen hat, geht leer aus - auch wer die Allianz vor Abschluss verlässt. Kampf-/Expeditions-Fortschritt wird beim Öffnen des Allianz-Tabs übertragen. Eine zerstörte Basis pausiert den Einsatzbetrieb bis zur Reparatur.' },
       { title:'Allianzpunkte & Allianz-Projekte', body:'Jeder abgeschlossene Einsatz (Tag/Woche/Monat) füllt zusätzlich einen gemeinsamen Vorrat an <strong>Allianzpunkten</strong> - unabhängig von der persönlichen Belohnung, einmal pro Einsatz für die ganze Allianz. Admins/Offiziere geben diese Punkte im Allianz-Tab für <strong>Allianz-Projekte</strong> aus: dauerhafte Boni für alle Mitglieder, aktuell <strong>Kriegsrat</strong> (+1% Angriffs- UND Verteidigungspunkte je Stufe, bis Stufe 10, fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein).' },
@@ -16519,10 +16552,9 @@
       return `<div class="bmeta" style="${reached?'color:#5dcaa5;':(isNext?'color:#e8e5ff;':'')}">${reached?'<i class="ti ti-check" aria-hidden="true"></i>':(isNext?'<i class="ti ti-chevron-right" aria-hidden="true"></i>':'<i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85;"></i>')} Stufe ${st.level}: ${st.text}</div>`;
     }).join('');
     const myContribSum = ['energie','erz','kristalle','deuterium','antimaterie'].reduce((a,rk)=>a+(state.allianceContributed['base_'+rk]||0),0);
-    box.innerHTML = titleHtml + `
+    box.innerHTML = titleHtml + allianceBaseHeroHtml(lvl, tag, sys, base) + allianceBaseSystemsStripHtml(lvl) + `
       <div class="card-row" style="flex-direction:column; align-items:stretch; gap:10px; ${lvl>=10?'border-color:#fac775;':''}">
         <div style="display:flex; gap:14px; align-items:center;">
-          <svg viewBox="-30 -30 60 60" width="84" height="84" style="flex-shrink:0;">${allianceBaseModelSvg(Math.max(1,lvl), 'Prev')}</svg>
           <div style="flex:1;">
             <div class="bname">Allianzbasis [${escapeHtml(tag)}] <span class="lvl-pill" style="${lvl>=10?'background:rgba(250,199,117,0.25); color:#fac775;':''}">Stufe ${lvl}${maxed?' · MAX':''}</span></div>
             <div class="bmeta"><i class="ti ti-planet" aria-hidden="true"></i> System: <strong style="color:#fff;">${sys?sys.name:base.sector}</strong> (dauerhaft) · gegründet von ${escapeHtml(base.foundedByName||'Admin')} · <a href="#" id="abJumpMapBtn" style="color:#c3bef5;">auf der Karte anzeigen</a></div>
@@ -16584,8 +16616,86 @@
       if (missionClaimBtn) missionClaimBtn.onclick = () => claimAllianceMissionReward(cadence);
     });
     box.querySelectorAll('[data-buy-project]').forEach(btn => btn.onclick = () => buyAllianceProject(btn.getAttribute('data-buy-project')));
+    const jumpToMap = (e) => { e.preventDefault(); activeSystem = base.sector; switchTab('karte'); };
     const jumpMapBtn = box.querySelector('#abJumpMapBtn');
-    if (jumpMapBtn) jumpMapBtn.onclick = (e) => { e.preventDefault(); activeSystem = base.sector; switchTab('karte'); };
+    if (jumpMapBtn) jumpMapBtn.onclick = jumpToMap;
+    const jumpMapBtn2 = box.querySelector('#abJumpMapBtn2');
+    if (jumpMapBtn2) jumpMapBtn2.onclick = jumpToMap;
+    box.querySelectorAll('[data-ab-jump]').forEach(btn => btn.onclick = () => {
+      const target = document.getElementById(btn.getAttribute('data-ab-jump'));
+      if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
+    });
+  }
+  // Sterne im großen Stationsdiorama (siehe allianceBaseHeroHtml) - fester Seed statt Math.random(),
+  // damit sich das Sternenfeld nicht bei jedem der häufigen renderAllianceBaseBox()-Aufrufe neu
+  // zusammenwürfelt und flackert. Dichte wächst mit der Ausbaustufe, wie schon beim Allianz-Banner
+  // (Runde 2 der Profilbild/Banner-Überarbeitung) - dieselbe Design-Regel wiederverwendet.
+  function allianceBaseHeroStars(level){
+    const rand = bannerRand(777);
+    const n = Math.max(6, Math.min(22, 6 + Math.round(level*1.5)));
+    let s = '';
+    for (let i=0;i<n;i++){
+      const x=(rand()*100-50).toFixed(1), y=(rand()*64-32).toFixed(1), r=(0.3+rand()*0.6).toFixed(2);
+      s += `<circle class="ab-hero-star" cx="${x}" cy="${y}" r="${r}" opacity="${(0.3+rand()*0.5).toFixed(2)}"/>`;
+    }
+    return s;
+  }
+  // Großes, animiertes Stationsdiorama oben in der Allianzbasis-Box (Spieler-Wunsch "interaktive
+  // Ansicht mit Bezug zur Sektorkarte"): zeigt bewusst DASSELBE allianceBaseModelSvg()-Modell wie die
+  // Sektorkarte (idSuffix 'Map') und die Teilen-Karten (idSuffix 'ShareCard') - nur groß, mit eigenem
+  // Sternenhintergrund und langsamer Rotation (.ab-hero-model, CSS @keyframes abHeroSpin) - statt einer
+  // neu erfundenen Bildsprache. Der Link führt direkt zur Sektorkarte, wo dasselbe Modell (idSuffix
+  // 'Map') im richtigen System erscheint.
+  function allianceBaseHeroHtml(lvl, tag, sys, base){
+    return `
+      <div class="ab-hero">
+        <div class="ab-hero-stage">
+          <svg viewBox="-50 -32 100 64" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            ${allianceBaseHeroStars(lvl)}
+            <g class="ab-hero-model">${allianceBaseModelSvg(Math.max(1,lvl), 'Hero')}</g>
+          </svg>
+        </div>
+        <div class="ab-hero-caption">
+          <span><i class="ti ti-building-fortress" aria-hidden="true"></i> [${escapeHtml(tag)}] · Stufe ${lvl}${lvl>=ALLIANCE_BASE_MAX_LEVEL?' · MAX':''} · System ${escapeHtml(sys?sys.name:base.sector)}</span>
+          <a href="#" id="abJumpMapBtn2"><i class="ti ti-map-2" aria-hidden="true"></i> dieselbe Station live auf der Sektorkarte ansehen</a>
+        </div>
+      </div>`;
+  }
+  // Aggregiert Ist-Stufe/Ist-Zustand gegen Maximum über eine Def-Liste zu einem einzigen Prozentwert -
+  // funktioniert einheitlich für gestufte (maxLevel, z.B. Technologien/Gebäude/Großprojekte) UND
+  // binäre Einträge (kein maxLevel, z.B. Weltprojekte/Allianz-Expansion), da binäre Einträge intern
+  // wie "maxLevel:1" behandelt werden. Nutzt ausschließlich bereits vorhandene Daten
+  // (allianceTechLevel()/state.allianceResearch) - kein neues Tracking für die Modul-Übersicht nötig.
+  function allianceStructurePct(defs){
+    let have=0, max=0;
+    defs.forEach(d => {
+      if (d.maxLevel){ have += allianceTechLevel(d.key); max += d.maxLevel; }
+      else { have += state.allianceResearch[d.key] ? 1 : 0; max += 1; }
+    });
+    return max>0 ? Math.round(have/max*100) : 0;
+  }
+  // Modul-Übersichtsleiste unter dem Stationsdiorama: vier Kacheln für die vier bereits bestehenden
+  // Allianz-Ausbausysteme (Technologien/Gebäude/Großprojekte/Weltprojekte), jede mit echtem
+  // Fortschritt statt einer erfundenen Zahl, klickbar zum jeweiligen Abschnitt weiter unten im selben
+  // Tab. Großprojekte/Weltprojekte bleiben optisch gesperrt, solange die Basis nicht Maximalstufe hat -
+  // deckt sich mit der bereits bestehenden Freischalt-Bedingung dieser beiden Abschnitte.
+  function allianceBaseSystemsStripHtml(baseLvl){
+    const maxed = baseLvl >= ALLIANCE_BASE_MAX_LEVEL;
+    const items = [
+      { icon:'ti-flask', name:'Technologien', pct:allianceStructurePct(ALLIANCE_TECH_DEFS), target:'allianceTechBox', locked:false },
+      { icon:'ti-building-castle', name:'Gebäude', pct:allianceStructurePct(ALLIANCE_BUILDING_DEFS), target:'allianceBuildingBox', locked:false },
+      { icon:'ti-sparkles', name:'Großprojekte', pct:allianceStructurePct(ALLIANCE_ENDGAME_PROJECT_DEFS), target:'allianceEndgameBox', locked:!maxed },
+      { icon:'ti-sun', name:'Weltprojekte', pct:allianceStructurePct(ALLIANCE_WORLD_PROJECT_DEFS), target:'allianceWorldBox', locked:!maxed }
+    ];
+    return `<div class="ab-systems">` + items.map(it => `
+      <button type="button" class="ab-sys-badge ${it.locked?'locked':''}" data-ab-jump="${it.target}" ${it.locked?'disabled':''}>
+        <div class="bicon" style="background:rgba(var(--info-rgb),0.16); color:var(--c-info);"><i class="ti ${it.icon}" aria-hidden="true"></i></div>
+        <div>
+          <div class="ab-sys-badge-name">${it.name}</div>
+          <div class="ab-sys-badge-val">${it.locked ? '<i class="ti ti-lock" aria-hidden="true"></i> ab Stufe '+ALLIANCE_BASE_MAX_LEVEL : it.pct+'% ausgebaut'}</div>
+        </div>
+      </button>
+    `).join('') + `</div>`;
   }
   // Kriegs-Abschnitt der Basis-Box: Hüllen-Leiste, Zerstört-Zustand mit Reparatur,
   // Verteidigungs-Stationierung und Angriff auf fremde Basen.
