@@ -2762,8 +2762,14 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.87.0';
+  const VERSION = '8.88.0';
   const PATCHNOTES = [
+    { version:'8.88.0', date:'18.07.2026', changes:[
+      'Offiziere deutlich ausgebaut (Spieler-Wunsch): Admiral wirkt jetzt auch (mit halber Rate) auf die Verteidigung statt nur auf den Angriff; Ingenieur beschleunigt jetzt auch den Schiffsbau, nicht mehr nur Gebäude; Händler erhöht jetzt zusätzlich den Ertrag von Kredit-/Verkaufs-Handelsrouten, nicht mehr nur die seltenen Schwarzmarkt-Angebote',
+      'Neu: ab Offiziers-Stufe 5 einmalig (dauerhaft, kein späterer Wechsel) zwischen den Spezialisierungen "Wirkung" (+50% Wirkung auf Stufe 6-10) und "Sparsamkeit" (−25% Kosten auf Stufe 6-10) wählbar',
+      'Bugfix: Offiziere, Kommandopunkte und beide Modul-Inventare wurden bisher bei JEDEM Prestige komplett gelöscht, ohne dass der Bestätigungs-Dialog das erwähnte - jetzt wie XP/Erfolge/seltene Items behandelt und bleiben erhalten (der härtere Aufstieg setzt weiterhin wirklich alles zurück, wie sein eigener Dialog es verspricht)',
+      'Bugfix: der Skill-Baum wurde ebenfalls bei jedem Prestige geleert, obwohl die Hilfe wörtlich verspricht, dass er "auch über einen Prestige-Reset hinweg" erhalten bleibt - jetzt stimmen Code und Text überein'
+    ]},
     { version:'8.87.0', date:'17.07.2026', changes:[
       'Letzte Kolonie-Pillen-Karte im Dashboard (.dash-colony-card) hat jetzt ebenfalls den HUD-Eckenschnitt - damit tragen alle wiederkehrenden Kartentypen im Spiel jetzt dieselbe Formsprache',
       'Eigenständiges Skript check-icons.js hinzugefügt (Teil des Pflicht-Pre-Commit-Checks laut CLAUDE.md): prüft automatisch ti-*-Icons gegen die Font-Whitelist UND icon:-Werte in den Gebäude-/Forschungs-/Schiffslisten gegen das ICONS-Objekt',
@@ -6147,7 +6153,14 @@
   // Routenoptimierung-Forschung (Nachrüstung): erhöht den Ertrag ALLER Routentypen leicht pro Stufe -
   // eigene, kleine additive Bonusgruppe (nicht Teil der allgemeinen production-globalBonus-Gruppe, da
   // Routen ohnehin schon einen eigenen Ertragsmechanismus haben, keine Vermischung mit anderen Boni).
-  function routeYieldMult(){ return 1 + (state.research.rroutenoptim||0)*0.03; }
+  // Spieler-Wunsch "Händler auf Markt/Handelsrouten ausweiten": vorher traf der Händler-Bonus nur das
+  // seltene Popup-Händler-Event (siehe acceptTrade()), praktisch nie relevant. Handelsrouten sind der
+  // tatsächlich genutzte Handels-Ausbau - derselbe Multiplikator-Hook wie rroutenoptim, wirkt auf
+  // Kredit-/Verkaufs-/Veredelungsrouten gleichermaßen. Der direkte Marktverkauf bleibt bewusst
+  // unangetastet: dessen Preisbildung ist laut Kommentar bei MARKET_SELL_SPREAD Backend-Autorität,
+  // ein reiner Frontend-Bonus dort würde nur die Anzeige, nicht den tatsächlich abgerechneten Preis
+  // verändern.
+  function routeYieldMult(){ return 1 + (state.research.rroutenoptim||0)*0.03 + officerBonus('haendler'); }
   // Veredelungsroute (vormals "Transportroute", war rein kosmetisch - siehe Kommentar unten in
   // processTradeRoutes): feste Umwandlungskette, Kurs grob am Verhältnis der echten Marktbasispreise
   // (erz 2.0 / kristalle 3.2 / deuterium 4.8 / antimaterie 24.0) orientiert, minus 20% Verlust -
@@ -8388,28 +8401,71 @@
   // gibt +2% seines Effekts (max +20% bei Level 10). Bezahlt mit Kommandopunkten (commandPoints), einer
   // getrennten Währung, die parallel zu Kampfpunkten verdient wird – Ausgeben senkt NICHT den Punktestand.
   const OFFICERS = [
-    { key:'ingenieur', name:'Ingenieur', icon:'ti-building-factory-2', color:'#f0997b', effect:'−2% Gebäude-Bauzeit pro Stufe', detail:'Beschleunigt den Bau von Gebäuden.' },
-    { key:'admiral', name:'Admiral', icon:'ti-sword', color:'#e24b4a', effect:'+2% Angriffskraft pro Stufe', detail:'Erhöht die Angriffskraft deiner Flotten.' },
+    { key:'ingenieur', name:'Ingenieur', icon:'ti-building-factory-2', color:'#f0997b', effect:'−2% Bauzeit pro Stufe', detail:'Beschleunigt den Bau von Gebäuden UND Schiffen.' },
+    { key:'admiral', name:'Admiral', icon:'ti-sword', color:'#e24b4a', effect:'+2% Angriffskraft, +1% Verteidigung pro Stufe', detail:'Erhöht vor allem die Angriffskraft, etwas auch die Verteidigung deiner Flotten.' },
     { key:'wissenschaftler', name:'Wissenschaftler', icon:'ti-flask', color:'#85b7eb', effect:'−2% Forschungsdauer pro Stufe', detail:'Verkürzt die Dauer von Forschungen.' },
-    { key:'haendler', name:'Händler', icon:'ti-truck', color:'#5dcaa5', effect:'+2% Handelsgewinn pro Stufe', detail:'Bessere Konditionen beim Schwarzmarkt-Händler.' }
+    { key:'haendler', name:'Händler', icon:'ti-truck', color:'#5dcaa5', effect:'+2% Ertrag pro Stufe', detail:'Bessere Konditionen beim Schwarzmarkt-Händler UND höherer Ertrag auf Kredit-/Verkaufs-Handelsrouten.' }
   ];
   const OFFICER_MAX_LEVEL = 10;
   const OFFICER_BONUS_PER_LEVEL = 0.02;
   function officerLevel(key){ return (state.officers||{})[key] || 0; }
-  function officerBonus(key){ return officerLevel(key) * OFFICER_BONUS_PER_LEVEL; }
-  function officerUpgradeCost(nextLevel){ return Math.round(20 * Math.pow(1.6, nextLevel - 1)); }
+  // Spieler-Wunsch "Talent-Verzweigung bei Stufe 5/10": ab Stufe 5 kann EINMALIG (dauerhaft, kein
+  // Re-Spec) zwischen zwei Ausrichtungen gewählt werden - "Wirkung" erhöht die Rate der Stufen 6-10
+  // um 50%, "Sparsamkeit" senkt die Kosten der Stufen 6-10 um 25%. Bewusst als einheitliche
+  // Machtstärke-vs-Preis-Entscheidung für alle 4 Offiziere umgesetzt statt 8 einzeln erfundener neuer
+  // Effekte - jeder neue Effekt hätte einen eigenen, ungetesteten Formel-Anschlusspunkt gebraucht;
+  // diese Variante nutzt ausschließlich die schon vorhandene, bewährte officerBonus/-UpgradeCost-Formel.
+  const OFFICER_TALENT_LEVEL = 5;
+  const OFFICER_TALENTS = {
+    power: { key:'power', name:'Wirkung', desc:'Stufen 6-10 wirken 50% stärker' },
+    thrift: { key:'thrift', name:'Sparsamkeit', desc:'Stufen 6-10 kosten 25% weniger Kommandopunkte' }
+  };
+  function officerTalent(key){ return (state.officerTalents||{})[key] || null; }
+  function officerBonus(key){
+    const lvl = officerLevel(key);
+    const baseLvls = Math.min(lvl, OFFICER_TALENT_LEVEL);
+    const extraLvls = Math.max(0, lvl - OFFICER_TALENT_LEVEL);
+    const extraRate = OFFICER_BONUS_PER_LEVEL * (officerTalent(key)==='power' ? 1.5 : 1);
+    return baseLvls*OFFICER_BONUS_PER_LEVEL + extraLvls*extraRate;
+  }
+  function officerUpgradeCost(key, nextLevel){
+    let cost = Math.round(20 * Math.pow(1.6, nextLevel - 1));
+    if (nextLevel > OFFICER_TALENT_LEVEL && officerTalent(key)==='thrift') cost = Math.round(cost*0.75);
+    return cost;
+  }
+  // Anzeige-Text je Offizier - admiral hat seit der "Admiral auf Verteidigung ausweiten"-Erweiterung
+  // zwei Teilwerte (Angriff/Verteidigung), die übrigen drei weiterhin nur einen.
+  function officerBonusDisplay(key){
+    const b = Math.round(officerBonus(key)*100);
+    if (key === 'admiral') return '+'+b+'% Angriff, +'+Math.round(officerBonus(key)*0.5*100)+'% Verteidigung';
+    if (key === 'ingenieur') return '−'+b+'% Bauzeit';
+    if (key === 'wissenschaftler') return '−'+b+'% Forschungsdauer';
+    if (key === 'haendler') return '+'+b+'% Ertrag';
+    return '+'+b+'%';
+  }
   function upgradeOfficer(key){
     const def = OFFICERS.find(o=>o.key===key);
     if (!def) return;
     const cur = officerLevel(key);
     if (cur >= OFFICER_MAX_LEVEL){ log(def.name+' ist bereits auf Maximalstufe.', 'ti-alert-triangle'); return; }
     const next = cur + 1;
-    const cost = officerUpgradeCost(next);
+    const cost = officerUpgradeCost(key, next);
     if ((state.commandPoints||0) < cost){ log('Nicht genug Kommandopunkte ('+cost+' benötigt, '+(state.commandPoints||0)+' vorhanden). Kommandopunkte gibt es fürs Kämpfen.', 'ti-alert-triangle'); return; }
     state.commandPoints -= cost;
     state.officers[key] = next;
     log((cur===0?def.name+' angeheuert':def.name+' auf Stufe '+next+' befördert')+' (−'+cost+' Kommandopunkte).', def.icon);
     playSound(cur===0?'achieve':'build');
+    render(); save();
+  }
+  function pickOfficerTalent(key, talent){
+    const def = OFFICERS.find(o=>o.key===key);
+    if (!def || !OFFICER_TALENTS[talent]) return;
+    if (officerLevel(key) < OFFICER_TALENT_LEVEL){ log('Erst ab Stufe '+OFFICER_TALENT_LEVEL+' wählbar.', 'ti-alert-triangle'); return; }
+    if (officerTalent(key)){ log('Spezialisierung bereits gewählt (dauerhaft, kein Wechsel möglich).', 'ti-alert-triangle'); return; }
+    state.officerTalents = state.officerTalents || {};
+    state.officerTalents[key] = talent;
+    log(def.name+' spezialisiert: '+OFFICER_TALENTS[talent].name+'.', def.icon);
+    playSound('research');
     render(); save();
   }
   // Kampfpunkte vergeben: erhöht sowohl die punkterelevanten battlePoints als auch – im gleichen Maß –
@@ -8533,6 +8589,11 @@
     if (planetKey) combatBonus += moduleBonusAt(planetKey, 'def');
     combatBonus += allianceProjectBonus('ap_kriegsrat');
     if (state.allianceResearch) combatBonus += 0.20*allianceTechFrac('ep_verteidigung'); // Permanentes Allianzprojekt "Verteidigungsnetzwerk"
+    // Spieler-Wunsch "Admiral auf Verteidigung ausweiten": bisher wirkte der Admiral NUR auf
+    // attackCombatBonusRaw(), obwohl er allgemein als "Kampf"-Offizier auftritt. Bewusst mit halber
+    // Rate (+1%/Stufe statt +2%/Stufe) - der Admiral bleibt primär ein Angriffs-Offizier, bekommt aber
+    // nicht mehr eine komplett blinde Verteidigungsseite.
+    combatBonus += officerBonus('admiral')*0.5;
     return combatBonus;
   }
   function defensePower(planetKey){
@@ -9694,7 +9755,7 @@
   function canPrestige(){ return computeScore() >= 5000; }
   function doPrestige(){
     if (!canPrestige()){ log('Punktzahl noch zu niedrig für Prestige (mind. 5000 nötig).', 'ti-alert-triangle'); return; }
-    if (!confirm('Prestige zurücksetzen? Gebäude, Forschung und Flotte gehen verloren, du behältst deinen Kommandanten-Namen, seltene Items, Freischaltungen und Erfolge, und erhältst dauerhaft +5% Produktion. Im nächsten Schritt wählst du zusätzlich einen dauerhaften Bonus.')) return;
+    if (!confirm('Prestige zurücksetzen? Gebäude, Forschung und Flotte gehen verloren, du behältst deinen Kommandanten-Namen, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie Offiziere/Kommandopunkte/Module, und erhältst dauerhaft +5% Produktion. Im nächsten Schritt wählst du zusätzlich einen dauerhaften Bonus.')) return;
     const body = document.getElementById('prestigePerkBody');
     if (body){
       body.innerHTML = PRESTIGE_PERKS.map(p => {
@@ -9842,6 +9903,7 @@
     }
     if (state.commandPoints === undefined) state.commandPoints = 0;
     if (!state.officers) state.officers = {};
+    if (!state.officerTalents) state.officerTalents = {};
     if (state.credits === undefined) state.credits = 250;
     if (!state.tradeRoutes) state.tradeRoutes = [];
     if (!state.factionRep) state.factionRep = {};
@@ -9925,6 +9987,22 @@
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
+    // Bugfix (Spieler-Wunsch, entdeckt bei der Offiziere-Recherche): Offiziere, Kommandopunkte und
+    // beide Modul-Inventare wurden bisher bei JEDEM Prestige komplett gelöscht, ohne dass der
+    // Bestätigungs-Dialog (siehe unten, Zeile ~9700) das erwähnt - der Dialog verspricht nur
+    // "Kommandantenname, seltene Items, Freischaltungen und Erfolge". Da Prestige der zentrale,
+    // wiederholt genutzte Fortschritts-Kreislauf ist, vernichtete das investierte Kommandopunkte bei
+    // jedem einzelnen Durchlauf. Jetzt wie XP/Erfolge/seltene Items behandelt: bleibt erhalten.
+    const keepOfficers = state.officers, keepCommandPoints = state.commandPoints, keepOfficerTalents = state.officerTalents;
+    const keepModules = state.modules, keepModuleSlotLevel = state.moduleSlotLevel, keepEquippedModules = state.equippedModules;
+    const keepShipModules = state.shipModules, keepShipModuleSlotLevel = state.shipModuleSlotLevel, keepEquippedShipModules = state.equippedShipModules;
+    // Bugfix: skillTree wurde bisher ebenfalls bei jedem Prestige geleert, obwohl HELP_SECTIONS
+    // 'fortschritt' wörtlich verspricht "Bleibt dauerhaft erhalten, auch über einen Prestige-Reset
+    // hinweg" - dieselbe Fehlerart wie der schon behobene state.ascension-Bug direkt darüber. Da
+    // Fähigkeitspunkte an das (ohnehin erhaltene) Kommandanten-Level gekoppelt sind, nicht an eine
+    // separate Währung, ist das kein Bilanzrisiko, nur eine Korrektur des tatsächlichen Verhaltens
+    // auf das schon immer dokumentierte.
+    const keepSkillTree = state.skillTree;
     // Bugfix: state.ascension wurde beim Prestige bisher NICHT übernommen - applyStateDefaults()
     // setzte danach Sternenessenz, Aufstiegs-Zähler und den kompletten Meta-Baum auf 0, obwohl die
     // Hilfe ausdrücklich verspricht, dass diese Boni JEDEN Reset überleben. Da der Aufstieg das
@@ -9941,11 +10019,14 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
+      skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: 250 + prestigeStartLvl*100, claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
       ascension: keepAscension,
+      officers:keepOfficers||{}, officerTalents:keepOfficerTalents||{}, commandPoints:keepCommandPoints||0,
+      modules:keepModules||{}, moduleSlotLevel:keepModuleSlotLevel||{}, equippedModules:keepEquippedModules||{},
+      shipModules:keepShipModules||{}, shipModuleSlotLevel:keepShipModuleSlotLevel||{}, equippedShipModules:keepEquippedShipModules||{},
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
     };
     applyStateDefaults();
@@ -10339,6 +10420,11 @@
       if (orbD && orbD.focus==='dock') effBuildTimeEach *= 1 - 0.06*orbD.level;
       const evD = planetEventOf(planetKey);
       if (evD && evD.def.effect.type==='shipbuild') effBuildTimeEach *= evD.def.effect.mult;
+      // Grafik/Balance-Runde (Spieler-Wunsch "Ingenieur auf Schiffsbau ausweiten"): der Ingenieur-Bonus
+      // wirkte bisher trotz allgemeiner "Bauzeit"-Beschreibung NUR auf Gebäude, Schiffe waren explizit
+      // ausgenommen. Gleicher Faktor wie bei Gebäuden, reiht sich multiplikativ neben Werft-Rolle/
+      // Orbitalstation-Fokus ein (wie diese bereits tun), kein neuer gedeckelter Bonustopf nötig.
+      effBuildTimeEach *= (1 - officerBonus('ingenieur'));
     }
     if (kind === 'building'){
       effBuildTimeEach *= (1 - officerBonus('ingenieur'));
@@ -12495,15 +12581,16 @@
       { title:'Kredit-Shop', body:'Im Markt-Tab kannst du Kredite ausgeben für: <strong>Produktions-Schub</strong> (+25% alle Ressourcen, 1h, 400 Kr.) · <strong>Söldnerflotte</strong> (+20% Angriffskraft, 2h, 600 Kr.) · <strong>Schildgenerator-Miete</strong> (+25% Verteidigung, 2h, 500 Kr.) · <strong>Modul-Blaupause</strong> (zufälliges Standort-Schiffsmodul, 2000 Kr.) · <strong>Schiffsklassen-Blaupause</strong> (zufälliges klassenweites Modul, max. Seltenheit "Selten", 3500 Kr.). Laufende Shop-Buffs können nicht gestapelt werden – erst nach Ablauf erneut kaufbar. Blaupausen sind beliebig oft kaufbar.' }
     ]},
     { key:'offiziere', icon:'ti-user-circle', title:'Offiziere', entries:[
-      { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Gebäude-Bauzeit pro Stufe), <strong>Admiral</strong> (+2% Angriffskraft), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Handelsgewinn beim Schwarzmarkt). Jeder geht von Stufe 0 (nicht angeheuert) bis 10, also bis zu ±20%.' },
-      { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr).' },
+      { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
+      { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
+      { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
       { title:'Schiffsmodule (Standort)', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Fünf Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei einem erfolgreichen Überfall). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots, die einzeln mit Kommandopunkten aufgerüstet werden (bis zu 4 Slots). Ein an Standort A ausgerüstetes Modul wirkt nur dort. Module findest du bei Expeditionen, treibenden Sonden und im Kredit-Shop. Mythische Module sind (noch) nicht über diese Quellen erhältlich - vorgesehen für hochstufige Allianzmissionen. Verwaltung im Offiziere-Tab.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Vor Allianzmissionen nur bis "Selten" über die Schiffsklassen-Blaupause im Kredit-Shop erhältlich – Episch/Legendär/Mythisch sind für hochstufige Allianzmissionen reserviert. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
-      { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge und Skill-Baum. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum.' },
+      { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong>. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie.' },
       { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator (Stufe 1-8), dann Galaktische Legende 1-12 (Stufe 9-20), Sternenherrscher 1-12 (Stufe 21-32), Kosmischer Souverän 1-12 (Stufe 33-44) und ab Stufe 45 zählt "Kosmischer Souverän" endlos weiter hoch. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
@@ -16424,6 +16511,7 @@
         }
         if (state.commandPoints === undefined) state.commandPoints = 0;
         if (!state.officers) state.officers = {};
+        if (!state.officerTalents) state.officerTalents = {};
         if (state.credits === undefined) state.credits = 250;
         if (!state.tradeRoutes) state.tradeRoutes = [];
         if (!state.factionRep) state.factionRep = {};
@@ -22864,30 +22952,38 @@
           const lvl = officerLevel(o.key);
           const maxed = lvl >= OFFICER_MAX_LEVEL;
           const next = lvl + 1;
-          const cost = maxed ? 0 : officerUpgradeCost(next);
+          const cost = maxed ? 0 : officerUpgradeCost(o.key, next);
           const canAfford = (state.commandPoints||0) >= cost;
-          const curBonusPct = Math.round(lvl * OFFICER_BONUS_PER_LEVEL * 100);
+          const talent = officerTalent(o.key);
+          const talentPickable = lvl >= OFFICER_TALENT_LEVEL && !talent;
           return `
             <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem; ${lvl>0?'border-color:'+o.color+';':''}">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                   <div class="bicon" style="background:${o.color}22; color:${o.color}; flex-shrink:0;"><i class="ti ${o.icon}" aria-hidden="true"></i></div>
                   <div>
-                    <div class="bname">${o.name} ${lvl>0?`<span class="lvl-pill" style="background:${o.color}22; color:${o.color};">Stufe ${lvl}</span>`:'<span class="lvl-pill">nicht angeheuert</span>'}</div>
+                    <div class="bname">${o.name} ${lvl>0?`<span class="lvl-pill" style="background:${o.color}22; color:${o.color};">Stufe ${lvl}</span>`:'<span class="lvl-pill">nicht angeheuert</span>'}${talent?` <span class="lvl-pill" style="background:${o.color}22; color:${o.color};"><i class="ti ti-sparkles" aria-hidden="true"></i> ${OFFICER_TALENTS[talent].name}</span>`:''}</div>
                     <div class="bmeta">${o.detail}</div>
-                    ${lvl>0?`<div class="bmeta" style="color:${o.color};">Aktuell: ${o.key==='ingenieur'||o.key==='wissenschaftler'?'−':'+'}${curBonusPct}%</div>`:''}
+                    ${lvl>0?`<div class="bmeta" style="color:${o.color};">Aktuell: ${officerBonusDisplay(o.key)}</div>`:''}
                   </div>
                 </div>
               </div>
               <div class="progress-outer" style="margin:8px 0 6px;"><div class="progress-inner" style="width:${lvl/OFFICER_MAX_LEVEL*100}%; background:${o.color};"></div></div>
+              ${talentPickable ? `
+              <div class="bmeta" style="margin-bottom:6px;">Ab Stufe ${OFFICER_TALENT_LEVEL} einmalig wählbar (dauerhaft, kein Wechsel):</div>
+              <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <button data-pick-talent="${o.key}" data-talent="power" style="flex:1; font-size:11px;" title="${OFFICER_TALENTS.power.desc}"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:3px;"></i>Wirkung</button>
+                <button data-pick-talent="${o.key}" data-talent="thrift" style="flex:1; font-size:11px;" title="${OFFICER_TALENTS.thrift.desc}"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:3px;"></i>Sparsamkeit</button>
+              </div>` : ''}
               ${maxed
-                ? `<div class="bmeta" style="color:${o.color}; text-align:center;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe (${o.effect.replace('pro Stufe','').trim()} × 10)</div>`
+                ? `<div class="bmeta" style="color:${o.color}; text-align:center;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe (${officerBonusDisplay(o.key)})</div>`
                 : `<button data-upgrade-officer="${o.key}" ${canAfford?'':'disabled'} style="width:100%;"><i class="ti ti-medal" aria-hidden="true" style="margin-right:4px;"></i>${lvl===0?'Anheuern':'Befördern auf Stufe '+next} · ${cost} KP${canAfford?'':' (zu wenig)'}</button>`
               }
             </div>
           `;
         }).join('');
         officerBox.querySelectorAll('[data-upgrade-officer]').forEach(btn => btn.onclick = () => upgradeOfficer(btn.getAttribute('data-upgrade-officer')));
+        officerBox.querySelectorAll('[data-pick-talent]').forEach(btn => btn.onclick = () => pickOfficerTalent(btn.getAttribute('data-pick-talent'), btn.getAttribute('data-talent')));
       }
       const moduleBox = document.getElementById('moduleBox');
       if (moduleBox){
