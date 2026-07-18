@@ -3015,8 +3015,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.100.0';
+  const VERSION = '8.101.0';
   const PATCHNOTES = [
+    { version:'8.101.0', date:'18.07.2026', changes:[
+      'Zufallsereignisse (90-Sekunden-Pop-ups) nochmal von 20 auf 60 Varianten erweitert (Spieler-Wunsch "nochmal 40 pro hinzufügen"): weitere Weltraum-Phänomene, Wracks, NPC-Begegnungen, Handelskontakte und Entdeckungen im selben Kosten-/Beute-Rahmen wie bisher',
+      'Expeditions-Sonderfunde ebenfalls von 20 auf 60 Varianten erweitert - alle mit derselben "mult"-Erfahrungsskalierung wie die bestehenden, kein Balance-Sprung, nur mehr Abwechslung. Beide Pools damit dreimal so groß wie zu Tagesbeginn'
+    ]},
     { version:'8.100.0', date:'18.07.2026', changes:[
       'Zufallsereignisse (90-Sekunden-Pop-ups) von 8 auf 20 Varianten erweitert (Spieler-Wunsch "mindestens 20 pro"): neu u.a. verlassener Frachter, Eiskomet, Meteoritenschauer, verschlüsseltes Forschungssignal, Flüchtlingsschiff, Geisterschiff-Signal, alte Navigationsbake (Flugzeit-Bonus), fremde Handelsflotte, Räuberbande, Kristalladern, experimentelles Antriebsmodul und Flüstern aus der Leere - gleicher Kosten-/Beute-Rahmen wie die bestehenden Varianten',
       'Expeditions-Sonderfunde von 6 auf 20 Varianten erweitert: neu u.a. Wrackteile, Kometeneis, Forschungsdepot, Flüchtlingskonvoi, Geisterwrack, Navigationsdaten, Handelskontakt, Räuberversteck, Kristallader, Antriebsmodul, Echo aus der Leere, beschleunigter Bauauftrag (analog zur bestehenden Forschungsbeschleunigung), Verteidigungs- und Angriffsbuffs - alle mit derselben "mult"-Erfahrungsskalierung wie die bestehenden sechs, kein Balance-Sprung'
@@ -5554,7 +5558,325 @@
           if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
             return 'Im Rauschen verbirgt sich ein seltener Fund: '+ri.name+'! +25 XP.'; }
           return 'Das Flüstern verstummt ohne erkennbaren Sinn. +25 XP.'; } },
-      optB:{ label:'Ignorieren', resolve:()=>'Das Flüstern verklingt ungehört.' } }
+      optB:{ label:'Ignorieren', resolve:()=>'Das Flüstern verklingt ungehört.' } },
+    // 18.07.2026 (Spieler-Wunsch "nochmal 40 pro hinzufügen"): von 20 auf 60 Varianten erweitert.
+    // Gleicher Kosten-/Belohnungsrahmen wie alle bisherigen - reine Abwechslung, kein Balance-Sprung.
+    { key:'gravity_anomaly', name:'Gravitationsanomalie vermessen', icon:'ti-atom', color:'#8f88e8',
+      desc:'Eine Gravitationsanomalie verzerrt Raum und Zeit in der Nähe. Eine Vermessung liefert wertvolle Forschungsdaten.',
+      optA:{ label:'Vermessen', cost:{energie:200},
+        resolve:()=>{ const amt = 50+Math.floor(Math.random()*60);
+          const cap = storageCap(); const before = state.resources.forschungspunkte||0;
+          state.resources.forschungspunkte = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.forschungspunkte-before; addXp(15);
+          return 'Anomalie vermessen: +'+fmt(gained)+' Forschungspunkte, +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Anomalie zieht unvermessen vorbei.' } },
+    { key:'star_shard', name:'Sternschnuppen-Fragment geborgen', icon:'ti-star', color:'#fac775',
+      desc:'Ein Fragment einer Sternschnuppe treibt in Reichweite. Eine Bergung könnte sich lohnen.',
+      optA:{ label:'Bergen', cost:{deuterium:120},
+        resolve:()=>{ const amt = 200+Math.floor(Math.random()*450);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Fragment geborgen: +'+fmt(gained)+' Erz.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Fragment verglüht ungenutzt.' } },
+    { key:'plasma_cloud', name:'Plasmawolke treibt vorbei', icon:'ti-bolt', color:'#f0997b',
+      desc:'Eine energiereiche Plasmawolke driftet in Sensorreichweite. Eine kontrollierte Anzapfung ist riskant, könnte aber Antimaterie liefern.',
+      optA:{ label:'Anzapfen', cost:{energie:220},
+        resolve:()=>{ const amt = 120+Math.floor(Math.random()*220);
+          const cap = storageCap(); const before = state.resources.antimaterie||0;
+          state.resources.antimaterie = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.antimaterie-before;
+          return 'Plasma angezapft: +'+fmt(gained)+' Antimaterie.'; } },
+      optB:{ label:'Meiden', resolve:()=>'Die Wolke zieht ungenutzt vorbei.' } },
+    { key:'radiation_belt', name:'Strahlungsgürtel durchquert', icon:'ti-alert-triangle', color:'#e0a548',
+      desc:'Ein Strahlungsgürtel liegt auf dem Kurs. Schutzschilde hochfahren kostet Energie, spart aber Produktionsausfälle - wer nichts tut, riskiert kurzzeitige Einbußen.',
+      optA:{ label:'Schutzschilde hochfahren', cost:{energie:180},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*250);
+          const cap = storageCap(); const before = state.resources.kristalle||0;
+          state.resources.kristalle = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.kristalle-before;
+          return 'Schilde halten - nebenbei +'+fmt(gained)+' Kristalle aus dem Strahlungsspektrum gewonnen.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>{ if (Math.random() < 0.45){ state.buffs = state.buffs||[]; state.buffs.push({ kind:'prod', res:'kristalle', mult:0.7, expiresAt: Date.now()+300000 });
+          return 'Die Strahlung stört die Kristallförderung - -30% Kristall-Produktion für 5 Minuten.'; }
+          return 'Der Gürtel wird ohne Folgen durchquert.'; } } },
+    { key:'magnetic_storm', name:'Magnetsturm erfasst die Flotte', icon:'ti-refresh', color:'#af9ce6',
+      desc:'Ein Magnetsturm bringt die Navigationssysteme durcheinander. Eine Neukalibrierung kostet Energie, verspricht aber kürzere Flugzeiten.',
+      optA:{ label:'Neu kalibrieren', cost:{energie:150},
+        resolve:()=>{ state.buffs = state.buffs||[]; state.buffs.push({ kind:'speed', mult:0.9, expiresAt: Date.now()+600000 }); addXp(15);
+          return 'Navigation neu kalibriert: -10% Flugzeit aller Missionen für 10 Minuten, +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Der Sturm zieht ohne Folgen vorbei.' } },
+    { key:'cargo_container', name:'Treibender Frachtcontainer', icon:'ti-box', color:'#5dcaa5',
+      desc:'Ein einzelner Frachtcontainer treibt führerlos im All. Eine Bergung könnte sich lohnen.',
+      optA:{ label:'Bergen', cost:{deuterium:100},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*250); state.credits = (state.credits||0)+amt; addXp(10);
+          return 'Container geborgen: +'+fmt(amt)+' Kredite, +10 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Der Container treibt ungenutzt weiter.' } },
+    { key:'research_station', name:'Verlassene Forschungsstation entdeckt', icon:'ti-flask', color:'#c3bef5',
+      desc:'Eine verlassene Forschungsstation treibt im All. Eine Untersuchung könnte verwertbare Daten liefern.',
+      optA:{ label:'Untersuchen', cost:{energie:200},
+        resolve:()=>{ const amt = 50+Math.floor(Math.random()*100);
+          const cap = storageCap(); const before = state.resources.forschungspunkte||0;
+          state.resources.forschungspunkte = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.forschungspunkte-before; addXp(15);
+          return 'Station untersucht: +'+fmt(gained)+' Forschungspunkte, +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Station bleibt unerforscht zurück.' } },
+    { key:'military_wreck', name:'Militärwrack gesichtet', icon:'ti-shield', color:'#e24b4a',
+      desc:'Ein zerstörtes Militärschiff treibt im All. Eine Durchsuchung ist riskant, könnte aber Wertvolles zutage fördern.',
+      optA:{ label:'Durchsuchen', cost:{deuterium:150},
+        resolve:()=>{ addXp(20);
+          if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+            return 'Wrack durchsucht: ein seltener Fund - '+ri.name+'! +20 XP.'; }
+          const amt = 200+Math.floor(Math.random()*300);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Wrack durchsucht: +'+fmt(gained)+' Erz aus der Hülle geborgen, +20 XP.'; } },
+      optB:{ label:'Meiden', resolve:()=>'Das Wrack bleibt unangetastet zurück.' } },
+    { key:'mining_ship', name:'Gestrandetes Bergbauschiff', icon:'ti-pick', color:'#c9c7bd',
+      desc:'Ein gestrandetes Bergbauschiff mit noch voller Ladung treibt in Reichweite. Eine Bergung lohnt sich.',
+      optA:{ label:'Ladung bergen', cost:{energie:150},
+        resolve:()=>{ const amt = 300+Math.floor(Math.random()*300);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Ladung geborgen: +'+fmt(gained)+' Erz.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Schiff bleibt liegen.' } },
+    { key:'tanker_wreck', name:'Leckgeschlagener Tanker', icon:'ti-droplet', color:'#a9cdf5',
+      desc:'Ein havarierter Tanker verliert langsam seine Deuterium-Ladung. Schnelles Handeln rettet noch einiges davon.',
+      optA:{ label:'Ladung abpumpen', cost:{energie:120},
+        resolve:()=>{ const amt = 250+Math.floor(Math.random()*250);
+          const cap = storageCap(); const before = state.resources.deuterium||0;
+          state.resources.deuterium = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.deuterium-before;
+          return 'Ladung abgepumpt: +'+fmt(gained)+' Deuterium.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das restliche Deuterium verpufft ungenutzt.' } },
+    { key:'bounty_hunter', name:'Kopfgeldjäger kreuzt die Route', icon:'ti-target', color:'#e24b4a',
+      desc:'Ein Kopfgeldjäger nähert sich und bietet einen Informationsaustausch an. Riskant, aber möglicherweise lohnend.',
+      optA:{ label:'Kontakt aufnehmen', cost:{kristalle:150},
+        resolve:()=>{ addXp(15);
+          if (Math.random() < 0.6){ const amt = 200+Math.floor(Math.random()*300); state.credits = (state.credits||0)+amt;
+            return 'Der Kopfgeldjäger teilt brauchbare Informationen: +'+fmt(amt)+' Kredite, +15 XP.'; }
+          return 'Der Kopfgeldjäger verlangt mehr, als er bietet - der Handel platzt. +15 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Der Kopfgeldjäger zieht weiter.' } },
+    { key:'smuggler_ship', name:'Schmuggler bietet Sonderdeal an', icon:'ti-truck', color:'#fac775',
+      desc:'Ein Schmuggler bietet einen inoffiziellen Tausch an - Kristalle gegen Deuterium, abseits der üblichen Kurse.',
+      optA:{ label:'Handeln (250 Kristalle → Deuterium)', cost:{kristalle:250},
+        resolve:()=>{ const amt = 300+Math.floor(Math.random()*150);
+          const cap = storageCap(); const before = state.resources.deuterium||0;
+          state.resources.deuterium = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.deuterium-before;
+          return 'Getauscht: 250 Kristalle → +'+fmt(gained)+' Deuterium.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Der Schmuggler zieht weiter.' } },
+    { key:'mercenary_offer', name:'Söldner bietet Kurzzeitvertrag an', icon:'ti-sword', color:'#e0a548',
+      desc:'Ein Söldnertrupp bietet befristete Unterstützung gegen Bezahlung an.',
+      optA:{ label:'Anheuern', cost:{kristalle:200},
+        resolve:()=>{ state.buffs = state.buffs||[]; state.buffs.push({ kind:'atk', mult:1.2, expiresAt: Date.now()+1800000 }); addXp(15);
+          return 'Söldner angeheuert: +20% Angriffskraft für 30 Minuten, +15 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Die Söldner ziehen weiter.' } },
+    { key:'diplomat_envoy', name:'Diplomatischer Gesandter macht Halt', icon:'ti-message', color:'#85b7eb',
+      desc:'Ein diplomatischer Gesandter bittet um eine kleine Versorgungsspende - als Dank winkt eine großzügige Gegenleistung.',
+      optA:{ label:'Spenden', cost:{erz:150},
+        resolve:()=>{ const amt = 200+Math.floor(Math.random()*250); state.credits = (state.credits||0)+amt; addXp(15);
+          return 'Spende überreicht: +'+fmt(amt)+' Kredite als Dank, +15 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Der Gesandte zieht ohne Spende weiter.' } },
+    { key:'wandering_scientist', name:'Wandernder Wissenschaftler bittet um Transport', icon:'ti-microscope', color:'#9be8c9',
+      desc:'Ein einzelner Wissenschaftler bittet um Energie für seine Instrumente - im Austausch teilt er seine Messdaten.',
+      optA:{ label:'Unterstützen', cost:{energie:180},
+        resolve:()=>{ const amt = 40+Math.floor(Math.random()*70);
+          const cap = storageCap(); const before = state.resources.forschungspunkte||0;
+          state.resources.forschungspunkte = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.forschungspunkte-before; addXp(15);
+          return 'Messdaten erhalten: +'+fmt(gained)+' Forschungspunkte, +15 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Der Wissenschaftler zieht unversorgt weiter.' } },
+    { key:'nomad_fleet', name:'Nomadenflotte bittet um Handel', icon:'ti-users', color:'#5dcaa5',
+      desc:'Eine kleine Nomadenflotte bietet Handel gegen Rohstoffe an.',
+      optA:{ label:'Handeln', cost:{erz:200},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*250); state.credits = (state.credits||0)+amt;
+          return 'Gehandelt: +'+fmt(amt)+' Kredite.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Die Nomaden ziehen weiter.' } },
+    { key:'colonist_ship', name:'Kolonistenschiff bittet um Versorgung', icon:'ti-home', color:'#f3aec6',
+      desc:'Ein Kolonistenschiff auf dem Weg zu einer neuen Siedlung bittet um Versorgung. Helfen kostet Ressourcen, bringt aber Dank.',
+      optA:{ label:'Versorgen', cost:{erz:150,deuterium:100},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*200); state.credits = (state.credits||0)+amt; addXp(20);
+          return 'Kolonisten versorgt: +'+fmt(amt)+' Kredite Dankspende, +20 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Das Schiff zieht ohne Hilfe weiter.' } },
+    { key:'auction_signal', name:'Verschlüsseltes Auktionssignal', icon:'ti-key', color:'#fac775',
+      desc:'Ein verschlüsseltes Signal deutet auf eine geheime Auktion hin. Teilnahme kostet Kristalle, könnte aber Seltenes einbringen.',
+      optA:{ label:'Teilnehmen', cost:{kristalle:300},
+        resolve:()=>{ addXp(20);
+          if (Math.random() < 0.18){ const name = grantRandomModule(); return 'Zuschlag erhalten: '+name+'! (Im Offiziere-Tab ausrüsten.) +20 XP.'; }
+          const amt = 150+Math.floor(Math.random()*200);
+          const cap = storageCap(); const before = state.resources.kristalle||0;
+          state.resources.kristalle = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.kristalle-before;
+          return 'Kein Zuschlag, aber +'+fmt(gained)+' Kristalle aus dem Restgebot zurückerhalten. +20 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Signal verstummt ungenutzt.' } },
+    { key:'black_market', name:'Schwarzmarkt-Kontakt meldet sich', icon:'ti-lock-open', color:'#af9ce6',
+      desc:'Ein anonymer Kontakt bietet Zugang zu einem Schwarzmarkt an. Riskant, aber möglicherweise lohnend.',
+      optA:{ label:'Kontakt aufnehmen', cost:{kristalle:250},
+        resolve:()=>{ addXp(20);
+          if (Math.random() < 0.15){ const name = grantRandomShipModule('selten'); return 'Über den Schwarzmarkt beschafft: '+name+'! (Im Offiziere-Tab einbaubar.) +20 XP.'; }
+          const amt = 200+Math.floor(Math.random()*250); state.credits = (state.credits||0)+amt;
+          return 'Der Deal bringt immerhin +'+fmt(amt)+' Kredite ein. +20 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Der Kontakt bricht ab.' } },
+    { key:'equipment_dealer', name:'Fliegender Ausrüstungshändler', icon:'ti-backpack', color:'#e0a548',
+      desc:'Ein fliegender Händler bietet gebrauchte Schiffsausrüstung an - Qualität unbekannt, aber der Preis stimmt.',
+      optA:{ label:'Kaufen', cost:{erz:200},
+        resolve:()=>{ addXp(15);
+          if (Math.random() < 0.15){ const name = grantRandomShipModule('selten'); return 'Kauf gelohnt: '+name+'! (Im Offiziere-Tab einbaubar.) +15 XP.'; }
+          const amt = 150+Math.floor(Math.random()*200);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Die Ausrüstung taugt nicht viel, aber die Ersatzteile bringen +'+fmt(gained)+' Erz. +15 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Der Händler zieht weiter.' } },
+    { key:'pirate_trap', name:'Piratenfalle rechtzeitig erkannt', icon:'ti-skull', color:'#e24b4a',
+      desc:'Sensoren warnen vor einer getarnten Piratenfalle voraus. Ein Umweg kostet Treibstoff, ein Durchbruch ist riskant.',
+      optA:{ label:'Umweg fliegen', cost:{deuterium:150},
+        resolve:()=>{ addXp(15); return 'Die Falle wird sicher umflogen. +15 XP.'; } },
+      optB:{ label:'Direkt durchfliegen', resolve:()=>{ if (Math.random() < 0.5){ const amt = 250+Math.floor(Math.random()*300);
+            const cap = storageCap(); const before = state.resources.kristalle||0;
+            state.resources.kristalle = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.kristalle-before;
+            return 'Durchbruch gelingt, dabei sogar Piratenbeute erwischt: +'+fmt(gained)+' Kristalle.'; }
+          state.buffs = state.buffs||[]; state.buffs.push({ kind:'prod_all', mult:0.85, expiresAt: Date.now()+300000 });
+          return 'Die Falle schnappt zu - -15% Gesamtproduktion für 5 Minuten.'; } } },
+    { key:'radiation_leak', name:'Strahlungsleck an Bord entdeckt', icon:'ti-alert-triangle', color:'#e0a548',
+      desc:'Ein kleines Strahlungsleck wird an Bord entdeckt. Schnelle Reparatur kostet Ressourcen, verhindert aber Folgeschäden.',
+      optA:{ label:'Reparieren', cost:{erz:150},
+        resolve:()=>{ addXp(15); return 'Leck erfolgreich abgedichtet. +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>{ if (Math.random() < 0.4){ state.buffs = state.buffs||[]; state.buffs.push({ kind:'prod', res:'energie', mult:0.7, expiresAt: Date.now()+300000 });
+          return 'Das Leck verschlimmert sich - -30% Energie-Produktion für 5 Minuten.'; }
+          return 'Das Leck versiegt glücklicherweise von selbst.'; } } },
+    { key:'system_glitch', name:'Systemausfall droht', icon:'ti-refresh', color:'#c9c7bd',
+      desc:'Ein Softwarefehler bedroht die Steuerungssysteme. Ein Neustart kostet Energie, verhindert aber einen größeren Ausfall.',
+      optA:{ label:'Neustart durchführen', cost:{energie:150},
+        resolve:()=>{ addXp(15); return 'Systeme erfolgreich neu gestartet. +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>{ if (Math.random() < 0.4){ state.buffs = state.buffs||[]; state.buffs.push({ kind:'speed', mult:1.15, expiresAt: Date.now()+300000 });
+          return 'Der Fehler verlangsamt die Navigation - +15% Flugzeit aller Missionen für 5 Minuten.'; }
+          return 'Der Fehler behebt sich von selbst.'; } } },
+    { key:'sensor_jam', name:'Sensorstörung erkannt', icon:'ti-bell', color:'#af9ce6',
+      desc:'Eine unbekannte Quelle stört die Sensoren. Eine Neukalibrierung kostet Energie, könnte aber auch die Ursache aufdecken.',
+      optA:{ label:'Neu kalibrieren', cost:{energie:170},
+        resolve:()=>{ addXp(20);
+          if (Math.random() < 0.3){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+            return 'Störquelle geortet und geborgen: '+ri.name+'! +20 XP.'; }
+          return 'Störung behoben, Ursache aber unklar. +20 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Störung verschwindet von selbst.' } },
+    { key:'ancient_ruins', name:'Alte Ruinen auf einem Asteroiden', icon:'ti-building-castle', color:'#c9c7bd',
+      desc:'Auf einem vorbeitreibenden Asteroiden sind Ruinen einer unbekannten Zivilisation sichtbar. Eine Expedition ist aufwendig, aber möglicherweise lohnend.',
+      optA:{ label:'Erkunden', cost:{deuterium:200},
+        resolve:()=>{ addXp(30);
+          if (Math.random() < 0.25){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+            return 'Ruinen erkundet: ein seltener Fund - '+ri.name+'! +30 XP.'; }
+          return 'Ruinen erkundet, aber längst geplündert. +30 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Ruinen bleiben unerforscht zurück.' } },
+    { key:'crystal_cave', name:'Kristallhöhle in einem Mond entdeckt', icon:'ti-diamond', color:'#c3bef5',
+      desc:'Sensoren orten eine Kristallhöhle in einem kleinen Mond. Ein Abbautrupp könnte sich lohnen.',
+      optA:{ label:'Abbauen', cost:{energie:200},
+        resolve:()=>{ const amt = 300+Math.floor(Math.random()*400);
+          const cap = storageCap(); const before = state.resources.kristalle||0;
+          state.resources.kristalle = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.kristalle-before;
+          return 'Höhle abgebaut: +'+fmt(gained)+' Kristalle.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Höhle bleibt ungenutzt zurück.' } },
+    { key:'old_archive', name:'Altes Datenarchiv gefunden', icon:'ti-mail', color:'#9be8c9',
+      desc:'Ein altes, verlassenes Datenarchiv treibt im All. Ein Auslesen kostet Energie, liefert aber möglicherweise wertvolle Forschungsdaten.',
+      optA:{ label:'Auslesen', cost:{energie:220},
+        resolve:()=>{ const amt = 50+Math.floor(Math.random()*90);
+          const cap = storageCap(); const before = state.resources.forschungspunkte||0;
+          state.resources.forschungspunkte = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.forschungspunkte-before; addXp(15);
+          return 'Archiv ausgelesen: +'+fmt(gained)+' Forschungspunkte, +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Archiv bleibt ungelesen zurück.' } },
+    { key:'star_chart_fragment', name:'Sternenkarten-Fragment entdeckt', icon:'ti-map-2', color:'#f0997b',
+      desc:'Ein Fragment einer alten Sternenkarte treibt in Reichweite. Ein Abgleich könnte verborgene Systeme enthüllen.',
+      optA:{ label:'Abgleichen', cost:{deuterium:150},
+        resolve:()=>{ addXp(20);
+          const hiddenUndiscovered = STAR_SYSTEMS.filter(s=>s.hidden && !(state.discoveredSystems && state.discoveredSystems[s.id]));
+          if (hiddenUndiscovered.length && Math.random() < 0.3){ const sys = hiddenUndiscovered[Math.floor(Math.random()*hiddenUndiscovered.length)];
+            if (!state.discoveredSystems) state.discoveredSystems = {}; state.discoveredSystems[sys.id] = true;
+            return 'Fragment abgeglichen: das verborgene System '+sys.name+' wurde enthüllt! +20 XP.'; }
+          return 'Fragment abgeglichen, aber ohne neue Erkenntnisse. +20 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Fragment bleibt ungenutzt zurück.' } },
+    { key:'distress_beacon', name:'Automatische Notbake sendet', icon:'ti-bell', color:'#e0a548',
+      desc:'Eine automatische Notbake sendet seit Jahren unbeantwortet ein Signal. Eine Untersuchung könnte sich lohnen.',
+      optA:{ label:'Untersuchen', cost:{deuterium:150},
+        resolve:()=>{ if (Math.random() < 0.6){ const amt = 200+Math.floor(Math.random()*350);
+            const cap = storageCap(); const before = state.resources.erz||0;
+            state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before; addXp(15);
+            return 'Bake untersucht: +'+fmt(gained)+' Erz aus dem umliegenden Trümmerfeld geborgen, +15 XP.'; }
+          return 'Bake untersucht, aber nichts Verwertbares gefunden. +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Bake sendet unbeantwortet weiter.' } },
+    { key:'solar_sail', name:'Treibendes Sonnensegel geborgen', icon:'ti-sun', color:'#fac775',
+      desc:'Ein antikes Sonnensegel treibt führerlos im All. Eine Bergung könnte brauchbares Material liefern.',
+      optA:{ label:'Bergen', cost:{energie:150},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*300);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Segel geborgen: +'+fmt(gained)+' Erz aus dem Material gewonnen.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Segel treibt ungenutzt weiter.' } },
+    { key:'ion_storm', name:'Ionensturm nähert sich', icon:'ti-bolt', color:'#af9ce6',
+      desc:'Ein Ionensturm bedroht die Schiffssysteme. Schutzsysteme hochfahren kostet Energie, schützt aber zuverlässig.',
+      optA:{ label:'Schutzsysteme hochfahren', cost:{energie:200},
+        resolve:()=>{ state.buffs = state.buffs||[]; state.buffs.push({ kind:'def', mult:1.2, expiresAt: Date.now()+900000 }); addXp(15);
+          return 'Schutzsysteme aktiv: +20% Verteidigung für 15 Minuten, +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>{ if (Math.random() < 0.5){ state.buffs = state.buffs||[]; state.buffs.push({ kind:'def', mult:0.8, expiresAt: Date.now()+300000 });
+          return 'Der Sturm trifft ungeschützt - -20% Verteidigung für 5 Minuten.'; }
+          return 'Der Sturm zieht glücklicherweise ohne Schaden vorbei.'; } } },
+    { key:'debris_field', name:'Ausgedehntes Trümmerfeld', icon:'ti-box', color:'#c9c7bd',
+      desc:'Ein ausgedehntes Trümmerfeld aus einer vergangenen Schlacht treibt im All. Eine gründliche Durchsuchung lohnt sich.',
+      optA:{ label:'Durchsuchen', cost:{deuterium:180},
+        resolve:()=>{ const amt = 250+Math.floor(Math.random()*350); const res = Math.random()<0.5?'erz':'kristalle';
+          const cap = storageCap(); const before = state.resources[res]||0;
+          state.resources[res] = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources[res]-before;
+          return 'Trümmerfeld durchsucht: +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+'.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Trümmerfeld bleibt unangetastet.' } },
+    { key:'lost_probe', name:'Verlorene Sonde geortet', icon:'ti-atom-2', color:'#c3bef5',
+      desc:'Eine seit langem vermisste Forschungssonde wird geortet. Eine Bergung könnte ihre gesammelten Daten retten.',
+      optA:{ label:'Bergen', cost:{energie:180},
+        resolve:()=>{ const amt = 40+Math.floor(Math.random()*70);
+          const cap = storageCap(); const before = state.resources.forschungspunkte||0;
+          state.resources.forschungspunkte = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.forschungspunkte-before; addXp(15);
+          return 'Sonde geborgen: +'+fmt(gained)+' Forschungspunkte, +15 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Sonde treibt weiter verloren im All.' } },
+    { key:'cryo_pod', name:'Kryokapsel entdeckt', icon:'ti-user', color:'#7bc4f0',
+      desc:'Eine einzelne Kryokapsel mit einem überlebenden Passagier treibt im All. Eine Rettung ist aufwendig, aber lohnend.',
+      optA:{ label:'Retten', cost:{deuterium:150,energie:100},
+        resolve:()=>{ const amt = 200+Math.floor(Math.random()*300); state.credits = (state.credits||0)+amt; addXp(25);
+          return 'Passagier gerettet: +'+fmt(amt)+' Kredite Dankspende, +25 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Kapsel treibt unbeachtet weiter.' } },
+    { key:'asteroid_swarm', name:'Asteroidenschwarm nähert sich', icon:'ti-mountain', color:'#e0a548',
+      desc:'Ein dichter Asteroidenschwarm nähert sich der Kolonie. Ein Abbautrupp könnte die Gelegenheit nutzen.',
+      optA:{ label:'Abbauen', cost:{energie:180},
+        resolve:()=>{ const amt = 250+Math.floor(Math.random()*400);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before;
+          return 'Schwarm abgebaut: +'+fmt(gained)+' Erz.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Der Schwarm zieht ungenutzt vorbei.' } },
+    { key:'energy_rift', name:'Energieriss in der Nähe', icon:'ti-atom', color:'#8f88e8',
+      desc:'Ein kleiner Energieriss öffnet sich in Sensorreichweite. Eine kontrollierte Annäherung könnte Antimaterie liefern.',
+      optA:{ label:'Annähern', cost:{deuterium:200},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*250);
+          const cap = storageCap(); const before = state.resources.antimaterie||0;
+          state.resources.antimaterie = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.antimaterie-before; addXp(20);
+          return 'Riss angezapft: +'+fmt(gained)+' Antimaterie, +20 XP.'; } },
+      optB:{ label:'Meiden', resolve:()=>'Der Riss kollabiert ungenutzt.' } },
+    { key:'old_beacon', name:'Verrostete Bake sendet Restsignal', icon:'ti-flag', color:'#c9c7bd',
+      desc:'Eine alte, verrostete Bake sendet noch ein schwaches Restsignal. Eine Untersuchung könnte sich lohnen.',
+      optA:{ label:'Untersuchen', cost:{energie:120},
+        resolve:()=>{ const amt = 150+Math.floor(Math.random()*250);
+          const cap = storageCap(); const before = state.resources.erz||0;
+          state.resources.erz = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources.erz-before; addXp(10);
+          return 'Bake untersucht: +'+fmt(gained)+' Erz aus dem umliegenden Schrott, +10 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Die Bake verstummt endgültig.' } },
+    { key:'trade_caravan', name:'Handelskarawane bittet um Geleitschutz', icon:'ti-truck', color:'#5dcaa5',
+      desc:'Eine kleine Handelskarawane bittet um kurzzeitigen Geleitschutz - als Dank winkt eine Belohnung.',
+      optA:{ label:'Geleitschutz gewähren', cost:{deuterium:120},
+        resolve:()=>{ const amt = 200+Math.floor(Math.random()*250); state.credits = (state.credits||0)+amt; addXp(20);
+          return 'Karawane sicher geleitet: +'+fmt(amt)+' Kredite, +20 XP.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Die Karawane zieht ohne Schutz weiter.' } },
+    { key:'scavenger_crew', name:'Plünderer-Crew angetroffen', icon:'ti-user-x', color:'#e24b4a',
+      desc:'Eine kleine Plünderer-Crew bietet einen zwielichtigen Tausch an - Ressourcen unbekannter Herkunft gegen Deuterium.',
+      optA:{ label:'Handeln', cost:{deuterium:150},
+        resolve:()=>{ const amt = 200+Math.floor(Math.random()*350); const res = Math.random()<0.5?'erz':'kristalle';
+          const cap = storageCap(); const before = state.resources[res]||0;
+          state.resources[res] = Math.min(cap, before+Math.min(2000,amt)); const gained = state.resources[res]-before;
+          return 'Getauscht: +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+'.'; } },
+      optB:{ label:'Ablehnen', resolve:()=>'Die Plünderer ziehen weiter.' } },
+    { key:'quantum_flicker', name:'Quantenflackern registriert', icon:'ti-sparkles', color:'#8f88e8',
+      desc:'Sensoren registrieren ein kurzes Quantenflackern unbekannten Ursprungs. Eine genaue Analyse ist aufwendig, aber vielversprechend.',
+      optA:{ label:'Analysieren', cost:{energie:220},
+        resolve:()=>{ addXp(25);
+          if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+            return 'Analyse erfolgreich: ein seltener Fund - '+ri.name+'! +25 XP.'; }
+          return 'Analyse abgeschlossen, aber ohne greifbares Ergebnis. +25 XP.'; } },
+      optB:{ label:'Ignorieren', resolve:()=>'Das Flackern verschwindet ungenutzt.' } }
   ];
   function maybeSpawnRandomEvent(){
     if (state.activeEvent) return;
@@ -22367,7 +22689,171 @@
         return { text:'Ein Verteidigungsdepot entdeckt: +25% Verteidigung für 30 Minuten.', icon:'ti-shield-lock' }; } },
     { key:'training_grounds', name:'Verlassenes Trainingsgelände erkundet', icon:'ti-target',
       resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'atk', mult:1.2, expiresAt: Date.now()+Math.round(1800000*mult) }); addXp(Math.round(25*mult));
-        return { text:'Ein verlassenes Trainingsgelände erkundet: +20% Angriffskraft für 30 Minuten.', icon:'ti-target' }; } }
+        return { text:'Ein verlassenes Trainingsgelände erkundet: +20% Angriffskraft für 30 Minuten.', icon:'ti-target' }; } },
+    // 18.07.2026 (Spieler-Wunsch "nochmal 40 pro hinzufügen"): von 20 auf 60 Varianten erweitert.
+    // Gleiche mult-Skalierung wie alle bisherigen - reine Abwechslung, kein Balance-Sprung.
+    { key:'gravity_survey', name:'Gravitationsfeld vermessen', icon:'ti-atom',
+      resolve:(mult) => { const amt = Math.round((50+Math.random()*70)*mult);
+        const cap = storageCap(); const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+amt); const gained = state.resources.forschungspunkte-before;
+        addXp(Math.round(20*mult)); return { text:'Gravitationsfeld vermessen: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-atom' }; } },
+    { key:'comet_fragment', name:'Kometenfragment geborgen', icon:'ti-star',
+      resolve:(mult) => { const amt = Math.round((250+Math.random()*350)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        addXp(Math.round(20*mult)); return { text:'Kometenfragment geborgen: +'+fmt(gained)+' Erz.', icon:'ti-star' }; } },
+    { key:'plasma_vent', name:'Plasmaquelle angezapft', icon:'ti-bolt',
+      resolve:(mult) => { const amt = Math.round((150+Math.random()*250)*mult);
+        const cap = storageCap(); const before = state.resources.antimaterie||0; state.resources.antimaterie = Math.min(cap, before+amt); const gained = state.resources.antimaterie-before;
+        addXp(Math.round(25*mult)); return { text:'Plasmaquelle angezapft: +'+fmt(gained)+' Antimaterie.', icon:'ti-bolt' }; } },
+    { key:'radiation_sample', name:'Strahlungsprobe genommen', icon:'ti-alert-triangle',
+      resolve:(mult) => { const amt = Math.round((50+Math.random()*90)*mult);
+        const cap = storageCap(); const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+amt); const gained = state.resources.forschungspunkte-before;
+        addXp(Math.round(20*mult)); return { text:'Strahlungsprobe genommen: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-alert-triangle' }; } },
+    { key:'ion_cache', name:'Ionenspur ausgewertet', icon:'ti-refresh',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'speed', mult:0.88, expiresAt: Date.now()+Math.round(900000*mult) }); addXp(Math.round(20*mult));
+        return { text:'Ionenspur ausgewertet: -12% Flugzeit aller Missionen für 15 Minuten.', icon:'ti-refresh' }; } },
+    { key:'sealed_container', name:'Versiegelter Container geöffnet', icon:'ti-box',
+      resolve:(mult) => { const amt = Math.round((150+Math.random()*250)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(20*mult));
+        return { text:'Versiegelter Container geöffnet: +'+fmt(amt)+' Kredite.', icon:'ti-box' }; } },
+    { key:'abandoned_lab', name:'Verlassenes Labor durchsucht', icon:'ti-flask',
+      resolve:(mult) => { const amt = Math.round((60+Math.random()*90)*mult);
+        const cap = storageCap(); const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+amt); const gained = state.resources.forschungspunkte-before;
+        addXp(Math.round(25*mult)); return { text:'Verlassenes Labor durchsucht: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-flask' }; } },
+    { key:'warship_hull', name:'Kriegsschiffrumpf verwertet', icon:'ti-shield',
+      resolve:(mult) => { addXp(Math.round(30*mult));
+        if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          return { text:'Kriegsschiffrumpf verwertet: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-shield' }; }
+        const amt = Math.round((300+Math.random()*350)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        return { text:'Kriegsschiffrumpf verwertet: +'+fmt(gained)+' Erz.', icon:'ti-shield' }; } },
+    { key:'mining_rig', name:'Bergbau-Rig geborgen', icon:'ti-pick',
+      resolve:(mult) => { const amt = Math.round((300+Math.random()*300)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        addXp(Math.round(20*mult)); return { text:'Bergbau-Rig geborgen: +'+fmt(gained)+' Erz.', icon:'ti-pick' }; } },
+    { key:'fuel_depot', name:'Treibstoffdepot gefunden', icon:'ti-droplet',
+      resolve:(mult) => { const amt = Math.round((250+Math.random()*300)*mult);
+        const cap = storageCap(); const before = state.resources.deuterium||0; state.resources.deuterium = Math.min(cap, before+amt); const gained = state.resources.deuterium-before;
+        addXp(Math.round(20*mult)); return { text:'Treibstoffdepot gefunden: +'+fmt(gained)+' Deuterium.', icon:'ti-droplet' }; } },
+    { key:'hunter_cache', name:'Kopfgeldjäger-Versteck geplündert', icon:'ti-target',
+      resolve:(mult) => { const amt = Math.round((200+Math.random()*300)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(25*mult));
+        return { text:'Kopfgeldjäger-Versteck geplündert: +'+fmt(amt)+' Kredite.', icon:'ti-target' }; } },
+    { key:'smuggler_stash', name:'Schmugglerversteck entdeckt', icon:'ti-truck',
+      resolve:(mult) => { const amt = Math.round((250+Math.random()*350)*mult);
+        const cap = storageCap(); const before = state.resources.kristalle||0; state.resources.kristalle = Math.min(cap, before+amt); const gained = state.resources.kristalle-before;
+        addXp(Math.round(20*mult)); return { text:'Schmugglerversteck entdeckt: +'+fmt(gained)+' Kristalle.', icon:'ti-truck' }; } },
+    { key:'mercenary_camp', name:'Söldnerlager durchsucht', icon:'ti-sword',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'atk', mult:1.2, expiresAt: Date.now()+Math.round(1800000*mult) }); addXp(Math.round(25*mult));
+        return { text:'Söldnerlager durchsucht: +20% Angriffskraft für 30 Minuten.', icon:'ti-sword' }; } },
+    { key:'envoy_gift', name:'Gesandtengeschenk erhalten', icon:'ti-message',
+      resolve:(mult) => { const amt = Math.round((200+Math.random()*250)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(20*mult));
+        return { text:'Ein diplomatisches Geschenk erhalten: +'+fmt(amt)+' Kredite.', icon:'ti-message' }; } },
+    { key:'field_notes', name:'Feldnotizen ausgewertet', icon:'ti-microscope',
+      resolve:(mult) => { const amt = Math.round((50+Math.random()*80)*mult);
+        const cap = storageCap(); const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+amt); const gained = state.resources.forschungspunkte-before;
+        addXp(Math.round(20*mult)); return { text:'Feldnotizen ausgewertet: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-microscope' }; } },
+    { key:'nomad_cache', name:'Nomadenlager entdeckt', icon:'ti-users',
+      resolve:(mult) => { const amt = Math.round((180+Math.random()*250)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(20*mult));
+        return { text:'Verlassenes Nomadenlager entdeckt: +'+fmt(amt)+' Kredite.', icon:'ti-users' }; } },
+    { key:'settler_gratitude', name:'Siedler-Dankspende erhalten', icon:'ti-home',
+      resolve:(mult) => { const amt = Math.round((180+Math.random()*220)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(25*mult));
+        return { text:'Siedler bedanken sich mit einer Spende: +'+fmt(amt)+' Kredite.', icon:'ti-home' }; } },
+    { key:'sealed_vault', name:'Versiegeltes Tresorfach geknackt', icon:'ti-key',
+      resolve:(mult) => { addXp(Math.round(25*mult));
+        if (Math.random() < 0.18){ const name = grantRandomModule(); return { text:'Tresorfach geknackt: '+name+'! (Im Offiziere-Tab ausrüsten.)', icon:'ti-key' }; }
+        const amt = Math.round((150+Math.random()*200)*mult);
+        const cap = storageCap(); const before = state.resources.kristalle||0; state.resources.kristalle = Math.min(cap, before+amt); const gained = state.resources.kristalle-before;
+        return { text:'Tresorfach geknackt: +'+fmt(gained)+' Kristalle.', icon:'ti-key' }; } },
+    { key:'black_market_stash', name:'Schwarzmarktversteck entdeckt', icon:'ti-lock-open',
+      resolve:(mult) => { addXp(Math.round(25*mult));
+        if (Math.random() < 0.14){ const name = grantRandomShipModule('selten'); return { text:'Schwarzmarktversteck entdeckt: '+name+'! (Im Offiziere-Tab einbaubar.)', icon:'ti-lock-open' }; }
+        const amt = Math.round((200+Math.random()*250)*mult); state.credits = (state.credits||0)+amt;
+        return { text:'Schwarzmarktversteck entdeckt: +'+fmt(amt)+' Kredite.', icon:'ti-lock-open' }; } },
+    { key:'gear_locker', name:'Ausrüstungsschließfach gefunden', icon:'ti-backpack',
+      resolve:(mult) => { addXp(Math.round(20*mult));
+        if (Math.random() < 0.15){ const name = grantRandomShipModule('selten'); return { text:'Ausrüstungsschließfach geöffnet: '+name+'! (Im Offiziere-Tab einbaubar.)', icon:'ti-backpack' }; }
+        const amt = Math.round((200+Math.random()*250)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        return { text:'Ausrüstungsschließfach geöffnet: +'+fmt(gained)+' Erz.', icon:'ti-backpack' }; } },
+    { key:'ambush_site', name:'Hinterhaltstelle durchsucht', icon:'ti-skull',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'prod_all', mult:1.15, expiresAt: Date.now()+Math.round(600000*mult) }); addXp(Math.round(20*mult));
+        return { text:'Hinterhaltstelle durchsucht: +15% Gesamtproduktion für 10 Minuten.', icon:'ti-skull' }; } },
+    { key:'sealed_reactor', name:'Versiegelter Reaktor stabilisiert', icon:'ti-bolt',
+      resolve:(mult) => { const amt = Math.round((300+Math.random()*400)*mult);
+        const cap = storageCap(); const before = state.resources.energie||0; state.resources.energie = Math.min(cap, before+amt); const gained = state.resources.energie-before;
+        addXp(Math.round(20*mult)); return { text:'Reaktor stabilisiert: +'+fmt(gained)+' Energie.', icon:'ti-bolt' }; } },
+    { key:'backup_core', name:'Sicherungskern ausgelesen', icon:'ti-refresh',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'speed', mult:0.9, expiresAt: Date.now()+Math.round(600000*mult) }); addXp(Math.round(20*mult));
+        return { text:'Sicherungskern ausgelesen: -10% Flugzeit aller Missionen für 10 Minuten.', icon:'ti-refresh' }; } },
+    { key:'jammed_array', name:'Gestörtes Array repariert', icon:'ti-bell',
+      resolve:(mult) => { const amt = Math.round((50+Math.random()*70)*mult);
+        const cap = storageCap(); const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+amt); const gained = state.resources.forschungspunkte-before;
+        addXp(Math.round(20*mult)); return { text:'Gestörtes Array repariert: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-bell' }; } },
+    { key:'ruins_survey', name:'Ruinen vermessen', icon:'ti-building-castle',
+      resolve:(mult) => { addXp(Math.round(30*mult));
+        if (Math.random() < 0.22){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          return { text:'Ruinen vermessen: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-building-castle' }; }
+        return { text:'Ruinen vermessen, aber längst geplündert.', icon:'ti-building-castle' }; } },
+    { key:'cave_deposit', name:'Höhlenvorkommen abgebaut', icon:'ti-diamond',
+      resolve:(mult) => { const amt = Math.round((300+Math.random()*350)*mult);
+        const cap = storageCap(); const before = state.resources.kristalle||0; state.resources.kristalle = Math.min(cap, before+amt); const gained = state.resources.kristalle-before;
+        addXp(Math.round(20*mult)); return { text:'Höhlenvorkommen abgebaut: +'+fmt(gained)+' Kristalle.', icon:'ti-diamond' }; } },
+    { key:'data_archive', name:'Datenarchiv gesichert', icon:'ti-mail',
+      resolve:(mult) => { const amt = Math.round((60+Math.random()*90)*mult);
+        const cap = storageCap(); const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+amt); const gained = state.resources.forschungspunkte-before;
+        addXp(Math.round(20*mult)); return { text:'Datenarchiv gesichert: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-mail' }; } },
+    { key:'chart_fragment', name:'Kartenfragment ausgewertet', icon:'ti-map-2',
+      resolve:(mult) => { addXp(Math.round(25*mult));
+        const hiddenUndiscovered = STAR_SYSTEMS.filter(s=>s.hidden && !(state.discoveredSystems && state.discoveredSystems[s.id]));
+        if (hiddenUndiscovered.length && Math.random() < 0.3){ const sys = hiddenUndiscovered[Math.floor(Math.random()*hiddenUndiscovered.length)];
+          if (!state.discoveredSystems) state.discoveredSystems = {}; state.discoveredSystems[sys.id] = true;
+          return { text:'Kartenfragment ausgewertet: das verborgene System '+sys.name+' wurde enthüllt!', icon:'ti-map-2' }; }
+        return { text:'Kartenfragment ausgewertet, aber ohne neue Erkenntnisse.', icon:'ti-map-2' }; } },
+    { key:'beacon_wreck', name:'Bakenwrack durchsucht', icon:'ti-flag',
+      resolve:(mult) => { const amt = Math.round((200+Math.random()*300)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        addXp(Math.round(15*mult)); return { text:'Bakenwrack durchsucht: +'+fmt(gained)+' Erz.', icon:'ti-flag' }; } },
+    { key:'sail_remnant', name:'Segelrest geborgen', icon:'ti-sun',
+      resolve:(mult) => { const amt = Math.round((200+Math.random()*300)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        addXp(Math.round(15*mult)); return { text:'Segelrest geborgen: +'+fmt(gained)+' Erz.', icon:'ti-sun' }; } },
+    { key:'storm_residue', name:'Sturmrückstand gesammelt', icon:'ti-shield-lock',
+      resolve:(mult) => { state.buffs = state.buffs||[]; state.buffs.push({ kind:'def', mult:1.2, expiresAt: Date.now()+Math.round(1800000*mult) }); addXp(Math.round(20*mult));
+        return { text:'Sturmrückstand gesammelt: +20% Verteidigung für 30 Minuten.', icon:'ti-shield-lock' }; } },
+    { key:'battlefield_debris', name:'Schlachtfeldtrümmer durchsucht', icon:'ti-box',
+      resolve:(mult) => { const amt = Math.round((250+Math.random()*350)*mult); const res = Math.random()<0.5?'erz':'kristalle';
+        const cap = storageCap(); const before = state.resources[res]||0; state.resources[res] = Math.min(cap, before+amt); const gained = state.resources[res]-before;
+        addXp(Math.round(20*mult)); return { text:'Schlachtfeldtrümmer durchsucht: +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+'.', icon:'ti-box' }; } },
+    { key:'probe_wreck', name:'Sondenwrack geborgen', icon:'ti-atom-2',
+      resolve:(mult) => { const amt = Math.round((50+Math.random()*80)*mult);
+        const cap = storageCap(); const before = state.resources.forschungspunkte||0; state.resources.forschungspunkte = Math.min(cap, before+amt); const gained = state.resources.forschungspunkte-before;
+        addXp(Math.round(20*mult)); return { text:'Sondenwrack geborgen: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-atom-2' }; } },
+    { key:'survivor_pod', name:'Überlebenskapsel geborgen', icon:'ti-user',
+      resolve:(mult) => { const amt = Math.round((200+Math.random()*300)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(30*mult));
+        return { text:'Überlebenskapsel geborgen: +'+fmt(amt)+' Kredite Dankspende.', icon:'ti-user' }; } },
+    { key:'swarm_harvest', name:'Schwarmernte eingebracht', icon:'ti-mountain',
+      resolve:(mult) => { const amt = Math.round((300+Math.random()*400)*mult);
+        const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
+        addXp(Math.round(20*mult)); return { text:'Schwarmernte eingebracht: +'+fmt(gained)+' Erz.', icon:'ti-mountain' }; } },
+    { key:'rift_sample', name:'Rissprobe entnommen', icon:'ti-atom',
+      resolve:(mult) => { const amt = Math.round((150+Math.random()*250)*mult);
+        const cap = storageCap(); const before = state.resources.antimaterie||0; state.resources.antimaterie = Math.min(cap, before+amt); const gained = state.resources.antimaterie-before;
+        addXp(Math.round(25*mult)); return { text:'Rissprobe entnommen: +'+fmt(gained)+' Antimaterie.', icon:'ti-atom' }; } },
+    { key:'beacon_relic', name:'Baken-Relikt geborgen', icon:'ti-flag',
+      resolve:(mult) => { addXp(Math.round(25*mult));
+        if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          return { text:'Baken-Relikt geborgen: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-flag' }; }
+        return { text:'Baken-Relikt geborgen, aber ohne besonderen Wert.', icon:'ti-flag' }; } },
+    { key:'caravan_gratitude', name:'Karawanen-Dankspende erhalten', icon:'ti-truck',
+      resolve:(mult) => { const amt = Math.round((180+Math.random()*220)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(20*mult));
+        return { text:'Eine Handelskarawane bedankt sich: +'+fmt(amt)+' Kredite.', icon:'ti-truck' }; } },
+    { key:'scavenger_haul', name:'Plünderer-Beute übernommen', icon:'ti-user-x',
+      resolve:(mult) => { const amt = Math.round((250+Math.random()*350)*mult); const res = Math.random()<0.5?'erz':'kristalle';
+        const cap = storageCap(); const before = state.resources[res]||0; state.resources[res] = Math.min(cap, before+amt); const gained = state.resources[res]-before;
+        addXp(Math.round(25*mult)); return { text:'Plünderer-Beute übernommen: +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+'.', icon:'ti-user-x' }; } },
+    { key:'quantum_reading', name:'Quantenmessung ausgewertet', icon:'ti-sparkles',
+      resolve:(mult) => { addXp(Math.round(30*mult));
+        if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          return { text:'Quantenmessung ausgewertet: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-sparkles' }; }
+        return { text:'Quantenmessung ausgewertet, ohne greifbares Ergebnis.', icon:'ti-sparkles' }; } }
   ];
   // Erfahrene Forschungsschiffe: mit jeder erfolgreich abgeschlossenen Expedition (kein Totalverlust)
   // steigt die Beute leicht, bis zu einem Deckel – repräsentiert eine erfahrenere Crew/Ausrüstung.
