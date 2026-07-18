@@ -2771,8 +2771,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.91.0';
+  const VERSION = '8.91.1';
   const PATCHNOTES = [
+    { version:'8.91.1', date:'18.07.2026', changes:[
+      'Teilen-Karten (Spieler-Wunsch, nachgelegt "immernoch zu langweilig"): deutlich mehr Detail hinzugefügt - Planet mit Orbit-Ringen und Radar-Sweep-Bögen füllen jetzt die vorher leeren Flächen, Lineal-Tickmarken am Rand, Glanzsterne mit Vierpunkt-Flare, statische Scanlines sowie kleine HUD-Readout-Zeilen (Sektor/Datum oben, Übertragungscode/Signalstatus unten) wie ein Kamera-/Cockpit-Overlay',
+      'Betrifft wieder alle Kartentypen gleichermaßen; im breiten Querformat (nur bei der Profilkarte wählbar) bleibt die untere Statuszeile weg, damit sie nicht mit dem dort anders platzierten Avatar kollidiert'
+    ]},
     { version:'8.91.0', date:'18.07.2026', changes:[
       'Admin-Bereich: neuer Reiter "Ankündigung" - Nachricht an alle Spieler senden, erscheint im globalen Chat mit hervorgehobenem Absender inklusive der bestehenden Ungelesen-Markierung am Chat-Symbol',
       'Teilen-Karten ("Kolonie teilen", Punktestand-Tab) grafisch komplett neu: HUD-Eckenschnitt-Rahmen mit Eckklammern, technisches Grid und Farbwolken im Hintergrund statt eines einzelnen weichen Verlaufs, Mono-Schrift, Glüh-Effekte auf Kennzahlen und Punkteverlauf, Instrumentenring mit Peilstrichen um den Avatar - dieselbe Bildsprache wie der Rest der Oberfläche seit den Grafik-Runden dieser Session. Die Akzentfarben folgen jetzt dem gewählten Farbthema, die Instrumentenfarbe (Rahmen/Rand) bleibt bewusst konstant',
@@ -19449,6 +19453,26 @@
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     }
 
+    // Orbit-Ring + Planet als weicher Hintergrund-Schmuck (Spieler-Wunsch "mehr Details, zu langweilig"):
+    // füllt genau die leeren Flächen unterhalb der eigentlichen Kennzahlen, statt dass dort nur
+    // schwarzer Raum bleibt - dieselbe Idee wie ein Planet am Bildrand einer echten Weltraumaufnahme.
+    // Bewusst sehr blass (0.05-0.14 Alpha), damit Text darüber immer lesbar bleibt.
+    ctx.save();
+    const pcx = W*0.74, pcy = H*0.685, pr = H*0.15;
+    const planetGrad = ctx.createRadialGradient(pcx-pr*0.3, pcy-pr*0.3, pr*0.1, pcx, pcy, pr);
+    planetGrad.addColorStop(0, 'rgba('+theme.secondaryRgb+',0.16)');
+    planetGrad.addColorStop(1, 'rgba('+theme.secondaryRgb+',0.02)');
+    ctx.fillStyle = planetGrad;
+    ctx.beginPath(); ctx.arc(pcx, pcy, pr, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba('+theme.infoRgb+',0.16)'; ctx.lineWidth = 1.5;
+    for (const ringR of [pr*1.55, pr*1.95]){
+      ctx.save();
+      ctx.translate(pcx, pcy); ctx.rotate(-0.35); ctx.scale(1, 0.34);
+      ctx.beginPath(); ctx.arc(0, 0, ringR, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
     // Technisches Grid, zur Kartenmitte hin ausgeblendet - dieselbe Idee wie .shell::before im echten UI.
     ctx.save();
     const gridR = ctx.createRadialGradient(W/2, H*0.35, H*0.1, W/2, H*0.35, H*0.85);
@@ -19465,10 +19489,40 @@
       ctx.fillStyle = 'rgba(255,255,255,'+(0.2+Math.random()*0.45).toFixed(2)+')';
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
     }
+    // Ein paar größere "Glanzsterne" mit Vierpunkt-Flare, wie bei echten Weltraumfotos - unregelmäßig
+    // platziert, damit es nicht wie ein Muster wirkt.
+    const flareSpots = [[W*0.12,H*0.14],[W*0.86,H*0.06],[W*0.06,H*0.62]];
+    for (const [fx,fy] of flareSpots){
+      ctx.save();
+      ctx.globalAlpha = 0.55 + Math.random()*0.3;
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+      const fl = 8+Math.random()*4;
+      ctx.beginPath(); ctx.moveTo(fx-fl,fy); ctx.lineTo(fx+fl,fy); ctx.moveTo(fx,fy-fl); ctx.lineTo(fx,fy+fl); ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(fx, fy, 1.8, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    // Halbe Radar-Sweep-Bögen hinter dem Kopfbereich (Pendant zum Sektorkarten-Radar-Overlay aus
+    // Grafik R9), rein dekorativ, deutet "gerade gescannt" an ohne die eigentliche Animation.
+    ctx.save();
+    ctx.strokeStyle = 'rgba('+theme.infoRgb+',0.14)'; ctx.lineWidth = 1.5;
+    for (const rr of [W*0.30, W*0.42, W*0.54]){
+      ctx.beginPath(); ctx.arc(W/2, -H*0.06, rr, Math.PI*0.18, Math.PI*0.82); ctx.stroke();
+    }
+    ctx.restore();
 
     const vig = ctx.createRadialGradient(W/2, H/2, H*0.35, W/2, H/2, H*0.75);
     vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,0.45)');
     ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+
+    // Statische Scanlines, dieselbe Idee wie .shell::after im echten UI (dort animiert, hier als
+    // Standbild trotzdem als feine Textur spürbar).
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+    for (let sy=0; sy<H; sy+=3){ ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke(); }
+    ctx.restore();
 
     ctx.restore(); // Ende Clip
 
@@ -19478,6 +19532,43 @@
     ctx.lineWidth = 2;
     ctx.stroke();
     hudCorners(ctx, 14, 14, W-28, H-28, Math.round(W*0.028), 'rgba('+theme.primaryRgb+',0.85)');
+
+    // Kleine Tick-Marken-Leiste am linken Rand, wie ein technisches Lineal - reine Detail-Textur.
+    ctx.save();
+    ctx.strokeStyle = 'rgba('+theme.infoRgb+',0.5)'; ctx.lineWidth = 1.5;
+    for (let ty=H*0.14; ty<H*0.9; ty+=H*0.045){
+      const long = (Math.round((ty)/(H*0.045)) % 4 === 0);
+      ctx.beginPath(); ctx.moveTo(cut+6, ty); ctx.lineTo(cut+6+(long?16:8), ty); ctx.stroke();
+    }
+    ctx.restore();
+
+    // Eckige Funk-Readouts (reine Zierschrift, wie ein Kamera-/Cockpit-HUD) - bewusst nur in den
+    // beiden OBEREN Ecken, damit sie nicht mit dem zentrierten Footer-Text unten kollidieren.
+    ctx.save();
+    ctx.font = '400 15px '+SHARE_FONT_MONO;
+    ctx.fillStyle = 'rgba('+theme.infoRgb+',0.55)';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '1px';
+    ctx.textAlign = 'left';
+    ctx.fillText('SEC · KEPLER-7', 34, 40);
+    ctx.textAlign = 'right';
+    ctx.fillText(new Date().toLocaleDateString('de-DE'), W-34, 40);
+    ctx.restore();
+    // Kleine Status-Leiste knapp über der Fußzeile - bewusst nicht in den Ecken (dort sitzen schon die
+    // Eckklammern), sondern als eigene Zeile im freien Bereich zwischen Statistiken und Footer-Trenner.
+    // Nur bei hochformatigen Karten (Beitrag/Story) - im breiten Querformat (nur Profilkarte) läuft an
+    // dieser Position sonst der Avatar links im Bild hinein.
+    if (H/W > 0.9){
+      ctx.save();
+      ctx.font = '400 14px '+SHARE_FONT_MONO;
+      ctx.fillStyle = 'rgba('+theme.infoRgb+',0.4)';
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '1px';
+      const txCode = Math.abs(String(state.player.id||'0').split('').reduce((a,c)=>a+c.charCodeAt(0),0)).toString(16).toUpperCase().slice(0,4).padStart(4,'0');
+      ctx.textAlign = 'left';
+      ctx.fillText('TX · '+txCode, 60, H-150);
+      ctx.textAlign = 'right';
+      ctx.fillText('SIGNAL STABIL', W-60, H-150);
+      ctx.restore();
+    }
 
     ctx.textAlign = 'center';
     return { canvas, ctx, theme, cut };
