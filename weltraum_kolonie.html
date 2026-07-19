@@ -3023,8 +3023,13 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.105.0';
+  const VERSION = '8.105.1';
   const PATCHNOTES = [
+    { version:'8.105.1', date:'19.07.2026', changes:[
+      'Allianz-Raid: Sammelphasen-Anzeige zeigt jetzt nur noch Teilnehmer, die laut ihrer Flugzeit rechtzeitig an der Basis eintreffen werden, in der Gesamtsumme - Zuspätkommer werden in der Teilnehmerliste sichtbar als "zu spät" markiert, statt die angezeigte Angriffskraft der Welle zu überschätzen',
+      'Allianz-Raid: eigener Beitritt zeigt jetzt einen Live-Status (unterwegs zur Basis mit Restzeit / an der Basis eingetroffen / droht die Welle zu verpassen) statt einer statischen Meldung',
+      'Allianz-Raid: dedizierter Test für den Rückzug einer Flotte während der Sammelphase ergänzt'
+    ]},
     { version:'8.105.0', date:'19.07.2026', changes:[
       'Allianz-Raid komplett überarbeitet (Spieler-Wunsch "das muss auch realistisch sein"): statt EIN Klick ohne Flugzeit/Flottenrisiko gibt es jetzt eine echte Sammelphase (30 Min./1/2 Std., wählbar von Admins/Offizieren) - wer beitritt, lässt seine Flotte mit ECHTER Flugzeit zur Allianzbasis fliegen (nur wer rechtzeitig ankommt, gehört zum Verband), danach fliegt der komplette Verband gemeinsam - wieder mit echter Flugzeit - zum Standort des Bosses (ein zufälliges Sternsystem). Bei Ankunft trägt der Verband den Kampf aus: Schaden nach Gesamt-Angriffskraft, aber jetzt mit echtem Flottenverlustrisiko (Boss kontert, stärker bei ungleichem Kräfteverhältnis). Übersteht der Boss eine Welle, wartet er angeschlagen auf die nächste (2 Std. Cooldown); Kill schließt die Stufe endgültig ab (6 Std. bis zum nächsten, stärkeren Sternenfresser)',
       'Der Allianz-Raid braucht jetzt eine gegründete Allianzbasis (dient als Treffpunkt der Sammelphase)'
@@ -18235,17 +18240,35 @@
       const remain = Math.max(0, doc.gatherEndsAt - Date.now());
       const waveKey = allianceRaidWaveKey(doc);
       const parts = (raidParticipantsCache && raidParticipantsCache.waveKey===waveKey) ? raidParticipantsCache.parts : [];
-      const totalShips = parts.reduce((a,p)=>a+(p.shipCount||0),0);
-      const totalPower = parts.reduce((a,p)=>a+(p.power||0),0);
-      const myJoined = state.allianceRaidContribution && state.allianceRaidContribution.raidId===doc.id && state.allianceRaidContribution.waveNumber===doc.waveNumber;
+      // Nur wer laut seiner Flugzeit rechtzeitig an der Basis eintrifft, zählt zur angezeigten Summe -
+      // dieselbe Regel wie beim tatsächlichen Abflug (checkAllianceRaidDispatch), damit die Anzeige
+      // während der Sammelphase nicht mehr Angriffskraft verspricht, als am Ende wirklich abfliegt.
+      // Zuspätkommer werden in der Teilnehmerliste trotzdem sichtbar, aber als solche markiert.
+      const onTimeParts = parts.filter(p => (p.arrivesAtBaseAt||Infinity) <= doc.gatherEndsAt);
+      const lateParts = parts.filter(p => (p.arrivesAtBaseAt||Infinity) > doc.gatherEndsAt);
+      const totalShips = onTimeParts.reduce((a,p)=>a+(p.shipCount||0),0);
+      const totalPower = onTimeParts.reduce((a,p)=>a+(p.power||0),0);
+      const contrib = state.allianceRaidContribution;
+      const myJoined = contrib && contrib.raidId===doc.id && contrib.waveNumber===doc.waveNumber;
+      let myStatusHtml;
+      if (myJoined){
+        const willMiss = contrib.arrivesAtBaseAt > doc.gatherEndsAt;
+        const arrived = Date.now() >= contrib.arrivesAtBaseAt;
+        const statusText = willMiss
+          ? `<span style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ACHTUNG: erreicht die Basis vermutlich ERST NACH Sammelphasenende - verpasst diese Welle (Schiffe kehren dann automatisch zurück)!</span>`
+          : arrived
+            ? `<span style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Deine Flotte ist an der Basis eingetroffen (${fmt(contrib.power)} Angriffskraft) - bereit zum Abflug.</span>`
+            : `<span style="color:#5dcaa5;"><i class="ti ti-rocket" aria-hidden="true"></i> Deine Flotte ist unterwegs zur Basis (${fmt(contrib.power)} Angriffskraft), Ankunft in ~${fmtDuration(Math.max(0,contrib.arrivesAtBaseAt-Date.now())/1000)}.</span>`;
+        myStatusHtml = `<div class="bmeta">${statusText}</div><button data-cancel-alliance-raid style="align-self:flex-start; font-size:11px;">Beitrag zurückziehen</button>`;
+      } else {
+        myStatusHtml = `<button data-join-alliance-raid class="attack" style="align-self:flex-start;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Flotte anschließen</button>`;
+      }
       const html = `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:rgba(93,202,165,0.4);">${hpBarHtml}
         <div class="bname"><i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> Sammelphase <span class="lvl-pill">${fmtDuration(remain/1000)}</span></div>
-        <div class="bmeta">Teilnehmer: <strong style="color:#fff;">${parts.length}</strong> · Gesamtschiffe: <strong style="color:#fff;">${fmt(totalShips)}</strong> · Gesamt-Angriffskraft: <strong style="color:#fff;">${fmt(totalPower)}</strong></div>
-        ${parts.length ? `<details><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>`<div class="bmeta">${escapeHtml(p.name)}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft</div>`).join('')}</div></details>` : ''}
+        <div class="bmeta">Rechtzeitig an der Basis: <strong style="color:#fff;">${onTimeParts.length}</strong> · Gesamtschiffe: <strong style="color:#fff;">${fmt(totalShips)}</strong> · Gesamt-Angriffskraft: <strong style="color:#fff;">${fmt(totalPower)}</strong>${lateParts.length?` · <span style="color:#f0997b;">${lateParts.length} vermutlich zu spät</span>`:''}</div>
+        ${parts.length ? `<details><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>{ const late = (p.arrivesAtBaseAt||Infinity) > doc.gatherEndsAt; return `<div class="bmeta">${escapeHtml(p.name)}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft${late?' <span style="color:#f0997b;">(zu spät, verpasst die Welle)</span>':''}</div>`; }).join('')}</div></details>` : ''}
         <div class="bmeta" style="margin-bottom:2px;">Wer beitritt, lässt seine Flotte erst zur Allianzbasis fliegen - nur wer rechtzeitig ankommt, gehört zum abfliegenden Verband.</div>
-        ${myJoined
-          ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Deine Flotte ist unterwegs zur Basis (${fmt(state.allianceRaidContribution.power)} Angriffskraft).</div><button data-cancel-alliance-raid style="align-self:flex-start; font-size:11px;">Beitrag zurückziehen</button>`
-          : `<button data-join-alliance-raid class="attack" style="align-self:flex-start;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Flotte anschließen</button>`}
+        ${myStatusHtml}
       </div>`;
       box.innerHTML = html;
       const joinBtn = box.querySelector('[data-join-alliance-raid]');
