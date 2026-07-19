@@ -3023,8 +3023,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.104.0';
+  const VERSION = '8.104.1';
   const PATCHNOTES = [
+    { version:'8.104.1', date:'18.07.2026', changes:[
+      'Tägliche Missionen von 11 auf 14 mögliche Typen erweitert: neu sind "1 Item im Kredit-Shop kaufen", "1 Fähigkeitspunkt investieren" und "1x zur Allianz beitragen" (Technologie/Gebäude/Reparatur/Weltprojekt zählen alle) - nach ehrlicher Prüfung auf diese drei nicht-redundanten Kandidaten begrenzt, statt künstlich mit sich wiederholenden Varianten aufzufüllen'
+    ]},
     { version:'8.104.0', date:'18.07.2026', changes:[
       'Tägliche Missionen von 8 auf 11 mögliche Typen erweitert (Spieler-Wunsch): neu sind "1 Item aus dem Inventar aktivieren", "1 Zufallsereignis lösen" und "1 Tribut an eine Fraktion zahlen" - gleiche Belohnungsgrößenordnung wie die bestehenden acht, funktioniert automatisch mit dem bestehenden Rotations-/Tausch-System'
     ]},
@@ -10706,7 +10709,13 @@
     // erweitert, gleiche Belohnungsgrößenordnung wie die bestehenden acht.
     { key:'item', name:'1 Item aus dem Inventar aktivieren', icon:'ti-backpack', target:1, reward:{credits:70} },
     { key:'randomevent', name:'1 Zufallsereignis lösen', icon:'ti-bolt', target:1, reward:{erz:350,kristalle:150} },
-    { key:'tribute', name:'1 Tribut an eine Fraktion zahlen', icon:'ti-flag', target:1, reward:{credits:90} }
+    { key:'tribute', name:'1 Tribut an eine Fraktion zahlen', icon:'ti-flag', target:1, reward:{credits:90} },
+    // 18.07.2026 (Spieler-Wunsch "ergänze die 4-5", nach ehrlicher Prüfung nur 3 echte, nicht-redundante
+    // Kandidaten gefunden - siehe Chat: Auto-Erkundungstour hätte nur mit 'explore' doppelt gezählt):
+    // von 11 auf 14 Typen erweitert.
+    { key:'shop', name:'1 Item im Kredit-Shop kaufen', icon:'ti-diamond', target:1, reward:{credits:60} },
+    { key:'skillpoint', name:'1 Fähigkeitspunkt investieren', icon:'ti-award', target:1, reward:{erz:400,kristalle:200} },
+    { key:'alliancecontrib', name:'1x zur Allianz beitragen', icon:'ti-users', target:1, reward:{credits:80} }
   ];
   const DAILY_QUEST_ACTIVE_COUNT = 5;
   const DAILY_QUEST_REROLL_COST = 15;
@@ -10732,7 +10741,8 @@
       date: today, activeKeys,
       startBattlePoints: state.battlePoints||0, startExpeditions: state.expeditionsCompleted||0,
       startNpcKills: state.npcKills||0, startDiscovered: Object.keys(state.discovered||{}).length,
-      researchCount:0, buildCount:0, tradeCount:0, fquestCount:0, itemCount:0, randomEventCount:0, tributeCount:0, claimed:{}
+      startShopPurchases: state.shopPurchases||0, startSkillPointsSpent: skillPointsSpent(),
+      researchCount:0, buildCount:0, tradeCount:0, fquestCount:0, itemCount:0, randomEventCount:0, tributeCount:0, allianceContribCount:0, claimed:{}
     };
   }
   function dailyQuestProgress(key){
@@ -10748,6 +10758,9 @@
     if (key==='item') return dq.itemCount||0;
     if (key==='randomevent') return dq.randomEventCount||0;
     if (key==='tribute') return dq.tributeCount||0;
+    if (key==='shop') return Math.max(0, (state.shopPurchases||0) - (dq.startShopPurchases||0));
+    if (key==='skillpoint') return Math.max(0, skillPointsSpent() - (dq.startSkillPointsSpent||0));
+    if (key==='alliancecontrib') return dq.allianceContribCount||0;
     return 0;
   }
   function claimDailyQuest(key){
@@ -13773,7 +13786,7 @@
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Vor Allianzmissionen nur bis "Selten" über die Schiffsklassen-Blaupause im Kredit-Shop erhältlich – Episch/Legendär/Mythisch sind für hochstufige Allianzmissionen reserviert. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
-      { title:'Tagesaufgaben', body:'Täglich werden 5 von 11 möglichen Aufgaben zufällig ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
+      { title:'Tagesaufgaben', body:'Täglich werden 5 von 14 möglichen Aufgaben zufällig ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
       { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong>. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie.' },
@@ -15595,6 +15608,7 @@
     state.resources[resKey] -= amount;
     const contribKey = 'base_'+resKey;
     state.allianceContributed[contribKey] = (state.allianceContributed[contribKey]||0) + amount;
+    if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
     try {
       const key = 'alliance:'+tag+':contrib:'+state.player.id;
       let doc = {};
@@ -16793,6 +16807,7 @@
     state.resources[resKey] -= amount;
     const contribKey = 'baserepair_'+resKey;
     state.allianceContributed[contribKey] = (state.allianceContributed[contribKey]||0) + amount;
+    if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
     try {
       const key = 'alliance:'+tag+':contrib:'+state.player.id;
       let doc = {};
@@ -16831,6 +16846,7 @@
     if ((state.resources[t.resKey]||0) < amount || amount <= 0){ log('Nicht genug Ressourcen für diesen Beitrag.', 'ti-alert-triangle'); return; }
     state.resources[t.resKey] -= amount;
     state.allianceContributed[techKey] = (state.allianceContributed[techKey]||0) + amount;
+    if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
     try {
       const key = 'alliance:'+tag+':contrib:'+state.player.id;
       let doc = {};
@@ -16865,6 +16881,7 @@
     state.rareItems[t.rareItem] -= amount;
     const rareContribKey = techKey+'_rare';
     state.allianceContributed[rareContribKey] = (state.allianceContributed[rareContribKey]||0) + amount;
+    if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
     try {
       const key = 'alliance:'+tag+':contrib:'+state.player.id;
       let doc = {};
