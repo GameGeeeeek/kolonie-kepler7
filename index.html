@@ -3023,8 +3023,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.105.1';
+  const VERSION = '8.106.0';
   const PATCHNOTES = [
+    { version:'8.106.0', date:'19.07.2026', changes:[
+      'Allianz-Raid serverseitig gehärtet (Spieler-Wunsch "sicherer machen"): Beitritt, Sammelphasen-Übergang, Kampfauflösung und Belohnung laufen jetzt über das Backend statt rein clientseitig - die Flottenzusammensetzung wird beim Beitritt gegen den echten Spielstand geprüft, die Angriffskraft serverseitig neu berechnet (ein selbst gemeldeter Wert wird ignoriert), und jeder Teilnehmer holt seine Belohnung serverseitig ab, statt sie sich clientseitig selbst zuzuschreiben - analog zur bestehenden Weltboss-Härtung'
+    ]},
     { version:'8.105.1', date:'19.07.2026', changes:[
       'Allianz-Raid: Sammelphasen-Anzeige zeigt jetzt nur noch Teilnehmer, die laut ihrer Flugzeit rechtzeitig an der Basis eintreffen werden, in der Gesamtsumme - Zuspätkommer werden in der Teilnehmerliste sichtbar als "zu spät" markiert, statt die angezeigte Angriffskraft der Welle zu überschätzen',
       'Allianz-Raid: eigener Beitritt zeigt jetzt einen Live-Status (unterwegs zur Basis mit Restzeit / an der Basis eingetroffen / droht die Welle zu verpassen) statt einer statischen Meldung',
@@ -17817,46 +17820,35 @@
   // der Weltboss (Leviathan der Leere) ist SERVERWEIT für alle Spieler gemeinsam, das Piratenversteck
   // ist rein SOLO. Der Allianz-Raid ist der bisher fehlende dritte Fall: ein Boss NUR für die eigene
   // Allianz, im geteilten Dokument alliance:<TAG>:raid.
-  // Sicherheits-Einordnung (bewusste Entscheidung, siehe Kommentar bei der Weltboss-Mission-Auflösung
-  // weiter unten in der Datei): der Weltboss wurde nach einer echten Sicherheitslücke auf server-
-  // seitige Auflösung (/worldboss/resolve) umgestellt, weil dort JEDER Spieler weltweit den gemeinsamen
-  // Zustand manipulieren konnte. Der Allianz-Raid dagegen läuft - wie der bereits bestehende und
-  // akzeptierte Musterangriff (resolveAllianceMusterAttack/claimMusterAttackOutcome, ebenfalls
-  // clientseitig berechnete echte Belohnungen über ein geteiltes Dokument) - bewusst weiterhin
-  // clientseitig: kleinerer, in sich geschlossener Wirkungskreis (nur die eigene Allianz betroffen,
-  // kein serverweiter Schaden), UND es existiert kein Backend-Endpunkt dafür in diesem Repository.
-  // Als zusätzliche Vorsicht sind die Belohnungen bewusst deutlich bescheidener als beim Weltboss.
   //
   // Überarbeitung 19.07.2026 (Spieler-Wunsch "das muss auch realistisch sein"): das ursprüngliche
   // Ein-Klick-Design (kein Flottenrisiko, keine Flugzeit) weicht jetzt demselben zweiphasigen Sammel-/
-  // Abflug-Muster wie der Musterangriff (createAllianceMusterAttack/joinAllianceMusterAttack/
-  // checkAllianceMusterDispatch), ZUSÄTZLICH mit einer eigenen Reise-Etappe zum Treffpunkt: wer
+  // Abflug-Muster wie der Musterangriff, ZUSÄTZLICH mit einer eigenen Reise-Etappe zum Treffpunkt: wer
   // beitritt, lässt seine Flotte erst zur Allianzbasis fliegen (Flugzeit nach Entfernung vom eigenen
   // Planeten); nur wer VOR Ende der Sammelphase dort eintrifft, gehört zum abfliegenden Verband. Der
-  // Boss braucht deshalb einen festen Standort (targetSector, zufälliges Sternsystem außer dem
-  // Basissystem) - der Verband fliegt von der Allianzbasis dorthin (zweite echte Flugzeit). Da die
-  // HP des Bosses eine einzelne Welle meist übersteht, wird derselbe Boss über mehrere Wellen bekämpft
-  // (waveNumber) - jede Welle ist ein eigener Sammel→Abflug→Kampf-Zyklus, bis er besiegt ist oder das
-  // 72-Std.-Zeitfenster (expiresAt, seit der ERSTEN Ausrufung, über alle Wellen hinweg) abläuft.
+  // Boss hat dafür einen festen Standort (targetSector, zufälliges Sternsystem außer dem Basissystem)
+  // - der Verband fliegt von der Allianzbasis dorthin (zweite echte Flugzeit). Da die HP des Bosses
+  // eine einzelne Welle meist übersteht, wird derselbe Boss über mehrere Wellen bekämpft (waveNumber)
+  // - jede Welle ist ein eigener Sammel→Abflug→Kampf-Zyklus, bis er besiegt ist oder das 72-Std.-
+  // Zeitfenster (expiresAt, seit der ERSTEN Ausrufung, über alle Wellen hinweg) abläuft.
+  //
+  // Härtung 19.07.2026 (Spieler-Wunsch "sicherer machen"): create/join/cancel/checkdispatch/resolve/
+  // claim laufen jetzt server-autoritativ über kolonie-kepler7-backend (analog /api/worldboss/resolve,
+  // siehe dessen Sicherheits-Kommentar) statt wie zuvor rein clientseitig über generische storageSet-
+  // Aufrufe - HP/Schaden/Angriffskraft/Belohnung/Zielsystem-Wahl werden dort berechnet, nicht mehr
+  // vom Client übernommen. Deshalb sind hier nur noch die reinen Anzeige-Hilfsfunktionen (Name/HP-
+  // Vorschau/Wellenschlüssel) übrig - die eigentliche Kampf-/Konter-/Zielsystem-Logik lebt jetzt im
+  // Backend (server.js).
   const ALLIANCE_RAID_BASE_HP = 20000;
-  const ALLIANCE_RAID_DURATION_MS = 72*60*60*1000; // Raid "entkommt" ungenutzt nach 72 Std. (gesamt, über alle Wellen)
-  const ALLIANCE_RAID_RESTART_COOLDOWN_MS = 6*60*60*1000; // nach Sieg/Verfall, bevor ein NEUER Boss (Stufe) ausgerufen werden kann
-  const ALLIANCE_RAID_WAVE_COOLDOWN_MS = 2*60*60*1000; // nach einer nicht-tödlichen Welle, bevor die NÄCHSTE Welle gegen denselben Boss startet
-  // Gegenwehr des Bosses ("Konterschaden") skaliert wie die HP - eine Welle mit Angriffskraft in
-  // HP-Größenordnung nimmt dadurch spürbare, aber verkraftbare Verluste, eine deutlich unterlegene
-  // Welle verliert dagegen empfindlich viel (gedeckelt/gedämpft über applyRetreatDampening, gleiches
-  // Muster wie beim Rückzug anderswo im Spiel) - das ist das neue, echte Flottenrisiko, das das alte
-  // "kein Flottenrisiko"-Design ersetzt.
-  const ALLIANCE_RAID_COUNTER_BASE = 4000;
+  // Nur noch für die client-seitige Countdown-ANZEIGE gebraucht ("Bereit in...") - die tatsächliche
+  // Durchsetzung der Cooldowns passiert serverseitig (server.js hält dieselben Werte, siehe dortige
+  // Konstanten gleichen Namens). Bei Änderung dort IMMER auch hier mitpflegen, sonst zeigt die Anzeige
+  // einen falschen Countdown.
+  const ALLIANCE_RAID_RESTART_COOLDOWN_MS = 6*60*60*1000;
+  const ALLIANCE_RAID_WAVE_COOLDOWN_MS = 2*60*60*1000;
   function allianceRaidHpFor(level){ return Math.round(ALLIANCE_RAID_BASE_HP * Math.pow(1.4, Math.max(0, level-1))); }
-  function allianceRaidCounterFor(level){ return Math.round(ALLIANCE_RAID_COUNTER_BASE * Math.pow(1.4, Math.max(0, level-1))); }
   function allianceRaidBossName(level){ return 'Sternenfresser - Stufe '+level; }
   function allianceRaidWaveKey(doc){ return doc ? doc.id+'-w'+(doc.waveNumber||1) : null; }
-  function pickAllianceRaidTargetSector(excludeSector){
-    const pool = STAR_SYSTEMS.filter(s => s.id !== excludeSector);
-    const list = pool.length ? pool : STAR_SYSTEMS;
-    return list[Math.floor(Math.random()*list.length)].id;
-  }
   let allianceRaidCache = null;
   async function loadAllianceRaidDoc(){
     const tag = myAllianceTag();
@@ -17882,33 +17874,28 @@
   // neuer Boss (Stufe steigt nur nach echtem Sieg, kein Straf-Sprung bei ungenutztem Entkommen, siehe
   // Restart-Cooldown), (b) angeschlagener ('idle') Boss derselben Stufe -> nächste Welle gegen
   // denselben Boss (HP/targetSector bleiben erhalten).
+  // ===== Ab hier server-autoritativ (19.07.2026, Spieler-Wunsch "sicherer machen") =====
+  // create/join/cancel/checkdispatch/resolve/claim laufen jetzt über das Backend
+  // (kolonie-kepler7-backend, /api/allianceraid/*) statt direkter storageGet/storageSet-Kampf-
+  // berechnung: Flottenzusammensetzung wird beim Beitritt gegen den echten, serverseitig
+  // gespeicherten Spielstand geprüft/gekappt, Angriffskraft wird dort neu berechnet (ein
+  // mitgeschickter Wert wird ignoriert), und jeder Teilnehmer holt seine Belohnung über /claim
+  // GENAU EINMAL selbst ab (Server schreibt dabei ausschließlich in den eigenen Spielstand, nie in
+  // den eines anderen Spielers - analog /api/worldboss/resolve). Bewusst weiterhin clientseitig:
+  // die Flugzeit (travelSec) wird vom Client berechnet und nur unverändert an den Server gereicht -
+  // dieselbe Vertrauensannahme wie bei jeder anderen Missionsart in diesem Spiel (siehe Kommentar im
+  // Backend).
   async function createAllianceRaid(gatherSeconds){
     if (!amIAllianceMusterLeader()){ log('Nur Admins/Offiziere können einen Allianz-Raid ausrufen.', 'ti-alert-triangle'); return; }
     const tag = myAllianceTag();
     if (!tag || !useBackend()) return;
-    if (!state.allianceBase || !state.allianceBase.foundedAt){ log('Der Allianz-Raid braucht eine gegründete Allianzbasis als Treffpunkt.', 'ti-alert-triangle'); return; }
-    if (!ALLIANCE_MUSTER_DURATIONS.includes(gatherSeconds)){ log('Ungültige Sammelzeit.', 'ti-alert-triangle'); return; }
-    const existing = await loadAllianceRaidDoc();
-    if (existing && (existing.phase === 'gathering' || existing.phase === 'enroute')){ log('Es läuft bereits eine Angriffswelle gegen den Sternenfresser.', 'ti-alert-triangle'); return; }
-    const now = Date.now();
-    let doc;
-    if (existing && existing.phase === 'idle' && existing.expiresAt > now){
-      const waveCdLeft = Math.max(0, (existing.lastWaveEndedAt||0) + ALLIANCE_RAID_WAVE_COOLDOWN_MS - now);
-      if (waveCdLeft > 0){ log('Nächste Welle gegen den Sternenfresser erst in '+fmtDuration(waveCdLeft/1000)+' möglich.', 'ti-clock'); return; }
-      doc = existing;
-      doc.waveNumber = (doc.waveNumber||1) + 1;
-      doc.phase = 'gathering'; doc.gatherEndsAt = now + gatherSeconds*1000; doc.dispatch = null;
-    } else {
-      const endedAt = existing ? (existing.result ? existing.result.resolvedAt : existing.expiresAt) : 0;
-      const restartCdLeft = existing ? Math.max(0, (endedAt||0) + ALLIANCE_RAID_RESTART_COOLDOWN_MS - now) : 0;
-      if (restartCdLeft > 0){ log('Nächster Allianz-Raid erst in '+fmtDuration(restartCdLeft/1000)+' ausrufbar.', 'ti-clock'); return; }
-      const level = existing && existing.result && existing.result.destroyed ? (existing.level||1)+1 : (existing ? (existing.level||1) : 1);
-      const targetSector = pickAllianceRaidTargetSector(state.allianceBase.sector);
-      doc = { id:'raid'+now, level, maxHp: allianceRaidHpFor(level), hp: allianceRaidHpFor(level), targetSector,
-        waveNumber: 1, startedAt: now, expiresAt: now+ALLIANCE_RAID_DURATION_MS, gatherEndsAt: now+gatherSeconds*1000,
-        phase: 'gathering', dispatch: null, lastWaveResult: null, lastWaveEndedAt: null, result: null };
-    }
-    await storageSet('alliance:'+tag+':raid', JSON.stringify(doc), true);
+    let res, data;
+    try {
+      res = await backendFetch('/allianceraid/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, gatherSeconds }) });
+      data = await res.json();
+    } catch(e){ log('Verbindungsfehler beim Ausrufen des Allianz-Raids.', 'ti-alert-triangle'); return; }
+    if (!res.ok || !data.ok){ log(data && data.error || 'Allianz-Raid konnte nicht ausgerufen werden.', 'ti-alert-triangle'); return; }
+    const doc = data.doc;
     allianceRaidCache = doc;
     raidParticipantsCache = { waveKey: allianceRaidWaveKey(doc), fetchedAt: Date.now(), parts: [] };
     const sys = STAR_SYSTEMS.find(s=>s.id===doc.targetSector);
@@ -17919,12 +17906,13 @@
     log('Sammelphase gegen '+allianceRaidBossName(doc.level)+' gestartet ('+fmtDuration(gatherSeconds)+').', 'ti-alert-triangle');
     render(); save();
   }
-  // Beitreten: baut die Angriffsflotte wie beim Musterangriff zusammen und zieht sie sofort lokal ab -
-  // NEU (Realismus-Wunsch): die Flugzeit zum Treffpunkt (Allianzbasis) wird nach echter Entfernung
-  // berechnet und im Beitritts-Dokument gespeichert. Nur wer laut dieser Flugzeit VOR Ende der
-  // Sammelphase an der Basis eintrifft, wird beim Abflug (checkAllianceRaidDispatch) mitgezählt - wer
-  // zu spät kommt, bekommt beim Abholen (claimAllianceRaidOutcome) automatisch seine Flotte unversehrt
-  // zurück, ohne am Kampf teilgenommen zu haben.
+  // Beitreten: Flugzeit zum Treffpunkt wird lokal (nach echter Entfernung) berechnet und dem Server
+  // mitgeteilt, die Flottenzusammensetzung wird dort gegen den echten Spielstand geprüft/gekappt
+  // UND abgezogen - lokal ziehen wir NUR den vom Server tatsächlich bestätigten (gekappten) Anteil
+  // nach, nicht unsere ursprüngliche Auswahl (analog "Verluste lokal nachziehen" bei der Weltboss-
+  // Missionsauswertung). Nur wer laut Flugzeit VOR Ende der Sammelphase an der Basis eintrifft, wird
+  // beim Abflug mitgezählt - wer zu spät kommt, bekommt beim Abholen (claimAllianceRaidOutcome)
+  // automatisch seine Flotte unversehrt zurück, ohne am Kampf teilgenommen zu haben.
   async function joinAllianceRaid(){
     const tag = myAllianceTag();
     if (!tag || !useBackend()) return;
@@ -17940,28 +17928,16 @@
     const arrivesAtBaseAt = Date.now() + travelSec*1000;
     const lateWarning = arrivesAtBaseAt > doc.gatherEndsAt ? ' ACHTUNG: Deine Flotte trifft laut Flugzeit voraussichtlich ERST NACH Ende der Sammelphase an der Basis ein und würde die Welle verpassen (die Schiffe kehren dann automatisch unversehrt zurück)!' : '';
     if (!confirm('Deine zusammengestellte Angriffsflotte ('+totalShips+' Schiffe von '+planetDisplayName(state.activeBasePlanet)+') dem Allianz-Raid anschließen? Flugzeit zur Allianzbasis: ~'+fmtDuration(travelSec)+'.'+lateWarning+' Die Schiffe sind bis zum Abschluss der Welle gebunden (Rückzug nur, solange die Sammelphase noch läuft).')) return;
-    const power = attackPower(composition, state.activeBasePlanet);
-    for (const [k,v] of Object.entries(composition)){ if (v>0) cf[k] = Math.max(0, (cf[k]||0)-v); }
-    const waveKey = allianceRaidWaveKey(doc);
-    const joinDoc = { playerId: state.player.id, name: state.player.name||'Kommandant', composition, power, originPlanet: state.activeBasePlanet, shipCount: totalShips, joinedAt: Date.now(), travelSec, arrivesAtBaseAt, cancelled:false };
+    let res, data;
     try {
-      const fresh = await storageGet('alliance:'+tag+':raid', true);
-      const freshDoc = (fresh && fresh.value) ? JSON.parse(fresh.value) : doc;
-      if (!freshDoc || freshDoc.phase !== 'gathering' || allianceRaidWaveKey(freshDoc) !== waveKey){
-        for (const [k,v] of Object.entries(composition)){ if (v>0) cf[k] = (cf[k]||0)+v; }
-        log('Die Sammelphase ist gerade zu Ende gegangen - versuch es bei der nächsten Welle erneut.', 'ti-alert-triangle');
-        render(); save();
-        return;
-      }
-      await storageSet('alliance:'+tag+':raidjoin:'+waveKey+':'+state.player.id, JSON.stringify(joinDoc), true);
-    } catch(e){
-      for (const [k,v] of Object.entries(composition)){ if (v>0) cf[k] = (cf[k]||0)+v; }
-      log('Fehler beim Anschließen - Schiffe wurden nicht abgezogen.', 'ti-alert-triangle');
-      render(); save();
-      return;
-    }
-    state.allianceRaidContribution = { raidId: doc.id, waveNumber: doc.waveNumber, level: doc.level, composition, power, originPlanet: state.activeBasePlanet, joinedAt: Date.now(), travelSec, arrivesAtBaseAt, gatherEndsAt: doc.gatherEndsAt };
-    log('Deine Flotte ('+totalShips+' Schiffe, '+fmt(power)+' Angriffskraft) fliegt zum Treffpunkt (Allianzbasis) - Ankunft in ~'+fmtDuration(travelSec)+'.', 'ti-rocket');
+      res = await backendFetch('/allianceraid/join', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, raidId: doc.id, waveNumber: doc.waveNumber, composition, originPlanet: state.activeBasePlanet, travelSec }) });
+      data = await res.json();
+    } catch(e){ log('Verbindungsfehler beim Anschließen.', 'ti-alert-triangle'); return; }
+    if (!res.ok || !data.ok){ log(data && data.error || 'Beitritt fehlgeschlagen.', 'ti-alert-triangle'); return; }
+    for (const [k,v] of Object.entries(data.join.composition||{})){ if (v>0) cf[k] = Math.max(0, (cf[k]||0)-v); }
+    if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+    state.allianceRaidContribution = { raidId: doc.id, waveNumber: doc.waveNumber, level: doc.level, composition: data.join.composition, power: data.join.power, originPlanet: state.activeBasePlanet, joinedAt: data.join.joinedAt, travelSec: data.join.travelSec, arrivesAtBaseAt: data.join.arrivesAtBaseAt, gatherEndsAt: doc.gatherEndsAt };
+    log('Deine Flotte ('+data.join.shipCount+' Schiffe, '+fmt(data.join.power)+' Angriffskraft) fliegt zum Treffpunkt (Allianzbasis) - Ankunft in ~'+fmtDuration(data.join.travelSec)+'.', 'ti-rocket');
     await refreshAllianceRaidParticipants(true);
     render(); save();
   }
@@ -17974,10 +17950,15 @@
       log('Ein Rückzug ist nur während der laufenden Sammelphase möglich.', 'ti-alert-triangle'); return;
     }
     if (!confirm('Deine Flotte vom Allianz-Raid zurückziehen? Die Schiffe kehren sofort zurück.')) return;
-    const waveKey = doc.id+'-w'+contrib.waveNumber;
-    try { await storageSet('alliance:'+tag+':raidjoin:'+waveKey+':'+state.player.id, JSON.stringify({ cancelled:true }), true); } catch(e){ log('Fehler beim Zurückziehen.', 'ti-alert-triangle'); return; }
+    let res, data;
+    try {
+      res = await backendFetch('/allianceraid/cancel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, raidId: contrib.raidId, waveNumber: contrib.waveNumber }) });
+      data = await res.json();
+    } catch(e){ log('Verbindungsfehler beim Zurückziehen.', 'ti-alert-triangle'); return; }
+    if (!res.ok || !data.ok){ log(data && data.error || 'Rückzug fehlgeschlagen.', 'ti-alert-triangle'); return; }
     const originFleet = contrib.originPlanet==='home' ? state.fleet : (state.colonies[contrib.originPlanet] ? state.colonies[contrib.originPlanet].fleet : null);
     if (originFleet){ for (const [k,v] of Object.entries(contrib.composition||{})){ if (typeof v==='number' && v>0) originFleet[k] = (originFleet[k]||0)+v; } }
+    if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
     log('Flotte vom Allianz-Raid zurückgezogen - alle Schiffe sind zurück.', 'ti-arrows-shuffle');
     state.allianceRaidContribution = null;
     await refreshAllianceRaidParticipants(true);
@@ -18000,95 +17981,48 @@
       raidParticipantsCache = { waveKey, fetchedAt: Date.now(), parts: loaded.filter(p=>p && !p.cancelled) };
     } catch(e){ raidParticipantsCache = raidParticipantsCache || { waveKey, fetchedAt: Date.now(), parts: [] }; }
   }
-  // Sammelphase abgelaufen -> nur Teilnehmer zählen, die laut ihrer Flugzeit RECHTZEITIG an der
-  // Allianzbasis eingetroffen sind (arrivesAtBaseAt <= gatherEndsAt) - wer zu spät kommt, bleibt außen
-  // vor (siehe claimAllianceRaidOutcome für die Rückkehr von dessen Flotte). Race-tolerant wie
-  // checkAllianceMusterDispatch: vor dem Schreiben frisch nachlesen und die Phase/Welle prüfen.
+  // Sammelphase abgelaufen -> Server aggregiert die rechtzeitig eingetroffenen Teilnehmer und lässt
+  // den Verband abfliegen (siehe Backend-Endpunkt: nur dort ist "rechtzeitig" vertrauenswürdig
+  // geprüft). Race-tolerant/idempotent wie zuvor: mehrere gleichzeitig pollende Clients erhalten
+  // denselben, bereits aufgelösten Zustand zurück - nur EINER hat die eigentliche Schreiboperation
+  // ausgelöst, unterscheidbar am lokalen "war noch gathering, ist jetzt nicht mehr"-Vergleich (nur
+  // für die Chronik-Meldung relevant, nicht sicherheitsrelevant - ein gelegentlicher doppelter
+  // Chronik-Eintrag bei einem echten Gleichstand ist rein kosmetisch).
   async function checkAllianceRaidDispatch(){
     const tag = myAllianceTag();
     if (!tag || !useBackend()) return;
-    let doc = null;
-    try { const r = await storageGet('alliance:'+tag+':raid', true); doc = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){ return; }
-    allianceRaidCache = doc;
+    const doc = allianceRaidCache;
     if (!doc || doc.phase !== 'gathering' || doc.gatherEndsAt > Date.now()) return;
-    await refreshAllianceRaidParticipants(true);
-    const waveKey = allianceRaidWaveKey(doc);
-    const allParts = (raidParticipantsCache && raidParticipantsCache.waveKey===waveKey) ? raidParticipantsCache.parts : [];
-    const parts = allParts.filter(p => (p.arrivesAtBaseAt||Infinity) <= doc.gatherEndsAt);
-    if (!parts.length){
-      try {
-        const r = await storageGet('alliance:'+tag+':raid', true);
-        const fresh = (r && r.value) ? JSON.parse(r.value) : doc;
-        if (allianceRaidWaveKey(fresh) === waveKey && fresh.phase === 'gathering'){
-          fresh.phase = 'idle'; fresh.lastWaveEndedAt = Date.now();
-          fresh.lastWaveResult = { waveNumber: fresh.waveNumber, noParticipants:true, resolvedAt: Date.now() };
-          await storageSet('alliance:'+tag+':raid', JSON.stringify(fresh), true);
-          allianceRaidCache = fresh;
-        }
-      } catch(e){}
-      return;
-    }
-    const totalComposition = {};
-    let totalPower = 0, totalShips = 0, topPower = -1, topId = null;
-    for (const p of parts){
-      for (const [k,v] of Object.entries(p.composition||{})) if (typeof v==='number' && v>0) totalComposition[k] = (totalComposition[k]||0)+v;
-      totalPower += p.power||0; totalShips += p.shipCount||0;
-      if ((p.power||0) > topPower){ topPower = p.power||0; topId = p.playerId||null; }
-    }
-    const sameSys = state.allianceBase && state.allianceBase.sector === doc.targetSector;
-    const dur = missionDurationFor(sameSys ? 150 : 600, totalComposition, ATTACK_SHIP_KEYS, doc.targetSector);
-    const now = Date.now();
-    const dispatch = { departedAt: now, arrivalAt: now+dur*1000, totalComposition, totalPower: Math.round(totalPower), totalShips, participantCount: parts.length, topParticipantId: topId, topParticipantPower: Math.round(Math.max(0,topPower)) };
     try {
-      const r = await storageGet('alliance:'+tag+':raid', true);
-      const fresh = (r && r.value) ? JSON.parse(r.value) : doc;
-      if (fresh.phase !== 'gathering' || allianceRaidWaveKey(fresh) !== waveKey){ allianceRaidCache = fresh; return; }
-      fresh.phase = 'enroute'; fresh.dispatch = dispatch;
-      await storageSet('alliance:'+tag+':raid', JSON.stringify(fresh), true);
+      const res = await backendFetch('/allianceraid/checkdispatch', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag }) });
+      const data = await res.json();
+      if (!res.ok || !data.ok || !data.doc) return;
+      const fresh = data.doc;
+      if (fresh.phase === 'enroute' && fresh.dispatch && allianceRaidWaveKey(fresh) === allianceRaidWaveKey(doc)){
+        const sys = STAR_SYSTEMS.find(s=>s.id===fresh.targetSector);
+        postAllianceBaseNews('⚔ Verband bricht von der Allianzbasis auf gegen "'+allianceRaidBossName(fresh.level)+'" (Standort: '+(sys?sys.name:fresh.targetSector)+')! '+fresh.dispatch.participantCount+' Kommandanten, '+fmt(fresh.dispatch.totalShips)+' Schiffe, '+fmt(fresh.dispatch.totalPower)+' Angriffskraft. Ankunft in ~'+fmtDuration(Math.max(0,(fresh.dispatch.arrivalAt-Date.now())/1000))+'.');
+      }
       allianceRaidCache = fresh;
-      const sys = STAR_SYSTEMS.find(s=>s.id===doc.targetSector);
-      await postAllianceBaseNews('⚔ Verband bricht von der Allianzbasis auf gegen "'+allianceRaidBossName(doc.level)+'" (Standort: '+(sys?sys.name:doc.targetSector)+')! '+parts.length+' Kommandanten, '+fmt(totalShips)+' Schiffe, '+fmt(Math.round(totalPower))+' Angriffskraft. Ankunft in ~'+fmtDuration(dur)+'.');
     } catch(e){}
   }
+  // Ankunft am Boss-Standort -> Server löst den Kampf auf (Schaden/HP/Phase). Idempotent wie oben:
+  // wer auch immer zuerst pollt, löst die eigentliche Schreiboperation aus.
   async function checkAllianceRaidArrival(){
-    const doc = allianceRaidCache;
-    if (doc && doc.phase === 'enroute' && doc.dispatch && doc.dispatch.arrivalAt <= Date.now()) await resolveAllianceRaidArrival();
-  }
-  // Kampf-Auflösung bei Ankunft: Schaden = Gesamt-Angriffskraft des Verbands (gedeckelt auf die
-  // Rest-HP), eigene Verluste anhand des Machtverhältnisses zur bosseigenen Gegenwehr (siehe
-  // ALLIANCE_RAID_COUNTER_BASE-Kommentar oben). Bei zu wenig HP-Rest stirbt der Boss (Stufe
-  // abgeschlossen), sonst geht die Welle zu Ende und der Boss wartet angeschlagen ('idle') auf die
-  // nächste Welle.
-  async function resolveAllianceRaidArrival(){
     const tag = myAllianceTag();
-    if (!tag || !useBackend()) return;
-    let doc = null;
-    try { const r = await storageGet('alliance:'+tag+':raid', true); doc = (r && r.value) ? JSON.parse(r.value) : null; } catch(e){ return; }
-    if (!doc || doc.phase !== 'enroute' || !doc.dispatch || doc.dispatch.arrivalAt > Date.now()){ if (doc) allianceRaidCache = doc; return; }
-    const waveKey = allianceRaidWaveKey(doc);
-    const power = doc.dispatch.totalPower;
-    const damage = Math.min(doc.hp, power);
-    const newHp = Math.max(0, doc.hp - damage);
-    const destroyed = newHp <= 0;
-    const counter = allianceRaidCounterFor(doc.level);
-    const rawLossPct = Math.max(0.05, Math.min(0.6, counter/(counter+power)));
-    const lossPct = applyRetreatDampening(rawLossPct).pct;
-    const now = Date.now();
-    const waveResult = { waveNumber: doc.waveNumber, damage: Math.round(damage), destroyed, lossPct, totalPower: power, totalShips: doc.dispatch.totalShips, participantCount: doc.dispatch.participantCount, topParticipantId: doc.dispatch.topParticipantId, resolvedAt: now };
+    const doc = allianceRaidCache;
+    if (!tag || !useBackend() || !doc || doc.phase !== 'enroute' || !doc.dispatch || doc.dispatch.arrivalAt > Date.now()) return;
     try {
-      const r = await storageGet('alliance:'+tag+':raid', true);
-      const fresh = (r && r.value) ? JSON.parse(r.value) : doc;
-      if (fresh.phase !== 'enroute' || allianceRaidWaveKey(fresh) !== waveKey){ allianceRaidCache = fresh; return; }
-      fresh.hp = newHp;
-      fresh.lastWaveResult = waveResult;
-      fresh.lastWaveEndedAt = now;
-      if (destroyed){ fresh.phase = 'resolved'; fresh.result = waveResult; }
-      else { fresh.phase = 'idle'; }
-      await storageSet('alliance:'+tag+':raid', JSON.stringify(fresh), true);
+      const res = await backendFetch('/allianceraid/resolve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag }) });
+      const data = await res.json();
+      if (!res.ok || !data.ok || !data.doc) return;
+      const fresh = data.doc;
+      if (fresh.phase !== 'enroute' && fresh.lastWaveResult && fresh.lastWaveResult.waveNumber === doc.waveNumber){
+        const destroyed = fresh.lastWaveResult.destroyed;
+        postAllianceBaseNews(destroyed
+          ? '💀 Die Allianz hat gemeinsam "'+allianceRaidBossName(doc.level)+'" besiegt! ('+fmt(fresh.lastWaveResult.damage)+' Schaden mit dem letzten Schlag)'
+          : '⚔ Welle gegen "'+allianceRaidBossName(doc.level)+'" beendet: '+fmt(fresh.lastWaveResult.damage)+' Schaden, noch '+fmt(fresh.hp)+'/'+fmt(fresh.maxHp)+' HP übrig.');
+      }
       allianceRaidCache = fresh;
-      await postAllianceBaseNews(destroyed
-        ? '💀 Die Allianz hat gemeinsam "'+allianceRaidBossName(doc.level)+'" besiegt! ('+fmt(Math.round(damage))+' Schaden mit dem letzten Schlag)'
-        : '⚔ Welle gegen "'+allianceRaidBossName(doc.level)+'" beendet: '+fmt(Math.round(damage))+' Schaden, noch '+fmt(newHp)+'/'+fmt(doc.maxHp)+' HP übrig.');
     } catch(e){}
   }
   // Ungenutztes Entkommen: nur wenn der Boss GERADE zwischen zwei Wellen ('idle') wartet, nicht
@@ -18110,13 +18044,11 @@
     } catch(e){}
   }
   // Angreifer-Seite, pro Teilnehmer: eigene Belohnung/Verluste bzw. unversehrte Rückkehr (bei
-  // verpasster Welle) genau einmal abholen, sobald die eigene Welle nicht mehr läuft. Beachte: das
-  // Ergebnis (doc.lastWaveResult) wird von der NÄCHSTEN Welle überschrieben, sobald ein Offizier sie
-  // startet - das ist ein bewusst akzeptiertes, seltenes Race (identisches Muster/Risiko wie das
-  // race-tolerante storageSet anderswo im Spiel): eine Welle braucht selbst mindestens die gewählte
-  // Sammelzeit (min. 30 Min.) plus Flugzeit, bevor eine neue starten kann - in dieser Zeit hat der
-  // automatische Poll (refreshAllianceRaid, alle paar Sekunden/Minuten je nach Tab) das Ergebnis in
-  // aller Regel längst abgeholt.
+  // verpasster Welle) über den server-autoritativen /claim-Endpunkt abholen, sobald die eigene Welle
+  // nicht mehr läuft. Der Server berechnet Belohnung/Verluste komplett selbst aus dem bereits dort
+  // gespeicherten Wellenergebnis und dem eigenen Beitritts-Dokument (nichts hiervon ist mehr
+  // client-seitig manipulierbar) und schreibt sie direkt in den eigenen Spielstand - lokal wird nur
+  // noch die Serverantwort angezeigt/nachgezogen (analog Weltboss-Missionsauswertung).
   async function claimAllianceRaidOutcome(){
     const contrib = state.allianceRaidContribution;
     if (!contrib) return;
@@ -18128,56 +18060,43 @@
     }
     if (!doc || doc.id !== contrib.raidId) return; // ganz neuer Boss ausgerufen, alte Welle ist Geschichte
     if (doc.waveNumber === contrib.waveNumber && (doc.phase === 'gathering' || doc.phase === 'enroute')) return; // meine Welle läuft noch
-    state.claimedAllianceRaidWaveIds = state.claimedAllianceRaidWaveIds || [];
-    const claimKey = contrib.raidId+'-w'+contrib.waveNumber;
-    if (state.claimedAllianceRaidWaveIds.includes(claimKey)){ state.allianceRaidContribution = null; save(); return; }
-    state.claimedAllianceRaidWaveIds.push(claimKey);
-    state.claimedAllianceRaidWaveIds = state.claimedAllianceRaidWaveIds.slice(-30);
+    let res, data;
+    try {
+      res = await backendFetch('/allianceraid/claim', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, raidId: contrib.raidId, waveNumber: contrib.waveNumber }) });
+      data = await res.json();
+    } catch(e){ return; } // Verbindungsfehler - beim nächsten Poll erneut versuchen, Beitrag bleibt offen
+    if (!res.ok || !data.ok) return;
+    if (data.cancelled || data.alreadyClaimed){ state.allianceRaidContribution = null; save(); return; }
     const originFleet = contrib.originPlanet==='home' ? state.fleet : (state.colonies[contrib.originPlanet] ? state.colonies[contrib.originPlanet].fleet : null);
-    const missedWave = contrib.arrivesAtBaseAt > contrib.gatherEndsAt;
-    if (missedWave){
+    if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+    if (data.missedWave){
       if (originFleet){ for (const [k,v] of Object.entries(contrib.composition||{})){ if (typeof v==='number' && v>0) originFleet[k] = (originFleet[k]||0)+v; } }
       log('Deine Flotte erreichte die Allianzbasis erst nach Abflug des Verbands - alle Schiffe sind unversehrt zurückgekehrt (keine Teilnahme an dieser Welle).', 'ti-arrows-shuffle');
       state.allianceRaidContribution = null;
       render(); save();
       return;
     }
-    const res = (doc.lastWaveResult && doc.lastWaveResult.waveNumber === contrib.waveNumber) ? doc.lastWaveResult
-              : (doc.result && doc.result.waveNumber === contrib.waveNumber) ? doc.result : null;
-    if (!res || res.noParticipants){
-      // Kein passendes Wellenergebnis mehr auffindbar (seltene Race, siehe Funktionskommentar) oder
-      // niemand hat teilgenommen - Schiffe sicherheitshalber ohne Verlust/Belohnung zurückholen, statt
-      // sie stillschweigend verschwinden zu lassen.
-      if (originFleet){ for (const [k,v] of Object.entries(contrib.composition||{})){ if (typeof v==='number' && v>0) originFleet[k] = (originFleet[k]||0)+v; } }
-      state.allianceRaidContribution = null;
-      render(); save();
-      return;
-    }
-    const share = res.totalPower>0 ? Math.min(1, (contrib.power||0)/res.totalPower) : 0;
     const lostParts = [];
     if (originFleet){
       for (const [k,v] of Object.entries(contrib.composition||{})){
         if (typeof v !== 'number' || v<=0) continue;
-        const lostN = Math.min(v, Math.round(v*(res.lossPct||0)));
+        const lostN = (data.lostShips && data.lostShips[k]) || 0;
         const survivors = v - lostN;
         if (survivors>0) originFleet[k] = (originFleet[k]||0) + survivors;
         if (lostN>0) lostParts.push(lostN+'x '+(shipDefOrSuper(k)||{name:k}).name);
       }
     }
-    const isTop = !!(res.topParticipantId && res.topParticipantId === state.player.id);
+    state.credits = data.newCredits;
+    state.battlePoints = data.newBattlePoints;
+    addXp(data.xp||0);
     const level = contrib.level || doc.level || 1;
-    const credits = Math.round((300 + level*150) * (0.4 + 0.6*share) * (isTop?1.5:1) * (res.destroyed?1:0.6));
-    const bp = Math.round((8 + level*4) * (0.4 + 0.6*share) * (res.destroyed?1:0.6));
-    state.credits = (state.credits||0) + credits;
-    awardBattlePoints(bp);
-    addXp(res.destroyed?20:12);
     let moduleMsg = '';
-    if (res.destroyed && Math.random() < 0.1 + share*0.25){ const mod = grantRandomModule(); moduleMsg = ' Modul erbeutet: '+mod+'!'; }
+    if (data.destroyed && Math.random() < 0.1 + (data.share||0)/100*0.25){ const mod = grantRandomModule(); moduleMsg = ' Modul erbeutet: '+mod+'!'; }
     const lostText = lostParts.join(', ');
-    logScoreChange(bp*3, allianceRaidBossName(level)+(res.destroyed?' erlegt':' angeschlagen')+' (Beitrag '+Math.round(share*100)+'%)', 'ti-sword');
-    log('Allianz-Raid-Belohnung: '+(res.destroyed?'Sternenfresser besiegt! ':'Welle beendet, Boss angeschlagen. ')+credits+' Kredite, '+bp+' Kampfpunkte'+(isTop?' (Top-Schädiger, +50%!)':'')+', +'+(res.destroyed?20:12)+' XP.'+moduleMsg+(lostText?' Eigene Verluste: '+lostText+'.':' Alle eigenen Schiffe zurückgekehrt.'), res.destroyed?'ti-skull':'ti-sword');
-    pushReport({ type:'item-found', itemName:'Allianz-Raid-Belohnung: '+credits+' Kredite + '+bp+' Kampfpunkte ('+Math.round(share*100)+'% Beitrag'+(isTop?', Top-Schädiger':'')+(res.destroyed?', Boss besiegt':', Boss angeschlagen')+')', itemIcon:'ti-sword', rare: res.destroyed && isTop, foundAt: allianceRaidBossName(level) });
-    playSound(res.destroyed?'achieve':'raid');
+    logScoreChange(data.battlePoints*3, allianceRaidBossName(level)+(data.destroyed?' erlegt':' angeschlagen')+' (Beitrag '+data.share+'%)', 'ti-sword');
+    log('Allianz-Raid-Belohnung: '+(data.destroyed?'Sternenfresser besiegt! ':'Welle beendet, Boss angeschlagen. ')+data.credits+' Kredite, '+data.battlePoints+' Kampfpunkte'+(data.isTop?' (Top-Schädiger, +50%!)':'')+', +'+data.xp+' XP.'+moduleMsg+(lostText?' Eigene Verluste: '+lostText+'.':' Alle eigenen Schiffe zurückgekehrt.'), data.destroyed?'ti-skull':'ti-sword');
+    pushReport({ type:'item-found', itemName:'Allianz-Raid-Belohnung: '+data.credits+' Kredite + '+data.battlePoints+' Kampfpunkte ('+data.share+'% Beitrag'+(data.isTop?', Top-Schädiger':'')+(data.destroyed?', Boss besiegt':', Boss angeschlagen')+')', itemIcon:'ti-sword', rare: data.destroyed && data.isTop, foundAt: allianceRaidBossName(level) });
+    playSound(data.destroyed?'achieve':'raid');
     state.allianceRaidContribution = null;
     render(); save();
   }
