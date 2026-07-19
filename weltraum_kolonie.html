@@ -1537,7 +1537,7 @@
       </div>
 
       <div class="resbar" id="resbar"></div>
-      <div id="nanoResBadge"></div>
+      <div id="tier2ResBadges"></div>
       <div id="dailyQuestBar" style="margin-bottom:0.75rem;"></div>
       <div class="event-banner" id="storageWarningBanner" style="display:none; border-color:rgba(224,165,72,0.5); background:rgba(224,165,72,0.1);">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -1629,7 +1629,7 @@
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Verschiebt Angriffs- und Verteidigungskraft gegenläufig, jederzeit kostenlos wechselbar (im Gegensatz zur Doktrin).</div>
         <div id="stanceBox"></div>
         <div class="section-title" style="margin-top:1.5rem; justify-content:space-between;"><span><i class="ti ti-atom-2" aria-hidden="true"></i>Weitere Verwendungen für Forschungspunkte</span><button class="help-jump-btn" data-jump-help="forschung"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
-        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Sind alle 32 Forschungszweige weit ausgebaut, lohnt sich überschüssige Forschungspunkte-Produktion hier weiter.</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Sind alle Forschungszweige weit ausgebaut, lohnt sich überschüssige Forschungspunkte-Produktion hier weiter.</div>
         <div class="section-title" style="margin-top:0.5rem; font-size:13px;"><i class="ti ti-flask" aria-hidden="true"></i>Forschungs-Sprint (temporärer Boost)</div>
         <div id="researchSprintBox"></div>
         <div class="section-title" style="margin-top:1rem; font-size:13px;"><i class="ti ti-atom-2" aria-hidden="true"></i>Exotische Forschung (Einmal-Unlocks)</div>
@@ -2403,14 +2403,13 @@
     { key:'antimaterie', label:'Antimaterie', icon:'ti-atom-2', bg:'rgba(237,147,177,0.18)', fg:'#f3aec6' },
     { key:'forschungspunkte', label:'Forschungspunkte', icon:'ti-flask', bg:'rgba(175,169,236,0.18)', fg:'#c3bef5' }
   ];
-  // Erste Tier-2-Ressource (19.07.2026, Phase 1 "Tier-2-Ressourcen", Spieler-Wunsch): bewusst NICHT in
-  // RES_DEFS aufgenommen, obwohl sie strukturell wie ein Rohstoff aussieht - RES_DEFS wird an >10
-  // Stellen als "die 6 über ratesPerSecond()/rates[res]*=mult produzierbaren Kern-Ressourcen" benutzt
-  // (Zufallsereignis-Boni, Forschungs-Sprint-Auswahl, u.a. RES_DEFS[Math.floor(Math.random()*...)]) -
-  // ein Aufnehmen hier hätte an all diesen Stellen NaN-Werte erzeugt, da Nanolegierungen nicht über
-  // ratesPerSecond() läuft, sondern über die eigene processNanoFactories()-Verbrauchslogik. Eigene,
-  // separate Definition für die (wenigen) Stellen, die sie tatsächlich anzeigen sollen.
-  const NANO_RES_DEF = { key:'nanolegierungen', label:'Nanolegierungen', icon:'ti-building-fortress', bg:'rgba(201,199,189,0.18)', fg:'#d8d5c9' };
+  // Tier-2-Ressourcen (Nanolegierungen, Quantenchips, ...) stehen bewusst NICHT in RES_DEFS, obwohl
+  // sie strukturell wie Rohstoffe aussehen - RES_DEFS wird an >10 Stellen als "die 6 über
+  // ratesPerSecond()/rates[res]*=mult produzierbaren Kern-Ressourcen" benutzt (Zufallsereignis-Boni,
+  // Forschungs-Sprint-Auswahl, u.a. RES_DEFS[Math.floor(Math.random()*...)]) - ein Aufnehmen hier
+  // hätte an all diesen Stellen NaN-Werte erzeugt, da Tier-2 nicht über ratesPerSecond() läuft,
+  // sondern über die eigene Verbrauchslogik. Ihre Definitionen liegen in TIER2_DEFS (bei
+  // processTier2Factories()), Anzeige-Fallback über resDefFor().
 
   const BUILDING_DEFS = [
     { key:'solar', name:'Solarkraftwerk', icon:'ti-sun', produces:'energie', baseRate:0.3, baseCost:{erz:10}, costMult:1.17, bg:'rgba(250,199,117,0.16)', fg:'#fac775', category:'production' },
@@ -2420,10 +2419,14 @@
     { key:'fusionsreaktor', name:'Fusionsreaktor', icon:'ti-atom', produces:'antimaterie', baseRate:0.015, baseCost:{deuterium:80, kristalle:60}, costMult:1.3, bg:'rgba(237,147,177,0.16)', fg:'#f3aec6', category:'production' },
     // Nanolegierungsfabrik (19.07.2026, Phase 1 "Tier-2-Ressourcen"): bewusst KEIN produces-Feld -
     // sie läuft nicht über den generischen "kostenlose Produktion"-Mechanismus, sondern über die
-    // eigene processNanoFactories()-Funktion (verbraucht laufend Erz/Kristalle/Energie aus dem Lager).
+    // generische Tier-2-Engine processTier2Factories() (verbraucht laufend Erz/Kristalle/Energie aus dem Lager).
     // maxLevel bewusst niedrig (15 statt der üblichen 20) - die zweite Bremse neben dem Rohstoffbedarf
     // selbst, damit Nanolegierungen dauerhaft knapp bleiben (Spieler-Vorgabe "Balancing").
     { key:'nanolegierungsfabrik', name:'Nanolegierungsfabrik', icon:'ti-building-factory-2', produces:null, baseRate:0, baseCost:{erz:5000, kristalle:3000, energie:2000}, costMult:1.35, bg:'rgba(201,199,189,0.16)', fg:'#d8d5c9', effectDesc:'Nanolegierungen-Produktion (verbraucht Erz/Kristalle/Energie)', category:'refine', maxLevel:15, buildTime:600, buildTimePerLevelMult:1.15, requires:['rnanotech'] },
+    // Quantenchipfabrik (Tier-2 Phase 3): zweite Raffinerie-Kette, tiefer gegated (rquantenphysik
+    // setzt rnanotech UND rkristall2 Stufe 10 voraus) und 3x langsamer als die Nanofabrik - Werte
+    // liegen als Datensatz in TIER2_DEFS, dieselbe generische Engine, keine eigene Prozess-Funktion.
+    { key:'quantenchipfabrik', name:'Quantenchipfabrik', icon:'ti-building-factory-2', produces:null, baseRate:0, baseCost:{erz:8000, kristalle:6000, deuterium:2500}, costMult:1.35, bg:'rgba(133,183,235,0.16)', fg:'#a9cdf5', effectDesc:'Quantenchip-Produktion (verbraucht Kristalle/Deuterium/Energie)', category:'refine', maxLevel:15, buildTime:900, buildTimePerLevelMult:1.15, requires:['rquantenphysik'] },
     { key:'habitat', name:'Habitat-Kuppel', icon:'ti-building-community', produces:null, baseRate:0, baseCost:{energie:100, erz:80}, costMult:1.2, bg:'rgba(93,202,165,0.16)', fg:'#5dcaa5', effectDesc:'Gesamtproduktion', category:'utility', maxLevel:20 },
     { key:'lager', name:'Lagerkomplex', icon:'ti-box', produces:null, baseRate:0, baseCost:{erz:120, kristalle:20}, costMult:1.25, bg:'rgba(255,255,255,0.1)', fg:'#c7cbe0', effectDesc:'Lagerkapazität', category:'utility' },
     { key:'turm', name:'Verteidigungsturm', icon:'ti-building-broadcast-tower', produces:null, baseRate:0, baseCost:{erz:70, energie:50}, costMult:1.2, bg:'rgba(226,75,74,0.16)', fg:'#f0997b', effectDesc:'Verteidigung', category:'defense', defVal:15, atkVal:8, buildTime:20, requires:[] },
@@ -3043,11 +3046,17 @@
     deuterium: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M21 4 C27 14 32 20 32 26 A11 11 0 1 1 10 26 C10 20 15 14 21 4 Z" fill="#a9cdf5"/></svg>`,
     antimaterie: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="3" fill="#f3aec6"/><ellipse cx="21" cy="21" rx="17" ry="7" fill="none" stroke="#f3aec6" stroke-width="2"/><ellipse cx="21" cy="21" rx="17" ry="7" fill="none" stroke="#ed93b1" stroke-width="2" transform="rotate(60 21 21)"/><ellipse cx="21" cy="21" rx="17" ry="7" fill="none" stroke="#d4537e" stroke-width="2" transform="rotate(120 21 21)"/></svg>`,
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`,
-    nanolegierungen: `<svg viewBox="0 0 42 42" width="20" height="20"><polygon points="21,4 36,13 36,29 21,38 6,29 6,13" fill="none" stroke="#d8d5c9" stroke-width="2.5"/><polygon points="21,12 29,17 29,25 21,30 13,25 13,17" fill="#d8d5c9"/></svg>`
+    nanolegierungen: `<svg viewBox="0 0 42 42" width="20" height="20"><polygon points="21,4 36,13 36,29 21,38 6,29 6,13" fill="none" stroke="#d8d5c9" stroke-width="2.5"/><polygon points="21,12 29,17 29,25 21,30 13,25 13,17" fill="#d8d5c9"/></svg>`,
+    quantenchips: `<svg viewBox="0 0 42 42" width="20" height="20"><rect x="11" y="11" width="20" height="20" rx="3" fill="none" stroke="#a9cdf5" stroke-width="2.5"/><rect x="17" y="17" width="8" height="8" fill="#a9cdf5"/><line x1="16" y1="4" x2="16" y2="11" stroke="#a9cdf5" stroke-width="2"/><line x1="26" y1="4" x2="26" y2="11" stroke="#a9cdf5" stroke-width="2"/><line x1="16" y1="31" x2="16" y2="38" stroke="#a9cdf5" stroke-width="2"/><line x1="26" y1="31" x2="26" y2="38" stroke="#a9cdf5" stroke-width="2"/><line x1="4" y1="16" x2="11" y2="16" stroke="#a9cdf5" stroke-width="2"/><line x1="4" y1="26" x2="11" y2="26" stroke="#a9cdf5" stroke-width="2"/><line x1="31" y1="16" x2="38" y2="16" stroke="#a9cdf5" stroke-width="2"/><line x1="31" y1="26" x2="38" y2="26" stroke="#a9cdf5" stroke-width="2"/></svg>`
   };
 
-  const VERSION = '8.113.0';
+  const VERSION = '8.114.0';
   const PATCHNOTES = [
+    { version:'8.114.0', date:'19.07.2026', changes:[
+      'Tier-2-Ressourcen, Phase 3: zweite raffinierte Ressource "Quantenchips" eingeführt. Neue Forschung "Quantenphysik" (benötigt Nanotechnologie + Nanoschliff-Kristalle Stufe 10 - liegt damit klar hinter den Nanolegierungen) schaltet die Quantenchipfabrik frei (max. Stufe 15, verbraucht laufend 12 Kristalle + 5 Deuterium + 6 Energie je Chip, bewusst 3x langsamer als die Nanofabrik). Verwendung folgt in einer späteren Version - gleiches bewährtes Vorgehen wie bei den Nanolegierungen',
+      'Intern: die Tier-2-Verarbeitung wurde von Einzelfunktionen zu einer generischen Engine verallgemeinert (eine Datendefinition je Ressource statt kopierter Funktionspaare) - keine Verhaltensänderung für Nanolegierungen',
+      'Die "N Forschungszweige"-Zahlenangaben in Hilfe/Erfolgen sind jetzt zahlenfrei formuliert ("alle Forschungszweige") - die harte Zahl war seit Monaten wiederholt veraltet und mit jedem neuen Zweig erneut zu pflegen'
+    ]},
     { version:'8.113.0', date:'19.07.2026', changes:[
       'Tier-2-Ressourcen, Phase 2: erste Verwendung für Nanolegierungen - die Nano-Verteidigungsplattform (Verteidigung-Tab, ab Forschung Nanotechnologie). Stärkstes reguläres Verteidigungsgebäude (150 Verteidigung / 60 Angriff je Stufe), Baukosten enthalten 60+ Nanolegierungen je Stufe - eingereihte Plattformen starten automatisch, sobald genug angesammelt ist. Balance vorab gerechnet: 10 Stufen kosten kumuliert ca. 4.200 Nanolegierungen (~13h Produktion einer voll ausgebauten Fabrik)',
       'Neuer Erfolg "Nano-Pionier" für den Bau der ersten Nanolegierungsfabrik',
@@ -5303,6 +5312,11 @@
     // rsolar2/rerz2 Stufe 5 -> rfusion Stufe 5 -> rbauplan Stufe 10), echtes Lategame statt des
     // Frühspiel-Fehlers bei den zurückgenommenen Tier-2-Produktionsgebäuden aus v8.111.0.
     { key:'rnanotech', name:'Nanotechnologie', baseCost:{erz:15000, kristalle:10000, deuterium:3000, forschungspunkte:1200}, costMult:1.3, baseDuration:1800, durationMult:1.35, desc:'Schaltet die Nanolegierungsfabrik frei (erste Tier-2-Ressource: Nanolegierungen, verbraucht laufend Erz/Kristalle/Energie).', effectRes:null, effectPerLevel:0, maxLevel:1, requires:[{key:'rbauplan',level:10}] },
+    // Tier-2 Phase 3 (19.07.2026): zweite Stufe der Forschungskette Nanotechnologie -> Quantenphysik.
+    // Gate vorab gerechnet: rkristall2 Stufe 10 allein kostet kumuliert ~2h reine Forschungszeit,
+    // dazu die komplette rnanotech-Kette (~2,5-3h) - Quantenchips liegen damit klar HINTER den
+    // Nanolegierungen, wie es die Ressourcen-Hierarchie verlangt.
+    { key:'rquantenphysik', name:'Quantenphysik', baseCost:{kristalle:30000, deuterium:12000, antimaterie:600, forschungspunkte:2500}, costMult:1.3, baseDuration:2700, durationMult:1.35, desc:'Schaltet die Quantenchipfabrik frei (zweite Tier-2-Ressource: Quantenchips, verbraucht laufend Kristalle/Deuterium/Energie).', effectRes:null, effectPerLevel:0, maxLevel:1, requires:[{key:'rnanotech',level:1},{key:'rkristall2',level:10}] },
     { key:'rpanzer', name:'Panzerplatten', baseCost:{erz:120, kristalle:40, forschungspunkte:20}, costMult:1.22, baseDuration:50, durationMult:1.45, desc:'Verteidigung · Schaltet ab Stufe 1 frei: Schildgenerator, Ionenschild, Plasmawerfer, Raketensilo', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:[] },
     { key:'rschildmatrix', name:'Schildmatrix', baseCost:{kristalle:150, deuterium:70, forschungspunkte:28}, costMult:1.24, baseDuration:70, durationMult:1.46, desc:'Verteidigung (vertieft) · Schaltet ab Stufe 1 frei: Gauss-Kanone, Railgun-Batterie, Void-Barriere, Verteidigungsbunker', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:[{key:'rpanzer',level:5}] },
     { key:'rkampf2', name:'Erweiterte Zielsysteme', baseCost:{kristalle:180, antimaterie:20, forschungspunkte:36}, costMult:1.24, baseDuration:90, durationMult:1.46, desc:'Angriffspunkte (vertieft) · Schaltet ab Stufe 1 frei: Bomber, Schlachtschiff', effectRes:null, effectPerLevel:0.02, maxLevel:20, requires:[{key:'rkampf',level:5}] },
@@ -8184,7 +8198,7 @@
     { key:'basewarwin', name:'Belagerungsmeister', desc:'Zerstöre die Allianzbasis einer fremden Allianz (solo oder im koordinierten Verband).', check: s => (s.allianceBaseAttacksWon||0) >= 1, progress: s => [Math.min(1,s.allianceBaseAttacksWon||0), 1], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
     { key:'allianzweltprojekt', name:'Weltenbauer', desc:'Vollende gemeinsam mit deiner Allianz ein Weltprojekt (z.B. Dyson-Sphäre, Sprungtor).', check: s => Object.keys(s.allianceResearch||{}).some(k => k.indexOf('wp_')===0 && s.allianceResearch[k]), progress: s => [Object.keys(s.allianceResearch||{}).filter(k => k.indexOf('wp_')===0 && s.allianceResearch[k]).length > 0 ? 1 : 0, 1], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
     { key:'allianzausbau100', name:'Ausbaumeister', desc:'Bringe gemeinsam mit deiner Allianz ein Ausbauprojekt (z.B. Allianz-Flottenwerft) auf Stufe 100.', check: s => Object.keys(s.allianceResearch||{}).some(k => k.indexOf('ep_')===0 && (s.allianceResearch[k]||0) >= 100), progress: s => [Math.min(100, Math.max(0, ...Object.keys(s.allianceResearch||{}).filter(k => k.indexOf('ep_')===0).map(k => s.allianceResearch[k]||0), 0)), 100], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
-    { key:'nanopionier', name:'Nano-Pionier', desc:'Errichte deine erste Nanolegierungsfabrik und steige in die Tier-2-Produktion ein.', check: s => nanoFactoryTotalLevel() >= 1, progress: s => [Math.min(1, nanoFactoryTotalLevel()), 1], reward:{erz:8000,kristalle:5000,deuterium:2000,credits:300}, xpReward:300 },
+    { key:'nanopionier', name:'Nano-Pionier', desc:'Errichte deine erste Nanolegierungsfabrik und steige in die Tier-2-Produktion ein.', check: s => tier2TotalLevel(tier2Def('nanolegierungen')) >= 1, progress: s => [Math.min(1, tier2TotalLevel(tier2Def('nanolegierungen'))), 1], reward:{erz:8000,kristalle:5000,deuterium:2000,credits:300}, xpReward:300 },
     { key:'allresearch', name:'Wissenschaftler', desc:'Erforsche alle verfügbaren Technologien.', check: s => RESEARCH_DEFS.every(r => s.research[r.key]), progress: s => [RESEARCH_DEFS.filter(r=>s.research[r.key]).length, RESEARCH_DEFS.length] },
     { key:'firstprestige', name:'Neuanfang', desc:'Führe deine erste Prestige-Zurücksetzung durch.', check: s => (s.prestige||0) >= 1, progress: s => [Math.min(1,s.prestige||0), 1] },
     { key:'level10', name:'Erfahrener Kommandant', desc:'Erreiche Kommandanten-Level 10.', check: s => commanderLevel(s.xp||0) >= 10, progress: s => [Math.min(10,commanderLevel(s.xp||0)), 10] },
@@ -8223,7 +8237,7 @@
     { key:'leerenweltmaster', name:'Leerengestalter', desc:'Terraforme einen Standort vollständig zur Leerenwelt.', check: s => Object.values(s.planetTypeOverride||{}).includes('leerenwelt'), progress: s => [Object.values(s.planetTypeOverride||{}).includes('leerenwelt')?1:0, 1], reward:{erz:20000,kristalle:14000,deuterium:8000,antimaterie:400,credits:800}, xpReward:600 },
     { key:'allianzeinsatz', name:'Einsatzbereit', desc:'Schließe einen Allianz-Einsatz der Allianzbasis ab.', check: s => (s.allianceMissionsDone||0) >= 1, progress: s => [Math.min(1, s.allianceMissionsDone||0), 1], reward:{credits:400}, xpReward:200 },
     { key:'allcolonyslots', name:'Vollständige Expansion', desc:'Belege alle 11 möglichen Kolonie-Plätze (erfordert Kolonial-Logistik auf Maximalstufe).', check: s => (s.research.rkolonisation||0) >= 20 && Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 11, progress: s => [Math.min(11,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 11], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
-    { key:'allresearchmax', name:'Forschungs-Meister', desc:'Bringe alle 32 Forschungszweige auf ihre jeweilige Maximalstufe.', check: s => RESEARCH_DEFS.every(r => (s.research[r.key]||0) >= r.maxLevel), progress: s => [RESEARCH_DEFS.filter(r=>(s.research[r.key]||0)>=r.maxLevel).length, RESEARCH_DEFS.length], reward:{erz:12000,kristalle:8000,deuterium:4000,antimaterie:150,credits:500}, xpReward:500 },
+    { key:'allresearchmax', name:'Forschungs-Meister', desc:'Bringe alle Forschungszweige auf ihre jeweilige Maximalstufe.', check: s => RESEARCH_DEFS.every(r => (s.research[r.key]||0) >= r.maxLevel), progress: s => [RESEARCH_DEFS.filter(r=>(s.research[r.key]||0)>=r.maxLevel).length, RESEARCH_DEFS.length], reward:{erz:12000,kristalle:8000,deuterium:4000,antimaterie:150,credits:500}, xpReward:500 },
     { key:'forschungsnexus', name:'Wächter des Wissens', desc:'Errichte den Forschungs-Nexus (erfordert alle Forschungszweige auf Maximalstufe).', check: s => !!((s.megaProjects||{}).forschungsnexus), progress: s => [((s.megaProjects||{}).forschungsnexus)?1:0, 1], reward:{erz:10000,kristalle:7000,deuterium:3500,antimaterie:150,credits:500}, xpReward:500 },
     { key:'allmegaprojects', name:'Architekt der Sterne', desc:'Errichte alle drei Mega-Projekte (Dyson-Schwarm, Void-Reaktor, Forschungs-Nexus).', check: s => MEGA_PROJECTS.every(p => !!((s.megaProjects||{})[p.key])), progress: s => [MEGA_PROJECTS.filter(p=>!!((s.megaProjects||{})[p.key])).length, MEGA_PROJECTS.length], reward:{erz:20000,kristalle:14000,deuterium:7000,antimaterie:300,credits:1000}, xpReward:800 },
     { key:'prestige10', name:'Zyklus-Meister', desc:'Erreiche Prestige-Stufe 10.', check: s => (s.prestige||0) >= 10, progress: s => [Math.min(10,s.prestige||0), 10], reward:{erz:15000,kristalle:10000,deuterium:5000,antimaterie:200,credits:750}, xpReward:600 },
@@ -8956,11 +8970,11 @@
   function miniResIcon(key){
     return (RES_ICONS[key]||'').replace('width="20" height="20"', 'width="13" height="13"');
   }
-  // Fallback auf NANO_RES_DEF nötig, seit Baukosten auch die Tier-2-Ressource enthalten können
-  // (Nanolegierungen stehen bewusst nicht in RES_DEFS, siehe Kommentar dort) - ohne Fallback
-  // crashte rd.label bei jedem Gebäude mit nanolegierungen-Kostenanteil.
+  // Fallback auf TIER2_DEFS nötig, seit Baukosten auch Tier-2-Ressourcen enthalten können
+  // (die stehen bewusst nicht in RES_DEFS, siehe Kommentar dort) - ohne Fallback crashte
+  // rd.label bei jedem Gebäude mit Tier-2-Kostenanteil.
   function resDefFor(key){
-    return RES_DEFS.find(x=>x.key===key) || (key===NANO_RES_DEF.key ? NANO_RES_DEF : { label:key });
+    return RES_DEFS.find(x=>x.key===key) || TIER2_DEFS.find(t=>t.key===key) || { label:key };
   }
   function costHtml(cost){
     return Object.entries(cost).map(([r,a]) => {
@@ -9164,56 +9178,64 @@
     if (doc) cap *= doc.cargoMult;
     return cap;
   }
-  // ===== Tier-2-Ressourcen: Nanolegierungsfabrik (19.07.2026, Phase 1 "Tier-2-Ressourcen") =====
-  // Einziges Produktionsgebäude im Spiel, das laufend ANDERE Ressourcen VERBRAUCHT statt nur zu
+  // ===== Tier-2-Ressourcen: generische Raffinerie-Engine =====
+  // (Phase 1 "Nanolegierungen" 19.07.2026, mit Phase 3 "Quantenchips" von Einzelfunktionen zu EINER
+  // Datendefinition je Ressource verallgemeinert - zwei kopierte Funktionspaare wären exakt der
+  // CLAUDE.md-Fallstrick "doppelte Funktionsdeklarationen/Drift" gewesen.)
+  // Die einzigen Produktionsgebäude im Spiel, die laufend ANDERE Ressourcen VERBRAUCHEN statt nur zu
   // produzieren - bewusst NICHT über das generische produces-Feld/ratesPerSecond() gelöst (das kennt
-  // nur "kostenlose" Produktion), sondern eine eigene, Lagerbestand-gedeckelte Funktion: läuft nur so
-  // schnell, wie es der aktuelle Erz-/Kristalle-/Energie-Bestand hergibt, nie ins Minus, kein
-  // Perpetuum mobile (gleiches Sicherheitsmuster wie die Veredelungsroute in processTradeRoutes()).
-  // Phase 1 hat ABSICHTLICH noch keinen Verbraucher für Nanolegierungen (kommt erst in Phase 2, nach
-  // Spieler-Feedback zur Produktionsseite) - Lagerkapazität ist deshalb bewusst simpel an die
-  // Fabrikstufe selbst gekoppelt statt an ein neues, eigenes Lagergebäude.
-  const NANO_INPUT_PER_UNIT = { erz: 8, kristalle: 5, energie: 4 };
-  const NANO_RATE_PER_LEVEL = 0.006; // Nanolegierungen/Sekunde je Fabrikstufe (Stufe 15 max. ~0,09/s)
-  function nanoFactoryTotalLevel(){ return allBuildingSets().reduce((a,b)=>a+(b.nanolegierungsfabrik||0),0); }
-  function nanoStorageCap(){ const lvl = nanoFactoryTotalLevel(); return lvl > 0 ? 200 + lvl*150 : 0; }
-  function processNanoFactories(seconds){
-    const totalLevel = nanoFactoryTotalLevel();
-    if (totalLevel <= 0) return;
-    const want = totalLevel * NANO_RATE_PER_LEVEL * seconds;
-    let maxByStock = want;
-    for (const res of Object.keys(NANO_INPUT_PER_UNIT)) maxByStock = Math.min(maxByStock, (state.resources[res]||0) / NANO_INPUT_PER_UNIT[res]);
-    const produced = Math.max(0, maxByStock);
-    if (produced <= 0) return;
-    for (const res of Object.keys(NANO_INPUT_PER_UNIT)) state.resources[res] = Math.max(0, (state.resources[res]||0) - produced*NANO_INPUT_PER_UNIT[res]);
-    state.resources.nanolegierungen = Math.min(nanoStorageCap(), (state.resources.nanolegierungen||0) + produced);
+  // nur "kostenlose" Produktion), sondern eine eigene, Lagerbestand-gedeckelte Verarbeitung: läuft
+  // nur so schnell, wie es der aktuelle Input-Bestand hergibt, nie ins Minus, kein Perpetuum mobile
+  // (gleiches Sicherheitsmuster wie die Veredelungsroute in processTradeRoutes()). Lagerkapazität
+  // bewusst simpel an die Fabrikstufe gekoppelt statt an eigene Lagergebäude.
+  const TIER2_DEFS = [
+    { key:'nanolegierungen', label:'Nanolegierungen', icon:'ti-building-fortress', bg:'rgba(201,199,189,0.18)', fg:'#d8d5c9',
+      buildingKey:'nanolegierungsfabrik', inputs:{ erz:8, kristalle:5, energie:4 }, ratePerLevel:0.006, storageBase:200, storagePerLevel:150 },
+    // Quantenchips (Phase 3): zweite Raffinerie-Stufe, Kristall-lastig und bewusst 3x langsamer als
+    // Nanolegierungen (0,002/s je Stufe, max. 0,03/s je Standort) - höherwertige, knappere Ressource.
+    { key:'quantenchips', label:'Quantenchips', icon:'ti-adjustments', bg:'rgba(133,183,235,0.18)', fg:'#a9cdf5',
+      buildingKey:'quantenchipfabrik', inputs:{ kristalle:12, deuterium:5, energie:6 }, ratePerLevel:0.002, storageBase:100, storagePerLevel:80 }
+  ];
+  function tier2Def(key){ return TIER2_DEFS.find(t=>t.key===key); }
+  function tier2TotalLevel(def){ return allBuildingSets().reduce((a,b)=>a+(b[def.buildingKey]||0),0); }
+  function tier2StorageCap(def){ const lvl = tier2TotalLevel(def); return lvl > 0 ? def.storageBase + lvl*def.storagePerLevel : 0; }
+  function processTier2Factories(seconds){
+    for (const def of TIER2_DEFS){
+      const totalLevel = tier2TotalLevel(def);
+      if (totalLevel <= 0) continue;
+      const want = totalLevel * def.ratePerLevel * seconds;
+      let maxByStock = want;
+      for (const res of Object.keys(def.inputs)) maxByStock = Math.min(maxByStock, (state.resources[res]||0) / def.inputs[res]);
+      const produced = Math.max(0, maxByStock);
+      if (produced <= 0) continue;
+      for (const res of Object.keys(def.inputs)) state.resources[res] = Math.max(0, (state.resources[res]||0) - produced*def.inputs[res]);
+      state.resources[def.key] = Math.min(tier2StorageCap(def), (state.resources[def.key]||0) + produced);
+    }
   }
-  // Eigenes kleines Anzeige-Badge statt Aufnahme in den generischen #resbar-Loop (der geht über
-  // RES_DEFS mit gemeinsamem storageCap() für alle Karten - Nanolegierungen hat ein eigenes,
-  // kleineres Lager). Nur sichtbar, sobald der Spieler die Fabrik gebaut hat oder bereits welche
-  // besitzt - für alle anderen bleibt die Oberfläche unverändert. Signatur-Cache-Muster (kein Live-
-  // Countdown enthalten, siehe CLAUDE.md), verhindert unnötigen innerHTML-Neuaufbau jede Sekunde.
-  let lastNanoBadgeSig = null;
-  function renderNanoResBadge(){
-    const el = document.getElementById('nanoResBadge');
+  // Eigene kleine Anzeige-Badges statt Aufnahme in den generischen #resbar-Loop (der geht über
+  // RES_DEFS mit gemeinsamem storageCap() für alle Karten - Tier-2-Ressourcen haben eigene, kleinere
+  // Lager). Nur sichtbar, sobald der Spieler die jeweilige Fabrik gebaut hat oder Bestand besitzt -
+  // für alle anderen bleibt die Oberfläche unverändert. Signatur-Cache-Muster (kein Live-Countdown
+  // enthalten, siehe CLAUDE.md), verhindert unnötigen innerHTML-Neuaufbau jede Sekunde.
+  let lastTier2BadgeSig = null;
+  function renderTier2Badges(){
+    const el = document.getElementById('tier2ResBadges');
     if (!el) return;
-    const lvl = nanoFactoryTotalLevel();
-    const val = state.resources.nanolegierungen||0;
-    if (lvl <= 0 && val <= 0){
-      if (lastNanoBadgeSig !== 'hidden'){ el.innerHTML = ''; lastNanoBadgeSig = 'hidden'; }
+    const visible = TIER2_DEFS.filter(d => tier2TotalLevel(d) > 0 || (state.resources[d.key]||0) > 0);
+    if (!visible.length){
+      if (lastTier2BadgeSig !== 'hidden'){ el.innerHTML = ''; lastTier2BadgeSig = 'hidden'; }
       return;
     }
-    const cap = nanoStorageCap();
-    const sig = Math.floor(val)+':'+cap;
-    if (sig === lastNanoBadgeSig) return;
-    lastNanoBadgeSig = sig;
-    el.innerHTML = `<div class="rescard" data-res="nanolegierungen" style="margin-top:6px;">
-      <div class="icon-badge" style="background:${NANO_RES_DEF.bg};"><i class="ti ${NANO_RES_DEF.icon}" aria-hidden="true" style="color:${NANO_RES_DEF.fg};"></i></div>
+    const sig = visible.map(d => d.key+':'+Math.floor(state.resources[d.key]||0)+':'+tier2StorageCap(d)).join('|');
+    if (sig === lastTier2BadgeSig) return;
+    lastTier2BadgeSig = sig;
+    el.innerHTML = visible.map(d => `<div class="rescard" data-res="${d.key}" style="margin-top:6px;">
+      <div class="icon-badge" style="background:${d.bg};"><i class="ti ${d.icon}" aria-hidden="true" style="color:${d.fg};"></i></div>
       <div class="rescard-info">
-        <div class="label">${NANO_RES_DEF.label}</div>
-        <div class="value">${fmt(val)} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(cap)}</span></div>
+        <div class="label">${d.label}</div>
+        <div class="value">${fmt(state.resources[d.key]||0)} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(tier2StorageCap(d))}</span></div>
       </div>
-    </div>`;
+    </div>`).join('');
   }
   // Ermittelt die Geschwindigkeit des langsamsten an einer Mission beteiligten Schiffstyps
   // (nur Typen mit Bestand > 0 werden berücksichtigt) und leitet daraus einen Dauer-Multiplikator ab.
@@ -11089,7 +11111,7 @@
   // oder ein Klick-Handler ohne Seiten-Reload zum Absturz bringen (Bug: Reset-Button ersetzte state
   // komplett, ohne die Migrations-Defaults von load() zu durchlaufen).
   function applyStateDefaults(){
-    if (state.resources && state.resources.nanolegierungen === undefined) state.resources.nanolegierungen = 0;
+    if (state.resources) for (const t2 of TIER2_DEFS) if (state.resources[t2.key] === undefined) state.resources[t2.key] = 0;
     if (state.expeditionsCompleted === undefined) state.expeditionsCompleted = 0;
     if (state.referredBy === undefined) state.referredBy = null;
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
@@ -13812,7 +13834,7 @@
       { title:'Kolonie teilen', body:'Der Button "Kolonie teilen" (Punktestand-Tab) erzeugt ein Bild mit Avatar, Level, Punktestand und den wichtigsten Eckdaten (Kolonien, Monde, Flotte, Kampfpunkte) - zum Teilen auf sozialen Netzwerken. Auf dem Handy öffnet sich meist direkt das Teilen-Menü des Betriebssystems, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser, ohne Server-Kontakt.' },
       { title:'Rahmen-Stufen im Spielerprofil', body:'Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>Silber</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert. Dazu kommt ab dem Lategame eine erste Tier-2-Ressource, Nanolegierungen (siehe eigener Eintrag unten) - eigenes, kleineres Lager, getrennt von den sechs Basis-Ressourcen.' },
-      { title:'Tier-2-Ressourcen: Nanolegierungen', body:'Ab der Forschung <strong>Nanotechnologie</strong> (freigeschaltet über „Effiziente Baupläne" Stufe 10 - echtes Lategame, kein Frühspiel-Inhalt) kannst du die <strong>Nanolegierungsfabrik</strong> bauen (max. Stufe 15). Anders als alle anderen Produktionsgebäude produziert sie NICHT kostenlos, sondern <strong>verbraucht laufend Erz, Kristalle und Energie</strong> aus deinem Lager (8 Erz + 5 Kristalle + 4 Energie je hergestellter Nanolegierung) - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig (max. ca. 0,09/s bei Stufe 15 <strong>je Standort</strong> - Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Nanolegierungen bleiben dauerhaft knapp. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab, ebenfalls ab Nanotechnologie) - das stärkste reguläre Verteidigungsgebäude, dessen Baukosten Nanolegierungen enthalten. Wird sie eingereiht, startet der Bau automatisch, sobald genug Nanolegierungen angesammelt sind.' },
+      { title:'Tier-2-Ressourcen: Nanolegierungen & Quantenchips', body:'Tier-2-Ressourcen werden nicht kostenlos produziert, sondern in speziellen Fabriken laufend <strong>aus Basis-Ressourcen hergestellt</strong> - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig und gilt <strong>je Standort</strong> (Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Tier-2-Ressourcen bleiben dauerhaft knapp und haben eigene, kleine Lager. <strong>Nanolegierungen</strong> (ab Forschung „Nanotechnologie", über „Effiziente Baupläne" Stufe 10): Nanolegierungsfabrik, max. Stufe 15, verbraucht 8 Erz + 5 Kristalle + 4 Energie je Einheit, max. ca. 0,09/s. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab) - das stärkste reguläre Verteidigungsgebäude; eingereihte Plattformen starten automatisch, sobald genug Nanolegierungen angesammelt sind. <strong>Quantenchips</strong> (ab Forschung „Quantenphysik", benötigt Nanotechnologie UND „Nanoschliff-Kristalle" Stufe 10): Quantenchipfabrik, max. Stufe 15, verbraucht 12 Kristalle + 5 Deuterium + 6 Energie je Chip und ist bewusst 3x langsamer (max. ca. 0,03/s) - die höherwertige, knappere zweite Stufe. Eine Verwendung für Quantenchips folgt in einer späteren Version.' },
       { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. Meldest du dich einen Tag <strong>nicht</strong> an, fällt der Fortschritt zurück auf Tag 1 - die Gesamtzahl der (nicht zwingend aufeinanderfolgenden) Logins zählt separat als "Tage in Folge" weiter, solange keine Lücke entsteht. Die komplette Vorschau mit allen 7 Tagen und der aktuellen Streak steht im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
       { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
@@ -13880,7 +13902,7 @@
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie, <strong>Wasserwelt</strong> +20% Lagerkapazität. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Generalist: +6% auf ALLE Ressourcen (kumuliert 30%), kostet aber 80% mehr als jeder Spezialist. Erdähnliche Welten, Gasriesen, Asteroiden und Superplaneten haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
-      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum, ebenfalls 24 Std. je Stufe: Gefechtsanalyse 6.000 FP, Erfahrene Besatzungen 12.000 FP, Legendäre Kommandeure 20.000 FP - nur eine Ausbildung gleichzeitig; alle FP-Angaben sind Basiswerte, die Imperiums-Skalierung von +25% je weiterem Standort kommt hinzu) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE 32 Forschungszweige ihre jeweilige Maximalstufe erreicht haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
+      { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum, ebenfalls 24 Std. je Stufe: Gefechtsanalyse 6.000 FP, Erfahrene Besatzungen 12.000 FP, Legendäre Kommandeure 20.000 FP - nur eine Ausbildung gleichzeitig; alle FP-Angaben sind Basiswerte, die Imperiums-Skalierung von +25% je weiterem Standort kommt hinzu) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE Forschungszweige ihre jeweilige Maximalstufe erreicht haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
       { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 45% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
       { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
@@ -18752,7 +18774,7 @@
     const cap = storageCap();
     const before = { ...state.resources };
     for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r]*capped, cap);
-    processNanoFactories(capped);
+    processTier2Factories(capped);
     const gained = {};
     for (const r of Object.keys(rates)) gained[r] = Math.round((state.resources[r]||0) - (before[r]||0));
     let missionsPending = 0;
@@ -23953,7 +23975,7 @@
         lastResRenderVal[d.key] = newVal;
       });
     }
-    renderNanoResBadge();
+    renderTier2Badges();
 
     const colonyIds = Object.keys(state.colonies||{}).sort((a,b) => (state.favoritePlanets[b]?1:0) - (state.favoritePlanets[a]?1:0));
     const favStar = (pid) => `<i class="ti ti-star" data-favorite-toggle="${pid}" aria-hidden="true" title="Favorit" style="margin-left:5px; color:${state.favoritePlanets[pid]?'#fac775':'#6b6f85'};"></i>`;
@@ -27960,7 +27982,7 @@
     const rates = ratesPerSecond();
     const cap = storageCap();
     for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r], cap);
-    processNanoFactories(1);
+    processTier2Factories(1);
     const missionsResolved = checkMissions();
     processPirateDebrisRaid();
     processVoidRift();
