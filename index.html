@@ -3023,8 +3023,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.107.0';
+  const VERSION = '8.107.1';
   const PATCHNOTES = [
+    { version:'8.107.1', date:'19.07.2026', changes:[
+      'Bugfix: solo Allianzbasis-Angriff (der ältere Einzelspieler-Mechanismus, separat vom koordinierten Musterangriff) nach dessen Härtung repariert - läuft jetzt über einen eigenen serverseitigen Endpunkt statt über den seither gesperrten generischen Speicherzugriff'
+    ]},
     { version:'8.107.0', date:'19.07.2026', changes:[
       'Koordinierter Allianzbasis-Angriff (Musterangriff) serverseitig gehärtet, gleiches Prinzip wie zuvor beim Allianz-Raid: Beitritt, Sammelphasen-Übergang, Kampfauflösung und Belohnung laufen jetzt über das Backend - Angriffskraft wird aus dem echten Spielstand neu berechnet, Schaden/Zerstörung der Ziel-Allianzbasis serverseitig gewürfelt statt clientseitig'
     ]},
@@ -16410,61 +16413,44 @@
     log('Angriffsflotte gegen die Allianzbasis von ['+targetTag+'] gestartet (~'+Math.round(dur)+'s Flugzeit). Treibstoff: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }
-  // Auflösung bei Ankunft (asynchron wie resolvePlayerAttackMission): Verteidigung der Zielbasis
-  // laden, Kampf berechnen, Schaden in das basewar-Dokument der Ziel-Allianz schreiben.
+  // Auflösung bei Ankunft (asynchron wie resolvePlayerAttackMission): läuft seit der Regressions-
+  // Behebung (19.07.2026, Musterangriff-Härtung hatte basewar komplett gesperrt) über den
+  // dedizierten Endpunkt /api/basedamage/solo - Angriffskraft/Verteidigung/Schaden werden serverseitig
+  // berechnet, der Server schreibt direkt in basewar. WICHTIG: dieser Missionstyp zieht Schiffe (anders
+  // als Raid/Musterangriff) NICHT beim Abflug ab (computeAwayByType zählt sie nur als "unterwegs") -
+  // der Server zieht deshalb ausschließlich die tatsächlichen KAMPFVERLUSTE ab, keine volle
+  // Zusammensetzung. Debris/Veteranen-XP bleiben bewusst client-seitige Kosmetik-Folgeeffekte (analog
+  // Modul-Drops beim Raid), berechnet aus den vom Server GEMELDETEN (nicht selbst erfundenen) Verlusten.
   async function resolveAllianceBaseAttack(m, planetKey, fleet){
     const targetTag = m.targetId;
-    let base = null, war = null;
-    try { const r = await storageGet('alliance:'+targetTag+':base', true); if (r && r.value) base = JSON.parse(r.value); } catch(e){}
-    if (!base || !base.foundedAt){ log('Die Allianzbasis von ['+targetTag+'] war bei Ankunft nicht mehr auffindbar.', 'ti-anchor'); return; }
-    try { const r = await storageGet('alliance:'+targetTag+':basewar', true); if (r && r.value) war = JSON.parse(r.value); } catch(e){}
-    war = war || { damage:0, lastDamageAt:0, destroyedAt:null, destroyedCount:0, attacks:[] };
-    // Stufe der Ziel-Basis aus deren Beiträgen ableiten (contrib-Lesen ist offen).
-    let targetLevel = 1;
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()) return;
+    let res, data;
     try {
-      const listRes = await storageList('alliance:'+targetTag+':contrib:', true);
-      const keys = (listRes && listRes.keys) ? listRes.keys : [];
-      const docs = await Promise.all(keys.map(async k => { try { const r = await storageGet(k, true); if (r && r.value) return JSON.parse(r.value); } catch(e){} return null; }));
-      const tot = { energie:0, erz:0, kristalle:0, deuterium:0, antimaterie:0 };
-      for (const d of docs){ if (!d) continue; for (const rk of Object.keys(tot)) tot[rk] += d['base_'+rk]||0; }
-      targetLevel = allianceBaseLevelFromDoc(base, tot);
-    } catch(e){}
-    if (targetLevel < 1){ log('Die Allianzbasis von ['+targetTag+'] ist noch im Aufbau (Stufe 0) - kein gültiges Angriffsziel.', 'ti-anchor'); return; }
-    if (war.destroyedAt){ log('Die Allianzbasis von ['+targetTag+'] liegt bereits in Trümmern.', 'ti-anchor'); return; }
-    const defSum = await loadBaseDefenseSum(targetTag);
-    const defense = ALLIANCE_BASE_DEF_PER_LEVEL*targetLevel + ((defSum && defSum.defense)||0);
-    const power = m.power || attackPower(fleet, planetKey);
-    const chance = Math.max(0.10, Math.min(0.92, power/(power+defense)));
-    const success = Math.random() < chance;
-    const maxHp = allianceBaseMaxHp(targetLevel);
-    const effDmgBefore = allianceBaseEffDamage(war, targetLevel);
-    let dealt = 0, destroyed = false;
-    if (success){
-      dealt = Math.round(power * (0.8 + Math.random()*0.4));
-      const newDamage = Math.min(maxHp, effDmgBefore + dealt);
-      war.damage = newDamage; war.lastDamageAt = Date.now();
-      if (newDamage >= maxHp){ destroyed = true; war.destroyedAt = Date.now(); war.destroyedCount = (war.destroyedCount||0) + 1; }
-    } else {
-      dealt = Math.round(power * 0.15);
-      war.damage = Math.min(maxHp, effDmgBefore + dealt); war.lastDamageAt = Date.now();
+      res = await backendFetch('/basedamage/solo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, targetTag, composition: m.composition, originPlanet: planetKey }) });
+      data = await res.json();
+    } catch(e){ log('Verbindungsfehler bei der Auflösung des Basis-Angriffs.', 'ti-alert-triangle'); return; }
+    if (!res.ok || !data.ok){ log('Angriff auf die Allianzbasis von ['+targetTag+'] fehlgeschlagen: '+(data && data.error || 'unbekannter Fehler')+'.', 'ti-alert-triangle'); return; }
+    if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+    state.battlePoints = data.newBattlePoints;
+    let debrisWeight = 0;
+    for (const [k, lost] of Object.entries(data.lostShips||{})){
+      fleet[k] = Math.max(0, (fleet[k]||0) - lost);
+      debrisWeight += lost * (SHIP_SCORE_WEIGHTS[k]||10);
     }
-    // Verteidiger-Verlustquote für die stationierten Flotten (wenden die Besitzer selbst an).
-    const defLossPct = success ? Math.max(0.08, Math.min(0.35, power/(power+defense*1.5))) : Math.max(0.03, Math.min(0.12, power/(power+defense*3)));
-    war.attacks = war.attacks || [];
-    war.attacks.unshift({ id: Date.now()+'-'+Math.random().toString(36).slice(2,8), ts: Date.now(), attackerTag: myAllianceTag(), attackerName: state.player.name, power: Math.round(power), damage: dealt, defLossPct: Math.round(defLossPct*100)/100, destroyed });
-    war.attacks = war.attacks.slice(0, 25);
-    try { await storageSet('alliance:'+targetTag+':basewar', JSON.stringify(war), true); } catch(e){}
-    // Eigene Verluste (auch bei Erfolg - man beisst sich an einer Festung die Zähne aus).
-    const ownLossPct = success ? 0.10+Math.random()*0.12 : 0.25+Math.random()*0.20;
-    const retreatB = applyRetreatDampening(ownLossPct);
-    const ownLost = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, retreatB.pct, planetKey, m.composition);
-    const ownLostText = lostCountsToText(ownLost);
-    const bp = destroyed ? 60 : (success ? 15 : 4);
-    awardBattlePoints(bp);
-    logScoreChange(bp*3, (destroyed?'Allianzbasis von ['+targetTag+'] ZERSTÖRT':'Angriff auf Allianzbasis ['+targetTag+']')+' (+'+bp+' Kampfpunkte)', 'ti-sword');
-    log((success?'Angriff auf die Allianzbasis von ['+targetTag+'] erfolgreich - '+fmt(dealt)+' Schaden!':'Angriff auf die Allianzbasis von ['+targetTag+'] abgewehrt (Verteidigung '+fmt(defense)+').')+(destroyed?' DIE BASIS WURDE ZERSTÖRT!':'')+(ownLostText?' Eigene Verluste: '+ownLostText+'.':''), destroyed?'ti-skull':'ti-sword');
-    pushReport({ type:'alliance-base-attack', result: destroyed?'destroyed':(success?'win':'loss'), targetTag, damage: dealt, hullAfter: Math.round(maxHp - war.damage), hullMax: maxHp, defensePower: defense, attackPower: Math.round(power), chancePct: Math.round(chance*100), fleet: m.composition||fleet, ownLostShips: ownLost, debris: combatDebrisOf(ownLost), battlePoints: bp, fromPlanet: planetDisplayName(planetKey) });
-    playSound(success?'win':'raid');
+    if (planetKey && (state.veteranXp||{})[planetKey]) addVeteranXp(planetKey, -Math.round(state.veteranXp[planetKey] * Math.min(0.95, Math.max(0, data.ownLossPct||0))));
+    let debris = null;
+    if (planetKey && debrisWeight > 0){
+      const debrisAmt = Math.round(debrisWeight*8);
+      debris = { erz: Math.round(debrisAmt*0.6), kristalle: Math.round(debrisAmt*0.3) };
+      addDebris(planetKey, debris);
+    }
+    const ownLostText = lostCountsToText(data.lostShips||{});
+    logScoreChange(data.battlePoints*3, (data.destroyed?'Allianzbasis von ['+targetTag+'] ZERSTÖRT':'Angriff auf Allianzbasis ['+targetTag+']')+' (+'+data.battlePoints+' Kampfpunkte)', 'ti-sword');
+    log((data.success?'Angriff auf die Allianzbasis von ['+targetTag+'] erfolgreich - '+fmt(data.damage)+' Schaden!':'Angriff auf die Allianzbasis von ['+targetTag+'] abgewehrt (Verteidigung '+fmt(data.defensePower)+').')+(data.destroyed?' DIE BASIS WURDE ZERSTÖRT!':'')+(ownLostText?' Eigene Verluste: '+ownLostText+'.':''), data.destroyed?'ti-skull':'ti-sword');
+    pushReport({ type:'alliance-base-attack', result: data.destroyed?'destroyed':(data.success?'win':'loss'), targetTag, damage: data.damage, hullAfter: data.hullAfter, hullMax: data.hullMax, defensePower: data.defensePower, attackPower: data.attackPower, chancePct: data.chancePct, fleet: m.composition||fleet, ownLostShips: data.lostShips, debris, battlePoints: data.battlePoints, fromPlanet: planetDisplayName(planetKey) });
+    playSound(data.success?'win':'raid');
+    save();
   }
   // ===== Koordinierte Allianzbasis-Angriffe (Spieler-Wunsch "Allianzbasis-Angriffe") =====
   // Erweitert den obigen Einzelspieler-Angriff um eine Sammelphase: Admin/Offizier plant einen
