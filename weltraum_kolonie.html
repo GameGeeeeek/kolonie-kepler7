@@ -3023,8 +3023,11 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.107.1';
+  const VERSION = '8.108.0';
   const PATCHNOTES = [
+    { version:'8.108.0', date:'19.07.2026', changes:[
+      'Mondbelagerung serverseitig gehärtet, gleiches Prinzip wie zuvor beim Allianz-Raid und Musterangriff: Zerstörungschance und Belohnung werden jetzt vom Server berechnet statt vom angreifenden Client selbst'
+    ]},
     { version:'8.107.1', date:'19.07.2026', changes:[
       'Bugfix: solo Allianzbasis-Angriff (der ältere Einzelspieler-Mechanismus, separat vom koordinierten Musterangriff) nach dessen Härtung repariert - läuft jetzt über einen eigenen serverseitigen Endpunkt statt über den seither gesperrten generischen Speicherzugriff'
     ]},
@@ -20784,45 +20787,29 @@
     log('Mondzerstörer gegen '+targetMoon.name+' ('+(targetDoc.name||'Unbekannt')+') gestartet (~'+Math.round(dur)+'s Flugzeit). Treibstoff: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }
-  // Auflösung bei Ankunft (asynchron wie resolveAllianceBaseAttack): frische Zielwerte laden,
-  // Zerstörungschance würfeln, Ergebnis in moondefense:<targetId> (Ziel entfernen) und
-  // moonsiegelog:<targetId> (Ereignis für das Opfer) schreiben.
+  // Auflösung bei Ankunft: läuft seit der Härtung (19.07.2026) über den dedizierten Endpunkt
+  // POST /api/moonsiege/resolve - Zerstörungschance/Kampfpunkte werden serverseitig berechnet
+  // (vorher konnte der Angreifer-Client beides frei erfinden und ungeprüft in den fremden
+  // Namensraum moondefense:/moonsiegelog: schreiben). Der Mondzerstörer selbst ist bei diesem
+  // Missionstyp nie in Gefahr (kein Verlustrisiko), daher keine Flotten-Buchhaltung nötig.
   async function resolveMoonSiege(m, planetKey, fleet){
-    const targetId = m.targetId;
-    let targetDoc = null;
-    try { const r = await storageGet('moondefense:'+targetId, true); if (r && r.value) targetDoc = JSON.parse(r.value); } catch(e){}
-    const targetMoon = targetDoc && Array.isArray(targetDoc.moons) ? targetDoc.moons.find(mo=>mo.moonKey===m.targetMoonKey) : null;
-    if (!targetMoon){ log('Mondbelagerung gegen '+(m.targetMoonName||'unbekanntes Ziel')+': der Mond war bei Ankunft nicht mehr auffindbar (bereits zerstört, aufgegeben oder verteidigt?).', 'ti-anchor'); return; }
-    const power = 300 * (0.85 + Math.random()*0.3) * (1+shipModuleBonusFor('mondzerstoerer','atk'));
-    // Verteidigung: Basis-Verteidigungswert des Mondes (Gebäude + stationierte Flotte) + Mondschild
-    // + Mondstabilität-Forschung + kleiner Allianz-Bonus (Spieler-Wunsch "Allianzverteidigung") -
-    // gedeckelt auf maximal 50% Zerstörungschance, egal wie schwach die Verteidigung ist ("nie
-    // garantiert", Spieler-Wunsch), und mindestens 3%, damit ein Angriff nie komplett wirkungslos ist.
-    const reduction = Math.min(0.75, (targetMoon.shieldLevel||0)*0.04 + (targetMoon.stabilityLevel||0)*0.02 + (targetMoon.allianceTag?0.05:0));
-    const baseChance = power / (power + Math.max(1, targetMoon.defense||0)*2.2);
-    const chance = Math.max(0.03, Math.min(0.5, baseChance * (1-reduction) + shipModuleBonusFor('mondzerstoerer','siegechance')));
-    const destroyed = Math.random() < chance;
-    const bp = destroyed ? 150 : 20;
-    awardBattlePoints(bp);
+    let res, data;
     try {
-      const r = await storageGet('moondefense:'+targetId, true);
-      const fresh = (r && r.value) ? JSON.parse(r.value) : targetDoc;
-      if (fresh && Array.isArray(fresh.moons)){
-        if (destroyed) fresh.moons = fresh.moons.filter(mo=>mo.moonKey!==m.targetMoonKey);
-        await storageSet('moondefense:'+targetId, JSON.stringify(fresh), true);
-      }
-      let log2 = null;
-      try { const r2 = await storageGet('moonsiegelog:'+targetId, true); log2 = (r2 && r2.value) ? JSON.parse(r2.value) : null; } catch(e){}
-      log2 = log2 || { events: [] };
-      log2.events = log2.events || [];
-      log2.events.unshift({ id: Date.now()+'-'+Math.random().toString(36).slice(2,8), ts: Date.now(), attackerName: state.player.name, moonKey: m.targetMoonKey, moonName: targetMoon.name, destroyed, chancePct: Math.round(chance*100) });
-      log2.events = log2.events.slice(0, 25);
-      await storageSet('moonsiegelog:'+targetId, JSON.stringify(log2), true);
-    } catch(e){}
-    logScoreChange(bp*3, (destroyed?'Mond '+targetMoon.name+' ZERSTÖRT':'Mondbelagerung gegen '+targetMoon.name+' abgewehrt')+' (+'+bp+' Kampfpunkte)', 'ti-sword');
-    log((destroyed?'Mondbelagerung erfolgreich - '+targetMoon.name+' ('+(m.targetPlayerName||'Unbekannt')+') wurde ZERSTÖRT!':'Mondbelagerung gegen '+targetMoon.name+' ('+(m.targetPlayerName||'Unbekannt')+') abgewehrt (Erfolgschance war nur '+Math.round(chance*100)+'%).'), destroyed?'ti-skull':'ti-sword');
-    pushReport({ type:'moon-siege', result: destroyed?'destroyed':'failed', targetMoonName: targetMoon.name, targetPlayerName: m.targetPlayerName, chancePct: Math.round(chance*100), battlePoints: bp, fromPlanet: planetDisplayName(planetKey) });
+      res = await backendFetch('/moonsiege/resolve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetPlayerId: m.targetId, targetMoonKey: m.targetMoonKey, originPlanet: planetKey }) });
+      data = await res.json();
+    } catch(e){ log('Verbindungsfehler bei der Auflösung der Mondbelagerung.', 'ti-alert-triangle'); return; }
+    if (!res.ok || !data.ok){
+      log('Mondbelagerung gegen '+(m.targetMoonName||'unbekanntes Ziel')+' fehlgeschlagen: '+(data && data.error || 'der Mond war bei Ankunft nicht mehr auffindbar (bereits zerstört, aufgegeben oder verteidigt?)')+'.', 'ti-anchor');
+      return;
+    }
+    if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+    state.battlePoints = data.newBattlePoints;
+    const { destroyed, chancePct, battlePoints: bp, targetMoonName } = data;
+    logScoreChange(bp*3, (destroyed?'Mond '+targetMoonName+' ZERSTÖRT':'Mondbelagerung gegen '+targetMoonName+' abgewehrt')+' (+'+bp+' Kampfpunkte)', 'ti-sword');
+    log((destroyed?'Mondbelagerung erfolgreich - '+targetMoonName+' ('+(m.targetPlayerName||'Unbekannt')+') wurde ZERSTÖRT!':'Mondbelagerung gegen '+targetMoonName+' ('+(m.targetPlayerName||'Unbekannt')+') abgewehrt (Erfolgschance war nur '+chancePct+'%).'), destroyed?'ti-skull':'ti-sword');
+    pushReport({ type:'moon-siege', result: destroyed?'destroyed':'failed', targetMoonName, targetPlayerName: m.targetPlayerName, chancePct, battlePoints: bp, fromPlanet: planetDisplayName(planetKey) });
     playSound(destroyed?'win':'raid');
+    save();
   }
   // Opfer-Seite: neue Belagerungs-Ereignisse gegen die EIGENEN Monde genau einmal verarbeiten -
   // bei Erfolg wird die Kolonie (Mond) tatsächlich und dauerhaft entfernt (state.moons/state.colonies).
