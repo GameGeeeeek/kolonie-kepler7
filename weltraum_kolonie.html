@@ -3088,8 +3088,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.118.1';
+  const VERSION = '8.119.0';
   const PATCHNOTES = [
+    { version:'8.119.0', date:'19.07.2026', changes:[
+      'Tier-2-Badge zeigt jetzt je Kette die aktuelle Produktionsrate pro Sekunde (Spieler-Wunsch) - und zwar die EFFEKTIVE Rate, nicht das theoretische Maximum: läuft die Fabrik wegen Rohstoffmangel gedrosselt, steht dort der echte niedrigere Wert mit Hinweis "Rohstoffe knapp"; pausiert sie wegen vollem Lager, steht dort "+0/s (Lager voll)" (gleiche Sprache wie bei den Basis-Ressourcen). Die Anzeige nutzt exakt dieselbe Berechnungsfunktion wie die echte Produktion (1-Sekunden-Trockenlauf inkl. Ketten-Reihenfolge) und kann daher nie von ihr abweichen'
+    ]},
     { version:'8.118.1', date:'19.07.2026', changes:[
       'Anzeige-Bugfix (danke für die Meldung!): Die neuen Tier-2-Gebäude und -Forschungen zeigten im Basis-, Verteidigungs- und Forschungs-Tab statt ihres Icons den Text "undefined" (im Layout abgeschnitten als "defin" sichtbar). Ursache: zwei Render-Stellen holen Icons per Schlüssel aus dem handgezeichneten Icon-Satz, die Tier-2-Neuzugänge haben dort (noch) keine Einträge. Jetzt greift ein Fallback auf das jeweilige Symbol-Icon in der Gebäudefarbe - auch für alle künftigen Einträge'
     ]},
@@ -9288,23 +9291,47 @@
   function tier2Def(key){ return TIER2_DEFS.find(t=>t.key===key); }
   function tier2TotalLevel(def){ return allBuildingSets().reduce((a,b)=>a+(b[def.buildingKey]||0),0); }
   function tier2StorageCap(def){ const lvl = tier2TotalLevel(def); return lvl > 0 ? def.storageBase + lvl*def.storagePerLevel : 0; }
+  // Ein Verarbeitungsschritt EINER Kette auf einem beliebigen resources-Objekt - gemeinsame
+  // Wahrheitsquelle für den echten Tick (processTier2Factories auf state.resources) UND den
+  // Anzeige-Trockenlauf (tier2RatesPerSecond auf einer Kopie), damit die angezeigte Rate nie von
+  // der tatsächlichen Produktion abweichen kann.
+  function tier2Step(def, resources, seconds){
+    const totalLevel = tier2TotalLevel(def);
+    if (totalLevel <= 0) return 0;
+    const want = totalLevel * def.ratePerLevel * seconds;
+    let maxByStock = want;
+    for (const res of Object.keys(def.inputs)) maxByStock = Math.min(maxByStock, (resources[res]||0) / def.inputs[res]);
+    // Bugfix v8.117.0: zusätzlich am freien Lagerplatz deckeln - vorher wurden bei vollem Tier-2-
+    // Lager die Inputs weiter verbraucht und der Überschuss verworfen (Rohstoff-Verbrennung).
+    // Jetzt pausiert die Fabrik stattdessen, analog zur Basis-Produktion bei vollem Lager
+    // ("stoppt komplett", siehe applySoftCappedGain/SOFT_CAP_OVERFLOW_RATE=0).
+    const maxBySpace = Math.max(0, tier2StorageCap(def) - (resources[def.key]||0));
+    const produced = Math.max(0, Math.min(maxByStock, maxBySpace));
+    if (produced <= 0) return 0;
+    for (const res of Object.keys(def.inputs)) resources[res] = Math.max(0, (resources[res]||0) - produced*def.inputs[res]);
+    resources[def.key] = (resources[def.key]||0) + produced;
+    return produced;
+  }
   function processTier2Factories(seconds){
-    for (const def of TIER2_DEFS){
-      const totalLevel = tier2TotalLevel(def);
-      if (totalLevel <= 0) continue;
-      const want = totalLevel * def.ratePerLevel * seconds;
-      let maxByStock = want;
-      for (const res of Object.keys(def.inputs)) maxByStock = Math.min(maxByStock, (state.resources[res]||0) / def.inputs[res]);
-      // Bugfix v8.117.0: zusätzlich am freien Lagerplatz deckeln - vorher wurden bei vollem Tier-2-
-      // Lager die Inputs weiter verbraucht und der Überschuss verworfen (Rohstoff-Verbrennung).
-      // Jetzt pausiert die Fabrik stattdessen, analog zur Basis-Produktion bei vollem Lager
-      // ("stoppt komplett", siehe applySoftCappedGain/SOFT_CAP_OVERFLOW_RATE=0).
-      const maxBySpace = Math.max(0, tier2StorageCap(def) - (state.resources[def.key]||0));
-      const produced = Math.max(0, Math.min(maxByStock, maxBySpace));
-      if (produced <= 0) continue;
-      for (const res of Object.keys(def.inputs)) state.resources[res] = Math.max(0, (state.resources[res]||0) - produced*def.inputs[res]);
-      state.resources[def.key] = (state.resources[def.key]||0) + produced;
-    }
+    for (const def of TIER2_DEFS) tier2Step(def, state.resources, seconds);
+  }
+  // Effektive (nicht theoretische) Produktionsraten je Sekunde für die Anzeige (Spieler-Wunsch
+  // 19.07.2026): Trockenlauf von 1 Sekunde auf einer Kopie des Ressourcenstands - berücksichtigt
+  // dadurch automatisch Rohstoff-Drosselung, Lager-Pause UND die Ketten-Reihenfolge (Fusion sieht
+  // die im selben Tick produzierten Nanos, exakt wie im echten Tick).
+  function tier2RatesPerSecond(){
+    const sim = Object.assign({}, state.resources);
+    const rates = {};
+    for (const def of TIER2_DEFS) rates[def.key] = tier2Step(def, sim, 1);
+    return rates;
+  }
+  // fmt() floort auf 1 Nachkommastelle - Tier-2-Raten (0,0005-0,09/s) würden dort alle als "0"
+  // erscheinen, daher eigener Kleinraten-Formatter.
+  function fmtTier2Rate(v){
+    if (v >= 1) return fmt(v);
+    if (v >= 0.1) return v.toFixed(2);
+    if (v >= 0.01) return v.toFixed(3);
+    return v.toFixed(4);
   }
   // Eigene kleine Anzeige-Badges statt Aufnahme in den generischen #resbar-Loop (der geht über
   // RES_DEFS mit gemeinsamem storageCap() für alle Karten - Tier-2-Ressourcen haben eigene, kleinere
@@ -9320,7 +9347,20 @@
       if (lastTier2BadgeSig !== 'hidden'){ el.innerHTML = ''; lastTier2BadgeSig = 'hidden'; }
       return;
     }
-    const sig = visible.map(d => d.key+':'+Math.floor(state.resources[d.key]||0)+':'+tier2StorageCap(d)).join('|');
+    // Effektive Rate je Kette (Spieler-Wunsch 19.07.2026) inkl. ehrlichem Status: "Lager voll"
+    // (Fabrik pausiert) bzw. "Rohstoffe knapp" (gedrosselt unter das theoretische Maximum).
+    const rates = tier2RatesPerSecond();
+    const rateLine = (d) => {
+      const lvl = tier2TotalLevel(d);
+      if (lvl <= 0) return '';
+      const eff = rates[d.key]||0;
+      const wantMax = lvl * d.ratePerLevel;
+      const full = (state.resources[d.key]||0) >= tier2StorageCap(d) - 1e-9;
+      if (full && eff <= 0) return `<div class="rate"><span style="color:#e0a548;">+0/s (Lager voll)</span></div>`;
+      if (eff < wantMax - 1e-9) return `<div class="rate"><span style="color:#e0a548;">+${fmtTier2Rate(eff)}/s (Rohstoffe knapp)</span></div>`;
+      return `<div class="rate">+${fmtTier2Rate(eff)}/s</div>`;
+    };
+    const sig = visible.map(d => d.key+':'+Math.floor(state.resources[d.key]||0)+':'+tier2StorageCap(d)+':'+fmtTier2Rate(rates[d.key]||0)+':'+((state.resources[d.key]||0) >= tier2StorageCap(d) - 1e-9 ? 1 : 0)).join('|');
     if (sig === lastTier2BadgeSig) return;
     lastTier2BadgeSig = sig;
     el.innerHTML = visible.map(d => `<div class="rescard" data-res="${d.key}" style="margin-top:6px;">
@@ -9328,6 +9368,7 @@
       <div class="rescard-info">
         <div class="label">${d.label}</div>
         <div class="value">${fmt(state.resources[d.key]||0)} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(tier2StorageCap(d))}</span></div>
+        ${rateLine(d)}
       </div>
     </div>`).join('');
   }
@@ -13934,7 +13975,7 @@
       { title:'Kolonie teilen', body:'Der Button "Kolonie teilen" (Punktestand-Tab) erzeugt ein Bild mit Avatar, Level, Punktestand und den wichtigsten Eckdaten (Kolonien, Monde, Flotte, Kampfpunkte) - zum Teilen auf sozialen Netzwerken. Auf dem Handy öffnet sich meist direkt das Teilen-Menü des Betriebssystems, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser, ohne Server-Kontakt.' },
       { title:'Rahmen-Stufen im Spielerprofil', body:'Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>Silber</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert. Dazu kommt ab dem Lategame eine erste Tier-2-Ressource, Nanolegierungen (siehe eigener Eintrag unten) - eigenes, kleineres Lager, getrennt von den sechs Basis-Ressourcen.' },
-      { title:'Tier-2-Ressourcen: Nanolegierungen & Quantenchips', body:'Tier-2-Ressourcen werden nicht kostenlos produziert, sondern in speziellen Fabriken laufend <strong>aus Basis-Ressourcen hergestellt</strong> - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig und gilt <strong>je Standort</strong> (Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Tier-2-Ressourcen bleiben dauerhaft knapp und haben eigene, kleine Lager. <strong>Nanolegierungen</strong> (ab Forschung „Nanotechnologie", über „Effiziente Baupläne" Stufe 10): Nanolegierungsfabrik, max. Stufe 15, verbraucht 8 Erz + 5 Kristalle + 4 Energie je Einheit, max. ca. 0,09/s. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab) - das stärkste reguläre Verteidigungsgebäude; eingereihte Plattformen starten automatisch, sobald genug Nanolegierungen angesammelt sind. <strong>Quantenchips</strong> (ab Forschung „Quantenphysik", benötigt Nanotechnologie UND „Nanoschliff-Kristalle" Stufe 10): Quantenchipfabrik, max. Stufe 15, verbraucht 12 Kristalle + 5 Deuterium + 6 Energie je Chip und ist bewusst 3x langsamer (max. ca. 0,03/s) - die höherwertige, knappere zweite Stufe. Erste Verwendung: die <strong>Quanten-Sensorphalanx</strong> (Verteidigung-Tab) - jede Stufe gibt +120 Sekunden Überfall-Vorwarnzeit (imperiumsweit gedeckelt bei +20 Minuten, zusätzlich zu Langstrecken-Scanner/Allianz/Pakten) plus etwas Verteidigung; eingereihte Phalanxen starten automatisch, sobald genug Quantenchips angesammelt sind. <strong>Hochenergiekristalle</strong> (ab Forschung „Hochenergiephysik", benötigt Quantenphysik UND „Vakuumfluktuationskompression" Stufe 5): Kristalllabor, max. Stufe 15, verbraucht 18 Kristalle + 12 Energie + 1 Antimaterie je Einheit - die erste Kette mit Antimaterie als Zutat und mit 0,0015/s je Stufe die langsamste. Verwendung: die <strong>Hochenergie-Schildkuppel</strong> (Verteidigung-Tab) - der stärkste reine Schild des Spiels (220 Verteidigung je Stufe, kein Angriff), Baukosten enthalten Hochenergiekristalle. <strong>Fusionskerne</strong> (ab Forschung „Fusionskern-Synthese", benötigt Hochenergiephysik UND „Isotopen-Anreicherung" Stufe 5): die Fusionsschmiede ist die erste <strong>mehrstufige</strong> Kette - sie verbraucht 20 Deuterium + 2 Antimaterie + <strong>3 Nanolegierungen</strong> je Kern, eine Tier-2-Ressource wird also selbst zur Zutat. Mit 0,0008/s je Stufe die langsamste Kette. Verwendung: die <strong>Fusionsbastion</strong> (Verteidigung-Tab) - starkes Kombigebäude (250 Verteidigung + 120 Angriff je Stufe), Baukosten enthalten Fusionskerne. <strong>KI-Kerne</strong> (ab Forschung „KI-Technologie", benötigt Fusionskern-Synthese): das KI-Labor ist die Spitze der Kette - die einzige Fabrik mit <strong>zwei Tier-2-Zutaten</strong> (2 Quantenchips + 2 Nanolegierungen + 3 Antimaterie je Kern) und mit 0,0005/s je Stufe die langsamste. Verwendung: der <strong>KI-Verteidigungskern</strong> (Verteidigung-Tab) - Spitze der regulären Verteidigungsleiter (300 Verteidigung + 150 Angriff je Stufe), nur die Kristallfestung mit seltenem Item bleibt darüber. Hinweis für alle Tier-2-Fabriken: Ist das jeweilige Tier-2-Lager voll, <strong>pausiert</strong> die Fabrik (verbraucht dann auch keine Rohstoffe mehr), bis wieder Platz ist.' },
+      { title:'Tier-2-Ressourcen: Nanolegierungen & Quantenchips', body:'Tier-2-Ressourcen werden nicht kostenlos produziert, sondern in speziellen Fabriken laufend <strong>aus Basis-Ressourcen hergestellt</strong> - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig und gilt <strong>je Standort</strong> (Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Tier-2-Ressourcen bleiben dauerhaft knapp und haben eigene, kleine Lager. <strong>Nanolegierungen</strong> (ab Forschung „Nanotechnologie", über „Effiziente Baupläne" Stufe 10): Nanolegierungsfabrik, max. Stufe 15, verbraucht 8 Erz + 5 Kristalle + 4 Energie je Einheit, max. ca. 0,09/s. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab) - das stärkste reguläre Verteidigungsgebäude; eingereihte Plattformen starten automatisch, sobald genug Nanolegierungen angesammelt sind. <strong>Quantenchips</strong> (ab Forschung „Quantenphysik", benötigt Nanotechnologie UND „Nanoschliff-Kristalle" Stufe 10): Quantenchipfabrik, max. Stufe 15, verbraucht 12 Kristalle + 5 Deuterium + 6 Energie je Chip und ist bewusst 3x langsamer (max. ca. 0,03/s) - die höherwertige, knappere zweite Stufe. Erste Verwendung: die <strong>Quanten-Sensorphalanx</strong> (Verteidigung-Tab) - jede Stufe gibt +120 Sekunden Überfall-Vorwarnzeit (imperiumsweit gedeckelt bei +20 Minuten, zusätzlich zu Langstrecken-Scanner/Allianz/Pakten) plus etwas Verteidigung; eingereihte Phalanxen starten automatisch, sobald genug Quantenchips angesammelt sind. <strong>Hochenergiekristalle</strong> (ab Forschung „Hochenergiephysik", benötigt Quantenphysik UND „Vakuumfluktuationskompression" Stufe 5): Kristalllabor, max. Stufe 15, verbraucht 18 Kristalle + 12 Energie + 1 Antimaterie je Einheit - die erste Kette mit Antimaterie als Zutat und mit 0,0015/s je Stufe die langsamste. Verwendung: die <strong>Hochenergie-Schildkuppel</strong> (Verteidigung-Tab) - der stärkste reine Schild des Spiels (220 Verteidigung je Stufe, kein Angriff), Baukosten enthalten Hochenergiekristalle. <strong>Fusionskerne</strong> (ab Forschung „Fusionskern-Synthese", benötigt Hochenergiephysik UND „Isotopen-Anreicherung" Stufe 5): die Fusionsschmiede ist die erste <strong>mehrstufige</strong> Kette - sie verbraucht 20 Deuterium + 2 Antimaterie + <strong>3 Nanolegierungen</strong> je Kern, eine Tier-2-Ressource wird also selbst zur Zutat. Mit 0,0008/s je Stufe die langsamste Kette. Verwendung: die <strong>Fusionsbastion</strong> (Verteidigung-Tab) - starkes Kombigebäude (250 Verteidigung + 120 Angriff je Stufe), Baukosten enthalten Fusionskerne. <strong>KI-Kerne</strong> (ab Forschung „KI-Technologie", benötigt Fusionskern-Synthese): das KI-Labor ist die Spitze der Kette - die einzige Fabrik mit <strong>zwei Tier-2-Zutaten</strong> (2 Quantenchips + 2 Nanolegierungen + 3 Antimaterie je Kern) und mit 0,0005/s je Stufe die langsamste. Verwendung: der <strong>KI-Verteidigungskern</strong> (Verteidigung-Tab) - Spitze der regulären Verteidigungsleiter (300 Verteidigung + 150 Angriff je Stufe), nur die Kristallfestung mit seltenem Item bleibt darüber. Hinweis für alle Tier-2-Fabriken: Ist das jeweilige Tier-2-Lager voll, <strong>pausiert</strong> die Fabrik (verbraucht dann auch keine Rohstoffe mehr), bis wieder Platz ist. Das Tier-2-Badge unter der Ressourcenleiste zeigt je Kette die aktuelle <strong>effektive Produktionsrate pro Sekunde</strong> - inklusive Hinweis, wenn die Fabrik wegen Rohstoffmangel gedrosselt läuft ("Rohstoffe knapp") oder wegen vollem Lager pausiert ("Lager voll").' },
       { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. Meldest du dich einen Tag <strong>nicht</strong> an, fällt der Fortschritt zurück auf Tag 1 - die Gesamtzahl der (nicht zwingend aufeinanderfolgenden) Logins zählt separat als "Tage in Folge" weiter, solange keine Lücke entsteht. Die komplette Vorschau mit allen 7 Tagen und der aktuellen Streak steht im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
       { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
