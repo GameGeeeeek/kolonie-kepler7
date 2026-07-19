@@ -2601,6 +2601,15 @@
     ship_spionageschiff: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)" opacity="0.92"><polygon points="88,50 42,38 18,44 18,56 42,62" fill="url(#gViolet)"/><ellipse cx="32" cy="30" rx="8" ry="4" fill="url(#gSky)" opacity="0.75"/></g></svg>`,
     ship_forscher: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="82,50 44,42 22,46 22,54 44,58" fill="url(#gViolet)"/><rect x="46" y="26" width="4" height="16" fill="url(#gSteel)"/><circle cx="48" cy="24" r="4" fill="url(#gSky)"/></g></svg>`
   };
+  // Bugfix v8.118.1 (Spieler-Meldung, "defin"-Artefakt): buildingRowHtml und die Forschungszeile
+  // greifen per Schlüssel in dieses ICONS-Objekt - Gebäude/Forschungen OHNE handgezeichneten Eintrag
+  // (die Tier-2-Neuzugänge) landeten als literaler "undefined"-Text im HTML. check-icons.js konnte
+  // das nicht fangen (es prüft nur die icon-Feldwerte der Defs, nicht die key-basierte ICONS-Abfrage).
+  // Dieser Fallback rendert stattdessen das ti-Icon aus der jeweiligen Def in deren Farbton und
+  // schließt die Fehlerklasse damit auch für alle künftigen Einträge ohne ICONS-SVG.
+  function iconHtmlFor(key, tiIcon, color){
+    return ICONS[key] || `<i class="ti ${tiIcon||'ti-flask'}" aria-hidden="true" style="color:${color||'#c7cbe0'}; font-size:20px;"></i>`;
+  }
 
   // Phase 2 der Grafik-Umstellung (siehe Vorschau-Datei): diese drei Verteidigungsgebäude bekommen
     // statt des flachen SVG-Icons eine kleine animierte Canvas-Grafik (40x40) im bicon-Slot. Bewusst
@@ -3079,8 +3088,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.118.0';
+  const VERSION = '8.118.1';
   const PATCHNOTES = [
+    { version:'8.118.1', date:'19.07.2026', changes:[
+      'Anzeige-Bugfix (danke für die Meldung!): Die neuen Tier-2-Gebäude und -Forschungen zeigten im Basis-, Verteidigungs- und Forschungs-Tab statt ihres Icons den Text "undefined" (im Layout abgeschnitten als "defin" sichtbar). Ursache: zwei Render-Stellen holen Icons per Schlüssel aus dem handgezeichneten Icon-Satz, die Tier-2-Neuzugänge haben dort (noch) keine Einträge. Jetzt greift ein Fallback auf das jeweilige Symbol-Icon in der Gebäudefarbe - auch für alle künftigen Einträge'
+    ]},
     { version:'8.118.0', date:'19.07.2026', changes:[
       'Tier-2-Ressourcen, Phase 7 (Abschluss): fünfte und letzte Ressource "KI-Kerne". Neue Forschung "KI-Technologie" (nach Fusionskern-Synthese - Abschluss der Kette Nanotechnologie -> Quantenphysik -> Hochenergiephysik -> Fusionskern-Synthese -> KI-Technologie) schaltet frei: das KI-Labor (einzige Fabrik mit ZWEI Tier-2-Zutaten: 2 Quantenchips + 2 Nanolegierungen + 3 Antimaterie je Kern; 0,0005/s je Stufe, langsamste Kette) und den KI-Verteidigungskern (Spitze der regulären Verteidigungsleiter: 300 Verteidigung + 150 Angriff je Stufe, Baukosten enthalten 20+ KI-Kerne)',
       'Neuer Abschluss-Erfolg "Meister der Produktionsketten": gleichzeitig mindestens 10 von jeder verfügbaren Tier-2-Ressource besitzen (wächst wie "Industriemagnat" automatisch mit künftigen Ressourcen mit)'
@@ -24396,7 +24408,7 @@
       return `
         <div class="card-row">
           <div class="left">
-            <div class="bicon" style="background:${def.bg};">${DEFENSE_CANVAS_KEYS.includes(def.key) ? `<canvas id="defIcon_${def.key}" width="40" height="40" style="display:block;"></canvas>` : ICONS[def.key]}</div>
+            <div class="bicon" style="background:${def.bg};">${DEFENSE_CANVAS_KEYS.includes(def.key) ? `<canvas id="defIcon_${def.key}" width="40" height="40" style="display:block;"></canvas>` : iconHtmlFor(def.key, def.icon, def.fg)}</div>
             <div style="min-width:0;">
               <div class="bname">${def.name} <span class="lvl-pill">Lv. ${lvl}</span></div>
               <div class="prodline">${prodLine}</div>
@@ -24686,7 +24698,7 @@
       const busy = !!state.activeResearch;
       const ok = unlocked && !maxed && !busy && canAfford(cost);
       const reqNames = (r.requires||[]).filter(req => (state.research[req.key]||0) < req.level).map(req => (RESEARCH_DEFS.find(x=>x.key===req.key)||{}).name+' Stufe '+req.level).join(', ');
-      const iconBox = (!unlocked && lvl===0) ? `<i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i>` : ICONS[r.key];
+      const iconBox = (!unlocked && lvl===0) ? `<i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i>` : iconHtmlFor(r.key, 'ti-flask', '#c3bef5');
       const totalBonus = Math.round(lvl*r.effectPerLevel*100);
       const bonusSuffix = r.key==='rscanner' ? (lvl>0?' · aktuell +'+(lvl*90)+'s Vorwarnzeit':'')
         : r.key==='rdiplomatie' ? (lvl>0?' · aktuell +'+(lvl*0.15).toFixed(2)+'% je aktivem Pakt':'')
