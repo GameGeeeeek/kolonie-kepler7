@@ -760,7 +760,7 @@
     @keyframes heroImpactL { 0%,88%,100%{ opacity:0; transform:scale(0.3); } 91%{ opacity:1; transform:scale(1); } 99%{ opacity:0; transform:scale(1.8); } }
     @keyframes heroImpactR { 0%,88%,100%{ opacity:0; transform:scale(0.3); } 91%{ opacity:1; transform:scale(1); } 99%{ opacity:0; transform:scale(1.8); } }
     .hero-battle-title { position:absolute; left:50%; top:5.5%; transform:translateX(-50%); color:#e8e9f0; font:600 16px system-ui,sans-serif; text-shadow:0 2px 14px rgba(0,0,0,0.9); letter-spacing:0.4px; opacity:0.95; text-align:center; white-space:nowrap; }
-    @media (max-width:480px){ .hero-battle-title { font-size:12.5px; } }
+    @media (max-width: 480px){ .hero-battle-title { font-size:12.5px; } }
     /* Sterne in den drei statischen Teaser-Bildern zum Twinkeln bringen (13.07.2026) - per
        Selektor auf die bestehenden <circle>-Elemente in den weiß gefüllten Stern-Gruppen, ohne die
        SVG-Markup selbst anfassen zu müssen. */
@@ -899,7 +899,7 @@
        niedriger, damit nicht zu viel gescrollt werden muss. */
     .analytics-chart-box { position:relative; height:230px; margin-bottom:1.3rem; }
     .analytics-chart-box.tall { height:340px; }
-    @media (max-width:480px) {
+    @media (max-width: 480px) {
       .analytics-chart-box { height:190px; }
       .analytics-chart-box.tall { height:280px; }
     }
@@ -3023,8 +3023,12 @@
     forschungspunkte: `<svg viewBox="0 0 42 42" width="20" height="20"><path d="M17 5 H25 V16 L32 33 A4 4 0 0 1 28 38 H14 A4 4 0 0 1 10 33 L17 16 Z" fill="none" stroke="#c3bef5" stroke-width="2.5"/><path d="M13 30 H29 L28 33 A2 2 0 0 1 26 35 H16 A2 2 0 0 1 14 33 Z" fill="#c3bef5" opacity="0.55"/><circle cx="19" cy="24" r="1.4" fill="#c3bef5"/><circle cx="24" cy="27" r="1" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.108.0';
+  const VERSION = '8.108.1';
   const PATCHNOTES = [
+    { version:'8.108.1', date:'19.07.2026', changes:[
+      'Performance: renderAllianceEndgameBox/renderAllianceWorldProjectsBox nutzen jetzt das Signatur-Cache-Muster (kein unnötiger innerHTML-Neuaufbau mehr jede Sekunde, wenn sich nichts geändert hat)',
+      'Grafik: Media-Query-Schreibweise für 480px-Breakpoint vereinheitlicht'
+    ]},
     { version:'8.108.0', date:'19.07.2026', changes:[
       'Mondbelagerung serverseitig gehärtet, gleiches Prinzip wie zuvor beim Allianz-Raid und Musterangriff: Zerstörungschance und Belohnung werden jetzt vom Server berechnet statt vom angreifenden Client selbst'
     ]},
@@ -16922,6 +16926,11 @@
   // Sperre "erst ab volledig ausgebauter Allianzbasis". Nutzt bewusst dieselben data-contrib-*
   // Attribute wie allianceStructureListHtml(), damit die bereits global registrierte
   // wireAllianceContribButtons() die Beitrags-Buttons hier automatisch mitbedient.
+  // Signatur-Cache (Performance, analog renderAllianceTitlesBox etc.): die ETA-Anzeige
+  // (allianceProjectEtaText) rechnet aus Date.now() hoch, ändert sich aber nur minutengenau, nicht
+  // sekündlich wie ein echter Countdown - deshalb ein Minuten-Bucket statt Date.now() selbst in der
+  // Signatur, sonst würde die Anzeige einfrieren, bis sich ein anderer Wert ändert.
+  let lastAllianceEndgameSig = null;
   function renderAllianceEndgameBox(){
     const box = document.getElementById('allianceEndgameBox');
     if (!box || isTypingIn('allianceEndgameBox')) return;
@@ -16934,6 +16943,11 @@
     const active = state.allianceActiveProjects || [];
     const totals = state.allianceTechTotals || {};
     const amLeader = amIAllianceMusterLeader();
+    const sigParts = [tag, active.join(','), amLeader?1:0, Math.floor(Date.now()/60000)];
+    for (const t of ALLIANCE_ENDGAME_PROJECT_DEFS) sigParts.push(t.key+':'+(totals[t.key]||0)+':'+(state.allianceContributed[t.key]||0));
+    const sig = sigParts.join('|');
+    if (sig === lastAllianceEndgameSig) return;
+    lastAllianceEndgameSig = sig;
     let html = `<div class="bmeta" style="margin-bottom:8px;">Bis zu ${ALLIANCE_ENDGAME_MAX_ACTIVE} Projekte können gleichzeitig aktiv sein und Beiträge annehmen - Admins/Offiziere wählen aus. Jedes Projekt hat 100 Ausbaustufen; der Bonus wächst mit jeder Stufe geringfügig weiter.</div>`;
     html += ALLIANCE_ENDGAME_PROJECT_DEFS.map(t => {
       const isActive = active.includes(t.key);
@@ -16995,6 +17009,9 @@
   // Render-Logik als bei den 100-stufigen Allianzprojekten oben. Ein abgeschlossenes Weltprojekt
   // bleibt dauerhaft als Prestigeobjekt sichtbar (research-done), auch wenn es aus der Aktiv-Liste
   // entfernt wurde.
+  // Signatur-Cache (Performance) - Minuten-Bucket aus demselben Grund wie bei renderAllianceEndgameBox
+  // (allianceProjectEtaText rechnet minutengenau aus Date.now() hoch).
+  let lastAllianceWorldSig = null;
   function renderAllianceWorldProjectsBox(){
     const box = document.getElementById('allianceWorldBox');
     if (!box || isTypingIn('allianceWorldBox')) return;
@@ -17007,6 +17024,11 @@
     const active = state.allianceActiveWorldProjects || [];
     const totals = state.allianceTechTotals || {};
     const amLeader = amIAllianceMusterLeader();
+    const sigParts = [tag, active.join(','), amLeader?1:0, Math.floor(Date.now()/60000)];
+    for (const t of ALLIANCE_WORLD_PROJECT_DEFS) sigParts.push(t.key+':'+(totals[t.key]||0)+':'+(state.allianceContributed[t.key]||0)+':'+(state.allianceResearch[t.key]?1:0));
+    const sig = sigParts.join('|');
+    if (sig === lastAllianceWorldSig) return;
+    lastAllianceWorldSig = sig;
     let html = `<div class="bmeta" style="margin-bottom:8px;">Nur EIN Weltprojekt gleichzeitig in Arbeit - Admins/Offiziere starten das nächste. Jedes ist einmalig und dauerhaft, ohne weitere Ausbaustufen.</div>`;
     html += ALLIANCE_WORLD_PROJECT_DEFS.map(t => {
       const done = !!state.allianceResearch[t.key];
