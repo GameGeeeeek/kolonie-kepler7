@@ -1582,7 +1582,7 @@
 
       <div class="tabs">
         <button class="tab-btn active" data-tab="basis"><span class="tab-icon-badge"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i></span>Basis</button>
-        <button class="tab-btn" data-tab="verteidigung"><span class="tab-icon-badge"><i class="ti ti-shield" aria-hidden="true" style="color:#e24b4a;"></i></span>Verteidigung</button>
+        <button class="tab-btn" data-tab="verteidigung" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-shield" aria-hidden="true" style="color:#e24b4a;"></i></span>Verteidigung<span id="voidRiftTabBadge" class="tab-badge" style="display:none;"></span></button>
         <button class="tab-btn" data-tab="forschung"><span class="tab-icon-badge"><i class="ti ti-flask" aria-hidden="true" style="color:#85b7eb;"></i></span>Forschung</button>
         <button class="tab-btn" data-tab="flotte"><span class="tab-icon-badge"><i class="ti ti-rocket" aria-hidden="true" style="color:#5dcaa5;"></i></span>Flotte</button>
         <div class="tab-group-divider" aria-hidden="true"></div>
@@ -3203,8 +3203,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.150.0';
+  const VERSION = '8.151.0';
   const PATCHNOTES = [
+    { version:'8.151.0', date:'20.07.2026', changes:[
+      'Leerenriss-Ereignisse deutlich auffälliger gemacht (Spieler-Feedback "habe gar nicht mitbekommen dass das Event ist"): der Verteidigung-Tab bekommt jetzt ein pulsierendes rotes Badge, sobald ein Riss offen ist - bleibt sichtbar, solange Handlungsbedarf besteht, nicht nur für ein paar Sekunden wie der Kurzhinweis. Der Meldungs-Toast beim Öffnen ist jetzt zusätzlich rot umrandet (kritischer Schweregrad statt neutral) und nennt direkt die verbleibende Zeit zum Schließen'
+    ]},
     { version:'8.150.0', date:'20.07.2026', changes:[
       'Schiffs-Icons in Eskorte-/Angriffslisten haben jetzt einen dezenten grauen Rahmen (Spieler-Wunsch) - besser von der Hintergrundfläche abgesetzt, gerade bei dunklen Schiffssilhouetten',
       'Frachter und Großer Frachter sind jetzt als Expeditions-Eskorte wählbar: Expeditionen hatten bisher gar keinen Frachtraum-Deckel, sehr große Ressourcenfunde (z.B. bei stark gestapelten Boni) konnten also beliebig groß ausfallen. Jetzt gibt es einen großzügigen Basis-Frachtraum, der praktisch jeden normalen Fund abdeckt - erst bei außergewöhnlich hohen Funden lohnt sich zusätzlicher Frachtraum durch Frachter in der Eskorte, sonst wird der Fund im Bericht sichtbar gedeckelt',
@@ -11221,7 +11224,10 @@
     const now = Date.now();
     state.voidRift = { planetKey, power, startTime: now, endTime: now + VOID_RIFT_DURATION_SEC*1000, attackArrival: null, attackSource: null };
     log('Ein Leerenriss hat sich über '+planetDisplayName(planetKey)+' geöffnet! Schließe ihn mit einer Kampfflotte, bevor er kollabiert ('+fmtDuration(VOID_RIFT_DURATION_SEC)+') - Belohnung: Leerensplitter und Antimaterie.', 'ti-atom-2');
-    pushToast('Leerenriss über '+planetDisplayName(planetKey)+'!', 'ti-atom-2');
+    // 'crit'-Schweregrad (20.07.2026, Spieler-Feedback): roter Glow statt neutralem Toast, damit der
+    // Riss auch im Vorbeigehen auffällt - dazu das pulsierende Tab-Badge (updateVoidRiftTabBadge), das
+    // anders als der 4,2s-Toast bis zum Schließen/Kollaps sichtbar bleibt.
+    pushToast('Leerenriss über '+planetDisplayName(planetKey)+' geöffnet - '+fmtDuration(VOID_RIFT_DURATION_SEC)+' Zeit zum Schließen!', 'ti-atom-2', 'crit');
     playSound('raid');
     render(); save();
   }
@@ -12938,6 +12944,17 @@
     if (!badge) return;
     const hasNew = (state.lastExpeditionEventTime||0) > (state.lastSeenExpeditionTime||0);
     badge.style.display = hasNew ? 'block' : 'none';
+  }
+  // Leerenriss-Sichtbarkeit (20.07.2026, Spieler-Feedback "habe gar nicht mitbekommen dass das Event
+  // ist"): der Spawn-Toast verschwindet nach 4,2s von selbst und war bisher die einzige Anzeige außerhalb
+  // der Verteidigung-Box - wer gerade auf einem anderen Tab war, hat den Riss leicht verpasst. Pulsierendes
+  // Badge bleibt (anders als die "ungesehen"-Badges bei Berichten/Expedition) bewusst die GESAMTE
+  // Laufzeit sichtbar, nicht nur bis zum ersten Hinsehen - der Handlungsbedarf besteht ja weiter, bis der
+  // Riss geschlossen oder kollabiert ist.
+  function updateVoidRiftTabBadge(){
+    const badge = document.getElementById('voidRiftTabBadge');
+    if (!badge) return;
+    badge.style.display = state.voidRift ? 'block' : 'none';
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
@@ -28054,6 +28071,7 @@
     }
     updateReportsBadge();
     updateExpeditionBadge();
+    updateVoidRiftTabBadge();
     if (document.activeElement !== document.getElementById('allianceInput')) document.getElementById('allianceInput').value = state.player.allianceTag || '';
     const allianceNameEl = document.getElementById('allianceNameDisplay');
     const allianceMetaEl = document.getElementById('allianceMetaLine');
