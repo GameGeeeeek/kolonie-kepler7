@@ -634,7 +634,15 @@
     /* Grafik-Runde 10, Vorschlag "Rest fertigstellen": border-radius bewusst nicht mehr hier gesetzt -
        die HUD-Eckenschnitt-Sammelregel weiter unten übernimmt das jetzt (letzte verbliebene runde
        Karte im Dashboard). */
-    .dash-colony-card.targeted { background:rgba(var(--danger-rgb), 0.14); border-color:rgba(var(--danger-rgb), 0.55); }
+    /* Farblich blinkende Kolonie-Karten für planetengebundene Ereignisse (20.07.2026, Spieler-Wunsch
+       "den Planeten der von einem Event betroffen ist farblich hervorheben, Box blinkt auf") - eine
+       geteilte Puls-Animation über --card-pulse-rgb, je Ereignistyp in dessen etablierter Akzentfarbe
+       (Angriff=Gefahr-Rot wie bisher, jetzt zusätzlich blinkend statt nur statisch; Sabotage=Warnung-
+       Amber; Leerenriss=Lila wie das Leerenriss-Icon/-Badge sonst im Spiel). */
+    @keyframes dashCardPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--card-pulse-rgb), 0.55); } 50% { box-shadow:0 0 0 7px rgba(var(--card-pulse-rgb), 0); } }
+    .dash-colony-card.targeted { background:rgba(var(--danger-rgb), 0.14); border-color:rgba(var(--danger-rgb), 0.55); --card-pulse-rgb:226,75,74; animation: dashCardPulse 1.6s ease-in-out infinite; }
+    .dash-colony-card.event-sabotage { background:rgba(224,165,72,0.14); border-color:rgba(224,165,72,0.55); --card-pulse-rgb:224,165,72; animation: dashCardPulse 1.6s ease-in-out infinite; }
+    .dash-colony-card.event-voidrift { background:rgba(168,158,240,0.14); border-color:rgba(168,158,240,0.55); --card-pulse-rgb:168,158,240; animation: dashCardPulse 1.6s ease-in-out infinite; }
     .dash-colony-card.active-base { background:rgba(var(--primary-rgb), 0.2); border-color:var(--c-primary); }
     .dash-colony-icon { width:28px; height:28px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; background:rgba(var(--primary-rgb), 0.18); color:var(--lilac); }
     .dash-role-badge { position:absolute; bottom:-4px; right:-4px; width:14px; height:14px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
@@ -657,6 +665,7 @@
     .dash-attack-badge { position:absolute; top:-5px; right:-5px; width:17px; height:17px; border-radius:50%; background:var(--c-danger); display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; box-shadow:0 0 0 2px #0d1224; animation: dashAttackPulse 1.3s ease-in-out infinite; }
     .dash-sabotage-badge { position:absolute; top:-5px; left:-5px; width:17px; height:17px; border-radius:50%; background:var(--c-warning); display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
     .dash-debris-badge { position:absolute; bottom:-5px; left:-5px; width:17px; height:17px; border-radius:50%; background:#8a8880; display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
+    .dash-voidrift-badge { position:absolute; bottom:-5px; right:-5px; width:17px; height:17px; border-radius:50%; background:#a89ef0; display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; animation: dashAttackPulse 1.3s ease-in-out infinite; }
     @keyframes dashAttackPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.18); } }
     .float-gain { position:absolute; right:10px; top:6px; font-size:11px; font-weight:500; color:var(--c-secondary); opacity:0; pointer-events:none; }
     .float-gain.show { animation: floatup 0.9s ease-out forwards; }
@@ -3209,8 +3218,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.152.0';
+  const VERSION = '8.153.0';
   const PATCHNOTES = [
+    { version:'8.153.0', date:'20.07.2026', changes:[
+      'Betroffene Kolonie-Karten im Basis-Tab-Dashboard blinken jetzt farblich auf (Spieler-Wunsch): Angriffsziel weiterhin rot (jetzt zusätzlich pulsierend statt nur statisch eingefärbt), Sabotage neu in Amber, Leerenriss neu in Lila - jeweils mit eigenem Symbol-Badge an der Karte, damit auf einen Blick klar ist, welcher Planet betroffen ist und um welches Ereignis es sich handelt'
+    ]},
     { version:'8.152.0', date:'20.07.2026', changes:[
       'Leerenriss-Benachrichtigung weiter verstärkt (Spieler-Wunsch direkt nach dem Badge-Punkt): der gesamte "Verteidigung"-Tab pulsiert jetzt rot, solange ein Riss offen ist - fällt auch beiläufig auf, ohne genau hinsehen zu müssen',
       'Automatische Verstärkung und Automatische Reparatur kosten jetzt zusätzlich KI-Kerne (Spieler-Wunsch, gleiche Automatik-Familie wie die bestehende KI-Abfangautomatik): je 3 KI-Kerne pro Einsatz. Reicht der Vorrat nicht, unterbleibt der automatische Eingriff und es wird einmalig darauf hingewiesen - beide Schalter-Beschreibungen im Verteidigung-Tab zeigen jetzt Kosten und aktuellen Vorrat'
@@ -25244,13 +25256,19 @@
     ];
     const raidTargetId = (state.incomingRaid && state.incomingRaid.detected) ? state.incomingRaid.planet : null;
     const sabotagedPlanetId = (state.mineDebuff && state.mineDebuff.until > Date.now()) ? (state.mineDebuff.planet||'home') : null;
+    // Leerenriss-Planet farblich hervorheben (20.07.2026, Spieler-Wunsch "Planet der von einem Event
+    // betroffen ist farblich hervorheben, Box blinkt auf") - dieselbe Blink-Behandlung wie Angriffsziel/
+    // Sabotage, in der etablierten Leerenriss-Akzentfarbe (siehe .dash-colony-card.event-voidrift).
+    const voidRiftPlanetId = state.voidRift ? state.voidRift.planetKey : null;
     document.getElementById('colonyDashboard').innerHTML = `
       <div class="dash-colony-row">
         ${dashSets.map(d => {
           const lvlSum = Object.values(d.b).reduce((a,v)=>a+v,0);
           const targeted = raidTargetId === d.id;
           const sabotaged = sabotagedPlanetId === d.id;
+          const hasVoidRift = voidRiftPlanetId === d.id;
           const sabotageTitle = sabotaged ? ' – sabotiert: '+buildingDisplayName(state.mineDebuff.key)+' -'+Math.round(state.mineDebuff.pct*100)+'% Produktion' : '';
+          const voidRiftTitle = hasVoidRift ? ' – Leerenriss offen, muss geschlossen werden!' : '';
           const shipCount = Object.entries(d.f||{}).reduce((a,[k,v]) => a + (SHIP_SCORE_WEIGHTS[k]!==undefined && typeof v==='number' ? v : 0), 0);
           const dAtk = Math.round(attackPower(d.f));
           const dDef = Math.round(defensePower(d.id));
@@ -25259,9 +25277,10 @@
           const debrisTitle = debrisInfoText(d.id) || '';
           const hasDebris = !!debrisTitle;
           return `
-            <div class="dash-colony-card ${targeted?'targeted':''} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${d.name}${role?' – Rolle: '+role.name+' ('+role.detail+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle} – anklicken zum Wechseln">
+            <div class="dash-colony-card ${targeted?'targeted':(sabotaged?'event-sabotage':(hasVoidRift?'event-voidrift':''))} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${d.name}${role?' – Rolle: '+role.name+' ('+role.detail+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle}${voidRiftTitle} – anklicken zum Wechseln">
               ${targeted ? `<span class="dash-attack-badge" title="Wird angegriffen!"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>` : ''}
               ${sabotaged ? `<span class="dash-sabotage-badge" title="Sabotiert${sabotageTitle}"><i class="ti ti-bolt" aria-hidden="true"></i></span>` : ''}
+              ${hasVoidRift ? `<span class="dash-voidrift-badge" title="Leerenriss offen${voidRiftTitle}"><i class="ti ti-atom-2" aria-hidden="true"></i></span>` : ''}
               ${hasDebris ? `<span class="dash-debris-badge" data-debris-info="${debrisTitle.replace(/"/g,'&quot;')}" title="${debrisTitle}"><i class="ti ti-recycle" aria-hidden="true"></i></span>` : ''}
               <div class="dash-colony-icon" style="position:relative;">
                 <canvas data-planet-icon="${isMoonKey(d.id) ? 'asteroid' : (effectivePlanetType(d.id) || 'erdaehnlich')}" width="26" height="26" style="display:block;"></canvas>
