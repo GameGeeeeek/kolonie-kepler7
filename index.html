@@ -3129,8 +3129,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.139.0';
+  const VERSION = '8.140.0';
   const PATCHNOTES = [
+    { version:'8.140.0', date:'20.07.2026', changes:[
+      'Berichte-Filter (Vorschlagsrunde, Punkt 5): im Berichte-Tab jetzt Kategorie-Filter (Alle/Kämpfe/Expeditionen/Spionage/Sonstiges, mit Trefferzahl) und Ergebnis-Filter (Alle/Nur Erfolge/Nur Rückschläge) über der Liste - praktisch, sobald die Berichteliste lang wird',
+      'Nebenbei aufgeräumt: die "positiv/negativ"-Einordnung eines Berichts (für die grüne/rote Kartenfarbe) war bisher nur inline im Karten-Rendering berechnet - jetzt eine gemeinsame Funktion (reportIsPositive), die auch der neue Ergebnis-Filter nutzt, statt die Sonderfall-Logik zweimal zu pflegen'
+    ]},
     { version:'8.139.0', date:'20.07.2026', changes:[
       'Expeditions-QoL (Spieler-Wunsch): neuer Knopf "Letzte wiederholen" im Expeditions-Bereich - stellt Typ und Eskorte der zuletzt gestarteten Expedition wieder her und startet sofort, ein Klick statt Eskorte manuell neu zusammenklicken plus separat "Expedition starten". Kappt automatisch auf das aktuell Verfügbare, falls seitdem weniger Schiffe vorhanden sind'
     ]},
@@ -14514,6 +14518,7 @@
       { title:'Heimatbasis-Bonus', body:'Die Heimatbasis hat <strong>+20% Verteidigungspunkte</strong> gegenüber identisch ausgebauten Kolonien. Macht "Heimat verteidigen" bewusst wichtiger.' },
       { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' },
       { title:'Verluste nachbauen', body:'Enthält ein Kampfbericht eigene Schiffsverluste, erscheint darunter der Knopf <strong>„Verluste nachbauen"</strong>: reiht alle verlorenen Schiffstypen in der passenden Menge am aktuell gewählten Standort in die Bauwarteschlange ein - zu den regulären Kosten ab dem heutigen Bestand. Seltene, itemgebundene Einheiten werden bewusst nicht automatisch nachgebaut (kein stiller Item-Verbrauch per Klick), ebenso wenig Schiffe, die bereits am Maximalbestand sind - dafür erscheint ein Hinweis.' },
+      { title:'Berichte-Filter', body:'Im Berichte-Tab lässt sich die Liste über zwei Filterzeilen eingrenzen: eine <strong>Kategorie</strong> (Alle, Kämpfe, Expeditionen, Spionage, Sonstiges - jeweils mit Trefferzahl in Klammern) und ein <strong>Ergebnis</strong> (Alle Ergebnisse, Nur Erfolge, Nur Rückschläge). Praktisch, sobald die Liste über die Zeit lang wird - z.B. nur fehlgeschlagene Kämpfe zum Nachjustieren der Verteidigung ansehen, oder nur Expeditionsfunde durchgehen. Die Auswahl gilt nur für die aktuelle Sitzung, kein Teil des gespeicherten Spielstands.' },
       { title:'Flotten-Vorlagen', body:'Im Bereich „Angriffsflotte zusammenstellen" (Galaxie-Tab) lässt sich die aktuelle Schiffsauswahl unter einem Namen als <strong>Vorlage</strong> speichern und später mit einem Klick wieder anwenden - praktisch für wiederkehrende Zusammenstellungen wie „Nur Jäger" oder „Vollangriff ohne Frachter". Vorlagen speichern absolute Schiffszahlen, werden beim Anwenden aber immer auf die am jeweiligen Standort <strong>aktuell verfügbare</strong> Menge gekappt - sie bleiben so auch nutzbar, wenn die Flotte seither gewachsen, geschrumpft oder anderswo unterwegs ist.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
@@ -14685,11 +14690,37 @@
   // Kopfzeile reichen als Signatur, um den (potenziell langen) innerHTML-Neuaufbau jede Sekunde zu
   // überspringen, solange sich nichts geändert hat (gleiches Muster wie renderGalaxyNews/renderDominance).
   let lastReportsSig = null;
+  // QoL-Vorschlag (20.07.2026, "Berichte-Filter", Spieler-Wunsch): Kategorie- und Ergebnis-Filter für
+  // die (bei aktivem Spiel schnell wachsende) Berichteliste. Session-lokal wie selectedExpeditionType/
+  // customFleetName - reine Anzeige-Einstellung, kein Teil des gespeicherten Spielstands.
+  let reportsFilterCategory = 'all';
+  let reportsFilterResult = 'all'; // 'all' | 'win' | 'loss'
+  // Kategorie-Zuordnung je Berichtstyp - eine Stelle statt die Typlisten in Filter-Logik UND
+  // Filter-Buttons getrennt zu pflegen.
+  const REPORT_CATEGORIES = [
+    { key:'all', label:'Alle', icon:'ti-list-details' },
+    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','pirate-debris-raid','void-rift'] },
+    { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered'] },
+    { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout'] },
+    { key:'other', label:'Sonstiges', icon:'ti-sparkles', types:['item-found','weekly-reward','debris-cleared','random-event'] }
+  ];
+  function reportCategoryOf(r){
+    for (const c of REPORT_CATEGORIES) if (c.types && c.types.includes(r.type)) return c.key;
+    return 'other';
+  }
+  // Ausgelagert aus dem bisherigen Inline-"positive"-Ausdruck im renderReportsBox()-Kartenaufbau (siehe
+  // dort) - jetzt eine gemeinsame Quelle für die Karten-Einfärbung UND den Ergebnis-Filter, statt die
+  // Sonderfall-Logik zweimal zu pflegen.
+  const REPORT_SPECIAL_GREEN_TYPES = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout'];
+  function reportIsPositive(r){
+    const expeditionPositive = r.type==='expedition' && (r.result==='success' || r.result==='defended');
+    return REPORT_SPECIAL_GREEN_TYPES.includes(r.type) || expeditionPositive || (r.type!=='expedition' && r.result==='win');
+  }
   function renderReportsBox(){
     const box = document.getElementById('reportsBox');
     if (!box) return;
     const statsHtml = battleStatsHtml();
-    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id).join(',');
+    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult;
     if (reportsSig === lastReportsSig) return;
     lastReportsSig = reportsSig;
     if (!useBackend()){
@@ -14697,8 +14728,29 @@
       return;
     }
     if (!reportsCache.length){ box.innerHTML = statsHtml + `<div class="bmeta">Noch keine Berichte.</div>`; return; }
-    box.innerHTML = statsHtml + `<button id="clearAllReportsBtn" style="font-size:11px; padding:5px 10px; margin-bottom:10px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Alle Berichte löschen</button>` +
-      reportsCache.map(r => {
+    // Kategorie-Pills zählen mit, wie viele Berichte JEWEILS dazu passen würden (unabhängig vom
+    // Ergebnis-Filter) - macht auf einen Blick sichtbar, wo überhaupt etwas zu finden ist.
+    const filterBarHtml = `
+      <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:6px;">
+        ${REPORT_CATEGORIES.map(c => {
+          const count = c.key==='all' ? reportsCache.length : reportsCache.filter(r=>reportCategoryOf(r)===c.key).length;
+          const active = reportsFilterCategory===c.key;
+          return `<button data-reports-filter-cat="${c.key}" style="font-size:10.5px; padding:5px 9px; ${active?'background:rgba(93,202,165,0.25); border-color:#5dcaa5; color:#5dcaa5;':''}"><i class="ti ${c.icon}" aria-hidden="true" style="margin-right:3px;"></i>${c.label} (${count})</button>`;
+        }).join('')}
+      </div>
+      <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px;">
+        ${[{key:'all',label:'Alle Ergebnisse'},{key:'win',label:'Nur Erfolge'},{key:'loss',label:'Nur Rückschläge'}].map(o => {
+          const active = reportsFilterResult===o.key;
+          return `<button data-reports-filter-result="${o.key}" style="font-size:10.5px; padding:5px 9px; ${active?'background:rgba(226,75,74,0.2); border-color:#e24b4a; color:#ffb4b4;':''}">${o.label}</button>`;
+        }).join('')}
+      </div>
+    `;
+    const filteredReports = reportsCache.filter(r =>
+      (reportsFilterCategory==='all' || reportCategoryOf(r)===reportsFilterCategory) &&
+      (reportsFilterResult==='all' || (reportsFilterResult==='win') === reportIsPositive(r))
+    );
+    box.innerHTML = statsHtml + filterBarHtml + `<button id="clearAllReportsBtn" style="font-size:11px; padding:5px 10px; margin-bottom:10px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Alle Berichte löschen</button>` +
+      (filteredReports.length ? filteredReports.map(r => {
       const when = new Date(r.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       const won = r.result === 'win';
       let title = '', body = '', actionsHtml = '';
@@ -14896,11 +14948,9 @@
       if (r.ownLostShips && Object.values(r.ownLostShips).some(v => v > 0)){
         actionsHtml += `<div style="margin-top:8px;"><button data-rebuild-losses="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:3px;"></i>Verluste nachbauen</button></div>`;
       }
-      const specialGreenTypes = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout'];
       const expeditionPositive = r.type==='expedition' && (r.result==='success' || r.result==='defended');
-      const expeditionNegative = r.type==='expedition' && (r.result==='weakened' || r.result==='destroyed');
-      const positive = specialGreenTypes.includes(r.type) || expeditionPositive || (!['expedition'].includes(r.type) && won);
-      const isSpecial = specialGreenTypes.includes(r.type) || r.type==='expedition';
+      const positive = reportIsPositive(r);
+      const isSpecial = REPORT_SPECIAL_GREEN_TYPES.includes(r.type) || r.type==='expedition';
       const cardIcon = r.type==='item-found' ? (r.itemIcon||'ti-sparkles')
         : r.type==='weekly-reward' ? 'ti-trophy'
         : r.type==='system-discovered' ? 'ti-sparkles'
@@ -14918,12 +14968,12 @@
               <button data-delete-report="${r.id}" style="font-size:10px; padding:3px 7px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
             </div>
           </div>
-          ${!specialGreenTypes.includes(r.type) ? `<span class="lvl-pill" style="align-self:flex-start; margin-top:4px; background:${positive?'rgba(29,158,117,0.25)':'rgba(226,75,74,0.25)'}; color:${positive?'#5dcaa5':'#ffb4b4'};"><i class="ti ${positive?'ti-check':'ti-x'}" aria-hidden="true"></i> ${positive?'Gewonnen':'Verloren'}</span>` : ''}
+          ${!REPORT_SPECIAL_GREEN_TYPES.includes(r.type) ? `<span class="lvl-pill" style="align-self:flex-start; margin-top:4px; background:${positive?'rgba(29,158,117,0.25)':'rgba(226,75,74,0.25)'}; color:${positive?'#5dcaa5':'#ffb4b4'};"><i class="ti ${positive?'ti-check':'ti-x'}" aria-hidden="true"></i> ${positive?'Gewonnen':'Verloren'}</span>` : ''}
           <div class="bmeta" style="margin-top:4px;">${body}</div>
           ${actionsHtml}
         </div>
       `;
-    }).join('');
+    }).join('') : `<div class="bmeta" style="padding:0.5rem 0;">Keine Berichte für diese Filterkombination.</div>`);
     document.querySelectorAll('[data-delete-report]').forEach(btn => btn.addEventListener('click', () => deleteReport(btn.getAttribute('data-delete-report'))));
     document.querySelectorAll('[data-share-battle]').forEach(btn => btn.addEventListener('click', () => {
       const rep = reportsCache.find(x => x.id === btn.getAttribute('data-share-battle'));
@@ -14943,6 +14993,14 @@
     }));
     document.querySelectorAll('[data-rebuild-losses]').forEach(btn => btn.addEventListener('click', () => {
       rebuildLostShips(btn.getAttribute('data-rebuild-losses'));
+    }));
+    document.querySelectorAll('[data-reports-filter-cat]').forEach(btn => btn.addEventListener('click', () => {
+      reportsFilterCategory = btn.getAttribute('data-reports-filter-cat');
+      render();
+    }));
+    document.querySelectorAll('[data-reports-filter-result]').forEach(btn => btn.addEventListener('click', () => {
+      reportsFilterResult = btn.getAttribute('data-reports-filter-result');
+      render();
     }));
   }
   // Springt für den "Direkt Angriff"-Smart-Button aus einem Bericht in den Galaxie-Tab und filtert die
