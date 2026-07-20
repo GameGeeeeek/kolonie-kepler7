@@ -3377,8 +3377,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.166.0';
+  const VERSION = '8.167.0';
   const PATCHNOTES = [
+    { version:'8.167.0', date:'20.07.2026', changes:[
+      'Feinschliff Limit-Orders: Beim Wechsel der Ressource im Order-Formular aktualisieren sich der „Aktueller Preis"-Hinweis und die vorgeschlagene Preisschwelle jetzt sofort (statt erst, nachdem man das Auswahlfeld verlässt) - passend zur gerade gewählten Ressource',
+    ]},
     { version:'8.166.0', date:'20.07.2026', changes:[
       'Neu: Limit-Orders am Markt - lege automatische Kauf-/Verkaufsaufträge an ("Verkaufe 500 Erz, sobald der Preis ≥ 4,00 steigt" bzw. "Kaufe, sobald er ≤ Schwelle fällt"). Erreicht der Marktpreis deine Schwelle, wird die Order automatisch über den regulären Markthandel ausgeführt und entfernt. Orders werden geprüft, solange du online bist (im Markt-Tab laufend, sonst alle 30 s im Hintergrund, solange welche offen sind). Max. 10 gleichzeitig, jederzeit stornierbar - ideal zusammen mit der Preis-Verlaufskurve und den Markt-Ereignissen',
     ]},
@@ -7965,7 +7968,7 @@
           <input type="number" min="0" step="0.01" data-lo-threshold value="${d.threshold||''}" style="width:90px; padding:5px 8px;" title="Preisschwelle in Kredite je Einheit"/>
           <button data-lo-add style="flex:1; min-width:120px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Order anlegen</button>
         </div>
-        ${curPrice!==null?`<div class="bmeta">Aktueller Preis ${resDefFor(d.resource).label}: <strong>${curPrice.toFixed(2)}</strong> Kr./Einheit</div>`:''}
+        <div class="bmeta" data-lo-pricehint>${curPrice!==null?`Aktueller Preis ${resDefFor(d.resource).label}: <strong>${curPrice.toFixed(2)}</strong> Kr./Einheit`:''}</div>
       </div>
       ${openHtml}`;
   }
@@ -8053,7 +8056,18 @@
     }).join('') + marketOrdersHtml();
     // Limit-Order-Formular + offene Orders verdrahten
     const loResSel = box.querySelector('[data-lo-res]');
-    if (loResSel) loResSel.onchange = () => { limitOrderDraft.resource = loResSel.value; renderMarket(); };
+    if (loResSel) loResSel.onchange = () => {
+      limitOrderDraft.resource = loResSel.value;
+      // Preis-Hinweis + Schwelle direkt aktualisieren, statt renderMarket() aufzurufen: solange das
+      // Select fokussiert ist, würde isTypingIn('marketBox') den Voll-Rerender ohnehin überspringen.
+      const m = state.marketCache && state.marketCache[limitOrderDraft.resource];
+      const price = m ? m.price : null;
+      if (price !== null) limitOrderDraft.threshold = Math.round(price*100)/100;
+      const thrInp = box.querySelector('[data-lo-threshold]');
+      if (thrInp) thrInp.value = limitOrderDraft.threshold || '';
+      const hintEl = box.querySelector('[data-lo-pricehint]');
+      if (hintEl) hintEl.innerHTML = price !== null ? 'Aktueller Preis '+resDefFor(limitOrderDraft.resource).label+': <strong>'+price.toFixed(2)+'</strong> Kr./Einheit' : '';
+    };
     const loSideSel = box.querySelector('[data-lo-side]');
     if (loSideSel) loSideSel.onchange = () => { limitOrderDraft.side = loSideSel.value; };
     const loAmtInp = box.querySelector('[data-lo-amt]');
