@@ -3377,8 +3377,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.164.0';
+  const VERSION = '8.165.0';
   const PATCHNOTES = [
+    { version:'8.165.0', date:'20.07.2026', changes:[
+      'Fog-of-War jetzt auch auf der Galaxie-Übersichtskarte: Systeme, in denen ein von dir ausgespähter Spieler wohnt, tragen ein 🔎-Abzeichen (mit Anzahl im Tooltip). Beim Ausspähen wird dafür das Heimatsystem des Ziels gemerkt - so siehst du auf der großen Karte auf einen Blick, wo du bereits Aufklärung hast, ergänzend zum Detail-Overlay in der Systemansicht',
+    ]},
     { version:'8.164.0', date:'20.07.2026', changes:[
       'Erfolgsjäger-Rang jetzt auch im Spielerprofil: neben der Rahmenstufe zeigt eine Plakette den Meta-Rang aus dem Erfolge-System (Neuling → Legende) samt Punktzahl - für dich und für andere Spieler, deren Profil du öffnest. Vorher war der Rang nur im eigenen Erfolge-Panel sichtbar',
       'Performance: Der 30-Sekunden-Marktpreis-Poll prüft jetzt zusätzlich, ob der Tab im Vordergrund sichtbar ist (Sichtbarkeits-Gate wie bei allen anderen Anzeige-Timern) - im Hintergrund-Tab werden keine unnötigen Serveranfragen mehr gestellt',
@@ -13118,7 +13121,7 @@
     if (detected && entry.defensePower !== undefined){
       storedEntry = Object.assign({}, entry, { defensePower: Math.round(entry.defensePower * (1.6 + Math.random())) });
     }
-    state.spyIntel[m.targetId] = { entry: storedEntry, capturedAt: Date.now(), deep, detected };
+    state.spyIntel[m.targetId] = { entry: storedEntry, capturedAt: Date.now(), deep, detected, system: entry.homeSystem || null };
     const shipLine = Object.keys(SHIP_SCORE_WEIGHTS)
       .filter(k => (entry[k]||0) > 0).map(k => (entry[k])+'x '+shipDisplayName(k)).join(', ') || 'keine bekannten Schiffe';
     const defLine = storedEntry.defensePower!==undefined ? ' · Verteidigungspunkte: '+fmt(storedEntry.defensePower) : '';
@@ -15200,7 +15203,7 @@
       { title:'Flottenvielfalt & Kampfbonus-Deckel', body:'<strong>Flottenvielfalt:</strong> Der Einsatz mehrerer verschiedener Kampfschifftypen (statt nur eines Typs) gibt +2% Angriffs- UND Verteidigungskraft je zusätzlichem genutztem Typ, gedeckelt bei 5 Typen (+8%). Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.' },
-      { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war.' },
+      { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war. Auf der <strong>Galaxie-Übersichtskarte</strong> tragen zusätzlich alle Systeme, in denen ein ausgespähter Spieler wohnt, ein 🔎-Abzeichen (Anzahl im Tooltip) - so siehst du auch aus der Distanz, wo du bereits Aufklärung hast.' },
       { title:'Störmanöver (Sabotage)', body:'Mit einem <strong>Spionagekreuzer</strong> kannst du im Spielerprofil (Menü "···" → Störmanöver) eine verdeckte Sabotage gegen einen anderen Spieler ausführen. Bei Erfolg stiehlst du <strong>ohne Flottenkampf</strong> eine kleine, gedeckelte Menge Ressourcen (4-8%, deutlich weniger als ein echter Angriff mit 12-25%). Kein Flottenrisiko, aber pro Ziel gilt eine <strong>2-Stunden-Abklingzeit</strong>. Die Erfolgschance sinkt mit der <strong>Spionageabwehr-Forschung des Ziels</strong> (von 85% bis herunter auf 25%) - wer viel in Spionageabwehr investiert, ist also nicht nur gegen Ausspähen, sondern auch gegen Sabotage geschützt. Der Kampf wird serverseitig aufgelöst (die Beute aus dem echten Spielstand berechnet), das Ziel wird benachrichtigt.' },
       { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
@@ -23941,6 +23944,14 @@
     }
     const visSys = visibleSystems();
     const spiralPos = galaxySpiralLayout(visSys);
+    // Fog-of-War-Layer auf System-Ebene (20.07.2026): Systeme, in denen ein von dir ausgespähter Spieler
+    // wohnt (Heimatsystem beim Ausspähen gemerkt, siehe resolveSpyMission), bekommen ein 🔎-Abzeichen -
+    // die Sektorkarten-Verzahnung (einzelner Marker) auf die Galaxie-Übersicht gehoben.
+    const intelBySystem = {};
+    for (const k in (state.spyIntel||{})){
+      const it = state.spyIntel[k];
+      if (it && it.entry && it.system) intelBySystem[it.system] = (intelBySystem[it.system]||0) + 1;
+    }
     // Fokussierter Start-Ausschnitt (Spieler-Wunsch: nicht von Anfang an mit der vollen, dichten
     // Galaxie starten und erst zoomen müssen) - beim allerersten Kartenaufbau dieser Sitzung auf die
     // Nachbarschaft des aktiven Systems zentrieren. "Zurücksetzen" bleibt die volle 950×500-Ansicht.
@@ -24014,6 +24025,7 @@
       const alienHere = (galaxyCache.unlockedAlienRaces||[]).find(r=>r.system===s.id);
       if (alienHere) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
       if (galaxyCache.activeWar && galaxyCache.activeWar.system === s.id) badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
+      if (intelBySystem[s.id]) badges.push({ icon:'🔎', title: intelBySystem[s.id]+' ausgespähte'+(intelBySystem[s.id]===1?'r Spieler':' Spieler')+' in diesem System (Aufklärung liegt vor)' });
       const badgeMarkup = badges.map((b,i) => `<text x="${pos.x+11+i*13}" y="${pos.y-11}" text-anchor="middle" style="font-size:11px;"><title>${b.title}</title>${b.icon}</text>`).join('');
 
       const factionRing = controlledByMe
