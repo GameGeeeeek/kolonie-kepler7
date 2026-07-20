@@ -3150,8 +3150,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.143.0';
+  const VERSION = '8.143.1';
   const PATCHNOTES = [
+    { version:'8.143.1', date:'20.07.2026', changes:[
+      'Bugfix (Spieler-Report): die "+N"-Einflug-Animation auf den Ressourcenkarten zeigte bei vollem Lager weiterhin die volle theoretische Produktionsrate an, obwohl effektiv nichts mehr hinzukam (Produktion pausiert komplett am Deckel). Zeigt jetzt den tatsächlich gutgeschriebenen Betrag - bei vollem Lager erscheint also gar keine Animation mehr'
+    ]},
     { version:'8.143.0', date:'20.07.2026', changes:[
       'Ressourcenleiste optisch vereinheitlicht (Spieler-Wunsch): Tier-2-Ressourcen (Nanolegierungen, Quantenchips, ...) erscheinen jetzt im selben kompakten Karten-Raster wie die Basis-Ressourcen, statt als volle Zeilen darunter',
       'Basis-Ressourcen bekommen bei vollem Lager jetzt denselben Warn-Rahmen wie volle Tier-2-Karten (statt eines separaten Banners) - auf einen Blick sichtbar, WELCHE Ressource betroffen ist',
@@ -24594,11 +24597,14 @@
     });
   }
 
-  function flashGains(rates){
+  // Erwartet die TATSÄCHLICH gutgeschriebenen Beträge dieses Ticks (nach applySoftCappedGain), nicht
+  // die theoretische Rate - sonst ploppt die Animation bei vollem Lager weiter mit voller Rate auf,
+  // obwohl effektiv nichts hinzukam (Bugfix 20.07.2026, siehe Aufrufstelle).
+  function flashGains(gains){
     RES_DEFS.forEach(d => {
       const el = document.querySelector(`.rescard[data-res="${d.key}"] .float-gain`);
-      if (!el || rates[d.key] <= 0) return;
-      el.textContent = '+'+fmt(rates[d.key]);
+      if (!el || gains[d.key] <= 0) return;
+      el.textContent = '+'+fmt(gains[d.key]);
       el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     });
   }
@@ -29075,12 +29081,21 @@
     if (!bootDataReady) return;
     const rates = ratesPerSecond();
     const cap = storageCap();
-    for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r], cap);
+    // Bugfix (Spieler-Report 20.07.2026): flashGains() bekam bisher die THEORETISCHE Rate übergeben,
+    // nicht den tatsächlich gutgeschriebenen Betrag - bei vollem Lager (SOFT_CAP_OVERFLOW_RATE=0, also
+    // effektiv +0) ploppte die "+N"-Einflug-Animation trotzdem weiter mit der vollen Rate auf, obwohl
+    // nichts hinzukam. Jetzt wird die ECHTE Differenz vor/nach applySoftCappedGain erfasst.
+    const actualGains = {};
+    for (const r of Object.keys(rates)){
+      const before = state.resources[r]||0;
+      applySoftCappedGain(state.resources, r, rates[r], cap);
+      actualGains[r] = (state.resources[r]||0) - before;
+    }
     processTier2Factories(1);
     const missionsResolved = checkMissions();
     processPirateDebrisRaid();
     processVoidRift();
-    flashGains(rates);
+    flashGains(actualGains);
     maybeDetectRaid();
     if (state.nextRaidTime && Date.now() >= state.nextRaidTime){
       const liveReport = executeRaid();
