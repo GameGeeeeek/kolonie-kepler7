@@ -43,3 +43,5 @@ Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Op
 ## Deploy
 
 Push nach `main` → GitHub Pages aktualisiert automatisch. Sascha zieht zusätzlich manuell auf dem Pi (falls dort ein Cache/eigener Reverse-Proxy zwischengeschaltet ist – im Zweifel nachfragen statt annehmen).
+
+**PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main` und GitHub Pages deployt nichts. Gilt für Frontend- und Backend-Repo gleichermaßen.
