@@ -1543,17 +1543,8 @@
       </div>
 
       <div class="resbar" id="resbar"></div>
-      <div id="tier2ResBadges"></div>
+      <div class="resbar" id="tier2ResBadges" style="margin-bottom:0;"></div>
       <div id="dailyQuestBar" style="margin-bottom:0.75rem;"></div>
-      <div class="event-banner" id="storageWarningBanner" style="display:none; border-color:rgba(224,165,72,0.5); background:rgba(224,165,72,0.1);">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <i class="ti ti-alert-triangle" aria-hidden="true" style="font-size:20px; color:#e0a548;"></i>
-          <div style="flex:1; min-width:0;">
-            <div style="font-weight:600; font-size:13px; color:#e0a548;" id="storageWarningTitle">Lager fast voll</div>
-            <div id="storageWarningDesc" style="font-size:11.5px; color:#c7cbe0; margin-top:2px;"></div>
-          </div>
-        </div>
-      </div>
 
       <div class="tabs">
         <button class="tab-btn active" data-tab="basis"><span class="tab-icon-badge"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i></span>Basis</button>
@@ -3159,8 +3150,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.142.1';
+  const VERSION = '8.143.0';
   const PATCHNOTES = [
+    { version:'8.143.0', date:'20.07.2026', changes:[
+      'Ressourcenleiste optisch vereinheitlicht (Spieler-Wunsch): Tier-2-Ressourcen (Nanolegierungen, Quantenchips, ...) erscheinen jetzt im selben kompakten Karten-Raster wie die Basis-Ressourcen, statt als volle Zeilen darunter',
+      'Basis-Ressourcen bekommen bei vollem Lager jetzt denselben Warn-Rahmen wie volle Tier-2-Karten (statt eines separaten Banners) - auf einen Blick sichtbar, WELCHE Ressource betroffen ist',
+      'Der separate "Lager fast voll"-Hinweisbalken ist entfallen - der Warn-Rahmen an der jeweiligen Karte übernimmt diese Rolle jetzt vollständig'
+    ]},
     { version:'8.142.1', date:'20.07.2026', changes:[
       'Bugfix: Klick auf einen Allianz-/Galaxie-Unterreiter wirkte bei manchen Spielständen scheinbar erst nach einem Seiten-Reload. Ursache: die Sichtbarkeits-Umschaltung lief bisher NACH mehreren anderen Render-Aufrufen im selben Tab-Block - falls einer davon bei bestimmten Serverdaten eine Exception warf, brach der komplette Render-Durchlauf davor ab. Läuft jetzt als Allererstes im Block und zusätzlich abgesichert, damit ein Fehler in einer einzelnen Box nie mehr die Reiter-Umschaltung blockiert. Die Auswahl wird außerdem sofort gespeichert statt erst beim nächsten automatischen Speichern'
     ]},
@@ -9707,9 +9703,10 @@
     if (!el) return;
     const visible = TIER2_DEFS.filter(d => tier2TotalLevel(d) > 0 || (state.resources[d.key]||0) > 0);
     if (!visible.length){
-      if (lastTier2BadgeSig !== 'hidden'){ el.innerHTML = ''; lastTier2BadgeSig = 'hidden'; }
+      if (lastTier2BadgeSig !== 'hidden'){ el.innerHTML = ''; el.style.marginBottom = '0'; lastTier2BadgeSig = 'hidden'; }
       return;
     }
+    el.style.marginBottom = '1.5rem';
     // Effektive Rate je Kette (Spieler-Wunsch 19.07.2026) inkl. ehrlichem Status: "Lager voll"
     // (Fabrik pausiert) bzw. "Rohstoffe knapp" (gedrosselt unter das theoretische Maximum).
     const rates = tier2RatesPerSecond();
@@ -9731,7 +9728,7 @@
       const stock = state.resources[d.key]||0;
       const full = cap > 0 && stock >= cap - 1e-9;
       const fillPct = cap > 0 ? Math.min(100, stock/cap*100) : 0;
-      return `<div class="rescard${full?' t2-full':''}" data-res="${d.key}" style="margin-top:6px;">
+      return `<div class="rescard${full?' t2-full':''}" data-res="${d.key}">
       <div class="icon-badge" style="background:${d.bg};"><i class="ti ${d.icon}" aria-hidden="true" style="color:${d.fg};"></i></div>
       <div class="rescard-info">
         <div class="label">${d.label}</div>
@@ -24878,7 +24875,7 @@
         const isFull = cap>0 && stock >= cap;
         const fillPct = cap>0 ? Math.min(100, stock/cap*100) : 0;
         return `
-        <div class="rescard" data-res="${d.key}">
+        <div class="rescard${isFull?' t2-full':''}" data-res="${d.key}">
           <div class="icon-badge" style="background:${d.bg};">${RES_ICONS[d.key]}</div>
           <div class="rescard-info">
             <div class="label">${d.label}</div>
@@ -24900,14 +24897,16 @@
         const oldVal = lastResRenderVal[d.key]!==undefined ? lastResRenderVal[d.key] : newVal;
         if (Math.abs(newVal-oldVal) > 0.001) animateResValue(valEl, oldVal, newVal, cap); else valEl.innerHTML = fmt(newVal)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
         lastResRenderVal[d.key] = newVal;
-        // Füllstands-Balken auch im Teil-Update-Pfad mitziehen (der Rebuild oben läuft nur, wenn
-        // die Kartenstruktur nicht mehr passt - im Normalbetrieb landet JEDER Tick hier).
+        // Füllstands-Balken UND Warn-Rahmen (t2-full, dieselbe Klasse wie bei den Tier-2-Badges) auch
+        // im Teil-Update-Pfad mitziehen (der Rebuild oben läuft nur, wenn die Kartenstruktur nicht
+        // mehr passt - im Normalbetrieb landet JEDER Tick hier).
         const fillEl = card.querySelector('.t2-fill');
+        const isFull = cap>0 && newVal >= cap;
         if (fillEl){
-          const isFull = cap>0 && newVal >= cap;
           fillEl.style.width = (cap>0 ? Math.min(100, newVal/cap*100) : 0).toFixed(1)+'%';
           fillEl.style.background = isFull ? '#e0a548' : d.color;
         }
+        card.classList.toggle('t2-full', isFull);
       });
     }
     renderTier2Badges();
@@ -27424,27 +27423,11 @@
       }
     }
 
-    // Zwei Stufen: "voll" (Kapazität erreicht/überschritten - Produktion läuft nur noch mit dem
-    // Überlauf-Restsatz) und "fast voll" (ab 90%). Der Banner-Titel richtet sich nach der höheren Stufe.
-    const watchRes = ['erz','kristalle','deuterium','antimaterie','energie','forschungspunkte'].filter(r => cap>0 && (rates[r]||0) > 0);
-    const fullRes = watchRes.filter(r => (state.resources[r]||0) >= cap);
-    const nearFullRes = watchRes.filter(r => (state.resources[r]||0) >= cap*0.90 && (state.resources[r]||0) < cap);
-    const storageWarningBanner = document.getElementById('storageWarningBanner');
-    if (storageWarningBanner){
-      if (fullRes.length || nearFullRes.length){
-        storageWarningBanner.style.display = 'block';
-        const titleEl = document.getElementById('storageWarningTitle');
-        if (titleEl) titleEl.textContent = fullRes.length ? 'Lager voll' : 'Lager fast voll';
-        const lbl = (arr) => arr.map(r => (RES_DEFS.find(x=>x.key===r)||{}).label||r).join(', ');
-        let msg = '';
-        if (fullRes.length) msg += lbl(fullRes)+' – Lager voll, die Produktion dieser Ressourcen ist GESTOPPT.';
-        if (nearFullRes.length) msg += (msg?' ':'')+lbl(nearFullRes)+' – Lager bald voll.';
-        msg += ' Mehr Lagerkapazität ausbauen oder Ressourcen verbrauchen (Bauen, Schiffe, Forschung).';
-        document.getElementById('storageWarningDesc').textContent = msg;
-      } else {
-        storageWarningBanner.style.display = 'none';
-      }
-    }
+    // QoL-Vorschlag (20.07.2026, Spieler-Wunsch): der bisherige separate "Lager fast voll"-Banner ist
+    // entfallen - volle Ressourcen-Karten bekommen stattdessen direkt den etablierten Warn-Rahmen
+    // (t2-full-Klasse, dieselbe Optik wie bei vollen Tier-2-Karten), gesetzt weiter oben im
+    // #resbar-Aufbau. Dort ist auf einen Blick sichtbar, WELCHE Ressource betroffen ist, statt in
+    // einem zusätzlichen Textblock nachlesen zu müssen.
 
     const dailyQuestBar = document.getElementById('dailyQuestBar');
     if (dailyQuestBar && state.dailyQuests){
