@@ -3218,8 +3218,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.153.0';
+  const VERSION = '8.153.1';
   const PATCHNOTES = [
+    { version:'8.153.1', date:'20.07.2026', changes:[
+      'Bugfix Orbitalstation (Spieler-Report "Kosten nicht aktuell"): der Ausbau-Button für Stufe 4-5 zeigte nur Erz/Kristalle/Deuterium an, obwohl diese Stufen zusätzlich Leerensplitter benötigen - der Bedarf wurde erst NACH dem Klick als Fehlermeldung sichtbar. Der Button zeigt die benötigten Leerensplitter jetzt direkt mit an, rot hervorgehoben bei zu wenig Vorrat'
+    ]},
     { version:'8.153.0', date:'20.07.2026', changes:[
       'Betroffene Kolonie-Karten im Basis-Tab-Dashboard blinken jetzt farblich auf (Spieler-Wunsch): Angriffsziel weiterhin rot (jetzt zusätzlich pulsierend statt nur statisch eingefärbt), Sabotage neu in Amber, Leerenriss neu in Lila - jeweils mit eigenem Symbol-Badge an der Karte, damit auf einen Blick klar ist, welcher Planet betroffen ist und um welches Ereignis es sich handelt'
     ]},
@@ -25702,12 +25705,19 @@
             const fdef = ORBITAL_FOCI.find(f=>f.key===cur.focus) || ORBITAL_FOCI[0];
             const nextLevel = cur.level + 1;
             const half = orbitalCost(cur.level);
+            // Bugfix (Spieler-Report "Kosten nicht aktuell, beim Bauen will er plötzlich Leerensplitter"):
+            // Stufe 4-5 verlangen zusätzlich Leerensplitter (siehe ORBITAL_VOID_LEVELS/buildOrbitalStation),
+            // das stand bisher NUR in der Bestätigungs-/Fehlermeldung nach dem Klick, nie im Button-Text
+            // selbst - jetzt vorab sichtbar, inkl. roter Hervorhebung bei zu wenig Vorrat.
+            const needShards = ORBITAL_VOID_LEVELS[nextLevel];
+            const shardShort = needShards && (state.rareItems.leerensplitter||0) < needShards;
+            const shardCostText = needShards ? ` <span class="costitem"${shardShort?' style="color:#e2647a;"':''}><i class="ti ti-diamond" aria-hidden="true"></i> ${needShards}x Leerensplitter</span>` : '';
             html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:${fdef.color};">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                 <span class="bname"><i class="ti ${fdef.icon}" aria-hidden="true" style="color:${fdef.color};"></i> ${fdef.name} <span class="lvl-pill">Stufe ${cur.level}/${ORBITAL_MAX_LEVEL}</span></span>
               </div>
               <div class="bmeta" style="margin-bottom:6px;">${fdef.desc} – aktuell wirksam: ${cur.focus==='def' ? '+'+(cur.level*8)+'% Verteidigung' : cur.focus==='prod' ? '+'+(cur.level*4)+'% Produktion' : '-'+(cur.level*6)+'% Schiffsbauzeit, +'+(cur.level*150)+' Lager'}</div>
-              ${nextLevel <= ORBITAL_MAX_LEVEL ? `<button data-build-orbital="${cur.focus}" style="margin-bottom:6px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Ausbau auf Stufe ${nextLevel} (${costHtml(orbitalCost(nextLevel))}, ${fmtDuration(orbitalBuildTime(nextLevel))})</button>` : `<div class="badge-done" style="text-align:center; margin-bottom:6px;"><i class="ti ti-check" aria-hidden="true"></i>Maximale Stufe erreicht</div>`}
+              ${nextLevel <= ORBITAL_MAX_LEVEL ? `<button data-build-orbital="${cur.focus}" style="margin-bottom:6px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Ausbau auf Stufe ${nextLevel} (${costHtml(orbitalCost(nextLevel))}${shardCostText}, ${fmtDuration(orbitalBuildTime(nextLevel))})</button>` : `<div class="badge-done" style="text-align:center; margin-bottom:6px;"><i class="ti ti-check" aria-hidden="true"></i>Maximale Stufe erreicht</div>`}
               <div class="bmeta" style="margin-bottom:4px;">Fokus umrüsten (sofort, halbe Baukosten der aktuellen Stufe):</div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
                 ${ORBITAL_FOCI.filter(f=>f.key!==cur.focus).map(f => `<button data-switch-orbital="${f.key}" style="font-size:10.5px; flex:1;"><i class="ti ${f.icon}" aria-hidden="true" style="margin-right:3px;"></i>${f.name}</button>`).join('')}
