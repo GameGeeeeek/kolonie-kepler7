@@ -1656,7 +1656,7 @@
         <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i>Flotte verlegen</div>
         <div id="relocateAllBox"></div>
         <div id="relocateBox"></div>
-        <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-ship" aria-hidden="true"></i>Schiffswerft</div>
+        <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-ship" aria-hidden="true"></i>Schiffswerft<span id="shipQueueBadge" class="lvl-pill" style="margin-left:8px; font-size:10px;"></span></div>
         <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning: bei der Flotte lag
              besonders viel dazwischen - Angriffspunkte, Missionen, Flottenverlegung). -->
         <div class="qty-select" id="qtySelectFleet"></div>
@@ -3169,8 +3169,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.146.0';
+  const VERSION = '8.147.0';
   const PATCHNOTES = [
+    { version:'8.147.0', date:'20.07.2026', changes:[
+      'Flotten-Warteschlange begrenzt (Spieler-Wunsch): Schiffs-Bauaufträge waren bisher komplett unbegrenzt - jeder Klick auf "Bauen", das Baukorb oder "Verluste nachbauen" legte einen weiteren Auftrag ab, egal wie viele bereits liefen. Jetzt wie bei der Gebäude- und Forschungs-Warteschlange bei 10 gleichzeitigen Aufträgen gedeckelt (zählt Aufträge/Zeilen, nicht die bestellte Stückzahl je Auftrag), mit Anzeige "X/10 Aufträge" direkt über der Schiffswerft'
+    ]},
     { version:'8.146.0', date:'20.07.2026', changes:[
       'Expeditionsberichte deutlich vertieft (Spieler-Wunsch "mehr Berichtstiefe"): zeigen jetzt zusätzlich Expeditionstyp, Flugdauer, die eingesetzte Eskortzusammensetzung sowie bei einer Begegnung die geschätzte Gegnerstärke und die Erfolgschance der Eskorte in Prozent - vorher stand dort nur Ausgangspunkt, Eskortstärke als nackte Zahl und der Fundtext',
       'Mehr Variation in den häufigsten Expeditions-Meldungen: "Nichts gefunden" (mit Abstand häufigster Fall) und die beiden Begegnungs-Meldungen ("Angriff abgewehrt"/"geschwächt zurückgekehrt") waren bisher IMMER exakt derselbe Satz - jetzt jeweils zufällig aus mehreren Textvarianten gewählt, ohne dass sich Wahrscheinlichkeiten oder Beute ändern'
@@ -12412,6 +12415,16 @@
   function buildingLevelDuration(def, currentLvl){
     return (def.buildTime||20) * Math.pow(def.buildTimePerLevelMult||1, currentLvl);
   }
+  // Flotten-Baukorb-Deckel (Spieler-Wunsch 20.07.2026, "Flotte Bauplätze Warteschlange auf 10
+  // begrenzen"): anders als Gebäude (state.buildQueue, seit jeher bei 10 gedeckelt) hatten
+  // Schiffs-Bauaufträge (state.constructionQueue, kind:'ship') gar kein Limit - jeder Klick auf
+  // "Bauen"/Baukorb/Nachbau legt einen weiteren Auftrag ab, imperiumsweit über alle Planeten
+  // zusammengezählt (gleiche Zählweise wie beim bestehenden Gebäude-Deckel). Der Zähler zählt
+  // AUFTRÄGE (Zeilen), nicht die Stückzahl je Auftrag - ein Klick mit qty=50 belegt weiterhin nur
+  // einen Slot, genau wie ein Gebäude-Warteschlangeneintrag unabhängig von seiner Bauzeit nur einen
+  // der 10 Plätze belegt.
+  const SHIP_QUEUE_MAX = 10;
+  function shipQueueCount(){ return (state.constructionQueue||[]).filter(j=>j.kind==='ship').length; }
   function queueConstruction(kind, planetKey, key, qty, buildTimeEach, label, icon, cost){
     let effBuildTimeEach = buildTimeEach;
     if (kind === 'ship'){
@@ -12466,12 +12479,13 @@
     const planetKey = state.activeBasePlanet;
     const cf = currentFleet();
     let queued = 0;
-    const skippedSpecial = [], skippedUnknown = [], skippedCapped = [];
+    const skippedSpecial = [], skippedUnknown = [], skippedCapped = [], skippedQueueFull = [];
     for (const [key, lostQty] of Object.entries(r.ownLostShips)){
       if (!(lostQty > 0)) continue;
       const def = SHIP_DEFS.find(d => d.key === key);
       if (!def || !def.costFn){ skippedUnknown.push(key); continue; }
       if (SPECIAL_UNIT_ITEMS[key]){ skippedSpecial.push(def.name); continue; }
+      if (shipQueueCount() >= SHIP_QUEUE_MAX){ skippedQueueFull.push(def.name); continue; }
       let qty = Math.floor(lostQty);
       const count = cf[key]||0;
       if (def.maxOwned){
@@ -12487,11 +12501,12 @@
       let msg = queued+' Schiffstyp(en) aus den Verlusten dieses Berichts zum Nachbau auf '+planetDisplayName(planetKey)+' eingereiht.';
       if (skippedSpecial.length) msg += ' '+skippedSpecial.join(', ')+' braucht seltene Items - bitte manuell nachbauen.';
       if (skippedCapped.length) msg += ' '+skippedCapped.join(', ')+' bereits am Maximalbestand.';
+      if (skippedQueueFull.length) msg += ' '+skippedQueueFull.join(', ')+' übersprungen - Flotten-Warteschlange voll (max. '+SHIP_QUEUE_MAX+').';
       log(msg, 'ti-rocket');
       playSound('build');
       render(); save();
-    } else if (skippedSpecial.length || skippedCapped.length){
-      log('Keine Verluste nachgebaut - '+[...skippedSpecial,...skippedCapped].join(', ')+' benötigt manuellen Nachbau bzw. ist am Maximalbestand.', 'ti-alert-triangle');
+    } else if (skippedSpecial.length || skippedCapped.length || skippedQueueFull.length){
+      log('Keine Verluste nachgebaut - '+[...skippedSpecial,...skippedCapped,...skippedQueueFull].join(', ')+' benötigt manuellen Nachbau, ist am Maximalbestand oder die Flotten-Warteschlange ist voll.', 'ti-alert-triangle');
     } else {
       log('Dieser Bericht enthält keine nachbaubaren Schiffsverluste.', 'ti-alert-triangle');
     }
@@ -25846,6 +25861,15 @@
       fleetLimitBadge.textContent = usedFl+'/'+maxFl+' Flotten';
       fleetLimitBadge.style.color = usedFl>=maxFl ? '#e24b4a' : '#9296ac';
     }
+    // Flotten-Baukorb-Deckel-Anzeige (Spieler-Wunsch 20.07.2026, "Warteschlange auf 10 begrenzen"):
+    // gleiches Muster wie fleetLimitBadge - macht den neuen Deckel sichtbar, bevor der Klick auf
+    // "Bauen" mit einer Fehlermeldung abgewiesen wird.
+    const shipQueueBadge = document.getElementById('shipQueueBadge');
+    if (shipQueueBadge){
+      const usedSq = shipQueueCount();
+      shipQueueBadge.textContent = usedSq+'/'+SHIP_QUEUE_MAX+' Aufträge';
+      shipQueueBadge.style.color = usedSq>=SHIP_QUEUE_MAX ? '#e24b4a' : '#9296ac';
+    }
     const nonExpeditionMissionsRaw = cf.missions.filter(m => m.type !== 'expedition');
     // Verband-Gruppierung (Bugfix, Spieler-Feedback 17.07.2026): relocateFleetGroup() erzeugt
     // technisch weiterhin eine 'relocate'-Mission PRO Schiffstyp (gleiche groupId, siehe dort) - ein
@@ -26591,12 +26615,15 @@
         // wird immer eingereiht, auch ohne ausreichende Ressourcen für den GESAMTEN Korb. Bezahlung
         // und Start passieren pro Schiffstyp einzeln in activateQueuedJobs, sobald bezahlbar.
         let any = false;
+        const skippedQueueFull = [];
         for (const d of basketDefs){
           const qty = shipBasket[d.key]||0;
           if (qty <= 0) continue;
+          if (shipQueueCount() >= SHIP_QUEUE_MAX){ skippedQueueFull.push(d.name); continue; }
           queueConstruction('ship', state.activeBasePlanet, d.key, qty, d.buildTime, d.name+' (+'+qty+', Baukorb)', 'ti-rocket', shipCostForRange(d, cf[d.key]||0, qty));
           any = true;
         }
+        if (skippedQueueFull.length) log(skippedQueueFull.join(', ')+' übersprungen - Flotten-Warteschlange voll (max. '+SHIP_QUEUE_MAX+').', 'ti-alert-triangle');
         if (!any) return;
         shipBasket = {};
         render(); save();
@@ -28566,6 +28593,7 @@
       if (!def || !shipRequirementsMet(def)) return;
       if (def.unlockItems && !state.unlocked[key]){ log(def.name+' muss zuerst freigeschaltet werden.', 'ti-alert-triangle'); return; }
       if (def.unlockEventParts && !state.unlocked[key]){ log(def.name+' muss zuerst zusammengebaut werden.', 'ti-alert-triangle'); return; }
+      if (shipQueueCount() >= SHIP_QUEUE_MAX){ log('Flotten-Warteschlange ist voll (max. '+SHIP_QUEUE_MAX+' Aufträge gleichzeitig).', 'ti-alert-triangle'); return; }
       const cf = currentFleet();
       const count = cf[key]||0;
       if (def.maxOwned){
@@ -28604,6 +28632,7 @@
     });
     const buySuperschlachtschiffBtn = document.getElementById('buySuperschlachtschiff');
     if (buySuperschlachtschiffBtn) buySuperschlachtschiffBtn.onclick = () => {
+      if (shipQueueCount() >= SHIP_QUEUE_MAX){ log('Flotten-Warteschlange ist voll (max. '+SHIP_QUEUE_MAX+' Aufträge gleichzeitig).', 'ti-alert-triangle'); return; }
       const cf = currentFleet();
       const count = cf.superschlachtschiff||0;
       let qty = buildQtyMode === 'max' ? Math.max(1, maxAffordableShipQty({costFn:superschlachtschiffCost}, count, 20)) : buildQtyMode;
