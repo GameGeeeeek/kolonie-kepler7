@@ -3218,8 +3218,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.153.1';
+  const VERSION = '8.154.0';
   const PATCHNOTES = [
+    { version:'8.154.0', date:'20.07.2026', changes:[
+      'Wichtiger Kampfkraft-Bugfix (Bug-Sweep): 8 Kampfschiffstypen mit echten Angriffswerten - Leerenjäger, Kometenjäger, Enterschiff, Phantomschiff, Riftwächter, Nanoklinge, Quantenkreuzer, Fusionsdreadnought - trugen in JEDEM clientseitig aufgelösten Kampf (NPCs, Weltboss, Leerenriss, Piratennest, Expeditions-Eskorte) 0 Angriffskraft bei, obwohl sie im Angriffs-Menü auswählbar sind. Nur echtes Server-PvP rechnete schon korrekt (dort bereits am 19.07. gefixt). Beide Formeln stimmen jetzt wieder überein - diese Schiffe sind jetzt in jedem Kampfkontext tatsächlich wirksam',
+      'Bugfix: der Mondzerstörer (seltenstes/teuerstes Schiff, 10 Tage Bauzeit) gab bisher 0 Bestenlisten-Punkte, weil er in der Punkte-Gewichtungstabelle fehlte - gibt jetzt wie jedes andere Schiff Punkte'
+    ]},
     { version:'8.153.1', date:'20.07.2026', changes:[
       'Bugfix Orbitalstation (Spieler-Report "Kosten nicht aktuell"): der Ausbau-Button für Stufe 4-5 zeigte nur Erz/Kristalle/Deuterium an, obwohl diese Stufen zusätzlich Leerensplitter benötigen - der Bedarf wurde erst NACH dem Klick als Fehlermeldung sichtbar. Der Button zeigt die benötigten Leerensplitter jetzt direkt mit an, rot hervorgehoben bei zu wenig Vorrat'
     ]},
@@ -10020,7 +10024,17 @@
     // Bei maximalem Stapeln (3 Slots, alle Mythisch, alle "Zielcomputer") wären es ungedeckelt +75% -
     // schon unter der Deckelung, der Cap dient vor allem als Schutz vor künftig stärkeren Modulen.
     const schlachtschiffAtkMult = 1 + Math.min(1.0, shipModuleBonusFor('schlachtschiff','atk'));
-    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90*schlachtschiffAtkMult + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8;
+    // Bugfix (20.07.2026, Bug-Sweep): 8 Kampfschiffstypen mit echten atk-Werten in SHIP_DEFS und
+    // Auswahlbarkeit in ATTACK_SHIP_KEYS fehlten hier komplett - trugen also in JEDEM clientseitig
+    // aufgelösten Kampf (NPCs, Weltboss, Leerenriss, Piratennest, Expeditions-Eskorte, Vorschauwerte)
+    // 0 Angriffskraft bei, obwohl sie im Menü wählbar sind. Das Backend (rawFleetPower() in
+    // server.js, für echtes Server-PvP) wurde dafür schon am 19.07.2026 korrigiert ("Balance-
+    // Entscheidung Sascha: Ja in Tabelle") - dieselben Werte hier nachgezogen, damit Frontend und
+    // Backend wieder übereinstimmen. mondzerstoerer bewusst NICHT hier (eigener, serverseitig
+    // gehärteter Mondbelagerungs-Kampfpfad, nie in ATTACK_SHIP_KEYS).
+    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90*schlachtschiffAtkMult + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8 +
+      diminishingShipCount(f.leerenjaeger||0)*140 + diminishingShipCount(f.kometenjaeger||0)*18 + diminishingShipCount(f.enterschiff||0)*25 + diminishingShipCount(f.phantomschiff||0)*35 + diminishingShipCount(f.riftwaechter||0)*20 +
+      diminishingShipCount(f.nanoklinge||0)*55 + diminishingShipCount(f.quantenkreuzer||0)*80 + diminishingShipCount(f.fusionsdreadnought||0)*180;
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
@@ -11391,7 +11405,11 @@
     ships:15, cruisers:25, jaeger:12, destroyers:35, bomber:45,
     schlachtschiff:70, carrier:30, superschlachtschiff:180, waechter:20, leerenjaeger:120, kometenjaeger:18, enterschiff:28, phantomschiff:26, riftwaechter:22, gesandtenschiff:15, schuerfschiff:15,
     nanoklinge:45, quantenkreuzer:65, fusionsdreadnought:150,
-    forscher:20, frachter:10, frachtergross:40, spaeher:15, spionageschiff:22, colonyShips:5, recycler:12
+    forscher:20, frachter:10, frachtergross:40, spaeher:15, spionageschiff:22, colonyShips:5, recycler:12,
+    // Bugfix (20.07.2026, Bug-Sweep): fehlte komplett - maxOwned:1, 10 Tage Bauzeit, Top-Tier-
+    // Forschung nötig, atk 300 (höchster Wert im Spiel) - Gewicht proportional zum Superschlachtschiff
+    // (atk 220 -> 180), plus Aufschlag für die Einzigartigkeit.
+    mondzerstoerer:250
   };
   function computeShipScoreTotal(){
     let total = 0;
