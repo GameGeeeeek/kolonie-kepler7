@@ -3129,8 +3129,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.136.0';
+  const VERSION = '8.137.0';
   const PATCHNOTES = [
+    { version:'8.137.0', date:'20.07.2026', changes:[
+      'Quality-of-Life-Runde (1/2, Vorschlagsrunde): Kampfberichte mit eigenen Schiffsverlusten bekommen den Knopf "Verluste nachbauen" - reiht alle verlorenen Schiffstypen passend am aktuellen Standort in die Bauwarteschlange ein (itemgebundene Einheiten und bereits maximal ausgebaute Typen werden übersprungen, mit Hinweis)',
+      'Tagesaufgaben-Leiste: Sammel-Knopf "Alle abholen" erscheint, sobald mindestens zwei Aufgaben gleichzeitig fertig sind, und holt sie in einem Rutsch ab (Belohnungs- und Streak-Bonus-Logik unverändert, nur einmaliges Neuzeichnen statt pro Aufgabe)',
+      'Markt: neue Knöpfe "Max Kauf" (größte mit dem Kreditstand bezahlbare Menge) und "Max Verkauf" (kompletter Bestand) tragen die Menge ins Eingabefeld ein - Auslösen bleibt ein bewusster zweiter Klick auf Kaufen/Verkaufen, wie bei den bestehenden Max-Buttons bei Pakt-Geschenken/Weltprojekten'
+    ]},
     { version:'8.136.0', date:'20.07.2026', changes:[
       'Siebtes Kalender-Event "Raffinerie-Krise" (Vorschlagsrunde) - das erste Event OHNE Sammel-Teile und Belohnungs-Schiff: Während des Eventfensters bringen Siege in NPC-Kämpfen, Piraten-Verstecken und gegen Elite-Gegner DOPPELTE Kampfpunkte, wenn mindestens ein Tier-2-Schiff (Nanoklinge, Quantenkreuzer oder Fusionsdreadnought) in der Angriffsflotte mitfliegt. Bewusst eine Verbrauchs-/Einsatz-Belohnung statt eines neuen Tier-2-Kanals - passend zur Markt-Entscheidung',
       'Die Event-Rotation umfasst damit sieben Events; Kalender-Box, Teile-Fund und die beiden Event-Schiff-Erfolge unterstützen jetzt generell Events ohne Schiff (der Erfolg "Event-Sammler" zählt weiterhin nur Events MIT Belohnungs-Schiff - er wäre sonst nie mehr abschließbar gewesen)'
@@ -7568,6 +7573,8 @@
           </div>
           <div style="display:flex; gap:6px; align-items:center; margin-top:8px; flex-wrap:wrap;">
             <input type="number" min="1" data-market-amt="${key}" value="${amt}" style="width:90px; padding:5px 8px;"/>
+            <button data-market-max-buy="${key}" style="font-size:10px; padding:5px 7px;" title="Höchste mit deinen Krediten kaufbare Menge einsetzen"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Max Kauf</button>
+            <button data-market-max-sell="${key}" ${owned<1?'disabled':''} style="font-size:10px; padding:5px 7px;" title="Kompletten Bestand einsetzen"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Max Verkauf</button>
             <button data-market-buy="${key}" style="flex:1; min-width:110px; background:rgba(226,75,74,0.15);"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>Kaufen (~${fmt(buyEst)} Kr.)</button>
             <button data-market-sell="${key}" style="flex:1; min-width:110px; background:rgba(93,202,165,0.15);"><i class="ti ti-truck" aria-hidden="true" style="margin-right:3px;"></i>Verkaufen (~${fmt(sellEst)} Kr.)</button>
           </div>
@@ -7585,6 +7592,28 @@
     box.querySelectorAll('[data-market-sell]').forEach(btn => btn.onclick = () => {
       const k = btn.getAttribute('data-market-sell');
       doMarketTrade('sell', k, marketTradeAmounts[k] || 100);
+    });
+    // "Max"-Buttons füllen nur das Mengenfeld (wie die etablierten Max-Buttons bei Pakt-/Weltprojekt-
+    // Spenden) - Auslösen bleibt ein bewusster zweiter Klick auf Kaufen/Verkaufen.
+    box.querySelectorAll('[data-market-max-buy]').forEach(btn => btn.onclick = () => {
+      const k = btn.getAttribute('data-market-max-buy');
+      const maxQty = maxAffordableMarketBuy(k);
+      const input = box.querySelector('[data-market-amt="'+k+'"]');
+      if (!input) return;
+      if (maxQty < 1){ log('Nicht genug Kredite für einen Kauf von '+resDefFor(k).label+'.', 'ti-alert-triangle'); return; }
+      input.value = maxQty;
+      marketTradeAmounts[k] = maxQty;
+      input.focus();
+    });
+    box.querySelectorAll('[data-market-max-sell]').forEach(btn => btn.onclick = () => {
+      const k = btn.getAttribute('data-market-max-sell');
+      const owned = Math.floor(state.resources[k]||0);
+      const input = box.querySelector('[data-market-amt="'+k+'"]');
+      if (!input) return;
+      if (owned < 1){ log('Kein Bestand von '+resDefFor(k).label+' zum Verkaufen.', 'ti-alert-triangle'); return; }
+      input.value = owned;
+      marketTradeAmounts[k] = owned;
+      input.focus();
     });
   }
 
@@ -7775,6 +7804,23 @@
     const impact = (amount/1000) * 0.04 * base * (state.marketCache[resource].impactScale||1);
     const priceAfter = action==='buy' ? price+impact : Math.max(0, price-impact);
     return Math.round((price+priceAfter)/2 * amount);
+  }
+  // QoL-Vorschlag (20.07.2026, "Max"-Buttons am Markt): größte mit dem aktuellen Kreditstand kaufbare
+  // Menge. estimateTradeCredits() ist streng monoton wachsend in amount (die Slippage-Formel hat
+  // keine Sprünge) - Binärsuche statt Formel-Umkehrung, robust gegen künftige Preisformel-Änderungen.
+  // Reine Client-Schätzung wie der Rest der Markt-Vorschau; der Server bleibt beim tatsächlichen Kauf
+  // die Autorität (siehe doMarketTrade-Kommentar).
+  function maxAffordableMarketBuy(resource){
+    if (!state.marketCache || !state.marketCache[resource]) return 0;
+    const credits = state.credits||0;
+    const discount = marketDiscountPct();
+    let lo = 0, hi = 1000000; // Server-Obergrenze pro Trade, siehe /api/market/trade
+    for (let i=0; i<40 && hi-lo>1; i++){
+      const mid = Math.floor((lo+hi)/2);
+      const cost = Math.round(estimateTradeCredits('buy', resource, mid) * (1 - discount));
+      if (cost <= credits) lo = mid; else hi = mid;
+    }
+    return lo;
   }
 
   // Merkt sich die zuletzt bekannte Liste eigener Systeme (nur Sitzung), um Verluste durch
@@ -11403,7 +11449,11 @@
     if (key==='tier2') return Math.floor(dq.tier2Produced||0); // Fabriken produzieren Bruchteile je Tick - erst volle Einheiten zählen
     return 0;
   }
-  function claimDailyQuest(key){
+  // skipRenderSave (QoL-Vorschlag 20.07.2026, "Alle abholen"-Sammel-Button): claimAllDailyQuests()
+  // ruft diese Funktion pro fertiger Aufgabe im Loop auf und will dabei nur EINMAL am Ende rendern/
+  // speichern statt bei jeder einzelnen Aufgabe - Reward-Logik und der Alle-erledigt-Bonus bleiben
+  // dabei exakt dieselbe einzige Quelle der Wahrheit, keine Duplizierung.
+  function claimDailyQuest(key, skipRenderSave){
     const def = DAILY_QUEST_DEFS.find(d=>d.key===key);
     if (!def || !state.dailyQuests) return;
     if (state.dailyQuests.claimed[key]){ log('Bereits abgeholt.', 'ti-alert-triangle'); return; }
@@ -11438,6 +11488,17 @@
       log('Alle Tagesmissionen erledigt! Bonus: +'+bonusCredits+' Kredite.', 'ti-trophy', 'ok');
       checkAchievements();
     }
+    if (!skipRenderSave){ render(); save(); }
+  }
+  // QoL-Vorschlag (20.07.2026, "Alle abholen"): holt alle fertigen, noch nicht abgeholten
+  // Tagesaufgaben in einem Rutsch ab - besonders vom Handy aus spürbar schneller als jede Pille
+  // einzeln antippen. Rendert/speichert nur einmal am Ende (siehe claimDailyQuest-Parameter oben).
+  function claimAllDailyQuests(){
+    if (!state.dailyQuests) return;
+    const activeKeys = state.dailyQuests.activeKeys||[];
+    const claimable = activeKeys.filter(k => !state.dailyQuests.claimed[k] && dailyQuestProgress(k) >= (DAILY_QUEST_DEFS.find(d=>d.key===k)||{}).target);
+    if (!claimable.length){ log('Gerade keine fertige Tagesaufgabe zum Abholen.', 'ti-alert-triangle'); return; }
+    for (const k of claimable) claimDailyQuest(k, true);
     render(); save();
   }
   // Spieler-Wunsch "Reroll-Option": tauscht eine noch offene (nicht abgeholte) Tagesaufgabe gegen eine
@@ -12258,6 +12319,49 @@
     const specialItemKey = SPECIAL_UNIT_ITEMS[key];
     state.constructionQueue.push({ id, kind, planet: planetKey, key, qty, paid:false, startTime:null, endTime:null, totalDur: dur, label, icon, cost: cost||{}, specialItemKey: specialItemKey||null, specialItemQty: specialItemKey?qty:0 });
     log(label+' zur Warteschlange auf '+planetDisplayName(planetKey)+' hinzugefügt (~'+dur+'s Bauzeit, sobald an der Reihe und bezahlbar).', icon||'ti-pick');
+  }
+  // QoL-Vorschlag (20.07.2026, Spieler-Wunsch "Verluste nachbauen"): liest die Schiffsverluste eines
+  // Kampfberichts (r.ownLostShips, {schiffTyp:anzahl}) und reiht sie am aktuell gewählten Standort
+  // exakt wie ein manueller Bau-Klick in die Warteschlange ein - dieselbe Kostenformel (shipCostForRange
+  // ab dem aktuellen Bestand), dieselbe Bezahl-bei-Fälligkeit-Logik wie beim normalen Bauen. "Super"-
+  // Einheiten (SPECIAL_UNIT_ITEMS: verbrauchen ein seltenes Item pro Schiff) werden bewusst NICHT
+  // automatisch nachgebaut - ein Report-Klick soll nicht stillschweigend seltene Items verbrauchen,
+  // die im Zweifel für Wichtigeres aufgehoben werden. maxOwned-Kappung wie beim regulären Bau-Button.
+  function rebuildLostShips(reportId){
+    const r = reportsCache.find(x => x.id === reportId);
+    if (!r || !r.ownLostShips) return;
+    const planetKey = state.activeBasePlanet;
+    const cf = currentFleet();
+    let queued = 0;
+    const skippedSpecial = [], skippedUnknown = [], skippedCapped = [];
+    for (const [key, lostQty] of Object.entries(r.ownLostShips)){
+      if (!(lostQty > 0)) continue;
+      const def = SHIP_DEFS.find(d => d.key === key);
+      if (!def || !def.costFn){ skippedUnknown.push(key); continue; }
+      if (SPECIAL_UNIT_ITEMS[key]){ skippedSpecial.push(def.name); continue; }
+      let qty = Math.floor(lostQty);
+      const count = cf[key]||0;
+      if (def.maxOwned){
+        const pendingQtyNow = (state.constructionQueue||[]).filter(j=>j.kind==='ship' && j.key===key).reduce((a,j)=>a+j.qty,0);
+        qty = Math.max(0, Math.min(qty, def.maxOwned - count - pendingQtyNow));
+        if (qty < 1){ skippedCapped.push(def.name); continue; }
+      }
+      const cost = shipCostForRange(def, count, qty);
+      queueConstruction('ship', planetKey, key, qty, def.buildTime, def.name+' (+'+qty+', Verlust-Nachbau)', 'ti-rocket', cost);
+      queued++;
+    }
+    if (queued){
+      let msg = queued+' Schiffstyp(en) aus den Verlusten dieses Berichts zum Nachbau auf '+planetDisplayName(planetKey)+' eingereiht.';
+      if (skippedSpecial.length) msg += ' '+skippedSpecial.join(', ')+' braucht seltene Items - bitte manuell nachbauen.';
+      if (skippedCapped.length) msg += ' '+skippedCapped.join(', ')+' bereits am Maximalbestand.';
+      log(msg, 'ti-rocket');
+      playSound('build');
+      render(); save();
+    } else if (skippedSpecial.length || skippedCapped.length){
+      log('Keine Verluste nachgebaut - '+[...skippedSpecial,...skippedCapped].join(', ')+' benötigt manuellen Nachbau bzw. ist am Maximalbestand.', 'ti-alert-triangle');
+    } else {
+      log('Dieser Bericht enthält keine nachbaubaren Schiffsverluste.', 'ti-alert-triangle');
+    }
   }
   // Aktiviert wartende Aufträge: für jede (Art, Planet)-Gruppe ohne aktuell laufenden Auftrag wird der
   // ERSTE bezahlbare wartende Auftrag in Warteschlangen-Reihenfolge bezahlt und gestartet - ein davor
@@ -14360,7 +14464,8 @@
       { title:'Taktik-Haltung', body:'Im Forschung-Tab frei wählbar, jederzeit kostenlos wechselbar: <strong>Aggressiv</strong> (+10% Angriff, -10% Verteidigung), <strong>Ausgewogen</strong> (neutral) oder <strong>Defensiv</strong> (-10% Angriff, +15% Verteidigung).' },
       { title:'Rückzugs-Mechanik', body:'Übersteigt die eigene Verlustquote in einem Gefecht 40%, rettet sich die Hälfte des Anteils <em>oberhalb</em> dieser Schwelle rechtzeitig zurück, statt komplett zerstört zu werden. Gilt bei Überfall-Verteidigung, NPC-Angriffen und PvP-Duellen – nicht für Raider-/NPC-Flotten.' },
       { title:'Heimatbasis-Bonus', body:'Die Heimatbasis hat <strong>+20% Verteidigungspunkte</strong> gegenüber identisch ausgebauten Kolonien. Macht "Heimat verteidigen" bewusst wichtiger.' },
-      { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' }
+      { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' },
+      { title:'Verluste nachbauen', body:'Enthält ein Kampfbericht eigene Schiffsverluste, erscheint darunter der Knopf <strong>„Verluste nachbauen"</strong>: reiht alle verlorenen Schiffstypen in der passenden Menge am aktuell gewählten Standort in die Bauwarteschlange ein - zu den regulären Kosten ab dem heutigen Bestand. Seltene, itemgebundene Einheiten werden bewusst nicht automatisch nachgebaut (kein stiller Item-Verbrauch per Klick), ebenso wenig Schiffe, die bereits am Maximalbestand sind - dafür erscheint ein Hinweis.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
       { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes über <strong>12 Runden</strong> (Anflug → Flankenmanöver → Gefecht → Entscheidung → Rückzugsgefecht → Nachspiel) – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger, die Szene färbt sich kurz grün bzw. rot ein und Bruchstücke fliegen als Partikel-Burst nach außen. Gelegentliche <strong>kritische Treffer</strong> (größerer Einschlag, weißer Bildschirmblitz, goldene Schadenszahl) und <strong>Beinahe-Treffer</strong> (Fehlschüsse, kein Schaden), eine einmalige <strong>Alpha-Salve</strong> schwerer Schiffe (Schlachtschiff/Superschlachtschiff) in der Entscheidungsrunde, <strong>Einzelschiff-Duelle</strong> im Kampfprotokoll (nennt konkrete Schiffe statt nur "beide Seiten"), ein <strong>Spannungs-Ping</strong> vor der Entscheidungsrunde, leises <strong>Hintergrund-Ambiente</strong> das dichter wird, sichtbarer <strong>Schadenszustand</strong> bei Schiffstypen unter 25% Bestand, eine <strong>auflockernde Formation</strong> ab 50% Verlusten, <strong>Trümmerpartikel</strong> im Hintergrund die sich über den Kampf aufbauen, sowie ein Kurzfazit, welcher eigene Schiffstyp den größten Anteil an der Kampfkraft hatte. Zusätzlich: langsam driftender Sternenhintergrund, phasenabhängige Szenen-Stimmung (Farbschein je Kampfphase), Schiffe in gestaffelter Formation mit leichter Idle-Bewegung statt einer starren Reihe, und ein sanftes Eintreten der Flotten zu Kampfbeginn.' },
@@ -14437,7 +14542,7 @@
       { title:'Erfolge & Tagesaufgaben zu den neuen Systemen', body:'Markt, Handelsrouten, Diplomatie, Eroberung und Kredit-Shop haben eigene <strong>Erfolge</strong> (z.B. Marktgänger, Großhändler, Logistiker, Eroberer, Systemherr, Diplomat, Auftragsjäger, Stammkunde, Kreditwürdig) und zwei neue <strong>Tagesaufgaben</strong>: „1 Handel am Markt abschließen" (+60 Kredite) und „1 Fraktionsauftrag abschließen" (+80 Kredite).' }
     ]},
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
-      { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln.' },
+      { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln. Die Knöpfe <strong>„Max Kauf"</strong> und <strong>„Max Verkauf"</strong> tragen die größtmögliche Menge (nach deinem Kreditstand bzw. Bestand) ins Mengenfeld ein - ausgelöst wird der Handel erst mit einem bewussten zweiten Klick auf Kaufen/Verkaufen.' },
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen (mit 20% Abschlag auf den Durchschnittspreis) und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Wer viel verkauft, drückt den Preis spürbar - bis auf rund 15% des Normalwerts. Preise erholen sich mit der Zeit: durch Käufe erhöhte Preise recht zügig, durch Verkäufe gedrückte Preise dagegen sehr langsam (mehrere Tage statt Stunden bis zur fast vollständigen Erholung). Ein großer Verkauf hat also eine lange spürbare Wirkung auf den Preis, ein großer Kauf nicht.' },
       { title:'Keine Tier-2-Ressourcen am Markt', body:'Die fünf <strong>Tier-2-Ressourcen</strong> sind bewusst NICHT handelbar (nach kurzem Test wieder entfernt): Sie kommen ausschließlich aus den eigenen Fabriken - ergänzt nur durch die hart gedeckelten Pakt-Geschenke. Der Markt handelt ausschließlich die fünf Basis-Ressourcen.' },
       { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
@@ -14452,7 +14557,7 @@
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Dazu die Klasse <strong>Tier-2-Schiffe</strong> (Nanoklinge/Quantenkreuzer/Fusionsdreadnought) mit drei Sondermodulen, die in KEINEM Fundpool auftauchen, sondern über die <strong>Tier-2-Modulfertigung</strong> direkt aus Tier-2-Ressourcen hergestellt werden (Nanophasen-Antrieb: +Geschwindigkeit für 60 Nanolegierungen, Quantenfeld-Kondensator: -Treibstoffverbrauch für 30 Quantenchips, Kristallmatrix-Hülle: +Verteidigungsbeitrag für 12 Hochenergiekristalle + 4 Fusionskerne; Selten zum 2,5-fachen Preis - bewusst nur Logistik-/Verteidigungs-Effekte, kein Angriff, da server-validierte Kämpfe Modul-Boni nicht kennen). Vor Allianzmissionen nur bis "Selten" über die Schiffsklassen-Blaupause im Kredit-Shop erhältlich – Episch/Legendär/Mythisch sind für hochstufige Allianzmissionen reserviert. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
-      { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag sowie - sobald mindestens eine Tier-2-Fabrik existiert - „5 Tier-2-Ressourcen produzieren", gezählt wird die echte Fabrik-Produktion aller Ketten) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
+      { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag sowie - sobald mindestens eine Tier-2-Fabrik existiert - „5 Tier-2-Ressourcen produzieren", gezählt wird die echte Fabrik-Produktion aller Ketten) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
       { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong>. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Tier-2-Bestände gehen beim Prestige verloren</strong> - es sei denn, du errichtest vorher ein <strong>Kryo-Archiv</strong> (Basis-Tab, ab Hochenergiephysik, max. Stufe 5 je Standort): je Stufe bewahrt es 40 Nanolegierungen / 20 Quantenchips / 15 Hochenergiekristalle / 8 Fusionskerne / 5 KI-Kerne durchs Prestige (Stufen aller Standorte summiert, imperiumsweit bei Stufe 10 gedeckelt). Das Archiv selbst wird wie alle Gebäude zurückgesetzt - eine bewusste Einmal-Investition pro Durchlauf. <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie.' },
@@ -14737,6 +14842,11 @@
       } else if (battleCardData(r)){
         actionsHtml += `<div style="margin-top:8px;"><button data-share-battle="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:3px;"></i>Teilen</button></div>`;
       }
+      // QoL: "Verluste nachbauen" - unabhängig vom Berichtstyp (Sieg oder Niederlage, eigener
+      // Überfall oder abgewehrter fremder), solange irgendwelche eigenen Schiffe verloren gingen.
+      if (r.ownLostShips && Object.values(r.ownLostShips).some(v => v > 0)){
+        actionsHtml += `<div style="margin-top:8px;"><button data-rebuild-losses="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:3px;"></i>Verluste nachbauen</button></div>`;
+      }
       const specialGreenTypes = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout'];
       const expeditionPositive = r.type==='expedition' && (r.result==='success' || r.result==='defended');
       const expeditionNegative = r.type==='expedition' && (r.result==='weakened' || r.result==='destroyed');
@@ -14781,6 +14891,9 @@
     }));
     document.querySelectorAll('[data-goto-attack]').forEach(btn => btn.addEventListener('click', () => {
       goToAttackPlayer(btn.getAttribute('data-goto-attack'), btn.getAttribute('data-goto-attack-name'));
+    }));
+    document.querySelectorAll('[data-rebuild-losses]').forEach(btn => btn.addEventListener('click', () => {
+      rebuildLostShips(btn.getAttribute('data-rebuild-losses'));
     }));
   }
   // Springt für den "Direkt Angriff"-Smart-Button aus einem Bericht in den Galaxie-Tab und filtert die
@@ -27117,7 +27230,11 @@
       const activeDefs = (state.dailyQuests.activeKeys||[]).map(k => DAILY_QUEST_DEFS.find(d=>d.key===k)).filter(Boolean);
       const allClaimed = activeDefs.length>0 && activeDefs.every(d => state.dailyQuests.claimed[d.key]);
       const openDefs = activeDefs.filter(d => !state.dailyQuests.claimed[d.key]);
-      dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${openDefs.map(d => {
+      // QoL "Alle abholen": Button nur, wenn mindestens 2 Aufgaben GLEICHZEITIG fertig sind - bei
+      // genau einer fertigen Aufgabe ist das direkte Antippen der Pille genauso schnell.
+      const claimableCount = openDefs.filter(d => dailyQuestProgress(d.key) >= d.target).length;
+      const claimAllBtnHtml = claimableCount >= 2 ? `<button id="claimAllQuestsBtn" style="font-size:10.5px; padding:5px 10px; background:rgba(250,199,117,0.15); border-color:rgba(250,199,117,0.4);"><i class="ti ti-check" aria-hidden="true" style="margin-right:3px;"></i>Alle abholen (${claimableCount})</button>` : '';
+      dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${claimAllBtnHtml}${openDefs.map(d => {
         const prog = Math.min(d.target, dailyQuestProgress(d.key));
         const done = prog >= d.target;
         const bg = done ? 'rgba(250,199,117,0.18)' : 'rgba(255,255,255,0.06)';
@@ -27132,6 +27249,8 @@
       }).join('')}${allClaimed ? `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:rgba(93,202,165,0.15); border:1px solid rgba(93,202,165,0.4);"><i class="ti ti-trophy" aria-hidden="true" style="color:#5dcaa5;"></i><span style="font-size:10.5px;">Alle Tagesmissionen erledigt${state.dailyQuestStreak?' · '+state.dailyQuestStreak+'-Tage-Serie':''} - morgen gibt's neue</span></div>` : ''}</div>`;
       dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
       dailyQuestBar.querySelectorAll('[data-reroll-quest]').forEach(el => el.onclick = (ev) => { ev.stopPropagation(); rerollDailyQuest(el.getAttribute('data-reroll-quest')); });
+      const claimAllQuestsBtn = document.getElementById('claimAllQuestsBtn');
+      if (claimAllQuestsBtn) claimAllQuestsBtn.onclick = claimAllDailyQuests;
     }
 
     const seasonalBadge = document.getElementById('seasonalBadge');
