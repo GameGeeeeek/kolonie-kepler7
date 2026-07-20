@@ -3129,8 +3129,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.133.0';
+  const VERSION = '8.134.0';
   const PATCHNOTES = [
+    { version:'8.134.0', date:'20.07.2026', changes:[
+      'Füllstands-Balken jetzt auch in der Basis-Ressourcenleiste (Vorschlagsrunde): derselbe dünne Lagerfüllstands-Balken wie im Tier-2-Badge, in Ressourcen-Farbe, Bernstein bei vollem Lager - der Lager-Deckel ist damit überall auf einen Blick ablesbar statt nur als Zahlentext',
+      'Tagesbilanz zeigt jetzt zusätzlich die Tier-2-Tagesproduktion ("+X Tier-2-Einheiten produziert") und die Tages-Historie im Fortschritt-Tab führt den Wert im Balken-Tooltip mit',
+      'Performance: renderTerritoryBox (Territorial-Übersicht im Galaxie-Tab) und renderCreditShop nutzen jetzt das Signatur-Cache-Muster statt jeden Sekunden-Tick ihr komplettes HTML neu zu bauen - beide haben weder Live-Countdown noch Eingabefelder, die Bedingung des Musters. Außerdem verifiziert: keine doppelten Funktionsdeklarationen in der gesamten Datei (der einzige doppelte Name ist ein bewusst lokal gekapselter Zoom-Handler in zwei getrennten Karten-Modulen)'
+    ]},
     { version:'8.133.0', date:'20.07.2026', changes:[
       'Tier-2-Ressourcen wieder KOMPLETT vom galaktischen Markt entfernt (Entscheidung Sascha, Rücknahme von v8.127.0): Tier-2 soll ausschließlich aus den eigenen Fabriken kommen - auch nicht in kleinen, tageslimitierten Mengen kaufbar. Die fünf Markt-Zeilen sind weg, serverseitig lehnt der Handels-Endpunkt Tier-2 wieder als nicht handelbar ab (inklusive Rückbau der Tages-Kauflimit-Logik)',
       'Bereits über den Markt gekaufte Tier-2-Bestände bleiben selbstverständlich erhalten. Die hart gedeckelten Pakt-Geschenke bleiben als einziger externer Tier-2-Kanal bestehen',
@@ -8006,9 +8011,19 @@
     checkAchievements();
     render(); save();
   }
+  // Signatur-Cache (Vorschlagsrunde 20.07.2026): keine Live-Countdowns (aktive Buffs zeigen nur
+  // "Aktiv", keine Restzeit) und keine Eingabefelder - nur Bezahlbarkeit und Aktiv-Status ändern
+  // das Rendering, beides in der Signatur erfasst.
+  let lastCreditShopSig = null;
   function renderCreditShop(){
     const box = document.getElementById('creditShopBox');
     if (!box) return;
+    const sig = CREDIT_SHOP.map(item => {
+      const buffKind = item.key==='boost_prod' ? 'prod_all' : (item.key==='soeldner' ? 'atk' : (item.key==='schild' ? 'def' : null));
+      return item.key+':'+(((state.credits||0) >= item.cost)?1:0)+':'+((buffKind && shopBuffActive(buffKind))?1:0);
+    }).join('|');
+    if (sig === lastCreditShopSig) return;
+    lastCreditShopSig = sig;
     box.innerHTML = CREDIT_SHOP.map(item => {
       const buffKind = item.key==='boost_prod' ? 'prod_all' : (item.key==='soeldner' ? 'atk' : (item.key==='schild' ? 'def' : null));
       const active = buffKind && shopBuffActive(buffKind);
@@ -9487,7 +9502,11 @@
     // (tier2RatesPerSecond nutzt tier2Step auf einer Kopie - dort darf nichts mitgezählt werden).
     let produced = 0;
     for (const def of TIER2_DEFS) produced += tier2Step(def, state.resources, seconds);
-    if (produced > 0 && state.dailyQuests) state.dailyQuests.tier2Produced = (state.dailyQuests.tier2Produced||0) + produced;
+    if (produced > 0){
+      if (state.dailyQuests) state.dailyQuests.tier2Produced = (state.dailyQuests.tier2Produced||0) + produced;
+      // Lebenszeit-Zähler für die Tagesbilanz (Differenz-Muster wie battleStats.wins/credits dort).
+      state.tier2ProducedTotal = (state.tier2ProducedTotal||0) + produced;
+    }
   }
   // Effektive (nicht theoretische) Produktionsraten je Sekunde für die Anzeige (Spieler-Wunsch
   // 19.07.2026): Trockenlauf von 1 Sekunde auf einer Kopie des Ressourcenstands - berücksichtigt
@@ -14900,13 +14919,20 @@
     if (ctrl.tag) return ctrl.tag === myAllianceTag() ? 1.05 : 1;
     return (state.player.id && ctrl.playerId === state.player.id) ? 1.05 : 1;
   }
+  // Signatur-Cache (Vorschlagsrunde 20.07.2026, gleiches Muster wie renderDominance & Co.): die Box
+  // hat keinen Live-Countdown und keine Eingabefelder, baute aber bisher bei jedem Sekunden-Tick im
+  // Galaxie-Tab ihr komplettes innerHTML neu, obwohl sich System-Kontrolle nur selten ändert.
+  let lastTerritorySig = null;
   function renderTerritoryBox(){
     const box = document.getElementById('territoryBox');
     if (!box) return;
     const controllers = computeSystemControllers();
     const entries = Object.entries(controllers).sort((a,b)=>b[1].planetCount-a[1].planetCount).slice(0,8);
-    if (!entries.length){ box.innerHTML = `<div class="bmeta">Noch keine volle System-Kontrolle erkennbar – ein System zählt erst, sobald dort ALLE kolonisierten Planeten demselben Spieler/derselben Allianz gehören.</div>`; return; }
     const myTag = myAllianceTag();
+    const sig = entries.map(([sys,ctrl]) => sys+':'+(ctrl.tag||'')+':'+(ctrl.playerId||'')+':'+(ctrl.playerName||'')+':'+ctrl.planetCount).join('|')+'#'+(myTag||'')+'#'+(state.player.id||'');
+    if (sig === lastTerritorySig) return;
+    lastTerritorySig = sig;
+    if (!entries.length){ box.innerHTML = `<div class="bmeta">Noch keine volle System-Kontrolle erkennbar – ein System zählt erst, sobald dort ALLE kolonisierten Planeten demselben Spieler/derselben Allianz gehören.</div>`; return; }
     box.innerHTML = entries.map(([sys, ctrl]) => {
       const sysDef = STAR_SYSTEMS.find(s=>s.id===sys);
       const mine = ctrl.tag ? (ctrl.tag === myTag) : (state.player.id && ctrl.playerId === state.player.id);
@@ -19932,20 +19958,24 @@
       const wins = Math.max(0, ((state.battleStats||{}).wins||0) - (ds.winsStart||0));
       const losses = Math.max(0, ((state.battleStats||{}).losses||0) - (ds.lossesStart||0));
       const creditsGain = Math.round((state.credits||0) - (ds.creditsStart||0));
+      // Tier-2-Tagesproduktion (Vorschlagsrunde 20.07.2026): Differenz des Lebenszeit-Zählers aus
+      // processTier2Factories - macht die Fabrik-Leistung in der Bilanz sichtbar.
+      const tier2Gain = Math.max(0, Math.floor((state.tier2ProducedTotal||0) - (ds.tier2Start||0)));
       if (!state.dailyHistory) state.dailyHistory = [];
-      state.dailyHistory.push({ day: ds.day, scoreGain, wins, losses, creditsGain });
+      state.dailyHistory.push({ day: ds.day, scoreGain, wins, losses, creditsGain, tier2Gain });
       while (state.dailyHistory.length > 14) state.dailyHistory.shift();
       // Bilanz nur zeigen, wenn am Vortag überhaupt etwas passiert ist
-      if (scoreGain > 0 || wins > 0 || losses > 0 || creditsGain !== 0){
+      if (scoreGain > 0 || wins > 0 || losses > 0 || creditsGain !== 0 || tier2Gain > 0){
         const parts = ['+'+fmt(scoreGain)+' Punkte'];
         if (wins || losses) parts.push(wins+' Siege / '+losses+' Niederlagen');
         if (creditsGain !== 0) parts.push((creditsGain>0?'+':'')+fmt(creditsGain)+' Kredite');
+        if (tier2Gain > 0) parts.push('+'+fmt(tier2Gain)+' Tier-2-Einheiten produziert');
         parts.push('Wochenpunkte aktuell: '+fmt(myWeekScore()));
         log('Tagesbilanz '+ds.day+': '+parts.join(' · '), 'ti-star');
         pushToast('Tagesbilanz: '+parts[0]+(wins||losses?' · '+wins+'S/'+losses+'N':''), 'ti-star');
       }
     }
-    state.dayStats = { day: today, scoreStart: computeScore(), winsStart: (state.battleStats||{}).wins||0, lossesStart: (state.battleStats||{}).losses||0, creditsStart: state.credits||0 };
+    state.dayStats = { day: today, scoreStart: computeScore(), winsStart: (state.battleStats||{}).wins||0, lossesStart: (state.battleStats||{}).losses||0, creditsStart: state.credits||0, tier2Start: state.tier2ProducedTotal||0 };
     save();
   }
   // Setzt innerHTML einer Box, ohne die horizontale Scroll-Position von markierten Scroll-Leisten
@@ -24518,17 +24548,25 @@
     const resBarOk = resBarEl.children.length === RES_DEFS.length &&
       RES_DEFS.every((d,i) => resBarEl.children[i] && resBarEl.children[i].getAttribute('data-res') === d.key);
     if (!resBarOk){
-      resBarEl.innerHTML = RES_DEFS.map(d => `
+      // Füllstands-Balken (Vorschlagsrunde 20.07.2026, gleiches Muster wie im Tier-2-Badge): dünner
+      // Balken in Ressourcen-Farbe am Kartenrand, Bernstein bei vollem Lager - derselbe Lager-Deckel,
+      // den die Karte ohnehin schon als "/ Zahl" zeigt, nur auf einen Blick ablesbar.
+      resBarEl.innerHTML = RES_DEFS.map(d => {
+        const stock = state.resources[d.key]||0;
+        const isFull = cap>0 && stock >= cap;
+        const fillPct = cap>0 ? Math.min(100, stock/cap*100) : 0;
+        return `
         <div class="rescard" data-res="${d.key}">
           <div class="icon-badge" style="background:${d.bg};">${RES_ICONS[d.key]}</div>
           <div class="rescard-info">
             <div class="label">${d.label}</div>
-            <div class="value">${fmt(state.resources[d.key])} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(cap)}</span></div>
-            <div class="rate">${(cap>0 && (state.resources[d.key]||0) >= cap && rates[d.key] > 0) ? '<span style="color:#e0a548;">+0/s (Lager voll)</span>' : '+'+fmt(rates[d.key])+'/s'}</div>
+            <div class="value">${fmt(stock)} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(cap)}</span></div>
+            <div class="rate">${(isFull && rates[d.key] > 0) ? '<span style="color:#e0a548;">+0/s (Lager voll)</span>' : '+'+fmt(rates[d.key])+'/s'}</div>
           </div>
           <div class="float-gain">+0</div>
+          <div class="t2-fill" style="width:${fillPct.toFixed(1)}%; background:${isFull?'#e0a548':d.color};"></div>
         </div>
-      `).join('');
+      `;}).join('');
       RES_DEFS.forEach(d => { lastResRenderVal[d.key] = state.resources[d.key]||0; });
     } else {
       RES_DEFS.forEach((d,i) => {
@@ -24540,6 +24578,14 @@
         const oldVal = lastResRenderVal[d.key]!==undefined ? lastResRenderVal[d.key] : newVal;
         if (Math.abs(newVal-oldVal) > 0.001) animateResValue(valEl, oldVal, newVal, cap); else valEl.innerHTML = fmt(newVal)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
         lastResRenderVal[d.key] = newVal;
+        // Füllstands-Balken auch im Teil-Update-Pfad mitziehen (der Rebuild oben läuft nur, wenn
+        // die Kartenstruktur nicht mehr passt - im Normalbetrieb landet JEDER Tick hier).
+        const fillEl = card.querySelector('.t2-fill');
+        if (fillEl){
+          const isFull = cap>0 && newVal >= cap;
+          fillEl.style.width = (cap>0 ? Math.min(100, newVal/cap*100) : 0).toFixed(1)+'%';
+          fillEl.style.background = isFull ? '#e0a548' : d.color;
+        }
       });
     }
     renderTier2Badges();
@@ -27157,7 +27203,7 @@
       const bars = hist.map(h => {
         const hW = Math.round((h.wins/maxFights)*46);
         const hL = Math.round((h.losses/maxFights)*46);
-        return `<div style="display:flex; flex-direction:column; align-items:center; gap:2px; flex:1; min-width:14px;" title="${h.day}: ${h.wins} Siege, ${h.losses} Niederlagen, +${fmt(h.scoreGain)} Punkte">
+        return `<div style="display:flex; flex-direction:column; align-items:center; gap:2px; flex:1; min-width:14px;" title="${h.day}: ${h.wins} Siege, ${h.losses} Niederlagen, +${fmt(h.scoreGain)} Punkte${h.tier2Gain?', +'+fmt(h.tier2Gain)+' Tier-2':''}">
           <div style="display:flex; align-items:flex-end; gap:1px; height:48px;">
             <div style="width:5px; height:${Math.max(h.wins?3:0,hW)}px; background:#5dcaa5; border-radius:2px 2px 0 0;"></div>
             <div style="width:5px; height:${Math.max(h.losses?3:0,hL)}px; background:#e24b4a; border-radius:2px 2px 0 0;"></div>
