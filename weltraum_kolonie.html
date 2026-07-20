@@ -3218,8 +3218,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.154.0';
+  const VERSION = '8.155.0';
   const PATCHNOTES = [
+    { version:'8.155.0', date:'20.07.2026', changes:[
+      'Einladungs-Link wird jetzt aktiv beworben (Wachstums-Idee): sobald du Kommandanten-Level 5 erreichst, bekommst du einmalig einen Hinweis auf "Freunde einladen" (Einstellungen) samt der konkreten Belohnung - die Funktion gab es schon lange, war aber leicht zu übersehen'
+    ]},
     { version:'8.154.0', date:'20.07.2026', changes:[
       'Wichtiger Kampfkraft-Bugfix (Bug-Sweep): 8 Kampfschiffstypen mit echten Angriffswerten - Leerenjäger, Kometenjäger, Enterschiff, Phantomschiff, Riftwächter, Nanoklinge, Quantenkreuzer, Fusionsdreadnought - trugen in JEDEM clientseitig aufgelösten Kampf (NPCs, Weltboss, Leerenriss, Piratennest, Expeditions-Eskorte) 0 Angriffskraft bei, obwohl sie im Angriffs-Menü auswählbar sind. Nur echtes Server-PvP rechnete schon korrekt (dort bereits am 19.07. gefixt). Beide Formeln stimmen jetzt wieder überein - diese Schiffe sind jetzt in jedem Kampfkontext tatsächlich wirksam',
       'Bugfix: der Mondzerstörer (seltenstes/teuerstes Schiff, 10 Tage Bauzeit) gab bisher 0 Bestenlisten-Punkte, weil er in der Punkte-Gewichtungstabelle fehlte - gibt jetzt wie jedes andere Schiff Punkte'
@@ -8757,7 +8760,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, referralNudgeShown: false, expeditionsCompleted: 0, themeKey: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [],
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -11544,6 +11547,17 @@
     if (after > before){
       log('Level aufgestiegen! Jetzt Kommandanten-Level '+after+'.', 'ti-award');
       tryClaimPendingReferral();
+      // Einmaliger Hinweis auf den Einladungs-Link (20.07.2026, Wachstums-Idee "praktisch fast ohne
+      // Aufwand"): die Funktion existiert schon lange (Einstellungen -> Freunde einladen), war aber nie
+      // aktiv beworben - Spieler mussten sie zufällig entdecken. Bewusst erst ab Level 5 (nicht am
+      // ersten Tag, wo noch nichts Erzählenswertes existiert) und nur einmal, kein Spam. Nur mit
+      // Backend sinnvoll, da die Funktion sonst gar nicht verfügbar ist (siehe useBackend()-Check am
+      // referralOwnCodeRow selbst).
+      if (after >= 5 && !state.referralNudgeShown && useBackend()){
+        state.referralNudgeShown = true;
+        log('Du kommst gut voran! Lade Freunde über deinen persönlichen Einladungs-Link ein (Einstellungen -> Freunde einladen) - sie bekommen 500 Erz + 500 Kristalle Starthilfe, du bekommst 50 Kredite, sobald sie Level 5 erreichen.', 'ti-users');
+        pushToast('Neu entdeckt: Freunde einladen (Einstellungen)', 'ti-users', 'ok');
+      }
       for (const rew of LEVEL_REWARDS){
         if (rew.level <= after && !state.levelRewardsClaimed[rew.level]){
           state.levelRewardsClaimed[rew.level] = true;
@@ -12131,7 +12145,7 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
+      skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, referralNudgeShown:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: 250 + prestigeStartLvl*100, claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
@@ -12208,7 +12222,7 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true,
+      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, referralNudgeShown:true,
       prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: startLvl*100,
       claimedBossKills: keepBossClaims,
