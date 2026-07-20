@@ -2074,6 +2074,7 @@
             <div class="card-row"><div class="left"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div class="bname">Anfliegende Überfälle</div></div><div class="toggle-switch" data-notif-cat="raid"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-mail" aria-hidden="true"></i><div class="bname">Patchnotes</div></div><div class="toggle-switch" data-notif-cat="patchnotes"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-user" aria-hidden="true"></i><div class="bname">Allianz-Bewerbungen</div><div class="bmeta">Nur relevant für Allianz-Admins/Offiziere</div></div><div class="toggle-switch" data-notif-cat="application"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-target" aria-hidden="true"></i><div class="bname">Spionage-Warnungen</div><div class="bmeta">Wenn dich jemand ausspäht</div></div><div class="toggle-switch" data-notif-cat="spy"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
           </div>
@@ -3343,8 +3344,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.157.0';
+  const VERSION = '8.157.1';
   const PATCHNOTES = [
+    { version:'8.157.1', date:'20.07.2026', changes:[
+      'Spionage vertieft: eine Tiefen-Aufklärung (Spionagekreuzer) schlüsselt die Beute-Schätzung jetzt nach Erz / Kristalle / Deuterium / Antimaterie auf (jeder Wert einzeln verschleiert) - so siehst du gezielt, wer welche Ressource gehortet hat',
+      'Web-Push für Spionage: die "du wurdest ausgespäht"-Warnung ist jetzt eine eigene, abschaltbare Benachrichtigungs-Kategorie (Einstellungen -> Benachrichtigungen -> Spionage-Warnungen) und wird bei aktiviertem Web-Push auch aufs Handy zugestellt',
+    ]},
     { version:'8.157.0', date:'20.07.2026', changes:[
       'Spionage-System überarbeitet (Spieler-Wunsch): Aufklärungsdaten sind jetzt tatsächlich nutzbar - im Spielerprofil zeigt die Angriffs-Vorschau, wie frisch deine letzte Aufklärung ist, statt dass ein Spähbericht folgenlos verpuffte (vorher wurden gespähte Daten nur gespeichert, nie wieder verwendet)',
       'Neuer Rollenunterschied der Späh-Schiffe: der Spionagekreuzer liefert jetzt Tiefen-Aufklärung mit einer Beute-Schätzung (erbeutbare Ressourcen des Ziels) - ideal, um lohnende Angriffsziele zu finden -, während das einfache Spähschiff nur die Basisdaten meldet. Die Beute-Schätzung erscheint direkt im Profil und im Aufklärungsbericht',
@@ -12969,7 +12974,7 @@
     const shieldNote = entry.spyShielded ? ' Achtung: Das Ziel betreibt Spionageabwehr – diese Werte können ungenau sein.' : '';
     const detNote = detected ? ' ⚠ Dein Späher wurde entdeckt – die Werte sind lückenhaft/verfälscht.' : '';
     if (showLog !== false) log((m.fleetName||'Spähschiff')+': Aufklärung von '+name+' abgeschlossen. Flotte: '+shipLine+defLine+lootLine+' · Punktestand: '+(entry.score||0)+'.'+shieldNote+detNote, 'ti-target');
-    pushReport({ type:'spy-report', targetId: m.targetId, targetName:name, ships:entry, score:entry.score||0, defensePower:entry.defensePower, buildLvl:entry.buildLvl, colonyCount:entry.colonyCount, fromPlanet:planetDisplayName(planetKey), spyShielded:!!entry.spyShielded, deep, resTotal: deep?entry.resTotal:undefined, detected });
+    pushReport({ type:'spy-report', targetId: m.targetId, targetName:name, ships:entry, score:entry.score||0, defensePower:entry.defensePower, buildLvl:entry.buildLvl, colonyCount:entry.colonyCount, fromPlanet:planetDisplayName(planetKey), spyShielded:!!entry.spyShielded, deep, resTotal: deep?entry.resTotal:undefined, resBreak: deep?entry.resBreak:undefined, detected });
     // Verteidiger benachrichtigen (Phase 2): meldet dem Ziel serverseitig "du wurdest ausgespäht".
     notifySpyTarget(m.targetId, deep);
     loadReports();
@@ -13195,7 +13200,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true, spy:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -13226,7 +13231,8 @@
     'pact-offer': { icon:'ti-shield', color:'#5dcaa5', text:(p)=>'Pakt-Angebot von '+(p.fromName||'einem Spieler')+' - im Diplomatie-Bereich (Galaxie-Tab) annehmen oder ablehnen.' },
     'weltboss-kill': { icon:'ti-skull', color:'#e24b4a', text:(p)=>'Leviathan Stufe '+(p.level||1)+' wurde besiegt - dein Beitrag: '+(p.share||0)+'%.' },
     'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' },
-    'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' }
+    'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' },
+    'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' }
   };
   async function loadNotificationEvents(){
     if (!useBackend()) return;
@@ -14987,7 +14993,7 @@
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Zwei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, und <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet. Kampfschiffe haben jetzt zusätzlich eine echte <strong>Verteidigungsspezialisierung</strong>, unabhängig von der Angriffskraft: Jäger/Bomber/Träger/Zerstörer sind offensiv ausgerichtet und dadurch fragiler in der Verteidigung, Wächter und Schlachtschiff (inkl. Superschlachtschiff) sind gepanzerte Verteidigungsspezialisten. Eine reine Angriffsflotte verteidigt sich also spürbar schlechter als eine gemischte oder auf Wächter/Schlachtschiffe setzende Flotte.' },
       { title:'Flottenvielfalt & Kampfbonus-Deckel', body:'<strong>Flottenvielfalt:</strong> Der Einsatz mehrerer verschiedener Kampfschifftypen (statt nur eines Typs) gibt +2% Angriffs- UND Verteidigungskraft je zusätzlichem genutztem Typ, gedeckelt bei 5 Typen (+8%). Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
-      { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
+      { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.' },
       { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
@@ -15426,7 +15432,10 @@
         if (r.defensePower!==undefined) body += '<br><i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigungspunkte (gesamtes Reich): '+fmt(r.defensePower);
         if (r.buildLvl!==undefined) body += '<br><i class="ti ti-building-factory-2" aria-hidden="true"></i> Gebäude-Level (gesamt): '+fmt(r.buildLvl);
         if (r.colonyCount!==undefined) body += '<br><i class="ti ti-planet" aria-hidden="true"></i> Kolonien: '+r.colonyCount;
-        if (r.deep && r.resTotal!==undefined) body += '<br><i class="ti ti-diamond" aria-hidden="true" style="color:#9fe1cb;"></i> Beute (geschätzt): '+fmt(r.resTotal)+' <span style="color:#7d8199;">(Erz+Kristalle+Deuterium+Antimaterie)</span>';
+        if (r.deep && r.resTotal!==undefined){
+          body += '<br><i class="ti ti-diamond" aria-hidden="true" style="color:#9fe1cb;"></i> Beute (geschätzt): '+fmt(r.resTotal);
+          if (r.resBreak) body += ' <span style="color:#7d8199;">(Erz '+fmt(r.resBreak.erz||0)+' · Kristalle '+fmt(r.resBreak.kristalle||0)+' · Deuterium '+fmt(r.resBreak.deuterium||0)+' · Antimaterie '+fmt(r.resBreak.antimaterie||0)+')</span>';
+        }
         body += '<br>Punktestand: '+fmt(r.score||0);
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
         // Gewinnchance: eigene volle Angriffskraft am aktuell aktiven Planeten (alle Kampfschiffe dort)
@@ -19798,10 +19807,13 @@
           recycler: fuzz(allFleets().reduce((a,f)=>a+(f.recycler||0),0)),
           forscher: fuzz(allFleets().reduce((a,f)=>a+(f.forscher||0),0)),
           defensePower: fuzz(Math.round(defensePower())),
-          // Beute-Schätzung für die Tiefen-Aufklärung (Spionagekreuzer): verschleierte Summe der
-          // erbeutbaren Ressourcen (Erz/Kristalle/Deuterium/Antimaterie). Energie/Forschungspunkte
-          // zählen nicht, da sie bei einem Angriff nicht gestohlen werden.
+          // Beute-Schätzung für die Tiefen-Aufklärung (Spionagekreuzer): verschleierte Summe UND
+          // Einzelaufschlüsselung der erbeutbaren Ressourcen (Erz/Kristalle/Deuterium/Antimaterie).
+          // Energie/Forschungspunkte zählen nicht, da sie bei einem Angriff nicht gestohlen werden.
+          // Jeder Wert wird einzeln verschleiert (fuzz), damit man nicht per Differenz zur Summe
+          // exakte Einzelwerte zurückrechnen kann.
           resTotal: fuzz(Math.round((state.resources.erz||0)+(state.resources.kristalle||0)+(state.resources.deuterium||0)+(state.resources.antimaterie||0))),
+          resBreak: { erz: fuzz(Math.round(state.resources.erz||0)), kristalle: fuzz(Math.round(state.resources.kristalle||0)), deuterium: fuzz(Math.round(state.resources.deuterium||0)), antimaterie: fuzz(Math.round(state.resources.antimaterie||0)) },
           // Veröffentlichte Spionageabwehr-Stufe: erlaubt fremden Spähmissionen, die Entdeckungs-/
           // Verfälschungs-Chance zu berechnen (Gegenspionage), ohne den echten Spielstand zu kennen.
           rspyshieldLevel: spyLvl,
