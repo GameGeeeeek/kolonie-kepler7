@@ -3169,8 +3169,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.145.0';
+  const VERSION = '8.146.0';
   const PATCHNOTES = [
+    { version:'8.146.0', date:'20.07.2026', changes:[
+      'Expeditionsberichte deutlich vertieft (Spieler-Wunsch "mehr Berichtstiefe"): zeigen jetzt zusätzlich Expeditionstyp, Flugdauer, die eingesetzte Eskortzusammensetzung sowie bei einer Begegnung die geschätzte Gegnerstärke und die Erfolgschance der Eskorte in Prozent - vorher stand dort nur Ausgangspunkt, Eskortstärke als nackte Zahl und der Fundtext',
+      'Mehr Variation in den häufigsten Expeditions-Meldungen: "Nichts gefunden" (mit Abstand häufigster Fall) und die beiden Begegnungs-Meldungen ("Angriff abgewehrt"/"geschwächt zurückgekehrt") waren bisher IMMER exakt derselbe Satz - jetzt jeweils zufällig aus mehreren Textvarianten gewählt, ohne dass sich Wahrscheinlichkeiten oder Beute ändern'
+    ]},
     { version:'8.145.0', date:'20.07.2026', changes:[
       'Bugfix (Spieler-Report "keine Beschreibung für was und was sie verbessern jede Stufe"): die 5 Tier-2-Fabriken UND die 4 Tier-2-Nutzgebäude (Hochsicherheitslager, Kryolager, Fusions-Werftkern, Kryo-Archiv) zeigten in der Gebäudeliste gar keine Effektbeschreibung an - die Zeile blieb komplett leer, obwohl die Daten dafür längst vorhanden waren. Zeigt jetzt bei allen 9 den tatsächlichen aktuellen Effekt und wie er sich nach dem nächsten Ausbau ändert, bei den Fabriken inklusive des steigenden Rohstoffverbrauchs (Erz/Kristalle/Energie/Deuterium/Antimaterie) je Ausbaustufe',
       'Die 4 Tier-2-Nutzgebäude hatten bisher generische Standard-Icons (Schloss, Kiste, Anker, Schlüssel) - jetzt eigene, zum Effekt passende Icons (Hochsicherheits-Tresor mit Scan-Ring, Frostkiste, Werftplattform mit Fusionskern, Frost-Archiv mit Schlüssel-Glühen)',
@@ -14923,12 +14927,21 @@
         title = 'Wöchentliche Bestenlisten-Belohnung – Platz '+r.rank;
         body = 'Belohnung erhalten: <strong>'+r.rewardLabel+'</strong>';
       } else if (r.type === 'expedition'){
+        // Mehr Berichtstiefe (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe bei Expedition"): vorher
+        // nur Ausgangspunkt/Eskortstärke/Fundtext - jetzt analog zu den NPC-Kampfberichten mit
+        // Expeditionstyp, Dauer, Eskortzusammensetzung und (bei Begegnung) Gegnerstärke/Erfolgschance.
         const resMap = { defended:{label:'Angriff abgewehrt', color:true}, success:{label:'Erfolgreich', color:true}, weakened:{label:'Geschwächt zurückgekehrt', color:false}, destroyed:{label:'Expedition verloren', color:false} };
         const info = resMap[r.result] || { label:r.result, color:true };
         title = 'Expedition – '+info.label;
-        body = 'Ausgangspunkt: <strong>'+(r.fromPlanet||'unbekannt')+'</strong><br>Eskortstärke: '+r.escortPower;
+        const etName = (EXPEDITION_TYPES.find(t=>t.key===r.expType)||{}).name || 'Standard-Expedition';
+        body = 'Ausgangspunkt: <strong>'+(r.fromPlanet||'unbekannt')+'</strong> · '+etName+(r.durationSec?' · <i class="ti ti-clock" aria-hidden="true"></i> Dauer: '+fmtDuration(r.durationSec):'');
+        body += '<br>Eskorte: '+fleetBreakdownHtml(r.fleet)+' (Stärke: '+r.escortPower+')';
+        if (r.encountered) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e0a548;"></i> Feindliche Flotte angetroffen'+(r.enemyPower!==undefined ? ' (geschätzte Stärke: '+r.enemyPower+', Erfolgschance der Eskorte: ~'+(r.encounterChancePct!==undefined?r.encounterChancePct:'?')+'%)' : '');
+        if (r.outcomeFlavor) body += '<br>'+r.outcomeFlavor;
         if (r.findText) body += '<br>'+r.findText;
         else if (r.reward) body += '<br>Beute: '+rewardHtml(r.reward);
+        if (r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips);
+        if (r.debris) body += debrisReportLine(r.debris);
         if (r.systemDiscovered) body += '<br><span style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Neues Sternsystem entdeckt!</span>';
       } else if (r.type === 'system-discovered'){
         title = 'Neues Sternsystem entdeckt: '+r.systemName;
@@ -21458,9 +21471,14 @@
           const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02) * seasonalLootMult();
           const encountered = Math.random() < encounterChance;
           let outcome = 'success';
+          // Auf Funktionsebene gehoben (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe"): vorher nur im
+          // if(encountered)-Block sichtbar und für den Bericht verloren - jetzt in beiden pushReport()-
+          // Aufrufen unten als konkrete Zahlen (Gegnerstärke, Erfolgschance) verfügbar, analog zu den
+          // bereits vorhandenen NPC-Kampfberichten (attackPower vs. defensePower, Chance in %).
+          let enemyPower = 0, ratio = 1;
           if (encountered){
-            const enemyPower = 40 + Math.random()*300 + computeScore()*0.03;
-            const ratio = escortPower / (escortPower+enemyPower);
+            enemyPower = 40 + Math.random()*300 + computeScore()*0.03;
+            ratio = escortPower / (escortPower+enemyPower);
             const roll = Math.random();
             if (roll < ratio*0.7){
               outcome = 'defended'; // Eskorte wehrt den Angriff ab, keine Verluste
@@ -21478,7 +21496,7 @@
             const lostEscort = applyCombatLosses(fleet, ESCORT_KEYS, 1.0, planetKey, m.composition);
             const lostEscortTxt = lostCountsToText(lostEscort);
             if (showLog !== false) log((m.fleetName||'Expedition')+' von einer feindlichen Flotte überrascht und vollständig verloren! (Eskortstärke '+Math.round(escortPower)+' reichte nicht aus, '+planetDisplayName(planetKey)+')'+(lostEscortTxt?' Verloren: '+lostEscortTxt+'. Trümmerfeld hinterlassen.':''), 'ti-alert-triangle');
-            pushReport({ type:'expedition', result:'destroyed', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), encountered:true, fleet:m.composition||fleet, ownLostShips:lostEscort, debris:combatDebrisOf(lostEscort) });
+            pushReport({ type:'expedition', result:'destroyed', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), encountered:true, fleet:m.composition||fleet, ownLostShips:lostEscort, debris:combatDebrisOf(lostEscort), expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100) });
             state.lastExpeditionEventTime = Date.now();
             playSound('raid');
           } else {
@@ -21523,7 +21541,7 @@
             let findText = '', findIcon = 'ti-map-2', reportExtra = {};
             if (findRoll < b_nothing){
               addXp(Math.round(8*mult));
-              findText = 'Diesmal nichts Verwertbares gefunden.';
+              findText = EXPEDITION_NOTHING_FLAVOR[Math.floor(Math.random()*EXPEDITION_NOTHING_FLAVOR.length)];
             } else if (findRoll < b_resource){
               const resKeys = ['erz','kristalle','deuterium','antimaterie','energie'];
               const res = resKeys[Math.floor(Math.random()*resKeys.length)];
@@ -21623,9 +21641,11 @@
                 playSound('achieve');
               }
             }
-            const outcomeMsg = outcome==='weakened' ? ' Bei einem Angriff geschwächt (ein Forschungsschiff verloren).' : (encountered ? ' Eskorte hat einen Angriff erfolgreich abgewehrt.' : '');
+            const outcomeMsg = outcome==='weakened'
+              ? ' '+EXPEDITION_WEAKENED_FLAVOR[Math.floor(Math.random()*EXPEDITION_WEAKENED_FLAVOR.length)]
+              : (encountered ? ' '+EXPEDITION_DEFENDED_FLAVOR[Math.floor(Math.random()*EXPEDITION_DEFENDED_FLAVOR.length)] : '');
             if (showLog !== false) log((m.fleetName||'Expedition')+' zurück in '+planetDisplayName(planetKey)+'.'+outcomeMsg+' '+findText+sysMsg, findIcon);
-            pushReport(Object.assign({ type:'expedition', result:outcome, escortPower:Math.round(escortPower), findText, systemDiscovered: !!sysMsg, fromPlanet: planetDisplayName(planetKey), encountered, fleet:m.composition||fleet, ownLostShips: outcome==='weakened' ? {forscher:1} : {} }, reportExtra));
+            pushReport(Object.assign({ type:'expedition', result:outcome, escortPower:Math.round(escortPower), findText, systemDiscovered: !!sysMsg, fromPlanet: planetDisplayName(planetKey), encountered, fleet:m.composition||fleet, ownLostShips: outcome==='weakened' ? {forscher:1} : {}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), outcomeFlavor: outcomeMsg.trim() }, encountered ? { enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100) } : {}, reportExtra));
           }
           state.lastExpeditionEventTime = Date.now();
         } else if (m.type === 'relocate'){
@@ -24173,6 +24193,30 @@
   }
   // Besondere Einzelereignisse: seltene, thematisch eigenständige Funde bei erfolgreichen Expeditionen
   // (zusätzlich zum normalen Ressourcenfund). resolve() gibt Text + Icon für Log/Bericht zurück.
+  // Erzählerische Variation für die häufigsten Expeditions-Ausgänge (Spieler-Wunsch 20.07.2026, "mehr
+  // Variation"): "nichts gefunden" (häufigster Fall, ~12% Basis-Chance) sowie die beiden Begegnungs-
+  // Meldungen waren bisher IMMER exakt derselbe Satz. Zufällige Auswahl aus einem kleinen Pool ändert
+  // nichts an Wahrscheinlichkeiten/Beute (siehe checkMissions), nur am Anzeigetext.
+  const EXPEDITION_NOTHING_FLAVOR = [
+    'Diesmal nichts Verwertbares gefunden.',
+    'Das durchsuchte System erwies sich als leer.',
+    'Nur Weltraumstaub und alte Trümmer – nichts von Wert.',
+    'Die Sensoren meldeten Fehlanzeige, kein brauchbarer Fund.',
+    'Ein ruhiger, ereignisloser Flug ohne nennenswerte Entdeckung.',
+    'Das Zielsystem war bereits gründlich ausgeplündert.',
+    'Trotz gründlicher Suche: nichts, das sich zu bergen lohnte.'
+  ];
+  const EXPEDITION_DEFENDED_FLAVOR = [
+    'Eskorte hat einen Angriff erfolgreich abgewehrt.',
+    'Ein feindliches Schiff näherte sich, wurde aber im letzten Moment abgeschreckt.',
+    'Kurzes Gefecht am Rand des Systems – die Eskorte behielt die Oberhand.',
+    'Ein Überfallversuch scheiterte an der starken Eskorte.'
+  ];
+  const EXPEDITION_WEAKENED_FLAVOR = [
+    'Bei einem Angriff geschwächt (ein Forschungsschiff verloren).',
+    'Ein Hinterhalt kostete ein Forschungsschiff, der Rest der Flotte kam durch.',
+    'Schwerer Zwischenfall: ein Forschungsschiff ging im Gefecht verloren.'
+  ];
   const EXPEDITION_SPECIAL_EVENTS = [
     { key:'colony', name:'Verlassene Kolonie entdeckt', icon:'ti-building-broadcast-tower',
       resolve:(mult) => { const amt = Math.round((500+Math.random()*400)*mult); const res = Math.random()<0.5?'erz':'kristalle';
