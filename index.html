@@ -1408,6 +1408,7 @@
             <div class="bmeta" id="profileModalAlliance">Keine Allianz</div>
             <div style="display:flex; align-items:center; flex-wrap:wrap; gap:0;">
               <div id="profileModalTierPill"></div>
+              <span id="profileAchRankPill" style="display:none;"></span>
               <span id="profileOnlinePill" class="profile-online-pill" style="display:none;"></span>
             </div>
           </div>
@@ -3376,8 +3377,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.163.0';
+  const VERSION = '8.164.0';
   const PATCHNOTES = [
+    { version:'8.164.0', date:'20.07.2026', changes:[
+      'Erfolgsjäger-Rang jetzt auch im Spielerprofil: neben der Rahmenstufe zeigt eine Plakette den Meta-Rang aus dem Erfolge-System (Neuling → Legende) samt Punktzahl - für dich und für andere Spieler, deren Profil du öffnest. Vorher war der Rang nur im eigenen Erfolge-Panel sichtbar',
+      'Performance: Der 30-Sekunden-Marktpreis-Poll prüft jetzt zusätzlich, ob der Tab im Vordergrund sichtbar ist (Sichtbarkeits-Gate wie bei allen anderen Anzeige-Timern) - im Hintergrund-Tab werden keine unnötigen Serveranfragen mehr gestellt',
+    ]},
     { version:'8.163.0', date:'20.07.2026', changes:[
       'Spionage & Karte verzahnt: Bereits ausgespähte Spieler tragen jetzt direkt auf der Sektorkarte einen Aufklärungs-Ring (🔎) mit bekannter Verteidigungsstärke (🛡) - dein Aufklärungsstand ist nicht mehr nur im Berichte-Tab, sondern direkt am Ziel auf der Karte sichtbar. Die Ringfarbe zeigt die Verlässlichkeit: cyan = frisch (unter 30 Min.), grau gestrichelt = veraltet, amber gestrichelt = Späher entdeckt (Werte verfälscht). Tooltip mit Aufklärungsalter, Verteidigung und Tiefenscan-Hinweis',
     ]},
@@ -9006,6 +9011,9 @@
     { min:1000, name:'Legende',      color:'#f0997b' }
   ];
   function achRank(points){ let r = ACH_RANKS[0]; for (const x of ACH_RANKS){ if (points >= x.min) r = x; } return r; }
+  // Summe der freigeschalteten Erfolgspunkte eines Spielstands (fürs Profil/Bestenliste). Nutzt dieselbe
+  // achPoints-Schwierigkeitsableitung wie das Erfolge-Panel - eine Quelle der Wahrheit.
+  function earnedAchPoints(achMap){ achMap = achMap || {}; let p = 0; for (const a of ACHIEVEMENTS){ if (achMap[a.key]) p += achPoints(a); } return p; }
   // Titel: automatisch aus dem prestigeträchtigsten freigeschalteten Erfolg abgeleitet (keine neue
   // Verfolgung nötig, nutzt einfach die bestehenden Erfolge). Reihenfolge = Priorität, oben gewinnt.
   const TITLE_MAP = [
@@ -13612,6 +13620,19 @@
     }
     const tierPillEl = document.getElementById('profileModalTierPill');
     if (tierPillEl) tierPillEl.innerHTML = tier ? `<span class="profile-hero-tier-pill" style="color:${tier.color}; background:rgba(${tier.rgb},0.14); border:1px solid rgba(${tier.rgb},0.4);"><i class="ti ti-award" aria-hidden="true"></i> ${tier.name}</span>` : '';
+    // Erfolgsjäger-Rang (aus den veröffentlichten Erfolgspunkten abgeleitet, v8.164.0): zeigt neben der
+    // Rahmenstufe den Meta-Rang aus dem Erfolge-System auch im Profil - vorher nur im Erfolge-Panel.
+    const achRankEl = document.getElementById('profileAchRankPill');
+    if (achRankEl){
+      const ap = entry.achievementPoints;
+      if (typeof ap === 'number'){
+        const ar = achRank(ap);
+        achRankEl.style.display = 'inline-flex';
+        achRankEl.className = 'profile-hero-tier-pill';
+        achRankEl.style.cssText = `display:inline-flex; color:${ar.color}; background:rgba(0,0,0,0.25); border:1px solid ${ar.color};`;
+        achRankEl.innerHTML = `<i class="ti ti-trophy" aria-hidden="true"></i> ${ar.name} · ${fmt(ap)}P`;
+      } else achRankEl.style.display = 'none';
+    }
     const heroStatsEl = document.getElementById('profileHeroStats');
     if (heroStatsEl){
       const hs = [
@@ -20140,6 +20161,7 @@
           moonCount: expansionCounts().moonCount,
           researchTotal: Object.values(state.research||{}).reduce((a,lvl)=>a+(lvl||0), 0),
           achievementsCount: Object.keys(state.achievements||{}).length,
+          achievementPoints: earnedAchPoints(state.achievements),
           battleWins: (state.battleStats&&state.battleStats.wins)||0,
           battleLosses: (state.battleStats&&state.battleStats.losses)||0,
           updated: Date.now()
@@ -30250,7 +30272,7 @@
   setInterval(() => { if (document.visibilityState !== 'visible') return; loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) syncOwnAllianceRole(); } }, 15000);
   setInterval(() => { if (document.visibilityState === 'visible') loadGalaxyState(); }, 120000); // Galaxie-Zustand ändert sich langsam (Server-Tick alle 15 Min.), reicht alle 2 Min. zu prüfen
   loadGalaxyState();
-  setInterval(() => { if (activeTab === 'markt') loadMarketState(); }, 30000); // Marktpreise im Markt-Tab alle 30s auffrischen
+  setInterval(() => { if (document.visibilityState === 'visible' && activeTab === 'markt') loadMarketState(); }, 30000); // Marktpreise im Markt-Tab alle 30s auffrischen (nur im sichtbaren Vordergrund-Tab - reines Anzeige-Polling, Sichtbarkeits-Gate wie bei den übrigen Anzeige-Timern)
   loadMarketState();
 
   // Tastenkürzel: Ziffern 1-9 und 0 wechseln direkt zum jeweiligen Tab (in Anzeigereihenfolge), sofern
