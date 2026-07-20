@@ -1097,6 +1097,14 @@
        (.card-row, .profile-card, ..., .rank-row) übernimmt das jetzt; stünde hier noch border-radius,
        würde es die dortige border-radius:0 wegen späterer Textposition ueberschreiben. */
     .rank-row.me { background:rgba(var(--primary-rgb), 0.18); border:0.5px solid var(--c-primary); }
+    /* Unterstützer-Kennzeichnung (20.07.2026, Spieler-Wunsch, Vorschlagsrunde "B+C kombiniert"):
+       dezenter Gold-Rahmen+Glow auf der ganzen Zeile (gleiche Sprache wie .rank-row.me, nur Gold statt
+       Lila) PLUS eine Medaillen-Pille direkt neben dem Namen (siehe renderLeaderboardList). Zeitlich
+       befristet auf 30 Tage ab der letzten Ko-fi-Spende - serverseitig berechnet, siehe isSupporter im
+       Bestenlisten-Eintrag. */
+    .rank-row.supporter { background:rgba(250,199,117,0.08); border:0.5px solid rgba(250,199,117,0.5); box-shadow:0 0 8px rgba(250,199,117,0.3); }
+    .rank-row.me.supporter { background:rgba(var(--primary-rgb), 0.18); border-color:var(--c-primary); box-shadow:0 0 8px rgba(250,199,117,0.3); }
+    .pill-supporter { color:#fac775; border-color:rgba(250,199,117,0.5); }
     .rank-num { width:22px; text-align:center; color:var(--c-info); font-weight:600; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
     .lb-note { font-size:11px; color:#7d8199; margin-top:8px; display:flex; align-items:center; gap:5px; }
     /* Runde 3 der Profilbild/Banner-Überarbeitung: Allianz-Chronik ist bewusst KEIN neues Tracking,
@@ -2266,6 +2274,7 @@
           <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="unterstuetzer"><span aria-hidden="true" style="margin-right:2px;">☕</span>Unterstützer<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
           <div class="prog-sec-body">
             <div id="kofiTopSupporterBox"></div>
+            <div id="kofiClaimSupporterBox" style="margin-top:0.75rem;"></div>
           </div>
         </div>
       </div>
@@ -2339,6 +2348,10 @@
   // undefined = noch nicht geladen, null = geladen, aber noch kein Unterstützer, {name,total} = da.
   let kofiTopSupporterCache;
   let kofiTopSupporterLastFetch = 0;
+  // Rückmeldung der Unterstützer-Freischaltung (20.07.2026) - rein transient, nicht Teil von state,
+  // verschwindet bewusst bei Tab-Wechsel/Reload wie andere Ad-hoc-Statusmeldungen in diesem Bereich.
+  let kofiClaimStatusMsg = '';
+  let kofiClaimStatusOk = null;
   async function loadKofiTopSupporterIfNeeded(){
     const now = Date.now();
     if (kofiTopSupporterCache !== undefined && now - kofiTopSupporterLastFetch < 10*60*1000) return;
@@ -3169,8 +3182,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.147.0';
+  const VERSION = '8.148.0';
   const PATCHNOTES = [
+    { version:'8.148.0', date:'20.07.2026', changes:[
+      'Unterstützer werden jetzt in der Bestenliste sichtbar gekennzeichnet (Spieler-Wunsch): Name bekommt eine ☕-Medaillen-Pille, die ganze Zeile einen dezenten Gold-Rahmen mit Leuchten. Im Fortschritt-Tab unter "Unterstützer" lässt sich die eigene Ko-fi-E-Mail-Adresse eintragen, um das Abzeichen freizuschalten - läuft 30 Tage nach der letzten Spende automatisch wieder ab, eine neue Spende verlängert das Fenster',
+      'Serverseitig fälschungssicher: die Kennzeichnung wird bei jedem Laden der Bestenliste frisch aus der hinterlegten Ko-fi-Spende berechnet, ein selbst gesetztes Abzeichen ohne echte Spende wird verworfen'
+    ]},
     { version:'8.147.0', date:'20.07.2026', changes:[
       'Flotten-Warteschlange begrenzt (Spieler-Wunsch): Schiffs-Bauaufträge waren bisher komplett unbegrenzt - jeder Klick auf "Bauen", das Baukorb oder "Verluste nachbauen" legte einen weiteren Auftrag ab, egal wie viele bereits liefen. Jetzt wie bei der Gebäude- und Forschungs-Warteschlange bei 10 gleichzeitigen Aufträgen gedeckelt (zählt Aufträge/Zeilen, nicht die bestellte Stückzahl je Auftrag), mit Anzeige "X/10 Aufträge" direkt über der Schiffswerft'
     ]},
@@ -24922,11 +24939,11 @@
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
       const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 4px rgba(93,202,165,0.7)':'none'};"></span>`;
       return `
-        <div class="rank-row ${isMe?'me':''}" data-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};">
+        <div class="rank-row ${isMe?'me':''} ${e.isSupporter?'supporter':''}" data-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <span class="rank-num">${rank}</span>
             ${onlineDot}
-            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+escapeHtml(e.allianceTag)+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+escapeHtml(e.title)+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+escapeHtml(e.allianceTag)+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+escapeHtml(e.title)+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${e.isSupporter?' <span class="lvl-pill pill-supporter" style="font-size:10px;" title="Unterstützer - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt">☕ Unterstützer</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
           </div>
           <div style="display:flex; gap:10px; color:#9296ac; flex-shrink:0; align-items:center;">
             <span><i class="ti ti-rocket" aria-hidden="true"></i> ${e.ships||0}</span>
@@ -28160,6 +28177,52 @@
         </div>`;
       }
       loadKofiTopSupporterIfNeeded();
+    }
+    // Unterstützer-Freischaltung (20.07.2026, Spieler-Wunsch "Supporter in der Bestenliste
+    // kennzeichnen", Verknüpfung C: Ko-fi-E-Mail-Abgleich): eigene Box statt Teil von kofiBox oben,
+    // da hier ein <input> lebt, das den isTypingIn()-Schutz braucht (CLAUDE.md-Fallstrick) - der
+    // Haupt-Tick würde sonst bei jedem Rendern den Fokus aus dem Feld reißen.
+    const claimBox = document.getElementById('kofiClaimSupporterBox');
+    if (claimBox && useBackend() && !isTypingIn('kofiClaimSupporterBox')){
+      const statusHtml = kofiClaimStatusMsg
+        ? `<div class="bmeta" style="color:${kofiClaimStatusOk?'#5dcaa5':'#f0997b'}; margin-top:6px;">${escapeHtml(kofiClaimStatusMsg)}</div>`
+        : '';
+      claimBox.innerHTML = `
+        <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px;">
+          <div class="bmeta">Schon gespendet? Trage deine Ko-fi-E-Mail-Adresse ein, um dein ☕-Unterstützer-Abzeichen in der Bestenliste freizuschalten (gilt jeweils 30 Tage ab der letzten Spende).</div>
+          <div style="display:flex; gap:6px;">
+            <input type="email" id="kofiClaimEmailInput" placeholder="deine-ko-fi-email@beispiel.de" value="${escapeHtml(state.kofiEmail||'')}" style="flex:1; min-width:0;"/>
+            <button id="kofiClaimBtn" style="white-space:nowrap;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Freischalten</button>
+          </div>
+          ${statusHtml}
+        </div>
+      `;
+      const claimInput = document.getElementById('kofiClaimEmailInput');
+      const claimBtn = document.getElementById('kofiClaimBtn');
+      if (claimBtn) claimBtn.onclick = async () => {
+        const email = (claimInput.value||'').trim();
+        if (!email){ kofiClaimStatusMsg = 'Bitte eine E-Mail-Adresse eintragen.'; kofiClaimStatusOk = false; render(); return; }
+        claimBtn.disabled = true;
+        try {
+          const res = await backendFetch('/claim-supporter', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email }) });
+          const data = await res.json().catch(()=>({}));
+          if (res.ok && data.ok){
+            state.kofiEmail = email;
+            kofiClaimStatusOk = true;
+            kofiClaimStatusMsg = data.active ? 'Unterstützer-Abzeichen freigeschaltet! Noch '+data.daysLeft+' Tag(e) aktiv, erscheint in Kürze in der Bestenliste.' : 'E-Mail verknüpft, aber die letzte Spende liegt schon länger als 30 Tage zurück - eine neue Spende schaltet das Abzeichen automatisch wieder frei.';
+            save();
+            loadLeaderboard();
+          } else {
+            kofiClaimStatusOk = false;
+            kofiClaimStatusMsg = data.error || 'Freischaltung fehlgeschlagen.';
+          }
+        } catch(e){
+          kofiClaimStatusOk = false;
+          kofiClaimStatusMsg = 'Server nicht erreichbar.';
+        }
+        claimBtn.disabled = false;
+        render();
+      };
     }
     const rareItemsBox = document.getElementById('rareItemsBox');
     if (rareItemsBox){
