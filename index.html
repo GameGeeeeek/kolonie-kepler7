@@ -3108,8 +3108,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.129.0';
+  const VERSION = '8.130.0';
   const PATCHNOTES = [
+    { version:'8.130.0', date:'19.07.2026', changes:[
+      'Zwei neue Erfolge für die Tier-2-Verbrauchs-Bausteine: "Verbrauchsstratege" (10 Verbrauchseinsätze insgesamt - Quantensensoren, KI-Abfangautomatik, Terraforming-Energieschub und Belagerungs-Ladungen zählen in einen gemeinsamen Zähler) und "Modulschmied" (3 Module in der Tier-2-Modulfertigung hergestellt)',
+      'Belohnungen bewusst nur Basis-Ressourcen und Kredite, keine Tier-2-Ressourcen - Erfolge sollen die Nutzung der Fabrik-Produktion belohnen, nicht sie ersetzen. Die Zähler starten ab diesem Update (rückwirkend gab es keine Zählung); wie andere Laufzähler setzen sie sich beim Prestige zurück'
+    ]},
     { version:'8.129.0', date:'19.07.2026', changes:[
       'Neue Schiffsklassen-Modul-Kategorie "Tier-2-Schiffe" (Nanoklinge/Quantenkreuzer/Fusionsdreadnought) mit drei Sondermodulen: Nanophasen-Antrieb (+10% Geschwindigkeit, 60 Nanolegierungen), Quantenfeld-Kondensator (-10% Treibstoffverbrauch, 30 Quantenchips) und Kristallmatrix-Hülle (+10% Verteidigungsbeitrag, 12 Hochenergiekristalle + 4 Fusionskerne). Slots wie bei den anderen Klassen über Kommandopunkte freischaltbar (Offiziere-Tab)',
       'Diese Module tauchen in KEINEM Fundpool und keiner Blaupause auf - sie werden ausschließlich in der neuen Tier-2-Modulfertigung deterministisch hergestellt (Gewöhnlich zum Basispreis, Selten zum 2,5-fachen; Episch/Legendär/Mythisch bleiben wie überall den Allianzmissions-Belohnungen vorbehalten)',
@@ -8368,6 +8372,12 @@
     // Abschluss-Erfolg des Tier-2-Systems - wie industriemagnat bewusst zahlenfrei und dynamisch
     // über TIER2_DEFS gerechnet, wächst mit künftigen Ressourcen automatisch mit.
     { key:'kettenmeister', name:'Meister der Produktionsketten', desc:'Besitze gleichzeitig mindestens 10 von jeder verfügbaren Tier-2-Ressource.', check: s => TIER2_DEFS.every(d => (s.resources[d.key]||0) >= 10), progress: s => [TIER2_DEFS.filter(d => (s.resources[d.key]||0) >= 10).length, TIER2_DEFS.length], reward:{erz:25000,kristalle:15000,deuterium:8000,antimaterie:400,credits:800}, xpReward:800 },
+    // Tier-2-Verbrauchs-Erfolge (19.07.2026): belohnen die LAUFENDE Nutzung der Verbrauchs-Bausteine
+    // (Quantensensoren, KI-Abfangautomatik, Energieschub, Belagerungs-Ladung - gemeinsamer Zähler
+    // tier2ConsumablesUsed) bzw. die Modulfertigung (tier2ModulesCrafted). Belohnungen bewusst nur
+    // Basis-Ressourcen/Kredite, keine Tier-2-Ressourcen (kein zweiter Produktionskanal).
+    { key:'verbrauchsstratege', name:'Verbrauchsstratege', desc:'Setze insgesamt 10 Tier-2-Verbrauchseinsätze ein (Quantensensoren, KI-Abfangautomatik, Terraforming-Energieschub oder Belagerungs-Ladungen).', check: s => (s.tier2ConsumablesUsed||0) >= 10, progress: s => [Math.min(10, s.tier2ConsumablesUsed||0), 10], reward:{erz:12000,kristalle:8000,deuterium:3000,credits:400}, xpReward:400 },
+    { key:'modulschmied', name:'Modulschmied', desc:'Fertige 3 Module in der Tier-2-Modulfertigung.', check: s => (s.tier2ModulesCrafted||0) >= 3, progress: s => [Math.min(3, s.tier2ModulesCrafted||0), 3], reward:{erz:10000,kristalle:6000,deuterium:2500,credits:350}, xpReward:350 },
     { key:'allresearch', name:'Wissenschaftler', desc:'Erforsche alle verfügbaren Technologien.', check: s => RESEARCH_DEFS.every(r => s.research[r.key]), progress: s => [RESEARCH_DEFS.filter(r=>s.research[r.key]).length, RESEARCH_DEFS.length] },
     { key:'firstprestige', name:'Neuanfang', desc:'Führe deine erste Prestige-Zurücksetzung durch.', check: s => (s.prestige||0) >= 1, progress: s => [Math.min(1,s.prestige||0), 1] },
     { key:'level10', name:'Erfahrener Kommandant', desc:'Erreiche Kommandanten-Level 10.', check: s => commanderLevel(s.xp||0) >= 10, progress: s => [Math.min(10,commanderLevel(s.xp||0)), 10] },
@@ -9888,6 +9898,7 @@
     for (const [k,v] of Object.entries(cost)) state.resources[k] -= v;
     const instKey = def.key+':'+rarity;
     state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
+    state.tier2ModulesCrafted = (state.tier2ModulesCrafted||0) + 1; // Erfolg "Modulschmied"
     log(MODULE_RARITY[rarity].label+' "'+def.name+'" gefertigt ('+Object.entries(cost).map(([k,v])=>v+' '+resDefFor(k).label).join(' + ')+') - liegt im Schiffsklassen-Modul-Inventar.', def.icon);
     playSound('build');
     render(); save();
@@ -10826,6 +10837,7 @@
       return;
     }
     state.resources.kikerne -= KI_INTERCEPT_COST_KERNE;
+    state.tier2ConsumablesUsed = (state.tier2ConsumablesUsed||0) + 1; // Erfolg "Verbrauchsstratege"
     log('KI-Abfangautomatik: Abfangdrohnen haben die Piraten-Trümmerräuber bei '+planetDisplayName(raid.planetKey)+' vertrieben ('+KI_INTERCEPT_COST_KERNE+' KI-Kerne verbraucht). Das Trümmerfeld bleibt erhalten.', 'ti-shield-lock');
     pushReport({ type:'pirate-debris-raid', result:'ki-intercept', targetPlanet: raid.planetKey, fleet: raid.fleet, kikerneUsed: KI_INTERCEPT_COST_KERNE });
     state.pirateDebrisRaid = null;
@@ -20559,6 +20571,7 @@
     const cost = terraformBoostCost(job);
     if ((state.resources.hochenergiekristalle||0) < cost){ log('Nicht genug Hochenergiekristalle für den Energieschub ('+cost+' benötigt) - das Kristalllabor stellt sie her.', 'ti-alert-triangle'); return; }
     state.resources.hochenergiekristalle -= cost;
+    state.tier2ConsumablesUsed = (state.tier2ConsumablesUsed||0) + 1; // Erfolg "Verbrauchsstratege"
     const cut = Math.round(job.totalDuration*1000*TERRAFORM_BOOST_FRAC);
     job.endTime = Math.max(Date.now(), job.endTime - cut);
     job.boostsUsed = used + 1;
@@ -21491,6 +21504,7 @@
     // Hochenergie-Ladung (19.07.2026): der Server bucht die Munition ab (25 HEK je Schuss) und
     // meldet den neuen Bestand zurück - lokal übernehmen, damit Anzeige und Server nicht driften.
     if (typeof data.newHochenergiekristalle === 'number') state.resources.hochenergiekristalle = data.newHochenergiekristalle;
+    if (data.ammoUsed) state.tier2ConsumablesUsed = (state.tier2ConsumablesUsed||0) + 1; // Erfolg "Verbrauchsstratege" (Belagerungs-Ladung)
     const { destroyed, chancePct, battlePoints: bp, targetMoonName } = data;
     if (destroyed) state.moonSiegesWon = (state.moonSiegesWon||0)+1;
     logScoreChange(bp*3, (destroyed?'Mond '+targetMoonName+' ZERSTÖRT':'Mondbelagerung gegen '+targetMoonName+' abgewehrt')+' (+'+bp+' Kampfpunkte)', 'ti-sword');
@@ -24035,6 +24049,7 @@
     state.resources.quantenchips -= QUANTENSENSOR_COST_CHIPS;
     state.buffs = state.buffs||[];
     state.buffs.push({ kind:'expsensor', expiresAt: Date.now()+QUANTENSENSOR_DURATION_MS, source:'quantensensor' });
+    state.tier2ConsumablesUsed = (state.tier2ConsumablesUsed||0) + 1; // Erfolg "Verbrauchsstratege"
     log('Quantensensoren kalibriert ('+QUANTENSENSOR_COST_CHIPS+' Quantenchips): Expeditionen, die in den nächsten 30 Minuten starten, haben deutlich bessere Fundchancen.', 'ti-sparkles');
     playSound('build');
     render(); save();
