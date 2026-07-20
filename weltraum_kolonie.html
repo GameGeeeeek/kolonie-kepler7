@@ -947,6 +947,23 @@
     .research-done { border-color:var(--c-secondary-dark) !important; background:rgba(var(--secondary-dark-rgb), 0.14) !important; box-shadow:var(--glow-ok) !important; }
     .research-locked { opacity:0.5; }
     .badge-done { font-size:10.5px; color:var(--c-secondary); display:flex; align-items:center; gap:4px; }
+    /* Erfolge: Übersichts-/Rangheader + Kategorie-Unterteilung (20.07.2026) */
+    .ach-summary { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px 14px; margin-bottom:14px;
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+    .ach-sum-top { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+    .ach-rank { font-family:var(--font-mono, monospace); font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+      padding:5px 11px; border:1.5px solid currentColor; border-radius:8px; display:inline-flex; align-items:center; gap:6px;
+      clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+    .ach-sum-nums { font-size:12.5px; color:#c7cbe0; }
+    .ach-sum-nums b { color:#f4f3ff; font-variant-numeric:tabular-nums; }
+    .ach-cat-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:16px 0 7px; padding-bottom:5px;
+      border-bottom:1px solid rgba(255,255,255,0.08); }
+    .ach-cat-title { display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; letter-spacing:0.4px; color:#c3bef5; text-transform:uppercase; }
+    .ach-cat-count { font-family:var(--font-mono, monospace); font-size:11px; font-weight:700; color:#7d8199; font-variant-numeric:tabular-nums;
+      padding:2px 8px; border:1px solid rgba(255,255,255,0.12); border-radius:20px; }
+    .ach-cat-count.ach-cat-full { color:var(--c-secondary); border-color:var(--c-secondary-dark); background:rgba(var(--secondary-dark-rgb),0.14); }
+    .ach-pts { font-family:var(--font-mono, monospace); font-size:9.5px; font-weight:700; color:#fac775; background:rgba(250,199,117,0.13);
+      border:0.5px solid rgba(250,199,117,0.35); border-radius:5px; padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
 
     .planet-switch { display:flex; gap:6px; margin-bottom:1rem; flex-wrap:wrap; }
     .planet-pill { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:10px; padding:6px 12px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; }
@@ -3347,8 +3364,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.160.0';
+  const VERSION = '8.161.0';
   const PATCHNOTES = [
+    { version:'8.161.0', date:'20.07.2026', changes:[
+      'Erfolge überarbeitet: Die Erfolgsliste ist jetzt nach Kategorien gegliedert (Aufbau & Wirtschaft, Forschung & Technik, Krieg & Kampf, Erkundung & Expansion, Handel & Diplomatie, Allianz & Gemeinschaft, Prestige & Meisterschaft) mit eigenem Fortschrittszähler pro Kategorie. Offene Erfolge stehen oben, erledigte rutschen ans Kategorieende',
+      'Neu: Erfolgspunkte & Erfolgsjäger-Rang - jeder Erfolg bringt je nach Schwierigkeit 10-50 Punkte. Ein Übersichts-Header zeigt Gesamtfortschritt, gesammelte Punkte und deinen Rang (Neuling → Sammler → Veteran → Meister → Großmeister → Legende) samt Restpunkten bis zur nächsten Stufe. Reines Prestige-Showcase ohne Wirtschafts-Bonus (bewusst, um Balance-Explosionen zu vermeiden)',
+    ]},
     { version:'8.160.0', date:'20.07.2026', changes:[
       'Neu: Störmanöver (Sabotage) - mit einem Spionagekreuzer lässt sich im Spielerprofil (Menü "···") eine verdeckte Sabotage gegen andere Spieler ausführen. Bei Erfolg stiehlst du ohne Flottenkampf eine kleine, gedeckelte Ressourcenmenge (4-8%, viel weniger als ein echter Angriff), pro Ziel mit 2-Stunden-Abklingzeit. Die Erfolgschance sinkt mit der Spionageabwehr-Forschung des Ziels (85% bis 25%) - Spionageabwehr schützt jetzt also auch vor Sabotage. Serverseitig aufgelöst und gehärtet; das Ziel wird benachrichtigt',
     ]},
@@ -8882,6 +8903,50 @@
     { key:'eventship1', name:'Ereignis-Pilot', desc:'Schalte dein erstes Event-Schiff frei.', check: s => EVENT_CALENDAR.some(e => e.shipKey && (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.some(e=>e.shipKey && (s.unlocked||{})[e.shipKey])?1:0, 1] },
     { key:'eventship_all', name:'Event-Sammler', desc:'Schalte alle bisherigen Event-Schiffe frei.', check: s => EVENT_CALENDAR.filter(e=>e.shipKey).every(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.filter(e=>e.shipKey && (s.unlocked||{})[e.shipKey]).length, EVENT_CALENDAR.filter(e=>e.shipKey).length], reward:{erz:6000,kristalle:4000,deuterium:2000,credits:250}, xpReward:250 }
   ];
+  // Erfolgs-Kategorien (20.07.2026, "Erfolge vertiefen"): rein additive Klassifikation per Key-Map,
+  // damit die ~63 Erfolge nicht mehr als undifferenzierte Flachliste erscheinen. Keys, die hier fehlen,
+  // landen automatisch in 'sonstige' ("Weitere") - neue Erfolge müssen also nicht zwingend eingetragen
+  // werden. Reihenfolge = Anzeigereihenfolge der Kategorien.
+  const ACH_CAT_DEFS = [
+    { id:'aufbau',    name:'Aufbau & Wirtschaft',    icon:'ti-building-factory-2' },
+    { id:'forschung', name:'Forschung & Technik',    icon:'ti-flask' },
+    { id:'krieg',     name:'Krieg & Kampf',          icon:'ti-sword' },
+    { id:'expansion', name:'Erkundung & Expansion',  icon:'ti-map-2' },
+    { id:'handel',    name:'Handel & Diplomatie',    icon:'ti-truck' },
+    { id:'allianz',   name:'Allianz & Gemeinschaft', icon:'ti-users' },
+    { id:'meister',   name:'Prestige & Meisterschaft', icon:'ti-award' },
+    { id:'sonstige',  name:'Weitere',                icon:'ti-star' }
+  ];
+  const ACH_CAT = {
+    firstbuild:'aufbau', firstcolony:'aufbau', nanopionier:'aufbau', industriemagnat:'aufbau', kettenmeister:'aufbau', verbrauchsstratege:'aufbau', modulschmied:'aufbau', terraform1:'aufbau', terraform10:'aufbau', erdweltmaster:'aufbau', leerenweltmaster:'aufbau', colonizer10:'aufbau', allcolonyslots:'aufbau', credits5k:'aufbau', planetrole:'aufbau', allroles:'aufbau',
+    allresearch:'forschung', allresearchmax:'forschung', allexotic:'forschung', skilltreemax:'forschung', forschungsnexus:'forschung', allmegaprojects:'forschung', module1:'forschung', module_legendary:'forschung',
+    tenkills:'krieg', bossdown:'krieg', abyssdown:'krieg', nyradown:'krieg', allbosses:'krieg', moonsiegewin:'krieg', basewarwin:'krieg', warvictor:'krieg', allveteran:'krieg',
+    allsystems:'expansion', explorer25:'expansion', conquer1:'expansion', conquer5:'expansion',
+    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', shop5:'handel',
+    allianzweltprojekt:'allianz', allianzausbau100:'allianz', allianzeinsatz:'allianz', allianceraidkill:'allianz',
+    firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister'
+  };
+  function achCat(key){ return ACH_CAT[key] || 'sonstige'; }
+  // Erfolgspunkte: aus der Schwierigkeit abgeleitet (vorhandene Belohnungsgröße als Proxy - schwere
+  // Endgame-Erfolge tragen xpReward/reward, leichte nicht). Kein neues Tracking nötig, wirkt sofort
+  // rückwirkend für jeden Spielstand. Summe der freigeschalteten Punkte treibt den Erfolgsjäger-Rang.
+  function achPoints(a){
+    if ((a.xpReward||0) >= 800) return 50;
+    if ((a.xpReward||0) >= 400) return 30;
+    if ((a.xpReward||0) >= 150 || a.reward) return 20;
+    return 10;
+  }
+  // Erfolgsjäger-Ränge (reines Meta-Showcase aus der Punktesumme, keine Balance-Wirkung auf die
+  // Wirtschaft - bewusst, um dem "N Minuten Produktion"-Explosionsmuster auszuweichen).
+  const ACH_RANKS = [
+    { min:0,    name:'Neuling',      color:'#8a8f9e' },
+    { min:100,  name:'Sammler',      color:'#c08a4a' },
+    { min:250,  name:'Veteran',      color:'#c7ccd6' },
+    { min:450,  name:'Meister',      color:'#fac775' },
+    { min:700,  name:'Großmeister',  color:'#9fe1cb' },
+    { min:1000, name:'Legende',      color:'#f0997b' }
+  ];
+  function achRank(points){ let r = ACH_RANKS[0]; for (const x of ACH_RANKS){ if (points >= x.min) r = x; } return r; }
   // Titel: automatisch aus dem prestigeträchtigsten freigeschalteten Erfolg abgeleitet (keine neue
   // Verfolgung nötig, nutzt einfach die bestehenden Erfolge). Reihenfolge = Priorität, oben gewinnt.
   const TITLE_MAP = [
@@ -29026,26 +29091,63 @@
       }).join('');
     }
     const achBox = document.getElementById('achievementsList');
-    if (achBox) achBox.innerHTML = ACHIEVEMENTS.map(a => {
-      const done = !!state.achievements[a.key];
-      let progressHtml = '';
-      if (!done && a.progress){
-        try {
-          const [cur, target] = a.progress(state);
-          const pct = target>0 ? Math.min(100, Math.round((cur/target)*100)) : 0;
-          if (target > 1) progressHtml = `<div class="progress-outer" style="margin-top:5px; height:5px;"><div class="progress-inner" style="width:${pct}%;"></div></div><div class="bmeta" style="font-size:10px; margin-top:2px;">${fmt(cur)}/${fmt(target)}</div>`;
-        } catch(e){}
-      }
-      return `
-        <div class="card-row ${done?'research-done':''}">
-          <div class="left">
-            <div class="bicon" style="background:${done?'rgba(29,158,117,0.2)':'rgba(255,255,255,0.05)'}; color:${done?'#5dcaa5':'#6b6f85'};"><i class="ti ${done?'ti-medal':'ti-lock'}" aria-hidden="true"></i></div>
-            <div style="min-width:0; flex:1;"><div class="bname">${a.name}</div><div class="bmeta">${a.desc}</div>${progressHtml}</div>
+    if (achBox){
+      const doneMap = state.achievements || {};
+      let earnedPts = 0, maxPts = 0, doneCount = 0;
+      const byCat = {};
+      ACHIEVEMENTS.forEach(a => {
+        const p = achPoints(a);
+        maxPts += p;
+        if (doneMap[a.key]){ earnedPts += p; doneCount++; }
+        const c = achCat(a.key);
+        (byCat[c] = byCat[c] || []).push(a);
+      });
+      const total = ACHIEVEMENTS.length;
+      const overallPct = total > 0 ? Math.round((doneCount/total)*100) : 0;
+      const rank = achRank(earnedPts);
+      const nextRank = ACH_RANKS.find(r => r.min > earnedPts);
+      let html = `
+        <div class="ach-summary">
+          <div class="ach-sum-top">
+            <div class="ach-rank" style="color:${rank.color};"><i class="ti ti-trophy" aria-hidden="true"></i>${rank.name}</div>
+            <div class="ach-sum-nums"><b>${doneCount}</b>/${total} Erfolge · <b style="color:#fac775;">${earnedPts}</b>/${maxPts} Punkte</div>
           </div>
-          ${done ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Erledigt</span>` : ''}
+          <div class="progress-outer" style="height:8px;"><div class="progress-inner" style="width:${overallPct}%;"></div></div>
+          <div class="bmeta" style="font-size:10px; margin-top:4px;">${nextRank ? `Noch <b style="color:${nextRank.color};">${nextRank.min-earnedPts}</b> Punkte bis zum Rang „${nextRank.name}"` : 'Höchster Rang erreicht — Legende der Kolonie!'}</div>
         </div>
       `;
-    }).join('');
+      const renderAch = a => {
+        const done = !!doneMap[a.key];
+        const pts = achPoints(a);
+        let progressHtml = '';
+        if (!done && a.progress){
+          try {
+            const [cur, target] = a.progress(state);
+            const pct = target>0 ? Math.min(100, Math.round((cur/target)*100)) : 0;
+            if (target > 1) progressHtml = `<div class="progress-outer" style="margin-top:5px; height:5px;"><div class="progress-inner" style="width:${pct}%;"></div></div><div class="bmeta" style="font-size:10px; margin-top:2px;">${fmt(cur)}/${fmt(target)}</div>`;
+          } catch(e){}
+        }
+        return `
+          <div class="card-row ${done?'research-done':''}">
+            <div class="left">
+              <div class="bicon" style="background:${done?'rgba(29,158,117,0.2)':'rgba(255,255,255,0.05)'}; color:${done?'#5dcaa5':'#6b6f85'};"><i class="ti ${done?'ti-medal':'ti-lock'}" aria-hidden="true"></i></div>
+              <div style="min-width:0; flex:1;"><div class="bname">${a.name}<span class="ach-pts">${pts}P</span></div><div class="bmeta">${a.desc}</div>${progressHtml}</div>
+            </div>
+            ${done ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Erledigt</span>` : ''}
+          </div>
+        `;
+      };
+      ACH_CAT_DEFS.forEach(cat => {
+        const list = byCat[cat.id];
+        if (!list || !list.length) return;
+        const cDone = list.filter(a => doneMap[a.key]).length;
+        // offene Erfolge zuerst, erledigte ans Kategorieende (stabil, Reihenfolge sonst beibehalten)
+        const sorted = list.slice().sort((a,b) => (doneMap[a.key]?1:0) - (doneMap[b.key]?1:0));
+        html += `<div class="ach-cat-head"><div class="ach-cat-title"><i class="ti ${cat.icon}" aria-hidden="true"></i>${cat.name}</div><span class="ach-cat-count ${cDone===list.length?'ach-cat-full':''}">${cDone}/${list.length}</span></div>`;
+        html += sorted.map(renderAch).join('');
+      });
+      achBox.innerHTML = html;
+    }
 
     const traderBox = document.getElementById('traderBox');
     if (traderBox){
