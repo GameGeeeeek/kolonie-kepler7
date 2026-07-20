@@ -3377,8 +3377,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.167.0';
+  const VERSION = '8.168.0';
   const PATCHNOTES = [
+    { version:'8.168.0', date:'20.07.2026', changes:[
+      'Grafik: Die Preisverlauf-Kurven am Markt haben jetzt eine weich auslaufende Flächenfüllung (Verlaufsgradient in der Ressourcenfarbe) und einen betonten Endpunkt mit Halo - der Trend ist auf einen Blick besser ablesbar.',
+      'Grafik: Die Erfolgsübersicht ist an deinen Erfolgsjäger-Rang gekoppelt - der Gesamtfortschrittsbalken und das Rang-Emblem leuchten jetzt in der Rangfarbe (Bronze → … → Legenden-Orange).',
+    ]},
     { version:'8.167.0', date:'20.07.2026', changes:[
       'Feinschliff Limit-Orders: Beim Wechsel der Ressource im Order-Formular aktualisieren sich der „Aktueller Preis"-Hinweis und die vorgeschlagene Preisschwelle jetzt sofort (statt erst, nachdem man das Auswahlfeld verlässt) - passend zur gerade gewählten Ressource',
     ]},
@@ -7910,9 +7914,14 @@
   const marketTradeAmounts = {};
   // Kleiner Preisverlaufs-Chart (Markt-Vertiefung 20.07.2026): normalisiert die letzten Preispunkte
   // (vom Backend geliefert, market[key].history) auf eine kompakte SVG-Linie mit betontem Endpunkt.
+  // Grafik-Aufwertung (v8.168.0): statt einer nackten Linie jetzt eine weich auslaufende Flächen-
+  // füllung (Verlaufsgradient in der Ressourcenfarbe) plus betonter Endpunkt mit Halo - liest den
+  // Preistrend deutlich schneller (Dataviz-Prinzip Fläche+Endpunkt). Jede Sparkline braucht eine
+  // eigene Gradient-ID (mehrere gleichzeitig im DOM).
+  let sparkGradSeq = 0;
   function marketSparkline(hist, color){
     if (!Array.isArray(hist) || hist.length < 2) return '';
-    const W = 104, H = 26, pad = 3;
+    const W = 108, H = 30, pad = 3;
     const min = Math.min(...hist), max = Math.max(...hist);
     const range = (max - min) || 1;
     const n = hist.length;
@@ -7921,9 +7930,17 @@
       const y = pad + (1-(hist[i]-min)/range)*(H-2*pad);
       return [x, y];
     };
-    const pts = hist.map((v,i) => xy(i).map(z=>z.toFixed(1)).join(',')).join(' ');
+    const linePts = hist.map((v,i) => xy(i).map(z=>z.toFixed(1)).join(',')).join(' ');
     const [lx, ly] = xy(n-1);
-    return `<svg class="mkt-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2" fill="${color}"/></svg>`;
+    const areaPts = `${pad.toFixed(1)},${(H-pad).toFixed(1)} ${linePts} ${(W-pad).toFixed(1)},${(H-pad).toFixed(1)}`;
+    const gid = 'spg'+(++sparkGradSeq);
+    return `<svg class="mkt-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" aria-hidden="true">`
+      + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.34"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`
+      + `<polygon points="${areaPts}" fill="url(#${gid})" stroke="none"/>`
+      + `<polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`
+      + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.4" fill="${color}" opacity="0.22"/>`
+      + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="1.9" fill="${color}"/>`
+      + `</svg>`;
   }
   // Entwurfszustand des Limit-Order-Formulars (nur UI, nicht gespeichert).
   const limitOrderDraft = { side:'sell', resource:'erz', amount:100, threshold:0 };
@@ -29365,10 +29382,10 @@
       let html = `
         <div class="ach-summary">
           <div class="ach-sum-top">
-            <div class="ach-rank" style="color:${rank.color};"><i class="ti ti-trophy" aria-hidden="true"></i>${rank.name}</div>
+            <div class="ach-rank" style="color:${rank.color}; text-shadow:0 0 12px ${rank.color}66;"><i class="ti ti-trophy" aria-hidden="true"></i>${rank.name}</div>
             <div class="ach-sum-nums"><b>${doneCount}</b>/${total} Erfolge · <b style="color:#fac775;">${earnedPts}</b>/${maxPts} Punkte</div>
           </div>
-          <div class="progress-outer" style="height:8px;"><div class="progress-inner" style="width:${overallPct}%;"></div></div>
+          <div class="progress-outer" style="height:8px;"><div class="progress-inner" style="width:${overallPct}%; background:linear-gradient(90deg, ${rank.color}, ${rank.color}aa);"></div></div>
           <div class="bmeta" style="font-size:10px; margin-top:4px;">${nextRank ? `Noch <b style="color:${nextRank.color};">${nextRank.min-earnedPts}</b> Punkte bis zum Rang „${nextRank.name}"` : 'Höchster Rang erreicht — Legende der Kolonie!'}</div>
         </div>
       `;
