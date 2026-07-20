@@ -584,6 +584,12 @@
     .tab-btn.active .tab-icon-badge { box-shadow:inset 2px 2px 4px rgba(0,0,0,0.6), inset -2px -2px 4px rgba(255,255,255,0.08); }
     .tab-badge { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--c-danger); box-shadow:0 0 6px var(--c-danger); animation: badgePulse 1.6s ease-in-out infinite; }
     @keyframes badgePulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    /* Ganzer Tab pulsiert rot als "hier ist etwas Dringendes" (20.07.2026, Spieler-Wunsch nach dem
+       kleinen Badge-Punkt: "soll rot pulsieren quasi als Benachrichtigungsfunktion") - wiederverwendet
+       dieselbe expandierende Ring-Optik wie .raid-banner (raidPulse), diesmal direkt am Tab-Button statt
+       an einer Box im Inhaltsbereich, damit es auch von JEDEM anderen Tab aus auffällt. */
+    .tab-btn.tab-btn-alert { border-color:var(--c-danger); color:#ffb4b4; animation: raidPulse 1.6s ease-in-out infinite; }
+    .tab-btn.tab-btn-alert.active { border-color:var(--c-danger); }
     #headerReportsIcon.reports-glow { animation: iconPulse 1.6s ease-in-out infinite; }
     #headerReportsBtn.active, #headerProfileBtn.active, #headerHelpBtn.active { background:rgba(var(--primary-rgb), 0.3); border-color:var(--c-primary); }
     @keyframes iconPulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
@@ -1633,11 +1639,11 @@
         <div id="festungBox"></div>
         <div id="abhorchpostenBox"></div>
         <div class="card-row" id="autoReinforceRow" style="cursor:pointer; margin-top:0.75rem;">
-          <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-shield-lock" aria-hidden="true"></i></div><div><div class="bname">Automatische Verstärkung</div><div class="bmeta" id="autoReinforceLabel">Aus – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten</div></div></div>
+          <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-shield-lock" aria-hidden="true"></i></div><div><div class="bname">Automatische Verstärkung</div><div class="bmeta" id="autoReinforceLabel">Aus – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten (3 KI-Kerne je Einsatz)</div></div></div>
           <div class="toggle-switch" id="autoReinforceSwitch"><div class="toggle-knob"></div></div>
         </div>
         <div class="card-row" id="autoRepairRow" style="cursor:pointer; margin-top:0.5rem;">
-          <div class="left"><div class="bicon" style="background:rgba(224,165,72,0.18); color:#e0a548;"><i class="ti ti-refresh" aria-hidden="true"></i></div><div><div class="bname">Automatische Reparatur</div><div class="bmeta" id="autoRepairLabel">Aus – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle statt 15 Min. zu warten</div></div></div>
+          <div class="left"><div class="bicon" style="background:rgba(224,165,72,0.18); color:#e0a548;"><i class="ti ti-refresh" aria-hidden="true"></i></div><div><div class="bname">Automatische Reparatur</div><div class="bmeta" id="autoRepairLabel">Aus – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne statt 15 Min. zu warten</div></div></div>
           <div class="toggle-switch" id="autoRepairSwitch"><div class="toggle-knob"></div></div>
         </div>
         <div class="card-row" id="autoWatchLiveRaidRow" style="cursor:pointer; margin-top:0.5rem;">
@@ -3203,8 +3209,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.151.0';
+  const VERSION = '8.152.0';
   const PATCHNOTES = [
+    { version:'8.152.0', date:'20.07.2026', changes:[
+      'Leerenriss-Benachrichtigung weiter verstärkt (Spieler-Wunsch direkt nach dem Badge-Punkt): der gesamte "Verteidigung"-Tab pulsiert jetzt rot, solange ein Riss offen ist - fällt auch beiläufig auf, ohne genau hinsehen zu müssen',
+      'Automatische Verstärkung und Automatische Reparatur kosten jetzt zusätzlich KI-Kerne (Spieler-Wunsch, gleiche Automatik-Familie wie die bestehende KI-Abfangautomatik): je 3 KI-Kerne pro Einsatz. Reicht der Vorrat nicht, unterbleibt der automatische Eingriff und es wird einmalig darauf hingewiesen - beide Schalter-Beschreibungen im Verteidigung-Tab zeigen jetzt Kosten und aktuellen Vorrat'
+    ]},
     { version:'8.151.0', date:'20.07.2026', changes:[
       'Leerenriss-Ereignisse deutlich auffälliger gemacht (Spieler-Feedback "habe gar nicht mitbekommen dass das Event ist"): der Verteidigung-Tab bekommt jetzt ein pulsierendes rotes Badge, sobald ein Riss offen ist - bleibt sichtbar, solange Handlungsbedarf besteht, nicht nur für ein paar Sekunden wie der Kurzhinweis. Der Meldungs-Toast beim Öffnen ist jetzt zusätzlich rot umrandet (kritischer Schweregrad statt neutral) und nennt direkt die verbleibende Zeit zum Schließen'
     ]},
@@ -10936,6 +10946,9 @@
   // Schalter automatisch die Hälfte der verfügbaren Kampfschiffe der stärksten ANDEREN Kolonie zum
   // bedrohten Planeten – sofern die Verlegung rechtzeitig vor dem Überfall ankommen würde. Nur einmal
   // pro erkanntem Überfall (reinforceSent-Flag), damit nicht bei jedem Tick erneut verlegt wird.
+  // Kostet KI-Kerne (20.07.2026, Spieler-Wunsch, gleiche Automatik-Familie wie KI-Abfangautomatik) -
+  // die Koordination der Verlegung läuft über dieselbe KI-Infrastruktur.
+  const AUTO_REINFORCE_COST_KERNE = 3;
   function maybeAutoReinforce(){
     if (!state.autoReinforceOn || !state.incomingRaid || state.incomingRaid.reinforceSent) return;
     const targetPlanet = state.incomingRaid.planet;
@@ -10958,11 +10971,16 @@
     const relevantKeys = Object.keys(best.avail).filter(k => best.avail[k] > 0);
     const dur = relocationDuration(best.planet, targetPlanet, relevantKeys[0]);
     if (dur*1000 >= remainMs) return; // würde nicht rechtzeitig ankommen
+    if ((state.resources.kikerne||0) < AUTO_REINFORCE_COST_KERNE){
+      log('Automatische Verstärkung: nicht genug KI-Kerne ('+AUTO_REINFORCE_COST_KERNE+' benötigt) - die Verlegung muss manuell erfolgen.', 'ti-alert-triangle');
+      return;
+    }
     const amounts = {};
     for (const k of relevantKeys) amounts[k] = Math.max(1, Math.floor(best.avail[k]*0.5));
+    state.resources.kikerne -= AUTO_REINFORCE_COST_KERNE;
     state.incomingRaid.reinforceSent = true;
     relocateFleetGroup(best.planet, targetPlanet, amounts);
-    log('Automatische Verstärkung: Kampfschiffe von '+planetDisplayName(best.planet)+' nach '+planetDisplayName(targetPlanet)+' unterwegs, um dem erkannten Überfall zu begegnen.', 'ti-shield-lock');
+    log('Automatische Verstärkung: Kampfschiffe von '+planetDisplayName(best.planet)+' nach '+planetDisplayName(targetPlanet)+' unterwegs, um dem erkannten Überfall zu begegnen ('+AUTO_REINFORCE_COST_KERNE+' KI-Kerne verbraucht).', 'ti-shield-lock');
   }
   function defenseBreakdownFor(planetKey){
     const b = buildingSetFor(planetKey);
@@ -12953,8 +12971,11 @@
   // Riss geschlossen oder kollabiert ist.
   function updateVoidRiftTabBadge(){
     const badge = document.getElementById('voidRiftTabBadge');
-    if (!badge) return;
-    badge.style.display = state.voidRift ? 'block' : 'none';
+    if (badge) badge.style.display = state.voidRift ? 'block' : 'none';
+    // Spieler-Wunsch als direkte Weiterentwicklung des Punkt-Badges: der GANZE Tab pulsiert rot, nicht
+    // nur ein kleiner Punkt - fällt auch beiläufig auf, ohne genau hinsehen zu müssen.
+    const tabBtn = document.querySelector('.tab-btn[data-tab="verteidigung"]');
+    if (tabBtn) tabBtn.classList.toggle('tab-btn-alert', !!state.voidRift);
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
@@ -14790,8 +14811,8 @@
       { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator (Stufe 1-8), dann Galaktische Legende 1-12 (Stufe 9-20), Sternenherrscher 1-12 (Stufe 21-32), Kosmischer Souverän 1-12 (Stufe 33-44) und ab Stufe 45 zählt "Kosmischer Souverän" endlos weiter hoch. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
-      { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Im Verteidigung-Tab an-/abschaltbar.' },
-      { title:'Automatische Reparatur', body:'Behebt Sabotage nach einem verlorenen Überfall sofort gegen 300 Erz + 150 Kristalle, statt 15 Minuten auf das automatische Ende zu warten.' },
+      { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Kostet 3 KI-Kerne je Einsatz (gleiche Automatik-Familie wie KI-Abfangautomatik) - reicht der Vorrat nicht, unterbleibt die Verlegung und du musst manuell reagieren. Im Verteidigung-Tab an-/abschaltbar.' },
+      { title:'Automatische Reparatur', body:'Behebt Sabotage nach einem verlorenen Überfall sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne, statt 15 Minuten auf das automatische Ende zu warten. Reicht der KI-Kerne-Vorrat nicht, bleibt die Sabotage bis zum manuellen Beheben oder Ablaufen aktiv.' },
       { title:'Live-Kampf-Wiedergabe', body:'Steuert, ob sich die Kampf-Wiedergabe automatisch öffnet, sobald ein Überfall abläuft, während man aktiv im Spiel ist. Standardmäßig an, im Verteidigung-Tab abschaltbar.' },
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
@@ -22340,14 +22361,25 @@
   }
   // Automatische Reparatur: löst bei aktiviertem Schalter eine laufende Sabotage (mineDebuff nach
   // verlorenem Überfall) sofort gegen Ressourcen ab, statt die vollen 15 Minuten Produktionsminus
-  // abzuwarten.
+  // abzuwarten. Kostet zusätzlich KI-Kerne (20.07.2026, Spieler-Wunsch, gleiche Automatik-Familie wie
+  // KI-Abfangautomatik/Auto-Verstärkung) - läuft jeden Tick, solange die Sabotage aktiv ist, daher
+  // "einmalig warnen"-Flag am Debuff selbst statt bei jedem Tick erneut zu loggen.
+  const AUTO_REPAIR_COST_KERNE = 3;
   function maybeAutoRepair(){
     if (!state.autoRepairOn || !state.mineDebuff) return;
     const cost = { erz: 300, kristalle: 150 };
     if (!canAfford(cost)) return;
+    if ((state.resources.kikerne||0) < AUTO_REPAIR_COST_KERNE){
+      if (!state.mineDebuff.kikerneWarned){
+        state.mineDebuff.kikerneWarned = true;
+        log('Automatische Reparatur: nicht genug KI-Kerne ('+AUTO_REPAIR_COST_KERNE+' benötigt) - die Sabotage muss von selbst auslaufen oder manuell behoben werden.', 'ti-alert-triangle');
+      }
+      return;
+    }
     pay(cost);
+    state.resources.kikerne -= AUTO_REPAIR_COST_KERNE;
     const def = BUILDING_DEFS.find(d=>d.key===state.mineDebuff.key);
-    log('Automatische Reparatur: Sabotage an '+(def?def.name:'einem Gebäude')+' behoben ('+costHtml(cost)+').', 'ti-refresh');
+    log('Automatische Reparatur: Sabotage an '+(def?def.name:'einem Gebäude')+' behoben ('+costHtml(cost)+' + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne).', 'ti-refresh');
     state.mineDebuff = null;
     render(); save();
   }
@@ -28104,7 +28136,7 @@
     const autoReinforceSwitch = document.getElementById('autoReinforceSwitch');
     if (autoReinforceSwitch) autoReinforceSwitch.classList.toggle('on', !!state.autoReinforceOn);
     const autoReinforceLabel = document.getElementById('autoReinforceLabel');
-    if (autoReinforceLabel) autoReinforceLabel.textContent = state.autoReinforceOn ? 'An – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten' : 'Aus – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten';
+    if (autoReinforceLabel) autoReinforceLabel.textContent = (state.autoReinforceOn ? 'An' : 'Aus') + ' – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten ('+AUTO_REINFORCE_COST_KERNE+' KI-Kerne je Einsatz; Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
 
     const kiInterceptRow = document.getElementById('kiInterceptRow');
     if (kiInterceptRow){
@@ -28118,7 +28150,7 @@
     const autoRepairSwitch = document.getElementById('autoRepairSwitch');
     if (autoRepairSwitch) autoRepairSwitch.classList.toggle('on', !!state.autoRepairOn);
     const autoRepairLabel = document.getElementById('autoRepairLabel');
-    if (autoRepairLabel) autoRepairLabel.textContent = state.autoRepairOn ? 'An – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle statt 15 Min. zu warten' : 'Aus – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle statt 15 Min. zu warten';
+    if (autoRepairLabel) autoRepairLabel.textContent = (state.autoRepairOn ? 'An' : 'Aus') + ' – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne statt 15 Min. zu warten (Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
     const autoWatchLiveRaidSwitch = document.getElementById('autoWatchLiveRaidSwitch');
     if (autoWatchLiveRaidSwitch) autoWatchLiveRaidSwitch.classList.toggle('on', !!state.autoWatchLiveRaid);
     const autoWatchLiveRaidLabel = document.getElementById('autoWatchLiveRaidLabel');
