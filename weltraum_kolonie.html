@@ -3129,8 +3129,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.137.0';
+  const VERSION = '8.138.0';
   const PATCHNOTES = [
+    { version:'8.138.0', date:'20.07.2026', changes:[
+      'Quality-of-Life-Runde (2/2, Vorschlagsrunde): "Flotten-Vorlagen" bei der Angriffsauswahl (Galaxie-Tab) - aktuelle Schiffsauswahl unter einem Namen speichern und später per Klick wieder anwenden, gekappt auf die am jeweiligen Standort tatsächlich verfügbare Menge',
+      'Nebenbei behoben: die "+1"/"Max"/"Alle Kampfschiffe"-Knöpfe der Angriffsauswahl berücksichtigten die Handelsrouten-Bindung von Frachtern nicht konsistent (der Kappungs-Code war an drei Stellen leicht unterschiedlich dupliziert) - jetzt eine gemeinsame Funktion (attackAvailableByType) für alle Stellen inkl. der neuen Vorlagen'
+    ]},
     { version:'8.137.0', date:'20.07.2026', changes:[
       'Quality-of-Life-Runde (1/2, Vorschlagsrunde): Kampfberichte mit eigenen Schiffsverlusten bekommen den Knopf "Verluste nachbauen" - reiht alle verlorenen Schiffstypen passend am aktuellen Standort in die Bauwarteschlange ein (itemgebundene Einheiten und bereits maximal ausgebaute Typen werden übersprungen, mit Hinweis)',
       'Tagesaufgaben-Leiste: Sammel-Knopf "Alle abholen" erscheint, sobald mindestens zwei Aufgaben gleichzeitig fertig sind, und holt sie in einem Rutsch ab (Belohnungs- und Streak-Bonus-Logik unverändert, nur einmaliges Neuzeichnen statt pro Aufgabe)',
@@ -8592,7 +8596,7 @@
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
     scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, expeditionsCompleted: 0, themeKey: 'standard',
-    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {},
+    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [],
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
     research: {},
@@ -9017,7 +9021,11 @@
   // Kampfflotte, damit sich das bisherige automatische Verhalten nicht ungefragt ändert – der Spieler
   // kann die Auswahl aber jederzeit gezielt reduzieren.
   let attackFleetSelection = {};
-  function getAttackSelection(planetKey, cf){
+  // Ausgelagert aus getAttackSelection/buildAttackFleet (20.07.2026, Vorlage für "Flotten-Vorlagen"):
+  // beide Stellen berechneten dieselbe Verfügbarkeit unabhängig voneinander - eine gemeinsame Funktion
+  // verhindert, dass sich die beiden Kopien künftig auseinanderentwickeln (gleiche Sorge wie bei jeder
+  // anderen balance-relevanten Formel in dieser Datei).
+  function attackAvailableByType(cf){
     const away = computeAwayByType(cf);
     const avail = {};
     for (const k of ATTACK_SHIP_KEYS){
@@ -9027,6 +9035,10 @@
       if (k === 'frachter') a = Math.max(0, a - frachterBoundToRoutes());
       avail[k] = a;
     }
+    return avail;
+  }
+  function getAttackSelection(planetKey, cf){
+    const avail = attackAvailableByType(cf);
     if (!attackFleetSelection[planetKey]){
       const init = {};
       for (const k of ATTACK_SHIP_KEYS) init[k] = avail[k];
@@ -9042,14 +9054,46 @@
   }
   function buildAttackFleet(planetKey, cf){
     const sel = getAttackSelection(planetKey, cf);
-    const away = computeAwayByType(cf);
+    const avail = attackAvailableByType(cf);
     const virtual = emptyFleet();
-    for (const k of ATTACK_SHIP_KEYS){
-      let avail = Math.max(0, (cf[k]||0) - (away[k]||0));
-      if (k === 'frachter') avail = Math.max(0, avail - frachterBoundToRoutes());
-      virtual[k] = Math.min(sel[k]||0, avail);
-    }
+    for (const k of ATTACK_SHIP_KEYS) virtual[k] = Math.min(sel[k]||0, avail[k]||0);
     return capFighterSelection(virtual);
+  }
+  // QoL-Vorschlag (20.07.2026, "Flotten-Vorlagen"): benannte, gespeicherte Angriffsauswahlen. Speichert
+  // absolute Schiffszahlen (wie die manuelle Auswahl selbst); beim Anwenden wird jeder Wert auf das an
+  // JENEM Standort aktuell Verfügbare gekappt (attackAvailableByType, dieselbe Kappung wie
+  // buildAttackFleet) - eine Vorlage bleibt so über Standorte und über wachsende/schrumpfende Flotten
+  // hinweg sinnvoll nutzbar, statt starr exakte Zahlen zu erzwingen, die es vielleicht nie wieder gibt.
+  function saveFleetTemplate(name){
+    const cf = currentFleet();
+    const sel = getAttackSelection(state.activeBasePlanet, cf);
+    const composition = {};
+    for (const k of ATTACK_SHIP_KEYS) if ((sel[k]||0) > 0) composition[k] = sel[k];
+    if (!Object.keys(composition).length){ log('Keine Auswahl zum Speichern - wähle zuerst Kampfschiffe aus.', 'ti-alert-triangle'); return; }
+    if (!state.fleetTemplates) state.fleetTemplates = [];
+    const trimmedName = (name||'').trim().slice(0,30) || ('Vorlage '+(state.fleetTemplates.length+1));
+    state.fleetTemplates.push({ id: Date.now()+'_'+Math.floor(Math.random()*1000), name: trimmedName, composition });
+    log('Flotten-Vorlage "'+trimmedName+'" gespeichert.', 'ti-list-details');
+    render(); save();
+  }
+  function applyFleetTemplate(id){
+    const tpl = (state.fleetTemplates||[]).find(t => t.id === id);
+    if (!tpl) return;
+    const cf = currentFleet();
+    const sel = getAttackSelection(state.activeBasePlanet, cf);
+    const avail = attackAvailableByType(cf);
+    for (const k of ATTACK_SHIP_KEYS) sel[k] = Math.min(tpl.composition[k]||0, avail[k]||0);
+    log('Flotten-Vorlage "'+tpl.name+'" angewendet.', 'ti-check');
+    render(); save();
+  }
+  function deleteFleetTemplate(id){
+    if (!state.fleetTemplates) return;
+    const idx = state.fleetTemplates.findIndex(t => t.id === id);
+    if (idx < 0) return;
+    const name = state.fleetTemplates[idx].name;
+    state.fleetTemplates.splice(idx, 1);
+    log('Flotten-Vorlage "'+name+'" gelöscht.', 'ti-trash');
+    render(); save();
   }
   // Bugfix (Spieler-Feedback 17.07.2026): Jäger/Bomber, die über die Hangar-Kapazität der in DIESER
   // Mission mitgeschickten Träger/Superschlachtschiffe hinausgehen, trugen zwar schon 0 Angriffskraft
@@ -14465,7 +14509,8 @@
       { title:'Rückzugs-Mechanik', body:'Übersteigt die eigene Verlustquote in einem Gefecht 40%, rettet sich die Hälfte des Anteils <em>oberhalb</em> dieser Schwelle rechtzeitig zurück, statt komplett zerstört zu werden. Gilt bei Überfall-Verteidigung, NPC-Angriffen und PvP-Duellen – nicht für Raider-/NPC-Flotten.' },
       { title:'Heimatbasis-Bonus', body:'Die Heimatbasis hat <strong>+20% Verteidigungspunkte</strong> gegenüber identisch ausgebauten Kolonien. Macht "Heimat verteidigen" bewusst wichtiger.' },
       { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' },
-      { title:'Verluste nachbauen', body:'Enthält ein Kampfbericht eigene Schiffsverluste, erscheint darunter der Knopf <strong>„Verluste nachbauen"</strong>: reiht alle verlorenen Schiffstypen in der passenden Menge am aktuell gewählten Standort in die Bauwarteschlange ein - zu den regulären Kosten ab dem heutigen Bestand. Seltene, itemgebundene Einheiten werden bewusst nicht automatisch nachgebaut (kein stiller Item-Verbrauch per Klick), ebenso wenig Schiffe, die bereits am Maximalbestand sind - dafür erscheint ein Hinweis.' }
+      { title:'Verluste nachbauen', body:'Enthält ein Kampfbericht eigene Schiffsverluste, erscheint darunter der Knopf <strong>„Verluste nachbauen"</strong>: reiht alle verlorenen Schiffstypen in der passenden Menge am aktuell gewählten Standort in die Bauwarteschlange ein - zu den regulären Kosten ab dem heutigen Bestand. Seltene, itemgebundene Einheiten werden bewusst nicht automatisch nachgebaut (kein stiller Item-Verbrauch per Klick), ebenso wenig Schiffe, die bereits am Maximalbestand sind - dafür erscheint ein Hinweis.' },
+      { title:'Flotten-Vorlagen', body:'Im Bereich „Angriffsflotte zusammenstellen" (Galaxie-Tab) lässt sich die aktuelle Schiffsauswahl unter einem Namen als <strong>Vorlage</strong> speichern und später mit einem Klick wieder anwenden - praktisch für wiederkehrende Zusammenstellungen wie „Nur Jäger" oder „Vollangriff ohne Frachter". Vorlagen speichern absolute Schiffszahlen, werden beim Anwenden aber immer auf die am jeweiligen Standort <strong>aktuell verfügbare</strong> Menge gekappt - sie bleiben so auch nutzbar, wenn die Flotte seither gewachsen, geschrumpft oder anderswo unterwegs ist.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
       { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes über <strong>12 Runden</strong> (Anflug → Flankenmanöver → Gefecht → Entscheidung → Rückzugsgefecht → Nachspiel) – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger, die Szene färbt sich kurz grün bzw. rot ein und Bruchstücke fliegen als Partikel-Burst nach außen. Gelegentliche <strong>kritische Treffer</strong> (größerer Einschlag, weißer Bildschirmblitz, goldene Schadenszahl) und <strong>Beinahe-Treffer</strong> (Fehlschüsse, kein Schaden), eine einmalige <strong>Alpha-Salve</strong> schwerer Schiffe (Schlachtschiff/Superschlachtschiff) in der Entscheidungsrunde, <strong>Einzelschiff-Duelle</strong> im Kampfprotokoll (nennt konkrete Schiffe statt nur "beide Seiten"), ein <strong>Spannungs-Ping</strong> vor der Entscheidungsrunde, leises <strong>Hintergrund-Ambiente</strong> das dichter wird, sichtbarer <strong>Schadenszustand</strong> bei Schiffstypen unter 25% Bestand, eine <strong>auflockernde Formation</strong> ab 50% Verlusten, <strong>Trümmerpartikel</strong> im Hintergrund die sich über den Kampf aufbauen, sowie ein Kurzfazit, welcher eigene Schiffstyp den größten Anteil an der Kampfkraft hatte. Zusätzlich: langsam driftender Sternenhintergrund, phasenabhängige Szenen-Stimmung (Farbschein je Kampfphase), Schiffe in gestaffelter Formation mit leichter Idle-Bewegung statt einer starren Reihe, und ein sanftes Eintreten der Flotten zu Kampfbeginn.' },
@@ -26734,6 +26779,20 @@
         const def = k==='superschlachtschiff' ? { name:'Superschlachtschiff', icon:'ship_superschlachtschiff' } : SHIP_DEFS.find(d=>d.key===k);
         return `<div class="chip"><span style="width:14px; height:14px; display:inline-flex;">${ICONS[def.icon]?ICONS[def.icon].replace('width="24" height="24"','width="14" height="14"'):''}</span><span class="chip-n">${attackFleet[k]}</span> ${def.name}</div>`;
       }).join('');
+      // QoL "Flotten-Vorlagen": benannte Auswahlen speichern/anwenden/löschen, siehe saveFleetTemplate/
+      // applyFleetTemplate/deleteFleetTemplate weiter oben.
+      const fleetTemplateRows = (state.fleetTemplates||[]).map(t => {
+        const partsText = Object.entries(t.composition).map(([k,v]) => v+'× '+(k==='superschlachtschiff'?'Superschlachtschiff':(SHIP_DEFS.find(d=>d.key===k)||{}).name||k)).join(', ');
+        return `<div class="card-row" style="padding:0.4rem 0.6rem;">
+          <div class="left" style="gap:6px;"><i class="ti ti-list-details" aria-hidden="true" style="color:#8489a0;"></i>
+            <div><div class="bname" style="font-size:11.5px;">${t.name}</div><div class="bmeta" style="font-size:10px;">${partsText||'leer'}</div></div>
+          </div>
+          <div style="display:flex; gap:5px;">
+            <button data-apply-fleet-template="${t.id}" style="font-size:10px; padding:4px 7px;" title="Anwenden"><i class="ti ti-check" aria-hidden="true"></i></button>
+            <button data-delete-fleet-template="${t.id}" style="font-size:10px; padding:4px 7px;" title="Löschen"><i class="ti ti-trash" aria-hidden="true"></i></button>
+          </div>
+        </div>`;
+      }).join('') || '<div class="bmeta" style="margin-bottom:0.3rem;">Noch keine Vorlagen gespeichert - Auswahl unten benennen und speichern.</div>';
       attackFleetBox.innerHTML = `
         <div class="card-row" style="margin-bottom:0.5rem; border-color:${vetRank.color};">
           <div class="left" style="gap:8px;"><i class="ti ti-award" aria-hidden="true" style="color:${vetRank.color}; font-size:18px;"></i>
@@ -26752,6 +26811,12 @@
           <button id="atkSelAllBtn" class="primary"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Alle Kampfschiffe</button>
           <button id="atkSelClearBtn" class="danger"><i class="ti ti-x" aria-hidden="true" style="margin-right:4px;"></i>Nichts</button>
         </div>
+        <div class="section-title" style="font-size:12px; margin-top:0.4rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Flotten-Vorlagen</div>
+        ${fleetTemplateRows}
+        <div style="display:flex; gap:6px; margin-bottom:0.5rem;">
+          <input type="text" id="fleetTemplateNameInput" placeholder="Name für aktuelle Auswahl speichern" maxlength="30" style="flex:1; min-width:0;"/>
+          <button id="saveFleetTemplateBtn" style="font-size:11px; padding:5px 9px; white-space:nowrap;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>Speichern</button>
+        </div>
         <div class="bmeta" style="margin-bottom:0.5rem;">Wähle aus, welche Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} für den nächsten Angriff eingesetzt werden. Wirkt sich auf Angriffskraft und Flugzeit je Ziel unten aus.</div>
         ${attackRows || `<div class="bmeta" style="padding:0.5rem 0;">Keine Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} verfügbar.</div>`}
         <input type="text" id="customFleetNameInputAttack" placeholder="Flottenname (optional, sonst automatisch)" maxlength="30" style="width:100%; margin-top:0.5rem;" value="${customFleetName}"/>
@@ -26767,9 +26832,8 @@
       attackFleetBox.querySelectorAll('[data-atksel-inc]').forEach(btn => btn.onclick = () => {
         const k = btn.getAttribute('data-atksel-inc');
         const sel = getAttackSelection(state.activeBasePlanet, cf);
-        const away = computeAwayByType(cf);
-        const avail = Math.max(0, (cf[k]||0) - (away[k]||0));
-        sel[k] = Math.min(avail, (sel[k]||0)+1);
+        const avail = attackAvailableByType(cf);
+        sel[k] = Math.min(avail[k]||0, (sel[k]||0)+1);
         render();
       });
       attackFleetBox.querySelectorAll('[data-atksel-dec]').forEach(btn => btn.onclick = () => {
@@ -26781,8 +26845,8 @@
       attackFleetBox.querySelectorAll('[data-atksel-max]').forEach(btn => btn.onclick = () => {
         const k = btn.getAttribute('data-atksel-max');
         const sel = getAttackSelection(state.activeBasePlanet, cf);
-        const away = computeAwayByType(cf);
-        sel[k] = Math.max(0, (cf[k]||0) - (away[k]||0));
+        const avail = attackAvailableByType(cf);
+        sel[k] = avail[k]||0;
         render();
       });
       attackFleetBox.querySelectorAll('[data-atksel-none]').forEach(btn => btn.onclick = () => {
@@ -26800,10 +26864,22 @@
       const atkSelAllBtn = document.getElementById('atkSelAllBtn');
       if (atkSelAllBtn) atkSelAllBtn.onclick = () => {
         const sel = getAttackSelection(state.activeBasePlanet, cf);
-        const away = computeAwayByType(cf);
-        for (const k of ATTACK_SHIP_KEYS) sel[k] = Math.max(0, (cf[k]||0) - (away[k]||0));
+        const avail = attackAvailableByType(cf);
+        for (const k of ATTACK_SHIP_KEYS) sel[k] = avail[k]||0;
         render();
       };
+      const saveFleetTemplateBtn = document.getElementById('saveFleetTemplateBtn');
+      const fleetTemplateNameInput = document.getElementById('fleetTemplateNameInput');
+      if (saveFleetTemplateBtn) saveFleetTemplateBtn.onclick = () => {
+        saveFleetTemplate(fleetTemplateNameInput ? fleetTemplateNameInput.value : '');
+        if (fleetTemplateNameInput) fleetTemplateNameInput.value = '';
+      };
+      attackFleetBox.querySelectorAll('[data-apply-fleet-template]').forEach(btn => btn.onclick = () => {
+        applyFleetTemplate(btn.getAttribute('data-apply-fleet-template'));
+      });
+      attackFleetBox.querySelectorAll('[data-delete-fleet-template]').forEach(btn => btn.onclick = () => {
+        deleteFleetTemplate(btn.getAttribute('data-delete-fleet-template'));
+      });
     }
 
     // Direkter "Spieler angreifen"-Knopf: erscheint, sobald über den "Direkt Angriff"-Smart-Button
