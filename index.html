@@ -3129,8 +3129,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.135.0';
+  const VERSION = '8.136.0';
   const PATCHNOTES = [
+    { version:'8.136.0', date:'20.07.2026', changes:[
+      'Siebtes Kalender-Event "Raffinerie-Krise" (Vorschlagsrunde) - das erste Event OHNE Sammel-Teile und Belohnungs-Schiff: Während des Eventfensters bringen Siege in NPC-Kämpfen, Piraten-Verstecken und gegen Elite-Gegner DOPPELTE Kampfpunkte, wenn mindestens ein Tier-2-Schiff (Nanoklinge, Quantenkreuzer oder Fusionsdreadnought) in der Angriffsflotte mitfliegt. Bewusst eine Verbrauchs-/Einsatz-Belohnung statt eines neuen Tier-2-Kanals - passend zur Markt-Entscheidung',
+      'Die Event-Rotation umfasst damit sieben Events; Kalender-Box, Teile-Fund und die beiden Event-Schiff-Erfolge unterstützen jetzt generell Events ohne Schiff (der Erfolg "Event-Sammler" zählt weiterhin nur Events MIT Belohnungs-Schiff - er wäre sonst nie mehr abschließbar gewesen)'
+    ]},
     { version:'8.135.0', date:'20.07.2026', changes:[
       'Auto-Kalibrierung für die Quantensensoren (Vorschlagsrunde, gleiche Automatik-Familie wie KI-Abfangautomatik und Auto-Reparatur): Neuer Umschalter im Expeditions-Bereich (ab Forschung Quantenphysik). Ist er an, werden beim Start einer Expedition automatisch 10 Quantenchips in ein frisches 30-Minuten-Sensorfenster investiert, falls gerade keins läuft - genau diese Expedition profitiert bereits. Reichen die Chips nicht, startet die Expedition normal ohne Bonus (kein Blockieren)',
       'Die Chip-Senke ist damit auch unterwegs nutzbar, ohne vor jedem Start an die Kalibrierung denken zu müssen - Auto-Einsätze zählen wie manuelle für den Erfolg "Verbrauchsstratege"'
@@ -6273,8 +6277,23 @@
     { key:'goldrausch', name:'Goldrausch', icon:'ti-pick', color:'#e0b25a',
       desc:'Ungewöhnlich reiche Rohstoffvorkommen werden im Sektor gemeldet. Erkundungsmissionen finden jetzt mit erhöhter Chance Erzkonzentrat.',
       partName:'Erzkonzentrat', partKey:'goldrausch_teil', partsNeeded:6, partChance:0.05,
-      shipKey:'schuerfschiff' }
+      shipKey:'schuerfschiff' },
+    // Raffinerie-Krise (Vorschlagsrunde 20.07.2026): erstes Event OHNE Sammel-Teile/Belohnungs-Schiff
+    // (buffOnly) - belohnt stattdessen den EINSATZ der Tier-2-Schiffe im Eventfenster mit doppelten
+    // Kampfpunkten (siehe tier2EventBpMult). Bewusst Verbrauchs- statt Produktions-Belohnung: kein
+    // neuer Tier-2-Kanal, passt zur Markt-Entfernung (v8.133.0). Alle Event-Konsumenten (Teil-Drop,
+    // Erfolge, Kalender-Box) prüfen deshalb jetzt auf partKey/shipKey statt sie vorauszusetzen.
+    { key:'raffineriekrise', name:'Raffinerie-Krise', icon:'ti-building-factory-2', color:'#d8d5c9', buffOnly:true,
+      desc:'Sabotierte Raffinerien im ganzen Sektor - raffinierte Schiffstechnik ist plötzlich heiß begehrt. Siege in NPC-Kämpfen, Piraten-Verstecken und gegen Elite-Gegner bringen DOPPELTE Kampfpunkte, wenn mindestens ein Tier-2-Schiff (Nanoklinge, Quantenkreuzer oder Fusionsdreadnought) in der Angriffsflotte mitfliegt.' }
   ];
+  // Kampfpunkte-Multiplikator der Raffinerie-Krise: greift nur im aktiven Eventfenster und nur,
+  // wenn die Angriffs-Zusammensetzung mindestens ein Tier-2-Schiff enthält.
+  function tier2EventBpMult(composition){
+    const ev = activeCalendarEventDef();
+    if (!ev || ev.key !== 'raffineriekrise' || !composition) return 1;
+    return (TIER2_SHIP_KEYS_FOR_EVENT.some(k => (composition[k]||0) > 0)) ? 2 : 1;
+  }
+  const TIER2_SHIP_KEYS_FOR_EVENT = ['nanoklinge','quantenkreuzer','fusionsdreadnought'];
   // Liefert das aktuell laufende ODER als nächstes anstehende Kalender-Event, rein aus Date.now()
   // berechnet - rotiert endlos durch EVENT_CALENDAR, mit EVENT_PAUSE_DAYS Pause zwischen zwei Events.
   // now-Parameter optional (Tests können einen festen Zeitpunkt reinreichen statt echter Systemzeit).
@@ -7873,11 +7892,20 @@
     if (ce.active){
       const def = ce.def;
       const remain = Math.max(0, ce.endsAt - Date.now());
-      const have = (state.eventParts && state.eventParts[def.partKey]) || 0;
-      const shipDef = SHIP_DEFS.find(s=>s.key===def.shipKey);
-      const shipName = shipDef ? shipDef.name : def.shipKey;
-      const shipUnlocked = !!(state.unlocked && state.unlocked[def.shipKey]);
-      const pct = Math.min(100, Math.round(have/def.partsNeeded*100));
+      // buffOnly-Events (Raffinerie-Krise) haben weder Sammel-Teile noch Belohnungs-Schiff -
+      // die Box zeigt dann nur Beschreibung + Restzeit statt Teile-Fortschritt.
+      let partsHtml = '';
+      if (def.partKey){
+        const have = (state.eventParts && state.eventParts[def.partKey]) || 0;
+        const shipDef = SHIP_DEFS.find(s=>s.key===def.shipKey);
+        const shipName = shipDef ? shipDef.name : def.shipKey;
+        const shipUnlocked = !!(state.unlocked && state.unlocked[def.shipKey]);
+        const pct = Math.min(100, Math.round(have/def.partsNeeded*100));
+        partsHtml = `
+          <div style="display:flex; justify-content:space-between; margin-top:8px;"><span class="bmeta">${def.partName} gesammelt</span><span class="bmeta">${fmt(have)}/${def.partsNeeded}</span></div>
+          <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:${def.color};"></div></div>
+          <div class="bmeta" style="margin-top:6px;">${shipUnlocked ? 'Event-Schiff „'+shipName+'" bereits freigeschaltet - im Flotte-Tab baubar.' : 'Event-Schiff „'+shipName+'" wird im Flotte-Tab freischaltbar, sobald genug Teile gesammelt sind.'}</div>`;
+      }
       box.innerHTML = `
         <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:${def.color};">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
@@ -7885,9 +7913,7 @@
             <span class="lvl-pill" style="background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-clock" aria-hidden="true"></i> läuft - noch ${fmtDuration(remain/1000)}</span>
           </div>
           <div class="bmeta" style="margin-top:4px;">${def.desc}</div>
-          <div style="display:flex; justify-content:space-between; margin-top:8px;"><span class="bmeta">${def.partName} gesammelt</span><span class="bmeta">${fmt(have)}/${def.partsNeeded}</span></div>
-          <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:${def.color};"></div></div>
-          <div class="bmeta" style="margin-top:6px;">${shipUnlocked ? 'Event-Schiff „'+shipName+'" bereits freigeschaltet - im Flotte-Tab baubar.' : 'Event-Schiff „'+shipName+'" wird im Flotte-Tab freischaltbar, sobald genug Teile gesammelt sind.'}</div>
+          ${partsHtml}
         </div>`;
     } else {
       const remain = Math.max(0, ce.nextStartsAt - Date.now());
@@ -8472,8 +8498,10 @@
     // Event-Schiffe (18.07.2026): dynamisch gegen EVENT_CALENDAR geprüft statt einer festen Liste -
     // wächst automatisch mit, sollten künftig weitere Events dazukommen, ganz wie bei 'allresearch'/
     // 'officer_all' schon üblich.
-    { key:'eventship1', name:'Ereignis-Pilot', desc:'Schalte dein erstes Event-Schiff frei.', check: s => EVENT_CALENDAR.some(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.some(e=>(s.unlocked||{})[e.shipKey])?1:0, 1] },
-    { key:'eventship_all', name:'Event-Sammler', desc:'Schalte alle bisherigen Event-Schiffe frei.', check: s => EVENT_CALENDAR.every(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.filter(e=>(s.unlocked||{})[e.shipKey]).length, EVENT_CALENDAR.length], reward:{erz:6000,kristalle:4000,deuterium:2000,credits:250}, xpReward:250 }
+    // shipKey-Filter (20.07.2026): buffOnly-Events wie die Raffinerie-Krise haben KEIN Belohnungs-
+    // Schiff - ohne Filter wäre "Event-Sammler" nie mehr abschließbar (unlocked[undefined]).
+    { key:'eventship1', name:'Ereignis-Pilot', desc:'Schalte dein erstes Event-Schiff frei.', check: s => EVENT_CALENDAR.some(e => e.shipKey && (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.some(e=>e.shipKey && (s.unlocked||{})[e.shipKey])?1:0, 1] },
+    { key:'eventship_all', name:'Event-Sammler', desc:'Schalte alle bisherigen Event-Schiffe frei.', check: s => EVENT_CALENDAR.filter(e=>e.shipKey).every(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.filter(e=>e.shipKey && (s.unlocked||{})[e.shipKey]).length, EVENT_CALENDAR.filter(e=>e.shipKey).length], reward:{erz:6000,kristalle:4000,deuterium:2000,credits:250}, xpReward:250 }
   ];
   // Titel: automatisch aus dem prestigeträchtigsten freigeschalteten Erfolg abgeleitet (keine neue
   // Verfolgung nötig, nutzt einfach die bestehenden Erfolge). Reihenfolge = Priorität, oben gewinnt.
@@ -14314,7 +14342,7 @@
       { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine verlassene Flotte. Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe.' },
       { title:'Expeditions-Limit: nur 1 gleichzeitig zu Beginn', body:'Zusätzlich zur Forschungsschiff-Anzahl je Planet und dem allgemeinen Flottenentsendelimit gibt es ein eigenes, planetenübergreifendes Limit für gleichzeitig laufende Expeditionen - anfangs nur <strong>1</strong>. Die eigenständige Forschung <strong>Expeditionskoordination</strong> (Kategorie Logistik) erhöht dieses Limit um 1 je Stufe, bis maximal <strong>5</strong> gleichzeitige Expeditionen bei Stufe 4. Der aktuelle Stand wird direkt im Expedition-Tab beim Start-Formular angezeigt.' },
       { title:'Fragmente & kosmetische Avatare', body:'Statt eines vollen seltenen Materials (Antimateriekern, Kristallherz, Alte Technologie) kann auch ein <strong>Fragment</strong> davon gefunden werden - häufiger, aber schwächer. Sind <strong>4 Fragmente</strong> desselben Typs im Inventar (Fortschritt-Tab), lassen sie sich per Knopfdruck zu 1x dem vollen Material zusammensetzen. Ebenfalls über Expeditionen erhältlich: drei <strong>exklusive Avatare</strong> (Nova, Void, Phoenix), die sonst nirgends wählbar sind - einmal gefunden dauerhaft freigeschaltet und in den Einstellungen auswählbar. Ist ein kosmetischer Fund bereits freigeschaltet, gibt es stattdessen Ersatz-Ressourcen, kein doppelter Nutzen.' },
-      { title:'Event-Kalender & Event-Schiffe', body:'Im Fortschritt-Tab ganz oben zeigt der <strong>Event-Kalender</strong>, ob gerade ein zeitlich begrenztes Event läuft oder wann das nächste beginnt - komplett automatisch aus dem Datum berechnet, kein Server nötig, sechs Events lösen sich endlos in Rotation ab. Während ein Event aktiv ist, finden erfolgreiche <strong>Expeditionen</strong> mit kleiner Zusatzchance Event-Teile (unabhängig vom sonstigen Expeditionsfund, verändert also keine bestehenden Fundchancen). Sind genug Teile beisammen, schaltet ein Knopf im Flotte-Tab das zugehörige <strong>exklusive Event-Schiff</strong> frei ("Zusammenbauen", verbraucht die Teile) - Event-Schiffe gibt es NUR über diesen Weg, nie über normale Forschung. Das <strong>Sammeln</strong> der Teile ist an die Event-Laufzeit gebunden, das spätere <strong>Bauen</strong> danach nicht mehr - einmal freigeschaltet, bleibt das Schiff dauerhaft normal baubar. Die sechs Events: „Meteoritensturm" mit dem <strong>Kometenjäger</strong> (schnellster Kampfschiff-Typ), „Piratenüberfall" mit dem <strong>Enterschiff</strong> (zäheste Angreiferklasse, hoher Schild), „Void-Anomalie" mit dem <strong>Phantomschiff</strong> (Glaskanone, sehr niedriger Schild), „Leerenriss-Welle" mit dem <strong>Riftwächter</strong> (nutzt schon vor der Leerenjäger-Forschung dieselbe Schwachstellen-Mechanik gegen Leere-Gegner), „Fraktionskonflikt" mit dem <strong>Gesandtenschiff</strong> (kampfunfähig, dafür +15% auf allen Ruf-Zuwachs bei NPC-Fraktionen, solange eins in der Flotte steht) und „Goldrausch" mit dem <strong>Schürfschiff</strong> (kampfunfähig, dafür +3% Gesamtproduktion, solange eins besessen wird) - jedes davon eine eigene Nische statt reinem Powercreep.' }
+      { title:'Event-Kalender & Event-Schiffe', body:'Im Fortschritt-Tab ganz oben zeigt der <strong>Event-Kalender</strong>, ob gerade ein zeitlich begrenztes Event läuft oder wann das nächste beginnt - komplett automatisch aus dem Datum berechnet, kein Server nötig, die Events lösen sich endlos in Rotation ab. Während ein Event aktiv ist, finden erfolgreiche <strong>Expeditionen</strong> mit kleiner Zusatzchance Event-Teile (unabhängig vom sonstigen Expeditionsfund, verändert also keine bestehenden Fundchancen). Sind genug Teile beisammen, schaltet ein Knopf im Flotte-Tab das zugehörige <strong>exklusive Event-Schiff</strong> frei ("Zusammenbauen", verbraucht die Teile) - Event-Schiffe gibt es NUR über diesen Weg, nie über normale Forschung. Das <strong>Sammeln</strong> der Teile ist an die Event-Laufzeit gebunden, das spätere <strong>Bauen</strong> danach nicht mehr - einmal freigeschaltet, bleibt das Schiff dauerhaft normal baubar. Die sechs Events: „Meteoritensturm" mit dem <strong>Kometenjäger</strong> (schnellster Kampfschiff-Typ), „Piratenüberfall" mit dem <strong>Enterschiff</strong> (zäheste Angreiferklasse, hoher Schild), „Void-Anomalie" mit dem <strong>Phantomschiff</strong> (Glaskanone, sehr niedriger Schild), „Leerenriss-Welle" mit dem <strong>Riftwächter</strong> (nutzt schon vor der Leerenjäger-Forschung dieselbe Schwachstellen-Mechanik gegen Leere-Gegner), „Fraktionskonflikt" mit dem <strong>Gesandtenschiff</strong> (kampfunfähig, dafür +15% auf allen Ruf-Zuwachs bei NPC-Fraktionen, solange eins in der Flotte steht) und „Goldrausch" mit dem <strong>Schürfschiff</strong> (kampfunfähig, dafür +3% Gesamtproduktion, solange eins besessen wird) - jedes davon eine eigene Nische statt reinem Powercreep. Dazu kommt als siebtes Event die <strong>„Raffinerie-Krise"</strong> - das erste Event OHNE Sammel-Teile und Belohnungs-Schiff: Während es läuft, bringen Siege in NPC-Kämpfen, Piraten-Verstecken und gegen Elite-Gegner <strong>doppelte Kampfpunkte</strong>, wenn mindestens ein Tier-2-Schiff in der Angriffsflotte mitfliegt.' }
     ]},
     { key:'kampf', icon:'ti-sword', title:'Kampf', entries:[
       { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.' },
@@ -20875,7 +20903,7 @@
             for (const [r,g] of Object.entries(rawLoot)){ const carried = Math.floor(g*cargoScale); state.resources[r] = Math.min(capL, (state.resources[r]||0)+carried); lootGiven[r] = carried; }
             const creditsGain = 30 + stage*20;
             state.credits = (state.credits||0) + creditsGain;
-            const bpGained = 5 + stage*3;
+            const bpGained = (5 + stage*3) * tier2EventBpMult(m.composition); // Raffinerie-Krise: x2 mit Tier-2-Schiff an Bord
             awardBattlePoints(bpGained);
             logScoreChange(bpGained*3, 'Piratenversteck Stufe '+stage+' ausgehoben (+'+bpGained+' Kampfpunkte)', 'ti-sword');
             addXp(stage*10);
@@ -20914,7 +20942,7 @@
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
-            const bpGained = stage;
+            const bpGained = stage * tier2EventBpMult(m.composition); // Raffinerie-Krise: x2 mit Tier-2-Schiff an Bord
             awardBattlePoints(bpGained);
             // Niederlage: spürbare Verluste (20-35%), aber die Stufe bleibt erhalten - man kann es
             // mit stärkerer Flotte erneut versuchen.
@@ -21063,7 +21091,7 @@
               state.resources[r] = Math.min(npcCargoCap, before+carried);
               lootGiven[r] = state.resources[r]-before;
             }
-            const bpGained = npc.level*10;
+            const bpGained = npc.level*10 * tier2EventBpMult(m.composition); // Raffinerie-Krise: x2 mit Tier-2-Schiff an Bord
             awardBattlePoints(bpGained);
             logScoreChange(bpGained*3, 'Sieg gegen '+npc.name+' (+'+bpGained+' Kampfpunkte)', 'ti-sword');
             state.npcKills = (state.npcKills||0)+1;
@@ -21105,7 +21133,7 @@
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
-            const bpGained = npc.level*2;
+            const bpGained = npc.level*2 * tier2EventBpMult(m.composition); // Raffinerie-Krise: x2 mit Tier-2-Schiff an Bord
             addVeteranXp(planetKey, 4);
             awardBattlePoints(bpGained);
             logScoreChange(bpGained*3, 'Angriff auf '+npc.name+' verloren (+'+bpGained+' Kampfpunkte Trostpreis)', 'ti-shield');
@@ -21276,7 +21304,7 @@
             // gerade ein Kalender-Event läuft (siehe EVENT_CALENDAR/currentCalendarEvent).
             if (outcome === 'success'){
               const activeEv = activeCalendarEventDef();
-              if (activeEv && Math.random() < activeEv.partChance){
+              if (activeEv && activeEv.partKey && Math.random() < activeEv.partChance){
                 state.eventParts = state.eventParts || {};
                 state.eventParts[activeEv.partKey] = (state.eventParts[activeEv.partKey]||0)+1;
                 const shipName = (SHIP_DEFS.find(s=>s.key===activeEv.shipKey)||{}).name||activeEv.shipKey;
