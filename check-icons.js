@@ -87,4 +87,32 @@ if (!/const ICONS = \{/.test(html)) {
   }
 }
 
+// --- Check 3: jedes SHIP_DEFS-Schiff braucht einen SHIP_HULL_DEFS-Eintrag -------------------
+// Nachrüstung 19.07.2026 (Report Sascha, Screenshot: leere Icon-Boxen bei Leerenjäger/Nanoklinge):
+// drawShipMiniIcon() bricht ohne Hull-Eintrag STUMM ab - die Flottenliste zeigt dann eine leere
+// Box statt eines Sprites. Beim Anlegen der 11 neueren Schiffe war dieser dritte Icon-Datensatz
+// (neben ti-Font und ICONS-SVGs) schlicht vergessen worden; dieser Check macht den Fehlertyp ab
+// jetzt vor dem Commit sichtbar, genau wie die beiden Checks oben für die anderen Icon-Systeme.
+{
+  const hullBlock = html.match(/const SHIP_HULL_DEFS = \{([\s\S]*?)\n    \};/);
+  const shipDefKeys = new Map();
+  for (const m of html.matchAll(/\{ key:'([a-zA-Z]+)', name:'[^']+', icon:'ship_/g)) {
+    if (!shipDefKeys.has(m[1])) shipDefKeys.set(m[1], html.slice(0, m.index).split('\n').length);
+  }
+  if (!hullBlock || shipDefKeys.size === 0) {
+    console.error('FEHLER: SHIP_HULL_DEFS oder SHIP_DEFS nicht gefunden - Check 3 übersprungen (Struktur verschoben?).');
+    hasError = true;
+  } else {
+    const hullKeys = new Set([...hullBlock[1].matchAll(/^\s{6}([a-zA-Z]+):/gm)].map(m => m[1]));
+    const missingHulls = [...shipDefKeys.entries()].filter(([k]) => !hullKeys.has(k));
+    if (missingHulls.length) {
+      hasError = true;
+      console.error('FEHLER: Schiffe ohne SHIP_HULL_DEFS-Eintrag (Flottenliste zeigt leere Icon-Box):');
+      for (const [k, line] of missingHulls) console.error(`  - ${k}  (SHIP_DEFS-Eintrag: Zeile ${line})`);
+    } else {
+      console.log(`OK: alle ${shipDefKeys.size} SHIP_DEFS-Schiffe haben einen SHIP_HULL_DEFS-Mini-Icon-Eintrag.`);
+    }
+  }
+}
+
 process.exit(hasError ? 1 : 0);

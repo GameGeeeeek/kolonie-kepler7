@@ -2741,7 +2741,22 @@
       recycler: { pts:[[78,50],[46,42],[24,46],[24,54],[46,58]], grad:'gold', claw:true },
       spaeher: { pts:[[86,50],[42,40],[20,46],[20,54],[42,60]], grad:'cyan', accent:{x:30,y:34,r:5,color:'rgba(169,212,232,0.8)'} },
       spionageschiff: { pts:[[88,50],[42,38],[18,44],[18,56],[42,62]], grad:'violet', accent:{x:32,y:30,r:8,ry:4,color:'rgba(169,212,232,0.75)'} },
-      forscher: { pts:[[82,50],[44,42],[22,46],[22,54],[44,58]], grad:'violet', antenna:true }
+      forscher: { pts:[[82,50],[44,42],[22,46],[22,54],[44,58]], grad:'violet', antenna:true },
+      // Bugfix-Nachtrag (Report Sascha, 19.07.2026): die 11 neueren Schiffstypen fehlten hier komplett -
+      // drawShipMiniIcon() bricht ohne Eintrag stumm ab, die Flottenliste zeigte leere Icon-Boxen
+      // (siehe Screenshot: Leerenjäger/Nanoklinge ohne Sprite, Schlachtschiff daneben mit). Formen im
+      // selben Seitenprofil-Format (Bug in der Zeile, nicht im Maler - der bleibt unverändert).
+      leerenjaeger: { pts:[[92,50],[52,38],[16,40],[10,50],[16,60],[52,62]], grad:'violet', accent:{x:62,y:50,r:3.5,color:'#c3bef5',pulse:true} },
+      kometenjaeger: { pts:[[90,50],[38,42],[14,46],[14,54],[38,58]], grad:'cyan', accent:{x:24,y:50,r:3,color:'#dceeff',pulse:true} },
+      enterschiff: { pts:[[78,50],[50,36],[20,38],[14,50],[20,62],[50,64]], grad:'steel', claw:true },
+      phantomschiff: { pts:[[90,50],[54,42],[30,34],[14,50],[30,66],[54,58]], grad:'violet', accent:{x:46,y:50,r:2.5,color:'rgba(195,190,245,0.9)',pulse:true} },
+      riftwaechter: { pts:[[84,50],[48,38],[22,42],[22,58],[48,62]], grad:'sky', accent:{x:36,y:50,r:6,color:'rgba(122,162,247,0.7)'} },
+      gesandtenschiff: { pts:[[82,50],[46,42],[20,46],[20,54],[46,58]], grad:'green', antenna:true },
+      schuerfschiff: { pts:[[76,50],[46,42],[22,46],[22,54],[46,58]], grad:'amber', rects:[[34,58,20,10]], dots:[[28,44,3]] },
+      nanoklinge: { pts:[[94,50],[40,44],[12,48],[12,52],[40,56]], grad:'steel', accent:{x:70,y:50,r:2.2,color:'#d8d5c9',pulse:true} },
+      quantenkreuzer: { pts:[[88,50],[52,38],[20,34],[12,46],[20,50],[12,54],[20,66],[52,62]], grad:'sky', dots:[[24,38,3],[24,62,3]] },
+      fusionsdreadnought: { pts:[[92,50],[56,34],[14,30],[6,50],[14,70],[56,66]], grad:'gold', dots:[[38,40,4.4],[38,60,4.4]], accent:{x:62,y:50,r:4,color:'#f0997b',pulse:true} },
+      mondzerstoerer: { pts:[[90,50],[54,36],[16,34],[10,50],[16,66],[54,64]], grad:'red', dots:[[36,42,4],[36,58,4]], accent:{x:76,y:50,r:5,color:'rgba(226,75,74,0.95)',pulse:true} }
     };
     function drawShipMiniIcon(key, canvas){
       if (!canvas) return;
@@ -3114,8 +3129,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.132.0';
+  const VERSION = '8.132.1';
   const PATCHNOTES = [
+    { version:'8.132.1', date:'20.07.2026', changes:[
+      'Bug behoben (danke an Sascha für den Screenshot-Report): 11 neuere Schiffstypen zeigten in der Flottenliste eine LEERE Icon-Box statt ihres Schiffs-Sprites - Leerenjäger, Mondzerstörer, die 3 Tier-2-Schiffe (Nanoklinge/Quantenkreuzer/Fusionsdreadnought) und alle 6 Event-Schiffe. Ursache: Die Canvas-Mini-Icons haben einen eigenen, dritten Icon-Datensatz (Rumpf-Formen), der beim Anlegen dieser Schiffe schlicht vergessen wurde - der Zeichner bricht ohne Eintrag stumm ab. Alle 11 haben jetzt eigene Seitenprofil-Sprites im Stil der bestehenden (Nanoklinge als schmale Stahl-Klinge, Fusionsdreadnought massiv in Gold mit pulsierendem Reaktor, Mondzerstörer mit pulsierender Buglaser-Mündung, Enterschiff mit Enterklaue usw.)',
+      'Kampfberichte geprüft (Teil des Reports): Dort werden die neuen Schiffe korrekt dargestellt - Berichte nutzen die SVG-Icons und Namens-Auflösung, beide kennen alle Schiffstypen. Betroffen waren nur die Canvas-Sprites der Flottenlisten',
+      'Das Icon-Prüfskript aus der Pflicht-Checkliste prüft ab jetzt zusätzlich, dass JEDES Schiff einen Mini-Icon-Rumpf-Eintrag hat - dieselbe Fehlerklasse (drittes, leicht übersehenes Icon-System) fällt damit künftig vor dem Commit auf statt im Spiel'
+    ]},
     { version:'8.132.0', date:'19.07.2026', changes:[
       'Grafik-Runde für die Tier-2-Oberflächen: Die Tier-2-Badge-Karten zeigen jetzt einen dünnen Lagerfüllstands-Balken in der Ketten-Farbe am unteren Kartenrand - da "Lager voll = Fabrik pausiert" die zentrale Tier-2-Mechanik ist, ist der Füllstand jetzt auf einen Blick ablesbar statt nur als Zahlentext. Bei vollem Lager wechselt der Balken auf Bernstein und die Karte bekommt den etablierten Warn-Glow-Rahmen',
       'Die Fertigen-Buttons der Tier-2-Modulfertigung tragen jetzt die Seltenheitsfarben aus dem Modul-Inventar (Gewöhnlich grau, Selten grün) statt zweier neutraler, ununterscheidbarer Buttons',
