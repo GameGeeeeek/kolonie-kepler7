@@ -584,6 +584,12 @@
     .tab-btn.active .tab-icon-badge { box-shadow:inset 2px 2px 4px rgba(0,0,0,0.6), inset -2px -2px 4px rgba(255,255,255,0.08); }
     .tab-badge { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--c-danger); box-shadow:0 0 6px var(--c-danger); animation: badgePulse 1.6s ease-in-out infinite; }
     @keyframes badgePulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    /* Ganzer Tab pulsiert rot als "hier ist etwas Dringendes" (20.07.2026, Spieler-Wunsch nach dem
+       kleinen Badge-Punkt: "soll rot pulsieren quasi als Benachrichtigungsfunktion") - wiederverwendet
+       dieselbe expandierende Ring-Optik wie .raid-banner (raidPulse), diesmal direkt am Tab-Button statt
+       an einer Box im Inhaltsbereich, damit es auch von JEDEM anderen Tab aus auffällt. */
+    .tab-btn.tab-btn-alert { border-color:var(--c-danger); color:#ffb4b4; animation: raidPulse 1.6s ease-in-out infinite; }
+    .tab-btn.tab-btn-alert.active { border-color:var(--c-danger); }
     #headerReportsIcon.reports-glow { animation: iconPulse 1.6s ease-in-out infinite; }
     #headerReportsBtn.active, #headerProfileBtn.active, #headerHelpBtn.active { background:rgba(var(--primary-rgb), 0.3); border-color:var(--c-primary); }
     @keyframes iconPulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
@@ -628,7 +634,15 @@
     /* Grafik-Runde 10, Vorschlag "Rest fertigstellen": border-radius bewusst nicht mehr hier gesetzt -
        die HUD-Eckenschnitt-Sammelregel weiter unten übernimmt das jetzt (letzte verbliebene runde
        Karte im Dashboard). */
-    .dash-colony-card.targeted { background:rgba(var(--danger-rgb), 0.14); border-color:rgba(var(--danger-rgb), 0.55); }
+    /* Farblich blinkende Kolonie-Karten für planetengebundene Ereignisse (20.07.2026, Spieler-Wunsch
+       "den Planeten der von einem Event betroffen ist farblich hervorheben, Box blinkt auf") - eine
+       geteilte Puls-Animation über --card-pulse-rgb, je Ereignistyp in dessen etablierter Akzentfarbe
+       (Angriff=Gefahr-Rot wie bisher, jetzt zusätzlich blinkend statt nur statisch; Sabotage=Warnung-
+       Amber; Leerenriss=Lila wie das Leerenriss-Icon/-Badge sonst im Spiel). */
+    @keyframes dashCardPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--card-pulse-rgb), 0.55); } 50% { box-shadow:0 0 0 7px rgba(var(--card-pulse-rgb), 0); } }
+    .dash-colony-card.targeted { background:rgba(var(--danger-rgb), 0.14); border-color:rgba(var(--danger-rgb), 0.55); --card-pulse-rgb:226,75,74; animation: dashCardPulse 1.6s ease-in-out infinite; }
+    .dash-colony-card.event-sabotage { background:rgba(224,165,72,0.14); border-color:rgba(224,165,72,0.55); --card-pulse-rgb:224,165,72; animation: dashCardPulse 1.6s ease-in-out infinite; }
+    .dash-colony-card.event-voidrift { background:rgba(168,158,240,0.14); border-color:rgba(168,158,240,0.55); --card-pulse-rgb:168,158,240; animation: dashCardPulse 1.6s ease-in-out infinite; }
     .dash-colony-card.active-base { background:rgba(var(--primary-rgb), 0.2); border-color:var(--c-primary); }
     .dash-colony-icon { width:28px; height:28px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; background:rgba(var(--primary-rgb), 0.18); color:var(--lilac); }
     .dash-role-badge { position:absolute; bottom:-4px; right:-4px; width:14px; height:14px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
@@ -651,6 +665,7 @@
     .dash-attack-badge { position:absolute; top:-5px; right:-5px; width:17px; height:17px; border-radius:50%; background:var(--c-danger); display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; box-shadow:0 0 0 2px #0d1224; animation: dashAttackPulse 1.3s ease-in-out infinite; }
     .dash-sabotage-badge { position:absolute; top:-5px; left:-5px; width:17px; height:17px; border-radius:50%; background:var(--c-warning); display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
     .dash-debris-badge { position:absolute; bottom:-5px; left:-5px; width:17px; height:17px; border-radius:50%; background:#8a8880; display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
+    .dash-voidrift-badge { position:absolute; bottom:-5px; right:-5px; width:17px; height:17px; border-radius:50%; background:#a89ef0; display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; animation: dashAttackPulse 1.3s ease-in-out infinite; }
     @keyframes dashAttackPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.18); } }
     .float-gain { position:absolute; right:10px; top:6px; font-size:11px; font-weight:500; color:var(--c-secondary); opacity:0; pointer-events:none; }
     .float-gain.show { animation: floatup 0.9s ease-out forwards; }
@@ -1197,6 +1212,27 @@
     </div>
   </div>
 
+  <!-- Ko-fi-E-Mail-Abfrage (20.07.2026, Spieler-Wunsch): erscheint einmalig VOR dem Sprung zu Ko-fi,
+       solange state.kofiEmail noch nicht gesetzt ist - sonst öffnet der Kaffee-Button Ko-fi direkt
+       (siehe headerKofiBtn-Wiring in render()). Verknüpft noch keine echte Spende (die existiert ja
+       erst nach dem Ko-fi-Besuch), merkt sich die E-Mail nur lokal für den späteren "Freischalten"-
+       Schritt im Unterstützer-Bereich (kofiClaimSupporterBox), der dort automatisch vorausgefüllt ist. -->
+  <div id="kofiEmailPromptOverlay" class="login-overlay" style="display:none;">
+    <div class="login-card" style="text-align:left; position:relative;">
+      <button id="kofiEmailPromptCloseBtn" style="position:absolute; top:14px; right:14px; padding:5px 9px; font-size:11px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+      <div class="login-header">
+        <span aria-hidden="true" style="font-size:26px;">☕</span>
+        <div>
+          <div class="login-title">Bevor es zu Ko-fi geht</div>
+          <div class="login-sub">Trag die E-Mail-Adresse ein, die du bei Ko-fi verwendest - nur damit lässt sich deine Spende später deinem Unterstützer-Abzeichen zuordnen.</div>
+        </div>
+      </div>
+      <input type="email" id="kofiEmailPromptInput" placeholder="deine-ko-fi-email@beispiel.de" style="width:100%; margin:1rem 0 0.5rem;"/>
+      <button id="kofiEmailPromptGoBtn" class="login-submit" style="width:100%;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>Speichern &amp; zu Ko-fi</button>
+      <button id="kofiEmailPromptSkipBtn" style="width:100%; margin-top:8px; background:transparent; border:none; color:#7d8199; font-size:11px; text-decoration:underline; cursor:pointer;">Ohne Verknüpfung zu Ko-fi</button>
+    </div>
+  </div>
+
   <div id="prestigePerkOverlay" class="login-overlay" style="display:none;">
     <div class="login-card" style="text-align:left;">
       <div class="login-header">
@@ -1475,7 +1511,7 @@
           <button id="headerReportsBtn" style="font-size:10.5px; padding:5px 9px; position:relative; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Berichte & Nachrichten"><i class="ti ti-mail" aria-hidden="true" id="headerReportsIcon" style="margin-right:3px;"></i><span class="header-btn-label">Berichte</span><span id="reportsBadge" class="tab-badge" style="display:none;"></span></button>
           <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Hilfe</span></button>
           <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Einstellungen</span></button>
-          <a href="https://ko-fi.com/gamegeeeeek/leaderboard" target="_blank" rel="noopener" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); border-radius:9px; border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; text-decoration:none; cursor:pointer; display:inline-flex; align-items:center; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;" title="Top-Unterstützer ansehen oder dem Entwickler einen Kaffee spendieren (Ko-fi)"><span aria-hidden="true" style="margin-right:3px;">☕</span><span class="header-btn-label">Kaffee</span></a>
+          <button id="headerKofiBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); border-radius:9px; border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; cursor:pointer; display:inline-flex; align-items:center; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;" title="Top-Unterstützer ansehen oder dem Entwickler einen Kaffee spendieren (Ko-fi)"><span aria-hidden="true" style="margin-right:3px;">☕</span><span class="header-btn-label">Kaffee</span></button>
           <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); align-items:center; justify-content:center;" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
         </div>
         <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true">
@@ -1561,7 +1597,7 @@
 
       <div class="tabs">
         <button class="tab-btn active" data-tab="basis"><span class="tab-icon-badge"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i></span>Basis</button>
-        <button class="tab-btn" data-tab="verteidigung"><span class="tab-icon-badge"><i class="ti ti-shield" aria-hidden="true" style="color:#e24b4a;"></i></span>Verteidigung</button>
+        <button class="tab-btn" data-tab="verteidigung" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-shield" aria-hidden="true" style="color:#e24b4a;"></i></span>Verteidigung<span id="voidRiftTabBadge" class="tab-badge" style="display:none;"></span></button>
         <button class="tab-btn" data-tab="forschung"><span class="tab-icon-badge"><i class="ti ti-flask" aria-hidden="true" style="color:#85b7eb;"></i></span>Forschung</button>
         <button class="tab-btn" data-tab="flotte"><span class="tab-icon-badge"><i class="ti ti-rocket" aria-hidden="true" style="color:#5dcaa5;"></i></span>Flotte</button>
         <div class="tab-group-divider" aria-hidden="true"></div>
@@ -1612,11 +1648,11 @@
         <div id="festungBox"></div>
         <div id="abhorchpostenBox"></div>
         <div class="card-row" id="autoReinforceRow" style="cursor:pointer; margin-top:0.75rem;">
-          <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-shield-lock" aria-hidden="true"></i></div><div><div class="bname">Automatische Verstärkung</div><div class="bmeta" id="autoReinforceLabel">Aus – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten</div></div></div>
+          <div class="left"><div class="bicon" style="background:rgba(226,75,74,0.18); color:#f0997b;"><i class="ti ti-shield-lock" aria-hidden="true"></i></div><div><div class="bname">Automatische Verstärkung</div><div class="bmeta" id="autoReinforceLabel">Aus – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten (3 KI-Kerne je Einsatz)</div></div></div>
           <div class="toggle-switch" id="autoReinforceSwitch"><div class="toggle-knob"></div></div>
         </div>
         <div class="card-row" id="autoRepairRow" style="cursor:pointer; margin-top:0.5rem;">
-          <div class="left"><div class="bicon" style="background:rgba(224,165,72,0.18); color:#e0a548;"><i class="ti ti-refresh" aria-hidden="true"></i></div><div><div class="bname">Automatische Reparatur</div><div class="bmeta" id="autoRepairLabel">Aus – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle statt 15 Min. zu warten</div></div></div>
+          <div class="left"><div class="bicon" style="background:rgba(224,165,72,0.18); color:#e0a548;"><i class="ti ti-refresh" aria-hidden="true"></i></div><div><div class="bname">Automatische Reparatur</div><div class="bmeta" id="autoRepairLabel">Aus – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne statt 15 Min. zu warten</div></div></div>
           <div class="toggle-switch" id="autoRepairSwitch"><div class="toggle-knob"></div></div>
         </div>
         <div class="card-row" id="autoWatchLiveRaidRow" style="cursor:pointer; margin-top:0.5rem;">
@@ -3182,8 +3218,32 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.149.0';
+  const VERSION = '8.154.0';
   const PATCHNOTES = [
+    { version:'8.154.0', date:'20.07.2026', changes:[
+      'Wichtiger Kampfkraft-Bugfix (Bug-Sweep): 8 Kampfschiffstypen mit echten Angriffswerten - Leerenjäger, Kometenjäger, Enterschiff, Phantomschiff, Riftwächter, Nanoklinge, Quantenkreuzer, Fusionsdreadnought - trugen in JEDEM clientseitig aufgelösten Kampf (NPCs, Weltboss, Leerenriss, Piratennest, Expeditions-Eskorte) 0 Angriffskraft bei, obwohl sie im Angriffs-Menü auswählbar sind. Nur echtes Server-PvP rechnete schon korrekt (dort bereits am 19.07. gefixt). Beide Formeln stimmen jetzt wieder überein - diese Schiffe sind jetzt in jedem Kampfkontext tatsächlich wirksam',
+      'Bugfix: der Mondzerstörer (seltenstes/teuerstes Schiff, 10 Tage Bauzeit) gab bisher 0 Bestenlisten-Punkte, weil er in der Punkte-Gewichtungstabelle fehlte - gibt jetzt wie jedes andere Schiff Punkte'
+    ]},
+    { version:'8.153.1', date:'20.07.2026', changes:[
+      'Bugfix Orbitalstation (Spieler-Report "Kosten nicht aktuell"): der Ausbau-Button für Stufe 4-5 zeigte nur Erz/Kristalle/Deuterium an, obwohl diese Stufen zusätzlich Leerensplitter benötigen - der Bedarf wurde erst NACH dem Klick als Fehlermeldung sichtbar. Der Button zeigt die benötigten Leerensplitter jetzt direkt mit an, rot hervorgehoben bei zu wenig Vorrat'
+    ]},
+    { version:'8.153.0', date:'20.07.2026', changes:[
+      'Betroffene Kolonie-Karten im Basis-Tab-Dashboard blinken jetzt farblich auf (Spieler-Wunsch): Angriffsziel weiterhin rot (jetzt zusätzlich pulsierend statt nur statisch eingefärbt), Sabotage neu in Amber, Leerenriss neu in Lila - jeweils mit eigenem Symbol-Badge an der Karte, damit auf einen Blick klar ist, welcher Planet betroffen ist und um welches Ereignis es sich handelt'
+    ]},
+    { version:'8.152.0', date:'20.07.2026', changes:[
+      'Leerenriss-Benachrichtigung weiter verstärkt (Spieler-Wunsch direkt nach dem Badge-Punkt): der gesamte "Verteidigung"-Tab pulsiert jetzt rot, solange ein Riss offen ist - fällt auch beiläufig auf, ohne genau hinsehen zu müssen',
+      'Automatische Verstärkung und Automatische Reparatur kosten jetzt zusätzlich KI-Kerne (Spieler-Wunsch, gleiche Automatik-Familie wie die bestehende KI-Abfangautomatik): je 3 KI-Kerne pro Einsatz. Reicht der Vorrat nicht, unterbleibt der automatische Eingriff und es wird einmalig darauf hingewiesen - beide Schalter-Beschreibungen im Verteidigung-Tab zeigen jetzt Kosten und aktuellen Vorrat'
+    ]},
+    { version:'8.151.0', date:'20.07.2026', changes:[
+      'Leerenriss-Ereignisse deutlich auffälliger gemacht (Spieler-Feedback "habe gar nicht mitbekommen dass das Event ist"): der Verteidigung-Tab bekommt jetzt ein pulsierendes rotes Badge, sobald ein Riss offen ist - bleibt sichtbar, solange Handlungsbedarf besteht, nicht nur für ein paar Sekunden wie der Kurzhinweis. Der Meldungs-Toast beim Öffnen ist jetzt zusätzlich rot umrandet (kritischer Schweregrad statt neutral) und nennt direkt die verbleibende Zeit zum Schließen'
+    ]},
+    { version:'8.150.0', date:'20.07.2026', changes:[
+      'Schiffs-Icons in Eskorte-/Angriffslisten haben jetzt einen dezenten grauen Rahmen (Spieler-Wunsch) - besser von der Hintergrundfläche abgesetzt, gerade bei dunklen Schiffssilhouetten',
+      'Frachter und Großer Frachter sind jetzt als Expeditions-Eskorte wählbar: Expeditionen hatten bisher gar keinen Frachtraum-Deckel, sehr große Ressourcenfunde (z.B. bei stark gestapelten Boni) konnten also beliebig groß ausfallen. Jetzt gibt es einen großzügigen Basis-Frachtraum, der praktisch jeden normalen Fund abdeckt - erst bei außergewöhnlich hohen Funden lohnt sich zusätzlicher Frachtraum durch Frachter in der Eskorte, sonst wird der Fund im Bericht sichtbar gedeckelt',
+      '"Alle starten"-Schnellstart-Button bei der Expedition (Spieler-Wunsch): startet mit einem Klick so viele Expeditionen gleichzeitig wie Forschungsschiffe, Expeditions- und Flottenentsende-Limit gerade zulassen, verteilt die gewählte Eskorte automatisch gleichmäßig auf alle gestarteten Expeditionen',
+      '5 neue Farbthemen: Türkis, Rosé, Oliv, Kupfer, Marine (insgesamt jetzt 14 Themen im Einstellungen-Bereich)',
+      'Ko-fi-Kaffee-Button fragt jetzt vor dem ersten Spenden-Besuch nach der Ko-fi-E-Mail-Adresse (Spieler-Wunsch): ohne hinterlegte E-Mail gäbe es später kein Unterstützer-Abzeichen, weil die Spende nicht zugeordnet werden kann. Ist die E-Mail schon eingetragen, öffnet sich Ko-fi weiterhin direkt ohne Zwischenschritt'
+    ]},
     { version:'8.149.0', date:'20.07.2026', changes:[
       'Unterstützer-Abzeichen überarbeitet (Spieler-Feedback direkt nach v8.148.0): statt einer einzelnen ☕-Pille mit Zeilen-Rahmen jetzt drei gestaffelte Medaillen-Stufen (🥉 Bronze/🥈 Silber/🥇 Gold), die sich automatisch aus der Gesamt-Spendensumme der verknüpften Ko-fi-E-Mail ergeben - der Zeilen-Rahmen entfällt zugunsten der schlichteren Medaillen-Pille'
     ]},
@@ -9087,7 +9147,16 @@
   // Funktion statt die Formel an jeder Stelle (Spielerangriffe, Bosse, Piratennest, NPCs) einzeln zu
   // wiederholen (13.07.2026, beim Ergänzen des Großen Frachters).
   function fleetCargoCapacity(fleet){ const cargoMult = 1+shipModuleBonusFor('frachter','cargo'); return (fleet.frachter||0)*CARGO_PER_FRACHTER*cargoMult + (fleet.frachtergross||0)*CARGO_PER_FRACHTER_GROSS*cargoMult; }
-  const EXPEDITION_SHIP_KEYS = ['forscher','jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','kometenjaeger','enterschiff','phantomschiff','riftwaechter'];
+  // Kostenloser Basis-Frachtraum NUR für Expeditionsfunde (20.07.2026) - anders als reguläre
+  // Angriffsmissionen (dort 0 Frachtraum ohne Frachter = Totalverlust der Beute, bewusst hart) sollen
+  // normale Expeditionsfunde (siehe b_resource-Zweig unten, typischerweise 250-450*mult) nicht plötzlich
+  // Frachter zur Pflicht machen - der Deckel soll nur bei außergewöhnlich großen Funden wirklich greifen.
+  const EXPEDITION_BASE_CARGO = 2000;
+  // Frachter als Eskorte (20.07.2026, Spieler-Wunsch): tragen 0 Angriffspunkte bei (wie bei
+  // ATTACK_SHIP_KEYS), erweitern aber den Frachtraum für Ressourcenfunde (siehe fleetCargoCapacity()
+  // in der Fundauflösung unten) - bei besonders großen Funden reicht der kostenlose Basis-Frachtraum
+  // sonst nicht aus.
+  const EXPEDITION_SHIP_KEYS = ['forscher','jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','kometenjaeger','enterschiff','phantomschiff','riftwaechter','frachter','frachtergross'];
   const ESCORT_KEYS = EXPEDITION_SHIP_KEYS.filter(k=>k!=='forscher');
   let expeditionEscortSelection = {};
   function getEscortSelection(planetKey, cf){
@@ -9955,7 +10024,17 @@
     // Bei maximalem Stapeln (3 Slots, alle Mythisch, alle "Zielcomputer") wären es ungedeckelt +75% -
     // schon unter der Deckelung, der Cap dient vor allem als Schutz vor künftig stärkeren Modulen.
     const schlachtschiffAtkMult = 1 + Math.min(1.0, shipModuleBonusFor('schlachtschiff','atk'));
-    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90*schlachtschiffAtkMult + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8;
+    // Bugfix (20.07.2026, Bug-Sweep): 8 Kampfschiffstypen mit echten atk-Werten in SHIP_DEFS und
+    // Auswahlbarkeit in ATTACK_SHIP_KEYS fehlten hier komplett - trugen also in JEDEM clientseitig
+    // aufgelösten Kampf (NPCs, Weltboss, Leerenriss, Piratennest, Expeditions-Eskorte, Vorschauwerte)
+    // 0 Angriffskraft bei, obwohl sie im Menü wählbar sind. Das Backend (rawFleetPower() in
+    // server.js, für echtes Server-PvP) wurde dafür schon am 19.07.2026 korrigiert ("Balance-
+    // Entscheidung Sascha: Ja in Tabelle") - dieselben Werte hier nachgezogen, damit Frontend und
+    // Backend wieder übereinstimmen. mondzerstoerer bewusst NICHT hier (eigener, serverseitig
+    // gehärteter Mondbelagerungs-Kampfpfad, nie in ATTACK_SHIP_KEYS).
+    let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90*schlachtschiffAtkMult + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8 +
+      diminishingShipCount(f.leerenjaeger||0)*140 + diminishingShipCount(f.kometenjaeger||0)*18 + diminishingShipCount(f.enterschiff||0)*25 + diminishingShipCount(f.phantomschiff||0)*35 + diminishingShipCount(f.riftwaechter||0)*20 +
+      diminishingShipCount(f.nanoklinge||0)*55 + diminishingShipCount(f.quantenkreuzer||0)*80 + diminishingShipCount(f.fusionsdreadnought||0)*180;
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
@@ -10896,6 +10975,9 @@
   // Schalter automatisch die Hälfte der verfügbaren Kampfschiffe der stärksten ANDEREN Kolonie zum
   // bedrohten Planeten – sofern die Verlegung rechtzeitig vor dem Überfall ankommen würde. Nur einmal
   // pro erkanntem Überfall (reinforceSent-Flag), damit nicht bei jedem Tick erneut verlegt wird.
+  // Kostet KI-Kerne (20.07.2026, Spieler-Wunsch, gleiche Automatik-Familie wie KI-Abfangautomatik) -
+  // die Koordination der Verlegung läuft über dieselbe KI-Infrastruktur.
+  const AUTO_REINFORCE_COST_KERNE = 3;
   function maybeAutoReinforce(){
     if (!state.autoReinforceOn || !state.incomingRaid || state.incomingRaid.reinforceSent) return;
     const targetPlanet = state.incomingRaid.planet;
@@ -10918,11 +11000,16 @@
     const relevantKeys = Object.keys(best.avail).filter(k => best.avail[k] > 0);
     const dur = relocationDuration(best.planet, targetPlanet, relevantKeys[0]);
     if (dur*1000 >= remainMs) return; // würde nicht rechtzeitig ankommen
+    if ((state.resources.kikerne||0) < AUTO_REINFORCE_COST_KERNE){
+      log('Automatische Verstärkung: nicht genug KI-Kerne ('+AUTO_REINFORCE_COST_KERNE+' benötigt) - die Verlegung muss manuell erfolgen.', 'ti-alert-triangle');
+      return;
+    }
     const amounts = {};
     for (const k of relevantKeys) amounts[k] = Math.max(1, Math.floor(best.avail[k]*0.5));
+    state.resources.kikerne -= AUTO_REINFORCE_COST_KERNE;
     state.incomingRaid.reinforceSent = true;
     relocateFleetGroup(best.planet, targetPlanet, amounts);
-    log('Automatische Verstärkung: Kampfschiffe von '+planetDisplayName(best.planet)+' nach '+planetDisplayName(targetPlanet)+' unterwegs, um dem erkannten Überfall zu begegnen.', 'ti-shield-lock');
+    log('Automatische Verstärkung: Kampfschiffe von '+planetDisplayName(best.planet)+' nach '+planetDisplayName(targetPlanet)+' unterwegs, um dem erkannten Überfall zu begegnen ('+AUTO_REINFORCE_COST_KERNE+' KI-Kerne verbraucht).', 'ti-shield-lock');
   }
   function defenseBreakdownFor(planetKey){
     const b = buildingSetFor(planetKey);
@@ -11184,7 +11271,10 @@
     const now = Date.now();
     state.voidRift = { planetKey, power, startTime: now, endTime: now + VOID_RIFT_DURATION_SEC*1000, attackArrival: null, attackSource: null };
     log('Ein Leerenriss hat sich über '+planetDisplayName(planetKey)+' geöffnet! Schließe ihn mit einer Kampfflotte, bevor er kollabiert ('+fmtDuration(VOID_RIFT_DURATION_SEC)+') - Belohnung: Leerensplitter und Antimaterie.', 'ti-atom-2');
-    pushToast('Leerenriss über '+planetDisplayName(planetKey)+'!', 'ti-atom-2');
+    // 'crit'-Schweregrad (20.07.2026, Spieler-Feedback): roter Glow statt neutralem Toast, damit der
+    // Riss auch im Vorbeigehen auffällt - dazu das pulsierende Tab-Badge (updateVoidRiftTabBadge), das
+    // anders als der 4,2s-Toast bis zum Schließen/Kollaps sichtbar bleibt.
+    pushToast('Leerenriss über '+planetDisplayName(planetKey)+' geöffnet - '+fmtDuration(VOID_RIFT_DURATION_SEC)+' Zeit zum Schließen!', 'ti-atom-2', 'crit');
     playSound('raid');
     render(); save();
   }
@@ -11315,7 +11405,11 @@
     ships:15, cruisers:25, jaeger:12, destroyers:35, bomber:45,
     schlachtschiff:70, carrier:30, superschlachtschiff:180, waechter:20, leerenjaeger:120, kometenjaeger:18, enterschiff:28, phantomschiff:26, riftwaechter:22, gesandtenschiff:15, schuerfschiff:15,
     nanoklinge:45, quantenkreuzer:65, fusionsdreadnought:150,
-    forscher:20, frachter:10, frachtergross:40, spaeher:15, spionageschiff:22, colonyShips:5, recycler:12
+    forscher:20, frachter:10, frachtergross:40, spaeher:15, spionageschiff:22, colonyShips:5, recycler:12,
+    // Bugfix (20.07.2026, Bug-Sweep): fehlte komplett - maxOwned:1, 10 Tage Bauzeit, Top-Tier-
+    // Forschung nötig, atk 300 (höchster Wert im Spiel) - Gewicht proportional zum Superschlachtschiff
+    // (atk 220 -> 180), plus Aufschlag für die Einzigartigkeit.
+    mondzerstoerer:250
   };
   function computeShipScoreTotal(){
     let total = 0;
@@ -12901,6 +12995,20 @@
     if (!badge) return;
     const hasNew = (state.lastExpeditionEventTime||0) > (state.lastSeenExpeditionTime||0);
     badge.style.display = hasNew ? 'block' : 'none';
+  }
+  // Leerenriss-Sichtbarkeit (20.07.2026, Spieler-Feedback "habe gar nicht mitbekommen dass das Event
+  // ist"): der Spawn-Toast verschwindet nach 4,2s von selbst und war bisher die einzige Anzeige außerhalb
+  // der Verteidigung-Box - wer gerade auf einem anderen Tab war, hat den Riss leicht verpasst. Pulsierendes
+  // Badge bleibt (anders als die "ungesehen"-Badges bei Berichten/Expedition) bewusst die GESAMTE
+  // Laufzeit sichtbar, nicht nur bis zum ersten Hinsehen - der Handlungsbedarf besteht ja weiter, bis der
+  // Riss geschlossen oder kollabiert ist.
+  function updateVoidRiftTabBadge(){
+    const badge = document.getElementById('voidRiftTabBadge');
+    if (badge) badge.style.display = state.voidRift ? 'block' : 'none';
+    // Spieler-Wunsch als direkte Weiterentwicklung des Punkt-Badges: der GANZE Tab pulsiert rot, nicht
+    // nur ein kleiner Punkt - fällt auch beiläufig auf, ohne genau hinsehen zu müssen.
+    const tabBtn = document.querySelector('.tab-btn[data-tab="verteidigung"]');
+    if (tabBtn) tabBtn.classList.toggle('tab-btn-alert', !!state.voidRift);
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
@@ -14611,7 +14719,7 @@
       { title:'Treibstoffkosten (Deuterium & Antimaterie)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). <strong>Welche Ressource verbraucht wird, hängt vom Antrieb ab:</strong> Schiffe mit Verbrennungs- oder Impulstriebwerk tanken Deuterium, Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken Antimaterie. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen. Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
       { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren, Spionage UND Flottenverlegungen zwischen eigenen Planeten - ein per "Verband versenden" gemeinsam losgeschickter Verband zählt dabei nur als EIN Slot, unabhängig davon, wie viele Schiffstypen er enthält. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
       { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
-      { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine verlassene Flotte. Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe.' },
+      { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine verlassene Flotte. Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
       { title:'Expeditions-Limit: nur 1 gleichzeitig zu Beginn', body:'Zusätzlich zur Forschungsschiff-Anzahl je Planet und dem allgemeinen Flottenentsendelimit gibt es ein eigenes, planetenübergreifendes Limit für gleichzeitig laufende Expeditionen - anfangs nur <strong>1</strong>. Die eigenständige Forschung <strong>Expeditionskoordination</strong> (Kategorie Logistik) erhöht dieses Limit um 1 je Stufe, bis maximal <strong>5</strong> gleichzeitige Expeditionen bei Stufe 4. Der aktuelle Stand wird direkt im Expedition-Tab beim Start-Formular angezeigt.' },
       { title:'Letzte Sendung wiederholen', body:'Sobald in der aktuellen Sitzung schon einmal erfolgreich eine Expedition gestartet wurde, erscheint neben „Expedition starten" der Knopf <strong>„Letzte wiederholen"</strong>: stellt Typ und Eskorte-Zusammensetzung der zuletzt gestarteten Expedition wieder her und startet SOFORT - ideal zum wiederholten Farmen, ohne die Eskorte jedes Mal neu zusammenzuklicken. Ist am aktuellen Standort inzwischen weniger verfügbar als beim letzten Mal, wird automatisch auf das tatsächlich Vorhandene gekappt statt die Sendung zu blockieren.' },
       { title:'Fragmente & kosmetische Avatare', body:'Statt eines vollen seltenen Materials (Antimateriekern, Kristallherz, Alte Technologie) kann auch ein <strong>Fragment</strong> davon gefunden werden - häufiger, aber schwächer. Sind <strong>4 Fragmente</strong> desselben Typs im Inventar (Fortschritt-Tab), lassen sie sich per Knopfdruck zu 1x dem vollen Material zusammensetzen. Ebenfalls über Expeditionen erhältlich: drei <strong>exklusive Avatare</strong> (Nova, Void, Phoenix), die sonst nirgends wählbar sind - einmal gefunden dauerhaft freigeschaltet und in den Einstellungen auswählbar. Ist ein kosmetischer Fund bereits freigeschaltet, gibt es stattdessen Ersatz-Ressourcen, kein doppelter Nutzen.' },
@@ -14736,8 +14844,8 @@
       { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator (Stufe 1-8), dann Galaktische Legende 1-12 (Stufe 9-20), Sternenherrscher 1-12 (Stufe 21-32), Kosmischer Souverän 1-12 (Stufe 33-44) und ab Stufe 45 zählt "Kosmischer Souverän" endlos weiter hoch. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
-      { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Im Verteidigung-Tab an-/abschaltbar.' },
-      { title:'Automatische Reparatur', body:'Behebt Sabotage nach einem verlorenen Überfall sofort gegen 300 Erz + 150 Kristalle, statt 15 Minuten auf das automatische Ende zu warten.' },
+      { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Kostet 3 KI-Kerne je Einsatz (gleiche Automatik-Familie wie KI-Abfangautomatik) - reicht der Vorrat nicht, unterbleibt die Verlegung und du musst manuell reagieren. Im Verteidigung-Tab an-/abschaltbar.' },
+      { title:'Automatische Reparatur', body:'Behebt Sabotage nach einem verlorenen Überfall sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne, statt 15 Minuten auf das automatische Ende zu warten. Reicht der KI-Kerne-Vorrat nicht, bleibt die Sabotage bis zum manuellen Beheben oder Ablaufen aktiv.' },
       { title:'Live-Kampf-Wiedergabe', body:'Steuert, ob sich die Kampf-Wiedergabe automatisch öffnet, sobald ein Überfall abläuft, während man aktiv im Spiel ist. Standardmäßig an, im Verteidigung-Tab abschaltbar.' },
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
@@ -21580,11 +21688,19 @@
             } else if (findRoll < b_resource){
               const resKeys = ['erz','kristalle','deuterium','antimaterie','energie'];
               const res = resKeys[Math.floor(Math.random()*resKeys.length)];
-              const amt = Math.round((250+Math.random()*450)*mult);
+              const rawAmt = Math.round((250+Math.random()*450)*mult);
+              // Frachtraum-Deckelung (20.07.2026, Spieler-Wunsch "bei vielen Ressourcen müssen die
+              // mitgenommen werden können"): großzügiger Basis-Frachtraum deckt praktisch jeden
+              // normalen Fund ab, erst bei außergewöhnlich hohem mult (Tiefenraum + gestapelte Boni)
+              // greift der Deckel wirklich - Frachter in der Eskorte (siehe EXPEDITION_SHIP_KEYS)
+              // heben ihn zusätzlich an, genau wie bei regulären Angriffsmissionen.
+              const cargoCapacity = EXPEDITION_BASE_CARGO + fleetCargoCapacity(m.composition||fleet);
+              const amt = Math.min(rawAmt, cargoCapacity);
+              const cargoLimited = amt < rawAmt;
               const cap = storageCap(); const before = state.resources[res]||0; state.resources[res] = Math.min(cap, before+amt); const gained = state.resources[res]-before;
               addXp(outcome==='weakened' ? 10 : 25);
-              findText = 'Beute: +'+fmt(gained)+' '+((RES_DEFS.find(r=>r.key===res)||{}).label||res)+'.';
-              reportExtra = { reward: {[res]: gained} };
+              findText = 'Beute: +'+fmt(gained)+' '+((RES_DEFS.find(r=>r.key===res)||{}).label||res)+'.'+(cargoLimited?' <span style="color:#e0a548;">Frachtraum war zu knapp für den vollen Fund – mehr Frachter in der Eskorte helfen beim nächsten Mal.</span>':'');
+              reportExtra = { reward: {[res]: gained}, cargoLimited };
             } else if (findRoll < b_special){
               const ev = EXPEDITION_SPECIAL_EVENTS[Math.floor(Math.random()*EXPEDITION_SPECIAL_EVENTS.length)];
               const result = ev.resolve(mult);
@@ -22278,14 +22394,25 @@
   }
   // Automatische Reparatur: löst bei aktiviertem Schalter eine laufende Sabotage (mineDebuff nach
   // verlorenem Überfall) sofort gegen Ressourcen ab, statt die vollen 15 Minuten Produktionsminus
-  // abzuwarten.
+  // abzuwarten. Kostet zusätzlich KI-Kerne (20.07.2026, Spieler-Wunsch, gleiche Automatik-Familie wie
+  // KI-Abfangautomatik/Auto-Verstärkung) - läuft jeden Tick, solange die Sabotage aktiv ist, daher
+  // "einmalig warnen"-Flag am Debuff selbst statt bei jedem Tick erneut zu loggen.
+  const AUTO_REPAIR_COST_KERNE = 3;
   function maybeAutoRepair(){
     if (!state.autoRepairOn || !state.mineDebuff) return;
     const cost = { erz: 300, kristalle: 150 };
     if (!canAfford(cost)) return;
+    if ((state.resources.kikerne||0) < AUTO_REPAIR_COST_KERNE){
+      if (!state.mineDebuff.kikerneWarned){
+        state.mineDebuff.kikerneWarned = true;
+        log('Automatische Reparatur: nicht genug KI-Kerne ('+AUTO_REPAIR_COST_KERNE+' benötigt) - die Sabotage muss von selbst auslaufen oder manuell behoben werden.', 'ti-alert-triangle');
+      }
+      return;
+    }
     pay(cost);
+    state.resources.kikerne -= AUTO_REPAIR_COST_KERNE;
     const def = BUILDING_DEFS.find(d=>d.key===state.mineDebuff.key);
-    log('Automatische Reparatur: Sabotage an '+(def?def.name:'einem Gebäude')+' behoben ('+costHtml(cost)+').', 'ti-refresh');
+    log('Automatische Reparatur: Sabotage an '+(def?def.name:'einem Gebäude')+' behoben ('+costHtml(cost)+' + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne).', 'ti-refresh');
     state.mineDebuff = null;
     render(); save();
   }
@@ -24211,7 +24338,15 @@
     { key:'arctic', name:'Arktis', primary:'#7ec8e3', primaryRgb:'126,200,227', secondary:'#a8dde8', secondaryRgb:'168,221,232', secondaryDark:'#4a90a4', secondaryDarkRgb:'74,144,164', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
     { key:'amber', name:'Bernstein', primary:'#c9973f', primaryRgb:'201,151,63', secondary:'#e0c068', secondaryRgb:'224,192,104', secondaryDark:'#a87a2c', secondaryDarkRgb:'168,122,44', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
     { key:'steel', name:'Stahl', primary:'#8496ac', primaryRgb:'132,150,172', secondary:'#6fa89a', secondaryRgb:'111,168,154', secondaryDark:'#4f7d70', secondaryDarkRgb:'79,125,112', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
-    { key:'indigo', name:'Indigo', primary:'#5a5fc7', primaryRgb:'90,95,199', secondary:'#7b7fe0', secondaryRgb:'123,127,224', secondaryDark:'#3e4296', secondaryDarkRgb:'62,66,150', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' }
+    { key:'indigo', name:'Indigo', primary:'#5a5fc7', primaryRgb:'90,95,199', secondary:'#7b7fe0', secondaryRgb:'123,127,224', secondaryDark:'#3e4296', secondaryDarkRgb:'62,66,150', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
+    /* Grafik-Runde (20.07.2026, Spieler-Wunsch "5 neue Farbthemen"): fünf weitere Paletten, jede in
+       einer bisher unbesetzten Farbfamilie (Türkis/Rosé/Oliv/Kupfer/Marine), damit sie sich auf einen
+       Blick von den bestehenden neun unterscheiden statt nur eine Nuance zu variieren. */
+    { key:'turquoise', name:'Türkis', primary:'#2bb5a0', primaryRgb:'43,181,160', secondary:'#6fe0cc', secondaryRgb:'111,224,204', secondaryDark:'#1d8577', secondaryDarkRgb:'29,133,119', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
+    { key:'rose', name:'Rosé', primary:'#e0658f', primaryRgb:'224,101,143', secondary:'#f0a8c0', secondaryRgb:'240,168,192', secondaryDark:'#b8446b', secondaryDarkRgb:'184,68,107', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
+    { key:'olive', name:'Oliv', primary:'#8a9a4a', primaryRgb:'138,154,74', secondary:'#b5c470', secondaryRgb:'181,196,112', secondaryDark:'#647034', secondaryDarkRgb:'100,112,52', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
+    { key:'copper', name:'Kupfer', primary:'#b5652f', primaryRgb:'181,101,47', secondary:'#d68a52', secondaryRgb:'214,138,82', secondaryDark:'#8a4620', secondaryDarkRgb:'138,70,32', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
+    { key:'navy', name:'Marine', primary:'#2d4a7a', primaryRgb:'45,74,122', secondary:'#4a6fa5', secondaryRgb:'74,111,165', secondaryDark:'#1c3155', secondaryDarkRgb:'28,49,85', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' }
   ];
   function applyTheme(key){
     const t = THEME_PRESETS.find(p=>p.key===key) || THEME_PRESETS[0];
@@ -24581,6 +24716,45 @@
     const sel = getEscortSelection(state.activeBasePlanet, cf);
     for (const k of ESCORT_KEYS) sel[k] = lastExpeditionSend.composition[k]||0;
     sendExpeditionMission();
+  }
+  // Wie viele weitere Expeditionen JETZT noch gestartet werden könnten - begrenzt durch freie
+  // Forschungsschiffe UND das planetenübergreifende Expeditions-Limit (20.07.2026, Spieler-Wunsch
+  // "Schnellstart-Button basierend auf wieviele Expeditionen möglich"). Gemeinsam von der Anzeige und
+  // sendMaxExpeditions() genutzt, damit beide garantiert dieselbe Zahl zeigen.
+  function maxSendableExpeditionsNow(){
+    const cf = currentFleet();
+    const slotsUsed = cf.missions.filter(m=>m.type==='expedition').length;
+    const forscherAvailable = Math.max(0, (cf.forscher||0) - slotsUsed);
+    const freeExpSlots = Math.max(0, maxConcurrentExpeditions() - activeExpeditionCount());
+    // Zusätzlich durchs ALLGEMEINE Flottenentsendelimit gedeckelt (siehe fleetLimitBlocks/
+    // maxConcurrentFleets) - gilt für ALLE Missionsarten zusammen, nicht nur Expeditionen. Ohne diese
+    // Zeile würde der Button eine höhere Zahl versprechen, als sendExpeditionMission() tatsächlich
+    // zulässt, und stumm weniger Expeditionen starten als angezeigt.
+    const freeFleetSlots = Math.max(0, maxConcurrentFleets() - activeFleetMissionCount());
+    return Math.min(forscherAvailable, freeExpSlots, freeFleetSlots);
+  }
+  // Schnellstart (20.07.2026, Spieler-Wunsch): startet auf einen Schlag so viele Expeditionen wie
+  // gerade möglich sind, verteilt die aktuell ausgewählte Eskorte GLEICHMÄSSIG auf alle (Restschiffe,
+  // die sich nicht glatt teilen lassen, bleiben zuhause statt einer Expedition bevorzugt zugeteilt zu
+  // werden). Jede einzelne Sendung läuft weiter über sendExpeditionMission() - dieselbe Treibstoff-/
+  // Limit-/Fehlerbehandlung wie beim manuellen Senden, bricht bei Bedarf (z.B. Treibstoff alle) sauber
+  // vorzeitig ab statt einer Endlosschleife.
+  function sendMaxExpeditions(){
+    const cf = currentFleet();
+    const sendable = maxSendableExpeditionsNow();
+    if (sendable <= 0){ log('Aktuell keine weitere Expedition möglich (Forschungsschiffe oder Expeditions-Limit ausgeschöpft).', 'ti-alert-triangle'); return; }
+    const sel = getEscortSelection(state.activeBasePlanet, cf);
+    const perExpedition = {};
+    for (const k of ESCORT_KEYS) perExpedition[k] = Math.floor((sel[k]||0) / sendable);
+    let sentCount = 0;
+    for (let i=0; i<sendable; i++){
+      const selNow = getEscortSelection(state.activeBasePlanet, cf);
+      for (const k of ESCORT_KEYS) selNow[k] = perExpedition[k];
+      const before = cf.missions.length;
+      sendExpeditionMission();
+      if (cf.missions.length > before) sentCount++; else break;
+    }
+    if (sentCount > 1) log(sentCount+' Expeditionen gleichzeitig gestartet, Eskorte gleichmäßig aufgeteilt.', 'ti-map-2');
   }
 
   // Analytics (13.07.2026, Feature-Wunsch: echte Nutzungsdaten statt Vermutung aus Code-Lesen) -
@@ -25103,13 +25277,19 @@
     ];
     const raidTargetId = (state.incomingRaid && state.incomingRaid.detected) ? state.incomingRaid.planet : null;
     const sabotagedPlanetId = (state.mineDebuff && state.mineDebuff.until > Date.now()) ? (state.mineDebuff.planet||'home') : null;
+    // Leerenriss-Planet farblich hervorheben (20.07.2026, Spieler-Wunsch "Planet der von einem Event
+    // betroffen ist farblich hervorheben, Box blinkt auf") - dieselbe Blink-Behandlung wie Angriffsziel/
+    // Sabotage, in der etablierten Leerenriss-Akzentfarbe (siehe .dash-colony-card.event-voidrift).
+    const voidRiftPlanetId = state.voidRift ? state.voidRift.planetKey : null;
     document.getElementById('colonyDashboard').innerHTML = `
       <div class="dash-colony-row">
         ${dashSets.map(d => {
           const lvlSum = Object.values(d.b).reduce((a,v)=>a+v,0);
           const targeted = raidTargetId === d.id;
           const sabotaged = sabotagedPlanetId === d.id;
+          const hasVoidRift = voidRiftPlanetId === d.id;
           const sabotageTitle = sabotaged ? ' – sabotiert: '+buildingDisplayName(state.mineDebuff.key)+' -'+Math.round(state.mineDebuff.pct*100)+'% Produktion' : '';
+          const voidRiftTitle = hasVoidRift ? ' – Leerenriss offen, muss geschlossen werden!' : '';
           const shipCount = Object.entries(d.f||{}).reduce((a,[k,v]) => a + (SHIP_SCORE_WEIGHTS[k]!==undefined && typeof v==='number' ? v : 0), 0);
           const dAtk = Math.round(attackPower(d.f));
           const dDef = Math.round(defensePower(d.id));
@@ -25118,9 +25298,10 @@
           const debrisTitle = debrisInfoText(d.id) || '';
           const hasDebris = !!debrisTitle;
           return `
-            <div class="dash-colony-card ${targeted?'targeted':''} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${d.name}${role?' – Rolle: '+role.name+' ('+role.detail+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle} – anklicken zum Wechseln">
+            <div class="dash-colony-card ${targeted?'targeted':(sabotaged?'event-sabotage':(hasVoidRift?'event-voidrift':''))} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${d.name}${role?' – Rolle: '+role.name+' ('+role.detail+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle}${voidRiftTitle} – anklicken zum Wechseln">
               ${targeted ? `<span class="dash-attack-badge" title="Wird angegriffen!"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>` : ''}
               ${sabotaged ? `<span class="dash-sabotage-badge" title="Sabotiert${sabotageTitle}"><i class="ti ti-bolt" aria-hidden="true"></i></span>` : ''}
+              ${hasVoidRift ? `<span class="dash-voidrift-badge" title="Leerenriss offen${voidRiftTitle}"><i class="ti ti-atom-2" aria-hidden="true"></i></span>` : ''}
               ${hasDebris ? `<span class="dash-debris-badge" data-debris-info="${debrisTitle.replace(/"/g,'&quot;')}" title="${debrisTitle}"><i class="ti ti-recycle" aria-hidden="true"></i></span>` : ''}
               <div class="dash-colony-icon" style="position:relative;">
                 <canvas data-planet-icon="${isMoonKey(d.id) ? 'asteroid' : (effectivePlanetType(d.id) || 'erdaehnlich')}" width="26" height="26" style="display:block;"></canvas>
@@ -25542,12 +25723,19 @@
             const fdef = ORBITAL_FOCI.find(f=>f.key===cur.focus) || ORBITAL_FOCI[0];
             const nextLevel = cur.level + 1;
             const half = orbitalCost(cur.level);
+            // Bugfix (Spieler-Report "Kosten nicht aktuell, beim Bauen will er plötzlich Leerensplitter"):
+            // Stufe 4-5 verlangen zusätzlich Leerensplitter (siehe ORBITAL_VOID_LEVELS/buildOrbitalStation),
+            // das stand bisher NUR in der Bestätigungs-/Fehlermeldung nach dem Klick, nie im Button-Text
+            // selbst - jetzt vorab sichtbar, inkl. roter Hervorhebung bei zu wenig Vorrat.
+            const needShards = ORBITAL_VOID_LEVELS[nextLevel];
+            const shardShort = needShards && (state.rareItems.leerensplitter||0) < needShards;
+            const shardCostText = needShards ? ` <span class="costitem"${shardShort?' style="color:#e2647a;"':''}><i class="ti ti-diamond" aria-hidden="true"></i> ${needShards}x Leerensplitter</span>` : '';
             html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:${fdef.color};">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                 <span class="bname"><i class="ti ${fdef.icon}" aria-hidden="true" style="color:${fdef.color};"></i> ${fdef.name} <span class="lvl-pill">Stufe ${cur.level}/${ORBITAL_MAX_LEVEL}</span></span>
               </div>
               <div class="bmeta" style="margin-bottom:6px;">${fdef.desc} – aktuell wirksam: ${cur.focus==='def' ? '+'+(cur.level*8)+'% Verteidigung' : cur.focus==='prod' ? '+'+(cur.level*4)+'% Produktion' : '-'+(cur.level*6)+'% Schiffsbauzeit, +'+(cur.level*150)+' Lager'}</div>
-              ${nextLevel <= ORBITAL_MAX_LEVEL ? `<button data-build-orbital="${cur.focus}" style="margin-bottom:6px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Ausbau auf Stufe ${nextLevel} (${costHtml(orbitalCost(nextLevel))}, ${fmtDuration(orbitalBuildTime(nextLevel))})</button>` : `<div class="badge-done" style="text-align:center; margin-bottom:6px;"><i class="ti ti-check" aria-hidden="true"></i>Maximale Stufe erreicht</div>`}
+              ${nextLevel <= ORBITAL_MAX_LEVEL ? `<button data-build-orbital="${cur.focus}" style="margin-bottom:6px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Ausbau auf Stufe ${nextLevel} (${costHtml(orbitalCost(nextLevel))}${shardCostText}, ${fmtDuration(orbitalBuildTime(nextLevel))})</button>` : `<div class="badge-done" style="text-align:center; margin-bottom:6px;"><i class="ti ti-check" aria-hidden="true"></i>Maximale Stufe erreicht</div>`}
               <div class="bmeta" style="margin-bottom:4px;">Fokus umrüsten (sofort, halbe Baukosten der aktuellen Stufe):</div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
                 ${ORBITAL_FOCI.filter(f=>f.key!==cur.focus).map(f => `<button data-switch-orbital="${f.key}" style="font-size:10.5px; flex:1;"><i class="ti ${f.icon}" aria-hidden="true" style="margin-right:3px;"></i>${f.name}</button>`).join('')}
@@ -26370,6 +26558,7 @@
       const maxExpSlots = maxConcurrentExpeditions();
       const usedExpSlots = activeExpeditionCount();
       const canSendExp = forscherAvailable > 0 && usedExpSlots < maxExpSlots;
+      const sendableNow = maxSendableExpeditionsNow();
       const escortRows = ESCORT_KEYS.filter(k => (cf[k]||0) > 0).map(k => {
         const def = k==='superschlachtschiff' ? { key:'superschlachtschiff', name:'Superschlachtschiff', icon:'ship_superschlachtschiff', atk:220 } : SHIP_DEFS.find(d=>d.key===k);
         const owned = cf[k]||0;
@@ -26383,7 +26572,7 @@
         return `
           <div class="card-row" style="padding:0.6rem 0.8rem;">
             <div class="left" style="gap:9px;">
-              <div class="bicon" style="width:30px; height:30px; background:rgba(255,255,255,0.06);"><canvas data-ship-icon="${def.key}" width="26" height="26" style="display:block;"></canvas></div>
+              <div class="bicon" style="width:30px; height:30px; background:rgba(255,255,255,0.06); border:1px solid var(--line-2);"><canvas data-ship-icon="${def.key}" width="26" height="26" style="display:block;"></canvas></div>
               <div>
                 <div class="bname" style="font-size:12.5px;">${def.name}</div>
                 <div class="bmeta">verfügbar: ${available} von ${owned}${awayNote} · Angriffspunkte je Schiff: ${def.atk}${capNote}</div>
@@ -26433,6 +26622,7 @@
             <span style="font-size:16px; font-weight:600; color:#5dcaa5;"><i class="ti ti-sword" aria-hidden="true"></i> Eskort-Kampfkraft: ${Math.round(escortPower)}</span>
             <div style="display:flex; gap:6px;">
               ${lastExpeditionSend ? `<button id="resendExpeditionBtn" ${canSendExp?'':'disabled'} style="font-size:11px; padding:6px 10px;" title="Wiederholt Typ + Eskorte der letzten gestarteten Expedition und startet sofort"><i class="ti ti-refresh" aria-hidden="true" style="margin-right:4px;"></i>Letzte wiederholen</button>` : ''}
+              ${sendableNow > 1 ? `<button id="sendMaxExpeditionsBtn" style="font-size:11px; padding:6px 10px;" title="Startet ${sendableNow} Expeditionen auf einmal, Eskorte gleichmäßig aufgeteilt"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Alle starten (${sendableNow})</button>` : ''}
               <button class="buy ${canSendExp?'affordable':''}" id="sendExpeditionBtn" ${canSendExp?'':'disabled'}><i class="ti ti-map-2" aria-hidden="true" style="margin-right:4px;"></i>Expedition starten</button>
             </div>
           </div>
@@ -26482,6 +26672,8 @@
       if (expBtn) expBtn.onclick = sendExpeditionMission;
       const resendExpBtn = document.getElementById('resendExpeditionBtn');
       if (resendExpBtn) resendExpBtn.onclick = resendLastExpedition;
+      const sendMaxExpBtn = document.getElementById('sendMaxExpeditionsBtn');
+      if (sendMaxExpBtn) sendMaxExpBtn.onclick = sendMaxExpeditions;
       const sensorBtn = document.getElementById('quantensensorBtn');
       if (sensorBtn) sensorBtn.onclick = activateQuantensensor;
       const autoSensorRow = document.getElementById('autoSensorToggleRow');
@@ -27077,7 +27269,7 @@
         return `
           <div class="card-row" style="padding:0.55rem 0.75rem;">
             <div class="left" style="gap:9px;">
-              <div class="bicon" style="width:28px; height:28px; background:rgba(255,255,255,0.06);"><canvas data-ship-icon="${def.key}" width="24" height="24" style="display:block;"></canvas></div>
+              <div class="bicon" style="width:28px; height:28px; background:rgba(255,255,255,0.06); border:1px solid var(--line-2);"><canvas data-ship-icon="${def.key}" width="24" height="24" style="display:block;"></canvas></div>
               <div>
                 <div class="bname" style="font-size:12px;">${def.name}</div>
                 <div class="bmeta">verfügbar: ${available} von ${owned}${awayNote} · Angriffspunkte je Schiff: ${def.atk}${capNote}</div>
@@ -27958,6 +28150,7 @@
     }
     updateReportsBadge();
     updateExpeditionBadge();
+    updateVoidRiftTabBadge();
     if (document.activeElement !== document.getElementById('allianceInput')) document.getElementById('allianceInput').value = state.player.allianceTag || '';
     const allianceNameEl = document.getElementById('allianceNameDisplay');
     const allianceMetaEl = document.getElementById('allianceMetaLine');
@@ -27990,7 +28183,7 @@
     const autoReinforceSwitch = document.getElementById('autoReinforceSwitch');
     if (autoReinforceSwitch) autoReinforceSwitch.classList.toggle('on', !!state.autoReinforceOn);
     const autoReinforceLabel = document.getElementById('autoReinforceLabel');
-    if (autoReinforceLabel) autoReinforceLabel.textContent = state.autoReinforceOn ? 'An – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten' : 'Aus – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten';
+    if (autoReinforceLabel) autoReinforceLabel.textContent = (state.autoReinforceOn ? 'An' : 'Aus') + ' – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten ('+AUTO_REINFORCE_COST_KERNE+' KI-Kerne je Einsatz; Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
 
     const kiInterceptRow = document.getElementById('kiInterceptRow');
     if (kiInterceptRow){
@@ -28004,7 +28197,7 @@
     const autoRepairSwitch = document.getElementById('autoRepairSwitch');
     if (autoRepairSwitch) autoRepairSwitch.classList.toggle('on', !!state.autoRepairOn);
     const autoRepairLabel = document.getElementById('autoRepairLabel');
-    if (autoRepairLabel) autoRepairLabel.textContent = state.autoRepairOn ? 'An – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle statt 15 Min. zu warten' : 'Aus – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle statt 15 Min. zu warten';
+    if (autoRepairLabel) autoRepairLabel.textContent = (state.autoRepairOn ? 'An' : 'Aus') + ' – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne statt 15 Min. zu warten (Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
     const autoWatchLiveRaidSwitch = document.getElementById('autoWatchLiveRaidSwitch');
     if (autoWatchLiveRaidSwitch) autoWatchLiveRaidSwitch.classList.toggle('on', !!state.autoWatchLiveRaid);
     const autoWatchLiveRaidLabel = document.getElementById('autoWatchLiveRaidLabel');
@@ -28894,6 +29087,32 @@
     if (headerProfileBtn) headerProfileBtn.onclick = () => switchTab('einstellungen');
     const headerReportsBtn = document.getElementById('headerReportsBtn');
     if (headerReportsBtn) headerReportsBtn.onclick = () => switchTab('berichte');
+    // Ko-fi-E-Mail-Abfrage vor dem ersten Sprung zu Ko-fi (20.07.2026, Spieler-Wunsch): ohne
+    // gespeicherte E-Mail erst die Abfrage zeigen, mit gespeicherter E-Mail den Umweg überspringen.
+    const headerKofiBtn = document.getElementById('headerKofiBtn');
+    if (headerKofiBtn) headerKofiBtn.onclick = () => {
+      if (state.kofiEmail){ window.open('https://ko-fi.com/gamegeeeeek/leaderboard', '_blank', 'noopener'); return; }
+      const overlay = document.getElementById('kofiEmailPromptOverlay');
+      const inp = document.getElementById('kofiEmailPromptInput');
+      if (inp) inp.value = '';
+      if (overlay) overlay.style.display = 'flex';
+    };
+    const kofiPromptClose = document.getElementById('kofiEmailPromptCloseBtn');
+    if (kofiPromptClose) kofiPromptClose.onclick = () => { document.getElementById('kofiEmailPromptOverlay').style.display = 'none'; };
+    const kofiPromptSkip = document.getElementById('kofiEmailPromptSkipBtn');
+    if (kofiPromptSkip) kofiPromptSkip.onclick = () => {
+      document.getElementById('kofiEmailPromptOverlay').style.display = 'none';
+      window.open('https://ko-fi.com/gamegeeeeek/leaderboard', '_blank', 'noopener');
+    };
+    const kofiPromptGo = document.getElementById('kofiEmailPromptGoBtn');
+    if (kofiPromptGo) kofiPromptGo.onclick = () => {
+      const email = (document.getElementById('kofiEmailPromptInput').value||'').trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ log('Bitte eine gültige E-Mail-Adresse eintragen.', 'ti-alert-triangle'); return; }
+      state.kofiEmail = email;
+      save();
+      document.getElementById('kofiEmailPromptOverlay').style.display = 'none';
+      window.open('https://ko-fi.com/gamegeeeeek/leaderboard', '_blank', 'noopener');
+    };
     const headerFeedbackBtn = document.getElementById('headerFeedbackBtn');
     if (headerFeedbackBtn) headerFeedbackBtn.onclick = () => {
       switchTab('einstellungen');
