@@ -1396,6 +1396,7 @@
           <button id="profileMoreBtn" class="btn-more" aria-expanded="false" title="Mehr">···</button>
         </div>
         <div id="profileMoreMenu" class="profile-more-menu">
+          <button id="profileSabotageBtn" style="width:100%; display:none;"><i class="ti ti-target" aria-hidden="true" style="margin-right:4px;"></i>Störmanöver (Sabotage)</button>
           <button id="profilePactBtn" style="width:100%;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten</button>
           <button id="profileAllianceInviteBtn" style="width:100%; display:none;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Zur Allianz einladen</button>
           <button id="profileReportBtn" style="width:100%; font-size:11px; padding:6px; opacity:0.75;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Spieler melden</button>
@@ -3346,8 +3347,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.159.0';
+  const VERSION = '8.160.0';
   const PATCHNOTES = [
+    { version:'8.160.0', date:'20.07.2026', changes:[
+      'Neu: Störmanöver (Sabotage) - mit einem Spionagekreuzer lässt sich im Spielerprofil (Menü "···") eine verdeckte Sabotage gegen andere Spieler ausführen. Bei Erfolg stiehlst du ohne Flottenkampf eine kleine, gedeckelte Ressourcenmenge (4-8%, viel weniger als ein echter Angriff), pro Ziel mit 2-Stunden-Abklingzeit. Die Erfolgschance sinkt mit der Spionageabwehr-Forschung des Ziels (85% bis 25%) - Spionageabwehr schützt jetzt also auch vor Sabotage. Serverseitig aufgelöst und gehärtet; das Ziel wird benachrichtigt',
+    ]},
     { version:'8.159.0', date:'20.07.2026', changes:[
       'Allianz-Aufklärung teilen: in der Aufklärungs-Übersicht (Berichte-Tab) lässt sich jeder eigene Spähbericht per Knopf mit der Allianz teilen. Mitglieder sehen die gesammelte geteilte Aufklärung unter "Von der Allianz geteilt" - koordinierte Angriffe planen wird damit deutlich einfacher (serverseitig auf Allianz-Mitglieder beschränkt)',
     ]},
@@ -13004,6 +13008,40 @@
       await storageSet('spyping:'+targetId, JSON.stringify({ fromId: state.player.id, fromName: state.player.name || 'Ein Spieler', deep: !!deep, time: Date.now() }));
     } catch(e){ /* Info-Ping, Fehler bewusst ignoriert - Aufklärung selbst war erfolgreich */ }
   }
+  // Störmanöver (Sabotage, Spionage-Vertiefung): verdeckte Operation eines Spionagekreuzers, die beim
+  // Ziel eine kleine, gedeckelte Ressourcenmenge stiehlt - ohne Flottenkampf, dafür serverseitig
+  // aufgelöst und gehärtet (Beute wird vom Server aus dem echten Spielstand berechnet). 2h Abklingzeit
+  // pro Ziel. Direkte Aktion wie die Spionage selbst, keine Flugzeit (bewusst verdeckt, keine Flotte).
+  async function sendSabotageMission(playerId, name){
+    if (playerId === state.player.id) return;
+    if (!useBackend()){ log('Störmanöver sind nur im Online-Modus möglich.', 'ti-alert-triangle'); return; }
+    const pactSab = activePactWith(playerId);
+    if (pactSab){ log('Nichtangriffspakt mit '+name+' aktiv - ein Störmanöver ist blockiert.', 'ti-shield'); return; }
+    const scouts = allFleets().reduce((a,f)=>a+(f.spionageschiff||0),0);
+    if (scouts < 1){ log('Du brauchst mindestens einen Spionagekreuzer für ein Störmanöver.', 'ti-alert-triangle'); return; }
+    try {
+      const res = await backendFetch('/sabotage', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: playerId }) });
+      const data = await res.json();
+      if (res.status === 429){ log('Störmanöver gegen '+name+' noch in der Abklingzeit'+(data.cooldownMs?' (noch '+fmtDuration(data.cooldownMs/1000)+')':'')+'.', 'ti-clock'); return; }
+      if (!res.ok){ log('Störmanöver nicht möglich: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
+      if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+      if (data.success){
+        const cap = storageCap(); const gained = [];
+        for (const [r,amt] of Object.entries(data.stolen||{})){
+          const before = state.resources[r]||0;
+          state.resources[r] = Math.min(cap, before + amt);
+          const got = state.resources[r]-before;
+          if (got>0) gained.push(got+' '+r);
+        }
+        log('Störmanöver gegen '+name+' erfolgreich! Verdeckt erbeutet: '+(gained.length?gained.join(', '):'nichts (Lager voll?)')+'.', 'ti-target');
+        pushToast('Sabotage erfolgreich: '+name, 'ti-target', 'ok');
+        trackEvent('sabotage_success');
+      } else {
+        log('Störmanöver gegen '+name+' fehlgeschlagen - die Spionageabwehr des Ziels hat es vereitelt.', 'ti-shield');
+      }
+      render(); save();
+    } catch(e){ log('Server für das Störmanöver nicht erreichbar.', 'ti-alert-triangle'); }
+  }
   async function sendPlayerAttackMission(playerId, name){
     const pactAtk = activePactWith(playerId);
     if (pactAtk){ log('Nichtangriffspakt mit '+name+' aktiv - Angriffe sind blockiert (läuft noch '+fmtDuration(Math.max(0,((pactAtk.cancelEffectiveAt||pactAtk.expiresAt)-Date.now()))/1000)+').', 'ti-shield'); return; }
@@ -13597,6 +13635,12 @@
       moreBtn.setAttribute('aria-expanded', 'false');
       moreBtn.style.display = isMe ? 'none' : 'flex';
       moreBtn.onclick = () => { const open = moreMenu.classList.toggle('open'); moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+    }
+    const sabotageBtn = document.getElementById('profileSabotageBtn');
+    if (sabotageBtn){
+      const canSabotage = !isMe && useBackend();
+      sabotageBtn.style.display = canSabotage ? 'block' : 'none';
+      if (canSabotage) sabotageBtn.onclick = () => { closePlayerProfile(); sendSabotageMission(entry.id, entry.name); };
     }
     msgBtn.onclick = () => { closePlayerProfile(); openMessageCompose(entry.id, entry.name); };
     if (spyBtn) spyBtn.onclick = () => { closePlayerProfile(); sendSpyMission(entry.id, entry.name); };
@@ -15011,6 +15055,7 @@
       { title:'Flottenvielfalt & Kampfbonus-Deckel', body:'<strong>Flottenvielfalt:</strong> Der Einsatz mehrerer verschiedener Kampfschifftypen (statt nur eines Typs) gibt +2% Angriffs- UND Verteidigungskraft je zusätzlichem genutztem Typ, gedeckelt bei 5 Typen (+8%). Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.' },
+      { title:'Störmanöver (Sabotage)', body:'Mit einem <strong>Spionagekreuzer</strong> kannst du im Spielerprofil (Menü "···" → Störmanöver) eine verdeckte Sabotage gegen einen anderen Spieler ausführen. Bei Erfolg stiehlst du <strong>ohne Flottenkampf</strong> eine kleine, gedeckelte Menge Ressourcen (4-8%, deutlich weniger als ein echter Angriff mit 12-25%). Kein Flottenrisiko, aber pro Ziel gilt eine <strong>2-Stunden-Abklingzeit</strong>. Die Erfolgschance sinkt mit der <strong>Spionageabwehr-Forschung des Ziels</strong> (von 85% bis herunter auf 25%) - wer viel in Spionageabwehr investiert, ist also nicht nur gegen Ausspähen, sondern auch gegen Sabotage geschützt. Der Kampf wird serverseitig aufgelöst (die Beute aus dem echten Spielstand berechnet), das Ziel wird benachrichtigt.' },
       { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
       { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt. Das <strong>Superschlachtschiff</strong> bringt zusätzlich einen kleinen Eigenhangar mit (2 Plätze je Schiff) - genug für eine winzige Eigen-Eskorte, aber kein Ersatz für dedizierte Träger bei größeren Jäger-/Bomber-Flotten.' },
@@ -15227,7 +15272,7 @@
     { key:'all', label:'Alle', icon:'ti-list-details' },
     { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','pirate-debris-raid','void-rift'] },
     { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered'] },
-    { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout'] },
+    { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout','sabotage-sent','sabotage-received'] },
     { key:'other', label:'Sonstiges', icon:'ti-sparkles', types:['item-found','weekly-reward','debris-cleared','random-event'] }
   ];
   function reportCategoryOf(r){
@@ -15397,6 +15442,16 @@
         body += '<br>Angegriffen mit: '+fleetBreakdownHtml(r.fleet);
         if (r.defenseBefore) body += '<br>Deine Verteidigung: '+defenseBreakdownHtml(r.defenseBefore, r.destroyedBuilding);
         if (!won && r.stolen) body += '<br>Entwendet: '+rewardHtml(r.stolen);
+      } else if (r.type === 'sabotage-sent'){
+        title = (won?'Störmanöver erfolgreich':'Störmanöver fehlgeschlagen')+' – gegen '+escapeHtml(r.targetName||'Unbekannt');
+        body = won
+          ? 'Dein Spionagekreuzer hat verdeckt erbeutet: '+(r.stolen?rewardHtml(r.stolen):'nichts')+'.'
+          : 'Die Spionageabwehr des Ziels hat das Störmanöver vereitelt - keine Beute.';
+      } else if (r.type === 'sabotage-received'){
+        title = (won?'Störmanöver abgewehrt':'Sabotiert')+' – von '+escapeHtml(r.attackerName||'Unbekannt');
+        body = won
+          ? 'Deine Spionageabwehr hat ein feindliches Störmanöver vereitelt.'
+          : 'Ein feindlicher Spionagekreuzer hat verdeckt Ressourcen gestohlen: '+(r.stolen?rewardHtml(r.stolen):'unbekannt')+'. Höhere Spionageabwehr-Forschung senkt die Erfolgschance solcher Angriffe.';
       } else if (r.type === 'raid'){
         title = (won?'Überfall abgewehrt':'Überfallen')+' – '+(r.faction||'NPC-Flotte')+(r.targetPlanet?' ('+planetDisplayName(r.targetPlanet)+')':'');
         body = (r.targetPlanet ? 'Angegriffener Planet: <strong>'+planetDisplayName(r.targetPlanet)+'</strong><br>' : '') + 'Angriffspunkte des Gegners: ~'+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
