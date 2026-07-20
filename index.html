@@ -1097,14 +1097,14 @@
        (.card-row, .profile-card, ..., .rank-row) übernimmt das jetzt; stünde hier noch border-radius,
        würde es die dortige border-radius:0 wegen späterer Textposition ueberschreiben. */
     .rank-row.me { background:rgba(var(--primary-rgb), 0.18); border:0.5px solid var(--c-primary); }
-    /* Unterstützer-Kennzeichnung (20.07.2026, Spieler-Wunsch, Vorschlagsrunde "B+C kombiniert"):
-       dezenter Gold-Rahmen+Glow auf der ganzen Zeile (gleiche Sprache wie .rank-row.me, nur Gold statt
-       Lila) PLUS eine Medaillen-Pille direkt neben dem Namen (siehe renderLeaderboardList). Zeitlich
-       befristet auf 30 Tage ab der letzten Ko-fi-Spende - serverseitig berechnet, siehe isSupporter im
-       Bestenlisten-Eintrag. */
-    .rank-row.supporter { background:rgba(250,199,117,0.08); border:0.5px solid rgba(250,199,117,0.5); box-shadow:0 0 8px rgba(250,199,117,0.3); }
-    .rank-row.me.supporter { background:rgba(var(--primary-rgb), 0.18); border-color:var(--c-primary); box-shadow:0 0 8px rgba(250,199,117,0.3); }
-    .pill-supporter { color:#fac775; border-color:rgba(250,199,117,0.5); }
+    /* Unterstützer-Kennzeichnung (20.07.2026, Spieler-Wunsch, finale Runde: Vorschlag D "gestaffelte
+       Medaillen"): eine Medaillen-Pille direkt neben dem Namen, Farbe/Symbol je nach Gesamt-
+       Spendenbetrag (Bronze/Silber/Gold, siehe supporterTierFor() im Backend und renderLeaderboardList
+       im Frontend). Zeitlich befristet auf 30 Tage ab der letzten Ko-fi-Spende - serverseitig
+       berechnet, siehe isSupporter/supporterTier im Bestenlisten-Eintrag. */
+    .pill-supporter-bronze { color:#c9885a; border-color:rgba(201,136,90,0.5); }
+    .pill-supporter-silver { color:#c7cbe0; border-color:rgba(199,203,224,0.5); }
+    .pill-supporter-gold { color:#fac775; border-color:rgba(250,199,117,0.5); box-shadow:0 0 6px rgba(250,199,117,0.35); }
     .rank-num { width:22px; text-align:center; color:var(--c-info); font-weight:600; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
     .lb-note { font-size:11px; color:#7d8199; margin-top:8px; display:flex; align-items:center; gap:5px; }
     /* Runde 3 der Profilbild/Banner-Überarbeitung: Allianz-Chronik ist bewusst KEIN neues Tracking,
@@ -3182,8 +3182,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.148.0';
+  const VERSION = '8.149.0';
   const PATCHNOTES = [
+    { version:'8.149.0', date:'20.07.2026', changes:[
+      'Unterstützer-Abzeichen überarbeitet (Spieler-Feedback direkt nach v8.148.0): statt einer einzelnen ☕-Pille mit Zeilen-Rahmen jetzt drei gestaffelte Medaillen-Stufen (🥉 Bronze/🥈 Silber/🥇 Gold), die sich automatisch aus der Gesamt-Spendensumme der verknüpften Ko-fi-E-Mail ergeben - der Zeilen-Rahmen entfällt zugunsten der schlichteren Medaillen-Pille'
+    ]},
     { version:'8.148.0', date:'20.07.2026', changes:[
       'Unterstützer werden jetzt in der Bestenliste sichtbar gekennzeichnet (Spieler-Wunsch): Name bekommt eine ☕-Medaillen-Pille, die ganze Zeile einen dezenten Gold-Rahmen mit Leuchten. Im Fortschritt-Tab unter "Unterstützer" lässt sich die eigene Ko-fi-E-Mail-Adresse eintragen, um das Abzeichen freizuschalten - läuft 30 Tage nach der letzten Spende automatisch wieder ab, eine neue Spende verlängert das Fenster',
       'Serverseitig fälschungssicher: die Kennzeichnung wird bei jedem Laden der Bestenliste frisch aus der hinterlegten Ko-fi-Spende berechnet, ein selbst gesetztes Abzeichen ohne echte Spende wird verworfen'
@@ -24938,12 +24941,18 @@
       const rank = leaderboardCache.indexOf(e)+1;
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
       const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 4px rgba(93,202,165,0.7)':'none'};"></span>`;
+      // Vorschlag D "gestaffelte Medaillen" (20.07.2026, finale Auswahl): Symbol/Farbe/Label je nach
+      // vom Server ermittelter Stufe (supporterTier, aus der Gesamt-Spendensumme, siehe Backend
+      // supporterTierFor). SUPPORTER_TIER_META lokal statt globaler Konstante, da nur hier gebraucht.
+      const SUPPORTER_TIER_META = { bronze:{icon:'🥉', label:'Unterstützer'}, silver:{icon:'🥈', label:'Unterstützer'}, gold:{icon:'🥇', label:'Top-Unterstützer'} };
+      const supporterMeta = e.isSupporter ? (SUPPORTER_TIER_META[e.supporterTier] || SUPPORTER_TIER_META.bronze) : null;
+      const supporterBadge = supporterMeta ? ` <span class="lvl-pill pill-supporter-${e.supporterTier||'bronze'}" style="font-size:10px;" title="${supporterMeta.label} - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt">${supporterMeta.icon} ${supporterMeta.label}</span>` : '';
       return `
-        <div class="rank-row ${isMe?'me':''} ${e.isSupporter?'supporter':''}" data-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};">
+        <div class="rank-row ${isMe?'me':''}" data-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <span class="rank-num">${rank}</span>
             ${onlineDot}
-            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+escapeHtml(e.allianceTag)+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+escapeHtml(e.title)+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${e.isSupporter?' <span class="lvl-pill pill-supporter" style="font-size:10px;" title="Unterstützer - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt">☕ Unterstützer</span>':''}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+escapeHtml(e.allianceTag)+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+escapeHtml(e.title)+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${supporterBadge}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
           </div>
           <div style="display:flex; gap:10px; color:#9296ac; flex-shrink:0; align-items:center;">
             <span><i class="ti ti-rocket" aria-hidden="true"></i> ${e.ships||0}</span>
@@ -28209,7 +28218,8 @@
           if (res.ok && data.ok){
             state.kofiEmail = email;
             kofiClaimStatusOk = true;
-            kofiClaimStatusMsg = data.active ? 'Unterstützer-Abzeichen freigeschaltet! Noch '+data.daysLeft+' Tag(e) aktiv, erscheint in Kürze in der Bestenliste.' : 'E-Mail verknüpft, aber die letzte Spende liegt schon länger als 30 Tage zurück - eine neue Spende schaltet das Abzeichen automatisch wieder frei.';
+            const tierLabel = { bronze:'Bronze 🥉', silver:'Silber 🥈', gold:'Gold 🥇' }[data.tier] || '';
+            kofiClaimStatusMsg = data.active ? 'Unterstützer-Abzeichen freigeschaltet ('+tierLabel+')! Noch '+data.daysLeft+' Tag(e) aktiv, erscheint in Kürze in der Bestenliste.' : 'E-Mail verknüpft, aber die letzte Spende liegt schon länger als 30 Tage zurück - eine neue Spende schaltet das Abzeichen automatisch wieder frei.';
             save();
             loadLeaderboard();
           } else {
