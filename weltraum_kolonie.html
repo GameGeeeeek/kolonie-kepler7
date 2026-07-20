@@ -3159,8 +3159,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.142.0';
+  const VERSION = '8.142.1';
   const PATCHNOTES = [
+    { version:'8.142.1', date:'20.07.2026', changes:[
+      'Bugfix: Klick auf einen Allianz-/Galaxie-Unterreiter wirkte bei manchen Spielständen scheinbar erst nach einem Seiten-Reload. Ursache: die Sichtbarkeits-Umschaltung lief bisher NACH mehreren anderen Render-Aufrufen im selben Tab-Block - falls einer davon bei bestimmten Serverdaten eine Exception warf, brach der komplette Render-Durchlauf davor ab. Läuft jetzt als Allererstes im Block und zusätzlich abgesichert, damit ein Fehler in einer einzelnen Box nie mehr die Reiter-Umschaltung blockiert. Die Auswahl wird außerdem sofort gespeichert statt erst beim nächsten automatischen Speichern'
+    ]},
     { version:'8.142.0', date:'20.07.2026', changes:[
       'Galaxie-Tab neu gegliedert (gleiches Muster wie beim Allianz-Tab, Spieler-Wunsch "auch für andere Bereiche"): statt 12 Abschnitten untereinander jetzt vier klickbare Unterreiter - Kampf & Eroberung (Angriffsflotte/Weltboss/Piraten-Versteck/Territorien), Diplomatie & Handel (NPC-Fraktionen/Pakte/Schwarzmarkt), Rangliste & Ruhm (Bestenliste/Ruhmeshalle/Wochenliga) und Nachrichten',
       'Nebenbei behoben: eine doppelte HTML-ID (zwei Elemente mit id="worldBossBox") sorgte dafür, dass der Weltboss-Inhalt immer im ersten, unbeschrifteten Element ganz oben landete statt unter der Überschrift "Weltboss - gemeinsame Jagd aller Spieler" weiter unten, die dadurch leer blieb - jetzt nur noch ein Element, korrekt in der Kampf-Gruppe'
@@ -26857,6 +26860,26 @@
     }
 
     if (activeTab === 'galaxie'){
+    // Galaxie-Unterreiter (20.07.2026, gleiches Muster wie beim Allianz-Tab, Spieler-Wunsch
+    // "auch für andere Bereiche"): vier Themengruppen statt 12 Abschnitten untereinander. Boxen
+    // rendern unverändert weiter (auch unsichtbare - die zugehörigen Funktionen laufen unabhängig
+    // vom Reiter), hier wird nur die Sichtbarkeit der vier Wrapper + der aktive Pillen-Button
+    // umgeschaltet - bewusst als eigener, paralleler Block statt Wiederverwendung der Allianz-
+    // Wiring-Funktion, um die bereits produktiv laufende Allianz-Logik nicht anzufassen.
+    // BEWUSST ganz am Anfang des Blocks UND in try/catch (Bug-Report 20.07.2026: Klick schien erst
+    // nach Seiten-Reload zu wirken) - wenn irgendeine der vielen Galaxie-Boxen weiter unten bei
+    // echten Serverdaten eine Exception wirft, brach das komplette render() vorher genau dort ab,
+    // BEVOR die Sichtbarkeits-Umschaltung überhaupt lief. So läuft sie garantiert als Erstes.
+    try {
+      if (state.galaxySubTab === undefined) state.galaxySubTab = 'kampf';
+      document.querySelectorAll('.galaxy-subpanel').forEach(panel => {
+        panel.style.display = panel.getAttribute('data-galaxy-sub') === state.galaxySubTab ? '' : 'none';
+      });
+      document.querySelectorAll('[data-galaxy-subtab]').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-galaxy-subtab') === state.galaxySubTab);
+        btn.onclick = () => { state.galaxySubTab = btn.getAttribute('data-galaxy-subtab'); render(); save(); };
+      });
+    } catch(e){ console.error('Galaxie-Unterreiter-Umschaltung fehlgeschlagen:', e); }
     renderGalaxyNews();
     const attackFleetBox = document.getElementById('attackFleetBox');
     if (attackFleetBox && !isTypingIn('attackFleetBox')){
@@ -27140,20 +27163,6 @@
         </div>
       `;
     }).join('');
-    // Galaxie-Unterreiter (20.07.2026, gleiches Muster wie beim Allianz-Tab, Spieler-Wunsch
-    // "auch für andere Bereiche"): vier Themengruppen statt 12 Abschnitten untereinander. Boxen
-    // rendern unverändert weiter (auch unsichtbare - die zugehörigen Funktionen laufen unabhängig
-    // vom Reiter), hier wird nur die Sichtbarkeit der vier Wrapper + der aktive Pillen-Button
-    // umgeschaltet - bewusst als eigener, paralleler Block statt Wiederverwendung der Allianz-
-    // Wiring-Funktion, um die bereits produktiv laufende Allianz-Logik nicht anzufassen.
-    if (state.galaxySubTab === undefined) state.galaxySubTab = 'kampf';
-    document.querySelectorAll('.galaxy-subpanel').forEach(panel => {
-      panel.style.display = panel.getAttribute('data-galaxy-sub') === state.galaxySubTab ? '' : 'none';
-    });
-    document.querySelectorAll('[data-galaxy-subtab]').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-galaxy-subtab') === state.galaxySubTab);
-      btn.onclick = () => { state.galaxySubTab = btn.getAttribute('data-galaxy-subtab'); render(); };
-    });
     } // Ende Galaxie-Tab-Guard
 
     document.getElementById('heroAttack').textContent = attackPower();
@@ -27978,6 +27987,24 @@
     // diese acht Allianz-Boxen wurden bisher JEDE Sekunde neu aufgebaut, auch wenn ein völlig anderer
     // Tab offen war und sie unsichtbar sind - nur bei aktivem Allianz-Tab neu berechnen.
     if (activeTab === 'allianz'){
+      // Allianz-Unterreiter (Vorschlagsrunde 20.07.2026, Spieler-Wunsch "Seite ordnen/unterteilen"):
+      // vier Themengruppen statt 17 Abschnitte untereinander - Boxen selbst rendern unverändert weiter
+      // (auch unsichtbare, da die zugehörigen loadAllianceX()-Funktionen unabhängig vom Reiter laufen),
+      // hier wird nur die Sichtbarkeit der vier Wrapper + der aktive Pillen-Button umgeschaltet.
+      // BEWUSST vor den 8 Box-Render-Aufrufen unten UND in try/catch (Bug-Report 20.07.2026: Klick
+      // schien erst nach Seiten-Reload zu wirken) - wenn eine dieser Boxen bei echten Serverdaten aus
+      // irgendeinem Grund eine Exception wirft, brach das komplette render() vorher an dieser Stelle
+      // ab, BEVOR die Sichtbarkeits-Umschaltung überhaupt lief. So läuft sie garantiert als Erstes.
+      try {
+        if (state.allianceSubTab === undefined) state.allianceSubTab = 'uebersicht';
+        document.querySelectorAll('.alliance-subpanel').forEach(panel => {
+          panel.style.display = panel.getAttribute('data-alliance-sub') === state.allianceSubTab ? '' : 'none';
+        });
+        document.querySelectorAll('[data-alliance-subtab]').forEach(btn => {
+          btn.classList.toggle('active', btn.getAttribute('data-alliance-subtab') === state.allianceSubTab);
+          btn.onclick = () => { state.allianceSubTab = btn.getAttribute('data-alliance-subtab'); render(); save(); };
+        });
+      } catch(e){ console.error('Allianz-Unterreiter-Umschaltung fehlgeschlagen:', e); }
       renderAllianceTechBox();
       renderAllianceBaseBox();
       renderAllianceMusterBox();
@@ -27986,18 +28013,6 @@
       renderAllianceBuildingBox();
       renderAllianceEndgameBox();
       renderAllianceWorldProjectsBox();
-      // Allianz-Unterreiter (Vorschlagsrunde 20.07.2026, Spieler-Wunsch "Seite ordnen/unterteilen"):
-      // vier Themengruppen statt 17 Abschnitte untereinander - Boxen selbst rendern unverändert weiter
-      // (auch unsichtbare, da die zugehörigen loadAllianceX()-Funktionen unabhängig vom Reiter laufen),
-      // hier wird nur die Sichtbarkeit der vier Wrapper + der aktive Pillen-Button umgeschaltet.
-      if (state.allianceSubTab === undefined) state.allianceSubTab = 'uebersicht';
-      document.querySelectorAll('.alliance-subpanel').forEach(panel => {
-        panel.style.display = panel.getAttribute('data-alliance-sub') === state.allianceSubTab ? '' : 'none';
-      });
-      document.querySelectorAll('[data-alliance-subtab]').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-alliance-subtab') === state.allianceSubTab);
-        btn.onclick = () => { state.allianceSubTab = btn.getAttribute('data-alliance-subtab'); render(); };
-      });
     }
     renderReportsBox();
     const kofiBox = document.getElementById('kofiTopSupporterBox');
