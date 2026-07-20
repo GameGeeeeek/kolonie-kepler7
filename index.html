@@ -964,6 +964,18 @@
     .ach-cat-count.ach-cat-full { color:var(--c-secondary); border-color:var(--c-secondary-dark); background:rgba(var(--secondary-dark-rgb),0.14); }
     .ach-pts { font-family:var(--font-mono, monospace); font-size:9.5px; font-weight:700; color:#fac775; background:rgba(250,199,117,0.13);
       border:0.5px solid rgba(250,199,117,0.35); border-radius:5px; padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
+    /* Markt-Vertiefung (20.07.2026): Preisverlauf-Sparkline + Ereignis-Banner */
+    .mkt-spark-wrap { flex-shrink:0; opacity:0.9; align-self:flex-start; }
+    .mkt-spark { display:block; }
+    .mkt-event { display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:0.9rem; border-radius:10px;
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+    .mkt-event > i { font-size:20px; flex-shrink:0; }
+    .mkt-event-up   { background:rgba(226,75,74,0.12);  border:0.5px solid rgba(226,75,74,0.5);  color:#f0997b; }
+    .mkt-event-down { background:rgba(93,202,165,0.12); border:0.5px solid rgba(93,202,165,0.5); color:#5dcaa5; }
+    .mkt-event-title { font-weight:700; font-size:13px; }
+    .mkt-event-sub { font-size:11px; color:#a7adc4; margin-top:1px; }
+    .mkt-tag { font-family:var(--font-mono, monospace); font-size:9.5px; font-weight:700; border:0.5px solid currentColor; border-radius:5px; padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
+    .mkt-affected { box-shadow:0 0 0 0.5px rgba(255,255,255,0.04); }
 
     .planet-switch { display:flex; gap:6px; margin-bottom:1rem; flex-wrap:wrap; }
     .planet-pill { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:10px; padding:6px 12px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; }
@@ -3364,8 +3376,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.161.0';
+  const VERSION = '8.162.0';
   const PATCHNOTES = [
+    { version:'8.162.0', date:'20.07.2026', changes:[
+      'Markt vertieft: Jede Ressource zeigt jetzt einen Preisverlauf-Chart (Sparkline) der letzten Stunden - so lässt sich auf einen Blick erkennen, ob ein Preis gerade steigt oder fällt, statt nur den Momentanwert zu sehen. Perfekt zum Timing von Ein- und Verkäufen',
+      'Neu: Markt-Ereignisse - gelegentlich erschüttert ein Angebots- oder Nachfrageschock eine einzelne Ressource (Knappheit treibt die Preise hoch, eine Schwemme drückt sie). Das Ereignis wird als Banner im Markt-Tab und in der Galaxie-News angekündigt, betrifft immer nur eine Ressource für 2-4 Stunden und lässt die Preise organisch zum Schockniveau driften (kein harter Sprung). Wer aufpasst, kann günstig einkaufen bzw. teuer verkaufen',
+    ]},
     { version:'8.161.0', date:'20.07.2026', changes:[
       'Erfolge überarbeitet: Die Erfolgsliste ist jetzt nach Kategorien gegliedert (Aufbau & Wirtschaft, Forschung & Technik, Krieg & Kampf, Erkundung & Expansion, Handel & Diplomatie, Allianz & Gemeinschaft, Prestige & Meisterschaft) mit eigenem Fortschrittszähler pro Kategorie. Offene Erfolge stehen oben, erledigte rutschen ans Kategorieende',
       'Neu: Erfolgspunkte & Erfolgsjäger-Rang - jeder Erfolg bringt je nach Schwierigkeit 10-50 Punkte. Ein Übersichts-Header zeigt Gesamtfortschritt, gesammelte Punkte und deinen Rang (Neuling → Sammler → Veteran → Meister → Großmeister → Legende) samt Restpunkten bis zur nächsten Stufe. Reines Prestige-Showcase ohne Wirtschafts-Bonus (bewusst, um Balance-Explosionen zu vermeiden)',
@@ -7875,6 +7891,23 @@
   const MARKET_RES_KEYS = ['erz','kristalle','deuterium','energie','antimaterie'];
   // Vom Markt-Tab genutzte, pro Ressource gemerkte Eingabemenge (nur UI-Zustand, nicht gespeichert).
   const marketTradeAmounts = {};
+  // Kleiner Preisverlaufs-Chart (Markt-Vertiefung 20.07.2026): normalisiert die letzten Preispunkte
+  // (vom Backend geliefert, market[key].history) auf eine kompakte SVG-Linie mit betontem Endpunkt.
+  function marketSparkline(hist, color){
+    if (!Array.isArray(hist) || hist.length < 2) return '';
+    const W = 104, H = 26, pad = 3;
+    const min = Math.min(...hist), max = Math.max(...hist);
+    const range = (max - min) || 1;
+    const n = hist.length;
+    const xy = i => {
+      const x = pad + (i/(n-1))*(W-2*pad);
+      const y = pad + (1-(hist[i]-min)/range)*(H-2*pad);
+      return [x, y];
+    };
+    const pts = hist.map((v,i) => xy(i).map(z=>z.toFixed(1)).join(',')).join(' ');
+    const [lx, ly] = xy(n-1);
+    return `<svg class="mkt-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2" fill="${color}"/></svg>`;
+  }
   function renderMarket(){
     const cd = document.getElementById('creditsDisplay');
     if (cd) cd.textContent = fmt(state.credits||0);
@@ -7901,7 +7934,26 @@
     // wurde auf Sascha-Entscheidung wieder komplett entfernt: Tier-2 kommt ausschließlich aus den
     // eigenen Fabriken (bzw. hart gedeckelten Pakt-Geschenken), nicht vom Markt - auch nicht in
     // kleinen Mengen. Serverseitig lehnt der Handels-Endpunkt Tier-2 wieder ab.
-    box.innerHTML = MARKET_RES_KEYS.map(key => {
+    // Aktives Markt-Ereignis (Angebots-/Nachfrageschock) als Banner. Client-seitig auf Ablauf geprüft,
+    // damit ein gerade abgelaufenes Ereignis nicht bis zum nächsten /market-Poll hängen bleibt.
+    const mev = state.marketEvent;
+    const mevActive = mev && mev.endsAt > Date.now() && state.marketCache[mev.resource];
+    let eventBanner = '';
+    if (mevActive){
+      const erd = RES_DEFS.find(r=>r.key===mev.resource) || { label:mev.resource };
+      const up = mev.kind === 'shortage';
+      const mins = Math.max(1, Math.round((mev.endsAt - Date.now())/60000));
+      const remain = mins >= 60 ? Math.floor(mins/60)+' h '+(mins%60)+' min' : mins+' min';
+      eventBanner = `
+        <div class="mkt-event ${up?'mkt-event-up':'mkt-event-down'}">
+          <i class="ti ${up?'ti-arrow-up':'ti-box'}" aria-hidden="true"></i>
+          <div style="flex:1; min-width:0;">
+            <div class="mkt-event-title">${mev.label}</div>
+            <div class="mkt-event-sub">${erd.label}: ${up?'Preise stark erhöht — teuer im Einkauf, lohnend im Verkauf':'Preise stark gedrückt — günstig im Einkauf'} · endet in ~${remain}</div>
+          </div>
+        </div>`;
+    }
+    box.innerHTML = eventBanner + MARKET_RES_KEYS.map(key => {
       const rd = RES_DEFS.find(r=>r.key===key) || { label:key, icon:'ti-diamond', color:'#c7cbe0' };
       const m = state.marketCache[key];
       if (!m) return '';
@@ -7913,17 +7965,20 @@
       const owned = Math.floor(state.resources[key]||0);
       const buyEst = estimateTradeCredits('buy', key, amt);
       const sellEst = estimateTradeCredits('sell', key, amt);
+      const affected = mevActive && mev.resource === key;
+      const spark = marketSparkline(m.history, rd.color);
       return `
-        <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="display:flex; align-items:center; gap:8px;">
+        <div class="card-row${affected?' mkt-affected':''}" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem;${affected?' border-left:2px solid '+(mev.kind==='shortage'?'#e24b4a':'#5dcaa5')+';':''}">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
               <div class="bicon" style="background:${rd.color}22; color:${rd.color};"><i class="ti ${rd.icon}" aria-hidden="true"></i></div>
-              <div>
-                <div class="bname">${rd.label}</div>
+              <div style="min-width:0;">
+                <div class="bname">${rd.label}${affected?` <span class="mkt-tag" style="color:${mev.kind==='shortage'?'#e24b4a':'#5dcaa5'};">${mev.kind==='shortage'?'Knappheit':'Schwemme'}</span>`:''}</div>
                 <div class="bmeta">Preis: <strong style="color:${rd.color};">${price.toFixed(2)}</strong> Kr./Einheit · <span style="color:${trendColor};">${trendLabel} (${pctVsBase>=0?'+':''}${pctVsBase}%)</span></div>
                 <div class="bmeta">Dein Bestand: ${fmt(owned)}</div>
               </div>
             </div>
+            ${spark ? `<div class="mkt-spark-wrap" title="Preisverlauf der letzten Stunden">${spark}</div>` : ''}
           </div>
           <div style="display:flex; gap:6px; align-items:center; margin-top:8px; flex-wrap:wrap;">
             <input type="number" min="1" data-market-amt="${key}" value="${amt}" style="width:90px; padding:5px 8px;"/>
@@ -8078,6 +8133,7 @@
       if (!res.ok) return;
       const data = await res.json();
       state.marketCache = data.market || null;
+      state.marketEvent = data.event || null; // aktiver Angebots-/Nachfrageschock (nur Anzeige, nicht gespeichert)
       if (activeTab === 'markt') renderMarket();
     } catch(e){}
   }
@@ -15231,7 +15287,8 @@
       { title:'Erfolge & Tagesaufgaben zu den neuen Systemen', body:'Markt, Handelsrouten, Diplomatie, Eroberung und Kredit-Shop haben eigene <strong>Erfolge</strong> (z.B. Marktgänger, Großhändler, Logistiker, Eroberer, Systemherr, Diplomat, Auftragsjäger, Stammkunde, Kreditwürdig) und zwei neue <strong>Tagesaufgaben</strong>: „1 Handel am Markt abschließen" (+60 Kredite) und „1 Fraktionsauftrag abschließen" (+80 Kredite).' }
     ]},
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
-      { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln. Die Knöpfe <strong>„Max Kauf"</strong> und <strong>„Max Verkauf"</strong> tragen die größtmögliche Menge (nach deinem Kreditstand bzw. Bestand) ins Mengenfeld ein - ausgelöst wird der Handel erst mit einem bewussten zweiten Klick auf Kaufen/Verkaufen.' },
+      { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln. Die Knöpfe <strong>„Max Kauf"</strong> und <strong>„Max Verkauf"</strong> tragen die größtmögliche Menge (nach deinem Kreditstand bzw. Bestand) ins Mengenfeld ein - ausgelöst wird der Handel erst mit einem bewussten zweiten Klick auf Kaufen/Verkaufen. Neben jedem Preis zeigt eine kleine <strong>Verlaufskurve</strong> (Sparkline) die Preisentwicklung der letzten Stunden - so erkennst du auf einen Blick, ob ein Preis gerade steigt oder fällt, und kannst Ein-/Verkäufe besser timen.' },
+      { title:'Markt-Ereignisse', body:'Gelegentlich erschüttert ein <strong>Angebots- oder Nachfrageschock</strong> eine einzelne Ressource: Eine <strong>Knappheit</strong> treibt ihre Preise deutlich hoch (teuer im Einkauf, lohnend im Verkauf), eine <strong>Schwemme</strong> drückt sie stark (günstig zum Einkaufen). Das Ereignis wird als Banner oben im Markt-Tab und in der Galaxie-News angekündigt, betrifft immer nur eine Ressource für 2-4 Stunden und lässt die Preise organisch zum Schockniveau driften (kein harter Sprung). Wer aufpasst, macht damit den besten Schnitt.' },
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen (mit 20% Abschlag auf den Durchschnittspreis) und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Wer viel verkauft, drückt den Preis spürbar - bis auf rund 15% des Normalwerts. Preise erholen sich mit der Zeit: durch Käufe erhöhte Preise recht zügig, durch Verkäufe gedrückte Preise dagegen sehr langsam (mehrere Tage statt Stunden bis zur fast vollständigen Erholung). Ein großer Verkauf hat also eine lange spürbare Wirkung auf den Preis, ein großer Kauf nicht.' },
       { title:'Keine Tier-2-Ressourcen am Markt', body:'Die fünf <strong>Tier-2-Ressourcen</strong> sind bewusst NICHT handelbar (nach kurzem Test wieder entfernt): Sie kommen ausschließlich aus den eigenen Fabriken - ergänzt nur durch die hart gedeckelten Pakt-Geschenke. Der Markt handelt ausschließlich die fünf Basis-Ressourcen.' },
       { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
