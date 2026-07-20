@@ -1,6 +1,6 @@
 # CLAUDE.md – kolonie-kepler7 (Frontend)
 
-Browserbasiertes Weltraum-Kolonie-Idle-Spiel, komplett in **einer Datei** `weltraum_kolonie.html` (~15.800 Zeilen: HTML + CSS + Vanilla-JS in `<script>`, kein Build-Schritt, kein Framework). Deployt via GitHub Pages.
+Browserbasiertes Weltraum-Kolonie-Idle-Spiel, komplett in **einer Datei** `weltraum_kolonie.html` (~15.800 Zeilen: HTML + CSS + Vanilla-JS in `<script>`, kein Build-Schritt, kein Framework). Deployt auf Saschas Raspberry Pi (nginx), erreichbar unter `gamegeeeeek.de` / `www.gamegeeeeek.de` per DynDNS (Domain-Offensive) – **nicht** über GitHub Pages (dort ist Pages deaktiviert, Stand 20.07.2026).
 
 ## Kritische Regel: zwei Dateien synchron halten
 
@@ -42,6 +42,6 @@ Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Op
 
 ## Deploy
 
-Push nach `main` → GitHub Pages aktualisiert automatisch. Sascha zieht zusätzlich manuell auf dem Pi (falls dort ein Cache/eigener Reverse-Proxy zwischengeschaltet ist – im Zweifel nachfragen statt annehmen).
+Push nach `main` landet im Repo; live geht es erst, wenn Sascha die Änderungen manuell auf seinem Raspberry Pi zieht (dort läuft nginx und bedient `gamegeeeeek.de`/`www.gamegeeeeek.de`, per DynDNS bei Domain-Offensive). **GitHub Pages ist nicht aktiviert** (Settings → Pages: Source = „None") und deployt nichts – im Zweifel nachfragen statt einen automatischen Pull anzunehmen.
 
-**PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main` und GitHub Pages deployt nichts. Gilt für Frontend- und Backend-Repo gleichermaßen.
+**PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main` und Sascha kann sie gar nicht erst auf den Pi ziehen. Gilt für Frontend- und Backend-Repo gleichermaßen.
