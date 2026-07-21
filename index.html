@@ -3408,8 +3408,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.181.0';
+  const VERSION = '8.182.0';
   const PATCHNOTES = [
+    { version:'8.182.0', date:'21.07.2026', changes:[
+      'Expedition „Alle starten" überarbeitet: Der Button teilt jetzt die GESAMTE an diesem Standort verfügbare Eskorte (alle eskortfähigen Schiffe, die nicht schon unterwegs sind) gleichmäßig auf die gestarteten Expeditionen auf - unabhängig von der manuellen Eskorte-Auswahl. Vorher wurde nur die aktuell ausgewählte Eskorte geteilt (bei leerer Auswahl starteten alle Expeditionen ganz ohne Eskorte), und die Abrundung ließ Restschiffe zuhause. Jetzt werden Reste, die sich nicht glatt teilen lassen, auf die ersten Expeditionen gestreut (z.B. 10 Kreuzer auf 3 Expeditionen = 4/3/3), sodass keine Schiffe unnötig liegen bleiben.',
+    ]},
     { version:'8.181.0', date:'21.07.2026', changes:[
       'Fix: Streak-Schutzschilde und eingelöste Login-Meilensteine gehen beim Prestige/Aufstieg nicht mehr verloren - die Login-Serie ist Treue-Fortschritt und überlebt den Reset wie bisher schon die Serienlänge selbst.',
       'Neu: 3 Erfolge für die Retention-Mechaniken - „Monatstreue" (30 Tage Login-Serie), „Hundert-Tage-Legende" (100 Tage Serie) und „Zur richtigen Zeit" (bei 10 Happy Hours aktiv dabei). Zählen in die Erfolgspunkte/den Rang mit ein.',
@@ -26133,28 +26136,40 @@
     const freeFleetSlots = Math.max(0, maxConcurrentFleets() - activeFleetMissionCount());
     return Math.min(forscherAvailable, freeExpSlots, freeFleetSlots);
   }
-  // Schnellstart (20.07.2026, Spieler-Wunsch): startet auf einen Schlag so viele Expeditionen wie
-  // gerade möglich sind, verteilt die aktuell ausgewählte Eskorte GLEICHMÄSSIG auf alle (Restschiffe,
-  // die sich nicht glatt teilen lassen, bleiben zuhause statt einer Expedition bevorzugt zugeteilt zu
-  // werden). Jede einzelne Sendung läuft weiter über sendExpeditionMission() - dieselbe Treibstoff-/
-  // Limit-/Fehlerbehandlung wie beim manuellen Senden, bricht bei Bedarf (z.B. Treibstoff alle) sauber
-  // vorzeitig ab statt einer Endlosschleife.
+  // Schnellstart (20.07.2026, Spieler-Wunsch; 21.07.2026 überarbeitet): startet auf einen Schlag so
+  // viele Expeditionen wie gerade möglich sind und verteilt dabei die GESAMTE an diesem Standort
+  // verfügbare Eskorte (alle eskortfähigen Schiffe, die nicht schon unterwegs sind) so gleichmäßig wie
+  // möglich auf alle Expeditionen - unabhängig von der manuellen Eskorte-Auswahl. Reste, die sich nicht
+  // glatt teilen lassen, werden auf die ERSTEN Expeditionen gestreut (base + 1), damit keine Schiffe
+  // unnötig zuhause bleiben (der frühere Math.floor(auswahl/n) ließ sowohl die Reste als auch - bei
+  // leerer Auswahl - die komplette Flotte liegen). Jede einzelne Sendung läuft weiter über
+  // sendExpeditionMission() - dieselbe Treibstoff-/Limit-/Fehlerbehandlung wie beim manuellen Senden,
+  // bricht bei Bedarf (z.B. Treibstoff alle) sauber vorzeitig ab statt einer Endlosschleife.
   function sendMaxExpeditions(){
     const cf = currentFleet();
     const sendable = maxSendableExpeditionsNow();
     if (sendable <= 0){ log('Aktuell keine weitere Expedition möglich (Forschungsschiffe oder Expeditions-Limit ausgeschöpft).', 'ti-alert-triangle'); return; }
-    const sel = getEscortSelection(state.activeBasePlanet, cf);
-    const perExpedition = {};
-    for (const k of ESCORT_KEYS) perExpedition[k] = Math.floor((sel[k]||0) / sendable);
+    // Verfügbare Gesamt-Eskorte je Typ (abzüglich schon unterwegs befindlicher Schiffe) einmal am
+    // Anfang bestimmen und in eine feste Aufteilungsmatrix shares[i][k] umrechnen. Die spätere
+    // getEscortSelection()-Klammerung je Sendung deckt sich exakt mit dieser Vorab-Verteilung, weil in
+    // Summe nie mehr verteilt wird als verfügbar ist.
+    const away = computeAwayByType(cf);
+    const shares = [];
+    for (let i=0; i<sendable; i++) shares.push({});
+    for (const k of ESCORT_KEYS){
+      const avail = Math.max(0, (cf[k]||0) - (away[k]||0));
+      const base = Math.floor(avail / sendable), rem = avail % sendable;
+      for (let i=0; i<sendable; i++) shares[i][k] = base + (i < rem ? 1 : 0);
+    }
     let sentCount = 0;
     for (let i=0; i<sendable; i++){
       const selNow = getEscortSelection(state.activeBasePlanet, cf);
-      for (const k of ESCORT_KEYS) selNow[k] = perExpedition[k];
+      for (const k of ESCORT_KEYS) selNow[k] = shares[i][k];
       const before = cf.missions.length;
       sendExpeditionMission();
       if (cf.missions.length > before) sentCount++; else break;
     }
-    if (sentCount > 1) log(sentCount+' Expeditionen gleichzeitig gestartet, Eskorte gleichmäßig aufgeteilt.', 'ti-map-2');
+    if (sentCount > 1) log(sentCount+' Expeditionen gleichzeitig gestartet, gesamte verfügbare Eskorte gleichmäßig aufgeteilt.', 'ti-map-2');
   }
 
   // Analytics (13.07.2026, Feature-Wunsch: echte Nutzungsdaten statt Vermutung aus Code-Lesen) -
@@ -28026,7 +28041,7 @@
             <span style="font-size:16px; font-weight:600; color:#5dcaa5;"><i class="ti ti-sword" aria-hidden="true"></i> Eskort-Kampfkraft: ${Math.round(escortPower)}</span>
             <div style="display:flex; gap:6px;">
               ${lastExpeditionSend ? `<button id="resendExpeditionBtn" ${canSendExp?'':'disabled'} style="font-size:11px; padding:6px 10px;" title="Wiederholt Typ + Eskorte der letzten gestarteten Expedition und startet sofort"><i class="ti ti-refresh" aria-hidden="true" style="margin-right:4px;"></i>Letzte wiederholen</button>` : ''}
-              ${sendableNow > 1 ? `<button id="sendMaxExpeditionsBtn" style="font-size:11px; padding:6px 10px;" title="Startet ${sendableNow} Expeditionen auf einmal, Eskorte gleichmäßig aufgeteilt"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Alle starten (${sendableNow})</button>` : ''}
+              ${sendableNow > 1 ? `<button id="sendMaxExpeditionsBtn" style="font-size:11px; padding:6px 10px;" title="Startet ${sendableNow} Expeditionen auf einmal und teilt die GESAMTE verfügbare Eskorte gleichmäßig auf sie auf"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Alle starten (${sendableNow})</button>` : ''}
               <button class="buy ${canSendExp?'affordable':''}" id="sendExpeditionBtn" ${canSendExp?'':'disabled'}><i class="ti ti-map-2" aria-hidden="true" style="margin-right:4px;"></i>Expedition starten</button>
             </div>
           </div>
