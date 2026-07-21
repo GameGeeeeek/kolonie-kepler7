@@ -3450,8 +3450,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.207.0';
+  const VERSION = '8.208.0';
   const PATCHNOTES = [
+    { version:'8.208.0', date:'21.07.2026', changes:[
+      'Neu: Wochen-Angebot im Kredit-Shop. Jede Woche wartet ein wechselndes, vergünstigtes Sonderangebot ganz oben im Shop (Turbo-Produktion, Kriegskasse, Modul-Sonderlieferung oder Kommandostab) – einmal pro Woche kaufbar. Das Angebot ist für alle Spieler gleich und wechselt automatisch zum Wochenwechsel.',
+    ]},
     { version:'8.207.0', date:'21.07.2026', changes:[
       'Mehr Kosmetik: fünf neue Profilbilder (Auge, Blitz, Ringplanet) und zwei davon als Belohnung – der „Kriegsorden" schaltet mit dem Erfolg „Kriegsheld" frei, die „Ligakrone" mit „Ligameister". Dazu zwei neue Allianz-Banner (Stahlarktis, Aschefeld). Alles rein optisch, ohne Spielwert.',
     ]},
@@ -8957,6 +8960,42 @@
     checkAchievements();
     render(); save();
   }
+  // ===== Wochen-Angebot (rotierend, #7) =====
+  // Jede Woche ein wechselndes, vergünstigtes Sonderangebot im Kredit-Shop - deterministisch aus dem
+  // Wochenschlüssel gewählt (kein Zufall, kein Server nötig, für alle gleich) und einmal pro Woche
+  // kaufbar (state.weeklyDealWeek merkt sich den zuletzt genutzten Wochenschlüssel). Bewusst nur
+  // Buffs/Module/Kommandopunkte als Belohnung - KEINE "N-Minuten-Produktion"-Ressourcenpakete
+  // (Explosionsschutz gemäß CLAUDE.md).
+  const WEEKLY_DEALS = [
+    { key:'wd_prod', name:'Turbo-Produktion', icon:'ti-bolt', cost:500, desc:'+40% Produktion auf alle Ressourcen für 2 Stunden – stärker und günstiger als der reguläre Schub.',
+      grant(){ state.buffs = state.buffs||[]; state.buffs.push({ kind:'prod_all', mult:1.40, expiresAt: Date.now()+2*60*60*1000, source:'shop' }); } },
+    { key:'wd_war', name:'Kriegskasse', icon:'ti-sword', cost:700, desc:'+30% Angriff UND +30% Verteidigung für 3 Stunden – beide Buffs zusammen zum Sonderpreis.',
+      grant(){ state.buffs = state.buffs||[]; const t = Date.now()+3*60*60*1000; state.buffs.push({ kind:'atk', mult:1.30, expiresAt:t, source:'shop' }); state.buffs.push({ kind:'def', mult:1.30, expiresAt:t, source:'shop' }); } },
+    { key:'wd_module', name:'Modul-Sonderlieferung', icon:'ti-box', cost:6000, desc:'Ein garantiertes Schiffsklassen-Modul (mind. „Selten") zum Bruchteil des Blaupausen-Preises.',
+      grant(){ return 'Erhalten: '+grantRandomShipModule('selten'); } },
+    { key:'wd_cp', name:'Kommandostab', icon:'ti-star', cost:450, desc:'+15 Kommandopunkte sofort – für Modul-Slots und Aufgaben-Reroll.',
+      grant(){ state.commandPoints = (state.commandPoints||0) + 15; } }
+  ];
+  function weeklyDealIndex(){
+    const wk = weekKeyOf(Date.now());
+    let h = 0; for (let i=0;i<wk.length;i++) h = (h*31 + wk.charCodeAt(i)) >>> 0;
+    return h % WEEKLY_DEALS.length;
+  }
+  function currentWeeklyDeal(){ return WEEKLY_DEALS[weeklyDealIndex()]; }
+  function weeklyDealClaimed(){ return state.weeklyDealWeek === weekKeyOf(Date.now()); }
+  function buyWeeklyDeal(){
+    const deal = currentWeeklyDeal();
+    if (weeklyDealClaimed()){ log('Das Wochen-Angebot hast du diese Woche schon genutzt – nächste Woche wartet ein neues.', 'ti-info-circle'); return; }
+    if ((state.credits||0) < deal.cost){ log('Nicht genug Kredite ('+deal.cost+' nötig).', 'ti-alert-triangle'); return; }
+    state.credits -= deal.cost;
+    const extra = deal.grant();
+    state.weeklyDealWeek = weekKeyOf(Date.now());
+    state.shopPurchases = (state.shopPurchases||0) + 1;
+    log('Wochen-Angebot „'+deal.name+'" gekauft ('+deal.cost+' Kredite).'+(extra?' '+extra:''), deal.icon, 'ok');
+    playSound('build');
+    checkAchievements();
+    render(); save();
+  }
   // Signatur-Cache (Vorschlagsrunde 20.07.2026): keine Live-Countdowns (aktive Buffs zeigen nur
   // "Aktiv", keine Restzeit) und keine Eingabefelder - nur Bezahlbarkeit und Aktiv-Status ändern
   // das Rendering, beides in der Signatur erfasst.
@@ -8964,13 +9003,24 @@
   function renderCreditShop(){
     const box = document.getElementById('creditShopBox');
     if (!box) return;
-    const sig = CREDIT_SHOP.map(item => {
+    const deal = currentWeeklyDeal();
+    const dealClaimed = weeklyDealClaimed();
+    const dealAfford = (state.credits||0) >= deal.cost;
+    const sig = 'deal:'+deal.key+':'+(dealClaimed?1:0)+':'+(dealAfford?1:0)+'|'+CREDIT_SHOP.map(item => {
       const buffKind = item.key==='boost_prod' ? 'prod_all' : (item.key==='soeldner' ? 'atk' : (item.key==='schild' ? 'def' : null));
       return item.key+':'+(((state.credits||0) >= item.cost)?1:0)+':'+((buffKind && shopBuffActive(buffKind))?1:0);
     }).join('|');
     if (sig === lastCreditShopSig) return;
     lastCreditShopSig = sig;
-    box.innerHTML = CREDIT_SHOP.map(item => {
+    // Wochen-Angebot als hervorgehobene Karte ganz oben.
+    const dealCard = `<div class="card-row" style="background:linear-gradient(135deg, rgba(250,199,117,0.18), rgba(127,119,221,0.14)); border-color:rgba(250,199,117,0.55); margin-bottom:0.5rem;">
+        <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.25); color:#fac775;"><i class="ti ${deal.icon}" aria-hidden="true"></i></div>
+          <div><div class="bname"><i class="ti ti-sparkles" aria-hidden="true" style="color:#fac775; margin-right:3px;"></i>Wochen-Angebot: ${deal.name}</div>
+          <div class="bmeta">${deal.desc}${dealClaimed?' <span style="color:#5dcaa5;">· diese Woche bereits genutzt</span>':''}</div></div>
+        </div>
+        <button data-buy-weekly-deal="1" ${(!dealAfford||dealClaimed)?'disabled':''} style="font-size:10.5px; white-space:nowrap;">${dealClaimed?'Genutzt':fmt(deal.cost)+' Kr.'}</button>
+      </div>`;
+    box.innerHTML = dealCard + CREDIT_SHOP.map(item => {
       const buffKind = item.key==='boost_prod' ? 'prod_all' : (item.key==='soeldner' ? 'atk' : (item.key==='schild' ? 'def' : null));
       const active = buffKind && shopBuffActive(buffKind);
       const affordable = (state.credits||0) >= item.cost;
@@ -8983,6 +9033,8 @@
       </div>`;
     }).join('');
     box.querySelectorAll('[data-shop-buy]').forEach(btn => btn.onclick = () => buyShopItem(btn.getAttribute('data-shop-buy')));
+    const dealBtn = box.querySelector('[data-buy-weekly-deal]');
+    if (dealBtn) dealBtn.onclick = () => buyWeeklyDeal();
   }
 
   // ===== Fraktions-Aufträge (Quests) =====
