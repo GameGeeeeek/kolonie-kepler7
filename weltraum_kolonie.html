@@ -3430,8 +3430,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.201.0';
+  const VERSION = '8.202.0';
   const PATCHNOTES = [
+    { version:'8.202.0', date:'21.07.2026', changes:[
+      'Ruhmeshalle jetzt serverseitig abgesichert: Der monatliche Spitzenreiter wird ab sofort direkt vom Server gepflegt (alle 15 Minuten, auch wenn gerade niemand online ist) und beim Monatswechsel korrekt eingefroren. Bisher hing das daran, dass ein Spieler kurz vor Monatsende die Bestenliste lud – tat das niemand, konnte ein veralteter Champion verewigt werden. Die Anzeige bleibt unverändert; der Eintrag ist nur zuverlässiger.',
+    ]},
     { version:'8.201.0', date:'21.07.2026', changes:[
       'Neu: Angriffs-Schutzschild gegen Dauer-Farmen (serverseitig). Wirst du erfolgreich überfallen (mit Beute) oder sabotiert, bist du 30 Minuten lang vor weiteren Spieler-Angriffen und Störmanövern geschützt – so kannst du in Ruhe wieder aufbauen, statt im Minutentakt weitergeplündert zu werden. Ein aktiver Schild wird oben im Verteidigung-Tab mit Countdown angezeigt. Achtung: Ein eigener Angriff/Störmanöver hebt deinen Schild sofort auf (der Schutz ist für Opfer gedacht, nicht als Deckung zum Zuschlagen). Greift man ein geschütztes Ziel an, prallt die Flotte unversehrt ab.',
     ]},
@@ -26720,25 +26723,16 @@
   // erneut feuert, während die vorherige Anfrage bei langsamer Verbindung noch läuft) – ohne diese
   // Sperre könnten sich offene Anfragen im Hintergrund stauen und das Spiel spürbar einfrieren lassen.
   let leaderboardLoading = false;
-  // Ruhmeshalle: da es keinen echten Server-Cron gibt, der Monate exakt abschließen könnte, pflegt
-  // JEDER Client bei jedem Bestenlisten-Laden opportunistisch den Eintrag für den AKTUELLEN Monat
-  // (überschreibt ihn mit dem jeweils aktuellen Spitzenreiter). Der letzte Stand vor Monatswechsel
-  // wird so zum faktischen Endstand – nicht perfekt exakt, aber robust und selbstkorrigierend.
+  // Ruhmeshalle: Seit v8.202.0 pflegt der SERVER (galaxyTick, alle 15 Min - auch ohne Online-Spieler)
+  // den Eintrag des laufenden Monats und friert ihn am Monatswechsel korrekt ein. Der Client SCHREIBT
+  // deshalb nichts mehr (früher tat er das opportunistisch bei jedem Bestenlisten-Laden - fror aber
+  // veraltete Champions ein, wenn in den letzten Stunden vor Monatswechsel niemand die Liste lud). Er
+  // holt den serverseitigen Stand jetzt nur noch zum Anzeigen.
   let hallOfFameCache = [];
   async function updateHallOfFame(entries){
-    if (!entries.length || !entries[0]) return;
-    const thisMonth = new Date().toISOString().slice(0,7);
     try {
       const r = await storageGet('halloffame:records', true);
-      let records = r && r.value ? JSON.parse(r.value) : [];
-      const champion = entries[0];
-      const entry = { month: thisMonth, name: champion.name||'Unbekannt', allianceTag: champion.allianceTag||'', score: champion.score||0 };
-      const idx = records.findIndex(rec => rec.month === thisMonth);
-      if (idx >= 0) records[idx] = entry; else records.push(entry);
-      records.sort((a,b) => a.month.localeCompare(b.month));
-      records = records.slice(-24);
-      await storageSet('halloffame:records', JSON.stringify(records), true);
-      hallOfFameCache = records;
+      hallOfFameCache = r && r.value ? JSON.parse(r.value) : [];
       renderHallOfFame();
     } catch(e){}
   }
