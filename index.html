@@ -2114,6 +2114,7 @@
             <div class="card-row"><div class="left"><i class="ti ti-target" aria-hidden="true"></i><div class="bname">Spionage-Warnungen</div><div class="bmeta">Wenn dich jemand ausspäht</div></div><div class="toggle-switch" data-notif-cat="spy"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-sword" aria-hidden="true"></i><div class="bname">Angriffe auf dich</div><div class="bmeta">Wenn dich ein Spieler angreift</div></div><div class="toggle-switch" data-notif-cat="attack"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-trophy" aria-hidden="true"></i><div class="bname">Bestenlisten-Überholung</div><div class="bmeta">Wenn dich jemand in der Rangliste überholt</div></div><div class="toggle-switch" data-notif-cat="leaderboard"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-check" aria-hidden="true"></i><div class="bname">Fertige Aufträge</div><div class="bmeta">Wenn Forschung, Bau oder Expedition fertig wird, während du weg bist</div></div><div class="toggle-switch" data-notif-cat="completion"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
           </div>
@@ -3407,8 +3408,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.179.0';
+  const VERSION = '8.180.0';
   const PATCHNOTES = [
+    { version:'8.180.0', date:'21.07.2026', changes:[
+      'Neu: Benachrichtigung, wenn ein Auftrag fertig wird, während du weg bist. Läuft eine Forschung, ein Bauauftrag, eine Expedition, ein Terraforming, eine exotische Forschung oder eine Veteranen-Ausbildung ab, während du NICHT im Spiel bist, bekommst du eine Meldung (Postfach und - bei aktiviertem Web-Push - aufs Handy). Bist du gerade online, kommt keine Benachrichtigung (du siehst es ja direkt). Eigene, abschaltbare Kategorie unter Einstellungen → Benachrichtigungen → „Fertige Aufträge". So musst du nicht mehr raten, wann sich das Zurückkommen lohnt.',
+    ]},
     { version:'8.179.0', date:'21.07.2026', changes:[
       'Neu: Benachrichtigung, wenn dich jemand in der Bestenliste überholt. Fällst du in der Rangliste zurück, weil ein anderer Spieler an dir vorbeigezogen ist, bekommst du eine Meldung (Postfach und - bei aktiviertem Web-Push - aufs Handy) mit deinem neuen Platz und dem Namen des Überholers. Bewusst nur für die vorderen Ränge und mit Ruhephase gegen Spam. Eigene, abschaltbare Kategorie unter Einstellungen → Benachrichtigungen → „Bestenlisten-Überholung". So bleibt der Wettkampf um die Spitzenplätze spannend.',
     ]},
@@ -13714,7 +13718,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -13730,6 +13734,37 @@
       if (res.ok) notifPrefsCache = await res.json();
       renderNotifPrefs();
     } catch(e){}
+  }
+  // Fertigstellungs-Erinnerungen ans Backend melden (Retention, 21.07.2026): sammelt die Endzeiten der
+  // laufenden Aufträge und meldet sie per POST /api/reminders (replace-all). Der Server pusht dann eine
+  // Benachrichtigung, falls ein Auftrag fertig wird, WÄHREND der Spieler weg ist. Nur bei aktivem
+  // Backend/Login. Der Signatur-Vergleich (lastRemindersSig) verhindert, dass bei jedem Tick gepostet
+  // wird - nur wenn sich die Menge/Zeiten der Aufträge tatsächlich ändern.
+  function collectPendingCompletions(){
+    const now = Date.now();
+    const out = [];
+    if (state.activeResearch && state.activeResearch.endTime > now) out.push({ type:'research', endTime: state.activeResearch.endTime });
+    for (const j of (state.constructionQueue||[])) if (j && j.paid && j.endTime > now) out.push({ type:'construction', endTime: j.endTime });
+    for (const { fleet } of allFleetsWithPlanet()) for (const m of (fleet.missions||[])) if (m && m.endTime > now && m.type === 'expedition') out.push({ type:'expedition', endTime: m.endTime });
+    if (state.terraformJob && state.terraformJob.endTime > now) out.push({ type:'terraform', endTime: state.terraformJob.endTime });
+    if (state.exoticResearchJob && state.exoticResearchJob.endTime > now) out.push({ type:'exotic', endTime: state.exoticResearchJob.endTime });
+    if (state.veteranTrainingJob && state.veteranTrainingJob.endTime > now) out.push({ type:'veteran', endTime: state.veteranTrainingJob.endTime });
+    out.sort((a,b)=>a.endTime-b.endTime);
+    return out.slice(0, 10);
+  }
+  let lastRemindersSig = null;
+  function syncCompletionReminders(){
+    if (!useBackend() || !state.player.id) return;
+    // Kategorie ausgeschaltet: gemeldete Termine einmalig leeren, damit keine alten Erinnerungen feuern.
+    if (notifPrefsCache && notifPrefsCache.completion === false){
+      if (lastRemindersSig !== 'off'){ lastRemindersSig = 'off'; backendFetch('/reminders', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ reminders: [] }) }).catch(()=>{}); }
+      return;
+    }
+    const list = collectPendingCompletions();
+    const sig = list.map(r=>r.type+'@'+r.endTime).join('|');
+    if (sig === lastRemindersSig) return;
+    lastRemindersSig = sig;
+    backendFetch('/reminders', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ reminders: list }) }).catch(()=>{});
   }
   function renderNotifPrefs(){
     const enabledSwitch = document.getElementById('notifPrefEnabledSwitch');
@@ -13748,7 +13783,8 @@
     'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' },
     'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' },
     'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') },
-    'leaderboard-overtaken': { icon:'ti-trophy', color:'#fac775', text:(p)=>(p.aheadName||'Ein Spieler')+' ist an dir vorbeigezogen - du bist jetzt auf Platz '+(p.rank||'?')+'. Zeit, zurückzuschlagen!' }
+    'leaderboard-overtaken': { icon:'ti-trophy', color:'#fac775', text:(p)=>(p.aheadName||'Ein Spieler')+' ist an dir vorbeigezogen - du bist jetzt auf Platz '+(p.rank||'?')+'. Zeit, zurückzuschlagen!' },
+    'job-complete': { icon:'ti-check', color:'#5dcaa5', text:(p)=>{ const l={ research:'Deine Forschung ist abgeschlossen', construction:'Ein Bauauftrag ist fertiggestellt', expedition:'Eine Expedition ist zurückgekehrt', mission:'Eine Mission ist zurückgekehrt', terraform:'Ein Terraforming-Projekt ist fertig', exotic:'Eine exotische Forschung ist abgeschlossen', veteran:'Eine Veteranen-Ausbildung ist abgeschlossen' }; return (l[p.jobType]||'Etwas in deiner Kolonie ist fertig')+' - komm zurück und mach weiter!'; } }
   };
   async function loadNotificationEvents(){
     if (!useBackend()) return;
@@ -15512,6 +15548,7 @@
       { title:'Synthese-Kette: Metamaterial & Singularitätskerne (Tier-2-Erweiterung)', body:'Die Kette setzt sich über die KI-Kerne hinaus fort - zwei <strong>Apex-Ressourcen</strong>, die je ZWEI bestehende Tier-2-Ressourcen bündeln und noch langsamer produzieren (reines Endgame). <strong>Metamaterial-Gewebe</strong> (ab Forschung „Metamaterial-Synthese", benötigt KI-Technologie): Metamaterialweberei, max. Stufe 15, verbraucht 2 Hochenergiekristalle + 1 Fusionskern + 30 Kristalle je Einheit (0,0004/s je Stufe). Verwendung: der <strong>Metamaterial-Panzerwall</strong> (Verteidigung-Tab) - stärkster reiner Schutz (340 Verteidigung, kein Angriff), der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, s. u.) und der <strong>Metamaterial-Titan</strong> (Flotte-Tab, 150 Angriff + höchster Schildwert). <strong>Singularitätskerne</strong> (ab Forschung „Singularitätsphysik", benötigt Metamaterial-Synthese): Singularitätsreaktor, max. Stufe 15, verbraucht 2 KI-Kerne + 2 Fusionskerne + 5 Antimaterie je Kern (0,0003/s je Stufe) - die rarste Ressource des Spiels. Verwendung: der <strong>Singularitäts-Geschützturm</strong> (Verteidigung-Tab, 330 Verteidigung + 180 Angriff - der beste BAUBARE Kombiwert, knapp unter der seltenen Kristallfestung) und der <strong>Singularitäts-Vernichter</strong> (Flotte-Tab, 280 Angriff - stärkster regulärer Angriffswert). Neue <strong>Effizienz-Achse:</strong> Die Forschung <strong>Raffinerie-Optimierung</strong> (ab Quantenphysik, bis Stufe 10) erhöht den Durchsatz ALLER Tier-2-Fabriken um +3% je Stufe (max. +30%); der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, ab Metamaterial-Synthese, bis Stufe 10) senkt den Rohstoffverbrauch aller Fabriken um -2% je Stufe (imperiumsweit max. -20%). Das Kryo-Archiv bewahrt beide neuen Ressourcen ebenfalls durchs Prestige (3 Metamaterial / 2 Singularitätskerne je Stufe). Zwei neue <strong>Verbrauchsgegenstände</strong> (Flotte-Tab, unter „Aktive Missionen", sobald du die jeweilige Ressource besitzt): der <strong>Metamaterial-Reparaturschwarm</strong> behebt eine aktive Sabotage (Produktions-Debuff nach verlorenem Überfall) sofort für 6 Metamaterial-Gewebe, und die <strong>Singularitäts-Sprungladung</strong> verkürzt die Restflugzeit deiner längsten laufenden Flottenmission um 25% für 3 Singularitätskerne. Und zwei neue <strong>gefertigte Module</strong> (Tier-2-Modulfertigung): Metamaterial-Panzerplatte (+14% Verteidigungsbeitrag) und Singularitäts-Fokusarray (+14% Angriffskraft).' },
       { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. <strong>Streak-Schutzschilde:</strong> verpasst du GENAU einen Tag, rettet ein vorhandener Schutzschild deine Serie (statt Reset auf Tag 1) - für jeden vollständig durchgehaltenen 7-Tage-Zyklus bekommst du automatisch +1 Schild (max. 3 auf Vorrat). Ohne Schild oder bei mehr als einem verpassten Tag beginnt die Serie neu. <strong>Treue-Meilensteine:</strong> erreicht deine Serie 14/30/60/100 Tage am Stück, gibt es je einmal pro Lauf eine große Zusatzbelohnung (Ressourcen, Kredite, ab Tag 60 auch Schiffe). Schild-Vorrat, nächster Meilenstein samt Countdown und die komplette 7-Tage-Vorschau stehen im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
       { title:'Happy Hour (Flash-Events)', body:'Zweimal pro Tag - um <strong>12:00 und 20:00 Uhr Ortszeit, je 60 Minuten</strong> - ist eine „Happy Hour" mit einem wechselnden Produktionsbonus aktiv. Vier Typen rotieren: <strong>Bergbau-Rausch</strong> (+40% Erz/Kristalle), <strong>Energie-Hoch</strong> (+40% Energie/Deuterium), <strong>Produktionsschub</strong> (+25% auf alle Grundressourcen) und <strong>Forschungsfieber</strong> (+60% Forschungspunkte). Die Termine sind fest aus dem Datum berechnet (kein Zufall, kein Server nötig), sodass du dich gezielt darauf einstellen kannst - ein Banner oben im <strong>Basis-Tab</strong> zeigt das gerade laufende bzw. das nächste Fenster samt Countdown, beim Start kommt eine Benachrichtigung. Der Bonus wirkt nur auf die laufende Live-Produktion, <strong>nicht</strong> auf die Offline-Gutschrift.' },
+      { title:'Benachrichtigungen', body:'Unter <strong>Einstellungen → Benachrichtigungen</strong> legst du je Kategorie fest, worüber du informiert wirst (Postfach im Spiel und, wenn aktiviert, echte Web-Push aufs Handy). Neben Nachrichten, Pakt-Angeboten, Weltboss-Kills, Überfällen, Patchnotes, Bewerbungen, Spionage und <strong>Angriffen auf dich</strong> gibt es zwei Retention-Kategorien: <strong>„Bestenlisten-Überholung"</strong> (wenn dich ein Spieler in der Rangliste überholt - nur für die vorderen Ränge, mit Ruhephase gegen Spam) und <strong>„Fertige Aufträge"</strong> (wenn Forschung, Bau, Expedition, Terraforming, exotische Forschung oder Veteranen-Ausbildung fertig wird, während du NICHT im Spiel bist - bist du online, kommt nichts, weil du es ohnehin siehst). Jede Kategorie einzeln abschaltbar.' },
       { title:'Comeback-Mission', body:'Warst du <strong>mindestens 48 Stunden</strong> nicht im Spiel, erscheint beim Zurückkommen oben im <strong>Basis-Tab</strong> eine kurze, geführte 3-Schritt-Mission, die dich schnell wieder in die Kernschleife bringt: (1) ein Gebäude ausbauen, (2) eine Forschung abschließen, (3) einen Kampf gewinnen. Die Schritte werden der Reihe nach freigeschaltet, jeder bringt sofort eine Belohnung (Ressourcen/Kredite). Schließt du alle drei ab, gibt es zum Abschluss zusätzlich <strong>+40 Kredite und +25% Produktion für 2 Stunden</strong>. Läuft parallel zum Rückkehrer-Bonus (+50% Produktion nach 24h Abwesenheit).' },
       { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
@@ -30939,6 +30976,7 @@
     const researchDone = processResearch();
     const researchQueued = tryStartQueuedResearch();
     const autoExplored = tryAutoExplore();
+    syncCompletionReminders();
     render();
     if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
   }, 1000);
