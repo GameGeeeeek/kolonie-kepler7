@@ -3426,8 +3426,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.195.0';
+  const VERSION = '8.196.0';
   const PATCHNOTES = [
+    { version:'8.196.0', date:'21.07.2026', changes:[
+      'Markt-Preisverlauf (Sparkline) endlich zuverlässig erkennbar: Klebt ein Preis über den ganzen Verlauf am Boden oder Deckel (z.B. -84% nach vielen Verkäufen), lag die Linie bisher direkt am unteren Rand und wirkte „leer". Ein flacher Verlauf wird jetzt als klar sichtbare, mittige Linie gezeichnet.',
+    ]},
     { version:'8.195.0', date:'21.07.2026', changes:[
       'Balance: Verkaufserlös am Markt gesenkt (Spieler-Report „man bekommt zu viele Kredite für Ressourcen"). Verkäufer erhalten jetzt 55% statt 80% des Marktwerts - Ressourcen zu Krediten zu machen ist damit rund ein Drittel weniger lukrativ. Gilt auch für Verkaufs-Handelsrouten. Kaufen bleibt unverändert. Die „~Kr."-Vorschau am Verkaufen-Button zeigt jetzt außerdem den echten (reduzierten) Erlös an, statt wie bisher den Spread zu ignorieren.',
     ]},
@@ -8076,16 +8079,18 @@
     // Linie/Fläche, Mittellinie und ein leuchtender Endpunkt, damit der Preisverlauf klar ablesbar ist.
     const W = 150, H = 44, pad = 5;
     const min = Math.min(...hist), max = Math.max(...hist);
-    const range = (max - min) || 1;
+    const span = max - min;
+    // Ist der Verlauf (nahezu) flach - typisch, wenn ein Preis am Boden/Deckel klebt (z.B. -84% nach
+    // vielen Verkäufen) - würde die Linie sonst direkt am unteren Panelrand liegen und "leer" aussehen.
+    // In dem Fall die Linie mittig zeichnen, damit sie klar als waagerechte Linie erkennbar ist.
+    const flat = span < (Math.abs(max) * 0.005 + 1e-9);
+    const range = span || 1;
     const n = hist.length;
-    const xy = i => {
-      const x = pad + (i/(n-1))*(W-2*pad);
-      const y = pad + (1-(hist[i]-min)/range)*(H-2*pad);
-      return [x, y];
-    };
+    const yFor = v => flat ? H/2 : pad + (1-(v-min)/range)*(H-2*pad);
+    const xy = i => [pad + (i/(n-1))*(W-2*pad), yFor(hist[i])];
     const linePts = hist.map((v,i) => xy(i).map(z=>z.toFixed(1)).join(',')).join(' ');
     const [lx, ly] = xy(n-1);
-    const midY = (pad + (1-((hist.reduce((a,b)=>a+b,0)/n)-min)/range)*(H-2*pad)).toFixed(1);
+    const midY = (flat ? H/2 : yFor(hist.reduce((a,b)=>a+b,0)/n)).toFixed(1);
     const areaPts = `${pad.toFixed(1)},${(H-pad).toFixed(1)} ${linePts} ${(W-pad).toFixed(1)},${(H-pad).toFixed(1)}`;
     const gid = 'spg'+(++sparkGradSeq);
     return `<svg class="mkt-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" aria-hidden="true">`
