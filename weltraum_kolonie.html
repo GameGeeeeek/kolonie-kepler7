@@ -3426,8 +3426,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.194.0';
+  const VERSION = '8.195.0';
   const PATCHNOTES = [
+    { version:'8.195.0', date:'21.07.2026', changes:[
+      'Balance: Verkaufserlös am Markt gesenkt (Spieler-Report „man bekommt zu viele Kredite für Ressourcen"). Verkäufer erhalten jetzt 55% statt 80% des Marktwerts - Ressourcen zu Krediten zu machen ist damit rund ein Drittel weniger lukrativ. Gilt auch für Verkaufs-Handelsrouten. Kaufen bleibt unverändert. Die „~Kr."-Vorschau am Verkaufen-Button zeigt jetzt außerdem den echten (reduzierten) Erlös an, statt wie bisher den Spread zu ignorieren.',
+    ]},
     { version:'8.194.0', date:'21.07.2026', changes:[
       'Markt: Nach einem Klick auf „Max Kauf"/„Max Verkauf" (und auch beim Tippen der Menge) aktualisiert sich die Kredit-Schätzung auf den Kaufen/Verkaufen-Buttons jetzt SOFORT, statt bis zu ~2 Sekunden nachzuhängen.',
       'Markt: Der Mini-Preisverlauf (Sparkline) je Ressource ist jetzt deutlich besser lesbar - größer, mit Hintergrund-Panel, kräftigerer Linie, Mittellinie und leuchtendem Endpunkt (war vorher kaum sichtbar).',
@@ -7882,8 +7885,10 @@
   const ROUTE_INTERVAL_MS = 60 * 1000; // ein Routen-Zyklus pro Minute
   const ROUTE_SELL_PER_FRACHTER = 40;    // verkaufte Ressourcenmenge pro Frachter je Zyklus
   // Muss synchron zu MARKET_SELL_SPREAD im Backend bleiben (dort die eigentliche Autorität für den
-  // direkten Marktverkauf) - hier nur für die client-seitig berechnete Verkaufsroute genutzt.
-  const MARKET_SELL_SPREAD = 0.80;
+  // direkten Marktverkauf) - hier für die client-seitig berechnete Verkaufsroute UND die Markt-
+  // Verkaufsvorschau (estimateTradeCredits) genutzt. Balance (21.07.2026, Spieler-Report "zu viele
+  // Kredite beim Verkauf"): von 0.80 auf 0.55 gesenkt - synchron zum Backend halten.
+  const MARKET_SELL_SPREAD = 0.55;
   // Kredit-Route (Balance-Pass v7.89): war vorher linear (12×Frachter, ohne Unterhalt) und damit ein
   // reines Perpetuum mobile - Frachter kosten nur einmalig 100 Erz und amortisierten sich in ~9 Min.,
   // danach unbegrenzt Gewinn. Jetzt: nur EINE Kredit-Route gleichzeitig, gedeckelt auf max. 15 Frachter,
@@ -8536,6 +8541,8 @@
     save(); renderMarket();
   }
   // Grobe Client-Schätzung der Kredit-Kosten/Erlöse (das Backend rechnet verbindlich).
+  // Nutzt die oben definierte MARKET_SELL_SPREAD-Konstante, damit die Verkaufs-Vorschau exakt dem
+  // tatsächlich vom Server gutgeschriebenen Erlös entspricht (sonst zeigt sie zu viel an).
   function estimateTradeCredits(action, resource, amount){
     if (!state.marketCache || !state.marketCache[resource]) return 0;
     const price = state.marketCache[resource].price;
@@ -8544,7 +8551,11 @@
     // Stückzahlen statt Tausenden gehandelt wird; so rechnet die Vorschau dieselbe Slippage.
     const impact = (amount/1000) * 0.04 * base * (state.marketCache[resource].impactScale||1);
     const priceAfter = action==='buy' ? price+impact : Math.max(0, price-impact);
-    return Math.round((price+priceAfter)/2 * amount);
+    const raw = (price+priceAfter)/2 * amount;
+    // Verkauf: Spread + Rabatt einrechnen (wie der Server). Kauf: roher Mittelwert - den Rabatt zieht
+    // maxAffordableMarketBuy separat ab, daher hier bewusst NICHT anwenden (sonst doppelt).
+    if (action === 'sell') return Math.round(raw * MARKET_SELL_SPREAD * (1 + marketDiscountPct()));
+    return Math.round(raw);
   }
   // QoL-Vorschlag (20.07.2026, "Max"-Buttons am Markt): größte mit dem aktuellen Kreditstand kaufbare
   // Menge. estimateTradeCredits() ist streng monoton wachsend in amount (die Slippage-Formel hat
