@@ -1771,6 +1771,7 @@
 
       <div class="tab-panel active" id="tab-basis">
         <div id="colonyDashboard"></div>
+        <div id="nextGoalBox"></div>
         <div id="relocateAllQuickBox"></div>
         <div id="planetRoleBox"></div>
         <div id="orbitalStationBox"></div>
@@ -3403,8 +3404,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.175.0';
+  const VERSION = '8.176.0';
   const PATCHNOTES = [
+    { version:'8.176.0', date:'21.07.2026', changes:[
+      'Neu: „Nächstes Ziel"-Widget direkt oben im Basis-Tab. Es zeigt auf einen Blick deinen Fortschritt zum nächsten Kommandanten-Level sowie den Erfolg, dem du gerade am nächsten bist (mit Fortschrittsbalken, Punkten und Kurzbeschreibung) - ein Klick springt in den Fortschritt-Tab. So hast du immer eine klare, konkrete nächste Aufgabe vor Augen, besonders praktisch für Rückkehrer und kurze Sessions.',
+    ]},
     { version:'8.175.0', date:'21.07.2026', changes:[
       'Neu: Streak-Schutzschilde. Deine tägliche Login-Serie bricht nicht mehr sofort ab, wenn du mal genau einen Tag verpasst - ein Schutzschild fängt das ab und rettet die Serie. Für jeden vollständig durchgehaltenen 7-Tage-Zyklus bekommst du automatisch +1 Schild (bis zu 3 auf Vorrat). Aktueller Vorrat und Verbrauch werden im Login-Kalender und im „Willkommen zurück"-Fenster angezeigt.',
       'Neu: Eskalierende Treue-Meilensteine. Erreicht deine Login-Serie 14, 30, 60 oder 100 Tage am Stück, gibt es eine einmalige große Zusatzbelohnung (Ressourcen, Kredite, dazu ab Tag 60 auch Schiffe) - ein sichtbares Langzeitziel jenseits des 7-Tage-Zyklus. Der Login-Kalender zeigt jetzt den nächsten Meilenstein samt Countdown und Belohnung an.',
@@ -20775,6 +20779,70 @@
     if (def.credits) return 'ti-diamond';
     return 'ti-box';
   }
+  // "Nächstes Ziel"-Widget im Basis-Dashboard (21.07.2026, Retention-Runde): gibt Rückkehrern und
+  // Gelegenheitsspielern immer eine klare, konkrete nächste Aufgabe - so muss niemand erst überlegen,
+  // "was mache ich jetzt eigentlich". Zeigt (a) den Fortschritt zum nächsten Kommandanten-Level und
+  // (b) den am nächsten dran liegenden noch nicht erreichten Erfolg (höchster Fortschrittsanteil).
+  // Der Erfolgs-Scan ist bewusst auf ~alle 4s gedrosselt (nextGoalCache), da a.progress(state) über
+  // alle Gebäude/Planeten iterieren kann - kombiniert mit dem Signatur-Cache-Muster wird die Box nur
+  // neu gezeichnet, wenn sich Level-XP oder das Zielobjekt tatsächlich ändern.
+  let nextGoalCache = { at:0, best:null };
+  function computeNearestAchievement(){
+    let best = null;
+    for (const a of ACHIEVEMENTS){
+      if (state.achievements[a.key] || typeof a.progress !== 'function') continue;
+      let p; try { p = a.progress(state); } catch(e){ continue; }
+      if (!p || !p[1]) continue;
+      const ratio = p[0]/p[1];
+      if (ratio >= 1 || ratio <= 0) continue; // fertig (wird ohnehin gleich freigeschaltet) oder noch nicht begonnen
+      if (!best || ratio > best.ratio) best = { key:a.key, name:a.name, desc:a.desc, cur:p[0], max:p[1], ratio, pts:achPoints(a) };
+    }
+    return best;
+  }
+  let lastNextGoalSig = null;
+  function renderNextGoalBox(){
+    const box = document.getElementById('nextGoalBox');
+    if (!box) return;
+    const lvl = commanderLevel(state.xp||0);
+    const curXp = Math.floor((state.xp||0) - xpForLevel(lvl));
+    const xpNext = Math.max(1, xpForLevel(lvl+1) - xpForLevel(lvl));
+    const xpPct = Math.max(0, Math.min(100, Math.round(curXp/xpNext*100)));
+    const now = Date.now();
+    if (now - nextGoalCache.at > 4000) nextGoalCache = { at:now, best:computeNearestAchievement() };
+    const best = nextGoalCache.best;
+    const sig = lvl+':'+curXp+':'+(best?best.key+':'+best.cur+'/'+best.max:'none');
+    if (sig === lastNextGoalSig) return;
+    lastNextGoalSig = sig;
+    let achHtml;
+    if (best){
+      const achPct = Math.max(0, Math.min(100, Math.round(best.ratio*100)));
+      achHtml = `
+        <div class="card-row" data-next-goal-tab="fortschritt" style="flex-direction:column; align-items:stretch; cursor:pointer;" title="${best.desc} – zum Fortschritt-Tab">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+            <span class="bname" style="font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><i class="ti ti-award" aria-hidden="true" style="color:#9fe1cb;"></i> ${best.name}</span>
+            <span class="lvl-pill" style="font-size:10px; flex-shrink:0;">${fmt(best.cur)} / ${fmt(best.max)} · ${best.pts} P</span>
+          </div>
+          <div class="progress-outer"><div class="progress-inner" style="width:${achPct}%;"></div></div>
+          <div class="bmeta" style="margin-top:5px;">${best.desc}</div>
+        </div>`;
+    } else {
+      achHtml = `<div class="bmeta" style="margin-top:6px;">Alle greifbaren Erfolge sind erreicht – starte eine neue Erkundung, Forschung oder einen Ausbau, um das nächste Ziel freizuschalten.</div>`;
+    }
+    box.innerHTML = `
+      <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-target" aria-hidden="true"></i>Nächstes Ziel</div>
+      <div class="card-row" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="bname" style="font-size:12.5px;"><i class="ti ti-star" aria-hidden="true" style="color:#fac775;"></i> Kommandant Level ${lvl}</span>
+          <span class="lvl-pill" style="font-size:10px;">${fmt(curXp)} / ${fmt(xpNext)} XP</span>
+        </div>
+        <div class="progress-outer"><div class="progress-inner" style="width:${xpPct}%;"></div></div>
+        <div class="bmeta" style="margin-top:5px;">Nächstes Level: +1% Gesamtproduktion und ein Fähigkeitspunkt.</div>
+      </div>
+      ${achHtml}
+    `;
+    const goalTab = box.querySelector('[data-next-goal-tab]');
+    if (goalTab) goalTab.onclick = () => { const btn = document.querySelector('.tab-btn[data-tab="fortschritt"]'); if (btn) btn.click(); };
+  }
   let lastDailyLoginSig = null;
   function renderDailyLoginBox(){
     const box = document.getElementById('dailyLoginBox');
@@ -26374,6 +26442,7 @@
       </div>
     `;
     refreshPlanetMiniIcons(document.getElementById('colonyDashboard'));
+    renderNextGoalBox();
     const relocateAllQuickBox = document.getElementById('relocateAllQuickBox');
     if (relocateAllQuickBox) relocateAllQuickBox.innerHTML = relocateAllQuickButtonsHtml();
 
