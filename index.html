@@ -2109,6 +2109,7 @@
             <div class="card-row"><div class="left"><i class="ti ti-mail" aria-hidden="true"></i><div class="bname">Patchnotes</div></div><div class="toggle-switch" data-notif-cat="patchnotes"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-user" aria-hidden="true"></i><div class="bname">Allianz-Bewerbungen</div><div class="bmeta">Nur relevant für Allianz-Admins/Offiziere</div></div><div class="toggle-switch" data-notif-cat="application"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-target" aria-hidden="true"></i><div class="bname">Spionage-Warnungen</div><div class="bmeta">Wenn dich jemand ausspäht</div></div><div class="toggle-switch" data-notif-cat="spy"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-sword" aria-hidden="true"></i><div class="bname">Angriffe auf dich</div><div class="bmeta">Wenn dich ein Spieler angreift</div></div><div class="toggle-switch" data-notif-cat="attack"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
           </div>
@@ -3402,8 +3403,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.173.0';
+  const VERSION = '8.174.0';
   const PATCHNOTES = [
+    { version:'8.174.0', date:'21.07.2026', changes:[
+      'Neu: Benachrichtigung, wenn dich ein Spieler angreift. Wird dein Standort von einem echten Spieler überfallen, bekommst du jetzt eine Meldung (im Postfach und - bei aktiviertem Web-Push - als Systembenachrichtigung aufs Handy), egal ob der Angriff durchkam oder deine Verteidigung gehalten hat. Eigene, abschaltbare Kategorie unter Einstellungen → Benachrichtigungen → „Angriffe auf dich". So verpasst du keinen Überfall mehr unbemerkt und kannst rechtzeitig aufrüsten oder zurückschlagen.',
+    ]},
     { version:'8.173.0', date:'21.07.2026', changes:[
       'Grafik: Der Gravitations-Stabilisator (Tier-2-Erweiterung) hat jetzt ein eigenes animiertes Symbol (Kern mit nach innen pulsenden Kompressionsringen) - passend zu den anderen Tier-2-Nutzgebäuden, die schon eigene Symbole haben.',
     ]},
@@ -13622,7 +13626,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true, spy:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true, spy:true, attack:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -13654,7 +13658,8 @@
     'weltboss-kill': { icon:'ti-skull', color:'#e24b4a', text:(p)=>'Leviathan Stufe '+(p.level||1)+' wurde besiegt - dein Beitrag: '+(p.share||0)+'%.' },
     'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' },
     'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' },
-    'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' }
+    'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' },
+    'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') }
   };
   async function loadNotificationEvents(){
     if (!useBackend()) return;
