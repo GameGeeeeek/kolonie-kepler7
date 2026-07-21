@@ -1443,6 +1443,7 @@
           <button id="profileMoreBtn" class="btn-more" aria-expanded="false" title="Mehr">···</button>
         </div>
         <div id="profileMoreMenu" class="profile-more-menu">
+          <button id="profileFriendBtn" style="width:100%; display:none;"><i class="ti ti-star" aria-hidden="true" style="margin-right:4px;"></i>Als Freund merken</button>
           <button id="profileSabotageBtn" style="width:100%; display:none;"><i class="ti ti-target" aria-hidden="true" style="margin-right:4px;"></i>Störmanöver (Sabotage)</button>
           <button id="profilePactBtn" style="width:100%;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Nichtangriffspakt anbieten</button>
           <button id="profileAllianceInviteBtn" style="width:100%; display:none;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Zur Allianz einladen</button>
@@ -2019,6 +2020,9 @@
           <button id="refreshReportsBtn" style="font-size:11px; padding:5px 10px;"><i class="ti ti-refresh" aria-hidden="true" style="margin-right:4px;"></i>Aktualisieren</button>
         </div>
         <div id="reportsBox"></div>
+
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-star" aria-hidden="true"></i>Freunde</div>
+        <div id="friendsBox"></div>
 
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-message" aria-hidden="true"></i>Nachrichten</div>
         <div id="messagesBox"></div>
@@ -3430,8 +3434,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.203.0';
+  const VERSION = '8.204.0';
   const PATCHNOTES = [
+    { version:'8.204.0', date:'21.07.2026', changes:[
+      'Neu: Freundesliste. Merke dir andere Spieler über ihr Profil („···"-Menü → „Als Freund merken") und finde sie gebündelt im Galaxie-Tab unter Rangliste & Ruhm → Nachrichten → Freunde – mit Online-Status und Punktestand, plus Direktzugriff auf Nachricht schreiben, Profil öffnen und entfernen. Persönliche Merkliste (max. 30), übersteht Prestige und Aufstieg. Nutzt die bestehenden Direktnachrichten. Nur mit eigenem Server.',
+    ]},
     { version:'8.203.0', date:'21.07.2026', changes:[
       'Wochenliga jetzt serverseitig abgesichert: Platzierung und Belohnung werden am Wochenwechsel vom Server aus den (bereits geprüften) Punktezuwächsen berechnet und über das Belohnungs-Postfach ausgeschüttet – der Client zahlt sich nicht mehr selbst aus. Damit kann sich niemand mehr eine höhere Liga oder Belohnung erschummeln. Für dich als ehrlichen Spieler ändert sich nichts am Ablauf: Beim nächsten Login nach Wochenwechsel wird deine Liga-Belohnung automatisch gutgeschrieben. (Im Solo-Modus ohne Server bleibt die lokale Abrechnung.)',
     ]},
@@ -12983,6 +12990,7 @@
     if (!state.pirateLairStage) state.pirateLairStage = 1;
     if (state.pirateLairPrestige === undefined) state.pirateLairPrestige = 0;
     if (!state.weeklyLeague) state.weeklyLeague = { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] };
+    if (!Array.isArray(state.friends)) state.friends = [];
     if (!state.veteranXp) state.veteranXp = {};
     if (state.dayStats === undefined) state.dayStats = null;
     if (!state.dailyHistory) state.dailyHistory = [];
@@ -13030,6 +13038,7 @@
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
+    const keepFriends = (state.friends||[]).slice(); // Freundesliste überlebt Prestige/Aufstieg (persönliche Lesezeichen, kein Wirtschaftswert)
     // Bugfix (Spieler-Wunsch, entdeckt bei der Offiziere-Recherche): Offiziere, Kommandopunkte und
     // beide Modul-Inventare wurden bisher bei JEDEM Prestige komplett gelöscht, ohne dass der
     // Bestätigungs-Dialog (siehe unten, Zeile ~9700) das erwähnt - der Dialog verspricht nur
@@ -13098,7 +13107,8 @@
       officers:keepOfficers||{}, officerTalents:keepOfficerTalents||{}, commandPoints:keepCommandPoints||0,
       modules:keepModules||{}, moduleSlotLevel:keepModuleSlotLevel||{}, equippedModules:keepEquippedModules||{},
       shipModules:keepShipModules||{}, shipModuleSlotLevel:keepShipModuleSlotLevel||{}, equippedShipModules:keepEquippedShipModules||{},
-      player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
+      player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
+      friends: keepFriends||[]
     };
     applyStateDefaults();
     // Kryo-Archiv anwenden: NACH applyStateDefaults (das setzt fehlende Tier-2-Felder auf 0),
@@ -13155,6 +13165,7 @@
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
+    const keepFriends = (state.friends||[]).slice(); // Freundesliste überlebt Prestige/Aufstieg (persönliche Lesezeichen, kein Wirtschaftswert)
     const asc = state.ascension || { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0,leere:0} };
     asc.count = (asc.count||0) + 1;
     asc.essence = (asc.essence||0) + gain;
@@ -13176,7 +13187,8 @@
       claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
       ascension: asc,
-      player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now()
+      player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
+      friends: keepFriends||[]
     };
     applyStateDefaults();
     log('AUFSTIEG '+asc.count+' vollzogen! +'+gain+' Sternenessenz (gesamt: '+asc.essence+'). Verteile sie im Meta-Baum (Fortschritt-Tab) - diese Boni überleben jeden Reset.', 'ti-sparkles');
@@ -14301,6 +14313,50 @@
     if (diff < 7*86400000) return 'vor '+Math.round(diff/86400000)+' Tagen';
     return new Date(ts).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
   }
+  // ===== Freundesliste (#8) =====
+  // Persönliche Lesezeichen-Liste anderer Spieler - liegt im eigenen Spielstand (state.friends), rein
+  // clientseitig. Direktnachrichten laufen über das bestehende /api/messages, der Online-Status über den
+  // lastSeen-Wert der geteilten Bestenliste. Übersteht Prestige/Aufstieg (kein Wirtschaftswert, s. dort).
+  const FRIENDS_MAX = 30;
+  function isFriend(id){ return (state.friends||[]).some(f => f.id === id); }
+  function toggleFriend(entry){
+    if (!state.friends) state.friends = [];
+    const idx = state.friends.findIndex(f => f.id === entry.id);
+    if (idx >= 0){ state.friends.splice(idx, 1); log(entry.name+' aus der Freundesliste entfernt.', 'ti-star'); }
+    else {
+      if (state.friends.length >= FRIENDS_MAX){ log('Freundesliste voll (max. '+FRIENDS_MAX+').', 'ti-alert-triangle'); return; }
+      state.friends.push({ id: entry.id, name: entry.name||'Unbekannt', allianceTag: entry.allianceTag||'' });
+      log(entry.name+' als Freund gemerkt.', 'ti-star', 'ok');
+    }
+    save();
+    renderFriendsBox();
+  }
+  let lastFriendsSig = null;
+  function renderFriendsBox(){
+    const box = document.getElementById('friendsBox');
+    if (!box) return;
+    if (!useBackend()){ if (lastFriendsSig !== 'nobackend'){ box.innerHTML = '<div class="bmeta">Freundesliste nur mit eigenem Server verfügbar.</div>'; lastFriendsSig = 'nobackend'; } return; }
+    const friends = state.friends || [];
+    if (!friends.length){ if (lastFriendsSig !== 'empty'){ box.innerHTML = '<div class="bmeta">Noch keine Freunde gemerkt. Öffne ein Spielerprofil (Bestenliste antippen) und wähle im „···"-Menü „Als Freund merken".</div>'; lastFriendsSig = 'empty'; } return; }
+    // Aktuelle Daten (Score, Online-Status) aus der Bestenliste anreichern, sofern vorhanden.
+    const byId = {}; for (const e of (leaderboardCache||[])) byId[e.id] = e;
+    const rows = friends.map(f => {
+      const e = byId[f.id];
+      const online = e && (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
+      const score = e ? fmt(e.score||0)+' Pkt.' : 'offline gemerkt';
+      const name = escapeHtml(e ? (e.name||f.name) : f.name);
+      const tag = (e && e.allianceTag) || f.allianceTag || '';
+      return { sig: f.id+':'+(online?'1':'0')+':'+(e?e.score:'-'), html:
+        `<div class="card-row"><div class="left"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-right:6px;background:${online?'#5dcaa5':'#5a5f73'};box-shadow:${online?'0 0 6px #5dcaa5':'none'};"></span><div><span class="bname">${name}${tag?' ['+escapeHtml(tag)+']':''}</span><div class="bmeta">${online?'<span style="color:#5dcaa5;">online</span> · ':''}${score}</div></div></div><div style="display:flex; gap:4px;"><button data-friend-msg="${f.id}" data-friend-name="${escapeHtml(f.name)}" style="font-size:10px; padding:5px 7px;" title="Nachricht schreiben"><i class="ti ti-mail" aria-hidden="true"></i></button><button data-friend-profile="${f.id}" style="font-size:10px; padding:5px 7px;" title="Profil öffnen"><i class="ti ti-user" aria-hidden="true"></i></button><button data-friend-remove="${f.id}" style="font-size:10px; padding:5px 7px;" title="Entfernen"><i class="ti ti-x" aria-hidden="true"></i></button></div></div>` };
+    });
+    const sig = rows.map(r => r.sig).join('|');
+    if (sig === lastFriendsSig) return;
+    lastFriendsSig = sig;
+    box.innerHTML = rows.map(r => r.html).join('');
+    box.querySelectorAll('[data-friend-msg]').forEach(b => b.onclick = () => openMessageCompose(b.getAttribute('data-friend-msg'), b.getAttribute('data-friend-name')));
+    box.querySelectorAll('[data-friend-profile]').forEach(b => b.onclick = () => { const id = b.getAttribute('data-friend-profile'); const e = (leaderboardCache||[]).find(x=>x.id===id) || (state.friends||[]).find(x=>x.id===id); if (e) showPlayerProfile(e.id ? e : { id, name:e.name, allianceTag:e.allianceTag }); });
+    box.querySelectorAll('[data-friend-remove]').forEach(b => b.onclick = () => { const id = b.getAttribute('data-friend-remove'); const f = (state.friends||[]).find(x=>x.id===id); if (f) toggleFriend(f); });
+  }
   function showPlayerProfile(entry){
     const avatarEl = document.getElementById('profileModalAvatar');
     const av = avatarSvg(entry.avatarKey);
@@ -14500,6 +14556,18 @@
       const canSabotage = !isMe && useBackend();
       sabotageBtn.style.display = canSabotage ? 'block' : 'none';
       if (canSabotage) sabotageBtn.onclick = () => { closePlayerProfile(); sendSabotageMission(entry.id, entry.name); };
+    }
+    const friendBtn = document.getElementById('profileFriendBtn');
+    if (friendBtn){
+      const canFriend = !isMe && useBackend() && entry.id;
+      friendBtn.style.display = canFriend ? 'block' : 'none';
+      if (canFriend){
+        const already = isFriend(entry.id);
+        friendBtn.innerHTML = already
+          ? '<i class="ti ti-star" aria-hidden="true" style="margin-right:4px;"></i>Aus Freundesliste entfernen'
+          : '<i class="ti ti-star" aria-hidden="true" style="margin-right:4px;"></i>Als Freund merken';
+        friendBtn.onclick = () => { toggleFriend(entry); closePlayerProfile(); };
+      }
     }
     msgBtn.onclick = () => { closePlayerProfile(); openMessageCompose(entry.id, entry.name); };
     if (spyBtn) spyBtn.onclick = () => { closePlayerProfile(); sendSpyMission(entry.id, entry.name); };
@@ -15899,6 +15967,7 @@
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Freunde einladen', body:'Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.' },
       { title:'Kolonie teilen', body:'Der Button "Kolonie teilen" (Punktestand-Tab) erzeugt ein Bild mit Avatar, Level, Punktestand und den wichtigsten Eckdaten (Kolonien, Monde, Flotte, Kampfpunkte) - zum Teilen auf sozialen Netzwerken. Auf dem Handy öffnet sich meist direkt das Teilen-Menü des Betriebssystems, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser, ohne Server-Kontakt.' },
+      { title:'Freundesliste', body:'Du kannst andere Spieler als <strong>Freunde merken</strong>: Öffne ihr Profil (in der Bestenliste auf den Namen tippen) und wähle im „···"-Menü <strong>„Als Freund merken"</strong>. Deine Freunde erscheinen dann gebündelt im Galaxie-Tab unter <strong>Rangliste & Ruhm → Nachrichten → Freunde</strong> - mit Online-Status (grüner Punkt = in den letzten Minuten aktiv) und aktuellem Punktestand. Direkt daneben kannst du ihnen eine <strong>Nachricht schreiben</strong>, ihr <strong>Profil öffnen</strong> oder sie wieder <strong>entfernen</strong>. Die Liste ist eine persönliche Merkliste (max. 30), liegt in deinem Spielstand und übersteht Prestige und Aufstieg. Nur mit eigenem Server verfügbar.' },
       { title:'Rahmen-Stufen im Spielerprofil', body:'Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>Silber</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert. Dazu kommt ab dem Lategame eine erste Tier-2-Ressource, Nanolegierungen (siehe eigener Eintrag unten) - eigenes, kleineres Lager, getrennt von den sechs Basis-Ressourcen.' },
       { title:'Tier-2-Ressourcen: Nanolegierungen & Quantenchips', body:'Tier-2-Ressourcen werden nicht kostenlos produziert, sondern in speziellen Fabriken laufend <strong>aus Basis-Ressourcen hergestellt</strong> - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig und gilt <strong>je Standort</strong> (Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Tier-2-Ressourcen bleiben dauerhaft knapp und haben eigene, kleine Lager. <strong>Nanolegierungen</strong> (ab Forschung „Nanotechnologie", über „Effiziente Baupläne" Stufe 10): Nanolegierungsfabrik, max. Stufe 15, verbraucht 8 Erz + 5 Kristalle + 4 Energie je Einheit, max. ca. 0,09/s. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab) - das stärkste reguläre Verteidigungsgebäude; eingereihte Plattformen starten automatisch, sobald genug Nanolegierungen angesammelt sind. <strong>Quantenchips</strong> (ab Forschung „Quantenphysik", benötigt Nanotechnologie UND „Nanoschliff-Kristalle" Stufe 10): Quantenchipfabrik, max. Stufe 15, verbraucht 12 Kristalle + 5 Deuterium + 6 Energie je Chip und ist bewusst 3x langsamer (max. ca. 0,03/s) - die höherwertige, knappere zweite Stufe. Erste Verwendung: die <strong>Quanten-Sensorphalanx</strong> (Verteidigung-Tab) - jede Stufe gibt +120 Sekunden Überfall-Vorwarnzeit (imperiumsweit gedeckelt bei +20 Minuten, zusätzlich zu Langstrecken-Scanner/Allianz/Pakten) plus etwas Verteidigung; eingereihte Phalanxen starten automatisch, sobald genug Quantenchips angesammelt sind. <strong>Hochenergiekristalle</strong> (ab Forschung „Hochenergiephysik", benötigt Quantenphysik UND „Vakuumfluktuationskompression" Stufe 5): Kristalllabor, max. Stufe 15, verbraucht 18 Kristalle + 12 Energie + 1 Antimaterie je Einheit - die erste Kette mit Antimaterie als Zutat und mit 0,0015/s je Stufe die langsamste. Verwendung: die <strong>Hochenergie-Schildkuppel</strong> (Verteidigung-Tab) - der stärkste reine Schild des Spiels (220 Verteidigung je Stufe, kein Angriff), Baukosten enthalten Hochenergiekristalle. <strong>Fusionskerne</strong> (ab Forschung „Fusionskern-Synthese", benötigt Hochenergiephysik UND „Isotopen-Anreicherung" Stufe 5): die Fusionsschmiede ist die erste <strong>mehrstufige</strong> Kette - sie verbraucht 20 Deuterium + 2 Antimaterie + <strong>3 Nanolegierungen</strong> je Kern, eine Tier-2-Ressource wird also selbst zur Zutat. Mit 0,0008/s je Stufe die langsamste Kette. Verwendung: die <strong>Fusionsbastion</strong> (Verteidigung-Tab) - starkes Kombigebäude (250 Verteidigung + 120 Angriff je Stufe), Baukosten enthalten Fusionskerne. <strong>KI-Kerne</strong> (ab Forschung „KI-Technologie", benötigt Fusionskern-Synthese): das KI-Labor ist die Spitze der Kette - die einzige Fabrik mit <strong>zwei Tier-2-Zutaten</strong> (2 Quantenchips + 2 Nanolegierungen + 3 Antimaterie je Kern) und mit 0,0005/s je Stufe die langsamste. Verwendung: der <strong>KI-Verteidigungskern</strong> (Verteidigung-Tab) - Spitze der regulären Verteidigungsleiter (300 Verteidigung + 150 Angriff je Stufe), nur die Kristallfestung mit seltenem Item bleibt darüber. Hinweis für alle Tier-2-Fabriken: Ist das jeweilige Tier-2-Lager voll, <strong>pausiert</strong> die Fabrik (verbraucht dann auch keine Rohstoffe mehr), bis wieder Platz ist. Das Tier-2-Badge unter der Ressourcenleiste zeigt je Kette die aktuelle <strong>effektive Produktionsrate pro Sekunde</strong> - inklusive Hinweis, wenn die Fabrik wegen Rohstoffmangel gedrosselt läuft ("Rohstoffe knapp") oder wegen vollem Lager pausiert ("Lager voll"). Neben den Verteidigungsgebäuden gibt es drei <strong>Nutzgebäude</strong> als weitere Verbraucher (Basis-Tab): das <strong>Hochsicherheitslager</strong> (+80 Tier-2-Lagerkapazität je Stufe auf jede Kette, Kosten enthalten Nanolegierungen), das <strong>Kryolager</strong> (+2.000 Basis-Lagerkapazität je Stufe, Kosten enthalten Hochenergiekristalle) und den <strong>Fusions-Werftkern</strong> (-1,5% Schiffsbauzeit je Stufe, imperiumsweit bei -15% gedeckelt, Kosten enthalten Fusionskerne). Dazu drei <strong>Tier-2-Schiffe</strong> (Flotte-Tab, Baukosten bestehen KOMPLETT aus raffinierten Ressourcen): die <strong>Nanoklinge</strong> (55 Angriff, schnell - 130 Nanolegierungen), der <strong>Quantenkreuzer</strong> (80 Angriff + Schildwert - 60 Quantenchips + 60 Nanolegierungen) und der <strong>Fusionsdreadnought</strong> (180 Angriff, zwischen Leerenjäger und Superschlachtschiff - 45 Fusionskerne + 60 Hochenergiekristalle). Alle drei sind in Angriffen, Allianz-Raids und Musterangriffen voll einsetzbar. Erster <strong>Verbrauchsgegenstand</strong>: „Quantensensoren kalibrieren" im Expeditions-Bereich (ab Forschung Quantenphysik) verbraucht 10 Quantenchips und gibt 30 Minuten lang allen in diesem Fenster GESTARTETEN Expeditionen einen spürbaren Glücksbonus auf die Fundqualität - laufende Expeditionen profitieren nicht rückwirkend. Die <strong>Auto-Kalibrierung</strong> (Schalter direkt darunter) investiert die 10 Chips beim Expeditions-Start automatisch, falls gerade kein Fenster läuft - reichen die Chips nicht, startet die Expedition normal ohne Bonus. Zweiter laufender Verbraucher: die <strong>KI-Abfangautomatik</strong> (Verteidigung-Tab, ab KI-Technologie) vertreibt Piraten-Trümmerräuber automatisch für 3 KI-Kerne je Einsatz - Details im Abschnitt „Piraten-Trümmerräuber". Dritter: der <strong>Terraforming-Energieschub</strong> (ab Hochenergiephysik) verkürzt eine laufende Terraforming-Stufe um je 10% für 6 Hochenergiekristalle x Zielstufe (max. 3 Schübe je Stufe) - Details im Abschnitt „Terraforming". Außerdem lassen sich Tier-2-Ressourcen als hart gedeckeltes <strong>Pakt-Geschenk</strong> an Paktpartner senden (ab Handelsabkommen, Details unter „Diplomatie") und es gibt eine eigene <strong>Tagesaufgabe</strong> „5 Tier-2-Ressourcen produzieren", sobald mindestens eine Fabrik existiert. Für Allianzen: Das Weltprojekt <strong>Galaktische Verbundraffinerie</strong> verlangt 600 Fusionskerne als Materialschwelle und belohnt mit dauerhaft +10% Durchsatz aller Tier-2-Fabriken (Details unter „Allianzen"). Am galaktischen Markt sind Tier-2-Ressourcen bewusst <strong>nicht</strong> handelbar - sie kommen ausschließlich aus den eigenen Fabriken. Fürs Prestige: das <strong>Kryo-Archiv</strong> (viertes Nutzgebäude, ab Hochenergiephysik) bewahrt je Stufe feste Tier-2-Mengen durch den Reset - ohne Archiv geht der Bestand verloren (Details unter „Fortschritt & Prestige"). Und für die Tier-2-Schiffe gibt es eine eigene Schiffsklassen-Modul-Kategorie mit <strong>gefertigten</strong> Modulen aus Tier-2-Ressourcen (Details unter „Offiziere").' },
@@ -21068,6 +21137,7 @@
         if (!state.pirateLairStage) state.pirateLairStage = 1;
         if (state.pirateLairPrestige === undefined) state.pirateLairPrestige = 0;
         if (!state.weeklyLeague) state.weeklyLeague = { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] };
+    if (!Array.isArray(state.friends)) state.friends = [];
         if (!state.veteranXp) state.veteranXp = {};
         if (state.dayStats === undefined) state.dayStats = null;
         if (!state.dailyHistory) state.dailyHistory = [];
@@ -22059,6 +22129,7 @@
   }
   function processWeeklyLeague(){
     if (!state.weeklyLeague) state.weeklyLeague = { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] };
+    if (!Array.isArray(state.friends)) state.friends = [];
     const wl = state.weeklyLeague;
     const nowKey = weekKeyOf(Date.now());
     if (wl.weekKey === nowKey) return;
@@ -26820,6 +26891,7 @@
       loadDiplomacy();
       loadWorldBoss();
       updateHallOfFame(entries);
+      renderFriendsBox();
       renderFpLeaderboard();
       renderLeaderboardList();
       renderTerritoryBox();
