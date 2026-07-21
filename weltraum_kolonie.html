@@ -3426,8 +3426,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.192.0';
+  const VERSION = '8.193.0';
   const PATCHNOTES = [
+    { version:'8.193.0', date:'21.07.2026', changes:[
+      'Neue Standort-Module: „Lagermodul" (erhöht die Lagerkapazität dieses Standorts) und „Abwehrmodul" (Gegenschlag - bei einem abgewehrten Überfall werden mehr gegnerische Schiffe zerstört). Damit gibt es jetzt sieben Standort-Modultypen.',
+      'Neue Schiffsklassen-Module (je eins mehr pro Klasse): Nachbrenner (Schlachtschiff +Geschwindigkeit), Not-Panzerung (Frachter +Verteidigungsbeitrag), Deflektorschild (Aufklärer +Schild), Schildmatrix (Mondzerstörer +Schild).',
+      'Legendäre Schiffsklassen-Module sind jetzt erreichbar: neue „Elite-Schiffsklassen-Blaupause" im Kredit-Shop (14000 Kredite) mit deutlich besseren Chancen bis Legendär. Bisher waren Schiffsklassen-Module nur bis „Selten" erhältlich.',
+      'Neue „Mythische Modulschmiede" (Offiziere-Tab, ab Forschung „Singularitätsphysik"): fertige mythische Module - die stärkste Stufe - deterministisch aus Apex-Ressourcen (15 Metamaterial-Gewebe + 8 Singularitätskerne je Modul), für BEIDE Modulsysteme (Standort und Schiffsklassen). Endgame-Ressourcen-Sink statt Zufallsglück.',
+    ]},
     { version:'8.192.0', date:'21.07.2026', changes:[
       'Prestige-Bug behoben (Spieler-Report): Standort-Module, die auf einer KOLONIE ausgerüstet waren, gingen beim Prestige verloren - obwohl der Bestätigungsdialog verspricht, dass Module erhalten bleiben. Ursache: beim Reset werden alle Kolonien gelöscht, die ausgerüsteten Module blieben aber an der verschwundenen Kolonie „hängen" (weder nutzbar noch im Inventar). Jetzt werden auf Kolonien ausgerüstete Module vor dem Reset zuverlässig ins Inventar zurückgelegt; nur die Heimatbasis behält ihre ausgerüsteten Module direkt. Schiffsklassen-Module waren nie betroffen.',
     ]},
@@ -8791,7 +8797,13 @@
     // Legendär/Mythisch bleiben so, wie im Feature-Wunsch beschrieben, hochstufigen Allianzmissionen
     // vorbehalten, sobald diese existieren.
     { key:'blaupauseKlasse', name:'Schiffsklassen-Blaupause', icon:'ti-truck', cost:3500, desc:'Ein zufälliges Schiffsklassen-Modul (max. Seltenheit "Selten", einbaubar im Offiziere-Tab)',
-      buy(){ const name = grantRandomShipModule('selten'); return 'Erhalten: '+name; } }
+      buy(){ const name = grantRandomShipModule('selten'); return 'Erhalten: '+name; } },
+    // Elite-Schiffsklassen-Blaupause (21.07.2026, Feature-Wunsch): erste echte Bezugsquelle für die
+    // stärkeren Schiffsklassen-Modulstufen bis Legendär (5% Legendär / 15% Episch / 30% Selten, sonst
+    // Gewöhnlich - dieselben Gewichte wie der Fundpool, nur mit angehobenem Deckel). Bewusst teuer, da
+    // beliebig oft kaufbar. Mythisch bleibt der Mythischen Modulschmiede (Endgame-Ressourcen) vorbehalten.
+    { key:'blaupauseKlasseElite', name:'Elite-Schiffsklassen-Blaupause', icon:'ti-award', cost:14000, desc:'Ein zufälliges Schiffsklassen-Modul mit deutlich besseren Chancen (bis "Legendär", einbaubar im Offiziere-Tab)',
+      buy(){ const name = grantRandomShipModule('legendaer'); return 'Erhalten: '+name; } }
   ];
   // Ein Shop-Buff derselben Art kann nicht gestapelt werden, solange er läuft (verhindert Mehrfachkauf-Stacking).
   function shopBuffActive(kind){
@@ -10392,6 +10404,8 @@
       const typeInfo = PLANET_TYPE_INFO[effectivePlanetType(planet)];
       if (typeInfo && typeInfo.storageBonus) contrib *= typeInfo.storageBonus;
       contrib *= terraformStorageMult(planet);
+      // Lagermodul (Standort-Modul, effect 'storage'): erhöht den Lager-Beitrag dieses Standorts.
+      contrib *= (1 + moduleBonusAt(planet, 'storage'));
       cap += contrib;
     }
     const lvl = state.research.rlager||0;
@@ -10779,7 +10793,13 @@
     { key:'waffen', name:'Waffenmodul', icon:'ti-sword', effect:'atk', base:0.05, desc:'Erhöht die Angriffskraft der hier stationierten Flotte.' },
     { key:'bergbau', name:'Bergbaumodul', icon:'ti-pick', effect:'prod', base:0.05, desc:'Erhöht die Produktion dieses Standorts.' },
     { key:'werft', name:'Werftmodul', icon:'ti-building-factory-2', effect:'buildspeed', base:0.05, desc:'Verkürzt die Bauzeit an diesem Standort.' },
-    { key:'schild', name:'Schildmodul', icon:'ti-shield-lock', effect:'raidloss', base:0.05, desc:'Verringert den Ressourcenverlust bei einem erfolgreichen Überfall auf diesen Standort.' }
+    { key:'schild', name:'Schildmodul', icon:'ti-shield-lock', effect:'raidloss', base:0.05, desc:'Verringert den Ressourcenverlust bei einem erfolgreichen Überfall auf diesen Standort.' },
+    // Neue Modultypen (21.07.2026, Feature-Wunsch): 'storage' erhöht den Lager-Beitrag der Gebäude
+    // dieses Standorts (siehe storageCap), 'defatk' erhöht den Verteidigungs-Gegenschlag - also wie
+    // viele gegnerische Schiffe die Abwehr bei einem ABGEWEHRTEN Überfall zerstört (siehe
+    // defenseAttackPower), unabhängig von der reinen Verteidigungsstärke (Panzerungsmodul).
+    { key:'lager', name:'Lagermodul', icon:'ti-box', effect:'storage', base:0.08, desc:'Erhöht die Lagerkapazität dieses Standorts.' },
+    { key:'abwehr', name:'Abwehrmodul', icon:'ti-target', effect:'defatk', base:0.08, desc:'Erhöht den Gegenschlag der Verteidigung – bei einem abgewehrten Überfall werden mehr gegnerische Schiffe zerstört.' }
   ];
   const MODULE_MAX_SLOT_LEVEL = 4; // max. Slots pro Planet
   function moduleInstanceInfo(instKey){
@@ -10895,6 +10915,12 @@
     { key:'mz_praezisionslaser', klasse:'mondzerstoerer', name:'Präzisionslaser',      icon:'ti-target',      effect:'siegechance', base:0.05, desc:'Erhöht die Erfolgschance von Mondbelagerungen.' },
     { key:'mz_huelle',         klasse:'mondzerstoerer', name:'Verstärkte Hülle',       icon:'ti-shield',      effect:'hull',        base:0.10, desc:'Erhöht den Verteidigungsbeitrag des Mondzerstörers.' },
     { key:'mz_antrieb',        klasse:'mondzerstoerer', name:'Antriebsoptimierung',    icon:'ti-rocket',      effect:'speed',       base:0.15, desc:'Erhöht die Geschwindigkeit des Mondzerstörers.' },
+    // Neue Schiffsklassen-Module (21.07.2026, Feature-Wunsch): mehr Auswahl pro Klasse. Nutzen
+    // ausschließlich bereits verdrahtete Effekte (speed/hull/shield), damit keine neue Kampf-Logik nötig ist.
+    { key:'ss_nachbrenner',    klasse:'schlachtschiff', name:'Nachbrenner',            icon:'ti-rocket',      effect:'speed',       base:0.08, desc:'Erhöht die Geschwindigkeit von Schlachtschiffen.' },
+    { key:'fr_notpanzerung',   klasse:'frachter',       name:'Not-Panzerung',          icon:'ti-shield',      effect:'hull',        base:0.10, desc:'Erhöht den Verteidigungsbeitrag von Frachtern (überleben Überfälle besser).' },
+    { key:'au_deflektor',      klasse:'aufklaerer',     name:'Deflektorschild',        icon:'ti-shield-lock', effect:'shield',      base:0.08, desc:'Erhöht die Schildpunkte von Aufklärungsschiffen.' },
+    { key:'mz_schildmatrix',   klasse:'mondzerstoerer', name:'Schildmatrix',           icon:'ti-shield-lock', effect:'shield',      base:0.08, desc:'Erhöht die Schildpunkte des Mondzerstörers.' },
     // Tier-2-Modulfertigung (19.07.2026): craftOnly-Module tauchen NIE im Zufalls-Fundpool auf
     // (siehe Filter in grantRandomShipModule) - sie werden deterministisch gegen Tier-2-Ressourcen
     // gefertigt. Effekte bewusst NUR speed/fuel/hull (PvE-/Logistik-Wirkung): kein 'atk', damit die
@@ -10979,6 +11005,39 @@
     log(MODULE_RARITY[rarity].label+' "'+def.name+'" gefertigt ('+Object.entries(cost).map(([k,v])=>v+' '+resDefFor(k).label).join(' + ')+') - liegt im Schiffsklassen-Modul-Inventar.', def.icon);
     playSound('build');
     render(); save();
+  }
+  // ===== Mythische Modulschmiede (21.07.2026, Feature-Wunsch) =====
+  // Deterministische Herstellung MYTHISCHER Module (stärkste Stufe, base×5) aus Endgame-Apex-Ressourcen
+  // für BEIDE Systeme (Standort- und Schiffsklassen-Module). Bewusst an die Singularitäts-Forschung
+  // gekoppelt (rsingularitaet) und sehr teuer - reiner Endgame-Ressourcen-Sink, statt Zufallsglück.
+  const MYTHIC_CRAFT_COST = { metamaterial: 15, singularitaetskern: 8 };
+  function mythicForgeUnlocked(){ return (state.research.rsingularitaet||0) >= 1; }
+  function mythicCraftAffordable(){ return Object.entries(MYTHIC_CRAFT_COST).every(([k,v]) => (state.resources[k]||0) >= v); }
+  function payMythicCraft(){ for (const [k,v] of Object.entries(MYTHIC_CRAFT_COST)) state.resources[k] -= v; }
+  const mythicCostText = () => Object.entries(MYTHIC_CRAFT_COST).map(([k,v])=>v+' '+resDefFor(k).label).join(' + ');
+  function craftMythicLocationModule(defKey){
+    if (!mythicForgeUnlocked()){ log('Die Mythische Modulschmiede benötigt die Forschung „Singularitätsphysik".', 'ti-alert-triangle'); return; }
+    const def = MODULE_DEFS.find(d=>d.key===defKey);
+    if (!def) return;
+    if (!mythicCraftAffordable()){ log('Nicht genug Apex-Ressourcen für die mythische Fertigung ('+mythicCostText()+' benötigt).', 'ti-alert-triangle'); return; }
+    payMythicCraft();
+    const instKey = def.key+':mythisch';
+    state.modules[instKey] = (state.modules[instKey]||0) + 1;
+    state.mythicModulesForged = (state.mythicModulesForged||0) + 1;
+    log('Mythisches „'+def.name+'" geschmiedet ('+mythicCostText()+') - liegt im Standort-Modul-Inventar.', def.icon);
+    playSound('achieve'); checkAchievements(); render(); save();
+  }
+  function craftMythicShipModule(defKey){
+    if (!mythicForgeUnlocked()){ log('Die Mythische Modulschmiede benötigt die Forschung „Singularitätsphysik".', 'ti-alert-triangle'); return; }
+    const def = SHIP_MODULE_DEFS.find(d=>d.key===defKey);
+    if (!def || def.craftOnly) return;
+    if (!mythicCraftAffordable()){ log('Nicht genug Apex-Ressourcen für die mythische Fertigung ('+mythicCostText()+' benötigt).', 'ti-alert-triangle'); return; }
+    payMythicCraft();
+    const instKey = def.key+':mythisch';
+    state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
+    state.mythicModulesForged = (state.mythicModulesForged||0) + 1;
+    log('Mythisches „'+def.name+'" geschmiedet ('+mythicCostText()+') - liegt im Schiffsklassen-Modul-Inventar.', def.icon);
+    playSound('achieve'); checkAchievements(); render(); save();
   }
   function unequipShipModule(klasse, slotIndex){
     const equipped = [...equippedShipModulesAt(klasse)];
@@ -11313,6 +11372,8 @@
     power *= (1 + prestigePerkCount('combat')*0.03);
     power *= (1 + ascBonus('combat')*0.02);
     power *= (1 + skillBonusPct('war'));
+    // Abwehrmodul (Standort-Modul, effect 'defatk'): stärkt den Gegenschlag der Verteidigung.
+    if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'defatk'));
     return Math.round(power);
   }
 
@@ -15848,8 +15909,8 @@
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
-      { title:'Schiffsmodule (Standort)', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Fünf Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei einem erfolgreichen Überfall). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots, die einzeln mit Kommandopunkten aufgerüstet werden (bis zu 4 Slots). Ein an Standort A ausgerüstetes Modul wirkt nur dort. Module findest du bei Expeditionen, treibenden Sonden und im Kredit-Shop. Mythische Module sind (noch) nicht über diese Quellen erhältlich - vorgesehen für hochstufige Allianzmissionen. Verwaltung im Offiziere-Tab.' },
-      { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Dazu die Klasse <strong>Tier-2-Schiffe</strong> (Nanoklinge/Quantenkreuzer/Fusionsdreadnought) mit drei Sondermodulen, die in KEINEM Fundpool auftauchen, sondern über die <strong>Tier-2-Modulfertigung</strong> direkt aus Tier-2-Ressourcen hergestellt werden (Nanophasen-Antrieb: +Geschwindigkeit für 60 Nanolegierungen, Quantenfeld-Kondensator: -Treibstoffverbrauch für 30 Quantenchips, Kristallmatrix-Hülle: +Verteidigungsbeitrag für 12 Hochenergiekristalle + 4 Fusionskerne; Selten zum 2,5-fachen Preis - bewusst nur Logistik-/Verteidigungs-Effekte, kein Angriff, da server-validierte Kämpfe Modul-Boni nicht kennen). Vor Allianzmissionen nur bis "Selten" über die Schiffsklassen-Blaupause im Kredit-Shop erhältlich – Episch/Legendär/Mythisch sind für hochstufige Allianzmissionen reserviert. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
+      { title:'Schiffsmodule (Standort)', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Sieben Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei einem erfolgreichen Überfall), <strong>Lager</strong> (erhöht die Lagerkapazität dieses Standorts) und <strong>Abwehr</strong> (Gegenschlag: bei einem abgewehrten Überfall werden mehr gegnerische Schiffe zerstört). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots, die einzeln mit Kommandopunkten aufgerüstet werden (bis zu 4 Slots). Ein an Standort A ausgerüstetes Modul wirkt nur dort. Module findest du bei Expeditionen, treibenden Sonden und im Kredit-Shop (findbar bis Legendär). <strong>Mythische</strong> Standort-Module fertigst du in der <strong>Mythischen Modulschmiede</strong> (Offiziere-Tab, ab Forschung „Singularitätsphysik") gegen Apex-Ressourcen (Metamaterial-Gewebe + Singularitätskerne). Verwaltung im Offiziere-Tab.' },
+      { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Dazu die Klasse <strong>Tier-2-Schiffe</strong> (Nanoklinge/Quantenkreuzer/Fusionsdreadnought) mit drei Sondermodulen, die in KEINEM Fundpool auftauchen, sondern über die <strong>Tier-2-Modulfertigung</strong> direkt aus Tier-2-Ressourcen hergestellt werden (Nanophasen-Antrieb: +Geschwindigkeit für 60 Nanolegierungen, Quantenfeld-Kondensator: -Treibstoffverbrauch für 30 Quantenchips, Kristallmatrix-Hülle: +Verteidigungsbeitrag für 12 Hochenergiekristalle + 4 Fusionskerne; Selten zum 2,5-fachen Preis - bewusst nur Logistik-/Verteidigungs-Effekte, kein Angriff, da server-validierte Kämpfe Modul-Boni nicht kennen). Zusätzlich pro Klasse ein weiteres Modul (Nachbrenner: +Geschwindigkeit Schlachtschiffe, Not-Panzerung: +Verteidigungsbeitrag Frachter, Deflektorschild: +Schild Aufklärer, Schildmatrix: +Schild Mondzerstörer). <strong>Bezugsquellen:</strong> die <strong>Schiffsklassen-Blaupause</strong> (3500 Kr.) liefert bis "Selten"; die neue <strong>Elite-Schiffsklassen-Blaupause</strong> (14000 Kr.) hat deutlich bessere Chancen bis <strong>Legendär</strong>. <strong>Mythische</strong> Schiffsklassen-Module fertigst du in der <strong>Mythischen Modulschmiede</strong> (unter dem jeweiligen Klassen-Inventar, ab Forschung „Singularitätsphysik") gegen Apex-Ressourcen. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
       { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag sowie - sobald mindestens eine Tier-2-Fabrik existiert - „5 Tier-2-Ressourcen produzieren", gezählt wird die echte Fabrik-Produktion aller Ketten) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
@@ -28729,11 +28790,20 @@
           }).join('');
           html += `</div>`;
         }
+        // Mythische Modulschmiede (Endgame): mythische Standort-Module aus Apex-Ressourcen fertigen.
+        if (mythicForgeUnlocked()){
+          const aff = mythicCraftAffordable();
+          const mc = MODULE_RARITY.mythisch.color;
+          html += `<div class="section-title" style="margin-top:1rem; font-size:13px;"><i class="ti ti-atom-2" aria-hidden="true" style="color:${mc};"></i>Mythische Modulschmiede</div>`;
+          html += `<div class="bmeta" style="margin-bottom:6px;">Fertige mythische Standort-Module (stärkste Stufe) aus Apex-Ressourcen. Kosten je Modul: ${mythicCostText()} (Vorrat: ${Math.floor(state.resources.metamaterial||0)} Metamaterial-Gewebe, ${Math.floor(state.resources.singularitaetskern||0)} Singularitätskerne).</div>`;
+          html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + MODULE_DEFS.map(def => `<button data-craft-mythic-loc="${def.key}" ${aff?'':'disabled'} style="font-size:10px; padding:5px 9px; border-color:${mc}66;${aff?' color:'+mc+';':''}"><i class="ti ${def.icon}" aria-hidden="true" style="margin-right:3px;"></i>${def.name}</button>`).join('') + `</div>`;
+        }
         setHtmlPreservingScroll(moduleBox, html);
         moduleBox.querySelectorAll('[data-module-planet]').forEach(btn => btn.onclick = () => { state.activeBasePlanet = btn.getAttribute('data-module-planet'); render(); });
         const upSlotBtn = moduleBox.querySelector('[data-upgrade-slot]');
         if (upSlotBtn) upSlotBtn.onclick = () => upgradeModuleSlot(pk);
         moduleBox.querySelectorAll('[data-equip-module]').forEach(btn => btn.onclick = () => equipModule(pk, btn.getAttribute('data-equip-module')));
+        moduleBox.querySelectorAll('[data-craft-mythic-loc]').forEach(btn => btn.onclick = () => craftMythicLocationModule(btn.getAttribute('data-craft-mythic-loc')));
         moduleBox.querySelectorAll('[data-unequip-module]').forEach(btn => btn.onclick = () => unequipModule(pk, parseInt(btn.getAttribute('data-unequip-module'))));
       }
       const shipModuleBox = document.getElementById('shipModuleBox');
@@ -28841,6 +28911,17 @@
           }).join('');
           html += `</div>`;
         }
+        // Mythische Fertigung für die aktuelle Schiffsklasse (nur normale, nicht die craftOnly-Tier-2-Module).
+        if (mythicForgeUnlocked()){
+          const classMods = SHIP_MODULE_DEFS.filter(d=>d.klasse===klasse && !d.craftOnly);
+          if (classMods.length){
+            const aff = mythicCraftAffordable();
+            const mc = MODULE_RARITY.mythisch.color;
+            html += `<div class="section-title" style="margin-top:1rem; font-size:13px;"><i class="ti ti-atom-2" aria-hidden="true" style="color:${mc};"></i>Mythische Fertigung (${clsDef.name})</div>`;
+            html += `<div class="bmeta" style="margin-bottom:6px;">Fertige mythische Module dieser Klasse aus Apex-Ressourcen. Kosten je Modul: ${mythicCostText()} (Vorrat: ${Math.floor(state.resources.metamaterial||0)} Metamaterial-Gewebe, ${Math.floor(state.resources.singularitaetskern||0)} Singularitätskerne).</div>`;
+            html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + classMods.map(def => `<button data-craft-mythic-ship="${def.key}" ${aff?'':'disabled'} style="font-size:10px; padding:5px 9px; border-color:${mc}66;${aff?' color:'+mc+';':''}"><i class="ti ${def.icon}" aria-hidden="true" style="margin-right:3px;"></i>${def.name}</button>`).join('') + `</div>`;
+          }
+        }
         setHtmlPreservingScroll(shipModuleBox, html);
         shipModuleBox.querySelectorAll('[data-shipmodule-class]').forEach(btn => btn.onclick = () => { state.activeShipModuleClass = btn.getAttribute('data-shipmodule-class'); render(); });
         const upShipSlotBtn = shipModuleBox.querySelector('[data-upgrade-shipmodule-slot]');
@@ -28848,6 +28929,7 @@
         shipModuleBox.querySelectorAll('[data-equip-shipmodule]').forEach(btn => btn.onclick = () => equipShipModule(klasse, btn.getAttribute('data-equip-shipmodule')));
         shipModuleBox.querySelectorAll('[data-unequip-shipmodule]').forEach(btn => btn.onclick = () => unequipShipModule(klasse, parseInt(btn.getAttribute('data-unequip-shipmodule'))));
         shipModuleBox.querySelectorAll('[data-craft-t2module]').forEach(btn => btn.onclick = () => craftTier2ShipModule(btn.getAttribute('data-craft-t2module'), btn.getAttribute('data-craft-t2rarity')));
+        shipModuleBox.querySelectorAll('[data-craft-mythic-ship]').forEach(btn => btn.onclick = () => craftMythicShipModule(btn.getAttribute('data-craft-mythic-ship')));
       }
     }
 
