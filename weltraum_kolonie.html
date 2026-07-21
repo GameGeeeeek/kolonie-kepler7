@@ -542,6 +542,14 @@
        einzelnen data-hscroll-Stellen im Code, "gap" wurde dort entfernt). */
     [data-hscroll] > .card-row { flex: 0 0 62%; max-width: 190px; min-width: 150px; margin-right: 8px; }
     [data-hscroll] > button { margin-right: 6px; }
+    /* Touch-Geräte (z.B. Samsung Internet): die Karten in den Wisch-Leisten und ihre Buttons waren zu
+       schmal/flach zum Treffen (Spieler-Report). Auf grobem Zeiger (Finger) werden die Karten breiter
+       und alle Buttons darin bekommen ein komfortables Mindest-Tap-Ziel (~44px), damit z.B. "Bauen" bei
+       der Orbitalring-Auswahl sicher trefbar ist. Desktop/Maus bleibt unverändert. */
+    @media (pointer: coarse){
+      [data-hscroll] > .card-row { flex-basis: 80%; min-width: 220px; }
+      [data-hscroll] .card-row button, [data-hscroll] > button { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
+    }
     .hstat { flex-shrink:0; }
     .raid-banner { display:flex; align-items:center; gap:6px; background:rgba(var(--danger-rgb), 0.22); border:0.5px solid var(--c-danger); border-radius:10px; padding:6px 12px; margin-bottom:0.6rem; color:#ffb4b4; font-size:11.5px; font-weight:500; animation: raidPulse 1.8s ease-in-out infinite; }
     .raid-banner i { font-size:18px; flex-shrink:0; }
@@ -3414,8 +3422,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.189.0';
+  const VERSION = '8.190.0';
   const PATCHNOTES = [
+    { version:'8.190.0', date:'21.07.2026', changes:[
+      'Mobil/Touch: Die Karten in den Wisch-Leisten (u.a. Orbitalring-Auswahl, Planeten-Rolle, Expeditionstyp, Modul-Standort) und ihre Buttons waren auf Handys (v.a. Samsung Internet) sehr schmal und kaum zu treffen. Auf Touch-Geräten sind die Karten jetzt breiter und alle Buttons darin haben ein komfortables Mindest-Tap-Ziel (~44px) - z.B. der „Bauen"-Knopf beim Orbitalring lässt sich jetzt zuverlässig drücken.',
+      'Modul-Inventar (Standort- und Schiffsklassen-Module) ist jetzt nach Seltenheit sortiert - das seltenste Modul steht oben, das häufigste unten (Mythisch → Legendär → Episch → Selten → Gewöhnlich), bei gleicher Seltenheit nach Modultyp.',
+    ]},
     { version:'8.189.0', date:'21.07.2026', changes:[
       'Störmanöver (Sabotage) grundlegend überarbeitet: Statt wie bisher heimlich Ressourcen zu klauen (das fühlte sich wie ein zweiter Piratenüberfall an), richtet ein erfolgreiches Störmanöver jetzt ECHTEN Schaden beim Ziel an. Zufällig wird entweder ein Produktionsgebäude des Ziels für 30 Minuten um 50% gedrosselt ODER seine Verteidigung ist 30 Minuten lang um 30% geschwächt (leichter angreifbar). Nichts wird mehr gestohlen. Abklingzeit (2 h/Ziel), Spionagekreuzer-Voraussetzung und die von der Spionageabwehr des Ziels abhängige Erfolgschance bleiben. Das Ziel sieht die Sabotage (Kolonie-Karte bzw. neuer Hinweis im Verteidigung-Tab) und kann sie aussitzen oder sofort beheben (Automatische Reparatur / Metamaterial-Reparaturschwarm).',
     ]},
@@ -28665,7 +28677,14 @@
           html += `<div class="lb-note"><i class="ti ti-info-circle" aria-hidden="true"></i>Noch keine Module im Inventar. Schick Expeditionen los oder untersuche treibende Sonden.</div>`;
         } else {
           html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
-          html += invKeys.sort().map(instKey => {
+          // Sortierung nach Seltenheit ABSTEIGEND (seltenstes zuerst), Spieler-Wunsch. Rang wird aus der
+          // MODULE_RARITY-Reihenfolge abgeleitet (gewoehnlich..mythisch), damit neue Stufen automatisch
+          // korrekt einsortiert werden; bei gleicher Seltenheit alphabetisch stabil nach Typ.
+          const rarityRankDesc = r => { const order = Object.keys(MODULE_RARITY); const i = order.indexOf(r); return i < 0 ? -1 : i; };
+          html += invKeys.sort((a,b) => {
+            const rb = rarityRankDesc(b.split(':')[1]) - rarityRankDesc(a.split(':')[1]);
+            return rb !== 0 ? rb : a.localeCompare(b);
+          }).map(instKey => {
             const info = moduleInstanceInfo(instKey);
             if (!info) return '';
             const count = state.modules[instKey];
@@ -28771,7 +28790,12 @@
             : `<div class="lb-note"><i class="ti ti-info-circle" aria-hidden="true"></i>Noch keine Module dieser Klasse im Inventar. Erhältlich über die Schiffsklassen-Blaupause im Kredit-Shop (max. "Selten") oder später über Allianzmissionen (höhere Seltenheiten).</div>`;
         } else {
           html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
-          html += invKeys.sort().map(instKey => {
+          // Wie beim Standort-Modul-Inventar: seltenstes zuerst (Rang aus MODULE_RARITY-Reihenfolge).
+          const rarityRankShip = r => { const order = Object.keys(MODULE_RARITY); const i = order.indexOf(r); return i < 0 ? -1 : i; };
+          html += invKeys.sort((a,b) => {
+            const rb = rarityRankShip(b.split(':')[1]) - rarityRankShip(a.split(':')[1]);
+            return rb !== 0 ? rb : a.localeCompare(b);
+          }).map(instKey => {
             const info = shipModuleInstanceInfo(instKey);
             if (!info) return '';
             const count = state.shipModules[instKey];
