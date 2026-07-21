@@ -1771,6 +1771,7 @@
 
       <div class="tab-panel active" id="tab-basis">
         <div id="colonyDashboard"></div>
+        <div id="comebackQuestBox"></div>
         <div id="happyHourBox"></div>
         <div id="nextGoalBox"></div>
         <div id="relocateAllQuickBox"></div>
@@ -3405,8 +3406,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.177.0';
+  const VERSION = '8.178.0';
   const PATCHNOTES = [
+    { version:'8.178.0', date:'21.07.2026', changes:[
+      'Neu: Comeback-Mission für Rückkehrer. Warst du mindestens 48 Stunden weg, wartet beim Zurückkommen oben im Basis-Tab eine kurze, geführte 3-Schritt-Mission (ein Gebäude ausbauen, eine Forschung abschließen, einen Kampf gewinnen) - jeder Schritt bringt sofort eine Belohnung, der Abschluss zusätzlich +40 Kredite und +25% Produktion für 2 Stunden. So findet man nach einer Pause schnell und mit klarer Marschrichtung wieder in die Kernschleife zurück.',
+    ]},
     { version:'8.177.0', date:'21.07.2026', changes:[
       'Neu: Tägliche „Happy Hour"-Flash-Events. Zweimal am Tag (12:00 und 20:00 Uhr Ortszeit, je 60 Minuten) ist ein wechselnder Produktionsbonus aktiv - z.B. „Bergbau-Rausch" (+40% Erz/Kristalle), „Energie-Hoch" (+40% Energie/Deuterium), „Produktionsschub" (+25% auf alle Grundressourcen) oder „Forschungsfieber" (+60% Forschungspunkte). Ein Banner im Basis-Tab zeigt das aktive bzw. nächste Fenster samt Countdown, beim Start gibt es eine Benachrichtigung. Die Fenster sind fest terminiert (nicht zufällig), sodass man sich gezielt darauf einstellen kann. Für die Offline-Gutschrift gilt der Bonus bewusst nicht.',
     ]},
@@ -9297,7 +9301,7 @@
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
     scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, referralNudgeShown: false, expeditionsCompleted: 0, themeKey: 'standard',
-    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, streakShields: 0, claimedStreakMilestones: [], autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
+    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, streakShields: 0, claimedStreakMilestones: [], comebackQuest: null, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
     research: {},
@@ -15503,6 +15507,7 @@
       { title:'Synthese-Kette: Metamaterial & Singularitätskerne (Tier-2-Erweiterung)', body:'Die Kette setzt sich über die KI-Kerne hinaus fort - zwei <strong>Apex-Ressourcen</strong>, die je ZWEI bestehende Tier-2-Ressourcen bündeln und noch langsamer produzieren (reines Endgame). <strong>Metamaterial-Gewebe</strong> (ab Forschung „Metamaterial-Synthese", benötigt KI-Technologie): Metamaterialweberei, max. Stufe 15, verbraucht 2 Hochenergiekristalle + 1 Fusionskern + 30 Kristalle je Einheit (0,0004/s je Stufe). Verwendung: der <strong>Metamaterial-Panzerwall</strong> (Verteidigung-Tab) - stärkster reiner Schutz (340 Verteidigung, kein Angriff), der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, s. u.) und der <strong>Metamaterial-Titan</strong> (Flotte-Tab, 150 Angriff + höchster Schildwert). <strong>Singularitätskerne</strong> (ab Forschung „Singularitätsphysik", benötigt Metamaterial-Synthese): Singularitätsreaktor, max. Stufe 15, verbraucht 2 KI-Kerne + 2 Fusionskerne + 5 Antimaterie je Kern (0,0003/s je Stufe) - die rarste Ressource des Spiels. Verwendung: der <strong>Singularitäts-Geschützturm</strong> (Verteidigung-Tab, 330 Verteidigung + 180 Angriff - der beste BAUBARE Kombiwert, knapp unter der seltenen Kristallfestung) und der <strong>Singularitäts-Vernichter</strong> (Flotte-Tab, 280 Angriff - stärkster regulärer Angriffswert). Neue <strong>Effizienz-Achse:</strong> Die Forschung <strong>Raffinerie-Optimierung</strong> (ab Quantenphysik, bis Stufe 10) erhöht den Durchsatz ALLER Tier-2-Fabriken um +3% je Stufe (max. +30%); der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, ab Metamaterial-Synthese, bis Stufe 10) senkt den Rohstoffverbrauch aller Fabriken um -2% je Stufe (imperiumsweit max. -20%). Das Kryo-Archiv bewahrt beide neuen Ressourcen ebenfalls durchs Prestige (3 Metamaterial / 2 Singularitätskerne je Stufe). Zwei neue <strong>Verbrauchsgegenstände</strong> (Flotte-Tab, unter „Aktive Missionen", sobald du die jeweilige Ressource besitzt): der <strong>Metamaterial-Reparaturschwarm</strong> behebt eine aktive Sabotage (Produktions-Debuff nach verlorenem Überfall) sofort für 6 Metamaterial-Gewebe, und die <strong>Singularitäts-Sprungladung</strong> verkürzt die Restflugzeit deiner längsten laufenden Flottenmission um 25% für 3 Singularitätskerne. Und zwei neue <strong>gefertigte Module</strong> (Tier-2-Modulfertigung): Metamaterial-Panzerplatte (+14% Verteidigungsbeitrag) und Singularitäts-Fokusarray (+14% Angriffskraft).' },
       { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. <strong>Streak-Schutzschilde:</strong> verpasst du GENAU einen Tag, rettet ein vorhandener Schutzschild deine Serie (statt Reset auf Tag 1) - für jeden vollständig durchgehaltenen 7-Tage-Zyklus bekommst du automatisch +1 Schild (max. 3 auf Vorrat). Ohne Schild oder bei mehr als einem verpassten Tag beginnt die Serie neu. <strong>Treue-Meilensteine:</strong> erreicht deine Serie 14/30/60/100 Tage am Stück, gibt es je einmal pro Lauf eine große Zusatzbelohnung (Ressourcen, Kredite, ab Tag 60 auch Schiffe). Schild-Vorrat, nächster Meilenstein samt Countdown und die komplette 7-Tage-Vorschau stehen im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
       { title:'Happy Hour (Flash-Events)', body:'Zweimal pro Tag - um <strong>12:00 und 20:00 Uhr Ortszeit, je 60 Minuten</strong> - ist eine „Happy Hour" mit einem wechselnden Produktionsbonus aktiv. Vier Typen rotieren: <strong>Bergbau-Rausch</strong> (+40% Erz/Kristalle), <strong>Energie-Hoch</strong> (+40% Energie/Deuterium), <strong>Produktionsschub</strong> (+25% auf alle Grundressourcen) und <strong>Forschungsfieber</strong> (+60% Forschungspunkte). Die Termine sind fest aus dem Datum berechnet (kein Zufall, kein Server nötig), sodass du dich gezielt darauf einstellen kannst - ein Banner oben im <strong>Basis-Tab</strong> zeigt das gerade laufende bzw. das nächste Fenster samt Countdown, beim Start kommt eine Benachrichtigung. Der Bonus wirkt nur auf die laufende Live-Produktion, <strong>nicht</strong> auf die Offline-Gutschrift.' },
+      { title:'Comeback-Mission', body:'Warst du <strong>mindestens 48 Stunden</strong> nicht im Spiel, erscheint beim Zurückkommen oben im <strong>Basis-Tab</strong> eine kurze, geführte 3-Schritt-Mission, die dich schnell wieder in die Kernschleife bringt: (1) ein Gebäude ausbauen, (2) eine Forschung abschließen, (3) einen Kampf gewinnen. Die Schritte werden der Reihe nach freigeschaltet, jeder bringt sofort eine Belohnung (Ressourcen/Kredite). Schließt du alle drei ab, gibt es zum Abschluss zusätzlich <strong>+40 Kredite und +25% Produktion für 2 Stunden</strong>. Läuft parallel zum Rückkehrer-Bonus (+50% Produktion nach 24h Abwesenheit).' },
       { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
       { title:'Imperiums-Skalierung der Kosten', body:'Zwei Kostenarten wachsen mit der Größe deines Imperiums, damit sie auch mit vielen Kolonien spürbar bleiben: <strong>1) Groß-Anschaffungen</strong> (Mega-Projekte, Orbitalstationen, exotische Forschung, Veteranen-Ausbildung) kosten <strong>+25% je Standort</strong> über dem ersten (Kolonien und Monde zählen mit) – bei Heimat + 10 Kolonien also das 3,5-fache. Alle angezeigten Preise sind bereits die skalierten Werte. <strong>2) Schiffe</strong> kosten <strong>+0,4% je bereits vorhandenem Schiff desselben Typs</strong> (imperiumsweit über alle Standorte gezählt), gedeckelt bei +100% – das ~250. Schiff eines Typs kostet also das Doppelte. Verluste im Kampf senken den Bestand und machen den Nachbau entsprechend wieder günstiger. Kolonisierungskosten skalieren wie bisher separat (+35% je bestehender Kolonie).' },
@@ -20710,6 +20715,84 @@
     setTimeout(()=>{ document.getElementById('loadstate').textContent=''; }, 4000);
   }
 
+  // Comeback-Quest-Kette (21.07.2026, Retention-Runde): Wer lange (>=48h) weg war, bekommt beim
+  // Zurückkommen eine kurze, geführte 3-Schritt-Mission, die die Kernschleife (Ausbauen, Forschen,
+  // Kämpfen) wieder aktiviert - jeder Schritt mit Sofort-Belohnung, das Finale mit Kredit- und
+  // Produktionsbonus. Fortschritt wird über DELTAS bestehender kumulativer Zähler erkannt (Gebäude-
+  // Level-Summe, Forschungs-Level-Summe, gewonnene Kämpfe), also ohne neue Instrumentierung an den
+  // Aktionsstellen. Bewusst sequenziell (eine klare "nächste Aufgabe" für Rückkehrer).
+  const COMEBACK_THRESHOLD_SEC = 48*3600;
+  const COMEBACK_STEPS = [
+    { key:'build',    label:'Baue ein Gebäude aus',     icon:'ti-building-factory-2', color:'#5dcaa5', reward:{ resources:{erz:2000, kristalle:1400} } },
+    { key:'research', label:'Schließe eine Forschung ab', icon:'ti-atom-2',            color:'#af9ce6', reward:{ resources:{forschungspunkte:180}, credits:10 } },
+    { key:'combat',   label:'Gewinne einen Kampf',       icon:'ti-sword',             color:'#e24b4a', reward:{ resources:{deuterium:1500}, credits:15 } }
+  ];
+  const COMEBACK_FINAL = { credits:40, prodBuffPct:0.25, prodBuffHours:2 };
+  function comebackMetric(stepKey){
+    if (stepKey === 'build') return allBuildingSets().reduce((a,b)=>a+Object.values(b).reduce((x,v)=>x+(v||0),0),0);
+    if (stepKey === 'research') return Object.values(state.research||{}).reduce((a,v)=>a+(v||0),0);
+    return (state.battleStats && state.battleStats.wins) || 0; // 'combat'
+  }
+  function startComebackQuest(){
+    state.comebackQuest = { step:0, baseline: comebackMetric(COMEBACK_STEPS[0].key), startedAt: Date.now() };
+    log('Willkommen zurück, Kommandant! Eine kurze Comeback-Mission wartet - schließe die drei Schritte ab für Extra-Belohnungen und einen Produktionsbonus.', 'ti-rocket');
+  }
+  function grantComebackReward(r){
+    const cap = storageCap();
+    if (r.resources) for (const [k,a] of Object.entries(r.resources)) state.resources[k] = Math.min(cap, (state.resources[k]||0)+a);
+    if (r.credits) state.credits = (state.credits||0) + r.credits;
+  }
+  function processComebackQuest(){
+    const cq = state.comebackQuest;
+    if (!cq) return;
+    const step = COMEBACK_STEPS[cq.step];
+    if (!step){ state.comebackQuest = null; return; }
+    if (comebackMetric(step.key) > cq.baseline){
+      grantComebackReward(step.reward);
+      log('Comeback-Mission: „'+step.label+'" abgeschlossen!', step.icon);
+      pushToast('Comeback: '+step.label+' ✓', step.icon);
+      cq.step++;
+      if (cq.step >= COMEBACK_STEPS.length){
+        state.credits = (state.credits||0) + COMEBACK_FINAL.credits;
+        state.buffs = state.buffs || [];
+        const expiresAt = Date.now() + COMEBACK_FINAL.prodBuffHours*3600*1000;
+        for (const res of ['energie','erz','kristalle','deuterium','antimaterie','forschungspunkte']) state.buffs.push({ kind:'prod', res, mult:1+COMEBACK_FINAL.prodBuffPct, expiresAt, source:'comeback' });
+        log('Comeback-Mission komplett! +'+COMEBACK_FINAL.credits+' Kredite und +'+Math.round(COMEBACK_FINAL.prodBuffPct*100)+'% Produktion für '+COMEBACK_FINAL.prodBuffHours+' Std.', 'ti-award');
+        pushToast('Comeback-Mission komplett!', 'ti-award');
+        playSound('achieve');
+        state.comebackQuest = null;
+      } else {
+        cq.baseline = comebackMetric(COMEBACK_STEPS[cq.step].key);
+      }
+      save();
+    }
+  }
+  let lastComebackSig = null;
+  function renderComebackQuestBox(){
+    const box = document.getElementById('comebackQuestBox');
+    if (!box) return;
+    const cq = state.comebackQuest;
+    const sig = cq ? 'c'+cq.step : 'none';
+    if (sig === lastComebackSig) return;
+    lastComebackSig = sig;
+    if (!cq){ box.innerHTML = ''; return; }
+    const stepsHtml = COMEBACK_STEPS.map((s,i) => {
+      const st = i < cq.step ? 'done' : (i === cq.step ? 'now' : 'todo');
+      const icon = st==='done' ? 'ti-check' : s.icon;
+      const col = st==='done' ? '#5dcaa5' : (st==='now' ? s.color : '#6b7086');
+      const rw = [];
+      if (s.reward.resources) for (const [k,a] of Object.entries(s.reward.resources)) rw.push(fmt(a)+' '+((RES_DEFS.find(x=>x.key===k)||{}).label||k));
+      if (s.reward.credits) rw.push(s.reward.credits+' Kredite');
+      return `<div class="card-row" style="${st==='now'?'background:rgba(93,202,165,0.10); border-color:rgba(93,202,165,0.35);':''}">
+        <div class="left"><i class="ti ${icon}" aria-hidden="true" style="color:${col};"></i><span class="bname" style="font-size:12px; ${st==='done'?'text-decoration:line-through; opacity:0.7;':''}">${i+1}. ${s.label}</span></div>
+        <span class="lvl-pill" style="font-size:9.5px;">${rw.join(', ')}</span>
+      </div>`;
+    }).join('');
+    box.innerHTML = `
+      <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-rocket" aria-hidden="true" style="color:#f0997b;"></i>Comeback-Mission</div>
+      <div class="bmeta" style="margin-bottom:6px;">Willkommen zurück! Schließe diese drei Schritte der Reihe nach ab – zum Abschluss gibt es +${COMEBACK_FINAL.credits} Kredite und +${Math.round(COMEBACK_FINAL.prodBuffPct*100)}% Produktion für ${COMEBACK_FINAL.prodBuffHours} Std.</div>
+      ${stepsHtml}`;
+  }
   // Sammelt Ressourcen-/Missions-Infos während der Offline-Berechnung, damit anschließend eine
   // "Willkommen zurück"-Zusammenfassung gezeigt werden kann statt nur einer Logzeile.
   let lastOfflineSummary = null;
@@ -20731,6 +20814,8 @@
       }
       returningBoostGranted = true;
     }
+    // Comeback-Quest-Kette starten, wenn lange weg und noch keine läuft (siehe COMEBACK_* oben).
+    if (seconds >= COMEBACK_THRESHOLD_SEC && !state.comebackQuest) startComebackQuest();
     const rates = ratesPerSecond({ noHappyHour:true });
     const cap = storageCap();
     const before = { ...state.resources };
@@ -26544,6 +26629,7 @@
       </div>
     `;
     refreshPlanetMiniIcons(document.getElementById('colonyDashboard'));
+    renderComebackQuestBox();
     renderHappyHourBox();
     renderNextGoalBox();
     const relocateAllQuickBox = document.getElementById('relocateAllQuickBox');
@@ -30842,6 +30928,7 @@
     maybeSpawnPlanetEvent();
     processWeeklyLeague();
     processDailySummary();
+    processComebackQuest();
     processRaidScout();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
