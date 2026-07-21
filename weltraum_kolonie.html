@@ -3403,8 +3403,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.174.0';
+  const VERSION = '8.175.0';
   const PATCHNOTES = [
+    { version:'8.175.0', date:'21.07.2026', changes:[
+      'Neu: Streak-Schutzschilde. Deine tägliche Login-Serie bricht nicht mehr sofort ab, wenn du mal genau einen Tag verpasst - ein Schutzschild fängt das ab und rettet die Serie. Für jeden vollständig durchgehaltenen 7-Tage-Zyklus bekommst du automatisch +1 Schild (bis zu 3 auf Vorrat). Aktueller Vorrat und Verbrauch werden im Login-Kalender und im „Willkommen zurück"-Fenster angezeigt.',
+      'Neu: Eskalierende Treue-Meilensteine. Erreicht deine Login-Serie 14, 30, 60 oder 100 Tage am Stück, gibt es eine einmalige große Zusatzbelohnung (Ressourcen, Kredite, dazu ab Tag 60 auch Schiffe) - ein sichtbares Langzeitziel jenseits des 7-Tage-Zyklus. Der Login-Kalender zeigt jetzt den nächsten Meilenstein samt Countdown und Belohnung an.',
+    ]},
     { version:'8.174.0', date:'21.07.2026', changes:[
       'Neu: Benachrichtigung, wenn dich ein Spieler angreift. Wird dein Standort von einem echten Spieler überfallen, bekommst du jetzt eine Meldung (im Postfach und - bei aktiviertem Web-Push - als Systembenachrichtigung aufs Handy), egal ob der Angriff durchkam oder deine Verteidigung gehalten hat. Eigene, abschaltbare Kategorie unter Einstellungen → Benachrichtigungen → „Angriffe auf dich". So verpasst du keinen Überfall mehr unbemerkt und kannst rechtzeitig aufrüsten oder zurückschlagen.',
     ]},
@@ -9274,7 +9278,7 @@
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
     scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, referralNudgeShown: false, expeditionsCompleted: 0, themeKey: 'standard',
-    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
+    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, streakShields: 0, claimedStreakMilestones: [], autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
     research: {},
@@ -20682,14 +20686,44 @@
     { resources:{erz:180, deuterium:120}, item:'boost_prod' },
     { resources:{erz:300, kristalle:220, deuterium:180, forschungspunkte:40}, ship:{key:'ships', name:'Erkundungsschiffe', amount:2}, credits:20 }
   ];
+  // Eskalierende Meilenstein-Belohnungen (21.07.2026, Retention-Runde): einmalige Extra-Belohnung je
+  // Streak-Lauf, wenn die Serie 14/30/60/100 Tage erreicht - gibt Langzeit-Loyalität ein sichtbares
+  // Ziel jenseits des 7-Tage-Zyklus. Bewusst FESTE Belohnungen (keine "N Minuten Produktion"-Formel,
+  // siehe CLAUDE.md-Fallstrick) und nur einmal pro Lauf einlösbar (state.claimedStreakMilestones,
+  // wird beim Streak-Reset geleert). Ressourcen sind lager-gedeckelt, Kredite sind der eigentliche
+  // Anreiz und bewusst moderat gehalten.
+  const STREAK_MILESTONES = [
+    { days:14,  label:'2 Wochen am Stück', icon:'ti-star',    resources:{erz:2500, kristalle:1800, deuterium:1200, forschungspunkte:200}, credits:15, item:'boost_prod' },
+    { days:30,  label:'1 Monat treu',      icon:'ti-medal',   resources:{erz:6000, kristalle:4500, deuterium:3000, antimaterie:150, forschungspunkte:450}, credits:30 },
+    { days:60,  label:'2 Monate treu',     icon:'ti-award',   resources:{erz:12000, kristalle:9000, deuterium:6500, antimaterie:400, forschungspunkte:900}, credits:50, ship:{key:'jaeger', name:'Jäger', amount:5} },
+    { days:100, label:'100 Tage Legende',  icon:'ti-trophy',  resources:{erz:25000, kristalle:18000, deuterium:13000, antimaterie:900, forschungspunkte:1800}, credits:80, ship:{key:'ships', name:'Erkundungsschiffe', amount:10} }
+  ];
+  const STREAK_SHIELD_MAX = 3; // Streak-Schutzschilde: max. Vorrat; +1 je abgeschlossenem 7-Tage-Zyklus
   // Täglicher Login-Bonus: einmal pro Kalendertag (lokale Zeit). Streak = Anzahl aufeinanderfolgender
-  // Tage, bricht bei einem ausgelassenen Tag auf 1 zurück (kein Fortschritt "gerettet"). dayInCycle
-  // bestimmt anhand der Streak, welcher der 7 Belohnungen heute zusteht - wiederholt sich alle 7 Tage.
+  // Tage. Bei GENAU einem ausgelassenen Tag rettet ein vorhandener Schutzschild die Serie (statt Reset
+  // auf 1); ohne Schild oder bei >1 verpasstem Tag beginnt die Serie neu. dayInCycle bestimmt anhand der
+  // Streak, welcher der 7 Belohnungen heute zusteht - wiederholt sich alle 7 Tage. Zusätzlich einmalige
+  // Meilenstein-Belohnungen (STREAK_MILESTONES) je Lauf.
   function checkDailyLogin(){
     const today = new Date().toDateString();
     if (state.lastLoginDate === today) return null;
     const yesterday = new Date(Date.now()-86400000).toDateString();
-    state.loginStreak = (state.lastLoginDate === yesterday) ? (state.loginStreak||0)+1 : 1;
+    const dayBefore = new Date(Date.now()-2*86400000).toDateString();
+    if (typeof state.streakShields !== 'number') state.streakShields = 0;
+    if (!Array.isArray(state.claimedStreakMilestones)) state.claimedStreakMilestones = [];
+    let shieldUsed = false;
+    if (state.lastLoginDate === yesterday){
+      state.loginStreak = (state.loginStreak||0)+1;
+    } else if (state.lastLoginDate === dayBefore && state.streakShields > 0){
+      // Genau ein Tag ausgelassen + Schutzschild vorhanden -> Serie retten
+      state.streakShields--;
+      state.loginStreak = (state.loginStreak||0)+1;
+      shieldUsed = true;
+    } else {
+      // Erster Login oder >1 Tag verpasst / kein Schild -> Serie beginnt neu
+      state.loginStreak = 1;
+      state.claimedStreakMilestones = [];
+    }
     state.lastLoginDate = today;
     const streak = state.loginStreak;
     const dayInCycle = ((streak-1) % DAILY_LOGIN_REWARDS.length) + 1;
@@ -20706,7 +20740,31 @@
     if (def.credits) state.credits = (state.credits||0) + def.credits;
     if (def.item) state.inventory[def.item] = (state.inventory[def.item]||0) + 1;
     if (def.ship) state.fleet[def.ship.key] = (state.fleet[def.ship.key]||0) + def.ship.amount;
-    return { streak, dayInCycle, reward: grantedResources, credits: def.credits||0, item: def.item||null, ship: def.ship||null };
+    // Schutzschild verdienen: +1 pro abgeschlossenem 7-Tage-Zyklus (Tag 7/14/21/...), gedeckelt.
+    let earnedShield = false;
+    if (streak % DAILY_LOGIN_REWARDS.length === 0 && state.streakShields < STREAK_SHIELD_MAX){
+      state.streakShields++;
+      earnedShield = true;
+    }
+    // Meilenstein prüfen: erste Erreichung dieser Tageszahl im aktuellen Lauf.
+    let milestone = null;
+    const ms = STREAK_MILESTONES.find(m => m.days === streak && !state.claimedStreakMilestones.includes(m.days));
+    if (ms){
+      state.claimedStreakMilestones.push(ms.days);
+      const msRes = {};
+      if (ms.resources){
+        for (const [r,a] of Object.entries(ms.resources)){
+          const before = state.resources[r]||0;
+          state.resources[r] = Math.min(cap, before+a);
+          msRes[r] = state.resources[r]-before;
+        }
+      }
+      if (ms.credits) state.credits = (state.credits||0) + ms.credits;
+      if (ms.item) state.inventory[ms.item] = (state.inventory[ms.item]||0) + 1;
+      if (ms.ship) state.fleet[ms.ship.key] = (state.fleet[ms.ship.key]||0) + ms.ship.amount;
+      milestone = { days:ms.days, label:ms.label, icon:ms.icon, resources:msRes, credits:ms.credits||0, item:ms.item||null, ship:ms.ship||null };
+    }
+    return { streak, dayInCycle, reward: grantedResources, credits: def.credits||0, item: def.item||null, ship: def.ship||null, shieldUsed, earnedShield, milestone };
   }
   // Kompaktes Symbol je Zyklustag für die Vorschau-Reihe - zeigt die "besonderste" Zutat dieses
   // Tages (Item > Schiff > Kredite > reine Ressourcen), damit auf einen Blick erkennbar ist, welche
@@ -20722,8 +20780,13 @@
     const box = document.getElementById('dailyLoginBox');
     if (!box) return;
     const streak = state.loginStreak||1;
-    if (streak === lastDailyLoginSig) return;
-    lastDailyLoginSig = streak;
+    const shields = state.streakShields||0;
+    const claimed = state.claimedStreakMilestones||[];
+    const nextMs = STREAK_MILESTONES.find(m => m.days > streak || (m.days === streak && !claimed.includes(m.days)))
+      || STREAK_MILESTONES.find(m => !claimed.includes(m.days));
+    const sig = streak+':'+shields+':'+(nextMs?nextMs.days:0);
+    if (sig === lastDailyLoginSig) return;
+    lastDailyLoginSig = sig;
     const dayInCycle = ((streak-1) % DAILY_LOGIN_REWARDS.length) + 1;
     const nextDayInCycle = (dayInCycle % DAILY_LOGIN_REWARDS.length) + 1;
     const nextDef = DAILY_LOGIN_REWARDS[nextDayInCycle-1];
@@ -20744,13 +20807,31 @@
         <span style="font-size:9.5px; color:${color};">Tag ${day}</span>
       </div>`;
     }).join('');
+    const msParts = [];
+    if (nextMs){
+      if (nextMs.resources) for (const [r,a] of Object.entries(nextMs.resources)) msParts.push(fmt(a)+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r));
+      if (nextMs.credits) msParts.push(nextMs.credits+' Kredite');
+      if (nextMs.item){ const it = ITEM_DEFS.find(x=>x.key===nextMs.item); if (it) msParts.push('1x '+it.name); }
+      if (nextMs.ship) msParts.push(nextMs.ship.amount+'x '+nextMs.ship.name);
+    }
+    const shieldRow = `<div class="card-row" style="margin-top:6px;">
+        <div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#85b7eb;"></i><span class="bname" style="font-size:12.5px;">Streak-Schutzschilde</span></div>
+        <span class="lvl-pill" style="font-size:10px;">${shields} / ${STREAK_SHIELD_MAX}</span>
+      </div>`;
+    const msRow = nextMs ? `<div class="card-row" style="margin-top:6px; background:rgba(250,199,117,0.08); border-color:rgba(250,199,117,0.25);">
+        <div class="left"><i class="ti ${nextMs.icon}" aria-hidden="true" style="color:#fac775;"></i><span class="bname" style="font-size:12.5px;">Meilenstein Tag ${nextMs.days} · ${nextMs.label}</span></div>
+        <span class="lvl-pill" style="font-size:10px;">noch ${Math.max(0,nextMs.days-streak)} Tag${nextMs.days-streak===1?'':'e'}</span>
+      </div>
+      <div class="bmeta" style="margin-top:-2px;">Belohnung: ${msParts.join(', ')}</div>` : '';
     box.innerHTML = `
-      <div class="bmeta" style="margin-bottom:8px;">Jeden Tag einloggen und eine kleine Belohnung erhalten - ein ausgelassener Tag setzt den Fortschritt auf Tag 1 zurück. Nach Tag 7 beginnt der Zyklus erneut, die Gesamt-Streak zählt aber unbegrenzt weiter.</div>
+      <div class="bmeta" style="margin-bottom:8px;">Jeden Tag einloggen und eine kleine Belohnung erhalten. Ein Schutzschild rettet deine Serie, wenn du mal genau einen Tag verpasst (je +1 nach einem vollen 7-Tage-Zyklus, max. ${STREAK_SHIELD_MAX}). Nach Tag 7 beginnt der Zyklus erneut, die Gesamt-Streak zählt unbegrenzt weiter.</div>
       <div style="display:flex; gap:5px; margin-bottom:8px;">${daysHtml}</div>
       <div class="card-row">
         <div class="left"><i class="ti ti-star" aria-hidden="true" style="color:#fac775;"></i><span class="bname" style="font-size:12.5px;">${streak} Tag${streak===1?'':'e'} in Folge</span></div>
         <span class="lvl-pill" style="font-size:10px;">Morgen: ${nextParts.join(', ')}</span>
       </div>
+      ${shieldRow}
+      ${msRow}
     `;
   }
   function showWelcomeBackModal(offlineSummary, loginBonus){
@@ -20772,6 +20853,20 @@
       if (loginBonus.ship) parts.push(loginBonus.ship.amount+'x '+loginBonus.ship.name);
       const bonusLine = parts.join(', ');
       html += `<div class="card-row" style="background:rgba(93,202,165,0.1); border-color:rgba(93,202,165,0.3);"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i><span class="bname" style="font-size:12.5px;">Täglicher Bonus – Tag ${loginBonus.dayInCycle} von 7 (${loginBonus.streak} Tage in Folge)</span></div><span class="lvl-pill" style="font-size:10px;">${bonusLine}</span></div>`;
+      if (loginBonus.shieldUsed){
+        html += `<div class="card-row" style="background:rgba(133,183,235,0.12); border-color:rgba(133,183,235,0.3);"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#85b7eb;"></i><span class="bname" style="font-size:12.5px;">Schutzschild eingesetzt</span></div><span class="lvl-pill" style="font-size:10px;">Serie gerettet</span></div>`;
+      }
+      if (loginBonus.earnedShield){
+        html += `<div class="card-row" style="background:rgba(133,183,235,0.12); border-color:rgba(133,183,235,0.3);"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#85b7eb;"></i><span class="bname" style="font-size:12.5px;">Neuer Schutzschild verdient</span></div><span class="lvl-pill" style="font-size:10px;">${state.streakShields}/${STREAK_SHIELD_MAX}</span></div>`;
+      }
+      if (loginBonus.milestone){
+        const m = loginBonus.milestone;
+        const mParts = Object.entries(m.resources||{}).filter(([,v])=>v>0).map(([r,v]) => fmt(v)+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r));
+        if (m.credits) mParts.push(fmt(m.credits)+' Kredite');
+        if (m.item){ const it = ITEM_DEFS.find(x=>x.key===m.item); if (it) mParts.push('1x '+it.name); }
+        if (m.ship) mParts.push(m.ship.amount+'x '+m.ship.name);
+        html += `<div class="card-row" style="background:rgba(250,199,117,0.14); border-color:rgba(250,199,117,0.4);"><div class="left"><i class="ti ${m.icon}" aria-hidden="true" style="color:#fac775;"></i><span class="bname" style="font-size:12.5px;">Meilenstein: ${m.label} (Tag ${m.days})</span></div><span class="lvl-pill" style="font-size:10px;">${mParts.join(', ')}</span></div>`;
+      }
       const nextDayInCycle = (loginBonus.dayInCycle % DAILY_LOGIN_REWARDS.length) + 1;
       const nextDef = DAILY_LOGIN_REWARDS[nextDayInCycle-1];
       const nextParts = [];
