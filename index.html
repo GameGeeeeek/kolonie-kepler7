@@ -1814,6 +1814,7 @@
           <div style="font-size:38px; font-weight:500; color:#f0997b; font-variant-numeric:tabular-nums;" id="defenseCentralValue">0</div>
         </div>
         <div id="defenseSabotageBanner" style="display:none;"></div>
+        <div id="attackShieldBanner" style="display:none;"></div>
         <div id="planetSwitcherDef"></div>
         <div id="raidScoutBox"></div>
         <div id="pirateDebrisRaidBox"></div>
@@ -2531,7 +2532,7 @@
       const res = await backendFetch('/me');
       if (!res.ok) return;
       const me = await res.json();
-      accountHasEmail = !!me.hasEmail;
+      accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0;
       accountMaskedEmail = me.maskedEmail||'';
       accountPendingEmail = me.pendingEmail||null;
       accountWantsPatchnotes = me.wantsPatchnotes !== false;
@@ -2543,6 +2544,9 @@
   let accountMaskedEmail = '';
   let accountPendingEmail = null;
   let accountWantsPatchnotes = true;
+  // Ablaufzeitpunkt des serverseitigen Angriffs-Schutzschilds (0 = keiner). Wird aus /api/me gesetzt und
+  // beim eigenen Angriff sofort lokal geleert (Server bricht ihn dort ebenfalls).
+  let myAttackShieldUntil = 0;
   // Unveränderlicher Registrierungs-Benutzername (13.07.2026, Bugfix-Fund) - getrennt vom änderbaren
   // "Kommandantenname" (state.player.name, alle 30 Tage änderbar). Der Einladungscode MUSS den
   // unveränderlichen Namen nutzen, da die Backend-Suche (db.users) nur darüber funktioniert - eine
@@ -3426,8 +3430,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.200.0';
+  const VERSION = '8.201.0';
   const PATCHNOTES = [
+    { version:'8.201.0', date:'21.07.2026', changes:[
+      'Neu: Angriffs-Schutzschild gegen Dauer-Farmen (serverseitig). Wirst du erfolgreich überfallen (mit Beute) oder sabotiert, bist du 30 Minuten lang vor weiteren Spieler-Angriffen und Störmanövern geschützt – so kannst du in Ruhe wieder aufbauen, statt im Minutentakt weitergeplündert zu werden. Ein aktiver Schild wird oben im Verteidigung-Tab mit Countdown angezeigt. Achtung: Ein eigener Angriff/Störmanöver hebt deinen Schild sofort auf (der Schutz ist für Opfer gedacht, nicht als Deckung zum Zuschlagen). Greift man ein geschütztes Ziel an, prallt die Flotte unversehrt ab.',
+    ]},
     { version:'8.200.0', date:'21.07.2026', changes:[
       'Sabotage-Benachrichtigung fürs Opfer: Wer sabotiert wird, bekommt jetzt eine eigene, klare Meldung (Glocke + optional Push) - „Produktion sabotiert (-50%)" bzw. „Verteidigung sabotiert (-30%)" inkl. Dauer und Angreifer-Name, statt der bisherigen generischen Spionage-Meldung. Der ausführliche Bericht im Berichte-Tab gab es schon; die Sofort-Meldung ist jetzt genauso eindeutig.',
       'Markt-Diagramm noch besser ablesbar: Die Preis-Sparkline markiert jetzt Hoch- (rot) und Tiefpunkt (grün) der letzten Stunden und zeigt beim Darüberfahren die konkreten Zahlen (Hoch / Tief / Aktuell in Kr.).',
@@ -13783,8 +13790,10 @@
     if (scouts < 1){ log('Du brauchst mindestens einen Spionagekreuzer für ein Störmanöver.', 'ti-alert-triangle'); return; }
     try {
       const res = await backendFetch('/sabotage', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: playerId }) });
+      myAttackShieldUntil = 0; // eigenes Störmanöver hebt den eigenen Schutzschild auf
       const data = await res.json();
       if (res.status === 429){ log('Störmanöver gegen '+name+' noch in der Abklingzeit'+(data.cooldownMs?' (noch '+fmtDuration(data.cooldownMs/1000)+')':'')+'.', 'ti-clock'); return; }
+      if (res.status === 403 && data && data.shieldMs > 0){ const mins = Math.max(1, Math.ceil(data.shieldMs/60000)); log(name+' steht unter Angriffs-Schutzschild (noch ~'+mins+' Min) – Störmanöver prallt ab.', 'ti-shield'); return; }
       if (!res.ok){ log('Störmanöver nicht möglich: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
       if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
       if (data.success){
@@ -13867,7 +13876,13 @@
       let data;
       try {
         const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: m.targetId }) });
+        myAttackShieldUntil = 0; // eigener Angriff hebt den eigenen Schutzschild auf (Server tut dasselbe)
         data = await res.json();
+        if (res.status === 403 && data && data.shieldMs > 0){
+          const mins = Math.max(1, Math.ceil(data.shieldMs/60000));
+          if (showLog !== false) log((m.fleetName||'Flotte')+': '+name+' steht unter Angriffs-Schutzschild (noch ~'+mins+' Min) – der Angriff prallt ab, die Flotte kehrt unversehrt zurück.', 'ti-shield');
+          return;
+        }
         if (!res.ok){ if (showLog !== false) log('Angriff auf '+name+' konnte nicht ausgewertet werden: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
       } catch(e){ if (showLog !== false) log('Server für Angriffsauswertung nicht erreichbar - Flotte kehrt ohne Ergebnis zurück.', 'ti-alert-triangle'); return; }
       // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
@@ -13964,6 +13979,15 @@
   async function attackPlayer(playerId, name){ return sendPlayerAttackMission(playerId, name); }
 
   let reportsCache = [];
+  // Holt den aktuellen Angriffs-Schutzschild-Status vom Server (leichtes /me), damit der Banner auch
+  // erscheint, während man online ist und gerade überfallen wurde - nicht erst nach einem Reload.
+  async function refreshAttackShield(){
+    if (!useBackend()) return;
+    try {
+      const r = await backendFetch('/me');
+      if (r.ok){ const me = await r.json(); if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; }
+    } catch(e){}
+  }
   async function loadReports(){
     if (!useBackend()){
       const box = document.getElementById('reportsBox');
@@ -15897,6 +15921,7 @@
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
       { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (die Flugzeit muss innerhalb der verbleibenden Zeit liegen), bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab. Ab Forschung <strong>KI-Technologie</strong> gibt es als Sicherheitsnetz die <strong>KI-Abfangautomatik</strong> (Schalter im Verteidigung-Tab): Ist sie an und fängst du nicht selbst ab, vertreiben KI-Abfangdrohnen die Piraten automatisch, sobald 60% der Zeit verstrichen sind - Kosten: 3 KI-Kerne je Einsatz. Der KI-Einsatz gelingt garantiert, bringt aber bewusst <strong>keine Kampfpunkte, keine Veteranen-Erfahrung und keine zerstörten Piratenschiffe</strong> - manuelles Abfangen bleibt immer lohnender, die KI verhindert nur den Beute-Verlust.' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
+      { title:'Angriffs-Schutzschild (Anti-Ganking)', body:'Wirst du erfolgreich <strong>überfallen (mit Beute) oder sabotiert</strong>, erhältst du automatisch einen <strong>Angriffs-Schutzschild für 30 Minuten</strong>: In dieser Zeit prallen weitere Spieler-Angriffe und Störmanöver gegen dich ab (keine Beute, kein Schaden). Das gibt dir Zeit, wieder aufzubauen, statt im Minutentakt weitergefarmt zu werden. Ein aktiver Schild wird oben im <strong>Verteidigung-Tab</strong> mit Countdown angezeigt. <strong>Wichtig:</strong> Sobald du selbst offensiv wirst (ein eigener Angriff oder ein eigenes Störmanöver), verfällt dein Schild sofort – der Schutz ist als Erholung für Opfer gedacht, nicht als Deckung, um selbst gefahrlos zuzuschlagen. Der Schild wird serverseitig vergeben und geprüft (nur im Online-Modus).' },
       { title:'Echte NPC-Flotten', body:'NPC-Gegner im Galaxie-Tab haben eine <strong>konkrete Flottenzusammensetzung</strong> (in der Angriffsvorschau sichtbar), deren Gesamt-Angriffskraft ihrem Verteidigungswert entspricht. Bei einem Sieg wird ein Teil dieser Flotte zerstört – je überlegener dein Angriff, desto mehr (40–90%), der Rest flieht. <strong>Das Trümmerfeld entsteht aus den tatsächlich zerstörten Gegner-Schiffen</strong> (dieselbe Formel wie bei allen anderen Kämpfen) statt aus einer Pauschale – schwere Gegner-Schiffe hinterlassen entsprechend mehr Trümmer. Nach jedem Sieg formiert sich der Gegner neu und stärker (Skalierung).' },
       { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln.' },
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Die spezielle, itemgebundene Kristallfestung (350 Verteidigung, 190 Angriff je Stufe) übertrifft ihn deutlich - passend zur Seltenheit des dafür nötigen Kristallherzens (0,6% Fundchance je Erkundung, dieselbe Seltenheit wie der Antimateriekern des Superschlachtschiffs).' },
@@ -29349,6 +29374,20 @@
       }
     }
 
+    // Angriffs-Schutzschild (serverseitig vergeben nach einem erfolgreichen Überfall/Sabotage gegen dich):
+    // solange aktiv, prallen feindliche PvP-Angriffe/Störmanöver ab. Bricht, sobald du selbst angreifst.
+    const asb = document.getElementById('attackShieldBanner');
+    if (asb){
+      const shieldLeft = (myAttackShieldUntil||0) - Date.now();
+      if (shieldLeft > 0){
+        const mm = Math.floor(shieldLeft/60000), ss = Math.floor((shieldLeft%60000)/1000);
+        asb.style.display = 'block';
+        asb.innerHTML = `<div class="card-row" style="background:rgba(93,202,165,0.12); border-color:rgba(93,202,165,0.5); margin-bottom:0.75rem;"><div class="left"><div class="bicon" style="background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-shield" aria-hidden="true"></i></div><div><div class="bname" style="color:#5dcaa5;">Angriffs-Schutzschild aktiv</div><div class="bmeta">Feindliche Angriffe und Störmanöver prallen ab – noch ${mm}m ${ss}s. <strong>Achtung:</strong> Ein eigener Angriff hebt den Schutz sofort auf.</div></div></div></div>`;
+      } else if (asb.style.display !== 'none'){
+        asb.style.display = 'none'; asb.innerHTML = '';
+      }
+    }
+
     renderFpLeaderboard();
     renderFpAllianceDonation();
     const fpList = document.getElementById('fleetPositionList');
@@ -31441,7 +31480,7 @@
   // - Sichtbarkeits-Check spart Server-Anfragen/Akku, wenn der Tab im Hintergrund liegt oder das Handy
   // gesperrt ist, analog zum bereits bestehenden Muster bei checkLiveVersionUpdate/checkChatUnread oben.
   // Beim nächsten sichtbaren Intervall-Tick wird einfach normal nachgeladen, kein Datenverlust.
-  setInterval(() => { if (document.visibilityState !== 'visible') return; loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); if (myAllianceTag()) syncOwnAllianceRole(); } }, 15000);
+  setInterval(() => { if (document.visibilityState !== 'visible') return; loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); refreshAttackShield(); if (myAllianceTag()) syncOwnAllianceRole(); } }, 15000);
   setInterval(() => { if (document.visibilityState === 'visible') loadGalaxyState(); }, 120000); // Galaxie-Zustand ändert sich langsam (Server-Tick alle 15 Min.), reicht alle 2 Min. zu prüfen
   loadGalaxyState();
   setInterval(() => { if (document.visibilityState === 'visible' && (activeTab === 'markt' || (state.limitOrders||[]).length)) loadMarketState(); }, 30000); // Marktpreise auffrischen: im Markt-Tab zur Anzeige, sonst nur wenn offene Limit-Orders auf Ausführung warten (loadMarketState prüft danach processLimitOrders) - Sichtbarkeits-Gate wie bei den übrigen Anzeige-Timern
@@ -31696,7 +31735,7 @@
       await load();
       bootDataReady = true;
       state.player.id = data.userId;
-      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
+      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
       render();
       loadLeaderboard();
       loadReports();
@@ -31815,7 +31854,7 @@
         if (res.ok){
           const me = await res.json();
           state.player.id = me.userId;
-          accountHasEmail = !!me.hasEmail;
+          accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0;
           accountMaskedEmail = me.maskedEmail||'';
           accountPendingEmail = me.pendingEmail||null;
           accountWantsPatchnotes = me.wantsPatchnotes !== false;
