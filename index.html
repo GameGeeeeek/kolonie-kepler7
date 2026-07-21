@@ -3408,8 +3408,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.180.0';
+  const VERSION = '8.181.0';
   const PATCHNOTES = [
+    { version:'8.181.0', date:'21.07.2026', changes:[
+      'Fix: Streak-Schutzschilde und eingelöste Login-Meilensteine gehen beim Prestige/Aufstieg nicht mehr verloren - die Login-Serie ist Treue-Fortschritt und überlebt den Reset wie bisher schon die Serienlänge selbst.',
+      'Neu: 3 Erfolge für die Retention-Mechaniken - „Monatstreue" (30 Tage Login-Serie), „Hundert-Tage-Legende" (100 Tage Serie) und „Zur richtigen Zeit" (bei 10 Happy Hours aktiv dabei). Zählen in die Erfolgspunkte/den Rang mit ein.',
+      'Verbessert: Das „Nächstes Ziel"-Widget im Basis-Tab zeigt jetzt zusätzlich die nächste startbare Forschung mit Kosten (hebt hervor, wenn sie sofort bezahlbar ist) - ein Klick springt in den Forschung-Tab.',
+    ]},
     { version:'8.180.0', date:'21.07.2026', changes:[
       'Neu: Benachrichtigung, wenn ein Auftrag fertig wird, während du weg bist. Läuft eine Forschung, ein Bauauftrag, eine Expedition, ein Terraforming, eine exotische Forschung oder eine Veteranen-Ausbildung ab, während du NICHT im Spiel bist, bekommst du eine Meldung (Postfach und - bei aktiviertem Web-Push - aufs Handy). Bist du gerade online, kommt keine Benachrichtigung (du siehst es ja direkt). Eigene, abschaltbare Kategorie unter Einstellungen → Benachrichtigungen → „Fertige Aufträge". So musst du nicht mehr raten, wann sich das Zurückkommen lohnt.',
     ]},
@@ -8646,6 +8651,7 @@
     if (!hh) return;
     if (state.lastHappyHourSeen === hh.startedAt) return;
     state.lastHappyHourSeen = hh.startedAt;
+    state.happyHoursUsed = (state.happyHoursUsed||0) + 1; // für den Erfolg "Zur richtigen Zeit"
     log('Happy Hour gestartet: '+hh.type.label+' – '+hh.type.desc+' (60 Min.)', hh.type.icon);
     pushToast('Happy Hour: '+hh.type.label+'!', hh.type.icon);
     playSound('achieve');
@@ -9216,7 +9222,11 @@
     // shipKey-Filter (20.07.2026): buffOnly-Events wie die Raffinerie-Krise haben KEIN Belohnungs-
     // Schiff - ohne Filter wäre "Event-Sammler" nie mehr abschließbar (unlocked[undefined]).
     { key:'eventship1', name:'Ereignis-Pilot', desc:'Schalte dein erstes Event-Schiff frei.', check: s => EVENT_CALENDAR.some(e => e.shipKey && (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.some(e=>e.shipKey && (s.unlocked||{})[e.shipKey])?1:0, 1] },
-    { key:'eventship_all', name:'Event-Sammler', desc:'Schalte alle bisherigen Event-Schiffe frei.', check: s => EVENT_CALENDAR.filter(e=>e.shipKey).every(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.filter(e=>e.shipKey && (s.unlocked||{})[e.shipKey]).length, EVENT_CALENDAR.filter(e=>e.shipKey).length], reward:{erz:6000,kristalle:4000,deuterium:2000,credits:250}, xpReward:250 }
+    { key:'eventship_all', name:'Event-Sammler', desc:'Schalte alle bisherigen Event-Schiffe frei.', check: s => EVENT_CALENDAR.filter(e=>e.shipKey).every(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.filter(e=>e.shipKey && (s.unlocked||{})[e.shipKey]).length, EVENT_CALENDAR.filter(e=>e.shipKey).length], reward:{erz:6000,kristalle:4000,deuterium:2000,credits:250}, xpReward:250 },
+    // Retention-Erfolge (21.07.2026): Login-Treue-Meilensteine und Happy-Hour-Nutzung sichtbar machen.
+    { key:'streak30', name:'Monatstreue', desc:'Erreiche 30 Tage Login-Serie am Stück.', check: s => (s.loginStreak||0) >= 30, progress: s => [Math.min(30,s.loginStreak||0), 30], reward:{erz:4000,kristalle:2500,deuterium:1500,credits:200}, xpReward:200 },
+    { key:'streak100', name:'Hundert-Tage-Legende', desc:'Erreiche 100 Tage Login-Serie am Stück.', check: s => (s.loginStreak||0) >= 100, progress: s => [Math.min(100,s.loginStreak||0), 100], reward:{erz:15000,kristalle:10000,deuterium:5000,antimaterie:200,credits:600}, xpReward:600 },
+    { key:'happyhour10', name:'Zur richtigen Zeit', desc:'Sei bei 10 Happy Hours aktiv dabei.', check: s => (s.happyHoursUsed||0) >= 10, progress: s => [Math.min(10,s.happyHoursUsed||0), 10], reward:{erz:3000,kristalle:2000,deuterium:1000,credits:150}, xpReward:150 }
   ];
   // Erfolgs-Kategorien (20.07.2026, "Erfolge vertiefen"): rein additive Klassifikation per Key-Map,
   // damit die ~63 Erfolge nicht mehr als undifferenzierte Flachliste erscheinen. Keys, die hier fehlen,
@@ -9240,7 +9250,7 @@
     allsystems:'expansion', explorer25:'expansion', conquer1:'expansion', conquer5:'expansion',
     trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', shop5:'handel',
     allianzweltprojekt:'allianz', allianzausbau100:'allianz', allianzeinsatz:'allianz', allianceraidkill:'allianz',
-    firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister'
+    firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister', streak30:'meister', streak100:'meister', happyhour10:'meister'
   };
   function achCat(key){ return ACH_CAT[key] || 'sonstige'; }
   // Erfolgspunkte: aus der Schwierigkeit abgeleitet (vorhandene Belohnungsgröße als Proxy - schwere
@@ -9309,7 +9319,7 @@
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
     scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, referralNudgeShown: false, expeditionsCompleted: 0, themeKey: 'standard',
-    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, streakShields: 0, claimedStreakMilestones: [], comebackQuest: null, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
+    favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, streakShields: 0, claimedStreakMilestones: [], comebackQuest: null, happyHoursUsed: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
     research: {},
@@ -12774,7 +12784,12 @@
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, referralNudgeShown:true,
-      prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
+      prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
+      // Login-Serie ist Treue-Fortschritt, kein Wirtschaftsfortschritt - Schutzschilde und die
+      // "Meilenstein bereits eingelöst"-Marker müssen den Reset überleben wie loginStreak selbst
+      // (RHS wird vor der state-Neuzuweisung ausgewertet, liest also die alten Werte).
+      streakShields:state.streakShields||0, claimedStreakMilestones:(state.claimedStreakMilestones||[]).slice(), comebackQuest:null,
+      autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: 250 + prestigeStartLvl*100, claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
       ascension: keepAscension,
@@ -12851,7 +12866,10 @@
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, referralNudgeShown:true,
-      prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak, autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
+      prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
+      // Wie beim Prestige: Login-Serien-Begleitfelder überstehen auch den Aufstieg-Reset.
+      streakShields:state.streakShields||0, claimedStreakMilestones:(state.claimedStreakMilestones||[]).slice(), comebackQuest:null,
+      autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: startLvl*100,
       claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
@@ -20986,7 +21004,7 @@
   // Der Erfolgs-Scan ist bewusst auf ~alle 4s gedrosselt (nextGoalCache), da a.progress(state) über
   // alle Gebäude/Planeten iterieren kann - kombiniert mit dem Signatur-Cache-Muster wird die Box nur
   // neu gezeichnet, wenn sich Level-XP oder das Zielobjekt tatsächlich ändern.
-  let nextGoalCache = { at:0, best:null };
+  let nextGoalCache = { at:0, best:null, research:null };
   function computeNearestAchievement(){
     let best = null;
     for (const a of ACHIEVEMENTS){
@@ -20999,6 +21017,23 @@
     }
     return best;
   }
+  // Empfehlung für die nächste startbare Forschung fürs "Nächstes Ziel"-Widget: unter allen bereits
+  // freigeschalteten, noch nicht maximierten Zweigen die günstigste - bezahlbare werden bevorzugt.
+  // Läuft schon eine Forschung, gibt es keine Empfehlung (der Spieler ist ja gerade dran).
+  function suggestNextResearch(){
+    if (state.activeResearch) return null;
+    let best = null;
+    for (const r of RESEARCH_DEFS){
+      const lvl = state.research[r.key]||0;
+      if (lvl >= r.maxLevel || !techUnlocked(r)) continue;
+      const cost = researchCostFor(r, lvl+1);
+      const total = Object.values(cost).reduce((a,v)=>a+v,0);
+      const affordable = canAfford(cost);
+      const rank = (affordable?0:1e15) + total; // bezahlbare zuerst, dann günstigste
+      if (!best || rank < best.rank) best = { name:r.name, cost, affordable, rank, targetLevel:lvl+1 };
+    }
+    return best;
+  }
   let lastNextGoalSig = null;
   function renderNextGoalBox(){
     const box = document.getElementById('nextGoalBox');
@@ -21008,11 +21043,21 @@
     const xpNext = Math.max(1, xpForLevel(lvl+1) - xpForLevel(lvl));
     const xpPct = Math.max(0, Math.min(100, Math.round(curXp/xpNext*100)));
     const now = Date.now();
-    if (now - nextGoalCache.at > 4000) nextGoalCache = { at:now, best:computeNearestAchievement() };
+    if (now - nextGoalCache.at > 4000) nextGoalCache = { at:now, best:computeNearestAchievement(), research:suggestNextResearch() };
     const best = nextGoalCache.best;
-    const sig = lvl+':'+curXp+':'+(best?best.key+':'+best.cur+'/'+best.max:'none');
+    const rec = nextGoalCache.research;
+    const sig = lvl+':'+curXp+':'+(best?best.key+':'+best.cur+'/'+best.max:'none')+':'+(rec?rec.name+(rec.affordable?'!':''):'nr');
     if (sig === lastNextGoalSig) return;
     lastNextGoalSig = sig;
+    let researchHtml = '';
+    if (rec){
+      const costStr = Object.entries(rec.cost).map(([k,v]) => fmt(v)+' '+((RES_DEFS.find(x=>x.key===k)||{}).label||k)).join(', ');
+      researchHtml = `
+        <div class="card-row" data-next-goal-tab="forschung" style="cursor:pointer; ${rec.affordable?'background:rgba(133,183,235,0.10); border-color:rgba(133,183,235,0.35);':''}" title="Zum Forschung-Tab">
+          <div class="left" style="min-width:0;"><i class="ti ti-atom-2" aria-hidden="true" style="color:#85b7eb;"></i><span class="bname" style="font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${rec.affordable?'Jetzt forschbar':'Nächste Forschung'}: ${rec.name}</span></div>
+          <span class="lvl-pill" style="font-size:9.5px; flex-shrink:0;">${costStr}</span>
+        </div>`;
+    }
     let achHtml;
     if (best){
       const achPct = Math.max(0, Math.min(100, Math.round(best.ratio*100)));
@@ -21039,9 +21084,11 @@
         <div class="bmeta" style="margin-top:5px;">Nächstes Level: +1% Gesamtproduktion und ein Fähigkeitspunkt.</div>
       </div>
       ${achHtml}
+      ${researchHtml}
     `;
-    const goalTab = box.querySelector('[data-next-goal-tab]');
-    if (goalTab) goalTab.onclick = () => { const btn = document.querySelector('.tab-btn[data-tab="fortschritt"]'); if (btn) btn.click(); };
+    box.querySelectorAll('[data-next-goal-tab]').forEach(el => {
+      el.onclick = () => { const btn = document.querySelector('.tab-btn[data-tab="'+el.getAttribute('data-next-goal-tab')+'"]'); if (btn) btn.click(); };
+    });
   }
   // Happy-Hour-Banner im Basis-Tab. BEWUSST OHNE Signatur-Cache, da der Countdown sichtbar
   // hochzählt (Date.now()-Differenz) - würde bei Cache einfrieren (siehe CLAUDE.md-Regel). Der
