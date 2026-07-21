@@ -3408,8 +3408,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.185.0';
+  const VERSION = '8.186.0';
   const PATCHNOTES = [
+    { version:'8.186.0', date:'21.07.2026', changes:[
+      'Zusätzliche Speicher-Absicherung gegen Fortschrittsverlust bei Updates (Spieler-Report: „nach einem Update ist die Flotten-Bauqueue leer / Forschung zurückgesetzt"). Der Spielstand wird jetzt auch sofort gesichert, sobald das Spiel in den Hintergrund geht oder geschlossen/neugeladen wird - nicht mehr nur alle 10 Sekunden. So ist ein gerade eingereihter Bauauftrag oder Forschungsfortschritt schon frisch gespeichert, bevor ein Update-Neuladen greift. Ergänzt die beiden vorherigen Kern-Fixes (Speichern vor dem Update-Neuladen abwarten, Lade-Speichern greift wieder).',
+    ]},
     { version:'8.185.0', date:'21.07.2026', changes:[
       'Kern-Bugfix zum Reload-Problem: Das Speichern direkt nach dem Laden lief ins Leere, weil der interne „bereit"-Schalter erst NACH dem Laden gesetzt wurde - die Speicherfunktion brach deshalb an genau dieser Stelle stillschweigend ab. Dadurch wurden der neue Zeitstempel, die Offline-Gutschrift, der Login-Bonus und aufgelöste Überfälle nie gespeichert und bei jedem erneuten Laden nochmal ausgelöst (immer 8h-Offline-Gutschrift, gleicher Login-Bonus, immer derselbe Kampfbericht). Jetzt wird direkt nach dem Laden zuverlässig und abgewartet gespeichert - ab dem ersten korrekten Laden ist der Kreislauf durchbrochen.',
     ]},
@@ -14571,6 +14574,15 @@
   setInterval(() => { if (document.visibilityState === 'visible') checkChatUnread(); }, 60000);
   setTimeout(checkChatUnread, 4000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); });
+  // Zusätzliche Speicher-Absicherung (Spieler-Report 21.07.2026: "nach einem Update ist die Bauqueue
+  // leer / Forschung zurückgesetzt"): Neben dem 10s-Intervallspeichern und dem abgewarteten Speichern
+  // vor einem Update-Neuladen wird der aktuelle Stand JETZT AUCH sofort gesichert, sobald der Tab in
+  // den Hintergrund geht oder geschlossen/neugeladen wird (visibilitychange -> hidden bzw. pagehide).
+  // So ist der zuletzt eingereihte Bauauftrag / Forschungsfortschritt schon frisch persistiert, bevor
+  // überhaupt ein Update-Neuladen ausgelöst wird - das schließt die Lücke zwischen zwei Intervall-Speicherungen.
+  const flushSaveOnLeave = () => { if (bootDataReady && !saveConflictDetected) { try { save(); } catch(e){} } };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSaveOnLeave(); });
+  window.addEventListener('pagehide', flushSaveOnLeave);
 
   const showTutorialBtn = document.getElementById('showTutorialBtn');
   if (showTutorialBtn) showTutorialBtn.addEventListener('click', showTutorial);
