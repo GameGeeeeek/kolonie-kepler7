@@ -1801,6 +1801,7 @@
           <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Verteidigungspunkte (aktueller Planet)</div>
           <div style="font-size:38px; font-weight:500; color:#f0997b; font-variant-numeric:tabular-nums;" id="defenseCentralValue">0</div>
         </div>
+        <div id="defenseSabotageBanner" style="display:none;"></div>
         <div id="planetSwitcherDef"></div>
         <div id="raidScoutBox"></div>
         <div id="pirateDebrisRaidBox"></div>
@@ -3413,8 +3414,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.188.0';
+  const VERSION = '8.189.0';
   const PATCHNOTES = [
+    { version:'8.189.0', date:'21.07.2026', changes:[
+      'Störmanöver (Sabotage) grundlegend überarbeitet: Statt wie bisher heimlich Ressourcen zu klauen (das fühlte sich wie ein zweiter Piratenüberfall an), richtet ein erfolgreiches Störmanöver jetzt ECHTEN Schaden beim Ziel an. Zufällig wird entweder ein Produktionsgebäude des Ziels für 30 Minuten um 50% gedrosselt ODER seine Verteidigung ist 30 Minuten lang um 30% geschwächt (leichter angreifbar). Nichts wird mehr gestohlen. Abklingzeit (2 h/Ziel), Spionagekreuzer-Voraussetzung und die von der Spionageabwehr des Ziels abhängige Erfolgschance bleiben. Das Ziel sieht die Sabotage (Kolonie-Karte bzw. neuer Hinweis im Verteidigung-Tab) und kann sie aussitzen oder sofort beheben (Automatische Reparatur / Metamaterial-Reparaturschwarm).',
+    ]},
     { version:'8.188.0', date:'21.07.2026', changes:[
       'Punktestand-Fehler behoben: Schiffe, die gerade verlegt werden, an der Allianzbasis stationiert sind oder einem koordinierten Musterangriff angeschlossen wurden, zählten NICHT mehr in den Punktestand - dadurch fiel er scheinbar grundlos (z.B. um zehntausende Punkte), obwohl gar keine Schiffe zerstört wurden. Diese eigenen Schiffe werden jetzt wieder voll mitgerechnet; der Punktestand bleibt beim Verlegen/Entsenden stabil. (Missionen, bei denen die Schiffe in der Flotte verbleiben - Angriff, Expedition, Weltboss usw. - waren nie betroffen.)',
       'Optik: Die Scrollleiste im Spieler-Profil-Fenster ist jetzt eine schlanke HUD-Leiste im Neon-Verlauf (Lila→Cyan) statt der grauen Browser-Standardleiste - passt sich damit dem restlichen Design an.',
@@ -9408,6 +9412,7 @@
     buffs: [],
     unlocked: { superschlachtschiff:false, festung:false },
     mineDebuff: null,
+    defenseSabotage: null,
     player: { id: null, name: '', allianceTag: '' },
     lastTick: Date.now()
   };
@@ -11257,6 +11262,10 @@
     // Planetentyp, Heimatbonus, Mond-Malus) bleiben bewusst multiplikativ.
     const combatBonus = Math.min(1.0, defenseCombatBonusRaw(planetKey));
     power *= (1 + combatBonus);
+    // Feindliche Sabotage (Störmanöver eines anderen Spielers) - imperiumsweite Verteidigungsschwächung
+    // für einen begrenzten Zeitraum. Wirkt auf die Gesamt-Verteidigungspunkte jedes Standorts.
+    const dsab = state.defenseSabotage && state.defenseSabotage.until > Date.now() ? state.defenseSabotage : null;
+    if (dsab) power *= (1 - dsab.pct);
     return Math.round(power);
   }
   // Angriffskraft der eigenen Verteidigungsanlagen (nur Waffen-Typen wie Türme/Geschütze – reine
@@ -12753,6 +12762,7 @@
     if (state.unlocked.festung === undefined) state.unlocked.festung = false;
     if (state.unlocked.mondzerstoerer === undefined) state.unlocked.mondzerstoerer = false;
     if (state.mineDebuff === undefined) state.mineDebuff = null;
+    if (state.defenseSabotage === undefined) state.defenseSabotage = null;
     if (state.doctrine === undefined) state.doctrine = null;
     if (state.activeEvent === undefined) state.activeEvent = null;
     if (state.lastEventTime === undefined) state.lastEventTime = 0;
@@ -12850,7 +12860,7 @@
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
-      rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
+      rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, referralNudgeShown:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Login-Serie ist Treue-Fortschritt, kein Wirtschaftsfortschritt - Schutzschilde und die
@@ -12932,7 +12942,7 @@
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
-      rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
+      rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, referralNudgeShown:true,
       prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Wie beim Prestige: Login-Serien-Begleitfelder überstehen auch den Aufstieg-Reset.
@@ -13558,10 +13568,23 @@
       await storageSet('spyping:'+targetId, JSON.stringify({ fromId: state.player.id, fromName: state.player.name || 'Ein Spieler', deep: !!deep, time: Date.now() }));
     } catch(e){ /* Info-Ping, Fehler bewusst ignoriert - Aufklärung selbst war erfolgreich */ }
   }
+  // Beschreibt die Wirkung eines erfolgreichen Störmanövers in Klartext (für Log/Toast beim Angreifer
+  // mit fromAttacker=true, und für die Kampfberichte beim Opfer mit fromAttacker=false).
+  function sabotageEffectText(eff, fromAttacker){
+    if (!eff || !eff.kind) return fromAttacker ? 'verdeckt sabotiert' : 'eine verdeckte Sabotage';
+    const dur = eff.durationMin || 30;
+    if (eff.kind === 'defense'){
+      return (fromAttacker ? 'Verteidigung des Ziels' : 'Deine Verteidigung')+' für '+dur+' Min um '+Math.round((eff.pct||0.3)*100)+'% geschwächt';
+    }
+    const bn = buildingDisplayName(eff.buildingKey) || 'ein Produktionsgebäude';
+    return (fromAttacker ? bn+' des Ziels' : bn)+' für '+dur+' Min um '+Math.round((eff.pct||0.5)*100)+'% lahmgelegt';
+  }
   // Störmanöver (Sabotage, Spionage-Vertiefung): verdeckte Operation eines Spionagekreuzers, die beim
-  // Ziel eine kleine, gedeckelte Ressourcenmenge stiehlt - ohne Flottenkampf, dafür serverseitig
-  // aufgelöst und gehärtet (Beute wird vom Server aus dem echten Spielstand berechnet). 2h Abklingzeit
-  // pro Ziel. Direkte Aktion wie die Spionage selbst, keine Flugzeit (bewusst verdeckt, keine Flotte).
+  // Ziel ECHTEN Schaden anrichtet statt Ressourcen zu klauen (Spieler-Wunsch 21.07.2026) - der Server
+  // würfelt zufällig eine von zwei Wirkungen und schreibt sie in den Spielstand des Ziels: entweder ein
+  // Produktionsgebäude läuft 30 Min mit -50% (mineDebuff, wie NPC-Sabotage nur stärker) ODER die
+  // Verteidigung ist 30 Min lang um 30% geschwächt (defenseSabotage). Ohne Flottenkampf, serverseitig
+  // aufgelöst und gehärtet. 2h Abklingzeit pro Ziel. Verdeckt, keine Flugzeit, keine Flotte.
   async function sendSabotageMission(playerId, name){
     if (playerId === state.player.id) return;
     if (!useBackend()){ log('Störmanöver sind nur im Online-Modus möglich.', 'ti-alert-triangle'); return; }
@@ -13576,14 +13599,7 @@
       if (!res.ok){ log('Störmanöver nicht möglich: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
       if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
       if (data.success){
-        const cap = storageCap(); const gained = [];
-        for (const [r,amt] of Object.entries(data.stolen||{})){
-          const before = state.resources[r]||0;
-          state.resources[r] = Math.min(cap, before + amt);
-          const got = state.resources[r]-before;
-          if (got>0) gained.push(got+' '+r);
-        }
-        log('Störmanöver gegen '+name+' erfolgreich! Verdeckt erbeutet: '+(gained.length?gained.join(', '):'nichts (Lager voll?)')+'.', 'ti-target');
+        log('Störmanöver gegen '+name+' erfolgreich! '+sabotageEffectText(data.effect, true)+'.', 'ti-target');
         pushToast('Sabotage erfolgreich: '+name, 'ti-target', 'ok');
         trackEvent('sabotage_success');
       } else {
@@ -15666,7 +15682,7 @@
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.' },
       { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war. Auf der <strong>Galaxie-Übersichtskarte</strong> tragen zusätzlich alle Systeme, in denen ein ausgespähter Spieler wohnt, ein 🔎-Abzeichen (Anzahl im Tooltip) - so siehst du auch aus der Distanz, wo du bereits Aufklärung hast.' },
-      { title:'Störmanöver (Sabotage)', body:'Mit einem <strong>Spionagekreuzer</strong> kannst du im Spielerprofil (Menü "···" → Störmanöver) eine verdeckte Sabotage gegen einen anderen Spieler ausführen. Bei Erfolg stiehlst du <strong>ohne Flottenkampf</strong> eine kleine, gedeckelte Menge Ressourcen (4-8%, deutlich weniger als ein echter Angriff mit 12-25%). Kein Flottenrisiko, aber pro Ziel gilt eine <strong>2-Stunden-Abklingzeit</strong>. Die Erfolgschance sinkt mit der <strong>Spionageabwehr-Forschung des Ziels</strong> (von 85% bis herunter auf 25%) - wer viel in Spionageabwehr investiert, ist also nicht nur gegen Ausspähen, sondern auch gegen Sabotage geschützt. Der Kampf wird serverseitig aufgelöst (die Beute aus dem echten Spielstand berechnet), das Ziel wird benachrichtigt.' },
+      { title:'Störmanöver (Sabotage)', body:'Mit einem <strong>Spionagekreuzer</strong> kannst du im Spielerprofil (Menü "···" → Störmanöver) eine verdeckte Sabotage gegen einen anderen Spieler ausführen. Es wird <strong>nichts gestohlen</strong> - stattdessen richtet ein erfolgreiches Störmanöver <strong>echten Schaden</strong> beim Ziel an: zufällig entweder wird ein <strong>Produktionsgebäude für 30 Minuten um 50% gedrosselt</strong> oder die <strong>Verteidigung des Ziels ist 30 Minuten lang um 30% geschwächt</strong> (leichter angreifbar). <strong>Ohne Flottenkampf und ohne Flottenrisiko</strong>, aber pro Ziel gilt eine <strong>2-Stunden-Abklingzeit</strong>. Die Erfolgschance sinkt mit der <strong>Spionageabwehr-Forschung des Ziels</strong> (von 85% bis herunter auf 25%) - wer viel in Spionageabwehr investiert, ist also nicht nur gegen Ausspähen, sondern auch gegen Sabotage geschützt. Das Ziel wird benachrichtigt und kann die Sabotage aussitzen oder sofort beheben (Automatische Reparatur bzw. Metamaterial-Reparaturschwarm). Serverseitig aufgelöst und gehärtet.' },
       { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
       { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt. Das <strong>Superschlachtschiff</strong> bringt zusätzlich einen kleinen Eigenhangar mit (2 Plätze je Schiff) - genug für eine winzige Eigen-Eskorte, aber kein Ersatz für dedizierte Träger bei größeren Jäger-/Bomber-Flotten.' },
@@ -15802,7 +15818,7 @@
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
       { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Kostet 3 KI-Kerne je Einsatz (gleiche Automatik-Familie wie KI-Abfangautomatik) - reicht der Vorrat nicht, unterbleibt die Verlegung und du musst manuell reagieren. Im Verteidigung-Tab an-/abschaltbar.' },
-      { title:'Automatische Reparatur', body:'Behebt Sabotage nach einem verlorenen Überfall sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne, statt 15 Minuten auf das automatische Ende zu warten. Reicht der KI-Kerne-Vorrat nicht, bleibt die Sabotage bis zum manuellen Beheben oder Ablaufen aktiv.' },
+      { title:'Automatische Reparatur', body:'Behebt eine aktive Sabotage sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne, statt auf das automatische Ende zu warten - egal ob Produktions-Drosselung (nach verlorenem Überfall oder feindlichem Störmanöver) oder eine durch ein Störmanöver geschwächte Verteidigung. Reicht der KI-Kerne-Vorrat nicht, bleibt die Sabotage bis zum manuellen Beheben oder Ablaufen aktiv.' },
       { title:'Live-Kampf-Wiedergabe', body:'Steuert, ob sich die Kampf-Wiedergabe automatisch öffnet, sobald ein Überfall abläuft, während man aktiv im Spiel ist. Standardmäßig an, im Verteidigung-Tab abschaltbar.' },
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
@@ -16058,13 +16074,13 @@
       } else if (r.type === 'sabotage-sent'){
         title = (won?'Störmanöver erfolgreich':'Störmanöver fehlgeschlagen')+' – gegen '+escapeHtml(r.targetName||'Unbekannt');
         body = won
-          ? 'Dein Spionagekreuzer hat verdeckt erbeutet: '+(r.stolen?rewardHtml(r.stolen):'nichts')+'.'
-          : 'Die Spionageabwehr des Ziels hat das Störmanöver vereitelt - keine Beute.';
+          ? 'Dein Spionagekreuzer hat '+(r.effect ? sabotageEffectText(r.effect, true) : ('verdeckt erbeutet: '+(r.stolen?rewardHtml(r.stolen):'nichts')))+'.'
+          : 'Die Spionageabwehr des Ziels hat das Störmanöver vereitelt.';
       } else if (r.type === 'sabotage-received'){
         title = (won?'Störmanöver abgewehrt':'Sabotiert')+' – von '+escapeHtml(r.attackerName||'Unbekannt');
         body = won
           ? 'Deine Spionageabwehr hat ein feindliches Störmanöver vereitelt.'
-          : 'Ein feindlicher Spionagekreuzer hat verdeckt Ressourcen gestohlen: '+(r.stolen?rewardHtml(r.stolen):'unbekannt')+'. Höhere Spionageabwehr-Forschung senkt die Erfolgschance solcher Angriffe.';
+          : 'Ein feindlicher Spionagekreuzer hat '+(r.effect ? sabotageEffectText(r.effect, false) : ('verdeckt Ressourcen gestohlen: '+(r.stolen?rewardHtml(r.stolen):'unbekannt')))+'. Höhere Spionageabwehr-Forschung senkt die Erfolgschance solcher Angriffe.';
       } else if (r.type === 'raid'){
         title = (won?'Überfall abgewehrt':'Überfallen')+' – '+(r.faction||'NPC-Flotte')+(r.targetPlanet?' ('+planetDisplayName(r.targetPlanet)+')':'');
         body = (r.targetPlanet ? 'Angegriffener Planet: <strong>'+planetDisplayName(r.targetPlanet)+'</strong><br>' : '') + 'Angriffspunkte des Gegners: ~'+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
@@ -20794,6 +20810,7 @@
         if (state.unlocked.festung === undefined) state.unlocked.festung = false;
         if (state.unlocked.mondzerstoerer === undefined) state.unlocked.mondzerstoerer = false;
         if (state.mineDebuff === undefined) state.mineDebuff = null;
+    if (state.defenseSabotage === undefined) state.defenseSabotage = null;
         if (state.doctrine === undefined) state.doctrine = null;
         if (state.activeEvent === undefined) state.activeEvent = null;
         if (state.lastEventTime === undefined) state.lastEventTime = 0;
@@ -23812,21 +23829,25 @@
   // "einmalig warnen"-Flag am Debuff selbst statt bei jedem Tick erneut zu loggen.
   const AUTO_REPAIR_COST_KERNE = 3;
   function maybeAutoRepair(){
-    if (!state.autoRepairOn || !state.mineDebuff) return;
+    if (!state.autoRepairOn) return;
+    const md = state.mineDebuff && state.mineDebuff.until > Date.now() ? state.mineDebuff : null;
+    const ds = state.defenseSabotage && state.defenseSabotage.until > Date.now() ? state.defenseSabotage : null;
+    if (!md && !ds) return;
     const cost = { erz: 300, kristalle: 150 };
     if (!canAfford(cost)) return;
     if ((state.resources.kikerne||0) < AUTO_REPAIR_COST_KERNE){
-      if (!state.mineDebuff.kikerneWarned){
-        state.mineDebuff.kikerneWarned = true;
+      const warnHost = md || ds;
+      if (!warnHost.kikerneWarned){
+        warnHost.kikerneWarned = true;
         log('Automatische Reparatur: nicht genug KI-Kerne ('+AUTO_REPAIR_COST_KERNE+' benötigt) - die Sabotage muss von selbst auslaufen oder manuell behoben werden.', 'ti-alert-triangle');
       }
       return;
     }
     pay(cost);
     state.resources.kikerne -= AUTO_REPAIR_COST_KERNE;
-    const def = BUILDING_DEFS.find(d=>d.key===state.mineDebuff.key);
-    log('Automatische Reparatur: Sabotage an '+(def?def.name:'einem Gebäude')+' behoben ('+costHtml(cost)+' + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne).', 'ti-refresh');
-    state.mineDebuff = null;
+    const what = md ? ((BUILDING_DEFS.find(d=>d.key===md.key)||{}).name || 'einem Gebäude') : 'der Verteidigung';
+    log('Automatische Reparatur: Sabotage an '+what+' behoben ('+costHtml(cost)+' + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne).', 'ti-refresh');
+    state.mineDebuff = null; state.defenseSabotage = null;
     render(); save();
   }
 
@@ -23838,13 +23859,15 @@
   const JUMP_CHARGE_COST_KERNE = 3;
   const JUMP_CHARGE_REDUCTION = 0.25;
   function metamaterialRepair(){
-    if (!(state.mineDebuff && state.mineDebuff.until > Date.now())){ log('Aktuell ist keine Sabotage aktiv, die behoben werden müsste.', 'ti-info-circle'); return; }
+    const md = state.mineDebuff && state.mineDebuff.until > Date.now() ? state.mineDebuff : null;
+    const ds = state.defenseSabotage && state.defenseSabotage.until > Date.now() ? state.defenseSabotage : null;
+    if (!md && !ds){ log('Aktuell ist keine Sabotage aktiv, die behoben werden müsste.', 'ti-info-circle'); return; }
     if ((state.resources.metamaterial||0) < META_REPAIR_COST.metamaterial){ log('Nicht genug Metamaterial-Gewebe für den Reparaturschwarm ('+META_REPAIR_COST.metamaterial+' benötigt).', 'ti-alert-triangle'); return; }
     state.resources.metamaterial -= META_REPAIR_COST.metamaterial;
-    const def = BUILDING_DEFS.find(d=>d.key===(state.mineDebuff&&state.mineDebuff.key));
-    state.mineDebuff = null;
+    const what = md ? ((BUILDING_DEFS.find(d=>d.key===md.key)||{}).name || 'einem Gebäude') : 'der Verteidigung';
+    state.mineDebuff = null; state.defenseSabotage = null;
     state.tier2ConsumablesUsed = (state.tier2ConsumablesUsed||0) + 1;
-    log('Metamaterial-Reparaturschwarm: Sabotage an '+(def?def.name:'einem Gebäude')+' sofort behoben ('+META_REPAIR_COST.metamaterial+' Metamaterial-Gewebe).', 'ti-shield-lock');
+    log('Metamaterial-Reparaturschwarm: Sabotage an '+what+' sofort behoben ('+META_REPAIR_COST.metamaterial+' Metamaterial-Gewebe).', 'ti-shield-lock');
     checkAchievements(); playSound('build'); render(); save();
   }
   function longestOutgoingMission(){
@@ -23878,7 +23901,7 @@
     if (!box) return;
     const hasMeta = tier2TotalLevel(tier2Def('metamaterial')) > 0 || (state.resources.metamaterial||0) > 0;
     const hasSing = tier2TotalLevel(tier2Def('singularitaetskern')) > 0 || (state.resources.singularitaetskern||0) > 0;
-    const debuffActive = !!(state.mineDebuff && state.mineDebuff.until > Date.now());
+    const debuffActive = !!((state.mineDebuff && state.mineDebuff.until > Date.now()) || (state.defenseSabotage && state.defenseSabotage.until > Date.now()));
     const jumpTarget = longestOutgoingMission();
     const rows = [];
     if (hasSing){
@@ -29086,6 +29109,18 @@
     document.getElementById('heroDefense').textContent = defensePower(state.activeBasePlanet);
     const dcv = document.getElementById('defenseCentralValue');
     if (dcv) dcv.textContent = defensePower(state.activeBasePlanet);
+    const dsb = document.getElementById('defenseSabotageBanner');
+    if (dsb){
+      const ds = state.defenseSabotage && state.defenseSabotage.until > Date.now() ? state.defenseSabotage : null;
+      if (ds){
+        const remainMs = ds.until - Date.now();
+        const mm = Math.floor(remainMs/60000), ss = Math.floor((remainMs%60000)/1000);
+        dsb.style.display = 'block';
+        dsb.innerHTML = `<div class="card-row" style="background:rgba(224,165,72,0.12); border-color:rgba(224,165,72,0.5); margin-bottom:0.75rem;"><div class="left"><div class="bicon" style="background:rgba(224,165,72,0.2); color:#e0a548;"><i class="ti ti-bolt" aria-hidden="true"></i></div><div><div class="bname" style="color:#e0a548;">Verteidigung sabotiert</div><div class="bmeta">Feindliches Störmanöver: -${Math.round(ds.pct*100)}% Verteidigungspunkte – noch ${mm}m ${ss}s. Sofort behebbar per Metamaterial-Reparaturschwarm oder Automatischer Reparatur.</div></div></div></div>`;
+      } else if (dsb.style.display !== 'none'){
+        dsb.style.display = 'none'; dsb.innerHTML = '';
+      }
+    }
 
     renderFpLeaderboard();
     renderFpAllianceDonation();
@@ -31089,7 +31124,7 @@
     // ("nach jedem Reset") greift hier ebenfalls.
     const keepAscension = state.ascension;
     const resetStartLvl = (keepAscension && keepAscension.tree && keepAscension.tree.start) || 0;
-    state = { resources:{energie:10 + resetStartLvl*300, erz:10 + resetStartLvl*400, kristalle:resetStartLvl*400, deuterium:resetStartLvl*150, antimaterie:0, forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, allianceResearch:{}, allianceContributed:{}, credits: 250 + resetStartLvl*100, ascension: keepAscension, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
+    state = { resources:{energie:10 + resetStartLvl*300, erz:10 + resetStartLvl*400, kristalle:resetStartLvl*400, deuterium:resetStartLvl*150, antimaterie:0, forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, defenseSabotage:null, allianceResearch:{}, allianceContributed:{}, credits: 250 + resetStartLvl*100, ascension: keepAscension, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
     // Füllt alle Felder auf, die diese verkürzte Reset-Liste nicht enthält (z.B. credits, skillTree,
     // favoritePlanets, collapsedSections, ascension, doctrine, ...) - sonst blieben sie `undefined` und
     // render()/Klick-Handler stürzten ohne Seiten-Reload ab (siehe applyStateDefaults()).
@@ -31133,6 +31168,7 @@
     if (state.trader && Date.now() > state.trader.expiresAt){ state.trader = null; }
     state.buffs = (state.buffs||[]).filter(b => b.expiresAt > Date.now());
     if (state.mineDebuff && state.mineDebuff.until < Date.now()) state.mineDebuff = null;
+    if (state.defenseSabotage && state.defenseSabotage.until < Date.now()) state.defenseSabotage = null;
     initDailyQuests();
     maybeAutoRepair();
     maybeAnnounceCalendarEvent();
