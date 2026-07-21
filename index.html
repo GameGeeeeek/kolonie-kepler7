@@ -2423,6 +2423,13 @@
             <div id="eventCalendarBox" style="margin-bottom:1.5rem;"></div>
           </div>
         </div>
+        <div class="prog-section" data-sec="kompendium">
+          <div class="section-title prog-sec-header" data-sec-toggle="kompendium"><i class="ti ti-star" aria-hidden="true"></i>Galaktisches Kompendium<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Dein Sammel-Fortschritt über die ganze Galaxie: entdeckte Welten, bereiste Systeme, besiegte Bosse, kennengelernte Fraktionen und freigeschaltete Erfolge. Jede vollständig erschlossene Kategorie gibt einmalig eine Belohnung.</div>
+            <div id="compendiumBox" style="margin-bottom:1.5rem;"></div>
+          </div>
+        </div>
         <div class="prog-section" data-sec="dominanz">
           <div class="section-title prog-sec-header" data-sec-toggle="dominanz"><i class="ti ti-medal" aria-hidden="true"></i>Galaktische Dominanz<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
           <div class="prog-sec-body">
@@ -3453,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.212.0';
+  const VERSION = '8.213.0';
   const PATCHNOTES = [
+    { version:'8.213.0', date:'21.07.2026', changes:[
+      'Neu: Galaktisches Kompendium (Fortschritt-Tab). Ein Sammel-Überblick über deinen Fortschritt in der ganzen Galaxie – entdeckte Planeten, bereiste Systeme, besiegte Sektor-Bosse, kennengelernte Fraktionen und freigeschaltete Erfolge, jeweils mit Fortschrittsbalken. Für jede vollständig erschlossene Kategorie gibt es einmalig eine Belohnung (Sternenessenz + Kredite). Der Belohnungs-Marker bleibt über Prestige und Aufstieg erhalten, damit nichts doppelt kassiert werden kann.',
+    ]},
     { version:'8.212.0', date:'21.07.2026', changes:[
       'Neu: Flaggschiff (Offiziere-Tab). Baue dein einzigartiges, unzerstörbares Kapitalschiff – getrennt von der Massenflotte. Jede Ausbaustufe (max. 20) gibt +1,5% Angriffs- und Verteidigungskraft (Teil der gedeckelten Kampf-Bonus-Gruppe). Bau/Ausbau kosten Ressourcen + Kredite, du kannst ihm einen eigenen Namen geben. Es überlebt einen Prestige-Reset (wie Offiziere/Module); ein Aufstieg setzt es zurück.',
     ]},
@@ -8888,6 +8898,67 @@
   // diskreten Spielereignissen (Bau fertig, Sieg, ...), nicht kontinuierlich wie die Ressourcenanzeige.
   // Signatur-Vergleich spart daher den innerHTML-Neuaufbau in den meisten der 1x/Sek.-Ticks.
   let lastDominanceSig = null;
+  // ===== Galaktisches Kompendium (#1) =====
+  // Sammel-Meta über den vorhandenen Content: rein aus bestehenden State-Feldern berechnet (keine neuen
+  // Tracker), jede Kategorie mit Fortschrittsbalken. Vollständig erschlossene Kategorien geben EINMALIG
+  // eine Belohnung (Sternenessenz + Kredite), gemerkt in state.compendiumClaimed. Der Claim-Marker
+  // überlebt Prestige UND Aufstieg (siehe keepCompendium dort) - sonst ließe sich die Belohnung nach
+  // jedem Reset (der discovered/Bosse zurücksetzt) erneut kassieren.
+  const COMPENDIUM_CATS = [
+    { key:'planets', name:'Sternenkarte', icon:'ti-map-2', reward:{ essence:3, credits:600 }, desc:'Entdeckte Planeten',
+      have:()=>Object.keys(state.discovered||{}).filter(k=>(state.discovered||{})[k]).length, total:()=>PLANETS.length },
+    { key:'systems', name:'Sternensysteme', icon:'ti-star', reward:{ essence:3, credits:600 }, desc:'Bereiste Systeme (mind. 1 Planet entdeckt)',
+      have:()=>STAR_SYSTEMS.filter(s=>PLANETS.some(p=>p.system===s.id && (state.discovered||{})[p.id])).length, total:()=>STAR_SYSTEMS.length },
+    { key:'bosses', name:'Trophäensaal', icon:'ti-skull', reward:{ essence:4, credits:800 }, desc:'Besiegte Sektor-Bosse',
+      have:()=>['boss1','boss2','boss3'].filter(id=>((state.npcScaling&&state.npcScaling[id])||0)>=1).length, total:()=>3 },
+    { key:'factions', name:'Fraktionsarchiv', icon:'ti-users', reward:{ essence:3, credits:500 }, desc:'Kennengelernte Fraktionen (Ruf ≠ 0)',
+      have:()=>Object.keys(FACTION_DIPLOMACY).filter(fid=>((state.factionRep||{})[fid]||0)!==0).length, total:()=>Object.keys(FACTION_DIPLOMACY).length },
+    { key:'achievements', name:'Erfolgsregister', icon:'ti-award', reward:{ essence:6, credits:1200 }, desc:'Freigeschaltete Erfolge',
+      have:()=>ACHIEVEMENTS.filter(a=>(state.achievements||{})[a.key]).length, total:()=>ACHIEVEMENTS.length }
+  ];
+  function claimCompendium(key){
+    const cat = COMPENDIUM_CATS.find(c=>c.key===key);
+    if (!cat) return;
+    if (!state.compendiumClaimed) state.compendiumClaimed = {};
+    if (state.compendiumClaimed[key]) return;
+    if (cat.have() < cat.total()){ log('Diese Kompendium-Kategorie ist noch nicht vollständig.', 'ti-alert-triangle'); return; }
+    state.compendiumClaimed[key] = true;
+    const r = cat.reward||{};
+    if (r.credits) state.credits = (state.credits||0) + r.credits;
+    if (r.essence){ if (!state.ascension) state.ascension = { count:0, essence:0, tree:{} }; state.ascension.essence = (state.ascension.essence||0) + r.essence; }
+    log('Kompendium „'+cat.name+'" vervollständigt! Belohnung: '+(r.essence?r.essence+' Sternenessenz':'')+(r.essence&&r.credits?' + ':'')+(r.credits?r.credits+' Kredite':'')+'.', cat.icon, 'ok');
+    playSound('achieve'); render(); save();
+  }
+  let lastCompendiumSig = null;
+  function renderCompendium(){
+    const box = document.getElementById('compendiumBox');
+    if (!box) return;
+    if (!state.compendiumClaimed) state.compendiumClaimed = {};
+    const rows = COMPENDIUM_CATS.map(cat=>{
+      const have = cat.have(), total = cat.total();
+      const pct = total>0 ? Math.min(100, Math.round(have/total*100)) : 0;
+      return { have, total, pct, done: have>=total, claimed: !!state.compendiumClaimed[cat.key], cat };
+    });
+    const sig = rows.map(r=>r.cat.key+':'+r.have+'/'+r.total+':'+(r.claimed?1:0)).join('|');
+    if (sig === lastCompendiumSig) return;
+    lastCompendiumSig = sig;
+    box.innerHTML = rows.map(r=>{
+      const cat=r.cat, rw=cat.reward||{};
+      const rewardTxt = (rw.essence?rw.essence+' Essenz':'')+(rw.essence&&rw.credits?' + ':'')+(rw.credits?fmt(rw.credits)+' Kr.':'');
+      const btn = r.claimed
+        ? '<span class="lvl-pill" style="background:rgba(93,202,165,0.2); color:#5dcaa5;">✓ komplett</span>'
+        : (r.done ? `<button data-compendium-claim="${cat.key}" style="white-space:nowrap;">Belohnung holen</button>` : `<span class="bmeta" style="font-variant-numeric:tabular-nums;">${r.have}/${r.total}</span>`);
+      return `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-bottom:0.6rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div class="left" style="min-width:0;"><div class="bicon" style="background:rgba(159,225,203,0.16); color:#9fe1cb;"><i class="ti ${cat.icon}" aria-hidden="true"></i></div>
+            <div style="min-width:0;"><div class="bname">${cat.name}</div><div class="bmeta">${cat.desc} · Belohnung: ${rewardTxt}</div></div></div>
+          ${btn}
+        </div>
+        <div style="height:7px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;"><div style="height:100%; width:${r.pct}%; background:${r.done?'#5dcaa5':'#9fe1cb'};"></div></div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('[data-compendium-claim]').forEach(b=>b.onclick=()=>claimCompendium(b.getAttribute('data-compendium-claim')));
+  }
   function renderDominance(){
     const box = document.getElementById('dominanceBox');
     if (!box) return;
@@ -13287,6 +13358,7 @@
     const keepBossClaims = state.claimedBossKills || [];
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
     const keepFriends = (state.friends||[]).slice(); // Freundesliste überlebt Prestige/Aufstieg (persönliche Lesezeichen, kein Wirtschaftswert)
+    const keepCompendium = state.compendiumClaimed; // Kompendium-Belohnungen sind einmalig - Marker überlebt jeden Reset (sonst Re-Farm)
     // Bugfix (Spieler-Wunsch, entdeckt bei der Offiziere-Recherche): Offiziere, Kommandopunkte und
     // beide Modul-Inventare wurden bisher bei JEDEM Prestige komplett gelöscht, ohne dass der
     // Bestätigungs-Dialog (siehe unten, Zeile ~9700) das erwähnt - der Dialog verspricht nur
@@ -13357,7 +13429,7 @@
       modules:keepModules||{}, moduleSlotLevel:keepModuleSlotLevel||{}, equippedModules:keepEquippedModules||{},
       shipModules:keepShipModules||{}, shipModuleSlotLevel:keepShipModuleSlotLevel||{}, equippedShipModules:keepEquippedShipModules||{},
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
-      friends: keepFriends||[]
+      friends: keepFriends||[], compendiumClaimed: keepCompendium||{}
     };
     applyStateDefaults();
     // Kryo-Archiv anwenden: NACH applyStateDefaults (das setzt fehlende Tier-2-Felder auf 0),
@@ -13415,6 +13487,7 @@
     const keepBossClaims = state.claimedBossKills || [];
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
     const keepFriends = (state.friends||[]).slice(); // Freundesliste überlebt Prestige/Aufstieg (persönliche Lesezeichen, kein Wirtschaftswert)
+    const keepCompendium = state.compendiumClaimed; // Kompendium-Belohnungen sind einmalig - Marker überlebt jeden Reset (sonst Re-Farm)
     const asc = state.ascension || { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0,leere:0} };
     asc.count = (asc.count||0) + 1;
     asc.essence = (asc.essence||0) + gain;
@@ -13437,7 +13510,7 @@
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
       ascension: asc,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
-      friends: keepFriends||[]
+      friends: keepFriends||[], compendiumClaimed: keepCompendium||{}
     };
     applyStateDefaults();
     log('AUFSTIEG '+asc.count+' vollzogen! +'+gain+' Sternenessenz (gesamt: '+asc.essence+'). Verteile sie im Meta-Baum (Fortschritt-Tab) - diese Boni überleben jeden Reset.', 'ti-sparkles');
@@ -16381,6 +16454,7 @@
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
       { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong>. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Tier-2-Bestände gehen beim Prestige verloren</strong> - es sei denn, du errichtest vorher ein <strong>Kryo-Archiv</strong> (Basis-Tab, ab Hochenergiephysik, max. Stufe 5 je Standort): je Stufe bewahrt es 40 Nanolegierungen / 20 Quantenchips / 15 Hochenergiekristalle / 8 Fusionskerne / 5 KI-Kerne durchs Prestige (Stufen aller Standorte summiert, imperiumsweit bei Stufe 10 gedeckelt). Das Archiv selbst wird wie alle Gebäude zurückgesetzt - eine bewusste Einmal-Investition pro Durchlauf. <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie.' },
+      { title:'Galaktisches Kompendium', body:'Im <strong>Fortschritt-Tab</strong> bündelt das Kompendium deinen Sammel-Fortschritt über die ganze Galaxie in fünf Kategorien: <strong>Sternenkarte</strong> (entdeckte Planeten), <strong>Sternensysteme</strong> (bereiste Systeme), <strong>Trophäensaal</strong> (besiegte Sektor-Bosse), <strong>Fraktionsarchiv</strong> (kennengelernte Fraktionen) und <strong>Erfolgsregister</strong> (freigeschaltete Erfolge). Jede Kategorie zeigt einen Fortschrittsbalken; sobald du sie <strong>vollständig</strong> erschlossen hast, kannst du einmalig eine Belohnung abholen (Sternenessenz + Kredite). Die Belohnung gibt es pro Kategorie nur ein einziges Mal – der Marker bleibt auch über Prestige und Aufstieg erhalten.' },
       { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator (Stufe 1-8), dann Galaktische Legende 1-12 (Stufe 9-20), Sternenherrscher 1-12 (Stufe 21-32), Kosmischer Souverän 1-12 (Stufe 33-44) und ab Stufe 45 zählt "Kosmischer Souverän" endlos weiter hoch. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
@@ -30456,6 +30530,7 @@
     const xpPct = Math.max(0, Math.min(100, ((curXp-xpBase)/(xpNext-xpBase))*100));
     const levelBox = document.getElementById('levelBox');
     renderEventCalendarBox();
+    renderCompendium();
     renderDominance();
     renderAllianceTitlesBox();
     renderAllianceSkinsBox();
