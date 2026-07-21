@@ -3408,8 +3408,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.186.0';
+  const VERSION = '8.187.0';
   const PATCHNOTES = [
+    { version:'8.187.0', date:'21.07.2026', changes:[
+      'Eigentliche Ursache des Speicher-Problems gefunden und behoben: Der Server hat bei stark entwickelten Konten den kompletten Spielstand abgelehnt (eine interne Plausibilitätsprüfung mit zu niedrigen Obergrenzen für Gebäude-/Forschungsstufen und Kredite). Das Spiel hat diese Ablehnung bisher STILL ignoriert - dadurch wurde gar nichts mehr gespeichert und bei jedem Laden der letzte akzeptierte Stand geladen (immer „8 Std. offline", Tagesbonus/Bauqueue/Forschung scheinbar zurückgesetzt, gleicher Kampfbericht). Die Grenzen sind jetzt weit über jeden realistischen Fortschritt angehoben (serverseitig). Zusätzlich meldet das Spiel eine vom Server abgelehnte Speicherung jetzt deutlich, statt sie stillschweigend zu verschlucken.',
+    ]},
     { version:'8.186.0', date:'21.07.2026', changes:[
       'Zusätzliche Speicher-Absicherung gegen Fortschrittsverlust bei Updates (Spieler-Report: „nach einem Update ist die Flotten-Bauqueue leer / Forschung zurückgesetzt"). Der Spielstand wird jetzt auch sofort gesichert, sobald das Spiel in den Hintergrund geht oder geschlossen/neugeladen wird - nicht mehr nur alle 10 Sekunden. So ist ein gerade eingereihter Bauauftrag oder Forschungsfortschritt schon frisch gespeichert, bevor ein Update-Neuladen greift. Ergänzt die beiden vorherigen Kern-Fixes (Speichern vor dem Update-Neuladen abwarten, Lade-Speichern greift wieder).',
     ]},
@@ -20468,6 +20471,22 @@
   // tatsächliche Server-Version nachladen und erneut versuchen. Nur wenn das AUCH fehlschlägt,
   // handelt es sich um einen echten Konflikt (z.B. ein zweites Gerät, das wirklich gleichzeitig
   // schreibt).
+  // Speicher-Ablehnung sichtbar machen (Spieler-Report 21.07.2026): Lehnt der Server den Spielstand ab
+  // (HTTP 400, z.B. Plausibilitätsprüfung), wurde das bisher STILL verschluckt (nur 409 war behandelt).
+  // Das bedeutet unbemerkten kompletten Speicherverlust - jeder Reload lädt den letzten akzeptierten
+  // Stand ("immer 8h offline", Tagesbonus/Bauqueue/Forschung scheinbar zurückgesetzt). Jetzt laut in
+  // Konsole loggen UND einen gedrosselten, gut sichtbaren Hinweis zeigen, statt so zu tun als sei alles ok.
+  let lastSaveRejectWarn = 0;
+  function notifySaveRejected(reason){
+    console.error('Kepler-7: Spielstand vom Server ABGELEHNT – wird NICHT gespeichert.', reason || '');
+    const now = Date.now();
+    if (now - lastSaveRejectWarn < 60000) return;
+    lastSaveRejectWarn = now;
+    try {
+      log('ACHTUNG: Dein Spielstand wird vom Server gerade NICHT gespeichert'+(reason?(' – '+reason):'')+'. Bitte informiere den Entwickler.', 'ti-alert-triangle', 'error');
+      pushToast('Speichern abgelehnt – Fortschritt wird nicht gesichert! Bitte melden.', 'ti-alert-triangle', 'error');
+    } catch(e){}
+  }
   async function saveGameStateVersioned(value, retryCount){
     retryCount = retryCount || 0;
     if (!useBackend()){
@@ -20492,6 +20511,11 @@
         return null;
       }
       if (res.ok){ const data = await res.json(); gameSaveVersion = data.version; return data; }
+      // Jede andere Nicht-OK-Antwort (v.a. 400 = vom Server abgelehnt) NICHT mehr still schlucken.
+      let reason = '';
+      try { const err = await res.json(); reason = (err && err.error) ? err.error : ('HTTP '+res.status); } catch(e){ reason = 'HTTP '+res.status; }
+      notifySaveRejected(reason);
+      return null;
     } catch(e){}
     return null;
   }
