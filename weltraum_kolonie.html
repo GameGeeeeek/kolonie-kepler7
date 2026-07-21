@@ -3408,8 +3408,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.184.0';
+  const VERSION = '8.185.0';
   const PATCHNOTES = [
+    { version:'8.185.0', date:'21.07.2026', changes:[
+      'Kern-Bugfix zum Reload-Problem: Das Speichern direkt nach dem Laden lief ins Leere, weil der interne „bereit"-Schalter erst NACH dem Laden gesetzt wurde - die Speicherfunktion brach deshalb an genau dieser Stelle stillschweigend ab. Dadurch wurden der neue Zeitstempel, die Offline-Gutschrift, der Login-Bonus und aufgelöste Überfälle nie gespeichert und bei jedem erneuten Laden nochmal ausgelöst (immer 8h-Offline-Gutschrift, gleicher Login-Bonus, immer derselbe Kampfbericht). Jetzt wird direkt nach dem Laden zuverlässig und abgewartet gespeichert - ab dem ersten korrekten Laden ist der Kreislauf durchbrochen.',
+    ]},
     { version:'8.184.0', date:'21.07.2026', changes:[
       'Wichtiger Bugfix (Spieler-Report): Beim automatischen Neuladen nach einem Versions-Update wurde der aktuelle Spielstand nicht mehr zuverlässig gespeichert - die Seite lud neu, bevor die (asynchrone) Server-Speicherung fertig war. Dadurch gingen die zuletzt gemachten Änderungen verloren und lösten beim nächsten Laden erneut aus: Tagesaufgaben und der tägliche Login-Bonus wirkten „zurückgesetzt", und ein bereits ausgetragener Überfall tauchte als immer gleicher Kampfbericht wieder auf. Jetzt wird vor JEDEM Update-Neuladen (automatisch wie per Knopf) zuerst sauber zu Ende gespeichert (mit Sicherheits-Timeout, falls der Server klemmt).',
     ]},
@@ -20770,11 +20773,21 @@
         const loginBonus = checkDailyLogin();
         initDailyQuests();
         checkForUpdateNotice();
-        save();
+        // KRITISCH (Spieler-Report 21.07.2026: "bei jedem Reload 8h-Offline-Gutschrift, gleicher
+        // Login-Bonus und immer derselbe Kampfbericht"): Der Spielstand ist jetzt vollständig geladen
+        // und die EINMALIGEN Lade-Effekte (Offline-Produktion, Login-Bonus, in applyOfflineProgress/
+        // Tick aufgelöste Überfälle -> nextRaidTime/incomingRaid genullt) sind angewandt. Dieses
+        // Speichern MUSS greifen - doSave() bricht aber bei !bootDataReady sofort ab, und bootDataReady
+        // wurde bisher erst NACH dem gesamten load() gesetzt. Dadurch war dieses save() ein No-Op: der
+        // neue lastTick und alle Gutschriften landeten nie auf dem Server und wurden bei JEDEM erneuten
+        // Laden nochmal ausgelöst. Jetzt bootDataReady VOR dem Speichern setzen (Stand ist vollständig)
+        // und das Speichern ABWARTEN, damit es auch bei sofortigem Neuladen sicher persistiert ist.
+        bootDataReady = true;
+        await save();
         const savedAgo = elapsed < 60 ? 'vor '+Math.round(elapsed)+'s' : 'vor '+Math.round(elapsed/60)+' Min.';
         document.getElementById('loadstate').textContent = 'Spielstand automatisch geladen (zuletzt gespeichert '+savedAgo+')';
         if (lastOfflineSummary || loginBonus) setTimeout(() => showWelcomeBackModal(lastOfflineSummary, loginBonus), 400);
-      } else { state.lastSeenVersion = VERSION; checkDailyLogin(); initDailyQuests(); document.getElementById('loadstate').textContent = 'Neue Kolonie gestartet – wird ab jetzt automatisch gespeichert'; }
+      } else { state.lastSeenVersion = VERSION; checkDailyLogin(); initDailyQuests(); bootDataReady = true; await save(); document.getElementById('loadstate').textContent = 'Neue Kolonie gestartet – wird ab jetzt automatisch gespeichert'; }
     } catch(e){
       // Diesen Fehler NIE stillschweigend verschlucken: ein Ladefehler bei einem BESTEHENDEN
       // Spielstand sah für Spieler zuvor exakt wie "Fortschritt komplett weg" aus, obwohl die
