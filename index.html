@@ -3450,8 +3450,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.208.0';
+  const VERSION = '8.209.0';
   const PATCHNOTES = [
+    { version:'8.209.0', date:'21.07.2026', changes:[
+      'Drei neue Offiziere (Offiziere-Tab): Navigator (−2% Flugzeit/Stufe), Quartiermeister (+2% Lagerkapazität/Stufe) und Aufklärer (+2% Expeditions-Ausbeute/Stufe). Sie werden wie die bisherigen mit Kommandopunkten angeheuert und befördert (inkl. Talent-Verzweigung ab Stufe 5). Damit gibt es jetzt 7 Offiziere. Der Erfolg „Kompletter Stab" verlangt entsprechend alle sieben.',
+    ]},
     { version:'8.208.0', date:'21.07.2026', changes:[
       'Neu: Wochen-Angebot im Kredit-Shop. Jede Woche wartet ein wechselndes, vergünstigtes Sonderangebot ganz oben im Shop (Turbo-Produktion, Kriegskasse, Modul-Sonderlieferung oder Kommandostab) – einmal pro Woche kaufbar. Das Angebot ist für alle Spieler gleich und wechselt automatisch zum Wochenwechsel.',
     ]},
@@ -9431,7 +9434,7 @@
     { key:'terraform1', name:'Weltgestalter', desc:'Terraforme einen Standort auf Stufe 1.', check: s => Object.values(s.terraforming||{}).some(v=>(typeof v==='number'?v:(v&&v.level)||0)>=1), progress: s => [Math.min(1, Object.values(s.terraforming||{}).filter(v=>(typeof v==='number'?v:(v&&v.level)||0)>=1).length), 1] },
     { key:'terraform10', name:'Paradies erschaffen', desc:'Bringe einen Standort auf Terraforming-Stufe 10.', check: s => Object.values(s.terraforming||{}).some(v=>(typeof v==='number'?v:(v&&v.level)||0)>=10), progress: s => [Math.min(10, Math.max(0, ...Object.values(s.terraforming||{}).map(v=>(typeof v==='number'?v:(v&&v.level)||0)), 0)), 10] },
     { key:'officer1', name:'Erster Offizier', desc:'Heuere einen Offizier an.', check: s => Object.values(s.officers||{}).some(v=>v>=1), progress: s => [Math.min(1, Object.values(s.officers||{}).filter(v=>v>=1).length), 1] },
-    { key:'officer_all', name:'Kompletter Stab', desc:'Heuere alle vier Offiziere an.', check: s => Object.values(s.officers||{}).filter(v=>v>=1).length >= 4, progress: s => [Object.values(s.officers||{}).filter(v=>v>=1).length, 4] },
+    { key:'officer_all', name:'Kompletter Stab', desc:'Heuere alle Offiziere an.', check: s => Object.values(s.officers||{}).filter(v=>v>=1).length >= OFFICERS.length, progress: s => [Object.values(s.officers||{}).filter(v=>v>=1).length, OFFICERS.length] },
     { key:'module1', name:'Aufgerüstet', desc:'Rüste ein Schiffsmodul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.length>0), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.length>0).length), 1] },
     { key:'module_legendary', name:'Legendäre Ausrüstung', desc:'Rüste ein legendäres Modul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.some(k=>k.endsWith(':legendaer'))), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.some(k=>k.endsWith(':legendaer'))).length), 1] },
     { key:'allroles', name:'Vielseitiges Imperium', desc:'Nutze alle sechs Planeten-Rollen gleichzeitig.', check: s => new Set(Object.values(s.planetSpecialization||{})).size >= 6, progress: s => [new Set(Object.values(s.planetSpecialization||{})).size, 6] },
@@ -9982,7 +9985,7 @@
   // abschätzen kann, ob der Frachtraum bei einem Glücksfund knapp würde.
   const EXPEDITION_MAX_RESOURCE_FIND_BASE = 700;
   function expeditionMaxResourceFind(rewardMult){
-    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + moduleBonusTotal('expedition')) * seasonalLootMult());
+    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + moduleBonusTotal('expedition') + officerBonus('aufklaerer')) * seasonalLootMult());
   }
   // Frachter als Eskorte (20.07.2026, Spieler-Wunsch): tragen 0 Angriffspunkte bei (wie bei
   // ATTACK_SHIP_KEYS), erweitern aber den Frachtraum für Ressourcenfunde (siehe fleetCargoCapacity()
@@ -10611,6 +10614,7 @@
     const doc = activeDoctrine();
     if (doc) cap *= doc.cargoMult;
     cap *= (1 + prestigePerkCount('storage')*0.05); // Prestige-Perk "Lagermeister"
+    cap *= (1 + officerBonus('quartiermeister')); // Offizier "Quartiermeister"
     return cap;
   }
   // ===== Tier-2-Ressourcen: generische Raffinerie-Engine =====
@@ -10835,6 +10839,7 @@
     // Allianzbasis ab Stufe 4: -10% Flugzeit für Missionen ins Basis-System (nur wenn der Aufrufer
     // das Zielsystem kennt und mitgibt - Missionsarten ohne echtes Zielsystem bleiben unberührt).
     mult *= allianceBaseFlightMult(targetSystem);
+    mult *= Math.max(0.5, 1 - officerBonus('navigator')); // Offizier "Navigator"
     return sec * mult;
   }
   // Kleiner Eigenhangar des Superschlachtschiffs (17.07.2026, Feature-Wunsch): bewusst zurückhaltend
@@ -11309,7 +11314,13 @@
     { key:'ingenieur', name:'Ingenieur', icon:'ti-building-factory-2', color:'#f0997b', effect:'−2% Bauzeit pro Stufe', detail:'Beschleunigt den Bau von Gebäuden UND Schiffen.' },
     { key:'admiral', name:'Admiral', icon:'ti-sword', color:'#e24b4a', effect:'+2% Angriffskraft, +1% Verteidigung pro Stufe', detail:'Erhöht vor allem die Angriffskraft, etwas auch die Verteidigung deiner Flotten.' },
     { key:'wissenschaftler', name:'Wissenschaftler', icon:'ti-flask', color:'#85b7eb', effect:'−2% Forschungsdauer pro Stufe', detail:'Verkürzt die Dauer von Forschungen.' },
-    { key:'haendler', name:'Händler', icon:'ti-truck', color:'#5dcaa5', effect:'+2% Ertrag pro Stufe', detail:'Bessere Konditionen beim Schwarzmarkt-Händler UND höherer Ertrag auf Kredit-/Verkaufs-Handelsrouten.' }
+    { key:'haendler', name:'Händler', icon:'ti-truck', color:'#5dcaa5', effect:'+2% Ertrag pro Stufe', detail:'Bessere Konditionen beim Schwarzmarkt-Händler UND höherer Ertrag auf Kredit-/Verkaufs-Handelsrouten.' },
+    // Drei weitere Offiziere (21.07.2026): bewusst an bereits BEWÄHRTE Formel-Anschlusspunkte gehängt
+    // (Flugzeit wie Navigations-Perk, Lager wie Lagermeister-Perk, Expedition wie Pfadfinder-Perk) - kein
+    // neuer, ungetesteter Hook, genau die Sorge aus dem Kommentar unten wird so vermieden.
+    { key:'navigator', name:'Navigator', icon:'ti-rocket', color:'#c3bef5', effect:'−2% Flugzeit pro Stufe', detail:'Verkürzt die Flugzeit aller Flottenmissionen.' },
+    { key:'quartiermeister', name:'Quartiermeister', icon:'ti-box', color:'#fac775', effect:'+2% Lagerkapazität pro Stufe', detail:'Erhöht die Lagerkapazität all deiner Standorte.' },
+    { key:'aufklaerer', name:'Aufklärer', icon:'ti-map-2', color:'#5dcaa5', effect:'+2% Expeditions-Ausbeute pro Stufe', detail:'Erhöht die Ausbeute deiner Expeditionen.' }
   ];
   const OFFICER_MAX_LEVEL = 10;
   const OFFICER_BONUS_PER_LEVEL = 0.02;
@@ -11346,6 +11357,9 @@
     if (key === 'ingenieur') return '−'+b+'% Bauzeit';
     if (key === 'wissenschaftler') return '−'+b+'% Forschungsdauer';
     if (key === 'haendler') return '+'+b+'% Ertrag';
+    if (key === 'navigator') return '−'+b+'% Flugzeit';
+    if (key === 'quartiermeister') return '+'+b+'% Lagerkapazität';
+    if (key === 'aufklaerer') return '+'+b+'% Expeditions-Ausbeute';
     return '+'+b+'%';
   }
   function upgradeOfficer(key){
@@ -23499,7 +23513,7 @@
           // Rückwärtskompatibel: ältere, bereits unterwegs befindliche Expeditionen ohne gespeicherten
           // Typ nutzen die bisherigen Standard-Werte (0.35 Begegnungschance, normale Beute).
           const encounterChance = m.encounterChance!==undefined ? m.encounterChance : 0.35;
-          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + moduleBonusTotal('expedition')) * seasonalLootMult();
+          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + moduleBonusTotal('expedition') + officerBonus('aufklaerer')) * seasonalLootMult();
           const encountered = Math.random() < encounterChance;
           let outcome = 'success';
           // Auf Funktionsebene gehoben (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe"): vorher nur im
