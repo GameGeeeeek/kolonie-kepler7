@@ -3399,8 +3399,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.171.0';
+  const VERSION = '8.172.0';
   const PATCHNOTES = [
+    { version:'8.172.0', date:'21.07.2026', changes:[
+      'Härtung der Tier-2-Erweiterung: Die zwei neuen Apex-Ressourcen (Metamaterial-Gewebe, Singularitätskerne) haben jetzt eine eigene, sinnvolle Pakt-Geschenk-Obergrenze (3 bzw. 2 statt bisher fälschlich nur 1). Die Singularitäts-Sprungladung beschleunigt außerdem keine Flottenverlegungen mehr - die werden intern pro Schiffstyp aufgeteilt, wodurch das Beschleunigen nur eines Teils den Verband auseinandergerissen hätte.',
+    ]},
     { version:'8.171.0', date:'20.07.2026', changes:[
       'Tier-2-Erweiterung, Abschluss: Zwei neue Verbrauchsgegenstände im Flotte-Tab (unter „Aktive Missionen", sobald du die jeweilige Ressource besitzt). Der Metamaterial-Reparaturschwarm behebt eine aktive Sabotage sofort (6 Metamaterial-Gewebe) - das manuelle Pendant zur automatischen Reparatur. Die Singularitäts-Sprungladung verkürzt die Restflugzeit deiner längsten laufenden Flottenmission um 25% (3 Singularitätskerne). Beide zählen für den Erfolg „Verbrauchsstratege".',
     ]},
@@ -21449,7 +21452,7 @@
   // Produktions-Formel - die Deckel sind über den Zutaten-Wert der fünf Ketten grob wertgleich
   // gewählt (~700-1000 Basis-Einheiten je Geschenk) und im Vergleich zur eigenen Fabrik-Produktion
   // klein: Geschenke bleiben eine soziale Geste, kein zweiter Produktionskanal.
-  const PACT_GIFT_TIER2_CAPS = { nanolegierungen: 20, quantenchips: 10, hochenergiekristalle: 8, fusionskerne: 4, kikerne: 3 };
+  const PACT_GIFT_TIER2_CAPS = { nanolegierungen: 20, quantenchips: 10, hochenergiekristalle: 8, fusionskerne: 4, kikerne: 3, metamaterial: 3, singularitaetskern: 2 };
   function pactGiftMaxAmount(resKey){
     if (PACT_GIFT_TIER2_CAPS[resKey]) return PACT_GIFT_TIER2_CAPS[resKey];
     return Math.max(1, Math.round((ratesPerSecond()[resKey]||0) * 60 * PACT_GIFT_PRODUCTION_MINUTES));
@@ -23291,7 +23294,10 @@
     let best = null;
     for (const { fleet } of allFleetsWithPlanet()){
       for (const m of (fleet.missions||[])){
-        if (!m.endTime || m.endTime <= now || m.type === 'expedition') continue;
+        // Expeditionen sind kein Flug; Verlegungen (relocate) bewusst ausgenommen - eine Verlegung wird
+        // technisch in eine Mission PRO Schiffstyp mit gemeinsamer groupId aufgeteilt, ein Beschleunigen
+        // nur eines Teils würde die Ankunft des Verbands auseinanderreißen.
+        if (!m.endTime || m.endTime <= now || m.type === 'expedition' || m.type === 'relocate') continue;
         const remaining = m.endTime - now;
         if (!best || remaining > best.remaining) best = { m, remaining };
       }
