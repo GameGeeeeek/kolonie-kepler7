@@ -3430,8 +3430,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.202.0';
+  const VERSION = '8.203.0';
   const PATCHNOTES = [
+    { version:'8.203.0', date:'21.07.2026', changes:[
+      'Wochenliga jetzt serverseitig abgesichert: Platzierung und Belohnung werden am Wochenwechsel vom Server aus den (bereits geprüften) Punktezuwächsen berechnet und über das Belohnungs-Postfach ausgeschüttet – der Client zahlt sich nicht mehr selbst aus. Damit kann sich niemand mehr eine höhere Liga oder Belohnung erschummeln. Für dich als ehrlichen Spieler ändert sich nichts am Ablauf: Beim nächsten Login nach Wochenwechsel wird deine Liga-Belohnung automatisch gutgeschrieben. (Im Solo-Modus ohne Server bleibt die lokale Abrechnung.)',
+    ]},
     { version:'8.202.0', date:'21.07.2026', changes:[
       'Ruhmeshalle jetzt serverseitig abgesichert: Der monatliche Spitzenreiter wird ab sofort direkt vom Server gepflegt (alle 15 Minuten, auch wenn gerade niemand online ist) und beim Monatswechsel korrekt eingefroren. Bisher hing das daran, dass ein Spieler kurz vor Monatsende die Bestenliste lud – tat das niemand, konnte ein veralteter Champion verewigt werden. Die Anzeige bleibt unverändert; der Eintrag ist nur zuverlässiger.',
     ]},
@@ -12231,6 +12234,28 @@
         const data = await res.json();
         if (!data.reward) break;
         const r = data.reward;
+        if (r.type === 'weekly-league'){
+          // Serverautoritative Wochenliga (v8.203.0): Der Server hat Platzierung + Liga bestimmt, der
+          // Client wendet nur noch die Belohnung der zugewiesenen Liga an (Kredite + anteilige Produktion
+          // nach der eigenen Rate). Dadurch kann sich niemand mehr selbst eine höhere Liga zuweisen.
+          const lg = LEAGUE_DEFS.find(l => l.key === r.league) || LEAGUE_DEFS[3];
+          state.credits = (state.credits||0) + lg.credits;
+          let msg = lg.credits+' Kredite';
+          if (lg.prodMin > 0){
+            const rates = ratesPerSecond(); const capW = storageCap(); const parts = [];
+            for (const res2 of ['energie','erz','kristalle','deuterium','antimaterie','forschungspunkte']){
+              const amt = Math.round((rates[res2]||0) * lg.prodMin * 60);
+              if (amt > 0){ state.resources[res2] = Math.min(capW, (state.resources[res2]||0) + amt); parts.push(fmt(amt)+' '+((RES_DEFS.find(x=>x.key===res2)||{}).label||res2)); }
+            }
+            if (parts.length) msg += ' + '+parts.join(', ');
+          }
+          if (state.weeklyLeague) state.weeklyLeague.lastResult = { weekKey: r.weekKey, league: lg.key, rank: r.rank, total: r.total };
+          log('Wochenliga abgerechnet: '+lg.name+'-Liga (Platz '+r.rank+' von '+r.total+'). Belohnung: '+msg+'.', 'ti-trophy', 'ok');
+          playSound('achieve');
+          pushReport({ type:'weekly-reward', rank:r.rank, rewardLabel: lg.name+'-Liga (Platz '+r.rank+'/'+r.total+'): '+msg });
+          save();
+          continue;
+        }
         if (r.credits) state.credits = (state.credits||0) + r.credits;
         log('Dankeschön vom Team: +'+fmt(r.credits)+' Kredite für deinen Bug-Report!', 'ti-award');
         save();
@@ -16049,7 +16074,7 @@
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. In den letzten 24h vor Ablauf lässt sich ein Pakt stattdessen auch direkt um weitere 7 Tage <strong>verlängern</strong>, ohne die Angebot-Warten-Annehmen-Prozedur erneut zu durchlaufen. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (mehr mit der Forschung „Diplomatie-Protokolle"), standardmäßig zählen bis zu 2 Pakte, die Forschung „Diplomatischer Kontaktkreis" erhöht das auf bis zu 4 - additiv zu den anderen globalen Boni. <strong>Diplomatische Doktrin</strong> (Endgame-Anschluss, ab „Diplomatie-Protokolle" Stufe 15 und „Diplomatischer Kontaktkreis" Stufe 2) vertieft die Friedensdividende ein weiteres Mal UND erhöht den Ruf-Zuwachs bei allen Fraktionen um 1%/Stufe. <strong>Pakt-Stufen:</strong> Ein bestehender Pakt lässt sich mit Zustimmung beider Seiten auf „Handelsabkommen" (Stufe 2, schaltet einmal täglich ein gedeckeltes Ressourcengeschenk an den Partner frei) und weiter auf „Frühwarnpartnerschaft" (Stufe 3, zusätzliche Überfall-Vorwarnzeit) anheben. Verschenken lassen sich auch <strong>Tier-2-Ressourcen</strong> (sobald du welche besitzt) - mit bewusst harten Fixdeckeln je Geschenk (20 Nanolegierungen, 10 Quantenchips, 8 Hochenergiekristalle, 4 Fusionskerne, 3 KI-Kerne), damit Geschenke eine Geste bleiben und kein zweiter Produktionskanal; beim Empfänger gilt zudem das kleine Tier-2-Lager. Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
       { title:'Spieler melden', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du unangemessenes Verhalten (z.B. einen anstößigen Namen) melden - kurze Begründung reicht. Spieler-/Allianznamen werden außerdem automatisch beim Anlegen auf eindeutig unangemessene Begriffe geprüft. Nur mit eigenem Server verfügbar.' },
       { title:'Private Nachrichten', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) oder direkt bei einer erhaltenen Nachricht im Berichte-Tab ("Antworten") kannst du einem einzelnen Spieler schreiben - unabhängig von Allianz und ohne den öffentlichen Chat. Erhaltene Nachrichten stehen im Berichte-Tab, die letzten 60 werden aufgehoben. Nur mit eigenem Server verfügbar.' },
-      { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Beim ersten Login der neuen Woche wird die Vorwoche abgerechnet und die Belohnung gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 12 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 6 Min., <strong>Silber</strong> 400 + 3 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Wer den Wochenwechsel verpasst, wird anhand des letzten bekannten Stands eingestuft. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
+      { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Die Abrechnung läuft jetzt <strong>serverseitig</strong>: Genau am Wochenwechsel bestimmt der Server aus den (bereits serverseitig geprüften) Punktezuwächsen die Platzierung und legt deine Liga-Belohnung bereit – niemand kann sich mehr selbst eine höhere Liga oder Belohnung zuweisen. Beim nächsten Login wird sie automatisch gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 12 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 6 Min., <strong>Silber</strong> 400 + 3 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
       { title:'Handelsmarkt', body:'Ein gemeinsamer Markttrend (0,75x bis 1,30x) schwankt langsam und beeinflusst die Angebote des Schwarzmarkt-Händlers – in guten Marktphasen bekommt man mehr für seine Ware.' },
@@ -22038,7 +22063,13 @@
     const nowKey = weekKeyOf(Date.now());
     if (wl.weekKey === nowKey) return;
     // Vorwoche abrechnen - nur wenn es eine gab (nicht beim allerersten Start des Features).
+    // Serverautoritativ (v8.203.0): Im Online-Modus rechnet der SERVER die Liga ab und schüttet die
+    // Belohnung über pending-rewards aus (siehe claimPendingRewards / resolveWeeklyLeagueServer im
+    // Backend) - der Client darf sich dann NICHT mehr selbst auszahlen (das war manipulierbar: eigener
+    // Rang + eigene Auszahlung). Nur im reinen Solo-Modus (kein Server) bleibt die lokale Abrechnung.
     if (wl.weekKey){
+      // Liga-Auszahlung nur im reinen Solo-Modus lokal - online schüttet der Server aus (s.o.).
+      if (!useBackend()){
       const myId = state.player.id;
       let list = (wl.boardSnapshot||[]).slice();
       if (myId && !list.some(e => e.id === myId)) list.push({ id: myId, weekScore: myWeekScore() });
@@ -22067,6 +22098,7 @@
         playSound('achieve');
         pushReport({ type:'weekly-reward', rank, rewardLabel: lg.name+'-Liga (Platz '+rank+'/'+list.length+'): '+msg });
       }
+      } // Ende Solo-Modus-Liga-Auszahlung
       // Spieler-Wunsch "Wochenquest zusätzlich zur Wochenliga": zusätzlicher, separater Bonus für
       // jeden Tag dieser (jetzt endenden) Woche, an dem alle Tagesaufgaben erledigt wurden - nutzt
       // bewusst denselben Wochenwechsel-Zeitpunkt wie die Liga oben statt eines eigenen Claim-Systems,
