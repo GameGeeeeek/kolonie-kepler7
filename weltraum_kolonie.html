@@ -3450,8 +3450,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.209.0';
+  const VERSION = '8.210.0';
   const PATCHNOTES = [
+    { version:'8.210.0', date:'21.07.2026', changes:[
+      'Neu: Kopfgeld-System. Jede Woche liegt ein Kopfgeld auf dem aktuellen Bestenlisten-Ersten – wer ihn als Erster im Kampf schlägt, kassiert 2.000 Kredite (beim nächsten Login gutgeschrieben). Danach ist das Kopfgeld für die Woche vergeben. Das aktuelle Kopfgeld erscheint oben im Galaxie-Tab unter „Nachrichten"; bist du selbst der Gejagte, wirst du gewarnt. Serverseitig gesteuert, nur mit eigenem Server. (Der Angriffs-Schutzschild schützt den Anführer weiterhin vor Dauer-Angriffen.)',
+    ]},
     { version:'8.209.0', date:'21.07.2026', changes:[
       'Drei neue Offiziere (Offiziere-Tab): Navigator (−2% Flugzeit/Stufe), Quartiermeister (+2% Lagerkapazität/Stufe) und Aufklärer (+2% Expeditions-Ausbeute/Stufe). Sie werden wie die bisherigen mit Kommandopunkten angeheuert und befördert (inkl. Talent-Verzweigung ab Stufe 5). Damit gibt es jetzt 7 Offiziere. Der Erfolg „Kompletter Stab" verlangt entsprechend alle sieben.',
     ]},
@@ -8717,11 +8720,27 @@
     const box = document.getElementById('galaxyNewsBox');
     if (!box) return;
     const news = galaxyCache.news || [];
-    if (!news.length){ if (lastGalaxyNewsSig !== 'empty'){ box.innerHTML = '<div class="bmeta">Noch keine galaktischen Ereignisse.</div>'; lastGalaxyNewsSig = 'empty'; } return; }
-    const newsSig = news.slice(0,12).map(n=>n.time+'|'+n.text).join(';');
+    // Kopfgeld-Banner (#2): aktuelles Kopfgeld auf den Bestenlisten-Ersten.
+    const b = galaxyCache.bounty;
+    let bountyHtml = '';
+    let bountySig = 'none';
+    if (b && b.targetUserId){
+      const onMe = b.targetUserId === state.player.id;
+      if (b.claimed){
+        bountySig = 'claimed:'+(b.claimedBy||'');
+        bountyHtml = `<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(90,95,115,0.12);"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#8489a0; font-size:15px; margin-right:8px;"></i><div class="bmeta">Das Wochen-Kopfgeld auf <strong>${escapeHtml(b.targetName||'?')}</strong> wurde bereits kassiert${b.claimedBy?' (von '+escapeHtml(b.claimedBy)+')':''}. Nächste Woche liegt ein neues Kopfgeld aus.</div></div></div>`;
+      } else {
+        bountySig = 'open:'+b.targetUserId+':'+(onMe?'me':'other');
+        bountyHtml = onMe
+          ? `<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(226,75,74,0.14); border-color:rgba(226,75,74,0.5);"><div class="left"><i class="ti ti-target" aria-hidden="true" style="color:#e24b4a; font-size:15px; margin-right:8px;"></i><div class="bmeta" style="color:#f0997b;"><strong>Auf dich ist ein Kopfgeld ausgesetzt!</strong> Wer dich diese Woche im Kampf schlägt, kassiert ${fmt(b.reward||0)} Kredite. Halte deine Verteidigung hoch.</div></div></div>`
+          : `<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(250,199,117,0.14); border-color:rgba(250,199,117,0.5);"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#fac775; font-size:15px; margin-right:8px;"></i><div class="bmeta"><strong style="color:#fac775;">Kopfgeld: ${fmt(b.reward||0)} Kredite</strong> auf <strong>${escapeHtml(b.targetName||'?')}</strong> (aktueller Bestenlisten-Erster). Schlage ihn im Kampf, um die Prämie zu kassieren – nur der Erste bekommt sie.</div></div></div>`;
+      }
+    }
+    if (!news.length){ const emptySig='empty|'+bountySig; if (lastGalaxyNewsSig !== emptySig){ box.innerHTML = bountyHtml + '<div class="bmeta">Noch keine galaktischen Ereignisse.</div>'; lastGalaxyNewsSig = emptySig; } return; }
+    const newsSig = bountySig+'||'+news.slice(0,12).map(n=>n.time+'|'+n.text).join(';');
     if (newsSig === lastGalaxyNewsSig) return;
     lastGalaxyNewsSig = newsSig;
-    box.innerHTML = news.slice(0, 12).map(n => {
+    box.innerHTML = bountyHtml + news.slice(0, 12).map(n => {
       const when = new Date(n.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       return `<div class="card-row" style="padding:0.5rem 0.7rem;"><div class="left"><i class="ti ${n.icon}" aria-hidden="true" style="color:#c3bef5; font-size:15px; margin-right:8px;"></i><div><div class="bmeta" style="color:#c7cbe0;">${n.text}</div><div class="bmeta" style="font-size:10px;">${when}</div></div></div></div>`;
     }).join('');
@@ -12386,6 +12405,13 @@
           log('KRIEG GEWONNEN gegen Allianz ['+(r.enemyTag||'?')+']! Siegprämie: +'+fmt(r.credits||0)+' Kredite. '+(r.myScore!=null?'Endstand '+r.myScore+':'+r.theirScore+'.':''), 'ti-trophy', 'ok');
           playSound('achieve');
           pushReport({ type:'weekly-reward', rank:1, rewardLabel: 'Kriegssieg gegen ['+(r.enemyTag||'?')+']: +'+fmt(r.credits||0)+' Kredite' });
+          save();
+          continue;
+        }
+        if (r.type === 'bounty'){
+          state.credits = (state.credits||0) + (r.credits||0);
+          log('KOPFGELD KASSIERT: Du hast '+(r.targetName||'den Gejagten')+' bezwungen und '+fmt(r.credits||0)+' Kredite Prämie erhalten!', 'ti-award', 'ok');
+          playSound('achieve');
           save();
           continue;
         }
@@ -16144,6 +16170,7 @@
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
       { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (die Flugzeit muss innerhalb der verbleibenden Zeit liegen), bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab. Ab Forschung <strong>KI-Technologie</strong> gibt es als Sicherheitsnetz die <strong>KI-Abfangautomatik</strong> (Schalter im Verteidigung-Tab): Ist sie an und fängst du nicht selbst ab, vertreiben KI-Abfangdrohnen die Piraten automatisch, sobald 60% der Zeit verstrichen sind - Kosten: 3 KI-Kerne je Einsatz. Der KI-Einsatz gelingt garantiert, bringt aber bewusst <strong>keine Kampfpunkte, keine Veteranen-Erfahrung und keine zerstörten Piratenschiffe</strong> - manuelles Abfangen bleibt immer lohnender, die KI verhindert nur den Beute-Verlust.' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
+      { title:'Kopfgeld', body:'Jede Woche liegt ein <strong>Kopfgeld auf dem aktuellen Bestenlisten-Ersten</strong> – dem stärksten Spieler der Galaxie. Wer ihn in dieser Woche als Erster im Kampf schlägt, kassiert eine <strong>Kredit-Prämie</strong> (die Belohnung wird beim nächsten Login gutgeschrieben). Danach ist das Kopfgeld für diese Woche vergeben; ein neues wird zum Wochenwechsel ausgesetzt. Auf sich selbst kann man kein Kopfgeld kassieren. Das aktuelle Kopfgeld siehst du oben im Galaxie-Tab unter „Nachrichten". Bist du selbst der Gejagte, weist dich ein roter Hinweis darauf hin – Zeit, die Verteidigung hochzufahren. Nur mit eigenem Server.' },
       { title:'Angriffs-Schutzschild (Anti-Ganking)', body:'Wirst du erfolgreich <strong>überfallen (mit Beute) oder sabotiert</strong>, erhältst du automatisch einen <strong>Angriffs-Schutzschild für 30 Minuten</strong>: In dieser Zeit prallen weitere Spieler-Angriffe und Störmanöver gegen dich ab (keine Beute, kein Schaden). Das gibt dir Zeit, wieder aufzubauen, statt im Minutentakt weitergefarmt zu werden. Ein aktiver Schild wird oben im <strong>Verteidigung-Tab</strong> mit Countdown angezeigt. <strong>Wichtig:</strong> Sobald du selbst offensiv wirst (ein eigener Angriff oder ein eigenes Störmanöver), verfällt dein Schild sofort – der Schutz ist als Erholung für Opfer gedacht, nicht als Deckung, um selbst gefahrlos zuzuschlagen. Der Schild wird serverseitig vergeben und geprüft (nur im Online-Modus).' },
       { title:'Echte NPC-Flotten', body:'NPC-Gegner im Galaxie-Tab haben eine <strong>konkrete Flottenzusammensetzung</strong> (in der Angriffsvorschau sichtbar), deren Gesamt-Angriffskraft ihrem Verteidigungswert entspricht. Bei einem Sieg wird ein Teil dieser Flotte zerstört – je überlegener dein Angriff, desto mehr (40–90%), der Rest flieht. <strong>Das Trümmerfeld entsteht aus den tatsächlich zerstörten Gegner-Schiffen</strong> (dieselbe Formel wie bei allen anderen Kämpfen) statt aus einer Pauschale – schwere Gegner-Schiffe hinterlassen entsprechend mehr Trümmer. Nach jedem Sieg formiert sich der Gegner neu und stärker (Skalierung).' },
       { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln.' },
