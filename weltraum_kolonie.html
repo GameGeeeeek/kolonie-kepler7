@@ -3408,8 +3408,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.182.0';
+  const VERSION = '8.183.0';
   const PATCHNOTES = [
+    { version:'8.183.0', date:'21.07.2026', changes:[
+      'Expedition: neuer „Ganze Flotte als Eskorte"-Knopf setzt alle eskortfähigen Schiffstypen auf einen Schlag auf ihr verfügbares Maximum (Gegenstück zum bestehenden „Alle Eskorten entfernen") - spart das Durchklicken der einzelnen „Max"-Knöpfe.',
+      'Expedition: Frachtraum-Vorschau im Startbereich. Zeigt den aktuellen Frachtraum (Basis 2000 + Frachter der Eskorte) an und warnt rechtzeitig, wenn ein großer Ressourcenfund (typisch bei Tiefenraum-Expeditionen mit erfahrener Crew) den Frachtraum sprengen könnte - dann lohnt sich ein Frachter oder Großer Frachter in der Eskorte, damit nichts von der Beute verloren geht.',
+    ]},
     { version:'8.182.0', date:'21.07.2026', changes:[
       'Expedition „Alle starten" überarbeitet: Der Button teilt jetzt die GESAMTE an diesem Standort verfügbare Eskorte (alle eskortfähigen Schiffe, die nicht schon unterwegs sind) gleichmäßig auf die gestarteten Expeditionen auf - unabhängig von der manuellen Eskorte-Auswahl. Vorher wurde nur die aktuell ausgewählte Eskorte geteilt (bei leerer Auswahl starteten alle Expeditionen ganz ohne Eskorte), und die Abrundung ließ Restschiffe zuhause. Jetzt werden Reste, die sich nicht glatt teilen lassen, auf die ersten Expeditionen gestreut (z.B. 10 Kreuzer auf 3 Expeditionen = 4/3/3), sodass keine Schiffe unnötig liegen bleiben.',
     ]},
@@ -9721,6 +9725,15 @@
   // normale Expeditionsfunde (siehe b_resource-Zweig unten, typischerweise 250-450*mult) nicht plötzlich
   // Frachter zur Pflicht machen - der Deckel soll nur bei außergewöhnlich großen Funden wirklich greifen.
   const EXPEDITION_BASE_CARGO = 2000;
+  // Grobe Obergrenze eines EINZELNEN Ressourcenfunds (bester Fall: Zufalls-Roll -> 1, kein
+  // Kampfverlust) - dient nur der Frachtraum-Warnung im UI vor dem Start. Spiegelt die Formel in der
+  // Fundauflösung: rawAmt = (250 + rand*450) * mult, also max. 700 * baseRewardMult (siehe b_resource-
+  // Zweig in checkMissions). Bewusst separat gehalten, damit die Warnung ohne echte Auswürfelung
+  // abschätzen kann, ob der Frachtraum bei einem Glücksfund knapp würde.
+  const EXPEDITION_MAX_RESOURCE_FIND_BASE = 700;
+  function expeditionMaxResourceFind(rewardMult){
+    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02) * seasonalLootMult());
+  }
   // Frachter als Eskorte (20.07.2026, Spieler-Wunsch): tragen 0 Angriffspunkte bei (wie bei
   // ATTACK_SHIP_KEYS), erweitern aber den Frachtraum für Ressourcenfunde (siehe fleetCargoCapacity()
   // in der Fundauflösung unten) - bei besonders großen Funden reicht der kostenlose Basis-Frachtraum
@@ -28022,7 +28035,10 @@
         </div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:0.5rem;">
           <div class="bmeta">Erfordert mind. 1 Forschungsschiff (0 Angriffspunkte). Wähle unten aus, welche Kampfschiffe als Eskorte mitfliegen sollen – ohne ausreichend Eskorte drohen unterwegs Verluste bis hin zum Totalverlust.</div>
-          ${escortRows ? `<button id="escortClearAllBtn" style="font-size:11px; padding:5px 10px; align-self:flex-start;"><i class="ti ti-x" aria-hidden="true" style="margin-right:4px;"></i>Alle Eskorten entfernen</button>` : ''}
+          ${escortRows ? `<div style="display:flex; gap:6px; flex-wrap:wrap; align-self:flex-start;">
+            <button id="escortMaxAllBtn" style="font-size:11px; padding:5px 10px;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Ganze Flotte als Eskorte</button>
+            <button id="escortClearAllBtn" style="font-size:11px; padding:5px 10px;"><i class="ti ti-x" aria-hidden="true" style="margin-right:4px;"></i>Alle Eskorten entfernen</button>
+          </div>` : ''}
         </div>
         ${escortRows || `<div class="bmeta" style="padding:0.5rem 0;">Keine Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} verfügbar – die Expedition würde ohne Eskorte starten.</div>`}
         <input type="text" id="customFleetNameInputExp" placeholder="Flottenname (optional, sonst automatisch)" maxlength="30" style="width:100%; margin-top:0.5rem;" value="${customFleetName}"/>
@@ -28033,6 +28049,19 @@
           </div>
           <div class="bmeta"${usedExpSlots>=maxExpSlots?' style="color:#e0a548;"':''}><i class="ti ti-rocket" aria-hidden="true"></i> Expeditions-Limit (planetenübergreifend): ${usedExpSlots}/${maxExpSlots}${usedExpSlots>=maxExpSlots?' – erreicht, Expeditionskoordination erforschen für mehr':''}</div>
           <div class="bmeta">Treibstoff: ~${fuelCostIconHtml(expFuel)}${!canAfford(expFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}${(state.expeditionsCompleted||0)>=10?' · <span style="color:#5dcaa5;">Erfahrene Crew: +'+Math.round((expeditionExperienceMult()-1)*100)+'% Beute</span>':''}</div>
+          ${(() => {
+            // Frachtraum-Vorschau + Warnung (Vorschlag #3, 21.07.2026): grober Best-Case-Fund vs.
+            // aktueller Frachtraum (Basis 2000 + Frachter der Eskorte). Nur warnen, wenn ein Glücksfund
+            // den Frachtraum tatsächlich überschreiten könnte - sonst ist der Basis-Frachtraum still ok.
+            const expCargo = EXPEDITION_BASE_CARGO + fleetCargoCapacity(escortFleet);
+            const maxFind = expeditionMaxResourceFind(selectedEt.rewardMult);
+            // Sicherheitspuffer: schon ab 90% Auslastung warnen, nicht erst bei striktem Überlauf - ein
+            // Glücks-Fund liegt nah am rechnerischen Maximum, und mit einem aktiven Beute-Event oder
+            // Aufstiegsbonus kippt es schnell über den Deckel. So sieht man die Warnung z.B. bei
+            // Tiefenraum-Expeditionen mit erfahrener Crew rechtzeitig, statt erst nach dem gekappten Fund.
+            const tight = maxFind > expCargo * 0.9;
+            return `<div class="bmeta"${tight?' style="color:#e0a548;"':''}><i class="ti ti-truck" aria-hidden="true"></i> Frachtraum: ${fmt(expCargo)}${tight?` – ein großer Ressourcenfund (bis ~${fmt(maxFind)}) könnte gedeckelt werden. Frachter/Großen Frachter als Eskorte mitnehmen, um nichts zu verlieren.`:' – deckt auch große Funde ab.'}</div>`;
+          })()}
           ${(state.research.rquantenphysik||0)>=1 ? (quantensensorActive()
             ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Quantensensoren kalibriert - jetzt gestartete Expeditionen finden deutlich mehr</div>`
             : `<div style="display:flex; align-items:center; gap:8px;"><button id="quantensensorBtn" style="font-size:11px; padding:5px 10px;" ${(state.resources.quantenchips||0)>=QUANTENSENSOR_COST_CHIPS?'':'disabled'}><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Quantensensoren kalibrieren (${QUANTENSENSOR_COST_CHIPS} Quantenchips)</button><span class="bmeta">30 Min. bessere Fundchancen für neu gestartete Expeditionen</span></div>`) : ''}
@@ -28081,6 +28110,16 @@
         sel[k] = 0;
         render();
       });
+      const escortMaxAllBtn = document.getElementById('escortMaxAllBtn');
+      if (escortMaxAllBtn) escortMaxAllBtn.onclick = () => {
+        // Setzt JEDEN Eskortetyp auf sein verfügbares Maximum (Bestand abzüglich schon unterwegs) -
+        // wie der Max-Knopf pro Zeile, nur für alle auf einen Schlag. Der Hangar-/Frachtraum-Deckel
+        // greift wie gewohnt erst bei der Zusammenstellung (buildEscortFleet/capFighterSelection).
+        const sel = getEscortSelection(state.activeBasePlanet, cf);
+        const away = computeAwayByType(cf);
+        for (const k of ESCORT_KEYS) sel[k] = Math.max(0, (cf[k]||0) - (away[k]||0));
+        render();
+      };
       const escortClearAllBtn = document.getElementById('escortClearAllBtn');
       if (escortClearAllBtn) escortClearAllBtn.onclick = () => {
         const sel = getEscortSelection(state.activeBasePlanet, cf);
