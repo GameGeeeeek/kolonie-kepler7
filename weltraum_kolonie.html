@@ -752,6 +752,10 @@
     .card-row:hover { background: var(--elev-2); border-color:rgba(var(--primary-rgb), 0.35); }
     .search-result-row:hover { background: rgba(var(--primary-rgb), 0.15); }
     .card-row .left { display:flex; align-items:center; gap:11px; min-width:0; }
+    /* Der Text-Container (letztes Kind neben dem Icon) braucht min-width:0, sonst kann langer bmeta-Text
+       nicht umbrechen und läuft über den Kartenrand hinaus/wird abgeschnitten (Spieler-Report Modul-
+       Beschreibungen). Das Icon (.bicon) hat flex-shrink:0 und bleibt davon unberührt. */
+    .card-row .left > div:last-child { min-width:0; overflow-wrap:anywhere; }
     .bicon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; overflow:hidden; }
     /* Tier-2-Gebäude hervorgehoben (20.07.2026, Spieler-Wunsch): dünner Info-Rahmen + leichter Glow auf
        dem Icon-Badge für alle Gebäude, die Tier-2-Ressourcen produzieren ODER als Baukosten verlangen
@@ -3422,8 +3426,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.190.0';
+  const VERSION = '8.191.0';
   const PATCHNOTES = [
+    { version:'8.191.0', date:'21.07.2026', changes:[
+      'Bug behoben: Das Frachter-Modul „Erweiterter Frachtraum" (+% Frachtkapazität) wirkte bisher nur auf die Missionsbeute, nicht auf die angezeigte Lagerkapazität - obwohl Frachter ohnehin Lager beisteuern. Ein größerer Frachtraum erhöht jetzt beides: der Modul-Bonus fließt in den Lagerraum-Beitrag der Frachter ein (Basis- und Handels-Welt-Bonus).',
+      'Anzeige-Bug behoben: In den Karten (u.a. Modul-Inventar) lief ein zu langer Beschreibungstext über den Kartenrand hinaus und wurde abgeschnitten - der Text bricht jetzt korrekt um.',
+    ]},
     { version:'8.190.0', date:'21.07.2026', changes:[
       'Mobil/Touch: Die Karten in den Wisch-Leisten (u.a. Orbitalring-Auswahl, Planeten-Rolle, Expeditionstyp, Modul-Standort) und ihre Buttons waren auf Handys (v.a. Samsung Internet) sehr schmal und kaum zu treffen. Auf Touch-Geräten sind die Karten jetzt breiter und alle Buttons darin haben ein komfortables Mindest-Tap-Ziel (~44px) - z.B. der „Bauen"-Knopf beim Orbitalring lässt sich jetzt zuverlässig drücken.',
       'Modul-Inventar (Standort- und Schiffsklassen-Module) ist jetzt nach Seltenheit sortiert - das seltenste Modul steht oben, das häufigste unten (Mythisch → Legendär → Episch → Selten → Gewöhnlich), bei gleicher Seltenheit nach Modultyp.',
@@ -10352,8 +10360,13 @@
   function storageCap(){
     // Großer Frachter (13.07.2026) gibt +1000 statt +250 Basis-Lager je Schiff - grösserer Rumpf,
     // grösserer Beitrag, passend zur 5x höheren Frachtraum-Kapazität in Missionen.
-    let cap = 800 + Math.max(0, allFleets().reduce((a,f)=>a+(f.frachter||0),0) - frachterBoundToRoutes())*250
-                  + allFleets().reduce((a,f)=>a+(f.frachtergross||0),0)*1000;
+    // Frachter-Cargo-Module ("Erweiterter Frachtraum", +% Frachtkapazität) erhöhen jetzt AUCH den
+    // Lagerraum-Beitrag der Frachter (Spieler-Report 21.07.2026: Modul wirkte nur auf die Missions-
+    // Frachtkapazität, nicht auf das sichtbare Lager - ein grösserer Frachtraum sollte beides erhöhen).
+    const frachterCargoMult = 1 + shipModuleBonusFor('frachter', 'cargo');
+    const freeFrachter = Math.max(0, allFleets().reduce((a,f)=>a+(f.frachter||0),0) - frachterBoundToRoutes());
+    const grossFrachter = allFleets().reduce((a,f)=>a+(f.frachtergross||0),0);
+    let cap = 800 + (freeFrachter*250 + grossFrachter*1000) * frachterCargoMult;
     for (const { planet, buildings: b } of allBuildingSetsWithPlanet()){
       // Kryolager (Tier-2-Verbraucher-Runde 19.07.2026): wie der Lagerkomplex, aber 5x stärkerer
       // Beitrag je Stufe - Lategame-Lagerausbau, Baukosten enthalten Hochenergiekristalle.
@@ -10367,7 +10380,7 @@
       // zählen nicht. Gilt seit dem Großen Frachter (13.07.2026) für beide Typen, entsprechend gestaffelt.
       if (role && role.key==='trade'){
         const f = planet==='home' ? state.fleet : (state.colonies[planet] ? state.colonies[planet].fleet : null);
-        if (f) contrib += (f.frachter||0)*250 + (f.frachtergross||0)*1000;
+        if (f) contrib += ((f.frachter||0)*250 + (f.frachtergross||0)*1000) * frachterCargoMult;
       }
       const orbS = orbitalStationOf(planet);
       if (orbS && orbS.focus==='dock') contrib += 150*orbS.level;
@@ -10869,7 +10882,7 @@
     { key:'ss_panzerung',      klasse:'schlachtschiff', name:'Verbesserte Panzerung',  icon:'ti-shield',      effect:'hull',        base:0.10, desc:'Erhöht den Verteidigungsbeitrag von Schlachtschiffen.' },
     { key:'ss_zielcomputer',   klasse:'schlachtschiff', name:'Zielcomputer',           icon:'ti-target',      effect:'atk',         base:0.05, desc:'Erhöht die Angriffskraft von Schlachtschiffen.' },
     { key:'ss_schildverstaerker', klasse:'schlachtschiff', name:'Schildverstärker',    icon:'ti-shield-lock', effect:'shield',      base:0.08, desc:'Erhöht die Schildpunkte von Schlachtschiffen.' },
-    { key:'fr_frachtraum',     klasse:'frachter',       name:'Erweiterter Frachtraum', icon:'ti-truck',       effect:'cargo',       base:0.20, desc:'Erhöht die Frachtkapazität von Frachtern.' },
+    { key:'fr_frachtraum',     klasse:'frachter',       name:'Erweiterter Frachtraum', icon:'ti-truck',       effect:'cargo',       base:0.20, desc:'Erhöht die Frachtkapazität von Frachtern (Missionsbeute) und ihren Lagerraum-Beitrag zur Lagerkapazität.' },
     { key:'fr_treibstoff',     klasse:'frachter',       name:'Treibstoffoptimierung',  icon:'ti-droplet',     effect:'fuel',        base:0.10, desc:'Verringert den Treibstoffverbrauch von Frachterflotten.' },
     { key:'fr_triebwerke',     klasse:'frachter',       name:'Verbesserte Triebwerke', icon:'ti-rocket',      effect:'speed',       base:0.10, desc:'Erhöht die Geschwindigkeit von Frachtern.' },
     { key:'au_sensoren',       klasse:'aufklaerer',     name:'Langstreckensensoren',   icon:'ti-map-2',       effect:'speed',       base:0.10, desc:'Erhöht die Geschwindigkeit von Aufklärungsschiffen.' },
