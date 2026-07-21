@@ -3426,8 +3426,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.199.0';
+  const VERSION = '8.200.0';
   const PATCHNOTES = [
+    { version:'8.200.0', date:'21.07.2026', changes:[
+      'Sabotage-Benachrichtigung fürs Opfer: Wer sabotiert wird, bekommt jetzt eine eigene, klare Meldung (Glocke + optional Push) - „Produktion sabotiert (-50%)" bzw. „Verteidigung sabotiert (-30%)" inkl. Dauer und Angreifer-Name, statt der bisherigen generischen Spionage-Meldung. Der ausführliche Bericht im Berichte-Tab gab es schon; die Sofort-Meldung ist jetzt genauso eindeutig.',
+      'Markt-Diagramm noch besser ablesbar: Die Preis-Sparkline markiert jetzt Hoch- (rot) und Tiefpunkt (grün) der letzten Stunden und zeigt beim Darüberfahren die konkreten Zahlen (Hoch / Tief / Aktuell in Kr.).',
+      'Kleiner Performance-Feinschliff: Die Box mit Server-Ereignissen baut sich nur noch neu auf, wenn sich wirklich etwas geändert hat (Signatur-Cache wie bei den übrigen Anzeige-Boxen), statt bei jedem Sekunden-Tick.',
+    ]},
     { version:'8.199.0', date:'21.07.2026', changes:[
       'Markt-Balance (Spieler-Report „beim Verkauf von 900k gibt es viel zu viele Kredite"): Ein riesiger Einzelverkauf drückt den Preis sofort auf den Boden - der Erlös wurde bisher aber so berechnet, als wäre die halbe Menge noch nahe dem hohen Startpreis verkauft worden. Jetzt wird der Durchschnittspreis klemm-korrekt gerechnet: nur bis der Boden erreicht ist zum vollen Preis, alle weiteren Einheiten zum Bodenpreis. Mega-Verkäufe bringen dadurch deutlich weniger (kleine Verkäufe bleiben unverändert). Die „~Kr."-Vorschau am Button zeigt das jetzt ebenfalls korrekt an.',
       'Modul-Blaupausen im Kredit-Shop weiter verteuert: Modul-Blaupause 5.000 → 10.000, Schiffsklassen-Blaupause 9.000 → 20.000, Elite-Schiffsklassen-Blaupause 35.000 → 75.000 Kredite.',
@@ -8103,12 +8108,27 @@
     const midY = (flat ? H/2 : yFor(hist.reduce((a,b)=>a+b,0)/n)).toFixed(1);
     const areaPts = `${pad.toFixed(1)},${(H-pad).toFixed(1)} ${linePts} ${(W-pad).toFixed(1)},${(H-pad).toFixed(1)}`;
     const gid = 'spg'+(++sparkGradSeq);
-    return `<svg class="mkt-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" aria-hidden="true">`
+    // Hoch-/Tief-Punkte hervorheben, damit die Preisspanne auf einen Blick ablesbar ist (nur wenn nicht
+    // flach - sonst lägen Hoch und Tief aufeinander und die Marker wären sinnlos). Rot = Hoch (teuer),
+    // Grün = Tief (günstig), an die Trendfarben der Markt-Anzeige angelehnt.
+    const hiI = hist.indexOf(max), loI = hist.indexOf(min);
+    let markers = '';
+    if (!flat){
+      const [hx, hy] = xy(hiI); const [ox, oy] = xy(loI);
+      markers = `<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="2.2" fill="#e24b4a"/>`
+        + `<circle cx="${ox.toFixed(1)}" cy="${oy.toFixed(1)}" r="2.2" fill="#5dcaa5"/>`;
+    }
+    // Nativer Tooltip mit konkreten Zahlen - übersteht das Neu-Rendern des Markt-Tabs (kein JS-Handler,
+    // der bei jedem innerHTML-Neuaufbau verloren ginge).
+    const tip = `Hoch ${max.toFixed(2)} · Tief ${min.toFixed(2)} · Aktuell ${hist[n-1].toFixed(2)} Kr.`;
+    return `<svg class="mkt-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" role="img" aria-label="${tip}">`
+      + `<title>${tip}</title>`
       + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.45"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/></linearGradient></defs>`
       + `<rect x="0.5" y="0.5" width="${W-1}" height="${H-1}" rx="7" fill="rgba(10,13,26,0.55)" stroke="${color}" stroke-opacity="0.28" stroke-width="1"/>`
       + `<line x1="${pad}" y1="${midY}" x2="${W-pad}" y2="${midY}" stroke="${color}" stroke-opacity="0.18" stroke-width="0.8" stroke-dasharray="3 3"/>`
       + `<polygon points="${areaPts}" fill="url(#${gid})" stroke="none"/>`
       + `<polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`
+      + markers
       + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="5" fill="${color}" opacity="0.28"/>`
       + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.6" fill="${color}"/>`
       + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="1.2" fill="#fff" opacity="0.85"/>`
@@ -14054,6 +14074,7 @@
     'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' },
     'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' },
     'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') },
+    'sabotaged': { icon:'ti-alert-triangle', color:'#e24b4a', text:(p)=> p.kind==='defense' ? ((p.fromName||'Ein Spieler')+' hat deine Verteidigung um 30% geschwächt ('+(p.durationMin||30)+' Min). Repariere oder rüste auf!') : ((p.fromName||'Ein Spieler')+' hat eine deiner Produktionen lahmgelegt (-50% für '+(p.durationMin||30)+' Min). Repariere im Verteidigungs-Tab.') },
     'leaderboard-overtaken': { icon:'ti-trophy', color:'#fac775', text:(p)=>(p.aheadName||'Ein Spieler')+' ist an dir vorbeigezogen - du bist jetzt auf Platz '+(p.rank||'?')+'. Zeit, zurückzuschlagen!' },
     'job-complete': { icon:'ti-check', color:'#5dcaa5', text:(p)=>{ const l={ research:'Deine Forschung ist abgeschlossen', construction:'Ein Bauauftrag ist fertiggestellt', expedition:'Eine Expedition ist zurückgekehrt', mission:'Eine Mission ist zurückgekehrt', terraform:'Ein Terraforming-Projekt ist fertig', exotic:'Eine exotische Forschung ist abgeschlossen', veteran:'Eine Veteranen-Ausbildung ist abgeschlossen' }; return (l[p.jobType]||'Etwas in deiner Kolonie ist fertig')+' - komm zurück und mach weiter!'; } }
   };
@@ -14064,11 +14085,15 @@
       if (res.ok){ const data = await res.json(); notificationEventsCache = data.notifications||[]; renderNotificationEventsBox(); }
     } catch(e){}
   }
+  let lastNotifEventsSig = null;
   function renderNotificationEventsBox(){
     const box = document.getElementById('notificationEventsBox');
     if (!box) return;
-    if (!useBackend()){ box.innerHTML = '<div class="bmeta">Nur mit eigenem Server verfügbar.</div>'; return; }
-    if (!notificationEventsCache.length){ box.innerHTML = '<div class="bmeta">Keine neuen Server-Ereignisse.</div>'; return; }
+    if (!useBackend()){ if (lastNotifEventsSig !== 'nobackend'){ box.innerHTML = '<div class="bmeta">Nur mit eigenem Server verfügbar.</div>'; lastNotifEventsSig = 'nobackend'; } return; }
+    if (!notificationEventsCache.length){ if (lastNotifEventsSig !== 'empty'){ box.innerHTML = '<div class="bmeta">Keine neuen Server-Ereignisse.</div>'; lastNotifEventsSig = 'empty'; } return; }
+    const sig = notificationEventsCache.map(n => n.id + ':' + n.type + ':' + n.time).join('|');
+    if (sig === lastNotifEventsSig) return;
+    lastNotifEventsSig = sig;
     box.innerHTML = notificationEventsCache.map(n => {
       const info = NOTIF_EVENT_INFO[n.type] || { icon:'ti-bell', color:'#9296ac', text:()=>'Ereignis' };
       const when = new Date(n.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
