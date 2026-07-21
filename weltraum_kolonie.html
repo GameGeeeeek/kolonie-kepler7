@@ -3426,8 +3426,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.191.0';
+  const VERSION = '8.192.0';
   const PATCHNOTES = [
+    { version:'8.192.0', date:'21.07.2026', changes:[
+      'Prestige-Bug behoben (Spieler-Report): Standort-Module, die auf einer KOLONIE ausgerüstet waren, gingen beim Prestige verloren - obwohl der Bestätigungsdialog verspricht, dass Module erhalten bleiben. Ursache: beim Reset werden alle Kolonien gelöscht, die ausgerüsteten Module blieben aber an der verschwundenen Kolonie „hängen" (weder nutzbar noch im Inventar). Jetzt werden auf Kolonien ausgerüstete Module vor dem Reset zuverlässig ins Inventar zurückgelegt; nur die Heimatbasis behält ihre ausgerüsteten Module direkt. Schiffsklassen-Module waren nie betroffen.',
+    ]},
     { version:'8.191.0', date:'21.07.2026', changes:[
       'Bug behoben: Das Frachter-Modul „Erweiterter Frachtraum" (+% Frachtkapazität) wirkte bisher nur auf die Missionsbeute, nicht auf die angezeigte Lagerkapazität - obwohl Frachter ohnehin Lager beisteuern. Ein größerer Frachtraum erhöht jetzt beides: der Modul-Bonus fließt in den Lagerraum-Beitrag der Frachter ein (Basis- und Handels-Welt-Bonus).',
       'Anzeige-Bug behoben: In den Karten (u.a. Modul-Inventar) lief ein zu langer Beschreibungstext über den Kartenrand hinaus und wurde abgeschnitten - der Text bricht jetzt korrekt um.',
@@ -12852,7 +12855,21 @@
     // wiederholt genutzte Fortschritts-Kreislauf ist, vernichtete das investierte Kommandopunkte bei
     // jedem einzelnen Durchlauf. Jetzt wie XP/Erfolge/seltene Items behandelt: bleibt erhalten.
     const keepOfficers = state.officers, keepCommandPoints = state.commandPoints, keepOfficerTalents = state.officerTalents;
-    const keepModules = state.modules, keepModuleSlotLevel = state.moduleSlotLevel, keepEquippedModules = state.equippedModules;
+    // Bugfix (21.07.2026, Spieler-Report nach Prestige): Standort-Module, die auf KOLONIEN ausgerüstet
+    // waren, gingen beim Prestige verloren - equippedModules wurde komplett behalten, aber colonies wird
+    // geleert, sodass equippedModules[kolonieKey] ins Leere zeigte (das Modul war danach weder nutzbar
+    // noch im Inventar). Der Bestätigungsdialog verspricht aber ausdrücklich "du behältst ... Module".
+    // Jetzt: auf Kolonien ausgerüstete Module VOR dem Reset zurück ins Inventar legen; nur die Heimat-
+    // basis behält ihre ausgerüsteten Module und Slot-Stufen (die Heimatbasis existiert weiter). Ship-
+    // Module sind klassengebunden (nicht ortsgebunden) und daher nie betroffen.
+    const keepModules = { ...(state.modules||{}) };
+    const keepEquippedModules = {};
+    for (const [pk, list] of Object.entries(state.equippedModules||{})){
+      if (!Array.isArray(list) || !list.length) continue;
+      if (pk === 'home'){ keepEquippedModules.home = list.slice(); continue; }
+      for (const instKey of list) keepModules[instKey] = (keepModules[instKey]||0) + 1;
+    }
+    const keepModuleSlotLevel = { home: (state.moduleSlotLevel||{}).home || 0 };
     const keepShipModules = state.shipModules, keepShipModuleSlotLevel = state.shipModuleSlotLevel, keepEquippedShipModules = state.equippedShipModules;
     // Bugfix: skillTree wurde bisher ebenfalls bei jedem Prestige geleert, obwohl HELP_SECTIONS
     // 'fortschritt' wörtlich verspricht "Bleibt dauerhaft erhalten, auch über einen Prestige-Reset
