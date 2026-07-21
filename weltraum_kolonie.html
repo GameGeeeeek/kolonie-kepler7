@@ -1771,6 +1771,7 @@
 
       <div class="tab-panel active" id="tab-basis">
         <div id="colonyDashboard"></div>
+        <div id="happyHourBox"></div>
         <div id="nextGoalBox"></div>
         <div id="relocateAllQuickBox"></div>
         <div id="planetRoleBox"></div>
@@ -3404,8 +3405,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.176.0';
+  const VERSION = '8.177.0';
   const PATCHNOTES = [
+    { version:'8.177.0', date:'21.07.2026', changes:[
+      'Neu: Tägliche „Happy Hour"-Flash-Events. Zweimal am Tag (12:00 und 20:00 Uhr Ortszeit, je 60 Minuten) ist ein wechselnder Produktionsbonus aktiv - z.B. „Bergbau-Rausch" (+40% Erz/Kristalle), „Energie-Hoch" (+40% Energie/Deuterium), „Produktionsschub" (+25% auf alle Grundressourcen) oder „Forschungsfieber" (+60% Forschungspunkte). Ein Banner im Basis-Tab zeigt das aktive bzw. nächste Fenster samt Countdown, beim Start gibt es eine Benachrichtigung. Die Fenster sind fest terminiert (nicht zufällig), sodass man sich gezielt darauf einstellen kann. Für die Offline-Gutschrift gilt der Bonus bewusst nicht.',
+    ]},
     { version:'8.176.0', date:'21.07.2026', changes:[
       'Neu: „Nächstes Ziel"-Widget direkt oben im Basis-Tab. Es zeigt auf einen Blick deinen Fortschritt zum nächsten Kommandanten-Level sowie den Erfolg, dem du gerade am nächsten bist (mit Fortschrittsbalken, Punkten und Kurzbeschreibung) - ein Klick springt in den Fortschritt-Tab. So hast du immer eine klare, konkrete nächste Aufgabe vor Augen, besonders praktisch für Rückkehrer und kurze Sessions.',
     ]},
@@ -8623,6 +8627,17 @@
     pushToast('Event „'+ce.def.name+'" hat begonnen!', ce.def.icon);
     playSound('achieve');
   }
+  // Happy-Hour-Start ankündigen (einmal je Fenster) - der Marker (startedAt) sorgt dafür, dass die
+  // Meldung nicht bei jedem Tick, sondern nur beim erstmaligen Erkennen des aktiven Fensters kommt.
+  function maybeAnnounceHappyHour(){
+    const hh = currentHappyHour();
+    if (!hh) return;
+    if (state.lastHappyHourSeen === hh.startedAt) return;
+    state.lastHappyHourSeen = hh.startedAt;
+    log('Happy Hour gestartet: '+hh.type.label+' – '+hh.type.desc+' (60 Min.)', hh.type.icon);
+    pushToast('Happy Hour: '+hh.type.label+'!', hh.type.icon);
+    playSound('achieve');
+  }
   // dominanceScore() speist sich aus Gebäuden/Schiffen/Forschung/Prestige etc. - ändert sich nur bei
   // diskreten Spielereignissen (Bau fertig, Sieg, ...), nicht kontinuierlich wie die Ressourcenanzeige.
   // Signatur-Vergleich spart daher den innerHTML-Neuaufbau in den meisten der 1x/Sek.-Ticks.
@@ -10082,7 +10097,55 @@
   }
   const MOON_PENALTY = 0.7; // Monde produzieren/verteidigen/lagern schwächer als ein richtiger Planet
   function moonPenalty(planetKey){ return isMoonKey(planetKey) ? MOON_PENALTY : 1; }
-  function ratesPerSecond(){
+  // Tägliche Flash-Events / "Happy Hour" (21.07.2026, Retention-Runde): zwei feste Zeitfenster pro Tag
+  // (lokale Zeit, je 60 Min.), in denen ein wechselnder Produktionsbonus aktiv ist. Bewusst
+  // DETERMINISTISCH aus dem Kalendertag abgeleitet, damit es sich wie ein echter, planbarer Termin
+  // anfühlt (jeder Spieler kann sich darauf einstellen) statt zufällig pro Session. Nur reine
+  // Ressourcenproduktion wird berührt (einziger Eingriff: ratesPerSecond) und moderat gedeckelt -
+  // kein Bau-/Kampf-Eingriff, keine "N Minuten Produktion"-Belohnungsformel (siehe CLAUDE.md).
+  const HAPPY_HOUR_WINDOWS = [12, 20]; // Startstunden (lokale Zeit)
+  const HAPPY_HOUR_DURATION_MS = 60*60*1000;
+  const HAPPY_HOUR_TYPES = [
+    { key:'bergbau',   label:'Bergbau-Rausch',    icon:'ti-diamond', color:'#fac775', resources:['erz','kristalle'], pct:0.40, desc:'+40% Erz- und Kristallproduktion' },
+    { key:'energie',   label:'Energie-Hoch',      icon:'ti-bolt',    color:'#85b7eb', resources:['energie','deuterium'], pct:0.40, desc:'+40% Energie- und Deuteriumproduktion' },
+    { key:'alle',      label:'Produktionsschub',  icon:'ti-star',    color:'#5dcaa5', resources:['energie','erz','kristalle','deuterium','antimaterie'], pct:0.25, desc:'+25% Produktion aller Grundressourcen' },
+    { key:'forschung', label:'Forschungsfieber',  icon:'ti-atom-2',  color:'#af9ce6', resources:['forschungspunkte'], pct:0.60, desc:'+60% Forschungspunkte-Produktion' }
+  ];
+  // Kalendertag-Index in LOKALER Zeit (nicht UTC) - so wechselt der Bonus-Typ zusammen mit dem lokalen
+  // Datum, passend zu den lokalen Startstunden der Fenster.
+  function happyHourDayIndex(d){ return Math.floor((d.getTime() - d.getTimezoneOffset()*60000)/86400000); }
+  function happyHourTypeFor(dayIdx, windowIdx){
+    const len = HAPPY_HOUR_TYPES.length;
+    const n = (((dayIdx*HAPPY_HOUR_WINDOWS.length + windowIdx) % len) + len) % len;
+    return HAPPY_HOUR_TYPES[n];
+  }
+  function currentHappyHour(){
+    const now = new Date();
+    const dayIdx = happyHourDayIndex(now);
+    for (let i=0; i<HAPPY_HOUR_WINDOWS.length; i++){
+      const start = new Date(now); start.setHours(HAPPY_HOUR_WINDOWS[i], 0, 0, 0);
+      const startMs = start.getTime();
+      if (now.getTime() >= startMs && now.getTime() < startMs + HAPPY_HOUR_DURATION_MS){
+        return { type: happyHourTypeFor(dayIdx, i), startedAt: startMs, endsAt: startMs + HAPPY_HOUR_DURATION_MS };
+      }
+    }
+    return null;
+  }
+  function nextHappyHour(){
+    const now = new Date();
+    let best = null;
+    for (let dayOff=0; dayOff<=1; dayOff++){
+      for (let i=0; i<HAPPY_HOUR_WINDOWS.length; i++){
+        const start = new Date(now); start.setDate(now.getDate()+dayOff); start.setHours(HAPPY_HOUR_WINDOWS[i], 0, 0, 0);
+        const startMs = start.getTime();
+        if (startMs > now.getTime() && (!best || startMs < best.startsAt)){
+          best = { type: happyHourTypeFor(happyHourDayIndex(start), i), startsAt: startMs };
+        }
+      }
+    }
+    return best;
+  }
+  function ratesPerSecond(opts){
     const rates = { energie:0, erz:0, kristalle:0, deuterium:0, antimaterie:0, forschungspunkte:0 };
     const debuff = state.mineDebuff && state.mineDebuff.until > Date.now() ? state.mineDebuff : null;
     for (const { planet, buildings: b } of allBuildingSetsWithPlanet()){
@@ -10181,6 +10244,15 @@
     // Aus demselben Grund (siehe oben) bleibt auch die additive Bonus-Gruppe (Allianz, Saison,
     // Perks, Skills, Territorium, Aufstieg u.a.) für Forschungspunkte außen vor.
     if (globalBonus > 0) for (const k of Object.keys(rates)) if (k !== 'forschungspunkte') rates[k] *= (1 + globalBonus);
+    // Happy-Hour-Flash-Event: dedizierter Multiplikator auf die betroffenen Ressourcen (auch auf
+    // Forschungspunkte, wenn der Forschungsfieber-Typ aktiv ist - deshalb hier NACH dem FP-Ausschluss
+    // oben, als bewusst eigenständiger, zeitlich begrenzter Bonus). Für die Offline-Gutschrift bewusst
+    // ausgelassen (opts.noHappyHour), damit sich stundenlange Abwesenheit nicht rückwirkend boosten
+    // lässt, nur weil man zufällig während eines Fensters die Seite öffnet.
+    if (!(opts && opts.noHappyHour)){
+      const hh = currentHappyHour();
+      if (hh) for (const k of Object.keys(rates)) if (hh.type.resources.includes(k)) rates[k] *= (1 + hh.type.pct);
+    }
     return rates;
   }
   // Harter Lager-Deckel (v8.7.2, vorher 20% Überlauf-Ertrag): Ist das Lager einer Ressource voll,
@@ -15429,7 +15501,8 @@
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert. Dazu kommt ab dem Lategame eine erste Tier-2-Ressource, Nanolegierungen (siehe eigener Eintrag unten) - eigenes, kleineres Lager, getrennt von den sechs Basis-Ressourcen.' },
       { title:'Tier-2-Ressourcen: Nanolegierungen & Quantenchips', body:'Tier-2-Ressourcen werden nicht kostenlos produziert, sondern in speziellen Fabriken laufend <strong>aus Basis-Ressourcen hergestellt</strong> - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig und gilt <strong>je Standort</strong> (Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Tier-2-Ressourcen bleiben dauerhaft knapp und haben eigene, kleine Lager. <strong>Nanolegierungen</strong> (ab Forschung „Nanotechnologie", über „Effiziente Baupläne" Stufe 10): Nanolegierungsfabrik, max. Stufe 15, verbraucht 8 Erz + 5 Kristalle + 4 Energie je Einheit, max. ca. 0,09/s. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab) - das stärkste reguläre Verteidigungsgebäude; eingereihte Plattformen starten automatisch, sobald genug Nanolegierungen angesammelt sind. <strong>Quantenchips</strong> (ab Forschung „Quantenphysik", benötigt Nanotechnologie UND „Nanoschliff-Kristalle" Stufe 10): Quantenchipfabrik, max. Stufe 15, verbraucht 12 Kristalle + 5 Deuterium + 6 Energie je Chip und ist bewusst 3x langsamer (max. ca. 0,03/s) - die höherwertige, knappere zweite Stufe. Erste Verwendung: die <strong>Quanten-Sensorphalanx</strong> (Verteidigung-Tab) - jede Stufe gibt +120 Sekunden Überfall-Vorwarnzeit (imperiumsweit gedeckelt bei +20 Minuten, zusätzlich zu Langstrecken-Scanner/Allianz/Pakten) plus etwas Verteidigung; eingereihte Phalanxen starten automatisch, sobald genug Quantenchips angesammelt sind. <strong>Hochenergiekristalle</strong> (ab Forschung „Hochenergiephysik", benötigt Quantenphysik UND „Vakuumfluktuationskompression" Stufe 5): Kristalllabor, max. Stufe 15, verbraucht 18 Kristalle + 12 Energie + 1 Antimaterie je Einheit - die erste Kette mit Antimaterie als Zutat und mit 0,0015/s je Stufe die langsamste. Verwendung: die <strong>Hochenergie-Schildkuppel</strong> (Verteidigung-Tab) - der stärkste reine Schild des Spiels (220 Verteidigung je Stufe, kein Angriff), Baukosten enthalten Hochenergiekristalle. <strong>Fusionskerne</strong> (ab Forschung „Fusionskern-Synthese", benötigt Hochenergiephysik UND „Isotopen-Anreicherung" Stufe 5): die Fusionsschmiede ist die erste <strong>mehrstufige</strong> Kette - sie verbraucht 20 Deuterium + 2 Antimaterie + <strong>3 Nanolegierungen</strong> je Kern, eine Tier-2-Ressource wird also selbst zur Zutat. Mit 0,0008/s je Stufe die langsamste Kette. Verwendung: die <strong>Fusionsbastion</strong> (Verteidigung-Tab) - starkes Kombigebäude (250 Verteidigung + 120 Angriff je Stufe), Baukosten enthalten Fusionskerne. <strong>KI-Kerne</strong> (ab Forschung „KI-Technologie", benötigt Fusionskern-Synthese): das KI-Labor ist die Spitze der Kette - die einzige Fabrik mit <strong>zwei Tier-2-Zutaten</strong> (2 Quantenchips + 2 Nanolegierungen + 3 Antimaterie je Kern) und mit 0,0005/s je Stufe die langsamste. Verwendung: der <strong>KI-Verteidigungskern</strong> (Verteidigung-Tab) - Spitze der regulären Verteidigungsleiter (300 Verteidigung + 150 Angriff je Stufe), nur die Kristallfestung mit seltenem Item bleibt darüber. Hinweis für alle Tier-2-Fabriken: Ist das jeweilige Tier-2-Lager voll, <strong>pausiert</strong> die Fabrik (verbraucht dann auch keine Rohstoffe mehr), bis wieder Platz ist. Das Tier-2-Badge unter der Ressourcenleiste zeigt je Kette die aktuelle <strong>effektive Produktionsrate pro Sekunde</strong> - inklusive Hinweis, wenn die Fabrik wegen Rohstoffmangel gedrosselt läuft ("Rohstoffe knapp") oder wegen vollem Lager pausiert ("Lager voll"). Neben den Verteidigungsgebäuden gibt es drei <strong>Nutzgebäude</strong> als weitere Verbraucher (Basis-Tab): das <strong>Hochsicherheitslager</strong> (+80 Tier-2-Lagerkapazität je Stufe auf jede Kette, Kosten enthalten Nanolegierungen), das <strong>Kryolager</strong> (+2.000 Basis-Lagerkapazität je Stufe, Kosten enthalten Hochenergiekristalle) und den <strong>Fusions-Werftkern</strong> (-1,5% Schiffsbauzeit je Stufe, imperiumsweit bei -15% gedeckelt, Kosten enthalten Fusionskerne). Dazu drei <strong>Tier-2-Schiffe</strong> (Flotte-Tab, Baukosten bestehen KOMPLETT aus raffinierten Ressourcen): die <strong>Nanoklinge</strong> (55 Angriff, schnell - 130 Nanolegierungen), der <strong>Quantenkreuzer</strong> (80 Angriff + Schildwert - 60 Quantenchips + 60 Nanolegierungen) und der <strong>Fusionsdreadnought</strong> (180 Angriff, zwischen Leerenjäger und Superschlachtschiff - 45 Fusionskerne + 60 Hochenergiekristalle). Alle drei sind in Angriffen, Allianz-Raids und Musterangriffen voll einsetzbar. Erster <strong>Verbrauchsgegenstand</strong>: „Quantensensoren kalibrieren" im Expeditions-Bereich (ab Forschung Quantenphysik) verbraucht 10 Quantenchips und gibt 30 Minuten lang allen in diesem Fenster GESTARTETEN Expeditionen einen spürbaren Glücksbonus auf die Fundqualität - laufende Expeditionen profitieren nicht rückwirkend. Die <strong>Auto-Kalibrierung</strong> (Schalter direkt darunter) investiert die 10 Chips beim Expeditions-Start automatisch, falls gerade kein Fenster läuft - reichen die Chips nicht, startet die Expedition normal ohne Bonus. Zweiter laufender Verbraucher: die <strong>KI-Abfangautomatik</strong> (Verteidigung-Tab, ab KI-Technologie) vertreibt Piraten-Trümmerräuber automatisch für 3 KI-Kerne je Einsatz - Details im Abschnitt „Piraten-Trümmerräuber". Dritter: der <strong>Terraforming-Energieschub</strong> (ab Hochenergiephysik) verkürzt eine laufende Terraforming-Stufe um je 10% für 6 Hochenergiekristalle x Zielstufe (max. 3 Schübe je Stufe) - Details im Abschnitt „Terraforming". Außerdem lassen sich Tier-2-Ressourcen als hart gedeckeltes <strong>Pakt-Geschenk</strong> an Paktpartner senden (ab Handelsabkommen, Details unter „Diplomatie") und es gibt eine eigene <strong>Tagesaufgabe</strong> „5 Tier-2-Ressourcen produzieren", sobald mindestens eine Fabrik existiert. Für Allianzen: Das Weltprojekt <strong>Galaktische Verbundraffinerie</strong> verlangt 600 Fusionskerne als Materialschwelle und belohnt mit dauerhaft +10% Durchsatz aller Tier-2-Fabriken (Details unter „Allianzen"). Am galaktischen Markt sind Tier-2-Ressourcen bewusst <strong>nicht</strong> handelbar - sie kommen ausschließlich aus den eigenen Fabriken. Fürs Prestige: das <strong>Kryo-Archiv</strong> (viertes Nutzgebäude, ab Hochenergiephysik) bewahrt je Stufe feste Tier-2-Mengen durch den Reset - ohne Archiv geht der Bestand verloren (Details unter „Fortschritt & Prestige"). Und für die Tier-2-Schiffe gibt es eine eigene Schiffsklassen-Modul-Kategorie mit <strong>gefertigten</strong> Modulen aus Tier-2-Ressourcen (Details unter „Offiziere").' },
       { title:'Synthese-Kette: Metamaterial & Singularitätskerne (Tier-2-Erweiterung)', body:'Die Kette setzt sich über die KI-Kerne hinaus fort - zwei <strong>Apex-Ressourcen</strong>, die je ZWEI bestehende Tier-2-Ressourcen bündeln und noch langsamer produzieren (reines Endgame). <strong>Metamaterial-Gewebe</strong> (ab Forschung „Metamaterial-Synthese", benötigt KI-Technologie): Metamaterialweberei, max. Stufe 15, verbraucht 2 Hochenergiekristalle + 1 Fusionskern + 30 Kristalle je Einheit (0,0004/s je Stufe). Verwendung: der <strong>Metamaterial-Panzerwall</strong> (Verteidigung-Tab) - stärkster reiner Schutz (340 Verteidigung, kein Angriff), der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, s. u.) und der <strong>Metamaterial-Titan</strong> (Flotte-Tab, 150 Angriff + höchster Schildwert). <strong>Singularitätskerne</strong> (ab Forschung „Singularitätsphysik", benötigt Metamaterial-Synthese): Singularitätsreaktor, max. Stufe 15, verbraucht 2 KI-Kerne + 2 Fusionskerne + 5 Antimaterie je Kern (0,0003/s je Stufe) - die rarste Ressource des Spiels. Verwendung: der <strong>Singularitäts-Geschützturm</strong> (Verteidigung-Tab, 330 Verteidigung + 180 Angriff - der beste BAUBARE Kombiwert, knapp unter der seltenen Kristallfestung) und der <strong>Singularitäts-Vernichter</strong> (Flotte-Tab, 280 Angriff - stärkster regulärer Angriffswert). Neue <strong>Effizienz-Achse:</strong> Die Forschung <strong>Raffinerie-Optimierung</strong> (ab Quantenphysik, bis Stufe 10) erhöht den Durchsatz ALLER Tier-2-Fabriken um +3% je Stufe (max. +30%); der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, ab Metamaterial-Synthese, bis Stufe 10) senkt den Rohstoffverbrauch aller Fabriken um -2% je Stufe (imperiumsweit max. -20%). Das Kryo-Archiv bewahrt beide neuen Ressourcen ebenfalls durchs Prestige (3 Metamaterial / 2 Singularitätskerne je Stufe). Zwei neue <strong>Verbrauchsgegenstände</strong> (Flotte-Tab, unter „Aktive Missionen", sobald du die jeweilige Ressource besitzt): der <strong>Metamaterial-Reparaturschwarm</strong> behebt eine aktive Sabotage (Produktions-Debuff nach verlorenem Überfall) sofort für 6 Metamaterial-Gewebe, und die <strong>Singularitäts-Sprungladung</strong> verkürzt die Restflugzeit deiner längsten laufenden Flottenmission um 25% für 3 Singularitätskerne. Und zwei neue <strong>gefertigte Module</strong> (Tier-2-Modulfertigung): Metamaterial-Panzerplatte (+14% Verteidigungsbeitrag) und Singularitäts-Fokusarray (+14% Angriffskraft).' },
-      { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. Meldest du dich einen Tag <strong>nicht</strong> an, fällt der Fortschritt zurück auf Tag 1 - die Gesamtzahl der (nicht zwingend aufeinanderfolgenden) Logins zählt separat als "Tage in Folge" weiter, solange keine Lücke entsteht. Die komplette Vorschau mit allen 7 Tagen und der aktuellen Streak steht im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
+      { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. <strong>Streak-Schutzschilde:</strong> verpasst du GENAU einen Tag, rettet ein vorhandener Schutzschild deine Serie (statt Reset auf Tag 1) - für jeden vollständig durchgehaltenen 7-Tage-Zyklus bekommst du automatisch +1 Schild (max. 3 auf Vorrat). Ohne Schild oder bei mehr als einem verpassten Tag beginnt die Serie neu. <strong>Treue-Meilensteine:</strong> erreicht deine Serie 14/30/60/100 Tage am Stück, gibt es je einmal pro Lauf eine große Zusatzbelohnung (Ressourcen, Kredite, ab Tag 60 auch Schiffe). Schild-Vorrat, nächster Meilenstein samt Countdown und die komplette 7-Tage-Vorschau stehen im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
+      { title:'Happy Hour (Flash-Events)', body:'Zweimal pro Tag - um <strong>12:00 und 20:00 Uhr Ortszeit, je 60 Minuten</strong> - ist eine „Happy Hour" mit einem wechselnden Produktionsbonus aktiv. Vier Typen rotieren: <strong>Bergbau-Rausch</strong> (+40% Erz/Kristalle), <strong>Energie-Hoch</strong> (+40% Energie/Deuterium), <strong>Produktionsschub</strong> (+25% auf alle Grundressourcen) und <strong>Forschungsfieber</strong> (+60% Forschungspunkte). Die Termine sind fest aus dem Datum berechnet (kein Zufall, kein Server nötig), sodass du dich gezielt darauf einstellen kannst - ein Banner oben im <strong>Basis-Tab</strong> zeigt das gerade laufende bzw. das nächste Fenster samt Countdown, beim Start kommt eine Benachrichtigung. Der Bonus wirkt nur auf die laufende Live-Produktion, <strong>nicht</strong> auf die Offline-Gutschrift.' },
       { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
       { title:'Imperiums-Skalierung der Kosten', body:'Zwei Kostenarten wachsen mit der Größe deines Imperiums, damit sie auch mit vielen Kolonien spürbar bleiben: <strong>1) Groß-Anschaffungen</strong> (Mega-Projekte, Orbitalstationen, exotische Forschung, Veteranen-Ausbildung) kosten <strong>+25% je Standort</strong> über dem ersten (Kolonien und Monde zählen mit) – bei Heimat + 10 Kolonien also das 3,5-fache. Alle angezeigten Preise sind bereits die skalierten Werte. <strong>2) Schiffe</strong> kosten <strong>+0,4% je bereits vorhandenem Schiff desselben Typs</strong> (imperiumsweit über alle Standorte gezählt), gedeckelt bei +100% – das ~250. Schiff eines Typs kostet also das Doppelte. Verluste im Kampf senken den Bestand und machen den Nachbau entsprechend wieder günstiger. Kolonisierungskosten skalieren wie bisher separat (+35% je bestehender Kolonie).' },
@@ -20658,7 +20731,7 @@
       }
       returningBoostGranted = true;
     }
-    const rates = ratesPerSecond();
+    const rates = ratesPerSecond({ noHappyHour:true });
     const cap = storageCap();
     const before = { ...state.resources };
     for (const r of Object.keys(rates)) applySoftCappedGain(state.resources, r, rates[r]*capped, cap);
@@ -20842,6 +20915,35 @@
     `;
     const goalTab = box.querySelector('[data-next-goal-tab]');
     if (goalTab) goalTab.onclick = () => { const btn = document.querySelector('.tab-btn[data-tab="fortschritt"]'); if (btn) btn.click(); };
+  }
+  // Happy-Hour-Banner im Basis-Tab. BEWUSST OHNE Signatur-Cache, da der Countdown sichtbar
+  // hochzählt (Date.now()-Differenz) - würde bei Cache einfrieren (siehe CLAUDE.md-Regel). Der
+  // innerHTML-Aufbau ist klein und billig genug fürs 1s-Tick-Neuzeichnen.
+  function renderHappyHourBox(){
+    const box = document.getElementById('happyHourBox');
+    if (!box) return;
+    const hh = currentHappyHour();
+    if (hh){
+      const t = hh.type;
+      const left = fmtDuration((hh.endsAt - Date.now())/1000);
+      box.innerHTML = `
+        <div class="card-row" style="margin:6px 0; background:linear-gradient(90deg, ${t.color}26, transparent); border-color:${t.color}88;">
+          <div class="left" style="min-width:0;"><i class="ti ${t.icon}" aria-hidden="true" style="color:${t.color};"></i><span class="bname" style="font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Happy Hour: ${t.label}</span></div>
+          <span class="lvl-pill" style="font-size:10px; background:${t.color}22; border-color:${t.color}66; color:${t.color};">noch ${left}</span>
+        </div>
+        <div class="bmeta" style="margin:-2px 0 6px;">${t.desc} – aktiv, solange das Fenster läuft. Jetzt ist der beste Moment, Produktion abzugreifen!</div>`;
+    } else {
+      const nx = nextHappyHour();
+      if (!nx){ box.innerHTML = ''; return; }
+      const until = fmtDuration((nx.startsAt - Date.now())/1000);
+      const t = nx.type;
+      box.innerHTML = `
+        <div class="card-row" style="margin:6px 0;">
+          <div class="left" style="min-width:0;"><i class="ti ${t.icon}" aria-hidden="true" style="color:${t.color};"></i><span class="bname" style="font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Nächste Happy Hour: ${t.label}</span></div>
+          <span class="lvl-pill" style="font-size:10px;">in ${until}</span>
+        </div>
+        <div class="bmeta" style="margin:-2px 0 6px;">${t.desc} – schau in ${until} wieder rein und nutze das Zeitfenster.</div>`;
+    }
   }
   let lastDailyLoginSig = null;
   function renderDailyLoginBox(){
@@ -26442,6 +26544,7 @@
       </div>
     `;
     refreshPlanetMiniIcons(document.getElementById('colonyDashboard'));
+    renderHappyHourBox();
     renderNextGoalBox();
     const relocateAllQuickBox = document.getElementById('relocateAllQuickBox');
     if (relocateAllQuickBox) relocateAllQuickBox.innerHTML = relocateAllQuickButtonsHtml();
@@ -30712,6 +30815,7 @@
     initDailyQuests();
     maybeAutoRepair();
     maybeAnnounceCalendarEvent();
+    maybeAnnounceHappyHour();
     maybeSpawnRandomEvent();
     if (state.activeEvent && Date.now() >= state.activeEvent.expiresAt){ resolveEvent('B'); }
     // Punktestand-Verlauf: alle 5 Minuten ein Snapshot fürs Diagramm im Punktestand-Tab, auf die
