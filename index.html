@@ -3426,8 +3426,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.196.0';
+  const VERSION = '8.197.0';
   const PATCHNOTES = [
+    { version:'8.197.0', date:'21.07.2026', changes:[
+      'Markt-Preisverlauf (Sparkline) endlich sichtbar - eigentliche Fehlerursache gefunden: Die Linie wurde mit einem gar nicht existierenden Farbfeld gezeichnet (undefined), dadurch war der komplette Linien-/Flächenzug unsichtbar - nur das Panel und ein schwarzer Endpunkt blieben übrig (genau das gemeldete „leere Kästchen"). Jetzt zeichnet die Sparkline in der jeweiligen Ressourcenfarbe. Nebenbei zeigen die Ressourcen-Icons und Preiszahlen im Markt wieder ihre Farbe.',
+    ]},
     { version:'8.196.0', date:'21.07.2026', changes:[
       'Markt-Preisverlauf (Sparkline) endlich zuverlässig erkennbar: Klebt ein Preis über den ganzen Verlauf am Boden oder Deckel (z.B. -84% nach vielen Verkäufen), lag die Linie bisher direkt am unteren Rand und wirkte „leer". Ein flacher Verlauf wird jetzt als klar sichtbare, mittige Linie gezeichnet.',
     ]},
@@ -8206,7 +8209,11 @@
         </div>`;
     }
     box.innerHTML = eventBanner + MARKET_RES_KEYS.map(key => {
-      const rd = RES_DEFS.find(r=>r.key===key) || { label:key, icon:'ti-diamond', color:'#c7cbe0' };
+      // Bugfix (21.07.2026): RES_DEFS-Einträge haben das Farbfeld 'fg' (nicht 'color') - die Markt-
+      // Anzeige nutzte aber durchgehend rd.color -> war überall undefined. Folge: Sparkline-Linie/Fläche
+      // mit stroke/fill "undefined" komplett unsichtbar (nur Panel + schwarzer Default-Endpunkt zu sehen,
+      // genau der Spieler-Report), und Ressourcen-Icon-/Preisfarben fehlten. Jetzt konsequent rd.fg.
+      const rd = RES_DEFS.find(r=>r.key===key) || { label:key, icon:'ti-diamond', fg:'#c7cbe0' };
       const m = state.marketCache[key];
       if (!m) return '';
       const price = m.price, base = m.basePrice || price;
@@ -8218,15 +8225,15 @@
       const buyEst = estimateTradeCredits('buy', key, amt);
       const sellEst = estimateTradeCredits('sell', key, amt);
       const affected = mevActive && mev.resource === key;
-      const spark = marketSparkline(m.history, rd.color);
+      const spark = marketSparkline(m.history, rd.fg);
       return `
         <div class="card-row${affected?' mkt-affected':''}" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem;${affected?' border-left:2px solid '+(mev.kind==='shortage'?'#e24b4a':'#5dcaa5')+';':''}">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-              <div class="bicon" style="background:${rd.color}22; color:${rd.color};"><i class="ti ${rd.icon}" aria-hidden="true"></i></div>
+              <div class="bicon" style="background:${rd.fg}22; color:${rd.fg};"><i class="ti ${rd.icon}" aria-hidden="true"></i></div>
               <div style="min-width:0;">
                 <div class="bname">${rd.label}${affected?` <span class="mkt-tag" style="color:${mev.kind==='shortage'?'#e24b4a':'#5dcaa5'};">${mev.kind==='shortage'?'Knappheit':'Schwemme'}</span>`:''}</div>
-                <div class="bmeta">Preis: <strong style="color:${rd.color};">${price.toFixed(2)}</strong> Kr./Einheit · <span style="color:${trendColor};">${trendLabel} (${pctVsBase>=0?'+':''}${pctVsBase}%)</span></div>
+                <div class="bmeta">Preis: <strong style="color:${rd.fg};">${price.toFixed(2)}</strong> Kr./Einheit · <span style="color:${trendColor};">${trendLabel} (${pctVsBase>=0?'+':''}${pctVsBase}%)</span></div>
                 <div class="bmeta">Dein Bestand: ${fmt(owned)}</div>
               </div>
             </div>
@@ -27497,7 +27504,7 @@
             const costHtml = Object.entries(cost).map(([k,v]) => {
               const rd = RES_DEFS.find(r=>r.key===k);
               const enough = (state.resources[k]||0) >= v;
-              return `<span style="display:inline-flex; align-items:center; gap:3px; margin-right:10px; color:${enough?'#c7cbe0':'#e24b4a'};"><i class="ti ${rd?rd.icon:'ti-planet'}" aria-hidden="true" style="color:${rd?rd.color:'#c7cbe0'};"></i>${fmt(v)}</span>`;
+              return `<span style="display:inline-flex; align-items:center; gap:3px; margin-right:10px; color:${enough?'#c7cbe0':'#e24b4a'};"><i class="ti ${rd?rd.icon:'ti-planet'}" aria-hidden="true" style="color:${rd?rd.fg:'#c7cbe0'};"></i>${fmt(v)}</span>`;
             }).join('');
             html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                 <span class="bname">Stufe ${lvl} / ${TERRAFORM_MAX_LEVEL}</span>
