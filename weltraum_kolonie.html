@@ -3460,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.213.0';
+  const VERSION = '8.214.0';
   const PATCHNOTES = [
+    { version:'8.214.0', date:'21.07.2026', changes:[
+      'Performance: Das Spiel ist auf dem Gerät jetzt sparsamer. Das Kolonie-Dashboard wird nur noch aufgebaut, wenn der Basis-Tab offen ist (vorher jede Sekunde auf jedem Tab – inklusive Neuzeichnen aller Planeten-Icons), und die Planeten-Umschalter werden nur noch neu gebaut, wenn sich wirklich etwas ändert (Kolonie/Mond dazu oder weg, Favorit umgeschaltet, aktiver Planet gewechselt). Spürbar weniger CPU-/Akkuverbrauch, besonders auf dem Handy und bei vielen Kolonien – am Spielverhalten ändert sich nichts.',
+    ]},
     { version:'8.213.0', date:'21.07.2026', changes:[
       'Neu: Galaktisches Kompendium (Fortschritt-Tab). Ein Sammel-Überblick über deinen Fortschritt in der ganzen Galaxie – entdeckte Planeten, bereiste Systeme, besiegte Sektor-Bosse, kennengelernte Fraktionen und freigeschaltete Erfolge, jeweils mit Fortschrittsbalken. Für jede vollständig erschlossene Kategorie gibt es einmalig eine Belohnung (Sternenessenz + Kredite). Der Belohnungs-Marker bleibt über Prestige und Aufstieg erhalten, damit nichts doppelt kassiert werden kann.',
     ]},
@@ -27116,6 +27119,8 @@
   // Grafik-Runde "Maximum", Vorschlag 25: letzter tatsächlich angezeigter Wert je Ressource, damit
   // render() weiss, von wo aus hochgezählt werden muss (siehe resBarOk-Zweig weiter unten).
   const lastResRenderVal = {};
+  // Signatur-Cache für die Planeten-Umschalter (Def/Flotte/Expedition) + fpColonyList - siehe render().
+  let lastSwitcherSig = null;
   const resValAnimFrames = new WeakMap();
   const prefersReducedMotionMq = (typeof window!=='undefined' && window.matchMedia) ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
   function animateResValue(el, from, to, cap){
@@ -27431,6 +27436,14 @@
     // Heimatbasis-Mond IMMER fälschlich als "verwaist" gelten und zusätzlich zum korrekten, angehängten
     // Badge eine doppelte Standalone-Karte "Mond von Heimatbasis" erzeugen (Bugfix 17.07.2026).
     const orphanMoonIds = colonyIds.filter(pid => isMoonKey(pid) && moonParentKey(pid) !== 'home' && !state.colonies[moonParentKey(pid)]);
+    // Signatur-Cache (Performance): Die drei Planeten-Umschalter und die fpColonyList wurden jeden Tick
+    // per innerHTML neu gebaut, obwohl sie sich nur bei Kolonie-/Mond-Änderung, Favoriten-Umschalten oder
+    // Wechsel des aktiven Planeten ändern. colonyIds enthält bereits alle Kolonie- UND Mond-Schlüssel
+    // (Mond-Existenz abgedeckt); Favoriten fließen über Reihenfolge UND explizit in die Signatur ein.
+    const switcherSig = colonyIds.join('|') + '@' + state.activeBasePlanet + '@' +
+      Object.keys(state.favoritePlanets||{}).filter(k=>state.favoritePlanets[k]).sort().join(',');
+    const switcherChanged = switcherSig !== lastSwitcherSig;
+    if (switcherChanged){
     const orphanMoonPillsHtml = orphanMoonIds.map(pid => `<button class="planet-pill ${state.activeBasePlanet===pid?'active':''}" data-planet-switch="${pid}">☾ ${planetDisplayName(pid)}</button>`).join('');
     const planetSwitchHtml = (!colonyIds.length) ? '' : `<div class="planet-switch">
       <button class="planet-pill ${state.activeBasePlanet==='home'?'active':''}" data-planet-switch="home" style="border-color:rgba(126,119,221,0.4); position:relative;"><i class="ti ${PLANET_TYPE_INFO.erdaehnlich.icon}" aria-hidden="true" style="color:#5dcaa5;"></i>Heimatbasis <i class="ti ti-home" aria-hidden="true" style="color:#c3bef5; font-size:10px; margin-left:2px;"></i>${pillMoonBtn('home')}</button>
@@ -27445,6 +27458,7 @@
     document.getElementById('planetSwitcherFleet').innerHTML = planetSwitchHtml;
     const psExp = document.getElementById('planetSwitcherExpedition');
     if (psExp) psExp.innerHTML = planetSwitchHtml;
+    }
 
     const fpColonyCountEl = document.getElementById('fpColonyCount');
     if (fpColonyCountEl) fpColonyCountEl.textContent = '('+currentColonyCount()+'/'+maxColoniesAllowed()+')';
@@ -27459,7 +27473,7 @@
       fpFleetCountEl.style.color = usedFleets >= maxFleets ? '#e24b4a' : '';
     }
     const fpColonyList = document.getElementById('fpColonyList');
-    if (fpColonyList){
+    if (fpColonyList && switcherChanged){
       fpColonyList.innerHTML = `
         <button class="fp-colony-btn ${state.activeBasePlanet==='home'?'active':''}" data-fp-colony-switch="home"><i class="ti ti-home" aria-hidden="true"></i>Heimatbasis${pillMoonBtn('home')}</button>
         ${colonyIds.filter(pid => !isMoonKey(pid)).map(pid => { const p = PLANETS.find(x=>x.id===pid); return `<button class="fp-colony-btn ${state.activeBasePlanet===pid?'active':''}" data-fp-colony-switch="${pid}"><i class="ti ti-planet" aria-hidden="true"></i>${p.name.split(' ').pop()}${pillMoonBtn(pid)}</button>`; }).join('')}
@@ -27471,9 +27485,16 @@
         render(); save();
       });
     }
+    // Signatur erst NACH den (evtl. übersprungenen) Umschalter-/fpColonyList-Rebuilds merken.
+    lastSwitcherSig = switcherSig;
 
     // Monde bekommen keine eigene Karte mehr - sie sind über das Mond-Symbol an der Karte ihres
     // Planeten erreichbar (siehe dash-moon-badge weiter unten).
+    // Performance: Das Kolonie-Dashboard ist nur im Basis-Tab sichtbar, wurde aber bisher auf JEDEM Tab
+    // jede Sekunde komplett neu aufgebaut - inkl. Canvas-Icon-Redraw je Kolonie (refreshPlanetMiniIcons)
+    // und der teuren dashSets-Map. Da switchTab() beim Tab-Wechsel render() aufruft, ist das Dashboard
+    // beim Betreten des Basis-Tabs sofort aktuell; auf den anderen Tabs entfällt der Aufwand komplett.
+    if (activeTab === 'basis'){
     const dashSets = [
       { id:'home', name:'Heimatbasis', b: state.buildings, f: state.fleet },
       ...colonyIds.filter(pid => !isMoonKey(pid)).map(pid => ({ id:pid, name: PLANETS.find(p=>p.id===pid).name, b: state.colonies[pid].buildings, f: state.colonies[pid].fleet })),
@@ -27525,6 +27546,7 @@
       </div>
     `;
     refreshPlanetMiniIcons(document.getElementById('colonyDashboard'));
+    }
     renderComebackQuestBox();
     renderHappyHourBox();
     renderNextGoalBox();
