@@ -2202,7 +2202,10 @@
 
       <div class="tab-panel" id="tab-offiziere">
         <div class="section-title"><i class="ti ti-user-circle" aria-hidden="true"></i>Offiziere</div>
-        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Vier Offiziere, alle gleichzeitig aktiv. Anheuern und Befördern kostet <strong>Kommandopunkte</strong> – die verdienst du fürs Kämpfen (parallel zu Kampfpunkten, ohne deinen Punktestand zu senken).</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Sieben Offiziere, alle gleichzeitig aktiv. Anheuern und Befördern kostet <strong>Kommandopunkte</strong> – die verdienst du fürs Kämpfen (parallel zu Kampfpunkten, ohne deinen Punktestand zu senken).</div>
+        <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-rocket" aria-hidden="true"></i>Flaggschiff</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Dein <strong>einzigartiges Kapitalschiff</strong> – getrennt von der Massenflotte, kann nicht zerstört werden. Jede Ausbaustufe erhöht deine gesamte <strong>Angriffs- UND Verteidigungskraft</strong> (Teil der gedeckelten Kampf-Bonus-Gruppe). Ausbau kostet Ressourcen + Kredite.</div>
+        <div id="flagshipBox" style="margin-bottom:1rem;"></div>
         <div id="combatBonusCapBox" style="margin-bottom:1rem;"></div>
         <div class="card-row" style="margin-bottom:1rem; border-color:#c3bef5;">
           <div class="left"><div class="bicon" style="background:rgba(195,190,245,0.18); color:#c3bef5;"><i class="ti ti-medal" aria-hidden="true"></i></div><div><div class="bname">Kommandopunkte</div><div class="bmeta">Verfügbar zum Ausgeben</div></div></div>
@@ -3450,8 +3453,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.211.0';
+  const VERSION = '8.212.0';
   const PATCHNOTES = [
+    { version:'8.212.0', date:'21.07.2026', changes:[
+      'Neu: Flaggschiff (Offiziere-Tab). Baue dein einzigartiges, unzerstörbares Kapitalschiff – getrennt von der Massenflotte. Jede Ausbaustufe (max. 20) gibt +1,5% Angriffs- und Verteidigungskraft (Teil der gedeckelten Kampf-Bonus-Gruppe). Bau/Ausbau kosten Ressourcen + Kredite, du kannst ihm einen eigenen Namen geben. Es überlebt einen Prestige-Reset (wie Offiziere/Module); ein Aufstieg setzt es zurück.',
+    ]},
     { version:'8.211.0', date:'21.07.2026', changes:[
       'Weltbosse gibt es jetzt in vier Varianten: Wandelnder Koloss (ausgewogen), Panzer-Bastion (extrem zäh, bleibt länger), Schwarm-Titan (wenig HP, aber kurzes Zeitfenster) und Phasen-Phantom (Schiffstyp-Schwäche wiegt besonders schwer). Beim Auftauchen zeigt die Galaxie-Nachricht an, welche Variante erschienen ist und was sie auszeichnet. Die Belohnung bleibt unverändert schadensanteil-basiert – die Varianten ändern nur den Kampf selbst.',
     ]},
@@ -11384,6 +11390,90 @@
     if (key === 'aufklaerer') return '+'+b+'% Expeditions-Ausbeute';
     return '+'+b+'%';
   }
+  // ===== Flaggschiff / Kapitalschiff (#3) =====
+  // Ein einziges, einzigartiges Kapitalschiff - getrennt von der Massenflotte, unzerstörbar. Jede Stufe
+  // gibt +1,5% in die GEDECKELTE additive Kampf-Bonus-Gruppe (wie prestigePerkCount('combat'), siehe
+  // combatBonus-Stellen), also kein unbegrenztes Aufschaukeln. Ausbau kostet Ressourcen + Kredite.
+  // Überlebt Prestige (wie Offiziere/Module), wird beim Aufstieg zurückgesetzt (voller Reset).
+  const FLAGSHIP_MAX_LEVEL = 20;
+  const FLAGSHIP_BONUS_PER_LEVEL = 0.015;
+  function flagshipState(){ if (!state.flagship) state.flagship = { level:0, name:null }; return state.flagship; }
+  function flagshipLevel(){ return (state.flagship && state.flagship.level) || 0; }
+  function flagshipCombatBonus(){ return flagshipLevel() * FLAGSHIP_BONUS_PER_LEVEL; }
+  function flagshipUpgradeCost(nextLevel){
+    const m = Math.pow(1.7, nextLevel - 1);
+    return { erz: Math.round(40000*m), kristalle: Math.round(25000*m), deuterium: Math.round(12000*m), credits: Math.round(1500*m) };
+  }
+  function flagshipAfford(cost){
+    for (const [k,v] of Object.entries(cost)){ if (k==='credits'){ if ((state.credits||0) < v) return false; } else if ((state.resources[k]||0) < v) return false; }
+    return true;
+  }
+  function payFlagship(cost){
+    for (const [k,v] of Object.entries(cost)){ if (k==='credits') state.credits = (state.credits||0) - v; else state.resources[k] = (state.resources[k]||0) - v; }
+  }
+  function buildOrUpgradeFlagship(){
+    const fs = flagshipState();
+    const next = (fs.level||0) + 1;
+    if (next > FLAGSHIP_MAX_LEVEL){ log('Das Flaggschiff ist bereits voll ausgebaut (Stufe '+FLAGSHIP_MAX_LEVEL+').', 'ti-alert-triangle'); return; }
+    const cost = flagshipUpgradeCost(next);
+    if (!flagshipAfford(cost)){ log('Nicht genug Ressourcen/Kredite für den Ausbau.', 'ti-alert-triangle'); return; }
+    payFlagship(cost);
+    fs.level = next;
+    if (!fs.name) fs.name = 'MS ' + (state.player.name || 'Kolonist');
+    log(next===1
+      ? ('Flaggschiff „'+fs.name+'" in Dienst gestellt! Kampfkraft +'+Math.round(flagshipCombatBonus()*100)+'%.')
+      : ('Flaggschiff auf Stufe '+next+' ausgebaut – Kampfkraft jetzt +'+Math.round(flagshipCombatBonus()*100)+'%.'), 'ti-rocket', 'ok');
+    playSound(next===1?'achieve':'build');
+    checkAchievements(); render(); save();
+  }
+  function renameFlagship(){
+    const fs = flagshipState();
+    if (!fs.level){ return; }
+    const cur = fs.name || '';
+    const nn = (typeof prompt==='function') ? prompt('Name deines Flaggschiffs (max. 24 Zeichen):', cur) : null;
+    if (nn === null) return;
+    const clean = String(nn).trim().slice(0, 24);
+    if (clean){ fs.name = clean; log('Flaggschiff umbenannt in „'+clean+'".', 'ti-rocket'); render(); save(); }
+  }
+  let lastFlagshipSig = null;
+  function renderFlagship(){
+    const box = document.getElementById('flagshipBox');
+    if (!box) return;
+    const fs = flagshipState();
+    const lvl = fs.level||0;
+    const next = lvl + 1;
+    const maxed = lvl >= FLAGSHIP_MAX_LEVEL;
+    const cost = maxed ? null : flagshipUpgradeCost(next);
+    const afford = cost ? flagshipAfford(cost) : false;
+    const sig = lvl+':'+(fs.name||'')+':'+(afford?1:0)+':'+(maxed?1:0);
+    if (sig === lastFlagshipSig) return;
+    lastFlagshipSig = sig;
+    const bonusPct = Math.round(flagshipCombatBonus()*100);
+    const costHtml = cost ? Object.entries(cost).map(([k,v])=>{
+      const have = k==='credits' ? (state.credits||0) : (state.resources[k]||0);
+      const label = k==='credits' ? 'Kr.' : ((RES_DEFS.find(x=>x.key===k)||{label:k}).label);
+      return `<span style="color:${have>=v?'#c7cbe0':'#e24b4a'};">${fmt(v)} ${label}</span>`;
+    }).join(' · ') : '';
+    if (lvl === 0){
+      box.innerHTML = `<div class="card-row" style="border-color:rgba(195,190,245,0.5);">
+        <div class="left"><div class="bicon" style="background:rgba(195,190,245,0.18); color:#c3bef5;"><i class="ti ti-rocket" aria-hidden="true"></i></div>
+          <div><div class="bname">Flaggschiff bauen</div><div class="bmeta">Stelle dein einzigartiges Kapitalschiff in Dienst. Kosten: ${costHtml}</div></div>
+        </div>
+        <button data-flagship-build="1" ${afford?'':'disabled'} style="white-space:nowrap;">Bauen</button>
+      </div>`;
+    } else {
+      box.innerHTML = `<div class="card-row" style="border-color:rgba(195,190,245,0.6); background:rgba(195,190,245,0.06);">
+        <div class="left"><div class="bicon" style="background:rgba(195,190,245,0.22); color:#c3bef5;"><i class="ti ti-rocket" aria-hidden="true"></i></div>
+          <div><div class="bname">${escapeHtml(fs.name||'Flaggschiff')} <button data-flagship-rename="1" title="Umbenennen" style="font-size:9px; padding:2px 6px; margin-left:4px;">Name</button></div>
+          <div class="bmeta">Stufe ${lvl}/${FLAGSHIP_MAX_LEVEL} · aktuell <strong style="color:#5dcaa5;">+${bonusPct}%</strong> Angriff & Verteidigung</div>
+          ${maxed?'<div class="bmeta" style="color:#fac775;">Voll ausgebaut.</div>':`<div class="bmeta">Ausbau auf Stufe ${next}: ${costHtml}</div>`}</div>
+        </div>
+        ${maxed?'':`<button data-flagship-build="1" ${afford?'':'disabled'} style="white-space:nowrap;">Ausbauen</button>`}
+      </div>`;
+    }
+    const bb = box.querySelector('[data-flagship-build]'); if (bb) bb.onclick = () => buildOrUpgradeFlagship();
+    const rb = box.querySelector('[data-flagship-rename]'); if (rb) rb.onclick = () => renameFlagship();
+  }
   function upgradeOfficer(key){
     const def = OFFICERS.find(o=>o.key===key);
     if (!def) return;
@@ -11429,6 +11519,7 @@
       combatBonus += 0.10*allianceTechFrac('ab_flotte2');
     }
     combatBonus += prestigePerkCount('combat')*0.03;
+    combatBonus += flagshipCombatBonus();
     combatBonus += ascBonus('combat')*0.02;
     combatBonus += skillBonusPct('war');
     combatBonus += (megaProjectCombatMult()-1);
@@ -11520,6 +11611,7 @@
       combatBonus += 0.20*allianceTechFrac('a_def2');
     }
     combatBonus += prestigePerkCount('combat')*0.03;
+    combatBonus += flagshipCombatBonus();
     combatBonus += ascBonus('combat')*0.02;
     combatBonus += skillBonusPct('war');
     combatBonus += (megaProjectCombatMult()-1);
@@ -13106,6 +13198,7 @@
     if (state.commandPoints === undefined) state.commandPoints = 0;
     if (!state.officers) state.officers = {};
     if (!state.officerTalents) state.officerTalents = {};
+    if (!state.flagship || typeof state.flagship !== 'object') state.flagship = { level:0, name:null };
     if (state.credits === undefined) state.credits = 250;
     if (!state.tradeRoutes) state.tradeRoutes = [];
     if (!state.factionRep) state.factionRep = {};
@@ -13201,6 +13294,7 @@
     // wiederholt genutzte Fortschritts-Kreislauf ist, vernichtete das investierte Kommandopunkte bei
     // jedem einzelnen Durchlauf. Jetzt wie XP/Erfolge/seltene Items behandelt: bleibt erhalten.
     const keepOfficers = state.officers, keepCommandPoints = state.commandPoints, keepOfficerTalents = state.officerTalents;
+    const keepFlagship = state.flagship; // Flaggschiff überlebt Prestige (wie Offiziere); Aufstieg setzt es zurück
     // Bugfix (21.07.2026, Spieler-Report nach Prestige): Standort-Module, die auf KOLONIEN ausgerüstet
     // waren, gingen beim Prestige verloren - equippedModules wurde komplett behalten, aber colonies wird
     // geleert, sodass equippedModules[kolonieKey] ins Leere zeigte (das Modul war danach weder nutzbar
@@ -13259,7 +13353,7 @@
       credits: 250 + prestigeStartLvl*100, claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
       ascension: keepAscension,
-      officers:keepOfficers||{}, officerTalents:keepOfficerTalents||{}, commandPoints:keepCommandPoints||0,
+      officers:keepOfficers||{}, officerTalents:keepOfficerTalents||{}, commandPoints:keepCommandPoints||0, flagship:keepFlagship||{level:0,name:null},
       modules:keepModules||{}, moduleSlotLevel:keepModuleSlotLevel||{}, equippedModules:keepEquippedModules||{},
       shipModules:keepShipModules||{}, shipModuleSlotLevel:keepShipModuleSlotLevel||{}, equippedShipModules:keepEquippedShipModules||{},
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
@@ -16148,7 +16242,8 @@
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Zwei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, und <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet. Kampfschiffe haben jetzt zusätzlich eine echte <strong>Verteidigungsspezialisierung</strong>, unabhängig von der Angriffskraft: Jäger/Bomber/Träger/Zerstörer sind offensiv ausgerichtet und dadurch fragiler in der Verteidigung, Wächter und Schlachtschiff (inkl. Superschlachtschiff) sind gepanzerte Verteidigungsspezialisten. Eine reine Angriffsflotte verteidigt sich also spürbar schlechter als eine gemischte oder auf Wächter/Schlachtschiffe setzende Flotte.' },
-      { title:'Flottenvielfalt & Kampfbonus-Deckel', body:'<strong>Flottenvielfalt:</strong> Der Einsatz mehrerer verschiedener Kampfschifftypen (statt nur eines Typs) gibt +2% Angriffs- UND Verteidigungskraft je zusätzlichem genutztem Typ, gedeckelt bei 5 Typen (+8%). Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
+      { title:'Flottenvielfalt & Kampfbonus-Deckel', body:'<strong>Flottenvielfalt:</strong> Der Einsatz mehrerer verschiedener Kampfschifftypen (statt nur eines Typs) gibt +2% Angriffs- UND Verteidigungskraft je zusätzlichem genutztem Typ, gedeckelt bei 5 Typen (+8%). Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
+      { title:'Flaggschiff', body:'Im <strong>Offiziere-Tab</strong> baust du dein <strong>einzigartiges Flaggschiff</strong> – ein Kapitalschiff getrennt von der Massenflotte, das nicht zerstört werden kann und keine Slots belegt. Jede Ausbaustufe (max. 20) gibt <strong>+1,5% Angriffs- UND Verteidigungskraft</strong>, die in die gedeckelte Kampf-Bonus-Gruppe einfließt (siehe „Flottenvielfalt & Kampfbonus-Deckel"). Bau und Ausbau kosten Ressourcen + Kredite (steigend je Stufe). Du kannst deinem Flaggschiff einen eigenen Namen geben. Es <strong>überlebt einen Prestige-Reset</strong> (wie Offiziere und Module); erst ein Aufstieg (Transzendenz) setzt es zurück.' },
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.' },
       { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war. Auf der <strong>Galaxie-Übersichtskarte</strong> tragen zusätzlich alle Systeme, in denen ein ausgespähter Spieler wohnt, ein 🔎-Abzeichen (Anzahl im Tooltip) - so siehst du auch aus der Distanz, wo du bereits Aufklärung hast.' },
@@ -21275,6 +21370,7 @@
         if (state.commandPoints === undefined) state.commandPoints = 0;
         if (!state.officers) state.officers = {};
         if (!state.officerTalents) state.officerTalents = {};
+    if (!state.flagship || typeof state.flagship !== 'object') state.flagship = { level:0, name:null };
         if (state.credits === undefined) state.credits = 250;
         if (!state.tradeRoutes) state.tradeRoutes = [];
         if (!state.factionRep) state.factionRep = {};
@@ -29064,6 +29160,7 @@
           <div class="bmeta" style="margin-top:8px; font-size:11px;">Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module und Allianz-Techs speisen zusammen diesen gedeckelten Topf - bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.</div>
         </div>`;
       }
+      renderFlagship();
       const officerBox = document.getElementById('officerBox');
       if (officerBox){
         officerBox.innerHTML = OFFICERS.map(o => {
