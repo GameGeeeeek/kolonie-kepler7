@@ -3434,8 +3434,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.205.0';
+  const VERSION = '8.206.0';
   const PATCHNOTES = [
+    { version:'8.206.0', date:'21.07.2026', changes:[
+      'Drei neue Prestige-Perks zur Auswahl: Fernraum-Pfadfinder (+4% Expeditions-Belohnung), Lagermeister (+5% Lagerkapazität) und Chefwissenschaftler (-3% Forschungszeit) – jeweils stapelbar. Damit gibt es jetzt 6 Perks für abwechslungsreichere Prestige-Läufe.',
+      'Zwei neue Standort-Module: Forschungsmodul (verkürzt die Forschungszeit) und Sondenmodul (erhöht die Expeditions-Ausbeute). Anders als die übrigen Module wirken diese beiden imperiumsweit – ihr Bonus zählt über alle Standorte zusammen.',
+      'Drei neue Erfolge zu den jüngsten Features: „Kriegsheld" (erklärten Allianz-Krieg gewinnen), „Ligameister" (Platin-Liga in der Wochenliga) und „Gut vernetzt" (5 Freunde in der Freundesliste).',
+    ]},
     { version:'8.205.0', date:'21.07.2026', changes:[
       'Allianz-Kriege haben jetzt ein Ziel: Ein erklärter Krieg läuft 7 Tage. Danach löst der Server ihn automatisch auf, kürt anhand der Kriegspunkte einen Sieger und schüttet allen beteiligten Kämpfern der siegreichen Allianz eine Kredit-Siegprämie aus (1.200 Kredite je Kämpfer, beim nächsten Login gutgeschrieben) – bei Gleichstand endet der Krieg unentschieden. Der Kriegs-Bereich (Allianz-Tab → Mitglieder & Kriege) zeigt jetzt den Countdown bis zum Ende und ob deine Allianz führt. Vorzeitiger Frieden per Admin bleibt möglich (dann ohne Prämie). Bestehende, vor diesem Update erklärte Kriege laufen unverändert weiter (ohne Zeitfenster).',
     ]},
@@ -9402,7 +9407,11 @@
     // Retention-Erfolge (21.07.2026): Login-Treue-Meilensteine und Happy-Hour-Nutzung sichtbar machen.
     { key:'streak30', name:'Monatstreue', desc:'Erreiche 30 Tage Login-Serie am Stück.', check: s => (s.loginStreak||0) >= 30, progress: s => [Math.min(30,s.loginStreak||0), 30], reward:{erz:4000,kristalle:2500,deuterium:1500,credits:200}, xpReward:200 },
     { key:'streak100', name:'Hundert-Tage-Legende', desc:'Erreiche 100 Tage Login-Serie am Stück.', check: s => (s.loginStreak||0) >= 100, progress: s => [Math.min(100,s.loginStreak||0), 100], reward:{erz:15000,kristalle:10000,deuterium:5000,antimaterie:200,credits:600}, xpReward:600 },
-    { key:'happyhour10', name:'Zur richtigen Zeit', desc:'Sei bei 10 Happy Hours aktiv dabei.', check: s => (s.happyHoursUsed||0) >= 10, progress: s => [Math.min(10,s.happyHoursUsed||0), 10], reward:{erz:3000,kristalle:2000,deuterium:1000,credits:150}, xpReward:150 }
+    { key:'happyhour10', name:'Zur richtigen Zeit', desc:'Sei bei 10 Happy Hours aktiv dabei.', check: s => (s.happyHoursUsed||0) >= 10, progress: s => [Math.min(10,s.happyHoursUsed||0), 10], reward:{erz:3000,kristalle:2000,deuterium:1000,credits:150}, xpReward:150 },
+    // Erfolge zu den serverseitigen Features (21.07.2026): Kriegssieg, Wochenliga-Platin, Freundesnetz.
+    { key:'kriegsheld', name:'Kriegsheld', desc:'Gewinne einen erklärten Allianz-Krieg (am Kriegsende mehr Kriegspunkte als der Gegner).', check: s => (s.warsWon||0) >= 1, progress: s => [Math.min(1,s.warsWon||0), 1], reward:{erz:8000,kristalle:5000,deuterium:2500,credits:500}, xpReward:400 },
+    { key:'ligameister', name:'Ligameister', desc:'Erreiche die Platin-Liga in der Wochenliga.', check: s => (s.leaguePlatinum||0) >= 1, progress: s => [Math.min(1,s.leaguePlatinum||0), 1], reward:{erz:6000,kristalle:4000,deuterium:2000,credits:400}, xpReward:300 },
+    { key:'gutvernetzt', name:'Gut vernetzt', desc:'Habe mindestens 5 Spieler in deiner Freundesliste.', check: s => ((s.friends||[]).length) >= 5, progress: s => [Math.min(5,(s.friends||[]).length), 5], reward:{credits:200}, xpReward:200 }
   ];
   // Erfolgs-Kategorien (20.07.2026, "Erfolge vertiefen"): rein additive Klassifikation per Key-Map,
   // damit die ~63 Erfolge nicht mehr als undifferenzierte Flachliste erscheinen. Keys, die hier fehlen,
@@ -9422,9 +9431,9 @@
     firstbuild:'aufbau', firstcolony:'aufbau', nanopionier:'aufbau', industriemagnat:'aufbau', kettenmeister:'aufbau', verbrauchsstratege:'aufbau', modulschmied:'aufbau', terraform1:'aufbau', terraform10:'aufbau', erdweltmaster:'aufbau', leerenweltmaster:'aufbau', colonizer10:'aufbau', allcolonyslots:'aufbau', credits5k:'aufbau', planetrole:'aufbau', allroles:'aufbau',
     allresearch:'forschung', allresearchmax:'forschung', allexotic:'forschung', skilltreemax:'forschung', forschungsnexus:'forschung', allmegaprojects:'forschung', module1:'forschung', module_legendary:'forschung', raffinerieoptimierer:'forschung',
     synthesemeister:'aufbau', singularitaetsarchitekt:'aufbau',
-    tenkills:'krieg', bossdown:'krieg', abyssdown:'krieg', nyradown:'krieg', allbosses:'krieg', moonsiegewin:'krieg', basewarwin:'krieg', warvictor:'krieg', allveteran:'krieg',
+    tenkills:'krieg', bossdown:'krieg', abyssdown:'krieg', nyradown:'krieg', allbosses:'krieg', moonsiegewin:'krieg', basewarwin:'krieg', warvictor:'krieg', kriegsheld:'krieg', ligameister:'krieg', allveteran:'krieg',
     allsystems:'expansion', explorer25:'expansion', conquer1:'expansion', conquer5:'expansion',
-    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', shop5:'handel',
+    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', shop5:'handel', gutvernetzt:'handel',
     allianzweltprojekt:'allianz', allianzausbau100:'allianz', allianzeinsatz:'allianz', allianceraidkill:'allianz',
     firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister', streak30:'meister', streak100:'meister', happyhour10:'meister'
   };
@@ -9902,7 +9911,7 @@
   // abschätzen kann, ob der Frachtraum bei einem Glücksfund knapp würde.
   const EXPEDITION_MAX_RESOURCE_FIND_BASE = 700;
   function expeditionMaxResourceFind(rewardMult){
-    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02) * seasonalLootMult());
+    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + moduleBonusTotal('expedition')) * seasonalLootMult());
   }
   // Frachter als Eskorte (20.07.2026, Spieler-Wunsch): tragen 0 Angriffspunkte bei (wie bei
   // ATTACK_SHIP_KEYS), erweitern aber den Frachtraum für Ressourcenfunde (siehe fleetCargoCapacity()
@@ -10136,6 +10145,8 @@
     if (hasRoleAnywhere('science')) labMult *= 0.90; // Forschungs-Welt: -10% Forschungszeit (imperiumsweit, nicht stapelbar)
     labMult *= (1 - officerBonus('wissenschaftler'));
     labMult *= allianceBaseResearchTimeMult();
+    labMult *= Math.max(0.5, 1 - prestigePerkCount('research')*0.03); // Prestige-Perk "Chefwissenschaftler"
+    labMult *= Math.max(0.6, 1 - moduleBonusTotal('research')); // imperiumsweites Forschungsmodul
     return Math.round(r.baseDuration * Math.pow(r.durationMult, targetLevel-1) * labMult);
   }
   function researchCostFor(r, targetLevel){
@@ -10528,6 +10539,7 @@
     }
     const doc = activeDoctrine();
     if (doc) cap *= doc.cargoMult;
+    cap *= (1 + prestigePerkCount('storage')*0.05); // Prestige-Perk "Lagermeister"
     return cap;
   }
   // ===== Tier-2-Ressourcen: generische Raffinerie-Engine =====
@@ -10728,7 +10740,10 @@
   const PRESTIGE_PERKS = [
     { key:'prod', name:'Produktionsspezialist', icon:'ti-bolt', desc:'+3% Ressourcenproduktion' },
     { key:'combat', name:'Kampferfahrung', icon:'ti-sword', desc:'+3% Angriffs- und Verteidigungspunkte' },
-    { key:'speed', name:'Navigationsexperte', icon:'ti-rocket', desc:'-3% Flugzeit aller Missionen' }
+    { key:'speed', name:'Navigationsexperte', icon:'ti-rocket', desc:'-3% Flugzeit aller Missionen' },
+    { key:'expedition', name:'Fernraum-Pfadfinder', icon:'ti-map-2', desc:'+4% Expeditions-Belohnung' },
+    { key:'storage', name:'Lagermeister', icon:'ti-box', desc:'+5% Lagerkapazität' },
+    { key:'research', name:'Chefwissenschaftler', icon:'ti-flask', desc:'-3% Forschungszeit' }
   ];
   function prestigePerkCount(key){ return (state.prestigePerks||[]).filter(k=>k===key).length; }
   function missionDurationFor(sec, fleet, relevantKeys, targetSystem){
@@ -10908,7 +10923,13 @@
     // viele gegnerische Schiffe die Abwehr bei einem ABGEWEHRTEN Überfall zerstört (siehe
     // defenseAttackPower), unabhängig von der reinen Verteidigungsstärke (Panzerungsmodul).
     { key:'lager', name:'Lagermodul', icon:'ti-box', effect:'storage', base:0.08, desc:'Erhöht die Lagerkapazität dieses Standorts.' },
-    { key:'abwehr', name:'Abwehrmodul', icon:'ti-target', effect:'defatk', base:0.08, desc:'Erhöht den Gegenschlag der Verteidigung – bei einem abgewehrten Überfall werden mehr gegnerische Schiffe zerstört.' }
+    { key:'abwehr', name:'Abwehrmodul', icon:'ti-target', effect:'defatk', base:0.08, desc:'Erhöht den Gegenschlag der Verteidigung – bei einem abgewehrten Überfall werden mehr gegnerische Schiffe zerstört.' },
+    // Imperiumsweite Module (21.07.2026): Anders als die ortsgebundenen Module oben wirken diese beiden
+    // GLOBAL - ihr Bonus wird über ALLE Standorte aufsummiert (moduleBonusTotal), nicht pro Standort
+    // angewendet. Damit decken sie zwei Bereiche ab, die es per Standort-Modul bisher nicht gab
+    // (Forschungszeit und Expeditions-Ausbeute sind ohnehin imperiumsweite Systeme).
+    { key:'forschung', name:'Forschungsmodul', icon:'ti-flask', effect:'research', base:0.05, desc:'Verkürzt die Forschungszeit – imperiumsweit (alle Standorte zählen zusammen).' },
+    { key:'sonde', name:'Sondenmodul', icon:'ti-map-2', effect:'expedition', base:0.06, desc:'Erhöht die Ausbeute deiner Expeditionen – imperiumsweit (alle Standorte zählen zusammen).' }
   ];
   const MODULE_MAX_SLOT_LEVEL = 4; // max. Slots pro Planet
   function moduleInstanceInfo(instKey){
@@ -10928,6 +10949,13 @@
       const info = moduleInstanceInfo(instKey);
       if (info && info.def.effect === effect) sum += info.bonus;
     }
+    return sum;
+  }
+  // Summe eines Modul-Effekts über ALLE Standorte - für imperiumsweite Module (Forschung/Expedition),
+  // die nicht ortsgebunden wirken. Gedeckelt an den Verbrauchsstellen (Math.max/Math.min).
+  function moduleBonusTotal(effect){
+    let sum = 0;
+    for (const pk of Object.keys(state.equippedModules||{})) sum += moduleBonusAt(pk, effect);
     return sum;
   }
   // Slot-Aufwertung: kostet Kommandopunkte, steigend mit Slot-Level und teurer für die Heimatbasis-... nein,
@@ -12260,6 +12288,7 @@
             if (parts.length) msg += ' + '+parts.join(', ');
           }
           if (state.weeklyLeague) state.weeklyLeague.lastResult = { weekKey: r.weekKey, league: lg.key, rank: r.rank, total: r.total };
+          if (lg.key === 'platin') state.leaguePlatinum = (state.leaguePlatinum||0) + 1; // für Erfolg "Ligameister"
           log('Wochenliga abgerechnet: '+lg.name+'-Liga (Platz '+r.rank+' von '+r.total+'). Belohnung: '+msg+'.', 'ti-trophy', 'ok');
           playSound('achieve');
           pushReport({ type:'weekly-reward', rank:r.rank, rewardLabel: lg.name+'-Liga (Platz '+r.rank+'/'+r.total+'): '+msg });
@@ -12268,6 +12297,7 @@
         }
         if (r.type === 'war-victory'){
           state.credits = (state.credits||0) + (r.credits||0);
+          state.warsWon = (state.warsWon||0) + 1; // für Erfolg "Kriegsheld"
           log('KRIEG GEWONNEN gegen Allianz ['+(r.enemyTag||'?')+']! Siegprämie: +'+fmt(r.credits||0)+' Kredite. '+(r.myScore!=null?'Endstand '+r.myScore+':'+r.theirScore+'.':''), 'ti-trophy', 'ok');
           playSound('achieve');
           pushReport({ type:'weekly-reward', rank:1, rewardLabel: 'Kriegssieg gegen ['+(r.enemyTag||'?')+']: +'+fmt(r.credits||0)+' Kredite' });
@@ -23398,7 +23428,7 @@
           // Rückwärtskompatibel: ältere, bereits unterwegs befindliche Expeditionen ohne gespeicherten
           // Typ nutzen die bisherigen Standard-Werte (0.35 Begegnungschance, normale Beute).
           const encounterChance = m.encounterChance!==undefined ? m.encounterChance : 0.35;
-          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02) * seasonalLootMult();
+          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + moduleBonusTotal('expedition')) * seasonalLootMult();
           const encountered = Math.random() < encounterChance;
           let outcome = 'success';
           // Auf Funktionsebene gehoben (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe"): vorher nur im
