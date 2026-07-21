@@ -45,4 +45,20 @@ Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Op
 
 Push nach `main` landet im Repo; live geht es erst, wenn Sascha die Änderungen manuell auf seinem Raspberry Pi zieht (dort läuft nginx und bedient `gamegeeeeek.de`/`www.gamegeeeeek.de`, per DynDNS bei Domain-Offensive). **GitHub Pages ist nicht aktiviert** (Settings → Pages: Source = „None") und deployt nichts – im Zweifel nachfragen statt einen automatischen Pull anzunehmen.
 
+### Pi-Laufzeit-Setup (Docker) und TLS-Zertifikat
+
+Der „nginx auf dem Pi" ist **kein systemd-nginx**, sondern läuft als **Docker-Container** (Vorfall 21.07.2026 – Zertifikat deckte nur `gamegeeeeek.de`, nicht `www.` → `NET::ERR_CERT_COMMON_NAME_INVALID` auf www). Wichtige Fakten für künftige Zertifikats-/Deploy-Fragen:
+
+- **Container**: `kepler7-nginx` (Image `nginx:alpine`) bedient 80+443; `kepler7-backend` ist das Node-Backend (nginx proxyt `/api/` intern auf `http://kepler7-backend:3001/api/`). Ein **systemd-`nginx`** existiert auf dem Host nur als Altlast und ist bewusst **deaktiviert** (`systemctl disable --now nginx`) – ihn zu starten scheitert an „Address already in use", weil Docker die Ports hält. **Nicht** versuchen, den systemd-nginx zu benutzen.
+- **Host-Mounts des nginx-Containers**: `/DATA/kepler7/certbot/conf → /etc/letsencrypt` (**hier liegen die Zertifikate**), `/DATA/kepler7/certbot/www → /var/www/certbot` (ACME-Webroot), `/DATA/kepler7/nginx/nginx.conf → /etc/nginx/conf.d/default.conf`, `/DATA/kepler7/web → /usr/share/nginx/html` (die Spieldateien).
+- **Das Zertifikat MUSS immer BEIDE Domains abdecken**: `gamegeeeeek.de` **und** `www.gamegeeeeek.de` (Canonical/OG-Tags, sitemap.xml, robots.txt zeigen alle auf `www.` als kanonische Domain). Zertifikats-Linie heißt `gamegeeeeek.de` (`live/gamegeeeeek.de/`); die `ssl_certificate`-Pfade in der nginx.conf zeigen dorthin.
+- **Neu ausstellen/erweitern** (downtime-frei, Webroot-Challenge über den laufenden Container – **kein** nginx.conf-Edit nötig, `--cert-name` hält die Linie stabil):
+  ```
+  docker run --rm -v /DATA/kepler7/certbot/conf:/etc/letsencrypt -v /DATA/kepler7/certbot/www:/var/www/certbot certbot/certbot certonly --webroot -w /var/www/certbot --cert-name gamegeeeeek.de -d gamegeeeeek.de -d www.gamegeeeeek.de --expand --non-interactive --agree-tos -m luftsascha@icloud.com
+  docker exec kepler7-nginx nginx -s reload
+  ```
+  (Vorher risikofrei mit `--dry-run` testen.) Prüfen: `echo | openssl s_client -connect www.gamegeeeeek.de:443 -servername www.gamegeeeeek.de 2>/dev/null | openssl x509 -noout -text | grep -A1 "Subject Alternative Name"` → beide DNS-Namen müssen erscheinen.
+- **Auto-Erneuerung** läuft per root-crontab (`certbot renew --quiet` im certbot-Container mit denselben Volumes, danach nginx-Reload/Restart). `certbot renew` nutzt die gespeicherte Renewal-Config und erneuert damit automatisch **beide** Domains – die `-d`-Namen nicht erneut angeben.
+- Der Host `certbot.timer` (systemd) ist eine **harmlose Altlast** und kennt die Docker-Volume-Zertifikate nicht – ignorieren.
+
 **PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main` und Sascha kann sie gar nicht erst auf den Pi ziehen. Gilt für Frontend- und Backend-Repo gleichermaßen.
