@@ -2276,7 +2276,7 @@
           <div class="leaderboard" id="allianceMembersBox"><div class="bmeta">lädt…</div></div>
 
           <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-skull" aria-hidden="true"></i>Allianz-Kriege</div>
-          <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Im Krieg gibt jeder erfolgreiche Angriff auf ein Mitglied der gegnerischen Allianz +50% Kampfpunkte und zählt für den gemeinsamen Kriegspunktestand. Nur Admins können Krieg erklären oder Frieden schließen.</div>
+          <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Ein Krieg läuft <strong>7 Tage</strong>: Jeder erfolgreiche Angriff auf ein Mitglied der gegnerischen Allianz gibt +50% Kampfpunkte und zählt für den gemeinsamen Kriegspunktestand. Am Ende gewinnt die Allianz mit mehr Kriegspunkten – ihre beteiligten Kämpfer erhalten je eine Kredit-Siegprämie (serverseitig ausgeschüttet). Nur Admins können Krieg erklären oder vorzeitig Frieden schließen.</div>
           <div id="allianceWarsBox"><div class="bmeta">lädt…</div></div>
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:0.5rem;" id="allianceWarDeclareRow">
             <div style="display:flex; gap:6px;">
@@ -3434,8 +3434,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.204.0';
+  const VERSION = '8.205.0';
   const PATCHNOTES = [
+    { version:'8.205.0', date:'21.07.2026', changes:[
+      'Allianz-Kriege haben jetzt ein Ziel: Ein erklärter Krieg läuft 7 Tage. Danach löst der Server ihn automatisch auf, kürt anhand der Kriegspunkte einen Sieger und schüttet allen beteiligten Kämpfern der siegreichen Allianz eine Kredit-Siegprämie aus (1.200 Kredite je Kämpfer, beim nächsten Login gutgeschrieben) – bei Gleichstand endet der Krieg unentschieden. Der Kriegs-Bereich (Allianz-Tab → Mitglieder & Kriege) zeigt jetzt den Countdown bis zum Ende und ob deine Allianz führt. Vorzeitiger Frieden per Admin bleibt möglich (dann ohne Prämie). Bestehende, vor diesem Update erklärte Kriege laufen unverändert weiter (ohne Zeitfenster).',
+    ]},
     { version:'8.204.0', date:'21.07.2026', changes:[
       'Neu: Freundesliste. Merke dir andere Spieler über ihr Profil („···"-Menü → „Als Freund merken") und finde sie gebündelt im Galaxie-Tab unter Rangliste & Ruhm → Nachrichten → Freunde – mit Online-Status und Punktestand, plus Direktzugriff auf Nachricht schreiben, Profil öffnen und entfernen. Persönliche Merkliste (max. 30), übersteht Prestige und Aufstieg. Nutzt die bestehenden Direktnachrichten. Nur mit eigenem Server.',
     ]},
@@ -12263,6 +12266,14 @@
           save();
           continue;
         }
+        if (r.type === 'war-victory'){
+          state.credits = (state.credits||0) + (r.credits||0);
+          log('KRIEG GEWONNEN gegen Allianz ['+(r.enemyTag||'?')+']! Siegprämie: +'+fmt(r.credits||0)+' Kredite. '+(r.myScore!=null?'Endstand '+r.myScore+':'+r.theirScore+'.':''), 'ti-trophy', 'ok');
+          playSound('achieve');
+          pushReport({ type:'weekly-reward', rank:1, rewardLabel: 'Kriegssieg gegen ['+(r.enemyTag||'?')+']: +'+fmt(r.credits||0)+' Kredite' });
+          save();
+          continue;
+        }
         if (r.credits) state.credits = (state.credits||0) + r.credits;
         log('Dankeschön vom Team: +'+fmt(r.credits)+' Kredite für deinen Bug-Report!', 'ti-award');
         save();
@@ -17510,6 +17521,13 @@
         let myScore = 0, theirScore = 0;
         try { const r1 = await storageGet('alliance:'+tag+':warscore:'+enemyTag, true); myScore = r1 && r1.value ? (JSON.parse(r1.value).score||0) : 0; } catch(e){}
         try { const r2 = await storageGet('alliance:'+enemyTag+':warscore:'+tag, true); theirScore = r2 && r2.value ? (JSON.parse(r2.value).score||0) : 0; } catch(e){}
+        let endsAt = 0;
+        try { const rm = await storageGet('alliance:'+tag+':warmeta:'+enemyTag, true); endsAt = rm && rm.value ? (JSON.parse(rm.value).endsAt||0) : 0; } catch(e){}
+        const msLeft = endsAt - Date.now();
+        const leadTxt = myScore>theirScore ? '<span style="color:#5dcaa5;">in Führung</span>' : (myScore<theirScore ? '<span style="color:#e24b4a;">im Rückstand</span>' : 'Gleichstand');
+        const timeHtml = endsAt>0
+          ? `<div class="bmeta" style="margin-top:4px; padding-left:24px;"><i class="ti ti-clock" aria-hidden="true" style="margin-right:3px;"></i>${msLeft>0 ? 'Endet in '+fmtDuration(msLeft/1000)+' · '+leadTxt+' · Sieger-Belohnung fürs Team' : 'Wird abgerechnet…'}</div>`
+          : '';
         const top = await loadWarTopContributors(tag, enemyTag);
         const topHtml = top.length
           ? `<div class="bmeta" style="margin-top:4px; padding-left:24px;"><i class="ti ti-medal" aria-hidden="true" style="color:#fac775; margin-right:3px;"></i>Top: ${top.map((t,i)=>(i+1)+'. '+escapeHtml(t.name)+' ('+t.score+')').join(' · ')}</div>`
@@ -17526,6 +17544,7 @@
                 ${amIAdmin ? `<button data-make-peace="${escapeHtml(enemyTag)}" style="font-size:10px; padding:5px 8px;"><i class="ti ti-flag" aria-hidden="true"></i> Frieden</button>` : ''}
               </div>
             </div>
+            ${timeHtml}
             ${topHtml}
           </div>
         `);
@@ -17534,19 +17553,27 @@
       box.querySelectorAll('[data-make-peace]').forEach(btn => btn.addEventListener('click', () => makePeace(btn.getAttribute('data-make-peace'))));
     } catch(e){ box.innerHTML = `<div class="bmeta">Kriegsliste aktuell nicht verfügbar.</div>`; }
   }
+  // Kriegs-Wertungsfenster: Ein erklärter Krieg läuft 7 Tage; danach löst ihn der Server (galaxyTick)
+  // automatisch auf, kürt anhand der Kriegspunkte einen Sieger und schüttet dessen Kämpfern eine
+  // Belohnung aus (siehe resolveAllianceWarsServer im Backend + claimPendingRewards 'war-victory').
+  const WAR_DURATION_MS = 7*24*60*60*1000;
   async function declareWar(enemyTag){
     if (state.player.allianceRole !== 'admin'){ log('Nur Admins können Krieg erklären.', 'ti-alert-triangle'); return; }
     const tag = myAllianceTag();
     enemyTag = String(enemyTag||'').trim().toUpperCase();
     if (!tag || !enemyTag){ return; }
     if (enemyTag === tag){ log('Man kann sich selbst keinen Krieg erklären.', 'ti-alert-triangle'); return; }
-    if (!confirm('Der Allianz ['+enemyTag+'] wirklich den Krieg erklären? Angriffe auf ihre Mitglieder geben dann +50% Kampfpunkte für beide Seiten.')) return;
+    if (!confirm('Der Allianz ['+enemyTag+'] wirklich den Krieg erklären? Der Krieg läuft 7 Tage. Angriffe auf ihre Mitglieder geben dann +50% Kampfpunkte für beide Seiten. Am Ende gewinnt die Allianz mit mehr Kriegspunkten – ihre Kämpfer erhalten eine Belohnung.')) return;
     try {
       const mine = await getWarList(tag);
       if (!mine.includes(enemyTag)){ mine.push(enemyTag); await storageSet('alliance:'+tag+':wars', JSON.stringify({ enemies: mine }), true); }
       const theirs = await getWarList(enemyTag);
       if (!theirs.includes(tag)){ theirs.push(tag); await storageSet('alliance:'+enemyTag+':wars', JSON.stringify({ enemies: theirs }), true); }
-      log('Krieg gegen Allianz ['+enemyTag+'] erklärt!', 'ti-skull', 'crit');
+      // Zeitfenster auf beiden Seiten festhalten (gleiche Daten, damit der Server es unabhängig findet).
+      const meta = JSON.stringify({ startedAt: Date.now(), endsAt: Date.now()+WAR_DURATION_MS, declaredBy: tag });
+      await storageSet('alliance:'+tag+':warmeta:'+enemyTag, meta, true);
+      await storageSet('alliance:'+enemyTag+':warmeta:'+tag, meta, true);
+      log('Krieg gegen Allianz ['+enemyTag+'] erklärt! Läuft 7 Tage.', 'ti-skull', 'crit');
       const input = document.getElementById('allianceWarTagInput');
       if (input) input.value = '';
       loadAllianceWars();
@@ -17563,6 +17590,11 @@
       await storageSet('alliance:'+tag+':wars', JSON.stringify({ enemies: mine }), true);
       const theirs = (await getWarList(enemyTag)).filter(e=>e!==tag);
       await storageSet('alliance:'+enemyTag+':wars', JSON.stringify({ enemies: theirs }), true);
+      // Zeitfenster entwerten, damit der Server die verwaisten Kriegsdaten zügig aufräumt (ohne Belohnung,
+      // da die Allianzen nicht mehr in den Kriegslisten stehen).
+      const dead = JSON.stringify({ startedAt: 0, endsAt: 0, declaredBy: tag });
+      await storageSet('alliance:'+tag+':warmeta:'+enemyTag, dead, true);
+      await storageSet('alliance:'+enemyTag+':warmeta:'+tag, dead, true);
       log('Frieden mit Allianz ['+enemyTag+'] geschlossen.', 'ti-flag');
       loadAllianceWars();
       postAllianceBaseNews('🕊 Frieden mit Allianz ['+enemyTag+'] geschlossen (von '+(state.player.name||'einem Admin')+').');
