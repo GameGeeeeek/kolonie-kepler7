@@ -3408,8 +3408,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.183.0';
+  const VERSION = '8.184.0';
   const PATCHNOTES = [
+    { version:'8.184.0', date:'21.07.2026', changes:[
+      'Wichtiger Bugfix (Spieler-Report): Beim automatischen Neuladen nach einem Versions-Update wurde der aktuelle Spielstand nicht mehr zuverlässig gespeichert - die Seite lud neu, bevor die (asynchrone) Server-Speicherung fertig war. Dadurch gingen die zuletzt gemachten Änderungen verloren und lösten beim nächsten Laden erneut aus: Tagesaufgaben und der tägliche Login-Bonus wirkten „zurückgesetzt", und ein bereits ausgetragener Überfall tauchte als immer gleicher Kampfbericht wieder auf. Jetzt wird vor JEDEM Update-Neuladen (automatisch wie per Knopf) zuerst sauber zu Ende gespeichert (mit Sicherheits-Timeout, falls der Server klemmt).',
+    ]},
     { version:'8.183.0', date:'21.07.2026', changes:[
       'Expedition: neuer „Ganze Flotte als Eskorte"-Knopf setzt alle eskortfähigen Schiffstypen auf einen Schlag auf ihr verfügbares Maximum (Gegenstück zum bestehenden „Alle Eskorten entfernen") - spart das Durchklicken der einzelnen „Max"-Knöpfe.',
       'Expedition: Frachtraum-Vorschau im Startbereich. Zeigt den aktuellen Frachtraum (Basis 2000 + Frachter der Eskorte) an und warnt rechtzeitig, wenn ein großer Ressourcenfund (typisch bei Tiefenraum-Expeditionen mit erfahrener Crew) den Frachtraum sprengen könnte - dann lohnt sich ein Frachter oder Großer Frachter in der Eskorte, damit nichts von der Beute verloren geht.',
@@ -31142,6 +31145,19 @@
       })
       .catch(()=>{});
   }
+  // Vor JEDEM Neuladen wegen eines Versions-Updates den aktuellen Stand SICHER persistieren, BEVOR
+  // location.reload() navigiert. Bugfix (Spieler-Report 21.07.2026: "Tagesquests/tägliche Belohnung
+  // resetten sich nach jedem Update, und es kommt gefühlt immer derselbe Kampfbericht"): der frühere
+  // Ablauf (save(); location.reload() bzw. beim manuellen Knopf reload() ganz ohne save) riss die
+  // asynchrone Speicherung mitten im Backend-PUT ab. Dadurch gingen die zuletzt gemachten
+  // Zustandsänderungen verloren - der heutige Login-Marker (lastLoginDate), die frisch gewürfelten
+  // Tagesquests und ein gerade aufgelöster Überfall (nextRaidTime/incomingRaid genullt) landeten nie
+  // auf dem Server, sodass sie beim nächsten Laden erneut auslösten (immer derselbe gespeicherte Raid).
+  // Der Safety-Timeout stellt sicher, dass ein hängender Server das Neuladen trotzdem nie blockiert.
+  async function saveThenReload(){
+    try { await Promise.race([ Promise.resolve(save()), new Promise(r => setTimeout(r, 5000)) ]); } catch(e){}
+    location.reload();
+  }
   function scheduleAutoReload(newVersion){
     if (autoReloadPending) return;
     autoReloadPending = true;
@@ -31152,7 +31168,7 @@
       const isTyping = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA');
       if (isTyping){ setTimeout(attempt, 5000); return; }
       pushToast('Neue Version ('+newVersion+') gefunden – wird automatisch geladen…', 'ti-refresh');
-      setTimeout(() => { save(); location.reload(); }, 2500);
+      setTimeout(() => { saveThenReload(); }, 2500);
     };
     attempt();
   }
@@ -31484,7 +31500,7 @@
   const welcomeBackDismissBtn = document.getElementById('welcomeBackDismissBtn');
   if (welcomeBackDismissBtn) welcomeBackDismissBtn.addEventListener('click', closeWelcomeBack);
   const updateReloadBtn = document.getElementById('updateReloadBtn');
-  if (updateReloadBtn) updateReloadBtn.addEventListener('click', () => location.reload());
+  if (updateReloadBtn) updateReloadBtn.addEventListener('click', saveThenReload);
   const updateNoticeOverlayEl = document.getElementById('updateNoticeOverlay');
   if (updateNoticeOverlayEl) updateNoticeOverlayEl.addEventListener('click', (e) => { if (e.target === updateNoticeOverlayEl && !liveUpdateShown) closeUpdateNotice(); });
 
