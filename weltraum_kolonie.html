@@ -977,8 +977,8 @@
     .ach-pts { font-family:var(--font-mono, monospace); font-size:9.5px; font-weight:700; color:#fac775; background:rgba(250,199,117,0.13);
       border:0.5px solid rgba(250,199,117,0.35); border-radius:5px; padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
     /* Markt-Vertiefung (20.07.2026): Preisverlauf-Sparkline + Ereignis-Banner */
-    .mkt-spark-wrap { flex-shrink:0; opacity:0.9; align-self:flex-start; }
-    .mkt-spark { display:block; }
+    .mkt-spark-wrap { flex-shrink:0; opacity:1; align-self:flex-start; }
+    .mkt-spark { display:block; width:150px; height:44px; }
     .mkt-event { display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:0.9rem; border-radius:10px;
       clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
     .mkt-event > i { font-size:20px; flex-shrink:0; }
@@ -3426,8 +3426,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.193.0';
+  const VERSION = '8.194.0';
   const PATCHNOTES = [
+    { version:'8.194.0', date:'21.07.2026', changes:[
+      'Markt: Nach einem Klick auf „Max Kauf"/„Max Verkauf" (und auch beim Tippen der Menge) aktualisiert sich die Kredit-Schätzung auf den Kaufen/Verkaufen-Buttons jetzt SOFORT, statt bis zu ~2 Sekunden nachzuhängen.',
+      'Markt: Der Mini-Preisverlauf (Sparkline) je Ressource ist jetzt deutlich besser lesbar - größer, mit Hintergrund-Panel, kräftigerer Linie, Mittellinie und leuchtendem Endpunkt (war vorher kaum sichtbar).',
+    ]},
     { version:'8.193.0', date:'21.07.2026', changes:[
       'Neue Standort-Module: „Lagermodul" (erhöht die Lagerkapazität dieses Standorts) und „Abwehrmodul" (Gegenschlag - bei einem abgewehrten Überfall werden mehr gegnerische Schiffe zerstört). Damit gibt es jetzt sieben Standort-Modultypen.',
       'Neue Schiffsklassen-Module (je eins mehr pro Klasse): Nachbrenner (Schlachtschiff +Geschwindigkeit), Not-Panzerung (Frachter +Verteidigungsbeitrag), Deflektorschild (Aufklärer +Schild), Schildmatrix (Mondzerstörer +Schild).',
@@ -8063,7 +8067,9 @@
   let sparkGradSeq = 0;
   function marketSparkline(hist, color){
     if (!Array.isArray(hist) || hist.length < 2) return '';
-    const W = 108, H = 30, pad = 3;
+    // Größer + kontrastreicher als zuvor (Spieler-Report "kaum sichtbar"): Hintergrund-Panel, kräftigere
+    // Linie/Fläche, Mittellinie und ein leuchtender Endpunkt, damit der Preisverlauf klar ablesbar ist.
+    const W = 150, H = 44, pad = 5;
     const min = Math.min(...hist), max = Math.max(...hist);
     const range = (max - min) || 1;
     const n = hist.length;
@@ -8074,14 +8080,18 @@
     };
     const linePts = hist.map((v,i) => xy(i).map(z=>z.toFixed(1)).join(',')).join(' ');
     const [lx, ly] = xy(n-1);
+    const midY = (pad + (1-((hist.reduce((a,b)=>a+b,0)/n)-min)/range)*(H-2*pad)).toFixed(1);
     const areaPts = `${pad.toFixed(1)},${(H-pad).toFixed(1)} ${linePts} ${(W-pad).toFixed(1)},${(H-pad).toFixed(1)}`;
     const gid = 'spg'+(++sparkGradSeq);
     return `<svg class="mkt-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" aria-hidden="true">`
-      + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.34"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`
+      + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.45"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/></linearGradient></defs>`
+      + `<rect x="0.5" y="0.5" width="${W-1}" height="${H-1}" rx="7" fill="rgba(10,13,26,0.55)" stroke="${color}" stroke-opacity="0.28" stroke-width="1"/>`
+      + `<line x1="${pad}" y1="${midY}" x2="${W-pad}" y2="${midY}" stroke="${color}" stroke-opacity="0.18" stroke-width="0.8" stroke-dasharray="3 3"/>`
       + `<polygon points="${areaPts}" fill="url(#${gid})" stroke="none"/>`
-      + `<polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`
-      + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.4" fill="${color}" opacity="0.22"/>`
-      + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="1.9" fill="${color}"/>`
+      + `<polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`
+      + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="5" fill="${color}" opacity="0.28"/>`
+      + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.6" fill="${color}"/>`
+      + `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="1.2" fill="#fff" opacity="0.85"/>`
       + `</svg>`;
   }
   // Entwurfszustand des Limit-Order-Formulars (nur UI, nicht gespeichert).
@@ -8130,6 +8140,15 @@
         <div class="bmeta" data-lo-pricehint>${curPrice!==null?`Aktueller Preis ${resDefFor(d.resource).label}: <strong>${curPrice.toFixed(2)}</strong> Kr./Einheit`:''}</div>
       </div>
       ${openHtml}`;
+  }
+  // Aktualisiert die Kredit-Schätzungen der Kaufen/Verkaufen-Buttons einer Markt-Zeile SOFORT, ohne auf
+  // den nächsten renderMarket() zu warten (der wird übersprungen, solange das Mengenfeld fokussiert ist,
+  // siehe isTypingIn('marketBox') - deshalb hing die Anzeige nach einem "Max"-Klick bisher ~2s hinterher).
+  function updateMarketRowEstimate(box, k, amt){
+    const buyBtn = box.querySelector('[data-market-buy="'+k+'"]');
+    const sellBtn = box.querySelector('[data-market-sell="'+k+'"]');
+    if (buyBtn) buyBtn.innerHTML = '<i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>Kaufen (~'+fmt(estimateTradeCredits('buy', k, amt))+' Kr.)';
+    if (sellBtn) sellBtn.innerHTML = '<i class="ti ti-truck" aria-hidden="true" style="margin-right:3px;"></i>Verkaufen (~'+fmt(estimateTradeCredits('sell', k, amt))+' Kr.)';
   }
   function renderMarket(){
     const cd = document.getElementById('creditsDisplay');
@@ -8239,6 +8258,7 @@
     box.querySelectorAll('[data-market-amt]').forEach(inp => inp.oninput = () => {
       const k = inp.getAttribute('data-market-amt');
       marketTradeAmounts[k] = Math.max(1, Math.floor(Number(inp.value)||1));
+      updateMarketRowEstimate(box, k, marketTradeAmounts[k]);
     });
     box.querySelectorAll('[data-market-buy]').forEach(btn => btn.onclick = () => {
       const k = btn.getAttribute('data-market-buy');
@@ -8258,6 +8278,7 @@
       if (maxQty < 1){ log('Nicht genug Kredite für einen Kauf von '+resDefFor(k).label+'.', 'ti-alert-triangle'); return; }
       input.value = maxQty;
       marketTradeAmounts[k] = maxQty;
+      updateMarketRowEstimate(box, k, maxQty);
       input.focus();
     });
     box.querySelectorAll('[data-market-max-sell]').forEach(btn => btn.onclick = () => {
@@ -8268,6 +8289,7 @@
       if (owned < 1){ log('Kein Bestand von '+resDefFor(k).label+' zum Verkaufen.', 'ti-alert-triangle'); return; }
       input.value = owned;
       marketTradeAmounts[k] = owned;
+      updateMarketRowEstimate(box, k, owned);
       input.focus();
     });
   }
