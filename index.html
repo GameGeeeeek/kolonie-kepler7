@@ -2113,6 +2113,7 @@
             <div class="card-row"><div class="left"><i class="ti ti-user" aria-hidden="true"></i><div class="bname">Allianz-Bewerbungen</div><div class="bmeta">Nur relevant für Allianz-Admins/Offiziere</div></div><div class="toggle-switch" data-notif-cat="application"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-target" aria-hidden="true"></i><div class="bname">Spionage-Warnungen</div><div class="bmeta">Wenn dich jemand ausspäht</div></div><div class="toggle-switch" data-notif-cat="spy"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-sword" aria-hidden="true"></i><div class="bname">Angriffe auf dich</div><div class="bmeta">Wenn dich ein Spieler angreift</div></div><div class="toggle-switch" data-notif-cat="attack"><div class="toggle-knob"></div></div></div>
+            <div class="card-row"><div class="left"><i class="ti ti-trophy" aria-hidden="true"></i><div class="bname">Bestenlisten-Überholung</div><div class="bmeta">Wenn dich jemand in der Rangliste überholt</div></div><div class="toggle-switch" data-notif-cat="leaderboard"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
           </div>
@@ -3406,8 +3407,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.178.0';
+  const VERSION = '8.179.0';
   const PATCHNOTES = [
+    { version:'8.179.0', date:'21.07.2026', changes:[
+      'Neu: Benachrichtigung, wenn dich jemand in der Bestenliste überholt. Fällst du in der Rangliste zurück, weil ein anderer Spieler an dir vorbeigezogen ist, bekommst du eine Meldung (Postfach und - bei aktiviertem Web-Push - aufs Handy) mit deinem neuen Platz und dem Namen des Überholers. Bewusst nur für die vorderen Ränge und mit Ruhephase gegen Spam. Eigene, abschaltbare Kategorie unter Einstellungen → Benachrichtigungen → „Bestenlisten-Überholung". So bleibt der Wettkampf um die Spitzenplätze spannend.',
+    ]},
     { version:'8.178.0', date:'21.07.2026', changes:[
       'Neu: Comeback-Mission für Rückkehrer. Warst du mindestens 48 Stunden weg, wartet beim Zurückkommen oben im Basis-Tab eine kurze, geführte 3-Schritt-Mission (ein Gebäude ausbauen, eine Forschung abschließen, einen Kampf gewinnen) - jeder Schritt bringt sofort eine Belohnung, der Abschluss zusätzlich +40 Kredite und +25% Produktion für 2 Stunden. So findet man nach einer Pause schnell und mit klarer Marschrichtung wieder in die Kernschleife zurück.',
     ]},
@@ -13710,7 +13714,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true, spy:true, attack:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -13743,7 +13747,8 @@
     'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' },
     'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' },
     'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' },
-    'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') }
+    'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') },
+    'leaderboard-overtaken': { icon:'ti-trophy', color:'#fac775', text:(p)=>(p.aheadName||'Ein Spieler')+' ist an dir vorbeigezogen - du bist jetzt auf Platz '+(p.rank||'?')+'. Zeit, zurückzuschlagen!' }
   };
   async function loadNotificationEvents(){
     if (!useBackend()) return;
