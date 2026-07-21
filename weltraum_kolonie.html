@@ -3460,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.215.0';
+  const VERSION = '8.216.0';
   const PATCHNOTES = [
+    { version:'8.216.0', date:'21.07.2026', changes:[
+      'Grafik: Gelegentlich ziehen jetzt Sternschnuppen durch den Weltraum-Hintergrund – ein heller Kopf mit ausblendendem Schweif, alle paar Sekunden von einer Seite schräg nach unten. Rein dekorativ, ohne Einfluss aufs Spiel; bei aktiviertem „Bewegung reduzieren" (Systemeinstellung) erscheinen keine.',
+    ]},
     { version:'8.215.0', date:'21.07.2026', changes:[
       'Barrierefreiheit: 20 Symbol-Schaltflächen ohne Text (Schließen-, Senden-, Löschen-, Abbrechen- und Warteschlangen-Knöpfe) haben jetzt eine sprechende Beschriftung (aria-label). Screenreader lesen sie dadurch als das vor, was sie tun, statt nur als „Schaltfläche" – rein additiv, an Aussehen und Bedienung ändert sich nichts.',
     ]},
@@ -24623,6 +24626,12 @@
     const reduceMotion = typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let layers = [];
     let nebulae = [];
+    // Gelegentliche Sternschnuppen (rein dekorativ, on-theme fürs Weltraum-Setting). Bei
+    // prefers-reduced-motion werden gar keine erzeugt (siehe Spawn-Gate unten). Leben im selben
+    // requestAnimationFrame-Loop wie die Sterne - der pausiert im Hintergrund-Tab automatisch.
+    let meteors = [];
+    let meteorLastT = 0;
+    let nextMeteorAt = 3000 + Math.random()*6000; // erste Schnuppe 3-9s nach dem Laden
     function resize(){
       canvas.width = shell.clientWidth; canvas.height = shell.clientHeight;
       const totalCount = Math.floor((canvas.width*canvas.height)/9000);
@@ -24649,6 +24658,7 @@
     resize();
     const ctx = canvas.getContext('2d');
     function frame(t){
+      const dt = meteorLastT ? Math.min(50, t - meteorLastT) : 16; meteorLastT = t;
       ctx.clearRect(0,0,canvas.width,canvas.height);
       for (const neb of nebulae){
         const ndx = reduceMotion ? 0 : Math.sin(t*0.00006 + neb.driftPhase)*30;
@@ -24665,6 +24675,41 @@
           const alpha = 0.25 + 0.55*Math.abs(Math.sin(t*0.001*s.twSpeed + s.phase));
           ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
           ctx.beginPath(); ctx.arc(s.x+dx, s.y, s.r, 0, Math.PI*2); ctx.fill();
+        }
+      }
+      // Sternschnuppen: nur ohne prefers-reduced-motion. Alle paar Sekunden eine, die von einer Seite
+      // schräg nach unten zieht - als heller Kopf mit ausblendendem Schweif (Verlaufslinie).
+      if (!reduceMotion){
+        if (t > nextMeteorAt){
+          nextMeteorAt = t + 5000 + Math.random()*9000; // nächste in 5-14s
+          const fromLeft = Math.random() < 0.5;
+          const speed = 0.45 + Math.random()*0.35; // px/ms
+          const ang = (18 + Math.random()*20) * Math.PI/180;
+          const vx = (fromLeft ? 1 : -1) * speed * Math.cos(ang);
+          const vy = speed * Math.sin(ang);
+          meteors.push({
+            x: fromLeft ? -40 : canvas.width + 40,
+            y: Math.random() * canvas.height * 0.5,
+            vx, vy, len: 70 + Math.random()*90, age: 0, life: 900 + Math.random()*500,
+            tint: Math.random() < 0.5 ? '186,230,255' : '255,255,255'
+          });
+        }
+        for (let i = meteors.length - 1; i >= 0; i--){
+          const m = meteors[i];
+          m.age += dt; m.x += m.vx*dt; m.y += m.vy*dt;
+          const lifeK = m.age / m.life;
+          if (lifeK >= 1 || m.x < -80 || m.x > canvas.width+80 || m.y > canvas.height+80){ meteors.splice(i,1); continue; }
+          const fade = lifeK < 0.15 ? lifeK/0.15 : (lifeK > 0.7 ? (1-lifeK)/0.3 : 1);
+          const a = Math.max(0, Math.min(1, fade)) * 0.8;
+          const nlen = m.len / Math.hypot(m.vx, m.vy);
+          const tx = m.x - m.vx*nlen, ty = m.y - m.vy*nlen;
+          const grad = ctx.createLinearGradient(m.x, m.y, tx, ty);
+          grad.addColorStop(0, `rgba(${m.tint},${a.toFixed(2)})`);
+          grad.addColorStop(1, `rgba(${m.tint},0)`);
+          ctx.strokeStyle = grad; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(tx, ty); ctx.stroke();
+          ctx.fillStyle = `rgba(255,255,255,${a.toFixed(2)})`;
+          ctx.beginPath(); ctx.arc(m.x, m.y, 1.4, 0, Math.PI*2); ctx.fill();
         }
       }
       requestAnimationFrame(frame);
