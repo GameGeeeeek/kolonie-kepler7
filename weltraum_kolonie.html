@@ -1059,7 +1059,12 @@
        bei den Teilen-Karten, hier als reines CSS statt Canvas, da es interaktiv/live ist), größerer
        Avatar, Eintritts-Animation. Tritt der .profile-card/.login-card-Gruppe oben bei, damit der
        Eckenschnitt automatisch mitkommt statt dupliziert zu werden. */
-    .profile-hero-card { overflow-y:auto; overflow-x:hidden; padding:0; max-height:calc(100vh - 40px); animation:profileHeroIn 0.35s cubic-bezier(0.2,0.8,0.3,1.1); background:linear-gradient(180deg,#0d1120,#0a0d18); border:1px solid var(--line-1); box-shadow:0 24px 60px rgba(0,0,0,0.55); }
+    .profile-hero-card { overflow-y:auto; overflow-x:hidden; padding:0; max-height:calc(100vh - 40px); animation:profileHeroIn 0.35s cubic-bezier(0.2,0.8,0.3,1.1); background:linear-gradient(180deg,#0d1120,#0a0d18); border:1px solid var(--line-1); box-shadow:0 24px 60px rgba(0,0,0,0.55); scrollbar-width:thin; scrollbar-color:rgba(var(--info-rgb),0.55) transparent; }
+    /* Schlanke HUD-Scrollleiste im Profil-Modal (Neon-Verlauf, eingerückter Daumen) statt grauer Browser-Standardleiste */
+    .profile-hero-card::-webkit-scrollbar { width:9px; }
+    .profile-hero-card::-webkit-scrollbar-track { background:transparent; margin:8px 0; }
+    .profile-hero-card::-webkit-scrollbar-thumb { background:linear-gradient(180deg, rgba(var(--primary-rgb),0.65), rgba(var(--info-rgb),0.6)); border:2px solid transparent; background-clip:padding-box; border-radius:10px; }
+    .profile-hero-card::-webkit-scrollbar-thumb:hover { background:linear-gradient(180deg, var(--c-primary), var(--c-info)); border:2px solid transparent; background-clip:padding-box; }
     @keyframes profileHeroIn { 0%{ opacity:0; transform:scale(0.96) translateY(6px); } 100%{ opacity:1; transform:scale(1) translateY(0); } }
     @media (prefers-reduced-motion: reduce){ .profile-hero-card { animation:none; } }
     .profile-hero-bg { position:relative; padding:22px 20px 16px; background:
@@ -3408,8 +3413,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.187.0';
+  const VERSION = '8.188.0';
   const PATCHNOTES = [
+    { version:'8.188.0', date:'21.07.2026', changes:[
+      'Punktestand-Fehler behoben: Schiffe, die gerade verlegt werden, an der Allianzbasis stationiert sind oder einem koordinierten Musterangriff angeschlossen wurden, zählten NICHT mehr in den Punktestand - dadurch fiel er scheinbar grundlos (z.B. um zehntausende Punkte), obwohl gar keine Schiffe zerstört wurden. Diese eigenen Schiffe werden jetzt wieder voll mitgerechnet; der Punktestand bleibt beim Verlegen/Entsenden stabil. (Missionen, bei denen die Schiffe in der Flotte verbleiben - Angriff, Expedition, Weltboss usw. - waren nie betroffen.)',
+      'Optik: Die Scrollleiste im Spieler-Profil-Fenster ist jetzt eine schlanke HUD-Leiste im Neon-Verlauf (Lila→Cyan) statt der grauen Browser-Standardleiste - passt sich damit dem restlichen Design an.',
+    ]},
     { version:'8.187.0', date:'21.07.2026', changes:[
       'Eigentliche Ursache des Speicher-Problems gefunden und behoben: Der Server hat bei stark entwickelten Konten den kompletten Spielstand abgelehnt (eine interne Plausibilitätsprüfung mit zu niedrigen Obergrenzen für Gebäude-/Forschungsstufen und Kredite). Das Spiel hat diese Ablehnung bisher STILL ignoriert - dadurch wurde gar nichts mehr gespeichert und bei jedem Laden der letzte akzeptierte Stand geladen (immer „8 Std. offline", Tagesbonus/Bauqueue/Forschung scheinbar zurückgesetzt, gleicher Kampfbericht). Die Grenzen sind jetzt weit über jeden realistischen Fortschritt angehoben (serverseitig). Zusätzlich meldet das Spiel eine vom Server abgelehnte Speicherung jetzt deutlich, statt sie stillschweigend zu verschlucken.',
     ]},
@@ -12080,9 +12089,36 @@
     // (atk 220 -> 180), plus Aufschlag für die Einzigartigkeit.
     mondzerstoerer:250
   };
+  // Eigene Schiffe, die gerade NICHT in einer stationierten Flotte stehen, dem Spieler aber weiterhin
+  // gehören: unterwegs bei Verlegung/Basisverteidigung/Solo-Allianzbasis-Angriff, an der Allianzbasis
+  // stationiert oder einem koordinierten Musterangriff angeschlossen. Diese MÜSSEN in den Punktestand
+  // einfließen, sonst FÄLLT er scheinbar grundlos (z.B. um zehntausende Punkte), sobald man eine große
+  // Flotte verlegt oder zur Allianzbasis schickt - die Schiffe sind nicht zerstört, nur woanders.
+  // Missionen, bei denen die Schiffe in der Flotte VERBLEIBEN (Angriff, Expedition, Weltboss, Piraten-
+  // versteck, Leerenriss, Erkundung ...), sind hier bewusst NICHT gelistet - sie zählen bereits über
+  // allFleets() und würden sonst doppelt gewertet.
+  function awayShipTotalsForScore(){
+    const away = {};
+    const add = (k,v)=>{ if (typeof v==='number' && v>0) away[k] = (away[k]||0) + v; };
+    for (const fleet of allFleets()){
+      for (const m of (fleet.missions||[])){
+        if (!m) continue;
+        if (m.type==='relocate') add(m.shipKey, m.qty);
+        else if (m.type==='defend-base' || m.type==='defend-base-return' || m.type==='attack-alliance-base'){
+          for (const [k,v] of Object.entries(m.composition||{})) add(k,v);
+        }
+      }
+    }
+    for (const [k,v] of Object.entries(state.shipsAtAllianceBase||{})) add(k,v);
+    const contrib = state.allianceMusterContribution;
+    if (contrib && contrib.composition) for (const [k,v] of Object.entries(contrib.composition)) add(k,v);
+    return away;
+  }
   function computeShipScoreTotal(){
     let total = 0;
     for (const f of allFleets()) for (const [key,weight] of Object.entries(SHIP_SCORE_WEIGHTS)) total += (f[key]||0) * weight;
+    const away = awayShipTotalsForScore();
+    for (const [key,weight] of Object.entries(SHIP_SCORE_WEIGHTS)) total += (away[key]||0) * weight;
     return total;
   }
   function computeResearchScoreTotal(){
@@ -12107,6 +12143,10 @@
     const buildLvl = allBuildingSets().reduce((sum,b) => sum + Object.values(b).reduce((a,v)=>a+v,0), 0);
     const shipTotals = {};
     for (const f of allFleets()) for (const key of Object.keys(SHIP_SCORE_WEIGHTS)) shipTotals[key] = (shipTotals[key]||0) + (f[key]||0);
+    // Unterwegs/geparkte eigene Schiffe (Verlegung, Allianzbasis, Musterangriff) ebenfalls einrechnen,
+    // damit Anzahl und Detailzeilen zur Gesamtpunktzahl passen (siehe awayShipTotalsForScore).
+    const awayForBreakdown = awayShipTotalsForScore();
+    for (const key of Object.keys(SHIP_SCORE_WEIGHTS)) shipTotals[key] = (shipTotals[key]||0) + (awayForBreakdown[key]||0);
     const shipCountAll = Object.values(shipTotals).reduce((a,b)=>a+b,0);
     const shipDetailLines = Object.entries(shipTotals).filter(([,c])=>c>0).map(([key,c]) => (shipDefOrSuper(key)||{name:key}).name+': '+c+' × '+SHIP_SCORE_WEIGHTS[key]+' = '+(c*SHIP_SCORE_WEIGHTS[key])).join(', ') || 'keine Schiffe';
     const researchLevelSum = Object.values(state.research).reduce((a,lvl)=>a+(lvl||0), 0);
