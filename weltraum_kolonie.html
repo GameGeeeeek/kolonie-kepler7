@@ -3460,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.217.0';
+  const VERSION = '8.218.0';
   const PATCHNOTES = [
+    { version:'8.218.0', date:'22.07.2026', changes:[
+      'Bugfix (Überfall-/Kampfberechnung): Bei einem erfolgreich abgewehrten Überfall, einem abgefangenen Piraten-Trümmerräuber und einem gewonnenen NPC-Kampf wurden dem verteidigenden Planeten fälschlich Veteranen-Erfahrungspunkte abgezogen – und zwar umso mehr, je mehr Gegner du zerstört hast. Der Abzug war eigentlich nur für EIGENE Flottenverluste gedacht, wurde aber versehentlich auch auf die zerstörte Gegnerflotte angewendet. Ab sofort verlieren gewonnene Verteidigungen/Abfänge/NPC-Kämpfe keine Veteranen-XP mehr (das Trümmerfeld bleibt wie gehabt).',
+    ]},
     { version:'8.217.0', date:'22.07.2026', changes:[
       'Neu: Auch die Heimatbasis kann jetzt eine Planeten-Rolle bekommen (Bergbau/Festung/Werft/Handel/Forschung/Logistik) – bisher gab es Rollen nur für Kolonien. Auswahl wie gewohnt im Basis-Tab, wenn die Heimatbasis aktiv ist; alle Boni wirken identisch wie bei Kolonien (erste Zuweisung sofort, ein Wechsel kostet Ressourcen + Umbauzeit, 2-Stunden-Cooldown). Wie bei Kolonien wird die Rolle bei einem Neustart (Prestige/Aufstieg) zurückgesetzt.',
     ]},
@@ -12236,7 +12239,7 @@
       // jetzt bleibt ein Trümmerfeld zurück (das zu einem Mond heranwachsen kann).
       const defAtk = defenseAttackPower(targetPlanet);
       const raiderLossPct = Math.max(0.15, Math.min(0.9, defAtk/(defAtk+raiderPower*0.4)));
-      const lostRaiderShips = applyCombatLosses(raiderFleet, Object.keys(raiderFleet), raiderLossPct, targetPlanet);
+      const lostRaiderShips = applyCombatLosses(raiderFleet, Object.keys(raiderFleet), raiderLossPct, targetPlanet, null, true);
       const lostText = lostCountsToText(lostRaiderShips);
       const raidDebris = combatDebrisOf(lostRaiderShips);
       log('Verteidigung von '+planetDisplayName(targetPlanet)+' hat den Überfall von '+factionName+' erfolgreich abgewehrt.'+(lostText?' Zerstört: '+lostText+'. Trümmerfeld hinterlassen.':''), 'ti-shield-lock');
@@ -23540,7 +23543,7 @@
           const chance = Math.max(0.55, Math.min(0.97, power/(power+raid.power*0.6)));
           const success = Math.random() < chance;
           if (success){
-            const lostPirates = applyCombatLosses(raid.fleet, Object.keys(raid.fleet), Math.max(0.5, Math.min(1, power/(power+raid.power*0.3))), planetKey);
+            const lostPirates = applyCombatLosses(raid.fleet, Object.keys(raid.fleet), Math.max(0.5, Math.min(1, power/(power+raid.power*0.3))), planetKey, null, true);
             const lostPiratesText = lostCountsToText(lostPirates);
             const bpGained = 8;
             awardBattlePoints(bpGained);
@@ -23686,7 +23689,7 @@
             const npcFleet = m.npcFleet || npcFleetFor(npc).fleet;
             const npcLossPct = Math.max(0.4, Math.min(0.9, power/(power+effDefense)));
             const npcFleetRemains = {...npcFleet};
-            const destroyedNpcShips = applyCombatLosses(npcFleetRemains, Object.keys(npcFleet), npcLossPct, planetKey);
+            const destroyedNpcShips = applyCombatLosses(npcFleetRemains, Object.keys(npcFleet), npcLossPct, planetKey, null, true);
             const npcDebris = combatDebrisOf(destroyedNpcShips) || { erz:0, kristalle:0 };
             // Auch bei einem Sieg nimmt die eigene Flotte jetzt kleinere Verluste (5-15%) statt komplett
             // unversehrt zurückzukehren – Trümmerfeld dafür kommt zum ohnehin schon vorhandenen
@@ -23992,9 +23995,14 @@
   // mitgeflogen sind) – sourcePool (i.d.R. m.composition der Mission) legt fest, aus welchem Pool
   // die Verlust-Prozente gezogen werden. Abgezogen wird trotzdem vom Gesamtbestand (fleet), da die
   // mitgeflogenen Schiffe ja Teil davon sind.
-  function applyCombatLosses(fleet, shipKeys, lossPct, debrisPlanetKey, sourcePool){
-    // Veteranen-XP schrumpft anteilig mit den Verlusten des Standorts (30% Verlust = ~30% XP weg).
-    if (debrisPlanetKey && (state.veteranXp||{})[debrisPlanetKey]){
+  function applyCombatLosses(fleet, shipKeys, lossPct, debrisPlanetKey, sourcePool, enemyFleet){
+    // Veteranen-XP schrumpft anteilig mit den Verlusten des Standorts (30% Verlust = ~30% XP weg) -
+    // aber NUR, wenn hier die EIGENE Flotte reduziert wird. Bei gegnerischen Flotten (enemyFleet=true:
+    // abgewehrte Raider, abgefangene Piraten, zerstörte NPC-Schiffe) wird weiterhin ein Trümmerfeld am
+    // Zielplaneten hinterlegt, es dürfen aber KEINE eigenen Veteranen-XP schrumpfen - der Verteidiger hat
+    // gerade gewonnen und selbst nichts verloren (Bugfix v8.218.0: vorher zog jeder gewonnene Abwehr-/
+    // Abfang-/NPC-Kampf dem eigenen Planeten XP ab, proportional zu den GEGNER-Verlusten).
+    if (!enemyFleet && debrisPlanetKey && (state.veteranXp||{})[debrisPlanetKey]){
       addVeteranXp(debrisPlanetKey, -Math.round(state.veteranXp[debrisPlanetKey] * Math.min(0.95, Math.max(0, lossPct))));
     }
     const pool = sourcePool || fleet;
