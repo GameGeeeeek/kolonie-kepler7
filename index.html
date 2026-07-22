@@ -3460,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.221.0';
+  const VERSION = '8.222.0';
   const PATCHNOTES = [
+    { version:'8.222.0', date:'22.07.2026', changes:[
+      'Bugfix (danke für den Report): Ein gescheiterter Leerenriss-Einsatz zeigte im Bericht „nullx Jäger, nullx Bomber …" statt der echten Verluste. Ursache war ein Rechenfehler bei den Flottenverlusten (ein Objekt statt der Verlustquote), der die Verlustzahlen auf einen ungültigen Wert setzte – und dabei sogar die betroffenen Schiffstypen der Flotte beschädigen konnte. Behoben: Der gescheiterte Leerenriss-Einsatz zieht jetzt korrekt die vorgesehenen 15–30% ab und zeigt die echten Verluste an.',
+    ]},
     { version:'8.221.0', date:'22.07.2026', changes:[
       'Lesbarkeit (Nachtrag): Auch die Live-Anflug-Countdowns zeigen jetzt Minuten statt roher Sekunden – „Ankunft in 284s" wird zu „Ankunft in 4m 44s". Betrifft Leerenriss-Anflug, Piraten-Abfangflotte und das Spähschiff zur anfliegenden Überfall-Flotte.',
     ]},
@@ -23620,7 +23623,7 @@
             pushReport(__battleReport);
             state.voidRift = null;
           } else {
-            const ownLostRift = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.15+Math.random()*0.15), planetKey, m.composition);
+            const ownLostRift = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.15+Math.random()*0.15).pct, planetKey, m.composition);
             const ownLostRiftText = lostCountsToText(ownLostRift);
             addVeteranXp(planetKey, 3);
             if (showLog !== false) log('Die Flotte konnte den Leerenriss über '+planetDisplayName(rift.planetKey)+' nicht schließen - die Leere-Energie hat sie zurückgeschlagen.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':'')+' Ein neuer Versuch ist möglich, solange der Riss offen ist.', 'ti-alert-triangle');
