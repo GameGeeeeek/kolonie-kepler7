@@ -3460,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.222.0';
+  const VERSION = '8.223.0';
   const PATCHNOTES = [
+    { version:'8.223.0', date:'22.07.2026', changes:[
+      'Neu: Erholungspause nach großen Überfall-Gefechten. Wurde bei einem Überfall eine große Flotte zerstört (mindestens 25 Schiffe – ob abgewehrte Raider oder eigene Verluste) oder war es ein Superangriff, folgt jetzt eine deutlich längere Ruhephase, bevor der nächste NPC-Überfall ansetzt: zusätzlich 1,5–3 Stunden obendrauf zur normalen Pause (~40–80 Min). So bleibt nach einem verlustreichen Kampf Zeit, Flotte und Verteidigung wieder aufzubauen, statt sofort von der nächsten Welle überrollt zu werden.',
+    ]},
     { version:'8.222.0', date:'22.07.2026', changes:[
       'Bugfix (danke für den Report): Ein gescheiterter Leerenriss-Einsatz zeigte im Bericht „nullx Jäger, nullx Bomber …" statt der echten Verluste. Ursache war ein Rechenfehler bei den Flottenverlusten (ein Objekt statt der Verlustquote), der die Verlustzahlen auf einen ungültigen Wert setzte – und dabei sogar die betroffenen Schiffstypen der Flotte beschädigen konnte. Behoben: Der gescheiterte Leerenriss-Einsatz zieht jetzt korrekt die vorgesehenen 15–30% ab und zeigt die echten Verluste an.',
     ]},
@@ -12068,6 +12071,9 @@
   }
   function maybeScheduleRaid(){
     if (state.nextRaidTime) return;
+    // Erholungspause nach einem großen Überfall-Gefecht (siehe executeRaid): in dieser Zeit wird kein
+    // neuer Überfall angesetzt, damit man Flotte/Verteidigung wieder aufbauen kann.
+    if (state.raidCooldownUntil && Date.now() < state.raidCooldownUntil) return;
     // Void-Diplomatie: guter Ruf bei den Void-Marodeuren macht Überfälle seltener (raidChanceMult 1/0.75/0.5).
     const chance = 0.35 * (state.research.rfruehwarnung ? Math.max(0.3, 1-((state.research.rfruehwarnung||0)*RESEARCH_DEFS.find(r=>r.key==='rfruehwarnung').effectPerLevel)) : 1) * raidChanceMult();
     if (Math.random() > chance) return;
@@ -12257,6 +12263,7 @@
     playAlarmSound(); // Alarm ertönt immer, sobald ein Überfall tatsächlich stattfindet – unabhängig vom Ausgang
     const repelChance = Math.max(0.1, Math.min(0.9, dp/(dp+raiderPower)));
     let builtReport = null;
+    let raidShipsDestroyed = 0; // Schiffe, die in DIESEM Gefecht zerstört wurden (Raider bei Abwehr bzw. eigene bei erfolgreichem Überfall) - steuert die verlängerte Erholungspause unten
     if (Math.random() < repelChance){
       // Verteidigungs-Angriffswert (nur Waffen-Gebäude, siehe atkVal) bestimmt jetzt, wie viel der
       // Raider-Flotte tatsächlich zerstört wird – vorher verschwand eine abgewehrte Flotte spurlos,
@@ -12264,6 +12271,7 @@
       const defAtk = defenseAttackPower(targetPlanet);
       const raiderLossPct = Math.max(0.15, Math.min(0.9, defAtk/(defAtk+raiderPower*0.4)));
       const lostRaiderShips = applyCombatLosses(raiderFleet, Object.keys(raiderFleet), raiderLossPct, targetPlanet, null, true);
+      raidShipsDestroyed = Object.values(lostRaiderShips).reduce((a,b)=>a+(b>0?b:0),0);
       const lostText = lostCountsToText(lostRaiderShips);
       const raidDebris = combatDebrisOf(lostRaiderShips);
       log('Verteidigung von '+planetDisplayName(targetPlanet)+' hat den Überfall von '+factionName+' erfolgreich abgewehrt.'+(lostText?' Zerstört: '+lostText+'. Trümmerfeld hinterlassen.':''), 'ti-shield-lock');
@@ -12309,6 +12317,7 @@
         const retreat = applyRetreatDampening(lossPct*0.5);
         const ownLostShips = applyCombatLosses(defenderFleet, ATTACK_SHIP_KEYS, retreat.pct, targetPlanet);
         ownLostShipsForReport = ownLostShips;
+        raidShipsDestroyed = Object.values(ownLostShips).reduce((a,b)=>a+(b>0?b:0),0);
         ownLossDebris = combatDebrisOf(ownLostShips);
         const ownLostTextInner = lostCountsToText(ownLostShips);
         if (ownLostTextInner) ownLossText = ' Eigene Flottenverluste: '+ownLostTextInner+'.'+(retreat.retreated?' Ein Teil der Flotte konnte sich rechtzeitig zurückziehen.':'');
@@ -12320,6 +12329,14 @@
     }
     if (state.incomingRaid && state.incomingRaid.scoutArrival && !state.incomingRaid.scouted){
       log('Der Spähbericht kam zu spät - die feindliche Flotte ist bereits eingeschlagen, bevor das Spähschiff sie erreichte.', 'ti-alert-triangle');
+    }
+    // Nach einem großen Gefecht (viele Schiffe zerstört und/oder ein Superangriff) eine deutlich längere
+    // Ruhephase bis zum nächsten Überfall – Zeit, Flotte und Verteidigung wieder aufzubauen. Normal folgt
+    // der nächste Überfall in ~40-80 Min; nach einem großen Gefecht kommen 1,5-3 Std. Erholung obendrauf
+    // (maybeScheduleRaid setzt in dieser Zeit keinen neuen Überfall an).
+    const RAID_BIG_BATTLE_SHIPS = 25;
+    if (raidShipsDestroyed >= RAID_BIG_BATTLE_SHIPS || isSuper){
+      state.raidCooldownUntil = Date.now() + (5400 + Math.random()*5400)*1000;
     }
     state.nextRaidTime = null;
     state.incomingRaid = null;
@@ -16390,6 +16407,7 @@
       { title:'Tresor: Ressourcenschutz bei Überfällen', body:'Ein erfolgreicher NPC-Überfall stiehlt normalerweise 5-50% jeder Ressource (abhängig von Angriffs-/Verteidigungskraft, weiter gesenkt durch Notfallprotokolle-Forschung, Allianz-Grenzbollwerk und Module). Der <strong>Tresor</strong> (Gebäude, benötigt Notfallprotokolle-Forschung) schützt zusätzlich <strong>400 jeder Ressource pro Stufe</strong> komplett vor diesem Verlust, unabhängig vom Prozentsatz - nur der Überschuss darüber hinaus ist noch gefährdet. Da Ressourcen über alle Planeten hinweg gemeinsam verwaltet werden, zählt die Summe aller deiner Tresore, egal welcher Planet gerade angegriffen wird.' },
       { title:'Taktik-Haltung', body:'Im Forschung-Tab frei wählbar, jederzeit kostenlos wechselbar: <strong>Aggressiv</strong> (+10% Angriff, -10% Verteidigung), <strong>Ausgewogen</strong> (neutral) oder <strong>Defensiv</strong> (-10% Angriff, +15% Verteidigung).' },
       { title:'Rückzugs-Mechanik', body:'Übersteigt die eigene Verlustquote in einem Gefecht 40%, rettet sich die Hälfte des Anteils <em>oberhalb</em> dieser Schwelle rechtzeitig zurück, statt komplett zerstört zu werden. Gilt bei Überfall-Verteidigung, NPC-Angriffen und PvP-Duellen – nicht für Raider-/NPC-Flotten.' },
+      { title:'Erholungspause nach großen Gefechten', body:'Normalerweise folgt der nächste NPC-Überfall rund 40-80 Minuten nach dem letzten. Wurde bei einem Überfall aber eine <strong>große Flotte zerstört</strong> (mindestens 25 Schiffe – egal ob abgewehrte Raider oder eigene Verluste) oder handelte es sich um einen <strong>Superangriff</strong>, kommen zusätzlich <strong>1,5-3 Stunden</strong> Ruhe obendrauf. So bleibt nach einem verlustreichen Gefecht Zeit, Flotte und Verteidigung wieder aufzubauen, bevor die nächste Welle anrollt.' },
       { title:'Heimatbasis-Bonus', body:'Die Heimatbasis hat <strong>+20% Verteidigungspunkte</strong> gegenüber identisch ausgebauten Kolonien. Macht "Heimat verteidigen" bewusst wichtiger.' },
       { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte.' },
       { title:'Verluste nachbauen', body:'Enthält ein Kampfbericht eigene Schiffsverluste, erscheint darunter der Knopf <strong>„Verluste nachbauen"</strong>: reiht alle verlorenen Schiffstypen in der passenden Menge am aktuell gewählten Standort in die Bauwarteschlange ein - zu den regulären Kosten ab dem heutigen Bestand. Seltene, itemgebundene Einheiten werden bewusst nicht automatisch nachgebaut (kein stiller Item-Verbrauch per Klick), ebenso wenig Schiffe, die bereits am Maximalbestand sind - dafür erscheint ein Hinweis.' },
