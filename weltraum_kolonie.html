@@ -3460,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.218.0';
+  const VERSION = '8.219.0';
   const PATCHNOTES = [
+    { version:'8.219.0', date:'22.07.2026', changes:[
+      'Berechnungs-Feinschliff (nach Prüfung der Kampfrechnung): Die Gesamt-Verteidigungsanzeige berücksichtigt jetzt auch beim „Alle Standorte"-Wert den Orbitalring-Verteidigungsfokus und aktive Planetenereignisse auf der stationierten Flotte – vorher flossen diese nur in den Pro-Planet-Wert ein, wodurch die Gesamt-Verteidigung leicht unterschätzt wurde (u.a. relevant für die Skalierung der Überfall-Stärke). Zusätzlich eine interne Absicherung in der Kampfkraft-Berechnung gegen unvollständige Flottendaten (verhindert seltene Fehlwerte).',
+    ]},
     { version:'8.218.0', date:'22.07.2026', changes:[
       'Bugfix (Überfall-/Kampfberechnung): Bei einem erfolgreich abgewehrten Überfall, einem abgefangenen Piraten-Trümmerräuber und einem gewonnenen NPC-Kampf wurden dem verteidigenden Planeten fälschlich Veteranen-Erfahrungspunkte abgezogen – und zwar umso mehr, je mehr Gegner du zerstört hast. Der Abzug war eigentlich nur für EIGENE Flottenverluste gedacht, wurde aber versehentlich auch auf die zerstörte Gegnerflotte angewendet. Ab sofort verlieren gewonnene Verteidigungen/Abfänge/NPC-Kämpfe keine Veteranen-XP mehr (das Trümmerfeld bleibt wie gehabt).',
     ]},
@@ -11033,6 +11036,10 @@
   const MEGA_FLEET_THRESHOLD = 300;
   const MEGA_FLEET_DIMINISH_RATE = 0.5;
   function diminishingShipCount(count){
+    // Absicherung (v8.219.0): undefined/NaN würde sonst durchrutschen - `undefined <= SCHWELLE` ist
+    // false, wodurch der else-Zweig mit `undefined - SCHWELLE` = NaN die gesamte Kampfkraft auf NaN
+    // kippen würde. Coercion auf 0 macht die Funktion robust gegen unvollständige Flottenobjekte.
+    count = count || 0;
     if (count <= MEGA_FLEET_THRESHOLD) return count;
     return MEGA_FLEET_THRESHOLD + (count-MEGA_FLEET_THRESHOLD)*MEGA_FLEET_DIMINISH_RATE;
   }
@@ -11749,6 +11756,14 @@
         let shipDef = shipDefenseContribution(f) * fleetDiversityMult(f);
         const role = planetRoleOf(planet);
         if (role && role.key==='fortress') shipDef *= 1.30;
+        // Konsistenz zur Pro-Planet-Berechnung oben (v8.219.0): Orbitalring-Verteidigungsfokus und ein
+        // aktives Planetenereignis wirken auch hier auf die stationierte Flotten-Verteidigung - fehlten
+        // in der Gesamt-Summe bisher, wodurch defensePower() ohne Argument die eigene Flotten-Abwehr
+        // leicht unterschätzte (u.a. relevant für die Überfall-Stärke-Untergrenze).
+        const orbF = orbitalStationOf(planet);
+        if (orbF && orbF.focus==='def') shipDef *= 1 + 0.08*orbF.level;
+        const evF = planetEventOf(planet);
+        if (evF && evF.def.effect.type==='def') shipDef *= evF.def.effect.mult;
         shipDef *= planetTypeDefMult(planet) * terraformDefMult(planet);
         if (planet === 'home') shipDef *= HOME_DEFENSE_BONUS;
         shipDef *= moonPenalty(planet);
