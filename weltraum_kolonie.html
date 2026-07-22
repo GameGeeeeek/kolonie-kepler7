@@ -3472,8 +3472,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.227.0';
+  const VERSION = '8.228.0';
   const PATCHNOTES = [
+    { version:'8.228.0', date:'22.07.2026', changes:[
+      'Bugfix (danke für den Report): Die Tagesaufgabe „1 Fähigkeitspunkt investieren" war für Spieler mit komplett freigeschaltetem Fähigkeitsbaum unerfüllbar – es gab nichts mehr, worin man investieren konnte. Sie wird jetzt gar nicht mehr angeboten, sobald alle Fähigkeitsbaum-Knoten freigeschaltet sind. Eine bereits aktive, dadurch unerfüllbar gewordene Aufgabe wird beim nächsten Laden automatisch und kostenlos gegen eine erfüllbare getauscht (kein Kommandopunkt-Reroll nötig).',
+    ]},
     { version:'8.227.0', date:'22.07.2026', changes:[
       'Komfort: Tagesaufgaben sind jetzt Direktsprünge. Tippt man eine noch offene Aufgabe an, springt das Spiel direkt zum passenden Menü – z.B. „1 Fähigkeitspunkt investieren" öffnet den Fortschritt-Tab und klappt den Fähigkeitsbaum auf, „3 NPC-Kämpfe gewinnen" führt in den Galaxie-Tab. Verdrahtet für alle Aufgaben mit eindeutigem Ziel (Forschung, Markt, Expedition, NPC-Kämpfe, Planet entdecken, Allianzbeitrag, Fähigkeitspunkt). Fertige Aufgaben holen beim Antippen wie gehabt die Belohnung ab.',
     ]},
@@ -12996,7 +12999,10 @@
     // Kandidaten gefunden - siehe Chat: Auto-Erkundungstour hätte nur mit 'explore' doppelt gezählt):
     // von 11 auf 14 Typen erweitert.
     { key:'shop', name:'1 Item im Kredit-Shop kaufen', icon:'ti-diamond', target:1, reward:{credits:60} },
-    { key:'skillpoint', name:'1 Fähigkeitspunkt investieren', icon:'ti-award', target:1, reward:{erz:400,kristalle:200}, nav:{ tab:'fortschritt', section:'faehigkeitsbaum' } },
+    // available (Spieler-Report): sobald ALLE Fähigkeitsbaum-Knoten freigeschaltet sind, kann man keinen
+    // Punkt mehr investieren - die Aufgabe wäre dauerhaft unerfüllbar. Nur anbieten, solange noch mindestens
+    // ein Knoten offen ist. (Zu wenig Punkte ist nur temporär und daher kein Ausschlussgrund.)
+    { key:'skillpoint', name:'1 Fähigkeitspunkt investieren', icon:'ti-award', target:1, reward:{erz:400,kristalle:200}, nav:{ tab:'fortschritt', section:'faehigkeitsbaum' }, available: () => SKILL_TREE.some(n => !(state.skillTree||{})[n.key]) },
     { key:'alliancecontrib', name:'1x zur Allianz beitragen', icon:'ti-users', target:1, reward:{credits:80}, nav:{ tab:'allianz' } },
     // Tier-2-Anbindung (Tier-2-Konzept Block 2, 19.07.2026): zählt die ECHTE Fabrik-Produktion des
     // Tages über alle fünf Ketten (Zähler in processTier2Factories). Nur im Tages-Pool, wenn
@@ -13007,9 +13013,30 @@
   ];
   const DAILY_QUEST_ACTIVE_COUNT = 5;
   const DAILY_QUEST_REROLL_COST = 15;
+  // Tauscht eine bereits AKTIVE, noch nicht abgeholte Tagesaufgabe KOSTENLOS aus, wenn sie durch
+  // Spielfortschritt strukturell unerfüllbar geworden ist (available() jetzt false) - z.B. „Fähigkeitspunkt
+  // investieren", nachdem der komplette Fähigkeitsbaum freigeschaltet wurde (Spieler-Report). Anders als der
+  // kostenpflichtige Reroll ist das gratis, weil der Spieler nichts dafür kann. Gibt true zurück, wenn etwas
+  // getauscht wurde (damit der Aufrufer speichern kann).
+  function sanitizeDailyQuests(){
+    if (!state.dailyQuests || !state.dailyQuests.activeKeys) return false;
+    let changed = false;
+    state.dailyQuests.activeKeys.forEach((k, idx) => {
+      if (state.dailyQuests.claimed[k]) return;
+      const def = DAILY_QUEST_DEFS.find(d=>d.key===k);
+      if (def && def.available && !def.available()){
+        const unused = DAILY_QUEST_DEFS.filter(d => (!d.available || d.available())).map(d=>d.key).filter(nk => !state.dailyQuests.activeKeys.includes(nk));
+        if (unused.length){
+          state.dailyQuests.activeKeys[idx] = unused[Math.floor(Math.random()*unused.length)];
+          changed = true;
+        }
+      }
+    });
+    return changed;
+  }
   function initDailyQuests(){
     const today = new Date().toDateString();
-    if (state.dailyQuests && state.dailyQuests.date === today) return;
+    if (state.dailyQuests && state.dailyQuests.date === today){ if (sanitizeDailyQuests()) save(); return; }
     // Streak/Wochenzähler (Spieler-Wunsch "Erfolg + Streak-Bonus"): wird beim TAGESWECHSEL anhand des
     // GESTERIGEN Standes ausgewertet, nicht beim Abholen selbst - so zählt es auch dann korrekt, wenn
     // die letzte Aufgabe des Tages erst nach Mitternacht (aber noch am "gestrigen" Client-Datum)
