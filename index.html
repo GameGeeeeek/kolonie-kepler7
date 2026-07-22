@@ -3472,8 +3472,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.230.0';
+  const VERSION = '8.231.0';
   const PATCHNOTES = [
+    { version:'8.231.0', date:'22.07.2026', changes:[
+      'Komfort: „Alles einsammeln". Warten mehrere fällige Belohnungen aus verschiedenen Systemen gleichzeitig – fertige Tagesaufgaben, abholbare Fraktionsgeschenke und/oder erreichte Dominanz-Stufen – erscheint in der Tagesaufgaben-Leiste ein Sammel-Knopf, der ab zwei fälligen Belohnungen insgesamt alles mit einem Klick abholt. Der bisherige „Alle abholen" (nur Tagesaufgaben) bleibt, wird aber unterdrückt, solange der übergeordnete Sammel-Knopf sichtbar ist. Bewusst rein solo/synchron – Allianz-Belohnungen mit eigener Bestätigung bleiben außen vor.',
+    ]},
     { version:'8.230.0', date:'22.07.2026', changes:[
       'Komfort: Warteschlangen-Gesamtzeit. Bei mehreren Aufträgen in der Schiffs- oder Verteidigungs-Bauwarteschlange steht jetzt oben „Warteschlange (N): alles fertig in ~X" – die Restzeit des laufenden Auftrags plus die Bauzeiten der wartenden. Wartet ein Auftrag noch auf Ressourcen, wird das als Zusatzzeit gekennzeichnet. Auch die Forschungs-Warteschlange zeigt jetzt „fertig in ~X" (inkl. Restzeit einer laufenden Forschung).',
     ]},
@@ -13164,6 +13167,38 @@
     for (const k of claimable) claimDailyQuest(k, true);
     render(); save();
   }
+  // "Alles einsammeln" (Komfort-Wunsch): holt in EINEM Klick alle gerade fälligen Solo-Belohnungen aus den
+  // verschiedenen Systemen ab - fertige Tagesaufgaben, abholbare Fraktionsgeschenke und erreichte, noch
+  // nicht abgeholte (Solo-)Dominanz-Stufen. Nutzt bewusst die bestehenden Einzel-Claim-Funktionen als
+  // einzige Quelle der Wahrheit (keine duplizierte Reward-Logik). Rein synchron/solo - Allianz-Dominanz
+  // und serverseitige Belohnungen mit eigener Bestätigung bleiben absichtlich außen vor.
+  const FACTION_GIFT_IDS = ['legion', 'schatten'];
+  function factionGiftReady(fid){ return factionEffectLevel(fid) > 0 && factionGiftCooldownLeft(fid) <= 0 && !!factionGiftPreview(fid); }
+  function claimableRewardCount(){
+    let c = 0;
+    if (state.dailyQuests){
+      const ak = state.dailyQuests.activeKeys||[];
+      c += ak.filter(k => !state.dailyQuests.claimed[k] && dailyQuestProgress(k) >= (DAILY_QUEST_DEFS.find(d=>d.key===k)||{}).target).length;
+    }
+    c += FACTION_GIFT_IDS.filter(factionGiftReady).length;
+    c += Math.max(0, dominanceLevelFor(dominanceScore()) - (state.dominanceClaimed||0));
+    return c;
+  }
+  function collectAllRewards(){
+    let n = 0;
+    if (state.dailyQuests){
+      for (const k of [...(state.dailyQuests.activeKeys||[])]){
+        const def = DAILY_QUEST_DEFS.find(d=>d.key===k);
+        if (def && !state.dailyQuests.claimed[k] && dailyQuestProgress(k) >= def.target){ claimDailyQuest(k, true); n++; }
+      }
+    }
+    for (const fid of FACTION_GIFT_IDS){ if (factionGiftReady(fid)){ claimFactionGift(fid); n++; } }
+    let guard = 0;
+    while (dominanceLevelFor(dominanceScore()) > (state.dominanceClaimed||0) && guard++ < 100){ claimDominanceReward(); n++; }
+    if (n === 0){ log('Aktuell gibt es nichts einzusammeln.', 'ti-info-circle'); return; }
+    log('Alles eingesammelt – '+n+' Belohnung'+(n===1?'':'en')+' abgeholt.', 'ti-check', 'ok');
+    render(); save();
+  }
   // Spieler-Wunsch "Reroll-Option": tauscht eine noch offene (nicht abgeholte) Tagesaufgabe gegen eine
   // andere, gerade nicht aktive Vorlage aus dem Pool - z.B. wenn "1 Forschung abschließen" gezogen
   // wurde, aber gerade keine Forschung läuft/möglich ist. Kostet Kommandopunkte (dieselbe Währung wie
@@ -16618,7 +16653,7 @@
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Vier Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Überlebenschance) und <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit). Dazu die Klasse <strong>Tier-2-Schiffe</strong> (Nanoklinge/Quantenkreuzer/Fusionsdreadnought) mit drei Sondermodulen, die in KEINEM Fundpool auftauchen, sondern über die <strong>Tier-2-Modulfertigung</strong> direkt aus Tier-2-Ressourcen hergestellt werden (Nanophasen-Antrieb: +Geschwindigkeit für 60 Nanolegierungen, Quantenfeld-Kondensator: -Treibstoffverbrauch für 30 Quantenchips, Kristallmatrix-Hülle: +Verteidigungsbeitrag für 12 Hochenergiekristalle + 4 Fusionskerne; Selten zum 2,5-fachen Preis - bewusst nur Logistik-/Verteidigungs-Effekte, kein Angriff, da server-validierte Kämpfe Modul-Boni nicht kennen). Zusätzlich pro Klasse ein weiteres Modul (Nachbrenner: +Geschwindigkeit Schlachtschiffe, Not-Panzerung: +Verteidigungsbeitrag Frachter, Deflektorschild: +Schild Aufklärer, Schildmatrix: +Schild Mondzerstörer). <strong>Bezugsquellen:</strong> die <strong>Schiffsklassen-Blaupause</strong> (3500 Kr.) liefert bis "Selten"; die neue <strong>Elite-Schiffsklassen-Blaupause</strong> (14000 Kr.) hat deutlich bessere Chancen bis <strong>Legendär</strong>. <strong>Mythische</strong> Schiffsklassen-Module fertigst du in der <strong>Mythischen Modulschmiede</strong> (unter dem jeweiligen Klassen-Inventar, ab Forschung „Singularitätsphysik") gegen Apex-Ressourcen. Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
-      { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag sowie - sobald mindestens eine Tier-2-Fabrik existiert - „5 Tier-2-Ressourcen produzieren", gezählt wird die echte Fabrik-Produktion aller Ketten) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
+      { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag sowie - sobald mindestens eine Tier-2-Fabrik existiert - „5 Tier-2-Ressourcen produzieren", gezählt wird die echte Fabrik-Produktion aller Ketten) - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Warten darüber hinaus noch weitere fällige Belohnungen aus anderen Systemen (abholbare <strong>Fraktionsgeschenke</strong>, erreichte <strong>Dominanz-Stufen</strong>), fasst der Knopf <strong>„Alles einsammeln"</strong> ab zwei fälligen Belohnungen insgesamt alles zusammen und holt es mit einem Klick ab. Offene (noch nicht erledigte) Aufgaben lassen sich außerdem antippen, um direkt zum passenden Menü zu springen. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
       { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong>. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Tier-2-Bestände gehen beim Prestige verloren</strong> - es sei denn, du errichtest vorher ein <strong>Kryo-Archiv</strong> (Basis-Tab, ab Hochenergiephysik, max. Stufe 5 je Standort): je Stufe bewahrt es 40 Nanolegierungen / 20 Quantenchips / 15 Hochenergiekristalle / 8 Fusionskerne / 5 KI-Kerne durchs Prestige (Stufen aller Standorte summiert, imperiumsweit bei Stufe 10 gedeckelt). Das Archiv selbst wird wie alle Gebäude zurückgesetzt - eine bewusste Einmal-Investition pro Durchlauf. <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie.' },
@@ -30405,8 +30440,13 @@
       // QoL "Alle abholen": Button nur, wenn mindestens 2 Aufgaben GLEICHZEITIG fertig sind - bei
       // genau einer fertigen Aufgabe ist das direkte Antippen der Pille genauso schnell.
       const claimableCount = openDefs.filter(d => dailyQuestProgress(d.key) >= d.target).length;
-      const claimAllBtnHtml = claimableCount >= 2 ? `<button id="claimAllQuestsBtn" style="font-size:10.5px; padding:5px 10px; background:rgba(250,199,117,0.15); border-color:rgba(250,199,117,0.4);"><i class="ti ti-check" aria-hidden="true" style="margin-right:3px;"></i>Alle abholen (${claimableCount})</button>` : '';
-      dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${claimAllBtnHtml}${openDefs.map(d => {
+      // "Alles einsammeln" bündelt Tagesaufgaben + Fraktionsgeschenke + Dominanz. Erscheint ab 2 fälligen
+      // Belohnungen insgesamt; solange es sichtbar ist, wird der reine Tagesaufgaben-"Alle abholen"-Button
+      // unterdrückt (der Sammler ist die Obermenge - kein doppelter Button).
+      const collectCount = claimableRewardCount();
+      const collectAllBtnHtml = collectCount >= 2 ? `<button id="collectAllBtn" style="font-size:10.5px; padding:5px 10px; background:rgba(93,202,165,0.18); border-color:rgba(93,202,165,0.55);"><i class="ti ti-check" aria-hidden="true" style="margin-right:3px;"></i>Alles einsammeln (${collectCount})</button>` : '';
+      const claimAllBtnHtml = (!collectAllBtnHtml && claimableCount >= 2) ? `<button id="claimAllQuestsBtn" style="font-size:10.5px; padding:5px 10px; background:rgba(250,199,117,0.15); border-color:rgba(250,199,117,0.4);"><i class="ti ti-check" aria-hidden="true" style="margin-right:3px;"></i>Alle abholen (${claimableCount})</button>` : '';
+      dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${collectAllBtnHtml}${claimAllBtnHtml}${openDefs.map(d => {
         const prog = Math.min(d.target, dailyQuestProgress(d.key));
         const done = prog >= d.target;
         const bg = done ? 'rgba(250,199,117,0.18)' : 'rgba(255,255,255,0.06)';
@@ -30426,6 +30466,8 @@
       dailyQuestBar.querySelectorAll('[data-reroll-quest]').forEach(el => el.onclick = (ev) => { ev.stopPropagation(); rerollDailyQuest(el.getAttribute('data-reroll-quest')); });
       const claimAllQuestsBtn = document.getElementById('claimAllQuestsBtn');
       if (claimAllQuestsBtn) claimAllQuestsBtn.onclick = claimAllDailyQuests;
+      const collectAllBtn = document.getElementById('collectAllBtn');
+      if (collectAllBtn) collectAllBtn.onclick = collectAllRewards;
     }
 
     const seasonalBadge = document.getElementById('seasonalBadge');
