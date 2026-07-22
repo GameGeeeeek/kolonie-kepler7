@@ -3481,8 +3481,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.240.0';
+  const VERSION = '8.241.0';
   const PATCHNOTES = [
+    { version:'8.241.0', date:'22.07.2026', changes:[
+      'Tier-2-Schiffe bekommen einzigartige Fähigkeiten (Spieler-Wunsch) – erster Baustein: Der Fusionsdreadnought hat jetzt die Fähigkeit „Fusionsantrieb-Effizienz". Ist mindestens einer in einer Flotte, sinkt der Treibstoffverbrauch der gesamten Mission um −4% je Fusionsdreadnought (hart gedeckelt bei −20%). Die angezeigten Missionskosten berücksichtigen den Rabatt sofort. Rein logistisch – kein Eingriff in die Kampfberechnung. Weitere T2-Fähigkeiten (Schild-Penetration, Schild-Auren usw.) folgen als eigene Ausbaustufe, sobald der Kampf-Kern serverseitig ein Schildmodell hat.',
+    ]},
     { version:'8.240.0', date:'22.07.2026', changes:[
       'Kleinigkeit: Die neue Forschung „Modulare Großlager" hat jetzt eine vollständige Beschreibung (bisher nur der knappe Kürzel-Text „Lagerkapazität (vertieft)"). Auf der Forschungskarte steht jetzt klar, dass es die zweite Stufe des Lager-Zweigs ist, +2,5% Lagerkapazität je Stufe gibt (bis +50%) und mit „Verstärkte Frachtcontainer" stapelt.',
     ]},
@@ -10140,7 +10143,7 @@
     // raffinierten Ressourcen (siehe Cost-Funktionen oben).
     { key:'nanoklinge', name:'Nanoklinge', icon:'ship_nanoklinge', atk:55, costFn:nanoklingeCost, buildTime:240, requires:['rnanotech'], drive:'impuls', speed:95, defWeight:0.8, nicheDesc:'erstes Tier-2-Schiff - schneller Angreifer, Baukosten komplett aus Nanolegierungen' },
     { key:'quantenkreuzer', name:'Quantenkreuzer', icon:'ship_quantenkreuzer', atk:80, shield:20, costFn:quantenkreuzerCost, buildTime:340, requires:['rquantenphysik'], drive:'impuls', speed:70, defWeight:1.4, nicheDesc:'zäher Tier-2-Brecher mit Schildwert - Baukosten aus Quantenchips und Nanolegierungen' },
-    { key:'fusionsdreadnought', name:'Fusionsdreadnought', icon:'ship_fusionsdreadnought', atk:180, costFn:fusionsdreadnoughtCost, buildTime:900, requires:['rfusionskerne'], drive:'hyperraum', speed:40, defWeight:1.5, nicheDesc:'schweres Tier-2-Flaggschiff zwischen Leerenjäger und Superschlachtschiff - Baukosten aus Fusionskernen und Hochenergiekristallen' },
+    { key:'fusionsdreadnought', name:'Fusionsdreadnought', icon:'ship_fusionsdreadnought', atk:180, costFn:fusionsdreadnoughtCost, buildTime:900, requires:['rfusionskerne'], drive:'hyperraum', speed:40, defWeight:1.5, nicheDesc:'schweres Tier-2-Flaggschiff zwischen Leerenjäger und Superschlachtschiff (Baukosten aus Fusionskernen und Hochenergiekristallen). Einzigartige Fähigkeit „Fusionsantrieb-Effizienz": senkt den Treibstoffverbrauch der ganzen Mission um −4% je Fusionsdreadnought in der Flotte (max −20%).' },
     { key:'hyperjaeger', name:'Hyperjäger', icon:'ship_hyperjaeger', atk:30, costFn:hyperjaegerCost, buildTime:130, requires:['rnanotech'], drive:'hyperraum', speed:150, defWeight:0.6, nicheDesc:'aufgemotzter Tier-2-Jäger mit Hyperraumantrieb - braucht KEINEN Trägerhangar und zählt direkt zum Kampf (anders als der normale Jäger); Baukosten aus Nanolegierungen' },
     { key:'hyperbomber', name:'Hyperbomber', icon:'ship_hyperbomber', atk:130, costFn:hyperbomberCost, buildTime:280, requires:['rquantenphysik'], drive:'hyperraum', speed:120, defWeight:0.9, nicheDesc:'aufgemotzter Tier-2-Bomber mit Hyperraumantrieb - braucht KEINEN Trägerhangar und zählt direkt zum Kampf (anders als der normale Bomber); Baukosten aus Quantenchips und Nanolegierungen' },
     { key:'metamaterialtitan', name:'Metamaterial-Titan', icon:'ship_metamaterialtitan', atk:150, shield:80, costFn:metamaterialtitanCost, buildTime:1100, requires:['rmetamaterial'], drive:'impuls', speed:45, defWeight:2.0, nicheDesc:'schwerster Verteidigungs-Titan, höchster Schildwert - Baukosten aus Metamaterial und Hochenergiekristallen' },
@@ -11556,6 +11559,11 @@
   // Gewichteter Treibstoff-Multiplikator einer Flottenzusammensetzung nach Klassen-Modulen mit
   // 'fuel'-Effekt (Frachter: Treibstoffoptimierung, Aufklärer: Tarnmodul) - gewichtet nach Anteil der
   // jeweiligen Klasse an der Gesamtschiffszahl, analog zu fleetDiversityMult()/counterMultiplier().
+  // Fusionsdreadnought – einzigartige T2-Fähigkeit „Fusionsantrieb-Effizienz": ein hocheffizientes
+  // Fusionstriebwerk in der Flotte senkt den Treibstoffverbrauch der GANZEN Mission, gedeckelt
+  // (−4% je Fusionsdreadnought, max −20%). Rein clientseitige Logistik (Treibstoff wird beim
+  // Losschicken abgebucht) – kein Eingriff in die server-autoritative Kampfauflösung.
+  const FUSIONSDREADNOUGHT_FUEL_PER = 0.04, FUSIONSDREADNOUGHT_FUEL_CAP = 0.20;
   function fleetFuelModuleMult(composition){
     let total = 0, weighted = 0;
     for (const [k,v] of Object.entries(composition||{})){
@@ -11565,7 +11573,10 @@
       const bonus = cls ? shipModuleBonusFor(cls, 'fuel') : 0;
       weighted += v * Math.max(0.1, 1-bonus);
     }
-    return total > 0 ? weighted/total : 1;
+    let mult = total > 0 ? weighted/total : 1;
+    const fus = (composition && typeof composition.fusionsdreadnought === 'number') ? composition.fusionsdreadnought : 0;
+    if (fus > 0) mult *= (1 - Math.min(FUSIONSDREADNOUGHT_FUEL_CAP, fus*FUSIONSDREADNOUGHT_FUEL_PER));
+    return mult;
   }
 
   // ===== Offiziere =====
