@@ -3472,8 +3472,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.228.0';
+  const VERSION = '8.229.0';
   const PATCHNOTES = [
+    { version:'8.229.0', date:'22.07.2026', changes:[
+      'Komfort: „Leistbar in …". Bei Gebäuden, Schiffen und Forschungen, die du dir gerade noch nicht leisten kannst, steht jetzt direkt in der Kostenzeile, in welcher Zeit die fehlende Ressource bei deiner aktuellen Produktion zusammen ist (z.B. „leistbar in 18s"). Berücksichtigt die real produzierende Ressource; wird eine benötigte Ressource gar nicht laufend produziert (z.B. Tier-2/Kredite), wird bewusst keine Schätzung angezeigt, um nicht zu täuschen.',
+    ]},
     { version:'8.228.0', date:'22.07.2026', changes:[
       'Bugfix (danke für den Report): Die Tagesaufgabe „1 Fähigkeitspunkt investieren" war für Spieler mit komplett freigeschaltetem Fähigkeitsbaum unerfüllbar – es gab nichts mehr, worin man investieren konnte. Sie wird jetzt gar nicht mehr angeboten, sobald alle Fähigkeitsbaum-Knoten freigeschaltet sind. Eine bereits aktive, dadurch unerfüllbar gewordene Aufgabe wird beim nächsten Laden automatisch und kostenlos gegen eine erfüllbare getauscht (kein Kommandopunkt-Reroll nötig).',
     ]},
@@ -10515,6 +10518,32 @@
       const rd = resDefFor(r);
       return `<span class="costitem">${miniResIcon(r)}${fmt(a)} ${rd.label}</span>`;
     }).join(' ');
+  }
+  // "Leistbar in ..." (Komfort-Wunsch): wie lange die aktuelle Produktion braucht, bis die noch FEHLENDEN
+  // Ressourcen eines Bauauftrags gedeckt sind. Nur Basis-Ressourcen werden laufend produziert - ist die
+  // begrenzende Ressource nicht produzierbar (Tier-2/Kredite) oder ihre Rate 0, wird bewusst KEINE
+  // (irreführende) Zeit angezeigt. ratesPerSecond() ist nicht ganz billig und diese Funktion läuft pro
+  // Bauzeile - daher die Raten pro Render-Sekunde einmal cachen statt je Zeile neu zu berechnen.
+  let _affordRatesCache = null, _affordRatesAt = 0;
+  function affordRatesCached(){
+    const now = Date.now();
+    if (_affordRatesCache && (now - _affordRatesAt) < 900) return _affordRatesCache;
+    _affordRatesCache = ratesPerSecond(); _affordRatesAt = now;
+    return _affordRatesCache;
+  }
+  function affordEtaHtml(cost){
+    if (!cost || canAfford(cost)) return '';
+    const rates = affordRatesCached();
+    let maxT = 0;
+    for (const [r, amt] of Object.entries(cost)){
+      const have = state.resources[r]||0;
+      if (have >= amt) continue;
+      const rate = rates[r]||0;
+      if (rate <= 0) return ''; // fehlende Ressource wird gar nicht laufend produziert -> keine Schätzung
+      maxT = Math.max(maxT, (amt-have)/rate);
+    }
+    if (maxT <= 0) return '';
+    return ` · <span style="color:#e0a548;">leistbar in ${fmtDuration(maxT)}</span>`;
   }
 
   function orbitBonusLabel(orbit){
@@ -28048,7 +28077,7 @@
               ${malusLine}
               ${specialItemLine}
               ${defReqLine}
-              ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe erreicht (${def.maxLevel}) - Effekt ist bereits voll ausgeschöpft, weiterer Ausbau würde nichts mehr bringen</div>` : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration((def.buildTime||20)*qty)}`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte</div>`}
+              ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe erreicht (${def.maxLevel}) - Effekt ist bereits voll ausgeschöpft, weiterer Ausbau würde nichts mehr bringen</div>` : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration((def.buildTime||20)*qty)}`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte${affordEtaHtml(cost)}</div>`}
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
@@ -28360,7 +28389,7 @@
             <div style="min-width:0;">
               <div class="bname">${r.name} <span class="lvl-pill">Lv. ${lvl}/${r.maxLevel}</span></div>
               <div class="bmeta">${r.desc}${bonusSuffix}</div>
-              ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dur)} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+              ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dur)} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte${affordEtaHtml(cost)}</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
             </div>
           </div>
           ${maxed ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max. Stufe</span>` : `
@@ -28923,7 +28952,7 @@
               <div class="bmeta">${driveLine}</div>
               ${SPECIAL_UNIT_ITEMS[def.key] ? `<div class="bmeta" style="${(state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0)<shipQty?'color:#e24b4a;':''}"><i class="ti ti-diamond" aria-hidden="true"></i> Verbraucht ${shipQty}x ${(RARE_ITEMS.find(r=>r.key===SPECIAL_UNIT_ITEMS[def.key])||{}).name||''} (vorhanden: ${state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0})</div>` : ''}
               ${allReqNames ? `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${allReqNames}</div>` : ''}
-              ${unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(def.buildTime*shipQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1)))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${shipScorePoints} Punkte (${SHIP_SCORE_WEIGHTS[def.key]||0}/Schiff)</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+              ${unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(def.buildTime*shipQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1)))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${shipScorePoints} Punkte (${SHIP_SCORE_WEIGHTS[def.key]||0}/Schiff)${affordEtaHtml(cost)}</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
               ${atOwnedCap ? `<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Maximalbestand (${def.maxOwned}) erreicht - erst nach Verlust/Verschrottung des vorhandenen Exemplars erneut baubar.</div>` : ''}
             </div>
           </div>
@@ -28956,7 +28985,7 @@
             <div class="bmeta">Angriffspunkte 220 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Endgame-Flaggschiff · eigener Hangar für ${SUPER_HANGAR_SLOTS} Jäger/Bomber je Schiff (Gesamtkapazität ${hangarCap})${(awayByType.superschlachtschiff||0)>0?' · <span style="color:#e24b4a;">'+awayByType.superschlachtschiff+' unterwegs</span>':''}</div>
             <div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Angriff: 220 · <i class="ti ti-shield" aria-hidden="true"></i> Schild: ${SUPERSCHLACHTSCHIFF_SHIELD} · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigungsbeitrag: ${Math.round(220*0.4)+SUPERSCHLACHTSCHIFF_SHIELD} (je stationiertem Schiff)</div>
             <div class="bmeta" style="${superHaveItem<superQty?'color:#e24b4a;':''}"><i class="ti ti-atom-2" aria-hidden="true"></i> Verbraucht ${superQty}x Antimateriekern (vorhanden: ${superHaveItem})${superHaveItem<superQty?' – nicht genug!':''} · sehr seltener Fund bei Erkundungsmissionen</div>
-            <div class="bcost">${costHtml(superC)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(240*superQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1)))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${SHIP_SCORE_WEIGHTS.superschlachtschiff*superQty} Punkte (${SHIP_SCORE_WEIGHTS.superschlachtschiff}/Schiff)</div>
+            <div class="bcost">${costHtml(superC)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(240*superQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1)))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${SHIP_SCORE_WEIGHTS.superschlachtschiff*superQty} Punkte (${SHIP_SCORE_WEIGHTS.superschlachtschiff}/Schiff)${affordEtaHtml(superC)}</div>
           </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
