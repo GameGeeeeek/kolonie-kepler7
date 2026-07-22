@@ -3460,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.223.0';
+  const VERSION = '8.224.0';
   const PATCHNOTES = [
+    { version:'8.224.0', date:'22.07.2026', changes:[
+      'Verteidigung-Tab: Läuft nach einem großen Gefecht die Erholungspause (siehe v8.223.0), wird sie jetzt sichtbar angezeigt – eine ruhige Info-Karte mit Live-Countdown „Nächster NPC-Überfall frühestens in …". So ist klar, warum gerade keine Angriffe kommen, statt dass sich die Pause nur unbemerkt im Hintergrund abspielt.',
+    ]},
     { version:'8.223.0', date:'22.07.2026', changes:[
       'Neu: Erholungspause nach großen Überfall-Gefechten. Wurde bei einem Überfall eine große Flotte zerstört (mindestens 25 Schiffe – ob abgewehrte Raider oder eigene Verluste) oder war es ein Superangriff, folgt jetzt eine deutlich längere Ruhephase, bevor der nächste NPC-Überfall ansetzt: zusätzlich 1,5–3 Stunden obendrauf zur normalen Pause (~40–80 Min). So bleibt nach einem verlustreichen Kampf Zeit, Flotte und Verteidigung wieder aufzubauen, statt sofort von der nächsten Welle überrollt zu werden.',
     ]},
@@ -30123,6 +30126,18 @@
           const scoutBtn = document.getElementById('scoutRaidBtn');
           if (scoutBtn) scoutBtn.onclick = scoutIncomingRaid;
         }
+      } else if (state.raidCooldownUntil && state.raidCooldownUntil > Date.now()){
+        // Erholungspause nach einem großen Gefecht (siehe executeRaid): so lange sie läuft, setzt
+        // maybeScheduleRaid keinen neuen NPC-Überfall an. Dem Spieler die verbleibende Ruhe live anzeigen,
+        // damit klar ist, WARUM gerade Ruhe herrscht (statt nur "es passiert nichts"). Live-Countdown -
+        // bewusst kein Signatur-Cache, weil er sichtbar herunterzählen soll.
+        const cdRemain = Math.max(0, state.raidCooldownUntil - Date.now());
+        raidScoutBox.innerHTML = `
+          <div class="card-row" style="margin-bottom:0.75rem; border-color:rgba(94,234,212,0.35);">
+            <div class="left"><div class="bicon" style="background:rgba(94,234,212,0.15); color:#5eead4;"><i class="ti ti-shield" aria-hidden="true"></i></div><div><div class="bname">Erholungspause nach großem Gefecht</div><div class="bmeta">Nach dem letzten verlustreichen Überfall halten sich die Angreifer zurück. Nächster NPC-Überfall frühestens nach dieser Pause – Zeit, Flotte und Verteidigung wieder aufzubauen.</div></div></div>
+            <span class="lvl-pill">${fmtDuration(cdRemain/1000)}</span>
+          </div>
+        `;
       } else {
         raidScoutBox.innerHTML = '';
       }
