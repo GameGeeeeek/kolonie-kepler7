@@ -767,6 +767,10 @@
        (usesTier2Resource()) - damit sind sie in der Gebäudeliste auf einen Blick als "Tier-2" erkennbar,
        bewusst die Info-Farbe (nicht Warn-Amber, das bedeutet "Lager voll"). */
     .bicon-t2 { border:2px solid rgba(var(--info-rgb),0.65); box-shadow:0 0 0 1px rgba(var(--info-rgb),0.18), 0 0 7px rgba(var(--info-rgb),0.4); }
+    /* Voller farblicher Karten-Rahmen für Tier-2-Inhalte (Spieler-Wunsch): Schiffe & Verteidigung/Gebäude,
+       die Tier-2-Ressourcen nutzen. Gleiches Info-Farbschema wie der bestehende bicon-t2-Icon-Rand, plus
+       ein Akzentstreifen links, damit T2-Karten auf einen Blick als höherwertig erkennbar sind. */
+    .tier2-card { border-color:rgba(var(--info-rgb),0.55) !important; box-shadow:inset 3px 0 0 rgba(var(--info-rgb),0.85), 0 0 8px rgba(var(--info-rgb),0.15); }
     .bname { font-weight:600; font-size:var(--fs-body-lg); letter-spacing:0.01em; display:flex; align-items:center; gap:6px; color:#fff; font-family:var(--font-mono); }
     .fleet-position-panel { position:fixed; right:14px; top:50%; transform:translateY(-50%); width:200px; max-height:74vh; overflow-y:auto; background:rgba(8,10,20,0.92); border:0.5px solid rgba(255,255,255,0.12); border-radius:12px; padding:10px; z-index:50; }
     .fleet-position-panel { scrollbar-width:thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; }
@@ -3472,8 +3476,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.234.0';
+  const VERSION = '8.235.0';
   const PATCHNOTES = [
+    { version:'8.235.0', date:'22.07.2026', changes:[
+      'Grafik: Tier-2-Inhalte haben jetzt einen eigenen farblichen Karten-Rahmen (Spieler-Wunsch). Tier-2-Schiffe (Nanoklinge, Quantenkreuzer, Fusionsdreadnought) in der Schiffswerft sowie Tier-2-Verteidigung/-Gebäude (alle, deren Baukosten Tier-2-Ressourcen enthalten – z.B. Nano-Verteidigungsplattform, Hochenergie-Schildkuppel, Fusionsbastion, KI-Verteidigungskern, plus die Tier-2-Fabriken und -Nutzgebäude) sind mit einem cyanfarbenen Rahmen samt Akzentstreifen markiert – dieselbe Farbsprache wie der bereits bestehende Tier-2-Icon-Rand. So sind höherwertige Einheiten auf einen Blick erkennbar.',
+    ]},
     { version:'8.234.0', date:'22.07.2026', changes:[
       'Flotte übersichtlicher: Neuer Umschalter „Nur baubare Schiffe anzeigen" direkt über der Schiffswerft. Ist er an, verschwinden gesperrte Schiffe aus der Liste, die du (noch) nicht bauen kannst – Forschung fehlt oder Event-/Item-Freischaltung offen. Schiffe, die du bereits besitzt oder gerade baust, bleiben immer sichtbar. Standardmäßig aus, die Einstellung wird gespeichert. Zeigt bei aktivem Filter, wie viele gesperrte Schiffe gerade ausgeblendet sind.',
       'Kleinigkeit: Der „unterwegs"-Hinweis bei Schiffen liest sich jetzt „N unterwegs (im Einsatz)" statt der etwas holprigen alten Formulierung.',
@@ -10880,6 +10887,11 @@
     const r2 = TIER2_DEFS.find(r=>r.key===key); return r2 ? r2.label : key;
   }
   function usesTier2Resource(def){ return TIER2_DEFS.some(t2 => (def.baseCost||{}).hasOwnProperty(t2.key)); }
+  // Tier-2-Schiff (für den farblichen Karten-Rahmen): erkennbar an einer Tier-2-Forschungsanforderung
+  // (Nanotechnologie/Quantenphysik/Hochenergiephysik/Fusionskern-Synthese/KI-Technologie). Deckt die
+  // bestehenden Tier-2-Schiffe (Nanoklinge/Quantenkreuzer/Fusionsdreadnought) sowie künftige ab.
+  const TIER2_SHIP_RESEARCH = ['rnanotech','rquantenphysik','rhochenergie','rfusionskerne','rkitech'];
+  function isTier2Ship(def){ return (def.requires||[]).some(r => TIER2_SHIP_RESEARCH.includes(typeof r==='string'?r:r.key)); }
   // Kryo-Archiv: bewahrte Tier-2-Menge je Archiv-Stufe und Kette beim Prestige (siehe
   // confirmPrestigeWithPerk). Werte grob wertgleich über die Ketten (~1.4k-2.1k Basis-Einheiten
   // je Stufe) und bei Voll-Deckel (Stufe 10 imperiumsweit) unterhalb der üblichen Lagerdeckel.
@@ -28147,10 +28159,11 @@
         defReqLine = `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${defReqNames}</div>`;
       }
       const scorePoints = qty*10;
+      const t2building = def.category==='refine' || usesTier2Resource(def);
       return `
-        <div class="card-row">
+        <div class="card-row${t2building?' tier2-card':''}">
           <div class="left">
-            <div class="bicon${(def.category==='refine'||usesTier2Resource(def))?' bicon-t2':''}" style="background:${def.bg};">${DEFENSE_CANVAS_KEYS.includes(def.key) ? `<canvas id="defIcon_${def.key}" width="40" height="40" style="display:block;"></canvas>` : iconHtmlFor(def.key, def.icon, def.fg)}</div>
+            <div class="bicon${t2building?' bicon-t2':''}" style="background:${def.bg};">${DEFENSE_CANVAS_KEYS.includes(def.key) ? `<canvas id="defIcon_${def.key}" width="40" height="40" style="display:block;"></canvas>` : iconHtmlFor(def.key, def.icon, def.fg)}</div>
             <div style="min-width:0;">
               <div class="bname">${def.name} <span class="lvl-pill">Lv. ${lvl}</span></div>
               <div class="prodline">${prodLine}</div>
@@ -29037,10 +29050,11 @@
       const perShipDefContrib = Math.round((def.atk||0)*0.4) + (def.shield||0);
       const combatStatsLine = `<i class="ti ti-sword" aria-hidden="true"></i> Angriff: ${def.atk} · <i class="ti ti-shield" aria-hidden="true"></i> Schild: ${def.shield} · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigungsbeitrag: ${perShipDefContrib} (je stationiertem Schiff)`;
       const shipScorePoints = (SHIP_SCORE_WEIGHTS[def.key]||0) * shipQty;
+      const t2ship = isTier2Ship(def);
       return `
-        <div class="card-row ${!unlocked?'research-locked':''}">
+        <div class="card-row ${!unlocked?'research-locked':''}${t2ship?' tier2-card':''}">
           <div class="left">
-            <div class="bicon" style="background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${def.key}" width="26" height="26" style="display:block;"></canvas></div>
+            <div class="bicon${t2ship?' bicon-t2':''}" style="background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${def.key}" width="26" height="26" style="display:block;"></canvas></div>
             <div>
               <div class="bname">${def.name} <span class="lvl-pill">${count}</span>${pendingQty?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">+${pendingQty} im Bau</span>`:''}</div>
               <div class="bmeta">${meta}</div>
