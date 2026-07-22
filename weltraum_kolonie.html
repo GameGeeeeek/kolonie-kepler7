@@ -3472,8 +3472,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.229.0';
+  const VERSION = '8.230.0';
   const PATCHNOTES = [
+    { version:'8.230.0', date:'22.07.2026', changes:[
+      'Komfort: Warteschlangen-Gesamtzeit. Bei mehreren Aufträgen in der Schiffs- oder Verteidigungs-Bauwarteschlange steht jetzt oben „Warteschlange (N): alles fertig in ~X" – die Restzeit des laufenden Auftrags plus die Bauzeiten der wartenden. Wartet ein Auftrag noch auf Ressourcen, wird das als Zusatzzeit gekennzeichnet. Auch die Forschungs-Warteschlange zeigt jetzt „fertig in ~X" (inkl. Restzeit einer laufenden Forschung).',
+    ]},
     { version:'8.229.0', date:'22.07.2026', changes:[
       'Komfort: „Leistbar in …". Bei Gebäuden, Schiffen und Forschungen, die du dir gerade noch nicht leisten kannst, steht jetzt direkt in der Kostenzeile, in welcher Zeit die fehlende Ressource bei deiner aktuellen Produktion zusammen ist (z.B. „leistbar in 18s"). Berücksichtigt die real produzierende Ressource; wird eine benötigte Ressource gar nicht laufend produziert (z.B. Tier-2/Kredite), wird bewusst keine Schätzung angezeigt, um nicht zu täuschen.',
     ]},
@@ -14157,6 +14160,17 @@
     const jobs = (state.constructionQueue||[]).filter(filterFn);
     if (!jobs.length) return '';
     const now = Date.now();
+    // Gesamt-ETA (Komfort-Wunsch): Bau läuft pro Planet+Art SEQUENZIELL - der laufende Auftrag plus die
+    // reinen Bauzeiten der wartenden ergeben, wann die ganze Warteschlange durch ist. Aufträge, die noch
+    // auf Ressourcen warten, können erst nach dem Ansparen starten - daher als Untergrenze gekennzeichnet.
+    let queueEta = '';
+    if (jobs.length >= 2){
+      const activeRemain = jobs.filter(j=>j.paid).reduce((a,j)=>a+Math.max(0, j.endTime-now), 0);
+      const waitingDur = jobs.filter(j=>!j.paid).reduce((a,j)=>a+(j.totalDur||0)*1000, 0);
+      const totalMs = activeRemain + waitingDur;
+      const anyWaitRes = jobs.some(j => !j.paid && !canAfford(j.cost));
+      queueEta = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> Warteschlange (${jobs.length}): alles fertig in ~${fmtDuration(totalMs/1000)}${anyWaitRes?' <span style="color:#e0a548;">(zzgl. Wartezeit auf Ressourcen)</span>':''}</div>`;
+    }
     const html = jobs.map(j => {
       const waiting = !j.paid;
       const remain = waiting ? 0 : Math.max(0, j.endTime - now);
@@ -14186,7 +14200,7 @@
     setTimeout(() => {
       document.querySelectorAll('[data-cancel-construction]').forEach(btn => btn.addEventListener('click', () => cancelConstruction(btn.getAttribute('data-cancel-construction'))));
     }, 0);
-    return html;
+    return queueEta + html;
   }
 
   async function loadPlayerEntry(playerId){
@@ -27857,20 +27871,24 @@
       }
       const totalRQCost = {};
       const queueTargetLevels = [];
+      let totalRQDurSec = 0; // Gesamt-Bauzeit der Warteschlange (Komfort-ETA)
       for (const key of rq){
         const r = RESEARCH_DEFS.find(x=>x.key===key);
         if (!r){ queueTargetLevels.push(null); continue; }
         const curLvl = rLevelSim[key] !== undefined ? rLevelSim[key] : (state.research[key]||0);
         const c = researchCostFor(r, curLvl+1);
         for (const [res,a] of Object.entries(c)) totalRQCost[res] = (totalRQCost[res]||0)+a;
+        totalRQDurSec += researchDuration(r, curLvl+1);
         rLevelSim[key] = curLvl+1;
         queueTargetLevels.push(curLvl+1);
       }
+      // Läuft gerade eine Forschung, kommt ihre Restzeit vor der Warteschlange - für die Gesamt-ETA addieren.
+      const activeResRemainSec = (state.activeResearch && state.activeResearch.endTime) ? Math.max(0, state.activeResearch.endTime - Date.now())/1000 : 0;
       const rqMinSlots = 3;
       const rqPlaceholders = Math.max(0, rqMinSlots - rq.length);
       rqBox.innerHTML = `
         <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Forschungs-Warteschlange (${rq.length}/10)</div>
-        <div class="bmeta" style="margin-bottom:0.5rem;">${rq.length ? 'Geschätzte Gesamtkosten: '+costHtml(totalRQCost) : 'Noch leer - Forschung über "Warteschlange" hinzufügen.'}</div>
+        <div class="bmeta" style="margin-bottom:0.5rem;">${rq.length ? 'Geschätzte Gesamtkosten: '+costHtml(totalRQCost)+' · <i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> fertig in ~'+fmtDuration(totalRQDurSec + activeResRemainSec) : 'Noch leer - Forschung über "Warteschlange" hinzufügen.'}</div>
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
           ${rq.map((key,i) => {
             const r = RESEARCH_DEFS.find(x=>x.key===key) || {};
