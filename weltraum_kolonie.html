@@ -3472,8 +3472,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.231.0';
+  const VERSION = '8.233.0';
   const PATCHNOTES = [
+    { version:'8.233.0', date:'22.07.2026', changes:[
+      'Expeditionen: Der „verlassene Flotte"-Fund gibt jetzt eine größere Auswahl an Schiffen (Spieler-Wunsch „auch Schiffe finden, aber nicht so viele"). Neben Jägern und Kreuzern tauchen gelegentlich auch stärkere Typen auf – Bomber, Zerstörer, Trägerschiff oder Schlachtschiff. Bewusst gedeckelt: stärkere Schiffe erscheinen seltener und in kleinerer Stückzahl (Schlachtschiff/Trägerschiff maximal 1 pro Fund), unabhängig von der Expeditionsstufe – der Fund bleibt eine nette Abwechslung, keine ergiebige Flotten-Quelle.',
+    ]},
+    { version:'8.232.0', date:'22.07.2026', changes:[
+      'Bugfix (danke für den Report): Der Werft-Overdrive wirkte zwar auf die tatsächliche Bauzeit, die in der Schiffswerft ANGEZEIGTE Bauzeit blieb aber unverändert – dadurch sah es aus, als bringe er nichts. Die angezeigte Bauzeit von Schiffen, Superschiffen und Verteidigungsgebäuden berücksichtigt jetzt alle Bau-Boni (Werft-Rolle, Werftkern/Assemblierwerft, Ingenieur, Allianz-Werft und den Werft-Overdrive); bei aktivem Overdrive erscheint zusätzlich ein „(Overdrive)"-Hinweis.',
+      'Verbesserung „Leistbar in …": zeigt jetzt auch auf dem Flotte- und Verteidigung-Tab mehr an. Kostet ein Bau eine Ressource, die gerade gar nicht produziert wird (z.B. Antimaterie ohne Reaktor oder eine Tier-2-Ressource ohne passende Fabrik), steht das jetzt klar dabei („… wird nicht produziert") statt gar nichts anzuzeigen. Tier-2-Fabrikproduktion fließt in die Zeitschätzung mit ein.',
+    ]},
     { version:'8.231.0', date:'22.07.2026', changes:[
       'Komfort: „Alles einsammeln". Warten mehrere fällige Belohnungen aus verschiedenen Systemen gleichzeitig – fertige Tagesaufgaben, abholbare Fraktionsgeschenke und/oder erreichte Dominanz-Stufen – erscheint in der Tagesaufgaben-Leiste ein Sammel-Knopf, der ab zwei fälligen Belohnungen insgesamt alles mit einem Klick abholt. Der bisherige „Alle abholen" (nur Tagesaufgaben) bleibt, wird aber unterdrückt, solange der übergeordnete Sammel-Knopf sichtbar ist. Bewusst rein solo/synchron – Allianz-Belohnungen mit eigener Bestätigung bleiben außen vor.',
     ]},
@@ -10526,27 +10533,34 @@
     }).join(' ');
   }
   // "Leistbar in ..." (Komfort-Wunsch): wie lange die aktuelle Produktion braucht, bis die noch FEHLENDEN
-  // Ressourcen eines Bauauftrags gedeckt sind. Nur Basis-Ressourcen werden laufend produziert - ist die
-  // begrenzende Ressource nicht produzierbar (Tier-2/Kredite) oder ihre Rate 0, wird bewusst KEINE
-  // (irreführende) Zeit angezeigt. ratesPerSecond() ist nicht ganz billig und diese Funktion läuft pro
-  // Bauzeile - daher die Raten pro Render-Sekunde einmal cachen statt je Zeile neu zu berechnen.
+  // Ressourcen eines Bauauftrags gedeckt sind. Bezieht Basis- UND Tier-2-Produktion ein (Schiffe/
+  // Verteidigung kosten oft Antimaterie/Tier-2). Wird eine fehlende Ressource GAR NICHT produziert
+  // (Rate 0, z.B. Antimaterie ohne Reaktor oder eine Tier-2-Kette ohne Fabrik), wird statt einer
+  // irreführenden Zeit klar benannt, WELCHE Ressource dafür fehlt. ratesPerSecond()/tier2RatesPerSecond()
+  // sind nicht ganz billig und diese Funktion läuft pro Bauzeile - daher pro Render-Sekunde einmal cachen.
   let _affordRatesCache = null, _affordRatesAt = 0;
   function affordRatesCached(){
     const now = Date.now();
     if (_affordRatesCache && (now - _affordRatesAt) < 900) return _affordRatesCache;
-    _affordRatesCache = ratesPerSecond(); _affordRatesAt = now;
+    _affordRatesCache = Object.assign({}, ratesPerSecond(), tier2RatesPerSecond());
+    _affordRatesAt = now;
     return _affordRatesCache;
   }
   function affordEtaHtml(cost){
     if (!cost || canAfford(cost)) return '';
     const rates = affordRatesCached();
     let maxT = 0;
+    const notProduced = [];
     for (const [r, amt] of Object.entries(cost)){
       const have = state.resources[r]||0;
       if (have >= amt) continue;
       const rate = rates[r]||0;
-      if (rate <= 0) return ''; // fehlende Ressource wird gar nicht laufend produziert -> keine Schätzung
+      if (rate <= 0){ if (r !== 'credits') notProduced.push(r); continue; } // fehlend & wird nicht produziert
       maxT = Math.max(maxT, (amt-have)/rate);
+    }
+    if (notProduced.length){
+      const names = notProduced.map(r => (resDefFor(r)||{label:r}).label).join(', ');
+      return ` · <span style="color:#e0a548;">${names} ${notProduced.length>1?'werden':'wird'} nicht produziert</span>`;
     }
     if (maxT <= 0) return '';
     return ` · <span style="color:#e0a548;">leistbar in ${fmtDuration(maxT)}</span>`;
@@ -14019,44 +14033,37 @@
   // der 10 Plätze belegt.
   const SHIP_QUEUE_MAX = 10;
   function shipQueueCount(){ return (state.constructionQueue||[]).filter(j=>j.kind==='ship').length; }
-  function queueConstruction(kind, planetKey, key, qty, buildTimeEach, label, icon, cost){
-    let effBuildTimeEach = buildTimeEach;
+  // Effektive Bauzeit PRO Einheit inkl. aller Bauzeit-Boni (Werft-Rolle, Orbitalstation-Dock,
+  // Planeten-Event, Offizier Ingenieur, Fusions-Werftkern/Quanten-Assemblierwerft, Werft-Overdrive,
+  // Allianzbasis-Bauzeit, Bauspeed-Module, Allianz-Flottenwerft, Weltprojekt Sternenwerft). Ausgelagert,
+  // damit sowohl der echte Bauauftrag (queueConstruction) ALS AUCH die Bauzeit-VORSCHAU in den Bau-Zeilen
+  // dieselbe Zahl zeigen - vorher zeigte die Vorschau nur die Werft-Rolle und ignorierte u.a. den
+  // Werft-Overdrive, sodass dessen Wirkung dort unsichtbar blieb (Spieler-Report "Overdrive bringt nichts").
+  function effectiveBuildTimeEach(kind, planetKey, baseEach){
+    let e = baseEach;
     if (kind === 'ship'){
       const role = planetRoleOf(planetKey);
-      if (role && role.key==='shipyard') effBuildTimeEach *= 0.80;
+      if (role && role.key==='shipyard') e *= 0.80;
       const orbD = orbitalStationOf(planetKey);
-      if (orbD && orbD.focus==='dock') effBuildTimeEach *= 1 - 0.06*orbD.level;
+      if (orbD && orbD.focus==='dock') e *= 1 - 0.06*orbD.level;
       const evD = planetEventOf(planetKey);
-      if (evD && evD.def.effect.type==='shipbuild') effBuildTimeEach *= evD.def.effect.mult;
-      // Grafik/Balance-Runde (Spieler-Wunsch "Ingenieur auf Schiffsbau ausweiten"): der Ingenieur-Bonus
-      // wirkte bisher trotz allgemeiner "Bauzeit"-Beschreibung NUR auf Gebäude, Schiffe waren explizit
-      // ausgenommen. Gleicher Faktor wie bei Gebäuden, reiht sich multiplikativ neben Werft-Rolle/
-      // Orbitalstation-Fokus ein (wie diese bereits tun), kein neuer gedeckelter Bonustopf nötig.
-      effBuildTimeEach *= (1 - officerBonus('ingenieur'));
-      // Fusions-Werftkern (Tier-2-Verbraucher-Runde 19.07.2026): -1,5% je Stufe, intern bei -15%
-      // gedeckelt (10 Stufen; weitere Standorte stapeln NICHT über den Deckel hinaus) - reiht sich
-      // multiplikativ ein wie Werft-Rolle/Orbitalstation/Ingenieur oben.
-      // Fusions-Werftkern UND Quanten-Assemblierwerft teilen sich einen gemeinsamen Deckel: die Stufen
-      // beider Gebäude über alle Standorte werden summiert, geben zusammen -1,5% je Stufe und sind bei
-      // -20% gekappt (additiv+gedeckelt statt zwei getrennter Multiplikatoren - kein Aufschaukeln).
+      if (evD && evD.def.effect.type==='shipbuild') e *= evD.def.effect.mult;
+      e *= (1 - officerBonus('ingenieur'));
       const werftkernLvl = allBuildingSets().reduce((a,b)=>a+(b.werftkern||0)+(b.quantenwerft||0),0);
-      if (werftkernLvl > 0) effBuildTimeEach *= (1 - Math.min(0.20, werftkernLvl*0.015));
-      // Werft-Overdrive (aktiver Tier-2-Verbrauchs-Boost, siehe activateWerftOverdrive): solange das
-      // 30-Minuten-Fenster läuft, zusätzlich -25% Schiffsbauzeit imperiumsweit.
-      if (werftOverdriveActive()) effBuildTimeEach *= 0.75;
+      if (werftkernLvl > 0) e *= (1 - Math.min(0.20, werftkernLvl*0.015));
+      if (werftOverdriveActive()) e *= 0.75;
     }
     if (kind === 'building'){
-      effBuildTimeEach *= (1 - officerBonus('ingenieur'));
-      effBuildTimeEach *= allianceBaseBuildTimeMult();
+      e *= (1 - officerBonus('ingenieur'));
+      e *= allianceBaseBuildTimeMult();
     }
-    effBuildTimeEach *= (1 - moduleBonusAt(planetKey, 'buildspeed'));
-    // Permanentes Allianzprojekt "Allianz-Flottenwerft" (17.07.2026, Feature-Wunsch) - wirkt bewusst
-    // auf BEIDE Bau-Arten (Schiffe UND Gebäude), anders als die bestehenden, je nach Art getrennten
-    // Boni oben, da der Feature-Wunsch explizit "Schnellere Schiffsbauzeiten" UND allgemein "Ausbau
-    // einer riesigen Werft" nennt.
-    if (state.allianceResearch) effBuildTimeEach *= (1 - 0.20*allianceTechFrac('ep_werft'));
-    if (state.allianceResearch && state.allianceResearch['wp_sternenwerft']) effBuildTimeEach *= 0.90; // Weltprojekt "Gigantische Sternenwerft"
-    const dur = Math.max(3, Math.round(effBuildTimeEach * qty));
+    e *= (1 - moduleBonusAt(planetKey, 'buildspeed'));
+    if (state.allianceResearch) e *= (1 - 0.20*allianceTechFrac('ep_werft')); // Allianz-Flottenwerft
+    if (state.allianceResearch && state.allianceResearch['wp_sternenwerft']) e *= 0.90; // Weltprojekt "Gigantische Sternenwerft"
+    return e;
+  }
+  function queueConstruction(kind, planetKey, key, qty, buildTimeEach, label, icon, cost){
+    const dur = Math.max(3, Math.round(effectiveBuildTimeEach(kind, planetKey, buildTimeEach) * qty));
     state.constructionQueue = state.constructionQueue || [];
     const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
     // Falls es sich um eine "Super"-Einheit handelt (siehe SPECIAL_UNIT_ITEMS), wurde bereits beim
@@ -16529,7 +16536,7 @@
       { title:'Treibstoffkosten (Deuterium & Antimaterie)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). <strong>Welche Ressource verbraucht wird, hängt vom Antrieb ab:</strong> Schiffe mit Verbrennungs- oder Impulstriebwerk tanken Deuterium, Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken Antimaterie. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen. Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
       { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren, Spionage UND Flottenverlegungen zwischen eigenen Planeten - ein per "Verband versenden" gemeinsam losgeschickter Verband zählt dabei nur als EIN Slot, unabhängig davon, wie viele Schiffstypen er enthält. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
       { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
-      { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine verlassene Flotte. Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
+      { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
       { title:'Expeditions-Limit: nur 1 gleichzeitig zu Beginn', body:'Zusätzlich zur Forschungsschiff-Anzahl je Planet und dem allgemeinen Flottenentsendelimit gibt es ein eigenes, planetenübergreifendes Limit für gleichzeitig laufende Expeditionen - anfangs nur <strong>1</strong>. Die eigenständige Forschung <strong>Expeditionskoordination</strong> (Kategorie Logistik) erhöht dieses Limit um 1 je Stufe, bis maximal <strong>5</strong> gleichzeitige Expeditionen bei Stufe 4. Der aktuelle Stand wird direkt im Expedition-Tab beim Start-Formular angezeigt.' },
       { title:'Letzte Sendung wiederholen', body:'Sobald in der aktuellen Sitzung schon einmal erfolgreich eine Expedition gestartet wurde, erscheint neben „Expedition starten" der Knopf <strong>„Letzte wiederholen"</strong>: stellt Typ und Eskorte-Zusammensetzung der zuletzt gestarteten Expedition wieder her und startet SOFORT - ideal zum wiederholten Farmen, ohne die Eskorte jedes Mal neu zusammenzuklicken. Ist am aktuellen Standort inzwischen weniger verfügbar als beim letzten Mal, wird automatisch auf das tatsächlich Vorhandene gekappt statt die Sendung zu blockieren.' },
       { title:'Fragmente & kosmetische Avatare', body:'Statt eines vollen seltenen Materials (Antimateriekern, Kristallherz, Alte Technologie) kann auch ein <strong>Fragment</strong> davon gefunden werden - häufiger, aber schwächer. Sind <strong>4 Fragmente</strong> desselben Typs im Inventar (Fortschritt-Tab), lassen sie sich per Knopfdruck zu 1x dem vollen Material zusammensetzen. Ebenfalls über Expeditionen erhältlich: drei <strong>exklusive Avatare</strong> (Nova, Void, Phoenix), die sonst nirgends wählbar sind - einmal gefunden dauerhaft freigeschaltet und in den Einstellungen auswählbar. Ist ein kosmetischer Fund bereits freigeschaltet, gibt es stattdessen Ersatz-Ressourcen, kein doppelter Nutzen.' },
@@ -24066,8 +24073,23 @@
               findIcon = 'ti-box';
               reportExtra = { itemFound: modName };
             } else {
-              const shipKey = Math.random()<0.6 ? 'jaeger' : 'cruisers';
-              const qty = Math.max(1, Math.round((1+Math.random()*2)*mult));
+              // Verlassene Flotte (Spieler-Wunsch "auch Schiffe finden, aber nicht so viele"): erweiterte
+              // Typen-Palette statt nur Jäger/Kreuzer - stärkere Schiffe erscheinen SELTENER (Gewicht) und
+              // in KLEINERER Zahl (harte Stück-Obergrenze `cap` je Typ, unabhängig von der Expeditionsstufe).
+              // So bleibt der Fund eine nette Abwechslung ohne zur ergiebigen Flotten-Quelle zu werden.
+              const derelictPool = [
+                { key:'jaeger',         weight:32, min:1, max:3, cap:4 },
+                { key:'cruisers',       weight:24, min:1, max:3, cap:4 },
+                { key:'bomber',         weight:14, min:1, max:2, cap:2 },
+                { key:'destroyers',     weight:12, min:1, max:2, cap:2 },
+                { key:'carrier',        weight:9,  min:1, max:1, cap:1 },
+                { key:'schlachtschiff', weight:6,  min:1, max:1, cap:1 },
+              ];
+              const totW = derelictPool.reduce((a,p)=>a+p.weight,0);
+              let rw = Math.random()*totW, pickShip = derelictPool[0];
+              for (const p of derelictPool){ if ((rw -= p.weight) < 0){ pickShip = p; break; } }
+              const shipKey = pickShip.key;
+              const qty = Math.max(1, Math.min(pickShip.cap, Math.round((pickShip.min + Math.random()*(pickShip.max-pickShip.min)) * mult)));
               fleet[shipKey] = (fleet[shipKey]||0)+qty;
               addXp(20);
               const shipName = (SHIP_DEFS.find(d=>d.key===shipKey)||{}).name||shipKey;
@@ -28130,7 +28152,7 @@
               ${malusLine}
               ${specialItemLine}
               ${defReqLine}
-              ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe erreicht (${def.maxLevel}) - Effekt ist bereits voll ausgeschöpft, weiterer Ausbau würde nichts mehr bringen</div>` : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration((def.buildTime||20)*qty)}`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte${affordEtaHtml(cost)}</div>`}
+              ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe erreicht (${def.maxLevel}) - Effekt ist bereits voll ausgeschöpft, weiterer Ausbau würde nichts mehr bringen</div>` : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(effectiveBuildTimeEach('building', state.activeBasePlanet, def.buildTime||20)*qty))}`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte${affordEtaHtml(cost)}</div>`}
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
@@ -29005,7 +29027,7 @@
               <div class="bmeta">${driveLine}</div>
               ${SPECIAL_UNIT_ITEMS[def.key] ? `<div class="bmeta" style="${(state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0)<shipQty?'color:#e24b4a;':''}"><i class="ti ti-diamond" aria-hidden="true"></i> Verbraucht ${shipQty}x ${(RARE_ITEMS.find(r=>r.key===SPECIAL_UNIT_ITEMS[def.key])||{}).name||''} (vorhanden: ${state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0})</div>` : ''}
               ${allReqNames ? `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${allReqNames}</div>` : ''}
-              ${unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(def.buildTime*shipQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1)))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${shipScorePoints} Punkte (${SHIP_SCORE_WEIGHTS[def.key]||0}/Schiff)${affordEtaHtml(cost)}</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+              ${unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(effectiveBuildTimeEach('ship', state.activeBasePlanet, def.buildTime)*shipQty))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''}${werftOverdriveActive()?' <span style="color:#c3bef5;">(Overdrive)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${shipScorePoints} Punkte (${SHIP_SCORE_WEIGHTS[def.key]||0}/Schiff)${affordEtaHtml(cost)}</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
               ${atOwnedCap ? `<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Maximalbestand (${def.maxOwned}) erreicht - erst nach Verlust/Verschrottung des vorhandenen Exemplars erneut baubar.</div>` : ''}
             </div>
           </div>
@@ -29038,7 +29060,7 @@
             <div class="bmeta">Angriffspunkte 220 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Endgame-Flaggschiff · eigener Hangar für ${SUPER_HANGAR_SLOTS} Jäger/Bomber je Schiff (Gesamtkapazität ${hangarCap})${(awayByType.superschlachtschiff||0)>0?' · <span style="color:#e24b4a;">'+awayByType.superschlachtschiff+' unterwegs</span>':''}</div>
             <div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Angriff: 220 · <i class="ti ti-shield" aria-hidden="true"></i> Schild: ${SUPERSCHLACHTSCHIFF_SHIELD} · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigungsbeitrag: ${Math.round(220*0.4)+SUPERSCHLACHTSCHIFF_SHIELD} (je stationiertem Schiff)</div>
             <div class="bmeta" style="${superHaveItem<superQty?'color:#e24b4a;':''}"><i class="ti ti-atom-2" aria-hidden="true"></i> Verbraucht ${superQty}x Antimateriekern (vorhanden: ${superHaveItem})${superHaveItem<superQty?' – nicht genug!':''} · sehr seltener Fund bei Erkundungsmissionen</div>
-            <div class="bcost">${costHtml(superC)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(240*superQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1)))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${SHIP_SCORE_WEIGHTS.superschlachtschiff*superQty} Punkte (${SHIP_SCORE_WEIGHTS.superschlachtschiff}/Schiff)${affordEtaHtml(superC)}</div>
+            <div class="bcost">${costHtml(superC)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(effectiveBuildTimeEach('ship', state.activeBasePlanet, 240)*superQty))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''}${werftOverdriveActive()?' <span style="color:#c3bef5;">(Overdrive)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${SHIP_SCORE_WEIGHTS.superschlachtschiff*superQty} Punkte (${SHIP_SCORE_WEIGHTS.superschlachtschiff}/Schiff)${affordEtaHtml(superC)}</div>
           </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
