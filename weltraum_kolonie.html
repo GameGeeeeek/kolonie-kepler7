@@ -3460,8 +3460,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.219.0';
+  const VERSION = '8.220.0';
   const PATCHNOTES = [
+    { version:'8.220.0', date:'22.07.2026', changes:[
+      'Lesbarkeit: Bau-, Forschungs- und Flugzeiten werden jetzt überall in lesbarer Form angezeigt (z. B. „3h 33m" oder „20m 0s") statt als rohe Sekundenzahl wie „12800s". Betrifft die Schiffs- und Verteidigungs-Bauzeiten, die Forschungsdauer sowie die Flugzeit-Vorschauen bei Erkundung, Kolonisierung und Angriff.',
+    ]},
     { version:'8.219.0', date:'22.07.2026', changes:[
       'Berechnungs-Feinschliff (nach Prüfung der Kampfrechnung): Die Gesamt-Verteidigungsanzeige berücksichtigt jetzt auch beim „Alle Standorte"-Wert den Orbitalring-Verteidigungsfokus und aktive Planetenereignisse auf der stationierten Flotte – vorher flossen diese nur in den Pro-Planet-Wert ein, wodurch die Gesamt-Verteidigung leicht unterschätzt wurde (u.a. relevant für die Skalierung der Überfall-Stärke). Zusätzlich eine interne Absicherung in der Kampfkraft-Berechnung gegen unvollständige Flottendaten (verhindert seltene Fehlwerte).',
     ]},
@@ -27900,7 +27903,7 @@
               ${malusLine}
               ${specialItemLine}
               ${defReqLine}
-              ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe erreicht (${def.maxLevel}) - Effekt ist bereits voll ausgeschöpft, weiterer Ausbau würde nichts mehr bringen</div>` : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${(def.buildTime||20)*qty}s`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte</div>`}
+              ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe erreicht (${def.maxLevel}) - Effekt ist bereits voll ausgeschöpft, weiterer Ausbau würde nichts mehr bringen</div>` : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration((def.buildTime||20)*qty)}`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte</div>`}
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
@@ -28212,7 +28215,7 @@
             <div style="min-width:0;">
               <div class="bname">${r.name} <span class="lvl-pill">Lv. ${lvl}/${r.maxLevel}</span></div>
               <div class="bmeta">${r.desc}${bonusSuffix}</div>
-              ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${dur}s · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+              ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dur)} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
             </div>
           </div>
           ${maxed ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max. Stufe</span>` : `
@@ -28774,7 +28777,7 @@
               <div class="bmeta">${driveLine}</div>
               ${SPECIAL_UNIT_ITEMS[def.key] ? `<div class="bmeta" style="${(state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0)<shipQty?'color:#e24b4a;':''}"><i class="ti ti-diamond" aria-hidden="true"></i> Verbraucht ${shipQty}x ${(RARE_ITEMS.find(r=>r.key===SPECIAL_UNIT_ITEMS[def.key])||{}).name||''} (vorhanden: ${state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0})</div>` : ''}
               ${allReqNames ? `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${allReqNames}</div>` : ''}
-              ${unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${Math.round(def.buildTime*shipQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1))}s${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${shipScorePoints} Punkte (${SHIP_SCORE_WEIGHTS[def.key]||0}/Schiff)</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+              ${unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(def.buildTime*shipQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1)))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${shipScorePoints} Punkte (${SHIP_SCORE_WEIGHTS[def.key]||0}/Schiff)</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
               ${atOwnedCap ? `<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Maximalbestand (${def.maxOwned}) erreicht - erst nach Verlust/Verschrottung des vorhandenen Exemplars erneut baubar.</div>` : ''}
             </div>
           </div>
@@ -28807,7 +28810,7 @@
             <div class="bmeta">Angriffspunkte 220 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Endgame-Flaggschiff · eigener Hangar für ${SUPER_HANGAR_SLOTS} Jäger/Bomber je Schiff (Gesamtkapazität ${hangarCap})${(awayByType.superschlachtschiff||0)>0?' · <span style="color:#e24b4a;">'+awayByType.superschlachtschiff+' unterwegs</span>':''}</div>
             <div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Angriff: 220 · <i class="ti ti-shield" aria-hidden="true"></i> Schild: ${SUPERSCHLACHTSCHIFF_SHIELD} · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigungsbeitrag: ${Math.round(220*0.4)+SUPERSCHLACHTSCHIFF_SHIELD} (je stationiertem Schiff)</div>
             <div class="bmeta" style="${superHaveItem<superQty?'color:#e24b4a;':''}"><i class="ti ti-atom-2" aria-hidden="true"></i> Verbraucht ${superQty}x Antimateriekern (vorhanden: ${superHaveItem})${superHaveItem<superQty?' – nicht genug!':''} · sehr seltener Fund bei Erkundungsmissionen</div>
-            <div class="bcost">${costHtml(superC)} · <i class="ti ti-clock" aria-hidden="true"></i> ${Math.round(240*superQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1))}s${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${SHIP_SCORE_WEIGHTS.superschlachtschiff*superQty} Punkte (${SHIP_SCORE_WEIGHTS.superschlachtschiff}/Schiff)</div>
+            <div class="bcost">${costHtml(superC)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(240*superQty*(planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?0.8:1)))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${SHIP_SCORE_WEIGHTS.superschlachtschiff*superQty} Punkte (${SHIP_SCORE_WEIGHTS.superschlachtschiff}/Schiff)</div>
           </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
@@ -29056,7 +29059,7 @@
                         <div class="bicon" style="width:32px; height:32px; background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${d.key}" width="26" height="26" style="display:block;"></canvas></div>
                         <div>
                           <div class="bname" style="font-size:12.5px;">${d.name} <span class="lvl-pill">${count} vorhanden</span></div>
-                          <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ~${Math.round(dur)}s Flugzeit · ~${fuelCostIconHtml(fuel)} Treibstoff (bei ${count})</div>
+                          <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ~${fmtDuration(dur)} Flugzeit · ~${fuelCostIconHtml(fuel)} Treibstoff (bei ${count})</div>
                           ${(d.key==='jaeger'||d.key==='bomber') && count>destHangarFree ? `<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Hangar bei ${planetDisplayName(state.activeBasePlanet)} hat nur noch ${destHangarFree} freie Plätze - der Rest kommt an, bleibt aber einsatzunfähig bis mehr Träger dort stehen.</div>` : ''}
                         </div>
                       </div>
@@ -29207,7 +29210,7 @@
             <div>
               <div class="bname"><i class="ti ti-planet" aria-hidden="true" style="font-size:12px; opacity:0.7;"></i> ${planetDisplayName(moonKey)}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
               <div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Mond: eigenständiges Ziel mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung (unabhängig vom Planeten) - produziert, verteidigt und lagert dafür nur ${Math.round(MOON_PENALTY*100)}% eines normalen Planeten</div>
-              ${!colonized ? `<div class="bcost">Kolonisierung: ${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${moonDur.toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${moonFuel} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +150 Punkte</div>` : ''}
+              ${!colonized ? `<div class="bcost">Kolonisierung: ${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(moonDur)} Flugzeit · ${miniResIcon('deuterium')} ${moonFuel} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +150 Punkte</div>` : ''}
               ${missingShip ? `<div class="bmeta" style="color:#f0997b;">Benötigt 1 Kolonieschiff (Flotte-Tab)</div>` : ''}
             </div>
           </div>
@@ -29249,11 +29252,11 @@
             <div class="bicon" style="background:${p.color}30; color:${p.color}; border-radius:50%;"><canvas data-planet-icon="${(state.planetTypeOverride||{})[p.id] || p.type}" width="26" height="26" style="display:block;"></canvas></div>
             <div>
               <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
-              <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system).toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system), 1)} Treibstoff</div>
+              <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system))} Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system), 1)} Treibstoff</div>
               ${p.orbit ? `<div class="bmeta">${orbitBonusLabel(p.orbit)}</div>` : ''}
               <div class="bcost">${rewardHtml(p.reward)}</div>
               ${bonus ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Verborgener Bonus: ${bonus.labelText}</div>` : ''}
-              ${disc && !colonized ? `<div class="bcost">Kolonisierung: ${costHtml(colCost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${colDur.toFixed(0)}s Flugzeit · ${miniResIcon('deuterium')} ${colFuel} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +200 Punkte</div>` : ''}
+              ${disc && !colonized ? `<div class="bcost">Kolonisierung: ${costHtml(colCost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(colDur)} Flugzeit · ${miniResIcon('deuterium')} ${colFuel} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +200 Punkte</div>` : ''}
               ${missingShip ? `<div class="bmeta" style="color:#f0997b;">Benötigt 1 Kolonieschiff (Flotte-Tab)</div>` : ''}
               ${(disc && !colonized && colonyLimitReached) ? `<div class="bmeta" style="color:#f0997b;">Kolonie-Limit erreicht (inkl. unterwegs: ${currentColonyCount()+pendingColonyCount()}/${maxColoniesAllowed()}) - Kolonial-Logistik weiter erforschen</div>` : ''}
             </div>
@@ -29883,7 +29886,7 @@
               <div class="bname">${n.name} <span class="lvl-pill">Stufe ${n.level}</span>${wins?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;"><i class="ti ti-arrow-up" aria-hidden="true"></i> ${wins}x besiegt</span>`:''}</div>
               <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
-              <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${flightTime.toFixed(0)}s Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
+              <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(flightTime)} Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
               <div class="bmeta" style="${atkCargoCapacity<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität: ${fmt(atkCargoCapacity)}${atkCargoCapacity<=0?' – ohne Frachter geht die Beute verloren!':''}</div>
               <div class="bcost">${rewardHtml(effLoot)}</div>
             </div>
