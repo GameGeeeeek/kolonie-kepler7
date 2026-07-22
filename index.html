@@ -556,6 +556,11 @@
     .event-banner { background:rgba(var(--secondary-rgb), 0.12); border:0.5px solid rgba(var(--secondary-rgb), 0.5); border-radius:12px; padding:12px 14px; margin-bottom:1.25rem; color:#e8eaf5; animation: eventGlow 2.4s ease-in-out infinite; }
     @keyframes eventGlow { 0%,100% { box-shadow:0 0 0 rgba(var(--secondary-rgb), 0); } 50% { box-shadow:0 0 14px rgba(var(--secondary-rgb), 0.35); } }
     @keyframes raidPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--danger-rgb), 0.4); } 50% { box-shadow:0 0 0 6px rgba(var(--danger-rgb), 0); } }
+    /* Ruhiger, langsamer Puls für die Erholungspausen-Karte (nach großem Gefecht) – bewusst grün/cyan
+       und deutlich langsamer als der rote Raid-Alarm, signalisiert "aktiver, aber entspannter Zustand". */
+    .recovery-pulse { animation: recoveryGlow 3.6s ease-in-out infinite; }
+    @keyframes recoveryGlow { 0%,100% { box-shadow:0 0 0 rgba(94,234,212,0); } 50% { box-shadow:0 0 16px rgba(94,234,212,0.35); } }
+    @media (prefers-reduced-motion: reduce) { .recovery-pulse { animation:none; } }
     @keyframes recycleSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
     .recycler-active { animation: recycleSpin 2.5s linear infinite; display:inline-block; }
     .hstat { background:var(--elev-2); border:0.5px solid rgba(255,255,255,0.12); border-radius:10px; padding:5px 10px; font-size:11px; display:flex; align-items:center; gap:6px; white-space:nowrap; font-variant-numeric:tabular-nums; cursor:default; }
@@ -3460,8 +3465,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.224.0';
+  const VERSION = '8.225.0';
   const PATCHNOTES = [
+    { version:'8.225.0', date:'22.07.2026', changes:[
+      'Kampfbericht: Löst ein Überfall die Erholungspause aus (großes Gefecht/Superangriff, siehe v8.223.0), steht das jetzt auch im Bericht („die Angreifer ziehen sich für rund X zurück") – so ist die Pause auch nachträglich im Berichte-Tab nachvollziehbar, nicht nur live im Verteidigung-Tab.',
+      'Grafik: Die Erholungspausen-Karte im Verteidigung-Tab pulsiert jetzt dezent grün-cyan (ruhiger und deutlich langsamer als der rote Überfall-Alarm), damit der aktive „Ruhephase läuft"-Zustand besser ins Auge fällt. Respektiert die Systemeinstellung für reduzierte Bewegung.',
+    ]},
     { version:'8.224.0', date:'22.07.2026', changes:[
       'Verteidigung-Tab: Läuft nach einem großen Gefecht die Erholungspause (siehe v8.223.0), wird sie jetzt sichtbar angezeigt – eine ruhige Info-Karte mit Live-Countdown „Nächster NPC-Überfall frühestens in …". So ist klar, warum gerade keine Angriffe kommen, statt dass sich die Pause nur unbemerkt im Hintergrund abspielt.',
     ]},
@@ -12280,7 +12289,7 @@
       log('Verteidigung von '+planetDisplayName(targetPlanet)+' hat den Überfall von '+factionName+' erfolgreich abgewehrt.'+(lostText?' Zerstört: '+lostText+'. Trümmerfeld hinterlassen.':''), 'ti-shield-lock');
       addVeteranXp(targetPlanet, 12);
       builtReport = { type:'raid', result:'win', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dp, defenseAttackPower:defAtk, defenseBefore:defBreakdown, fleet:raiderFleet, destroyedShips:lostRaiderShips, debris:raidDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
-      pushReport(builtReport);
+      // pushReport erst nach dem Erholungspausen-Block unten, damit recoveryPauseMs noch mit in den Bericht wandert.
     } else {
       let lossPct = Math.max(0.05, Math.min(isSuper?0.5:0.35, raiderPower/(raiderPower+dp*2)));
       const nfLvl = state.research.rnotfall||0;
@@ -12328,7 +12337,7 @@
       logScoreChange(-Math.round(totalLost/25), (isSuper?'Superangriff':factionName+'-Überfall')+' auf '+planetDisplayName(targetPlanet)+' – ~'+Math.round(lossPct*100)+'% Ressourcen verloren', 'ti-alert-triangle');
       log(factionName+'-Überfall auf '+planetDisplayName(targetPlanet)+' erfolgreich! Rund '+Math.round(lossPct*100)+'% der Ressourcen verloren. '+victim.name+' dort läuft 15 Min. mit -40% Produktion (sabotiert).'+ownLossText, 'ti-alert-triangle');
       builtReport = { type:'raid', result:'loss', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dp, defenseBefore:defBreakdown, lossPct:Math.round(lossPct*100), lostResources, sabotagedBuilding:victim.name, fleet:raiderFleet, ownLostShips:ownLostShipsForReport, ownLossDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
-      pushReport(builtReport);
+      // pushReport erst nach dem Erholungspausen-Block unten, damit recoveryPauseMs noch mit in den Bericht wandert.
     }
     if (state.incomingRaid && state.incomingRaid.scoutArrival && !state.incomingRaid.scouted){
       log('Der Spähbericht kam zu spät - die feindliche Flotte ist bereits eingeschlagen, bevor das Spähschiff sie erreichte.', 'ti-alert-triangle');
@@ -12338,9 +12347,14 @@
     // der nächste Überfall in ~40-80 Min; nach einem großen Gefecht kommen 1,5-3 Std. Erholung obendrauf
     // (maybeScheduleRaid setzt in dieser Zeit keinen neuen Überfall an).
     const RAID_BIG_BATTLE_SHIPS = 25;
-    if (raidShipsDestroyed >= RAID_BIG_BATTLE_SHIPS || isSuper){
-      state.raidCooldownUntil = Date.now() + (5400 + Math.random()*5400)*1000;
+    if (builtReport && (raidShipsDestroyed >= RAID_BIG_BATTLE_SHIPS || isSuper)){
+      const recoveryMs = (5400 + Math.random()*5400)*1000;
+      state.raidCooldownUntil = Date.now() + recoveryMs;
+      // Dauer der Erholungspause im Bericht festhalten, damit sie auch nachträglich im Berichte-Tab
+      // sichtbar ist (nicht nur live im Verteidigung-Tab).
+      builtReport.recoveryPauseMs = recoveryMs;
     }
+    if (builtReport) pushReport(builtReport);
     state.nextRaidTime = null;
     state.incomingRaid = null;
     render(); save();
@@ -16800,6 +16814,7 @@
             body += debrisReportLine(r.ownLossDebris);
           }
         }
+        if (r.recoveryPauseMs) body += '<br><i class="ti ti-shield" aria-hidden="true" style="color:#5eead4;"></i> Großes Gefecht: die Angreifer ziehen sich für rund '+fmtDuration(r.recoveryPauseMs/1000)+' zurück – so lange kommt kein neuer Überfall.';
       } else if (r.type === 'alliance-base-attack'){
         title = (r.result==='destroyed'?'💥 ':'')+'Angriff auf die Allianzbasis von ['+escapeHtml(r.targetTag||'?')+']';
         body = '<strong>'+(r.result==='destroyed' ? 'DIE BASIS WURDE ZERSTÖRT! Schaden: '+fmt(r.damage||0)+'.' : (r.result==='win' ? 'Treffer! '+fmt(r.damage||0)+' Schaden an der Basis (Hülle danach: '+fmt(r.hullAfter||0)+'/'+fmt(r.hullMax||0)+').' : 'Abgewehrt - die Verteidigung ('+fmt(r.defensePower||0)+') hielt stand (Erfolgschance ~'+(r.chancePct||0)+'%).'))+'</strong>';
@@ -30133,7 +30148,7 @@
         // bewusst kein Signatur-Cache, weil er sichtbar herunterzählen soll.
         const cdRemain = Math.max(0, state.raidCooldownUntil - Date.now());
         raidScoutBox.innerHTML = `
-          <div class="card-row" style="margin-bottom:0.75rem; border-color:rgba(94,234,212,0.35);">
+          <div class="card-row recovery-pulse" style="margin-bottom:0.75rem; border-color:rgba(94,234,212,0.35);">
             <div class="left"><div class="bicon" style="background:rgba(94,234,212,0.15); color:#5eead4;"><i class="ti ti-shield" aria-hidden="true"></i></div><div><div class="bname">Erholungspause nach großem Gefecht</div><div class="bmeta">Nach dem letzten verlustreichen Überfall halten sich die Angreifer zurück. Nächster NPC-Überfall frühestens nach dieser Pause – Zeit, Flotte und Verteidigung wieder aufzubauen.</div></div></div>
             <span class="lvl-pill">${fmtDuration(cdRemain/1000)}</span>
           </div>
