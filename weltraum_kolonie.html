@@ -3472,8 +3472,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.226.0';
+  const VERSION = '8.227.0';
   const PATCHNOTES = [
+    { version:'8.227.0', date:'22.07.2026', changes:[
+      'Komfort: Tagesaufgaben sind jetzt Direktsprünge. Tippt man eine noch offene Aufgabe an, springt das Spiel direkt zum passenden Menü – z.B. „1 Fähigkeitspunkt investieren" öffnet den Fortschritt-Tab und klappt den Fähigkeitsbaum auf, „3 NPC-Kämpfe gewinnen" führt in den Galaxie-Tab. Verdrahtet für alle Aufgaben mit eindeutigem Ziel (Forschung, Markt, Expedition, NPC-Kämpfe, Planet entdecken, Allianzbeitrag, Fähigkeitspunkt). Fertige Aufgaben holen beim Antippen wie gehabt die Belohnung ab.',
+    ]},
     { version:'8.226.0', date:'22.07.2026', changes:[
       'Neu: Flottenbau mit Tier-2-Material beschleunigen (Spieler-Wunsch). Zwei neue Wege senken die Schiffsbauzeit imperiumsweit: (1) Die Quanten-Assemblierwerft (neues Nutzgebäude im Basis-Tab, ab Forschung Quantenphysik, Kosten enthalten Quantenchips) gibt dauerhaft -1,5% Schiffsbauzeit je Stufe. Sie teilt sich einen gemeinsamen Deckel mit dem Fusions-Werftkern – beide Werft-Gebäude zusammen sind bei -20% gekappt (der Werftkern-Deckel steigt dadurch von -15% auf gemeinsame -20%). (2) Der Werft-Overdrive (neuer Verbrauchs-Boost direkt unter der Schiffswerft im Flotte-Tab): 12 Quantenchips → -25% Schiffsbauzeit für 30 Minuten, imperiumsweit, mit Live-Countdown. Beide geben der Quantenchip-Kette einen zweiten Dauer- bzw. Verbrauchs-Sink; der Overdrive zählt für den Erfolg „Verbrauchsstratege".',
     ]},
@@ -12972,14 +12975,18 @@
   // Handel/Fraktionsauftrag weiterhin über einfache Tageszähler an den bestehenden Abschluss-
   // Funktionen.
   const DAILY_QUEST_DEFS = [
-    { key:'battle', name:'10 Kampfpunkte sammeln', icon:'ti-sword', target:10, reward:{erz:400,kristalle:200} },
-    { key:'research', name:'1 Forschung abschließen', icon:'ti-flask', target:1, reward:{forschungspunkte:15,deuterium:150} },
+    // nav (Spieler-Wunsch): optionales Sprungziel - beim Antippen einer noch offenen Aufgabe direkt zum
+    // passenden Tab (und, falls angegeben, zur Sektion im Fortschritt-Tab) springen, statt das Menü selbst
+    // suchen zu müssen. Nur bei Aufgaben mit EINDEUTIGEM Ziel gesetzt (mehrdeutige wie "Gebäude ODER Schiff"
+    // bleiben ohne nav). Siehe navToQuestTarget() und die Tagesaufgaben-Leiste.
+    { key:'battle', name:'10 Kampfpunkte sammeln', icon:'ti-sword', target:10, reward:{erz:400,kristalle:200}, nav:{ tab:'galaxie' } },
+    { key:'research', name:'1 Forschung abschließen', icon:'ti-flask', target:1, reward:{forschungspunkte:15,deuterium:150}, nav:{ tab:'forschung' } },
     { key:'build', name:'1 Gebäude oder Schiff fertigstellen', icon:'ti-building-factory-2', target:1, reward:{erz:600,energie:400} },
-    { key:'trade', name:'1 Handel am Markt abschließen', icon:'ti-truck', target:1, reward:{credits:60} },
+    { key:'trade', name:'1 Handel am Markt abschließen', icon:'ti-truck', target:1, reward:{credits:60}, nav:{ tab:'markt' } },
     { key:'fquest', name:'1 Fraktionsauftrag abschließen', icon:'ti-medal', target:1, reward:{credits:80} },
-    { key:'expedition', name:'1 Expedition abschließen', icon:'ti-map-2', target:1, reward:{forschungspunkte:20,deuterium:100} },
-    { key:'npc', name:'3 NPC-Kämpfe gewinnen', icon:'ti-target', target:3, reward:{erz:500,kristalle:250} },
-    { key:'explore', name:'1 neuen Planeten entdecken', icon:'ti-planet', target:1, reward:{credits:70} },
+    { key:'expedition', name:'1 Expedition abschließen', icon:'ti-map-2', target:1, reward:{forschungspunkte:20,deuterium:100}, nav:{ tab:'expedition' } },
+    { key:'npc', name:'3 NPC-Kämpfe gewinnen', icon:'ti-target', target:3, reward:{erz:500,kristalle:250}, nav:{ tab:'galaxie' } },
+    { key:'explore', name:'1 neuen Planeten entdecken', icon:'ti-planet', target:1, reward:{credits:70}, nav:{ tab:'galaxie' } },
     // 18.07.2026 (Spieler-Wunsch "Tägliche Missionen Variation erweitern"): von 8 auf 11 Typen
     // erweitert, gleiche Belohnungsgrößenordnung wie die bestehenden acht.
     { key:'item', name:'1 Item aus dem Inventar aktivieren', icon:'ti-backpack', target:1, reward:{credits:70} },
@@ -12989,8 +12996,8 @@
     // Kandidaten gefunden - siehe Chat: Auto-Erkundungstour hätte nur mit 'explore' doppelt gezählt):
     // von 11 auf 14 Typen erweitert.
     { key:'shop', name:'1 Item im Kredit-Shop kaufen', icon:'ti-diamond', target:1, reward:{credits:60} },
-    { key:'skillpoint', name:'1 Fähigkeitspunkt investieren', icon:'ti-award', target:1, reward:{erz:400,kristalle:200} },
-    { key:'alliancecontrib', name:'1x zur Allianz beitragen', icon:'ti-users', target:1, reward:{credits:80} },
+    { key:'skillpoint', name:'1 Fähigkeitspunkt investieren', icon:'ti-award', target:1, reward:{erz:400,kristalle:200}, nav:{ tab:'fortschritt', section:'faehigkeitsbaum' } },
+    { key:'alliancecontrib', name:'1x zur Allianz beitragen', icon:'ti-users', target:1, reward:{credits:80}, nav:{ tab:'allianz' } },
     // Tier-2-Anbindung (Tier-2-Konzept Block 2, 19.07.2026): zählt die ECHTE Fabrik-Produktion des
     // Tages über alle fünf Ketten (Zähler in processTier2Factories). Nur im Tages-Pool, wenn
     // mindestens eine Tier-2-Fabrik existiert (available-Prädikat) - sonst wäre die Aufgabe
@@ -27193,6 +27200,21 @@
   }
   document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', ()=>switchTab(b.getAttribute('data-tab'))));
 
+  // Direktsprung von einer Tagesaufgabe zum passenden Menü (Spieler-Wunsch): wechselt den Tab und - falls
+  // ein Sektions-Schlüssel angegeben ist (Fortschritt-Tab, z.B. Fähigkeitsbaum) - klappt die Sektion auf
+  // und scrollt sie ins Bild. Sektions-Klappzustand VOR switchTab setzen, damit render() sie gleich
+  // aufgeklappt zeichnet; danach zusätzlich manuell entklappen+scrollen (dieselbe Logik wie die Sprung-
+  // Navigation im Fortschritt-Tab).
+  function navToQuestTarget(nav){
+    if (!nav || !nav.tab) return;
+    if (nav.section){ if (!state.collapsedSections) state.collapsedSections = {}; state.collapsedSections[nav.section] = false; }
+    switchTab(nav.tab);
+    if (nav.section){
+      const target = document.querySelector('.prog-section[data-sec="'+nav.section+'"]');
+      if (target){ target.classList.remove('collapsed'); target.scrollIntoView({ behavior:'smooth', block:'start' }); }
+    }
+  }
+
   // Sektor-Suche: filtert Systeme UND Planeten nach Namen. Bei Systemtreffern springt die Karte direkt
   // dorthin, bei Planetentreffern zusätzlich mit kurzem Puls-Highlight auf dem System-Detail-Marker.
   function performSectorSearch(query){
@@ -30315,8 +30337,10 @@
         const done = prog >= d.target;
         const bg = done ? 'rgba(250,199,117,0.18)' : 'rgba(255,255,255,0.06)';
         const border = done ? 'rgba(250,199,117,0.5)' : 'rgba(255,255,255,0.1)';
-        return `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:${bg}; border:1px solid ${border};" title="${d.name}">
-          <span style="cursor:${done?'pointer':'default'}; display:flex; align-items:center; gap:5px;" ${done?`data-claim-quest="${d.key}"`:''}>
+        const navigable = !done && !!d.nav;
+        const pillTitle = done ? d.name+' – antippen zum Abholen' : (navigable ? d.name+' – antippen, um direkt zum passenden Menü zu springen' : d.name);
+        return `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:${bg}; border:1px solid ${border};" title="${pillTitle}">
+          <span style="cursor:${(done||navigable)?'pointer':'default'}; display:flex; align-items:center; gap:5px;" ${done?`data-claim-quest="${d.key}"`:(navigable?`data-quest-nav="${d.key}"`:'')}>
             <i class="ti ${d.icon}" aria-hidden="true" style="color:${done?'#fac775':'#9296ac'};"></i>
             <span style="font-size:10.5px;">${d.name} (${prog}/${d.target})</span>
           </span>
@@ -30324,6 +30348,7 @@
         </div>`;
       }).join('')}${allClaimed ? `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:rgba(93,202,165,0.15); border:1px solid rgba(93,202,165,0.4);"><i class="ti ti-trophy" aria-hidden="true" style="color:#5dcaa5;"></i><span style="font-size:10.5px;">Alle Tagesmissionen erledigt${state.dailyQuestStreak?' · '+state.dailyQuestStreak+'-Tage-Serie':''} - morgen gibt's neue</span></div>` : ''}</div>`;
       dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
+      dailyQuestBar.querySelectorAll('[data-quest-nav]').forEach(el => el.onclick = () => { const def = DAILY_QUEST_DEFS.find(d=>d.key===el.getAttribute('data-quest-nav')); if (def) navToQuestTarget(def.nav); });
       dailyQuestBar.querySelectorAll('[data-reroll-quest]').forEach(el => el.onclick = (ev) => { ev.stopPropagation(); rerollDailyQuest(el.getAttribute('data-reroll-quest')); });
       const claimAllQuestsBtn = document.getElementById('claimAllQuestsBtn');
       if (claimAllQuestsBtn) claimAllQuestsBtn.onclick = claimAllDailyQuests;
