@@ -3472,8 +3472,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.233.0';
+  const VERSION = '8.234.0';
   const PATCHNOTES = [
+    { version:'8.234.0', date:'22.07.2026', changes:[
+      'Flotte übersichtlicher: Neuer Umschalter „Nur baubare Schiffe anzeigen" direkt über der Schiffswerft. Ist er an, verschwinden gesperrte Schiffe aus der Liste, die du (noch) nicht bauen kannst – Forschung fehlt oder Event-/Item-Freischaltung offen. Schiffe, die du bereits besitzt oder gerade baust, bleiben immer sichtbar. Standardmäßig aus, die Einstellung wird gespeichert. Zeigt bei aktivem Filter, wie viele gesperrte Schiffe gerade ausgeblendet sind.',
+      'Kleinigkeit: Der „unterwegs"-Hinweis bei Schiffen liest sich jetzt „N unterwegs (im Einsatz)" statt der etwas holprigen alten Formulierung.',
+    ]},
     { version:'8.233.0', date:'22.07.2026', changes:[
       'Expeditionen: Der „verlassene Flotte"-Fund gibt jetzt eine größere Auswahl an Schiffen (Spieler-Wunsch „auch Schiffe finden, aber nicht so viele"). Neben Jägern und Kreuzern tauchen gelegentlich auch stärkere Typen auf – Bomber, Zerstörer, Trägerschiff oder Schlachtschiff. Bewusst gedeckelt: stärkere Schiffe erscheinen seltener und in kleinerer Stückzahl (Schlachtschiff/Trägerschiff maximal 1 pro Fund), unabhängig von der Expeditionsstufe – der Fund bleibt eine nette Abwechslung, keine ergiebige Flotten-Quelle.',
     ]},
@@ -13376,6 +13380,7 @@
     if (state.uiJumpNav === undefined) state.uiJumpNav = false;
     if (state.uiCollapsibleSections === undefined) state.uiCollapsibleSections = false;
     if (state.uiTwoColumn === undefined) state.uiTwoColumn = false;
+    if (state.uiHideLockedShips === undefined) state.uiHideLockedShips = false;
     if (!state.collapsedSections) state.collapsedSections = {};
     if (!state.favoritePlanets) state.favoritePlanets = {};
     if (state.lastLoginDate === undefined) state.lastLoginDate = null;
@@ -28917,7 +28922,23 @@
     const superC = shipCostForRange({costFn:superschlachtschiffCost}, cf.superschlachtschiff||0, superQty);
     const superHaveItem = state.rareItems.antimateriekern||0;
 
-    const shipRows = SHIP_DEFS.map(def => {
+    // Schiffslisten-Filter (Spieler-Wunsch "Flotte verbessern"): opt-in Toggle blendet gesperrte, noch
+    // nicht besessene Schiffe aus (Forschung nicht erreicht ODER Event-/Item-Freischaltung offen), damit
+    // die 29 Schiffe lange Liste übersichtlicher wird. Was man besitzt oder gerade baut, bleibt IMMER
+    // sichtbar; Standard ist aus, ändert also für niemanden ungefragt die Ansicht.
+    const hideLockedShips = !!state.uiHideLockedShips;
+    const shipIsHiddenByFilter = (def) => {
+      if ((cf[def.key]||0) > 0) return false;
+      if (pendingHere.some(j=>j.key===def.key)) return false;
+      if ((def.unlockItems || def.unlockEventParts) && !state.unlocked[def.key]) return true;
+      if (!shipRequirementsMet(def)) return true;
+      return false;
+    };
+    const visibleShipDefs = hideLockedShips ? SHIP_DEFS.filter(d => !shipIsHiddenByFilter(d)) : SHIP_DEFS;
+    // Superschlachtschiff (separater Block unten) zählt beim Ausblenden mit, wenn noch gesperrt & 0 besessen.
+    const superHiddenByFilter = hideLockedShips && !state.unlocked.superschlachtschiff && (cf.superschlachtschiff||0)===0 && !pendingHere.some(j=>j.key==='superschlachtschiff');
+    const hiddenShipCount = (SHIP_DEFS.length - visibleShipDefs.length) + (superHiddenByFilter ? 1 : 0);
+    const shipRows = visibleShipDefs.map(def => {
       const count = cf[def.key]||0;
       const pendingQty = pendingHere.filter(j=>j.key===def.key).reduce((a,j)=>a+j.qty,0);
       // Mehrere seltene Items gleichzeitig zum einmaligen Freischalten (aktuell nur Mondzerstörer) -
@@ -28985,7 +29006,7 @@
       // Warteschlange befindliche Exemplare zählen zusammen gegen die Obergrenze.
       const atOwnedCap = def.maxOwned && (count + pendingQty) >= def.maxOwned;
       let meta = '';
-      const awayNote = (key) => (awayByType[key]||0) > 0 ? ` · <span style="color:#e24b4a;">${awayByType[key]} unterwegs (angreift/expediert)</span>` : '';
+      const awayNote = (key) => (awayByType[key]||0) > 0 ? ` · <span style="color:#e24b4a;">${awayByType[key]} unterwegs (im Einsatz)</span>` : '';
       if (def.key==='ships') meta = `Angriffspunkte 5 · ${slotsUsedExplore}/${count} Erkundungs-Slots belegt`;
       else if (def.key==='jaeger') meta = `Angriffspunkte 10 · ${slotsUsedAttack}/${combatShips} Kampf-Slots · einsatzbereit ${df.jaeger}/${count}${df.idleJaeger>0?' ('+df.idleJaeger+' ohne Hangarplatz)':''}${awayNote('jaeger')}`;
       else if (def.key==='bomber') meta = `Angriffspunkte 60 · benötigt Hangarplatz · einsatzbereit ${df.bomber}/${count}${df.idleBomber>0?' ('+df.idleBomber+' ohne Hangarplatz)':''}${awayNote('bomber')}`;
@@ -29040,7 +29061,7 @@
     }).join('');
 
     const superPendingQty = pendingHere.filter(j=>j.key==='superschlachtschiff').reduce((a,j)=>a+j.qty,0);
-    const superBlock = !state.unlocked.superschlachtschiff ? `
+    const superBlock = superHiddenByFilter ? '' : !state.unlocked.superschlachtschiff ? `
       <div class="card-row research-locked">
         <div class="left">
           <div class="bicon" style="background:rgba(121,31,31,0.3);"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
@@ -29070,7 +29091,11 @@
       </div>
     `;
 
-    document.getElementById('fleet').innerHTML = constructionProgressCards(j=>j.kind==='ship' && j.planet===state.activeBasePlanet) + shipRows + superBlock;
+    // Filter-Umschalter direkt über der Liste - zeigt nur, wenn er entweder aktiv ist oder tatsächlich
+    // etwas ausblenden würde (sonst kein Mehrwert, z.B. wenn ohnehin alles freigeschaltet ist).
+    const anyFilterable = hiddenShipCount > 0 || SHIP_DEFS.some(shipIsHiddenByFilter) || (!state.unlocked.superschlachtschiff && (cf.superschlachtschiff||0)===0);
+    const shipFilterToggle = anyFilterable ? `<div class="bmeta" data-toggle-hide-locked style="cursor:pointer; margin-bottom:8px;"><i class="ti ${hideLockedShips?'ti-check':'ti-x'}" aria-hidden="true" style="color:${hideLockedShips?'#5dcaa5':'#7d8199'};"></i> Nur baubare Schiffe anzeigen: <strong style="color:${hideLockedShips?'#5dcaa5':'#7d8199'};">${hideLockedShips?'AN':'AUS'}</strong>${hideLockedShips&&hiddenShipCount>0?` <span style="color:#7d8199;">(${hiddenShipCount} gesperrte ausgeblendet)</span>`:''} <span style="color:#7d8199;">– antippen zum Umschalten</span></div>` : '';
+    document.getElementById('fleet').innerHTML = shipFilterToggle + constructionProgressCards(j=>j.kind==='ship' && j.planet===state.activeBasePlanet) + shipRows + superBlock;
     refreshShipMiniIcons(document.getElementById('fleet'));
 
     const debrisBox = document.getElementById('debrisBox');
@@ -31559,6 +31584,7 @@
     document.querySelectorAll('[data-research]').forEach(btn => btn.onclick = () => startResearch(btn.getAttribute('data-research')));
     document.querySelectorAll('[data-send]').forEach(btn => btn.onclick = () => sendExploreMission(btn.getAttribute('data-send')));
     document.querySelectorAll('[data-attack]').forEach(btn => btn.onclick = () => sendAttackMission(btn.getAttribute('data-attack')));
+    document.querySelectorAll('[data-toggle-hide-locked]').forEach(el => el.onclick = () => { state.uiHideLockedShips = !state.uiHideLockedShips; render(); save(); });
     document.querySelectorAll('[data-buyship]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-buyship');
       const def = SHIP_DEFS.find(d=>d.key===key);
