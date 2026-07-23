@@ -3481,8 +3481,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.245.0';
+  const VERSION = '8.246.0';
   const PATCHNOTES = [
+    { version:'8.246.0', date:'23.07.2026', changes:[
+      'Balance-Bugfix (danke für den Report): Prestige kostete bisher IMMER 5000 Punkte – da jede Prestige-Stufe aber dauerhaft +500 Basis-Punkte gibt, erreichte man die 5000 irgendwann allein durch die Prestige-Zahl und konnte endlos „nachprestigen". Ab jetzt kostet die erste Stufe 5000 Punkte und jede weitere das Fünffache der vorherigen (5000 → 25.000 → 125.000 → 625.000 …). Die nötige Punktzahl steht im Fortschritt-Tab an der Prestige-Karte. Bereits erreichte Prestige-Stufen bleiben unangetastet.',
+    ]},
     { version:'8.245.0', date:'23.07.2026', changes:[
       'Bugfix (danke für den Hinweis): Die Beschreibungstexte der Schiffe (inkl. der einzigartigen Tier-2-Fähigkeiten wie „Panzerbrecher", „Gravitationssog", „Ausweichmanöver" usw.) wurden in der Schiffswerft gar nicht angezeigt – der `nicheDesc`-Text war bisher nur bei gesperrten Event-Schiffen sichtbar. Jede Schiffskarte zeigt jetzt ihren Beschreibungs-/Fähigkeitstext als eigene Zeile (violett, mit Stern). Leere „Meta"-Zeilen bei Schiffen ohne Zusatzinfo entfallen.',
     ]},
@@ -13410,9 +13413,16 @@
     return true;
   }
 
-  function canPrestige(){ return computeScore() >= 5000; }
+  // Prestige-Kosten skalieren (Bugfix 23.07.2026): früher fixe 5000 Punkte je Prestige. Da computeScore()
+  // aber pro Prestige-Stufe dauerhaft +500 Basis-Punkte vergibt, erreichte man die 5000 irgendwann allein
+  // durch die Prestige-Zahl und konnte endlos „nachprestigen". Jetzt kostet die erste Stufe 5000 und jede
+  // weitere das Fünffache der vorherigen (5000, 25.000, 125.000, …) - wächst deutlich schneller als der
+  // +500/Stufe-Bonus, endloses Spammen ist damit ausgeschlossen.
+  const PRESTIGE_BASE_COST = 5000, PRESTIGE_COST_MULT = 5;
+  function prestigeRequiredScore(){ return PRESTIGE_BASE_COST * Math.pow(PRESTIGE_COST_MULT, state.prestige||0); }
+  function canPrestige(){ return computeScore() >= prestigeRequiredScore(); }
   function doPrestige(){
-    if (!canPrestige()){ log('Punktzahl noch zu niedrig für Prestige (mind. 5000 nötig).', 'ti-alert-triangle'); return; }
+    if (!canPrestige()){ log('Punktzahl noch zu niedrig für Prestige (mind. '+fmt(prestigeRequiredScore())+' nötig).', 'ti-alert-triangle'); return; }
     const kryoNoteLvl = kryoarchivEffectiveLevel();
     if (!confirm('Prestige zurücksetzen? Gebäude, Forschung und Flotte gehen verloren, du behältst deinen Kommandanten-Namen, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie Offiziere/Kommandopunkte/Module, und erhältst dauerhaft +5% Produktion.'+(kryoNoteLvl>0?' Dein Kryo-Archiv (Stufe '+kryoNoteLvl+') bewahrt zusätzlich eingelagerte Tier-2-Bestände.':' Tier-2-Bestände gehen ohne Kryo-Archiv verloren.')+' Im nächsten Schritt wählst du zusätzlich einen dauerhaften Bonus.')) return;
     const body = document.getElementById('prestigePerkBody');
@@ -31294,7 +31304,7 @@
             <div class="bicon" style="background:rgba(126,119,221,0.2); color:#c3bef5;"><i class="ti ti-infinity" aria-hidden="true"></i></div>
             <div>
               <div class="bname">Prestige-Stufe ${state.prestige||0}</div>
-              <div class="bmeta">+${(state.prestige||0)*5}% dauerhafte Produktion · Punktzahl: ${computeScore()} / 5000 nötig</div>
+              <div class="bmeta">+${(state.prestige||0)*5}% dauerhafte Produktion · Punktzahl: ${fmt(computeScore())} / ${fmt(prestigeRequiredScore())} nötig (nächste Stufe kostet das 5-Fache)</div>
             </div>
           </div>
           <button class="buy ${ready?'affordable':''}" id="prestigeBtn" ${ready?'':'disabled'}><i class="ti ti-refresh" aria-hidden="true" style="margin-right:4px;"></i>Zurücksetzen</button>
