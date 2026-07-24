@@ -710,6 +710,19 @@
        etablierte Neon-Glow-Statussprache (var(--glow-warn)) auf der Karte, sobald das Lager voll ist. */
     .t2-fill { position:absolute; left:0; bottom:0; height:2.5px; opacity:0.85; pointer-events:none; transition:width 0.4s ease; }
     .rescard.t2-full { border-color:rgba(var(--warning-rgb),0.55); box-shadow:var(--glow-warn); }
+    /* Vorwarnstufe "Lager fast voll" (Grafik-Audit 24.07.2026, Entwurf D): Bisher wurde eine
+       Ressource erst MARKIERT, wenn das Lager bereits voll war - also erst, wenn schon Produktion
+       verloren geht (harter Lager-Deckel, siehe Kommentar bei applyProduction). Genau dann ist die
+       Warnung aber zu spät. Ab 85% Füllstand bekommt die Karte deshalb eine gedämpfte Vorstufe
+       derselben Bernstein-Sprache: dünnerer Rahmen, KEIN Glow (der bleibt dem echten "voll"
+       vorbehalten, damit die Stufen unterscheidbar bleiben). Der Balken ist zugleich etwas kräftiger
+       (3.5px statt 2.5px) und bekommt bei vollem Lager einen Leuchtsaum - er ist die eigentliche
+       Information der Karte und war vorher als 2.5px-Haarlinie kaum zu sehen. */
+    .rescard.t2-near { border-color:rgba(var(--warning-rgb),0.3); }
+    .rescard .t2-fill { height:3.5px; }
+    .rescard.t2-full .t2-fill { box-shadow:0 0 8px rgba(var(--warning-rgb),0.75); opacity:1; }
+    .rescard .rate .pct { color:#7d8199; }
+    .rescard.t2-near .rate .pct { color:var(--c-warning); }
     .rescard .icon-badge { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
     .rescard .label { font-size:11px; color:#a8adc4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rescard .value { font-size:17px; font-weight:500; line-height:1.25; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -3633,8 +3646,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.276.0';
+  const VERSION = '8.277.0';
   const PATCHNOTES = [
+    { version:'8.277.0', date:'24.07.2026', changes:[
+      'Ressourcenkarten warnen jetzt VOR dem vollen Lager: Ab 85% Füllstand färbt sich die Karte bernsteinfarben und die Rate zeigt "· 90% – fast voll". Bisher wurde eine Ressource erst markiert, wenn das Lager bereits voll war – also erst, wenn schon Produktion verfällt (der Lager-Deckel stoppt sie bei 100% komplett). Hintergrund: Der separate "Lager fast voll"-Hinweisbalken war früher einmal entfernt worden, weil der Warn-Rahmen an der Karte seine Rolle übernehmen sollte – der löste aber ausschließlich bei 100% aus, sodass die Vorwarnstufe seitdem faktisch fehlte. Sie ist jetzt direkt auf der Karte zurück.',
+      'Der Lager-Füllstandsbalken auf den Ressourcenkarten ist etwas kräftiger (3,5 statt 2,5 Pixel) und bekommt bei vollem Lager einen Leuchtsaum – er trägt die eigentliche Information der Karte und war vorher als Haarlinie kaum zu erkennen. Zusätzlich steht der Füllstand jetzt auch als Prozentzahl neben der Produktionsrate.',
+    ]},
     { version:'8.276.0', date:'24.07.2026', changes:[
       'Behoben: In der Kopfzeile überlappte der Titel "Kolonie Kepler-7" die Knopfleiste (Bug/Vorschlag, Berichte, Hilfe, Einstellungen, Kaffee). Sichtbar war das zwischen rund 700 und 1100 Pixel Fensterbreite – also auf vielen Tablets und in schmalen Desktop-Fenstern. Ursache: Titel und Knöpfe waren getrennt voneinander an denselben unteren Rand geheftet, ohne voneinander zu wissen. Beide teilen sich jetzt eine gemeinsame Zeile, in der der Titel bei Platzmangel schrumpft und die Knöpfe notfalls umbrechen – eine Überlappung ist damit strukturell ausgeschlossen.',
     ]},
@@ -17533,7 +17550,7 @@
       { title:'Happy Hour (Flash-Events)', body:'Zweimal pro Tag - um <strong>12:00 und 20:00 Uhr Ortszeit, je 60 Minuten</strong> - ist eine „Happy Hour" mit einem wechselnden Produktionsbonus aktiv. Vier Typen rotieren: <strong>Bergbau-Rausch</strong> (+40% Erz/Kristalle), <strong>Energie-Hoch</strong> (+40% Energie/Deuterium), <strong>Produktionsschub</strong> (+25% auf alle Grundressourcen) und <strong>Forschungsfieber</strong> (+60% Forschungspunkte). Die Termine sind fest aus dem Datum berechnet (kein Zufall, kein Server nötig), sodass du dich gezielt darauf einstellen kannst - ein Banner oben im <strong>Basis-Tab</strong> zeigt das gerade laufende bzw. das nächste Fenster samt Countdown, beim Start kommt eine Benachrichtigung. Der Bonus wirkt nur auf die laufende Live-Produktion, <strong>nicht</strong> auf die Offline-Gutschrift.' },
       { title:'Benachrichtigungen', body:'Unter <strong>Einstellungen → Benachrichtigungen</strong> legst du je Kategorie fest, worüber du informiert wirst (Postfach im Spiel und, wenn aktiviert, echte Web-Push aufs Handy). Neben Nachrichten, Pakt-Angeboten, Weltboss-Kills, Überfällen, Patchnotes, Bewerbungen, Spionage und <strong>Angriffen auf dich</strong> gibt es zwei Retention-Kategorien: <strong>„Bestenlisten-Überholung"</strong> (wenn dich ein Spieler in der Rangliste überholt - nur für die vorderen Ränge, mit Ruhephase gegen Spam) und <strong>„Fertige Aufträge"</strong> (wenn Forschung, Bau, Expedition, Terraforming, exotische Forschung oder Veteranen-Ausbildung fertig wird, während du NICHT im Spiel bist - bist du online, kommt nichts, weil du es ohnehin siehst). Jede Kategorie einzeln abschaltbar.' },
       { title:'Comeback-Mission', body:'Warst du <strong>mindestens 48 Stunden</strong> nicht im Spiel, erscheint beim Zurückkommen oben im <strong>Basis-Tab</strong> eine kurze, geführte 3-Schritt-Mission, die dich schnell wieder in die Kernschleife bringt: (1) ein Gebäude ausbauen, (2) eine Forschung abschließen, (3) einen Kampf gewinnen. Die Schritte werden der Reihe nach freigeschaltet, jeder bringt sofort eine Belohnung (Ressourcen/Kredite). Schließt du alle drei ab, gibt es zum Abschluss zusätzlich <strong>+40 Kredite und +25% Produktion für 2 Stunden</strong>. Läuft parallel zum Rückkehrer-Bonus (+50% Produktion nach 24h Abwesenheit).' },
-      { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung).' },
+      { title:'Lager-Kapazität', body:'Jedes Lagergebäude-Level erhöht die Kapazität. Ist das Lager einer Ressource <strong>voll, geht jeder Überschuss verloren</strong> - egal ob aus laufender Produktion, Belohnungen, Beute oder Erstattungen. Nur ein bereits VORHANDENER Überstand (z.B. wenn die Kapazität durch den Verlust eines Lagergebäudes sinkt) wird nicht nachträglich weggekappt, es kommt nur nichts Neues mehr dazu, bis wieder Platz ist. Baue rechtzeitig Lagerkapazität aus oder verbrauche Ressourcen (Bauen, Schiffe, Forschung). Die Ressourcenkarte zeigt den Füllstand als Balken am unteren Kartenrand und den Prozentwert neben der Rate. <strong>Ab 85% färbt sich die Karte zur Vorwarnung bernsteinfarben</strong> („fast voll"), bei 100% kommt der volle Warnrahmen mit Leuchtsaum dazu und die Rate wechselt auf „+0/s (Lager voll)" - so siehst du rechtzeitig, wo Produktion zu verfallen droht, statt es erst zu merken, wenn sie schon verloren geht.' },
       { title:'Produktions-Multiplikatoren', body:'Planeten-lokale Boni (Habitat bis <strong>+40% (Deckel)</strong>, Bergbau-Rolle +25%, Terraforming, Planetentyp, Module) und Forschung wirken multiplikativ. Die globalen Boni (Allianz, Saison-Events, Prestige-Perks, Skill-Baum, Territorium, eroberte Systeme, Megaprojekte) werden <strong>addiert</strong> und als ein Gesamtbonus angewendet – sie potenzieren sich nicht mehr gegenseitig. Der Kommandanten-Level-Bonus ist bei +30% gedeckelt, Prestige (+5% je Stufe) bleibt ungedeckelt.' },
       { title:'Imperiums-Skalierung der Kosten', body:'Zwei Kostenarten wachsen mit der Größe deines Imperiums, damit sie auch mit vielen Kolonien spürbar bleiben: <strong>1) Groß-Anschaffungen</strong> (Mega-Projekte, Orbitalstationen, exotische Forschung, Veteranen-Ausbildung) kosten <strong>+25% je Standort</strong> über dem ersten (Kolonien und Monde zählen mit) – bei Heimat + 10 Kolonien also das 3,5-fache. Alle angezeigten Preise sind bereits die skalierten Werte. <strong>2) Schiffe</strong> kosten <strong>+0,4% je bereits vorhandenem Schiff desselben Typs</strong> (imperiumsweit über alle Standorte gezählt), gedeckelt bei +100% – das ~250. Schiff eines Typs kostet also das Doppelte. Verluste im Kampf senken den Bestand und machen den Nachbau entsprechend wieder günstiger. Kolonisierungskosten skalieren wie bisher separat (+35% je bestehender Kolonie).' },
       { title:'Saison-Events', body:'Rein datumsbasierte Boni, die für alle Spieler gleichzeitig laufen (kein Zufall, kein Server nötig) – ein kleines Badge neben \"Kolonie Kepler-7\" zeigt an, welche gerade aktiv sind (antippen für Details). Vier Kategorien, jede einzeln gedeckelt, damit seltene Überlappungen nicht unbegrenzt eskalieren: <strong>Ressourcenproduktion (Deckel +25%)</strong> – Wochenend-Bonus (Sa+So, +15%), die vier Jahreszeiten-Events (+6% bis +10% je nach Saison), Tag-und-Nacht-Gleiche und Sonnenwende (je +4%, nur am exakten Tag), Neujahr und Silvester (je +5%) und das jährliche Jubiläum am 10. Juli (+8%). <strong>Einzelressource (Deckel +15%)</strong> – an jedem Werktag ist eine andere Ressource dran (Montag Erz, Dienstag Kristalle, Mittwoch Energie, Donnerstag Deuterium), je +5%. <strong>Mondkolonien (Deckel +20%)</strong> – bei astronomischem Vollmond (rechnerisch ermittelt, ca. 1×/Monat) +8% Produktion, aber nur auf Mondkolonien. <strong>Beute (Deckel +20%)</strong> – Freitag (Kopfgeldtag, +6%) und die Perseiden-Meteorschauer Mitte August (+8%) erhöhen die Beute bei NPC-Angriffen und Expeditionen.' },
@@ -28685,6 +28702,28 @@
   // Grafik-Runde "Maximum", Vorschlag 25: letzter tatsächlich angezeigter Wert je Ressource, damit
   // render() weiss, von wo aus hochgezählt werden muss (siehe resBarOk-Zweig weiter unten).
   const lastResRenderVal = {};
+  // Ab diesem Füllstand gilt eine Ressource als "fast voll" und wird vorgewarnt (Grafik-Audit
+  // 24.07.2026, Entwurf D). Bewusst 85%: der harte Lager-Deckel stoppt die Produktion bei 100%
+  // komplett, eine Warnung erst dort wäre zu spät, um noch zu reagieren (bauen/verkaufen/Lager
+  // ausbauen). Bei starker Wirtschaft sind die letzten 15% je nach Ressource nur Minuten.
+  const RES_NEAR_FULL_PCT = 85;
+  // Anzeige-Zustand einer Ressourcenkarte an EINER Stelle berechnet. Beide Render-Pfade unten
+  // (Struktur-Neuaufbau und der pro-Tick-Teil-Update-Pfad) rufen diese Funktion auf - vorher war
+  // dieselbe Logik zweimal ausgeschrieben und musste von Hand synchron gehalten werden.
+  function resCardState(d, stock, cap, rate){
+    const pct = cap>0 ? Math.min(100, stock/cap*100) : 0;
+    const isFull = cap>0 && stock >= cap;
+    const isNear = !isFull && pct >= RES_NEAR_FULL_PCT;
+    const r = rate||0;
+    let rateHtml;
+    if (isFull && r > 0) rateHtml = '<span style="color:#e0a548;">+0/s (Lager voll)</span>';
+    else if (isNear) rateHtml = '+'+fmt(r)+'/s <span class="pct">· '+Math.round(pct)+'% – fast voll</span>';
+    else rateHtml = '+'+fmt(r)+'/s'+(cap>0 ? ' <span class="pct">· '+Math.round(pct)+'%</span>' : '');
+    return { pct, isFull, isNear, rateHtml,
+      cls: isFull ? ' t2-full' : (isNear ? ' t2-near' : ''),
+      fillPct: pct.toFixed(1),
+      fillColor: isFull ? '#e0a548' : d.color };
+  }
   // Signatur-Cache für die Planeten-Umschalter (Def/Flotte/Expedition) + fpColonyList - siehe render().
   let lastSwitcherSig = null;
   const resValAnimFrames = new WeakMap();
@@ -28966,18 +29005,17 @@
       // den die Karte ohnehin schon als "/ Zahl" zeigt, nur auf einen Blick ablesbar.
       resBarEl.innerHTML = RES_DEFS.map(d => {
         const stock = state.resources[d.key]||0;
-        const isFull = cap>0 && stock >= cap;
-        const fillPct = cap>0 ? Math.min(100, stock/cap*100) : 0;
+        const st = resCardState(d, stock, cap, rates[d.key]);
         return `
-        <div class="rescard${isFull?' t2-full':''}" data-res="${d.key}">
+        <div class="rescard${st.cls}" data-res="${d.key}">
           <div class="icon-badge" style="background:${d.bg};">${RES_ICONS[d.key]}</div>
           <div class="rescard-info">
             <div class="label">${d.label}</div>
             <div class="value">${fmt(stock)} <span style="font-size:10px; color:#7d8199; font-weight:400;">/ ${fmt(cap)}</span></div>
-            <div class="rate">${(isFull && rates[d.key] > 0) ? '<span style="color:#e0a548;">+0/s (Lager voll)</span>' : '+'+fmt(rates[d.key])+'/s'}</div>
+            <div class="rate">${st.rateHtml}</div>
           </div>
           <div class="float-gain">+0</div>
-          <div class="t2-fill" style="width:${fillPct.toFixed(1)}%; background:${isFull?'#e0a548':d.color};"></div>
+          <div class="t2-fill" style="width:${st.fillPct}%; background:${st.fillColor};"></div>
         </div>
       `;}).join('');
       RES_DEFS.forEach(d => { lastResRenderVal[d.key] = state.resources[d.key]||0; });
@@ -28987,20 +29025,22 @@
         const rateEl = card.querySelector('.rate');
         const valEl = card.querySelector('.value');
         const newVal = state.resources[d.key]||0;
-        rateEl.innerHTML = (cap>0 && newVal >= cap && rates[d.key] > 0) ? '<span style="color:#e0a548;">+0/s (Lager voll)</span>' : '+'+fmt(rates[d.key])+'/s';
+        const st = resCardState(d, newVal, cap, rates[d.key]);
+        rateEl.innerHTML = st.rateHtml;
         const oldVal = lastResRenderVal[d.key]!==undefined ? lastResRenderVal[d.key] : newVal;
         if (Math.abs(newVal-oldVal) > 0.001) animateResValue(valEl, oldVal, newVal, cap); else valEl.innerHTML = fmt(newVal)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
         lastResRenderVal[d.key] = newVal;
-        // Füllstands-Balken UND Warn-Rahmen (t2-full, dieselbe Klasse wie bei den Tier-2-Badges) auch
-        // im Teil-Update-Pfad mitziehen (der Rebuild oben läuft nur, wenn die Kartenstruktur nicht
-        // mehr passt - im Normalbetrieb landet JEDER Tick hier).
+        // Füllstands-Balken UND Warn-Rahmen (t2-full/t2-near) auch im Teil-Update-Pfad mitziehen
+        // (der Rebuild oben läuft nur, wenn die Kartenstruktur nicht mehr passt - im Normalbetrieb
+        // landet JEDER Tick hier). Beide Pfade holen ihren Zustand aus derselben Funktion
+        // resCardState(), damit sie nicht auseinanderlaufen können.
         const fillEl = card.querySelector('.t2-fill');
-        const isFull = cap>0 && newVal >= cap;
         if (fillEl){
-          fillEl.style.width = (cap>0 ? Math.min(100, newVal/cap*100) : 0).toFixed(1)+'%';
-          fillEl.style.background = isFull ? '#e0a548' : d.color;
+          fillEl.style.width = st.fillPct+'%';
+          fillEl.style.background = st.fillColor;
         }
-        card.classList.toggle('t2-full', isFull);
+        card.classList.toggle('t2-full', st.isFull);
+        card.classList.toggle('t2-near', st.isNear);
       });
     }
     renderTier2Badges();
