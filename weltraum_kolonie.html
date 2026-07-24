@@ -254,6 +254,19 @@
     }
     @media (prefers-reduced-motion: reduce) { .shell::after { animation:none; } }
     @keyframes shellScan { 0%{ transform:translateY(0); } 100%{ transform:translateY(42px); } }
+    /* Energiesparmodus (Einstellungen, auf Handy/Tablet automatisch an): schaltet die DAUERHAFT
+       laufenden Deko-Animationen ab - volle Bildschirm-Scanlinien, Kauf-Puls auf allen leistbaren
+       Buttons, Radar-Sweeps, Planeten-/Mond-Rotationen, Rahmen-Ring-Pulse. Informative Warn-Pulse
+       (Überfall-Alarm, Tab-Badges, Karten-Alarm) bleiben bewusst AN - sie tragen Information und
+       laufen nur in Ausnahmesituationen. Der Sternenhimmel-Canvas wird separat in initBgCanvas()
+       statisch gestellt (powerSaveActive()-Check dort). */
+    body.power-save .shell::after { animation:none; }
+    body.power-save button.buy.affordable { animation:none; }
+    body.power-save .map-radar-sweep::before, body.power-save .ab-hero-radar::before { animation:none; }
+    body.power-save .ab-hero-model, body.power-save .ab-hero-ring { animation:none; }
+    body.power-save .moon1, body.power-save .moon2, body.power-save .twinkle, body.power-save .planet-terminator { animation:none; }
+    body.power-save .frame-ring.frame-platin, body.power-save .frame-ring.frame-diamant, body.power-save .frame-ring.frame-legendaer { animation:none; }
+    body.power-save .profile-online-dot.live { animation:none; }
     /* Grafik-Runde "High-End", Vorschlag 31 "Bedrohungs-Vignette": box-shadow statt drittem
        Pseudo-Element - .shell::before/::after sind schon für Grid+Scanlines vergeben. Nur aktiv bei
        ERKANNTEM Überfall (siehe render(), gleiche Bedingung wie das bestehende Raid-Timer-Badge). */
@@ -1846,6 +1859,10 @@
         <div class="card-row" id="autoWatchLiveRaidRow" style="cursor:pointer; margin-top:0.5rem;">
           <div class="left"><div class="bicon" style="background:rgba(127,119,221,0.18); color:#c3bef5;"><i class="ti ti-sword" aria-hidden="true"></i></div><div><div class="bname">Live-Kampf-Wiedergabe</div><div class="bmeta" id="autoWatchLiveRaidLabel">An – öffnet die Kampf-Wiedergabe automatisch, sobald ein Kampf abläuft (eigener Angriff oder eingehender Überfall), während du gerade im Spiel bist</div></div></div>
           <div class="toggle-switch" id="autoWatchLiveRaidSwitch"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="card-row" id="powerSaveRow" style="cursor:pointer; margin-top:0.5rem;">
+          <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.16); color:#5dcaa5;"><i class="ti ti-bolt" aria-hidden="true"></i></div><div><div class="bname">Energiesparmodus</div><div class="bmeta" id="powerSaveLabel">Aus – alle Animationen aktiv (Sternenhimmel, Scanlinien, Puls-Effekte)</div></div></div>
+          <div class="toggle-switch" id="powerSaveSwitch"><div class="toggle-knob"></div></div>
         </div>
         <div class="card-row" id="kiInterceptRow" style="cursor:pointer; margin-top:0.5rem; display:none;">
           <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.16); color:#c3bef5;"><i class="ti ti-building-factory-2" aria-hidden="true"></i></div><div><div class="bname">KI-Abfangautomatik</div><div class="bmeta" id="kiInterceptLabel">Aus – vertreibt Piraten-Trümmerräuber automatisch, falls du nicht selbst rechtzeitig abfängst (3 KI-Kerne je Einsatz, keine Kampfpunkte)</div></div></div>
@@ -3481,8 +3498,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.249.0';
+  const VERSION = '8.250.0';
   const PATCHNOTES = [
+    { version:'8.250.0', date:'24.07.2026', changes:[
+      'Große Performance-Runde für Handy und Tablet (danke für den Report „frisst viel Leistung"): Der Sternenhimmel-Hintergrund zeichnete bisher mit voller Display-Frequenz – auf 120-Hz-Geräten 120 Voll-Neuzeichnungen des ganzen Bildschirms pro Sekunde. Er läuft jetzt mit gedeckelten 30 Bildern/s (optisch kein Unterschied beim langsamen Funkeln). Zusätzlich schreibt das Spiel die Anzeige nicht mehr jede Sekunde neu, wenn der Tab gar nicht sichtbar ist (Bildschirm aus / anderer Tab) – die Spielmechanik läuft im Hintergrund selbstverständlich normal weiter, beim Zurückkehren ist sofort alles aktuell.',
+      'Neu: Energiesparmodus (Einstellungen). Auf Handy und Tablet automatisch aktiv, jederzeit abschaltbar – auf dem Desktop automatisch aus. Er stellt den Sternenhimmel auf ein stehendes Bild, schaltet die dauerhaft laufenden Deko-Animationen ab (Bildschirm-Scanlinien, Puls-Effekt auf kaufbaren Buttons, Radar-Sweeps, Planeten-Rotationen, Rahmen-Ring-Pulse) und lässt Ressourcen-Zahlen springen statt weich hochzuzählen. Wichtige Warn-Effekte (Überfall-Alarm, Tab-Hinweispunkte) bleiben bewusst an. Die Automatik gilt pro Gerät: Wer auf Handy UND Desktop spielt, bekommt auf jedem Gerät die passende Voreinstellung, bis er den Schalter einmal selbst umlegt.',
+    ]},
     { version:'8.249.0', date:'24.07.2026', changes:[
       'PvP-Kampf weiter angeglichen: Im server-entschiedenen Spieler-gegen-Spieler-Kampf zählen jetzt auch dein Flaggschiff, der Fähigkeitsbaum-Zweig „Kampf", das Mega-Projekt „Void-Reaktor", deine Veteranen-Ausbildung und der Admiral-Offizier – genau wie in der Vorschau. Zusätzlich ein Feinschliff: Das Piratennest-Prestige wirkt korrekt nur auf den Angriff (nicht mehr versehentlich auch auf die Verteidigung), und der Admiral zählt auf den Angriff voll, auf die Verteidigung halb – identisch zur Anzeige im Spiel. Betrifft vor allem weit entwickelte Konten.',
     ]},
@@ -25020,10 +25041,47 @@
         { x:canvas.width*0.75, y:canvas.height*0.7, r:maxDim*0.3, color:'55,138,221', driftPhase:2.4 }
       ];
     }
-    window.addEventListener('resize', resize);
+    // Performance-Runde (24.07.2026, Spieler-Report "frisst viel Leistung auf Handy und Tablet"):
+    // (1) 30-FPS-Deckel - der Loop lief vorher mit voller Display-Frequenz (auf 120-Hz-Handys/Tablets
+    //     also 120 Voll-Neuzeichnungen des gesamten Bildschirms pro Sekunde, für ein langsames
+    //     Twinkeln völlig unnötig). Frames dazwischen werden übersprungen, halbiert/viertelt die
+    //     Canvas-Last ohne sichtbaren Unterschied.
+    // (2) Energiesparmodus: EIN statisches Bild zeichnen, danach nur noch 1x/1,5s per setTimeout
+    //     nachschauen, ob der Modus wieder aus ist (statt 60-120 Wakeups/s) - so wacht der Himmel
+    //     nach dem Umschalten in den Einstellungen von selbst wieder auf, ohne externe Hooks.
+    //     Der resize-Listener setzt staticDrawn zurück, damit nach Größenänderung neu gezeichnet wird.
+    let lastFrameT = 0, staticDrawn = false;
+    const FRAME_MIN_MS = 33; // ~30 FPS
+    window.addEventListener('resize', () => { resize(); staticDrawn = false; });
     resize();
     const ctx = canvas.getContext('2d');
+    function drawStaticFrame(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      for (const neb of nebulae){
+        const g = ctx.createRadialGradient(neb.x, neb.y, 0, neb.x, neb.y, neb.r);
+        g.addColorStop(0, `rgba(${neb.color},0.05)`);
+        g.addColorStop(1, `rgba(${neb.color},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+      }
+      for (const layer of layers){
+        for (const s of layer.stars){
+          const alpha = 0.25 + 0.55*Math.abs(Math.sin(s.phase)); // eingefrorene, aber pro Stern unterschiedliche Helligkeit
+          ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+        }
+      }
+    }
     function frame(t){
+      if (typeof powerSaveActive === 'function' && powerSaveActive()){
+        if (!staticDrawn){ drawStaticFrame(); staticDrawn = true; }
+        meteors = []; meteorLastT = 0;
+        setTimeout(() => requestAnimationFrame(frame), 1500);
+        return;
+      }
+      staticDrawn = false;
+      if (t - lastFrameT < FRAME_MIN_MS){ requestAnimationFrame(frame); return; }
+      lastFrameT = t;
       const dt = meteorLastT ? Math.min(50, t - meteorLastT) : 16; meteorLastT = t;
       ctx.clearRect(0,0,canvas.width,canvas.height);
       for (const neb of nebulae){
@@ -27575,6 +27633,7 @@
   // die theoretische Rate - sonst ploppt die Animation bei vollem Lager weiter mit voller Rate auf,
   // obwohl effektiv nichts hinzukam (Bugfix 20.07.2026, siehe Aufrufstelle).
   function flashGains(gains){
+    if (powerSaveActive()) return; // Energiesparmodus: keine sekündliche "+N"-Einflug-Animation (die Rate steht ohnehin auf der Karte)
     RES_DEFS.forEach(d => {
       const el = document.querySelector(`.rescard[data-res="${d.key}"] .float-gain`);
       if (!el || gains[d.key] <= 0) return;
@@ -27589,9 +27648,21 @@
   let lastSwitcherSig = null;
   const resValAnimFrames = new WeakMap();
   const prefersReducedMotionMq = (typeof window!=='undefined' && window.matchMedia) ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  // ===== Energiesparmodus (Performance-Runde 24.07.2026, Spieler-Report "frisst viel Leistung auf
+  // Handy und Tablet") =====
+  // Auf Geräten mit Touch-Bedienung (pointer: coarse = Handy/Tablet) automatisch AN, solange der
+  // Spieler nichts anderes wählt; per Einstellungs-Schalter jederzeit explizit an/aus. Bewusst
+  // tri-state (undefined = Automatik) statt beim Laden fest in den Spielstand zu schreiben - so
+  // entscheidet bei Server-Sync jedes GERÄT für sich (Desktop bleibt voll animiert, Handy spart),
+  // bis der Spieler explizit umschaltet. Wirkung: statischer Sternenhimmel (initBgCanvas),
+  // CSS-Deko-Dauerschleifen aus (body.power-save-Block), Zahlen-Zählanimation aus (unten),
+  // "+N"-Einflug aus (flashGains).
+  const isCoarsePointer = (typeof window!=='undefined' && window.matchMedia) ? window.matchMedia('(pointer: coarse)').matches : false;
+  function powerSaveActive(){ return state.powerSave !== undefined ? !!state.powerSave : isCoarsePointer; }
+  function applyPowerSaveClass(){ if (document.body) document.body.classList.toggle('power-save', powerSaveActive()); }
   function animateResValue(el, from, to, cap){
     if (resValAnimFrames.has(el)) cancelAnimationFrame(resValAnimFrames.get(el));
-    if (prefersReducedMotionMq && prefersReducedMotionMq.matches){
+    if ((prefersReducedMotionMq && prefersReducedMotionMq.matches) || powerSaveActive()){
       el.innerHTML = fmt(to)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
       return;
     }
@@ -27831,6 +27902,7 @@
   }
 
   function render(){
+    applyPowerSaveClass(); // Energiesparmodus-Klasse (billig: ein classList.toggle) - greift auch nach Laden/Sync eines fremden Spielstands
     const rates = ratesPerSecond();
 
     const cap = storageCap();
@@ -31035,6 +31107,12 @@
     if (autoWatchLiveRaidSwitch) autoWatchLiveRaidSwitch.classList.toggle('on', !!state.autoWatchLiveRaid);
     const autoWatchLiveRaidLabel = document.getElementById('autoWatchLiveRaidLabel');
     if (autoWatchLiveRaidLabel) autoWatchLiveRaidLabel.textContent = state.autoWatchLiveRaid ? 'An – öffnet die Kampf-Wiedergabe automatisch, sobald ein Kampf abläuft (eigener Angriff oder eingehender Überfall), während du gerade im Spiel bist' : 'Aus – Kämpfe laufen im Hintergrund ab, Wiedergabe nur über den Bericht im Nachhinein';
+    const powerSaveSwitch = document.getElementById('powerSaveSwitch');
+    if (powerSaveSwitch) powerSaveSwitch.classList.toggle('on', powerSaveActive());
+    const powerSaveLabel = document.getElementById('powerSaveLabel');
+    if (powerSaveLabel) powerSaveLabel.textContent = powerSaveActive()
+      ? 'An – spart Akku und Leistung: Sternenhimmel steht still, Scanlinien und Deko-Puls-Effekte aus, Zahlen springen statt zu zählen. Warn-Hinweise (Überfall-Alarm) bleiben aktiv.'+(state.powerSave===undefined?' (automatisch, da Handy/Tablet erkannt)':'')
+      : 'Aus – alle Animationen aktiv (Sternenhimmel, Scanlinien, Puls-Effekte)'+(state.powerSave===undefined && isCoarsePointer===false?' (automatisch, da Desktop erkannt)':'');
 
     const notifIcon = document.getElementById('notifIcon');
     if (notifIcon) notifIcon.className = 'ti '+(state.notifOn?'ti-bell':'ti-bell');
@@ -32042,6 +32120,14 @@
       log('Live-Kampf-Wiedergabe '+(state.autoWatchLiveRaid?'aktiviert':'deaktiviert')+'.', 'ti-sword');
       render(); save();
     };
+    const powerSaveBtn = document.getElementById('powerSaveRow');
+    if (powerSaveBtn) powerSaveBtn.onclick = () => {
+      // Erst ab dem ersten Klick wird ein expliziter Wert gespeichert - vorher gilt die
+      // Geräte-Automatik (Handy/Tablet an, Desktop aus), siehe powerSaveActive().
+      state.powerSave = !powerSaveActive();
+      log('Energiesparmodus '+(state.powerSave?'aktiviert':'deaktiviert')+'.', 'ti-bolt');
+      applyPowerSaveClass(); render(); save();
+    };
     const soundToggleBtn = document.getElementById('soundToggleRow');
     if (soundToggleBtn) soundToggleBtn.onclick = () => { state.soundOn = !state.soundOn; render(); save(); };
     const uiJumpNavToggleBtn = document.getElementById('uiJumpNavToggleRow');
@@ -32405,7 +32491,13 @@
     const missionsResolved = checkMissions();
     processPirateDebrisRaid();
     processVoidRift();
-    flashGains(actualGains);
+    // Performance (24.07.2026): Anzeige-Arbeit nur bei sichtbarem Tab - im Hintergrund (Handy-Screen
+    // aus, anderer Tab) sieht niemand die "+N"-Animation, das DOM-Neuschreiben wäre reine Akku-
+    // Verschwendung. Die SPIELMECHANIK oben/unten läuft bewusst unverändert weiter (siehe CLAUDE.md,
+    // "Sichtbarkeits-Gate für reines Anzeige-Polling"). Beim Sichtbarwerden holt der
+    // visibilitychange-Listener (unten bei den Intervallen) sofort einen vollen render() nach.
+    const tabVisible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+    if (tabVisible) flashGains(actualGains);
     maybeDetectRaid();
     if (state.nextRaidTime && Date.now() >= state.nextRaidTime){
       const liveReport = executeRaid();
@@ -32457,9 +32549,12 @@
     const researchQueued = tryStartQueuedResearch();
     const autoExplored = tryAutoExplore();
     syncCompletionReminders();
-    render();
+    if (tabVisible) render();
     if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
   }, 1000);
+  // Nachhol-Render beim Zurückkehren in den Tab (Gegenstück zum tabVisible-Gate im Haupt-Tick):
+  // der erste sichtbare Frame zeigt sofort den aktuellen Stand statt bis zu 1s alte Werte.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && bootDataReady && !saveConflictDetected) render(); });
   setInterval(save, 10000);
   // Reine Anzeige-Aktualisierungen (kein Spielmechanik-Timing, das im Hintergrund weiterlaufen müsste)
   // - Sichtbarkeits-Check spart Server-Anfragen/Akku, wenn der Tab im Hintergrund liegt oder das Handy
