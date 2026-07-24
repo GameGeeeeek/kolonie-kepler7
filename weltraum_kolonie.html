@@ -2070,6 +2070,9 @@
 
           <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-award" aria-hidden="true"></i>Wochenliga</div>
           <div id="weeklyLeagueBox"><div class="bmeta">lädt…</div></div>
+
+          <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-trophy" aria-hidden="true"></i>Saison-Liga</div>
+          <div id="seasonLeagueBox"><div class="bmeta">lädt…</div></div>
         </div>
 
         <div class="galaxy-subpanel" data-galaxy-sub="info" style="display:none;">
@@ -2626,7 +2629,7 @@
       const res = await backendFetch('/me');
       if (!res.ok) return;
       const me = await res.json();
-      accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0;
+      accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; }
       accountMaskedEmail = me.maskedEmail||'';
       accountPendingEmail = me.pendingEmail||null;
       accountWantsPatchnotes = me.wantsPatchnotes !== false;
@@ -2638,6 +2641,11 @@
   let accountMaskedEmail = '';
   let accountPendingEmail = null;
   let accountWantsPatchnotes = true;
+  // Saison-Liga (serverautoritativ, monatlich) - aus /api/me: aktueller Saison-Schlüssel, Saison-Ende
+  // und der eigene Saison-Start-Score (null = für diese Saison noch nicht erfasst -> Zuwachs 0).
+  let mySeasonKey = null;
+  let mySeasonStartScore = null;
+  let mySeasonEndsAt = 0;
   // Ablaufzeitpunkt des serverseitigen Angriffs-Schutzschilds (0 = keiner). Wird aus /api/me gesetzt und
   // beim eigenen Angriff sofort lokal geleert (Server bricht ihn dort ebenfalls).
   let myAttackShieldUntil = 0;
@@ -3551,8 +3559,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.258.0';
+  const VERSION = '8.259.0';
   const PATCHNOTES = [
+    { version:'8.259.0', date:'24.07.2026', changes:[
+      'Neu: Saison-Liga – ein monatlicher Wettbewerbs-Loop mit dauerhaften Belohnungen. Jeden Kalendermonat zählt dein Score-Zuwachs als „Saison-Punkte". Am Monatsende teilt der Server alle Teilnehmer nach Rang in fünf Ligen ein (Diamant/Platin/Gold/Silber/Bronze) und schaltet einen exklusiven, dauerhaften Saison-Titel frei – vom „Saison-Champion" (Diamant) bis „Saison-Teilnehmer" (Bronze) – dazu Kredite und Modulfragmente je nach Liga. Anschließend startet automatisch eine frische Saison, in der wieder jeder eine Chance auf Platz 1 hat. Neue Box im Fortschritt-Tab: aktuelle Saison, Countdown, deine Saison-Punkte, deine gesammelten Titel und die Liga-Belohnungen. Serverautoritativ (Rang, Liga und Belohnung bestimmt der Server – nichts ist manipulierbar), läuft exakt am Monatswechsel auch ohne Online-Spieler.',
+    ]},
     { version:'8.258.0', date:'24.07.2026', changes:[
       'Berichte neu gestaltet (Spieler-Wunsch „optisch schöner"): Jede Bericht-Karte hat jetzt einen farbigen Ergebnis-Streifen links (grün = Erfolg/Sieg, rot = Verlust/Niederlage), das Typ-Icon sitzt in einer eigenen Kachel, und die Kopfzeile fasst Titel, Gewonnen/Verloren-Markierung, Datum und den Löschen-Knopf sauber in einer Reihe zusammen. Darunter, durch eine feine Trennlinie abgesetzt, stehen weiterhin alle gewohnten Details (Ausgangspunkt, Eskorte, Beute, Begegnungen, Verluste, Trümmer) – nur aufgeräumter und leichter zu scannen. Gilt für alle Berichtsarten (Expeditionen, Kämpfe, Sonderereignisse).',
     ]},
@@ -13088,6 +13099,23 @@
           save();
           continue;
         }
+        if (r.type === 'season-league'){
+          // Serverautoritative Saison-Liga: Server hat Rang + Liga bestimmt, der Client schaltet den
+          // exklusiven Saison-Titel frei und schreibt die zugewiesene Belohnung gut.
+          const t = SEASON_LEAGUE_TIER_DEFS.find(x => x.key === r.tier) || SEASON_LEAGUE_TIER_DEFS[4];
+          state.credits = (state.credits||0) + t.credits;
+          state.moduleFragments = (state.moduleFragments||0) + t.fragments;
+          if (!Array.isArray(state.seasonTitles)) state.seasonTitles = [];
+          if (!state.seasonTitles.some(x => x.seasonKey === r.seasonKey)) state.seasonTitles.push({ seasonKey: r.seasonKey, tier: t.key, title: t.title });
+          if (!state.seasonLeague) state.seasonLeague = {};
+          state.seasonLeague.lastResult = { seasonKey: r.seasonKey, tier: t.key, rank: r.rank, total: r.total };
+          if (t.key === 'diamant') state.seasonChampionships = (state.seasonChampionships||0) + 1; // für Erfolg
+          log('SAISON '+r.seasonKey+' abgerechnet: '+t.name+'-Liga (Platz '+r.rank+' von '+r.total+')! Titel freigeschaltet: „'+t.title+'". Belohnung: +'+fmt(t.credits)+' Kredite, +'+t.fragments+' Modulfragmente.', 'ti-trophy', 'ok');
+          playSound('achieve');
+          pushReport({ type:'weekly-reward', rank:r.rank, rewardLabel: 'Saison '+r.seasonKey+' – '+t.name+'-Liga (Platz '+r.rank+'/'+r.total+'): Titel „'+t.title+'", +'+fmt(t.credits)+' Kredite, +'+t.fragments+' Fragmente' });
+          save();
+          continue;
+        }
         if (r.type === 'war-victory'){
           state.credits = (state.credits||0) + (r.credits||0);
           state.warsWon = (state.warsWon||0) + 1; // für Erfolg "Kriegsheld"
@@ -14953,7 +14981,7 @@
     if (!useBackend()) return;
     try {
       const r = await backendFetch('/me');
-      if (r.ok){ const me = await r.json(); if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; }
+      if (r.ok){ const me = await r.json(); if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } }
     } catch(e){}
   }
   async function loadReports(){
@@ -17139,6 +17167,7 @@
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. In den letzten 24h vor Ablauf lässt sich ein Pakt stattdessen auch direkt um weitere 7 Tage <strong>verlängern</strong>, ohne die Angebot-Warten-Annehmen-Prozedur erneut zu durchlaufen. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (mehr mit der Forschung „Diplomatie-Protokolle"), standardmäßig zählen bis zu 2 Pakte, die Forschung „Diplomatischer Kontaktkreis" erhöht das auf bis zu 4 - additiv zu den anderen globalen Boni. <strong>Diplomatische Doktrin</strong> (Endgame-Anschluss, ab „Diplomatie-Protokolle" Stufe 15 und „Diplomatischer Kontaktkreis" Stufe 2) vertieft die Friedensdividende ein weiteres Mal UND erhöht den Ruf-Zuwachs bei allen Fraktionen um 1%/Stufe. <strong>Pakt-Stufen:</strong> Ein bestehender Pakt lässt sich mit Zustimmung beider Seiten auf „Handelsabkommen" (Stufe 2, schaltet einmal täglich ein gedeckeltes Ressourcengeschenk an den Partner frei) und weiter auf „Frühwarnpartnerschaft" (Stufe 3, zusätzliche Überfall-Vorwarnzeit) anheben. Verschenken lassen sich auch <strong>Tier-2-Ressourcen</strong> (sobald du welche besitzt) - mit bewusst harten Fixdeckeln je Geschenk (20 Nanolegierungen, 10 Quantenchips, 8 Hochenergiekristalle, 4 Fusionskerne, 3 KI-Kerne), damit Geschenke eine Geste bleiben und kein zweiter Produktionskanal; beim Empfänger gilt zudem das kleine Tier-2-Lager. Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
       { title:'Spieler melden', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du unangemessenes Verhalten (z.B. einen anstößigen Namen) melden - kurze Begründung reicht. Spieler-/Allianznamen werden außerdem automatisch beim Anlegen auf eindeutig unangemessene Begriffe geprüft. Nur mit eigenem Server verfügbar.' },
       { title:'Private Nachrichten', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) oder direkt bei einer erhaltenen Nachricht im Berichte-Tab ("Antworten") kannst du einem einzelnen Spieler schreiben - unabhängig von Allianz und ohne den öffentlichen Chat. Erhaltene Nachrichten stehen im Berichte-Tab, die letzten 60 werden aufgehoben. Nur mit eigenem Server verfügbar.' },
+      { title:'Saison-Liga', body:'Zusätzlich zur Wochenliga läuft ein <strong>monatlicher</strong> Wettbewerb mit dauerhaften Belohnungen. Jeden Kalendermonat merkt der Server deinen Score als Startwert; deine <strong>Saison-Punkte</strong> sind alles, was seitdem dazukam. Am Monatsende teilt der Server alle Teilnehmer nach Rang in <strong>fünf Ligen</strong> ein – ab 5 Teilnehmern nach Fünfteln (Top 20% <strong>Diamant</strong>, dann Platin, Gold, Silber, Bronze), bei weniger nach Plätzen. Jede Liga schaltet einen <strong>exklusiven, dauerhaften Saison-Titel</strong> frei: Diamant „Saison-Champion", Platin „Saison-Meister", Gold „Saison-Veteran", Silber „Saison-Kämpfer", Bronze „Saison-Teilnehmer" – dazu Kredite und Modulfragmente je nach Liga (Diamant 5.000 Kr + 12 Fragmente … Bronze 400 Kr + 1 Fragment). Danach beginnt automatisch eine neue Saison, in der wieder jeder eine Chance auf Platz 1 hat. Alles serverseitig bestimmt (Rang, Liga, Belohnung – nichts manipulierbar). Deine aktuelle Saison, der Countdown, deine Saison-Punkte, deine gesammelten Titel und die Liga-Belohnungen stehen im <strong>Fortschritt-Tab</strong> unter „Saison-Liga".' },
       { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Die Abrechnung läuft jetzt <strong>serverseitig</strong>: Genau am Wochenwechsel bestimmt der Server aus den (bereits serverseitig geprüften) Punktezuwächsen die Platzierung und legt deine Liga-Belohnung bereit – niemand kann sich mehr selbst eine höhere Liga oder Belohnung zuweisen. Beim nächsten Login wird sie automatisch gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 12 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 6 Min., <strong>Silber</strong> 400 + 3 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
@@ -23168,6 +23197,45 @@
     const wl = state.weeklyLeague || {};
     return Math.max(0, Math.round(computeScore() - (wl.startScore||0)));
   }
+  // --- Saison-Liga (monatlich, serverautoritativ) ---
+  // Fünf Ligen mit exklusiven, dauerhaften Saison-Titeln als Hauptbelohnung (plus Kredite/Fragmente).
+  // Rang + Liga bestimmt der Server am Monatswechsel; der Client zeigt nur an und wendet die vom Server
+  // zugewiesene Belohnung an (siehe claimPendingRewards, Typ 'season-league').
+  const SEASON_LEAGUE_TIER_DEFS = [
+    { key:'diamant', name:'Diamant', title:'Saison-Champion',   color:'#7fe0ff', credits:5000, fragments:12 },
+    { key:'platin',  name:'Platin',  title:'Saison-Meister',    color:'#8ecfe8', credits:3000, fragments:8 },
+    { key:'gold',    name:'Gold',    title:'Saison-Veteran',    color:'#fac775', credits:1800, fragments:5 },
+    { key:'silber',  name:'Silber',  title:'Saison-Kämpfer',    color:'#c9ccd9', credits:900,  fragments:3 },
+    { key:'bronze',  name:'Bronze',  title:'Saison-Teilnehmer', color:'#c98d5f', credits:400,  fragments:1 }
+  ];
+  function mySeasonScore(){
+    if (mySeasonStartScore == null) return 0;
+    return Math.max(0, Math.round(computeScore() - mySeasonStartScore));
+  }
+  function renderSeasonLeague(){
+    const box = document.getElementById('seasonLeagueBox');
+    if (!box) return;
+    if (!useBackend() || !mySeasonKey){
+      box.innerHTML = '<div class="bmeta">Die Saison-Liga läuft serverseitig – sichtbar, sobald du online mit eigenem Konto spielst.</div>';
+      return;
+    }
+    const remainMs = Math.max(0, (mySeasonEndsAt||0) - Date.now());
+    const d = Math.floor(remainMs/86400000), h = Math.floor((remainMs%86400000)/3600000);
+    const myPts = mySeasonScore();
+    const last = (state.seasonLeague && state.seasonLeague.lastResult) || null;
+    const lastDef = last ? SEASON_LEAGUE_TIER_DEFS.find(t=>t.key===last.tier) : null;
+    const titles = state.seasonTitles || [];
+    const tile = (label, val, color) => `<div style="flex:1; min-width:130px; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:10px; padding:9px 11px;"><div class="bmeta" style="font-size:10px; text-transform:uppercase; letter-spacing:.1em;">${label}</div><div style="font-family:var(--font-mono); font-size:16px; font-weight:700;${color?' color:'+color+';':''}">${val}</div></div>`;
+    const ladder = SEASON_LEAGUE_TIER_DEFS.map(t =>
+      `<div style="display:flex; align-items:center; gap:8px; padding:5px 0; border-top:1px solid var(--line-1);"><i class="ti ti-trophy" aria-hidden="true" style="color:${t.color};"></i><span style="flex:1; font-weight:600; color:${t.color};">${t.name}</span><span class="bmeta" style="font-size:11px;">Titel „${t.title}" · +${fmt(t.credits)} Kr · +${t.fragments} Fragmente</span></div>`).join('');
+    box.innerHTML =
+      `<div class="lb-note" style="margin-bottom:0.6rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Jeden Monat ein neuer Wettlauf: Deine <strong>Saison-Punkte</strong> sind der Score-Zuwachs seit Saisonstart. Am Monatsende bestimmt dein Rang die Liga – die Top-Ligen bringen <strong>exklusive, dauerhafte Saison-Titel</strong>.</div>
+       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:0.7rem;">${tile('Saison', mySeasonKey)}${tile('Endet in', d+'T '+h+'Std')}${tile('Deine Saison-Punkte', fmt(myPts), '#5dcaa5')}</div>
+       ${last && lastDef ? `<div class="card-row" style="margin-bottom:0.6rem; border-color:${lastDef.color};"><div class="left"><i class="ti ti-trophy" aria-hidden="true" style="color:${lastDef.color};"></i><span class="bname">Letzte Saison: ${lastDef.name}-Liga</span></div><span class="lvl-pill">Platz ${last.rank}/${last.total}</span></div>` : ''}
+       ${titles.length ? `<div class="bmeta" style="margin-bottom:0.5rem;"><strong>Deine Saison-Titel:</strong> ${titles.map(t=>'🏆 '+t.title+' ('+t.seasonKey+')').join(' · ')}</div>` : ''}
+       <div class="bmeta" style="font-size:11px; text-transform:uppercase; letter-spacing:.1em; margin-bottom:2px;">Ligen &amp; Belohnungen</div>
+       ${ladder}`;
+  }
   function processWeeklyLeague(){
     if (!state.weeklyLeague) state.weeklyLeague = { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] };
     if (!Array.isArray(state.friends)) state.friends = [];
@@ -28206,6 +28274,7 @@
         if (snap.length) state.weeklyLeague.boardSnapshot = snap;
       }
       renderWeeklyLeague();
+      renderSeasonLeague();
       loadDiplomacy();
       loadWorldBoss();
       updateHallOfFame(entries);
@@ -33401,7 +33470,7 @@
       await load();
       bootDataReady = true;
       state.player.id = data.userId;
-      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
+      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
       render();
       loadLeaderboard();
       loadReports();
@@ -33528,7 +33597,7 @@
         if (res.ok){
           const me = await res.json();
           state.player.id = me.userId;
-          accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0;
+          accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; }
           accountMaskedEmail = me.maskedEmail||'';
           accountPendingEmail = me.pendingEmail||null;
           accountWantsPatchnotes = me.wantsPatchnotes !== false;
