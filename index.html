@@ -3562,8 +3562,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.264.0';
+  const VERSION = '8.265.0';
   const PATCHNOTES = [
+    { version:'8.265.0', date:'24.07.2026', changes:[
+      'Balance-Pass Module (Fortsetzung des Bauzeit-Fixes): systematischer Durchgang aller Modul-Effekte auf fehlende Deckel. Ergebnis: die Zeit-Reduktionen (Bauzeit, Treibstoff, Expeditions-Risiko, Forschung, Überfall-Schutz), Handel (+30%) und die Kampfwerte Angriff/Verteidigung (gemeinsame +100%-Gruppe) waren bereits sauber gedeckelt. Zwei ungedeckelte Stellen wurden geschlossen: der Verteidigungs-Gegenschlag der Abwehrmodule und die Expeditions-Ausbeute der Sondenmodule sind jetzt beim Modul-Anteil auf +100% gedeckelt. Produktion und Lager bleiben bewusst frei skalierbar (Kern der Idle-Progression, kein Zeit-/Kampf-Exploit). Damit ist das gesamte Modul-System gegen „auf null / ins Unendliche"-Aufschaukeln abgesichert.',
+    ]},
     { version:'8.264.0', date:'24.07.2026', changes:[
       'Balance-Fix (danke für den Report „50 Schlachtschiffe in 40 Sekunden"): Die Bauzeit-Verkürzung durch Werftmodule ist jetzt bei −50% gedeckelt. Bisher war dieser eine Modul-Effekt als einziger der Zeit-Reduktions-Effekte ungedeckelt (Treibstoff/Expeditions-Risiko −50%, Forschung −40%, Überfall-Schutz −60% waren es längst) – mit mehreren hochstufigen Werftmodulen plus Industriekomplex-Set plus Modultechnik-Forschung konnte er die Schiffsbauzeit gegen null drücken. Die übrigen Bau-Boni (Werftkern/Assemblierwerft, Werft-Rolle, Werft-Overdrive, Ingenieur, Allianz-Werft) stapeln bewusst weiterhin zusätzlich – ein maximal ausgebauter Werft-Fokus bleibt also sehr stark, aber baut keine Flotte mehr in Sekunden.',
     ]},
@@ -10380,7 +10383,7 @@
   // abschätzen kann, ob der Frachtraum bei einem Glücksfund knapp würde.
   const EXPEDITION_MAX_RESOURCE_FIND_BASE = 700;
   function expeditionMaxResourceFind(rewardMult){
-    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + moduleBonusTotal('expedition') + officerBonus('aufklaerer')) * seasonalLootMult());
+    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + Math.min(1.0, moduleBonusTotal('expedition')) + officerBonus('aufklaerer')) * seasonalLootMult());
   }
   // Frachter als Eskorte (20.07.2026, Spieler-Wunsch): tragen 0 Angriffspunkte bei (wie bei
   // ATTACK_SHIP_KEYS), erweitern aber den Frachtraum für Ressourcenfunde (siehe fleetCargoCapacity()
@@ -11503,13 +11506,13 @@
     // viele gegnerische Schiffe die Abwehr bei einem ABGEWEHRTEN Überfall zerstört (siehe
     // defenseAttackPower), unabhängig von der reinen Verteidigungsstärke (Panzerungsmodul).
     { key:'lager', name:'Lagermodul', icon:'ti-box', effect:'storage', base:0.08, desc:'Erhöht die Lagerkapazität dieses Standorts.' },
-    { key:'abwehr', name:'Abwehrmodul', icon:'ti-target', effect:'defatk', base:0.08, desc:'Erhöht den Gegenschlag der Verteidigung – bei einem abgewehrten Überfall werden mehr gegnerische Schiffe zerstört.' },
+    { key:'abwehr', name:'Abwehrmodul', icon:'ti-target', effect:'defatk', base:0.08, desc:'Erhöht den Gegenschlag der Verteidigung – bei einem abgewehrten Überfall werden mehr gegnerische Schiffe zerstört (Modul-Anteil bei +100% gedeckelt).' },
     // Imperiumsweite Module (21.07.2026): Anders als die ortsgebundenen Module oben wirken diese beiden
     // GLOBAL - ihr Bonus wird über ALLE Standorte aufsummiert (moduleBonusTotal), nicht pro Standort
     // angewendet. Damit decken sie zwei Bereiche ab, die es per Standort-Modul bisher nicht gab
     // (Forschungszeit und Expeditions-Ausbeute sind ohnehin imperiumsweite Systeme).
     { key:'forschung', name:'Forschungsmodul', icon:'ti-flask', effect:'research', base:0.05, desc:'Verkürzt die Forschungszeit – imperiumsweit (alle Standorte zählen zusammen).' },
-    { key:'sonde', name:'Sondenmodul', icon:'ti-map-2', effect:'expedition', base:0.06, desc:'Erhöht die Ausbeute deiner Expeditionen – imperiumsweit (alle Standorte zählen zusammen).' },
+    { key:'sonde', name:'Sondenmodul', icon:'ti-map-2', effect:'expedition', base:0.06, desc:'Erhöht die Ausbeute deiner Expeditionen – imperiumsweit (alle Standorte zählen zusammen, bei +100% gedeckelt).' },
     // Modul-Ausbau (24.07.2026, Spieler-Wunsch "Modul-Segment massiv ausbauen"): drei neue Typen mit
     // klaren, VERIFIZIERTEN Verrechnungspunkten (Lehre aus dem Modul-Text-Audit vom selben Tag - nie
     // wieder Module mit versprochener, aber nirgends verrechneter Wirkung): 'fuelcost' wirkt in
@@ -12455,7 +12458,10 @@
     power *= (1 + ascBonus('combat')*0.02);
     power *= (1 + skillBonusPct('war'));
     // Abwehrmodul (Standort-Modul, effect 'defatk'): stärkt den Gegenschlag der Verteidigung.
-    if (planetKey) power *= (1 + moduleBonusAt(planetKey, 'defatk'));
+    // Modul-Anteil bei +100% gedeckelt (Balance-Pass 24.07.2026, analog zum Bauzeit-Deckel und zur
+    // +100%-Kampfgruppe von atk/def): mit mehreren hochstufigen Abwehrmodulen + Festungs-Set + Modultechnik
+    // lief der Gegenschlag sonst ungebremst hoch. Die strukturellen Multiplikatoren oben bleiben unberührt.
+    if (planetKey) power *= (1 + Math.min(1.0, moduleBonusAt(planetKey, 'defatk')));
     return Math.round(power);
   }
 
@@ -24645,7 +24651,7 @@
           // Begegnungschance feindlicher Flotten für Expeditionen, die von DIESEM Standort
           // gestartet sind - gedeckelt bei -50%, damit Tiefenraum nie risikofrei wird.
           const encounterChance = (m.encounterChance!==undefined ? m.encounterChance : 0.35) * Math.max(0.5, 1 - moduleBonusAt(planetKey, 'exprisk'));
-          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + moduleBonusTotal('expedition') + officerBonus('aufklaerer')) * seasonalLootMult();
+          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + Math.min(1.0, moduleBonusTotal('expedition')) + officerBonus('aufklaerer')) * seasonalLootMult();
           const encountered = Math.random() < encounterChance;
           let outcome = 'success';
           // Auf Funktionsebene gehoben (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe"): vorher nur im
