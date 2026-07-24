@@ -3481,8 +3481,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.247.0';
+  const VERSION = '8.248.0';
   const PATCHNOTES = [
+    { version:'8.248.0', date:'24.07.2026', changes:[
+      'Bugfix (beim Kampf-Audit entdeckt): Der Singularitäts-Vernichter ist als „stärkster regulärer Angriffswert" (280) beschrieben, konnte aber tatsächlich gar nicht angreifen – er fehlte in der Angriffstabelle und trug in jedem Kampf 0 Angriffskraft bei. Ab jetzt greift er mit seinen vollen 280 Angriffspunkten an (Frontend und server-entschiedenes PvP gleichermaßen). Seine einzigartige Aura „Gravitationssog" (+5% Flottenangriff je Vernichter) kommt wie bisher zusätzlich obendrauf. Der Metamaterial-Titan bleibt bewusst ein reines Verteidigungsschiff.',
+    ]},
     { version:'8.247.0', date:'24.07.2026', changes:[
       'PvP-Kampf voll angeglichen (Audit auf Nachfrage: „werden Angriff, Verteidigung, Schilde und Buffs richtig berücksichtigt?"): Der serverseitig entscheidende Spieler-gegen-Spieler-Kampf rechnete bisher mit deutlich weniger als die Vorschau im Spiel. Jetzt zählen dort dieselben Werte wie in deiner Anzeige – alle 19 Verteidigungsgebäude samt Schildanteil, die Schildpunkte deiner stationierten Schiffe, deine Doktrin (offensiv/defensiv), aktive Kampf-Buffs sowie die globalen Kampfboni (Prestige-Perk, Aszension, Artefakt-Set, Piratennest-Prestige, gedeckelt bei +100%). Konkret spürbar: eine reine Verteidigungsflotte und deine Buffs wirken beim PvP jetzt tatsächlich so stark, wie die Zahlen es versprechen.',
       'Bugfix im selben Zug: Der Metamaterial-Titan und der Singularitäts-Vernichter fehlten serverseitig komplett in den Kampf- und Score-Tabellen – der Titan trug im server-entschiedenen PvP-Kampf 0 zur Verteidigung bei (obwohl er der schwerste Verteidigungs-Titan des Spiels ist) und beide zählten zu niedrig für den Bestenlisten-Score. Beide sind jetzt mit ihren korrekten Werten hinterlegt.',
@@ -10205,7 +10208,7 @@
   const EXPLORE_SHIP_KEYS = ['ships'];
   // Frachter zählen jetzt auch zur Angriffsflotte – sie tragen 0 Angriffspunkte bei, sind aber für
   // den Abtransport erbeuteter Ressourcen zwingend nötig (siehe CARGO_PER_FRACHTER).
-  const ATTACK_SHIP_KEYS = ['jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','frachter','frachtergross','waechter','kometenjaeger','enterschiff','phantomschiff','riftwaechter','nanoklinge','quantenkreuzer','fusionsdreadnought','hyperjaeger','hyperbomber'];
+  const ATTACK_SHIP_KEYS = ['jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','frachter','frachtergross','waechter','kometenjaeger','enterschiff','phantomschiff','riftwaechter','nanoklinge','quantenkreuzer','fusionsdreadnought','hyperjaeger','hyperbomber','singularitaetsvernichter'];
   const CARGO_PER_FRACHTER = 300; // Ladekapazität pro mitgeführtem Kleinen Frachter für Plünderungen (NPC- und Spielerangriffe)
   const CARGO_PER_FRACHTER_GROSS = 1500; // Ladekapazität pro mitgeführtem Großen Frachter - 5x so viel wie der Kleine
   // Gesamt-Frachtraum einer Flottenzusammenstellung über BEIDE Frachtertypen hinweg - zentrale
@@ -11241,7 +11244,14 @@
     let power = diminishingShipCount(f.cruisers)*20 + diminishingShipCount(f.destroyers||0)*45 + diminishingShipCount(f.ships)*5 + diminishingShipCount(df.jaeger)*10 + diminishingShipCount(df.bomber)*60 + diminishingShipCount(f.schlachtschiff||0)*90*schlachtschiffAtkMult + diminishingShipCount(f.carrier||0)*15 + diminishingShipCount(f.superschlachtschiff||0)*220 + diminishingShipCount(f.waechter||0)*8 +
       diminishingShipCount(f.leerenjaeger||0)*140 + diminishingShipCount(f.kometenjaeger||0)*18 + diminishingShipCount(f.enterschiff||0)*25 + diminishingShipCount(f.phantomschiff||0)*35 + diminishingShipCount(f.riftwaechter||0)*20 +
       diminishingShipCount(f.nanoklinge||0)*55 + diminishingShipCount(f.quantenkreuzer||0)*80 + diminishingShipCount(f.fusionsdreadnought||0)*180 +
-      diminishingShipCount(f.hyperjaeger||0)*30 + diminishingShipCount(f.hyperbomber||0)*130;
+      diminishingShipCount(f.hyperjaeger||0)*30 + diminishingShipCount(f.hyperbomber||0)*130 +
+      // Singularitäts-Vernichter (24.07.2026, Balance-Entscheidung Sascha: "Ja, angreifen lassen"):
+      // Apex-Flaggschiff, stärkster regulärer Angriffswert (280). War bisher NUR in der Verteidigung/
+      // Aura, nicht in ATTACK_SHIP_KEYS/attackPowerRaw - trug also trotz seiner Beschreibung 0 Angriff
+      // bei. Backend rawFleetPower() synchron nachgezogen. Metamaterial-Titan bleibt bewusst draußen
+      // (reines Verteidigungsschiff). Die Offensiv-Aura "Gravitationssog" (+5%/Schiff) kommt zusätzlich
+      // oben drauf und ist davon unberührt.
+      diminishingShipCount(f.singularitaetsvernichter||0)*280;
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
