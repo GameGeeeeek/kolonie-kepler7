@@ -3498,8 +3498,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.250.0';
+  const VERSION = '8.251.0';
   const PATCHNOTES = [
+    { version:'8.251.0', date:'24.07.2026', changes:[
+      'Bonus-Audit („werden alle Boni einberechnet?") – drei Funde, alle behoben. (1) Schiffs-Verlegungen, Piraten-Abfangen und Leerenriss-Flüge liefen an der zentralen Flugzeit-Formel vorbei: Navigator-Offizier, Prestige-Perk „Navigationsexperte", Aszension, Logistik-Fähigkeitszweig, Allianz-Tempo-Techs, gekaufte Flotten-Booster und Klassen-Tempomodule wirkten dort schlicht nicht. Jetzt zählen bei diesen Flügen dieselben Boni wie bei jeder anderen Mission.',
+      '(2) Das Schildmodul („verringert den Ressourcenverlust bei einem Überfall") schützte nur gegen NPC-Piraten – beim echten Spieler-Überfall (serverseitig entschieden) wirkte es gar nicht. Jetzt senkt es auch dort die Beute; da die Server-Beute kontoweit abgezogen wird, zählt der Durchschnitt deiner Standort-Boni (gleicher Deckel wie bei NPC-Überfällen). (3) Die Verteidigungs-Sabotage („Störmanöver": −30% Verteidigung für 30 Min) wurde vom Server zwar verhängt, aber bei Folgeangriffen nie eingerechnet – ein sabotiertes Ziel verteidigte serverseitig mit voller Stärke. Jetzt wirkt die Schwächung wie angezeigt.',
+    ]},
     { version:'8.250.0', date:'24.07.2026', changes:[
       'Große Performance-Runde für Handy und Tablet (danke für den Report „frisst viel Leistung"): Der Sternenhimmel-Hintergrund zeichnete bisher mit voller Display-Frequenz – auf 120-Hz-Geräten 120 Voll-Neuzeichnungen des ganzen Bildschirms pro Sekunde. Er läuft jetzt mit gedeckelten 30 Bildern/s (optisch kein Unterschied beim langsamen Funkeln). Zusätzlich schreibt das Spiel die Anzeige nicht mehr jede Sekunde neu, wenn der Tab gar nicht sichtbar ist (Bildschirm aus / anderer Tab) – die Spielmechanik läuft im Hintergrund selbstverständlich normal weiter, beim Zurückkehren ist sofort alles aktuell.',
       'Neu: Energiesparmodus (Einstellungen). Auf Handy und Tablet automatisch aktiv, jederzeit abschaltbar – auf dem Desktop automatisch aus. Er stellt den Sternenhimmel auf ein stehendes Bild, schaltet die dauerhaft laufenden Deko-Animationen ab (Bildschirm-Scanlinien, Puls-Effekt auf kaufbaren Buttons, Radar-Sweeps, Planeten-Rotationen, Rahmen-Ring-Pulse) und lässt Ressourcen-Zahlen springen statt weich hochzuzählen. Wichtige Warn-Effekte (Überfall-Alarm, Tab-Hinweispunkte) bleiben bewusst an. Die Automatik gilt pro Gerät: Wer auf Handy UND Desktop spielt, bekommt auf jedem Gerät die passende Voreinstellung, bis er den Schalter einmal selbst umlegt.',
@@ -24684,12 +24688,16 @@
   function relocationDuration(fromPlanet, toPlanet, shipKey){
     const sameSystem = planetSystemOf(fromPlanet) === planetSystemOf(toPlanet);
     const baseSec = sameSystem ? 90 : 420;
-    const lvl = state.research.rfusion||0;
-    let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
-    const speed = shipKey==='superschlachtschiff' ? SUPER_SPEED : (SHIP_DEFS.find(d=>d.key===shipKey)||{}).speed;
-    if (speed) mult *= (100/speed);
-    mult *= allianceBaseFlightMult(planetSystemOf(toPlanet));
-    return baseSec * mult;
+    // Bugfix (24.07.2026, Bonus-Audit "welche Boni werden nicht einberechnet"): lief bisher an
+    // missionDurationFor() VORBEI und verrechnete nur rfusion + Schiffstempo + Allianzbasis-Bonus.
+    // Navigator-Offizier, Prestige-Perk "Navigationsexperte", Aszension "speed", Logistik-
+    // Fähigkeitszweig, Allianz-Tempo-Techs (a_speed/ep_logistik/wp_sprungtor), Exotisch "tiefenraum",
+    // gekaufte Flotten-Booster (Speed-Buffs - deren Text "alle ab jetzt neu gestarteten Missionen"
+    // verspricht!) und Klassen-Tempomodule wirkten auf Verlegungen, Piraten-Abfangen und
+    // Leerenriss-Flüge NICHT. Jetzt durch die zentrale Formel geroutet: Pseudo-Flotte aus genau
+    // einem Schiff des Typs; fleetSpeedMultiplier/effectiveShipSpeed decken dort den
+    // SUPER_SPEED-Sonderfall des Superschlachtschiffs identisch ab.
+    return missionDurationFor(baseSec, { [shipKey]: 1 }, [shipKey], planetSystemOf(toPlanet));
   }
   function relocateShips(fromPlanet, toPlanet, shipKey, amount, forcedDur, forcedFleetName, skipFuelCharge, groupId){
     if (!amount || amount <= 0){ log('Ungültige Anzahl.', 'ti-alert-triangle'); return; }
