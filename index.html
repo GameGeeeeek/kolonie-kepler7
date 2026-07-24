@@ -3525,8 +3525,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.254.0';
+  const VERSION = '8.255.0';
   const PATCHNOTES = [
+    { version:'8.255.0', date:'24.07.2026', changes:[
+      'Großer Expeditions-Ausbau (6 Erweiterungen). (1) Drei neue spezialisierte Expeditionstypen mit eigenem Fund-Fokus: Bergungsexpedition (viel mehr Module und verlassene Schiffe), Forschungsexpedition (viel mehr Items/Fragmente/Materialien, bevorzugt Forschungspunkte) und Schürfexpedition (fast nur Rohstoffe, sehr sicher) – zusätzlich zu Kurz/Standard/Tiefenraum.',
+      '(2) Neuer Wagnis-Regler beim Start: Vorsichtig (−30% Begegnungsrisiko, −15% Beute), Normal oder Wagemutig (+40% Risiko, +35% Beute) – die Wahl wird gemerkt. (3) Eskorten-Zusammensetzung zählt jetzt mehr: Spähschiffe sind als reine Utility-Eskorte wählbar (keine Kampfkraft, aber mehr Sonderfunde und bessere Fund-Qualität).',
+      '(4) Expeditions-Ketten: Gelegentlich findest du „Sternenkarten-Fragmente". Drei davon schalten die Koordinaten eines verschollenen Schatzdepots frei – deine nächste erfolgreiche Expedition birgt dann garantiert einen wertvollen Fund (großer Ressourcen-Cache + Standort-Modul + Modulfragmente + XP).',
+      '(5) Neuer Expeditions-Kodex (aufklappbar im Expedition-Tab): sammelt entdeckte Sonderfunde, gefundene seltene Materialien, entdeckte Systeme und abgeschlossene Schatzdepots. (6) Neue Sonderfund-Kategorien: Kommandozentralen-Datenkerne geben Kommandopunkte, Bergungs-Fragmentkisten geben Modulfragmente (für die Modul-Schmelze).',
+    ]},
     { version:'8.254.0', date:'24.07.2026', changes:[
       'Bugfix (Expeditions-Audit): Zwei eigentlich exklusive Gegenstände konnten versehentlich doch über Expeditionen erbeutet werden. Der Leerensplitter (Endgame-Ressource, gedacht nur über Leere-Gegner, Weltboss und Piraten-Endboss – plus dem Zusammensetzen aus Fragmenten) und der Allianz-Kriegsschub (nur über Allianz-Wochen-/Großprojekte) sind als „chance:0" markiert, aber der Expeditions-Fundpool wählte nach Seltenheit aus und übersah dieses Feld. Zusätzlich zog der Sonderfund „Fremdes Artefakt geborgen" gleichverteilt aus allen seltenen Materialien – inklusive Leerensplitter. Beides ist behoben: Als „chance:0" markierte Gegenstände tauchen jetzt nirgends mehr im Expeditions-Zufallspool auf. Die Leerensplitter-FRAGMENTE (der beabsichtigte Sammelweg) bleiben unverändert findbar.',
     ]},
@@ -10305,7 +10311,10 @@
   // ATTACK_SHIP_KEYS), erweitern aber den Frachtraum für Ressourcenfunde (siehe fleetCargoCapacity()
   // in der Fundauflösung unten) - bei besonders großen Funden reicht der kostenlose Basis-Frachtraum
   // sonst nicht aus.
-  const EXPEDITION_SHIP_KEYS = ['forscher','jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','kometenjaeger','enterschiff','phantomschiff','riftwaechter','frachter','frachtergross'];
+  // spaeher (24.07.2026, Ausbau D): Spähschiffe sind als reine Utility-Eskorte wählbar - sie tragen 0
+  // Angriffspunkte bei (nicht in ATTACK_SHIP_KEYS, escortPower unberührt), verbessern aber gezielt die
+  // Expeditionsausbeute (mehr Sonderereignisse + bessere Fund-Qualität, siehe checkMissions).
+  const EXPEDITION_SHIP_KEYS = ['forscher','spaeher','jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','kometenjaeger','enterschiff','phantomschiff','riftwaechter','frachter','frachtergross'];
   const ESCORT_KEYS = EXPEDITION_SHIP_KEYS.filter(k=>k!=='forscher');
   let expeditionEscortSelection = {};
   function getEscortSelection(planetKey, cf){
@@ -13846,6 +13855,9 @@
     if (state.defenseSabotage === undefined) state.defenseSabotage = null;
     if (state.moduleFragments === undefined) state.moduleFragments = 0; // Modul-Schmelze (24.07.2026)
     if (state.moduleLoadouts === undefined) state.moduleLoadouts = {}; // Modul-Loadouts (24.07.2026)
+    if (state.expeditionRisk === undefined) state.expeditionRisk = 'normal'; // Expeditions-Ausbau (24.07.2026)
+    if (state.expeditionChain === undefined) state.expeditionChain = { fragments:0, readyFinale:false };
+    if (state.expeditionCodex === undefined) state.expeditionCodex = { specials:{}, rares:{}, chainCompleted:0 };
     if (state.doctrine === undefined) state.doctrine = null;
     if (state.activeEvent === undefined) state.activeEvent = null;
     if (state.lastEventTime === undefined) state.lastEventTime = 0;
@@ -16885,7 +16897,9 @@
       { title:'Treibstoffkosten (Deuterium & Antimaterie)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). <strong>Welche Ressource verbraucht wird, hängt vom Antrieb ab:</strong> Schiffe mit Verbrennungs- oder Impulstriebwerk tanken Deuterium, Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken Antimaterie. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen. Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
       { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren, Spionage UND Flottenverlegungen zwischen eigenen Planeten - ein per "Verband versenden" gemeinsam losgeschickter Verband zählt dabei nur als EIN Slot, unabhängig davon, wie viele Schiffstypen er enthält. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
       { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
-      { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig, drei wählbare Typen: Kurz/Standard/Tiefenraum mit steigendem Risiko und Beute) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
+      { title:'Expeditionstypen, Wagnis & Eskorte', body:'Vor dem Start wählst du <strong>Expeditionstyp</strong>, <strong>Wagnis</strong> und <strong>Eskorte</strong> – alle drei formen Risiko und Beute. <strong>Typen:</strong> Kurz (schnell/sicher, wenig), Standard (ausgewogen), Tiefenraum (lang/riskant, viel) sowie drei spezialisierte: <strong>Bergungsexpedition</strong> (viel mehr Module und verlassene Schiffe, weniger Rohstoffe), <strong>Forschungsexpedition</strong> (viel mehr Items/Fragmente/Materialien und bevorzugt Forschungspunkte, kaum Rohstoffe) und <strong>Schürfexpedition</strong> (fast nur Rohstoffe, sehr sicher). <strong>Wagnis-Regler:</strong> Vorsichtig (−30% Begegnungsrisiko, −15% Beute), Normal, oder Wagemutig (+40% Risiko, +35% Beute). <strong>Eskorte:</strong> Kampfschiffe schützen vor Begegnungen; <strong>Spähschiffe</strong> tragen keine Kampfkraft bei, verbessern aber gezielt die Ausbeute (mehr Sonderfunde und bessere Fund-Qualität); <strong>Frachter/Große Frachter</strong> erweitern den Frachtraum für große Ressourcenfunde.' },
+      { title:'Expeditions-Kette & Kodex', body:'<strong>Sternenkarten-Fragmente</strong> tauchen gelegentlich als Sonderfund auf. Hast du drei gesammelt, sind die Koordinaten eines verschollenen <strong>Schatzdepots</strong> vollständig – deine nächste erfolgreiche Expedition birgt dann garantiert einen wertvollen Fund (großer Ressourcen-Cache, ein Standort-Modul, Modulfragmente und XP). Der <strong>Expeditions-Kodex</strong> (aufklappbar im Expedition-Tab) sammelt deinen Fortschritt: entdeckte Sonderfunde, gefundene seltene Materialien, entdeckte Systeme und abgeschlossene Schatzdepots.' },
+      { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
       { title:'Expeditions-Limit: nur 1 gleichzeitig zu Beginn', body:'Zusätzlich zur Forschungsschiff-Anzahl je Planet und dem allgemeinen Flottenentsendelimit gibt es ein eigenes, planetenübergreifendes Limit für gleichzeitig laufende Expeditionen - anfangs nur <strong>1</strong>. Die eigenständige Forschung <strong>Expeditionskoordination</strong> (Kategorie Logistik) erhöht dieses Limit um 1 je Stufe, bis maximal <strong>5</strong> gleichzeitige Expeditionen bei Stufe 4. Der aktuelle Stand wird direkt im Expedition-Tab beim Start-Formular angezeigt.' },
       { title:'Letzte Sendung wiederholen', body:'Sobald in der aktuellen Sitzung schon einmal erfolgreich eine Expedition gestartet wurde, erscheint neben „Expedition starten" der Knopf <strong>„Letzte wiederholen"</strong>: stellt Typ und Eskorte-Zusammensetzung der zuletzt gestarteten Expedition wieder her und startet SOFORT - ideal zum wiederholten Farmen, ohne die Eskorte jedes Mal neu zusammenzuklicken. Ist am aktuellen Standort inzwischen weniger verfügbar als beim letzten Mal, wird automatisch auf das tatsächlich Vorhandene gekappt statt die Sendung zu blockieren.' },
       { title:'Fragmente & kosmetische Avatare', body:'Statt eines vollen seltenen Materials (Antimateriekern, Kristallherz, Alte Technologie) kann auch ein <strong>Fragment</strong> davon gefunden werden - häufiger, aber schwächer. Sind <strong>4 Fragmente</strong> desselben Typs im Inventar (Fortschritt-Tab), lassen sie sich per Knopfdruck zu 1x dem vollen Material zusammensetzen. Ebenfalls über Expeditionen erhältlich: drei <strong>exklusive Avatare</strong> (Nova, Void, Phoenix), die sonst nirgends wählbar sind - einmal gefunden dauerhaft freigeschaltet und in den Einstellungen auswählbar. Ist ein kosmetischer Fund bereits freigeschaltet, gibt es stattdessen Ersatz-Ressourcen, kein doppelter Nutzen.' },
@@ -22037,6 +22051,9 @@
         if (state.defenseSabotage === undefined) state.defenseSabotage = null;
         if (state.moduleFragments === undefined) state.moduleFragments = 0; // Modul-Schmelze (24.07.2026)
         if (state.moduleLoadouts === undefined) state.moduleLoadouts = {}; // Modul-Loadouts (24.07.2026)
+        if (state.expeditionRisk === undefined) state.expeditionRisk = 'normal'; // Expeditions-Ausbau (24.07.2026)
+        if (state.expeditionChain === undefined) state.expeditionChain = { fragments:0, readyFinale:false };
+        if (state.expeditionCodex === undefined) state.expeditionCodex = { specials:{}, rares:{}, chainCompleted:0 };
         if (state.doctrine === undefined) state.doctrine = null;
         if (state.activeEvent === undefined) state.activeEvent = null;
         if (state.lastEventTime === undefined) state.lastEventTime = 0;
@@ -24332,7 +24349,12 @@
             // grobe Fundart-Verteilung selbst, sondern verschieben etwas Wahrscheinlichkeitsmasse
             // aus "nichts gefunden" in die Item-/Raritäten-Töpfe, UND begünstigen innerhalb dieser
             // Töpfe höhere Seltenheitsstufen (siehe pickWeightedByRarity).
-            const typeLuck = { short:0, standard:0.05, deep:0.12 }[m.expType] || 0;
+            // Ausbau A (24.07.2026): typ-eigene Fund-Bänder + nothingBase (Standard = bisherige Balance).
+            const etDef = EXPEDITION_TYPES.find(t=>t.key===m.expType) || EXPEDITION_TYPES[1];
+            const bands = etDef.bands || EXP_DEFAULT_BANDS;
+            const nothingBase = etDef.nothingBase !== undefined ? etDef.nothingBase : 0.12;
+            const comp = m.composition || fleet;
+            const typeLuck = { short:0, standard:0.05, deep:0.12, salvage:0.06, research:0.12, mining:0 }[m.expType] || 0;
             const escortLuck = Math.min(0.15, escortPower/2000);
             const researchLuck = (state.research.rexpedition||0) * RESEARCH_DEFS.find(r=>r.key==='rexpedition').effectPerLevel;
             const activeLootEvent = seasonalLootMult() > 1;
@@ -24343,28 +24365,55 @@
             // sendExpeditionMission) - additiv in dieselbe Gruppe, der globale freed-Deckel (0.09
             // eine Zeile tiefer) bleibt unverändert die Obergrenze.
             const sensorLuck = m.sensorBoosted ? 0.10 : 0;
-            const luckBonus = typeLuck + escortLuck + researchLuck + seasonalLuck + allianceLuck + sensorLuck;
+            // Ausbau D (24.07.2026): Spähschiffe in der Eskorte erkunden gründlicher - bessere
+            // Fund-QUALITÄT (spaeherLuck) UND mehr SONDEREREIGNISSE (specialBoost verschiebt Masse aus
+            // dem Ressourcen- in den Sonderereignis-Topf, Gesamtsumme bleibt exakt erhalten).
+            const spaeherCount = comp.spaeher || 0;
+            const spaeherLuck = Math.min(0.10, spaeherCount * 0.012);
+            const specialBoost = Math.min(0.12, spaeherCount * 0.012);
+            const luckBonus = typeLuck + escortLuck + researchLuck + seasonalLuck + allianceLuck + sensorLuck + spaeherLuck;
             // "freed" ist die Wahrscheinlichkeitsmasse, die aus dem "nichts gefunden"-Topf
             // herausgenommen und 1:1 auf Item-/Raritäten-Topf verteilt wird - Gesamtsumme bleibt
-            // dadurch immer exakt 1.0, alle anderen Topfbreiten (Ressourcen/Sonderereignis/Modul/
-            // verlassene Flotte) bleiben unverändert.
-            const freed = Math.min(0.09, luckBonus*0.25);
-            const b_nothing = 0.12 - freed;
-            const b_resource = b_nothing + 0.50;
-            const b_special = b_resource + 0.12;
-            const b_item = b_special + 0.12 + freed*0.45;
-            const b_rare = b_item + 0.08 + freed*0.55;
-            const b_module = b_rare + 0.03;
+            // dadurch immer exakt 1.0 (die verlassene Flotte ist der implizite Rest über b_module).
+            // freed zusätzlich an nothingBase gedeckelt (24.07.2026): bei Typen mit kleinem "Nichts"-Topf
+            // (z.B. Schürf 0.08) darf nicht mehr Masse "befreit" werden, als der Topf hergibt - sonst
+            // würde b_nothing negativ (harmlos, aber unsauber). So bleibt die Umverteilung exakt.
+            const freed = Math.min(0.09, nothingBase, luckBonus*0.25);
+            const b_nothing = nothingBase - freed;
+            const b_resource = b_nothing + Math.max(0.10, bands.resource - specialBoost);
+            const b_special = b_resource + bands.special + specialBoost;
+            const b_item = b_special + bands.item + freed*0.45;
+            const b_rare = b_item + bands.rare + freed*0.55;
+            const b_module = b_rare + bands.module;
             // Fundart würfeln: nichts / Ressourcen (häufigster Fall) / Sonderereignis / Item / seltenes
             // Item / verlassene Flotte. Bandbreiten bewusst so gewählt, dass Ressourcenfunde weiterhin
             // der Normalfall bleiben, aber Abwechslung reinkommt.
             const findRoll = Math.random();
             let findText = '', findIcon = 'ti-map-2', reportExtra = {};
-            if (findRoll < b_nothing){
+            // Ausbau C (24.07.2026): Schatzdepot-Finale. Sind alle Sternenkarten-Fragmente gesammelt,
+            // ist die NÄCHSTE erfolgreiche Expedition ein garantierter Jackpot (überschreibt den
+            // normalen Fund-Roll). Bewusst großzügig, aber nicht spielentscheidend - der Aufwand
+            // (3 seltene Sonderfunde sammeln) rechtfertigt es.
+            if (state.expeditionChain && state.expeditionChain.readyFinale){
+              state.expeditionChain.readyFinale = false;
+              state.expeditionChain.fragments = 0;
+              state.expeditionCodex = state.expeditionCodex || {};
+              state.expeditionCodex.chainCompleted = (state.expeditionCodex.chainCompleted||0)+1;
+              // Jackpot: großer Ressourcen-Cache + garantiertes Standort-Modul (bis Legendär) + Fragmente + XP.
+              const jackRes = { erz: Math.round(3000*mult), kristalle: Math.round(2200*mult), deuterium: Math.round(1400*mult), antimaterie: Math.round(180*mult) };
+              gainResources(jackRes);
+              const modName = grantRandomModule();
+              state.moduleFragments = (state.moduleFragments||0) + 6;
+              addXp(120);
+              findText = 'SCHATZDEPOT ENTDECKT! Die entschlüsselten Sternenkarten führten zu einem verschollenen Depot: großer Ressourcen-Cache, ein Standort-Modul ('+modName+'), +6 Modulfragmente und +120 XP!';
+              findIcon = 'ti-diamond';
+              reportExtra = { chainFinale:true, itemFound: modName };
+            } else if (findRoll < b_nothing){
               addXp(Math.round(8*mult));
               findText = EXPEDITION_NOTHING_FLAVOR[Math.floor(Math.random()*EXPEDITION_NOTHING_FLAVOR.length)];
             } else if (findRoll < b_resource){
-              const resKeys = ['erz','kristalle','deuterium','antimaterie','energie'];
+              // Ausbau A: Forschungsexpeditionen schütten bevorzugt Forschungspunkte aus (etDef.resKeys).
+              const resKeys = etDef.resKeys || ['erz','kristalle','deuterium','antimaterie','energie'];
               const res = resKeys[Math.floor(Math.random()*resKeys.length)];
               const rawAmt = Math.round((250+Math.random()*450)*mult);
               // Frachtraum-Deckelung (20.07.2026, Spieler-Wunsch "bei vielen Ressourcen müssen die
@@ -24385,6 +24434,7 @@
               findText = result.text;
               findIcon = result.icon;
               reportExtra = { specialEvent: ev.name };
+              recordCodexSpecial(ev.key); // Ausbau B: Sonderereignis im Kodex vermerken
             } else if (findRoll < b_item){
               // Event-Items sind nur Teil des Fundpools, wenn gerade ein saisonales Beute-Event aktiv ist.
               const itemPool = activeLootEvent ? ITEM_DEFS.concat(EVENT_ITEM_DEFS) : ITEM_DEFS;
@@ -24428,6 +24478,7 @@
                 findText = 'Seltener Fund: '+ri.name+' ('+rarityBadgeHtml(ri.rarity)+')!';
                 findIcon = ri.icon||'ti-diamond';
                 reportExtra = { itemFound: ri.name, rarity: ri.rarity, rare: true };
+                recordCodexRare(ri.key); // Ausbau B: seltenes Material im Kodex vermerken
               }
             } else if (findRoll < b_module){
               const modName = grantRandomModule();
@@ -27127,12 +27178,33 @@
   // Wählbare Expeditionstypen: unterschiedliches Risiko-/Beute-/Dauer-Profil. Wird am Missionsobjekt
   // selbst gespeichert (encounterChance/rewardMult/durationMult), damit spätere Balance-Änderungen an
   // EXPEDITION_TYPES bereits unterwegs befindliche Missionen nicht rückwirkend verändern.
+  // Fund-Verteilung ("Bänder") je Expeditionstyp (24.07.2026, Ausbau A): die sechs positiven Töpfe
+  // müssen mit nothingBase zusammen 1.0 ergeben (Ressourcen/Sonderereignis/Item/selten/Modul/verlassene
+  // Flotte). Der Standard reproduziert exakt die bisherige Balance. Spezialtypen verschieben den Fokus,
+  // ohne neue Kampf-/Fund-Logik zu brauchen - reine Wahrscheinlichkeitsmasse.
+  const EXP_DEFAULT_BANDS = { resource:0.50, special:0.12, item:0.12, rare:0.08, module:0.03, derelict:0.03 };
   const EXPEDITION_TYPES = [
     { key:'short', name:'Kurze Erkundung', icon:'ti-map-pin', desc:'Schnell und vergleichsweise sicher, aber bescheidene Beute.', durationMult:0.5, encounterChance:0.20, rewardMult:0.6 },
     { key:'standard', name:'Standard-Expedition', icon:'ti-map-2', desc:'Ausgewogenes Verhältnis von Risiko und Beute.', durationMult:1.0, encounterChance:0.35, rewardMult:1.0 },
-    { key:'deep', name:'Tiefenraum-Expedition', icon:'ti-atom-2', desc:'Lang und riskant, dafür deutlich größere Beute.', durationMult:1.8, encounterChance:0.50, rewardMult:1.8 }
+    { key:'deep', name:'Tiefenraum-Expedition', icon:'ti-atom-2', desc:'Lang und riskant, dafür deutlich größere Beute.', durationMult:1.8, encounterChance:0.50, rewardMult:1.8 },
+    // Spezialisierte Typen (24.07.2026, Ausbau A): eigener Fund-Fokus über Band-Overrides + resKeys.
+    { key:'salvage', name:'Bergungsexpedition', icon:'ti-box', desc:'Auf Wracks und Technik spezialisiert: deutlich höhere Chance auf Module und verlassene Schiffe, dafür weniger reine Rohstoffe.', durationMult:1.3, encounterChance:0.42, rewardMult:1.1,
+      nothingBase:0.10, bands:{ resource:0.34, special:0.10, item:0.10, rare:0.08, module:0.16, derelict:0.12 } },
+    { key:'research', name:'Forschungsexpedition', icon:'ti-flask', desc:'Wissenschaftlicher Tiefflug: viel höhere Item-, Fragment- und Materialchance und bevorzugt Forschungspunkte – dafür kaum Rohstoffe.', durationMult:1.5, encounterChance:0.40, rewardMult:1.0,
+      nothingBase:0.10, bands:{ resource:0.30, special:0.13, item:0.22, rare:0.16, module:0.05, derelict:0.04 }, resKeys:['forschungspunkte','forschungspunkte','kristalle','antimaterie'] },
+    { key:'mining', name:'Schürfexpedition', icon:'ti-pick', desc:'Reiner Rohstoff-Abbau in sicheren Zonen: fast nur Ressourcenfunde und geringes Begegnungsrisiko, aber kaum Besonderes.', durationMult:0.9, encounterChance:0.15, rewardMult:1.15,
+      nothingBase:0.08, bands:{ resource:0.74, special:0.06, item:0.04, rare:0.03, module:0.03, derelict:0.02 } }
   ];
   let selectedExpeditionType = 'standard';
+  // Risiko/Belohnung-Regler (24.07.2026, Ausbau E): skaliert Begegnungschance UND Beute-Multiplikator
+  // beim Start. Wird beim Senden in die (unveränderlichen) Missionsfelder eingebacken, damit spätere
+  // Balance-Änderungen unterwegs befindliche Expeditionen nicht rückwirkend betreffen. In state
+  // gemerkt (state.expeditionRisk), Standard 'normal'.
+  const EXPEDITION_RISK_MODES = {
+    vorsichtig: { label:'Vorsichtig', icon:'ti-shield', enc:0.70, rew:0.85, desc:'−30% Begegnungsrisiko, aber −15% Beute.' },
+    normal:     { label:'Normal',     icon:'ti-adjustments', enc:1.00, rew:1.00, desc:'Ausgewogen – die Standardwerte des Expeditionstyps.' },
+    wagemutig:  { label:'Wagemutig',  icon:'ti-bolt', enc:1.40, rew:1.35, desc:'+40% Begegnungsrisiko für +35% Beute – etwas für mutige Kommandanten.' }
+  };
   // Saisonale Events: zeitlich wiederkehrende Bonus-Modifikatoren, rein datumsbasiert (kein Zufall,
   // kein Serverzustand nötig) – laufen also für alle Spieler gleichzeitig synchron.
   // "kind" bestimmt, in welchen Topf der Bonus einzahlt (siehe seasonal*Mult()-Funktionen unten):
@@ -27526,9 +27598,28 @@
         addXp(Math.round(25*mult)); return { text:'Rissprobe entnommen: +'+fmt(gained)+' Antimaterie.', icon:'ti-atom' }; } },
     { key:'beacon_relic', name:'Baken-Relikt geborgen', icon:'ti-flag',
       resolve:(mult) => { addXp(Math.round(25*mult));
-        if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+        if (Math.random() < 0.2){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
           return { text:'Baken-Relikt geborgen: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-flag' }; }
         return { text:'Baken-Relikt geborgen, aber ohne besonderen Wert.', icon:'ti-flag' }; } },
+    // Ausbau F (24.07.2026): Sonderfunde, die in bereits vorhandene Währungen einzahlen (keine neuen
+    // Systeme). Kommandopunkte (Offiziere/Module) und Modulfragmente (Modul-Schmelze aus v8.252).
+    { key:'command_datacore', name:'Kommandozentralen-Datenkern geborgen', icon:'ti-award',
+      resolve:(mult) => { const amt = Math.max(1, Math.round((3+Math.random()*5)*Math.min(2,mult))); state.commandPoints = (state.commandPoints||0)+amt; addXp(Math.round(25*mult));
+        return { text:'Ein Kommandozentralen-Datenkern liefert wertvolle Einsatzdaten: +'+amt+' Kommandopunkte (für Offiziere und Modul-Slots).', icon:'ti-award' }; } },
+    { key:'salvage_fragments', name:'Bergungs-Fragmentkiste geöffnet', icon:'ti-box',
+      resolve:(mult) => { const amt = Math.max(2, Math.round((3+Math.random()*6)*Math.min(2,mult))); state.moduleFragments = (state.moduleFragments||0)+amt; addXp(Math.round(25*mult));
+        return { text:'Eine Bergungs-Fragmentkiste enthält verwertbare Modulteile: +'+amt+' Modulfragmente (für die Modul-Schmelze im Offiziere-Tab).', icon:'ti-box' }; } },
+    // Ausbau C (24.07.2026): Sternenkarten-Fragmente sammeln - je EXPEDITION_CHAIN_NEEDED gefundene
+    // schalten den nächsten Expeditions-Abschluss als garantierten Jackpot frei (siehe checkMissions).
+    { key:'starmap_fragment', name:'Sternenkarten-Fragment entschlüsselt', icon:'ti-map-2',
+      resolve:(mult) => { addXp(Math.round(30*mult));
+        if (!state.expeditionChain) state.expeditionChain = { fragments:0, readyFinale:false };
+        if (state.expeditionChain.readyFinale){
+          return { text:'Ein weiteres Sternenkarten-Fragment - die entschlüsselten Koordinaten sind bereits vollständig, der nächste Expeditionsabschluss birgt den Schatz.', icon:'ti-map-2' }; }
+        state.expeditionChain.fragments = (state.expeditionChain.fragments||0)+1;
+        if (state.expeditionChain.fragments >= EXPEDITION_CHAIN_NEEDED){ state.expeditionChain.fragments = EXPEDITION_CHAIN_NEEDED; state.expeditionChain.readyFinale = true;
+          return { text:'Sternenkarten-Fragment '+EXPEDITION_CHAIN_NEEDED+'/'+EXPEDITION_CHAIN_NEEDED+' entschlüsselt! Die Koordinaten eines verschollenen Schatzdepots sind vollständig - deine nächste erfolgreiche Expedition birgt garantiert einen wertvollen Fund.', icon:'ti-map-2' }; }
+        return { text:'Ein verschlüsseltes Sternenkarten-Fragment geborgen ('+state.expeditionChain.fragments+'/'+EXPEDITION_CHAIN_NEEDED+') - sammle die restlichen für die Koordinaten eines Schatzdepots.', icon:'ti-map-2' }; } },
     { key:'caravan_gratitude', name:'Karawanen-Dankspende erhalten', icon:'ti-truck',
       resolve:(mult) => { const amt = Math.round((180+Math.random()*220)*mult); state.credits = (state.credits||0)+amt; addXp(Math.round(20*mult));
         return { text:'Eine Handelskarawane bedankt sich: +'+fmt(amt)+' Kredite.', icon:'ti-truck' }; } },
@@ -27538,10 +27629,19 @@
         addXp(Math.round(25*mult)); return { text:'Plünderer-Beute übernommen: +'+fmt(gained)+' '+(RES_DEFS.find(r=>r.key===res)||{}).label+'.', icon:'ti-user-x' }; } },
     { key:'quantum_reading', name:'Quantenmessung ausgewertet', icon:'ti-sparkles',
       resolve:(mult) => { addXp(Math.round(30*mult));
-        if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+        if (Math.random() < 0.2){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
           return { text:'Quantenmessung ausgewertet: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-sparkles' }; }
         return { text:'Quantenmessung ausgewertet, ohne greifbares Ergebnis.', icon:'ti-sparkles' }; } }
   ];
+  // Kette-Konstante (Ausbau C) + Leak-sicherer Zufalls-Zieher für seltene Materialien (chance:0
+  // ausgeschlossen, siehe Expeditions-Audit v8.254 - derselbe Schutz wie in pickWeightedByRarity).
+  const EXPEDITION_CHAIN_NEEDED = 3;
+  function randomFindableRareItem(){ const pool = RARE_ITEMS.filter(r => r.chance !== 0); return pool[Math.floor(Math.random()*pool.length)]; }
+  // Ausbau B (24.07.2026): Expeditions-Kodex - dauerhafte Sammel-Statistik (entdeckte Sonderereignisse,
+  // seltene Materialien, abgeschlossene Ketten). Reines Anzeige-/Sammelziel, kein Spieleffekt.
+  function ensureExpeditionCodex(){ if (!state.expeditionCodex) state.expeditionCodex = { specials:{}, rares:{}, chainCompleted:0 }; if (!state.expeditionCodex.specials) state.expeditionCodex.specials = {}; if (!state.expeditionCodex.rares) state.expeditionCodex.rares = {}; return state.expeditionCodex; }
+  function recordCodexSpecial(key){ const c = ensureExpeditionCodex(); c.specials[key] = (c.specials[key]||0)+1; }
+  function recordCodexRare(key){ const c = ensureExpeditionCodex(); c.rares[key] = (c.rares[key]||0)+1; }
   // Erfahrene Forschungsschiffe: mit jeder erfolgreich abgeschlossenen Expedition (kein Totalverlust)
   // steigt die Beute leicht, bis zu einem Deckel – repräsentiert eine erfahrenere Crew/Ausrüstung.
   function expeditionExperienceMult(){ return 1 + Math.min(0.5, Math.floor((state.expeditionsCompleted||0)/10)*0.05); }
@@ -27637,7 +27737,8 @@
     if (state.autoSensorOn && !quantensensorActive() && (state.research.rquantenphysik||0) >= 1 && (state.resources.quantenchips||0) >= QUANTENSENSOR_COST_CHIPS){
       activateQuantensensor();
     }
-    cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: et.encounterChance, rewardMult: et.rewardMult, sensorBoosted: quantensensorActive() });
+    const risk = EXPEDITION_RISK_MODES[state.expeditionRisk||'normal'] || EXPEDITION_RISK_MODES.normal;
+    cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: Math.min(0.9, et.encounterChance*risk.enc), rewardMult: et.rewardMult*risk.rew, riskMode: state.expeditionRisk||'normal', sensorBoosted: quantensensorActive() });
     lastExpeditionSend = { type: et.key, composition: ESCORT_KEYS.reduce((acc,k) => { if ((escortFleet[k]||0) > 0) acc[k] = escortFleet[k]; return acc; }, {}) };
     log(fleetName+' ('+et.name+') von '+planetDisplayName(state.activeBasePlanet)+' in unerforschten Raum aufgebrochen. Eskorte: '+escortSummary+' (Kampfkraft '+Math.round(escortPower)+'). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-map-2');
     render(); save();
@@ -29645,6 +29746,27 @@
           </div>
           <div class="bmeta" style="font-size:10.5px;">${selectedEt.desc} (${Math.round(selectedEt.durationMult*100)}% Dauer, ${Math.round(selectedEt.encounterChance*100)}% Begegnungschance, ${Math.round(selectedEt.rewardMult*100)}% Beute)</div>
         </div>
+        <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+          <div class="bmeta"><i class="ti ti-bolt" aria-hidden="true"></i> Wagnis (Risiko ⇄ Belohnung):</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${Object.entries(EXPEDITION_RISK_MODES).map(([k,r]) => `
+              <button data-expedition-risk="${k}" title="${r.desc}" style="flex:1; min-width:96px; font-size:11px; padding:6px 8px; ${(state.expeditionRisk||'normal')===k?'background:rgba(224,165,72,0.2); border-color:#e0a548; color:#e0a548;':''}">
+                <i class="ti ${r.icon}" aria-hidden="true" style="margin-right:4px;"></i>${r.label}
+              </button>`).join('')}
+          </div>
+          ${(() => { const r = EXPEDITION_RISK_MODES[state.expeditionRisk||'normal']||EXPEDITION_RISK_MODES.normal; return `<div class="bmeta" style="font-size:10.5px;">${r.desc}</div>`; })()}
+        </div>
+        ${(() => {
+          // Ausbau C: Ketten-Fortschritt / Finale-Hinweis.
+          const ch = state.expeditionChain || { fragments:0, readyFinale:false };
+          if (ch.readyFinale){
+            return `<div class="card-row" style="background:rgba(250,199,117,0.12); border-color:rgba(250,199,117,0.5);"><div class="left"><div class="bicon" style="background:rgba(250,199,117,0.2); color:#fac775;"><i class="ti ti-map-2" aria-hidden="true"></i></div><div><div class="bname" style="color:#fac775;">Schatzdepot-Koordinaten entschlüsselt!</div><div class="bmeta">Deine nächste erfolgreiche Expedition birgt garantiert einen wertvollen Fund.</div></div></div></div>`;
+          }
+          if ((ch.fragments||0) > 0){
+            return `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-map-2" aria-hidden="true" style="color:#c3bef5;"></i> Sternenkarten-Fragmente: <strong>${ch.fragments}/${EXPEDITION_CHAIN_NEEDED}</strong> – sammle sie über Sonderfunde für ein garantiertes Schatzdepot.</div>`;
+          }
+          return '';
+        })()}
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:0.5rem;">
           <div class="bmeta">Erfordert mind. 1 Forschungsschiff (0 Angriffspunkte). Wähle unten aus, welche Kampfschiffe als Eskorte mitfliegen sollen – ohne ausreichend Eskorte drohen unterwegs Verluste bis hin zum Totalverlust.</div>
           ${escortRows ? `<div style="display:flex; gap:6px; flex-wrap:wrap; align-self:flex-start;">
@@ -29687,10 +29809,33 @@
             </div>
           </div>
         </div>
+        ${(() => {
+          // Ausbau B: Expeditions-Kodex (aufklappbar, session-lokal state.showExpCodex).
+          const codex = state.expeditionCodex || { specials:{}, rares:{}, chainCompleted:0 };
+          const specialsSeen = Object.keys(codex.specials||{}).length;
+          const specialsTotal = EXPEDITION_SPECIAL_EVENTS.length;
+          const systemsSeen = Object.keys(state.discoveredSystems||{}).length;
+          const head = `<div class="card-row" id="expCodexToggle" style="cursor:pointer; margin-top:0.75rem;"><div class="left"><div class="bicon" style="background:rgba(126,119,221,0.15); color:#c3bef5;"><i class="ti ti-list-details" aria-hidden="true"></i></div><div><div class="bname">Expeditions-Kodex</div><div class="bmeta">${specialsSeen}/${specialsTotal} Sonderfunde entdeckt · ${systemsSeen} Systeme · ${codex.chainCompleted||0}× Schatzdepot</div></div></div><i class="ti ${state.showExpCodex?'ti-chevron-right':'ti-chevron-right'}" aria-hidden="true"></i></div>`;
+          if (!state.showExpCodex) return head;
+          const rareRows = RARE_ITEMS.filter(r=>r.chance!==0).map(r => `<span class="lvl-pill" style="font-size:10px;"><i class="ti ${r.icon||'ti-diamond'}" aria-hidden="true" style="margin-right:3px;"></i>${r.name}: ${(codex.rares||{})[r.key]||0}</span>`).join(' ');
+          const specialRows = EXPEDITION_SPECIAL_EVENTS.map(ev => { const n=(codex.specials||{})[ev.key]||0; return `<span style="font-size:10.5px; color:${n?'#c3bef5':'#5a5f78'};">${n?'✓':'○'} ${ev.name}${n>1?' ×'+n:''}</span>`; }).join('<br>');
+          return head + `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+            <div class="bmeta">Seltene Materialien gefunden:</div>
+            <div style="display:flex; gap:5px; flex-wrap:wrap;">${rareRows||'<span class="bmeta">noch keine</span>'}</div>
+            <div class="bmeta" style="margin-top:4px;">Sonderfunde (${specialsSeen}/${specialsTotal}):</div>
+            <div style="line-height:1.7;">${specialRows}</div>
+          </div>`;
+        })()}
       `);
       refreshShipMiniIcons(expeditionBox);
       const cfnExp = document.getElementById('customFleetNameInputExp');
       if (cfnExp) cfnExp.oninput = () => { customFleetName = cfnExp.value; };
+      const expCodexToggle = document.getElementById('expCodexToggle');
+      if (expCodexToggle) expCodexToggle.onclick = () => { state.showExpCodex = !state.showExpCodex; render(); };
+      document.querySelectorAll('[data-expedition-risk]').forEach(btn => btn.onclick = () => {
+        state.expeditionRisk = btn.getAttribute('data-expedition-risk');
+        render(); save();
+      });
       document.querySelectorAll('[data-expedition-type]').forEach(btn => btn.onclick = () => {
         selectedExpeditionType = btn.getAttribute('data-expedition-type');
         render();
