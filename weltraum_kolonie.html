@@ -267,6 +267,17 @@
     body.power-save .moon1, body.power-save .moon2, body.power-save .twinkle, body.power-save .planet-terminator { animation:none; }
     body.power-save .frame-ring.frame-platin, body.power-save .frame-ring.frame-diamant, body.power-save .frame-ring.frame-legendaer { animation:none; }
     body.power-save .profile-online-dot.live { animation:none; }
+    /* Flotten-Tab-Unterreiter + Sticky-Statusleiste (24.07.2026, "übersichtlicher machen" Vorschlag 1) */
+    .fleet-sticky { position:sticky; top:calc(env(safe-area-inset-top, 0px) + 4px); z-index:30; display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; padding:8px 13px; margin-bottom:10px; font-size:11.5px; color:#9aa0b8; background:rgba(10,13,26,0.96); border:0.5px solid rgba(92,225,255,0.28); clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px); font-variant-numeric:tabular-nums; }
+    .fleet-sticky b { color:#5ce1ff; font-weight:600; }
+    .fleet-sticky .warn { color:#e24b4a; }
+    .fleet-sticky i.ti { margin-right:3px; }
+    .fleet-subtabs { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px; }
+    .fleet-subtab { font-family:inherit; cursor:pointer; text-align:center; padding:9px 6px; font-size:12.5px; letter-spacing:0.5px; border:0.5px solid rgba(127,119,221,0.35); color:#9aa0b8; background:rgba(13,18,36,0.8); clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px); }
+    .fleet-subtab small { display:block; font-size:9px; margin-top:2px; color:#7d8199; letter-spacing:0; }
+    .fleet-subtab.on { color:#5ce1ff; border-color:rgba(92,225,255,0.7); background:rgba(92,225,255,0.10); box-shadow:inset 0 0 14px rgba(92,225,255,0.18); }
+    .fleet-subtab.on small { color:#8fd8ef; }
+    @media (max-width:520px){ .fleet-subtab small { display:none; } .fleet-subtab { font-size:11.5px; padding:8px 4px; } }
     /* Grafik-Runde "High-End", Vorschlag 31 "Bedrohungs-Vignette": box-shadow statt drittem
        Pseudo-Element - .shell::before/::after sind schon für Grid+Scanlines vergeben. Nur aktiv bei
        ERKANNTEM Überfall (siehe render(), gleiche Bedingung wie das bestehende Raid-Timer-Badge). */
@@ -1895,25 +1906,41 @@
 
       <div class="tab-panel" id="tab-flotte">
         <div id="planetSwitcherFleet" class="planet-switch"></div>
-        <div style="text-align:center; padding:1.5rem 0; margin-bottom:1rem; background:rgba(226,75,74,0.08); border-radius:14px; border:0.5px solid rgba(226,75,74,0.25);">
-          <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angriffspunkte (aktueller Planet)</div>
-          <div style="font-size:38px; font-weight:500; color:#e24b4a; font-variant-numeric:tabular-nums;" id="attackCentralValue">0</div>
+        <!-- Flotten-Tab-Umbau (24.07.2026, Spieler-Wunsch "übersichtlicher machen", Vorschlag 1):
+             Sticky-Statusleiste mit den Kernzahlen + drei Unterreiter (Werft / Flotte & Verlegen /
+             Missionen) statt einer ~7.000px hohen Scrollsäule. Die Inhalte selbst sind unverändert,
+             nur in drei Sub-Container gruppiert; state.fleetSubTab merkt sich die Auswahl. -->
+        <div class="fleet-sticky" id="fleetStickyBar"></div>
+        <div class="fleet-subtabs" id="fleetSubtabs">
+          <button type="button" class="fleet-subtab" data-fleet-subtab="werft"><i class="ti ti-ship" aria-hidden="true"></i> Werft<small>Schiffe bauen · Baukorb</small></button>
+          <button type="button" class="fleet-subtab" data-fleet-subtab="flotte"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Flotte &amp; Verlegen<small>Angriffskraft · Verlegung · Trümmer</small></button>
+          <button type="button" class="fleet-subtab" data-fleet-subtab="missionen"><i class="ti ti-rocket" aria-hidden="true"></i> Missionen<small id="fleetSubtabMissionsNote">Aktive Flotten</small></button>
         </div>
-        <div id="debrisBox"></div>
-        <div class="section-title"><i class="ti ti-rocket" aria-hidden="true"></i>Aktive Missionen<span id="fleetLimitBadge" class="lvl-pill" style="margin-left:8px; font-size:10px;"></span></div>
-        <div class="missions-active" id="missionsActive"></div>
-        <div id="tier2ConsumablesBox"></div>
-        <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i>Flotte verlegen</div>
-        <div id="relocateAllBox"></div>
-        <div id="relocateBox"></div>
-        <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-ship" aria-hidden="true"></i>Schiffswerft<span id="shipQueueBadge" class="lvl-pill" style="margin-left:8px; font-size:10px;"></span></div>
-        <div id="werftOverdriveBox"></div>
-        <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning: bei der Flotte lag
-             besonders viel dazwischen - Angriffspunkte, Missionen, Flottenverlegung). -->
-        <div class="qty-select" id="qtySelectFleet"></div>
-        <div class="fleet" id="fleet"></div>
-        <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Baukorb (mehrere Schiffstypen zusammen bauen)</div>
-        <div id="shipBasketBox"></div>
+        <div id="fleetSubMissionen">
+          <div class="section-title"><i class="ti ti-rocket" aria-hidden="true"></i>Aktive Missionen<span id="fleetLimitBadge" class="lvl-pill" style="margin-left:8px; font-size:10px;"></span></div>
+          <div class="missions-active" id="missionsActive"></div>
+          <div id="tier2ConsumablesBox"></div>
+        </div>
+        <div id="fleetSubFlotte">
+          <div style="text-align:center; padding:1.5rem 0; margin-bottom:1rem; background:rgba(226,75,74,0.08); border-radius:14px; border:0.5px solid rgba(226,75,74,0.25);">
+            <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angriffspunkte (aktueller Planet)</div>
+            <div style="font-size:38px; font-weight:500; color:#e24b4a; font-variant-numeric:tabular-nums;" id="attackCentralValue">0</div>
+          </div>
+          <div id="debrisBox"></div>
+          <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i>Flotte verlegen</div>
+          <div id="relocateAllBox"></div>
+          <div id="relocateBox"></div>
+        </div>
+        <div id="fleetSubWerft">
+          <div class="section-title"><i class="ti ti-ship" aria-hidden="true"></i>Schiffswerft<span id="shipQueueBadge" class="lvl-pill" style="margin-left:8px; font-size:10px;"></span></div>
+          <div id="werftOverdriveBox"></div>
+          <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning: bei der Flotte lag
+               besonders viel dazwischen - Angriffspunkte, Missionen, Flottenverlegung). -->
+          <div class="qty-select" id="qtySelectFleet"></div>
+          <div class="fleet" id="fleet"></div>
+          <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Baukorb (mehrere Schiffstypen zusammen bauen)</div>
+          <div id="shipBasketBox"></div>
+        </div>
       </div>
 
       <div class="tab-panel" id="tab-expedition">
@@ -3498,8 +3525,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.252.0';
+  const VERSION = '8.253.0';
   const PATCHNOTES = [
+    { version:'8.253.0', date:'24.07.2026', changes:[
+      'Flotten-Tab komplett neu gegliedert (Spieler-Wunsch „übersichtlicher machen"): Statt einer einzigen, rund 7.000 Pixel langen Scrollsäule gibt es jetzt drei Unterreiter – „Werft" (Schiffe bauen + Baukorb), „Flotte & Verlegen" (Angriffspunkte, Trümmerfeld, Verlegung) und „Missionen" (aktive Flotten). Die Auswahl wird gemerkt. Dazu eine neue Sticky-Statusleiste, die beim Scrollen oben sichtbar bleibt und die Kernzahlen zeigt: Angriffskraft, Flotten unterwegs (rot bei vollem Limit), Werft-Aufträge und Treibstoff-Vorrat (Deuterium/Antimaterie). Alle Inhalte und Funktionen sind unverändert – nur sortiert.',
+    ]},
     { version:'8.252.0', date:'24.07.2026', changes:[
       'Großer Modul-Ausbau, Teil 1 – Bugfixes aus dem Modul-Text-Audit: Drei Module versprachen Wirkung, die nirgends verrechnet wurde – der Präzisionslaser (+Belagerungs-Erfolgschance) und das Reaktorkern-Upgrade (+Belagerungs-Angriffskraft) des Mondzerstörers sowie das teuer gefertigte Singularitäts-Fokusarray (+14% Tier-2-Angriffskraft, 10 Singularitätskerne!). Alle drei wirken jetzt wirklich: Der Server liest die ausgerüsteten Kampfmodule direkt aus dem Spielstand – Mondbelagerung, PvP-Kampf und Client-Vorschau rechnen identisch. Auch der Zielcomputer der Schlachtschiffe zählt jetzt im server-entschiedenen PvP. Dazu Textkorrekturen: Modul-Fundmeldungen sagen jetzt korrekt „Standort-Modul", die Effekt-Anzeige im Inventar zeigte für Lager/Abwehr/Forschungs/Sonden/Schild-Module fälschlich „Bauspeed" an.',
       'Teil 2 – Modul-Schmelze: 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär – Mythisch bleibt Schmiede und Allianzmissionen vorbehalten). Überzählige Module lassen sich zu Modulfragmenten zerlegen (1/3/8/20/50 je nach Seltenheit) und daraus fertigst du gezielt dein Wunschmodul (4/12/32/80 Fragmente) – Schluss mit nutzlosen Duplikaten und reinem Fundglück. Gilt für beide Modulsysteme, gemeinsamer Fragment-Vorrat.',
@@ -29030,6 +29060,32 @@
       const usedSq = shipQueueCount();
       shipQueueBadge.textContent = usedSq+'/'+SHIP_QUEUE_MAX+' Aufträge';
       shipQueueBadge.style.color = usedSq>=SHIP_QUEUE_MAX ? '#e24b4a' : '#9296ac';
+    }
+    // Unterreiter + Sticky-Statusleiste (Flotten-Tab-Umbau 24.07.2026, Vorschlag 1): drei kurze
+    // Ansichten statt einer ~7.000px-Scrollsäule. state.fleetSubTab merkt sich die Auswahl (auch
+    // über Reloads), Standard ist die Werft. Die Sticky-Leiste hält die Kernzahlen beim Scrollen
+    // sichtbar - bewusst KEIN Signatur-Cache (Angriff/Flotten/Werft/Treibstoff ändern sich laufend).
+    {
+      const fleetSub = state.fleetSubTab || 'werft';
+      const subMap = { werft:'fleetSubWerft', flotte:'fleetSubFlotte', missionen:'fleetSubMissionen' };
+      for (const [k, id] of Object.entries(subMap)){
+        const el = document.getElementById(id);
+        if (el) el.style.display = (k===fleetSub) ? '' : 'none';
+      }
+      document.querySelectorAll('#fleetSubtabs .fleet-subtab').forEach(btn => {
+        btn.classList.toggle('on', btn.getAttribute('data-fleet-subtab')===fleetSub);
+        btn.onclick = () => { state.fleetSubTab = btn.getAttribute('data-fleet-subtab'); render(); save(); };
+      });
+      const usedFlS = activeFleetMissionCount(), maxFlS = maxConcurrentFleets(), usedSqS = shipQueueCount();
+      const missionsNote = document.getElementById('fleetSubtabMissionsNote');
+      if (missionsNote) missionsNote.textContent = usedFlS ? usedFlS+' Flotte'+(usedFlS===1?'':'n')+' unterwegs' : 'Keine Flotte unterwegs';
+      const stickyEl = document.getElementById('fleetStickyBar');
+      if (stickyEl){
+        stickyEl.innerHTML = '<span><i class="ti ti-sword" aria-hidden="true"></i>Angriff <b>'+fmt(attackPower())+'</b></span>'
+          +'<span><i class="ti ti-rocket" aria-hidden="true"></i>Flotten <b class="'+(usedFlS>=maxFlS?'warn':'')+'">'+usedFlS+'/'+maxFlS+'</b></span>'
+          +'<span><i class="ti ti-ship" aria-hidden="true"></i>Werft <b class="'+(usedSqS>=SHIP_QUEUE_MAX?'warn':'')+'">'+usedSqS+'/'+SHIP_QUEUE_MAX+'</b></span>'
+          +'<span><i class="ti ti-droplet" aria-hidden="true"></i>Treibstoff <b>'+fmt(state.resources.deuterium||0)+'</b> Deuterium · <b>'+fmt(state.resources.antimaterie||0)+'</b> Antimaterie</span>';
+      }
     }
     renderWerftOverdriveBox();
     const nonExpeditionMissionsRaw = cf.missions.filter(m => m.type !== 'expedition');
