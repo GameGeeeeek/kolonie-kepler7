@@ -540,9 +540,19 @@
 
     .hero { position:relative; border-radius:16px; overflow:hidden; height:190px; margin-bottom:1.1rem; background:radial-gradient(ellipse at 70% 35%, #171c34, #0a0d1a 70%); }
     .hero svg { width:100%; height:100%; display:block; }
-    .hero-title { position:absolute; left:18px; bottom:14px; }
-    .hero-title .name { font-size:20px; font-weight:500; display:flex; align-items:center; gap:8px; }
-    .hero-title .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+    /* Bugfix 24.07.2026 (Grafik-Audit): Titel und Kopfzeilen-Knöpfe waren BEIDE einzeln absolut auf
+       bottom:14px gesetzt - der Titel links, die Knopfleiste rechts - ohne voneinander zu wissen.
+       Zwischen 700px (ab da blendet die Medienabfrage die Knopf-Beschriftungen wieder ein) und rund
+       1100px Breite überlappten sie dadurch sichtbar: "Kolonie Kepler-7" lag unter "Bug/Vorschlag".
+       Jetzt teilen sich beide EINE Flex-Zeile (.hero-bottom): der Titel darf schrumpfen
+       (flex:1 + min-width:0, Unterzeile mit Ellipse), die Knöpfe behalten ihre Größe und rutschen
+       bei echtem Platzmangel in die nächste Zeile. Eine Überlappung ist damit strukturell
+       ausgeschlossen, nicht nur bei den heute getesteten Breiten. */
+    .hero-bottom { position:absolute; left:18px; right:18px; bottom:14px; z-index:5; display:flex; align-items:flex-end; justify-content:space-between; gap:10px 14px; flex-wrap:wrap; }
+    .hero-title { flex:1 1 auto; min-width:0; }
+    .hero-title .name { font-size:20px; font-weight:500; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .hero-title .sub { font-size:12px; opacity:0.65; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .hero-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; flex:0 1 auto; }
     .hero-stats { position:absolute; right:0; left:0; top:14px; display:flex; gap:8px; flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; padding:0 16px; scrollbar-width:none; -ms-overflow-style:none; }
     .hero-stats::-webkit-scrollbar { display:none; }
     /* Schlanker, themenfarbener Scrollbalken für alle horizontalen Wisch-Leisten (Rollen,
@@ -1739,14 +1749,6 @@
     <div class="shell-inner">
 
       <div class="hero">
-        <div style="position:absolute; bottom:14px; right:18px; z-index:5; display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; max-width:calc(100vw - 36px);">
-          <button id="headerFeedbackBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Bug melden oder Vorschlag einreichen"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Bug/Vorschlag</span></button>
-          <button id="headerReportsBtn" style="font-size:10.5px; padding:5px 9px; position:relative; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Berichte & Nachrichten"><i class="ti ti-mail" aria-hidden="true" id="headerReportsIcon" style="margin-right:3px;"></i><span class="header-btn-label">Berichte</span><span id="reportsBadge" class="tab-badge" style="display:none;"></span></button>
-          <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Hilfe</span></button>
-          <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Einstellungen</span></button>
-          <button id="headerKofiBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); border-radius:9px; border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; cursor:pointer; display:inline-flex; align-items:center; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;" title="Top-Unterstützer ansehen oder dem Entwickler einen Kaffee spendieren (Ko-fi)"><span aria-hidden="true" style="margin-right:3px;">☕</span><span class="header-btn-label">Kaffee</span></button>
-          <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); align-items:center; justify-content:center;" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
-        </div>
         <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true">
           <defs>
             <radialGradient id="planetGrad" cx="35%" cy="35%" r="70%">
@@ -1778,9 +1780,19 @@
           <circle class="twinkle" cx="330" cy="140" r="1.8" fill="#fff" style="animation-delay:0.8s"/>
           <circle class="twinkle" cx="410" cy="55" r="2" fill="#fff" style="animation-delay:1.4s"/>
         </svg>
-        <div class="hero-title">
-          <div class="name"><i class="ti ti-planet" aria-hidden="true"></i>Kolonie Kepler-7<span id="seasonalBadge" style="display:none; margin-left:8px; font-size:10px; font-weight:600; padding:2px 8px; border-radius:20px; background:rgba(var(--secondary-rgb),0.25); border:0.5px solid rgba(var(--secondary-rgb),0.6); vertical-align:middle;"></span></div>
-          <div class="sub">Außenposten am Rand des Kepler-Systems</div>
+        <div class="hero-bottom">
+          <div class="hero-title">
+            <div class="name"><i class="ti ti-planet" aria-hidden="true"></i>Kolonie Kepler-7<span id="seasonalBadge" style="display:none; margin-left:8px; font-size:10px; font-weight:600; padding:2px 8px; border-radius:20px; background:rgba(var(--secondary-rgb),0.25); border:0.5px solid rgba(var(--secondary-rgb),0.6); vertical-align:middle;"></span></div>
+            <div class="sub">Außenposten am Rand des Kepler-Systems</div>
+          </div>
+          <div class="hero-actions">
+            <button id="headerFeedbackBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Bug melden oder Vorschlag einreichen"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Bug/Vorschlag</span></button>
+            <button id="headerReportsBtn" style="font-size:10.5px; padding:5px 9px; position:relative; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Berichte &amp; Nachrichten"><i class="ti ti-mail" aria-hidden="true" id="headerReportsIcon" style="margin-right:3px;"></i><span class="header-btn-label">Berichte</span><span id="reportsBadge" class="tab-badge" style="display:none;"></span></button>
+            <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Hilfe</span></button>
+            <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Einstellungen</span></button>
+            <button id="headerKofiBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); border-radius:9px; border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; cursor:pointer; display:inline-flex; align-items:center; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;" title="Top-Unterstützer ansehen oder dem Entwickler einen Kaffee spendieren (Ko-fi)"><span aria-hidden="true" style="margin-right:3px;">☕</span><span class="header-btn-label">Kaffee</span></button>
+            <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); align-items:center; justify-content:center;" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
+          </div>
         </div>
         <div class="hero-stats">
           <div class="hstat" title="Kommandanten-Level (mehr XP = höhere Produktion)"><i class="ti ti-award" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Level</span><span id="heroLevel" class="hstat-value">0</span></div></div>
@@ -3621,8 +3633,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.275.0';
+  const VERSION = '8.276.0';
   const PATCHNOTES = [
+    { version:'8.276.0', date:'24.07.2026', changes:[
+      'Behoben: In der Kopfzeile überlappte der Titel "Kolonie Kepler-7" die Knopfleiste (Bug/Vorschlag, Berichte, Hilfe, Einstellungen, Kaffee). Sichtbar war das zwischen rund 700 und 1100 Pixel Fensterbreite – also auf vielen Tablets und in schmalen Desktop-Fenstern. Ursache: Titel und Knöpfe waren getrennt voneinander an denselben unteren Rand geheftet, ohne voneinander zu wissen. Beide teilen sich jetzt eine gemeinsame Zeile, in der der Titel bei Platzmangel schrumpft und die Knöpfe notfalls umbrechen – eine Überlappung ist damit strukturell ausgeschlossen.',
+    ]},
     { version:'8.275.0', date:'24.07.2026', changes:[
       'Neu: Flotten-Anstrich (Schiffs-Skins). Im Kommandant-Profil (Fortschritt-Tab) wählst du jetzt eine kosmetische Lackierung für deine ganze Flotte – sie färbt alle Schiffs-Sprites einheitlich um. Sechs Anstriche: Standard (immer), Goldflotte (25 Kampfsiege), Eisflotte (10 Expeditionen), Purpurflotte (100 Kampfsiege), Leerenflotte (1 Aszension) und Smaragdflotte (10 Erfolge). REIN KOSMETISCH – kein Kampfwert, keine Spielwirkung, nur Optik. Freischaltung über deine ohnehin gezählten Lebenszeit-Erfolge.',
     ]},
