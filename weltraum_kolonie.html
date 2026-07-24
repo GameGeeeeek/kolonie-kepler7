@@ -548,6 +548,33 @@
        (flex:1 + min-width:0, Unterzeile mit Ellipse), die Knöpfe behalten ihre Größe und rutschen
        bei echtem Platzmangel in die nächste Zeile. Eine Überlappung ist damit strukturell
        ausgeschlossen, nicht nur bei den heute getesteten Breiten. */
+    /* Schiffs-Datenblatt (Grafik-Audit 24.07.2026, Entwurf C). Die Werft-Zeilen waren Textwüsten:
+       ein 26px-Icon plus drei Zeilen Fließtext mit Mitteldots ("Angriff: 10 · Schild: 5 ·
+       Verteidigungsbeitrag: 9"). Werte liessen sich nur LESEN, nicht vergleichen - im Kern eines
+       Weltraumspiels ausgerechnet bei den Schiffen. Jetzt: grösseres Rendering (dieselbe
+       drawShipMiniIcon-Funktion, nur auf 52px - sie zeichnet aufloesungsunabhaengig, siehe s-Faktor
+       dort), Rollen-Farbstreifen an der Kante und Mikro-Balken je Kennwert, normiert auf den besten
+       Wert der Flotte. Bewusst als eigene Modifikator-Klasse .ship-card: .card-row wird von
+       Gebaeuden, Forschung und Verteidigung mitbenutzt und darf sich NICHT mitveraendern. */
+    .card-row.ship-card { position:relative; }
+    .card-row.ship-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--ship-role,#7f77dd); box-shadow:0 0 10px var(--ship-role,#7f77dd); opacity:0.9; pointer-events:none; z-index:2; }
+    .card-row.ship-card.research-locked::before { opacity:0.25; box-shadow:none; }
+    .ship-art { display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; }
+    .ship-art .frame { width:56px; height:44px; display:flex; align-items:center; justify-content:center; border:0.5px solid var(--line-1); background:radial-gradient(ellipse at 50% 62%, rgba(92,225,255,0.10), transparent 70%), rgba(0,0,0,0.30); }
+    .ship-art .rolelbl { font-family:var(--font-mono); font-size:8px; letter-spacing:0.09em; text-transform:uppercase; color:var(--ship-role,#7f77dd); white-space:nowrap; }
+    .ship-stats { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:3px 14px; margin-top:5px; margin-bottom:2px; }
+    .sstat { display:flex; align-items:center; gap:6px; min-width:0; }
+    .sstat .k { font-family:var(--font-mono); font-size:8.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-dim); width:44px; flex-shrink:0; }
+    .sstat .tr { flex:1; min-width:28px; height:4px; background:rgba(255,255,255,0.09); overflow:hidden; }
+    .sstat .tr i { display:block; height:100%; }
+    .sstat .v { font-family:var(--font-mono); font-size:10.5px; font-variant-numeric:tabular-nums; width:30px; text-align:right; flex-shrink:0; color:#c7cbe0; }
+    @media (max-width: 640px) { .ship-stats { grid-template-columns:1fr; } }
+    /* Aufklappbare Zeile für gesperrte Event-Schiffe (siehe Begründung im JS). */
+    details.event-locked > summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+    details.event-locked > summary::-webkit-details-marker { display:none; }
+    details.event-locked > summary::after { content:'\25be'; color:var(--ink-dim); font-size:11px; margin-left:auto; transition:transform 0.15s ease; }
+    details.event-locked[open] > summary::after { transform:rotate(180deg); }
+    details.event-locked > summary:focus-visible { outline:1px solid var(--c-info); outline-offset:2px; }
     .hero-bottom { position:absolute; left:18px; right:18px; bottom:14px; z-index:5; display:flex; align-items:flex-end; justify-content:space-between; gap:10px 14px; flex-wrap:wrap; }
     .hero-title { flex:1 1 auto; min-width:0; }
     .hero-title .name { font-size:20px; font-weight:500; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -3646,8 +3673,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.277.0';
+  const VERSION = '8.278.0';
   const PATCHNOTES = [
+    { version:'8.278.0', date:'24.07.2026', changes:[
+      'Die Schiffswerft zeigt Schiffe jetzt als Datenblatt statt als Fließtext. Jedes Schiff bekommt ein doppelt so großes Rendering (52 statt 26 Pixel) in einem eigenen Rahmen, ein Rollen-Kürzel darunter (Angriff, Schnellangriff, Panzerung, Zivil) und einen farbigen Rollen-Streifen an der Kartenkante. Die Kennwerte Angriff, Schild, Abwehr und Tempo stehen als Mikro-Balken nebeneinander – jeder Balken im Verhältnis zum besten Wert der ganzen Flotte. Dadurch sieht man auf einen Blick, dass ein Jäger schnell und ein Wächter zäh ist, ohne eine einzige Zahl lesen zu müssen. Vorher stand dort eine Zeile Fließtext mit Mitteldots ("Angriff: 10 · Schild: 5 · Verteidigungsbeitrag: 9"), in der sich nichts vergleichen ließ.',
+      'Nebeneffekt: Der Flotten-Anstrich (Schiffs-Skins) ist jetzt endlich deutlich zu sehen – bei 26 Pixeln war von der Lackierung kaum etwas zu erkennen.',
+      'Gesperrte Event-Schiffe belegen nur noch eine kompakte Zeile mit Fortschrittsbalken statt eines mehrzeiligen Textblocks. Bei sechs Event-Schiffen schob das die eigentliche Werft bisher weit nach unten. Die vollständige Beschreibung ist weiterhin da – einfach die Zeile antippen zum Aufklappen. Der "Zusammenbauen"-Knopf bleibt immer sichtbar, man muss also nichts aufklappen, um ein fertiges Event-Schiff zu bauen.',
+      'Die Geschwindigkeit wird in der Antriebszeile nicht mehr zusätzlich als Zahl wiederholt – sie steht jetzt als "Tempo"-Balken im Datenblatt darüber.',
+    ]},
     { version:'8.277.0', date:'24.07.2026', changes:[
       'Ressourcenkarten warnen jetzt VOR dem vollen Lager: Ab 85% Füllstand färbt sich die Karte bernsteinfarben und die Rate zeigt "· 90% – fast voll". Bisher wurde eine Ressource erst markiert, wenn das Lager bereits voll war – also erst, wenn schon Produktion verfällt (der Lager-Deckel stoppt sie bei 100% komplett). Hintergrund: Der separate "Lager fast voll"-Hinweisbalken war früher einmal entfernt worden, weil der Warn-Rahmen an der Karte seine Rolle übernehmen sollte – der löste aber ausschließlich bei 100% aus, sodass die Vorwarnstufe seitdem faktisch fehlte. Sie ist jetzt direkt auf der Karte zurück.',
       'Der Lager-Füllstandsbalken auf den Ressourcenkarten ist etwas kräftiger (3,5 statt 2,5 Pixel) und bekommt bei vollem Lager einen Leuchtsaum – er trägt die eigentliche Information der Karte und war vorher als Haarlinie kaum zu erkennen. Zusätzlich steht der Füllstand jetzt auch als Prozentzahl neben der Produktionsrate.',
@@ -10482,6 +10515,52 @@
   // bestehenden Zäh-statt-Schaden-Dial abgebildet (siehe shipDefenseContribution).
   function mondzerstoererCost(n){ return scaledShipCost({ erz: 22000, kristalle: 16000, deuterium: 11000, antimaterie: 2800 }, 'mondzerstoerer', n); }
 
+  // ===== Schiffs-Datenblatt (Grafik-Audit 24.07.2026, Entwurf C) =====
+  // Rolle eines Schiffs, ABGELEITET aus schon vorhandenen Eigenschaften (atk/defWeight/speed) -
+  // bewusst kein neues Feld in SHIP_DEFS, damit kein Datensatz nachgepflegt werden muss und
+  // künftige Schiffe automatisch eine Rolle bekommen. Dient nur der Einfärbung/Beschriftung im
+  // Datenblatt, hat KEINE Spielwirkung.
+  function shipRoleInfo(def){
+    const dw = def.defWeight !== undefined ? def.defWeight : 1;
+    if (!def.atk || def.atk <= 5) return { label:'Zivil', color:'#5dcaa5' };
+    if (dw >= 1.2) return { label:'Panzerung', color:'#7f77dd' };
+    if ((def.speed||0) >= 110) return { label:'Schnellangriff', color:'#5ce1ff' };
+    return { label:'Angriff', color:'#e24b4a' };
+  }
+  // Bezugsgrössen für die Mikro-Balken: der jeweils beste Wert der gesamten Flotte (inkl.
+  // Superschlachtschiff, das nicht in SHIP_DEFS steht). Einmal berechnet und gemerkt - SHIP_DEFS
+  // ändert sich zur Laufzeit nicht. Ohne gemeinsame Bezugsgrösse wären die Balken zwischen zwei
+  // Karten nicht vergleichbar, und genau die Vergleichbarkeit ist der Zweck der Umstellung.
+  let shipStatMaxCache = null;
+  function shipStatMax(){
+    if (shipStatMaxCache) return shipStatMaxCache;
+    const m = { atk:220, shield:SUPERSCHLACHTSCHIFF_SHIELD||1, def:1, speed:1 };
+    for (const d of SHIP_DEFS){
+      m.atk = Math.max(m.atk, d.atk||0);
+      m.shield = Math.max(m.shield, d.shield||0);
+      m.def = Math.max(m.def, Math.round((d.atk||0)*0.4) + (d.shield||0));
+      m.speed = Math.max(m.speed, d.speed||0);
+    }
+    m.def = Math.max(m.def, Math.round(220*0.4) + (SUPERSCHLACHTSCHIFF_SHIELD||0));
+    shipStatMaxCache = m;
+    return m;
+  }
+  // Vier Kennwerte als beschriftete Mikro-Balken statt einer Fliesstext-Zeile mit Mitteldots.
+  function shipStatBarsHtml(atk, shield, defContrib, speed){
+    const m = shipStatMax();
+    // title-Text je Zeile: die Erklärungen, die vorher im Fliesstext standen ("je stationiertem
+    // Schiff", Bezugsgrösse des Balkens), gehen dadurch nicht verloren.
+    const row = (k, val, max, color, tip) => {
+      const pct = max>0 ? Math.max(0, Math.min(100, (val/max)*100)) : 0;
+      return `<div class="sstat" title="${tip} – Balken im Verhältnis zum besten Wert der Flotte (${max})."><span class="k">${k}</span><span class="tr"><i style="width:${pct.toFixed(1)}%; background:${color};"></i></span><span class="v">${val}</span></div>`;
+    };
+    return `<div class="ship-stats">
+      ${row('Angriff', atk||0, m.atk, '#e24b4a', 'Angriffspunkte je Schiff')}
+      ${row('Schild', shield||0, m.shield, '#5ce1ff', 'Schildpunkte je Schiff')}
+      ${row('Abwehr', defContrib||0, m.def, '#7f77dd', 'Verteidigungsbeitrag je STATIONIERTEM Schiff')}
+      ${row('Tempo', speed||0, m.speed, '#5dcaa5', 'Geschwindigkeit (langsamstes Schiff bestimmt die Flugzeit)')}
+    </div>`;
+  }
   // Drei Antriebsklassen bestimmen die Basisgeschwindigkeit eines Schiffs. Bei Missionen zählt
   // immer die Geschwindigkeit des LANGSAMSTEN beteiligten Schiffstyps (wie ein Konvoi).
   const DRIVE_INFO = {
@@ -30306,16 +30385,27 @@
         const statusLine = isRunning
           ? `<span style="color:#5dcaa5;"><i class="ti ${evDef.icon}" aria-hidden="true"></i> Event "${evDef.name}" läuft gerade - noch ${fmtDuration(Math.max(0,ce.endsAt-Date.now())/1000)}</span>`
           : `<span style="color:#8489a0;"><i class="ti ${evDef.icon}" aria-hidden="true"></i> Event "${evDef.name}" läuft gerade nicht - bereits gesammelte Teile bleiben erhalten, neue gibt es erst wieder beim nächsten Durchlauf</span>`;
+        // Gesperrte Event-Schiffe belegten vorher genauso viel Fläche wie baubare Schiffe (mehrere
+        // Zeilen Beschreibungstext), obwohl man mit ihnen gerade nichts tun kann - bei sechs
+        // Event-Schiffen schob das die eigentliche Werft weit nach unten. Jetzt eine kompakte Zeile
+        // mit Fortschritt; der vollständige Text bleibt über <details> erreichbar (nativ, kein
+        // eigenes JS, tastaturbedienbar). Der Freischalt-Knopf liegt bewusst AUSSERHALB des
+        // Aufklappbereichs - wer genug Teile hat, muss nichts aufklappen, um ihn zu sehen.
         return `
-          <div class="card-row research-locked">
+          <div class="card-row research-locked event-locked-card">
             <div class="left">
               <div class="bicon" style="background:rgba(250,199,117,0.12);"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
-              <div>
-                <div class="bname">${def.name} <span class="lvl-pill">Event-Schiff, gesperrt</span></div>
-                <div class="bmeta">Exklusives Event-Schiff (Angriff ${def.atk}${def.shield!==undefined?', Schild '+def.shield:''} - ${def.nicheDesc||'exklusive Sondereinheit'}). Nur über ${evDef.partName} freischaltbar, die ausschließlich während des Events "${evDef.name}" bei Erkundungsmissionen gefunden werden.</div>
-                <div class="bmeta" style="margin-top:2px;">${statusLine}</div>
-                <div style="display:flex; justify-content:space-between; margin-top:6px;"><span class="bmeta">${evDef.partName}</span><span class="bmeta">${have}/${needed}</span></div>
-                <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:${evDef.color};"></div></div>
+              <div style="min-width:0; flex:1;">
+                <details class="event-locked">
+                  <summary>
+                    <span class="bname" style="display:inline;">${def.name}</span>
+                    <span class="lvl-pill">Event-Schiff</span>
+                    <span class="bmeta" style="display:inline;">${evDef.name} · ${have}/${needed} ${evDef.partName}${isRunning?' <span style="color:#5dcaa5;">· läuft</span>':''}</span>
+                  </summary>
+                  <div class="bmeta" style="margin-top:6px;">Exklusives Event-Schiff (Angriff ${def.atk}${def.shield!==undefined?', Schild '+def.shield:''} - ${def.nicheDesc||'exklusive Sondereinheit'}). Nur über ${evDef.partName} freischaltbar, die ausschließlich während des Events "${evDef.name}" bei Erkundungsmissionen gefunden werden.</div>
+                  <div class="bmeta" style="margin-top:2px;">${statusLine}</div>
+                </details>
+                <div class="progress-outer" style="margin-top:6px;" title="${evDef.partName}: ${have} von ${needed}"><div class="progress-inner" style="width:${pct}%; background:${evDef.color};"></div></div>
               </div>
             </div>
             <button class="buy ${ready?'affordable':''}" data-unlock-event="${def.key}" ${ready?'':'disabled'}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>Zusammenbauen</button>
@@ -30359,20 +30449,25 @@
       const reqNames = (def.requires||[]).filter(req => typeof req === 'string' ? (state.research[req]||0)<1 : (state.research[req.key]||0)<req.level).map(reqNameFor).join(', ');
       const allReqNames = (def.requires||[]).map(reqNameFor).join(', ');
       const drive = DRIVE_INFO[def.drive] || {};
-      const driveLine = `<i class="ti ${drive.icon||'ti-bolt'}" aria-hidden="true" style="color:${drive.color||'#9296ac'};"></i> ${drive.name||'Antrieb'} · Geschwindigkeit ${def.speed||'–'} · Treibstoff: ${miniResIcon(drive.fuel||'deuterium')}${(RES_DEFS.find(r=>r.key===(drive.fuel||'deuterium'))||{}).label||'Deuterium'}`;
+      // Geschwindigkeit steht jetzt als "Tempo"-Balken im Datenblatt darüber und wird hier bewusst
+      // NICHT mehr zusätzlich als Zahl wiederholt (war doppelt).
+      const driveLine = `<i class="ti ${drive.icon||'ti-bolt'}" aria-hidden="true" style="color:${drive.color||'#9296ac'};"></i> ${drive.name||'Antrieb'} · Treibstoff: ${miniResIcon(drive.fuel||'deuterium')}${(RES_DEFS.find(r=>r.key===(drive.fuel||'deuterium'))||{}).label||'Deuterium'}`;
       const perShipDefContrib = Math.round((def.atk||0)*0.4) + (def.shield||0);
-      const combatStatsLine = `<i class="ti ti-sword" aria-hidden="true"></i> Angriff: ${def.atk} · <i class="ti ti-shield" aria-hidden="true"></i> Schild: ${def.shield} · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigungsbeitrag: ${perShipDefContrib} (je stationiertem Schiff)`;
+      const shipRole = shipRoleInfo(def);
       const shipScorePoints = (SHIP_SCORE_WEIGHTS[def.key]||0) * shipQty;
       const t2ship = isTier2Ship(def);
       return `
-        <div class="card-row ${!unlocked?'research-locked':''}${t2ship?' tier2-card':''}">
+        <div class="card-row ship-card ${!unlocked?'research-locked':''}${t2ship?' tier2-card':''}" style="--ship-role:${shipRole.color};">
           <div class="left">
-            <div class="bicon${t2ship?' bicon-t2':''}" style="background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${def.key}" width="26" height="26" style="display:block;"></canvas></div>
+            <div class="ship-art">
+              <div class="frame${t2ship?' bicon-t2':''}"><canvas data-ship-icon="${def.key}" width="52" height="40" style="display:block;"></canvas></div>
+              <span class="rolelbl">${shipRole.label}</span>
+            </div>
             <div>
               <div class="bname">${def.name} <span class="lvl-pill">${count}</span>${pendingQty?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">+${pendingQty} im Bau</span>`:''}</div>
               ${meta ? `<div class="bmeta">${meta}</div>` : ''}
               ${def.nicheDesc ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${def.nicheDesc}</div>` : ''}
-              <div class="bmeta">${combatStatsLine}</div>
+              ${shipStatBarsHtml(def.atk, def.shield, perShipDefContrib, def.speed)}
               <div class="bmeta">${driveLine}</div>
               ${SPECIAL_UNIT_ITEMS[def.key] ? `<div class="bmeta" style="${(state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0)<shipQty?'color:#e24b4a;':''}"><i class="ti ti-diamond" aria-hidden="true"></i> Verbraucht ${shipQty}x ${(RARE_ITEMS.find(r=>r.key===SPECIAL_UNIT_ITEMS[def.key])||{}).name||''} (vorhanden: ${state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0})</div>` : ''}
               ${allReqNames ? `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${allReqNames}</div>` : ''}
@@ -30401,13 +30496,16 @@
         <button class="buy ${(state.rareItems.antimateriekern||0)>=1?'affordable':''}" data-unlock="superschlachtschiff" ${(state.rareItems.antimateriekern||0)>=1?'':'disabled'}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>Freischalten</button>
       </div>
     ` : `
-      <div class="card-row">
+      <div class="card-row ship-card" style="--ship-role:#7f77dd;">
         <div class="left">
-          <div class="bicon" style="background:rgba(121,31,31,0.35);">${ICONS.ship_superschlachtschiff}</div>
+          <div class="ship-art">
+            <div class="frame" style="background:rgba(121,31,31,0.35);">${ICONS.ship_superschlachtschiff}</div>
+            <span class="rolelbl">Flaggschiff</span>
+          </div>
           <div>
             <div class="bname">Superschlachtschiff <span class="lvl-pill">${cf.superschlachtschiff||0}</span>${superPendingQty?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">+${superPendingQty} im Bau</span>`:''}</div>
             <div class="bmeta">Angriffspunkte 220 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Endgame-Flaggschiff · eigener Hangar für ${SUPER_HANGAR_SLOTS} Jäger/Bomber je Schiff (Gesamtkapazität ${hangarCap})${(awayByType.superschlachtschiff||0)>0?' · <span style="color:#e24b4a;">'+awayByType.superschlachtschiff+' unterwegs</span>':''}</div>
-            <div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Angriff: 220 · <i class="ti ti-shield" aria-hidden="true"></i> Schild: ${SUPERSCHLACHTSCHIFF_SHIELD} · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigungsbeitrag: ${Math.round(220*0.4)+SUPERSCHLACHTSCHIFF_SHIELD} (je stationiertem Schiff)</div>
+            ${shipStatBarsHtml(220, SUPERSCHLACHTSCHIFF_SHIELD, Math.round(220*0.4)+SUPERSCHLACHTSCHIFF_SHIELD, SUPER_SPEED)}
             <div class="bmeta" style="${superHaveItem<superQty?'color:#e24b4a;':''}"><i class="ti ti-atom-2" aria-hidden="true"></i> Verbraucht ${superQty}x Antimateriekern (vorhanden: ${superHaveItem})${superHaveItem<superQty?' – nicht genug!':''} · sehr seltener Fund bei Erkundungsmissionen</div>
             <div class="bcost">${costHtml(superC)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(effectiveBuildTimeEach('ship', state.activeBasePlanet, 240)*superQty))}${planetRoleOf(state.activeBasePlanet)&&planetRoleOf(state.activeBasePlanet).key==='shipyard'?' <span style="color:#5dcaa5;">(Werft-Welt)</span>':''}${werftOverdriveActive()?' <span style="color:#c3bef5;">(Overdrive)</span>':''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${SHIP_SCORE_WEIGHTS.superschlachtschiff*superQty} Punkte (${SHIP_SCORE_WEIGHTS.superschlachtschiff}/Schiff)${affordEtaHtml(superC)}</div>
           </div>
