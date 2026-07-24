@@ -3562,8 +3562,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.265.0';
+  const VERSION = '8.267.0';
   const PATCHNOTES = [
+    { version:'8.267.0', date:'24.07.2026', changes:[
+      'Komfort (Spieler-Wunsch): Schnell-Verschrotten von Modulen. Über dem Modul-Inventar (Standort- UND Schiffsklassen-Module) gibt es jetzt Sammel-Buttons, um überschüssige Module in einem Rutsch zu zerlegen: pro Seltenheit „Alle Gewöhnlichen / Selten / … (Anzahl, +Fragmente)" oder „Duplikate" (behält je Modultyp 1 Exemplar und verschrottet den Rest). Jeder Button zeigt vorab Menge und Fragment-Ertrag und muss zur Sicherheit zweimal geklickt werden (Bestätigung). Es werden ausschließlich nicht-ausgerüstete Module aus dem Inventar erfasst – ausgerüstete Module sind nie betroffen. Schluss mit dem einzelnen Wegklicken von Fund-Massen.',
+    ]},
+    { version:'8.266.0', date:'24.07.2026', changes:[
+      'Modul-Ausbau Runde 5: neue Effekt-Domäne „Erfahrung". Neues Standort-Modul <strong>Kommandomodul</strong> (imperiumsweit) erhöht die gesamte Erfahrungspunkte-Ausbeute deines Kommandanten – jede XP-Quelle (Kämpfe, Missionen, Tagesaufgaben, Events, Expeditionen …) profitiert, da der Bonus an der zentralen XP-Vergabestelle greift. Schnellere Level bedeuten mehr Produktions-Boni und Fähigkeitspunkte. Von Anfang an bei +100% gedeckelt (im Sinne des Balance-Pass 8.265.0), damit es kein neuer Aufschaukel-Vektor wird. „Erfahrung" ist außerdem als Substat (Zweitbonus) auf anderen Modulen möglich. Eigenes Icon, vollständig ins Schmelz-/Zerlege-/Aufwert-System integriert.',
+    ]},
     { version:'8.265.0', date:'24.07.2026', changes:[
       'Balance-Pass Module (Fortsetzung des Bauzeit-Fixes): systematischer Durchgang aller Modul-Effekte auf fehlende Deckel. Ergebnis: die Zeit-Reduktionen (Bauzeit, Treibstoff, Expeditions-Risiko, Forschung, Überfall-Schutz), Handel (+30%) und die Kampfwerte Angriff/Verteidigung (gemeinsame +100%-Gruppe) waren bereits sauber gedeckelt. Zwei ungedeckelte Stellen wurden geschlossen: der Verteidigungs-Gegenschlag der Abwehrmodule und die Expeditions-Ausbeute der Sondenmodule sind jetzt beim Modul-Anteil auf +100% gedeckelt. Produktion und Lager bleiben bewusst frei skalierbar (Kern der Idle-Progression, kein Zeit-/Kampf-Exploit). Damit ist das gesamte Modul-System gegen „auf null / ins Unendliche"-Aufschaukeln abgesichert.',
     ]},
@@ -11469,10 +11475,10 @@
   // würfeln nie Angriffskraft, damit die server-validierte PvP-Kampfkraft (die Substats gar nicht kennt)
   // NIE von der Frontend-Vorschau abweicht - kein Backend-Change nötig. Voll rückwärtskompatibel: alte
   // Schlüssel ohne 4. Segment haben einfach keine Substats.
-  const MODULE_SUB_POOL_LOC = ['prod','buildspeed','storage','research','expedition','def','raidloss','defatk','trade','fuelcost','exprisk'];
+  const MODULE_SUB_POOL_LOC = ['prod','buildspeed','storage','research','expedition','def','raidloss','defatk','trade','fuelcost','exprisk','xpgain'];
   const MODULE_SUB_POOL_SHIP = ['hull','shield','cargo','fuel','speed'];
   const MODULE_SUB_RANGE = { gewoehnlich:[0,0], selten:[0,1], episch:[1,1], legendaer:[1,2], mythisch:[2,2] };
-  const MODULE_SUB_EFFECT_LABEL = { prod:'Produktion', buildspeed:'Bauzeit', storage:'Lager', research:'Forschung', expedition:'Expedition', def:'Verteidigung', raidloss:'Überfall-Schutz', defatk:'Gegenschlag', trade:'Handel', fuelcost:'Treibstoff', exprisk:'Exp.-Sicherheit', hull:'Hülle', shield:'Schild', cargo:'Fracht', fuel:'Treibstoff', speed:'Tempo' };
+  const MODULE_SUB_EFFECT_LABEL = { prod:'Produktion', buildspeed:'Bauzeit', storage:'Lager', research:'Forschung', expedition:'Expedition', def:'Verteidigung', raidloss:'Überfall-Schutz', defatk:'Gegenschlag', trade:'Handel', fuelcost:'Treibstoff', exprisk:'Exp.-Sicherheit', xpgain:'Erfahrung', hull:'Hülle', shield:'Schild', cargo:'Fracht', fuel:'Treibstoff', speed:'Tempo' };
   function moduleSubsOf(instKey){
     const seg = String(instKey||'').split(':')[3] || '';
     if (!seg) return [];
@@ -11521,7 +11527,11 @@
     // 'trade' erhöht imperiumsweit den Handelsrouten-Ertrag (routeYieldMult, gedeckelt +30%).
     { key:'treibstoffdepot', name:'Treibstoffdepot', icon:'ti-droplet', effect:'fuelcost', base:0.06, desc:'Senkt den Treibstoffverbrauch aller Missionen, die von diesem Standort starten – wer seine Flottenbasis hier hat, fliegt günstiger (maximal −50%).' },
     { key:'expschutz', name:'Eskorten-Leitsystem', icon:'ti-map-pin', effect:'exprisk', base:0.06, desc:'Senkt die Chance, dass Expeditionen von diesem Standort auf feindliche Flotten treffen – weniger verlorene Eskorten und Forschungsschiffe (maximal −50% Begegnungschance).' },
-    { key:'handelsleitstand', name:'Handelsleitstand', icon:'ti-world', effect:'trade', base:0.05, desc:'Erhöht den Ertrag aller Handelsrouten – imperiumsweit (alle Standorte zählen zusammen, gemeinsam mit allen Handels-Boni bei +30% gedeckelt).' }
+    { key:'handelsleitstand', name:'Handelsleitstand', icon:'ti-world', effect:'trade', base:0.05, desc:'Erhöht den Ertrag aller Handelsrouten – imperiumsweit (alle Standorte zählen zusammen, gemeinsam mit allen Handels-Boni bei +30% gedeckelt).' },
+    // Modul-Ausbau Runde 5 (24.07.2026): neue Effekt-Domäne 'xpgain'. Wirkt imperiumsweit und wird an EINER
+    // zentralen Stelle verrechnet (addXp), damit die Wirkung garantiert überall greift und nirgends doppelt/
+    // vergessen ist (Lehre aus dem Modul-Text-Audit). Von Anfang an bei +100% gedeckelt (Balance-Pass 8.265.0).
+    { key:'kommando', name:'Kommandomodul', icon:'ti-star', effect:'xpgain', base:0.06, desc:'Erhöht die gesamte Erfahrungspunkte-Ausbeute deines Kommandanten – imperiumsweit (alle Standorte zählen zusammen). Beschleunigt so Level-Aufstiege und damit Produktions- und Fähigkeitspunkte-Gewinn. Der Modul-Anteil ist bei +100% gedeckelt.' }
   ];
   const MODULE_MAX_SLOT_LEVEL = 4; // Basis-Obergrenze Slots pro Planet
   // Slot-Obergrenze pro Standort - mit der Forschung "Slot-Miniaturisierung" (rmodulslots) +1 (Runde 4).
@@ -11714,6 +11724,84 @@
     state.moduleFragments = (state.moduleFragments||0) + frag;
     log((info?info.rar.label+' '+info.def.name+(info.level>1?' Lvl '+info.level:''):'Modul')+' zerlegt: +'+frag+' Modulfragmente (Vorrat: '+state.moduleFragments+').', 'ti-box');
     render(); save();
+  }
+  // ===== Schnell-Verschrotten (Bulk-Zerlegen überschüssiger Module, 24.07.2026, Spieler-Wunsch) =====
+  // Das Inventar (state.modules / state.shipModules) enthält NUR nicht-ausgerüstete Module - equipModule
+  // entfernt sie aus dem Count-Map. Diese Bulk-Aktionen können daher NIE ein ausgerüstetes Modul treffen.
+  // Zweistufige Sicherheitsabfrage (arm -> Bestätigen binnen 5 s), damit kein versehentliches Massen-
+  // löschen wertvoller Module passiert.
+  let bulkScrapArm = null; // { token, at }
+  function bulkScrapArmed(token){ return !!bulkScrapArm && bulkScrapArm.token === token && (Date.now() - bulkScrapArm.at) < 5000; }
+  function runBulkScrapToken(token){
+    const parts = String(token).split(':'); // 'loc'|'ship' , dann 'dup' ODER 'rar','<seltenheit>'
+    const isShip = parts[0] === 'ship';
+    const run = parts[1] === 'dup'
+      ? () => bulkDismantleModules(isShip, () => true, 1)               // Duplikate: je Typ 1 behalten
+      : () => bulkDismantleModules(isShip, k => k.split(':')[1] === parts[2], 0); // ganze Seltenheit
+    if (bulkScrapArmed(token)){ bulkScrapArm = null; run(); }
+    else { bulkScrapArm = { token, at: Date.now() }; render(); }        // erst scharfschalten, dann bestätigen
+  }
+  // Verschrottet alle Inventar-Module, die filterFn erfüllen, bis auf keepPerKey Stück je Typ. Gibt Fragmente
+  // wie das Einzel-Zerlegen (Seltenheits-Wert × Level je Stück) und loggt EINMAL zusammengefasst.
+  function bulkDismantleModules(isShip, filterFn, keepPerKey){
+    const inv = isShip ? state.shipModules : state.modules;
+    if (!inv){ return { count:0, frag:0 }; }
+    let count = 0, frag = 0;
+    for (const instKey of Object.keys(inv)){
+      const have = inv[instKey]||0;
+      if (have < 1 || !filterFn(instKey)) continue;
+      const scrap = Math.max(0, have - (keepPerKey||0));
+      if (scrap <= 0) continue;
+      const per = (MODULE_FRAGMENT_VALUE[instKey.split(':')[1]]||1) * moduleLevelOf(instKey);
+      count += scrap; frag += per * scrap;
+      inv[instKey] = have - scrap;
+      if (inv[instKey] <= 0) delete inv[instKey];
+    }
+    if (count > 0){
+      state.moduleFragments = (state.moduleFragments||0) + frag;
+      log(count+' Module verschrottet: +'+frag+' Modulfragmente (Vorrat: '+state.moduleFragments+').', 'ti-box', 'ok');
+      playSound('build');
+    } else {
+      log('Keine passenden Module zum Verschrotten im Inventar.', 'ti-info-circle');
+    }
+    render(); save();
+    return { count, frag };
+  }
+  // Zusammenfassung fürs UI: je Seltenheit Anzahl + Fragmentwert (nicht-ausgerüstet) sowie die Duplikat-
+  // Menge (alles über 1 Stück je Typ) und deren Fragmentwert.
+  function bulkScrapSummary(isShip){
+    const inv = isShip ? state.shipModules : state.modules;
+    const byRar = {}; let dupCount = 0, dupFrag = 0;
+    for (const instKey of Object.keys(inv||{})){
+      const have = inv[instKey]||0; if (have < 1) continue;
+      const rar = instKey.split(':')[1];
+      const per = (MODULE_FRAGMENT_VALUE[rar]||1) * moduleLevelOf(instKey);
+      byRar[rar] = byRar[rar] || { count:0, frag:0 };
+      byRar[rar].count += have; byRar[rar].frag += per*have;
+      if (have > 1){ dupCount += have-1; dupFrag += per*(have-1); }
+    }
+    return { byRar, dupCount, dupFrag };
+  }
+  // HTML-Panel mit den Schnell-Verschrotten-Buttons (nach Seltenheit + Duplikate). Für Standort- UND
+  // Schiffsmodul-Inventar identisch nutzbar (prefix 'loc'/'ship').
+  function bulkScrapControlsHtml(isShip){
+    const sum = bulkScrapSummary(isShip);
+    const rars = Object.keys(MODULE_RARITY).filter(r => sum.byRar[r]);
+    if (!rars.length) return '';
+    const prefix = isShip ? 'ship' : 'loc';
+    let h = `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:5px; margin:4px 0 8px; border-color:#5a5f7a;">`;
+    h += `<div class="bmeta" style="opacity:0.85;"><i class="ti ti-box" aria-hidden="true"></i> Schnell-verschrotten (nur nicht-ausgerüstete Module · zweimal klicken zum Bestätigen):</div>`;
+    h += `<div style="display:flex; gap:5px; flex-wrap:wrap;">`;
+    if (sum.dupCount > 0){
+      const tok = prefix+':dup', armed = bulkScrapArmed(tok);
+      h += `<button data-bulkscrap="${tok}" style="font-size:10px; padding:4px 8px; ${armed?'border-color:#e24b4a; color:#e24b4a; background:rgba(226,75,74,0.14);':''}" title="Behält je Modultyp 1 Stück und verschrottet den Rest"><i class="ti ti-box" aria-hidden="true" style="margin-right:3px;"></i>${armed?'Wirklich? ':'Duplikate '}${sum.dupCount} (+${sum.dupFrag})</button>`;
+    }
+    for (const r of rars){
+      const tok = prefix+':rar:'+r, armed = bulkScrapArmed(tok), c = MODULE_RARITY[r].color;
+      h += `<button data-bulkscrap="${tok}" style="font-size:10px; padding:4px 8px; border-color:${armed?'#e24b4a':c+'66'}; ${armed?'color:#e24b4a; background:rgba(226,75,74,0.14);':'color:'+c+';'}" title="Verschrottet ALLE nicht-ausgerüsteten ${MODULE_RARITY[r].label}-Module"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>${armed?'Wirklich? alle ':'Alle '}${MODULE_RARITY[r].label} ${sum.byRar[r].count} (+${sum.byRar[r].frag})</button>`;
+    }
+    h += `</div></div>`;
+    return h;
   }
   // Modul aufwerten (Level L -> L+1): kostet Fragmente, tauscht den Inventar-Schlüssel gegen die
   // nächsthöhere Level-Kodierung. Gilt für Standort- UND Schiffsmodule (gemeinsamer Fragment-Vorrat).
@@ -13508,6 +13596,10 @@
   ];
   function addXp(amount){
     if (state.allianceResearch) amount = Math.round(amount*(1+0.05*allianceTechFrac('ab_hq')));
+    // Kommandomodul (Modul-Ausbau Runde 5, effect 'xpgain'): imperiumsweiter XP-Bonus, Modul-Anteil bei
+    // +100% gedeckelt. Zentrale Stelle, damit JEDE XP-Quelle (Kämpfe, Missionen, Aufgaben, Events ...) profitiert.
+    const xpMod = Math.min(1.0, moduleBonusTotal('xpgain'));
+    if (xpMod > 0) amount = Math.round(amount * (1 + xpMod));
     const before = commanderLevel(state.xp||0);
     state.xp = (state.xp||0) + amount;
     const after = commanderLevel(state.xp);
@@ -17316,7 +17408,7 @@
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
-      { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Zwölf Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit, alle Werftmodule eines Standorts zusammen bei −50% gedeckelt), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit) sowie neu: <strong>Treibstoffdepot</strong> (Missionen von diesem Standort kosten weniger Treibstoff), <strong>Eskorten-Leitsystem</strong> (Expeditionen von hier treffen seltener auf feindliche Flotten) und <strong>Handelsleitstand</strong> (Handelsrouten-Ertrag, imperiumsweit). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort zwei speicherbare Vorlagen (A/B, z.B. „Krieg"/„Wirtschaft") mit 1-Klick-Wechsel. Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
+      { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Dreizehn Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit, alle Werftmodule eines Standorts zusammen bei −50% gedeckelt), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen, +100% gedeckelt), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit, +100% gedeckelt), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit, +100% gedeckelt – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort zwei speicherbare Vorlagen (A/B, z.B. „Krieg"/„Wirtschaft") mit 1-Klick-Wechsel. Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Sieben Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
@@ -30678,6 +30770,7 @@
         // Inventar
         const invKeys = Object.keys(state.modules||{}).filter(k=>(state.modules[k]||0)>0);
         html += `<div class="section-title" style="margin-top:0.5rem; font-size:13px;"><i class="ti ti-backpack" aria-hidden="true"></i>Modul-Inventar</div>`;
+        html += bulkScrapControlsHtml(false);
         if (!invKeys.length){
           html += `<div class="lb-note"><i class="ti ti-info-circle" aria-hidden="true"></i>Noch keine Module im Inventar. Schick Expeditionen los oder untersuche treibende Sonden.</div>`;
         } else {
@@ -30750,6 +30843,7 @@
         moduleBox.querySelectorAll('[data-unequip-module]').forEach(btn => btn.onclick = () => unequipModule(pk, parseInt(btn.getAttribute('data-unequip-module'))));
         moduleBox.querySelectorAll('[data-fuse-module]').forEach(btn => btn.onclick = () => fuseModules(false, btn.getAttribute('data-fuse-module')));
         moduleBox.querySelectorAll('[data-dismantle-module]').forEach(btn => btn.onclick = () => dismantleModule(false, btn.getAttribute('data-dismantle-module')));
+        moduleBox.querySelectorAll('[data-bulkscrap]').forEach(btn => btn.onclick = () => runBulkScrapToken(btn.getAttribute('data-bulkscrap')));
         moduleBox.querySelectorAll('[data-upgrade-module]').forEach(btn => btn.onclick = () => upgradeModule(false, btn.getAttribute('data-upgrade-module')));
         moduleBox.querySelectorAll('[data-reroll-module]').forEach(btn => btn.onclick = () => rerollModuleSubs(false, btn.getAttribute('data-reroll-module')));
         moduleBox.querySelectorAll('[data-fragrar]').forEach(btn => btn.onclick = () => { state.fragCraftRarity = btn.getAttribute('data-fragrar'); render(); });
@@ -30835,6 +30929,7 @@
         }
 
         html += `<div class="section-title" style="margin-top:0.5rem; font-size:13px;"><i class="ti ti-backpack" aria-hidden="true"></i>Modul-Inventar (${clsDef.name})</div>`;
+        html += bulkScrapControlsHtml(true);
         if (!invKeys.length){
           html += klasse === 'raffiniert'
             ? `<div class="lb-note"><i class="ti ti-info-circle" aria-hidden="true"></i>Noch keine Module dieser Klasse im Inventar - fertige sie oben aus Tier-2-Ressourcen.</div>`
@@ -30908,6 +31003,7 @@
         shipModuleBox.querySelectorAll('[data-craft-mythic-ship]').forEach(btn => btn.onclick = () => craftMythicShipModule(btn.getAttribute('data-craft-mythic-ship')));
         shipModuleBox.querySelectorAll('[data-fuse-shipmodule]').forEach(btn => btn.onclick = () => fuseModules(true, btn.getAttribute('data-fuse-shipmodule')));
         shipModuleBox.querySelectorAll('[data-dismantle-shipmodule]').forEach(btn => btn.onclick = () => dismantleModule(true, btn.getAttribute('data-dismantle-shipmodule')));
+        shipModuleBox.querySelectorAll('[data-bulkscrap]').forEach(btn => btn.onclick = () => runBulkScrapToken(btn.getAttribute('data-bulkscrap')));
         shipModuleBox.querySelectorAll('[data-upgrade-shipmodule]').forEach(btn => btn.onclick = () => upgradeModule(true, btn.getAttribute('data-upgrade-shipmodule')));
         shipModuleBox.querySelectorAll('[data-reroll-shipmodule]').forEach(btn => btn.onclick = () => rerollModuleSubs(true, btn.getAttribute('data-reroll-shipmodule')));
         shipModuleBox.querySelectorAll('[data-fragcraft-ship]').forEach(btn => btn.onclick = () => craftModuleFromFragments(true, btn.getAttribute('data-fragcraft-ship'), state.fragCraftRarity||'gewoehnlich'));
