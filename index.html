@@ -2517,6 +2517,13 @@
 
       <div class="tab-panel" id="tab-fortschritt">
         <div class="jumpnav" id="jumpnav-fortschritt" style="display:none;"></div>
+        <div class="prog-section" data-sec="profil">
+          <div class="section-title prog-sec-header" data-sec-toggle="profil"><i class="ti ti-user-circle" aria-hidden="true"></i>Kommandant-Profil<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Dein Kommandant auf einen Blick: Lebenszeit-Statistiken, verdiente Titel und Erfolge.</div>
+            <div id="commanderProfileBox" style="margin-bottom:1.5rem;"></div>
+          </div>
+        </div>
         <div class="prog-section" data-sec="uebersicht">
           <div class="section-title prog-sec-header" data-sec-toggle="uebersicht"><i class="ti ti-world" aria-hidden="true"></i>Imperium-Übersicht<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
           <div class="prog-sec-body">
@@ -3587,8 +3594,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.273.0';
+  const VERSION = '8.274.0';
   const PATCHNOTES = [
+    { version:'8.274.0', date:'24.07.2026', changes:[
+      'Neu: Kommandant-Profil. Ganz oben im Fortschritt-Tab zeigt eine neue Sektion deinen Kommandanten mit Avatar, Name, Allianz-Tag, Level und Punkten sowie deiner Lebenszeit-Bilanz (Siege, Niederlagen, Expeditionen, Aszensionen, Kriegssiege, Erfolge X/Y). Darunter deine verdienten Titel als Plaketten – Saison-Liga-Titel (z.B. Saison-Champion) und Allianz-Titel. Deine Identität und Erfolge auf einen Blick.',
+    ]},
     { version:'8.273.0', date:'24.07.2026', changes:[
       'Neu: Imperium-Übersicht. Ganz oben im Fortschritt-Tab zeigt eine neue Sektion alle Kernzahlen deines Imperiums auf einen Blick: Produktion pro Sekunde für alle sechs Ressourcen (imperiumsweit), dazu Kredite, Angriffskraft, Verteidigung, Anzahl Standorte, Kommandanten-Level, Modulfragmente und Kommandopunkte. Praktisch, um Wachstum und Kampfkraft schnell einzuschätzen, ohne durch mehrere Tabs zu klicken.',
     ]},
@@ -9265,6 +9275,53 @@
     if (r.essence){ if (!state.ascension) state.ascension = { count:0, essence:0, tree:{} }; state.ascension.essence = (state.ascension.essence||0) + r.essence; }
     log('Kompendium „'+cat.name+'" vervollständigt! Belohnung: '+(r.essence?r.essence+' Sternenessenz':'')+(r.essence&&r.credits?' + ':'')+(r.credits?r.credits+' Kredite':'')+'.', cat.icon, 'ok');
     playSound('achieve'); render(); save();
+  }
+  // ===== Kommandant-Profil (24.07.2026, Spieler-Feature): Identität, Lebenszeit-Statistiken, Titel =====
+  // Reine Anzeige -> Signatur-Cache-Muster. Zieht bestehende Lebenszeit-Zähler zusammen (battleStats,
+  // expeditionsCompleted, ascension.count, warVictories, seasonTitles, allianceTitles, Erfolge).
+  let lastCmdProfileSig = null;
+  function renderCommanderProfile(){
+    const box = document.getElementById('commanderProfileBox');
+    if (!box) return;
+    const p = state.player || {};
+    const wins = (state.battleStats&&state.battleStats.wins)||0, losses = (state.battleStats&&state.battleStats.losses)||0;
+    const exps = state.expeditionsCompleted||0;
+    const asc = (state.ascension&&state.ascension.count)||0;
+    const wars = state.warVictories||0;
+    const achDone = Object.keys(state.achievements||{}).length, achTotal = (typeof ACHIEVEMENTS!=='undefined'?ACHIEVEMENTS.length:achDone);
+    const level = commanderLevel(state.xp||0);
+    const score = (typeof computeScore==='function') ? computeScore() : (state.points||0);
+    const seasonT = Array.isArray(state.seasonTitles) ? state.seasonTitles : [];
+    const allianceT = Array.isArray(state.allianceTitles) ? state.allianceTitles : [];
+    const sig = [p.avatarKey||'', p.name||'', level, score, wins, losses, exps, asc, wars, achDone, seasonT.length, allianceT.length].join('|');
+    if (sig === lastCmdProfileSig) return;
+    lastCmdProfileSig = sig;
+    const av = (typeof avatarSvg==='function') ? avatarSvg(p.avatarKey) : null;
+    const avBg = (typeof AVATAR_DEFS!=='undefined' ? (AVATAR_DEFS.find(a=>a.key===p.avatarKey)||{}).bg : null) || 'rgba(126,119,245,0.3)';
+    const tile = (label, value, color) => `<div class="card-row" style="flex-direction:column; align-items:flex-start; gap:2px; min-width:92px; flex:1;">
+      <span class="bmeta" style="text-transform:uppercase; letter-spacing:0.4px; font-size:9.5px; opacity:0.8;">${label}</span>
+      <span class="bname" style="font-size:15px; color:${color}; font-variant-numeric:tabular-nums;">${value}</span></div>`;
+    let html = `<div class="card-row" style="align-items:center; gap:12px; margin-bottom:10px; border-color:#7e77dd;">
+      <div style="width:52px; height:52px; border-radius:50%; background:${avBg}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${av || '<i class="ti ti-user-circle" aria-hidden="true" style="font-size:26px; color:#fff;"></i>'}</div>
+      <div style="min-width:0;"><div class="bname" style="font-size:16px;">${escapeHtml(p.name||'Kommandant')}${p.allianceTag?` <span class="lvl-pill" style="font-size:10px;">[${escapeHtml(p.allianceTag)}]</span>`:''}</div>
+      <div class="bmeta">Kommandanten-Level ${level} · ${fmt(score)} Punkte</div></div></div>`;
+    html += `<div class="bmeta" style="margin-bottom:5px; opacity:0.85;"><i class="ti ti-sword" aria-hidden="true"></i> Lebenszeit-Bilanz</div>`;
+    html += `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">`
+      + tile('Siege', fmt(wins), '#5dcaa5')
+      + tile('Niederlagen', fmt(losses), '#e24b4a')
+      + tile('Expeditionen', fmt(exps), '#7fd7f0')
+      + tile('Aszensionen', fmt(asc), '#fac775')
+      + tile('Kriegssiege', fmt(wars), '#f0997b')
+      + tile('Erfolge', achDone+'/'+achTotal, '#c3bef5')
+      + `</div>`;
+    const titleChips = [];
+    for (const t of seasonT) titleChips.push('<span class="lvl-pill" style="font-size:10.5px; background:rgba(250,199,117,0.18); color:#fac775;"><i class="ti ti-trophy" aria-hidden="true" style="margin-right:3px;"></i>'+escapeHtml(t.title||t.tier||'Titel')+'</span>');
+    for (const t of allianceT) titleChips.push('<span class="lvl-pill" style="font-size:10.5px; background:rgba(126,119,221,0.2); color:#c3bef5;"><i class="ti ti-medal" aria-hidden="true" style="margin-right:3px;"></i>'+escapeHtml((typeof t==='string')?t:(t.title||t.name||'Titel'))+'</span>');
+    html += `<div class="bmeta" style="margin-bottom:5px; opacity:0.85;"><i class="ti ti-trophy" aria-hidden="true"></i> Verdiente Titel</div>`;
+    html += titleChips.length
+      ? `<div style="display:flex; gap:5px; flex-wrap:wrap;">${titleChips.join('')}</div>`
+      : `<div class="bmeta" style="opacity:0.7;">Noch keine Titel verdient – hol dir welche in der Saison-Liga oder als Allianz-Anführer.</div>`;
+    box.innerHTML = html;
   }
   // ===== Imperium-Übersicht (24.07.2026, Spieler-Feature): alle Kernzahlen auf einen Blick =====
   // Reine Anzeige (kein Live-Countdown) -> Signatur-Cache-Muster wie renderDominance/renderCompendium.
@@ -32309,6 +32366,7 @@
     const xpPct = Math.max(0, Math.min(100, ((curXp-xpBase)/(xpNext-xpBase))*100));
     const levelBox = document.getElementById('levelBox');
     renderEventCalendarBox();
+    renderCommanderProfile();
     renderEmpireOverview();
     renderCompendium();
     renderDominance();
