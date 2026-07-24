@@ -3559,8 +3559,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.261.0';
+  const VERSION = '8.262.0';
   const PATCHNOTES = [
+    { version:'8.262.0', date:'24.07.2026', changes:[
+      'Modul-Ausbau Runde 3: Benannte Set-Boni. Neben dem bekannten „3 Module gleicher Seltenheit"-Bonus schalten jetzt gezielte TYP-Kombinationen an einem Standort zusätzliche, benannte Sets frei: „Festungs-Doktrin" (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), „Industriekomplex" (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), „Logistiknetz" (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff-Ersparnis & Expeditions-Sicherheit) und „Forschungszentrum" (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, und fast-vollständige Sets zeigen genau, welches Modul noch fehlt – so lohnt sich gezieltes Zusammenstellen statt reinem Wert-Stapeln. Alle Set-Boni sind additiv und bewusst PvP-parität-sicher (kein Angriffs- oder Überfall-Schutz-Feld, das der Server nachrechnet), Kampf-Vorschau und PvP bleiben synchron.',
+    ]},
     { version:'8.261.0', date:'24.07.2026', changes:[
       'Modul-Ausbau Runde 2: Substats (Zufalls-Zweitboni). Gefundene Module ab Selten würfeln jetzt zusätzlich 0–2 zufällige Zweit-Boni auf ANDERE Bereiche (z.B. ein Bergbaumodul mit +1,8% Tempo und +1,2% Lager). Selten bis zu 1, Episch 1, Legendär 1–2, Mythisch 2 Substats – so ist kein Fund mehr wie der andere und das Optimieren beginnt richtig. Substats werden am Modul angezeigt und wirken zusätzlich zum Hauptbonus (sie überstehen auch das Aufwerten). Mit dem neuen „Reroll"-Knopf (Fragmente) lassen sich die Substats neu würfeln, bis die Kombination passt. Bewusst ohne Angriffskraft-Substats, damit die server-entschiedene PvP-Kampfkraft exakt zur Vorschau passt.',
     ]},
@@ -11527,6 +11530,38 @@
     }
     return 1;
   }
+  // Benannte Set-Boni (24.07.2026, Modul-Ausbau Runde 3): thematische Kombinationen BESTIMMTER Modul-TYPEN
+  // an EINEM Standort schalten einen zusätzlichen, additiven Bonus auf mehrere Effekte frei (kein reines
+  // "3 gleiche Seltenheit" mehr, sondern belohnt gezieltes Zusammenstellen). Bewusst PvP-parität-sicher:
+  // KEIN Set berührt 'raidloss' (das einzige standortgebundene Modul-Feld, das der Server in der PvP-Beute
+  // nachrechnet - raidlossProtectionMult) und KEIN 'atk' (Schiffsklassen-Angriff läuft über eigene
+  // Schiffsmodule). Alle Boni sind daher rein client-seitig (Verteidigungs-Anzeige, Wirtschaft, Forschung,
+  // Handel) und divergieren nicht vom Server. Additiv, damit sie sich nicht mit anderen Boni aufschaukeln.
+  const MODULE_SET_DEFS = [
+    { key:'festung', name:'Festungs-Doktrin', icon:'ti-shield', req:['panzerung','abwehr'],
+      bonuses:{ def:0.15, defatk:0.15 },
+      desc:'Panzerungs- UND Abwehrmodul zusammen an einem Standort: die Festungs-Doktrin verstärkt Verteidigung und Gegenschlag um je +15% – additiv, nur an diesem Standort.' },
+    { key:'industrie', name:'Industriekomplex', icon:'ti-building-factory-2', req:['bergbau','werft','lager'],
+      bonuses:{ prod:0.12, buildspeed:0.12, storage:0.12 },
+      desc:'Bergbau-, Werft- UND Lagermodul zusammen an einem Standort: der Industriekomplex hebt Produktion, Bauzeit und Lagerkapazität um je +12% – additiv, nur an diesem Standort.' },
+    { key:'logistik', name:'Logistiknetz', icon:'ti-world', req:['handelsleitstand','treibstoffdepot','expschutz'],
+      bonuses:{ trade:0.10, fuelcost:0.10, exprisk:0.10 },
+      desc:'Handelsleitstand, Treibstoffdepot UND Eskorten-Leitsystem zusammen an einem Standort: das Logistiknetz stärkt den Handelsertrag, spart Treibstoff und senkt das Expeditionsrisiko um je +10% – additiv (Handel zählt imperiumsweit).' },
+    { key:'forschungszentrum', name:'Forschungszentrum', icon:'ti-flask', req:['forschung','sonde'],
+      bonuses:{ research:0.10, expedition:0.10 },
+      desc:'Forschungs- UND Sondenmodul zusammen an einem Standort: das Forschungszentrum verkürzt die Forschungszeit und hebt die Expeditionsausbeute um je +10% – additiv (beide zählen imperiumsweit über die Standortsumme).' }
+  ];
+  // Welche benannten Sets sind an einem Standort aktiv? (Alle geforderten Modul-TYPEN unter den ausgerüsteten.)
+  function activeSetsAt(planetKey){
+    const types = new Set(equippedAt(planetKey).map(k=>String(k).split(':')[0]));
+    return MODULE_SET_DEFS.filter(s => s.req.every(t => types.has(t)));
+  }
+  // Additiver Set-Bonus auf einen Effekt an einem Standort (Summe über alle dort aktiven benannten Sets).
+  function setBonusAt(planetKey, effect){
+    let sum = 0;
+    for (const s of activeSetsAt(planetKey)) sum += (s.bonuses[effect] || 0);
+    return sum;
+  }
   // Summierter Bonus eines Effekts (siehe MODULE_DEFS: def/atk/prod/buildspeed/raidloss/storage/
   // defatk/research/expedition/fuelcost/exprisk/trade) durch ausgerüstete Module an einem Standort,
   // inklusive Set-Bonus.
@@ -11538,7 +11573,8 @@
       if (info.def.effect === effect) sum += info.bonus;
       for (const s of info.subs) if (s.effect === effect) sum += s.value; // Substats zählen auf ihren jeweiligen Effekt
     }
-    return sum * moduleSetMult(planetKey);
+    // Generischer Seltenheits-Set-Bonus multiplikativ auf die Modulsumme; benannte Set-Boni additiv obendrauf.
+    return sum * moduleSetMult(planetKey) + setBonusAt(planetKey, effect);
   }
   // Summe eines Modul-Effekts über ALLE Standorte - für imperiumsweite Module (Forschung/Expedition),
   // die nicht ortsgebunden wirken. Gedeckelt an den Verbrauchsstellen (Math.max/Math.min).
@@ -17243,7 +17279,7 @@
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
-      { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Zwölf Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit) sowie neu: <strong>Treibstoffdepot</strong> (Missionen von diesem Standort kosten weniger Treibstoff), <strong>Eskorten-Leitsystem</strong> (Expeditionen von hier treffen seltener auf feindliche Flotten) und <strong>Handelsleitstand</strong> (Handelsrouten-Ertrag, imperiumsweit). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, einzeln mit Kommandopunkten aufrüstbar). <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort zwei speicherbare Vorlagen (A/B, z.B. „Krieg"/„Wirtschaft") mit 1-Klick-Wechsel. Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. Verwaltung im Offiziere-Tab.' },
+      { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Zwölf Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit) sowie neu: <strong>Treibstoffdepot</strong> (Missionen von diesem Standort kosten weniger Treibstoff), <strong>Eskorten-Leitsystem</strong> (Expeditionen von hier treffen seltener auf feindliche Flotten) und <strong>Handelsleitstand</strong> (Handelsrouten-Ertrag, imperiumsweit). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, einzeln mit Kommandopunkten aufrüstbar). <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort zwei speicherbare Vorlagen (A/B, z.B. „Krieg"/„Wirtschaft") mit 1-Klick-Wechsel. Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. Verwaltung im Offiziere-Tab.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Sieben Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
@@ -30571,6 +30607,20 @@
           html += `<div class="bmeta" style="color:#5dcaa5; margin-bottom:4px;"><i class="ti ti-check" aria-hidden="true"></i> Set-Bonus aktiv: 3+ Module derselben Seltenheit · +10% auf alle Modul-Boni dieses Standorts</div>`;
         } else if (equipped.length >= 2){
           html += `<div class="bmeta" style="opacity:0.75; margin-bottom:4px;"><i class="ti ti-info-circle" aria-hidden="true"></i> Set-Bonus: Rüste 3 Module DERSELBEN Seltenheit aus für +10% auf alle Modul-Boni hier</div>`;
+        }
+        // Benannte Set-Boni (Runde 3): aktive Sets grün, fast-vollständige (nur 1 Typ fehlt) als Anreiz-Hinweis.
+        {
+          const equippedTypes = new Set(equipped.map(k=>String(k).split(':')[0]));
+          const bonusLine = (bn) => Object.keys(bn).map(e=>'+'+Math.round(bn[e]*100)+'% '+(MODULE_SUB_EFFECT_LABEL[e]||e)).join(', ');
+          for (const s of MODULE_SET_DEFS){
+            const have = s.req.filter(t=>equippedTypes.has(t));
+            if (have.length === s.req.length){
+              html += `<div class="bmeta" style="color:#5dcaa5; margin-bottom:4px;"><i class="ti ${s.icon}" aria-hidden="true"></i> Set „${s.name}" aktiv · ${bonusLine(s.bonuses)}</div>`;
+            } else if (have.length === s.req.length - 1 && have.length >= 1){
+              const missing = s.req.filter(t=>!equippedTypes.has(t)).map(t=>{const d=MODULE_DEFS.find(x=>x.key===t);return d?d.name:t;}).join(', ');
+              html += `<div class="bmeta" style="opacity:0.75; margin-bottom:4px;"><i class="ti ${s.icon}" aria-hidden="true"></i> Set „${s.name}": nur noch ${missing} fehlt für ${bonusLine(s.bonuses)}</div>`;
+            }
+          }
         }
         // Slot-Aufwertung
         if (!maxedSlots){
