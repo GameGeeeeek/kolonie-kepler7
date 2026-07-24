@@ -3315,44 +3315,57 @@
       log('Flotten-Anstrich gewechselt: '+sk.name+'.', 'ti-star', 'ok');
       render(); save();
     }
+    // Silhouetten-Runde (24.07.2026, Spieler-Wunsch "Silhouetten markanter"): Vorher waren fast alle
+    // Rümpfe derselbe 5-Punkt-Keil - die Schiffe unterschieden sich praktisch nur durch die Farbe.
+    // Jetzt hat jede KLASSE eine eigene Formsprache, damit man sie an der Silhouette auseinanderhält:
+    //   Jagdschiffe    - schlanker Pfeil mit nach hinten gepfeilten Flügelspitzen
+    //   Bomber         - gedrungen mit durchhängendem Bauch, stumpfe Nase
+    //   Kreuzer/Zerst. - kantig mit Heckfinnen oben und unten
+    //   Schlachtschiffe- langer Rumpf mit STUFIGEM Aufbau (Brücke) und Bugsporn
+    //   Träger         - flaches Flugdeck mit aufgesetzter Insel
+    //   Frachter       - Kastenrumpf mit abgeschrägten Ecken
+    //   Zivil/Support  - schmal und rund, ohne Kampfmerkmale
+    // Die Punktzahl pro Rumpf steigt dafür von 5-8 auf bis zu 15. Der Maler kommt damit unverändert
+    // klar (beliebige Polygone, auch konkave), und weil Triebwerke/Kanzel/Lichter aus der Geometrie
+    // abgeleitet werden, sitzen sie bei den neuen Formen automatisch richtig.
     const SHIP_HULL_DEFS = {
-      ships: { pts:[[82,50],[44,42],[24,46],[24,54],[44,58]], grad:'cyan', accent:{x:60,y:50,r:4,color:'#dceeff'} },
-      jaeger: { pts:[[86,50],[40,36],[18,44],[18,56],[40,64]], grad:'red', accent:{x:58,y:50,r:2.6,color:'#ffd8c8',pulse:true} },
-      cruisers: { pts:[[88,50],[50,38],[20,32],[12,44],[20,50],[12,56],[20,68],[50,62]], grad:'red', dots:[[22,34,3.4],[22,66,3.4]] },
-      destroyers: { pts:[[88,50],[46,40],[16,44],[16,56],[46,60]], grad:'red', rects:[[60,46,16,8]] },
-      schlachtschiff: { pts:[[90,50],[55,36],[14,32],[8,50],[14,68],[55,64]], grad:'red', dots:[[40,42,4],[40,58,4],[58,50,5]] },
-      superschlachtschiff: { pts:[[92,50],[55,34],[12,30],[4,50],[12,70],[55,66]], grad:'gold', dots:[[40,40,4.4],[40,60,4.4],[60,50,5.6]] },
-      waechter: { pts:[[84,50],[48,38],[20,40],[20,60],[48,62]], grad:'steel', dome:true },
-      bomber: { pts:[[86,50],[44,40],[20,44],[20,56],[44,60]], grad:'amber', pods:[[42,66,10,5]] },
-      carrier: { pts:[[18,38],[80,38],[80,62],[18,62]], grad:'sky', hangar:true },
-      frachter: { pts:[[80,50],[48,42],[24,44],[24,56],[48,58]], grad:'amber', rects:[[42,60,18,12]] },
-      frachtergross: { pts:[[86,50],[50,40],[18,42],[18,58],[50,60]], grad:'gold', rects:[[30,62,16,14],[50,62,16,14]] },
-      colonyShips: { pts:[[80,50],[46,40],[22,44],[22,56],[46,60]], grad:'green', accent:{x:52,y:50,r:11,color:'rgba(169,212,232,0.85)'} },
-      recycler: { pts:[[78,50],[46,42],[24,46],[24,54],[46,58]], grad:'gold', claw:true },
-      spaeher: { pts:[[86,50],[42,40],[20,46],[20,54],[42,60]], grad:'cyan', accent:{x:30,y:34,r:5,color:'rgba(169,212,232,0.8)'} },
-      spionageschiff: { pts:[[88,50],[42,38],[18,44],[18,56],[42,62]], grad:'violet', accent:{x:32,y:30,r:8,ry:4,color:'rgba(169,212,232,0.75)'} },
-      forscher: { pts:[[82,50],[44,42],[22,46],[22,54],[44,58]], grad:'violet', antenna:true },
+      ships: { pts:[[86,50],[58,45],[40,43],[26,45],[20,50],[26,55],[40,57],[58,55]], grad:'cyan', accent:{x:60,y:50,r:4,color:'#dceeff'} },
+      jaeger: { pts:[[92,50],[62,44],[52,40],[30,22],[22,26],[36,44],[16,46],[16,54],[36,56],[22,74],[30,78],[52,60],[62,56]], grad:'red', accent:{x:58,y:50,r:2.6,color:'#ffd8c8',pulse:true} },
+      cruisers: { pts:[[92,50],[66,42],[50,38],[30,36],[24,28],[16,30],[18,40],[10,46],[10,54],[18,60],[16,70],[24,72],[30,64],[50,62],[66,58]], grad:'red', dots:[[26,40,3.2],[26,60,3.2]] },
+      destroyers: { pts:[[92,50],[62,43],[44,40],[26,40],[20,32],[14,34],[18,44],[14,48],[14,52],[18,56],[14,66],[20,68],[26,60],[44,60],[62,57]], grad:'red', rects:[[58,46,16,8]] },
+      schlachtschiff: { pts:[[94,50],[76,42],[60,40],[58,32],[40,32],[38,40],[16,38],[10,44],[10,56],[16,62],[38,60],[40,68],[58,68],[60,60],[76,58]], grad:'red', dots:[[46,42,3.6],[46,58,3.6],[68,50,4]] },
+      superschlachtschiff: { pts:[[98,50],[80,42],[64,40],[62,30],[38,30],[36,40],[14,36],[6,44],[6,56],[14,64],[36,60],[38,70],[62,70],[64,60],[80,58]], grad:'gold', dots:[[48,40,4],[48,60,4],[72,50,4.4]] },
+      waechter: { pts:[[80,50],[64,40],[40,36],[22,40],[16,50],[22,60],[40,64],[64,60]], grad:'steel', dome:true },
+      bomber: { pts:[[88,48],[70,40],[44,38],[24,42],[16,50],[24,62],[44,70],[70,60],[80,54]], grad:'amber', pods:[[42,66,10,5]] },
+      carrier: { pts:[[88,42],[88,58],[16,58],[10,52],[10,48],[16,42],[52,42],[52,32],[68,32],[68,42]], grad:'sky', hangar:true },
+      frachter: { pts:[[86,50],[76,44],[70,42],[24,42],[18,46],[18,54],[24,58],[70,58],[76,56]], grad:'amber', rects:[[42,60,18,12]] },
+      frachtergross: { pts:[[90,50],[80,44],[74,41],[20,41],[14,46],[14,54],[20,59],[74,59],[80,56]], grad:'gold', rects:[[30,62,16,14],[50,62,16,14]] },
+      colonyShips: { pts:[[84,50],[62,42],[42,38],[26,42],[20,50],[26,58],[42,62],[62,58]], grad:'green', accent:{x:52,y:50,r:11,color:'rgba(169,212,232,0.85)'} },
+      recycler: { pts:[[80,50],[58,44],[40,42],[28,45],[24,50],[28,55],[40,58],[58,56]], grad:'gold', claw:true },
+      spaeher: { pts:[[94,50],[54,46],[30,44],[18,47],[18,53],[30,56],[54,54]], grad:'cyan', accent:{x:30,y:34,r:5,color:'rgba(169,212,232,0.8)'} },
+      spionageschiff: { pts:[[92,50],[56,44],[32,42],[20,46],[20,54],[32,58],[56,56]], grad:'violet', accent:{x:32,y:30,r:8,ry:4,color:'rgba(169,212,232,0.75)'} },
+      forscher: { pts:[[84,50],[58,44],[38,42],[26,45],[22,50],[26,55],[38,58],[58,56]], grad:'violet', antenna:true },
       // Bugfix-Nachtrag (Report Sascha, 19.07.2026): die 11 neueren Schiffstypen fehlten hier komplett -
       // drawShipMiniIcon() bricht ohne Eintrag stumm ab, die Flottenliste zeigte leere Icon-Boxen
       // (siehe Screenshot: Leerenjäger/Nanoklinge ohne Sprite, Schlachtschiff daneben mit). Formen im
       // selben Seitenprofil-Format (Bug in der Zeile, nicht im Maler - der bleibt unverändert).
-      leerenjaeger: { pts:[[92,50],[52,38],[16,40],[10,50],[16,60],[52,62]], grad:'violet', accent:{x:62,y:50,r:3.5,color:'#c3bef5',pulse:true} },
-      kometenjaeger: { pts:[[90,50],[38,42],[14,46],[14,54],[38,58]], grad:'cyan', accent:{x:24,y:50,r:3,color:'#dceeff',pulse:true} },
-      enterschiff: { pts:[[78,50],[50,36],[20,38],[14,50],[20,62],[50,64]], grad:'steel', claw:true },
-      phantomschiff: { pts:[[90,50],[54,42],[30,34],[14,50],[30,66],[54,58]], grad:'violet', accent:{x:46,y:50,r:2.5,color:'rgba(195,190,245,0.9)',pulse:true} },
-      riftwaechter: { pts:[[84,50],[48,38],[22,42],[22,58],[48,62]], grad:'sky', accent:{x:36,y:50,r:6,color:'rgba(122,162,247,0.7)'} },
-      gesandtenschiff: { pts:[[82,50],[46,42],[20,46],[20,54],[46,58]], grad:'green', antenna:true },
-      schuerfschiff: { pts:[[76,50],[46,42],[22,46],[22,54],[46,58]], grad:'amber', rects:[[34,58,20,10]], dots:[[28,44,3]] },
-      nanoklinge: { pts:[[94,50],[40,44],[12,48],[12,52],[40,56]], grad:'steel', accent:{x:70,y:50,r:2.2,color:'#d8d5c9',pulse:true} },
-      hyperjaeger: { pts:[[92,50],[40,40],[14,46],[14,54],[40,60]], grad:'violet', accent:{x:64,y:50,r:2.4,color:'#e0d8ff',pulse:true} },
-      hyperbomber: { pts:[[88,50],[44,40],[18,44],[18,56],[44,60]], grad:'violet', pods:[[42,64,10,5]], accent:{x:34,y:50,r:3,color:'#c3bef5',pulse:true} },
-      quantenkreuzer: { pts:[[88,50],[52,38],[20,34],[12,46],[20,50],[12,54],[20,66],[52,62]], grad:'sky', dots:[[24,38,3],[24,62,3]] },
-      fusionsdreadnought: { pts:[[92,50],[56,34],[14,30],[6,50],[14,70],[56,66]], grad:'gold', dots:[[38,40,4.4],[38,60,4.4]], accent:{x:62,y:50,r:4,color:'#f0997b',pulse:true} },
+      leerenjaeger: { pts:[[94,50],[64,43],[52,39],[32,24],[24,28],[38,44],[16,44],[10,50],[16,56],[38,56],[24,72],[32,76],[52,61],[64,57]], grad:'violet', accent:{x:62,y:50,r:3.5,color:'#c3bef5',pulse:true} },
+      kometenjaeger: { pts:[[96,50],[60,46],[44,43],[26,42],[18,47],[14,50],[18,53],[26,58],[44,57],[60,54]], grad:'cyan', accent:{x:26,y:50,r:3,color:'#dceeff',pulse:true} },
+      enterschiff: { pts:[[80,50],[64,38],[44,34],[26,38],[18,50],[26,62],[44,66],[64,62]], grad:'steel', claw:true },
+      phantomschiff: { pts:[[94,50],[70,40],[46,28],[26,38],[14,50],[26,62],[46,72],[70,60]], grad:'violet', accent:{x:52,y:50,r:2.5,color:'rgba(195,190,245,0.9)',pulse:true} },
+      riftwaechter: { pts:[[86,50],[66,40],[44,36],[26,40],[18,50],[26,60],[44,64],[66,60]], grad:'sky', accent:{x:40,y:50,r:6,color:'rgba(122,162,247,0.7)'} },
+      gesandtenschiff: { pts:[[84,50],[60,44],[40,42],[26,45],[22,50],[26,55],[40,58],[60,56]], grad:'green', antenna:true },
+      schuerfschiff: { pts:[[80,50],[66,44],[52,42],[24,44],[18,50],[24,56],[52,58],[66,56]], grad:'amber', rects:[[34,58,20,10]], dots:[[30,47,2.6]] },
+      nanoklinge: { pts:[[96,50],[52,47],[26,46],[14,49],[14,51],[26,54],[52,53]], grad:'steel', accent:{x:70,y:50,r:2.2,color:'#d8d5c9',pulse:true} },
+      hyperjaeger: { pts:[[94,50],[62,43],[50,39],[30,26],[22,30],[36,44],[14,46],[14,54],[36,56],[22,70],[30,74],[50,61],[62,57]], grad:'violet', accent:{x:64,y:50,r:2.4,color:'#e0d8ff',pulse:true} },
+      hyperbomber: { pts:[[90,48],[72,40],[46,38],[26,42],[18,50],[26,62],[46,70],[72,60],[82,54]], grad:'violet', pods:[[42,64,10,5]], accent:{x:38,y:50,r:3,color:'#c3bef5',pulse:true} },
+      quantenkreuzer: { pts:[[90,50],[64,42],[48,38],[28,36],[22,28],[14,30],[16,40],[10,46],[10,54],[16,60],[14,70],[22,72],[28,64],[48,62],[64,58]], grad:'sky', dots:[[26,40,3],[26,60,3]] },
+      fusionsdreadnought: { pts:[[96,50],[78,42],[62,40],[60,30],[36,30],[34,40],[12,36],[4,44],[4,56],[12,64],[34,60],[36,70],[60,70],[62,60],[78,58]], grad:'gold', dots:[[46,40,4],[46,60,4]], accent:{x:70,y:50,r:4,color:'#f0997b',pulse:true} },
       // Tier-2-Erweiterung "Synthese-Kette" (20.07.2026): breiter Panzer-Titan (grün, Kuppel-Schild)
       // und aggressives Apex-Flaggschiff (violett, pulsierender Singularitätskern).
-      metamaterialtitan: { pts:[[90,50],[54,32],[10,34],[4,50],[10,66],[54,68]], grad:'green', dome:true, dots:[[36,42,4],[36,58,4]] },
-      singularitaetsvernichter: { pts:[[96,50],[54,30],[10,28],[2,50],[10,72],[54,70]], grad:'violet', dots:[[40,40,4.6],[40,60,4.6]], accent:{x:64,y:50,r:5,color:'#c3bef5',pulse:true} },
-      mondzerstoerer: { pts:[[90,50],[54,36],[16,34],[10,50],[16,66],[54,64]], grad:'red', dots:[[36,42,4],[36,58,4]], accent:{x:76,y:50,r:5,color:'rgba(226,75,74,0.95)',pulse:true} }
+      metamaterialtitan: { pts:[[88,50],[68,34],[36,30],[14,34],[4,50],[14,66],[36,70],[68,66]], grad:'green', dome:true, dots:[[34,42,4],[34,58,4]] },
+      singularitaetsvernichter: { pts:[[98,50],[76,38],[62,34],[60,26],[34,26],[32,36],[10,30],[2,44],[2,56],[10,70],[32,64],[34,74],[60,74],[62,66],[76,62]], grad:'violet', dots:[[44,42,4.4],[44,58,4.4]], accent:{x:68,y:50,r:5,color:'#c3bef5',pulse:true} },
+      mondzerstoerer: { pts:[[92,50],[80,44],[70,42],[68,34],[46,34],[44,42],[18,38],[10,46],[10,54],[18,62],[44,58],[46,66],[68,66],[70,58],[80,56]], grad:'red', dots:[[54,42,3.6],[54,58,3.6]], accent:{x:82,y:50,r:4,color:'rgba(226,75,74,0.95)',pulse:true} }
     };
     // ===== Schiffs-Detailmaler (24.07.2026, Spieler-Wunsch "mehr Details, größer, mehr wow") =====
     // Die Rümpfe waren flache Polygone mit Verlauf - bei 26px ging das durch, beim vergrößerten
@@ -3372,10 +3385,14 @@
       return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';
     }
     // Heckkante finden: alle Punkte nahe am kleinsten x - dort sitzen die Triebwerke.
+    // WICHTIG: die Toleranz muss eng sein. Mit einem groben Fenster zählten bei gepfeilten Formen
+    // (Jäger) auch die FLÜGELSPITZEN zur "Heckkante" - die Triebwerke landeten dann neben dem Rumpf
+    // in der Luft, weil dort auf Höhe der Spitzen gar kein Rumpf mehr ist. 6% der Rumpflänge trifft
+    // genau die echte Heckkante und lässt zurückgepfeilte Flügel außen vor.
     function hullRearSpan(pts){
       const xs = pts.map(p=>p[0]), ys = pts.map(p=>p[1]);
       const minX = Math.min(...xs), maxX = Math.max(...xs);
-      const tol = (maxX-minX)*0.16 + 0.001;
+      const tol = (maxX-minX)*0.06 + 0.001;
       const rear = pts.filter(p => p[0] <= minX+tol);
       const ry = (rear.length?rear:pts).map(p=>p[1]);
       return { x:minX, y0:Math.min(...ry), y1:Math.max(...ry), midY:(Math.min(...ys)+Math.max(...ys))/2 };
@@ -3386,9 +3403,9 @@
       const sp = hullRearSpan(cfg.pts);
       const span = sp.y1 - sp.y0;
       const cy = (sp.y0 + sp.y1)/2;
-      if (span < 9) return [[sp.x, cy, 3.2]];
-      if (span < 26) return [[sp.x, sp.y0+span*0.3, 2.9], [sp.x, sp.y1-span*0.3, 2.9]];
-      return [[sp.x, sp.y0+span*0.22, 3.0], [sp.x, cy, 3.6], [sp.x, sp.y1-span*0.22, 3.0]];
+      if (span < 7) return [[sp.x, cy, 3.2]];
+      if (span < 22) return [[sp.x, sp.y0+span*0.28, 2.7], [sp.x, sp.y1-span*0.28, 2.7]];
+      return [[sp.x, sp.y0+span*0.2, 2.8], [sp.x, cy, 3.4], [sp.x, sp.y1-span*0.2, 2.8]];
     }
     function drawShipMiniIcon(key, canvas){
       if (!canvas) return;
@@ -3496,7 +3513,10 @@
       }
       // --- Kanzel/Cockpit kurz hinter der Nase: der Blickfang, der aus einem Keil ein Schiff macht.
       if (!cfg.noCanopy){
-        const cn = cfg.canopy || [hullX0 + (hullX1-hullX0)*0.70, (aoY0+aoY1)/2, (hullX1-hullX0)*0.075, (aoY1-aoY0)*0.12];
+        // Die Höhe wird gegen die LÄNGE gedeckelt: aoY1-aoY0 ist die volle Spannweite inklusive
+        // Flügel, ohne Deckel würde die Kanzel bei gepfeilten Formen fast kreisrund und riesig.
+        const canopyH = Math.min((aoY1-aoY0)*0.09, (hullX1-hullX0)*0.05);
+        const cn = cfg.canopy || [hullX0 + (hullX1-hullX0)*0.70, (aoY0+aoY1)/2, (hullX1-hullX0)*0.09, canopyH];
         const [cx,cy,crx,cry] = cfg.canopy ? [P(cn[0],cn[1])[0], P(cn[0],cn[1])[1], cn[2]*s, cn[3]*s] : cn;
         const cg = ctx.createLinearGradient(cx, cy-cry, cx, cy+cry);
         cg.addColorStop(0,'rgba(190,235,255,0.95)');
@@ -3851,8 +3871,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.282.0';
+  const VERSION = '8.283.0';
   const PATCHNOTES = [
+    { version:'8.283.0', date:'24.07.2026', changes:[
+      'Alle Schiffe haben neue, deutlich markantere Umrisse. Vorher war fast jeder Rumpf derselbe schlichte Keil – die Schiffe unterschieden sich praktisch nur durch die Farbe. Jetzt hat jede Klasse ihre eigene Formsprache: Jagdschiffe sind schlanke Pfeile mit nach hinten gepfeilten Flügelspitzen, Bomber gedrungen mit durchhängendem Bauch, Kreuzer und Zerstörer kantig mit Heckfinnen, Schlachtschiffe lang mit gestuftem Aufbau und Bugsporn, der Träger hat ein flaches Flugdeck mit aufgesetzter Insel und die Frachter einen Kastenrumpf. Man erkennt den Schiffstyp jetzt an der Silhouette, nicht erst am Namen.',
+      'Die Triebwerke sitzen dabei zuverlässig am Heck: Bei den neuen gepfeilten Formen wurden vorher versehentlich die Flügelspitzen als Heckkante erkannt, wodurch die Abgasstrahlen neben dem Rumpf in der Luft hingen. Auch die Cockpit-Kanzel ist jetzt eine längliche Haube statt einer fast kreisrunden Blase.',
+    ]},
     { version:'8.282.0', date:'24.07.2026', changes:[
       'Die Schiffe sind neu gezeichnet – deutlich detaillierter und größer. Jedes Schiff hat jetzt leuchtende Triebwerksfahnen am Heck mit hellem Düsenkern, eine Cockpit-Kanzel kurz hinter der Nase, Panelfugen quer über den Rumpf (das Ding sieht aus, als wäre es aus Platten gebaut), eine Lichtkante an der Oberkante (Licht von oben) und blinkende Positionslichter an den äußersten Ecken – oben rot, unten grün, wie in der Luftfahrt. In der Schiffswerft werden sie zudem größer dargestellt (78 statt 52 Pixel breit).',
       'Alle 31 Schiffe profitieren sofort, und jedes künftige Schiff bekommt die Details automatisch: Die neuen Ebenen werden aus der Rumpfform ABGELEITET (Triebwerke sitzen an der Heckkante, die Kanzel kurz hinter der Nase, die Positionslichter an den äußersten Ecken) statt für jedes Schiff einzeln gepflegt zu werden.',
