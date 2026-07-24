@@ -682,7 +682,35 @@
       .tab-btn { flex-shrink:0; }
     }
     .tab-btn { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:10px; padding:8px 14px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
+    /* Navigation nach Domäne farbcodiert (Grafik-Audit 24.07.2026, Entwurf B). Zwölf optisch
+       identische Reiter konkurrierten um dieselbe Aufmerksamkeit - nichts sagte, dass "Basis"
+       täglich und "Fortschritt" selten gebraucht wird, und es gab kein Muster, das man sich merken
+       konnte. Die vorhandenen .tab-group-divider markierten zwar schon vier Gruppen, waren aber mit
+       1px bei 14% Weiss praktisch unsichtbar UND gehen beim Zeilenumbruch verloren (bei 12 Reitern
+       der Normalfall). Farbe überlebt den Umbruch, ein Trennstrich nicht - deshalb tragen jetzt die
+       Reiter selbst die Gruppenfarbe.
+       Die Gruppierung übernimmt EXAKT die schon vorhandenen Divider-Positionen, und die Reihenfolge
+       der Reiter bleibt unverändert: Umsortieren würde die Muskelerinnerung bestehender Spieler
+       zerstören - ein realer Verlust, dem kein Gewinn gegenübersteht. */
+    .tab-btn[data-tab-domain="kolonie"]      { --tab-dom:#7f77dd; }
+    .tab-btn[data-tab-domain="erkundung"]    { --tab-dom:#5ce1ff; }
+    .tab-btn[data-tab-domain="gemeinschaft"] { --tab-dom:#fac775; }
+    .tab-btn[data-tab-domain="meta"]         { --tab-dom:#5dcaa5; }
+    .tab-btn[data-tab-domain] { position:relative; }
+    /* Ruhender Zustand: dünner Farbfuss, damit die Gruppe auch bei NICHT gewähltem Reiter lesbar
+       ist - das ist der eigentliche Orientierungs-Gewinn. Bewusst dezent (35% Deckkraft). */
+    .tab-btn[data-tab-domain]::after { content:''; position:absolute; left:10px; right:10px; bottom:3px; height:2px; background:var(--tab-dom); opacity:0.35; border-radius:2px; transition:opacity 0.2s ease; pointer-events:none; }
+    .tab-btn[data-tab-domain]:hover::after { opacity:0.6; }
+    .tab-btn.active::after { opacity:1; }
     .tab-btn.active { background:rgba(var(--primary-rgb), 0.25); border-color:var(--c-primary); color:#fff; box-shadow:0 0 12px rgba(var(--primary-rgb), 0.25); }
+    /* Der aktive Reiter übernimmt die Gruppenfarbe statt des festen Violett - so ist auf einen Blick
+       klar, in WELCHEM Bereich man sich gerade befindet, nicht nur auf welchem Reiter. Farbwerte
+       bewusst ausgeschrieben statt per color-mix(): color-mix wird von älteren Handy-Browsern nicht
+       unterstützt und würde dort ersatzlos ausfallen. */
+    .tab-btn.active[data-tab-domain="kolonie"]      { background:rgba(127,119,221,0.22); border-color:#7f77dd; box-shadow:0 0 12px rgba(127,119,221,0.30); }
+    .tab-btn.active[data-tab-domain="erkundung"]    { background:rgba(92,225,255,0.18);  border-color:#5ce1ff; box-shadow:0 0 12px rgba(92,225,255,0.28); }
+    .tab-btn.active[data-tab-domain="gemeinschaft"] { background:rgba(250,199,117,0.18); border-color:#fac775; box-shadow:0 0 12px rgba(250,199,117,0.28); }
+    .tab-btn.active[data-tab-domain="meta"]         { background:rgba(93,202,165,0.18);  border-color:#5dcaa5; box-shadow:0 0 12px rgba(93,202,165,0.28); }
     /* Dezente Gruppentrenner in der Tab-Leiste (13.07.2026, Übersichtlichkeit-Feature-Wunsch) - macht
        die bereits bestehende logische Reihenfolge (Aufbau/Erkundung/Sozial/Meta) sichtbar, ohne
        irgendetwas an der Reihenfolge selbst zu ändern (kein Risiko fürs eingespielte Muskelgedächtnis
@@ -1880,22 +1908,24 @@
       <div class="resbar" id="tier2ResBadges" style="margin-bottom:0;"></div>
       <div id="dailyQuestBar" style="margin-bottom:0.75rem;"></div>
 
+      <!-- Die vier data-tab-domain-Gruppen entsprechen exakt den Abschnitten zwischen den
+           tab-group-divider-Elementen. Reihenfolge bewusst unverändert (Muskelerinnerung). -->
       <div class="tabs">
-        <button class="tab-btn active" data-tab="basis"><span class="tab-icon-badge"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i></span>Basis</button>
-        <button class="tab-btn" data-tab="verteidigung" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-shield" aria-hidden="true" style="color:#e24b4a;"></i></span>Verteidigung<span id="voidRiftTabBadge" class="tab-badge" style="display:none;"></span></button>
-        <button class="tab-btn" data-tab="forschung"><span class="tab-icon-badge"><i class="ti ti-flask" aria-hidden="true" style="color:#85b7eb;"></i></span>Forschung</button>
-        <button class="tab-btn" data-tab="flotte"><span class="tab-icon-badge"><i class="ti ti-rocket" aria-hidden="true" style="color:#5dcaa5;"></i></span>Flotte</button>
+        <button class="tab-btn active" data-tab="basis" data-tab-domain="kolonie"><span class="tab-icon-badge"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i></span>Basis</button>
+        <button class="tab-btn" data-tab="verteidigung" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-shield" aria-hidden="true" style="color:#e24b4a;"></i></span>Verteidigung<span id="voidRiftTabBadge" class="tab-badge" style="display:none;"></span></button>
+        <button class="tab-btn" data-tab="forschung" data-tab-domain="kolonie"><span class="tab-icon-badge"><i class="ti ti-flask" aria-hidden="true" style="color:#85b7eb;"></i></span>Forschung</button>
+        <button class="tab-btn" data-tab="flotte" data-tab-domain="kolonie"><span class="tab-icon-badge"><i class="ti ti-rocket" aria-hidden="true" style="color:#5dcaa5;"></i></span>Flotte</button>
         <div class="tab-group-divider" aria-hidden="true"></div>
-        <button class="tab-btn" data-tab="expedition" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-map-2" aria-hidden="true" style="color:#f0997b;"></i></span>Expedition<span id="expeditionBadge" class="tab-badge" style="display:none;"></span></button>
-        <button class="tab-btn" data-tab="karte"><span class="tab-icon-badge"><i class="ti ti-map-2" aria-hidden="true" style="color:#af9ce6;"></i></span>Sektorkarte</button>
-        <button class="tab-btn" data-tab="galaxie"><span class="tab-icon-badge"><i class="ti ti-users" aria-hidden="true" style="color:#ed93b1;"></i></span>Galaxie</button>
+        <button class="tab-btn" data-tab="expedition" data-tab-domain="erkundung" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-map-2" aria-hidden="true" style="color:#f0997b;"></i></span>Expedition<span id="expeditionBadge" class="tab-badge" style="display:none;"></span></button>
+        <button class="tab-btn" data-tab="karte" data-tab-domain="erkundung"><span class="tab-icon-badge"><i class="ti ti-map-2" aria-hidden="true" style="color:#af9ce6;"></i></span>Sektorkarte</button>
+        <button class="tab-btn" data-tab="galaxie" data-tab-domain="erkundung"><span class="tab-icon-badge"><i class="ti ti-users" aria-hidden="true" style="color:#ed93b1;"></i></span>Galaxie</button>
         <div class="tab-group-divider" aria-hidden="true"></div>
-        <button class="tab-btn" data-tab="allianz"><span class="tab-icon-badge"><i class="ti ti-flag" aria-hidden="true" style="color:#378add;"></i></span>Allianz</button>
-        <button class="tab-btn" data-tab="offiziere"><span class="tab-icon-badge"><i class="ti ti-user-circle" aria-hidden="true" style="color:#b39ef0;"></i></span>Offiziere</button>
+        <button class="tab-btn" data-tab="allianz" data-tab-domain="gemeinschaft"><span class="tab-icon-badge"><i class="ti ti-flag" aria-hidden="true" style="color:#378add;"></i></span>Allianz</button>
+        <button class="tab-btn" data-tab="offiziere" data-tab-domain="gemeinschaft"><span class="tab-icon-badge"><i class="ti ti-user-circle" aria-hidden="true" style="color:#b39ef0;"></i></span>Offiziere</button>
         <div class="tab-group-divider" aria-hidden="true"></div>
-        <button class="tab-btn" data-tab="markt"><span class="tab-icon-badge"><i class="ti ti-truck" aria-hidden="true" style="color:#ef9f27;"></i></span>Markt</button>
-        <button class="tab-btn" data-tab="punkte"><span class="tab-icon-badge"><i class="ti ti-star" aria-hidden="true" style="color:#fbe08f;"></i></span>Punktestand</button>
-        <button class="tab-btn" data-tab="fortschritt"><span class="tab-icon-badge"><i class="ti ti-award" aria-hidden="true" style="color:#9fe1cb;"></i></span>Fortschritt</button>
+        <button class="tab-btn" data-tab="markt" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-truck" aria-hidden="true" style="color:#ef9f27;"></i></span>Markt</button>
+        <button class="tab-btn" data-tab="punkte" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-star" aria-hidden="true" style="color:#fbe08f;"></i></span>Punktestand</button>
+        <button class="tab-btn" data-tab="fortschritt" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-award" aria-hidden="true" style="color:#9fe1cb;"></i></span>Fortschritt</button>
       </div>
 
       <div class="tab-panel active" id="tab-basis">
@@ -3673,8 +3703,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.278.0';
+  const VERSION = '8.279.0';
   const PATCHNOTES = [
+    { version:'8.279.0', date:'24.07.2026', changes:[
+      'Die zwölf Reiter sind jetzt nach Bereich farbcodiert: Kolonie (Basis, Verteidigung, Forschung, Flotte) violett, Erkundung (Expedition, Sektorkarte, Galaxie) cyan, Gemeinschaft (Allianz, Offiziere) gold und Fortschritt (Markt, Punktestand, Fortschritt) grün. Jeder Reiter trägt einen dünnen Farbfuß, der aktive Reiter übernimmt die Farbe seines Bereichs komplett – so sieht man auf einen Blick, in welchem Bereich man gerade ist. Die Reihenfolge der Reiter bleibt bewusst unverändert, damit die gewohnten Positionen erhalten bleiben.',
+      'Hintergrund: Die Gruppen gab es strukturell schon (als Trennstriche zwischen den Reitern), aber die Striche waren fast unsichtbar und gingen beim Zeilenumbruch verloren – bei zwölf Reitern der Normalfall. Farbe überlebt den Umbruch, ein Trennstrich nicht.',
+    ]},
     { version:'8.278.0', date:'24.07.2026', changes:[
       'Die Schiffswerft zeigt Schiffe jetzt als Datenblatt statt als Fließtext. Jedes Schiff bekommt ein doppelt so großes Rendering (52 statt 26 Pixel) in einem eigenen Rahmen, ein Rollen-Kürzel darunter (Angriff, Schnellangriff, Panzerung, Zivil) und einen farbigen Rollen-Streifen an der Kartenkante. Die Kennwerte Angriff, Schild, Abwehr und Tempo stehen als Mikro-Balken nebeneinander – jeder Balken im Verhältnis zum besten Wert der ganzen Flotte. Dadurch sieht man auf einen Blick, dass ein Jäger schnell und ein Wächter zäh ist, ohne eine einzige Zahl lesen zu müssen. Vorher stand dort eine Zeile Fließtext mit Mitteldots ("Angriff: 10 · Schild: 5 · Verteidigungsbeitrag: 9"), in der sich nichts vergleichen ließ.',
       'Nebeneffekt: Der Flotten-Anstrich (Schiffs-Skins) ist jetzt endlich deutlich zu sehen – bei 26 Pixeln war von der Lackierung kaum etwas zu erkennen.',
