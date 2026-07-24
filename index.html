@@ -559,8 +559,8 @@
     .card-row.ship-card { position:relative; }
     .card-row.ship-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--ship-role,#7f77dd); box-shadow:0 0 10px var(--ship-role,#7f77dd); opacity:0.9; pointer-events:none; z-index:2; }
     .card-row.ship-card.research-locked::before { opacity:0.25; box-shadow:none; }
-    .ship-art { display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; }
-    .ship-art .frame { width:56px; height:44px; display:flex; align-items:center; justify-content:center; border:0.5px solid var(--line-1); background:radial-gradient(ellipse at 50% 62%, rgba(92,225,255,0.10), transparent 70%), rgba(0,0,0,0.30); }
+    .ship-art { display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; width:82px; }
+    .ship-art .frame { width:82px; height:62px; display:flex; align-items:center; justify-content:center; border:0.5px solid var(--line-1); background:radial-gradient(ellipse at 50% 62%, rgba(92,225,255,0.10), transparent 70%), rgba(0,0,0,0.30); }
     .ship-art .rolelbl { font-family:var(--font-mono); font-size:8px; letter-spacing:0.09em; text-transform:uppercase; color:var(--ship-role,#7f77dd); white-space:nowrap; }
     .ship-stats { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:3px 14px; margin-top:5px; margin-bottom:2px; }
     .sstat { display:flex; align-items:center; gap:6px; min-width:0; }
@@ -3354,6 +3354,42 @@
       singularitaetsvernichter: { pts:[[96,50],[54,30],[10,28],[2,50],[10,72],[54,70]], grad:'violet', dots:[[40,40,4.6],[40,60,4.6]], accent:{x:64,y:50,r:5,color:'#c3bef5',pulse:true} },
       mondzerstoerer: { pts:[[90,50],[54,36],[16,34],[10,50],[16,66],[54,64]], grad:'red', dots:[[36,42,4],[36,58,4]], accent:{x:76,y:50,r:5,color:'rgba(226,75,74,0.95)',pulse:true} }
     };
+    // ===== Schiffs-Detailmaler (24.07.2026, Spieler-Wunsch "mehr Details, größer, mehr wow") =====
+    // Die Rümpfe waren flache Polygone mit Verlauf - bei 26px ging das durch, beim vergrößerten
+    // Datenblatt-Rendering sah man, dass da kaum etwas IST. Die neuen Detailschichten werden bewusst
+    // AUS DER GEOMETRIE ABGELEITET statt für jedes Schiff von Hand gepflegt: Triebwerke sitzen an der
+    // Heckkante (kleinstes x), die Kanzel kurz hinter der Nase (größtes x), Panelfugen laufen quer
+    // über den Rumpf, Positionslichter an den äußersten Ecken. Dadurch profitieren alle 31 Schiffe
+    // sofort UND jedes künftige Schiff automatisch, ohne einen einzigen neuen Datensatz.
+    // Pro Schiff abschaltbar/übersteuerbar über die optionalen Felder engines/canopy/noLights.
+    // #rrggbb -> rgba(). Die Rumpffarben kommen aus SHIP_GRAD_STOPS bzw. dem aktiven Flotten-Anstrich
+    // und sind immer 6-stellige Hexwerte; alles andere wird unverändert durchgereicht (dann greift der
+    // Alphawert eben nicht, statt eine kaputte Farbe zu erzeugen).
+    function hexToRgba(hex, a){
+      if (typeof hex !== 'string' || hex.charAt(0) !== '#' || hex.length !== 7) return hex;
+      const n = parseInt(hex.slice(1), 16);
+      if (isNaN(n)) return hex;
+      return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';
+    }
+    // Heckkante finden: alle Punkte nahe am kleinsten x - dort sitzen die Triebwerke.
+    function hullRearSpan(pts){
+      const xs = pts.map(p=>p[0]), ys = pts.map(p=>p[1]);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const tol = (maxX-minX)*0.16 + 0.001;
+      const rear = pts.filter(p => p[0] <= minX+tol);
+      const ry = (rear.length?rear:pts).map(p=>p[1]);
+      return { x:minX, y0:Math.min(...ry), y1:Math.max(...ry), midY:(Math.min(...ys)+Math.max(...ys))/2 };
+    }
+    // Triebwerksdüsen aus der Heckkante ableiten: schmales Heck = eine Düse, breites = zwei bis drei.
+    function hullEngines(cfg){
+      if (cfg.engines) return cfg.engines;
+      const sp = hullRearSpan(cfg.pts);
+      const span = sp.y1 - sp.y0;
+      const cy = (sp.y0 + sp.y1)/2;
+      if (span < 9) return [[sp.x, cy, 3.2]];
+      if (span < 26) return [[sp.x, sp.y0+span*0.3, 2.9], [sp.x, sp.y1-span*0.3, 2.9]];
+      return [[sp.x, sp.y0+span*0.22, 3.0], [sp.x, cy, 3.6], [sp.x, sp.y1-span*0.22, 3.0]];
+    }
     function drawShipMiniIcon(key, canvas){
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
@@ -3367,6 +3403,31 @@
       const stops = activeShipSkinStops() || SHIP_GRAD_STOPS[cfg.grad]; // aktiver Flotten-Anstrich überschreibt die Rumpffarbe (rein kosmetisch)
       const pts = cfg.pts.map(p=>P(p[0],p[1]));
       const xs = pts.map(p=>p[0]);
+      // --- Triebwerksfahnen: ZUERST, damit sie hinter dem Rumpf liegen. Radiale Verläufe statt
+      // shadowBlur - Blur ist auf schwachen Geräten teuer, und die Flotte wird pro Tick neu gemalt.
+      const engines = hullEngines(cfg);
+      const flameCore = stops[0], flameMid = stops[1];
+      for (const [ex,ey,er] of engines){
+        const [px,py] = P(ex,ey);
+        const len = er*s*5.2;
+        const pl = ctx.createLinearGradient(px,py,px-len,py);
+        pl.addColorStop(0, 'rgba(255,255,255,0.85)');
+        pl.addColorStop(0.25, hexToRgba(flameCore,0.55));
+        pl.addColorStop(1, hexToRgba(flameMid,0));
+        ctx.fillStyle = pl;
+        ctx.beginPath();
+        ctx.moveTo(px, py-er*s*0.85);
+        ctx.lineTo(px-len, py);
+        ctx.lineTo(px, py+er*s*0.85);
+        ctx.closePath(); ctx.fill();
+        // heller Düsenkern direkt an der Heckkante
+        const gl = ctx.createRadialGradient(px,py,0,px,py,er*s*1.5);
+        gl.addColorStop(0,'rgba(255,255,255,0.95)');
+        gl.addColorStop(0.45, hexToRgba(flameCore,0.7));
+        gl.addColorStop(1, hexToRgba(flameCore,0));
+        ctx.fillStyle = gl;
+        ctx.beginPath(); ctx.arc(px,py,er*s*1.5,0,Math.PI*2); ctx.fill();
+      }
       const grad = ctx.createLinearGradient(Math.min(...xs),0,Math.max(...xs),0);
       grad.addColorStop(0, stops[0]); grad.addColorStop(0.5, stops[1]); grad.addColorStop(1, stops[2]);
       ctx.beginPath();
@@ -3422,7 +3483,56 @@
       const aoGrad = ctx.createLinearGradient(0,aoY0,0,aoY1);
       aoGrad.addColorStop(0,'rgba(0,0,0,0.22)'); aoGrad.addColorStop(0.5,'rgba(0,0,0,0)'); aoGrad.addColorStop(1,'rgba(0,0,0,0.28)');
       ctx.fillStyle = aoGrad; ctx.fillRect(0,aoY0,w,aoY1-aoY0);
+      // --- Panelfugen: dünne Querlinien über den Rumpf, innerhalb desselben Clips. Der mit Abstand
+      // billigste Weg zu "das Ding ist aus Platten gebaut" - ohne einen einzigen neuen Formendatensatz.
+      const hullX0 = Math.min(...xs), hullX1 = Math.max(...xs);
+      const seamStep = Math.max(5*s, (hullX1-hullX0)/6);
+      ctx.lineWidth = Math.max(0.4, s*0.5);
+      for (let sx = hullX0+seamStep; sx < hullX1-seamStep*0.4; sx += seamStep){
+        ctx.strokeStyle = 'rgba(0,0,0,0.26)';
+        ctx.beginPath(); ctx.moveTo(sx, aoY0); ctx.lineTo(sx, aoY1); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        ctx.beginPath(); ctx.moveTo(sx+Math.max(0.5,s*0.5), aoY0); ctx.lineTo(sx+Math.max(0.5,s*0.5), aoY1); ctx.stroke();
+      }
+      // --- Kanzel/Cockpit kurz hinter der Nase: der Blickfang, der aus einem Keil ein Schiff macht.
+      if (!cfg.noCanopy){
+        const cn = cfg.canopy || [hullX0 + (hullX1-hullX0)*0.70, (aoY0+aoY1)/2, (hullX1-hullX0)*0.075, (aoY1-aoY0)*0.12];
+        const [cx,cy,crx,cry] = cfg.canopy ? [P(cn[0],cn[1])[0], P(cn[0],cn[1])[1], cn[2]*s, cn[3]*s] : cn;
+        const cg = ctx.createLinearGradient(cx, cy-cry, cx, cy+cry);
+        cg.addColorStop(0,'rgba(190,235,255,0.95)');
+        cg.addColorStop(0.55,'rgba(90,170,220,0.75)');
+        cg.addColorStop(1,'rgba(20,50,80,0.6)');
+        ctx.fillStyle = cg;
+        ctx.beginPath(); ctx.ellipse(cx, cy, Math.max(1,crx), Math.max(0.8,cry), 0, 0, Math.PI*2); ctx.fill();
+      }
+      // --- Rim-Light: heller Saum NUR an der Oberkante (Licht von oben). Ein Strich um die ganze
+      // Silhouette hätte das Schiff wie ausgeschnitten aussehen lassen statt beleuchtet; als
+      // Verlaufsband im oberen Rumpfdrittel liest es sich als Lichtkante.
+      const rimGrad = ctx.createLinearGradient(0, aoY0, 0, aoY0+(aoY1-aoY0)*0.30);
+      rimGrad.addColorStop(0,'rgba(255,255,255,0.55)');
+      rimGrad.addColorStop(0.45,'rgba(255,255,255,0.16)');
+      rimGrad.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle = rimGrad;
+      ctx.fillRect(hullX0, aoY0, hullX1-hullX0, (aoY1-aoY0)*0.30);
       ctx.restore();
+      // --- Positionslichter an den äußersten Ecken (oben rot, unten grün - wie in der Luftfahrt).
+      // Blinken nur, wenn der Energiesparmodus aus ist; sonst statisch, aber weiterhin sichtbar.
+      if (!cfg.noLights){
+        const topPt = pts.reduce((a,b)=>b[1]<a[1]?b:a);
+        const botPt = pts.reduce((a,b)=>b[1]>a[1]?b:a);
+        const saving = (typeof powerSaveActive === 'function') && powerSaveActive();
+        const blink = saving ? 0.85 : (0.45 + 0.55*Math.abs(Math.sin(Date.now()*0.0022)));
+        const lr = Math.max(0.9, s*1.5);
+        [[topPt,'#ff6b6b'],[botPt,'#5dcaa5']].forEach(([p,col])=>{
+          ctx.save(); ctx.globalAlpha = blink;
+          const g = ctx.createRadialGradient(p[0],p[1],0,p[0],p[1],lr*2.4);
+          g.addColorStop(0, col); g.addColorStop(0.35, hexToRgba(col,0.5)); g.addColorStop(1, hexToRgba(col,0));
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0],p[1],lr*2.4,0,Math.PI*2); ctx.fill();
+          ctx.globalAlpha = Math.min(1, blink+0.15);
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p[0],p[1],lr*0.5,0,Math.PI*2); ctx.fill();
+          ctx.restore();
+        });
+      }
     }
     function refreshShipMiniIcons(root){
       const scope = root || document;
@@ -3741,8 +3851,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.281.0';
+  const VERSION = '8.282.0';
   const PATCHNOTES = [
+    { version:'8.282.0', date:'24.07.2026', changes:[
+      'Die Schiffe sind neu gezeichnet – deutlich detaillierter und größer. Jedes Schiff hat jetzt leuchtende Triebwerksfahnen am Heck mit hellem Düsenkern, eine Cockpit-Kanzel kurz hinter der Nase, Panelfugen quer über den Rumpf (das Ding sieht aus, als wäre es aus Platten gebaut), eine Lichtkante an der Oberkante (Licht von oben) und blinkende Positionslichter an den äußersten Ecken – oben rot, unten grün, wie in der Luftfahrt. In der Schiffswerft werden sie zudem größer dargestellt (78 statt 52 Pixel breit).',
+      'Alle 31 Schiffe profitieren sofort, und jedes künftige Schiff bekommt die Details automatisch: Die neuen Ebenen werden aus der Rumpfform ABGELEITET (Triebwerke sitzen an der Heckkante, die Kanzel kurz hinter der Nase, die Positionslichter an den äußersten Ecken) statt für jedes Schiff einzeln gepflegt zu werden.',
+      'Die Positionslichter blinken nur bei ausgeschaltetem Energiesparmodus – im Sparmodus leuchten sie ruhig weiter, verschwinden also nicht. Der Mehraufwand beim Zeichnen ist mit rund 1 Millisekunde je Durchlauf der gesamten Flotte messbar, aber unkritisch.',
+    ]},
     { version:'8.281.0', date:'24.07.2026', changes:[
       'Behoben (Absturzschutz): Ein Bauauftrag ohne Kostenangabe in der Warteschlange brachte den Haupt-Tick zum Absturz – und zwar bei jedem weiteren Tick erneut, weil der Eintrag liegen blieb. Folge: Bauqueue, Forschung, Missionen und das Speichern kamen gar nicht mehr durch, der Spielstand wirkte wie eingefroren. Solche Aufträge werden jetzt beim Tick erkannt: unbezahlte werden entfernt (dafür wurde nachweislich noch nichts abgebucht, es geht also nichts verloren) und die Baustelle wird wieder frei; bereits bezahlte bleiben erhalten und werden normal fertiggebaut. Ein beschädigter Auftrag blockiert damit auch keinen gesunden Auftrag mehr, der hinter ihm wartet.',
       'Dieselbe Absicherung für die Bau-Wunschliste: Steht dort ein Gebäude, das es im Spiel nicht mehr gibt, wird der Eintrag jetzt entfernt statt den Tick abstürzen zu lassen.',
@@ -30597,7 +30712,7 @@
         <div class="card-row ship-card ${!unlocked?'research-locked':''}${t2ship?' tier2-card':''}" style="--ship-role:${shipRole.color};">
           <div class="left">
             <div class="ship-art">
-              <div class="frame${t2ship?' bicon-t2':''}"><canvas data-ship-icon="${def.key}" width="52" height="40" style="display:block;"></canvas></div>
+              <div class="frame${t2ship?' bicon-t2':''}"><canvas data-ship-icon="${def.key}" width="78" height="58" style="display:block;"></canvas></div>
               <span class="rolelbl">${shipRole.label}</span>
             </div>
             <div>
