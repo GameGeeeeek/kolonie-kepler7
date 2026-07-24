@@ -3525,8 +3525,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.253.0';
+  const VERSION = '8.254.0';
   const PATCHNOTES = [
+    { version:'8.254.0', date:'24.07.2026', changes:[
+      'Bugfix (Expeditions-Audit): Zwei eigentlich exklusive Gegenstände konnten versehentlich doch über Expeditionen erbeutet werden. Der Leerensplitter (Endgame-Ressource, gedacht nur über Leere-Gegner, Weltboss und Piraten-Endboss – plus dem Zusammensetzen aus Fragmenten) und der Allianz-Kriegsschub (nur über Allianz-Wochen-/Großprojekte) sind als „chance:0" markiert, aber der Expeditions-Fundpool wählte nach Seltenheit aus und übersah dieses Feld. Zusätzlich zog der Sonderfund „Fremdes Artefakt geborgen" gleichverteilt aus allen seltenen Materialien – inklusive Leerensplitter. Beides ist behoben: Als „chance:0" markierte Gegenstände tauchen jetzt nirgends mehr im Expeditions-Zufallspool auf. Die Leerensplitter-FRAGMENTE (der beabsichtigte Sammelweg) bleiben unverändert findbar.',
+    ]},
     { version:'8.253.0', date:'24.07.2026', changes:[
       'Flotten-Tab komplett neu gegliedert (Spieler-Wunsch „übersichtlicher machen"): Statt einer einzigen, rund 7.000 Pixel langen Scrollsäule gibt es jetzt drei Unterreiter – „Werft" (Schiffe bauen + Baukorb), „Flotte & Verlegen" (Angriffspunkte, Trümmerfeld, Verlegung) und „Missionen" (aktive Flotten). Die Auswahl wird gemerkt. Dazu eine neue Sticky-Statusleiste, die beim Scrollen oben sichtbar bleibt und die Kernzahlen zeigt: Angriffskraft, Flotten unterwegs (rot bei vollem Limit), Werft-Aufträge und Treibstoff-Vorrat (Deuterium/Antimaterie). Alle Inhalte und Funktionen sind unverändert – nur sortiert.',
     ]},
@@ -22592,6 +22595,14 @@
   const RARITY_BASE_WEIGHT = { gewoehnlich:100, ungewoehnlich:45, selten:18, episch:6, legendaer:1.5 };
   const RARITY_TIER_INDEX = { gewoehnlich:0, ungewoehnlich:1, selten:2, episch:3, legendaer:4 };
   function pickWeightedByRarity(items, luckBonus){
+    // Bugfix (24.07.2026, Expeditions-Audit): Einträge mit chance:0 sind bewusst NICHT Teil des
+    // Zufalls-Fundpools (z.B. Leerensplitter/Allianz-Kriegsschub - siehe deren Definitionen). Diese
+    // Funktion gewichtet nur nach Seltenheit und hat das chance-Feld bisher komplett ignoriert, sodass
+    // die "chance:0 = nie über Expeditionen findbar"-Zusicherung faktisch nicht griff. Jetzt vorab
+    // gefiltert: nur explizit auf 0 gesetzte Einträge fliegen raus (undefined/>0 bleiben drin, damit
+    // Fragmente/Kosmetik/Event-Items ohne chance-Feld unberührt bleiben).
+    const eligible = items.filter(it => it.chance !== 0);
+    items = eligible.length ? eligible : items;
     const weighted = items.map(it => {
       const base = RARITY_BASE_WEIGHT[it.rarity] || RARITY_BASE_WEIGHT.gewoehnlich;
       const boost = 1 + (luckBonus||0)*RARITY_TIER_INDEX[it.rarity||'gewoehnlich'];
@@ -27283,7 +27294,11 @@
           return { text:'Eine Anomalie vermessen: +'+Math.round(60*mult)+' XP, laufende Forschung um '+Math.round(saved/1000)+'s beschleunigt.', icon:'ti-atom-2' }; }
         return { text:'Eine Anomalie vermessen: +'+Math.round(60*mult)+' XP für die Crew.', icon:'ti-atom-2' }; } },
     { key:'artifact', name:'Fremdes Artefakt geborgen', icon:'ti-diamond',
-      resolve:(mult) => { const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1; addXp(40);
+      // Bugfix (24.07.2026, Expeditions-Audit): zog bisher GLEICHVERTEILT aus RARE_ITEMS - inklusive
+      // Leerensplitter (chance:0), der eigentlich NUR über Leere-NPCs/Weltboss/Piraten-Endboss zu
+      // holen sein soll. Damit war dieser Sonderfund die größte Leak-Quelle (25% pro Auslösung).
+      // Jetzt nur noch aus den regulär findbaren seltenen Materialien (chance:0 ausgeschlossen).
+      resolve:(mult) => { const pool = RARE_ITEMS.filter(r => r.chance !== 0); const ri = pool[Math.floor(Math.random()*pool.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1; addXp(40);
         return { text:'Ein fremdes Artefakt geborgen: '+ri.name+'! +40 XP.', icon:ri.icon||'ti-diamond' }; } },
     // 18.07.2026 (Spieler-Wunsch "mehr Ideen"): drei weitere Varianten fuer mehr Abwechslung im
     // gleichverteilten Auswahl-Pool (bisher nur 3, bei potenziell hunderten Expeditionen pro Sitzung
