@@ -3741,8 +3741,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.280.0';
+  const VERSION = '8.281.0';
   const PATCHNOTES = [
+    { version:'8.281.0', date:'24.07.2026', changes:[
+      'Behoben (Absturzschutz): Ein Bauauftrag ohne Kostenangabe in der Warteschlange brachte den Haupt-Tick zum Absturz – und zwar bei jedem weiteren Tick erneut, weil der Eintrag liegen blieb. Folge: Bauqueue, Forschung, Missionen und das Speichern kamen gar nicht mehr durch, der Spielstand wirkte wie eingefroren. Solche Aufträge werden jetzt beim Tick erkannt: unbezahlte werden entfernt (dafür wurde nachweislich noch nichts abgebucht, es geht also nichts verloren) und die Baustelle wird wieder frei; bereits bezahlte bleiben erhalten und werden normal fertiggebaut. Ein beschädigter Auftrag blockiert damit auch keinen gesunden Auftrag mehr, der hinter ihm wartet.',
+      'Dieselbe Absicherung für die Bau-Wunschliste: Steht dort ein Gebäude, das es im Spiel nicht mehr gibt, wird der Eintrag jetzt entfernt statt den Tick abstürzen zu lassen.',
+      'Im normalen Spielbetrieb konnte das nicht entstehen – neu eingereihte Aufträge bekommen immer ein Kostenobjekt. Betroffen waren ausschließlich sehr alte oder beschädigte Spielstände. Genau diese Fälle sind aber die, die beim Spieler als „hängt seit Tagen" ankommen und kaum zu reproduzieren sind.',
+    ]},
     { version:'8.280.0', date:'24.07.2026', changes:[
       'Neu: Kompakte Kopfzeile. Auf schmalen Bildschirmen begann der eigentliche Tab-Inhalt bisher erst nach 721 Pixeln – Planeten-Banner, Ressourcenleiste, Tagesaufgaben und Reiter stapelten sich auf JEDEM Tab neu übereinander. Auf einem Handy sah man damit ohne Scrollen praktisch nichts vom Spiel. Im kompakten Modus beginnt der Inhalt nach rund 330 Pixeln, also mehr als 400 Pixel früher. Dabei geht nichts verloren: alle sechs Ressourcen sind weiterhin da (als dichte, seitlich wischbare Zeile mit Füllstandsbalken), die Tagesaufgaben ebenso, und die Reiter bleiben beim Scrollen jetzt oben stehen.',
       'Der Modus schaltet sich auf schmalen Bildschirmen (bis 1000 Pixel) automatisch ein und auf breiten aus – dort ist genug Platz und das Planeten-Banner ist ein Gewinn. Mit dem neuen Knopf in der Kopfzeile lässt sich jederzeit umschalten; deine Wahl wird gespeichert und gilt dann geräteweise, genau wie beim Energiesparmodus. Solange du nicht selbst umschaltest, entscheidet die Automatik weiter mit der Bildschirmbreite.',
@@ -15111,6 +15116,11 @@
       const b = item.planet === 'home' ? state.buildings : (state.colonies[item.planet] ? state.colonies[item.planet].buildings : null);
       if (!b){ state.buildQueue.splice(i,1); return true; }
       const def = BUILDING_DEFS.find(d=>d.key===item.key);
+      // Dieselbe Fehlerklasse wie bei den Bauaufträgen (siehe pruneBrokenConstructionJobs): steht in
+      // der gespeicherten Wunschliste ein Gebäude, das es in BUILDING_DEFS nicht (mehr) gibt, warf
+      // die nächste Zeile bisher bei JEDEM Tick - der ganze Haupt-Tick blieb hängen. Eintrag
+      // entfernen statt abstürzen, gleiches Muster wie die Planeten-Prüfung direkt darüber.
+      if (!def){ state.buildQueue.splice(i,1); log('Unbekannter Eintrag "'+item.key+'" aus der Bau-Wunschliste entfernt (Gebäude existiert nicht mehr).', 'ti-alert-triangle'); return true; }
       if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){ state.buildQueue.splice(i,1); return true; }
       const lvl = b[item.key]||0;
       if (def.maxLevel && lvl >= def.maxLevel){ log(def.name+' (Warteschlange) hat bereits die Maximalstufe ('+def.maxLevel+') erreicht - Eintrag übersprungen.', 'ti-alert-triangle'); state.buildQueue.splice(i,1); return true; }
@@ -15261,7 +15271,33 @@
   // ERSTE bezahlbare wartende Auftrag in Warteschlangen-Reihenfolge bezahlt und gestartet - ein davor
   // liegender, noch nicht bezahlbarer Auftrag wird dabei übersprungen (bleibt liegen, wird beim
   // nächsten Tick erneut versucht). Läuft vor processConstructionQueue() im Haupt-Tick.
+  // Härtung gegen beschädigte/veraltete Warteschlangen-Einträge (24.07.2026). canAfford() und pay()
+  // machen beide Object.entries(job.cost) - ist cost kein Objekt (undefined/null), wirft der
+  // HAUPT-TICK. Und zwar bei JEDEM weiteren Tick erneut, weil der Eintrag liegen bleibt: Bauqueue,
+  // Forschung, Missionen und Speichern kommen dann gar nicht mehr durch. Das ist genau die Sorte
+  // Fehler, die beim Spieler als "hängt seit Tagen / immer derselbe Stand" ankommt und extrem schwer
+  // zu reproduzieren ist (siehe der Vorfall mit saveSanityViolation in CLAUDE.md).
+  // queueConstruction() setzt heute IMMER cost:{} (siehe dort), im Normalbetrieb kann das also nicht
+  // entstehen - betroffen sind ausschliesslich Spielstände aus der Zeit davor sowie beschädigte oder
+  // von Hand veränderte Stände.
+  // UNBEZAHLTE Einträge werden entfernt: die Bezahlung passiert erst weiter unten in
+  // activateQueuedJobs, es wurde also nachweislich noch nichts abgebucht - es geht nichts verloren
+  // und die Baustelle wird wieder frei. BEZAHLTE Einträge bleiben erhalten und bekommen cost:{}:
+  // sie sind bereits abgebucht und sollen normal fertig werden (cancelConstruction nutzt ohnehin
+  // schon job.cost||{}, dort war die Absicherung also bereits vorhanden).
+  function pruneBrokenConstructionJobs(){
+    if (!state.constructionQueue || !state.constructionQueue.length) return;
+    const broken = state.constructionQueue.filter(j => !j || !j.cost || typeof j.cost !== 'object');
+    if (!broken.length) return;
+    for (const j of broken) if (j && j.paid) j.cost = {};
+    const drop = broken.filter(j => !j || !j.paid);
+    if (drop.length){
+      state.constructionQueue = state.constructionQueue.filter(j => drop.indexOf(j) === -1);
+      log(drop.length+' beschädigte(r) Bauauftrag/-aufträge ohne Kostenangabe aus der Warteschlange entfernt - dafür wurden keine Ressourcen abgebucht.', 'ti-alert-triangle');
+    }
+  }
   function activateQueuedJobs(){
+    pruneBrokenConstructionJobs();
     if (!state.constructionQueue || !state.constructionQueue.length) return false;
     const now = Date.now();
     const groups = {};
