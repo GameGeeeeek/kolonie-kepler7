@@ -737,6 +737,43 @@
     .tab-panel.active { display:block; animation: tabIn 0.28s ease forwards; }
     @keyframes tabIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 
+    /* ===== Kompakte Kopfzeile (Grafik-Audit 24.07.2026, Entwurf A) =====
+       Gemessen im echten Spiel: auf 420px Breite begann der Tab-INHALT erst bei 721px, weil sich
+       Hero-Banner (190px) + Ressourcenleiste + Tagesaufgaben + Reiter auf JEDEM Tab neu stapeln.
+       Auf einem Handy (rund 700px sichtbar) sah man damit ohne Scrollen null Spielinhalt.
+       Der kompakte Modus schrumpft genau diese Kopfzone. Bewusst REIN ÜBER CSS auf einer
+       body-Klasse: die Render-Logik, die Reihenfolge der Elemente und alle Event-Handler bleiben
+       unangetastet - der Modus kann deshalb nichts kaputt machen, was im Normalmodus funktioniert,
+       und ist jederzeit umschaltbar. Standard: an auf schmalen Bildschirmen (dort ist das Problem),
+       aus auf breiten (dort ist genug Platz und das Banner ist ein Gewinn). */
+    body.compact-head .hero { height:auto; margin-bottom:0.6rem; }
+    body.compact-head .hero > svg { display:none; }
+    body.compact-head .hero-stats { position:static; padding:8px 12px 0; gap:6px; }
+    body.compact-head .hero-bottom { position:static; padding:6px 12px 10px; gap:6px 10px; }
+    body.compact-head .hero-title .name { font-size:15px; }
+    body.compact-head .hero-title .sub { display:none; }
+    body.compact-head .header-btn-label { display:none; }
+    body.compact-head .hstat { padding:3px 7px; }
+    body.compact-head .hstat-label { font-size:8.5px; }
+    body.compact-head .hstat-value { font-size:12px; }
+    /* Ressourcen: eine dichte, waagerecht wischbare Zeile statt eines 2-3-zeiligen Kachelrasters.
+       Die Karten behalten ihre Struktur und ihren Füllstandsbalken - nur Beschriftung und Polster
+       fallen weg, der Wert bleibt gross und lesbar. */
+    body.compact-head .resbar { display:flex; gap:6px; overflow-x:auto; margin-bottom:0.6rem; padding-bottom:4px; scrollbar-width:thin; scrollbar-color:rgba(var(--info-rgb),0.55) transparent; }
+    body.compact-head .rescard { flex:0 0 auto; min-width:104px; padding:6px 9px; gap:7px; border-radius:8px; }
+    body.compact-head .rescard .icon-badge { width:22px; height:22px; border-radius:6px; font-size:12px; }
+    body.compact-head .rescard .label { display:none; }
+    body.compact-head .rescard .value { font-size:14px; }
+    body.compact-head .rescard .value span { display:none; }
+    body.compact-head .rescard .rate { font-size:9.5px; }
+    /* Tagesaufgaben: eine wischbare Zeile statt eines umbrechenden Chip-Blocks. */
+    body.compact-head #dailyQuestBar > div { flex-wrap:nowrap !important; overflow-x:auto; padding-bottom:4px; }
+    body.compact-head #dailyQuestBar > div > * { flex:0 0 auto; }
+    body.compact-head #dailyQuestBar { margin-bottom:0.5rem !important; }
+    /* Die Reiter bleiben beim Scrollen oben stehen - der haeufigste Handgriff im Spiel. */
+    body.compact-head .tabs { position:sticky; top:0; z-index:25; background:rgba(10,13,26,0.94); backdrop-filter:blur(6px); padding:6px 0; margin-bottom:0.8rem; }
+    .head-compact-toggle { font-size:10.5px; padding:4px 9px; margin-left:auto; }
+    @media (prefers-reduced-motion: reduce) { body.compact-head .tabs { backdrop-filter:none; background:#0a0d1a; } }
     .resbar { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:1.5rem; }
     @media (min-width: 1400px) { .resbar { grid-template-columns: repeat(6, 1fr); } }
     /* Grafik-Runde 10, "Breakpoints konsolidieren": die frühere @media(max-width:620px)-Regel setzte
@@ -1859,6 +1896,7 @@
             <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Hilfe</span></button>
             <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Einstellungen</span></button>
             <button id="headerKofiBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); border-radius:9px; border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; cursor:pointer; display:inline-flex; align-items:center; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;" title="Top-Unterstützer ansehen oder dem Entwickler einen Kaffee spendieren (Ko-fi)"><span aria-hidden="true" style="margin-right:3px;">☕</span><span class="header-btn-label">Kaffee</span></button>
+            <button id="headerCompactBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Kopfzeile kompakt oder ausführlich anzeigen" aria-pressed="false"><i class="ti ti-list-details" aria-hidden="true" id="headerCompactIcon"></i></button>
             <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); align-items:center; justify-content:center;" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
           </div>
         </div>
@@ -3703,8 +3741,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.279.0';
+  const VERSION = '8.280.0';
   const PATCHNOTES = [
+    { version:'8.280.0', date:'24.07.2026', changes:[
+      'Neu: Kompakte Kopfzeile. Auf schmalen Bildschirmen begann der eigentliche Tab-Inhalt bisher erst nach 721 Pixeln – Planeten-Banner, Ressourcenleiste, Tagesaufgaben und Reiter stapelten sich auf JEDEM Tab neu übereinander. Auf einem Handy sah man damit ohne Scrollen praktisch nichts vom Spiel. Im kompakten Modus beginnt der Inhalt nach rund 330 Pixeln, also mehr als 400 Pixel früher. Dabei geht nichts verloren: alle sechs Ressourcen sind weiterhin da (als dichte, seitlich wischbare Zeile mit Füllstandsbalken), die Tagesaufgaben ebenso, und die Reiter bleiben beim Scrollen jetzt oben stehen.',
+      'Der Modus schaltet sich auf schmalen Bildschirmen (bis 1000 Pixel) automatisch ein und auf breiten aus – dort ist genug Platz und das Planeten-Banner ist ein Gewinn. Mit dem neuen Knopf in der Kopfzeile lässt sich jederzeit umschalten; deine Wahl wird gespeichert und gilt dann geräteweise, genau wie beim Energiesparmodus. Solange du nicht selbst umschaltest, entscheidet die Automatik weiter mit der Bildschirmbreite.',
+    ]},
     { version:'8.279.0', date:'24.07.2026', changes:[
       'Die zwölf Reiter sind jetzt nach Bereich farbcodiert: Kolonie (Basis, Verteidigung, Forschung, Flotte) violett, Erkundung (Expedition, Sektorkarte, Galaxie) cyan, Gemeinschaft (Allianz, Offiziere) gold und Fortschritt (Markt, Punktestand, Fortschritt) grün. Jeder Reiter trägt einen dünnen Farbfuß, der aktive Reiter übernimmt die Farbe seines Bereichs komplett – so sieht man auf einen Blick, in welchem Bereich man gerade ist. Die Reihenfolge der Reiter bleibt bewusst unverändert, damit die gewohnten Positionen erhalten bleiben.',
       'Hintergrund: Die Gruppen gab es strukturell schon (als Trennstriche zwischen den Reitern), aber die Striche waren fast unsichtbar und gingen beim Zeilenumbruch verloren – bei zwölf Reitern der Normalfall. Farbe überlebt den Umbruch, ein Trennstrich nicht.',
@@ -28853,6 +28895,30 @@
   const isCoarsePointer = (typeof window!=='undefined' && window.matchMedia) ? window.matchMedia('(pointer: coarse)').matches : false;
   function powerSaveActive(){ return state.powerSave !== undefined ? !!state.powerSave : isCoarsePointer; }
   function applyPowerSaveClass(){ if (document.body) document.body.classList.toggle('power-save', powerSaveActive()); }
+  // Kompakte Kopfzeile (Grafik-Audit 24.07.2026, Entwurf A). Bewusst nach demselben tri-state-Muster
+  // wie powerSave oben: undefined = Automatik (kompakt nur dort, wo die Kopfzone wirklich stört -
+  // also auf schmalen Bildschirmen), true/false = ausdrückliche Wahl des Spielers. So entscheidet bei
+  // Server-Sync jedes GERÄT für sich, statt eine Handy-Einstellung auf den Desktop zu zwingen.
+  const COMPACT_HEAD_MAX_WIDTH = 1000;
+  function compactHeadAuto(){ return (typeof window!=='undefined') && window.innerWidth <= COMPACT_HEAD_MAX_WIDTH; }
+  function compactHeadActive(){ return state.compactHead !== undefined ? !!state.compactHead : compactHeadAuto(); }
+  function applyCompactHeadClass(){
+    if (!document.body) return;
+    const on = compactHeadActive();
+    document.body.classList.toggle('compact-head', on);
+    const btn = document.getElementById('headerCompactBtn');
+    if (btn){
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.title = on ? 'Kopfzeile kompakt (antippen für die ausführliche Ansicht mit Planeten-Banner)'
+                     : 'Kopfzeile ausführlich (antippen für die kompakte Ansicht - mehr Platz für den Tab-Inhalt)';
+      btn.style.color = on ? '#5ce1ff' : '';
+    }
+  }
+  function toggleCompactHead(){
+    state.compactHead = !compactHeadActive();
+    applyCompactHeadClass();
+    save();
+  }
   function animateResValue(el, from, to, cap){
     if (resValAnimFrames.has(el)) cancelAnimationFrame(resValAnimFrames.get(el));
     if ((prefersReducedMotionMq && prefersReducedMotionMq.matches) || powerSaveActive()){
@@ -29097,6 +29163,7 @@
 
   function render(){
     applyPowerSaveClass(); // Energiesparmodus-Klasse (billig: ein classList.toggle) - greift auch nach Laden/Sync eines fremden Spielstands
+    applyCompactHeadClass(); // dito für die kompakte Kopfzeile - ebenfalls nur ein classList.toggle
     const rates = ratesPerSecond();
 
     const cap = storageCap();
@@ -33489,6 +33556,11 @@
     if (refreshReportsBtn) refreshReportsBtn.onclick = () => loadReports();
     const headerHelpBtn = document.getElementById('headerHelpBtn');
     if (headerHelpBtn) headerHelpBtn.onclick = () => switchTab('hilfe');
+    const headerCompactBtn = document.getElementById('headerCompactBtn');
+    if (headerCompactBtn) headerCompactBtn.onclick = () => toggleCompactHead();
+    // Beim Drehen/Größenändern greift die Automatik neu - aber nur, solange der Spieler NICHT
+    // ausdrücklich gewählt hat (state.compactHead undefined). Eine bewusste Wahl bleibt bestehen.
+    window.addEventListener('resize', () => { if (state.compactHead === undefined) applyCompactHeadClass(); });
     const headerProfileBtn = document.getElementById('headerProfileBtn');
     if (headerProfileBtn) headerProfileBtn.onclick = () => switchTab('einstellungen');
     const headerReportsBtn = document.getElementById('headerReportsBtn');
