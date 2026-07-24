@@ -3562,8 +3562,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.269.0';
+  const VERSION = '8.270.0';
   const PATCHNOTES = [
+    { version:'8.270.0', date:'24.07.2026', changes:[
+      'Modul-Ausbau: Standort-Sockel („Sockets"). Jeder Standort hat jetzt zwei Sockel-Plätze, in die du gegen Modulfragmente (15 je Chip) selbst gewählte Sockel-Chips einsetzt – jeder Chip gibt +2% auf einen Effekt deiner Wahl (Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit). Anders als die zufälligen Substats bestimmst du hier gezielt, was verstärkt wird. Von Anfang an bewusst gedeckelt: nur 2 Plätze je Standort, nur +2% je Chip, und die Chips zahlen auf dieselben nachgelagerten Deckel ein wie alle Modul-Boni (Bauzeit −50%, Verteidigung +100% usw.). Kein Angriffs- oder Überfall-Schutz-Effekt (PvP-Parität bleibt exakt, kein Backend nötig). Chips lassen sich jederzeit wieder entfernen (werden dabei verworfen). Verwaltung im Offiziere-Tab unter den Modul-Slots.',
+    ]},
     { version:'8.269.0', date:'24.07.2026', changes:[
       'Modul-Ausbau Runde 6: Loadout-Profile ausgebaut. Statt zwei anonymer Ausrüstungs-Vorlagen (A/B) gibt es jetzt DREI Profile je Standort – und beim Speichern bekommt jedes Profil automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung", „Wirtschaft", „Forschung" oder „Angriff/Wirtschaft" bei gemischten Setups). So sieht man auf einen Blick, welches Profil welchen Zweck hat, ohne selbst tippen zu müssen. Reine Komfort-Funktion ohne Spielwirkung; das 1-Klick-Anwenden tauscht die Module weiterhin sauber übers Inventar und überspringt zwischenzeitlich verschmolzene/zerlegte Module.',
     ]},
@@ -11606,6 +11609,47 @@
     for (const s of activeSetsAt(planetKey)) sum += (s.bonuses[effect] || 0);
     return sum;
   }
+  // ===== Standort-Sockel (Modul-Ausbau Runde 6, Teil „Sockets", 24.07.2026) =====
+  // Bewusst PRO STANDORT statt pro Modul: die Modul-Count-Map (typ:seltenheit:...) müsste sonst ein
+  // fragiles 5. Schlüssel-Segment tragen (genau die Fehlerklasse aus dem Schmelze-Bugfix). Sockel werden
+  // wie equippedModules pro Planet gespeichert (state.planetSockets[pk] = [{e:'prod'}, ...]).
+  // GEDECKELT VON ANFANG AN: fest 2 Sockel je Standort, je Chip nur +2%, und der Effekt-Pool enthält
+  // BEWUSST kein 'raidloss' (server-nachgerechnete PvP-Beute) und kein 'atk'/Schiffs-Feld -> rein
+  // client-seitig, keine PvP-Parität betroffen, kein Backend-Change. Die Boni fließen additiv in
+  // moduleBonusAt und unterliegen damit denselben nachgelagerten Deckeln (Bauzeit -50%, Verteidigung
+  // +100% usw.) wie alle anderen Modul-Boni.
+  const SOCKET_SLOTS_PER_PLANET = 2;
+  const SOCKET_CHIP_COST = 15;      // Modulfragmente je Chip
+  const SOCKET_CHIP_BONUS = 0.02;   // +2% auf den gewählten Effekt je Chip
+  const SOCKET_POOL = ['prod','buildspeed','storage','def','defatk','fuelcost','exprisk']; // nur ortsgebundene, client-only Effekte
+  function planetSocketsOf(pk){ return (state.planetSockets||{})[pk||'home'] || []; }
+  function socketBonusAt(planetKey, effect){
+    let s = 0;
+    for (const c of planetSocketsOf(planetKey)) if (c && c.e === effect) s += SOCKET_CHIP_BONUS;
+    return s;
+  }
+  function insertSocketChip(pk, effect){
+    pk = pk || 'home';
+    if (!SOCKET_POOL.includes(effect)){ return; }
+    if (pk !== 'home' && !state.colonies[pk]){ log('Ungültiger Standort.', 'ti-alert-triangle'); return; }
+    const cur = planetSocketsOf(pk);
+    if (cur.length >= SOCKET_SLOTS_PER_PLANET){ log('Alle Sockel an diesem Standort sind belegt.', 'ti-alert-triangle'); return; }
+    if ((state.moduleFragments||0) < SOCKET_CHIP_COST){ log('Nicht genug Modulfragmente ('+SOCKET_CHIP_COST+' benötigt, Vorrat: '+(state.moduleFragments||0)+'). Zerlege überzählige Module.', 'ti-alert-triangle'); return; }
+    state.moduleFragments -= SOCKET_CHIP_COST;
+    if (!state.planetSockets) state.planetSockets = {};
+    state.planetSockets[pk] = [...cur, { e: effect }];
+    log('Sockel-Chip eingesetzt: +'+Math.round(SOCKET_CHIP_BONUS*100)+'% '+(MODULE_SUB_EFFECT_LABEL[effect]||effect)+' an '+displayPlanetName(pk)+' (−'+SOCKET_CHIP_COST+' Fragmente, Rest: '+state.moduleFragments+').', 'ti-atom-2', 'ok');
+    playSound('build'); render(); save();
+  }
+  function removeSocketChip(pk, idx){
+    pk = pk || 'home';
+    const cur = [...planetSocketsOf(pk)];
+    if (idx < 0 || idx >= cur.length) return;
+    const removed = cur.splice(idx, 1)[0];
+    state.planetSockets[pk] = cur;
+    log('Sockel-Chip entfernt und verworfen (+'+Math.round(SOCKET_CHIP_BONUS*100)+'% '+(removed?(MODULE_SUB_EFFECT_LABEL[removed.e]||removed.e):'')+').', 'ti-box');
+    render(); save();
+  }
   // Summierter Bonus eines Effekts (siehe MODULE_DEFS: def/atk/prod/buildspeed/raidloss/storage/
   // defatk/research/expedition/fuelcost/exprisk/trade) durch ausgerüstete Module an einem Standort,
   // inklusive Set-Bonus.
@@ -11617,9 +11661,10 @@
       if (info.def.effect === effect) sum += info.bonus;
       for (const s of info.subs) if (s.effect === effect) sum += s.value; // Substats zählen auf ihren jeweiligen Effekt
     }
-    // Generischer Seltenheits-Set-Bonus multiplikativ auf die Modulsumme; benannte Set-Boni additiv obendrauf;
-    // ganz zum Schluss der globale Modultechnik-Forschungsfaktor (moduleTechMult, ohne raidloss - PvP-Parität).
-    return (sum * moduleSetMult(planetKey) + setBonusAt(planetKey, effect)) * moduleTechMult(effect);
+    // Generischer Seltenheits-Set-Bonus multiplikativ auf die Modulsumme; benannte Set-Boni + Standort-Sockel
+    // additiv obendrauf; ganz zum Schluss der globale Modultechnik-Forschungsfaktor (moduleTechMult, ohne
+    // raidloss - PvP-Parität). Alle Summanden landen in denselben nachgelagerten Deckeln.
+    return (sum * moduleSetMult(planetKey) + setBonusAt(planetKey, effect) + socketBonusAt(planetKey, effect)) * moduleTechMult(effect);
   }
   // Summe eines Modul-Effekts über ALLE Standorte - für imperiumsweite Module (Forschung/Expedition),
   // die nicht ortsgebunden wirken. Gedeckelt an den Verbrauchsstellen (Math.max/Math.min).
@@ -17444,7 +17489,7 @@
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
-      { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Dreizehn Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit, alle Werftmodule eines Standorts zusammen bei −50% gedeckelt), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen, +100% gedeckelt), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit, +100% gedeckelt), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit, +100% gedeckelt – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär; Level und Substats der Module bleiben dabei erhalten); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
+      { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Dreizehn Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit, alle Werftmodule eines Standorts zusammen bei −50% gedeckelt), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen, +100% gedeckelt), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit, +100% gedeckelt), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit, +100% gedeckelt – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente/Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär; Level und Substats der Module bleiben dabei erhalten); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Sieben Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
@@ -30793,6 +30838,31 @@
         } else {
           html += `<div class="bmeta" style="text-align:center; color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximale Slot-Anzahl erreicht</div>`;
         }
+        // Standort-Sockel (Runde 6, „Sockets"): bis zu 2 Chips je Standort, je +2% auf einen gewählten Effekt.
+        {
+          const sockets = planetSocketsOf(pk);
+          const canAffordChip = (state.moduleFragments||0) >= SOCKET_CHIP_COST;
+          html += `<div class="bmeta" style="margin-top:10px; margin-bottom:4px;"><i class="ti ti-atom-2" aria-hidden="true"></i> Standort-Sockel (${sockets.length}/${SOCKET_SLOTS_PER_PLANET} · je Chip +${Math.round(SOCKET_CHIP_BONUS*100)}% auf einen Effekt, ${SOCKET_CHIP_COST} Fragmente):</div>`;
+          html += `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;">`;
+          for (let i=0;i<SOCKET_SLOTS_PER_PLANET;i++){
+            const c = sockets[i];
+            if (c){
+              html += `<div class="card-row" style="min-width:120px; align-items:center; gap:6px; border-color:#7e77dd;">
+                <span class="bmeta" style="color:#c3bef5;"><i class="ti ti-atom-2" aria-hidden="true"></i> +${Math.round(SOCKET_CHIP_BONUS*100)}% ${MODULE_SUB_EFFECT_LABEL[c.e]||c.e}</span>
+                <button data-socket-remove="${i}" style="font-size:10px; padding:3px 6px;" title="Chip entfernen (wird verworfen)"><i class="ti ti-x" aria-hidden="true" style="margin-right:2px;"></i>Entfernen</button>
+              </div>`;
+            } else {
+              html += `<div class="card-row" style="min-width:120px; justify-content:center; border-style:dashed; opacity:0.7;"><span class="bmeta"><i class="ti ti-plus" aria-hidden="true"></i> Freier Sockel</span></div>`;
+            }
+          }
+          html += `</div>`;
+          if (sockets.length < SOCKET_SLOTS_PER_PLANET){
+            html += `<div class="bmeta" style="opacity:0.8; margin-bottom:3px;">Chip einsetzen${canAffordChip?'':' (zu wenig Fragmente)'}:</div>`;
+            html += `<div style="display:flex; gap:5px; flex-wrap:wrap;">` + SOCKET_POOL.map(e =>
+              `<button data-socket-insert="${e}" ${canAffordChip?'':'disabled'} style="font-size:10px; padding:4px 8px;" title="Sockel-Chip +${Math.round(SOCKET_CHIP_BONUS*100)}% ${MODULE_SUB_EFFECT_LABEL[e]||e} einsetzen (${SOCKET_CHIP_COST} Fragmente)">+${Math.round(SOCKET_CHIP_BONUS*100)}% ${MODULE_SUB_EFFECT_LABEL[e]||e}</button>`
+            ).join('') + `</div>`;
+          }
+        }
         // Modul-Loadouts (24.07.2026): zwei Vorlagen pro Standort, speichern + 1-Klick anwenden.
         {
           const lo = (state.moduleLoadouts||{})[pk]||{};
@@ -30893,6 +30963,8 @@
         moduleBox.querySelectorAll('[data-fragcraft-loc]').forEach(btn => btn.onclick = () => craftModuleFromFragments(false, btn.getAttribute('data-fragcraft-loc'), state.fragCraftRarity||'gewoehnlich'));
         moduleBox.querySelectorAll('[data-loadout-save]').forEach(btn => btn.onclick = () => saveModuleLoadout(pk, btn.getAttribute('data-loadout-save')));
         moduleBox.querySelectorAll('[data-loadout-apply]').forEach(btn => btn.onclick = () => applyModuleLoadout(pk, btn.getAttribute('data-loadout-apply')));
+        moduleBox.querySelectorAll('[data-socket-insert]').forEach(btn => btn.onclick = () => insertSocketChip(pk, btn.getAttribute('data-socket-insert')));
+        moduleBox.querySelectorAll('[data-socket-remove]').forEach(btn => btn.onclick = () => removeSocketChip(pk, parseInt(btn.getAttribute('data-socket-remove'))));
       }
       const shipModuleBox = document.getElementById('shipModuleBox');
       if (shipModuleBox){
