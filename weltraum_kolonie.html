@@ -3551,8 +3551,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.257.0';
+  const VERSION = '8.258.0';
   const PATCHNOTES = [
+    { version:'8.258.0', date:'24.07.2026', changes:[
+      'Berichte neu gestaltet (Spieler-Wunsch „optisch schöner"): Jede Bericht-Karte hat jetzt einen farbigen Ergebnis-Streifen links (grün = Erfolg/Sieg, rot = Verlust/Niederlage), das Typ-Icon sitzt in einer eigenen Kachel, und die Kopfzeile fasst Titel, Gewonnen/Verloren-Markierung, Datum und den Löschen-Knopf sauber in einer Reihe zusammen. Darunter, durch eine feine Trennlinie abgesetzt, stehen weiterhin alle gewohnten Details (Ausgangspunkt, Eskorte, Beute, Begegnungen, Verluste, Trümmer) – nur aufgeräumter und leichter zu scannen. Gilt für alle Berichtsarten (Expeditionen, Kämpfe, Sonderereignisse).',
+    ]},
     { version:'8.257.0', date:'24.07.2026', changes:[
       'Neu: Willkommens-Screen für neue Spieler. Direkt nach der ersten Anmeldung stellt dir das Spiel dein frisch zugewiesenes Heimatsystem auf einer kleinen Galaxiekarte vor (mit deiner echten Position weit am Rand, entfernt von den bewohnten Systemen) und zeigt deinen 4-Tage-Anfängerschutz mit Restzeit. Ein Klick auf „Kolonie betreten" führt anschließend in den gewohnten Einführungs-Rundgang. Erscheint nur einmal und nur für frisch registrierte Konten.',
     ]},
@@ -17599,17 +17602,26 @@
         : r.type==='random-event' ? (r.icon||'ti-sparkles')
         : r.type==='expedition' ? (expeditionPositive?'ti-map-2':'ti-alert-triangle')
         : (won?'ti-shield-lock':'ti-alert-triangle');
+      // Kartenstil "Vorschlag A": farbiger Ergebnis-Streifen links, Icon in einer Kachel, saubere
+      // Kopfzeile (Titel · Gewonnen/Verloren-Pill · Datum · Löschen), darunter der vollständige
+      // Berichtstext (Ausgangspunkt, Eskorte, Beute, Begegnung, Verluste ... - bleibt komplett erhalten).
+      const rAccent = positive ? '#5dcaa5' : '#e24b4a';
+      const rIconBg = positive ? 'rgba(93,202,165,0.16)' : 'rgba(226,75,74,0.16)';
+      const rIconBorder = positive ? 'rgba(93,202,165,0.4)' : 'rgba(226,75,74,0.4)';
+      const wonPill = !REPORT_SPECIAL_GREEN_TYPES.includes(r.type)
+        ? `<span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; color:${positive?'#5dcaa5':'#ffb4b4'}; background:${positive?'rgba(93,202,165,0.16)':'rgba(226,75,74,0.2)'}; border:0.5px solid ${positive?'rgba(93,202,165,0.4)':'rgba(226,75,74,0.4)'}; border-radius:5px; padding:2px 7px;"><i class="ti ${positive?'ti-check':'ti-x'}" aria-hidden="true"></i> ${positive?'Gewonnen':'Verloren'}</span>`
+        : '';
       return `
-        <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:${positive?(isSpecial?'#5dcaa5':'#1d9e75'):'#e24b4a'};">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span class="bname"><i class="ti ${cardIcon}" aria-hidden="true" style="color:${positive?'#5dcaa5':'#e24b4a'};"></i> ${title}</span>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span class="bmeta">${when}</span>
-              <button aria-label="Bericht löschen" data-delete-report="${r.id}" style="font-size:10px; padding:3px 7px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
-            </div>
+        <div class="card-row" style="flex-direction:column; align-items:stretch; gap:0; border-color:var(--line-1); border-left:3px solid ${rAccent}; box-shadow:-2px 0 12px -6px ${rAccent};">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="bicon" style="width:34px; height:34px; font-size:16px; background:${rIconBg}; border:1px solid ${rIconBorder}; color:${rAccent};"><i class="ti ${cardIcon}" aria-hidden="true"></i></div>
+            <span class="bname" style="flex:1; min-width:0;">${title}</span>
+            ${wonPill}
+            <span class="bmeta" style="white-space:nowrap;">${when}</span>
+            <button aria-label="Bericht löschen" data-delete-report="${r.id}" style="font-size:10px; padding:3px 7px; flex-shrink:0;"><i class="ti ti-trash" aria-hidden="true"></i></button>
           </div>
-          ${!REPORT_SPECIAL_GREEN_TYPES.includes(r.type) ? `<span class="lvl-pill" style="align-self:flex-start; margin-top:4px; background:${positive?'rgba(29,158,117,0.25)':'rgba(226,75,74,0.25)'}; color:${positive?'#5dcaa5':'#ffb4b4'};"><i class="ti ${positive?'ti-check':'ti-x'}" aria-hidden="true"></i> ${positive?'Gewonnen':'Verloren'}</span>` : ''}
-          <div class="bmeta" style="margin-top:4px;">${body}</div>
+          <div style="height:1px; background:var(--line-1); margin:10px 0;"></div>
+          <div class="bmeta">${body}</div>
           ${actionsHtml}
         </div>
       `;
