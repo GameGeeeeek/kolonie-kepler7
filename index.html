@@ -2517,6 +2517,13 @@
 
       <div class="tab-panel" id="tab-fortschritt">
         <div class="jumpnav" id="jumpnav-fortschritt" style="display:none;"></div>
+        <div class="prog-section" data-sec="uebersicht">
+          <div class="section-title prog-sec-header" data-sec-toggle="uebersicht"><i class="ti ti-world" aria-hidden="true"></i>Imperium-Übersicht<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Alle Kernzahlen deines Imperiums auf einen Blick – Produktion pro Sekunde, Wirtschaft, Kampfkraft und Ausdehnung.</div>
+            <div id="empireOverviewBox" style="margin-bottom:1.5rem;"></div>
+          </div>
+        </div>
         <div class="prog-section" data-sec="eventkalender">
           <div class="section-title prog-sec-header" data-sec-toggle="eventkalender"><i class="ti ti-clock" aria-hidden="true"></i>Event-Kalender<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
           <div class="prog-sec-body">
@@ -3580,8 +3587,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.272.0';
+  const VERSION = '8.273.0';
   const PATCHNOTES = [
+    { version:'8.273.0', date:'24.07.2026', changes:[
+      'Neu: Imperium-Übersicht. Ganz oben im Fortschritt-Tab zeigt eine neue Sektion alle Kernzahlen deines Imperiums auf einen Blick: Produktion pro Sekunde für alle sechs Ressourcen (imperiumsweit), dazu Kredite, Angriffskraft, Verteidigung, Anzahl Standorte, Kommandanten-Level, Modulfragmente und Kommandopunkte. Praktisch, um Wachstum und Kampfkraft schnell einzuschätzen, ohne durch mehrere Tabs zu klicken.',
+    ]},
     { version:'8.272.0', date:'24.07.2026', changes:[
       'Neu: Standort-Notizen. Zusätzlich zum eigenen Kolonie-Namen kannst du im Basis-Tab jetzt eine kurze Notiz je Standort hinterlegen (z.B. „Werft-Welt Nord" oder „hier Verteidigung ausbauen"). Die Notiz erscheint als Tooltip auf den Kolonie-Karten der Kopfleiste. Außerdem behoben: eigene Kolonie-Namen werden jetzt WIRKLICH überall in der Oberfläche angezeigt – einige Stellen (u.a. Missions-/Expeditionsansichten) zeigten bisher noch den Standardnamen statt deines eigenen.',
     ]},
@@ -9255,6 +9265,46 @@
     if (r.essence){ if (!state.ascension) state.ascension = { count:0, essence:0, tree:{} }; state.ascension.essence = (state.ascension.essence||0) + r.essence; }
     log('Kompendium „'+cat.name+'" vervollständigt! Belohnung: '+(r.essence?r.essence+' Sternenessenz':'')+(r.essence&&r.credits?' + ':'')+(r.credits?r.credits+' Kredite':'')+'.', cat.icon, 'ok');
     playSound('achieve'); render(); save();
+  }
+  // ===== Imperium-Übersicht (24.07.2026, Spieler-Feature): alle Kernzahlen auf einen Blick =====
+  // Reine Anzeige (kein Live-Countdown) -> Signatur-Cache-Muster wie renderDominance/renderCompendium.
+  let lastEmpireOvSig = null;
+  function renderEmpireOverview(){
+    const box = document.getElementById('empireOverviewBox');
+    if (!box) return;
+    const r = ratesPerSecond();
+    const atk = attackPower(), def = defensePower();
+    const colonies = 1 + Object.keys(state.colonies||{}).length;
+    const level = commanderLevel(state.xp||0);
+    const credits = Math.floor(state.credits||0);
+    const frags = state.moduleFragments||0, cp = state.commandPoints||0;
+    const sig = [r.energie,r.erz,r.kristalle,r.deuterium,r.antimaterie,r.forschungspunkte,atk,def,colonies,level,credits,frags,cp].map(v=>Math.round(v)).join('|');
+    if (sig === lastEmpireOvSig) return;
+    lastEmpireOvSig = sig;
+    const tile = (label, value, color, icon) => `<div class="card-row" style="flex-direction:column; align-items:flex-start; gap:2px; min-width:104px; flex:1;">
+      <span class="bmeta" style="text-transform:uppercase; letter-spacing:0.4px; font-size:9.5px; opacity:0.8;"><i class="ti ${icon}" aria-hidden="true" style="margin-right:3px; color:${color};"></i>${label}</span>
+      <span class="bname" style="font-size:15px; color:${color}; font-variant-numeric:tabular-nums;">${value}</span></div>`;
+    const rate = v => (v>=0?'+':'')+fmt(Math.round(v))+'/s';
+    let html = `<div class="bmeta" style="margin-bottom:5px; opacity:0.85;"><i class="ti ti-bolt" aria-hidden="true"></i> Produktion pro Sekunde (imperiumsweit)</div>`;
+    html += `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">`
+      + tile('Energie', rate(r.energie), '#fac775', 'ti-bolt')
+      + tile('Erz', rate(r.erz), '#c7cbe0', 'ti-pick')
+      + tile('Kristalle', rate(r.kristalle), '#9fe1cb', 'ti-diamond')
+      + tile('Deuterium', rate(r.deuterium), '#7fd7f0', 'ti-droplet')
+      + tile('Antimaterie', rate(r.antimaterie), '#f3aec6', 'ti-atom-2')
+      + tile('Forschung', rate(r.forschungspunkte), '#c3bef5', 'ti-flask')
+      + `</div>`;
+    html += `<div class="bmeta" style="margin-bottom:5px; opacity:0.85;"><i class="ti ti-trophy" aria-hidden="true"></i> Wirtschaft, Kampfkraft & Ausdehnung</div>`;
+    html += `<div style="display:flex; gap:6px; flex-wrap:wrap;">`
+      + tile('Kredite', fmt(credits), '#fac775', 'ti-diamond')
+      + tile('Angriffskraft', fmt(atk), '#e24b4a', 'ti-sword')
+      + tile('Verteidigung', fmt(def), '#5dcaa5', 'ti-shield')
+      + tile('Standorte', colonies, '#c3bef5', 'ti-world')
+      + tile('Kommandant', 'Lvl '+level, '#c3bef5', 'ti-user-circle')
+      + tile('Modulfragmente', fmt(frags), '#9fe1cb', 'ti-box')
+      + tile('Kommandopunkte', fmt(cp), '#c3bef5', 'ti-medal')
+      + `</div>`;
+    box.innerHTML = html;
   }
   let lastCompendiumSig = null;
   function renderCompendium(){
@@ -32259,6 +32309,7 @@
     const xpPct = Math.max(0, Math.min(100, ((curXp-xpBase)/(xpNext-xpBase))*100));
     const levelBox = document.getElementById('levelBox');
     renderEventCalendarBox();
+    renderEmpireOverview();
     renderCompendium();
     renderDominance();
     renderAllianceTitlesBox();
