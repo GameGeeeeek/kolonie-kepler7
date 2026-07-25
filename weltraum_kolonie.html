@@ -2334,6 +2334,19 @@
             <div class="toggle-switch" id="patchnotesToggleSwitch"><div class="toggle-knob"></div></div>
           </div>
         </div>
+<div class="section-title" style="margin-top:1.5rem;" id="sessionSectionTitle"><i class="ti ti-shield-lock" aria-hidden="true"></i>Sitzung &amp; Sicherheit</div>
+        <div id="sessionBox" style="display:none;">
+          <div class="bmeta" id="lastLoginText"><i class="ti ti-clock" aria-hidden="true"></i> Zuletzt angemeldet: —</div>
+          <div class="bmeta" style="margin-top:6px;">Pro Konto ist immer nur eine Sitzung aktiv. Passt der Zeitpunkt oben nicht zu deiner eigenen letzten Anmeldung, hat sich jemand anderes an deinem Konto angemeldet.</div>
+          <button id="logoutAllToggleBtn" style="margin-top:10px; font-size:11px;"><i class="ti ti-logout" aria-hidden="true" style="margin-right:4px;"></i>Alle Sitzungen beenden</button>
+          <div id="logoutAllRow" style="display:none; margin-top:8px;">
+            <div class="bmeta" style="color:#e0a548; margin-bottom:6px;">Beendet <strong>alle</strong> Anmeldungen dieses Kontos – auch die hier. Du wirst danach sofort abgemeldet und musst dich neu anmelden. Wenn sich jemand Fremdes angemeldet hat: <strong>ändere danach unbedingt dein Passwort</strong>, sonst kommt er mit demselben Passwort direkt wieder rein.</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <input type="password" id="logoutAllPasswordInput" placeholder="Aktuelles Passwort" style="flex:1; min-width:160px;"/>
+              <button id="logoutAllBtn"><i class="ti ti-logout" aria-hidden="true" style="margin-right:4px;"></i>Jetzt überall abmelden</button>
+            </div>
+          </div>
+        </div>
 <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-users" aria-hidden="true"></i>Freunde einladen</div>
         <div class="bmeta" style="margin-bottom:8px;">Teile deinen Einladungs-Link - klickt ein neuer Spieler darauf und registriert sich, wird der Bonus automatisch eingelöst. Bekommt ihr beide einen Bonus - nur mit eigenem Server verfügbar.</div>
         <div id="referralOwnCodeRow" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;">
@@ -2837,6 +2850,7 @@
       accountPendingEmail = me.pendingEmail||null;
       accountWantsPatchnotes = me.wantsPatchnotes !== false;
       accountUsername = me.username||'';
+      accountLastLoginAt = me.lastLoginAt || null;
     } catch(e){}
   }
 
@@ -2844,6 +2858,9 @@
   let accountMaskedEmail = '';
   let accountPendingEmail = null;
   let accountWantsPatchnotes = true;
+  // Zeitpunkt der Anmeldung, die die laufende Sitzung eröffnet hat (aus /me). null = Konto hat sich
+  // seit Einführung der Sitzungsführung noch nicht neu angemeldet, oder Server kennt das Feld nicht.
+  let accountLastLoginAt = null;
   // Saison-Liga (serverautoritativ, monatlich) - aus /api/me: aktueller Saison-Schlüssel, Saison-Ende
   // und der eigene Saison-Start-Score (null = für diese Saison noch nicht erfasst -> Zuwachs 0).
   let mySeasonKey = null;
@@ -4198,8 +4215,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.292.0';
+  const VERSION = '8.293.0';
   const PATCHNOTES = [
+    { version:'8.293.0', date:'25.07.2026', changes:[
+      'Neuer Bereich „Sitzung & Sicherheit" in den Einstellungen. Dort steht jetzt, wann die aktuell laufende Sitzung begonnen hat – also wann sich dein Konto zuletzt angemeldet hat. Passt der Zeitpunkt nicht zu deiner eigenen letzten Anmeldung, weißt du, dass jemand anderes an deinem Konto war. Bisher gab es dafür überhaupt keinen Anhaltspunkt.',
+      'Dazu der Knopf „Alle Sitzungen beenden" (Passwort-Bestätigung nötig): Er macht JEDE bisher ausgestellte Anmeldung dieses Kontos ungültig – auch die auf dem Gerät, an dem du ihn drückst, du wirst also sofort abgemeldet. Dein Spielstand wird vorher gesichert. Auch alte Anmeldungen aus der Zeit vor der Sitzungsführung erwischt es damit.',
+      'Ehrlich dazugesagt, weil es sonst falsche Sicherheit vorgaukelt: Wenn jemand dein Passwort kennt, kann er sich nach dem Abmelden direkt wieder anmelden. Der Knopf verschafft dir Zeit – ändere danach dein Passwort. Genau das steht auch im Spiel an der Stelle.'
+    ]},
     { version:'8.292.0', date:'25.07.2026', changes:[
       'Wichtig für alle, die auf mehreren Geräten spielen: Pro Konto ist ab jetzt immer nur EINE Sitzung aktiv – der Server führt sie mit. Meldest du dich auf einem zweiten Gerät an, wird das vorher angemeldete Gerät sauber abgemeldet und erklärt dort auch, warum. Bisher liefen beide Geräte einfach weiter und haben sich gegenseitig den Spielstand überschrieben: Wer auf dem Handy baute und am PC forschte, verlor je nachdem, welches Gerät zuletzt gespeichert hat, die Fortschritte des anderen – ohne jede Warnung.',
       'Der Abmelde-Dialog hat versprochen, dass „immer nur eine Sitzung aktiv" bleibt. Das stimmte bisher schlicht nicht – jetzt schon. Der Text nennt außerdem den tatsächlichen Grund: verdrängte Sitzung oder Speicherkonflikt.',
@@ -18879,6 +18901,7 @@
       { title:'Übersichtlichkeit (optional)', body:'In den <strong>Einstellungen</strong> lassen sich drei Layout-Optionen für die dichtesten Tabs (Punktestand, Fortschritt) einzeln aktivieren, alle standardmäßig aus: <strong>Sprungmarken</strong> (Klick-Leiste oben springt direkt zu einem Abschnitt), <strong>Aufklappbare Abschnitte</strong> (jeder Abschnitt einzeln ein-/ausklappbar, gemerkt) und <strong>Zweispaltiges Layout</strong> (kurze Abschnitte nebeneinander, nur auf breiteren Bildschirmen sichtbar). Das bisherige Layout bleibt unverändert der Standard.' },
       { title:'Konto & E-Mail-Bestätigung', body:'Für ein neues Konto ist eine <strong>E-Mail-Adresse Pflicht</strong>. Nach der Registrierung bekommst du eine Bestätigungs-E-Mail mit einem Link (24h gültig) – erst nach dem Klick darauf ist dein Konto freigeschaltet und du kannst dich anmelden. Keine Mail erhalten? Auch im Spam-Ordner nachsehen oder über den Login-Bildschirm eine neue anfordern. Bestehende Konten sind davon nicht betroffen.' },
       { title:'Nur ein Gerät gleichzeitig', body:'Pro Konto ist immer nur <strong>eine Sitzung</strong> aktiv. Meldest du dich auf einem zweiten Gerät an (Handy, Tablet, anderer Browser), wird das zuvor angemeldete Gerät automatisch abgemeldet und zeigt dort einen Hinweis – dein Fortschritt bis dahin ist gespeichert. Hintergrund: Zwei parallel laufende Geräte haben sich sonst gegenseitig den Spielstand überschrieben, sodass Bauaufträge, Forschung oder Ressourcen scheinbar zurücksprangen. <strong>Mehrere Tabs auf demselben Gerät</strong> sind ausdrücklich weiterhin erlaubt – sie teilen sich dieselbe Sitzung und stören sich nicht. Zum Gerätewechsel reicht ein normaler Login auf dem neuen Gerät, ein Abmelden auf dem alten ist nicht nötig.' },
+      { title:'Zuletzt angemeldet & alle Sitzungen beenden', body:'Unter <strong>Einstellungen → Sitzung &amp; Sicherheit</strong> steht, wann die aktuell laufende Sitzung begonnen hat. Passt dieser Zeitpunkt nicht zu deiner eigenen letzten Anmeldung, hat sich jemand anderes an deinem Konto angemeldet. Dort findest du auch <strong>„Alle Sitzungen beenden"</strong> (Passwort-Bestätigung nötig): Das macht <strong>jede</strong> bisherige Anmeldung dieses Kontos ungültig – auch die auf dem Gerät, an dem du es auslöst, du wirst also sofort abgemeldet. Dein Spielstand wird vorher gespeichert. <strong>Wichtig:</strong> Das allein hilft nur kurzfristig, wenn jemand dein Passwort kennt – er kann sich damit direkt wieder anmelden. Ändere in dem Fall anschließend unbedingt dein Passwort. Nur mit eigenem Server verfügbar.' },
       { title:'E-Mail ändern', body:'In den Einstellungen unter „E-Mail" kannst du deine Adresse jederzeit ändern (Passwort-Bestätigung nötig). Die neue Adresse wird erst aktiv, nachdem du den Bestätigungslink geklickt hast, der dorthin geschickt wird – deine bisherige Adresse bleibt bis dahin gültig, damit du nicht ausgesperrt wirst.' },
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Freunde einladen', body:'Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.' },
@@ -23793,13 +23816,22 @@
       + 'Melde dich erneut an, wenn du auf diesem Gerät weiterspielen möchtest.',
     conflict: 'Dieses Gerät wurde automatisch abgemeldet, weil ein anderes Gerät mit demselben Account '
       + 'zwischenzeitlich gespeichert hat. So bleibt immer nur eine Sitzung aktiv und es geht kein '
-      + 'Fortschritt verloren. Melde dich hier bei Bedarf erneut an.'
+      + 'Fortschritt verloren. Melde dich hier bei Bedarf erneut an.',
+    logoutall: 'Du hast alle Sitzungen dieses Kontos beendet – auch diese hier. Jede bisherige '
+      + 'Anmeldung ist damit ungültig, auf welchem Gerät auch immer. Dein Spielstand wurde vorher '
+      + 'gespeichert. War jemand Fremdes an deinem Konto: ändere jetzt dein Passwort, sonst kann er '
+      + 'sich mit demselben Passwort direkt wieder anmelden.'
   };
   function showConflictOverlay(reason){
     const txt = document.getElementById('conflictOverlayText');
     if (txt) txt.textContent = CONFLICT_TEXTS[reason] || CONFLICT_TEXTS.conflict;
     const sub = document.getElementById('conflictOverlaySub');
-    if (sub) sub.textContent = reason === 'superseded' ? 'Du spielst gerade auf einem anderen Gerät weiter' : 'Du bist gerade auf einem anderen Gerät aktiv';
+    const SUBS = {
+      superseded: 'Du spielst gerade auf einem anderen Gerät weiter',
+      logoutall: 'Alle Sitzungen wurden auf deinen Wunsch beendet',
+      conflict: 'Du bist gerade auf einem anderen Gerät aktiv'
+    };
+    if (sub) sub.textContent = SUBS[reason] || SUBS.conflict;
     const el = document.getElementById('conflictOverlay');
     if (el) el.style.display = 'flex';
   }
@@ -33844,6 +33876,23 @@
       if (ptToggle) ptToggle.classList.toggle('on', accountWantsPatchnotes);
       if (ptLabel) ptLabel.textContent = accountWantsPatchnotes ? 'An' : 'Aus';
     }
+    // Sitzung & Sicherheit: nur mit eigenem Server sinnvoll (im Solo-Modus gibt es keine Anmeldung).
+    const sessionBox = document.getElementById('sessionBox');
+    const sessionTitle = document.getElementById('sessionSectionTitle');
+    if (sessionBox && sessionTitle){
+      const show = useBackend();
+      sessionBox.style.display = show ? 'block' : 'none';
+      sessionTitle.style.display = show ? '' : 'none';
+      const lastEl = document.getElementById('lastLoginText');
+      if (lastEl && show){
+        // Kein Wert = Server ohne dieses Feld (älteres Backend) oder Anmeldung noch aus der Zeit vor
+        // der Sitzungsführung. Das ehrlich benennen statt ein erfundenes Datum zu zeigen.
+        const when = accountLastLoginAt
+          ? new Date(accountLastLoginAt).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+          : 'unbekannt (erst ab der nächsten Anmeldung verfügbar)';
+        lastEl.innerHTML = '<i class="ti ti-clock" aria-hidden="true"></i> Zuletzt angemeldet: <strong>'+when+'</strong>';
+      }
+    }
     updateReportsBadge();
     updateExpeditionBadge();
     updateVoidRiftTabBadge();
@@ -34813,6 +34862,38 @@
         render();
       } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
     };
+    const logoutAllToggleBtn = document.getElementById('logoutAllToggleBtn');
+    if (logoutAllToggleBtn) logoutAllToggleBtn.onclick = () => {
+      const row = document.getElementById('logoutAllRow');
+      if (row) row.style.display = row.style.display === 'none' ? 'block' : 'none';
+    };
+    const logoutAllBtn = document.getElementById('logoutAllBtn');
+    if (logoutAllBtn) logoutAllBtn.onclick = async () => {
+      const pwEl = document.getElementById('logoutAllPasswordInput');
+      const password = pwEl ? pwEl.value : '';
+      if (!password){ log('Bitte zur Bestätigung dein aktuelles Passwort eingeben.', 'ti-alert-triangle'); return; }
+      // Letzter Stand noch schnell weg, bevor die Sitzung endet - sonst ginge der Fortschritt seit
+      // dem letzten Auto-Save verloren, und genau das soll dieser Knopf ja NICHT auslösen.
+      try { await save(); } catch(e){}
+      try {
+        const res = await backendFetch('/logout-all', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password }) });
+        let data = null; try { data = await res.json(); } catch(e){}
+        if (!res.ok){
+          log(res.status === 404
+            ? 'Dein Server kennt diese Funktion noch nicht - bitte das Backend aktualisieren und den Server-Prozess neu starten.'
+            : ((data && data.error) || 'Abmelden fehlgeschlagen.'), 'ti-alert-triangle', 'error');
+          return;
+        }
+        if (pwEl) pwEl.value = '';
+        // Ab hier ist auch das eigene Token entwertet. Erst gar nicht weiterlaufen lassen, sondern
+        // dieselbe saubere Abmeldung wie bei einer verdrängten Sitzung - inklusive gestopptem
+        // Speichern (saveConflictDetected), damit nichts mehr gegen einen 401 läuft.
+        saveConflictDetected = true;
+        try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
+        authToken = null;
+        showConflictOverlay('logoutall');
+      } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle', 'error'); }
+    };
     const patchnotesToggleRow = document.getElementById('patchnotesToggleRow');
     if (patchnotesToggleRow) patchnotesToggleRow.onclick = async () => {
       const next = !accountWantsPatchnotes;
@@ -35613,7 +35694,7 @@
       await load();
       bootDataReady = true;
       state.player.id = data.userId;
-      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
+      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; accountLastLoginAt = me.lastLoginAt || null; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
       render();
       // Sitzungsführung: Diese Anmeldung hat ein anderes, noch angemeldetes Gerät verdrängt. Das
       // offen sagen, damit niemand rätselt, warum das Tablet nebenan plötzlich abgemeldet ist.
@@ -35754,6 +35835,7 @@
           accountPendingEmail = me.pendingEmail||null;
           accountWantsPatchnotes = me.wantsPatchnotes !== false;
           accountUsername = me.username||'';
+          accountLastLoginAt = me.lastLoginAt || null;
           if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; }
           if (!state.player.name) state.player.name = me.username;
           showLogoutBtn();
