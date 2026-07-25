@@ -108,6 +108,11 @@ if (von > 0 && bis > von){
   const lauf = new Function('escortPower', 'K', `
     let outcome='success', ratio=1, enemyPower=0, schwerVerlustAnteil=0;
     const encountered = true;
+    // Ab v8.298.14 liest der Block m.withdrawOnContact (Rueckzug) und rettungskapselGreift().
+    // Hier bewusst BEIDE aus: gemessen wird die regulaere Verlustkurve, der Rueckzug und die
+    // Rettungskapsel haben ihren eigenen Test (test_rueckzug.js).
+    const m = { withdrawOnContact: false };
+    const rettungskapselGreift = () => false;
     const fleet={forscher:5};
     // Ab v8.298.11 liest der Block state.expeditionSafeRuns (Quantenpeilung). Bewusst 0, damit hier
     // die REGULAERE Kurve gemessen wird - der Schutz ist Gegenstand eines eigenen Tests.
@@ -155,6 +160,11 @@ if (von > 0 && bis > von){
   const lauf2 = new Function('escortPower', 'K', 'st', `
     let outcome='success', ratio=1, enemyPower=0, schwerVerlustAnteil=0;
     const encountered = true;
+    // Ab v8.298.14 liest der Block m.withdrawOnContact (Rueckzug) und rettungskapselGreift().
+    // Hier bewusst BEIDE aus: gemessen wird die regulaere Verlustkurve, der Rueckzug und die
+    // Rettungskapsel haben ihren eigenen Test (test_rueckzug.js).
+    const m = { withdrawOnContact: false };
+    const rettungskapselGreift = () => false;
     const fleet={forscher:5};
     const state = st;
     const computeScore=()=>K.score;
