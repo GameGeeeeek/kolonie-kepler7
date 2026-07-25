@@ -18,6 +18,18 @@ cp weltraum_kolonie.html index.html
 5. Bei Mechanik-/Balance-Änderungen: **HELP_SECTIONS und TUTORIAL_STEPS** live-Texte mit aktualisieren (nicht die Patchnotes-Historie).
 6. **Jeder neue Inhalt braucht Icon UND vollständige Beschreibung (Pflicht, keine Ausnahme).** Wird irgendetwas Neues hinzugefügt – Forschung (`RESEARCH_DEFS`), Gebäude (`BUILDING_DEFS`), Schiff (`SHIP_DEFS`/Superschiffe), Modul, Offizier, Doktrin, Event, Item usw. –, gehört von Anfang an dazu: (a) ein **eigenes Icon** (handgezeichnetes SVG in `ICONS`/`RES_ICONS`/`SHIP_HULL_DEFS` per Key, oder ein gültiges `ti-*`-Icon aus der 69er-Whitelist; der `iconHtmlFor`-Fallback auf `ti-flask` ist nur Notnagel, kein Ersatz) **und** (b) eine **vollständige, selbsterklärende `desc`/`effectDesc`** – ein ganzer Satz, der Wirkung und ggf. Stapelverhalten/Deckel nennt (Vorbild: `rexpedition`), **nicht** nur ein knapper Kürzel-Text wie „Lagerkapazität (vertieft)" (Spieler-Report 22.07.2026: das las sich wie eine fehlende Beschreibung). Nach dem Einfügen prüfen: `node check-icons.js` (Icon) und einen Render-Blick auf die Karte (Beschreibung erscheint vollständig).
 
+## Icon-Font ist ein SUBSET (seit v8.296.0)
+
+Der eingebettete Icon-Font enthält **nur die 69 tatsächlich verwendeten Icons** (10,8 KB), nicht mehr den kompletten Tabler-Font (446,7 KB / 5.071 Glyphen). Das spart bei jedem Seitenaufruf rund ein Drittel der Übertragung (gzip 1.345 KB → 919 KB), weil Base64 um ein Drittel aufbläht und WOFF2 als bereits komprimiertes Format von gzip kaum noch profitiert.
+
+**Ein neues `ti-*`-Icon einzubauen reicht deshalb NICHT mehr aus** – der Glyph fehlt dann schlicht im Font, `check-icons.js` schlägt an. Vorgehen:
+
+1. CSS-Regel in `weltraum_kolonie.html` ergänzen: `.ti-neuesicon:before { content: "\eXXX"; }` (Codepoint aus der Tabler-Webfont-CSS)
+2. `node build-icon-subset.js` ausführen – baut den Font neu und aktualisiert **beide** HTML-Dateien
+3. `node check-icons.js` zur Kontrolle
+
+Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:before`-Regeln), es gibt also keine zweite Liste, die veralten könnte. Quelle ist das mitversionierte `tabler-icons-full.woff2` – bewusst im Repo und **nicht** per npm nachgeladen, weil eine andere Tabler-Version still abweichende Glyphen liefern könnte. Abhängigkeit: `pip install fonttools brotli`.
+
 ## Bekannte Fallstricke
 
 - **Doppelte Funktionsdeklarationen**: JS überschreibt bei zwei `function name(){}` mit demselben Namen stillschweigend die erste mit der zweiten – bei dieser Dateigröße schon einmal passiert (`renderWorldBoss` existierte zweimal, die spätere/falsche gewann). Vor Änderungen an einer Funktion: `grep -n "function funktionsname"` prüfen, dass es nur eine Definition gibt.
