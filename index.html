@@ -4236,8 +4236,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.3';
+  const VERSION = '8.298.4';
   const PATCHNOTES = [
+    { version:'8.298.4', date:'25.07.2026', changes:[
+      'Bugfix bei Pakt-Geschenken – dieselbe Ursache wie bei den Allianz-Beiträgen in 8.298.2, nur an einer zweiten Stelle: Konnte der Server das Geschenk nicht annehmen (Serverfehler, Verbindungsabbruch, abgelehnte Berechtigung), waren die Ressourcen trotzdem weg. Das Spiel meldete „Geschenk gesendet", beim Paktpartner kam nie etwas an – und der 24-Stunden-Sperre lief für ein Geschenk, das es nie gegeben hat.',
+      'Jetzt wird das Geschenk verbindlich übermittelt. Klappt das nicht, bekommst du eine klare Meldung mit dem Grund; Ressourcen und Sperrfrist bleiben unangetastet, du kannst es sofort erneut versuchen. Ohne Serververbindung wird der Versand gar nicht erst begonnen.',
+      'Nach dem gleichen Muster wurden alle weiteren Stellen durchsucht, an denen erst Ressourcen abgebucht und danach in den geteilten Speicher geschrieben wird – die übrigen Fundstellen (Spendenrangliste, Kriegszustand der Allianzbasis) schreiben erst NACH einem bereits verbindlich bestätigten Beitrag und können keine Ressourcen verschlucken.'
+    ]},
     { version:'8.298.3', date:'25.07.2026', changes:[
       'Neu: kontextbezogene Ersthinweise. Öffnest du einen Menüpunkt zum ersten Mal, erscheint direkt unter der Menüleiste ein kurzer Hinweis, was es dort zu tun gibt – inklusive eines Knopfes „Mehr dazu", der direkt in den passenden Hilfe-Abschnitt springt. Mit „Verstanden" ist er für diesen Menüpunkt dauerhaft weg und kommt auch nach einem Neuladen nicht wieder.',
       'Hintergrund: Das Tutorial erklärt nur Basis, Forschung, Flotte/Kampf, Erkunden, Allianz und Galaxie. Module, Offiziere, Expeditionen, Markt, Punktestand, Prestige und Aufstieg tauchen dort nirgends auf, obwohl es zwölf Menüpunkte gibt – wer nicht zufällig in der Hilfe nachgelesen hat, hat diese Bereiche nie erklärt bekommen.',
@@ -26081,22 +26086,43 @@
     const last = (p.giftCooldown||{})[state.player.id];
     return !!last && (Date.now() - last) < PACT_GIFT_COOLDOWN_MS;
   }
+  // Geschenke kosten den Absender ECHTE Ressourcen, deshalb darf das Schreiben ins geteilte
+  // Pakt-Dokument hier nicht die resiliente storageSet() sein: die faellt bei jeder Nicht-OK-Antwort
+  // (403/413/507/500) still auf localStorage zurueck und meldet Erfolg. Das Ergebnis waere exakt der
+  // Fehler, der bei den Allianz-Beitraegen bis v8.298.2 steckte - abgebucht, „gesendet" gemeldet,
+  // beim Partner nie angekommen, dazu 24 Stunden Sperre fuer ein Geschenk, das es nie gab.
+  //
+  // Deshalb: erst eine KOPIE des Pakts aendern, die strikt schreiben, und den Cache-Eintrag nur bei
+  // Erfolg uebernehmen. Waere stattdessen p selbst mutiert worden, zeigte die Diplomatie-Box nach
+  // einem Fehlschlag bis zum naechsten loadDiplomacy() ein Phantom-Geschenk samt Cooldown an.
   async function sendPactGift(key, resKey){
     const e = diploCache.find(x => x.key === key);
     if (!e || !pactIsActive(e.data)) return;
     const p = e.data;
     if (pactTier(p) < 2){ log('Geschenke brauchen mindestens ein Handelsabkommen (Pakt-Stufe 2).', 'ti-alert-triangle'); return; }
     if (pactGiftOnCooldown(p)){ log('Du hast diesem Paktpartner heute schon ein Geschenk geschickt - wieder in 24h möglich.', 'ti-alert-triangle'); return; }
+    if (!useBackend()){ log('Ohne Serververbindung lassen sich keine Pakt-Geschenke versenden - deine Ressourcen bleiben dir erhalten.', 'ti-alert-triangle', 'warn'); return; }
     const amount = Math.min(pactGiftMaxAmount(resKey), Math.floor(state.resources[resKey]||0));
     if (amount <= 0){ log('Nicht genug '+(resDefFor(resKey).label||resKey)+' für ein Geschenk.', 'ti-alert-triangle'); return; }
+    const neu = JSON.parse(JSON.stringify(p));
+    neu.giftCooldown = neu.giftCooldown || {};
+    neu.giftCooldown[state.player.id] = Date.now();
+    neu.pendingGifts = (neu.pendingGifts||[]).filter(g => g.to !== pactOtherId(p) || (Date.now()-g.sentAt) < 7*86400000);
+    neu.pendingGifts.push({ id:'gift-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), from: state.player.id, to: pactOtherId(p), resKey, amount, sentAt: Date.now() });
+    if (neu.pendingGifts.length > 10) neu.pendingGifts = neu.pendingGifts.slice(-10);
     state.resources[resKey] -= amount;
-    p.giftCooldown = p.giftCooldown || {};
-    p.giftCooldown[state.player.id] = Date.now();
-    p.pendingGifts = (p.pendingGifts||[]).filter(g => g.to !== pactOtherId(p) || (Date.now()-g.sentAt) < 7*86400000);
-    p.pendingGifts.push({ id:'gift-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), from: state.player.id, to: pactOtherId(p), resKey, amount, sentAt: Date.now() });
-    if (p.pendingGifts.length > 10) p.pendingGifts = p.pendingGifts.slice(-10);
-    await savePact(p);
-    log(resDefFor(resKey).label+'-Geschenk ('+fmt(amount)+') an '+pactOtherName(p)+' gesendet.', 'ti-award');
+    try {
+      await storageSetStrict(pactKeyFor(neu.a, neu.b), JSON.stringify(neu), true);
+    } catch(err){
+      // Nichts wurde uebertragen: Ressourcen zurueck, Cache unveraendert, kein Cooldown.
+      state.resources[resKey] += amount;
+      log('Das Geschenk konnte nicht an '+pactOtherName(p)+' übermittelt werden ('+((err && err.message) || 'Serverfehler')+') - nichts wurde abgebucht.', 'ti-alert-triangle', 'warn');
+      render(); save();
+      return;
+    }
+    e.data = neu;
+    await loadDiplomacy();
+    log(resDefFor(resKey).label+'-Geschenk ('+fmt(amount)+') an '+pactOtherName(neu)+' gesendet.', 'ti-award');
     playSound('trade');
     render(); save();
   }
