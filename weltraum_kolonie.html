@@ -4242,8 +4242,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.6';
+  const VERSION = '8.298.7';
   const PATCHNOTES = [
+    { version:'8.298.7', date:'25.07.2026', changes:[
+      'Das Spiel startet spürbar leichter: Die Patchnotes-Seite baute bisher beim Laden die komplette Versionsgeschichte auf einmal auf – bei inzwischen 685 Einträgen waren das 5.067 der insgesamt 8.512 Elemente der Seite. Die Historie kostete damit mehr als das ganze restliche Spiel zusammen, bei jedem Aufruf, auch wenn man die Seite nie öffnete.',
+      'Jetzt stehen dort zunächst die 15 neuesten Versionen, darunter ein Knopf „Ältere Versionen anzeigen" für den Rest. Gemessen sinkt die Seite dadurch von 8.512 auf 3.593 Elemente – gut 58 % weniger, vor allem auf dem Handy spürbar.',
+      'An den Patchnotes selbst ändert sich nichts: Alle 685 Einträge sind unverändert vorhanden und einen Klick entfernt.'
+    ]},
     { version:'8.298.6', date:'25.07.2026', changes:[
       'Neue Karte „Ersthinweise zurücksetzen" in den Einstellungen, direkt unter dem Einführungs-Rundgang. Die kurzen Hinweise unter der Menüleiste (seit 8.298.3) verschwanden nach dem Wegklicken dauerhaft – wer alle zwölf weggeklickt hatte, kam nicht mehr an sie heran. Ein Klick stellt sie alle wieder her.'
     ]},
@@ -36334,10 +36339,16 @@
   }
   setInterval(() => { if (document.visibilityState === 'visible') checkForNewVersionOnServer(); }, 5*60*1000);
 
-  function renderPatchnotes(){
-    document.getElementById('versionTag').textContent = 'v'+VERSION;
-    document.getElementById('versionTag').addEventListener('click', () => switchTab('update'));
-    document.getElementById('patchnotesList').innerHTML = PATCHNOTES.map(p => `
+  // Die Patchnotes-Liste war der mit Abstand teuerste Posten beim Seitenstart: renderPatchnotes()
+  // laeuft beim Boot und schrieb ALLE Eintraege auf einmal ins DOM. Gemessen am 25.07.2026 bei 685
+  // Eintraegen: 5.067 Knoten in #patchnotesList von 8.512 im gesamten Dokument - die Versionshistorie
+  // kostete also mehr DOM als das komplette Spiel, auf jedem Aufruf, auch wenn niemand den
+  // Update-Tab oeffnet. Jetzt werden nur die neuesten PATCHNOTES_SOFORT gezeichnet, der Rest erst auf
+  // Knopfdruck. Die Daten bleiben unveraendert im Array (Historie ist unantastbar, siehe CLAUDE.md) -
+  // es aendert sich ausschliesslich, WANN sie gezeichnet werden.
+  const PATCHNOTES_SOFORT = 15;
+  function patchnoteKarte(p){
+    return `
       <div class="card-row" style="flex-direction:column; align-items:stretch;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <span class="bname">Version ${p.version}</span>
@@ -36347,7 +36358,19 @@
           ${p.changes.map(c => `<li>${c}</li>`).join('')}
         </ul>
       </div>
-    `).join('');
+    `;
+  }
+  function renderPatchnotes(alleZeigen){
+    document.getElementById('versionTag').textContent = 'v'+VERSION;
+    const liste = document.getElementById('patchnotesList');
+    if (!liste) return;
+    const alle = alleZeigen || PATCHNOTES.length <= PATCHNOTES_SOFORT;
+    const sichtbar = alle ? PATCHNOTES : PATCHNOTES.slice(0, PATCHNOTES_SOFORT);
+    const rest = PATCHNOTES.length - sichtbar.length;
+    liste.innerHTML = sichtbar.map(patchnoteKarte).join('')
+      + (rest > 0 ? `<button id="patchnotesMoreBtn" style="width:100%; margin-top:8px;"><i class="ti ti-chevron-right" aria-hidden="true" style="margin-right:4px;"></i>${rest} ältere Version${rest===1?'':'en'} anzeigen</button>` : '');
+    const mehr = document.getElementById('patchnotesMoreBtn');
+    if (mehr) mehr.addEventListener('click', () => renderPatchnotes(true));
   }
 
   function showLoginOverlay(){ const el = document.getElementById('loginOverlay'); if (el) el.style.display = 'flex'; }
@@ -36678,6 +36701,11 @@
   initHeroStars();
   initBgCanvas();
   renderPatchnotes();
+  // Bewusst HIER und nicht in renderPatchnotes(): die Funktion laeuft seit v8.298.7 ein zweites Mal,
+  // wenn der Spieler die aelteren Versionen nachladen laesst - der Listener wuerde sich sonst
+  // aufaddieren und ein Klick auf die Versionsnummer mehrfach feuern.
+  const versionTagEl = document.getElementById('versionTag');
+  if (versionTagEl) versionTagEl.addEventListener('click', () => switchTab('update'));
   const conflictReloadBtn = document.getElementById('conflictReloadBtn');
   if (conflictReloadBtn) conflictReloadBtn.addEventListener('click', () => location.reload());
   const profileCloseBtn = document.getElementById('profileCloseBtn');
