@@ -4236,8 +4236,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.4';
+  const VERSION = '8.298.5';
   const PATCHNOTES = [
+    { version:'8.298.5', date:'25.07.2026', changes:[
+      'Jeder der 73 Erfolge hat jetzt ein eigenes Symbol. Bisher trugen ausnahmslos alle dieselben zwei – eine Medaille für erledigt, ein Schloss für offen. Die längste Kartenliste des Spiels war dadurch visuell völlig flach: Man musste jeden Eintrag lesen, um ihn zu erkennen.',
+      'Die Symbole passen zum jeweiligen Erfolg: Schwert und Totenkopf beim Kämpfen, Planet und Fähnchen beim Erobern, Fabrik und Atom beim Ausbau, Lastwagen und Diamant beim Handeln, Tropfen und Sonne beim Terraforming. Insgesamt 51 verschiedene Symbole statt zweier.',
+      'Dieselben Symbole erscheinen jetzt auch beim Freischalten – im Ereignisprotokoll und im kleinen Aufblitz-Abzeichen. Vorher zeigten beide unabhängig vom Erfolg immer die Medaille.',
+      'Alle Symbole stammen aus der bereits eingebetteten Icon-Schrift, die Seite wird dadurch kein Byte größer.'
+    ]},
     { version:'8.298.4', date:'25.07.2026', changes:[
       'Bugfix bei Pakt-Geschenken – dieselbe Ursache wie bei den Allianz-Beiträgen in 8.298.2, nur an einer zweiten Stelle: Konnte der Server das Geschenk nicht annehmen (Serverfehler, Verbindungsabbruch, abgelehnte Berechtigung), waren die Ressourcen trotzdem weg. Das Spiel meldete „Geschenk gesendet", beim Paktpartner kam nie etwas an – und der 24-Stunden-Sperre lief für ein Geschenk, das es nie gegeben hat.',
       'Jetzt wird das Geschenk verbindlich übermittelt. Klappt das nicht, bekommst du eine klare Meldung mit dem Grund; Ressourcen und Sperrfrist bleiben unangetastet, du kannst es sofort erneut versuchen. Ohne Serververbindung wird der Versand gar nicht erst begonnen.',
@@ -11343,6 +11349,45 @@
     firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister', streak30:'meister', streak100:'meister', happyhour10:'meister'
   };
   function achCat(key){ return ACH_CAT[key] || 'sonstige'; }
+  // Eigenes Icon je Erfolg. Bis v8.298.4 trugen ALLE 73 Erfolge dieselben zwei Symbole (ti-medal
+  // erledigt / ti-lock offen) - die groesste Kartenliste des Spiels war damit visuell voellig flach
+  // und man erkannte einen Erfolg erst am Text. Bewusst als eigene Zuordnung neben ACH_CAT statt als
+  // Feld in den 73 Array-Eintraegen: der ACHIEVEMENTS-Block enthaelt Funktionen (check/progress) mit
+  // verschachtelten Klammern, in denen sich Massenbearbeitung erfahrungsgemaess verhakt (siehe
+  // CLAUDE.md, "Naive Regex ueber die ganze Datei"). Alle Werte stammen aus der 69er-Whitelist des
+  // Icon-Subsets, ein Font-Neubau ist also nicht noetig. Faellt ein Schluessel hier heraus, greift
+  // das Kategorie-Icon - ein neuer Erfolg sieht damit nie "kaputt" aus, verdient aber ein eigenes.
+  const ACH_ICONS = {
+    firstbuild:'ti-building-factory-2', firstcolony:'ti-planet', allsystems:'ti-map-2',
+    tenkills:'ti-sword', bossdown:'ti-skull', abyssdown:'ti-skull', nyradown:'ti-alien',
+    allbosses:'ti-trophy', moonsiegewin:'ti-target', allianceraidkill:'ti-alien',
+    basewarwin:'ti-building-fortress', allianzweltprojekt:'ti-building-castle',
+    allianzausbau100:'ti-building-community', nanopionier:'ti-atom',
+    industriemagnat:'ti-building-factory-2', kettenmeister:'ti-box', synthesemeister:'ti-atom-2',
+    singularitaetsarchitekt:'ti-infinity', raffinerieoptimierer:'ti-adjustments',
+    verbrauchsstratege:'ti-bolt', modulschmied:'ti-backpack', allresearch:'ti-flask',
+    firstprestige:'ti-refresh', level10:'ti-arrow-up', doctrine:'ti-target',
+    planetrole:'ti-adjustments', terraform1:'ti-droplet', terraform10:'ti-sun',
+    officer1:'ti-user', officer_all:'ti-users', module1:'ti-backpack',
+    module_legendary:'ti-sparkles', allroles:'ti-adjustments', explorer25:'ti-map-pin',
+    colonizer10:'ti-planet', warvictor:'ti-sword', tier2fleet:'ti-anchor',
+    trade1:'ti-truck', trade50:'ti-truck', route1:'ti-arrows-shuffle',
+    trade_empire:'ti-diamond', trade_longrun:'ti-clock', conquer1:'ti-flag',
+    conquer5:'ti-world', allied:'ti-message', pact3:'ti-shield', pact_century:'ti-shield-lock',
+    fquest10:'ti-list-details', shop5:'ti-diamond', credits5k:'ti-diamond',
+    skilltreemax:'ti-star', allveteran:'ti-medal', allexotic:'ti-atom-2',
+    erdweltmaster:'ti-plant', leerenweltmaster:'ti-mountain', allianzeinsatz:'ti-bell',
+    allcolonyslots:'ti-home', allresearchmax:'ti-microscope',
+    forschungsnexus:'ti-building-broadcast-tower', allmegaprojects:'ti-building-castle',
+    prestige10:'ti-recycle', ascended:'ti-sparkles', dailyquest1:'ti-list-details',
+    dailyquest7:'ti-clock', eventship1:'ti-rocket', eventship_all:'ti-ship',
+    eventmodule_all:'ti-lock-open', streak30:'ti-login', streak100:'ti-star',
+    happyhour10:'ti-sparkles', kriegsheld:'ti-flag', ligameister:'ti-medal',
+    gutvernetzt:'ti-users'
+  };
+  function achIcon(key){
+    return ACH_ICONS[key] || (ACH_CAT_DEFS.find(c => c.id === achCat(key)) || {}).icon || 'ti-medal';
+  }
   // Erfolgspunkte: aus der Schwierigkeit abgeleitet (vorhandene Belohnungsgröße als Proxy - schwere
   // Endgame-Erfolge tragen xpReward/reward, leichte nicht). Kein neues Tracking nötig, wirkt sofort
   // rückwirkend für jeden Spielstand. Summe der freigeschalteten Punkte treibt den Erfolgsjäger-Rang.
@@ -15702,9 +15747,9 @@
         const xpReward = a.xpReward || 50;
         addXp(xpReward);
         rewardParts.push('+'+xpReward+' XP');
-        log('Erfolg freigeschaltet: '+a.name+' ('+rewardParts.join(', ')+')', 'ti-medal');
+        log('Erfolg freigeschaltet: '+a.name+' ('+rewardParts.join(', ')+')', achIcon(a.key));
         playSound('achieve');
-        playAchievementPop();
+        playAchievementPop(achIcon(a.key));
       }
     }
   }
@@ -28931,11 +28976,13 @@
   // seltenen "großen Momente", die Hierarchie zwischen beiden muss erhalten bleiben. Kein DOM-Ziel im
   // Erfolge-Tab nötig (der ist beim Freischalten oft gar nicht geöffnet) - eigenes, fest positioniertes
   // Badge statt Partikel-Burst.
-  function playAchievementPop(){
+  // icon: das Symbol des gerade freigeschalteten Erfolgs (achIcon) - dieselbe Groesse wie in der
+  // Erfolgsliste und im Log, damit alle drei Anzeigestellen dasselbe zeigen. Ohne Angabe die Medaille.
+  function playAchievementPop(icon){
     if (typeof document === 'undefined') return;
     const el = document.createElement('div');
     el.className = 'ach-pop-badge';
-    el.innerHTML = '<i class="ti ti-medal" aria-hidden="true"></i><span class="ach-pop-ring"></span>';
+    el.innerHTML = '<i class="ti '+(icon || 'ti-medal')+'" aria-hidden="true"></i><span class="ach-pop-ring"></span>';
     document.body.appendChild(el);
     setTimeout(() => { el.classList.add('fade'); setTimeout(() => el.remove(), 400); }, 1400);
   }
@@ -35063,7 +35110,7 @@
         return `
           <div class="card-row ${done?'research-done':''}">
             <div class="left">
-              <div class="bicon" style="background:${done?'rgba(29,158,117,0.2)':'rgba(255,255,255,0.05)'}; color:${done?'#5dcaa5':'#6b6f85'};"><i class="ti ${done?'ti-medal':'ti-lock'}" aria-hidden="true"></i></div>
+              <div class="bicon" style="background:${done?'rgba(29,158,117,0.2)':'rgba(255,255,255,0.05)'}; color:${done?'#5dcaa5':'#6b6f85'};"><i class="ti ${achIcon(a.key)}" aria-hidden="true"></i></div>
               <div style="min-width:0; flex:1;"><div class="bname">${a.name}<span class="ach-pts">${pts}P</span></div><div class="bmeta">${a.desc}</div>${progressHtml}</div>
             </div>
             ${done ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Erledigt</span>` : ''}
