@@ -4217,8 +4217,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.296.0';
+  const VERSION = '8.297.0';
   const PATCHNOTES = [
+    { version:'8.297.0', date:'25.07.2026', changes:[
+      'Nur für den Admin-Bereich, aber wichtig fürs Spiel: Die Statistik zeigt jetzt die Wiederkehr-Quote. Bisher stand dort nur, wie viele Spieler an einem Tag da WAREN – nie, ob sie wiederkommen. Ohne diese Zahl lässt sich nicht beurteilen, ob eine Änderung am Spiel etwas gebracht hat.',
+      'Drei Werte: Wie viele der an einem Tag neu registrierten Spieler sind am nächsten Tag wieder da (Tag 1) und nach einer Woche (Tag 7), plus die Tagestreue – wie viele von gestern heute wieder gespielt haben. Dazu eine Tabelle je Registrierungstag.',
+      'Kein neues Mitschneiden nötig: Die Auswertung rechnet ausschließlich mit Daten, die ohnehin schon gespeichert wurden. Es wird nichts zusätzlich über Spieler erfasst.',
+      'Wo die Datenlage eine Frage nicht hergibt, steht „—" und nicht „0%". Eine Gruppe, die sich gestern registriert hat, KANN noch keine Sieben-Tage-Quote haben – sie als 0% auszuweisen wäre schlicht falsch und würde zu falschen Schlüssen führen.',
+      'Die Wiederkehr-Zahlen sind bewusst reines HTML und laden unabhängig von der Diagramm-Bibliothek: Ist das CDN nicht erreichbar, fehlen zwar die Kurven, die Zahlen stehen trotzdem da.'
+    ]},
     { version:'8.296.0', date:'25.07.2026', changes:[
       'Das Spiel lädt spürbar schneller – vor allem am Handy und beim ersten Aufruf. Im HTML steckte der KOMPLETTE Icon-Font mit 5.071 Zeichen, obwohl das Spiel genau 69 davon benutzt. Jetzt ist nur noch das Nötige eingebettet: aus 446,7 KB Font werden 10,8 KB.',
       'Konkret über die Leitung: Die ausgelieferte Seite schrumpft von rund 1.345 KB auf 919 KB – ein Drittel weniger bei JEDEM Seitenaufruf. Der Font allein machte vorher ein Drittel der gesamten Übertragung aus, weil eingebettete Schriften als Base64 um ein Drittel aufblähen und sich praktisch nicht mehr komprimieren lassen.',
@@ -17906,6 +17913,8 @@
         <div class="section-title" style="font-size:13px;"><i class="ti ti-list-details" aria-hidden="true"></i>Häufigste Ereignisse</div>
         <div id="analyticsEventsEmpty" class="bmeta" style="display:none;">Noch keine Ereignisse in diesem Zeitraum aufgezeichnet.</div>
         <div class="analytics-chart-box tall" id="analyticsEventsBoxWrap"><canvas id="analyticsEventsCanvas"></canvas></div>
+        <div class="section-title" style="font-size:13px;"><i class="ti ti-refresh" aria-hidden="true"></i>Wiederkehr (kommen sie zurück?)</div>
+        <div id="analyticsRetentionView"><div class="bmeta">lädt…</div></div>
       `;
       el.querySelectorAll('[data-analytics-range]').forEach(btn => btn.onclick = () => {
         if (analyticsRange === btn.getAttribute('data-analytics-range')) return;
@@ -17914,13 +17923,84 @@
         fetchAndRenderAnalytics();
       });
     }
+    // Wiederkehr-Quote zuerst und BEWUSST vor/unabhaengig von Chart.js: sie ist reines HTML und
+    // damit auch dann da, wenn das Diagramm-CDN klemmt. Die Zahl ist wichtiger als das Schaubild.
+    fetchAndRenderRetention();
     try { await loadChartJs(); }
     catch(e){
       const summaryRow = document.getElementById('analyticsSummaryRow');
-      if (summaryRow) summaryRow.innerHTML = '<div class="bmeta" style="color:#e24b4a;">Diagramm-Bibliothek konnte nicht geladen werden (CDN nicht erreichbar).</div>';
+      if (summaryRow) summaryRow.innerHTML = '<div class="bmeta" style="color:#e24b4a;">Diagramm-Bibliothek konnte nicht geladen werden (CDN nicht erreichbar). Die Wiederkehr-Zahlen unten sind davon nicht betroffen.</div>';
       return;
     }
     fetchAndRenderAnalytics();
+  }
+  // Wiederkehr-Quote. Die wichtigste Zahl fuers Spiel und die einzige, an der sich ablesen laesst,
+  // ob eine Aenderung etwas gebracht hat - DAU allein sagt das nicht.
+  // Bewusst reines HTML statt Chart.js: eine Tabelle mit 30 Zeilen liest sich hier besser als eine
+  // Kurve, und sie funktioniert auch ohne CDN.
+  async function fetchAndRenderRetention(){
+    const box = document.getElementById('analyticsRetentionView');
+    if (!box) return;
+    let d;
+    try {
+      const res = await backendFetch('/admin/retention?days=30');
+      d = await res.json();
+      if (!res.ok){
+        box.innerHTML = '<div class="bmeta">' + (res.status===404
+          ? 'Dein Server kennt diese Auswertung noch nicht – bitte das Backend aktualisieren und neu starten.'
+          : escapeHtml(d.error||'Fehler beim Laden.')) + '</div>';
+        return;
+      }
+    } catch(e){ box.innerHTML = '<div class="bmeta">Server nicht erreichbar.</div>'; return; }
+
+    // Ueber alle AUSWERTBAREN Kohorten mitteln - Kohorten mit null werden nicht als 0 mitgezaehlt,
+    // sonst wuerde jede junge Kohorte den Schnitt kuenstlich nach unten ziehen.
+    const mittel = feld => {
+      const werte = (d.kohorten||[]).filter(k => k[feld]).map(k => k[feld].quote);
+      return werte.length ? Math.round(werte.reduce((a,b)=>a+b,0)/werte.length*10)/10 : null;
+    };
+    const d1m = mittel('d1'), d7m = mittel('d7');
+    const haft = (d.haftung||[]).filter(h => h.quote !== null).map(h => h.quote);
+    const haftM = haft.length ? Math.round(haft.reduce((a,b)=>a+b,0)/haft.length*10)/10 : null;
+
+    const kachel = (label, wert, hinweis) => `<div class="card-row" style="flex:1; min-width:130px; flex-direction:column; align-items:flex-start; gap:2px;">
+      <div class="bmeta">${label}</div>
+      <div style="font-size:20px; font-variant-numeric:tabular-nums; color:${wert===null?'#7d8199':'#5dcaa5'};">${wert===null?'—':wert+'%'}</div>
+      ${hinweis?`<div class="bmeta" style="font-size:10px;">${hinweis}</div>`:''}
+    </div>`;
+    const pct = v => v === null
+      // Der Unterschied zwischen "0%" und "weiss ich nicht" ist hier entscheidend: eine Kohorte von
+      // gestern HAT noch keine 7-Tage-Quote. Sie als 0% zu zeigen waere eine Falschaussage.
+      ? '<span style="color:#7d8199;" title="Noch nicht auswertbar – der Zeitraum liegt in der Zukunft oder außerhalb des 60-Tage-Fensters.">—</span>'
+      : '<span style="color:'+(v.quote>=40?'#5dcaa5':v.quote>=20?'#e0a548':'#e24b4a')+';">'+v.quote+'%</span> <span style="color:#7d8199;">('+v.wieder+')</span>';
+
+    const zeilen = (d.kohorten||[]).filter(k => k.neu > 0).reverse();
+    box.innerHTML = `
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        ${kachel('Tag 1 zurück', d1m, 'Schnitt über auswertbare Tage')}
+        ${kachel('Tag 7 zurück', d7m, 'Schnitt über auswertbare Tage')}
+        ${kachel('Tagestreue', haftM, 'von gestern heute wieder da')}
+      </div>
+      <div class="bmeta" style="margin-bottom:8px;">
+        <strong>${fmt(d.konten||0)}</strong> registrierte Konten, davon <strong>${fmt(d.imFensterAktiv||0)}</strong> in den letzten ${d.fenster?d.fenster.tage:60} Tagen aktiv.
+        ${d.kontenOhneRegistrierungsdatum ? ' · '+fmt(d.kontenOhneRegistrierungsdatum)+' Altkonten ohne Registrierungsdatum (nicht in den Kohorten enthalten).' : ''}
+      </div>
+      ${zeilen.length ? `<div data-hscroll style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums;">
+          <thead><tr style="color:#7d8199; text-align:left;">
+            <th style="padding:4px 8px 4px 0;">Registriert am</th><th style="padding:4px 8px;">Neu</th>
+            <th style="padding:4px 8px;">Tag 1</th><th style="padding:4px 8px;">Tag 7</th>
+          </tr></thead>
+          <tbody>${zeilen.map(k => `<tr style="border-top:0.5px solid rgba(255,255,255,0.07);">
+            <td style="padding:4px 8px 4px 0;">${k.tag}</td>
+            <td style="padding:4px 8px;">${k.neu}</td>
+            <td style="padding:4px 8px;">${pct(k.d1)}</td>
+            <td style="padding:4px 8px;">${pct(k.d7)}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`
+      : '<div class="bmeta">In den letzten 30 Tagen hat sich niemand neu registriert – es gibt also keine Kohorten auszuwerten. Die Tagestreue oben gilt trotzdem.</div>'}
+      <div class="bmeta" style="margin-top:8px; font-size:10px;">„—" heißt <em>noch nicht auswertbar</em>, nicht 0%: der Zeitraum liegt in der Zukunft oder außerhalb des ${d.fenster?d.fenster.tage:60}-Tage-Fensters, das die Statistik vorhält.</div>
+    `;
   }
   async function fetchAndRenderAnalytics(){
     const summaryRow = document.getElementById('analyticsSummaryRow');
