@@ -4217,8 +4217,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.1';
+  const VERSION = '8.298.2';
   const PATCHNOTES = [
+    { version:'8.298.2', date:'25.07.2026', changes:[
+      'Wichtiger Bugfix bei Allianz-Beiträgen: Wenn der Server den Beitrag nicht annehmen konnte (Serverfehler, Verbindungsabbruch, abgelehnte Berechtigung), waren die Ressourcen trotzdem weg – das Spiel meldete „beigetragen", die Allianz sah aber nie etwas davon. Grund war ein stiller Rückfall auf den lokalen Speicher: Für gemeinsame Daten heißt das, sie liegen in genau einem Browser, wo sie niemand zu Gesicht bekommt.',
+      'Jetzt wird der Beitrag verbindlich übermittelt. Klappt das nicht, bekommst du eine klare Meldung mit dem Grund, und Ressourcen, Beitragszähler und Tagesaufgaben-Fortschritt werden vollständig zurückgebucht – es geht nichts mehr verloren. Betrifft alle fünf Beitragsarten: Allianzbasis, Basis-Reparatur, Allianz-Technologien/-Gebäude sowie seltene Materialien und Tier-2-Ressourcen für Groß- und Weltprojekte.',
+      'Ohne Serververbindung wird ein Beitrag jetzt von vornherein abgelehnt (mit Hinweis), statt Ressourcen ins Leere abzubuchen.',
+      'Nicht betroffen und bewusst unverändert: der Fortschritt bei Allianz-Einsätzen. Der veröffentlicht bei jedem Beitrag den vollen Wert neu und holt einen verlorenen Übertragungsversuch beim nächsten Mal von selbst nach.'
+    ]},
     { version:'8.298.1', date:'25.07.2026', changes:[
       'Die Angriffs-Vorschau im Spielerprofil urteilte bisher nur mit Ja oder Nein: „Angriff erfolgversprechend" bzw. „Angriff aussichtslos", rein aus dem Vergleich Angriffskraft gegen Verteidigung. Das passte seit den Kampfphasen (8.295.0) nicht mehr zur Wirklichkeit – bei Gleichstand erschien der grüne Haken, obwohl es exakt ein Münzwurf ist. Sie zeigt jetzt die echte Siegchance in Prozent, dieselbe Zahl, die der Server später würfelt.',
       'Damit stehen zwei Dinge erstmals offen da: Gegen andere Spieler ist KEIN Angriff sicher (Deckel 90%) und KEINER chancenlos (Boden 10%) – wer als hoffnungslos unterlegen galt, gewinnt trotzdem jeden zehnten Versuch. Bei den NPC-Zielen stand die echte Prozentzahl schon immer da; PvP war die Ausnahme.',
@@ -21618,6 +21624,38 @@
     } catch(e){ log('Gründung fehlgeschlagen (Verbindungsfehler).', 'ti-alert-triangle'); }
     render(); save();
   }
+  // Beiträge an die Allianz landen in EINEM geteilten Dokument je Spieler und werden dort
+  // hochgezählt (read-modify-write). Zwei Dinge machen das heikel:
+  //  1. Die Ressourcen sind bereits abgebucht, BEVOR geschrieben wird - geht der Schreibvorgang
+  //     verloren, sind sie weg und die Allianz sieht nichts davon.
+  //  2. storageSet() taugt hier nicht: Es fällt bei einem Serverfehler oder einer Ablehnung still
+  //     auf localStorage zurück und meldet trotzdem Erfolg - für einen GETEILTEN Schlüssel heißt das,
+  //     die Daten liegen in genau einem Browser, wo sie niemand je zu Gesicht bekommt. Genau dieselbe
+  //     Klasse Fehler wie der verschluckte Spielstand-Ablehnung vom 21.07.2026 (siehe CLAUDE.md),
+  //     nur für geteilte Daten statt für den eigenen Spielstand.
+  // Deshalb strikt schreiben und dem Aufrufer sagen, ob es geklappt hat - der nimmt den Abzug bei
+  // Misserfolg zurück. Bewusst NICHT auf den Einsatz-Fortschritt angewandt
+  // (publishAllianceMissionProgress): der veröffentlicht jedes Mal den vollen Wert neu und heilt
+  // einen verlorenen Schreibvorgang beim nächsten Aufruf von selbst.
+  async function addAllianceContribution(docKey, amount){
+    const tag = myAllianceTag();
+    if (!tag) return false;
+    if (!useBackend()){
+      log('Ohne Serververbindung lassen sich keine Allianz-Beiträge leisten - deine Ressourcen bleiben dir erhalten.', 'ti-alert-triangle', 'warn');
+      return false;
+    }
+    const key = 'alliance:'+tag+':contrib:'+state.player.id;
+    let doc = {};
+    try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
+    doc[docKey] = (doc[docKey]||0) + amount;
+    try {
+      await storageSetStrict(key, JSON.stringify(doc), true);
+      return true;
+    } catch(e){
+      log('Der Beitrag konnte nicht an die Allianz übermittelt werden ('+((e && e.message) || 'Serverfehler')+') - nichts wurde abgebucht.', 'ti-alert-triangle', 'warn');
+      return false;
+    }
+  }
   async function contributeToAllianceBase(resKey, amount){
     const tag = myAllianceTag();
     if (!tag || !useBackend()){ log('Die Allianzbasis braucht eine Allianz und den Server-Modus.', 'ti-alert-triangle'); return; }
@@ -21636,13 +21674,14 @@
     const contribKey = 'base_'+resKey;
     state.allianceContributed[contribKey] = (state.allianceContributed[contribKey]||0) + amount;
     if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
-    try {
-      const key = 'alliance:'+tag+':contrib:'+state.player.id;
-      let doc = {};
-      try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
-      doc[contribKey] = (doc[contribKey]||0) + amount;
-      await storageSet(key, JSON.stringify(doc), true);
-    } catch(e){}
+    if (!(await addAllianceContribution(contribKey, amount))){
+      // Fehlgeschlagen: Abzug und Zähler zurücknehmen, damit dem Spieler nichts verlorengeht.
+      state.resources[resKey] += amount;
+      state.allianceContributed[contribKey] = Math.max(0, (state.allianceContributed[contribKey]||0) - amount);
+      if (state.dailyQuests) state.dailyQuests.allianceContribCount = Math.max(0, (state.dailyQuests.allianceContribCount||0) - 1);
+      render(); save();
+      return;
+    }
     log(fmt(amount)+' '+(RES_DEFS.find(r=>r.key===resKey)||{}).label+' zur Allianzbasis beigetragen.', 'ti-building-fortress');
     playSound('trade');
     await recordAllianceDonation(amount);
@@ -22729,13 +22768,14 @@
     const contribKey = 'baserepair_'+resKey;
     state.allianceContributed[contribKey] = (state.allianceContributed[contribKey]||0) + amount;
     if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
-    try {
-      const key = 'alliance:'+tag+':contrib:'+state.player.id;
-      let doc = {};
-      try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
-      doc[contribKey] = (doc[contribKey]||0) + amount;
-      await storageSet(key, JSON.stringify(doc), true);
-    } catch(e){}
+    if (!(await addAllianceContribution(contribKey, amount))){
+      // Fehlgeschlagen: Abzug und Zähler zurücknehmen, damit dem Spieler nichts verlorengeht.
+      state.resources[resKey] += amount;
+      state.allianceContributed[contribKey] = Math.max(0, (state.allianceContributed[contribKey]||0) - amount);
+      if (state.dailyQuests) state.dailyQuests.allianceContribCount = Math.max(0, (state.dailyQuests.allianceContribCount||0) - 1);
+      render(); save();
+      return;
+    }
     log(fmt(amount)+' '+(RES_DEFS.find(r=>r.key===resKey)||{}).label+' zur Reparatur der Allianzbasis beigetragen.', 'ti-building-fortress');
     playSound('trade');
     await loadAllianceTechData();
@@ -22768,13 +22808,13 @@
     state.resources[t.resKey] -= amount;
     state.allianceContributed[techKey] = (state.allianceContributed[techKey]||0) + amount;
     if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
-    try {
-      const key = 'alliance:'+tag+':contrib:'+state.player.id;
-      let doc = {};
-      try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
-      doc[techKey] = (doc[techKey]||0) + amount;
-      await storageSet(key, JSON.stringify(doc), true);
-    } catch(e){}
+    if (!(await addAllianceContribution(techKey, amount))){
+      state.resources[t.resKey] += amount;
+      state.allianceContributed[techKey] = Math.max(0, (state.allianceContributed[techKey]||0) - amount);
+      if (state.dailyQuests) state.dailyQuests.allianceContribCount = Math.max(0, (state.dailyQuests.allianceContribCount||0) - 1);
+      render(); save();
+      return;
+    }
     log(amount+' '+RES_DEFS.find(r=>r.key===t.resKey).label+' zu "'+t.name+'" beigetragen.', 'ti-flask');
     playSound('trade');
     await recordAllianceDonation(amount);
@@ -22803,13 +22843,13 @@
     const rareContribKey = techKey+'_rare';
     state.allianceContributed[rareContribKey] = (state.allianceContributed[rareContribKey]||0) + amount;
     if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
-    try {
-      const key = 'alliance:'+tag+':contrib:'+state.player.id;
-      let doc = {};
-      try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
-      doc[techKey+'__rare'] = (doc[techKey+'__rare']||0) + amount;
-      await storageSet(key, JSON.stringify(doc), true);
-    } catch(e){}
+    if (!(await addAllianceContribution(techKey+'__rare', amount))){
+      state.rareItems[t.rareItem] += amount;
+      state.allianceContributed[rareContribKey] = Math.max(0, (state.allianceContributed[rareContribKey]||0) - amount);
+      if (state.dailyQuests) state.dailyQuests.allianceContribCount = Math.max(0, (state.dailyQuests.allianceContribCount||0) - 1);
+      render(); save();
+      return;
+    }
     log(amount+'x '+(RARE_ITEMS.find(r=>r.key===t.rareItem)||{}).name+' zu "'+t.name+'" beigetragen.', 'ti-diamond');
     playSound('trade');
     await loadAllianceTechData();
@@ -22833,13 +22873,13 @@
     state.resources[t.t2Item] -= amount;
     state.allianceContributed[techKey+'_t2'] = (state.allianceContributed[techKey+'_t2']||0) + amount;
     if (state.dailyQuests) state.dailyQuests.allianceContribCount = (state.dailyQuests.allianceContribCount||0) + 1;
-    try {
-      const key = 'alliance:'+tag+':contrib:'+state.player.id;
-      let doc = {};
-      try { const r = await storageGet(key, true); if (r && r.value) doc = JSON.parse(r.value); } catch(e){}
-      doc[techKey+'__t2'] = (doc[techKey+'__t2']||0) + amount;
-      await storageSet(key, JSON.stringify(doc), true);
-    } catch(e){}
+    if (!(await addAllianceContribution(techKey+'__t2', amount))){
+      state.resources[t.t2Item] += amount;
+      state.allianceContributed[techKey+'_t2'] = Math.max(0, (state.allianceContributed[techKey+'_t2']||0) - amount);
+      if (state.dailyQuests) state.dailyQuests.allianceContribCount = Math.max(0, (state.dailyQuests.allianceContribCount||0) - 1);
+      render(); save();
+      return;
+    }
     log(amount+'x '+resDefFor(t.t2Item).label+' zu "'+t.name+'" beigetragen.', 'ti-diamond');
     playSound('trade');
     await loadAllianceTechData();
