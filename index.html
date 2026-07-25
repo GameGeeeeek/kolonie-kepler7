@@ -4217,8 +4217,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.297.1';
+  const VERSION = '8.297.2';
   const PATCHNOTES = [
+    { version:'8.297.2', date:'25.07.2026', changes:[
+      'Bugfix (danke für den Hinweis): Klappt man die Karte eines noch gesperrten Event-Schiffs auf – z.B. das Enterschiff –, ging sie nach etwa einer Sekunde von selbst wieder zu. Der Beschreibungstext war damit praktisch nicht lesbar. Ursache: Die Werft wird jede Sekunde neu gezeichnet (wegen der mitlaufenden Bauzeit- und Event-Countdowns), und der Aufklappzustand wurde dabei jedes Mal mit weggeworfen. Er wird jetzt über das Neuzeichnen hinweg gemerkt – aufgeklappt bleibt aufgeklappt, bis man selbst wieder zuklappt.',
+      'Derselbe Fehler steckte in drei weiteren Aufklapp-Blöcken und ist dort mitbehoben: „Ausbaustufen & Boni anzeigen" bei der Allianzbasis sowie „Teilnehmer anzeigen" beim Allianz-Raid und beim koordinierten Allianzbasis-Angriff.'
+    ]},
     { version:'8.297.1', date:'25.07.2026', changes:[
       'Bugfix (danke für den Hinweis): Das Spiel hat an 15 Stellen behauptet, Event-Bauteile und exklusive Event-Module würden auf ERKUNDUNGSMISSIONEN gefunden. Tatsächlich fallen sie ausschließlich auf EXPEDITIONEN – wer nach der Beschreibung Erkundungsschiffe losgeschickt hat, konnte nie etwas finden, die Chance war schlicht null. Betroffen waren alle sechs Event-Beschreibungen, die sechs Modul-Beschreibungen, die Hinweiszeile über dem Event-Kalender, die Modulzeile im Kalender und die Karte des Event-Schiffs im Flotte-Tab.',
       'An der Mechanik ändert sich nichts – nur die Texte sagen jetzt die Wahrheit. Konkret fürs Enterschiff: „Enterausrüstung" fällt mit 5% je erfolgreicher Expedition (6 Stück nötig), das Modul „Verstärkte Enterhaken" mit 2,5% (1 Stück reicht), beides nur während des Piratenüberfalls.',
@@ -12122,6 +12126,28 @@
     const within = el === active || el.contains(active);
     return within && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
   }
+  // Aufklappzustand von <details>-Blöcken über die Sekunden-Neuzeichnung retten.
+  // Problem (Spielerbericht 25.07.2026, gesperrte Event-Schiff-Karte "Enterschiff"): Ein natives
+  // <details> hält seinen Zustand ausschließlich im DOM. Jede Box, die der Haupt-Tick per innerHTML
+  // neu schreibt (#fleet, Allianzbasis, Raid, Musterangriff), warf das Aufgeklappte damit nach
+  // spätestens einer Sekunde wieder weg - der Spieler sah die Karte "von selbst" zuklappen.
+  // Lösung: Jeder betroffene Block bekommt ein stabiles data-keep-open="<schlüssel>". Ein einziger
+  // Zuhörer merkt sich den Zustand hier, detailsOpenAttr() schreibt ihn beim Neuaufbau zurück.
+  // Bewusst NICHT in state/Spielstand: reiner Anzeigezustand, gehört nicht in den Speicherstand
+  // (und damit auch nicht gegen die Backend-SAVE_SANITY_LIMITS).
+  const openDetailKeys = new Set();
+  // Capture-Phase ist Pflicht: 'toggle' steigt nicht auf (bubbles:false), erreicht einen Zuhörer am
+  // document also nur auf dem Weg NACH UNTEN zum Ziel.
+  document.addEventListener('toggle', e => {
+    const el = e.target;
+    if (!el || el.tagName !== 'DETAILS') return;
+    const key = el.getAttribute('data-keep-open');
+    if (!key) return;
+    if (el.open) openDetailKeys.add(key); else openDetailKeys.delete(key);
+  }, true);
+  // Beim Neuaufbau eingesetzt. Ein von Anfang an gesetztes open-Attribut löst kein toggle aus,
+  // der gemerkte Zustand kann sich also nicht selbst überschreiben.
+  function detailsOpenAttr(key){ return openDetailKeys.has(key) ? ' open' : ''; }
   function isMoonKey(key){ return typeof key === 'string' && key.indexOf('moon_') === 0; }
   function pillMoonBtn(pid){ return (state.colonies && state.colonies['moon_'+pid]) ? `<span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+pid?'active':''}" data-moon-switch="moon_${pid}" title="${planetDisplayName('moon_'+pid)} – zum Mond wechseln">☾</span>` : ''; }
   function moonParentKey(key){ return key.slice(5); }
@@ -23346,7 +23372,7 @@
           ${barsHtml}
         `}
         <div class="bmeta">Dein Gesamtbeitrag zur Basis: ${fmt(myContribSum)} Ressourcen</div>
-        <details><summary class="bmeta" style="cursor:pointer;">Ausbaustufen & Boni anzeigen</summary><div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">${stagesHtml}</div></details>
+        <details data-keep-open="allianceBaseStages"${detailsOpenAttr('allianceBaseStages')}><summary class="bmeta" style="cursor:pointer;">Ausbaustufen & Boni anzeigen</summary><div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">${stagesHtml}</div></details>
         ${allianceBaseWarSectionHtml(lvl)}
         ${allianceMissionSectionHtml(lvl,'daily')}
         ${allianceMissionSectionHtml(lvl,'weekly')}
@@ -24066,7 +24092,7 @@
       const html = `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:rgba(93,202,165,0.4);">${hpBarHtml}
         <div class="bname"><i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> Sammelphase <span class="lvl-pill">${fmtDuration(remain/1000)}</span></div>
         <div class="bmeta">Rechtzeitig an der Basis: <strong style="color:#fff;">${onTimeParts.length}</strong> · Gesamtschiffe: <strong style="color:#fff;">${fmt(totalShips)}</strong> · Gesamt-Angriffskraft: <strong style="color:#fff;">${fmt(totalPower)}</strong>${lateParts.length?` · <span style="color:#f0997b;">${lateParts.length} vermutlich zu spät</span>`:''}</div>
-        ${parts.length ? `<details><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>{ const late = (p.arrivesAtBaseAt||Infinity) > doc.gatherEndsAt; return `<div class="bmeta">${escapeHtml(p.name)}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft${late?' <span style="color:#f0997b;">(zu spät, verpasst die Welle)</span>':''}</div>`; }).join('')}</div></details>` : ''}
+        ${parts.length ? `<details data-keep-open="allianceRaidParts"${detailsOpenAttr('allianceRaidParts')}><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>{ const late = (p.arrivesAtBaseAt||Infinity) > doc.gatherEndsAt; return `<div class="bmeta">${escapeHtml(p.name)}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft${late?' <span style="color:#f0997b;">(zu spät, verpasst die Welle)</span>':''}</div>`; }).join('')}</div></details>` : ''}
         <div class="bmeta" style="margin-bottom:2px;">Wer beitritt, lässt seine Flotte erst zur Allianzbasis fliegen - nur wer rechtzeitig ankommt, gehört zum abfliegenden Verband.</div>
         ${myStatusHtml}
       </div>`;
@@ -24150,7 +24176,7 @@
           <div class="bname"><i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> Sammelphase gegen [${escapeHtml(doc.targetTag)}] <span class="lvl-pill">${fmtDuration(remain/1000)}</span></div>
           <div class="bmeta">Geplant von ${escapeHtml(doc.createdByName)}${doc.message?' · Nachricht: „'+escapeHtml(doc.message)+'"':''}</div>
           <div class="bmeta">Teilnehmer: <strong style="color:#fff;">${parts.length}</strong> · Gesamtschiffe: <strong style="color:#fff;">${fmt(totalShips)}</strong> · Gesamt-Angriffskraft: <strong style="color:#fff;">${fmt(totalPower)}</strong></div>
-          ${parts.length ? `<details><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>`<div class="bmeta">${escapeHtml(p.name)}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft</div>`).join('')}</div></details>` : ''}
+          ${parts.length ? `<details data-keep-open="allianceMusterParts"${detailsOpenAttr('allianceMusterParts')}><summary class="bmeta" style="cursor:pointer;">Teilnehmer anzeigen</summary><div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">${parts.map(p=>`<div class="bmeta">${escapeHtml(p.name)}: ${fmt(p.shipCount||0)} Schiffe, ${fmt(p.power||0)} Angriffskraft</div>`).join('')}</div></details>` : ''}
           ${myJoined
             ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Deine Flotte ist angeschlossen (${fmt(state.allianceMusterContribution.power)} Angriffskraft).</div><button id="musterCancelBtn" style="align-self:flex-start; font-size:11px;">Beitrag zurückziehen</button>`
             : `<div class="bmeta">Nutzt deine im Galaxie-Tab zusammengestellte Angriffsflotte des aktuellen Standorts.</div><button id="musterJoinBtn" class="attack" style="align-self:flex-start;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Flotte anschließen</button>`}
@@ -32183,7 +32209,7 @@
             <div class="left">
               <div class="bicon" style="background:rgba(250,199,117,0.12);"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
               <div style="min-width:0; flex:1;">
-                <details class="event-locked">
+                <details class="event-locked" data-keep-open="eventship:${def.key}"${detailsOpenAttr('eventship:'+def.key)}>
                   <summary>
                     <span class="bname" style="display:inline;">${def.name}</span>
                     <span class="lvl-pill">Event-Schiff</span>
