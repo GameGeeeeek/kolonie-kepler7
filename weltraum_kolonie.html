@@ -4183,8 +4183,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.290.0';
+  const VERSION = '8.291.0';
   const PATCHNOTES = [
+    { version:'8.291.0', date:'25.07.2026', changes:[
+      'Neu (danke für den Wunsch): Jedes der sechs Sammel-Events hat jetzt zusätzlich zum Event-Schiff ein EXKLUSIVES MODUL, das es nur während der Eventlaufzeit gibt. „Kometenschild-Projektor" (Meteoritensturm), „Verstärkte Enterhaken" (Piratenüberfall), „Phasenfeld-Stabilisator" (Void-Anomalie), „Stabilisierter Riss-Kern" (Leerenriss-Welle), „Depeschen-Relais" (Fraktionskonflikt) und „Erzgreifer-Ausleger" (Goldrausch). Gefunden werden sie wie die Event-Teile auf erfolgreichen Erkundungsmissionen, aber seltener (2,5% statt 5%) – vom Bauteil brauchst du sechs, vom Modul reicht eines. Im normalen Modul-Fundpool tauchen sie nie auf: Ist das Event vorbei, gibt es das Modul bis zur nächsten Kalenderrunde nicht mehr. Dafür starten sie bei Seltenheit „Selten" und werden in 30% der Fälle Episch, in 10% sogar Legendär.',
+      'Jedes Event-Modul stärkt die Schiffsklasse seines eigenen Event-Schiffs. Dafür gibt es die neue Schiffsklasse „Event-Schiffe" (Enterschiff, Phantomschiff, Riftwächter, Gesandtenschiff, Schürfschiff): Diese fünf Schiffe gehörten bisher zu GAR KEINER Klasse und konnten deshalb überhaupt keine Klassen-Module tragen – jetzt schon. Der Kometenjäger bleibt bewusst im Jäger-Geschwader, damit er seine dortigen Module nicht verliert; sein Event-Modul wirkt entsprechend dort.',
+      'Der Event-Kalender zeigt jetzt bei jedem Event, welches Modul es dazu gibt, was es bewirkt und ob du es schon besitzt – auch beim kommenden Event als Vorschau. Dazu der neue Erfolg „Zeitzeuge" für alle sechs Event-Module: Da jedes nur in seinem eigenen Zeitfenster zu finden ist, heißt das, über mehrere Kalenderrunden hinweg dabei gewesen zu sein.'
+    ]},
     { version:'8.290.0', date:'25.07.2026', changes:[
       'Neu: die MODULBÖRSE – Module lassen sich ab sofort direkt mit anderen Spielern handeln. Zum Anbieten drückst du im Offiziere-Tab an einem Modul im Inventar den neuen „Börse"-Knopf und nennst deinen Preis (1.000 bis 5.000.000 Kredite). Alle offenen Angebote stehen im Markt-Tab unter „Modulbörse", nach Preis sortiert, mit Modulname, Seltenheit, Stufe und Anbieter.',
       'Die Börse arbeitet mit echter TREUHAND: Ein eingestelltes Modul verlässt sofort dein Inventar und liegt bis zum Verkauf oder Zurückziehen bei der Börse. Dadurch kann dasselbe Modul nie zweimal verkauft werden und es kann auch keines aus dem Nichts entstehen – selbst dann nicht, wenn zwei Spieler im selben Moment auf dasselbe Angebot klicken. Der Server prüft und verbucht alles, der Spielstand entscheidet nichts davon selbst.',
@@ -10148,6 +10153,7 @@
           </div>
           <div class="bmeta" style="margin-top:4px;">${def.desc}</div>
           ${partsHtml}
+          ${eventModuleHtml(def, true)}
         </div>`;
     } else {
       const remain = Math.max(0, ce.nextStartsAt - Date.now());
@@ -10158,8 +10164,23 @@
             <span class="lvl-pill"><i class="ti ti-clock" aria-hidden="true"></i> nächstes Event in ${fmtDuration(remain/1000)}</span>
           </div>
           <div class="bmeta" style="margin-top:4px;">${ce.nextDef.desc}</div>
+          ${eventModuleHtml(ce.nextDef, false)}
         </div>`;
     }
+  }
+  // Zeile zum exklusiven Event-Modul in der Kalender-Box. Zeigt Name, Wirkung, betroffene Klasse und
+  // ob man es schon besitzt - beim kommenden Event als Vorschau, damit man weiß, worauf man wartet.
+  function eventModuleHtml(def, running){
+    const mod = def && eventModuleDefFor(def.key);
+    if (!mod) return '';
+    const cls = SHIP_CLASS_DEFS.find(c => c.key === mod.klasse);
+    // Besitz zählt über alle Seltenheiten/Stufen: der instKey beginnt immer mit "<modulkey>:".
+    const owned = Object.keys(state.shipModules||{}).some(k => String(k).split(':')[0] === mod.key)
+      || Object.values(state.equippedShipModules||{}).some(arr => (arr||[]).some(k => String(k).split(':')[0] === mod.key));
+    return `<div class="bmeta" style="margin-top:6px; color:${owned ? '#5dcaa5' : def.color};">
+      <i class="ti ${mod.icon}" aria-hidden="true"></i> Exklusives Event-Modul: <strong>${mod.name}</strong>
+      (${shipModuleEffectLabel(mod.effect, mod.base)}, ${cls ? cls.name : mod.klasse})
+      ${owned ? '· <strong>hast du bereits</strong>' : (running ? '· mit etwas Glück auf Erkundungsmissionen zu finden, solange das Event läuft' : '· nur während des Events zu finden')}</div>`;
   }
   // Feuert genau EINMAL pro Event-Start (Marker aus Event-Schlüssel+Startzeitpunkt, überlebt daher
   // auch einen Neustart der Rotation) - Toast+Log+Chronik-ähnlicher Hinweis, damit niemand ein
@@ -11137,6 +11158,14 @@
     // Schiff - ohne Filter wäre "Event-Sammler" nie mehr abschließbar (unlocked[undefined]).
     { key:'eventship1', name:'Ereignis-Pilot', desc:'Schalte dein erstes Event-Schiff frei.', check: s => EVENT_CALENDAR.some(e => e.shipKey && (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.some(e=>e.shipKey && (s.unlocked||{})[e.shipKey])?1:0, 1] },
     { key:'eventship_all', name:'Event-Sammler', desc:'Schalte alle bisherigen Event-Schiffe frei.', check: s => EVENT_CALENDAR.filter(e=>e.shipKey).every(e => (s.unlocked||{})[e.shipKey]), progress: s => [EVENT_CALENDAR.filter(e=>e.shipKey && (s.unlocked||{})[e.shipKey]).length, EVENT_CALENDAR.filter(e=>e.shipKey).length], reward:{erz:6000,kristalle:4000,deuterium:2000,credits:250}, xpReward:250 },
+    // Event-Module (25.07.2026): jedes nur im eigenen Zeitfenster zu finden - alle sechs zu besitzen
+    // heißt, über mehrere Kalenderrunden hinweg dabei gewesen zu sein. Gezählt wird über den Besitz
+    // (Inventar ODER ausgerüstet), nicht über einen Fundzähler: so bleibt der Erfolg auch dann
+    // erfüllt, wenn ein Modul gerade eingebaut ist.
+    { key:'eventmodule_all', name:'Zeitzeuge', desc:'Besitze alle sechs exklusiven Event-Module – jedes gibt es nur, solange sein Event läuft.',
+      check: s => EVENT_MODULE_KEYS.every(k => ownsShipModuleKey(s, k)),
+      progress: s => [EVENT_MODULE_KEYS.filter(k => ownsShipModuleKey(s, k)).length, EVENT_MODULE_KEYS.length],
+      reward:{kristalle:8000,deuterium:4000,credits:400}, xpReward:400 },
     // Retention-Erfolge (21.07.2026): Login-Treue-Meilensteine und Happy-Hour-Nutzung sichtbar machen.
     { key:'streak30', name:'Monatstreue', desc:'Erreiche 30 Tage Login-Serie am Stück.', check: s => (s.loginStreak||0) >= 30, progress: s => [Math.min(30,s.loginStreak||0), 30], reward:{erz:4000,kristalle:2500,deuterium:1500,credits:200}, xpReward:200 },
     { key:'streak100', name:'Hundert-Tage-Legende', desc:'Erreiche 100 Tage Login-Serie am Stück.', check: s => (s.loginStreak||0) >= 100, progress: s => [Math.min(100,s.loginStreak||0), 100], reward:{erz:15000,kristalle:10000,deuterium:5000,antimaterie:200,credits:600}, xpReward:600 },
@@ -13385,7 +13414,16 @@
     // überall verdrahtete, klassen-generische Effekte) - kein 'atk', das bleibt den drei explizit
     // server-gespiegelten Kampfmodulen (Zielcomputer/Reaktorkern/Fokusarray) vorbehalten.
     { key:'jagdgeschwader',  name:'Jäger-Geschwader',      icon:'ship_jaeger',          shipKeys:['jaeger','hyperjaeger','leerenjaeger','kometenjaeger'] },
-    { key:'schwerelinie',    name:'Schwere Linie',         icon:'ship_bomber',          shipKeys:['cruisers','destroyers','bomber','hyperbomber'] }
+    { key:'schwerelinie',    name:'Schwere Linie',         icon:'ship_bomber',          shipKeys:['cruisers','destroyers','bomber','hyperbomber'] },
+    // Event-Flotte (25.07.2026, Spieler-Wunsch "bei Events auch Module finden"): Bis hierher gehörten
+    // FÜNF der sechs Event-Schiffe zu gar keiner Klasse und konnten deshalb überhaupt keine
+    // Klassen-Module tragen. Diese Klasse fasst sie zusammen, damit die neuen Event-Module (siehe
+    // EVENT_MODULE_KEYS) irgendwo wirken können.
+    // Der Kometenjäger fehlt hier BEWUSST: er steht bereits im Jagdgeschwader, und shipClassKeyFor()
+    // nimmt das erste Match - ihn hierher zu ziehen würde ihm still seine bisherigen
+    // Jagdgeschwader-Module entziehen. Sein Event-Modul (Meteoritensturm) ist deshalb als
+    // Jagdgeschwader-Modul angelegt und wirkt genau dort, wo er einsortiert ist.
+    { key:'eventflotte',     name:'Event-Schiffe',         icon:'ship_enterschiff',     shipKeys:['enterschiff','phantomschiff','riftwaechter','gesandtenschiff','schuerfschiff'] }
   ];
   function shipClassKeyFor(shipKey){
     const cls = SHIP_CLASS_DEFS.find(c=>c.shipKeys.includes(shipKey));
@@ -13435,8 +13473,66 @@
     { key:'sl_treibstoffzellen',klasse:'schwerelinie',  name:'Hochdruck-Treibstoffzellen', icon:'ti-droplet', effect:'fuel',        base:0.10, desc:'Verringert den Treibstoffverbrauch von Missionen mit Schiffen der Schweren Linie – gerade bei den durstigen schweren Rümpfen eine deutliche Ersparnis.' },
     // Tier-2-Erweiterung "Synthese-Kette" (20.07.2026): zwei Apex-Module aus den neuen Ressourcen.
     { key:'t2_metamaterialpanzer', klasse:'raffiniert', name:'Metamaterial-Panzerplatte', icon:'ti-shield-lock', effect:'hull',      base:0.14, craftOnly:true, craftCost:{ metamaterial: 18 }, desc:'Erhöht den Verteidigungsbeitrag von Tier-2-Schiffen deutlich. Nur über die Tier-2-Modulfertigung erhältlich.' },
-    { key:'t2_singularitaetsfokus', klasse:'raffiniert', name:'Singularitäts-Fokusarray', icon:'ti-bolt',       effect:'atk',         base:0.14, craftOnly:true, craftCost:{ singularitaetskern: 10 }, desc:'Erhöht die Angriffskraft von Tier-2-Schiffen deutlich. Nur über die Tier-2-Modulfertigung erhältlich.' }
+    { key:'t2_singularitaetsfokus', klasse:'raffiniert', name:'Singularitäts-Fokusarray', icon:'ti-bolt',       effect:'atk',         base:0.14, craftOnly:true, craftCost:{ singularitaetskern: 10 }, desc:'Erhöht die Angriffskraft von Tier-2-Schiffen deutlich. Nur über die Tier-2-Modulfertigung erhältlich.' },
+    // ===== Event-Module (25.07.2026, Spieler-Wunsch) =====
+    // Je EIN exklusives Modul pro Sammel-Event, das ausschließlich WÄHREND der Eventlaufzeit auf
+    // Expeditionen gefunden werden kann (eventKey + Filter in grantRandomShipModule, gleiche Idee wie
+    // craftOnly). Läuft das Event aus, ist das Modul bis zur nächsten Runde des Kalenders nicht mehr
+    // erhältlich - dieselbe Exklusivität wie beim Event-Schiff selbst.
+    // Jedes Modul wirkt auf die Klasse SEINES Event-Schiffs: fünf der sechs Event-Schiffe stecken in
+    // der neuen Klasse 'eventflotte', der Kometenjäger im Jagdgeschwader (siehe SHIP_CLASS_DEFS).
+    // Effekte bewusst nur hull/shield/speed/fuel/cargo - 'atk' bleibt laut Kommentar oben den drei
+    // server-gespiegelten Kampfmodulen vorbehalten, damit Client und Server nicht auseinanderlaufen.
+    { key:'ev_kometenschild',  klasse:'jagdgeschwader', name:'Kometenschild-Projektor', icon:'ti-mountain',   effect:'shield',      base:0.12, eventKey:'meteorsturm',
+      desc:'Aus Meteoritensplittern gefertigte Ablenkfelder: erhöht die Schildpunkte aller Schiffe des Jäger-Geschwaders (Jäger, Hyperjäger, Leerenjäger, Kometenjäger) und damit die Verteidigung ihres Standorts. Exklusiv – nur während des Meteoritensturms auf Erkundungsmissionen zu finden.' },
+    { key:'ev_enterhaken',     klasse:'eventflotte',    name:'Verstärkte Enterhaken',  icon:'ti-anchor',      effect:'hull',        base:0.12, eventKey:'piratenueberfall',
+      desc:'Von Piraten geborgene Enterausrüstung, zur Panzerung umgebaut: erhöht den Verteidigungsbeitrag aller Event-Schiffe (Enterschiff, Phantomschiff, Riftwächter, Gesandtenschiff, Schürfschiff) – sie halten Angriffen auf ihren Standort besser stand. Exklusiv – nur während des Piratenüberfalls auf Erkundungsmissionen zu finden.' },
+    { key:'ev_phasenfeld',     klasse:'eventflotte',    name:'Phasenfeld-Stabilisator', icon:'ti-alien',      effect:'speed',       base:0.14, eventKey:'voidanomalie',
+      desc:'Ein aus Anomalie-Fragmenten gewonnener Feldgenerator: erhöht die Geschwindigkeit aller Event-Schiffe deutlich, ihre Missionen kommen spürbar früher an. Exklusiv – nur während der Void-Anomalie auf Erkundungsmissionen zu finden.' },
+    { key:'ev_risskern',       klasse:'eventflotte',    name:'Stabilisierter Riss-Kern', icon:'ti-atom',      effect:'shield',      base:0.12, eventKey:'leerenrisswelle',
+      desc:'Ein eingefangener Leerenriss als Energiequelle: erhöht die Schildpunkte aller Event-Schiffe und stärkt damit die Verteidigung ihres Standorts. Exklusiv – nur während der Leerenriss-Welle auf Erkundungsmissionen zu finden.' },
+    { key:'ev_depeschenrelais',klasse:'eventflotte',    name:'Depeschen-Relais',       icon:'ti-message',     effect:'fuel',        base:0.12, eventKey:'fraktionskonflikt',
+      desc:'Erbeutete Fraktions-Funkprotokolle erlauben effizientere Flugrouten: verringert den Treibstoffverbrauch aller Missionen mit Event-Schiffen. Exklusiv – nur während des Fraktionskonflikts auf Erkundungsmissionen zu finden.' },
+    { key:'ev_erzgreifer',     klasse:'eventflotte',    name:'Erzgreifer-Ausleger',    icon:'ti-pick',        effect:'cargo',       base:0.25, eventKey:'goldrausch',
+      desc:'Schwere Bergebäume aus der Goldrausch-Ausrüstung: erhöht die Frachtkapazität aller Event-Schiffe deutlich – Missionen bringen mehr Beute zurück. Exklusiv – nur während des Goldrauschs auf Erkundungsmissionen zu finden.' }
   ];
+  // Alle Modulschlüssel, die an ein Event gebunden sind (Fundpool-Filter + Kalenderanzeige).
+  const EVENT_MODULE_KEYS = SHIP_MODULE_DEFS.filter(d => d.eventKey).map(d => d.key);
+  // Das Event-Modul eines Events (oder null, wenn das Event keines hat - z.B. die buffOnly-Krise).
+  function eventModuleDefFor(eventKey){ return SHIP_MODULE_DEFS.find(d => d.eventKey === eventKey) || null; }
+  // Besitzt der Spielstand ein Schiffsmodul dieses Typs - egal in welcher Seltenheit/Stufe und egal
+  // ob im Inventar oder eingebaut? (Ausgerüstete Module sind bewusst NICHT in der Inventar-Zählkarte,
+  // siehe equipShipModule - ohne den zweiten Zweig würde ein eingebautes Modul als "fehlt" gelten.)
+  function ownsShipModuleKey(s, modKey){
+    if (Object.keys((s && s.shipModules) || {}).some(k => String(k).split(':')[0] === modKey)) return true;
+    return Object.values((s && s.equippedShipModules) || {}).some(arr => (arr||[]).some(k => String(k).split(':')[0] === modKey));
+  }
+  // Fundchance je erfolgreicher Expedition, solange das Event läuft. Bewusst niedriger als die
+  // Bauteil-Chance (5%): vom Bauteil braucht man SECHS, vom Modul reicht eines - bei gleicher Chance
+  // hätte man das Modul lange vor dem Schiff und das Event verlöre seinen Spannungsbogen.
+  const EVENT_MODULE_CHANCE = 0.025;
+  // Seltenheitsverteilung des Event-Moduls: startet bei "Selten" statt "Gewöhnlich" - ein Fund, den
+  // es nur in einem begrenzten Zeitfenster gibt, soll sich auch lohnen. Legendär bleibt selten genug,
+  // dass es ein echter Glücksmoment ist.
+  function rollEventModuleRarity(){
+    const r = Math.random();
+    if (r < 0.10) return 'legendaer';
+    if (r < 0.40) return 'episch';
+    return 'selten';
+  }
+  // Gewährt das Event-Modul des laufenden Events. Gibt den Anzeigenamen zurück oder null, wenn das
+  // Event gar kein Modul hat (buffOnly-Events wie die Raffinerie-Krise).
+  function grantEventShipModule(eventKey){
+    const def = eventModuleDefFor(eventKey);
+    if (!def) return null;
+    const rarity = rollEventModuleRarity();
+    const subs = rollModuleSubs(rarity, true, def.effect);
+    const instKey = subs ? (def.key+':'+rarity+':1:'+subs) : (def.key+':'+rarity);
+    state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
+    state.eventModulesFound = (state.eventModulesFound||0) + 1;   // für den Erfolg
+    const info = shipModuleInstanceInfo(instKey);
+    return info ? (info.rar.label+' '+info.def.name) : def.name;
+  }
   const SHIP_MODULE_MAX_SLOT_LEVEL = 3; // etwas knapper als das Standort-System (4) - wirkt klassenweit statt nur an einem Ort
   function shipModuleInstanceInfo(instKey){
     const [key, rarity] = instKey.split(':');
@@ -13561,8 +13657,11 @@
   const SHIP_MODULE_RARITY_ORDER = ['gewoehnlich','selten','episch','legendaer','mythisch'];
   function grantRandomShipModule(maxRarity){
     // craftOnly-Module (Tier-2-Fertigung) sind bewusst NICHT im Zufalls-Fundpool - sie kommen
-    // ausschließlich aus craftTier2ShipModule() gegen Tier-2-Ressourcen.
-    const pool = SHIP_MODULE_DEFS.filter(d => !d.craftOnly);
+    // ausschließlich aus craftTier2ShipModule() gegen Tier-2-Ressourcen. Ebenso wenig die
+    // Event-Module: die gibt es NUR während ihres Events und ausschließlich über den eigenen
+    // Fundzweig (siehe grantEventShipModule) - sonst wären sie jederzeit über den normalen Pool
+    // erreichbar und die Event-Exklusivität wäre wertlos.
+    const pool = SHIP_MODULE_DEFS.filter(d => !d.craftOnly && !d.eventKey);
     const def = pool[Math.floor(Math.random()*pool.length)];
     const capIdx = maxRarity ? SHIP_MODULE_RARITY_ORDER.indexOf(maxRarity) : SHIP_MODULE_RARITY_ORDER.length-1;
     const roll = Math.random();
@@ -18807,7 +18906,8 @@
       { title:'Expeditions-Limit: nur 1 gleichzeitig zu Beginn', body:'Zusätzlich zur Forschungsschiff-Anzahl je Planet und dem allgemeinen Flottenentsendelimit gibt es ein eigenes, planetenübergreifendes Limit für gleichzeitig laufende Expeditionen - anfangs nur <strong>1</strong>. Die eigenständige Forschung <strong>Expeditionskoordination</strong> (Kategorie Logistik) erhöht dieses Limit um 1 je Stufe, bis maximal <strong>5</strong> gleichzeitige Expeditionen bei Stufe 4. Der aktuelle Stand wird direkt im Expedition-Tab beim Start-Formular angezeigt.' },
       { title:'Letzte Sendung wiederholen', body:'Sobald in der aktuellen Sitzung schon einmal erfolgreich eine Expedition gestartet wurde, erscheint neben „Expedition starten" der Knopf <strong>„Letzte wiederholen"</strong>: stellt Typ und Eskorte-Zusammensetzung der zuletzt gestarteten Expedition wieder her und startet SOFORT - ideal zum wiederholten Farmen, ohne die Eskorte jedes Mal neu zusammenzuklicken. Ist am aktuellen Standort inzwischen weniger verfügbar als beim letzten Mal, wird automatisch auf das tatsächlich Vorhandene gekappt statt die Sendung zu blockieren.' },
       { title:'Fragmente & kosmetische Avatare', body:'Statt eines vollen seltenen Materials (Antimateriekern, Kristallherz, Alte Technologie) kann auch ein <strong>Fragment</strong> davon gefunden werden - häufiger, aber schwächer. Sind <strong>4 Fragmente</strong> desselben Typs im Inventar (Fortschritt-Tab), lassen sie sich per Knopfdruck zu 1x dem vollen Material zusammensetzen. Ebenfalls über Expeditionen erhältlich: drei <strong>exklusive Avatare</strong> (Nova, Void, Phoenix), die sonst nirgends wählbar sind - einmal gefunden dauerhaft freigeschaltet und in den Einstellungen auswählbar. Ist ein kosmetischer Fund bereits freigeschaltet, gibt es stattdessen Ersatz-Ressourcen, kein doppelter Nutzen.' },
-      { title:'Event-Kalender & Event-Schiffe', body:'Im Fortschritt-Tab ganz oben zeigt der <strong>Event-Kalender</strong>, ob gerade ein zeitlich begrenztes Event läuft oder wann das nächste beginnt - komplett automatisch aus dem Datum berechnet, kein Server nötig, die Events lösen sich endlos in Rotation ab. Während ein Event aktiv ist, finden erfolgreiche <strong>Expeditionen</strong> mit kleiner Zusatzchance Event-Teile (unabhängig vom sonstigen Expeditionsfund, verändert also keine bestehenden Fundchancen). Sind genug Teile beisammen, schaltet ein Knopf im Flotte-Tab das zugehörige <strong>exklusive Event-Schiff</strong> frei ("Zusammenbauen", verbraucht die Teile) - Event-Schiffe gibt es NUR über diesen Weg, nie über normale Forschung. Das <strong>Sammeln</strong> der Teile ist an die Event-Laufzeit gebunden, das spätere <strong>Bauen</strong> danach nicht mehr - einmal freigeschaltet, bleibt das Schiff dauerhaft normal baubar. Die sechs Events: „Meteoritensturm" mit dem <strong>Kometenjäger</strong> (schnellster Kampfschiff-Typ), „Piratenüberfall" mit dem <strong>Enterschiff</strong> (zäheste Angreiferklasse, hoher Schild), „Void-Anomalie" mit dem <strong>Phantomschiff</strong> (Glaskanone, sehr niedriger Schild), „Leerenriss-Welle" mit dem <strong>Riftwächter</strong> (nutzt schon vor der Leerenjäger-Forschung dieselbe Schwachstellen-Mechanik gegen Leere-Gegner), „Fraktionskonflikt" mit dem <strong>Gesandtenschiff</strong> (kampfunfähig, dafür +15% auf allen Ruf-Zuwachs bei NPC-Fraktionen, solange eins in der Flotte steht) und „Goldrausch" mit dem <strong>Schürfschiff</strong> (kampfunfähig, dafür +3% Gesamtproduktion, solange eins besessen wird) - jedes davon eine eigene Nische statt reinem Powercreep. Dazu kommt als siebtes Event die <strong>„Raffinerie-Krise"</strong> - das erste Event OHNE Sammel-Teile und Belohnungs-Schiff: Während es läuft, bringen Siege in NPC-Kämpfen, Piraten-Verstecken und gegen Elite-Gegner <strong>doppelte Kampfpunkte</strong>, wenn mindestens ein Tier-2-Schiff in der Angriffsflotte mitfliegt.' }
+      { title:'Event-Kalender & Event-Schiffe', body:'Im Fortschritt-Tab ganz oben zeigt der <strong>Event-Kalender</strong>, ob gerade ein zeitlich begrenztes Event läuft oder wann das nächste beginnt - komplett automatisch aus dem Datum berechnet, kein Server nötig, die Events lösen sich endlos in Rotation ab. Während ein Event aktiv ist, finden erfolgreiche <strong>Expeditionen</strong> mit kleiner Zusatzchance Event-Teile (unabhängig vom sonstigen Expeditionsfund, verändert also keine bestehenden Fundchancen). Sind genug Teile beisammen, schaltet ein Knopf im Flotte-Tab das zugehörige <strong>exklusive Event-Schiff</strong> frei ("Zusammenbauen", verbraucht die Teile) - Event-Schiffe gibt es NUR über diesen Weg, nie über normale Forschung. Das <strong>Sammeln</strong> der Teile ist an die Event-Laufzeit gebunden, das spätere <strong>Bauen</strong> danach nicht mehr - einmal freigeschaltet, bleibt das Schiff dauerhaft normal baubar. Die sechs Events: „Meteoritensturm" mit dem <strong>Kometenjäger</strong> (schnellster Kampfschiff-Typ), „Piratenüberfall" mit dem <strong>Enterschiff</strong> (zäheste Angreiferklasse, hoher Schild), „Void-Anomalie" mit dem <strong>Phantomschiff</strong> (Glaskanone, sehr niedriger Schild), „Leerenriss-Welle" mit dem <strong>Riftwächter</strong> (nutzt schon vor der Leerenjäger-Forschung dieselbe Schwachstellen-Mechanik gegen Leere-Gegner), „Fraktionskonflikt" mit dem <strong>Gesandtenschiff</strong> (kampfunfähig, dafür +15% auf allen Ruf-Zuwachs bei NPC-Fraktionen, solange eins in der Flotte steht) und „Goldrausch" mit dem <strong>Schürfschiff</strong> (kampfunfähig, dafür +3% Gesamtproduktion, solange eins besessen wird) - jedes davon eine eigene Nische statt reinem Powercreep. Dazu kommt als siebtes Event die <strong>„Raffinerie-Krise"</strong> - das erste Event OHNE Sammel-Teile und Belohnungs-Schiff: Während es läuft, bringen Siege in NPC-Kämpfen, Piraten-Verstecken und gegen Elite-Gegner <strong>doppelte Kampfpunkte</strong>, wenn mindestens ein Tier-2-Schiff in der Angriffsflotte mitfliegt.' },
+      { title:'Exklusive Event-Module', body:'Jedes der sechs Sammel-Events hat zusätzlich ein <strong>eigenes Schiffsklassen-Modul</strong>, das es AUSSCHLIESSLICH während der Eventlaufzeit gibt: „Kometenschild-Projektor" (Meteoritensturm), „Verstärkte Enterhaken" (Piratenüberfall), „Phasenfeld-Stabilisator" (Void-Anomalie), „Stabilisierter Riss-Kern" (Leerenriss-Welle), „Depeschen-Relais" (Fraktionskonflikt) und „Erzgreifer-Ausleger" (Goldrausch). Sie werden wie die Event-Teile auf erfolgreichen <strong>Expeditionen</strong> gefunden, aber seltener (2,5% statt 5%) – vom Bauteil brauchst du sechs, vom Modul reicht eines. Im normalen Modul-Fundpool tauchen sie nie auf: Läuft das Event aus, ist das Modul bis zur nächsten Kalenderrunde nicht mehr erhältlich. Dafür starten sie erst bei Seltenheit „Selten" (30% Episch, 10% Legendär). Jedes Modul wirkt auf die Schiffsklasse seines Event-Schiffs – fünf davon auf die neue Klasse <strong>„Event-Schiffe"</strong> (Enterschiff, Phantomschiff, Riftwächter, Gesandtenschiff, Schürfschiff), die bis dahin überhaupt keine Klassen-Module tragen konnte; das Meteoritensturm-Modul wirkt auf das Jäger-Geschwader, wo der Kometenjäger einsortiert ist. Wer alle sechs besitzt, schaltet den Erfolg <strong>„Zeitzeuge"</strong> frei.' }
     ]},
     { key:'kampf', icon:'ti-sword', title:'Kampf', entries:[
       { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.' },
@@ -26482,6 +26582,14 @@
                 state.eventParts[activeEv.partKey] = (state.eventParts[activeEv.partKey]||0)+1;
                 const shipName = (SHIP_DEFS.find(s=>s.key===activeEv.shipKey)||{}).name||activeEv.shipKey;
                 findText += ' Außerdem: '+activeEv.partName+' gefunden ('+state.eventParts[activeEv.partKey]+'/'+activeEv.partsNeeded+' für '+shipName+')!';
+              }
+              // Event-Modul (25.07.2026, Spieler-Wunsch): zweite, unabhängige Zusatzchance neben dem
+              // Bauteil. Seltener als das Bauteil (das braucht man SECHSMAL, das Modul einmal) und
+              // ebenfalls nur, solange das Event läuft. Verändert keine der regulären Fund-
+              // Wahrscheinlichkeiten, sondern kommt oben drauf.
+              if (activeEv && Math.random() < EVENT_MODULE_CHANCE){
+                const found = grantEventShipModule(activeEv.key);
+                if (found) findText += ' Und ein Fund von bleibendem Wert: '+found+'!';
               }
             }
             let sysMsg = '';
