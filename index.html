@@ -1704,10 +1704,10 @@
         <i class="ti ti-logout" aria-hidden="true" style="font-size:26px; color:#e24b4a;"></i>
         <div>
           <div class="login-title">Auf diesem Gerät abgemeldet</div>
-          <div class="login-sub">Du bist gerade auf einem anderen Gerät aktiv</div>
+          <div class="login-sub" id="conflictOverlaySub">Du bist gerade auf einem anderen Gerät aktiv</div>
         </div>
       </div>
-      <div class="bmeta" style="line-height:1.5; margin-bottom:14px;">
+      <div class="bmeta" id="conflictOverlayText" style="line-height:1.5; margin-bottom:14px;">
         Dieses Gerät wurde automatisch abgemeldet, weil ein anderes Gerät mit demselben Account
         zwischenzeitlich gespeichert hat. So bleibt immer nur eine Sitzung aktiv und es geht kein
         Fortschritt verloren. Melde dich hier bei Bedarf erneut an.
@@ -2895,10 +2895,25 @@
     } catch(e){}
   }
 
+  // Solange der Spielstart noch die gespeicherte Anmeldung prüft, wird eine verdrängte Sitzung NICHT
+  // als Abmelde-Dialog gezeigt - dort ist der richtige Ort der normale Anmeldebildschirm (mit Hinweis).
+  let bootAuthPhase = true;
   async function backendFetch(path, options){
     const opts = options || {};
     opts.headers = Object.assign({ 'Authorization': 'Bearer '+authToken }, opts.headers||{});
-    return fetch('/api'+path, opts);
+    const res = await fetch('/api'+path, opts);
+    // Sitzungsführung (25.07.2026): Der Server lässt pro Konto nur EINE Sitzung zu. Meldet man sich
+    // auf einem zweiten Gerät an, beantwortet er jede weitere Anfrage des alten Geräts mit
+    // 401 + sessionSuperseded. Das hier zentral abzufangen sorgt dafür, dass ALLE Aufrufe im Spiel
+    // dasselbe saubere Verhalten zeigen (Abmelde-Dialog), statt dass jede Stelle einzeln scheitert.
+    // res.clone() ist nötig, weil der Aufrufer den Body danach noch selbst lesen können muss.
+    if (res.status === 401 && !bootAuthPhase && !saveConflictDetected){
+      try {
+        const info = await res.clone().json();
+        if (info && info.sessionSuperseded) handleSessionSuperseded();
+      } catch(e){}
+    }
+    return res;
   }
   async function storageGet(key, shared){
     if (useBackend()){
@@ -4183,8 +4198,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.291.0';
+  const VERSION = '8.292.0';
   const PATCHNOTES = [
+    { version:'8.292.0', date:'25.07.2026', changes:[
+      'Wichtig für alle, die auf mehreren Geräten spielen: Pro Konto ist ab jetzt immer nur EINE Sitzung aktiv – der Server führt sie mit. Meldest du dich auf einem zweiten Gerät an, wird das vorher angemeldete Gerät sauber abgemeldet und erklärt dort auch, warum. Bisher liefen beide Geräte einfach weiter und haben sich gegenseitig den Spielstand überschrieben: Wer auf dem Handy baute und am PC forschte, verlor je nachdem, welches Gerät zuletzt gespeichert hat, die Fortschritte des anderen – ohne jede Warnung.',
+      'Der Abmelde-Dialog hat versprochen, dass „immer nur eine Sitzung aktiv" bleibt. Das stimmte bisher schlicht nicht – jetzt schon. Der Text nennt außerdem den tatsächlichen Grund: verdrängte Sitzung oder Speicherkonflikt.',
+      'Startest du das Spiel auf einem verdrängten Gerät neu, landest du direkt auf dem normalen Anmeldebildschirm – mit einem Hinweis, warum die gespeicherte Anmeldung nicht mehr gilt. Und wer sich neu anmeldet und dabei ein anderes Gerät verdrängt, bekommt das als Meldung gesagt, statt nebenan zu rätseln.',
+      'Mehrere Tabs auf DEMSELBEN Gerät bleiben ausdrücklich erlaubt – sie teilen sich dieselbe Sitzung und verdrängen sich nicht gegenseitig. Niemand wird durch dieses Update ausgeloggt: Bestehende Anmeldungen bleiben gültig, bis man sich das nächste Mal irgendwo anmeldet.'
+    ]},
     { version:'8.291.0', date:'25.07.2026', changes:[
       'Neu (danke für den Wunsch): Jedes der sechs Sammel-Events hat jetzt zusätzlich zum Event-Schiff ein EXKLUSIVES MODUL, das es nur während der Eventlaufzeit gibt. „Kometenschild-Projektor" (Meteoritensturm), „Verstärkte Enterhaken" (Piratenüberfall), „Phasenfeld-Stabilisator" (Void-Anomalie), „Stabilisierter Riss-Kern" (Leerenriss-Welle), „Depeschen-Relais" (Fraktionskonflikt) und „Erzgreifer-Ausleger" (Goldrausch). Gefunden werden sie wie die Event-Teile auf erfolgreichen Erkundungsmissionen, aber seltener (2,5% statt 5%) – vom Bauteil brauchst du sechs, vom Modul reicht eines. Im normalen Modul-Fundpool tauchen sie nie auf: Ist das Event vorbei, gibt es das Modul bis zur nächsten Kalenderrunde nicht mehr. Dafür starten sie bei Seltenheit „Selten" und werden in 30% der Fälle Episch, in 10% sogar Legendär.',
       'Jedes Event-Modul stärkt die Schiffsklasse seines eigenen Event-Schiffs. Dafür gibt es die neue Schiffsklasse „Event-Schiffe" (Enterschiff, Phantomschiff, Riftwächter, Gesandtenschiff, Schürfschiff): Diese fünf Schiffe gehörten bisher zu GAR KEINER Klasse und konnten deshalb überhaupt keine Klassen-Module tragen – jetzt schon. Der Kometenjäger bleibt bewusst im Jäger-Geschwader, damit er seine dortigen Module nicht verliert; sein Event-Modul wirkt entsprechend dort.',
@@ -18857,6 +18878,7 @@
     { key:'grundlagen', icon:'ti-home', title:'Grundlagen', entries:[
       { title:'Übersichtlichkeit (optional)', body:'In den <strong>Einstellungen</strong> lassen sich drei Layout-Optionen für die dichtesten Tabs (Punktestand, Fortschritt) einzeln aktivieren, alle standardmäßig aus: <strong>Sprungmarken</strong> (Klick-Leiste oben springt direkt zu einem Abschnitt), <strong>Aufklappbare Abschnitte</strong> (jeder Abschnitt einzeln ein-/ausklappbar, gemerkt) und <strong>Zweispaltiges Layout</strong> (kurze Abschnitte nebeneinander, nur auf breiteren Bildschirmen sichtbar). Das bisherige Layout bleibt unverändert der Standard.' },
       { title:'Konto & E-Mail-Bestätigung', body:'Für ein neues Konto ist eine <strong>E-Mail-Adresse Pflicht</strong>. Nach der Registrierung bekommst du eine Bestätigungs-E-Mail mit einem Link (24h gültig) – erst nach dem Klick darauf ist dein Konto freigeschaltet und du kannst dich anmelden. Keine Mail erhalten? Auch im Spam-Ordner nachsehen oder über den Login-Bildschirm eine neue anfordern. Bestehende Konten sind davon nicht betroffen.' },
+      { title:'Nur ein Gerät gleichzeitig', body:'Pro Konto ist immer nur <strong>eine Sitzung</strong> aktiv. Meldest du dich auf einem zweiten Gerät an (Handy, Tablet, anderer Browser), wird das zuvor angemeldete Gerät automatisch abgemeldet und zeigt dort einen Hinweis – dein Fortschritt bis dahin ist gespeichert. Hintergrund: Zwei parallel laufende Geräte haben sich sonst gegenseitig den Spielstand überschrieben, sodass Bauaufträge, Forschung oder Ressourcen scheinbar zurücksprangen. <strong>Mehrere Tabs auf demselben Gerät</strong> sind ausdrücklich weiterhin erlaubt – sie teilen sich dieselbe Sitzung und stören sich nicht. Zum Gerätewechsel reicht ein normaler Login auf dem neuen Gerät, ein Abmelden auf dem alten ist nicht nötig.' },
       { title:'E-Mail ändern', body:'In den Einstellungen unter „E-Mail" kannst du deine Adresse jederzeit ändern (Passwort-Bestätigung nötig). Die neue Adresse wird erst aktiv, nachdem du den Bestätigungslink geklickt hast, der dorthin geschickt wird – deine bisherige Adresse bleibt bis dahin gültig, damit du nicht ausgesperrt wirst.' },
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Freunde einladen', body:'Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.' },
@@ -23760,7 +23782,24 @@
     wireAllianceContribButtons();
   }
 
-  function showConflictOverlay(){
+  // Zwei Wege führen zu diesem Dialog, und sie haben unterschiedliche Ursachen - der Text muss
+  // also dazu passen, sonst erklärt er dem Spieler etwas Falsches:
+  //  'superseded' = der Server hat diese Sitzung verdrängt, weil man sich woanders angemeldet hat
+  //  'conflict'   = ein Schreibkonflikt beim Speichern (409), der sich nicht auflösen ließ
+  const CONFLICT_TEXTS = {
+    superseded: 'Dein Konto wurde gerade auf einem anderen Gerät angemeldet. Pro Konto ist immer nur '
+      + 'eine Sitzung aktiv – dieses Gerät wurde deshalb abgemeldet, damit sich beide Geräte nicht '
+      + 'gegenseitig den Spielstand überschreiben. Dein Fortschritt bis hierher ist gespeichert. '
+      + 'Melde dich erneut an, wenn du auf diesem Gerät weiterspielen möchtest.',
+    conflict: 'Dieses Gerät wurde automatisch abgemeldet, weil ein anderes Gerät mit demselben Account '
+      + 'zwischenzeitlich gespeichert hat. So bleibt immer nur eine Sitzung aktiv und es geht kein '
+      + 'Fortschritt verloren. Melde dich hier bei Bedarf erneut an.'
+  };
+  function showConflictOverlay(reason){
+    const txt = document.getElementById('conflictOverlayText');
+    if (txt) txt.textContent = CONFLICT_TEXTS[reason] || CONFLICT_TEXTS.conflict;
+    const sub = document.getElementById('conflictOverlaySub');
+    if (sub) sub.textContent = reason === 'superseded' ? 'Du spielst gerade auf einem anderen Gerät weiter' : 'Du bist gerade auf einem anderen Gerät aktiv';
     const el = document.getElementById('conflictOverlay');
     if (el) el.style.display = 'flex';
   }
@@ -23769,7 +23808,18 @@
     saveConflictDetected = true;
     try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
     authToken = null;
-    showConflictOverlay();
+    showConflictOverlay('conflict');
+  }
+  // Gegenstück zu handleSaveConflict() für die serverseitige Sitzungsführung: der Server hat diese
+  // Sitzung verdrängt (401 + sessionSuperseded, siehe backendFetch). saveConflictDetected stoppt
+  // dabei zugleich alles Weitere - Speichern, Render-Schleife und das Speichern beim Schließen -,
+  // damit das verdrängte Gerät den Spielstand des neuen nicht mehr anfassen kann.
+  function handleSessionSuperseded(){
+    if (saveConflictDetected) return;
+    saveConflictDetected = true;
+    try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
+    authToken = null;
+    showConflictOverlay('superseded');
   }
   // Bug-Fix: Server-seitige Aktionen wie ein Spielerangriff (/attack) verändern u.U. den
   // gespeicherten Spielstand des Angreifers als Nebeneffekt (z.B. Kampfpunkte), OHNE dass der
@@ -23822,6 +23872,10 @@
         return null;
       }
       if (res.ok){ const data = await res.json(); gameSaveVersion = data.version; return data; }
+      // Verdrängte Sitzung (401 + sessionSuperseded): backendFetch hat den Abmelde-Dialog bereits
+      // gezeigt. Hier still aussteigen, statt zusätzlich den "Speichern abgelehnt"-Alarm zu feuern -
+      // das ist kein Datenproblem, sondern die gewollte Abmeldung.
+      if (res.status === 401 && saveConflictDetected) return null;
       // Jede andere Nicht-OK-Antwort (v.a. 400 = vom Server abgelehnt) NICHT mehr still schlucken.
       let reason = '';
       try { const err = await res.json(); reason = (err && err.error) ? err.error : ('HTTP '+res.status); } catch(e){ reason = 'HTTP '+res.status; }
@@ -35561,6 +35615,14 @@
       state.player.id = data.userId;
       try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
       render();
+      // Sitzungsführung: Diese Anmeldung hat ein anderes, noch angemeldetes Gerät verdrängt. Das
+      // offen sagen, damit niemand rätselt, warum das Tablet nebenan plötzlich abgemeldet ist.
+      if (data.supersededPrevious){
+        try {
+          log('Andere Sitzung beendet: Dein Konto war noch auf einem anderen Gerät angemeldet – dort wurdest du abgemeldet, damit sich die Spielstände nicht überschreiben.', 'ti-logout', 'info');
+          pushToast('Dein Konto war noch auf einem anderen Gerät angemeldet – dort ist die Sitzung jetzt beendet.', 'ti-logout', 'info');
+        } catch(e){}
+      }
       loadLeaderboard();
       loadReports();
       // Neue Spieler: erst der Willkommens-Screen (Heimatsystem + Anfängerschutz), danach der Rundgang.
@@ -35622,6 +35684,7 @@
       log('Einladungscode von '+data.referrerName+' verknüpft - der Bonus wird automatisch gutgeschrieben, sobald du Kommandanten-Level '+(data.levelNeeded||5)+' erreichst.', 'ti-users');
     }
   }
+  let supersededAtBoot = false;
   async function initAuth(){
     // Einladungs-Link (13.07.2026, Feature-Wunsch: per Link statt nur per eingetipptem Namen
     // einladen können) - ?ref=NAME wird gemerkt (localStorage, überlebt den kompletten
@@ -35696,12 +35759,27 @@
           showLogoutBtn();
           return true;
         }
+        // Sitzungsführung: Das gespeicherte Token gehört zu einer Sitzung, die inzwischen von einem
+        // anderen Gerät abgelöst wurde. Beim Spielstart ist der Abmelde-Dialog der falsche Ort dafür
+        // (man ist ja noch gar nicht drin) - stattdessen ganz normal den Anmeldebildschirm zeigen und
+        // dort erklären, warum die gespeicherte Anmeldung nicht mehr gilt.
+        if (res.status === 401){
+          try { const info = await res.json(); if (info && info.sessionSuperseded) supersededAtBoot = true; } catch(e){}
+        }
       } catch(e){}
       authToken = null;
       try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
     }
     wireLoginUI();
     showLoginOverlay();
+    if (supersededAtBoot){
+      const infoEl = document.getElementById('loginInfo');
+      if (infoEl){
+        infoEl.style.color = '#e0a548';
+        infoEl.textContent = 'Dein Konto wurde zwischenzeitlich auf einem anderen Gerät angemeldet. '
+          + 'Pro Konto ist immer nur eine Sitzung aktiv – melde dich erneut an, um hier weiterzuspielen.';
+      }
+    }
     return false;
   }
 
@@ -35742,6 +35820,7 @@
 
   (async () => {
     const ready = await initAuth();
+    bootAuthPhase = false; // ab hier darf eine verdrängte Sitzung den Abmelde-Dialog auslösen
     if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); checkIncomingMoonSieges(); if (myAllianceTag()){ loadAllianceWars(); if (useBackend()){ loadAllianceTechData(); loadAllianceBase(); loadAllianceDonationRanking(); } } if (!maybeShowNewbieWelcome() && !state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
   })();
   // PWA: Service Worker registrieren (macht die App zusätzlich zum Manifest auch am DESKTOP
