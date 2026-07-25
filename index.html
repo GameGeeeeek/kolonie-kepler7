@@ -4246,8 +4246,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.9';
+  const VERSION = '8.298.10';
   const PATCHNOTES = [
+    { version:'8.298.10', date:'25.07.2026', changes:[
+      'Expeditionen kosten deutlich weniger Schiffe (Spieler-Report: „man verliert so viel Schiffe, das ist abnormal"). Nachgerechnet stimmte das nicht nur gefühlt: Bei einer Begegnung lag die Chance auf einen Totalverlust bei 45% minus einem winzigen Bonus für die Eskorte – selbst eine unendlich starke Eskorte kam nie unter 30%, und verloren war dann jedes Mal die komplette Eskorte.',
+      'Daraus folgte ein verkehrter Anreiz: Eine größere Eskorte senkte das Risiko kaum, vervielfachte aber den Einsatz, der bei diesem Risiko verbrennt. Rechnerisch war es am besten, so wenig wie möglich mitzuschicken – genau das Gegenteil dessen, wofür eine Eskorte da ist.',
+      'Drei Änderungen: (1) Die Eskorte wirkt jetzt überproportional – bei ausgeglichenen Kräften sinkt das Risiko eines schweren Verlusts von 38% auf 10%, bei deutlicher Überlegenheit von 33% auf unter 2%. (2) Ein schwerer Verlust löscht nicht mehr die ganze Eskorte aus, sondern 50–80% je nach Kräfteverhältnis – der Rest setzt sich ab. (3) Die Stärke der Gegner wuchs bisher unbegrenzt mit dem eigenen Punktestand (bei 500.000 Punkten im Schnitt 15.190) und ist jetzt gedeckelt: Fortschritt verschlechtert die Lage nicht mehr automatisch.',
+      'Unterm Strich verliert eine Standard-Expedition mit ordentlicher Eskorte statt 13% ihrer Eskorte nur noch etwa 0,3% – ein Bruchteil. Ohne jede Eskorte bleibt es dagegen bewusst hart: Wer unbewacht losfliegt, verliert bei einem Zwischenfall bis zu 80%.',
+      'Die Hilfe hat einen neuen Abschnitt „Was bei einer Begegnung passiert", der die drei möglichen Ausgänge, die Wirkung der Eskorte sowie zwei Dinge nennt, die bisher nirgends standen: Verlorene Schiffe hinterlassen ein bergbares Trümmerfeld am Startplaneten, und Hyperjäger in der Eskorte senken die eigenen Verluste um 3% je Stück (maximal −30%).'
+    ]},
     { version:'8.298.9', date:'25.07.2026', changes:[
       'Aufräumen unter der Haube, ohne sichtbare Änderung im Spiel: Zwei Funktionen, die nirgends mehr aufgerufen wurden (eine zur Prüfung freigeschalteter Flotten-Lackierungen, eine zur Abfrage der Konterrolle eines Schiffs), sind entfernt. Ihre Logik steckt längst direkt an den Stellen, wo sie gebraucht wird.',
       'Damit so etwas künftig nicht erst nach Monaten auffällt, prüft der Testlauf jetzt automatisch, ob eine Funktion ohne Aufrufstelle im Spiel steht – und zusätzlich, ob zwei Funktionen denselben Namen tragen (dabei überschreibt die spätere die frühere stillschweigend, ein Fehler, der in diesem Projekt schon einmal aufgetreten ist).'
@@ -11973,6 +11980,28 @@
   // spaeher (24.07.2026, Ausbau D): Spähschiffe sind als reine Utility-Eskorte wählbar - sie tragen 0
   // Angriffspunkte bei (nicht in ATTACK_SHIP_KEYS, escortPower unberührt), verbessern aber gezielt die
   // Expeditionsausbeute (mehr Sonderereignisse + bessere Fund-Qualität, siehe checkMissions).
+  // Begegnungs-Balance (Überarbeitung 25.07.2026, Spieler-Report zu übermäßigen Schiffsverlusten).
+  // Bewusst als benannte Konstanten an EINER Stelle statt als Zahlen in der Auflösungsformel - die
+  // alten Werte steckten verstreut im Code und ihre Wirkung war nur durch Nachrechnen sichtbar.
+  //
+  //   P(schwerer Verlust) = HEAVY_BASE · (1−r)²        r = Eskorte / (Eskorte + Gegner)
+  //   P(geschwächt)       = WEAK_BASE · (1−r)
+  //   P(abgewehrt)        = Rest
+  //   Verlustanteil bei schwerem Verlust = HEAVY_LOSS_MIN + HEAVY_LOSS_SPAN · (1−r)
+  //
+  // Wirkung gegenüber vorher (P(schwerer Verlust) bei Begegnung): r=0,2 → 26% statt 42%;
+  // r=0,5 → 10% statt 38%; r=0,8 → 1,6% statt 33%. Und selbst dann stirbt nicht mehr alles,
+  // sondern 50-80% je nach Kräfteverhältnis. Ohne jede Eskorte (r≈0) bleibt es mit 40% hart -
+  // unbewachte Expeditionen sollen weiterhin eine schlechte Idee sein.
+  const EXPEDITION_HEAVY_BASE = 0.40;
+  const EXPEDITION_WEAK_BASE = 0.55;
+  const EXPEDITION_HEAVY_LOSS_MIN = 0.50, EXPEDITION_HEAVY_LOSS_SPAN = 0.30;
+  // Die Gegnerstärke wuchs bisher ungedeckelt mit dem eigenen Punktestand mit (bei 500.000 Punkten
+  // im Mittel 15.190) - Fortschritt verschlechterte das Kräfteverhältnis also automatisch, ohne dass
+  // man je aufholen konnte. Der Deckel greift ab ca. 83.000 Punkten und hält die Begegnung danach
+  // auf einem Niveau, das eine ordentliche Eskorte sicher beherrscht.
+  const EXPEDITION_ENEMY_SCORE_FACTOR = 0.03;
+  const EXPEDITION_ENEMY_SCORE_CAP = 2500;
   const EXPEDITION_SHIP_KEYS = ['forscher','spaeher','jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','kometenjaeger','enterschiff','phantomschiff','riftwaechter','frachter','frachtergross'];
   const ESCORT_KEYS = EXPEDITION_SHIP_KEYS.filter(k=>k!=='forscher');
   let expeditionEscortSelection = {};
@@ -19571,7 +19600,8 @@
       { title:'Treibstoffkosten (Deuterium & Antimaterie)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). <strong>Welche Ressource verbraucht wird, hängt vom Antrieb ab:</strong> Schiffe mit Verbrennungs- oder Impulstriebwerk tanken Deuterium, Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken Antimaterie. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen. Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
       { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren, Spionage UND Flottenverlegungen zwischen eigenen Planeten - ein per "Verband versenden" gemeinsam losgeschickter Verband zählt dabei nur als EIN Slot, unabhängig davon, wie viele Schiffstypen er enthält. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
       { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
-      { title:'Expeditionstypen, Wagnis & Eskorte', body:'Vor dem Start wählst du <strong>Expeditionstyp</strong>, <strong>Wagnis</strong> und <strong>Eskorte</strong> – alle drei formen Risiko und Beute. <strong>Typen:</strong> Kurz (schnell/sicher, wenig), Standard (ausgewogen), Tiefenraum (lang/riskant, viel) sowie drei spezialisierte: <strong>Bergungsexpedition</strong> (viel mehr Module und verlassene Schiffe, weniger Rohstoffe), <strong>Forschungsexpedition</strong> (viel mehr Items/Fragmente/Materialien und bevorzugt Forschungspunkte, kaum Rohstoffe) und <strong>Schürfexpedition</strong> (fast nur Rohstoffe, sehr sicher). <strong>Wagnis-Regler:</strong> Vorsichtig (−30% Begegnungsrisiko, −15% Beute), Normal, oder Wagemutig (+40% Risiko, +35% Beute). <strong>Eskorte:</strong> Kampfschiffe schützen vor Begegnungen; <strong>Spähschiffe</strong> tragen keine Kampfkraft bei, verbessern aber gezielt die Ausbeute (mehr Sonderfunde und bessere Fund-Qualität); <strong>Frachter/Große Frachter</strong> erweitern den Frachtraum für große Ressourcenfunde.' },
+      { title:'Expeditionstypen, Wagnis & Eskorte', body:'Vor dem Start wählst du <strong>Expeditionstyp</strong>, <strong>Wagnis</strong> und <strong>Eskorte</strong> – alle drei formen Risiko und Beute. <strong>Typen:</strong> Kurz (schnell/sicher, wenig), Standard (ausgewogen), Tiefenraum (lang/riskant, viel) sowie drei spezialisierte: <strong>Bergungsexpedition</strong> (viel mehr Module und verlassene Schiffe, weniger Rohstoffe), <strong>Forschungsexpedition</strong> (viel mehr Items/Fragmente/Materialien und bevorzugt Forschungspunkte, kaum Rohstoffe) und <strong>Schürfexpedition</strong> (fast nur Rohstoffe, sehr sicher). <strong>Wagnis-Regler:</strong> Vorsichtig (−30% Begegnungsrisiko, −15% Beute), Normal, oder Wagemutig (+40% Risiko, +35% Beute). <strong>Eskorte:</strong> Kampfschiffe entscheiden, wie eine Begegnung <em>ausgeht</em> (die Wahrscheinlichkeit, überhaupt auf jemanden zu treffen, hängt nur vom Typ, vom Wagnis und vom Modul „Eskorten-Leitsystem" ab); <strong>Spähschiffe</strong> tragen keine Kampfkraft bei, verbessern aber gezielt die Ausbeute (mehr Sonderfunde und bessere Fund-Qualität); <strong>Frachter/Große Frachter</strong> erweitern den Frachtraum für große Ressourcenfunde.' },
+      { title:'Was bei einer Begegnung passiert', body:'Trifft eine Expedition auf eine feindliche Flotte, entscheidet allein das <strong>Kräfteverhältnis</strong> zwischen deiner Eskorte und dem Gegner über den Ausgang – es gibt drei: <strong>abgewehrt</strong> (keine Verluste, volle Beute), <strong>geschwächt</strong> (das Forschungsschiff geht verloren, die Beute schrumpft auf 40%) und <strong>schwerer Verlust</strong> (Forschungsschiff plus 50–80% der Eskorte, keine Beute – der Rest der Eskorte setzt sich ab). Die Eskorte wirkt dabei stark überproportional: Bei ausgeglichenen Kräften liegt das Risiko eines schweren Verlusts bei rund 10%, bei deutlicher Überlegenheit unter 2%, ohne jede Eskorte dagegen bei 40%. Es lohnt sich also, lieber eine ordentliche Eskorte mitzuschicken als gar keine – anders als früher vervielfacht eine größere Eskorte den zu erwartenden Verlust nicht, sondern senkt ihn. Die Stärke der Gegner wächst mit deinem Punktestand, aber nur bis zu einer festen Obergrenze; ein gut ausgebautes Imperium wächst also aus dem Risiko heraus. Verlorene Schiffe hinterlassen ein <strong>Trümmerfeld</strong> am Startplaneten, das sich mit Recyclern bergen lässt, und <strong>Hyperjäger</strong> in der Eskorte senken die eigenen Verluste um 3% je Stück (max. −30%).' },
       { title:'Expeditions-Kette & Kodex', body:'<strong>Sternenkarten-Fragmente</strong> tauchen gelegentlich als Sonderfund auf. Hast du drei gesammelt, sind die Koordinaten eines verschollenen <strong>Schatzdepots</strong> vollständig – deine nächste erfolgreiche Expedition birgt dann garantiert einen wertvollen Fund (großer Ressourcen-Cache, ein Standort-Modul, Modulfragmente und XP). Der <strong>Expeditions-Kodex</strong> (aufklappbar im Expedition-Tab) sammelt deinen Fortschritt: entdeckte Sonderfunde, gefundene seltene Materialien, entdeckte Systeme und abgeschlossene Schatzdepots.' },
       { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
       { title:'Expeditions-Limit: nur 1 gleichzeitig zu Beginn', body:'Zusätzlich zur Forschungsschiff-Anzahl je Planet und dem allgemeinen Flottenentsendelimit gibt es ein eigenes, planetenübergreifendes Limit für gleichzeitig laufende Expeditionen - anfangs nur <strong>1</strong>. Die eigenständige Forschung <strong>Expeditionskoordination</strong> (Kategorie Logistik) erhöht dieses Limit um 1 je Stufe, bis maximal <strong>5</strong> gleichzeitige Expeditionen bei Stufe 4. Der aktuelle Stand wird direkt im Expedition-Tab beim Start-Formular angezeigt.' },
@@ -20133,7 +20163,7 @@
         // Mehr Berichtstiefe (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe bei Expedition"): vorher
         // nur Ausgangspunkt/Eskortstärke/Fundtext - jetzt analog zu den NPC-Kampfberichten mit
         // Expeditionstyp, Dauer, Eskortzusammensetzung und (bei Begegnung) Gegnerstärke/Erfolgschance.
-        const resMap = { defended:{label:'Angriff abgewehrt', color:true}, success:{label:'Erfolgreich', color:true}, weakened:{label:'Geschwächt zurückgekehrt', color:false}, destroyed:{label:'Expedition verloren', color:false} };
+        const resMap = { defended:{label:'Angriff abgewehrt', color:true}, success:{label:'Erfolgreich', color:true}, weakened:{label:'Geschwächt zurückgekehrt', color:false}, destroyed:{label:'Schwerer Verlust', color:false} };
         const info = resMap[r.result] || { label:r.result, color:true };
         title = 'Expedition – '+info.label;
         const etName = (EXPEDITION_TYPES.find(t=>t.key===r.expType)||{}).name || 'Standard-Expedition';
@@ -27245,27 +27275,41 @@
           // if(encountered)-Block sichtbar und für den Bericht verloren - jetzt in beiden pushReport()-
           // Aufrufen unten als konkrete Zahlen (Gegnerstärke, Erfolgschance) verfügbar, analog zu den
           // bereits vorhandenen NPC-Kampfberichten (attackPower vs. defensePower, Chance in %).
-          let enemyPower = 0, ratio = 1;
+          let enemyPower = 0, ratio = 1, schwerVerlustAnteil = 0;
           if (encountered){
-            enemyPower = 40 + Math.random()*300 + computeScore()*0.03;
+            // Balance-Überarbeitung 25.07.2026 (Spieler-Report "man verliert so viel Schiffe, das ist
+            // abnormal"). Nachgerechnet an der alten Formel: P(Totalverlust|Begegnung) war
+            // 0,45 − 0,15·ratio - selbst eine UNENDLICH starke Eskorte kam nie unter 30%, und verloren
+            // war dann jedes Mal die komplette Eskorte. Daraus folgte ein verkehrter Anreiz: mehr
+            // Eskorte senkte das Risiko kaum, vervielfachte aber den Einsatz, der bei diesem Risiko
+            // verbrennt - rechnerisch war es am besten, möglichst WENIG mitzuschicken. Drei Änderungen:
+            //   (C) Die Gegnerstärke wuchs unbegrenzt mit dem eigenen Punktestand (0,03 je Punkt) -
+            //       ein weit entwickeltes Konto konnte nicht mehr aufholen. Jetzt gedeckelt.
+            //   (B) Die Eskorte wirkt: quadratische statt flacher Kopplung, geht gegen null.
+            //   (A) Der schwere Verlust ist keine Totalauslöschung mehr, sondern ein Anteil, der
+            //       ebenfalls vom Kräfteverhältnis abhängt.
+            enemyPower = 40 + Math.random()*300 + Math.min(EXPEDITION_ENEMY_SCORE_CAP, computeScore()*EXPEDITION_ENEMY_SCORE_FACTOR);
             ratio = escortPower / (escortPower+enemyPower);
+            const pSchwer = EXPEDITION_HEAVY_BASE * Math.pow(1-ratio, 2);
+            const pGeschwaecht = EXPEDITION_WEAK_BASE * (1-ratio);
             const roll = Math.random();
-            if (roll < ratio*0.7){
-              outcome = 'defended'; // Eskorte wehrt den Angriff ab, keine Verluste
-            } else if (roll < ratio*0.7 + 0.55*(1-ratio)){
+            if (roll < pSchwer){
+              outcome = 'destroyed'; // schwerer Verlust: Forschungsschiff + Teil der Eskorte, keine Beute
+              fleet.forscher = Math.max(0, (fleet.forscher||0)-1);
+              schwerVerlustAnteil = EXPEDITION_HEAVY_LOSS_MIN + EXPEDITION_HEAVY_LOSS_SPAN*(1-ratio);
+            } else if (roll < pSchwer + pGeschwaecht){
               outcome = 'weakened'; // Verlust: ein Forschungsschiff, reduzierte Beute
               fleet.forscher = Math.max(0, (fleet.forscher||0)-1);
             } else {
-              outcome = 'destroyed'; // Totalverlust: Forschungsschiff weg, keine Beute
-              fleet.forscher = Math.max(0, (fleet.forscher||0)-1);
+              outcome = 'defended'; // Eskorte wehrt den Angriff ab, keine Verluste
             }
           }
           if (outcome === 'destroyed'){
-            // Die komplette Eskorte gilt als zerstört – hinterlässt jetzt ein Trümmerfeld statt
-            // spurlos zu verschwinden, konsistent mit allen anderen Kampf-Auflösungen.
-            const lostEscort = applyCombatLosses(fleet, ESCORT_KEYS, 1.0, planetKey, m.composition);
+            // Ein Teil der Eskorte geht verloren (Anteil oben aus dem Kräfteverhältnis) - der Rest
+            // kommt zurück. Hinterlässt ein Trümmerfeld, konsistent mit allen anderen Auflösungen.
+            const lostEscort = applyCombatLosses(fleet, ESCORT_KEYS, schwerVerlustAnteil, planetKey, m.composition);
             const lostEscortTxt = lostCountsToText(lostEscort);
-            if (showLog !== false) log((m.fleetName||'Expedition')+' von einer feindlichen Flotte überrascht und vollständig verloren! (Eskortstärke '+Math.round(escortPower)+' reichte nicht aus, '+planetDisplayName(planetKey)+')'+(lostEscortTxt?' Verloren: '+lostEscortTxt+'. Trümmerfeld hinterlassen.':''), 'ti-alert-triangle');
+            if (showLog !== false) log((m.fleetName||'Expedition')+' von einer feindlichen Flotte überrascht und schwer getroffen! Das Forschungsschiff und '+Math.round(schwerVerlustAnteil*100)+'% der Eskorte gingen verloren, der Rest konnte sich absetzen. (Eskortstärke '+Math.round(escortPower)+' gegen '+Math.round(enemyPower)+', '+planetDisplayName(planetKey)+')'+(lostEscortTxt?' Verloren: '+lostEscortTxt+'. Trümmerfeld hinterlassen.':''), 'ti-alert-triangle');
             pushReport({ type:'expedition', result:'destroyed', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), encountered:true, fleet:m.composition||fleet, ownLostShips:lostEscort, debris:combatDebrisOf(lostEscort), expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100) });
             state.lastExpeditionEventTime = Date.now();
             playSound('raid');
@@ -32799,7 +32843,7 @@
           return '';
         })()}
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:0.5rem;">
-          <div class="bmeta">Erfordert mind. 1 Forschungsschiff (0 Angriffspunkte). Wähle unten aus, welche Kampfschiffe als Eskorte mitfliegen sollen – ohne ausreichend Eskorte drohen unterwegs Verluste bis hin zum Totalverlust.</div>
+          <div class="bmeta">Erfordert mind. 1 Forschungsschiff (0 Angriffspunkte). Wähle unten aus, welche Kampfschiffe als Eskorte mitfliegen sollen. Die Eskorte entscheidet, wie eine Begegnung ausgeht, und wirkt überproportional: ohne sie gehen bei einem Zwischenfall bis zu 80% verloren, mit deutlicher Überlegenheit sinkt das Risiko unter 2%.</div>
           ${escortRows ? `<div style="display:flex; gap:6px; flex-wrap:wrap; align-self:flex-start;">
             <button id="escortMaxAllBtn" style="font-size:11px; padding:5px 10px;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Ganze Flotte als Eskorte</button>
             <button id="escortClearAllBtn" style="font-size:11px; padding:5px 10px;"><i class="ti ti-x" aria-hidden="true" style="margin-right:4px;"></i>Alle Eskorten entfernen</button>
