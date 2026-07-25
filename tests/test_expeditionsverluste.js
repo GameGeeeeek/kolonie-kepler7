@@ -109,6 +109,9 @@ if (von > 0 && bis > von){
     let outcome='success', ratio=1, enemyPower=0, schwerVerlustAnteil=0;
     const encountered = true;
     const fleet={forscher:5};
+    // Ab v8.298.11 liest der Block state.expeditionSafeRuns (Quantenpeilung). Bewusst 0, damit hier
+    // die REGULAERE Kurve gemessen wird - der Schutz ist Gegenstand eines eigenen Tests.
+    const state={ expeditionSafeRuns:0 };
     const computeScore=()=>K.score;
     const EXPEDITION_ENEMY_SCORE_CAP=K.SCORE_CAP, EXPEDITION_ENEMY_SCORE_FACTOR=K.SCORE_FACTOR;
     const EXPEDITION_HEAVY_BASE=K.HEAVY_BASE, EXPEDITION_WEAK_BASE=K.WEAK_BASE;
@@ -146,6 +149,34 @@ if (von > 0 && bis > von){
     { gemittelt: +anteilMittel.toFixed(3), band: [LOSS_MIN, LOSS_MIN + LOSS_SPAN] });
   check('6: kein einziger Durchlauf löscht die komplette Eskorte aus',
     anteilMittel < 1);
+
+  // ---- Quantenpeilung (episches Fundstück, v8.298.11): schliesst schwere Verluste aus und
+  // verbraucht sich dabei. Ohne diese Pruefung koennte der Schutz still ins Leere laufen.
+  const lauf2 = new Function('escortPower', 'K', 'st', `
+    let outcome='success', ratio=1, enemyPower=0, schwerVerlustAnteil=0;
+    const encountered = true;
+    const fleet={forscher:5};
+    const state = st;
+    const computeScore=()=>K.score;
+    const EXPEDITION_ENEMY_SCORE_CAP=K.SCORE_CAP, EXPEDITION_ENEMY_SCORE_FACTOR=K.SCORE_FACTOR;
+    const EXPEDITION_HEAVY_BASE=K.HEAVY_BASE, EXPEDITION_WEAK_BASE=K.WEAK_BASE;
+    const EXPEDITION_HEAVY_LOSS_MIN=K.LOSS_MIN, EXPEDITION_HEAVY_LOSS_SPAN=K.LOSS_SPAN;
+    ${block}
+    return { outcome };
+  `);
+  // Sehr schwache Eskorte: ohne Schutz waeren schwere Verluste haeufig, mit Schutz unmoeglich.
+  const stSchutz = { expeditionSafeRuns: 3 };
+  let schwerTrotzSchutz = 0;
+  for (let i = 0; i < 3; i++) if (lauf2(1, K, stSchutz).outcome === 'destroyed') schwerTrotzSchutz++;
+  check('Quantenpeilung: kein schwerer Verlust, solange der Schutz läuft', schwerTrotzSchutz === 0);
+  check('Quantenpeilung: der Schutz verbraucht sich pro Begegnung',
+    stSchutz.expeditionSafeRuns === 0, stSchutz);
+  // Und danach greift wieder die normale Kurve - der Schutz darf nicht dauerhaft haengenbleiben.
+  const stLeer = { expeditionSafeRuns: 0 };
+  let schwerOhne = 0;
+  for (let i = 0; i < 4000; i++) if (lauf2(1, K, stLeer).outcome === 'destroyed') schwerOhne++;
+  check('Quantenpeilung: nach Verbrauch gilt wieder das normale Risiko',
+    schwerOhne / 4000 > 0.25, { anteil: +(schwerOhne / 4000).toFixed(3) });
 }
 
 // ---------------------------------------------------------------- 7) alle Anzeigestellen mitgezogen
