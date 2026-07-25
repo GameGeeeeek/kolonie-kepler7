@@ -27,6 +27,7 @@ etwas Sinnvolles prüfen. Ein Test, der niemand ausführt, ist kein Sicherheitsn
 | `lib/umgebung.js` | findet Playwright, den Browser, die Spieldatei und optional das Backend-Repo |
 | `sweep.js` | Pflichtprüfung 3 aus CLAUDE.md: Boot + alle Tabs durchklicken, auf Konsolenfehler prüfen |
 | `test_*.js` | je ein Feature/Bugfix |
+| `test_tote_funktionen.js` | Sonderfall: reiner Textscan ohne Browser – findet Funktionen ohne Aufrufstelle und doppelte Deklarationen auf oberster Ebene (der Fallstrick aus CLAUDE.md) |
 
 **Keine absoluten Pfade in den Tests.** Alles kommt aus `lib/umgebung.js`; nur dort steht, wo
 Playwright und der Browser liegen. Überschreibbar per `KEPLER_CHROMIUM` und
