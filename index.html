@@ -2458,6 +2458,12 @@
           <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-rocket" aria-hidden="true"></i></div><div><div class="bname">Einführungs-Rundgang</div><div class="bmeta">Kurzer Überblick über Basis, Forschung, Flotte, Kolonisierung und Allianz</div></div></div>
           <i class="ti ti-chevron-right" aria-hidden="true" style="color:#7d8199;"></i>
         </div>
+        <!-- Gegenstueck zum Einfuehrungs-Rundgang: die Ersthinweise (v8.298.3) verschwinden nach dem
+             Wegklicken dauerhaft, ohne diese Karte gaebe es keinen Weg zurueck. -->
+        <div class="card-row" id="resetTabHintsBtn" style="cursor:pointer;">
+          <div class="left"><div class="bicon" style="background:rgba(55,138,221,0.18); color:#378add;"><i class="ti ti-info-circle" aria-hidden="true"></i></div><div><div class="bname">Ersthinweise zurücksetzen</div><div class="bmeta" id="resetTabHintsMeta">Zeigt den kurzen Hinweis unter der Menüleiste beim nächsten Öffnen jedes Menüpunkts wieder an</div></div></div>
+          <i class="ti ti-refresh" aria-hidden="true" style="color:#7d8199;"></i>
+        </div>
         <div class="bmeta" style="margin-top:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i> Tipp: Ziffern 1–9 und 0 wechseln direkt zwischen den Tabs (Basis bis Fortschritt, in Anzeigereihenfolge).</div>
           </div>
         </div>
@@ -4236,8 +4242,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.5';
+  const VERSION = '8.298.6';
   const PATCHNOTES = [
+    { version:'8.298.6', date:'25.07.2026', changes:[
+      'Neue Karte „Ersthinweise zurücksetzen" in den Einstellungen, direkt unter dem Einführungs-Rundgang. Die kurzen Hinweise unter der Menüleiste (seit 8.298.3) verschwanden nach dem Wegklicken dauerhaft – wer alle zwölf weggeklickt hatte, kam nicht mehr an sie heran. Ein Klick stellt sie alle wieder her.'
+    ]},
     { version:'8.298.5', date:'25.07.2026', changes:[
       'Jeder der 73 Erfolge hat jetzt ein eigenes Symbol. Bisher trugen ausnahmslos alle dieselben zwei – eine Medaille für erledigt, ein Schloss für offen. Die längste Kartenliste des Spiels war dadurch visuell völlig flach: Man musste jeden Eintrag lesen, um ihn zu erkennen.',
       'Die Symbole passen zum jeweiligen Erfolg: Schwert und Totenkopf beim Kämpfen, Planet und Fähnchen beim Erobern, Fabrik und Atom beim Ausbau, Lastwagen und Diamant beim Handeln, Tropfen und Sonne beim Terraforming. Insgesamt 51 verschiedene Symbole statt zweier.',
@@ -18471,6 +18480,28 @@
 
   const showTutorialBtn = document.getElementById('showTutorialBtn');
   if (showTutorialBtn) showTutorialBtn.addEventListener('click', showTutorial);
+  // Ersthinweise zurueckholen - ohne diesen Weg gaebe es kein Zurueck, wer alle zwoelf weggeklickt
+  // hat, kaeme nie wieder an sie heran. tabHintShownFor und der direkte maybeShowTabHint-Aufruf sind
+  // Vorsorge, keine Notwendigkeit: die Karte sitzt in den Einstellungen, und der Einstellungen-Tab
+  // hat selbst keinen Ersthinweis, die Leiste steht beim Klick also ohnehin auf null. Wandert die
+  // Karte irgendwann auf einen Tab MIT Hinweis, bliebe sie ohne diese zwei Zeilen bis zum naechsten
+  // Tabwechsel stumm.
+  const resetTabHintsBtn = document.getElementById('resetTabHintsBtn');
+  if (resetTabHintsBtn) resetTabHintsBtn.addEventListener('click', () => {
+    state.seenTabHints = {};
+    tabHintShownFor = null;
+    save();
+    // Kurze Bestaetigung direkt in der Karte, danach zurueck auf die Beschreibung - ein dauerhaft
+    // stehendes „Zurueckgesetzt" waere beim naechsten Besuch der Einstellungen schlicht falsch.
+    const meta = document.getElementById('resetTabHintsMeta');
+    if (meta && !meta.dataset.original){
+      meta.dataset.original = meta.textContent;
+      meta.textContent = 'Zurückgesetzt - die Hinweise erscheinen beim nächsten Öffnen jedes Menüpunkts wieder.';
+      setTimeout(() => { meta.textContent = meta.dataset.original; delete meta.dataset.original; }, 4000);
+    }
+    log('Ersthinweise zurückgesetzt - beim nächsten Öffnen eines Menüpunkts erscheint der Hinweis wieder.', 'ti-info-circle');
+    maybeShowTabHint(activeTab);
+  });
   // Server-Ereignis-Benachrichtigungen: Schalter verdrahten
   const notifEnabledSwitch = document.getElementById('notifPrefEnabledSwitch');
   if (notifEnabledSwitch) notifEnabledSwitch.addEventListener('click', () => { notifPrefsCache.enabled = !notifPrefsCache.enabled; saveNotificationPrefs(); });
