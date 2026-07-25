@@ -605,7 +605,19 @@
     .hero-stats::-webkit-scrollbar { display:none; }
     /* Schlanker, themenfarbener Scrollbalken für alle horizontalen Wisch-Leisten (Rollen,
        Orbitalstation-Fokus, Expeditionstyp, Modul-Standort) statt des klobigen Browser-Standards. */
-    [data-hscroll] { scrollbar-width: thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; }
+    /* Bug behoben (Spieler-Report 25.07.2026, "Slider Expeditionstyp geht nicht richtig am Handy"):
+       Die Wisch-Leisten stehen als Flex-Kind in Karten mit flex-direction:column. Dort ist die
+       Querachse die WAAGERECHTE - und die Regel "overflow ≠ visible ⇒ automatische Mindestgröße 0"
+       greift nur auf der HAUPTachse, hier also senkrecht. Mit dem verbliebenen min-width:auto zog
+       sich die Leiste auf ihre volle Inhaltsbreite auf (gemessen 687px statt der verfügbaren 349px
+       auf einem 393px-Handy). Sichtbar wurde das nicht, weil .shell den Überhang per
+       overflow-x:hidden abschneidet - aber der Leiste blieb dadurch nur ein Bruchteil des nötigen
+       Scrollwegs (852-687 = 165px statt 852-350 = 502px). Folge: Wischen bewegte kaum etwas und die
+       hinteren Einträge (bei der Expedition "Forschungs-" und "Schürfexpedition") waren gar nicht
+       erreichbar. min-width:0 bindet die Leiste wieder an ihren Container, der komplette Inhalt wird
+       erwischbar. Gilt bewusst für ALLE Leisten - sie stecken alle im selben Kartenaufbau.
+       -webkit-overflow-scrolling sorgt zusätzlich für Schwung-Scrollen auf älteren iOS-Versionen. */
+    [data-hscroll] { min-width: 0; max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; }
     [data-hscroll]::-webkit-scrollbar { height: 6px; }
     [data-hscroll]::-webkit-scrollbar-track { background: var(--elev-1); border-radius: 10px; margin: 0 4px; }
     [data-hscroll]::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); border-radius: 10px; }
@@ -4168,8 +4180,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.288.0';
+  const VERSION = '8.288.1';
   const PATCHNOTES = [
+    { version:'8.288.1', date:'25.07.2026', changes:[
+      'Behoben (danke für den Hinweis): Die Auswahlleiste für den Expeditionstyp ließ sich auf dem Handy nicht richtig bedienen – Wischen bewegte sie kaum, und die hinteren Einträge "Forschungsexpedition" und "Schürfexpedition" waren überhaupt nicht erreichbar. Ursache: Die Leiste zog sich auf ihre volle Inhaltsbreite auf (gemessen 687 statt der verfügbaren 349 Pixel auf einem 393-Pixel-Handy) und ragte damit unsichtbar über den Bildschirmrand hinaus; ihr blieb dadurch nur ein Bruchteil des nötigen Wischwegs übrig. Sie ist jetzt wieder an ihren Container gebunden, der gesamte Inhalt lässt sich erwischen und antippen. Die übrigen Wischleisten (Planeten-Rollen, Orbitalstation-Fokus, Modul-Standorte) waren nicht betroffen, bekommen die Absicherung aber gleich mit.'
+    ]},
     { version:'8.288.0', date:'25.07.2026', changes:[
       'Die Verteidigungsanlagen werden jetzt deutlich größer dargestellt (68px statt 42px, auf schmalen Handys 56px). Seit die 21 Anlagen eigene gezeichnete Grafiken haben, waren die alten Kacheln zu klein, um die Silhouetten wirklich auseinanderzuhalten – die Schiffe zeichnen längst auf einer dreimal so großen Fläche.',
       'Gesperrte Verteidigungsanlagen zeigen ab sofort ihre echte Grafik (entsättigt, mit kleinem Schloss-Abzeichen) statt eines für alle gleichen Schloss-Symbols. Man sieht damit schon vorher, worauf man hinarbeitet – bisher sahen vier verschiedene gesperrte Anlagen exakt gleich aus.',
