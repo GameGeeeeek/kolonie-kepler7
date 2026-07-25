@@ -4215,8 +4215,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.293.0';
+  const VERSION = '8.294.0';
   const PATCHNOTES = [
+    { version:'8.294.0', date:'25.07.2026', changes:[
+      'Kampf-Tiefe, Teil 1: Das Kontersystem gilt jetzt für ALLE Kampfschiffe. Bisher hatten nur vier Schiffe überhaupt eine Konterrolle (Jäger, Bomber, Kreuzer, Zerstörer) – alle 17 übrigen, inklusive sämtlicher Tier-2- und Event-Schiffe, waren konterneutral. Ausgerechnet die teuerste Flotte im Spiel war damit die einzige, die man nicht kontern konnte. Jetzt gehört jedes Kampfschiff zu einer von drei Rollen im Kreis: Abfangjäger schlagen Bomber, Bomber schlagen Großkampfschiffe, Großkampfschiffe schlagen Abfangjäger.',
+      'Die Konterwirkung greift jetzt auch bei deinen eigenen Angriffen auf NPCs. Vorher rechnete das Spiel die Konter nur bei der Abwehr von Überfällen und bei Spieler-Angriffen (serverseitig) mit – deine NPC-Angriffe ignorierten sie komplett, obwohl die gegnerische Flotte in der Angriffsvorschau sichtbar ist. Vorschau, Startmeldung und Kampfauflösung nennen jetzt alle dieselbe Zahl.',
+      'Der Flottenbonus belohnt nicht mehr eine Checkliste. Bisher gab es +2% je unterschiedlichem Schiffstyp bis 5 Typen – „von allem eins mitnehmen" war immer richtig, egal wie die Flotte aussah. Jetzt zählt, wie gleichmäßig sich deine Angriffskraft über die drei Konterrollen verteilt: ausgewogen bringt weiterhin die vollen +8%, eine reine Ein-Rollen-Flotte nichts. Dafür holt die spezialisierte Flotte beim richtigen Ziel bis zu +25% Konterbonus. Ausgewogen = sichere Prämie, spezialisiert = Aufklären und gezielt zuschlagen.',
+      'Wichtig für Flotten aus fünf Typen DERSELBEN Rolle (z.B. fünf verschiedene Großkampfschiffe): die bekamen bisher die vollen +8% und bekommen jetzt keinen Aufbau-Bonus mehr. Im Gegenzug wirken bei ihnen erstmals die Konterboni – gegen Abfangjäger-Flotten stehen sie damit deutlich besser da als vorher.',
+      'Sichtbar gemacht: Jede Schiffskarte in der Werft zeigt ihre Konterrolle (mit Tooltip, wogegen sie stark und schwach ist), die NPC-Angriffsvorschau bewertet deine Zusammensetzung gegen die gegnerische Flotte, und der Kampfbericht weist aus, wie stark der Konter tatsächlich gewirkt hat.'
+    ]},
     { version:'8.293.0', date:'25.07.2026', changes:[
       'Neuer Bereich „Sitzung & Sicherheit" in den Einstellungen. Dort steht jetzt, wann die aktuell laufende Sitzung begonnen hat – also wann sich dein Konto zuletzt angemeldet hat. Passt der Zeitpunkt nicht zu deiner eigenen letzten Anmeldung, weißt du, dass jemand anderes an deinem Konto war. Bisher gab es dafür überhaupt keinen Anhaltspunkt.',
       'Dazu der Knopf „Alle Sitzungen beenden" (Passwort-Bestätigung nötig): Er macht JEDE bisher ausgestellte Anmeldung dieses Kontos ungültig – auch die auf dem Gerät, an dem du ihn drückst, du wirst also sofort abgemeldet. Dein Spielstand wird vorher gesichert. Auch alte Anmeldungen aus der Zeit vor der Sitzungsführung erwischt es damit.',
@@ -11612,7 +11619,25 @@
   // bewusst kein neues Feld in SHIP_DEFS, damit kein Datensatz nachgepflegt werden muss und
   // künftige Schiffe automatisch eine Rolle bekommen. Dient nur der Einfärbung/Beschriftung im
   // Datenblatt, hat KEINE Spielwirkung.
+  // Seit 25.07.2026 hat die KONTERROLLE echte Spielwirkung (siehe COUNTER_ROLE_DEFS). Zwei
+  // verschiedene "Rollen" nebeneinander anzuzeigen - eine rein kosmetische und eine wirksame -
+  // würde die Karte unlesbar machen. Deshalb gewinnt hier die Konterrolle, wo es eine gibt; die
+  // frühere abgeleitete Einteilung bleibt nur noch für Schiffe ohne Kampfrolle (Frachter, Späher,
+  // Forscher ...) als Beschriftung erhalten.
+  const COUNTER_ROLE_COLORS = { abfang:'#5ce1ff', bomber:'#e24b4a', kapital:'#7f77dd' };
   function shipRoleInfo(def){
+    const rolle = COUNTER_ROLE_OF[def.key];
+    if (rolle){
+      const rd = counterRoleDef(rolle);
+      const geschlagenVon = COUNTER_ROLE_DEFS.filter(r => r.schlaegt === rolle).map(r => r.name).join('/');
+      return {
+        label: rd ? (rd.kurz || rd.name) : rolle,
+        color: COUNTER_ROLE_COLORS[rolle] || '#e24b4a',
+        counterRole: rolle,
+        // Der Tooltip macht den Kreis lesbar, ohne die kleine Kachel zu sprengen.
+        tip: rd ? (rd.name + ': ' + rd.desc + ' Stark gegen ' + (counterRoleDef(rd.schlaegt)||{}).name + ', schwach gegen ' + geschlagenVon + '.') : ''
+      };
+    }
     const dw = def.defWeight !== undefined ? def.defWeight : 1;
     if (!def.atk || def.atk <= 5) return { label:'Zivil', color:'#5dcaa5' };
     if (dw >= 1.2) return { label:'Panzerung', color:'#7f77dd' };
@@ -12709,12 +12734,75 @@
   // dem Überfall-Ereignis, Verteidiger-Flotte als Schnappschuss). Bei NPC-Kämpfen und PvP-Duellen
   // ist die Zusammensetzung der Gegenseite nicht bekannt (nur eine abstrakte Verteidigungs-/
   // Angriffszahl), daher bleibt der Bonus dort bewusst wirkungslos (Multiplikator 1).
-  const SHIP_COUNTERS = {
-    jaeger: { strongVs: ['bomber'], weakVs: ['cruisers','destroyers'] },
-    bomber: { strongVs: ['cruisers','destroyers'], weakVs: ['jaeger'] },
-    cruisers: { strongVs: ['jaeger'], weakVs: ['bomber'] },
-    destroyers: { strongVs: ['jaeger'], weakVs: ['bomber'] }
+  // Konterrollen (25.07.2026): Bis dahin hatten nur vier Schiffe (Jäger, Bomber, Kreuzer, Zerstörer)
+  // überhaupt eine Konterrolle - alle 17 übrigen Kampfschiffe, inklusive sämtlicher Tier-2- und
+  // Event-Schiffe, waren konterneutral. Damit war ausgerechnet die teuerste Flotte die einzige, die
+  // man nicht kontern konnte. Statt weiter Paare von Hand aufzuzählen (fehleranfällig und bei jedem
+  // neuen Schiff eine stille Lücke), bekommt jedes Kampfschiff EINE Rolle; die strongVs/weakVs-Listen
+  // ergeben sich daraus. Neue Schiffe brauchen künftig nur einen Eintrag hier.
+  // Der Kreis: Abfangjäger schlagen Bomber, Bomber schlagen Großkampfschiffe, Großkampfschiffe
+  // schlagen Abfangjäger. Die Zuordnung folgt dem Rumpfcharakter (defWeight) und der Namensgebung -
+  // ein "Jäger" gehört zu den Abfangjägern, auch wenn er hart zuschlägt, sonst wird die Anzeige für
+  // Spieler unverständlich.
+  // WICHTIG: Für die ursprünglichen vier Schiffe ergibt diese Ableitung exakt dieselben Listen wie
+  // die frühere handgeschriebene Tabelle - keine Verhaltensänderung für bestehende Flotten (im
+  // Test test_konter.js als Regression abgesichert).
+  const COUNTER_ROLE_DEFS = [
+    { key:'abfang',  name:'Abfangjäger', kurz:'Abfangjäger',     schlaegt:'bomber',  icon:'ti-rocket',        desc:'Schnell und wendig - überfordert die trägen Bomber, wird von der Panzerung der Großkampfschiffe zerrieben.' },
+    { key:'bomber',  name:'Bomber', kurz:'Bomber',           schlaegt:'kapital', icon:'ti-bolt', desc:'Schwere Waffen gegen große Ziele - reißt Großkampfschiffe auf, ist gegen wendige Abfangjäger aber im Nachteil.' },
+    { key:'kapital', name:'Großkampfschiff', kurz:'Großkampf',  schlaegt:'abfang',  icon:'ti-shield',        desc:'Schwer gepanzert mit breiter Abwehr - fegt Abfangjäger vom Himmel, bietet Bombern aber eine große Angriffsfläche.' }
+  ];
+  const COUNTER_ROLE_OF = {
+    // Abfangjäger (leichte, schnelle Rümpfe)
+    jaeger:'abfang', hyperjaeger:'abfang', kometenjaeger:'abfang', phantomschiff:'abfang', leerenjaeger:'abfang',
+    // Bomber (hohe Angriffskraft, auf große Ziele ausgelegt)
+    bomber:'bomber', hyperbomber:'bomber', nanoklinge:'bomber', singularitaetsvernichter:'bomber', mondzerstoerer:'bomber',
+    // Großkampfschiffe (gepanzert, breite Abwehr)
+    cruisers:'kapital', destroyers:'kapital', schlachtschiff:'kapital', superschlachtschiff:'kapital',
+    carrier:'kapital', waechter:'kapital', quantenkreuzer:'kapital', fusionsdreadnought:'kapital',
+    metamaterialtitan:'kapital', enterschiff:'kapital', riftwaechter:'kapital'
+    // Bewusst OHNE Rolle (Multiplikator 1): Frachter, Späher, Spionageschiff, Forscher, Recycler,
+    // Kolonieschiff, Gesandtenschiff, Schürfschiff - alles Schiffe ohne oder ohne nennenswerte
+    // Kampfkraft. Sie sollen weder kontern noch gekontert werden.
   };
+  const ROLE_BEATS = {}; for (const r of COUNTER_ROLE_DEFS) ROLE_BEATS[r.key] = r.schlaegt;
+  // strongVs/weakVs einmalig aus den Rollen ableiten (statt bei jedem Kampf neu zu berechnen).
+  const SHIP_COUNTERS = (() => {
+    const byRole = {}; for (const r of COUNTER_ROLE_DEFS) byRole[r.key] = [];
+    for (const [ship, role] of Object.entries(COUNTER_ROLE_OF)) if (byRole[role]) byRole[role].push(ship);
+    const out = {};
+    for (const [ship, role] of Object.entries(COUNTER_ROLE_OF)){
+      const beats = ROLE_BEATS[role];
+      const beatenBy = COUNTER_ROLE_DEFS.filter(r => r.schlaegt === role).map(r => r.key);
+      out[ship] = {
+        strongVs: byRole[beats] || [],
+        weakVs: beatenBy.reduce((acc, r) => acc.concat(byRole[r] || []), [])
+      };
+    }
+    return out;
+  })();
+  function counterRoleOf(shipKey){ return COUNTER_ROLE_OF[shipKey] || null; }
+  function counterRoleDef(roleKey){ return COUNTER_ROLE_DEFS.find(r => r.key === roleKey) || null; }
+  // Ein Kontersystem, das man nicht sieht, ist keine Entscheidung, sondern eine versteckte Zahl.
+  // Diese beiden Helfer machen den Effekt an den zwei Stellen sichtbar, an denen er zählt:
+  // im Kampfbericht (was ist passiert) und beim Zusammenstellen (was wird passieren).
+  function counterVerdict(mult){
+    if (!(mult > 0)) return null;
+    const pct = Math.round((mult - 1) * 100);
+    if (pct >= 12) return { pct, farbe:'#5dcaa5', icon:'ti-sword',          text:'Deine Zusammensetzung kontert die gegnerische Flotte' };
+    if (pct >= 4)  return { pct, farbe:'#9fe1cb', icon:'ti-sword',          text:'Leichter Zusammensetzungs-Vorteil' };
+    if (pct <= -8) return { pct, farbe:'#e24b4a', icon:'ti-alert-triangle', text:'Die gegnerische Flotte kontert deine Zusammensetzung' };
+    if (pct <= -2) return { pct, farbe:'#e0a548', icon:'ti-alert-triangle', text:'Leichter Zusammensetzungs-Nachteil' };
+    return { pct, farbe:'#7d8199', icon:'ti-arrows-shuffle', text:'Zusammensetzung neutral gegen diese Flotte' };
+  }
+  function counterReportLine(mult){
+    const v = counterVerdict(mult);
+    // Exakt 1.0 heißt "kein Gegner-Flottenwissen" (z.B. Piratennest) - dann gar nichts schreiben,
+    // statt eine belanglose "±0%"-Zeile in jeden Bericht zu setzen.
+    if (!v || mult === 1) return '';
+    return '<br><i class="ti '+v.icon+'" aria-hidden="true" style="color:'+v.farbe+';"></i> Konterwirkung: <span style="color:'+v.farbe+';">'
+      + (v.pct>0?'+':'') + v.pct + '% Angriffskraft</span> – ' + v.text + '.';
+  }
   const COUNTER_BONUS = 0.25; // +25% Angriffskraft-Anteil, wenn im Vorteil
   const COUNTER_MALUS = 0.15; // -15% Angriffskraft-Anteil, wenn im Nachteil
   function counterMultiplier(ownFleet, enemyFleet){
@@ -12779,11 +12867,58 @@
   const FLEET_DIVERSITY_COMBAT_KEYS = ['jaeger','cruisers','destroyers','bomber','schlachtschiff','superschlachtschiff','carrier','waechter'];
   const FLEET_DIVERSITY_BONUS_PER_TYPE = 0.02;
   const FLEET_DIVERSITY_MAX_TYPES = 5;
+  // Flottenaufbau-Bonus (25.07.2026 umgestellt). VORHER: +2% je unterschiedlichem Schiffstyp, bis
+  // 5 Typen - also schlicht "von allem eins mitnehmen", eine Checkliste ohne Entscheidung. Wer sie
+  // abgehakt hatte, bekam die vollen +8% geschenkt, egal wie die Flotte aussah.
+  // JETZT: gemessen wird, wie gleichmäßig sich die Flotte über die drei KONTERROLLEN verteilt
+  // (Abfangjäger / Bomber / Großkampfschiff). Damit wird der Bonus zu dem, was er inhaltlich sein
+  // sollte - die Versicherungsprämie dafür, sich NICHT festzulegen:
+  //   ausgewogene Flotte  -> volle +8%, dafür konterneutral (Multiplikator ~1,0)
+  //   spezialisierte Flotte -> +0%, dafür bis +25% Konterbonus beim richtigen Ziel (und -15% beim falschen)
+  // Aufklären und gezielt bauen schlägt damit die Allzweckflotte, ohne sie wertlos zu machen. Der
+  // Höchstwert bleibt bewusst bei +8% wie bisher, damit sich für ausgewogene Flotten zahlenmäßig
+  // nichts ändert. Wer bisher 5 Typen NUR aus einer Rolle hatte (z.B. fünf Großkampfschiffe),
+  // verliert den Bonus - bekommt im Gegenzug aber erstmals Zugriff auf die Konterboni.
+  const FLEET_BALANCE_MAX_BONUS = 0.08;
+  // Angriffsgewichte NUR für die Rollenbalance - bewusst eine eigene, explizite Tabelle:
+  //  (a) Das Superschlachtschiff hat in SHIP_DEFS gar kein atk-Feld (sein Wert steckt in eigenen
+  //      SUPERSCHLACHTSCHIFF_*-Konstanten). Über SHIP_DEFS gelesen wäre es mit Gewicht 1 in die
+  //      Rechnung eingegangen - das stärkste Schiff des Spiels praktisch unsichtbar.
+  //  (b) Der Server hat kein SHIP_DEFS. Eine gespiegelte Tabelle auf beiden Seiten ist die einzige
+  //      Form, in der sich die Gleichheit überhaupt beweisen lässt (test_flottenbalance.js).
+  // Werte identisch zu server.js (COUNTER_ROLE_ATK). Wird ein Schiff hier geändert, dort mitziehen.
+  const COUNTER_ROLE_ATK = {
+    jaeger:10, hyperjaeger:30, kometenjaeger:18, phantomschiff:35, leerenjaeger:140,
+    bomber:60, hyperbomber:130, nanoklinge:55, singularitaetsvernichter:280, mondzerstoerer:300,
+    cruisers:20, destroyers:45, schlachtschiff:90, superschlachtschiff:220, carrier:15,
+    waechter:8, quantenkreuzer:80, fusionsdreadnought:180, metamaterialtitan:150,
+    enterschiff:25, riftwaechter:20
+  };
   function fleetDiversityMult(fleet){
     if (!fleet) return 1;
-    const distinctTypes = FLEET_DIVERSITY_COMBAT_KEYS.filter(k => (fleet[k]||0) > 0).length;
-    const bonusTypes = Math.max(0, Math.min(FLEET_DIVERSITY_MAX_TYPES, distinctTypes) - 1);
-    return 1 + bonusTypes*FLEET_DIVERSITY_BONUS_PER_TYPE;
+    // Gewichtet nach Angriffskraft, nicht nach Stückzahl: 500 Jäger neben 1 Schlachtschiff sind
+    // keine ausgewogene Flotte, auch wenn beide Rollen "vertreten" sind.
+    const perRole = {};
+    let total = 0;
+    for (const [k, atk] of Object.entries(COUNTER_ROLE_ATK)){
+      const rolle = COUNTER_ROLE_OF[k];
+      if (!rolle) continue;
+      const n = fleet[k]||0;
+      if (n <= 0) continue;
+      const gewicht = n * (atk||1);
+      perRole[rolle] = (perRole[rolle]||0) + gewicht;
+      total += gewicht;
+    }
+    if (total <= 0) return 1;
+    const rollen = COUNTER_ROLE_DEFS.length;
+    // Gleichverteilungsmaß: 1 bei perfekter Drittelung, 0 wenn alles in einer Rolle steckt.
+    // (Summe der Abweichungen vom Idealanteil, normiert - keine Logarithmen, bleibt nachvollziehbar.)
+    const ideal = 1/rollen;
+    let abweichung = 0;
+    for (const r of COUNTER_ROLE_DEFS) abweichung += Math.abs((perRole[r.key]||0)/total - ideal);
+    const maxAbweichung = 2*(1-ideal); // Fall "alles in einer Rolle"
+    const balance = maxAbweichung > 0 ? Math.max(0, 1 - abweichung/maxAbweichung) : 1;
+    return 1 + balance*FLEET_BALANCE_MAX_BONUS;
   }
   function attackPowerRaw(fleet){
     const f = fleet || currentFleet();
@@ -18932,7 +19067,8 @@
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Zwei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, und <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet. Kampfschiffe haben jetzt zusätzlich eine echte <strong>Verteidigungsspezialisierung</strong>, unabhängig von der Angriffskraft: Jäger/Bomber/Träger/Zerstörer sind offensiv ausgerichtet und dadurch fragiler in der Verteidigung, Wächter und Schlachtschiff (inkl. Superschlachtschiff) sind gepanzerte Verteidigungsspezialisten. Eine reine Angriffsflotte verteidigt sich also spürbar schlechter als eine gemischte oder auf Wächter/Schlachtschiffe setzende Flotte.' },
-      { title:'Flottenvielfalt & Kampfbonus-Deckel', body:'<strong>Flottenvielfalt:</strong> Der Einsatz mehrerer verschiedener Kampfschifftypen (statt nur eines Typs) gibt +2% Angriffs- UND Verteidigungskraft je zusätzlichem genutztem Typ, gedeckelt bei 5 Typen (+8%). Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
+      { title:'Konterrollen (Schere-Stein-Papier)', body:'Jedes Kampfschiff gehört zu einer von drei <strong>Konterrollen</strong>, die im Kreis stehen: <strong>Abfangjäger</strong> schlagen <strong>Bomber</strong>, Bomber schlagen <strong>Großkampfschiffe</strong>, Großkampfschiffe schlagen Abfangjäger. Die Rolle steht auf jeder Schiffskarte in der Werft (Tooltip erklärt, wogegen sie stark und schwach ist). Trifft deine Flotte auf viele Schiffe, die sie kontert, steigt die Angriffskraft um bis zu <strong>+25%</strong>; triffst du auf deine Gegenrolle, sinkt sie um bis zu <strong>-15%</strong>. Der Effekt richtet sich nach dem <em>Anteil</em> der jeweiligen Rolle an der Gegnerflotte – ein einzelnes Schiff kippt also nichts. Wirksam überall dort, wo die gegnerische Zusammensetzung bekannt ist: bei Angriffen auf <strong>Spieler</strong> (Aufklärung zeigt sie dir), auf <strong>NPCs</strong> (steht in der Angriffsvorschau) und bei der Abwehr von Überfällen. Bei Piratennestern gilt stattdessen die dort ausgewiesene Schwachstelle. Im Kampfbericht steht, wie stark der Konter tatsächlich gewirkt hat.' },
+      { title:'Flottenaufbau & Kampfbonus-Deckel', body:'<strong>Flottenaufbau:</strong> Wie gleichmäßig sich die Angriffskraft deiner Flotte über die drei Konterrollen verteilt, gibt bis zu <strong>+8%</strong> Angriffs- UND Verteidigungskraft – volle Prämie bei einer zu Dritteln ausgewogenen Flotte, nichts bei einer reinen Ein-Rollen-Flotte. Gewichtet wird nach Angriffskraft, nicht nach Stückzahl: ein einzelnes Alibi-Schiff macht eine Flotte nicht ausgewogen. Damit hast du eine echte Wahl: <strong>ausgewogen</strong> bringt die sichere Prämie, ist aber konterneutral; <strong>spezialisiert</strong> verzichtet darauf und holt dafür beim richtigen Ziel bis zu +25% Konterbonus (beim falschen -15%). Aufklären lohnt sich also. Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
       { title:'Flaggschiff', body:'Im <strong>Offiziere-Tab</strong> baust du dein <strong>einzigartiges Flaggschiff</strong> – ein Kapitalschiff getrennt von der Massenflotte, das nicht zerstört werden kann und keine Slots belegt. Jede Ausbaustufe (max. 20) gibt <strong>+1,5% Angriffs- UND Verteidigungskraft</strong>, die in die gedeckelte Kampf-Bonus-Gruppe einfließt (siehe „Flottenvielfalt & Kampfbonus-Deckel"). Bau und Ausbau kosten Ressourcen + Kredite (steigend je Stufe). Du kannst deinem Flaggschiff einen eigenen Namen geben. Es <strong>überlebt einen Prestige-Reset</strong> (wie Offiziere und Module); erst ein Aufstieg (Transzendenz) setzt es zurück.' },
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.' },
@@ -19467,6 +19603,7 @@
           const weaknessNameMap = { cruiser:'Kreuzer', destroyer:'Zerstörer', jaeger:'Jäger', bomber:'Bomber', schlachtschiff:'Schlachtschiff', superschlachtschiff:'Superschlachtschiff', leerenjaeger:'Leerenjäger' };
           body += '<br>Schwachstelle des Gegners: '+(weaknessNameMap[r.weaknessType]||shipDisplayName(r.weaknessType))+(r.hasWeakness?' (ausgenutzt, +25% Angriffskraft)':' (nicht mitgeführt)');
         }
+        body += counterReportLine(r.counterMult);
         if (r.loot){
           body += '<br>Beute: '+rewardHtml(r.loot);
           if (r.cargoCapacity <= 0) body += '<br><span style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Keine Frachter mitgeführt – Beute ging verloren!</span>';
@@ -26355,6 +26492,19 @@
           const effDefense = npcEffectiveDefense(npc);
           const effLoot = npcEffectiveLoot(npc);
           let power = m.power || attackPower(fleet);
+          // Konterrollen greifen jetzt auch gegen NPCs (25.07.2026). Bis dahin rief das Frontend
+          // counterMultiplier() an genau EINER Stelle auf (Raider-Abwehr) - die eigenen Angriffe
+          // ignorierten die Konter komplett, obwohl die NPC-Flotte bekannt ist UND dem Spieler in der
+          // Angriffsvorschau angezeigt wird (renderGalaxy, npcFleetFor). Die Zusammensetzung ist hier
+          // also eine informierte Entscheidung, keine Blindwahl - genau der Fall, für den das
+          // Kontersystem gedacht ist. m.npcFleet wird beim Missionsstart eingefroren, damit ein
+          // zwischenzeitlich hochskalierter NPC die Rechnung nicht rückwirkend verschiebt.
+          // Bewusst NICHT bei Piratennestern: die haben keine modellierte Flotte, sondern mit
+          // pirateLairWeakness einen eigenen, gröberen Mechanismus - dort würde ein zweiter
+          // Zusammensetzungs-Bonus doppelt zählen.
+          const npcCounterFleet = m.npcFleet || npcFleetFor(npc).fleet;
+          const npcCounterMult = counterMultiplier(m.composition || fleet, npcCounterFleet);
+          power = Math.round(power * npcCounterMult);
           const df = deployableFighters(fleet);
           const hasWeakness = (npc.weakness==='jaeger' && df.jaeger>0) || (npc.weakness==='bomber' && df.bomber>0) ||
             (npc.weakness==='cruiser' && fleet.cruisers>0) || (npc.weakness==='destroyer' && (fleet.destroyers||0)>0) ||
@@ -26423,7 +26573,7 @@
             const destroyedNpcText = lostCountsToText(destroyedNpcShips);
             if (showLog !== false) log('Sieg gegen '+npc.name+'! ('+planetDisplayName(planetKey)+')'+(hasWeakness?' Schwachstelle ausgenutzt.':'')+(destroyedNpcText?' Zerstörte Gegner-Schiffe: '+destroyedNpcText+'.':'')+' Trümmerfeld hinterlassen.'+cargoNote+(ownLostWinText?' Eigene Verluste: '+ownLostWinText+'.':'')+' '+npc.name+' wird ab jetzt härter und lohnender.', 'ti-sword');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin };
+            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -26439,7 +26589,7 @@
             const ownLostLossText = lostCountsToText(ownLostLoss);
             const ownLossDebrisLoss = combatDebrisOf(ownLostLoss);
             if (showLog !== false) log('Angriff auf '+npc.name+' gescheitert. Flotte kehrt nach '+planetDisplayName(planetKey)+' zurück.'+(ownLostLossText?' Verluste: '+ownLostLossText+'. Trümmerfeld hinterlassen.':'')+(retreatNpc.retreated?' Ein Teil der Flotte konnte sich rechtzeitig zurückziehen.':''), 'ti-shield');
-            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, fleet:m.composition||fleet, npcFleet: m.npcFleet || npcFleetFor(npc).fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, fleet:m.composition||fleet, npcFleet: m.npcFleet || npcFleetFor(npc).fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
@@ -29301,8 +29451,14 @@
     // NPC-Flotte beim Losschicken einfrieren: die Auflösung bei Ankunft kämpft exakt gegen die
     // Zusammensetzung, die der Spieler in der Vorschau gesehen hat - auch falls sich Skalierung
     // oder globaler Schwierigkeitsgrad während des Flugs ändern.
-    cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet, npcFleet: npcFleetFor(npc).fleet });
-    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen '+npc.name+' gestartet (Angriffskraft '+power+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
+    const npcFleetFrozen = npcFleetFor(npc).fleet;
+    // Nur für die Startmeldung: dieselbe Konterwirkung einrechnen, die auch die Angriffsvorschau
+    // gezeigt hat, sonst nennt die Meldung eine andere Zahl als die Karte eine Sekunde vorher.
+    // In der Mission bleibt bewusst der ROHE Wert stehen - die Auflösung multipliziert den Konter
+    // selbst und würde ihn sonst doppelt zählen.
+    const powerAngezeigt = Math.round(power * counterMultiplier(attackFleet, npcFleetFrozen));
+    cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet, npcFleet: npcFleetFrozen });
+    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen '+npc.name+' gestartet (Angriffskraft '+powerAngezeigt+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }
 
@@ -31833,7 +31989,7 @@
           <div class="left">
             <div class="ship-art">
               <div class="frame${t2ship?' bicon-t2':''}"><canvas data-ship-icon="${def.key}" width="78" height="58" style="display:block;"></canvas></div>
-              <span class="rolelbl">${shipRole.label}</span>
+              <span class="rolelbl"${shipRole.tip?` title="${shipRole.tip.replace(/"/g,'&quot;')}"`:''}>${shipRole.label}</span>
             </div>
             <div>
               <div class="bname">${def.name} <span class="lvl-pill">${count}</span>${pendingQty?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">+${pendingQty} im Bau</span>`:''}</div>
@@ -33167,7 +33323,13 @@
       const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
       const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
       const canSendN = slotsFreeN && !busy && totalSelected > 0;
-      const power = attackPower(attackFleet);
+      // Die Konterwirkung MUSS hier genauso einfliessen wie bei der Auflösung (resolveMission,
+      // npcCounterMult) - sonst zeigt die Karte eine Erfolgschance an, die der tatsächliche Kampf
+      // anders ausrechnet. Genau dieser Auseinanderlauf ist der Grund, warum die Vorschau und der
+      // Kampf dieselbe Funktion benutzen.
+      const npcFleetPreview = npcFleetFor(n).fleet;
+      const npcCounterPreview = counterMultiplier(attackFleet, npcFleetPreview);
+      const power = Math.round(attackPower(attackFleet) * npcCounterPreview);
       const effDefense = npcEffectiveDefense(n);
       const effLoot = npcEffectiveLoot(n);
       const wins = npcScalingCount(n.id);
@@ -33175,7 +33337,7 @@
       const flightTime = missionDurationFor(n.duration, attackFleet, ATTACK_SHIP_KEYS, n.system);
       const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
-      const npcFleetPreview = npcFleetFor(n).fleet;
+      const kv = totalSelected > 0 ? counterVerdict(npcCounterPreview) : null;
       return `
         <div class="card-row">
           <div class="left">
@@ -33184,6 +33346,7 @@
               <div class="bname">${n.name} <span class="lvl-pill">Stufe ${n.level}</span>${wins?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;"><i class="ti ti-arrow-up" aria-hidden="true"></i> ${wins}x besiegt</span>`:''}</div>
               <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
+              ${kv && npcCounterPreview !== 1 ? `<div class="bmeta" style="color:${kv.farbe};"><i class="ti ${kv.icon}" aria-hidden="true"></i> ${kv.text} (${kv.pct>0?'+':''}${kv.pct}% Angriffskraft)</div>` : ''}
               <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(flightTime)} Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
               <div class="bmeta" style="${atkCargoCapacity<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität: ${fmt(atkCargoCapacity)}${atkCargoCapacity<=0?' – ohne Frachter geht die Beute verloren!':''}</div>
               <div class="bcost">${rewardHtml(effLoot)}</div>
