@@ -617,6 +617,20 @@
        erreichbar. min-width:0 bindet die Leiste wieder an ihren Container, der komplette Inhalt wird
        erwischbar. Gilt bewusst für ALLE Leisten - sie stecken alle im selben Kartenaufbau.
        -webkit-overflow-scrolling sorgt zusätzlich für Schwung-Scrollen auf älteren iOS-Versionen. */
+    /* Ersthinweis je Tab - unaufdringlich, aber nicht zu übersehen; verschwindet nach dem
+       Wegklicken für immer (state.seenTabHints). */
+    .tab-hint { display:flex; align-items:flex-start; gap:10px; margin:0 0 1rem 0; padding:10px 12px;
+      background:rgba(var(--info-rgb),0.10); border:1px solid rgba(var(--info-rgb),0.35);
+      border-radius:8px; font-size:12px; line-height:1.5; }
+    .tab-hint > i { color:var(--c-info); font-size:17px; flex-shrink:0; margin-top:1px; }
+    .tab-hint .tab-hint-text { flex:1; min-width:0; }
+    .tab-hint .tab-hint-actions { display:flex; gap:6px; flex-shrink:0; align-items:center; }
+    .tab-hint button { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; padding:5px 9px; white-space:nowrap; }
+    @media (max-width: 560px) {
+      .tab-hint { flex-wrap:wrap; }
+      .tab-hint .tab-hint-actions { width:100%; justify-content:flex-end; }
+      .tab-hint button { min-height:36px; }
+    }
     [data-hscroll] { min-width: 0; max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; }
     [data-hscroll]::-webkit-scrollbar { height: 6px; }
     [data-hscroll]::-webkit-scrollbar-track { background: var(--elev-1); border-radius: 10px; margin: 0 4px; }
@@ -2013,6 +2027,11 @@
         <button class="tab-btn" data-tab="punkte" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-star" aria-hidden="true" style="color:#fbe08f;"></i></span>Punktestand</button>
         <button class="tab-btn" data-tab="fortschritt" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-award" aria-hidden="true" style="color:#9fe1cb;"></i></span>Fortschritt</button>
       </div>
+
+      <!-- Kontextbezogener Ersthinweis: erscheint EINMAL je Tab, wenn man ihn zum ersten Mal
+           öffnet. Bewusst hier direkt unter der Tab-Leiste und nicht in den einzelnen Panels -
+           ein Container für alle, damit kein Tab-Markup angefasst werden muss. -->
+      <div id="tabHintBar" style="display:none;"></div>
 
       <div class="tab-panel active" id="tab-basis">
         <div id="colonyDashboard"></div>
@@ -4217,8 +4236,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.2';
+  const VERSION = '8.298.3';
   const PATCHNOTES = [
+    { version:'8.298.3', date:'25.07.2026', changes:[
+      'Neu: kontextbezogene Ersthinweise. Öffnest du einen Menüpunkt zum ersten Mal, erscheint direkt unter der Menüleiste ein kurzer Hinweis, was es dort zu tun gibt – inklusive eines Knopfes „Mehr dazu", der direkt in den passenden Hilfe-Abschnitt springt. Mit „Verstanden" ist er für diesen Menüpunkt dauerhaft weg und kommt auch nach einem Neuladen nicht wieder.',
+      'Hintergrund: Das Tutorial erklärt nur Basis, Forschung, Flotte/Kampf, Erkunden, Allianz und Galaxie. Module, Offiziere, Expeditionen, Markt, Punktestand, Prestige und Aufstieg tauchen dort nirgends auf, obwohl es zwölf Menüpunkte gibt – wer nicht zufällig in der Hilfe nachgelesen hat, hat diese Bereiche nie erklärt bekommen.',
+      'Die Hinweise erscheinen bewusst für alle Spieler und nicht nur für neue Konten: Wer lange auf der Basis gespielt hat, kennt deshalb noch lange nicht den Markt oder die Modul-Setboni. Ein Prestige oder Aufstieg setzt sie nicht zurück – einmal weggeklickt bleibt weggeklickt.',
+      'Während des Tutorials und der Begrüßungsfenster bleiben die Hinweise unterdrückt, damit das Spiel nicht doppelt redet; sie werden danach nachgereicht.'
+    ]},
     { version:'8.298.2', date:'25.07.2026', changes:[
       'Wichtiger Bugfix bei Allianz-Beiträgen: Wenn der Server den Beitrag nicht annehmen konnte (Serverfehler, Verbindungsabbruch, abgelehnte Berechtigung), waren die Ressourcen trotzdem weg – das Spiel meldete „beigetragen", die Allianz sah aber nie etwas davon. Grund war ein stiller Rückfall auf den lokalen Speicher: Für gemeinsame Daten heißt das, sie liegen in genau einem Browser, wo sie niemand zu Gesicht bekommt.',
       'Jetzt wird der Beitrag verbindlich übermittelt. Klappt das nicht, bekommst du eine klare Meldung mit dem Grund, und Ressourcen, Beitragszähler und Tagesaufgaben-Fortschritt werden vollständig zurückgebucht – es geht nichts mehr verloren. Betrifft alle fünf Beitragsarten: Allianzbasis, Basis-Reparatur, Allianz-Technologien/-Gebäude sowie seltene Materialien und Tier-2-Ressourcen für Groß- und Weltprojekte.',
@@ -11378,7 +11403,7 @@
 
   let state = {
     resources: { energie: 10, erz: 10, kristalle: 0, deuterium: 0, antimaterie: 0, forschungspunkte: 0 },
-    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, referralNudgeShown: false, expeditionsCompleted: 0, themeKey: 'standard', shipSkin: 'standard',
+    scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, seenTabHints: {}, referralNudgeShown: false, expeditionsCompleted: 0, themeKey: 'standard', shipSkin: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, streakShields: 0, claimedStreakMilestones: [], comebackQuest: null, happyHoursUsed: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, colonyNotes: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
@@ -16043,6 +16068,7 @@
   function applyStateDefaults(){
     if (state.resources) for (const t2 of TIER2_DEFS) if (state.resources[t2.key] === undefined) state.resources[t2.key] = 0;
     if (state.expeditionsCompleted === undefined) state.expeditionsCompleted = 0;
+    if (!state.seenTabHints || typeof state.seenTabHints !== 'object') state.seenTabHints = {};
     if (state.referredBy === undefined) state.referredBy = null;
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
     if (state.pirateDebrisRaid === undefined) state.pirateDebrisRaid = null;
@@ -16321,7 +16347,7 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, referralNudgeShown:true,
+      skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Login-Serie ist Treue-Fortschritt, kein Wirtschaftsfortschritt - Schutzschilde und die
       // "Meilenstein bereits eingelöst"-Marker müssen den Reset überleben wie loginStreak selbst
@@ -16406,7 +16432,7 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, referralNudgeShown:true,
+      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true,
       prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Wie beim Prestige: Login-Serien-Begleitfelder überstehen auch den Aufstieg-Reset.
       streakShields:state.streakShields||0, claimedStreakMilestones:(state.claimedStreakMilestones||[]).slice(), comebackQuest:null,
@@ -18358,6 +18384,9 @@
     document.getElementById('tutorialOverlay').style.display = 'none';
     state.tutorialSeen = true;
     save();
+    // Direkt im Anschluss den Ersthinweis für den gerade offenen Tab nachreichen - während des
+    // Tutorials hat tabHintBlocked() ihn bewusst unterdrückt.
+    maybeShowTabHint(activeTab);
   }
   document.getElementById('tutorialNextBtn').addEventListener('click', () => {
     if (tutorialStep >= TUTORIAL_STEPS.length-1){ closeTutorial(); return; }
@@ -19654,6 +19683,79 @@
   function jumpToHelp(key){
     switchTab('hilfe');
     renderHelpBox(key);
+  }
+  // Kontextbezogener Ersthinweis je Tab. Hintergrund: TUTORIAL_STEPS deckt nur Basis, Forschung,
+  // Flotte/Kampf, Erkunden/Kolonisieren, Allianz und Galaxie ab - Module, Offiziere, Expeditionen,
+  // Markt, Prestige/Aufstieg, Tagesaufgaben, Events, Konterrollen und die Verteidigungs-Aufstellung
+  // tauchen dort nirgends auf, obwohl es 12 Tabs und 15 Hilfe-Kategorien gibt. Diese Leiste schließt
+  // die Lücke an der Stelle, an der die Frage tatsächlich aufkommt: beim ERSTEN Öffnen eines Tabs.
+  // Bewusst für ALLE Spieler und nicht nur für neue Konten - wer lange auf der Basis gespielt hat,
+  // kennt deshalb weder Markt noch Module; genau diese Spieler hat das Tutorial nie erreicht.
+  // Jeder Eintrag: eigenes Icon (aus der 69er-Whitelist des Icon-Subsets) + ganzer, selbsterklärender
+  // Satz + Sprungziel in HELP_SECTIONS für den Knopf „Mehr dazu".
+  const TAB_HINTS = {
+    basis: { icon:'ti-home', help:'grundlagen',
+      text:'Hier baust du eine <strong>einzelne Kolonie</strong> aus: Minen und Kraftwerke erhöhen die Produktion pro Sekunde, Lager verhindern, dass sie überläuft. Gebäudestufen gelten immer nur für den oben gewählten Planeten - jede weitere Kolonie musst du getrennt ausbauen.' },
+    forschung: { icon:'ti-flask', help:'forschung',
+      text:'Forschungen laufen nacheinander aus einer Warteschlange und schalten dauerhaft Gebäude, Schiffe und Boni frei. Weiter unten im Tab stehen zwei Grundsatzentscheidungen: die <strong>Doktrin</strong> (nur eine aktiv, ein späterer Wechsel kostet Ressourcen) und die <strong>Taktik-Haltung</strong>, die Angriffs- und Verteidigungskraft gegenläufig verschiebt und jederzeit kostenlos wechselbar ist.' },
+    flotte: { icon:'ti-ship', help:'flotte',
+      text:'Schiffswerft und laufende Missionen. Zwei Dinge, die man leicht übersieht: Kampfschiffe haben <strong>Konterrollen</strong> - die passende Zusammensetzung schlägt reine Masse -, und jede unterwegs befindliche Mission belegt einen deiner begrenzten Flottenslots (anfangs 2, über die Forschung Flottenkoordination bis 10).' },
+    verteidigung: { icon:'ti-shield', help:'kampf',
+      text:'Verteidigungsgebäude schützen ausschließlich den gewählten Planeten und fliegen nie mit einer Flotte mit. Darüber wählst du die <strong>Verteidigungs-Aufstellung</strong> - deine Antwort als Verteidiger auf die Konterrolle des Angreifers; sie entscheidet Gefechte spürbar mit.' },
+    expedition: { icon:'ti-rocket', help:'flotte',
+      text:'Expeditionen schicken Schiffe ins Unerforschte. <strong>Typ, Wagnis-Regler und Eskorte</strong> bestimmen zusammen Risiko und Ausbeute: Spähschiffe tragen keine Kampfkraft bei, verbessern aber gezielt die Fundqualität, Frachter erweitern den Platz für große Ressourcenfunde.' },
+    karte: { icon:'ti-map-2', help:'kolonien',
+      text:'Die Sektorkarte zeigt dein System und die Nachbarschaft - von hier aus erkundest du fremde Planeten und schickst Kolonieschiffe los. Die <strong>Entfernung</strong> bestimmt Flugzeit und Treibstoffverbrauch jeder Mission, nahe Ziele sind also deutlich günstiger als weit entfernte.' },
+    galaxie: { icon:'ti-world', help:'galaxie',
+      text:'Bestenliste, globaler Chat und der Zustand der lebendigen Galaxie. Tippe einen Spieler in der Liste an: sein Profil zeigt dir deine <strong>Siegchance in Prozent</strong>, bevor du eine Flotte losschickst - inklusive der Konterwirkung deiner aktuellen Zusammensetzung.' },
+    allianz: { icon:'ti-users', help:'allianz',
+      text:'Allianzen teilen Forschung, bauen gemeinsam eine Allianzbasis aus und fliegen Raids und Musterangriffe zusammen. Alles davon läuft über den Server - ohne Verbindung bleibt der Tab weitgehend leer, und Beiträge werden dann gar nicht erst abgebucht.' },
+    offiziere: { icon:'ti-user-circle', help:'offiziere',
+      text:'Offiziere geben dauerhafte Boni, steigen mit Erfahrung auf und lassen dich ab Stufe 5 und 10 je ein <strong>Talent</strong> wählen. Im selben Tab liegen deine <strong>Module</strong> - Ausrüstung für Schiffsklassen und Standorte, die zusätzlich Set-Boni geben, wenn mehrere aus einer Reihe zusammenkommen.' },
+    markt: { icon:'ti-truck', help:'markt',
+      text:'Ressourcen gegen Kredite handeln. Große Verkaufsmengen drücken den Preis - der Abschlag steht schon vor dem Klick da, deshalb lohnen sich mehrere Tranchen statt eines Riesenverkaufs. Außerdem hier: Modulfragmente, ein täglich wechselndes Angebot und der Modulhandel mit anderen Spielern.' },
+    punkte: { icon:'ti-star', help:'fortschritt',
+      text:'Dein Punktestand aufgeschlüsselt - woher die Punkte kommen, wie sie sich über die Zeit entwickelt haben und wie deine Kampfbilanz aussieht. Dieselbe Zahl bestimmt deinen Platz in der Bestenliste und ist die Schwelle für Prestige und Aufstieg.' },
+    fortschritt: { icon:'ti-trophy', help:'fortschritt',
+      text:'Erfolge, Fähigkeitsbaum, Prestige und Aufstieg. <strong>Prestige</strong> setzt dein Imperium für dauerhafte Boni zurück; der <strong>Aufstieg</strong> darüber (ab Prestige 3 und 50.000 Punkten) setzt sogar die Prestige-Stufen zurück und zahlt in Sternenessenz, der einzigen Währung, die jeden Reset überlebt.' }
+  };
+  // Während des Tutorials oder eines Start-Overlays wäre der Hinweis doppelte Ansprache und würde
+  // hinter dem Overlay unbemerkt „verbraucht" - deshalb erst danach.
+  function tabHintBlocked(){
+    if (!state.tutorialSeen) return true;
+    for (const id of ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']){
+      const ov = document.getElementById(id);
+      if (ov && ov.style.display && ov.style.display !== 'none') return true;
+    }
+    return false;
+  }
+  // Merkt sich, für welchen Tab die Leiste gerade steht. Ohne das würde der Haupt-Tick (1×/Sekunde)
+  // dieselbe Leiste jede Sekunde neu schreiben - unnötige Arbeit und ein Flackern beim Anfassen.
+  let tabHintShownFor = null;
+  function hideTabHint(){
+    const bar = document.getElementById('tabHintBar');
+    if (!bar || tabHintShownFor === null) return;
+    tabHintShownFor = null;
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  }
+  function maybeShowTabHint(tab){
+    const bar = document.getElementById('tabHintBar');
+    if (!bar) return;
+    const hint = TAB_HINTS[tab];
+    if (!state.seenTabHints) state.seenTabHints = {};
+    if (!hint || state.seenTabHints[tab] || tabHintBlocked()){ hideTabHint(); return; }
+    if (tabHintShownFor === tab) return;
+    tabHintShownFor = tab;
+    bar.innerHTML = `<div class="tab-hint">
+      <i class="ti ${hint.icon}" aria-hidden="true"></i>
+      <div class="tab-hint-text">${hint.text}</div>
+      <div class="tab-hint-actions">
+        <button data-jump-help="${hint.help}"><i class="ti ti-info-circle" aria-hidden="true"></i>Mehr dazu</button>
+        <button data-tab-hint-dismiss="${tab}"><i class="ti ti-check" aria-hidden="true"></i>Verstanden</button>
+      </div>
+    </div>`;
+    bar.style.display = '';
   }
   // Berichte sind nach Erstellung unveränderlich - reportsCache.length+IDs plus die Kampf-Statistik-
   // Kopfzeile reichen als Signatur, um den (potenziell langen) innerHTML-Neuaufbau jede Sekunde zu
@@ -24579,6 +24681,9 @@
         const isPreExistingSave = parsedSave.tutorialSeen === undefined;
         state = Object.assign(state, parsedSave);
         if (isPreExistingSave) state.tutorialSeen = true;
+        // Ersthinweise: alte Spielstände kennen das Feld nicht, Object.assign lässt den Default
+        // dann stehen - der explizite Check fängt zusätzlich einen null-Wert ab.
+        if (!state.seenTabHints || typeof state.seenTabHints !== 'object') state.seenTabHints = {};
         if (state.expeditionsCompleted === undefined) state.expeditionsCompleted = 0;
         if (!state.themeKey) state.themeKey = 'standard';
         applyTheme(state.themeKey);
@@ -30572,6 +30677,7 @@
       save();
       updateExpeditionBadge();
     }
+    maybeShowTabHint(tab);
     render();
   }
   document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', ()=>switchTab(b.getAttribute('data-tab'))));
@@ -35859,6 +35965,15 @@
   document.addEventListener('click', (e) => {
     const jumpBtn = e.target.closest('[data-jump-help]');
     if (jumpBtn) jumpToHelp(jumpBtn.getAttribute('data-jump-help'));
+    // „Verstanden" beim Ersthinweis: merken und nie wieder zeigen. Gleiche Delegation, weil die
+    // Leiste bei jedem Tab-Wechsel neu geschrieben wird und direkte Listener verloren gingen.
+    const hintBtn = e.target.closest('[data-tab-hint-dismiss]');
+    if (hintBtn){
+      if (!state.seenTabHints) state.seenTabHints = {};
+      state.seenTabHints[hintBtn.getAttribute('data-tab-hint-dismiss')] = true;
+      save();
+      hideTabHint();
+    }
   });
 
   // Grafik-Runde "Maximum", Vorschlag 26 "Karten-Tilt": EIN delegierter pointermove-Listener statt
@@ -36014,6 +36129,11 @@
     const researchQueued = tryStartQueuedResearch();
     const autoExplored = tryAutoExplore();
     syncCompletionReminders();
+    // Ersthinweis nachreichen: Beim Start ist „Basis" bereits offen, ohne dass switchTab je lief -
+    // und während eines Start-Overlays (Willkommen zurück, Patchnotes, Tutorial) blockt
+    // tabHintBlocked() bewusst ab. Der Tick holt beides nach, sobald der Weg frei ist; ist die
+    // Leiste schon gesetzt oder der Hinweis weggeklickt, steigt maybeShowTabHint sofort wieder aus.
+    if (tabVisible) maybeShowTabHint(activeTab);
     if (tabVisible) render();
     if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
   }, 1000);
