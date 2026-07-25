@@ -2450,6 +2450,9 @@
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-diamond" aria-hidden="true"></i>Kredit-Shop</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Gib Kredite für temporäre Verstärkungen oder Modul-Blaupausen aus. Laufende Shop-Buffs können nicht gestapelt werden.</div>
         <div id="creditShopBox" style="margin-bottom:0.5rem;"></div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-box" aria-hidden="true"></i>Modulbörse</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Handle <strong>Module direkt mit anderen Spielern</strong>. Ein eingestelltes Modul wandert sofort in <strong>Treuhand</strong> – es verlässt dein Inventar und kommt erst beim Zurückziehen zurück, kann also nie doppelt verkauft werden. Der Erlös wird dir beim nächsten Laden gutgeschrieben, auch wenn du beim Verkauf offline warst. Anbieten kannst du deine Module im Offiziere-Tab.</div>
+        <div id="moduleMarketBox"></div>
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-truck" aria-hidden="true"></i>Handelsrouten</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Binde Frachter (Kleine und Große) dauerhaft an eine Route für passiven Ertrag. Gebundene Frachter stehen für Kämpfe und andere Missionen nicht mehr bereit und zählen nicht zur Lagerkapazität. Jede fällige Route hat ein kleines Piratenrisiko - "Routenschutz" senkt es deutlich, kostet dafür einen Teil des Ertrags.</div>
         <div id="tradeRouteBox"></div>
@@ -4180,8 +4183,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.289.0';
+  const VERSION = '8.290.0';
   const PATCHNOTES = [
+    { version:'8.290.0', date:'25.07.2026', changes:[
+      'Neu: die MODULBÖRSE – Module lassen sich ab sofort direkt mit anderen Spielern handeln. Zum Anbieten drückst du im Offiziere-Tab an einem Modul im Inventar den neuen „Börse"-Knopf und nennst deinen Preis (1.000 bis 5.000.000 Kredite). Alle offenen Angebote stehen im Markt-Tab unter „Modulbörse", nach Preis sortiert, mit Modulname, Seltenheit, Stufe und Anbieter.',
+      'Die Börse arbeitet mit echter TREUHAND: Ein eingestelltes Modul verlässt sofort dein Inventar und liegt bis zum Verkauf oder Zurückziehen bei der Börse. Dadurch kann dasselbe Modul nie zweimal verkauft werden und es kann auch keines aus dem Nichts entstehen – selbst dann nicht, wenn zwei Spieler im selben Moment auf dasselbe Angebot klicken. Der Server prüft und verbucht alles, der Spielstand entscheidet nichts davon selbst.',
+      'Verkaufserlöse werden dir beim nächsten Laden des Spiels gutgeschrieben – auch wenn du während des Verkaufs offline warst. Die Börse behält 5% Gebühr ein. Du kannst höchstens 5 Angebote gleichzeitig laufen haben, jedes jederzeit zurückziehen (das Modul kommt unverändert zurück), und dein eigenes Angebot nicht selbst kaufen.'
+    ]},
     { version:'8.289.0', date:'25.07.2026', changes:[
       'Marktausbau, Teil 1 – Schluss mit Knopf-Spammen: Blaupausen und die neue Fragment-Lieferung lassen sich jetzt mehrfach auf einmal kaufen. An jeder Karte stehen ×1 / ×5 / ×10 / Max, der Kaufknopf zeigt die Gesamtsumme, und es kommt EINE zusammengefasste Meldung ("10× Elite-Blaupause gekauft → 1× Legendär, 2× Episch, 3× Selten, 4× Gewöhnlich") statt zehn einzelner. Wer mehr wählt, als er bezahlen kann, bekommt die Menge automatisch auf das Bezahlbare gekürzt statt einer Fehlermeldung.',
       'Marktausbau, Teil 2 – große Mengen verkaufen: Der Handel nimmt serverseitig höchstens 1.000.000 Einheiten pro Anfrage an. Bisher schrieb "Max Verkauf" den vollen Bestand ins Feld, lief damit in eine Ablehnung und man musste die Zahl von Hand kleiner tippen. Jetzt werden größere Mengen automatisch als Sammelauftrag in Tranchen nacheinander abgearbeitet – du trägst einfach deinen ganzen Bestand ein. Ein Fortschrittsbalken oben im Markt zeigt die laufende Tranche und lässt sich jederzeit abbrechen.',
@@ -9325,6 +9333,7 @@
     if (cd) cd.textContent = fmt(state.credits||0);
     renderTradeRoutes();
     renderCreditShop();
+    renderModuleMarket();
     const box = document.getElementById('marketBox');
     if (!box) return;
     // Bug behoben (danke an holyhenning für den Report): renderMarket() lief bisher bei jedem
@@ -9493,6 +9502,57 @@
     updateMarketRowEstimate(box, k, amt);
   }
 
+  // Modulbörse-Anzeige. Signatur-Cache (kein Live-Countdown, kein Eingabefeld in dieser Box - der
+  // Preis wird im Offiziere-Tab an der Modulkarte eingegeben, nicht hier).
+  let lastModuleMarketSig = null;
+  function renderModuleMarket(){
+    const box = document.getElementById('moduleMarketBox');
+    if (!box) return;
+    if (!useBackend()){
+      box.innerHTML = '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Die Modulbörse ist nur mit Serververbindung verfügbar.</div>';
+      return;
+    }
+    if (!moduleMarketCache){
+      box.innerHTML = '<div class="lb-note"><i class="ti ti-clock" aria-hidden="true"></i>Modulbörse wird geladen…</div>';
+      loadModuleMarket();
+      return;
+    }
+    const listings = moduleMarketCache.listings || [];
+    const lim = moduleMarketCache.limits || {};
+    const sig = listings.map(l => l.id+':'+l.price+':'+(l.mine?1:0)).join('|')+'|cr:'+Math.floor((state.credits||0)/1000);
+    if (sig === lastModuleMarketSig) return;
+    lastModuleMarketSig = sig;
+    const mineCount = listings.filter(l => l.mine).length;
+    if (!listings.length){
+      box.innerHTML = '<div class="bmeta"><i class="ti ti-box" aria-hidden="true"></i> Gerade bietet niemand ein Modul an. Stell selbst eins ein – im Offiziere-Tab hat jedes Modul im Inventar einen „Börse"-Knopf.</div>';
+      return;
+    }
+    // Günstigste zuerst - beim Stöbern ist der Preis das erste Kriterium.
+    const sorted = listings.slice().sort((a,b) => (a.mine===b.mine) ? a.price-b.price : (a.mine?1:-1));
+    box.innerHTML = `<div class="bmeta" style="margin-bottom:0.5rem;">${listings.length} Angebot(e) · davon ${mineCount} von dir (max. ${lim.maxPerUser||5}) · Börsengebühr beim Verkauf: ${Math.round((lim.feePct||0.05)*100)}%</div>`
+      + sorted.map(l => {
+      const info = l.isShip ? shipModuleInstanceInfo(l.instKey) : moduleInstanceInfo(l.instKey);
+      const rar = info ? info.rar : { label:'?', color:'#9aa0b8' };
+      const name = info ? info.def.name : l.instKey;
+      const lvl = info && info.level > 1 ? ' · Stufe '+info.level : '';
+      const afford = (state.credits||0) >= l.price;
+      return `<div class="card-row" style="border-color:${rar.color}55;">
+        <div class="left">
+          <div class="bicon" style="background:${rar.color}22; color:${rar.color};"><i class="ti ${info?info.def.icon:'ti-box'}" aria-hidden="true"></i></div>
+          <div style="min-width:0;">
+            <div class="bname">${name} <span class="lvl-pill" style="background:${rar.color}22; color:${rar.color};">${rar.label}</span></div>
+            <div class="bmeta">${info?info.def.desc:''}</div>
+            <div class="bmeta" style="color:#8489a0;">${l.isShip?'Schiffsklassen-Modul':'Standort-Modul'}${lvl} · Anbieter: <strong>${escapeHtml(l.sellerName||'?')}</strong>${l.mine?' <span style="color:#fac775;">(dein Angebot)</span>':''}</div>
+          </div>
+        </div>
+        ${l.mine
+          ? `<button data-mm-cancel="${l.id}" style="font-size:10.5px; white-space:nowrap;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Zurückziehen</button>`
+          : `<button data-mm-buy="${l.id}" ${afford?'':'disabled'} style="font-size:10.5px; white-space:nowrap;" title="${afford?'':'Nicht genug Kredite'}">${fmt(l.price)} Kr.</button>`}
+      </div>`;
+    }).join('');
+    box.querySelectorAll('[data-mm-buy]').forEach(btn => btn.onclick = () => buyModuleListing(btn.getAttribute('data-mm-buy')));
+    box.querySelectorAll('[data-mm-cancel]').forEach(btn => btn.onclick = () => cancelModuleListing(btn.getAttribute('data-mm-cancel')));
+  }
   // UI-Zustand für das Anlegen einer neuen Route (nicht gespeichert).
   const newRouteDraft = { type:'credits', frachter:1, resource:'erz', fromPlanet:'home', toPlanet:'home' };
   function renderTradeRoutes(){
@@ -9679,6 +9739,103 @@
       return true;
     } catch(e){ if (!opts.viaLimit) log('Marktverbindung fehlgeschlagen.', 'ti-alert-triangle'); return false; }
     finally { marketTradeInFlight = false; }
+  }
+  // ===== Modulbörse: Spieler-zu-Spieler-Handel (25.07.2026) =====
+  // Gegenstück zu /api/modulemarket im Backend. Der Server führt echte Treuhand: ein eingestelltes
+  // Modul verlässt sofort das eigene Inventar und kommt erst beim Zurückziehen zurück - der Client
+  // rechnet hier deshalb NICHTS selbst, sondern übernimmt die Serverantwort (wie beim Ressourcenmarkt).
+  let moduleMarketCache = null;      // { listings, limits } - zuletzt geladener Stand
+  let moduleMarketInFlight = false;
+  const moduleListDraft = { instKey:null, isShip:false, price:0 };
+  async function loadModuleMarket(){
+    if (!useBackend()) return;
+    try {
+      const res = await backendFetch('/modulemarket', { method:'GET' });
+      if (!res.ok) return;
+      moduleMarketCache = await res.json();
+      if (activeTab === 'markt') renderModuleMarket();
+    } catch(e){}
+  }
+  // Ein Modul aus dem Inventar zum Verkauf stellen.
+  async function listModuleOnMarket(isShip, instKey, price){
+    if (!useBackend()){ log('Die Modulbörse braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
+    if (moduleMarketInFlight) return;
+    const lim = (moduleMarketCache && moduleMarketCache.limits) || { minPrice:1000, maxPrice:5000000 };
+    const p = Math.floor(Number(price)||0);
+    if (p < lim.minPrice || p > lim.maxPrice){
+      log('Preis muss zwischen '+fmt(lim.minPrice)+' und '+fmt(lim.maxPrice)+' Krediten liegen.', 'ti-alert-triangle'); return;
+    }
+    moduleMarketInFlight = true;
+    try {
+      const res = await backendFetch('/modulemarket/list', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ isShip: !!isShip, instKey, price: p }) });
+      const data = await res.json();
+      if (!res.ok || !data.ok){ log('Einstellen fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
+      // Der Server hat das Modul bereits aus dem gespeicherten Inventar genommen - lokal nachziehen,
+      // damit die Anzeige nicht bis zum nächsten Laden ein Modul zeigt, das schon in der Treuhand liegt.
+      const inv = isShip ? state.shipModules : state.modules;
+      if (inv[instKey]){ inv[instKey] -= 1; if (inv[instKey] <= 0) delete inv[instKey]; }
+      if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+      const info = isShip ? shipModuleInstanceInfo(instKey) : moduleInstanceInfo(instKey);
+      log('Modul zur Börse gestellt: '+(info?info.rar.label+' '+info.def.name:'Modul')+' für '+fmt(p)+' Kredite. Bis zum Verkauf liegt es in der Treuhand und steht dir nicht zur Verfügung.', 'ti-diamond');
+      moduleListDraft.instKey = null;
+      await loadModuleMarket();
+      render(); save();
+    } catch(e){ log('Verbindung zur Modulbörse fehlgeschlagen.', 'ti-alert-triangle'); }
+    finally { moduleMarketInFlight = false; }
+  }
+  async function cancelModuleListing(id){
+    if (!useBackend() || moduleMarketInFlight) return;
+    moduleMarketInFlight = true;
+    try {
+      const res = await backendFetch('/modulemarket/cancel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+      const data = await res.json();
+      if (!res.ok || !data.ok){ log('Zurückziehen fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(); return; }
+      const inv = data.isShip ? state.shipModules : state.modules;
+      inv[data.instKey] = (inv[data.instKey]||0) + 1;
+      if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+      const info = data.isShip ? shipModuleInstanceInfo(data.instKey) : moduleInstanceInfo(data.instKey);
+      log('Angebot zurückgezogen: '+(info?info.rar.label+' '+info.def.name:'Modul')+' liegt wieder in deinem Inventar.', 'ti-box');
+      await loadModuleMarket();
+      render(); save();
+    } catch(e){ log('Verbindung zur Modulbörse fehlgeschlagen.', 'ti-alert-triangle'); }
+    finally { moduleMarketInFlight = false; }
+  }
+  // Fragt den Wunschpreis ab und stellt das Modul ein. Als Vorschlag steht das Doppelte des
+  // Kredit-Sofortverkaufswerts (moduleSellValue) darin - das ist der Betrag, den man ohne Börse
+  // bekäme, also die sinnvolle Untergrenze für einen Handel mit Mitspielern.
+  function promptOfferModule(isShip, instKey){
+    const lim = (moduleMarketCache && moduleMarketCache.limits) || { minPrice:1000, maxPrice:5000000, feePct:0.05 };
+    const info = isShip ? shipModuleInstanceInfo(instKey) : moduleInstanceInfo(instKey);
+    const name = info ? info.rar.label+' '+info.def.name : 'Modul';
+    const vorschlag = Math.min(lim.maxPrice, Math.max(lim.minPrice, moduleSellValue(instKey) * 2 || lim.minPrice));
+    const eingabe = prompt('„'+name+'" anderen Spielern anbieten.\n\nPreis in Krediten ('+fmt(lim.minPrice)+' bis '+fmt(lim.maxPrice)+').\n'
+      + 'Beim Verkauf gehen '+Math.round((lim.feePct||0.05)*100)+'% Börsengebühr ab.\n'
+      + 'Das Modul liegt bis zum Verkauf in Treuhand und steht dir solange nicht zur Verfügung.', String(vorschlag));
+    if (eingabe === null) return;
+    const p = Math.floor(Number(String(eingabe).replace(/[^\d]/g,'')));
+    if (!p){ log('Kein gültiger Preis eingegeben.', 'ti-alert-triangle'); return; }
+    listModuleOnMarket(isShip, instKey, p);
+  }
+  async function buyModuleListing(id){
+    if (!useBackend() || moduleMarketInFlight) return;
+    moduleMarketInFlight = true;
+    try {
+      const res = await backendFetch('/modulemarket/buy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+      const data = await res.json();
+      if (!res.ok || !data.ok){ log('Kauf fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(); return; }
+      const inv = data.isShip ? state.shipModules : state.modules;
+      inv[data.instKey] = (inv[data.instKey]||0) + 1;
+      state.credits = data.newCredits;
+      if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+      const info = data.isShip ? shipModuleInstanceInfo(data.instKey) : moduleInstanceInfo(data.instKey);
+      state.modulePurchases = (state.modulePurchases||0) + 1;
+      log('Von der Börse gekauft: '+(info?info.rar.label+' '+info.def.name:'Modul')+' von '+(data.sellerName||'einem Spieler')+' für '+fmt(data.price)+' Kredite.', 'ti-diamond', 'ok');
+      playSound('trade');
+      await loadModuleMarket();
+      render(); save();
+    } catch(e){ log('Verbindung zur Modulbörse fehlgeschlagen.', 'ti-alert-triangle'); }
+    finally { moduleMarketInFlight = false; }
   }
   // ===== Sammelauftrag: Handel über der Server-Obergrenze (25.07.2026, Spieler-Report) =====
   // Der Handels-Endpunkt nimmt höchstens MARKET_MAX_PER_TRADE Einheiten pro Anfrage an. Wer mehr als
@@ -14692,6 +14849,21 @@
           save();
           continue;
         }
+        if (r.type === 'module-sale'){
+          // Modulbörse: Ein anderer Spieler hat ein eingestelltes Modul gekauft. Der Erlös kommt
+          // bewusst über diese Warteschlange und nicht direkt in den Spielstand - man kann während
+          // des Verkaufs offline sein, und ein direkter Servereingriff würde beim nächsten Auto-Save
+          // des eigenen Clients wieder überschrieben (siehe Kommentar oben an dieser Funktion).
+          state.credits = (state.credits||0) + (r.credits||0);
+          const soldInfo = r.isShip ? shipModuleInstanceInfo(r.instKey) : moduleInstanceInfo(r.instKey);
+          const soldName = soldInfo ? soldInfo.rar.label+' '+soldInfo.def.name : 'Modul';
+          state.moduleSales = (state.moduleSales||0) + 1;
+          log('MODUL VERKAUFT: '+(r.buyerName||'Ein Spieler')+' hat dein '+soldName+' für '+fmt(r.price||0)+' Kredite gekauft. Nach '+fmt(r.fee||0)+' Kredite Börsengebühr gutgeschrieben: +'+fmt(r.credits||0)+'.', 'ti-diamond', 'ok');
+          playSound('trade');
+          pushReport({ type:'weekly-reward', rank:1, rewardLabel: 'Modulbörse: '+soldName+' an '+(r.buyerName||'einen Spieler')+' verkauft, +'+fmt(r.credits||0)+' Kredite' });
+          save();
+          continue;
+        }
         if (r.type === 'bounty'){
           state.credits = (state.credits||0) + (r.credits||0);
           log('KOPFGELD KASSIERT: Du hast '+(r.targetName||'den Gejagten')+' bezwungen und '+fmt(r.credits||0)+' Kredite Prämie erhalten!', 'ti-award', 'ok');
@@ -18749,7 +18921,8 @@
       { title:'Kredit-Shop', body:'Im Markt-Tab kannst du Kredite ausgeben für: <strong>Produktions-Schub</strong> (+25% alle Ressourcen, 1h, 400 Kr.) · <strong>Söldnerflotte</strong> (+20% Angriffskraft, 2h, 600 Kr.) · <strong>Schildgenerator-Miete</strong> (+25% Verteidigung, 2h, 500 Kr.) · <strong>Modul-Blaupause</strong> (zufälliges Standort-Modul, 10.000 Kr.) · <strong>Schiffsklassen-Blaupause</strong> (zufälliges klassenweites Modul, max. „Selten", 20.000 Kr.) · <strong>Elite-Schiffsklassen-Blaupause</strong> (bis „Legendär", 75.000 Kr.) · <strong>Modulfragment-Lieferung</strong> (10 Fragmente, 40.000 Kr.). Laufende Shop-Buffs können nicht gestapelt werden – erst nach Ablauf erneut kaufbar. Alles andere ist beliebig oft kaufbar, und zwar auch <strong>mehrfach auf einmal</strong>: die Mengenknöpfe ×1/×5/×10/Max an der Karte kaufen die gewählte Anzahl in einem Zug.' },
       { title:'Angebote des Tages', body:'Über den festen Shop-Einträgen stehen täglich <strong>zwei konkret benannte Module</strong> – eines für Standorte, eines für Schiffsklassen – mit voller Beschreibung und Seltenheit. Anders als bei den Blaupausen weißt du hier vorher genau, was du bekommst. Beide sind je einmal pro Tag kaufbar und wechseln um Mitternacht; das Angebot ist für alle Spieler dasselbe. Preise nach Seltenheit: 12.000 (Gewöhnlich), 36.000 (Selten), 100.000 (Episch), 260.000 Kr. (Legendär) – günstiger als der gezielte Weg über Fragmente, dafür kannst du das Modul nicht auswählen.' },
       { title:'Große Mengen handeln', body:'Der Handel nimmt pro Anfrage höchstens <strong>1.000.000 Einheiten</strong> an. Größere Mengen werden automatisch als <strong>Sammelauftrag</strong> in mehreren Tranchen nacheinander ausgeführt – du kannst also deinen kompletten Bestand eintragen, auch wenn er zweistellig in Millionen liegt. Oben im Markt zeigt ein Balken den Fortschritt und lässt sich jederzeit abbrechen; bereits gehandelte Tranchen bleiben natürlich verbucht. Zur schnellen Mengenwahl gibt es <strong>×10</strong> und <strong>×100</strong> sowie <strong>25% / 50% / 100%</strong> deines Bestands. Achtung: Jede Tranche drückt den Preis weiter – unter den Knöpfen siehst du den erwarteten Durchschnittspreis, den Preis danach und einen Hinweis, wenn Stückeln über mehrere Zeitpunkte mehr einbringt.' },
-      { title:'Module zu Geld machen', body:'Jedes nicht ausgerüstete Modul im Inventar hat neben „Zerlegen" (gibt Modulfragmente) einen zweiten Knopf: den <strong>Verkauf gegen Kredite</strong> (5.000 / 16.000 / 45.000 / 115.000 / 300.000 Kr. je nach Seltenheit, multipliziert mit der Modulstufe). Der Verkaufswert liegt bewusst unter dem Kaufpreis derselben Seltenheit – Kaufen und sofort Weiterverkaufen ist also ein Verlustgeschäft, kein Geldautomat.' }
+      { title:'Module zu Geld machen', body:'Jedes nicht ausgerüstete Modul im Inventar hat neben „Zerlegen" (gibt Modulfragmente) einen zweiten Knopf: den <strong>Verkauf gegen Kredite</strong> (5.000 / 16.000 / 45.000 / 115.000 / 300.000 Kr. je nach Seltenheit, multipliziert mit der Modulstufe). Der Verkaufswert liegt bewusst unter dem Kaufpreis derselben Seltenheit – Kaufen und sofort Weiterverkaufen ist also ein Verlustgeschäft, kein Geldautomat.' },
+      { title:'Modulbörse (Handel mit anderen Spielern)', body:'Im Markt-Tab gibt es die <strong>Modulbörse</strong>: Module lassen sich direkt zwischen Spielern handeln. Zum Anbieten drückst du im Offiziere-Tab an einem Modul im Inventar den Knopf <strong>„Börse"</strong> und nennst deinen Preis (1.000 bis 5.000.000 Kredite). <strong>Wichtig – Treuhand:</strong> Das eingestellte Modul verlässt sofort dein Inventar und liegt bis zum Verkauf oder Zurückziehen bei der Börse. Dadurch kann dasselbe Modul niemals zweimal verkauft werden, und es entsteht auch keines aus dem Nichts. Du kannst höchstens <strong>5 Angebote gleichzeitig</strong> laufen haben und jedes jederzeit zurückziehen – das Modul kommt dann unverändert zurück. Beim Verkauf behält die Börse <strong>5% Gebühr</strong> ein; der Rest wird dir beim nächsten Laden des Spiels gutgeschrieben, auch wenn du während des Verkaufs offline warst. Dein eigenes Angebot kannst du nicht selbst kaufen. Die Börse braucht eine Serververbindung.' }
     ]},
     { key:'offiziere', icon:'ti-user-circle', title:'Offiziere', entries:[
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
@@ -29620,6 +29793,10 @@
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
     if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceChronicle(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
+    // Modulbörse frisch laden, wenn der Markt geöffnet wird - sie ändert sich durch ANDERE Spieler
+    // und würde sonst einen veralteten Stand zeigen. Bewusst kein Dauer-Polling: der Signatur-Cache
+    // von renderModuleMarket zeichnet ohnehin nur bei echten Änderungen neu.
+    if (tab === 'markt'){ lastModuleMarketSig = null; loadModuleMarket(); }
     if (tab === 'verteidigung'){ loadDetectedFleets(); checkIncomingMoonSieges(); }
     if (tab === 'berichte'){
       loadReports();
@@ -32295,6 +32472,7 @@
                   ${canFuse?`<button data-fuse-module="${instKey}" style="font-size:9.5px; padding:3px 6px;" title="3× ${info.rar.label} zu 1× ${MODULE_RARITY[nextRar].label} verschmelzen"><i class="ti ti-atom-2" aria-hidden="true" style="margin-right:2px;"></i>3→1</button>`:''}
                   <button data-dismantle-module="${instKey}" style="font-size:9.5px; padding:3px 6px;" title="Zerlegen: +${fragVal} Modulfragmente"><i class="ti ti-x" aria-hidden="true" style="margin-right:2px;"></i>Zerlegen</button>
                   ${moduleSellValue(instKey)>0?`<button data-sell-module="${instKey}" style="font-size:9.5px; padding:3px 6px; border-color:rgba(250,199,117,0.5); color:#fac775;" title="Auf dem Markt verkaufen: +${fmt(moduleSellValue(instKey))} Kredite (Zerlegen gibt stattdessen Fragmente)"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:2px;"></i>${fmt(moduleSellValue(instKey))} Kr.</button>`:''}
+                  ${useBackend()?`<button data-offer-module="${instKey}" style="font-size:9.5px; padding:3px 6px; border-color:rgba(133,183,235,0.5); color:#85b7eb;" title="Anderen Spielern zum Kauf anbieten (Modulbörse im Markt-Tab). Das Modul liegt bis zum Verkauf in Treuhand."><i class="ti ti-users" aria-hidden="true" style="margin-right:2px;"></i>Börse</button>`:''}
                 </div>
               </div>
             </div>`;
@@ -32334,6 +32512,7 @@
         moduleBox.querySelectorAll('[data-fuse-module]').forEach(btn => btn.onclick = () => fuseModules(false, btn.getAttribute('data-fuse-module')));
         moduleBox.querySelectorAll('[data-dismantle-module]').forEach(btn => btn.onclick = () => dismantleModule(false, btn.getAttribute('data-dismantle-module')));
         moduleBox.querySelectorAll('[data-sell-module]').forEach(btn => btn.onclick = () => sellModuleForCredits(false, btn.getAttribute('data-sell-module')));
+        moduleBox.querySelectorAll('[data-offer-module]').forEach(btn => btn.onclick = () => promptOfferModule(false, btn.getAttribute('data-offer-module')));
         moduleBox.querySelectorAll('[data-bulkscrap]').forEach(btn => btn.onclick = () => runBulkScrapToken(btn.getAttribute('data-bulkscrap')));
         moduleBox.querySelectorAll('[data-upgrade-module]').forEach(btn => btn.onclick = () => upgradeModule(false, btn.getAttribute('data-upgrade-module')));
         moduleBox.querySelectorAll('[data-reroll-module]').forEach(btn => btn.onclick = () => rerollModuleSubs(false, btn.getAttribute('data-reroll-module')));
@@ -32465,6 +32644,7 @@
                   ${canFuseS?`<button data-fuse-shipmodule="${instKey}" style="font-size:9.5px; padding:3px 6px;" title="3× ${info.rar.label} zu 1× ${MODULE_RARITY[nextRarS].label} verschmelzen"><i class="ti ti-atom-2" aria-hidden="true" style="margin-right:2px;"></i>3→1</button>`:''}
                   <button data-dismantle-shipmodule="${instKey}" style="font-size:9.5px; padding:3px 6px;" title="Zerlegen: +${fragValS} Modulfragmente"><i class="ti ti-x" aria-hidden="true" style="margin-right:2px;"></i>Zerlegen</button>
                   ${moduleSellValue(instKey)>0?`<button data-sell-shipmodule="${instKey}" style="font-size:9.5px; padding:3px 6px; border-color:rgba(250,199,117,0.5); color:#fac775;" title="Auf dem Markt verkaufen: +${fmt(moduleSellValue(instKey))} Kredite (Zerlegen gibt stattdessen Fragmente)"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:2px;"></i>${fmt(moduleSellValue(instKey))} Kr.</button>`:''}
+                  ${useBackend()?`<button data-offer-shipmodule="${instKey}" style="font-size:9.5px; padding:3px 6px; border-color:rgba(133,183,235,0.5); color:#85b7eb;" title="Anderen Spielern zum Kauf anbieten (Modulbörse im Markt-Tab). Das Modul liegt bis zum Verkauf in Treuhand."><i class="ti ti-users" aria-hidden="true" style="margin-right:2px;"></i>Börse</button>`:''}
                 </div>
               </div>
             </div>`;
@@ -32507,6 +32687,7 @@
         shipModuleBox.querySelectorAll('[data-fuse-shipmodule]').forEach(btn => btn.onclick = () => fuseModules(true, btn.getAttribute('data-fuse-shipmodule')));
         shipModuleBox.querySelectorAll('[data-dismantle-shipmodule]').forEach(btn => btn.onclick = () => dismantleModule(true, btn.getAttribute('data-dismantle-shipmodule')));
         shipModuleBox.querySelectorAll('[data-sell-shipmodule]').forEach(btn => btn.onclick = () => sellModuleForCredits(true, btn.getAttribute('data-sell-shipmodule')));
+        shipModuleBox.querySelectorAll('[data-offer-shipmodule]').forEach(btn => btn.onclick = () => promptOfferModule(true, btn.getAttribute('data-offer-shipmodule')));
         shipModuleBox.querySelectorAll('[data-bulkscrap]').forEach(btn => btn.onclick = () => runBulkScrapToken(btn.getAttribute('data-bulkscrap')));
         shipModuleBox.querySelectorAll('[data-upgrade-shipmodule]').forEach(btn => btn.onclick = () => upgradeModule(true, btn.getAttribute('data-upgrade-shipmodule')));
         shipModuleBox.querySelectorAll('[data-reroll-shipmodule]').forEach(btn => btn.onclick = () => rerollModuleSubs(true, btn.getAttribute('data-reroll-shipmodule')));
