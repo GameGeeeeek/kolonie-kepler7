@@ -4251,8 +4251,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.14';
+  const VERSION = '8.298.15';
   const PATCHNOTES = [
+    { version:'8.298.15', date:'25.07.2026', changes:[
+      'Expeditionen sind nicht länger reiner Zufall: Jede heimkehrende Expedition fängt jetzt mit rund 14% Wahrscheinlichkeit eine <strong>Peilung</strong> auf – ein zeitlich begrenztes Ziel in einem bereits entdeckten Sternsystem, dessen Fundart du vorher kennst.',
+      'Vier Arten: <strong>Materialpeilung</strong> (ein seltenes Material), <strong>Technik-Echo</strong> (ein Standort-Modul plus 4 Modulfragmente), <strong>Frachtsignal</strong> (ein großer Ressourcen-Cache) und <strong>Kartenfragment-Signal</strong> (ein Sternenkarten-Fragment für die Schatzdepot-Kette). Steuerst du eine an, ersetzt sie beim Eintreffen den normalen Fundwurf durch ihren Fund – garantiert.',
+      'Peilungen stehen im Expeditions-Reiter über dem Startknopf mit laufender Restzeit und tauchen als 📡 auf der Galaxie-Karte auf. Es sind höchstens 3 gleichzeitig aktiv, höchstens eine je System, und jede verfällt nach 2 Stunden.',
+      'Das Ziel wird wie der Rückzugsschalter beim Start in die Mission eingebacken, und ein bereits angesteuertes Signal lässt sich nicht ein zweites Mal wählen – zwei Expeditionen können sich also nicht gegenseitig den Fund wegnehmen. Verfällt eine Peilung, während deine Expedition noch fliegt, würfelt diese ganz normal. An der Begegnungs- und Verlustmechanik ändert sich nichts.'
+    ]},
     { version:'8.298.14', date:'25.07.2026', changes:[
       'Zwei Sicherheitsnetze für Expeditionen. Der neue Schalter <strong>„Bei Feindkontakt abbrechen"</strong> über dem Startknopf lässt die Expedition sofort abdrehen, sobald sie auf eine feindliche Flotte trifft: keine Beute, aber garantiert keine Verluste. Aus dem Risiko wird damit eine bewusste Entscheidung statt eines Würfelwurfs.',
       'Die Einstellung wird beim Start in die Mission eingebacken – legst du den Schalter später um, gilt das erst für die nächste Expedition und ändert nichts an bereits fliegenden. Ein Rückzug zählt bewusst nicht als abgeschlossene Expedition, der Erfahrungsbonus lässt sich damit also nicht erschleichen.',
@@ -16246,6 +16252,10 @@
     if (!state.codexClaimed || typeof state.codexClaimed !== 'object') state.codexClaimed = {};
     if (!Number.isFinite(state.expeditionSafeRuns)) state.expeditionSafeRuns = 0;
     if (state.expeditionWithdraw === undefined) state.expeditionWithdraw = false;
+    // Expeditions-Signale (Inhaltspaket 5/5): Altstaende haben das Feld nicht, und ein defekter
+    // Wert wuerde activeSignals()/pruneSignals() bei jedem Tick auf die Nase fallen lassen.
+    if (!Array.isArray(state.expeditionSignals)) state.expeditionSignals = [];
+    if (state.expeditionTargetSignal === undefined) state.expeditionTargetSignal = null;
     if (!state.seenTabHints || typeof state.seenTabHints !== 'object') state.seenTabHints = {};
     if (state.referredBy === undefined) state.referredBy = null;
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
@@ -19677,6 +19687,7 @@
       { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
       { title:'Expeditionstypen, Wagnis & Eskorte', body:'Vor dem Start wählst du <strong>Expeditionstyp</strong>, <strong>Wagnis</strong> und <strong>Eskorte</strong> – alle drei formen Risiko und Beute. <strong>Typen:</strong> Kurz (schnell/sicher, wenig), Standard (ausgewogen), Tiefenraum (lang/riskant, viel) sowie drei spezialisierte: <strong>Bergungsexpedition</strong> (viel mehr Module und verlassene Schiffe, weniger Rohstoffe), <strong>Forschungsexpedition</strong> (viel mehr Items/Fragmente/Materialien und bevorzugt Forschungspunkte, kaum Rohstoffe) und <strong>Schürfexpedition</strong> (fast nur Rohstoffe, sehr sicher). <strong>Wagnis-Regler:</strong> Vorsichtig (−30% Begegnungsrisiko, −15% Beute), Normal, oder Wagemutig (+40% Risiko, +35% Beute). <strong>Eskorte:</strong> Kampfschiffe entscheiden, wie eine Begegnung <em>ausgeht</em> (die Wahrscheinlichkeit, überhaupt auf jemanden zu treffen, hängt nur vom Typ, vom Wagnis und vom Modul „Eskorten-Leitsystem" ab); <strong>Spähschiffe</strong> tragen keine Kampfkraft bei, verbessern aber gezielt die Ausbeute (mehr Sonderfunde und bessere Fund-Qualität); <strong>Frachter/Große Frachter</strong> erweitern den Frachtraum für große Ressourcenfunde.' },
       { title:'Rückzug & Rettungskapsel', body:'Zwei Sicherheitsnetze für vorsichtige Kommandanten. Der Schalter <strong>„Bei Feindkontakt abbrechen"</strong> über dem Startknopf legt fest, dass die Expedition sofort abdreht, sobald sie auf eine feindliche Flotte trifft: keine Beute, aber garantiert keine Verluste – und die Expedition zählt dann auch nicht als abgeschlossen, der Erfahrungsbonus lässt sich damit also nicht erschleichen. Die Einstellung wird beim <strong>Start</strong> in die Mission eingebacken; änderst du den Schalter, gilt das erst für die nächste Expedition, nicht für bereits fliegende. Unabhängig davon gibt es die <strong>Rettungskapsel</strong>: Geht eine Begegnung schief, hatte das Forschungsschiff bisher keine Überlebenschance. Jetzt kommt es mit 35% Wahrscheinlichkeit durch, und jede Stufe der Forschung <strong>Expeditionsanalytik</strong> hebt das um 3 Prozentpunkte an, gedeckelt bei 75% – ein Forschungsschiff mitzuschicken bleibt also ein echter Einsatz, nur kein sicherer Totalverlust mehr.' },
+      { title:'Expeditions-Signale (Peilungen)', body:'Expeditionen sind sonst reiner Zufall – Signale machen daraus eine Entscheidung. Jede heimkehrende Expedition fängt mit rund 14% Wahrscheinlichkeit eine <strong>Peilung</strong> auf: ein zeitlich begrenztes Ziel in einem <strong>bereits entdeckten</strong> Sternsystem, dessen Fundart du vorher <strong>kennst</strong>. Es gibt vier Arten: <strong>Materialpeilung</strong> (ein seltenes Material), <strong>Technik-Echo</strong> (ein Standort-Modul plus 4 Modulfragmente), <strong>Frachtsignal</strong> (ein großer Ressourcen-Cache) und <strong>Kartenfragment-Signal</strong> (ein Sternenkarten-Fragment für die Schatzdepot-Kette). Peilungen erscheinen im Expeditions-Reiter über dem Startknopf und als 📡 auf der Galaxie-Karte. Steuerst du eine an, <strong>ersetzt</strong> sie beim Eintreffen den normalen Fundwurf durch ihren Fund – garantiert, ohne Würfeln. Das Ziel wird wie der Rückzugsschalter beim <strong>Start</strong> in die Mission eingebacken, und ein bereits angesteuertes Signal lässt sich nicht ein zweites Mal wählen. Es sind höchstens 3 Peilungen gleichzeitig aktiv, höchstens eine je System, und jede verfällt nach 2 Stunden. Läuft sie ab, während deine Expedition noch fliegt, würfelt diese ganz normal – die Begegnungs- und Verlustmechanik ist von Signalen völlig unberührt.' },
       { title:'Was bei einer Begegnung passiert', body:'Trifft eine Expedition auf eine feindliche Flotte, entscheidet allein das <strong>Kräfteverhältnis</strong> zwischen deiner Eskorte und dem Gegner über den Ausgang – es gibt drei: <strong>abgewehrt</strong> (keine Verluste, volle Beute), <strong>geschwächt</strong> (das Forschungsschiff geht verloren, die Beute schrumpft auf 40%) und <strong>schwerer Verlust</strong> (Forschungsschiff plus 50–80% der Eskorte, keine Beute – der Rest der Eskorte setzt sich ab). Die Eskorte wirkt dabei stark überproportional: Bei ausgeglichenen Kräften liegt das Risiko eines schweren Verlusts bei rund 10%, bei deutlicher Überlegenheit unter 2%, ohne jede Eskorte dagegen bei 40%. Es lohnt sich also, lieber eine ordentliche Eskorte mitzuschicken als gar keine – anders als früher vervielfacht eine größere Eskorte den zu erwartenden Verlust nicht, sondern senkt ihn. Die Stärke der Gegner wächst mit deinem Punktestand, aber nur bis zu einer festen Obergrenze; ein gut ausgebautes Imperium wächst also aus dem Risiko heraus. Verlorene Schiffe hinterlassen ein <strong>Trümmerfeld</strong> am Startplaneten, das sich mit Recyclern bergen lässt, und <strong>Hyperjäger</strong> in der Eskorte senken die eigenen Verluste um 3% je Stück (max. −30%).' },
       { title:'Expeditions-Kette & Kodex', body:'<strong>Sternenkarten-Fragmente</strong> tauchen gelegentlich als Sonderfund auf. Hast du drei gesammelt, sind die Koordinaten eines verschollenen <strong>Schatzdepots</strong> vollständig – deine nächste erfolgreiche Expedition birgt dann garantiert einen wertvollen Fund (großer Ressourcen-Cache, ein Standort-Modul, Modulfragmente und XP). Der <strong>Expeditions-Kodex</strong> (aufklappbar im Expedition-Tab) sammelt deinen Fortschritt: entdeckte Sonderfunde, gefundene seltene Materialien, entdeckte Systeme und abgeschlossene Schatzdepots. Das Sammeln zahlt sich aus: Der Kodex hat sechs <strong>Stufen</strong>, die sich einmalig einlösen lassen – 15, 30, 45 und alle Sonderfunde, jedes auffindbare Material sowie drei abgeschlossene Schatzdepot-Ketten. Sie bringen Sternenessenz und Kredite, drei davon zusätzlich einen <strong>dauerhaften Beutebonus</strong> auf alle künftigen Expeditionen (+3%, +5% und +2%, zusammen bis zu +10%). Der Bonus fließt in dieselbe gedeckelte Bonus-Gruppe wie Aufstiegs-, Prestige-, Modul- und Offiziersboni. Eingelöste Stufen bleiben über Prestige UND Aufstieg hinweg erhalten – sie lassen sich also weder verlieren noch nach einem Reset erneut kassieren.' },
       { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
@@ -27554,7 +27565,15 @@
             // ist die NÄCHSTE erfolgreiche Expedition ein garantierter Jackpot (überschreibt den
             // normalen Fund-Roll). Bewusst großzügig, aber nicht spielentscheidend - der Aufwand
             // (3 seltene Sonderfunde sammeln) rechtfertigt es.
-            if (state.expeditionChain && state.expeditionChain.readyFinale){
+            // Angesteuertes Signal (Inhaltspaket 5/5): ersetzt den Fundwurf durch den bekannten,
+            // garantierten Fund. Ist das Signal inzwischen abgelaufen, liefert resolveSignalFind null
+            // und es laeuft der normale Wurf - die Expedition war dann eben umsonst unterwegs.
+            const signalFund = m.signalId ? resolveSignalFind(m.signalId, mult) : null;
+            if (signalFund){
+              findText = signalFund.text;
+              findIcon = signalFund.icon || 'ti-map-2';
+              reportExtra = { signalFind:true };
+            } else if (state.expeditionChain && state.expeditionChain.readyFinale){
               state.expeditionChain.readyFinale = false;
               state.expeditionChain.fragments = 0;
               state.expeditionCodex = state.expeditionCodex || {};
@@ -27711,6 +27730,13 @@
               : (encountered ? ' '+EXPEDITION_DEFENDED_FLAVOR[Math.floor(Math.random()*EXPEDITION_DEFENDED_FLAVOR.length)] : '');
             if (showLog !== false) log((m.fleetName||'Expedition')+' zurück in '+planetDisplayName(planetKey)+'.'+outcomeMsg+' '+findText+sysMsg, findIcon);
             pushReport(Object.assign({ type:'expedition', result:outcome, escortPower:Math.round(escortPower), findText, systemDiscovered: !!sysMsg, fromPlanet: planetDisplayName(planetKey), encountered, fleet:m.composition||fleet, ownLostShips: (outcome==='weakened' && !forscherGerettet) ? {forscher:1} : {}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), outcomeFlavor: outcomeMsg.trim() }, encountered ? { enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100) } : {}, reportExtra));
+            // Inhaltspaket 5/5: Die heimkehrende Expedition bringt gelegentlich eine Peilung mit.
+            // Bewusst NUR hier - eine vernichtete Expedition kommt gar nicht erst zurueck, und ein
+            // Spawn aus dem Haupt-Tick heraus wuerde Signale ohne eigenes Zutun regnen lassen.
+            const neuesSignal = maybeSpawnSignal();
+            if (neuesSignal && showLog !== false){
+              log('Peilung aufgefangen: '+neuesSignal.typ.name+' im System '+neuesSignal.sys.name+'. Steuere es innerhalb von '+Math.round(SIGNAL_LIFETIME_MS/60000)+' Minuten mit einer Expedition an, dann ist der Fund garantiert.', neuesSignal.typ.icon, 'good');
+            }
           }
           state.lastExpeditionEventTime = Date.now();
         } else if (m.type === 'relocate'){
@@ -29415,6 +29441,10 @@
       const it = state.spyIntel[k];
       if (it && it.entry && it.system) intelBySystem[it.system] = (intelBySystem[it.system]||0) + 1;
     }
+    // Expeditions-Signale (Inhaltspaket 5/5) auf derselben badges-Infrastruktur - so sieht man die
+    // aufgefangene Peilung dort, wo man ohnehin auf die Galaxie schaut, ohne neue Positionierungslogik.
+    const signalBySystem = {};
+    for (const sig of activeSignals()) signalBySystem[sig.systemId] = sig;
     // Fokussierter Start-Ausschnitt (Spieler-Wunsch: nicht von Anfang an mit der vollen, dichten
     // Galaxie starten und erst zoomen müssen) - beim allerersten Kartenaufbau dieser Sitzung auf die
     // Nachbarschaft des aktiven Systems zentrieren. "Zurücksetzen" bleibt die volle 950×500-Ansicht.
@@ -29489,6 +29519,10 @@
       if (alienHere) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
       if (galaxyCache.activeWar && galaxyCache.activeWar.system === s.id) badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
       if (intelBySystem[s.id]) badges.push({ icon:'🔎', title: intelBySystem[s.id]+' ausgespähte'+(intelBySystem[s.id]===1?'r Spieler':' Spieler')+' in diesem System (Aufklärung liegt vor)' });
+      if (signalBySystem[s.id]){
+        const sg = signalBySystem[s.id];
+        badges.push({ icon:'📡', title:'Peilung: '+signalTypeOf(sg.kind).name+' – '+(sg.enRoute?'bereits angesteuert':'im Expeditions-Reiter ansteuern')+' (verfällt in '+fmtDuration(Math.max(0, Math.round((sg.expiresAt-Date.now())/1000)))+')' });
+      }
       const badgeMarkup = badges.map((b,i) => `<text x="${pos.x+11+i*13}" y="${pos.y-11}" text-anchor="middle" style="font-size:11px;"><title>${b.title}</title>${b.icon}</text>`).join('');
 
       const factionRing = controlledByMe
@@ -30821,6 +30855,96 @@
   // Kette-Konstante (Ausbau C) + Leak-sicherer Zufalls-Zieher für seltene Materialien (chance:0
   // ausgeschlossen, siehe Expeditions-Audit v8.254 - derselbe Schutz wie in pickWeightedByRarity).
   const EXPEDITION_CHAIN_NEEDED = 3;
+  // ===== Expeditions-Signale (25.07.2026, Inhaltspaket 5/5) =====
+  // Expeditionen waren bis hierher reine Zufallsmaschinen: losschicken, warten, wuerfeln. Signale
+  // machen daraus eine Entscheidung. Eine erfolgreiche Expedition faengt gelegentlich eine Peilung
+  // auf - ein zeitlich begrenztes Ziel in einem BEREITS ENTDECKTEN System mit BEKANNTER Fundart.
+  // Steuert man es an, ist der Fund garantiert; laesst man es verstreichen, war es eine verpasste
+  // Gelegenheit. Bewusst kein eigener Missionstyp und keine eigene Flugmechanik: die Expedition
+  // laeuft voellig normal, nur der Fundwurf wird beim Eintreffen ersetzt.
+  const SIGNAL_MAX = 3;                      // mehr als drei gleichzeitig wuerde die Auswahl entwerten
+  const SIGNAL_LIFETIME_MS = 2*60*60*1000;   // zwei Stunden - lang genug fuer eine Tiefenraum-Expedition
+  const SIGNAL_SPAWN_CHANCE = 0.14;          // je erfolgreich abgeschlossener Expedition
+  const SIGNAL_TYPES = [
+    { key:'material', name:'Materialpeilung', icon:'ti-diamond', gewicht:30,
+      desc:'Steuerst du dieses Signal an, bringt die Expedition garantiert ein zufälliges seltenes Material mit - genau jene Funde, die sonst nur mit wenigen Prozent Wahrscheinlichkeit auftauchen.' },
+    { key:'modul', name:'Technik-Echo', icon:'ti-box', gewicht:25,
+      desc:'Steuerst du dieses Signal an, birgt die Expedition garantiert ein zufälliges Standort-Modul und zusätzlich 4 Modulfragmente.' },
+    { key:'cache', name:'Frachtsignal', icon:'ti-truck', gewicht:30,
+      desc:'Steuerst du dieses Signal an, birgt die Expedition garantiert einen großen Ressourcen-Cache aus Erz, Kristallen, Deuterium und Antimaterie - skaliert mit deinem Expeditionsertrag.' },
+    { key:'kette', name:'Kartenfragment-Signal', icon:'ti-map-2', gewicht:15,
+      desc:'Steuerst du dieses Signal an, birgt die Expedition garantiert ein Sternenkarten-Fragment für die Schatzdepot-Kette. Ist die Kette bereits vollständig, gibt es stattdessen 4 Modulfragmente.' }
+  ];
+  function ensureSignals(){ if (!Array.isArray(state.expeditionSignals)) state.expeditionSignals = []; return state.expeditionSignals; }
+  // Abgelaufene entfernen. Wird vor jeder Anzeige und vor jeder Nutzung aufgerufen, damit nirgends
+  // ein totes Signal auftaucht - ein eigener Timer waere dafuer unnoetig.
+  function pruneSignals(){
+    const jetzt = Date.now();
+    const vorher = ensureSignals().length;
+    state.expeditionSignals = state.expeditionSignals.filter(s => s && s.expiresAt > jetzt);
+    return vorher - state.expeditionSignals.length;
+  }
+  function activeSignals(){ pruneSignals(); return state.expeditionSignals; }
+  function signalTypeOf(key){ return SIGNAL_TYPES.find(t => t.key === key) || SIGNAL_TYPES[0]; }
+  // Spawn nach einer erfolgreichen Expedition. Zielsystem nur aus BEREITS ENTDECKTEN Systemen - ein
+  // Signal in einem unbekannten System waere kein Angebot, sondern eine Sackgasse.
+  function maybeSpawnSignal(){
+    pruneSignals();
+    if (state.expeditionSignals.length >= SIGNAL_MAX) return null;
+    if (Math.random() >= SIGNAL_SPAWN_CHANCE) return null;
+    const bekannt = STAR_SYSTEMS.filter(s => PLANETS.some(p => p.system === s.id && (state.discovered||{})[p.id]));
+    if (!bekannt.length) return null;
+    const belegt = new Set(state.expeditionSignals.map(s => s.systemId));
+    const frei = bekannt.filter(s => !belegt.has(s.id));
+    if (!frei.length) return null; // pro System hoechstens ein Signal, sonst wird die Karte unleserlich
+    const sys = frei[Math.floor(Math.random()*frei.length)];
+    const gesamt = SIGNAL_TYPES.reduce((a,t)=>a+t.gewicht, 0);
+    let w = Math.random()*gesamt, typ = SIGNAL_TYPES[0];
+    for (const t of SIGNAL_TYPES){ if ((w -= t.gewicht) < 0){ typ = t; break; } }
+    const sig = { id:'sig-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), systemId: sys.id, kind: typ.key, expiresAt: Date.now()+SIGNAL_LIFETIME_MS };
+    state.expeditionSignals.push(sig);
+    return { sig, sys, typ };
+  }
+  // Loest den garantierten Fund eines angesteuerten Signals aus. Gibt den Anzeigetext zurueck oder
+  // null, wenn das Signal inzwischen abgelaufen ist (dann laeuft der normale Fundwurf weiter).
+  function resolveSignalFind(signalId, mult){
+    pruneSignals();
+    const idx = state.expeditionSignals.findIndex(s => s.id === signalId);
+    if (idx < 0) return null;
+    const sig = state.expeditionSignals[idx];
+    state.expeditionSignals.splice(idx, 1);
+    const typ = signalTypeOf(sig.kind);
+    if (sig.kind === 'material'){
+      const ri = randomFindableRareItem();
+      state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+      recordCodexRare(ri.key);
+      addXp(Math.round(60*mult));
+      return { text:'Die Peilung führte ans Ziel: '+ri.name+' geborgen!', icon: ri.icon||'ti-diamond' };
+    }
+    if (sig.kind === 'modul'){
+      const modName = grantRandomModule();
+      state.moduleFragments = (state.moduleFragments||0) + 4;
+      addXp(Math.round(60*mult));
+      return { text:'Dem Technik-Echo gefolgt: '+modName+' und +4 Modulfragmente geborgen!', icon:'ti-box' };
+    }
+    if (sig.kind === 'kette'){
+      if (!state.expeditionChain) state.expeditionChain = { fragments:0, readyFinale:false };
+      if (state.expeditionChain.readyFinale) {
+        // Kette bereits vollstaendig - statt den Fund verpuffen zu lassen, gibt es den Gegenwert.
+        state.moduleFragments = (state.moduleFragments||0) + 4;
+        addXp(Math.round(60*mult));
+        return { text:'Das Kartenfragment-Signal führte zu einem Duplikat - die Koordinaten sind längst vollständig. Immerhin: +4 Modulfragmente aus dem Wrack.', icon:'ti-map-2' };
+      }
+      state.expeditionChain.fragments = Math.min(EXPEDITION_CHAIN_NEEDED, (state.expeditionChain.fragments||0)+1);
+      if (state.expeditionChain.fragments >= EXPEDITION_CHAIN_NEEDED) state.expeditionChain.readyFinale = true;
+      addXp(Math.round(60*mult));
+      return { text:'Dem Kartenfragment-Signal gefolgt: Sternenkarten-Fragment '+state.expeditionChain.fragments+'/'+EXPEDITION_CHAIN_NEEDED+' geborgen'+(state.expeditionChain.readyFinale?' - die Koordinaten des Schatzdepots sind damit vollständig!':'.'), icon:'ti-map-2' };
+    }
+    const cache = { erz: Math.round(1600*mult), kristalle: Math.round(1200*mult), deuterium: Math.round(700*mult), antimaterie: Math.round(90*mult) };
+    gainResources(cache);
+    addXp(Math.round(60*mult));
+    return { text:'Dem Frachtsignal gefolgt: ein großer Ressourcen-Cache geborgen ('+Object.entries(cache).map(([r,a])=>fmt(a)+' '+((RES_DEFS.find(x=>x.key===r)||{label:r}).label)).join(', ')+')!', icon: typ.icon };
+  }
   function randomFindableRareItem(){ const pool = RARE_ITEMS.filter(r => r.chance !== 0); return pool[Math.floor(Math.random()*pool.length)]; }
   // Ausbau B (24.07.2026): Expeditions-Kodex - dauerhafte Sammel-Statistik (entdeckte Sonderereignisse,
   // seltene Materialien, abgeschlossene Ketten). Reines Anzeige-/Sammelziel, kein Spieleffekt.
@@ -30977,9 +31101,24 @@
       activateQuantensensor();
     }
     const risk = EXPEDITION_RISK_MODES[state.expeditionRisk||'normal'] || EXPEDITION_RISK_MODES.normal;
-    cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: Math.min(0.9, et.encounterChance*risk.enc), rewardMult: et.rewardMult*risk.rew, riskMode: state.expeditionRisk||'normal', withdrawOnContact: !!state.expeditionWithdraw, sensorBoosted: quantensensorActive() });
+    // Angesteuertes Signal (Inhaltspaket 5/5) wird wie withdrawOnContact/encounterChance beim START
+    // in die Mission eingebacken. Das Signal wird sofort als "angesteuert" markiert, damit eine
+    // zweite Expedition nicht dasselbe Ziel waehlen kann - sonst kaeme die zweite garantiert leer
+    // zurueck, weil die erste den Fund bereits verbraucht hat.
+    let signalId = null, signalTxt = '';
+    if (state.expeditionTargetSignal){
+      const sig = activeSignals().find(s => s.id === state.expeditionTargetSignal && !s.enRoute);
+      if (sig){
+        sig.enRoute = true;
+        signalId = sig.id;
+        const sys = STAR_SYSTEMS.find(s => s.id === sig.systemId);
+        signalTxt = ' Kurs auf die Peilung: '+signalTypeOf(sig.kind).name+(sys?' im System '+sys.name:'')+'.';
+      }
+      state.expeditionTargetSignal = null;
+    }
+    cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: Math.min(0.9, et.encounterChance*risk.enc), rewardMult: et.rewardMult*risk.rew, riskMode: state.expeditionRisk||'normal', withdrawOnContact: !!state.expeditionWithdraw, sensorBoosted: quantensensorActive(), signalId });
     lastExpeditionSend = { type: et.key, composition: ESCORT_KEYS.reduce((acc,k) => { if ((escortFleet[k]||0) > 0) acc[k] = escortFleet[k]; return acc; }, {}) };
-    log(fleetName+' ('+et.name+') von '+planetDisplayName(state.activeBasePlanet)+' in unerforschten Raum aufgebrochen. Eskorte: '+escortSummary+' (Kampfkraft '+Math.round(escortPower)+'). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-map-2');
+    log(fleetName+' ('+et.name+') von '+planetDisplayName(state.activeBasePlanet)+' in unerforschten Raum aufgebrochen. Eskorte: '+escortSummary+' (Kampfkraft '+Math.round(escortPower)+'). Treibstoff verbraucht: '+fuelCostText(fuel)+'.'+signalTxt, 'ti-map-2');
     render(); save();
   }
   // Wendet Typ + Eskorte der letzten erfolgreichen Sendung an und startet SOFORT (ein Klick statt
@@ -33084,6 +33223,33 @@
           <div class="toggle-switch ${state.expeditionWithdraw?'on':''}"><div class="toggle-knob"></div></div>
         </div>
         ${(() => {
+          // Inhaltspaket 5/5: aufgefangene Peilungen. Bewusst KEIN Signatur-Cache (CLAUDE.md) - die
+          // Restlaufzeit zaehlt sichtbar herunter und wuerde mit Cache einfrieren. Die ganze Box wird
+          // ohnehin jeden Tick neu geschrieben, der Countdown kostet also nichts extra.
+          const sigs = activeSignals();
+          if (!sigs.length){
+            return `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-target" aria-hidden="true" style="color:#5b6b84;"></i> Keine Peilung aufgefangen. Heimkehrende Expeditionen fangen gelegentlich eine auf – ein zeitlich begrenztes Ziel mit garantiertem Fund.</div>`;
+          }
+          return `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px; background:rgba(93,202,165,0.08); border-color:rgba(93,202,165,0.32);">
+            <div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> Aufgefangene Peilungen (${sigs.length}/${SIGNAL_MAX}) – ein angesteuertes Signal ersetzt den Fundwurf durch seinen bekannten Fund:</div>
+            ${sigs.map(s => {
+              const typ = signalTypeOf(s.kind);
+              const sys = STAR_SYSTEMS.find(x => x.id === s.systemId);
+              const restSek = Math.max(0, Math.round((s.expiresAt - Date.now())/1000));
+              const gewaehlt = state.expeditionTargetSignal === s.id;
+              return `<div class="card-row" style="${gewaehlt?'background:rgba(93,202,165,0.18); border-color:#5dcaa5;':''}">
+                <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.18); color:#5dcaa5;"><i class="ti ${typ.icon}" aria-hidden="true"></i></div>
+                  <div><div class="bname">${typ.name}${sys?' · '+sys.name:''}</div>
+                  <div class="bmeta">${typ.desc}</div>
+                  <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Verfällt in ${fmtDuration(restSek)}${s.enRoute?' · eine Expedition ist bereits unterwegs':''}</div></div></div>
+                ${s.enRoute
+                  ? `<span class="lvl-pill" style="color:#5dcaa5;">angesteuert</span>`
+                  : `<button data-signal-target="${s.id}" style="font-size:11px; padding:6px 10px; ${gewaehlt?'background:rgba(93,202,165,0.25); border-color:#5dcaa5; color:#5dcaa5;':''}">${gewaehlt?'Ziel aufheben':'Ziel ansteuern'}</button>`}
+              </div>`;
+            }).join('')}
+          </div>`;
+        })()}
+        ${(() => {
           // Ausbau C: Ketten-Fortschritt / Finale-Hinweis.
           const ch = state.expeditionChain || { fragments:0, readyFinale:false };
           if (ch.readyFinale){
@@ -33186,6 +33352,11 @@
       });
       const withdrawRow = document.getElementById('expWithdrawRow');
       if (withdrawRow) withdrawRow.onclick = () => { state.expeditionWithdraw = !state.expeditionWithdraw; render(); save(); };
+      document.querySelectorAll('[data-signal-target]').forEach(btn => btn.onclick = () => {
+        const id = btn.getAttribute('data-signal-target');
+        state.expeditionTargetSignal = (state.expeditionTargetSignal === id) ? null : id;
+        render(); save();
+      });
       document.querySelectorAll('[data-expedition-type]').forEach(btn => btn.onclick = () => {
         selectedExpeditionType = btn.getAttribute('data-expedition-type');
         render();
