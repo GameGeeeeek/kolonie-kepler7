@@ -4217,8 +4217,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.297.2';
+  const VERSION = '8.297.3';
   const PATCHNOTES = [
+    { version:'8.297.3', date:'25.07.2026', changes:[
+      'Der Hinweis in „Aktive Effekte" sagte „Finde welche bei Erkundungsmissionen!" und war damit irreführend. Erkundungen liefern keine Effekte, sondern Booster-ITEMS (Ressourcenschub, Schildüberladung, Antriebsmatrix – zusammen rund 11% je Erkundung), die erst wirken, wenn man sie im Inventar aktiviert. Wer erkundete und die Box danach weiter leer sah, musste das für einen Fehler halten.',
+      'Außerdem nannte der Satz ausgerechnet die schwächste Quelle. Effekte entstehen sofort durch: Zufallsereignisse (die Pop-ups mit A/B-Entscheidung – die häufigste Quelle, im Schnitt alle paar Minuten), Sonderfunde auf Expeditionen, den Forschungs-Sprint und Booster aus dem Kredit-Shop. Das steht jetzt alles in der Box.',
+      'An der Mechanik ändert sich nichts – die Quellen waren immer schon so, nur stand es nirgends.'
+    ]},
     { version:'8.297.2', date:'25.07.2026', changes:[
       'Bugfix (danke für den Hinweis): Klappt man die Karte eines noch gesperrten Event-Schiffs auf – z.B. das Enterschiff –, ging sie nach etwa einer Sekunde von selbst wieder zu. Der Beschreibungstext war damit praktisch nicht lesbar. Ursache: Die Werft wird jede Sekunde neu gezeichnet (wegen der mitlaufenden Bauzeit- und Event-Countdowns), und der Aufklappzustand wurde dabei jedes Mal mit weggeworfen. Er wird jetzt über das Neuzeichnen hinweg gemerkt – aufgeklappt bleibt aufgeklappt, bis man selbst wieder zuklappt.',
       'Derselbe Fehler steckte in drei weiteren Aufklapp-Blöcken und ist dort mitbehoben: „Ausbaustufen & Boni anzeigen" bei der Allianzbasis sowie „Teilnehmer anzeigen" beim Allianz-Raid und beim koordinierten Allianzbasis-Angriff.'
@@ -34523,7 +34528,12 @@
     if (buffsBox){
       const activeBuffs = (state.buffs||[]).filter(b=>b.expiresAt>Date.now());
       if (!activeBuffs.length){
-        buffsBox.innerHTML = `<div class="bmeta">Keine aktiven Effekte. Finde welche bei Erkundungsmissionen!</div>`;
+        // Der frühere Text ("Finde welche bei Erkundungsmissionen!") nannte nur die schwächste von
+        // mehreren Quellen - und dort findet man auch keine Effekte, sondern ITEMS, die erst im
+        // Fortschritt-Tab aktiviert werden müssen. Wer nach dem Text erkundete und die Box leer sah,
+        // musste das für einen Fehler halten. Jetzt stehen die tatsächlichen Quellen da, die
+        // häufigste zuerst.
+        buffsBox.innerHTML = `<div class="bmeta">Gerade keine aktiven Effekte. Sie entstehen sofort durch: <strong>Zufallsereignisse</strong> (die Pop-ups mit A/B-Entscheidung, im Schnitt alle paar Minuten), <strong>Sonderfunde auf Expeditionen</strong>, den <strong>Forschungs-Sprint</strong> und <strong>Booster aus dem Kredit-Shop</strong>. Zusätzlich findest du auf Erkundungen und Expeditionen Booster-<em>Items</em> (Ressourcenschub, Schildüberladung, Antriebsmatrix) – die wirken erst, wenn du sie oben unter „Inventar" aktivierst.</div>`;
       } else {
         buffsBox.innerHTML = activeBuffs.map(b => {
           const remain = Math.max(0, b.expiresAt-Date.now());
