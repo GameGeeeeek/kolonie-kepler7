@@ -922,6 +922,21 @@
        Beschreibungen). Das Icon (.bicon) hat flex-shrink:0 und bleibt davon unberührt. */
     .card-row .left > div:last-child { min-width:0; overflow-wrap:anywhere; }
     .bicon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; overflow:hidden; }
+    /* Verteidigungsanlagen-Kachel: deutlich größer als das generische 42px-Badge. Seit v8.287.0 hat
+       jede der 21 Anlagen eine eigene gezeichnete Grafik, die auf 40px schlicht zu klein war, um die
+       Silhouetten auseinanderzuhalten - die Schiffe zeichnen seit v8.282.0 auf 78x58. Auf schmalen
+       Handys eine Stufe kleiner, damit neben der Kachel genug Platz für die Textspalte bleibt.
+       Das canvas bekommt max-width/max-height statt fester Maße: ensureCanvasDpr schreibt auf
+       Retina-Geräten ein inline style.width/height in Attributgröße, und nur max-* setzt sich
+       dagegen durch (greift in der Größenberechnung nach width, unabhängig von Spezifität). */
+    .bicon-def { width:68px; height:68px; border-radius:14px; padding:2px; box-sizing:border-box; position:relative; }
+    .bicon-def canvas { max-width:100%; max-height:100%; }
+    /* Gesperrte Anlage: Grafik bleibt sichtbar (man soll sehen, worauf man hinarbeitet), wird aber
+       entsättigt und trägt ein kleines Schloss-Abzeichen. Vorher stand hier nur ein Schloss-Symbol,
+       vier verschiedene Anlagen sahen dadurch identisch aus. */
+    .bicon-def.bicon-locked canvas { filter:grayscale(0.8); }
+    .bicon-def .lock-badge { position:absolute; right:1px; bottom:1px; font-size:11px; line-height:1; color:#c9d4e0; background:rgba(6,9,14,0.82); border-radius:5px; padding:2px 3px; }
+    @media (max-width:520px){ .bicon-def { width:56px; height:56px; border-radius:12px; } }
     /* Tier-2-Gebäude hervorgehoben (20.07.2026, Spieler-Wunsch): dünner Info-Rahmen + leichter Glow auf
        dem Icon-Badge für alle Gebäude, die Tier-2-Ressourcen produzieren ODER als Baukosten verlangen
        (usesTier2Resource()) - damit sind sie in der Gebäudeliste auf einen Blick als "Tier-2" erkennbar,
@@ -3489,6 +3504,50 @@
     function refreshDefenseMiniIcons(){
       DEFENSE_CANVAS_KEYS.forEach(key => { const c = document.getElementById('defIcon_'+key); ensureCanvasDpr(c); drawDefenseMiniIcon(key, c); });
     }
+    // Icon-Kachel einer Gebäudekarte. Anlagen mit gezeichneter Grafik bekommen die große .bicon-def-
+    // Kachel mit Canvas, alle übrigen Gebäude unverändert das generische 42px-Badge. Gesperrte Anlagen
+    // zeigen dieselbe Grafik entsättigt mit Schloss-Abzeichen statt eines nichtssagenden Schlosses -
+    // die Karte verrät damit, worauf man hinarbeitet. Die Canvas-ID bleibt pro Gebäude eindeutig, weil
+    // immer nur EIN Karten-Zweig (gesperrt ODER baubar) für ein Gebäude gerendert wird.
+    function buildingIconHtml(def, opts){
+      const locked = !!(opts && opts.locked);
+      const t2 = !!(opts && opts.tier2);
+      if (DEFENSE_CANVAS_KEYS.includes(def.key)){
+        return `<div class="bicon bicon-def${t2?' bicon-t2':''}${locked?' bicon-locked':''}" style="background:${def.bg};">`
+             + `<canvas id="defIcon_${def.key}" width="64" height="64" style="display:block;"></canvas>`
+             + (locked ? `<span class="lock-badge"><i class="ti ti-lock" aria-hidden="true"></i></span>` : '')
+             + `</div>`;
+      }
+      const inner = locked
+        ? `<i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i>`
+        : iconHtmlFor(def.key, def.icon, def.fg);
+      return `<div class="bicon${t2?' bicon-t2':''}" style="background:${def.bg};">${inner}</div>`;
+    }
+    // Wirkungs-Vorschau für eine gesperrte Verteidigungsanlage. Bisher stand auf gesperrten Karten nur
+    // die fehlende Voraussetzung - was die Anlage überhaupt leistet, sah man erst nach dem Freischalten.
+    // Zeigt die echten Werte je Stufe aus der Def, damit die Zahlen nicht auseinanderlaufen können.
+    function defenseLockedPreview(def){
+      if (def.category !== 'defense') return '';
+      // Zwei Anlagen tragen ihre Wirkung nicht in atkVal/defVal (beide stehen dort auf 0), sondern in
+      // eigenen Regeln - ohne diese Zweige bliebe ihre Vorschau leer. Zahlen kommen aus derselben
+      // Quelle wie die freigeschaltete Karte, damit sie nicht auseinanderlaufen können.
+      if (def.key === 'abhorchposten'){
+        return `Erkennt fremde Flottenbewegungen im Umkreis (Missionsart ab Stufe 3, Schiffszusammensetzung ab Stufe 4) · Reichweite wächst je Stufe bis ${ABHORCHPOSTEN_MAX_SECTORS} Sektoren${def.maxLevel?` · max. Stufe ${def.maxLevel}`:''}`;
+      }
+      if (def.key === 'mondschild'){
+        return `Senkt die Zerstörungschance durch einen gegnerischen Mondzerstörer um ${Math.round((def.siegeDefensePerLevel||0)*100)}% je Stufe${def.maxLevel?` · max. Stufe ${def.maxLevel}`:''}`;
+      }
+      const parts = [];
+      if (def.atkVal) parts.push(`+${def.atkVal} Angriff`);
+      if (def.defVal) parts.push(`+${def.defVal} Verteidigung`);
+      let text = parts.length ? parts.join(' · ') + ' je Stufe' : '';
+      // effectDesc nur anhängen, wenn er mehr sagt als die Zahlen selbst - bei den älteren Anlagen
+      // steht dort teils nur das Wort "Verteidigung", das wäre neben "+65 Verteidigung je Stufe" leer.
+      const extra = (def.effectDesc||'').trim();
+      if (extra && extra !== 'Verteidigung') text = text ? text + ' · ' + extra : extra;
+      if (def.maxLevel) text += ` · max. Stufe ${def.maxLevel}`;
+      return text;
+    }
 
     // Phase 2 der Grafik-Umstellung, Fortsetzung: Schiffe bekommen dieselbe Behandlung wie die drei
     // Verteidigungsgebäude - kleine Canvas-Grafik statt flachem Icon, synchron bei jedem Rebuild neu
@@ -4109,8 +4168,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.287.0';
+  const VERSION = '8.288.0';
   const PATCHNOTES = [
+    { version:'8.288.0', date:'25.07.2026', changes:[
+      'Die Verteidigungsanlagen werden jetzt deutlich größer dargestellt (68px statt 42px, auf schmalen Handys 56px). Seit die 21 Anlagen eigene gezeichnete Grafiken haben, waren die alten Kacheln zu klein, um die Silhouetten wirklich auseinanderzuhalten – die Schiffe zeichnen längst auf einer dreimal so großen Fläche.',
+      'Gesperrte Verteidigungsanlagen zeigen ab sofort ihre echte Grafik (entsättigt, mit kleinem Schloss-Abzeichen) statt eines für alle gleichen Schloss-Symbols. Man sieht damit schon vorher, worauf man hinarbeitet – bisher sahen vier verschiedene gesperrte Anlagen exakt gleich aus.',
+      'Gesperrte Verteidigungsanlagen nennen zusätzlich ihre Wirkung, z.B. "+30 Verteidigung je Stufe" oder "+36 Angriff · +65 Verteidigung je Stufe", bei begrenzten Anlagen auch die Maximalstufe. Vorher stand dort nur die fehlende Forschung, ohne jeden Hinweis darauf, ob sich das Freischalten lohnt.'
+    ]},
     { version:'8.287.0', date:'25.07.2026', changes:[
       'Alle 21 Verteidigungsanlagen haben jetzt eine eigene gezeichnete Grafik. Bisher hatten nur drei (Geschützturm, Schildgenerator, Raketensilo) ein eigenes Bild – die übrigen 18 teilten sich rund elf flache Symbole, mehrere Anlagen sahen dadurch exakt gleich aus (allein vier trugen dasselbe Schloss-Symbol). Jede Anlage bekommt jetzt eine unverwechselbare Silhouette: Flak mit Doppelrohr und Mündungsfeuer, Gaußkanone mit langem Rohr auf Drehkranz, Railgun mit Schienenpaar, Void-Barriere als Raumriss, Festung als Kristall, Nanoplattform als Gitterpanel, Sensorphalanx mit Parabolschüssel, Fusionsbastion mit Reaktortorus, Metamaterialwall mit Facettenkamm, Singularitätsturm mit Akkretionsscheibe, Mondschild mit Kuppel und Mondsichel.',
       'Behoben: Auf hochauflösenden Bildschirmen (fast jedes Handy, Retina-Notebooks) wurden ALLE Verteidigungs-Symbole halb so groß in der linken oberen Ecke ihres Feldes gezeichnet statt auf voller Fläche. Ursache war die Retina-Schärfung, die die Zeichenfläche vergrößert – der Verteidigungs-Zeichner rechnete als einziger noch mit festen Maßen und nahm die Vergrößerung nicht mit. Die Symbole sind jetzt überall vollflächig und gestochen scharf.'
@@ -29927,10 +29991,11 @@
         return `
           <div class="card-row research-locked">
             <div class="left">
-              <div class="bicon" style="background:${def.bg};"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
-              <div>
+              ${buildingIconHtml(def, {locked:true})}
+              <div style="min-width:0;">
                 <div class="bname">${def.name} <span class="lvl-pill">nur auf Monden</span></div>
                 <div class="bmeta">Dieses Gebäude kann nur auf einem kolonisierten Mond errichtet werden - zum Mond wechseln (☾-Symbol), falls vorhanden.</div>
+                ${defenseLockedPreview(def) ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${defenseLockedPreview(def)}</div>` : ''}
               </div>
             </div>
           </div>
@@ -29942,10 +30007,11 @@
         return `
           <div class="card-row research-locked">
             <div class="left">
-              <div class="bicon" style="background:${def.bg};"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
-              <div>
+              ${buildingIconHtml(def, {locked:true})}
+              <div style="min-width:0;">
                 <div class="bname">${def.name} <span class="lvl-pill">gesperrt</span></div>
                 <div class="bmeta">Benötigt 1x ${def.unlockItem} (du hast: ${have}) · sehr seltener Fund bei Erkundungsmissionen</div>
+                ${defenseLockedPreview(def) ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${defenseLockedPreview(def)}</div>` : ''}
               </div>
             </div>
             <button class="buy ${canUnlock?'affordable':''}" data-unlock="${def.key}" ${canUnlock?'':'disabled'}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>Freischalten</button>
@@ -29957,10 +30023,11 @@
         return `
           <div class="card-row research-locked">
             <div class="left">
-              <div class="bicon" style="background:${def.bg};"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
-              <div>
+              ${buildingIconHtml(def, {locked:true})}
+              <div style="min-width:0;">
                 <div class="bname">${def.name} <span class="lvl-pill">gesperrt</span></div>
                 <div class="bmeta">Benötigt Forschung: ${reqNames}</div>
+                ${defenseLockedPreview(def) ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${defenseLockedPreview(def)}</div>` : ''}
               </div>
             </div>
           </div>
@@ -30090,7 +30157,7 @@
       return `
         <div class="card-row${t2building?' tier2-card':''}">
           <div class="left">
-            <div class="bicon${t2building?' bicon-t2':''}" style="background:${def.bg};">${DEFENSE_CANVAS_KEYS.includes(def.key) ? `<canvas id="defIcon_${def.key}" width="40" height="40" style="display:block;"></canvas>` : iconHtmlFor(def.key, def.icon, def.fg)}</div>
+            ${buildingIconHtml(def, {tier2:t2building})}
             <div style="min-width:0;">
               <div class="bname">${def.name} <span class="lvl-pill">Lv. ${lvl}</span></div>
               <div class="prodline">${prodLine}</div>
