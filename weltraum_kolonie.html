@@ -2047,6 +2047,8 @@
         </div>
         <div id="defenseSabotageBanner" style="display:none;"></div>
         <div id="attackShieldBanner" style="display:none;"></div>
+        <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-shield-lock" aria-hidden="true"></i>Aufstellung</div>
+        <div id="defenseFormationBox"></div>
         <div id="planetSwitcherDef"></div>
         <div id="raidScoutBox"></div>
         <div id="pirateDebrisRaidBox"></div>
@@ -4215,8 +4217,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.294.0';
+  const VERSION = '8.295.0';
   const PATCHNOTES = [
+    { version:'8.295.0', date:'25.07.2026', changes:[
+      'Kampf-Tiefe, Teil 2: Ein Kampf ist kein einzelner Münzwurf mehr. Statt einmal zu würfeln laufen jetzt DREI PHASEN – Anflug, Hauptgefecht, Rückzug – und wer zwei davon gewinnt, gewinnt den Kampf. Entscheidend ist die unterschiedliche Gewichtung: Im Anflug zählen die Konterrollen anderthalbfach, im Hauptgefecht normal, im Rückzug nur halb. Wer gut zusammengestellt hat, entscheidet den Kampf früh; wer gekontert wurde, kann sich noch fangen.',
+      'Was das zahlenmäßig bedeutet: Der Spielraum bleibt exakt derselbe wie vorher (min. 5%, max. 95% Siegchance – die Phasen-Grenzen sind dafür eigens zurückgerechnet). Aber der Stärkere gewinnt verlässlicher. Bei doppelter Übermacht steigt die Siegchance von 67% auf 74%, bei dreifacher von 75% auf 84%. Bei gleicher Stärke bleibt es bei 50%. Weniger Pech, mehr Vorbereitung. Der Kampfbericht zeigt jede Phase einzeln mit ihrer eigenen Chance.',
+      'Neu für Verteidiger: die AUFSTELLUNG. Der Verteidiger hatte bisher keine einzige Entscheidung – Verteidigung war eine reine Summe aus Gebäuden und Flotte. Jetzt wählst du im Verteidigung-Tab zwischen „Ausgewogen", „Schilde vorn" (+15% gegen Bomber, -10% gegen Abfangjäger) und „Geschütze vorn" (umgekehrt). Du legst dich fest, ohne zu wissen, wer kommt – genau das ist der Preis dafür, dass die Wahl überhaupt etwas bringt.',
+      'Die Aufstellung wirkt bei NPC-Überfällen und bei Spieler-Angriffen, dort serverseitig geprüft – sonst hätte die Wahl ausgerechnet im einzigen Kampf, in dem ein echter Gegner seine Flotte wählt, keine Wirkung. Wie die Konter zählt sie anteilig: Ein einzelner Bomber in einer Abfangjäger-Flotte kippt nichts.',
+      'Vorschau und Auflösung nennen weiterhin überall dieselbe Zahl. Die angezeigte Siegchance ist jetzt die echte Phasen-Wahrscheinlichkeit („zwei von drei"), nicht mehr die eines Einzelwurfs – nachgerechnet gegen 40.000 simulierte Kämpfe.'
+    ]},
     { version:'8.294.0', date:'25.07.2026', changes:[
       'Kampf-Tiefe, Teil 1: Das Kontersystem gilt jetzt für ALLE Kampfschiffe. Bisher hatten nur vier Schiffe überhaupt eine Konterrolle (Jäger, Bomber, Kreuzer, Zerstörer) – alle 17 übrigen, inklusive sämtlicher Tier-2- und Event-Schiffe, waren konterneutral. Ausgerechnet die teuerste Flotte im Spiel war damit die einzige, die man nicht kontern konnte. Jetzt gehört jedes Kampfschiff zu einer von drei Rollen im Kreis: Abfangjäger schlagen Bomber, Bomber schlagen Großkampfschiffe, Großkampfschiffe schlagen Abfangjäger.',
       'Die Konterwirkung greift jetzt auch bei deinen eigenen Angriffen auf NPCs. Vorher rechnete das Spiel die Konter nur bei der Abwehr von Überfällen und bei Spieler-Angriffen (serverseitig) mit – deine NPC-Angriffe ignorierten sie komplett, obwohl die gegnerische Flotte in der Angriffsvorschau sichtbar ist. Vorschau, Startmeldung und Kampfauflösung nennen jetzt alle dieselbe Zahl.',
@@ -12795,6 +12804,144 @@
     if (pct <= -2) return { pct, farbe:'#e0a548', icon:'ti-alert-triangle', text:'Leichter Zusammensetzungs-Nachteil' };
     return { pct, farbe:'#7d8199', icon:'ti-arrows-shuffle', text:'Zusammensetzung neutral gegen diese Flotte' };
   }
+  // ===== Kampfphasen (25.07.2026) =====
+  // Vorher war jeder Kampf EIN Münzwurf: chance = power/(power+def), einmal würfeln, fertig. Die
+  // ganze Tiefe davor (Doktrin, Stance, Module, Konter) wurde zu einer Zahl zusammengefaltet und
+  // dann von einem einzigen Zufallswert entschieden.
+  // Jetzt drei Phasen mit UNTERSCHIEDLICHER Kontergewichtung - wer besser komponiert hat, gewinnt
+  // vor allem den Anflug; wer gekontert wurde, kann sich im Hauptgefecht noch fangen. Wer zwei der
+  // drei Phasen gewinnt, gewinnt den Kampf.
+  const BATTLE_PHASES = [
+    { key:'anflug',   name:'Anflug',       konterGewicht:1.5, icon:'ti-rocket', desc:'Auf Distanz entscheidet die Zusammensetzung am stärksten - Konter wirken hier anderthalbfach.' },
+    { key:'haupt',    name:'Hauptgefecht', konterGewicht:1.0, icon:'ti-sword',  desc:'Das eigentliche Ringen auf kurze Distanz - Konter wirken in normaler Stärke.' },
+    { key:'rueckzug', name:'Rückzug',      konterGewicht:0.5, icon:'ti-shield', desc:'Im ungeordneten Abbruch zählt kaum noch Taktik - Konter wirken nur halb.' }
+  ];
+  // Der Deckel je Phase ist so gewählt, dass der Kampf INSGESAMT denselben Zufallsspielraum behält
+  // wie vorher (min. 5%, max. 95% Siegchance). "Zwei von drei" verschärft die Wahrscheinlichkeit:
+  // p_gesamt = 3p²(1-p) + p³. Bei p=0,14 ergibt das 5,3%, bei p=0,86 ergibt das 94,7% - also
+  // praktisch exakt die früheren Grenzen. Wer hier an den Phasen-Deckeln dreht, verschiebt damit
+  // auch die Gesamtgrenzen und muss sie neu ausrechnen.
+  const PHASE_CHANCE_MIN = 0.14, PHASE_CHANCE_MAX = 0.86;
+  // basePower MUSS die Angriffskraft OHNE Konterwirkung sein - die wird hier je Phase eigen
+  // gewichtet. Wer schon multipliziert übergibt, zählt den Konter doppelt.
+  // Signatur bewusst identisch zum Backend (server.js) - inklusive der optionalen Deckel, auch
+  // wenn das Frontend praktisch immer seine eigenen Konstanten nutzt. Gleiche Form auf beiden
+  // Seiten heisst, dass der Paritaetstest dieselbe Funktion mit denselben Argumenten aufrufen kann.
+  function resolveBattlePhases(basePower, defense, counterMult, minC, maxC, rng){
+    const min = (typeof minC === 'number') ? minC : PHASE_CHANCE_MIN;
+    const max = (typeof maxC === 'number') ? maxC : PHASE_CHANCE_MAX;
+    const wurf = rng || Math.random;
+    const mult = (typeof counterMult === 'number' && counterMult > 0) ? counterMult : 1;
+    const phasen = [];
+    let siege = 0;
+    for (const ph of BATTLE_PHASES){
+      const p = Math.max(0, basePower * (1 + (mult - 1) * ph.konterGewicht));
+      const roh = (p + defense) > 0 ? p/(p+defense) : 0;
+      const chance = Math.max(min, Math.min(max, roh));
+      const gewonnen = wurf() < chance;
+      if (gewonnen) siege++;
+      phasen.push({ key:ph.key, name:ph.name, icon:ph.icon, chance, gewonnen, power: Math.round(p) });
+    }
+    return { success: siege >= 2, siege, phasen };
+  }
+  // Gesamt-Siegchance analytisch (zwei von drei) - für Vorschau und Bericht, ohne zu würfeln.
+  function battleWinChance(basePower, defense, counterMult, minC, maxC){
+    const min = (typeof minC === 'number') ? minC : PHASE_CHANCE_MIN;
+    const max = (typeof maxC === 'number') ? maxC : PHASE_CHANCE_MAX;
+    const mult = (typeof counterMult === 'number' && counterMult > 0) ? counterMult : 1;
+    const ps = BATTLE_PHASES.map(ph => {
+      const p = Math.max(0, basePower * (1 + (mult - 1) * ph.konterGewicht));
+      const roh = (p + defense) > 0 ? p/(p+defense) : 0;
+      return Math.max(min, Math.min(max, roh));
+    });
+    // Genaue Wahrscheinlichkeit für "mindestens 2 von 3" bei unterschiedlichen Einzelchancen.
+    const [a,b,c] = ps;
+    return a*b*(1-c) + a*(1-b)*c + (1-a)*b*c + a*b*c;
+  }
+  // ===== Verteidigungs-Aufstellung (25.07.2026) =====
+  // Der Verteidiger hatte bisher KEINE einzige Entscheidung: Verteidigung war eine reine Summe über
+  // Gebäude und Flotte. Angreifen war taktisch, Verteidigen war Buchhaltung.
+  // Die Aufstellung ist das Gegenstück zur Konterrolle des Angreifers - man legt sich vorab fest,
+  // gegen welche Art Flotte man gerüstet sein will, ohne zu wissen, wer kommt. Wirkt in derselben
+  // Größenordnung wie die Konter (deutlich spürbar, aber nie entscheidend allein).
+  const DEFENSE_FORMATIONS = [
+    { key:'ausgewogen', name:'Ausgewogen', icon:'ti-shield', stark:null, schwach:null,
+      desc:'Keine Schwerpunkte: die Verteidigung steht gegen jede Angriffsflotte gleich gut, holt aber gegen keine etwas heraus. Die sichere Wahl, wenn du nicht weißt, wer kommt.' },
+    { key:'schilde', name:'Schilde vorn', icon:'ti-shield-lock', stark:'bomber', schwach:'abfang',
+      desc:'Schildgeneratoren nach vorn, Geschütze in zweiter Reihe: hält den schweren Waffen der Bomber deutlich besser stand (+15%), lässt aber wendigen Abfangjägern Lücken (-10%).' },
+    { key:'geschuetze', name:'Geschütze vorn', icon:'ti-target', stark:'abfang', schwach:'bomber',
+      desc:'Flak und schnelle Geschütze nach vorn: fegt Abfangjäger-Schwärme vom Himmel (+15%), bietet den schweren Bombern dafür mehr Angriffsfläche (-10%).' }
+  ];
+  const FORMATION_BONUS = 0.15, FORMATION_MALUS = 0.10;
+  function activeFormationKey(){ return (state && state.defenseFormation) || 'ausgewogen'; }
+  function formationDef(key){ return DEFENSE_FORMATIONS.find(f => f.key === (key || activeFormationKey())) || DEFENSE_FORMATIONS[0]; }
+  // Wie die Konter anteilsgewichtet: eine Aufstellung wirkt genau so stark, wie die passende Rolle
+  // in der Angreiferflotte vertreten ist. Ein einzelner Bomber kippt also nichts.
+  function formationDefenseMult(attackerFleet, formationKey){
+    const f = formationDef(formationKey);
+    if (!f || !f.stark || !attackerFleet) return 1;
+    let total = 0; const perRole = {};
+    for (const [k, atk] of Object.entries(COUNTER_ROLE_ATK)){
+      const rolle = COUNTER_ROLE_OF[k]; if (!rolle) continue;
+      const n = attackerFleet[k]||0; if (!(n>0)) continue;
+      const g = n * (atk||1);
+      perRole[rolle] = (perRole[rolle]||0) + g; total += g;
+    }
+    if (total <= 0) return 1;
+    const anteilStark = (perRole[f.stark]||0)/total;
+    const anteilSchwach = (perRole[f.schwach]||0)/total;
+    return 1 + anteilStark*FORMATION_BONUS - anteilSchwach*FORMATION_MALUS;
+  }
+  // Signatur-Cache-Muster (kein Live-Countdown in dieser Box).
+  let lastFormationSig = null;
+  function renderDefenseFormationBox(){
+    const box = document.getElementById('defenseFormationBox');
+    if (!box) return;
+    const aktiv = activeFormationKey();
+    const sig = aktiv;
+    if (sig === lastFormationSig) return;
+    lastFormationSig = sig;
+    box.innerHTML = DEFENSE_FORMATIONS.map(f => {
+      const an = f.key === aktiv;
+      return `<div class="card-row" data-formation="${f.key}" style="cursor:pointer; ${an?'border-color:#5dcaa5; background:rgba(93,202,165,0.10);':''}">
+        <div class="left">
+          <div class="bicon" style="background:rgba(93,202,165,${an?'0.22':'0.10'}); color:${an?'#5dcaa5':'#7d8199'};"><i class="ti ${f.icon}" aria-hidden="true"></i></div>
+          <div>
+            <div class="bname">${f.name}${an?' <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">aktiv</span>':''}</div>
+            <div class="bmeta">${f.desc}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('') + `<div class="bmeta" style="margin-top:6px;">Die Aufstellung gilt für <strong>alle</strong> deine Planeten und wirkt nur gegen Angriffe – je nachdem, woraus die Angriffsflotte besteht. Du legst dich fest, ohne zu wissen, wer kommt: Das ist der Preis dafür, dass sie überhaupt etwas bringt.</div>`;
+    box.querySelectorAll('[data-formation]').forEach(el => {
+      el.onclick = () => {
+        const k = el.getAttribute('data-formation');
+        if (k === activeFormationKey()) return;
+        state.defenseFormation = k;
+        lastFormationSig = null;
+        const f = formationDef(k);
+        log('Verteidigungs-Aufstellung geändert: '+f.name+'.', f.icon, 'info');
+        render(); save();
+      };
+    });
+  }
+  function formationReportLine(formationKey, mult){
+    const f = formationDef(formationKey);
+    if (!f || !f.stark || !(mult > 0) || mult === 1) return '';
+    const pct = Math.round((mult-1)*100);
+    const farbe = pct > 0 ? '#5dcaa5' : (pct < 0 ? '#e24b4a' : '#7d8199');
+    return '<br><i class="ti '+f.icon+'" aria-hidden="true" style="color:'+farbe+';"></i> Aufstellung „'+f.name+'": '
+      + '<span style="color:'+farbe+';">'+(pct>0?'+':'')+pct+'% Verteidigung</span> gegen diese Angriffsflotte.';
+  }
+  function battlePhaseReportHtml(phasen){
+    if (!phasen || !phasen.length) return '';
+    const teile = phasen.map(p =>
+      '<span style="white-space:nowrap;"><i class="ti '+p.icon+'" aria-hidden="true" style="color:'+(p.gewonnen?'#5dcaa5':'#e24b4a')+';"></i> '
+      + p.name + ' ' + (p.gewonnen?'gewonnen':'verloren') + ' <span style="color:#7d8199;">(~'+Math.round(p.chance*100)+'%)</span></span>'
+    ).join(' · ');
+    const siege = phasen.filter(p=>p.gewonnen).length;
+    return '<br>Kampfverlauf ('+siege+' von 3 Phasen gewonnen): '+teile;
+  }
   function counterReportLine(mult){
     const v = counterVerdict(mult);
     // Exakt 1.0 heißt "kein Gegner-Flottenwissen" (z.B. Piratennest) - dann gar nichts schreiben,
@@ -14735,7 +14882,12 @@
     const factionName = state.incomingRaid ? state.incomingRaid.faction : 'Unbekannte Flotte';
     const isSuper = !!(state.incomingRaid && state.incomingRaid.superAttack);
     playAlarmSound(); // Alarm ertönt immer, sobald ein Überfall tatsächlich stattfindet – unabhängig vom Ausgang
-    const repelChance = Math.max(0.1, Math.min(0.9, dp/(dp+raiderPower)));
+    // Verteidigungs-Aufstellung (25.07.2026): Hier zahlt sich die Wahl des Verteidigers aus - je
+    // nachdem, woraus die Raider-Flotte besteht, traegt die gewaehlte Aufstellung besser oder
+    // schlechter. Anteilsgewichtet wie die Konter, ein einzelnes Schiff kippt nichts.
+    const formationMult = formationDefenseMult(raiderFleet);
+    const dpMitAufstellung = Math.round(dp * formationMult);
+    const repelChance = Math.max(0.1, Math.min(0.9, dpMitAufstellung/(dpMitAufstellung+raiderPower)));
     let builtReport = null;
     let raidShipsDestroyed = 0; // Schiffe, die in DIESEM Gefecht zerstört wurden (Raider bei Abwehr bzw. eigene bei erfolgreichem Überfall) - steuert die verlängerte Erholungspause unten
     if (Math.random() < repelChance){
@@ -14750,7 +14902,7 @@
       const raidDebris = combatDebrisOf(lostRaiderShips);
       log('Verteidigung von '+planetDisplayName(targetPlanet)+' hat den Überfall von '+factionName+' erfolgreich abgewehrt.'+(lostText?' Zerstört: '+lostText+'. Trümmerfeld hinterlassen.':''), 'ti-shield-lock');
       addVeteranXp(targetPlanet, 12);
-      builtReport = { type:'raid', result:'win', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dp, defenseAttackPower:defAtk, defenseBefore:defBreakdown, fleet:raiderFleet, destroyedShips:lostRaiderShips, debris:raidDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
+      builtReport = { type:'raid', result:'win', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dpMitAufstellung, formation:activeFormationKey(), formationMult, defenseAttackPower:defAtk, defenseBefore:defBreakdown, fleet:raiderFleet, destroyedShips:lostRaiderShips, debris:raidDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
       // pushReport erst nach dem Erholungspausen-Block unten, damit recoveryPauseMs noch mit in den Bericht wandert.
     } else {
       let lossPct = Math.max(0.05, Math.min(isSuper?0.5:0.35, raiderPower/(raiderPower+dp*2)));
@@ -14798,7 +14950,7 @@
       }
       logScoreChange(-Math.round(totalLost/25), (isSuper?'Superangriff':factionName+'-Überfall')+' auf '+planetDisplayName(targetPlanet)+' – ~'+Math.round(lossPct*100)+'% Ressourcen verloren', 'ti-alert-triangle');
       log(factionName+'-Überfall auf '+planetDisplayName(targetPlanet)+' erfolgreich! Rund '+Math.round(lossPct*100)+'% der Ressourcen verloren. '+victim.name+' dort läuft 15 Min. mit -40% Produktion (sabotiert).'+ownLossText, 'ti-alert-triangle');
-      builtReport = { type:'raid', result:'loss', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dp, defenseBefore:defBreakdown, lossPct:Math.round(lossPct*100), lostResources, sabotagedBuilding:victim.name, fleet:raiderFleet, ownLostShips:ownLostShipsForReport, ownLossDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
+      builtReport = { type:'raid', result:'loss', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dpMitAufstellung, formation:activeFormationKey(), formationMult, defenseBefore:defBreakdown, lossPct:Math.round(lossPct*100), lostResources, sabotagedBuilding:victim.name, fleet:raiderFleet, ownLostShips:ownLostShipsForReport, ownLossDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
       // pushReport erst nach dem Erholungspausen-Block unten, damit recoveryPauseMs noch mit in den Bericht wandert.
     }
     if (state.incomingRaid && state.incomingRaid.scoutArrival && !state.incomingRaid.scouted){
@@ -19068,6 +19220,8 @@
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Zwei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, und <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet. Kampfschiffe haben jetzt zusätzlich eine echte <strong>Verteidigungsspezialisierung</strong>, unabhängig von der Angriffskraft: Jäger/Bomber/Träger/Zerstörer sind offensiv ausgerichtet und dadurch fragiler in der Verteidigung, Wächter und Schlachtschiff (inkl. Superschlachtschiff) sind gepanzerte Verteidigungsspezialisten. Eine reine Angriffsflotte verteidigt sich also spürbar schlechter als eine gemischte oder auf Wächter/Schlachtschiffe setzende Flotte.' },
       { title:'Konterrollen (Schere-Stein-Papier)', body:'Jedes Kampfschiff gehört zu einer von drei <strong>Konterrollen</strong>, die im Kreis stehen: <strong>Abfangjäger</strong> schlagen <strong>Bomber</strong>, Bomber schlagen <strong>Großkampfschiffe</strong>, Großkampfschiffe schlagen Abfangjäger. Die Rolle steht auf jeder Schiffskarte in der Werft (Tooltip erklärt, wogegen sie stark und schwach ist). Trifft deine Flotte auf viele Schiffe, die sie kontert, steigt die Angriffskraft um bis zu <strong>+25%</strong>; triffst du auf deine Gegenrolle, sinkt sie um bis zu <strong>-15%</strong>. Der Effekt richtet sich nach dem <em>Anteil</em> der jeweiligen Rolle an der Gegnerflotte – ein einzelnes Schiff kippt also nichts. Wirksam überall dort, wo die gegnerische Zusammensetzung bekannt ist: bei Angriffen auf <strong>Spieler</strong> (Aufklärung zeigt sie dir), auf <strong>NPCs</strong> (steht in der Angriffsvorschau) und bei der Abwehr von Überfällen. Bei Piratennestern gilt stattdessen die dort ausgewiesene Schwachstelle. Im Kampfbericht steht, wie stark der Konter tatsächlich gewirkt hat.' },
+      { title:'Kampfphasen', body:'Ein Kampf wird nicht mehr mit einem einzigen Wurf entschieden, sondern in <strong>drei Phasen</strong>: <strong>Anflug</strong>, <strong>Hauptgefecht</strong> und <strong>Rückzug</strong>. Wer zwei der drei Phasen gewinnt, gewinnt den Kampf. Der Clou ist die unterschiedliche Gewichtung: Im Anflug zählen die Konterrollen <strong>anderthalbfach</strong>, im Hauptgefecht normal, im Rückzug nur halb. Eine gut zusammengestellte Flotte entscheidet den Kampf also früh; wer gekontert wurde, kann sich im weiteren Verlauf noch fangen. <strong>Was sich dadurch ändert:</strong> Der Gesamt-Spielraum bleibt gleich (min. 5%, max. 95% Siegchance), aber der Stärkere gewinnt <em>verlässlicher</em> – bei doppelter Übermacht steigt die Siegchance von 67% auf 74%, bei dreifacher von 75% auf 84%. Weniger Zufall, mehr Vorbereitung. Der Kampfbericht zeigt jede Phase einzeln.' },
+      { title:'Verteidigungs-Aufstellung', body:'Im Verteidigung-Tab wählst du eine <strong>Aufstellung</strong>, die für alle deine Planeten gilt: <strong>Ausgewogen</strong> (keine Schwerpunkte, wirkt nie), <strong>Schilde vorn</strong> (+15% gegen Bomber, -10% gegen Abfangjäger) oder <strong>Geschütze vorn</strong> (+15% gegen Abfangjäger, -10% gegen Bomber). Sie ist das Gegenstück zur Konterrolle des Angreifers – nur legst du dich fest, <em>ohne</em> zu wissen, wer kommt. Genau das ist der Preis dafür, dass sie überhaupt etwas bringt. Wie die Konter wirkt sie anteilig: Ein einzelner Bomber in einer Abfangjäger-Flotte kippt nichts. Wirkt bei NPC-Überfällen und bei Spieler-Angriffen (dort serverseitig geprüft). Im Kampfbericht steht, wie stark deine Aufstellung gegen die konkrete Angriffsflotte getragen hat.' },
       { title:'Flottenaufbau & Kampfbonus-Deckel', body:'<strong>Flottenaufbau:</strong> Wie gleichmäßig sich die Angriffskraft deiner Flotte über die drei Konterrollen verteilt, gibt bis zu <strong>+8%</strong> Angriffs- UND Verteidigungskraft – volle Prämie bei einer zu Dritteln ausgewogenen Flotte, nichts bei einer reinen Ein-Rollen-Flotte. Gewichtet wird nach Angriffskraft, nicht nach Stückzahl: ein einzelnes Alibi-Schiff macht eine Flotte nicht ausgewogen. Damit hast du eine echte Wahl: <strong>ausgewogen</strong> bringt die sichere Prämie, ist aber konterneutral; <strong>spezialisiert</strong> verzichtet darauf und holt dafür beim richtigen Ziel bis zu +25% Konterbonus (beim falschen -15%). Aufklären lohnt sich also. Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
       { title:'Flaggschiff', body:'Im <strong>Offiziere-Tab</strong> baust du dein <strong>einzigartiges Flaggschiff</strong> – ein Kapitalschiff getrennt von der Massenflotte, das nicht zerstört werden kann und keine Slots belegt. Jede Ausbaustufe (max. 20) gibt <strong>+1,5% Angriffs- UND Verteidigungskraft</strong>, die in die gedeckelte Kampf-Bonus-Gruppe einfließt (siehe „Flottenvielfalt & Kampfbonus-Deckel"). Bau und Ausbau kosten Ressourcen + Kredite (steigend je Stufe). Du kannst deinem Flaggschiff einen eigenen Namen geben. Es <strong>überlebt einen Prestige-Reset</strong> (wie Offiziere und Module); erst ein Aufstieg (Transzendenz) setzt es zurück.' },
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
@@ -19491,6 +19645,7 @@
         body = (r.targetPlanet ? 'Angegriffener Planet: <strong>'+planetDisplayName(r.targetPlanet)+'</strong><br>' : '') + 'Angriffspunkte des Gegners: ~'+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
         body += '<br>Angegriffen mit: '+fleetBreakdownHtml(r.fleet);
         if (r.defenseBefore) body += '<br>Deine Verteidigung: '+defenseBreakdownHtml(r.defenseBefore, null);
+        body += formationReportLine(r.formation, r.formationMult);
         if (won){
           if (r.destroyedShips && Object.keys(r.destroyedShips).length){
             body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstört: '+lostCountsToText(r.destroyedShips)+' (Trümmerfeld hinterlassen)';
@@ -19604,6 +19759,7 @@
           body += '<br>Schwachstelle des Gegners: '+(weaknessNameMap[r.weaknessType]||shipDisplayName(r.weaknessType))+(r.hasWeakness?' (ausgenutzt, +25% Angriffskraft)':' (nicht mitgeführt)');
         }
         body += counterReportLine(r.counterMult);
+        body += battlePhaseReportHtml(r.phasen);
         if (r.loot){
           body += '<br>Beute: '+rewardHtml(r.loot);
           if (r.cargoCapacity <= 0) body += '<br><span style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Keine Frachter mitgeführt – Beute ging verloren!</span>';
@@ -26317,8 +26473,13 @@
           const lairHasWeakness = fleetHasShipType(attackComposition, lairWeakness);
           let power = m.power || attackPower(fleet);
           if (lairHasWeakness) power *= 1.25;
-          const chance = Math.max(0.05, Math.min(0.95, power/(power+lairDef))) * (lairHasWeakness?1.1:1);
-          const success = Math.random() < chance;
+          // Auch hier drei Phasen. Die Kontergewichtung bleibt neutral (1), weil ein Piratennest
+          // keine modellierte Flotte hat - die Phasen wirken hier also nur als ruhigerer Verlauf,
+          // nicht als Zusammensetzungs-Entscheidung. Der Schwachstellen-Bonus zaehlt wie bisher.
+          const lairPhasenBasis = power * (lairHasWeakness ? 1.1 : 1);
+          const lairPhasen = resolveBattlePhases(lairPhasenBasis, lairDef, 1);
+          const chance = battleWinChance(lairPhasenBasis, lairDef, 1);
+          const success = lairPhasen.success;
           const flightTime = Math.round(((m.endTime-(m.startTime||m.endTime))/1000) || 0);
           const lairLabel = pirateLairName(stage);
           if (success){
@@ -26369,7 +26530,7 @@
             const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
             if (showLog !== false) log('Sieg gegen '+lairLabel+'! +'+creditsGain+' Kredite.'+cargoNote+moduleMsg+(ownLostLairText?' Eigene Verluste: '+ownLostLairText+'.':'')+stageMsg, 'ti-sword');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair };
+            const __battleReport = { type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, phasen: lairPhasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -26382,7 +26543,7 @@
             const lostText = lostCountsToText(lostShips);
             if (showLog !== false) log('Niederlage gegen '+lairLabel+'.'+(lostText?' Verluste: '+lostText+'.':'')+' Das Versteck bleibt auf Stufe '+stage+' - rüste auf und versuche es erneut.', 'ti-alert-triangle');
             playSound('lose');
-            const __battleReport = { type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:lostShips };
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, phasen: lairPhasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:lostShips };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
@@ -26504,6 +26665,9 @@
           // Zusammensetzungs-Bonus doppelt zählen.
           const npcCounterFleet = m.npcFleet || npcFleetFor(npc).fleet;
           const npcCounterMult = counterMultiplier(m.composition || fleet, npcCounterFleet);
+          // power bleibt hier bewusst OHNE Konter - resolveBattlePhases() gewichtet ihn je Phase
+          // selbst. Nur für Anzeige/Bericht wird der einfach gewichtete Wert mitgeführt.
+          const powerRoh = power;
           power = Math.round(power * npcCounterMult);
           const df = deployableFighters(fleet);
           const hasWeakness = (npc.weakness==='jaeger' && df.jaeger>0) || (npc.weakness==='bomber' && df.bomber>0) ||
@@ -26515,9 +26679,13 @@
             // Forschungsvoraussetzung.
             (npc.weakness==='leerenjaeger' && ((fleet.leerenjaeger||0)>0 || (fleet.riftwaechter||0)>0));
           if (hasWeakness) power *= 1.25;
-          const chance = Math.max(0.05, Math.min(0.95, power/(power+effDefense))) * (hasWeakness?1.1:1);
-          const roll = Math.random();
-          const success = roll < Math.min(0.97, chance);
+          // Kampfphasen (25.07.2026): drei Wuerfe mit unterschiedlicher Kontergewichtung statt
+          // einem. Die ausgenutzte Schwachstelle wirkt weiterhin als flacher Aufschlag auf die
+          // Grundkraft - sie beschreibt eine Luecke des Gegners, keine Zusammensetzungsfrage.
+          const phasenBasis = powerRoh * (hasWeakness ? 1.25 : 1) * (hasWeakness ? 1.1 : 1);
+          const phasenErgebnis = resolveBattlePhases(phasenBasis, effDefense, npcCounterMult);
+          const chance = battleWinChance(phasenBasis, effDefense, npcCounterMult);
+          const success = phasenErgebnis.success;
           const flightTime = Math.round(((m.endTime-(m.startTime||m.endTime))/1000) || 0);
           if (success){
             const factor = (0.7 + Math.random()*0.3) * (hasWeakness?1.25:1);
@@ -26573,7 +26741,7 @@
             const destroyedNpcText = lostCountsToText(destroyedNpcShips);
             if (showLog !== false) log('Sieg gegen '+npc.name+'! ('+planetDisplayName(planetKey)+')'+(hasWeakness?' Schwachstelle ausgenutzt.':'')+(destroyedNpcText?' Zerstörte Gegner-Schiffe: '+destroyedNpcText+'.':'')+' Trümmerfeld hinterlassen.'+cargoNote+(ownLostWinText?' Eigene Verluste: '+ownLostWinText+'.':'')+' '+npc.name+' wird ab jetzt härter und lohnender.', 'ti-sword');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin };
+            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(chance*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, phasen: phasenErgebnis.phasen, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -26589,7 +26757,7 @@
             const ownLostLossText = lostCountsToText(ownLostLoss);
             const ownLossDebrisLoss = combatDebrisOf(ownLostLoss);
             if (showLog !== false) log('Angriff auf '+npc.name+' gescheitert. Flotte kehrt nach '+planetDisplayName(planetKey)+' zurück.'+(ownLostLossText?' Verluste: '+ownLostLossText+'. Trümmerfeld hinterlassen.':'')+(retreatNpc.retreated?' Ein Teil der Flotte konnte sich rechtzeitig zurückziehen.':''), 'ti-shield');
-            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(Math.min(0.97,chance)*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, fleet:m.composition||fleet, npcFleet: m.npcFleet || npcFleetFor(npc).fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(chance*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, phasen: phasenErgebnis.phasen, fleet:m.composition||fleet, npcFleet: m.npcFleet || npcFleetFor(npc).fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
@@ -33297,7 +33465,9 @@
       const plAttackFleet = buildAttackFleet(state.activeBasePlanet, cf);
       const plSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(plAttackFleet[k]||0),0);
       const plPower = attackPower(plAttackFleet, state.activeBasePlanet);
-      const plChance = plSelected > 0 ? Math.max(0.05, Math.min(0.95, plPower/(plPower+lairDef))) : 0;
+      // Gleiche Rechnung wie die Auflösung (Phasen, Konter neutral) - sonst weicht die
+      // angezeigte Siegchance vom tatsächlichen Kampf ab.
+      const plChance = plSelected > 0 ? battleWinChance(plPower, lairDef, 1) : 0;
       const plBusy = cf.missions.some(m=>m.type==='piratelair');
       const plLoot = pirateLairLoot(stage);
       const plCan = !plBusy && plSelected > 0;
@@ -33329,11 +33499,14 @@
       // Kampf dieselbe Funktion benutzen.
       const npcFleetPreview = npcFleetFor(n).fleet;
       const npcCounterPreview = counterMultiplier(attackFleet, npcFleetPreview);
-      const power = Math.round(attackPower(attackFleet) * npcCounterPreview);
+      const powerRohPreview = attackPower(attackFleet);
+      const power = Math.round(powerRohPreview * npcCounterPreview);
       const effDefense = npcEffectiveDefense(n);
       const effLoot = npcEffectiveLoot(n);
       const wins = npcScalingCount(n.id);
-      const chance = Math.round(Math.max(0.05, Math.min(0.95, power/(power+effDefense)))*100);
+      // Dieselbe Rechnung wie die Auflösung (resolveBattlePhases/battleWinChance) - "zwei von drei
+      // Phasen" ergibt eine andere Zahl als ein einzelner Wurf, und die Karte muss die echte nennen.
+      const chance = Math.round(battleWinChance(powerRohPreview, effDefense, npcCounterPreview)*100);
       const flightTime = missionDurationFor(n.duration, attackFleet, ATTACK_SHIP_KEYS, n.system);
       const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
@@ -33364,6 +33537,7 @@
     document.getElementById('heroDefense').textContent = defensePower(state.activeBasePlanet);
     const dcv = document.getElementById('defenseCentralValue');
     if (dcv) dcv.textContent = defensePower(state.activeBasePlanet);
+    renderDefenseFormationBox();
     const dsb = document.getElementById('defenseSabotageBanner');
     if (dsb){
       const ds = state.defenseSabotage && state.defenseSabotage.until > Date.now() ? state.defenseSabotage : null;
