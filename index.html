@@ -4251,8 +4251,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.13';
+  const VERSION = '8.298.14';
   const PATCHNOTES = [
+    { version:'8.298.14', date:'25.07.2026', changes:[
+      'Zwei Sicherheitsnetze für Expeditionen. Der neue Schalter <strong>„Bei Feindkontakt abbrechen"</strong> über dem Startknopf lässt die Expedition sofort abdrehen, sobald sie auf eine feindliche Flotte trifft: keine Beute, aber garantiert keine Verluste. Aus dem Risiko wird damit eine bewusste Entscheidung statt eines Würfelwurfs.',
+      'Die Einstellung wird beim Start in die Mission eingebacken – legst du den Schalter später um, gilt das erst für die nächste Expedition und ändert nichts an bereits fliegenden. Ein Rückzug zählt bewusst nicht als abgeschlossene Expedition, der Erfahrungsbonus lässt sich damit also nicht erschleichen.',
+      'Neu ist außerdem die <strong>Rettungskapsel</strong>: Ging eine Begegnung schief, war das Forschungsschiff bisher in jedem Fall verloren – auch beim eigentlich glimpflichen „geschwächt". Jetzt kommt es mit 35% Wahrscheinlichkeit durch, und jede Stufe der Forschung Expeditionsanalytik hebt das um 3 Prozentpunkte an, gedeckelt bei 75%.',
+      'Kampfbericht, Ereignisprotokoll und die Ergebnistexte melden beide Fälle jetzt korrekt – ein gerettetes Forschungsschiff wird nicht länger als Verlust gebucht.'
+    ]},
     { version:'8.298.13', date:'25.07.2026', changes:[
       'Das Galaktische Kompendium im Fortschritt-Tab hat drei neue Kategorien und damit acht statt fünf: <strong>Schiffsregister</strong> (Schiffstypen in deinem Besitz), <strong>Modulkabinett</strong> (Standort-Modularten im Inventar oder eingebaut) und <strong>Gebäudearchiv</strong> (Gebäudearten, die irgendwo bei dir stehen). Jede bringt bei Vollständigkeit einmalig 5 Sternenessenz und 1.000 Kredite.',
       'Wie die bisherigen fünf werden auch sie ausschließlich aus vorhandenen Spielstandsdaten berechnet – es läuft kein neuer Zähler mit, dein bisheriger Fortschritt zählt also rückwirkend voll mit. Kolonien werden dabei ebenso berücksichtigt wie die Heimatbasis.',
@@ -12053,6 +12059,17 @@
   // auf einem Niveau, das eine ordentliche Eskorte sicher beherrscht.
   const EXPEDITION_ENEMY_SCORE_FACTOR = 0.03;
   const EXPEDITION_ENEMY_SCORE_CAP = 2500;
+  // Rettungskapsel (25.07.2026, Inhaltspaket 4/5): Das Forschungsschiff ist das eigentliche
+  // Expeditionsschiff und ging bei JEDEM schlechten Ausgang sicher verloren - auch beim bloss
+  // "geschwaechten", der ansonsten glimpflich ist. Das war der Ausgang, der eine Serie besonders
+  // zermuerbend macht, weil man staendig nachbaut. Jetzt gibt es eine Grundchance, dass die Kapsel
+  // die Besatzung samt Schiff herausbringt; die Forschung Expeditionsanalytik hebt sie an, gedeckelt
+  // deutlich unter 100% - das Forschungsschiff bleibt ein echter Einsatz.
+  const RETTUNGSKAPSEL_BASIS = 0.35, RETTUNGSKAPSEL_PRO_STUFE = 0.03, RETTUNGSKAPSEL_DECKEL = 0.75;
+  function rettungskapselChance(){
+    return Math.min(RETTUNGSKAPSEL_DECKEL, RETTUNGSKAPSEL_BASIS + (state.research.rexpedition||0)*RETTUNGSKAPSEL_PRO_STUFE);
+  }
+  function rettungskapselGreift(){ return Math.random() < rettungskapselChance(); }
   const EXPEDITION_SHIP_KEYS = ['forscher','spaeher','jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','kometenjaeger','enterschiff','phantomschiff','riftwaechter','frachter','frachtergross'];
   const ESCORT_KEYS = EXPEDITION_SHIP_KEYS.filter(k=>k!=='forscher');
   let expeditionEscortSelection = {};
@@ -16228,6 +16245,7 @@
     if (state.freeDoctrineSwitch === undefined) state.freeDoctrineSwitch = false;
     if (!state.codexClaimed || typeof state.codexClaimed !== 'object') state.codexClaimed = {};
     if (!Number.isFinite(state.expeditionSafeRuns)) state.expeditionSafeRuns = 0;
+    if (state.expeditionWithdraw === undefined) state.expeditionWithdraw = false;
     if (!state.seenTabHints || typeof state.seenTabHints !== 'object') state.seenTabHints = {};
     if (state.referredBy === undefined) state.referredBy = null;
     if (state.referralRedeemed === undefined) state.referralRedeemed = false;
@@ -19658,6 +19676,7 @@
       { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig unterwegs befindliche Flottenmissionen, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren, Spionage UND Flottenverlegungen zwischen eigenen Planeten - ein per "Verband versenden" gemeinsam losgeschickter Verband zählt dabei nur als EIN Slot, unabhängig davon, wie viele Schiffstypen er enthält. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
       { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
       { title:'Expeditionstypen, Wagnis & Eskorte', body:'Vor dem Start wählst du <strong>Expeditionstyp</strong>, <strong>Wagnis</strong> und <strong>Eskorte</strong> – alle drei formen Risiko und Beute. <strong>Typen:</strong> Kurz (schnell/sicher, wenig), Standard (ausgewogen), Tiefenraum (lang/riskant, viel) sowie drei spezialisierte: <strong>Bergungsexpedition</strong> (viel mehr Module und verlassene Schiffe, weniger Rohstoffe), <strong>Forschungsexpedition</strong> (viel mehr Items/Fragmente/Materialien und bevorzugt Forschungspunkte, kaum Rohstoffe) und <strong>Schürfexpedition</strong> (fast nur Rohstoffe, sehr sicher). <strong>Wagnis-Regler:</strong> Vorsichtig (−30% Begegnungsrisiko, −15% Beute), Normal, oder Wagemutig (+40% Risiko, +35% Beute). <strong>Eskorte:</strong> Kampfschiffe entscheiden, wie eine Begegnung <em>ausgeht</em> (die Wahrscheinlichkeit, überhaupt auf jemanden zu treffen, hängt nur vom Typ, vom Wagnis und vom Modul „Eskorten-Leitsystem" ab); <strong>Spähschiffe</strong> tragen keine Kampfkraft bei, verbessern aber gezielt die Ausbeute (mehr Sonderfunde und bessere Fund-Qualität); <strong>Frachter/Große Frachter</strong> erweitern den Frachtraum für große Ressourcenfunde.' },
+      { title:'Rückzug & Rettungskapsel', body:'Zwei Sicherheitsnetze für vorsichtige Kommandanten. Der Schalter <strong>„Bei Feindkontakt abbrechen"</strong> über dem Startknopf legt fest, dass die Expedition sofort abdreht, sobald sie auf eine feindliche Flotte trifft: keine Beute, aber garantiert keine Verluste – und die Expedition zählt dann auch nicht als abgeschlossen, der Erfahrungsbonus lässt sich damit also nicht erschleichen. Die Einstellung wird beim <strong>Start</strong> in die Mission eingebacken; änderst du den Schalter, gilt das erst für die nächste Expedition, nicht für bereits fliegende. Unabhängig davon gibt es die <strong>Rettungskapsel</strong>: Geht eine Begegnung schief, hatte das Forschungsschiff bisher keine Überlebenschance. Jetzt kommt es mit 35% Wahrscheinlichkeit durch, und jede Stufe der Forschung <strong>Expeditionsanalytik</strong> hebt das um 3 Prozentpunkte an, gedeckelt bei 75% – ein Forschungsschiff mitzuschicken bleibt also ein echter Einsatz, nur kein sicherer Totalverlust mehr.' },
       { title:'Was bei einer Begegnung passiert', body:'Trifft eine Expedition auf eine feindliche Flotte, entscheidet allein das <strong>Kräfteverhältnis</strong> zwischen deiner Eskorte und dem Gegner über den Ausgang – es gibt drei: <strong>abgewehrt</strong> (keine Verluste, volle Beute), <strong>geschwächt</strong> (das Forschungsschiff geht verloren, die Beute schrumpft auf 40%) und <strong>schwerer Verlust</strong> (Forschungsschiff plus 50–80% der Eskorte, keine Beute – der Rest der Eskorte setzt sich ab). Die Eskorte wirkt dabei stark überproportional: Bei ausgeglichenen Kräften liegt das Risiko eines schweren Verlusts bei rund 10%, bei deutlicher Überlegenheit unter 2%, ohne jede Eskorte dagegen bei 40%. Es lohnt sich also, lieber eine ordentliche Eskorte mitzuschicken als gar keine – anders als früher vervielfacht eine größere Eskorte den zu erwartenden Verlust nicht, sondern senkt ihn. Die Stärke der Gegner wächst mit deinem Punktestand, aber nur bis zu einer festen Obergrenze; ein gut ausgebautes Imperium wächst also aus dem Risiko heraus. Verlorene Schiffe hinterlassen ein <strong>Trümmerfeld</strong> am Startplaneten, das sich mit Recyclern bergen lässt, und <strong>Hyperjäger</strong> in der Eskorte senken die eigenen Verluste um 3% je Stück (max. −30%).' },
       { title:'Expeditions-Kette & Kodex', body:'<strong>Sternenkarten-Fragmente</strong> tauchen gelegentlich als Sonderfund auf. Hast du drei gesammelt, sind die Koordinaten eines verschollenen <strong>Schatzdepots</strong> vollständig – deine nächste erfolgreiche Expedition birgt dann garantiert einen wertvollen Fund (großer Ressourcen-Cache, ein Standort-Modul, Modulfragmente und XP). Der <strong>Expeditions-Kodex</strong> (aufklappbar im Expedition-Tab) sammelt deinen Fortschritt: entdeckte Sonderfunde, gefundene seltene Materialien, entdeckte Systeme und abgeschlossene Schatzdepots. Das Sammeln zahlt sich aus: Der Kodex hat sechs <strong>Stufen</strong>, die sich einmalig einlösen lassen – 15, 30, 45 und alle Sonderfunde, jedes auffindbare Material sowie drei abgeschlossene Schatzdepot-Ketten. Sie bringen Sternenessenz und Kredite, drei davon zusätzlich einen <strong>dauerhaften Beutebonus</strong> auf alle künftigen Expeditionen (+3%, +5% und +2%, zusammen bis zu +10%). Der Bonus fließt in dieselbe gedeckelte Bonus-Gruppe wie Aufstiegs-, Prestige-, Modul- und Offiziersboni. Eingelöste Stufen bleiben über Prestige UND Aufstieg hinweg erhalten – sie lassen sich also weder verlieren noch nach einem Reset erneut kassieren.' },
       { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
@@ -20221,7 +20240,7 @@
         // Mehr Berichtstiefe (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe bei Expedition"): vorher
         // nur Ausgangspunkt/Eskortstärke/Fundtext - jetzt analog zu den NPC-Kampfberichten mit
         // Expeditionstyp, Dauer, Eskortzusammensetzung und (bei Begegnung) Gegnerstärke/Erfolgschance.
-        const resMap = { defended:{label:'Angriff abgewehrt', color:true}, success:{label:'Erfolgreich', color:true}, weakened:{label:'Geschwächt zurückgekehrt', color:false}, destroyed:{label:'Schwerer Verlust', color:false} };
+        const resMap = { defended:{label:'Angriff abgewehrt', color:true}, success:{label:'Erfolgreich', color:true}, weakened:{label:'Geschwächt zurückgekehrt', color:false}, destroyed:{label:'Schwerer Verlust', color:false}, withdrawn:{label:'Planmäßig abgedreht', color:true} };
         const info = resMap[r.result] || { label:r.result, color:true };
         title = 'Expedition – '+info.label;
         const etName = (EXPEDITION_TYPES.find(t=>t.key===r.expType)||{}).name || 'Standard-Expedition';
@@ -27418,7 +27437,7 @@
           // if(encountered)-Block sichtbar und für den Bericht verloren - jetzt in beiden pushReport()-
           // Aufrufen unten als konkrete Zahlen (Gegnerstärke, Erfolgschance) verfügbar, analog zu den
           // bereits vorhandenen NPC-Kampfberichten (attackPower vs. defensePower, Chance in %).
-          let enemyPower = 0, ratio = 1, schwerVerlustAnteil = 0;
+          let enemyPower = 0, ratio = 1, schwerVerlustAnteil = 0, forscherGerettet = false;
           if (encountered){
             // Balance-Überarbeitung 25.07.2026 (Spieler-Report "man verliert so viel Schiffe, das ist
             // abnormal"). Nachgerechnet an der alten Formel: P(Totalverlust|Begegnung) war
@@ -27440,23 +27459,41 @@
             const pSchwer = peilungAktiv ? 0 : EXPEDITION_HEAVY_BASE * Math.pow(1-ratio, 2);
             const pGeschwaecht = EXPEDITION_WEAK_BASE * (1-ratio);
             const roll = Math.random();
-            if (roll < pSchwer){
+            // Rueckzugs-Option (25.07.2026, Inhaltspaket 4/5): beim START festgelegt und in der
+            // Mission eingebacken, damit ein spaeteres Umlegen des Schalters unterwegs befindliche
+            // Expeditionen nicht rueckwirkend betrifft - dasselbe Prinzip wie bei encounterChance
+            // und rewardMult. Die Flotte dreht ab: keine Beute, aber garantiert keine Verluste.
+            if (m.withdrawOnContact){
+              outcome = 'withdrawn';
+            } else if (roll < pSchwer){
               outcome = 'destroyed'; // schwerer Verlust: Forschungsschiff + Teil der Eskorte, keine Beute
-              fleet.forscher = Math.max(0, (fleet.forscher||0)-1);
+              // Rettungskapsel (Inhaltspaket 4/5): das Forschungsschiff ist das eigentliche
+              // Expeditionsschiff und ging bisher bei BEIDEN schlechten Ausgaengen sicher verloren.
+              // Jetzt gibt es eine Chance, dass die Besatzung samt Schiff durchkommt.
+              if (!rettungskapselGreift()) fleet.forscher = Math.max(0, (fleet.forscher||0)-1);
+              else forscherGerettet = true;
               schwerVerlustAnteil = EXPEDITION_HEAVY_LOSS_MIN + EXPEDITION_HEAVY_LOSS_SPAN*(1-ratio);
             } else if (roll < pSchwer + pGeschwaecht){
               outcome = 'weakened'; // Verlust: ein Forschungsschiff, reduzierte Beute
-              fleet.forscher = Math.max(0, (fleet.forscher||0)-1);
+              if (!rettungskapselGreift()) fleet.forscher = Math.max(0, (fleet.forscher||0)-1);
+              else forscherGerettet = true;
             } else {
               outcome = 'defended'; // Eskorte wehrt den Angriff ab, keine Verluste
             }
           }
-          if (outcome === 'destroyed'){
+          if (outcome === 'withdrawn'){
+            // Rueckzug: keine Beute, keine Verluste, kein Fundwurf. Zaehlt bewusst NICHT als
+            // abgeschlossene Expedition (expeditionsCompleted) - die Crew hat ja nichts erkundet,
+            // und der Erfahrungsbonus daraus soll nicht durch Abbrechen farmbar sein.
+            if (showLog !== false) log((m.fleetName||'Expedition')+' hat bei '+planetDisplayName(planetKey)+' Feindkontakt gemeldet und ist wie befohlen abgedreht - ohne Beute, aber vollzählig zurück. (Gegnerstärke '+Math.round(enemyPower)+' gegen Eskorte '+Math.round(escortPower)+')', 'ti-arrows-shuffle');
+            pushReport({ type:'expedition', result:'withdrawn', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), encountered:true, fleet:m.composition||fleet, ownLostShips:{}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100) });
+            state.lastExpeditionEventTime = Date.now();
+          } else if (outcome === 'destroyed'){
             // Ein Teil der Eskorte geht verloren (Anteil oben aus dem Kräfteverhältnis) - der Rest
             // kommt zurück. Hinterlässt ein Trümmerfeld, konsistent mit allen anderen Auflösungen.
             const lostEscort = applyCombatLosses(fleet, ESCORT_KEYS, schwerVerlustAnteil, planetKey, m.composition);
             const lostEscortTxt = lostCountsToText(lostEscort);
-            if (showLog !== false) log((m.fleetName||'Expedition')+' von einer feindlichen Flotte überrascht und schwer getroffen! Das Forschungsschiff und '+Math.round(schwerVerlustAnteil*100)+'% der Eskorte gingen verloren, der Rest konnte sich absetzen. (Eskortstärke '+Math.round(escortPower)+' gegen '+Math.round(enemyPower)+', '+planetDisplayName(planetKey)+')'+(lostEscortTxt?' Verloren: '+lostEscortTxt+'. Trümmerfeld hinterlassen.':''), 'ti-alert-triangle');
+            if (showLog !== false) log((m.fleetName||'Expedition')+' von einer feindlichen Flotte überrascht und schwer getroffen! '+(forscherGerettet?'Die Rettungskapsel brachte das Forschungsschiff heraus, aber ':'Das Forschungsschiff und ')+Math.round(schwerVerlustAnteil*100)+'% der Eskorte gingen verloren, der Rest konnte sich absetzen. (Eskortstärke '+Math.round(escortPower)+' gegen '+Math.round(enemyPower)+', '+planetDisplayName(planetKey)+')'+(lostEscortTxt?' Verloren: '+lostEscortTxt+'. Trümmerfeld hinterlassen.':''), 'ti-alert-triangle');
             pushReport({ type:'expedition', result:'destroyed', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), encountered:true, fleet:m.composition||fleet, ownLostShips:lostEscort, debris:combatDebrisOf(lostEscort), expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100) });
             state.lastExpeditionEventTime = Date.now();
             playSound('raid');
@@ -27668,10 +27705,12 @@
               }
             }
             const outcomeMsg = outcome==='weakened'
-              ? ' '+EXPEDITION_WEAKENED_FLAVOR[Math.floor(Math.random()*EXPEDITION_WEAKENED_FLAVOR.length)]
+              ? ' '+(forscherGerettet
+                  ? EXPEDITION_RESCUED_FLAVOR[Math.floor(Math.random()*EXPEDITION_RESCUED_FLAVOR.length)]
+                  : EXPEDITION_WEAKENED_FLAVOR[Math.floor(Math.random()*EXPEDITION_WEAKENED_FLAVOR.length)])
               : (encountered ? ' '+EXPEDITION_DEFENDED_FLAVOR[Math.floor(Math.random()*EXPEDITION_DEFENDED_FLAVOR.length)] : '');
             if (showLog !== false) log((m.fleetName||'Expedition')+' zurück in '+planetDisplayName(planetKey)+'.'+outcomeMsg+' '+findText+sysMsg, findIcon);
-            pushReport(Object.assign({ type:'expedition', result:outcome, escortPower:Math.round(escortPower), findText, systemDiscovered: !!sysMsg, fromPlanet: planetDisplayName(planetKey), encountered, fleet:m.composition||fleet, ownLostShips: outcome==='weakened' ? {forscher:1} : {}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), outcomeFlavor: outcomeMsg.trim() }, encountered ? { enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100) } : {}, reportExtra));
+            pushReport(Object.assign({ type:'expedition', result:outcome, escortPower:Math.round(escortPower), findText, systemDiscovered: !!sysMsg, fromPlanet: planetDisplayName(planetKey), encountered, fleet:m.composition||fleet, ownLostShips: (outcome==='weakened' && !forscherGerettet) ? {forscher:1} : {}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), outcomeFlavor: outcomeMsg.trim() }, encountered ? { enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100) } : {}, reportExtra));
           }
           state.lastExpeditionEventTime = Date.now();
         } else if (m.type === 'relocate'){
@@ -30494,6 +30533,13 @@
     'Ein Hinterhalt kostete ein Forschungsschiff, der Rest der Flotte kam durch.',
     'Schwerer Zwischenfall: ein Forschungsschiff ging im Gefecht verloren.'
   ];
+  // Eigene Variante, seit das Forschungsschiff dank Rettungskapsel durchkommen kann - der alte Text
+  // haette sonst einen Verlust gemeldet, den es gar nicht gab (CLAUDE.md-Regel 6: JEDE Anzeigestelle).
+  const EXPEDITION_RESCUED_FLAVOR = [
+    'Bei einem Angriff geschwächt - die Rettungskapsel brachte die Besatzung samt Forschungsschiff heraus.',
+    'Ein Hinterhalt setzte der Expedition zu, doch das Forschungsschiff konnte sich retten.',
+    'Schwerer Zwischenfall, aber die Notabkopplung funktionierte: das Forschungsschiff kam durch.'
+  ];
   const EXPEDITION_SPECIAL_EVENTS = [
     { key:'colony', name:'Verlassene Kolonie entdeckt', icon:'ti-building-broadcast-tower',
       resolve:(mult) => { const amt = Math.round((500+Math.random()*400)*mult); const res = Math.random()<0.5?'erz':'kristalle';
@@ -30931,7 +30977,7 @@
       activateQuantensensor();
     }
     const risk = EXPEDITION_RISK_MODES[state.expeditionRisk||'normal'] || EXPEDITION_RISK_MODES.normal;
-    cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: Math.min(0.9, et.encounterChance*risk.enc), rewardMult: et.rewardMult*risk.rew, riskMode: state.expeditionRisk||'normal', sensorBoosted: quantensensorActive() });
+    cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: Math.min(0.9, et.encounterChance*risk.enc), rewardMult: et.rewardMult*risk.rew, riskMode: state.expeditionRisk||'normal', withdrawOnContact: !!state.expeditionWithdraw, sensorBoosted: quantensensorActive() });
     lastExpeditionSend = { type: et.key, composition: ESCORT_KEYS.reduce((acc,k) => { if ((escortFleet[k]||0) > 0) acc[k] = escortFleet[k]; return acc; }, {}) };
     log(fleetName+' ('+et.name+') von '+planetDisplayName(state.activeBasePlanet)+' in unerforschten Raum aufgebrochen. Eskorte: '+escortSummary+' (Kampfkraft '+Math.round(escortPower)+'). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-map-2');
     render(); save();
@@ -33032,6 +33078,11 @@
           </div>
           ${(() => { const r = EXPEDITION_RISK_MODES[state.expeditionRisk||'normal']||EXPEDITION_RISK_MODES.normal; return `<div class="bmeta" style="font-size:10.5px;">${r.desc}</div>`; })()}
         </div>
+        <div class="card-row" id="expWithdrawRow" role="button" tabindex="0" style="cursor:pointer;" aria-pressed="${state.expeditionWithdraw?'true':'false'}">
+          <div class="left"><div class="bicon" style="background:rgba(55,138,221,0.18); color:#378add;"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i></div>
+            <div><div class="bname">Bei Feindkontakt abbrechen</div><div class="bmeta">Trifft die Expedition auf eine feindliche Flotte, dreht sie sofort ab: keine Beute, aber auch keine Verluste. Die Entscheidung wird beim Start festgelegt und gilt nur für Expeditionen, die ab dann losfliegen.</div></div></div>
+          <div class="toggle-switch ${state.expeditionWithdraw?'on':''}"><div class="toggle-knob"></div></div>
+        </div>
         ${(() => {
           // Ausbau C: Ketten-Fortschritt / Finale-Hinweis.
           const ch = state.expeditionChain || { fragments:0, readyFinale:false };
@@ -33133,6 +33184,8 @@
         state.expeditionRisk = btn.getAttribute('data-expedition-risk');
         render(); save();
       });
+      const withdrawRow = document.getElementById('expWithdrawRow');
+      if (withdrawRow) withdrawRow.onclick = () => { state.expeditionWithdraw = !state.expeditionWithdraw; render(); save(); };
       document.querySelectorAll('[data-expedition-type]').forEach(btn => btn.onclick = () => {
         selectedExpeditionType = btn.getAttribute('data-expedition-type');
         render();
