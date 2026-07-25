@@ -4217,8 +4217,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.297.4';
+  const VERSION = '8.297.5';
   const PATCHNOTES = [
+    { version:'8.297.5', date:'25.07.2026', changes:[
+      'Wichtiger Bugfix beim Allianz-Raid: Die gewählte Sammeldauer sprang nach einer Sekunde stillschweigend auf 30 Minuten zurück – und der Raid startete dann auch wirklich mit 30 Minuten statt der eingestellten Zeit, weil der Knopf den Wert erst beim Klick ausliest. Wer „2 Stunden" gewählt hatte, bekam trotzdem 30 Minuten Sammelzeit, ohne dass es irgendwo stand. Dieselbe Ursache wie beim Aufklapp-Fehler in 8.297.2: Die Box wird jede Sekunde neu gezeichnet, und die Auswahl steckte nur im Bildschirm, nicht im Spiel.',
+      'Gleicher Fehler mitbehoben beim koordinierten Allianzbasis-Angriff (dort war er dadurch verdeckt, dass die Auswahl hielt, solange man das Feld angeklickt ließ – sobald man woanders hinklickte, war sie weg) und beim Pakt-Geschenk in der Diplomatie (dort setzte es sich alle 15 Sekunden zurück, man verschenkte also womöglich eine andere Ressource als gewählt).',
+      'Alle drei Auswahlfelder merken sich ihre Einstellung jetzt über das Neuzeichnen hinweg.'
+    ]},
     { version:'8.297.4', date:'25.07.2026', changes:[
       'Neuer Hilfe-Abschnitt „Aktive Effekte (Buffs)" (Hilfe → Fortschritt). Effekte entstehen an sechs verschiedenen Stellen und verhalten sich unterschiedlich – erklärt war das bisher nirgends. Der Abschnitt nennt alle Quellen, warnt davor, dass „Ignorieren" bei Zufallsereignissen auch einen negativen Effekt bringen kann, und erklärt das Stapeln: Effekte multiplizieren sich untereinander (x1,2 und x1,4 ergibt x1,68) und liegen außerhalb des bei +100% gedeckelten Kampfbonus-Topfes – sie wirken also auch dann noch voll, wenn du diesen Deckel längst erreicht hast.',
       'Wichtigster Teil ist das Timing, weil es dort zwei verschiedene Regeln gibt: Bei Angriffen auf NPC-Ziele wird die Angriffskraft beim LOSSCHICKEN eingefroren – der Effekt muss laufen, wenn du startest. Bei Angriffen auf andere Spieler rechnet der Server erst bei der ANKUNFT. Verteidigungs-Effekte zählen immer zum Zeitpunkt des Überfalls. Wer das nicht weiß, verschenkt einen gekauften Booster.'
@@ -12157,6 +12162,33 @@
   // Beim Neuaufbau eingesetzt. Ein von Anfang an gesetztes open-Attribut löst kein toggle aus,
   // der gemerkte Zustand kann sich also nicht selbst überschreiben.
   function detailsOpenAttr(key){ return openDetailKeys.has(key) ? ' open' : ''; }
+  // Dasselbe Problem, andere Bauform: Ein <select> in einer Box, die periodisch per innerHTML neu
+  // geschrieben wird, verliert seine Auswahl - die frisch erzeugten <option>s tragen kein
+  // selected-Attribut, der Browser nimmt wieder die erste. Das ist schlimmer als beim <details>:
+  // dort ging nur Text verloren, hier wird eine EINGABE verfälscht. Beim Allianz-Raid liest der
+  // Startknopf sel.value erst im Moment des Klicks - der Raid startete also stillschweigend mit
+  // der Vorgabedauer statt der gewählten (nachgestellt 25.07.2026: 1 Std. gewählt, nach einer
+  // Sekunde 30 Min.).
+  // Jedes betroffene Feld bekommt ein stabiles data-keep-value="<schlüssel>", selectedAttrFor()
+  // setzt die gemerkte Auswahl beim Neuaufbau zurück.
+  const rememberedSelectValues = new Map();
+  // 'change' steigt zwar auf, aber die Capture-Phase ist robuster: sie greift auch, falls ein
+  // Zwischenhandler das Ereignis stoppt.
+  document.addEventListener('change', e => {
+    const el = e.target;
+    if (!el || el.tagName !== 'SELECT') return;
+    const key = el.getAttribute('data-keep-value');
+    if (key) rememberedSelectValues.set(key, el.value);
+  }, true);
+  // Beim Rendern je <option> aufgerufen. fallback = die Vorgabe, solange der Spieler nichts gewählt
+  // hat. Steht der gemerkte Wert nicht mehr zur Auswahl (z.B. eine Tier-2-Ressource, die auf 0
+  // gefallen und aus der Liste geflogen ist), bekommt keine Option das Attribut und der Browser
+  // zeigt wieder die erste - die auslesenden Stellen nehmen ohnehin sel.value aus dem DOM, Anzeige
+  // und tatsächlich verschickter Wert können also nicht auseinanderlaufen.
+  function selectedAttrFor(key, optionValue, fallback){
+    const merk = rememberedSelectValues.has(key) ? rememberedSelectValues.get(key) : fallback;
+    return String(merk) === String(optionValue) ? ' selected' : '';
+  }
   function isMoonKey(key){ return typeof key === 'string' && key.indexOf('moon_') === 0; }
   function pillMoonBtn(pid){ return (state.colonies && state.colonies['moon_'+pid]) ? `<span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+pid?'active':''}" data-moon-switch="moon_${pid}" title="${planetDisplayName('moon_'+pid)} – zum Mond wechseln">☾</span>` : ''; }
   function moonParentKey(key){ return key.slice(5); }
@@ -24025,7 +24057,7 @@
     if (!state.allianceBase || !state.allianceBase.foundedAt){ box.innerHTML = `<div class="bmeta">Der Allianz-Raid braucht eine gegründete Allianzbasis als Treffpunkt (siehe Allianzbasis oben).</div>`; return; }
     const doc = allianceRaidCache;
     const canLead = amIAllianceMusterLeader();
-    const durOptions = ALLIANCE_MUSTER_DURATIONS.map(s => `<option value="${s}">${fmtDuration(s)}</option>`).join('');
+    const durOptions = ALLIANCE_MUSTER_DURATIONS.map(s => `<option value="${s}"${selectedAttrFor('raidDuration', s, ALLIANCE_MUSTER_DURATIONS[0])}>${fmtDuration(s)}</option>`).join('');
 
     if (!doc || doc.phase === 'resolved'){
       const res = doc ? doc.result : null;
@@ -24034,7 +24066,7 @@
       const restartCdLeft = doc ? Math.max(0, (endedAt||0) + ALLIANCE_RAID_RESTART_COOLDOWN_MS - Date.now()) : 0;
       let html = `<div class="bmeta" style="margin-bottom:8px;">${res ? (res.destroyed ? 'Der letzte Sternenfresser wurde besiegt!' : 'Der letzte Sternenfresser ist ungenutzt entkommen.') : 'Aktuell läuft kein Allianz-Raid.'} Nächster Gegner: ${allianceRaidBossName(nextLevel)} (${fmt(allianceRaidHpFor(nextLevel))} HP).</div>`;
       if (canLead){
-        html += `<div style="display:flex; gap:6px; align-items:center;"><select id="raidDurationSelect" style="font-size:12px;">${durOptions}</select><button data-start-alliance-raid ${restartCdLeft>0?'disabled':''}><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>${restartCdLeft>0?'Bereit in '+fmtDuration(restartCdLeft/1000):'Raid ausrufen'}</button></div>`;
+        html += `<div style="display:flex; gap:6px; align-items:center;"><select id="raidDurationSelect" data-keep-value="raidDuration" style="font-size:12px;">${durOptions}</select><button data-start-alliance-raid ${restartCdLeft>0?'disabled':''}><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>${restartCdLeft>0?'Bereit in '+fmtDuration(restartCdLeft/1000):'Raid ausrufen'}</button></div>`;
       } else {
         html += `<div class="bmeta" style="color:#6b6f85;">Nur Admins/Offiziere können einen neuen Raid ausrufen.</div>`;
       }
@@ -24061,7 +24093,7 @@
       if (lastRes && lastRes.noParticipants) html += `<div class="bmeta" style="margin-bottom:4px;">Die letzte Sammelphase hatte keine Teilnehmer.</div>`;
       else if (lastRes) html += `<div class="bmeta" style="margin-bottom:4px;">Letzte Welle: ${fmt(lastRes.damage)} Schaden, ${lastRes.participantCount} Kommandanten.</div>`;
       if (canLead){
-        html += `<div style="display:flex; gap:6px; align-items:center;"><select id="raidDurationSelect" style="font-size:12px;">${durOptions}</select><button data-start-alliance-raid ${waveCdLeft>0?'disabled':''}><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>${waveCdLeft>0?'Bereit in '+fmtDuration(waveCdLeft/1000):'Nächste Welle starten'}</button></div>`;
+        html += `<div style="display:flex; gap:6px; align-items:center;"><select id="raidDurationSelect" data-keep-value="raidDuration" style="font-size:12px;">${durOptions}</select><button data-start-alliance-raid ${waveCdLeft>0?'disabled':''}><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>${waveCdLeft>0?'Bereit in '+fmtDuration(waveCdLeft/1000):'Nächste Welle starten'}</button></div>`;
       } else {
         html += `<div class="bmeta" style="color:#6b6f85;">Nur Admins/Offiziere können die nächste Welle starten.</div>`;
       }
@@ -24157,13 +24189,13 @@
           </div>`;
       }
       if (canLead){
-        const durOptions = ALLIANCE_MUSTER_DURATIONS.map(s => `<option value="${s}">${fmtDuration(s)}</option>`).join('');
+        const durOptions = ALLIANCE_MUSTER_DURATIONS.map(s => `<option value="${s}"${selectedAttrFor('musterDuration', s, ALLIANCE_MUSTER_DURATIONS[0])}>${fmtDuration(s)}</option>`).join('');
         html += `
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
             <div class="bmeta">Plant einen koordinierten Angriff: alle Mitglieder können während der Sammelphase freiwillig ihre Angriffsflotte anschließen. Danach fliegt der GESAMTE Verband gemeinsam los und trifft gleichzeitig am Ziel ein.</div>
             <div style="display:flex; gap:6px; align-items:center;">
               <input type="text" id="musterTargetTagInput" placeholder="Ziel-Allianz-Tag" maxlength="6" style="flex:1; font-size:12px; text-transform:uppercase;"/>
-              <select id="musterDurationSelect" style="font-size:12px;">${durOptions}</select>
+              <select id="musterDurationSelect" data-keep-value="musterDuration" style="font-size:12px;">${durOptions}</select>
             </div>
             <input type="text" id="musterMessageInput" placeholder="Nachricht/Strategie (optional)" maxlength="140" style="font-size:12px;"/>
             <button id="musterCreateBtn" class="attack" style="align-self:flex-start;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angriff planen</button>
@@ -26023,9 +26055,9 @@
           ${(p.upgradeOfferedBy && p.upgradeOfferedBy !== state.player.id) ? `<span class="bmeta" style="font-size:10px; color:#5dcaa5;">${pactOtherName(p)} schlägt Upgrade auf "${PACT_TIER_NAMES[tier+1]}" vor</span> <button class="buy affordable" data-pact-upgrade-accept="${e.key}" style="font-size:10px; padding:4px 8px;">Annehmen</button> <button data-pact-upgrade-decline="${e.key}" style="font-size:10px; padding:4px 8px;">Ablehnen</button>` : ''}
         </div>
         ${tier >= 2 ? `<div style="display:flex; gap:6px; align-items:center; margin-top:6px;">
-          <select data-pact-gift-res="${e.key}" style="font-size:10.5px; padding:4px 6px;">
-            ${MARKET_RES_KEYS.map(k=>{const rd=RES_DEFS.find(r=>r.key===k)||{label:k}; return `<option value="${k}">${rd.label} (max. ${fmt(pactGiftMaxAmount(k))})</option>`;}).join('')}
-            ${TIER2_DEFS.filter(t=>Math.floor(state.resources[t.key]||0)>=1).map(t=>`<option value="${t.key}">${t.label} (max. ${pactGiftMaxAmount(t.key)})</option>`).join('')}
+          <select data-pact-gift-res="${e.key}" data-keep-value="pactGift:${e.key}" style="font-size:10.5px; padding:4px 6px;">
+            ${MARKET_RES_KEYS.map(k=>{const rd=RES_DEFS.find(r=>r.key===k)||{label:k}; return `<option value="${k}"${selectedAttrFor('pactGift:'+e.key, k, MARKET_RES_KEYS[0])}>${rd.label} (max. ${fmt(pactGiftMaxAmount(k))})</option>`;}).join('')}
+            ${TIER2_DEFS.filter(t=>Math.floor(state.resources[t.key]||0)>=1).map(t=>`<option value="${t.key}"${selectedAttrFor('pactGift:'+e.key, t.key, MARKET_RES_KEYS[0])}>${t.label} (max. ${pactGiftMaxAmount(t.key)})</option>`).join('')}
           </select>
           <button data-pact-gift-send="${e.key}" ${pactGiftOnCooldown(p)?'disabled':''} style="font-size:10px; padding:4px 8px;"><i class="ti ti-award" aria-hidden="true" style="margin-right:3px;"></i>${pactGiftOnCooldown(p)?'Heute schon geschenkt':'Geschenk senden'}</button>
         </div>` : ''}
