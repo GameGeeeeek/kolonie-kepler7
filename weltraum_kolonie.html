@@ -4251,8 +4251,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.11';
+  const VERSION = '8.298.12';
   const PATCHNOTES = [
+    { version:'8.298.12', date:'25.07.2026', changes:[
+      'Der Expeditions-Kodex belohnt jetzt das Sammeln. Bisher führte er nur Buch – entdeckte Sonderfunde, gefundene Materialien, abgeschlossene Schatzdepot-Ketten – ohne dass irgendetwas davon je etwas eingebracht hätte.',
+      'Sechs neue Kodex-Stufen zum einmaligen Einlösen: <strong>Feldforscher</strong> (15 Sonderfunde), <strong>Chronist der Randzone</strong> (30), <strong>Kartograf des Unbekannten</strong> (45), <strong>Vollständiger Kodex</strong> (alle 63), <strong>Materialkunde</strong> (jedes auffindbare Material) und <strong>Schatzsucher</strong> (drei abgeschlossene Ketten).',
+      'Sie bringen zusammen 46 Sternenessenz und 25.800 Kredite – und drei davon zusätzlich einen dauerhaften Beutebonus auf alle künftigen Expeditionen (+3%, +5%, +2%, zusammen bis zu +10%). Der Bonus fließt in dieselbe gedeckelte Gruppe wie Aufstiegs-, Prestige-, Modul- und Offiziersboni und schaukelt sich damit nicht auf.',
+      'Erreichte Stufen erscheinen ganz oben im aufgeklappten Kodex mit einem Einlösen-Knopf. Eingelöste Stufen überstehen Prestige UND Aufstieg – sie gehen weder verloren noch lassen sie sich nach einem Reset erneut kassieren.'
+    ]},
     { version:'8.298.11', date:'25.07.2026', changes:[
       'Es gibt deutlich mehr zu finden. Ausgezählt standen bisher 63 Expeditions-Sonderereignisse und 60 Zufallsereignisse ganzen NEUN Verbrauchsgegenständen und DREI per Expedition auffindbaren Materialien gegenüber – nicht die Chancen waren das Problem, sondern dass es kaum etwas zu finden gab.',
       'Zehn neue Verbrauchsgegenstände, die bewusst in vorhandene Systeme eingreifen statt weitere „+X% für Y Minuten"-Boosts zu sein: <strong>Bergungsdrohnen-Schwarm</strong> (räumt dein größtes Trümmerfeld ohne Recycler ab), <strong>Sternenkarten-Kopie</strong> (zählt auf die Schatzdepot-Kette ein), <strong>Modul-Katalysator</strong> (+4 Modulfragmente), <strong>Veteranen-Drillbefehl</strong> (+400 Veteranen-Erfahrung), <strong>Empfehlungsschreiben</strong> (+12 Fraktionsruf), <strong>Umschulungsbefehl</strong> (nächster Doktrin-Wechsel gratis) und <strong>Treibstoff-Notration</strong> (+600 Deuterium, +40 Antimaterie).',
@@ -16199,6 +16205,7 @@
     if (state.expeditionsCompleted === undefined) state.expeditionsCompleted = 0;
     // Fundtabellen-Ausbau 25.07.2026: zwei Zaehlstaende der neuen epischen Gegenstaende.
     if (state.freeDoctrineSwitch === undefined) state.freeDoctrineSwitch = false;
+    if (!state.codexClaimed || typeof state.codexClaimed !== 'object') state.codexClaimed = {};
     if (!Number.isFinite(state.expeditionSafeRuns)) state.expeditionSafeRuns = 0;
     if (!state.seenTabHints || typeof state.seenTabHints !== 'object') state.seenTabHints = {};
     if (state.referredBy === undefined) state.referredBy = null;
@@ -16423,6 +16430,7 @@
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
     const keepFriends = (state.friends||[]).slice(); // Freundesliste überlebt Prestige/Aufstieg (persönliche Lesezeichen, kein Wirtschaftswert)
     const keepCompendium = state.compendiumClaimed; // Kompendium-Belohnungen sind einmalig - Marker überlebt jeden Reset (sonst Re-Farm)
+    const keepCodex = state.codexClaimed; // dito für die Kodex-Stufen (Inhaltspaket 2/5)
     // Bugfix (Spieler-Wunsch, entdeckt bei der Offiziere-Recherche): Offiziere, Kommandopunkte und
     // beide Modul-Inventare wurden bisher bei JEDEM Prestige komplett gelöscht, ohne dass der
     // Bestätigungs-Dialog (siehe unten, Zeile ~9700) das erwähnt - der Dialog verspricht nur
@@ -16493,7 +16501,7 @@
       modules:keepModules||{}, moduleSlotLevel:keepModuleSlotLevel||{}, equippedModules:keepEquippedModules||{},
       shipModules:keepShipModules||{}, shipModuleSlotLevel:keepShipModuleSlotLevel||{}, equippedShipModules:keepEquippedShipModules||{},
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
-      friends: keepFriends||[], compendiumClaimed: keepCompendium||{}
+      friends: keepFriends||[], compendiumClaimed: keepCompendium||{}, codexClaimed: keepCodex||{}
     };
     applyStateDefaults();
     // Kryo-Archiv anwenden: NACH applyStateDefaults (das setzt fehlende Tier-2-Felder auf 0),
@@ -16552,6 +16560,7 @@
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
     const keepFriends = (state.friends||[]).slice(); // Freundesliste überlebt Prestige/Aufstieg (persönliche Lesezeichen, kein Wirtschaftswert)
     const keepCompendium = state.compendiumClaimed; // Kompendium-Belohnungen sind einmalig - Marker überlebt jeden Reset (sonst Re-Farm)
+    const keepCodex = state.codexClaimed; // dito für die Kodex-Stufen (Inhaltspaket 2/5)
     const asc = state.ascension || { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0,leere:0} };
     asc.count = (asc.count||0) + 1;
     asc.essence = (asc.essence||0) + gain;
@@ -16574,7 +16583,7 @@
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
       ascension: asc,
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
-      friends: keepFriends||[], compendiumClaimed: keepCompendium||{}
+      friends: keepFriends||[], compendiumClaimed: keepCompendium||{}, codexClaimed: keepCodex||{}
     };
     applyStateDefaults();
     log('AUFSTIEG '+asc.count+' vollzogen! +'+gain+' Sternenessenz (gesamt: '+asc.essence+'). Verteile sie im Meta-Baum (Fortschritt-Tab) - diese Boni überleben jeden Reset.', 'ti-sparkles');
@@ -19629,7 +19638,7 @@
       { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
       { title:'Expeditionstypen, Wagnis & Eskorte', body:'Vor dem Start wählst du <strong>Expeditionstyp</strong>, <strong>Wagnis</strong> und <strong>Eskorte</strong> – alle drei formen Risiko und Beute. <strong>Typen:</strong> Kurz (schnell/sicher, wenig), Standard (ausgewogen), Tiefenraum (lang/riskant, viel) sowie drei spezialisierte: <strong>Bergungsexpedition</strong> (viel mehr Module und verlassene Schiffe, weniger Rohstoffe), <strong>Forschungsexpedition</strong> (viel mehr Items/Fragmente/Materialien und bevorzugt Forschungspunkte, kaum Rohstoffe) und <strong>Schürfexpedition</strong> (fast nur Rohstoffe, sehr sicher). <strong>Wagnis-Regler:</strong> Vorsichtig (−30% Begegnungsrisiko, −15% Beute), Normal, oder Wagemutig (+40% Risiko, +35% Beute). <strong>Eskorte:</strong> Kampfschiffe entscheiden, wie eine Begegnung <em>ausgeht</em> (die Wahrscheinlichkeit, überhaupt auf jemanden zu treffen, hängt nur vom Typ, vom Wagnis und vom Modul „Eskorten-Leitsystem" ab); <strong>Spähschiffe</strong> tragen keine Kampfkraft bei, verbessern aber gezielt die Ausbeute (mehr Sonderfunde und bessere Fund-Qualität); <strong>Frachter/Große Frachter</strong> erweitern den Frachtraum für große Ressourcenfunde.' },
       { title:'Was bei einer Begegnung passiert', body:'Trifft eine Expedition auf eine feindliche Flotte, entscheidet allein das <strong>Kräfteverhältnis</strong> zwischen deiner Eskorte und dem Gegner über den Ausgang – es gibt drei: <strong>abgewehrt</strong> (keine Verluste, volle Beute), <strong>geschwächt</strong> (das Forschungsschiff geht verloren, die Beute schrumpft auf 40%) und <strong>schwerer Verlust</strong> (Forschungsschiff plus 50–80% der Eskorte, keine Beute – der Rest der Eskorte setzt sich ab). Die Eskorte wirkt dabei stark überproportional: Bei ausgeglichenen Kräften liegt das Risiko eines schweren Verlusts bei rund 10%, bei deutlicher Überlegenheit unter 2%, ohne jede Eskorte dagegen bei 40%. Es lohnt sich also, lieber eine ordentliche Eskorte mitzuschicken als gar keine – anders als früher vervielfacht eine größere Eskorte den zu erwartenden Verlust nicht, sondern senkt ihn. Die Stärke der Gegner wächst mit deinem Punktestand, aber nur bis zu einer festen Obergrenze; ein gut ausgebautes Imperium wächst also aus dem Risiko heraus. Verlorene Schiffe hinterlassen ein <strong>Trümmerfeld</strong> am Startplaneten, das sich mit Recyclern bergen lässt, und <strong>Hyperjäger</strong> in der Eskorte senken die eigenen Verluste um 3% je Stück (max. −30%).' },
-      { title:'Expeditions-Kette & Kodex', body:'<strong>Sternenkarten-Fragmente</strong> tauchen gelegentlich als Sonderfund auf. Hast du drei gesammelt, sind die Koordinaten eines verschollenen <strong>Schatzdepots</strong> vollständig – deine nächste erfolgreiche Expedition birgt dann garantiert einen wertvollen Fund (großer Ressourcen-Cache, ein Standort-Modul, Modulfragmente und XP). Der <strong>Expeditions-Kodex</strong> (aufklappbar im Expedition-Tab) sammelt deinen Fortschritt: entdeckte Sonderfunde, gefundene seltene Materialien, entdeckte Systeme und abgeschlossene Schatzdepots.' },
+      { title:'Expeditions-Kette & Kodex', body:'<strong>Sternenkarten-Fragmente</strong> tauchen gelegentlich als Sonderfund auf. Hast du drei gesammelt, sind die Koordinaten eines verschollenen <strong>Schatzdepots</strong> vollständig – deine nächste erfolgreiche Expedition birgt dann garantiert einen wertvollen Fund (großer Ressourcen-Cache, ein Standort-Modul, Modulfragmente und XP). Der <strong>Expeditions-Kodex</strong> (aufklappbar im Expedition-Tab) sammelt deinen Fortschritt: entdeckte Sonderfunde, gefundene seltene Materialien, entdeckte Systeme und abgeschlossene Schatzdepots. Das Sammeln zahlt sich aus: Der Kodex hat sechs <strong>Stufen</strong>, die sich einmalig einlösen lassen – 15, 30, 45 und alle Sonderfunde, jedes auffindbare Material sowie drei abgeschlossene Schatzdepot-Ketten. Sie bringen Sternenessenz und Kredite, drei davon zusätzlich einen <strong>dauerhaften Beutebonus</strong> auf alle künftigen Expeditionen (+3%, +5% und +2%, zusammen bis zu +10%). Der Bonus fließt in dieselbe gedeckelte Bonus-Gruppe wie Aufstiegs-, Prestige-, Modul- und Offiziersboni. Eingelöste Stufen bleiben über Prestige UND Aufstieg hinweg erhalten – sie lassen sich also weder verlieren noch nach einem Reset erneut kassieren.' },
       { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
       { title:'Expeditions-Limit: nur 1 gleichzeitig zu Beginn', body:'Zusätzlich zur Forschungsschiff-Anzahl je Planet und dem allgemeinen Flottenentsendelimit gibt es ein eigenes, planetenübergreifendes Limit für gleichzeitig laufende Expeditionen - anfangs nur <strong>1</strong>. Die eigenständige Forschung <strong>Expeditionskoordination</strong> (Kategorie Logistik) erhöht dieses Limit um 1 je Stufe, bis maximal <strong>5</strong> gleichzeitige Expeditionen bei Stufe 4. Der aktuelle Stand wird direkt im Expedition-Tab beim Start-Formular angezeigt.' },
       { title:'Verbrauchsgegenstände & seltene Materialien', body:'Neben Ressourcen bringen Expeditionen zwei Arten von Fundstücken mit. <strong>Verbrauchsgegenstände</strong> liegen im Inventar und werden per Klick eingelöst – neben den bekannten Boostern gibt es inzwischen Fundstücke, die gezielt in vorhandene Systeme eingreifen: <strong>Bergungsdrohnen</strong> räumen ein eigenes Trümmerfeld ohne Recycler ab, die <strong>Sternenkarten-Kopie</strong> zählt auf die Schatzdepot-Kette ein, der <strong>Modul-Katalysator</strong> liefert Modulfragmente, der <strong>Veteranen-Drillbefehl</strong> Veteranen-Erfahrung, das <strong>Empfehlungsschreiben</strong> Fraktionsruf, der <strong>Umschulungsbefehl</strong> einen kostenlosen Doktrin-Wechsel und die <strong>Treibstoff-Notration</strong> Deuterium und Antimaterie. Drei Stücke sind <strong>episch</strong> und entsprechend selten: der <strong>Störsender</strong> verschiebt den nächsten Piratenüberfall um zwei Stunden, das <strong>Werftkommando</strong> stellt alle bezahlten Bauaufträge sofort fertig, und die <strong>Quantenpeilung</strong> schützt deine nächsten drei Expeditionen vor einem schweren Verlust. <strong>Seltene Materialien</strong> dagegen verbraucht man nicht direkt: Sie schalten Gebäude frei (Kristallherz → Kristallfestung, <strong>Resonanzkristall</strong> → Resonanzschild-Emitter, <strong>Urmaterie</strong> → Urmaterie-Reaktor) oder werden für Allianz-Weltprojekte und Spezialschiffe gebraucht. Von jedem Material gibt es auch <strong>Fragmente</strong> – ein häufigerer, kleinerer Fund; je vier davon lassen sich zum vollen Material zusammensetzen, sodass Pech beim Würfeln nicht endlos bestraft wird.' },
@@ -27381,7 +27390,7 @@
           // Begegnungschance feindlicher Flotten für Expeditionen, die von DIESEM Standort
           // gestartet sind - gedeckelt bei -50%, damit Tiefenraum nie risikofrei wird.
           const encounterChance = (m.encounterChance!==undefined ? m.encounterChance : 0.35) * Math.max(0.5, 1 - moduleBonusAt(planetKey, 'exprisk'));
-          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + Math.min(1.0, moduleBonusTotal('expedition')) + officerBonus('aufklaerer')) * seasonalLootMult();
+          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + Math.min(1.0, moduleBonusTotal('expedition')) + officerBonus('aufklaerer') + codexExpeditionBonus()) * seasonalLootMult();
           const encountered = Math.random() < encounterChance;
           let outcome = 'success';
           // Auf Funktionsebene gehoben (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe"): vorher nur im
@@ -30751,6 +30760,60 @@
   function ensureExpeditionCodex(){ if (!state.expeditionCodex) state.expeditionCodex = { specials:{}, rares:{}, chainCompleted:0 }; if (!state.expeditionCodex.specials) state.expeditionCodex.specials = {}; if (!state.expeditionCodex.rares) state.expeditionCodex.rares = {}; return state.expeditionCodex; }
   function recordCodexSpecial(key){ const c = ensureExpeditionCodex(); c.specials[key] = (c.specials[key]||0)+1; }
   function recordCodexRare(key){ const c = ensureExpeditionCodex(); c.rares[key] = (c.rares[key]||0)+1; }
+  // ===== Kodex-Stufen (25.07.2026, Inhaltspaket 2/5) =====
+  // Der Kodex sammelte bisher AUSSCHLIESSLICH - entdeckte Sonderfunde, gefundene Materialien,
+  // abgeschlossene Ketten - und belohnte nichts davon. Das Galaktische Kompendium daneben macht
+  // genau das vor (Einmalbelohnung je vollstaendiger Kategorie), also uebernimmt der Kodex dessen
+  // Muster: Stufen mit Einmalbelohnung, Marker in state.codexClaimed, der Prestige UND Aufstieg
+  // ueberlebt (sonst liesse sich nach jedem Reset erneut kassieren, siehe keepCodex dort).
+  //
+  // Die dauerhaften Beuteboni sind bewusst KLEIN und wandern in die bereits gedeckelte additive
+  // Bonus-Gruppe des Expeditionsertrags (CLAUDE.md: keine neue eigene Multiplikation aufmachen).
+  const CODEX_TIERS = [
+    { key:'specials15', name:'Feldforscher', icon:'ti-list-details',
+      desc:'15 verschiedene Sonderfunde entdeckt. Belohnung: 4 Sternenessenz und 800 Kredite.',
+      have:()=>Object.keys((ensureExpeditionCodex().specials)||{}).length, need:15, reward:{ essence:4, credits:800 } },
+    { key:'specials30', name:'Chronist der Randzone', icon:'ti-map-2',
+      desc:'30 verschiedene Sonderfunde entdeckt. Belohnung: 6 Sternenessenz und dauerhaft +3% Expeditionsbeute.',
+      have:()=>Object.keys((ensureExpeditionCodex().specials)||{}).length, need:30, reward:{ essence:6, expBonus:0.03 } },
+    { key:'specials45', name:'Kartograf des Unbekannten', icon:'ti-star',
+      desc:'45 verschiedene Sonderfunde entdeckt. Belohnung: 8 Sternenessenz und 10.000 Kredite.',
+      have:()=>Object.keys((ensureExpeditionCodex().specials)||{}).length, need:45, reward:{ essence:8, credits:10000 } },
+    { key:'specialsAll', name:'Vollständiger Kodex', icon:'ti-trophy',
+      desc:'Alle Sonderfunde des Spiels mindestens einmal entdeckt. Belohnung: 12 Sternenessenz und dauerhaft +5% Expeditionsbeute.',
+      have:()=>Object.keys((ensureExpeditionCodex().specials)||{}).length, need:()=>EXPEDITION_SPECIAL_EVENTS.length, reward:{ essence:12, expBonus:0.05 } },
+    { key:'raresAll', name:'Materialkunde', icon:'ti-diamond',
+      desc:'Jedes per Expedition auffindbare seltene Material mindestens einmal geborgen. Belohnung: 6 Sternenessenz und dauerhaft +2% Expeditionsbeute.',
+      have:()=>Object.keys((ensureExpeditionCodex().rares)||{}).length, need:()=>RARE_ITEMS.filter(r=>r.chance!==0).length, reward:{ essence:6, expBonus:0.02 } },
+    { key:'chains3', name:'Schatzsucher', icon:'ti-key',
+      desc:'Drei Schatzdepot-Ketten vollständig abgeschlossen. Belohnung: 10 Sternenessenz und 15.000 Kredite.',
+      have:()=>ensureExpeditionCodex().chainCompleted||0, need:3, reward:{ essence:10, credits:15000 } }
+  ];
+  function codexTierNeed(t){ return typeof t.need === 'function' ? t.need() : t.need; }
+  function codexTierDone(t){ return t.have() >= codexTierNeed(t); }
+  function codexTierClaimed(t){ return !!(state.codexClaimed||{})[t.key]; }
+  // Summe der dauerhaften Beuteboni aller EINGELOESTEN Stufen. Fliesst unten in dieselbe additive
+  // Gruppe wie Aufstiegs-, Prestige-, Modul- und Offiziersboni des Expeditionsertrags.
+  function codexExpeditionBonus(){
+    return CODEX_TIERS.reduce((a,t) => a + (codexTierClaimed(t) ? (t.reward.expBonus||0) : 0), 0);
+  }
+  function claimCodexTier(key){
+    const t = CODEX_TIERS.find(x=>x.key===key);
+    if (!t) return;
+    if (!state.codexClaimed) state.codexClaimed = {};
+    if (state.codexClaimed[key]) return;
+    if (!codexTierDone(t)){ log('Diese Kodex-Stufe ist noch nicht erreicht.', 'ti-alert-triangle'); return; }
+    state.codexClaimed[key] = true;
+    const r = t.reward||{};
+    if (r.credits) state.credits = (state.credits||0) + r.credits;
+    if (r.essence){ if (!state.ascension) state.ascension = { count:0, essence:0, tree:{} }; state.ascension.essence = (state.ascension.essence||0) + r.essence; }
+    const teile = [];
+    if (r.essence) teile.push(r.essence+' Sternenessenz');
+    if (r.credits) teile.push(fmt(r.credits)+' Kredite');
+    if (r.expBonus) teile.push('dauerhaft +'+Math.round(r.expBonus*100)+'% Expeditionsbeute');
+    log('Kodex-Stufe „'+t.name+'" abgeschlossen! Belohnung: '+teile.join(', ')+'.', t.icon);
+    playSound('achieve'); render(); save();
+  }
   // Erfahrene Forschungsschiffe: mit jeder erfolgreich abgeschlossenen Expedition (kein Totalverlust)
   // steigt die Beute leicht, bis zu einem Deckel – repräsentiert eine erfahrenere Crew/Ausrüstung.
   function expeditionExperienceMult(){ return 1 + Math.min(0.5, Math.floor((state.expeditionsCompleted||0)/10)*0.05); }
@@ -33011,8 +33074,25 @@
           if (!state.showExpCodex) return head;
           const rareRows = RARE_ITEMS.filter(r=>r.chance!==0).map(r => `<span class="lvl-pill" style="font-size:10px;"><i class="ti ${r.icon||'ti-diamond'}" aria-hidden="true" style="margin-right:3px;"></i>${r.name}: ${(codex.rares||{})[r.key]||0}</span>`).join(' ');
           const specialRows = EXPEDITION_SPECIAL_EVENTS.map(ev => { const n=(codex.specials||{})[ev.key]||0; return `<span style="font-size:10.5px; color:${n?'#c3bef5':'#5a5f78'};">${n?'✓':'○'} ${ev.name}${n>1?' ×'+n:''}</span>`; }).join('<br>');
+          // Kodex-Stufen (Inhaltspaket 2/5): erreichte Stufen lassen sich hier einlösen. Bewusst
+          // GANZ OBEN im aufgeklappten Kodex - eine fertige Stufe soll auffallen, nicht unter der
+          // langen Sonderfund-Liste verschwinden.
+          const tierRows = CODEX_TIERS.map(t => {
+            const have = t.have(), need = codexTierNeed(t), fertig = have >= need, geholt = codexTierClaimed(t);
+            const pct = need > 0 ? Math.min(100, Math.round(have/need*100)) : 0;
+            return `<div class="card-row ${geholt?'research-done':''}" style="margin:0;">
+              <div class="left"><div class="bicon" style="background:${geholt?'rgba(29,158,117,0.2)':'rgba(255,255,255,0.05)'}; color:${geholt?'#5dcaa5':'#6b6f85'};"><i class="ti ${t.icon}" aria-hidden="true"></i></div>
+                <div style="min-width:0; flex:1;"><div class="bname">${t.name}</div><div class="bmeta">${t.desc}</div>
+                ${geholt ? '' : `<div class="progress-outer" style="margin-top:5px; height:5px;"><div class="progress-inner" style="width:${pct}%;"></div></div><div class="bmeta" style="font-size:10px; margin-top:2px;">${fmt(have)}/${fmt(need)}</div>`}</div></div>
+              ${geholt ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Eingelöst</span>`
+                       : (fertig ? `<button class="buy affordable" data-codex-claim="${t.key}"><i class="ti ti-award" aria-hidden="true" style="margin-right:4px;"></i>Einlösen</button>` : '')}
+            </div>`;
+          }).join('');
+          const bonusJetzt = codexExpeditionBonus();
           return head + `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
-            <div class="bmeta">Seltene Materialien gefunden:</div>
+            <div class="bmeta">Kodex-Stufen${bonusJetzt>0?' · aktuell +'+Math.round(bonusJetzt*100)+'% Expeditionsbeute aus eingelösten Stufen':''}:</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">${tierRows}</div>
+            <div class="bmeta" style="margin-top:4px;">Seltene Materialien gefunden:</div>
             <div style="display:flex; gap:5px; flex-wrap:wrap;">${rareRows||'<span class="bmeta">noch keine</span>'}</div>
             <div class="bmeta" style="margin-top:4px;">Sonderfunde (${specialsSeen}/${specialsTotal}):</div>
             <div style="line-height:1.7;">${specialRows}</div>
@@ -33024,6 +33104,10 @@
       if (cfnExp) cfnExp.oninput = () => { customFleetName = cfnExp.value; };
       const expCodexToggle = document.getElementById('expCodexToggle');
       if (expCodexToggle) expCodexToggle.onclick = () => { state.showExpCodex = !state.showExpCodex; render(); };
+      expeditionBox.querySelectorAll('[data-codex-claim]').forEach(btn => btn.onclick = (e) => {
+        e.stopPropagation(); // sonst klappt der Kodex durch den Toggle darueber gleich wieder zu
+        claimCodexTier(btn.getAttribute('data-codex-claim'));
+      });
       document.querySelectorAll('[data-expedition-risk]').forEach(btn => btn.onclick = () => {
         state.expeditionRisk = btn.getAttribute('data-expedition-risk');
         render(); save();
