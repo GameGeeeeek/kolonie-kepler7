@@ -160,6 +160,42 @@ const hinweisText = () => { const b = document.getElementById('tabHintBar'); ret
   await page.waitForTimeout(600);
   check('4: auch nach einem Reload bleibt er weg', (await page.evaluate(hinweisText)) === '');
 
+  // -------------------------------------------------- 7) Zuruecksetzen in den Einstellungen
+  // Ohne diesen Weg gaebe es kein Zurueck: wer alle zwoelf Hinweise weggeklickt hat, kaeme nie
+  // wieder an sie heran. Ausgangslage hier: "markt" und "forschung" gelten als gesehen.
+  await page.evaluate(() => { const b = document.getElementById('headerProfileBtn'); if (b) b.click(); });
+  await page.waitForTimeout(500);
+  check('7: die Karte „Ersthinweise zurücksetzen" existiert',
+    await page.locator('#resetTabHintsBtn').count() === 1);
+  await page.click('#resetTabHintsBtn');
+  await page.waitForTimeout(400);
+  check('7: die Karte bestätigt das Zurücksetzen sichtbar',
+    /Zurückgesetzt/.test(await page.evaluate(() => (document.getElementById('resetTabHintsMeta') || {}).textContent || '')));
+  await page.waitForTimeout(1200);
+  const zurueckgesetzt = JSON.parse(store['kepler7-save-v3'] || '{}').seenTabHints || {};
+  check('7: der Spielstand enthält keine gesehenen Hinweise mehr',
+    Object.keys(zurueckgesetzt).length === 0, zurueckgesetzt);
+  // Und der Hinweis kommt an den bereits weggeklickten Tabs tatsaechlich wieder.
+  await page.evaluate(klickTab('markt'));
+  await page.waitForTimeout(600);
+  check('7: der zuvor weggeklickte Markt-Hinweis erscheint wieder',
+    (await page.evaluate(hinweisText)).length > 60, (await page.evaluate(hinweisText)).slice(0, 70));
+  await page.evaluate(klickTab('forschung'));
+  await page.waitForTimeout(600);
+  check('7: auch der von Anfang an als gesehen markierte Tab zeigt wieder einen Hinweis',
+    (await page.evaluate(hinweisText)).length > 60);
+  // Die Bestaetigung darf nicht dauerhaft stehen bleiben - beim naechsten Besuch der Einstellungen
+  // waere „Zurueckgesetzt" schlicht falsch.
+  let zurueck = true;
+  try {
+    await page.waitForFunction(() => {
+      const el = document.getElementById('resetTabHintsMeta');
+      return el && !/Zurückgesetzt/.test(el.textContent);
+    }, null, { timeout: 8000 });
+  } catch(e){ zurueck = false; }
+  check('7: die Bestätigung weicht wieder der Beschreibung', zurueck,
+    await page.evaluate(() => (document.getElementById('resetTabHintsMeta') || {}).textContent || ''));
+
   // -------------------------------------------------- 6) waehrend des Tutorials nichts
   const ctx2 = await browser.newContext({ viewport: { width: 1200, height: 1400 } });
   const page2 = await ctx2.newPage();
