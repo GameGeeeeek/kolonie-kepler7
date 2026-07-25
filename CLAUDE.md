@@ -11,6 +11,16 @@ cp weltraum_kolonie.html index.html
 
 ## Vor jedem Commit (Pflicht, keine Ausnahme)
 
+**Kurzform: `node tests/run.js`** – der Prüflauf im Repo führt die Punkte 1–4 automatisch aus und
+danach alle Tests unter `tests/`. Exit-Code 0 heißt sauber. `node tests/run.js --nur-pflicht` macht
+nur die schnellen Prüfungen (Sekunden statt Minuten). Details: `tests/README.md`.
+
+Bis zum 25.07.2026 lagen die Tests ausschließlich im Sitzungs-Scratchpad unter `/tmp` und waren mit
+dem Container weg – das Repo hatte **keinen einzigen Test**. Entsprechend verrottet waren die alten:
+von 16 stichprobenartig gestarteten liefen nur 6. Was jetzt unter `tests/` liegt, ist bewusst
+kuratiert (nur was nachweislich läuft und etwas prüft) und darf **nicht** wieder ins Scratchpad
+abwandern – ein neuer Test gehört ins Repo, sonst gibt es ihn beim nächsten Mal nicht mehr.
+
 1. **Syntax-Check**: `node -e "new Function(fs.readFileSync('weltraum_kolonie.html','utf8').match(/<script>([\s\S]*)<\/script>/)[1])"`
 2. **Icon-Whitelist-Check**: `node check-icons.js` ausführen (Exit-Code 0 = sauber). Prüft automatisch (a) alle `ti-*`-Verwendungen gegen die ~69 Icons des eingebetteten Icon-Fonts (Whitelist wird per Regex aus der Datei selbst gezogen, nie aus dem Gedächtnis geraten) und (b) alle nicht-`ti-*`-`icon:'X'`-Werte in den DEFS-Arrays gegen die Schlüssel des `ICONS`-Objekts. Eingeführt nach dem `ti-gift`-Bug (v8.77.1), der vor dem Commit nicht auffiel – das Skript macht genau diesen Fehlertyp jetzt automatisch sichtbar.
 3. **JSDOM-Boot+Tab-Sweep**: Datei in jsdom laden, `runScripts:'dangerously'`, alle Tab-Buttons durchklicken, auf Konsolenfehler prüfen. Mit realistischem Spielstand (mehrere Kolonien inkl. Mond, aktive Forschung/Missionen) – ein leerer Spielstand übersieht Bugs, die erst bei voller Array-Traversierung auftreten.
