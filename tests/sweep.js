@@ -1,5 +1,16 @@
 // Pflicht-Sweep (CLAUDE.md Schritt 3): Boot + alle Tabs durchklicken, auf Konsolenfehler prüfen.
 // Realistischer Spielstand: mehrere Kolonien inkl. Mond, aktive Forschung/Missionen/Bauqueue.
+//
+// BEWUSSTE GRENZE DIESES TESTS (26.07.2026): Die Attrappe hier antwortet auf die serverabhängigen
+// Endpunkte absichtlich mager (`return j({})`). Damit prüft der Sweep den Solo-/Offline-Pfad - also
+// dass alle Tabs auch ohne Serverdaten fehlerfrei aufgehen. Das ist wertvoll, hat aber einen blinden
+// Fleck: Anzeigebereiche, die bei fehlenden Daten in einen Leerzustand gehen, führen ihren
+// eigentlichen Rendercode nie aus. Genau darin steckte der Fraktionsladen-Fehler (v8.298.22 bis
+// v8.298.28) monatelang unentdeckt - wo nichts rendert, kann auch nichts krachen.
+//
+// Die Gegenprobe MIT gefüllten Serverdaten steht in tests/test_serverbereiche.js. Dieser Sweep hier
+// soll bewusst NICHT umgestellt werden: die beiden Tests decken zwei verschiedene Zustände ab, und
+// der leere ist der, in dem echte Spieler ohne Serververbindung sitzen.
 const { starteBrowser, SPIEL_URL, SPIELDATEI, SERVER_JS, ueberspringen } = require('./lib/umgebung');
 const path = require('path');
 const FILE = SPIEL_URL;
