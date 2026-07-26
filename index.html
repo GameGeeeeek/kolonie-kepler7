@@ -4266,8 +4266,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.27';
+  const VERSION = '8.298.28';
   const PATCHNOTES = [
+    { version:'8.298.28', date:'26.07.2026', changes:[
+      '<strong>Der Fraktionsbereich war leer – drei Fehler, die sich gegenseitig verdeckt haben.</strong> Danke für den Screenshot; das war kein Bedienfehler.',
+      '<strong>Erstens:</strong> Die Galaxie-Daten wurden beim Start zwar angefordert, aber zu einem Zeitpunkt, an dem die Serververbindung noch gar nicht bestätigt war – die Anfrage lief still ins Leere. Die Fraktionen erschienen deshalb erst beim nächsten Abgleich <em>zwei Minuten später</em>. Wer vorher in den Galaxie-Tab schaute, sah nichts. Der Erstabruf steht jetzt an der richtigen Stelle: direkt nachdem die Verbindung steht.',
+      '<strong>Zweitens:</strong> Fehlten diese Daten, hat der Fraktionsbereich sich komplett verabschiedet („Noch keine Fraktionsdaten geladen.") – und damit war der gesamte Fraktions-Ausbau unsichtbar: Ruf, Ränge, Aufträge, Gunstmarken, Läden, Botschaften, Rivalitäten. Dabei braucht davon fast nichts den Server. Die vier Fraktionen sind jetzt <strong>immer da</strong>; vom Server kommen nur noch die Dinge, die wirklich von ihm kommen müssen: wie viele Systeme eine Fraktion hält, ihre Militärstärke und laufende Fraktionskriege. Fehlen die, sagt eine Hinweiszeile genau das – statt einer leeren Fläche ohne Erklärung. Und im Solo-Modus ohne Server funktioniert der ganze Bereich damit ebenfalls.',
+      '<strong>Drittens:</strong> Dahinter lag seit v8.298.22 ein Programmfehler in der Ladenzeile, der beim Zeichnen einer Fraktionskarte abbrach – der <strong>Fraktionsladen</strong> war also auch dann kaputt, wenn die Daten da waren. Aufgefallen ist das nie, weil der Bereich wegen des zweiten Fehlers vorher schon ausstieg und diese Zeilen nie erreichte. Auch kein Prüflauf kam dort an.',
+      'Nebenbei: In Meldungen stand ohne Serververbindung der interne Kürzel („kartell") statt des Namens („Aschen-Kartell").',
+      'Der neue Prüflauf zeichnet den Fraktionsbereich jetzt wirklich und schaut hinein – einmal mit und einmal ohne Galaxie-Daten, jeweils mit der Zusicherung, dass alle vier Karten samt Rang-, Laden- und Botschaftszeile erscheinen und dabei kein Fehler auftritt. Genau die Lücke, durch die diese drei Fehler gemeinsam schlüpfen konnten.'
+    ]},
     { version:'8.298.27', date:'26.07.2026', changes:[
       '<strong>Fehler behoben: das Botschaftsviertel ließ sich überhaupt nicht bauen.</strong> Es war das erste Gebäude mit einem Kredit-Anteil in den Baukosten – und die Kostenprüfung suchte Kredite an der falschen Stelle. Sie liegen in einem eigenen Feld, nicht bei den Ressourcen, also las die Prüfung dort immer „0 vorhanden" und verweigerte den Bau, egal wie voll die Kasse war. Danke für den Screenshot.',
       'Aus derselben Ursache stand in der Kostenzeile <strong>„280 credits"</strong> klein und englisch zwischen „6.3k Erz" und „4.5k Kristalle". Jetzt steht dort „280 Kredite" mit dem gewohnten Kredit-Symbol, und die Rot-Markierung bei zu wenig Geld greift ebenfalls richtig.',
@@ -11362,7 +11370,9 @@
   const WAR_SUPPORT_COST = { erz:4000, kristalle:2500, deuterium:1200 };
   const WAR_SUPPORT_REP = 22, WAR_SUPPORT_CREDITS = 800;
   function warFactionIdByName(name){
-    const f = Object.values(galaxyCache.factions||{}).find(x => x && x.name === name);
+    // Ueber die zusammengefuehrte Liste, damit die Zuordnung auch dann klappt, wenn der Server die
+    // Namen der vier Diplomatie-Fraktionen (noch) nicht mitgeliefert hat.
+    const f = Object.values(diplomacyFactions()).find(x => x && x.name === name);
     return f ? f.id : null;
   }
   // Eindeutiger Schlüssel des laufenden Kriegs - damit "einmal je Krieg" auch nach einem Reload gilt.
@@ -11552,12 +11562,46 @@
     playSound('trade');
     render(); save();
   }
+  // Name und Farbe stehen seit v8.298.28 HIER und nicht mehr nur in der Server-Antwort.
+  //
+  // Vorher kamen sie ausschliesslich aus galaxyCache.factions, und renderFactions stieg bei leerem
+  // Cache komplett aus ("Noch keine Fraktionsdaten geladen."). Damit war der GESAMTE Fraktions-Ausbau
+  // - Raenge, Auftraege, Gunstmarken, Laeden, Botschaften, Rivalitaeten, Feindschaft - unsichtbar,
+  // sobald /galaxy nicht antwortete oder man ohne Server spielte. Spieler-Screenshot 26.07.2026:
+  // eingeloggt, alles andere lief, und der Fraktionsbereich war leer, ohne zu sagen warum.
+  //
+  // Klare Trennung ab jetzt: INHALT (welche Fraktionen es gibt, wie sie heissen, ihre Farbe) ist
+  // lokal. ZUSTAND (welche Systeme sie halten, ihre Militaerstaerke, laufende Kriege) kommt vom
+  // Server und fehlt einfach, wenn er nicht antwortet - ohne den Rest mitzunehmen.
   const FACTION_DIPLOMACY = {
-    kartell:  { effectLabel:'Marktrabatt', friendly:'5% bessere Marktpreise', allied:'10% bessere Marktpreise' },
-    void:     { effectLabel:'Raid-Schutz', friendly:'25% seltener Überfälle', allied:'50% seltener Überfälle' },
-    legion:   { effectLabel:'Ressourcen-Geschenke', friendly:'Belohnung 1x täglich abholbar (klein)', allied:'Belohnung 1x täglich abholbar (groß)' },
-    schatten: { effectLabel:'Kredit-Geschenke', friendly:'Belohnung 1x täglich abholbar (60 Kr.)', allied:'Belohnung 1x täglich abholbar (150 Kr.)' }
+    kartell:  { name:'Aschen-Kartell',   color:'#e0a548', effectLabel:'Marktrabatt', friendly:'5% bessere Marktpreise', allied:'10% bessere Marktpreise' },
+    void:     { name:'Void-Marodeure',   color:'#c3bef5', effectLabel:'Raid-Schutz', friendly:'25% seltener Überfälle', allied:'50% seltener Überfälle' },
+    legion:   { name:'Eisenlegion',      color:'#e24b4a', effectLabel:'Ressourcen-Geschenke', friendly:'Belohnung 1x täglich abholbar (klein)', allied:'Belohnung 1x täglich abholbar (groß)' },
+    schatten: { name:'Schattenbund',     color:'#6fd0c0', effectLabel:'Kredit-Geschenke', friendly:'Belohnung 1x täglich abholbar (60 Kr.)', allied:'Belohnung 1x täglich abholbar (150 Kr.)' }
   };
+  // Die anzuzeigenden Fraktionen: die vier Diplomatie-Fraktionen IMMER (aus FACTION_DIPLOMACY),
+  // angereichert mit dem Server-Zustand wo vorhanden - plus alles, was der Server zusaetzlich kennt
+  // (Piratenflotte, Rote Klaue und andere Kriegsparteien ohne Diplomatie).
+  function diplomacyFactions(){
+    const server = galaxyCache.factions || {};
+    const out = {};
+    for (const [fid, d] of Object.entries(FACTION_DIPLOMACY)){
+      const s = server[fid] || {};
+      out[fid] = {
+        id: fid,
+        name: s.name || d.name,
+        color: s.color || d.color,
+        systems: Array.isArray(s.systems) ? s.systems : [],
+        strength: s.strength || 0,
+        // Damit die Anzeige den Unterschied benennen kann: stehen hier ueberhaupt Server-Daten?
+        serverBekannt: !!server[fid]
+      };
+    }
+    for (const [fid, s] of Object.entries(server)){
+      if (!out[fid]) out[fid] = Object.assign({ id: fid, systems: [], strength: 0, serverBekannt: true }, s);
+    }
+    return out;
+  }
   function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, (state.factionRep||{})[fid]||0)); }
   // ===== Acht Raenge je Fraktion (26.07.2026, Fraktions-Ausbau Paket 5/6) =====
   // Vorher gab es fuenf Stufen, und drei davon (Feindlich, Neutral, Freundlich) deckten je 40-60
@@ -11727,7 +11771,14 @@
   const RIVAL_SPILL = 0.35;        // Anteil eines Ruf-Wechsels, der beim Rivalen gegenlaeufig ankommt
   const REP_ALLY_THRESHOLD = 70;   // identisch zu repTierOf() UND zum Backend - nicht einseitig aendern
   function rivalOf(fid){ return FACTION_RIVALS[fid] || null; }
-  function factionNameOf(fid){ const f = (galaxyCache.factions||{})[fid]; return f ? f.name : fid; }
+  function factionNameOf(fid){
+    // Reihenfolge: Server (kann abweichende Namen fuehren), dann die lokale Grundlage, dann die rohe
+    // ID als letzter Notnagel. Vorher stand in Solo-Meldungen woertlich "kartell" statt "Aschen-Kartell".
+    const f = (galaxyCache.factions||{})[fid];
+    if (f && f.name) return f.name;
+    const d = (typeof FACTION_DIPLOMACY !== 'undefined' ? FACTION_DIPLOMACY : {})[fid];
+    return (d && d.name) ? d.name : fid;
+  }
   function setFactionRepRaw(fid, wert){ state.factionRep[fid] = Math.max(REP_MIN, Math.min(REP_MAX, Math.round(wert))); }
   // Das Ueberschwappen wird bewusst DIREKT gesetzt und nicht ueber changeFactionRep geleitet: sonst
   // wuerde es sich gegenseitig aufrufen, und der Gesandtenschiff-/Forschungsbonus wuerde auch den
@@ -12094,11 +12145,16 @@
     // (data-contrib-input) und wird über renderGalaxyNews() bei aktivem Galaxie-Tab jeden
     // Sekunden-Tick neu aufgebaut - ohne diesen Schutz würde Tippen den Fokus verlieren.
     if (isTypingIn('factionBox')) return;
-    const factions = galaxyCache.factions;
-    if (!factions || !Object.keys(factions).length){
-      box.innerHTML = '<div class="bmeta">Noch keine Fraktionsdaten geladen.</div>';
-      return;
-    }
+    const factions = diplomacyFactions();
+    // Kein Totalausstieg mehr: die vier Diplomatie-Fraktionen sind immer da. Fehlt der Server-Zustand,
+    // sagt eine Hinweiszeile das ausdruecklich, statt den ganzen Bereich leer zu lassen.
+    const serverFehlt = !Object.values(factions).some(f => f.serverBekannt);
+    const serverHinweis = serverFehlt ? `<div class="card-row" style="margin-bottom:0.5rem; border-color:rgba(224,165,72,0.5);">
+      <div class="left"><div class="bicon" style="background:rgba(224,165,72,0.16); color:#e0a548;"><i class="ti ti-info-circle" aria-hidden="true"></i></div>
+        <div><div class="bname">Galaxie-Zustand nicht geladen</div>
+        <div class="bmeta">${useBackend() ? 'Der Server hat die Territorien noch nicht geliefert (er versucht es alle 2 Minuten erneut).' : 'Ohne Serververbindung spielst du im Solo-Modus.'} Ruf, Ränge, Aufträge, Gunstmarken, Läden und Botschaften funktionieren trotzdem – nur wie viele Systeme eine Fraktion hält, ihre Militärstärke und laufende Fraktionskriege fehlen.</div></div>
+      </div>
+    </div>` : '';
     const sorted = Object.values(factions).sort((a,b)=>(b.systems?.length||0)-(a.systems?.length||0));
     // Übersicht der eigenen eroberten Systeme (falls vorhanden) mit ihrem laufenden Nutzen.
     const mine = myConqueredSystems();
@@ -12180,9 +12236,18 @@
         <div class="bmeta">Strafexpeditionen: <strong style="color:#e24b4a;">+${pc}% Überfall-Häufigkeit</strong>, <strong style="color:#e24b4a;">+${pp}% Angreifer-Stärke</strong> – dafür <strong style="color:#5dcaa5;">+${pd}% Trümmer</strong>, wenn du sie abschlägst.</div>
       </div>`;
     })();
-    box.innerHTML = mineCard + botschaftCard + feindCard + kriegCard + sorted.map(f => {
+    box.innerHTML = serverHinweis + mineCard + botschaftCard + feindCard + kriegCard + sorted.map(f => {
       const count = (f.systems||[]).length;
       const strength = f.strength ? f.strength.toFixed(1) : '?';
+      // Diese vier ZUERST: der Fraktionsladen unten liest lvl, und ein const wird nicht gehoistet.
+      // Bis v8.298.27 standen sie weiter unten - die Ladenzeile lief in einen ReferenceError
+      // ("Cannot access 'lvl' before initialization") und riss das ganze Neuzeichnen mit. Aufgefallen
+      // ist das nie, weil renderFactions bei leerem galaxyCache vorher ausstieg und diese Zeilen
+      // gar nicht erreichte - auch in allen Tests. Erst der lokale Fraktions-Rueckfall legte es frei.
+      const dip = FACTION_DIPLOMACY[f.id];
+      const rep = factionRepOf(f.id);
+      const tier = repTierOf(rep);
+      const lvl = factionEffectLevel(f.id);
       // Fraktionsladen (Paket 4/6): aufklappbar je Fraktion, damit die Karte nicht explodiert.
       // Der offene Laden steht in einer sitzungslokalen Variable (kein Spielstand) - genau wie der
       // Expeditions-Kodex, dasselbe Muster.
@@ -12232,11 +12297,7 @@
             return `<button data-attack-faction-sys="${sysId}" style="font-size:10.5px; padding:3px 7px; background:rgba(226,75,74,0.15);"><i class="ti ti-sword" aria-hidden="true" style="margin-right:2px;"></i>${sys?sys.name:sysId}</button>`;
           }).join('') + `</div>`
         : '';
-      // Diplomatie-Zeile: Ruf, Stufe, aktiver Effekt, Tribut-Button.
-      const rep = factionRepOf(f.id);
-      const tier = repTierOf(rep);
-      const dip = FACTION_DIPLOMACY[f.id];
-      const lvl = factionEffectLevel(f.id);
+      // Diplomatie-Zeile: Ruf, Stufe, aktiver Effekt, Tribut-Button. (rep/tier/dip/lvl stehen oben.)
       const effectTxt = dip ? (lvl===2 ? dip.allied : (lvl===1 ? dip.friendly : dip.effectLabel+' (ab Ruf 30)')) : '';
       const tributeCdLeft = Math.max(0, ((state.tributeLastPaid||{})[f.id]||0) + TRIBUTE_COOLDOWN_MS - Date.now());
       // Tribut-Aufschlag der unteren Raenge sichtbar machen, sonst wirkt der höhere Preis wie ein Fehler.
@@ -38099,7 +38160,9 @@
   // Beim nächsten sichtbaren Intervall-Tick wird einfach normal nachgeladen, kein Datenverlust.
   setInterval(() => { if (document.visibilityState !== 'visible') return; loadLeaderboard(); if (useBackend()){ loadReports(); loadMessages(); claimPendingRewards(); refreshAttackShield(); if (myAllianceTag()) syncOwnAllianceRole(); } }, 15000);
   setInterval(() => { if (document.visibilityState === 'visible') loadGalaxyState(); }, 120000); // Galaxie-Zustand ändert sich langsam (Server-Tick alle 15 Min.), reicht alle 2 Min. zu prüfen
-  loadGalaxyState();
+  // Bewusst OHNE Erstaufruf an dieser Stelle: hier ist backendAvailable noch null, useBackend() also
+  // false, und loadGalaxyState() wuerde sofort aussteigen. Der echte Erstaufruf steht im Login-Pfad,
+  // sobald der Server bestaetigt ist (siehe dort).
   setInterval(() => { if (document.visibilityState === 'visible' && (activeTab === 'markt' || (state.limitOrders||[]).length)) loadMarketState(); }, 30000); // Marktpreise auffrischen: im Markt-Tab zur Anzeige, sonst nur wenn offene Limit-Orders auf Ausführung warten (loadMarketState prüft danach processLimitOrders) - Sichtbarkeits-Gate wie bei den übrigen Anzeige-Timern
   loadMarketState();
 
@@ -38584,7 +38647,12 @@
   (async () => {
     const ready = await initAuth();
     bootAuthPhase = false; // ab hier darf eine verdrängte Sitzung den Abmelde-Dialog auslösen
-    if (ready){ await load(); bootDataReady = true; render(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); checkIncomingMoonSieges(); if (myAllianceTag()){ loadAllianceWars(); if (useBackend()){ loadAllianceTechData(); loadAllianceBase(); loadAllianceDonationRanking(); } } if (!maybeShowNewbieWelcome() && !state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
+    // loadGalaxyState() MUSS hier stehen: der Aufruf beim Skriptstart lief immer ins Leere, weil er
+    // mit if (!useBackend()) return; beginnt und backendAvailable zu dem Zeitpunkt noch null ist
+    // (die Health-Pruefung laeuft asynchron). Die Fraktions- und Territoriumsdaten kamen dadurch
+    // erst beim ersten 2-Minuten-Tick - wer den Galaxie-Tab frueher oeffnete, sah einen leeren
+    // Fraktionsbereich (Spieler-Screenshot 26.07.2026).
+    if (ready){ await load(); bootDataReady = true; render(); loadGalaxyState(); loadLeaderboard(); loadReports(); loadMessages(); claimPendingRewards(); checkIncomingMoonSieges(); if (myAllianceTag()){ loadAllianceWars(); if (useBackend()){ loadAllianceTechData(); loadAllianceBase(); loadAllianceDonationRanking(); } } if (!maybeShowNewbieWelcome() && !state.tutorialSeen) showTutorial(); tryAutoRedeemReferral(); }
   })();
   // PWA: Service Worker registrieren (macht die App zusätzlich zum Manifest auch am DESKTOP
   // installierbar - Chrome/Edge verlangen dafür einen aktiven Service Worker, mobile Browser
