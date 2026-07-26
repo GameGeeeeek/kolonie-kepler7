@@ -2334,6 +2334,7 @@
             <div style="font-size:38px; font-weight:500; color:#e24b4a; font-variant-numeric:tabular-nums;" id="attackCentralValue">0</div>
           </div>
           <div id="debrisBox"></div>
+          <div id="prisenhofBox"></div>
           <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i>Flotte verlegen</div>
           <div id="relocateAllBox"></div>
           <div id="relocateBox"></div>
@@ -4448,8 +4449,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.300.1';
+  const VERSION = '8.301.0';
   const PATCHNOTES = [
+    { version:'8.301.0', date:'26.07.2026', changes:[
+      '<strong>Das Enterschiff entert jetzt wirklich.</strong> Es hieß seit dem 18.07.2026 so, trägt Enterhaken im Rumpf-Symbol und sammelt „Enterausrüstung" als Event-Teile – mechanisch war es aber schlicht der zäheste Angreifer. Der Name stellte einen Scheck aus, den die Mechanik nicht einlöste.',
+      '<strong>Neu: die Enterphase.</strong> Fliegt mindestens ein Enterschiff mit und ist der NPC-Kampf gewonnen, folgt eine vierte, eigen gewürfelte Phase gegen den überlebenden Rest der Gegnerflotte. Wer knapp gewinnt, hat mehr Widerstand vor sich als wer überrannt hat.',
+      '<strong>Gelingt sie, kaperst du Schiffe</strong> – zwei Enterschiffe tragen ein Prisenkommando (einen Kaperplatz), höchstens 10 je Kampf, und nur Klassen bis zum Bomber. Schlachtschiff, Leerenjäger und Superschlachtschiff bleiben außen vor: Entern soll keine Abkürzung zu Großschiffen sein.',
+      '<strong>Das kostet etwas.</strong> Gekaperte Schiffe fehlen anschließend im Trümmerfeld – du tauschst Recycler-Beute gegen Schiffe, es kommt nichts obendrauf. Und ein misslungener Enterversuch kostet 30% der eingesetzten Enterschiffe.',
+      '<strong>Neu: Prisengut und der Prisenhof.</strong> Jede geglückte Enterung bringt zusätzlich Prisengut, so viel wie die Prise an Punktegewicht wert ist. Ausgegeben wird es im Prisenhof (Flotte-Tab, Unterreiter „Flotte & Verlegen"): 400 Prisengut werden zu einem Modulfragment, 25 zu 200 Krediten, und der Enterhaken-Ausbau gibt in fünf Stufen dauerhaft +1 Kaperplatz und +4 Prozentpunkte Enterchance je Stufe. Feste Preise, keine Kopplung an die eigene Produktionsgröße.',
+      'Angriffs-Vorschau und Kampfbericht zeigen die Enterphase mit ihrer eigenen Chance an, dazu zwei neue Erfolge („Erste Prise", „Freibeuter" ab 50 gekaperten Schiffen).',
+      '<strong>Nicht dabei:</strong> Entern gegen andere Spieler. Diese Kämpfe rechnet der Server allein aus – das wäre eine Backend-Änderung. Und Piratennester haben bewusst keine modellierte Flotte, dort gäbe es nichts zu kapern.'
+    ]},
     { version:'8.300.1', date:'26.07.2026', changes:[
       '<strong>Textfehler auf der neuen Startseite korrigiert.</strong> Im Abschnitt „Kämpfe, die man planen kann" stand „die Trefferchance ist auf 10–90 % gedeckelt". Das war doppelt falsch: Gedeckelt ist die <em>Sieg</em>chance, nicht die Trefferchance – und 10–90 % gilt nur für Kämpfe gegen echte Spieler. Gegen NPCs ist die Spanne mit 5–95 % weiter. Beide Zahlen stehen jetzt richtig dort.'
     ]},
@@ -12892,6 +12902,8 @@
     { key:'bossdown', name:'Wächter-Bezwinger', desc:'Besiege den Wächter von Kepler.', check: s => (s.bossKills||0) >= 1, progress: s => [Math.min(1,s.bossKills||0), 1] },
     { key:'abyssdown', name:'Abyss-Bezwinger', desc:'Besiege den Abyss-Fürst.', check: s => ((s.npcScaling && s.npcScaling.boss2) || 0) >= 1, progress: s => [Math.min(1,(s.npcScaling && s.npcScaling.boss2)||0), 1] },
     { key:'nyradown', name:'Verschlingerin bezwungen', desc:'Besiege Nyra, die Verschlingerin.', check: s => ((s.npcScaling && s.npcScaling.boss3) || 0) >= 1, progress: s => [Math.min(1,(s.npcScaling && s.npcScaling.boss3)||0), 1] },
+    { key:'ersteprise', name:'Erste Prise', desc:'Kapere dein erstes Schiff mit einer Enterung.', check: s => (s.boardedShips||0) >= 1, progress: s => [Math.min(1, s.boardedShips||0), 1] },
+    { key:'freibeuter', name:'Freibeuter', desc:'Kapere insgesamt 50 Schiffe mit Enterungen.', check: s => (s.boardedShips||0) >= 50, progress: s => [Math.min(50, s.boardedShips||0), 50], reward:{erz:6000,kristalle:4000,credits:250}, xpReward:250 },
     { key:'allbosses', name:'Boss-Jäger', desc:'Besiege alle drei Bosse.', check: s => ['boss1','boss2','boss3'].every(id => ((s.npcScaling && s.npcScaling[id]) || 0) >= 1), progress: s => [['boss1','boss2','boss3'].filter(id => ((s.npcScaling && s.npcScaling[id]) || 0) >= 1).length, 3] },
     { key:'moonsiegewin', name:'Mondzerstörer', desc:'Zerstöre erfolgreich den Mond eines anderen Spielers.', check: s => (s.moonSiegesWon||0) >= 1, progress: s => [Math.min(1,s.moonSiegesWon||0), 1], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
     { key:'allianceraidkill', name:'Sternenfresser-Jäger', desc:'Besiege gemeinsam mit deiner Allianz den Allianz-Raid-Boss "Sternenfresser".', check: s => (s.allianceRaidBossKills||0) >= 1, progress: s => [Math.min(1,s.allianceRaidBossKills||0), 1], reward:{erz:10000,kristalle:6000,deuterium:3000,antimaterie:100,credits:400}, xpReward:400 },
@@ -13042,6 +13054,7 @@
     firstbuild:'ti-building-factory-2', firstcolony:'ti-planet', allsystems:'ti-map-2',
     tenkills:'ti-sword', bossdown:'ti-skull', abyssdown:'ti-skull', nyradown:'ti-alien',
     allbosses:'ti-trophy', moonsiegewin:'ti-target', allianceraidkill:'ti-alien',
+    ersteprise:'ti-anchor', freibeuter:'ti-ship',
     basewarwin:'ti-building-fortress', allianzweltprojekt:'ti-building-castle',
     allianzausbau100:'ti-building-community', nanopionier:'ti-atom',
     industriemagnat:'ti-building-factory-2', kettenmeister:'ti-box', synthesemeister:'ti-atom-2',
@@ -13137,6 +13150,10 @@
     scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, seenTabHints: {}, referralNudgeShown: false, expeditionsCompleted: 0, themeKey: 'standard', shipSkin: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, streakShields: 0, claimedStreakMilestones: [], comebackQuest: null, happyHoursUsed: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, colonyNotes: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
+    // Enterung (v8.301.0). Alle vier Felder sind kleine Ganzzahlen - Prisengut waechst ueber eine
+    // lange Spielerlaufbahn in den sechsstelligen Bereich und liegt damit weit unter den
+    // Backend-SAVE_SANITY_LIMITS (Kredite 1e12), enterhaken ist bei ENTERHAKEN_MAX=5 gedeckelt.
+    prisengut: 0, enterhaken: 0, boardedShips: 0, boardings: 0,
     // Wie viele der wöchentlich hinzukommenden Sternsysteme der Spieler schon gemeldet bekommen hat.
     // Vorbelegt mit dem aktuellen Stand, damit weder ein frisch angelegtes Konto noch ein
     // Bestandsspielstand beim ersten Start eine Sammelmeldung über alle bisherigen Systeme bekommt -
@@ -13531,7 +13548,7 @@
     // Geschwindigkeit oder roher Feuerkraft: expliziter Schildwert (32) weit über der automatischen
     // Ableitung (atk*0.5=12.5, siehe Schildpunkte-Kommentar unten bei SHIP_DEFS), zusammen mit
     // defWeight 1.6 der zäheste Angreifer knapp unter dem reinen Verteidigungsspezialisten Wächter.
-    { key:'enterschiff', name:'Enterschiff', icon:'ship_enterschiff', atk:25, shield:32, costFn:enterschiffCost, buildTime:150, requires:['rkampf'], drive:'impuls', speed:55, defWeight:1.6, unlockEventParts:{ eventKey:'piratenueberfall' }, nicheDesc:'zäheste Angreiferklasse im Spiel (hoher Schildwert statt roher Feuerkraft)' },
+    { key:'enterschiff', name:'Enterschiff', icon:'ship_enterschiff', atk:25, shield:32, costFn:enterschiffCost, buildTime:150, requires:['rkampf'], drive:'impuls', speed:55, defWeight:1.6, unlockEventParts:{ eventKey:'piratenueberfall' }, nicheDesc:'zäheste Angreiferklasse im Spiel (hoher Schildwert statt roher Feuerkraft) – und das einzige Schiff, das nach einem gewonnenen NPC-Kampf entern und gegnerische Schiffe kapern kann' },
     // Phantomschiff: exklusives Event-Schiff "Void-Anomalie" (18.07.2026) - Nische ist die Glaskanone:
     // hoher Angriffswert (35) bei explizit sehr niedrigem Schild (5, weit unter der automatischen
     // Ableitung 17.5) und dem niedrigsten defWeight aller Kampfschiffe - schlägt hart zu, hält aber
@@ -14816,6 +14833,96 @@
     const [a,b,c] = ps;
     return a*b*(1-c) + a*(1-b)*c + (1-a)*b*c + a*b*c;
   }
+
+  // ===== Enterung (26.07.2026) =====
+  // Das Enterschiff hiess seit dem 18.07.2026 so, hatte Enterhaken im Rumpf-Icon, sammelte
+  // "Enterausrüstung" als Event-Teile - und enterte nichts. Es war schlicht der zaeheste Angreifer.
+  //
+  // Die Enterung ist eine VIERTE Phase NACH den drei Kampfphasen und nur bei einem GEWONNENEN
+  // NPC-Kampf: Wer selbst zurueckgeschlagen wird, entert niemanden. Sie wird eigen gewuerfelt,
+  // gegen den ueberlebenden Rest der Gegnerflotte - wer den Kampf knapp gewinnt, hat also mehr
+  // Widerstand vor sich als wer ihn ueberrannt hat.
+  //
+  // Der Preis macht sie zur Entscheidung statt zum Geschenk: Gekaperte Schiffe fehlen anschliessend
+  // im TRUEMMERFELD - man tauscht Recycler-Beute gegen Schiffe. Und ein misslungener Enterversuch
+  // kostet einen Teil der Enterschiffe, die dabei an Bord waren.
+  //
+  // Nur NPC-Kaempfe: Spieler-gegen-Spieler loest das Backend allein auf (POST /api/attack), dort
+  // waere eine Enterung eine serverseitige Aenderung. Piratennester haben bewusst gar keine
+  // modellierte Flotte (siehe pirateLairWeakness), es gaebe dort nichts zu kapern.
+  const BOARD_POWER_PER_SHIP = 22;        // Enterkraft je Enterschiff
+  const BOARD_CAPACITY_PER_SHIP = 0.5;    // zwei Enterschiffe tragen ein Prisenkommando
+  const BOARD_CAPTURE_CAP = 10;           // harte Obergrenze gekaperter Schiffe je Kampf
+  // Kaperbar sind nur Klassen bis zu diesem Punktegewicht (SHIP_SCORE_WEIGHTS): Jaeger 12, Ships 15,
+  // Kreuzer 25, Traeger 30, Zerstoerer 35, Bomber 45 - Schlachtschiff (70), Leerenjaeger (120) und
+  // Superschlachtschiff (180) bleiben aussen vor. Sonst waere die Enterung eine Abkuerzung zu genau
+  // den Grossschiffen, die sonst lange Forschung und Bauzeit kosten.
+  const BOARD_MAX_SHIP_WEIGHT = 45;
+  const BOARD_CHANCE_MIN = 0.08, BOARD_CHANCE_MAX = 0.78;
+  const BOARD_FAIL_LOSS = 0.30;           // Anteil der Enterschiffe, der bei Fehlschlag draufgeht
+  const PRISENGUT_PER_WEIGHT = 1;         // Prisengut je Punkt Schiffsgewicht der Prise
+  // Enterhaken-Ausbau (Prisenhof): dauerhafte, gedeckelte Verbesserung. Additiv auf die Chance, im
+  // Sinne der additiv-gedeckelten Bonusgruppen des Spiels - keine weitere Multiplikation.
+  const ENTERHAKEN_MAX = 5;
+  const ENTERHAKEN_COSTS = [300, 700, 1300, 2200, 3500];
+  const ENTERHAKEN_CHANCE_PER = 0.04;     // +4 Prozentpunkte Enterchance je Stufe
+  const ENTERHAKEN_SLOT_PER = 1;          // +1 Kaperplatz je Stufe
+
+  function enterhakenLevel(){ return Math.max(0, Math.min(ENTERHAKEN_MAX, state.enterhaken||0)); }
+  // Wie viele fremde Schiffe die mitgefuehrten Enterschiffe hoechstens uebernehmen koennen.
+  function boardingCapacity(composition){
+    const n = (composition && composition.enterschiff) || 0;
+    if (n <= 0) return 0;
+    return Math.min(BOARD_CAPTURE_CAP, Math.floor(n * BOARD_CAPACITY_PER_SHIP) + enterhakenLevel()*ENTERHAKEN_SLOT_PER);
+  }
+  // Enterchance gegen den ueberlebenden Rest einer Gegnerflotte. Getrennt von resolveBoarding(),
+  // damit die Angriffsvorschau dieselbe Zahl nennen kann, die spaeter wirklich gewuerfelt wird.
+  function boardingChance(composition, restVerteidigung){
+    const n = (composition && composition.enterschiff) || 0;
+    if (n <= 0) return 0;
+    const kraft = n * BOARD_POWER_PER_SHIP;
+    const roh = (kraft + restVerteidigung) > 0 ? kraft/(kraft+restVerteidigung) : 0;
+    return Math.max(BOARD_CHANCE_MIN, Math.min(BOARD_CHANCE_MAX, roh + enterhakenLevel()*ENTERHAKEN_CHANCE_PER));
+  }
+  function isBoardable(shipKey){ return (SHIP_SCORE_WEIGHTS[shipKey]||999) <= BOARD_MAX_SHIP_WEIGHT; }
+
+  // Fuehrt die Enterung aus. WICHTIG: laeuft VOR applyCombatLosses auf die Gegnerflotte und
+  // ENTFERNT die Prisen aus gegnerFleetRemains - dadurch werden sie weder als zerstoert gezaehlt
+  // noch zu Truemmern. Genau das ist der Preis der Enterung, nicht ein Zusatzgewinn obendrauf.
+  // Gibt null zurueck, wenn gar kein Enterschiff dabei war (dann bleibt alles wie bisher).
+  function resolveBoarding(composition, gegnerFleetRemains, restVerteidigung, ownFleet, planetKey, rng){
+    const enterschiffe = (composition && composition.enterschiff) || 0;
+    if (enterschiffe <= 0) return null;
+    const wurf = rng || Math.random;
+    const chance = boardingChance(composition, restVerteidigung);
+    const erfolg = wurf() < chance;
+    const ergebnis = { chance, erfolg, enterschiffe, gekapert:{}, gekapertGesamt:0, prisengut:0, verloren:null };
+    if (!erfolg){
+      // Der Enterversuch schlaegt fehl: ein Teil der Enterkommandos kommt nicht zurueck. Bewusst
+      // ueber applyCombatLosses, damit auch daraus ein Truemmerfeld am Heimatplaneten entsteht.
+      ergebnis.verloren = applyCombatLosses(ownFleet, ['enterschiff'], BOARD_FAIL_LOSS, planetKey, composition);
+      return ergebnis;
+    }
+    let platz = boardingCapacity(composition);
+    if (platz <= 0) return ergebnis;
+    // Wertvollstes zuerst - innerhalb der Kaper-Grenze ist die Prise die Belohnung, da muss der
+    // Spieler nicht auch noch gegen eine Zufallsauswahl anspielen.
+    const kandidaten = Object.keys(gegnerFleetRemains)
+      .filter(k => (gegnerFleetRemains[k]||0) > 0 && isBoardable(k))
+      .sort((a,b) => (SHIP_SCORE_WEIGHTS[b]||0) - (SHIP_SCORE_WEIGHTS[a]||0));
+    for (const k of kandidaten){
+      if (platz <= 0) break;
+      const nimm = Math.min(platz, gegnerFleetRemains[k]||0);
+      if (nimm <= 0) continue;
+      gegnerFleetRemains[k] -= nimm;
+      ergebnis.gekapert[k] = (ergebnis.gekapert[k]||0) + nimm;
+      ergebnis.gekapertGesamt += nimm;
+      ergebnis.prisengut += nimm * (SHIP_SCORE_WEIGHTS[k]||10) * PRISENGUT_PER_WEIGHT;
+      platz -= nimm;
+    }
+    return ergebnis;
+  }
+
   // ===== Verteidigungs-Aufstellung (25.07.2026) =====
   // Der Verteidiger hatte bisher KEINE einzige Entscheidung: Verteidigung war eine reine Summe über
   // Gebäude und Flotte. Angreifen war taktisch, Verteidigen war Buchhaltung.
@@ -14900,6 +15007,112 @@
     const siege = phasen.filter(p=>p.gewonnen).length;
     return '<br>Kampfverlauf ('+siege+' von 3 Phasen gewonnen): '+teile;
   }
+  // Enterphase im Kampfbericht (26.07.2026). Eigene Zeile mit eigener Chance - die Enterung ist ein
+  // getrennter Wurf und wuerde in der Phasenzeile faelschlich wie eine der drei Kampfphasen wirken.
+  function boardingReportHtml(e){
+    if (!e) return '';
+    const pct = Math.round(e.chance*100);
+    if (!e.erfolg){
+      const verloren = lostCountsToText(e.verloren);
+      return '<br><i class="ti ti-anchor" aria-hidden="true" style="color:#e24b4a;"></i> Enterphase: <span style="color:#e24b4a;">gescheitert</span> <span style="color:#7d8199;">(~'+pct+'%)</span>'
+        + (verloren ? ' – verloren: '+verloren : '');
+    }
+    const gekapert = lostCountsToText(e.gekapert);
+    if (!gekapert) return '<br><i class="ti ti-anchor" aria-hidden="true" style="color:#5dcaa5;"></i> Enterphase: <span style="color:#5dcaa5;">geglückt</span> <span style="color:#7d8199;">(~'+pct+'%)</span> – nichts Kaperbares übrig.';
+    return '<br><i class="ti ti-anchor" aria-hidden="true" style="color:#5dcaa5;"></i> Enterphase: <span style="color:#5dcaa5;">geglückt</span> <span style="color:#7d8199;">(~'+pct+'%)</span> – gekapert: '
+      + gekapert + ' · +' + fmt(e.prisengut||0) + ' Prisengut'
+      + '<br><span style="color:#7d8199;">Gekaperte Schiffe fehlen im Trümmerfeld – die Prise ist ein Tausch gegen Recycler-Beute.</span>';
+  }
+  // ===== Prisenhof (26.07.2026) =====
+  // Was man erbeutet, ist fremde Bauart - nachbauen kann man es nicht, ausschlachten schon. Der
+  // Prisenhof ist die einzige Verwendung fuer Prisengut und bewusst eine GESCHLOSSENE Schleife:
+  // Prisengut kommt nur aus Enterungen und geht nur in Dinge, die der Enterung selbst dienen oder
+  // fest bepreist sind. Feste Preise statt produktionsabhaengiger Formeln - "N Minuten eigene
+  // Produktion" ist genau das Muster, vor dem CLAUDE.md warnt.
+  // Preis-Eichung: 1 Modulfragment kostet im Kredit-Shop 4.000 Kredite (40.000 fuer 10). Bei
+  // 400 Prisengut je Fragment entspricht 1 Prisengut also rund 10 Krediten - der direkte
+  // Kredit-Tausch liegt mit 8 bewusst leicht darunter, damit Fragmente die lohnendere Wahl bleiben.
+  const PRISENHOF_FRAGMENT_COST = 400;
+  const PRISENHOF_CREDIT_COST = 25;
+  const PRISENHOF_CREDIT_GAIN = 200;
+  let lastPrisenhofSig = null;
+  function enterhakenNextCost(){
+    const lvl = enterhakenLevel();
+    return lvl >= ENTERHAKEN_MAX ? null : ENTERHAKEN_COSTS[lvl];
+  }
+  function renderPrisenhofBox(){
+    const box = document.getElementById('prisenhofBox');
+    if (!box) return;
+    const pg = Math.floor(state.prisengut||0);
+    const lvl = enterhakenLevel();
+    // Vor der ersten Enterung gar nicht erst anzeigen - eine leere Box mit einer Waehrung, die man
+    // noch nie gesehen hat, erklaert nichts und nimmt nur Platz.
+    if (pg <= 0 && lvl === 0 && (state.boardings||0) === 0){ if (box.innerHTML) box.innerHTML = ''; lastPrisenhofSig = null; return; }
+    const kosten = enterhakenNextCost();
+    // Signatur-Cache: die Box hat keinen Live-Countdown, muss also nicht jede Sekunde neu entstehen.
+    const sig = pg+'|'+lvl+'|'+(state.boardedShips||0);
+    if (sig === lastPrisenhofSig) return;
+    lastPrisenhofSig = sig;
+    const angebot = (id, icon, farbe, titel, preis, text, machbar) => `
+      <div class="card-row" style="margin-bottom:8px;">
+        <div class="left">
+          <div class="bicon" style="background:rgba(${farbe},0.18); color:rgb(${farbe});"><i class="ti ${icon}" aria-hidden="true"></i></div>
+          <div><div class="bname">${titel}</div><div class="bmeta">${text}</div></div>
+        </div>
+        <button class="buy${machbar?' affordable':''}" data-prisenhof="${id}"${machbar?'':' disabled'}>${fmt(preis)} Prisengut</button>
+      </div>`;
+    box.innerHTML = `
+      <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-anchor" aria-hidden="true"></i>Prisenhof</div>
+      <div class="card-row" style="margin-bottom:0.75rem;">
+        <div class="left">
+          <div class="bicon" style="background:rgba(250,199,117,0.18); color:#fac775;"><i class="ti ti-anchor" aria-hidden="true"></i></div>
+          <div>
+            <div class="bname">Prisengut <span class="lvl-pill">${fmt(pg)}</span></div>
+            <div class="bmeta">Aus ${fmt(state.boardedShips||0)} gekaperten Schiffen in ${fmt(state.boardings||0)} geglückten Enterungen. Fremde Bauart lässt sich nicht nachbauen – nur ausschlachten.</div>
+          </div>
+        </div>
+      </div>
+      ${angebot('fragment','ti-atom-2','93,202,165','Beutegut ausschlachten', PRISENHOF_FRAGMENT_COST,
+        '1 Modulfragment aus fremder Technik. Im Kredit-Shop kostet dasselbe Fragment 4.000 Kredite.', pg >= PRISENHOF_FRAGMENT_COST)}
+      ${angebot('kredite','ti-diamond','55,138,221','Prise verhökern', PRISENHOF_CREDIT_COST,
+        fmt(PRISENHOF_CREDIT_GAIN)+' Kredite. Der schnelle Weg – pro Prisengut etwas weniger wert als der Umweg über Fragmente.', pg >= PRISENHOF_CREDIT_COST)}
+      ${kosten === null
+        ? `<div class="card-row" style="margin-bottom:8px;"><div class="left">
+             <div class="bicon" style="background:rgba(127,119,221,0.18); color:#7f77dd;"><i class="ti ti-anchor" aria-hidden="true"></i></div>
+             <div><div class="bname">Enterhaken-Ausbau <span class="lvl-pill">Stufe ${ENTERHAKEN_MAX}/${ENTERHAKEN_MAX}</span></div>
+             <div class="bmeta">Voll ausgebaut: +${ENTERHAKEN_MAX} Kaperplätze und +${Math.round(ENTERHAKEN_MAX*ENTERHAKEN_CHANCE_PER*100)} Prozentpunkte Enterchance.</div></div>
+           </div></div>`
+        : angebot('haken','ti-anchor','127,119,221','Enterhaken-Ausbau '+(lvl+1)+'/'+ENTERHAKEN_MAX, kosten,
+            'Dauerhaft +1 Kaperplatz je Kampf und +'+Math.round(ENTERHAKEN_CHANCE_PER*100)+' Prozentpunkte Enterchance. Aktuell Stufe '+lvl+': +'+lvl+' Plätze, +'+Math.round(lvl*ENTERHAKEN_CHANCE_PER*100)+' Punkte.', pg >= kosten)}
+    `;
+    box.querySelectorAll('[data-prisenhof]').forEach(b => b.onclick = () => prisenhofKauf(b.getAttribute('data-prisenhof')));
+  }
+  function prisenhofKauf(art){
+    const pg = Math.floor(state.prisengut||0);
+    if (art === 'fragment'){
+      if (pg < PRISENHOF_FRAGMENT_COST){ log('Nicht genug Prisengut ('+PRISENHOF_FRAGMENT_COST+' nötig, Vorrat: '+fmt(pg)+').', 'ti-alert-triangle'); return; }
+      state.prisengut = pg - PRISENHOF_FRAGMENT_COST;
+      state.moduleFragments = (state.moduleFragments||0) + 1;
+      log('Prise ausgeschlachtet: +1 Modulfragment (Vorrat: '+fmt(state.moduleFragments)+').', 'ti-atom-2', 'ok');
+    } else if (art === 'kredite'){
+      if (pg < PRISENHOF_CREDIT_COST){ log('Nicht genug Prisengut ('+PRISENHOF_CREDIT_COST+' nötig, Vorrat: '+fmt(pg)+').', 'ti-alert-triangle'); return; }
+      state.prisengut = pg - PRISENHOF_CREDIT_COST;
+      state.credits = (state.credits||0) + PRISENHOF_CREDIT_GAIN;
+      log('Prise verhökert: +'+fmt(PRISENHOF_CREDIT_GAIN)+' Kredite.', 'ti-diamond', 'ok');
+    } else if (art === 'haken'){
+      const kosten = enterhakenNextCost();
+      if (kosten === null){ log('Der Enterhaken-Ausbau ist bereits voll ausgebaut.', 'ti-info-circle'); return; }
+      if (pg < kosten){ log('Nicht genug Prisengut ('+kosten+' nötig, Vorrat: '+fmt(pg)+').', 'ti-alert-triangle'); return; }
+      state.prisengut = pg - kosten;
+      state.enterhaken = enterhakenLevel() + 1;
+      log('Enterhaken-Ausbau auf Stufe '+state.enterhaken+'/'+ENTERHAKEN_MAX+': +'+state.enterhaken+' Kaperplätze, +'+Math.round(state.enterhaken*ENTERHAKEN_CHANCE_PER*100)+' Punkte Enterchance.', 'ti-anchor', 'ok');
+    } else return;
+    playSound('build');
+    checkAchievements();
+    lastPrisenhofSig = null;
+    render(); save();
+  }
+
   function counterReportLine(mult){
     const v = counterVerdict(mult);
     // Exakt 1.0 heißt "kein Gegner-Flottenwissen" (z.B. Piratennest) - dann gar nichts schreiben,
@@ -21417,6 +21630,8 @@
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Zwei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, und <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet. Kampfschiffe haben jetzt zusätzlich eine echte <strong>Verteidigungsspezialisierung</strong>, unabhängig von der Angriffskraft: Jäger/Bomber/Träger/Zerstörer sind offensiv ausgerichtet und dadurch fragiler in der Verteidigung, Wächter und Schlachtschiff (inkl. Superschlachtschiff) sind gepanzerte Verteidigungsspezialisten. Eine reine Angriffsflotte verteidigt sich also spürbar schlechter als eine gemischte oder auf Wächter/Schlachtschiffe setzende Flotte.' },
       { title:'Konterrollen (Schere-Stein-Papier)', body:'Jedes Kampfschiff gehört zu einer von drei <strong>Konterrollen</strong>, die im Kreis stehen: <strong>Abfangjäger</strong> schlagen <strong>Bomber</strong>, Bomber schlagen <strong>Großkampfschiffe</strong>, Großkampfschiffe schlagen Abfangjäger. Die Rolle steht auf jeder Schiffskarte in der Werft (Tooltip erklärt, wogegen sie stark und schwach ist). Trifft deine Flotte auf viele Schiffe, die sie kontert, steigt die Angriffskraft um bis zu <strong>+25%</strong>; triffst du auf deine Gegenrolle, sinkt sie um bis zu <strong>-15%</strong>. Der Effekt richtet sich nach dem <em>Anteil</em> der jeweiligen Rolle an der Gegnerflotte – ein einzelnes Schiff kippt also nichts. Wirksam überall dort, wo die gegnerische Zusammensetzung bekannt ist: bei Angriffen auf <strong>Spieler</strong> (Aufklärung zeigt sie dir), auf <strong>NPCs</strong> (steht in der Angriffsvorschau) und bei der Abwehr von Überfällen. Bei Piratennestern gilt stattdessen die dort ausgewiesene Schwachstelle. Im Kampfbericht steht, wie stark der Konter tatsächlich gewirkt hat.' },
       { title:'Kampfphasen', body:'Ein Kampf wird nicht mehr mit einem einzigen Wurf entschieden, sondern in <strong>drei Phasen</strong>: <strong>Anflug</strong>, <strong>Hauptgefecht</strong> und <strong>Rückzug</strong>. Wer zwei der drei Phasen gewinnt, gewinnt den Kampf. Der Clou ist die unterschiedliche Gewichtung: Im Anflug zählen die Konterrollen <strong>anderthalbfach</strong>, im Hauptgefecht normal, im Rückzug nur halb. Eine gut zusammengestellte Flotte entscheidet den Kampf also früh; wer gekontert wurde, kann sich im weiteren Verlauf noch fangen. <strong>Was sich dadurch ändert:</strong> Der Gesamt-Spielraum bleibt gleich (min. 5%, max. 95% Siegchance), aber der Stärkere gewinnt <em>verlässlicher</em> – bei doppelter Übermacht steigt die Siegchance von 67% auf 74%, bei dreifacher von 75% auf 84%. Weniger Zufall, mehr Vorbereitung. Der Kampfbericht zeigt jede Phase einzeln. <strong>Gegen andere Spieler</strong> ist der Spielraum bewusst enger: dort liegt die Siegchance immer zwischen <strong>10% und 90%</strong> – kein Angriff auf einen Mitspieler ist sicher, keiner chancenlos. Die Angriffs-Vorschau im Spielerprofil nennt genau diese Zahl. Sie bleibt aber eine Schätzung: Die <strong>Verteidigungs-Aufstellung</strong> des Ziels wird erst beim Eintreffen angewandt und ist vorher nicht einsehbar.' },
+      { title:'Enterung – die vierte Phase', body:'Das <strong>Enterschiff</strong> (Event-Schiff des „Piratenüberfalls") kann als einziges Schiff <strong>entern</strong>. Fliegt mindestens eines im Angriff mit und ist der Kampf gegen einen <strong>NPC-Gegner</strong> gewonnen, folgt eine vierte, eigen gewürfelte Phase. Sie läuft gegen den <em>überlebenden</em> Rest der Gegnerflotte – wer knapp gewinnt, hat mehr Widerstand vor sich als wer überrannt hat. <strong>Bei Erfolg</strong> übernimmst du gegnerische Schiffe: zwei Enterschiffe tragen ein Prisenkommando, also einen Kaperplatz (maximal 10 je Kampf). Kaperbar sind nur kleine bis mittlere Klassen bis Bomber – Schlachtschiff, Leerenjäger und Superschlachtschiff lassen sich nicht übernehmen, die Enterung ist keine Abkürzung zu Großschiffen. <strong>Der Preis:</strong> Gekaperte Schiffe fehlen anschließend im <strong>Trümmerfeld</strong> – du tauschst Recycler-Beute gegen Schiffe, es gibt nichts obendrauf. <strong>Bei Fehlschlag</strong> kommen 30% der eingesetzten Enterschiffe nicht zurück. Die Angriffs-Vorschau nennt Chance und Kaperplätze vorher, der Kampfbericht zeigt die Phase einzeln. <strong>Nicht möglich</strong> ist die Enterung gegen andere Spieler (dort rechnet der Server den Kampf allein) und gegen Piratennester (die haben keine modellierte Flotte).' },
+      { title:'Prisengut & Prisenhof', body:'Jede geglückte Enterung bringt neben den Schiffen auch <strong>Prisengut</strong> – so viel, wie die gekaperten Schiffe an Punktegewicht wert sind. Es ist die einzige Beute, die man <em>nur</em> übers Entern bekommt, und die einzige Verwendung dafür ist der <strong>Prisenhof</strong> im Flotte-Tab (Unterreiter „Flotte & Verlegen", erscheint nach der ersten Enterung). Drei feste Angebote, bewusst ohne jede Kopplung an deine Produktionsgröße: <strong>Beutegut ausschlachten</strong> (400 Prisengut → 1 Modulfragment; dasselbe Fragment kostet im Kredit-Shop 4.000 Kredite), <strong>Prise verhökern</strong> (25 Prisengut → 200 Kredite, der schnellere aber leicht schlechtere Kurs) und der <strong>Enterhaken-Ausbau</strong> in fünf Stufen (300/700/1.300/2.200/3.500 Prisengut), der dauerhaft je Stufe <strong>+1 Kaperplatz</strong> und <strong>+4 Prozentpunkte</strong> Enterchance gibt. Damit ist Prisengut eine geschlossene Schleife: Es entsteht nur beim Entern und fließt vor allem ins Entern zurück.' },
       { title:'Verteidigungs-Aufstellung', body:'Im Verteidigung-Tab wählst du eine <strong>Aufstellung</strong>, die für alle deine Planeten gilt: <strong>Ausgewogen</strong> (keine Schwerpunkte, wirkt nie), <strong>Schilde vorn</strong> (+15% gegen Bomber, -10% gegen Abfangjäger) oder <strong>Geschütze vorn</strong> (+15% gegen Abfangjäger, -10% gegen Bomber). Sie ist das Gegenstück zur Konterrolle des Angreifers – nur legst du dich fest, <em>ohne</em> zu wissen, wer kommt. Genau das ist der Preis dafür, dass sie überhaupt etwas bringt. Wie die Konter wirkt sie anteilig: Ein einzelner Bomber in einer Abfangjäger-Flotte kippt nichts. Wirkt bei NPC-Überfällen und bei Spieler-Angriffen (dort serverseitig geprüft). Im Kampfbericht steht, wie stark deine Aufstellung gegen die konkrete Angriffsflotte getragen hat.' },
       { title:'Flottenaufbau & Kampfbonus-Deckel', body:'<strong>Flottenaufbau:</strong> Wie gleichmäßig sich die Angriffskraft deiner Flotte über die drei Konterrollen verteilt, gibt bis zu <strong>+8%</strong> Angriffs- UND Verteidigungskraft – volle Prämie bei einer zu Dritteln ausgewogenen Flotte, nichts bei einer reinen Ein-Rollen-Flotte. Gewichtet wird nach Angriffskraft, nicht nach Stückzahl: ein einzelnes Alibi-Schiff macht eine Flotte nicht ausgewogen. Damit hast du eine echte Wahl: <strong>ausgewogen</strong> bringt die sichere Prämie, ist aber konterneutral; <strong>spezialisiert</strong> verzichtet darauf und holt dafür beim richtigen Ziel bis zu +25% Konterbonus (beim falschen -15%). Aufklären lohnt sich also. Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
       { title:'Flaggschiff', body:'Im <strong>Offiziere-Tab</strong> baust du dein <strong>einzigartiges Flaggschiff</strong> – ein Kapitalschiff getrennt von der Massenflotte, das nicht zerstört werden kann und keine Slots belegt. Jede Ausbaustufe (max. 20) gibt <strong>+1,5% Angriffs- UND Verteidigungskraft</strong>, die in die gedeckelte Kampf-Bonus-Gruppe einfließt (siehe „Flottenvielfalt & Kampfbonus-Deckel"). Bau und Ausbau kosten Ressourcen + Kredite (steigend je Stufe). Du kannst deinem Flaggschiff einen eigenen Namen geben. Es <strong>überlebt einen Prestige-Reset</strong> (wie Offiziere und Module); erst ein Aufstieg (Transzendenz) setzt es zurück.' },
@@ -22042,6 +22257,7 @@
         }
         body += counterReportLine(r.counterMult);
         body += battlePhaseReportHtml(r.phasen);
+        body += boardingReportHtml(r.enterung);
         if (r.loot){
           body += '<br>Beute: '+rewardHtml(r.loot);
           if (r.cargoCapacity <= 0) body += '<br><span style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Keine Frachter mitgeführt – Beute ging verloren!</span>';
@@ -29160,6 +29376,19 @@
             const npcFleet = m.npcFleet || npcFleetFor(npc).fleet;
             const npcLossPct = Math.max(0.4, Math.min(0.9, power/(power+effDefense)));
             const npcFleetRemains = {...npcFleet};
+            // Enterung (26.07.2026) - vierte Phase, BEVOR die Verluste gerechnet werden. Was hier
+            // gekapert wird, verschwindet aus npcFleetRemains und taucht deshalb weder in den
+            // zerstoerten Schiffen noch im Truemmerfeld auf: die Prise ist ein TAUSCH gegen
+            // Recycler-Beute, kein Zusatzgewinn. Gewuerfelt wird gegen den ueberlebenden Rest der
+            // Gegnerflotte (effDefense abzueglich des im Kampf gefallenen Anteils).
+            const restVerteidigung = Math.max(1, Math.round(effDefense * (1 - npcLossPct)));
+            const enterung = resolveBoarding(m.composition || fleet, npcFleetRemains, restVerteidigung, fleet, planetKey);
+            if (enterung && enterung.erfolg && enterung.gekapertGesamt > 0){
+              for (const [k,v] of Object.entries(enterung.gekapert)) fleet[k] = (fleet[k]||0) + v;
+              state.prisengut = (state.prisengut||0) + enterung.prisengut;
+              state.boardedShips = (state.boardedShips||0) + enterung.gekapertGesamt;
+              state.boardings = (state.boardings||0) + 1;
+            }
             const destroyedNpcShips = applyCombatLosses(npcFleetRemains, Object.keys(npcFleet), npcLossPct, planetKey, null, true);
             const npcDebris = combatDebrisOf(destroyedNpcShips) || { erz:0, kristalle:0 };
             // Auch bei einem Sieg nimmt die eigene Flotte jetzt kleinere Verluste (5-15%) statt komplett
@@ -29167,15 +29396,39 @@
             // NPC-Trümmerfeld oben hinzu.
             addVeteranXp(planetKey, 15);
             const ownLostWin = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.1, planetKey, m.composition);
+            // Verluste eines gescheiterten Enterversuchs in DIESELBE Zahl einrechnen. Sonst nennt die
+            // Enterzeile des Berichts "6x Enterschiff verloren", waehrend die Verlustzeile daneben
+            // (und die Live-Kampf-Wiedergabe, die dieselbe Liste abspielt) nur die allgemeinen
+            // Gefechtsverluste zeigt - genau die zweite Anzeigestelle mit der alten Annahme, vor der
+            // CLAUDE.md Regel 6 warnt. Beim Aufbau der Enterung ist genau das aufgefallen.
+            if (enterung && !enterung.erfolg && enterung.verloren){
+              for (const [k,v] of Object.entries(enterung.verloren)){
+                if (k === '__debris' || !(v > 0)) continue;
+                ownLostWin[k] = (ownLostWin[k]||0) + v;
+              }
+            }
             const ownLostWinText = lostCountsToText(ownLostWin);
             const ownLossDebrisWin = combatDebrisOf(ownLostWin);
             // Für den Bericht: NPC-Trümmer und eigene Verlust-Trümmer zu einer Gesamtsumme zusammenzählen.
             const totalDebrisWin = { erz: npcDebris.erz + (ownLossDebrisWin?ownLossDebrisWin.erz:0), kristalle: npcDebris.kristalle + (ownLossDebrisWin?ownLossDebrisWin.kristalle:0) };
             const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
             const destroyedNpcText = lostCountsToText(destroyedNpcShips);
-            if (showLog !== false) log('Sieg gegen '+npc.name+'! ('+planetDisplayName(planetKey)+')'+(hasWeakness?' Schwachstelle ausgenutzt.':'')+(destroyedNpcText?' Zerstörte Gegner-Schiffe: '+destroyedNpcText+'.':'')+' Trümmerfeld hinterlassen.'+cargoNote+(ownLostWinText?' Eigene Verluste: '+ownLostWinText+'.':'')+' '+npc.name+' wird ab jetzt härter und lohnender.', 'ti-sword');
+            // Enter-Meldung als eigener Satz - sie beschreibt eine eigene Phase mit eigenem Wurf und
+            // geht in der ohnehin langen Sieg-Zeile sonst unter.
+            let enterText = '';
+            if (enterung){
+              if (enterung.erfolg && enterung.gekapertGesamt > 0){
+                enterText = ' Enterung geglückt ('+Math.round(enterung.chance*100)+'%): '+lostCountsToText(enterung.gekapert)+' gekapert, +'+fmt(enterung.prisengut)+' Prisengut.';
+              } else if (enterung.erfolg){
+                enterText = ' Enterung geglückt ('+Math.round(enterung.chance*100)+'%), aber es war nichts Kaperbares mehr übrig.';
+              } else {
+                const verlorenTxt = lostCountsToText(enterung.verloren);
+                enterText = ' Enterversuch gescheitert ('+Math.round(enterung.chance*100)+'% Chance)'+(verlorenTxt?': '+verlorenTxt+' verloren.':'.');
+              }
+            }
+            if (showLog !== false) log('Sieg gegen '+npc.name+'! ('+planetDisplayName(planetKey)+')'+(hasWeakness?' Schwachstelle ausgenutzt.':'')+(destroyedNpcText?' Zerstörte Gegner-Schiffe: '+destroyedNpcText+'.':'')+' Trümmerfeld hinterlassen.'+cargoNote+(ownLostWinText?' Eigene Verluste: '+ownLostWinText+'.':'')+enterText+' '+npc.name+' wird ab jetzt härter und lohnender.', 'ti-sword');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(chance*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, phasen: phasenErgebnis.phasen, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin };
+            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(chance*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, phasen: phasenErgebnis.phasen, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin, enterung: enterung ? { chance:enterung.chance, erfolg:enterung.erfolg, gekapert:enterung.gekapert, prisengut:enterung.prisengut, verloren:enterung.verloren||null } : null };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -35050,6 +35303,8 @@
       }
     }
 
+    renderPrisenhofBox();
+
     const expeditionBox = document.getElementById('expeditionBox');
     if (expeditionBox && !isTypingIn('expeditionBox')){
       // Gleicher Fehler wie bei attackFleetBox/factionBox/tradeRouteBox/marketBox: enthält das
@@ -36377,6 +36632,19 @@
       const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
       const kv = totalSelected > 0 ? counterVerdict(npcCounterPreview) : null;
+      // Enter-Vorschau (26.07.2026): Ohne sie waere die Enterphase eine Ueberraschung im Bericht.
+      // Gerechnet wird mit demselben boardingChance() wie spaeter im Kampf; als Widerstand dient der
+      // Erwartungswert des ueberlebenden Rests bei dieser Kraefteverteilung - dieselbe Formel wie in
+      // der Kampfaufloesung (effDefense * (1 - npcLossPct)).
+      const enterSchiffePreview = attackFleet.enterschiff||0;
+      let enterZeile = '';
+      if (enterSchiffePreview > 0){
+        const verlustPct = Math.max(0.4, Math.min(0.9, power/(power+effDefense||1)));
+        const restPreview = Math.max(1, Math.round(effDefense * (1 - verlustPct)));
+        const eChance = Math.round(boardingChance(attackFleet, restPreview)*100);
+        const platz = boardingCapacity(attackFleet);
+        enterZeile = `<div class="bmeta" style="color:#fac775;"><i class="ti ti-anchor" aria-hidden="true"></i> Enterphase nach gewonnenem Kampf: ~${eChance}% · bis zu ${platz} Schiff${platz===1?'':'e'} kaperbar${platz<=0?' (zu wenige Enterschiffe für einen Kaperplatz)':''} · Fehlschlag kostet ${Math.round(BOARD_FAIL_LOSS*100)}% der Enterschiffe</div>`;
+      }
       return `
         <div class="card-row">
           <div class="left">
@@ -36386,6 +36654,7 @@
               <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
               ${kv && npcCounterPreview !== 1 ? `<div class="bmeta" style="color:${kv.farbe};"><i class="ti ${kv.icon}" aria-hidden="true"></i> ${kv.text} (${kv.pct>0?'+':''}${kv.pct}% Angriffskraft)</div>` : ''}
+              ${enterZeile}
               <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(flightTime)} Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
               <div class="bmeta" style="${atkCargoCapacity<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität: ${fmt(atkCargoCapacity)}${atkCargoCapacity<=0?' – ohne Frachter geht die Beute verloren!':''}</div>
               <div class="bcost">${rewardHtml(effLoot)}</div>
