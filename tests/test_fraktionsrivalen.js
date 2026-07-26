@@ -140,8 +140,12 @@ check('5: zwei Bündnisse sind aber sehr wohl erreichbar (nicht überkorrigiert)
 // (marketDiscountPctFor in server.js). Eine einseitige Aenderung hier wuerde Anzeige und
 // Server-Rechnung auseinanderlaufen lassen - deshalb festgenagelt.
 check('6: die Bündnis-Schwelle ist unverändert 70', ALLY === 70, ALLY);
-check('6: repTierOf nutzt weiterhin 70 und 30',
-  /if \(rep >= 70\) return \{ key:'verbuendet'/.test(src) && /if \(rep >= 30\) return \{ key:'freundlich'/.test(src));
+// Seit v8.298.23 ist die Rufleiter eine Tabelle (REP_RANKS, acht Raenge) statt einer if-Kette.
+// Gepruefte Groesse ist unveraendert dieselbe: die beiden Schwellen, die das Backend spiegelt.
+check('6: die Rufleiter setzt "verbuendet" weiterhin auf 70',
+  /\{ key:'verbuendet',\s+min:70,/.test(src));
+check('6: die Rufleiter setzt "freundlich" weiterhin auf 30',
+  /\{ key:'freundlich',\s+min:30,/.test(src));
 check('6: der Kartell-Marktrabatt ist unverändert 5%/10%',
   /let pct = lvl === 2 \? 0\.10 : \(lvl === 1 \? 0\.05 : 0\);/.test(src));
 
