@@ -4266,8 +4266,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.24';
+  const VERSION = '8.298.25';
   const PATCHNOTES = [
+    { version:'8.298.25', date:'26.07.2026', changes:[
+      '<strong>Vier Tagesaufgaben für die Fraktionen.</strong> Der Fraktions-Ausbau hat sechs Systeme gebracht – der Tagesaufgaben-Pool kannte davon kein einziges, er stammte noch aus der Zeit davor. Jetzt sind es <strong>20 Vorlagen</strong> statt 16, von denen wie bisher täglich 5 gezogen werden.',
+      '<strong>„1 Posten in einem Fraktionsladen kaufen"</strong> – erscheint, sobald mindestens eine Fraktion freundlich ist. Anders als der Kredit-Shop-Kauf zahlst du hier mit Gunstmarken, also mit etwas, das du bei genau dieser Fraktion verdient haben musst.',
+      '<strong>„In einem Fraktionskrieg Partei ergreifen"</strong> – die zweite Aufgabe, die eine <em>Entscheidung</em> verlangt statt einer Menge (nach „1 Peilung ansteuern"). Sie kommt nur in den Pool, solange wirklich ein Krieg läuft, beide Parteien überhaupt Diplomatie haben und du noch keine Seite gewählt hast; endet der Krieg mitten am Tag, wird sie kostenlos getauscht.',
+      '<strong>„1 Fraktionsrang aufsteigen"</strong> – gemessen an der Summe aller vier Rangnummern, damit jeder einzelne Aufstieg zählt, auch wenn eine andere Fraktion längst auf Rang 8 steht. Verschwindet aus dem Pool, wenn alle vier oben sind.',
+      '<strong>„Bei 3 Fraktionen Kontakt halten"</strong> – die Gegenaufgabe zum Ruf-Verfall. Als Kontakt zählt jeder abgeschlossene Auftrag, Tribut, Ladenkauf, jede abgeholte Belohnung und jede Parteinahme. Botschaften zählen bewusst <em>nicht</em> automatisch mit, sonst wäre die Aufgabe für jeden mit drei Botschaften von selbst fast erledigt.',
+      'Bewusst <strong>nicht</strong> aufgenommen: „Gunstmarken verdienen" wäre nur der bestehende Fraktionsauftrag mit anderem Etikett gewesen (Marken kommen fast ausschließlich aus genau diesen Aufträgen), und „Eine Botschaft eröffnen" ist bei drei Plätzen insgesamt ein Einmal-Ereignis und damit nach drei Tagen tote Pool-Masse.',
+      'Alle vier messen über bereits vorhandene Zähler – es gibt keinen neuen Haken an einer Abschluss-Stelle. Wer mitten am Tag aktualisiert, bekommt die Tagesmarken nachgetragen, damit die neuen Aufgaben nicht sofort als erledigt gelten.'
+    ]},
     { version:'8.298.24', date:'26.07.2026', changes:[
       '<strong>Botschaftsviertel – drei Plätze, vier Fraktionen.</strong> Der Abschluss des Fraktions-Ausbaus. Ränge, Läden, Rivalitäten und Feindschaft erzwingen alle eine Wahl – aber es fehlte der Ort, an dem man diese Wahl <em>festlegt</em> und dauerhaft davon lebt. Das neue Gebäude <strong>Botschaftsviertel</strong> bietet Botschaftsplätze: den ersten ab Gesamtstufe 1, den zweiten ab 6, den dritten ab 12. Die Stufen aller Botschaftsviertel im Imperium zählen zusammen.',
       '<strong>Mehr als drei Plätze gibt es nie</strong> – bei vier Fraktionen bleibt immer eine draußen. Das ist der ganze Punkt.',
@@ -11582,6 +11591,11 @@
     const namen = FACTION_RANK_NAMES[fid];
     return { key:rang.key, label:rang.label, color:rang.color, nr:idx+1, name:(namen && namen[idx]) || rang.label };
   }
+  // Summe der vier Rangnummern (4 bis 32). Grundlage der Tagesaufgabe 'rank': so zaehlt jeder
+  // einzelne Aufstieg, auch wenn eine andere Fraktion schon auf dem hoechsten Rang steht.
+  function factionRankSum(){
+    return Object.keys(FACTION_DIPLOMACY).reduce((a,fid) => a + factionRankOf(fid).nr, 0);
+  }
   // Ruf, ab dem der naechste Rang beginnt - null beim hoechsten. Fuer die Fortschrittsanzeige.
   function nextRankAt(rep){
     const idx = repRankIndex(rep);
@@ -11625,6 +11639,10 @@
   function touchFactionContact(fid){
     if (!state.factionLastContact) state.factionLastContact = {};
     state.factionLastContact[fid] = Date.now();
+    // Tagesaufgabe 'repcare' (26.07.2026): Dies ist der EINZIGE Trichter fuer echten Spielerkontakt -
+    // Auftrag, Tribut, Ladenkauf, Belohnung, Parteinahme und jeder Ruf-Zuwachs laufen hier durch.
+    // Deshalb genuegt diese eine Stelle, es braucht keinen Zaehler an jeder Aktion.
+    if (state.dailyQuests && state.dailyQuests.contactedFactions) state.dailyQuests.contactedFactions[fid] = true;
   }
   // Verbleibende Zeit bis zum naechsten Ruf-Verlust; null, wenn nichts zu verlieren ist.
   function repDecayDueIn(fid){
@@ -17056,7 +17074,35 @@
     // gar nicht genug Expeditionen fliegt, um regelmaessig Peilungen aufzufangen; und der
     // Pechstraehnen-Schutz in maybeSpawnSignal garantiert nach SIGNAL_PITY_AFTER erfolglosen
     // Expeditionen die naechste Peilung. Belohnung in der Groessenordnung der uebrigen 15.
-    { key:'signal', name:'1 Peilung ansteuern', icon:'ti-antenna-bars-5', target:1, reward:{forschungspunkte:20,credits:70}, nav:{ tab:'expedition' }, available: () => (state.expeditionsCompleted||0) >= 15 }
+    { key:'signal', name:'1 Peilung ansteuern', icon:'ti-antenna-bars-5', target:1, reward:{forschungspunkte:20,credits:70}, nav:{ tab:'expedition' }, available: () => (state.expeditionsCompleted||0) >= 15 },
+    // 26.07.2026, nach dem Fraktions-Ausbau (Pakete 1-6): der Pool kannte von den sechs neuen
+    // Systemen kein einziges. Vier davon sind als Tagesaufgabe wirklich tragfaehig, zwei bewusst
+    // NICHT (dieselbe ehrliche Auslese wie am 18.07.2026):
+    //   - "Gunstmarken verdienen" waere blosses fquest mit anderem Etikett - Marken kommen fast
+    //     ausschliesslich aus genau denselben Fraktionsauftraegen, die 'fquest' schon zaehlt.
+    //   - "Eine Botschaft eroeffnen" ist mit drei Plaetzen insgesamt ein EINMAL-Ereignis, keine
+    //     taegliche Handlung - als Tagesaufgabe waere sie nach drei Tagen fuer immer toter Pool.
+    // Alle vier neuen messen ueber vorhandene Lebenszeit-Zaehler bzw. den einen Kontakt-Trichter,
+    // es gibt also keinen neuen Hook an einer Abschluss-Stelle.
+    { key:'shopbuy', name:'1 Posten in einem Fraktionsladen kaufen', icon:'ti-diamond', target:1, reward:{credits:90}, nav:{ tab:'galaxie' },
+      // Der Laden oeffnet erst ab Freundlich - vorher waere die Aufgabe unerfuellbar.
+      available: () => Object.keys(FACTION_DIPLOMACY).some(fid => factionEffectLevel(fid) > 0) },
+    // Die zweite Aufgabe, die eine ENTSCHEIDUNG statt einer Menge verlangt (nach 'signal'): welche
+    // Seite. Nur im Pool, wenn ueberhaupt ein Krieg laeuft, beide Parteien Diplomatie haben und noch
+    // nicht Partei ergriffen wurde - sonst waere sie strukturell unerfuellbar, und sanitizeDailyQuests
+    // tauscht sie kostenlos, falls der Krieg mitten am Tag endet.
+    { key:'warsupport', name:'In einem Fraktionskrieg Partei ergreifen', icon:'ti-sword', target:1, reward:{erz:500,kristalle:250}, nav:{ tab:'galaxie' },
+      available: () => !!galaxyCache.activeWar && !warSupportedSide() &&
+        !!(warFactionIdByName(galaxyCache.activeWar.factionA) || warFactionIdByName(galaxyCache.activeWar.factionB)) },
+    // Rang aufsteigen: gemessen an der SUMME der vier Rangnummern, damit jeder einzelne Aufstieg
+    // zaehlt (ein Maximum ueber alle vier waere bei einer Fraktion auf Rang 8 fuer immer eingefroren).
+    { key:'rank', name:'1 Fraktionsrang aufsteigen', icon:'ti-medal', target:1, reward:{credits:100}, nav:{ tab:'galaxie' },
+      available: () => Object.keys(FACTION_DIPLOMACY).some(fid => factionRankOf(fid).nr < REP_RANKS.length) },
+    // Die Gegenaufgabe zum Ruf-Verfall: nicht "mehr Ruf", sondern "kuemmere dich um drei von vier".
+    // Botschaften zaehlen bewusst NICHT automatisch mit (applyReputationDecay zieht deren Kontaktuhr
+    // direkt weiter, nicht ueber touchFactionContact) - sonst waere die Aufgabe fuer Spieler mit drei
+    // Botschaften von selbst fast erledigt.
+    { key:'repcare', name:'Bei 3 Fraktionen Kontakt halten', icon:'ti-flag', target:3, reward:{credits:110}, nav:{ tab:'galaxie' } }
   ];
   const DAILY_QUEST_ACTIVE_COUNT = 5;
   const DAILY_QUEST_REROLL_COST = 15;
@@ -17068,6 +17114,15 @@
   function sanitizeDailyQuests(){
     if (!state.dailyQuests || !state.dailyQuests.activeKeys) return false;
     let changed = false;
+    // Nachtrag fuer Spielstaende, die MITTEN AM TAG auf v8.298.25 aktualisieren: ihr dailyQuests-
+    // Objekt kennt die vier neuen Tagesbeginn-Marken noch nicht. Ohne diesen Nachtrag wuerden
+    // 'shopbuy'/'warsupport'/'rank' den kompletten Lebenszeit-Stand als heutigen Zuwachs lesen und
+    // waeren sofort erledigt, und 'repcare' koennte den ganzen Tag nicht hochzaehlen.
+    const dq = state.dailyQuests;
+    if (dq.startFactionShopPurchases === undefined){ dq.startFactionShopPurchases = state.factionShopPurchases||0; changed = true; }
+    if (dq.startWarSidesTaken === undefined){ dq.startWarSidesTaken = state.warSidesTaken||0; changed = true; }
+    if (dq.startRankSum === undefined){ dq.startRankSum = factionRankSum(); changed = true; }
+    if (!dq.contactedFactions){ dq.contactedFactions = {}; changed = true; }
     state.dailyQuests.activeKeys.forEach((k, idx) => {
       if (state.dailyQuests.claimed[k]) return;
       const def = DAILY_QUEST_DEFS.find(d=>d.key===k);
@@ -17106,6 +17161,11 @@
       startNpcKills: state.npcKills||0, startDiscovered: Object.keys(state.discovered||{}).length,
       startShopPurchases: state.shopPurchases||0, startSkillPointsSpent: skillPointsSpent(),
       startSignalsFollowed: (state.expeditionCodex||{}).signalsFollowed||0,
+      // Fraktions-Ausbau (26.07.2026): drei weitere Tagesbeginn-Marken auf vorhandene
+      // Lebenszeit-Zaehler, plus contactedFactions als Tages-Menge fuer 'repcare'.
+      startFactionShopPurchases: state.factionShopPurchases||0, startWarSidesTaken: state.warSidesTaken||0,
+      startRankSum: factionRankSum(),
+      contactedFactions: {},
       researchCount:0, buildCount:0, tradeCount:0, fquestCount:0, itemCount:0, randomEventCount:0, tributeCount:0, allianceContribCount:0, tier2Produced:0, claimed:{}
     };
   }
@@ -17127,6 +17187,10 @@
     if (key==='alliancecontrib') return dq.allianceContribCount||0;
     if (key==='tier2') return Math.floor(dq.tier2Produced||0); // Fabriken produzieren Bruchteile je Tick - erst volle Einheiten zählen
     if (key==='signal') return Math.max(0, ((state.expeditionCodex||{}).signalsFollowed||0) - (dq.startSignalsFollowed||0));
+    if (key==='shopbuy') return Math.max(0, (state.factionShopPurchases||0) - (dq.startFactionShopPurchases||0));
+    if (key==='warsupport') return Math.max(0, (state.warSidesTaken||0) - (dq.startWarSidesTaken||0));
+    if (key==='rank') return Math.max(0, factionRankSum() - (dq.startRankSum||0));
+    if (key==='repcare') return Object.keys(dq.contactedFactions||{}).length;
     return 0;
   }
   // skipRenderSave (QoL-Vorschlag 20.07.2026, "Alle abholen"-Sammel-Button): claimAllDailyQuests()
@@ -20938,7 +21002,7 @@
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Sieben Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
-      { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag, sobald mindestens eine Tier-2-Fabrik existiert „5 Tier-2-Ressourcen produzieren" (gezählt wird die echte Fabrik-Produktion aller Ketten) sowie, ab 15 abgeschlossenen Expeditionen, „1 Peilung ansteuern") - jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Warten darüber hinaus noch weitere fällige Belohnungen aus anderen Systemen (abholbare <strong>Fraktionsgeschenke</strong>, erreichte <strong>Dominanz-Stufen</strong>), fasst der Knopf <strong>„Alles einsammeln"</strong> ab zwei fälligen Belohnungen insgesamt alles zusammen und holt es mit einem Klick ab. Offene (noch nicht erledigte) Aufgaben lassen sich außerdem antippen, um direkt zum passenden Menü zu springen. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
+      { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag, sobald mindestens eine Tier-2-Fabrik existiert „5 Tier-2-Ressourcen produzieren" (gezählt wird die echte Fabrik-Produktion aller Ketten) sowie, ab 15 abgeschlossenen Expeditionen, „1 Peilung ansteuern"). Nach dem Fraktions-Ausbau kommen vier <strong>Fraktions-Aufgaben</strong> dazu: „1 Posten in einem Fraktionsladen kaufen" (sobald mindestens eine Fraktion freundlich ist), „In einem Fraktionskrieg Partei ergreifen" (nur solange wirklich ein Krieg läuft und du noch keine Seite gewählt hast), „1 Fraktionsrang aufsteigen" und „Bei 3 Fraktionen Kontakt halten" – letztere ist die Gegenaufgabe zum Ruf-Verfall: als Kontakt zählt jeder abgeschlossene Auftrag, Tribut, Ladenkauf, jede abgeholte Belohnung und jede Parteinahme. Botschaften zählen dabei bewusst nicht mit, sonst wäre die Aufgabe von selbst fast erledigt. Insgesamt sind es damit 20 Vorlagen – jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Warten darüber hinaus noch weitere fällige Belohnungen aus anderen Systemen (abholbare <strong>Fraktionsgeschenke</strong>, erreichte <strong>Dominanz-Stufen</strong>), fasst der Knopf <strong>„Alles einsammeln"</strong> ab zwei fälligen Belohnungen insgesamt alles zusammen und holt es mit einem Klick ab. Offene (noch nicht erledigte) Aufgaben lassen sich außerdem antippen, um direkt zum passenden Menü zu springen. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen Kredit-Bonus, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt - ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
       { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum sowie <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong>. Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Tier-2-Bestände gehen beim Prestige verloren</strong> - es sei denn, du errichtest vorher ein <strong>Kryo-Archiv</strong> (Basis-Tab, ab Hochenergiephysik, max. Stufe 5 je Standort): je Stufe bewahrt es 40 Nanolegierungen / 20 Quantenchips / 15 Hochenergiekristalle / 8 Fusionskerne / 5 KI-Kerne durchs Prestige (Stufen aller Standorte summiert, imperiumsweit bei Stufe 10 gedeckelt). Das Archiv selbst wird wie alle Gebäude zurückgesetzt - eine bewusste Einmal-Investition pro Durchlauf. <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie.' },
