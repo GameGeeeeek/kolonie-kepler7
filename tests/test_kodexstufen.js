@@ -45,10 +45,10 @@ function baueUmgebung(codex, claimed){
   return { ctx, state };
 }
 
-const leer = { specials:{}, rares:{}, chainCompleted:0 };
+const leer = { specials:{}, rares:{}, chainCompleted:0, signalsFollowed:0 };
 const { ctx } = baueUmgebung(leer, {});
 const TIERS = ctx.TIERS;
-check('1: sechs Kodex-Stufen definiert', TIERS.length === 6, TIERS.length);
+check('1: sieben Kodex-Stufen definiert', TIERS.length === 7, TIERS.length);
 check('1: jede Stufe hat ein Icon aus der Whitelist',
   TIERS.every(t => whitelist.has(t.icon)), TIERS.filter(t => !whitelist.has(t.icon)).map(t => t.key + '=' + t.icon));
 check('1: jede Stufe hat eine vollständige Beschreibung mit Belohnungsangabe',
@@ -86,7 +86,7 @@ check('4: und beim Neuaufbau des Zustands wieder eingesetzt',
 check('4: mit Vorgabewert für Altstände', /state\.codexClaimed = \{\}/.test(src));
 
 // ---------------------------------------------------------------- 5) Verhalten
-const voll = { specials:{}, rares:{}, chainCompleted:5 };
+const voll = { specials:{}, rares:{}, chainCompleted:5, signalsFollowed:20 };
 for (let i = 0; i < SPECIALS_TOTAL; i++) voll.specials['s' + i] = 1;
 for (let i = 0; i < RARE_FINDBAR; i++) voll.rares['r' + i] = 1;
 const u2 = baueUmgebung(voll, {});
@@ -110,7 +110,12 @@ check('5: und verweigert nicht erreichte Stufen',
 
 // ---------------------------------------------------------------- 6) Hilfe mitgezogen
 check('6: die Hilfe erklärt die Kodex-Stufen',
-  /sechs <strong>Stufen<\/strong>/.test(src) && /dauerhaften Beutebonus/.test(src));
+  /sieben <strong>Stufen<\/strong>/.test(src) && /dauerhaften Beutebonus/.test(src));
+// Die Hilfe nennt die Summe der Beuteboni als Zahl - genau die Sorte zweite Anzeigestelle, die beim
+// Hinzufuegen einer Stufe stehen bleibt (CLAUDE.md Regel 6). Gegen den echten Wert pruefen.
+check('6: und nennt die richtige Gesamtsumme der Beuteboni',
+  new RegExp('zusammen bis zu \\+' + Math.round(summe*100) + '%').test(src),
+  { erwartet: Math.round(summe*100)+'%' });
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);
