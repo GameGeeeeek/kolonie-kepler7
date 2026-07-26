@@ -60,6 +60,24 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   // Ladebildschirm, dann das eigentliche Stylesheet). Mit indexOf endete der "JS-Vorlagen"-Abschnitt
   // schon bei Zeile 129 und die Prüfung las in Wahrheit das komplette Haupt-Stylesheet mit - sie
   // hätte also unter falschem Namen angeschlagen. Die Rot-Probe hat genau das sichtbar gemacht.
+  // ---------------------------------------------------------------- Rahmenstärken (v8.303.0)
+  // BEFUND: fünf Stärken (0.5/1/1.5/2/3px) für in Wahrheit drei Aufgaben. 46 Vollrahmen lagen auf
+  // 0.5px, 32 auf 1px - beide im selben Ruhezustand, nur zu verschiedenen Zeiten geschrieben.
+  for (const t of ['--bw-1','--bw-2','--bw-rail'])
+    check('1: Rahmen-Stufe '+t+' ist definiert', new RegExp(t+': ?[0-9.]+px;').test(src));
+  // Die Stufen müssen unterscheidbar bleiben: ein Ruhezustand, der so dick ist wie die
+  // Hervorhebung, trägt keine Information mehr.
+  const bw = t => parseFloat((src.match(new RegExp(t+': ?([0-9.]+)px;'))||[])[1]);
+  check('1: Ruhezustand ist dünner als die Hervorhebung', bw('--bw-1') < bw('--bw-2'), [bw('--bw-1'), bw('--bw-2')]);
+  check('1: die Akzentleiste ist die kräftigste Stufe', bw('--bw-rail') > bw('--bw-2'), [bw('--bw-2'), bw('--bw-rail')]);
+  // Genau EIN fester px-Rahmenwert darf übrig bleiben: der verdiente Zierring um den Avatar
+  // (.frame-ring). Er ist kein Rahmen im Sinne der Skala und im Code ausdrücklich begründet.
+  const festeRahmen = src.match(/border(?:-[a-z]+)?: ?[0-9.]+px/g) || [];
+  check('1: nur der begründete Zierring hat noch einen festen px-Rahmen',
+    festeRahmen.length === 1 && /3px/.test(festeRahmen[0]), festeRahmen);
+  check('1: und seine Ausnahme ist im Code begründet',
+    /AUSSERHALB der --bw-Skala/.test(src) && /\.frame-ring \{[^}]*border:3px/.test(src));
+
   const stil = src.lastIndexOf('</style>');
   const vorlagen = src.slice(stil);
   const inline = vorlagen.match(/border-radius: ?[0-9]+px/g) || [];
