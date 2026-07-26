@@ -4259,8 +4259,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.21';
+  const VERSION = '8.298.22';
   const PATCHNOTES = [
+    { version:'8.298.22', date:'26.07.2026', changes:[
+      '<strong>Gunstmarken und Fraktionsläden.</strong> Aufträge und Parteinahme brachten bisher nur Ruf und Ressourcen – Ruf selbst war ab einem gewissen Punkt wertlos, weil es nichts gab, wofür man ihn ausgeben konnte. Jetzt zahlt jede Fraktion in ihrer eigenen Währung: <strong>Gunstmarken</strong>.',
+      'Verdient werden sie durch Fraktionsaufträge (Bronze 1, Silber 2, Gold 4 Marken) und durch Parteinahme in einem Fraktionskrieg (3 Marken). Marken sind <strong>nicht übertragbar</strong> – Kartell-Marken zahlen nur beim Kartell. Wer überall ein bisschen mitläuft, kauft nirgends etwas; wer sich entscheidet, kommt an die guten Sachen.',
+      'Ab <em>Freundlich</em> öffnet jede Fraktion ihren <strong>eigenen Laden mit vier Posten</strong>, die zu ihr passen: das <strong>Aschen-Kartell</strong> verkauft Kredite, Modulfragmente und Handelsleitstände, die <strong>Eisenlegion</strong> Kommandopunkte, Waffen- und Panzerungsmodule, die <strong>Void-Marodeure</strong> Forschungspunkte, Sondentechnik und – ganz neu – eine <strong>angeforderte Peilung</strong> in einem entdeckten System, der <strong>Schattenbund</strong> Kredite, Tier-2-Material und ein Eskorten-Leitsystem.',
+      'Der jeweils vierte Posten kostet 8 Marken und ist <strong>nur Verbündeten</strong> zugänglich. Da man seit den Rivalitäten höchstens zwei Bündnisse gleichzeitig halten kann, sind die vier Spitzenposten nie alle zusammen erreichbar – welche zwei es werden, entscheidet die eigene Bündnispolitik.',
+      'Gekaufte Module landen im ganz normalen Modul-Inventar und sind von gefertigten nicht zu unterscheiden. Schlägt eine Lieferung fehl – etwa weil schon die Höchstzahl an Peilungen offen ist –, werden <strong>keine Marken abgebucht</strong>; erst kommt die Ware, dann die Bezahlung.',
+      'Zwei neue Erfolge: <strong>Gern gesehener Gast</strong> (10 gekaufte Posten) und <strong>Wohlgesonnen</strong> (8 Marken bei einer Fraktion gleichzeitig).'
+    ]},
     { version:'8.298.21', date:'26.07.2026', changes:[
       '<strong>Feindschaft hat jetzt Folgen.</strong> „Feindlich" war bisher nur ein rotes Etikett ohne jede Wirkung – es gab weder einen Nachteil noch einen Grund, den Ruf zu pflegen. Neu ist außerdem die Stufe <strong>Verfeindet</strong> ab Ruf −70.',
       'Jede Fraktion schadet dort, wo sie sonst nützt: das <strong>Aschen-Kartell</strong> boykottiert deine Handelsrouten (−12% bzw. −25% Ertrag), die <strong>Void-Marodeure</strong> lenken Überfälle auf dich (+25% bzw. +60% Häufigkeit), die <strong>Eisenlegion</strong> fängt deine Expeditionen ab (+20% bzw. +45% Begegnungschance) und der <strong>Schattenbund</strong> verkauft deine Positionen weiter (+15% bzw. +30% Ressourcenverlust bei Überfällen).',
@@ -11257,9 +11265,12 @@
     changeFactionRep(fid, q.rewardRep);
     if (q.rewardCredits) state.credits = (state.credits||0) + q.rewardCredits;
     if (q.rewardFragments) state.moduleFragments = (state.moduleFragments||0) + q.rewardFragments;
+    // Gunstmarken (Paket 4/6): Bronze 1, Silber 2, Gold 4 - die Waehrung des Fraktionsladens.
+    const marken = FAVOR_PER_TIER[q.tier] || 1;
+    addFactionFavor(fid, marken);
     const f = (galaxyCache.factions||{})[fid];
     const tier = questTierOf(q.tier);
-    const teile = ['+'+q.rewardRep+' Ruf'];
+    const teile = ['+'+q.rewardRep+' Ruf', '+'+marken+' Gunstmarke'+(marken===1?'':'n')];
     if (q.rewardCredits) teile.push('+'+fmt(q.rewardCredits)+' Kredite');
     if (q.rewardFragments) teile.push('+'+q.rewardFragments+' Modulfragmente');
     log(tier.label+'-Auftrag für '+(f?f.name:fid)+' abgeschlossen: '+teile.join(', ')+'.', tier.icon, 'ok');
@@ -11317,9 +11328,124 @@
     changeFactionRep(fid, WAR_SUPPORT_REP);
     state.credits = (state.credits||0) + WAR_SUPPORT_CREDITS;
     state.warSidesTaken = (state.warSidesTaken||0) + 1;
+    addFactionFavor(fid, FAVOR_WAR_SUPPORT);
     const gegner = fid === idA ? idB : idA;
-    log('Kriegslieferung an '+factionNameOf(fid)+' im Kampf um '+w.system+': +'+WAR_SUPPORT_REP+' Ruf und '+fmt(WAR_SUPPORT_CREDITS)+' Kredite'+(gegner?'. Auf der Gegenseite hat '+factionNameOf(gegner)+' es zur Kenntnis genommen.':'.'), 'ti-sword', 'ok');
+    log('Kriegslieferung an '+factionNameOf(fid)+' im Kampf um '+w.system+': +'+WAR_SUPPORT_REP+' Ruf, +'+FAVOR_WAR_SUPPORT+' Gunstmarken und '+fmt(WAR_SUPPORT_CREDITS)+' Kredite'+(gegner?'. Auf der Gegenseite hat '+factionNameOf(gegner)+' es zur Kenntnis genommen.':'.'), 'ti-sword', 'ok');
     playSound('win');
+    checkAchievements();
+    render(); save();
+  }
+  // ===== Gunstmarken und Fraktionsläden (26.07.2026, Fraktions-Ausbau Paket 4/6) =====
+  // Bis hierher endete jede Fraktionsbeziehung in einem passiven Prozentwert: Marktrabatt,
+  // Raid-Schutz, ein Tagesgeschenk. Ruf war ein Schalter, kein Ziel. Der Laden gibt dem System eine
+  // eigene Fortschrittsschleife - und macht die vier Fraktionen zu GRUENDEN, unterschiedlich zu
+  // spielen: wer beim Void-Zirkel einkauft, bekommt Expeditionsausruestung, wer bei der Legion
+  // einkauft, Kampfausruestung. Zusammen mit der Buendnis-Exklusivitaet aus Paket 3 ist das eine
+  // echte Weichenstellung statt einer Sammelaufgabe.
+  //
+  // Waehrung: Gunstmarken JE FRAKTION (state.factionFavor). Sie kommen aus deren eigenen Auftraegen
+  // (Bronze 1, Silber 2, Gold 4) und aus der Parteinahme im Krieg (3) - also genau aus den beiden
+  // Taetigkeiten, die Paket 1 und 3 eingefuehrt haben. Marken sind bewusst NICHT zwischen Fraktionen
+  // uebertragbar: sonst waere der Laden nur eine weitere Kreditsenke statt einer Bindung.
+  const FAVOR_PER_TIER = { bronze:1, silber:2, gold:4 };
+  const FAVOR_WAR_SUPPORT = 3;
+  function factionFavorOf(fid){ return Math.max(0, Math.floor((state.factionFavor||{})[fid]||0)); }
+  function addFactionFavor(fid, n){
+    if (!state.factionFavor) state.factionFavor = {};
+    state.factionFavor[fid] = factionFavorOf(fid) + Math.max(0, Math.round(n||0));
+  }
+  // Jeder Posten nennt: Preis in Marken, ab welcher Ruf-Stufe er ueberhaupt angeboten wird
+  // (1 = Freundlich, 2 = Verbuendet) und was er tut. gib() liefert den Meldungstext zurueck.
+  const FACTION_SHOPS = {
+    kartell: [
+      { key:'kredit', name:'Kreditlinie', icon:'ti-diamond', kosten:2, stufe:1,
+        desc:'Das Kartell öffnet dir seine Bücher: 15.000 Kredite sofort, ohne Gegenleistung.',
+        gib(){ state.credits = (state.credits||0) + 15000; return '15.000 Kredite'; } },
+      { key:'fracht', name:'Frachtbrief', icon:'ti-truck', kosten:3, stufe:1,
+        desc:'Eine Sammellieferung ausgemusterter Technik: 25 Modulfragmente für die eigene Fertigung.',
+        gib(){ state.moduleFragments = (state.moduleFragments||0) + 25; return '25 Modulfragmente'; } },
+      { key:'leitstand', name:'Handelsleitstand (Selten)', icon:'ti-world', kosten:5, stufe:1,
+        desc:'Ein seltener Handelsleitstand aus Kartell-Beständen – erhöht imperiumsweit den Ertrag aller Handelsrouten.',
+        gib(){ return gibModul('handelsleitstand', 'selten'); } },
+      { key:'exklusiv', name:'Exklusivvertrag', icon:'ti-star', kosten:8, stufe:2,
+        desc:'Nur für Verbündete: ein epischer Handelsleitstand, wie ihn sonst kein Außenstehender bekommt.',
+        gib(){ return gibModul('handelsleitstand', 'episch'); } }
+    ],
+    legion: [
+      { key:'schulung', name:'Offiziersschulung', icon:'ti-medal', kosten:3, stufe:1,
+        desc:'Die Legion stellt dir ihre Ausbilder zur Verfügung: 40 Kommandopunkte für Offiziere, Modul-Slots und Talente.',
+        gib(){ state.commandPoints = (state.commandPoints||0) + 40; return '40 Kommandopunkte'; } },
+      { key:'waffen', name:'Waffenlieferung (Selten)', icon:'ti-sword', kosten:4, stufe:1,
+        desc:'Ein seltenes Waffenmodul aus Legionsbeständen – erhöht die Angriffskraft der Flotte am Standort.',
+        gib(){ return gibModul('waffen', 'selten'); } },
+      { key:'panzer', name:'Panzerplatten (Selten)', icon:'ti-shield', kosten:4, stufe:1,
+        desc:'Ein seltenes Panzerungsmodul – erhöht die Verteidigung des Standorts, an dem du es einbaust.',
+        gib(){ return gibModul('panzerung', 'selten'); } },
+      { key:'elite', name:'Elite-Ausrüstung', icon:'ti-trophy', kosten:8, stufe:2,
+        desc:'Nur für Verbündete: ein episches Waffenmodul aus den Arsenalen der Ersten Legion.',
+        gib(){ return gibModul('waffen', 'episch'); } }
+    ],
+    void: [
+      { key:'daten', name:'Forschungsdaten', icon:'ti-flask', kosten:2, stufe:1,
+        desc:'Auswertungen aus den Tiefenraum-Archiven: 400 Forschungspunkte sofort.',
+        gib(){ state.resources.forschungspunkte = (state.resources.forschungspunkte||0) + 400; return '400 Forschungspunkte'; } },
+      { key:'peilung', name:'Peilung anfordern', icon:'ti-antenna-bars-5', kosten:3, stufe:1,
+        desc:'Der Zirkel gibt dir eine seiner Ortungen: sofort eine zusätzliche Peilung in einem entdeckten System. Nur möglich, solange nicht schon die Höchstzahl an Peilungen offen ist.',
+        gib(){
+          const sig = maybeSpawnSignal(true);
+          if (!sig) return null;
+          return 'eine Peilung: '+sig.typ.name+' im System '+sig.sys.name;
+        },
+        fehler:'Es sind bereits so viele Peilungen offen, wie gleichzeitig möglich sind – oder es gibt kein freies entdecktes System dafür.' },
+      { key:'sonde', name:'Sondentechnik (Selten)', icon:'ti-map-2', kosten:4, stufe:1,
+        desc:'Ein seltenes Sondenmodul – erhöht imperiumsweit die Ausbeute deiner Expeditionen.',
+        gib(){ return gibModul('sonde', 'selten'); } },
+      { key:'leerenblick', name:'Leerenblick', icon:'ti-atom-2', kosten:8, stufe:2,
+        desc:'Nur für Verbündete: ein episches Sondenmodul, gefertigt aus Material jenseits der Kartenränder.',
+        gib(){ return gibModul('sonde', 'episch'); } }
+    ],
+    schatten: [
+      { key:'bestechung', name:'Bestechungsgelder', icon:'ti-diamond', kosten:2, stufe:1,
+        desc:'Umgeleitete Zahlungen aus fremden Kassen: 12.000 Kredite, keine Fragen.',
+        gib(){ state.credits = (state.credits||0) + 12000; return '12.000 Kredite'; } },
+      { key:'schwarzmarkt', name:'Schwarzmarkt-Ware', icon:'ti-box', kosten:3, stufe:1,
+        desc:'Raffinierte Ware aus zweifelhafter Quelle: 8 Quantenchips und 8 Nanolegierungen – Tier-2-Material, das sonst nur die eigenen Fabriken liefern.',
+        gib(){
+          state.resources.quantenchips = (state.resources.quantenchips||0) + 8;
+          state.resources.nanolegierungen = (state.resources.nanolegierungen||0) + 8;
+          return '8 Quantenchips und 8 Nanolegierungen';
+        } },
+      { key:'eskorte', name:'Eskorten-Leitsystem (Selten)', icon:'ti-map-pin', kosten:4, stufe:1,
+        desc:'Ein seltenes Eskorten-Leitsystem aus abgefangenen Bauplänen – deine Expeditionen treffen seltener auf feindliche Flotten.',
+        gib(){ return gibModul('expschutz', 'selten'); } },
+      { key:'schattennetz', name:'Schattennetz', icon:'ti-droplet', kosten:8, stufe:2,
+        desc:'Nur für Verbündete: ein episches Treibstoffdepot – Missionen von diesem Standort kosten deutlich weniger Treibstoff.',
+        gib(){ return gibModul('treibstoffdepot', 'episch'); } }
+    ]
+  };
+  // Legt ein Modul bestimmter Art und Seltenheit ins Inventar - dieselbe Kodierung wie
+  // craftModuleFromFragments, damit Ladenware und gefertigte Module ununterscheidbar sind.
+  function gibModul(typ, seltenheit){
+    const instKey = typ+':'+seltenheit;
+    state.modules[instKey] = (state.modules[instKey]||0) + 1;
+    const info = moduleInstanceInfo(instKey);
+    return info ? (info.rar.label+' '+info.def.name) : 'ein Modul';
+  }
+  function factionShopItem(fid, key){ return (FACTION_SHOPS[fid]||[]).find(p => p.key === key) || null; }
+  function buyFactionShopItem(fid, key){
+    const p = factionShopItem(fid, key);
+    if (!p) return;
+    const stufe = factionEffectLevel(fid);
+    if (stufe < p.stufe){ log(p.stufe === 2 ? 'Dieser Posten wird nur Verbündeten angeboten.' : 'Dieser Posten wird erst ab Freundlich angeboten.', 'ti-alert-triangle'); return; }
+    if (factionFavorOf(fid) < p.kosten){ log('Nicht genug Gunstmarken bei '+factionNameOf(fid)+' ('+p.kosten+' nötig, vorhanden: '+factionFavorOf(fid)+'). Gunstmarken gibt es für abgeschlossene Aufträge dieser Fraktion.', 'ti-alert-triangle'); return; }
+    // Erst die Ware, dann bezahlen: Posten, die fehlschlagen koennen (Peilung bei vollem Deckel),
+    // duerfen die Marken nicht verschlucken - derselbe Grundsatz wie beim Pakt-Geschenk (v8.298.4).
+    const erhalten = p.gib();
+    if (!erhalten){ log(p.fehler || 'Dieser Posten ist gerade nicht verfügbar - es wurden keine Gunstmarken abgebucht.', 'ti-alert-triangle', 'warn'); return; }
+    state.factionFavor[fid] = factionFavorOf(fid) - p.kosten;
+    state.factionShopPurchases = (state.factionShopPurchases||0) + 1;
+    log(factionNameOf(fid)+' liefert: '+erhalten+' (−'+p.kosten+' Gunstmarken, Rest: '+factionFavorOf(fid)+').', p.icon, 'ok');
+    playSound('build');
     checkAchievements();
     render(); save();
   }
@@ -11624,6 +11750,7 @@
     } catch(e){ log('Angriff fehlgeschlagen (Verbindungsfehler).', 'ti-alert-triangle'); }
   }
 
+  let offenerFraktionsladen = null; // sitzungslokal, wie state.showExpCodex beim Expeditions-Kodex
   function renderFactions(){
     ensureFactionQuests();
     // Altstände können noch bei beiden Rivalen gleichzeitig verbündet sein - einmalig bereinigen.
@@ -11694,6 +11821,27 @@
     box.innerHTML = mineCard + feindCard + kriegCard + sorted.map(f => {
       const count = (f.systems||[]).length;
       const strength = f.strength ? f.strength.toFixed(1) : '?';
+      // Fraktionsladen (Paket 4/6): aufklappbar je Fraktion, damit die Karte nicht explodiert.
+      // Der offene Laden steht in einer sitzungslokalen Variable (kein Spielstand) - genau wie der
+      // Expeditions-Kodex, dasselbe Muster.
+      const marken = factionFavorOf(f.id);
+      const shopOffen = offenerFraktionsladen === f.id;
+      const shopKopf = `<div class="card-row" data-shop-toggle="${f.id}" role="button" tabindex="0" style="cursor:pointer; margin-top:4px;">
+        <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.15); color:#fac775;"><i class="ti ti-diamond" aria-hidden="true"></i></div>
+          <div><div class="bname">Fraktionsladen</div><div class="bmeta">${marken} Gunstmarke${marken===1?'':'n'}${lvl<=0?' · <span style="color:#8489a0;">öffnet ab Freundlich</span>':''}</div></div></div>
+        <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      </div>`;
+      const shopRows = shopOffen ? (FACTION_SHOPS[f.id]||[]).map(p => {
+        const gesperrt = lvl < p.stufe;
+        const bezahlbar = !gesperrt && marken >= p.kosten;
+        return `<div class="card-row" style="margin:0 0 0 12px;">
+          <div class="left"><div class="bicon" style="background:rgba(255,255,255,0.05); color:${gesperrt?'#6b6f85':'#fac775'};"><i class="ti ${p.icon}" aria-hidden="true"></i></div>
+            <div style="min-width:0;"><div class="bname">${p.name}${p.stufe===2?' <span class="lvl-pill" style="font-size:9.5px;">nur Verbündete</span>':''}</div>
+            <div class="bmeta">${p.desc}</div>
+            <div class="bmeta"><i class="ti ti-diamond" aria-hidden="true" style="color:#fac775;"></i> ${p.kosten} Gunstmarken${gesperrt?' · <span style="color:#e0784a;">'+(p.stufe===2?'erst ab Verbündet':'erst ab Freundlich')+'</span>':(bezahlbar?'':' · <span style="color:#e0784a;">noch '+(p.kosten-marken)+' fehlen</span>')}</div></div></div>
+          <button data-shop-buy="${f.id}:${p.key}" ${bezahlbar?'class="affordable"':'disabled'} style="font-size:10.5px; padding:4px 9px;">Kaufen</button>
+        </div>`;
+      }).join('') : '';
       // Feindschaft sichtbar machen (Paket 2/6) - sonst wirken höhere Überfallzahlen, teurere
       // Expeditionen und magere Handelsrouten wie ein Fehler statt wie eine Folge.
       const hos = factionHostilityLevel(f.id);
@@ -11773,6 +11921,8 @@
         ${hosRow}
         ${rivalRow}
         ${giftRow}
+        ${shopKopf}
+        ${shopRows}
         ${questRow}
         ${sysButtons}
       </div>`;
@@ -11782,6 +11932,15 @@
     box.querySelectorAll('[data-claim-faction-gift]').forEach(btn => btn.onclick = () => claimFactionGift(btn.getAttribute('data-claim-faction-gift')));
     box.querySelectorAll('[data-quest-complete]').forEach(btn => btn.onclick = () => completeFactionQuest(btn.getAttribute('data-quest-complete')));
     box.querySelectorAll('[data-war-support]').forEach(btn => btn.onclick = () => supportWarSide(btn.getAttribute('data-war-support')));
+    box.querySelectorAll('[data-shop-toggle]').forEach(el => el.onclick = () => {
+      const fid = el.getAttribute('data-shop-toggle');
+      offenerFraktionsladen = (offenerFraktionsladen === fid) ? null : fid;
+      render();
+    });
+    box.querySelectorAll('[data-shop-buy]').forEach(btn => btn.onclick = () => {
+      const [fid, key] = btn.getAttribute('data-shop-buy').split(':');
+      buyFactionShopItem(fid, key);
+    });
   }
   function npcEffectiveDefense(npc){ return Math.round(npc.defense * (1 + npcScalingCount(npc.id)*0.18) * (galaxyCache.npcEmpireStrength||1)); }
   // Echte NPC-Flotten (16.07.2026, Feature-Wunsch): jeder NPC hat statt eines rein abstrakten
@@ -11874,6 +12033,8 @@
     // Neu 26.07.2026 mit den fraktionseigenen Auftragspools: Gold-Auftraege sind die seltene,
     // aufwendige Stufe (13% Ziehungschance) - ein eigenes Ziel dafuer, und eines fuer die Menge.
     { key:'fquestgold5', name:'Goldstandard', desc:'Schließe 5 Gold-Aufträge einer Fraktion ab – die seltenste und aufwendigste Auftragsstufe.', check: s => (s.factionGoldQuestsDone||0) >= 5, progress: s => [Math.min(5,s.factionGoldQuestsDone||0), 5], reward:{erz:9000,kristalle:6000,deuterium:3000,credits:700}, xpReward:500 },
+    { key:'gunst10', name:'Gern gesehener Gast', desc:'Kaufe 10 Posten in Fraktionsläden – bezahlt wird ausschließlich mit Gunstmarken der jeweiligen Fraktion.', check: s => (s.factionShopPurchases||0) >= 10, progress: s => [Math.min(10,s.factionShopPurchases||0), 10], reward:{erz:10000,kristalle:7000,deuterium:3500,credits:700}, xpReward:500 },
+    { key:'gunstvorrat', name:'Wohlgesonnen', desc:'Halte bei einer einzelnen Fraktion gleichzeitig 8 Gunstmarken – genug für ihren Spitzenposten.', check: s => Object.values(s.factionFavor||{}).some(v => (v||0) >= 8), progress: s => [Math.min(8, Math.max(0, ...Object.values(s.factionFavor||{}).map(v=>v||0), 0)), 8], reward:{credits:500}, xpReward:300 },
     { key:'erzfeind', name:'Erzfeind', desc:'Bringe eine Fraktion auf Verfeindet (Ruf unter −70) – und überlebe ihre Strafexpeditionen.', check: s => Object.keys(s.factionRep||{}).some(k => (s.factionRep[k]||0) <= -70), progress: s => [Math.min(70, Math.max(0, ...Object.keys(s.factionRep||{}).map(k => -(s.factionRep[k]||0)), 0)), 70], reward:{erz:12000,kristalle:8000,deuterium:4000,credits:600}, xpReward:500 },
     { key:'kriegspartei', name:'Königsmacher', desc:'Ergreife dreimal Partei in einem Fraktionskrieg und entscheide mit, wer die Galaxie beherrscht.', check: s => (s.warSidesTaken||0) >= 3, progress: s => [Math.min(3,s.warSidesTaken||0), 3], reward:{erz:12000,kristalle:8000,deuterium:4000,credits:800}, xpReward:600 },
     { key:'fquest50', name:'Vertragsmeister', desc:'Schließe 50 Fraktionsaufträge ab.', check: s => (s.factionQuestsDone||0) >= 50, progress: s => [Math.min(50,s.factionQuestsDone||0), 50], reward:{erz:14000,kristalle:9000,deuterium:5000,antimaterie:150,credits:900}, xpReward:700 },
@@ -11940,7 +12101,7 @@
     synthesemeister:'aufbau', singularitaetsarchitekt:'aufbau',
     tenkills:'krieg', bossdown:'krieg', abyssdown:'krieg', nyradown:'krieg', allbosses:'krieg', moonsiegewin:'krieg', basewarwin:'krieg', warvictor:'krieg', kriegsheld:'krieg', ligameister:'krieg', allveteran:'krieg',
     allsystems:'expansion', explorer25:'expansion', conquer1:'expansion', conquer5:'expansion',
-    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', fquestgold5:'handel', fquest50:'handel', kriegspartei:'handel', erzfeind:'handel', shop5:'handel', gutvernetzt:'handel',
+    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', fquestgold5:'handel', fquest50:'handel', kriegspartei:'handel', erzfeind:'handel', gunst10:'handel', gunstvorrat:'handel', shop5:'handel', gutvernetzt:'handel',
     allianzweltprojekt:'allianz', allianzausbau100:'allianz', allianzeinsatz:'allianz', allianceraidkill:'allianz',
     firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister', streak30:'meister', streak100:'meister', happyhour10:'meister'
   };
@@ -11970,7 +12131,7 @@
     trade1:'ti-truck', trade50:'ti-truck', route1:'ti-arrows-shuffle',
     trade_empire:'ti-diamond', trade_longrun:'ti-clock', conquer1:'ti-flag',
     conquer5:'ti-world', allied:'ti-message', pact3:'ti-shield', pact_century:'ti-shield-lock',
-    fquest10:'ti-list-details', fquestgold5:'ti-trophy', fquest50:'ti-medal', kriegspartei:'ti-sword', erzfeind:'ti-alert-triangle', shop5:'ti-diamond', credits5k:'ti-diamond',
+    fquest10:'ti-list-details', fquestgold5:'ti-trophy', fquest50:'ti-medal', kriegspartei:'ti-sword', erzfeind:'ti-alert-triangle', gunst10:'ti-diamond', gunstvorrat:'ti-star', shop5:'ti-diamond', credits5k:'ti-diamond',
     skilltreemax:'ti-star', allveteran:'ti-medal', allexotic:'ti-atom-2',
     erdweltmaster:'ti-plant', leerenweltmaster:'ti-mountain', allianzeinsatz:'ti-bell',
     allcolonyslots:'ti-home', allresearchmax:'ti-microscope',
@@ -16935,6 +17096,8 @@
     if (state.factionGoldQuestsDone === undefined) state.factionGoldQuestsDone = 0;
     if (state.warSupport === undefined) state.warSupport = null;
     if (state.warSidesTaken === undefined) state.warSidesTaken = 0;
+    if (!state.factionFavor || typeof state.factionFavor !== 'object') state.factionFavor = {};
+    if (state.factionShopPurchases === undefined) state.factionShopPurchases = 0;
     if (state.shopPurchases === undefined) state.shopPurchases = 0;
     if (state.dominanceClaimed === undefined) state.dominanceClaimed = 0;
     if (state.allianceDominanceClaimed === undefined) state.allianceDominanceClaimed = 0;
@@ -20334,6 +20497,7 @@
       { title:'Weltboss: Leviathan der Leere', body:'Gelegentlich erscheint der <strong>Leviathan der Leere</strong> (oben im Galaxie-Tab): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Angriff läuft wie eine normale Angriffsmission: Du stellst deine Angriffsflotte zusammen (Bereich "Angriffsflotte zusammenstellen") und schickst sie los - mit echter Flugzeit und Treibstoffkosten (Deuterium). Am Ziel zieht deine Angriffskraft (×0,8-1,2 Streuung) Schaden ab, der Leviathan schlägt zurück (8-15%+ Flottenverluste, steigt mit seiner Stufe). <strong>Einmal pro Tag</strong> pro Spieler angreifbar - die Sperre bleibt auch bestehen, wenn der aktuelle Leviathan besiegt wird und ein neuer erscheint. Beim Kill: Belohnung (Kredite + Kampfpunkte) nach Schadensanteil, Top-Schädiger bekommt +50% Bonus. Nach einem Kill erscheint nach einer Weile automatisch die nächste, stärkere Stufe.' },
       { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
       { title:'Rivalitäten: du kannst nicht mit allen befreundet sein', body:'Je zwei Fraktionen stehen sich als <strong>Rivalen</strong> gegenüber: <strong>Aschen-Kartell gegen Schattenbund</strong> (Wirtschaft) und <strong>Eisenlegion gegen Void-Marodeure</strong> (Militär und Mystik). Das hat zwei Folgen.<br><br><strong>Erstens: Ruf schwappt über.</strong> Gewinnst du bei einer Fraktion Ruf, verlierst du rund ein Drittel davon bei ihrem Rivalen. Umgekehrt gilt dasselbe: Greifst du eine Fraktion an, freut sich ihr Rivale und dein Ruf dort steigt. Einen Gegner zu haben ist damit nicht mehr nur schlecht.<br><br><strong>Zweitens: nur ein Bündnis je Paar.</strong> Zwei Rivalen dulden keinen gemeinsamen Verbündeten. Überschreitest du bei einer die Bündnis-Schwelle, kündigt die andere auf und fällt auf <em>Freundlich</em> zurück – du behältst dort also den kleineren Effekt, nur nicht den vollen. Du kannst damit höchstens <strong>zwei Fraktionen gleichzeitig als Verbündete</strong> haben, eine je Paar. Wer vorher bei mehreren gleichzeitig verbündet war, behält beim ersten Aufruf das jeweils <em>stärkere</em> Bündnis.<br><br>Damit ist die Diplomatie eine echte Entscheidung: entweder zwei tiefe Bündnisse und zwei kühle Verhältnisse, oder überall freundlich und nirgends verbündet.' },
+      { title:'Gunstmarken & Fraktionsläden', body:'Jede Fraktion führt ein eigenes Konto: <strong>Gunstmarken</strong>. Du bekommst sie ausschließlich für <strong>Aufträge dieser Fraktion</strong> (Bronze 1, Silber 2, Gold 4) und für eine <strong>Parteinahme in ihrem Krieg</strong> (3). Marken sind <strong>nicht übertragbar</strong> – Gunst beim Kartell hilft dir bei der Legion nicht weiter. Genau das macht die Bindung an eine Fraktion zu einer Entscheidung.<br><br>Ab <strong>Freundlich</strong> öffnet sich der <strong>Fraktionsladen</strong> (im Galaxie-Tab, aufklappbar unter jeder Fraktion) mit vier Posten. Drei davon gibt es ab Freundlich, der vierte ist <strong>Verbündeten vorbehalten</strong> – und da du dank der Rivalitäten höchstens zwei Bündnisse gleichzeitig halten kannst, sind die vier Spitzenposten nie alle gleichzeitig erreichbar.<br><br><strong>Aschen-Kartell:</strong> Kreditlinie (15.000 Kredite), Frachtbrief (25 Modulfragmente), seltener Handelsleitstand – und für Verbündete ein <em>epischer</em> Handelsleitstand.<br><strong>Eisenlegion:</strong> Offiziersschulung (40 Kommandopunkte), seltenes Waffen- und Panzerungsmodul – für Verbündete ein <em>episches</em> Waffenmodul.<br><strong>Void-Zirkel:</strong> Forschungsdaten (400 Punkte), <strong>Peilung anfordern</strong> (sofort eine zusätzliche Expeditions-Peilung), seltenes Sondenmodul – für Verbündete ein <em>episches</em> Sondenmodul.<br><strong>Schatten-Syndikat:</strong> Bestechungsgelder (12.000 Kredite), Schwarzmarkt-Ware (8 Quantenchips + 8 Nanolegierungen – Tier-2-Material ohne eigene Fabrik), seltenes Eskorten-Leitsystem – für Verbündete ein <em>episches</em> Treibstoffdepot.<br><br>Gekaufte Module landen im normalen Inventar und sind von gefundenen oder gefertigten nicht zu unterscheiden – sie lassen sich also aufwerten, verschmelzen und mit Substats versehen wie jedes andere Modul. Schlägt ein Kauf fehl (z.B. „Peilung anfordern", wenn schon die Höchstzahl an Peilungen offen ist), werden <strong>keine Marken abgebucht</strong>.' },
       { title:'Feindschaft: was passiert, wenn der Ruf fällt', body:'Ruf kann nicht nur steigen. Fällt er unter <strong>−30</strong>, giltst du als <strong>Feindlich</strong>, unter <strong>−70</strong> als <strong>Verfeindet</strong>. Das war früher nur ein rotes Etikett – jetzt schadet jede Fraktion genau dort, wo sie sonst nützt:<br><br><strong>Aschen-Kartell:</strong> die Handelsgilden boykottieren dich – −12% (feindlich) bzw. −25% (verfeindet) Ertrag aus allen Handelsrouten.<br><strong>Void-Marodeure:</strong> statt dich zu verschonen, lenken sie Überfälle auf dich – +25% bzw. +60% Überfall-Häufigkeit.<br><strong>Eisenlegion:</strong> ihre Patrouillen fangen deine Expeditionen ab – +20% bzw. +45% Begegnungschance.<br><strong>Schattenbund:</strong> sie verkaufen deine Positionen weiter – +15% bzw. +30% Ressourcenverlust bei erfolgreichen Überfällen (gilt für Überfälle durch NPC-Flotten; bei Angriffen echter Spieler rechnet der Server).<br><br><strong>Strafexpeditionen:</strong> Zusätzlich schickt <em>jede</em> feindliche Fraktion Verbände gegen deine Planeten. Je Feindschaftsstufe insgesamt steigt die Überfall-Häufigkeit um 18% und die Stärke der Angreifer um 12% – bei mehreren Feinden summiert sich das spürbar.<br><br><strong>Aber es gibt auch eine Gegenleistung:</strong> Wer mehr und schwerere Angriffe abwehrt, bergt mehr. Je Feindschaftsstufe bleiben 15% mehr <strong>Trümmer</strong> liegen, wenn du einen Überfall abschlägst. Sich Feinde zu machen ist damit eine Strategie mit Preis, kein reiner Fehler – wenn deine Verteidigung steht, wird die Feindschaft zur Trümmerquelle.<br><br>Unverändert bleiben der Kartell-<em>Marktrabatt</em> und die Schwierigkeit von Fraktions-Systemangriffen: beides rechnet der Server, eine einseitige Verschärfung im Spiel würde Anzeige und Serverrechnung auseinanderlaufen lassen.' },
       { title:'Fraktionskriege: Partei ergreifen', body:'Von Zeit zu Zeit brechen zwischen zwei NPC-Fraktionen <strong>Kriege</strong> aus (36 Stunden, auf der Galaxie-Karte am ⚔️ zu erkennen). Läuft gerade einer, steht im Galaxie-Tab über den Fraktionen eine Kriegskarte: Du kannst <strong>eine</strong> der beiden Seiten mit einer Kriegslieferung unterstützen (4.000 Erz, 2.500 Kristalle, 1.200 Deuterium) und bekommst dafür <strong>+22 Ruf und 800 Kredite</strong> bei der gewählten Seite – der mit Abstand größte Ruf-Sprung im Spiel. Über die Rivalitäten bekommt die Gegenseite das automatisch zu spüren.<br><br>Pro Krieg ist das <strong>einmal</strong> möglich, und die Entscheidung lässt sich nicht zurücknehmen. Kriegsparteien ohne eigene Diplomatie (etwa die Piratenflotte) lassen sich nicht unterstützen – dort gäbe es keinen Ruf zu gewinnen.' },
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
@@ -25539,6 +25703,8 @@
     if (state.factionGoldQuestsDone === undefined) state.factionGoldQuestsDone = 0;
     if (state.warSupport === undefined) state.warSupport = null;
     if (state.warSidesTaken === undefined) state.warSidesTaken = 0;
+    if (!state.factionFavor || typeof state.factionFavor !== 'object') state.factionFavor = {};
+    if (state.factionShopPurchases === undefined) state.factionShopPurchases = 0;
         if (state.shopPurchases === undefined) state.shopPurchases = 0;
         if (state.dominanceClaimed === undefined) state.dominanceClaimed = 0;
         if (state.allianceDominanceClaimed === undefined) state.allianceDominanceClaimed = 0;
@@ -31492,7 +31658,10 @@
   // naechste garantiert. Der Zaehler laeuft NUR, wenn ein Spawn ueberhaupt moeglich waere (Platz
   // unter dem Deckel und ein freies System) - wer bereits drei Peilungen liegen hat, ist nicht im
   // Pech, sondern satt.
-  function maybeSpawnSignal(){
+  // erzwingen=true ueberspringt den Wuerfelwurf (Fraktionsladen "Peilung anfordern", Paket 4/6) -
+  // Deckel, freies System und Typ-Auslosung bleiben identisch, es gibt also keinen zweiten Pfad,
+  // der bei einer Aenderung an den Signalregeln vergessen werden koennte.
+  function maybeSpawnSignal(erzwingen){
     pruneSignals();
     if (state.expeditionSignals.length >= SIGNAL_MAX) return null;
     const bekannt = STAR_SYSTEMS.filter(s => PLANETS.some(p => p.system === s.id && (state.discovered||{})[p.id]));
@@ -31501,7 +31670,7 @@
     const frei = bekannt.filter(s => !belegt.has(s.id));
     if (!frei.length) return null; // pro System hoechstens ein Signal, sonst wird die Karte unleserlich
     state.signalDrought = (state.signalDrought||0) + 1;
-    const garantiert = state.signalDrought >= SIGNAL_PITY_AFTER;
+    const garantiert = erzwingen || state.signalDrought >= SIGNAL_PITY_AFTER;
     if (!garantiert && Math.random() >= SIGNAL_SPAWN_CHANCE) return null;
     state.signalDrought = 0;
     const sys = frei[Math.floor(Math.random()*frei.length)];
