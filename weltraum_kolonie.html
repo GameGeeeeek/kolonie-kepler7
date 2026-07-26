@@ -197,6 +197,21 @@
          Einsortieren aller log()-Aufrufe im Code zu riskant für diesen Durchgang wäre. */
       --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
       --corner: 10px;
+      /* Ecken-Skala (Grafik-Audit 26.07.2026, "das Design muss im kompletten Spiel stimmig sein").
+         BEFUND: Das Spiel sprach zwei Formensprachen gleichzeitig. Flächen (Karten, Kacheln,
+         Unterreiter, Modals) waren über zehn Grafik-Runden hinweg auf den HUD-Look mit
+         GESCHNITTENER Ecke umgestellt worden - die Bedienelemente aber nie: 158 border-radius-
+         Angaben in 12 verschiedenen Größen (2/3/4/5/6/8/9/10/11/12/14/20px) gegen 18 clip-path-
+         Schnittecken in 9 verschiedenen Größen. Ausgerechnet die meistgeklickten Elemente des
+         Spiels - Bau-/Kauf-Buttons, Reiter, Eingabefelder, Icon-Kacheln - waren weiche App-Pillen
+         auf HUD-Karten. Das ist der Hauptgrund, warum sich das Ganze zusammengestückelt anfühlte.
+         Vier Stufen, überall dieselben. Wer eine neue Fläche baut, nimmt eine davon - nicht eine
+         dreizehnte Handzahl. `--cut-*` ist das Schnittmaß für die HUD-Ecke, `--r-*` bleibt für
+         die wenigen Dinge, die WIRKLICH rund sein müssen (Avatare, Punkte, Balkenenden). */
+      --cut-xs: 5px;
+      --cut-sm: 7px;
+      --cut-md: 10px;
+      --cut-lg: 14px;
       --c-info:#378add;
       --info-rgb: 55,138,221;
       --warning-rgb: 224,165,72;
@@ -229,7 +244,7 @@
     }
 
     .shell {
-      position:relative; border-radius:20px; overflow:hidden; border:0.5px solid rgba(255,255,255,0.08);
+      position:relative; overflow:hidden; border:0.5px solid rgba(255,255,255,0.08);
       background:
         radial-gradient(ellipse 700px 450px at 12% 8%, rgba(var(--primary-rgb), 0.28), transparent 60%),
         radial-gradient(ellipse 550px 400px at 88% 15%, rgba(212,83,126,0.22), transparent 55%),
@@ -353,10 +368,10 @@
        Rekonstruktion in Runden, keine erneute Berechnung. */
     .battle-modal-overlay { position:fixed; inset:0; z-index:210; display:none; align-items:center; justify-content:center; background:rgba(4,6,14,0.82); padding:16px; }
     .battle-modal-overlay.open { display:flex; }
-    .battle-modal { width:100%; max-width:440px; max-height:88vh; overflow-y:auto; background:#0d1224; border:0.5px solid rgba(var(--primary-rgb), 0.35); border-radius:16px; padding:1.1rem; box-shadow:0 20px 60px rgba(0,0,0,0.55); }
+    .battle-modal { width:100%; max-width:440px; max-height:88vh; overflow-y:auto; background:#0d1224; border:0.5px solid rgba(var(--primary-rgb), 0.35); padding:1.1rem; box-shadow:0 20px 60px rgba(0,0,0,0.55); }
     .battle-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
     .battle-modal-title { font-size:14px; font-weight:700; }
-    .battle-scene { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; background:radial-gradient(ellipse at 50% 40%, rgba(var(--primary-rgb),0.14), transparent 70%), radial-gradient(ellipse at 50% 40%, #1c2140, #080a14 75%); background-repeat:no-repeat; border-radius:12px; padding:0.85rem 0.6rem; margin-bottom:0.75rem; min-height:130px; overflow:hidden; transition:transform 0.4s ease, box-shadow 1.3s ease; }
+    .battle-scene { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; background:radial-gradient(ellipse at 50% 40%, rgba(var(--primary-rgb),0.14), transparent 70%), radial-gradient(ellipse at 50% 40%, #1c2140, #080a14 75%); background-repeat:no-repeat; padding:0.85rem 0.6rem; margin-bottom:0.75rem; min-height:130px; overflow:hidden; transition:transform 0.4s ease, box-shadow 1.3s ease; }
     /* Bewegliche Hintergrund-Tiefe (13.07.2026, Feature-Wunsch: optisch aufwerten) - die Sterne liegen
        jetzt auf einer eigenen Ebene (statt fest im Haupt-Hintergrund) und driften langsam hin und her,
        gibt der Szene mehr Räumlichkeit als ein komplett statischer Sternenhimmel. */
@@ -380,7 +395,7 @@
     @keyframes battleShake { 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(calc(-1 * var(--shake-amp, 3px))); } 75%{ transform:translateX(var(--shake-amp, 3px)); } }
     .battle-scene.climax { animation: battleClimaxPulse 1.4s ease-in-out infinite; }
     @keyframes battleClimaxPulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.025); } }
-    .battle-round-counter { position:absolute; top:6px; left:10px; font-size:10px; color:var(--ink-dim); background:rgba(0,0,0,0.35); padding:2px 7px; border-radius:20px; z-index:2; letter-spacing:0.3px; }
+    .battle-round-counter { position:absolute; top:6px; left:10px; font-size:10px; color:var(--ink-dim); background:rgba(0,0,0,0.35); padding:2px 7px; z-index:2; letter-spacing:0.3px; }
     .battle-big-result { position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:6; pointer-events:none; }
     .battle-big-result.play { display:flex; }
     .battle-big-result span { font-family:var(--font-mono); font-size:24px; font-weight:700; letter-spacing:6px; text-transform:uppercase; animation: battleBigResultPop 1.3s ease-out forwards; text-shadow:0 0 16px currentColor, 0 0 32px currentColor; }
@@ -403,7 +418,7 @@
     @keyframes battlePlasmaRight { 0%{ opacity:1; transform:scale(0.6); } 15%{ opacity:1; transform:scale(1.1); } 100%{ left:var(--to); opacity:0.9; transform:scale(0.9); } }
     @keyframes battlePlasmaLeft { 0%{ opacity:1; transform:scale(0.6); } 15%{ opacity:1; transform:scale(1.1); } 100%{ left:var(--to); opacity:0.9; transform:scale(0.9); } }
     /* Rakete: kleines Geschoss mit Abgasspur, etwas langsamer als Energiewaffen */
-    .battle-missile { position:absolute; top:48%; width:7px; height:4px; margin-top:-2px; border-radius:1px 4px 4px 1px; background:currentColor; box-shadow:-6px 0 6px -1px currentColor, -12px 0 5px -2px currentColor; opacity:0; pointer-events:none; }
+    .battle-missile { position:absolute; top:48%; width:7px; height:4px; margin-top:-2px; 4px 4px 1px; background:currentColor; box-shadow:-6px 0 6px -1px currentColor, -12px 0 5px -2px currentColor; opacity:0; pointer-events:none; }
     .battle-missile.fly-right { animation: battleMissileRight 0.65s ease-in forwards; }
     .battle-missile.fly-left { animation: battleMissileLeft 0.65s ease-in forwards; transform:scaleX(-1); }
     @keyframes battleMissileRight { 0%{ opacity:1; } 90%{ opacity:1; } 100%{ left:var(--to); opacity:0.8; } }
@@ -466,7 +481,7 @@
        kleine, langsam driftende und verblassende Bruchstücke, werden mit fortschreitendem Kampf
        häufiger gespawnt und vermitteln so den Eindruck eines sich aufbauenden Trümmerfelds, ohne
        dass die Elemente selbst unbegrenzt im DOM verbleiben. */
-    .battle-debris-particle { position:absolute; border-radius:1px; background:#5a5f78; pointer-events:none; opacity:0; z-index:1; }
+    .battle-debris-particle { position:absolute; background:#5a5f78; pointer-events:none; opacity:0; z-index:1; }
     .battle-debris-particle.play { animation: battleDebrisDrift 4.5s linear forwards; }
     @keyframes battleDebrisDrift {
       0% { opacity:0; transform:translate(0,0) rotate(0deg); }
@@ -476,7 +491,7 @@
     }
     .battle-side { flex:1; min-width:0; position:relative; z-index:1; }
     .battle-side-label { font-size:10.5px; color:var(--ink-dim); text-align:center; margin-bottom:6px; font-weight:600; }
-    .battle-side-sublabel { font-size:8.5px; color:#7a7e94; text-align:center; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px; }
+    .battle-side-sublabel { font-size:8.5px; color:#7d8199; text-align:center; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px; }
     /* Grafik-Runde "High-End", Vorschlag 32 "3D-Flottenformation": baut auf der bestehenden
        Formations-Staffelung (--stagger-y, siehe Kommentar weiter unten) auf - dieselbe idx%3-
        Gruppierung bekommt jetzt zusätzlich eine --stagger-z-Tiefe, per perspective auf dem Container
@@ -531,16 +546,16 @@
     @keyframes battleBuildingFlicker { 0%,100%{ filter:none; } 30%,70%{ filter:brightness(1.9) drop-shadow(0 0 4px var(--c-secondary)); } }
     .battle-abstract-side { display:flex; flex-direction:column; align-items:center; gap:6px; }
     .battle-abstract-icon { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:22px; background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.15); }
-    .battle-hp-bar { width:80px; height:6px; border-radius:4px; background:rgba(255,255,255,0.1); overflow:hidden; margin-left:auto; margin-right:auto; }
+    .battle-hp-bar { width:80px; height:6px; background:rgba(255,255,255,0.1); overflow:hidden; margin-left:auto; margin-right:auto; }
     .battle-hp-bar-fill { height:100%; background:linear-gradient(90deg,var(--c-secondary),#3fae8a); transition:width 0.5s ease; }
     .battle-vs { flex-shrink:0; font-size:16px; color:var(--c-secondary); padding:0 4px; position:relative; z-index:1; }
-    .battle-log { background:rgba(255,255,255,0.03); border-radius:10px; padding:0.6rem 0.75rem; max-height:180px; overflow-y:auto; margin-bottom:0.75rem; display:flex; flex-direction:column; gap:5px; }
+    .battle-log { background:rgba(255,255,255,0.03); padding:0.6rem 0.75rem; max-height:180px; overflow-y:auto; margin-bottom:0.75rem; display:flex; flex-direction:column; gap:5px; }
     .battle-log-line { font-size:11.5px; color:#c7cbe0; opacity:0; animation: battleLogFadeIn 0.35s ease forwards; }
     @keyframes battleLogFadeIn { from{ opacity:0; transform:translateY(4px); } to{ opacity:1; transform:translateY(0); } }
     .battle-controls { display:flex; gap:8px; }
-    .battle-result-banner { margin-top:0.75rem; padding:0.7rem 0.8rem; border-radius:10px; font-size:12.5px; }
+    .battle-result-banner { margin-top:0.75rem; padding:0.7rem 0.8rem; font-size:12.5px; }
 
-    .hero { position:relative; border-radius:16px; overflow:hidden; height:190px; margin-bottom:1.1rem; background:radial-gradient(ellipse at 70% 35%, #171c34, #0a0d1a 70%); }
+    .hero { position:relative; overflow:hidden; height:190px; margin-bottom:1.1rem; background:radial-gradient(ellipse at 70% 35%, #171c34, #0a0d1a 70%); }
     .hero svg { width:100%; height:100%; display:block; }
     /* Bugfix 24.07.2026 (Grafik-Audit): Titel und Kopfzeilen-Knöpfe waren BEIDE einzeln absolut auf
        bottom:14px gesetzt - der Titel links, die Knopfleiste rechts - ohne voneinander zu wissen.
@@ -583,7 +598,7 @@
        Geräten, Knöpfe immer vollständig sichtbar. */
     .mod-slot-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; margin-bottom:8px; }
     @media (max-width: 560px) { .mod-slot-grid { grid-template-columns:1fr; } }
-    .mod-slot { background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:12px; padding:10px 12px;
+    .mod-slot { background:var(--elev-1); border:0.5px solid var(--line-1); padding:10px 12px;
       display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; flex-wrap:nowrap; gap:5px; min-width:0; }
     .mod-slot .mod-head { display:flex; align-items:center; gap:6px; min-width:0; }
     .mod-slot .mod-head .bname { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -623,12 +638,14 @@
        statt :focus, damit der Rahmen nur bei Tastaturnavigation erscheint und nicht nach jedem
        Mausklick stehen bleibt - gleiche Farbsprache wie der Eingabefeld-Fokus weiter oben. */
     .card-row[role="button"]:focus { outline:none; }
-    .card-row[role="button"]:focus-visible { outline:1px solid var(--c-info); outline-offset:2px; box-shadow:var(--glow-info); }
+    /* Fokusring nach innen (Grafik-Audit 26.07.2026): .card-row ist jetzt geschnitten, und clip-path
+       beschneidet outline UND box-shadow. Ein Ring mit outline-offset:2px läge außerhalb der Form und
+       wäre für Tastatur-Bedienung danach unsichtbar - der Ring wandert deshalb nach innen. */
+    .card-row[role="button"]:focus-visible { outline:none; box-shadow:inset 0 0 0 2px var(--c-info), inset 0 0 12px rgba(var(--info-rgb),0.35); }
     /* Ersthinweis je Tab - unaufdringlich, aber nicht zu übersehen; verschwindet nach dem
        Wegklicken für immer (state.seenTabHints). */
     .tab-hint { display:flex; align-items:flex-start; gap:10px; margin:0 0 1rem 0; padding:10px 12px;
-      background:rgba(var(--info-rgb),0.10); border:1px solid rgba(var(--info-rgb),0.35);
-      border-radius:8px; font-size:12px; line-height:1.5; }
+      background:rgba(var(--info-rgb),0.10); border:1px solid rgba(var(--info-rgb),0.35); font-size:12px; line-height:1.5; }
     .tab-hint > i { color:var(--c-info); font-size:17px; flex-shrink:0; margin-top:1px; }
     .tab-hint .tab-hint-text { flex:1; min-width:0; }
     .tab-hint .tab-hint-actions { display:flex; gap:6px; flex-shrink:0; align-items:center; }
@@ -640,8 +657,8 @@
     }
     [data-hscroll] { min-width: 0; max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; }
     [data-hscroll]::-webkit-scrollbar { height: 6px; }
-    [data-hscroll]::-webkit-scrollbar-track { background: var(--elev-1); border-radius: 10px; margin: 0 4px; }
-    [data-hscroll]::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); border-radius: 10px; }
+    [data-hscroll]::-webkit-scrollbar-track { background: var(--elev-1); margin: 0 4px; }
+    [data-hscroll]::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); }
     [data-hscroll]::-webkit-scrollbar-thumb:hover { background: var(--c-info); }
     /* Bug behoben: Karten mit fester min-width (Rollen, Orbitalstation-Fokus) wurden je nach exakter
        Bildschirmbreite mal fast vollständig vom rechten Rand abgeschnitten (z.B. der "Bauen"-Button
@@ -666,9 +683,9 @@
       [data-hscroll] .card-row button, [data-hscroll] > button { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
     }
     .hstat { flex-shrink:0; }
-    .raid-banner { display:flex; align-items:center; gap:6px; background:rgba(var(--danger-rgb), 0.22); border:0.5px solid var(--c-danger); border-radius:10px; padding:6px 12px; margin-bottom:0.6rem; color:#ffb4b4; font-size:11.5px; font-weight:500; animation: raidPulse 1.8s ease-in-out infinite; }
+    .raid-banner { display:flex; align-items:center; gap:6px; background:rgba(var(--danger-rgb), 0.22); border:0.5px solid var(--c-danger); padding:6px 12px; margin-bottom:0.6rem; color:#ffb4b4; font-size:11.5px; font-weight:500; animation: raidPulse 1.8s ease-in-out infinite; }
     .raid-banner i { font-size:18px; flex-shrink:0; }
-    .event-banner { background:rgba(var(--secondary-rgb), 0.12); border:0.5px solid rgba(var(--secondary-rgb), 0.5); border-radius:12px; padding:12px 14px; margin-bottom:1.25rem; color:#e8eaf5; animation: eventGlow 2.4s ease-in-out infinite; }
+    .event-banner { background:rgba(var(--secondary-rgb), 0.12); border:0.5px solid rgba(var(--secondary-rgb), 0.5); padding:12px 14px; margin-bottom:1.25rem; color:#e8eaf5; animation: eventGlow 2.4s ease-in-out infinite; }
     @keyframes eventGlow { 0%,100% { box-shadow:0 0 0 rgba(var(--secondary-rgb), 0); } 50% { box-shadow:0 0 14px rgba(var(--secondary-rgb), 0.35); } }
     @keyframes raidPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--danger-rgb), 0.4); } 50% { box-shadow:0 0 0 6px rgba(var(--danger-rgb), 0); } }
     /* Ruhiger, langsamer Puls für die Erholungspausen-Karte (nach großem Gefecht) – bewusst grün/cyan
@@ -678,7 +695,7 @@
     @media (prefers-reduced-motion: reduce) { .recovery-pulse { animation:none; } }
     @keyframes recycleSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
     .recycler-active { animation: recycleSpin 2.5s linear infinite; display:inline-block; }
-    .hstat { background:var(--elev-2); border:0.5px solid rgba(255,255,255,0.12); border-radius:10px; padding:5px 10px; font-size:11px; display:flex; align-items:center; gap:6px; white-space:nowrap; font-variant-numeric:tabular-nums; cursor:default; }
+    .hstat { background:var(--elev-2); border:0.5px solid rgba(255,255,255,0.12); padding:5px 10px; font-size:11px; display:flex; align-items:center; gap:6px; white-space:nowrap; font-variant-numeric:tabular-nums; cursor:default; }
     .hstat-text { display:flex; flex-direction:column; line-height:1.2; }
     .hstat-label { font-size:8px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.3px; font-family:var(--font-mono); }
     .hstat-value { font-size:var(--fs-small); font-weight:500; color:#e9ecf5; font-variant-numeric:tabular-nums; font-family:var(--font-mono); }
@@ -731,11 +748,11 @@
     @media (max-width: 700px) {
       .tabs { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; padding-bottom:4px; }
       .tabs::-webkit-scrollbar { height:6px; }
-      .tabs::-webkit-scrollbar-track { background: var(--elev-1); border-radius:10px; }
-      .tabs::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); border-radius:10px; }
+      .tabs::-webkit-scrollbar-track { background: var(--elev-1); }
+      .tabs::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); }
       .tab-btn { flex-shrink:0; }
     }
-    .tab-btn { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:10px; padding:8px 14px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
+    .tab-btn { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; padding:8px 14px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
     /* Navigation nach Domäne farbcodiert (Grafik-Audit 24.07.2026, Entwurf B). Zwölf optisch
        identische Reiter konkurrierten um dieselbe Aufmerksamkeit - nichts sagte, dass "Basis"
        täglich und "Fortschritt" selten gebraucht wird, und es gab kein Muster, das man sich merken
@@ -753,18 +770,18 @@
     .tab-btn[data-tab-domain] { position:relative; }
     /* Ruhender Zustand: dünner Farbfuss, damit die Gruppe auch bei NICHT gewähltem Reiter lesbar
        ist - das ist der eigentliche Orientierungs-Gewinn. Bewusst dezent (35% Deckkraft). */
-    .tab-btn[data-tab-domain]::after { content:''; position:absolute; left:10px; right:10px; bottom:3px; height:2px; background:var(--tab-dom); opacity:0.35; border-radius:2px; transition:opacity 0.2s ease; pointer-events:none; }
+    .tab-btn[data-tab-domain]::after { content:''; position:absolute; left:10px; right:10px; bottom:3px; height:2px; background:var(--tab-dom); opacity:0.35; transition:opacity 0.2s ease; pointer-events:none; }
     .tab-btn[data-tab-domain]:hover::after { opacity:0.6; }
     .tab-btn.active::after { opacity:1; }
-    .tab-btn.active { background:rgba(var(--primary-rgb), 0.25); border-color:var(--c-primary); color:#fff; box-shadow:0 0 12px rgba(var(--primary-rgb), 0.25); }
+    .tab-btn.active { background:rgba(var(--primary-rgb), 0.25); border-color:var(--c-primary); color:#fff; box-shadow:inset 0 0 14px rgba(var(--primary-rgb), 0.45); }
     /* Der aktive Reiter übernimmt die Gruppenfarbe statt des festen Violett - so ist auf einen Blick
        klar, in WELCHEM Bereich man sich gerade befindet, nicht nur auf welchem Reiter. Farbwerte
        bewusst ausgeschrieben statt per color-mix(): color-mix wird von älteren Handy-Browsern nicht
        unterstützt und würde dort ersatzlos ausfallen. */
-    .tab-btn.active[data-tab-domain="kolonie"]      { background:rgba(127,119,221,0.22); border-color:#7f77dd; box-shadow:0 0 12px rgba(127,119,221,0.30); }
-    .tab-btn.active[data-tab-domain="erkundung"]    { background:rgba(92,225,255,0.18);  border-color:#5ce1ff; box-shadow:0 0 12px rgba(92,225,255,0.28); }
-    .tab-btn.active[data-tab-domain="gemeinschaft"] { background:rgba(250,199,117,0.18); border-color:#fac775; box-shadow:0 0 12px rgba(250,199,117,0.28); }
-    .tab-btn.active[data-tab-domain="meta"]         { background:rgba(93,202,165,0.18);  border-color:#5dcaa5; box-shadow:0 0 12px rgba(93,202,165,0.28); }
+    .tab-btn.active[data-tab-domain="kolonie"]      { background:rgba(127,119,221,0.22); border-color:#7f77dd; box-shadow:inset 0 0 14px rgba(127,119,221,0.30); }
+    .tab-btn.active[data-tab-domain="erkundung"]    { background:rgba(92,225,255,0.18);  border-color:#5ce1ff; box-shadow:inset 0 0 14px rgba(92,225,255,0.28); }
+    .tab-btn.active[data-tab-domain="gemeinschaft"] { background:rgba(250,199,117,0.18); border-color:#fac775; box-shadow:inset 0 0 14px rgba(250,199,117,0.28); }
+    .tab-btn.active[data-tab-domain="meta"]         { background:rgba(93,202,165,0.18);  border-color:#5dcaa5; box-shadow:inset 0 0 14px rgba(93,202,165,0.28); }
     /* Dezente Gruppentrenner in der Tab-Leiste (13.07.2026, Übersichtlichkeit-Feature-Wunsch) - macht
        die bereits bestehende logische Reihenfolge (Aufbau/Erkundung/Sozial/Meta) sichtbar, ohne
        irgendetwas an der Reihenfolge selbst zu ändern (kein Risiko fürs eingespielte Muskelgedächtnis
@@ -773,7 +790,7 @@
     /* Geprägtes 3D-Icon-Badge, nur in der Haupt-Tab-Leiste (Balance-/Feature-Wunsch 13.07.2026,
        Entwurf "Neumorph" nach Freigabe). Ruhezustand wirkt aus der dunklen Fläche herausgedrückt
        (raised), aktiver Tab wirkt hineingedrückt (inset) - verstärkt visuell "hier bist du gerade". */
-    .tab-icon-badge { width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:#10131f; box-shadow:3px 3px 6px rgba(0,0,0,0.55), -2px -2px 5px rgba(255,255,255,0.07); transition:box-shadow 0.2s ease; }
+    .tab-icon-badge { width:26px; height:26px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:#10131f; box-shadow:3px 3px 6px rgba(0,0,0,0.55), -2px -2px 5px rgba(255,255,255,0.07); transition:box-shadow 0.2s ease; }
     .tab-icon-badge i { font-size:15px; }
     .tab-btn.active .tab-icon-badge { box-shadow:inset 2px 2px 4px rgba(0,0,0,0.6), inset -2px -2px 4px rgba(255,255,255,0.08); }
     .tab-badge { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--c-danger); box-shadow:0 0 6px var(--c-danger); animation: badgePulse 1.6s ease-in-out infinite; }
@@ -814,8 +831,8 @@
        Die Karten behalten ihre Struktur und ihren Füllstandsbalken - nur Beschriftung und Polster
        fallen weg, der Wert bleibt gross und lesbar. */
     body.compact-head .resbar { display:flex; gap:6px; overflow-x:auto; margin-bottom:0.6rem; padding-bottom:4px; scrollbar-width:thin; scrollbar-color:rgba(var(--info-rgb),0.55) transparent; }
-    body.compact-head .rescard { flex:0 0 auto; min-width:104px; padding:6px 9px; gap:7px; border-radius:8px; }
-    body.compact-head .rescard .icon-badge { width:22px; height:22px; border-radius:6px; font-size:12px; }
+    body.compact-head .rescard { flex:0 0 auto; min-width:104px; padding:6px 9px; gap:7px; }
+    body.compact-head .rescard .icon-badge { width:22px; height:22px; font-size:12px; }
     body.compact-head .rescard .label { display:none; }
     body.compact-head .rescard .value { font-size:14px; }
     body.compact-head .rescard .value span { display:none; }
@@ -841,7 +858,7 @@
        ohne echte Mehrgeräte-Sichttests zusammenzulegen wäre ein unnötiges Risiko für einen rein
        kosmetischen Aufräum-Task gewesen. */
     @media (max-width: 480px) { .resbar { grid-template-columns: repeat(2, 1fr); } }
-    .rescard { position:relative; overflow:hidden; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:12px; padding: 0.8rem 0.9rem; display:flex; align-items:center; gap:10px; transition:border-color 0.2s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
+    .rescard { position:relative; overflow:hidden; background:var(--elev-1); border:0.5px solid var(--line-1); padding: 0.8rem 0.9rem; display:flex; align-items:center; gap:10px; transition:border-color 0.2s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
     .rescard:hover { border-color:rgba(var(--primary-rgb), 0.3); }
     /* Grafik-Runde 9, Vorschlag 37 "Touch-Feedback": kurzer Hintergrund-Aufblitz statt Ripple-Kreis
        (siehe Begründung im JS) - gilt für .card-row genauso wie .rescard, daher hier zentral statt
@@ -855,7 +872,11 @@
        der Füllstand soll deshalb auf einen Blick ablesbar sein statt nur als "x / y"-Text. Dazu die
        etablierte Neon-Glow-Statussprache (var(--glow-warn)) auf der Karte, sobald das Lager voll ist. */
     .t2-fill { position:absolute; left:0; bottom:0; height:2.5px; opacity:0.85; pointer-events:none; transition:width 0.4s ease; }
-    .rescard.t2-full { border-color:rgba(var(--warning-rgb),0.55); box-shadow:var(--glow-warn); }
+    /* Glow nach INNEN (Grafik-Audit 26.07.2026): Die Karte trägt jetzt die HUD-Schnittecke, und
+       clip-path beschneidet auch box-shadow - der bisherige äußere Warnschein wäre danach komplett
+       unsichtbar gewesen und damit ausgerechnet das Signal weg, das "Lager voll, Produktion steht"
+       meldet. Innen liegend bleibt es sichtbar und stört die Form nicht. */
+    .rescard.t2-full { border-color:rgba(var(--warning-rgb),0.55); box-shadow:inset 0 0 12px rgba(var(--warning-rgb),0.45); }
     /* Vorwarnstufe "Lager fast voll" (Grafik-Audit 24.07.2026, Entwurf D): Bisher wurde eine
        Ressource erst MARKIERT, wenn das Lager bereits voll war - also erst, wenn schon Produktion
        verloren geht (harter Lager-Deckel, siehe Kommentar bei applyProduction). Genau dann ist die
@@ -869,8 +890,8 @@
     .rescard.t2-full .t2-fill { box-shadow:0 0 8px rgba(var(--warning-rgb),0.75); opacity:1; }
     .rescard .rate .pct { color:#7d8199; }
     .rescard.t2-near .rate .pct { color:var(--c-warning); }
-    .rescard .icon-badge { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
-    .rescard .label { font-size:11px; color:#a8adc4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rescard .icon-badge { width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+    .rescard .label { font-size:11px; color:#aeb1c4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rescard .value { font-size:17px; font-weight:500; line-height:1.25; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rescard .rate { font-size:10px; color:#7d8199; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .dash-colony-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:1rem; }
@@ -918,13 +939,13 @@
     .section-title { font-size:var(--fs-body-lg); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin: 0 0 0.75rem; display:flex; align-items:center; gap:6px; color:#c7cbe0; padding-left:9px; border-left:2px solid var(--c-primary); font-family:var(--font-mono); }
 
     .buildings, .fleet, .research-list, .planet-list, .npc-list, .leaderboard { display:flex; flex-direction:column; gap:9px; }
-    .card-row { background: var(--elev-1); border: 0.5px solid var(--line-1); border-radius:14px; padding: 0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:background 0.15s ease, border-color 0.15s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
+    .card-row { background: var(--elev-1); border: 0.5px solid var(--line-1); padding: 0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:background 0.15s ease, border-color 0.15s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
 
     /* ===== Optionale Übersichtlichkeits-Layouts (Einstellungen) - standardmäßig alle aus, aktuelles
        Layout bleibt unverändert der Standard. Wirkt aktuell nur in den Tabs "Punktestand" und
        "Fortschritt" (dichteste Tabs) - Ausweitung auf weitere Tabs bei Bedarf separat. ===== */
-    .jumpnav { display:flex; gap:6px; flex-wrap:wrap; background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.07); border-radius:10px; padding:8px; margin-bottom:14px; }
-    .jumpnav a { font-size:10px; padding:4px 9px; border-radius:7px; background:var(--elev-2); color:#9fa3ba; white-space:nowrap; text-decoration:none; }
+    .jumpnav { display:flex; gap:6px; flex-wrap:wrap; background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.07); padding:8px; margin-bottom:14px; }
+    .jumpnav a { font-size:10px; padding:4px 9px; background:var(--elev-2); color:#9fa3ba; white-space:nowrap; text-decoration:none; }
     .jumpnav a:hover { background:rgba(var(--primary-rgb),0.18); color:#fff; }
     .prog-chevron { display:none; margin-left:auto; font-size:12px; transition:transform 0.15s ease; }
     .ui-accordion-on .prog-sec-header { cursor:pointer; }
@@ -937,14 +958,14 @@
     @media (min-width:760px){
       .ui-twocol-on .prog-twocol-group { display:grid; grid-template-columns:1fr 1fr; gap:0 20px; align-items:start; }
     }
-    .summary-bar { background: linear-gradient(135deg, rgba(var(--primary-rgb),0.22), rgba(var(--primary-rgb),0.08)); border: 1px solid rgba(var(--primary-rgb),0.5); border-radius: 12px; padding: 9px 11px; margin-bottom: 10px; }
+    .summary-bar { background: linear-gradient(135deg, rgba(var(--primary-rgb),0.22), rgba(var(--primary-rgb),0.08)); border: 1px solid rgba(var(--primary-rgb),0.5); padding: 9px 11px; margin-bottom: 10px; }
     .summary-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; }
     .summary-title { font-size: 11px; font-weight: 600; color: var(--lilac); display:flex; align-items:center; gap:5px; }
     .summary-chips { display:flex; gap:6px; flex-wrap:wrap; }
-    .chip { display:flex; align-items:center; gap:4px; background: var(--elev-2); border-radius:8px; padding:3px 8px 3px 6px; font-size:10.5px; color:#e9ecf5; }
+    .chip { display:flex; align-items:center; gap:4px; background: var(--elev-2); padding:3px 8px 3px 6px; font-size:10.5px; color:#e9ecf5; }
     .chip .chip-n { font-weight:700; color:var(--gold); }
     .quick-actions { display:flex; gap:6px; margin-bottom:10px; }
-    .quick-actions button { flex:1; font-size:10.5px; padding:7px 4px; border-radius:8px; }
+    .quick-actions button { flex:1; font-size:10.5px; padding:7px 4px; }
     .quick-actions button.primary { background: rgba(93,202,165,0.15); border-color: rgba(93,202,165,0.4); color:#9fe1cb; box-shadow:var(--glow-ok); }
     .quick-actions button.danger { background: rgba(226,75,74,0.12); border-color: rgba(226,75,74,0.35); color:#f0997b; }
     .card-row:hover { background: var(--elev-2); border-color:rgba(var(--primary-rgb), 0.35); }
@@ -954,7 +975,7 @@
        nicht umbrechen und läuft über den Kartenrand hinaus/wird abgeschnitten (Spieler-Report Modul-
        Beschreibungen). Das Icon (.bicon) hat flex-shrink:0 und bleibt davon unberührt. */
     .card-row .left > div:last-child { min-width:0; overflow-wrap:anywhere; }
-    .bicon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; overflow:hidden; }
+    .bicon { width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; overflow:hidden; }
     /* Verteidigungsanlagen-Kachel: deutlich größer als das generische 42px-Badge. Seit v8.287.0 hat
        jede der 21 Anlagen eine eigene gezeichnete Grafik, die auf 40px schlicht zu klein war, um die
        Silhouetten auseinanderzuhalten - die Schiffe zeichnen seit v8.282.0 auf 78x58. Auf schmalen
@@ -962,34 +983,34 @@
        Das canvas bekommt max-width/max-height statt fester Maße: ensureCanvasDpr schreibt auf
        Retina-Geräten ein inline style.width/height in Attributgröße, und nur max-* setzt sich
        dagegen durch (greift in der Größenberechnung nach width, unabhängig von Spezifität). */
-    .bicon-def { width:68px; height:68px; border-radius:14px; padding:2px; box-sizing:border-box; position:relative; }
+    .bicon-def { width:68px; height:68px; padding:2px; box-sizing:border-box; position:relative; }
     .bicon-def canvas { max-width:100%; max-height:100%; }
     /* Gesperrte Anlage: Grafik bleibt sichtbar (man soll sehen, worauf man hinarbeitet), wird aber
        entsättigt und trägt ein kleines Schloss-Abzeichen. Vorher stand hier nur ein Schloss-Symbol,
        vier verschiedene Anlagen sahen dadurch identisch aus. */
     .bicon-def.bicon-locked canvas { filter:grayscale(0.8); }
-    .bicon-def .lock-badge { position:absolute; right:1px; bottom:1px; font-size:11px; line-height:1; color:#c9d4e0; background:rgba(6,9,14,0.82); border-radius:5px; padding:2px 3px; }
-    @media (max-width:520px){ .bicon-def { width:56px; height:56px; border-radius:12px; } }
+    .bicon-def .lock-badge { position:absolute; right:1px; bottom:1px; font-size:11px; line-height:1; color:#c7cbe0; background:rgba(6,9,14,0.82); padding:2px 3px; }
+    @media (max-width:520px){ .bicon-def { width:56px; height:56px; } }
     /* Tier-2-Gebäude hervorgehoben (20.07.2026, Spieler-Wunsch): dünner Info-Rahmen + leichter Glow auf
        dem Icon-Badge für alle Gebäude, die Tier-2-Ressourcen produzieren ODER als Baukosten verlangen
        (usesTier2Resource()) - damit sind sie in der Gebäudeliste auf einen Blick als "Tier-2" erkennbar,
        bewusst die Info-Farbe (nicht Warn-Amber, das bedeutet "Lager voll"). */
-    .bicon-t2 { border:2px solid rgba(var(--info-rgb),0.65); box-shadow:0 0 0 1px rgba(var(--info-rgb),0.18), 0 0 7px rgba(var(--info-rgb),0.4); }
+    .bicon-t2 { border:2px solid rgba(var(--info-rgb),0.65); box-shadow:inset 0 0 0 1px rgba(var(--info-rgb),0.25), inset 0 0 8px rgba(var(--info-rgb),0.45); }
     /* Voller farblicher Karten-Rahmen für Tier-2-Inhalte (Spieler-Wunsch): Schiffe & Verteidigung/Gebäude,
        die Tier-2-Ressourcen nutzen. Gleiches Info-Farbschema wie der bestehende bicon-t2-Icon-Rand, plus
        ein Akzentstreifen links, damit T2-Karten auf einen Blick als höherwertig erkennbar sind. */
     .tier2-card { border-color:rgba(var(--info-rgb),0.55) !important; box-shadow:inset 3px 0 0 rgba(var(--info-rgb),0.85), 0 0 8px rgba(var(--info-rgb),0.15); }
     .bname { font-weight:600; font-size:var(--fs-body-lg); letter-spacing:0.01em; display:flex; align-items:center; gap:6px; color:#fff; font-family:var(--font-mono); }
-    .fleet-position-panel { position:fixed; right:14px; top:50%; transform:translateY(-50%); width:200px; max-height:74vh; overflow-y:auto; background:rgba(8,10,20,0.92); border:0.5px solid rgba(255,255,255,0.12); border-radius:12px; padding:10px; z-index:50; }
+    .fleet-position-panel { position:fixed; right:14px; top:50%; transform:translateY(-50%); width:200px; max-height:74vh; overflow-y:auto; background:rgba(8,10,20,0.92); border:0.5px solid rgba(255,255,255,0.12); padding:10px; z-index:50; }
     .fleet-position-panel { scrollbar-width:thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; }
     .fleet-position-panel::-webkit-scrollbar { width:6px; }
-    .fleet-position-panel::-webkit-scrollbar-track { background: var(--elev-1); border-radius:10px; }
-    .fleet-position-panel::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); border-radius:10px; }
+    .fleet-position-panel::-webkit-scrollbar-track { background: var(--elev-1); }
+    .fleet-position-panel::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); }
     .fleet-position-panel::-webkit-scrollbar-thumb:hover { background: var(--c-info); }
     .fleet-position-panel .fp-title { font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:var(--ink-dim); margin-bottom:6px; display:flex; align-items:center; gap:4px; }
     .fp-section { margin-top:14px; padding-top:12px; border-top:0.5px solid rgba(255,255,255,0.08); }
     .fp-section:first-child { margin-top:0; padding-top:0; border-top:none; }
-    .fp-colony-btn { width:100%; text-align:left; background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:8px; padding:6px 9px; font-size:11px; cursor:pointer; margin-bottom:5px; display:flex; align-items:center; gap:6px; }
+    .fp-colony-btn { width:100%; text-align:left; background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; padding:6px 9px; font-size:11px; cursor:pointer; margin-bottom:5px; display:flex; align-items:center; gap:6px; }
     .fp-colony-btn.active { background:rgba(var(--primary-rgb), 0.25); border-color:var(--c-primary); color:#fff; }
     .fp-lb-row { display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#c7cbe0; padding:4px 0; }
     .fp-lb-row .fp-lb-rank { color:#7d8199; width:16px; flex-shrink:0; }
@@ -1019,7 +1040,7 @@
       }
       .fp-close-btn { display:flex !important; }
     }
-    .fp-close-btn { display:none; position:absolute; top:8px; right:8px; width:28px; height:28px; align-items:center; justify-content:center; padding:0; font-size:12px; border-radius:8px; }
+    .fp-close-btn { display:none; position:absolute; top:8px; right:8px; width:28px; height:28px; align-items:center; justify-content:center; padding:0; font-size:12px; }
     .fp-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:205; }
     .fp-backdrop.show { display:block; }
 
@@ -1030,14 +1051,14 @@
     .login-hero-wrap { display:flex; flex-direction:column; align-items:center; gap:1.4rem; width:100%; max-width:680px; margin:auto; }
     .login-teaser-strip { display:flex; gap:10px; overflow-x:auto; width:100%; padding:2px 2px 6px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
     .login-teaser-strip::-webkit-scrollbar { height:5px; }
-    .login-teaser-strip::-webkit-scrollbar-thumb { background:rgba(127,119,221,0.4); border-radius:4px; }
-    .login-teaser-item { flex:0 0 auto; width:210px; scroll-snap-align:center; border-radius:12px; overflow:hidden; border:0.5px solid rgba(127,119,221,0.3); background:#0d1224; }
+    .login-teaser-strip::-webkit-scrollbar-thumb { background:rgba(127,119,221,0.4); }
+    .login-teaser-item { flex:0 0 auto; width:210px; scroll-snap-align:center; overflow:hidden; border:0.5px solid rgba(127,119,221,0.3); background:#0d1224; }
     .login-teaser-item svg { display:block; width:100%; height:auto; }
     .login-teaser-caption { font-size:11px; color:var(--ink-dim); text-align:center; padding:6px 4px; }
     /* Animierte Hero-Kampfszene (13.07.2026, Feature-Wunsch: "video-artiges" bombastisches Element
        für die Titelseite) - kein echtes Video, sondern eine durchgehend loopende CSS/SVG-Animation im
        selben Look wie die In-Game-Kampf-Wiedergabe (Schuss-Strahlen, Einschläge, Sternendrift). */
-    .hero-battle { position:relative; width:100%; max-width:760px; aspect-ratio:800/280; overflow:hidden; border-radius:16px; border:0.5px solid rgba(127,119,221,0.3); background:radial-gradient(ellipse at 50% 42%, #2a1c1c 0%, #131025 45%, #080a14 85%); animation:heroShake 7s ease-in-out infinite; margin:0 auto 1.2rem; }
+    .hero-battle { position:relative; width:100%; max-width:760px; aspect-ratio:800/280; overflow:hidden; border:0.5px solid rgba(127,119,221,0.3); background:radial-gradient(ellipse at 50% 42%, #2a1c1c 0%, #131025 45%, #080a14 85%); animation:heroShake 7s ease-in-out infinite; margin:0 auto 1.2rem; }
     @keyframes heroShake { 0%,84%,100%{ transform:translate(0,0); } 86%{ transform:translate(1.5px,-1px); } 88%{ transform:translate(-1.5px,1px); } 90%{ transform:translate(1px,1px); } 92%{ transform:translate(0,0); } }
     .hero-star { position:absolute; border-radius:50%; background:#fff; animation:heroTwinkle 3s ease-in-out infinite; }
     @keyframes heroTwinkle { 0%,100%{ opacity:0.25; } 50%{ opacity:1; } }
@@ -1061,7 +1082,7 @@
     .login-teaser-item svg g[fill="#fff"] circle:nth-child(2n) { animation-delay:0.6s; }
     .login-teaser-item svg g[fill="#fff"] circle:nth-child(3n) { animation-delay:1.3s; }
     .login-teaser-item svg g[fill="#fff"] circle:nth-child(4n) { animation-delay:2s; }
-    .login-card { width:100%; max-width:340px; background:rgba(13,18,36,0.96); border:0.5px solid rgba(var(--primary-rgb), 0.35); border-radius:16px; padding:1.75rem 1.5rem; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+    .login-card { width:100%; max-width:340px; background:rgba(13,18,36,0.96); border:0.5px solid rgba(var(--primary-rgb), 0.35); padding:1.75rem 1.5rem; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
     /* Grafik-Runde 3, Vorschlag "Boot-Sequenz": rein dekorative, sich selbst per CSS-Animation
        einblendende Zeilen vor dem Formular - kein JS-Timer/Skip-Zustand nötig (Formular ist von
        Anfang an nutzbar, blockiert also nichts), das war laut Vorschlag die aufwendigste/riskanteste
@@ -1082,8 +1103,8 @@
     .login-header { display:flex; align-items:center; gap:12px; margin-bottom:1.25rem; }
     .login-title { font-size:17px; font-weight:600; color:#f2f3f8; }
     .login-sub { font-size:11.5px; color:var(--ink-dim); }
-    .login-tabs { display:flex; gap:6px; margin-bottom:1rem; background:var(--elev-1); border-radius:10px; padding:3px; }
-    .login-tab { flex:1; background:transparent; border:none; color:var(--ink-dim); padding:8px; border-radius:8px; font-size:12.5px; cursor:pointer; }
+    .login-tabs { display:flex; gap:6px; margin-bottom:1rem; background:var(--elev-1); padding:3px; }
+    .login-tab { flex:1; background:transparent; border:none; color:var(--ink-dim); padding:8px; font-size:12.5px; cursor:pointer; }
     .login-tab.active { background:rgba(var(--primary-rgb), 0.3); color:#fff; }
     .login-card input { width:100%; box-sizing:border-box; margin-bottom:10px; padding:10px 12px; font-size:13px; }
     /* Grafik-Runde 4, Vorschlag "Eckenschnitt für große CTAs": bewusst nur auf .login-submit
@@ -1170,14 +1191,14 @@
     .ll-copy p { margin:0 0 20px; font-size:14px; line-height:1.72; color:var(--ink-dim); }
     .ll-bul { display:flex; flex-direction:column; gap:11px; margin:0; padding:0; list-style:none; }
     .ll-bul li { display:flex; gap:11px; font-size:13px; line-height:1.55; color:#c3bef5; }
-    .ll-bul i { flex:none; width:16px; height:16px; margin-top:2px; border-radius:4px; display:grid; place-items:center;
+    .ll-bul i { flex:none; width:16px; height:16px; margin-top:2px; display:grid; place-items:center;
       background:rgba(var(--secondary-rgb),0.18); color:var(--c-secondary); font-size:10px; font-style:normal; }
     .ll-facs { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
     .ll-fac { position:relative; padding:26px 20px 22px; border:1px solid rgba(255,255,255,0.09); background:#090d1a; overflow:hidden;
       clip-path:polygon(13px 0, 100% 0, 100% calc(100% - 13px), calc(100% - 13px) 100%, 0 100%, 0 13px); }
     .ll-fac::before { content:''; position:absolute; inset:0; opacity:0.5;
       background:radial-gradient(ellipse 130% 80% at 50% 0%, var(--ll-fc), transparent 62%); }
-    .ll-fac-sig { position:relative; width:44px; height:44px; margin-bottom:15px; border-radius:11px; display:grid; place-items:center;
+    .ll-fac-sig { position:relative; width:44px; height:44px; margin-bottom:15px; display:grid; place-items:center;
       border:1px solid var(--ll-fc); color:var(--ll-fc); background:rgba(0,0,0,0.4); font-size:21px; }
     .ll-fac b { position:relative; display:block; font-size:14.5px; margin-bottom:6px; }
     .ll-fac p { position:relative; margin:0; font-size:11.5px; line-height:1.55; color:var(--ink-dim); }
@@ -1185,8 +1206,8 @@
     .ll-finale h2 { margin:0 0 18px; font-size:clamp(28px, 4.2vw, 48px); font-weight:720; letter-spacing:-0.03em; text-wrap:balance; }
     .ll-finale p { margin:0 auto 34px; max-width:52ch; font-size:15px; line-height:1.7; color:var(--ink-dim); }
     .ll-foot { position:relative; z-index:2; background:#04060e; border-top:1px solid rgba(var(--primary-rgb),0.14);
-      padding:32px 26px 40px; text-align:center; font-size:11px; color:#6b7089; line-height:1.85; }
-    .ll-foot a { color:#8a8fa8; text-decoration:none; }
+      padding:32px 26px 40px; text-align:center; font-size:11px; color:#6b6f85; line-height:1.85; }
+    .ll-foot a { color:#9296ac; text-decoration:none; }
     /* Anmeldekarten liegen als eigenes Overlay ueber der Landeseite. */
     .ll-modal { position:fixed; inset:0; z-index:40; display:none; align-items:center; justify-content:center;
       padding:20px; overflow-y:auto; background:rgba(3,5,12,0.82); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); }
@@ -1200,7 +1221,7 @@
       .ll-trust { letter-spacing:0.12em; } .ll-hero-mid { padding:28px 20px 40px; } }
     @media (max-width:820px){ .ll-livebar { grid-template-columns:repeat(2,1fr); }
       .ll-livebar div:nth-child(3) { border-left:0; } .ll-topbar { padding:16px 18px; } .ll-topbar nav { display:none; } }
-    .toast { background:rgba(13,18,36,0.96); border:0.5px solid rgba(var(--primary-rgb), 0.4); border-radius:12px; padding:10px 16px; font-size:12.5px; color:#e9ecf5; display:flex; align-items:flex-start; gap:8px; box-shadow:0 8px 24px rgba(0,0,0,0.35); opacity:0; transform:translateY(-14px) scale(0.96); transition:opacity 0.3s ease, transform 0.3s ease; max-width:420px; }
+    .toast { background:rgba(13,18,36,0.96); border:0.5px solid rgba(var(--primary-rgb), 0.4); padding:10px 16px; font-size:12.5px; color:#e9ecf5; display:flex; align-items:flex-start; gap:8px; box-shadow:0 8px 24px rgba(0,0,0,0.35); opacity:0; transform:translateY(-14px) scale(0.96); transition:opacity 0.3s ease, transform 0.3s ease; max-width:420px; }
     /* Schweregrad-Varianten (siehe log()/pushToast() weiter unten) - ueberschreiben nur Rand + Glow,
        nicht den Grundaufbau (Eckenschnitt/Klammern kommen weiterhin aus der HUD-Sammelregel). */
     .toast.toast-info { border-color:rgba(var(--info-rgb),0.5); box-shadow:0 8px 24px rgba(0,0,0,0.35), var(--glow-info); }
@@ -1214,18 +1235,18 @@
        das HTML in den vielen render*()-Funktionen auf echte Segment-Balken umzustellen, bekommt die
        bestehende Pille ein feines Streifenmuster + schärfere Ecken + Mono-Ziffern - liest sich wie
        eine kleine Signalanzeige, ohne dass ein einziger Aufrufort im JS geändert werden musste. */
-    .lvl-pill { font-size:var(--fs-small); font-weight:600; padding:1px 8px; border-radius:3px; background:repeating-linear-gradient(90deg, var(--elev-3) 0px, var(--elev-3) 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px); border:0.5px solid var(--line-2); color:#c7cbe0; font-variant-numeric:tabular-nums; font-family:var(--font-mono); display:inline-block; min-width:1.2em; text-align:center; }
+    .lvl-pill { font-size:var(--fs-small); font-weight:600; padding:1px 8px; background:repeating-linear-gradient(90deg, var(--elev-3) 0px, var(--elev-3) 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px); border:0.5px solid var(--line-2); color:#c7cbe0; font-variant-numeric:tabular-nums; font-family:var(--font-mono); display:inline-block; min-width:1.2em; text-align:center; }
     .bmeta { font-size:var(--fs-small); color:var(--ink-dim); margin-top:2px; font-family:var(--font-mono); }
     @media (max-width: 700px) {
       .lvl-pill { font-size:11px; }
       .bmeta { font-size:12px; }
       .header-btn-label { display:none; }
     }
-    .bcost { font-size:var(--fs-small); color:#8489a0; margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); }
+    .bcost { font-size:var(--fs-small); color:#7d8199; margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); }
     .bcost .costitem { display:flex; align-items:center; gap:3px; }
     .bcost .short { color:#e2647a; }
 
-    button { background: var(--elev-2); border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; border-radius:9px; padding:8px 13px; font-size:12.5px; cursor:pointer; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease; }
+    button { background: var(--elev-2); border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; padding:8px 13px; font-size:12.5px; cursor:pointer; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease; }
     button:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
     button:active:not(:disabled) { transform: scale(0.97); }
     button:disabled { opacity:0.4; cursor:default; }
@@ -1236,15 +1257,19 @@
       button { min-height: 36px; }
       .pill-moon-btn { width:28px; height:28px; font-size:13px; }
     }
-    button.buy.affordable { background: rgba(var(--secondary-rgb), 0.22); border-color:var(--c-secondary-dark); box-shadow:0 0 0 0 rgba(var(--secondary-dark-rgb), 0.5); animation: affordPulse 2.2s ease-in-out infinite; }
-    @keyframes affordPulse { 0%,100% { box-shadow:0 0 0 0 rgba(var(--secondary-dark-rgb), 0.35); } 50% { box-shadow:0 0 0 5px rgba(var(--secondary-dark-rgb), 0); } }
-    button.attack { background: rgba(var(--danger-rgb), 0.22); border-color:var(--c-danger); box-shadow:var(--glow-crit); }
-    button.primary { background: rgba(55,138,221,0.28); border-color:var(--c-info); box-shadow:var(--glow-info); }
-    input[type=text], input[type=email], input[type=password], input[type=number], textarea { background: var(--elev-2); border:0.5px solid rgba(255,255,255,0.18); color:#fff; border-radius:9px; padding:8px 11px; font-size:13px; font-family:inherit; transition:border-color 0.15s ease, box-shadow 0.15s ease; }
+    /* Alle drei Zustände auf inset umgestellt (Grafik-Audit 26.07.2026): Der Button trägt jetzt die
+       HUD-Schnittecke, und clip-path schneidet äußere Schatten mit weg - der bisherige Ring/Schein
+       nach AUSSEN wäre danach schlicht unsichtbar gewesen. Der Puls wandert deshalb nach innen und
+       läuft als Lichtsaum am Rand entlang; er bleibt genauso auffällig, ohne aus der Form zu treten. */
+    button.buy.affordable { background: rgba(var(--secondary-rgb), 0.22); border-color:var(--c-secondary-dark); animation: affordPulse 2.2s ease-in-out infinite; }
+    @keyframes affordPulse { 0%,100% { box-shadow:inset 0 0 0 0 rgba(var(--secondary-dark-rgb), 0.55); } 50% { box-shadow:inset 0 0 9px 1px rgba(var(--secondary-dark-rgb), 0.75); } }
+    button.attack { background: rgba(var(--danger-rgb), 0.22); border-color:var(--c-danger); box-shadow:inset 0 0 10px rgba(var(--danger-rgb),0.5); }
+    button.primary { background: rgba(55,138,221,0.28); border-color:var(--c-info); box-shadow:inset 0 0 10px rgba(var(--info-rgb),0.5); }
+    input[type=text], input[type=email], input[type=password], input[type=number], textarea { background: var(--elev-2); border:0.5px solid rgba(255,255,255,0.18); color:#fff; padding:8px 11px; font-size:13px; font-family:inherit; transition:border-color 0.15s ease, box-shadow 0.15s ease; }
     /* Grafik-Runde 5, Vorschlag "Eingabefeld-Fokus": bisher kein eigener :focus-Zustand definiert -
        der Browser zeichnete seinen Standard-Fokusring (browserabhängig, passt nicht zum Farbschema). */
     input[type=text]:focus, input[type=email]:focus, input[type=password]:focus, input[type=number]:focus, textarea:focus {
-      outline:none; border-color:var(--c-info); box-shadow:0 0 0 3px rgba(var(--info-rgb),0.15), var(--glow-info);
+      outline:none; border-color:var(--c-info); box-shadow:inset 0 0 0 1px rgba(var(--info-rgb),0.45), inset 0 0 12px rgba(var(--info-rgb),0.3);
     }
     /* iOS Safari zoomt beim Fokussieren automatisch rein, wenn ein Eingabefeld unter 16px Schrift
        hat - auf schmalen Screens (also praktisch immer am Handy) daher auf 16px angehoben, damit
@@ -1261,7 +1286,7 @@
     select {
       background: var(--elev-2) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" fill="none" stroke="%23c7cbe0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>') no-repeat right 9px center;
       background-size: 13px;
-      border:0.5px solid rgba(255,255,255,0.18); color:#fff; border-radius:9px; padding:8px 26px 8px 11px;
+      border:0.5px solid rgba(255,255,255,0.18); color:#fff; padding:8px 26px 8px 11px;
       font-size:13px; font-family:inherit; appearance:none; -webkit-appearance:none;
       transition:border-color 0.15s ease, box-shadow 0.15s ease;
     }
@@ -1269,8 +1294,8 @@
     select option { background:#161a2c; color:#fff; }
     @media (max-width: 700px) { select { font-size:16px; } }
 
-    .progress-outer { width:100%; height:6px; background: var(--elev-2); border-radius:4px; overflow:hidden; margin-top:9px; }
-    .progress-inner { height:100%; background: linear-gradient(90deg,#378ADD,var(--c-secondary)); border-radius:4px; transition: width 0.3s linear; box-shadow:0 0 8px rgba(var(--secondary-rgb), 0.5); }
+    .progress-outer { width:100%; height:6px; background: var(--elev-2); overflow:hidden; margin-top:9px; }
+    .progress-inner { height:100%; background: linear-gradient(90deg,#378ADD,var(--c-secondary)); transition: width 0.3s linear; box-shadow:0 0 8px rgba(var(--secondary-rgb), 0.5); }
     /* Bug entdeckt+behoben (Grafik-Runde 2): attackbar hatte bisher trotz rotem Verlauf den grünen
        box-shadow-Glow von .progress-inner geerbt (dort für rgba(--secondary-rgb) fest verdrahtet) -
        Angriffsbalken leuchteten also grün statt rot. */
@@ -1280,11 +1305,11 @@
     .research-locked { opacity:0.5; }
     .badge-done { font-size:10.5px; color:var(--c-secondary); display:flex; align-items:center; gap:4px; }
     /* Erfolge: Übersichts-/Rangheader + Kategorie-Unterteilung (20.07.2026) */
-    .ach-summary { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px 14px; margin-bottom:14px;
+    .ach-summary { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); padding:12px 14px; margin-bottom:14px;
       clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
     .ach-sum-top { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
     .ach-rank { font-family:var(--font-mono, monospace); font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
-      padding:5px 11px; border:1.5px solid currentColor; border-radius:8px; display:inline-flex; align-items:center; gap:6px;
+      padding:5px 11px; border:1.5px solid currentColor; display:inline-flex; align-items:center; gap:6px;
       clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
     .ach-sum-nums { font-size:12.5px; color:#c7cbe0; }
     .ach-sum-nums b { color:#f4f3ff; font-variant-numeric:tabular-nums; }
@@ -1292,31 +1317,31 @@
       border-bottom:1px solid rgba(255,255,255,0.08); }
     .ach-cat-title { display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; letter-spacing:0.4px; color:#c3bef5; text-transform:uppercase; }
     .ach-cat-count { font-family:var(--font-mono, monospace); font-size:11px; font-weight:700; color:#7d8199; font-variant-numeric:tabular-nums;
-      padding:2px 8px; border:1px solid rgba(255,255,255,0.12); border-radius:20px; }
+      padding:2px 8px; border:1px solid rgba(255,255,255,0.12); }
     .ach-cat-count.ach-cat-full { color:var(--c-secondary); border-color:var(--c-secondary-dark); background:rgba(var(--secondary-dark-rgb),0.14); }
     .ach-pts { font-family:var(--font-mono, monospace); font-size:9.5px; font-weight:700; color:#fac775; background:rgba(250,199,117,0.13);
-      border:0.5px solid rgba(250,199,117,0.35); border-radius:5px; padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
+      border:0.5px solid rgba(250,199,117,0.35); padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
     /* Markt-Vertiefung (20.07.2026): Preisverlauf-Sparkline + Ereignis-Banner */
     .mkt-spark-wrap { flex-shrink:0; opacity:1; align-self:flex-start; }
     .mkt-spark { display:block; width:150px; height:44px; }
-    .mkt-event { display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:0.9rem; border-radius:10px;
+    .mkt-event { display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:0.9rem;
       clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
     .mkt-event > i { font-size:20px; flex-shrink:0; }
     .mkt-event-up   { background:rgba(226,75,74,0.12);  border:0.5px solid rgba(226,75,74,0.5);  color:#f0997b; }
     .mkt-event-down { background:rgba(93,202,165,0.12); border:0.5px solid rgba(93,202,165,0.5); color:#5dcaa5; }
     .mkt-event-title { font-weight:700; font-size:13px; }
-    .mkt-event-sub { font-size:11px; color:#a7adc4; margin-top:1px; }
-    .mkt-tag { font-family:var(--font-mono, monospace); font-size:9.5px; font-weight:700; border:0.5px solid currentColor; border-radius:5px; padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
+    .mkt-event-sub { font-size:11px; color:#aeb1c4; margin-top:1px; }
+    .mkt-tag { font-family:var(--font-mono, monospace); font-size:9.5px; font-weight:700; border:0.5px solid currentColor; padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
     .mkt-affected { box-shadow:0 0 0 0.5px rgba(255,255,255,0.04); }
 
     .planet-switch { display:flex; gap:6px; margin-bottom:1rem; flex-wrap:wrap; }
-    .planet-pill { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:10px; padding:6px 12px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; }
+    .planet-pill { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; padding:6px 12px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; }
     .planet-pill.active { background:rgba(var(--primary-rgb), 0.25); border-color:var(--c-primary); color:#fff; }
     .prodline { font-size:11.5px; color:#7d8199; margin-top:2px; }
     .colonized-badge { font-size:10.5px; color:var(--c-secondary); display:flex; align-items:center; gap:4px; }
 
     .qty-select { display:flex; gap:6px; margin-bottom:1rem; }
-    .qty-btn { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; border-radius:9px; padding:5px 11px; font-size:11.5px; cursor:pointer; }
+    .qty-btn { background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); color:#c7cbe0; padding:5px 11px; font-size:11.5px; cursor:pointer; }
     .qty-btn.active { background:rgba(var(--secondary-rgb), 0.22); border-color:var(--c-secondary-dark); color:#fff; }
     /* Analytics-Dashboard (16.07.2026, optische/funktionale Überarbeitung auf Feature-Wunsch) - eigene
        Chart.js-Diagramme statt reiner CSS-Balken. Container-Höhen fest, damit Chart.js' responsive
@@ -1328,14 +1353,14 @@
       .analytics-chart-box { height:190px; }
       .analytics-chart-box.tall { height:280px; }
     }
-    .analytics-summary-pill { display:inline-flex; align-items:center; gap:5px; background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); border-radius:20px; padding:6px 13px; font-size:12px; color:#c7cbe0; }
+    .analytics-summary-pill { display:inline-flex; align-items:center; gap:5px; background:var(--elev-1); border:0.5px solid rgba(255,255,255,0.1); padding:6px 13px; font-size:12px; color:#c7cbe0; }
 
-    .map-wrap { position:relative; border-radius:14px; overflow:hidden; background:radial-gradient(ellipse at 15% 20%, #171c34, #0a0d1a 70%); margin-bottom:1rem; height:230px; }
-    .system-nav { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:1rem; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:12px; padding:8px 6px; }
+    .map-wrap { position:relative; overflow:hidden; background:radial-gradient(ellipse at 15% 20%, #171c34, #0a0d1a 70%); margin-bottom:1rem; height:230px; }
+    .system-nav { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:1rem; background:var(--elev-1); border:0.5px solid var(--line-1); padding:8px 6px; }
     .system-nav button { padding:8px 12px; }
     .system-nav-label { text-align:center; flex:1; }
     .system-nav-name { font-size:14px; font-weight:600; color:#f2f3f8; }
-    .system-nav-meta { font-size:11px; color:#8489a0; margin-top:1px; }
+    .system-nav-meta { font-size:11px; color:#7d8199; margin-top:1px; }
     .map-wrap svg { width:100%; height:100%; }
     /* Grafik-Runde 9, Vorschlag 35 "Sektorkarte als Radar-Display": bewusst NICHT Teil des SVG-Inhalts
        (der bei jedem buildMap()-Aufruf komplett per innerHTML ersetzt wird, siehe Kommentar dort, und
@@ -1361,7 +1386,7 @@
 
     .missions-active { display:flex; flex-direction:column; gap:8px; margin-bottom:1rem; }
 
-    .profile-card { background: var(--elev-1); border:0.5px solid var(--line-1); border-radius:14px; padding:1rem 1.1rem; margin-bottom:1.25rem; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .profile-card { background: var(--elev-1); border:0.5px solid var(--line-1); padding:1rem 1.1rem; margin-bottom:1.25rem; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
     /* Grafik-Runde 2, Vorschlag "HUD-Panels": ersetzt die runden Ecken der wiederverwendeten
        Karten-/Dialog-Container durch einen einzelnen diagonalen Eckenschnitt (oben-links/unten-rechts)
        + kleine Eckklammern an den beiden verbleibenden rechten-Winkel-Ecken. Absichtlich nur EIN
@@ -1395,7 +1420,7 @@
     /* Schlanke HUD-Scrollleiste im Profil-Modal (Neon-Verlauf, eingerückter Daumen) statt grauer Browser-Standardleiste */
     .profile-hero-card::-webkit-scrollbar { width:9px; }
     .profile-hero-card::-webkit-scrollbar-track { background:transparent; margin:8px 0; }
-    .profile-hero-card::-webkit-scrollbar-thumb { background:linear-gradient(180deg, rgba(var(--primary-rgb),0.65), rgba(var(--info-rgb),0.6)); border:2px solid transparent; background-clip:padding-box; border-radius:10px; }
+    .profile-hero-card::-webkit-scrollbar-thumb { background:linear-gradient(180deg, rgba(var(--primary-rgb),0.65), rgba(var(--info-rgb),0.6)); border:2px solid transparent; background-clip:padding-box; }
     .profile-hero-card::-webkit-scrollbar-thumb:hover { background:linear-gradient(180deg, var(--c-primary), var(--c-info)); border:2px solid transparent; background-clip:padding-box; }
     @keyframes profileHeroIn { 0%{ opacity:0; transform:scale(0.96) translateY(6px); } 100%{ opacity:1; transform:scale(1) translateY(0); } }
     @media (prefers-reduced-motion: reduce){ .profile-hero-card { animation:none; } }
@@ -1411,7 +1436,7 @@
     .profile-hero-top { position:relative; display:flex; align-items:center; gap:14px; }
     .profile-hero-avatar-wrap { position:relative; width:72px; height:72px; flex-shrink:0; }
     .profile-hero-avatar-wrap .avatar { width:72px; height:72px; font-size:26px; }
-    .profile-hero-tier-pill { position:relative; display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; padding:2px 8px; margin-top:6px; border-radius:3px; }
+    .profile-hero-tier-pill { position:relative; display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; padding:2px 8px; margin-top:6px; }
     /* Rahmen-Stufen: bewusst aus bereits vorhandenem Fortschritt abgeleitet (Level/Prestige/Ascension/
        Ranglistenplatz), kein neues Freischalt-Tracking - siehe computePlayerFrameTier(). */
     .frame-ring { position:absolute; inset:-6px; border-radius:50%; pointer-events:none; border:3px solid var(--frame-color); box-shadow:0 0 10px rgba(var(--frame-rgb),0.55); }
@@ -1429,7 +1454,7 @@
        Bedrohungs-Banner, aufgewertete Kennzahl-Kacheln, Sektionen mit Vergleichsbalken, Flotten-Mini-
        Icons, Angriffs-Vorschau, klare Button-Hierarchie mit einklappbarem Mehr-Menü. */
     .profile-rank-ribbon { position:absolute; top:0; right:0; z-index:3; font-family:var(--font-mono); font-weight:700; font-size:11px; letter-spacing:0.08em; color:#2a1e05; padding:5px 13px 5px 17px; background:linear-gradient(135deg,#e8c15a,#b8892f); clip-path:polygon(12px 0,100% 0,100% 100%,0 100%); box-shadow:0 2px 10px rgba(232,193,90,0.4); display:flex; align-items:center; gap:5px; }
-    .profile-online-pill { display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; padding:2px 8px; margin-top:6px; margin-left:6px; border-radius:3px; }
+    .profile-online-pill { display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; padding:2px 8px; margin-top:6px; margin-left:6px; }
     .profile-online-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
     .profile-online-dot.live { background:#5dcaa5; box-shadow:0 0 8px #5dcaa5; animation:profileOnlinePulse 1.8s ease-in-out infinite; }
     @keyframes profileOnlinePulse { 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
@@ -1444,7 +1469,7 @@
     .profile-hero-stat { position:relative; clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px)); }
     .profile-hero-stat .phstat-ico { display:block; font-size:13px; opacity:0.75; margin-bottom:1px; }
     .profile-hero-stat b { font-variant-numeric:tabular-nums; }
-    .profile-hero-stat::after { content:''; position:absolute; top:0; left:11px; right:11px; height:2px; border-radius:2px; background:var(--phstat-accent,var(--primary)); }
+    .profile-hero-stat::after { content:''; position:absolute; top:0; left:11px; right:11px; height:2px; background:var(--phstat-accent,var(--primary)); }
     /* Sektions-Überschriften */
     .profile-sec { font-family:var(--font-mono); font-size:10px; letter-spacing:0.16em; color:var(--lilac); text-transform:uppercase; margin:15px 0 8px; display:flex; align-items:center; gap:10px; }
     .profile-sec::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,rgba(var(--primary-rgb),0.35),transparent); }
@@ -1457,34 +1482,34 @@
     .prow-val { font-family:var(--font-mono); font-weight:700; color:#fff; font-variant-numeric:tabular-nums; white-space:nowrap; }
     .prow-cmp { font-family:var(--font-mono); font-size:10.5px; margin-left:6px; }
     .prow-cmp.up { color:#5dcaa5; } .prow-cmp.down { color:#e24b4a; } .prow-cmp.eq { color:#9296ac; }
-    .pbar { height:6px; border-radius:4px; background:rgba(255,255,255,0.06); overflow:hidden; display:flex; }
+    .pbar { height:6px; background:rgba(255,255,255,0.06); overflow:hidden; display:flex; }
     .pbar .them { height:100%; }
     .pbar .you { height:100%; background:repeating-linear-gradient(45deg,rgba(255,255,255,0.30),rgba(255,255,255,0.30) 3px,transparent 3px,transparent 6px); }
     /* Flotten-Mini-Icons */
     .pfleet { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
-    .pfchip { display:flex; align-items:center; gap:5px; background:var(--elev-1); border:1px solid var(--line-1); border-radius:7px; padding:3px 8px 3px 5px; font-family:var(--font-mono); font-size:11.5px; color:#dfe3f2; }
+    .pfchip { display:flex; align-items:center; gap:5px; background:var(--elev-1); border:1px solid var(--line-1); padding:3px 8px 3px 5px; font-family:var(--font-mono); font-size:11.5px; color:#dfe3f2; }
     .pfchip canvas { width:22px; height:15px; }
     .pfchip b { color:#fff; font-weight:700; }
     /* Angriffs-Vorschau */
-    .profile-preview { margin-top:15px; border-radius:12px; padding:12px 14px; border:1px solid; }
+    .profile-preview { margin-top:15px; padding:12px 14px; border:1px solid; }
     .profile-preview.pp-danger { background:linear-gradient(180deg,rgba(226,75,74,0.10),rgba(226,75,74,0.02)); border-color:rgba(226,75,74,0.3); }
     .profile-preview.pp-good { background:linear-gradient(180deg,rgba(93,202,165,0.10),rgba(93,202,165,0.02)); border-color:rgba(93,202,165,0.3); }
     .profile-preview .pp-h { font-family:var(--font-mono); font-size:10px; letter-spacing:0.13em; text-transform:uppercase; margin-bottom:8px; display:flex; align-items:center; gap:7px; }
     .profile-preview.pp-danger .pp-h { color:#ff9d8f; } .profile-preview.pp-good .pp-h { color:#7fe0be; }
-    .pp-gauge-row { display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:11px; color:#8489a0; margin-bottom:5px; gap:8px; }
+    .pp-gauge-row { display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:11px; color:#7d8199; margin-bottom:5px; gap:8px; }
     .pp-gauge-row b { font-variant-numeric:tabular-nums; }
-    .pp-gauge { height:10px; border-radius:6px; background:rgba(255,255,255,0.06); position:relative; overflow:hidden; }
-    .pp-gauge .fill { position:absolute; left:0; top:0; height:100%; border-radius:6px; }
+    .pp-gauge { height:10px; background:rgba(255,255,255,0.06); position:relative; overflow:hidden; }
+    .pp-gauge .fill { position:absolute; left:0; top:0; height:100%; }
     .profile-preview.pp-danger .pp-gauge .fill { background:linear-gradient(90deg,#e24b4a,#ff8a5c); }
     .profile-preview.pp-good .pp-gauge .fill { background:linear-gradient(90deg,#5dcaa5,#9fe1cb); }
     .pp-verdict { font-family:var(--font-mono); font-size:11.5px; margin-top:9px; display:flex; gap:7px; align-items:flex-start; }
     .profile-preview.pp-danger .pp-verdict { color:#ff9d8f; } .profile-preview.pp-good .pp-verdict { color:#7fe0be; }
     /* Aktions-Buttons mit Hierarchie */
     .profile-actions { display:flex; gap:9px; margin-top:16px; align-items:stretch; }
-    .profile-actions .btn-attack-lg { flex:1; background:linear-gradient(180deg,#e24b4a,#b3312f); color:#fff; border:none; font-family:var(--font-mono); font-weight:700; font-size:14px; letter-spacing:0.06em; padding:13px; border-radius:11px; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; box-shadow:0 0 16px rgba(226,75,74,0.4),inset 0 1px 0 rgba(255,255,255,0.15); clip-path:polygon(0 0,calc(100% - 11px) 0,100% 11px,100% 100%,11px 100%,0 calc(100% - 11px)); }
-    .profile-actions .btn-ico { width:54px; flex-shrink:0; background:var(--elev-1); border:1px solid var(--line-1); border-radius:11px; color:var(--lilac); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:9px; cursor:pointer; font-family:var(--font-mono); }
+    .profile-actions .btn-attack-lg { flex:1; background:linear-gradient(180deg,#e24b4a,#b3312f); color:#fff; border:none; font-family:var(--font-mono); font-weight:700; font-size:14px; letter-spacing:0.06em; padding:13px; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; box-shadow:0 0 16px rgba(226,75,74,0.4),inset 0 1px 0 rgba(255,255,255,0.15); clip-path:polygon(0 0,calc(100% - 11px) 0,100% 11px,100% 100%,11px 100%,0 calc(100% - 11px)); }
+    .profile-actions .btn-ico { width:54px; flex-shrink:0; background:var(--elev-1); border:1px solid var(--line-1); color:var(--lilac); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:9px; cursor:pointer; font-family:var(--font-mono); }
     .profile-actions .btn-ico i { font-size:16px; }
-    .profile-actions .btn-more { width:44px; flex-shrink:0; background:var(--elev-1); border:1px solid var(--line-1); border-radius:11px; color:#8489a0; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; cursor:pointer; letter-spacing:0.05em; }
+    .profile-actions .btn-more { width:44px; flex-shrink:0; background:var(--elev-1); border:1px solid var(--line-1); color:#7d8199; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; cursor:pointer; letter-spacing:0.05em; }
     .profile-actions .btn-more[aria-expanded="true"] { color:var(--lilac); border-color:rgba(var(--primary-rgb),0.4); }
     .profile-more-menu { margin-top:10px; display:none; flex-direction:column; gap:8px; }
     .profile-more-menu.open { display:flex; }
@@ -1503,7 +1528,7 @@
     .avatar-option { width:36px; height:36px; border-radius:50%; background:var(--elev-2); border:2px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
     .avatar-option.active { border-color:var(--c-primary); background:rgba(var(--primary-rgb), 0.25); }
     .banner-picker { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-    .banner-option { width:56px; height:36px; border-radius:8px; cursor:pointer; border:2px solid transparent; padding:0; overflow:hidden; position:relative; }
+    .banner-option { width:56px; height:36px; cursor:pointer; border:2px solid transparent; padding:0; overflow:hidden; position:relative; }
     .banner-option.active { border-color:var(--c-primary); }
     .banner-option.locked { cursor:not-allowed; opacity:0.4; }
     .banner-option.locked::after { content:'🔒'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:13px; background:rgba(6,8,18,0.45); }
@@ -1518,7 +1543,7 @@
     .alliance-hero-banner::before { content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size:22px 22px; mask-image:radial-gradient(ellipse 100% 100% at 50% 20%, #000 40%, transparent 96%); -webkit-mask-image:radial-gradient(ellipse 100% 100% at 50% 20%, #000 40%, transparent 96%); }
     .alliance-hero-banner::after { content:''; position:absolute; inset:0; background:linear-gradient(0deg, rgba(6,8,18,0.55), transparent 65%); }
     .alliance-hero-star { position:absolute; width:2px; height:2px; border-radius:50%; background:#fff; opacity:0.65; }
-    .alliance-hero-level-pill { position:absolute; top:12px; right:14px; z-index:1; font-family:var(--font-mono); font-size:10px; letter-spacing:0.03em; padding:3px 8px; background:rgba(6,8,18,0.5); border:1px solid rgba(255,255,255,0.22); border-radius:3px; }
+    .alliance-hero-level-pill { position:absolute; top:12px; right:14px; z-index:1; font-family:var(--font-mono); font-size:10px; letter-spacing:0.03em; padding:3px 8px; background:rgba(6,8,18,0.5); border:1px solid rgba(255,255,255,0.22); }
     .alliance-hero-logo-wrap { position:relative; z-index:1; width:60px; height:60px; flex-shrink:0; }
     .alliance-hero-logo-wrap .avatar { width:60px; height:60px; font-size:22px; background:rgba(6,8,18,0.4); border:2px solid rgba(255,255,255,0.3); color:#fff; }
     .alliance-hero-name { position:relative; z-index:1; font-size:18px; font-weight:700; text-shadow:0 1px 6px rgba(0,0,0,0.65); }
@@ -1588,14 +1613,20 @@
     .pill-supporter-silver { color:#c7cbe0; border-color:rgba(199,203,224,0.5); }
     .pill-supporter-gold { color:#fac775; border-color:rgba(250,199,117,0.5); box-shadow:0 0 6px rgba(250,199,117,0.35); }
     .rank-num { width:22px; text-align:center; color:var(--c-info); font-weight:600; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
-    .lb-note { font-size:11px; color:#7d8199; margin-top:8px; display:flex; align-items:center; gap:5px; }
+    /* War display:flex, um das führende Icon auszurichten - dadurch wurde aber JEDER Kindknoten zum
+       Flex-Element: ein <strong> mitten im Satz bekam eine eigene Spalte und riss den Text
+       auseinander ("Ein | geteilter Markt | für alle Spieler:" in drei Blöcken nebeneinander, im
+       Markt-Tab gut sichtbar). 51 Stellen nutzen die Klasse, 7 davon mit Auszeichnungen im Satz.
+       Fließtext gehört in den normalen Textfluss; das Icon richtet sich per vertical-align aus. */
+    .lb-note { font-size:11px; color:#7d8199; margin-top:8px; line-height:1.55; }
+    .lb-note > i.ti { margin-right:5px; vertical-align:-1px; }
     /* Runde 3 der Profilbild/Banner-Überarbeitung: Allianz-Chronik ist bewusst KEIN neues Tracking,
        sondern liest die bereits vorhandenen Systemnachrichten (🏰 Allianzbasis / 🏆 Spendenwertung im
        Allianz-Chat, siehe postAllianceBaseNews()) als schmale Zeitleiste statt als Chat-Verlauf. */
     .chronicle-entry { position:relative; padding:8px 0 8px 14px; border-left:2px solid var(--line-2); font-size:12.5px; color:#e2e4f0; }
     .chronicle-entry::before { content:''; position:absolute; left:-4px; top:13px; width:6px; height:6px; border-radius:50%; background:var(--c-info); box-shadow:0 0 5px rgba(var(--info-rgb),0.7); }
     .chronicle-entry:last-child { border-left-color:transparent; }
-    .help-category { margin-bottom:10px; border:0.5px solid rgba(255,255,255,0.08); border-radius:12px; overflow:hidden; }
+    .help-category { margin-bottom:10px; border:0.5px solid rgba(255,255,255,0.08); overflow:hidden; }
     .help-category-header { display:flex; align-items:center; gap:10px; padding:0.75rem 0.9rem; cursor:pointer; background:var(--elev-1); }
     .help-category-header:active { background:var(--elev-2); }
     .help-category-header .bicon { flex-shrink:0; }
@@ -1607,21 +1638,76 @@
     .help-entry { margin-bottom:0.9rem; }
     .help-entry:last-child { margin-bottom:0; }
     .help-entry-title { font-size:12.5px; font-weight:600; color:#e8e9f0; margin-bottom:3px; }
-    .help-entry-body { font-size:11.5px; color:#a8acc0; line-height:1.5; }
+    .help-entry-body { font-size:11.5px; color:#aeb1c4; line-height:1.5; }
     .help-entry-body strong { color:var(--lilac); }
-    .help-jump-btn { display:inline-flex; align-items:center; gap:3px; font-size:10.5px; padding:2px 7px; border-radius:20px; background:rgba(var(--primary-rgb),0.18); color:var(--lilac); border:0.5px solid rgba(var(--primary-rgb),0.35); cursor:pointer; vertical-align:middle; margin-left:6px; }
+    .help-jump-btn { display:inline-flex; align-items:center; gap:3px; font-size:10.5px; padding:2px 7px; background:rgba(var(--primary-rgb),0.18); color:var(--lilac); border:0.5px solid rgba(var(--primary-rgb),0.35); cursor:pointer; vertical-align:middle; margin-left:6px; }
 
-    .log { font-size:11.5px; color:#8489a0; margin-top:1rem; min-height:16px; display:flex; align-items:center; gap:6px; }
+    .log { font-size:11.5px; color:#7d8199; margin-top:1rem; min-height:16px; display:flex; align-items:center; gap:6px; }
     .resetrow { margin-top:1.5rem; text-align:right; }
     .resetrow button { font-size:11.5px; }
-    .loadstate { font-size:11.5px; color:#8489a0; }
+    .loadstate { font-size:11.5px; color:#7d8199; }
     .header { display:flex; justify-content:flex-end; margin-bottom:0.5rem; }
+
+    /* ============================================================================================
+       EINE FORMENSPRACHE (Grafik-Audit 26.07.2026, "das Design muss im kompletten Spiel stimmig sein")
+
+       BEFUND: Das Spiel sprach zwei Formensprachen gleichzeitig. Die FLÄCHEN - Karten, Kacheln,
+       Unterreiter, Modals - waren über zehn Grafik-Runden hinweg auf den HUD-Look mit geschnittener
+       Ecke umgestellt worden. Die BEDIENELEMENTE nie: 158 border-radius-Angaben in zwölf
+       verschiedenen Größen gegen 18 clip-path-Schnittecken in neun verschiedenen Größen.
+       Ausgerechnet die meistgeklickten Dinge des Spiels - Bau- und Kauf-Buttons, die zwölf Reiter,
+       Eingabefelder, Icon-Kacheln - blieben weiche App-Pillen auf HUD-Karten. Das ist der
+       Hauptgrund, warum sich das Ganze zusammengestückelt anfühlte.
+
+       Dieser Block steht bewusst GANZ AM ENDE des Stylesheets. Erster Versuch war weiter oben bei
+       den Tokens - dort gewann er zwar mit clip-path, aber die border-radius-Werte der jeweiligen
+       Element-Regeln stehen später und überschrieben die Rücksetzung: Ergebnis waren Elemente mit
+       zwei geschnittenen UND zwei runden Ecken. Am Ende gewinnt die Kaskade ohne !important und
+       ohne dass zwanzig Einzelregeln angefasst werden mussten.
+
+       ACHTUNG für künftige Änderungen: clip-path beschneidet auch box-shadow. Alles, was hier
+       geschnitten wird, braucht `inset`-Schatten - ein äußerer Schein wird mit weggeschnitten und
+       ist danach unsichtbar. Genau deshalb sind affordPulse, button.attack/.primary, .tab-btn.active
+       und der Eingabefeld-Fokus auf inset umgestellt.
+       ============================================================================================ */
+    .hud-cut,
+    button, select, .tab-btn, .chip, .jumpnav, .jumpnav a, .hstat, .card-row, .mod-slot,
+    .bicon, .bicon-def, .tab-icon-badge, .rescard, .icon-badge,
+    .raid-banner, .event-banner, .summary-bar, .battle-log, .battle-result-banner,
+    .fp-colony-btn, .login-teaser-item, .help-category, .help-jump-btn,
+    .lvl-pill, .ach-pts, .ach-cat-count, .lock-badge, .tab-hint, .map-wrap,
+    .ach-summary, .ach-rank, .login-tabs, .login-tab, .ll-fac-sig, .ll-bul i,
+    input[type=text], input[type=email], input[type=password], input[type=number], textarea {
+      clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+      border-radius: 0;
+    }
+    /* Zuordnung der vier Stufen: je größer die Fläche, desto größer der Schnitt. */
+    button, select, .tab-btn, .jumpnav, .hstat, .bicon, .tab-icon-badge, .rescard,
+    .login-tabs, .login-tab, .ll-fac-sig, .ach-summary, .ach-rank,
+    input[type=text], input[type=email], input[type=password], input[type=number], textarea { --cut: var(--cut-sm); }
+    .chip, .jumpnav a, .icon-badge, .help-jump-btn,
+    .lvl-pill, .ach-pts, .ach-cat-count, .lock-badge, .ll-bul i { --cut: var(--cut-xs); }
+    .card-row, .mod-slot, .raid-banner, .event-banner, .summary-bar, .battle-log,
+    .battle-result-banner, .fp-colony-btn, .login-teaser-item, .help-category,
+    .tab-hint, .map-wrap { --cut: var(--cut-md); }
+    .bicon-def { --cut: var(--cut-lg); }
+    @media (max-width:520px){ .bicon-def { --cut: var(--cut-md); } }
+    /* Fortschritts-, Lebens- und Erfahrungsbalken: KEIN Eckenschnitt. Die Balken sind 4-8px hoch,
+       ein 5px-Schnitt würde sie sichtbar zerschneiden statt sie zu formen. Stattdessen einfach
+       gerade Enden - runde Balkenkappen sind das klassischste "weiche App"-Merkmal überhaupt und
+       genau das, was neben den geschnittenen Flächen fremd wirkte. */
+    .progress-outer, .progress-inner, .battle-hp-bar, .battle-hp-fill { border-radius:0; }
+    /* Dinge, die WIRKLICH rund sein müssen, dürfen nicht mitgeschnitten werden: Avatare, Punkte,
+       Mondsichel-Pille und der Schließen-Knopf des Flottenpanels sind Kreise, keine Konsolenflächen. */
+    button.pill-moon-btn, button.fp-close-btn, .bicon.round, .rescard .icon-badge.round {
+      clip-path:none; border-radius:50%;
+    }
   </style>
 
   <h1 class="sr-only">Kolonie Kepler-7 – kostenloses Weltraum-Idle-Spiel im Browser: Ressourcen sammeln, Gebäude ausbauen, Forschung betreiben, NPC-Gegner angreifen und in einer geteilten Bestenliste mit anderen Spielern konkurrieren</h1>
 
   <noscript>
-    <div style="max-width:760px;margin:2rem auto;padding:1.5rem;line-height:1.6;color:#cdd3e6;font-family:system-ui,sans-serif;">
+    <div style="max-width:760px;margin:2rem auto;padding:1.5rem;line-height:1.6;color:#c7cbe0;font-family:system-ui,sans-serif;">
       <h2>Kolonie Kepler-7 – das kostenlose Weltraum-Idle-Spiel für den Browser</h2>
       <p>Kolonie Kepler-7 ist ein kostenloses, browserbasiertes Weltraum-Aufbau- und Idle-Spiel auf Deutsch. Du gründest eine eigene Weltraum-Kolonie, sammelst Ressourcen wie Erz, Kristalle und Deuterium, baust deine Basis Stück für Stück aus und erforschst neue Technologien – ganz ohne Download, direkt im Browser auf PC und Handy.</p>
       <h3>Was dich erwartet</h3>
@@ -1864,22 +1950,22 @@
       <div style="font-family:ui-monospace,Menlo,Consolas,monospace; letter-spacing:.22em; text-transform:uppercase; color:#9fe1cb; font-size:11px; display:flex; align-items:center; gap:8px; margin-bottom:10px;"><span style="width:8px; height:8px; border-radius:50%; background:#5dcaa5; box-shadow:0 0 10px #5dcaa5;"></span>Erstkontakt · Neue Kolonie</div>
       <div class="login-title" style="font-size:24px;">Willkommen, Kommandant</div>
       <div class="bmeta" style="font-size:13px; line-height:1.55; margin:8px 0 14px;">Deine Kolonie ist gegründet. Wir haben dir ein ruhiges Heimatsystem am Rand der bekannten Galaxie zugewiesen – bewusst weit weg von etablierten Flotten, damit du in Ruhe starten kannst.</div>
-      <div style="display:flex; gap:14px; align-items:center; background:rgba(18,22,40,0.6); border:1px solid rgba(133,142,180,0.24); border-radius:12px; padding:14px; margin-bottom:12px;">
+      <div style="display:flex; gap:14px; align-items:center; background:rgba(18,22,40,0.6); border:1px solid rgba(133,142,180,0.24); padding:14px; margin-bottom:12px;">
         <div id="welcomeMap" style="width:150px; flex:none;"></div>
         <div>
-          <div style="font-family:ui-monospace,Menlo,Consolas,monospace; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:#8b90a8;">Heimatsystem</div>
+          <div style="font-family:ui-monospace,Menlo,Consolas,monospace; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:#9296ac;">Heimatsystem</div>
           <div id="welcomeSysName" style="font-family:ui-monospace,Menlo,Consolas,monospace; font-size:19px; font-weight:700; margin:3px 0; color:#eef0f8;">—</div>
           <div id="welcomeSysSlot" style="font-size:12.5px; color:#9fe1cb;"></div>
           <div class="bmeta" style="font-size:12px; line-height:1.45; margin-top:8px;">Dein nächster bewohnter Nachbar ist weit entfernt – kein Start zwischen etablierten Spielern.</div>
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap:12px; background:rgba(93,202,165,0.12); border:1px solid rgba(93,202,165,0.5); border-radius:12px; padding:13px 15px; margin-bottom:16px;">
-        <div style="width:38px; height:38px; flex:none; border-radius:9px; display:grid; place-items:center; background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-shield" aria-hidden="true" style="font-size:20px;"></i></div>
+      <div style="display:flex; align-items:center; gap:12px; background:rgba(93,202,165,0.12); border:1px solid rgba(93,202,165,0.5); padding:13px 15px; margin-bottom:16px;">
+        <div style="width:38px; height:38px; flex:none; display:grid; place-items:center; background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-shield" aria-hidden="true" style="font-size:20px;"></i></div>
         <div style="flex:1;">
           <div style="font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; color:#5dcaa5; font-size:14px;">Anfängerschutz aktiv</div>
           <div class="bmeta" style="font-size:12px; margin-top:1px;">Angriffe prallen ab. Der Schutz endet, sobald du selbst zum ersten Mal angreifst.</div>
         </div>
-        <div style="text-align:right; flex:none; font-family:ui-monospace,Menlo,Consolas,monospace;"><span id="welcomeShieldTime" style="font-size:18px; color:#9fe1cb; font-weight:700;">4T</span><div style="font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#8b90a8;">übrig</div></div>
+        <div style="text-align:right; flex:none; font-family:ui-monospace,Menlo,Consolas,monospace;"><span id="welcomeShieldTime" style="font-size:18px; color:#9fe1cb; font-weight:700;">4T</span><div style="font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#9296ac;">übrig</div></div>
       </div>
       <button id="welcomeEnterBtn" class="buy affordable login-submit" style="width:100%;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:6px;"></i>Kolonie betreten</button>
     </div>
@@ -2137,7 +2223,7 @@
         </svg>
         <div class="hero-bottom">
           <div class="hero-title">
-            <div class="name"><i class="ti ti-planet" aria-hidden="true"></i>Kolonie Kepler-7<span id="seasonalBadge" style="display:none; margin-left:8px; font-size:10px; font-weight:600; padding:2px 8px; border-radius:20px; background:rgba(var(--secondary-rgb),0.25); border:0.5px solid rgba(var(--secondary-rgb),0.6); vertical-align:middle;"></span></div>
+            <div class="name"><i class="ti ti-planet" aria-hidden="true"></i>Kolonie Kepler-7<span id="seasonalBadge" style="display:none; margin-left:8px; font-size:10px; font-weight:600; padding:2px 8px; background:rgba(var(--secondary-rgb),0.25); border:0.5px solid rgba(var(--secondary-rgb),0.6); vertical-align:middle;"></span></div>
             <div class="sub">Außenposten am Rand des Kepler-Systems</div>
           </div>
           <div class="hero-actions">
@@ -2145,7 +2231,7 @@
             <button id="headerReportsBtn" style="font-size:10.5px; padding:5px 9px; position:relative; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Berichte &amp; Nachrichten"><i class="ti ti-mail" aria-hidden="true" id="headerReportsIcon" style="margin-right:3px;"></i><span class="header-btn-label">Berichte</span><span id="reportsBadge" class="tab-badge" style="display:none;"></span></button>
             <button id="headerHelpBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Hilfe"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Hilfe</span></button>
             <button id="headerProfileBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Einstellungen"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:3px;"></i><span class="header-btn-label">Einstellungen</span></button>
-            <button id="headerKofiBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); border-radius:9px; border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; cursor:pointer; display:inline-flex; align-items:center; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;" title="Top-Unterstützer ansehen oder dem Entwickler einen Kaffee spendieren (Ko-fi)"><span aria-hidden="true" style="margin-right:3px;">☕</span><span class="header-btn-label">Kaffee</span></button>
+            <button id="headerKofiBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); border:0.5px solid rgba(255,255,255,0.16); color:#f2f3f8; cursor:pointer; display:inline-flex; align-items:center; transition:background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;" title="Top-Unterstützer ansehen oder dem Entwickler einen Kaffee spendieren (Ko-fi)"><span aria-hidden="true" style="margin-right:3px;">☕</span><span class="header-btn-label">Kaffee</span></button>
             <button id="headerCompactBtn" style="font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px);" title="Kopfzeile kompakt oder ausführlich anzeigen" aria-pressed="false"><i class="ti ti-list-details" aria-hidden="true" id="headerCompactIcon"></i></button>
             <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); backdrop-filter:blur(4px); align-items:center; justify-content:center;" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
           </div>
@@ -2248,7 +2334,7 @@
       </div>
 
       <div class="tab-panel" id="tab-verteidigung">
-        <div id="defenseCentral" style="text-align:center; padding:1.5rem 0; margin-bottom:1rem; background:rgba(226,75,74,0.08); border-radius:14px; border:0.5px solid rgba(226,75,74,0.25);">
+        <div id="defenseCentral" style="text-align:center; padding:1.5rem 0; margin-bottom:1rem; background:rgba(226,75,74,0.08); border:0.5px solid rgba(226,75,74,0.25);">
           <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Verteidigungspunkte (aktueller Planet)</div>
           <div style="font-size:38px; font-weight:500; color:#f0997b; font-variant-numeric:tabular-nums;" id="defenseCentralValue">0</div>
         </div>
@@ -2329,7 +2415,7 @@
           <div id="tier2ConsumablesBox"></div>
         </div>
         <div id="fleetSubFlotte">
-          <div style="text-align:center; padding:1.5rem 0; margin-bottom:1rem; background:rgba(226,75,74,0.08); border-radius:14px; border:0.5px solid rgba(226,75,74,0.25);">
+          <div style="text-align:center; padding:1.5rem 0; margin-bottom:1rem; background:rgba(226,75,74,0.08); border:0.5px solid rgba(226,75,74,0.25);">
             <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Angriffspunkte (aktueller Planet)</div>
             <div style="font-size:38px; font-weight:500; color:#e24b4a; font-variant-numeric:tabular-nums;" id="attackCentralValue">0</div>
           </div>
@@ -2363,14 +2449,14 @@
         <div class="section-title"><i class="ti ti-map-2" aria-hidden="true"></i>Sektorkarte</div>
         <div style="position:relative; margin-bottom:0.75rem;">
           <input type="text" id="sectorSearchInput" placeholder="System oder Planet suchen…" style="width:100%;"/>
-          <div id="sectorSearchResults" style="display:none; position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#171c34; border:0.5px solid rgba(126,119,221,0.4); border-radius:10px; max-height:260px; overflow-y:auto; z-index:20; box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+          <div id="sectorSearchResults" style="display:none; position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#171c34; border:0.5px solid rgba(126,119,221,0.4); max-height:260px; overflow-y:auto; z-index:20; box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
         </div>
         <div class="map-wrap" style="height:340px; margin-bottom:1rem; position:relative; touch-action:none;">
           <svg id="galaxyMapSvg" viewBox="0 0 950 500" width="100%" height="100%" style="cursor:grab;"></svg>
           <div style="position:absolute; right:8px; bottom:8px; display:flex; flex-direction:column; gap:6px; z-index:5;">
-            <button id="galaxyZoomInBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
-            <button id="galaxyZoomOutBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
-            <button id="galaxyZoomResetBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:14px; background:rgba(13,18,36,0.9);">⟲</button>
+            <button id="galaxyZoomInBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
+            <button id="galaxyZoomOutBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
+            <button id="galaxyZoomResetBtn" style="width:34px; height:34px; padding:0; font-size:14px; background:rgba(13,18,36,0.9);">⟲</button>
           </div>
         </div>
         <div class="bmeta" id="galaxyGrowthLine" style="margin:-0.5rem 0 0.9rem; text-align:center;"></div>
@@ -2387,9 +2473,9 @@
           <svg id="mapSvg" viewBox="0 0 700 230" width="100%" height="100%" style="cursor:grab;"></svg>
           <div class="map-radar-overlay" aria-hidden="true"><div class="map-radar-sweep"></div></div>
           <div style="position:absolute; right:8px; bottom:8px; display:flex; flex-direction:column; gap:6px; z-index:5;">
-            <button id="mapZoomInBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
-            <button id="mapZoomOutBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
-            <button id="mapZoomResetBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:14px; background:rgba(13,18,36,0.9);">⟲</button>
+            <button id="mapZoomInBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
+            <button id="mapZoomOutBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
+            <button id="mapZoomResetBtn" style="width:34px; height:34px; padding:0; font-size:14px; background:rgba(13,18,36,0.9);">⟲</button>
           </div>
         </div>
         <div class="planet-list" id="planetList"></div>
@@ -2637,7 +2723,7 @@
             <button id="feedbackImgBtn" style="font-size:11px;"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:4px;"></i>Screenshot anhängen</button>
             <input type="file" id="feedbackImgInput" accept="image/png,image/jpeg" style="display:none;"/>
             <span id="feedbackImgPreviewWrap" style="display:none; align-items:center; gap:6px;">
-              <img id="feedbackImgPreview" alt="Screenshot-Vorschau" style="height:36px; border-radius:6px; border:0.5px solid rgba(126,119,221,0.5);"/>
+              <img id="feedbackImgPreview" alt="Screenshot-Vorschau" style="height:36px; border:0.5px solid rgba(126,119,221,0.5);"/>
               <button id="feedbackImgRemoveBtn" title="Screenshot entfernen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
             </span>
           </div>
@@ -2856,7 +2942,7 @@
 
       <div class="tab-panel" id="tab-punkte">
         <div class="jumpnav" id="jumpnav-punkte" style="display:none;"></div>
-        <div style="text-align:center; padding:1.25rem 0; margin-bottom:1rem; background:rgba(126,119,221,0.1); border-radius:14px; border:0.5px solid rgba(126,119,221,0.3);">
+        <div style="text-align:center; padding:1.25rem 0; margin-bottom:1rem; background:rgba(126,119,221,0.1); border:0.5px solid rgba(126,119,221,0.3);">
           <div style="font-size:11px; color:#9296ac; text-transform:uppercase; letter-spacing:0.5px;"><i class="ti ti-star" aria-hidden="true" style="margin-right:4px;"></i>Aktueller Punktestand</div>
           <div style="font-size:38px; font-weight:500; color:#c3bef5; font-variant-numeric:tabular-nums;" id="scoreTotalValue">0</div>
           <div id="shareTypeChips" style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-top:10px;"></div>
@@ -3533,7 +3619,7 @@
     // Bodenschatten + Sockel + typeigener Aufbau + Lichtkante. Jede Anlage bekommt eine eigene
     // Aufbauform, damit man sie an der Silhouette auseinanderhält, nicht nur am Namen.
     const DEFENSE_ART = {
-      flak:              { base:'platform', top:'twinup',  col:'#c9d4e0' },
+      flak:              { base:'platform', top:'twinup',  col:'#c7cbe0' },
       ionenschild:       { base:'platform', top:'ringdome',col:'#a48bd9' },
       laser:             { base:'platform', top:'emitter', col:'#5dcaa5' },
       plasma:            { base:'platform', top:'orb',     col:'#f3aec6' },
@@ -3592,14 +3678,14 @@
         ctx.strokeStyle=`rgba(170,220,255,${flicker*0.7})`; ctx.lineWidth=1.2; ctx.stroke();
       } else if (key === 'raketen'){
         ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.ellipse(20,34,10,3,0,0,Math.PI*2); ctx.fill();
-        const bg = ctx.createLinearGradient(0,13,0,32); bg.addColorStop(0,'#545e69'); bg.addColorStop(1,'#242a31');
+        const bg = ctx.createLinearGradient(0,13,0,32); bg.addColorStop(0,'#4c5661'); bg.addColorStop(1,'#242a31');
         ctx.beginPath(); ctx.moveTo(14,32); ctx.lineTo(16,15); ctx.lineTo(24,15); ctx.lineTo(26,32); ctx.closePath();
         ctx.fillStyle=bg; ctx.fill(); ctx.strokeStyle='rgba(6,9,14,0.8)'; ctx.lineWidth=0.7; ctx.stroke();
         const phase = (t+900)%3600;
         if (phase>280 && phase<1900){
           const lp=(phase-280)/1620, my=17-lp*22;
           ctx.beginPath(); ctx.fillStyle=`rgba(255,200,140,${(1-lp*0.4)*0.6})`; ctx.arc(20,my+2.4,1.1,0,Math.PI*2); ctx.fill();
-          ctx.fillStyle='#c7ced4'; ctx.beginPath(); ctx.moveTo(20,my-2.4); ctx.lineTo(18.4,my); ctx.lineTo(21.6,my); ctx.closePath(); ctx.fill();
+          ctx.fillStyle='#c7cbe0'; ctx.beginPath(); ctx.moveTo(20,my-2.4); ctx.lineTo(18.4,my); ctx.lineTo(21.6,my); ctx.closePath(); ctx.fill();
         }
       } else if (DEFENSE_ART[key]){
         drawDefenseArt(key, ctx, t);
@@ -3630,7 +3716,7 @@
       const glow = (x,y,r,c,al) => { const g=ctx.createRadialGradient(x,y,0,x,y,r);
         g.addColorStop(0,hexToRgba(c,Math.min(1,al))); g.addColorStop(1,hexToRgba(c,0));
         ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); };
-      const steel = (x,y,w,h) => { ctx.fillStyle='#4a535f'; ctx.fillRect(x,y,w,h);
+      const steel = (x,y,w,h) => { ctx.fillStyle='#4c5661'; ctx.fillRect(x,y,w,h);
         ctx.strokeStyle='rgba(6,9,14,0.7)'; ctx.lineWidth=0.5; ctx.strokeRect(x,y,w,h); };
       switch (a.top){
         case 'twinup': // zwei kurze Rohre schräg nach oben, mit Mündungsfeuer (Flak)
@@ -3750,7 +3836,7 @@
           break;
         case 'antenna': // Mast mit kleiner Schüssel und Blinklicht
           steel(19.2,8,1.6,17);
-          ctx.strokeStyle='#4a535f'; ctx.lineWidth=0.8;
+          ctx.strokeStyle='#4c5661'; ctx.lineWidth=0.8;
           ctx.beginPath(); ctx.moveTo(15,25); ctx.lineTo(20,17); ctx.lineTo(25,25); ctx.stroke();
           ctx.fillStyle=hexToRgba(col,0.35); ctx.beginPath(); ctx.ellipse(20,10,5,2.4,0,0,Math.PI*2); ctx.fill();
           ctx.strokeStyle=hexToRgba(col,0.9); ctx.lineWidth=0.9; ctx.stroke();
@@ -4106,7 +4192,7 @@
         ctx.fillStyle = '#5b6577'; // Mündung
         offs.forEach(o => ctx.fillRect(px+barLen-Math.max(0.9,r*0.34), py+o-barW/2, Math.max(0.9,r*0.34), barW));
         const tg = ctx.createRadialGradient(px-r*0.32, py-r*0.42, r*0.08, px, py, r);
-        tg.addColorStop(0,'#98a1b2'); tg.addColorStop(0.62,'#5c6577'); tg.addColorStop(1,'#2c323d');
+        tg.addColorStop(0,'#9296ac'); tg.addColorStop(0.62,'#5c6577'); tg.addColorStop(1,'#2c323d');
         ctx.fillStyle = tg;
         // Basis leicht abgeflacht (ry < rx) - eine exakte Kugel las sich wie ein Ball auf dem Deck,
         // ein gedrückter Turm sitzt optisch AUF dem Rumpf.
@@ -4309,7 +4395,7 @@
     // Hintergrundfarben bewusst NEU gewählt, teils an die 4 neuen Farbthemen dieser Session angelehnt
     // (Arktis/Bernstein/Stahl/Indigo), damit Profilbild und gewähltes Oberflächen-Thema zusammenpassen
     // können, ohne dass das erzwungen wird.
-    { key:'sword', bg:'#8496ac', svg:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 1 L14 3 L14 15 L12 21 L10 15 L10 3 Z" fill="#fff"/><rect x="6" y="14" width="12" height="2.4" rx="1" fill="#fff"/><circle cx="12" cy="19.5" r="1.6" fill="#fff"/></svg>' },
+    { key:'sword', bg:'#9296ac', svg:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 1 L14 3 L14 15 L12 21 L10 15 L10 3 Z" fill="#fff"/><rect x="6" y="14" width="12" height="2.4" rx="1" fill="#fff"/><circle cx="12" cy="19.5" r="1.6" fill="#fff"/></svg>' },
     { key:'diamond', bg:'#5a5fc7', svg:'<svg viewBox="0 0 24 24" width="20" height="20"><polygon points="12,2 19,9 12,22 5,9" fill="#fff"/><polygon points="5,9 19,9 12,2" fill="#fff" opacity="0.55"/></svg>' },
     { key:'atom', bg:'#3a9188', svg:'<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="2.3" fill="#fff"/><ellipse cx="12" cy="12" rx="9.5" ry="3.6" fill="none" stroke="#fff" stroke-width="1.4"/><ellipse cx="12" cy="12" rx="9.5" ry="3.6" fill="none" stroke="#fff" stroke-width="1.4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="3.6" fill="none" stroke="#fff" stroke-width="1.4" transform="rotate(120 12 12)"/></svg>' },
     { key:'flame', bg:'#c9973f', svg:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 1 C8 6 6 9.5 6 13.5 A6 6 0 1 0 18 13.5 C18 11.5 17 9.5 15 8.5 C15.5 10.5 14.5 11.7 13.4 11.2 C14.6 7.8 13 3.5 12 1 Z" fill="#fff"/></svg>' },
@@ -4398,8 +4484,8 @@
       +bannerStars(26,66,'#fff')) },
     // Zwei weitere Banner (21.07.2026, "mehr Kosmetik"): Stahlarktis (kühler Blaugrau-Himmel mit
     // Ringplanet) und Aschefeld (dunkelroter Nebel mit Asteroidengürtel) - dieselbe Szenen-Machart.
-    { key:'stahl', css:svgBg(bannerGradDefs([[0,'#8496ac'],[100,'#3a4658']],150)
-      +bannerStars(20,77,'#fff')+bannerPlanet(300,60,30,'#b8c4d4','#dfe8f2','#eaf2fb')+bannerPlanet(110,40,8,'#cfd6df',null,null)) },
+    { key:'stahl', css:svgBg(bannerGradDefs([[0,'#9296ac'],[100,'#3a4658']],150)
+      +bannerStars(20,77,'#fff')+bannerPlanet(300,60,30,'#b8c4d4','#dfe8f2','#eaf2fb')+bannerPlanet(110,40,8,'#c7cbe0',null,null)) },
     { key:'asche', css:svgBg(bannerGradDefs([[0,'#6b2f22'],[100,'#2a1410']])
       +bannerNebula(170,64,140,60,'#c9603f',-12)+bannerStars(14,88,'#ffb99a')
       +bannerAsteroid(90,96,9,'#d6a086')+bannerAsteroid(140,110,6,'#c08a6e')+bannerAsteroid(250,100,8,'#d6a086')+bannerAsteroid(320,112,5,'#b57e62')) },
@@ -4412,9 +4498,9 @@
       +`<path d="M0,25 Q100,-8 200,28 T400,18" stroke="#9ff5df" stroke-width="2.5" fill="none" opacity="0.4"/><path d="M0,45 Q100,15 200,48 T400,40" stroke="#c9fff2" stroke-width="1.5" fill="none" opacity="0.3"/>`) },
     { key:'bronze', css:svgBg(bannerGradDefs([[0,'#c9973f'],[100,'#7a5a18']])
       +bannerStars(10,88,'#fff')+bannerAsteroid(95,82,20,'#8a6530')+bannerAsteroid(150,48,14,'#6b4d24')+bannerAsteroid(325,90,26,'#7a5a25')+bannerAsteroid(250,35,10,'#8a6530')) },
-    { key:'stahl', css:svgBg(bannerGradDefs([[0,'#8496ac'],[100,'#4f5d70']])
-      +Array.from({length:6}).map((_,i)=>`<line x1="0" y1="${i*28}" x2="400" y2="${i*28}" stroke="#c7ccd6" stroke-width="1" opacity="0.1"/>`).join('')
-      +Array.from({length:14}).map((_,i)=>`<line x1="${i*30}" y1="0" x2="${i*30}" y2="140" stroke="#c7ccd6" stroke-width="1" opacity="0.1"/>`).join('')
+    { key:'stahl', css:svgBg(bannerGradDefs([[0,'#9296ac'],[100,'#4f5d70']])
+      +Array.from({length:6}).map((_,i)=>`<line x1="0" y1="${i*28}" x2="400" y2="${i*28}" stroke="#c7cbe0" stroke-width="1" opacity="0.1"/>`).join('')
+      +Array.from({length:14}).map((_,i)=>`<line x1="${i*30}" y1="0" x2="${i*30}" y2="140" stroke="#c7cbe0" stroke-width="1" opacity="0.1"/>`).join('')
       +bannerShip(150,72,1.9,'#2c333d',0)+bannerShip(270,48,1.4,'#2c333d',0)+bannerStars(8,99,'#fff')) },
     { key:'indigo', css:svgBg(bannerGradDefs([[0,'#5a5fc7'],[100,'#2e3178']])
       +[0,1,2,3].map(i=>`<ellipse cx="220" cy="70" rx="${20+i*22}" ry="${8+i*9}" fill="none" stroke="#c3bef5" stroke-width="1.5" opacity="${0.5-i*0.1}" transform="rotate(${i*14} 220 70)"/>`).join('')
@@ -4449,8 +4535,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.301.2';
+  const VERSION = '8.302.0';
   const PATCHNOTES = [
+    { version:'8.302.0', date:'26.07.2026', changes:[
+      '<strong>Das ganze Spiel spricht jetzt eine Formensprache.</strong> Über die letzten Monate sind viele Bereiche einzeln umgebaut worden, und dabei ist etwas entstanden, das man erst sieht, wenn man alle zwölf Reiter nebeneinanderlegt: Die <em>Flächen</em> – Karten, Kacheln, Unterreiter, Fenster – hatten längst die kantige HUD-Ecke, die <em>Bedienelemente</em> aber nie. Ausgerechnet das, was man am häufigsten anfasst – Bau- und Kauf-Buttons, die Reiter oben, Eingabefelder, Icon-Kacheln – waren noch weiche, runde App-Knöpfe auf kantigen Konsolen-Karten. Genau das ließ das Ganze zusammengestückelt wirken.',
+      'Gezählt waren es <strong>158 Rundungen in zwölf verschiedenen Größen</strong> gegen 18 geschnittene Ecken in neun Größen – kein Muster, nur Gewachsenes. Jetzt gibt es <strong>vier feste Eckenstufen</strong> für das gesamte Spiel, und die Formel dafür steht an genau einer Stelle. Was wirklich rund sein soll – Avatare, Statuspunkte, der Radar-Sweep der Sektorkarte – ist bewusst rund geblieben.',
+      'Mit umgestellt: <strong>Fortschritts-, Lebens- und Erfahrungsbalken</strong> haben jetzt gerade Enden statt runder Kappen, und die Leuchtsignale (Kauf-Puls, Angriffsknopf, „Lager voll") liegen nach innen statt nach außen – von außen hätte die neue Eckform sie abgeschnitten und sie wären ersatzlos verschwunden.',
+      '<strong>Farben aufgeräumt:</strong> 20 Grautöne waren im Lauf der Zeit als versehentliche Dubletten entstanden – Werte, die von einer bereits vorhandenen Stufe nicht zu unterscheiden waren. Sie sind auf ihre jeweilige Stufe zusammengeführt. Die benannten Akzentfarben (Flieder, Gold, Grün, Rot) sind unangetastet.',
+      '<strong>Textfehler behoben:</strong> In Hinweiszeilen mit <strong>fett ausgezeichneten</strong> Wörtern riss der Satz auseinander – die hervorgehobenen Stellen bekamen eine eigene Spalte statt im Fließtext zu bleiben. Am deutlichsten war das im Markt-Reiter zu sehen. Betraf 51 Hinweiszeilen im ganzen Spiel.'
+    ]},
     { version:'8.301.2', date:'26.07.2026', changes:[
       '<strong>Die Enterphase schweigt nicht mehr, wenn sie ausfällt.</strong> Zwei Fälle sahen bisher aus wie ein kaputtes Feature: Wer Enterschiffe besitzt, aber keins in die angreifende Flotte legt, fand im Kampfbericht überhaupt keine Enterzeile. Und wer mit genau <em>einem</em> Enterschiff (ohne Enterhaken-Ausbau) losflog, gewann zwar den Enterwurf, hatte aber null Kaperplätze – der Bericht behauptete dann, beim Gegner sei „nichts Kaperbares mehr übrig" gewesen. Das stimmte nicht: kaperbar war reichlich, es fehlte der Platz.',
       'Kampfbericht und Sieg-Meldung nennen jetzt beide Fälle beim Namen und sagen dazu, was fehlt („einen Kaperplatz gibt es je 2 Enterschiffe, dazu +1 je Enterhaken-Stufe"). Die Angriffs-Vorschau warnt schon <em>vor</em> dem Start, wenn Enterschiffe da sind, aber keins mitfliegt – das ist der billigere Zeitpunkt für den Hinweis.',
@@ -10050,7 +10143,7 @@
               const distPct = Math.abs(price - o.threshold) / price * 100;
               const near = distPct <= 5;
               const dir = o.side === 'buy' ? 'fallen' : 'steigen';
-              return `<div class="bmeta" style="color:${near?'#e0a548':'#8489a0'};">Preis muss noch ~${distPct.toFixed(1)}% ${dir}${near?' – kurz davor':''}</div>`;
+              return `<div class="bmeta" style="color:${near?'#e0a548':'#7d8199'};">Preis muss noch ~${distPct.toFixed(1)}% ${dir}${near?' – kurz davor':''}</div>`;
             })() : ''}
           </div>
         </div>
@@ -10065,7 +10158,7 @@
         const hrd = resDefFor(h.resource);
         const mins = Math.max(0, Math.round((Date.now()-h.at)/60000));
         const ago = mins < 60 ? 'vor '+mins+' min' : 'vor '+Math.floor(mins/60)+' h '+(mins%60)+' min';
-        return `<div class="bmeta" style="color:#8489a0; margin-left:2px;">${h.side==='buy'?'Gekauft':'Verkauft'}: ${fmt(h.amount)} ${hrd.label} bei ${(h.price!=null?h.price:h.threshold).toFixed(2)} Kr. · ${ago}</div>`;
+        return `<div class="bmeta" style="color:#7d8199; margin-left:2px;">${h.side==='buy'?'Gekauft':'Verkauft'}: ${fmt(h.amount)} ${hrd.label} bei ${(h.price!=null?h.price:h.threshold).toFixed(2)} Kr. · ${ago}</div>`;
       }).join('')}` : '';
     return `
       <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-flag" aria-hidden="true"></i>Limit-Orders</div>
@@ -10120,10 +10213,10 @@
     // Ab spürbarer Preisbewegung warnend einfärben - das ist der Moment, in dem Stückeln lohnt.
     const warn = movePct >= 10;
     const chunks = amt > MARKET_MAX_PER_TRADE ? Math.ceil(amt/MARKET_MAX_PER_TRADE) : 0;
-    return `<i class="ti ti-arrows-shuffle" aria-hidden="true" style="color:${warn?'#e0a548':'#8489a0'};"></i> `
+    return `<i class="ti ti-arrows-shuffle" aria-hidden="true" style="color:${warn?'#e0a548':'#7d8199'};"></i> `
       + `Kauf Ø <strong>${buyAvg.toFixed(2)}</strong> → Preis danach ${buyAfter.toFixed(2)} · `
       + `Verkauf Ø <strong>${sellAvg.toFixed(2)}</strong> → Preis danach ${sellAfter.toFixed(2)}`
-      + (movePct >= 1 ? ` <span style="color:${warn?'#e0a548':'#8489a0'};">(bewegt den Preis um ~${movePct}%${warn?' – in mehreren kleineren Schritten bekommst du mehr':''})</span>` : '')
+      + (movePct >= 1 ? ` <span style="color:${warn?'#e0a548':'#7d8199'};">(bewegt den Preis um ~${movePct}%${warn?' – in mehreren kleineren Schritten bekommst du mehr':''})</span>` : '')
       + (chunks ? ` <span style="color:#85b7eb;">· wird als Sammelauftrag in ${chunks} Tranchen ausgeführt</span>` : '');
   }
   function renderMarket(){
@@ -10195,7 +10288,7 @@
       if (!m) return '';
       const price = m.price, base = m.basePrice || price;
       const pctVsBase = Math.round((price/base - 1)*100);
-      const trendColor = pctVsBase > 3 ? '#e24b4a' : (pctVsBase < -3 ? '#5dcaa5' : '#8489a0');
+      const trendColor = pctVsBase > 3 ? '#e24b4a' : (pctVsBase < -3 ? '#5dcaa5' : '#7d8199');
       const trendLabel = pctVsBase > 3 ? '▲ teuer' : (pctVsBase < -3 ? '▼ günstig' : '≈ normal');
       const amt = marketTradeAmounts[key] || 100;
       const owned = Math.floor(state.resources[key]||0);
@@ -10340,7 +10433,7 @@
           <div style="min-width:0;">
             <div class="bname">${name} <span class="lvl-pill" style="background:${rar.color}22; color:${rar.color};">${rar.label}</span></div>
             <div class="bmeta">${info?info.def.desc:''}</div>
-            <div class="bmeta" style="color:#8489a0;">${l.isShip?'Schiffsklassen-Modul':'Standort-Modul'}${lvl} · Anbieter: <strong>${escapeHtml(l.sellerName||'?')}</strong>${l.mine?' <span style="color:#fac775;">(dein Angebot)</span>':''}</div>
+            <div class="bmeta" style="color:#7d8199;">${l.isShip?'Schiffsklassen-Modul':'Standort-Modul'}${lvl} · Anbieter: <strong>${escapeHtml(l.sellerName||'?')}</strong>${l.mine?' <span style="color:#fac775;">(dein Angebot)</span>':''}</div>
           </div>
         </div>
         ${l.mine
@@ -10837,7 +10930,7 @@
       const onMe = b.targetUserId === state.player.id;
       if (b.claimed){
         bountySig = 'claimed:'+(b.claimedBy||'');
-        bountyHtml = `<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(90,95,115,0.12);"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#8489a0; font-size:15px; margin-right:8px;"></i><div class="bmeta">Das Wochen-Kopfgeld auf <strong>${escapeHtml(b.targetName||'?')}</strong> wurde bereits kassiert${b.claimedBy?' (von '+escapeHtml(b.claimedBy)+')':''}. Nächste Woche liegt ein neues Kopfgeld aus.</div></div></div>`;
+        bountyHtml = `<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(90,95,115,0.12);"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#7d8199; font-size:15px; margin-right:8px;"></i><div class="bmeta">Das Wochen-Kopfgeld auf <strong>${escapeHtml(b.targetName||'?')}</strong> wurde bereits kassiert${b.claimedBy?' (von '+escapeHtml(b.claimedBy)+')':''}. Nächste Woche liegt ein neues Kopfgeld aus.</div></div></div>`;
       } else {
         bountySig = 'open:'+b.targetUserId+':'+(onMe?'me':'other');
         bountyHtml = onMe
@@ -11106,8 +11199,8 @@
     html += `<div style="display:flex; gap:6px; flex-wrap:wrap;">` + SHIP_SKINS.map(sk => {
       const unlocked = sk.unlock(state), active = sk.key === curSkin;
       const swatch = sk.stops
-        ? `<span style="display:inline-block; width:26px; height:12px; border-radius:3px; background:linear-gradient(90deg,${sk.stops[0]},${sk.stops[1]},${sk.stops[2]});"></span>`
-        : `<span style="display:inline-block; width:26px; height:12px; border-radius:3px; background:linear-gradient(90deg,#4da8d6,#c0504f,#d1ad5c);"></span>`;
+        ? `<span style="display:inline-block; width:26px; height:12px; background:linear-gradient(90deg,${sk.stops[0]},${sk.stops[1]},${sk.stops[2]});"></span>`
+        : `<span style="display:inline-block; width:26px; height:12px; background:linear-gradient(90deg,#4da8d6,#c0504f,#d1ad5c);"></span>`;
       const tail = unlocked ? (active?' <i class="ti ti-check" aria-hidden="true"></i>':'') : ' <i class="ti ti-lock" aria-hidden="true"></i>';
       return `<button data-ship-skin="${sk.key}" ${unlocked?'':'disabled'} title="${unlocked?(active?'Aktiv':'Anwenden'):('Gesperrt – '+sk.hint)}" style="display:flex; align-items:center; gap:5px; font-size:10px; padding:4px 8px; ${active?'border-color:#c3bef5; color:#c3bef5; background:rgba(126,119,221,0.16);':''}">${swatch}${sk.name}${tail}</button>`;
     }).join('') + `</div>`;
@@ -11274,7 +11367,7 @@
             <div style="min-width:0;"><div class="bname">${cat.name}</div><div class="bmeta">${cat.desc} · Belohnung: ${rewardTxt}</div></div></div>
           ${btn}
         </div>
-        <div style="height:7px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;"><div style="height:100%; width:${r.pct}%; background:${r.done?'#5dcaa5':'#9fe1cb'};"></div></div>
+        <div style="height:7px; background:rgba(255,255,255,0.08); overflow:hidden;"><div style="height:100%; width:${r.pct}%; background:${r.done?'#5dcaa5':'#9fe1cb'};"></div></div>
       </div>`;
     }).join('');
     box.querySelectorAll('[data-compendium-claim]').forEach(b=>b.onclick=()=>claimCompendium(b.getAttribute('data-compendium-claim')));
@@ -11301,7 +11394,7 @@
           <div class="bmeta">Dominanz-Wert: ${fmt(score)} · nächste Stufe bei ${fmt(nextThresh)}</div></div>
           <button data-claim-dominance ${claimable?'':'disabled'} style="white-space:nowrap; ${claimable?'background:rgba(195,190,245,0.2);':''}">${claimable?'Stufe '+nextLvl+' abholen':'Noch '+fmt(Math.max(0,nextThresh-score))}</button>
         </div>
-        <div style="height:10px; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden; margin-bottom:4px;">
+        <div style="height:10px; background:rgba(255,255,255,0.06); overflow:hidden; margin-bottom:4px;">
           <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#7f77dd,#c3bef5);"></div>
         </div>
         <div class="bmeta">Belohnung für Stufe ${nextLvl}: +${rw.credits} Kredite, +${rw.commandPoints} Kommandopunkte · Titel: „${dominanceTitle(nextLvl)}"</div>
@@ -11569,7 +11662,7 @@
         <div class="left"><div class="bicon" style="background:${rar.color}22; color:${rar.color};"><i class="ti ${o.def.icon}" aria-hidden="true"></i></div>
           <div style="min-width:0;"><div class="bname">${o.def.name} <span class="lvl-pill" style="background:${rar.color}22; color:${rar.color};">${rar.label}</span></div>
           <div class="bmeta">${o.def.desc}</div>
-          <div class="bmeta" style="color:#8489a0;">Heutiges ${o.isShip?'Schiffsklassen':'Standort'}-Angebot · wechselt um Mitternacht${claimed?' · <span style="color:#5dcaa5;">heute bereits gekauft</span>':''}</div></div>
+          <div class="bmeta" style="color:#7d8199;">Heutiges ${o.isShip?'Schiffsklassen':'Standort'}-Angebot · wechselt um Mitternacht${claimed?' · <span style="color:#5dcaa5;">heute bereits gekauft</span>':''}</div></div>
         </div>
         <button data-daily-offer="${o.slot}" ${(!afford||claimed)?'disabled':''} style="font-size:10.5px; white-space:nowrap;">${claimed?'Genutzt':fmt(o.cost)+' Kr.'}</button>
       </div>`;
@@ -12073,7 +12166,7 @@
     { key:'verfeindet',   min:-100, label:'Verfeindet',   color:'#e24b4a' },
     { key:'feindlich',    min:-69,  label:'Feindlich',    color:'#e0784a' },
     { key:'misstrauisch', min:-29,  label:'Misstrauisch', color:'#c99a5b' },
-    { key:'neutral',      min:-9,   label:'Neutral',      color:'#8489a0' },
+    { key:'neutral',      min:-9,   label:'Neutral',      color:'#7d8199' },
     { key:'bekannt',      min:15,   label:'Bekannt',      color:'#9fb4d6' },
     { key:'freundlich',   min:30,   label:'Freundlich',   color:'#85b7eb' },
     { key:'geachtet',     min:50,   label:'Geachtet',     color:'#6fd0c0' },
@@ -12709,7 +12802,7 @@
       const shopOffen = offenerFraktionsladen === f.id;
       const shopKopf = `<div class="card-row" data-shop-toggle="${f.id}" role="button" tabindex="0" style="cursor:pointer; margin-top:4px;">
         <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.15); color:#fac775;"><i class="ti ti-diamond" aria-hidden="true"></i></div>
-          <div><div class="bname">Fraktionsladen</div><div class="bmeta">${marken} Gunstmarke${marken===1?'':'n'}${lvl<=0?' · <span style="color:#8489a0;">öffnet ab Freundlich</span>':''}</div></div></div>
+          <div><div class="bname">Fraktionsladen</div><div class="bmeta">${marken} Gunstmarke${marken===1?'':'n'}${lvl<=0?' · <span style="color:#7d8199;">öffnet ab Freundlich</span>':''}</div></div></div>
         <i class="ti ti-chevron-right" aria-hidden="true"></i>
       </div>`;
       const shopRows = shopOffen ? (FACTION_SHOPS[f.id]||[]).map(p => {
@@ -12758,7 +12851,7 @@
       const tributeKosten = tributeCostFor(f.id);
       const tributeBtnLabel = tributeCdLeft > 0 ? ('Tribut in '+fmtDuration(tributeCdLeft/1000)) : ('Tribut ('+fmt(tributeKosten)+' Kr. → +'+TRIBUTE_GAIN+')');
       const dipRow = dip ? `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap;">
-        <div class="bmeta">Ruf: <strong style="color:${tier.color};">${rep} (${tier.label})</strong> · <span style="color:${lvl>0?'#5dcaa5':'#8489a0'};">${effectTxt}</span></div>
+        <div class="bmeta">Ruf: <strong style="color:${tier.color};">${rep} (${tier.label})</strong> · <span style="color:${lvl>0?'#5dcaa5':'#7d8199'};">${effectTxt}</span></div>
         <button data-tribute="${f.id}" ${tributeCdLeft>0?'disabled':''} style="font-size:10.5px; padding:3px 8px;"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:2px;"></i>${tributeBtnLabel}</button>
       </div>` : '';
       // ===== Rang-Zeile (Paket 5/6) =====
@@ -12801,14 +12894,14 @@
             : (frei > 0 ? botEffekt.text(pct)+' und kein Ruf-Verfall – '+frei+' von '+plaetze+' Plätzen frei'
                         : 'alle '+plaetze+' Plätze belegt'+(naechster ? ' · nächster ab Gesamtstufe '+naechster : ' · mehr als '+EMBASSY_SLOT_AT.length+' gibt es nicht')));
         return `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap;">
-          <div class="bmeta"><i class="ti ti-building-bank" aria-hidden="true" style="margin-right:3px; color:#8489a0;"></i>Botschaft: <span style="color:#8489a0;">${hinweis}</span></div>
+          <div class="bmeta"><i class="ti ti-building-bank" aria-hidden="true" style="margin-right:3px; color:#7d8199;"></i>Botschaft: <span style="color:#7d8199;">${hinweis}</span></div>
           <button data-embassy-open="${f.id}" ${(frei>0 && rangReicht)?'':'disabled'} style="font-size:10.5px; padding:3px 8px;"><i class="ti ti-building-bank" aria-hidden="true" style="margin-right:2px;"></i>Eröffnen</button>
         </div>`;
       })() : '';
       const verfallIn = repDecayDueIn(f.id);
       // Mit Botschaft gibt es keinen Verfall - dann sagt das die Botschaftszeile, nicht zwei Zeilen.
       const verfallRow = (dip && !botschaft && verfallIn !== null) ? (verfallIn > 0
-        ? `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-clock" aria-hidden="true" style="margin-right:3px; color:#8489a0;"></i>Kontakt gepflegt · ohne neuen Kontakt sinkt der Ruf in ${fmtDuration(verfallIn/1000)} um ${REP_DECAY_PER_DAY} pro Tag</div>`
+        ? `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-clock" aria-hidden="true" style="margin-right:3px; color:#7d8199;"></i>Kontakt gepflegt · ohne neuen Kontakt sinkt der Ruf in ${fmtDuration(verfallIn/1000)} um ${REP_DECAY_PER_DAY} pro Tag</div>`
         : `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-clock" aria-hidden="true" style="margin-right:3px; color:#e0a548;"></i><strong style="color:#e0a548;">Vernachlässigt:</strong> −${REP_DECAY_PER_DAY} Ruf pro Tag, bis du wieder Kontakt aufnimmst (Auftrag, Tribut, Einkauf oder Belohnung)</div>`) : '';
       // Tägliche Fraktionsbelohnung (nur Legion/Schattenbund haben eine Geschenk-Mechanik): Abholen-
       // Button mit Vorschau, wenn bereit, sonst Countdown bis zur nächsten Abholung.
@@ -12816,7 +12909,7 @@
       const giftCdLeft = factionGiftCooldownLeft(f.id);
       const giftPreviewHtml = giftPreview ? (giftPreview.credits !== undefined ? '<span class="costitem"><i class="ti ti-diamond" aria-hidden="true"></i>'+fmt(giftPreview.credits)+' Kredite</span>' : rewardHtml(giftPreview)) : '';
       const giftRow = (f.id==='legion' || f.id==='schatten') ? `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap;">
-        <div class="bmeta"><i class="ti ti-award" aria-hidden="true" style="margin-right:3px; color:#fac775;"></i>Tägliche Belohnung${lvl<=0?' <span style="color:#8489a0;">(ab Freundlich verfügbar)</span>':(giftCdLeft>0?' <span style="color:#8489a0;">nächste in '+fmtDuration(giftCdLeft/1000)+'</span>':(giftPreviewHtml?' <strong style="color:#5dcaa5;">'+giftPreviewHtml+'</strong>':''))}</div>
+        <div class="bmeta"><i class="ti ti-award" aria-hidden="true" style="margin-right:3px; color:#fac775;"></i>Tägliche Belohnung${lvl<=0?' <span style="color:#7d8199;">(ab Freundlich verfügbar)</span>':(giftCdLeft>0?' <span style="color:#7d8199;">nächste in '+fmtDuration(giftCdLeft/1000)+'</span>':(giftPreviewHtml?' <strong style="color:#5dcaa5;">'+giftPreviewHtml+'</strong>':''))}</div>
         <button data-claim-faction-gift="${f.id}" ${(lvl<=0||giftCdLeft>0)?'disabled':''} style="font-size:10.5px; padding:3px 8px;"><i class="ti ti-award" aria-hidden="true" style="margin-right:2px;"></i>Abholen</button>
       </div>` : '';
       // Auftrag dieser Fraktion mit Fortschritt und Abschluss-Button.
@@ -13107,7 +13200,7 @@
   const ACH_RANKS = [
     { min:0,    name:'Neuling',      color:'#8a8f9e' },
     { min:100,  name:'Sammler',      color:'#c08a4a' },
-    { min:250,  name:'Veteran',      color:'#c7ccd6' },
+    { min:250,  name:'Veteran',      color:'#c7cbe0' },
     { min:450,  name:'Meister',      color:'#fac775' },
     { min:700,  name:'Großmeister',  color:'#9fe1cb' },
     { min:1000, name:'Legende',      color:'#f0997b' }
@@ -13141,7 +13234,7 @@
     { key:'diamant', name:'Diamant', color:'#9fe1cb', rgb:'159,225,203' },
     { key:'platin', name:'Platin', color:'#cfe7ff', rgb:'207,231,255' },
     { key:'gold', name:'Gold', color:'#fac775', rgb:'250,199,117' },
-    { key:'silber', name:'Silber', color:'#c7ccd6', rgb:'199,204,214' },
+    { key:'silber', name:'Silber', color:'#c7cbe0', rgb:'199,204,214' },
     { key:'bronze', name:'Bronze', color:'#c08a4a', rgb:'192,138,74' }
   ];
   // d: { level, prestige, ascensionCount, rank } - rank optional (null/undefined wenn unbekannt, z.B.
@@ -20030,7 +20123,7 @@
       sec('Militär') +
       (entry.defensePower!==undefined ? prow('ti-shield-lock','#378add','Verteidigung', `${fmt(entry.defensePower)}${cmpH(myStats.defensePower, entry.defensePower)}`, barH(myStats.defensePower, entry.defensePower, '#e24b4a')) : '') +
       prow('ti-sword','#f0997b','Kampfpunkte', `${fmt(entry.bp||0)}${cmpH(myStats.bp, entry.bp)}`, barH(myStats.bp, entry.bp, '#f0997b')) +
-      `<div class="prow"><div class="prow-top"><span class="prow-lab"><i class="ti ti-rocket" aria-hidden="true" style="color:#85b7eb;"></i>Flotte</span><span class="prow-val" style="font-size:11px;color:#8489a0;font-weight:400;">${fmt(fleetTotal)} Schiffe</span></div>${fleetChips}</div>` +
+      `<div class="prow"><div class="prow-top"><span class="prow-lab"><i class="ti ti-rocket" aria-hidden="true" style="color:#85b7eb;"></i>Flotte</span><span class="prow-val" style="font-size:11px;color:#7d8199;font-weight:400;">${fmt(fleetTotal)} Schiffe</span></div>${fleetChips}</div>` +
       prow('ti-alien','#e24b4a','NPC-Siege', `${fmt(entry.npcKills||0)}${cmpH(myStats.npcKills, entry.npcKills)}`, '') +
       (totalBattles>0 ? prow('ti-target','#9fe1cb','Erfolgsquote', `${winRate}% <span style="color:#7d8199;font-weight:400;">(${entry.battleWins||0} S / ${entry.battleLosses||0} N)</span>`, '') : '') +
       sec('Fortschritt') +
@@ -20073,8 +20166,8 @@
           const verdict = `Siegchance <b style="font-size:15px;">~${ch}%</b>`
             + `<div class="bmeta" style="margin-top:5px;font-size:10.5px;line-height:1.45;">Schätzung: Der Kampf läuft in <strong>drei Phasen</strong> („zwei von drei") – deshalb ist kein Angriff sicher (max. 90%) und keiner chancenlos (min. 10%). Die <strong>Verteidigungs-Aufstellung</strong> des Ziels kennst du nicht; sie kann den Wert um bis zu ±15% verschieben.</div>`;
           const intelLine = intel
-            ? `<div style="font-family:var(--font-mono);font-size:10.5px;color:${intelFresh?'#7fe0be':'#8489a0'};margin-bottom:8px;"><i class="ti ti-target" aria-hidden="true"></i> Aufklärung vor ${fmtDuration(intelAgeMs/1000)}${intel.deep?' · Tiefen-Scan':''}${intel.detected?' · ⚠ unzuverlässig':''}</div>`
-            : `<div style="font-family:var(--font-mono);font-size:10.5px;color:#8489a0;margin-bottom:8px;"><i class="ti ti-target" aria-hidden="true"></i> Noch nicht ausgespäht – „Spähen" liefert eine Beute-Schätzung und aktuelle Werte.</div>`;
+            ? `<div style="font-family:var(--font-mono);font-size:10.5px;color:${intelFresh?'#7fe0be':'#7d8199'};margin-bottom:8px;"><i class="ti ti-target" aria-hidden="true"></i> Aufklärung vor ${fmtDuration(intelAgeMs/1000)}${intel.deep?' · Tiefen-Scan':''}${intel.detected?' · ⚠ unzuverlässig':''}</div>`
+            : `<div style="font-family:var(--font-mono);font-size:10.5px;color:#7d8199;margin-bottom:8px;"><i class="ti ti-target" aria-hidden="true"></i> Noch nicht ausgespäht – „Spähen" liefert eine Beute-Schätzung und aktuelle Werte.</div>`;
           preEl.className = 'profile-preview '+(good?'pp-good':'pp-danger'); preEl.style.display = 'block';
           preEl.innerHTML = `<div class="pp-h">⚔ Angriffs-Vorschau</div>`+ intelLine +
             `<div class="pp-gauge-row"><span>Deine Angriffskraft <b style="color:#6fb2ee;">${fmt(previewPower)}</b></span><span>Verteidigung <b style="color:${good?'#7fe0be':'#ff9d8f'};">${fmt(defVal)}</b></span></div>`+
@@ -20569,7 +20662,7 @@
     // Label mittig unter dem Marker, aber am Kartenrand einklemmen, damit „DEIN SYSTEM" nie abgeschnitten wird.
     const lx = Math.max(42, Math.min(W-42, parseFloat(hx))).toFixed(1);
     const ly = Math.min(H-6, parseFloat(hy)+24).toFixed(1);
-    return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="border-radius:10px; background:#0a0e1a; display:block;" role="img" aria-label="Galaxiekarte mit deinem Heimatsystem">'
+    return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style=" background:#0a0e1a; display:block;" role="img" aria-label="Galaxiekarte mit deinem Heimatsystem">'
       + '<rect width="'+W+'" height="'+H+'" fill="#0a0e1a"/>'
       + dots
       + '<circle cx="'+hx+'" cy="'+hy+'" r="22" fill="none" stroke="#5dcaa5" stroke-width="1" stroke-dasharray="4,5" opacity="0.55"/>'
@@ -22444,7 +22537,7 @@
       const rIconBg = positive ? 'rgba(93,202,165,0.16)' : 'rgba(226,75,74,0.16)';
       const rIconBorder = positive ? 'rgba(93,202,165,0.4)' : 'rgba(226,75,74,0.4)';
       const wonPill = !REPORT_SPECIAL_GREEN_TYPES.includes(r.type)
-        ? `<span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; color:${positive?'#5dcaa5':'#ffb4b4'}; background:${positive?'rgba(93,202,165,0.16)':'rgba(226,75,74,0.2)'}; border:0.5px solid ${positive?'rgba(93,202,165,0.4)':'rgba(226,75,74,0.4)'}; border-radius:5px; padding:2px 7px;"><i class="ti ${positive?'ti-check':'ti-x'}" aria-hidden="true"></i> ${positive?'Gewonnen':'Verloren'}</span>`
+        ? `<span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; color:${positive?'#5dcaa5':'#ffb4b4'}; background:${positive?'rgba(93,202,165,0.16)':'rgba(226,75,74,0.2)'}; border:0.5px solid ${positive?'rgba(93,202,165,0.4)':'rgba(226,75,74,0.4)'}; padding:2px 7px;"><i class="ti ${positive?'ti-check':'ti-x'}" aria-hidden="true"></i> ${positive?'Gewonnen':'Verloren'}</span>`
         : '';
       return `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:0; border-color:var(--line-1); border-left:3px solid ${rAccent}; box-shadow:-2px 0 12px -6px ${rAccent};">
@@ -23738,7 +23831,7 @@
           <div class="bmeta">Gemeinsam: ${fmt(total)} · nächste Stufe bei ${fmt(nextThresh)}</div></div>
           <button data-claim-alliance-dominance ${claimable?'':'disabled'} style="white-space:nowrap; ${claimable?'background:rgba(195,190,245,0.2);':''}">${claimable?'Stufe '+nextLvl+' abholen':'Noch '+fmt(Math.max(0,nextThresh-total))}</button>
         </div>
-        <div style="height:10px; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden; margin-bottom:4px;">
+        <div style="height:10px; background:rgba(255,255,255,0.06); overflow:hidden; margin-bottom:4px;">
           <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#7f77dd,#c3bef5);"></div>
         </div>
         <div class="bmeta">Belohnung für Stufe ${nextLvl}: +${rw.credits} Kredite, +${rw.commandPoints} Kommandopunkte (jedes Mitglied kann einzeln abholen)</div>
@@ -27236,7 +27329,7 @@
     const stepsHtml = COMEBACK_STEPS.map((s,i) => {
       const st = i < cq.step ? 'done' : (i === cq.step ? 'now' : 'todo');
       const icon = st==='done' ? 'ti-check' : s.icon;
-      const col = st==='done' ? '#5dcaa5' : (st==='now' ? s.color : '#6b7086');
+      const col = st==='done' ? '#5dcaa5' : (st==='now' ? s.color : '#6b6f85');
       const rw = [];
       if (s.reward.resources) for (const [k,a] of Object.entries(s.reward.resources)) rw.push(fmt(a)+' '+((RES_DEFS.find(x=>x.key===k)||{}).label||k));
       if (s.reward.credits) rw.push(s.reward.credits+' Kredite');
@@ -27542,8 +27635,8 @@
       const icon = state2==='done' ? 'ti-check' : dailyLoginDayIcon(def);
       const bg = state2==='today' ? 'rgba(93,202,165,0.22)' : state2==='done' ? 'rgba(93,202,165,0.08)' : 'rgba(255,255,255,0.04)';
       const border = state2==='today' ? '#5dcaa5' : 'rgba(255,255,255,0.1)';
-      const color = state2==='upcoming' ? '#6b7086' : '#c7cbe0';
-      return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; background:${bg}; border:1.5px solid ${border}; border-radius:9px; padding:6px 2px; min-width:0;" title="Tag ${day}">
+      const color = state2==='upcoming' ? '#6b6f85' : '#c7cbe0';
+      return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; background:${bg}; border:1.5px solid ${border}; padding:6px 2px; min-width:0;" title="Tag ${day}">
         <i class="ti ${icon}" aria-hidden="true" style="font-size:15px; color:${color};"></i>
         <span style="font-size:9.5px; color:${color};">Tag ${day}</span>
       </div>`;
@@ -28144,7 +28237,7 @@
   const LEAGUE_DEFS = [
     { key:'platin', name:'Platin', color:'#8ecfe8', credits:1500, prodMin:12 },
     { key:'gold',   name:'Gold',   color:'#fac775', credits:800,  prodMin:6 },
-    { key:'silber', name:'Silber', color:'#c9ccd9', credits:400,  prodMin:3 },
+    { key:'silber', name:'Silber', color:'#c7cbe0', credits:400,  prodMin:3 },
     { key:'bronze', name:'Bronze', color:'#c98d5f', credits:150,  prodMin:0 }
   ];
   // Wochenschlüssel = Datum des Montags dieser Woche (lokale Zeit), z.B. "2026-07-13".
@@ -28183,7 +28276,7 @@
     { key:'diamant', name:'Diamant', title:'Saison-Champion',   color:'#7fe0ff', credits:5000, fragments:12 },
     { key:'platin',  name:'Platin',  title:'Saison-Meister',    color:'#8ecfe8', credits:3000, fragments:8 },
     { key:'gold',    name:'Gold',    title:'Saison-Veteran',    color:'#fac775', credits:1800, fragments:5 },
-    { key:'silber',  name:'Silber',  title:'Saison-Kämpfer',    color:'#c9ccd9', credits:900,  fragments:3 },
+    { key:'silber',  name:'Silber',  title:'Saison-Kämpfer',    color:'#c7cbe0', credits:900,  fragments:3 },
     { key:'bronze',  name:'Bronze',  title:'Saison-Teilnehmer', color:'#c98d5f', credits:400,  fragments:1 }
   ];
   function mySeasonScore(){
@@ -28203,7 +28296,7 @@
     const last = (state.seasonLeague && state.seasonLeague.lastResult) || null;
     const lastDef = last ? SEASON_LEAGUE_TIER_DEFS.find(t=>t.key===last.tier) : null;
     const titles = state.seasonTitles || [];
-    const tile = (label, val, color) => `<div style="flex:1; min-width:130px; background:var(--elev-1); border:0.5px solid var(--line-1); border-radius:10px; padding:9px 11px;"><div class="bmeta" style="font-size:10px; text-transform:uppercase; letter-spacing:.1em;">${label}</div><div style="font-family:var(--font-mono); font-size:16px; font-weight:700;${color?' color:'+color+';':''}">${val}</div></div>`;
+    const tile = (label, val, color) => `<div style="flex:1; min-width:130px; background:var(--elev-1); border:0.5px solid var(--line-1); padding:9px 11px;"><div class="bmeta" style="font-size:10px; text-transform:uppercase; letter-spacing:.1em;">${label}</div><div style="font-family:var(--font-mono); font-size:16px; font-weight:700;${color?' color:'+color+';':''}">${val}</div></div>`;
     const ladder = SEASON_LEAGUE_TIER_DEFS.map(t =>
       `<div style="display:flex; align-items:center; gap:8px; padding:5px 0; border-top:1px solid var(--line-1);"><i class="ti ti-trophy" aria-hidden="true" style="color:${t.color};"></i><span style="flex:1; font-weight:600; color:${t.color};">${t.name}</span><span class="bmeta" style="font-size:11px;">Titel „${t.title}" · +${fmt(t.credits)} Kr · +${t.fragments} Fragmente</span></div>`).join('');
     box.innerHTML =
@@ -31717,7 +31810,7 @@
         ? `<circle cx="${x}" cy="${y}" r="16" fill="#5dcaa514" stroke="#5dcaa5" stroke-width="2" stroke-opacity="0.9"><title>Von dir kontrolliert</title></circle>`
         : (owner ? `<circle cx="${x}" cy="${y}" r="16" fill="${owner.color}14" stroke="${owner.color}" stroke-width="1.6" stroke-opacity="0.8"><title>${owner.name} – Territorium</title></circle>` : '');
       const statusText = isCollapsed ? 'Kollabiert' : (controlledByMe ? '★ Kontrolle' : (owner ? owner.name : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))));
-      const statusColor = isCollapsed ? '#e24b4a' : (controlledByMe ? '#5dcaa5' : (owner ? owner.color : '#8489a0'));
+      const statusColor = isCollapsed ? '#e24b4a' : (controlledByMe ? '#5dcaa5' : (owner ? owner.color : '#7d8199'));
       const sunType = sunTypeFor(s.id);
       const glowR = (17*sunType.r).toFixed(1);
       const ringR = 9.5*sunType.r;
@@ -32149,7 +32242,7 @@
         const ageMs = Date.now() - (it.capturedAt||0);
         const stale = ageMs > 30*60*1000;
         const unreliable = !!it.detected;
-        const ringColor = unreliable ? '#e0a548' : (stale ? '#8489a0' : '#5ad1e8');
+        const ringColor = unreliable ? '#e0a548' : (stale ? '#7d8199' : '#5ad1e8');
         const dp = it.entry.defensePower;
         const tip = 'Aufgeklärt vor '+fmtDuration(ageMs/1000) + (unreliable?' · verfälscht (entdeckt)':(stale?' · veraltet':'')) + (dp!==undefined?' · Verteidigung ~'+fmt(dp):'') + (it.deep?' · Tiefenscan':'');
         intelMarkup = `
@@ -32741,7 +32834,7 @@
        (Lackierung) wechseln mit dem Thema. */
     { key:'arctic', name:'Arktis', primary:'#7ec8e3', primaryRgb:'126,200,227', secondary:'#a8dde8', secondaryRgb:'168,221,232', secondaryDark:'#4a90a4', secondaryDarkRgb:'74,144,164', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
     { key:'amber', name:'Bernstein', primary:'#c9973f', primaryRgb:'201,151,63', secondary:'#e0c068', secondaryRgb:'224,192,104', secondaryDark:'#a87a2c', secondaryDarkRgb:'168,122,44', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
-    { key:'steel', name:'Stahl', primary:'#8496ac', primaryRgb:'132,150,172', secondary:'#6fa89a', secondaryRgb:'111,168,154', secondaryDark:'#4f7d70', secondaryDarkRgb:'79,125,112', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
+    { key:'steel', name:'Stahl', primary:'#9296ac', primaryRgb:'132,150,172', secondary:'#6fa89a', secondaryRgb:'111,168,154', secondaryDark:'#4f7d70', secondaryDarkRgb:'79,125,112', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
     { key:'indigo', name:'Indigo', primary:'#5a5fc7', primaryRgb:'90,95,199', secondary:'#7b7fe0', secondaryRgb:'123,127,224', secondaryDark:'#3e4296', secondaryDarkRgb:'62,66,150', danger:'#e24b4a', dangerRgb:'226,75,74', warning:'#e0a548' },
     /* Grafik-Runde (20.07.2026, Spieler-Wunsch "5 neue Farbthemen"): fünf weitere Paletten, jede in
        einer bisher unbesetzten Farbfamilie (Türkis/Rosé/Oliv/Kupfer/Marine), damit sie sich auf einen
@@ -33700,7 +33793,7 @@
       // FALSCHEN, fremden Eintrag als "ich" markieren und dessen Angriffs-/Späh-Buttons ausblenden.
       const isMe = !!(state.player.id && e.id === state.player.id);
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
-      const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 3px rgba(93,202,165,0.7)':'none'};"></span>`;
+      const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4c5661'}; box-shadow:${isOnline?'0 0 3px rgba(93,202,165,0.7)':'none'};"></span>`;
       return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style="color:#7d8199;">['+escapeHtml(e.allianceTag)+']</span>':''}</span><span>${e.score||0}</span></div>`;
     }).join('');
     box.querySelectorAll('[data-fp-profile]').forEach(row => row.addEventListener('click', () => {
@@ -33867,7 +33960,7 @@
       const isMe = !!(state.player.id && e.id === state.player.id);
       const rank = leaderboardCache.indexOf(e)+1;
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
-      const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4a4e63'}; box-shadow:${isOnline?'0 0 4px rgba(93,202,165,0.7)':'none'};"></span>`;
+      const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4c5661'}; box-shadow:${isOnline?'0 0 4px rgba(93,202,165,0.7)':'none'};"></span>`;
       // Vorschlag D "gestaffelte Medaillen" (20.07.2026, finale Auswahl): Symbol/Farbe/Label je nach
       // vom Server ermittelter Stufe (supporterTier, aus der Gesamt-Spendensumme, siehe Backend
       // supporterTierFor). SUPPORTER_TIER_META lokal statt globaler Konstante, da nur hier gebraucht.
@@ -34549,7 +34642,7 @@
           const curInfo = PLANET_TYPE_INFO[curType] || {};
           let html = `<div class="section-title" style="margin-top:0.5rem; justify-content:space-between;"><span><i class="ti ti-plant" aria-hidden="true"></i>Terraforming: ${planetDisplayName(pk)}</span><button class="help-jump-btn" data-jump-help="kolonien"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>`;
           html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;">
-            <div class="bmeta" style="margin-bottom:8px;">Aktueller Typ: <i class="ti ${curInfo.icon||'ti-planet'}" aria-hidden="true" style="color:${curInfo.color||'#c7cbe0'};"></i> <strong>${curInfo.label||curType}</strong> <span style="color:${curInfo.bonusText?'#5dcaa5':'#8489a0'};">(${curInfo.bonusText||'kein spezieller Produktions-/Verteidigungsbonus'})</span></div>`;
+            <div class="bmeta" style="margin-bottom:8px;">Aktueller Typ: <i class="ti ${curInfo.icon||'ti-planet'}" aria-hidden="true" style="color:${curInfo.color||'#c7cbe0'};"></i> <strong>${curInfo.label||curType}</strong> <span style="color:${curInfo.bonusText?'#5dcaa5':'#7d8199'};">(${curInfo.bonusText||'kein spezieller Produktions-/Verteidigungsbonus'})</span></div>`;
 
           if (job){
             // Eine Stufe läuft gerade.
@@ -34613,7 +34706,7 @@
             const options = TERRAFORM_TARGET_TYPES.filter(t => t !== curType && (t !== 'leerenwelt' || (state.research.rleere||0) >= 5));
             html += `<div class="bmeta" style="margin:${(targetType&&lvl>0)?'10px':'0'} 0 8px;">${lvl>=TERRAFORM_MAX_LEVEL?'Erneut terraformen zu einem anderen Typ:':(targetType?'Anderes Ziel wählen:':'Zieltyp wählen, um mit dem Terraforming zu beginnen:')}</div>
               <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                ${options.map(t => { const ti = PLANET_TYPE_INFO[t]; return `<button data-pick-terraform-target="${t}" style="font-size:10.5px; flex:1; min-width:120px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 6px;"><span><i class="ti ${ti.icon}" aria-hidden="true" style="margin-right:3px; color:${ti.color};"></i>${ti.label}</span>${ti.bonusText?`<span style="font-size:9px; color:#8489a0; font-weight:400;">${ti.bonusText}</span>`:''}</button>`; }).join('')}
+                ${options.map(t => { const ti = PLANET_TYPE_INFO[t]; return `<button data-pick-terraform-target="${t}" style="font-size:10.5px; flex:1; min-width:120px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 6px;"><span><i class="ti ${ti.icon}" aria-hidden="true" style="margin-right:3px; color:${ti.color};"></i>${ti.label}</span>${ti.bonusText?`<span style="font-size:9px; color:#7d8199; font-weight:400;">${ti.bonusText}</span>`:''}</button>`; }).join('')}
               </div>
               <div class="bmeta" style="margin-top:6px; font-size:11px;">10 Stufen à mehrere Stunden, insgesamt teuer - jede Stufe gewährt nur einen kleinen Anteil des vollen Bonus, erst bei Stufe 10 ist die Umwandlung (inkl. neuer Farbe auf der Sektorkarte) abgeschlossen. Die Zielwahl selbst ist immer möglich, auch während anderswo eine Stufe läuft - nur das tatsächliche Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt.</div>`;
           }
@@ -34807,7 +34900,7 @@
           <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(195,190,245,0.15)'}; color:${done?'#5dcaa5':'#c3bef5'};"><i class="ti ${e.icon}" aria-hidden="true"></i></div>
               <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${e.name}</div>
-              <div class="bmeta">${e.desc}${done?'':' · '+fmt(eCost)+' Forschungspunkte · 24 Std.'+(otherRunning?' · <span style="color:#8489a0;">andere Forschung läuft</span>':'')}</div></div>
+              <div class="bmeta">${e.desc}${done?'':' · '+fmt(eCost)+' Forschungspunkte · 24 Std.'+(otherRunning?' · <span style="color:#7d8199;">andere Forschung läuft</span>':'')}</div></div>
             </div>
             ${rightHtml}
           </div>
@@ -34840,7 +34933,7 @@
           <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div class="left"><div class="bicon" style="background:${done?'rgba(93,202,165,0.2)':'rgba(226,75,74,0.12)'}; color:${done?'#5dcaa5':'#e24b4a'};"><i class="ti ti-medal" aria-hidden="true"></i></div>
               <div><div class="bname">${done?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}${v.name}</div>
-              <div class="bmeta">${v.desc}${done?'':' · '+fmt(vCost)+' Forschungspunkte · 24 Std.'+(reqOk?'':' · benötigt '+(VETERAN_TRAINING.find(x=>x.key===v.requires)||{}).name+' zuerst')+(otherRunning?' · <span style="color:#8489a0;">andere Ausbildung läuft</span>':'')}</div></div>
+              <div class="bmeta">${v.desc}${done?'':' · '+fmt(vCost)+' Forschungspunkte · 24 Std.'+(reqOk?'':' · benötigt '+(VETERAN_TRAINING.find(x=>x.key===v.requires)||{}).name+' zuerst')+(otherRunning?' · <span style="color:#7d8199;">andere Ausbildung läuft</span>':'')}</div></div>
             </div>
             ${rightHtml}
           </div>
@@ -35233,7 +35326,7 @@
         const pct = Math.min(100, Math.round(have/needed*100));
         const statusLine = isRunning
           ? `<span style="color:#5dcaa5;"><i class="ti ${evDef.icon}" aria-hidden="true"></i> Event "${evDef.name}" läuft gerade - noch ${fmtDuration(Math.max(0,ce.endsAt-Date.now())/1000)}</span>`
-          : `<span style="color:#8489a0;"><i class="ti ${evDef.icon}" aria-hidden="true"></i> Event "${evDef.name}" läuft gerade nicht - bereits gesammelte Teile bleiben erhalten, neue gibt es erst wieder beim nächsten Durchlauf</span>`;
+          : `<span style="color:#7d8199;"><i class="ti ${evDef.icon}" aria-hidden="true"></i> Event "${evDef.name}" läuft gerade nicht - bereits gesammelte Teile bleiben erhalten, neue gibt es erst wieder beim nächsten Durchlauf</span>`;
         // Gesperrte Event-Schiffe belegten vorher genauso viel Fläche wie baubare Schiffe (mehrere
         // Zeilen Beschreibungstext), obwohl man mit ihnen gerade nichts tun kann - bei sechs
         // Event-Schiffen schob das die eigentliche Werft weit nach unten. Jetzt eine kompakte Zeile
@@ -36053,7 +36146,7 @@
             const haveFrag = (state.moduleFragments||0) >= upCost;
             html += `<div class="mod-slot" style="border-color:${info?info.rar.color:'#5a5f7a'};">
               <div class="mod-head"><i class="ti ${info?info.def.icon:'ti-box'}" aria-hidden="true" style="color:${info?info.rar.color:'#c7cbe0'};"></i><span class="bname">${info?info.def.name:'?'}</span></div>
-              <div class="mod-eff" style="color:${info?info.rar.color:'#8489a0'};">+${info?Math.round(info.bonus*100):0}% ${info?moduleEffectLabel(info.def.effect):''}</div>
+              <div class="mod-eff" style="color:${info?info.rar.color:'#7d8199'};">+${info?Math.round(info.bonus*100):0}% ${info?moduleEffectLabel(info.def.effect):''}</div>
               <div class="bmeta">${info?info.rar.label:''}${info&&info.level>1?' · Stufe '+info.level+'/'+MODULE_LEVEL_MAX:''}</div>
               ${(info&&info.subs.length)?`<div class="mod-sub"><i class="ti ti-sparkles" aria-hidden="true"></i> ${info.subs.map(s=>'+'+(s.value*100).toFixed(1)+'% '+(MODULE_SUB_EFFECT_LABEL[s.effect]||s.effect)).join(', ')}</div>`:''}
               <div class="mod-acts">
@@ -36132,7 +36225,7 @@
           const loRow = (nm) => {
             const label = loadoutName(pk, nm) || nm;                 // Auto-Name, sonst Slot-Buchstabe
             const has = !!lo[nm];
-            return `<div style="display:flex; gap:4px; align-items:center; border:1px solid #3a3f57; border-radius:6px; padding:3px 5px;">
+            return `<div style="display:flex; gap:4px; align-items:center; border:1px solid #3a3f57; padding:3px 5px;">
               <span class="bmeta" style="min-width:74px; ${has?'color:#c3bef5;':'opacity:0.6;'}">${has?'„'+label+'"':'Slot '+nm}${has?' ('+lo[nm].length+')':''}</span>
               <button data-loadout-save="${nm}" style="font-size:10px; padding:3px 7px;" title="Aktuelle Ausrüstung als Vorlage ${nm} speichern (Name wird automatisch vergeben)"><i class="ti ti-plus" aria-hidden="true" style="margin-right:2px;"></i>Speichern</button>
               <button data-loadout-apply="${nm}" ${has?'':'disabled'} style="font-size:10px; padding:3px 7px;" title="${has?'Vorlage „'+label+'" ('+lo[nm].length+' Module) anwenden':'Noch keine Vorlage in Slot '+nm}"><i class="ti ti-check" aria-hidden="true" style="margin-right:2px;"></i>Anwenden</button>
@@ -36268,7 +36361,7 @@
             const haveFrag = (state.moduleFragments||0) >= upCost;
             html += `<div class="mod-slot" style="border-color:${info?info.rar.color:'#5a5f7a'};">
               <div class="mod-head"><i class="ti ${info?info.def.icon:'ti-box'}" aria-hidden="true" style="color:${info?info.rar.color:'#c7cbe0'};"></i><span class="bname">${info?info.def.name:'?'}</span></div>
-              <div class="mod-eff" style="color:${info?info.rar.color:'#8489a0'};">+${info?Math.round(info.bonus*100):0}% ${info?shipModuleEffectLabel(info.def.effect):''}</div>
+              <div class="mod-eff" style="color:${info?info.rar.color:'#7d8199'};">+${info?Math.round(info.bonus*100):0}% ${info?shipModuleEffectLabel(info.def.effect):''}</div>
               <div class="bmeta">${info?info.rar.label:''}${info&&info.level>1?' · Stufe '+info.level+'/'+MODULE_LEVEL_MAX:''}</div>
               ${(info&&info.subs.length)?`<div class="mod-sub"><i class="ti ti-sparkles" aria-hidden="true"></i> ${info.subs.map(s=>'+'+(s.value*100).toFixed(1)+'% '+(MODULE_SUB_EFFECT_LABEL[s.effect]||s.effect)).join(', ')}</div>`:''}
               <div class="mod-acts">
@@ -36479,7 +36572,7 @@
       const fleetTemplateRows = (state.fleetTemplates||[]).map(t => {
         const partsText = Object.entries(t.composition).map(([k,v]) => v+'× '+(k==='superschlachtschiff'?'Superschlachtschiff':(SHIP_DEFS.find(d=>d.key===k)||{}).name||k)).join(', ');
         return `<div class="card-row" style="padding:0.4rem 0.6rem;">
-          <div class="left" style="gap:6px;"><i class="ti ti-list-details" aria-hidden="true" style="color:#8489a0;"></i>
+          <div class="left" style="gap:6px;"><i class="ti ti-list-details" aria-hidden="true" style="color:#7d8199;"></i>
             <div><div class="bname" style="font-size:11.5px;">${t.name}</div><div class="bmeta" style="font-size:10px;">${partsText||'leer'}</div></div>
           </div>
           <div style="display:flex; gap:5px;">
@@ -37089,7 +37182,7 @@
             <i class="ti ${d.icon}" aria-hidden="true" style="color:${done?'#fac775':'#9296ac'};"></i>
             <span style="font-size:10.5px;">${d.name} (${prog}/${d.target})</span>
           </span>
-          ${!done ? `<i class="ti ti-refresh" data-reroll-quest="${d.key}" title="Gegen andere Tagesaufgabe tauschen (${DAILY_QUEST_REROLL_COST} KP)" style="cursor:pointer; color:#7a7e94; font-size:11px; margin-left:2px;"></i>` : ''}
+          ${!done ? `<i class="ti ti-refresh" data-reroll-quest="${d.key}" title="Gegen andere Tagesaufgabe tauschen (${DAILY_QUEST_REROLL_COST} KP)" style="cursor:pointer; color:#7d8199; font-size:11px; margin-left:2px;"></i>` : ''}
         </div>`;
       }).join('')}${allClaimed ? `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:rgba(93,202,165,0.15); border:1px solid rgba(93,202,165,0.4);"><i class="ti ti-trophy" aria-hidden="true" style="color:#5dcaa5;"></i><span style="font-size:10.5px;">Alle Tagesmissionen erledigt${state.dailyQuestStreak?' · '+state.dailyQuestStreak+'-Tage-Serie':''} - morgen gibt's neue</span></div>` : ''}</div>`;
       dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
@@ -37219,8 +37312,8 @@
         const hL = Math.round((h.losses/maxFights)*46);
         return `<div style="display:flex; flex-direction:column; align-items:center; gap:2px; flex:1; min-width:14px;" title="${h.day}: ${h.wins} Siege, ${h.losses} Niederlagen, +${fmt(h.scoreGain)} Punkte${h.tier2Gain?', +'+fmt(h.tier2Gain)+' Tier-2':''}">
           <div style="display:flex; align-items:flex-end; gap:1px; height:48px;">
-            <div style="width:5px; height:${Math.max(h.wins?3:0,hW)}px; background:#5dcaa5; border-radius:2px 2px 0 0;"></div>
-            <div style="width:5px; height:${Math.max(h.losses?3:0,hL)}px; background:#e24b4a; border-radius:2px 2px 0 0;"></div>
+            <div style="width:5px; height:${Math.max(h.wins?3:0,hW)}px; background:#5dcaa5; 2px 0 0;"></div>
+            <div style="width:5px; height:${Math.max(h.losses?3:0,hL)}px; background:#e24b4a; 2px 0 0;"></div>
           </div>
           <div style="font-size:8px; color:#7d8199;">${h.day.slice(8)}</div>
         </div>`;
@@ -37262,8 +37355,8 @@
           <polygon points="${area}" fill="url(#scoreHistGrad)"/>
           <polyline points="${line}" fill="none" stroke="#afa9ec" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
           <circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3.5" fill="#c3bef5"/>
-          <text x="${PAD}" y="12" style="font-size:9px; fill:#8489a0;">${fmt(maxV)}</text>
-          <text x="${PAD}" y="${H-PAD-2}" style="font-size:9px; fill:#8489a0;">${fmt(minV)}</text>
+          <text x="${PAD}" y="12" style="font-size:9px; fill:#7d8199;">${fmt(maxV)}</text>
+          <text x="${PAD}" y="${H-PAD-2}" style="font-size:9px; fill:#7d8199;">${fmt(minV)}</text>
         `;
       }
       if (note) note.innerHTML = `<i class="ti ti-info-circle" aria-hidden="true"></i>Snapshot alle 5 Minuten während des Spielens${hist.length?' · '+hist.length+' Datenpunkt'+(hist.length===1?'':'e'):''}.`;
@@ -37292,8 +37385,8 @@
         <polygon points="${area}" fill="url(#${gradId})"/>
         <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         <circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3.5" fill="${color}"/>
-        <text x="${PAD}" y="12" style="font-size:9px; fill:#8489a0;">${fmtFn(maxV)}</text>
-        <text x="${PAD}" y="${H-PAD-2}" style="font-size:9px; fill:#8489a0;">${fmtFn(minV)}</text>
+        <text x="${PAD}" y="12" style="font-size:9px; fill:#7d8199;">${fmtFn(maxV)}</text>
+        <text x="${PAD}" y="${H-PAD-2}" style="font-size:9px; fill:#7d8199;">${fmtFn(minV)}</text>
       `;
     }
     renderMiniChart('creditsHistorySvg', 'credits', '#fac775', v=>fmt(Math.round(v)));
@@ -37331,7 +37424,7 @@
       prodNowBox.innerHTML = entries.map(e => `
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
           <div class="bmeta" style="width:130px; flex-shrink:0;"><i class="ti ${e.def.icon}" aria-hidden="true" style="color:${e.def.color}; margin-right:4px;"></i>${e.def.label}</div>
-          <div style="flex:1; height:10px; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden;"><div style="width:${Math.round(e.v/maxRate*100)}%; height:100%; background:${e.def.color}; opacity:0.7;"></div></div>
+          <div style="flex:1; height:10px; background:rgba(255,255,255,0.06); overflow:hidden;"><div style="width:${Math.round(e.v/maxRate*100)}%; height:100%; background:${e.def.color}; opacity:0.7;"></div></div>
           <div class="bmeta" style="width:70px; text-align:right; font-variant-numeric:tabular-nums;">${e.v.toFixed(2)}/s</div>
         </div>`).join('');
     }
@@ -37511,7 +37604,7 @@
     const themePicker = document.getElementById('themePicker');
     if (themePicker){
       themePicker.innerHTML = THEME_PRESETS.map(t => `
-        <button data-theme-key="${t.key}" title="${t.name}" style="flex-shrink:0; width:56px; height:56px; padding:0; border-radius:12px; overflow:hidden; ${((state.themeKey||'standard')===t.key)?'border-color:#fff; box-shadow:0 0 0 2px #fff;':''}">
+        <button data-theme-key="${t.key}" title="${t.name}" style="flex-shrink:0; width:56px; height:56px; padding:0; overflow:hidden; ${((state.themeKey||'standard')===t.key)?'border-color:#fff; box-shadow:0 0 0 2px #fff;':''}">
           <div style="width:100%; height:50%; background:${t.primary};"></div>
           <div style="width:100%; height:50%; background:${t.secondary};"></div>
         </button>
@@ -37817,7 +37910,7 @@
       for (const branchKey of Object.keys(SKILL_BRANCH_INFO)){
         const info = SKILL_BRANCH_INFO[branchKey];
         const nodes = SKILL_TREE.filter(n=>n.branch===branchKey);
-        html += `<div style="border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px;">
+        html += `<div style="border:1px solid rgba(255,255,255,0.08); padding:10px;">
           <div class="bname" style="font-size:12.5px; margin-bottom:6px;"><i class="ti ${info.icon}" aria-hidden="true" style="color:${info.color};"></i> ${info.name}</div>
           <div style="display:flex; flex-direction:column; gap:6px;">
             ${nodes.map(n => {
