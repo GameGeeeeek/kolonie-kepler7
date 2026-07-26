@@ -49,10 +49,20 @@ function baue(state){
   const ctx = {};
   const allFleets = () => [state.fleet || {}].concat(Object.values(state.colonies || {}).map(c => c.fleet || {}));
   const allBuildingSets = () => [state.buildings || {}].concat(Object.values(state.colonies || {}).map(c => c.buildings || {}));
+  // Seit v8.299.0 (woechentlich wachsende Galaxie) zaehlen die beiden Karten-Kategorien bewusst
+  // gegen die fest eingetragene Kern-Galaxie statt gegen die wachsenden Arrays - sonst wuerde eine
+  // abgeschlossene Kategorie jeden Montag wieder aufreissen. Hier stehen die Stubs dafuer: alle
+  // Attrappen-Planeten/-Systeme gelten als Kern-Galaxie.
+  const BASE_PLANET_COUNT = DEFS.PLANETS.length;
+  const BASE_STAR_SYSTEM_COUNT = DEFS.STAR_SYSTEMS.length;
+  const BASE_PLANET_IDS = new Set(DEFS.PLANETS.map(p => p.id));
+  const baseStarSystems = () => DEFS.STAR_SYSTEMS;
   new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'ACHIEVEMENTS', 'SHIP_DEFS', 'MODULE_DEFS',
     'BUILDING_DEFS', 'FACTION_DIPLOMACY', 'allFleets', 'allBuildingSets',
+    'BASE_PLANET_COUNT', 'BASE_STAR_SYSTEM_COUNT', 'BASE_PLANET_IDS', 'baseStarSystems',
     block + ';ctx.CATS=COMPENDIUM_CATS;')(ctx, state, DEFS.PLANETS, DEFS.STAR_SYSTEMS, DEFS.ACHIEVEMENTS,
-    DEFS.SHIP_DEFS, DEFS.MODULE_DEFS, DEFS.BUILDING_DEFS, DEFS.FACTION_DIPLOMACY, allFleets, allBuildingSets);
+    DEFS.SHIP_DEFS, DEFS.MODULE_DEFS, DEFS.BUILDING_DEFS, DEFS.FACTION_DIPLOMACY, allFleets, allBuildingSets,
+    BASE_PLANET_COUNT, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_IDS, baseStarSystems);
   return ctx.CATS;
 }
 

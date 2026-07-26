@@ -2191,6 +2191,7 @@
             <button id="galaxyZoomResetBtn" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:14px; background:rgba(13,18,36,0.9);">⟲</button>
           </div>
         </div>
+        <div class="bmeta" id="galaxyGrowthLine" style="margin:-0.5rem 0 0.9rem; text-align:center;"></div>
         <div class="system-nav">
           <button id="systemPrevBtn" title="Vorheriges System"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
           <div class="system-nav-label">
@@ -4266,8 +4267,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.31';
+  const VERSION = '8.299.0';
   const PATCHNOTES = [
+    { version:'8.299.0', date:'26.07.2026', changes:[
+      '<strong>Die Galaxie wächst ab jetzt jede Woche weiter.</strong> Jeden Montag um 00:00 Uhr UTC kommen automatisch <strong>zwei neue Sternsysteme</strong> am Außenrand dazu – dauerhaft, ohne dass jemand sie von Hand eintragen müsste. Bisher war die Sternenkarte mit 69 Systemen ein für alle Mal fertig; wer sie durchhatte, hatte nichts Neues mehr zu erkunden.',
+      'Jedes neue System bringt <strong>5 bis 10 Planeten</strong> mit – nach exakt derselben Planetenrotation wie die bestehende Galaxie: dieselben zehn Orbit-Positionen, dieselben neun Planetentypen mit ihren Produktionsboni, dieselben Formeln für Erkundungsdauer, Beute, Entdeckungsbonus und Kolonisierungskosten. Ein neues System ist von einem der bisherigen also nicht zu unterscheiden – es steht nur noch nicht auf der Karte.',
+      'Alle Spieler sehen dieselben neuen Systeme <strong>zur selben Sekunde</strong>: Namen, Position und Planeten werden aus dem Kalender berechnet, nicht ausgewürfelt. Ein einmal erschienenes System behält seine Planeten für immer – eine dort gegründete Kolonie kann also nicht wieder verschwinden.',
+      'Unter der Galaxie-Übersicht steht neu, wie viele Systeme aktuell kartiert sind und wann die nächsten zwei kommen. Sind sie da, meldet das Log ihre Namen – auch wenn das Spiel gerade offen ist, ohne Neuladen.',
+      'Der Erfolg „Grenzgänger" und die Kompendium-Kategorien „Sternenkarte"/„Sternensysteme" zählen ab jetzt ausdrücklich nur die <strong>fest eingetragene Kern-Galaxie</strong>. Sonst wäre ein einmal abgeschlossenes Sammelziel jeden Montag wieder aberkannt worden und nie mehr erreichbar gewesen. Die neuen Planeten sind ganz normal erkund- und besiedelbar, sie zählen nur für diese drei Sammelziele nicht mit.',
+      'Deckel bei 104 Wochen (208 zusätzliche Systeme, gut 1.500 Planeten) – die Karte soll auch in zwei Jahren noch flüssig und lesbar bleiben.'
+    ]},
     { version:'8.298.31', date:'26.07.2026', changes:[
       '<strong>Auch die Allianz-Bereiche werden jetzt mit echten Daten geprüft.</strong> Sie waren der letzte große Rest der blinden Stelle: Mitgliederliste, Allianzbasis, Allianzforschung, Raid, Musterangriff und Kriege brauchen einen vollständigen Allianz-Datensatz im geteilten Speicher – den hatte keine automatische Prüfung je bereitgestellt. Damit war der komplette Allianz-Anzeigecode noch nie ausgeführt worden.',
       'Der neue Prüflauf richtet eine ausgebaute Test-Allianz ein – drei Mitglieder mit Rollen, gegründete Basis mit Beiträgen, verteilte Forschungspunkte, laufender Raid in der Sammelphase, laufender Musterangriff und ein erklärter Krieg – klickt alle Unterreiter durch und besteht darauf, dass jeder Bereich wirklich Inhalt zeigt.',
@@ -8430,9 +8439,10 @@
   // (z.B. Flugzeiten), nirgends eine echte Distanz. Nutzt die einzigen vorhandenen Koordinaten
   // (gx/gy, sonst nur zur Sortierung der Spiralgalaxie-Anzeige verwendet) als Basis für ein neues
   // "Sektor"-Konzept: SECTOR_UNIT_DISTANCE ist so kalibriert (≈1,5× der medianen Abstand zum
-  // nächsten Nachbarsystem über alle 69 Systeme), dass "1 Sektor" typischerweise eine Handvoll
-  // wirklich benachbarter Systeme einschließt, nicht nur den einen nächsten oder gleich die halbe
-  // Galaxie.
+  // nächsten Nachbarsystem über alle 69 fest eingetragenen Systeme), dass "1 Sektor" typischerweise
+  // eine Handvoll wirklich benachbarter Systeme einschließt, nicht nur den einen nächsten oder gleich
+  // die halbe Galaxie. Die wöchentlich hinzukommenden Systeme (siehe buildWeeklySystem) sind bewusst
+  // mit demselben Nachbarschaftsabstand angesetzt, damit dieser Maßstab weiter stimmt.
   const SECTOR_UNIT_DISTANCE = 65;
   function systemDistance(sysIdA, sysIdB){
     if (sysIdA === sysIdB) return 0;
@@ -9012,6 +9022,209 @@
     { id:'gx313', system:'sysn_ophiar', orbit:6, name:'Glitzergürtel Caelur', type:'kristall', x:380, y:170, duration:374, reward:{kristalle:66, erz:28}, discoveryBonus:{kristalle:63, erz:27}, color:'#b39ef0', colonizeCost:{kristalle:785, erz:337} },
     { id:'gx314', system:'sysn_ophiar', orbit:7, name:'Rimemond Raelerin', type:'eis', x:570, y:170, duration:399, reward:{deuterium:65, erz:35}, discoveryBonus:{deuterium:62, erz:34}, color:'#bfe6f5', colonizeCost:{deuterium:778, erz:419} },
   ];
+
+  // ===========================================================================================
+  // Wöchentlich wachsende Galaxie (v8.299.0, Feature-Wunsch 26.07.2026)
+  // ===========================================================================================
+  // Jede Woche kommen zwei weitere Sternsysteme dazu, jedes mit 5–10 Planeten nach exakt derselben
+  // Planetenrotation wie die Galaxie-Erweiterung v8.44.0: dieselben zehn Orbit-Positionen, dieselben
+  // neun Planetentypen, dieselben Formeln für Erkundungsdauer, Beute, Entdeckungsbonus und
+  // Kolonisierungskosten. Die neuen Systeme sind also inhaltlich nicht von den bestehenden zu
+  // unterscheiden - nur eben nicht von Hand eingetragen.
+  //
+  // WARUM DETERMINISTISCH STATT SERVERSEITIG: Die Galaxie ist geteilter Weltzustand - zwei Spieler
+  // müssen dasselbe sehen, sonst zeigen Angriffe, Allianzbasen und Territorien ins Leere. Alles hier
+  // wird deshalb allein aus dem Wochen-Index abgeleitet (fester Zufallsstartwert je System), ohne
+  // eine einzige Zeile Backend: Jeder Client rechnet unabhängig dieselbe Galaxie aus. Ein einmal
+  // erzeugtes System behält seinen Index und damit für immer denselben Namen, dieselbe Position und
+  // dieselben Planeten - ein kolonisierter Planet kann also nie unter einem weg-generiert werden.
+  //
+  // WOCHENGRENZE IN UTC, nicht wie weekKeyOf() in lokaler Zeit: Sonst sähen Spieler in
+  // unterschiedlichen Zeitzonen für ein paar Stunden verschieden viele Systeme.
+  const WEEKLY_SYSTEMS_PER_WEEK = 2;
+  const WEEKLY_SYSTEM_EPOCH = Date.UTC(2026, 6, 20); // Montag, 20.07.2026, 00:00 UTC
+  const WEEK_MS = 7*24*3600*1000;
+  // Deckel bei 104 Wochen (2 Jahre) = 208 Systeme mit rund 1.560 Planeten. Grund für den Deckel:
+  // PLANETS wird an knapp 50 Stellen linear durchsucht, teils im Sekundentakt des Haupt-Ticks, und
+  // die Galaxie-Übersicht malt jedes System als eigenen Knoten. Wer ihn anhebt, muss vorher die
+  // Kartendichte und die PLANETS.find()-Aufrufe im Renderpfad prüfen.
+  const WEEKLY_SYSTEM_MAX = 208;
+  // Zahl der Systeme, die es ohne die Wochen-Erweiterung gäbe. Erfolge und Kompendium zählen bewusst
+  // gegen diese festen Werte (siehe ACHIEVEMENTS 'allsystems' und COMPENDIUM_CATS): Ein einmal
+  // abgeschlossenes Sammelziel darf nicht jede Woche wieder aufreißen.
+  const BASE_STAR_SYSTEM_COUNT = STAR_SYSTEMS.length;
+  const BASE_PLANET_COUNT = PLANETS.length;
+  const BASE_PLANET_IDS = new Set(PLANETS.map(p=>p.id));
+  // Die fest eingetragenen Systeme. Da nur angehängt wird, sind das immer die ersten N Einträge.
+  function baseStarSystems(){ return STAR_SYSTEMS.slice(0, BASE_STAR_SYSTEM_COUNT); }
+
+  // Anzahl der bis JETZT freigeschalteten Wochen-Systeme. In der Woche der Veröffentlichung sind es
+  // bereits die ersten zwei (Index 0 = Epochenwoche), danach jeden Montag zwei mehr.
+  function weeklySystemCount(now){
+    const wochen = Math.floor(((now||Date.now()) - WEEKLY_SYSTEM_EPOCH) / WEEK_MS);
+    if (wochen < 0) return 0;
+    return Math.min(WEEKLY_SYSTEM_MAX, (wochen+1) * WEEKLY_SYSTEMS_PER_WEEK);
+  }
+  // Zeitpunkt, zu dem die nächsten zwei Systeme erscheinen (0 = Deckel erreicht, es kommt nichts mehr).
+  function nextWeeklySystemTs(now){
+    const jetzt = now||Date.now();
+    if (weeklySystemCount(jetzt) >= WEEKLY_SYSTEM_MAX) return 0;
+    const wochen = Math.floor((jetzt - WEEKLY_SYSTEM_EPOCH) / WEEK_MS);
+    return WEEKLY_SYSTEM_EPOCH + (wochen+1) * WEEK_MS;
+  }
+
+  // Die zehn Orbit-Positionen der Sektorkarte, in genau der Reihenfolge, in der sie die bestehenden
+  // Systeme belegen (nachgezogen aus gx261..gx270). Ein System mit n Planeten nutzt die ersten n.
+  const WEEKLY_ORBIT_POS = [
+    [260,150], [380,55], [470,160], [570,70], [150,170],
+    [380,170], [570,170], [260,55], [470,55], [150,70]
+  ];
+  // Planetentypen mit ihrer Ressourcenmischung. 'faktor' ist der Anteil der Erkundungsdauer, der als
+  // Hauptressource ausgeschüttet wird - abgelesen an den bestehenden Planeten (z.B. Vulkan: 41 Erz
+  // bei 252 s Dauer = 0.163), damit ein neues System exakt so viel abwirft wie ein bestehendes
+  // gleicher Dauer. 'mix' sind die Nebenressourcen als Vielfaches der Hauptressource.
+  const WEEKLY_PLANET_TYPES = [
+    { type:'eis',         faktor:0.163, haupt:'deuterium',   mix:{ erz:0.54 },
+      praefixe:['Frosttundra','Rimemond','Gletscherfeld','Kryosphäre','Eisfeld','Frostmond'] },
+    { type:'kristall',    faktor:0.176, haupt:'kristalle',   mix:{ erz:0.43 },
+      praefixe:['Kristallkern','Kristallgürtel','Prismenfeld','Glitzergürtel','Kristallwelt'] },
+    { type:'gasriese',    faktor:0.125, haupt:'energie',     mix:{ antimaterie:0.5, deuterium:0.5 },
+      praefixe:['Gasriese','Nebel','Sturmwelt','Gaswolke','Wirbelriese'] },
+    { type:'wueste',      faktor:0.164, haupt:'energie',     mix:{ erz:0.54 },
+      praefixe:['Ödland','Dünenwelt','Staubwelt','Sandmeer'] },
+    { type:'wasserwelt',  faktor:0.138, haupt:'deuterium',   mix:{ erz:0.82 },
+      praefixe:['Sturmmeer','Ozeanwelt','Tiefsee','Gezeitenwelt','Regenwelt'] },
+    { type:'vulkan',      faktor:0.163, haupt:'erz',         mix:{ energie:0.54 },
+      praefixe:['Vulkanmond','Feuerwelt','Glutmond','Aschekrater','Magmafeld'] },
+    { type:'asteroid',    faktor:0.175, haupt:'erz',         mix:{ kristalle:0.43 },
+      praefixe:['Felsbrocken','Trümmerfeld','Gesteinsgürtel','Schuttfeld','Asteroid'] },
+    { type:'todeswelt',   faktor:0.111, haupt:'antimaterie', mix:{ kristalle:1.22 },
+      praefixe:['Schattenwelt','Verwüstung','Ruinenwelt','Ödwelt','Aschewelt'] },
+    { type:'erdaehnlich', faktor:0.088, haupt:'antimaterie', mix:{ erz:0.86, deuterium:1 },
+      praefixe:['Kolonie','Grenzwelt','Zufluchtswelt','Verlorene Kolonie'] }
+  ];
+  // Namensbausteine im Stil der bestehenden Galaxie (Stämme und Endungen aus den vorhandenen Namen
+  // abgeleitet, damit sich neue Welten nicht wie ein Fremdkörper lesen).
+  const WEEKLY_NAME_STAMM = ['Kry','Bel','Aer','Ivar','Fyra','Fen','Xen','Grix','Gor','Halo','Ilo','Quen',
+    'Ryn','Bryn','Nor','Drex','Lyr','Nyx','Pyr','Hyx','Jor','Jun','Tyr','Sar','Vex','Ophi','Sel','Cael',
+    'Rael','Tren','Kaz','Uro','Vor','Mira','Prax','Zan','Corv','Wren','Vas','Nira','Obe','Zeph','Drao',
+    'Kel','Mor','Vel','Lun','Tal','Sil','Aur'];
+  const WEEKLY_NAME_ENDUNG = ['esk','ond','ova','ist','ese','is','erin','oz','ion','iel','var','ax','ien',
+    'aeth','yn','yth','iva','on','ur','oara','oth','ar','ash','yx','eth','os','and','ora','yss','ael'];
+  const WEEKLY_SYSTEM_SUFFIX = ['Feld','Sektor','Riff','Void','Weite','Grat','Kluft','Bogen','System',
+    'Schneise','Reichweite','Passage','Ring','Tiefe','Spirale','Schwelle','Kern','Saum','Nebel','Zone','Gürtel'];
+
+  // mulberry32 - kleiner, schneller Zufallsgenerator mit festem Startwert. Bewusst NICHT
+  // hashStringToFloat: der liefert je Zeichenkette genau EINEN Wert, hier werden pro System aber
+  // Dutzende gebraucht (Name, Position, Planetenzahl, je Planet Typ/Name/Dauer).
+  function weeklyRng(seed){
+    let t = seed >>> 0;
+    return function(){
+      t = (t + 0x6D2B79F5) >>> 0;
+      let x = Math.imul(t ^ (t >>> 15), 1 | t);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // Mittelpunkt und Außenradius der fest eingetragenen Galaxie - Grundlage dafür, die neuen Systeme
+  // als wachsenden Ring AUSSEN anzusetzen statt zwischen die bestehenden zu streuen. gx/gy steuern
+  // die echte Entfernung (systemDistance, Abhorchposten-Reichweite) und die Reihenfolge auf der
+  // Spiralkarte; die Bildschirmposition selbst rechnet galaxySpiralLayout ohnehin neu.
+  const WEEKLY_RING = (function(){
+    let sx = 0, sy = 0;
+    for (const s of STAR_SYSTEMS){ sx += s.gx; sy += s.gy; }
+    const cx = sx/STAR_SYSTEMS.length, cy = sy/STAR_SYSTEMS.length;
+    let rMax = 0;
+    for (const s of STAR_SYSTEMS) rMax = Math.max(rMax, Math.hypot(s.gx-cx, s.gy-cy));
+    return { cx, cy, r0: rMax + 45 };
+  })();
+
+  // Erzeugt System Nummer i (0-basiert) samt Planeten. Rein aus i abgeleitet - kein Datum, kein
+  // Math.random(), kein Spielstand. 'benutzt' verhindert doppelte Anzeigenamen (die IDs sind über den
+  // Index ohnehin eindeutig).
+  function buildWeeklySystem(i, benutzt){
+    const rnd = weeklyRng(0x5EED0000 + i*2654435761);
+    const eindeutig = (bau) => { let n = bau(); for (let v=0; v<40 && benutzt.has(n); v++) n = bau(); benutzt.add(n); return n; };
+    const wort = () => WEEKLY_NAME_STAMM[Math.floor(rnd()*WEEKLY_NAME_STAMM.length)]
+                     + WEEKLY_NAME_ENDUNG[Math.floor(rnd()*WEEKLY_NAME_ENDUNG.length)];
+    const sysName = eindeutig(() => wort()+'-'+WEEKLY_SYSTEM_SUFFIX[Math.floor(rnd()*WEEKLY_SYSTEM_SUFFIX.length)]);
+    // Goldener Winkel auf einem Ring, dessen Fläche linear mit der Systemzahl wächst - dadurch bleibt
+    // der Abstand zwischen benachbarten neuen Systemen konstant bei rund 47 Einheiten (so dicht wie
+    // die bestehende Galaxie, siehe SECTOR_UNIT_DISTANCE) und die Galaxie wuchert nicht ins Endlose.
+    const winkel = i * 2.39996323;
+    const radius = Math.sqrt(WEEKLY_RING.r0*WEEKLY_RING.r0 + (i+1)*700);
+    const sys = {
+      id: 'sysw_'+i,
+      name: sysName,
+      gx: Math.round((WEEKLY_RING.cx + Math.cos(winkel)*radius)*10)/10,
+      gy: Math.round((WEEKLY_RING.cy + Math.sin(winkel)*radius)*10)/10,
+      weekly: true
+    };
+    const anzahl = 5 + Math.floor(rnd()*6); // 5..10 Planeten, wie in der bestehenden Erweiterung
+    const basisDauer = 300 + Math.floor(rnd()*1000); // 300..1300 s für den ersten Orbit
+    const schritt = Math.max(12, Math.round(basisDauer/20));
+    const planeten = [];
+    for (let o=0; o<anzahl; o++){
+      const td = WEEKLY_PLANET_TYPES[Math.floor(rnd()*WEEKLY_PLANET_TYPES.length)];
+      const pos = WEEKLY_ORBIT_POS[o];
+      const dauer = basisDauer + o*schritt;
+      const haupt = Math.max(1, Math.round(dauer * td.faktor));
+      const reward = { [td.haupt]: haupt };
+      for (const r in td.mix) reward[r] = Math.max(1, Math.round(haupt * td.mix[r]));
+      const discoveryBonus = {}, colonizeCost = {};
+      for (const r in reward){ discoveryBonus[r] = Math.max(1, Math.round(reward[r]*0.96)); colonizeCost[r] = reward[r]*12; }
+      const praefix = td.praefixe[Math.floor(rnd()*td.praefixe.length)];
+      planeten.push({
+        id: 'gw'+i+'_'+(o+1),
+        system: sys.id,
+        orbit: o+1,
+        name: eindeutig(() => praefix+' '+wort()),
+        type: td.type,
+        x: pos[0], y: pos[1],
+        duration: dauer,
+        reward, discoveryBonus, colonizeCost,
+        color: (PLANET_TYPE_INFO[td.type]||{}).color || '#9b9890',
+        weekly: true
+      });
+    }
+    return { sys, planeten };
+  }
+
+  // Hängt alle bis jetzt fälligen Wochen-Systeme an STAR_SYSTEMS und PLANETS an. Wird einmal beim
+  // Laden ausgeführt und danach bei jedem Wochenwechsel im Haupt-Tick nachgezogen (siehe
+  // syncWeeklySystems). Nur ANHÄNGEN, nie entfernen - alles Bestehende bleibt unangetastet.
+  let weeklySystemsBuilt = 0;
+  function extendWeeklySystems(now){
+    const soll = weeklySystemCount(now);
+    if (soll <= weeklySystemsBuilt) return 0;
+    const benutzt = new Set();
+    for (const s of STAR_SYSTEMS) benutzt.add(s.name);
+    for (const p of PLANETS) benutzt.add(p.name);
+    const vorher = weeklySystemsBuilt;
+    for (let i = weeklySystemsBuilt; i < soll; i++){
+      const { sys, planeten } = buildWeeklySystem(i, benutzt);
+      STAR_SYSTEMS.push(sys);
+      for (const p of planeten) PLANETS.push(p);
+    }
+    weeklySystemsBuilt = soll;
+    return soll - vorher;
+  }
+  extendWeeklySystems(Date.now());
+
+  // Wochenwechsel im laufenden Spiel: Wer den Tab über Montag 00:00 UTC hinweg offen lässt, bekommt
+  // die neuen Systeme sofort, ohne neu zu laden. Und er erfährt davon - zwei neue Systeme nützen
+  // nichts, wenn sie unbemerkt am Rand der Karte auftauchen.
+  function syncWeeklySystems(){
+    extendWeeklySystems(Date.now());
+    const gesehen = state.weeklySystemsSeen;
+    if (typeof gesehen !== 'number'){ state.weeklySystemsSeen = weeklySystemsBuilt; return false; }
+    if (weeklySystemsBuilt <= gesehen) return false;
+    const dazu = weeklySystemsBuilt - gesehen;
+    const namen = STAR_SYSTEMS.slice(STAR_SYSTEMS.length - dazu).map(s => s.name).join(', ');
+    state.weeklySystemsSeen = weeklySystemsBuilt;
+    log('Die Fernaufklärung hat '+(dazu === 1 ? 'ein neues Sternsystem' : dazu+' neue Sternsysteme')+' kartiert: '+namen+'. Auf der Galaxie-Karte wartet unerkundetes Gebiet.', 'ti-star', 'ok');
+    return true;
+  }
 
   // Kosten am 13.07.2026 grundlegend neu kalibriert (Faktor ×40 Tier-1, ×50 Tier-2 gegenüber den
   // ursprünglichen Werten) - die alten Kosten (5.000-18.000, einmalig, auf die ganze Allianz gepoolt)
@@ -10579,10 +10792,14 @@
   // überlebt Prestige UND Aufstieg (siehe keepCompendium dort) - sonst ließe sich die Belohnung nach
   // jedem Reset (der discovered/Bosse zurücksetzt) erneut kassieren.
   const COMPENDIUM_CATS = [
-    { key:'planets', name:'Sternenkarte', icon:'ti-map-2', reward:{ essence:3, credits:600 }, desc:'Entdeckte Planeten',
-      have:()=>Object.keys(state.discovered||{}).filter(k=>(state.discovered||{})[k]).length, total:()=>PLANETS.length },
-    { key:'systems', name:'Sternensysteme', icon:'ti-star', reward:{ essence:3, credits:600 }, desc:'Bereiste Systeme (mind. 1 Planet entdeckt)',
-      have:()=>STAR_SYSTEMS.filter(s=>PLANETS.some(p=>p.system===s.id && (state.discovered||{})[p.id])).length, total:()=>STAR_SYSTEMS.length },
+    // Beide Kategorien zählen ausdrücklich nur die fest eingetragene Kern-Galaxie (BASE_*), nicht die
+    // wöchentlich hinzukommenden Systeme - eine einmal abgeschlossene Kompendium-Kategorie soll nicht
+    // jeden Montag wieder aufreißen. Wochen-Planeten bleiben natürlich erkundbar, sie zählen hier nur
+    // nicht mit.
+    { key:'planets', name:'Sternenkarte', icon:'ti-map-2', reward:{ essence:3, credits:600 }, desc:'Entdeckte Planeten der Kern-Galaxie',
+      have:()=>Object.keys(state.discovered||{}).filter(k=>(state.discovered||{})[k] && BASE_PLANET_IDS.has(k)).length, total:()=>BASE_PLANET_COUNT },
+    { key:'systems', name:'Sternensysteme', icon:'ti-star', reward:{ essence:3, credits:600 }, desc:'Bereiste Kernsysteme (mind. 1 Planet entdeckt)',
+      have:()=>baseStarSystems().filter(s=>PLANETS.some(p=>p.system===s.id && (state.discovered||{})[p.id])).length, total:()=>BASE_STAR_SYSTEM_COUNT },
     { key:'bosses', name:'Trophäensaal', icon:'ti-skull', reward:{ essence:4, credits:800 }, desc:'Besiegte Sektor-Bosse',
       have:()=>['boss1','boss2','boss3'].filter(id=>((state.npcScaling&&state.npcScaling[id])||0)>=1).length, total:()=>3 },
     { key:'factions', name:'Fraktionsarchiv', icon:'ti-users', reward:{ essence:3, credits:500 }, desc:'Kennengelernte Fraktionen (Ruf ≠ 0)',
@@ -12470,7 +12687,9 @@
   const ACHIEVEMENTS = [
     { key:'firstbuild', name:'Erster Spatenstich', desc:'Baue dein erstes Gebäude aus.', check: s => allBuildingSets().some(b => Object.values(b).some(v=>v>0)), progress: s => [allBuildingSets().some(b => Object.values(b).some(v=>v>0))?1:0, 1] },
     { key:'firstcolony', name:'Neue Heimat', desc:'Kolonisiere deinen ersten Planeten.', check: s => Object.keys(s.colonies||{}).length >= 1, progress: s => [Math.min(1,Object.keys(s.colonies||{}).length), 1] },
-    { key:'allsystems', name:'Grenzgänger', desc:'Entdecke mindestens einen Planeten in jedem System.', check: s => STAR_SYSTEMS.every(sys => PLANETS.filter(p=>p.system===sys.id).some(p=>s.discovered[p.id])), progress: s => [STAR_SYSTEMS.filter(sys => PLANETS.filter(p=>p.system===sys.id).some(p=>s.discovered[p.id])).length, STAR_SYSTEMS.length] },
+    // Zählt bewusst nur die fest eingetragenen Systeme (baseStarSystems), nicht die wöchentlich
+    // hinzukommenden - sonst wäre der Erfolg jeden Montag wieder aberkannt und nie abschließbar.
+    { key:'allsystems', name:'Grenzgänger', desc:'Entdecke mindestens einen Planeten in jedem Kernsystem der Galaxie.', check: s => baseStarSystems().every(sys => PLANETS.filter(p=>p.system===sys.id).some(p=>s.discovered[p.id])), progress: s => [baseStarSystems().filter(sys => PLANETS.filter(p=>p.system===sys.id).some(p=>s.discovered[p.id])).length, BASE_STAR_SYSTEM_COUNT] },
     { key:'tenkills', name:'Gefürchtet', desc:'Besiege 10 NPC-Gegner.', check: s => (s.npcKills||0) >= 10, progress: s => [Math.min(10,s.npcKills||0), 10] },
     { key:'bossdown', name:'Wächter-Bezwinger', desc:'Besiege den Wächter von Kepler.', check: s => (s.bossKills||0) >= 1, progress: s => [Math.min(1,s.bossKills||0), 1] },
     { key:'abyssdown', name:'Abyss-Bezwinger', desc:'Besiege den Abyss-Fürst.', check: s => ((s.npcScaling && s.npcScaling.boss2) || 0) >= 1, progress: s => [Math.min(1,(s.npcScaling && s.npcScaling.boss2)||0), 1] },
@@ -12720,6 +12939,11 @@
     scoreLog: [], npcScaling: {}, spyIntel: {}, doctrine: null, activeEvent: null, lastEventTime: 0, planetSpecialization: {}, orbitalStations: {}, planetEvents: {}, nextPlanetEventCheck: 0, pirateLairStage: 1, pirateLairPrestige: 0, weeklyLeague: { weekKey:null, startScore:0, lastResult:null, boardSnapshot:[] }, veteranXp: {}, dayStats: null, dailyHistory: [], notifiedPactOffers: [], claimedBossKills: [], lastSeenChatTime: 0, researchMilestones: {}, ascension: { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0 } }, warVictories: 0, scoreHistory: [], lastScoreSnapshot: 0, tutorialSeen: false, seenTabHints: {}, referralNudgeShown: false, expeditionsCompleted: 0, themeKey: 'standard', shipSkin: 'standard',
     favoritePlanets: {}, lastLoginDate: null, loginStreak: 0, streakShields: 0, claimedStreakMilestones: [], comebackQuest: null, happyHoursUsed: 0, autoRepairOn: false, prestigePerks: [], skillTree: {}, dailyQuests: null, allianceIsTopRank: false, colonyNames: {}, colonyNotes: {}, megaProjects: {}, exoticResearch: {}, veteranTraining: {}, pendingRoleChange: {}, lastNameChangeAt: null, debrisFieldTrackers: {}, fleetTemplates: [], limitOrders: [],
     autoWatchLiveRaid: true, battleStats: { wins: 0, losses: 0 }, combatStance: 'ausgewogen',
+    // Wie viele der wöchentlich hinzukommenden Sternsysteme der Spieler schon gemeldet bekommen hat.
+    // Vorbelegt mit dem aktuellen Stand, damit weder ein frisch angelegtes Konto noch ein
+    // Bestandsspielstand beim ersten Start eine Sammelmeldung über alle bisherigen Systeme bekommt -
+    // gemeldet wird nur, was ab jetzt dazukommt.
+    weeklySystemsSeen: weeklySystemCount(),
     buildings: { solar: 0, mine: 0, raffinerie: 0, synth: 0, fusionsreaktor: 0, habitat: 0, lager: 0, turm: 0, schild: 0, laser: 0, plasma: 0, raketen: 0, gauss: 0, labor: 0, festung: 0 },
     research: {},
     activeResearch: null,
@@ -21060,7 +21284,8 @@
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (Deckel bei 6 Sektoren). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
       { title:'Mondzerstörer & Mondbelagerung', body:'Endgame-Schiff (Flotte-Tab), das einen fremden, kolonisierten Mond dauerhaft zerstören kann. Voraussetzung: Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die höchste Forschungshürde im Spiel), danach ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Extrem teuer, extrem langsam (weit unter der Geschwindigkeit jedes anderen Schiffs, entsprechend lange Flugzeit und hoher Treibstoffverbrauch) und immer nur als einzelnes Exemplar besitzbar. Ein Ziel wählst du direkt über die Bestenliste (Schädel-Symbol bei einem fremden Spieler) - dort erscheinen dessen kolonisierte Monde zur Auswahl. Die Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes: eigene Gebäude/Flotte am Mond, der neue Mondschildgenerator (Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken sie zusätzlich; ein aktiver Allianz-Beitritt gibt dem Ziel ebenfalls einen kleinen Bonus. Nach jeder Belagerung - egal ob erfolgreich oder abgewehrt - braucht der Mondzerstörer 48 Std. Abklingzeit. Jeder Belagerungsschuss verbraucht zusätzlich eine <strong>Belagerungs-Ladung aus 25 Hochenergiekristallen</strong> (Tier-2-Ressource aus dem Kristalllabor) - sie wird bei der Ankunft serverseitig abgebucht; ohne ausreichende Ladung schlägt die Belagerung fehl. Erfolgschance und Ergebnis werden serverseitig berechnet.' },
-      { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert. Die Galaxie-Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen ~67 Systemen gleichzeitig - der ⟲-Button zoomt bei Bedarf auf die volle Übersicht heraus. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne, sobald man in das System hineinzoomt.' },
+      { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert. Die Galaxie-Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen Systemen gleichzeitig - der ⟲-Button zoomt bei Bedarf auf die volle Übersicht heraus. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne, sobald man in das System hineinzoomt.' },
+      { title:'Die Galaxie wächst jede Woche', body:'Die Sternenkarte ist nicht fertig: Jeden <strong>Montag um 00:00 Uhr UTC</strong> kommen automatisch <strong>zwei weitere Sternsysteme</strong> am Außenrand der Galaxie dazu, jedes mit <strong>5 bis 10 Planeten</strong> nach denselben Regeln wie die bereits vorhandenen - eigene Namen, eigene Planetentypen, eigene Erkundungsdauern, Beute und Kolonisierungskosten in derselben Größenordnung wie die bestehenden Außensysteme. Es ist also dauerhaft neues Gebiet zu erkunden und zu besiedeln, ohne dass sich an irgendeinem bestehenden Planeten etwas ändert. Die Zeile unter der Galaxie-Übersicht zeigt, wie viele Systeme aktuell kartiert sind und wann die nächsten zwei erscheinen; sobald sie da sind, meldet das Log die neuen Namen. Alle Spieler sehen dieselben neuen Systeme zur selben Zeit - die Karte wird aus dem Kalender berechnet, nicht ausgewürfelt. <strong>Wichtig für Sammler:</strong> Erfolg „Grenzgänger" und die Kompendium-Kategorien „Sternenkarte"/„Sternensysteme" zählen ausdrücklich nur die fest eingetragene Kern-Galaxie - ein einmal abgeschlossenes Sammelziel reißt durch die wöchentlichen Neuzugänge also nicht wieder auf.' },
       { title:'Terraforming', body:'Jede Kolonie UND die Heimatbasis (nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Die Zielwahl selbst ist auf JEDEM Standort jederzeit möglich, auch während anderswo bereits eine Stufe läuft - nur das tatsächliche Bezahlen/Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt, so lässt sich für mehrere Standorte vorausplanen. Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie). Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen und der Standort trägt den neuen Typ dauerhaft. Bei Kolonien UND der Heimatbasis ändert sich dabei sofort die Textur auf der Sektorkarte; die Heimatbasis behält zusätzlich ihren eigenen violetten Ring als Kennzeichnung, zeigt aber während des laufenden Terraformings denselben gestrichelten Fortschritts-Ring wie Kolonien. Insgesamt deutlich teurer als früher. Erdwelt (Bonus auf ALLE Ressourcen statt nur einer) kostet zusätzlich 80% mehr als jeder Spezialist - eine reine Fokus-Kolonie profitiert trotzdem meist mehr vom passenden Spezialisten. Zu finden im Basis-Tab. Ab Forschung <strong>Hochenergiephysik</strong> lässt sich eine laufende (und bereits voll bezahlte) Stufe optional per <strong>Energieschub</strong> beschleunigen: je Schub -10% der Stufendauer für 6 Hochenergiekristalle x Zielstufe, maximal 3 Schübe je Stufe (Deckel -30%). Rein optionaler Zeit-Abkauf - die regulären Kosten und Dauern ändern sich dadurch nicht.' },
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie, <strong>Wasserwelt</strong> +20% Lagerkapazität. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Generalist: +6% auf ALLE Ressourcen (kumuliert 30%), kostet aber 80% mehr als jeder Spezialist. Erdähnliche Welten, Gasriesen, Asteroiden und Superplaneten haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
@@ -31104,6 +31329,27 @@
       }
       metaEl.textContent = metaText;
     }
+    // Zeile unter der Galaxie-Übersicht: aktueller Umfang der Galaxie plus der Countdown bis zur
+    // nächsten Erweiterung. Ohne sie wären die wöchentlich hinzukommenden Systeme etwas, das man nur
+    // zufällig bemerkt - mit ihr ist es ein sichtbarer Termin.
+    const growthEl = document.getElementById('galaxyGrowthLine');
+    if (growthEl){
+      const naechste = nextWeeklySystemTs();
+      // visSys, nicht STAR_SYSTEMS.length: die beiden versteckten Systeme (zenith/tiefsee) tauchen
+      // erst nach ihrer Entdeckung auf der Karte auf. Mit der Rohzahl stünde hier „71 kartiert",
+      // während die Karte 69 Knoten zeigt und die Navigation darunter „System 1/69" schreibt.
+      let txt = visSys.length+' Sternsysteme kartiert';
+      if (naechste){
+        // Eigene Formatierung statt fmtDuration: das schreibt bei einer knappen Woche „167h 23m",
+        // was hier niemand lesen will.
+        const restSek = Math.max(0, Math.round((naechste - Date.now())/1000));
+        const tage = Math.floor(restSek/86400), stunden = Math.floor((restSek%86400)/3600);
+        txt += ' · '+WEEKLY_SYSTEMS_PER_WEEK+' neue in '+(tage > 0 ? tage+'d '+stunden+'h' : fmtDuration(restSek));
+      } else {
+        txt += ' · die Galaxie ist vollständig vermessen';
+      }
+      growthEl.textContent = txt;
+    }
     const prevBtn = document.getElementById('systemPrevBtn');
     if (prevBtn) prevBtn.onclick = () => switchToSystem(visSys[(idx-1+visSys.length)%visSys.length].id);
     const nextBtn = document.getElementById('systemNextBtn');
@@ -38171,6 +38417,7 @@
     processVeteranTrainingJob();
     processTradeRoutes();
     const rufVerfallen = processReputationDecay();
+    const neueSysteme = syncWeeklySystems();
     accruePactUptime();
     processConqueredSystems();
     maybeSpawnPlanetEvent();
@@ -38189,7 +38436,7 @@
     // Leiste schon gesetzt oder der Hinweis weggeklickt, steigt maybeShowTabHint sofort wieder aus.
     if (tabVisible) maybeShowTabHint(activeTab);
     if (tabVisible) render();
-    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored || rufVerfallen) save();
+    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored || rufVerfallen || neueSysteme) save();
   }, 1000);
   // Nachhol-Render beim Zurückkehren in den Tab (Gegenstück zum tabVisible-Gate im Haupt-Tick):
   // der erste sichtbare Frame zeigt sofort den aktuellen Stand statt bis zu 1s alte Werte.

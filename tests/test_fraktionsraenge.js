@@ -218,7 +218,10 @@ for (const [wo, name] of [
 }
 // Der Verfall muss im Haupt-Tick haengen, sonst laeuft er nie.
 check('7: der Verfall hängt im Haupt-Tick', /const rufVerfallen = processReputationDecay\(\);/.test(src));
-check('7: ein Verfall löst ein Speichern aus', /\|\| rufVerfallen\) save\(\);/.test(src));
+// Bewusst ohne die schliessende Klammer festgezurrt: an dieser Bedingung haengen inzwischen mehrere
+// Ereignisse (zuletzt die woechentlich neuen Sternsysteme), und ein weiterer Eintrag dahinter ist
+// kein Grund, diesen Test rot zu faerben - entscheidend ist, dass rufVerfallen ein Speichern ausloest.
+check('7: ein Verfall löst ein Speichern aus', /\|\| rufVerfallen[^)]*\) save\(\);/.test(src));
 
 // ---------------------------------------------------------------- 8: Rang-Vergünstigungen
 // Tribut-Aufschlag: je tiefer der Rang, desto teurer der Weg zurueck.
