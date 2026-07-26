@@ -4259,8 +4259,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.17';
+  const VERSION = '8.298.18';
   const PATCHNOTES = [
+    { version:'8.298.18', date:'26.07.2026', changes:[
+      'Fehler behoben (Spieler-Report): <strong>Sieben Schiffstypen konnten überhaupt nicht auf Expedition</strong> – Wächter, Hyperjäger, Hyperbomber sowie die vier Tier-2-/Apex-Rümpfe Nanoklinge, Quantenkreuzer, Fusionsdreadnought und Singularitäts-Vernichter. Sie tauchten in der Eskorte-Auswahl gar nicht erst auf, obwohl sie in jedem anderen Kampf mitfliegen und ihre Angriffskraft überall sonst mitzählt.',
+      'Am deutlichsten fiel es beim Schnellstart auf: „Alle starten" verspricht, die <em>gesamte</em> verfügbare Eskorte aufzuteilen – ließ aber genau diese sieben Typen zuhause. Dasselbe galt für „Ganze Flotte als Eskorte".',
+      'Ursache war eine zweite, von Hand gepflegte Schiffsliste, die beim Einfügen neuer Schiffe nicht mitgezogen wurde. Sie leitet sich jetzt direkt aus der Angriffs-Schiffsliste ab: Was angreifen darf, darf auch eskortieren. Ein neuer Test hält beide Listen zusammen und schlägt an, sobald ein Schiff nur in einer der beiden steht.',
+      'Bewusst weiterhin nicht dabei: der <strong>Mondzerstörer</strong> (eigener Belagerungspfad) und der <strong>Metamaterial-Titan</strong> (reines Verteidigungsschiff) – beide sind auch bei normalen Angriffen nicht wählbar.',
+      'Nebeneffekt: Der Fusionsdreadnought senkt mit seiner Fähigkeit „Fusionsantrieb-Effizienz" jetzt auch den Treibstoffverbrauch von Expeditionen, wenn er mitfliegt.'
+    ]},
     { version:'8.298.17', date:'26.07.2026', changes:[
       'Neuer Abschnitt <strong>„Boni-Bilanz"</strong> im Fortschritt-Tab. Boni derselben Art werden im Spiel zusammengezählt, und ein Teil dieser Summen hat eine Obergrenze – bisher stand die verstreut in einzelnen Beschreibungen und an mehreren Stellen gar nicht. Die Bilanz zeigt jetzt für jede der 15 Bonus-Gruppen: was du gesammelt hast, was davon ankommt, wo die Grenze liegt und wie viel Luft noch bleibt.',
       'Steht eine Gruppe an ihrer Grenze, sagt die Bilanz auch, wie viele Prozentpunkte gerade wirkungslos verpuffen – statt dass ein zusätzliches Modul einfach nichts tut und man rätselt, warum.',
@@ -12191,7 +12198,23 @@
     return Math.min(RETTUNGSKAPSEL_DECKEL, RETTUNGSKAPSEL_BASIS + (state.research.rexpedition||0)*RETTUNGSKAPSEL_PRO_STUFE);
   }
   function rettungskapselGreift(){ return Math.random() < rettungskapselChance(); }
-  const EXPEDITION_SHIP_KEYS = ['forscher','spaeher','jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','kometenjaeger','enterschiff','phantomschiff','riftwaechter','frachter','frachtergross'];
+  // Bugfix (26.07.2026, Spieler-Report "beim Losschicken aller Expeditionen werden nur die
+  // ursprünglichen Schiffe eingerechnet, die ganzen Tier-2-Schiffe fehlen"): Die Liste war von Hand
+  // geführt und hinkte ATTACK_SHIP_KEYS um SIEBEN Schiffe hinterher - Wächter, Hyperjäger,
+  // Hyperbomber und die vier Tier-2-/Apex-Rümpfe (Nanoklinge, Quantenkreuzer, Fusionsdreadnought,
+  // Singularitäts-Vernichter). Die konnten also überhaupt nicht auf Expedition, obwohl sie in jedem
+  // anderen Kampf mitfliegen und attackPowerRaw() ihre Angriffskraft längst mitzählt. Am
+  // deutlichsten fiel es beim Schnellstart auf, der ausdrücklich die "GESAMTE verfügbare Eskorte"
+  // verspricht (sendMaxExpeditions) - der ließ genau diese sieben Typen zuhause.
+  //
+  // Jetzt ABGELEITET statt gepflegt: Was angreifen darf, darf auch eskortieren. Genau diese zweite
+  // Liste war der wiederkehrende Projektfehler (CLAUDE.md) - beim Einfügen neuer Schiffe wurde
+  // ATTACK_SHIP_KEYS gepflegt und EXPEDITION_SHIP_KEYS vergessen. Bewusst NICHT dabei bleiben damit
+  // auch hier draußen: Mondzerstörer (eigener, serverseitig gehärteter Belagerungspfad) und
+  // Metamaterial-Titan (reines Verteidigungsschiff) - beide fehlen schon in ATTACK_SHIP_KEYS.
+  // Vorne dazu die zwei Nicht-Kampfschiffe, die eine Expedition braucht: das Forschungsschiff
+  // (Pflicht) und das Spähschiff (bessere Fundqualität, siehe spaeherLuck).
+  const EXPEDITION_SHIP_KEYS = ['forscher','spaeher'].concat(ATTACK_SHIP_KEYS);
   const ESCORT_KEYS = EXPEDITION_SHIP_KEYS.filter(k=>k!=='forscher');
   let expeditionEscortSelection = {};
   function getEscortSelection(planetKey, cf){
