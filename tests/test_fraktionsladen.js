@@ -38,16 +38,18 @@ function baue(opts){
     factionShopPurchases: 0
   };
   const meldungen = [];
-  const protokoll = { signale: 0 };
+  const protokoll = { signale: 0, kontakt: [] };
   new Function('ctx', 'state', 'log', 'fmt', 'playSound', 'checkAchievements', 'render', 'save',
-    'factionEffectLevel', 'factionNameOf', 'maybeSpawnSignal', 'moduleInstanceInfo',
+    'factionEffectLevel', 'factionNameOf', 'maybeSpawnSignal', 'moduleInstanceInfo', 'touchFactionContact',
     block + ';ctx.SHOPS=FACTION_SHOPS;ctx.FAVOR=FAVOR_PER_TIER;ctx.WAR=FAVOR_WAR_SUPPORT;' +
     'ctx.favorOf=factionFavorOf;ctx.add=addFactionFavor;ctx.buy=buyFactionShopItem;ctx.item=factionShopItem;ctx.gibModul=gibModul;'
   )(ctx, state, (t)=>meldungen.push(t), (n)=>String(n), ()=>{}, ()=>{}, ()=>{}, ()=>{},
     (fid) => (opts.stufe || {})[fid] !== undefined ? opts.stufe[fid] : (opts.stufeAlle !== undefined ? opts.stufeAlle : 2),
     (fid) => fid,
     () => { if (opts.signalVoll) return null; protokoll.signale++; return { typ:{name:'Materialpeilung'}, sys:{name:'Testsystem'} }; },
-    (k) => ({ rar:{label:k.split(':')[1]}, def:{name:k.split(':')[0]} }));
+    (k) => ({ rar:{label:k.split(':')[1]}, def:{name:k.split(':')[0]} }),
+    // Kontaktuhr des Ruf-Verfalls (v8.298.23) - hier nur aufgezeichnet, gemessen in test_fraktionsraenge.js.
+    (fid) => protokoll.kontakt.push(fid));
   return { ctx, state, meldungen, protokoll };
 }
 
@@ -152,8 +154,11 @@ check('6: Marken werden nie negativ',
 check('7: die Stufen geben unterschiedlich viele Marken',
   u.ctx.FAVOR.bronze < u.ctx.FAVOR.silber && u.ctx.FAVOR.silber < u.ctx.FAVOR.gold, u.ctx.FAVOR);
 check('7: eine Parteinahme im Krieg lohnt sich in Marken', u.ctx.WAR >= u.ctx.FAVOR.silber, u.ctx.WAR);
+// Seit v8.298.23 kommt ab Rang "Geachtet" eine Marke oben drauf (rangBonus) - die Stufen-Grundmenge
+// muss aber weiterhin genau aus FAVOR_PER_TIER kommen. Der Rangbonus selbst wird in
+// test_fraktionsraenge.js gemessen.
 check('7: Aufträge schreiben die Marken gut',
-  /const marken = FAVOR_PER_TIER\[q\.tier\] \|\| 1;\n    addFactionFavor\(fid, marken\);/.test(src));
+  /const marken = \(FAVOR_PER_TIER\[q\.tier\] \|\| 1\) \+ rangBonus;\n    addFactionFavor\(fid, marken\);/.test(src));
 check('7: und die Abschluss-Meldung nennt sie',
   /'\+'\+marken\+' Gunstmarke'\+\(marken===1\?'':'n'\)/.test(src));
 check('7: die Parteinahme ebenfalls',

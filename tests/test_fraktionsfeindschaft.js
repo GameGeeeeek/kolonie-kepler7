@@ -20,7 +20,9 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 
 // ---------------------------------------------------------------- Block ausführbar machen
-const von = src.indexOf('  function repTierOf(rep){');
+// Seit v8.298.23 ist repTierOf tabellengetrieben (REP_RANKS, acht Raenge) - der Block muss
+// deshalb bei der Tabelle beginnen, nicht erst bei der Funktion.
+const von = src.indexOf('  const REP_RANKS = [');
 const bis = src.indexOf('const PUNITIVE_DEBRIS_PER_LEVEL', von);
 const endeBlock = src.indexOf('\n  }\n', src.indexOf('function punitiveDebrisMult', bis)) + 4;
 check('Feindschafts-Block gefunden', von > 0 && bis > von && endeBlock > bis);
@@ -45,7 +47,11 @@ const u = baue();
 // ---------------------------------------------------------------- 1) Stufen
 check('1: bei -70 und darunter gilt Verfeindet', u.ctx.tier(-70).key === 'verfeindet' && u.ctx.tier(-100).key === 'verfeindet');
 check('1: zwischen -69 und -30 gilt Feindlich', u.ctx.tier(-69).key === 'feindlich' && u.ctx.tier(-30).key === 'feindlich');
-check('1: darüber bleibt es neutral', u.ctx.tier(-29).key === 'neutral' && u.ctx.tier(0).key === 'neutral');
+// Seit v8.298.23 heisst der Bereich -29..-10 "Misstrauisch" (Rang 3 von 8). Gepruefte Groesse
+// bleibt dieselbe: oberhalb von -30 gibt es KEINEN Feindschafts-Malus mehr.
+check('1: oberhalb von -30 endet die Feindschaft', u.ctx.hos('kartell') === 0 && baue({ kartell:-29 }).ctx.hos('kartell') === 0);
+check('1: -29 ist Misstrauisch, 0 ist Neutral', u.ctx.tier(-29).key === 'misstrauisch' && u.ctx.tier(0).key === 'neutral',
+  [u.ctx.tier(-29).key, u.ctx.tier(0).key]);
 check('1: die Freundschaftsseite ist unverändert',
   u.ctx.tier(30).key === 'freundlich' && u.ctx.tier(70).key === 'verbuendet' && u.ctx.tier(100).key === 'verbuendet');
 check('1: die Feindschaftsstufe ist 0/1/2',
@@ -143,8 +149,10 @@ check('6: der Kartell-Marktrabatt bekommt KEINEN Feindschafts-Aufschlag',
 check('6: Fraktions-Systemangriffe werden nicht clientseitig erschwert',
   rumpf('attackFactionSystem').length > 50 && !/[Hh]ostil/.test(rumpf('attackFactionSystem')),
   rumpf('attackFactionSystem').length);
+// Die Rufleiter ist seit v8.298.23 eine Tabelle statt einer if-Kette - die beiden vom Backend
+// gespiegelten Schwellen muessen aber unveraendert dort liegen.
 check('6: die Freundschafts-Schwellen 30/70 sind unverändert',
-  /if \(rep >= 70\) return \{ key:'verbuendet'/.test(src) && /if \(rep >= 30\) return \{ key:'freundlich'/.test(src));
+  /\{ key:'verbuendet',\s+min:70,/.test(src) && /\{ key:'freundlich',\s+min:30,/.test(src));
 
 // ---------------------------------------------------------------- 7) Verdrahtung
 check('7: der Handelsrouten-Malus hängt an routeYieldMult',

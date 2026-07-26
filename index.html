@@ -4259,8 +4259,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.22';
+  const VERSION = '8.298.23';
   const PATCHNOTES = [
+    { version:'8.298.23', date:'26.07.2026', changes:[
+      '<strong>Acht Ränge statt fünf Stufen – und jede Fraktion hat eigene Namen dafür.</strong> Bisher deckten drei der fünf Stufen je 40 bis 60 Rufpunkte ab: zwischen Ruf 0 und 29 änderte sich 29 Punkte lang gar nichts, weder in der Anzeige noch mechanisch. Jetzt steigst du beim <strong>Aschen-Kartell</strong> vom Geächteten Schuldner über Stammkunde und Konzessionär zum <em>Syndikatspartner</em>, bei der <strong>Eisenlegion</strong> vom Kriegsverbrecher zum <em>Schwertträger</em>, bei den <strong>Void-Marodeuren</strong> vom Anathema zur <em>Stimme im Riss</em>, beim <strong>Schattenbund</strong> vom Enttarnten zum <em>Teil des Netzes</em>. Die Fraktionskarte zeigt Rang, Wirkung und den Weg zum nächsten.',
+      '<strong>Jeder Rang tut etwas</strong> – kein Rang ist ein bloßes Etikett. Rang 3 (Misstrauisch): Tribut kostet die Hälfte mehr. Rang 5 (Bekannt): Aufträge dieser Fraktion laufen 36 statt 24 Stunden. Rang 6 (Freundlich): Fraktionseffekt und Laden wie bisher. Rang 7 (Geachtet): <strong>+1 Gunstmarke auf jeden Auftrag</strong>. Rang 8 (Verbündet): stärkster Effekt, Spitzenposten – und <strong>doppelt so oft Gold-Aufträge</strong>.',
+      '<strong>Der Weg zurück kostet.</strong> Wer eine Fraktion feindlich oder verfeindet gemacht hat, zahlt für den Tribut das Doppelte bzw. Dreifache. Sich Feinde zu machen bleibt eine Option – nur eben keine folgenlose.',
+      '<strong>Ruf verfällt ohne Kontakt.</strong> Ruf war ein Sperrklinken-Rad: einmal auf 100, für immer auf 100 – nach ein paar Tagen war das ganze Fraktionssystem abgeschlossen. Kümmerst du dich jetzt drei Tage lang nicht um eine Fraktion, sinkt ihr Ruf um <strong>3 pro Tag</strong>, bis er wieder bei Neutral steht. Als Kontakt zählt alles, was Bindung zeigt: abgeschlossener Auftrag, Tribut, Einkauf im Laden, abgeholte Belohnung oder Parteinahme in ihrem Krieg. Die Karte sagt jederzeit, wann der nächste Verfall fällig wäre – es sinkt nichts unangekündigt.',
+      '<strong>Groll verfällt bewusst nicht.</strong> Negativer Ruf bleibt liegen, bis du ihn aktiv reparierst. Eine Feindschaft aussitzen zu können hätte den Feindschafts-Malus aus der Vorversion zu einer reinen Wartezeit gemacht. Der Verfall läuft außerdem am Rivalitäten-System vorbei: nachlassendes Wohlwollen ist keine Tat gegen die Fraktion, ihr Gegenspieler gewinnt daraus nichts.',
+      'Zwei neue Erfolge: <strong>Überall bekannt</strong> (alle vier Fraktionen gleichzeitig auf Rang 5) und <strong>Namhaft</strong> (zwei Fraktionen gleichzeitig auf Rang 7).',
+      'Die vier alten Schwellen liegen unverändert bei −70, −30, 30 und 70 – die beiden oberen spiegelt der Server (Marktrabatt, Bündnis-Schwelle), die beiden unteren sind die Feindschaftsstufen. Die acht Ränge sind eine reine Verfeinerung dazwischen.'
+    ]},
     { version:'8.298.22', date:'26.07.2026', changes:[
       '<strong>Gunstmarken und Fraktionsläden.</strong> Aufträge und Parteinahme brachten bisher nur Ruf und Ressourcen – Ruf selbst war ab einem gewissen Punkt wertlos, weil es nichts gab, wofür man ihn ausgeben konnte. Jetzt zahlt jede Fraktion in ihrer eigenen Währung: <strong>Gunstmarken</strong>.',
       'Verdient werden sie durch Fraktionsaufträge (Bronze 1, Silber 2, Gold 4 Marken) und durch Parteinahme in einem Fraktionskrieg (3 Marken). Marken sind <strong>nicht übertragbar</strong> – Kartell-Marken zahlen nur beim Kartell. Wer überall ein bisschen mitläuft, kauft nirgends etwas; wer sich entscheidet, kommt an die guten Sachen.',
@@ -11208,7 +11217,13 @@
     if (!pool.length) return null;
     const t = pool[Math.floor(Math.random()*pool.length)];
     const r = Math.random();
-    const tier = r < 0.55 ? QUEST_TIERS[0] : (r < 0.87 ? QUEST_TIERS[1] : QUEST_TIERS[2]);
+    // Rang-Vergünstigungen (Paket 5/6): ab "Verbündet" faellt die Gold-Schwelle von 13% auf 26%,
+    // ab "Bekannt" laeuft der Auftrag 50% laenger. Beides wird beim ERZEUGEN festgeschrieben - ein
+    // spaeterer Rangverlust nimmt einen bereits angenommenen Auftrag also nicht nachtraeglich weg.
+    const rangNr = factionRankOf(fid).nr;
+    const goldSchwelle = rangNr >= RANK_GOLD_CHANCE_FROM ? 0.74 : 0.87;
+    const laufzeit = Math.round(QUEST_DURATION_MS * (rangNr >= RANK_QUEST_TIME_FROM ? 1 + RANK_QUEST_TIME_BONUS : 1));
+    const tier = r < 0.55 ? QUEST_TIERS[0] : (r < goldSchwelle ? QUEST_TIERS[1] : QUEST_TIERS[2]);
     return {
       tpl: t.key, tier: tier.key, faction: fid,
       target: Math.max(1, Math.round(t.basis * tier.mult)),
@@ -11217,7 +11232,7 @@
       rewardFragments: tier.key === 'gold' ? QUEST_GOLD_FRAGMENTS : 0,
       // Nur 'gain'-Auftraege brauchen einen Startwert; 'have'/'deliver' messen den Bestand.
       startValue: t.kind === 'gain' ? (t.zaehler()||0) : 0,
-      expiresAt: Date.now() + QUEST_DURATION_MS
+      expiresAt: Date.now() + laufzeit
     };
   }
   // Sorgt dafür, dass jede Fraktion einen gültigen Auftrag hat (neu bei Fehlen/Ablauf).
@@ -11256,6 +11271,10 @@
     const t = questTemplateOf(q.faction || fid, q.tpl);
     if (!t){ log('Dieser Auftrag ist nicht mehr gültig und wird ersetzt.', 'ti-alert-triangle'); state.factionQuests[fid] = generateFactionQuest(fid); render(); save(); return; }
     if (questProgress(q) < q.target){ log('Der Auftrag ist noch nicht erfüllt.', 'ti-info-circle'); return; }
+    // Rang VOR der Ruf-Belohnung festhalten: sonst haenge die Zusatzmarke davon ab, ob genau dieser
+    // Auftrag einen ueber die Schwelle hebt - man soll fuer den Rang belohnt werden, den man beim
+    // Abliefern schon hatte.
+    const rangNr = factionRankOf(fid).nr;
     if (t.kind === 'deliver'){
       if (questHaveAmount(t) < q.target){ log('Nicht genug zum Abliefern.', 'ti-alert-triangle'); return; }
       if (t.res) state.resources[t.res] -= q.target;
@@ -11266,11 +11285,14 @@
     if (q.rewardCredits) state.credits = (state.credits||0) + q.rewardCredits;
     if (q.rewardFragments) state.moduleFragments = (state.moduleFragments||0) + q.rewardFragments;
     // Gunstmarken (Paket 4/6): Bronze 1, Silber 2, Gold 4 - die Waehrung des Fraktionsladens.
-    const marken = FAVOR_PER_TIER[q.tier] || 1;
+    // Ab Rang "Geachtet" (Paket 5/6) legt die Fraktion eine Marke drauf.
+    const rangBonus = rangNr >= RANK_FAVOR_BONUS_FROM ? 1 : 0;
+    const marken = (FAVOR_PER_TIER[q.tier] || 1) + rangBonus;
     addFactionFavor(fid, marken);
+    touchFactionContact(fid);
     const f = (galaxyCache.factions||{})[fid];
     const tier = questTierOf(q.tier);
-    const teile = ['+'+q.rewardRep+' Ruf', '+'+marken+' Gunstmarke'+(marken===1?'':'n')];
+    const teile = ['+'+q.rewardRep+' Ruf', '+'+marken+' Gunstmarke'+(marken===1?'':'n')+(rangBonus?' (davon 1 als Rangbonus)':'')];
     if (q.rewardCredits) teile.push('+'+fmt(q.rewardCredits)+' Kredite');
     if (q.rewardFragments) teile.push('+'+q.rewardFragments+' Modulfragmente');
     log(tier.label+'-Auftrag für '+(f?f.name:fid)+' abgeschlossen: '+teile.join(', ')+'.', tier.icon, 'ok');
@@ -11444,6 +11466,7 @@
     if (!erhalten){ log(p.fehler || 'Dieser Posten ist gerade nicht verfügbar - es wurden keine Gunstmarken abgebucht.', 'ti-alert-triangle', 'warn'); return; }
     state.factionFavor[fid] = factionFavorOf(fid) - p.kosten;
     state.factionShopPurchases = (state.factionShopPurchases||0) + 1;
+    touchFactionContact(fid); // Einkauf zaehlt als Kontakt (Ruf-Verfall, Paket 5/6)
     log(factionNameOf(fid)+' liefert: '+erhalten+' (−'+p.kosten+' Gunstmarken, Rest: '+factionFavorOf(fid)+').', p.icon, 'ok');
     playSound('build');
     checkAchievements();
@@ -11479,6 +11502,7 @@
     if (!preview) return;
     state.factionGiftClaimedAt = state.factionGiftClaimedAt || {};
     state.factionGiftClaimedAt[fid] = Date.now();
+    touchFactionContact(fid); // Abholen zaehlt als Kontakt (Ruf-Verfall, Paket 5/6)
     const f = (galaxyCache.factions||{})[fid];
     const fname = f ? f.name : fid;
     if (fid === 'legion'){
@@ -11498,17 +11522,137 @@
     schatten: { effectLabel:'Kredit-Geschenke', friendly:'Belohnung 1x täglich abholbar (60 Kr.)', allied:'Belohnung 1x täglich abholbar (150 Kr.)' }
   };
   function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, (state.factionRep||{})[fid]||0)); }
+  // ===== Acht Raenge je Fraktion (26.07.2026, Fraktions-Ausbau Paket 5/6) =====
+  // Vorher gab es fuenf Stufen, und drei davon (Feindlich, Neutral, Freundlich) deckten je 40-60
+  // Rufpunkte ab - zwischen Ruf 0 und Ruf 29 aenderte sich also 29 Punkte lang GAR NICHTS, weder in
+  // der Anzeige noch mechanisch. Wer bei einer Fraktion anfing, sah lange keinerlei Fortschritt.
+  //
+  // Jetzt sind es acht Raenge, und JEDER Fraktion gehoert ein eigener Satz Rangnamen - man ist beim
+  // Kartell "Stammkunde", bei der Legion "Waffenbruder", nicht ueberall dasselbe blasse "Freundlich".
+  //
+  // Die vier alten Schwellen bleiben EXAKT erhalten (-70 / -30 / 30 / 70): 30 und 70 spiegelt das
+  // Backend (marketDiscountPctFor in server.js) und REP_ALLY_THRESHOLD, -30/-70 sind die beiden
+  // Feindschaftsstufen aus Paket 2/6. Die vier NEUEN Schwellen (-10, 15, 50) liegen bewusst
+  // dazwischen und beruehren nichts davon.
+  const REP_RANKS = [
+    { key:'verfeindet',   min:-100, label:'Verfeindet',   color:'#e24b4a' },
+    { key:'feindlich',    min:-69,  label:'Feindlich',    color:'#e0784a' },
+    { key:'misstrauisch', min:-29,  label:'Misstrauisch', color:'#c99a5b' },
+    { key:'neutral',      min:-9,   label:'Neutral',      color:'#8489a0' },
+    { key:'bekannt',      min:15,   label:'Bekannt',      color:'#9fb4d6' },
+    { key:'freundlich',   min:30,   label:'Freundlich',   color:'#85b7eb' },
+    { key:'geachtet',     min:50,   label:'Geachtet',     color:'#6fd0c0' },
+    { key:'verbuendet',   min:70,   label:'Verbündet',    color:'#5dcaa5' }
+  ];
+  // Je Fraktion acht eigene Rangbezeichnungen, in derselben Reihenfolge wie REP_RANKS.
+  const FACTION_RANK_NAMES = {
+    kartell:  ['Geächteter Schuldner','Säumiger Zahler','Bittsteller','Gelegenheitskunde','Stammkunde','Konzessionär','Teilhaber','Syndikatspartner'],
+    legion:   ['Kriegsverbrecher','Fahnenflüchtiger','Geduldeter','Zivilist','Hilfstruppe','Waffenbruder','Offizier der Reserve','Schwertträger'],
+    void:     ['Anathema','Störfaktor','Unwissender','Fremder','Zuhörer','Eingeweihter','Deuter der Leere','Stimme im Riss'],
+    schatten: ['Enttarnter','Belasteter Kontakt','Unbekannte Größe','Namenloser','Mittelsmann','Vertrauter','Schattenwandler','Teil des Netzes']
+  };
   function repTierOf(rep){
-    // "Verfeindet" (26.07.2026, Fraktions-Ausbau Paket 2/6): Bis dahin war "Feindlich" ein rein
-    // KOSMETISCHES rotes Etikett - factionEffectLevel lieferte fuer alles unter Freundlich einfach 0,
-    // es gab also weder Nachteil noch Drama beim Angreifen. Jetzt gibt es zwei Feindschaftsstufen mit
-    // echten Folgen (siehe factionHostilityLevel). Die Schwellen 30/70 nach oben bleiben unangetastet
-    // (Backend-Paritaet, marketDiscountPctFor in server.js); -30/-70 sind rein clientseitig.
-    if (rep <= -70) return { key:'verfeindet', label:'Verfeindet', color:'#e24b4a' };
-    if (rep <= -30) return { key:'feindlich', label:'Feindlich', color:'#e0784a' };
-    if (rep >= 70) return { key:'verbuendet', label:'Verbündet', color:'#5dcaa5' };
-    if (rep >= 30) return { key:'freundlich', label:'Freundlich', color:'#85b7eb' };
-    return { key:'neutral', label:'Neutral', color:'#8489a0' };
+    const r = Math.max(REP_MIN, Math.min(REP_MAX, Math.round(rep||0)));
+    let treffer = REP_RANKS[0];
+    for (const rang of REP_RANKS){ if (r >= rang.min) treffer = rang; }
+    return treffer;
+  }
+  function repRankIndex(rep){ return REP_RANKS.indexOf(repTierOf(rep)); }
+  // Rang einer Fraktion mit ihrem EIGENEN Namen und der Nummer 1-8 fuer die Anzeige.
+  function factionRankOf(fid){
+    const rep = factionRepOf(fid);
+    const idx = repRankIndex(rep);
+    const rang = REP_RANKS[idx];
+    const namen = FACTION_RANK_NAMES[fid];
+    return { key:rang.key, label:rang.label, color:rang.color, nr:idx+1, name:(namen && namen[idx]) || rang.label };
+  }
+  // Ruf, ab dem der naechste Rang beginnt - null beim hoechsten. Fuer die Fortschrittsanzeige.
+  function nextRankAt(rep){
+    const idx = repRankIndex(rep);
+    return idx >= REP_RANKS.length-1 ? null : REP_RANKS[idx+1].min;
+  }
+  // ===== Was die Raenge konkret bringen =====
+  // Grundsatz aus Paket 2/6: Kein Rang darf ein reines Etikett sein. Die vier Raenge, die vorher
+  // keine Mechanik hatten (Misstrauisch, Bekannt, Geachtet und der Ausbau von Verbuendet), bekommen
+  // deshalb je eine eigene Wirkung - bewusst alle rein clientseitig, damit die Backend-Schwellen
+  // 30/70 unberuehrt bleiben.
+  const RANK_TRIBUTE_SURCHARGE = { misstrauisch:1.5, feindlich:2, verfeindet:3 };
+  const RANK_QUEST_TIME_FROM = 5;      // ab "Bekannt": mehr Zeit fuer Auftraege
+  const RANK_QUEST_TIME_BONUS = 0.5;   // +50% Laufzeit
+  const RANK_FAVOR_BONUS_FROM = 7;     // ab "Geachtet": +1 Gunstmarke je Auftrag
+  const RANK_GOLD_CHANCE_FROM = 8;     // ab "Verbuendet": doppelt so oft Gold-Auftraege
+  const RANK_PERKS = {
+    verfeindet:   'voller Feindschafts-Malus und Strafexpeditionen · Tribut kostet das Dreifache',
+    feindlich:    'Feindschafts-Malus dieser Fraktion · Tribut kostet das Doppelte',
+    misstrauisch: 'kein Malus mehr, aber Tribut kostet die Hälfte mehr – sie lassen sich die Versöhnung bezahlen',
+    neutral:      'weder Vorteil noch Nachteil',
+    bekannt:      'Aufträge dieser Fraktion laufen '+Math.round(RANK_QUEST_TIME_BONUS*100)+'% länger',
+    freundlich:   'Fraktionseffekt aktiv und der Fraktionsladen öffnet',
+    geachtet:     '+1 Gunstmarke auf jeden abgeschlossenen Auftrag',
+    verbuendet:   'stärkster Fraktionseffekt, Spitzenposten im Laden und doppelt so oft Gold-Aufträge'
+  };
+  function tributeCostFor(fid){
+    return Math.round(TRIBUTE_COST * (RANK_TRIBUTE_SURCHARGE[repTierOf(factionRepOf(fid)).key] || 1));
+  }
+  // ===== Ruf-Verfall ohne Kontakt (Paket 5/6) =====
+  // Ruf war bisher ein reines Sperrklinken-Rad: einmal auf 100, fuer immer auf 100. Damit war das
+  // ganze Fraktionssystem nach ein paar Tagen abgeschlossen und der Laden aus Paket 4/6 waere eine
+  // Einmal-Freischaltung geworden statt einer Beziehung, die man haelt.
+  //
+  // Jetzt zerfaellt NUR Wohlwollen, und zwar erst nach einer Schonfrist von drei Tagen ohne Kontakt.
+  // Groll zerfaellt bewusst NICHT: eine Fraktion, der man die Flotte zerschossen hat, vergisst das
+  // nicht von selbst - sonst waere der Feindschafts-Malus aus Paket 2/6 bloss eine Frage des
+  // Aussitzens. Den Weg zurueck gibt es ueber Tribut, Auftraege und den Rivalen-Umweg.
+  const REP_DECAY_PER_DAY = 3;
+  const REP_DECAY_GRACE_MS = 3*24*3600*1000;
+  const REP_DECAY_INTERVAL_MS = 24*3600*1000;
+  function touchFactionContact(fid){
+    if (!state.factionLastContact) state.factionLastContact = {};
+    state.factionLastContact[fid] = Date.now();
+  }
+  // Verbleibende Zeit bis zum naechsten Ruf-Verlust; null, wenn nichts zu verlieren ist.
+  function repDecayDueIn(fid){
+    if ((state.factionRep||{})[fid] === undefined || factionRepOf(fid) <= 0) return null;
+    const kontakt = (state.factionLastContact||{})[fid];
+    if (!kontakt) return null;
+    return Math.max(0, kontakt + REP_DECAY_GRACE_MS + REP_DECAY_INTERVAL_MS - Date.now());
+  }
+  function applyReputationDecay(){
+    if (!state.factionLastContact) state.factionLastContact = {};
+    const jetzt = Date.now();
+    let gesamt = 0;
+    for (const fid of Object.keys(FACTION_DIPLOMACY)){
+      // Altstaende und frische Spielstaende haben noch keinen Zeitstempel - die Uhr startet jetzt,
+      // damit niemand beim ersten Laden rueckwirkend Ruf verliert.
+      if (!state.factionLastContact[fid]){ state.factionLastContact[fid] = jetzt; continue; }
+      let verloren = 0;
+      // Schleife statt Division: so rueckt die Kontaktuhr genau um die tatsaechlich abgebauten Tage
+      // vor, und der Deckel bei 0 greift sauber - auch nach langer Abwesenheit.
+      while (jetzt - state.factionLastContact[fid] >= REP_DECAY_GRACE_MS + REP_DECAY_INTERVAL_MS){
+        const rep = state.factionRep[fid]||0;
+        if (rep <= 0){ state.factionLastContact[fid] = jetzt; break; }
+        const ab = Math.min(REP_DECAY_PER_DAY, rep);
+        // Bewusst setFactionRepRaw statt changeFactionRep: Verfall ist ein Nachlassen des eigenen
+        // Wohlwollens, keine Tat gegen die Fraktion - der Rivale soll daraus nichts gewinnen.
+        setFactionRepRaw(fid, rep - ab);
+        verloren += ab;
+        state.factionLastContact[fid] += REP_DECAY_INTERVAL_MS;
+      }
+      if (verloren > 0){
+        gesamt += verloren;
+        log(factionNameOf(fid)+' vermisst deinen Kontakt: −'+verloren+' Ruf (jetzt '+factionRepOf(fid)+', Rang '+factionRankOf(fid).nr+': '+factionRankOf(fid).name+').', 'ti-flag', 'warn');
+      }
+    }
+    return gesamt;
+  }
+  let letzterRufVerfallCheck = 0;
+  // Aufhaenger im Haupt-Tick. Der Verfall rechnet in Tagen - einmal pro Minute nachzusehen reicht
+  // und haelt den Sekunden-Tick frei. Bewusst OHNE Sichtbarkeits-Gate: das ist echte Spielmechanik,
+  // keine reine Anzeige-Aktualisierung (dieselbe Trennlinie wie bei maybeScheduleRaid).
+  function processReputationDecay(){
+    if (Date.now() - letzterRufVerfallCheck < 60000) return false;
+    letzterRufVerfallCheck = Date.now();
+    return applyReputationDecay() > 0;
   }
   // ===== Fraktions-Rivalitäten (26.07.2026, Fraktions-Ausbau Paket 3/6) =====
   // Vorher konnte man bei ALLEN VIER Fraktionen auf Ruf 100 stehen - der Kastentext behauptete zwar
@@ -11588,6 +11732,10 @@
     applyRivalSpill(fid, delta);
     // Und wer gerade ein Bündnis erreicht hat, verliert das des Rivalen.
     if (delta > 0) enforceRivalExclusivity(fid);
+    // Kontaktuhr des Ruf-Verfalls (Paket 5/6): Jeder ZUWACHS ist gepflegter Kontakt und setzt die
+    // Schonfrist zurueck. Bewusst nur bei positiven Deltas - ein Angriff auf die Fraktion ist zwar
+    // auch Kontakt, soll aber nicht ausgerechnet ihr Wohlwollen konservieren.
+    if (delta > 0) touchFactionContact(fid);
   }
   // Effektstärke einer Fraktion: 0 = kein Effekt, 1 = freundlich, 2 = verbündet.
   function factionEffectLevel(fid){
@@ -11677,15 +11825,17 @@
   function payTribute(fid){
     const cdLeft = Math.max(0, ((state.tributeLastPaid||{})[fid]||0) + TRIBUTE_COOLDOWN_MS - Date.now());
     if (cdLeft > 0){ log('Tribut an diese Fraktion erst wieder in '+fmtDuration(cdLeft/1000)+' möglich.', 'ti-clock'); return; }
-    if ((state.credits||0) < TRIBUTE_COST){ log('Nicht genug Kredite für einen Tribut ('+TRIBUTE_COST+' nötig).', 'ti-alert-triangle'); return; }
+    // Rang-Aufschlag (Paket 5/6): wer unter Neutral steht, zahlt mehr fuer den Weg zurueck.
+    const kosten = tributeCostFor(fid);
+    if ((state.credits||0) < kosten){ log('Nicht genug Kredite für einen Tribut ('+kosten+' nötig).', 'ti-alert-triangle'); return; }
     if (factionRepOf(fid) >= REP_MAX){ log('Der Ruf bei dieser Fraktion ist bereits maximal.', 'ti-info-circle'); return; }
-    state.credits -= TRIBUTE_COST;
+    state.credits -= kosten;
     changeFactionRep(fid, TRIBUTE_GAIN);
     state.tributeLastPaid = state.tributeLastPaid || {};
     state.tributeLastPaid[fid] = Date.now();
     if (state.dailyQuests) state.dailyQuests.tributeCount = (state.dailyQuests.tributeCount||0) + 1;
     const f = (galaxyCache.factions||{})[fid];
-    log('Tribut an '+(f?f.name:fid)+' gezahlt: +'+TRIBUTE_GAIN+' Ruf (jetzt '+factionRepOf(fid)+').', 'ti-flag');
+    log('Tribut an '+(f?f.name:fid)+' gezahlt ('+fmt(kosten)+' Kredite): +'+TRIBUTE_GAIN+' Ruf (jetzt '+factionRepOf(fid)+', '+factionRankOf(fid).name+').', 'ti-flag');
     playSound('trade');
     render(); save();
   }
@@ -11877,11 +12027,34 @@
       const lvl = factionEffectLevel(f.id);
       const effectTxt = dip ? (lvl===2 ? dip.allied : (lvl===1 ? dip.friendly : dip.effectLabel+' (ab Ruf 30)')) : '';
       const tributeCdLeft = Math.max(0, ((state.tributeLastPaid||{})[f.id]||0) + TRIBUTE_COOLDOWN_MS - Date.now());
-      const tributeBtnLabel = tributeCdLeft > 0 ? ('Tribut in '+fmtDuration(tributeCdLeft/1000)) : ('Tribut ('+TRIBUTE_COST+' Kr. → +'+TRIBUTE_GAIN+')');
+      // Tribut-Aufschlag der unteren Raenge sichtbar machen, sonst wirkt der höhere Preis wie ein Fehler.
+      const tributeKosten = tributeCostFor(f.id);
+      const tributeBtnLabel = tributeCdLeft > 0 ? ('Tribut in '+fmtDuration(tributeCdLeft/1000)) : ('Tribut ('+fmt(tributeKosten)+' Kr. → +'+TRIBUTE_GAIN+')');
       const dipRow = dip ? `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap;">
         <div class="bmeta">Ruf: <strong style="color:${tier.color};">${rep} (${tier.label})</strong> · <span style="color:${lvl>0?'#5dcaa5':'#8489a0'};">${effectTxt}</span></div>
         <button data-tribute="${f.id}" ${tributeCdLeft>0?'disabled':''} style="font-size:10.5px; padding:3px 8px;"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:2px;"></i>${tributeBtnLabel}</button>
       </div>` : '';
+      // ===== Rang-Zeile (Paket 5/6) =====
+      // Der eigene Rangname der Fraktion, was er bringt, und wie weit es zum nächsten ist. Ohne den
+      // Fortschrittsbalken bliebe unsichtbar, dass sich zwischen zwei Rängen überhaupt etwas bewegt -
+      // genau der Mangel, den die alten fünf Stufen hatten.
+      const rang = factionRankOf(f.id);
+      const naechstesAb = nextRankAt(rep);
+      const rangVon = REP_RANKS[rang.nr-1].min;
+      const rangPct = naechstesAb === null ? 100 : Math.max(0, Math.min(100, Math.round((rep - rangVon) / (naechstesAb - rangVon) * 100)));
+      const naechsterName = naechstesAb === null ? null : ((FACTION_RANK_NAMES[f.id]||[])[rang.nr] || REP_RANKS[rang.nr].label);
+      const rangRow = dip ? `<div style="margin-top:4px;">
+        <div class="bmeta"><i class="ti ti-medal" aria-hidden="true" style="margin-right:3px; color:${rang.color};"></i>Rang ${rang.nr}/8: <strong style="color:${rang.color};">${rang.name}</strong> · ${RANK_PERKS[rang.key]}</div>
+        <div class="bmeta" style="margin-top:2px;">${naechstesAb === null ? 'Höchster Rang erreicht.' : 'Nächster Rang <strong>'+naechsterName+'</strong> ab Ruf '+naechstesAb+' (noch '+(naechstesAb-rep)+')'}</div>
+        <div class="progress-outer" style="height:4px; margin-top:3px;"><div class="progress-inner" style="width:${rangPct}%; background:${rang.color};"></div></div>
+      </div>` : '';
+      // ===== Kontakt-/Verfallszeile (Paket 5/6) =====
+      // Pflicht, nicht Kür: ein Ruf, der still sinkt, ohne dass irgendwo steht warum, ist genau der
+      // Fehler, den dieses Projekt schon mehrfach hatte. Nur anzeigen, wenn es etwas zu verlieren gibt.
+      const verfallIn = repDecayDueIn(f.id);
+      const verfallRow = (dip && verfallIn !== null) ? (verfallIn > 0
+        ? `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-clock" aria-hidden="true" style="margin-right:3px; color:#8489a0;"></i>Kontakt gepflegt · ohne neuen Kontakt sinkt der Ruf in ${fmtDuration(verfallIn/1000)} um ${REP_DECAY_PER_DAY} pro Tag</div>`
+        : `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-clock" aria-hidden="true" style="margin-right:3px; color:#e0a548;"></i><strong style="color:#e0a548;">Vernachlässigt:</strong> −${REP_DECAY_PER_DAY} Ruf pro Tag, bis du wieder Kontakt aufnimmst (Auftrag, Tribut, Einkauf oder Belohnung)</div>`) : '';
       // Tägliche Fraktionsbelohnung (nur Legion/Schattenbund haben eine Geschenk-Mechanik): Abholen-
       // Button mit Vorschau, wenn bereit, sonst Countdown bis zur nächsten Abholung.
       const giftPreview = factionGiftPreview(f.id);
@@ -11918,6 +12091,8 @@
           </div>
         </div>
         ${dipRow}
+        ${rangRow}
+        ${verfallRow}
         ${hosRow}
         ${rivalRow}
         ${giftRow}
@@ -12035,6 +12210,11 @@
     { key:'fquestgold5', name:'Goldstandard', desc:'Schließe 5 Gold-Aufträge einer Fraktion ab – die seltenste und aufwendigste Auftragsstufe.', check: s => (s.factionGoldQuestsDone||0) >= 5, progress: s => [Math.min(5,s.factionGoldQuestsDone||0), 5], reward:{erz:9000,kristalle:6000,deuterium:3000,credits:700}, xpReward:500 },
     { key:'gunst10', name:'Gern gesehener Gast', desc:'Kaufe 10 Posten in Fraktionsläden – bezahlt wird ausschließlich mit Gunstmarken der jeweiligen Fraktion.', check: s => (s.factionShopPurchases||0) >= 10, progress: s => [Math.min(10,s.factionShopPurchases||0), 10], reward:{erz:10000,kristalle:7000,deuterium:3500,credits:700}, xpReward:500 },
     { key:'gunstvorrat', name:'Wohlgesonnen', desc:'Halte bei einer einzelnen Fraktion gleichzeitig 8 Gunstmarken – genug für ihren Spitzenposten.', check: s => Object.values(s.factionFavor||{}).some(v => (v||0) >= 8), progress: s => [Math.min(8, Math.max(0, ...Object.values(s.factionFavor||{}).map(v=>v||0), 0)), 8], reward:{credits:500}, xpReward:300 },
+    // Neu 26.07.2026 mit den acht Raengen: eines in die Breite (ueberall ein Fuss in der Tuer, was
+    // wegen des Rivalen-Ueberschwappens Arbeit macht) und eines in die Tiefe (zwei Fraktionen
+    // gleichzeitig auf Rang 7 halten, obwohl der Ruf ohne Kontakt taeglich zerfaellt).
+    { key:'rangfuenf', name:'Überall bekannt', desc:'Steh bei allen vier Fraktionen gleichzeitig mindestens auf Rang 5 („Bekannt", Ruf 15) – trotz der Rivalitäten, die jeden Zugewinn beim Gegenspieler abziehen.', check: s => ['kartell','legion','void','schatten'].every(k => (s.factionRep||{})[k] >= 15), progress: s => [['kartell','legion','void','schatten'].filter(k => (s.factionRep||{})[k] >= 15).length, 4], reward:{erz:11000,kristalle:7000,deuterium:3500,credits:700}, xpReward:500 },
+    { key:'ranggeachtet', name:'Namhaft', desc:'Halte bei zwei Fraktionen gleichzeitig mindestens Rang 7 („Geachtet", Ruf 50) – jeder Auftrag dieser beiden bringt dann eine Gunstmarke extra.', check: s => Object.values(s.factionRep||{}).filter(r => (r||0) >= 50).length >= 2, progress: s => [Math.min(2, Object.values(s.factionRep||{}).filter(r => (r||0) >= 50).length), 2], reward:{erz:13000,kristalle:9000,deuterium:4500,credits:900}, xpReward:600 },
     { key:'erzfeind', name:'Erzfeind', desc:'Bringe eine Fraktion auf Verfeindet (Ruf unter −70) – und überlebe ihre Strafexpeditionen.', check: s => Object.keys(s.factionRep||{}).some(k => (s.factionRep[k]||0) <= -70), progress: s => [Math.min(70, Math.max(0, ...Object.keys(s.factionRep||{}).map(k => -(s.factionRep[k]||0)), 0)), 70], reward:{erz:12000,kristalle:8000,deuterium:4000,credits:600}, xpReward:500 },
     { key:'kriegspartei', name:'Königsmacher', desc:'Ergreife dreimal Partei in einem Fraktionskrieg und entscheide mit, wer die Galaxie beherrscht.', check: s => (s.warSidesTaken||0) >= 3, progress: s => [Math.min(3,s.warSidesTaken||0), 3], reward:{erz:12000,kristalle:8000,deuterium:4000,credits:800}, xpReward:600 },
     { key:'fquest50', name:'Vertragsmeister', desc:'Schließe 50 Fraktionsaufträge ab.', check: s => (s.factionQuestsDone||0) >= 50, progress: s => [Math.min(50,s.factionQuestsDone||0), 50], reward:{erz:14000,kristalle:9000,deuterium:5000,antimaterie:150,credits:900}, xpReward:700 },
@@ -12101,7 +12281,7 @@
     synthesemeister:'aufbau', singularitaetsarchitekt:'aufbau',
     tenkills:'krieg', bossdown:'krieg', abyssdown:'krieg', nyradown:'krieg', allbosses:'krieg', moonsiegewin:'krieg', basewarwin:'krieg', warvictor:'krieg', kriegsheld:'krieg', ligameister:'krieg', allveteran:'krieg',
     allsystems:'expansion', explorer25:'expansion', conquer1:'expansion', conquer5:'expansion',
-    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', fquestgold5:'handel', fquest50:'handel', kriegspartei:'handel', erzfeind:'handel', gunst10:'handel', gunstvorrat:'handel', shop5:'handel', gutvernetzt:'handel',
+    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', fquestgold5:'handel', fquest50:'handel', kriegspartei:'handel', erzfeind:'handel', rangfuenf:'handel', ranggeachtet:'handel', gunst10:'handel', gunstvorrat:'handel', shop5:'handel', gutvernetzt:'handel',
     allianzweltprojekt:'allianz', allianzausbau100:'allianz', allianzeinsatz:'allianz', allianceraidkill:'allianz',
     firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister', streak30:'meister', streak100:'meister', happyhour10:'meister'
   };
@@ -12131,7 +12311,7 @@
     trade1:'ti-truck', trade50:'ti-truck', route1:'ti-arrows-shuffle',
     trade_empire:'ti-diamond', trade_longrun:'ti-clock', conquer1:'ti-flag',
     conquer5:'ti-world', allied:'ti-message', pact3:'ti-shield', pact_century:'ti-shield-lock',
-    fquest10:'ti-list-details', fquestgold5:'ti-trophy', fquest50:'ti-medal', kriegspartei:'ti-sword', erzfeind:'ti-alert-triangle', gunst10:'ti-diamond', gunstvorrat:'ti-star', shop5:'ti-diamond', credits5k:'ti-diamond',
+    fquest10:'ti-list-details', fquestgold5:'ti-trophy', fquest50:'ti-medal', kriegspartei:'ti-sword', erzfeind:'ti-alert-triangle', rangfuenf:'ti-medal', ranggeachtet:'ti-trophy', gunst10:'ti-diamond', gunstvorrat:'ti-star', shop5:'ti-diamond', credits5k:'ti-diamond',
     skilltreemax:'ti-star', allveteran:'ti-medal', allexotic:'ti-atom-2',
     erdweltmaster:'ti-plant', leerenweltmaster:'ti-mountain', allianzeinsatz:'ti-bell',
     allcolonyslots:'ti-home', allresearchmax:'ti-microscope',
@@ -12237,6 +12417,7 @@
     nextFactionGift: 0,
     factionGiftClaimedAt: {},
     factionQuests: {},
+    factionLastContact: {},
     marketTradesDone: 0,
     factionQuestsDone: 0,
     shopPurchases: 0,
@@ -17091,6 +17272,7 @@
     if (state.nextFactionGift === undefined) state.nextFactionGift = 0;
     if (!state.factionGiftClaimedAt) state.factionGiftClaimedAt = {};
     if (!state.factionQuests) state.factionQuests = {};
+    if (!state.factionLastContact || typeof state.factionLastContact !== 'object') state.factionLastContact = {};
     if (state.marketTradesDone === undefined) state.marketTradesDone = 0;
     if (state.factionQuestsDone === undefined) state.factionQuestsDone = 0;
     if (state.factionGoldQuestsDone === undefined) state.factionGoldQuestsDone = 0;
@@ -17241,7 +17423,7 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true,
+      skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionLastContact:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true,
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Login-Serie ist Treue-Fortschritt, kein Wirtschaftsfortschritt - Schutzschilde und die
       // "Meilenstein bereits eingelöst"-Marker müssen den Reset überleben wie loginStreak selbst
@@ -17327,7 +17509,7 @@
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
-      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true,
+      skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionLastContact:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true,
       prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Wie beim Prestige: Login-Serien-Begleitfelder überstehen auch den Aufstieg-Reset.
       streakShields:state.streakShields||0, claimedStreakMilestones:(state.claimedStreakMilestones||[]).slice(), comebackQuest:null,
@@ -20497,13 +20679,14 @@
       { title:'Weltboss: Leviathan der Leere', body:'Gelegentlich erscheint der <strong>Leviathan der Leere</strong> (oben im Galaxie-Tab): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Angriff läuft wie eine normale Angriffsmission: Du stellst deine Angriffsflotte zusammen (Bereich "Angriffsflotte zusammenstellen") und schickst sie los - mit echter Flugzeit und Treibstoffkosten (Deuterium). Am Ziel zieht deine Angriffskraft (×0,8-1,2 Streuung) Schaden ab, der Leviathan schlägt zurück (8-15%+ Flottenverluste, steigt mit seiner Stufe). <strong>Einmal pro Tag</strong> pro Spieler angreifbar - die Sperre bleibt auch bestehen, wenn der aktuelle Leviathan besiegt wird und ein neuer erscheint. Beim Kill: Belohnung (Kredite + Kampfpunkte) nach Schadensanteil, Top-Schädiger bekommt +50% Bonus. Nach einem Kill erscheint nach einer Weile automatisch die nächste, stärkere Stufe.' },
       { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
       { title:'Rivalitäten: du kannst nicht mit allen befreundet sein', body:'Je zwei Fraktionen stehen sich als <strong>Rivalen</strong> gegenüber: <strong>Aschen-Kartell gegen Schattenbund</strong> (Wirtschaft) und <strong>Eisenlegion gegen Void-Marodeure</strong> (Militär und Mystik). Das hat zwei Folgen.<br><br><strong>Erstens: Ruf schwappt über.</strong> Gewinnst du bei einer Fraktion Ruf, verlierst du rund ein Drittel davon bei ihrem Rivalen. Umgekehrt gilt dasselbe: Greifst du eine Fraktion an, freut sich ihr Rivale und dein Ruf dort steigt. Einen Gegner zu haben ist damit nicht mehr nur schlecht.<br><br><strong>Zweitens: nur ein Bündnis je Paar.</strong> Zwei Rivalen dulden keinen gemeinsamen Verbündeten. Überschreitest du bei einer die Bündnis-Schwelle, kündigt die andere auf und fällt auf <em>Freundlich</em> zurück – du behältst dort also den kleineren Effekt, nur nicht den vollen. Du kannst damit höchstens <strong>zwei Fraktionen gleichzeitig als Verbündete</strong> haben, eine je Paar. Wer vorher bei mehreren gleichzeitig verbündet war, behält beim ersten Aufruf das jeweils <em>stärkere</em> Bündnis.<br><br>Damit ist die Diplomatie eine echte Entscheidung: entweder zwei tiefe Bündnisse und zwei kühle Verhältnisse, oder überall freundlich und nirgends verbündet.' },
+      { title:'Die acht Ränge und der Ruf-Verfall', body:'Zwischen −100 und 100 liegen <strong>acht Ränge</strong>, und jede Fraktion hat dafür ihre eigenen Bezeichnungen: beim <strong>Aschen-Kartell</strong> steigst du vom <em>Geächteten Schuldner</em> über <em>Stammkunde</em> und <em>Konzessionär</em> bis zum <em>Syndikatspartner</em>, bei der <strong>Eisenlegion</strong> vom <em>Kriegsverbrecher</em> zum <em>Schwertträger</em>, bei den <strong>Void-Marodeuren</strong> vom <em>Anathema</em> zur <em>Stimme im Riss</em>, beim <strong>Schattenbund</strong> vom <em>Enttarnten</em> zum <em>Teil des Netzes</em>. Die Karte im Galaxie-Tab zeigt deinen Rang, was er bringt, und wie weit es zum nächsten ist.<br><br><strong>Was die Ränge bringen:</strong><br><strong>Rang 1–2 (Verfeindet, Feindlich):</strong> voller Feindschafts-Malus – und der Tribut kostet das Dreifache bzw. Doppelte, denn den Weg zurück lässt sich eine gekränkte Fraktion bezahlen.<br><strong>Rang 3 (Misstrauisch, ab Ruf −29):</strong> kein Malus mehr, aber Tribut kostet noch die Hälfte mehr.<br><strong>Rang 4 (Neutral, ab −9):</strong> weder Vorteil noch Nachteil.<br><strong>Rang 5 (Bekannt, ab 15):</strong> Aufträge dieser Fraktion laufen 50% länger – 36 statt 24 Stunden.<br><strong>Rang 6 (Freundlich, ab 30):</strong> der Fraktionseffekt wird aktiv und der Fraktionsladen öffnet.<br><strong>Rang 7 (Geachtet, ab 50):</strong> jeder abgeschlossene Auftrag bringt <strong>eine Gunstmarke zusätzlich</strong>.<br><strong>Rang 8 (Verbündet, ab 70):</strong> stärkster Fraktionseffekt, der Spitzenposten im Laden – und <strong>doppelt so oft Gold-Aufträge</strong>.<br><br><strong>Ruf verfällt ohne Kontakt.</strong> Kümmerst du dich drei Tage lang nicht um eine Fraktion, sinkt ihr Ruf danach um <strong>3 pro Tag</strong> – so weit, bis er wieder bei 0 (Neutral) steht. Als Kontakt zählt alles, was Bindung zeigt: ein abgeschlossener Auftrag, ein Tribut, ein Einkauf im Laden, eine abgeholte Belohnung oder eine Parteinahme in ihrem Krieg. Die Fraktionskarte sagt jederzeit, wann der nächste Verfall fällig wäre.<br><br><strong>Groll verfällt bewusst nicht.</strong> Wer sich eine Fraktion zum Feind gemacht hat, sitzt das nicht einfach aus – negativer Ruf bleibt, bis du ihn aktiv reparierst (Tribut, Aufträge, oder der Umweg über ihren Rivalen). Ein Bündnis muss gepflegt werden, eine Feindschaft nicht.' },
       { title:'Gunstmarken & Fraktionsläden', body:'Jede Fraktion führt ein eigenes Konto: <strong>Gunstmarken</strong>. Du bekommst sie ausschließlich für <strong>Aufträge dieser Fraktion</strong> (Bronze 1, Silber 2, Gold 4) und für eine <strong>Parteinahme in ihrem Krieg</strong> (3). Marken sind <strong>nicht übertragbar</strong> – Gunst beim Kartell hilft dir bei der Legion nicht weiter. Genau das macht die Bindung an eine Fraktion zu einer Entscheidung.<br><br>Ab <strong>Freundlich</strong> öffnet sich der <strong>Fraktionsladen</strong> (im Galaxie-Tab, aufklappbar unter jeder Fraktion) mit vier Posten. Drei davon gibt es ab Freundlich, der vierte ist <strong>Verbündeten vorbehalten</strong> – und da du dank der Rivalitäten höchstens zwei Bündnisse gleichzeitig halten kannst, sind die vier Spitzenposten nie alle gleichzeitig erreichbar.<br><br><strong>Aschen-Kartell:</strong> Kreditlinie (15.000 Kredite), Frachtbrief (25 Modulfragmente), seltener Handelsleitstand – und für Verbündete ein <em>epischer</em> Handelsleitstand.<br><strong>Eisenlegion:</strong> Offiziersschulung (40 Kommandopunkte), seltenes Waffen- und Panzerungsmodul – für Verbündete ein <em>episches</em> Waffenmodul.<br><strong>Void-Zirkel:</strong> Forschungsdaten (400 Punkte), <strong>Peilung anfordern</strong> (sofort eine zusätzliche Expeditions-Peilung), seltenes Sondenmodul – für Verbündete ein <em>episches</em> Sondenmodul.<br><strong>Schatten-Syndikat:</strong> Bestechungsgelder (12.000 Kredite), Schwarzmarkt-Ware (8 Quantenchips + 8 Nanolegierungen – Tier-2-Material ohne eigene Fabrik), seltenes Eskorten-Leitsystem – für Verbündete ein <em>episches</em> Treibstoffdepot.<br><br>Gekaufte Module landen im normalen Inventar und sind von gefundenen oder gefertigten nicht zu unterscheiden – sie lassen sich also aufwerten, verschmelzen und mit Substats versehen wie jedes andere Modul. Schlägt ein Kauf fehl (z.B. „Peilung anfordern", wenn schon die Höchstzahl an Peilungen offen ist), werden <strong>keine Marken abgebucht</strong>.' },
       { title:'Feindschaft: was passiert, wenn der Ruf fällt', body:'Ruf kann nicht nur steigen. Fällt er unter <strong>−30</strong>, giltst du als <strong>Feindlich</strong>, unter <strong>−70</strong> als <strong>Verfeindet</strong>. Das war früher nur ein rotes Etikett – jetzt schadet jede Fraktion genau dort, wo sie sonst nützt:<br><br><strong>Aschen-Kartell:</strong> die Handelsgilden boykottieren dich – −12% (feindlich) bzw. −25% (verfeindet) Ertrag aus allen Handelsrouten.<br><strong>Void-Marodeure:</strong> statt dich zu verschonen, lenken sie Überfälle auf dich – +25% bzw. +60% Überfall-Häufigkeit.<br><strong>Eisenlegion:</strong> ihre Patrouillen fangen deine Expeditionen ab – +20% bzw. +45% Begegnungschance.<br><strong>Schattenbund:</strong> sie verkaufen deine Positionen weiter – +15% bzw. +30% Ressourcenverlust bei erfolgreichen Überfällen (gilt für Überfälle durch NPC-Flotten; bei Angriffen echter Spieler rechnet der Server).<br><br><strong>Strafexpeditionen:</strong> Zusätzlich schickt <em>jede</em> feindliche Fraktion Verbände gegen deine Planeten. Je Feindschaftsstufe insgesamt steigt die Überfall-Häufigkeit um 18% und die Stärke der Angreifer um 12% – bei mehreren Feinden summiert sich das spürbar.<br><br><strong>Aber es gibt auch eine Gegenleistung:</strong> Wer mehr und schwerere Angriffe abwehrt, bergt mehr. Je Feindschaftsstufe bleiben 15% mehr <strong>Trümmer</strong> liegen, wenn du einen Überfall abschlägst. Sich Feinde zu machen ist damit eine Strategie mit Preis, kein reiner Fehler – wenn deine Verteidigung steht, wird die Feindschaft zur Trümmerquelle.<br><br>Unverändert bleiben der Kartell-<em>Marktrabatt</em> und die Schwierigkeit von Fraktions-Systemangriffen: beides rechnet der Server, eine einseitige Verschärfung im Spiel würde Anzeige und Serverrechnung auseinanderlaufen lassen.' },
       { title:'Fraktionskriege: Partei ergreifen', body:'Von Zeit zu Zeit brechen zwischen zwei NPC-Fraktionen <strong>Kriege</strong> aus (36 Stunden, auf der Galaxie-Karte am ⚔️ zu erkennen). Läuft gerade einer, steht im Galaxie-Tab über den Fraktionen eine Kriegskarte: Du kannst <strong>eine</strong> der beiden Seiten mit einer Kriegslieferung unterstützen (4.000 Erz, 2.500 Kristalle, 1.200 Deuterium) und bekommst dafür <strong>+22 Ruf und 800 Kredite</strong> bei der gewählten Seite – der mit Abstand größte Ruf-Sprung im Spiel. Über die Rivalitäten bekommt die Gegenseite das automatisch zu spüren.<br><br>Pro Krieg ist das <strong>einmal</strong> möglich, und die Entscheidung lässt sich nicht zurücknehmen. Kriegsparteien ohne eigene Diplomatie (etwa die Piratenflotte) lassen sich nicht unterstützen – dort gäbe es keinen Ruf zu gewinnen.' },
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
       { title:'Nutzen eroberter Systeme', body:'Jedes von dir kontrollierte System bringt laufend <strong>+3 Kredite pro Minute</strong> und <strong>+1% Produktion</strong> auf alle Ressourcen (Produktionsbonus gedeckelt bei +15%, also ab 15 Systemen). Die Übersicht im Galaxie-Tab zeigt deine Systeme und ihren Gesamtertrag. <strong>Achtung:</strong> Fraktionen versuchen gelegentlich, an ihr Gebiet grenzende Systeme <strong>zurückzuerobern</strong>. Ob sie Erfolg haben, hängt von deiner Gesamtverteidigung ab – wer stark verteidigt, verliert praktisch nie (Erfolgschance zwischen 3% und maximal 50% pro Versuch, Versuche sind selten). Deine Heimatsysteme sind davon nie betroffen. Verlierst du ein System, wirst du beim nächsten Kartenabgleich benachrichtigt.' },
-      { title:'Diplomatie & Ruf', body:'Bei jeder Fraktion hast du einen <strong>Ruf</strong> (-100 bis 100). Angriffe auf ihre Systeme senken ihn um 15, <strong>Tribut zahlen</strong> (400 Kredite → +3 Ruf, alle 2 Stunden je Fraktion, im Galaxie-Tab) erhöht ihn. Ab Ruf 30 („Freundlich") gibt jede Fraktion einen Effekt, ab 70 („Verbündet") die stärkere Stufe: <strong>Aschen-Kartell</strong> 5%/10% bessere Marktpreise beim Kaufen und Verkaufen · <strong>Void-Marodeure</strong> 25%/50% seltener Überfälle · <strong>Eisenlegion</strong> und <strong>Schattenbund</strong> geben eine Belohnung (Ressourcen bzw. Kredite), die einmal täglich manuell abgeholt werden muss (Knopf "Abholen" bei der jeweiligen Fraktion) - ein Countdown zeigt an, wann die nächste Belohnung bereit ist. Du kannst also wählen: eine Fraktion bekriegen und erobern, oder sie pflegen und von ihr profitieren.' },
+      { title:'Diplomatie & Ruf', body:'Bei jeder Fraktion hast du einen <strong>Ruf</strong> (-100 bis 100). Angriffe auf ihre Systeme senken ihn um 15, <strong>Tribut zahlen</strong> (400 Kredite → +3 Ruf, alle 2 Stunden je Fraktion, im Galaxie-Tab) erhöht ihn – unter Neutral wird der Tribut teurer, siehe „Die acht Ränge". Ab Ruf 30 („Freundlich") gibt jede Fraktion einen Effekt, ab 70 („Verbündet") die stärkere Stufe: <strong>Aschen-Kartell</strong> 5%/10% bessere Marktpreise beim Kaufen und Verkaufen · <strong>Void-Marodeure</strong> 25%/50% seltener Überfälle · <strong>Eisenlegion</strong> und <strong>Schattenbund</strong> geben eine Belohnung (Ressourcen bzw. Kredite), die einmal täglich manuell abgeholt werden muss (Knopf "Abholen" bei der jeweiligen Fraktion) - ein Countdown zeigt an, wann die nächste Belohnung bereit ist. Du kannst also wählen: eine Fraktion bekriegen und erobern, oder sie pflegen und von ihr profitieren.' },
       { title:'Fraktions-Aufträge', body:'Jede Fraktion bietet dir einen <strong>Auftrag</strong> an (im Galaxie-Tab, 24h gültig, danach kommt ein neuer) – und zwar einen, der <strong>zu ihr passt</strong>: Das <strong>Aschen-Kartell</strong> will Umsatz, Lieferungen und Markthandel; die <strong>Eisenlegion</strong> Kämpfe, geräumte Piratennester und aufgestellte Flottenstärke; der <strong>Void-Zirkel</strong> Expeditionen, angesteuerte Peilungen, Kodex-Einträge und seltene Materie; das <strong>Schatten-Syndikat</strong> Aufklärung, verdeckte Beschaffung und Schweigegeld. Jede Fraktion zieht aus ihrem eigenen Pool von sieben Auftragsarten, du siehst also nicht mehr überall dasselbe.<br><br>Jeder Auftrag hat eine <strong>Stufe</strong>: <strong>Bronze</strong> (häufig, kleines Ziel), <strong>Silber</strong> (2,5× Ziel, deutlich mehr Lohn) und <strong>Gold</strong> (5× Ziel, rund 2,4× Ruf, 3,5× Kredite – und zusätzlich <strong>6 Modulfragmente</strong>). Gold ist selten und entsprechend ein Ereignis. Die Stufe steht farbig vor dem Auftragstext, ein Balken darunter zeigt den Fortschritt.<br><br>Manche Aufträge verlangen eine echte <strong>Lieferung</strong> (Ressourcen, Fragmente, Kredite) – die werden beim Abschließen abgebucht. Andere prüfen nur deinen <strong>Stand</strong> (aufgestellte Flottenstärke, Kodex-Einträge, bereitgehaltene Kredite) und kosten dich nichts. Aufträge, die du gerade grundsätzlich nicht erfüllen könntest (z.B. Ausspähen ohne Serververbindung oder eine Mondbelagerung ohne Mondzerstörer), werden dir gar nicht erst angeboten.' },
       { title:'Statistik-Dashboard', body:'Im Punktestand-Tab findest du ein <strong>Statistik-Dashboard</strong>: Kennzahlen-Kacheln (Siege, Niederlagen, Siegquote, Kampfpunkte, Expeditionen, eroberte Systeme, Kredite, gebundene Frachter), Verlaufsdiagramme für <strong>Kredite</strong> und <strong>Erz-Produktion</strong> sowie die aktuelle Produktion pro Sekunde aller Ressourcen als Balken. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.' },
       { title:'Erfolge & Tagesaufgaben zu den neuen Systemen', body:'Markt, Handelsrouten, Diplomatie, Eroberung und Kredit-Shop haben eigene <strong>Erfolge</strong> (z.B. Marktgänger, Großhändler, Logistiker, Eroberer, Systemherr, Diplomat, Auftragsjäger, Stammkunde, Kreditwürdig) und zwei neue <strong>Tagesaufgaben</strong>: „1 Handel am Markt abschließen" (+60 Kredite) und „1 Fraktionsauftrag abschließen" (+80 Kredite).' }
@@ -25698,6 +25881,7 @@
         if (state.nextFactionGift === undefined) state.nextFactionGift = 0;
         if (!state.factionGiftClaimedAt) state.factionGiftClaimedAt = {};
         if (!state.factionQuests) state.factionQuests = {};
+        if (!state.factionLastContact || typeof state.factionLastContact !== 'object') state.factionLastContact = {};
         if (state.marketTradesDone === undefined) state.marketTradesDone = 0;
         if (state.factionQuestsDone === undefined) state.factionQuestsDone = 0;
     if (state.factionGoldQuestsDone === undefined) state.factionGoldQuestsDone = 0;
@@ -37545,6 +37729,7 @@
     processExoticResearchJob();
     processVeteranTrainingJob();
     processTradeRoutes();
+    const rufVerfallen = processReputationDecay();
     accruePactUptime();
     processConqueredSystems();
     maybeSpawnPlanetEvent();
@@ -37563,7 +37748,7 @@
     // Leiste schon gesetzt oder der Hinweis weggeklickt, steigt maybeShowTabHint sofort wieder aus.
     if (tabVisible) maybeShowTabHint(activeTab);
     if (tabVisible) render();
-    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored) save();
+    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored || rufVerfallen) save();
   }, 1000);
   // Nachhol-Render beim Zurückkehren in den Tab (Gegenstück zum tabVisible-Gate im Haupt-Tick):
   // der erste sichtbare Frame zeigt sofort den aktuellen Stand statt bis zu 1s alte Werte.

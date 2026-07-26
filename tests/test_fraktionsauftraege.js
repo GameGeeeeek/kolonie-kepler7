@@ -39,11 +39,15 @@ function baue(opts){
     discoveredSystems:{}, spyIntel:{}, modulePurchases:0, moduleSales:0, commandPoints:0,
     expeditionSafeRuns:0, tradeRoutes:[]
   }, opts.state || {});
-  new Function('ctx', 'state', 'fmt', 'useBackend', 'attackPower', 'currentFleet', 'QUEST_DURATION_MS',
+  new Function('ctx', 'state', 'fmt', 'useBackend', 'attackPower', 'currentFleet', 'QUEST_DURATION_MS', 'factionRankOf',
+    'RANK_GOLD_CHANCE_FROM', 'RANK_QUEST_TIME_FROM', 'RANK_QUEST_TIME_BONUS',
     block + ';ctx.TIERS=QUEST_TIERS;ctx.POOLS=FACTION_QUEST_POOLS;ctx.gen=generateFactionQuest;' +
     'ctx.tierOf=questTierOf;ctx.tplOf=questTemplateOf;ctx.GOLDFRAG=QUEST_GOLD_FRAGMENTS;'
   )(ctx, state, (n)=>String(n), () => opts.backend !== false,
-    () => opts.flottenkraft || 0, () => ({ mondzerstoerer: opts.mondzerstoerer || 0 }), 24*3600*1000);
+    () => opts.flottenkraft || 0, () => ({ mondzerstoerer: opts.mondzerstoerer || 0 }), 24*3600*1000,
+    // Rangabhaengige Verguenstigungen (v8.298.23) - hier neutral gestellt, damit dieser Test
+    // weiterhin nur die Auftragspools misst. Eigener Nachweis in test_fraktionsraenge.js.
+    () => ({ nr: opts.rang || 1 }), 8, 5, 0.5);
   return { ctx, state };
 }
 
