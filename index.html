@@ -4259,8 +4259,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.18';
+  const VERSION = '8.298.19';
   const PATCHNOTES = [
+    { version:'8.298.19', date:'26.07.2026', changes:[
+      'Die Fraktions-Aufträge sind komplett überarbeitet – erster Teil eines größeren Fraktions-Ausbaus. Bisher gab es <strong>drei gemeinsame Auftragsvorlagen für vier Fraktionen</strong>, blind gewürfelt: deshalb stand bei zwei Fraktionen regelmäßig derselbe Auftrag, und das Händler-Kartell konnte „Gewinne 3 Kämpfe" verlangen. Jetzt hat jede Fraktion ihren <strong>eigenen Pool von sieben Auftragsarten</strong> – 28 statt 3.',
+      'Und sie passen zur Fraktion: das <strong>Aschen-Kartell</strong> will Umsatz, Lieferungen und Markthandel; die <strong>Eisenlegion</strong> Kämpfe, geräumte Piratennester und aufgestellte Flottenstärke; der <strong>Void-Zirkel</strong> Expeditionen, angesteuerte Peilungen, Kodex-Einträge und seltene Materie; das <strong>Schatten-Syndikat</strong> Aufklärung, verdeckte Beschaffung und Schweigegeld.',
+      'Neu sind <strong>drei Auftragsstufen</strong>: Bronze (häufig), Silber (2,5× Ziel, deutlich mehr Lohn) und Gold (5× Ziel, rund 2,4× Ruf, 3,5× Kredite und zusätzlich 6 Modulfragmente). Gold ist mit etwa 14% Ziehungschance ein Ereignis. Die Stufe steht farbig vor dem Auftrag, ein Balken darunter zeigt den Fortschritt.',
+      'Manche Aufträge verlangen eine echte <strong>Lieferung</strong> (Ressourcen, Fragmente, Kredite) und buchen beim Abschließen ab. Andere prüfen nur deinen <strong>Stand</strong> – aufgestellte Flottenstärke, Kodex-Einträge, bereitgehaltene Kredite – und kosten nichts.',
+      'Aufträge, die du gerade grundsätzlich nicht erfüllen könntest, werden gar nicht erst angeboten: Ausspähen und Markthandel nur mit Serververbindung, Mondbelagerung nur mit Mondzerstörer, Handelsrouten-Umsatz nur mit eingerichteter Route. Vorher hätte so ein toter Auftrag die Fraktion 24 Stunden blockiert.',
+      'Dazu zwei neue Erfolge: <strong>Goldstandard</strong> (5 Gold-Aufträge) und <strong>Vertragsmeister</strong> (50 Fraktionsaufträge).'
+    ]},
     { version:'8.298.18', date:'26.07.2026', changes:[
       'Fehler behoben (Spieler-Report): <strong>Sieben Schiffstypen konnten überhaupt nicht auf Expedition</strong> – Wächter, Hyperjäger, Hyperbomber sowie die vier Tier-2-/Apex-Rümpfe Nanoklinge, Quantenkreuzer, Fusionsdreadnought und Singularitäts-Vernichter. Sie tauchten in der Eskorte-Auswahl gar nicht erst auf, obwohl sie in jedem anderen Kampf mitfliegen und ihre Angriffskraft überall sonst mitzählt.',
       'Am deutlichsten fiel es beim Schnellstart auf: „Alle starten" verspricht, die <em>gesamte</em> verfügbare Eskorte aufzuteilen – ließ aber genau diese sieben Typen zuhause. Dasselbe galt für „Ganze Flotte als Eskorte".',
@@ -11093,53 +11101,158 @@
   // Lebenszeit-Zähler gemessen (battleStats.wins, expeditionsCompleted) statt über neue Hooks im
   // Kampf-/Expeditionscode: der Auftrag merkt sich den Zählerstand bei Annahme, Fortschritt = Differenz.
   const QUEST_DURATION_MS = 24*60*60*1000;
-  const QUEST_TEMPLATES = [
-    { type:'deliver', gen(){ const opts=[{res:'erz',amt:1500},{res:'kristalle',amt:1000},{res:'deuterium',amt:600},{res:'energie',amt:1200}]; const o=opts[Math.floor(Math.random()*opts.length)]; return { type:'deliver', res:o.res, target:o.amt, rewardRep:12, rewardCredits:200 }; } },
-    { type:'combat', gen(){ return { type:'combat', target:3, startValue: (state.battleStats&&state.battleStats.wins)||0, rewardRep:15, rewardCredits:300 }; } },
-    { type:'expedition', gen(){ return { type:'expedition', target:2, startValue: state.expeditionsCompleted||0, rewardRep:12, rewardCredits:250 }; } }
+  // ===== Fraktionseigene Auftragspools (26.07.2026) =====
+  // Vorher: DREI gemeinsame Vorlagen (liefern/kämpfen/Expedition) fuer VIER Fraktionen, blind
+  // gewuerfelt. Folge war das, was ein Spieler gemeldet hat: bei zwei Fraktionen stand derselbe
+  // Auftrag - bei 3 Vorlagen und 4 Fraktionen ist das der Normalfall, nicht der Ausnahmefall. Und die
+  // Auftraege hatten keinen Charakter: das Haendler-Kartell konnte "Gewinne 3 Kaempfe" verlangen, die
+  // Eisenlegion "Liefere 1.500 Erz".
+  //
+  // Jetzt hat jede Fraktion ihren EIGENEN Pool, der zu ihr passt, und jeder Auftrag drei Stufen.
+  //
+  // Zwei Bauregeln, die hier bewusst durchgehalten sind:
+  //  (a) Fortschritt wird ueber VORHANDENE Lebenszeit-Zaehler gemessen (kind:'gain', Differenz zum
+  //      Stand bei Annahme) oder ueber den aktuellen Bestand (kind:'have'/'deliver'). Kein neuer Hook
+  //      an irgendeiner Abschluss-Stelle - dasselbe Muster wie bei den Tagesaufgaben.
+  //  (b) available(): Auftraege, die ohne Server oder ohne bestimmte Freischaltungen unerfuellbar
+  //      waeren (Ausspaehen, Markthandel, Mondbelagerung), kommen dann gar nicht erst in den Pool.
+  //      Sonst blockiert ein toter Auftrag die Fraktion 24 Stunden lang.
+  const QUEST_TIERS = [
+    { key:'bronze', label:'Bronze', mult:1,   repMult:0.7, creditMult:0.6, icon:'ti-medal',  color:'#c08457' },
+    { key:'silber', label:'Silber', mult:2.5, repMult:1.4, creditMult:1.6, icon:'ti-medal',  color:'#b9c0d4' },
+    { key:'gold',   label:'Gold',   mult:5,   repMult:2.4, creditMult:3.5, icon:'ti-trophy', color:'#fac775' }
   ];
-  function generateFactionQuest(){
-    const t = QUEST_TEMPLATES[Math.floor(Math.random()*QUEST_TEMPLATES.length)];
-    const q = t.gen();
-    q.expiresAt = Date.now() + QUEST_DURATION_MS;
-    return q;
+  // Gold-Auftraege geben zusaetzlich Modulfragmente - der erste fraktionseigene Sachwert. Bewusst
+  // Fragmente und kein fertiges Modul: die sind schon eine etablierte Waehrung (Schmelze/Fertigung)
+  // und lassen sich fein dosieren.
+  const QUEST_GOLD_FRAGMENTS = 6;
+  const FACTION_QUEST_POOLS = {
+    // Aschen-Kartell: Haendler. Alles, was mit Umsatz, Markt und Logistik zu tun hat.
+    kartell: [
+      { key:'erz',      kind:'deliver', res:'erz',        basis:1500, rep:12, credits:200, text:t=>'Liefere '+fmt(t)+' Erz' },
+      { key:'kristall', kind:'deliver', res:'kristalle',  basis:1000, rep:12, credits:200, text:t=>'Liefere '+fmt(t)+' Kristalle' },
+      { key:'deut',     kind:'deliver', res:'deuterium',  basis:600,  rep:12, credits:220, text:t=>'Liefere '+fmt(t)+' Deuterium' },
+      { key:'handel',   kind:'gain', zaehler:()=>state.marketTradesDone||0, basis:3, rep:14, credits:260, text:t=>'Schließe '+t+' Handel am Markt ab',
+        available:()=>useBackend() },
+      { key:'routen',   kind:'gain', zaehler:()=>Math.floor(state.tradeRouteLifetimeCredits||0), basis:2000, rep:14, credits:250, text:t=>'Erwirtschafte '+fmt(t)+' Kredite über Handelsrouten',
+        available:()=>(state.tradeRoutes||[]).length > 0 },
+      { key:'shop',     kind:'gain', zaehler:()=>state.shopPurchases||0, basis:2, rep:12, credits:180, text:t=>'Kaufe '+t+' Posten im Kredit-Shop' },
+      { key:'kasse',    kind:'have', zaehler:()=>state.credits||0, basis:8000, rep:10, credits:0, text:t=>'Halte '+fmt(t)+' Kredite als Sicherheit bereit' }
+    ],
+    // Eisenlegion: Militaer. Kaempfe, Aufraeumen, Verteidigung.
+    legion: [
+      { key:'kaempfe',  kind:'gain', zaehler:()=>((state.battleStats&&state.battleStats.wins)||0), basis:3, rep:15, credits:300, text:t=>'Gewinne '+t+' Kämpfe' },
+      { key:'npc',      kind:'gain', zaehler:()=>state.npcKills||0, basis:4, rep:15, credits:300, text:t=>'Besiege '+t+' NPC-Flotten' },
+      { key:'punkte',   kind:'gain', zaehler:()=>state.battlePoints||0, basis:25, rep:14, credits:280, text:t=>'Sammle '+t+' Kampfpunkte' },
+      { key:'nester',   kind:'gain', zaehler:()=>state.pirateLairPrestige||0, basis:1, rep:18, credits:400, text:t=>'Räume '+t+' Piratennest'+(t===1?'':'er')+' aus' },
+      { key:'bosse',    kind:'gain', zaehler:()=>state.bossKills||0, basis:1, rep:20, credits:450, text:t=>'Besiege '+t+' Wächter-Boss'+(t===1?'':'e') },
+      { key:'flotte',   kind:'have', zaehler:()=>Math.round(attackPower(currentFleet())), basis:2500, rep:12, credits:200, text:t=>'Stelle eine Flotte mit '+fmt(t)+' Angriffskraft auf' },
+      { key:'monde',    kind:'gain', zaehler:()=>state.moonSiegesWon||0, basis:1, rep:25, credits:600, text:t=>'Zerstöre '+t+' fremden Mond',
+        available:()=>useBackend() && (currentFleet().mondzerstoerer||0) > 0 }
+    ],
+    // Void: mystisch, Tiefenraum. Expeditionen, Anomalien, seltene Materie.
+    void: [
+      { key:'expedition', kind:'gain', zaehler:()=>state.expeditionsCompleted||0, basis:2, rep:12, credits:250, text:t=>'Schließe '+t+' Expeditionen ab' },
+      { key:'peilung',    kind:'gain', zaehler:()=>((state.expeditionCodex||{}).signalsFollowed||0), basis:1, rep:18, credits:350, text:t=>'Steuere '+t+' aufgefangene Peilung'+(t===1?'':'en')+' an',
+        available:()=>(state.expeditionsCompleted||0) >= 15 },
+      { key:'sonderfund', kind:'have', zaehler:()=>Object.keys(((state.expeditionCodex||{}).specials)||{}).length, basis:8, rep:14, credits:260, text:t=>'Trage '+t+' verschiedene Sonderfunde in den Kodex ein' },
+      { key:'material',   kind:'have', zaehler:()=>Object.keys(((state.expeditionCodex||{}).rares)||{}).length, basis:2, rep:20, credits:400, text:t=>'Berge '+t+' verschiedene seltene Materialien' },
+      { key:'fragmente',  kind:'deliver', res:null, feld:'moduleFragments', basis:10, rep:14, credits:0, text:t=>'Übergib '+t+' Modulfragmente an die Leerenforscher' },
+      { key:'antimaterie',kind:'deliver', res:'antimaterie', basis:120, rep:16, credits:300, text:t=>'Liefere '+fmt(t)+' Antimaterie' },
+      { key:'systeme',    kind:'have', zaehler:()=>Object.keys(state.discoveredSystems||{}).length, basis:4, rep:12, credits:220, text:t=>'Erkunde '+t+' Sternsysteme' }
+    ],
+    // Schatten: verdeckt. Spionage, Beschaffung, Diskretion.
+    schatten: [
+      { key:'spionage', kind:'have', zaehler:()=>Object.keys(state.spyIntel||{}).length, basis:2, rep:16, credits:320, text:t=>'Halte Aufklärung über '+t+' Spieler bereit',
+        available:()=>useBackend() },
+      { key:'module',   kind:'gain', zaehler:()=>state.modulePurchases||0, basis:2, rep:14, credits:200, text:t=>'Beschaffe '+t+' Module über den Markt',
+        available:()=>useBackend() },
+      { key:'verkauf',  kind:'gain', zaehler:()=>state.moduleSales||0, basis:2, rep:14, credits:260, text:t=>'Verschiebe '+t+' Module diskret weiter',
+        available:()=>useBackend() },
+      { key:'energie',  kind:'deliver', res:'energie', basis:1200, rep:12, credits:200, text:t=>'Liefere '+fmt(t)+' Energie unauffällig' },
+      { key:'kredite',  kind:'deliver', res:null, feld:'credits', basis:1200, rep:16, credits:0, text:t=>'Zahle '+fmt(t)+' Kredite Schweigegeld' },
+      { key:'punkte',   kind:'gain', zaehler:()=>state.commandPoints||0, basis:20, rep:12, credits:220, text:t=>'Sammle '+t+' Kommandopunkte' },
+      { key:'tarnung',  kind:'gain', zaehler:()=>state.expeditionSafeRuns||0, basis:2, rep:14, credits:240, text:t=>'Bringe '+t+' Expeditionen ohne Zwischenfall zurück' }
+    ]
+  };
+  function questTierOf(key){ return QUEST_TIERS.find(t => t.key === key) || QUEST_TIERS[0]; }
+  function questTemplateOf(fid, key){ return (FACTION_QUEST_POOLS[fid]||[]).find(t => t.key === key) || null; }
+  // Erzeugt einen Auftrag fuer eine BESTIMMTE Fraktion aus ihrem eigenen Pool. Die Stufe wird
+  // gewuerfelt (Bronze am haeufigsten, Gold am seltensten) - so bleibt Gold ein Ereignis.
+  function generateFactionQuest(fid){
+    const pool = (FACTION_QUEST_POOLS[fid]||[]).filter(t => !t.available || t.available());
+    if (!pool.length) return null;
+    const t = pool[Math.floor(Math.random()*pool.length)];
+    const r = Math.random();
+    const tier = r < 0.55 ? QUEST_TIERS[0] : (r < 0.87 ? QUEST_TIERS[1] : QUEST_TIERS[2]);
+    return {
+      tpl: t.key, tier: tier.key, faction: fid,
+      target: Math.max(1, Math.round(t.basis * tier.mult)),
+      rewardRep: Math.max(1, Math.round(t.rep * tier.repMult)),
+      rewardCredits: Math.round(t.credits * tier.creditMult),
+      rewardFragments: tier.key === 'gold' ? QUEST_GOLD_FRAGMENTS : 0,
+      // Nur 'gain'-Auftraege brauchen einen Startwert; 'have'/'deliver' messen den Bestand.
+      startValue: t.kind === 'gain' ? (t.zaehler()||0) : 0,
+      expiresAt: Date.now() + QUEST_DURATION_MS
+    };
   }
   // Sorgt dafür, dass jede Fraktion einen gültigen Auftrag hat (neu bei Fehlen/Ablauf).
   function ensureFactionQuests(){
     for (const fid of Object.keys(FACTION_DIPLOMACY)){
       const q = state.factionQuests[fid];
-      if (!q || q.expiresAt < Date.now()) state.factionQuests[fid] = generateFactionQuest();
+      // Auch Altstände mit dem ALTEN Format (q.type statt q.tpl) werden hier ersetzt - sonst
+      // stünden sie bis zum Ablauf als "?" in der Anzeige.
+      if (!q || !q.tpl || q.expiresAt < Date.now()) state.factionQuests[fid] = generateFactionQuest(fid);
     }
   }
+  // Der aktuelle Wert, den ein Auftrag misst. Drei Messarten:
+  //   gain    - Zuwachs eines Lebenszeit-Zaehlers seit Annahme (Kaempfe, Expeditionen, Umsatz)
+  //   have    - aktueller Bestand/Stand (Kredite, Flottenstaerke, Kodex-Eintraege) - bleibt beim
+  //             Abschluss unangetastet, die Fraktion prueft nur nach
+  //   deliver - aktueller Bestand, wird beim Abschluss ABGEZOGEN (echte Lieferung)
   function questProgress(q){
-    if (q.type === 'deliver') return Math.min(q.target, Math.floor(state.resources[q.res]||0));
-    if (q.type === 'combat') return Math.min(q.target, Math.max(0, ((state.battleStats&&state.battleStats.wins)||0) - (q.startValue||0)));
-    if (q.type === 'expedition') return Math.min(q.target, Math.max(0, (state.expeditionsCompleted||0) - (q.startValue||0)));
-    return 0;
+    const t = q && questTemplateOf(q.faction, q.tpl);
+    if (!t) return 0;
+    if (t.kind === 'gain') return Math.min(q.target, Math.max(0, (t.zaehler()||0) - (q.startValue||0)));
+    return Math.min(q.target, Math.floor(questHaveAmount(t)));
+  }
+  // Bestand fuer have/deliver: entweder eine Ressource, ein Zustandsfeld oder eine eigene Funktion.
+  function questHaveAmount(t){
+    if (t.res) return state.resources[t.res]||0;
+    if (t.feld) return (t.feld === 'credits' ? (state.credits||0) : (state[t.feld]||0));
+    return t.zaehler ? (t.zaehler()||0) : 0;
   }
   function questLabel(q){
-    if (q.type === 'deliver'){ const rd = RES_DEFS.find(r=>r.key===q.res)||{label:q.res}; return 'Liefere '+fmt(q.target)+' '+rd.label; }
-    if (q.type === 'combat') return 'Gewinne '+q.target+' Kämpfe';
-    if (q.type === 'expedition') return 'Schließe '+q.target+' Expeditionen ab';
-    return '?';
+    const t = q && questTemplateOf(q.faction, q.tpl);
+    return t ? t.text(q.target) : 'Auftrag';
   }
   function completeFactionQuest(fid){
     const q = state.factionQuests[fid];
     if (!q) return;
+    const t = questTemplateOf(q.faction || fid, q.tpl);
+    if (!t){ log('Dieser Auftrag ist nicht mehr gültig und wird ersetzt.', 'ti-alert-triangle'); state.factionQuests[fid] = generateFactionQuest(fid); render(); save(); return; }
     if (questProgress(q) < q.target){ log('Der Auftrag ist noch nicht erfüllt.', 'ti-info-circle'); return; }
-    if (q.type === 'deliver'){
-      if ((state.resources[q.res]||0) < q.target){ log('Nicht genug Ressourcen zum Abliefern.', 'ti-alert-triangle'); return; }
-      state.resources[q.res] -= q.target;
+    if (t.kind === 'deliver'){
+      if (questHaveAmount(t) < q.target){ log('Nicht genug zum Abliefern.', 'ti-alert-triangle'); return; }
+      if (t.res) state.resources[t.res] -= q.target;
+      else if (t.feld === 'credits') state.credits -= q.target;
+      else if (t.feld) state[t.feld] = (state[t.feld]||0) - q.target;
     }
     changeFactionRep(fid, q.rewardRep);
-    state.credits = (state.credits||0) + q.rewardCredits;
+    if (q.rewardCredits) state.credits = (state.credits||0) + q.rewardCredits;
+    if (q.rewardFragments) state.moduleFragments = (state.moduleFragments||0) + q.rewardFragments;
     const f = (galaxyCache.factions||{})[fid];
-    log('Auftrag für '+(f?f.name:fid)+' abgeschlossen: +'+q.rewardRep+' Ruf, +'+q.rewardCredits+' Kredite.', 'ti-medal');
+    const tier = questTierOf(q.tier);
+    const teile = ['+'+q.rewardRep+' Ruf'];
+    if (q.rewardCredits) teile.push('+'+fmt(q.rewardCredits)+' Kredite');
+    if (q.rewardFragments) teile.push('+'+q.rewardFragments+' Modulfragmente');
+    log(tier.label+'-Auftrag für '+(f?f.name:fid)+' abgeschlossen: '+teile.join(', ')+'.', tier.icon, 'ok');
     playSound('win');
     state.factionQuestsDone = (state.factionQuestsDone||0) + 1;
+    if (q.tier === 'gold') state.factionGoldQuestsDone = (state.factionGoldQuestsDone||0) + 1;
     if (state.dailyQuests) state.dailyQuests.fquestCount = (state.dailyQuests.fquestCount||0) + 1;
     checkAchievements();
-    state.factionQuests[fid] = generateFactionQuest();
+    state.factionQuests[fid] = generateFactionQuest(fid);
     render(); save();
   }
 
@@ -11385,13 +11498,21 @@
       </div>` : '';
       // Auftrag dieser Fraktion mit Fortschritt und Abschluss-Button.
       const quest = state.factionQuests[f.id];
-      const questRow = (dip && quest) ? (()=>{
+      const questRow = (dip && quest && quest.tpl) ? (()=>{
         const prog = questProgress(quest);
         const done = prog >= quest.target;
         const hoursLeft = Math.max(0, Math.ceil((quest.expiresAt - Date.now())/3600000));
-        return `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap;">
-          <div class="bmeta"><i class="ti ti-medal" aria-hidden="true" style="margin-right:3px; color:#fac775;"></i>Auftrag: ${questLabel(quest)} <strong style="color:${done?'#5dcaa5':'#c7cbe0'};">(${prog}/${quest.target})</strong> · +${quest.rewardRep} Ruf, +${quest.rewardCredits} Kr. · noch ${hoursLeft}h</div>
-          <button data-quest-complete="${f.id}" ${done?'':'disabled'} style="font-size:10.5px; padding:3px 8px; ${done?'background:rgba(93,202,165,0.2);':''}">${done?'Abschließen':'Offen'}</button>
+        const tier = questTierOf(quest.tier);
+        const pct = quest.target > 0 ? Math.min(100, Math.round(prog/quest.target*100)) : 0;
+        const lohn = ['+'+quest.rewardRep+' Ruf']
+          .concat(quest.rewardCredits ? ['+'+fmt(quest.rewardCredits)+' Kr.'] : [])
+          .concat(quest.rewardFragments ? ['+'+quest.rewardFragments+' Fragmente'] : []).join(', ');
+        return `<div style="margin-top:4px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
+            <div class="bmeta"><i class="ti ${tier.icon}" aria-hidden="true" style="margin-right:3px; color:${tier.color};"></i><strong style="color:${tier.color};">${tier.label}</strong> · ${questLabel(quest)} <strong style="color:${done?'#5dcaa5':'#c7cbe0'};">(${fmt(prog)}/${fmt(quest.target)})</strong> · ${lohn} · noch ${hoursLeft}h</div>
+            <button data-quest-complete="${f.id}" ${done?'':'disabled'} style="font-size:10.5px; padding:3px 8px; ${done?'background:rgba(93,202,165,0.2);':''}">${done?'Abschließen':'Offen'}</button>
+          </div>
+          ${done ? '' : `<div class="progress-outer" style="height:4px; margin-top:4px;"><div class="progress-inner" style="width:${pct}%; background:${tier.color};"></div></div>`}
         </div>`;
       })() : '';
       return `<div class="card-row" style="flex-direction:column; align-items:stretch;">
@@ -11500,6 +11621,10 @@
     { key:'pact3', name:'Diplomat der Sterne', desc:'Halte 3 Nichtangriffspakte mit anderen Spielern gleichzeitig aktiv.', check: s => diploCache.filter(e=>pactIsActive(e.data)).length >= 3, progress: s => [Math.min(3,diploCache.filter(e=>pactIsActive(e.data)).length), 3] },
     { key:'pact_century', name:'Jahrhundertfrieden', desc:'Halte insgesamt 100 Tage lang (nicht zwingend am Stück) mindestens einen aktiven Nichtangriffspakt.', check: s => (s.pactCumulativeActiveMs||0) >= 100*86400000, progress: s => [Math.min(100,Math.floor((s.pactCumulativeActiveMs||0)/86400000)), 100] },
     { key:'fquest10', name:'Auftragsjäger', desc:'Schließe 10 Fraktionsaufträge ab.', check: s => (s.factionQuestsDone||0) >= 10, progress: s => [Math.min(10,s.factionQuestsDone||0), 10] },
+    // Neu 26.07.2026 mit den fraktionseigenen Auftragspools: Gold-Auftraege sind die seltene,
+    // aufwendige Stufe (13% Ziehungschance) - ein eigenes Ziel dafuer, und eines fuer die Menge.
+    { key:'fquestgold5', name:'Goldstandard', desc:'Schließe 5 Gold-Aufträge einer Fraktion ab – die seltenste und aufwendigste Auftragsstufe.', check: s => (s.factionGoldQuestsDone||0) >= 5, progress: s => [Math.min(5,s.factionGoldQuestsDone||0), 5], reward:{erz:9000,kristalle:6000,deuterium:3000,credits:700}, xpReward:500 },
+    { key:'fquest50', name:'Vertragsmeister', desc:'Schließe 50 Fraktionsaufträge ab.', check: s => (s.factionQuestsDone||0) >= 50, progress: s => [Math.min(50,s.factionQuestsDone||0), 50], reward:{erz:14000,kristalle:9000,deuterium:5000,antimaterie:150,credits:900}, xpReward:700 },
     { key:'shop5', name:'Stammkunde', desc:'Kaufe 5 Mal im Kredit-Shop ein.', check: s => (s.shopPurchases||0) >= 5, progress: s => [Math.min(5,s.shopPurchases||0), 5] },
     { key:'credits5k', name:'Kreditwürdig', desc:'Besitze 5000 Kredite gleichzeitig.', check: s => (s.credits||0) >= 5000, progress: s => [Math.min(5000,Math.floor(s.credits||0)), 5000] },
     // ===== Schwere Endgame-Erfolge (13.07.2026) - deutlich größere Belohnung, gestaffelt nach
@@ -11563,7 +11688,7 @@
     synthesemeister:'aufbau', singularitaetsarchitekt:'aufbau',
     tenkills:'krieg', bossdown:'krieg', abyssdown:'krieg', nyradown:'krieg', allbosses:'krieg', moonsiegewin:'krieg', basewarwin:'krieg', warvictor:'krieg', kriegsheld:'krieg', ligameister:'krieg', allveteran:'krieg',
     allsystems:'expansion', explorer25:'expansion', conquer1:'expansion', conquer5:'expansion',
-    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', shop5:'handel', gutvernetzt:'handel',
+    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', fquestgold5:'handel', fquest50:'handel', shop5:'handel', gutvernetzt:'handel',
     allianzweltprojekt:'allianz', allianzausbau100:'allianz', allianzeinsatz:'allianz', allianceraidkill:'allianz',
     firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister', streak30:'meister', streak100:'meister', happyhour10:'meister'
   };
@@ -11593,7 +11718,7 @@
     trade1:'ti-truck', trade50:'ti-truck', route1:'ti-arrows-shuffle',
     trade_empire:'ti-diamond', trade_longrun:'ti-clock', conquer1:'ti-flag',
     conquer5:'ti-world', allied:'ti-message', pact3:'ti-shield', pact_century:'ti-shield-lock',
-    fquest10:'ti-list-details', shop5:'ti-diamond', credits5k:'ti-diamond',
+    fquest10:'ti-list-details', fquestgold5:'ti-trophy', fquest50:'ti-medal', shop5:'ti-diamond', credits5k:'ti-diamond',
     skilltreemax:'ti-star', allveteran:'ti-medal', allexotic:'ti-atom-2',
     erdweltmaster:'ti-plant', leerenweltmaster:'ti-mountain', allianzeinsatz:'ti-bell',
     allcolonyslots:'ti-home', allresearchmax:'ti-microscope',
@@ -16550,6 +16675,7 @@
     if (!state.factionQuests) state.factionQuests = {};
     if (state.marketTradesDone === undefined) state.marketTradesDone = 0;
     if (state.factionQuestsDone === undefined) state.factionQuestsDone = 0;
+    if (state.factionGoldQuestsDone === undefined) state.factionGoldQuestsDone = 0;
     if (state.shopPurchases === undefined) state.shopPurchases = 0;
     if (state.dominanceClaimed === undefined) state.dominanceClaimed = 0;
     if (state.allianceDominanceClaimed === undefined) state.allianceDominanceClaimed = 0;
@@ -19952,7 +20078,7 @@
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
       { title:'Nutzen eroberter Systeme', body:'Jedes von dir kontrollierte System bringt laufend <strong>+3 Kredite pro Minute</strong> und <strong>+1% Produktion</strong> auf alle Ressourcen (Produktionsbonus gedeckelt bei +15%, also ab 15 Systemen). Die Übersicht im Galaxie-Tab zeigt deine Systeme und ihren Gesamtertrag. <strong>Achtung:</strong> Fraktionen versuchen gelegentlich, an ihr Gebiet grenzende Systeme <strong>zurückzuerobern</strong>. Ob sie Erfolg haben, hängt von deiner Gesamtverteidigung ab – wer stark verteidigt, verliert praktisch nie (Erfolgschance zwischen 3% und maximal 50% pro Versuch, Versuche sind selten). Deine Heimatsysteme sind davon nie betroffen. Verlierst du ein System, wirst du beim nächsten Kartenabgleich benachrichtigt.' },
       { title:'Diplomatie & Ruf', body:'Bei jeder Fraktion hast du einen <strong>Ruf</strong> (-100 bis 100). Angriffe auf ihre Systeme senken ihn um 15, <strong>Tribut zahlen</strong> (400 Kredite → +3 Ruf, alle 2 Stunden je Fraktion, im Galaxie-Tab) erhöht ihn. Ab Ruf 30 („Freundlich") gibt jede Fraktion einen Effekt, ab 70 („Verbündet") die stärkere Stufe: <strong>Aschen-Kartell</strong> 5%/10% bessere Marktpreise beim Kaufen und Verkaufen · <strong>Void-Marodeure</strong> 25%/50% seltener Überfälle · <strong>Eisenlegion</strong> und <strong>Schattenbund</strong> geben eine Belohnung (Ressourcen bzw. Kredite), die einmal täglich manuell abgeholt werden muss (Knopf "Abholen" bei der jeweiligen Fraktion) - ein Countdown zeigt an, wann die nächste Belohnung bereit ist. Du kannst also wählen: eine Fraktion bekriegen und erobern, oder sie pflegen und von ihr profitieren.' },
-      { title:'Fraktions-Aufträge', body:'Jede Fraktion bietet dir einen <strong>Auftrag</strong> an (im Galaxie-Tab, 24h gültig, danach kommt ein neuer): Ressourcen liefern, Kämpfe gewinnen oder Expeditionen abschließen. Abschluss bringt <strong>+12 bis +15 Ruf und 200–300 Kredite</strong> – der lohnendere Weg, Ruf aufzubauen, verglichen mit Tribut. Nach dem Abschließen gibt es sofort einen neuen Auftrag.' },
+      { title:'Fraktions-Aufträge', body:'Jede Fraktion bietet dir einen <strong>Auftrag</strong> an (im Galaxie-Tab, 24h gültig, danach kommt ein neuer) – und zwar einen, der <strong>zu ihr passt</strong>: Das <strong>Aschen-Kartell</strong> will Umsatz, Lieferungen und Markthandel; die <strong>Eisenlegion</strong> Kämpfe, geräumte Piratennester und aufgestellte Flottenstärke; der <strong>Void-Zirkel</strong> Expeditionen, angesteuerte Peilungen, Kodex-Einträge und seltene Materie; das <strong>Schatten-Syndikat</strong> Aufklärung, verdeckte Beschaffung und Schweigegeld. Jede Fraktion zieht aus ihrem eigenen Pool von sieben Auftragsarten, du siehst also nicht mehr überall dasselbe.<br><br>Jeder Auftrag hat eine <strong>Stufe</strong>: <strong>Bronze</strong> (häufig, kleines Ziel), <strong>Silber</strong> (2,5× Ziel, deutlich mehr Lohn) und <strong>Gold</strong> (5× Ziel, rund 2,4× Ruf, 3,5× Kredite – und zusätzlich <strong>6 Modulfragmente</strong>). Gold ist selten und entsprechend ein Ereignis. Die Stufe steht farbig vor dem Auftragstext, ein Balken darunter zeigt den Fortschritt.<br><br>Manche Aufträge verlangen eine echte <strong>Lieferung</strong> (Ressourcen, Fragmente, Kredite) – die werden beim Abschließen abgebucht. Andere prüfen nur deinen <strong>Stand</strong> (aufgestellte Flottenstärke, Kodex-Einträge, bereitgehaltene Kredite) und kosten dich nichts. Aufträge, die du gerade grundsätzlich nicht erfüllen könntest (z.B. Ausspähen ohne Serververbindung oder eine Mondbelagerung ohne Mondzerstörer), werden dir gar nicht erst angeboten.' },
       { title:'Statistik-Dashboard', body:'Im Punktestand-Tab findest du ein <strong>Statistik-Dashboard</strong>: Kennzahlen-Kacheln (Siege, Niederlagen, Siegquote, Kampfpunkte, Expeditionen, eroberte Systeme, Kredite, gebundene Frachter), Verlaufsdiagramme für <strong>Kredite</strong> und <strong>Erz-Produktion</strong> sowie die aktuelle Produktion pro Sekunde aller Ressourcen als Balken. Verlaufsdaten werden alle 5 Minuten während des Spielens aufgezeichnet.' },
       { title:'Erfolge & Tagesaufgaben zu den neuen Systemen', body:'Markt, Handelsrouten, Diplomatie, Eroberung und Kredit-Shop haben eigene <strong>Erfolge</strong> (z.B. Marktgänger, Großhändler, Logistiker, Eroberer, Systemherr, Diplomat, Auftragsjäger, Stammkunde, Kreditwürdig) und zwei neue <strong>Tagesaufgaben</strong>: „1 Handel am Markt abschließen" (+60 Kredite) und „1 Fraktionsauftrag abschließen" (+80 Kredite).' }
     ]},
@@ -25148,6 +25274,7 @@
         if (!state.factionQuests) state.factionQuests = {};
         if (state.marketTradesDone === undefined) state.marketTradesDone = 0;
         if (state.factionQuestsDone === undefined) state.factionQuestsDone = 0;
+    if (state.factionGoldQuestsDone === undefined) state.factionGoldQuestsDone = 0;
         if (state.shopPurchases === undefined) state.shopPurchases = 0;
         if (state.dominanceClaimed === undefined) state.dominanceClaimed = 0;
         if (state.allianceDominanceClaimed === undefined) state.allianceDominanceClaimed = 0;
