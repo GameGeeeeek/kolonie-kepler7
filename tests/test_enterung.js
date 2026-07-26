@@ -181,6 +181,17 @@ check('2: ohne Enterschiff keine Chance', K.boardingChance({}, 100) === 0);
   const kauf = src.slice(src.indexOf('function prisenhofKauf'), src.indexOf('function counterReportLine'));
   check('6: jeder Kauf prüft den Vorrat', (kauf.match(/Nicht genug Prisengut/g)||[]).length === 3, (kauf.match(/Nicht genug Prisengut/g)||[]).length);
   check('6: der Ausbau ist bei der Höchststufe gesperrt', /bereits voll ausgebaut/.test(kauf));
+  // Spieler-Report 26.07.2026 ("da steht nix"): Die erste Fassung blendete den Prisenhof bis zur
+  // ersten GEGLUECKTEN Enterung komplett aus. Wer den Wurf verlor - je nach Gegner gut jeder
+  // fuenfte Versuch -, sah danach nirgends etwas und musste annehmen, die Funktion sei kaputt.
+  check('6: der Prisenhof erscheint schon, sobald man Enterschiffe besitzt',
+    /const hatEnterschiffe = allFleets\(\)\.some\(f => \(f && f\.enterschiff\) > 0\);/.test(hof)
+    && /&& !hatEnterschiffe\)\{ if \(box\.innerHTML\)/.test(hof));
+  check('6: ohne Enterschiffe bleibt er weiterhin weg', /if \(pg <= 0 && lvl === 0 && \(state\.boardings\|\|0\) === 0 && !hatEnterschiffe\)/.test(hof));
+  check('6: der Leerzustand erklärt, was zu tun ist',
+    /zwei Enterschiffe<\/strong> in einen Angriff auf einen <strong>NPC-Gegner/.test(hof));
+  check('6: gescheiterte Versuche werden mitgezählt und angezeigt',
+    /state\.boardAttempts = \(state\.boardAttempts\|\|0\) \+ 1;/.test(src) && /Enterversuch/.test(hof));
 }
 
 // ---------------------------------------------------------------- 7: Anzeigestellen (Regel 6)

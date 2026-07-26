@@ -4449,8 +4449,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.301.0';
+  const VERSION = '8.301.1';
   const PATCHNOTES = [
+    { version:'8.301.1', date:'26.07.2026', changes:[
+      '<strong>Der Prisenhof war nicht zu finden, wenn die erste Enterung schiefging</strong> (Spieler-Report mit Screenshot). Er erschien bisher erst nach der ersten <em>geglückten</em> Enterung – wer den Wurf verlor, und das passiert je nach Gegner in gut jedem fünften Fall, sah danach nirgends etwas und musste annehmen, die Funktion sei kaputt.',
+      'Der Prisenhof erscheint jetzt, sobald du überhaupt <strong>Enterschiffe besitzt</strong>. Steht noch keine Prise darin, erklärt er, was zu tun ist: mindestens zwei Enterschiffe in einen Angriff auf einen NPC-Gegner, und den gewinnen. Gab es schon Versuche, zählt er sie mit – so ist auch bei Pech sichtbar, dass die Enterphase wirklich läuft.',
+      'An der Mechanik ändert sich nichts, nur an der Sichtbarkeit.'
+    ]},
     { version:'8.301.0', date:'26.07.2026', changes:[
       '<strong>Das Enterschiff entert jetzt wirklich.</strong> Es hieß seit dem 18.07.2026 so, trägt Enterhaken im Rumpf-Symbol und sammelt „Enterausrüstung" als Event-Teile – mechanisch war es aber schlicht der zäheste Angreifer. Der Name stellte einen Scheck aus, den die Mechanik nicht einlöste.',
       '<strong>Neu: die Enterphase.</strong> Fliegt mindestens ein Enterschiff mit und ist der NPC-Kampf gewonnen, folgt eine vierte, eigen gewürfelte Phase gegen den überlebenden Rest der Gegnerflotte. Wer knapp gewinnt, hat mehr Widerstand vor sich als wer überrannt hat.',
@@ -13153,7 +13158,7 @@
     // Enterung (v8.301.0). Alle vier Felder sind kleine Ganzzahlen - Prisengut waechst ueber eine
     // lange Spielerlaufbahn in den sechsstelligen Bereich und liegt damit weit unter den
     // Backend-SAVE_SANITY_LIMITS (Kredite 1e12), enterhaken ist bei ENTERHAKEN_MAX=5 gedeckelt.
-    prisengut: 0, enterhaken: 0, boardedShips: 0, boardings: 0,
+    prisengut: 0, enterhaken: 0, boardedShips: 0, boardings: 0, boardAttempts: 0,
     // Wie viele der wöchentlich hinzukommenden Sternsysteme der Spieler schon gemeldet bekommen hat.
     // Vorbelegt mit dem aktuellen Stand, damit weder ein frisch angelegtes Konto noch ein
     // Bestandsspielstand beim ersten Start eine Sammelmeldung über alle bisherigen Systeme bekommt -
@@ -15045,12 +15050,17 @@
     if (!box) return;
     const pg = Math.floor(state.prisengut||0);
     const lvl = enterhakenLevel();
-    // Vor der ersten Enterung gar nicht erst anzeigen - eine leere Box mit einer Waehrung, die man
-    // noch nie gesehen hat, erklaert nichts und nimmt nur Platz.
-    if (pg <= 0 && lvl === 0 && (state.boardings||0) === 0){ if (box.innerHTML) box.innerHTML = ''; lastPrisenhofSig = null; return; }
+    // Sichtbar, sobald der Spieler ueberhaupt Enterschiffe HAT - nicht erst nach der ersten
+    // geglueckten Enterung. Die erste Fassung blendete die Box bis dahin komplett aus; wer den
+    // Enterwurf verlor (und das sind je nach Gegner gut 20%), sah danach nirgends etwas und musste
+    // annehmen, die Funktion sei kaputt (Spieler-Report 26.07.2026). Ohne Enterschiffe bleibt sie
+    // weiterhin weg - dann erklaert sie wirklich nichts.
+    const versuche = state.boardAttempts||0;
+    const hatEnterschiffe = allFleets().some(f => (f && f.enterschiff) > 0);
+    if (pg <= 0 && lvl === 0 && (state.boardings||0) === 0 && !hatEnterschiffe){ if (box.innerHTML) box.innerHTML = ''; lastPrisenhofSig = null; return; }
     const kosten = enterhakenNextCost();
     // Signatur-Cache: die Box hat keinen Live-Countdown, muss also nicht jede Sekunde neu entstehen.
-    const sig = pg+'|'+lvl+'|'+(state.boardedShips||0);
+    const sig = pg+'|'+lvl+'|'+(state.boardedShips||0)+'|'+versuche+'|'+hatEnterschiffe;
     if (sig === lastPrisenhofSig) return;
     lastPrisenhofSig = sig;
     const angebot = (id, icon, farbe, titel, preis, text, machbar) => `
@@ -15068,7 +15078,11 @@
           <div class="bicon" style="background:rgba(250,199,117,0.18); color:#fac775;"><i class="ti ti-anchor" aria-hidden="true"></i></div>
           <div>
             <div class="bname">Prisengut <span class="lvl-pill">${fmt(pg)}</span></div>
-            <div class="bmeta">Aus ${fmt(state.boardedShips||0)} gekaperten Schiffen in ${fmt(state.boardings||0)} geglückten Enterungen. Fremde Bauart lässt sich nicht nachbauen – nur ausschlachten.</div>
+            <div class="bmeta">${(state.boardings||0) > 0
+              ? 'Aus '+fmt(state.boardedShips||0)+' gekaperten Schiffen in '+fmt(state.boardings||0)+' geglückten Enterungen'+(versuche > (state.boardings||0) ? ' ('+fmt(versuche)+' Versuche insgesamt)' : '')+'. Fremde Bauart lässt sich nicht nachbauen – nur ausschlachten.'
+              : (versuche > 0
+                ? '<span style="color:#fac775;">Noch keine Prise – '+fmt(versuche)+' Enterversuch'+(versuche===1?'':'e')+' bisher gescheitert.</span> Die Enterphase wird eigen gewürfelt; die Angriffs-Vorschau nennt die Chance vorher.'
+                : 'Noch keine Enterung. Schick mindestens <strong>zwei Enterschiffe</strong> in einen Angriff auf einen <strong>NPC-Gegner</strong> und gewinne ihn – danach folgt die Enterphase. Gegen Spieler und Piratennester gibt es keine Enterung.')}</div>
           </div>
         </div>
       </div>
@@ -29383,6 +29397,9 @@
             // Gegnerflotte (effDefense abzueglich des im Kampf gefallenen Anteils).
             const restVerteidigung = Math.max(1, Math.round(effDefense * (1 - npcLossPct)));
             const enterung = resolveBoarding(m.composition || fleet, npcFleetRemains, restVerteidigung, fleet, planetKey);
+            // Auch gescheiterte Versuche zaehlen - sonst hat ein Spieler, dessen erste Enterungen
+            // schiefgehen, ueberhaupt keine Rueckmeldung, dass das System bei ihm laeuft.
+            if (enterung) state.boardAttempts = (state.boardAttempts||0) + 1;
             if (enterung && enterung.erfolg && enterung.gekapertGesamt > 0){
               for (const [k,v] of Object.entries(enterung.gekapert)) fleet[k] = (fleet[k]||0) + v;
               state.prisengut = (state.prisengut||0) + enterung.prisengut;
