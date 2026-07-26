@@ -4266,8 +4266,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.25';
+  const VERSION = '8.298.26';
   const PATCHNOTES = [
+    { version:'8.298.26', date:'26.07.2026', changes:[
+      '<strong>Der Einführungsrundgang kennt jetzt die Fraktionen.</strong> Sechs neue Systeme, 20 Tagesaufgaben und 15 Erfolge – und das Tutorial erwähnte davon kein Wort. Ein neuer Spieler lief an Rängen, Gunstmarken, Läden und dem Ruf-Verfall komplett vorbei, bis er zufällig in den Galaxie-Tab schaute. Neuer siebter Schritt <strong>„Fraktionen: Ruf, Ränge und Botschaften"</strong>: die vier Fraktionen, die acht Ränge mit ihren eigenen Namen, der Laden ab Rang 6 mit Gunstmarken statt Krediten, die zwei Rivalenpaare, der Verfall nach drei Tagen ohne Kontakt und die Botschaft dagegen.',
+      'Bewusst kurz gehalten und ohne Zahlenkolonnen – der Rundgang soll den Weg zeigen, die Einzelheiten stehen im Hilfe-Tab, auf den der Abschluss-Schritt verweist. Der erste Entwurf war mehr als doppelt so lang wie jeder andere Schritt und hätte das Overlay gesprengt; er ist jetzt auf Rundgang-Länge gekürzt.',
+      'Technische Absicherung dazu: Tutorial-Texte sind eine zweite Anzeigestelle für Balance-Zahlen und werden von niemandem angefasst, der an den Konstanten schraubt. Ein neuer Prüflauf vergleicht die Zahlen im Rundgang jetzt direkt mit dem Code – Anzahl der Ränge, Ladenschwelle, Schonfrist – und prüft außerdem, dass die zitierten Rangnamen wirklich existieren und dass in keinem Schritt HTML steht (die Texte werden als Klartext gesetzt).'
+    ]},
     { version:'8.298.25', date:'26.07.2026', changes:[
       '<strong>Vier Tagesaufgaben für die Fraktionen.</strong> Der Fraktions-Ausbau hat sechs Systeme gebracht – der Tagesaufgaben-Pool kannte davon kein einziges, er stammte noch aus der Zeit davor. Jetzt sind es <strong>20 Vorlagen</strong> statt 16, von denen wie bisher täglich 5 gezogen werden.',
       '<strong>„1 Posten in einem Fraktionsladen kaufen"</strong> – erscheint, sobald mindestens eine Fraktion freundlich ist. Anders als der Kredit-Shop-Kauf zahlst du hier mit Gunstmarken, also mit etwas, das du bei genau dieser Fraktion verdient haben musst.',
@@ -19654,9 +19659,15 @@
       refreshAdminReportCount();
     } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
   }
-  // Einführungstutorial für neue Spieler: sechs kurze Schritte über die Kernmechaniken. Erscheint
+  // Einführungstutorial für neue Spieler: acht kurze Schritte über die Kernmechaniken. Erscheint
   // automatisch beim allerersten Start (state.tutorialSeen noch false) und lässt sich jederzeit über
   // den Hilfe-Button in den Einstellungen erneut öffnen.
+  //
+  // ACHTUNG bei Änderungen: renderTutorialStep() setzt title und text per textContent, NICHT per
+  // innerHTML - HTML-Auszeichnung in diesen Strings würde als Klartext im Overlay stehen. Und Zahlen
+  // in diesen Texten sind eine ZWEITE Anzeigestelle im Sinne von CLAUDE.md Regel 6: sie müssen zu
+  // den Konstanten passen (REP_RANKS, EMBASSY_MIN_RANK, REP_DECAY_GRACE_MS), sonst erklärt der
+  // Rundgang neuen Spielern ein Spiel, das es nicht mehr gibt. test_tutorial_fraktionen.js prüft das.
   const TUTORIAL_STEPS = [
     { icon:'ti-rocket', title:'Willkommen, Kommandant!', text:'Du übernimmst eine kleine Außenposten-Kolonie am Rand des Kepler-Systems. Baue Ressourcenproduktion auf, erforsche Technologien, baue eine Flotte und erkunde die Galaxie – dieser kurze Rundgang zeigt die wichtigsten Bereiche.' },
     { icon:'ti-building-factory-2', title:'Basis & Ressourcen', text:'Im Basis-Tab baust du Gebäude, die Energie, Erz, Kristalle, Deuterium und Antimaterie produzieren. Fast jeder Gebäude-, Schiffs- und Forschungsausbau kostet unter anderem Energie – baue Solarzellen früh mit aus, sonst fehlt dir bald das Kleingeld für alles andere.' },
@@ -19664,6 +19675,7 @@
     { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – wähle vorher deine Angriffsflotte aus. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
     { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab erkundest du Planeten mit Erkundungsschiffen und kolonisierst sie später mit Kolonieschiffen. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft oder Handel) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
     { icon:'ti-users', title:'Allianz & Gemeinschaft', text:'Im Allianz-Tab schließt du dich mit anderen zusammen für gemeinsame Technologien, Gebäude und sogar Kriege gegen andere Allianzen.' },
+    { icon:'ti-flag', title:'Fraktionen: Ruf, Ränge und Botschaften', text:'Im Galaxie-Tab stehen vier NPC-Fraktionen: Aschen-Kartell, Eisenlegion, Void-Marodeure und Schattenbund. Bei jeder steigst du über acht Ränge auf, für die jede eigene Namen führt – beim Kartell vom Bittsteller zum Syndikatspartner. Ab Rang 6 („Freundlich") gibt eine Fraktion dir ihren Effekt und öffnet ihren Laden, in dem du mit Gunstmarken aus ihren Aufträgen zahlst statt mit Krediten. Überall beliebt sein geht nicht: die vier bilden zwei Rivalenpaare. Und Ruf muss gepflegt werden – drei Tage ohne Kontakt, und er sinkt wieder, sofern du dort keine Botschaft unterhältst. Feindschaft hat umgekehrt echte Nachteile.' },
     { icon:'ti-skull', title:'Lebendige Galaxie', text:'Im Galaxie-Tab wartet mehr als PvP: Jage mit allen Spielern gemeinsam den Weltboss "Leviathan der Leere", räuchere Piraten-Verstecke aus (Stufe 1-10), kämpfe in der Wochenliga um Liga-Belohnungen und schließe Nichtangriffspakte mit anderen Spielern (Friedensdividende: +5% Produktion je Pakt, mehrere Pakte zählen). Details zu allem findest du im Hilfe-Tab – diesen Rundgang jederzeit über die Einstellungen.' }
   ];
   let tutorialStep = 0;
