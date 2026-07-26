@@ -19,6 +19,8 @@
 //   4) am laufenden Spiel: im Offiziere-Reiter steckt in jeder Offizierskachel ein <svg>
 //   5) dasselbe für die 13 Standort-Module, dazu die Begründung des mod_-Präfixes (Kollision mit
 //      Gebäudeschlüsseln) und dass Schiffsmodule bewusst noch beim Schrift-Icon bleiben
+//   6) Gebäude - und dabei BEIDE Grafiksysteme mitgerechnet: gezeichnetes SVG oder animiertes
+//      Canvas. Die erste Zählung kannte nur ICONS und meldete deshalb 11 statt 4 Lücken.
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
 
@@ -102,14 +104,88 @@ for (const k of modKeys){
     gehaeuse && striche.every(s=>s==='4'||s==='1.6'), { gehaeuse, striche });
 }
 
+// ---------------------------------------------------------------- 6: Gebäude (v8.306.0)
+// KORREKTUR EINES EIGENEN FEHLBEFUNDS: Das Audit meldete "11 Gebäude noch flach". Es sind vier.
+// Sieben der elf haben längst eine ANIMIERTE CANVAS-Grafik (DEFENSE_ART bzw. DEFENSE_CANVAS_KEYS),
+// und defIconHtml() prüft die VOR dem ICONS-Objekt - ein SVG dafür wäre toter Code gewesen. Die
+// Zählung schaute nur ins ICONS-Objekt und übersah damit ein ganzes zweites Grafiksystem.
+// Die Canvas-Schlüssel gehören deshalb ab hier in JEDE Abdeckungsrechnung.
+const dokKeysVorab = [...arrBlock('DOCTRINE_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+const formKeysVorab = [...arrBlock('DEFENSE_FORMATIONS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+const artBlock = obj('DEFENSE_ART');
+const CANVAS = new Set(['turm','schild','raketen', ...[...artBlock.matchAll(/^\s+(\w+):\s*\{/gm)].map(m=>m[1])]);
+check('6: die Canvas-Anlagen sind gefunden', CANVAS.size >= 20, CANVAS.size);
+// Die Reihenfolge über Positionen statt über eine Regex mit Abstandsgrenze: der Abstand zwischen
+// beiden Stellen ist Umbauten ausgesetzt, die Reihenfolge nicht. Genau diese Reihenfolge ist der
+// Grund, warum ein SVG für eine Canvas-Anlage toter Code wäre.
+const iCanvas = src.indexOf('DEFENSE_CANVAS_KEYS.includes(def.key)');
+const iFallback = src.indexOf('iconHtmlFor(def.key, def.icon, def.fg)');
+check('6: defIconHtml prüft Canvas VOR dem ICONS-Objekt',
+  iCanvas > 0 && iFallback > iCanvas, { canvas:iCanvas, icons:iFallback });
+const gebBlock = arrBlock('BUILDING_DEFS');
+const gebKeys = [...gebBlock.matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+const gebFlach = gebKeys.filter(k => !ICONS.has(k) && !CANVAS.has(k));
+check('6: kein Gebäude trägt mehr ein flaches Schrift-Icon', gebFlach.length === 0, gebFlach);
+for (const k of ['quantenwerft','resonanzschild','urmateriereaktor','botschaft']){
+  const m = ICONS_BLOCK.match(new RegExp('\\b'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"));
+  if (!m){ check('6: '+k+' gefunden', false); continue; }
+  const svg = m[1];
+  const striche = [...svg.matchAll(/stroke-width="([\d.]+)"/g)].map(x=>x[1]);
+  check('6: '+k.padEnd(18)+' Maße, Filter und Strichstärken nach Hausstil',
+    /viewBox="0 0 100 100" width="24" height="24"/.test(svg) && /<g filter="url\(#ig\)">/.test(svg)
+    && striche.every(x=>x==='4'||x==='1.6'), striche);
+}
+// Kein Icon DIESER Runden darf in der Canvas-Liste stehen - sonst wäre es toter Code, weil
+// defIconHtml() die Canvas-Grafik zuerst nimmt. Bewusst über ALLE neu angelegten Schlüssel statt
+// über eine Handliste: Die Rot-Probe zeigte, dass eine Handliste ein neu eingeschleustes totes
+// Icon durchgehen lässt.
+// GRENZE dieser Prüfung, ausdrücklich festgehalten: Ein pauschales "kein ICONS-Schlüssel darf
+// Canvas-Schlüssel sein" wäre FALSCH. Rund vierzehn Altlasten (schild, turm, flak, laser, ...)
+// existieren in beiden Systemen, und sie sind nicht zwangsläufig tot - iconHtmlFor() wird an
+// anderen Stellen (Kompendium, Listen) auch ohne den Canvas-Vorrang aufgerufen. Geprüft wird
+// deshalb nur, was in diesen Runden dazugekommen ist.
+const neueSchluessel = [...offKeys, ...modKeys.map(k=>'mod_'+k), ...dokKeysVorab,
+  ...formKeysVorab.map(k=>'form_'+k), 'quantenwerft','resonanzschild','urmateriereaktor','botschaft'];
+const totesIcon = neueSchluessel.filter(k => CANVAS.has(k));
+check('6: kein neu angelegtes Icon wird von einer Canvas-Grafik verdeckt', totesIcon.length === 0, totesIcon);
+
+// ------------------------------------------- 7: Doktrinen und Aufstellungen (v8.306.0)
+// Beides sind AUSWAHLKARTEN: drei Optionen nebeneinander, der Unterschied soll auf einen Blick
+// erkennbar sein. Ausgerechnet dort trugen alle drei fast dieselben flachen Symbole - bei den
+// Aufstellungen zweimal ein Schild. Der Test hält fest, dass die drei einer Reihe wirklich
+// VERSCHIEDENE Icons haben; gleiche Icons wären hier schlimmer als gar keine.
+const dokKeys = [...arrBlock('DOCTRINE_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+const formKeys = [...arrBlock('DEFENSE_FORMATIONS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+check('7: jede Doktrin hat ein eigenes gezeichnetes Icon',
+  dokKeys.length === 3 && dokKeys.every(k => ICONS.has(k)), dokKeys.filter(k=>!ICONS.has(k)));
+// Aufstellungs-Schlüssel sind sehr generisch ('schilde','ausgewogen') - Präfix form_ wie mod_/ship_,
+// damit sie nicht irgendwann still ein fremdes Icon erwischen.
+check('7: jede Aufstellung hat ein eigenes gezeichnetes Icon (Präfix form_)',
+  formKeys.length === 3 && formKeys.every(k => ICONS.has('form_'+k)), formKeys.filter(k=>!ICONS.has('form_'+k)));
+check('7: die Aufstellungs-Karte holt es über das Präfix ab',
+  /iconHtmlFor\('form_'\+f\.key, f\.icon/.test(src));
+check('7: die Doktrin-Karte holt es über den Schlüssel ab',
+  /iconHtmlFor\(d\.key, d\.icon, isActive/.test(src));
+// Drei gleiche Icons in einer Auswahl wären der eigentliche Fehler - deshalb ausdrücklich geprüft.
+const dokSvgs = dokKeys.map(k => (ICONS_BLOCK.match(new RegExp('\\b'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"))||[])[1]);
+const formSvgs = formKeys.map(k => (ICONS_BLOCK.match(new RegExp('\\bform_'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"))||[])[1]);
+check('7: die drei Doktrin-Icons sind wirklich verschieden', new Set(dokSvgs).size === 3);
+check('7: die drei Aufstellungs-Icons sind wirklich verschieden', new Set(formSvgs).size === 3);
+for (const [name, liste] of [['Doktrin',dokSvgs],['Aufstellung',formSvgs]])
+  check('7: '+name+'-Icons nach Hausstil', liste.every(v => v
+    && /viewBox="0 0 100 100" width="24" height="24"/.test(v) && /<g filter="url\(#ig\)">/.test(v)
+    && [...v.matchAll(/stroke-width="([\d.]+)"/g)].every(m=>m[1]==='4'||m[1]==='1.6')));
+
 // ---------------------------------------------------------------- offene Lücken benennen
 // Kein Fehlschlag - eine Standortbestimmung, damit die verbleibende Arbeit sichtbar bleibt.
+// Rechnet BEIDE Grafiksysteme mit (gezeichnetes SVG ODER Canvas), sonst zählt sie wieder falsch.
 const rest = {};
-for (const name of ['MODULE_DEFS','DOCTRINE_DEFS','DEFENSE_FORMATIONS','BUILDING_DEFS']){
+for (const name of ['MODULE_DEFS','DOCTRINE_DEFS','DEFENSE_FORMATIONS','BUILDING_DEFS','SHIP_MODULE_DEFS']){
   const b = arrBlock(name); if (!b) continue;
   const eintraege = [...b.matchAll(/key:'([^']+)'[^}]*?icon:'([^']+)'|icon:'([^']+)'[^}]*?key:'([^']+)'/g)]
     .map(m=>({k:m[1]||m[4], ic:m[2]||m[3]}));
-  const flach = eintraege.filter(e => !(ICONS.has(e.k) || ICONS.has(e.ic)));
+  const flach = eintraege.filter(e =>
+    !(ICONS.has(e.k) || ICONS.has(e.ic) || ICONS.has('mod_'+e.k) || ICONS.has('form_'+e.k) || CANVAS.has(e.k)));
   if (eintraege.length) rest[name] = flach.length+' von '+eintraege.length+' noch flach';
 }
 console.log('\n  Noch offen (bewusst, kein Fehlschlag):');
