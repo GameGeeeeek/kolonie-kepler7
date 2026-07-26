@@ -1,4 +1,4 @@
-// Icon-Abdeckung: haben alle Inhalte ein GEZEICHNETES Icon? (Icon-Audit 26.07.2026, v8.304.0)
+// Icon-Abdeckung: haben alle Inhalte ein GEZEICHNETES Icon? (Icon-Audit 26.07.2026, v8.304/305.0)
 //
 // BEFUND des Audits: Das Spiel hat zwei Icon-Systeme mit sichtbar verschiedener Handschrift -
 // 98 handgezeichnete SVG (weich, gefüllt, Farbverlauf, Schattierung) und 69 Schrift-Icons aus dem
@@ -7,15 +7,18 @@
 // Offiziere-Reiter wechselte, wechselte die Bildsprache. CLAUDE.md Regel 7 nennt den ti-Fallback
 // ausdrücklich "Notnagel, kein Ersatz".
 //
-// Dieser Test wächst mit: Wenn später Module und die 11 restlichen Gebäude ihre Icons bekommen,
-// kommen sie hier als weitere Gruppe dazu. Bis dahin steht ausdrücklich drin, welche Bereiche
-// noch offen sind - damit die Lücke sichtbar bleibt statt vergessen zu werden.
+// Dieser Test wächst mit: v8.304.0 brachte die Offiziere (Abschnitte 1-4), v8.305.0 die
+// Standort-Module (5, 5b). Kommen später Doktrinen, Aufstellungen und die 11 restlichen Gebäude
+// dazu, gehören sie als weitere Gruppe hierher. Bis dahin steht am Ende ausdrücklich, welche
+// Bereiche noch offen sind - damit die Lücke sichtbar bleibt statt vergessen zu werden.
 //
 // Geprüft wird:
 //   1) jeder Offizier hat einen eigenen ICONS-Eintrag
 //   2) die Offizierskarte holt ihn auch wirklich ab (sie schrieb das Schrift-Icon vorher fest ein)
 //   3) die neuen Icons halten den Hausstil ein (Maße, Filter, Strichstärken)
 //   4) am laufenden Spiel: im Offiziere-Reiter steckt in jeder Offizierskachel ein <svg>
+//   5) dasselbe für die 13 Standort-Module, dazu die Begründung des mod_-Präfixes (Kollision mit
+//      Gebäudeschlüsseln) und dass Schiffsmodule bewusst noch beim Schrift-Icon bleiben
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
 
@@ -67,6 +70,38 @@ for (const k of offKeys){
     masse && filter && sauber, { masse, filter, striche });
 }
 
+// ---------------------------------------------------------------- 5: Standort-Module (v8.305.0)
+// Die Modulschlüssel 'schild' und 'lager' sind IDENTISCH mit Gebäudeschlüsseln. Ein
+// iconHtmlFor(def.key) hätte dem Schildmodul das Icon der Schildkuppel gegeben - semantisch nah
+// genug, dass es niemandem aufgefallen wäre, aber Zufall statt Entscheidung. Deshalb das Präfix
+// mod_, wie die Schiffe seit jeher ship_ benutzen. Der Test hält beides fest: das Präfix UND dass
+// die Kollisionsschlüssel wirklich betroffen sind (sonst verliert die Begründung ihren Grund).
+const modBlock = arrBlock('MODULE_DEFS');
+const modKeys = [...modBlock.matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+check('5: alle Standort-Module sind im Array', modKeys.length === 13, modKeys.length);
+const modOhne = modKeys.filter(k => !ICONS.has('mod_'+k));
+check('5: jedes Standort-Modul hat ein eigenes gezeichnetes Icon', modOhne.length === 0, modOhne);
+// Erst behauptet: drei Kollisionen (schild/lager/werft). Der Test hat die Behauptung widerlegt -
+// 'werft' existiert gar nicht als ICONS-Schlüssel, es sind ZWEI. Die Prüfung steht bewusst hier,
+// damit die Begründung des mod_-Präfixes nachprüfbar bleibt statt eine Erzählung zu sein.
+const kollision = modKeys.filter(k => ICONS.has(k));
+check('5: genau die zwei bekannten Kollisionsschlüssel existieren doppelt (Begründung des Präfixes)',
+  kollision.length === 2 && kollision.includes('schild') && kollision.includes('lager'), kollision);
+check('5: es gibt einen eigenen Modul-Helfer mit mod_-Präfix',
+  /function moduleIconHtml\(def, isShip, color\)/.test(src) && /iconHtmlFor\('mod_'\+def\.key/.test(src));
+// Schiffsmodule sind eine eigene Familie mit eigenen Schlüsseln und noch ohne gezeichnete Icons -
+// ein pauschales 'mod_'+key hätte für sie ins Leere gegriffen. Der isShip-Zweig muss bleiben.
+check('5: Schiffsmodule bleiben bewusst beim Schrift-Icon', /if \(isShip\) return `<i class="ti \$\{def\.icon\}"/.test(src));
+for (const k of modKeys){
+  const m = ICONS_BLOCK.match(new RegExp('\\bmod_'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"));
+  if (!m){ continue; }
+  const svg = m[1];
+  const gehaeuse = /M50 8 L86 29 V71 L50 92 L14 71 V29 Z/.test(svg);
+  const striche = [...svg.matchAll(/stroke-width="([\d.]+)"/g)].map(x=>x[1]);
+  check('5: mod_'+k.padEnd(17)+' gemeinsames Gehäuse und Hausstil-Strichstärken',
+    gehaeuse && striche.every(s=>s==='4'||s==='1.6'), { gehaeuse, striche });
+}
+
 // ---------------------------------------------------------------- offene Lücken benennen
 // Kein Fehlschlag - eine Standortbestimmung, damit die verbleibende Arbeit sichtbar bleibt.
 const rest = {};
@@ -96,6 +131,13 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   buildings:{solar:20,mine:18,lager:14,werft:10,labor:12}, research:{}, fleet:{jaeger:100,missions:[]},
   colonies:{}, activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null},
   officers:{ ingenieur:3, admiral:2 }, commandPoints:40,
+  // Ausgerüstete Standort-Module, damit die Slot-Kacheln überhaupt gerendert werden. 'schild' ist
+  // bewusst dabei: das ist einer der drei Schlüssel, die mit einem Gebäude kollidieren.
+  modules:{ 'panzerung:selten':1, 'schild:episch':1, 'lager:gewoehnlich':1 },
+  equippedModules:{ home:['panzerung:selten','schild:episch','lager:gewoehnlich'] },
+  // Ohne Sockel gibt es keine Slots und damit auch keine Kacheln - moduleSlotCount() liest
+  // ausschliesslich state.moduleSlotLevel. Fehlte das, prüfte 5b in Wahrheit eine leere Liste.
+  moduleSlotLevel:{ home:3 },
   battleStats:{wins:9,losses:2}, xp:20000, credits:50000, buffs:[], lastTick:Date.now(),
   colonyNames:{}, modules:{}, shipModules:{} });
 
@@ -139,6 +181,22 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
     const keinSchrift = befund.treffer.filter(t=>t.karte).every(t=>!t.schrift);
     check('4: und keine mehr das flache Schrift-Icon', keinSchrift,
       befund.treffer.filter(t=>t.schrift).map(t=>t.name));
+  }
+  // ---------------------------------------------------------------- 5b: Module am laufenden Spiel
+  await page.evaluate(()=>{const b=document.querySelector('[data-officer-subtab="module"]'); if(b) b.click();});
+  await page.waitForTimeout(400);
+  const mods = await page.evaluate(()=>{
+    const koepfe=[...document.querySelectorAll('.mod-head')];
+    return { anzahl:koepfe.length,
+             mitSvg:koepfe.filter(k=>k.querySelector('svg')).length,
+             mitSchrift:koepfe.filter(k=>k.querySelector('i.ti')).length };
+  });
+  // Die Anzahl-Prüfung ist der Schutz gegen eine leere Wahrheit: Ohne sie wäre "alle Kacheln zeigen
+  // ein svg" auch dann grün, wenn gar keine Kachel gerendert wurde.
+  check('5b: die ausgerüsteten Modul-Kacheln sind gerendert', mods.anzahl >= 3, mods);
+  if (mods.anzahl > 0){
+    check('5b: jede zeigt ein gezeichnetes Icon', mods.mitSvg === mods.anzahl, mods);
+    check('5b: keine mehr ein flaches Schrift-Icon', mods.mitSchrift === 0, mods);
   }
   check('keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
   console.log('\n' + (fail ? 'FAIL' : 'PASS'));
