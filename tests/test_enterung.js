@@ -33,8 +33,12 @@ if (von < 0 || bis < von || gewVon < 0){ console.log('\nFAIL'); process.exit(1);
 // applyCombatLosses wird als Attrappe uebergeben: die echte Funktion haengt an Veteranen-XP,
 // Truemmerfeldern und Hyperjaeger-Boni - hier interessiert nur, DASS sie mit den richtigen
 // Argumenten gerufen wird und wie viel sie abzieht.
-function bau(zustand){
+// `flotten` sind die Flotten, die allFleets() liefert - ownsEnterschiffe() haengt daran und
+// entscheidet, ob ein Kampf ohne mitfliegendes Enterschiff die Enterphase ueberhaupt erwaehnt.
+// Vorgabe: leer, der Spieler besitzt also keine Enterschiffe.
+function bau(zustand, flotten){
   const rufe = [];
+  const allFleets = () => (flotten || []);
   const applyCombatLosses = (fleet, keys, pct, planetKey, pool) => {
     rufe.push({ keys:[...keys], pct, planetKey });
     const verloren = {};
@@ -45,13 +49,13 @@ function bau(zustand){
     }
     return verloren;
   };
-  const api = new Function('state', 'applyCombatLosses',
+  const api = new Function('state', 'applyCombatLosses', 'allFleets',
     src.slice(gewVon, gewBis) + '\n' + src.slice(von, bis) +
     '\nreturn { BOARD_POWER_PER_SHIP, BOARD_CAPACITY_PER_SHIP, BOARD_CAPTURE_CAP, BOARD_MAX_SHIP_WEIGHT,' +
     ' BOARD_CHANCE_MIN, BOARD_CHANCE_MAX, BOARD_FAIL_LOSS, PRISENGUT_PER_WEIGHT, ENTERHAKEN_MAX,' +
     ' ENTERHAKEN_COSTS, ENTERHAKEN_CHANCE_PER, ENTERHAKEN_SLOT_PER, SHIP_SCORE_WEIGHTS,' +
-    ' enterhakenLevel, boardingCapacity, boardingChance, isBoardable, resolveBoarding };'
-  )(zustand, applyCombatLosses);
+    ' enterhakenLevel, boardingCapacity, boardingChance, isBoardable, resolveBoarding, ownsEnterschiffe };'
+  )(zustand, applyCombatLosses, allFleets);
   api.__rufe = rufe;
   return api;
 }
@@ -154,8 +158,43 @@ check('2: ohne Enterschiff keine Chance', K.boardingChance({}, 100) === 0);
   const A = bau({ enterhaken:0 });
   const gegner = { jaeger:20 };
   const r = A.resolveBoarding({ jaeger:100, bomber:20 }, gegner, 10, { jaeger:100 }, 'home', () => 0);
-  check('5: ohne Enterschiff gibt es gar keine Enterphase', r === null, r);
+  check('5: wer keine Enterschiffe besitzt, bekommt gar keine Enterphase', r === null, r);
   check('5: und die Gegnerflotte bleibt unberührt', gegner.jaeger === 20);
+}
+// Der stille Fall Nr. 1 (v8.301.2): Enterschiffe DA, aber keins in dieser Flotte. Vorher schwieg der
+// Bericht komplett - fuer den Spieler nicht unterscheidbar von "die Enterung ist kaputt".
+{
+  const A = bau({ enterhaken:0 }, [{ enterschiff:12 }]);
+  const gegner = { jaeger:20 };
+  const r = A.resolveBoarding({ jaeger:100 }, gegner, 10, { jaeger:100 }, 'home', () => 0);
+  check('5: wer Enterschiffe besitzt, aber keins mitschickt, bekommt eine Begründung',
+    r && r.grund === 'nicht_dabei', r);
+  check('5: dabei wird nichts gewürfelt und nichts verloren',
+    !!r && r.chance === 0 && r.erfolg === false && r.gekapertGesamt === 0 && r.verloren === null, r);
+  check('5: und die Gegnerflotte bleibt auch dann unberührt', gegner.jaeger === 20);
+  // Auch ein frueherer Versuch zaehlt als "spielt die Enterung" - ein Fehlschlag kostet 30% der
+  // Enterschiffe, wer wenige hatte steht danach ohne da und wuerde sonst wieder nichts erklaert kriegen.
+  const B = bau({ enterhaken:0, boardAttempts:3 }, []);
+  check('5: ein früherer Enterversuch reicht dafür ebenfalls', B.ownsEnterschiffe() === true);
+}
+// Der stille Fall Nr. 2 (v8.301.2): Wurf gewonnen, aber 0 Kaperplaetze. Der Bericht behauptete
+// vorher, beim Gegner sei nichts Kaperbares uebrig gewesen - das war schlicht falsch.
+{
+  const A = bau({ enterhaken:0 });
+  const gegner = { jaeger:20, destroyers:4 };
+  const eigene = { enterschiff:1 };
+  check('5: ein einzelnes Enterschiff ohne Enterhaken ergibt 0 Kaperplätze', A.boardingCapacity({ enterschiff:1 }) === 0);
+  const r = A.resolveBoarding({ enterschiff:1 }, gegner, 10, eigene, 'home', () => 0);
+  check('5: der Wurf gilt trotzdem als gewonnen', r && r.erfolg === true, r);
+  check('5: und wird als fehlender Kaperplatz begründet, nicht als leerer Gegner', !!r && r.grund === 'kein_platz', r && r.grund);
+  check('5: es wird nichts gekapert und nichts abgezogen',
+    !!r && r.gekapertGesamt === 0 && gegner.jaeger === 20 && gegner.destroyers === 4 && eigene.enterschiff === 1);
+  // Gegenprobe: mit Enterhaken-Stufe 1 hat dasselbe eine Flotte sehr wohl einen Platz.
+  const B = bau({ enterhaken:1 });
+  const gegner2 = { jaeger:20 };
+  const r2 = B.resolveBoarding({ enterschiff:1 }, gegner2, 10, { enterschiff:1 }, 'home', () => 0);
+  check('5: mit Enterhaken-Stufe 1 kapert dieselbe Flotte sehr wohl',
+    !!r2 && r2.grund === undefined && r2.gekapertGesamt === 1, r2 && { grund:r2.grund, n:r2.gekapertGesamt });
 }
 
 // ---------------------------------------------------------------- 6: Prisenhof
@@ -185,8 +224,10 @@ check('2: ohne Enterschiff keine Chance', K.boardingChance({}, 100) === 0);
   // ersten GEGLUECKTEN Enterung komplett aus. Wer den Wurf verlor - je nach Gegner gut jeder
   // fuenfte Versuch -, sah danach nirgends etwas und musste annehmen, die Funktion sei kaputt.
   check('6: der Prisenhof erscheint schon, sobald man Enterschiffe besitzt',
-    /const hatEnterschiffe = allFleets\(\)\.some\(f => \(f && f\.enterschiff\) > 0\);/.test(hof)
+    /const hatEnterschiffe = ownsEnterschiffe\(\);/.test(hof)
     && /&& !hatEnterschiffe\)\{ if \(box\.innerHTML\)/.test(hof));
+  check('6: dieselbe Prüfung entscheidet auch über den Hinweis im Kampf (eine Quelle, nicht zwei)',
+    (src.match(/ownsEnterschiffe\(\)/g)||[]).length >= 3, (src.match(/ownsEnterschiffe\(\)/g)||[]).length);
   check('6: ohne Enterschiffe bleibt er weiterhin weg', /if \(pg <= 0 && lvl === 0 && \(state\.boardings\|\|0\) === 0 && !hatEnterschiffe\)/.test(hof));
   check('6: der Leerzustand erklärt, was zu tun ist',
     /zwei Enterschiffe<\/strong> in einen Angriff auf einen <strong>NPC-Gegner/.test(hof));
@@ -235,6 +276,28 @@ check('2: ohne Enterschiff keine Chance', K.boardingChance({}, 100) === 0);
     /if \(enterung && !enterung\.erfolg && enterung\.verloren\)\{/.test(src)
     && /ownLostWin\[k\] = \(ownLostWin\[k\]\|\|0\) \+ v;/.test(src));
   check('7: dabei wird die interne __debris-Marke übersprungen', /if \(k === '__debris' \|\| !\(v > 0\)\) continue;/.test(src));
+  // v8.301.2: die zwei stillen Faelle muessen an JEDER Anzeigestelle ankommen, nicht nur dort, wo
+  // sie entstehen - genau der Fehlertyp aus CLAUDE.md Regel 6.
+  const bericht = src.slice(src.indexOf('function boardingReportHtml'), src.indexOf('  // Truemmerfeld-Box'));
+  check('7: der Kampfbericht kennt beide stillen Fälle',
+    /e\.grund === 'nicht_dabei'/.test(bericht) && /e\.grund === 'kein_platz'/.test(bericht));
+  check('7: und behauptet beim fehlenden Kaperplatz nicht mehr, der Gegner sei leer gewesen',
+    bericht.indexOf("e.grund === 'kein_platz'") < bericht.indexOf('nichts Kaperbares übrig'));
+  check('7: der Bericht erklärt beim fehlenden Platz die Regel',
+    /je 2 Enterschiffe, dazu \+1 je Enterhaken-Stufe/.test(bericht));
+  check('7: die Sieg-Meldung kennt dieselben zwei Fälle',
+    /enterung\.grund === 'nicht_dabei'/.test(src) && /enterung\.grund === 'kein_platz'/.test(src));
+  check('7: der Bericht transportiert grund und Schiffszahl mit', /grund:enterung\.grund\|\|null, enterschiffe:enterung\.enterschiffe/.test(src));
+  // Ein entfallener Versuch ist KEIN Versuch - sonst zaehlte der Prisenhof Kaempfe mit, in denen
+  // gar nicht gewuerfelt wurde, und seine Erklaerung ("X Versuche gescheitert") waere gelogen.
+  check('7: eine entfallene Enterphase zählt nicht als Enterversuch',
+    /if \(enterung && enterung\.grund !== 'nicht_dabei'\) state\.boardAttempts/.test(src));
+  check('7: die Angriffs-Vorschau warnt vor dem Start, wenn kein Enterschiff mitfliegt',
+    /\} else if \(ownsEnterschiffe\(\)\)\{/.test(src) && /ohne sie entfällt die Enterphase/.test(src));
+  // Die Hilfe sagte bis v8.301.2 noch, der Prisenhof erscheine "nach der ersten Enterung" - seit
+  // v8.301.1 stimmt das nicht mehr. Zweite Anzeigestelle mit der alten Annahme.
+  check('7: die Hilfe nennt die aktuelle Sichtbarkeitsregel des Prisenhofs',
+    !/erscheint nach der ersten Enterung/.test(src) && /erscheint, sobald du Enterschiffe besitzt/.test(src));
   // Erfolge
   check('7: zwei neue Erfolge', /key:'ersteprise'/.test(src) && /key:'freibeuter'/.test(src));
   check('7: beide haben ein eigenes Icon', /ersteprise:'ti-anchor', freibeuter:'ti-ship',/.test(src));
