@@ -32,8 +32,9 @@ function baue(opts){
   const state = {
     expeditionSignals: opts.signale || [],
     discovered: opts.discovered || {},
+    signalDrought: opts.drought || 0,
     rareItems: {}, moduleFragments: 0, expeditionChain: opts.chain || null,
-    expeditionCodex: { specials:{}, rares:{}, chainCompleted:0 }
+    expeditionCodex: { specials:{}, rares:{}, chainCompleted:0, signalsFollowed:0 }
   };
   const protokoll = { xp:0, res:null, module:0, codexRares:[] };
   const PLANETS = [], STAR_SYSTEMS = [];
@@ -43,8 +44,8 @@ function baue(opts){
   }
   new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'EXPEDITION_CHAIN_NEEDED', 'RARE_ITEMS',
     'RES_DEFS', 'randomFindableRareItem', 'grantRandomModule', 'gainResources', 'addXp',
-    'recordCodexRare', 'fmt', block +
-    ';ctx.MAX=SIGNAL_MAX;ctx.LIFETIME=SIGNAL_LIFETIME_MS;ctx.CHANCE=SIGNAL_SPAWN_CHANCE;ctx.TYPES=SIGNAL_TYPES;' +
+    'recordCodexRare', 'ensureExpeditionCodex', 'fmt', block +
+    ';ctx.MAX=SIGNAL_MAX;ctx.LIFETIME=SIGNAL_LIFETIME_MS;ctx.CHANCE=SIGNAL_SPAWN_CHANCE;ctx.PITY=SIGNAL_PITY_AFTER;ctx.TYPES=SIGNAL_TYPES;' +
     'ctx.spawn=maybeSpawnSignal;ctx.resolve=resolveSignalFind;ctx.active=activeSignals;ctx.prune=pruneSignals;ctx.typeOf=signalTypeOf;'
   )(ctx, state, PLANETS, STAR_SYSTEMS, 3,
     [{ key:'r1', name:'Testmaterial', icon:'ti-diamond', chance:0.01 }],
@@ -54,6 +55,7 @@ function baue(opts){
     (r) => { protokoll.res = r; },
     (x) => { protokoll.xp += x; },
     (k) => { protokoll.codexRares.push(k); },
+    () => state.expeditionCodex,
     (n) => String(n));
   return { ctx, state, protokoll, STAR_SYSTEMS };
 }
@@ -111,9 +113,11 @@ for (let i = 0; i < 6000; i++){ const r = wurf.ctx.spawn(); if (r) arten.add(r.t
 check('3: alle vier Arten treten tatsächlich auf', arten.size === 4, [...arten]);
 
 // Spawnrate: grob im Bereich der Konstante (kein Balance-Urteil, nur "die Konstante wirkt").
+// signalDrought wird je Runde zurueckgesetzt, damit hier die GRUNDCHANCE gemessen wird und nicht
+// der Pechstraehnen-Schutz - der bekommt gleich seine eigenen Pruefungen.
 let treffer = 0;
 const rate = baue({ discovered: { p0:true } });
-for (let i = 0; i < 20000; i++){ if (rate.ctx.spawn()) treffer++; rate.state.expeditionSignals.length = 0; }
+for (let i = 0; i < 20000; i++){ rate.state.signalDrought = 0; if (rate.ctx.spawn()) treffer++; rate.state.expeditionSignals.length = 0; }
 check('3: die Spawn-Wahrscheinlichkeit entspricht der Konstante',
   Math.abs(treffer/20000 - rate.ctx.CHANCE) < 0.02, { gemessen: +(treffer/20000).toFixed(3), erwartet: rate.ctx.CHANCE });
 
@@ -187,6 +191,56 @@ check('6: der Ressourcen-Cache skaliert mit dem Expeditionsertrag',
   gross.protokoll.res.erz === klein.protokoll.res.erz * 2,
   { einfach: klein.protokoll.res.erz, doppelt: gross.protokoll.res.erz });
 
+// ---------------------------------------------------------------- 6b) Pechsträhnen-Schutz
+// Ohne ihn waere die Tagesaufgabe "1 Peilung ansteuern" an einem Pechtag unerfuellbar gewesen.
+const pity = baue({ discovered: { p0:true } });
+check('6b: der Pechsträhnen-Deckel ist gesetzt und sinnvoll (3 bis 20 Expeditionen)',
+  Number.isFinite(pity.ctx.PITY) && pity.ctx.PITY >= 3 && pity.ctx.PITY <= 20, { pity: pity.ctx.PITY });
+// Laengste Durststrecke ueber viele Laeufe: darf NIE ueber dem Deckel liegen.
+let laengsteDurststrecke = 0;
+{
+  const u = baue({ discovered: { p0:true } });
+  let seitLetztem = 0;
+  for (let i = 0; i < 20000; i++){
+    seitLetztem++;
+    if (u.ctx.spawn()){ laengsteDurststrecke = Math.max(laengsteDurststrecke, seitLetztem); seitLetztem = 0; }
+    u.state.expeditionSignals.length = 0;
+  }
+}
+check('6b: nach spätestens ' + pity.ctx.PITY + ' erfolglosen Expeditionen kommt garantiert eine Peilung',
+  laengsteDurststrecke <= pity.ctx.PITY, { laengsteDurststrecke });
+check('6b: und der Schutz ersetzt nicht den Zufall (kurze Strähnen kommen weiterhin vor)',
+  laengsteDurststrecke > 1, { laengsteDurststrecke });
+// Der Zaehler darf NICHT laufen, wenn ein Spawn ohnehin unmoeglich waere - sonst wuerde jemand mit
+// drei liegenden Peilungen einen Anspruch ansammeln, den er nie "erlitten" hat.
+const satt = baue({ discovered: { p0:true, p1:true, p2:true } });
+for (let i = 0; i < 3; i++) satt.state.expeditionSignals.push({ id:'x'+i, systemId:'s'+i, kind:'cache', expiresAt: Date.now()+60000 });
+for (let i = 0; i < 50; i++) satt.ctx.spawn();
+check('6b: am Deckel läuft der Pech-Zähler nicht mit', (satt.state.signalDrought||0) === 0, { drought: satt.state.signalDrought });
+const unbekannt = baue({ discovered: {} });
+for (let i = 0; i < 50; i++) unbekannt.ctx.spawn();
+check('6b: ohne entdecktes System ebenfalls nicht', (unbekannt.state.signalDrought||0) === 0, { drought: unbekannt.state.signalDrought });
+// Eine erfolgreiche Peilung setzt den Zaehler zurueck.
+const reset = baue({ discovered: { p0:true }, drought: 7 });
+let versuche = 0;
+while (!reset.ctx.spawn() && versuche < 50) versuche++;
+check('6b: eine aufgefangene Peilung setzt den Pech-Zähler zurück',
+  (reset.state.signalDrought||0) === 0, { drought: reset.state.signalDrought, versuche });
+
+// ---------------------------------------------------------------- 6c) Kodex-Zähler
+const zaehler = baue({ signale: [
+  { id:'a', systemId:'s0', kind:'cache', expiresAt: Date.now()+60000 },
+  { id:'b', systemId:'s1', kind:'material', expiresAt: Date.now()+60000 },
+  { id:'c', systemId:'s2', kind:'kette', expiresAt: Date.now()-1000 }
+], chain:{ fragments:0, readyFinale:false } });
+zaehler.ctx.resolve('a', 1);
+zaehler.ctx.resolve('b', 1);
+zaehler.ctx.resolve('c', 1); // abgelaufen - darf NICHT zaehlen
+check('6c: jede angekommene Peilung erhöht den Kodex-Zähler',
+  zaehler.state.expeditionCodex.signalsFollowed === 2, { gezaehlt: zaehler.state.expeditionCodex.signalsFollowed });
+check('6c: eine verfallene Peilung zählt nicht mit',
+  zaehler.ctx.resolve('c', 1) === null && zaehler.state.expeditionCodex.signalsFollowed === 2);
+
 // ---------------------------------------------------------------- 7) Verdrahtung in der Spieldatei
 check('7: das Ziel wird beim START in die Mission eingebacken, nicht live gelesen',
   /signalId \}\);/.test(src) && /const signalFund = m\.signalId \? resolveSignalFind\(m\.signalId, mult\) : null;/.test(src));
@@ -201,9 +255,49 @@ check('7: Signale entstehen nur bei einer heimkehrenden Expedition, nicht im Hau
   (src.match(/.{40}maybeSpawnSignal\(\)/g) || []));
 check('7: der Signalfund überschreibt den normalen Fundwurf VOR dem Schatzdepot-Finale',
   src.indexOf('const signalFund = m.signalId') < src.indexOf('} else if (state.expeditionChain && state.expeditionChain.readyFinale)'));
-check('7: beide neuen Zustandsfelder haben einen Vorgabewert für Altstände',
+check('7: alle drei neuen Zustandsfelder haben einen Vorgabewert für Altstände',
   /if \(!Array\.isArray\(state\.expeditionSignals\)\) state\.expeditionSignals = \[\];/.test(src) &&
-  /if \(state\.expeditionTargetSignal === undefined\) state\.expeditionTargetSignal = null;/.test(src));
+  /if \(state\.expeditionTargetSignal === undefined\) state\.expeditionTargetSignal = null;/.test(src) &&
+  /if \(!Number\.isFinite\(state\.signalDrought\)\) state\.signalDrought = 0;/.test(src));
+check('7: der Kodex-Zähler bekommt auch in ensureExpeditionCodex einen Vorgabewert (Altstände)',
+  /if \(!Number\.isFinite\(state\.expeditionCodex\.signalsFollowed\)\) state\.expeditionCodex\.signalsFollowed = 0;/.test(src));
+
+// ---------------------------------------------------------------- 7b) Tagesaufgabe
+check('7b: es gibt eine Tagesaufgabe für Peilungen mit eigenem Icon und Sprungziel',
+  /\{ key:'signal', name:'1 Peilung ansteuern', icon:'ti-antenna-bars-5'/.test(src) &&
+  /nav:\{ tab:'expedition' \}/.test(src));
+check('7b: sie misst den Zuwachs seit Tagesbeginn (Schnappschuss-Muster wie battle/expedition/npc)',
+  /if \(key==='signal'\) return Math\.max\(0, \(\(state\.expeditionCodex\|\|\{\}\)\.signalsFollowed\|\|0\) - \(dq\.startSignalsFollowed\|\|0\)\);/.test(src));
+check('7b: und der Tagesbeginn legt den Schnappschuss an',
+  /startSignalsFollowed: \(state\.expeditionCodex\|\|\{\}\)\.signalsFollowed\|\|0,/.test(src));
+// available-Praedikat: die Aufgabe darf gar nicht erst gezogen werden, solange der Spieler noch
+// nicht genug Expeditionen fliegt, um regelmaessig Peilungen aufzufangen.
+check('7b: sie kommt erst in den Pool, wenn genug Expeditionen geflogen wurden',
+  /available: \(\) => \(state\.expeditionsCompleted\|\|0\) >= 15/.test(src));
+check('7b: das Icon steht als CSS-Regel im Icon-Subset',
+  /\.ti-antenna-bars-5:before\{content:"\\eccb"\}/.test(src));
+
+// ---------------------------------------------------------------- 7c) Kodex-Stufe
+check('7c: es gibt eine Kodex-Stufe für angesteuerte Peilungen',
+  /\{ key:'signals12', name:'Signalhorcher', icon:'ti-antenna-bars-5'/.test(src) &&
+  /have:\(\)=>ensureExpeditionCodex\(\)\.signalsFollowed\|\|0, need:12/.test(src));
+check('7c: die Kodex-Kopfzeile zeigt den Peilungs-Zähler mit an',
+  /× Schatzdepot · \$\{codex\.signalsFollowed\|\|0\}× Peilung/.test(src));
+
+// ---------------------------------------------------------------- 7d) Galaxie-Karte: Zwischenspeicher
+check('7d: die Karte schreibt nur bei geändertem Markup neu',
+  /if \(inner === lastGalaxyMapMarkup\) return;/.test(src) && /lastGalaxyMapMarkup = inner;/.test(src));
+check('7d: der viewBox wird trotzdem immer gesetzt (Zoom/Pan ändern das Markup nicht)',
+  src.indexOf("svg.setAttribute('viewBox'") < src.indexOf('if (inner === lastGalaxyMapMarkup) return;'));
+check('7d: ein leeres SVG erzwingt den Neuaufbau',
+  /if \(!svg\.firstChild\) lastGalaxyMapMarkup = null;/.test(src));
+// Voraussetzung fuer den Zwischenspeicher UND fuer sich ein Anzeigefehler: das Sternenfeld wurde
+// jede Sekunde neu ausgewuerfelt und sprang sichtbar.
+check('7d: das Sternenfeld ist deterministisch statt zufällig',
+  /hashStringToFloat\('stern'\+i\+'x'\)/.test(src) &&
+  !/<circle cx="\$\{\(Math\.random\(\)\*950\)/.test(src));
+check('7d: das Karten-Abzeichen trägt keinen Countdown mehr (der würde den Neuaufbau erzwingen)',
+  !/badges\.push\(\{ icon:'📡'[^}]*fmtDuration/.test(src));
 
 // ---------------------------------------------------------------- 8) Anzeigestellen (CLAUDE.md 6)
 check('8: der Expeditions-Reiter zeigt die Peilungen mit Restzeit an',
