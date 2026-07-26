@@ -4266,8 +4266,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.26';
+  const VERSION = '8.298.27';
   const PATCHNOTES = [
+    { version:'8.298.27', date:'26.07.2026', changes:[
+      '<strong>Fehler behoben: das Botschaftsviertel ließ sich überhaupt nicht bauen.</strong> Es war das erste Gebäude mit einem Kredit-Anteil in den Baukosten – und die Kostenprüfung suchte Kredite an der falschen Stelle. Sie liegen in einem eigenen Feld, nicht bei den Ressourcen, also las die Prüfung dort immer „0 vorhanden" und verweigerte den Bau, egal wie voll die Kasse war. Danke für den Screenshot.',
+      'Aus derselben Ursache stand in der Kostenzeile <strong>„280 credits"</strong> klein und englisch zwischen „6.3k Erz" und „4.5k Kristalle". Jetzt steht dort „280 Kredite" mit dem gewohnten Kredit-Symbol, und die Rot-Markierung bei zu wenig Geld greift ebenfalls richtig.',
+      'Gleich mitgehärtet: Auch das Abbuchen und Gutschreiben kennt Kredite jetzt ausdrücklich. Ohne das hätte ein Kauf einen ungültigen Zahlenwert in den Ressourcen hinterlassen – und ein solcher Wert lässt den Server den <em>gesamten</em> Spielstand ablehnen, womit gar nichts mehr gespeichert würde. Der Fehler war also eine Zeile davon entfernt, deutlich unangenehmer zu werden.',
+      '<strong>Zwei neue Tutorial-Schritte.</strong> „Kredite: die zweite Währung" beantwortet eine Frage, die der Rundgang bisher offenließ – woher Kredite überhaupt kommen: vor allem aus Handelsrouten, dazu Verkäufe am Markt, Tagesaufgaben, Fraktionsaufträge, Erfolge, eroberte Systeme und der Schattenbund als Verbündeter. Und „Tagesaufgaben: der tägliche Faden" erklärt die täglich wiederkehrende Schleife, die im Rundgang komplett fehlte, obwohl sie der schnellste Weg ist, das Spiel kennenzulernen. Damit sind es zehn Schritte.',
+      'Der Prüflauf vergleicht die Zahlen in den neuen Schritten wieder direkt mit dem Code – die Größe des Aufgaben-Pools, wie viele täglich gezogen werden – und prüft, dass jede genannte Kredit-Quelle im Spiel wirklich existiert. Dazu ein neuer Wächter, der anschlägt, sobald irgendwo Baukosten mit einem Schlüssel auftauchen, den das Kostensystem nicht kennt: genau der Fehlertyp, der das Botschaftsviertel unbaubar gemacht hat.'
+    ]},
     { version:'8.298.26', date:'26.07.2026', changes:[
       '<strong>Der Einführungsrundgang kennt jetzt die Fraktionen.</strong> Sechs neue Systeme, 20 Tagesaufgaben und 15 Erfolge – und das Tutorial erwähnte davon kein Wort. Ein neuer Spieler lief an Rängen, Gunstmarken, Läden und dem Ruf-Verfall komplett vorbei, bis er zufällig in den Galaxie-Tab schaute. Neuer siebter Schritt <strong>„Fraktionen: Ruf, Ränge und Botschaften"</strong>: die vier Fraktionen, die acht Ränge mit ihren eigenen Namen, der Laden ab Rang 6 mit Gunstmarken statt Krediten, die zwei Rivalenpaare, der Verfall nach drei Tagen ohne Kontakt und die Botschaft dagegen.',
       'Bewusst kurz gehalten und ohne Zahlenkolonnen – der Rundgang soll den Weg zeigen, die Einzelheiten stehen im Hilfe-Tab, auf den der Abschluss-Schritt verweist. Der erste Entwurf war mehr als doppelt so lang wie jeder andere Schritt und hätte das Overlay gesprengt; er ist jetzt auf Rundgang-Länge gekürzt.',
@@ -13308,7 +13315,15 @@
       return (state.research[req.key]||0) >= req.level;
     });
   }
-  function canAfford(cost){ return Object.entries(cost).every(([r,amt]) => (state.resources[r]||0) >= amt); }
+  // Kredite liegen NICHT in state.resources, sondern in state.credits - ein Kostenposten 'credits'
+  // wurde deshalb bis v8.298.26 als "0 vorhanden" gelesen und machte den Posten UNBEZAHLBAR (Spieler-
+  // Report 26.07.2026: das Botschaftsviertel mit 400 Kredit-Anteil liess sich nie bauen). Der
+  // Zeitschaetzer (affordHint) kannte den Sonderfall schon, canAfford und pay nicht - eine halb
+  // verdrahtete Stelle. Beide Funktionen behandeln 'credits' jetzt ausdruecklich; wer einen neuen
+  // Kostenposten einfuehrt, muss ihn hier UND in pay() kennen (test_kostenschluessel.js prueft, dass
+  // in den DEFS keine anderen als die bekannten Kostenschluessel vorkommen).
+  function costAmountAvailable(r){ return r === 'credits' ? (state.credits||0) : (state.resources[r]||0); }
+  function canAfford(cost){ return Object.entries(cost).every(([r,amt]) => costAmountAvailable(r) >= amt); }
   // Treibstoffkosten-Audit (16.07.2026, Prüf- und Balance-Wunsch): die Formel selbst (linear zur
   // tatsächlichen Flugzeit NACH allen Geschwindigkeitsboni, mit der Wurzel der Schiffszahl skaliert)
   // war strukturell korrekt - Allianz-Rabatt (ab_expedition) und Doktrin-Multiplikator (fuelMult)
@@ -13368,7 +13383,16 @@
   function fuelCostIconHtml(fuel){
     return Object.entries(fuel).map(([r,a])=>miniResIcon(r)+' '+a).join(' + ');
   }
-  function pay(cost){ for (const [r,amt] of Object.entries(cost)) state.resources[r] -= amt; }
+  function pay(cost){
+    for (const [r,amt] of Object.entries(cost)){
+      // Gegenstueck zu costAmountAvailable: ohne diesen Zweig wuerde state.resources.credits zu NaN
+      // (undefined - 280). Ein NaN in state.resources ist genau das, was der Backend-Sanity-Check
+      // ablehnt - und eine dauerhaft abgelehnte Speicherung friert den ganzen Spielstand ein
+      // (Vorfall 21.07.2026, siehe CLAUDE.md). Nur weil canAfford vorher blockte, ist das nie passiert.
+      if (r === 'credits') state.credits = (state.credits||0) - amt;
+      else state.resources[r] -= amt;
+    }
+  }
   // Zentrale Gutschreibungs-Funktion für Ressourcen-Gewinne aus JEDER Quelle (Belohnungen, Beute,
   // Erstattungen, Handelsrouten-Bonus, Entdeckungen, Überfälle, ...) - respektiert konsequent den
   // Lager-Deckel: ist das Lager voll, geht der Überschuss verloren, unabhängig davon woher die
@@ -13384,6 +13408,8 @@
       // klemmen an DEREN Deckel statt am riesigen Basis-Lager. Mindestens storageBase, damit ein
       // Geschenk an einen Empfänger OHNE eigene Fabrik (tier2StorageCap wäre dort 0) nicht
       // stillschweigend verpufft - er kann den Bestand trotzdem verbauen (z.B. Tier-2-Schiffe).
+      // Kredite haben kein Lager-Limit und liegen ausserhalb von state.resources (siehe canAfford).
+      if (r === 'credits'){ state.credits = (state.credits||0) + amt; continue; }
       const t2 = typeof TIER2_DEFS !== 'undefined' ? TIER2_DEFS.find(t=>t.key===r) : null;
       const useCap = t2 ? Math.max(tier2StorageCap(t2), t2.storageBase) : cap;
       // Math.max: ein bereits über der Lagergrenze liegender Bestand darf durch die Zugangs-
@@ -13586,18 +13612,25 @@
     return m;
   }
   function miniResIcon(key){
+    // Kredite haben kein handgezeichnetes SVG in RES_ICONS - sie benutzen im ganzen Spiel ti-diamond.
+    if (key === 'credits') return '<i class="ti ti-diamond" aria-hidden="true" style="color:#fac775;"></i>';
     return (RES_ICONS[key]||'').replace('width="20" height="20"', 'width="13" height="13"');
   }
   // Fallback auf TIER2_DEFS nötig, seit Baukosten auch Tier-2-Ressourcen enthalten können
   // (die stehen bewusst nicht in RES_DEFS, siehe Kommentar dort) - ohne Fallback crashte
   // rd.label bei jedem Gebäude mit Tier-2-Kostenanteil.
   function resDefFor(key){
+    // Kredite stehen bewusst nicht in RES_DEFS (sie sind keine produzierbare Ressource, siehe dort) -
+    // ohne diesen Zweig fiel der Fallback auf { label:key } zurueck und die Kostenzeile zeigte
+    // "280 credits" auf englisch und klein zwischen "6.3k Erz" und "4.5k Kristalle"
+    // (Spieler-Screenshot 26.07.2026, Botschaftsviertel).
+    if (key === 'credits') return { key:'credits', label:'Kredite', icon:'ti-diamond', fg:'#fac775' };
     return RES_DEFS.find(x=>x.key===key) || TIER2_DEFS.find(t=>t.key===key) || { label:key };
   }
   function costHtml(cost){
     return Object.entries(cost).map(([r,a]) => {
       const rd = resDefFor(r);
-      return `<span class="costitem${(state.resources[r]||0)<a?' short':''}">${miniResIcon(r)}${fmt(a)} ${rd.label}</span>`;
+      return `<span class="costitem${costAmountAvailable(r)<a?' short':''}">${miniResIcon(r)}${fmt(a)} ${rd.label}</span>`;
     }).join(' ');
   }
   function rewardHtml(obj){
@@ -13626,7 +13659,7 @@
     let maxT = 0;
     const notProduced = [];
     for (const [r, amt] of Object.entries(cost)){
-      const have = state.resources[r]||0;
+      const have = costAmountAvailable(r);
       if (have >= amt) continue;
       const rate = rates[r]||0;
       if (rate <= 0){ if (r !== 'credits') notProduced.push(r); continue; } // fehlend & wird nicht produziert
@@ -19659,7 +19692,7 @@
       refreshAdminReportCount();
     } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
   }
-  // Einführungstutorial für neue Spieler: acht kurze Schritte über die Kernmechaniken. Erscheint
+  // Einführungstutorial für neue Spieler: zehn kurze Schritte über die Kernmechaniken. Erscheint
   // automatisch beim allerersten Start (state.tutorialSeen noch false) und lässt sich jederzeit über
   // den Hilfe-Button in den Einstellungen erneut öffnen.
   //
@@ -19667,7 +19700,7 @@
   // innerHTML - HTML-Auszeichnung in diesen Strings würde als Klartext im Overlay stehen. Und Zahlen
   // in diesen Texten sind eine ZWEITE Anzeigestelle im Sinne von CLAUDE.md Regel 6: sie müssen zu
   // den Konstanten passen (REP_RANKS, EMBASSY_MIN_RANK, REP_DECAY_GRACE_MS), sonst erklärt der
-  // Rundgang neuen Spielern ein Spiel, das es nicht mehr gibt. test_tutorial_fraktionen.js prüft das.
+  // Rundgang neuen Spielern ein Spiel, das es nicht mehr gibt. test_tutorial.js prüft das.
   const TUTORIAL_STEPS = [
     { icon:'ti-rocket', title:'Willkommen, Kommandant!', text:'Du übernimmst eine kleine Außenposten-Kolonie am Rand des Kepler-Systems. Baue Ressourcenproduktion auf, erforsche Technologien, baue eine Flotte und erkunde die Galaxie – dieser kurze Rundgang zeigt die wichtigsten Bereiche.' },
     { icon:'ti-building-factory-2', title:'Basis & Ressourcen', text:'Im Basis-Tab baust du Gebäude, die Energie, Erz, Kristalle, Deuterium und Antimaterie produzieren. Fast jeder Gebäude-, Schiffs- und Forschungsausbau kostet unter anderem Energie – baue Solarzellen früh mit aus, sonst fehlt dir bald das Kleingeld für alles andere.' },
@@ -19675,6 +19708,8 @@
     { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – wähle vorher deine Angriffsflotte aus. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
     { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab erkundest du Planeten mit Erkundungsschiffen und kolonisierst sie später mit Kolonieschiffen. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft oder Handel) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
     { icon:'ti-users', title:'Allianz & Gemeinschaft', text:'Im Allianz-Tab schließt du dich mit anderen zusammen für gemeinsame Technologien, Gebäude und sogar Kriege gegen andere Allianzen.' },
+    { icon:'ti-diamond', title:'Kredite: die zweite Währung', text:'Neben Ressourcen gibt es Kredite als Handelswährung – dafür brauchst du keine Fabrik, sondern Aktivität. Die verlässlichste Quelle sind Handelsrouten (Markt-Tab): einmal eingerichtet, liefern sie dauernd Kredite. Dazu kommen der Verkauf überschüssiger Ressourcen am Markt, die Belohnungen der Tagesaufgaben, Fraktionsaufträge, Erfolge, eroberte Sternsysteme und der Schattenbund als Verbündeter. Ausgegeben werden sie im Kredit-Shop, für Tribute, am Markt und für einzelne Gebäude wie das Botschaftsviertel.' },
+    { icon:'ti-list-details', title:'Tagesaufgaben: der tägliche Faden', text:'Unter der Ressourcenleiste liegen die Tagesaufgaben: fünf werden täglich aus 20 Vorlagen gezogen, quer durch alle Bereiche – Kampf, Forschung, Bau, Markt, Expeditionen, Fraktionen. Jede gibt Ressourcen oder Kredite, und wer an einem Tag alle abholt, bekommt einen Serien-Bonus, der über mehrere Komplett-Tage wächst. Eine offene Aufgabe kannst du antippen, um direkt zum passenden Menü zu springen. Das ist der schnellste Weg, das Spiel kennenzulernen: die Aufgaben führen dich von selbst durch alle Systeme.' },
     { icon:'ti-flag', title:'Fraktionen: Ruf, Ränge und Botschaften', text:'Im Galaxie-Tab stehen vier NPC-Fraktionen: Aschen-Kartell, Eisenlegion, Void-Marodeure und Schattenbund. Bei jeder steigst du über acht Ränge auf, für die jede eigene Namen führt – beim Kartell vom Bittsteller zum Syndikatspartner. Ab Rang 6 („Freundlich") gibt eine Fraktion dir ihren Effekt und öffnet ihren Laden, in dem du mit Gunstmarken aus ihren Aufträgen zahlst statt mit Krediten. Überall beliebt sein geht nicht: die vier bilden zwei Rivalenpaare. Und Ruf muss gepflegt werden – drei Tage ohne Kontakt, und er sinkt wieder, sofern du dort keine Botschaft unterhältst. Feindschaft hat umgekehrt echte Nachteile.' },
     { icon:'ti-skull', title:'Lebendige Galaxie', text:'Im Galaxie-Tab wartet mehr als PvP: Jage mit allen Spielern gemeinsam den Weltboss "Leviathan der Leere", räuchere Piraten-Verstecke aus (Stufe 1-10), kämpfe in der Wochenliga um Liga-Belohnungen und schließe Nichtangriffspakte mit anderen Spielern (Friedensdividende: +5% Produktion je Pakt, mehrere Pakte zählen). Details zu allem findest du im Hilfe-Tab – diesen Rundgang jederzeit über die Einstellungen.' }
   ];

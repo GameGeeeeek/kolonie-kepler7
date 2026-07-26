@@ -1,4 +1,4 @@
-// Tutorial-Schritt zu den Fraktionen v8.298.26.
+// Einfuehrungsrundgang (TUTORIAL_STEPS) v8.298.27.
 //
 // Ausgangslage: Der Fraktions-Ausbau hat sechs Systeme, 20 Tagesaufgaben und 15 Erfolge gebracht -
 // TUTORIAL_STEPS erwaehnte davon kein Wort. Ein neuer Spieler lief an Raengen, Gunstmarken, Laeden
@@ -18,6 +18,8 @@
 //   5) die zitierten Rangnamen stehen wirklich in FACTION_RANK_NAMES
 //   6) KEIN Schritt enthaelt HTML - renderTutorialStep nutzt textContent, Auszeichnung waere Klartext
 //   7) alle Schritte bleiben formal in Ordnung (Icon in der Whitelist, Titel/Text gefuellt)
+//   9) die Schritte zu Krediten und Tagesaufgaben (v8.298.27) - inklusive der Pruefung, dass
+//      jede genannte Kredit-Quelle im Code wirklich existiert
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
 
@@ -125,15 +127,53 @@ check('4: der Verfallssatz wird nicht halb zitiert',
 }
 
 // ---------------------------------------------------------------- 7: alle Schritte formal in Ordnung
-check('7: es sind acht Schritte', STEPS.length === 8, STEPS.length);
+check('7: es sind zehn Schritte', STEPS.length === 10, STEPS.length);
 check('7: der Kommentar über TUTORIAL_STEPS nennt die richtige Anzahl',
-  /Einführungstutorial für neue Spieler: acht kurze Schritte/.test(src));
+  /Einführungstutorial für neue Spieler: zehn kurze Schritte/.test(src));
 check('7: alle Titel sind verschieden', new Set(STEPS.map(s=>s.title)).size === STEPS.length);
 for (const s of STEPS){
   check('7: "'+s.title.slice(0,28)+'" hat ein Icon aus der Whitelist',
     /^ti-[a-z0-9-]+$/.test(s.icon||'') && new RegExp('\\.'+s.icon+':before').test(src), s.icon);
   check('7: "'+s.title.slice(0,28)+'" hat einen gefüllten Text', typeof s.text === 'string' && s.text.length >= 120, s.text && s.text.length);
 }
+// ---------------------------------------------------------------- 9: Kredite und Tagesaufgaben
+// Zwei Luecken derselben Art wie beim Fraktions-Schritt: die zweite Waehrung und die taegliche
+// Schleife des Spiels kamen im Rundgang gar nicht vor (Spieler-Frage 26.07.2026: "wie bekommt man
+// credits").
+{
+  const kredit = STEPS.find(s => /Kredite/.test(s.title));
+  check('9: es gibt einen Kredit-Schritt', !!kredit, kredit && kredit.title);
+  if (kredit){
+    // Jede genannte Quelle muss es im Spiel wirklich geben - sonst schickt der Rundgang neue Spieler
+    // auf eine Schnitzeljagd nach etwas, das nicht existiert.
+    check('9: der Kredit-Schritt nennt Handelsrouten als Hauptquelle', /Handelsrouten/.test(kredit.text));
+    check('9: Handelsrouten schreiben wirklich Kredite gut',
+      /state\.tradeRouteLifetimeCredits = \(state\.tradeRouteLifetimeCredits\|\|0\) \+/.test(src));
+    check('9: der Schritt nennt eroberte Systeme', /eroberte Sternsysteme/.test(kredit.text));
+    check('9: eroberte Systeme zahlen wirklich Kredite', /CONQUERED_CREDITS_PER_MIN/.test(src));
+    check('9: der Schritt nennt den Kredit-Shop als Senke', /Kredit-Shop/.test(kredit.text));
+    check('9: der Schritt nennt das Botschaftsviertel als Kredit-Senke', /Botschaftsviertel/.test(kredit.text));
+    // Und das ist keine leere Behauptung mehr: das Gebaeude hat wirklich Kredit-Kosten UND die
+    // Kostenpruefung kann sie lesen (das war der Fehler aus v8.298.24).
+    check('9: das Botschaftsviertel hat wirklich Kredit-Kosten', /baseCost:\{erz:9000, kristalle:6500, deuterium:3200, credits:400\}/.test(src));
+  }
+  const tag = STEPS.find(s => /Tagesaufgaben/.test(s.title));
+  check('9: es gibt einen Tagesaufgaben-Schritt', !!tag, tag && tag.title);
+  if (tag){
+    // Die Poolgroesse im Text muss zu DAILY_QUEST_DEFS passen, und die Zahl der taeglich gezogenen
+    // zu DAILY_QUEST_ACTIVE_COUNT - wieder Regel 6.
+    const defsQ = src.slice(src.indexOf('  const DAILY_QUEST_DEFS = ['), src.indexOf('  const DAILY_QUEST_ACTIVE_COUNT', src.indexOf('  const DAILY_QUEST_DEFS = [')));
+    const POOL = new Function(defsQ + ';return DAILY_QUEST_DEFS.length;')();
+    const AKTIV = Number((src.match(/const DAILY_QUEST_ACTIVE_COUNT = (\d+);/)||[])[1]);
+    check('9: die genannte Poolgröße stimmt mit DAILY_QUEST_DEFS überein',
+      tag.text.includes(POOL+' Vorlagen'), { imText: POOL+' Vorlagen', konstante: POOL });
+    check('9: die Zahl der täglich gezogenen stimmt mit DAILY_QUEST_ACTIVE_COUNT überein',
+      tag.text.includes(ZAHLWORT[AKTIV]+' werden täglich'), { konstante: AKTIV });
+    check('9: der Schritt nennt den Serien-Bonus', /Serien-Bonus/.test(tag.text));
+    check('9: der Schritt nennt das Antippen zum Springen', /antippen/.test(tag.text));
+  }
+}
+
 // Der Fraktions-Schritt soll VOR dem Abschluss-Schritt stehen, der auf den Hilfe-Tab verweist -
 // sonst kommt der Verweis „Details im Hilfe-Tab" vor dem Inhalt, auf den er sich bezieht.
 {
