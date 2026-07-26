@@ -4259,8 +4259,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.298.20';
+  const VERSION = '8.298.21';
   const PATCHNOTES = [
+    { version:'8.298.21', date:'26.07.2026', changes:[
+      '<strong>Feindschaft hat jetzt Folgen.</strong> „Feindlich" war bisher nur ein rotes Etikett ohne jede Wirkung – es gab weder einen Nachteil noch einen Grund, den Ruf zu pflegen. Neu ist außerdem die Stufe <strong>Verfeindet</strong> ab Ruf −70.',
+      'Jede Fraktion schadet dort, wo sie sonst nützt: das <strong>Aschen-Kartell</strong> boykottiert deine Handelsrouten (−12% bzw. −25% Ertrag), die <strong>Void-Marodeure</strong> lenken Überfälle auf dich (+25% bzw. +60% Häufigkeit), die <strong>Eisenlegion</strong> fängt deine Expeditionen ab (+20% bzw. +45% Begegnungschance) und der <strong>Schattenbund</strong> verkauft deine Positionen weiter (+15% bzw. +30% Ressourcenverlust bei Überfällen).',
+      '<strong>Strafexpeditionen:</strong> Jede feindliche Fraktion schickt zusätzlich Verbände. Je Feindschaftsstufe steigt die Überfall-Häufigkeit um 18% und die Stärke der Angreifer um 12% – bei mehreren Feinden summiert sich das spürbar.',
+      '<strong>Und es lohnt sich auch:</strong> Wer mehr und schwerere Angriffe abwehrt, bergt mehr. Je Feindschaftsstufe bleiben 15% mehr Trümmer liegen, wenn du einen Überfall abschlägst. Sich Feinde zu machen ist damit eine Strategie mit Preis, kein reiner Fehler – steht deine Verteidigung, wird die Feindschaft zur Trümmerquelle.',
+      'Jede Fraktionskarte zeigt ihren Feindschafts-Malus im Klartext an, damit höhere Überfallzahlen und magere Handelsrouten nicht wie ein Fehler wirken. Neuer Erfolg <strong>Erzfeind</strong>.',
+      'Unangetastet bleiben der Kartell-Marktrabatt und die Schwierigkeit von Fraktions-Systemangriffen – beides rechnet der Server, eine einseitige Verschärfung im Spiel würde Anzeige und Serverrechnung auseinanderlaufen lassen.'
+    ]},
     { version:'8.298.20', date:'26.07.2026', changes:[
       'Die vier Fraktionen sind jetzt <strong>Rivalen</strong>: Aschen-Kartell gegen Schattenbund (Wirtschaft), Eisenlegion gegen Void-Marodeure (Militär und Mystik). Bisher konnte man bei allen vier gleichzeitig auf Ruf 100 stehen – wer einmal oben war, hatte das ganze System für immer abgeschlossen.',
       '<strong>Ruf schwappt über:</strong> Gewinnst du bei einer Fraktion Ruf, verlierst du rund ein Drittel davon bei ihrem Rivalen. Und umgekehrt – greifst du eine Fraktion an, freut sich ihr Rivale und dein Ruf dort steigt. Einen Gegner zu haben ist damit nicht mehr nur schlecht.',
@@ -9321,7 +9329,7 @@
   // verändern.
   // Handelsleitstand (24.07.2026, neuer Standort-Modultyp 'trade'): imperiumsweiter Routen-Ertragsbonus,
   // eigenständig bei +30% gedeckelt (dieselbe Obergrenze wie rroutenoptim auf Maximalstufe).
-  function routeYieldMult(){ return 1 + (state.research.rroutenoptim||0)*0.03 + officerBonus('haendler') + Math.min(0.3, moduleBonusTotal('trade')); }
+  function routeYieldMult(){ return (1 + (state.research.rroutenoptim||0)*0.03 + officerBonus('haendler') + Math.min(0.3, moduleBonusTotal('trade'))) * hostileRouteMult(); }
   // Veredelungsroute (vormals "Transportroute", war rein kosmetisch - siehe Kommentar unten in
   // processTradeRoutes): feste Umwandlungskette, Kurs grob am Verhältnis der echten Marktbasispreise
   // (erz 2.0 / kristalle 3.2 / deuterium 4.8 / antimaterie 24.0) orientiert, minus 20% Verlust -
@@ -11365,7 +11373,13 @@
   };
   function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, (state.factionRep||{})[fid]||0)); }
   function repTierOf(rep){
-    if (rep <= -30) return { key:'feindlich', label:'Feindlich', color:'#e24b4a' };
+    // "Verfeindet" (26.07.2026, Fraktions-Ausbau Paket 2/6): Bis dahin war "Feindlich" ein rein
+    // KOSMETISCHES rotes Etikett - factionEffectLevel lieferte fuer alles unter Freundlich einfach 0,
+    // es gab also weder Nachteil noch Drama beim Angreifen. Jetzt gibt es zwei Feindschaftsstufen mit
+    // echten Folgen (siehe factionHostilityLevel). Die Schwellen 30/70 nach oben bleiben unangetastet
+    // (Backend-Paritaet, marketDiscountPctFor in server.js); -30/-70 sind rein clientseitig.
+    if (rep <= -70) return { key:'verfeindet', label:'Verfeindet', color:'#e24b4a' };
+    if (rep <= -30) return { key:'feindlich', label:'Feindlich', color:'#e0784a' };
     if (rep >= 70) return { key:'verbuendet', label:'Verbündet', color:'#5dcaa5' };
     if (rep >= 30) return { key:'freundlich', label:'Freundlich', color:'#85b7eb' };
     return { key:'neutral', label:'Neutral', color:'#8489a0' };
@@ -11454,6 +11468,61 @@
     const tier = repTierOf(factionRepOf(fid));
     return tier.key === 'verbuendet' ? 2 : (tier.key === 'freundlich' ? 1 : 0);
   }
+  // ===== Feindschaft mit Folgen (26.07.2026, Fraktions-Ausbau Paket 2/6) =====
+  // Spiegelbild von factionEffectLevel: 0 = nicht feindlich, 1 = feindlich (<=-30),
+  // 2 = verfeindet (<=-70). Jede Fraktion schadet dort, wo sie sonst nuetzt.
+  //
+  // WICHTIG - was hier bewusst NICHT steht: Der Kartell-MARKTRABATT bekommt keinen Aufschlag, und
+  // Fraktions-Systemangriffe werden nicht schwerer. Beides rechnet der Server (marketDiscountPctFor
+  // bzw. /faction/attack); eine einseitige Verschaerfung im Frontend wuerde Anzeige und
+  // Serverrechnung auseinanderlaufen lassen. Die vier Mali unten sind alle rein clientseitig.
+  function factionHostilityLevel(fid){
+    const tier = repTierOf(factionRepOf(fid));
+    return tier.key === 'verfeindet' ? 2 : (tier.key === 'feindlich' ? 1 : 0);
+  }
+  function anyHostileLevel(){
+    return Object.keys(FACTION_DIPLOMACY).reduce((a,fid) => Math.max(a, factionHostilityLevel(fid)), 0);
+  }
+  function hostileFactionIds(){
+    return Object.keys(FACTION_DIPLOMACY).filter(fid => factionHostilityLevel(fid) > 0);
+  }
+  // Kartell feindlich: die Handelsgilden boykottieren deine Routen. 1 / 0.88 / 0.75
+  function hostileRouteMult(){
+    const h = factionHostilityLevel('kartell');
+    return h === 2 ? 0.75 : (h === 1 ? 0.88 : 1);
+  }
+  // Legion feindlich: ihre Patrouillen fangen deine Expeditionen haeufiger ab. 1 / 1.2 / 1.45
+  function hostileEncounterMult(){
+    const h = factionHostilityLevel('legion');
+    return h === 2 ? 1.45 : (h === 1 ? 1.2 : 1);
+  }
+  // Schatten feindlich: sie verkaufen deine Positionen weiter - Ueberfaelle kosten mehr Ressourcen.
+  // Gilt bewusst NUR fuer NPC-Ueberfaelle; den Verlust bei SPIELER-Ueberfaellen rechnet der Server
+  // (raidlossProtectionMult), da wuerde ein einseitiger Aufschlag auseinanderlaufen. 1 / 1.15 / 1.3
+  function hostileRaidLossMult(){
+    const h = factionHostilityLevel('schatten');
+    return h === 2 ? 1.3 : (h === 1 ? 1.15 : 1);
+  }
+  // Strafexpeditionen: JEDE verfeindete Fraktion schickt zusaetzlich Ueberfaelle. Der Malus des
+  // Void-Kults (raidChanceMult) wirkt weiterhin darueber hinaus - er ist ihr Spezialgebiet.
+  const PUNITIVE_RAID_PER_LEVEL = 0.18;   // Aufschlag auf die Ueberfall-Chance je Feindschaftsstufe
+  const PUNITIVE_POWER_PER_LEVEL = 0.12;  // ... und auf die Staerke der Angreifer
+  function punitiveRaidChanceMult(){
+    const summe = Object.keys(FACTION_DIPLOMACY).reduce((a,fid) => a + factionHostilityLevel(fid), 0);
+    return 1 + summe * PUNITIVE_RAID_PER_LEVEL;
+  }
+  function punitiveRaidPowerMult(){
+    const summe = Object.keys(FACTION_DIPLOMACY).reduce((a,fid) => a + factionHostilityLevel(fid), 0);
+    return 1 + summe * PUNITIVE_POWER_PER_LEVEL;
+  }
+  // Die Gegenleistung (Paket 2 verspricht Nachteil UND Nutzen): Wer sich Feinde macht, wird oefter
+  // und haerter angegriffen - schlaegt er die Angriffe ab, bleibt entsprechend mehr Wrack liegen.
+  // Bewusst an derselben Summe wie oben aufgehaengt, damit Risiko und Ertrag zusammen wachsen.
+  const PUNITIVE_DEBRIS_PER_LEVEL = 0.15;
+  function punitiveDebrisMult(){
+    const summe = Object.keys(FACTION_DIPLOMACY).reduce((a,fid) => a + factionHostilityLevel(fid), 0);
+    return 1 + summe * PUNITIVE_DEBRIS_PER_LEVEL;
+  }
   // Kartell: Markt-Preisvorteil (Kauf billiger, Verkauf besser). 0 / 0.05 / 0.10
   function marketDiscountPct(){
     const lvl = factionEffectLevel('kartell');
@@ -11471,7 +11540,12 @@
   // Void: Multiplikator auf die Raid-Wahrscheinlichkeit. 1 / 0.75 / 0.5
   function raidChanceMult(){
     const lvl = factionEffectLevel('void');
-    return lvl === 2 ? 0.5 : (lvl === 1 ? 0.75 : 1);
+    const freundlich = lvl === 2 ? 0.5 : (lvl === 1 ? 0.75 : 1);
+    // Feindschaft dreht den Spieß um: Void feindlich/verfeindet erhöht die Chance wieder, und
+    // JEDE verfeindete Fraktion schickt zusätzlich Strafexpeditionen (punitiveRaidChanceMult).
+    const h = factionHostilityLevel('void');
+    const voidMalus = h === 2 ? 1.6 : (h === 1 ? 1.25 : 1);
+    return freundlich * voidMalus * punitiveRaidChanceMult();
   }
   const TRIBUTE_COOLDOWN_MS = 2*3600*1000; // Balance-Wunsch 13.07.2026: bisher keine Sperre, beliebig oft hintereinander klickbar
   function payTribute(fid){
@@ -11598,9 +11672,41 @@
         <div style="display:flex; gap:6px; flex-wrap:wrap;">${knopf(idA, krieg.factionA)}${knopf(idB, krieg.factionB)}</div>
       </div>`;
     })();
-    box.innerHTML = mineCard + kriegCard + sorted.map(f => {
+    // Feindschafts-Übersicht (Paket 2/6): Die Einzelkarten nennen jeweils IHREN Malus - hier steht,
+    // was insgesamt zusammenkommt. Ohne diese Zeile bliebe unerklärt, warum plötzlich häufiger und
+    // schwerer angegriffen wird, wenn man sich mit mehreren Fraktionen überworfen hat.
+    const feindCard = (() => {
+      const ids = hostileFactionIds();
+      if (!ids.length) return '';
+      const schlimmste = anyHostileLevel();
+      const namen = ids.map(id => factionNameOf(id) + (factionHostilityLevel(id) === 2 ? ' (verfeindet)' : '')).join(', ');
+      const pc = Math.round((punitiveRaidChanceMult()-1)*100);
+      const pp = Math.round((punitiveRaidPowerMult()-1)*100);
+      const pd = Math.round((punitiveDebrisMult()-1)*100);
+      return `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:5px; margin-bottom:0.5rem; border-color:rgba(224,120,74,0.5); background:rgba(224,120,74,0.08);">
+        <div class="left" style="gap:8px;"><div class="bicon" style="background:rgba(224,120,74,0.2); color:${schlimmste===2?'#e24b4a':'#e0784a'};"><i class="ti ti-alert-triangle" aria-hidden="true"></i></div>
+          <div><div class="bname" style="color:${schlimmste===2?'#e24b4a':'#e0784a'};">${ids.length} ${ids.length===1?'Fraktion ist':'Fraktionen sind'} dir feindlich gesinnt</div>
+          <div class="bmeta">${namen}</div></div>
+        </div>
+        <div class="bmeta">Strafexpeditionen: <strong style="color:#e24b4a;">+${pc}% Überfall-Häufigkeit</strong>, <strong style="color:#e24b4a;">+${pp}% Angreifer-Stärke</strong> – dafür <strong style="color:#5dcaa5;">+${pd}% Trümmer</strong>, wenn du sie abschlägst.</div>
+      </div>`;
+    })();
+    box.innerHTML = mineCard + feindCard + kriegCard + sorted.map(f => {
       const count = (f.systems||[]).length;
       const strength = f.strength ? f.strength.toFixed(1) : '?';
+      // Feindschaft sichtbar machen (Paket 2/6) - sonst wirken höhere Überfallzahlen, teurere
+      // Expeditionen und magere Handelsrouten wie ein Fehler statt wie eine Folge.
+      const hos = factionHostilityLevel(f.id);
+      const hosRow = hos > 0 ? (() => {
+        const malus = {
+          kartell:  ['−12% Handelsrouten-Ertrag', '−25% Handelsrouten-Ertrag'],
+          void:     ['+25% Überfall-Häufigkeit', '+60% Überfall-Häufigkeit'],
+          legion:   ['+20% Begegnungschance bei Expeditionen', '+45% Begegnungschance bei Expeditionen'],
+          schatten: ['+15% Ressourcenverlust bei Überfällen', '+30% Ressourcenverlust bei Überfällen']
+        }[f.id];
+        const txt = malus ? malus[hos-1] : 'Nachteile im Umgang mit dieser Fraktion';
+        return `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:3px; color:#e24b4a;"></i><strong style="color:#e24b4a;">${hos===2?'Verfeindet':'Feindlich'}:</strong> ${txt}${hos===2?' · schickt <strong>Strafexpeditionen</strong> gegen deine Planeten':''}</div>`;
+      })() : '';
       // Rivalität sichtbar machen - sonst wirkt der Ruf-Verlust beim Rivalen wie ein Fehler.
       const rival = rivalOf(f.id);
       const rivalRow = rival ? `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px; color:#e0a548;"></i>Rivale: <strong>${factionNameOf(rival)}</strong> · Ruf-Gewinn hier kostet dort etwa ${Math.round(RIVAL_SPILL*100)}%${(factionRepOf(f.id) >= REP_ALLY_THRESHOLD) ? ' · <span style="color:#e0a548;">solange dieses Bündnis steht, ist dort keines möglich</span>' : ''}</div>` : '';
@@ -11664,6 +11770,7 @@
           </div>
         </div>
         ${dipRow}
+        ${hosRow}
         ${rivalRow}
         ${giftRow}
         ${questRow}
@@ -11767,6 +11874,7 @@
     // Neu 26.07.2026 mit den fraktionseigenen Auftragspools: Gold-Auftraege sind die seltene,
     // aufwendige Stufe (13% Ziehungschance) - ein eigenes Ziel dafuer, und eines fuer die Menge.
     { key:'fquestgold5', name:'Goldstandard', desc:'Schließe 5 Gold-Aufträge einer Fraktion ab – die seltenste und aufwendigste Auftragsstufe.', check: s => (s.factionGoldQuestsDone||0) >= 5, progress: s => [Math.min(5,s.factionGoldQuestsDone||0), 5], reward:{erz:9000,kristalle:6000,deuterium:3000,credits:700}, xpReward:500 },
+    { key:'erzfeind', name:'Erzfeind', desc:'Bringe eine Fraktion auf Verfeindet (Ruf unter −70) – und überlebe ihre Strafexpeditionen.', check: s => Object.keys(s.factionRep||{}).some(k => (s.factionRep[k]||0) <= -70), progress: s => [Math.min(70, Math.max(0, ...Object.keys(s.factionRep||{}).map(k => -(s.factionRep[k]||0)), 0)), 70], reward:{erz:12000,kristalle:8000,deuterium:4000,credits:600}, xpReward:500 },
     { key:'kriegspartei', name:'Königsmacher', desc:'Ergreife dreimal Partei in einem Fraktionskrieg und entscheide mit, wer die Galaxie beherrscht.', check: s => (s.warSidesTaken||0) >= 3, progress: s => [Math.min(3,s.warSidesTaken||0), 3], reward:{erz:12000,kristalle:8000,deuterium:4000,credits:800}, xpReward:600 },
     { key:'fquest50', name:'Vertragsmeister', desc:'Schließe 50 Fraktionsaufträge ab.', check: s => (s.factionQuestsDone||0) >= 50, progress: s => [Math.min(50,s.factionQuestsDone||0), 50], reward:{erz:14000,kristalle:9000,deuterium:5000,antimaterie:150,credits:900}, xpReward:700 },
     { key:'shop5', name:'Stammkunde', desc:'Kaufe 5 Mal im Kredit-Shop ein.', check: s => (s.shopPurchases||0) >= 5, progress: s => [Math.min(5,s.shopPurchases||0), 5] },
@@ -11832,7 +11940,7 @@
     synthesemeister:'aufbau', singularitaetsarchitekt:'aufbau',
     tenkills:'krieg', bossdown:'krieg', abyssdown:'krieg', nyradown:'krieg', allbosses:'krieg', moonsiegewin:'krieg', basewarwin:'krieg', warvictor:'krieg', kriegsheld:'krieg', ligameister:'krieg', allveteran:'krieg',
     allsystems:'expansion', explorer25:'expansion', conquer1:'expansion', conquer5:'expansion',
-    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', fquestgold5:'handel', fquest50:'handel', kriegspartei:'handel', shop5:'handel', gutvernetzt:'handel',
+    trade1:'handel', trade50:'handel', route1:'handel', trade_empire:'handel', trade_longrun:'handel', allied:'handel', pact3:'handel', pact_century:'handel', fquest10:'handel', fquestgold5:'handel', fquest50:'handel', kriegspartei:'handel', erzfeind:'handel', shop5:'handel', gutvernetzt:'handel',
     allianzweltprojekt:'allianz', allianzausbau100:'allianz', allianzeinsatz:'allianz', allianceraidkill:'allianz',
     firstprestige:'meister', prestige10:'meister', ascended:'meister', level10:'meister', doctrine:'meister', officer1:'meister', officer_all:'meister', dailyquest1:'meister', dailyquest7:'meister', eventship1:'meister', eventship_all:'meister', streak30:'meister', streak100:'meister', happyhour10:'meister'
   };
@@ -11862,7 +11970,7 @@
     trade1:'ti-truck', trade50:'ti-truck', route1:'ti-arrows-shuffle',
     trade_empire:'ti-diamond', trade_longrun:'ti-clock', conquer1:'ti-flag',
     conquer5:'ti-world', allied:'ti-message', pact3:'ti-shield', pact_century:'ti-shield-lock',
-    fquest10:'ti-list-details', fquestgold5:'ti-trophy', fquest50:'ti-medal', kriegspartei:'ti-sword', shop5:'ti-diamond', credits5k:'ti-diamond',
+    fquest10:'ti-list-details', fquestgold5:'ti-trophy', fquest50:'ti-medal', kriegspartei:'ti-sword', erzfeind:'ti-alert-triangle', shop5:'ti-diamond', credits5k:'ti-diamond',
     skilltreemax:'ti-star', allveteran:'ti-medal', allexotic:'ti-atom-2',
     erdweltmaster:'ti-plant', leerenweltmaster:'ti-mountain', allianzeinsatz:'ti-bell',
     allcolonyslots:'ti-home', allresearchmax:'ti-microscope',
@@ -15432,7 +15540,9 @@
     const totalDefense = defensePower();
     const minPower = totalDefense * 0.35; // Überfälle nie deutlich schwächer als 35% der eigenen Gesamtverteidigung
     const scaledRandom = 40 + Math.random()*260 + computeScore()*0.04;
-    let targetPower = Math.max(minPower, scaledRandom) * faction.mult;
+    // Strafexpeditionen (Paket 2/6): verfeindete Fraktionen schicken nicht nur haeufiger, sondern
+    // auch schwerere Verbaende. Beides haengt an derselben Summe der Feindschaftsstufen.
+    let targetPower = Math.max(minPower, scaledRandom) * faction.mult * punitiveRaidPowerMult();
 
     // Seltene Superangriffe: eine Elite-Flotte, die deutlich mächtiger ist als ein gewöhnlicher Überfall
     const isSuperAttack = Math.random() < 0.05;
@@ -15629,13 +15739,16 @@
       const lostRaiderShips = applyCombatLosses(raiderFleet, Object.keys(raiderFleet), raiderLossPct, targetPlanet, null, true);
       raidShipsDestroyed = Object.values(lostRaiderShips).reduce((a,b)=>a+(b>0?b:0),0);
       const lostText = lostCountsToText(lostRaiderShips);
-      const raidDebris = combatDebrisOf(lostRaiderShips);
+      // Gegenleistung fuer die Feindschaft: wer oefter und haerter angegriffen wird, bekommt beim
+      // Abwehren auch mehr Wrack - Risiko und Ertrag wachsen an derselben Summe (Paket 2/6).
+      const raidDebris = skaliereTruemmer(combatDebrisOf(lostRaiderShips), punitiveDebrisMult(), targetPlanet);
       log('Verteidigung von '+planetDisplayName(targetPlanet)+' hat den Überfall von '+factionName+' erfolgreich abgewehrt.'+(lostText?' Zerstört: '+lostText+'. Trümmerfeld hinterlassen.':''), 'ti-shield-lock');
       addVeteranXp(targetPlanet, 12);
       builtReport = { type:'raid', result:'win', faction:factionName, attackPower:Math.round(raiderPower), defensePower:dpMitAufstellung, formation:activeFormationKey(), formationMult, defenseAttackPower:defAtk, defenseBefore:defBreakdown, fleet:raiderFleet, destroyedShips:lostRaiderShips, debris:raidDebris, targetPlanet, superAttack:isSuper, stationedFleet:stationedFleetSnapshot };
       // pushReport erst nach dem Erholungspausen-Block unten, damit recoveryPauseMs noch mit in den Bericht wandert.
     } else {
-      let lossPct = Math.max(0.05, Math.min(isSuper?0.5:0.35, raiderPower/(raiderPower+dp*2)));
+      // Schatten feindlich: sie verkaufen deine Positionen weiter - der Verlust faellt hoeher aus.
+      let lossPct = Math.max(0.05, Math.min(isSuper?0.5:0.35, raiderPower/(raiderPower+dp*2))) * hostileRaidLossMult();
       const nfLvl = state.research.rnotfall||0;
       if (nfLvl) lossPct *= Math.max(0.5, 1-nfLvl*RESEARCH_DEFS.find(r=>r.key==='rnotfall').effectPerLevel);
       if (state.allianceResearch) lossPct *= (1-0.20*allianceTechFrac('ab_bollwerk'));
@@ -20221,6 +20334,7 @@
       { title:'Weltboss: Leviathan der Leere', body:'Gelegentlich erscheint der <strong>Leviathan der Leere</strong> (oben im Galaxie-Tab): ein gemeinsamer Gegner mit geteiltem HP-Pool, gegen den <strong>alle Spieler zusammen</strong> kämpfen. Angriff läuft wie eine normale Angriffsmission: Du stellst deine Angriffsflotte zusammen (Bereich "Angriffsflotte zusammenstellen") und schickst sie los - mit echter Flugzeit und Treibstoffkosten (Deuterium). Am Ziel zieht deine Angriffskraft (×0,8-1,2 Streuung) Schaden ab, der Leviathan schlägt zurück (8-15%+ Flottenverluste, steigt mit seiner Stufe). <strong>Einmal pro Tag</strong> pro Spieler angreifbar - die Sperre bleibt auch bestehen, wenn der aktuelle Leviathan besiegt wird und ein neuer erscheint. Beim Kill: Belohnung (Kredite + Kampfpunkte) nach Schadensanteil, Top-Schädiger bekommt +50% Bonus. Nach einem Kill erscheint nach einer Weile automatisch die nächste, stärkere Stufe.' },
       { title:'Vier Fraktionen', body:'Vier NPC-Fraktionen (Void-Marodeure, Aschen-Kartell, Eisenlegion, Schattenbund) teilen die Galaxie unter sich auf. Jede besitzt Systeme, hat eine Militärstärke und <strong>expandiert selbstständig</strong>: sie besetzen freie Systeme und erobern sich gegenseitig Grenzgebiete. Das läuft im Hintergrund auf dem Server weiter, auch wenn du offline bist.' },
       { title:'Rivalitäten: du kannst nicht mit allen befreundet sein', body:'Je zwei Fraktionen stehen sich als <strong>Rivalen</strong> gegenüber: <strong>Aschen-Kartell gegen Schattenbund</strong> (Wirtschaft) und <strong>Eisenlegion gegen Void-Marodeure</strong> (Militär und Mystik). Das hat zwei Folgen.<br><br><strong>Erstens: Ruf schwappt über.</strong> Gewinnst du bei einer Fraktion Ruf, verlierst du rund ein Drittel davon bei ihrem Rivalen. Umgekehrt gilt dasselbe: Greifst du eine Fraktion an, freut sich ihr Rivale und dein Ruf dort steigt. Einen Gegner zu haben ist damit nicht mehr nur schlecht.<br><br><strong>Zweitens: nur ein Bündnis je Paar.</strong> Zwei Rivalen dulden keinen gemeinsamen Verbündeten. Überschreitest du bei einer die Bündnis-Schwelle, kündigt die andere auf und fällt auf <em>Freundlich</em> zurück – du behältst dort also den kleineren Effekt, nur nicht den vollen. Du kannst damit höchstens <strong>zwei Fraktionen gleichzeitig als Verbündete</strong> haben, eine je Paar. Wer vorher bei mehreren gleichzeitig verbündet war, behält beim ersten Aufruf das jeweils <em>stärkere</em> Bündnis.<br><br>Damit ist die Diplomatie eine echte Entscheidung: entweder zwei tiefe Bündnisse und zwei kühle Verhältnisse, oder überall freundlich und nirgends verbündet.' },
+      { title:'Feindschaft: was passiert, wenn der Ruf fällt', body:'Ruf kann nicht nur steigen. Fällt er unter <strong>−30</strong>, giltst du als <strong>Feindlich</strong>, unter <strong>−70</strong> als <strong>Verfeindet</strong>. Das war früher nur ein rotes Etikett – jetzt schadet jede Fraktion genau dort, wo sie sonst nützt:<br><br><strong>Aschen-Kartell:</strong> die Handelsgilden boykottieren dich – −12% (feindlich) bzw. −25% (verfeindet) Ertrag aus allen Handelsrouten.<br><strong>Void-Marodeure:</strong> statt dich zu verschonen, lenken sie Überfälle auf dich – +25% bzw. +60% Überfall-Häufigkeit.<br><strong>Eisenlegion:</strong> ihre Patrouillen fangen deine Expeditionen ab – +20% bzw. +45% Begegnungschance.<br><strong>Schattenbund:</strong> sie verkaufen deine Positionen weiter – +15% bzw. +30% Ressourcenverlust bei erfolgreichen Überfällen (gilt für Überfälle durch NPC-Flotten; bei Angriffen echter Spieler rechnet der Server).<br><br><strong>Strafexpeditionen:</strong> Zusätzlich schickt <em>jede</em> feindliche Fraktion Verbände gegen deine Planeten. Je Feindschaftsstufe insgesamt steigt die Überfall-Häufigkeit um 18% und die Stärke der Angreifer um 12% – bei mehreren Feinden summiert sich das spürbar.<br><br><strong>Aber es gibt auch eine Gegenleistung:</strong> Wer mehr und schwerere Angriffe abwehrt, bergt mehr. Je Feindschaftsstufe bleiben 15% mehr <strong>Trümmer</strong> liegen, wenn du einen Überfall abschlägst. Sich Feinde zu machen ist damit eine Strategie mit Preis, kein reiner Fehler – wenn deine Verteidigung steht, wird die Feindschaft zur Trümmerquelle.<br><br>Unverändert bleiben der Kartell-<em>Marktrabatt</em> und die Schwierigkeit von Fraktions-Systemangriffen: beides rechnet der Server, eine einseitige Verschärfung im Spiel würde Anzeige und Serverrechnung auseinanderlaufen lassen.' },
       { title:'Fraktionskriege: Partei ergreifen', body:'Von Zeit zu Zeit brechen zwischen zwei NPC-Fraktionen <strong>Kriege</strong> aus (36 Stunden, auf der Galaxie-Karte am ⚔️ zu erkennen). Läuft gerade einer, steht im Galaxie-Tab über den Fraktionen eine Kriegskarte: Du kannst <strong>eine</strong> der beiden Seiten mit einer Kriegslieferung unterstützen (4.000 Erz, 2.500 Kristalle, 1.200 Deuterium) und bekommst dafür <strong>+22 Ruf und 800 Kredite</strong> bei der gewählten Seite – der mit Abstand größte Ruf-Sprung im Spiel. Über die Rivalitäten bekommt die Gegenseite das automatisch zu spüren.<br><br>Pro Krieg ist das <strong>einmal</strong> möglich, und die Entscheidung lässt sich nicht zurücknehmen. Kriegsparteien ohne eigene Diplomatie (etwa die Piratenflotte) lassen sich nicht unterstützen – dort gäbe es keinen Ruf zu gewinnen.' },
       { title:'Auf der Karte', body:'Das Territorium jeder Fraktion ist auf der Sektorkarte in ihrer Farbe eingefärbt (farbiger Ring ums System). Im Galaxie-Tab siehst du eine Übersicht aller Fraktionen mit ihrer Systemzahl und Militärstärke. Deine eigenen Heimatsysteme sind für die Fraktionen tabu – sie werden nie erobert.' },
       { title:'Fraktionssysteme erobern', body:'Im Galaxie-Tab kannst du bekannte Fraktionssysteme <strong>direkt angreifen</strong>. Der Ausgang hängt von deiner Angriffskraft gegen die Militärstärke der Fraktion ab (große Reiche verteidigen härter). <strong>Bei Erfolg</strong> gehört das System dir: es erscheint grün als „Deine Kontrolle" auf der Karte, du bekommst Kampfpunkte und Kredite, und die Fraktion kann es nicht zurückerobern. <strong>Bei Misserfolg</strong> verlierst du einen Teil deiner Flotte. Fraktions-Angriffe brauchen eine Serververbindung.' },
@@ -28297,6 +28411,21 @@
     return lostCounts;
   }
   function combatDebrisOf(lostCounts){ return lostCounts && lostCounts.__debris ? lostCounts.__debris : null; }
+  // Erhoeht eine bereits abgelegte Truemmermenge (Strafexpeditionen, Paket 2/6). Legt die DIFFERENZ
+  // wirklich am Planeten ab und gibt erst dann den erhoehten Wert zurueck - wuerde hier nur der
+  // Rueckgabewert skaliert, naennte der Bericht eine Menge, die im Truemmerfeld gar nicht liegt
+  // (genau die Sorte zweite Anzeigestelle, die in diesem Projekt schon mehrfach auseinanderlief).
+  function skaliereTruemmer(debris, mult, planetKey){
+    if (!debris || !(mult > 1)) return debris;
+    const zusatz = {}, erhoeht = {};
+    for (const [k,v] of Object.entries(debris)){
+      const neu = Math.round(v * mult);
+      erhoeht[k] = neu;
+      if (neu > v) zusatz[k] = neu - v;
+    }
+    if (planetKey && Object.keys(zusatz).length) addDebris(planetKey, zusatz);
+    return erhoeht;
+  }
   function lostCountsToText(lostCounts){
     return Object.entries(lostCounts).map(([k,n]) => n+'x '+shipDisplayName(k)).join(', ') || null;
   }
@@ -31606,7 +31735,7 @@
       }
       state.expeditionTargetSignal = null;
     }
-    cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: Math.min(0.9, et.encounterChance*risk.enc), rewardMult: et.rewardMult*risk.rew, riskMode: state.expeditionRisk||'normal', withdrawOnContact: !!state.expeditionWithdraw, sensorBoosted: quantensensorActive(), signalId });
+    cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: Math.min(0.9, et.encounterChance*risk.enc*hostileEncounterMult()), rewardMult: et.rewardMult*risk.rew, riskMode: state.expeditionRisk||'normal', withdrawOnContact: !!state.expeditionWithdraw, sensorBoosted: quantensensorActive(), signalId });
     lastExpeditionSend = { type: et.key, composition: ESCORT_KEYS.reduce((acc,k) => { if ((escortFleet[k]||0) > 0) acc[k] = escortFleet[k]; return acc; }, {}) };
     log(fleetName+' ('+et.name+') von '+planetDisplayName(state.activeBasePlanet)+' in unerforschten Raum aufgebrochen. Eskorte: '+escortSummary+' (Kampfkraft '+Math.round(escortPower)+'). Treibstoff verbraucht: '+fuelCostText(fuel)+'.'+signalTxt, 'ti-map-2');
     render(); save();
