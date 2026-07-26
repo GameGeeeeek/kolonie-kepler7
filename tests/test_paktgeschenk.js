@@ -105,7 +105,11 @@ async function lauf(browser, schreibfehler){
   // --- (a) Normalfall: der Server nimmt an
   const ok = await lauf(browser, false);
   check('Geschenk-Schaltfläche gefunden und ausgelöst', ok.knopf > 0 && ok.ausgeloest, { knopf: ok.knopf, ausgeloest: ok.ausgeloest });
-  check('a) Erfolgsmeldung erscheint', /Geschenk \([\d.,]+\) an /.test(ok.log), ok.log.slice(0, 140));
+  // Die Menge haengt am aktuellen Bestand und wird per fmt() formatiert - ab 1.000 also "1.1k" statt
+  // "1100". Der alte Ausdruck erlaubte nur Ziffern und schlug deshalb zufaellig fehl, je nachdem wie
+  // viel Erz waehrend des Testlaufs zusammengekommen war (aufgetreten am 26.07.2026). Die Einheiten-
+  // Suffixe gehoeren mit in den Ausdruck - geprueft wird, DASS eine Menge dasteht, nicht welche.
+  check('a) Erfolgsmeldung erscheint', /Geschenk \([\d.,]+[kmbtKMBT]?\) an /.test(ok.log), ok.log.slice(0, 140));
   const gifts = (ok.gespeicherterPakt || {}).pendingGifts || [];
   check('a) das Geschenk steht im geteilten Pakt-Dokument', gifts.length === 1, gifts);
   check('a) und ist an den Partner adressiert',
