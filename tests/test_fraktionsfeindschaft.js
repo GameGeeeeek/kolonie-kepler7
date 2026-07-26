@@ -31,15 +31,23 @@ const block = src.slice(von, endeBlock);
 
 function baue(rep){
   const ctx = {};
-  const state = { factionRep: Object.assign({ kartell:0, legion:0, void:0, schatten:0 }, rep || {}) };
+  const state = { factionRep: Object.assign({ kartell:0, legion:0, void:0, schatten:0 }, rep || {}), embassySeats:{}, embassyOpenedAt:{} };
   new Function('ctx', 'state', 'FACTION_DIPLOMACY', 'REP_MIN', 'REP_MAX', 'factionRepOf',
+    // Ab v8.298.24 drehen Botschaften dieselben vier Hebel in die Gegenrichtung (embassyMult).
+    // Hier bewusst OHNE Botschaftsviertel gestellt, damit dieser Test weiter die reinen
+    // Feindschafts-Mali misst - das Zusammenspiel prueft test_botschaft.js.
+    'allBuildingSets', 'factionRankOf', 'factionNameOf', 'log', 'touchFactionContact',
+    'fmtDuration', 'playSound', 'checkAchievements', 'render', 'save', 'changeFactionRep',
     block + ';ctx.tier=repTierOf;ctx.eff=factionEffectLevel;ctx.hos=factionHostilityLevel;' +
     'ctx.route=hostileRouteMult;ctx.enc=hostileEncounterMult;ctx.loss=hostileRaidLossMult;' +
     'ctx.punChance=punitiveRaidChanceMult;ctx.punPower=punitiveRaidPowerMult;ctx.punDebris=punitiveDebrisMult;' +
     'ctx.anyHos=anyHostileLevel;ctx.hostileIds=hostileFactionIds;' +
     'ctx.PC=PUNITIVE_RAID_PER_LEVEL;ctx.PP=PUNITIVE_POWER_PER_LEVEL;ctx.PD=PUNITIVE_DEBRIS_PER_LEVEL;'
   )(ctx, state, { kartell:{}, legion:{}, void:{}, schatten:{} }, -100, 100,
-    (fid) => Math.max(-100, Math.min(100, state.factionRep[fid]||0)));
+    (fid) => Math.max(-100, Math.min(100, state.factionRep[fid]||0)),
+    () => [],  // keine Gebaeude -> kein Botschaftsviertel -> embassyMult() liefert ueberall 1
+    (fid) => ({ nr: 1, name: fid }), (fid) => fid, () => {}, () => {},
+    (n) => String(n), () => {}, () => {}, () => {}, () => {}, () => {});
   return { ctx, state };
 }
 const u = baue();
@@ -157,8 +165,10 @@ check('6: die Freundschafts-Schwellen 30/70 sind unverändert',
 // ---------------------------------------------------------------- 7) Verdrahtung
 check('7: der Handelsrouten-Malus hängt an routeYieldMult',
   /\* hostileRouteMult\(\); \}/.test(src));
+// Seit v8.298.24 haengt an derselben Stelle auch die Void-Botschaft (embassyMult) - die drei
+// anderen Faktoren muessen aber unveraendert alle mitwirken.
 check('7: der Überfall-Malus hängt an raidChanceMult, zusammen mit den Strafexpeditionen',
-  /return freundlich \* voidMalus \* punitiveRaidChanceMult\(\);/.test(src));
+  /return freundlich \* voidMalus \* embassyMult\('void'\) \* punitiveRaidChanceMult\(\);/.test(src));
 check('7: der Expeditions-Malus wird beim START eingebacken (wie encounterChance selbst)',
   /et\.encounterChance\*risk\.enc\*hostileEncounterMult\(\)/.test(src));
 check('7: der Verlust-Malus greift beim NPC-Überfall',

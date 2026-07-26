@@ -51,6 +51,9 @@ function baue(rep, kontakt, jetzt){
   const changeFactionRep = () => { throw new Error('changeFactionRep darf im Verfall nicht aufgerufen werden'); };
   new Function('ctx', 'state', 'log', 'Date', 'REP_MIN', 'REP_MAX', 'FACTION_DIPLOMACY',
     'factionRepOf', 'setFactionRepRaw', 'changeFactionRep', 'factionNameOf', 'TRIBUTE_COST',
+    // Ab v8.298.24 setzt eine Botschaft den Verfall aus (Paket 6/6). Hier auf "keine Botschaft"
+    // gestellt, damit dieser Test weiter den reinen Verfall misst; die Kopplung prueft test_botschaft.js.
+    'hasEmbassy',
     block +
     ';ctx.RANKS=REP_RANKS;ctx.NAMEN=FACTION_RANK_NAMES;ctx.PERKS=RANK_PERKS;' +
     'ctx.tier=repTierOf;ctx.rang=factionRankOf;ctx.next=nextRankAt;ctx.idx=repRankIndex;' +
@@ -61,7 +64,7 @@ function baue(rep, kontakt, jetzt){
     'ctx.decay=applyReputationDecay;ctx.touch=touchFactionContact;ctx.dueIn=repDecayDueIn;'
   )(ctx, state, (t)=>meldungen.push(t), { now: () => jetzt || 0 }, REP_MIN, REP_MAX,
     { kartell:1, legion:1, void:1, schatten:1 },
-    factionRepOf, setFactionRepRaw, changeFactionRep, fid => fid, 400);
+    factionRepOf, setFactionRepRaw, changeFactionRep, fid => fid, 400, () => false);
   return { ctx, state, meldungen, rivalGesetzt };
 }
 
