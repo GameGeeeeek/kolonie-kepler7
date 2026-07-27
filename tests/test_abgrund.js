@@ -18,6 +18,7 @@
 //   6) Wiederholte Tiefen lohnen weniger als der naechste Schritt nach unten
 //   7) Verdrahtung: Missionstyp ueberall dort, wo die anderen Angriffstypen stehen
 //   8) Backend-Vertraeglichkeit und CLAUDE.md-Regeln (Icons, Beschreibungen, DOM-Zustand)
+//   9) Bestenlisten-Verdrahtung: veroeffentlicht, unverrauscht, angezeigt, ranglistet
 const fs = require('fs');
 const path = require('path');
 const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
@@ -276,6 +277,29 @@ check('8: es gibt einen Hilfe-Abschnitt zum Abgrund',
   /title:'Der Abgrund[^']*',\s*body:'/.test(js));
 check('8: der oberste Patchnotes-Eintrag beschreibt den Abgrund',
   /version:'8\.320\.0'[\s\S]{0,4000}Abgrund/.test(js));
+
+// ---- 9) Bestenlisten-Verdrahtung (v8.321.0) ----
+// Der Determinismus aus Abschnitt 1 hat nur dann einen Zweck, wenn die Tiefe auch irgendwo
+// verglichen wird. Geprueft wird die ganze Kette: veroeffentlichen, anzeigen, ranglisten.
+check('9: die Rekordtiefe wird im Bestenlisten-Eintrag veroeffentlicht',
+  /abgrundBest: \(state\.abgrund && state\.abgrund\.best\) \|\| 0,/.test(js));
+// Sie darf NICHT durch die Spionageabwehr verrauscht werden - eine verrauschte Bestleistung
+// waere als Vergleichswert wertlos. fuzz() umschliesst die Flottenzahlen, nicht diese.
+check('9: die Tiefe wird nicht von der Spionageabwehr verrauscht',
+  !/abgrundBest:\s*fuzz\(/.test(js));
+check('9: die Bestenliste zeigt ein Tiefen-Abzeichen',
+  /e\.abgrundBest\?' <span class="lvl-pill"[^]{0,200}ti-infinity/.test(js));
+check('9: das Spielerprofil zeigt die Rekordtiefe im Vergleich',
+  /entry\.abgrundBest \? prow\('ti-infinity'[^]{0,200}Rekordtiefe/.test(js));
+const boxQuelle9 = fnAus('renderAbgrundBox');
+check('9: die Abgrund-Box baut eine Tiefen-Rangliste',
+  /const tiefenListe = \(leaderboardCache\|\|\[\]\)/.test(boxQuelle9) && /tiefsten Kommandanten/.test(boxQuelle9));
+// Sie darf keinen eigenen Serverabruf ausloesen - der Zwischenspeicher ist ohnehin da.
+check('9: die Rangliste laedt nichts nach, sie nutzt den vorhandenen Zwischenspeicher',
+  !/storageList|storageGet|loadLeaderboard\(/.test(boxQuelle9));
+// Und sie muss ehrlich beschriften, dass nur die geladenen Top 30 gewertet sind.
+check('9: die Rangliste nennt ihre Grenze (nur die geladenen Top 30)',
+  /Top 30/.test(boxQuelle9));
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);
