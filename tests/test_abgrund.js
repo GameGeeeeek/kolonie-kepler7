@@ -20,6 +20,7 @@
 //   8) Backend-Vertraeglichkeit und CLAUDE.md-Regeln (Icons, Beschreibungen, DOM-Zustand)
 //   9) Bestenlisten-Verdrahtung: veroeffentlicht, unverrauscht, angezeigt, ranglistet
 //  10) Wochenlauf, Tiefensonde, Allianz-Tiefenlauf (v8.322.0)
+//  11) Waechter-Tiefen, Mutator-Gegenmassnahmen, Abgrund-Titel (v8.323.0)
 const fs = require('fs');
 const path = require('path');
 const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
@@ -75,12 +76,19 @@ function baueKontext(zustand){
     block('ABGRUND_ALLIANZ_MARKEN') ? 'const ABGRUND_ALLIANZ_MARKEN = '+block('ABGRUND_ALLIANZ_MARKEN')+';' : (()=>{throw new Error('ABGRUND_ALLIANZ_MARKEN fehlt')})(),
     fnAus('weekKeyOf'), fnAus('abgrundWochenpflege'), fnAus('abgrundWochenPraemieSplitter'),
     fnAus('abgrundSondeReichweite'),
+    konstAus('ABGRUND_WAECHTER_ALLE'), konstAus('ABGRUND_WAECHTER_STAERKE'),
+    konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_GEGEN_KOSTEN'),
+    block('ABGRUND_WAECHTER_NAMEN') ? 'const ABGRUND_WAECHTER_NAMEN = '+block('ABGRUND_WAECHTER_NAMEN')+';' : (()=>{throw new Error('ABGRUND_WAECHTER_NAMEN fehlt')})(),
+    fnAus('abgrundIstWaechter'), fnAus('abgrundWaechterDef'), fnAus('abgrundSektorMitBann'),
     'return { abgrundSektor, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
     '  abgrundWiederholungsFaktor, abgrundWerkstattStufe, abgrundWerkstattKosten, abgrundWerkstattBonus,',
     '  abgrundTiefenBonus, abgrundChronikOffen, abgrundFreigeschaltet, abgrundKampfkraft,',
     '  ABGRUND_MUTATOREN, ABGRUND_WERKSTATT, ABGRUND_CHRONIK, ABGRUND_WIEDERHOLUNG,',
     '  weekKeyOf, abgrundWochenpflege, abgrundWochenPraemieSplitter, abgrundSondeReichweite,',
-    '  ABGRUND_ALLIANZ_MARKEN, ABGRUND_WOCHE_FAKTOR, ABGRUND_SONDE_MAX };'
+    '  ABGRUND_ALLIANZ_MARKEN, ABGRUND_WOCHE_FAKTOR, ABGRUND_SONDE_MAX,',
+    '  abgrundIstWaechter, abgrundWaechterDef, abgrundSektorMitBann,',
+    '  ABGRUND_WAECHTER_ALLE, ABGRUND_WAECHTER_STAERKE, ABGRUND_WAECHTER_SPLITTER,',
+    '  ABGRUND_WAECHTER_NAMEN, ABGRUND_GEGEN_KOSTEN };'
   ].join('\n');
   return new Function('state', quelle)(zustand);
 }
@@ -455,6 +463,98 @@ check('10: der Allianz-Stand wird nur bei sichtbarem Tab nachgeladen',
   /visibilityState === 'visible'\) ladeAbgrundAllianzstand\(\)/.test(js));
 check('10: der eigene Beitrag wird unabhaengig von der Sichtbarkeit gemeldet',
   /^\s*meldeAbgrundAllianzBeitrag\(\);$/m.test(js));
+
+// ---- 11) Waechter, Gegenmassnahmen, Titel (v8.323.0) ----
+check('11: jede zehnte Tiefe ist eine Waechtertiefe',
+  G.abgrundIstWaechter(10) && G.abgrundIstWaechter(20) && !G.abgrundIstWaechter(9) && !G.abgrundIstWaechter(11));
+check('11: Waechter haben Namen UND einen eigenen Text',
+  G.ABGRUND_WAECHTER_NAMEN.length >= 12 && G.ABGRUND_WAECHTER_NAMEN.every(w => w.name && w.text && w.text.length >= 60),
+  { anzahl:G.ABGRUND_WAECHTER_NAMEN.length });
+// Ueber die Liste hinaus muss es weitergehen - der Abstieg ist unendlich, die Namensliste nicht.
+{
+  const erste = G.abgrundWaechterDef(10);
+  const nachRunde = G.abgrundWaechterDef(10 + G.ABGRUND_WAECHTER_ALLE * G.ABGRUND_WAECHTER_NAMEN.length);
+  check('11: nach der Namensliste kehren Waechter mit Zaehlnummer wieder',
+    !!nachRunde && nachRunde.name !== erste.name && /Wiederkehr/.test(nachRunde.name),
+    { erste:erste.name, spaeter: nachRunde ? nachRunde.name : null });
+  // Absturzsicher formuliert: Laeuft die Namensliste aus und die Funktion liefert null, soll hier
+  // eine lesbare FAIL-Zeile stehen und kein nackter TypeError.
+  const tief = G.abgrundWaechterDef(10000);
+  check('11: auch in Tiefe 10.000 gibt es noch einen benannten Waechter',
+    !!tief && !!tief.name, tief ? tief.name : null);
+}
+// Der Waechter muss sich in Staerke UND Belohnung niederschlagen, sonst ist er nur ein Etikett.
+{
+  const w = G.abgrundSektor(20), davor = G.abgrundSektor(19), danach = G.abgrundSektor(21);
+  check('11: der Sektor traegt den Waechter', !!w.waechter && !davor.waechter && !danach.waechter);
+  // Gegen die reine Tiefenkurve gerechnet: Tiefe 20 muss deutlich ueber der Interpolation liegen.
+  const erwartetOhne = Math.sqrt(davor.defense * danach.defense);
+  check('11: eine Waechtertiefe ist spuerbar staerker als ihre Nachbarn',
+    w.defense > erwartetOhne * 1.2, { tiefe20:w.defense, nachbarmittel:Math.round(erwartetOhne) });
+  check('11: und sie gibt mehr Splitter', w.splitter > davor.splitter * 2, { t19:davor.splitter, t20:w.splitter });
+}
+check('11: der Waechter laesst garantiert ein Modul fallen',
+  /if \(sektor\.waechter\)\{[\s\S]{0,200}grantRandomModule\(\)/.test(js));
+// ---- Gegenmassnahme ----
+{
+  const roh = G.abgrundSektor(17); // Tiefe >= 15 -> drei Mutatoren
+  check('11: eine Tiefe ab 15 hat drei Mutatoren zum Bannen', roh.mutatoren.length === 3);
+  const opfer = roh.mutatoren[0];
+  const gebannt = G.abgrundSektorMitBann(roh, opfer.key);
+  check('11: der gebannte Mutator ist aus dem Sektor verschwunden',
+    gebannt.mutatoren.length === roh.mutatoren.length - 1 &&
+    !gebannt.mutatoren.some(m => m.key === opfer.key) &&
+    gebannt.gebannt && gebannt.gebannt.key === opfer.key,
+    { vorher:roh.mutatoren.map(m=>m.key), nachher:gebannt.mutatoren.map(m=>m.key) });
+  // Und seine WIRKUNG muss weg sein, nicht nur sein Name aus der Liste. Breit gemessen statt an
+  // einem Einzelfall: Die erste Fassung dieser Pruefung hatte ein "|| a === b && ..."-Oder, das sie
+  // fast immer wahr machte - eine leere Pruefung genau an der Stelle, um die es geht.
+  // Ausnahmen sind moeglich, wenn die Deckelung beide Werte auf dieselbe Grenze presst; deshalb
+  // wird eine Quote geprueft und die Ausreisser werden mit ausgegeben.
+  const WIRK = ['atk','def','loot','shards','dur','loss'];
+  let banns = 0, wirksam = 0; const ausreisser = [];
+  for (let t = 15; t <= 120; t++){
+    const sk = G.abgrundSektor(t);
+    for (const mut of sk.mutatoren){
+      banns++;
+      const ohne = G.abgrundSektorMitBann(sk, mut.key);
+      if (WIRK.some(f => Math.abs(ohne.mods[f] - sk.mods[f]) > 1e-9)) wirksam++;
+      else if (ausreisser.length < 4) ausreisser.push({ tiefe:t, mutator:mut.key });
+    }
+  }
+  check('11: ein Bann aendert die Wirkung des Sektors, nicht nur die Namensliste',
+    banns > 200 && wirksam / banns >= 0.95, { banns, wirksam, ausreisser });
+  // Ein Bann auf einen Mutator, der gar nicht im Sektor liegt, darf nichts veraendern.
+  check('11: ein wirkungsloser Bann laesst den Sektor unveraendert',
+    G.abgrundSektorMitBann(roh, 'gibtesnicht') === roh);
+  // Der Waechterzuschlag muss den Bann ueberleben - er haengt an der Tiefe, nicht am Mutator.
+  const wRoh = G.abgrundSektor(20);
+  const wGebannt = G.abgrundSektorMitBann(wRoh, wRoh.mutatoren[0].key);
+  check('11: ein Bann hebt den Waechterstatus nicht auf',
+    !!wGebannt.waechter && wGebannt.splitter > G.abgrundSektor(19).splitter * 2,
+    { splitter:wGebannt.splitter });
+}
+check('11: die Gegenmassnahme wird beim START verbraucht, nicht bei der Rueckkehr',
+  /a\.gegenmassnahmen -= 1;/.test(js) && /bann,\n/.test(js));
+check('11: der Bann kommt bei der Aufloesung aus der MISSION',
+  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null\)/.test(js));
+// Vorschau und Kampf muessen denselben Bann anwenden.
+{
+  const boxQ = fnAus('renderAbgrundBox');
+  check('11: die Vorschau rechnet mit demselben Bann wie der Start',
+    /abgrundSektorMitBann\(rohSektor, bannAktiv\)/.test(boxQ) && /rohSektor\.mutatoren\.some/.test(boxQ));
+}
+// ---- Titel ----
+{
+  const tm = block('TITLE_MAP');
+  check('11: es gibt drei Abgrund-Titel', tm && (tm.match(/abgrund(10|25|50)/g)||[]).length === 3,
+    tm ? (tm.match(/achievement:'abgrund\d+', title:'[^']+'/g)||[]) : null);
+  // Reihenfolge ist Rangfolge (playerTitle nimmt den ersten Treffer): der schwerste zuerst.
+  const i50 = tm.indexOf("'abgrund50'"), i25 = tm.indexOf("'abgrund25'"), i10 = tm.indexOf("'abgrund10'");
+  check('11: die Abgrund-Titel stehen in absteigender Schwierigkeit ganz oben',
+    i50 >= 0 && i50 < i25 && i25 < i10 && i10 < tm.indexOf("'allbosses'"),
+    { i50, i25, i10 });
+}
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);
