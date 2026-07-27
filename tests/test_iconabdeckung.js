@@ -28,6 +28,8 @@
 //  10) die vier Fraktionen und die Gegenstände - beide Male geht es NICHT um "hat ein Symbol",
 //      sondern um "hat ein EIGENES": vier Fraktionen mit demselben ti-flag, zwei Gegenstände mit
 //      demselben ti-building-factory-2.
+//  11) die sechsundzwanzig Gegenstände, seit v8.312.0 gezeichnet - inklusive der sieben
+//      Event-Gegenstände, die in DERSELBEN Liste stehen und deshalb mitmüssen.
 //   6) Gebäude - und dabei BEIDE Grafiksysteme mitgerechnet: gezeichnetes SVG oder animiertes
 //      Canvas. Die erste Zählung kannte nur ICONS und meldete deshalb 11 statt 4 Lücken.
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
@@ -336,6 +338,47 @@ const itemDoppel = Object.entries(proIcon).filter(([,ks]) => ks.length > 1)
   .map(([ic,ks]) => ic+' → '+ks.join(', '));
 check('10: kein Gegenstand teilt sein Symbol mit einem anderen', itemDoppel.length === 0, itemDoppel);
 
+// ------------------------------------------- 11: Gegenstände (v8.312.0)
+// Die Gegenstände waren die letzte geschlossen flache Gruppe. Sie wurden bewusst als GANZES
+// umgestellt: Die Inventarliste wirft ITEM_DEFS und EVENT_ITEM_DEFS zusammen (allItemDefs), und
+// sieben flache Symbole zwischen neunzehn gezeichneten wären unruhiger gewesen als der Zustand
+// vorher. Genau diese Vollständigkeit prüft der Abschnitt - eine Teilumstellung wäre hier ein
+// Rückschritt, kein halber Fortschritt.
+const itemKeys  = [...arrBlock('ITEM_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+const eventKeys = [...arrBlock('EVENT_ITEM_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+check('11: neunzehn Gegenstände und sieben Event-Gegenstände sind erfasst',
+  itemKeys.length === 19 && eventKeys.length === 7, { items:itemKeys.length, event:eventKeys.length });
+const itemOhne = [...itemKeys, ...eventKeys].filter(k => !ICONS.has('item_'+k));
+check('11: JEDER Gegenstand der gemeinsamen Liste hat ein eigenes gezeichnetes Icon',
+  itemOhne.length === 0, itemOhne);
+const itemSvgs = [...itemKeys, ...eventKeys]
+  .map(k => (ICONS_BLOCK.match(new RegExp('\\bitem_'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"))||[])[1]);
+check('11: alle sechsundzwanzig Symbole sind verschieden',
+  new Set(itemSvgs).size === itemSvgs.length,
+  itemSvgs.length+' Symbole, '+new Set(itemSvgs).size+' verschieden');
+// Gemeinsames Gehäuse - das Anhängeschild ist die DRITTE Silhouette neben dem Sechseck der
+// Standort-Module und dem Steckmodul der Schiffsmodule. Der Test hält die Abgrenzung fest.
+const SECHSECK = 'M50 8 L86 29 V71 L50 92 L14 71 V29 Z';
+const itemStil = [...itemKeys, ...eventKeys].filter((k,i) => { const v = itemSvgs[i]; return !(v
+  && /viewBox="0 0 100 100" width="24" height="24"/.test(v) && /<g filter="url\(#ig\)">/.test(v)
+  && /<rect x="14" y="14" width="72" height="78" rx="10"/.test(v)   // Schild-Körper
+  && /<circle cx="50" cy="25" r="4.5"/.test(v)                      // Aufhängeloch
+  && !v.includes(SECHSECK)
+  && !/<rect x="24" y="10" width="52" height="62"/.test(v)); });    // nicht das Steckmodul
+check('11: alle tragen dasselbe Anhängeschild - und keine der beiden Modul-Silhouetten',
+  itemStil.length === 0, itemStil);
+// Kleine Formen mit Verlauf verschwinden im fast schwarzen Ende der Bounding-Box (mod_abwehr,
+// v8.305.0). Der Kern - alles nach dem schließenden </g> des Gehäuses - bleibt solide.
+const itemVerlauf = [...itemKeys, ...eventKeys].filter((k,i) => {
+  const v = itemSvgs[i]; return v && v.slice(v.indexOf('</g>')+4).includes('url(#g'); });
+check('11: kein Kern benutzt einen Farbverlauf', itemVerlauf.length === 0, itemVerlauf);
+check('11: die Inventarzeile holt das Icon über das Präfix ab',
+  /iconHtmlFor\('item_'\+it\.key, it\.icon, '#c3bef5'\)/.test(src));
+// Die zwei bewussten Ausnahmen als Regel festhalten, damit sie nicht als vergessener Rest gelesen
+// werden: die Tagesbonus-Vorschau (gemischte Reihe mit Schiffen/Krediten) und der Kredit-Shop.
+check('11: die Ausnahmen sind im Code begründet',
+  /würde EINE Zelle aus der Reihe herausbrechen/.test(src));
+
 // ---------------------------------------------------------------- offene Lücken benennen
 // Kein Fehlschlag - eine Standortbestimmung, damit die verbleibende Arbeit sichtbar bleibt.
 // Rechnet BEIDE Grafiksysteme mit (gezeichnetes SVG ODER Canvas), sonst zählt sie wieder falsch.
@@ -378,6 +421,9 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   // Ohne Sockel gibt es keine Slots und damit auch keine Kacheln - moduleSlotCount() liest
   // ausschliesslich state.moduleSlotLevel. Fehlte das, prüfte 5b in Wahrheit eine leere Liste.
   moduleSlotLevel:{ home:3 },
+  // Inventar mit BEIDEN Sorten: drei gewöhnliche Gegenstände und zwei Event-Gegenstände. Genau
+  // diese Mischung ist der Grund, warum das Paket alle sechsundzwanzig umstellen musste.
+  inventory:{ boost_prod:2, cargo:1, werftkommando:1, eventkapsel:3, glueckstalisman:1 },
   // Ausgeruestete Schiffsmodule fuer 8b. Bewusst eine Klasse mit MEHREREN Modulen, damit die
   // Kacheln nebeneinander stehen - genau die Ansicht, in der sie unterscheidbar sein muessen.
   shipModules:{ 'ss_panzerung:selten':1, 'ss_zielcomputer:episch':1, 'ss_schildverstaerker:selten':1 },
@@ -515,6 +561,31 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
       da.filter(t=>t.schrift).map(t=>t.name));
     check('10b: und die vier Karten zeigen verschiedene Bilder',
       new Set(da.map(t=>t.bild)).size === da.length, da.length+' Karten, '+new Set(da.map(t=>t.bild)).size+' Bilder');
+  }
+
+  // ------------------------------------------- 11b: Inventarliste am laufenden Spiel
+  // Die Liste mischt ITEM_DEFS und EVENT_ITEM_DEFS. Gemessen wird deshalb nicht "es gibt Symbole",
+  // sondern dass KEINE Zeile mehr flach ist - eine halb umgestellte Liste wäre der eigentliche
+  // Fehler, den dieses Paket vermeiden sollte.
+  await page.evaluate(()=>{const b=document.querySelector('.tab-btn[data-tab="fortschritt"]'); if(b) b.click();});
+  await page.waitForTimeout(600);
+  await page.evaluate(()=>{const h=document.querySelector('[data-sec-toggle="inventar"]'); if(h) h.click();});
+  await page.waitForTimeout(900);
+  const inv = await page.evaluate(()=>{
+    const box=document.getElementById('inventoryBox');
+    if(!box) return { fehlt:true };
+    const k=[...box.querySelectorAll('.bicon')];
+    return { fehlt:false, anzahl:k.length,
+             mitSvg:k.filter(e=>e.querySelector('svg')).length,
+             mitSchrift:k.filter(e=>e.querySelector('i.ti')).length,
+             verschieden:new Set(k.map(e=>{const v=e.querySelector('svg'); return v?v.innerHTML:'-';})).size };
+  });
+  check('11b: die Inventarliste ist da', inv && !inv.fehlt, inv && inv.fehlt);
+  if (inv && !inv.fehlt){
+    check('11b: alle fünf Gegenstände des Spielstands sind gerendert', inv.anzahl >= 5, inv);
+    check('11b: jede Zeile zeigt ein gezeichnetes Icon', inv.mitSvg === inv.anzahl, inv);
+    check('11b: keine einzige Zeile ist noch flach', inv.mitSchrift === 0, inv);
+    check('11b: und die Zeilen zeigen verschiedene Bilder', inv.verschieden === inv.anzahl, inv);
   }
 
   check('keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
