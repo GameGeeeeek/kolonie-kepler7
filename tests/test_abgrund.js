@@ -19,6 +19,7 @@
 //   7) Verdrahtung: Missionstyp ueberall dort, wo die anderen Angriffstypen stehen
 //   8) Backend-Vertraeglichkeit und CLAUDE.md-Regeln (Icons, Beschreibungen, DOM-Zustand)
 //   9) Bestenlisten-Verdrahtung: veroeffentlicht, unverrauscht, angezeigt, ranglistet
+//  10) Wochenlauf, Tiefensonde, Allianz-Tiefenlauf (v8.322.0)
 const fs = require('fs');
 const path = require('path');
 const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
@@ -55,6 +56,9 @@ function baueKontext(zustand){
     konstAus('ABGRUND_SILBEN_A'), konstAus('ABGRUND_SILBEN_B'), konstAus('ABGRUND_SILBEN_C'),
     konstAus('ABGRUND_GRIECHISCH'),
     block('ABGRUND_MUTATOREN') ? 'const ABGRUND_MUTATOREN = '+block('ABGRUND_MUTATOREN')+';' : (()=>{throw new Error('ABGRUND_MUTATOREN fehlt')})(),
+    // ABGRUND_SONDE_MAX zuerst: das Werkstatt-Array referenziert die Konstante in seinem
+    // Literal, eine spaetere Deklaration liefe in die temporale Todeszone.
+    konstAus('ABGRUND_SONDE_MAX'),
     block('ABGRUND_WERKSTATT') ? 'const ABGRUND_WERKSTATT = '+block('ABGRUND_WERKSTATT')+';' : (()=>{throw new Error('ABGRUND_WERKSTATT fehlt')})(),
     block('ABGRUND_CHRONIK') ? 'const ABGRUND_CHRONIK = '+block('ABGRUND_CHRONIK')+';' : (()=>{throw new Error('ABGRUND_CHRONIK fehlt')})(),
     js.match(/^\s*const ABGRUND_GRENZEN = \{[\s\S]*?\};/m)[0].trim(),
@@ -67,10 +71,16 @@ function baueKontext(zustand){
     fnAus('abgrundWerkstattKosten'), fnAus('abgrundWerkstattBonus'),
     fnAus('abgrundTiefenBonus'), fnAus('abgrundChronikOffen'), fnAus('abgrundFreigeschaltet'),
     fnAus('abgrundKampfkraft'),
+    konstAus('ABGRUND_WOCHE_FAKTOR'),
+    block('ABGRUND_ALLIANZ_MARKEN') ? 'const ABGRUND_ALLIANZ_MARKEN = '+block('ABGRUND_ALLIANZ_MARKEN')+';' : (()=>{throw new Error('ABGRUND_ALLIANZ_MARKEN fehlt')})(),
+    fnAus('weekKeyOf'), fnAus('abgrundWochenpflege'), fnAus('abgrundWochenPraemieSplitter'),
+    fnAus('abgrundSondeReichweite'),
     'return { abgrundSektor, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
     '  abgrundWiederholungsFaktor, abgrundWerkstattStufe, abgrundWerkstattKosten, abgrundWerkstattBonus,',
     '  abgrundTiefenBonus, abgrundChronikOffen, abgrundFreigeschaltet, abgrundKampfkraft,',
-    '  ABGRUND_MUTATOREN, ABGRUND_WERKSTATT, ABGRUND_CHRONIK, ABGRUND_WIEDERHOLUNG };'
+    '  ABGRUND_MUTATOREN, ABGRUND_WERKSTATT, ABGRUND_CHRONIK, ABGRUND_WIEDERHOLUNG,',
+    '  weekKeyOf, abgrundWochenpflege, abgrundWochenPraemieSplitter, abgrundSondeReichweite,',
+    '  ABGRUND_ALLIANZ_MARKEN, ABGRUND_WOCHE_FAKTOR, ABGRUND_SONDE_MAX };'
   ].join('\n');
   return new Function('state', quelle)(zustand);
 }
@@ -169,9 +179,12 @@ check('3: die Flugzeit ist nach oben gedeckelt',
 // ---- 4) Werkstatt ----
 const WS = G.ABGRUND_WERKSTATT;
 check('4: es gibt mindestens vier Ausbaustufen-Zweige', WS.length >= 4, { anzahl:WS.length });
+// Die Deckelung MUSS in der Beschreibung stehen (CLAUDE.md Regel 7 verlangt Wirkung inkl. Deckel),
+// aber nicht mit einem bestimmten Wort: die Tiefensonde zaehlt Tiefen und sagt "hoechstens drei".
+const nenntDeckel = d => /gedeckelt|h[oö]chstens|maximal/i.test(d.desc||'');
 check('4: jeder Zweig hat Icon und vollstaendige Beschreibung mit Deckelangabe',
-  WS.every(d => d.icon && d.desc && d.desc.length >= 80 && /gedeckelt/i.test(d.desc)),
-  WS.filter(d => !(d.icon && d.desc && d.desc.length >= 80 && /gedeckelt/i.test(d.desc))).map(d=>d.key));
+  WS.every(d => d.icon && d.desc && d.desc.length >= 80 && nenntDeckel(d)),
+  WS.filter(d => !(d.icon && d.desc && d.desc.length >= 80 && nenntDeckel(d))).map(d=>d.key));
 check('4: die Preise steigen mit jeder Stufe',
   WS.every(d => G.abgrundWerkstattKosten(d,0) < G.abgrundWerkstattKosten(d,1) &&
                 G.abgrundWerkstattKosten(d,5) < G.abgrundWerkstattKosten(d,10)),
@@ -187,14 +200,38 @@ check('4: auch bei 100.000 Stufen bleibt jede Wirkung an ihrem Deckel',
   WS.every(d => Math.abs(Gvoll.abgrundWerkstattBonus(d.key) - d.deckel) < 1e-9),
   WS.map(d => ({ k:d.key, bonus:Gvoll.abgrundWerkstattBonus(d.key), deckel:d.deckel })));
 // Und: die Werkstatt-Boni duerfen NUR im Abgrund wirken. Geprueft an den Aufrufstellen im Quelltext.
-const wsAufrufe = (js.match(/abgrundWerkstattBonus\('([a-z]+)'\)/g) || []);
-const erlaubteUmgebung = /abgrundKampfkraft|abgrund'|renderAbgrundBox|kaufeAbgrundAusbau/;
+// Werkstatt-Boni duerfen NUR im Abgrund wirken. Gemessen wird an der UMSCHLIESSENDEN FUNKTION,
+// nicht an einem Zeichenfenster: Ein Fenster ist von der Codelaenge abhaengig und meldete eine
+// voellig korrekte neue Aufrufstelle (abgrundSondeReichweite) faelschlich als Verstoss.
+// Fuer checkMissions gilt zusaetzlich, dass der Aufruf im 'abgrund'-Zweig stehen muss - sonst
+// wuerde ein Werkstatt-Bonus in einem FREMDEN Missionstyp hier durchrutschen.
+function umschliessendeFunktion(index){
+  const davor = js.slice(0, index);
+  const treffer = davor.match(/\n  (?:async )?function ([A-Za-z0-9_]+)\s*\(/g);
+  if (!treffer || !treffer.length) return null;
+  const letzte = treffer[treffer.length-1];
+  return (letzte.match(/function ([A-Za-z0-9_]+)/)||[])[1] || null;
+}
+const wsStellen = [];
+{
+  const re = /abgrundWerkstattBonus\('([a-z]+)'\)/g;
+  let m;
+  while ((m = re.exec(js)) !== null) wsStellen.push({ index:m.index, fn:umschliessendeFunktion(m.index) });
+}
+const wsVerstoss = wsStellen.filter(st => {
+  if (!st.fn) return true;
+  if (/^(abgrund|renderAbgrund|kaufeAbgrund)/.test(st.fn)) return false;
+  if (st.fn === 'checkMissions'){
+    // Steht der Aufruf hinter dem Beginn des Abgrund-Zweigs und vor dem naechsten Zweig?
+    const zweig = js.indexOf("} else if (m.type === 'abgrund'){");
+    const naechster = js.indexOf("} else if (m.type === 'intercept-pirates'){", zweig);
+    return !(zweig >= 0 && st.index > zweig && (naechster < 0 || st.index < naechster));
+  }
+  return true;
+});
 check('4: abgrundWerkstattBonus wird nur im Abgrund-Kontext aufgerufen',
-  wsAufrufe.length >= 4 && wsAufrufe.every(a => {
-    const i = js.indexOf(a);
-    const umfeld = js.slice(Math.max(0, i-2500), i+200);
-    return erlaubteUmgebung.test(umfeld);
-  }), { aufrufe:wsAufrufe.length });
+  wsStellen.length >= 4 && wsVerstoss.length === 0,
+  { aufrufe:wsStellen.length, funktionen:[...new Set(wsStellen.map(s=>s.fn))], verstoesse:wsVerstoss.map(v=>v.fn) });
 
 // ---- 5) Tiefenbonus ----
 const bonusBei = best => baueKontext({ research:{}, abgrund:{ tiefe:1, best, splitter:0, tauchgaenge:0, gesehen:{}, werkstatt:{} } }).abgrundTiefenBonus();
@@ -300,6 +337,124 @@ check('9: die Rangliste laedt nichts nach, sie nutzt den vorhandenen Zwischenspe
 // Und sie muss ehrlich beschriften, dass nur die geladenen Top 30 gewertet sind.
 check('9: die Rangliste nennt ihre Grenze (nur die geladenen Top 30)',
   /Top 30/.test(boxQuelle9));
+
+// ---- 10) Wochen-Tiefenlauf, Tiefensonde, Allianz-Tiefenlauf (v8.322.0) ----
+// Gemessen wird am ZUSTAND, nicht am Rueckgabewert: abgrundWochenpflege arbeitet auf state.
+{
+  const zustand = { research:{}, player:{id:'u',name:'A'},
+    abgrund:{ tiefe:1, best:30, splitter:0, tauchgaenge:0, gesehen:{}, werkstatt:{},
+              woche:{ key:'2020-01-06', best:12 }, wochePraemie:null, allianzMarken:{} } };
+  const W = baueKontext(zustand);
+  W.abgrundWochenpflege();
+  check('10: nach dem Wochenwechsel steht die Vorwoche als Praemie bereit',
+    !!zustand.abgrund.wochePraemie && zustand.abgrund.wochePraemie.tiefe === 12,
+    { praemie: zustand.abgrund.wochePraemie });
+  check('10: die laufende Woche startet bei 0 und traegt den aktuellen Schluessel',
+    zustand.abgrund.woche.best === 0 && zustand.abgrund.woche.key === W.weekKeyOf(Date.now()),
+    { woche: zustand.abgrund.woche });
+  // Zweiter Aufruf in derselben Woche darf nichts mehr veraendern.
+  zustand.abgrund.woche.best = 5;
+  W.abgrundWochenpflege();
+  check('10: ein zweiter Aufruf in derselben Woche laesst den Lauf unangetastet',
+    zustand.abgrund.woche.best === 5, { best: zustand.abgrund.woche.best });
+}
+// Eine bessere, noch nicht abgeholte Praemie darf nicht von einer schlechteren ueberschrieben werden.
+{
+  const zustand = { research:{}, player:{id:'u',name:'A'},
+    abgrund:{ tiefe:1, best:30, splitter:0, tauchgaenge:0, gesehen:{}, werkstatt:{},
+              woche:{ key:'2020-01-06', best:3 }, wochePraemie:{ key:'2019-12-30', tiefe:25 }, allianzMarken:{} } };
+  baueKontext(zustand).abgrundWochenpflege();
+  check('10: eine bessere offene Praemie wird nicht von einer schlechteren verdraengt',
+    zustand.abgrund.wochePraemie.tiefe === 25, { praemie: zustand.abgrund.wochePraemie });
+}
+check('10: die Wochenpraemie waechst mit der Tiefe und ist mindestens 1',
+  G.abgrundWochenPraemieSplitter(0) >= 1 && G.abgrundWochenPraemieSplitter(40) > G.abgrundWochenPraemieSplitter(20),
+  { t20:G.abgrundWochenPraemieSplitter(20), t40:G.abgrundWochenPraemieSplitter(40) });
+check('10: der Wochenlauf zaehlt auch unterhalb des Rekords (das ist sein Zweck)',
+  /if \(tiefe > \(a\.woche\.best\|\|0\)\) a\.woche\.best = tiefe;/.test(js));
+check('10: die Wochentiefe wird mit ihrem Wochenschluessel veroeffentlicht',
+  /abgrundWoche: \(state\.abgrund && state\.abgrund\.woche\)/.test(js) && /key: state\.abgrund\.woche\.key/.test(js));
+// Sonde: gedeckelt, und sie nutzt dieselbe Werkstatt-Rechnung wie alle anderen Zweige.
+{
+  const sonde = G.ABGRUND_WERKSTATT.find(d => d.key === 'tiefensonde');
+  check('10: die Tiefensonde ist ein regulaerer Werkstatt-Zweig', !!sonde && sonde.einheit === 'Tiefen',
+    sonde ? { deckel:sonde.deckel, schritt:sonde.schritt } : null);
+  const S0 = baueKontext({ research:{}, abgrund:{ tiefe:1, best:0, splitter:0, tauchgaenge:0, gesehen:{}, werkstatt:{}, woche:{key:null,best:0}, wochePraemie:null, allianzMarken:{} } });
+  check('10: ohne Sonde gibt es keine Vorschau', S0.abgrundSondeReichweite() === 0);
+  const S9 = baueKontext({ research:{}, abgrund:{ tiefe:1, best:0, splitter:0, tauchgaenge:0, gesehen:{}, werkstatt:{ tiefensonde:99 }, woche:{key:null,best:0}, wochePraemie:null, allianzMarken:{} } });
+  check('10: die Vorschau ist bei drei Tiefen gedeckelt', S9.abgrundSondeReichweite() === 3, { weite:S9.abgrundSondeReichweite() });
+  check('10: die Sonde aendert nichts am Kampf, nur an der Anzeige',
+    !/tiefensonde/.test(fnAus('abgrundKampfkraft')) && !/tiefensonde/.test(fnAus('abgrundSektor')));
+}
+// Allianz: eigener Schluessel je Mitglied - das ist der Punkt, an dem Beitraege sonst verlorengehen.
+check('10: jedes Mitglied schreibt nur seinen EIGENEN Allianz-Schluessel',
+  /storageSet\('alliance:'\+tag\+':abgrund:'\+state\.player\.id/.test(js));
+check('10: gelesen wird ueber storageList, nicht ueber ein gemeinsames Dokument',
+  /storageList\('alliance:'\+tag\+':abgrund:'/.test(js));
+check('10: nur Beitraege der laufenden Woche zaehlen fuer die Marken',
+  /x\.weekKey === woche/.test(js));
+check('10: es gibt drei aufsteigende Allianz-Marken mit Beschreibung',
+  G.ABGRUND_ALLIANZ_MARKEN.length === 3 &&
+  G.ABGRUND_ALLIANZ_MARKEN.every((m,i) => m.desc && m.desc.length >= 60 && (i===0 || m.ziel > G.ABGRUND_ALLIANZ_MARKEN[i-1].ziel)),
+  G.ABGRUND_ALLIANZ_MARKEN.map(m => ({ k:m.key, ziel:m.ziel, splitter:m.splitter })));
+// Diese beiden Regeln werden am VERHALTEN gemessen, nicht am Vorhandensein eines Tokens.
+// Erster Anlauf prüfte nur, ob "a.allianzMarken[merker]" irgendwo im Quelltext steht - die
+// Zuweisung eine Zeile weiter unten liess den Test auch dann gruen, wenn die Sperre entfernt war.
+// Die Rot-Probe "Marke laesst sich mehrfach abholen" schlug deshalb nicht an.
+const aktuelleWoche = G.weekKeyOf(Date.now());
+function markenKontext(zustand, summe){
+  const quelle = [
+    block('ABGRUND_ALLIANZ_MARKEN') ? 'const ABGRUND_ALLIANZ_MARKEN = '+block('ABGRUND_ALLIANZ_MARKEN')+';' : '',
+    fnAus('weekKeyOf'), fnAus('ensureAbgrund'), fnAus('abgrundWochenpflege'),
+    'function abgrundAllianzSumme(){ return SUMME; }'.replace('SUMME', String(summe)),
+    fnAus('abgrundAllianzMarkeErreicht'), fnAus('holeAbgrundAllianzMarke'),
+    // Nebenwirkungen stumm schalten - geprueft wird die Buchhaltung, nicht die Anzeige.
+    'function log(){} function fmt(x){ return String(x); } function playSound(){} function save(){} function render(){}',
+    'return { holeAbgrundAllianzMarke };'
+  ].join('\n');
+  return new Function('state', quelle)(zustand);
+}
+{
+  const zustand = { research:{}, player:{id:'u',name:'A'},
+    abgrund:{ tiefe:1, best:9, splitter:0, tauchgaenge:1, gesehen:{}, werkstatt:{},
+              woche:{ key:null, best:9 }, wochePraemie:null, allianzMarken:{} } };
+  // Der Wochenschluessel MUSS der aktuelle sein: holeAbgrundAllianzMarke ruft abgrundWochenpflege
+  // auf, und ein abweichender Schluessel gilt dort - voellig richtig - als Wochenwechsel und setzt
+  // den Lauf auf 0 zurueck. Mit key:null hatte die erste Fassung dieses Tests genau das ausgeloest
+  // und dann eine Auszahlung von 0 gemessen, ohne dass am Produkt etwas falsch war.
+  zustand.abgrund.woche = { key: aktuelleWoche, best: 9 };
+  const M = markenKontext(zustand, 999); // Summe weit ueber jeder Marke
+  M.holeAbgrundAllianzMarke('m50');
+  const nachErstem = zustand.abgrund.splitter;
+  M.holeAbgrundAllianzMarke('m50');
+  const nachZweitem = zustand.abgrund.splitter;
+  check('10: eine Marke laesst sich je Woche nur EINMAL abholen (am Verhalten gemessen)',
+    nachErstem > 0 && nachZweitem === nachErstem, { nachErstem, nachZweitem });
+}
+{
+  const zustand = { research:{}, player:{id:'u',name:'A'},
+    abgrund:{ tiefe:1, best:9, splitter:0, tauchgaenge:0, gesehen:{}, werkstatt:{},
+              woche:{ key:aktuelleWoche, best:0 }, wochePraemie:null, allianzMarken:{} } };
+  const M = markenKontext(zustand, 999);
+  M.holeAbgrundAllianzMarke('m50');
+  check('10: wer selbst nicht getaucht ist, bekommt nichts (am Verhalten gemessen)',
+    (zustand.abgrund.splitter||0) === 0, { splitter: zustand.abgrund.splitter });
+}
+{
+  const zustand = { research:{}, player:{id:'u',name:'A'},
+    abgrund:{ tiefe:1, best:9, splitter:0, tauchgaenge:1, gesehen:{}, werkstatt:{},
+              woche:{ key:aktuelleWoche, best:9 }, wochePraemie:null, allianzMarken:{} } };
+  const M = markenKontext(zustand, 10); // Summe UNTER der ersten Marke
+  M.holeAbgrundAllianzMarke('m50');
+  check('10: eine nicht erreichte Marke zahlt nichts aus',
+    (zustand.abgrund.splitter||0) === 0, { splitter: zustand.abgrund.splitter });
+}
+// Das Nachladen ist reines Anzeige-Polling und gehoert hinter das Sichtbarkeits-Gate (CLAUDE.md);
+// das MELDEN des eigenen Beitrags haengt an echter Mechanik und darf es nicht.
+check('10: der Allianz-Stand wird nur bei sichtbarem Tab nachgeladen',
+  /visibilityState === 'visible'\) ladeAbgrundAllianzstand\(\)/.test(js));
+check('10: der eigene Beitrag wird unabhaengig von der Sichtbarkeit gemeldet',
+  /^\s*meldeAbgrundAllianzBeitrag\(\);$/m.test(js));
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);
