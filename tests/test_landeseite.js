@@ -115,7 +115,12 @@ async function oeffne(browser, opt){
   check('1: drei Abschnittsbilder', auf.arts === 3, auf.arts);
   check('1: die Schlagzeile steht', /Die Galaxie wartet nicht auf dich/.test(auf.h1||''), auf.h1);
   check('1: es gibt mehrere Einstiegsknöpfe', auf.knoepfe >= 3, auf.knoepfe);
-  check('1: drei Inhaltsabschnitte', auf.abschnitte === 3, auf.abschnitte);
+  // Seit v8.317.0 sind es vier: "Drei Systeme", "Vier Mächte", der neue FAQ-Abschnitt und das
+  // Finale. Der FAQ-Abschnitt ist kein Beiwerk, sondern der einzige Ort, an dem der beschreibende
+  // Text im gerenderten DOM steht - vorher lag er im <noscript>-Block und war für Suchmaschinen
+  // unsichtbar (Details in tests/test_seo.js). Geprüft wird weiterhin auf eine feste Zahl statt auf
+  // ">= 3": Ein versehentlich verlorener Abschnitt soll auffallen.
+  check('1: vier Inhaltsabschnitte', auf.abschnitte === 4, auf.abschnitte);
   check('1: vier Fraktionskarten', auf.fraktionen === 4, auf.fraktionen);
   check('1: Fußzeile mit den Rechtstexten', auf.fuss);
 
