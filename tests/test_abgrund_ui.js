@@ -18,6 +18,7 @@
 //      Splitter und Mutatoren-Verzeichnis stehen danach im gespeicherten Stand
 //   6) die Werkstatt gibt Splitter aus und erhoeht die Stufe
 //   7) die Rekordtiefe landet im veroeffentlichten Bestenlisten-Eintrag und die Rangliste rendert
+//   8) Wochenlauf abrechenbar, Tiefensonde zeigt kommende Sektoren, Allianz-Beitrag unter eigenem Schluessel
 // Konsolenfehler werden in jedem Abschnitt mitgeprueft.
 const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
 
@@ -190,6 +191,62 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     check('7: die Abgrund-Box zeigt die Tiefen-Rangliste',
       !!txt && /tiefsten Kommandanten/i.test(txt), txt ? txt.split('\n').filter(z=>/Kommandanten/i.test(z)) : null);
     check('7: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ---- 8) Wochenlauf, Tiefensonde, Allianz-Tiefenlauf (v8.322.0) ----
+  {
+    // Vorwoche mit Ergebnis 12: die Praemie muss beim Laden abholbar dastehen, ohne dass man
+    // erst wieder tauchen muss.
+    const stand = basisStand({ research:{ rsingularitaet:1 },
+      abgrund:{ tiefe:6, best:5, splitter:400, tauchgaenge:9, gesehen:{}, werkstatt:{ tiefensonde:2 },
+                woche:{ key:'2020-01-06', best:12 }, wochePraemie:null, allianzMarken:{} } });
+    const { ctx, page, errs, store } = await starte(browser, stand);
+    await page.waitForTimeout(1200);
+    const txt = await boxText(page);
+    check('8: die Wochenlauf-Karte ist sichtbar', !!txt && /Wochen-Tiefenlauf/i.test(txt));
+    check('8: die faellige Vorwoche laesst sich abrechnen',
+      await page.evaluate(()=>!!document.querySelector('[data-abgrund-woche]')));
+    const vorher = gespeichert(store).abgrund || {};
+    await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-woche]'); if(b) b.click(); });
+    await page.waitForTimeout(1200);
+    const nachher = gespeichert(store).abgrund || {};
+    check('8: die Abrechnung schreibt Splitter gut',
+      (nachher.splitter||0) > (vorher.splitter||0), { vorher:vorher.splitter, nachher:nachher.splitter });
+    check('8: die Praemie ist danach verbraucht', !nachher.wochePraemie, { praemie:nachher.wochePraemie });
+    // Tiefensonde Stufe 2: zwei kommende Tiefen mit Namen muessen dastehen.
+    const txt2 = await boxText(page);
+    check('8: die Tiefensonde zeigt die kommenden Sektoren',
+      !!txt2 && /Tiefensonde – was darunter wartet/.test(txt2) &&
+      (txt2.match(/Tiefe \d+: [A-ZÄÖÜ][a-zäöü]+/g)||[]).length >= 2,
+      txt2 ? (txt2.match(/Tiefe \d+: .{0,30}/g)||[]).slice(0,3) : null);
+    check('8: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+  {
+    // Allianz-Tiefenlauf: eigener Beitrag muss unter dem EIGENEN Schluessel landen.
+    const jetzt = Date.now();
+    const stand = basisStand({
+      research:{ rsingularitaet:1 },
+      player:{ id:'u', name:'A', avatarKey:null, allianceTag:'ABC', allianceRole:'member' },
+      fleet:{ jaeger:4000, schlachtschiff:400, frachter:200, missions:[
+        { id:'t2', type:'abgrund', targetId:1, startTime: jetzt-600000, endTime: jetzt-2000,
+          composition:{ jaeger:4000, schlachtschiff:400, frachter:200 }, fleetName:'Probe', power:200000 }
+      ]}
+    });
+    const { ctx, page, errs, store } = await starte(browser, stand);
+    await page.waitForTimeout(2000);
+    const eigene = Object.keys(store).filter(k => k.startsWith('alliance:ABC:abgrund:'));
+    check('8: der eigene Allianz-Beitrag wurde unter dem eigenen Schluessel abgelegt',
+      eigene.length === 1 && eigene[0] === 'alliance:ABC:abgrund:u', eigene);
+    let beitrag = null; try { beitrag = JSON.parse(store[eigene[0]]); } catch(e){}
+    check('8: der Beitrag traegt Tiefe UND Wochenschluessel',
+      !!beitrag && (beitrag.tiefe||0) >= 1 && !!beitrag.weekKey,
+      beitrag ? { tiefe:beitrag.tiefe, weekKey:beitrag.weekKey } : null);
+    const txt = await boxText(page);
+    check('8: die Allianz-Karte erscheint mit dem eigenen Tag',
+      !!txt && /Allianz-Tiefenlauf/i.test(txt) && /ABC/.test(txt));
+    check('8: keine Konsolenfehler beim Allianz-Lauf', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 

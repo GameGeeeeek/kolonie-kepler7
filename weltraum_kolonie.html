@@ -1411,6 +1411,9 @@
     @media (max-width: 700px) { select { font-size:16px; } }
 
     .progress-outer { width:100%; height:6px; background: var(--elev-2); overflow:hidden; margin-top:9px; }
+    /* Trennlinie der Tiefensonden-Vorschau. Als Klasse und nicht inline, weil Rahmenangaben in
+       JS-Vorlagen von keiner CSS-Regel mehr korrigiert werden koennen (siehe test_formensprache). */
+    .sonde-vorschau { border-top: var(--hair, 1px) solid var(--elev-2); }
     .progress-inner { height:100%; background: linear-gradient(90deg,#378ADD,var(--c-secondary)); transition: width 0.3s linear; box-shadow:0 0 8px rgba(var(--secondary-rgb), 0.5); }
     /* Bug entdeckt+behoben (Grafik-Runde 2): attackbar hatte bisher trotz rotem Verlauf den grünen
        box-shadow-Glow von .progress-inner geerbt (dort für rgba(--secondary-rgb) fest verdrahtet) -
@@ -4957,8 +4960,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.321.0';
+  const VERSION = '8.322.0';
   const PATCHNOTES = [
+    { version:'8.322.0', date:'27.07.2026', changes:[
+      '<strong>Wochen-Tiefenlauf.</strong> Die Rekordtiefe ist eine Einbahnstraße – wer bei Tiefe 60 hängt, hat wochenlang nichts Neues vorzuweisen. Gewertet wird jetzt zusätzlich, wie tief du <strong>in dieser Woche</strong> kommst, auch unterhalb deines Rekords. Montags beginnt der Lauf neu, abgerechnet wird in Abgrundsplittern (1,5 je erreichter Tiefe). Dazu eine Wochen-Rangliste neben der Allzeit-Rangliste.',
+      '<strong>Tiefensonde.</strong> Neuer Werkstatt-Zweig: Er zeigt dir bis zu drei Tiefen im Voraus Name und Mutatoren der kommenden Sektoren. Der Sektor stand ohnehin fest – die Sonde macht das Wissen nur zugänglich. Sie ändert nichts am Kampf, nur an dem, was du vorher weißt: Wer sieht, dass zwei Tiefen weiter ein Ionensturm liegt, baut die Flotte schon jetzt anders. Preis verdreifacht sich je Stufe.',
+      '<strong>Allianz-Tiefenlauf.</strong> Alle Mitglieder zahlen mit ihrer besten Wochentiefe in ein gemeinsames Konto ein. Erreicht die Allianz eine der drei Marken – <strong>Vorstoß</strong> (50 Tiefen), <strong>Tiefenzug</strong> (150), <strong>Abgrundflotte</strong> (300) –, kann sie jedes Mitglied abholen, das selbst mitgetaucht ist. Einmal pro Woche und Marke.',
+      'Technisch schreibt dabei jedes Mitglied ausschließlich seinen <strong>eigenen</strong> Eintrag. Ein gemeinsames Dokument hätte Lesen-Ändern-Schreiben gebraucht – tauchen zwei Mitglieder gleichzeitig, wäre der Beitrag des einen still verschwunden.',
+      'Die Restlaufzeit der Woche steht bewusst grob in Tagen und Stunden statt sekundengenau: Die Abgrund-Box wird nur neu gezeichnet, wenn sich ihr Inhalt ändert – ein tickender Countdown hätte Werkstatt, Chronik, Verzeichnis und beide Ranglisten jede Sekunde neu aufgebaut.'
+    ]},
     { version:'8.321.0', date:'27.07.2026', changes:[
       '<strong>Die Rekordtiefe im Abgrund ist jetzt sichtbar – für alle.</strong> Der Abgrund war seit v8.320.0 spielerübergreifend vergleichbar gebaut (Tiefe 47 ist für jeden dieselbe), aber es gab keine Stelle, an der man das gesehen hätte. Jetzt gibt es drei.',
       '<strong>Abzeichen in der Bestenliste:</strong> neben dem Namen steht ein <strong>T</strong>-Abzeichen mit der erreichten Tiefe – gleiche Bauart wie das Aufstiegs-Abzeichen daneben.',
@@ -13985,6 +13995,12 @@
   let myHomeSlot = 0;
   let expandedItemKey = null;
   let leaderboardCache = [];
+  // Zwischenspeicher des Allianz-Tiefenlaufs. Steht BEWUSST hier oben bei den uebrigen Caches und
+  // nicht unten im Abgrund-Block: ladeAbgrundAllianzstand() wird beim Start aufgerufen, und diese
+  // Zeile laeuft im IIFE frueher als der Abgrund-Block. Stand die Deklaration dort, lief der
+  // Startaufruf in die temporale Todeszone ("Cannot access 'abgrundAllianzCache' before
+  // initialization") - im Browser-Test als echter Konsolenfehler aufgeschlagen.
+  let abgrundAllianzCache = { tag:null, stand:[], geladenAm:0 };
 
   function uid(){
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -21540,8 +21556,14 @@
   setTimeout(checkLiveVersionUpdate, 15000);
   setInterval(() => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); }, 600000);
   setInterval(() => { if (document.visibilityState === 'visible') checkChatUnread(); }, 60000);
+  // Allianz-Tiefenlauf: reines ANZEIGE-Polling, also mit Sichtbarkeits-Gate (CLAUDE.md). Der eigene
+  // Beitrag wird davon unabhaengig beim Tauchgang gemeldet - der haengt an echter Spielmechanik und
+  // darf nicht davon abhaengen, ob der Reiter gerade sichtbar ist.
+  setInterval(() => { if (document.visibilityState === 'visible') ladeAbgrundAllianzstand(); }, 120000);
   setTimeout(checkChatUnread, 4000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); });
+  // Einmal beim Start laden, sonst stuende der Allianz-Tiefenlauf die ersten zwei Minuten leer da.
+  ladeAbgrundAllianzstand();
   // Zusätzliche Speicher-Absicherung (Spieler-Report 21.07.2026: "nach einem Update ist die Bauqueue
   // leer / Forschung zurückgesetzt"): Neben dem 10s-Intervallspeichern und dem abgewarteten Speichern
   // vor einem Update-Neuladen wird der aktuelle Stand JETZT AUCH sofort gesichert, sobald der Tab in
@@ -22608,7 +22630,7 @@
       { title:'Automatische Update-Erkennung', body:'Bleibt die Kolonie lange im selben Tab geöffnet (z.B. als installierte App), prüft sie im Hintergrund von selbst, ob eine neue Version bereitsteht - beim Zurückwechseln in den Tab und danach alle 10 Minuten. Wird eine gefunden, erscheint automatisch das Update-Fenster mit den vollständigen Patchnotes; es lässt sich nicht wegklicken, nur über "Seite neu laden" geht es weiter (dein Fortschritt bleibt dabei erhalten).' },
       { title:'Push-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich der Knopf "Push auf diesem Gerät" aktivieren (Browser fragt einmalig um Erlaubnis) - danach schickt der Server für Nachrichten, Pakt-Angebote, Weltboss-Kills, anfliegende Überfälle und Patchnotes echte Benachrichtigungen an dieses Gerät, auch wenn die Seite geschlossen ist. Fünf Kategorien lassen sich einzeln abschalten. Alle Ereignisse landen zusätzlich als geräteübergreifendes Postfach im <strong>Berichte-Tab</strong> unter "Server-Ereignisse" - nur mit eigenem Server verfügbar.' },
       { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt. Wird dein gemeldeter Bug behoben, bekommst du dafür eine Nachricht vom Team und einmalig eine kleine <strong>Kredit-Belohnung</strong> - erscheint automatisch beim nächsten Einloggen.' },
-      { title:'Der Abgrund – endlos neue Sektoren', body:'Ab <strong>Singularitätsphysik</strong> öffnet sich unter der Galaxie <strong>der Abgrund</strong>: eine nach unten offene Folge von Sektoren, die du im Galaxie-Tab unter „Kampf &amp; Eroberung\" findest. Jede <strong>Tiefe</strong> ist ein eigener, benannter Sektor mit eigenen <strong>Mutatoren</strong> – Umgebungsregeln, die den Kampf wirklich verändern: eigene Kampfkraft, Gegnerstärke, Rohstoffbeute, Anflugzeit und eigene Verluste. Es gibt <strong>18 Mutatoren</strong>, ab Tiefe 15 liegen immer drei gleichzeitig auf einem Sektor – welche Flotte sich lohnt, entscheidet sich also je Tiefe neu. Ein Sektor wird aus seiner Tiefe berechnet und sieht deshalb <strong>für jeden Spieler gleich aus</strong>: Tiefe 47 ist überall Tiefe 47, und ein Neuladen würfelt sie nicht neu. Ein <strong>Sieg</strong> schaltet die nächste Tiefe frei und bringt <strong>Abgrundsplitter</strong>; eine <strong>Niederlage</strong> kostet Schiffe, aber die Tiefe bleibt erreichbar. Bereits bezwungene Tiefen kannst du erneut antauchen, sie geben dann nur noch 35% Ausbeute – der nächste echte Schritt nach unten lohnt sich immer mehr als das Farmen einer bequemen Tiefe. Splitter gibst du ausschließlich in der <strong>Abgrund-Werkstatt</strong> aus (Kampfkraft, Verluste, Splitter- und Rohstoffausbeute); jede Stufe wird teurer, jede Wirkung ist gedeckelt, und <strong>alle vier Boni wirken nur im Abgrund</strong> – kein Splitterberg kann die normale Wirtschaft oder das PvP kippen. Deine <strong>Rekordtiefe</strong> gibt dauerhaft Produktion, logarithmisch wie die Ewigkeitsforschungen (Rekord 20 rund +8,8%, Rekord 100 rund +13,3%). Dazu sammelst du zwei Verzeichnisse: die <strong>Chronik des Abstiegs</strong> mit 16 Berichten an festen Tiefenmarken und das <strong>Mutatoren-Verzeichnis</strong>, das sich füllt, sobald du einem Mutator zum ersten Mal begegnet bist – auch bei einer Niederlage. Deine Rekordtiefe ist außerdem <strong>öffentlich</strong>: Sie erscheint als Abzeichen neben deinem Namen in der Bestenliste, im Spielerprofil im Vergleich zu deiner eigenen Tiefe, und im Abgrund selbst als Rangliste „Die tiefsten Kommandanten". Gewertet werden dort nur die nach Punktestand geladenen Top 30, nicht alle Spieler.' },
+      { title:'Der Abgrund – endlos neue Sektoren', body:'Ab <strong>Singularitätsphysik</strong> öffnet sich unter der Galaxie <strong>der Abgrund</strong>: eine nach unten offene Folge von Sektoren, die du im Galaxie-Tab unter „Kampf &amp; Eroberung\" findest. Jede <strong>Tiefe</strong> ist ein eigener, benannter Sektor mit eigenen <strong>Mutatoren</strong> – Umgebungsregeln, die den Kampf wirklich verändern: eigene Kampfkraft, Gegnerstärke, Rohstoffbeute, Anflugzeit und eigene Verluste. Es gibt <strong>18 Mutatoren</strong>, ab Tiefe 15 liegen immer drei gleichzeitig auf einem Sektor – welche Flotte sich lohnt, entscheidet sich also je Tiefe neu. Ein Sektor wird aus seiner Tiefe berechnet und sieht deshalb <strong>für jeden Spieler gleich aus</strong>: Tiefe 47 ist überall Tiefe 47, und ein Neuladen würfelt sie nicht neu. Ein <strong>Sieg</strong> schaltet die nächste Tiefe frei und bringt <strong>Abgrundsplitter</strong>; eine <strong>Niederlage</strong> kostet Schiffe, aber die Tiefe bleibt erreichbar. Bereits bezwungene Tiefen kannst du erneut antauchen, sie geben dann nur noch 35% Ausbeute – der nächste echte Schritt nach unten lohnt sich immer mehr als das Farmen einer bequemen Tiefe. Splitter gibst du ausschließlich in der <strong>Abgrund-Werkstatt</strong> aus (Kampfkraft, Verluste, Splitter- und Rohstoffausbeute); jede Stufe wird teurer, jede Wirkung ist gedeckelt, und <strong>alle vier Boni wirken nur im Abgrund</strong> – kein Splitterberg kann die normale Wirtschaft oder das PvP kippen. Deine <strong>Rekordtiefe</strong> gibt dauerhaft Produktion, logarithmisch wie die Ewigkeitsforschungen (Rekord 20 rund +8,8%, Rekord 100 rund +13,3%). Dazu sammelst du zwei Verzeichnisse: die <strong>Chronik des Abstiegs</strong> mit 16 Berichten an festen Tiefenmarken und das <strong>Mutatoren-Verzeichnis</strong>, das sich füllt, sobald du einem Mutator zum ersten Mal begegnet bist – auch bei einer Niederlage. Deine Rekordtiefe ist außerdem <strong>öffentlich</strong>: Sie erscheint als Abzeichen neben deinem Namen in der Bestenliste, im Spielerprofil im Vergleich zu deiner eigenen Tiefe, und im Abgrund selbst als Rangliste „Die tiefsten Kommandanten". Gewertet werden dort nur die nach Punktestand geladenen Top 30, nicht alle Spieler. Drei Dinge kommen mit v8.322.0 dazu: Der <strong>Wochen-Tiefenlauf</strong> wertet, wie tief du <strong>in dieser Woche</strong> kommst – auch unterhalb deines Rekords, damit es jeden Montag wieder etwas zu erreichen gibt; abgerechnet wird in Abgrundsplittern (1,5 je erreichter Tiefe), abzuholen in der Abgrund-Box. Die <strong>Tiefensonde</strong> ist ein Werkstatt-Zweig, der dir bis zu drei Tiefen im Voraus Name und Mutatoren der kommenden Sektoren zeigt – der Sektor steht ja ohnehin fest, die Sonde macht das Wissen nur zugänglich und ändert nichts am Kampf. Und der <strong>Allianz-Tiefenlauf</strong> summiert die Wochentiefen aller Mitglieder zu einem gemeinsamen Konto: Erreicht die Allianz eine der drei Marken (50, 150, 300 Tiefen), kann sie <strong>jedes</strong> Mitglied abholen, das selbst mitgetaucht ist – einmal pro Woche und Marke.' },
       { title:'Ewigkeitsforschungen (ohne Maximalstufe)', body:'Die 43 regulären Forschungszweige haben zusammen 584 Stufen - irgendwann sind sie durch. Ab <strong>Singularitätsphysik</strong> öffnen sich vier Zweige, die <strong>nie enden</strong>: <strong>Rekursive Fertigungsoptimierung</strong> (Gesamtproduktion), <strong>Selbstlernende Fertigungsstraßen</strong> (Bau- und Schiffsbauzeit), <strong>Adaptive Panzerungsmatrix</strong> (Verteidigungspunkte) und <strong>Raumfaltungs-Container</strong> (Lagerkapazität). Ihr Nutzen wächst <strong>logarithmisch</strong>: Stufe 5 gibt rund +13%, Stufe 20 rund +22%, Stufe 100 rund +33%. Die Kosten steigen dagegen exponentiell - der Abstand zwischen beiden Kurven wird mit jeder Stufe größer, sodass die Zweige von selbst auslaufen, ohne je abgeschlossen zu sein. Sie wirken bewusst <strong>außerhalb</strong> der gedeckelten Bonus-Gruppen, sonst wären sie bei einem gut ausgebauten Konto sofort wirkungslos. Für den Erfolg „Forschungs-Meister" und den Forschungs-Nexus zählen sie nicht mit - beide bleiben mit den 43 regulären Zweigen erreichbar.' },
       { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: ab <strong>Prestige 3 und 50.000 Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit sechs Zweigen (je max. Stufe 10, Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset), Pfadfinder-Instinkt (+2% Expeditions-Belohnung) und Blick in die Leere (+4% Leerensplitter-Ausbeute). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste. <strong>Seit v8.319.0 haben die Zweige keine Maximalstufe mehr.</strong> Bis Stufe 10 kostet jede Stufe wie bisher (Stufennummer in Essenz) und wirkt voll. Darüber steigen die Kosten steil (Stufe 11 kostet 59, Stufe 20 bereits 163, Stufe 50 dann 774 Essenz), und jede Stufe wirkt nur noch zu einem Fünftel. Der Baum ist damit nie ausgekauft: Sternenessenz behält immer einen Zweck, und der Aufstieg lohnt sich auch beim zwanzigsten Mal. Die Karte zeigt neben der erreichten Stufe die <strong>wirksame</strong> Stufe, damit klar ist, wie viel davon ankommt.' },
       { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
@@ -27777,6 +27799,10 @@
           // Tiefe waere als Vergleichswert wertlos, und genau die Vergleichbarkeit ist der Grund,
           // warum die Sektoren ueberhaupt deterministisch erzeugt werden.
           abgrundBest: (state.abgrund && state.abgrund.best) || 0,
+          // Wochen-Tiefenlauf (v8.322.0): der Wochenschluessel MUSS mitreisen. Ohne ihn koennte die
+          // Rangliste das Ergebnis einer laengst vergangenen Woche als aktuell anzeigen, sobald
+          // jemand seit Montag nicht mehr eingeloggt war.
+          abgrundWoche: (state.abgrund && state.abgrund.woche) ? { key: state.abgrund.woche.key, best: state.abgrund.woche.best||0 } : null,
           ascensionCount: (state.ascension&&state.ascension.count)||0,
           ships: fuzz(allFleets().reduce((a,f)=>a+f.ships,0)),
           cruisers: fuzz(allFleets().reduce((a,f)=>a+f.cruisers,0)),
@@ -29317,8 +29343,61 @@
     if (typeof a.tauchgaenge !== 'number' || a.tauchgaenge < 0) a.tauchgaenge = 0;
     if (!a.gesehen) a.gesehen = {};     // Mutator-Bestiarium: key -> Anzahl Begegnungen
     if (!a.werkstatt) a.werkstatt = {}; // gekaufte Ausbaustufen
+    if (!a.woche) a.woche = { key:null, best:0 };        // Tiefenlauf der laufenden Woche
+    if (!a.wochePraemie) a.wochePraemie = null;          // { key, tiefe } - abgeschlossen, noch nicht abgeholt
+    if (!a.allianzMarken) a.allianzMarken = {};          // "<wochenschluessel>|<marke>" -> true
     return a;
   }
+  // ---- Wochen-Tiefenlauf (v8.322.0) ----
+  // Der Rekord ist auf Dauer eine Einbahnstrasse: Wer bei Tiefe 60 haengt, hat wochenlang keinen
+  // Fortschritt mehr zu zeigen. Der Wochenlauf wertet stattdessen, wie tief man DIESE WOCHE war -
+  // das gibt es jeden Montag neu, unabhaengig vom Rekord.
+  //
+  // Wochenschluessel und Rhythmus kommen von weekKeyOf() - derselbe Montag-bis-Sonntag-Takt wie die
+  // Wochenliga, damit nicht zwei verschiedene "Wochen" nebeneinander laufen.
+  //
+  // Belohnt wird bewusst in ABGRUNDSPLITTERN und nicht in Ressourcen oder Krediten: Splitter sind
+  // eine geschlossene Waehrung (nur in der Abgrund-Werkstatt ausgebbar, alle Wirkungen ausschliesslich
+  // im Abgrund). Eine zusaetzliche Ressourcenquelle waere genau die Sorte Belohnung, vor der CLAUDE.md
+  // warnt; Splitter koennen dagegen nichts ausserhalb des Abgrunds aus dem Gleichgewicht bringen.
+  const ABGRUND_WOCHE_FAKTOR = 1.5; // Splitter je erreichter Wochentiefe
+  function abgrundWochenpflege(){
+    const a = ensureAbgrund();
+    const jetzt = weekKeyOf(Date.now());
+    if (a.woche.key === jetzt) return;
+    // Woche gewechselt: das Ergebnis der abgelaufenen Woche wird zur abholbaren Praemie. Eine noch
+    // nicht abgeholte aeltere Praemie wird dabei NICHT ueberschrieben, wenn sie besser war - sonst
+    // verlöre jemand, der zwei Wochen nicht hereinschaut, das bessere Ergebnis.
+    if (a.woche.key && (a.woche.best||0) > 0){
+      if (!a.wochePraemie || (a.wochePraemie.tiefe||0) < a.woche.best){
+        a.wochePraemie = { key: a.woche.key, tiefe: a.woche.best };
+      }
+    }
+    a.woche = { key: jetzt, best: 0 };
+  }
+  function abgrundWochenPraemieSplitter(tiefe){ return Math.max(1, Math.round((tiefe||0) * ABGRUND_WOCHE_FAKTOR)); }
+  function holeAbgrundWochenpraemie(){
+    const a = ensureAbgrund();
+    abgrundWochenpflege();
+    if (!a.wochePraemie || !(a.wochePraemie.tiefe > 0)) return;
+    const splitter = abgrundWochenPraemieSplitter(a.wochePraemie.tiefe);
+    a.splitter = (a.splitter||0) + splitter;
+    log('Wochen-Tiefenlauf abgerechnet: Tiefe '+a.wochePraemie.tiefe+' erreicht, +'+fmt(splitter)+' Abgrundsplitter.', 'ti-trophy');
+    playSound('achieve');
+    a.wochePraemie = null;
+    save();
+    render();
+  }
+  // ---- Tiefensonde (v8.322.0) ----
+  // Der Sektor ist deterministisch - was in Tiefe N+1 wartet, steht also laengst fest. Die Sonde
+  // macht dieses Wissen kaufbar und verwandelt den Abstieg von "hoffen" in "planen": Wer weiss, dass
+  // zwei Tiefen weiter ein Ionensturm liegt, baut die Flotte schon jetzt anders.
+  //
+  // Die Sonde liegt bewusst als normaler Werkstatt-Zweig im selben Array wie die uebrigen: Stufe,
+  // Preiskurve und Deckelung kommen damit aus derselben Rechnung, und es gibt keine zweite Stelle,
+  // die beim naechsten Balance-Pass veralten koennte. Ihre "proStufe" ist eine TIEFE, kein Prozentwert.
+  const ABGRUND_SONDE_MAX = 3;
+  function abgrundSondeReichweite(){ return abgrundWerkstattBonus('tiefensonde'); }
   // Tauchtiefe, die aktuell gewählt werden darf: alles bis eine Stufe über dem eigenen Rekord.
   function abgrundMaxTiefe(){ return Math.max(1, (ensureAbgrund().best||0) + 1); }
   function abgrundGewaehlteTiefe(){
@@ -29345,7 +29424,11 @@
     { key:'echolot', name:'Resonanz-Echolot', icon:'ti-antenna-bars-5', basis:12, schritt:1.30, proStufe:0.04, deckel:1.00,
       desc:'Je Stufe +4% Abgrundsplitter aus jedem erfolgreichen Tauchgang, gedeckelt bei +100%. Bezahlt sich mit der Zeit selbst, wird aber pro Stufe deutlich teurer.' },
     { key:'bergungsarm', name:'Bergungsarm', icon:'ti-box', basis:9, schritt:1.26, proStufe:0.05, deckel:1.50,
-      desc:'Je Stufe +5% Rohstoffbeute aus dem Abgrund, gedeckelt bei +150%. Braucht weiterhin Frachter an Bord – ohne Frachtraum kommt nichts nach Hause.' }
+      desc:'Je Stufe +5% Rohstoffbeute aus dem Abgrund, gedeckelt bei +150%. Braucht weiterhin Frachter an Bord – ohne Frachtraum kommt nichts nach Hause.' },
+    // Einziger Zweig, dessen "proStufe" keine Prozente sind, sondern Tiefen - deshalb steht das in
+    // der Beschreibung ausdrücklich dran (einheit:'Tiefen' steuert zusätzlich die Anzeige).
+    { key:'tiefensonde', name:'Tiefensonde', icon:'ti-antenna-bars-5', basis:25, schritt:3.0, proStufe:1, deckel:ABGRUND_SONDE_MAX, einheit:'Tiefen',
+      desc:'Je Stufe siehst du eine Tiefe weiter voraus: Name und Mutatoren der nächsten Sektoren, bevor du dorthin abtauchst. Höchstens drei Tiefen – danach ist der Zweig vollständig ausgebaut. Ändert nichts am Kampf, nur an dem, was du vorher weißt.' }
   ];
   function abgrundWerkstattStufe(key){ return (ensureAbgrund().werkstatt||{})[key] || 0; }
   function abgrundWerkstattKosten(def, stufe){ return Math.max(1, Math.round(def.basis * Math.pow(def.schritt, stufe))); }
@@ -29400,6 +29483,84 @@
   function abgrundChronikOffen(){
     const best = ensureAbgrund().best || 0;
     return ABGRUND_CHRONIK.filter(e => best >= e.tiefe);
+  }
+
+  // ---- Allianz-Tiefenlauf (v8.322.0) ----
+  // Ein gemeinsamer Tauchgang im Wortsinn - alle Mitglieder gleichzeitig im selben Sektor - braeuchte
+  // eine serverseitige Schiedsinstanz, die es dafuer nicht gibt. Der Allianz-Tiefenlauf erreicht
+  // dasselbe Ziel ohne sie: Die Allianz sammelt ueber die Woche die Tiefen ihrer Mitglieder, und die
+  // gemeinsamen Marken schalten fuer ALLE eine Praemie frei. Kooperativ, ohne dass zwei Spieler im
+  // selben Moment online sein muessen.
+  //
+  // WARUM EIN SCHLUESSEL JE MITGLIED und nicht ein gemeinsames Dokument:
+  // Ein einzelnes alliance:<TAG>:abgrund haette Lese-Aendern-Schreiben gebraucht. Tauchen zwei
+  // Mitglieder gleichzeitig auf, ueberschreibt der zweite Schreibvorgang den ersten - der Beitrag
+  // waere still weg. Mit alliance:<TAG>:abgrund:<playerId> schreibt jeder ausschliesslich seinen
+  // eigenen Schluessel; storageList sammelt sie beim Lesen wieder ein. Dasselbe Muster wie
+  // alliance:<TAG>:sharedintel:<id>.
+  const ABGRUND_ALLIANZ_MARKEN = [
+    { key:'m50',  ziel:50,  splitter:15, name:'Vorstoß',   desc:'Die Allianz erreicht in einer Woche zusammen 50 Tiefen. Belohnung: 15 Abgrundsplitter für jedes Mitglied, das mitgetaucht ist.' },
+    { key:'m150', ziel:150, splitter:40, name:'Tiefenzug', desc:'Zusammen 150 Tiefen in einer Woche. Belohnung: 40 Abgrundsplitter für jedes beteiligte Mitglied.' },
+    { key:'m300', ziel:300, splitter:90, name:'Abgrundflotte', desc:'Zusammen 300 Tiefen in einer Woche – etwas für gut besetzte Allianzen. Belohnung: 90 Abgrundsplitter für jedes beteiligte Mitglied.' }
+  ];
+  // Eigenen Beitrag melden. Nur der EIGENE Schluessel wird geschrieben - kein fremder Zustand, damit
+  // auch bei gleichzeitigen Tauchgaengen nichts verlorengeht.
+  async function meldeAbgrundAllianzBeitrag(){
+    const tag = myAllianceTag();
+    if (!tag || !state.player.id || !useBackend()) return;
+    const a = ensureAbgrund();
+    try {
+      await storageSet('alliance:'+tag+':abgrund:'+state.player.id, JSON.stringify({
+        id: state.player.id, name: state.player.name || 'Kommandant',
+        weekKey: a.woche.key, tiefe: a.woche.best || 0, ts: Date.now()
+      }), true);
+    } catch(e){ console.warn('Allianz-Tiefenlauf: Beitrag konnte nicht gemeldet werden', e); }
+  }
+  async function ladeAbgrundAllianzstand(){
+    const tag = myAllianceTag();
+    if (!tag || !useBackend()){ abgrundAllianzCache = { tag:null, stand:[], geladenAm:Date.now() }; return; }
+    try {
+      const listRes = await storageList('alliance:'+tag+':abgrund:', true);
+      const keys = (listRes && listRes.keys) ? listRes.keys.slice(0, 60) : [];
+      const roh = await Promise.all(keys.map(async k => {
+        try { const r = await storageGet(k, true); return r && r.value ? JSON.parse(r.value) : null; }
+        catch(e){ return null; }
+      }));
+      const woche = weekKeyOf(Date.now());
+      abgrundAllianzCache = {
+        tag,
+        // Nur Beitraege der LAUFENDEN Woche - ein Eintrag von letzter Woche darf die Marke nicht
+        // mittragen, sonst waere sie nach ein paar Wochen dauerhaft erfuellt.
+        stand: roh.filter(x => x && x.weekKey === woche && (x.tiefe||0) > 0),
+        geladenAm: Date.now()
+      };
+    } catch(e){ console.warn('Allianz-Tiefenlauf: Stand nicht ladbar', e); }
+  }
+  function abgrundAllianzSumme(){
+    return (abgrundAllianzCache.stand||[]).reduce((sum,x) => sum + (x.tiefe||0), 0);
+  }
+  function abgrundAllianzMarkeErreicht(m){ return abgrundAllianzSumme() >= m.ziel; }
+  // Eingeloest wird je Woche und Marke genau einmal, und nur von jemandem, der selbst mitgetaucht ist.
+  function abgrundAllianzEingeloest(m){
+    const a = ensureAbgrund();
+    return !!(a.allianzMarken && a.allianzMarken[a.woche.key+'|'+m.key]);
+  }
+  function holeAbgrundAllianzMarke(key){
+    const m = ABGRUND_ALLIANZ_MARKEN.find(x => x.key === key);
+    if (!m) return;
+    const a = ensureAbgrund();
+    abgrundWochenpflege();
+    if (!(a.woche.best > 0)){ log('Du musst diese Woche selbst mindestens einmal abtauchen, um die Allianz-Marke abzuholen.', 'ti-alert-triangle'); return; }
+    if (!abgrundAllianzMarkeErreicht(m)){ log('Die Allianz hat diese Marke noch nicht erreicht.', 'ti-alert-triangle'); return; }
+    if (!a.allianzMarken) a.allianzMarken = {};
+    const merker = a.woche.key+'|'+m.key;
+    if (a.allianzMarken[merker]){ log('Diese Marke hast du diese Woche schon abgeholt.', 'ti-info-circle'); return; }
+    a.allianzMarken[merker] = true;
+    a.splitter = (a.splitter||0) + m.splitter;
+    log('Allianz-Marke „'+m.name+'" abgeholt: +'+fmt(m.splitter)+' Abgrundsplitter.', 'ti-users');
+    playSound('achieve');
+    save();
+    render();
   }
 
   // ---- Tauchgang starten ----
@@ -29479,7 +29640,7 @@
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:6px;">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
             <span class="bname"><i class="ti ${def.icon}" aria-hidden="true" style="color:#9fe1cb;"></i> ${def.name}</span>
-            <span class="lvl-pill">Stufe ${stufe}</span>
+            <span class="lvl-pill">Stufe ${stufe}${def.einheit ? ' · '+fmt(Math.min(def.deckel, stufe*def.proStufe))+' '+def.einheit : ''}</span>
           </div>
           <div class="bmeta" style="margin:4px 0 6px;">${def.desc}${amDeckel?' <strong style="color:#9fe1cb;">Deckel erreicht.</strong>':''}</div>
           <button data-abgrund-kauf="${def.key}" ${leistbar?'':'disabled'}>${amDeckel?'Vollständig ausgebaut':'<i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>'+fmt(kosten)+' Splitter'}</button>
@@ -29491,6 +29652,31 @@
       : '<div class="bmeta">Noch kein Eintrag. Der erste Bericht entsteht bei Rekordtiefe 3.</div>';
     const naechste = ABGRUND_CHRONIK.find(e => e.tiefe > (a.best||0));
     const gesehen = ABGRUND_MUTATOREN.filter(m => (a.gesehen||{})[m.key]);
+    // Wochenlauf: einmal pflegen (Wochenwechsel erkennen), dann anzeigen. Der Aufruf gehoert hierher
+    // und nicht nur in die Tauchgang-Aufloesung - sonst saehe jemand, der eine Woche pausiert, seine
+    // faellige Praemie erst nach dem naechsten Tauchgang.
+    abgrundWochenpflege();
+    const wocheTiefe = a.woche.best || 0;
+    const praemie = a.wochePraemie;
+    // BEWUSST GROB (Tage/Stunden statt Sekunden): Diese Box wird ueber setBoxHtml mit
+    // Markup-Signatur geschrieben. Ein sekundengenauer Countdown wuerde das Markup jede Sekunde
+    // aendern und damit die gesamte Box - Werkstatt, Chronik, Verzeichnis, beide Ranglisten -
+    // jede Sekunde neu aufbauen und neu verdrahten. Fuer einen Reset, der einmal pro Woche
+    // stattfindet, ist das reine Verschwendung; die Anzeige aendert sich so nur stuendlich.
+    const wochenRestStd = Math.max(0, Math.floor((nextWeekStartTs() - Date.now()) / 3600000));
+    const wochenRestText = wochenRestStd >= 24
+      ? 'Noch '+Math.floor(wochenRestStd/24)+' Tage.'
+      : (wochenRestStd >= 1 ? 'Noch '+wochenRestStd+' Stunden.' : 'Endet in weniger als einer Stunde.');
+    // Sondenvorschau: der Sektor ist deterministisch, die naechsten Tiefen stehen also laengst fest.
+    const sondeWeite = abgrundSondeReichweite();
+    const vorschau = [];
+    for (let i = 1; i <= sondeWeite; i++) vorschau.push(abgrundSektor(tiefe + i));
+    const vorschauHtml = vorschau.length
+      ? vorschau.map(v => `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:4px;">
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><i class="ti ti-antenna-bars-5" aria-hidden="true" style="color:#85b7eb; margin-right:4px;"></i>Tiefe ${v.tiefe}: ${v.name}</span>
+          <span class="bmeta" style="flex-shrink:0;">${v.mutatoren.map(m=>m.name).join(', ')}</span>
+        </div>`).join('')
+      : '';
     // Tiefen-Rangliste aus dem BEREITS geladenen Bestenlisten-Zwischenspeicher - kein zusaetzlicher
     // Serverabruf, die Liste wird ohnehin alle 15s aktualisiert. Genau dafuer werden die Sektoren
     // deterministisch erzeugt: eine Tiefe bedeutet fuer jeden dasselbe und ist damit vergleichbar.
@@ -29510,6 +29696,52 @@
           </div>`;
         }).join('')
       : '<div class="bmeta">Noch ist niemand aus den geladenen Eintraegen abgetaucht. Sei der Erste.</div>';
+    // Allianz-Tiefenlauf: rein aus dem Zwischenspeicher, das Nachladen erledigt ein eigener
+    // Sichtbarkeits-gegateter Intervall (siehe unten) - eine Renderfunktion soll nichts anfordern.
+    const meinTag = myAllianceTag();
+    const allianzStand = (abgrundAllianzCache.tag === meinTag) ? (abgrundAllianzCache.stand||[]) : [];
+    const allianzSumme = abgrundAllianzSumme();
+    const allianzHtml = allianzStand.length
+      ? allianzStand.slice().sort((x,y)=>(y.tiefe||0)-(x.tiefe||0)).slice(0,12).map(x => {
+          const ich = !!(x.id && x.id === state.player.id);
+          return `<div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px; ${ich?'color:#c3bef5; font-weight:500;':''}">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(x.name||'Unbekannt')}</span>
+            <span class="lvl-pill" style="flex-shrink:0;">Tiefe ${fmt(x.tiefe||0)}</span>
+          </div>`;
+        }).join('')
+      : '<div class="bmeta">Diese Woche hat noch niemand aus deiner Allianz einen Tauchgang gemeldet.</div>';
+    const markenHtml = ABGRUND_ALLIANZ_MARKEN.map(m => {
+      const erreicht = abgrundAllianzMarkeErreicht(m);
+      const schonGeholt = abgrundAllianzEingeloest(m);
+      const selbstGetaucht = (a.woche.best||0) > 0;
+      const anteil = Math.min(100, Math.round(allianzSumme/m.ziel*100));
+      return `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:6px; ${erreicht?'border-color:#9fe1cb;':''}">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+          <span class="bname"><i class="ti ti-users" aria-hidden="true" style="color:${erreicht?'#9fe1cb':'#7d8199'};"></i> ${m.name}</span>
+          <span class="lvl-pill">${fmt(Math.min(allianzSumme, m.ziel))} / ${fmt(m.ziel)}</span>
+        </div>
+        <div class="bmeta" style="margin:4px 0 6px;">${m.desc}</div>
+        <div class="progress-outer" style="height:4px; margin-bottom:6px;"><div class="progress-inner" style="width:${anteil}%; background:${erreicht?'#9fe1cb':'#7f77dd'};"></div></div>
+        ${schonGeholt
+          ? '<div class="bmeta" style="color:#9fe1cb;"><i class="ti ti-check" aria-hidden="true"></i> Diese Woche abgeholt.</div>'
+          : `<button data-abgrund-marke="${m.key}" ${(erreicht && selbstGetaucht)?'':'disabled'}>${erreicht ? (selbstGetaucht ? '<i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>'+fmt(m.splitter)+' Splitter abholen' : 'Erst selbst abtauchen') : 'Noch nicht erreicht'}</button>`}
+      </div>`;
+    }).join('');
+    // Wochenrangliste: nur Eintraege mit dem AKTUELLEN Wochenschluessel - ein Eintrag von letzter
+    // Woche darf hier nicht als diesjaehriges Ergebnis erscheinen.
+    const wochenSchluessel = weekKeyOf(Date.now());
+    const wochenListe = (leaderboardCache||[])
+      .filter(x => x.abgrundWoche && x.abgrundWoche.key === wochenSchluessel && (x.abgrundWoche.best||0) > 0)
+      .sort((x,y) => (y.abgrundWoche.best||0) - (x.abgrundWoche.best||0));
+    const wochenHtml = wochenListe.length
+      ? wochenListe.slice(0,10).map((x,i) => {
+          const ich = !!(x.id && x.id === state.player.id);
+          return `<div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px; ${ich?'color:#c3bef5; font-weight:500;':''}">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i+1}. ${escapeHtml(x.name||'Unbekannt')}</span>
+            <span class="lvl-pill" style="flex-shrink:0;">Tiefe ${fmt(x.abgrundWoche.best||0)}</span>
+          </div>`;
+        }).join('')
+      : '<div class="bmeta">Diese Woche ist noch niemand aus den geladenen Eintraegen abgetaucht.</div>';
     // Wie viele der geladenen Kommandanten waren schon mindestens so tief wie der gewaehlte Sektor?
     const soTief = tiefenListe.filter(x => (x.abgrundBest||0) >= tiefe).length;
     const bestiarHtml = ABGRUND_MUTATOREN.map(m => {
@@ -29518,6 +29750,14 @@
     }).join('');
     setBoxHtml(box, 'abgrundBox', `
       <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-infinity" aria-hidden="true"></i>Der Abgrund <span class="lvl-pill" style="margin-left:6px;">Rekord ${a.best||0}</span></div>
+      <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem; border-color:#fac775;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
+          <span class="bname"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i> Wochen-Tiefenlauf</span>
+          <span class="lvl-pill">Diese Woche: Tiefe ${fmt(wocheTiefe)}</span>
+        </div>
+        <div class="bmeta" style="margin-top:4px;">Gewertet wird die tiefste Tiefe, die du <strong>in dieser Woche</strong> bezwingst – auch unterhalb deines Rekords. Am Montag beginnt der Lauf neu; die Belohnung sind ${ABGRUND_WOCHE_FAKTOR} Abgrundsplitter je erreichter Tiefe. ${wochenRestText}</div>
+        ${praemie ? `<button data-abgrund-woche style="margin-top:6px;"><i class="ti ti-trophy" aria-hidden="true" style="margin-right:4px;"></i>Vorwoche abrechnen: Tiefe ${fmt(praemie.tiefe)} → ${fmt(abgrundWochenPraemieSplitter(praemie.tiefe))} Splitter</button>` : ''}
+      </div>
       <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Jede Tiefe ist ein eigener Sektor mit eigenem Namen und eigenen <strong>Mutatoren</strong> – Umgebungsregeln, die Kampfkraft, Gegnerstärke, Beute, Flugzeit und Verluste verändern. Die Tiefe ist nach unten offen. Ein Sektor sieht für jeden Spieler gleich aus, du kannst dich also über Tiefen austauschen.</div>
       <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#7f77dd;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:4px;">
@@ -29527,6 +29767,7 @@
         <div class="bmeta" style="margin-bottom:6px;">Gegnerstärke ${fmt(sektor.defense)} · Anflug ${fmtDuration(sektor.dauer)} · Bergung ~${fmt(Math.round(sektor.loot.erz*bergung*wiederholung))} Erz, ${fmt(Math.round(sektor.loot.kristalle*bergung*wiederholung))} Kristalle, ${fmt(Math.round(sektor.loot.deuterium*bergung*wiederholung))} Deuterium (Frachter nötig!) · +${fmt(splitterErwartet)} Abgrundsplitter${wiederholung<1?' <span style="color:#f0997b;">(Wiederholung: nur '+Math.round(ABGRUND_WIEDERHOLUNG*100)+'% Ausbeute)</span>':''}</div>
         ${mutHtml}
         <div class="bmeta" style="margin:8px 0 6px;">${gewaehlt>0?'Deine Flotte: Kraft '+fmt(Math.round(rohkraft))+(Math.abs(kraft-rohkraft)>1?' → im Sektor '+fmt(Math.round(kraft)):'')+' → Siegchance ~'+Math.round(chance*100)+'%':'Stelle unten eine Angriffsflotte zusammen.'}</div>
+        ${vorschauHtml ? `<div class="sonde-vorschau" style="margin:6px 0; padding-top:6px;"><span class="bmeta" style="color:#85b7eb;">Tiefensonde – was darunter wartet:</span>${vorschauHtml}</div>` : ''}
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
           <button data-abgrund-tiefe="-1" ${tiefe>1?'':'disabled'} style="min-width:44px;"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
           <span class="lvl-pill">Tauchtiefe ${tiefe} / ${maxT}</span>
@@ -29553,9 +29794,20 @@
         <summary class="bname" style="cursor:pointer;"><i class="ti ti-trophy" aria-hidden="true" style="color:#fac775;"></i> Die tiefsten Kommandanten${meinPlatz?' · dein Platz '+meinPlatz:''}</summary>
         <div style="margin-top:8px;">
           ${tiefenHtml}
+          <div class="bmeta" style="margin-top:10px; margin-bottom:4px; color:#fac775;"><i class="ti ti-trophy" aria-hidden="true"></i> Diese Woche</div>
+          ${wochenHtml}
           <div class="bmeta" style="margin-top:8px; color:#5a5f78;">Gewertet werden nur die nach Punktestand geladenen Top 30 der Bestenliste, nicht alle Spieler.</div>
         </div>
       </details>
+      ${meinTag ? `<details data-keep-open="abgrundAllianz"${detailsOpenAttr('abgrundAllianz')} style="margin-bottom:0.75rem;">
+        <summary class="bname" style="cursor:pointer;"><i class="ti ti-users" aria-hidden="true" style="color:#378add;"></i> Allianz-Tiefenlauf [${escapeHtml(meinTag)}] · ${fmt(allianzSumme)} Tiefen</summary>
+        <div style="margin-top:8px;">
+          <div class="bmeta" style="margin-bottom:8px;">Alle Mitglieder zahlen mit ihrer besten Tiefe dieser Woche in ein gemeinsames Konto ein. Wird eine Marke erreicht, kann sie <strong>jedes</strong> Mitglied abholen, das selbst mitgetaucht ist – einmal pro Woche und Marke. Am Montag beginnt der Lauf neu.</div>
+          ${markenHtml}
+          <div class="bmeta" style="margin:10px 0 4px; color:#378add;"><i class="ti ti-users" aria-hidden="true"></i> Beiträge dieser Woche</div>
+          ${allianzHtml}
+        </div>
+      </details>` : ''}
       <details data-keep-open="abgrundBestiarium"${detailsOpenAttr('abgrundBestiarium')} style="margin-bottom:1rem;">
         <summary class="bname" style="cursor:pointer;"><i class="ti ti-microscope" aria-hidden="true" style="color:#85b7eb;"></i> Mutatoren-Verzeichnis · ${gesehen.length}/${ABGRUND_MUTATOREN.length}</summary>
         <div style="margin-top:8px;">${bestiarHtml}</div>
@@ -29569,6 +29821,11 @@
         render();
       };
     });
+    box.querySelectorAll('[data-abgrund-marke]').forEach(el => {
+      el.onclick = () => holeAbgrundAllianzMarke(el.getAttribute('data-abgrund-marke'));
+    });
+    const wocheBtn = box.querySelector('[data-abgrund-woche]');
+    if (wocheBtn) wocheBtn.onclick = () => holeAbgrundWochenpraemie();
     const startBtn = box.querySelector('[data-abgrund-start]');
     if (startBtn) startBtn.onclick = () => sendeAbgrundMission();
     box.querySelectorAll('[data-abgrund-kauf]').forEach(el => {
@@ -30775,6 +31032,9 @@
           // Bestiarium: gesehen wird ein Mutator auch bei einer Niederlage - man war ja dort.
           for (const mut of sektor.mutatoren) a.gesehen[mut.key] = (a.gesehen[mut.key]||0) + 1;
           a.tauchgaenge = (a.tauchgaenge||0) + 1;
+          // Wochenlauf VOR der Auswertung pflegen, damit ein Tauchgang, der ueber einen Wochenwechsel
+          // hinweg unterwegs war, in der neuen Woche landet und nicht die alte nachtraeglich erhoeht.
+          abgrundWochenpflege();
           const mutText = sektor.mutatoren.map(x=>x.name).join(', ');
           // Verlustquote: Grundwert × Sektor-Mutatoren × Werkstatt-Tiefenpanzerung.
           const panzer = 1 - abgrundWerkstattBonus('tiefenpanzer');
@@ -30801,6 +31061,13 @@
             addVeteranXp(planetKey, Math.round(8 + tiefe));
             const ownLost = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, Math.max(0.01, (0.04+Math.random()*0.08) * sektor.mods.loss * panzer), planetKey, m.composition);
             const ownLostText = lostCountsToText(ownLost);
+            // Wochenlauf: gewertet wird die TIEFSTE in dieser Woche bezwungene Tiefe - auch dann,
+            // wenn sie unter dem Allzeit-Rekord liegt. Genau das ist der Zweck: Wer bei Tiefe 60
+            // haengt, hat trotzdem jede Woche etwas zu erreichen.
+            if (tiefe > (a.woche.best||0)) a.woche.best = tiefe;
+            // Der Allianz den eigenen Wochenstand melden (nur der eigene Schluessel, siehe oben).
+            // Bewusst ohne await: der Kampfbericht soll nicht auf das Netz warten.
+            meldeAbgrundAllianzBeitrag();
             // Rekord und nächste Tiefe nur, wenn es wirklich ein Schritt nach unten war.
             let tiefenMsg = '';
             if (tiefe > (a.best||0)){
