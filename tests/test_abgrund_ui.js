@@ -1,4 +1,4 @@
-// Der Abgrund im laufenden Spiel (27.07.2026, v8.320.0).
+// Der Abgrund im laufenden Spiel (27.07.2026, v8.320.0 / v8.321.0).
 //
 // test_abgrund.js prueft die Formeln am Quelltext. Dieser Test prueft, ob das Ding im Browser
 // wirklich funktioniert - genau die Klasse von Fehlern, die eine Quelltextpruefung nicht sieht:
@@ -17,7 +17,8 @@
 //   5) DER KERNFALL: eine faellige Abgrund-Mission wird beim Laden aufgeloest - Rekordtiefe,
 //      Splitter und Mutatoren-Verzeichnis stehen danach im gespeicherten Stand
 //   6) die Werkstatt gibt Splitter aus und erhoeht die Stufe
-//   7) keine Konsolenfehler dabei
+//   7) die Rekordtiefe landet im veroeffentlichten Bestenlisten-Eintrag und die Rangliste rendert
+// Konsolenfehler werden in jedem Abschnitt mitgeprueft.
 const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
 
 function backend(store){ return async r => {
@@ -166,6 +167,29 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     check('6: Splitter wurden abgezogen',
       (nachher.splitter||0) < (vorher.splitter||0), { vorher:vorher.splitter, nachher:nachher.splitter });
     check('6: keine Konsolenfehler beim Kauf', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ---- 7) Bestenlisten-Verdrahtung (v8.321.0) ----
+  // Das ist der Fall, den eine reine Quelltextpruefung nicht sieht: liest die Anzeige ein Feld,
+  // das gar nicht veroeffentlicht wird, ist die Kette still tot. Genau das war beim ersten Anlauf
+  // der Fall - die Veroeffentlichungszeile fehlte, waehrend Abzeichen und Rangliste sie schon lasen.
+  {
+    const stand = basisStand({ research:{ rsingularitaet:1 },
+      abgrund:{ tiefe:8, best:7, splitter:20, tauchgaenge:9, gesehen:{ nullzone:2 }, werkstatt:{} } });
+    const { ctx, page, errs, store } = await starte(browser, stand);
+    await page.waitForTimeout(1500);
+    let eigener = null;
+    for (const [k,v] of Object.entries(store)){
+      if (k.startsWith('leaderboard:')){ try { eigener = JSON.parse(v); } catch(e){} }
+    }
+    check('7: der eigene Bestenlisten-Eintrag wurde geschrieben', !!eigener, eigener ? Object.keys(eigener).length+' Felder' : null);
+    check('7: er enthaelt die Rekordtiefe unverrauscht',
+      !!eigener && eigener.abgrundBest === 7, eigener ? { abgrundBest:eigener.abgrundBest } : null);
+    const txt = await boxText(page);
+    check('7: die Abgrund-Box zeigt die Tiefen-Rangliste',
+      !!txt && /tiefsten Kommandanten/i.test(txt), txt ? txt.split('\n').filter(z=>/Kommandanten/i.test(z)) : null);
+    check('7: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
