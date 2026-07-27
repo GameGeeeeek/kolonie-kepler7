@@ -153,7 +153,7 @@ const check=(n,c,x)=>{ console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | 
     // die Dateien kommen ins Repo, oder die Links müssen weg. Ein Impressum ist in Deutschland
     // keine Kür, und ein toter Link im Footer jeder Seite kostet zusätzlich Vertrauen bei der
     // Bewertung der Seite.
-    const AUSNAHMEN = ['impressum.html', 'patchnotes.html'];
+    const AUSNAHMEN = ['patchnotes.html'];
     const tot = [], ausgenommen = [];
     const pruefe = (datei, s) => {
       for (const m of s.matchAll(/href="([^"#?:]+\.(?:html|css))"/g)){
@@ -188,6 +188,41 @@ const check=(n,c,x)=>{ console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | 
     const robots = fs.readFileSync(path.join(WURZEL,'robots.txt'), 'utf8');
     check('7: robots.txt verweist auf die Sitemap', /Sitemap: https:\/\/www\.gamegeeeeek\.de\/sitemap\.xml/.test(robots));
     check('7: robots.txt sperrt nichts aus', !/Disallow: \//.test(robots));
+  }
+
+  // -------------------------------------------------- 8) Rechtstexte
+  // Impressum und Datenschutzerklärung sind keine SEO-Seiten, gehören aber hierher: Ein toter Link
+  // im Footer JEDER Seite kostet Vertrauen bei der Bewertung, und ein fehlendes Impressum ist in
+  // Deutschland ein rechtliches Problem, kein kosmetisches.
+  {
+    const RECHT = ['impressum.html','datenschutzerklaerung.html','nutzungsbedingungen.html'];
+    for (const datei of RECHT){
+      const p = path.join(WURZEL, datei);
+      check('8: '+datei+' existiert', fs.existsSync(p));
+      if (!fs.existsSync(p)) continue;
+      const s = fs.readFileSync(p, 'utf8');
+      // Rechtstexte sollen erreichbar, aber nicht indexiert sein - sonst konkurrieren sie in den
+      // Ergebnissen mit den Seiten, die tatsächlich Spieler bringen sollen.
+      check('8: '+datei+' ist von der Indexierung ausgenommen',
+        /<meta name="robots" content="noindex/.test(s));
+      check('8: '+datei+' verweist zurück auf die Startseite', /href="\/"/.test(s));
+    }
+    // Die Sitemap darf sie nicht listen - eine Sitemap-Adresse mit noindex ist ein Widerspruch,
+    // den die Search Console als Fehler meldet.
+    const sm = fs.readFileSync(path.join(WURZEL,'sitemap.xml'), 'utf8');
+    const inSitemap = RECHT.filter(d => sm.includes('/'+d));
+    check('8: die Rechtstexte stehen nicht in der Sitemap (sie sind noindex)',
+      inSitemap.length === 0, inSitemap);
+
+    // Der eigentliche Grund, warum das hier geprüft wird: Ein Text mit offenen Platzhaltern sieht
+    // fertig aus und ist es nicht. Solange welche drinstehen, soll das sichtbar bleiben.
+    for (const datei of ['impressum.html','datenschutzerklaerung.html']){
+      const s = fs.readFileSync(path.join(WURZEL, datei), 'utf8');
+      const offen = (s.match(/class="ausfuellen"/g)||[]).length;
+      if (offen) console.log('     (Hinweis: '+datei+' hat noch '+offen+' auszufüllende Stelle(n))');
+      check('8: '+datei+' weist offene Stellen sichtbar aus',
+        offen === 0 || /class="hinweis"/.test(s), { offen });
+    }
   }
 
   console.log('\n' + (fail ? 'FAIL' : 'PASS'));
