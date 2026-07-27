@@ -4845,8 +4845,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.315.0';
+  const VERSION = '8.316.0';
   const PATCHNOTES = [
+    { version:'8.316.0', date:'27.07.2026', changes:[
+      '<strong>Je Modultyp ist nur noch EIN Modul gleichzeitig eingebaut.</strong> Bisher ließ sich derselbe Typ mehrfach in dieselben Slots stecken – viermal Panzerung war schlicht der vierfache Panzerungsbonus. Das war zugleich die stärkste und die einfallsloseste Aufstellung, und mit jedem zusätzlichen Slot wuchs sie ungebremst weiter.',
+      'Die Regel zählt den <strong>Typ</strong>, nicht das einzelne Modul: Panzerung (Gewöhnlich) und Panzerung (Episch) zählen als derselbe Typ und schließen sich gegenseitig aus. Anders wäre sie wirkungslos – man hätte einfach vier Seltenheitsstufen desselben Moduls gestapelt.',
+      'Gilt für <strong>beide Modulsysteme</strong>: Standort-Module je Planet und Schiffsklassen-Module je Klasse. Auch die Ausrüstungs-Vorlagen halten sich daran und überspringen Doppelungen aus der Zeit davor.',
+      '<strong>Nichts geht verloren.</strong> Wer bereits mehrere gleiche Module eingebaut hatte, findet die überzähligen beim nächsten Laden wieder im Inventar – dort sind sie sofort an einem anderen Standort oder für eine andere Schiffsklasse einsetzbar, verkaufbar oder verschmelzbar. Eine Meldung sagt beim Laden, wie viele es waren.',
+      'Im Inventar steht der Grund jetzt <strong>am Knopf</strong> („Typ belegt") statt erst als Fehlermeldung nach dem Klick.',
+      'Nebeneffekt, der ausdrücklich gewollt ist: Die benannten Set-Boni (Festungs-Doktrin, Industriekomplex, Logistiknetz, Forschungszentrum) belohnen genau die Typ-Vielfalt, die diese Regel erzwingt – sie werden dadurch zur eigentlichen Ausbaurichtung statt zur Nebensache.'
+    ]},
     { version:'8.315.0', date:'27.07.2026', changes:[
       '<strong>Die Karten in den Wischleisten sind wieder Karten.</strong> Spieler-Fotos vom Handy: In der Planeten-Rolle klaffte zwischen Überschrift und Beschreibung ein Loch über die halbe Kartenhöhe, und der Knopf stand hochkant daneben – so schmal, dass vom Wort „Wählen" nur „Wähle" übrig blieb. Gemessen waren es 114 Pixel Leerraum in einer 177 Pixel hohen Karte.',
       'Ursache war keine dieser Karten selbst, sondern die gemeinsame Grundlage: Kartenzeilen sind waagerecht entworfen, und an rund 95 Stellen im Spiel werden sie hochkant gestellt. Drei Regeln kippen dabei mit ins Senkrechte und meinen dort etwas völlig anderes – „Kinder an die Ränder verteilen" wurde zu „über die ganze Höhe auseinanderziehen", „bei Platzmangel umbrechen" zu „zweite Spalte aufmachen", und „letztes Element auf eigene Zeile" zu „letztes Element über die volle Höhe strecken".',
@@ -16008,6 +16016,34 @@
   }
   function moduleSlotCount(planetKey){ return (state.moduleSlotLevel||{})[planetKey||'home'] || 0; }
   function equippedAt(planetKey){ return (state.equippedModules||{})[planetKey||'home'] || []; }
+  // ===== Ein Modul je Typ (27.07.2026, Balance-Ansage: "Module zu stark, egal wo nur 1 pro Typ") =====
+  // Bis hierher ließ sich derselbe Modultyp mehrfach in dieselben Slots stecken. Da die Boni eines
+  // Typs additiv in dieselbe Summe laufen (moduleBonusFor), war viermal Panzerung schlicht der
+  // vierfache Panzerungsbonus - die stärkste und zugleich einfallsloseste Aufstellung, und mit
+  // steigender Slot-Zahl skalierte sie ungebremst mit.
+  //
+  // Gezählt wird der TYP, nicht die Instanz: Ein Instanz-Schlüssel ist "typ:seltenheit" bzw.
+  // "typ:seltenheit:stufe:zusatzwerte" kodiert, der Typ ist alles vor dem ersten Doppelpunkt. Die
+  // Regel muss zwingend auf dieser Ebene greifen - würde sie nur exakt gleiche Instanzen verbieten,
+  // ließe sie sich mit Panzerung(gewöhnlich) + Panzerung(selten) + Panzerung(episch) umgehen und
+  // wäre wirkungslos. Beide Modulsysteme (Standort und Schiffsklasse) nutzen dieselbe Kodierung
+  // und damit dieselbe Funktion.
+  function moduleTypeOf(instKey){ return String(instKey||'').split(':')[0]; }
+  function typeAlreadyEquipped(liste, instKey){
+    const typ = moduleTypeOf(instKey);
+    return (liste||[]).some(k => moduleTypeOf(k) === typ);
+  }
+  // Räumt eine Ausrüstungsliste auf ein Modul je Typ ein und gibt die Überzähligen zurück, damit
+  // der Aufrufer sie ins Inventar zurücklegen kann. Behalten wird jeweils das ERSTE Vorkommen.
+  function dedupeModuleList(liste){
+    const behalten = [], zurueck = [], gesehen = new Set();
+    for (const k of (liste||[])){
+      const typ = moduleTypeOf(k);
+      if (gesehen.has(typ)){ zurueck.push(k); continue; }
+      gesehen.add(typ); behalten.push(k);
+    }
+    return { behalten, zurueck };
+  }
   // Set-Bonus (24.07.2026, Modul-Ausbau): 3+ ausgerüstete Module DERSELBEN Seltenheit an einem
   // Standort verstärken alle Modul-Boni dieses Standorts um +10% - multiplikativ nur auf die
   // Modulsumme selbst (nicht auf die Gesamtverteidigung o.ä.), bewusst klein gehalten. Sammelanreiz:
@@ -16154,6 +16190,11 @@
     if ((state.modules[instKey]||0) < 1){ log('Dieses Modul ist nicht mehr im Inventar.', 'ti-alert-triangle'); return; }
     const equipped = equippedAt(planetKey);
     if (equipped.length >= moduleSlotCount(planetKey)){ log('Keine freien Slots an diesem Standort.', 'ti-alert-triangle'); return; }
+    if (typeAlreadyEquipped(equipped, instKey)){
+      const info = moduleInstanceInfo(instKey);
+      log((info?info.def.name:'Dieses Modul')+' ist an diesem Standort bereits eingebaut – je Typ ist nur EIN Modul erlaubt, unabhängig von der Seltenheit. Nimm das vorhandene zuerst ab.', 'ti-alert-triangle');
+      return;
+    }
     state.modules[instKey] -= 1;
     if (state.modules[instKey] <= 0) delete state.modules[instKey];
     state.equippedModules[planetKey] = [...equipped, instKey];
@@ -16467,16 +16508,22 @@
     if (!preset){ log('Vorlage '+slotName+' ist an diesem Standort noch nicht gespeichert.', 'ti-alert-triangle'); return; }
     for (const instKey of equippedAt(planetKey)) state.modules[instKey] = (state.modules[instKey]||0) + 1;
     state.equippedModules[planetKey] = [];
-    let missing = 0;
+    let missing = 0, doppelt = 0;
     for (const instKey of preset){
       if (equippedAt(planetKey).length >= moduleSlotCount(planetKey)) break;
+      // Ein Modul je Typ gilt auch hier (v8.316.0). Vorlagen aus der Zeit davor können denselben Typ
+      // mehrfach enthalten; ohne diese Prüfung wäre das 1-Klick-Anwenden das offene Schlupfloch,
+      // durch das die Regel wieder herausfiele.
+      if (typeAlreadyEquipped(equippedAt(planetKey), instKey)){ doppelt++; continue; }
       if ((state.modules[instKey]||0) > 0){
         state.modules[instKey] -= 1;
         if (state.modules[instKey] <= 0) delete state.modules[instKey];
         state.equippedModules[planetKey] = [...equippedAt(planetKey), instKey];
       } else missing++;
     }
-    log('Modul-Vorlage '+slotName+' angewendet ('+equippedAt(planetKey).length+' Module ausgerüstet'+(missing?', '+missing+' nicht mehr im Besitz - übersprungen':'')+').', 'ti-box');
+    log('Modul-Vorlage '+slotName+' angewendet ('+equippedAt(planetKey).length+' Module ausgerüstet'
+      +(missing?', '+missing+' nicht mehr im Besitz - übersprungen':'')
+      +(doppelt?', '+doppelt+' übersprungen (Typ schon eingebaut, nur eines je Typ erlaubt)':'')+').', 'ti-box');
     playSound('build');
     render(); save();
   }
@@ -16664,6 +16711,11 @@
     if ((state.shipModules[instKey]||0) < 1){ log('Dieses Modul ist nicht mehr im Inventar.', 'ti-alert-triangle'); return; }
     const equipped = equippedShipModulesAt(klasse);
     if (equipped.length >= shipModuleSlotCount(klasse)){ log('Keine freien Slots für diese Schiffsklasse.', 'ti-alert-triangle'); return; }
+    if (typeAlreadyEquipped(equipped, instKey)){
+      const vorhanden = shipModuleInstanceInfo(instKey);
+      log((vorhanden?vorhanden.def.name:'Dieses Modul')+' ist für diese Schiffsklasse bereits eingebaut – je Typ ist nur EIN Modul erlaubt, unabhängig von der Seltenheit. Nimm das vorhandene zuerst ab.', 'ti-alert-triangle');
+      return;
+    }
     state.shipModules[instKey] -= 1;
     if (state.shipModules[instKey] <= 0) delete state.shipModules[instKey];
     state.equippedShipModules[klasse] = [...equipped, instKey];
@@ -19013,6 +19065,29 @@
     for (const pid of Object.keys(state.colonies)){
       for (const def of BUILDING_DEFS) if (state.colonies[pid].buildings[def.key] === undefined) state.colonies[pid].buildings[def.key] = 0;
     }
+    migrateEinModulJeTyp();
+  }
+  // Altbestände auf "ein Modul je Typ" bringen (v8.316.0). Wer vor der Regel viermal Panzerung
+  // eingebaut hatte, behielte den vierfachen Bonus sonst dauerhaft - die Regel würde nur Neueinbauten
+  // treffen und ausgerechnet die stärksten Konten verschonen. Die überzähligen Module gehen NICHT
+  // verloren, sondern wandern zurück ins Inventar; dort sind sie sofort an einem anderen Standort
+  // bzw. für eine andere Schiffsklasse einsetzbar, verkaufbar oder verschmelzbar.
+  function migrateEinModulJeTyp(){
+    let zurueck = 0;
+    for (const [pk, liste] of Object.entries(state.equippedModules||{})){
+      const { behalten, zurueck: raus } = dedupeModuleList(liste);
+      if (!raus.length) continue;
+      state.equippedModules[pk] = behalten;
+      for (const k of raus){ state.modules[k] = (state.modules[k]||0) + 1; zurueck++; }
+    }
+    for (const [kl, liste] of Object.entries(state.equippedShipModules||{})){
+      const { behalten, zurueck: raus } = dedupeModuleList(liste);
+      if (!raus.length) continue;
+      state.equippedShipModules[kl] = behalten;
+      for (const k of raus){ state.shipModules[k] = (state.shipModules[k]||0) + 1; zurueck++; }
+    }
+    if (zurueck) log('Regeländerung: Je Modultyp ist nur noch EIN Modul gleichzeitig eingebaut. '+zurueck
+      +' überzählige'+(zurueck===1?'s Modul liegt':' Module liegen')+' wieder im Inventar – nichts ist verloren gegangen.', 'ti-box', 'warn');
   }
   function confirmPrestigeWithPerk(perkKey){
     document.getElementById('prestigePerkOverlay').style.display = 'none';
@@ -22382,8 +22457,8 @@
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
-      { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Dreizehn Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente <em>oder</em> 60.000 Kredite je Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär; Level und Substats der Module bleiben dabei erhalten); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. Aufwerten geht sowohl im Inventar als auch <strong>direkt am eingebauten Modul</strong> – es bleibt dabei im Slot, du musst es nicht erst abnehmen. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
-      { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Sieben Klassen mit eigenen Slots (bis zu 3): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
+      { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Dreizehn Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Je Typ nur EIN Modul gleichzeitig:</strong> Du kannst an einem Standort nicht zweimal Panzerung einbauen – auch nicht in unterschiedlichen Seltenheitsstufen. Wer Slots füllen will, muss also <strong>verschiedene</strong> Typen kombinieren, statt den stärksten Bonus einfach zu stapeln. Genau deshalb lohnen sich die benannten Set-Boni weiter unten: Sie belohnen ausgerechnet die Vielfalt, die diese Regel erzwingt. <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente <em>oder</em> 60.000 Kredite je Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär; Level und Substats der Module bleiben dabei erhalten); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. Aufwerten geht sowohl im Inventar als auch <strong>direkt am eingebauten Modul</strong> – es bleibt dabei im Slot, du musst es nicht erst abnehmen. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
+      { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Sieben Klassen mit eigenen Slots (bis zu 3, und wie bei den Standort-Modulen <strong>je Typ nur eines gleichzeitig</strong> – unabhängig von der Seltenheit): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
       { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag, sobald mindestens eine Tier-2-Fabrik existiert „5 Tier-2-Ressourcen produzieren" (gezählt wird die echte Fabrik-Produktion aller Ketten) sowie, ab 15 abgeschlossenen Expeditionen, „1 Peilung ansteuern"). Nach dem Fraktions-Ausbau kommen vier <strong>Fraktions-Aufgaben</strong> dazu: „1 Posten in einem Fraktionsladen kaufen" (sobald mindestens eine Fraktion freundlich ist), „In einem Fraktionskrieg Partei ergreifen" (nur solange wirklich ein Krieg läuft und du noch keine Seite gewählt hast), „1 Fraktionsrang aufsteigen" und „Bei 3 Fraktionen Kontakt halten" – letztere ist die Gegenaufgabe zum Ruf-Verfall: als Kontakt zählt jeder abgeschlossene Auftrag, Tribut, Ladenkauf, jede abgeholte Belohnung und jede Parteinahme. Botschaften zählen dabei bewusst nicht mit, sonst wäre die Aufgabe von selbst fast erledigt. Insgesamt sind es damit 20 Vorlagen – jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Warten darüber hinaus noch weitere fällige Belohnungen aus anderen Systemen (abholbare <strong>Fraktionsgeschenke</strong>, erreichte <strong>Dominanz-Stufen</strong>), fasst der Knopf <strong>„Alles einsammeln"</strong> ab zwei fälligen Belohnungen insgesamt alles zusammen und holt es mit einem Klick ab. Offene (noch nicht erledigte) Aufgaben lassen sich außerdem antippen, um direkt zum passenden Menü zu springen. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen <strong>Komplett-Tag-Bonus</strong>, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt: Kredite (40 je Serientag, also bis 400), <strong>Modulfragmente</strong> (1 je zwei Serientage, mindestens 1, also 1 bis 5) und ab Serientag 3 auch <strong>Kommandopunkte</strong> (1 je drei Serientage, also bis 3). Modulfragmente und Kommandopunkte wachsen bewusst <em>nicht</em> mit deiner Wirtschaft mit – anders als die Einzelbelohnungen, die sich an deiner Produktion orientieren. Genau deshalb bleibt der Bonus auch für ein weit entwickeltes Imperium interessant: Fragmente und Kommandopunkte sind dort das Knappe, nicht Erz. Ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
@@ -36833,6 +36908,12 @@
             if (!info) return '';
             const count = state.modules[instKey];
             const slotsFree = equipped.length < slots;
+            // Ein Modul je Typ (v8.316.0): Der Grund gehört AN DEN KNOPF, nicht erst in die Meldung
+            // nach dem Klick - sonst probiert man es bei jedem Duplikat im Inventar erneut.
+            const typBelegt = typeAlreadyEquipped(equipped, instKey);
+            const einbaubar = slotsFree && !typBelegt;
+            const knopfText = typBelegt ? 'Typ belegt' : (slotsFree ? 'Ausrüsten' : 'Keine Slots');
+            const knopfTitel = typBelegt ? info.def.name+' ist hier bereits eingebaut - je Typ ist nur eines erlaubt, unabhängig von der Seltenheit' : '';
             // Schmelze-Aktionen (24.07.2026): 3→1-Fusion bei genug Duplikaten (bis Legendär) + Zerlegen.
             const nextRar = nextRarityOf(instKey.split(':')[1]);
             const canFuse = count >= MODULE_FUSE_COUNT && nextRar && nextRar !== 'mythisch';
@@ -36845,7 +36926,7 @@
                   return '+'+Math.round(info.bonus*100)+'% '+l; })()} · ${info.def.desc}${info.subs.length?`<div style="margin-top:2px; color:#9fe1cb;"><i class="ti ti-sparkles" aria-hidden="true"></i> Substats: ${info.subs.map(s=>'+'+(s.value*100).toFixed(1)+'% '+(MODULE_SUB_EFFECT_LABEL[s.effect]||s.effect)).join(', ')}</div>`:''}</div></div>
               </div>
               <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-                <button data-equip-module="${instKey}" ${slotsFree?'':'disabled'} style="font-size:10.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>${slotsFree?'Ausrüsten':'Keine Slots'}</button>
+                <button data-equip-module="${instKey}" ${einbaubar?'':'disabled'} title="${knopfTitel}" style="font-size:10.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>${knopfText}</button>
                 <div style="display:flex; gap:4px;">
                   ${info.level<MODULE_LEVEL_MAX?`<button data-upgrade-module="${instKey}" style="font-size:9.5px; padding:3px 6px;" title="Aufwerten auf Stufe ${info.level+1}/${MODULE_LEVEL_MAX} (kostet ${moduleUpgradeCost(info.rarity,info.level)} Fragmente)"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:2px;"></i>Lvl↑ (${moduleUpgradeCost(info.rarity,info.level)})</button>`:''}
                   ${((MODULE_SUB_RANGE[info.rarity]||[0,0])[1]>0)?`<button data-reroll-module="${instKey}" style="font-size:9.5px; padding:3px 6px;" title="Substats neu würfeln (kostet ${moduleRerollCost(info.rarity)} Fragmente)"><i class="ti ti-atom-2" aria-hidden="true" style="margin-right:2px;"></i>Reroll (${moduleRerollCost(info.rarity)})</button>`:''}
@@ -37014,6 +37095,11 @@
             if (!info) return '';
             const count = state.shipModules[instKey];
             const slotsFree = equipped.length < slots;
+            // Ein Modul je Typ (v8.316.0) - siehe Standort-Modulbox oben, gleiche Begründung.
+            const typBelegtS = typeAlreadyEquipped(equipped, instKey);
+            const einbaubarS = slotsFree && !typBelegtS;
+            const knopfTextS = typBelegtS ? 'Typ belegt' : (slotsFree ? 'Ausrüsten' : 'Keine Slots');
+            const knopfTitelS = typBelegtS ? info.def.name+' ist für diese Klasse bereits eingebaut - je Typ ist nur eines erlaubt, unabhängig von der Seltenheit' : '';
             const effectLabel = { atk:'Angriff', hull:'Verteidigung', shield:'Schild', cargo:'Frachtkapazität', fuel:'Treibstoffersparnis', speed:'Geschwindigkeit', siegechance:'Belagerungs-Erfolgschance' }[info.def.effect] || info.def.effect;
             const nextRarS = nextRarityOf(instKey.split(':')[1]);
             const canFuseS = count >= MODULE_FUSE_COUNT && nextRarS && nextRarS !== 'mythisch';
@@ -37024,7 +37110,7 @@
                 <div class="bmeta">+${Math.round(info.bonus*100)}% ${effectLabel} · ${info.def.desc}${info.subs.length?`<div style="margin-top:2px; color:#9fe1cb;"><i class="ti ti-sparkles" aria-hidden="true"></i> Substats: ${info.subs.map(s=>'+'+(s.value*100).toFixed(1)+'% '+(MODULE_SUB_EFFECT_LABEL[s.effect]||s.effect)).join(', ')}</div>`:''}</div></div>
               </div>
               <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-                <button data-equip-shipmodule="${instKey}" ${slotsFree?'':'disabled'} style="font-size:10.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>${slotsFree?'Ausrüsten':'Keine Slots'}</button>
+                <button data-equip-shipmodule="${instKey}" ${einbaubarS?'':'disabled'} title="${knopfTitelS}" style="font-size:10.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>${knopfTextS}</button>
                 <div style="display:flex; gap:4px;">
                   ${info.level<MODULE_LEVEL_MAX?`<button data-upgrade-shipmodule="${instKey}" style="font-size:9.5px; padding:3px 6px;" title="Aufwerten auf Stufe ${info.level+1}/${MODULE_LEVEL_MAX} (kostet ${moduleUpgradeCost(info.rarity,info.level)} Fragmente)"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:2px;"></i>Lvl↑ (${moduleUpgradeCost(info.rarity,info.level)})</button>`:''}
                   ${((MODULE_SUB_RANGE[info.rarity]||[0,0])[1]>0)?`<button data-reroll-shipmodule="${instKey}" style="font-size:9.5px; padding:3px 6px;" title="Substats neu würfeln (kostet ${moduleRerollCost(info.rarity)} Fragmente)"><i class="ti ti-atom-2" aria-hidden="true" style="margin-right:2px;"></i>Reroll (${moduleRerollCost(info.rarity)})</button>`:''}
