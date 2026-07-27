@@ -1,4 +1,4 @@
-// Die vier großen Listen: Zwischenspeicher (27.07.2026, v8.310.0).
+// Die großen Listen: Zwischenspeicher (27.07.2026, v8.310.0 und v8.311.0).
 //
 // Ausgangsbefund - GEMESSEN, nicht geschätzt: Ein MutationObserver über sechs Sekunden zeigt, dass
 // vier Listen jede Sekunde komplett neu geschrieben werden, solange ihr Reiter offen ist:
@@ -9,6 +9,23 @@
 //     #planetRoleBox       3.9 kB            Basis-Reiter
 //
 // Zusammen rund 127 kB pro Sekunde, auf genau den Reitern, auf denen man am meisten sitzt.
+//
+// v8.311.0, zweite Messrunde nach denselben vier: Es gibt eine zweite Klasse von Boxen, die NICHT
+// an einen Reiter gebunden ist und deshalb auf JEDEM Reiter mitläuft, auch wo sie unsichtbar ist:
+//
+//     #npcList            57.2 kB Markup     lief auf jedem Reiter mit
+//     #factionBox         18.5 kB
+//     #attackFleetBox     11.9 kB
+//     #terraformBox        4.1 kB
+//     #pirateLairBox       1.1 kB
+//     #colonyDashboard     1.1 kB
+//     #relocateAllQuickBox 1.1 kB
+//     #qtySelect(Def/Fleet) 3x 0.2 kB
+//
+// Nicht umgestellt, weil ihr Markup sich WIRKLICH jede Sekunde ändert: #orbitalStationBox (zeigt
+// die Restzeit eines laufenden Ausbaus), #buildQueueBox/#researchQueueBox (Countdown),
+// #happyHourBox (Restzeit), #resbar (Rohstoffzähler). Nachgemessen, nicht angenommen: ein
+// Vergleich des Markups über zwei Sekunden zeigt bei #orbitalStationBox "11m 58s" -> "11m 56s".
 //
 // KERNPUNKT DIESES TESTS - die Signatur ist das FERTIGE MARKUP, nicht eine Liste von Werten.
 // CLAUDE.md sagt, das Muster dürfe nur auf Boxen OHNE Live-Countdown angewandt werden. Das gilt für
@@ -159,6 +176,43 @@ async function spiel(browser, zustand){
     await ctx.close();
   }
 
+  // ------------------------------------------- 6) die reiterunabhängigen Boxen (v8.311.0)
+  // #npcList ist mit 57 kB die zweitgrößte Box des Spiels und hing an KEINEM Reiter - sie lief auf
+  // jedem mit, auch auf dem Basis-Reiter, wo sie niemand sieht. Der Test steht deshalb bewusst auf
+  // dem Galaxie-Reiter (wo sie sichtbar ist) UND prüft danach den Basis-Reiter.
+  {
+    const { page, ctx, errs } = await spiel(browser, {});
+    await reiter(page, 'galaxie');
+    for (const id of ['npcList','factionBox','colonyDashboard']){
+      const start = await page.evaluate(x=>{const b=document.getElementById(x); return b?b.innerHTML.length:-1;}, id);
+      check('6: #'+id+' ist gerendert', start > 500, start);
+      check('6: #'+id+' lässt sich markieren', await markiere(page, id) === true);
+    }
+    await page.waitForTimeout(3400);
+    const nach = await page.evaluate(()=>{
+      const w = x => { const b=document.getElementById(x); return { da:!!(b && b.firstElementChild && b.firstElementChild.__marke),
+        canvas: b?b.querySelectorAll('canvas').length:-1 }; };
+      return { npc:w('npcList'), fak:w('factionBox'), kol:w('colonyDashboard') };
+    });
+    check('6: #npcList wird über mehrere Ticks NICHT neu geschrieben', nach.npc.da === true, nach.npc);
+    check('6: #factionBox ebenso', nach.fak.da === true, nach.fak);
+    check('6: #colonyDashboard ebenso', nach.kol.da === true, nach.kol);
+    // refreshPlanetMiniIcons() läuft seit v8.311.0 nur noch beim echten Neuaufbau - dieselbe
+    // Gegenprobe wie bei den Verteidigungs-Grafiken.
+    check('6: die gezeichneten Planeten im Kolonie-Überblick überleben übersprungene Ticks',
+      nach.kol.canvas > 0, nach.kol);
+    // Und auf einem Reiter, auf dem #npcList gar nicht sichtbar ist, darf sie erst recht nicht
+    // arbeiten - genau das war der Befund.
+    await reiter(page, 'basis');
+    await markiere(page, 'npcList');
+    await page.waitForTimeout(3400);
+    const aufBasis = await page.evaluate(()=>{const b=document.getElementById('npcList');
+      return !!(b && b.firstElementChild && b.firstElementChild.__marke);});
+    check('6: #npcList steht auch auf einem fremden Reiter still', aufBasis === true);
+    check('6: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
   // ------------------------------------------------- Quelltext-Prüfungen
   const src = fs.readFileSync(SPIELDATEI, 'utf8');
   check('Q: es gibt genau eine setBoxHtml-Definition',
@@ -170,8 +224,21 @@ async function spiel(browser, zustand){
     && (src.match(/setBoxHtml\(roleBox, 'planetRoleBox'/g)||[]).length === 2);
   // childElementCount ist kein Beiwerk: Räumt irgendwer eine Box von außen leer, muss der
   // Neuaufbau trotz gleicher Signatur laufen.
+  // Der Helfer muss BEIDE Sonderfälle abdecken: eine von außen geleerte Box (childElementCount)
+  // und eine absichtlich leere (Terraforming/Orbitalstation auf einem Mond schreiben ''). Ohne den
+  // zweiten Teil hätte die absichtlich leere Box jeden Tick ein wirkungsloses innerHTML='' bekommen.
   check('Q: der Leer-Fall ist im Helfer abgesichert',
-    /boxHtmlCache\[schluessel\] === html && box\.childElementCount/.test(src));
+    /boxHtmlCache\[schluessel\] === html && \(box\.childElementCount \|\| !html\)/.test(src));
+  check('Q: auch die reiterunabhängigen Boxen laufen über den Helfer',
+    /setBoxHtml\(document\.getElementById\('npcList'\), 'npcList'/.test(src)
+    && /setBoxHtml\(box, 'factionBox'/.test(src)
+    && /setBoxHtml\(attackFleetBox, 'attackFleetBox'/.test(src)
+    && /setBoxHtml\(pirateLairBox, 'pirateLairBox'/.test(src)
+    && (src.match(/setBoxHtml\(terraBox, 'terraformBox'/g)||[]).length === 2
+    && (src.match(/setBoxHtml\(orbitalBox, 'orbitalStationBox'/g)||[]).length === 2
+    && (src.match(/setBoxHtml\(document\.getElementById\('qtySelect/g)||[]).length === 3);
+  check('Q: die Planeten-Mini-Icons werden nur beim echten Neuaufbau neu gesetzt',
+    /if \(kolNeu\) refreshPlanetMiniIcons/.test(src));
   check('Q: die Canvas-Grafiken werden nur beim echten Neuaufbau neu gesetzt',
     /if \(defNeu\) refreshDefenseMiniIcons\(\);/.test(src));
   // Die Begründung, warum das Muster hier trotz Countdown erlaubt ist, gehört in den Code -

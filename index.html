@@ -4754,8 +4754,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.310.0';
+  const VERSION = '8.311.0';
   const PATCHNOTES = [
+    { version:'8.311.0', date:'27.07.2026', changes:[
+      '<strong>Zweite Messrunde, größerer Fund als beim ersten Mal:</strong> Die NPC-Liste ist mit 57 kB die zweitgrößte Anzeige des Spiels – und sie hing an <em>keinem</em> Reiter. Sie wurde jede Sekunde neu aufgebaut, egal wo man gerade war, auch auf dem Basis-Reiter, wo sie niemand sieht.',
+      'Dasselbe galt für die Fraktionsübersicht (18 kB), die Angriffsflotten-Auswahl (12 kB), Terraforming, Piratennester, den Kolonie-Überblick, die Schnellverlegung und die drei Mengenwähler. Alle laufen jetzt über dieselbe Prüfung wie die vier großen Listen aus dem letzten Update.',
+      '<strong>Was bewusst weiterläuft:</strong> Orbitalstation, Bau- und Forschungswarteschlange, Happy Hour und die Rohstoffzähler – deren Anzeige ändert sich wirklich jede Sekunde. Nachgemessen, nicht angenommen: Ein Vergleich über zwei Sekunden zeigt bei der Orbitalstation „11m 58s" gegen „11m 56s".',
+      'Die gezeichneten Planeten im Kolonie-Überblick werden – wie schon die animierten Verteidigungsanlagen – nur noch beim echten Neuaufbau neu gesetzt. Der Prüflauf misst gegen, dass sie über übersprungene Sekunden hinweg stehen bleiben.'
+    ]},
     { version:'8.310.0', date:'27.07.2026', changes:[
       '<strong>Die vier größten Listen des Spiels arbeiten nicht mehr im Leerlauf.</strong> Forschungsliste, Gebäudeliste, Verteidigungsliste und die Planeten-Rolle wurden bisher <em>jede Sekunde</em> komplett neu aufgebaut, solange ihr Reiter offen war – zusammen rund 127 kB Text pro Sekunde, auf genau den Reitern, auf denen man am meisten sitzt. Jetzt passiert das nur noch, wenn sich am Angezeigten wirklich etwas ändert.',
       'Am Bild ändert sich nichts. Läuft ein Bauauftrag, zählt die Restzeit weiter wie vorher – die Prüfung merkt selbst, dass sich etwas bewegt.',
@@ -13060,7 +13066,7 @@
         <div class="bmeta">Strafexpeditionen: <strong style="color:#e24b4a;">+${pc}% Überfall-Häufigkeit</strong>, <strong style="color:#e24b4a;">+${pp}% Angreifer-Stärke</strong> – dafür <strong style="color:#5dcaa5;">+${pd}% Trümmer</strong>, wenn du sie abschlägst.</div>
       </div>`;
     })();
-    box.innerHTML = serverHinweis + mineCard + botschaftCard + feindCard + kriegCard + sorted.map(f => {
+    setBoxHtml(box, 'factionBox', serverHinweis + mineCard + botschaftCard + feindCard + kriegCard + sorted.map(f => {
       const count = (f.systems||[]).length;
       const strength = f.strength ? f.strength.toFixed(1) : '?';
       // Diese vier ZUERST: der Fraktionsladen unten liest lvl, und ein const wird nicht gehoistet.
@@ -13227,7 +13233,7 @@
         ${questRow}
         ${sysButtons}
       </div>`;
-    }).join('');
+    }).join(''));
     box.querySelectorAll('[data-attack-faction-sys]').forEach(btn => btn.onclick = () => attackFactionSystem(btn.getAttribute('data-attack-faction-sys')));
     box.querySelectorAll('[data-tribute]').forEach(btn => btn.onclick = () => payTribute(btn.getAttribute('data-tribute')));
     box.querySelectorAll('[data-claim-faction-gift]').forEach(btn => btn.onclick = () => claimFactionGift(btn.getAttribute('data-claim-faction-gift')));
@@ -28711,7 +28717,11 @@
   const boxHtmlCache = Object.create(null);
   function setBoxHtml(box, schluessel, html){
     if (!box) return false;
-    if (boxHtmlCache[schluessel] === html && box.childElementCount) return false;
+    // `|| !html` deckt die absichtlich leere Box ab (Terraforming und Orbitalstation schreiben auf
+    // einem Mond bewusst ''): ohne diesen Zusatz hätte childElementCount===0 dort jeden Tick ein
+    // wirkungsloses innerHTML='' erzwungen und die Prüfung genau da ausgehebelt, wo sie am
+    // einfachsten greifen könnte.
+    if (boxHtmlCache[schluessel] === html && (box.childElementCount || !html)) return false;
     boxHtmlCache[schluessel] = html;
     setHtmlPreservingScroll(box, html);
     return true;
@@ -34457,7 +34467,7 @@
     // betroffen ist farblich hervorheben, Box blinkt auf") - dieselbe Blink-Behandlung wie Angriffsziel/
     // Sabotage, in der etablierten Leerenriss-Akzentfarbe (siehe .dash-colony-card.event-voidrift).
     const voidRiftPlanetId = state.voidRift ? state.voidRift.planetKey : null;
-    document.getElementById('colonyDashboard').innerHTML = `
+    const kolNeu = setBoxHtml(document.getElementById('colonyDashboard'), 'colonyDashboard', `
       <div class="dash-colony-row">
         ${dashSets.map(d => {
           const lvlSum = Object.values(d.b).reduce((a,v)=>a+v,0);
@@ -34492,14 +34502,16 @@
           `;
         }).join('')}
       </div>
-    `;
-    refreshPlanetMiniIcons(document.getElementById('colonyDashboard'));
+    `);
+    // Wie bei den Verteidigungs-Grafiken: die Planeten-Mini-Icons nur beim echten Neuaufbau neu
+    // setzen. Bleibt das Markup stehen, bleiben auch die gezeichneten Planeten stehen.
+    if (kolNeu) refreshPlanetMiniIcons(document.getElementById('colonyDashboard'));
     }
     renderComebackQuestBox();
     renderHappyHourBox();
     renderNextGoalBox();
     const relocateAllQuickBox = document.getElementById('relocateAllQuickBox');
-    if (relocateAllQuickBox) relocateAllQuickBox.innerHTML = relocateAllQuickButtonsHtml();
+    if (relocateAllQuickBox) setBoxHtml(relocateAllQuickBox, 'relocateAllQuickBox', relocateAllQuickButtonsHtml());
 
     const qBox = document.getElementById('buildQueueBox');
     if (qBox){
@@ -34593,9 +34605,12 @@
     }
 
     const qtyHtml = [1,5,10,'max'].map(v => `<button class="qty-btn ${buildQtyMode===v?'active':''}" data-qty="${v}">${v==='max'?'Max':'x'+v}</button>`).join('');
-    document.getElementById('qtySelect').innerHTML = qtyHtml;
-    document.getElementById('qtySelectDef').innerHTML = qtyHtml;
-    document.getElementById('qtySelectFleet').innerHTML = qtyHtml;
+    // Dreimal dasselbe Markup, dreimal jede Sekunde neu - obwohl sich nur beim Umschalten der
+    // Baumenge etwas ändert. Der aktive Knopf steht als Klasse IM Markup, die Signatur erfasst die
+    // Umschaltung also zuverlässig.
+    setBoxHtml(document.getElementById('qtySelect'), 'qtySelect', qtyHtml);
+    setBoxHtml(document.getElementById('qtySelectDef'), 'qtySelectDef', qtyHtml);
+    setBoxHtml(document.getElementById('qtySelectFleet'), 'qtySelectFleet', qtyHtml);
 
     const activeB = currentBuildings();
     function buildingRowHtml(def){
@@ -34842,7 +34857,7 @@
       if (orbitalBox){
         const pk = state.activeBasePlanet;
         if (isMoonKey(pk)){
-          orbitalBox.innerHTML = '';
+          setBoxHtml(orbitalBox, 'orbitalStationBox', '');
         } else {
           const cur = orbitalStationOf(pk);
           const job = orbitalJobFor(pk);
@@ -34925,7 +34940,7 @@
               </div>
             </div>`;
           }
-          setHtmlPreservingScroll(orbitalBox, html);
+          setBoxHtml(orbitalBox, 'orbitalStationBox', html);
           orbitalBox.querySelectorAll('[data-build-orbital]').forEach(btn => btn.onclick = () => buildOrbitalStation(btn.getAttribute('data-build-orbital')));
           orbitalBox.querySelectorAll('[data-switch-orbital]').forEach(btn => btn.onclick = () => switchOrbitalFocus(btn.getAttribute('data-switch-orbital')));
           orbitalBox.querySelectorAll('[data-orbital-cancel]').forEach(btn => btn.onclick = () => cancelConstruction(btn.getAttribute('data-orbital-cancel')));
@@ -34941,7 +34956,7 @@
       if (terraBox){
         const pk = state.activeBasePlanet;
         if (isMoonKey(pk)){
-          terraBox.innerHTML = '';
+          setBoxHtml(terraBox, 'terraformBox', '');
         } else {
           const tfState = terraformStateOf(pk);
           const lvl = terraformLevel(pk);
@@ -35022,7 +35037,7 @@
           }
           html += `</div>`;
 
-          terraBox.innerHTML = html;
+          setBoxHtml(terraBox, 'terraformBox', html);
           const continueBtn = terraBox.querySelector('[data-continue-terraform]');
           if (continueBtn) continueBtn.onclick = () => startTerraform(pk);
           const boostBtn = terraBox.querySelector('[data-boost-terraform]');
@@ -36927,7 +36942,7 @@
           </div>
         </div>`;
       }).join('') || '<div class="bmeta" style="margin-bottom:0.3rem;">Noch keine Vorlagen gespeichert - Auswahl unten benennen und speichern.</div>';
-      attackFleetBox.innerHTML = `
+      setBoxHtml(attackFleetBox, 'attackFleetBox', `
         <div class="card-row" style="margin-bottom:0.5rem; border-color:${vetRank.color};">
           <div class="left" style="gap:8px;"><i class="ti ti-award" aria-hidden="true" style="color:${vetRank.color}; font-size:18px;"></i>
             <div><div class="bname" style="font-size:12px;">Veteranenrang: <span style="color:${vetRank.color};">${vetRank.name}</span>${vetRank.bonus>0?' (+'+Math.round(vetRank.bonus*100)+'% Angriff & Verteidigung)':''}</div>
@@ -36959,7 +36974,7 @@
             <span style="font-size:15px; font-weight:600; color:#e24b4a;"><i class="ti ti-sword" aria-hidden="true"></i> Angriffskraft: ${attackFleetPower}</span>
           </div>
         </div>
-      `;
+      `);
       refreshShipMiniIcons(attackFleetBox);
       const cfnAttack = document.getElementById('customFleetNameInputAttack');
       if (cfnAttack) cfnAttack.oninput = () => { customFleetName = cfnAttack.value; };
@@ -37103,7 +37118,7 @@
       const plLoot = pirateLairLoot(stage);
       const plCan = !plBusy && plSelected > 0;
       const prestigeNote = prestige > 0 ? ` · <span style="color:#fac775;"><i class="ti ti-star" aria-hidden="true"></i> ${Math.min(PIRATE_LAIR_PRESTIGE_CAP,prestige)}× abgeschlossen (+${Math.min(PIRATE_LAIR_PRESTIGE_CAP,prestige)*2}% Angriff dauerhaft)</span>` : '';
-      pirateLairBox.innerHTML = `
+      setBoxHtml(pirateLairBox, 'pirateLairBox', `
         <div class="section-title" style="margin-top:0.75rem;"><i class="ti ti-skull" aria-hidden="true"></i>Piraten-Versteck <span class="lvl-pill" style="margin-left:6px;">Stufe ${stage}/${PIRATE_LAIR_MAX_STAGE}</span></div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:${stage>=PIRATE_LAIR_MAX_STAGE?'#e24b4a':'#7f77dd'};">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -37113,11 +37128,11 @@
           <div class="bmeta" style="margin-bottom:4px;">Sieg: ~${fmt(plLoot.erz)} Erz, ${fmt(plLoot.kristalle)} Kristalle, ${fmt(plLoot.deuterium)} Deuterium (Frachter nötig!) · +${30+stage*20} Kredite · +${5+stage*3} Kampfpunkte · ${stage>=PIRATE_LAIR_MAX_STAGE?'garantiertes Modul + 500 Bonus-Kredite + Ketten-Neustart mit dauerhaftem Angriffsbonus':Math.round((0.10+stage*0.02)*100)+'% Modul-Chance'}${prestigeNote}</div>
           <div class="bmeta" style="margin-bottom:6px;">Niederlage: 20-35% Flottenverluste, Stufe bleibt. ${plSelected>0?'Deine Angriffsflotte: Kraft '+fmt(plPower)+' → Siegchance ~'+Math.round(plChance*100)+'%':'Stelle unten eine Angriffsflotte zusammen.'}</div>
           <button data-attack-lair ${plCan?'':'disabled'}>${plBusy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Versteck angreifen'}</button>
-        </div>`;
+        </div>`);
       const lairBtn = pirateLairBox.querySelector('[data-attack-lair]');
       if (lairBtn) lairBtn.onclick = () => sendPirateLairMission();
     }
-    document.getElementById('npcList').innerHTML = NPCS.filter(n => !n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1).map(n => {
+    setBoxHtml(document.getElementById('npcList'), 'npcList', NPCS.filter(n => !n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1).map(n => {
       const busy = cf.missions.some(m=>m.type==='attack' && m.targetId===n.id);
       const combatShipsN = combatFleetCount(cf);
       const slotsFreeN = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='worldboss').length < combatShipsN;
@@ -37177,7 +37192,7 @@
           <button class="attack" data-attack="${n.id}" ${canSendN?'':'disabled'}>${busy?'im Einsatz':'Angreifen'}</button>
         </div>
       `;
-    }).join('');
+    }).join(''));
     } // Ende Galaxie-Tab-Guard
 
     document.getElementById('heroAttack').textContent = attackPower();
