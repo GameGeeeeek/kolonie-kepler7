@@ -22,6 +22,9 @@
 //      Gebäudeschlüsseln)
 //   8) dasselbe für die 36 Schiffsklassen-Module (Präfix sm_, eigenes Gehäuse) - samt der Frage,
 //      die dort allein zählt: unterscheiden sich die Module INNERHALB einer Schiffsklasse?
+//   9) die Rohstoffe: RES_ICONS muss JEDEN Schlüssel abdecken, der in einer Kostenzeile landen
+//      kann - miniResIcon() liefert für einen unbekannten Schlüssel '' und die Zeile bleibt
+//      wortlos leer, ohne dass irgendwo ein Fehler auftaucht.
 //   6) Gebäude - und dabei BEIDE Grafiksysteme mitgerechnet: gezeichnetes SVG oder animiertes
 //      Canvas. Die erste Zählung kannte nur ICONS und meldete deshalb 11 statt 4 Lücken.
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
@@ -257,6 +260,45 @@ for (const knopf of ['data-craft-mythic-loc','data-craft-mythic-ship','data-frag
   check('8: '+knopf.padEnd(24)+' benutzt weiterhin das Schrift-Icon',
     new RegExp(knopf+'="\\$\\{def\\.key\\}"[^`]*<i class="ti \\$\\{def\\.icon\\}"').test(src));
 
+// ------------------------------------------- 9: Rohstoffe (v8.307.1)
+// BEFUND: Von den sieben Tier-2-Rohstoffen hatten zwei keinen RES_ICONS-Eintrag - Metamaterial-
+// Gewebe und Singularitätskerne. miniResIcon() gibt für einen unbekannten Schlüssel schlicht ''
+// zurück, es gibt also nicht einmal einen ti-Notnagel: Die Kostenzeile der beiden Endgame-Schiffe
+// zeigte "40 Metamaterial-Gewebe" ganz ohne Symbol, direkt neben "30 Hochenergiekristalle" mit.
+// Diese Fehlerklasse ist besonders leise, weil sie weder crasht noch etwas Falsches anzeigt -
+// sie zeigt einfach nichts. Deshalb ab hier geprüft.
+const resIconBlock = obj('RES_ICONS');
+const RESICONS = new Set([...resIconBlock.matchAll(/(\w+):\s*`<svg/g)].map(m=>m[1]));
+const resKeys  = [...arrBlock('RES_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+const t2Keys   = [...arrBlock('TIER2_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+check('9: die sechs Kern-Rohstoffe sind gefunden', resKeys.length === 6, resKeys);
+check('9: die sieben Tier-2-Rohstoffe sind gefunden', t2Keys.length === 7, t2Keys);
+const resOhne = [...resKeys, ...t2Keys].filter(k => !RESICONS.has(k));
+check('9: jeder Rohstoff, der in einer Kostenzeile landen kann, hat ein RES_ICONS-Symbol',
+  resOhne.length === 0, resOhne);
+// Kredite sind die EINE bewusste Ausnahme - sie sind keine produzierbare Ressource und benutzen im
+// ganzen Spiel ti-diamond. Der Zweig muss stehen bleiben, sonst wäre auch dort die Zeile leer.
+check('9: Kredite haben ihren eigenen Zweig in miniResIcon',
+  /if \(key === 'credits'\) return '<i class="ti ti-diamond"/.test(src));
+
+// Hausstil der RES_ICONS - bewusst ein ANDERER als bei ICONS: kleinere viewBox, 20px statt 24px,
+// flache Vollfarbe statt Verlauf, kein <g filter="url(#ig)">. Rohstoffe sind Symbole, keine Objekte.
+// Der Test hält den Unterschied fest, damit nicht irgendwann ein ICONS-Icon hier hineinrutscht.
+for (const k of [...resKeys, ...t2Keys]){
+  const m = resIconBlock.match(new RegExp('\\b'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"));
+  if (!m){ continue; }
+  const svg = m[1];
+  check('9: '+k.padEnd(20)+' im RES_ICONS-Hausstil',
+    /viewBox="0 0 42 42" width="20" height="20"/.test(svg)
+    && !svg.includes('url(#ig)') && !svg.includes('url(#g'),
+    svg.slice(0,60));
+}
+// Und wie bei den Modulen: gleiche Symbole wären schlimmer als gar keine.
+const resSvgs = [...resKeys, ...t2Keys]
+  .map(k => (resIconBlock.match(new RegExp('\\b'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"))||[])[1]);
+check('9: alle dreizehn Rohstoff-Symbole sind verschieden',
+  new Set(resSvgs).size === resSvgs.length, resSvgs.length+' Symbole, '+new Set(resSvgs).size+' verschieden');
+
 // ---------------------------------------------------------------- offene Lücken benennen
 // Kein Fehlschlag - eine Standortbestimmung, damit die verbleibende Arbeit sichtbar bleibt.
 // Rechnet BEIDE Grafiksysteme mit (gezeichnetes SVG ODER Canvas), sonst zählt sie wieder falsch.
@@ -286,9 +328,12 @@ function backend(store){ return async r => {
 };}
 const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
-  buildings:{solar:20,mine:18,lager:14,werft:10,labor:12}, research:{}, fleet:{jaeger:100,missions:[]},
+  buildings:{solar:20,mine:18,lager:14,werft:10,labor:12}, fleet:{jaeger:100,missions:[]},
   colonies:{}, activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null},
   officers:{ ingenieur:3, admiral:2 }, commandPoints:40,
+  // Ohne diese zwei Forschungen erscheinen Metamaterial-Titan und Singularitäts-Vernichter gar
+  // nicht im Flotte-Reiter - und 9b prüfte eine leere Liste (dieselbe Falle wie bei 5b/8b).
+  research:{ rmetamaterial:1, rsingularitaet:1 },
   // Ausgerüstete Standort-Module, damit die Slot-Kacheln überhaupt gerendert werden. 'schild' ist
   // bewusst dabei: das ist einer der drei Schlüssel, die mit einem Gebäude kollidieren.
   modules:{ 'panzerung:selten':1, 'schild:episch':1, 'lager:gewoehnlich':1 },
@@ -381,6 +426,20 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
     check('8b: und die Kacheln einer Klasse zeigen verschiedene Bilder',
       smods.verschieden === smods.anzahl, smods);
   }
+  // ------------------------------------------- 9b: Kostenzeilen am laufenden Spiel
+  // Die eigentliche Messung. Ein fehlender RES_ICONS-Eintrag erzeugt weder Fehler noch falschen
+  // Text - nur eine Zeile ohne Symbol. Genau das wird hier gesucht, an der Stelle, an der es dem
+  // Spieler auffiel: den Baukosten der beiden Endgame-Schiffe.
+  await page.evaluate(()=>{const b=document.querySelector('.tab-btn[data-tab="flotte"]'); if(b) b.click();});
+  await page.waitForTimeout(1200);
+  const kosten = await page.evaluate(()=>[...document.querySelectorAll('.costitem')]
+    .map(e=>({ txt:e.textContent.trim(), svg:!!e.querySelector('svg'), ti:!!e.querySelector('i.ti') })));
+  const t2Zeilen = kosten.filter(z=>/Metamaterial-Gewebe|Singularitätskerne|Fusionskerne|Hochenergiekristalle/.test(z.txt));
+  check('9b: die Tier-2-Kostenzeilen sind überhaupt gerendert', t2Zeilen.length >= 4, t2Zeilen.length);
+  const ohneBild = kosten.filter(z=>!z.svg && !z.ti);
+  check('9b: keine einzige Kostenzeile steht ohne Symbol da', ohneBild.length === 0,
+    ohneBild.slice(0,5).map(z=>z.txt));
+
   check('keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
   console.log('\n' + (fail ? 'FAIL' : 'PASS'));
   await browser.close();
