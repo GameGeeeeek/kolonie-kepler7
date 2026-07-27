@@ -25,6 +25,9 @@
 //   9) die Rohstoffe: RES_ICONS muss JEDEN Schlüssel abdecken, der in einer Kostenzeile landen
 //      kann - miniResIcon() liefert für einen unbekannten Schlüssel '' und die Zeile bleibt
 //      wortlos leer, ohne dass irgendwo ein Fehler auftaucht.
+//  10) die vier Fraktionen und die Gegenstände - beide Male geht es NICHT um "hat ein Symbol",
+//      sondern um "hat ein EIGENES": vier Fraktionen mit demselben ti-flag, zwei Gegenstände mit
+//      demselben ti-building-factory-2.
 //   6) Gebäude - und dabei BEIDE Grafiksysteme mitgerechnet: gezeichnetes SVG oder animiertes
 //      Canvas. Die erste Zählung kannte nur ICONS und meldete deshalb 11 statt 4 Lücken.
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
@@ -299,6 +302,40 @@ const resSvgs = [...resKeys, ...t2Keys]
 check('9: alle dreizehn Rohstoff-Symbole sind verschieden',
   new Set(resSvgs).size === resSvgs.length, resSvgs.length+' Symbole, '+new Set(resSvgs).size+' verschieden');
 
+// ------------------------------------------- 10: Fraktionen und Gegenstände (v8.308.0)
+// BEFUND: Alle vier Fraktionen trugen dasselbe Symbol - ti-flag, nur in verschiedenen Farben.
+// Dieselbe Fehlerklasse wie bei Doktrinen und Aufstellungen (Abschnitt 7), aber folgenreicher:
+// Fraktionen stehen nicht nur nebeneinander, sie sind paarweise verfeindet (FACTION_RIVALS), und
+// im Fraktionskrieg wählt man EINE Seite - eine Entscheidung, die je Krieg endgültig ist.
+const fakKeys = [...obj('FACTION_DIPLOMACY').matchAll(/^\s{4}(\w+):\s*\{/gm)].map(m=>m[1]);
+check('10: die vier Fraktionen sind gefunden', fakKeys.length === 4, fakKeys);
+const fakOhne = fakKeys.filter(k => !ICONS.has('fac_'+k));
+check('10: jede Fraktion hat ein eigenes gezeichnetes Icon (Präfix fac_)', fakOhne.length === 0, fakOhne);
+const fakSvgs = fakKeys.map(k => (ICONS_BLOCK.match(new RegExp('\\bfac_'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"))||[])[1]);
+check('10: und die vier Symbole sind wirklich verschieden', new Set(fakSvgs).size === 4);
+check('10: Fraktions-Icons nach Hausstil', fakSvgs.every(v => v
+  && /viewBox="0 0 100 100" width="24" height="24"/.test(v) && /<g filter="url\(#ig\)">/.test(v)
+  && [...v.matchAll(/stroke-width="([\d.]+)"/g)].every(m=>['4','1.6','5','6','2.5'].includes(m[1]))));
+// Beide Anzeigestellen, nicht nur die eine: die Fraktionskarte UND die Kriegskarte, wo man sich
+// zwischen den zwei Kriegsparteien entscheidet. Genau dort trugen bisher beide Seiten ein Schwert.
+check('10: die Fraktionskarte holt das Icon über das Präfix ab',
+  /iconHtmlFor\('fac_'\+f\.id, 'ti-flag', f\.color\)/.test(src));
+check('10: auch die beiden Kriegsparteien tragen ihr eigenes Wappen',
+  /const wappen = id => id \? `<span[^`]*iconHtmlFor\('fac_'\+id/.test(src));
+
+// Gegenstände: hier ist ein gezeichnetes Icon NICHT die Forderung - alle neunzehn stehen als eine
+// Liste im Inventar, und eine gemischte Liste (ein paar gezeichnet, der Rest flach) wäre unruhiger
+// als eine durchgehend flache. Geprüft wird die Eigenschaft, auf die es in einer Liste ankommt:
+// kein Symbol darf doppelt vorkommen. Bautrupp-Express und Werftkommando taten genau das.
+const itemBlock = arrBlock('ITEM_DEFS');
+const items = [...itemBlock.matchAll(/key:'([^']+)'[\s\S]{0,200}?icon:'([^']+)'/g)].map(m=>({k:m[1], ic:m[2]}));
+check('10: alle neunzehn Gegenstände sind erfasst', items.length === 19, items.length);
+const proIcon = {};
+for (const it of items) (proIcon[it.ic] = proIcon[it.ic] || []).push(it.k);
+const itemDoppel = Object.entries(proIcon).filter(([,ks]) => ks.length > 1)
+  .map(([ic,ks]) => ic+' → '+ks.join(', '));
+check('10: kein Gegenstand teilt sein Symbol mit einem anderen', itemDoppel.length === 0, itemDoppel);
+
 // ---------------------------------------------------------------- offene Lücken benennen
 // Kein Fehlschlag - eine Standortbestimmung, damit die verbleibende Arbeit sichtbar bleibt.
 // Rechnet BEIDE Grafiksysteme mit (gezeichnetes SVG ODER Canvas), sonst zählt sie wieder falsch.
@@ -439,6 +476,46 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   const ohneBild = kosten.filter(z=>!z.svg && !z.ti);
   check('9b: keine einzige Kostenzeile steht ohne Symbol da', ohneBild.length === 0,
     ohneBild.slice(0,5).map(z=>z.txt));
+
+  // ------------------------------------------- 10b: Fraktionskarten am laufenden Spiel
+  // Wie bei den Offizieren: Die Icons könnten im Objekt liegen, ohne dass je eines zu sehen wäre -
+  // die Karte schrieb ihr ti-flag vorher fest ins Markup. Und die Frage, um die es hier geht,
+  // beantwortet nur das laufende Spiel: Zeigen die vier Karten VERSCHIEDENE Bilder?
+  await page.evaluate(()=>{const b=document.querySelector('.tab-btn[data-tab="galaxie"]'); if(b) b.click();});
+  await page.waitForTimeout(500);
+  await page.evaluate(()=>{const b=document.querySelector('[data-galaxy-subtab="diplo"]'); if(b) b.click();});
+  await page.waitForTimeout(1200);
+  // Der factionBox enthält MEHR als die vier Fraktionskarten - Fraktionsladen, Botschafts-
+  // Übersicht und Feindseligkeits-Warnung haben eigene .bicon-Kacheln und bleiben bewusst flach.
+  // Ein pauschales querySelectorAll('.bicon') maß deshalb zehn Kacheln statt vier und schlug fehl.
+  // Gesucht wird stattdessen je Fraktion die Karte, deren Überschrift ihren Namen trägt.
+  const fak = await page.evaluate(namen => {
+    const box=document.getElementById('factionBox');
+    if(!box) return { fehlt:true };
+    const treffer = namen.map(n => {
+      const karte = [...box.querySelectorAll('.card-row')].find(c => {
+        const t=c.querySelector('.bname'); return t && t.textContent.trim() === n;
+      });
+      if(!karte) return { name:n, karte:false };
+      const kachel = karte.querySelector('.bicon');
+      const svg = kachel && kachel.querySelector('svg');
+      return { name:n, karte:true, svg:!!svg, schrift:!!(kachel && kachel.querySelector('i.ti')),
+               bild: svg ? svg.innerHTML : null };
+    });
+    return { fehlt:false, treffer };
+  }, ['Aschen-Kartell','Void-Marodeure','Eisenlegion','Schattenbund']);
+  check('10b: der Fraktions-Bereich ist da', fak && !fak.fehlt, fak && fak.fehlt);
+  if (fak && !fak.fehlt){
+    check('10b: alle vier Fraktionskarten sind gerendert', fak.treffer.every(t=>t.karte),
+      fak.treffer.filter(t=>!t.karte).map(t=>t.name));
+    const da = fak.treffer.filter(t=>t.karte);
+    check('10b: jede zeigt ein gezeichnetes Icon', da.every(t=>t.svg),
+      da.filter(t=>!t.svg).map(t=>t.name));
+    check('10b: keine mehr das flache Schrift-Icon', da.every(t=>!t.schrift),
+      da.filter(t=>t.schrift).map(t=>t.name));
+    check('10b: und die vier Karten zeigen verschiedene Bilder',
+      new Set(da.map(t=>t.bild)).size === da.length, da.length+' Karten, '+new Set(da.map(t=>t.bild)).size+' Bilder');
+  }
 
   check('keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
   console.log('\n' + (fail ? 'FAIL' : 'PASS'));
