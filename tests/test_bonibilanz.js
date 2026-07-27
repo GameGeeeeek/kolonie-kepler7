@@ -128,8 +128,13 @@ check('5: die Box existiert im Fortschritt-Tab', /id="bonusBalanceBox"/.test(src
 check('5: und wird gerendert', /renderBonusBalance\(\);/.test(src));
 check('5: sie nutzt den Signatur-Cache (kein Live-Countdown in der Box)',
   /lastBonusBalanceSig/.test(src) && /if \(sig === lastBonusBalanceSig\) return;/.test(src));
+// Seit v8.315.0 stehen Rohwert und Obergrenze in ZWEI Zeilen statt einer (Layout-Fix, siehe
+// test_kartenlayout.js): Die eine Zeile war mit white-space:nowrap unschrumpfbar und drückte den
+// Namen daneben bis unter seine Wortbreite. Geprüft wird weiterhin, dass beide Zahlen da sind -
+// nur nicht mehr, dass sie in derselben Zeile stehen.
 check('5: sie nennt Rohwert, wirksamen Wert und Obergrenze',
-  /von \$\{vz\}\$\{pct\(roh\)\} · max\. \$\{vz\}\$\{pct\(deckel\)\}/.test(src));
+  /von \$\{vz\}\$\{pct\(roh\)\}/.test(src) && /max\. \$\{vz\}\$\{pct\(deckel\)\}/.test(src)
+  && /\$\{vz\}\$\{pct\(wirksam\)\}/.test(src));
 check('5: und sagt, wie viel an der Grenze verpufft',
   /Obergrenze erreicht – \$\{pct\(verpufft\)\} ohne Wirkung/.test(src));
 check('5: und wie viel Luft sonst noch ist', /noch \$\{pct\(deckel-roh\)\} Luft/.test(src));
