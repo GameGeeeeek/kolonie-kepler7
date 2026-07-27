@@ -4754,8 +4754,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.309.0';
+  const VERSION = '8.310.0';
   const PATCHNOTES = [
+    { version:'8.310.0', date:'27.07.2026', changes:[
+      '<strong>Die vier größten Listen des Spiels arbeiten nicht mehr im Leerlauf.</strong> Forschungsliste, Gebäudeliste, Verteidigungsliste und die Planeten-Rolle wurden bisher <em>jede Sekunde</em> komplett neu aufgebaut, solange ihr Reiter offen war – zusammen rund 127 kB Text pro Sekunde, auf genau den Reitern, auf denen man am meisten sitzt. Jetzt passiert das nur noch, wenn sich am Angezeigten wirklich etwas ändert.',
+      'Am Bild ändert sich nichts. Läuft ein Bauauftrag, zählt die Restzeit weiter wie vorher – die Prüfung merkt selbst, dass sich etwas bewegt.',
+      '<strong>Gefunden durch Messen, nicht durch Schätzen:</strong> Ein Beobachter im laufenden Spiel hat sechs Sekunden lang mitgezählt, welcher Bereich wie oft neu geschrieben wird. Die reine Code-Durchsicht hätte diese vier übersehen – sie sind keine eigenen Funktionen, sondern stehen mitten im Sekunden-Takt.',
+      'Der Prüflauf klickt nach mehreren übersprungenen Sekunden gezielt auf „Warteschlange" und „Ausbauen" und misst, dass beides noch wirkt, dass die animierten Verteidigungs-Grafiken erhalten bleiben und dass die Liste bei einem laufenden Bauauftrag weiter jede Sekunde mitläuft.'
+    ]},
     { version:'8.309.0', date:'27.07.2026', changes:[
       '<strong>Der Offiziere-Reiter arbeitet nicht mehr im Leerlauf.</strong> Die beiden Modul-Bereiche – Standort-Module und Klassen-Module – wurden bisher <em>jede Sekunde</em> komplett neu aufgebaut und danach mit über dreißig Durchläufen neu verknüpft, obwohl sich nichts geändert hatte und immer nur einer von beiden überhaupt sichtbar ist. Jetzt passiert das nur noch, wenn sich am angezeigten Inhalt wirklich etwas ändert.',
       'Für dich ändert sich am Bild nichts – außer dass Handy-Akku und Rechner geschont werden, besonders seit dort seit den letzten Updates bis zu sechs handgezeichnete Symbole mitgeschrieben werden.',
@@ -28685,6 +28691,31 @@
   // (data-hscroll) zu verlieren. Ohne diesen Erhalt springt jede per Tick neu gerenderte
   // Wisch-Leiste (Planeten-Rollen, Orbital-Fokus, Expeditionstyp, Modul-Standorte) jede Sekunde
   // an den Anfang zurück - auf dem Handy fühlt sich das an, als würde sich das Swipen "resetten".
+  // Schreibt Markup nur, wenn es sich seit dem letzten Mal geändert hat (27.07.2026, v8.310.0).
+  //
+  // Gemessen statt geraten: Ein MutationObserver über 6 Sekunden zeigt, dass die vier großen Listen
+  // JEDE SEKUNDE komplett neu geschrieben werden, solange ihr Reiter offen ist - Forschung 73.9 kB,
+  // Gebäude 27.7 kB, Verteidigung 21.3 kB, Planeten-Rolle 3.9 kB Markup. Das sind zusammen rund
+  // 127 kB pro Sekunde auf genau den vier Reitern, auf denen man am meisten sitzt.
+  //
+  // WICHTIG - warum das FERTIGE MARKUP als Signatur taugt, auch bei Live-Countdown:
+  // CLAUDE.md sagt, das Signatur-Cache-Muster dürfe nur auf Boxen OHNE Countdown angewandt werden.
+  // Das gilt für Signaturen aus einer LISTE VON WERTEN: Wer den Countdown darin vergisst, friert
+  // die Anzeige ein. Beim vollen Markup kann das nicht passieren - läuft ein Countdown, ist das
+  // Markup jede Sekunde ein anderes und die Box wird neu geschrieben; läuft keiner, steht sie still.
+  // Die Prüfung ist damit selbstkorrigierend, und genau deshalb ist sie hier auch auf Boxen mit
+  // Restzeit-Anzeige (Bauaufträge, Minen-Störung, Rollenumbau) anwendbar.
+  //
+  // childElementCount als zweite Bedingung: Räumt irgendwer die Box von außen leer, muss der
+  // Neuaufbau trotz gleicher Signatur laufen.
+  const boxHtmlCache = Object.create(null);
+  function setBoxHtml(box, schluessel, html){
+    if (!box) return false;
+    if (boxHtmlCache[schluessel] === html && box.childElementCount) return false;
+    boxHtmlCache[schluessel] = html;
+    setHtmlPreservingScroll(box, html);
+    return true;
+  }
   function setHtmlPreservingScroll(box, html){
     if (!box) return;
     const prev = {};
@@ -34763,11 +34794,11 @@
     // Performance: Gebäudelisten (bis zu 19 Definitionen mit Kosten-/Punkte-Berechnung je Tick)
     // nur bei sichtbarem jeweiligem Tab neu berechnen.
     if (activeTab === 'basis'){
-      document.getElementById('buildings').innerHTML = BUILDING_DEFS.filter(d=>d.category!=='defense').map(buildingRowHtml).join('');
+      setBoxHtml(document.getElementById('buildings'), 'buildings', BUILDING_DEFS.filter(d=>d.category!=='defense').map(buildingRowHtml).join(''));
       const roleBox = document.getElementById('planetRoleBox');
       if (roleBox){
         if (isMoonKey(state.activeBasePlanet)){
-          roleBox.innerHTML = `<div class="lb-note" style="margin-bottom:1rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Planeten-Rollen gibt es nur für kolonisierte Planeten (und die Heimatbasis), nicht für Monde.</div>`;
+          setBoxHtml(roleBox, 'planetRoleBox', `<div class="lb-note" style="margin-bottom:1rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Planeten-Rollen gibt es nur für kolonisierte Planeten (und die Heimatbasis), nicht für Monde.</div>`);
         } else {
           const currentRole = planetRoleOf(state.activeBasePlanet);
           const pending = (state.pendingRoleChange||{})[state.activeBasePlanet];
@@ -34787,7 +34818,7 @@
               </div>
             `;
           }
-          setHtmlPreservingScroll(roleBox, pendingHtml + `
+          setBoxHtml(roleBox, 'planetRoleBox', pendingHtml + `
             <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-target" aria-hidden="true"></i>Planeten-Rolle: ${planetDisplayName(state.activeBasePlanet)}</div>
             <div data-hscroll="roles" style="display:flex; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
               ${PLANET_ROLES.map(r => {
@@ -35019,7 +35050,15 @@
         colonyAbandonBtn.onclick = () => abandonColony(state.activeBasePlanet);
       }
     }
-    if (activeTab === 'verteidigung'){ document.getElementById('defenseBuildings').innerHTML = constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense') + BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join(''); refreshDefenseMiniIcons(); renderAbhorchpostenBox(); }
+    if (activeTab === 'verteidigung'){
+      // refreshDefenseMiniIcons() setzt die animierten Canvas-Grafiken neu auf - das muss nur laufen,
+      // wenn die Kacheln tatsächlich neu gebaut wurden. Deshalb am Rückgabewert von setBoxHtml.
+      const defNeu = setBoxHtml(document.getElementById('defenseBuildings'), 'defenseBuildings',
+        constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense')
+        + BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join(''));
+      if (defNeu) refreshDefenseMiniIcons();
+      renderAbhorchpostenBox();
+    }
 
     // Performance: Forschungsliste (18 Technologien mit Kosten-/Dauer-Berechnung je Tick) nur im
     // Forschung-Tab sichtbar – wird deshalb nur bei aktivem Tab neu berechnet.
@@ -35044,7 +35083,7 @@
       `;
     })() : `<div class="bmeta" style="margin-bottom:0.75rem;">Kein aktives Forschungsprojekt. ${labCount>0?'Forschungslabore ('+labCount+') verkürzen die Dauer um bis zu '+Math.min(75,labCount*6)+'% und produzieren Forschungspunkte.':'Baue Forschungslabore, um Forschungszeit zu verkürzen und Forschungspunkte zu produzieren.'}</div>`;
 
-    document.getElementById('research').innerHTML = researchProgressHtml + RESEARCH_DEFS.map(r => {
+    setBoxHtml(document.getElementById('research'), 'research', researchProgressHtml + RESEARCH_DEFS.map(r => {
       const lvl = state.research[r.key]||0;
       const maxed = lvl >= r.maxLevel;
       const unlocked = techUnlocked(r);
@@ -35078,7 +35117,7 @@
           `}
         </div>
       `;
-    }).join('');
+    }).join(''));
     const cancelResearchBtn = document.getElementById('cancelResearchBtn');
     if (cancelResearchBtn) cancelResearchBtn.onclick = () => cancelResearch();
     const doctrineBox = document.getElementById('doctrineBox');
