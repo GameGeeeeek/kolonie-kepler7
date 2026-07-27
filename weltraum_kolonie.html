@@ -989,8 +989,16 @@
     .card-row .left { display:flex; align-items:center; gap:11px; min-width:0; }
     /* Der Text-Container (letztes Kind neben dem Icon) braucht min-width:0, sonst kann langer bmeta-Text
        nicht umbrechen und läuft über den Kartenrand hinaus/wird abgeschnitten (Spieler-Report Modul-
-       Beschreibungen). Das Icon (.bicon) hat flex-shrink:0 und bleibt davon unberührt. */
-    .card-row .left > div:last-child { min-width:0; overflow-wrap:anywhere; }
+       Beschreibungen). Das Icon (.bicon) hat flex-shrink:0 und bleibt davon unberührt.
+       break-word statt anywhere (Spieler-Report 27.07.2026, Foto der Boni-Bilanz): Die beiden brechen
+       gleich, unterscheiden sich aber in der MINDESTBREITE, die sie dem Flex-Layout melden. "anywhere"
+       meldet null - die Textspalte durfte damit beliebig schmal werden, weil daneben der Zahlenblock
+       mit white-space:nowrap unschrumpfbar ist und sich nimmt, was er braucht. Ergebnis waren Titel,
+       die mitten im Wort umbrachen: "Angriff/skraft", "Vertei/digung", "Heimatb/asis". "break-word"
+       meldet als Mindestbreite das längste Wort, die Spalte schrumpft also nur bis dahin - der Schutz
+       gegen überlaufende Beschreibungen bleibt aber vollständig erhalten, denn brechen tut es weiterhin,
+       sobald es sonst überlaufen würde. */
+    .card-row .left > div:last-child { min-width:0; overflow-wrap:break-word; }
     .bicon { width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; overflow:hidden; }
     /* Verteidigungsanlagen-Kachel: deutlich größer als das generische 42px-Badge. Seit v8.287.0 hat
        jede der 21 Anlagen eine eigene gezeichnete Grafik, die auf 40px schlicht zu klein war, um die
@@ -1016,7 +1024,13 @@
        die Tier-2-Ressourcen nutzen. Gleiches Info-Farbschema wie der bestehende bicon-t2-Icon-Rand, plus
        ein Akzentstreifen links, damit T2-Karten auf einen Blick als höherwertig erkennbar sind. */
     .tier2-card { border-color:rgba(var(--info-rgb),0.55) !important; box-shadow:inset 3px 0 0 rgba(var(--info-rgb),0.85), 0 0 8px rgba(var(--info-rgb),0.15); }
-    .bname { font-weight:600; font-size:var(--fs-body-lg); letter-spacing:0.01em; display:flex; align-items:center; gap:6px; color:#fff; font-family:var(--font-mono); }
+    /* flex-wrap:wrap (27.07.2026): .bname ist eine Flex-Zeile, Name und Zusätze (Ortsangabe,
+       Stufen-Pille, Icon) sind eigene Flex-Items. Ohne Umbruch stehen sie um jeden Preis
+       nebeneinander und laufen auf schmalen Geräten über den Kartenrand - gemessen bei 320px
+       Breite an "Angriffskraft · Heimatbasis" in der Boni-Bilanz, 28px über die Kante hinaus.
+       Verdeckt war das, solange der Textblock daneben overflow-wrap:anywhere hatte und deshalb
+       bis unter jede Wortbreite schrumpfen durfte - dafür brach der Name mitten im Wort. */
+    .bname { font-weight:600; font-size:var(--fs-body-lg); letter-spacing:0.01em; display:flex; align-items:center; flex-wrap:wrap; gap:6px; color:#fff; font-family:var(--font-mono); }
     .fleet-position-panel { position:fixed; right:14px; top:50%; transform:translateY(-50%); width:200px; max-height:74vh; overflow-y:auto; background:rgba(8,10,20,0.92); border:var(--bw-1) solid rgba(255,255,255,0.12); padding:10px; z-index:50; }
     .fleet-position-panel { scrollbar-width:thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; }
     .fleet-position-panel::-webkit-scrollbar { width:6px; }
@@ -1043,6 +1057,28 @@
       .card-row { flex-wrap: wrap; }
       .card-row > *:last-child { flex: 1 1 100%; }
     }
+
+    /* Hochkant gedrehte .card-row: die geerbten ZEILEN-Regeln zurücknehmen (Spieler-Report
+       27.07.2026 mit fünf Handy-Fotos). .card-row ist als waagerechte Zeile entworfen; an rund
+       95 Stellen wird sie per Inline-Style auf flex-direction:column gedreht. Dann kippen drei
+       Regeln von oben ins Senkrechte und werden dort falsch:
+         (1) justify-content:space-between verteilt die Kinder über die volle KARTENHÖHE. Sichtbar
+             wurde das in den Wischleisten (Planeten-Rolle, Orbital-Fokus, Expeditionstyp), weil
+             deren Karten durch align-items:stretch alle so hoch sind wie die höchste: Zwischen
+             Titel und Beschreibung klaffte ein Loch von 114 px in einer 177 px hohen Karte.
+         (2) flex-wrap:wrap (unter 480px) lässt Kinder in eine zweite SPALTE umbrechen statt in
+             eine zweite Zeile.
+         (3) > *:last-child{flex:1 1 100%} (ebenfalls unter 480px) meint "letztes Kind auf eigene
+             Zeile"; senkrecht heißt 100% aber 100% der HÖHE. Zusammen mit (2) stellte das den
+             "Wählen"-Knopf hochkant über die ganze Kartenhöhe in eine eigene Spalte rechts neben
+             den Text, wo ihn der Kartenrand halb abschnitt ("Wähle").
+       Genau diese Fehlerklasse war am 25.07.2026 schon einmal dran (siehe .mod-slot weiter oben);
+       dort wurde sie mit einer eigenen Klasse für EINE Stelle gelöst. Diese Regel behebt sie an
+       allen übrigen auf einmal - der Attribut-Selektor greift, weil die Inline-Schreibweise im
+       ganzen Projekt einheitlich "flex-direction:column" ohne Leerzeichen ist. Wo eine Stelle
+       bewusst etwas anderes will, setzt sie es weiterhin selbst inline und gewinnt. */
+    .card-row[style*="flex-direction:column"] { justify-content: flex-start; flex-wrap: nowrap; }
+    .card-row[style*="flex-direction:column"] > *:last-child { flex: 0 0 auto; }
 
 
     /* Responsive: fixed sidebar only where there is genuinely enough room beside the centered
@@ -4809,8 +4845,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.314.0';
+  const VERSION = '8.315.0';
   const PATCHNOTES = [
+    { version:'8.315.0', date:'27.07.2026', changes:[
+      '<strong>Die Karten in den Wischleisten sind wieder Karten.</strong> Spieler-Fotos vom Handy: In der Planeten-Rolle klaffte zwischen Überschrift und Beschreibung ein Loch über die halbe Kartenhöhe, und der Knopf stand hochkant daneben – so schmal, dass vom Wort „Wählen" nur „Wähle" übrig blieb. Gemessen waren es 114 Pixel Leerraum in einer 177 Pixel hohen Karte.',
+      'Ursache war keine dieser Karten selbst, sondern die gemeinsame Grundlage: Kartenzeilen sind waagerecht entworfen, und an rund 95 Stellen im Spiel werden sie hochkant gestellt. Drei Regeln kippen dabei mit ins Senkrechte und meinen dort etwas völlig anderes – „Kinder an die Ränder verteilen" wurde zu „über die ganze Höhe auseinanderziehen", „bei Platzmangel umbrechen" zu „zweite Spalte aufmachen", und „letztes Element auf eigene Zeile" zu „letztes Element über die volle Höhe strecken".',
+      'Dieselbe Fehlerklasse war am 25.07.2026 schon einmal dran, damals an den Modul-Kacheln. Gelöst wurde sie dort für genau eine Stelle. <strong>Jetzt ist sie an allen übrigen auf einmal behoben</strong> – Planeten-Rolle, Orbital-Fokus, Expeditionstypen und alles Weitere, was hochkant steht.',
+      '<strong>Boni-Bilanz: Titel brechen nicht mehr mitten im Wort.</strong> Dort stand „Angriff/skraft", „Vertei/digung", „Heimatb/asis". Die Zahlenspalte daneben war unschrumpfbar und nahm sich mehr als die halbe Karte; der Name musste bis unter seine eigene Wortbreite weichen. Die Zahlen stehen jetzt in zwei kurzen Zeilen statt einer langen, und der Name darf sich den gewonnenen Platz nehmen.',
+      'Nachgemessen über vier Gerätebreiten von 320 bis 480 Pixeln: nichts ragt mehr über einen Kartenrand, nichts überlappt, kein Wort wird zerrissen.'
+    ]},
     { version:'8.314.0', date:'27.07.2026', changes:[
       '<strong>Bau- und Forschungswarteschlange laufen jetzt auch weiter, während du offline bist.</strong> Spieler-Report, und er stimmte – zur Hälfte, was den Fehler so zäh machte: Der Auftrag, der beim Verlassen SCHON lief, war beim Zurückkommen fertig. Alles, was dahinter wartete, stand still. Nach zwei Stunden Pause waren von drei eingereihten Bauaufträgen zu je einer Minute genau EINER fertig, und die Forschungswarteschlange begann erst im Moment der Rückkehr zu laufen.',
       'Ursache: Der Start eines wartenden Auftrags vergibt seine Bauzeit erst in dem Moment, in dem er startet – und starten konnte er nur im Sekundentakt des laufenden Spiels. Ohne offenen Reiter gab es keinen Takt, also keinen Start. Jetzt wird die Warteschlange beim Zurückkommen rückwirkend durchgerechnet: fertig, nächster, fertig, nächster – so wie sie mit offenem Spiel gelaufen wäre.',
@@ -11682,9 +11725,17 @@
             <div style="min-width:0;"><div class="bname">${g.name}${g.ort?' <span class="bmeta">· '+planetDisplayName(state.activeBasePlanet)+'</span>':''}</div>
             <div class="bmeta">${g.quelle}</div></div>
           </div>
-          <div style="text-align:right; white-space:nowrap;">
-            <div class="bname" style="color:${farbe};">${vz}${pct(wirksam)}</div>
-            <div class="bmeta">von ${vz}${pct(roh)} · max. ${vz}${pct(deckel)}</div>
+          <!-- Zwei feste Zeilen statt einer langen (27.07.2026, Spieler-Foto): "von X · max. Y" stand
+               als EINE Zeile mit white-space:nowrap da und war damit unschrumpfbar - der Block nahm
+               sich auf schmalen Geräten mehr als die halbe Karte, und der Name daneben musste bis
+               unter seine Wortbreite weichen ("Angriff/skraft"). Den Umbruch einfach freizugeben
+               half nicht: Dann zerfiel die Zeile in fünf Fetzen ("von" / "+10%" / "·" / "max." /
+               "+100%"). Zwei benannte Zeilen, jede für sich am Stück, sind halb so breit wie vorher
+               und bleiben in jeder Breite geordnet. -->
+          <div style="text-align:right; flex-shrink:0;">
+            <div class="bname" style="color:${farbe}; white-space:nowrap; justify-content:flex-end;">${vz}${pct(wirksam)}</div>
+            <div class="bmeta" style="white-space:nowrap;">von ${vz}${pct(roh)}</div>
+            <div class="bmeta" style="white-space:nowrap;">max. ${vz}${pct(deckel)}</div>
           </div>
         </div>
         <div class="progress-outer" style="height:5px;"><div class="progress-inner" style="width:${fuellung}%; ${voll?'background:#e0a548;':''}"></div></div>
