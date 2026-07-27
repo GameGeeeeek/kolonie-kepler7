@@ -8,9 +8,10 @@
 // ausdrücklich "Notnagel, kein Ersatz".
 //
 // Dieser Test wächst mit: v8.304.0 brachte die Offiziere (Abschnitte 1-4), v8.305.0 die
-// Standort-Module (5, 5b). Kommen später Doktrinen, Aufstellungen und die 11 restlichen Gebäude
-// dazu, gehören sie als weitere Gruppe hierher. Bis dahin steht am Ende ausdrücklich, welche
-// Bereiche noch offen sind - damit die Lücke sichtbar bleibt statt vergessen zu werden.
+// Standort-Module (5, 5b), v8.306.0 Gebäude, Doktrinen und Aufstellungen (6, 7), v8.307.0 die 36
+// Schiffsklassen-Module (8, 8b). Kommt später etwas Neues dazu, gehört es als weitere Gruppe
+// hierher. Am Ende steht ausdrücklich, welche Bereiche noch offen sind - damit eine Lücke sichtbar
+// bleibt statt vergessen zu werden.
 //
 // Geprüft wird:
 //   1) jeder Offizier hat einen eigenen ICONS-Eintrag
@@ -18,7 +19,9 @@
 //   3) die neuen Icons halten den Hausstil ein (Maße, Filter, Strichstärken)
 //   4) am laufenden Spiel: im Offiziere-Reiter steckt in jeder Offizierskachel ein <svg>
 //   5) dasselbe für die 13 Standort-Module, dazu die Begründung des mod_-Präfixes (Kollision mit
-//      Gebäudeschlüsseln) und dass Schiffsmodule bewusst noch beim Schrift-Icon bleiben
+//      Gebäudeschlüsseln)
+//   8) dasselbe für die 36 Schiffsklassen-Module (Präfix sm_, eigenes Gehäuse) - samt der Frage,
+//      die dort allein zählt: unterscheiden sich die Module INNERHALB einer Schiffsklasse?
 //   6) Gebäude - und dabei BEIDE Grafiksysteme mitgerechnet: gezeichnetes SVG oder animiertes
 //      Canvas. Die erste Zählung kannte nur ICONS und meldete deshalb 11 statt 4 Lücken.
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
@@ -91,9 +94,11 @@ check('5: genau die zwei bekannten Kollisionsschlüssel existieren doppelt (Begr
   kollision.length === 2 && kollision.includes('schild') && kollision.includes('lager'), kollision);
 check('5: es gibt einen eigenen Modul-Helfer mit mod_-Präfix',
   /function moduleIconHtml\(def, isShip, color\)/.test(src) && /iconHtmlFor\('mod_'\+def\.key/.test(src));
-// Schiffsmodule sind eine eigene Familie mit eigenen Schlüsseln und noch ohne gezeichnete Icons -
-// ein pauschales 'mod_'+key hätte für sie ins Leere gegriffen. Der isShip-Zweig muss bleiben.
-check('5: Schiffsmodule bleiben bewusst beim Schrift-Icon', /if \(isShip\) return `<i class="ti \$\{def\.icon\}"/.test(src));
+// Schiffsmodule sind eine eigene Familie mit eigenen Schlüsseln. Der isShip-Zweig muss bleiben:
+// ein pauschales 'mod_'+key griffe für sie ins Leere - und 'schild'/'lager' würden dann quer
+// zwischen den Familien treffen, also genau die Kollision, die das Präfix verhindern soll.
+check('5: der isShip-Zweig trennt die beiden Modulfamilien weiterhin',
+  /if \(isShip\) return iconHtmlFor\('sm_'\+def\.key, def\.icon, color\);/.test(src));
 for (const k of modKeys){
   const m = ICONS_BLOCK.match(new RegExp('\\bmod_'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"));
   if (!m){ continue; }
@@ -144,8 +149,10 @@ for (const k of ['quantenwerft','resonanzschild','urmateriereaktor','botschaft']
 // existieren in beiden Systemen, und sie sind nicht zwangsläufig tot - iconHtmlFor() wird an
 // anderen Stellen (Kompendium, Listen) auch ohne den Canvas-Vorrang aufgerufen. Geprüft wird
 // deshalb nur, was in diesen Runden dazugekommen ist.
+const smKeysVorab = [...arrBlock('SHIP_MODULE_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
 const neueSchluessel = [...offKeys, ...modKeys.map(k=>'mod_'+k), ...dokKeysVorab,
-  ...formKeysVorab.map(k=>'form_'+k), 'quantenwerft','resonanzschild','urmateriereaktor','botschaft'];
+  ...formKeysVorab.map(k=>'form_'+k), ...smKeysVorab.map(k=>'sm_'+k),
+  'quantenwerft','resonanzschild','urmateriereaktor','botschaft'];
 const totesIcon = neueSchluessel.filter(k => CANVAS.has(k));
 check('6: kein neu angelegtes Icon wird von einer Canvas-Grafik verdeckt', totesIcon.length === 0, totesIcon);
 
@@ -176,6 +183,80 @@ for (const [name, liste] of [['Doktrin',dokSvgs],['Aufstellung',formSvgs]])
     && /viewBox="0 0 100 100" width="24" height="24"/.test(v) && /<g filter="url\(#ig\)">/.test(v)
     && [...v.matchAll(/stroke-width="([\d.]+)"/g)].every(m=>m[1]==='4'||m[1]==='1.6')));
 
+// ------------------------------------------- 8: Schiffsklassen-Module (v8.307.0)
+// Letzte grosse Gruppe des Icon-Durchgangs. Zwei Dinge sind hier eigen:
+//   a) EIGENES GEHÄUSE (Steckmodul mit zwei Kontaktstiften) statt des Sechsecks der Standort-
+//      Module. Beide heissen im Spiel "Modul", sind aber verschiedene Technik - zwei Umrisse
+//      halten sie auseinander. Der Test haelt das Gehaeuse fest, damit die Familie geschlossen
+//      bleibt, wenn jemand ein 37. Modul ergaenzt.
+//   b) Die Module stehen NIE alle zusammen in einer Liste, sondern immer nur die einer
+//      Schiffsklasse. Verschiedene Icons ueber alle 36 waeren also die falsche Forderung (dann
+//      braeuchte es 36 Motive); entscheidend ist die Unterscheidbarkeit INNERHALB einer Klasse.
+//      Genau das prueft der Test - und genau daran haengen die zwei Sonderkerne.
+const smBlock = arrBlock('SHIP_MODULE_DEFS');
+const smDefs = [...smBlock.matchAll(/key:'([^']+)'[\s\S]*?klasse:'([^']+)'[\s\S]*?effect:'([^']+)'/g)]
+  .map(m=>({ k:m[1], klasse:m[2], effect:m[3] }));
+check('8: alle 36 Schiffsmodule sind erfasst', smDefs.length === 36, smDefs.length);
+const smOhne = smDefs.filter(d => !ICONS.has('sm_'+d.k)).map(d=>d.k);
+check('8: jedes Schiffsmodul hat ein eigenes gezeichnetes Icon (Präfix sm_)', smOhne.length === 0, smOhne);
+
+const GEHAEUSE = 'M50 8 L86 29 V71 L50 92 L14 71 V29 Z';   // das Sechseck der Standort-Module
+const smSvg = {};
+for (const d of smDefs){
+  const m = ICONS_BLOCK.match(new RegExp('\\bsm_'+d.k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"));
+  if (m) smSvg[d.k] = m[1];
+}
+const stilFehler = smDefs.filter(d => { const v = smSvg[d.k]; return !(v
+  && /viewBox="0 0 100 100" width="24" height="24"/.test(v) && /<g filter="url\(#ig\)">/.test(v)
+  && /<rect x="24" y="10" width="52" height="62"/.test(v)      // Gehäuse-Körper
+  && (v.match(/<rect x="(?:33|58)" y="72"/g)||[]).length === 2 // die zwei Kontaktstifte
+  && !v.includes(GEHAEUSE)
+  // dieselben zwei Strichstärken wie in allen anderen Paketen
+  && [...v.matchAll(/stroke-width="([\d.]+)"/g)].every(x=>x[1]==='4'||x[1]==='1.6')); }).map(d=>d.k);
+check('8: alle tragen dasselbe eigene Gehäuse - und NICHT das Sechseck der Standort-Module',
+  stilFehler.length === 0, stilFehler);
+
+// Kleine Formen mit Verlauf verschwinden im fast schwarzen Ende der Bounding-Box (Lehre aus
+// mod_abwehr, v8.305.0). Der Kern - alles nach dem schliessenden </g> des Gehäuses - muss deshalb
+// solide Farben benutzen.
+const verlaufImKern = smDefs.filter(d => {
+  const v = smSvg[d.k]; if (!v) return false;
+  return v.slice(v.indexOf('</g>')+4).includes('url(#g');
+}).map(d=>d.k);
+check('8: kein Kern benutzt einen Farbverlauf (kleine Formen bleiben sichtbar)',
+  verlaufImKern.length === 0, verlaufImKern);
+
+// Der eigentliche Punkt: innerhalb einer Schiffsklasse muss jedes Modul anders aussehen.
+const proKlasse = {};
+for (const d of smDefs) (proKlasse[d.klasse] = proKlasse[d.klasse] || []).push(d);
+const doppelt = [];
+for (const [klasse, liste] of Object.entries(proKlasse)){
+  const kerne = liste.map(d => (smSvg[d.k]||'').slice((smSvg[d.k]||'').indexOf('</g>')));
+  if (new Set(kerne).size !== liste.length) doppelt.push(klasse+' ('+liste.map(d=>d.k).join(', ')+')');
+}
+check('8: innerhalb jeder Schiffsklasse sind die Icons unterscheidbar', doppelt.length === 0, doppelt);
+// Und die Begründung der zwei Sonderkerne nachprüfbar halten: OHNE sie waeren es genau diese vier
+// Module, die sich in ihrer Klasse doppelten. Faellt eine Wirkung weg, faellt auch diese Prüfung
+// auf - dann ist der Sonderkern womöglich gar nicht mehr nötig.
+const nachWirkung = [];
+for (const [klasse, liste] of Object.entries(proKlasse)){
+  const zaehler = {};
+  for (const d of liste) zaehler[d.effect] = (zaehler[d.effect]||0) + 1;
+  for (const [ef,n] of Object.entries(zaehler)) if (n > 1)
+    nachWirkung.push(klasse+':'+ef+' ('+liste.filter(d=>d.effect===ef).map(d=>d.k).join('+')+')');
+}
+check('8: genau zwei Wirkungspaare brauchen einen Sonderkern (Begründung der Sonderkerne)',
+  nachWirkung.length === 2, nachWirkung);
+
+// Die schmalen Fertigungs-Knöpfe bleiben bewusst flach (font-size:10px, ein 24px-SVG sprengt die
+// Zeile) - und zwar fuer BEIDE Modulfamilien gleich. Festgehalten, damit die Ausnahme eine Regel
+// ist und nicht als vergessener Rest gelesen wird.
+check('8: die Ausnahme der Fertigungs-Knöpfe steht als Begründung im Code',
+  /WO DIESE FUNKTION BEWUSST NICHT AUFGERUFEN WIRD/.test(src));
+for (const knopf of ['data-craft-mythic-loc','data-craft-mythic-ship','data-fragcraft-loc','data-fragcraft-ship'])
+  check('8: '+knopf.padEnd(24)+' benutzt weiterhin das Schrift-Icon',
+    new RegExp(knopf+'="\\$\\{def\\.key\\}"[^`]*<i class="ti \\$\\{def\\.icon\\}"').test(src));
+
 // ---------------------------------------------------------------- offene Lücken benennen
 // Kein Fehlschlag - eine Standortbestimmung, damit die verbleibende Arbeit sichtbar bleibt.
 // Rechnet BEIDE Grafiksysteme mit (gezeichnetes SVG ODER Canvas), sonst zählt sie wieder falsch.
@@ -185,7 +266,8 @@ for (const name of ['MODULE_DEFS','DOCTRINE_DEFS','DEFENSE_FORMATIONS','BUILDING
   const eintraege = [...b.matchAll(/key:'([^']+)'[^}]*?icon:'([^']+)'|icon:'([^']+)'[^}]*?key:'([^']+)'/g)]
     .map(m=>({k:m[1]||m[4], ic:m[2]||m[3]}));
   const flach = eintraege.filter(e =>
-    !(ICONS.has(e.k) || ICONS.has(e.ic) || ICONS.has('mod_'+e.k) || ICONS.has('form_'+e.k) || CANVAS.has(e.k)));
+    !(ICONS.has(e.k) || ICONS.has(e.ic) || ICONS.has('mod_'+e.k) || ICONS.has('form_'+e.k)
+      || ICONS.has('sm_'+e.k) || CANVAS.has(e.k)));
   if (eintraege.length) rest[name] = flach.length+' von '+eintraege.length+' noch flach';
 }
 console.log('\n  Noch offen (bewusst, kein Fehlschlag):');
@@ -214,8 +296,13 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   // Ohne Sockel gibt es keine Slots und damit auch keine Kacheln - moduleSlotCount() liest
   // ausschliesslich state.moduleSlotLevel. Fehlte das, prüfte 5b in Wahrheit eine leere Liste.
   moduleSlotLevel:{ home:3 },
+  // Ausgeruestete Schiffsmodule fuer 8b. Bewusst eine Klasse mit MEHREREN Modulen, damit die
+  // Kacheln nebeneinander stehen - genau die Ansicht, in der sie unterscheidbar sein muessen.
+  shipModules:{ 'ss_panzerung:selten':1, 'ss_zielcomputer:episch':1, 'ss_schildverstaerker:selten':1 },
+  equippedShipModules:{ schlachtschiff:['ss_panzerung:selten','ss_zielcomputer:episch','ss_schildverstaerker:selten'] },
+  shipModuleSlotLevel:{ schlachtschiff:3 },
   battleStats:{wins:9,losses:2}, xp:20000, credits:50000, buffs:[], lastTick:Date.now(),
-  colonyNames:{}, modules:{}, shipModules:{} });
+  colonyNames:{} });
 
 (async () => {
   const browser = await starteBrowser();
@@ -273,6 +360,26 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   if (mods.anzahl > 0){
     check('5b: jede zeigt ein gezeichnetes Icon', mods.mitSvg === mods.anzahl, mods);
     check('5b: keine mehr ein flaches Schrift-Icon', mods.mitSchrift === 0, mods);
+  }
+  // ------------------------------------------- 8b: Schiffsmodule am laufenden Spiel
+  // Eigener Unterreiter, deshalb eigener Klick. Dieselbe Falle wie bei 5b: ohne Sockel
+  // (shipModuleSlotLevel) gibt es keine Slots, keine Kacheln - und die Prüfung waere leer wahr.
+  await page.evaluate(()=>{const b=document.querySelector('[data-officer-subtab="schiffsmodule"]'); if(b) b.click();});
+  await page.waitForTimeout(500);
+  const smods = await page.evaluate(()=>{
+    const koepfe=[...document.querySelectorAll('.mod-head')];
+    return { anzahl:koepfe.length,
+             mitSvg:koepfe.filter(k=>k.querySelector('svg')).length,
+             mitSchrift:koepfe.filter(k=>k.querySelector('i.ti')).length,
+             // Zeigen die drei Kacheln nebeneinander wirklich verschiedene Bilder?
+             verschieden:new Set(koepfe.map(k=>{const v=k.querySelector('svg');return v?v.innerHTML:'';})).size };
+  });
+  check('8b: die ausgerüsteten Schiffsmodul-Kacheln sind gerendert', smods.anzahl >= 3, smods);
+  if (smods.anzahl > 0){
+    check('8b: jede zeigt ein gezeichnetes Icon', smods.mitSvg === smods.anzahl, smods);
+    check('8b: keine mehr ein flaches Schrift-Icon', smods.mitSchrift === 0, smods);
+    check('8b: und die Kacheln einer Klasse zeigen verschiedene Bilder',
+      smods.verschieden === smods.anzahl, smods);
   }
   check('keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
   console.log('\n' + (fail ? 'FAIL' : 'PASS'));
