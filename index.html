@@ -4754,8 +4754,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.308.0';
+  const VERSION = '8.309.0';
   const PATCHNOTES = [
+    { version:'8.309.0', date:'27.07.2026', changes:[
+      '<strong>Der Offiziere-Reiter arbeitet nicht mehr im Leerlauf.</strong> Die beiden Modul-Bereiche – Standort-Module und Klassen-Module – wurden bisher <em>jede Sekunde</em> komplett neu aufgebaut und danach mit über dreißig Durchläufen neu verknüpft, obwohl sich nichts geändert hatte und immer nur einer von beiden überhaupt sichtbar ist. Jetzt passiert das nur noch, wenn sich am angezeigten Inhalt wirklich etwas ändert.',
+      'Für dich ändert sich am Bild nichts – außer dass Handy-Akku und Rechner geschont werden, besonders seit dort seit den letzten Updates bis zu sechs handgezeichnete Symbole mitgeschrieben werden.',
+      '<strong>Der Risikofall dabei</strong> waren die Knöpfe: Wird ein Durchlauf übersprungen, werden auch die Klick-Verknüpfungen nicht neu gesetzt. Der Prüflauf klickt deshalb nach mehreren übersprungenen Sekunden gezielt auf „Abnehmen" und misst, dass der Slot danach wirklich frei ist – und dass die Box sich bei einer echten Änderung sofort wieder aufbaut statt einzufrieren.'
+    ]},
     { version:'8.308.0', date:'27.07.2026', changes:[
       '<strong>Die vier Fraktionen sahen alle gleich aus.</strong> Aschen-Kartell, Void-Marodeure, Eisenlegion und Schattenbund trugen dasselbe Symbol – eine Fahne, nur in vier Farben. Jetzt hat jede ihr eigenes Wappen: eine <strong>Glutschale</strong>, ein <strong>dreizinkiger Enterhaken</strong>, ein <strong>Kammhelm mit T-Visier</strong> und eine <strong>Finsternis</strong> – eine helle Scheibe, die von einer dunklen verdeckt wird.',
       '<strong>Auch die Kriegskarte</strong>: Läuft ein Fraktionskrieg, stehen dort die beiden Parteien nebeneinander und man unterstützt <em>eine</em> davon – endgültig, einmal je Krieg. Beide Seiten trugen bisher dasselbe Schwert. Jetzt steht das Wappen der jeweiligen Fraktion davor.',
@@ -15425,6 +15430,11 @@
   // Recycler am Planeten ueberhaupt nichts aendert. Die Signatur enthaelt bewusst das fertige
   // rewardHtml() statt der Rohzahlen - dann wird genau dann neu gezeichnet, wenn sich die
   // ANGEZEIGTEN Werte aendern, und nicht schon bei einer Nachkommastelle, die fmt() gar nicht zeigt.
+  // Zwischenspeicher der beiden Modul-Boxen (27.07.2026). Beide liegen im activeTab-'offiziere'-
+  // Zweig der Hauptrenderfunktion und wurden dort jede Sekunde neu aufgebaut; hier steht das
+  // zuletzt geschriebene Markup, damit ein unveränderter Tick nichts zu tun hat.
+  let lastModuleBoxHtml = null;
+  let lastShipModuleHtml = null;
   let lastDebrisSig = null;
   function renderDebrisBox(cf){
     const debrisBox = document.getElementById('debrisBox');
@@ -36577,27 +36587,34 @@
           }).join('') + `</div>`;
           html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + MODULE_DEFS.map(def => `<button data-fragcraft-loc="${def.key}" ${fragStock>=fragCost?'':'disabled'} style="font-size:10px; padding:5px 9px;" title="${def.desc}"><i class="ti ${def.icon}" aria-hidden="true" style="margin-right:3px;"></i>${def.name}</button>`).join('') + `</div>`;
         }
-        setHtmlPreservingScroll(moduleBox, html);
-        moduleBox.querySelectorAll('[data-module-planet]').forEach(btn => btn.onclick = () => { state.activeBasePlanet = btn.getAttribute('data-module-planet'); render(); });
-        const upSlotBtn = moduleBox.querySelector('[data-upgrade-slot]');
-        if (upSlotBtn) upSlotBtn.onclick = () => upgradeModuleSlot(pk);
-        moduleBox.querySelectorAll('[data-equip-module]').forEach(btn => btn.onclick = () => equipModule(pk, btn.getAttribute('data-equip-module')));
-        moduleBox.querySelectorAll('[data-craft-mythic-loc]').forEach(btn => btn.onclick = () => craftMythicLocationModule(btn.getAttribute('data-craft-mythic-loc')));
-        moduleBox.querySelectorAll('[data-unequip-module]').forEach(btn => btn.onclick = () => unequipModule(pk, parseInt(btn.getAttribute('data-unequip-module'))));
-        moduleBox.querySelectorAll('[data-fuse-module]').forEach(btn => btn.onclick = () => fuseModules(false, btn.getAttribute('data-fuse-module')));
-        moduleBox.querySelectorAll('[data-dismantle-module]').forEach(btn => btn.onclick = () => dismantleModule(false, btn.getAttribute('data-dismantle-module')));
-        moduleBox.querySelectorAll('[data-sell-module]').forEach(btn => btn.onclick = () => sellModuleForCredits(false, btn.getAttribute('data-sell-module')));
-        moduleBox.querySelectorAll('[data-offer-module]').forEach(btn => btn.onclick = () => promptOfferModule(false, btn.getAttribute('data-offer-module')));
-        moduleBox.querySelectorAll('[data-bulkscrap]').forEach(btn => btn.onclick = () => runBulkScrapToken(btn.getAttribute('data-bulkscrap')));
-        moduleBox.querySelectorAll('[data-upgrade-module]').forEach(btn => btn.onclick = () => upgradeModule(false, btn.getAttribute('data-upgrade-module')));
-        moduleBox.querySelectorAll('[data-reroll-module]').forEach(btn => btn.onclick = () => rerollModuleSubs(false, btn.getAttribute('data-reroll-module')));
-        moduleBox.querySelectorAll('[data-fragrar]').forEach(btn => btn.onclick = () => { state.fragCraftRarity = btn.getAttribute('data-fragrar'); render(); });
-        moduleBox.querySelectorAll('[data-fragcraft-loc]').forEach(btn => btn.onclick = () => craftModuleFromFragments(false, btn.getAttribute('data-fragcraft-loc'), state.fragCraftRarity||'gewoehnlich'));
-        moduleBox.querySelectorAll('[data-loadout-save]').forEach(btn => btn.onclick = () => saveModuleLoadout(pk, btn.getAttribute('data-loadout-save')));
-        moduleBox.querySelectorAll('[data-loadout-apply]').forEach(btn => btn.onclick = () => applyModuleLoadout(pk, btn.getAttribute('data-loadout-apply')));
-        moduleBox.querySelectorAll('[data-socket-insert]').forEach(btn => btn.onclick = () => insertSocketChip(pk, btn.getAttribute('data-socket-insert'), 'fragments'));
-        moduleBox.querySelectorAll('[data-socket-insert-cr]').forEach(btn => btn.onclick = () => insertSocketChip(pk, btn.getAttribute('data-socket-insert-cr'), 'credits'));
-        moduleBox.querySelectorAll('[data-socket-remove]').forEach(btn => btn.onclick = () => removeSocketChip(pk, parseInt(btn.getAttribute('data-socket-remove'))));
+        // Signatur-Cache, gleiche Begründung wie bei der Schiffsmodul-Box weiter unten: derselbe
+        // Haupt-Tick, dasselbe vollständige Neuschreiben samt allen Verdrahtungsläufen, kein
+        // Live-Countdown. Beide Boxen liegen im selben `activeTab === 'offiziere'`-Zweig und wurden
+        // bisher beide jede Sekunde neu aufgebaut, obwohl immer nur EINE davon sichtbar ist.
+        if (html !== lastModuleBoxHtml || !moduleBox.childElementCount){
+          lastModuleBoxHtml = html;
+          setHtmlPreservingScroll(moduleBox, html);
+          moduleBox.querySelectorAll('[data-module-planet]').forEach(btn => btn.onclick = () => { state.activeBasePlanet = btn.getAttribute('data-module-planet'); render(); });
+          const upSlotBtn = moduleBox.querySelector('[data-upgrade-slot]');
+          if (upSlotBtn) upSlotBtn.onclick = () => upgradeModuleSlot(pk);
+          moduleBox.querySelectorAll('[data-equip-module]').forEach(btn => btn.onclick = () => equipModule(pk, btn.getAttribute('data-equip-module')));
+          moduleBox.querySelectorAll('[data-craft-mythic-loc]').forEach(btn => btn.onclick = () => craftMythicLocationModule(btn.getAttribute('data-craft-mythic-loc')));
+          moduleBox.querySelectorAll('[data-unequip-module]').forEach(btn => btn.onclick = () => unequipModule(pk, parseInt(btn.getAttribute('data-unequip-module'))));
+          moduleBox.querySelectorAll('[data-fuse-module]').forEach(btn => btn.onclick = () => fuseModules(false, btn.getAttribute('data-fuse-module')));
+          moduleBox.querySelectorAll('[data-dismantle-module]').forEach(btn => btn.onclick = () => dismantleModule(false, btn.getAttribute('data-dismantle-module')));
+          moduleBox.querySelectorAll('[data-sell-module]').forEach(btn => btn.onclick = () => sellModuleForCredits(false, btn.getAttribute('data-sell-module')));
+          moduleBox.querySelectorAll('[data-offer-module]').forEach(btn => btn.onclick = () => promptOfferModule(false, btn.getAttribute('data-offer-module')));
+          moduleBox.querySelectorAll('[data-bulkscrap]').forEach(btn => btn.onclick = () => runBulkScrapToken(btn.getAttribute('data-bulkscrap')));
+          moduleBox.querySelectorAll('[data-upgrade-module]').forEach(btn => btn.onclick = () => upgradeModule(false, btn.getAttribute('data-upgrade-module')));
+          moduleBox.querySelectorAll('[data-reroll-module]').forEach(btn => btn.onclick = () => rerollModuleSubs(false, btn.getAttribute('data-reroll-module')));
+          moduleBox.querySelectorAll('[data-fragrar]').forEach(btn => btn.onclick = () => { state.fragCraftRarity = btn.getAttribute('data-fragrar'); render(); });
+          moduleBox.querySelectorAll('[data-fragcraft-loc]').forEach(btn => btn.onclick = () => craftModuleFromFragments(false, btn.getAttribute('data-fragcraft-loc'), state.fragCraftRarity||'gewoehnlich'));
+          moduleBox.querySelectorAll('[data-loadout-save]').forEach(btn => btn.onclick = () => saveModuleLoadout(pk, btn.getAttribute('data-loadout-save')));
+          moduleBox.querySelectorAll('[data-loadout-apply]').forEach(btn => btn.onclick = () => applyModuleLoadout(pk, btn.getAttribute('data-loadout-apply')));
+          moduleBox.querySelectorAll('[data-socket-insert]').forEach(btn => btn.onclick = () => insertSocketChip(pk, btn.getAttribute('data-socket-insert'), 'fragments'));
+          moduleBox.querySelectorAll('[data-socket-insert-cr]').forEach(btn => btn.onclick = () => insertSocketChip(pk, btn.getAttribute('data-socket-insert-cr'), 'credits'));
+          moduleBox.querySelectorAll('[data-socket-remove]').forEach(btn => btn.onclick = () => removeSocketChip(pk, parseInt(btn.getAttribute('data-socket-remove'))));
+        }
       }
       const shipModuleBox = document.getElementById('shipModuleBox');
       if (shipModuleBox){
@@ -36751,22 +36768,40 @@
             html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + classCraftable.map(def => `<button data-fragcraft-ship="${def.key}" ${fragStock>=fragCost?'':'disabled'} style="font-size:10px; padding:5px 9px;" title="${def.desc}"><i class="ti ${def.icon}" aria-hidden="true" style="margin-right:3px;"></i>${def.name}</button>`).join('') + `</div>`;
           }
         }
-        setHtmlPreservingScroll(shipModuleBox, html);
-        shipModuleBox.querySelectorAll('[data-shipmodule-class]').forEach(btn => btn.onclick = () => { state.activeShipModuleClass = btn.getAttribute('data-shipmodule-class'); render(); });
-        const upShipSlotBtn = shipModuleBox.querySelector('[data-upgrade-shipmodule-slot]');
-        if (upShipSlotBtn) upShipSlotBtn.onclick = () => upgradeShipModuleSlot(klasse);
-        shipModuleBox.querySelectorAll('[data-equip-shipmodule]').forEach(btn => btn.onclick = () => equipShipModule(klasse, btn.getAttribute('data-equip-shipmodule')));
-        shipModuleBox.querySelectorAll('[data-unequip-shipmodule]').forEach(btn => btn.onclick = () => unequipShipModule(klasse, parseInt(btn.getAttribute('data-unequip-shipmodule'))));
-        shipModuleBox.querySelectorAll('[data-craft-t2module]').forEach(btn => btn.onclick = () => craftTier2ShipModule(btn.getAttribute('data-craft-t2module'), btn.getAttribute('data-craft-t2rarity')));
-        shipModuleBox.querySelectorAll('[data-craft-mythic-ship]').forEach(btn => btn.onclick = () => craftMythicShipModule(btn.getAttribute('data-craft-mythic-ship')));
-        shipModuleBox.querySelectorAll('[data-fuse-shipmodule]').forEach(btn => btn.onclick = () => fuseModules(true, btn.getAttribute('data-fuse-shipmodule')));
-        shipModuleBox.querySelectorAll('[data-dismantle-shipmodule]').forEach(btn => btn.onclick = () => dismantleModule(true, btn.getAttribute('data-dismantle-shipmodule')));
-        shipModuleBox.querySelectorAll('[data-sell-shipmodule]').forEach(btn => btn.onclick = () => sellModuleForCredits(true, btn.getAttribute('data-sell-shipmodule')));
-        shipModuleBox.querySelectorAll('[data-offer-shipmodule]').forEach(btn => btn.onclick = () => promptOfferModule(true, btn.getAttribute('data-offer-shipmodule')));
-        shipModuleBox.querySelectorAll('[data-bulkscrap]').forEach(btn => btn.onclick = () => runBulkScrapToken(btn.getAttribute('data-bulkscrap')));
-        shipModuleBox.querySelectorAll('[data-upgrade-shipmodule]').forEach(btn => btn.onclick = () => upgradeModule(true, btn.getAttribute('data-upgrade-shipmodule')));
-        shipModuleBox.querySelectorAll('[data-reroll-shipmodule]').forEach(btn => btn.onclick = () => rerollModuleSubs(true, btn.getAttribute('data-reroll-shipmodule')));
-        shipModuleBox.querySelectorAll('[data-fragcraft-ship]').forEach(btn => btn.onclick = () => craftModuleFromFragments(true, btn.getAttribute('data-fragcraft-ship'), state.fragCraftRarity||'gewoehnlich'));
+        // Signatur-Cache (Hausmuster aus CLAUDE.md, 27.07.2026). Die Box hing bis hier ungefiltert
+        // am Haupt-Tick: Solange der Offiziere-Reiter offen war, wurde sie JEDE SEKUNDE komplett neu
+        // geschrieben und danach vierzehnmal per querySelectorAll neu verdrahtet - auch dann, wenn
+        // sich kein einziger Wert geändert hatte. Seit v8.307.0 stehen in dem Markup außerdem bis zu
+        // sechs handgezeichnete SVG.
+        //
+        // Die Signatur ist hier ausnahmsweise das FERTIGE MARKUP statt einer Liste der angezeigten
+        // Werte. Grund: Diese Box zeigt nicht fünf Zahlen, sondern Slots, Inventar, Schmelze,
+        // Tier-2-Fertigung und Set-Boni - eine Wertliste wäre lang, schwer vollständig zu halten und
+        // würde beim nächsten neuen Feld still veralten. Der Aufbau der Zeichenkette ist billig; teuer
+        // sind das innerHTML-Schreiben und die Verdrahtungsläufe, und genau die entfallen.
+        // childElementCount als zweite Bedingung: Räumt irgendwer die Box von außen leer, darf der
+        // Zwischenspeicher den Neuaufbau nicht verhindern.
+        // Kein Live-Countdown in dieser Box (geprüft: kein Date.now(), kein fmtDuration) - die
+        // Bedingung, unter der das Muster laut CLAUDE.md überhaupt angewandt werden darf.
+        if (html !== lastShipModuleHtml || !shipModuleBox.childElementCount){
+          lastShipModuleHtml = html;
+          setHtmlPreservingScroll(shipModuleBox, html);
+          shipModuleBox.querySelectorAll('[data-shipmodule-class]').forEach(btn => btn.onclick = () => { state.activeShipModuleClass = btn.getAttribute('data-shipmodule-class'); render(); });
+          const upShipSlotBtn = shipModuleBox.querySelector('[data-upgrade-shipmodule-slot]');
+          if (upShipSlotBtn) upShipSlotBtn.onclick = () => upgradeShipModuleSlot(klasse);
+          shipModuleBox.querySelectorAll('[data-equip-shipmodule]').forEach(btn => btn.onclick = () => equipShipModule(klasse, btn.getAttribute('data-equip-shipmodule')));
+          shipModuleBox.querySelectorAll('[data-unequip-shipmodule]').forEach(btn => btn.onclick = () => unequipShipModule(klasse, parseInt(btn.getAttribute('data-unequip-shipmodule'))));
+          shipModuleBox.querySelectorAll('[data-craft-t2module]').forEach(btn => btn.onclick = () => craftTier2ShipModule(btn.getAttribute('data-craft-t2module'), btn.getAttribute('data-craft-t2rarity')));
+          shipModuleBox.querySelectorAll('[data-craft-mythic-ship]').forEach(btn => btn.onclick = () => craftMythicShipModule(btn.getAttribute('data-craft-mythic-ship')));
+          shipModuleBox.querySelectorAll('[data-fuse-shipmodule]').forEach(btn => btn.onclick = () => fuseModules(true, btn.getAttribute('data-fuse-shipmodule')));
+          shipModuleBox.querySelectorAll('[data-dismantle-shipmodule]').forEach(btn => btn.onclick = () => dismantleModule(true, btn.getAttribute('data-dismantle-shipmodule')));
+          shipModuleBox.querySelectorAll('[data-sell-shipmodule]').forEach(btn => btn.onclick = () => sellModuleForCredits(true, btn.getAttribute('data-sell-shipmodule')));
+          shipModuleBox.querySelectorAll('[data-offer-shipmodule]').forEach(btn => btn.onclick = () => promptOfferModule(true, btn.getAttribute('data-offer-shipmodule')));
+          shipModuleBox.querySelectorAll('[data-bulkscrap]').forEach(btn => btn.onclick = () => runBulkScrapToken(btn.getAttribute('data-bulkscrap')));
+          shipModuleBox.querySelectorAll('[data-upgrade-shipmodule]').forEach(btn => btn.onclick = () => upgradeModule(true, btn.getAttribute('data-upgrade-shipmodule')));
+          shipModuleBox.querySelectorAll('[data-reroll-shipmodule]').forEach(btn => btn.onclick = () => rerollModuleSubs(true, btn.getAttribute('data-reroll-shipmodule')));
+          shipModuleBox.querySelectorAll('[data-fragcraft-ship]').forEach(btn => btn.onclick = () => craftModuleFromFragments(true, btn.getAttribute('data-fragcraft-ship'), state.fragCraftRarity||'gewoehnlich'));
+        }
       }
     }
 
