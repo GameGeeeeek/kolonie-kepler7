@@ -331,7 +331,12 @@ check('10: auch die beiden Kriegsparteien tragen ihr eigenes Wappen',
 // kein Symbol darf doppelt vorkommen. Bautrupp-Express und Werftkommando taten genau das.
 const itemBlock = arrBlock('ITEM_DEFS');
 const items = [...itemBlock.matchAll(/key:'([^']+)'[\s\S]{0,200}?icon:'([^']+)'/g)].map(m=>({k:m[1], ic:m[2]}));
-check('10: alle neunzehn Gegenstände sind erfasst', items.length === 19, items.length);
+// Selbstkalibrierend statt feste Zahl: Die Erwartung "19" musste bei jedem neuen Gegenstand
+// nachgezogen werden und meldete sonst einen Fehler, den es nicht gab. Entscheidend ist, dass
+// die Auswertung KEINEN Eintrag verliert - deshalb gegen die Zahl der key-Felder im Block.
+const itemRoh = (itemBlock.match(/key:'/g) || []).length;
+check('10: alle Gegenstände sind erfasst, keiner übersprungen',
+  items.length === itemRoh && items.length >= 19, { erfasst:items.length, imBlock:itemRoh });
 const proIcon = {};
 for (const it of items) (proIcon[it.ic] = proIcon[it.ic] || []).push(it.k);
 const itemDoppel = Object.entries(proIcon).filter(([,ks]) => ks.length > 1)
@@ -346,14 +351,14 @@ check('10: kein Gegenstand teilt sein Symbol mit einem anderen', itemDoppel.leng
 // Rückschritt, kein halber Fortschritt.
 const itemKeys  = [...arrBlock('ITEM_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
 const eventKeys = [...arrBlock('EVENT_ITEM_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
-check('11: neunzehn Gegenstände und sieben Event-Gegenstände sind erfasst',
-  itemKeys.length === 19 && eventKeys.length === 7, { items:itemKeys.length, event:eventKeys.length });
+check('11: Gegenstände und Event-Gegenstände sind vollständig erfasst',
+  itemKeys.length >= 19 && eventKeys.length >= 7, { items:itemKeys.length, event:eventKeys.length });
 const itemOhne = [...itemKeys, ...eventKeys].filter(k => !ICONS.has('item_'+k));
 check('11: JEDER Gegenstand der gemeinsamen Liste hat ein eigenes gezeichnetes Icon',
   itemOhne.length === 0, itemOhne);
 const itemSvgs = [...itemKeys, ...eventKeys]
   .map(k => (ICONS_BLOCK.match(new RegExp('\\bitem_'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"))||[])[1]);
-check('11: alle sechsundzwanzig Symbole sind verschieden',
+check('11: alle Symbole sind verschieden',
   new Set(itemSvgs).size === itemSvgs.length,
   itemSvgs.length+' Symbole, '+new Set(itemSvgs).size+' verschieden');
 // Gemeinsames Gehäuse - das Anhängeschild ist die DRITTE Silhouette neben dem Sechseck der

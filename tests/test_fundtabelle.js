@@ -44,7 +44,7 @@ check('1: jeder Gegenstand hat eine activate()-Funktion',
 
 const doppelt = items.map(i => i.key).filter((k, idx, a) => a.indexOf(k) !== idx);
 check('2: keine doppelten Gegenstands-Schluessel', doppelt.length === 0, doppelt);
-const STUFEN = ['gewoehnlich', 'ungewoehnlich', 'selten', 'episch', 'legendaer'];
+const STUFEN = ['gewoehnlich','ungewoehnlich','selten','episch','legendaer','mythisch'];
 const proStufe = {};
 items.forEach(i => { proStufe[i.rarity] = (proStufe[i.rarity] || 0) + 1; });
 check('2: alle Seltenheitsstufen sind belegt (episch war frueher leer)',
