@@ -63,10 +63,14 @@ const G = new Function(`
   const ABGRUND_WAECHTER_SPLITTER = ${zahl('ABGRUND_WAECHTER_SPLITTER')};
   const ABGRUND_WAECHTER_BERGUNG = ${zahl('ABGRUND_WAECHTER_BERGUNG')};
   const ABGRUND_SUCHE_WEITE = ${zahl('ABGRUND_SUCHE_WEITE')};
+  // abgrundRufAktiv liest state (Waechterruf, v8.336.0) - hier leer, damit dieser Test weiterhin
+  // nur die regulaeren Waechtertiefen misst.
+  const state = {};
   let abgrundSucheCache = { von:null, treffer:null };
   ${fnAus('abgrundRng')}
   ${fnAus('abgrundMutatorAnzahl')}
   ${fnAus('abgrundIstWaechter')}
+  ${fnAus('abgrundRufAktiv')}
   ${fnAus('abgrundWaechterDef')}
   ${fnAus('abgrundKonstellationFuer')}
   ${fnAus('abgrundKonstellationsEmblem')}

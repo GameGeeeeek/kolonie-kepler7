@@ -178,10 +178,12 @@ check('5: er wirkt multiplikativ auf den Werkstatt-/Reliquienschutz, nicht in de
   /\(1 - abgrundKanalBonus\('verlust'\)\) \* \(1 - Math\.min\(0\.5, kiel\)\)/.test(js));
 
 // ---- 6) Stillgaenger: Sondenreichweite ----
-const SR = new Function('abgrundWerkstattBonus, shipModuleBonusFor, ABGRUND_STILLGAENGER_MAX',
+const SR = new Function('abgrundWerkstattBonus, shipModuleBonusFor, ABGRUND_STILLGAENGER_MAX, state',
   fnAus('abgrundSondeReichweite')+'; return abgrundSondeReichweite;');
 const MAXS = zahl('ABGRUND_STILLGAENGER_MAX');
-const sicht = (werkstatt, modul) => SR(() => werkstatt, () => modul, MAXS)();
+// state kommt seit v8.336.0 dazu: abgrundSondeReichweite liest darin das Tiefenlot. Hier ohne
+// Lot, damit dieser Abschnitt weiterhin nur den Stillgaenger misst.
+const sicht = (werkstatt, modul) => SR(() => werkstatt, () => modul, MAXS, { abgrund:{} })();
 check('6: ohne alles ist die Reichweite 0', sicht(0,0) === 0);
 check('6: gekaufte Werkstattstufen zaehlen weiterhin', sicht(2,0) === 2);
 check('6: das Modul wirkt auch ohne gekaufte Sonde', sicht(0,1) === 1);
