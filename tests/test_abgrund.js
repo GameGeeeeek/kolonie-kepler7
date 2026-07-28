@@ -91,7 +91,8 @@ function baueKontext(zustand){
     fnAus('weekKeyOf'), fnAus('abgrundWochenpflege'), fnAus('abgrundWochenPraemieSplitter'),
     fnAus('abgrundSondeReichweite'),
     konstAus('ABGRUND_WAECHTER_ALLE'), konstAus('ABGRUND_WAECHTER_STAERKE'),
-    konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_GEGEN_KOSTEN'),
+    konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_WAECHTER_BERGUNG'), konstAus('ABGRUND_GEGEN_KOSTEN'),
+    fnAus('abgrundBergungsgut'),
     block('ABGRUND_WAECHTER_NAMEN') ? 'const ABGRUND_WAECHTER_NAMEN = '+block('ABGRUND_WAECHTER_NAMEN')+';' : (()=>{throw new Error('ABGRUND_WAECHTER_NAMEN fehlt')})(),
     fnAus('abgrundIstWaechter'), fnAus('abgrundWaechterDef'), fnAus('abgrundSektorMitBann'),
     'return { abgrundSektor, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
@@ -102,6 +103,7 @@ function baueKontext(zustand){
     '  ABGRUND_ALLIANZ_MARKEN, ABGRUND_WOCHE_FAKTOR, ABGRUND_SONDE_MAX,',
     '  abgrundIstWaechter, abgrundWaechterDef, abgrundSektorMitBann,',
     '  ABGRUND_WAECHTER_ALLE, ABGRUND_WAECHTER_STAERKE, ABGRUND_WAECHTER_SPLITTER,',
+    '  ABGRUND_WAECHTER_BERGUNG, abgrundBergungsgut,',
     '  ABGRUND_WAECHTER_NAMEN, ABGRUND_GEGEN_KOSTEN };'
   ].join('\n');
   return new Function('state', quelle)(zustand);

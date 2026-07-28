@@ -61,6 +61,7 @@ const G = new Function(`
   const ABGRUND_WAECHTER_ALLE = ${zahl('ABGRUND_WAECHTER_ALLE')};
   const ABGRUND_WAECHTER_STAERKE = ${zahl('ABGRUND_WAECHTER_STAERKE')};
   const ABGRUND_WAECHTER_SPLITTER = ${zahl('ABGRUND_WAECHTER_SPLITTER')};
+  const ABGRUND_WAECHTER_BERGUNG = ${zahl('ABGRUND_WAECHTER_BERGUNG')};
   const ABGRUND_SUCHE_WEITE = ${zahl('ABGRUND_SUCHE_WEITE')};
   let abgrundSucheCache = { von:null, treffer:null };
   ${fnAus('abgrundRng')}
@@ -70,6 +71,7 @@ const G = new Function(`
   ${fnAus('abgrundKonstellationFuer')}
   ${fnAus('abgrundKonstellationsEmblem')}
   ${fnAus('abgrundKonstellationsSuche')}
+  ${fnAus('abgrundBergungsgut')}
   ${fnAus('abgrundSektor')}
   ${fnAus('abgrundSektorMitBann')}
   return { ABGRUND_KONSTELLATIONEN, ABGRUND_MUTATOREN, ABGRUND_GRENZEN, ABGRUND_SUCHE_WEITE,
