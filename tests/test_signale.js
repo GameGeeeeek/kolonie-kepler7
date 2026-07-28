@@ -37,6 +37,10 @@ function baue(opts){
     expeditionCodex: { specials:{}, rares:{}, chainCompleted:0, signalsFollowed:0 }
   };
   const protokoll = { xp:0, res:null, module:0, codexRares:[] };
+  // Echolotmast (v8.334.0): Das Modul verlaengert die Peilungsfrist. Ohne Modul ist der Bonus 0 -
+  // dann muessen alle bisherigen Fristpruefungen unveraendert gelten. Abschnitt 9 dreht ihn hoch.
+  let mastBonus = 0;
+  ctx.setMast = (v) => { mastBonus = v; };
   const PLANETS = [], STAR_SYSTEMS = [];
   for (let i = 0; i < 6; i++){
     STAR_SYSTEMS.push({ id:'s'+i, name:'System '+i });
@@ -44,8 +48,8 @@ function baue(opts){
   }
   new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'EXPEDITION_CHAIN_NEEDED', 'RARE_ITEMS',
     'RES_DEFS', 'randomFindableRareItem', 'grantRandomModule', 'gainResources', 'addXp',
-    'recordCodexRare', 'ensureExpeditionCodex', 'fmt', block +
-    ';ctx.MAX=SIGNAL_MAX;ctx.LIFETIME=SIGNAL_LIFETIME_MS;ctx.CHANCE=SIGNAL_SPAWN_CHANCE;ctx.PITY=SIGNAL_PITY_AFTER;ctx.TYPES=SIGNAL_TYPES;' +
+    'recordCodexRare', 'ensureExpeditionCodex', 'fmt', 'moduleBonusTotal', block +
+    ';ctx.MAST_DECKEL=SIGNAL_MAST_DECKEL;ctx.MAX=SIGNAL_MAX;ctx.LIFETIME=SIGNAL_LIFETIME_MS;ctx.CHANCE=SIGNAL_SPAWN_CHANCE;ctx.PITY=SIGNAL_PITY_AFTER;ctx.TYPES=SIGNAL_TYPES;' +
     'ctx.spawn=maybeSpawnSignal;ctx.resolve=resolveSignalFind;ctx.active=activeSignals;ctx.prune=pruneSignals;ctx.typeOf=signalTypeOf;'
   )(ctx, state, PLANETS, STAR_SYSTEMS, 3,
     [{ key:'r1', name:'Testmaterial', icon:'ti-diamond', chance:0.01 }],
@@ -56,7 +60,10 @@ function baue(opts){
     (x) => { protokoll.xp += x; },
     (k) => { protokoll.codexRares.push(k); },
     () => state.expeditionCodex,
-    (n) => String(n));
+    (n) => String(n),
+    // Echolotmast (v8.334.0): Ohne Modul ist der Bonus 0, die Peilungsfrist also unveraendert.
+    // Abschnitt 9 dreht ihn hoch und prueft, dass die Frist wirklich mitwaechst UND am Deckel haelt.
+    (eff) => (eff === 'signal' ? mastBonus : 0));
   return { ctx, state, protokoll, STAR_SYSTEMS };
 }
 
@@ -320,6 +327,46 @@ check('8: die Hilfe erklärt Peilungen',
 check('8: die Hilfe nennt Deckel, Laufzeit und alle vier Arten',
   /höchstens 3 Peilungen/.test(src) && /nach 2 Stunden/.test(src) &&
   ['Materialpeilung', 'Technik-Echo', 'Frachtsignal', 'Kartenfragment-Signal'].every(n => new RegExp(n).test(src)));
+
+// ---------------------------------------------------------------- 9) Echolotmast (v8.334.0)
+// Das Abgrund-Standortmodul verlaengert die Frist aufgefangener Peilungen. Geprueft wird an einer
+// WIRKLICH ERZEUGTEN Peilung, nicht an der Konstanten - die Frist entsteht in maybeSpawnSignal(),
+// und genau dort koennte der Faktor fehlen, ohne dass irgendeine Konstante das verraet.
+{
+  const u = baue({ discovered: { p0:true } });
+  const frist = () => {
+    u.state.expeditionSignals.length = 0;      // Platz schaffen, sonst greift der Deckel
+    u.ctx.spawn(true);
+    const a = u.state.expeditionSignals;
+    return a.length ? a[a.length-1].expiresAt - Date.now() : null;
+  };
+  const ohne = frist();
+  check('9: ohne Mast gilt die normale Frist von zwei Stunden',
+    Math.abs(ohne - u.ctx.LIFETIME) < 5000, { ohne, normal: u.ctx.LIFETIME });
+
+  u.ctx.setMast(0.5);
+  const mitHalb = frist();
+  check('9: mit Mast wird die Frist laenger', mitHalb > ohne * 1.4, { ohne, mitHalb });
+  check('9: und zwar genau um den Bonus (nicht irgendwie mehr)',
+    Math.abs(mitHalb - u.ctx.LIFETIME * 1.5) < 5000, { mitHalb, erwartet: u.ctx.LIFETIME*1.5 });
+
+  // Der Deckel an einem absurd hohen Bonus gemessen: Mit den heutigen Modulwerten wird er nie
+  // erreicht, eine Pruefung an realistischen Zahlen koennte also gar nicht fehlschlagen.
+  u.ctx.setMast(99);
+  const mitAbsurd = frist();
+  check('9: der Deckel haelt auch bei absurdem Bonus',
+    Math.abs(mitAbsurd - u.ctx.LIFETIME * (1 + u.ctx.MAST_DECKEL)) < 5000,
+    { mitAbsurd, deckel: u.ctx.MAST_DECKEL, erwartet: u.ctx.LIFETIME*(1+u.ctx.MAST_DECKEL) });
+
+  // Die Zusicherung aus der Modulbeschreibung: bereits liegende Peilungen behalten ihre Frist.
+  // Sonst wuerde ein spaeter ausgebautes Modul eine Peilung mitten im Anflug verkuerzen.
+  const vorher = u.state.expeditionSignals.map(x => x.expiresAt);
+  u.ctx.setMast(0);
+  u.ctx.prune();
+  check('9: eine bereits liegende Peilung behaelt ihre Frist, wenn der Mast wegfaellt',
+    vorher.length > 0 && u.state.expeditionSignals.every((x,i) => x.expiresAt === vorher[i]),
+    { vorher, nachher: u.state.expeditionSignals.map(x=>x.expiresAt) });
+}
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);
