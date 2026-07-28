@@ -5127,8 +5127,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.331.0';
+  const VERSION = '8.332.0';
   const PATCHNOTES = [
+    { version:'8.332.0', date:'28.07.2026', changes:[
+      '<strong>Vorbereitung für Abgrund-eigene Ausrüstung.</strong> Der Abgrund soll Module, Gegenstände und Schiffe bekommen, die es <em>nur</em> dort gibt – und die dann im ganzen restlichen Spiel wirken, damit sich der Abstieg auch für jemanden lohnt, der sonst nie so tief geht. Damit „nur dort zu finden" überhaupt haltbar ist, musste zuerst geklärt werden, wer im Spiel eigentlich alles etwas auslost. Antwort: <strong>an sechs Stellen</strong> – Marktkisten, Expeditionsfunde, Allianz-Belohnungen, Tagesangebote, das Urwerkzeug und die Wächter. Ab jetzt führen alle sechs durch <em>eine</em> Tür, die fragt, woher ein Stück kommen darf.',
+      'Dabei kam ein Fehler heraus, der schon länger lief: Die <strong>Allianz-Missionsbelohnung</strong> zog aus der vollen Modul-Liste und konnte deshalb Bau- und Event-Module ausschütten, die dort gar nicht hingehören – anders als der Fund zwei Bildschirme weiter, der korrekt filterte. Behoben.',
+      '<strong>Der Leerensplitter ist wieder das, was seine Beschreibung sagt.</strong> Er ist als „kein Zufallsfund" markiert und soll nur aus Leere-Gegnern, dem Weltboss und dem Piraten-Endboss kommen. Genau eine Fundstelle hielt sich daran – <strong>zwölf weitere</strong> (sieben Zufallsereignisse, vier Expeditions-Sonderfunde, ein Planetenfund) zogen daneben aus der vollen Materialliste und schütteten die Endgame-Ressource mit rund jedem sechsten Fund einfach so aus. Die Hilfe hat die ganze Zeit die richtigen Quellen genannt; der Code nicht. Jetzt beide.',
+      'Für alle anderen seltenen Materialien ändert sich nichts: Antimateriekern, Kristallherz, Alte Technologie, Resonanzkristall und Urmaterie sind unverändert an denselben Stellen findbar – nur etwas häufiger, weil der gesperrte sechste Eintrag den Platz nicht mehr belegt.'
+    ]},
     { version:'8.331.0', date:'28.07.2026', changes:[
       '<strong>Der Baukorb zeigt die Kosten jetzt je Zeile</strong> (Spieler-Wunsch). Bisher stand dort nur eine Gesamtsumme ganz unten – wer bei einem von dreißig Schiffstypen eine Stückzahl eintrug, sah zwar, was der ganze Korb kostet, aber nicht, was <em>diese</em> Zeile beiträgt. Bei gestaffelten Schiffspreisen ist genau das die interessante Zahl: Schiff Nummer 1000 kostet ein Vielfaches von Schiff Nummer 1.',
       'Die Zeilenkosten laufen <strong>beim Tippen sofort mit</strong>, ohne dass das Eingabefeld den Fokus verliert – die Summe darunter und die Beschriftung des Bau-Knopfes ebenfalls. Tippt man 1000 Jäger ein, steht der Preis da, bevor man das Feld verlässt.',
@@ -8896,7 +8902,7 @@
       desc:'Sensoren orten eine treibende Sonde unbekannten Ursprungs. Eine Untersuchung könnte sich lohnen – oder Zeitverschwendung sein.',
       optA:{ label:'Untersuchen', resolve:()=>{ addXp(25);
           if (Math.random() < 0.18){ const modName = grantRandomModule(); return 'Sonde geborgen! +25 XP und ein Standort-Modul: '+modName+'! (Im Offiziere-Tab an einem Standort ausrüsten.)'; }
-          if (Math.random() < 0.3){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1; return 'Sonde geborgen! +25 XP und ein seltener Fund: '+ri.name+'!'; }
+          if (Math.random() < 0.3){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1; return 'Sonde geborgen! +25 XP und ein seltener Fund: '+ri.name+'!'; }
           return 'Sonde untersucht. +25 XP, aber sonst nichts Verwertbares.'; } },
       optB:{ label:'Ignorieren', resolve:()=>'Die Sonde verschwindet ungenutzt im Dunkel des Alls.' } },
     { key:'solarflare', name:'Sonnensturm nähert sich', icon:'ti-sun', color:'#f0997b',
@@ -9002,7 +9008,7 @@
       desc:'Ein pulsierendes, nicht identifizierbares Signal geht von einem treibenden Wrack aus. Eine Untersuchung ist riskant, könnte aber Seltenes zutage fördern.',
       optA:{ label:'Untersuchen', cost:{deuterium:150},
         resolve:()=>{ addXp(20);
-          if (Math.random() < 0.22){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          if (Math.random() < 0.22){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
             return 'Untersucht: ein seltener Fund tritt zutage - '+ri.name+'! +20 XP.'; }
           return 'Untersucht, aber das Signal verstummt ohne weitere Erkenntnisse. +20 XP.'; } },
       optB:{ label:'Meiden', resolve:()=>'Das Signal bleibt unerforscht zurück.' } },
@@ -9052,7 +9058,7 @@
       desc:'Ein kaum wahrnehmbares Flüstern aus dem Void-Rauschen erreicht die Sensoren. Ein genaues Abhören ist mysteriös, aber möglicherweise lohnend.',
       optA:{ label:'Abhören', cost:{deuterium:160},
         resolve:()=>{ addXp(25);
-          if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          if (Math.random() < 0.2){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
             return 'Im Rauschen verbirgt sich ein seltener Fund: '+ri.name+'! +25 XP.'; }
           return 'Das Flüstern verstummt ohne erkennbaren Sinn. +25 XP.'; } },
       optB:{ label:'Ignorieren', resolve:()=>'Das Flüstern verklingt ungehört.' } },
@@ -9116,7 +9122,7 @@
       desc:'Ein zerstörtes Militärschiff treibt im All. Eine Durchsuchung ist riskant, könnte aber Wertvolles zutage fördern.',
       optA:{ label:'Durchsuchen', cost:{deuterium:150},
         resolve:()=>{ addXp(20);
-          if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          if (Math.random() < 0.2){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
             return 'Wrack durchsucht: ein seltener Fund - '+ri.name+'! +20 XP.'; }
           const amt = 200+Math.floor(Math.random()*300);
           const cap = storageCap(); const before = state.resources.erz||0;
@@ -9243,7 +9249,7 @@
       desc:'Eine unbekannte Quelle stört die Sensoren. Eine Neukalibrierung kostet Energie, könnte aber auch die Ursache aufdecken.',
       optA:{ label:'Neu kalibrieren', cost:{energie:170},
         resolve:()=>{ addXp(20);
-          if (Math.random() < 0.3){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          if (Math.random() < 0.3){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
             return 'Störquelle geortet und geborgen: '+ri.name+'! +20 XP.'; }
           return 'Störung behoben, Ursache aber unklar. +20 XP.'; } },
       optB:{ label:'Ignorieren', resolve:()=>'Die Störung verschwindet von selbst.' } },
@@ -9251,7 +9257,7 @@
       desc:'Auf einem vorbeitreibenden Asteroiden sind Ruinen einer unbekannten Zivilisation sichtbar. Eine Expedition ist aufwendig, aber möglicherweise lohnend.',
       optA:{ label:'Erkunden', cost:{deuterium:200},
         resolve:()=>{ addXp(30);
-          if (Math.random() < 0.25){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          if (Math.random() < 0.25){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
             return 'Ruinen erkundet: ein seltener Fund - '+ri.name+'! +30 XP.'; }
           return 'Ruinen erkundet, aber längst geplündert. +30 XP.'; } },
       optB:{ label:'Ignorieren', resolve:()=>'Die Ruinen bleiben unerforscht zurück.' } },
@@ -9370,7 +9376,7 @@
       desc:'Sensoren registrieren ein kurzes Quantenflackern unbekannten Ursprungs. Eine genaue Analyse ist aufwendig, aber vielversprechend.',
       optA:{ label:'Analysieren', cost:{energie:220},
         resolve:()=>{ addXp(25);
-          if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+          if (Math.random() < 0.2){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
             return 'Analyse erfolgreich: ein seltener Fund - '+ri.name+'! +25 XP.'; }
           return 'Analyse abgeschlossen, aber ohne greifbares Ergebnis. +25 XP.'; } },
       optB:{ label:'Ignorieren', resolve:()=>'Das Flackern verschwindet ungenutzt.' } }
@@ -12409,8 +12415,11 @@
   // Die zwei Angebote des Tages: [0] Standort-Modul, [1] Schiffsklassen-Modul.
   // craftOnly-Schiffsmodule bleiben außen vor - sie sind bewusst der Tier-2-Fertigung vorbehalten.
   function dailyModuleOffers(){
-    const locPool = MODULE_DEFS;
-    const shipPool = SHIP_MODULE_DEFS.filter(d => !d.craftOnly);
+    // Das Tagesangebot ist eine KAUF-Quelle und damit erst recht kein Ort fuer exklusive Funde -
+    // sonst waere „nur im Abgrund findbar" eine Preisfrage. craft:true bleibt beim Schiffs-Pool
+    // bewusst AUS (Tier-2-Fertigung), event ebenso.
+    const locPool = fundPool(MODULE_DEFS);
+    const shipPool = fundPool(SHIP_MODULE_DEFS);
     const out = [];
     [['loc', locPool, false], ['ship', shipPool, true]].forEach(([slot, pool, isShip], i) => {
       if (!pool.length) return;
@@ -16776,9 +16785,60 @@
     log('Modul abgenommen und ins Inventar zurückgelegt.', 'ti-box');
     render(); save();
   }
+  // ===== Herkunfts-Schloss (v8.332.0) =====
+  // „Nur im Abgrund findbar" ist keine Eigenschaft, die ein Eintrag mitbringt - es ist eine
+  // Eigenschaft ALLER ANDEREN Fundquellen. Solange irgendeine davon blind aus dem vollen DEFS-Array
+  // zieht, ist jeder exklusive Inhalt am Tag seiner Einfuehrung auch im Markt, in Expeditionsfunden
+  // und in Allianz-Belohnungen.
+  //
+  // BEFUND VOR DIESER VERSION: Sechs Stellen zogen zufaellig aus den Modul-Arrays. Zwei davon
+  // filterten (craftOnly/eventKey), vier gar nicht - darunter grantAllianceMissionBonusModule(),
+  // das aus dem VOLLEN SHIP_MODULE_DEFS zog und damit craftOnly- und Event-Module als
+  // Missionsbelohnung ausschuetten konnte, anders als grantRandomShipModule() zwei Bildschirme
+  // weiter. Kein Absturz, niemandem aufgefallen - und genau das Leck, das jeder neue exklusive
+  // Inhalt sofort wiederfindet.
+  //
+  // Seitdem gibt es GENAU EINE Ziehquelle. Wer eine neue Fundstelle baut, kann die Filter nicht
+  // mehr vergessen, weil es keinen anderen Weg gibt; tests/test_herkunft.js meldet jede direkte
+  // Array-Ziehung als Verstoss.
+  //
+  // Das Feld heisst `quelle` und fehlt bei allem Vorhandenen - `undefined` gilt als 'normal'. Die
+  // Umstellung aendert damit fuer keinen einzigen bestehenden Eintrag etwas.
+  const HERKUNFT_NORMAL = 'normal';
+  const HERKUNFT_ABGRUND = 'abgrund';
+  // Welche Eintraege darf diese Fundquelle ausschuetten?
+  //   quelle: 'normal' (Vorgabe) | 'abgrund' | 'alle'
+  //   craft:  craftOnly-Eintraege zulassen (Vorgabe nein - die kommen aus der Fertigung)
+  //   event:  eventKey-Eintraege zulassen (Vorgabe nein - die kommen aus ihrem Event)
+  //
+  // `chance: 0` fliegt IMMER raus und hat bewusst keinen Schalter: Das Feld heisst an seinen
+  // Definitionsstellen ausdruecklich "nie ein Zufallsfund" (Leerensplitter, Allianz-Kriegsschub) -
+  // es gibt keine Fundquelle, fuer die eine Ausnahme sinnvoll waere. Wer so einen Eintrag vergeben
+  // will, vergibt ihn direkt statt ihn zu ziehen.
+  function fundPool(defs, opt){
+    const o = opt || {};
+    const quelle = o.quelle || HERKUNFT_NORMAL;
+    return (defs || []).filter(d => {
+      const dq = d.quelle || HERKUNFT_NORMAL;
+      if (quelle !== 'alle' && dq !== quelle) return false;
+      if (d.craftOnly && !o.craft) return false;
+      if (d.eventKey && !o.event) return false;
+      if (d.chance === 0) return false;
+      return true;
+    });
+  }
+  // Zieht EINEN Eintrag. Es gibt bewusst keine Variante, die ein Array direkt indiziert - genau die
+  // waere der Weg, an dem der naechste Umbau die Filter wieder vergisst.
+  function zieheAusPool(defs, opt){
+    const pool = fundPool(defs, opt);
+    return pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
+  }
+
   // Vergibt ein zufälliges Modul (nach Seltenheits-Gewichtung) ins Inventar – aufgerufen bei Funden.
   function grantRandomModule(){
-    const type = MODULE_DEFS[Math.floor(Math.random()*MODULE_DEFS.length)].key;
+    const gezogen = zieheAusPool(MODULE_DEFS);
+    if (!gezogen) return 'Modul';
+    const type = gezogen.key;
     const roll = Math.random();
     let rarity = 'gewoehnlich';
     if (roll < 0.05) rarity = 'legendaer';
@@ -17365,8 +17425,8 @@
     // Event-Module: die gibt es NUR während ihres Events und ausschließlich über den eigenen
     // Fundzweig (siehe grantEventShipModule) - sonst wären sie jederzeit über den normalen Pool
     // erreichbar und die Event-Exklusivität wäre wertlos.
-    const pool = SHIP_MODULE_DEFS.filter(d => !d.craftOnly && !d.eventKey);
-    const def = pool[Math.floor(Math.random()*pool.length)];
+    const def = zieheAusPool(SHIP_MODULE_DEFS);
+    if (!def) return 'Schiffsklassen-Modul';
     const capIdx = maxRarity ? SHIP_MODULE_RARITY_ORDER.indexOf(maxRarity) : SHIP_MODULE_RARITY_ORDER.length-1;
     const roll = Math.random();
     let idx = 0;
@@ -25635,13 +25695,19 @@
     const useShipModule = Math.random() < 0.5;
     const rarity = (minTier==='legendaer' && Math.random()<0.08) ? 'mythisch' : minTier;
     if (useShipModule){
-      const def = SHIP_MODULE_DEFS[Math.floor(Math.random()*SHIP_MODULE_DEFS.length)];
+      // Nebenbefund behoben (v8.332.0): Hier stand eine direkte Ziehung aus dem VOLLEN Array -
+      // craftOnly- und Event-Module konnten also als Missionsbelohnung herausfallen, anders als bei
+      // grantRandomShipModule(). Jetzt derselbe Pool wie ueberall.
+      const def = zieheAusPool(SHIP_MODULE_DEFS);
+      if (!def) return 'Schiffsklassen-Modul';
       const instKey = def.key+':'+rarity;
       state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
       const info = shipModuleInstanceInfo(instKey);
       return info ? (info.rar.label+' '+info.def.name+' (Schiffsklasse)') : 'Schiffsklassen-Modul';
     }
-    const type = MODULE_DEFS[Math.floor(Math.random()*MODULE_DEFS.length)].key;
+    const locDef = zieheAusPool(MODULE_DEFS);
+    if (!locDef) return 'Modul';
+    const type = locDef.key;
     const instKey = type+':'+rarity;
     state.modules[instKey] = (state.modules[instKey]||0) + 1;
     const info = moduleInstanceInfo(instKey);
@@ -29169,8 +29235,9 @@
         return 'Forschungsdurchbruch: '+((r&&r.name)||'Das laufende Projekt')+' ist sofort abgeschlossen.';
     }},
     { key:'urwerkzeug', name:'Urwerkzeug', icon:'ti-sparkles', desc:'Ein Werkzeug aus einer Legierung, die es nicht geben sollte – älter als jede bekannte Werft und immer noch funktionsfähig. Es fertigt ein Modul höchster, MYTHISCHER Güte, wie es sonst nur die Mythische Modulschmiede herstellt.', chance:0.004, rarity:'mythisch', activate: () => {
-        const typ = MODULE_DEFS[Math.floor(Math.random()*MODULE_DEFS.length)].key;
-        const name = gibModul(typ, 'mythisch');
+        const gezogen = zieheAusPool(MODULE_DEFS);
+        if (!gezogen) return 'Das Urwerkzeug findet nichts, woran es arbeiten könnte.';
+        const name = gibModul(gezogen.key, 'mythisch');
         return 'Urwerkzeug eingesetzt: '+name+' gefertigt.';
     }},
     // Gegenstände (25% auf EINEN Auftrag gegen ALLE Aufträge sofort fertig).
@@ -29285,7 +29352,7 @@
         return 'Feuerwerksrakete gezündet: +20% Angriffskraft für 20 Minuten!';
     }},
     { key:'glueckstalisman', name:'Glückstalisman', icon:'ti-star', desc:'Gewährt garantiert ein seltenes Material.', rarity:'episch', activate: () => {
-        const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+        const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
         return 'Glückstalisman eingelöst: '+ri.name+' erhalten!';
     }}
   ];
@@ -32801,7 +32868,10 @@
               recordCodexSpecial(ev.key); // Ausbau B: Sonderereignis im Kodex vermerken
             } else if (findRoll < b_item){
               // Event-Items sind nur Teil des Fundpools, wenn gerade ein saisonales Beute-Event aktiv ist.
-              const itemPool = activeLootEvent ? ITEM_DEFS.concat(EVENT_ITEM_DEFS) : ITEM_DEFS;
+              // fundPool() statt des rohen Arrays: Expeditionen sind eine NORMALE Fundquelle und
+              // duerfen deshalb keine Abgrund-Gegenstaende ausschuetten. Die Event-Gegenstaende
+              // kommen weiterhin nur waehrend eines aktiven Beute-Events dazu.
+              const itemPool = fundPool(ITEM_DEFS).concat(activeLootEvent ? fundPool(EVENT_ITEM_DEFS, { event:true }) : []);
               const it = pickWeightedByRarity(itemPool, luckBonus);
               state.inventory[it.key] = (state.inventory[it.key]||0)+1;
               addXp(15);
@@ -35930,7 +36000,7 @@
         return { text:'Ein notleidender Konvoi wurde versorgt: +'+fmt(amt)+' Kredite Dankspende.', icon:'ti-users' }; } },
     { key:'ghost_wreck', name:'Geisterwrack durchsucht', icon:'ti-alien',
       resolve:(mult) => { addXp(Math.round(30*mult));
-        if (Math.random() < 0.25){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+        if (Math.random() < 0.25){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
           return { text:'Geisterwrack durchsucht: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-alien' }; }
         return { text:'Geisterwrack durchsucht, aber ohne verwertbaren Fund.', icon:'ti-alien' }; } },
     { key:'beacon_data', name:'Alte Navigationsdaten geborgen', icon:'ti-map-pin',
@@ -35956,7 +36026,7 @@
         return { text:'Modul nicht mehr zu retten, aber Restteile bringen +'+fmt(gained)+' Erz.', icon:'ti-rocket' }; } },
     { key:'void_echo', name:'Echo aus der Leere vermessen', icon:'ti-atom',
       resolve:(mult) => { addXp(Math.round(35*mult));
-        if (Math.random() < 0.18){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+        if (Math.random() < 0.18){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
           return { text:'Ein Echo aus der Leere vermessen: seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-atom' }; }
         return { text:'Ein Echo aus der Leere vermessen, ohne greifbares Ergebnis.', icon:'ti-atom' }; } },
     { key:'construction_insight', name:'Konstruktionsdaten ausgewertet', icon:'ti-list-details',
@@ -36001,7 +36071,7 @@
         addXp(Math.round(25*mult)); return { text:'Verlassenes Labor durchsucht: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-flask' }; } },
     { key:'warship_hull', name:'Kriegsschiffrumpf verwertet', icon:'ti-shield',
       resolve:(mult) => { addXp(Math.round(30*mult));
-        if (Math.random() < 0.2){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+        if (Math.random() < 0.2){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
           return { text:'Kriegsschiffrumpf verwertet: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-shield' }; }
         const amt = Math.round((300+Math.random()*350)*mult);
         const cap = storageCap(); const before = state.resources.erz||0; state.resources.erz = Math.min(cap, before+amt); const gained = state.resources.erz-before;
@@ -36070,7 +36140,7 @@
         addXp(Math.round(20*mult)); return { text:'Gestörtes Array repariert: +'+fmt(gained)+' Forschungspunkte.', icon:'ti-bell' }; } },
     { key:'ruins_survey', name:'Ruinen vermessen', icon:'ti-building-castle',
       resolve:(mult) => { addXp(Math.round(30*mult));
-        if (Math.random() < 0.22){ const ri = RARE_ITEMS[Math.floor(Math.random()*RARE_ITEMS.length)]; state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
+        if (Math.random() < 0.22){ const ri = randomFindableRareItem(); state.rareItems[ri.key] = (state.rareItems[ri.key]||0)+1;
           return { text:'Ruinen vermessen: ein seltener Fund - '+ri.name+'!', icon: ri.icon||'ti-building-castle' }; }
         return { text:'Ruinen vermessen, aber längst geplündert.', icon:'ti-building-castle' }; } },
     { key:'cave_deposit', name:'Höhlenvorkommen abgebaut', icon:'ti-diamond',
@@ -36269,7 +36339,17 @@
     addXp(Math.round(60*mult));
     return { text:'Dem Frachtsignal gefolgt: ein großer Ressourcen-Cache geborgen ('+Object.entries(cache).map(([r,a])=>fmt(a)+' '+((RES_DEFS.find(x=>x.key===r)||{label:r}).label)).join(', ')+')!', icon: typ.icon };
   }
-  function randomFindableRareItem(){ const pool = RARE_ITEMS.filter(r => r.chance !== 0); return pool[Math.floor(Math.random()*pool.length)]; }
+  // Ein zufälliges seltenes Material – die EINZIGE Ziehstelle für RARE_ITEMS.
+  //
+  // Bugfix (28.07.2026, v8.332.0): Diese Funktion filterte `chance:0` korrekt weg, aber nur DREI
+  // Fundstellen riefen sie auf. Zwölf weitere – sieben Zufallsereignisse, vier Expeditions-
+  // Sonderfunde, ein Planetenfund – zogen daneben direkt aus dem vollen `RARE_ITEMS`. Da genau ein
+  // Eintrag `chance:0` trägt, kam bei jedem dieser zwölf Funde mit rund 1/6 der Leerensplitter
+  // heraus – ausgerechnet die Endgame-Ressource, deren eigene Definition „KEIN Direktfund bei
+  // Expeditionen" verspricht und die nur aus Leere-NPCs, Weltboss und Piraten-Endboss kommen soll.
+  // Der richtige und der falsche Weg standen seitdem nebeneinander im selben Quelltext; jetzt gibt
+  // es nur noch den einen. `chance:0` liegt dafür in fundPool() statt hier – siehe dort.
+  function randomFindableRareItem(){ return zieheAusPool(RARE_ITEMS); }
   // Ausbau B (24.07.2026): Expeditions-Kodex - dauerhafte Sammel-Statistik (entdeckte Sonderereignisse,
   // seltene Materialien, abgeschlossene Ketten). Reines Anzeige-/Sammelziel, kein Spieleffekt.
   function ensureExpeditionCodex(){ if (!state.expeditionCodex) state.expeditionCodex = { specials:{}, rares:{}, chainCompleted:0, signalsFollowed:0 }; if (!state.expeditionCodex.specials) state.expeditionCodex.specials = {}; if (!state.expeditionCodex.rares) state.expeditionCodex.rares = {}; if (!Number.isFinite(state.expeditionCodex.signalsFollowed)) state.expeditionCodex.signalsFollowed = 0; return state.expeditionCodex; }
