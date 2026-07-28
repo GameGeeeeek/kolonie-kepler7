@@ -66,6 +66,11 @@ function baueKontext(zustand){
     konstAus('ABGRUND_SILBEN_A'), konstAus('ABGRUND_SILBEN_B'), konstAus('ABGRUND_SILBEN_C'),
     konstAus('ABGRUND_GRIECHISCH'),
     block('ABGRUND_MUTATOREN') ? 'const ABGRUND_MUTATOREN = '+block('ABGRUND_MUTATOREN')+';' : (()=>{throw new Error('ABGRUND_MUTATOREN fehlt')})(),
+    // Seit v8.329.0 ruft abgrundSektor() die Konstellationen auf - ohne sie wirft der Kontext beim
+    // ersten Sektor. Beides gehoert deshalb mit in die Umgebung, aus der Datei gezogen wie alles
+    // andere hier.
+    'const ABGRUND_KONSTELLATIONEN = '+block('ABGRUND_KONSTELLATIONEN')+';',
+    fnAus('abgrundKonstellationFuer'),
     // ABGRUND_SONDE_MAX zuerst: das Werkstatt-Array referenziert die Konstante in seinem
     // Literal, eine spaetere Deklaration liefe in die temporale Todeszone.
     konstAus('ABGRUND_SONDE_MAX'),
