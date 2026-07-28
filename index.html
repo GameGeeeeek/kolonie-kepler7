@@ -1423,6 +1423,9 @@
     .progress-outer { width:100%; height:6px; background: var(--elev-2); overflow:hidden; margin-top:9px; }
     /* Trennlinie der Tiefensonden-Vorschau. Als Klasse und nicht inline, weil Rahmenangaben in
        JS-Vorlagen von keiner CSS-Regel mehr korrigiert werden koennen (siehe test_formensprache). */
+    /* Baukorb-Zeilenkosten (v8.331.0): duerfen umbrechen, statt die Zeile zu sprengen - bei
+       vierstelligen Stueckzahlen stehen dort schnell vier Ressourcen mit sechsstelligen Zahlen. */
+    .korb-kosten { display:flex; flex-wrap:wrap; gap:2px 8px; margin-top:2px; font-size:10.5px; }
     .sonde-vorschau { border-top: var(--hair, 1px) solid var(--elev-2); }
     /* Wächter-Tafel (v8.328.0): Portrait links, Text rechts. Das Portrait bekommt als einziges
        Element des Abgrunds eine eigene Bewegung - ein sehr langsames Atmen, 6 Sekunden je Zug. Der
@@ -5124,8 +5127,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.330.0';
+  const VERSION = '8.331.0';
   const PATCHNOTES = [
+    { version:'8.331.0', date:'28.07.2026', changes:[
+      '<strong>Der Baukorb zeigt die Kosten jetzt je Zeile</strong> (Spieler-Wunsch). Bisher stand dort nur eine Gesamtsumme ganz unten – wer bei einem von dreißig Schiffstypen eine Stückzahl eintrug, sah zwar, was der ganze Korb kostet, aber nicht, was <em>diese</em> Zeile beiträgt. Bei gestaffelten Schiffspreisen ist genau das die interessante Zahl: Schiff Nummer 1000 kostet ein Vielfaches von Schiff Nummer 1.',
+      'Die Zeilenkosten laufen <strong>beim Tippen sofort mit</strong>, ohne dass das Eingabefeld den Fokus verliert – die Summe darunter und die Beschriftung des Bau-Knopfes ebenfalls. Tippt man 1000 Jäger ein, steht der Preis da, bevor man das Feld verlässt.',
+      'Zeilen ohne Stückzahl bleiben leer statt eine Null anzuzeigen, damit die Liste bei dreißig Schiffstypen lesbar bleibt.'
+    ]},
     { version:'8.330.0', date:'28.07.2026', changes:[
       '<strong>Zwölf Reliquien – je eine von jedem Wächter.</strong> Bisher ließ ein bezwungener Wächter ein <em>zufälliges Standard-Modul</em> fallen, dasselbe, was auch aus einer Marktkiste kommt: zwölf benannte Gegner mit eigenem Text und eigenem Portrait, und ihre Belohnung war austauschbar. Jetzt hinterlässt jeder beim <strong>ersten</strong> Sieg sein eigenes Stück – der <em>Kalte Anker</em> einen Ankerstein, der <em>Zählende</em> ein Zählwerk, das sich nicht anhalten lässt, die <em>Schwelle</em> eine Navigationstafel, auf der die Rückflugbahn fehlt: nicht gelöscht, nie eingetragen.',
       '<strong>Du verlierst dabei nichts.</strong> Ab dem zweiten Sieg über denselben Wächter fällt wieder ein Modul wie bisher. Der Erstsieg ist ein Ereignis und bekommt das Einmalige, die Wiederholung bleibt die Quelle für nachwachsende Beute.',
@@ -15135,6 +15143,51 @@
     // (Spieler-Screenshot 26.07.2026, Botschaftsviertel).
     if (key === 'credits') return { key:'credits', label:'Kredite', icon:'ti-diamond', fg:'#fac775' };
     return RES_DEFS.find(x=>x.key===key) || TIER2_DEFS.find(t=>t.key===key) || { label:key };
+  }
+  // ---- Baukorb: Kosten je Zeile (v8.331.0) ----
+  // Der Korb zeigte bisher nur eine Gesamtsumme ganz unten. Wer bei einem von dreissig Schiffstypen
+  // eine Stueckzahl eintraegt, sieht damit zwar, was der ganze Korb kostet, aber nicht, was DIESE
+  // Zeile beitraegt - und bei gestaffelten Schiffspreisen ist genau das die interessante Zahl:
+  // Schiff Nummer 1000 kostet ein Vielfaches von Schiff Nummer 1.
+  //
+  // shipCostForRange() rechnet die Staffelung ab dem aktuellen Bestand korrekt aus; hier wird sie
+  // nur je Zeile statt einmal fuer alles aufgerufen.
+  // WICHTIG: der Bestand kommt aus currentFleet(), NICHT aus state.fleet. Auf einer Kolonie als
+  // aktiver Basis sind das zwei verschiedene Flotten - die Zeile haette dann eine andere Staffelung
+  // gezeigt als die Summe darunter, die schon immer mit currentFleet() rechnet. Zwei Anzeigestellen
+  // derselben Groesse mit zwei Quellen: genau der wiederkehrende Fehler aus CLAUDE.md Regel 6.
+  function korbZeilenkosten(shipDef){
+    const menge = shipBasket[shipDef.key] || 0;
+    if (menge <= 0) return '<span style="color:#5a5f78;">–</span>';
+    const bestand = (currentFleet() || {})[shipDef.key] || 0;
+    return costHtml(shipCostForRange(shipDef, bestand, menge));
+  }
+  // Schreibt Zeilen- und Summenkosten direkt in die vorhandenen Knoten. Bewusst KEIN innerHTML auf
+  // der Box: Das Eingabefeld haette danach den Fokus verloren, und der Spieler tippt gerade darin.
+  function aktualisiereKorbKosten(box, defs, cf){
+    if (!box) return;
+    const summe = {};
+    let etwas = false;
+    for (const d of defs){
+      const menge = shipBasket[d.key] || 0;
+      const feld = box.querySelector('[data-korb-kosten="'+d.key+'"]');
+      if (feld) feld.innerHTML = korbZeilenkosten(d);
+      if (menge <= 0) continue;
+      etwas = true;
+      const c = shipCostForRange(d, (cf && cf[d.key]) || 0, menge);
+      for (const [r,a] of Object.entries(c)) summe[r] = (summe[r]||0) + a;
+    }
+    const summenFeld = box.querySelector('[data-korb-summe]');
+    if (summenFeld) summenFeld.innerHTML = etwas ? costHtml(summe) : '– noch keine Menge eingetragen –';
+    // Der Bau-Knopf haengt an der Bezahlbarkeit und muss deshalb mitwandern - sonst steht dort
+    // "einreihen", obwohl die Summe laengst bezahlbar ist (oder umgekehrt).
+    const knopf = box.querySelector('#shipBasketBuildBtn');
+    if (knopf){
+      const bezahlbar = etwas && canAfford(summe);
+      knopf.classList.toggle('affordable', bezahlbar);
+      knopf.disabled = !etwas;
+      knopf.innerHTML = '<i class="ti ti-ship" aria-hidden="true" style="margin-right:4px;"></i>Baukorb ' + (bezahlbar ? 'bauen' : 'einreihen');
+    }
   }
   function costHtml(cost){
     return Object.entries(cost).map(([r,a]) => {
@@ -38816,12 +38869,17 @@
           <div style="display:flex; flex-direction:column; gap:6px;">
             ${basketDefs.map(d => `
               <div class="card-row" style="padding:0.5rem 0.7rem;">
-                <div class="left"><div class="bicon" style="width:30px; height:30px; background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${d.key}" width="26" height="26" style="display:block;"></canvas></div><div class="bname" style="font-size:12px;">${d.name}</div></div>
+                <div class="left" style="min-width:0;"><div class="bicon" style="width:30px; height:30px; background:rgba(255,255,255,0.08);"><canvas data-ship-icon="${d.key}" width="26" height="26" style="display:block;"></canvas></div>
+                  <div style="min-width:0;">
+                    <div class="bname" style="font-size:12px;">${d.name}</div>
+                    <div class="bmeta korb-kosten" data-korb-kosten="${d.key}">${korbZeilenkosten(d)}</div>
+                  </div>
+                </div>
                 <input type="text" inputmode="numeric" class="basket-amount" data-basket-ship="${d.key}" value="${shipBasket[d.key]||0}" style="width:60px; text-align:center;"/>
               </div>
             `).join('')}
           </div>
-          <div class="bmeta">Gesamtkosten: ${anyQty ? costHtml(totalCost) : '– noch keine Menge eingetragen –'}</div>
+          <div class="bmeta">Gesamtkosten: <span data-korb-summe>${anyQty ? costHtml(totalCost) : '– noch keine Menge eingetragen –'}</span></div>
           ${(anyQty && !affordable) ? `<div class="bmeta" style="color:#f0997b;"><i class="ti ti-clock" aria-hidden="true"></i> Wird eingereiht und startet automatisch, sobald genug Ressourcen vorhanden sind.</div>` : ''}
           <button class="buy ${affordable?'affordable':''}" id="shipBasketBuildBtn" ${anyQty?'':'disabled'} style="align-self:flex-start;"><i class="ti ti-ship" aria-hidden="true" style="margin-right:4px;"></i>Baukorb ${affordable?'bauen':'einreihen'}</button>
         </div>
@@ -38830,6 +38888,13 @@
       shipBasketBox.querySelectorAll('.basket-amount').forEach(inp => inp.oninput = () => {
         const k = inp.getAttribute('data-basket-ship');
         shipBasket[k] = Math.max(0, Math.floor(Number(inp.value||0)));
+        // Kosten SOFORT beim Tippen nachziehen (Spieler-Wunsch 28.07.2026: "wenn man 1000 Schiffe
+        // baut, sollen die Kosten direkt in der Spalte stehen"). Das geht bewusst NICHT ueber
+        // render(): Die ganze Box steht unter isTypingIn()-Schutz, weil ein innerHTML-Neuaufbau dem
+        // Eingabefeld den Fokus entreissen wuerde - genau der CLAUDE.md-Fallstrick. Geschrieben
+        // werden deshalb nur die beiden Textknoten, die sich wirklich aendern: die Kostenzeile
+        // dieses Schiffs und die Summe darunter. Das Eingabefeld selbst wird nicht angefasst.
+        aktualisiereKorbKosten(shipBasketBox, basketDefs, cf);
         if (!isTypingIn('shipBasketBox')) render();
       });
       const basketBuildBtn = document.getElementById('shipBasketBuildBtn');
