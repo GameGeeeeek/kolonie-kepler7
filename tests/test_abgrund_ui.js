@@ -64,7 +64,9 @@ async function starte(browser, stand){
   await page.goto(SPIEL_URL); await page.waitForTimeout(2800);
   await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
   await page.evaluate(()=>{const b=document.querySelector('.tab-btn[data-tab="galaxie"]');if(b)b.click();});
-  await page.evaluate(()=>{const b=document.querySelector('[data-galaxy-subtab="kampf"]');if(b)b.click();});
+  // Seit v8.325.0 hat der Abgrund einen EIGENEN Unterreiter im Galaxie-Tab. Vorher lag die Box im
+  // Kampf-Panel; wer hier weiter "kampf" klickt, misst eine unsichtbare Box (Hoehe 0).
+  await page.evaluate(()=>{const b=document.querySelector('[data-galaxy-subtab="abgrund"]');if(b)b.click();});
   await page.waitForTimeout(1200);
   return { ctx, page, errs, store };
 }
