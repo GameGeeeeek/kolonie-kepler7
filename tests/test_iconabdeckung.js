@@ -91,7 +91,10 @@ for (const k of offKeys){
 // die Kollisionsschlüssel wirklich betroffen sind (sonst verliert die Begründung ihren Grund).
 const modBlock = arrBlock('MODULE_DEFS');
 const modKeys = [...modBlock.matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
-check('5: alle Standort-Module sind im Array', modKeys.length === 13, modKeys.length);
+// 13 bis v8.333.0, seit v8.334.0 die vier Abgrund-Standortmodule (Drucktank, Echolotmast,
+// Splitterofen, Nullfeldanker). Die Zahl steht hier fest, damit ein neu eingefuegtes Modul nicht
+// still an den Icon-Pruefungen darunter vorbeirutscht.
+check('5: alle Standort-Module sind im Array', modKeys.length === 17, modKeys.length);
 const modOhne = modKeys.filter(k => !ICONS.has('mod_'+k));
 check('5: jedes Standort-Modul hat ein eigenes gezeichnetes Icon', modOhne.length === 0, modOhne);
 // Erst behauptet: drei Kollisionen (schild/lager/werft). Der Test hat die Behauptung widerlegt -

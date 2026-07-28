@@ -23,6 +23,8 @@ const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
+const zeilenVon = (t) => t.split('\n');
+
 let fail = false;
 const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail = fail || !c; };
 
@@ -36,9 +38,9 @@ function fnAus(n){
 }
 
 // ---- A) fundPool an eingeschleusten Eintraegen AUSFUEHREN ----
-// Die echten DEFS haben heute noch keinen einzigen Abgrund-Eintrag (Phase 0 ist reine
-// Infrastruktur). An ihnen laesst sich die Filterwirkung deshalb gar nicht messen - deswegen
-// bekommt die Funktion hier erfundene Eintraege, die genau die vier Faelle abdecken.
+// Erfundene Eintraege statt der echten DEFS, weil sich nur so ALLE Faelle abdecken lassen - auch
+// die Kombination Abgrund+craftOnly, die es im Spiel (noch) nicht gibt. Abschnitt C prueft dieselbe
+// Funktion danach an den echten MODULE_DEFS; das eine ersetzt das andere nicht.
 const G = new Function(`
   const HERKUNFT_NORMAL = 'normal';
   const HERKUNFT_ABGRUND = 'abgrund';
@@ -154,15 +156,43 @@ check('B: der Expeditions-Itempool laeuft ueber fundPool',
 check('B: waehrend eines Beute-Events kommen die Event-Gegenstaende weiterhin dazu',
   /activeLootEvent \? fundPool\(EVENT_ITEM_DEFS, \{ event:true \}\)/.test(js));
 
-// ---- C) Der Herkunfts-Umbau selbst aendert am Bestand nichts ----
-// Traegt heute schon ein Eintrag quelle:'abgrund', waere das ein verfrueht eingefuegter Inhalt - und
-// der wuerde ab sofort aus allen normalen Quellen verschwinden, ohne dass es irgendwo eine
-// Ersatzquelle gaebe. Der Abgrund-Inhalt kommt ab Phase 1.
-const vorzeitig = (js.match(/quelle:\s*'abgrund'/g)||[]).length;
-check('C: noch traegt kein Eintrag quelle:"abgrund" - der Inhalt kommt ab Phase 1',
-  vorzeitig === 0, { treffer: vorzeitig });
+// ---- C) Die Sperre traegt echten Inhalt ----
+// Bis v8.333.0 stand hier "noch traegt kein Eintrag quelle:'abgrund'" - Phase 0 war reine
+// Infrastruktur. Seit v8.334.0 gibt es die ersten Abgrund-Module, und damit dreht sich die Pruefung
+// um: Eine Sperre ohne Inhalt dahinter kann nicht falsch sein und beweist deshalb auch nichts.
+const abgrundEintraege = (js.match(/quelle:\s*HERKUNFT_ABGRUND/g)||[]).length;
+check('C: es gibt Eintraege mit Abgrund-Herkunft', abgrundEintraege >= 4, { eintraege: abgrundEintraege });
+// Kommentarzeilen ausgenommen: Die Prosa oben ERKLAERT das Feld und schreibt es dabei aus - das ist
+// kein loser Wert im Code, sondern der Grund, warum es die Konstante gibt.
+const loseHerkunft = zeilenVon(js)
+  .map((z,i) => ({ z, nr:i+1 }))
+  .filter(x => !x.z.trim().startsWith('//') && /quelle:\s*'abgrund'/.test(x.z))
+  .map(x => 'Zeile '+x.nr);
+check('C: die Herkunft steht als KONSTANTE dran, nicht als lose Zeichenkette',
+  loseHerkunft.length === 0, loseHerkunft);
 check('C: die beiden Herkunfts-Konstanten sind benannt, nicht als Zeichenkette verstreut',
   /const HERKUNFT_NORMAL = 'normal'/.test(js) && /const HERKUNFT_ABGRUND = 'abgrund'/.test(js));
+
+// Und die Gegenprobe, die den ganzen Umbau erst rechtfertigt: Ein Abgrund-Eintrag darf aus KEINER
+// normalen Quelle kommen. Gemessen wird das an den echten MODULE_DEFS, ausgefuehrt.
+const MD = (() => {
+  const i = js.indexOf('const MODULE_DEFS = [');
+  let d=0, s=js.indexOf('[', i), k=s;
+  for (; k<js.length; k++){ if(js[k]==='[')d++; else if(js[k]===']'){d--; if(!d)break;} }
+  // Die desc-Texte enthalten HTML, aber keine Funktionsaufrufe - das Array ist als Literal lesbar,
+  // sobald die beiden Herkunfts-Konstanten definiert sind.
+  return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund'; return "+js.slice(s,k+1))();
+})();
+const abgrundKeys = MD.filter(d => d.quelle === 'abgrund').map(d => d.key);
+check('C: die echten MODULE_DEFS tragen die Abgrund-Module', abgrundKeys.length >= 4, abgrundKeys);
+const normalerPool = G.fundPool(MD).map(d => d.key);
+check('C: KEIN Abgrund-Modul liegt im normalen Fundpool (Markt, Expedition, Kiste, Allianz)',
+  abgrundKeys.every(k => !normalerPool.includes(k)),
+  abgrundKeys.filter(k => normalerPool.includes(k)));
+const abgrundPool = G.fundPool(MD, { quelle:'abgrund' }).map(d => d.key);
+check('C: und der Abgrund-Pool enthaelt AUSSCHLIESSLICH sie (keine normalen Module von unten)',
+  abgrundPool.length === abgrundKeys.length && abgrundPool.every(k => abgrundKeys.includes(k)),
+  abgrundPool);
 
 // ---- D) chance:0 - der Nebenbefund, der den Umbau bezahlt hat ----
 // Beim Zusammenziehen der Ziehstellen fiel auf: RARE_ITEMS hat SECHS Eintraege, einer davon
