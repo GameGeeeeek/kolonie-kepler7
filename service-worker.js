@@ -39,7 +39,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  const isNavigation = req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html');
+    const STATIC_PASSTHROUGH = ['/robots.txt', '/sitemap.xml'];
+    const isNavigation = !STATIC_PASSTHROUGH.includes(url.pathname) &&
+          (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html'));
 
   if (isNavigation) {
     event.respondWith(
