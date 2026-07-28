@@ -239,9 +239,15 @@ function umschliessendeFunktion(index){
   const letzte = treffer[treffer.length-1];
   return (letzte.match(/function ([A-Za-z0-9_]+)/)||[])[1] || null;
 }
+// Seit v8.330.0 laufen die vier Bonus-Kanaele (Kampfkraft, Verluste, Splitter, Beute) NICHT mehr
+// einzeln ueber abgrundWerkstattBonus, sondern gebuendelt ueber abgrundKanalBonus - dort werden
+// Werkstatt und Reliquien addiert. Die REGEL, die dieser Abschnitt schuetzt, ist unveraendert:
+// Ein Abgrund-Bonus darf nirgends ausserhalb des Abgrunds gelesen werden, sonst wuerde er die
+// normale Wirtschaft oder das PvP verschieben. Nur der Traeger heisst jetzt anders, deshalb
+// werden BEIDE Namen eingesammelt statt der Test gestrichen.
 const wsStellen = [];
 {
-  const re = /abgrundWerkstattBonus\('([a-z]+)'\)/g;
+  const re = /(abgrundWerkstattBonus|abgrundKanalBonus)\('([a-z]+)'\)/g;
   let m;
   while ((m = re.exec(js)) !== null) wsStellen.push({ index:m.index, fn:umschliessendeFunktion(m.index) });
 }
@@ -256,7 +262,7 @@ const wsVerstoss = wsStellen.filter(st => {
   }
   return true;
 });
-check('4: abgrundWerkstattBonus wird nur im Abgrund-Kontext aufgerufen',
+check('4: Abgrund-Boni werden nur im Abgrund-Kontext gelesen',
   wsStellen.length >= 4 && wsVerstoss.length === 0,
   { aufrufe:wsStellen.length, funktionen:[...new Set(wsStellen.map(s=>s.fn))], verstoesse:wsVerstoss.map(v=>v.fn) });
 
@@ -538,8 +544,18 @@ check('11: Waechter haben Namen UND einen eigenen Text',
     w.defense > erwartetOhne * 1.2, { tiefe20:w.defense, nachbarmittel:Math.round(erwartetOhne) });
   check('11: und sie gibt mehr Splitter', w.splitter > davor.splitter * 2, { t19:davor.splitter, t20:w.splitter });
 }
-check('11: der Waechter laesst garantiert ein Modul fallen',
-  /if \(sektor\.waechter\)\{[\s\S]{0,200}grantRandomModule\(\)/.test(js));
+// Seit v8.330.0 ist der Erstsieg anders belohnt als die Wiederholung: beim ERSTEN Sieg ueber einen
+// Waechter faellt seine Reliquie, ab dem zweiten wie bisher ein Modul. Die Zusage "ein Waechter
+// gibt garantiert etwas Einmaliges" gilt also weiter - nur eben zweigeteilt. Beide Aeste werden
+// geprueft, sonst koennte einer davon still verschwinden.
+{
+  const i = js.indexOf('const relikt = abgrundReliktDef(tiefe);');
+  const zweig = i > 0 ? js.slice(i, i + 1600) : '';
+  check('11: der Erstsieg ueber einen Waechter gibt seine Reliquie',
+    /a\.relikte\[relikt\.key\] = true/.test(zweig));
+  check('11: jeder weitere Sieg gibt weiterhin garantiert ein Modul',
+    /reliktNeu \? null : grantRandomModule\(\)/.test(zweig));
+}
 // ---- Gegenmassnahme ----
 {
   const roh = G.abgrundSektor(17); // Tiefe >= 15 -> drei Mutatoren
