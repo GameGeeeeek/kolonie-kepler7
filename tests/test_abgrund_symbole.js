@@ -255,5 +255,55 @@ const fehlendeRuecksicht = bewegteKlassen.filter(k => {
 check('8: jede neue Bewegung steht bei prefers-reduced-motion still',
   fehlendeRuecksicht.length === 0, fehlendeRuecksicht);
 
+// ---- 9) Lebendes Panorama (v8.329.0, Entwurf 06) ----
+// Parallax hat genau zwei Arten, still kaputtzugehen, und beide sieht man erst nach Sekunden:
+//   a) Eine Bahn ohne Kopie reisst nach einem Durchlauf eine leere Bahn auf.
+//   b) Der Verschiebeweg im CSS und die Bildhoehe im JS laufen auseinander - dann springt das Bild
+//      bei jedem Durchlauf. Das ist der CLAUDE.md-Regel-6-Fall in Reinform: EINE Groesse, zwei
+//      Stellen. Deshalb wird die Hoehe aus dem Quelltext gezogen und mit dem Keyframe verglichen,
+//      statt beide Zahlen hier abzuschreiben.
+const panoMitFall = panoUmgebung(sek(20, ['nullzone']), true);
+const panoOhneFall = panoUmgebung(sek(20, ['nullzone']), false);
+check('9: das Panorama hat drei getrennte Zieh-Schichten',
+  ['pano-fern','pano-mitte','pano-nah'].every(k => panoOhneFall.includes('class="'+k+'"')));
+check('9: die Klasse "faellt" haengt NUR dran, solange ein Tauchgang laeuft',
+  panoMitFall.includes('abgrund-panorama faellt') && !panoOhneFall.includes('faellt'));
+// Jede Bahn traegt ihren Inhalt zweimal - einmal am Platz, einmal um H versetzt.
+const hoeheJs = Number((fnAus('abgrundPanorama').match(/W = \d+, H = (\d+)/)||[])[1]);
+// Gesucht wird die WOERTLICHE Zeichenkette statt einer zusammengebauten Regex: Beim ersten Anlauf
+// standen hier RegExp-Literale aus Strings, deren Escapes durch zwei Ebenen liefen und am Ende
+// etwas anderes suchten als gemeint. Der Test war gruen-blind, nicht der Code kaputt.
+const marke = '<g transform="translate(0,'+hoeheJs+')">';
+check('9: jede Zieh-Schicht enthaelt eine um die Bildhoehe versetzte Kopie',
+  panoOhneFall.split(marke).length - 1 === 3,
+  { hoehe: hoeheJs, kopien: panoOhneFall.split(marke).length - 1 });
+const keyframeWeg = Number((src.match(/@keyframes panoZug \{ from \{ transform: translateY\(0\); \} to \{ transform: translateY\(-(\d+)px\); \} \}/)||[])[1]);
+check('9: der Verschiebeweg im CSS entspricht exakt der Bildhoehe im JS',
+  keyframeWeg === hoeheJs, { css: keyframeWeg, js: hoeheJs });
+// Fallend muss schneller sein als treibend, sonst traegt die Geschwindigkeit keine Auskunft mehr.
+// Die Regel wird ueber ihren Anfang gefunden und danach die erste Sekundenzahl gelesen.
+function sekundenNach(anfang){
+  const i = src.indexOf(anfang);
+  if (i < 0) return NaN;
+  const m = src.slice(i, i + 160).match(/(\d+(?:\.\d+)?)s/);
+  return m ? Number(m[1]) : NaN;
+}
+const dauer = (kl, imFall) => sekundenNach(imFall ? '.abgrund-panorama.faellt .'+kl : '\n    .'+kl+' ');
+const schichten = ['pano-fern','pano-mitte','pano-nah'];
+const zuLangsam = schichten.filter(k => !(dauer(k,true) > 0 && dauer(k,true) < dauer(k,false)));
+check('9: im Tauchgang zieht jede Schicht schneller als im Ruhezustand', zuLangsam.length === 0,
+  schichten.map(k => k+': '+dauer(k,false)+'s -> '+dauer(k,true)+'s'));
+// Parallax heisst: verschiedene Geschwindigkeiten. Sind alle gleich, ist es nur ein Schwenk.
+const ruhe = schichten.map(k => dauer(k,false));
+check('9: die drei Schichten ziehen wirklich verschieden schnell (sonst kein Parallax)',
+  new Set(ruhe).size === 3 && ruhe[0] > ruhe[1] && ruhe[1] > ruhe[2], ruhe);
+check('9: auch das Panorama steht bei prefers-reduced-motion still',
+  /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.pano-fern, \.pano-mitte, \.pano-nah \{ animation:none; \}/.test(src));
+// Der Grund darf NICHT mitziehen - ein wandernder Boden kehrt die Leserichtung um.
+const nachFest = panoOhneFall.split('</g>').pop();
+check('9: der Grund liegt ausserhalb der Zieh-Schichten',
+  /fill="#141a30"/.test(panoOhneFall.replace(/<g class="pano-[a-z]+">[\s\S]*?<\/g><\/g>/g, '')),
+  { rest: nachFest.length });
+
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
 process.exit(fail ? 1 : 0);
