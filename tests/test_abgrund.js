@@ -22,6 +22,7 @@
 //  10) Wochenlauf, Tiefensonde, Allianz-Tiefenlauf (v8.322.0)
 //  11) Waechter-Tiefen, Mutator-Gegenmassnahmen, Abgrund-Titel (v8.323.0)
 //  12) Auffindbarkeit der Werkstatt und laute Fehlermeldung (v8.324.0)
+//  13) Grafik: Sektor-Siegel je Tiefe und Tiefenprofil (v8.326.0)
 const fs = require('fs');
 const path = require('path');
 const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
@@ -321,8 +322,26 @@ check('8: jedes <details> der Abgrund-Box hat data-keep-open',
 check('8: die gewaehlte Tauchtiefe liegt im Spielstand, nicht nur im DOM',
   /z\.tiefe = Math\.max\(1, Math\.min\(abgrundMaxTiefe\(\)/.test(boxQuelle) && !/<select/.test(boxQuelle));
 // Hilfe und Patchnotes: neue Mechanik ohne Erklaerung ist halbe Arbeit (CLAUDE.md Punkt 5).
-check('8: es gibt einen Hilfe-Abschnitt zum Abgrund',
-  /title:'Der Abgrund[^']*',\s*body:'/.test(js));
+// Seit v8.326.0 ist die Abgrund-Hilfe ein EIGENER Abschnitt mit mehreren Eintraegen, kein
+// Sammelabsatz mehr unter "Grundlagen". Vorher war es ein einziger Eintrag mit 581 Woertern, an
+// den ueber fuenf Versionen immer weiter angehaengt wurde - und er stand im Einsteiger-Abschnitt,
+// obwohl der Abgrund Endgame-Inhalt ist.
+{
+  const i = js.indexOf("{ key:'abgrund', icon:'ti-infinity', title:'Der Abgrund', entries:[");
+  check('8: der Abgrund hat einen EIGENEN Hilfe-Abschnitt', i > 0);
+  const ende = i > 0 ? js.indexOf('\n    ]},', i) : -1;
+  const abschnitt = i > 0 && ende > i ? js.slice(i, ende) : '';
+  const eintraege = (abschnitt.match(/\{ title:'/g) || []).length;
+  check('8: er ist in mehrere Eintraege gegliedert, keine Textwand', eintraege >= 5, { eintraege });
+  // Kein Einzeleintrag darf wieder zur Wand werden - genau so ist der alte entstanden.
+  const laengen = [...abschnitt.matchAll(/body:'((?:[^'\\]|\\.)*)'/g)].map(m => m[1].length);
+  check('8: kein einzelner Hilfe-Eintrag ist laenger als 2000 Zeichen',
+    laengen.length > 0 && Math.max.apply(null, laengen) <= 2000,
+    { laengen, laengster: laengen.length ? Math.max.apply(null, laengen) : 0 });
+  // Und der alte Sammelabsatz darf nicht danebenstehen geblieben sein.
+  check('8: der alte Sammelabsatz unter "Grundlagen" ist verschwunden',
+    (js.match(/title:'Der Abgrund – endlos neue Sektoren'/g) || []).length === 0);
+}
 check('8: der oberste Patchnotes-Eintrag beschreibt den Abgrund',
   /version:'8\.320\.0'[\s\S]{0,4000}Abgrund/.test(js));
 
@@ -590,6 +609,67 @@ check('11: der Bann kommt bei der Aufloesung aus der MISSION',
   check('12: die Meldung stellt klar, dass der eigene Tauchgang zaehlt',
     /eigener Tauchgang ist davon nicht betroffen/.test(meldeQ));
 }
+
+// ---- 13) Grafik: Sektor-Siegel und Tiefenprofil (v8.326.0) ----
+// Der Abgrund war bis v8.325.0 reine Schrift. Ein System, dessen ganzer Reiz "jede Tiefe ist ein
+// anderer Ort" ist, sah an jedem Ort gleich aus.
+{
+  const GG = baueKontext(neuerZustand());
+  const siegelQ = fnAus('abgrundSiegel');
+  check('13: es gibt ein Sektor-Siegel und ein Tiefenprofil',
+    siegelQ.length > 100 && fnAus('abgrundTiefenprofil').length > 100);
+  // Das Siegel muss aus der TIEFE kommen, nicht aus dem Zufall - sonst zeichnet jeder Tick ein
+  // anderes Bild und die Zusage "Tiefe 47 ist fuer alle dieselbe" gilt fuer das Wappen nicht.
+  check('13: das Siegel wird gewuerfelt wie der Sektor: aus der Tiefe, nicht aus Math.random',
+    /abgrundRng\(/.test(siegelQ) && !/Math\.random/.test(siegelQ));
+}
+{
+  // Ausfuehren statt nur lesen: dieselbe Tiefe muss dasselbe Markup ergeben, verschiedene Tiefen
+  // verschiedenes. Dafuer werden die echten Funktionen mit den Sektoren gefuettert.
+  const zeichner = new Function('ABGRUND_WAECHTER_ALLE',
+    [konstAus('ABGRUND_SIEGEL_KERNE'), konstAus('ABGRUND_SIEGEL_RINGE'),
+     fnAus('abgrundRng'), fnAus('abgrundSiegel'), fnAus('abgrundTiefenprofil'),
+     'return { abgrundSiegel, abgrundTiefenprofil };'].join('\n'))(G.ABGRUND_WAECHTER_ALLE);
+  const s20a = zeichner.abgrundSiegel(G.abgrundSektor(20), 56);
+  const s20b = zeichner.abgrundSiegel(G.abgrundSektor(20), 56);
+  check('13: dieselbe Tiefe ergibt exakt dasselbe Siegel', s20a === s20b, { laenge:s20a.length });
+  const bilder = new Set();
+  for (let t = 1; t <= 120; t++) bilder.add(zeichner.abgrundSiegel(G.abgrundSektor(t), 56));
+  check('13: 120 Tiefen ergeben ueberwiegend verschiedene Siegel',
+    bilder.size >= 100, { verschieden:bilder.size, von:120 });
+  check('13: das Siegel ist gueltiges, in sich geschlossenes SVG',
+    /^<svg /.test(s20a) && /<\/svg>$/.test(s20a) && !/undefined|NaN/.test(s20a));
+  // Waechtertiefen muessen sich auch im Bild unterscheiden - die Farbe traegt Information.
+  // ACHTUNG, hier steckte ein Loch: Die erste Fassung prueft nur, OB die Waechterfarbe vorkommt.
+  // Das kleine Waechter-Dreieck traegt sie aber ohnehin, also blieb die Pruefung gruen, als die
+  // Farbcodierung von Ring, Speichen und Kern absichtlich abgeschaltet wurde. Jetzt wird gezaehlt:
+  // ein Waechtersiegel muss die Farbe MEHRFACH tragen (Ring, Speichen, Kern, Marke), ein normales
+  // ueberhaupt nicht.
+  const w = zeichner.abgrundSiegel(G.abgrundSektor(20), 56);
+  const n = zeichner.abgrundSiegel(G.abgrundSektor(21), 56);
+  const zaehle = (t,f) => (t.match(new RegExp(f,'g'))||[]).length;
+  check('13: eine Waechtertiefe faerbt das ganze Siegel, nicht nur die Marke',
+    zaehle(w,'#e24b4a') >= 3 && zaehle(n,'#e24b4a') === 0,
+    { waechter:zaehle(w,'#e24b4a'), normal:zaehle(n,'#e24b4a') });
+  // Und die Farbe muss die Zahl der Mutatoren abbilden - sonst ist sie reine Dekoration.
+  const farbeVon = t => (zeichner.abgrundSiegel(G.abgrundSektor(t), 56).match(/#[0-9a-f]{6}/g)||[])
+    .filter(f => f !== '#0d1224')[0];
+  const einer = farbeVon(2), zweier = farbeVon(7), dreier = farbeVon(17);
+  check('13: die Siegelfarbe unterscheidet ein, zwei und drei Mutatoren',
+    einer && zweier && dreier && new Set([einer, zweier, dreier]).size === 3,
+    { einMutator:einer, zwei:zweier, drei:dreier });
+  // Profil: Marken fuer jeden Waechter bis zum naechsten Ziel, keine kaputten Zahlen.
+  const profil = zeichner.abgrundTiefenprofil(23, 24);
+  check('13: das Tiefenprofil zeichnet die Waechter als Marken',
+    /^<svg /.test(profil) && !/undefined|NaN/.test(profil) &&
+    (profil.match(/<path d="M[\d.]+ 20 L/g)||[]).length >= 3,
+    { marken:(profil.match(/<path d="M[\d.]+ 20 L/g)||[]).length });
+  check('13: auch ohne jeden Tauchgang ergibt das Profil ein gueltiges Bild',
+    /^<svg /.test(zeichner.abgrundTiefenprofil(0, 1)) && !/NaN/.test(zeichner.abgrundTiefenprofil(0, 1)));
+}
+check('13: die Sektorkarte zeigt Siegel und Profil',
+  /abgrundSiegel\(sektor, 56\)/.test(fnAus('renderAbgrundBox')) &&
+  /abgrundTiefenprofil\(a\.best\|\|0, tiefe\)/.test(fnAus('renderAbgrundBox')));
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);
