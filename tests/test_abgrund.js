@@ -39,6 +39,13 @@ function block(name){
   for(;k<js.length;k++){ if(js[k]==='[')d++; else if(js[k]===']'){d--; if(!d)break;} }
   return js.slice(s, k+1);
 }
+function objBlock(name){
+  const i = js.indexOf('const '+name+' = {');
+  if (i < 0) throw new Error('Objekt nicht gefunden: '+name);
+  let d=0, s=js.indexOf('{', i), k=s;
+  for(;k<js.length;k++){ if(js[k]==='{')d++; else if(js[k]==='}'){d--; if(!d)break;} }
+  return js.slice(s, k+1);
+}
 function fnAus(name){
   const i = js.indexOf('function '+name+'(');
   if (i < 0) throw new Error('Funktion nicht gefunden: '+name);
@@ -130,9 +137,14 @@ check('1: der Name enthaelt griechischen Buchstaben und Katalognummer',
 // ---- 2) Mutatoren ----
 const MUT = G.ABGRUND_MUTATOREN;
 check('2: es gibt mindestens 18 Mutatoren', MUT.length >= 18, { anzahl:MUT.length });
-check('2: jeder hat Schluessel, Namen, Icon und vollstaendige Beschreibung (CLAUDE.md Regel 7)',
-  MUT.every(m => m.key && m.name && m.icon && typeof m.desc === 'string' && m.desc.length >= 60 && /[.!]$/.test(m.desc.trim())),
-  MUT.filter(m => !(m.key && m.name && m.icon && m.desc && m.desc.length >= 60)).map(m=>m.key));
+// Das Bild ist seit v8.328.0 KEIN Schrift-Icon mehr, sondern eine gezeichnete Form in
+// ABGRUND_SYMBOLE (davor hatten vier Paare dasselbe ti-Icon, siehe tests/test_abgrund_symbole.js).
+// Diese Pruefung wurde deshalb umgestellt statt gestrichen - ein Mutator ohne Bild bleibt ein
+// Verstoss gegen CLAUDE.md Regel 7, nur liegt das Bild jetzt woanders.
+const SYMBOLE = eval('('+objBlock('ABGRUND_SYMBOLE')+')');
+check('2: jeder hat Schluessel, Namen, gezeichnetes Symbol und vollstaendige Beschreibung (CLAUDE.md Regel 7)',
+  MUT.every(m => m.key && m.name && SYMBOLE[m.key] && typeof m.desc === 'string' && m.desc.length >= 60 && /[.!]$/.test(m.desc.trim())),
+  MUT.filter(m => !(m.key && m.name && SYMBOLE[m.key] && m.desc && m.desc.length >= 60)).map(m=>m.key));
 const WIRKFELDER = ['atk','def','loot','shards','dur','loss'];
 check('2: jeder Mutator wirkt auf mindestens ein Feld',
   MUT.every(m => WIRKFELDER.some(f => typeof m[f] === 'number')),
@@ -296,12 +308,16 @@ check('7: Vorschau und Aufloesung teilen sich eine Kampfkraft-Funktion',
 check('8: die Rohstoffbeute bleibt auch in Tiefe 10.000 weit unter dem Ressourcen-Limit',
   Math.max.apply(null, Object.values(G.abgrundSektor(10000).loot)) < 1e12,
   { maxBeute:Math.max.apply(null, Object.values(G.abgrundSektor(10000).loot)) });
-// Icons: alle Mutator- und Werkstatt-Icons muessen in der Font-Whitelist liegen. check-icons.js
-// prueft nur ti-*-Vorkommen im Markup; diese hier stehen in Datenfeldern.
+// Icons: die Werkstatt-Zweige tragen weiterhin Schrift-Icons und muessen deshalb in der
+// Font-Whitelist liegen. check-icons.js prueft nur ti-*-Vorkommen im MARKUP; diese hier stehen in
+// Datenfeldern und faenden dort niemanden. Die Mutatoren sind seit v8.328.0 gezeichnet und deshalb
+// hier raus - fuer sie prueft tests/test_abgrund_symbole.js Vollstaendigkeit UND Eindeutigkeit.
 const whitelist = new Set((js + src).match(/\.ti-[a-z0-9-]+:before/g).map(s => s.slice(1).replace(':before','')));
-const fehlendeIcons = MUT.concat(WS).map(x=>x.icon).filter(i => !whitelist.has(i));
-check('8: alle Mutator- und Werkstatt-Icons sind im Icon-Subset enthalten',
+const fehlendeIcons = WS.map(x=>x.icon).filter(i => !whitelist.has(i));
+check('8: alle Werkstatt-Icons sind im Icon-Subset enthalten',
   fehlendeIcons.length === 0, fehlendeIcons);
+check('8: kein Mutator traegt noch ein Schrift-Icon-Feld (das Bild kommt aus ABGRUND_SYMBOLE)',
+  MUT.every(m => !m.icon), MUT.filter(m=>m.icon).map(m=>m.key));
 // Chronik: echte Lese-Inhalte, keine Platzhalter.
 const CH = G.ABGRUND_CHRONIK;
 check('8: die Chronik hat mindestens 16 Eintraege mit echtem Text',

@@ -1424,6 +1424,39 @@
     /* Trennlinie der Tiefensonden-Vorschau. Als Klasse und nicht inline, weil Rahmenangaben in
        JS-Vorlagen von keiner CSS-Regel mehr korrigiert werden koennen (siehe test_formensprache). */
     .sonde-vorschau { border-top: var(--hair, 1px) solid var(--elev-2); }
+    /* Wächter-Tafel (v8.328.0): Portrait links, Text rechts. Das Portrait bekommt als einziges
+       Element des Abgrunds eine eigene Bewegung - ein sehr langsames Atmen, 6 Sekunden je Zug. Der
+       Grund ist inhaltlich, nicht dekorativ: Ein Wächter ist die einzige Tiefe, in der etwas WARTET,
+       und ein Bild, das sich kaum merklich bewegt, liest sich anders als eins, das stillsteht.
+       Alle übrigen Tiefen bleiben bewusst reglos, sonst wäre der Unterschied keiner mehr. */
+    /* Abstiegs-Panorama (v8.328.0): der gezeichnete Schnitt über der Sektorkarte. Er ist Bild, kein
+       Bedienelement – deshalb display:block und keine eigene Interaktion. Die Höhe steht fest, die
+       Breite folgt der Karte (preserveAspectRatio="none" im SVG, siehe abgrundPanorama). */
+    .abgrund-panorama { display:block; width:100%; }
+    /* Tauchgang-Streifen (v8.328.0): läuft NUR, solange eine Abgrund-Mission unterwegs ist. Bis
+       hierher passierte beim Abtauchen nichts Sichtbares – der Knopf wurde grau, mehr nicht.
+       Reines CSS auf einem festen Verlauf: kein Neuzeichnen der Box, keine Kosten pro Sekunde. */
+    .tauchgang-streifen { position:relative; overflow:hidden; height:16px; }
+    .tauchgang-streifen::before {
+      content:""; position:absolute; inset:-100% 0;
+      background: repeating-linear-gradient(to bottom, rgba(195,190,245,0.45) 0 2px, transparent 2px 22px);
+      animation: tauchgangZug 1.1s linear infinite;
+    }
+    @keyframes tauchgangZug { from { transform: translateY(0); } to { transform: translateY(22px); } }
+    @media (prefers-reduced-motion: reduce) { .tauchgang-streifen::before { animation:none; } }
+    /* Kartenraum (v8.328.0): senkrechte Stationsliste. Die durchgehende Linie links entsteht aus
+       dem Rand des Marken-Feldes, nicht aus einem eigenen Element – so bleibt sie automatisch so
+       lang wie die Liste. Verschlossene Stationen bekommen sie gestrichelt: gleiche Linie, anderer
+       Zustand. */
+    .kartenraum-station { display:flex; gap:10px; align-items:center; padding:6px 0; }
+    .kartenraum-marke { flex-shrink:0; width:44px; display:flex; justify-content:center; align-items:center;
+      border-left: var(--bw-2, 2px) solid rgba(226,75,74,0.55); padding-left:8px; min-height:40px; }
+    .kartenraum-station.offen .kartenraum-marke { border-left-style:dashed; border-left-color:#3a3f56; }
+    .kartenraum-station.offen { opacity:0.55; }
+    .waechter-tafel { display:flex; gap:10px; align-items:center; }
+    .waechter-portrait { flex-shrink:0; line-height:0; animation: waechterAtem 6s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(226,75,74,0.45)); }
+    @keyframes waechterAtem { 0%,100% { opacity:0.72; transform:scale(1); } 50% { opacity:1; transform:scale(1.04); } }
+    @media (prefers-reduced-motion: reduce) { .waechter-portrait { animation:none; opacity:1; } }
     .progress-inner { height:100%; background: linear-gradient(90deg,#378ADD,var(--c-secondary)); transition: width 0.3s linear; box-shadow:0 0 8px rgba(var(--secondary-rgb), 0.5); }
     /* Bug entdeckt+behoben (Grafik-Runde 2): attackbar hatte bisher trotz rotem Verlauf den grünen
        box-shadow-Glow von .progress-inner geerbt (dort für rgba(--secondary-rgb) fest verdrahtet) -
@@ -5049,8 +5082,18 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.327.0';
+  const VERSION = '8.328.0';
   const PATCHNOTES = [
+    { version:'8.328.0', date:'28.07.2026', changes:[
+      '<strong>Alle 24 Mutatoren haben jetzt ein eigenes gezeichnetes Symbol.</strong> Vorher trugen sie Schrift-Icons – und davon <em>vier Paare doppelt</em>: Kristallsporen und Kristallschlund sahen gleich aus, ebenso Spiegelfeld und Funkenflug, Splitterregen und Blindgänger, Resonanzader und Altes Signal. Zwei verschiedene Umgebungsregeln waren am Bild nicht zu unterscheiden, ausgerechnet dort, wo man in zwei Sekunden erkennen will, was einen unten erwartet.',
+      '<strong>Die zwölf Wächter haben Portraits.</strong> Zwölf eigene Texte, aber bis hierher zwölfmal derselbe Totenkopf. Jedes Portrait zeichnet, was im Text steht: Die <em>Stille Masse</em> ist ein Körper ohne ein einziges Merkmal, der <em>Chor der Verlorenen</em> sind Bugspitzen nach innen, der <em>Zählende</em> eine steigende Zahl, das <em>Offene Tor</em> steht offen. Als einziges Bild im Abgrund atmet es – sehr langsam, sechs Sekunden je Zug –, weil ein Wächter die einzige Tiefe ist, in der etwas <em>wartet</em>.',
+      '<strong>Die Tiefensonde zeigt die Mutatoren jetzt als Symbolreihe</strong> statt als Komma-Aufzählung, mit Namen darunter. Die Symbole sind die schnelle Ebene, die Namen bleiben die sichere – ein reiner Symbolbalken wäre für jemanden, der ein Zeichen noch nicht kennt, unlesbar, und ein Tooltip hilft auf dem Telefon niemandem.',
+      '<strong>Ein Abstiegs-Panorama über der Sektorkarte.</strong> Ein gezeichneter Schnitt durch den Sektor, der sich mit der Tiefe verändert: Oben stehen noch Sterne, weiter unten werden sie weniger und die Schwaden dichter, ab etwa Tiefe 60 ist der letzte weg. Die Mutatoren malen mit – Kristallsporen setzen Kristalle auf den Grund, Trümmerfelder Wrackkanten, der Ionensturm Entladungen, und die Leerenstille räumt alles ab. Ein Wächter ragt als roter Körper aus dem Grund. Alles aus derselben Tiefe gerechnet wie der Sektor selbst, also für jeden Kommandanten gleich.',
+      '<strong>Der Kartenraum</strong> – ein neues Aufklappfeld, das jede Wächtertiefe als Station deines Abstiegs zeigt: Portrait, Sektorname, Siegel und der Tag, an dem du sie zum ersten Mal bezwungen hast. Darunter steht immer genau die nächste, noch verschlossene. Das ist der Ort, an dem der Abgrund die Geschichte deines Kontos erzählt statt einer Zahl. Für Wächter, die du vor dieser Version bezwungen hast, gibt es kein Datum – dort steht „bezwungen" ohne Tag statt eines erfundenen.',
+      '<strong>Beim Abtauchen sieht man jetzt, dass etwas läuft:</strong> ein fallender Streifen an der Sektorkarte, solange die Flotte unterwegs ist. Vorher wurde nur der Knopf grau.',
+      'Der Erfolg „Vollständiges Verzeichnis" sprach noch von <strong>18</strong> Mutatoren, obwohl es seit v8.326.0 vierundzwanzig sind – die Fortschrittsanzeige darunter zählte längst richtig.',
+      'Im <strong>Tiefenprofil</strong> hing die Beschriftung der letzten Wächtermarke halb außerhalb des Bildes – aus „40" wurde „4C". Die Zahlen rücken jetzt so weit nach innen, dass sie ganz zu sehen sind, die Rauten bleiben an ihrem Platz.'
+    ]},
     { version:'8.327.0', date:'28.07.2026', changes:[
       '<strong>Das Unterstützer-Abzeichen schaltet sich jetzt von selbst frei</strong> (Spieler-Report: hat gespendet, aber nie eine Kaffeetasse bekommen). Bisher war das ein Handgriff ganz unten im Fortschritt-Tab – wer nach der Spende nie dorthin scrollte, bekam sein Abzeichen nie, und nichts im Spiel sagte ihm, dass da noch ein Schritt fehlt. Ist deine Ko-fi-E-Mail hinterlegt, fragt das Spiel jetzt von selbst nach: kurz nach dem Start, danach halbstündlich, und sofort wenn du aus dem Ko-fi-Tab zurückkommst. Sobald die Spende ankommt, erscheint die Tasse mit einer Meldung.',
       '<strong>Der Unterstützer-Bereich sagt dir jetzt, woran du bist.</strong> Vorher stand dort nur ein leeres Eingabefeld, egal ob dein Abzeichen längst lief oder gar nichts verknüpft war. Jetzt steht die Stufe da, wie viele Tage es noch läuft – oder mit welcher Adresse du verknüpft bist, falls noch keine Spende zugeordnet werden konnte.',
@@ -13849,7 +13892,7 @@
     { key:'abgrund10', name:'Tiefenlotse', desc:'Erreiche im Abgrund die Rekordtiefe 10.', check: s => ((s.abgrund&&s.abgrund.best)||0) >= 10, progress: s => [Math.min(10,(s.abgrund&&s.abgrund.best)||0), 10], reward:{erz:8000,kristalle:5000,credits:400}, xpReward:200 },
     { key:'abgrund25', name:'Grenzgänger der Tiefe', desc:'Erreiche im Abgrund die Rekordtiefe 25.', check: s => ((s.abgrund&&s.abgrund.best)||0) >= 25, progress: s => [Math.min(25,(s.abgrund&&s.abgrund.best)||0), 25], reward:{erz:20000,kristalle:14000,deuterium:7000,credits:1200}, xpReward:400 },
     { key:'abgrund50', name:'Ohne Boden', desc:'Erreiche im Abgrund die Rekordtiefe 50.', check: s => ((s.abgrund&&s.abgrund.best)||0) >= 50, progress: s => [Math.min(50,(s.abgrund&&s.abgrund.best)||0), 50], reward:{erz:60000,kristalle:40000,deuterium:20000,antimaterie:200,credits:3000}, xpReward:800 },
-    { key:'abgrundmutatoren', name:'Vollständiges Verzeichnis', desc:'Begegne allen 18 Mutatoren des Abgrunds mindestens einmal.', check: s => ABGRUND_MUTATOREN.every(m => ((s.abgrund&&s.abgrund.gesehen)||{})[m.key]), progress: s => [ABGRUND_MUTATOREN.filter(m => ((s.abgrund&&s.abgrund.gesehen)||{})[m.key]).length, ABGRUND_MUTATOREN.length], reward:{kristalle:25000,antimaterie:120,credits:1500}, xpReward:500 },
+    { key:'abgrundmutatoren', name:'Vollständiges Verzeichnis', desc:'Begegne allen 24 Mutatoren des Abgrunds mindestens einmal.', check: s => ABGRUND_MUTATOREN.every(m => ((s.abgrund&&s.abgrund.gesehen)||{})[m.key]), progress: s => [ABGRUND_MUTATOREN.filter(m => ((s.abgrund&&s.abgrund.gesehen)||{})[m.key]).length, ABGRUND_MUTATOREN.length], reward:{kristalle:25000,antimaterie:120,credits:1500}, xpReward:500 },
     { key:'allresearchmax', name:'Forschungs-Meister', desc:'Bringe alle Forschungszweige auf ihre jeweilige Maximalstufe.', check: s => RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).every(r => (s.research[r.key]||0) >= r.maxLevel), progress: s => [RESEARCH_DEFS.filter(r=>(s.research[r.key]||0)>=r.maxLevel).length, RESEARCH_DEFS.length], reward:{erz:12000,kristalle:8000,deuterium:4000,antimaterie:150,credits:500}, xpReward:500 },
     { key:'forschungsnexus', name:'Wächter des Wissens', desc:'Errichte den Forschungs-Nexus (erfordert alle Forschungszweige auf Maximalstufe).', check: s => !!((s.megaProjects||{}).forschungsnexus), progress: s => [((s.megaProjects||{}).forschungsnexus)?1:0, 1], reward:{erz:10000,kristalle:7000,deuterium:3500,antimaterie:150,credits:500}, xpReward:500 },
     { key:'allmegaprojects', name:'Architekt der Sterne', desc:'Errichte alle drei Mega-Projekte (Dyson-Schwarm, Void-Reaktor, Forschungs-Nexus).', check: s => MEGA_PROJECTS.every(p => !!((s.megaProjects||{})[p.key])), progress: s => [MEGA_PROJECTS.filter(p=>!!((s.megaProjects||{})[p.key])).length, MEGA_PROJECTS.length], reward:{erz:20000,kristalle:14000,deuterium:7000,antimaterie:300,credits:1000}, xpReward:800 },
@@ -22937,8 +22980,8 @@
     // einer Wand: Wer nur wissen will, was ein Waechter ist, soll nicht sechs Absaetze ueberspringen.
     { key:'abgrund', icon:'ti-infinity', title:'Der Abgrund', entries:[
       { title:'Was der Abgrund ist und wo du ihn findest', body:'Unter der Galaxie liegt eine Tiefe ohne Boden. Du findest sie im Reiter <strong>Galaxie</strong> im eigenen Unterreiter <strong>„Der Abgrund"</strong>, direkt hinter „Kampf &amp; Eroberung". Geöffnet wird sie von der Forschung <strong>Singularitätsphysik</strong> – vorher siehst du dort nur eine verschlossene Karte. Jede <strong>Tiefe</strong> ist ein eigener, benannter Sektor: du schickst eine Angriffsflotte hin, sie fliegt eine Weile, und bei der Ankunft wird wie überall in drei Phasen gekämpft. Ein <strong>Sieg</strong> schaltet die nächste Tiefe frei, eine <strong>Niederlage</strong> kostet Schiffe, lässt die Tiefe aber erreichbar. Nach unten ist nichts begrenzt: Es gibt keine letzte Tiefe, nur die, an der deine Flotte nicht mehr weiterkommt.' },
-      { title:'Mutatoren – warum keine zwei Tiefen gleich sind', body:'Auf jedem Sektor liegen <strong>Mutatoren</strong>: Umgebungsregeln, die den Kampf wirklich verändern. Der <strong>Ionensturm</strong> nimmt dir ein Viertel deiner Kampfkraft, die <strong>Wracklinie</strong> schenkt 80% mehr Rohstoffbeute und gibt dem Gegner Deckung, die <strong>Phosphorwolke</strong> frisst Rohstoffe und lässt dafür mehr Splitter auskristallisieren. Es gibt <strong>24</strong> davon; bis Tiefe 5 liegt einer auf einem Sektor, danach zwei, ab Tiefe 15 immer drei. Welche Flotte sich lohnt, entscheidet sich damit bei jeder Tiefe neu. Ein Sektor wird aus seiner Tiefe <strong>berechnet</strong>, nicht gewürfelt: Tiefe 47 ist für jeden Spieler dieselbe, mit demselben Namen, denselben Mutatoren und demselben Siegel – und ein Neuladen würfelt keinen bequemeren Sektor. Genau deshalb kannst du dich in der Allianz über Tiefen austauschen.' },
-      { title:'Wächter – jede zehnte Tiefe ist eine Wegmarke', body:'Auf jeder zehnten Tiefe wartet ein <strong>Wächter</strong>: ein benannter Gegner mit eigenem Text, den du im Sektor gleich mitliest. Es gibt zwölf – <em>Die Stille Masse</em>, <em>Der Wandelnde Riss</em>, <em>Chor der Verlorenen</em> und neun weitere –, danach kehren sie mit Zählnummer wieder. Der Abstieg endet nie, die Namensliste schon. Ein Wächter ist <strong>60% stärker</strong> als der Sektor sonst wäre, lässt dafür aber <strong>garantiert ein Modul</strong> fallen und gibt die <strong>dreifache</strong> Splitterausbeute. Er kämpft nicht anders als alles andere – was ihn ausmacht, ist Stärke und Belohnung, keine Sonderregel. Im <strong>Tiefenprofil</strong> über der Sektorkarte siehst du alle Wächter als Rauten: gefüllt heißt bezwungen, grau heißt, dort liegt dein nächstes Ziel.' },
+      { title:'Mutatoren – warum keine zwei Tiefen gleich sind', body:'Auf jedem Sektor liegen <strong>Mutatoren</strong>: Umgebungsregeln, die den Kampf wirklich verändern. Der <strong>Ionensturm</strong> nimmt dir ein Viertel deiner Kampfkraft, die <strong>Wracklinie</strong> schenkt 80% mehr Rohstoffbeute und gibt dem Gegner Deckung, die <strong>Phosphorwolke</strong> frisst Rohstoffe und lässt dafür mehr Splitter auskristallisieren. Es gibt <strong>24</strong> davon; bis Tiefe 5 liegt einer auf einem Sektor, danach zwei, ab Tiefe 15 immer drei. Jeder Mutator hat ein <strong>eigenes gezeichnetes Symbol</strong>; in der Tiefensonde und auf der Sektorkarte erkennst du die Lage damit, bevor du einen Satz gelesen hast. Welche Flotte sich lohnt, entscheidet sich damit bei jeder Tiefe neu. Ein Sektor wird aus seiner Tiefe <strong>berechnet</strong>, nicht gewürfelt: Tiefe 47 ist für jeden Spieler dieselbe, mit demselben Namen, denselben Mutatoren und demselben Siegel – und ein Neuladen würfelt keinen bequemeren Sektor. Genau deshalb kannst du dich in der Allianz über Tiefen austauschen. Über der Sektorkarte steht ein <strong>Abstiegs-Panorama</strong>: ein gezeichneter Schnitt durch den Sektor, der mit der Tiefe dunkler und enger wird und auf dem die anwesenden Mutatoren mitmalen.' },
+      { title:'Wächter – jede zehnte Tiefe ist eine Wegmarke', body:'Auf jeder zehnten Tiefe wartet ein <strong>Wächter</strong>: ein benannter Gegner mit eigenem Text und <strong>eigenem Portrait</strong>, beides liest du im Sektor gleich mit. Die Zeichnung zeigt nicht ein Monster, sondern das, was im Text steht – die Stille Masse ist ein Körper ohne jedes Merkmal, der Chor sind Bugspitzen nach innen, das Offene Tor steht offen. Es gibt zwölf – <em>Die Stille Masse</em>, <em>Der Wandelnde Riss</em>, <em>Chor der Verlorenen</em> und neun weitere –, danach kehren sie mit Zählnummer wieder. Der Abstieg endet nie, die Namensliste schon. Ein Wächter ist <strong>60% stärker</strong> als der Sektor sonst wäre, lässt dafür aber <strong>garantiert ein Modul</strong> fallen und gibt die <strong>dreifache</strong> Splitterausbeute. Er kämpft nicht anders als alles andere – was ihn ausmacht, ist Stärke und Belohnung, keine Sonderregel. Im <strong>Tiefenprofil</strong> über der Sektorkarte siehst du alle Wächter als Rauten: gefüllt heißt bezwungen, grau heißt, dort liegt dein nächstes Ziel. Im <strong>Kartenraum</strong> weiter unten steht jede Wächtertiefe als Station deines Abstiegs – mit Portrait, Sektornamen, Siegel und dem Tag der Ersteroberung.' },
       { title:'Die Abgrund-Werkstatt – wofür du Splitter ausgibst', body:'Siege bringen <strong>Abgrundsplitter</strong>. Ausgeben kannst du sie nur an einer Stelle: in der <strong>Abgrund-Werkstatt</strong>, dem ersten Aufklappfeld unter der Sektorkarte. Fünf Zweige: <strong>Verstärkte Druckhülle</strong> (+2% Kampfkraft je Stufe, max. +100%), <strong>Tiefenpanzerung</strong> (−3% Schiffsverluste je Stufe, max. −60%), <strong>Resonanz-Echolot</strong> (+4% Splitterausbeute je Stufe, max. +100%), <strong>Bergungsarm</strong> (+5% Rohstoffbeute je Stufe, max. +150%) und die <strong>Tiefensonde</strong>, die dir bis zu drei Tiefen im Voraus Namen, Siegel und Mutatoren der kommenden Sektoren zeigt. Jede Stufe wird teurer, jede Wirkung ist gedeckelt – und <strong>alle Boni wirken ausschließlich im Abgrund</strong>, nie in deiner Wirtschaft oder im PvP. Dazu die <strong>Gegenmaßnahme</strong> als Verbrauchsgegenstand: Sie streicht <strong>einen</strong> Mutator deines nächsten Tauchgangs vollständig, du wählst am Sektor aus, welchen. Verbraucht wird sie beim Abtauchen, und der Bann reist in der Mission mit – spätere Käufe ändern an einem laufenden Tauchgang nichts mehr. Zusammen mit der Sonde ist das der eigentliche Denkzug: sehen, was kommt, und den teuersten Nachteil wegnehmen.' },
       { title:'Wochenlauf und Allianz-Tiefenlauf', body:'Der Rekord ist eine Einbahnstraße – wer bei Tiefe 60 hängt, hätte sonst wochenlang nichts vorzuweisen. Der <strong>Wochen-Tiefenlauf</strong> wertet deshalb, wie tief du <strong>in dieser Woche</strong> kommst, ausdrücklich auch unterhalb deines Rekords. Montags beginnt er neu, abgerechnet wird in Abgrundsplittern (1,5 je erreichter Tiefe) über einen Knopf in der Abgrund-Box. Bist du in einer <strong>Allianz</strong>, zahlen alle Mitglieder mit ihrer besten Wochentiefe in ein gemeinsames Konto ein. Erreicht die Allianz eine der drei Marken – <strong>Vorstoß</strong> (50 Tiefen), <strong>Tiefenzug</strong> (150), <strong>Abgrundflotte</strong> (300) –, kann sie <strong>jedes</strong> Mitglied abholen, das selbst mitgetaucht ist, einmal pro Woche und Marke. Ihr müsst dafür nicht gleichzeitig online sein.' },
       { title:'Chronik, Verzeichnis, Titel und was der Abgrund draußen bringt', body:'Zwei Sammlungen füllen sich beim Abstieg. Die <strong>Chronik des Abstiegs</strong> gibt an festen Tiefenmarken einen Bericht frei – zwanzig Stück, als durchlaufende Erzählung geschrieben, nicht als Flavour-Schnipsel. Das <strong>Mutatoren-Verzeichnis</strong> füllt sich, sobald du einem Mutator zum ersten Mal begegnet bist; eine Niederlage zählt dabei mit, du warst ja dort. Deine <strong>Rekordtiefe</strong> ist außerdem öffentlich: Sie erscheint als Abzeichen neben deinem Namen in der Bestenliste, im Spielerprofil im Vergleich zu deiner eigenen, und im Abgrund als Rangliste <em>„Die tiefsten Kommandanten"</em> (gewertet werden dort nur die geladenen Top 30). Bei Rekordtiefe 10, 25 und 50 bekommst du dazu einen <strong>Titel</strong>: <em>Tiefenlotse</em>, <em>Grenzgänger der Tiefe</em>, <em>Ohne Boden</em>. Und der einzige Weg, auf dem der Abgrund deine normale Wirtschaft berührt: Deine Rekordtiefe gibt dauerhaft Produktion, logarithmisch wie die Ewigkeitsforschungen – Rekord 20 rund +8,8%, Rekord 100 rund +13,3%.' }
@@ -29403,8 +29446,8 @@
   //
   // Der Abgrund erzeugt stattdessen endlos NEUE, BENANNTE Orte. Jede Tiefe ist ein eigener Sektor
   // mit eigenem Namen und einer eigenen Kombination aus Mutatoren - Umgebungsregeln, die den Kampf
-  // real verändern (eigene Kampfkraft, Gegnerstärke, Beute, Flugzeit, Verluste). Bei 18 Mutatoren
-  // und bis zu dreien je Sektor gibt es 816 Kombinationen, jede mit anderer optimaler Flotte.
+  // real verändern (eigene Kampfkraft, Gegnerstärke, Beute, Flugzeit, Verluste). Bei 24 Mutatoren
+  // und bis zu dreien je Sektor gibt es 2024 Kombinationen, jede mit anderer optimaler Flotte.
   //
   // WARUM DETERMINISTISCH: Der Sektor wird aus der Tiefe geseedet, nicht gewürfelt. Tiefe 47 sieht
   // für jeden Spieler gleich aus. Das macht die Tiefe vergleichbar (Bestenliste, Gespräch in der
@@ -29436,59 +29479,115 @@
   // loot = Rohstoffbeute, shards = Splitterausbeute, dur = Flugzeit, loss = eigene Verluste.
   // Bewusst gemischt: rein gute, rein schlechte und - der interessanteste Fall - solche mit Preis.
   const ABGRUND_MUTATOREN = [
-    { key:'ionensturm', name:'Ionensturm', icon:'ti-bolt', atk:0.75,
+    { key:'ionensturm', name:'Ionensturm', atk:0.75,
       desc:'Ein stehender Ladungssturm reibt die Schilde auf: deine Kampfkraft zählt in diesem Sektor nur zu 75%.' },
-    { key:'trichter', name:'Gravitationstrichter', icon:'ti-planet', dur:1.6, shards:1.35,
+    { key:'trichter', name:'Gravitationstrichter', dur:1.6, shards:1.35,
       desc:'Der Anflug dauert 60% länger, weil die Flotte gegen den Sog ankämpfen muss – dafür bringt der Sektor 35% mehr Abgrundsplitter.' },
-    { key:'truemmerdicht', name:'Dichtes Trümmerfeld', icon:'ti-box', loot:1.6, loss:1.2,
+    { key:'truemmerdicht', name:'Dichtes Trümmerfeld', loot:1.6, loss:1.2,
       desc:'Wracks aus Jahrhunderten treiben hier: 60% mehr Rohstoffbeute, aber 20% höhere eigene Verluste durch Kollisionen.' },
-    { key:'echokammer', name:'Echokammer', icon:'ti-volume', shards:1.5, atk:0.9,
+    { key:'echokammer', name:'Echokammer', shards:1.5, atk:0.9,
       desc:'Jeder Schuss hallt vielfach zurück und stört die eigene Zielerfassung: 10% weniger Kampfkraft, dafür 50% mehr Abgrundsplitter.' },
-    { key:'leerenstille', name:'Leerenstille', icon:'ti-shield', loss:0.6,
+    { key:'leerenstille', name:'Leerenstille', loss:0.6,
       desc:'Kein Staub, kein Signal, kein Hinterhalt – die eigenen Verluste fallen in diesem Sektor um 40% geringer aus.' },
-    { key:'kristallsporen', name:'Kristallsporen', icon:'ti-diamond', loot:1.45,
+    { key:'kristallsporen', name:'Kristallsporen', loot:1.45,
       desc:'Wuchernde Kristallgeflechte lassen sich direkt abernten: 45% mehr Rohstoffbeute.' },
-    { key:'dunkelstroemung', name:'Dunkelströmung', icon:'ti-arrow-up', dur:0.6,
+    { key:'dunkelstroemung', name:'Dunkelströmung', dur:0.6,
       desc:'Eine Strömung trägt die Flotte hinein: der Anflug dauert nur 60% der üblichen Zeit.' },
-    { key:'panzerschwarm', name:'Panzerschwarm', icon:'ti-alien', def:1.4,
+    { key:'panzerschwarm', name:'Panzerschwarm', def:1.4,
       desc:'Der Sektor wird von gepanzerten Schwarmwesen gehalten: die Gegnerstärke liegt 40% über dem Normalwert dieser Tiefe.' },
-    { key:'sensorblind', name:'Sensorblindheit', icon:'ti-target', atk:0.85, shards:1.25,
+    { key:'sensorblind', name:'Sensorblindheit', atk:0.85, shards:1.25,
       desc:'Die Ortung reicht kaum über den eigenen Rumpf hinaus: 15% weniger Kampfkraft, aber 25% mehr Abgrundsplitter für die Mühe.' },
-    { key:'hitzeblase', name:'Hitzeblase', icon:'ti-sun', loss:1.5, loot:1.3,
+    { key:'hitzeblase', name:'Hitzeblase', loss:1.5, loot:1.3,
       desc:'Glühendes Plasma frisst Hüllen und legt zugleich Erzadern frei: 50% höhere eigene Verluste, 30% mehr Rohstoffbeute.' },
-    { key:'wracklinie', name:'Wracklinie', icon:'ti-ship', loot:1.8, def:1.2,
+    { key:'wracklinie', name:'Wracklinie', loot:1.8, def:1.2,
       desc:'Eine ganze versunkene Schlachtlinie liegt hier: 80% mehr Rohstoffbeute, aber die Wracks dienen dem Gegner als Deckung (+20% Gegnerstärke).' },
-    { key:'resonanzader', name:'Resonanzader', icon:'ti-antenna-bars-5', shards:1.6, dur:1.3,
+    { key:'resonanzader', name:'Resonanzader', shards:1.6, dur:1.3,
       desc:'Eine singende Ader zieht sich durch den Sektor: 60% mehr Abgrundsplitter, dafür 30% längerer Anflug bis zur Bergung.' },
-    { key:'nullzone', name:'Nullzone', icon:'ti-atom', def:0.7,
+    { key:'nullzone', name:'Nullzone', def:0.7,
       desc:'Hier funktioniert kaum eine Waffe – auch die des Gegners nicht: die Gegnerstärke fällt auf 70%.' },
-    { key:'splitterregen', name:'Splitterregen', icon:'ti-alert-triangle', loss:1.35,
+    { key:'splitterregen', name:'Splitterregen', loss:1.35,
       desc:'Dauerbeschuss aus Mikrotrümmern: die eigenen Verluste fallen 35% höher aus.' },
-    { key:'spiegelfeld', name:'Spiegelfeld', icon:'ti-sparkles', atk:1.25,
+    { key:'spiegelfeld', name:'Spiegelfeld', atk:1.25,
       desc:'Ein Reflexionsfeld verdoppelt jeden Energiestrahl: deine Kampfkraft zählt in diesem Sektor 25% höher.' },
-    { key:'tiefendruck', name:'Tiefendruck', icon:'ti-mountain', def:1.25, shards:1.2,
+    { key:'tiefendruck', name:'Tiefendruck', def:1.25, shards:1.2,
       desc:'Der Druck presst die Hüllen zusammen und härtet auch den Gegner: +25% Gegnerstärke, aber 20% mehr Abgrundsplitter.' },
-    { key:'phosphorwolke', name:'Phosphorwolke', icon:'ti-flask', loot:0.6, shards:1.45,
+    { key:'phosphorwolke', name:'Phosphorwolke', loot:0.6, shards:1.45,
       desc:'Die Wolke zersetzt Rohstoffe, bevor sie an Bord kommen (nur 60% Rohstoffbeute), lässt aber 45% mehr Abgrundsplitter auskristallisieren.' },
     // Nachschub 28.07.2026 (v8.326.0): sechs weitere Mutatoren, 18 -> 24. Damit steigt die Zahl der
     // moeglichen Dreier-Kombinationen von 816 auf 2024 - der eigentliche Grund, warum sich die
     // Tiefen ueberhaupt unterscheiden.
-    { key:'magnetklemme', name:'Magnetklemme', icon:'ti-anchor', dur:1.4, loss:0.7,
+    { key:'magnetklemme', name:'Magnetklemme', dur:1.4, loss:0.7,
       desc:'Ein Magnetfeld hält die Flotte fest im Verband: Der Anflug dauert 40% länger, dafür fallen die eigenen Verluste um 30% geringer aus.' },
-    { key:'funkenflug', name:'Funkenflug', icon:'ti-sparkles', shards:1.4, loss:1.25,
+    { key:'funkenflug', name:'Funkenflug', shards:1.4, loss:1.25,
       desc:'Überschlagende Entladungen zwischen den Wracks: 40% mehr Abgrundsplitter, aber 25% höhere eigene Verluste.' },
-    { key:'kristallschlund', name:'Kristallschlund', icon:'ti-diamond', loot:2.0, dur:1.35,
+    { key:'kristallschlund', name:'Kristallschlund', loot:2.0, dur:1.35,
       desc:'Eine Ader aus gewachsenem Kristall zieht sich kilometerweit durch den Sektor: doppelte Rohstoffbeute, dafür 35% längerer Anflug bis zur vollständigen Bergung.' },
-    { key:'blindgaenger', name:'Blindgänger', icon:'ti-alert-triangle', def:0.8, loot:0.7,
+    { key:'blindgaenger', name:'Blindgänger', def:0.8, loot:0.7,
       desc:'Der Sektor ist längst ausgeräumt und schlecht bewacht: 20% schwächere Gegner, aber nur 70% Rohstoffbeute – hier war schon jemand.' },
-    { key:'sternenwind', name:'Sternenwind', icon:'ti-star', atk:1.15, dur:0.8,
+    { key:'sternenwind', name:'Sternenwind', atk:1.15, dur:0.8,
       desc:'Ein Teilchenstrom aus der Tiefe trägt die Flotte: 15% mehr Kampfkraft und 20% kürzerer Anflug – einer der wenigen Sektoren ohne Nachteil.' },
-    { key:'hallenbau', name:'Hallenbau', icon:'ti-building-fortress',
+    { key:'hallenbau', name:'Hallenbau',
       def:1.3, loot:1.4,
       desc:'Etwas hat hier Kammern in den Raum gebaut, gefüllt mit Material und verteidigt: 30% stärkere Gegner, dafür 40% mehr Rohstoffbeute.' },
-    { key:'altes_signal', name:'Altes Signal', icon:'ti-antenna-bars-5', shards:1.3, loot:1.2, def:1.15,
+    { key:'altes_signal', name:'Altes Signal', shards:1.3, loot:1.2, def:1.15,
       desc:'Ein Notruf aus einer Zeit vor der Kolonisierung lockt Beute UND Wächter an: +30% Splitter, +20% Rohstoffe, aber +15% Gegnerstärke.' }
   ];
+  // ---- Gezeichnete Mutator-Symbole (v8.328.0) ----
+  // Bis hierher trugen die 24 Mutatoren Schrift-Icons aus dem Tabler-Font, und zwar VIER PAARE
+  // davon doppelt: Kristallsporen und Kristallschlund beide ti-diamond, Spiegelfeld und Funkenflug
+  // beide ti-sparkles, Splitterregen und Blindgaenger beide ti-alert-triangle, Resonanzader und
+  // Altes Signal beide ti-antenna-bars-5. Zwei verschiedene Umgebungsregeln sahen also identisch
+  // aus - im Verzeichnis nebeneinander, und auf der Sektorkarte genau dort, wo man in zwei Sekunden
+  // erkennen will, was einen unten erwartet. CLAUDE.md Regel 7 nennt den ti-Fallback ausdruecklich
+  // "Notnagel, kein Ersatz".
+  //
+  // Formensprache: Strich, nicht Blech. Die uebrigen gezeichneten Icons des Spiels (Gebaeude,
+  // Schiffe, Offiziere) sind gefuellte Koerper mit Farbverlauf und Schattierung - das passt zu
+  // Dingen, die man baut. Der Abgrund ist kein Ding, das man baut, sondern eine Karte, die man
+  // liest; seine beiden vorhandenen Zeichnungen (Sektor-Siegel, Tiefenprofil) sind deshalb reine
+  // Linienzeichnungen, und diese Symbole schliessen daran an.
+  //
+  // Alle Striche benutzen `currentColor`. Damit erben sie die Farbe der Stelle, an der sie stehen,
+  // und die vorhandene Farblogik (violett = gesehen, grau = unbekannt, halb transparent = gebannt)
+  // gilt weiter, ohne dass eine einzige Aufrufstelle davon wissen muss.
+  const ABGRUND_SYMBOLE = {
+    ionensturm: '<path d="M56 6 L34 46 H52 L42 94"/><path d="M18 28 A34 34 0 0 0 18 72"/><path d="M82 28 A34 34 0 0 1 82 72"/>',
+    trichter: '<path d="M12 20 H88 L58 62 V84 L42 74 V62 Z"/><path d="M32 34 H68"/>',
+    truemmerdicht: '<path d="M20 24 L36 18 L42 34 L26 40 Z"/><path d="M60 16 L78 24 L70 40 L56 32 Z"/><path d="M16 60 L32 54 L40 70 L22 78 Z"/><path d="M56 58 L80 62 L76 82 L58 76 Z"/>',
+    echokammer: '<circle cx="26" cy="50" r="6"/><path d="M42 28 A28 28 0 0 1 42 72"/><path d="M56 18 A40 40 0 0 1 56 82"/><path d="M70 10 A52 52 0 0 1 70 90"/>',
+    leerenstille: '<circle cx="50" cy="50" r="32"/><path d="M30 50 H70"/>',
+    kristallsporen: '<path d="M50 12 L64 40 L50 60 L36 40 Z"/><path d="M22 44 L32 62 L22 78 L14 62 Z"/><path d="M76 40 L88 60 L76 80 L66 60 Z"/><path d="M50 60 V88"/>',
+    dunkelstroemung: '<path d="M10 28 Q34 12 58 28 T90 28"/><path d="M10 50 Q34 34 58 50 T90 50"/><path d="M10 72 Q34 56 58 72 T90 72"/><path d="M72 40 L88 50 L72 60"/>',
+    panzerschwarm: '<path d="M14 44 Q30 22 46 44 Q30 58 14 44 Z"/><path d="M54 30 Q70 10 86 30 Q70 44 54 30 Z"/><path d="M40 76 Q58 54 76 76 Q58 90 40 76 Z"/>',
+    sensorblind: '<circle cx="50" cy="50" r="34"/><circle cx="50" cy="50" r="14"/><path d="M20 20 L80 80"/>',
+    hitzeblase: '<circle cx="50" cy="56" r="26"/><path d="M50 30 Q42 18 50 8 Q58 18 50 30"/><path d="M24 34 Q18 26 22 16"/><path d="M76 34 Q82 26 78 16"/>',
+    wracklinie: '<path d="M10 40 L30 32 L34 48 L14 54 Z"/><path d="M42 56 L64 46 L70 64 L48 72 Z"/><path d="M74 28 L92 34 L88 50 L70 44 Z"/><path d="M8 78 H92"/>',
+    resonanzader: '<path d="M8 68 Q20 68 26 50 T44 32 T62 50 T80 32 Q86 32 92 32"/><path d="M8 84 H92"/><circle cx="26" cy="50" r="4"/><circle cx="62" cy="50" r="4"/>',
+    nullzone: '<circle cx="50" cy="50" r="30"/><path d="M28 26 L72 74"/><path d="M50 8 V20 M50 80 V92 M8 50 H20 M80 50 H92"/>',
+    splitterregen: '<path d="M24 10 L34 34 L20 30 Z"/><path d="M56 6 L66 30 L52 26 Z"/><path d="M38 46 L48 70 L34 66 Z"/><path d="M70 44 L82 70 L66 64 Z"/><path d="M14 86 H86"/>',
+    spiegelfeld: '<path d="M44 6 V94"/><path d="M56 6 V94" opacity="0.45"/><path d="M6 20 L40 50 L6 80"/><path d="M94 20 L60 50 L94 80"/>',
+    tiefendruck: '<path d="M50 40 V8 M38 24 L50 38 L62 24"/><path d="M50 60 V92 M38 76 L50 62 L62 76"/><path d="M14 50 H86"/>',
+    phosphorwolke: '<path d="M24 62 A18 18 0 0 1 30 30 A22 22 0 0 1 70 30 A18 18 0 0 1 76 62 Z"/><circle cx="34" cy="78" r="4"/><circle cx="52" cy="86" r="4"/><circle cx="70" cy="76" r="4"/>',
+    magnetklemme: '<path d="M24 84 V50 A26 26 0 0 1 76 50 V84"/><path d="M24 66 H50 M76 66 H50" opacity="0.5"/><path d="M14 84 H34 M66 84 H86"/>',
+    funkenflug: '<circle cx="50" cy="50" r="9"/><path d="M50 12 V30 M50 70 V88 M12 50 H30 M70 50 H88 M24 24 L37 37 M63 63 L76 76 M76 24 L63 37 M37 63 L24 76"/>',
+    kristallschlund: '<path d="M10 16 L26 46 L40 16 L54 46 L68 16 L82 46 L92 16"/><path d="M10 86 L26 56 L40 86 L54 56 L68 86 L82 56 L92 86"/>',
+    blindgaenger: '<path d="M22 26 H78 V78 H22 Z"/><path d="M22 26 L78 78 M78 26 L22 78"/>',
+    sternenwind: '<path d="M30 50 L44 42 L50 24 L56 42 L70 50 L56 58 L50 76 L44 58 Z"/><path d="M4 34 H22 M4 66 H22 M78 34 H96 M78 66 H96"/>',
+    hallenbau: '<path d="M14 84 V38 L34 22 L54 38 V84 Z"/><path d="M54 84 V50 L72 38 L88 50 V84 Z"/><path d="M26 84 V64 H42 V84"/><path d="M8 84 H92"/>',
+    altes_signal: '<path d="M50 88 V44"/><path d="M34 88 H66"/><circle cx="50" cy="34" r="8"/><path d="M28 34 A30 30 0 0 1 40 12" opacity="0.75"/><path d="M72 34 A30 30 0 0 0 60 12" opacity="0.75"/><path d="M14 34 A46 46 0 0 1 32 2" opacity="0.45"/><path d="M86 34 A46 46 0 0 0 68 2" opacity="0.45"/>'
+  };
+  // Ein Symbol als fertiges <svg>. groesse in px; die Farbe kommt ueber currentColor von aussen.
+  // Fehlt ein Schluessel (neuer Mutator ohne Zeichnung), gibt es bewusst KEIN stilles Ersatzbild -
+  // stattdessen bleibt die Stelle leer und faellt beim Ansehen sofort auf. Der Test
+  // tests/test_abgrund_symbole.js verhindert, dass es ueberhaupt so weit kommt.
+  function abgrundMutatorSymbol(key, groesse){
+    const p = ABGRUND_SYMBOLE[key];
+    if (!p) return '';
+    const g = groesse || 20;
+    return '<svg viewBox="0 0 100 100" width="'+g+'" height="'+g+'" aria-hidden="true" fill="none" stroke="currentColor" '
+      + 'stroke-width="7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; vertical-align:-0.15em;">'
+      + p + '</svg>';
+  }
   // Anzahl der Mutatoren wächst mit der Tiefe: die ersten Tauchgänge sind bewusst einfach lesbar,
   // ab Tiefe 15 überlagern sich drei Regeln und die Flottenwahl wird zur echten Entscheidung.
   function abgrundMutatorAnzahl(tiefe){ return tiefe < 5 ? 1 : (tiefe < 15 ? 2 : 3); }
@@ -29533,10 +29632,174 @@
     const runde = Math.floor(i / ABGRUND_WAECHTER_NAMEN.length);
     return { name: runde > 0 ? d.name+' ('+(runde+1)+'. Wiederkehr)' : d.name, text: d.text };
   }
+  // ---- Abstiegs-Panorama (v8.328.0, Entwurf 03) ----
+  // Ein gezeichneter Schnitt durch den Sektor, der ueber der Karte steht. Er zeigt in einem Bild,
+  // was sonst nur als Zahlenzeile dasteht: WIE TIEF man ist und WAS dort liegt.
+  //
+  // Fuenf Schichten, alle aus Tiefe und Mutatoren gerechnet, keine einzige Bilddatei:
+  //   1) Sterne  - werden mit der Tiefe weniger und blasser. Ab etwa Tiefe 60 ist keiner mehr da.
+  //   2) Schwaden - waagerechte Baender, die mit der Tiefe dichter und dunkler zusammenruecken.
+  //   3) Silhouetten - Wracks/Massen am unteren Rand, hoeher je tiefer.
+  //   4) Mutatorspur - die anwesenden Mutatoren malen mit: Kristallsporen setzen Kristalle,
+  //      Truemmerfelder Wrackkanten, Leerenstille raeumt alles weg.
+  //   5) Waechter-Silhouette - nur auf Zehnertiefen, als roter Koerper in der Mitte.
+  //
+  // Deterministisch aus derselben Tiefe wie der Sektor: Tiefe 47 sieht fuer jeden gleich aus, und
+  // ein Neuladen zeichnet nicht um. Ein zufaelliges Panorama waere huebsch und bedeutungslos.
+  const ABGRUND_PANORAMA_TIEFE_STERNE = 60;   // ab hier ist der letzte Stern weg
+  function abgrundPanorama(sektor){
+    const t = Math.max(1, sektor.tiefe|0);
+    const rng = abgrundRng(t * 1299721 + 31337);
+    const W = 320, H = 96;
+    const dunkel = Math.min(1, (t-1) / ABGRUND_PANORAMA_TIEFE_STERNE);   // 0 = oben, 1 = ganz unten
+    const hat = k => sektor.mutatoren.some(m => m.key === k);
+    const leer = hat('leerenstille');
+    const teile = [];
+    // 1) Sterne
+    const sterne = leer ? 0 : Math.round(26 * (1 - dunkel));
+    for (let i = 0; i < sterne; i++){
+      const x = rng()*W, y = rng()*(H*0.55), r = 0.6 + rng()*1.1;
+      teile.push('<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="#c3bef5" opacity="'+(0.25 + rng()*0.5*(1-dunkel)).toFixed(2)+'"/>');
+    }
+    // 2) Schwaden: je tiefer, desto mehr und desto weiter unten zusammengedraengt
+    const baender = 3 + Math.round(dunkel*4);
+    for (let i = 0; i < baender; i++){
+      const y = H*0.30 + (H*0.62) * (i/baender) * (0.55 + dunkel*0.45);
+      const amp = 3 + rng()*7;
+      const d = 'M0 '+y.toFixed(1)+' Q'+(W*0.25).toFixed(0)+' '+(y-amp).toFixed(1)+' '+(W*0.5).toFixed(0)+' '+y.toFixed(1)
+              + ' T'+W+' '+y.toFixed(1);
+      teile.push('<path d="'+d+'" stroke="#7f77dd" stroke-width="'+(0.8 + dunkel*1.4).toFixed(1)+'" fill="none" opacity="'+(0.14 + dunkel*0.28).toFixed(2)+'"/>');
+    }
+    // 3) Silhouetten am Grund - waechst mit der Tiefe, bis die Masse den halben Rahmen fuellt
+    const grund = H - (10 + dunkel*30);
+    const zacken = [];
+    for (let x = 0; x <= W; x += 20) zacken.push(x+' '+(grund + (rng()-0.5)*14*(0.4+dunkel)).toFixed(1));
+    teile.push('<path d="M0 '+H+' L0 '+grund.toFixed(1)+' L'+zacken.join(' L')+' L'+W+' '+H+' Z" fill="#141a30" opacity="'+(0.75 + dunkel*0.25).toFixed(2)+'"/>');
+    // 4) Mutatorspur - jeder malende Mutator legt seine eigene Handschrift auf den Grund
+    if (hat('kristallsporen') || hat('kristallschlund')){
+      for (let i = 0; i < 7; i++){
+        const x = 14 + rng()*(W-28), h = 6 + rng()*12;
+        teile.push('<path d="M'+x.toFixed(0)+' '+grund.toFixed(0)+' l'+(h*0.4).toFixed(0)+' -'+h.toFixed(0)+' l'+(h*0.4).toFixed(0)+' '+h.toFixed(0)+' Z" fill="#5dcaa5" opacity="0.55"/>');
+      }
+    }
+    if (hat('truemmerdicht') || hat('wracklinie')){
+      for (let i = 0; i < 6; i++){
+        const x = 10 + rng()*(W-20), y = grund - 4 - rng()*22, w = 8 + rng()*16;
+        teile.push('<path d="M'+x.toFixed(0)+' '+y.toFixed(0)+' l'+w.toFixed(0)+' '+(rng()*6-3).toFixed(0)+' l-2 5 l-'+w.toFixed(0)+' 1 Z" fill="#8f9bb5" opacity="0.4"/>');
+      }
+    }
+    if (hat('hitzeblase')){
+      teile.push('<ellipse cx="'+(W*0.5).toFixed(0)+'" cy="'+(grund+6).toFixed(0)+'" rx="70" ry="16" fill="#f0997b" opacity="0.18"/>');
+    }
+    if (hat('phosphorwolke')){
+      for (let i = 0; i < 12; i++){
+        teile.push('<circle cx="'+(rng()*W).toFixed(0)+'" cy="'+(H*0.35 + rng()*H*0.4).toFixed(0)+'" r="'+(1+rng()*2).toFixed(1)+'" fill="#9fe1cb" opacity="0.5"/>');
+      }
+    }
+    if (hat('ionensturm') || hat('funkenflug')){
+      for (let i = 0; i < 3; i++){
+        const x = 30 + rng()*(W-60), y = H*0.2 + rng()*H*0.4;
+        teile.push('<path d="M'+x.toFixed(0)+' '+y.toFixed(0)+' l6 12 l-5 0 l7 14" stroke="#fac775" stroke-width="1.4" fill="none" opacity="0.65"/>');
+      }
+    }
+    // 5) Waechter: ein Koerper, der aus dem Grund ragt - das einzige rote Element im Bild
+    if (sektor.waechter){
+      teile.push('<path d="M'+(W*0.5-26).toFixed(0)+' '+H+' Q'+(W*0.5).toFixed(0)+' '+(grund-34).toFixed(0)+' '+(W*0.5+26).toFixed(0)+' '+H+' Z" fill="#e24b4a" opacity="0.30"/>');
+      teile.push('<circle cx="'+(W*0.5).toFixed(0)+'" cy="'+(grund-16).toFixed(0)+'" r="4" fill="#e24b4a" opacity="0.8"/>');
+    }
+    return '<svg class="abgrund-panorama" viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="none" aria-hidden="true">'
+      + '<rect width="'+W+'" height="'+H+'" fill="#080b16"/>'
+      + teile.join('')
+      + '</svg>';
+  }
+  // ---- Waechter-Portraits (v8.328.0) ----
+  // Zwoelf Waechter mit zwoelf eigenen Texten - und bis hierher alle mit demselben Totenkopf aus
+  // dem Symbol-Font. Der Wandelnde Riss sah aus wie das Vaterschiff sah aus wie das Offene Tor.
+  // Ausgerechnet die Momente, an denen man sich erinnern soll, waren die austauschbarsten Bilder
+  // des ganzen Systems.
+  //
+  // Jedes Portrait zeichnet, was im Text steht - nicht ein Monster, sondern die BEOBACHTUNG: die
+  // Stille Masse ist ein Koerper ohne jedes Merkmal, der Chor sind zweihundert Bugspitzen nach
+  // innen, der Zaehlende ist eine steigende Zahl, das Offene Tor ist offen. Ein Portrait, das
+  // etwas anderes zeigt als der Text daneben, waere schlimmer als gar keins.
+  //
+  // Die Reihenfolge MUSS zu ABGRUND_WAECHTER_NAMEN passen - deshalb liegt das Portrait direkt im
+  // selben Eintrag statt in einer zweiten Liste, die auseinanderlaufen koennte. Genau diese
+  // Trennung ist der wiederkehrende Fehler dieses Projekts (CLAUDE.md Regel 6).
+  const ABGRUND_WAECHTER_BILDER = [
+    // Der Erste Waechter: steht, greift nicht an, laesst nicht durch.
+    '<path d="M50 12 V88"/><path d="M26 30 Q50 20 74 30"/><path d="M22 88 H78"/><ellipse cx="50" cy="48" rx="17" ry="10"/><circle cx="50" cy="48" r="4" fill="currentColor"/>',
+    // Die Stille Masse: ein Koerper ohne ein einziges Merkmal, groesser als der Rahmen.
+    '<circle cx="50" cy="62" r="42"/><path d="M8 62 H92" opacity="0.35"/>',
+    // Der Wandelnde Riss: ein Spalt, hinter dem keine Messwerte sind.
+    '<path d="M42 4 L58 26 L40 42 L62 60 L44 74 L58 96"/><path d="M22 20 L30 34" opacity="0.5"/><path d="M78 34 L70 48" opacity="0.5"/><path d="M20 70 L30 60" opacity="0.5"/>',
+    // Chor der Verlorenen: konzentrische Ringe aus Bugspitzen, alle nach innen.
+    '<circle cx="50" cy="50" r="10"/><path d="M50 22 L44 34 H56 Z M78 50 L66 44 V56 Z M50 78 L56 66 H44 Z M22 50 L34 56 V44 Z"/><path d="M70 30 L60 38 L68 44 Z M70 70 L62 60 L56 68 Z M30 70 L40 62 L32 56 Z M30 30 L38 40 L44 32 Z" opacity="0.6"/>',
+    // Der Kalte Anker: er zieht nicht, er haelt. Flotten stehen ploetzlich still.
+    '<path d="M50 14 V78"/><path d="M22 46 H78"/><path d="M18 62 Q50 96 82 62"/><circle cx="50" cy="14" r="8"/>',
+    // Vaterschiff: keplerische Bauweise, unmoegliche Groesse, Baudatum in der Zukunft.
+    '<path d="M6 56 L34 40 H82 L94 56 L82 70 H34 Z"/><path d="M34 40 V70"/><path d="M52 40 V70" opacity="0.6"/><path d="M70 40 V70" opacity="0.6"/><path d="M46 22 H74 L82 40" opacity="0.8"/>',
+    // Der Zaehlende: eine Zahl, die steigt, wenn man naeher kommt.
+    '<path d="M22 78 V22"/><path d="M36 78 V34"/><path d="M50 78 V44"/><path d="M64 78 V52"/><path d="M78 78 V64"/><path d="M14 88 H86"/><path d="M16 16 L30 8" opacity="0.6"/>',
+    // Schwelle: kein Gegner, ein Zustand - ab hier stimmen Rueckflugberechnungen nicht mehr.
+    '<path d="M22 88 V20 H78 V88"/><path d="M8 88 H92"/><path d="M36 88 V44 H64 V88" opacity="0.55"/><path d="M22 34 H78" opacity="0.5"/>',
+    // Die Zweite Stille: wie die Stille Masse, aber groesser - und sie war vorher nicht da.
+    '<circle cx="36" cy="58" r="26" opacity="0.45"/><circle cx="62" cy="52" r="36"/>',
+    // Der Letzte Waechter: der Name stammt aus einem Logbuch aus Tiefe 12.
+    '<path d="M50 26 V88"/><path d="M22 88 H78"/><path d="M28 26 L36 8 L50 20 L64 8 L72 26 Z"/><path d="M32 52 H68" opacity="0.6"/>',
+    // Nachhall: die Erinnerung eines Waechters, den jemand anders laengst besiegt hat.
+    '<path d="M14 90 V44 A18 18 0 0 1 50 44 V90"/><path d="M34 90 V50 A14 14 0 0 1 62 50 V90" opacity="0.5"/><path d="M52 90 V56 A10 10 0 0 1 72 56 V90" opacity="0.24"/>',
+    // Das Offene Tor: es blockiert nichts. Genau das ist beunruhigend.
+    '<path d="M18 88 V44 A32 32 0 0 1 82 44 V88"/><path d="M8 88 H92"/><path d="M18 60 L4 52" opacity="0.6"/><path d="M82 60 L96 52" opacity="0.6"/>'
+  ];
+  // Portrait eines Waechters. Der Index kommt aus derselben Rechnung wie sein Name, damit Bild und
+  // Text bei der zyklischen Wiederkehr ("2. Wiederkehr") nicht auseinanderlaufen.
+  function abgrundWaechterBild(tiefe, groesse){
+    if (!abgrundIstWaechter(tiefe)) return '';
+    const i = Math.floor(tiefe / ABGRUND_WAECHTER_ALLE) - 1;
+    const p = ABGRUND_WAECHTER_BILDER[i % ABGRUND_WAECHTER_BILDER.length];
+    if (!p) return '';
+    const g = groesse || 52;
+    return '<svg viewBox="0 0 100 100" width="'+g+'" height="'+g+'" aria-hidden="true" fill="none" stroke="currentColor" '
+      + 'stroke-width="5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">'
+      + p + '</svg>';
+  }
   const ABGRUND_BASIS_STAERKE = 900;   // Gegnerstärke in Tiefe 1
   const ABGRUND_STAERKE_MULT = 1.15;   // je Tiefe
   const ABGRUND_MAX_FLUG_SEK = 4*3600; // ein Tauchgang dauert nie länger als vier Stunden
 
+  // ---- Der Kartenraum (v8.328.0, Entwurf 06) ----
+  // Eine senkrechte Karte des gesamten Abstiegs: jede Waechtertiefe als Station mit Siegel,
+  // Portrait, Sektorname und dem Tag, an dem du sie bezwungen hast. Was darunter liegt, bleibt
+  // gestrichelt. Das ist der Ort, an dem der Abgrund zur Geschichte des Kontos wird statt zu einer
+  // Zahl - und die Daten dafuer gab es bis auf das Datum alle schon, sie standen nur nirgends
+  // zusammen.
+  //
+  // WARUM DAS DATUM ALS ZEICHENKETTE und nicht als Zeitstempel: Der Backend-Endpunkt lehnt einen
+  // GESAMTEN Spielstand mit HTTP 400 ab, sobald EIN Zahlenfeld ueber den SAVE_SANITY_LIMITS liegt
+  // (Vorfall 21.07.2026, siehe CLAUDE.md - danach speichert gar nichts mehr). Ein Date.now() liegt
+  // bei rund 1,75 Billionen; ob eine kuenftige Grenze das trifft, weiss hier niemand. Angezeigt
+  // wird ohnehin nur der Tag, also wird auch nur der Tag gespeichert - ein Feld, das gar keine
+  // Zahl ist, kann keine Zahlengrenze reissen.
+  function abgrundHeuteKurz(){
+    const d = new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function merkeWaechterSieg(tiefe){
+    const a = ensureAbgrund();
+    a.waechterTage = a.waechterTage || {};
+    // Nur der ERSTE Sieg zaehlt: ein Wiederholungs-Tauchgang darf das Datum nicht ueberschreiben,
+    // sonst waere die Karte eine Liste der letzten Besuche statt der Ersteroberungen.
+    if (!a.waechterTage[tiefe]) a.waechterTage[tiefe] = abgrundHeuteKurz();
+  }
+  // Wie weit die Karte reicht: bis zur naechsten Waechtertiefe HINTER dem Rekord, mindestens aber
+  // bis zur ersten. So steht immer genau eine ungeoeffnete Station als naechstes Ziel darunter.
+  function abgrundKartenraumTiefen(best){
+    const bis = Math.max(ABGRUND_WAECHTER_ALLE, (Math.floor((best||0) / ABGRUND_WAECHTER_ALLE) + 1) * ABGRUND_WAECHTER_ALLE);
+    const liste = [];
+    for (let t = ABGRUND_WAECHTER_ALLE; t <= bis; t += ABGRUND_WAECHTER_ALLE) liste.push(t);
+    return liste;
+  }
   function abgrundSektor(tiefe){
     const t = Math.max(1, Math.floor(tiefe) || 1);
     const rng = abgrundRng(t * 7919 + 104729);
@@ -29580,6 +29843,10 @@
     if (typeof a.splitter !== 'number' || a.splitter < 0) a.splitter = 0;
     if (typeof a.tauchgaenge !== 'number' || a.tauchgaenge < 0) a.tauchgaenge = 0;
     if (!a.gesehen) a.gesehen = {};     // Mutator-Bestiarium: key -> Anzahl Begegnungen
+    // Kartenraum: Tiefe -> Tag der Ersteroberung als "JJJJ-MM-TT". BEWUSST eine Zeichenkette und
+    // kein Zeitstempel, siehe merkeWaechterSieg() - ein Feld, das keine Zahl ist, kann die
+    // Backend-Zahlengrenzen nicht reissen.
+    if (!a.waechterTage) a.waechterTage = {};
     if (!a.werkstatt) a.werkstatt = {}; // gekaufte Ausbaustufen
     if (!a.woche) a.woche = { key:null, best:0 };        // Tiefenlauf der laufenden Woche
     if (!a.wochePraemie) a.wochePraemie = null;          // { key, tiefe } - abgeschlossen, noch nicht abgeholt
@@ -29943,11 +30210,18 @@
     const bis = Math.max(12, Math.ceil((B + 2) / ABGRUND_WAECHTER_ALLE) * ABGRUND_WAECHTER_ALLE);
     const W = 320, H = 54, links = 4, rechts = W - 4;
     const x = t => links + (rechts - links) * ((t - 1) / Math.max(1, bis - 1));
+    // Beschriftungen nach innen klemmen: Die letzte Waechtermarke liegt genau auf dem rechten Rand,
+    // und eine mittig gesetzte Zahl haengt dort zur Haelfte ausserhalb des viewBox - im Spiel stand
+    // "4C" statt "40" (gesehen 28.07.2026 beim Sichttest). Die RAUTE bleibt an ihrem echten Platz,
+    // nur der Text rueckt so weit hinein, dass er ganz zu sehen ist. Die Breite waechst mit der
+    // Stellenzahl, sonst reisst derselbe Fehler bei vierstelligen Tiefen wieder auf.
+    const halbeBreite = t => String(t).length * 2.6 + 1;
+    const textX = t => Math.max(halbeBreite(t), Math.min(W - halbeBreite(t), x(t)));
     const marken = [];
     for (let t = ABGRUND_WAECHTER_ALLE; t <= bis; t += ABGRUND_WAECHTER_ALLE){
       const erreicht = t <= B;
       marken.push('<path d="M'+x(t).toFixed(1)+' 20 L'+(x(t)+4).toFixed(1)+' 28 L'+x(t).toFixed(1)+' 36 L'+(x(t)-4).toFixed(1)+' 28 Z" fill="'+(erreicht?'#e24b4a':'#3a3f56')+'"/>');
-      marken.push('<text x="'+x(t).toFixed(1)+'" y="50" text-anchor="middle" font-size="9" fill="'+(erreicht?'#9296ac':'#5a5f78')+'">'+t+'</text>');
+      marken.push('<text x="'+textX(t).toFixed(1)+'" y="50" text-anchor="middle" font-size="9" fill="'+(erreicht?'#9296ac':'#5a5f78')+'">'+t+'</text>');
     }
     const zeiger = Math.max(1, Math.min(bis, gewaehlt||1));
     return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="none" aria-hidden="true">'
@@ -29955,7 +30229,7 @@
       + '<path d="M'+links+' 28 H'+x(B).toFixed(1)+'" stroke="#7f77dd" stroke-width="3"/>'
       + marken.join('')
       + '<circle cx="'+x(zeiger).toFixed(1)+'" cy="28" r="5" fill="#c3bef5" stroke="#0d1224" stroke-width="2"/>'
-      + '<text x="'+x(zeiger).toFixed(1)+'" y="13" text-anchor="middle" font-size="10" fill="#c3bef5">'+zeiger+'</text>'
+      + '<text x="'+textX(zeiger).toFixed(1)+'" y="13" text-anchor="middle" font-size="10" fill="#c3bef5">'+zeiger+'</text>'
       + '</svg>';
   }
   // ---- Tauchgang starten ----
@@ -30042,7 +30316,7 @@
       const vorgemerkt = a.bann === m.key;
       return `
       <div style="display:flex; gap:6px; align-items:flex-start; margin-top:5px; ${gebannt?'opacity:0.5;':''}">
-        <i class="ti ${m.icon}" aria-hidden="true" style="color:${gebannt?'#5a5f78':'#a89ef0'}; margin-top:2px;"></i>
+        <span style="color:${gebannt?'#5a5f78':'#a89ef0'}; margin-top:1px; display:inline-flex;">${abgrundMutatorSymbol(m.key, 22)}</span>
         <div style="min-width:0; flex:1;">
           <strong style="color:${gebannt?'#5a5f78':'#c3bef5'};">${m.name}</strong>${gebannt?' <span class="bmeta">– gebannt</span>':''}<br>
           <span class="bmeta">${m.desc}</span>
@@ -30099,9 +30373,13 @@
     const vorschau = [];
     for (let i = 1; i <= sondeWeite; i++) vorschau.push(abgrundSektor(tiefe + i));
     const vorschauHtml = vorschau.length
-      ? vorschau.map(v => `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:4px;">
-          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:5px;">${abgrundSiegel(v, 22)}Tiefe ${v.tiefe}: ${v.name}${v.waechter?' <span style="color:#e24b4a;">· '+v.waechter.name+'</span>':''}</span>
-          <span class="bmeta" style="flex-shrink:0;">${v.mutatoren.map(m=>m.name).join(', ')}</span>
+      // Zwei Zeilen statt einer (v8.328.0): oben Siegel, Tiefe und Name, unten die Mutatoren als
+      // Symbolreihe MIT Namen. Eine reine Symbolreihe waere kuerzer, aber wer ein Symbol noch nicht
+      // kennt, koennte die Vorschau dann gar nicht lesen - und ein title-Tooltip hilft auf dem
+      // Telefon niemandem. Die Symbole sind die schnelle Ebene, die Namen bleiben die sichere.
+      ? vorschau.map(v => `<div style="margin-top:6px;">
+          <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:5px;">${abgrundSiegel(v, 22)}Tiefe ${v.tiefe}: ${v.name}${v.waechter?' <span style="color:#e24b4a;">· '+v.waechter.name+'</span>':''}</div>
+          <div class="bmeta" style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin:2px 0 0 27px;">${v.mutatoren.map(m => '<span style="display:inline-flex; align-items:center; gap:4px; color:#a89ef0;">'+abgrundMutatorSymbol(m.key, 16)+'<span class="bmeta">'+m.name+'</span></span>').join('')}</div>
         </div>`).join('')
       : '';
     // Tiefen-Rangliste aus dem BEREITS geladenen Bestenlisten-Zwischenspeicher - kein zusaetzlicher
@@ -30171,9 +30449,32 @@
       : '<div class="bmeta">Diese Woche ist noch niemand aus den geladenen Eintraegen abgetaucht.</div>';
     // Wie viele der geladenen Kommandanten waren schon mindestens so tief wie der gewaehlte Sektor?
     const soTief = tiefenListe.filter(x => (x.abgrundBest||0) >= tiefe).length;
+    // Kartenraum (Entwurf 06): jede Waechtertiefe als Station. Bezwungene tragen Portrait, Siegel,
+    // Sektornamen und den Tag der Ersteroberung; die naechste steht gestrichelt darunter.
+    // waechterTage kann bei Konten fehlen, die vor v8.328.0 schon Waechter bezwungen hatten - dann
+    // steht dort bewusst "bezwungen" ohne Datum statt eines erfundenen.
+    const waechterTage = a.waechterTage || {};
+    const kartenraumHtml = abgrundKartenraumTiefen(a.best||0).map(t => {
+      const geschafft = (a.best||0) >= t;
+      const sek = abgrundSektor(t);
+      const tag = waechterTage[t];
+      return `<div class="kartenraum-station${geschafft?'':' offen'}">
+        <div class="kartenraum-marke" style="color:${geschafft?'#e24b4a':'#3a3f56'};">${geschafft ? abgrundWaechterBild(t, 38) : '<i class="ti ti-lock" aria-hidden="true" style="font-size:20px;"></i>'}</div>
+        <div style="min-width:0; flex:1;">
+          <div class="bname" style="color:${geschafft?'#c3bef5':'#5a5f78'};">Tiefe ${t} · ${geschafft ? escapeHtml(sek.waechter.name) : 'unbekannter Wächter'}</div>
+          <div class="bmeta">${geschafft
+            ? escapeHtml(sek.name) + (tag ? ' · bezwungen am '+escapeHtml(tag) : ' · bezwungen')
+            : 'Noch nicht erreicht – deine Rekordtiefe ist '+(a.best||0)+'.'}</div>
+        </div>
+        ${geschafft ? abgrundSiegel(sek, 30) : ''}
+      </div>`;
+    }).join('');
     const bestiarHtml = ABGRUND_MUTATOREN.map(m => {
       const n = (a.gesehen||{})[m.key] || 0;
-      return `<div style="margin-bottom:6px; opacity:${n?1:0.45};"><i class="ti ${n?m.icon:'ti-lock'}" aria-hidden="true" style="color:${n?'#a89ef0':'#5a5f78'}; margin-right:5px;"></i><strong style="color:${n?'#c3bef5':'#5a5f78'};">${n?m.name:'Unbekannt'}</strong>${n>1?' <span class="bmeta">×'+n+'</span>':''}${n?'<br><span class="bmeta">'+m.desc+'</span>':''}</div>`;
+      // Unbekannt bleibt bewusst ein Schloss statt eines verdunkelten Symbols: Wer den Mutator noch
+      // nie gesehen hat, soll seine Zeichnung auch noch nicht kennen - sonst waere das Verzeichnis
+      // schon beim ersten Blick durchgeblaettert.
+      return `<div style="margin-bottom:6px; opacity:${n?1:0.45};"><span style="color:${n?'#a89ef0':'#5a5f78'}; margin-right:5px; display:inline-flex; vertical-align:-0.15em;">${n?abgrundMutatorSymbol(m.key, 20):'<i class="ti ti-lock" aria-hidden="true"></i>'}</span><strong style="color:${n?'#c3bef5':'#5a5f78'};">${n?m.name:'Unbekannt'}</strong>${n>1?' <span class="bmeta">×'+n+'</span>':''}${n?'<br><span class="bmeta">'+m.desc+'</span>':''}</div>`;
     }).join('');
     setBoxHtml(box, 'abgrundBox', `
       <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-infinity" aria-hidden="true"></i>Der Abgrund <span class="lvl-pill" style="margin-left:6px;">Rekord ${a.best||0}</span><span class="lvl-pill" style="margin-left:6px; color:#9fe1cb; border-color:#9fe1cb;"><i class="ti ti-diamond" aria-hidden="true"></i> ${fmt(a.splitter||0)} Splitter</span></div>
@@ -30187,7 +30488,9 @@
       </div>
       <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Jede Tiefe ist ein eigener Sektor mit eigenem Namen und eigenen <strong>Mutatoren</strong> – Umgebungsregeln, die Kampfkraft, Gegnerstärke, Beute, Flugzeit und Verluste verändern. Die Tiefe ist nach unten offen. Ein Sektor sieht für jeden Spieler gleich aus, du kannst dich also über Tiefen austauschen.</div>
       <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#7f77dd;">
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+        ${abgrundPanorama(sektor)}
+        ${busy ? '<div class="tauchgang-streifen" title="Die Flotte ist unterwegs"></div>' : ''}
+        <div style="display:flex; align-items:center; gap:10px; margin:8px 0 6px;">
           ${abgrundSiegel(sektor, 56)}
           <div style="min-width:0; flex:1;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
@@ -30198,7 +30501,10 @@
           </div>
         </div>
         <div style="margin-bottom:6px;">${abgrundTiefenprofil(a.best||0, tiefe)}</div>
-        ${sektor.waechter ? `<div class="bmeta" style="margin-bottom:6px; color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> <strong>${sektor.waechter.name}</strong> – ${sektor.waechter.text} Wächter sind ${Math.round((ABGRUND_WAECHTER_STAERKE-1)*100)}% stärker, lassen aber garantiert ein Modul fallen und geben die ${ABGRUND_WAECHTER_SPLITTER}-fache Splitterausbeute.</div>` : ''}
+        ${sektor.waechter ? `<div class="waechter-tafel" style="margin-bottom:6px; color:#e24b4a;">
+          <div class="waechter-portrait">${abgrundWaechterBild(tiefe, 62)}</div>
+          <div class="bmeta" style="color:#e24b4a; min-width:0;"><strong>${sektor.waechter.name}</strong> – ${sektor.waechter.text} Wächter sind ${Math.round((ABGRUND_WAECHTER_STAERKE-1)*100)}% stärker, lassen aber garantiert ein Modul fallen und geben die ${ABGRUND_WAECHTER_SPLITTER}-fache Splitterausbeute.</div>
+        </div>` : ''}
         <div class="bmeta" style="margin-bottom:6px;">Gegnerstärke ${fmt(sektor.defense)} · Anflug ${fmtDuration(sektor.dauer)} · Bergung ~${fmt(Math.round(sektor.loot.erz*bergung*wiederholung))} Erz, ${fmt(Math.round(sektor.loot.kristalle*bergung*wiederholung))} Kristalle, ${fmt(Math.round(sektor.loot.deuterium*bergung*wiederholung))} Deuterium (Frachter nötig!) · +${fmt(splitterErwartet)} Abgrundsplitter${wiederholung<1?' <span style="color:#f0997b;">(Wiederholung: nur '+Math.round(ABGRUND_WIEDERHOLUNG*100)+'% Ausbeute)</span>':''}</div>
         ${mutHtml}
         <div class="bmeta" style="margin:8px 0 6px;">${gewaehlt>0?'Deine Flotte: Kraft '+fmt(Math.round(rohkraft))+(Math.abs(kraft-rohkraft)>1?' → im Sektor '+fmt(Math.round(kraft)):'')+' → Siegchance ~'+Math.round(chance*100)+'%':'Stelle unten eine Angriffsflotte zusammen.'}</div>
@@ -30224,6 +30530,13 @@
             <div class="bmeta" style="margin:4px 0 6px;">Ein Verbrauchsgegenstand: Er streicht <strong>einen</strong> Mutator des nächsten Tauchgangs vollständig – du wählst oben am Sektor aus, welchen. Verbraucht wird er beim Abtauchen, nicht bei der Rückkehr. Zusammen mit der Tiefensonde kannst du damit gezielt den teuersten Nachteil der kommenden Tiefe entfernen.</div>
             <button data-abgrund-gegen ${(a.splitter||0) >= ABGRUND_GEGEN_KOSTEN ? '' : 'disabled'}><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>${fmt(ABGRUND_GEGEN_KOSTEN)} Splitter</button>
           </div>
+        </div>
+      </details>
+      <details data-keep-open="abgrundKartenraum"${detailsOpenAttr('abgrundKartenraum')} style="margin-bottom:0.75rem;">
+        <summary class="bname" style="cursor:pointer;"><i class="ti ti-map-2" aria-hidden="true" style="color:#e24b4a;"></i> Kartenraum · ${Math.floor((a.best||0)/ABGRUND_WAECHTER_ALLE)} von ${abgrundKartenraumTiefen(a.best||0).length} Stationen</summary>
+        <div style="margin-top:8px;">
+          <div class="bmeta" style="margin-bottom:8px;">Jede Wächtertiefe ist eine Station deines Abstiegs. Bezwungene tragen Portrait, Sektornamen, Siegel und den Tag der Ersteroberung; darunter steht immer genau die nächste, die noch verschlossen ist.</div>
+          ${kartenraumHtml}
         </div>
       </details>
       <details data-keep-open="abgrundChronik"${detailsOpenAttr('abgrundChronik')} style="margin-bottom:0.75rem;">
@@ -31541,6 +31854,11 @@
             let waechterMsg = '';
             if (sektor.waechter){
               const modName = grantRandomModule();
+              // Tag der Ersteroberung fuer den Kartenraum festhalten (v8.328.0). Steht hier und
+              // nicht in der Anzeige: Nur an dieser Stelle steht fest, dass der Waechter WIRKLICH
+              // gefallen ist - eine Renderfunktion, die das nachtraegt, wuerde bei einem gescheiterten
+              // Tauchgang auf dieselbe Tiefe ein falsches Datum eintragen.
+              merkeWaechterSieg(tiefe);
               waechterMsg = ' WÄCHTER BEZWUNGEN: '+sektor.waechter.name+'. Modul geborgen: '+modName+'!';
               registerShareMoment('Wächter bezwungen', sektor.waechter.name+' in Tiefe '+tiefe, '\uD83D\uDD31');
               playSound('achieve');
