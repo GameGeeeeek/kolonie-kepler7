@@ -21,6 +21,7 @@
 //   9) Bestenlisten-Verdrahtung: veroeffentlicht, unverrauscht, angezeigt, ranglistet
 //  10) Wochenlauf, Tiefensonde, Allianz-Tiefenlauf (v8.322.0)
 //  11) Waechter-Tiefen, Mutator-Gegenmassnahmen, Abgrund-Titel (v8.323.0)
+//  12) Auffindbarkeit der Werkstatt und laute Fehlermeldung (v8.324.0)
 const fs = require('fs');
 const path = require('path');
 const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
@@ -311,7 +312,9 @@ check('8: die Chronik-Tiefen steigen streng an',
 // data-keep-open nach einer Sekunde von selbst wieder zu.
 const boxQuelle = fnAus('renderAbgrundBox');
 const details = (boxQuelle.match(/<details/g) || []).length;
-const keepOpen = (boxQuelle.match(/data-keep-open="/g) || []).length;
+// Nur Vorkommen AM <details>-Tag zaehlen: seit v8.324.0 steht derselbe Text auch in einem
+// querySelector im Verdrahtungsteil, und der ist kein Markup.
+const keepOpen = (boxQuelle.match(/<details[^>]*data-keep-open="/g) || []).length;
 check('8: jedes <details> der Abgrund-Box hat data-keep-open',
   details > 0 && details === keepOpen, { details, keepOpen });
 // Und die Tauchtiefe darf nicht nur im DOM stehen - sonst ist sie beim naechsten Tick weg.
@@ -395,8 +398,10 @@ check('10: die Wochentiefe wird mit ihrem Wochenschluessel veroeffentlicht',
     !/tiefensonde/.test(fnAus('abgrundKampfkraft')) && !/tiefensonde/.test(fnAus('abgrundSektor')));
 }
 // Allianz: eigener Schluessel je Mitglied - das ist der Punkt, an dem Beitraege sonst verlorengehen.
+// Gemeint ist der SCHLUESSEL, nicht die Schreibvariante - seit v8.324.0 laeuft das ueber
+// storageSetStrict (siehe Abschnitt 12). Deshalb bewusst offen fuer beide Varianten.
 check('10: jedes Mitglied schreibt nur seinen EIGENEN Allianz-Schluessel',
-  /storageSet\('alliance:'\+tag\+':abgrund:'\+state\.player\.id/.test(js));
+  /storageSet(Strict)?\('alliance:'\+tag\+':abgrund:'\+state\.player\.id/.test(js));
 check('10: gelesen wird ueber storageList, nicht ueber ein gemeinsames Dokument',
   /storageList\('alliance:'\+tag\+':abgrund:'/.test(js));
 check('10: nur Beitraege der laufenden Woche zaehlen fuer die Marken',
@@ -554,6 +559,36 @@ check('11: der Bann kommt bei der Aufloesung aus der MISSION',
   check('11: die Abgrund-Titel stehen in absteigender Schwierigkeit ganz oben',
     i50 >= 0 && i50 < i25 && i25 < i10 && i10 < tm.indexOf("'allbosses'"),
     { i50, i25, i10 });
+}
+
+// ---- 12) Auffindbarkeit und laute Fehler (v8.324.0) ----
+// Spieler-Report 28.07.2026: "wo ist die Abgrund-Splitter-Werkstatt?" - sie war die einzige
+// Ausgabestelle fuer Splitter und lag hinter einem Aufklappfeld, das openDetailKeys (ein reiner
+// Sitzungs-Cache) nach jedem Neuladen wieder zuklappte.
+{
+  const boxQ = fnAus('renderAbgrundBox');
+  check('12: der Splitterstand steht in der immer sichtbaren Ueberschrift',
+    /section-title[^`]*Der Abgrund[^`]*Splitter/.test(boxQ));
+  check('12: die Werkstatt steht offen, solange sie noch nie angefasst wurde',
+    /a\.werkstattGesehen \? detailsOpenAttr\('abgrundWerkstatt'\) : ' open'/.test(boxQ));
+  // Und ein bewusstes Zuklappen muss ueberleben - sonst bevormundet die Box den Spieler.
+  check('12: ein eigenes Auf-/Zuklappen wird dauerhaft gemerkt',
+    /werkstattGesehen = true; save\(\)/.test(boxQ) && /addEventListener\('toggle'/.test(boxQ));
+  check('12: die Beschriftung sagt, wofuer die Werkstatt da ist',
+    /Werkstatt – hier gibst du Splitter aus/.test(boxQ));
+}
+// Der Allianz-Beitrag darf NICHT ueber storageSet laufen: das faellt bei jeder Nicht-OK-Antwort
+// still auf localStorage zurueck, und ein geteilter Schluessel im eigenen Browser ist wertlos.
+{
+  const meldeQ = fnAus('meldeAbgrundAllianzBeitrag');
+  check('12: der Allianz-Beitrag nutzt die strikte Schreibvariante',
+    /storageSetStrict\(/.test(meldeQ) && !/[^t]storageSet\(/.test(meldeQ));
+  check('12: eine Ablehnung wird dem Spieler gemeldet, nicht nur der Konsole',
+    /log\(/.test(meldeQ) && /'warn'/.test(meldeQ));
+  check('12: aber nur einmal je Grund, nicht bei jedem Tauchgang',
+    /a\.allianzMeldungFehler !== grund/.test(meldeQ));
+  check('12: die Meldung stellt klar, dass der eigene Tauchgang zaehlt',
+    /eigener Tauchgang ist davon nicht betroffen/.test(meldeQ));
 }
 
 console.log(fail ? '\nFAIL' : '\nPASS');

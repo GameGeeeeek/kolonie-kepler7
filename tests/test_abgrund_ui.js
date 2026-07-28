@@ -19,6 +19,7 @@
 //   6) die Werkstatt gibt Splitter aus und erhoeht die Stufe
 //   7) die Rekordtiefe landet im veroeffentlichten Bestenlisten-Eintrag und die Rangliste rendert
 //   8) Wochenlauf abrechenbar, Tiefensonde zeigt kommende Sektoren, Allianz-Beitrag unter eigenem Schluessel
+//   9) die Werkstatt ist ohne Zutun sichtbar, ein bewusstes Zuklappen ueberlebt
 // Konsolenfehler werden in jedem Abschnitt mitgeprueft.
 const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
 
@@ -247,6 +248,38 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     check('8: die Allianz-Karte erscheint mit dem eigenen Tag',
       !!txt && /Allianz-Tiefenlauf/i.test(txt) && /ABC/.test(txt));
     check('8: keine Konsolenfehler beim Allianz-Lauf', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ---- 9) Auffindbarkeit der Werkstatt (v8.324.0) ----
+  // Spieler-Report: "wo ist die Abgrund-Splitter-Werkstatt?" - sie lag hinter einem Aufklappfeld,
+  // das nach jedem Neuladen wieder zu war. Hier wird gemessen, was der Spieler WIRKLICH sieht.
+  {
+    const stand = basisStand({ research:{ rsingularitaet:1 },
+      abgrund:{ tiefe:3, best:2, splitter:250, tauchgaenge:4, gesehen:{}, werkstatt:{},
+                woche:{ key:null, best:0 }, wochePraemie:null, allianzMarken:{} } });
+    const { ctx, page, errs, store } = await starte(browser, stand);
+    // Sichtbar heisst: der Kaufknopf hat eine echte Groesse, ohne dass irgendwo geklickt wurde.
+    const sichtbar = await page.evaluate(()=>{
+      const b = document.querySelector('[data-abgrund-kauf="druckhuelle"]');
+      if (!b) return { da:false };
+      const r = b.getBoundingClientRect();
+      return { da:true, hoehe:Math.round(r.height), breite:Math.round(r.width) };
+    });
+    check('9: der Werkstatt-Kaufknopf ist ohne Zutun sichtbar',
+      sichtbar.da && sichtbar.hoehe > 10 && sichtbar.breite > 30, sichtbar);
+    const txt = await boxText(page);
+    check('9: der Splitterstand steht in der Ueberschrift, ohne aufzuklappen',
+      !!txt && /250 SPLITTER/i.test(txt), txt ? txt.split('\n').slice(0,3) : null);
+    // Zuklappen muss ueberleben: nach dem Schliessen darf die Box es nicht wieder aufreissen.
+    await page.evaluate(()=>{ const d=document.querySelector('[data-keep-open="abgrundWerkstatt"]'); if(d) d.open=false; });
+    await page.waitForTimeout(2500); // mehrere Ticks
+    const nochZu = await page.evaluate(()=>{ const d=document.querySelector('[data-keep-open="abgrundWerkstatt"]'); return d ? !d.open : null; });
+    check('9: ein bewusstes Zuklappen wird nicht ueberstimmt', nochZu === true, { nochZu });
+    const gemerkt = gespeichert(store).abgrund || {};
+    check('9: und es ist im Spielstand gemerkt, ueberlebt also das Neuladen',
+      gemerkt.werkstattGesehen === true, { werkstattGesehen:gemerkt.werkstattGesehen });
+    check('9: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
