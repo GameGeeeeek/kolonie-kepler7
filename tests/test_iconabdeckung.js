@@ -207,7 +207,9 @@ for (const [name, liste] of [['Doktrin',dokSvgs],['Aufstellung',formSvgs]])
 const smBlock = arrBlock('SHIP_MODULE_DEFS');
 const smDefs = [...smBlock.matchAll(/key:'([^']+)'[\s\S]*?klasse:'([^']+)'[\s\S]*?effect:'([^']+)'/g)]
   .map(m=>({ k:m[1], klasse:m[2], effect:m[3] }));
-check('8: alle 36 Schiffsmodule sind erfasst', smDefs.length === 36, smDefs.length);
+// 36 bis v8.334.0, seit v8.335.0 die sechs Abgrund-Schiffsmodule. Die Zahl steht fest, damit ein
+// neu eingefuegtes Modul nicht still an den Icon-Pruefungen darunter vorbeirutscht.
+check('8: alle 42 Schiffsmodule sind erfasst', smDefs.length === 42, smDefs.length);
 const smOhne = smDefs.filter(d => !ICONS.has('sm_'+d.k)).map(d=>d.k);
 check('8: jedes Schiffsmodul hat ein eigenes gezeichnetes Icon (Präfix sm_)', smOhne.length === 0, smOhne);
 
