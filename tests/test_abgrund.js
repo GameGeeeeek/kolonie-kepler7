@@ -94,7 +94,7 @@ function baueKontext(zustand){
     konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_WAECHTER_BERGUNG'), konstAus('ABGRUND_GEGEN_KOSTEN'),
     fnAus('abgrundBergungsgut'),
     block('ABGRUND_WAECHTER_NAMEN') ? 'const ABGRUND_WAECHTER_NAMEN = '+block('ABGRUND_WAECHTER_NAMEN')+';' : (()=>{throw new Error('ABGRUND_WAECHTER_NAMEN fehlt')})(),
-    fnAus('abgrundIstWaechter'), fnAus('abgrundWaechterDef'), fnAus('abgrundSektorMitBann'),
+    fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'), fnAus('abgrundWaechterDef'), fnAus('abgrundSektorMitBann'),
     'return { abgrundSektor, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
     '  abgrundWiederholungsFaktor, abgrundWerkstattStufe, abgrundWerkstattKosten, abgrundWerkstattBonus,',
     '  abgrundTiefenBonus, abgrundChronikOffen, abgrundFreigeschaltet, abgrundKampfkraft,',
@@ -597,15 +597,21 @@ check('11: Waechter haben Namen UND einen eigenen Text',
     !!wGebannt.waechter && wGebannt.splitter > G.abgrundSektor(19).splitter * 2,
     { splitter:wGebannt.splitter });
 }
+// Seit v8.336.0 reisen neben dem Bann drei weitere Vormerkungen mit (Bannspule, Waechterruf,
+// Grundberuehrung). Die Aussage bleibt dieselbe - beim START verbraucht, in der Mission mitgereist -,
+// nur die Schreibweise der Zeile hat sich geaendert.
 check('11: die Gegenmassnahme wird beim START verbraucht, nicht bei der Rueckkehr',
-  /a\.gegenmassnahmen -= 1;/.test(js) && /bann,\n/.test(js));
+  /a\.gegenmassnahmen -= 1;/.test(js) && /composition: flotte, fleetName: sektor\.name, bann,/.test(js));
 check('11: der Bann kommt bei der Aufloesung aus der MISSION',
-  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null\)/.test(js));
+  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule\)/.test(js));
 // Vorschau und Kampf muessen denselben Bann anwenden.
 {
   const boxQ = fnAus('renderAbgrundBox');
+  // Seit v8.336.0 gibt die Vorschau auch die Bannspule mit - sie verschiebt Gegnerstaerke und
+  // Beute, und eine Vorschau, die das verschweigt, waere genau der Auseinanderlauf, den dieser
+  // Abschnitt verhindern soll.
   check('11: die Vorschau rechnet mit demselben Bann wie der Start',
-    /abgrundSektorMitBann\(rohSektor, bannAktiv\)/.test(boxQ) && /rohSektor\.mutatoren\.some/.test(boxQ));
+    /abgrundSektorMitBann\(rohSektor, bannAktiv, !!a\.spule && !!bannAktiv\)/.test(boxQ) && /rohSektor\.mutatoren\.some/.test(boxQ));
 }
 // ---- Titel ----
 {
