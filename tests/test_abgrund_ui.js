@@ -59,14 +59,19 @@ const gespeichert = store => { try { return JSON.parse(store['kepler7-save-v3']|
 // Maschinenauslastung ein anderes Ergebnis liefert, entwertet den ganzen Pflichtlauf: Man gewoehnt
 // sich an, ein Rot wegzuklicken. Nachgewiesen auf v8.338.0 GENAUSO wie auf dem neuen Stand, es ist
 // also keine Regression, sondern lag latent im Test.
-async function warteAufStand(page, store, pruefe, maxMs){
+async function warteAuf(page, pruefe, maxMs){
   const bis = Date.now() + (maxMs || 15000);
   while (Date.now() < bis){
-    if (pruefe(gespeichert(store))) return true;
+    // await, damit auch Pruefungen gegen das DOM (boxText) benutzt werden koennen - ein blosses
+    // if (pruefe()) waere bei einer async-Pruefung IMMER wahr (ein Promise ist truthy) und der
+    // Helfer damit wirkungslos, ohne dass es auffiele.
+    if (await pruefe()) return true;
     await page.waitForTimeout(100);
   }
   return false;   // Zeit abgelaufen - die Pruefungen dahinter melden es als Fehlschlag
 }
+// Der haeufigste Fall: auf eine Bedingung IM SPIELSTAND warten.
+const warteAufStand = (page, store, pruefe, maxMs) => warteAuf(page, () => pruefe(gespeichert(store)), maxMs);
 
 async function starte(browser, stand){
   const store={'kepler7-save-v3':stand};
@@ -266,7 +271,13 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
       ]}
     });
     const { ctx, page, errs, store } = await starte(browser, stand);
-    await page.waitForTimeout(2000);
+    // Auf den geschriebenen Allianz-Beitrag warten statt auf die Uhr. Er landet NICHT im
+    // Spielstand, sondern unter einem eigenen Speicherschluessel - deshalb hier warteAuf() statt
+    // warteAufStand(). Unter Last reichten die festen 2000 ms nicht.
+    // 30 s statt der ueblichen 15: Hier haengt eine ganze Kette dran - Tick, faellige Mission,
+    // Aufloesung, dann erst meldeAbgrundAllianzBeitrag() ueber das Netz. Unter Last reichten 15 s
+    // in einem von sechs Laeufen nicht; die Bedingung war richtig, nur die Geduld zu knapp.
+    await warteAuf(page, () => Object.keys(store).some(k => k.startsWith('alliance:ABC:abgrund:')), 30000);
     const eigene = Object.keys(store).filter(k => k.startsWith('alliance:ABC:abgrund:'));
     check('8: der eigene Allianz-Beitrag wurde unter dem eigenen Schluessel abgelegt',
       eigene.length === 1 && eigene[0] === 'alliance:ABC:abgrund:u', eigene);
@@ -274,6 +285,9 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     check('8: der Beitrag traegt Tiefe UND Wochenschluessel',
       !!beitrag && (beitrag.tiefe||0) >= 1 && !!beitrag.weekKey,
       beitrag ? { tiefe:beitrag.tiefe, weekKey:beitrag.weekKey } : null);
+    // Zwischen "Beitrag geschrieben" und "Karte sichtbar" liegt noch ein Schritt: Der Allianzstand
+    // muss nachgeladen und die Box neu gezeichnet werden. Auch darauf wird gewartet statt geraten.
+    await warteAuf(page, async () => /\[ABC\]/.test((await boxText(page)) || ''), 20000);
     const txt = await boxText(page);
     check('8: die Allianz-Karte erscheint mit dem eigenen Tag',
       !!txt && /Allianz-Tiefenlauf/i.test(txt) && /ABC/.test(txt));
