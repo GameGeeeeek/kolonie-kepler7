@@ -606,8 +606,10 @@ check('11: Waechter haben Namen UND einen eigenen Text',
 // nur die Schreibweise der Zeile hat sich geaendert.
 check('11: die Gegenmassnahme wird beim START verbraucht, nicht bei der Rueckkehr',
   /a\.gegenmassnahmen -= 1;/.test(js) && /composition: flotte, fleetName: sektor\.name, bann,/.test(js));
+// Seit v8.339.0 kommt als vierter Parameter der Nullkiel dazu - er haengt an der MITGEFLOGENEN
+// Flotte, damit ein zwischenzeitlicher Verkauf den Sektor nicht rueckwirkend haerter macht.
 check('11: der Bann kommt bei der Aufloesung aus der MISSION',
-  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule\)/.test(js));
+  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule, nullkielAktiv\(m\.composition \|\| fleet\)\)/.test(js));
 // Vorschau und Kampf muessen denselben Bann anwenden.
 {
   const boxQ = fnAus('renderAbgrundBox');
@@ -615,7 +617,7 @@ check('11: der Bann kommt bei der Aufloesung aus der MISSION',
   // Beute, und eine Vorschau, die das verschweigt, waere genau der Auseinanderlauf, den dieser
   // Abschnitt verhindern soll.
   check('11: die Vorschau rechnet mit demselben Bann wie der Start',
-    /abgrundSektorMitBann\(rohSektor, bannAktiv, !!a\.spule && !!bannAktiv\)/.test(boxQ) && /rohSektor\.mutatoren\.some/.test(boxQ));
+    /abgrundSektorMitBann\(rohSektor, bannAktiv, !!a\.spule && !!bannAktiv, nullkielAktiv\(flotte\)\)/.test(boxQ) && /rohSektor\.mutatoren\.some/.test(boxQ));
 }
 // ---- Titel ----
 {
