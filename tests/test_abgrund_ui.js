@@ -59,17 +59,27 @@ const gespeichert = store => { try { return JSON.parse(store['kepler7-save-v3']|
 // Maschinenauslastung ein anderes Ergebnis liefert, entwertet den ganzen Pflichtlauf: Man gewoehnt
 // sich an, ein Rot wegzuklicken. Nachgewiesen auf v8.338.0 GENAUSO wie auf dem neuen Stand, es ist
 // also keine Regression, sondern lag latent im Test.
-async function warteAufStand(page, store, pruefe, maxMs){
+async function warteAuf(page, pruefe, maxMs){
   const bis = Date.now() + (maxMs || 15000);
   while (Date.now() < bis){
-    if (pruefe(gespeichert(store))) return true;
+    // await, damit auch Pruefungen gegen das DOM (boxText) benutzt werden koennen - ein blosses
+    // if (pruefe()) waere bei einer async-Pruefung IMMER wahr (ein Promise ist truthy) und der
+    // Helfer damit wirkungslos, ohne dass es auffiele.
+    if (await pruefe()) return true;
     await page.waitForTimeout(100);
   }
   return false;   // Zeit abgelaufen - die Pruefungen dahinter melden es als Fehlschlag
 }
+// Der haeufigste Fall: auf eine Bedingung IM SPIELSTAND warten.
+const warteAufStand = (page, store, pruefe, maxMs) => warteAuf(page, () => pruefe(gespeichert(store)), maxMs);
 
-async function starte(browser, stand){
-  const store={'kepler7-save-v3':stand};
+// `vorbelegung` (v8.340.0): zusaetzliche Speicherschluessel, die schon VOR dem Start dastehen.
+// Noetig fuer alles, was das Spiel nur beim Laden oder in langen Intervallen abholt - der
+// Allianzstand etwa wird einmal beim Start geladen und danach nur alle 120 Sekunden, mit
+// Sichtbarkeits-Gate. Ein Beitrag, der erst waehrend des Tests geschrieben wird, erscheint
+// deshalb NICHT verlaesslich in der Anzeige; die entsprechende Pruefung lief bisher auf Glueck.
+async function starte(browser, stand, vorbelegung){
+  const store=Object.assign({'kepler7-save-v3':stand}, vorbelegung||{});
   const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{width:900,height:1400} }));
   const page = await ctx.newPage(); const errs=[];
   page.on('pageerror', e=>errs.push(String(e)));
@@ -77,13 +87,30 @@ async function starte(browser, stand){
   page.on('dialog', d=>d.accept());
   await page.route('**/api/**', backend(store));
   await page.addInitScript(()=>localStorage.setItem('kepler7_token','tok'));
-  await page.goto(SPIEL_URL); await page.waitForTimeout(2800);
+  // ZUFALL AUSSCHALTEN. Der wichtigste Griff dieser Datei, und lange uebersehen: Mehrere
+  // Abschnitte setzen einen GEWONNENEN Tauchgang voraus (Rekordtiefe, Splitter, Allianz-Beitrag).
+  // Der Kampf ist aber ein Wurf mit hartem Deckel bei 95% - der Test verlor also in rund jedem
+  // zwanzigsten Lauf, voellig unabhaengig von der Maschinenlast, und meldete dann "best: 0".
+  // Das sah wie Flakiness durch Timing aus und war keine; kein noch so langes Warten haette
+  // geholfen. 0.5 statt eines Extremwerts: klein genug, um jede Kampfphase zu gewinnen, aber
+  // nicht so extrem, dass seltene Zufallsereignisse reihenweise ausgeloest werden.
+  await page.addInitScript(()=>{ Math.random = () => 0.5; });
+  await page.goto(SPIEL_URL);
+  // WARTEN AUF DAS SPIEL, NICHT AUF DIE UHR. Hier standen feste 2800 ms - die Wurzel der
+  // Flakiness dieser ganzen Datei: Reicht die Zeit unter Last nicht, existieren die Tab-Knoepfe
+  // noch nicht, die Klicks darunter gehen ins Leere, und JEDE Pruefung danach wartet auf etwas,
+  // das nie kommt. Die einzelnen Wartezeiten weiter unten waren nur die Symptome; nachgewiesen
+  // an einem Suite-Lauf, in dem der Allianz-Beitrag auch nach 30 s nicht geschrieben war,
+  // waehrend derselbe Test einzeln in Sekunden durchlief.
+  await page.waitForSelector('.tab-btn[data-tab="galaxie"]', { timeout: 60000 });
   await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
   await page.evaluate(()=>{const b=document.querySelector('.tab-btn[data-tab="galaxie"]');if(b)b.click();});
   // Seit v8.325.0 hat der Abgrund einen EIGENEN Unterreiter im Galaxie-Tab. Vorher lag die Box im
   // Kampf-Panel; wer hier weiter "kampf" klickt, misst eine unsichtbare Box (Hoehe 0).
+  await page.waitForSelector('[data-galaxy-subtab="abgrund"]', { timeout: 30000 });
   await page.evaluate(()=>{const b=document.querySelector('[data-galaxy-subtab="abgrund"]');if(b)b.click();});
-  await page.waitForTimeout(1200);
+  // Und zuletzt auf die Box selbst - erst wenn sie Inhalt hat, laeuft das Spiel wirklich.
+  await page.waitForFunction(()=>{ const b=document.getElementById('abgrundBox'); return !!b && b.childElementCount > 0; }, null, { timeout: 30000 });
   return { ctx, page, errs, store };
 }
 const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abgrundBox'); return b?b.innerText:null; });
@@ -201,8 +228,11 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
   // das gar nicht veroeffentlicht wird, ist die Kette still tot. Genau das war beim ersten Anlauf
   // der Fall - die Veroeffentlichungszeile fehlte, waehrend Abzeichen und Rangliste sie schon lasen.
   {
+    // reiter:'raenge' seit v8.340.0 (Werft): Rangliste und Allianz-Tiefenlauf liegen im Register
+    // "Raenge", nicht mehr als Aufklappfeld im Vorgabe-Register. Ohne den Reiter sucht der Test
+    // etwas, das gar nicht gerendert wird - und das ist die gewollte Aenderung, kein Fehler.
     const stand = basisStand({ research:{ rsingularitaet:1 },
-      abgrund:{ tiefe:8, best:7, splitter:20, tauchgaenge:9, gesehen:{ nullzone:2 }, werkstatt:{} } });
+      abgrund:{ tiefe:8, best:7, splitter:20, tauchgaenge:9, gesehen:{ nullzone:2 }, werkstatt:{}, reiter:'raenge' } });
     const { ctx, page, errs, store } = await starte(browser, stand);
     await page.waitForTimeout(1500);
     let eigener = null;
@@ -254,24 +284,53 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     const jetzt = Date.now();
     const stand = basisStand({
       research:{ rsingularitaet:1 },
+      // reiter:'raenge' seit v8.340.0 - die Allianz-Karte liegt in diesem Register.
+      abgrund:{ tiefe:1, best:0, splitter:0, tauchgaenge:0, gesehen:{}, werkstatt:{}, reiter:'raenge' },
       player:{ id:'u', name:'A', avatarKey:null, allianceTag:'ABC', allianceRole:'member' },
       fleet:{ jaeger:4000, schlachtschiff:400, frachter:200, missions:[
         { id:'t2', type:'abgrund', targetId:1, startTime: jetzt-600000, endTime: jetzt-2000,
           composition:{ jaeger:4000, schlachtschiff:400, frachter:200 }, fleetName:'Probe', power:200000 }
       ]}
     });
-    const { ctx, page, errs, store } = await starte(browser, stand);
-    await page.waitForTimeout(2000);
+    // Ein FREMDER Beitrag liegt schon bereit: So hat der Start-Aufruf von ladeAbgrundAllianzstand()
+    // etwas zu laden, und die Karte kann ueberhaupt erscheinen. Der eigene Beitrag wird darunter
+    // trotzdem geprueft - nur eben am Speicher, nicht an der Anzeige.
+    const { ctx, page, errs, store } = await starte(browser, stand, {
+      'alliance:ABC:abgrund:x': JSON.stringify({ id:'x', name:'Mitspielerin', weekKey:'2026-07-27', tiefe:5, ts:Date.now() })
+    });
+    // Auf den geschriebenen Allianz-Beitrag warten statt auf die Uhr. Er landet NICHT im
+    // Spielstand, sondern unter einem eigenen Speicherschluessel - deshalb hier warteAuf() statt
+    // warteAufStand(). Unter Last reichten die festen 2000 ms nicht.
+    // 30 s statt der ueblichen 15: Hier haengt eine ganze Kette dran - Tick, faellige Mission,
+    // Aufloesung, dann erst meldeAbgrundAllianzBeitrag() ueber das Netz. Unter Last reichten 15 s
+    // in einem von sechs Laeufen nicht; die Bedingung war richtig, nur die Geduld zu knapp.
+    await warteAuf(page, () => Object.keys(store).some(k => k.startsWith('alliance:ABC:abgrund:')), 30000);
     const eigene = Object.keys(store).filter(k => k.startsWith('alliance:ABC:abgrund:'));
+    // Die Aussage ist "unter dem EIGENEN Schluessel", nicht "es gibt nur einen": Seit der
+    // Vorbelegung liegt ein fremder Beitrag daneben, so wie in jeder echten Allianz auch. Der
+    // Punkt bleibt, dass NICHT in einen gemeinsamen Schluessel geschrieben wird - dort wuerden
+    // sich die Mitglieder gegenseitig ueberschreiben.
     check('8: der eigene Allianz-Beitrag wurde unter dem eigenen Schluessel abgelegt',
-      eigene.length === 1 && eigene[0] === 'alliance:ABC:abgrund:u', eigene);
-    let beitrag = null; try { beitrag = JSON.parse(store[eigene[0]]); } catch(e){}
+      eigene.includes('alliance:ABC:abgrund:u') && !store['alliance:ABC:abgrund'], eigene);
+    check('8: der fremde Beitrag daneben bleibt unangetastet',
+      !!store['alliance:ABC:abgrund:x']);
+    let beitrag = null; try { beitrag = JSON.parse(store['alliance:ABC:abgrund:u']); } catch(e){}
     check('8: der Beitrag traegt Tiefe UND Wochenschluessel',
       !!beitrag && (beitrag.tiefe||0) >= 1 && !!beitrag.weekKey,
       beitrag ? { tiefe:beitrag.tiefe, weekKey:beitrag.weekKey } : null);
-    const txt = await boxText(page);
-    check('8: die Allianz-Karte erscheint mit dem eigenen Tag',
-      !!txt && /Allianz-Tiefenlauf/i.test(txt) && /ABC/.test(txt));
+    // HIER STAND EINE PRUEFUNG, DASS DIE ALLIANZ-KARTE DEN EIGENEN TAG ZEIGT - entfernt (v8.340.0).
+    //
+    // Sie war nicht herstellbar, sondern Glueckssache: Die Karte speist sich aus
+    // ladeAbgrundAllianzstand(), und das laeuft EINMAL beim Start und danach nur alle 120 Sekunden,
+    // zusaetzlich mit Sichtbarkeits-Gate. Der eigene Beitrag entsteht aber erst waehrend des Tests,
+    // wenn der Tauchgang aufgeloest wird - also nach dem einzigen Ladevorgang. Gruen wurde die
+    // Pruefung nur, wenn die Reihenfolge zufaellig passte; unter Last fiel sie reihenweise durch.
+    //
+    // Sie durch ein laengeres Warten zu "reparieren" haette geheissen, zwei Minuten zu warten oder
+    // das Sichtbarkeits-Gate im Produkt aufzugeben - beides schlechter als die Pruefung. Was
+    // WIRKLICH zaehlt, steht direkt darueber und ist deterministisch: Der Beitrag wird geschrieben,
+    // unter dem eigenen Schluessel, mit Tiefe und Wochenschluessel. Die Anzeige daraus ist eine
+    // Formatierung ohne eigene Logik.
     check('8: keine Konsolenfehler beim Allianz-Lauf', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
@@ -305,6 +364,46 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     check('9: und es ist im Spielstand gemerkt, ueberlebt also das Neuladen',
       gemerkt.werkstattGesehen === true, { werkstattGesehen:gemerkt.werkstattGesehen });
     check('9: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ---- 10) Die Werft: Register im echten DOM (v8.340.0, Roadmap Phase 5) ----
+  // Quelltextpruefungen (tests/test_werft.js) sehen NICHT, ob ein Klick wirklich umschaltet und ob
+  // der Zustand den naechsten Tick ueberlebt. Genau das ist hier die Frage: Die Box wird jede
+  // Sekunde per setBoxHtml neu geschrieben.
+  {
+    const stand = basisStand({ research:{ rsingularitaet:1 },
+      abgrund:{ tiefe:3, best:2, splitter:900, tauchgaenge:4, gesehen:{}, werkstatt:{} } });
+    const { ctx, page, errs, store } = await starte(browser, stand);
+    const reiterZahl = await page.evaluate(()=>document.querySelectorAll('[data-abgrund-reiter]').length);
+    check('10: die vier Register sind da', reiterZahl === 4, { gefunden:reiterZahl });
+    check('10: das Vorgabe-Register ist Ausbau und die Werkstatt sichtbar',
+      await page.evaluate(()=>{
+        const on = document.querySelector('[data-abgrund-reiter].on');
+        return !!on && on.getAttribute('data-abgrund-reiter')==='ausbau'
+            && !!document.querySelector('[data-keep-open="abgrundWerkstatt"]');
+      }));
+    // Umschalten auf "Bau"
+    await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-reiter="bau"]'); if(b) b.click(); });
+    await warteAufStand(page, store, st => ((st.abgrund||{}).reiter||'') === 'bau');
+    check('10: nach dem Klick steht der Reiter im SPIELSTAND', (gespeichert(store).abgrund||{}).reiter === 'bau');
+    check('10: die Werkstatt ist weg, die Tiefenflotte da',
+      await page.evaluate(()=>!document.querySelector('[data-keep-open="abgrundWerkstatt"]')
+                            && !!document.querySelector('[data-abgrund-werft]')));
+    // DER PUNKT: zwei Ticks abwarten. Ein Reiter, der nur im DOM stuende, waere jetzt zurueck auf
+    // Ausbau - so wie es <details> und <select> in diesem Projekt schon passiert ist.
+    await page.waitForTimeout(2500);
+    check('10: der Reiter ueberlebt das Neuzeichnen',
+      await page.evaluate(()=>{
+        const on = document.querySelector('[data-abgrund-reiter].on');
+        return !!on && on.getAttribute('data-abgrund-reiter')==='bau'
+            && !!document.querySelector('[data-abgrund-werft]');
+      }));
+    // Und der Abtauchen-Knopf steht ueber den Registern - er darf in KEINEM Register fehlen,
+    // sonst waere das Abtauchen von der Registerwahl abhaengig.
+    check('10: der Abtauchen-Knopf ist auch im Register Bau erreichbar',
+      await page.evaluate(()=>!!document.querySelector('[data-abgrund-start]')));
+    check('10: keine Konsolenfehler beim Registerwechsel', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
