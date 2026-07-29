@@ -71,6 +71,9 @@ const G = new Function(`
   ${fnAus('abgrundMutatorAnzahl')}
   ${fnAus('abgrundIstWaechter')}
   ${fnAus('abgrundRufAktiv')}
+  const TIEFENSCHIFF_WIRKUNG = {};
+  ${fnAus('tiefenschiffBonus')}
+  ${fnAus('abgrundAnflugdauer')}
   ${fnAus('abgrundWaechterDef')}
   ${fnAus('abgrundKonstellationFuer')}
   ${fnAus('abgrundKonstellationsEmblem')}

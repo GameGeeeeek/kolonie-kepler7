@@ -169,21 +169,26 @@ check('4: Vorschau und Aufloesung geben beide die Flotte mit',
   /abgrundKampfkraft\(rohkraft, sektor, m\.composition \|\| fleet\)/.test(js));
 
 // ---- 5) Tiefenkiel: Verluste ----
-const kielStelle = js.slice(js.indexOf("const kiel = abgrundSchiffsmodul"), js.indexOf("const kiel = abgrundSchiffsmodul")+420);
+// Fenster grosszuegig: Seit v8.337.0 steht der Kessel-Kommentar zwischen Kiel-Definition und
+// Verlustzeile. Ein zu enges Fenster haette die Pruefung stillschweigend ins Leere laufen lassen.
+const kielStelle = js.slice(js.indexOf("const kiel = abgrundSchiffsmodul"), js.indexOf("const kiel = abgrundSchiffsmodul")+1200);
 check('5: der Kiel skaliert mit der Tiefe', /Math\.min\(1, tiefe\/50\)/.test(kielStelle), kielStelle.split('\n')[0]);
 check('5: er ist eigenstaendig gedeckelt', /Math\.min\(0\.5, kiel\)/.test(kielStelle));
 // Multiplikativ AUF den Werkstattschutz: eine gemeinsame additive Gruppe wuerde die 60%-Deckelung
 // der Tiefenpanzerung still aushebeln.
+// Seit v8.337.0 haengt der Kessel als DRITTER Faktor daran. Die Aussage bleibt dieselbe: drei
+// Quellen, die denselben Wert senken, wirken multiplikativ statt in einer gemeinsamen additiven
+// Gruppe - addiert laendeten sie schnell bei 100%, multiplikativ naehern sie sich der Null an.
 check('5: er wirkt multiplikativ auf den Werkstatt-/Reliquienschutz, nicht in derselben Gruppe',
-  /\(1 - abgrundKanalBonus\('verlust'\)\) \* \(1 - Math\.min\(0\.5, kiel\)\)/.test(js));
+  /\(1 - abgrundKanalBonus\('verlust'\)\) \* \(1 - Math\.min\(0\.5, kiel\)\) \* \(1 - kesselSchutz\)/.test(js));
 
 // ---- 6) Stillgaenger: Sondenreichweite ----
-const SR = new Function('abgrundWerkstattBonus, shipModuleBonusFor, ABGRUND_STILLGAENGER_MAX, state',
+const SR = new Function('abgrundWerkstattBonus, shipModuleBonusFor, ABGRUND_STILLGAENGER_MAX, state, lotsenbootSicht',
   fnAus('abgrundSondeReichweite')+'; return abgrundSondeReichweite;');
 const MAXS = zahl('ABGRUND_STILLGAENGER_MAX');
 // state kommt seit v8.336.0 dazu: abgrundSondeReichweite liest darin das Tiefenlot. Hier ohne
 // Lot, damit dieser Abschnitt weiterhin nur den Stillgaenger misst.
-const sicht = (werkstatt, modul) => SR(() => werkstatt, () => modul, MAXS, { abgrund:{} })();
+const sicht = (werkstatt, modul) => SR(() => werkstatt, () => modul, MAXS, { abgrund:{} }, () => 0)();
 check('6: ohne alles ist die Reichweite 0', sicht(0,0) === 0);
 check('6: gekaufte Werkstattstufen zaehlen weiterhin', sicht(2,0) === 2);
 check('6: das Modul wirkt auch ohne gekaufte Sonde', sicht(0,1) === 1);
