@@ -89,7 +89,11 @@ function baueKontext(zustand){
     konstAus('ABGRUND_WOCHE_FAKTOR'),
     block('ABGRUND_ALLIANZ_MARKEN') ? 'const ABGRUND_ALLIANZ_MARKEN = '+block('ABGRUND_ALLIANZ_MARKEN')+';' : (()=>{throw new Error('ABGRUND_ALLIANZ_MARKEN fehlt')})(),
     fnAus('weekKeyOf'), fnAus('abgrundWochenpflege'), fnAus('abgrundWochenPraemieSplitter'),
-    konstAus('ABGRUND_STILLGAENGER_MAX'), 'const shipModuleBonusFor = () => 0;', fnAus('abgrundSondeReichweite'),
+    konstAus('ABGRUND_STILLGAENGER_MAX'), 'const shipModuleBonusFor = () => 0;',
+    // Tiefenflotte (v8.337.0): die Sondenreichweite und die Anflugdauer fragen sie jetzt mit.
+    // Hier ohne Tiefenschiffe, damit dieser Test weiterhin die Grundwerte misst.
+    'const currentFleet = () => ({});', 'const TIEFENSCHIFF_WIRKUNG = {};',
+    fnAus('tiefenschiffBonus'), fnAus('lotsenbootSicht'), fnAus('abgrundAnflugdauer'), fnAus('abgrundSondeReichweite'),
     konstAus('ABGRUND_WAECHTER_ALLE'), konstAus('ABGRUND_WAECHTER_STAERKE'),
     konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_WAECHTER_BERGUNG'), konstAus('ABGRUND_GEGEN_KOSTEN'),
     fnAus('abgrundBergungsgut'),

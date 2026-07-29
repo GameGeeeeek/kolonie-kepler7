@@ -128,12 +128,14 @@ check('3: ohne gewaehlte Gegenmassnahme wird die Spule NICHT verbraucht',
   /const spule = !!a\.spule && !!bann;/.test(js));
 
 // ---- 4) Bannspule: streicht wirklich einen zweiten Mutator ----
-const SMB = new Function('abgrundKonstellationFuer, ABGRUND_GRENZEN, ABGRUND_BASIS_STAERKE, ABGRUND_STAERKE_MULT, ABGRUND_WAECHTER_STAERKE, ABGRUND_WAECHTER_SPLITTER, ABGRUND_MAX_FLUG_SEK, abgrundBergungsgut',
+const SMB = new Function('abgrundKonstellationFuer, ABGRUND_GRENZEN, ABGRUND_BASIS_STAERKE, ABGRUND_STAERKE_MULT, ABGRUND_WAECHTER_STAERKE, ABGRUND_WAECHTER_SPLITTER, ABGRUND_MAX_FLUG_SEK, abgrundBergungsgut, abgrundAnflugdauer',
   fnAus('abgrundSektorMitBann')+'; return abgrundSektorMitBann;')(
     () => null,
     new Function('return '+js.slice(js.indexOf('{', js.indexOf('const ABGRUND_GRENZEN')), js.indexOf('};', js.indexOf('const ABGRUND_GRENZEN'))+1))(),
     zahl('ABGRUND_BASIS_STAERKE'), zahl('ABGRUND_STAERKE_MULT'), zahl('ABGRUND_WAECHTER_STAERKE'),
-    zahl('ABGRUND_WAECHTER_SPLITTER'), 4*3600, () => 5);
+    zahl('ABGRUND_WAECHTER_SPLITTER'), 4*3600, () => 5,
+    // Anflugdauer haengt seit v8.337.0 an der Flotte - hier ein fester Wert, dieser Test misst Mutatoren.
+    () => 300);
 const probeSektor = () => ({ tiefe:20, mutatoren:[{key:'a'},{key:'b'},{key:'c'}], mods:{atk:1,def:1,loot:1,shards:1,dur:1,loss:1}, waechter:null });
 check('4: ohne Bann bleibt der Sektor unveraendert', SMB(probeSektor(), null, false).mutatoren.length === 3);
 check('4: ein Bann streicht einen Mutator', SMB(probeSektor(), 'b', false).mutatoren.length === 2);
@@ -167,9 +169,9 @@ check('6: ein leerer Spielstand stuerzt nicht ab', RUF({})(1) === false);
 check('6: abgrundWaechterDef beruecksichtigt den Ruf', /!abgrundIstWaechter\(tiefe\) && !abgrundRufAktiv\(tiefe\)/.test(js));
 
 // ---- 7) Tiefenlot: Sicht, die von selbst aufgebraucht wird ----
-const SR = new Function('abgrundWerkstattBonus, shipModuleBonusFor, ABGRUND_STILLGAENGER_MAX, state',
+const SR = new Function('abgrundWerkstattBonus, shipModuleBonusFor, ABGRUND_STILLGAENGER_MAX, state, lotsenbootSicht',
   fnAus('abgrundSondeReichweite')+'; return abgrundSondeReichweite;');
-const sicht = (werkstatt, lotBis, tiefe) => SR(() => werkstatt, () => 0, zahl('ABGRUND_STILLGAENGER_MAX'), { abgrund:{ lotBis, tiefe } })();
+const sicht = (werkstatt, lotBis, tiefe) => SR(() => werkstatt, () => 0, zahl('ABGRUND_STILLGAENGER_MAX'), { abgrund:{ lotBis, tiefe } }, () => 0)();
 check('7: ohne Lot gilt die normale Reichweite', sicht(2, 0, 5) === 2);
 check('7: ein frisches Lot reicht zehn Tiefen weit', sicht(0, 15, 5) === 10);
 check('7: es schrumpft, waehrend man tiefer kommt', sicht(0, 15, 12) === 3, { r:sicht(0,15,12) });
