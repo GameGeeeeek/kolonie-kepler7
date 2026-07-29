@@ -1,7 +1,12 @@
-// Tiefenflotte, Staffel I (28.07.2026, v8.337.0, Roadmap Phase 4a).
+// Tiefenflotte, Staffel I (28.07.2026, v8.337.0, Roadmap Phase 4a)
+// und Staffel II (29.07.2026, v8.338.0, Roadmap Phase 4b).
 //
-// Lotsenboot, Kessel, Bergungskran. Das tiefste System des Spiels hatte kein eigenes Geraet - man
-// tauchte mit derselben Flotte ab, mit der man PvP spielt.
+// Staffel I: Lotsenboot, Kessel, Bergungskran - sie machen den Abstieg MACHBAR.
+// Staffel II: Presslufthai, Ankerwerfer, Echoschnitter - sie machen ihn STEUERBAR, indem sie gegen
+// die Mutatoren des Sektors arbeiten. Alle sechs unterliegen denselben Riegeln (Abschnitt 1+2).
+//
+// Das tiefste System des Spiels hatte kein eigenes Geraet - man tauchte mit derselben Flotte ab,
+// mit der man PvP spielt.
 //
 // DIE TRENNUNG IST DER GANZE PUNKT und Abschnitt 2 ist deshalb der wichtigste Abschnitt hier.
 //
@@ -41,12 +46,18 @@ function arrAus(name){
 }
 const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1]);
 const DREI = ['lotsenboot','kessel','bergungskran'];
+const DREI_II = ['presslufthai','ankerwerfer','echoschnitter'];
+// Abschnitt 1 und 2 gelten fuer BEIDE Staffeln. Waeren sie auf Staffel I beschraenkt geblieben,
+// haette Staffel II drei Schiffe ohne Icon, ohne Beschreibung und ohne PvP-Riegel einschleusen
+// koennen, ohne dass ein einziger Test rot wird - genau der Fehlertyp, den dieses Projekt kennt.
+const SECHS = DREI.concat(DREI_II);
 
-// ---- 1) Die drei Schiffe (CLAUDE.md Regel 7) ----
+// ---- 1) Die sechs Schiffe (CLAUDE.md Regel 7) ----
 const shipBlock = arrAus('SHIP_DEFS');
 const ICON_KEYS = new Set(Array.from(js.matchAll(/^\s{4}([a-z][a-z0-9_]*): `<svg/gm)).map(m=>m[1]));
 const HULL_KEYS = new Set(Array.from(js.matchAll(/^\s{6}([a-z][a-z0-9_]*):\s*\{ pts:/gm)).map(m=>m[1]));
-for (const k of DREI){
+check('1: beide Staffeln sind vollzaehlig', SECHS.length === 6);
+for (const k of SECHS){
   const m = shipBlock.match(new RegExp("\\{ key:'"+k+"'[\\s\\S]{0,900}?\\}, *\\n"));
   check('1: '+k.padEnd(13)+' ist angelegt', !!m);
   if (!m) continue;
@@ -65,8 +76,8 @@ for (const k of DREI){
 // ---- 2) DIE TRENNUNG ----
 const ATTACK_KEYS = new Function('return '+arrAus('ATTACK_SHIP_KEYS'))();
 check('2: die Positivliste ist ueberhaupt eine Liste', Array.isArray(ATTACK_KEYS) && ATTACK_KEYS.length > 15, ATTACK_KEYS.length);
-check('2: KEINES der drei steht in ATTACK_SHIP_KEYS - damit kann es im PvP gar nicht zaehlen',
-  DREI.every(k => !ATTACK_KEYS.includes(k)), DREI.filter(k => ATTACK_KEYS.includes(k)));
+check('2: KEINES der sechs steht in ATTACK_SHIP_KEYS - damit kann es im PvP gar nicht zaehlen',
+  SECHS.every(k => !ATTACK_KEYS.includes(k)), SECHS.filter(k => ATTACK_KEYS.includes(k)));
 // Die Gegenprobe: Die Liste muss die richtigen Schiffe weiterhin enthalten, sonst haette ich
 // beim Einfuegen etwas kaputtgemacht und der Test waere aus dem falschen Grund gruen.
 check('2: die vorhandenen Kampfschiffe stehen weiterhin darin',
@@ -74,12 +85,21 @@ check('2: die vorhandenen Kampfschiffe stehen weiterhin darin',
 // Und keine der Kampf-/Verteidigungsfunktionen darf die drei namentlich kennen.
 for (const fn of ['attackPowerRaw','defenseCombatBonusRaw','defensePower','shipDefenseContribution']){
   const q = fnAus(fn);
-  const drin = DREI.filter(k => q.includes("'"+k+"'"));
-  check('2: '+fn.padEnd(24)+' kennt keins der drei Schiffe', drin.length === 0, drin);
+  const drin = SECHS.filter(k => q.includes("'"+k+"'"));
+  check('2: '+fn.padEnd(24)+' kennt keins der sechs Schiffe', drin.length === 0, drin);
+}
+// Der Presslufthai ist der heikelste Fall der ganzen Trennung: Er ist das EINZIGE Tiefenschiff mit
+// Kampfkraft. Seine Wirkung darf deshalb ausschliesslich in abgrundKampfkraft() liegen - die
+// Funktion wird nur im Abgrund gerufen und ist serverseitig nicht gespiegelt.
+{
+  const stellen = (js.match(/tiefenschiffBonus\([^)]*'presslufthai'\)/g)||[]).length;
+  check('2: der Presslufthai wirkt an genau EINER Stelle', stellen === 1, { stellen });
+  check('2: und diese Stelle ist abgrundKampfkraft()',
+    fnAus('abgrundKampfkraft').includes("'presslufthai'"));
 }
 // defWeight:0 - der dritte Riegel. shipDefenseContribution summiert ueber defWeight; eine
 // versehentliche 1 dort waere Verteidigungskraft im PvP, ohne dass irgendwo ein Name faellt.
-for (const k of DREI){
+for (const k of SECHS){
   const e = shipBlock.match(new RegExp("\\{ key:'"+k+"'[\\s\\S]{0,900}?\\}, *\\n"))[0];
   check('2: '+k.padEnd(13)+' traegt defWeight:0 (kein stiller Verteidigungsbeitrag)', /defWeight:0/.test(e));
 }
@@ -119,7 +139,12 @@ check('4: pay() faellt nicht unter null (ein negativer Wert liesse das Backend d
 // Die Preise muessen mit der Stueckzahl steigen, wie bei allen anderen Schiffen.
 const TK = new Function('TIEFENFLOTTE', fnAus('tiefenschiffKosten')+'; return tiefenschiffKosten;')(
   new Function('return '+js.slice(js.indexOf('{', js.indexOf('const TIEFENFLOTTE')), js.indexOf('};', js.indexOf('const TIEFENFLOTTE'))+1))());
-check('4: jedes der drei hat einen Preis > 0', DREI.every(k => TK(k,1) > 0), DREI.map(k=>k+':'+TK(k,1)));
+check('4: jedes der sechs hat einen Preis > 0', SECHS.every(k => TK(k,1) > 0), SECHS.map(k=>k+':'+TK(k,1)));
+// Staffel II wird spaeter freigeschaltet und muss deshalb auch teurer sein als Staffel I - sonst
+// waere das tiefere Gate eine reine Formalitaet.
+check('4: das billigste Schiff der Staffel II kostet mehr als das teuerste der Staffel I',
+  Math.min(...DREI_II.map(k=>TK(k,1))) > Math.max(...DREI.map(k=>TK(k,1))),
+  { staffelI:DREI.map(k=>TK(k,1)), staffelII:DREI_II.map(k=>TK(k,1)) });
 check('4: 100 Stueck kosten mehr als das 100-fache des ersten (Staffelung greift)',
   TK('kessel',100) > TK('kessel',1)*100, { einzeln:TK('kessel',1), hundert:TK('kessel',100) });
 check('4: ein unbekanntes Schiff kostet 0 statt NaN', TK('gibtsnicht',5) === 0);
@@ -127,13 +152,13 @@ check('4: ein unbekanntes Schiff kostet 0 statt NaN', TK('gibtsnicht',5) === 0);
 // ---- 5) Die drei Wirkungen, ausgefuehrt ----
 const TB = new Function('TIEFENSCHIFF_WIRKUNG', fnAus('tiefenschiffBonus')+'; return tiefenschiffBonus;')(
   new Function('return '+js.slice(js.indexOf('{', js.indexOf('const TIEFENSCHIFF_WIRKUNG')), js.indexOf('};', js.indexOf('const TIEFENSCHIFF_WIRKUNG'))+1))());
-check('5: ohne Schiffe kein Bonus', DREI.every(k => TB({}, k) === 0) && TB(null,'kessel') === 0);
+check('5: ohne Schiffe kein Bonus', SECHS.every(k => TB({}, k) === 0) && TB(null,'kessel') === 0);
 check('5: der Bonus waechst mit der Stueckzahl', TB({kessel:5},'kessel') < TB({kessel:20},'kessel'));
 // Deckel an absurder Stueckzahl gemessen - mit realistischen Zahlen wuerde die Pruefung nie
 // fehlschlagen und bewiese nichts.
 check('5: jeder Bonus ist gedeckelt, auch bei 100.000 Schiffen',
-  DREI.every(k => TB({[k]:100000}, k) === TB({[k]:1e9}, k) && TB({[k]:1e9}, k) < 1),
-  DREI.map(k => k+':'+TB({[k]:1e9},k)));
+  SECHS.every(k => TB({[k]:100000}, k) === TB({[k]:1e9}, k) && TB({[k]:1e9}, k) < 1),
+  SECHS.map(k => k+':'+TB({[k]:1e9},k)));
 check('5: ein Schiff zaehlt nur fuer seine eigene Wirkung', TB({kessel:50},'lotsenboot') === 0);
 
 // Anflugdauer: Lotsenboot verkuerzt, Vorschau und Start MUESSEN dieselbe Funktion benutzen.
@@ -156,6 +181,68 @@ check('5: und hebt zusaetzlich die geborgene Menge',
   /abgrundKanalBonus\('beute'\) \+ tiefenschiffBonus\(m\.composition \|\| fleet, 'bergungskran'\)/.test(js));
 check('5: das Lotsenboot erweitert die Sondenreichweite',
   /\+ lotsenbootSicht\(\)/.test(js) && /f\.lotsenboot\|\|0\) > 0\)? \? 1 : 0/.test(fnAus('lotsenbootSicht')));
+
+// ---- 6) Staffel II: die drei Gegenmittel, ausgefuehrt ----
+// Ankerwerfer. Er daempft den UEBERSCHUSS ueber 1, nicht den Faktor selbst. Das ist der ganze
+// Entwurf und deshalb hier in beide Richtungen geprueft: Ein verlaengernder Mutator verliert einen
+// Teil seiner Wirkung, ein VERKUERZENDER bleibt unangetastet. Haette ich stattdessen dur * (1-x)
+// gerechnet, waere die zweite Zeile rot - und der Spieler haette mit einem gebauten Schiff bei
+// einem guenstigen Sektor plötzlich LAENGER geflogen.
+{
+  const OHNE = {}, MIT = { ankerwerfer:50 };
+  check('6: ein verlaengernder Mutator (dur 1.6) wird gedaempft', AD(30, 1.6, MIT) < AD(30, 1.6, OHNE),
+    { ohne:AD(30,1.6,OHNE), mit:AD(30,1.6,MIT) });
+  check('6: aber nie unter die normale Flugzeit - er nimmt nur den Aufschlag',
+    AD(30, 1.6, MIT) >= AD(30, 1, OHNE), { gedaempft:AD(30,1.6,MIT), normal:AD(30,1,OHNE) });
+  check('6: ein VERKUERZENDER Mutator (dur 0.6) bleibt unberuehrt', AD(30, 0.6, MIT) === AD(30, 0.6, OHNE),
+    { ohne:AD(30,0.6,OHNE), mit:AD(30,0.6,MIT) });
+  check('6: ohne Mutator aendert der Ankerwerfer gar nichts', AD(30, 1, MIT) === AD(30, 1, OHNE));
+  check('6: Lotsenboot und Ankerwerfer wirken zusammen',
+    AD(30, 1.6, { lotsenboot:20, ankerwerfer:50 }) < Math.min(AD(30,1.6,{lotsenboot:20}), AD(30,1.6,MIT)));
+  // Der Ankerwerfer muss ALLE vier verlaengernden Mutatoren erfassen. Er kennt bewusst keinen
+  // Namen - diese Probe stellt sicher, dass die Namenlosigkeit auch traegt.
+  for (const dur of [1.3, 1.35, 1.4, 1.6]){
+    check('6: Mutator mit dur '+dur+' wird erfasst', AD(40, dur, MIT) < AD(40, dur, OHNE));
+  }
+}
+// Presslufthai: der einzige Beitrag im Spiel, der mit der TIEFE waechst.
+{
+  const AK = new Function(
+    'abgrundKanalBonus, abgrundSchiffsmodul, fleetDiversityMult, FLEET_BALANCE_MAX_BONUS, tiefenschiffBonus, ABGRUND_KRAFT_DECKEL, state',
+    fnAus('abgrundKampfkraft')+'; return abgrundKampfkraft;'
+  )(()=>0, ()=>0, ()=>1, 1, TB, 2.0, {});
+  const sek = t => ({ tiefe:t, mutatoren:[], mods:{ atk:1 } });
+  const HAI = { presslufthai:60 };
+  check('6: ohne Presslufthai ist die Kampfkraft unveraendert', AK(1000, sek(80), {}) === 1000);
+  check('6: mit ihm steigt sie', AK(1000, sek(80), HAI) > 1000, { tief:AK(1000,sek(80),HAI) });
+  check('6: und zwar in TIEFE 80 staerker als in Tiefe 20',
+    AK(1000, sek(80), HAI) > AK(1000, sek(20), HAI),
+    { t20:AK(1000,sek(20),HAI), t80:AK(1000,sek(80),HAI) });
+  check('6: ab Tiefe 80 ist der Ortsfaktor voll - tiefer bringt keinen weiteren Sprung',
+    AK(1000, sek(80), HAI) === AK(1000, sek(100), HAI));
+  // Der Deckel wird an SEINEM EIGENEN Anteil nicht sichtbar - sein Wirkungsdeckel (0,50) liegt weit
+  // unter ABGRUND_KRAFT_DECKEL (2,0). Der Punkt ist ein anderer: Er muss IN der gemeinsamen Gruppe
+  // liegen. Deshalb hier ein zweiter Aufbau, bei dem die uebrigen Kanaele die Gruppe schon fast
+  // fuellen - kaeme der Hai als eigener Faktor obendrauf, staende hier mehr als der Deckel.
+  const AK_VOLL = new Function(
+    'abgrundKanalBonus, abgrundSchiffsmodul, fleetDiversityMult, FLEET_BALANCE_MAX_BONUS, tiefenschiffBonus, ABGRUND_KRAFT_DECKEL, state',
+    fnAus('abgrundKampfkraft')+'; return abgrundKampfkraft;'
+  )(()=>1.9, ()=>0, ()=>1, 1, TB, 2.0, {});
+  check('6: sein Beitrag steckt im gemeinsamen Deckel, nicht daneben',
+    AK_VOLL(1000, sek(100), HAI) === 1000 * (1 + 2.0),
+    { mitHai:AK_VOLL(1000, sek(100), HAI), ohneHai:AK_VOLL(1000, sek(100), {}) });
+  check('6: die Gegenprobe - ohne ihn liegt die Gruppe noch unter dem Deckel',
+    AK_VOLL(1000, sek(100), {}) === 1000 * (1 + 1.9));
+}
+// Echoschnitter: mehr Splitter, in DERSELBEN additiven Gruppe wie Werkstatt und Reliquien.
+check('6: der Echoschnitter liegt in der additiven Splitter-Gruppe, nicht als eigener Faktor',
+  /\(1 \+ abgrundKanalBonus\('splitter'\) \+ tiefenschiffBonus\(m\.composition \|\| fleet, 'echoschnitter'\)\)/.test(js));
+check('6: und wirkt an genau einer Stelle',
+  (js.match(/tiefenschiffBonus\([^)]*'echoschnitter'\)/g)||[]).length === 1);
+// Die Beute-Zeile daneben darf er NICHT anfassen - dort sitzt der Bergungskran. Zwei Schiffe auf
+// denselben Kanal waere die Art Doppelung, die dieses Projekt sonst erst beim Spieler auffaellt.
+check('6: die Beute bleibt Sache des Bergungskrans',
+  !new RegExp("abgrundKanalBonus\\('beute'\\)[^\\n]*echoschnitter").test(js));
 
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
 process.exit(fail ? 1 : 0);
