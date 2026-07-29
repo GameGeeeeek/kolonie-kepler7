@@ -123,13 +123,15 @@ function arrAus(name){
   check('4: die Anflugdauer liest den Navigator', /officerBonus\('navigator'\)/.test(q));
   check('4: mit demselben Deckel wie die normale Flugzeitrechnung (hoechstens die Haelfte)',
     /Math\.min\(0\.5, officerBonus\('navigator'\)\)/.test(q));
-  const AD = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus',
+  // abgrundRissKuerzung kam in v8.343.0 dazu und wird hier fest auf 0 gestellt: Dieser Abschnitt
+  // misst den Navigator, nicht die Stroemung. Die hat ihren Nachweis in Abschnitt 8.
+  const AD = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus, abgrundRissKuerzung',
     q+'; return abgrundAnflugdauer;');
-  const ohne = AD(()=>0, 4*3600, ()=>0)(30, 1, {});
-  const mit  = AD(()=>0, 4*3600, ()=>0.3)(30, 1, {});
+  const ohne = AD(()=>0, 4*3600, ()=>0, ()=>0)(30, 1, {});
+  const mit  = AD(()=>0, 4*3600, ()=>0.3, ()=>0)(30, 1, {});
   check('4: er verkuerzt den Anflug wirklich', mit < ohne, { ohne, mit });
   check('4: und laesst ihn nie unter die Haelfte fallen',
-    AD(()=>0, 4*3600, ()=>5)(30, 1, {}) === Math.round(ohne*0.5));
+    AD(()=>0, 4*3600, ()=>5, ()=>0)(30, 1, {}) === Math.round(ohne*0.5));
 }
 
 // ---- 5) Der Vorbote ----
@@ -160,6 +162,174 @@ function arrAus(name){
     /r === 'bergung'/.test(fnAus('pay')) && /'bergung'/.test(fnAus('costAmountAvailable')));
 }
 
+// ===================== Zweite Runde (v8.343.0): sechs weitere Beruehrungspunkte ==============
+// Die erste Runde hat den Abgrund SICHTBAR gemacht (Aufgaben, Auftraege, Peilung, Gebaeude). Die
+// zweite verschraenkt ihn mit Entscheidungen, die der Spieler ohnehin trifft: welche Rolle ein
+// Planet bekommt, ob er einen Leerenriss schliesst, was seine Allianz erforscht.
+
+// ---- 8) Rissstroemung: ein Ereignis des Hauptspiels wirkt in den Abgrund ----
+{
+  const f = fnAus('abgrundRissKuerzung');
+  const RISS = new Function('state, Date',
+    'const ABGRUND_RISS_KUERZUNG = '+(js.match(/const ABGRUND_RISS_KUERZUNG = ([\d.]+);/)||[])[1]+';\n'
+    + f + '; return abgrundRissKuerzung;');
+  const jetzt = 1000000;
+  const D = { now: () => jetzt };
+  check('8: ohne Riss gibt es keine Verkuerzung', RISS({ voidRift:null }, D)() === 0);
+  check('8: ein offener Riss verkuerzt', RISS({ voidRift:{ endTime: jetzt+60000 } }, D)() > 0);
+  // Ein kollabierter Riss darf NICHT weiterwirken. processVoidRift raeumt ihn zwar weg, aber die
+  // Vorschau rechnet zwischen zwei Ticks - ohne diese Pruefung stuende dort eine Zeit, die beim
+  // Start nicht mehr gilt.
+  check('8: ein abgelaufener Riss wirkt nicht mehr', RISS({ voidRift:{ endTime: jetzt-1 } }, D)() === 0);
+  // Und die Anflugdauer muss ihn wirklich benutzen - nicht nur die Funktion existieren.
+  check('8: abgrundAnflugdauer rechnet die Stroemung ein',
+    /abgrundRissKuerzung\(\)/.test(fnAus('abgrundAnflugdauer')));
+  // Regel 6: Der Spieler muss die Stroemung an BEIDEN Stellen sehen - in der Tauchvorschau (wo die
+  // Zahl steht) UND an der Riss-Box (wo er ueber das Schliessen entscheidet). Nur die Vorschau
+  // waere die halbe Wahrheit: Wer den Riss schliesst, erfaehrt nie, was er dabei aufgibt.
+  // Die Vorschau muss die Stroemung NENNEN, sonst wundert sich der Spieler ueber eine Zahl, die
+  // sich ohne sein Zutun geaendert hat.
+  check('8: die Tauchvorschau nennt die Stroemung',
+    /Anflug \$\{fmtDuration\(abgrundAnflugdauer[\s\S]{0,200}Rissströmung/.test(js));
+  // Und die Dauer muss wirklich kuerzer werden - nicht nur der Hinweis erscheinen.
+  const AD2 = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus, abgrundRissKuerzung',
+    fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;');
+  const dOhne = AD2(()=>0, 4*3600, ()=>0, ()=>0)(30, 1, {});
+  const dMit  = AD2(()=>0, 4*3600, ()=>0, ()=>0.4)(30, 1, {});
+  check('8: mit offenem Riss ist der Anflug wirklich kuerzer', dMit < dOhne, { dOhne, dMit });
+  check('8: und zwar um genau den angegebenen Anteil', dMit === Math.round(dOhne*0.6), { dOhne, dMit });
+  const rissBox = js.slice(js.indexOf("const voidRiftBox = document.getElementById('voidRiftBox')"));
+  check('8: die Riss-Box nennt die Zwickmuehle ebenfalls',
+    /Rissströmung/.test(rissBox.slice(0, 4000)));
+  check('8: und zeigt sie nur, wenn der Abgrund ueberhaupt offen ist',
+    /abgrundFreigeschaltet\(\)\?/.test(rissBox.slice(0, 4000).replace(/\s/g,'')));
+}
+
+// ---- 9) Punktestand: die Rekordtiefe zaehlt im Score ----
+{
+  const SC = new Function('state',
+    'const ABGRUND_SCORE_JE_TIEFE = '+(js.match(/const ABGRUND_SCORE_JE_TIEFE = (\d+);/)||[])[1]+';\n'
+    + fnAus('abgrundScoreTotal') + '; return abgrundScoreTotal;');
+  check('9: ohne Tauchgang gibt der Abgrund keine Punkte', SC({ abgrund:{} })() === 0);
+  check('9: die Rekordtiefe zaehlt linear', SC({ abgrund:{ best:10 } })() === 10*SC({ abgrund:{ best:1 } })());
+  // Beide Stellen: die Summe UND die Aufschluesselung. Genau hier war der wiederkehrende Fehler -
+  // eine Zahl im Score, die in der Aufschluesselung fehlt, laesst die Liste nicht mehr aufgehen.
+  check('9: computeScore zaehlt sie mit', /abgrundScoreTotal\(\)/.test(fnAus('computeScore')));
+  check('9: und die Aufschluesselung fuehrt sie eigens auf',
+    /abgrundScoreTotal\(\)/.test(fnAus('computeScoreBreakdown')) &&
+    /Rekordtiefe im Abgrund/.test(fnAus('computeScoreBreakdown')));
+}
+
+// ---- 10) Tiefenaufkaeufer: Splitter werden ausserhalb der Werkstatt etwas wert ----
+{
+  const shop = arrAus('CREDIT_SHOP');
+  const e = shop.match(/\{ key:'tiefenaufkaeufer'[\s\S]*?\} \},/);
+  check('10: der Tiefenaufkaeufer steht im Kredit-Shop', !!e);
+  if (e){
+    check('10: er ist ohne Abgrund unsichtbar', /sichtbar\(\)\{ return abgrundFreigeschaltet\(\); \}/.test(e[0]));
+    check('10: seine Kaufbarkeit haengt an den SPLITTERN, nicht an Krediten',
+      /kaufbar\(\)\{[\s\S]*?splitter[\s\S]*?ABGRUND_SPLITTER_VERKAUF/.test(e[0]));
+    check('10: und er bucht die Splitter auch wirklich ab', /a\.splitter = Math\.max\(0,/.test(e[0]));
+    // Bergungsgut bleibt tabu - sonst waere "nur im Abgrund zu bekommen" eine Preisfrage.
+    check('10: Bergungsgut bleibt unverkaeuflich', !/bergung/.test(e[0]));
+  }
+  // Der Shop kannte diese drei Felder vorher nicht. Ohne sie stuende der Eintrag mit "0 Kr." bei
+  // jedem Spieler - auch ohne Abgrund. Beide Verbrauchsstellen muessen sie kennen.
+  const render = fnAus('renderCreditShop');
+  check('10: das Rendern filtert ueber sichtbar()',
+    /CREDIT_SHOP\.filter\(item => !item\.sichtbar \|\| item\.sichtbar\(\)\)/.test(render));
+  check('10: dieselbe gefilterte Liste bildet Signatur UND Markup (keine zwei Filterlaeufe)',
+    (render.match(/sichtbare\.map\(/g)||[]).length === 2 && !/CREDIT_SHOP\.map\(/.test(render));
+  check('10: der Knopf zeigt den eigenen Preistext statt "0 Kr."', /item\.preisText \? item\.preisText/.test(render));
+  const kauf = fnAus('buyShopItem');
+  check('10: der Kauf prueft sichtbar() und kaufbar() erneut',
+    /item\.sichtbar && !item\.sichtbar\(\)/.test(kauf) && /item\.kaufbar && !item\.kaufbar\(\)/.test(kauf));
+  // Ein VERKAUF darf den Einkaufszaehler nicht hochzaehlen: Erfolg, Tagesaufgabe und
+  // Fraktionsauftrag sprechen alle vom KAUFEN (CLAUDE.md Regel 6).
+  check('10: ein Verkauf zaehlt nicht als Einkauf',
+    /if \(!eigenerPreis\) state\.shopPurchases/.test(kauf));
+}
+
+// ---- 11) Tiefenhafen: die erste Planeten-Rolle, die auf den Abgrund zeigt ----
+{
+  const rollen = arrAus('PLANET_ROLES');
+  const e = rollen.match(/\{ key:'deepport'[^\n]*/);
+  check('11: die Rolle Tiefenhafen ist angelegt', !!e);
+  if (e){
+    check('11: sie hat ein eigenes Icon (kein Zweitverwerten)', /icon:'ti-building-lighthouse'/.test(e[0]));
+    check('11: sie ist als Abgrund-Rolle markiert', /abgrund:true/.test(e[0]));
+    check('11: ihr detail nennt die Wirkung samt Einschraenkung "von dieser Welt"',
+      /Abgrundsplitter/.test(e[0]) && /DIESER Welt/.test(e[0]));
+  }
+  check('11: ohne Abgrund taucht sie in der Auswahl nicht auf',
+    /r\.abgrund \|\| abgrundFreigeschaltet\(\)/.test(fnAus('planetRolesSichtbar')) &&
+    /planetRolesSichtbar\(\)\.map/.test(js));
+  check('11: und der Umbau selbst weist sie ebenfalls ab',
+    /role\.abgrund && !abgrundFreigeschaltet\(\)/.test(fnAus('setPlanetRole')));
+  // Die Wirkung haengt am STARTPLANETEN, nicht am gerade angezeigten - sonst koennte man den Bonus
+  // nach dem Abtauchen noch nachtraeglich durch einen Standortwechsel holen.
+  const fak = fnAus('abgrundSplitterFaktor');
+  check('11: der Bonus liest die Rolle des uebergebenen Planeten',
+    /planetRoleOf\(planetKey\)/.test(fak) && /'deepport'/.test(fak));
+  check('11: er ist ein SUMMAND der vorhandenen Splitter-Gruppe, keine eigene Multiplikation',
+    /1 \+ abgrundKanalBonus\('splitter'\) \+ tiefenschiffBonus\(flotte, 'echoschnitter'\) \+ hafen/.test(fak));
+  const SF = new Function('state, abgrundKanalBonus, tiefenschiffBonus, planetRoleOf',
+    'const PLANET_ROLE_TIEFENHAFEN = '+(js.match(/const PLANET_ROLE_TIEFENHAFEN = ([\d.]+);/)||[])[1]+';\n'
+    + fak + '; return abgrundSplitterFaktor;');
+  const ohne = SF({}, ()=>0, ()=>0, ()=>null)({}, 'home');
+  const mit  = SF({}, ()=>0, ()=>0, ()=>({key:'deepport'}))({}, 'home');
+  check('11: mit Hafen faellt mehr ab als ohne', mit > ohne, { ohne, mit });
+  check('11: eine ANDERE Rolle bringt nichts',
+    SF({}, ()=>0, ()=>0, ()=>({key:'mining'}))({}, 'home') === ohne);
+}
+
+// ---- 12) Tiefenkartierung: eine Allianz-Technologie fuer den Abgrund ----
+{
+  const techs = arrAus('ALLIANCE_TECH_DEFS');
+  const e = techs.match(/\{ key:'a_abgrund'[^\n]*/);
+  check('12: die Allianz-Technologie Tiefenkartierung ist angelegt', !!e);
+  if (e){
+    check('12: sie hat Stufen, Gesamtbonus, Kosten, Ressource und Icon',
+      /maxLevel:20/.test(e[0]) && /totalBonus:0\.15/.test(e[0]) && /cost:\d+/.test(e[0])
+      && /resKey:'/.test(e[0]) && /icon:'ti-/.test(e[0]));
+    check('12: ihre Beschreibung nennt Wirkung je Stufe UND das Maximum',
+      /je Stufe/.test(e[0]) && /max\./.test(e[0]));
+  }
+  const w = fnAus('abgrundWiederholungsFaktor');
+  check('12: sie wirkt auf den Wiederholungsfaktor', /allianceTechFrac\('a_abgrund'\)/.test(w));
+  check('12: als Summand innerhalb des vorhandenen Math.min(1, ...)-Deckels',
+    /Math\.min\(1, ABGRUND_WIEDERHOLUNG \+ tiefenschiffBonus\(flotte, 'grundgaenger'\) \+ karte\)/.test(w));
+  const WF = new Function('state, ensureAbgrund, tiefenschiffBonus, allianceTechFrac',
+    'const ABGRUND_WIEDERHOLUNG = 0.35;\n' + w + '; return abgrundWiederholungsFaktor;');
+  const st = { abgrund:{ best:50 }, allianceResearch:{} };
+  const ohneK = WF(st, ()=>st.abgrund, ()=>0, ()=>0)(10, false, {});
+  const mitK  = WF(st, ()=>st.abgrund, ()=>0, ()=>1)(10, false, {});
+  check('12: voll erforscht gibt eine Wiederholung mehr her', mitK > ohneK, { ohneK, mitK });
+  // Der Deckel ist der Punkt: Selbst mit allen Quellen darf eine Wiederholung nie mehr als eine
+  // Erstbegehung bringen - sonst waere das Wiederholen der beste Weg nach unten.
+  const voll = WF(st, ()=>st.abgrund, ()=>0.35, ()=>1)(10, false, {});
+  check('12: aber nie mehr als ein Erstabstieg', voll <= 1, { voll });
+  check('12: ein Erstabstieg selbst bleibt bei voller Ausbeute',
+    WF(st, ()=>st.abgrund, ()=>0, ()=>1)(80, false, {}) === 1);
+}
+
+// ---- 13) Kompendium: Reliquien und Konstellationen sind Sammelkategorien ----
+{
+  const kats = arrAus('COMPENDIUM_CATS');
+  for (const k of ['relikte','konstellationen']){
+    const i = kats.indexOf("{ key:'"+k+"'");
+    const e = i < 0 ? null : [kats.slice(i, i+400)];
+    check('13: Kompendium-Kategorie '+k.padEnd(16)+' ist angelegt', !!e);
+    if (!e) continue;
+    check('13: '+k.padEnd(16)+' hat Icon, Beschreibung und Belohnung',
+      /icon:'ti-/.test(e[0]) && /desc:'/.test(e[0]) && /reward:\{/.test(e[0]));
+    // have/total muessen aus der QUELLLISTE kommen. Eine feste Zahl waere beim naechsten neuen
+    // Relikt still falsch - und niemand merkt es, weil die Kategorie weiter "voll" anzeigt.
+    check('13: '+k.padEnd(16)+' zaehlt gegen die Quellliste, nicht gegen eine feste Zahl',
+      /total:\(\)=>ABGRUND_(RELIKTE|KONSTELLATIONEN)\.length/.test(e[0].replace(/\s/g,'')));
+  }
+}
+
 // ---- 7) Die Gesamtaussage ----
 // Der eigentliche Befund des Spieler-Reports: Wie viele Beruehrungen gibt es ueberhaupt? Diese
 // Zahl darf wachsen, aber nicht schrumpfen - deshalb steht sie hier als Untergrenze.
@@ -173,8 +343,18 @@ function arrAus(name){
     /state\.abgrundVorbote/.test(js),                                     // Vorbote
     /key:'bergungswerft'/.test(js)                                        // Gebaeude
   ];
-  check('7: alle sechs Bruecken stehen', bruecken.every(Boolean),
+  check('7: alle sechs Bruecken der ersten Runde stehen', bruecken.every(Boolean),
     { fehlend: bruecken.map((b,i) => b?null:i).filter(x => x!==null) });
+  const runde2 = [
+    /function abgrundRissKuerzung/.test(js),        // Leerenriss -> Anflug
+    /function abgrundScoreTotal/.test(js),          // Rekordtiefe -> Score
+    /key:'tiefenaufkaeufer'/.test(js),              // Splitter -> Kredite
+    /key:'deepport'/.test(js),                      // Planeten-Rolle
+    /key:'a_abgrund'/.test(js),                     // Allianz-Technologie
+    /key:'relikte'/.test(js) && /key:'konstellationen'/.test(js)  // Kompendium
+  ];
+  check('7: alle sechs Bruecken der zweiten Runde stehen', runde2.every(Boolean),
+    { fehlend: runde2.map((b,i) => b?null:i).filter(x => x!==null) });
 }
 
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');

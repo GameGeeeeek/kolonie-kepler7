@@ -102,9 +102,20 @@ check('A: Bergungsgut und Splitter liegen in getrennten Feldern',
 // den Basisbauplatz, und zwar genau EINMAL.
 check('A: der Basissektor traegt das Bergungsgut',
   /return \{ tiefe:t,[^\n]*bergung:/.test(fnAus('abgrundSektor')));
-check('A: es gibt nur EINE Stelle, die die Fundformel aufruft (keine zweite Wahrheit)',
-  (js.match(/abgrundBergungsgut\(/g)||[]).length === 2,   // 1x Definition, 1x Aufruf
-  { vorkommen: (js.match(/abgrundBergungsgut\(/g)||[]).length });
+// Die Aussage ist "keine zweite FORMEL", nicht "kein zweiter Aufruf". Bis v8.342.0 fielen beide
+// zusammen (ein einziger Aufruf), seit der Tiefenspur-Peilung gibt es einen zweiten - der aber
+// genau richtig ist: Er ruft dieselbe Funktion, statt die Formel abzuschreiben. Gezaehlt wird
+// deshalb die FORMEL, und die darf nur in ihrer eigenen Funktion stehen.
+{
+  const aufrufe = (js.match(/abgrundBergungsgut\(/g)||[]).length;
+  const formel = /4 \+ \(tiefe\|\|1\)\*0\.36/g;
+  const gesamt = (js.match(formel)||[]).length;
+  const inFunktion = (fnAus('abgrundBergungsgut').match(formel)||[]).length;
+  check('A: die Fundformel steht genau einmal, und zwar in ihrer eigenen Funktion',
+    gesamt === 1 && inFunktion === 1, { gesamt, inFunktion });
+  check('A: und jede Fundstelle geht ueber diese Funktion',
+    aufrufe >= 2, { aufrufe });
+}
 
 // Symbol: CLAUDE.md Regel 7 - jeder neue Inhalt braucht ein EIGENES gezeichnetes Icon, kein
 // ti-*-Notnagel. Geprueft wird, dass wirklich gezeichnet wurde und nicht nur ein leeres <svg> steht.

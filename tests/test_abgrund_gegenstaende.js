@@ -153,10 +153,12 @@ check('4: bei nur einem Mutator streicht die Spule nichts Zusaetzliches (kein Ab
 // tiefenschiffBonus kam mit dem Grundgaenger (v8.339.0) dazu. Hier eine Attrappe, die 0 liefert:
 // Dieser Abschnitt prueft die GRUNDBERUEHRUNG, das Schiff hat seinen eigenen Test
 // (tests/test_tiefenflotte.js, Abschnitt 7). Ohne die Attrappe waere es ein ReferenceError.
-const WF = new Function('ensureAbgrund, ABGRUND_WIEDERHOLUNG, tiefenschiffBonus',
+// state/allianceTechFrac kamen mit der Tiefenkartierung (v8.343.0) dazu - hier ohne Allianz (0),
+// damit dieser Abschnitt weiter den reinen Grundwert der Grundberuehrung misst.
+const WF = new Function('state, ensureAbgrund, ABGRUND_WIEDERHOLUNG, tiefenschiffBonus, allianceTechFrac',
   fnAus('abgrundWiederholungsFaktor')+'; return abgrundWiederholungsFaktor;');
 const WIED = zahl('ABGRUND_WIEDERHOLUNG');
-const wf = (tiefe, best, grund) => WF(() => ({ best, grund:false }), WIED, () => 0)(tiefe, grund, {});
+const wf = (tiefe, best, grund) => WF({ allianceResearch:{} }, () => ({ best, grund:false }), WIED, () => 0, () => 0)(tiefe, grund, {});
 check('5: eine neue Tiefe gibt volle Ausbeute', wf(11, 10, false) === 1);
 check('5: eine bekannte Tiefe wird abgeschlagen', wf(5, 10, false) === WIED);
 check('5: mit Grundberuehrung gibt auch eine bekannte Tiefe volle Ausbeute', wf(5, 10, true) === 1);

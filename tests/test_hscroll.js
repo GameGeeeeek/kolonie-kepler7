@@ -28,6 +28,22 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
 
 // Echte Touch-Wischgeste ueber das Chrome DevTools Protocol - page.mouse erzeugt in einem
 // Touch-Kontext KEIN Scrollen, ein Maus-Drag wuerde hier faelschlich "geht nicht" melden.
+// Nach dem Loslassen laeuft der Schwung noch aus. Bis v8.343.0 stand hier eine feste Wartezeit von
+// 600 ms - auf einer freien Maschine reichlich, im vollen Prueflauf gelegentlich nicht: Der Test
+// mass dann scrollLeft 0 und meldete "Wischen bewegt die Leiste nicht", obwohl die Leiste in
+// Ordnung war. Jetzt wird gewartet, bis die Leiste WIRKLICH zur Ruhe kommt (zwei gleiche Messungen
+// hintereinander), hoechstens 3 Sekunden. Das ist schneller, wenn es schnell geht, und geduldig,
+// wenn die Maschine unter Last steht.
+async function warteAufRuhe(page, name, maxMs){
+  let vorher = null;
+  for (let t = 0; t < maxMs; t += 100){
+    await page.waitForTimeout(100);
+    const jetzt = await page.evaluate(n => Math.round(document.querySelector(`[data-hscroll="${n}"]`).scrollLeft), name);
+    if (vorher !== null && jetzt === vorher && jetzt > 0) return jetzt;
+    vorher = jetzt;
+  }
+  return vorher;
+}
 async function swipeLeft(page, cdp, box, dist){
   const y = Math.round(box.y + box.h/2);
   // Bewusst NICHT am aeussersten rechten Rand ansetzen: dort liegt der fixierte Randreiter
@@ -40,7 +56,6 @@ async function swipeLeft(page, cdp, box, dist){
     await page.waitForTimeout(16);
   }
   await cdp.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
-  await page.waitForTimeout(600);
 }
 
 (async () => {
@@ -99,7 +114,7 @@ async function swipeLeft(page, cdp, box, dist){
         const inView = info.y >= 0 && info.y + info.h <= 851;
         check(label+': liegt fuer die Wischprobe im Sichtbereich', inView, {y:Math.round(info.y), h:Math.round(info.h)});
         await swipeLeft(page, cdp, {x:info.x,y:info.y,w:info.w,h:info.h}, Math.min(200, have));
-        const after = await page.evaluate(n=>Math.round(document.querySelector(`[data-hscroll="${n}"]`).scrollLeft), name);
+        const after = await warteAufRuhe(page, name, 3000);
         check(label+': Wischen bewegt die Leiste', after > 20, {scrollLeftNachWisch:after});
       }
       // 4) Der hinterste Eintrag laesst sich per Antippen wirklich auswaehlen (nur bei Button-Leisten).

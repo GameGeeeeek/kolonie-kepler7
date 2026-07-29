@@ -179,14 +179,17 @@ check('5: ein Schiff zaehlt nur fuer seine eigene Wirkung', TB({kessel:50},'lots
 // officerBonus kam mit v8.342.0 dazu (Navigator wirkt jetzt auch auf den Abgrund-Anflug). Hier eine
 // Attrappe mit 0: Dieser Abschnitt misst die SCHIFFE. Der Navigator hat seinen eigenen Nachweis
 // weiter unten, wo er ausdruecklich hochgedreht wird.
-const AD = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 0);
+// abgrundRissKuerzung kam in v8.343.0 dazu (Leerenriss verkuerzt den Anflug). Hier ueberall fest
+// auf 0: Dieser Test misst Lotsenboot, Ankerwerfer und Navigator, nicht die Stroemung - die hat
+// ihren eigenen Nachweis in test_abgrundbezug.js, Abschnitt 8.
+const AD = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus, abgrundRissKuerzung', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 0, () => 0);
 // Navigator-Ausweitung (v8.342.0): derselbe Offizier, der oben die Flugzeit senkt, wirkt jetzt auch
 // unten. Geprueft mit einer Attrappe, die einen echten Bonus liefert.
 {
-  const ADnav = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 0.2);
+  const ADnav = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus, abgrundRissKuerzung', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 0.2, () => 0);
   check('5: der Navigator verkuerzt den Abgrund-Anflug', ADnav(30, 1, {}) < AD(30, 1, {}),
     { ohne:AD(30,1,{}), mit:ADnav(30,1,{}) });
-  const ADmax = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 9);
+  const ADmax = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus, abgrundRissKuerzung', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 9, () => 0);
   check('5: und ist bei der Haelfte gedeckelt wie in der normalen Flugzeitrechnung',
     ADmax(30, 1, {}) === Math.round(AD(30,1,{}) * 0.5), { gedeckelt:ADmax(30,1,{}), halb:Math.round(AD(30,1,{})*0.5) });
 }
@@ -204,8 +207,13 @@ check('5: der Kessel senkt die Verluste multiplikativ, nicht in derselben Gruppe
   /\* \(1 - kesselSchutz\)/.test(js));
 check('5: der Kran traegt eigenen Laderaum, ohne fleetCargoCapacity anzufassen',
   /kraene \* CARGO_PER_BERGUNGSKRAN/.test(js) && !/bergungskran/.test(fnAus('fleetCargoCapacity')));
+// Seit v8.343.0 steht die Beute-Formel in abgrundBeuteFaktor() statt zweimal inline - deshalb
+// wird hier die FUNKTION geprueft und zusaetzlich, dass Vorschau und Abrechnung beide sie rufen.
+// Vorher hatten sie je eine eigene Zeile, und die der Vorschau kannte den Kran gar nicht.
 check('5: und hebt zusaetzlich die geborgene Menge',
-  /abgrundKanalBonus\('beute'\) \+ tiefenschiffBonus\(m\.composition \|\| fleet, 'bergungskran'\)/.test(js));
+  /abgrundKanalBonus\('beute'\) \+ tiefenschiffBonus\(flotte, 'bergungskran'\)/.test(fnAus('abgrundBeuteFaktor')));
+check('5: Vorschau und Abrechnung holen die Beute aus derselben Funktion',
+  (js.match(/abgrundBeuteFaktor\(/g)||[]).length === 3);
 check('5: das Lotsenboot erweitert die Sondenreichweite',
   /\+ lotsenbootSicht\(\)/.test(js) && /f\.lotsenboot\|\|0\) > 0\)? \? 1 : 0/.test(fnAus('lotsenbootSicht')));
 
@@ -262,10 +270,14 @@ check('5: das Lotsenboot erweitert die Sondenreichweite',
     AK_VOLL(1000, sek(100), {}) === 1000 * (1 + 1.9));
 }
 // Echoschnitter: mehr Splitter, in DERSELBEN additiven Gruppe wie Werkstatt und Reliquien.
+// Auch diese Gruppe steht seit v8.343.0 in einer Funktion (abgrundSplitterFaktor) - mit dem
+// Tiefenhafen als viertem Summanden. Entscheidend bleibt: EINE Summe, kein zweiter Faktor daneben.
 check('6: der Echoschnitter liegt in der additiven Splitter-Gruppe, nicht als eigener Faktor',
-  /\(1 \+ abgrundKanalBonus\('splitter'\) \+ tiefenschiffBonus\(m\.composition \|\| fleet, 'echoschnitter'\)\)/.test(js));
+  /1 \+ abgrundKanalBonus\('splitter'\) \+ tiefenschiffBonus\(flotte, 'echoschnitter'\) \+ hafen/.test(fnAus('abgrundSplitterFaktor')));
 check('6: und wirkt an genau einer Stelle',
   (js.match(/tiefenschiffBonus\([^)]*'echoschnitter'\)/g)||[]).length === 1);
+check('6: Vorschau und Abrechnung holen die Splitter aus derselben Funktion',
+  (js.match(/abgrundSplitterFaktor\(/g)||[]).length === 3);
 // Die Beute-Zeile daneben darf er NICHT anfassen - dort sitzt der Bergungskran. Zwei Schiffe auf
 // denselben Kanal waere die Art Doppelung, die dieses Projekt sonst erst beim Spieler auffaellt.
 check('6: die Beute bleibt Sache des Bergungskrans',
@@ -336,9 +348,12 @@ check('6: die Beute bleibt Sache des Bergungskrans',
 // Grundgaenger: hebt den Wiederholungsabschlag an - dauerhaft, aber nur teilweise.
 {
   const ABSCHLAG = zahl('ABGRUND_WIEDERHOLUNG');
-  const WF = new Function('ensureAbgrund, ABGRUND_WIEDERHOLUNG, tiefenschiffBonus',
+  // state/allianceTechFrac kamen mit der Tiefenkartierung (v8.343.0) dazu - hier ohne Allianz (0),
+  // dieser Abschnitt misst den Grundgaenger. Die Technologie hat ihren eigenen Nachweis in
+  // test_abgrundbezug.js, Abschnitt 12.
+  const WF = new Function('state, ensureAbgrund, ABGRUND_WIEDERHOLUNG, tiefenschiffBonus, allianceTechFrac',
     fnAus('abgrundWiederholungsFaktor')+'; return abgrundWiederholungsFaktor;'
-  )(()=>({ best:100, grund:false }), ABSCHLAG, TB);
+  )({ allianceResearch:{} }, ()=>({ best:100, grund:false }), ABSCHLAG, TB, ()=>0);
   check('7: eine neue Tiefe gibt weiterhin die volle Ausbeute', WF(101, false, {}) === 1);
   check('7: eine wiederholte ohne Grundgaenger den vollen Abschlag', WF(50, false, {}) === ABSCHLAG);
   check('7: mit Grundgaengern wird der Abschlag kleiner', WF(50, false, { grundgaenger:40 }) > ABSCHLAG,

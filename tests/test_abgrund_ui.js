@@ -304,7 +304,13 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     // 30 s statt der ueblichen 15: Hier haengt eine ganze Kette dran - Tick, faellige Mission,
     // Aufloesung, dann erst meldeAbgrundAllianzBeitrag() ueber das Netz. Unter Last reichten 15 s
     // in einem von sechs Laeufen nicht; die Bedingung war richtig, nur die Geduld zu knapp.
-    await warteAuf(page, () => Object.keys(store).some(k => k.startsWith('alliance:ABC:abgrund:')), 30000);
+    // Auf den EIGENEN Schluessel warten, nicht auf irgendeinen mit dem Praefix. Genau das war der
+    // Fehler bis v8.343.0: Seit der fremde Beitrag vorbelegt wird, war die Bedingung
+    // "irgendein alliance:ABC:abgrund:*" schon vor dem ersten Tick wahr - der warteAuf kehrte
+    // sofort zurueck und die Pruefung darunter lief in ein Rennen gegen die Netzkette. Auf einer
+    // schnellen Maschine gewann sie, unter Last verlor sie. Der Test war also nicht "flaky",
+    // sondern wartete nachweislich auf die falsche Sache.
+    await warteAuf(page, () => !!store['alliance:ABC:abgrund:u'], 30000);
     const eigene = Object.keys(store).filter(k => k.startsWith('alliance:ABC:abgrund:'));
     // Die Aussage ist "unter dem EIGENEN Schluessel", nicht "es gibt nur einen": Seit der
     // Vorbelegung liegt ein fremder Beitrag daneben, so wie in jeder echten Allianz auch. Der

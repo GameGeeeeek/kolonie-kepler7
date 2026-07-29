@@ -79,7 +79,21 @@ const u = baue();
 const defOf = k => u.ctx.DEFS.find(d => d.key === k);
 
 // ---------------------------------------------------------------- 1: vier neue Vorlagen
-check('1: der Pool hat 20 Vorlagen', u.ctx.DEFS.length === 20, u.ctx.DEFS.length);
+// 22 seit v8.342.0 (zwei Abgrund-Aufgaben kamen dazu). Die Zahl steht hier bewusst als feste
+// Groesse und nicht als "mindestens 20": Sie wird an ZWEI weiteren Stellen dem Spieler genannt
+// (Tutorial-Schritt, Hilfe-Abschnitt "Tagesaufgaben"), und genau die vergisst man beim Erweitern.
+// Deshalb werden beide hier gleich mitgeprueft - ein neuer Eintrag im Pool muss diesen Test rot
+// machen, sonst laeuft die Zahl im Text still davon.
+check('1: der Pool hat 22 Vorlagen', u.ctx.DEFS.length === 22, u.ctx.DEFS.length);
+{
+  const fs2 = require('fs');
+  const { SPIELDATEI: DATEI } = require('./lib/umgebung');
+  const roh = fs2.readFileSync(DATEI, 'utf8');
+  const stellen = [...roh.matchAll(/aus (\d+) Vorlagen gezogen/g), ...roh.matchAll(/damit (\d+) Vorlagen/g)]
+    .map(m => Number(m[1]));
+  check('1: Tutorial UND Hilfe nennen dieselbe Poolgroesse',
+    stellen.length === 2 && stellen.every(n => n === u.ctx.DEFS.length), stellen);
+}
 check('1: alle Schlüssel sind eindeutig', new Set(u.ctx.DEFS.map(d=>d.key)).size === u.ctx.DEFS.length);
 for (const k of NEU){
   const d = defOf(k);
@@ -263,7 +277,12 @@ check('7: contactedFactions wird beim Tageswechsel geleert', /contactedFactions:
                             ['rank','Fraktionsrang'], ['repcare','Kontakt halten']]){
     check('8: die Hilfe nennt '+k+' („'+wort+'")', hilfe.includes(wort));
   }
-  check('8: die Hilfe nennt die neue Pool-Größe', /20 Vorlagen/.test(hilfe));
+  // Die Zahl steht nicht mehr fest im Test: Sie kommt aus DEFS und wird oben in Abschnitt 1 gegen
+  // beide Textstellen geprueft. Hier bleibt nur, dass die Hilfe die Groesse ueberhaupt nennt - und
+  // dass sie die beiden Tiefen-Aufgaben aufzaehlt statt sie nur mitzuzaehlen.
+  check('8: die Hilfe nennt die Pool-Größe', new RegExp(u.ctx.DEFS.length+' Vorlagen').test(hilfe));
+  check('8: und zaehlt die beiden Tiefen-Aufgaben mit auf',
+    /Tauchgang in den Abgrund/.test(hilfe) && /Rekordtiefe/.test(hilfe));
   check('8: die Hilfe erklärt, was als Kontakt zählt', /als Kontakt zählt/.test(hilfe));
   check('8: die Hilfe sagt, dass Botschaften nicht mitzählen', /Botschaften zählen dabei bewusst nicht mit/.test(hilfe));
 }

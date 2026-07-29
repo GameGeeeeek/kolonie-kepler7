@@ -97,13 +97,17 @@ function baueKontext(zustand){
     // Hier ohne Offizier (0), damit dieser Test weiterhin die Grundwerte misst - der Navigator hat
     // seinen eigenen Nachweis in test_tiefenflotte.js und test_abgrundbezug.js.
     'const officerBonus = () => 0;',
+    // Rissstroemung (v8.343.0): abgrundAnflugdauer fragt jetzt abgrundRissKuerzung(). Hier fest 0 -
+    // dieser Test misst die Grundwerte ohne Leerenriss; die Stroemung selbst wird in
+    // test_abgrundbezug.js nachgewiesen.
+    'const abgrundRissKuerzung = () => 0;',
     fnAus('tiefenschiffBonus'), fnAus('lotsenbootSicht'), fnAus('abgrundAnflugdauer'), fnAus('abgrundSondeReichweite'),
     konstAus('ABGRUND_WAECHTER_ALLE'), konstAus('ABGRUND_WAECHTER_STAERKE'),
     konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_WAECHTER_BERGUNG'), konstAus('ABGRUND_GEGEN_KOSTEN'),
     fnAus('abgrundBergungsgut'),
     block('ABGRUND_WAECHTER_NAMEN') ? 'const ABGRUND_WAECHTER_NAMEN = '+block('ABGRUND_WAECHTER_NAMEN')+';' : (()=>{throw new Error('ABGRUND_WAECHTER_NAMEN fehlt')})(),
     fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'), fnAus('abgrundWaechterDef'), fnAus('abgrundSektorMitBann'),
-    'return { abgrundSektor, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
+    'return { abgrundSektor, abgrundAnflugdauer, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
     '  abgrundWiederholungsFaktor, abgrundWerkstattStufe, abgrundWerkstattKosten, abgrundWerkstattBonus,',
     '  abgrundTiefenBonus, abgrundChronikOffen, abgrundFreigeschaltet, abgrundKampfkraft,',
     '  ABGRUND_MUTATOREN, ABGRUND_WERKSTATT, ABGRUND_CHRONIK, ABGRUND_WIEDERHOLUNG,',
@@ -197,9 +201,17 @@ check('2: ueber 1000 Tiefen bleibt jede Wirkung in ihren Grenzen', !ausserhalb, 
 check('3: es gibt keine Maximaltiefe im Code',
   !/ABGRUND_MAX_TIEFE|MAX_ABGRUND_TIEFE|abgrundMaxDepth/.test(js));
 const sehrTief = G.abgrundSektor(500);
+// sektor.dauer gibt es seit v8.343.0 nicht mehr: Das Feld wurde nirgends gelesen und rechnete mit
+// der ROHEN Formel - ohne Lotsenboot, Ankerwerfer, Navigator und Rissstroemung. Es war also eine
+// zweite, veraltete Wahrheit ueber dieselbe Groesse (CLAUDE.md Regel 6). Die Anflugdauer kommt
+// jetzt ausschliesslich aus abgrundAnflugdauer(), und genau die wird hier geprueft.
+const dauer500 = G.abgrundAnflugdauer(500, sehrTief.mods.dur, {});
 check('3: auch Tiefe 500 liefert einen gueltigen Sektor',
-  sehrTief.name && sehrTief.defense > 0 && sehrTief.splitter > 0 && sehrTief.dauer > 0,
-  { name:sehrTief.name, staerke:sehrTief.defense, splitter:sehrTief.splitter });
+  sehrTief.name && sehrTief.defense > 0 && sehrTief.splitter > 0 && dauer500 > 0,
+  { name:sehrTief.name, staerke:sehrTief.defense, splitter:sehrTief.splitter, dauer:dauer500 });
+check('3: der Sektor traegt KEINE eigene Anflugdauer mehr (nur eine Wahrheit)',
+  sehrTief.dauer === undefined && !/^\s*dauer[,:]/m.test(fnAus('abgrundSektor')),
+  { dauerFeld:sehrTief.dauer });
 // Schwierigkeit geometrisch, Belohnung linear: der Abstand waechst, die Tiefe wird also von selbst
 // zur Wand - das ist der Sinn. Waere die Beute ebenfalls geometrisch, waere jede Tiefe gratis.
 const d10 = G.abgrundSektor(10), d20 = G.abgrundSektor(20), d40 = G.abgrundSektor(40);
@@ -210,8 +222,15 @@ const splitterRoh = t => Math.round(3 + t*0.8); // Basiskurve ohne Mutatorstreuu
 check('3: die Splitterausbeute waechst nur linear, nicht geometrisch',
   splitterRoh(100)/splitterRoh(50) < 2.2 && splitterRoh(200)/splitterRoh(100) < 2.2,
   { t50:splitterRoh(50), t100:splitterRoh(100), t200:splitterRoh(200) });
-check('3: die Flugzeit ist nach oben gedeckelt',
-  G.abgrundSektor(5000).dauer <= 4*3600, { tiefe5000:G.abgrundSektor(5000).dauer });
+{
+  const s5000 = G.abgrundSektor(5000);
+  const d5000 = G.abgrundAnflugdauer(5000, s5000.mods.dur, {});
+  check('3: die Flugzeit ist nach oben gedeckelt', d5000 <= 4*3600, { tiefe5000:d5000 });
+  // Gegenprobe: Der Deckel darf nicht deshalb halten, weil die Funktion gar nichts rechnet.
+  check('3: und sie waechst vorher wirklich mit der Tiefe',
+    G.abgrundAnflugdauer(50, 1, {}) > G.abgrundAnflugdauer(5, 1, {}),
+    { t5:G.abgrundAnflugdauer(5, 1, {}), t50:G.abgrundAnflugdauer(50, 1, {}) });
+}
 
 // ---- 4) Werkstatt ----
 const WS = G.ABGRUND_WERKSTATT;
