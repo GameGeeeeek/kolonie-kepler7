@@ -201,8 +201,11 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
   // das gar nicht veroeffentlicht wird, ist die Kette still tot. Genau das war beim ersten Anlauf
   // der Fall - die Veroeffentlichungszeile fehlte, waehrend Abzeichen und Rangliste sie schon lasen.
   {
+    // reiter:'raenge' seit v8.340.0 (Werft): Rangliste und Allianz-Tiefenlauf liegen im Register
+    // "Raenge", nicht mehr als Aufklappfeld im Vorgabe-Register. Ohne den Reiter sucht der Test
+    // etwas, das gar nicht gerendert wird - und das ist die gewollte Aenderung, kein Fehler.
     const stand = basisStand({ research:{ rsingularitaet:1 },
-      abgrund:{ tiefe:8, best:7, splitter:20, tauchgaenge:9, gesehen:{ nullzone:2 }, werkstatt:{} } });
+      abgrund:{ tiefe:8, best:7, splitter:20, tauchgaenge:9, gesehen:{ nullzone:2 }, werkstatt:{}, reiter:'raenge' } });
     const { ctx, page, errs, store } = await starte(browser, stand);
     await page.waitForTimeout(1500);
     let eigener = null;
@@ -254,6 +257,8 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     const jetzt = Date.now();
     const stand = basisStand({
       research:{ rsingularitaet:1 },
+      // reiter:'raenge' seit v8.340.0 - die Allianz-Karte liegt in diesem Register.
+      abgrund:{ tiefe:1, best:0, splitter:0, tauchgaenge:0, gesehen:{}, werkstatt:{}, reiter:'raenge' },
       player:{ id:'u', name:'A', avatarKey:null, allianceTag:'ABC', allianceRole:'member' },
       fleet:{ jaeger:4000, schlachtschiff:400, frachter:200, missions:[
         { id:'t2', type:'abgrund', targetId:1, startTime: jetzt-600000, endTime: jetzt-2000,
@@ -305,6 +310,46 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     check('9: und es ist im Spielstand gemerkt, ueberlebt also das Neuladen',
       gemerkt.werkstattGesehen === true, { werkstattGesehen:gemerkt.werkstattGesehen });
     check('9: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ---- 10) Die Werft: Register im echten DOM (v8.340.0, Roadmap Phase 5) ----
+  // Quelltextpruefungen (tests/test_werft.js) sehen NICHT, ob ein Klick wirklich umschaltet und ob
+  // der Zustand den naechsten Tick ueberlebt. Genau das ist hier die Frage: Die Box wird jede
+  // Sekunde per setBoxHtml neu geschrieben.
+  {
+    const stand = basisStand({ research:{ rsingularitaet:1 },
+      abgrund:{ tiefe:3, best:2, splitter:900, tauchgaenge:4, gesehen:{}, werkstatt:{} } });
+    const { ctx, page, errs, store } = await starte(browser, stand);
+    const reiterZahl = await page.evaluate(()=>document.querySelectorAll('[data-abgrund-reiter]').length);
+    check('10: die vier Register sind da', reiterZahl === 4, { gefunden:reiterZahl });
+    check('10: das Vorgabe-Register ist Ausbau und die Werkstatt sichtbar',
+      await page.evaluate(()=>{
+        const on = document.querySelector('[data-abgrund-reiter].on');
+        return !!on && on.getAttribute('data-abgrund-reiter')==='ausbau'
+            && !!document.querySelector('[data-keep-open="abgrundWerkstatt"]');
+      }));
+    // Umschalten auf "Bau"
+    await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-reiter="bau"]'); if(b) b.click(); });
+    await warteAufStand(page, store, st => ((st.abgrund||{}).reiter||'') === 'bau');
+    check('10: nach dem Klick steht der Reiter im SPIELSTAND', (gespeichert(store).abgrund||{}).reiter === 'bau');
+    check('10: die Werkstatt ist weg, die Tiefenflotte da',
+      await page.evaluate(()=>!document.querySelector('[data-keep-open="abgrundWerkstatt"]')
+                            && !!document.querySelector('[data-abgrund-werft]')));
+    // DER PUNKT: zwei Ticks abwarten. Ein Reiter, der nur im DOM stuende, waere jetzt zurueck auf
+    // Ausbau - so wie es <details> und <select> in diesem Projekt schon passiert ist.
+    await page.waitForTimeout(2500);
+    check('10: der Reiter ueberlebt das Neuzeichnen',
+      await page.evaluate(()=>{
+        const on = document.querySelector('[data-abgrund-reiter].on');
+        return !!on && on.getAttribute('data-abgrund-reiter')==='bau'
+            && !!document.querySelector('[data-abgrund-werft]');
+      }));
+    // Und der Abtauchen-Knopf steht ueber den Registern - er darf in KEINEM Register fehlen,
+    // sonst waere das Abtauchen von der Registerwahl abhaengig.
+    check('10: der Abtauchen-Knopf ist auch im Register Bau erreichbar',
+      await page.evaluate(()=>!!document.querySelector('[data-abgrund-start]')));
+    check('10: keine Konsolenfehler beim Registerwechsel', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
