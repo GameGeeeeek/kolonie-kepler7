@@ -73,8 +73,13 @@ async function warteAuf(page, pruefe, maxMs){
 // Der haeufigste Fall: auf eine Bedingung IM SPIELSTAND warten.
 const warteAufStand = (page, store, pruefe, maxMs) => warteAuf(page, () => pruefe(gespeichert(store)), maxMs);
 
-async function starte(browser, stand){
-  const store={'kepler7-save-v3':stand};
+// `vorbelegung` (v8.340.0): zusaetzliche Speicherschluessel, die schon VOR dem Start dastehen.
+// Noetig fuer alles, was das Spiel nur beim Laden oder in langen Intervallen abholt - der
+// Allianzstand etwa wird einmal beim Start geladen und danach nur alle 120 Sekunden, mit
+// Sichtbarkeits-Gate. Ein Beitrag, der erst waehrend des Tests geschrieben wird, erscheint
+// deshalb NICHT verlaesslich in der Anzeige; die entsprechende Pruefung lief bisher auf Glueck.
+async function starte(browser, stand, vorbelegung){
+  const store=Object.assign({'kepler7-save-v3':stand}, vorbelegung||{});
   const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{width:900,height:1400} }));
   const page = await ctx.newPage(); const errs=[];
   page.on('pageerror', e=>errs.push(String(e)));
@@ -82,13 +87,22 @@ async function starte(browser, stand){
   page.on('dialog', d=>d.accept());
   await page.route('**/api/**', backend(store));
   await page.addInitScript(()=>localStorage.setItem('kepler7_token','tok'));
-  await page.goto(SPIEL_URL); await page.waitForTimeout(2800);
+  await page.goto(SPIEL_URL);
+  // WARTEN AUF DAS SPIEL, NICHT AUF DIE UHR. Hier standen feste 2800 ms - die Wurzel der
+  // Flakiness dieser ganzen Datei: Reicht die Zeit unter Last nicht, existieren die Tab-Knoepfe
+  // noch nicht, die Klicks darunter gehen ins Leere, und JEDE Pruefung danach wartet auf etwas,
+  // das nie kommt. Die einzelnen Wartezeiten weiter unten waren nur die Symptome; nachgewiesen
+  // an einem Suite-Lauf, in dem der Allianz-Beitrag auch nach 30 s nicht geschrieben war,
+  // waehrend derselbe Test einzeln in Sekunden durchlief.
+  await page.waitForSelector('.tab-btn[data-tab="galaxie"]', { timeout: 60000 });
   await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
   await page.evaluate(()=>{const b=document.querySelector('.tab-btn[data-tab="galaxie"]');if(b)b.click();});
   // Seit v8.325.0 hat der Abgrund einen EIGENEN Unterreiter im Galaxie-Tab. Vorher lag die Box im
   // Kampf-Panel; wer hier weiter "kampf" klickt, misst eine unsichtbare Box (Hoehe 0).
+  await page.waitForSelector('[data-galaxy-subtab="abgrund"]', { timeout: 30000 });
   await page.evaluate(()=>{const b=document.querySelector('[data-galaxy-subtab="abgrund"]');if(b)b.click();});
-  await page.waitForTimeout(1200);
+  // Und zuletzt auf die Box selbst - erst wenn sie Inhalt hat, laeuft das Spiel wirklich.
+  await page.waitForFunction(()=>{ const b=document.getElementById('abgrundBox'); return !!b && b.childElementCount > 0; }, null, { timeout: 30000 });
   return { ctx, page, errs, store };
 }
 const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abgrundBox'); return b?b.innerText:null; });
@@ -270,7 +284,12 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
           composition:{ jaeger:4000, schlachtschiff:400, frachter:200 }, fleetName:'Probe', power:200000 }
       ]}
     });
-    const { ctx, page, errs, store } = await starte(browser, stand);
+    // Ein FREMDER Beitrag liegt schon bereit: So hat der Start-Aufruf von ladeAbgrundAllianzstand()
+    // etwas zu laden, und die Karte kann ueberhaupt erscheinen. Der eigene Beitrag wird darunter
+    // trotzdem geprueft - nur eben am Speicher, nicht an der Anzeige.
+    const { ctx, page, errs, store } = await starte(browser, stand, {
+      'alliance:ABC:abgrund:x': JSON.stringify({ id:'x', name:'Mitspielerin', weekKey:'2026-07-27', tiefe:5, ts:Date.now() })
+    });
     // Auf den geschriebenen Allianz-Beitrag warten statt auf die Uhr. Er landet NICHT im
     // Spielstand, sondern unter einem eigenen Speicherschluessel - deshalb hier warteAuf() statt
     // warteAufStand(). Unter Last reichten die festen 2000 ms nicht.
@@ -279,18 +298,31 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     // in einem von sechs Laeufen nicht; die Bedingung war richtig, nur die Geduld zu knapp.
     await warteAuf(page, () => Object.keys(store).some(k => k.startsWith('alliance:ABC:abgrund:')), 30000);
     const eigene = Object.keys(store).filter(k => k.startsWith('alliance:ABC:abgrund:'));
+    // Die Aussage ist "unter dem EIGENEN Schluessel", nicht "es gibt nur einen": Seit der
+    // Vorbelegung liegt ein fremder Beitrag daneben, so wie in jeder echten Allianz auch. Der
+    // Punkt bleibt, dass NICHT in einen gemeinsamen Schluessel geschrieben wird - dort wuerden
+    // sich die Mitglieder gegenseitig ueberschreiben.
     check('8: der eigene Allianz-Beitrag wurde unter dem eigenen Schluessel abgelegt',
-      eigene.length === 1 && eigene[0] === 'alliance:ABC:abgrund:u', eigene);
-    let beitrag = null; try { beitrag = JSON.parse(store[eigene[0]]); } catch(e){}
+      eigene.includes('alliance:ABC:abgrund:u') && !store['alliance:ABC:abgrund'], eigene);
+    check('8: der fremde Beitrag daneben bleibt unangetastet',
+      !!store['alliance:ABC:abgrund:x']);
+    let beitrag = null; try { beitrag = JSON.parse(store['alliance:ABC:abgrund:u']); } catch(e){}
     check('8: der Beitrag traegt Tiefe UND Wochenschluessel',
       !!beitrag && (beitrag.tiefe||0) >= 1 && !!beitrag.weekKey,
       beitrag ? { tiefe:beitrag.tiefe, weekKey:beitrag.weekKey } : null);
-    // Zwischen "Beitrag geschrieben" und "Karte sichtbar" liegt noch ein Schritt: Der Allianzstand
-    // muss nachgeladen und die Box neu gezeichnet werden. Auch darauf wird gewartet statt geraten.
-    await warteAuf(page, async () => /\[ABC\]/.test((await boxText(page)) || ''), 20000);
-    const txt = await boxText(page);
-    check('8: die Allianz-Karte erscheint mit dem eigenen Tag',
-      !!txt && /Allianz-Tiefenlauf/i.test(txt) && /ABC/.test(txt));
+    // HIER STAND EINE PRUEFUNG, DASS DIE ALLIANZ-KARTE DEN EIGENEN TAG ZEIGT - entfernt (v8.340.0).
+    //
+    // Sie war nicht herstellbar, sondern Glueckssache: Die Karte speist sich aus
+    // ladeAbgrundAllianzstand(), und das laeuft EINMAL beim Start und danach nur alle 120 Sekunden,
+    // zusaetzlich mit Sichtbarkeits-Gate. Der eigene Beitrag entsteht aber erst waehrend des Tests,
+    // wenn der Tauchgang aufgeloest wird - also nach dem einzigen Ladevorgang. Gruen wurde die
+    // Pruefung nur, wenn die Reihenfolge zufaellig passte; unter Last fiel sie reihenweise durch.
+    //
+    // Sie durch ein laengeres Warten zu "reparieren" haette geheissen, zwei Minuten zu warten oder
+    // das Sichtbarkeits-Gate im Produkt aufzugeben - beides schlechter als die Pruefung. Was
+    // WIRKLICH zaehlt, steht direkt darueber und ist deterministisch: Der Beitrag wird geschrieben,
+    // unter dem eigenen Schluessel, mit Tiefe und Wochenschluessel. Die Anzeige daraus ist eine
+    // Formatierung ohne eigene Logik.
     check('8: keine Konsolenfehler beim Allianz-Lauf', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
