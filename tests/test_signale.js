@@ -48,7 +48,11 @@ function baue(opts){
   }
   new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'EXPEDITION_CHAIN_NEEDED', 'RARE_ITEMS',
     'RES_DEFS', 'randomFindableRareItem', 'grantRandomModule', 'gainResources', 'addXp',
-    'recordCodexRare', 'ensureExpeditionCodex', 'fmt', 'moduleBonusTotal', block +
+    'recordCodexRare', 'ensureExpeditionCodex', 'fmt', 'moduleBonusTotal',
+    // Tiefenspur (v8.342.0): Die neue Peilung fragt abgrundFreigeschaltet() ab und braucht beim
+    // Aufloesen ensureAbgrund() und abgrundBergungsgut(). Vorgabe: Abgrund offen, damit sie
+    // ueberhaupt gezogen und gemessen wird.
+    'abgrundFreigeschaltet', 'ensureAbgrund', 'abgrundBergungsgut', block +
     ';ctx.MAST_DECKEL=SIGNAL_MAST_DECKEL;ctx.MAX=SIGNAL_MAX;ctx.LIFETIME=SIGNAL_LIFETIME_MS;ctx.CHANCE=SIGNAL_SPAWN_CHANCE;ctx.PITY=SIGNAL_PITY_AFTER;ctx.TYPES=SIGNAL_TYPES;' +
     'ctx.spawn=maybeSpawnSignal;ctx.resolve=resolveSignalFind;ctx.active=activeSignals;ctx.prune=pruneSignals;ctx.typeOf=signalTypeOf;'
   )(ctx, state, PLANETS, STAR_SYSTEMS, 3,
@@ -63,13 +67,17 @@ function baue(opts){
     (n) => String(n),
     // Echolotmast (v8.334.0): Ohne Modul ist der Bonus 0, die Peilungsfrist also unveraendert.
     // Abschnitt 9 dreht ihn hoch und prueft, dass die Frist wirklich mitwaechst UND am Deckel haelt.
-    (eff) => (eff === 'signal' ? mastBonus : 0));
+    (eff) => (eff === 'signal' ? mastBonus : 0),
+    () => opts.abgrund !== false,
+    () => { state.abgrund = state.abgrund || { best:0, bergung:0, gegenmassnahmen:0 }; return state.abgrund; },
+    (tiefe) => Math.max(1, Math.round(4 + (tiefe||1)*0.36)));
   return { ctx, state, protokoll, STAR_SYSTEMS };
 }
 
 // ---------------------------------------------------------------- 1) Form der Signalarten
 const u0 = baue();
-check('1: vier Signalarten', u0.ctx.TYPES.length === 4, u0.ctx.TYPES.length);
+// Fuenf seit v8.342.0: die Tiefenspur kam dazu, die erste Peilung mit Abgrund-Bezug.
+check('1: fuenf Signalarten', u0.ctx.TYPES.length === 5, u0.ctx.TYPES.length);
 check('1: jede Art hat ein Icon aus der Whitelist',
   u0.ctx.TYPES.every(t => whitelist.has(t.icon)), u0.ctx.TYPES.filter(t => !whitelist.has(t.icon)).map(t => t.key + '=' + t.icon));
 // CLAUDE.md Regel 7: vollstaendige, selbsterklaerende Beschreibung - kein Kuerzel-Text.
@@ -77,7 +85,7 @@ check('1: jede Art hat eine vollständige Beschreibung (ganzer Satz, nennt die W
   u0.ctx.TYPES.every(t => t.desc && t.desc.length >= 80 && /garantiert/.test(t.desc)),
   u0.ctx.TYPES.filter(t => !t.desc || t.desc.length < 80).map(t => t.key + '=' + (t.desc || '').length));
 check('1: keine doppelten Schlüssel und jede Art hat ein positives Gewicht',
-  new Set(u0.ctx.TYPES.map(t => t.key)).size === 4 && u0.ctx.TYPES.every(t => t.gewicht > 0));
+  new Set(u0.ctx.TYPES.map(t => t.key)).size === u0.ctx.TYPES.length && u0.ctx.TYPES.every(t => t.gewicht > 0));
 check('1: die Beschreibungen sind auf Deutsch mit Umlauten, nicht transliteriert',
   !u0.ctx.TYPES.some(t => /(fuer|groess|zusaetz|zufaell|Waehr|naechst|vollstaend)/.test(t.desc)),
   u0.ctx.TYPES.filter(t => /(fuer|groess|zusaetz|zufaell|Waehr|naechst|vollstaend)/.test(t.desc)).map(t => t.key));
@@ -117,7 +125,16 @@ check('3: jedes Signal hat eine eindeutige Kennung, ein Ablaufdatum und eine gü
 const arten = new Set();
 const wurf = baue({ discovered: { p0:true } });
 for (let i = 0; i < 6000; i++){ const r = wurf.ctx.spawn(); if (r) arten.add(r.typ.key); wurf.state.expeditionSignals.length = 0; }
-check('3: alle vier Arten treten tatsächlich auf', arten.size === 4, [...arten]);
+check('3: alle fuenf Arten treten tatsächlich auf', arten.size === 5, [...arten]);
+// Und die Gegenprobe zum available-Praedikat: OHNE freigeschalteten Abgrund darf die Tiefenspur
+// gar nicht erst gezogen werden - sonst waere sie eine Peilung, deren Beute man nicht benutzen kann.
+{
+  const ohne = new Set();
+  const w2 = baue({ discovered: { p0:true }, abgrund:false });
+  for (let i = 0; i < 3000; i++){ const r = w2.ctx.spawn(); if (r) ohne.add(r.typ.key); w2.state.expeditionSignals.length = 0; }
+  check('3: ohne freigeschalteten Abgrund erscheint die Tiefenspur nicht', !ohne.has('tiefe'), [...ohne]);
+  check('3: die uebrigen vier erscheinen weiterhin', ohne.size === 4, [...ohne]);
+}
 
 // Spawnrate: grob im Bereich der Konstante (kein Balance-Urteil, nur "die Konstante wirkt").
 // signalDrought wird je Runde zurueckgesetzt, damit hier die GRUNDCHANCE gemessen wird und nicht

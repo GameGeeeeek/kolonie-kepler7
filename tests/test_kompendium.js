@@ -1,11 +1,12 @@
-// Galaktisches Kompendium, Erweiterung v8.298.13 (Inhaltspaket 3/5) von fuenf auf acht Kategorien.
+// Galaktisches Kompendium: v8.298.13 (Inhaltspaket 3/5) von fuenf auf acht Kategorien, v8.343.0
+// auf zehn (Reliquien der Tiefe, Konstellationen).
 //
 // Die tragende Regel des Kompendiums steht als Kommentar im Code: "rein aus bestehenden
 // State-Feldern berechnet (keine neuen Tracker)". Genau die prueft dieser Test - eine Kategorie, die
 // heimlich einen neuen Zaehler braeuchte, wuerde bei Altstaenden dauerhaft auf 0 stehen.
 //
 // Geprueft wird:
-//   1) acht Kategorien, jede mit Icon (Whitelist), Beschreibung, Belohnung, have() und total()
+//   1) zehn Kategorien, jede mit Icon (Whitelist), Beschreibung, Belohnung, have() und total()
 //   2) have()/total() laufen ohne Absturz auf einem LEEREN und auf einem VOLLEN Zustand
 //   3) leer ergibt 0, voll ergibt total() - die Kategorie ist also ueberhaupt erfuellbar
 //   4) keine Kategorie braucht ein Zustandsfeld, das es nicht gibt
@@ -42,8 +43,15 @@ const DEFS = {
   SHIP_DEFS: liste(N.SHIP_DEFS, 'sh'),
   MODULE_DEFS: liste(N.MODULE_DEFS, 'mo'),
   BUILDING_DEFS: liste(N.BUILDING_DEFS, 'bd'),
-  FACTION_DIPLOMACY: { kartell:{}, void:{}, legion:{}, schatten:{} }
+  FACTION_DIPLOMACY: { kartell:{}, void:{}, legion:{}, schatten:{} },
+  // Reliquien und Konstellationen (v8.343.0). Wie bei den anderen Listen mit der ECHTEN Laenge
+  // aus der Spieldatei, damit total() plausibel ist statt frei erfunden.
+  ABGRUND_RELIKTE: liste(laenge('ABGRUND_RELIKTE'), 'rel'),
+  ABGRUND_KONSTELLATIONEN: liste(laenge('ABGRUND_KONSTELLATIONEN'), 'kon')
 };
+check('Bestandszahlen Abgrund gelesen',
+  DEFS.ABGRUND_RELIKTE.length > 0 && DEFS.ABGRUND_KONSTELLATIONEN.length > 0,
+  { relikte:DEFS.ABGRUND_RELIKTE.length, konstellationen:DEFS.ABGRUND_KONSTELLATIONEN.length });
 
 function baue(state){
   const ctx = {};
@@ -60,16 +68,18 @@ function baue(state){
   new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'ACHIEVEMENTS', 'SHIP_DEFS', 'MODULE_DEFS',
     'BUILDING_DEFS', 'FACTION_DIPLOMACY', 'allFleets', 'allBuildingSets',
     'BASE_PLANET_COUNT', 'BASE_STAR_SYSTEM_COUNT', 'BASE_PLANET_IDS', 'baseStarSystems',
+    'ABGRUND_RELIKTE', 'ABGRUND_KONSTELLATIONEN',
     block + ';ctx.CATS=COMPENDIUM_CATS;')(ctx, state, DEFS.PLANETS, DEFS.STAR_SYSTEMS, DEFS.ACHIEVEMENTS,
     DEFS.SHIP_DEFS, DEFS.MODULE_DEFS, DEFS.BUILDING_DEFS, DEFS.FACTION_DIPLOMACY, allFleets, allBuildingSets,
-    BASE_PLANET_COUNT, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_IDS, baseStarSystems);
+    BASE_PLANET_COUNT, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_IDS, baseStarSystems,
+    DEFS.ABGRUND_RELIKTE, DEFS.ABGRUND_KONSTELLATIONEN);
   return ctx.CATS;
 }
 
 // ---------------------------------------------------------------- 1) Form
-const leerState = { discovered:{}, npcScaling:{}, factionRep:{}, achievements:{}, fleet:{}, buildings:{}, colonies:{}, modules:{}, equippedModules:{} };
+const leerState = { discovered:{}, npcScaling:{}, factionRep:{}, achievements:{}, fleet:{}, buildings:{}, colonies:{}, modules:{}, equippedModules:{}, abgrund:{ relikte:{}, konstGesehen:{} } };
 const cats = baue(leerState);
-check('1: acht Kategorien', cats.length === 8, cats.length);
+check('1: zehn Kategorien', cats.length === 10, cats.length);
 check('1: jede Kategorie hat ein Icon aus der Whitelist',
   cats.every(c => whitelist.has(c.icon)), cats.filter(c => !whitelist.has(c.icon)).map(c => c.key + '=' + c.icon));
 check('1: jede Kategorie hat Name, Beschreibung und Belohnung',
@@ -89,8 +99,11 @@ check('3: jede Kategorie hat ein positives Ziel',
 // Voller Zustand: alles entdeckt, alle Bosse, alle Fraktionen, alle Erfolge, je ein Schiff/Modul/Gebäude.
 const vollState = {
   discovered:{}, npcScaling:{ boss1:1, boss2:1, boss3:1 }, factionRep:{ kartell:5, void:5, legion:5, schatten:5 },
-  achievements:{}, fleet:{}, buildings:{}, colonies:{}, modules:{}, equippedModules:{ home:[] }
+  achievements:{}, fleet:{}, buildings:{}, colonies:{}, modules:{}, equippedModules:{ home:[] },
+  abgrund:{ relikte:{}, konstGesehen:{} }
 };
+DEFS.ABGRUND_RELIKTE.forEach(r => { vollState.abgrund.relikte[r.key] = true; });
+DEFS.ABGRUND_KONSTELLATIONEN.forEach(k => { vollState.abgrund.konstGesehen[k.key] = true; });
 DEFS.PLANETS.forEach(p => { vollState.discovered[p.id] = true; });
 DEFS.ACHIEVEMENTS.forEach(a => { vollState.achievements[a.key] = true; });
 DEFS.SHIP_DEFS.forEach(s => { vollState.fleet[s.key] = 1; });

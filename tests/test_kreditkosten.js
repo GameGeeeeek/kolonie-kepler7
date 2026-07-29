@@ -149,7 +149,21 @@ check('5: der Zeitschätzer liest denselben Bestand', /const have = costAmountAv
   const resKeys = new Function(src.slice(src.indexOf('  const RES_DEFS = ['), src.indexOf('\n  ];', src.indexOf('  const RES_DEFS = [')) + 5) + ';return RES_DEFS.map(r=>r.key);')();
   const t2Block = src.slice(src.indexOf('  const TIER2_DEFS = ['), src.indexOf('\n  ];', src.indexOf('  const TIER2_DEFS = [')) + 5);
   const t2Keys = [...t2Block.matchAll(/key:'([a-z0-9]+)'/g)].map(m => m[1]);
-  const erlaubt = new Set([...resKeys, ...t2Keys, 'credits']);
+  // 'bergung' (v8.342.0) ist keine RES_DEFS-Ressource, sondern liegt in state.abgrund.bergung -
+  // die Bergungswerft ist das erste Gebaeude, das damit bezahlt wird. Es gehoert genau dann in
+  // diese Liste, wenn canAfford/pay/costAmountAvailable den Schluessel wirklich kennen; sonst
+  // waere die Werft unbezahlbar. Die drei Stellen werden hier ausdruecklich nachgeprueft, damit
+  // der Eintrag nicht zur blossen Ausnahme verkommt.
+  // canAfford steht bewusst NICHT in dieser Schleife: Es nennt gar keinen Schluessel, sondern
+  // fragt fuer jeden einzeln costAmountAvailable - es kann bergung also nicht "vergessen".
+  // Geprueft werden die beiden Stellen, die Schluessel wirklich einzeln behandeln.
+  for (const fn of ['pay','costAmountAvailable']){
+    const i = src.indexOf('function '+fn+'(');
+    check('7: '+fn.padEnd(20)+' kennt den Schluessel bergung', i > 0 && /'bergung'/.test(src.slice(i, i+900)));
+  }
+  check('7: canAfford fragt jeden Schluessel ueber costAmountAvailable ab',
+    /function canAfford\(cost\)\{ return Object\.entries\(cost\)\.every\(\(\[r,amt\]\) => costAmountAvailable\(r\) >= amt\); \}/.test(src));
+  const erlaubt = new Set([...resKeys, ...t2Keys, 'credits', 'bergung']);
   check('7: die Liste der erlaubten Kostenschlüssel ist plausibel gefüllt', erlaubt.size >= 8, [...erlaubt]);
   let verstoesse = [];
   for (const m of src.matchAll(/baseCost:\{([^}]*)\}/g)){
