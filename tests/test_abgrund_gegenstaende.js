@@ -119,9 +119,12 @@ check('3: Spule, Grundberuehrung und Ruf werden beim START verbraucht',
   /if \(grund\) a\.grund = false;/.test(startBlock) &&
   /if \(ruf\)\s+a\.ruf\s+= false;/.test(startBlock), startBlock.split('\n').slice(0,12));
 check('3: und reisen in der Mission mit', /composition: flotte, fleetName: sektor\.name, bann, spule, grund, ruf,/.test(js));
+// Beide Funktionen haben seit v8.339.0 einen Parameter mehr (Nullkiel bzw. Grundgaenger, beide
+// aus der MITGEFLOGENEN Flotte). Die Aussage dieses Checks bleibt dieselbe: Was in der Mission
+// steht, entscheidet - nicht der Zustand von jetzt.
 check('3: die Aufloesung liest sie AUS DER MISSION, nicht aus dem aktuellen Zustand',
-  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule\)/.test(js) &&
-  /abgrundWiederholungsFaktor\(tiefe, !!m\.grund\)/.test(js));
+  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule, nullkielAktiv\(m\.composition \|\| fleet\)\)/.test(js) &&
+  /abgrundWiederholungsFaktor\(tiefe, !!m\.grund, m\.composition \|\| fleet\)/.test(js));
 // Die Spule braucht einen gewaehlten Bann - sonst haette sie nichts zu streichen und wuerde beim
 // Abtauchen still verpuffen.
 check('3: ohne gewaehlte Gegenmassnahme wird die Spule NICHT verbraucht',
@@ -137,20 +140,23 @@ const SMB = new Function('abgrundKonstellationFuer, ABGRUND_GRENZEN, ABGRUND_BAS
     // Anflugdauer haengt seit v8.337.0 an der Flotte - hier ein fester Wert, dieser Test misst Mutatoren.
     () => 300);
 const probeSektor = () => ({ tiefe:20, mutatoren:[{key:'a'},{key:'b'},{key:'c'}], mods:{atk:1,def:1,loot:1,shards:1,dur:1,loss:1}, waechter:null });
-check('4: ohne Bann bleibt der Sektor unveraendert', SMB(probeSektor(), null, false).mutatoren.length === 3);
-check('4: ein Bann streicht einen Mutator', SMB(probeSektor(), 'b', false).mutatoren.length === 2);
-check('4: mit Spule fallen ZWEI', SMB(probeSektor(), 'b', true).mutatoren.length === 1,
-  { rest: SMB(probeSektor(), 'b', true).mutatoren.map(m=>m.key) });
+check('4: ohne Bann bleibt der Sektor unveraendert', SMB(probeSektor(), null, false, false).mutatoren.length === 3);
+check('4: ein Bann streicht einen Mutator', SMB(probeSektor(), 'b', false, false).mutatoren.length === 2);
+check('4: mit Spule fallen ZWEI', SMB(probeSektor(), 'b', true, false).mutatoren.length === 1,
+  { rest: SMB(probeSektor(), 'b', true, false).mutatoren.map(m=>m.key) });
 check('4: die Spule streicht deterministisch, nicht zufaellig (Vorschau und Kampf muessen gleich rechnen)',
-  new Set(Array.from({length:30}, () => SMB(probeSektor(), 'b', true).mutatoren.map(m=>m.key).join())).size === 1);
+  new Set(Array.from({length:30}, () => SMB(probeSektor(), 'b', true, false).mutatoren.map(m=>m.key).join())).size === 1);
 check('4: bei nur einem Mutator streicht die Spule nichts Zusaetzliches (kein Absturz)',
-  SMB({ tiefe:3, mutatoren:[{key:'a'}], mods:{atk:1,def:1,loot:1,shards:1,dur:1,loss:1}, waechter:null }, 'a', true).mutatoren.length === 0);
+  SMB({ tiefe:3, mutatoren:[{key:'a'}], mods:{atk:1,def:1,loot:1,shards:1,dur:1,loss:1}, waechter:null }, 'a', true, false).mutatoren.length === 0);
 
 // ---- 5) Grundberuehrung: hebt den Wiederholungsabschlag auf ----
-const WF = new Function('ensureAbgrund, ABGRUND_WIEDERHOLUNG',
+// tiefenschiffBonus kam mit dem Grundgaenger (v8.339.0) dazu. Hier eine Attrappe, die 0 liefert:
+// Dieser Abschnitt prueft die GRUNDBERUEHRUNG, das Schiff hat seinen eigenen Test
+// (tests/test_tiefenflotte.js, Abschnitt 7). Ohne die Attrappe waere es ein ReferenceError.
+const WF = new Function('ensureAbgrund, ABGRUND_WIEDERHOLUNG, tiefenschiffBonus',
   fnAus('abgrundWiederholungsFaktor')+'; return abgrundWiederholungsFaktor;');
 const WIED = zahl('ABGRUND_WIEDERHOLUNG');
-const wf = (tiefe, best, grund) => WF(() => ({ best, grund:false }), WIED)(tiefe, grund);
+const wf = (tiefe, best, grund) => WF(() => ({ best, grund:false }), WIED, () => 0)(tiefe, grund, {});
 check('5: eine neue Tiefe gibt volle Ausbeute', wf(11, 10, false) === 1);
 check('5: eine bekannte Tiefe wird abgeschlagen', wf(5, 10, false) === WIED);
 check('5: mit Grundberuehrung gibt auch eine bekannte Tiefe volle Ausbeute', wf(5, 10, true) === 1);

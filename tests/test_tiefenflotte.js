@@ -1,9 +1,11 @@
-// Tiefenflotte, Staffel I (28.07.2026, v8.337.0, Roadmap Phase 4a)
-// und Staffel II (29.07.2026, v8.338.0, Roadmap Phase 4b).
+// Tiefenflotte, Staffel I (v8.337.0, Phase 4a), II (v8.338.0, Phase 4b) und III (v8.339.0, 4c).
 //
 // Staffel I: Lotsenboot, Kessel, Bergungskran - sie machen den Abstieg MACHBAR.
 // Staffel II: Presslufthai, Ankerwerfer, Echoschnitter - sie machen ihn STEUERBAR, indem sie gegen
-// die Mutatoren des Sektors arbeiten. Alle sechs unterliegen denselben Riegeln (Abschnitt 1+2).
+// die Mutatoren des Sektors arbeiten.
+// Staffel III: Bannschiff, Nullkiel, Grundgaenger - sie gehen die drei HAERTEN an: den Waechter,
+// den Mutator, den man sich nicht aussuchen kann, und den Wiederholungsabschlag.
+// Alle neun unterliegen denselben Riegeln (Abschnitt 1+2).
 //
 // Das tiefste System des Spiels hatte kein eigenes Geraet - man tauchte mit derselben Flotte ab,
 // mit der man PvP spielt.
@@ -47,17 +49,24 @@ function arrAus(name){
 const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1]);
 const DREI = ['lotsenboot','kessel','bergungskran'];
 const DREI_II = ['presslufthai','ankerwerfer','echoschnitter'];
-// Abschnitt 1 und 2 gelten fuer BEIDE Staffeln. Waeren sie auf Staffel I beschraenkt geblieben,
-// haette Staffel II drei Schiffe ohne Icon, ohne Beschreibung und ohne PvP-Riegel einschleusen
+const DREI_III = ['bannschiff','nullkiel','grundgaenger'];
+// Abschnitt 1 und 2 gelten fuer ALLE Staffeln. Waeren sie auf Staffel I beschraenkt geblieben,
+// haetten spaetere Staffeln Schiffe ohne Icon, ohne Beschreibung und ohne PvP-Riegel einschleusen
 // koennen, ohne dass ein einziger Test rot wird - genau der Fehlertyp, den dieses Projekt kennt.
-const SECHS = DREI.concat(DREI_II);
+const ALLE = DREI.concat(DREI_II).concat(DREI_III);
+// Der Nullkiel ist die einzige Ausnahme vom gleitenden Bonusmuster: Seine Wirkung ist binaer
+// (ein Mutator faellt weg oder nicht), er steht deshalb nicht in TIEFENSCHIFF_WIRKUNG. Er MUSS
+// aus den gleitenden Pruefungen heraus - sonst waeren sie fuer ihn gruen, ohne etwas zu pruefen:
+// tiefenschiffBonus() liefert fuer unbekannte Schluessel 0, und "0 === 0 und 0 < 1" haelt jede
+// Deckelpruefung aus. Abschnitt 7 prueft ihn stattdessen an seiner Schwelle.
+const GLEITEND = ALLE.filter(k => k !== 'nullkiel');
 
 // ---- 1) Die sechs Schiffe (CLAUDE.md Regel 7) ----
 const shipBlock = arrAus('SHIP_DEFS');
 const ICON_KEYS = new Set(Array.from(js.matchAll(/^\s{4}([a-z][a-z0-9_]*): `<svg/gm)).map(m=>m[1]));
 const HULL_KEYS = new Set(Array.from(js.matchAll(/^\s{6}([a-z][a-z0-9_]*):\s*\{ pts:/gm)).map(m=>m[1]));
-check('1: beide Staffeln sind vollzaehlig', SECHS.length === 6);
-for (const k of SECHS){
+check('1: alle drei Staffeln sind vollzaehlig', ALLE.length === 9, ALLE.length);
+for (const k of ALLE){
   const m = shipBlock.match(new RegExp("\\{ key:'"+k+"'[\\s\\S]{0,900}?\\}, *\\n"));
   check('1: '+k.padEnd(13)+' ist angelegt', !!m);
   if (!m) continue;
@@ -76,8 +85,8 @@ for (const k of SECHS){
 // ---- 2) DIE TRENNUNG ----
 const ATTACK_KEYS = new Function('return '+arrAus('ATTACK_SHIP_KEYS'))();
 check('2: die Positivliste ist ueberhaupt eine Liste', Array.isArray(ATTACK_KEYS) && ATTACK_KEYS.length > 15, ATTACK_KEYS.length);
-check('2: KEINES der sechs steht in ATTACK_SHIP_KEYS - damit kann es im PvP gar nicht zaehlen',
-  SECHS.every(k => !ATTACK_KEYS.includes(k)), SECHS.filter(k => ATTACK_KEYS.includes(k)));
+check('2: KEINES der neun steht in ATTACK_SHIP_KEYS - damit kann es im PvP gar nicht zaehlen',
+  ALLE.every(k => !ATTACK_KEYS.includes(k)), ALLE.filter(k => ATTACK_KEYS.includes(k)));
 // Die Gegenprobe: Die Liste muss die richtigen Schiffe weiterhin enthalten, sonst haette ich
 // beim Einfuegen etwas kaputtgemacht und der Test waere aus dem falschen Grund gruen.
 check('2: die vorhandenen Kampfschiffe stehen weiterhin darin',
@@ -85,8 +94,8 @@ check('2: die vorhandenen Kampfschiffe stehen weiterhin darin',
 // Und keine der Kampf-/Verteidigungsfunktionen darf die drei namentlich kennen.
 for (const fn of ['attackPowerRaw','defenseCombatBonusRaw','defensePower','shipDefenseContribution']){
   const q = fnAus(fn);
-  const drin = SECHS.filter(k => q.includes("'"+k+"'"));
-  check('2: '+fn.padEnd(24)+' kennt keins der sechs Schiffe', drin.length === 0, drin);
+  const drin = ALLE.filter(k => q.includes("'"+k+"'"));
+  check('2: '+fn.padEnd(24)+' kennt keins der neun Schiffe', drin.length === 0, drin);
 }
 // Der Presslufthai ist der heikelste Fall der ganzen Trennung: Er ist das EINZIGE Tiefenschiff mit
 // Kampfkraft. Seine Wirkung darf deshalb ausschliesslich in abgrundKampfkraft() liegen - die
@@ -99,7 +108,7 @@ for (const fn of ['attackPowerRaw','defenseCombatBonusRaw','defensePower','shipD
 }
 // defWeight:0 - der dritte Riegel. shipDefenseContribution summiert ueber defWeight; eine
 // versehentliche 1 dort waere Verteidigungskraft im PvP, ohne dass irgendwo ein Name faellt.
-for (const k of SECHS){
+for (const k of ALLE){
   const e = shipBlock.match(new RegExp("\\{ key:'"+k+"'[\\s\\S]{0,900}?\\}, *\\n"))[0];
   check('2: '+k.padEnd(13)+' traegt defWeight:0 (kein stiller Verteidigungsbeitrag)', /defWeight:0/.test(e));
 }
@@ -139,7 +148,7 @@ check('4: pay() faellt nicht unter null (ein negativer Wert liesse das Backend d
 // Die Preise muessen mit der Stueckzahl steigen, wie bei allen anderen Schiffen.
 const TK = new Function('TIEFENFLOTTE', fnAus('tiefenschiffKosten')+'; return tiefenschiffKosten;')(
   new Function('return '+js.slice(js.indexOf('{', js.indexOf('const TIEFENFLOTTE')), js.indexOf('};', js.indexOf('const TIEFENFLOTTE'))+1))());
-check('4: jedes der sechs hat einen Preis > 0', SECHS.every(k => TK(k,1) > 0), SECHS.map(k=>k+':'+TK(k,1)));
+check('4: jedes der neun hat einen Preis > 0', ALLE.every(k => TK(k,1) > 0), ALLE.map(k=>k+':'+TK(k,1)));
 // Staffel II wird spaeter freigeschaltet und muss deshalb auch teurer sein als Staffel I - sonst
 // waere das tiefere Gate eine reine Formalitaet.
 check('4: das billigste Schiff der Staffel II kostet mehr als das teuerste der Staffel I',
@@ -152,13 +161,18 @@ check('4: ein unbekanntes Schiff kostet 0 statt NaN', TK('gibtsnicht',5) === 0);
 // ---- 5) Die drei Wirkungen, ausgefuehrt ----
 const TB = new Function('TIEFENSCHIFF_WIRKUNG', fnAus('tiefenschiffBonus')+'; return tiefenschiffBonus;')(
   new Function('return '+js.slice(js.indexOf('{', js.indexOf('const TIEFENSCHIFF_WIRKUNG')), js.indexOf('};', js.indexOf('const TIEFENSCHIFF_WIRKUNG'))+1))());
-check('5: ohne Schiffe kein Bonus', SECHS.every(k => TB({}, k) === 0) && TB(null,'kessel') === 0);
+check('5: ohne Schiffe kein Bonus', GLEITEND.every(k => TB({}, k) === 0) && TB(null,'kessel') === 0);
 check('5: der Bonus waechst mit der Stueckzahl', TB({kessel:5},'kessel') < TB({kessel:20},'kessel'));
 // Deckel an absurder Stueckzahl gemessen - mit realistischen Zahlen wuerde die Pruefung nie
 // fehlschlagen und bewiese nichts.
 check('5: jeder Bonus ist gedeckelt, auch bei 100.000 Schiffen',
-  SECHS.every(k => TB({[k]:100000}, k) === TB({[k]:1e9}, k) && TB({[k]:1e9}, k) < 1),
-  SECHS.map(k => k+':'+TB({[k]:1e9},k)));
+  GLEITEND.every(k => TB({[k]:100000}, k) === TB({[k]:1e9}, k) && TB({[k]:1e9}, k) < 1),
+  GLEITEND.map(k => k+':'+TB({[k]:1e9},k)));
+// Die Gegenprobe zur Ausnahme: JEDES gleitende Schiff muss auch wirklich einen Bonus liefern.
+// Ohne diese Zeile koennte ein Schiff aus TIEFENSCHIFF_WIRKUNG herausfallen und die Deckelpruefung
+// darueber bliebe still gruen.
+check('5: und jeder gleitende Bonus ist bei genug Schiffen auch groesser als null',
+  GLEITEND.every(k => TB({[k]:1000}, k) > 0), GLEITEND.filter(k => !(TB({[k]:1000},k) > 0)));
 check('5: ein Schiff zaehlt nur fuer seine eigene Wirkung', TB({kessel:50},'lotsenboot') === 0);
 
 // Anflugdauer: Lotsenboot verkuerzt, Vorschau und Start MUESSEN dieselbe Funktion benutzen.
@@ -243,6 +257,92 @@ check('6: und wirkt an genau einer Stelle',
 // denselben Kanal waere die Art Doppelung, die dieses Projekt sonst erst beim Spieler auffaellt.
 check('6: die Beute bleibt Sache des Bergungskrans',
   !new RegExp("abgrundKanalBonus\\('beute'\\)[^\\n]*echoschnitter").test(js));
+
+// ---- 7) Staffel III: die drei Haerten, ausgefuehrt ----
+// Bannschiff: Kampfkraft NUR gegen Waechter. Die Gegenprobe (ohne Waechter passiert nichts) ist
+// hier die wichtigere Haelfte - ein Bannschiff, das ueberall wirkte, waere ein zweiter
+// Presslufthai statt eines eigenen Schiffs.
+{
+  const AK = new Function(
+    'abgrundKanalBonus, abgrundSchiffsmodul, fleetDiversityMult, FLEET_BALANCE_MAX_BONUS, tiefenschiffBonus, ABGRUND_KRAFT_DECKEL, state',
+    fnAus('abgrundKampfkraft')+'; return abgrundKampfkraft;'
+  )(()=>0, ()=>0, ()=>1, 1, TB, 2.0, { abgrund:{ best:200 } });
+  const sek = (t, w) => ({ tiefe:t, mutatoren:[], waechter:w||null, mods:{ atk:1 } });
+  const BANN = { bannschiff:40 };
+  check('7: gegen einen Waechter steigt die Kampfkraft', AK(1000, sek(80,{name:'X'}), BANN) > 1000,
+    { mit:AK(1000, sek(80,{name:'X'}), BANN) });
+  check('7: ohne Waechter bringt das Bannschiff GAR NICHTS', AK(1000, sek(80), BANN) === 1000,
+    { ohneWaechter:AK(1000, sek(80), BANN) });
+  // Es gilt bewusst auch in laengst bezwungenen Tiefen - anders als der Waechterbann des
+  // Schwerelinie-Moduls. Der Zustand oben hat best:200, die Tiefe 80 ist also laengst bezwungen.
+  check('7: es wirkt auch in einer laengst bezwungenen Tiefe',
+    AK(1000, sek(80,{name:'X'}), BANN) > 1000);
+  check('7: die Tiefe selbst aendert seine Wirkung nicht (anders als beim Presslufthai)',
+    AK(1000, sek(20,{name:'X'}), BANN) === AK(1000, sek(90,{name:'X'}), BANN));
+}
+// Nullkiel: die Schwelle, und der Unterschied zur Bannspule.
+{
+  const SCHWELLE = zahl('NULLKIEL_SCHWELLE');
+  const NA = new Function('NULLKIEL_SCHWELLE', fnAus('nullkielAktiv')+'; return nullkielAktiv;')(SCHWELLE);
+  check('7: die Schwelle ist ueberhaupt gesetzt', SCHWELLE > 1, SCHWELLE);
+  check('7: knapp darunter wirkt er nicht', NA({ nullkiel: SCHWELLE-1 }) === false);
+  check('7: genau auf der Schwelle wirkt er', NA({ nullkiel: SCHWELLE }) === true);
+  check('7: ohne Flotte kein Absturz', NA(null) === false && NA({}) === false);
+
+  const SMB = new Function('abgrundKonstellationFuer, ABGRUND_GRENZEN, ABGRUND_BASIS_STAERKE, ABGRUND_STAERKE_MULT, ABGRUND_WAECHTER_STAERKE, ABGRUND_WAECHTER_SPLITTER, abgrundAnflugdauer',
+    fnAus('abgrundSektorMitBann')+'; return abgrundSektorMitBann;'
+  )(()=>null, { atk:[0.1,10], def:[0.1,10], loot:[0.1,10], shards:[0.1,10], dur:[0.5,2], loss:[0.1,10] }, 100, 1.1, 1.6, 3, ()=>300);
+  const roh = { tiefe:10, waechter:null, bergung:8, mutatoren:[
+    { key:'a', def:2 }, { key:'b', def:3 }, { key:'c', def:5 } ] };
+  const anz = s => s.mutatoren.length;
+  check('7: ohne alles bleiben alle drei Mutatoren', anz(SMB(roh, null, false, false)) === 3);
+  // DAS ist seine Nische: ein Mutator faellt, OHNE dass eine Gegenmassnahme gewaehlt wurde.
+  check('7: der Nullkiel streicht einen Mutator OHNE gewaehlte Gegenmassnahme',
+    anz(SMB(roh, null, false, true)) === 2, { rest:anz(SMB(roh, null, false, true)) });
+  // Die Bannspule kann das ausdruecklich NICHT - sie ist ein zweiter Bann, kein erster.
+  check('7: die Bannspule allein streicht weiterhin nichts',
+    anz(SMB(roh, null, true, false)) === 3);
+  check('7: mit gewaehlter Gegenmassnahme faellt einer', anz(SMB(roh, 'b', false, false)) === 2);
+  check('7: Gegenmassnahme + Kiel streichen zwei', anz(SMB(roh, 'b', false, true)) === 1);
+  check('7: Gegenmassnahme + Kiel + Spule streichen drei', anz(SMB(roh, 'b', true, true)) === 0);
+  // Deterministisch: derselbe Aufruf muss denselben Sektor liefern. Ein Zufall hier waere genau
+  // der Auseinanderlauf von Vorschau und Abrechnung, den der Code an dieser Stelle ausschliesst.
+  const w1 = SMB(roh, null, false, true), w2 = SMB(roh, null, false, true);
+  check('7: die Auswahl ist deterministisch, nicht zufaellig',
+    JSON.stringify(w1.mutatoren) === JSON.stringify(w2.mutatoren),
+    { erster:w1.mutatoren.map(m=>m.key), zweiter:w2.mutatoren.map(m=>m.key) });
+  check('7: es gibt keinen Zufall in der Bann-Funktion', !/Math\.random/.test(fnAus('abgrundSektorMitBann')));
+  // Alle DREI Aufrufstellen muessen den Kiel durchreichen - Start, Vorschau, Abrechnung. Genau
+  // hier ist in Phase 1 schon einmal eine Stelle vergessen worden (zwei Sektor-Bauer).
+  check('7: alle drei Aufrufstellen reichen den Nullkiel durch',
+    (js.match(/abgrundSektorMitBann\([^;]*nullkielAktiv\(/g)||[]).length === 3,
+    { stellen:(js.match(/abgrundSektorMitBann\([^;]*nullkielAktiv\(/g)||[]).length });
+  check('7: und die Abrechnung nimmt die MITGEFLOGENE Flotte, nicht die daheim',
+    /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule, nullkielAktiv\(m\.composition \|\| fleet\)\)/.test(js));
+}
+// Grundgaenger: hebt den Wiederholungsabschlag an - dauerhaft, aber nur teilweise.
+{
+  const ABSCHLAG = zahl('ABGRUND_WIEDERHOLUNG');
+  const WF = new Function('ensureAbgrund, ABGRUND_WIEDERHOLUNG, tiefenschiffBonus',
+    fnAus('abgrundWiederholungsFaktor')+'; return abgrundWiederholungsFaktor;'
+  )(()=>({ best:100, grund:false }), ABSCHLAG, TB);
+  check('7: eine neue Tiefe gibt weiterhin die volle Ausbeute', WF(101, false, {}) === 1);
+  check('7: eine wiederholte ohne Grundgaenger den vollen Abschlag', WF(50, false, {}) === ABSCHLAG);
+  check('7: mit Grundgaengern wird der Abschlag kleiner', WF(50, false, { grundgaenger:40 }) > ABSCHLAG,
+    { ohne:WF(50,false,{}), mit:WF(50,false,{grundgaenger:40}) });
+  // Er hebt ihn NIE ganz auf - das kann nur die Grundberuehrung, und die ist einmalig. Ein Schiff,
+  // das den Abschlag ganz aufhoebe, haette das Item entwertet.
+  check('7: er hebt den Abschlag NIE ganz auf, auch bei absurder Stueckzahl',
+    WF(50, false, { grundgaenger:1e9 }) < 1, { extrem:WF(50,false,{grundgaenger:1e9}) });
+  check('7: die Grundberuehrung dagegen hebt ihn ganz auf', WF(50, true, {}) === 1);
+  // Und die Anzeige muss den TATSAECHLICHEN Faktor nennen, nicht die Konstante - sonst behauptet
+  // die Vorschau 35%, waehrend die Abrechnung 70% gibt (CLAUDE.md Regel 6).
+  check('7: keine Anzeigestelle nennt mehr die rohe Konstante',
+    !/Math\.round\(ABGRUND_WIEDERHOLUNG\*100\)/.test(js));
+  check('7: Vorschau und Bericht zeigen beide den tatsaechlichen Faktor',
+    (js.match(/Math\.round\(wiederholung\*100\)/g)||[]).length === 2,
+    { stellen:(js.match(/Math\.round\(wiederholung\*100\)/g)||[]).length });
+}
 
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
 process.exit(fail ? 1 : 0);

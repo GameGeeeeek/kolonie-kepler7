@@ -51,6 +51,22 @@ let fail=false;
 const check=(n,c,x)=>{ console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail=fail||!c; };
 
 const gespeichert = store => { try { return JSON.parse(store['kepler7-save-v3']||'{}'); } catch(e){ return {}; } };
+// Auf eine BEDINGUNG im gespeicherten Stand warten statt auf eine feste Zeitspanne.
+//
+// Warum: Abschnitt 6 wartete nach dem Klick 1200 ms darauf, dass der Werkstatt-Kauf im Spielstand
+// landet. Einzeln reichte das immer, unter Last (der Pflichtlauf startet mehrere jsdom-Tests) nicht
+// mehr - der Test wurde dann rot, obwohl das Spiel richtig rechnete. Ein Test, der je nach
+// Maschinenauslastung ein anderes Ergebnis liefert, entwertet den ganzen Pflichtlauf: Man gewoehnt
+// sich an, ein Rot wegzuklicken. Nachgewiesen auf v8.338.0 GENAUSO wie auf dem neuen Stand, es ist
+// also keine Regression, sondern lag latent im Test.
+async function warteAufStand(page, store, pruefe, maxMs){
+  const bis = Date.now() + (maxMs || 15000);
+  while (Date.now() < bis){
+    if (pruefe(gespeichert(store))) return true;
+    await page.waitForTimeout(100);
+  }
+  return false;   // Zeit abgelaufen - die Pruefungen dahinter melden es als Fehlschlag
+}
 
 async function starte(browser, stand){
   const store={'kepler7-save-v3':stand};
@@ -108,7 +124,8 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
 
     // ---- 4) Tauchgang starten ----
     await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-start]'); if(b) b.click(); });
-    await page.waitForTimeout(1500);
+    // Auf die gebuchte Mission warten statt auf die Uhr - siehe warteAufStand() oben.
+    await warteAufStand(page, store, st => (((st.fleet||{}).missions)||[]).some(m=>m.type==='abgrund'));
     const nachStart = gespeichert(store);
     const mission = ((nachStart.fleet||{}).missions||[]).find(m=>m.type==='abgrund');
     check('4: der Tauchgang steht als Mission im gespeicherten Spielstand',
@@ -133,7 +150,11 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
       ]}
     });
     const { ctx, page, errs, store } = await starte(browser, stand);
-    await page.waitForTimeout(1800);
+    // Auf die AUFGELOESTE Mission warten statt auf die Uhr - dieser Abschnitt fiel unter Last
+    // ebenso durch wie Abschnitt 6, aus derselben Ursache.
+    // Auf die GUTSCHRIFT warten, nicht nur auf das Verschwinden der Mission: Zwischen beidem liegt
+    // ein weiterer Speichervorgang, und genau darin lag die Restflakiness dieses Abschnitts.
+    await warteAufStand(page, store, st => ((st.abgrund||{}).best||0) >= 1);
     const s = gespeichert(store);
     const a = s.abgrund || {};
     check('5: die faellige Mission ist aufgeloest (keine offene Abgrund-Mission mehr)',
@@ -164,7 +185,8 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
       if(!b || b.disabled) return false; b.click(); return true;
     });
     check('6: der Kauf-Knopf der Werkstatt ist bedienbar', gedrueckt);
-    await page.waitForTimeout(1200);
+    // Auf den gebuchten Kauf warten statt auf die Uhr - siehe warteAufStand() oben.
+    await warteAufStand(page, store, st => (((st.abgrund||{}).werkstatt||{}).druckhuelle||0) >= 1);
     const nachher = gespeichert(store).abgrund || {};
     check('6: die Ausbaustufe ist gestiegen',
       ((nachher.werkstatt||{}).druckhuelle||0) === 1, { stufe:(nachher.werkstatt||{}).druckhuelle });
@@ -212,7 +234,8 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
       await page.evaluate(()=>!!document.querySelector('[data-abgrund-woche]')));
     const vorher = gespeichert(store).abgrund || {};
     await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-woche]'); if(b) b.click(); });
-    await page.waitForTimeout(1200);
+    // Auf die gutgeschriebenen Splitter warten statt auf die Uhr - siehe warteAufStand() oben.
+    await warteAufStand(page, store, st => ((st.abgrund||{}).splitter||0) > (vorher.splitter||0));
     const nachher = gespeichert(store).abgrund || {};
     check('8: die Abrechnung schreibt Splitter gut',
       (nachher.splitter||0) > (vorher.splitter||0), { vorher:vorher.splitter, nachher:nachher.splitter });
