@@ -122,8 +122,11 @@ check('3: jedes Schiff der Klasse zaehlt, nicht nur das erste',
   jg.shipKeys.every(k => asm({ [k]:1 }, 'jagdgeschwader', 0.1) === 0.1), jg.shipKeys);
 
 // ---- 4) Kampfkraft: die drei Module darin, ausgefuehrt ----
+// tiefenschiffBonus steht seit v8.338.0 (Presslufthai) mit in der Funktion. Hier eine Attrappe, die
+// immer 0 liefert: Dieser Test prueft die MODULE, und die Tiefenflotte hat ihren eigenen
+// (tests/test_tiefenflotte.js, Abschnitt 6). Ohne die Attrappe waere es ein ReferenceError.
 const KK = new Function(
-  'state, abgrundKanalBonus, abgrundSchiffsmodul, fleetDiversityMult, FLEET_BALANCE_MAX_BONUS, ABGRUND_KRAFT_DECKEL',
+  'state, abgrundKanalBonus, abgrundSchiffsmodul, fleetDiversityMult, FLEET_BALANCE_MAX_BONUS, ABGRUND_KRAFT_DECKEL, tiefenschiffBonus',
   fnAus('abgrundKampfkraft')+'; return abgrundKampfkraft;'
 );
 const DECKEL = zahl('ABGRUND_KRAFT_DECKEL');
@@ -135,7 +138,7 @@ function kraft(opt){
     () => 0,
     (f, klasse, effect) => (o.modul === effect ? (o.wert||0.1) : 0),
     () => 1 + (o.balance||0)*BAL,
-    BAL, DECKEL
+    BAL, DECKEL, () => 0
   )(1000, { mods:{atk:1}, mutatoren: new Array(o.mut||0).fill({}), waechter: o.waechter||null, tiefe: o.tiefe||1 }, o.flotte||{ jaeger:1 });
 }
 check('4: ohne Module ist die Kampfkraft unveraendert', kraft({}) === 1000, { k:kraft({}) });
