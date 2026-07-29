@@ -37,17 +37,23 @@ function baue(opts){
     battleStats:{ wins:0 }, npcKills:0, battlePoints:0, pirateLairPrestige:0, bossKills:0,
     moonSiegesWon:0, expeditionsCompleted:0, expeditionCodex:{ specials:{}, rares:{}, signalsFollowed:0 },
     discoveredSystems:{}, spyIntel:{}, modulePurchases:0, moduleSales:0, commandPoints:0,
-    expeditionSafeRuns:0, tradeRoutes:[]
+    expeditionSafeRuns:0, tradeRoutes:[],
+    // Abgrund-Auftraege (v8.342.0): Ohne diese Felder wuerden ihre zaehler() beim Ziehen auf
+    // undefined laufen. Vorgabe ist ein Konto, das den Abgrund kennt, aber noch nichts erreicht hat.
+    abgrund:{ best:0, tauchgaenge:0, bergung:0, relikte:{}, konstGesehen:{} }
   }, opts.state || {});
   new Function('ctx', 'state', 'fmt', 'useBackend', 'attackPower', 'currentFleet', 'QUEST_DURATION_MS', 'factionRankOf',
-    'RANK_GOLD_CHANCE_FROM', 'RANK_QUEST_TIME_FROM', 'RANK_QUEST_TIME_BONUS',
+    'RANK_GOLD_CHANCE_FROM', 'RANK_QUEST_TIME_FROM', 'RANK_QUEST_TIME_BONUS', 'abgrundFreigeschaltet',
     block + ';ctx.TIERS=QUEST_TIERS;ctx.POOLS=FACTION_QUEST_POOLS;ctx.gen=generateFactionQuest;' +
     'ctx.tierOf=questTierOf;ctx.tplOf=questTemplateOf;ctx.GOLDFRAG=QUEST_GOLD_FRAGMENTS;'
   )(ctx, state, (n)=>String(n), () => opts.backend !== false,
     () => opts.flottenkraft || 0, () => ({ mondzerstoerer: opts.mondzerstoerer || 0 }), 24*3600*1000,
     // Rangabhaengige Verguenstigungen (v8.298.23) - hier neutral gestellt, damit dieser Test
     // weiterhin nur die Auftragspools misst. Eigener Nachweis in test_fraktionsraenge.js.
-    () => ({ nr: opts.rang || 1 }), 8, 5, 0.5);
+    () => ({ nr: opts.rang || 1 }), 8, 5, 0.5,
+    // abgrundFreigeschaltet: Vorgabe true, damit die Tiefenauftraege im Pool sind und mitgemessen
+    // werden. opts.abgrund === false schaltet sie ab - so laesst sich auch das Gegenteil pruefen.
+    () => opts.abgrund !== false);
   return { ctx, state };
 }
 

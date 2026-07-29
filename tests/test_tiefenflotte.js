@@ -176,7 +176,20 @@ check('5: und jeder gleitende Bonus ist bei genug Schiffen auch groesser als nul
 check('5: ein Schiff zaehlt nur fuer seine eigene Wirkung', TB({kessel:50},'lotsenboot') === 0);
 
 // Anflugdauer: Lotsenboot verkuerzt, Vorschau und Start MUESSEN dieselbe Funktion benutzen.
-const AD = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600);
+// officerBonus kam mit v8.342.0 dazu (Navigator wirkt jetzt auch auf den Abgrund-Anflug). Hier eine
+// Attrappe mit 0: Dieser Abschnitt misst die SCHIFFE. Der Navigator hat seinen eigenen Nachweis
+// weiter unten, wo er ausdruecklich hochgedreht wird.
+const AD = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 0);
+// Navigator-Ausweitung (v8.342.0): derselbe Offizier, der oben die Flugzeit senkt, wirkt jetzt auch
+// unten. Geprueft mit einer Attrappe, die einen echten Bonus liefert.
+{
+  const ADnav = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 0.2);
+  check('5: der Navigator verkuerzt den Abgrund-Anflug', ADnav(30, 1, {}) < AD(30, 1, {}),
+    { ohne:AD(30,1,{}), mit:ADnav(30,1,{}) });
+  const ADmax = new Function('tiefenschiffBonus, ABGRUND_MAX_FLUG_SEK, officerBonus', fnAus('abgrundAnflugdauer')+'; return abgrundAnflugdauer;')(TB, 4*3600, () => 9);
+  check('5: und ist bei der Haelfte gedeckelt wie in der normalen Flugzeitrechnung',
+    ADmax(30, 1, {}) === Math.round(AD(30,1,{}) * 0.5), { gedeckelt:ADmax(30,1,{}), halb:Math.round(AD(30,1,{})*0.5) });
+}
 check('5: ohne Lotsenboot bleibt die Dauer wie bisher', AD(10, 1, {}) === Math.round(240+10*20));
 check('5: mit Lotsenboot wird sie kuerzer', AD(10, 1, {lotsenboot:10}) < AD(10, 1, {}),
   { ohne:AD(10,1,{}), mit:AD(10,1,{lotsenboot:10}) });

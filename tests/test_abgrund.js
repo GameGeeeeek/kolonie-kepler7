@@ -93,6 +93,10 @@ function baueKontext(zustand){
     // Tiefenflotte (v8.337.0): die Sondenreichweite und die Anflugdauer fragen sie jetzt mit.
     // Hier ohne Tiefenschiffe, damit dieser Test weiterhin die Grundwerte misst.
     'const currentFleet = () => ({});', 'const TIEFENSCHIFF_WIRKUNG = {};',
+    // Navigator-Ausweitung (v8.342.0): abgrundAnflugdauer liest jetzt officerBonus('navigator').
+    // Hier ohne Offizier (0), damit dieser Test weiterhin die Grundwerte misst - der Navigator hat
+    // seinen eigenen Nachweis in test_tiefenflotte.js und test_abgrundbezug.js.
+    'const officerBonus = () => 0;',
     fnAus('tiefenschiffBonus'), fnAus('lotsenbootSicht'), fnAus('abgrundAnflugdauer'), fnAus('abgrundSondeReichweite'),
     konstAus('ABGRUND_WAECHTER_ALLE'), konstAus('ABGRUND_WAECHTER_STAERKE'),
     konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_WAECHTER_BERGUNG'), konstAus('ABGRUND_GEGEN_KOSTEN'),
