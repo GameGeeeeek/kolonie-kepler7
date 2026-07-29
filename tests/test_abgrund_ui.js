@@ -87,6 +87,14 @@ async function starte(browser, stand, vorbelegung){
   page.on('dialog', d=>d.accept());
   await page.route('**/api/**', backend(store));
   await page.addInitScript(()=>localStorage.setItem('kepler7_token','tok'));
+  // ZUFALL AUSSCHALTEN. Der wichtigste Griff dieser Datei, und lange uebersehen: Mehrere
+  // Abschnitte setzen einen GEWONNENEN Tauchgang voraus (Rekordtiefe, Splitter, Allianz-Beitrag).
+  // Der Kampf ist aber ein Wurf mit hartem Deckel bei 95% - der Test verlor also in rund jedem
+  // zwanzigsten Lauf, voellig unabhaengig von der Maschinenlast, und meldete dann "best: 0".
+  // Das sah wie Flakiness durch Timing aus und war keine; kein noch so langes Warten haette
+  // geholfen. 0.5 statt eines Extremwerts: klein genug, um jede Kampfphase zu gewinnen, aber
+  // nicht so extrem, dass seltene Zufallsereignisse reihenweise ausgeloest werden.
+  await page.addInitScript(()=>{ Math.random = () => 0.5; });
   await page.goto(SPIEL_URL);
   // WARTEN AUF DAS SPIEL, NICHT AUF DIE UHR. Hier standen feste 2800 ms - die Wurzel der
   // Flakiness dieser ganzen Datei: Reicht die Zeit unter Last nicht, existieren die Tab-Knoepfe
