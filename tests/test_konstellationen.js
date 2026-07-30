@@ -76,6 +76,10 @@ const G = new Function(`
   ${fnAus('abgrundAnflugdauer')}
   ${fnAus('abgrundWaechterDef')}
   ${fnAus('abgrundKonstellationFuer')}
+  // abgrundMisch (v8.345.0): Das Emblem mischt seinen dunklen Grund daraus. abgrundRng steht schon
+  // weiter oben in dieser Umgebung - das Sternenfeld hinter der Figur ist gesaet, nicht gewuerfelt,
+  // damit dieselbe Konstellation immer denselben Himmel hat.
+  ${fnAus('abgrundMisch')}
   ${fnAus('abgrundKonstellationsEmblem')}
   ${fnAus('abgrundKonstellationsSuche')}
   ${fnAus('abgrundBergungsgut')}
