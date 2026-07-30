@@ -185,7 +185,12 @@ const sichtbar = (alle, entdeckt) => alle.filter(s => !s.hidden || entdeckt);
   check('7: und ebenso bei voller Galaxie', voll.eng <= 8, voll);
   check('7: der goldene Winkel steht als benannte Konstante im Code',
     /const GALAXY_GOLDEN_ANGLE = 2\.39996323;/.test(src));
-  check('7: und wird für den Grundwinkel verwendet', /const baseAngle = i \* GALAXY_GOLDEN_ANGLE;/.test(src));
+  // Auf die WIRKUNG geprüft statt auf eine wörtliche Zeile: bis v8.349.0 stand hier
+  // /const baseAngle = i \* GALAXY_GOLDEN_ANGLE;/, und als der Grundwinkel beim Umbau auf die
+  // Platz-Entspannung in denselben Ausdruck wie die Streuung wanderte, meldete der Test einen
+  // Fehler, obwohl sich am Verhalten nichts geändert hatte. Was zählt: der goldene Winkel wird mit
+  // der Platznummer multipliziert.
+  check('7: und wird für den Grundwinkel verwendet', /i \* GALAXY_GOLDEN_ANGLE/.test(src));
 }
 
 console.log('\n' + (fail ? 'FAIL' : 'PASS'));

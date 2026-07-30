@@ -2799,8 +2799,10 @@
           <input type="text" id="sectorSearchInput" placeholder="System oder Planet suchen…" style="width:100%;"/>
           <div id="sectorSearchResults" style="display:none; position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#171c34; border:var(--bw-1) solid rgba(126,119,221,0.4); max-height:260px; overflow-y:auto; z-index:20; box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
         </div>
-        <div class="map-wrap" style="height:340px; margin-bottom:1rem; position:relative; touch-action:none;">
+        <div class="map-wrap" style="height:420px; margin-bottom:1rem; position:relative; touch-action:none;">
           <svg id="galaxyMapSvg" viewBox="0 0 950 500" width="100%" height="100%" style="cursor:grab;"></svg>
+          <div class="map-radar-overlay" aria-hidden="true"><div class="map-radar-sweep"></div></div>
+          <button id="galaxyBackBtn" style="display:none; position:absolute; left:8px; top:8px; z-index:5; padding:5px 11px; font-size:12px; background:rgba(13,18,36,0.9);"><i class="ti ti-chevron-left" aria-hidden="true" style="margin-right:5px;"></i>Galaxie</button>
           <div style="position:absolute; right:8px; bottom:8px; display:flex; flex-direction:column; gap:6px; z-index:5;">
             <button id="galaxyZoomInBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
             <button id="galaxyZoomOutBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
@@ -2817,15 +2819,6 @@
           <button id="systemNextBtn" title="Nächstes System"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
         </div>
         <div class="planet-switch" id="mapBaseLinks" style="margin-bottom:0.75rem;"></div>
-        <div class="map-wrap" style="height:260px; position:relative; touch-action:none;">
-          <svg id="mapSvg" viewBox="0 0 700 230" width="100%" height="100%" style="cursor:grab;"></svg>
-          <div class="map-radar-overlay" aria-hidden="true"><div class="map-radar-sweep"></div></div>
-          <div style="position:absolute; right:8px; bottom:8px; display:flex; flex-direction:column; gap:6px; z-index:5;">
-            <button id="mapZoomInBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
-            <button id="mapZoomOutBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
-            <button id="mapZoomResetBtn" style="width:34px; height:34px; padding:0; font-size:14px; background:rgba(13,18,36,0.9);">⟲</button>
-          </div>
-        </div>
         <div class="planet-list" id="planetList"></div>
         <div id="moonListWrap"></div>
         <div class="card-row" id="autoExploreRow" role="button" tabindex="0" style="cursor:pointer; margin-top:0.75rem;">
@@ -5273,8 +5266,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.348.0';
+  const VERSION = '8.349.0';
   const PATCHNOTES = [
+    { version:'8.349.0', date:'30.07.2026', changes:[
+      '<strong>Eine Karte statt zwei.</strong> Der Sektorkarte-Reiter hatte zwei Kartenkästen übereinander: oben die Galaxie, unten das gerade gewählte System, und dazwischen eine ◀/▶-Navigation. Man wählte ein System oben aus und sah es unten – zwei Bilder für einen Gedanken. Jetzt gibt es <strong>eine</strong> Karte: ein Klick auf ein System fährt hinein, und die Planeten gehen an genau der Stelle auf, an der das System in der Galaxie steht. Zurück mit dem Knopf oben links, mit <em>Esc</em> oder einem Klick ins Leere.',
+      '<strong>Die Nachbarn bleiben stehen.</strong> Im aufgeklappten Zustand sind die umliegenden Systeme weiter als schwache Punkte zu sehen – das ist der ganze Reiz daran, dass es dieselbe Karte ist. Sie tragen dort bewusst keinen Leuchthof: Die Kamera vergrößert gut zweifach, ein mitvergrößerter Hof saß direkt neben der Sonne und sah aus wie ein Planet des Systems.',
+      '<strong>Systeme lagen übereinander – gemessen 6,9 Pixel im engsten Fall.</strong> Solange man Systeme über eine Liste auswählte, war das ein Schönheitsfehler. Seit man sie im Bild anklickt, ist es eine Bedienbedingung: zwei Sterne mit 6,9 Pixeln Abstand sind kein Ziel, das man treffen kann. Jetzt liegt <strong>kein Systempaar mehr enger als 24 Pixel</strong> beieinander, weder heute noch im Vollausbau.',
+      '<strong>Der Leuchthof schrumpft mit der Galaxie.</strong> Bei den heutigen 69 Systemen bleibt er, wie er war; im Vollausbau mit 277 ist er halb so groß. Nachgerechnet ging es nicht anders: Bliebe er fest, bräuchte er 34 Pixel Abstand, und dann berühren sich <em>trotzdem noch 218 von 277</em> Knoten – so viel Platz gibt die Karte nicht her. Mit dem mitschrumpfenden Hof genügen 24 Pixel, es berührt sich kein einziger, und die Spiralarme bleiben sichtbar statt zu einem gleichmäßigen Teppich zu werden.',
+      '<strong>Ein Systemplatz rückt dabei nicht von der Stelle.</strong> Der Mindestabstand wird für alle 277 Plätze auf einmal hergestellt – auch für die noch leeren, für die es heute gar kein System gibt. Der erste Anlauf schob die <em>vorhandenen</em> Systeme auseinander; damit hätte ein entdecktes Geheimsystem seine Nachbarn um bis zu 2,7 Pixel verschoben und vierzig neue Wochensysteme die bestehenden um bis zu 6,9. Genau das Versprechen aus v8.299.1, dass eine einmal gemerkte Stelle für immer stimmt – der Test dazu hat den Fehler gemeldet, bevor er in die Karte kam.',
+      '<strong>73 Zeilen doppelte Bedienung sind entfallen.</strong> Zoomen, Ziehen und Pinch gab es zweimal, einmal je Karte, in zwei fast zeichengleichen Blöcken. Jetzt gibt es einen Ausschnitt und einen Block, der ihn in beiden Zuständen bedient.',
+      '<strong>Was im aufgeklappten System zu sehen ist, ist unverändert dasselbe:</strong> Monde, Trümmerfelder, Peilungen, Orbitalringe, Aufklärungs-Marker, Allianzbasis und fremde Spieler. Die Systemansicht wurde nicht nachgebaut, sondern als Ganzes in die Galaxiekarte gesetzt – so kann keine dieser Kleinigkeiten beim Umbau verlorengehen.',
+    ] },
     { version:'8.348.0', date:'30.07.2026', changes:[
       '<strong>Das Spiel sagt jetzt, wo etwas offen ist.</strong> Nachgezählt hatte es 13 Hauptreiter und genau <em>zwei</em> Punkte: Verteidigung und Expedition. Wer sich einloggte, musste die übrigen elf abklappern, um zu sehen, ob irgendwo etwas wartet – und das kostete nicht einmal, sondern jede Sitzung. Jeder Reiter kann jetzt einen Punkt tragen, und die Bedingungen dafür stehen an <em>einer</em> Stelle im Code, aus der sich alle vier Anzeigen speisen.',
       '<strong>Zwei Farben, zwei Bedeutungen.</strong> <span style="color:#e0a548;">Bernstein</span> heißt „hier ist etwas offen" und bleibt stehen, bis du es tust – bewusst dieselbe Farbe wie eine vollgelaufene Ressource, denn dahinter steht dieselbe Aussage: hier verpufft gerade Fortschritt. <span style="color:#e24b4a;">Rot</span> heißt „hier ist etwas passiert" und verschwindet beim Hinsehen, so wie der Punkt bisher gemeint war. Der Leerenriss behält als einziges Ereignis die lautere Stufe, bei der der ganze Reiter pulsiert – täte das jeder offene Punkt, würde das Pulsieren nichts mehr bedeuten.',
@@ -22460,7 +22462,9 @@
     { icon:'ti-building-factory-2', title:'Basis & Ressourcen', text:'Im Basis-Tab baust du Gebäude, die Energie, Erz, Kristalle, Deuterium und Antimaterie produzieren. Fast jeder Gebäude-, Schiffs- und Forschungsausbau kostet unter anderem Energie – baue Solarzellen früh mit aus, sonst fehlt dir bald das Kleingeld für alles andere.' },
     { icon:'ti-flask', title:'Forschung & Doktrin', text:'Im Forschung-Tab verbesserst du Produktion, Kampfkraft und mehr dauerhaft. Im Spätspiel kannst du dort außerdem eine Doktrin wählen – eine strategische Grundsatzentscheidung zwischen Offensive, Verteidigung und Logistik.' },
     { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – wähle vorher deine Angriffsflotte aus. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
-    { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab erkundest du Planeten mit Erkundungsschiffen und kolonisierst sie später mit Kolonieschiffen. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft oder Handel) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
+    // Ohne HTML: renderTutorialStep setzt den Text per textContent, ein <strong> stünde wörtlich im
+    // Fenster. test_tutorial prüft das - und hat genau diesen Fehler bei v8.349.0 gemeldet.
+    { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab siehst du zuerst die ganze Galaxie. Klick ein System an, dann fährt die Karte hinein und seine Planeten gehen auf – dort erkundest du sie mit Erkundungsschiffen und kolonisierst sie später mit Kolonieschiffen. Zurück zur Übersicht mit Esc. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft oder Handel) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
     { icon:'ti-users', title:'Allianz & Gemeinschaft', text:'Im Allianz-Tab schließt du dich mit anderen zusammen für gemeinsame Technologien, Gebäude und sogar Kriege gegen andere Allianzen.' },
     { icon:'ti-diamond', title:'Kredite: die zweite Währung', text:'Neben Ressourcen gibt es Kredite als Handelswährung – dafür brauchst du keine Fabrik, sondern Aktivität. Die verlässlichste Quelle sind Handelsrouten (Markt-Tab): einmal eingerichtet, liefern sie dauernd Kredite. Dazu kommen der Verkauf überschüssiger Ressourcen am Markt, die Belohnungen der Tagesaufgaben, Fraktionsaufträge, Erfolge, eroberte Sternsysteme und der Schattenbund als Verbündeter. Ausgegeben werden sie im Kredit-Shop, für Tribute, am Markt und für einzelne Gebäude wie das Botschaftsviertel.' },
     { icon:'ti-list-details', title:'Tagesaufgaben: der tägliche Faden', text:'Unter der Ressourcenleiste liegen die Tagesaufgaben: fünf werden täglich aus 22 Vorlagen gezogen, quer durch alle Bereiche – Kampf, Forschung, Bau, Markt, Expeditionen, Fraktionen, und mit freigeschaltetem Abgrund auch Tauchgänge. Jede gibt Ressourcen oder Kredite, und wer an einem Tag alle abholt, bekommt einen Serien-Bonus, der über mehrere Komplett-Tage wächst. Eine offene Aufgabe kannst du antippen, um direkt zum passenden Menü zu springen. Das ist der schnellste Weg, das Spiel kennenzulernen: die Aufgaben führen dich von selbst durch alle Systeme.' },
@@ -23729,7 +23733,8 @@
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (Deckel bei 6 Sektoren). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
       { title:'Mondzerstörer & Mondbelagerung', body:'Endgame-Schiff (Flotte-Tab), das einen fremden, kolonisierten Mond dauerhaft zerstören kann. Voraussetzung: Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die höchste Forschungshürde im Spiel), danach ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Extrem teuer, extrem langsam (weit unter der Geschwindigkeit jedes anderen Schiffs, entsprechend lange Flugzeit und hoher Treibstoffverbrauch) und immer nur als einzelnes Exemplar besitzbar. Ein Ziel wählst du direkt über die Bestenliste (Schädel-Symbol bei einem fremden Spieler) - dort erscheinen dessen kolonisierte Monde zur Auswahl. Die Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes: eigene Gebäude/Flotte am Mond, der neue Mondschildgenerator (Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken sie zusätzlich; ein aktiver Allianz-Beitritt gibt dem Ziel ebenfalls einen kleinen Bonus. Nach jeder Belagerung - egal ob erfolgreich oder abgewehrt - braucht der Mondzerstörer 48 Std. Abklingzeit. Jeder Belagerungsschuss verbraucht zusätzlich eine <strong>Belagerungs-Ladung aus 25 Hochenergiekristallen</strong> (Tier-2-Ressource aus dem Kristalllabor) - sie wird bei der Ankunft serverseitig abgebucht; ohne ausreichende Ladung schlägt die Belagerung fehl. Erfolgschance und Ergebnis werden serverseitig berechnet.' },
-      { title:'Sektorkarte bedienen', body:'Sowohl die Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter lassen sich zoomen und verschieben: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–/⟲-Buttons unten rechts an der jeweiligen Karte. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert. Die Galaxie-Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen Systemen gleichzeitig - der ⟲-Button zoomt bei Bedarf auf die volle Übersicht heraus. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne, sobald man in das System hineinzoomt.' },
+      { title:'Sektorkarte bedienen', body:'Es gibt <strong>eine</strong> Karte mit zwei Zuständen. Sie beginnt als Galaxie-Übersicht; ein <strong>Klick auf ein System</strong> fährt hinein, und die Planeten gehen an genau der Stelle auf, an der das System in der Galaxie steht - die Nachbarsysteme bleiben als schwache Punkte am Rand sichtbar. Zurück geht es über den Knopf <strong>„‹ Galaxie"</strong> oben links, mit <strong>Esc</strong>, mit einem Klick ins Leere oder über den ⟲-Knopf. Zoomen und Verschieben gilt in beiden Zuständen: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–-Knöpfe unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert; das aufgeklappte System wird bewusst nicht gespeichert - nach einem Neuladen beginnst du wieder in der Übersicht. Die Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen Systemen gleichzeitig. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne im aufgeklappten System.' },
+      { title:'Warum die Sterne kleiner werden, je größer die Galaxie wird', body:'Jedes System wird als kleiner Kern mit einem <strong>Leuchthof</strong> gezeichnet. Da die Karte anklickbar ist, müssen zwei Systeme weit genug auseinanderstehen, um getroffen werden zu können - im Spiel sind das <strong>mindestens 24 Pixel</strong>, die nach dem Setzen der Plätze einmalig erzwungen werden. Der Leuchthof schrumpft dabei mit der Größe der Galaxie: bei den heutigen 69 Systemen hat er seine volle Größe, im Vollausbau mit 277 nur noch die Hälfte. Bliebe er fest, bräuchten die Knoten 34 Pixel Abstand - und so viel Platz gibt die Karte nicht her; die Spiralarme würden zu einem gleichmäßigen Teppich. Ein Systemplatz <strong>verschiebt sich dadurch nie</strong>: Der Mindestabstand wird für alle 277 Plätze auf einmal hergestellt, auch für die noch leeren, sodass eine einmal gemerkte Stelle für immer stimmt.' },
       { title:'Die Galaxie wächst jede Woche', body:'Die Sternenkarte ist nicht fertig: Jeden <strong>Montag um 00:00 Uhr UTC</strong> kommen automatisch <strong>zwei weitere Sternsysteme</strong> am Außenrand der Galaxie dazu, jedes mit <strong>5 bis 10 Planeten</strong> nach denselben Regeln wie die bereits vorhandenen - eigene Namen, eigene Planetentypen, eigene Erkundungsdauern, Beute und Kolonisierungskosten in derselben Größenordnung wie die bestehenden Außensysteme. Es ist also dauerhaft neues Gebiet zu erkunden und zu besiedeln, ohne dass sich an irgendeinem bestehenden Planeten etwas ändert. Die Zeile unter der Galaxie-Übersicht zeigt, wie viele Systeme aktuell kartiert sind und wann die nächsten zwei erscheinen; sobald sie da sind, meldet das Log die neuen Namen. <strong>Bestehende Systeme rücken dabei nicht von der Stelle:</strong> Jedes System hat einen festen Platz auf der Karte, die neuen setzen sich weiter außen an. Alle Spieler sehen dieselben neuen Systeme zur selben Zeit - die Karte wird aus dem Kalender berechnet, nicht ausgewürfelt. <strong>Wichtig für Sammler:</strong> Erfolg „Grenzgänger" und die Kompendium-Kategorien „Sternenkarte"/„Sternensysteme" zählen ausdrücklich nur die fest eingetragene Kern-Galaxie - ein einmal abgeschlossenes Sammelziel reißt durch die wöchentlichen Neuzugänge also nicht wieder auf.' },
       { title:'Terraforming', body:'Jede Kolonie UND die Heimatbasis (nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Die Zielwahl selbst ist auf JEDEM Standort jederzeit möglich, auch während anderswo bereits eine Stufe läuft - nur das tatsächliche Bezahlen/Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt, so lässt sich für mehrere Standorte vorausplanen. Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie). Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen und der Standort trägt den neuen Typ dauerhaft. Bei Kolonien UND der Heimatbasis ändert sich dabei sofort die Textur auf der Sektorkarte; die Heimatbasis behält zusätzlich ihren eigenen violetten Ring als Kennzeichnung, zeigt aber während des laufenden Terraformings denselben gestrichelten Fortschritts-Ring wie Kolonien. Insgesamt deutlich teurer als früher. Erdwelt (Bonus auf ALLE Ressourcen statt nur einer) kostet zusätzlich 80% mehr als jeder Spezialist - eine reine Fokus-Kolonie profitiert trotzdem meist mehr vom passenden Spezialisten. Zu finden im Basis-Tab. Ab Forschung <strong>Hochenergiephysik</strong> lässt sich eine laufende (und bereits voll bezahlte) Stufe optional per <strong>Energieschub</strong> beschleunigen: je Schub -10% der Stufendauer für 6 Hochenergiekristalle x Zielstufe, maximal 3 Schübe je Stufe (Deckel -30%). Rein optionaler Zeit-Abkauf - die regulären Kosten und Dauern ändern sich dadurch nicht.' },
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie, <strong>Wasserwelt</strong> +20% Lagerkapazität. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Generalist: +6% auf ALLE Ressourcen (kumuliert 30%), kostet aber 80% mehr als jeder Spezialist. Erdähnliche Welten, Gasriesen, Asteroiden und Superplaneten haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
@@ -23948,7 +23953,7 @@
     expedition: { icon:'ti-rocket', help:'flotte',
       text:'Expeditionen schicken Schiffe ins Unerforschte. <strong>Typ, Wagnis-Regler und Eskorte</strong> bestimmen zusammen Risiko und Ausbeute: Spähschiffe tragen keine Kampfkraft bei, verbessern aber gezielt die Fundqualität, Frachter erweitern den Platz für große Ressourcenfunde.' },
     karte: { icon:'ti-map-2', help:'kolonien',
-      text:'Die Sektorkarte zeigt dein System und die Nachbarschaft - von hier aus erkundest du fremde Planeten und schickst Kolonieschiffe los. Die <strong>Entfernung</strong> bestimmt Flugzeit und Treibstoffverbrauch jeder Mission, nahe Ziele sind also deutlich günstiger als weit entfernte.' },
+      text:'Die Sektorkarte beginnt als Blick auf die ganze Galaxie. <strong>Klick ein System an</strong> - die Ansicht fährt hinein und die Planeten gehen auf; von dort erkundest du sie und schickst Kolonieschiffe los. Zurück mit <strong>Esc</strong> oder dem Knopf oben links. Die <strong>Entfernung</strong> bestimmt Flugzeit und Treibstoffverbrauch jeder Mission, nahe Ziele sind also deutlich günstiger als weit entfernte.' },
     galaxie: { icon:'ti-world', help:'galaxie',
       text:'Bestenliste, globaler Chat und der Zustand der lebendigen Galaxie. Tippe einen Spieler in der Liste an: sein Profil zeigt dir deine <strong>Siegchance in Prozent</strong>, bevor du eine Flotte losschickst - inklusive der Konterwirkung deiner aktuellen Zusammensetzung.' },
     allianz: { icon:'ti-users', help:'allianz',
@@ -36493,15 +36498,9 @@
   // Ob der fokussierte Start-Ausschnitt (Nachbarschaft des aktiven Systems) schon einmal gesetzt
   // wurde - erst danach greift der volle 950×500-Ausschnitt nur noch über den "Zurücksetzen"-Knopf.
   let galaxyMapFocused = false;
-  let mapViewBox = { x:0, y:0, w:700, h:230 };
-  let mapDidDrag = false; // unterdrückt einen Klick (Erkundungsmission!) direkt nach dem Ziehen/Zoomen
-  function clampMapViewBox(){
-    mapViewBox.w = Math.max(130, Math.min(700, mapViewBox.w));
-    mapViewBox.h = mapViewBox.w * (230/700);
-    mapViewBox.x = Math.max(-60, Math.min(700-mapViewBox.w+60, mapViewBox.x));
-    mapViewBox.y = Math.max(-40, Math.min(230-mapViewBox.h+40, mapViewBox.y));
-  }
-  let galaxyMapDidDrag = false; // unterdrückt einen Klick direkt nach dem Ziehen/Zoomen
+  // mapViewBox/clampMapViewBox/mapDidDrag sind mit v8.349.0 entfallen: Es gibt nur noch EINEN
+  // Kartenausschnitt (galaxyMapViewBox), in dem die Systemansicht als skalierte Gruppe sitzt.
+  let galaxyMapDidDrag = false; // unterdrückt einen Klick (Erkundungsmission!) nach dem Ziehen/Zoomen
   function clampGalaxyViewBox(){
     // Die Zoom-Grenze zieht mit dem Belegungsgrad mit (siehe galaxyFillRatio): Solange die Systeme
     // enger beieinanderstehen, muss man auch enger heranzoomen dürfen - sonst würde diese Schranke
@@ -36566,23 +36565,94 @@
   // Die drei Spiralarme im Hintergrund der Karte bleiben davon unberührt, sie sind eigene Deko-Pfade.
   const GALAXY_GOLDEN_ANGLE = 2.39996323;
   function galaxySpiralLayout(systems){
-    const cx = 478, cy = 250;
+    const plaetze = galaxySlotPositions();
     // Platznummer je System-ID in einem Durchgang. STAR_SYSTEMS wächst, die Zuordnung wird deshalb
     // bei jedem Aufbau frisch gebildet – die Nummern selbst ändern sich dabei nie.
     const platz = {};
     STAR_SYSTEMS.forEach((s,i) => { platz[s.id] = i; });
     const pos = {};
     for (const s of systems){
-      const i = platz[s.id] !== undefined ? platz[s.id] : 0;
-      const t = Math.sqrt((i + 0.5) / GALAXY_SPIRAL_SLOTS); // 0..1 Zentrum -> Rand, flächentreu
-      const baseAngle = i * GALAXY_GOLDEN_ANGLE;
-      const jitterA = (hashStringToFloat(s.id+'a') - 0.5) * 0.55;
-      const jitterR = (hashStringToFloat(s.id+'r') - 0.5) * 24;
-      const angle = baseAngle + jitterA;
-      const radius = Math.max(16, t*GALAXY_SPIRAL_RMAX + jitterR);
-      pos[s.id] = { x: cx + Math.cos(angle)*radius*2.05, y: cy + Math.sin(angle)*radius*0.92 };
+      const i = Math.min(plaetze.length-1, platz[s.id] !== undefined ? platz[s.id] : 0);
+      // Kopie statt Verweis: die Platzliste ist ein dauerhafter Zwischenspeicher, und ein Aufrufer,
+      // der an einer Position herumrechnet, würde sie sonst für den Rest der Sitzung verbiegen.
+      pos[s.id] = { x: plaetze[i].x, y: plaetze[i].y };
     }
     return pos;
+  }
+  // Die Positionen ALLER Plätze – auch der noch leeren, für die es heute kein System gibt.
+  //
+  // Das ist der Kern der Sache, und die erste Fassung hatte ihn falsch: Sie hat die SICHTBAREN
+  // Systeme auseinandergeschoben. Damit hing die Position eines Systems wieder daran, welche
+  // anderen es gerade gibt – ein entdecktes Geheimsystem verschob seine Nachbarn um bis zu 2,7 px,
+  // vierzig neue Wochensysteme die bestehenden um bis zu 6,9 px. Genau das Versprechen aus
+  // v8.299.1 („eine einmal gemerkte Stelle auf der Karte stimmt für immer"), das test_kartenposition
+  // schützt – und der Test hat es auch prompt gemeldet.
+  //
+  // Jetzt wird das ganze FELD entspannt, einmal und für alle 277 Plätze. Ein Platz behält seine
+  // Stelle für immer, egal wie viele Systeme belegt sind, und weil alle Plätze mindestens 24 px
+  // auseinanderliegen, gilt das für jede Teilmenge davon automatisch mit.
+  //
+  // Deshalb hängt die Streuung jetzt an der PLATZNUMMER statt an der System-ID: die Nummer eines
+  // künftigen Wochensystems steht schon fest, seine ID noch nicht. Die Plätze der heutigen 69
+  // Systeme verschieben sich dadurch einmalig – was der Entspannungsdurchlauf ohnehin täte.
+  let galaxySlotCache = null;
+  function galaxySlotPositions(){
+    if (galaxySlotCache) return galaxySlotCache;
+    const cx = 478, cy = 250;
+    const p = [];
+    for (let i=0; i<GALAXY_SPIRAL_SLOTS; i++){
+      const t = Math.sqrt((i + 0.5) / GALAXY_SPIRAL_SLOTS); // 0..1 Zentrum -> Rand, flächentreu
+      const jitterA = (hashStringToFloat('platz'+i+'a') - 0.5) * 0.55;
+      const jitterR = (hashStringToFloat('platz'+i+'r') - 0.5) * 24;
+      const angle = i * GALAXY_GOLDEN_ANGLE + jitterA;
+      const radius = Math.max(16, t*GALAXY_SPIRAL_RMAX + jitterR);
+      p.push({ x: cx + Math.cos(angle)*radius*2.05, y: cy + Math.sin(angle)*radius*0.92 });
+    }
+    galaxyRelax(p);
+    galaxySlotCache = p;
+    return p;
+  }
+  // Mindestabstand zwischen zwei Systemknoten. Gemessen an der heutigen Verteilung: der kleinste
+  // Abstand beträgt 6,9 px – zwei Sterne, die 6,9 px auseinanderstehen, sind kein Ziel, das man
+  // treffen kann. Solange man Systeme über eine Liste auswählte, war das ein Schönheitsfehler; seit
+  // man sie IM BILD anklickt, ist es eine Bedienbedingung.
+  const GALAXY_MIN_NODE_DIST = 24;
+  // Wie stark ein Systemknoten gezeichnet wird, abhängig davon, wie voll die Galaxie schon ist.
+  // Bei 69 Systemen bleibt alles wie bisher (Faktor 1), im Vollausbau (277) halbiert es sich.
+  //
+  // Warum überhaupt: Der Leuchthof ist 17 px, also 34 px im Durchmesser. Bliebe er fest, bräuchten
+  // die Knoten 34 px Abstand, damit sich zwei Höfe nicht berühren – und das gibt das Feld nicht her.
+  // Gemessen: mit festem Hof und Zielabstand 34 berühren sich im Vollausbau immer noch 218 von 277
+  // Knoten, und von den Spiralarmen bleibt nichts übrig. Mit dem mitschrumpfenden Hof genügen 24 px,
+  // es berührt sich kein einziger, und die Arme bleiben sichtbar.
+  function galaxyNodeScale(){
+    return Math.max(0.42, Math.min(1, Math.sqrt(BASE_STAR_SYSTEM_COUNT / Math.max(1, STAR_SYSTEMS.length))));
+  }
+  // Schiebt eine Punktliste an Ort und Stelle auseinander, bis kein Paar mehr enger als
+  // GALAXY_MIN_NODE_DIST beieinanderliegt. Läuft genau EINMAL je Sitzung (siehe galaxySlotCache) –
+  // gemessen 254 ms für die 277 Plätze, das darf nicht in den Sekundentakt der Karte geraten.
+  function galaxyRelax(p){
+    const MIN = GALAXY_MIN_NODE_DIST;
+    for (let runde=0; runde<200; runde++){
+      let bewegt = 0;
+      for (let i=0;i<p.length;i++) for (let j=i+1;j<p.length;j++){
+        let dx=p[j].x-p[i].x, dy=p[j].y-p[i].y, d=Math.hypot(dx,dy);
+        if (d >= MIN) continue;
+        // Zwei exakt deckungsgleiche Knoten hätten keine Richtung zum Auseinanderschieben. Die
+        // Ersatzrichtung kommt aus hashStringToFloat, nicht aus Math.random(): das Ergebnis muss
+        // deterministisch sein, sonst wäre das erzeugte Markup nie zweimal gleich und der
+        // Markup-Zwischenspeicher von buildGalaxyMap liefe ins Leere.
+        if (d < 0.01){ dx=hashStringToFloat('rx'+i+'_'+j)-0.5; dy=hashStringToFloat('ry'+i+'_'+j)-0.5; d=Math.hypot(dx,dy)||1; }
+        const f=(MIN-d)/2/d;
+        p[i].x-=dx*f; p[i].y-=dy*f; p[j].x+=dx*f; p[j].y+=dy*f; bewegt++;
+      }
+      // In JEDER Runde ins Feld zurückholen, nicht erst am Ende – sonst schieben sich die Knoten
+      // erst weit hinaus und werden dann alle gleichzeitig auf den Rand geklemmt, wo sie wieder
+      // aufeinanderliegen.
+      for (const o of p){ o.x=Math.max(18,Math.min(932,o.x)); o.y=Math.max(18,Math.min(482,o.y)); }
+      if (!bewegt) break;
+    }
+    return p;
   }
   // Anteil des Spiralfelds, der aktuell wirklich belegt ist (Radius-Verhältnis, deshalb die Wurzel).
   // Solange die Galaxie noch wächst, sitzen die vorhandenen Systeme dichter beieinander als am Ende;
@@ -36593,6 +36663,83 @@
     return Math.max(0.35, Math.min(1, Math.sqrt(STAR_SYSTEMS.length / GALAXY_SPIRAL_SLOTS)));
   }
   let lastGalaxyMapMarkup = null; // siehe Zwischenspeicher am Ende von buildGalaxyMap()
+
+  // ===== Aufgehendes System: eine Karte, zwei Zustände ==========================================
+  // Bis v8.348.0 gab es zwei Karten in zwei Reitern - die Galaxie-Übersicht und die Sektorkarte -
+  // und der Weg von der einen zur anderen war ein Reiterwechsel. Jetzt fährt dieselbe Karte auf das
+  // angeklickte System zu und die Planeten gehen an Ort und Stelle auf.
+  //
+  // Der offene Zustand steht in einer Modulvariablen und NICHT im DOM: Der Haupt-Tick schreibt die
+  // Karte jede Sekunde neu, ein nur im DOM gehaltener Bedienzustand wäre danach weg (die Falle, die
+  // in CLAUDE.md unter „Jeder Bedienzustand, der NUR im DOM steckt" beschrieben ist). Er wird
+  // bewusst NICHT gespeichert - beim nächsten Laden startet man wieder in der Übersicht.
+  let galaxyOpenSystem = null;
+  // Die Sektorkarte rechnet in ihrem eigenen Koordinatensystem (viewBox 700×230, Sonne bei 350/115).
+  // Statt diese 382 Zeilen umzurechnen, wird ihr Ergebnis als Ganzes in eine <g>-Gruppe gelegt und
+  // dorthin geschoben und skaliert, wo der Systemknoten in der Galaxie sitzt. Damit erbt der offene
+  // Zustand jede Kleinigkeit der Sektorkarte - Monde, Trümmerfelder, Peilungen, Orbitalringe,
+  // Aufklärungs-Marker, fremde Spieler - ohne dass eine davon zweimal im Code steht.
+  const GALAXY_SYSTEM_VIEW_W = 410;                    // Breite des Kameraausschnitts im offenen Zustand
+  const GALAXY_SYSTEM_SCALE = GALAXY_SYSTEM_VIEW_W/700; // Sektorkarten-Einheiten → Galaxie-Einheiten
+  let galaxyCamTo = null, galaxyCamFrom = null, galaxyCamStart = 0;
+  const GALAXY_CAM_MS = 520;
+  function galaxyCamTarget(){
+    if (!galaxyOpenSystem) return { x:0, y:0, w:950, h:500 };
+    const pos = galaxySpiralLayout(visibleSystems())[galaxyOpenSystem];
+    const w = GALAXY_SYSTEM_VIEW_W, h = w*(500/950);
+    // Die Sonne der Sektorkarte sitzt bei 115 von 230, also leicht oberhalb der Mitte ihres Feldes.
+    // Der Ausschnitt wird deshalb auf den Knoten zentriert, nicht auf die Mitte des Systemfeldes.
+    return pos ? { x: pos.x-w/2, y: pos.y-h/2, w, h } : { x:0, y:0, w:950, h:500 };
+  }
+  function galaxyCamStep(){
+    if (!galaxyCamTo) return;
+    const t = Math.min(1, (performance.now()-galaxyCamStart)/GALAXY_CAM_MS);
+    const e = t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;   // weiches Anfahren und Abbremsen
+    galaxyMapViewBox = {
+      x: galaxyCamFrom.x + (galaxyCamTo.x-galaxyCamFrom.x)*e,
+      y: galaxyCamFrom.y + (galaxyCamTo.y-galaxyCamFrom.y)*e,
+      w: galaxyCamFrom.w + (galaxyCamTo.w-galaxyCamFrom.w)*e,
+      h: galaxyCamFrom.h + (galaxyCamTo.h-galaxyCamFrom.h)*e
+    };
+    const svg = document.getElementById('galaxyMapSvg');
+    if (svg) svg.setAttribute('viewBox', `${galaxyMapViewBox.x.toFixed(1)} ${galaxyMapViewBox.y.toFixed(1)} ${galaxyMapViewBox.w.toFixed(1)} ${galaxyMapViewBox.h.toFixed(1)}`);
+    if (t < 1) requestAnimationFrame(galaxyCamStep); else galaxyCamTo = null;
+  }
+  function galaxyCamFahre(){
+    const ziel = galaxyCamTarget();
+    // Wer Bewegung abgestellt hat, bekommt keine Fahrt, sondern den fertigen Ausschnitt. Dieselbe
+    // Regel wie überall sonst im Spiel (prefers-reduced-motion).
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      galaxyCamTo = null; galaxyMapViewBox = ziel;
+      const svg = document.getElementById('galaxyMapSvg');
+      if (svg) svg.setAttribute('viewBox', `${ziel.x.toFixed(1)} ${ziel.y.toFixed(1)} ${ziel.w.toFixed(1)} ${ziel.h.toFixed(1)}`);
+      return;
+    }
+    galaxyCamFrom = { x:galaxyMapViewBox.x, y:galaxyMapViewBox.y, w:galaxyMapViewBox.w, h:galaxyMapViewBox.h };
+    galaxyCamTo = ziel; galaxyCamStart = performance.now();
+    requestAnimationFrame(galaxyCamStep);
+  }
+  function galaxyOeffne(systemId){
+    galaxyOpenSystem = systemId;
+    activeSystem = systemId;
+    lastGalaxyMapMarkup = null;   // der Zustandswechsel MUSS neu zeichnen
+    galaxyCamFahre();
+    buildGalaxyMap();
+    loadPlayersInSystem();
+    updateGalaxyBackButton();
+  }
+  function galaxySchliesse(){
+    if (!galaxyOpenSystem) return;
+    galaxyOpenSystem = null;
+    lastGalaxyMapMarkup = null;
+    galaxyCamFahre();
+    buildGalaxyMap();
+    updateGalaxyBackButton();
+  }
+  function updateGalaxyBackButton(){
+    const b = document.getElementById('galaxyBackBtn');
+    if (b) b.style.display = galaxyOpenSystem ? '' : 'none';
+  }
   function buildGalaxyMap(){
     const svg = document.getElementById('galaxyMapSvg');
     if (!svg) return;
@@ -36663,10 +36810,18 @@
     // die Schwelle in der heutigen, noch dichten Galaxie schon im Standard-Zustand erreicht und die
     // Label-Reduktion damit wirkungslos.
     const zoomedIn = galaxyMapViewBox.w < 220*galaxyFillRatio();
+    const knotenSkala = galaxyNodeScale();
+    const offen = galaxyOpenSystem && visSys.some(s => s.id === galaxyOpenSystem) ? galaxyOpenSystem : null;
     const CX = 478, CY = 250;
     // Leuchtendes Galaxie-Zentrum + angedeutete Spiralarme (rein atmosphärisch) - macht auf den
     // ersten Blick klar, dass hier eine Galaxie und kein Gitter dargestellt wird.
-    inner += `<circle cx="${CX}" cy="${CY}" r="70" fill="url(#miniSunGlow-gelb)" opacity="0.5"/><circle cx="${CX}" cy="${CY}" r="16" fill="#fff7d6" opacity="0.85"/>`;
+    //
+    // Im offenen Zustand entfällt die helle SCHEIBE des Zentrums. Grund (im Entwurf gesehen):
+    // Systeme nahe der Mitte - Kepler ist eines - haben sie direkt neben ihrer Sonne, und bei gut
+    // zweifachem Zoom sieht sie aus wie ein zweiter Stern des Systems. Der weiche Schein bleibt, er
+    // trägt die Orientierung, ohne sich als Objekt anzubieten.
+    inner += `<circle cx="${CX}" cy="${CY}" r="70" fill="url(#miniSunGlow-gelb)" opacity="${offen?0.22:0.5}"/>`;
+    if (!offen) inner += `<circle cx="${CX}" cy="${CY}" r="16" fill="#fff7d6" opacity="0.85"/>`;
     for (let arm=0; arm<3; arm++){
       let path = '';
       for (let step=0; step<=20; step++){
@@ -36692,6 +36847,22 @@
     for (const s of visSys){
       const pos = spiralPos[s.id];
       if (!pos) continue;
+      // Das geöffnete System wird nicht als Knoten gezeichnet - an seiner Stelle geht die
+      // Systemebene auf (siehe unten).
+      if (offen === s.id) continue;
+      // Die NACHBARN bleiben im offenen Zustand sichtbar, aber nur als kleine Punkte ohne Leuchthof.
+      // Grund (im Entwurf gesehen): Die Kamera vergrößert gut zweifach, damit würden die Höfe der
+      // Nachbarn doppelt so groß und drängen sich um das offene System - einer davon saß direkt
+      // neben der Sonne und sah aus wie ein Planet. Der Punkt allein genügt, um zu zeigen, dass man
+      // immer noch in derselben Galaxie steckt.
+      if (offen){
+        inner += `<g class="galaxy-node" data-system-node="${s.id}" style="cursor:pointer;" opacity="0.45">
+          <title>${s.name}</title>
+          <circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="1.3" fill="${sunTypeFor(s.id).core}"/>
+          <circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="6" fill="transparent"/>
+        </g>`;
+        continue;
+      }
       const x = pos.x.toFixed(1), y = pos.y.toFixed(1);
       const planetsInSys = PLANETS.filter(p=>p.system===s.id);
       const discCount = planetsInSys.filter(p=>state.discovered[p.id]).length;
@@ -36725,25 +36896,36 @@
         const sg = signalBySystem[s.id];
         badges.push({ icon:'📡', title:'Peilung: '+signalTypeOf(sg.kind).name+' – '+(sg.enRoute?'bereits angesteuert':'im Expeditions-Reiter ansteuern, dort steht auch die Restzeit') });
       }
-      const badgeMarkup = badges.map((b,i) => `<text x="${pos.x+11+i*13}" y="${pos.y-11}" text-anchor="middle" style="font-size:11px;"><title>${b.title}</title>${b.icon}</text>`).join('');
+      // Abzeichen wandern mit dem Knoten nach innen, schrumpfen aber nur bis zu einer Untergrenze:
+      // ein Piraten- oder Kriegssymbol bei 5,5 px wäre nicht mehr zu erkennen, und es trägt Inhalt,
+      // nicht nur Atmosphäre.
+      const badgeSize = Math.max(8, 11*knotenSkala);
+      const badgeStep = Math.max(9, 13*knotenSkala);
+      const badgeMarkup = badges.map((b,i) => `<text x="${(pos.x+11*knotenSkala+i*badgeStep).toFixed(1)}" y="${(pos.y-11*knotenSkala).toFixed(1)}" text-anchor="middle" style="font-size:${badgeSize.toFixed(1)}px;"><title>${b.title}</title>${b.icon}</text>`).join('');
 
       const factionRing = controlledByMe
-        ? `<circle cx="${x}" cy="${y}" r="16" fill="#5dcaa514" stroke="#5dcaa5" stroke-width="2" stroke-opacity="0.9"><title>Von dir kontrolliert</title></circle>`
-        : (owner ? `<circle cx="${x}" cy="${y}" r="16" fill="${owner.color}14" stroke="${owner.color}" stroke-width="1.6" stroke-opacity="0.8"><title>${owner.name} – Territorium</title></circle>` : '');
+        ? `<circle cx="${x}" cy="${y}" r="${(16*knotenSkala).toFixed(1)}" fill="#5dcaa514" stroke="#5dcaa5" stroke-width="2" stroke-opacity="0.9"><title>Von dir kontrolliert</title></circle>`
+        : (owner ? `<circle cx="${x}" cy="${y}" r="${(16*knotenSkala).toFixed(1)}" fill="${owner.color}14" stroke="${owner.color}" stroke-width="1.6" stroke-opacity="0.8"><title>${owner.name} – Territorium</title></circle>` : '');
       const statusText = isCollapsed ? 'Kollabiert' : (controlledByMe ? '★ Kontrolle' : (owner ? owner.name : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))));
       const statusColor = isCollapsed ? '#e24b4a' : (controlledByMe ? '#5dcaa5' : (owner ? owner.color : '#7d8199'));
       const sunType = sunTypeFor(s.id);
-      const glowR = (17*sunType.r).toFixed(1);
-      const ringR = 9.5*sunType.r;
-      const coreR = (5.5*sunType.r).toFixed(1);
+      // knotenSkala schrumpft den ganzen Knoten mit der Galaxiegröße (siehe galaxyNodeScale) –
+      // Hof, Fortschrittsring und Kern gemeinsam, damit die Proportion des Sterns erhalten bleibt.
+      const glowR = (17*sunType.r*knotenSkala).toFixed(1);
+      const ringR = 9.5*sunType.r*knotenSkala;
+      const coreR = (5.5*sunType.r*knotenSkala).toFixed(1);
       const ringDash = isCollapsed ? '2.5 2.5' : (2*Math.PI*ringR*pct).toFixed(1)+' 200';
       // Label-Reduktion (Spieler-Wunsch: nicht sofort mit vollem Namens-Gewirr starten) - Name bleibt
       // dauerhaft sichtbar für Heimat, aktives System, dessen direkte Nachbarn sowie generell sobald
       // man nah genug herangezoomt hat; alle anderen zeigen ihren Namen nur noch im Hover-Tooltip.
       const nearActive = activePos && Math.hypot(pos.x-activePos.x, pos.y-activePos.y) < 110*galaxyFillRatio();
       const showLabel = active || isHome || isAllianceBase || nearActive || zoomedIn;
-      const binaryCompanion = sunType.binary ? `<circle cx="${(pos.x+4*sunType.r).toFixed(1)}" cy="${(pos.y-3*sunType.r).toFixed(1)}" r="${(2.6*sunType.r).toFixed(1)}" fill="${sunType.core}" opacity="0.85"/>` : '';
-      const pulsarRing = sunType.pulsar ? `<circle cx="${x}" cy="${y}" r="${(13*sunType.r).toFixed(1)}" fill="none" stroke="${sunType.glow}" stroke-width="1" stroke-dasharray="2 5" opacity="0.7"><animateTransform attributeName="transform" type="rotate" from="0 ${x} ${y}" to="360 ${x} ${y}" dur="2.2s" repeatCount="indefinite"/></circle>` : '';
+      const binaryCompanion = sunType.binary ? `<circle cx="${(pos.x+4*sunType.r*knotenSkala).toFixed(1)}" cy="${(pos.y-3*sunType.r*knotenSkala).toFixed(1)}" r="${(2.6*sunType.r*knotenSkala).toFixed(1)}" fill="${sunType.core}" opacity="0.85"/>` : '';
+      const pulsarRing = sunType.pulsar ? `<circle cx="${x}" cy="${y}" r="${(13*sunType.r*knotenSkala).toFixed(1)}" fill="none" stroke="${sunType.glow}" stroke-width="1" stroke-dasharray="2 5" opacity="0.7"><animateTransform attributeName="transform" type="rotate" from="0 ${x} ${y}" to="360 ${x} ${y}" dur="2.2s" repeatCount="indefinite"/></circle>` : '';
+      // Der Name sitzt unter dem Leuchthof, also muss sein Abstand demselben Radius folgen wie der
+      // Hof - ein fester Wert von 21 px hätte in einer vollen Galaxie mitten in der Leere gestanden.
+      const labelY = (pos.y + 17*sunType.r*knotenSkala + 6).toFixed(1);
+      const glyphSize = (7*knotenSkala).toFixed(1), glyphY = (pos.y + 2.5*knotenSkala).toFixed(1);
 
       inner += `
         <g class="galaxy-node" data-system-node="${s.id}" style="cursor:pointer;">
@@ -36754,15 +36936,27 @@
           <circle cx="${x}" cy="${y}" r="${ringR.toFixed(1)}" fill="none" stroke="${isCollapsed?'#e24b4a':(active?'#afa9ec':'#5a5f7a')}" stroke-width="${active?2:1.1}" stroke-dasharray="${ringDash}"/>
           <circle cx="${x}" cy="${y}" r="${coreR}" fill="${isCollapsed?'#3a1414':(isHome?'#e24b4a':sunType.core)}" opacity="${isCollapsed?0.9:(active?1:0.85)}"/>
           ${isCollapsed ? '' : binaryCompanion}
-          ${isCollapsed ? `<text x="${x}" y="${(pos.y+2.5).toFixed(1)}" text-anchor="middle" style="font-size:7px;">💥</text>` : (isHome ? `<text x="${x}" y="${(pos.y+2.5).toFixed(1)}" text-anchor="middle" style="font-size:6.5px; fill:#fff;">🏠</text>` : '')}
+          ${isCollapsed ? `<text x="${x}" y="${glyphY}" text-anchor="middle" style="font-size:${glyphSize}px;">💥</text>` : (isHome ? `<text x="${x}" y="${glyphY}" text-anchor="middle" style="font-size:${(6.5*knotenSkala).toFixed(1)}px; fill:#fff;">🏠</text>` : '')}
           ${badgeMarkup}
-          ${showLabel ? `<text class="planet-label" x="${x}" y="${(pos.y+21).toFixed(1)}" text-anchor="middle" style="font-size:9px; font-weight:${active?700:500}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>` : ''}
+          ${showLabel ? `<text class="planet-label" x="${x}" y="${labelY}" text-anchor="middle" style="font-size:9px; font-weight:${active?700:500}; fill:${active?'#fff':'#c7cbe0'};">${s.name}</text>` : ''}
         </g>
       `;
     }
+    // Die Systemebene: eine leere Gruppe an der Stelle des geöffneten Knotens, verschoben und
+    // skaliert. buildMap() füllt sie gleich - in SEINEN Koordinaten (700×230, Sonne bei 350/115),
+    // die der transform in Galaxie-Koordinaten übersetzt.
+    if (offen){
+      const op = spiralPos[offen];
+      const k = GALAXY_SYSTEM_SCALE;
+      inner += `<g id="galaxySystemLayer" transform="translate(${(op.x-350*k).toFixed(2)} ${(op.y-115*k).toFixed(2)}) scale(${k.toFixed(4)})"></g>`;
+    }
     // Der viewBox haengt an Zoom/Pan und wird IMMER gesetzt - er kann sich aendern, ohne dass sich
-    // am Markup etwas aendert (Ziehen verschiebt nur den Ausschnitt).
-    svg.setAttribute('viewBox', `${galaxyMapViewBox.x.toFixed(1)} ${galaxyMapViewBox.y.toFixed(1)} ${galaxyMapViewBox.w.toFixed(1)} ${galaxyMapViewBox.h.toFixed(1)}`);
+    // am Markup etwas aendert (Ziehen verschiebt nur den Ausschnitt). Waehrend einer Kamerafahrt
+    // NICHT: dort schreibt galaxyCamStep den Ausschnitt Bild fuer Bild, ein Ueberschreiben von hier
+    // wuerde die Fahrt bei jedem Tick zurueckwerfen.
+    if (!galaxyCamTo){
+      svg.setAttribute('viewBox', `${galaxyMapViewBox.x.toFixed(1)} ${galaxyMapViewBox.y.toFixed(1)} ${galaxyMapViewBox.w.toFixed(1)} ${galaxyMapViewBox.h.toFixed(1)}`);
+    }
     // Zwischenspeicher (26.07.2026). Gemessen: 448 SVG-Knoten / 49 KB Markup, rund 10% aller Knoten
     // der Seite - und das jede Sekunde neu geparst, solange der Karte-Tab offen ist, obwohl sich in
     // aller Regel nichts geaendert hat.
@@ -36774,15 +36968,21 @@
     // vergessen wird - dann friert die Karte ein. Verglichen wird deshalb das ERZEUGTE MARKUP
     // selbst; es kann per Konstruktion nicht veralten. Gespart wird damit das Teure (innerHTML
     // parsen, 448 Knoten aufbauen, Klick-Handler neu binden), nicht das Billige (String bauen).
-    if (inner === lastGalaxyMapMarkup) return;
-    lastGalaxyMapMarkup = inner;
-    svg.innerHTML = inner;
-    svg.querySelectorAll('[data-system-node]').forEach(node => {
-      node.addEventListener('click', () => {
-        if (galaxyMapDidDrag) return; // Klick direkt nach einem Zieh-/Zoom-Vorgang unterdrücken
-        activeSystem = node.getAttribute('data-system-node'); render(); loadPlayersInSystem();
+    // Die Systemebene wird IMMER neu gefüllt, auch wenn das Galaxie-Markup gleich blieb: In ihr
+    // laufen Countdowns (Erkundungsmissionen, Terraforming), die sonst stehen blieben. Der
+    // Zwischenspeicher spart das Teure an der GALAXIE, nicht den Inhalt des offenen Systems.
+    const rest = (inner === lastGalaxyMapMarkup);
+    if (!rest){
+      lastGalaxyMapMarkup = inner;
+      svg.innerHTML = inner;
+      svg.querySelectorAll('[data-system-node]').forEach(node => {
+        node.addEventListener('click', () => {
+          if (galaxyMapDidDrag) return; // Klick direkt nach einem Zieh-/Zoom-Vorgang unterdrücken
+          galaxyOeffne(node.getAttribute('data-system-node'));
+        });
       });
-    });
+    }
+    buildMap();
   }
 
   let otherPlayersInSystem = [];
@@ -36847,10 +37047,13 @@
     const rad = 200 * Math.PI/180;
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
   }
+  // Seit v8.349.0 heißt „zu einem System wechseln" zugleich „dieses System aufklappen" - es gibt
+  // keinen zweiten Kartenkasten mehr, in dem es auch ohne das Aufklappen zu sehen wäre. Alle
+  // Sprungziele (Basis-Sprungmarken, Peilungen, Suche, ◀/▶) laufen hierüber und landen damit
+  // automatisch im offenen Zustand.
   function switchToSystem(id){
-    activeSystem = id;
+    galaxyOeffne(id);
     render();
-    loadPlayersInSystem();
   }
   // Hervorhebung eines Kartenmarkers: wird als State gehalten statt einmalig ins DOM injiziert,
   // damit sie den periodischen Kartenaufbau (jede Sekunde) übersteht statt sofort wieder
@@ -36916,7 +37119,12 @@
   }
   function buildMap(){
     renderMapBaseLinks();
-    const svg = document.getElementById('mapSvg');
+    // Ziel ist seit v8.349.0 die Gruppe INNERHALB der Galaxiekarte, nicht mehr ein eigenes SVG in
+    // einem eigenen Reiter. Die 382 Zeilen darunter rechnen unverändert in ihrem alten
+    // Koordinatensystem (700×230, Sonne bei 350/115); der transform der Gruppe übersetzt das an die
+    // Stelle des Systemknotens. Dadurch erbt der offene Zustand Monde, Trümmerfelder, Peilungen,
+    // Orbitalringe, Aufklärungs-Marker und fremde Spieler, ohne dass eines davon zweimal im Code steht.
+    const svg = document.getElementById('galaxySystemLayer');
     const visSys = visibleSystems();
     const idx = visSys.findIndex(s=>s.id===activeSystem);
     const curSys = visSys[idx] || visSys[0];
@@ -36960,6 +37168,16 @@
     if (prevBtn) prevBtn.onclick = () => switchToSystem(visSys[(idx-1+visSys.length)%visSys.length].id);
     const nextBtn = document.getElementById('systemNextBtn');
     if (nextBtn) nextBtn.onclick = () => switchToSystem(visSys[(idx+1)%visSys.length].id);
+    // Die ◀/▶-Zeile benennt das aufgeklappte System. Ist keines offen, hat sie nichts zu benennen und
+    // würde den zuletzt geöffneten Namen unter einer Galaxie-Übersicht stehen lassen.
+    const navRow = document.querySelector('#tab-karte .system-nav');
+    if (navRow) navRow.style.display = galaxyOpenSystem ? '' : 'none';
+
+    // AB HIER wird gezeichnet. Der Kopfteil darüber (Systemname, Wachstumszeile, Basis-Schnellzugriff,
+    // ◀/▶) gehört zum Reiter und muss auch dann laufen, wenn gerade kein System aufgeklappt ist -
+    // sonst stünde beim Öffnen des Reiters weder die Zahl der kartierten Systeme noch der Sprung zur
+    // eigenen Basis da. Alles darunter schreibt in die Gruppe und wäre ohne sie Arbeit für nichts.
+    if (!svg) return;
 
     const sysPlanets = PLANETS.filter(p=>p.system===activeSystem);
     const orbitsPresent = [...new Set(sysPlanets.map(p=>p.orbit||3))].sort((a,b)=>a-b);
@@ -37251,20 +37469,22 @@
         <text class="planet-label" x="165" y="86" text-anchor="middle" style="fill:${abDestroyed?'#e24b4a':(abLvl>=10?'#fac775':'#c3bef5')};">Allianzbasis [${myAllianceTag()}] · ${abDestroyed?'ZERSTÖRT':'St. '+abLvl}</text>
       `;
     }
+    // Kein eigener viewBox mehr: Der Ausschnitt gehört jetzt der Galaxiekarte, und die Gruppe sitzt
+    // über ihren transform darin. Ein zweiter viewBox hier hätte gar keine Wirkung (<g> kennt das
+    // Attribut nicht) und würde nur so aussehen, als gäbe es noch zwei Ausschnitte.
     svg.innerHTML = inner;
-    svg.setAttribute('viewBox', `${mapViewBox.x.toFixed(1)} ${mapViewBox.y.toFixed(1)} ${mapViewBox.w.toFixed(1)} ${mapViewBox.h.toFixed(1)}`);
     svg.querySelectorAll('[data-planet]').forEach(node => {
       const pid = node.getAttribute('data-planet');
       if (pid === '__home__') return;
-      node.addEventListener('click', () => { if (mapDidDrag) return; sendExploreMission(pid); });
+      node.addEventListener('click', () => { if (galaxyMapDidDrag) return; sendExploreMission(pid); });
     });
     svg.querySelectorAll('[data-map-player]').forEach(node => {
-      node.addEventListener('click', () => { if (mapDidDrag) return; mapPlayerClick(node.getAttribute('data-map-player'), node.getAttribute('data-map-name')); });
+      node.addEventListener('click', () => { if (galaxyMapDidDrag) return; mapPlayerClick(node.getAttribute('data-map-player'), node.getAttribute('data-map-name')); });
     });
     svg.querySelectorAll('[data-alliance-base]').forEach(node => {
       node.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (mapDidDrag) return;
+        if (galaxyMapDidDrag) return;
         const abL = allianceBaseLevel();
         pushToast('Allianzbasis ['+myAllianceTag()+'] · Stufe '+abL+' - Details & Beiträge im Allianz-Tab.', 'ti-building-fortress');
         switchTab('allianz');
@@ -37272,7 +37492,7 @@
     });
     svg.querySelectorAll('[data-map-npc]').forEach(node => {
       node.addEventListener('click', () => {
-        if (mapDidDrag) return;
+        if (galaxyMapDidDrag) return;
         if (confirm((node.getAttribute('data-map-npcname')||'NPC')+' angreifen?')) sendAttackMission(node.getAttribute('data-map-npc'));
       });
     });
@@ -37282,7 +37502,7 @@
     svg.querySelectorAll('[data-map-moon]').forEach(node => {
       node.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (mapDidDrag) return;
+        if (galaxyMapDidDrag) return;
         moonMapClick(node.getAttribute('data-map-moon'));
       });
     });
@@ -37291,7 +37511,7 @@
     svg.querySelectorAll('[data-map-debris]').forEach(node => {
       node.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (mapDidDrag) return;
+        if (galaxyMapDidDrag) return;
         const info = debrisInfoText(node.getAttribute('data-map-debris'));
         if (info) pushToast(info, 'ti-recycle');
       });
@@ -43783,8 +44003,10 @@
     // Übersichtskarte (galaxyMapSvg) liegt aber im karte-Tab, nicht im galaxie-Tab (NPC-Kämpfe/
     // Händler). Dadurch wurde die Karte nie neu gezeichnet, während man tatsächlich drauf schaute -
     // erklärt das gemeldete "die obere Karte lädt manchmal nicht".
+    // Seit v8.349.0 nur noch EIN Aufruf: buildGalaxyMap() füllt die Systemebene selbst, sobald ein
+    // System aufgeklappt ist. Ein zweiter buildMap()-Aufruf von hier würde die Gruppe ein zweites Mal
+    // je Sekunde neu schreiben - dieselbe Arbeit doppelt, und im Grundzustand ins Leere.
     if (activeTab === 'karte') buildGalaxyMap();
-    if (activeTab === 'karte') buildMap();
   }
 
   // Fester Chat-Tab am linken Bildschirmrand: unabhängig vom aktuell gewählten Spiel-Tab immer
@@ -43923,83 +44145,39 @@
     if (zoomInBtn) zoomInBtn.onclick = () => zoomBy(1.4);
     const zoomOutBtn = document.getElementById('galaxyZoomOutBtn');
     if (zoomOutBtn) zoomOutBtn.onclick = () => zoomBy(1/1.4);
+    // „Zurücksetzen" heißt jetzt auch: das offene System wieder zuklappen. Sonst hätte man einen
+    // Knopf, der auf die volle Galaxie herauszoomt, während die Planeten eines Systems weiter mitten
+    // im Bild stehen - zwei Zustände, die sich widersprechen.
     const zoomResetBtn = document.getElementById('galaxyZoomResetBtn');
-    if (zoomResetBtn) zoomResetBtn.onclick = () => { galaxyMapViewBox = { x:0, y:0, w:950, h:500 }; buildGalaxyMap(); };
-  })();
-
-  // Zoom/Pan für die untere Systemansicht (mapSvg) - exakt dasselbe Verhalten wie bei der oberen
-  // Galaxie-Karte (Maus-Drag, Mausrad, Pinch-Zoom, +/-/Reset-Knöpfe), nur auf den eigenen
-  // mapViewBox-Zustand und buildMap() bezogen. Klicks auf Planeten lösen echte Erkundungsmissionen
-  // aus, daher der mapDidDrag-Schutz gegen versehentliche Missionen direkt nach dem Ziehen/Zoomen.
-  (function initSystemMapZoomPan(){
-    const svg = document.getElementById('mapSvg');
-    if (!svg) return;
-    const DRAG_THRESHOLD = 6;
-    function zoomBy(factor, cx, cy){
-      const rect = svg.getBoundingClientRect();
-      const relX = cx!==undefined ? (cx-rect.left)/rect.width : 0.5;
-      const relY = cy!==undefined ? (cy-rect.top)/rect.height : 0.5;
-      const px = mapViewBox.x + relX*mapViewBox.w;
-      const py = mapViewBox.y + relY*mapViewBox.h;
-      mapViewBox.w /= factor; mapViewBox.h /= factor;
-      mapViewBox.x = px - relX*mapViewBox.w;
-      mapViewBox.y = py - relY*mapViewBox.h;
-      clampMapViewBox();
-      buildMap();
-    }
-    let dragging = false, lastX=0, lastY=0, downX=0, downY=0;
-    svg.addEventListener('mousedown', (e) => { dragging=true; mapDidDrag=false; lastX=e.clientX; lastY=e.clientY; downX=e.clientX; downY=e.clientY; });
-    window.addEventListener('mousemove', (e) => {
-      if (!dragging) return;
-      if (Math.abs(e.clientX-downX)>DRAG_THRESHOLD || Math.abs(e.clientY-downY)>DRAG_THRESHOLD) mapDidDrag = true;
-      const rect = svg.getBoundingClientRect();
-      const dx = (e.clientX-lastX) * (mapViewBox.w/rect.width);
-      const dy = (e.clientY-lastY) * (mapViewBox.h/rect.height);
-      mapViewBox.x -= dx; mapViewBox.y -= dy;
-      lastX=e.clientX; lastY=e.clientY;
-      clampMapViewBox(); buildMap();
+    if (zoomResetBtn) zoomResetBtn.onclick = () => {
+      if (galaxyOpenSystem){ galaxySchliesse(); return; }
+      galaxyMapViewBox = { x:0, y:0, w:950, h:500 }; buildGalaxyMap();
+    };
+    const backBtn = document.getElementById('galaxyBackBtn');
+    if (backBtn) backBtn.onclick = (e) => { e.stopPropagation(); galaxySchliesse(); };
+    // Klick ins Leere schließt ebenfalls. Nur wenn nicht gerade gezogen wurde und der Klick nicht
+    // einem Knoten, einem Planeten oder einem der Abzeichen galt - sonst würde jeder Planetenklick
+    // das System hinter sich zuziehen.
+    svg.addEventListener('click', (e) => {
+      if (!galaxyOpenSystem || galaxyMapDidDrag) return;
+      if (e.target.closest('[data-system-node],[data-planet],[data-map-player],[data-map-npc],[data-map-moon],[data-map-debris],[data-alliance-base]')) return;
+      galaxySchliesse();
     });
-    window.addEventListener('mouseup', () => { dragging=false; });
-    svg.addEventListener('wheel', (e) => { e.preventDefault(); zoomBy(e.deltaY<0?1.15:1/1.15, e.clientX, e.clientY); }, {passive:false});
-
-    let touchState = null;
-    svg.addEventListener('touchstart', (e) => {
-      mapDidDrag = false;
-      if (e.touches.length===1){ touchState = { mode:'pan', x:e.touches[0].clientX, y:e.touches[0].clientY, downX:e.touches[0].clientX, downY:e.touches[0].clientY }; }
-      else if (e.touches.length===2){
-        const dx = e.touches[0].clientX-e.touches[1].clientX, dy = e.touches[0].clientY-e.touches[1].clientY;
-        touchState = { mode:'pinch', dist: Math.hypot(dx,dy), vbw: mapViewBox.w };
-      }
-    }, {passive:true});
-    svg.addEventListener('touchmove', (e) => {
-      if (!touchState) return;
-      e.preventDefault();
-      if (touchState.mode==='pan' && e.touches.length===1){
-        if (Math.abs(e.touches[0].clientX-touchState.downX)>DRAG_THRESHOLD || Math.abs(e.touches[0].clientY-touchState.downY)>DRAG_THRESHOLD) mapDidDrag = true;
-        const rect = svg.getBoundingClientRect();
-        const dx = (e.touches[0].clientX-touchState.x) * (mapViewBox.w/rect.width);
-        const dy = (e.touches[0].clientY-touchState.y) * (mapViewBox.h/rect.height);
-        mapViewBox.x -= dx; mapViewBox.y -= dy;
-        touchState.x = e.touches[0].clientX; touchState.y = e.touches[0].clientY;
-        clampMapViewBox(); buildMap();
-      } else if (touchState.mode==='pinch' && e.touches.length===2){
-        mapDidDrag = true;
-        const dx = e.touches[0].clientX-e.touches[1].clientX, dy = e.touches[0].clientY-e.touches[1].clientY;
-        const dist = Math.hypot(dx,dy);
-        const factor = dist/touchState.dist;
-        mapViewBox.w = touchState.vbw / factor;
-        clampMapViewBox(); buildMap();
-      }
-    }, {passive:false});
-    svg.addEventListener('touchend', () => { touchState = null; });
-
-    const mapZoomInBtn = document.getElementById('mapZoomInBtn');
-    if (mapZoomInBtn) mapZoomInBtn.onclick = () => zoomBy(1.4);
-    const mapZoomOutBtn = document.getElementById('mapZoomOutBtn');
-    if (mapZoomOutBtn) mapZoomOutBtn.onclick = () => zoomBy(1/1.4);
-    const mapZoomResetBtn = document.getElementById('mapZoomResetBtn');
-    if (mapZoomResetBtn) mapZoomResetBtn.onclick = () => { mapViewBox = { x:0, y:0, w:700, h:230 }; buildMap(); };
   })();
+  // Esc schließt das offene System - dieselbe Taste, die überall sonst im Spiel einen Kasten
+  // zumacht. Nur wenn gerade nichts getippt wird, sonst nähme sie dem Suchfeld das Abbrechen weg.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !galaxyOpenSystem) return;
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    galaxySchliesse();
+  });
+
+  // Der zweite Zoom/Pan-Block ist mit v8.349.0 entfallen. Er bediente die untere Systemansicht
+  // (mapSvg) und war eine fast zeichengleiche Kopie des Blocks darüber - 73 Zeilen, die dieselbe
+  // Maus-, Rad-, Pinch- und Knopf-Bedienung ein zweites Mal beschrieben. Seit die Systemansicht in
+  // der Galaxiekarte aufgeht, gibt es nur noch einen Ausschnitt, und der Block darüber bedient ihn
+  // in beiden Zuständen mit.
 
   (function initBattleModal(){
     const overlay = document.getElementById('battleModalOverlay');
