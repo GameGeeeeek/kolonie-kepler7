@@ -309,10 +309,16 @@ check('7c: die Kodex-Kopfzeile zeigt den Peilungs-Zähler mit an',
   /× Schatzdepot · \$\{codex\.signalsFollowed\|\|0\}× Peilung/.test(src));
 
 // ---------------------------------------------------------------- 7d) Galaxie-Karte: Zwischenspeicher
+// Auf die WIRKUNG geprüft statt auf zwei wörtliche Zeilen. Bis v8.349.0 stand hier
+// /if \(inner === lastGalaxyMapMarkup\) return;/ - ein vorzeitiges return. Seit die Systemansicht in
+// derselben Karte aufgeht, darf an dieser Stelle nicht mehr zurückgesprungen werden: die Systemebene
+// muss auch dann gefüllt werden, wenn das Galaxie-Markup gleich blieb, sonst frören die Countdowns
+// der Erkundungsmissionen ein. Der Vergleich selbst und die Reihenfolge (viewBox VOR dem Vergleich)
+// sind unverändert - und genau die tragen den Zwischenspeicher.
 check('7d: die Karte schreibt nur bei geändertem Markup neu',
-  /if \(inner === lastGalaxyMapMarkup\) return;/.test(src) && /lastGalaxyMapMarkup = inner;/.test(src));
+  /inner === lastGalaxyMapMarkup/.test(src) && /lastGalaxyMapMarkup = inner;/.test(src));
 check('7d: der viewBox wird trotzdem immer gesetzt (Zoom/Pan ändern das Markup nicht)',
-  src.indexOf("svg.setAttribute('viewBox'") < src.indexOf('if (inner === lastGalaxyMapMarkup) return;'));
+  src.indexOf("svg.setAttribute('viewBox'") < src.indexOf('inner === lastGalaxyMapMarkup'));
 check('7d: ein leeres SVG erzwingt den Neuaufbau',
   /if \(!svg\.firstChild\) lastGalaxyMapMarkup = null;/.test(src));
 // Voraussetzung fuer den Zwischenspeicher UND fuer sich ein Anzeigefehler: das Sternenfeld wurde
