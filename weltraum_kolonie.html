@@ -1437,6 +1437,13 @@
        Bedienelement – deshalb display:block und keine eigene Interaktion. Die Höhe steht fest, die
        Breite folgt der Karte (preserveAspectRatio="none" im SVG, siehe abgrundPanorama). */
     .abgrund-panorama { display:block; width:100%; }
+    /* Die Szene (v8.345.0): SVG traegt das Bild, der Canvas darueber die Dichte. Der Canvas ist
+       bewusst NICHT bedienbar (pointer-events:none) und liegt VOR dem SVG – fällt er aus (kein
+       2D-Kontext, reduzierte Bewegung, Skript-Fehler), ist die Szene im SVG trotzdem vollständig.
+       Das ist die Aufteilung: Struktur unten, Teilchen oben. */
+    .abgrund-szene { position:relative; line-height:0; }
+    .abgrund-szene .abgrund-schnee { position:absolute; inset:0; width:100%; height:100%;
+      pointer-events:none; }
     /* Lebendes Panorama (v8.329.0): drei Schichten, drei Geschwindigkeiten. Jede Bahn enthält ihren
        Inhalt zweimal (das Original und eine um die Bildhöhe versetzte Kopie, siehe abgrundPanorama);
        verschoben wird um genau diese Höhe, deshalb springt der Übergang nie.
@@ -1450,11 +1457,41 @@
     .abgrund-panorama.faellt .pano-fern  { animation-duration: 13s; }
     .abgrund-panorama.faellt .pano-mitte { animation-duration:  7s; }
     .abgrund-panorama.faellt .pano-nah   { animation-duration:  3s; }
-    /* -96 = die Bildhöhe aus abgrundPanorama. Ändert sie sich dort, muss sie hier mit -
+    /* -168 = die Bildhöhe aus abgrundPanorama. Ändert sie sich dort, muss sie hier mit -
        tests/test_abgrund_symbole.js prüft genau diese Gleichheit. */
-    @keyframes panoZug { from { transform: translateY(0); } to { transform: translateY(-96px); } }
+    @keyframes panoZug { from { transform: translateY(0); } to { transform: translateY(-168px); } }
+    /* Leuchtgänger am Grund (v8.345.0): Biolumineszenz, die langsam heller und dunkler wird. Der
+       Grund, warum das Bild auch im Stillstand lebt – eine CSS-Animation auf einer Gruppe, kein
+       Neuzeichnen. Die Verzögerung setzt abgrundPanorama je Motiv einzeln, sonst pulsierten alle
+       im Gleichtakt und es sähe nach Blinklicht aus statt nach Leben. */
+    .pano-glimm { animation: panoGlimm 5.5s ease-in-out infinite; }
+    @keyframes panoGlimm { 0%,100% { opacity:0.35; } 50% { opacity:1; } }
+    /* Das Auge des Wächters: langsamer und tiefer als das Glimmen – es beobachtet, es leuchtet nicht. */
+    .pano-auge { animation: panoAuge 3.4s ease-in-out infinite; }
+    @keyframes panoAuge { 0%,100% { opacity:0.6; } 50% { opacity:1; } }
+    /* Der Aussenring des Siegels dreht sich sehr langsam (v8.345.0) – 52 Sekunden für eine Umdrehung
+       ist bewusst so langsam, dass man die Bewegung eher bemerkt als sieht. Ein schnellerer Ring
+       würde aus einem Fundstück ein Ladesymbol machen. */
+    .siegel-ring { animation: siegelRing 52s linear infinite; transform-origin:50px 50px; }
+    @keyframes siegelRing { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+    /* Die Ankunft (v8.345.0): Beide Elemente stehen IMMER im Markup und sind ohne die Klasse
+       "ankommt" unsichtbar. Der Effekt braucht damit kein zweites Markup – nur eine Klasse mehr am
+       Wurzelelement, gesetzt für gut zwei Sekunden nach einem gewonnenen Tauchgang. */
+    .pano-stoss, .pano-blitz { opacity:0; }
+    .abgrund-panorama.ankommt .pano-stoss { animation: panoStoss 2.1s cubic-bezier(.16,.9,.3,1) 1; }
+    .abgrund-panorama.ankommt .pano-blitz { animation: panoBlitz 2.1s ease-out 1; }
+    @keyframes panoStoss {
+      0%   { opacity:0.95; transform:scale(0.04); }
+      70%  { opacity:0.30; }
+      100% { opacity:0;    transform:scale(9); }
+    }
+    @keyframes panoBlitz { 0% { opacity:0.30; } 30% { opacity:0.10; } 100% { opacity:0; } }
+    /* Der Druckstoß skaliert um seinen eigenen Mittelpunkt – ohne transform-box wäre der Ursprung
+       die linke obere Ecke des SVG und der Ring liefe schräg aus dem Bild. */
+    .pano-stoss { transform-box:fill-box; transform-origin:center; }
     @media (prefers-reduced-motion: reduce) {
-      .pano-fern, .pano-mitte, .pano-nah { animation:none; }
+      .pano-fern, .pano-mitte, .pano-nah, .pano-glimm, .pano-auge, .siegel-ring,
+      .pano-stoss, .pano-blitz { animation:none; }
     }
     /* Tauchgang-Streifen (v8.328.0): läuft NUR, solange eine Abgrund-Mission unterwegs ist. Bis
        hierher passierte beim Abtauchen nichts Sichtbares – der Knopf wurde grau, mehr nicht.
@@ -5199,8 +5236,18 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.344.0';
+  const VERSION = '8.345.0';
   const PATCHNOTES = [
+    { version:'8.345.0', date:'30.07.2026', changes:[
+      '<strong>Der Abgrund sieht jetzt aus wie ein Abgrund.</strong> Nachgemessen war er der flachste Ort im ganzen Spiel – und zwar wörtlich: Seine rund 1.300 Zeilen Zeichencode benutzten <em>keinen einzigen Farbverlauf und keinen einzigen Filter</em>, nur Flächen und Striche. Der Rest des Spiels hat beides längst (33 Verlaufsdefinitionen, eine Glühsprache, Canvas-Schattierung für Schiffe und Planeten); der Abgrund ist als Mechanik gewachsen und grafisch stehen geblieben.',
+      '<strong>Eine Farbreise statt einer Abblendung.</strong> Aus der Tiefe wurde bisher ein einziger Wert gerechnet, und der senkte nur die Deckkraft – Tiefe 100 war dasselbe Bild wie Tiefe 1, nur blasser. Jetzt liest jedes Abgrund-Bild seine Farben aus <em>einer</em> Stelle, die von kaltem Sternenblau über Druck-Violett zu einem Schwarz reist, in dem nur noch die Biolumineszenz übrig ist. Der Wendepunkt liegt bei Tiefe 45: Bis dahin stirbt das Licht von oben, danach fängt der Grund selbst an zu leuchten. Was von oben verschwindet, kommt von unten zurück.',
+      '<strong>Volumetrisches Licht.</strong> Zwei Lichtschächte von der Oberkante geben dem Bild eine Richtung – und weil sie mit der Tiefe schmaler werden und bei etwa Tiefe 45 ganz ausgehen, wird der Abstieg selbst sichtbar. Dazu ein Schein auf den hellsten Sternen, ein leuchtender Grat am Grund mit ungleichmäßigen Nestern, Sediment und Grate auf dem Boden, und eine Vignette, die den Blick fasst.',
+      '<strong>Meeresschnee.</strong> Vor dem gezeichneten Bild treibt jetzt ein Teilchenfeld, und es <em>reagiert auf den Sektor</em>: Der Sog zieht die Teilchen seitwärts, der Ionensturm lässt sie flackern, die Leerenstille nimmt sie fast alle weg, Trümmerfelder machen sie groß und träge. Die Mutatoren standen bisher als Textzeile daneben – jetzt stehen sie im Bild. Der Lauf hält an, sobald der Bereich nicht mehr sichtbar ist, im Hintergrund-Tab und bei reduzierter Bewegung ganz.',
+      '<strong>Das Siegel ist ein Fundstück geworden.</strong> 24 Grundformen, gewürfelt aus der Tiefe – bisher als gleichmäßige Striche in einer Farbe, also wie ein Menü-Symbol. Jetzt mit einem Verlauf entlang des Strichs (das liest das Auge als Metall), einer Prägung nach innen und einem Außenring, der 52 Sekunden für eine Umdrehung braucht. Die Farbaussage bleibt unangetastet: Sie verrät weiterhin Wächter und Zahl der Mutatoren.',
+      '<strong>Wächter wirken groß.</strong> „Ein Körper von der Größe eines Mondes" war bisher eine Strichzeichnung in Rot. Größe entsteht aber nicht durch Details, sondern durch Verdeckung: dunkle Silhouette, ein Randlicht, das nur die Kante säumt, Dunst davor – und im Panorama eine unregelmäßige Gestalt, die oben aus dem Bild bricht. Was nicht ganz ins Bild passt, wirkt größer.',
+      '<strong>Konstellationen sind ein Himmel geworden</strong> – mit Sternenfeld hinter der Figur, glühenden Knoten und einem dunklen Grund, auf dem das Glimmen etwas zum Leuchten hat. Und die <strong>Ankunft</strong> ist nicht mehr leer: Nach einem gewonnenen Tauchgang läuft ein Druckstoß durch das Bild und der Grat flammt auf. Zwei Sekunden, einmal, nur nach einem Sieg – bei Offline-Rückkehr also nicht siebenmal hintereinander.',
+      'Nichts davon bringt eine Bilddatei mit. Das Spiel ist eine einzige HTML-Datei, die bei jedem Aufruf komplett übertragen wird – der Symbol-Font wurde gerade von 447 kB auf 11 kB verkleinert, um ein Drittel der Übertragung zu sparen. Alles Neue ist <em>gerechnet</em>, nicht gemalt: gut 3 kB Markup für den gesamten Umbau.'
+    ]},
     { version:'8.344.0', date:'30.07.2026', changes:[
       '<strong>Der Abgrund überlebt jetzt das Prestige.</strong> Bisher löschte jeder Reset ihn komplett: Rekordtiefe, Werkstatt, Reliquien, Konstellationen und beide Werkstoffe waren weg. Das stand in keinem Dialog und in keinem Hilfetext – es passierte einfach, weil <code>state.abgrund</code> in keiner der beiden Erhalten-Listen stand. Da Prestige der zentrale, wiederholt genutzte Kreislauf des Spiels ist, war damit der ganze Abgrund Fortschritt mit Verfallsdatum: Jede der zwölf Verbindungen aus den beiden Vorgängerversionen zeigte auf etwas, das beim nächsten Durchlauf wieder bei null anfing.',
       '<strong>Prestige nimmt jetzt ALLES mit.</strong> Der Abgrund ist in sich geschlossen – jede seiner Wirkungen hängt an Werten, die er selbst führt, und kein Feld zeigt auf eine Kolonie oder einen Planeten. Er kann durch den Reset also nichts verlieren, was oben noch gebraucht würde (anders als die auf Kolonien ausgerüsteten Module, siehe v8.204.0). „Behalten" heißt trotzdem nicht „Wirtschaft behalten": <strong>Singularitätsphysik</strong> wird wie jede Forschung zurückgesetzt, der Abgrund ist also erst wieder erreichbar, wenn du sie erneut abgeschlossen hast.',
@@ -23725,6 +23772,7 @@
       { title:'Ausrüstung aus der Tiefe – sechs Schiffsmodule', body:'Neben den vier Standortmodulen fallen im Abgrund auch <strong>Klassen-Module</strong>, und die wirken – anders als jene – <strong>ausschließlich im Abgrund</strong>. Das ist die Grenze dieser ganzen Ausrüstungslinie: Was Wirtschaft und NPC-Abwehr betrifft, darf oben wirken; was Kampfkraft betrifft, nicht, sonst wäre Abtauchen ein Vorsprung gegen Mitspieler.<br><br><strong>Tiefenkiel</strong> (Schlachtschiffe) senkt die eigenen Verluste bei Tauchgängen, und zwar umso stärker, je tiefer der Sektor liegt – flach kaum spürbar, ab Tiefe 50 mit voller Wirkung.<br><strong>Schwarmoptik</strong> (Jäger-Geschwader) verstärkt den Vielfalts-Bonus einer ausgewogenen Flotte. Einer einseitigen Flotte nützt sie nichts – sie verstärkt, was du ohnehin richtig machst.<br><strong>Resonanzlanze</strong> (Schwere Linie) gibt Kampfkraft <strong>je Mutator</strong> im Sektor. Ein ruhiger Sektor bringt wenig, drei überlagerte Regeln viel: Sie macht die schwersten Sektoren zu den lohnendsten.<br><strong>Bergungsklaue</strong> (Frachter) erweitert den Laderaum bei Tauchgängen. Die Beute des Abgrunds übersteigt mit der Tiefe schnell das, was eine normale Frachterflotte tragen kann.<br><strong>Stillgänger</strong> (Aufklärer) erweitert die Reichweite der <strong>Tiefensonde</strong> um zusätzliche Tiefen – auch dann, wenn du noch keine Sondenstufe gekauft hast.<br><strong>Wächterbann</strong> (Schwere Linie) gibt Kampfkraft gegen Wächter, aber <strong>nur in Tiefen, die du noch nie bezwungen hast</strong>. Er hilft dir an einer Zehnertiefe vorbei, an der du feststeckst; das Wiederholen bekannter Wächter bleibt gleich schwer.<br><br>Alle sechs setzen voraus, dass Schiffe der zugehörigen Klasse wirklich mitfliegen – ein Tiefenkiel ohne Schlachtschiff in der Flotte tut nichts. Ausnahme ist der Stillgänger: Vorausschau ist kein Kampf, und die Sonde zeigt ihre Sektoren, bevor überhaupt eine Flotte gewählt ist.' },
       { title:'Was der Abstieg dir bringt', body:'Fast alles, was du unten sammelst, wirkt <strong>ausschließlich unten</strong>: Werkstatt, Reliquien, die Abgrund-Schiffsmodule und die neun Tiefenschiffe verbessern deine Tauchgänge und sonst nichts.<br><br><strong>Nach oben wirken nur zwei Dinge.</strong> Erstens der <strong>Tiefenbonus</strong> auf deine Produktion: Er hängt an deiner Rekordtiefe und wächst logarithmisch – Tiefe 30 gibt rund +10%, Tiefe 100 rund +13%, Tiefe 1000 rund +20%. Jede Verdopplung bringt denselben Zuwachs, er kann also nie davonlaufen. Zweitens die vier <strong>Abgrund-Standortmodule</strong>: Drucktank (Lager), Echolotmast (Signal), Splitterofen (Fragmente) und Nullfeldanker.<br><br><strong>Gegen Mitspieler zählt nichts davon.</strong> Deine Angriffs- und Verteidigungspunkte entstehen aus Quellen, die keinen einzigen Abgrund-Bonus lesen. Die einzige Ausnahme ist der <strong>Nullfeldanker</strong>, und der wirkt ausdrücklich nur gegen <em>NPC-Überfälle</em> und auch dort nur, wenn du in Unterzahl bist. Das ist Absicht: Abtauchen soll dich unten stärker machen und deine Wirtschaft voranbringen – nicht deine Nachbarn schwächen.<br><br>Die Boni je Kanal werden addiert und gedeckelt, nicht multipliziert. Bei den <strong>Verlusten</strong> ist es anders: Dort werden die Quellen multiplikativ verrechnet, damit deine Verluste sich der Null nähern, ohne sie je zu erreichen.' },
       { title:'Der Abgrund und der Rest des Spiels', body:'Der Abgrund ist kein abgeschlossener Nebenschauplatz – sechs Dinge verbinden ihn mit deinem normalen Spiel.<br><br><strong>Von oben nach unten:</strong> Die <strong>Tiefenspur</strong>, eine seltene Peilung auf der Sektorkarte, bringt dir eine fertige Gegenmaßnahme und Bergungsgut, ohne dass du dafür tauchen musst. Dein <strong>Navigator</strong> verkürzt den Anflug in die Tiefe genauso wie jeden anderen Flug.<br><br><strong>Von unten nach oben:</strong> Deine <strong>Rekordtiefe</strong> steigert dauerhaft deine Produktion. Die vier <strong>Abgrund-Standortmodule</strong> wirken an deinen Kolonien. Und die <strong>Bergungswerft</strong> ist das einzige Gebäude, dessen Bau Bergungsgut verlangt – wer nie abgetaucht ist, kann sie nicht errichten.<br><br><strong>Im Alltag:</strong> Zwei <strong>Tagesaufgaben</strong> und in jeder der vier Fraktionen mindestens ein <strong>Tiefenauftrag</strong> – Ruf und Gunstmarken lassen sich also auch unten verdienen. Alle erscheinen erst, wenn du den Abgrund freigeschaltet hast.<br><br>Was weiterhin <em>nicht</em> verbunden ist: Gegen Mitspieler zählt nichts aus der Tiefe. Das bleibt Absicht.' },
+      { title:'Was du im Bild siehst', body:'Das Panorama über der Sektorkarte ist kein Dekor – es ist eine <strong>Auskunft</strong>, und zwar eine, die du ohne ein Wort lesen kannst.<br><br><strong>Die Farbe sagt die Tiefe.</strong> Oben ist das Wasser kalt und blau, bei etwa Tiefe 45 kippt es in Druck-Violett, ganz unten bleibt fast nur Schwarz. Zwei <strong>Lichtschächte</strong> fallen von oben ein und werden mit jeder Tiefe schmaler; ab etwa Tiefe 45 kommt von dort nichts mehr. Dafür beginnt der <strong>Grat am Grund</strong> zu leuchten – je tiefer, desto heller. Was von oben verschwindet, kommt von unten zurück.<br><br><strong>Die Bewegung sagt den Zustand.</strong> Liegt die Flotte im Hafen, treiben die Schichten so langsam, dass man es eher spürt als sieht. Ist ein Tauchgang unterwegs, <em>fällt</em> das Bild – dieselbe Auskunft wie der Streifen darunter, nur ohne Text. Nach einem gewonnenen Tauchgang läuft einmal ein Druckstoß durch.<br><br><strong>Die Teilchen sagen den Sektor.</strong> Der treibende Meeresschnee reagiert auf die Mutatoren: Der <em>Sog</em> zieht ihn seitwärts, der <em>Ionensturm</em> lässt ihn flackern, die <em>Leerenstille</em> nimmt ihn fast ganz weg, ein <em>Trümmerfeld</em> macht ihn groß und träge, <em>Kristallsporen</em> lassen Zacken aus dem Grund wachsen. Du siehst also, was dich erwartet, bevor du die Mutatorliste liest.<br><br><strong>Das Siegel sagt die Lage.</strong> Jede Tiefe hat ihr eigenes, aus der Tiefe selbst berechnet – für jeden Kommandanten dasselbe. Grün heißt ein Mutator, blau zwei, violett drei, <span style="color:#e24b4a;">rot</span> heißt Wächter.<br><br>Wer <strong>reduzierte Bewegung</strong> im Betriebssystem eingestellt hat, bekommt dasselbe Bild ohne jede Animation – die Auskunft steckt dann in Farbe und Form allein.' },
       { title:'Sechs weitere Berührungspunkte', body:'Die zweite Runde greift dort an, wo der Abgrund und das übrige Spiel dieselben Entscheidungen betreffen.<br><br><strong>Rissströmung:</strong> Solange über einem deiner Planeten ein <strong>Leerenriss</strong> offen steht, dauert jeder Anflug in den Abgrund 40% weniger. Das ist eine echte Zwickmühle: Den Riss zu schließen braucht dieselbe Kampfflotte, die sonst tauchen würde – und lässt du ihn stehen, kollabiert er nach 45 Minuten und reißt 10% deiner gelagerten Antimaterie mit.<br><br><strong>Tiefenhafen:</strong> die siebte Planeten-Rolle, sichtbar erst mit freigeschaltetem Abgrund. Tauchgänge, die von genau dieser Welt starten, bringen +25% Abgrundsplitter. Damit ist zum ersten Mal wichtig, <em>von wo</em> du abtauchst – und dieser Planet kann dann eben keine Bergbau- oder Festungs-Welt mehr sein.<br><br><strong>Tiefenkartierung:</strong> eine Allianz-Technologie. Sie hebt die Ausbeute beim Wiederholen bereits bezwungener Tiefen um bis zu 15 Prozentpunkte – gemeinsam gesammelte Messdaten, die allen Mitgliedern nützen.<br><br><strong>Tiefenaufkäufer:</strong> im Kredit-Shop, sobald du 200 Abgrundsplitter übrig hast. Der einzige Weg, Splitter außerhalb der Werkstatt zu verwerten. Bergungsgut bleibt ausdrücklich unverkäuflich.<br><br><strong>Punktestand:</strong> Deine Rekordtiefe zählt mit 50 Punkten je Tiefe in den Score – der Abgrund taucht damit in Bestenliste und Wochenliga auf.<br><br><strong>Kompendium:</strong> Reliquien und Konstellationen sind zwei eigene Sammelkategorien mit Essenz-Belohnung.' },
       { title:'Die Werft – vier Register', body:'Der Abgrund-Bereich ist in vier Register geteilt. Das gewählte bleibt gespeichert, auch über einen Neustart hinweg.<br><br><strong>Ausbau</strong> – die Werkstatt, in der du Abgrundsplitter ausgibst, und die Gegenmaßnahme.<br><strong>Bau</strong> – deine neun Tiefenschiffe mit Bestand und Preis in Bergungsgut. Was noch verschlossen ist, zeigt dir, wie viele Tiefen bis zur Freischaltung fehlen. <em>Gebaut wird in der Werft</em> wie jedes andere Schiff auch – ein Knopf bringt dich direkt dorthin.<br><strong>Sammlung</strong> – Konstellationen samt Sucher, Kartenraum, Reliquienkabinett und Mutatoren-Verzeichnis.<br><strong>Ränge</strong> – Chronik des Abstiegs, die tiefsten Kommandanten und der Allianz-Tiefenlauf.<br><br>Der Sektor selbst, die Tauchtiefe und der Abtauchen-Knopf stehen über den Registern und sind immer sichtbar – du musst zum Abtauchen also nie ein bestimmtes Register offen haben.' },
       { title:'Zwei Werkstoffe: Splitter und Bergungsgut', body:'Jeder gewonnene Tauchgang bringt <strong>zwei</strong> verschiedene Dinge mit. <strong>Abgrundsplitter</strong> sind die Währung der Abgrund-Werkstatt – du gibst sie für Ausbaustufen aus, die ausschließlich im Abgrund wirken. <strong>Bergungsgut</strong> sind geborgene Wrackteile und der Werkstoff für die Ausrüstung, die es nur unten gibt; sie wirkt anschließend im ganzen Spiel. Beide stehen in der Überschrift des Abgrund-Bereichs, und die Vorschau am Sektor nennt dir vor dem Abtauchen, wie viel von beidem zu erwarten ist.<br><br>Warum getrennt: Die Werkstatt wird bewusst nie „fertig", ihre Preise steigen immer weiter. Liefe die Ausrüstung über dieselbe Zahl, würde jedes gebaute Schiff die Werkstatt zurückwerfen und jede gekaufte Werkstattstufe die Ausrüstung verzögern. So kannst du beides nebeneinander verfolgen.<br><br>Bergungsgut ist deutlich <strong>knapper</strong> als Splitter (rund 4 Stück in Tiefe 1, rund 40 in Tiefe 100) – was draußen wirkt, ist teurer als was nur unten wirkt. Es hängt allein an der Tiefe, nicht an der Größe deines Imperiums, und wird von den Werkstatt- und Reliquienboni <strong>nicht</strong> erhöht: Die vier Bonuskanäle wirken auf Kampfkraft, Verluste, Splitter und Rohstoffbeute. <strong>Wächter geben das Vierfache.</strong> Das ist der Grund, eine schon bezwungene Zehnertiefe erneut anzugehen – der Wiederholungsabschlag drückt den Ertrag, das Wächter-Vielfache hebt ihn wieder darüber.' },
@@ -30627,93 +30675,400 @@
   //
   // Deterministisch aus derselben Tiefe wie der Sektor: Tiefe 47 sieht fuer jeden gleich aus, und
   // ein Neuladen zeichnet nicht um. Ein zufaelliges Panorama waere huebsch und bedeutungslos.
+  // ══════════════════════ Tiefendruck: die Farbreise (v8.345.0) ══════════════════════
+  //
+  // Bis hierher rechnete der gesamte Abgrund EINEN Wert aus der Tiefe: `dunkel`, von 0 bis 1, und
+  // der senkte nur Deckkraft und Sternenzahl. Tiefe 100 war deshalb dasselbe Bild wie Tiefe 1, nur
+  // blasser - und blasser ist keine Tiefe, sondern Nebel. Kein Farbverlauf, kein Filter, nirgends:
+  // 1.300 Zeilen Zeichencode aus Flaechen und Strichen, waehrend der Rest des Spiels 33
+  // Verlaufsdefinitionen und eine Gluehsprache hat.
+  //
+  // Diese Funktion ist die eine Stelle, aus der ALLE Abgrund-Bilder ihre Farbe lesen. Zwei
+  // Abschnitte statt einer geraden Mischung, weil der Abstieg einen Wendepunkt hat: Bis Tiefe 45
+  // stirbt das Licht von oben, danach beginnt der Grund selbst zu leuchten. Eine einzige lineare
+  // Mischung koennte diesen Umschlag nicht abbilden.
+  //
+  //   licht  faellt von 1 auf 0 (Lichtschaechte von oben) - bei ~48 ist Schluss
+  //   glut   steigt von 0.12 auf 0.9 (Biolumineszenz des Grundes) - die Gegenbewegung
+  //
+  // Genau diese Gegenbewegung ist die dramatische Idee des Abstiegs: Was von oben verschwindet,
+  // kommt von unten zurueck. Sie ist der Grund, warum die Palette zwei Werte fuehrt und nicht einen.
+  function abgrundMisch(a, b, f){
+    const z = (c, i) => parseInt(c.slice(1 + i*2, 3 + i*2), 16);
+    const h = n => { const v = Math.max(0, Math.min(255, Math.round(n))).toString(16); return v.length < 2 ? '0'+v : v; };
+    return '#' + h(z(a,0) + (z(b,0)-z(a,0))*f) + h(z(a,1) + (z(b,1)-z(a,1))*f) + h(z(a,2) + (z(b,2)-z(a,2))*f);
+  }
+  // Die drei Stationen der Reise. Bewusst aus den Farben gebaut, die der Abgrund im Spiel schon
+  // benutzt (#7f77dd Druck-Violett, #5dcaa5 Biolumineszenz, #85b7eb Sternenblau) - die neuen Bilder
+  // sollen aussehen, als haetten sie immer dorthin gehoert.
+  // DREI Fassungen hat diese Tabelle gebraucht, und beide Fehlversuche sind hier festgehalten, weil
+  // sie derselbe Fehler in zwei Richtungen waren - naemlich am falschen Hebel gedreht:
+  //
+  //   1. Zu dunkel: Wasser #16233f, Grund #232d52, Vignette 0.5. Rechnerisch richtig, im Bild fast
+  //      schwarz - jede Tiefe sah gleich aus, nur dunkel statt blass.
+  //   2. Zu hell: alles angehoben, Grund #3c4b7e HELLER als das Wasser, Lichtschaechte auf 0.40.
+  //      Ergebnis: ein milchiges Grau-Blau, das aussah wie eine beleuchtete Wanne. Ein Abgrund mit
+  //      hellem Boden ist kein Abgrund.
+  //
+  // Der Hebel ist nicht die Helligkeit, sondern der KONTRAST, und der laeuft in eine bestimmte
+  // Richtung: Das Wasser bleibt dunkel, der GRUND ist noch dunkler (eine Silhouette), und die
+  // Helligkeit steckt in wenigen Dingen - der leuchtenden Grundkante, den Sternen, den Leuchtgaengern.
+  // Ein dunkler Boden mit heller Kante liest sich als Tiefe; ein heller Boden als Untergrund.
+  const ABGRUND_FARBSTATIONEN = [
+    // Tiefe 1 - noch von oben beleuchtet, kaltes Sternenblau
+    { oben:'#17253f', unten:'#0d1631', grund:'#080c1e', leucht:'#a9d4f7', dunst:'#6b63c0', kante:'#cfe6fb' },
+    // Tiefe 45 - das Licht ist fast weg, Druck-Violett uebernimmt
+    { oben:'#101835', unten:'#080d21', grund:'#050813', leucht:'#7fdcc4', dunst:'#5b53a8', kante:'#a2edd9' },
+    // Tiefe 140 - der Grund. Nur noch Biolumineszenz
+    { oben:'#05070f', unten:'#02030a', grund:'#010206', leucht:'#5dcaa5', dunst:'#3b3178', kante:'#7fe8bd' }
+  ];
+  const ABGRUND_FARB_WENDE = 45;    // hier stirbt das Licht von oben - der Wendepunkt der Reise
+  const ABGRUND_FARB_TIEF = 140;   // ab hier aendert sich nichts mehr
+  function abgrundTiefenFarben(tiefe){
+    const t = Math.max(1, tiefe|0);
+    let f, von, bis;
+    if (t <= ABGRUND_FARB_WENDE){
+      f = (t - 1) / (ABGRUND_FARB_WENDE - 1);
+      von = ABGRUND_FARBSTATIONEN[0]; bis = ABGRUND_FARBSTATIONEN[1];
+    } else {
+      f = Math.min(1, (t - ABGRUND_FARB_WENDE) / (ABGRUND_FARB_TIEF - ABGRUND_FARB_WENDE));
+      von = ABGRUND_FARBSTATIONEN[1]; bis = ABGRUND_FARBSTATIONEN[2];
+    }
+    const m = k => abgrundMisch(von[k], bis[k], f);
+    // licht/glut haengen an der ABSOLUTEN Tiefe, nicht am Abschnittsfortschritt - sonst spraenge
+    // die Beleuchtung am Wendepunkt.
+    const abs = Math.min(1, (t - 1) / ABGRUND_FARB_TIEF);
+    return {
+      oben: m('oben'), unten: m('unten'), grund: m('grund'),
+      leucht: m('leucht'), dunst: m('dunst'), kante: m('kante'),
+      licht: Math.max(0, 1 - Math.min(1, (t - 1) / 48)),
+      glut:  0.12 + 0.78 * Math.pow(abs, 0.7)
+    };
+  }
+  // ---- Der gemeinsame Filter-Vorrat ----
+  // Filter sind farbunabhaengig und koennen deshalb EINMAL im Dokument stehen; jedes Abgrund-Bild
+  // verweist per url(#...) darauf. Die VERLAEUFE stehen dagegen bewusst inline im jeweiligen Bild:
+  // Sie haengen an der Tiefe bzw. an der Siegelfarbe, und ein Verlauf in einem gemeinsamen defs-Block
+  // koennte weder currentColor noch eine CSS-Variable des verweisenden Elements lesen (beide loesen
+  // gegen die Stelle auf, an der der Verlauf STEHT, nicht gegen die, die ihn benutzt - eine der
+  // wenigen echten Fallen in SVG).
+  const ABGRUND_FILTER = '<svg width="0" height="0" style="position:absolute;pointer-events:none;" aria-hidden="true" focusable="false"><defs>'
+    + '<filter id="abGlut" x="-120%" y="-120%" width="340%" height="340%">'
+    +   '<feGaussianBlur stdDeviation="2.2"/></filter>'
+    + '<filter id="abGlutXL" x="-150%" y="-150%" width="400%" height="400%">'
+    +   '<feGaussianBlur stdDeviation="5.5"/></filter>'
+    + '<filter id="abPraege" x="-45%" y="-45%" width="190%" height="190%">'
+    +   '<feDropShadow dx="0" dy="1.5" stdDeviation="1.15" flood-color="#000000" flood-opacity="0.78"/></filter>'
+    + '<filter id="abWeich" x="-60%" y="-60%" width="220%" height="220%">'
+    +   '<feGaussianBlur stdDeviation="3.4"/></filter>'
+    + '</defs></svg>';
   const ABGRUND_PANORAMA_TIEFE_STERNE = 60;   // ab hier ist der letzte Stern weg
+  // ══════════════════════ Meeresschnee auf Canvas (v8.345.0) ══════════════════════
+  //
+  // Das groesste sichtbare Defizit des Panoramas war die DICHTE. Drei SVG-Bahnen mit je einem Dutzend
+  // festen Kreisen ziehen an - aber es sind immer dieselben Kreise in derselben Reihenfolge, und man
+  // sieht es nach zwei Durchlaeufen. Ein Canvas mit ein paar hundert Teilchen kann etwas, das SVG
+  // hier nicht kann: auf den SEKTOR reagieren. Die Mutatoren standen bis hierher als Textzeile
+  // daneben - jetzt stehen sie im Bild.
+  //
+  // WARUM DAS VERTRETBAR IST, obwohl CLAUDE.md Neuzeichnen pro Sekunde ausdruecklich vermeidet:
+  //   1. Der Lauf haelt an, sobald der Canvas nicht mehr im Dokument haengt (Box neu geschrieben),
+  //   2. er haelt an bei document.hidden (Hintergrund-Tab),
+  //   3. und bei prefers-reduced-motion wird EIN Bild gezeichnet und nie wieder.
+  // Ohne diese drei Bedingungen wuerde ich es nicht bauen. Der Canvas liegt VOR dem SVG und zeichnet
+  // ausschliesslich Teilchen: Faellt er aus, ist die Szene im SVG immer noch vollstaendig - das ist
+  // kein Zufall, sondern die Aufteilung. SVG traegt die Szene, Canvas die Dichte.
+  //
+  // Der Teilchenzustand liegt BEWUSST ausserhalb: Die Box wird neu geschrieben, wenn sich ihr Markup
+  // aendert (Tiefe gewaehlt, Tauchgang gestartet). Laege das Feld am Canvas, spraenge es dabei jedes
+  // Mal auf Anfang - ein sichtbarer Ruck genau in dem Moment, in dem der Spieler etwas tut.
+  // ---- Die Ankunft (v8.345.0) ----
+  // Ein Tauchgang laeuft bis zu vier Stunden. Beim ABTAUCHEN faellt das Panorama - das stand schon.
+  // Bei der ANKUNFT erschien eine Zeile im Protokoll, sonst nichts: der dramaturgische Hoehepunkt der
+  // ganzen Mechanik, grafisch leer.
+  //
+  // Bewusst klein gehalten: ein Druckstoss, der einmal durch das Bild laeuft, und ein Aufflammen der
+  // Grundkante. Zwei Sekunden, einmal, nur nach einem Sieg - kein zweites Fenster, kein Bestaetigen,
+  // dasselbe Panorama, das schon dort steht.
+  //
+  // Die Marke liegt in einer Modulvariablen und NICHT im Spielstand: Sie soll einen Reload nicht
+  // ueberleben. Ein Effekt, der nach dem Neuladen nochmal laeuft, erzaehlt von einem Ereignis, das
+  // langst vorbei ist.
+  const ABGRUND_ANKUNFT_MS = 2100;
+  let abgrundAnkunftBis = 0;
+  const ABGRUND_SCHNEE_W = 920, ABGRUND_SCHNEE_H = 336;   // doppelte Panorama-Groesse = scharfe Kanten
+  let abgrundSchnee = { teilchen:null, sig:null, raf:null, ctx:null };
+  function abgrundSchneeSig(sektor){
+    return (sektor.tiefe|0) + '|' + sektor.mutatoren.map(m => m.key).sort().join(',');
+  }
+  // Die Handschrift des Sektors. Eine Tabelle statt verstreuter if-Zweige: So steht an EINER Stelle,
+  // was ein Mutator im Bild bedeutet, und ein neuer Mutator ist eine Zeile.
+  function abgrundSchneeArt(sektor){
+    const hat = k => sektor.mutatoren.some(m => m.key === k);
+    if (hat('leerenstille'))                              return { n: 14, farbe:[190,205,235], gr:1.0, v:0.30, sog:0,    flacker:0,   deck:0.30 };
+    if (hat('ionensturm') || hat('funkenflug'))           return { n:150, farbe:[250,199,117], gr:1.3, v:1.05, sog:0.4,  flacker:1,   deck:0.55 };
+    if (hat('sog') || hat('mahlstrom'))                   return { n:170, farbe:[196,208,240], gr:1.2, v:1.35, sog:2.9,  flacker:0,   deck:0.45 };
+    if (hat('truemmerdicht') || hat('wracklinie'))         return { n: 95, farbe:[152,162,186], gr:2.4, v:0.55, sog:0.15, flacker:0,   deck:0.5  };
+    if (hat('kristallsporen') || hat('kristallschlund'))   return { n:160, farbe:[130,235,200], gr:1.3, v:0.70, sog:0.2,  flacker:0.3, deck:0.5  };
+    if (hat('phosphorwolke'))                              return { n:185, farbe:[159,225,203], gr:1.5, v:0.55, sog:0.25, flacker:0.5, deck:0.55 };
+    return                                                        { n:150, farbe:[200,214,240], gr:1.3, v:0.75, sog:0.25, flacker:0,   deck:0.42 };
+  }
+  function abgrundSchneeBauen(art){
+    const t = [];
+    for (let i = 0; i < art.n; i++) t.push({
+      x: Math.random()*ABGRUND_SCHNEE_W, y: Math.random()*ABGRUND_SCHNEE_H,
+      r: 0.6 + Math.random()*art.gr, v: 0.2 + Math.random()*art.v,
+      f: Math.random()*Math.PI*2, o: (0.10 + Math.random()*0.5) * (art.deck || 0.45)
+    });
+    return t;
+  }
+  function abgrundSchneeZeichnen(zeit, art, faellt){
+    const c = abgrundSchnee.ctx;
+    if (!c) return;
+    const W = ABGRUND_SCHNEE_W, H = ABGRUND_SCHNEE_H, t = (zeit||0)/1000;
+    const tempo = faellt ? 5.5 : 1;   // im Tauchgang faellt das Bild - dieselbe Auskunft wie die CSS-Bahnen
+    c.clearRect(0, 0, W, H);
+    const teilchen = abgrundSchnee.teilchen || [];
+    for (let i = 0; i < teilchen.length; i++){
+      const d = teilchen[i];
+      d.y += d.v * (1 + d.r*0.25) * tempo;
+      d.x += art.sog
+        ? Math.sin(t*0.5 + d.y*0.006)*art.sog + art.sog*0.5
+        : Math.sin(t*0.3 + d.f)*0.3;
+      if (d.y > H + 6){ d.y = -6; d.x = Math.random()*W; }
+      if (d.x > W + 6) d.x = -6; else if (d.x < -6) d.x = W + 6;
+      let op = d.o;
+      if (art.flacker) op = d.o * (1 - art.flacker*0.75*Math.abs(Math.sin(t*6 + d.f*9)));
+      c.beginPath();
+      c.arc(d.x, d.y, d.r, 0, Math.PI*2);
+      c.fillStyle = 'rgba('+art.farbe[0]+','+art.farbe[1]+','+art.farbe[2]+','+op.toFixed(3)+')';
+      c.fill();
+    }
+  }
+  function abgrundSchneeAn(sektor, faellt){
+    const cv = document.querySelector('#abgrundBox .abgrund-schnee');
+    if (abgrundSchnee.raf){ cancelAnimationFrame(abgrundSchnee.raf); abgrundSchnee.raf = null; }
+    if (!cv || !cv.getContext) return;
+    const art = abgrundSchneeArt(sektor), sig = abgrundSchneeSig(sektor);
+    // Nur bei WIRKLICH anderem Sektor neu saeen. Ein Neuzeichnen der Box allein (etwa weil sich die
+    // Splitterzahl geaendert hat) darf das Feld nicht zuruecksetzen.
+    if (!abgrundSchnee.teilchen || abgrundSchnee.sig !== sig){
+      abgrundSchnee.teilchen = abgrundSchneeBauen(art);
+      abgrundSchnee.sig = sig;
+    }
+    abgrundSchnee.ctx = cv.getContext('2d');
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      abgrundSchneeZeichnen(0, art, false);   // ein Bild, dann Ruhe
+      return;
+    }
+    const schritt = (zeit) => {
+      // isConnected ist die Abbruchbedingung, die ohne Zutun funktioniert: Wird die Box neu
+      // geschrieben, ist DIESER Canvas nicht mehr im Dokument, der Lauf endet von selbst, und der
+      // naechste Aufruf von abgrundSchneeAn haengt sich an den neuen Canvas.
+      if (!cv.isConnected || document.hidden){ abgrundSchnee.raf = null; return; }
+      abgrundSchneeZeichnen(zeit, art, faellt);
+      abgrundSchnee.raf = requestAnimationFrame(schritt);
+    };
+    abgrundSchnee.raf = requestAnimationFrame(schritt);
+  }
   function abgrundPanorama(sektor, faellt){
     const t = Math.max(1, sektor.tiefe|0);
     const rng = abgrundRng(t * 1299721 + 31337);
-    const W = 320, H = 96;
+    const W = 460, H = 168;
+    const p = abgrundTiefenFarben(t);
     const dunkel = Math.min(1, (t-1) / ABGRUND_PANORAMA_TIEFE_STERNE);   // 0 = oben, 1 = ganz unten
     const hat = k => sektor.mutatoren.some(m => m.key === k);
     const leer = hat('leerenstille');
-    // Drei ziehende Schichten und eine feste (v8.329.0). Jede ziehende Schicht wird ZWEIMAL
-    // gezeichnet - einmal an ihrem Platz, einmal um genau H nach unten versetzt - und dann um H
-    // nach oben geschoben. Am Ende des Durchlaufs steht die Kopie exakt dort, wo das Original
-    // begann; die Bewegung springt also nie. Ohne die Kopie risse unten eine leere Bahn auf.
-    const fern = [], mitte = [], nah = [], fest = [];
-    // 1) FERN: Sterne. Bewusst ueber die GANZE Hoehe verteilt, nicht nur oben - eine Sternenbahn,
-    // die scrollt, darf keine Kante haben. Ihre Zahl faellt weiter mit der Tiefe.
-    const sterne = leer ? 0 : Math.round(26 * (1 - dunkel));
+    const id = 'pn' + t + (sektor.waechter ? 'w' : '');   // eindeutig je Bild, sonst greifen die Verlaeufe ineinander
+    const ankommt = Date.now() < abgrundAnkunftBis;
+    // Drei ziehende Schichten und eine feste. Jede ziehende Schicht wird ZWEIMAL gezeichnet -
+    // einmal an ihrem Platz, einmal um genau H nach unten versetzt - und dann um H nach oben
+    // geschoben. Am Ende des Durchlaufs steht die Kopie exakt dort, wo das Original begann; die
+    // Bewegung springt also nie. Ohne die Kopie risse unten eine leere Bahn auf.
+    const fern = [], mitte = [], nah = [], fest = [], glut = [];
+    // ---- 1) FERN: Sterne. Bewusst ueber die GANZE Hoehe verteilt, nicht nur oben - eine
+    // Sternenbahn, die scrollt, darf keine Kante haben. Ihre Zahl faellt mit der Tiefe; die
+    // hellsten bekommen zusaetzlich einen Schein (v8.345.0), das gibt dem Bild seine Tiefenschaerfe.
+    const sterne = leer ? 0 : Math.round(20 * (1 - dunkel));
     for (let i = 0; i < sterne; i++){
-      const x = rng()*W, y = rng()*H, r = 0.6 + rng()*1.1;
-      fern.push('<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="#c3bef5" opacity="'+(0.25 + rng()*0.5*(1-dunkel)).toFixed(2)+'"/>');
+      const x = rng()*W, y = rng()*H, r = 0.6 + rng()*1.3;
+      const op = 0.45 + rng()*0.5*(1-dunkel);
+      // class="pano-stern" ist ein Pruefhaken, kein Aussehen: Der Test zaehlt die Sterne darueber.
+      // Vorher zaehlte er die feste Farbe #c3bef5 - seit die Farbe aus der Tiefenpalette kommt,
+      // waere das ein Zaehler auf einen Wert gewesen, der sich je Tiefe aendert.
+      const c = '<circle class="pano-stern" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+p.kante+'" opacity="'+op.toFixed(2)+'"/>';
+      fern.push(c);
+      if (op > 0.78) fern.push('<g filter="url(#abGlut)" opacity="0.45"><circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(r*1.25).toFixed(1)+'" fill="'+p.kante+'"/></g>');
     }
-    // 2) MITTE: Schwaden, je tiefer desto mehr und desto dichter.
+    // ---- 2) MITTE: Schwaden, je tiefer desto mehr und desto dichter.
     const baender = 3 + Math.round(dunkel*4);
     for (let i = 0; i < baender; i++){
-      const y = H*0.30 + (H*0.62) * (i/baender) * (0.55 + dunkel*0.45);
-      const amp = 3 + rng()*7;
+      const y = H*0.28 + (H*0.64) * (i/baender) * (0.55 + dunkel*0.45);
+      const amp = 4 + rng()*9;
       const d = 'M0 '+y.toFixed(1)+' Q'+(W*0.25).toFixed(0)+' '+(y-amp).toFixed(1)+' '+(W*0.5).toFixed(0)+' '+y.toFixed(1)
               + ' T'+W+' '+y.toFixed(1);
-      mitte.push('<path d="'+d+'" stroke="#7f77dd" stroke-width="'+(0.8 + dunkel*1.4).toFixed(1)+'" fill="none" opacity="'+(0.14 + dunkel*0.28).toFixed(2)+'"/>');
+      mitte.push('<path d="'+d+'" stroke="'+p.dunst+'" stroke-width="'+(3.5 + dunkel*5.5).toFixed(1)+'" fill="none" opacity="'+(0.10 + dunkel*0.15).toFixed(2)+'" filter="url(#abWeich)"/>');
     }
-    // 3) NAH: kurze Striche dicht vor der Linse, die am schnellsten ziehen. Sie tragen keine
+    // ---- 3) NAH: kurze Striche dicht vor der Linse, die am schnellsten ziehen. Sie tragen keine
     // Information - ihre einzige Aufgabe ist, dem Bild eine VORDERSTE Ebene zu geben. Ohne sie
     // bewegen sich nur ferne Dinge, und das liest sich als Schweben statt als Fallen.
-    const striche = leer ? 3 : 9;
+    const striche = leer ? 3 : 8;
     for (let i = 0; i < striche; i++){
-      const x = rng()*W, y = rng()*H, l = 5 + rng()*11;
-      nah.push('<path d="M'+x.toFixed(1)+' '+y.toFixed(1)+' V'+(y+l).toFixed(1)+'" stroke="#c3bef5" stroke-width="1.1" opacity="'+(0.18 + rng()*0.22).toFixed(2)+'"/>');
+      const x = rng()*W, y = rng()*H, l = 6 + rng()*13;
+      nah.push('<path d="M'+x.toFixed(1)+' '+y.toFixed(1)+' V'+(y+l).toFixed(1)+'" stroke="'+p.kante+'" stroke-width="1" opacity="'+(0.12 + rng()*0.18).toFixed(2)+'"/>');
     }
-    // 4) FEST: der Grund und alles, was darauf liegt. Er darf NICHT mitziehen - er ist der Boden
-    // des Bildes, und ein wandernder Boden wuerde die Leserichtung umkehren.
-    const grund = H - (10 + dunkel*30);
+    // ---- 4) FEST: der Grund und alles, was darauf liegt. Er darf NICHT mitziehen - er ist der
+    // Boden des Bildes, und ein wandernder Boden wuerde die Leserichtung umkehren.
+    const grund = H - (42 + dunkel*60);
     const zacken = [];
-    for (let x = 0; x <= W; x += 20) zacken.push(x+' '+(grund + (rng()-0.5)*14*(0.4+dunkel)).toFixed(1));
-    fest.push('<path d="M0 '+H+' L0 '+grund.toFixed(1)+' L'+zacken.join(' L')+' L'+W+' '+H+' Z" fill="#141a30" opacity="'+(0.75 + dunkel*0.25).toFixed(2)+'"/>');
+    for (let x = 0; x <= W; x += 23) zacken.push(x+' '+(grund + (rng()-0.5)*20*(0.4+dunkel)).toFixed(1));
+    const grundPfad = 'M0 '+H+' L0 '+grund.toFixed(1)+' L'+zacken.join(' L')+' L'+W+' '+H+' Z';
+    fest.push('<path d="'+grundPfad+'" fill="url(#gr'+id+')"/>');
+    for (let i = 0; i < 7; i++){
+      const rx = rng()*W, ry = grund + 6 + rng()*(H-grund-8), rw = 24 + rng()*70;
+      fest.push('<path d="M'+rx.toFixed(0)+' '+ry.toFixed(1)+' q'+(rw/2).toFixed(0)+' '+(-3-rng()*5).toFixed(1)+' '+rw.toFixed(0)+' 0" '
+        + 'stroke="'+p.dunst+'" stroke-width="1" fill="none" opacity="'+(0.10 + rng()*0.14).toFixed(2)+'"/>');
+    }
+    for (let i = 0; i < 26; i++){
+      const sx = rng()*W, sy = grund + 4 + rng()*(H-grund-6);
+      fest.push('<circle cx="'+sx.toFixed(1)+'" cy="'+sy.toFixed(1)+'" r="'+(0.4+rng()*0.7).toFixed(1)+'" fill="'+p.leucht+'" opacity="'+(0.06 + rng()*0.16).toFixed(2)+'"/>');
+    }
+    // Die leuchtende Grundkante: das Gegenstueck zum sterbenden Licht von oben. Je tiefer, desto
+    // heller - p.glut steigt, wo p.licht faellt. Zweimal gezeichnet, unten weichgezeichnet: so
+    // liegt der Schein UNTER der Kante statt sie zu verwaschen.
+    fest.push('<g filter="url(#abGlut)" opacity="'+(0.28 + 0.40*p.glut).toFixed(2)+'"><path d="'+grundPfad+'" fill="none" stroke="'+p.kante+'" stroke-width="3"/></g>');
+    fest.push('<path d="'+grundPfad+'" fill="none" stroke="'+p.kante+'" stroke-width="0.8" opacity="'+(0.16 + p.glut*0.22).toFixed(2)+'"/>');
+    // Ungleichmaessige Aufhellungen ENTLANG des Grats: Biolumineszenz sitzt in Nestern, nicht in
+    // einer Linie. Ohne sie bleibt die Kante ein Draht, egal wie stark der Schein darunter ist.
+    for (let i = 0; i < 5 + Math.round(p.glut*4); i++){
+      const bx = rng()*W, bw = 16 + rng()*40;
+      fest.push('<g filter="url(#abGlut)" opacity="'+(0.25 + p.glut*0.5).toFixed(2)+'">'
+        + '<path d="M'+bx.toFixed(0)+' '+(grund + (rng()-0.5)*8).toFixed(1)+' h'+bw.toFixed(0)+'" stroke="'+p.leucht+'" stroke-width="3.4" fill="none"/></g>');
+    }
+    // Leuchtgaenger: ein paar Motive direkt ueber dem Grund, die langsam heller und dunkler werden.
+    // Sie sind der Grund, warum das Bild auch im Stillstand lebt - eine CSS-Animation auf einer
+    // Gruppe, kein Neuzeichnen (und bei prefers-reduced-motion steht sie still, siehe CSS).
+    const motive = leer ? 0 : 3 + Math.round(p.glut*5);
+    for (let i = 0; i < motive; i++){
+      const x = 12 + rng()*(W-24), y = grund - 2 - rng()*30, r = 0.7 + rng()*1.0;
+      glut.push('<g class="pano-glimm" style="animation-delay:'+(rng()*4).toFixed(1)+'s;">'
+        + '<g filter="url(#abGlut)"><circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(r*1.7).toFixed(1)+'" fill="'+p.leucht+'" opacity="0.42"/></g>'
+        + '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+p.kante+'"/></g>');
+    }
     // Mutatorspur - jeder malende Mutator legt seine eigene Handschrift auf den Grund
     if (hat('kristallsporen') || hat('kristallschlund')){
-      for (let i = 0; i < 7; i++){
-        const x = 14 + rng()*(W-28), h = 6 + rng()*12;
-        fest.push('<path d="M'+x.toFixed(0)+' '+grund.toFixed(0)+' l'+(h*0.4).toFixed(0)+' -'+h.toFixed(0)+' l'+(h*0.4).toFixed(0)+' '+h.toFixed(0)+' Z" fill="#5dcaa5" opacity="0.55"/>');
+      for (let i = 0; i < 8; i++){
+        const x = 14 + rng()*(W-28), h = 8 + rng()*18;
+        const zack = 'M'+x.toFixed(0)+' '+grund.toFixed(0)+' l'+(h*0.38).toFixed(0)+' -'+h.toFixed(0)+' l'+(h*0.38).toFixed(0)+' '+h.toFixed(0)+' Z';
+        fest.push('<g filter="url(#abGlut)" opacity="0.6"><path d="'+zack+'" fill="#5dcaa5"/></g>');
+        fest.push('<path d="'+zack+'" fill="#5dcaa5" opacity="0.5"/><path d="'+zack+'" fill="none" stroke="#a8ffe0" stroke-width="0.8" opacity="0.8"/>');
       }
     }
     if (hat('truemmerdicht') || hat('wracklinie')){
-      for (let i = 0; i < 6; i++){
-        const x = 10 + rng()*(W-20), y = grund - 4 - rng()*22, w = 8 + rng()*16;
-        fest.push('<path d="M'+x.toFixed(0)+' '+y.toFixed(0)+' l'+w.toFixed(0)+' '+(rng()*6-3).toFixed(0)+' l-2 5 l-'+w.toFixed(0)+' 1 Z" fill="#8f9bb5" opacity="0.4"/>');
+      for (let i = 0; i < 7; i++){
+        const x = 10 + rng()*(W-20), y = grund - 4 - rng()*30, w = 10 + rng()*20;
+        fest.push('<path d="M'+x.toFixed(0)+' '+y.toFixed(0)+' l'+w.toFixed(0)+' '+(rng()*7-3.5).toFixed(0)+' l-2 6 l-'+w.toFixed(0)+' 1 Z" fill="#8f9bb5" opacity="0.34"/>'
+          + '<path d="M'+x.toFixed(0)+' '+y.toFixed(0)+' l'+w.toFixed(0)+' '+(rng()*3-1.5).toFixed(0)+'" stroke="'+p.kante+'" stroke-width="0.7" opacity="0.35"/>');
       }
     }
     if (hat('hitzeblase')){
-      fest.push('<ellipse cx="'+(W*0.5).toFixed(0)+'" cy="'+(grund+6).toFixed(0)+'" rx="70" ry="16" fill="#f0997b" opacity="0.18"/>');
+      fest.push('<ellipse cx="'+(W*0.5).toFixed(0)+'" cy="'+(grund+8).toFixed(0)+'" rx="105" ry="24" fill="#f0997b" opacity="0.13"/>');
+      fest.push('<g filter="url(#abWeich)"><ellipse cx="'+(W*0.5).toFixed(0)+'" cy="'+(grund+4).toFixed(0)+'" rx="62" ry="13" fill="#f0997b" opacity="0.4"/></g>');
     }
     // Die Phosphorwolke schwebt und gehoert deshalb in die MITTLERE Schicht, nicht auf den Grund.
     if (hat('phosphorwolke')){
-      for (let i = 0; i < 12; i++){
-        mitte.push('<circle cx="'+(rng()*W).toFixed(0)+'" cy="'+(rng()*H).toFixed(0)+'" r="'+(1+rng()*2).toFixed(1)+'" fill="#9fe1cb" opacity="0.5"/>');
+      for (let i = 0; i < 14; i++){
+        const cx = (rng()*W).toFixed(0), cy = (rng()*H).toFixed(0), r = (1+rng()*2.2).toFixed(1);
+        mitte.push('<g filter="url(#abGlut)" opacity="0.55"><circle cx="'+cx+'" cy="'+cy+'" r="'+(r*2)+'" fill="#9fe1cb"/></g>'
+          + '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#c8fce8" opacity="0.75"/>');
       }
     }
     if (hat('ionensturm') || hat('funkenflug')){
       for (let i = 0; i < 3; i++){
         const x = 30 + rng()*(W-60), y = rng()*H;
-        mitte.push('<path d="M'+x.toFixed(0)+' '+y.toFixed(0)+' l6 12 l-5 0 l7 14" stroke="#fac775" stroke-width="1.4" fill="none" opacity="0.65"/>');
+        const bl = 'M'+x.toFixed(0)+' '+y.toFixed(0)+' l7 14 l-6 0 l8 17';
+        mitte.push('<g filter="url(#abGlut)" opacity="0.7"><path d="'+bl+'" stroke="#fac775" stroke-width="2.4" fill="none"/></g>'
+          + '<path d="'+bl+'" stroke="#ffe9bd" stroke-width="1.1" fill="none" opacity="0.9"/>');
       }
     }
-    // 5) Waechter: ein Koerper, der aus dem Grund ragt - das einzige rote Element im Bild, und
-    // aus demselben Grund fest wie der Grund selbst.
+    // ---- 5) Waechter: ein Koerper, der aus dem Grund ragt. Bis v8.344.0 war das eine rote
+    // Vollflaeche - der Text verspricht "ein Koerper von der Groesse eines Mondes", das Bild lieferte
+    // einen Farbfleck. Groesse entsteht nicht durch Details, sondern durch VERDECKUNG: dunkle
+    // Silhouette, ein Randlicht, das nur die Kante saeumt, und der Dunst DAVOR. Rot bleibt dem
+    // Waechter allein vorbehalten - das war schon vorher so und darf nicht aufweichen.
     if (sektor.waechter){
-      fest.push('<path d="M'+(W*0.5-26).toFixed(0)+' '+H+' Q'+(W*0.5).toFixed(0)+' '+(grund-34).toFixed(0)+' '+(W*0.5+26).toFixed(0)+' '+H+' Z" fill="#e24b4a" opacity="0.30"/>');
-      fest.push('<circle cx="'+(W*0.5).toFixed(0)+'" cy="'+(grund-16).toFixed(0)+'" r="4" fill="#e24b4a" opacity="0.8"/>');
+      // Unregelmaessige Silhouette statt einer perfekten Parabel: Ein Koerper von der Groesse eines
+      // Mondes hat keine Lehrbuchkurve, und die erste Fassung sah genau danach aus - gezeichnet statt
+      // gewachsen. Gesaet aus derselben Tiefe, also dieselbe Tiefe, dieselbe Gestalt.
+      // kh darf die Oberkante DURCHBRECHEN - ein Koerper, der nicht ins Bild passt, wirkt groesser
+      // als einer, der brav darunter bleibt. Aber nur ein Stueck: Bei -6 ist Schluss, sonst wuerde
+      // aus der Spitze eine Wand und der Grat dahinter waere gar nicht mehr zu sehen.
+      const kb = 60 + rng()*26, kh = Math.max(-6, grund - 46 - rng()*30);
+      const kx = W*0.5 + (rng()-0.5)*30;
+      const kanten = [];
+      for (let i = 0; i <= 8; i++){
+        const f2 = i/8, bogen = Math.sin(f2*Math.PI);
+        kanten.push((kx - kb + 2*kb*f2).toFixed(1) + ' '
+          + (H - (H - kh) * bogen * (0.82 + rng()*0.30)).toFixed(1));
+      }
+      const kp = 'M'+(kx-kb).toFixed(1)+' '+H+' L'+kanten.join(' L')+' L'+(kx+kb).toFixed(1)+' '+H+' Z';
+      fest.push('<g filter="url(#abWeich)" opacity="0.85"><path d="'+kp+'" fill="none" stroke="#e24b4a" stroke-width="3"/></g>');
+      fest.push('<path d="'+kp+'" fill="url(#wk'+id+')"/>');
+      fest.push('<path d="'+kp+'" fill="none" stroke="#e24b4a" stroke-width="1.1" opacity="0.5"/>');
+      fest.push('<g class="pano-auge"><g filter="url(#abGlut)"><circle cx="'+kx.toFixed(1)+'" cy="'+(kh+22).toFixed(1)+'" r="5.5" fill="#e24b4a"/></g>'
+        + '<circle cx="'+kx.toFixed(1)+'" cy="'+(kh+22).toFixed(1)+'" r="2.1" fill="#ffd9d6"/></g>');
     }
     // Eine ziehende Schicht: Inhalt einmal am Platz, einmal um H versetzt, beides in einer Gruppe.
     const bahn = (klasse, teile) => teile.length
       ? '<g class="'+klasse+'">'+teile.join('')+'<g transform="translate(0,'+H+')">'+teile.join('')+'</g></g>'
       : '';
-    return '<svg class="abgrund-panorama'+(faellt?' faellt':'')+'" viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="none" aria-hidden="true">'
-      + '<rect width="'+W+'" height="'+H+'" fill="#080b16"/>'
+    // Die Verlaeufe stehen INLINE: sie haengen an der Tiefe, und ein gemeinsamer defs-Block koennte
+    // das nicht (siehe die Begruendung bei ABGRUND_FILTER).
+    const defs = '<defs>'
+      + '<linearGradient id="wa'+id+'" x1="0" y1="0" x2="0" y2="1">'
+      +   '<stop offset="0" stop-color="'+p.oben+'"/><stop offset="1" stop-color="'+p.unten+'"/></linearGradient>'
+      + '<linearGradient id="sc'+id+'" x1="0" y1="0" x2="0" y2="1">'
+      +   '<stop offset="0" stop-color="'+p.kante+'" stop-opacity="'+(0.15*p.licht).toFixed(3)+'"/>'
+      +   '<stop offset="0.7" stop-color="'+p.kante+'" stop-opacity="'+(0.035*p.licht).toFixed(3)+'"/>'
+      +   '<stop offset="1" stop-color="'+p.kante+'" stop-opacity="0"/></linearGradient>'
+      + '<linearGradient id="gr'+id+'" x1="0" y1="0" x2="0" y2="1">'
+      +   '<stop offset="0" stop-color="'+p.grund+'"/><stop offset="1" stop-color="#010206"/></linearGradient>'
+      + '<linearGradient id="si'+id+'" x1="0" y1="0" x2="0" y2="1">'
+      +   '<stop offset="0" stop-color="'+p.dunst+'" stop-opacity="0"/>'
+      +   '<stop offset="1" stop-color="'+p.dunst+'" stop-opacity="'+(0.10 + dunkel*0.16).toFixed(2)+'"/></linearGradient>'
+      + '<radialGradient id="vi'+id+'" cx="0.5" cy="0.38" r="0.88">'
+      +   '<stop offset="0.42" stop-color="#000000" stop-opacity="0"/>'
+      +   '<stop offset="1" stop-color="#000000" stop-opacity="0.46"/></radialGradient>'
+      + (sektor.waechter
+          ? '<linearGradient id="wk'+id+'" x1="0" y1="0" x2="0" y2="1">'
+            + '<stop offset="0" stop-color="#1c0d18"/><stop offset="1" stop-color="#05030a"/></linearGradient>'
+          : '')
+      + '</defs>';
+    // Lichtschaechte von oben: FEST, nicht ziehend - Licht faellt, es treibt nicht. Sie stehen VOR
+    // dem Wasser und HINTER allem anderen, damit Sterne und Teilchen durch sie hindurchziehen.
+    const schaechte = p.licht > 0.015
+      ? '<path d="M'+(W*0.22).toFixed(0)+' 0 L'+(W*0.12).toFixed(0)+' '+H+' L'+(W*0.30).toFixed(0)+' '+H+' L'+(W*0.29).toFixed(0)+' 0 Z" fill="url(#sc'+id+')"/>'
+        + '<path d="M'+(W*0.68).toFixed(0)+' 0 L'+(W*0.63).toFixed(0)+' '+H+' L'+(W*0.78).toFixed(0)+' '+H+' L'+(W*0.75).toFixed(0)+' 0 Z" fill="url(#sc'+id+')" opacity="0.6"/>'
+      : '';
+    // Der Druckstoss steht IMMER im Markup und ist ohne die Klasse "ankommt" unsichtbar (r=0,
+    // opacity=0 per CSS). So braucht der Effekt kein zweites Markup und keinen zweiten Codeweg -
+    // nur eine Klasse mehr am Wurzelelement.
+    const stoss = '<g class="pano-stoss">'
+      + '<circle cx="'+(W*0.5).toFixed(0)+'" cy="'+(grund-18).toFixed(0)+'" r="1" fill="none" stroke="'+p.kante+'" stroke-width="3"/>'
+      + '</g>'
+      + '<rect class="pano-blitz" width="'+W+'" height="'+H+'" fill="'+p.kante+'"/>';
+    return '<svg class="abgrund-panorama'+(faellt?' faellt':'')+(ankommt?' ankommt':'')+'" viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="none" aria-hidden="true">'
+      + defs
+      + '<rect width="'+W+'" height="'+H+'" fill="url(#wa'+id+')"/>'
+      + schaechte
       + bahn('pano-fern', fern)
       + bahn('pano-mitte', mitte)
+      + '<rect y="'+(H*0.42).toFixed(0)+'" width="'+W+'" height="'+(H*0.58).toFixed(0)+'" fill="url(#si'+id+')"/>'
       + fest.join('')
+      + glut.join('')
       + bahn('pano-nah', nah)
+      + '<rect width="'+W+'" height="'+H+'" fill="url(#vi'+id+')"/>'
+      + stoss
       + '</svg>';
   }
   // ---- Waechter-Portraits (v8.328.0) ----
@@ -30764,9 +31119,27 @@
     const p = ABGRUND_WAECHTER_BILDER[i % ABGRUND_WAECHTER_BILDER.length];
     if (!p) return '';
     const g = groesse || 52;
+    // ---- Randlicht und Dunst (v8.345.0) ----
+    // Zwoelf Waechter, zwoelf eigene Zeichnungen, zwoelf eigene Texte - "ein Koerper von der Groesse
+    // eines Mondes, der jede Bahn blockiert". Der Text versprach Ehrfurcht, das Bild lieferte eine
+    // Strichzeichnung in Rot.
+    //
+    // Groesse entsteht nicht durch mehr Details, sondern durch VERDECKUNG. Drei Schichten:
+    //   1. dieselbe Zeichnung weichgezeichnet darunter - das Randlicht, das die Silhouette saeumt
+    //   2. die Zeichnung selbst, unveraendert
+    //   3. ein Dunst DAVOR, der die untere Haelfte verschluckt
+    // Was man nicht ganz sieht, wirkt groesser. Die zwoelf Zeichnungen bleiben unangetastet - sie
+    // bekommen nur eine Beleuchtung.
+    const wid = 'wb' + (tiefe|0);
     return '<svg viewBox="0 0 100 100" width="'+g+'" height="'+g+'" aria-hidden="true" fill="none" stroke="currentColor" '
       + 'stroke-width="5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">'
-      + p + '</svg>';
+      + '<defs><linearGradient id="'+wid+'" x1="0" y1="0" x2="0" y2="1">'
+      +   '<stop offset="0.35" stop-color="#05070f" stop-opacity="0"/>'
+      +   '<stop offset="1" stop-color="#05070f" stop-opacity="0.72"/></linearGradient></defs>'
+      + '<g filter="url(#abWeich)" opacity="0.9" stroke-width="7">'+p+'</g>'
+      + p
+      + '<rect x="0" y="0" width="100" height="100" fill="url(#'+wid+')" stroke="none"/>'
+      + '</svg>';
   }
   const ABGRUND_BASIS_STAERKE = 900;   // Gegnerstärke in Tiefe 1
   const ABGRUND_STAERKE_MULT = 1.15;   // je Tiefe
@@ -30868,10 +31241,34 @@
         + (ABGRUND_SYMBOLE[p.key]||'') + '</g>';
     }).join('');
     const knoten = punkte.map(p => '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.2" fill="currentColor" opacity="0.55"/>').join('');
+    // ---- Vom Diagramm zum Sternbild (v8.345.0) ----
+    // Das Emblem war eine korrekte technische Zeichnung: Kreis, Verbindungslinien, Symbole. Was ein
+    // KONSTELLATION heisst, verlangt aber einen Himmel. Drei Zutaten, alle aus dem vorhandenen
+    // Material:
+    //   1. ein Sternenfeld hinter der Figur - gesaet aus den Teilen, also fuer dieselbe
+    //      Konstellation immer dasselbe (ein wuerfelnder Himmel waere bei jedem Neuzeichnen anders)
+    //   2. Glut auf den Linien und Knoten (abGlut) - dieselbe Technik wie im Panorama
+    //   3. ein dunkler Grund mit Verlauf, damit das Glimmen etwas hat, worauf es leuchtet
+    const kid = 'ke' + def.teile.join('');
+    const hrng = abgrundRng(def.teile.join('').split('').reduce((a,c) => a*31 + c.charCodeAt(0), 7) >>> 0);
+    let himmel = '';
+    for (let i = 0; i < 22; i++){
+      const w = hrng()*Math.PI*2, r = 14 + hrng()*44;
+      himmel += '<circle cx="'+(65+Math.cos(w)*r).toFixed(1)+'" cy="'+(65+Math.sin(w)*r).toFixed(1)
+             +  '" r="'+(0.5+hrng()*0.9).toFixed(1)+'" fill="currentColor" opacity="'+(0.12+hrng()*0.24).toFixed(2)+'" stroke="none"/>';
+    }
     return '<svg viewBox="0 0 130 130" width="'+g+'" height="'+g+'" aria-hidden="true" style="flex-shrink:0; color:'+def.farbe+';">'
-      + '<circle cx="65" cy="65" r="58" fill="none" stroke="currentColor" stroke-width="2" opacity="0.28"/>'
-      + '<path d="'+figur+'" fill="none" stroke="currentColor" stroke-width="2" opacity="0.5"/>'
-      + knoten + sym + '</svg>';
+      + '<defs><radialGradient id="'+kid+'" cx="0.5" cy="0.5" r="0.5">'
+      +   '<stop offset="0" stop-color="'+abgrundMisch(def.farbe,'#05070f',0.82)+'"/>'
+      +   '<stop offset="1" stop-color="#04060e"/></radialGradient></defs>'
+      + '<circle cx="65" cy="65" r="58" fill="url(#'+kid+')"/>'
+      + himmel
+      + '<circle cx="65" cy="65" r="58" fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.34"/>'
+      + '<g filter="url(#abGlut)" opacity="0.65">'
+      +   '<path d="'+figur+'" fill="none" stroke="currentColor" stroke-width="2.6"/>'+knoten
+      + '</g>'
+      + '<path d="'+figur+'" fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.85"/>'
+      + knoten.replace(/opacity="0.55"/g, 'opacity="0.95"') + sym + '</svg>';
   }
   // ---- Der Sucher ----
   // Sektoren sind berechnet, nicht gewuerfelt - wo eine Konstellation liegt, steht also laengst
@@ -31565,12 +31962,40 @@
       '<path d="M50 6 L86 50 L50 94 L14 50 Z" fill="none" stroke="'+farbe+'" stroke-width="2.5" opacity="0.55"/>',
       '<path d="M50 8 L84 28 V72 L50 92 L16 72 V28 Z" fill="none" stroke="'+farbe+'" stroke-width="2.5" opacity="0.55"/>'
     ];
-    return '<svg viewBox="0 0 100 100" width="'+g+'" height="'+g+'" aria-hidden="true" style="flex-shrink:0;">'
-      + '<circle cx="50" cy="50" r="46" fill="#0d1224" opacity="0.55"/>'
-      + RINGE[ring]
-      + '<path d="'+speichenPfad.join(' ')+'" stroke="'+farbe+'" stroke-width="2.5" opacity="0.7" stroke-linecap="round"/>'
-      + KERNE[kern]
-      + (wa ? '<path d="M50 14 L54 24 H46 Z" fill="#e24b4a"/>' : '')
+    // ---- Praegung (v8.345.0) ----
+    // Das Siegel war bis hierher ein Menue-Symbol: gleichmaessige Striche, eine Farbe, keine
+    // Oberflaeche. Drei Zutaten machen daraus ein Fundstueck:
+    //   1. ein Verlauf ENTLANG des Strichs (oben hell, unten dunkel) - das liest das Auge als Metall
+    //   2. ein Schlagschatten nach innen (abPraege) - der Strich sitzt damit IM Siegel, nicht darauf
+    //   3. ein Aussenring, der sich sehr langsam dreht (CSS, kein Neuzeichnen)
+    // Der Verlauf bleibt bewusst im SELBEN Farbton: Die Farbe traegt Information (Waechter, Zahl der
+    // Mutatoren), und eine Praegung, die sie verwaschen wuerde, kostet mehr als sie bringt.
+    // Er steht INLINE, weil er je Siegel eine andere Farbe hat - drei Siegel koennen gleichzeitig
+    // sichtbar sein, ein gemeinsamer defs-Block koennte das nicht (siehe ABGRUND_FILTER).
+    const sid = 'sg' + sektor.tiefe + (wa ? 'w' : '');
+    const dunkler = abgrundMisch(farbe, '#05070f', 0.62);
+    // data-siegelfarbe ist ein Pruefhaken UND eine Lesehilfe: Die Farbe traegt Information (Waechter,
+    // Zahl der Mutatoren), und seit der Praegung steht sie nicht mehr als erster Farbwert im Markup -
+    // dort steht jetzt das Weiss des Metallverlaufs. Ohne diesen Haken muesste ein Leser (und ein
+    // Test) die Reihenfolge der Verlaufsstopps kennen, um die Aussage des Siegels zu finden.
+    return '<svg viewBox="0 0 100 100" width="'+g+'" height="'+g+'" aria-hidden="true" data-siegelfarbe="'+farbe+'" style="flex-shrink:0;">'
+      + '<defs>'
+      +   '<linearGradient id="me'+sid+'" x1="0" y1="0" x2="0.32" y2="1">'
+      +     '<stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>'
+      +     '<stop offset="0.42" stop-color="'+farbe+'"/>'
+      +     '<stop offset="1" stop-color="'+dunkler+'"/></linearGradient>'
+      +   '<radialGradient id="mu'+sid+'" cx="0.5" cy="0.4" r="0.62">'
+      +     '<stop offset="0" stop-color="'+farbe+'" stop-opacity="0.18"/>'
+      +     '<stop offset="0.66" stop-color="#000000" stop-opacity="0.5"/>'
+      +     '<stop offset="1" stop-color="#000000" stop-opacity="0.85"/></radialGradient>'
+      + '</defs>'
+      + '<circle cx="50" cy="50" r="46" fill="url(#mu'+sid+')"/>'
+      + '<g class="siegel-ring">'+RINGE[ring].replace('stroke="'+farbe+'"', 'stroke="url(#me'+sid+')"').replace('opacity="0.55"','opacity="0.85"')+'</g>'
+      + '<g filter="url(#abPraege)">'
+      +   '<path d="'+speichenPfad.join(' ')+'" stroke="url(#me'+sid+')" stroke-width="2.5" opacity="0.95" stroke-linecap="round"/>'
+      +   KERNE[kern].replace(new RegExp('stroke="'+farbe+'"', 'g'), 'stroke="url(#me'+sid+')"')
+      + '</g>'
+      + (wa ? '<g filter="url(#abGlut)"><path d="M50 12 L55 24 H45 Z" fill="#e24b4a"/></g><path d="M50 14 L54 24 H46 Z" fill="#ffd9d6"/>' : '')
       + '</svg>';
   }
   // Höhenschnitt des Abstiegs: eine Linie von Tiefe 1 bis kurz hinter den eigenen Rekord, mit den
@@ -31975,7 +32400,12 @@
       return `<div style="margin-bottom:6px; opacity:${n?1:0.45};"><span style="color:${n?'#a89ef0':'#5a5f78'}; margin-right:5px; display:inline-flex; vertical-align:-0.15em;">${n?abgrundMutatorSymbol(m.key, 20):'<i class="ti ti-lock" aria-hidden="true"></i>'}</span><strong style="color:${n?'#c3bef5':'#5a5f78'};">${n?m.name:'Unbekannt'}</strong>${n>1?' <span class="bmeta">×'+n+'</span>':''}${n?'<br><span class="bmeta">'+m.desc+'</span>':''}</div>`;
     }).join('');
     const reiter = abgrundReiter();
-    setBoxHtml(box, 'abgrundBox', `
+    // ABGRUND_FILTER steht als ERSTES im Markup und damit bei jedem Neuzeichnen wieder da: Die Box
+    // wird per innerHTML komplett ersetzt, ein einmal woanders eingehaengter defs-Block waere danach
+    // zwar noch im Dokument, aber die Verweise darauf gehoerten zu einer Box, die es nicht mehr gibt.
+    // Er ist unsichtbar (width=0) und kostet knapp 700 Byte - billiger als die Verlaeufe, die er
+    // ersetzt, denn Filter sind farbunabhaengig und muessen deshalb NICHT je Bild wiederholt werden.
+    setBoxHtml(box, 'abgrundBox', ABGRUND_FILTER + `
       <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-infinity" aria-hidden="true"></i>Der Abgrund <span class="lvl-pill" style="margin-left:6px;">Rekord ${a.best||0}</span><span class="lvl-pill" style="margin-left:6px; color:#9fe1cb; border-color:#9fe1cb;"><i class="ti ti-diamond" aria-hidden="true"></i> ${fmt(a.splitter||0)} Splitter</span><span class="lvl-pill" style="margin-left:6px; color:#e0a548; border-color:#e0a548;">${bergungsgutSymbol(14)} ${fmt(a.bergung||0)} Bergungsgut</span></div>
       <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:0.75rem; border-color:#fac775;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -31987,7 +32417,7 @@
       </div>
       <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Jede Tiefe ist ein eigener Sektor mit eigenem Namen und eigenen <strong>Mutatoren</strong> – Umgebungsregeln, die Kampfkraft, Gegnerstärke, Beute, Flugzeit und Verluste verändern. Die Tiefe ist nach unten offen. Ein Sektor sieht für jeden Spieler gleich aus, du kannst dich also über Tiefen austauschen.</div>
       <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#7f77dd;">
-        ${abgrundPanorama(sektor, busy)}
+        <div class="abgrund-szene">${abgrundPanorama(sektor, busy)}<canvas class="abgrund-schnee" width="${ABGRUND_SCHNEE_W}" height="${ABGRUND_SCHNEE_H}" aria-hidden="true"></canvas></div>
         ${busy ? '<div class="tauchgang-streifen" title="Die Flotte ist unterwegs"></div>' : ''}
         <div style="display:flex; align-items:center; gap:10px; margin:8px 0 6px;">
           ${abgrundSiegel(sektor, 56)}
@@ -32142,6 +32572,11 @@
         render();
       };
     });
+    // Den Meeresschnee nach JEDEM Durchlauf anstossen - auch nach einem, in dem setBoxHtml das
+    // Markup gar nicht neu geschrieben hat. Der Aufruf ist in dem Fall billig (er findet denselben
+    // Canvas, sieht dieselbe Signatur und laesst das Teilchenfeld stehen), und er ist der einzige
+    // Ort, an dem ein neu entstandener Canvas seinen Lauf zurueckbekommt.
+    abgrundSchneeAn(sektor, busy);
     const werftBtn = box.querySelector('[data-abgrund-werft]');
     if (werftBtn) werftBtn.onclick = () => {
       // Gebaut wird in der Werft, nicht hier - dieser Knopf bringt den Spieler nur dorthin.
@@ -33504,6 +33939,11 @@
               playSound('achieve');
             }
             const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Der Frachtraum reichte nicht für die volle Bergung.' : '');
+            // Die Ankunft laeuft genau dann, wenn auch die Erfolgsmeldung laeuft. Das ist keine
+            // Bequemlichkeit, sondern die Bedingung: Bei Offline-Rueckkehr loesen sich mehrere
+            // Missionen auf einmal auf (showLog === false fuer alle bis auf die letzte) - ohne diese
+            // Kopplung liefe der Effekt siebenmal hintereinander an.
+            if (showLog !== false) abgrundAnkunftBis = Date.now() + ABGRUND_ANKUNFT_MS;
             if (showLog !== false) log('Tauchgang erfolgreich: '+sektor.name+' (Tiefe '+tiefe+') bezwungen. +'+fmt(splitter)+' Abgrundsplitter, +'+fmt(bergungsgut)+' Bergungsgut'+(fragmente>0?', +'+fmt(fragmente)+' Modulfragmente (Splitterofen)':'')+'.'+(abgrundModulName?' Aus dem Wrackfeld geborgen: '+abgrundModulName+'!':'')+(abgrundItemName?' Gegenstand geborgen: '+abgrundItemName+'!':'')+cargoNote+(ownLostText?' Eigene Verluste: '+ownLostText+'.':'')+tiefenMsg+waechterMsg, 'ti-infinity');
             playSound('win');
             const __battleReport = { type:'npc-attack', result:'win', npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLost, abgrundSplitter:splitter, abgrundBergung:bergungsgut, abgrundFragmente:fragmente, abgrundModul:abgrundModulName, abgrundItem:abgrundItemName, abgrundMutatoren:mutText };

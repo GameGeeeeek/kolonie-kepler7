@@ -172,14 +172,26 @@ check('5: die Tiefensonde und das Verzeichnis rufen abgrundMutatorSymbol() auf',
 // eins davon weg, sieht jede Tiefe wieder gleich aus - also genau der Zustand, den diese Runde
 // beheben sollte. Geprueft wird deshalb NICHT "es kommt ein <svg> zurueck", sondern dass sich das
 // Ergebnis zwischen verschiedenen Eingaben messbar unterscheidet.
+// Die Tiefenpalette (v8.345.0) gehoert mit in die Umgebung: Das Panorama liest seit dieser Version
+// JEDE Farbe aus ihr. Sie wird ECHT mitgeladen und nicht attrappiert - waere sie eine Attrappe mit
+// festen Farben, pruefte der Test die Attrappe statt die Farbreise.
 const panoUmgebung = new Function(`
   ${fnAus('abgrundRng')}
   const ABGRUND_PANORAMA_TIEFE_STERNE = ${(js.match(/const ABGRUND_PANORAMA_TIEFE_STERNE = (\d+)/)||[])[1]};
+  ${fnAus('abgrundMisch')}
+  const ABGRUND_FARBSTATIONEN = ${(js.match(/const ABGRUND_FARBSTATIONEN = (\[[\s\S]*?\n  \]);/)||[])[1]};
+  const ABGRUND_FARB_WENDE = ${(js.match(/const ABGRUND_FARB_WENDE\s*=\s*(\d+)/)||[])[1]};
+  const ABGRUND_FARB_TIEF = ${(js.match(/const ABGRUND_FARB_TIEF\s*=\s*(\d+)/)||[])[1]};
+  ${fnAus('abgrundTiefenFarben')}
+  // Die Ankunfts-Marke (v8.345.0) steht bewusst auf 0: Dieser Abschnitt prueft das RUHENDE Bild.
+  // Die Ankunft selbst hat ihren eigenen Nachweis weiter unten - dort wird sie auf einen Zeitpunkt
+  // in der Zukunft gesetzt und die Klasse am Wurzelelement geprueft.
+  let abgrundAnkunftBis = 0;
   ${fnAus('abgrundPanorama')}
-  return abgrundPanorama;
+  return function(sektor, faellt, ankunftBis){ abgrundAnkunftBis = ankunftBis || 0; return abgrundPanorama(sektor, faellt); };
 `)();
 const sek = (tiefe, keys, waechter) => ({ tiefe, mutatoren: (keys||[]).map(k => ({ key:k })), waechter: waechter||null });
-const zaehlSterne = svgTxt => (svgTxt.match(/<circle[^>]*fill="#c3bef5"/g)||[]).length;
+const zaehlSterne = svgTxt => (svgTxt.match(/class="pano-stern"/g)||[]).length;
 
 const flach = panoUmgebung(sek(2, ['ionensturm']), 0);
 const tief  = panoUmgebung(sek(55, ['ionensturm']), 0);
@@ -297,13 +309,51 @@ check('9: im Tauchgang zieht jede Schicht schneller als im Ruhezustand', zuLangs
 const ruhe = schichten.map(k => dauer(k,false));
 check('9: die drei Schichten ziehen wirklich verschieden schnell (sonst kein Parallax)',
   new Set(ruhe).size === 3 && ruhe[0] > ruhe[1] && ruhe[1] > ruhe[2], ruhe);
-check('9: auch das Panorama steht bei prefers-reduced-motion still',
-  /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.pano-fern, \.pano-mitte, \.pano-nah \{ animation:none; \}/.test(src));
+// Seit v8.345.0 gibt es zwei weitere Bewegungen im Panorama (Leuchtgaenger am Grund, Wächter-Auge).
+// Geprueft wird deshalb nicht mehr eine woertliche Zeile, sondern dass JEDE .pano-Klasse mit einer
+// Animation auch im reduce-Block auftaucht - so faellt eine kuenftige dritte Bewegung auf, statt
+// still durchzurutschen.
+{
+  const reduceBlock = (src.match(/@media \(prefers-reduced-motion: reduce\) \{\s*\n\s*\.pano-[^}]*\}/)||[''])[0];
+  const bewegte = [...new Set([...src.matchAll(/\.(pano-[a-z]+)\s*\{\s*animation:/g)].map(m => m[1]))];
+  const fehlend = bewegte.filter(k => !reduceBlock.includes('.'+k));
+  check('9: auch das Panorama steht bei prefers-reduced-motion still',
+    bewegte.length >= 3 && fehlend.length === 0, { bewegte, fehlend });
+}
 // Der Grund darf NICHT mitziehen - ein wandernder Boden kehrt die Leserichtung um.
 const nachFest = panoOhneFall.split('</g>').pop();
+// Der Grund wird seit v8.345.0 mit einem Verlauf gefuellt statt mit einer festen Farbe - gesucht
+// wird deshalb die Verlaufs-Referenz, nicht der alte Farbwert.
 check('9: der Grund liegt ausserhalb der Zieh-Schichten',
-  /fill="#141a30"/.test(panoOhneFall.replace(/<g class="pano-[a-z]+">[\s\S]*?<\/g><\/g>/g, '')),
+  /fill="url\(#gr[^)]+\)"/.test(panoOhneFall.replace(/<g class="pano-[a-z]+">[\s\S]*?<\/g><\/g>/g, '')),
   { rest: nachFest.length });
+
+// ---- 10) Die Ankunft (v8.345.0) ----
+// Der Effekt ist reine Kosmetik - und genau deshalb kann er still ausfallen, ohne dass irgendetwas
+// kaputtgeht. Geprueft wird die ganze Kette: Klasse am Wurzelelement, beide Elemente im Markup,
+// beide unsichtbar OHNE die Klasse, und die Kopplung an dieselbe Bedingung wie die Erfolgsmeldung.
+{
+  const ruhig = panoUmgebung(sek(30, ['sog']), false, 0);
+  const kommt = panoUmgebung(sek(30, ['sog']), false, Date.now() + 5000);
+  check('10: ohne Ankunft traegt das Bild die Klasse nicht',
+    !/class="abgrund-panorama[^"]*ankommt/.test(ruhig));
+  check('10: nach einem Sieg traegt es sie', /class="abgrund-panorama ankommt"/.test(kommt));
+  // Die Elemente stehen IMMER im Markup - sonst braeuchte der Effekt einen zweiten Codeweg.
+  check('10: Druckstoss und Aufblitzen stehen in beiden Faellen im Markup',
+    ruhig.includes('class="pano-stoss"') && ruhig.includes('class="pano-blitz"')
+    && kommt.includes('class="pano-stoss"') && kommt.includes('class="pano-blitz"'));
+  // ... und sind ohne die Klasse unsichtbar. Ohne diese Regel waere im Ruhezustand ein Ring zu sehen.
+  check('10: ohne die Klasse sind sie per CSS unsichtbar',
+    /\.pano-stoss, \.pano-blitz \{ opacity:0; \}/.test(src));
+  check('10: die Skalierung dreht um den eigenen Mittelpunkt (sonst laeuft der Ring schraeg raus)',
+    /\.pano-stoss \{ transform-box:fill-box; transform-origin:center; \}/.test(src));
+  // Die Kopplung an showLog: Bei Offline-Rueckkehr loesen sich mehrere Missionen auf einmal auf.
+  // Ohne dieselbe Bedingung wie die Erfolgsmeldung liefe der Effekt mehrfach hintereinander.
+  check('10: ausgeloest wird nur dort, wo auch die Erfolgsmeldung laeuft',
+    /if \(showLog !== false\) abgrundAnkunftBis = Date\.now\(\) \+ ABGRUND_ANKUNFT_MS;/.test(js));
+  check('10: die Marke liegt NICHT im Spielstand (ein Reload soll sie nicht wiederholen)',
+    !/state\.abgrundAnkunft|a\.ankunftBis/.test(js) && /let abgrundAnkunftBis = 0;/.test(js));
+}
 
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
 process.exit(fail ? 1 : 0);

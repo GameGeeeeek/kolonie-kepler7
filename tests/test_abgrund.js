@@ -80,6 +80,12 @@ function baueKontext(zustand){
     konstAus('ABGRUND_BASIS_STAERKE'), konstAus('ABGRUND_STAERKE_MULT'),
     konstAus('ABGRUND_MAX_FLUG_SEK'), konstAus('ABGRUND_WIEDERHOLUNG'),
     konstAus('ABGRUND_REQ_RESEARCH'),
+    // abgrundMisch/abgrundTiefenFarben (v8.345.0): Das Siegel liest seine Praegefarbe daraus. Sie
+    // werden ECHT mitgeladen, nicht attrappiert - eine Attrappe mit fester Farbe pruefte die Attrappe.
+    fnAus('abgrundMisch'),
+    (js.match(/const ABGRUND_FARBSTATIONEN = (\[[\s\S]*?\n  \]);/)||[])[0],
+    konstAus('ABGRUND_FARB_WENDE'), konstAus('ABGRUND_FARB_TIEF'),
+    fnAus('abgrundTiefenFarben'),
     fnAus('abgrundRng'), fnAus('abgrundSektor'), fnAus('abgrundMutatorAnzahl'),
     fnAus('ensureAbgrund'), fnAus('abgrundMaxTiefe'), fnAus('abgrundGewaehlteTiefe'),
     fnAus('abgrundWiederholungsFaktor'), fnAus('abgrundWerkstattStufe'),
@@ -702,6 +708,8 @@ check('11: der Bann kommt bei der Aufloesung aus der MISSION',
   // verschiedenes. Dafuer werden die echten Funktionen mit den Sektoren gefuettert.
   const zeichner = new Function('ABGRUND_WAECHTER_ALLE',
     [konstAus('ABGRUND_SIEGEL_KERNE'), konstAus('ABGRUND_SIEGEL_RINGE'),
+     // abgrundMisch (v8.345.0): Das Siegel mischt seine Praegefarbe damit ab.
+     fnAus('abgrundMisch'),
      fnAus('abgrundRng'), fnAus('abgrundSiegel'), fnAus('abgrundTiefenprofil'),
      'return { abgrundSiegel, abgrundTiefenprofil };'].join('\n'))(G.ABGRUND_WAECHTER_ALLE);
   const s20a = zeichner.abgrundSiegel(G.abgrundSektor(20), 56);
@@ -726,8 +734,10 @@ check('11: der Bann kommt bei der Aufloesung aus der MISSION',
     zaehle(w,'#e24b4a') >= 3 && zaehle(n,'#e24b4a') === 0,
     { waechter:zaehle(w,'#e24b4a'), normal:zaehle(n,'#e24b4a') });
   // Und die Farbe muss die Zahl der Mutatoren abbilden - sonst ist sie reine Dekoration.
-  const farbeVon = t => (zeichner.abgrundSiegel(G.abgrundSektor(t), 56).match(/#[0-9a-f]{6}/g)||[])
-    .filter(f => f !== '#0d1224')[0];
+  // Gelesen wird der ausdrueckliche Haken, nicht der erste Farbwert im Markup. Seit der Praegung
+  // (v8.345.0) steht dort das Weiss des Metallverlaufs - der Test war mit der alten Regex dreimal
+  // "#ffffff" und damit rot, obwohl die Farbaussage des Siegels vollstaendig erhalten war.
+  const farbeVon = t => (zeichner.abgrundSiegel(G.abgrundSektor(t), 56).match(/data-siegelfarbe="(#[0-9a-f]{6})"/)||[])[1];
   const einer = farbeVon(2), zweier = farbeVon(7), dreier = farbeVon(17);
   check('13: die Siegelfarbe unterscheidet ein, zwei und drei Mutatoren',
     einer && zweier && dreier && new Set([einer, zweier, dreier]).size === 3,
