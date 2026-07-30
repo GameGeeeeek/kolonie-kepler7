@@ -257,7 +257,12 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
       abgrund:{ tiefe:6, best:5, splitter:400, tauchgaenge:9, gesehen:{}, werkstatt:{ tiefensonde:2 },
                 woche:{ key:'2020-01-06', best:12 }, wochePraemie:null, allianzMarken:{} } });
     const { ctx, page, errs, store } = await starte(browser, stand);
-    await page.waitForTimeout(1200);
+    // Auf die Karte WARTEN, nicht auf die Uhr. Hier standen 1200 ms fest - auf einer freien Maschine
+    // reichlich, im vollen Prueflauf gelegentlich nicht: Dann war die Box noch leer, und die drei
+    // Pruefungen darunter fielen der Reihe nach um, obwohl am Wochenlauf nichts falsch war. Genau
+    // derselbe Fehler wie in Abschnitt 8 daneben (v8.343.0) - nur eben ein zweites Mal, ein paar
+    // Zeilen weiter. Auch hier gilt: Der Test war nicht "flaky", er wartete auf die falsche Sache.
+    await warteAuf(page, async () => { const t = await boxText(page); return !!t && /Wochen-Tiefenlauf/i.test(t); });
     const txt = await boxText(page);
     check('8: die Wochenlauf-Karte ist sichtbar', !!txt && /Wochen-Tiefenlauf/i.test(txt));
     check('8: die faellige Vorwoche laesst sich abrechnen',
