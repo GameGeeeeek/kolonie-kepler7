@@ -355,5 +355,42 @@ check('9: der Grund liegt ausserhalb der Zieh-Schichten',
     !/state\.abgrundAnkunft|a\.ankunftBis/.test(js) && /let abgrundAnkunftBis = 0;/.test(js));
 }
 
+// ---- 11) Tiefenprofil und Vitrine (v8.346.0) ----
+// Der Grund, warum dieser Abschnitt existiert, ist ein Fehler, der KEINEN Fehler erzeugt hat:
+// Die Schiene des Profils wird mit einem Verlauf gestrichen, und sie ist eine WAAGERECHTE LINIE -
+// ihre Bounding-Box hat damit die Hoehe 0. Ein Verlauf in objectBoundingBox-Einheiten (der
+// SVG-Standard) ist bei einer entarteten Box undefiniert: keine Meldung, kein Farbwert, einfach
+// nichts. Die Schiene war unsichtbar, und im Quelltext sah alles richtig aus. Gefunden nur durch
+// eine echte Bildschirmaufnahme.
+{
+  const prof = fnAus('abgrundTiefenprofil');
+  check('11: die Schiene traegt die Farbreise, nicht eine feste Farbe',
+    /abgrundTiefenFarben\(/.test(prof) && !/stroke="#7f77dd"/.test(prof));
+  // DIE Pruefung dieses Abschnitts. Jeder Verlauf im Profil MUSS Nutzerkoordinaten benutzen.
+  const verlaeufe = prof.match(/<linearGradient[^>]*>/g) || [];
+  check('11: es gibt ueberhaupt Verlaeufe im Profil', verlaeufe.length >= 2, verlaeufe.length);
+  const ohneUserSpace = verlaeufe.filter(v => !/gradientUnits="userSpaceOnUse"/.test(v));
+  check('11: jeder Verlauf der Schiene benutzt Nutzerkoordinaten (entartete Box, siehe oben)',
+    ohneUserSpace.length === 0, ohneUserSpace);
+  // Und die Koordinaten muessen die Schienenenden sein, nicht 0..1 - sonst laege der ganze Verlauf
+  // in den ersten Bildpunkten und die Farbreise waere ein Farbsprung am linken Rand.
+  check('11: und zwar die echten Schienenenden',
+    /x1="'\+links\+'"[^>]*x2="'\+rechts\+'"/.test(prof.replace(/\s+/g,' ')), true);
+  // Erreicht/unerreicht muss ein LICHTZUSTAND sein, kein Farbwert: der Unterschied liest sich sonst
+  // nicht auf einen Blick.
+  check('11: eine bezwungene Waechtertiefe glueht, eine offene nicht',
+    /if \(erreicht\) marken\.push\('<g filter="url\(#abGlut\)"/.test(prof));
+  // Die Vitrine: ein leeres Fach muss UNBELEUCHTET sein, nicht nur blasser. Genau das war vorher der
+  // Fall - gestrichelter Rand, sonst identisch.
+  check('11: das leere Vitrinenfach hat weder Lichtkegel noch Glanz',
+    /\.vitrine-fach\.leer::before, \.vitrine-fach\.leer::after \{ display:none; \}/.test(src));
+  check('11: das gefuellte Fach hat beides',
+    /\.vitrine-fach::before \{ content:''/.test(src) && /\.vitrine-fach::after \{ content:''/.test(src));
+  check('11: die Reliquie selbst wirft Licht zurueck (derselbe Filter wie im Panorama)',
+    /<g filter="url\(#abGlut\)" opacity="0\.75" stroke-width="7">'\+r\.bild/.test(js));
+  check('11: das Schweben der Reliquie steht bei reduzierter Bewegung still',
+    /@media \(prefers-reduced-motion: reduce\)\{ \.vitrine-fach \.vitrine-bild \{ animation:none; \} \}/.test(src));
+}
+
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
 process.exit(fail ? 1 : 0);

@@ -1521,15 +1521,45 @@
        einnehmen wie die vollen. Eine Sammlung, die ihre Lücken versteckt, ist keine Sammlung –
        deshalb hat ein leeres Fach dieselbe Größe, nur einen gestrichelten Rand und die Tiefe,
        in der das fehlende Stück liegt. */
-    .vitrine { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
     @media (max-width:620px){ .vitrine { grid-template-columns:repeat(4,1fr); } }
     @media (max-width:400px){ .vitrine { grid-template-columns:repeat(3,1fr); } }
-    .vitrine-fach { border:var(--bw-1,1px) solid rgba(250,199,117,0.45); background:rgba(250,199,117,0.06);
-      padding:8px 4px 6px; text-align:center; color:#fac775; min-height:74px;
-      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; }
-    .vitrine-fach.leer { border-style:dashed; border-color:#2a2f45; background:transparent; color:#4c5266; }
-    .vitrine-bild { line-height:0; }
-    .vitrine-name { font-size:9.5px; line-height:1.25; word-break:break-word; }
+    /* ---- Beleuchtete Schaukästen (v8.346.0) ----
+       Die Vitrine war ein Raster aus Kästchen mit dünnem Rand: technisch eine Vitrine, gestalterisch
+       eine Tabelle. Ein Schaukasten wird durch LICHT zum Schaukasten, und zwar durch drei Dinge:
+       einen Lichtkegel von oben, einen dunklen Grund darunter (damit das Licht etwas hat, worauf es
+       fällt) und einen Glanzstreifen auf dem Glas. Alles drei ist CSS – kein zusätzliches Markup,
+       kein Neuzeichnen.
+       Der entscheidende Unterschied zu vorher: Ein LEERES Fach ist nicht nur blasser, es ist
+       UNBELEUCHTET. Man sieht auf einen Blick, wo etwas steht und wo nur ein Platz reserviert ist. */
+    .vitrine { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
+    /* Ohne Rundung: Die Kante gehört zur Formensprache des Spiels (die --cut- und --r--Stufen), und
+       ein handgesetzter 2px-Radius wäre genau die „dreizehnte Handzahl", die das Formen-Audit vom
+       26.07.2026 überall herausgeräumt hat. test_formensprache.js hat ihn sofort gemeldet. */
+    .vitrine-fach { position:relative; overflow:hidden; border:var(--bw-1,1px) solid rgba(250,199,117,0.5);
+      padding:10px 4px 7px; text-align:center; color:#fac775; min-height:80px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+      background:
+        radial-gradient(120% 70% at 50% -8%, rgba(250,199,117,0.20) 0%, rgba(250,199,117,0.05) 42%, transparent 72%),
+        linear-gradient(180deg, #171a2c 0%, #0a0c18 100%);
+      box-shadow: inset 0 1px 0 rgba(255,235,190,0.16), inset 0 -14px 22px -14px rgba(0,0,0,0.9); }
+    /* Der Lichtkegel selbst: ein schmales Trapez, das von der Oberkante herabfällt. */
+    .vitrine-fach::before { content:''; position:absolute; top:-2px; left:50%; width:56%; height:74%;
+      transform:translateX(-50%); pointer-events:none;
+      background:linear-gradient(180deg, rgba(255,232,180,0.16) 0%, rgba(255,232,180,0.03) 55%, transparent 100%);
+      clip-path:polygon(30% 0, 70% 0, 100% 100%, 0 100%); }
+    /* Der Glanzstreifen auf dem Glas – schräg, schmal, und nur ein Hauch. */
+    .vitrine-fach::after { content:''; position:absolute; inset:0; pointer-events:none;
+      background:linear-gradient(112deg, transparent 34%, rgba(255,255,255,0.055) 44%, transparent 52%); }
+    .vitrine-fach.leer { border-style:dashed; border-color:#252a3e; color:#4c5266;
+      background:linear-gradient(180deg, #0c0e1a 0%, #070912 100%); box-shadow:none; }
+    /* Unbeleuchtet heißt unbeleuchtet: kein Kegel, kein Glanz. */
+    .vitrine-fach.leer::before, .vitrine-fach.leer::after { display:none; }
+    .vitrine-bild { line-height:0; position:relative; }
+    /* Die Reliquie schwebt sehr langsam – sie liegt nicht auf, sie hängt im Licht. */
+    .vitrine-fach:not(.leer) .vitrine-bild { animation: vitrineSchweben 7s ease-in-out infinite; }
+    @keyframes vitrineSchweben { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-2.5px); } }
+    @media (prefers-reduced-motion: reduce){ .vitrine-fach .vitrine-bild { animation:none; } }
+    .vitrine-name { font-size:9.5px; line-height:1.25; word-break:break-word; position:relative; }
     .konst-tafel { display:flex; gap:10px; align-items:center; }
     .konst-emblem { flex-shrink:0; line-height:0; animation: konstKreis 60s linear infinite; }
     .konst-emblem svg > g { animation: konstKreisZurueck 60s linear infinite; transform-origin:65px 65px; }
@@ -5236,8 +5266,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.345.0';
+  const VERSION = '8.346.0';
   const PATCHNOTES = [
+    { version:'8.346.0', date:'30.07.2026', changes:[
+      '<strong>Das Tiefenprofil ist jetzt selbst die Farbreise.</strong> Die Schiene unter dem Panorama war ein graues Band mit einem violetten Stück darauf – technisch richtig und ohne jede Auskunft außer der Länge. Jetzt trägt sie die Farben der Tiefen, über die sie läuft: Sie beginnt im Sternenblau der ersten Meter und endet in dem Schwarzgrün, das dort unten übrig ist. Damit zeigt das Profil nicht mehr nur, <em>wie weit</em> man ist, sondern <em>wohin</em> es geht – und benutzt dafür keine zweite Farbtabelle, sondern dieselbe Funktion wie das Panorama.',
+      '<strong>Der Weg hinter einem leuchtet.</strong> Die erreichte Strecke bekommt einen Schein und eine helle Oberkante, die unerreichte dieselben Farben flach und abgedunkelt – man sieht, was kommt, ohne dass es aussieht, als hätte man es schon. Bezwungene Wächtertiefen glühen als rote Rauten, offene bleiben stumpfe Umrisse; vorher war dieser Unterschied ein reiner Farbwert. Der Zeiger trägt die Wasserfarbe <em>seiner</em> Tiefe und ist damit selbst eine Ablesung.',
+      '<strong>Die Reliquien stehen jetzt in beleuchteten Schaukästen.</strong> Die Vitrine war ein Raster aus Kästchen mit dünnem Rand: technisch eine Vitrine, gestalterisch eine Tabelle. Jetzt fällt ein Lichtkegel von der Oberkante herab, darunter liegt ein dunkler Grund, damit das Licht etwas hat, worauf es fällt, und über dem Ganzen liegt ein schräger Glanzstreifen auf dem Glas. Jede Reliquie ist zweimal gezeichnet – weichgezeichnet als Schein, darüber scharf –, denn ein Stück im Lichtkegel wirft Licht zurück, und sie schwebt sehr langsam: Sie liegt nicht auf, sie hängt im Licht.',
+      '<strong>Ein leeres Fach ist nicht blasser, es ist unbeleuchtet.</strong> Kein Kegel, kein Glanz, kein Schatten – man sieht auf einen Blick, wo etwas steht und wo nur ein Platz reserviert ist. Der gestrichelte Rand und die Tiefenangabe bleiben, denn eine Sammlung, die ihre Lücken versteckt, ist keine Sammlung.',
+      '<strong>Zwei Lehren aus dieser Runde, beide im Code vermerkt.</strong> Erstens: Die Wasserfarben direkt auf die Schiene zu legen war rechnerisch richtig und im Bild unsichtbar – Wasser ist per Entwurf sehr dunkel, und eine dunkle Linie auf einem dunklen Feld ist keine Linie. Sie wird jetzt Richtung Leuchtfarbe aufgehellt, der Verlauf bleibt derselbe. Zweitens: Ein SVG-Farbverlauf auf einer <em>waagerechten</em> Linie zeichnet in der Standardeinstellung gar nichts, weil die Umgrenzung der Linie die Höhe 0 hat – kein Fehler, keine Meldung, nur eine fehlende Schiene. Beides fand sich erst beim Hinsehen, nicht beim Nachrechnen.',
+    ] },
     { version:'8.345.0', date:'30.07.2026', changes:[
       '<strong>Der Abgrund sieht jetzt aus wie ein Abgrund.</strong> Nachgemessen war er der flachste Ort im ganzen Spiel – und zwar wörtlich: Seine rund 1.300 Zeilen Zeichencode benutzten <em>keinen einzigen Farbverlauf und keinen einzigen Filter</em>, nur Flächen und Striche. Der Rest des Spiels hat beides längst (33 Verlaufsdefinitionen, eine Glühsprache, Canvas-Schattierung für Schiffe und Planeten); der Abgrund ist als Mechanik gewachsen und grafisch stehen geblieben.',
       '<strong>Eine Farbreise statt einer Abblendung.</strong> Aus der Tiefe wurde bisher ein einziger Wert gerechnet, und der senkte nur die Deckkraft – Tiefe 100 war dasselbe Bild wie Tiefe 1, nur blasser. Jetzt liest jedes Abgrund-Bild seine Farben aus <em>einer</em> Stelle, die von kaltem Sternenblau über Druck-Violett zu einem Schwarz reist, in dem nur noch die Biolumineszenz übrig ist. Der Wendepunkt liegt bei Tiefe 45: Bis dahin stirbt das Licht von oben, danach fängt der Grund selbst an zu leuchten. Was von oben verschwindet, kommt von unten zurück.',
@@ -32018,16 +32055,63 @@
     const marken = [];
     for (let t = ABGRUND_WAECHTER_ALLE; t <= bis; t += ABGRUND_WAECHTER_ALLE){
       const erreicht = t <= B;
-      marken.push('<path d="M'+x(t).toFixed(1)+' 20 L'+(x(t)+4).toFixed(1)+' 28 L'+x(t).toFixed(1)+' 36 L'+(x(t)-4).toFixed(1)+' 28 Z" fill="'+(erreicht?'#e24b4a':'#3a3f56')+'"/>');
-      marken.push('<text x="'+textX(t).toFixed(1)+'" y="50" text-anchor="middle" font-size="9" fill="'+(erreicht?'#9296ac':'#5a5f78')+'">'+t+'</text>');
+      const raute = 'M'+x(t).toFixed(1)+' 19 L'+(x(t)+4.5).toFixed(1)+' 28 L'+x(t).toFixed(1)+' 37 L'+(x(t)-4.5).toFixed(1)+' 28 Z';
+      // Eine bezwungene Waechtertiefe glueht, eine offene bleibt stumpf. Der Unterschied war vorher
+      // nur ein Farbwert - jetzt ist er ein Lichtzustand, und der liest sich auf einen Blick.
+      if (erreicht) marken.push('<g filter="url(#abGlut)" opacity="0.85"><path d="'+raute+'" fill="#e24b4a"/></g>');
+      marken.push('<path d="'+raute+'" fill="'+(erreicht?'#e24b4a':'#1b1f30')+'" stroke="'+(erreicht?'#ffd9d6':'#3a3f56')+'" stroke-width="'+(erreicht?1:1.2)+'"/>');
+      marken.push('<text x="'+textX(t).toFixed(1)+'" y="50" text-anchor="middle" font-size="9" font-weight="'+(erreicht?600:400)+'" fill="'+(erreicht?'#e8a9a6':'#5a5f78')+'">'+t+'</text>');
     }
     const zeiger = Math.max(1, Math.min(bis, gewaehlt||1));
+    // ---- Die Schiene IST die Farbreise (v8.346.0) ----
+    // Bis hierher war das Profil ein graues Band mit einem violetten Stueck darauf - technisch
+    // richtig und ohne jede Auskunft ausser der Laenge. Jetzt traegt die Schiene selbst die Farben
+    // der Tiefen, ueber die sie laeuft: Sie beginnt im Sternenblau der ersten Meter und endet in dem
+    // Schwarzgruen, das dort unten uebrig ist. Damit zeigt das Profil nicht nur, WIE WEIT man ist,
+    // sondern WOHIN es geht - und es benutzt dafuer keine zweite Farbtabelle, sondern dieselbe
+    // Funktion wie das Panorama. Acht Stuetzstellen genuegen; mehr sieht man auf 320 Punkten nicht.
+    const pid = 'tp' + bis + '_' + B;
+    // Die Wasserfarbe DIREKT zu nehmen war der erste Anlauf und im Bild fast unsichtbar: Wasser ist
+    // per Entwurf sehr dunkel (#17253f bis #05070f), und auf einem dunklen Panel verschwindet eine
+    // dunkle Schiene. Sie wird deshalb Richtung Leuchtfarbe aufgehellt - der FARBVERLAUF bleibt
+    // derselbe (Sternenblau -> Violett -> Schwarzgruen), nur auf einer sichtbaren Helligkeit.
+    const stopps = [];
+    for (let i = 0; i <= 7; i++){
+      const pt = abgrundTiefenFarben(Math.round(1 + (bis - 1) * (i/7)));
+      stopps.push('<stop offset="'+(i/7*100).toFixed(1)+'%" stop-color="'+abgrundMisch(pt.oben, pt.kante, 0.46)+'"/>');
+    }
+    const glutStopps = [];
+    for (let i = 0; i <= 7; i++){
+      const t = 1 + (bis - 1) * (i/7);
+      const pt = abgrundTiefenFarben(Math.round(t));
+      glutStopps.push('<stop offset="'+(i/7*100).toFixed(1)+'%" stop-color="'+pt.kante+'"/>');
+    }
+    const pz = abgrundTiefenFarben(zeiger);
     return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="none" aria-hidden="true">'
-      + '<path d="M'+links+' 28 H'+rechts+'" stroke="#2a2f45" stroke-width="3"/>'
-      + '<path d="M'+links+' 28 H'+x(B).toFixed(1)+'" stroke="#7f77dd" stroke-width="3"/>'
+      + '<defs>'
+      // gradientUnits="userSpaceOnUse" ist hier PFLICHT, nicht Geschmack: Die Schiene ist eine
+      // waagerechte Linie, ihre Bounding-Box hat also die Hoehe 0 - und ein Verlauf in
+      // objectBoundingBox-Einheiten (der Standard) ist bei einer entarteten Box undefiniert. Beim
+      // ersten Anlauf war die Schiene deshalb komplett UNSICHTBAR, nicht bloss dunkel: kein
+      // Farbwert, kein Fehler, keine Meldung. Mit expliziten Nutzerkoordinaten ist die Box
+      // gleichgueltig.
+      +   '<linearGradient id="ts'+pid+'" gradientUnits="userSpaceOnUse" x1="'+links+'" y1="0" x2="'+rechts+'" y2="0">'+stopps.join('')+'</linearGradient>'
+      +   '<linearGradient id="tg'+pid+'" gradientUnits="userSpaceOnUse" x1="'+links+'" y1="0" x2="'+rechts+'" y2="0">'+glutStopps.join('')+'</linearGradient>'
+      + '</defs>'
+      // Die UNerreichte Strecke: dieselben Farben, aber flach und dunkel. Man sieht, was kommt,
+      // ohne dass es aussieht, als haette man es schon.
+      + '<path d="M'+links+' 28 H'+rechts+'" stroke="url(#ts'+pid+')" stroke-width="8" stroke-linecap="round" opacity="0.26"/>'
+      // Die erreichte Strecke: volle Farbe, darunter ein Schein - der Weg, den man hinter sich hat,
+      // leuchtet. Ohne den Schein waere der Unterschied nur ein Helligkeitssprung.
+      + (B > 1 ? '<g filter="url(#abGlut)" opacity="0.45"><path d="M'+links+' 28 H'+x(B).toFixed(1)+'" stroke="url(#tg'+pid+')" stroke-width="6" stroke-linecap="round"/></g>' : '')
+      + '<path d="M'+links+' 28 H'+x(B).toFixed(1)+'" stroke="url(#ts'+pid+')" stroke-width="8" stroke-linecap="round"/>'
+      + '<path d="M'+links+' 25.6 H'+x(B).toFixed(1)+'" stroke="url(#tg'+pid+')" stroke-width="1.4" stroke-linecap="round" opacity="0.55"/>'
       + marken.join('')
-      + '<circle cx="'+x(zeiger).toFixed(1)+'" cy="28" r="5" fill="#c3bef5" stroke="#0d1224" stroke-width="2"/>'
-      + '<text x="'+textX(zeiger).toFixed(1)+'" y="13" text-anchor="middle" font-size="10" fill="#c3bef5">'+zeiger+'</text>'
+      // Der Zeiger traegt die Wasserfarbe SEINER Tiefe - er ist damit selbst eine Ablesung.
+      + '<g filter="url(#abGlut)" opacity="0.8"><circle cx="'+x(zeiger).toFixed(1)+'" cy="28" r="6" fill="'+pz.kante+'"/></g>'
+      + '<circle cx="'+x(zeiger).toFixed(1)+'" cy="28" r="5.5" fill="'+pz.oben+'" stroke="'+pz.kante+'" stroke-width="1.6"/>'
+      + '<circle cx="'+x(zeiger).toFixed(1)+'" cy="28" r="1.8" fill="'+pz.kante+'"/>'
+      + '<text x="'+textX(zeiger).toFixed(1)+'" y="12" text-anchor="middle" font-size="10" font-weight="600" fill="'+pz.kante+'">'+zeiger+'</text>'
       + '</svg>';
   }
   // ---- Tauchgang starten ----
@@ -32322,7 +32406,10 @@
       const woTiefe = (i+1) * ABGRUND_WAECHTER_ALLE;
       return `<div class="vitrine-fach${hat?'':' leer'}" title="${escapeHtml(hat ? r.name : 'Tiefe '+woTiefe)}">
         <div class="vitrine-bild">${hat
-          ? '<svg viewBox="0 0 100 100" width="38" height="38" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">'+r.bild+'</svg>'
+          ? '<svg viewBox="0 0 100 100" width="40" height="40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">'
+            // Zweimal dieselbe Zeichnung: unten weichgezeichnet als Schein, oben scharf. Dasselbe
+            // Verfahren wie beim Grat im Panorama - ein Objekt im Lichtkegel wirft Licht zurueck.
+            + '<g filter="url(#abGlut)" opacity="0.75" stroke-width="7">'+r.bild+'</g>'+r.bild+'</svg>'
           : '<i class="ti ti-lock" aria-hidden="true" style="font-size:18px;"></i>'}</div>
         <div class="vitrine-name">${hat ? escapeHtml(r.name) : 'Tiefe '+woTiefe}</div>
       </div>`;

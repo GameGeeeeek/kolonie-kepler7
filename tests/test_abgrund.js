@@ -61,6 +61,16 @@ function konstAus(name){
   if (!m) throw new Error('Konstante nicht gefunden: '+name);
   return m[0].trim();
 }
+// ABGRUND_FARBSTATIONEN ist ein MEHRZEILIGES Array-Literal - konstAus() zieht nur eine Zeile und
+// liefert deshalb ein abgeschnittenes `const ... = [`, was den ganzen Aufbau mit einem
+// SyntaxError kippt. Die Klammersuche steht hier EINMAL, weil zwei Aufbauten sie brauchen (der
+// Hauptkontext und der Zeichner fuer Siegel/Tiefenprofil) und eine zweimal getippte Regex genau die
+// Sorte Fundstelle ist, die beim naechsten Umbau nur an einer Stelle mitwandert.
+function farbstationenQuelle(){
+  const m = js.match(/const ABGRUND_FARBSTATIONEN = \[[\s\S]*?\n  \];/);
+  if (!m) throw new Error('ABGRUND_FARBSTATIONEN nicht gefunden');
+  return m[0];
+}
 function baueKontext(zustand){
   const quelle = [
     konstAus('ABGRUND_SILBEN_A'), konstAus('ABGRUND_SILBEN_B'), konstAus('ABGRUND_SILBEN_C'),
@@ -83,7 +93,7 @@ function baueKontext(zustand){
     // abgrundMisch/abgrundTiefenFarben (v8.345.0): Das Siegel liest seine Praegefarbe daraus. Sie
     // werden ECHT mitgeladen, nicht attrappiert - eine Attrappe mit fester Farbe pruefte die Attrappe.
     fnAus('abgrundMisch'),
-    (js.match(/const ABGRUND_FARBSTATIONEN = (\[[\s\S]*?\n  \]);/)||[])[0],
+    farbstationenQuelle(),
     konstAus('ABGRUND_FARB_WENDE'), konstAus('ABGRUND_FARB_TIEF'),
     fnAus('abgrundTiefenFarben'),
     fnAus('abgrundRng'), fnAus('abgrundSektor'), fnAus('abgrundMutatorAnzahl'),
@@ -709,7 +719,13 @@ check('11: der Bann kommt bei der Aufloesung aus der MISSION',
   const zeichner = new Function('ABGRUND_WAECHTER_ALLE',
     [konstAus('ABGRUND_SIEGEL_KERNE'), konstAus('ABGRUND_SIEGEL_RINGE'),
      // abgrundMisch (v8.345.0): Das Siegel mischt seine Praegefarbe damit ab.
+     // abgrundTiefenFarben samt Stationen (v8.346.0): Das Tiefenprofil streicht seine Schiene
+     // damit ein - es benutzt bewusst DIESELBE Farbfunktion wie das Panorama, damit es keine
+     // zweite Farbtabelle gibt, die veralten kann. Fehlt sie hier, stuerzt der Zeichner ab.
      fnAus('abgrundMisch'),
+     farbstationenQuelle(),
+     konstAus('ABGRUND_FARB_WENDE'), konstAus('ABGRUND_FARB_TIEF'),
+     fnAus('abgrundTiefenFarben'),
      fnAus('abgrundRng'), fnAus('abgrundSiegel'), fnAus('abgrundTiefenprofil'),
      'return { abgrundSiegel, abgrundTiefenprofil };'].join('\n'))(G.ABGRUND_WAECHTER_ALLE);
   const s20a = zeichner.abgrundSiegel(G.abgrundSektor(20), 56);
@@ -744,10 +760,19 @@ check('11: der Bann kommt bei der Aufloesung aus der MISSION',
     { einMutator:einer, zwei:zweier, drei:dreier });
   // Profil: Marken fuer jeden Waechter bis zum naechsten Ziel, keine kaputten Zahlen.
   const profil = zeichner.abgrundTiefenprofil(23, 24);
+  // Gezaehlt werden die BESCHRIFTUNGEN der Marken, nicht die Rauten. Seit v8.346.0 zeichnet eine
+  // bezwungene Waechtertiefe ihre Raute zweimal (weichgezeichneter Schein, darueber scharf), eine
+  // offene einmal - eine Zaehlung der Pfade wuerde die erreichten also doppelt zaehlen und bei jeder
+  // Aenderung am Lichtzustand kippen, ohne dass eine Marke fehlt. Die Beschriftung gibt es dagegen
+  // pro Marke genau einmal, und sie muss auf einer Waechtertiefe stehen.
+  const markenZahlen = [...profil.matchAll(/<text[^>]*y="50"[^>]*>(\d+)<\/text>/g)].map(m => +m[1]);
   check('13: das Tiefenprofil zeichnet die Waechter als Marken',
     /^<svg /.test(profil) && !/undefined|NaN/.test(profil) &&
-    (profil.match(/<path d="M[\d.]+ 20 L/g)||[]).length >= 3,
-    { marken:(profil.match(/<path d="M[\d.]+ 20 L/g)||[]).length });
+    markenZahlen.length >= 3 && markenZahlen.every(t => t % G.ABGRUND_WAECHTER_ALLE === 0),
+    { marken:markenZahlen });
+  check('13: und jede Marke hat ihre Raute',
+    (profil.match(/<path d="M[\d.]+ 19 L[\d.]+ 28 L[\d.]+ 37 L[\d.]+ 28 Z"/g)||[]).length >= markenZahlen.length,
+    { rauten:(profil.match(/<path d="M[\d.]+ 19 L/g)||[]).length, marken:markenZahlen.length });
   check('13: auch ohne jeden Tauchgang ergibt das Profil ein gueltiges Bild',
     /^<svg /.test(zeichner.abgrundTiefenprofil(0, 1)) && !/NaN/.test(zeichner.abgrundTiefenprofil(0, 1)));
 }
