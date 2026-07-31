@@ -219,7 +219,9 @@ check('JEDER shipStatBarsHtml-Aufruf gibt einen Schiffsschluessel mit (sonst zei
 
 // Die fuenf Rechenstellen muessen die Marke tatsaechlich lesen.
 const rechenstellen = [
-  ['Angriff (attackPowerRaw)', /const dm = \(key, count\) => diminishingShipCount\(count\|\|0\) \* \(1 \+ shipMarkBonus\(key,'atk'\)\)/],
+  // Seit v8.354.0 hat dm() einen ohneMarken-Schalter fuer die Bericht-Anzeige - der Markenfaktor
+  // steht weiterhin genau hier, nur eben hinter der Abfrage.
+  ['Angriff (attackPowerRaw)', /const dm = \(key, count\) => diminishingShipCount\(count\|\|0\) \* \(ohneMarken \? 1 : \(1 \+ shipMarkBonus\(key,'atk'\)\)\)/],
   ['Schild (defensePower)', /shipMarkBonus\(def\.key, 'shield'\)/],
   ['Tempo (effectiveShipSpeed)', /speed \*= \(1 \+ shipMarkBonus\(shipKey, 'speed'\)\)/],
   ['Treibstoff (fleetFuelModuleMult)', /shipMarkBonus\(k, 'fuel'\)/],
@@ -354,6 +356,54 @@ check('andere Klassen sagen, warum ihr Knopf grau ist', /es läuft immer nur ein
 check('die Hilfe erklaert die Aufruestzeit', /<strong>Ein Umbau braucht Zeit<\/strong>/.test(src));
 check('die Hilfe nennt den Ein-Umbau-Grundsatz und die volle Rueckgabe',
   /ein Umbau gleichzeitig<\/strong>/.test(src) && /Abbrechen geht jederzeit und gibt alles zurück<\/strong>/.test(src));
+
+// ---------------------------------------------------------------- 12. Marken im Kampfbericht (v8.354.0)
+// Die Marken flossen seit v8.350.0 in jede Kampfrechnung ein, aber kein Bericht sagte es. Was hier
+// still danebengehen kann:
+//   a) EIN KAMPFPFAD OHNE STEMPEL. Es gibt zwoelf Stellen, an denen ein Kampfbericht gebaut wird.
+//      Der Markenstand wird deshalb an der EINEN Stelle gesetzt, durch die alle laufen (pushReport).
+//   b) DIE FALSCHE FLOTTE GESTEMPELT. Bei einem Ueberfall steht unter report.fleet die Flotte der
+//      ANGREIFER - ein pauschaler Stempel haette dem Spieler seine eigenen Marken auf den Gegner
+//      geschrieben. Die eigene Flotte ist dort stationedFleet.
+//   c) DER HEUTIGE STAND IN EINEM ALTEN BERICHT. Wird der Stand beim LESEN ermittelt statt beim
+//      Austragen, wird eine mit Mk III gewonnene Schlacht nach dem naechsten Umbau zum Mk-IV-Sieg.
+//   d) EINE ZWEITE, NACHGEBAUTE PROZENTFORMEL. Sie waere beim naechsten neuen Schiff still falsch.
+//      Der Anteil kommt aus zwei Durchlaeufen DERSELBEN Funktion.
+//   e) NUR DER BERICHT, NICHT DIE VORSCHAU (Regel 6).
+check('attackPowerRaw kann markenlos rechnen (ein Schalter, keine zweite Kopie)',
+  /function attackPowerRaw\(fleet, ohneMarken\)/.test(src)
+  && /\(ohneMarken \? 1 : \(1 \+ shipMarkBonus\(key,'atk'\)\)\)/.test(src));
+check('shipDefenseContribution ebenso', /function shipDefenseContribution\(fleet, ohneMarken\)/.test(src));
+check('der Angriffsanteil kommt aus zwei Durchlaeufen derselben Funktion',
+  /const mit = attackPowerRaw\(fleet\), ohne = attackPowerRaw\(fleet, true\);/.test(src));
+check('der Verteidigungsanteil ebenso (Marke wirkt dort ueber atk UND Schild)',
+  /const mit = shipDefenseContribution\(fleet\), ohne = shipDefenseContribution\(fleet, true\);/.test(src));
+check('es gibt eine Momentaufnahme des Markenstands', /function fleetMarksSnapshot\(fleet\)/.test(src));
+check('und eine Berichtszeile dafuer', /function markReportLine\(marken, anteil, groesse\)/.test(src));
+// (a) Der Stempel sitzt an der einen Stelle, durch die jeder Bericht laeuft.
+check('der Markenstand wird zentral in pushReport gestempelt',
+  /async function pushReport\(report\)\{\s*stampShipMarks\(report\);/.test(src));
+check('stampShipMarks existiert genau einmal',
+  (src.match(/function stampShipMarks\(/g) || []).length === 1);
+// (b) Beim Ueberfall ist die eigene Flotte die stationierte, nicht report.fleet.
+check('beim Ueberfall wird die STATIONIERTE Flotte gestempelt, nicht die der Angreifer',
+  /else if \(report\.type === 'raid'\) eigene = report\.stationedFleet;/.test(src));
+check('und dort zaehlt der Verteidigungsanteil',
+  /report\.type === 'raid'\s*\?\s*fleetMarkDefShare\(eigene\) : fleetMarkAtkShare\(eigene\)/.test(src));
+// (c) Gespeichert, nicht beim Lesen gerechnet.
+check('der Anteil wird im Bericht gespeichert', /report\.markAtkShare = Math\.round\(/.test(src));
+check('die Berichtszeile liest den gespeicherten Stand', /markReportLine\(r\.marken, r\.markAtkShare/.test(src));
+// (e) Alle vier Kampfberichte und die Vorschau.
+const berichte = (src.match(/markReportLine\(r\.marken, r\.markAtkShare/g) || []).length;
+check('alle vier Kampfberichte zeigen die Zeile (NPC, Spieler, Allianzbasis, Ueberfall)',
+  berichte === 4, berichte);
+check('der Ueberfall-Bericht nennt ausdruecklich die Flottenverteidigung',
+  /markReportLine\(r\.marken, r\.markAtkShare, 'Flottenverteidigung'\)/.test(src));
+check('auch die NPC-Angriffsvorschau nennt die Marken',
+  /const markenPreview = totalSelected > 0 \? fleetMarksSnapshot\(attackFleet\) : null;/.test(src)
+  && /bereits eingerechnet/.test(src));
+check('die Hilfe sagt, dass Vorschau und Bericht sie ausweisen',
+  /<strong>Im Kampf sind sie ausgewiesen:<\/strong>/.test(src));
 
 console.log('\n' + (fail ? 'FAIL' : 'PASS'));
 process.exit(fail ? 1 : 0);

@@ -5465,8 +5465,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.353.0';
+  const VERSION = '8.354.0';
   const PATCHNOTES = [
+    { version:'8.354.0', date:'31.07.2026', changes:[
+      '<strong>Werftmarken stehen jetzt im Kampfbericht.</strong> Sie flossen seit v8.350.0 in JEDE Kampfrechnung ein – Angriffskraft, Verteidigung, im PvP auch serverseitig –, aber kein Bericht sagte es. Wer eine Klasse teuer auf Mk VII gebracht hatte, sah danach dieselbe Zahl wie vorher und konnte nicht nachvollziehen, ob sie überhaupt gewirkt hat. Jetzt führt jeder Kampfbericht eine eigene Zeile: welche Klassen mit welcher Marke gekämpft haben und wie viel Prozent Angriffskraft daraus kamen.',
+      '<strong>Betroffen sind alle vier Kampfberichte:</strong> NPC-Angriff, Spielerangriff, Angriff auf eine Allianzbasis und der abgewehrte Überfall. Beim Überfall steht dort der Anteil an der <em>Flottenverteidigung</em> statt an der Angriffskraft – dort wirkt die Marke über den Angriffswert <em>und</em> den Schild, der reine Angriffsanteil wäre schlicht die falsche Größe.',
+      '<strong>Der Bericht zeigt den Markenstand von damals, nicht den von heute.</strong> Er wird beim Austragen des Kampfes hineingeschrieben, nicht beim Lesen ermittelt. Eine mit Mk III gewonnene Schlacht bleibt sonst nach dem nächsten Umbau ein Mk-IV-Sieg – und der Bericht wäre als Beleg wertlos.',
+      '<strong>Auch die NPC-Angriffsvorschau nennt sie</strong>, mitsamt dem Hinweis, dass sie in der angezeigten Angriffskraft bereits enthalten sind. Stünden sie nur im Bericht, wäre die Vorschau die Anzeigestelle, die die alte Annahme behält – genau der wiederkehrende Fehler dieses Projekts.',
+      '<strong>Der Prozentanteil wird gerechnet, nicht geschätzt:</strong> Dieselbe Flotte läuft zweimal durch dieselbe Funktion, einmal mit Marken und einmal auf Mk I gestellt. Eine zweite, nachgebaute Formel wäre beim nächsten neuen Schiff still falsch geworden – die Angriffswerte der 22 Kampfklassen stehen weiterhin genau einmal im Code.',
+      '<strong>Der Markenstand wird an einer einzigen Stelle in den Bericht gestempelt</strong>, durch die jeder Kampf läuft, statt in den zwölf einzelnen Bericht-Bausteinen. Ein dreizehnter Kampfpfad wäre sonst genau der, der es vergisst. Welche Flotte dabei die eigene ist, entscheidet die Berichtsart: Beim Überfall stehen unter „Flotte" die Schiffe der <em>Angreifer</em> – ein pauschaler Stempel hätte dem Spieler seine eigenen Marken auf den Gegner geschrieben.'
+    ] },
     { version:'8.353.0', date:'31.07.2026', changes:[
       '<strong>Ein Klick auf die Sektorkarte öffnet jetzt ein kleines Menü, statt sofort loszufliegen.</strong> Bisher löste jeder Kartenklick genau eine Sache aus – Planet: Erkundungsmission, auch auf dem eigenen längst kolonisierten Planeten; fremder Spieler: Angriffsvorbereitung; NPC: ein Systemdialog „angreifen?". Die jeweils zweite Möglichkeit gab es nur ganz woanders: Kolonisieren in der Planetenliste darunter, Spähen im Bestenlisten-Tab. Auf einer verschiebbaren Karte verklickt man sich leicht, und ein Fehlklick kostete Treibstoff.',
       '<strong>Jedes Objekt bekommt die Aktionen, die es wirklich kennt.</strong> Planet: Erkunden, Kolonisieren (sobald entdeckt), bei eigenen Kolonien zusätzlich „Als aktive Basis wählen". Mond: dasselbe für den Mond. Fremder Spieler: Spähen, Angreifen, Monde belagern. Gegner: Angreifen. Unter jedem Eintrag stehen Flugzeit und Kosten – oder der Grund, warum er grau ist („Kein Kolonieschiff auf …", „Kolonie-Limit erreicht (3/3)", „Nichtangriffspakt aktiv").',
@@ -17295,6 +17303,55 @@
     return '<br><i class="ti '+v.icon+'" aria-hidden="true" style="color:'+v.farbe+';"></i> Konterwirkung: <span style="color:'+v.farbe+';">'
       + (v.pct>0?'+':'') + v.pct + '% Angriffskraft</span> – ' + v.text + '.';
   }
+  // ===== Werftmarken im Kampfbericht (31.07.2026) =====
+  // Die Marken flossen seit v8.350.0 in JEDE Kampfrechnung ein (attackPowerRaw, defensePower, PvP
+  // serverseitig) - aber kein Bericht sagte es. Wer eine Klasse teuer auf Mk VII gebracht hatte,
+  // sah danach dieselbe Zahl wie vorher und konnte nicht nachvollziehen, ob sie überhaupt gewirkt
+  // hat. Genau der Fall, den Regel 6 dieses Projekts meint: die Mechanik stimmte, die Anzeige fehlte.
+  //
+  // Der Stand wird BEIM AUSTRAGEN in den Bericht geschrieben, nicht beim Lesen ermittelt. Sonst
+  // zeigte ein alter Bericht den heutigen Markenstand - eine Schlacht, die mit Mk III gewonnen
+  // wurde, stünde nach dem nächsten Umbau als Mk IV-Sieg da.
+  function fleetMarksSnapshot(fleet){
+    if (!fleet) return null;
+    const m = {};
+    for (const [k,v] of Object.entries(fleet)){
+      if (!(v > 0)) continue;
+      const mk = shipMarkOf(k);
+      if (mk > 1) m[k] = mk;
+    }
+    return Object.keys(m).length ? m : null;
+  }
+  // Anteil, den die Marken an der Angriffskraft DIESER Flotte hatten. Aus zwei Durchläufen derselben
+  // Funktion statt aus einer nachgebauten Formel - eine zweite Formel wäre beim nächsten neuen
+  // Schiff still falsch geworden.
+  function fleetMarkAtkShare(fleet){
+    const mit = attackPowerRaw(fleet), ohne = attackPowerRaw(fleet, true);
+    if (!(ohne > 0)) return 0;
+    return mit/ohne - 1;
+  }
+  // Dasselbe für die Verteidigung. Eigene Funktion, weil die Marke dort auf ZWEI Wegen wirkt (der
+  // angriffsabgeleitete Anteil über atk, die Schildpunkte über shield) - der Angriffsanteil allein
+  // wäre in einem Abwehrbericht die falsche Zahl.
+  function fleetMarkDefShare(fleet){
+    const mit = shipDefenseContribution(fleet), ohne = shipDefenseContribution(fleet, true);
+    if (!(ohne > 0)) return 0;
+    return mit/ohne - 1;
+  }
+  // Eine Zeile für den Bericht. marken = Momentaufnahme aus fleetMarksSnapshot(), anteil = optional
+  // der vorberechnete Angriffsanteil (ebenfalls im Bericht gespeichert, damit die Zeile auch dann
+  // stimmt, wenn die Flotte inzwischen anders aussieht).
+  function markReportLine(marken, anteil, groesse){
+    if (!marken || !Object.keys(marken).length) return '';
+    const liste = Object.entries(marken)
+      .sort((a,b) => b[1]-a[1])
+      .map(([k,mk]) => shipDisplayName(k)+' <strong>Mk '+SHIP_MARK_ROMAN[mk-1]+'</strong>')
+      .join(', ');
+    const pct = (anteil > 0)
+      ? ' – <span style="color:#5dcaa5;">+'+(Math.round(anteil*1000)/10).toString().replace('.',',')+'% '+(groesse || 'Angriffskraft')+'</span>'
+      : '';
+    return '<br><i class="ti ti-arrow-up" aria-hidden="true" style="color:#f0b556;"></i> Werftmarken: '+liste+pct+'.';
+  }
   const COUNTER_BONUS = 0.25; // +25% Angriffskraft-Anteil, wenn im Vorteil
   const COUNTER_MALUS = 0.15; // -15% Angriffskraft-Anteil, wenn im Nachteil
   function counterMultiplier(ownFleet, enemyFleet){
@@ -17412,7 +17469,13 @@
     const balance = maxAbweichung > 0 ? Math.max(0, 1 - abweichung/maxAbweichung) : 1;
     return 1 + balance*FLEET_BALANCE_MAX_BONUS;
   }
-  function attackPowerRaw(fleet){
+  // ohneMarken (31.07.2026): rechnet dieselbe Flotte so, als stünde jede Klasse auf Mk I. Gebraucht
+  // wird das AUSSCHLIESSLICH für die Anzeige - der Kampfbericht soll sagen, wie viel die Marken
+  // tatsächlich beigetragen haben. Bewusst ein Schalter an DIESER Funktion statt einer zweiten,
+  // markenlosen Kopie: Die Angriffswerte der 22 Klassen stehen hier genau einmal, und eine Kopie
+  // wäre spätestens beim nächsten neuen Schiff auseinandergelaufen (der wiederkehrende Fehler
+  // dieses Projekts). Die Kampfauflösung ruft die Funktion weiterhin ohne den Schalter auf.
+  function attackPowerRaw(fleet, ohneMarken){
     const f = fleet || currentFleet();
     const df = deployableFighters(f);
     // Zielcomputer-Modulbonus lokal bei +100% gedeckelt (Balance-Review 17.07.2026) - dieselbe
@@ -17447,7 +17510,7 @@
     // 22 Kampfklassen. Ein Eintrag dort hätte die Marke bei Schlachtschiff und Tier-2 gedeckelt und
     // bei den anderen 19 ungedeckelt gelassen - dieselbe Größe, zwei Regeln. Der Markenfaktor ist
     // stattdessen durch SHIP_MARK_MAX baulich bei +27% begrenzt, für jede Klasse gleich.
-    const dm = (key, count) => diminishingShipCount(count||0) * (1 + shipMarkBonus(key,'atk'));
+    const dm = (key, count) => diminishingShipCount(count||0) * (ohneMarken ? 1 : (1 + shipMarkBonus(key,'atk')));
     let power = dm('cruisers',f.cruisers)*20 + dm('destroyers',f.destroyers)*45 + dm('ships',f.ships)*5 + dm('jaeger',df.jaeger)*10 + dm('bomber',df.bomber)*60 + dm('schlachtschiff',f.schlachtschiff)*90*schlachtschiffAtkMult + dm('carrier',f.carrier)*15 + dm('superschlachtschiff',f.superschlachtschiff)*220 + dm('waechter',f.waechter)*8 +
       dm('leerenjaeger',f.leerenjaeger)*140 + dm('kometenjaeger',f.kometenjaeger)*18 + dm('enterschiff',f.enterschiff)*25 + dm('phantomschiff',f.phantomschiff)*35 + dm('riftwaechter',f.riftwaechter)*20 +
       (dm('nanoklinge',f.nanoklinge)*55 + dm('quantenkreuzer',f.quantenkreuzer)*80 + dm('fusionsdreadnought',f.fusionsdreadnought)*180)*t2AtkMult +
@@ -18841,7 +18904,10 @@
     const col = state.colonies[planetKey];
     return col ? col.buildings : state.buildings;
   }
-  function shipDefenseContribution(fleet){
+  // ohneMarken (31.07.2026): dieselbe Flotte gerechnet, als stuende jede Klasse auf Mk I - nur
+  // fuer die Anzeige im Kampfbericht ("davon durch Werftmarken"). Wie bei attackPowerRaw() ein
+  // Schalter statt einer zweiten Kopie, damit die Gewichte hier genau einmal stehen.
+  function shipDefenseContribution(fleet, ohneMarken){
     if (!fleet) return 0;
     // Echte Verteidigungsspezialisierung (13.07.2026, Feature-Wunsch): vorher war die Verteidigung
     // jedes Schiffs reinrechnerisch 40% seines Angriffswerts plus Schild - Angriffs- und
@@ -18876,8 +18942,8 @@
       // attackPowerRaw() - er ist derselbe Angriffswert, nur mit defWeight verrechnet. Der
       // Schildanteil zieht den eigenen shield-Anteil der Marke. Beide additiv zum Modulbonus, damit
       // ein Schiff mit Modul UND Marke nicht das Produkt zweier Prozentfaktoren bekommt.
-      const markAtk = shipMarkBonus(def.key, 'atk');
-      const markShield = shipMarkBonus(def.key, 'shield');
+      const markAtk = ohneMarken ? 0 : shipMarkBonus(def.key, 'atk');
+      const markShield = ohneMarken ? 0 : shipMarkBonus(def.key, 'shield');
       atkDerivedSum += diminishingShipCount(count) * (def.atk||0) * weight * (1+hullBonus+markAtk);
       shieldSum += count * (def.shield ? def.shield*(1+shieldBonus+markShield) : (def.atk||0)*shieldBonus*0.5);
     }
@@ -18886,8 +18952,8 @@
       // Das Superschlachtschiff steht nicht in SHIP_DEFS und läuft deshalb an der Schleife oben
       // vorbei - seine Marke muss hier eigens angewandt werden, sonst wäre es die eine Klasse, bei
       // der die Marke in der Verteidigung stillschweigend wirkungslos bliebe.
-      const superMarkAtk = shipMarkBonus('superschlachtschiff','atk');
-      const superMarkShield = shipMarkBonus('superschlachtschiff','shield');
+      const superMarkAtk = ohneMarken ? 0 : shipMarkBonus('superschlachtschiff','atk');
+      const superMarkShield = ohneMarken ? 0 : shipMarkBonus('superschlachtschiff','shield');
       atkDerivedSum += diminishingShipCount(superCount) * 220 * SUPERSCHLACHTSCHIFF_DEF_WEIGHT * (1+superMarkAtk);
       shieldSum += superCount * SUPERSCHLACHTSCHIFF_SHIELD * (1+superMarkShield);
     }
@@ -23303,7 +23369,33 @@
     if (r.type === 'alliance-base-attack') return (r.result === 'win' || r.result === 'destroyed') ? 'win' : 'loss';
     return null;
   }
+  // Markenstand in den Bericht stempeln (31.07.2026). Bewusst HIER, an der einen Stelle, durch die
+  // jeder Bericht läuft, und nicht in den zwölf Bericht-Literalen einzeln: Ein dreizehnter Kampfpfad
+  // wäre sonst genau der, der es vergisst.
+  //
+  // Der Typ entscheidet, WELCHE Flotte die eigene ist - ein pauschales report.fleet wäre falsch:
+  // Bei einem Überfall ('raid') steht dort die Flotte der ANGREIFER, die eigenen Schiffe stehen in
+  // stationedFleet. Ein Markenstempel auf die Raiderflotte hätte dem Spieler die eigenen Marken auf
+  // den Gegner geschrieben.
+  function stampShipMarks(report){
+    if (!report || report.marken !== undefined) return report;
+    let eigene = null;
+    if (report.type === 'npc-attack' || report.type === 'player-attack' || report.type === 'alliance-base-attack') eigene = report.fleet;
+    else if (report.type === 'raid') eigene = report.stationedFleet;
+    if (!eigene) return report;
+    const marken = fleetMarksSnapshot(eigene);
+    if (!marken) return report;
+    report.marken = marken;
+    // Der Anteil wird mitgespeichert statt beim Lesen gerechnet: Ein alter Bericht soll die Zahl
+    // zeigen, die DAMALS galt, nicht die des heutigen Markenstands. Beim Überfall ist die eigene
+    // Flotte die VERTEIDIGENDE - dort zählt der Verteidigungsanteil (atk-abgeleitet plus Schild),
+    // der Angriffsanteil wäre schlicht die falsche Größe.
+    report.markAtkShare = Math.round((report.type === 'raid'
+      ? fleetMarkDefShare(eigene) : fleetMarkAtkShare(eigene)) * 10000) / 10000;
+    return report;
+  }
   async function pushReport(report){
+    stampShipMarks(report);
     // Läuft bewusst VOR dem useBackend-Check, damit die Kampf-Statistik auch ohne eigenen Server
     // funktioniert (die Berichte selbst werden dort zwar nicht gespeichert, die Zählung aber schon).
     const outcome = battleOutcomeOf(report);
@@ -24415,7 +24507,7 @@
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
       { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Dreizehn Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Je Typ nur EIN Modul gleichzeitig:</strong> Du kannst an einem Standort nicht zweimal Panzerung einbauen – auch nicht in unterschiedlichen Seltenheitsstufen. Wer Slots füllen will, muss also <strong>verschiedene</strong> Typen kombinieren, statt den stärksten Bonus einfach zu stapeln. Genau deshalb lohnen sich die benannten Set-Boni weiter unten: Sie belohnen ausgerechnet die Vielfalt, die diese Regel erzwingt. <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente <em>oder</em> 60.000 Kredite je Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär; Level und Substats der Module bleiben dabei erhalten); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. Aufwerten geht sowohl im Inventar als auch <strong>direkt am eingebauten Modul</strong> – es bleibt dabei im Slot, du musst es nicht erst abnehmen. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
-      { title:'Werftmarken – zehn Ausbaustufen je Schiffsklasse', body:'Jede Schiffsklasse lässt sich in der <strong>Werft</strong> über zehn Stufen ausbauen. <strong>Mk I</strong> ist der Auslieferungszustand, darüber liegen neun bezahlte Schritte. Eine Marke gilt für die <strong>ganze Klasse</strong> – für jedes Schiff, das du schon hast, und für jedes künftig gebaute. Deshalb sind die Zuwächse bewusst klein: je Stufe <strong>+3% Angriff</strong>, <strong>+3% Schild</strong>, <strong>+2% Tempo</strong>, <strong>−1,5% Treibstoffverbrauch</strong> und <strong>−2% Bauzeit</strong>; auf Mk X also +27% Angriff und Schild, +18% Tempo, −13,5% Treibstoff, −18% Bauzeit. Angriff und Schild gelten für alle Klassen mit Kampfwert, <strong>Tempo und Treibstoff für jede der 40 Klassen</strong> – auch Frachter, Aufklärer und die Tiefenflotte haben also etwas davon. <strong>Wichtig beim Tempo:</strong> Die Flugzeit einer Mission bestimmt immer das <strong>langsamste</strong> beteiligte Schiff (wie ein Konvoi) – ein aufgerüsteter Jäger neben einem unaufgerüsteten Kolonieschiff bringt beim Tempo nichts. Wer schneller fliegen will, rüstet gezielt den Bremser auf. <strong>Kosten:</strong> Der Preis richtet sich nach der Bauzeit der Klasse (Bauzeit ÷ 50, gedeckelt bei 20) und steigt je Stufe um rund das 1,6-Fache. Der komplette Weg Mk I → Mk X kostet einen Jäger rund 2,3 Mio Erz, ein Schlachtschiff etwa 14,5 Mio, einen Fusionsdreadnought gut 40 Mio – eine echte Senke für spätes Material. <strong>Ab Mk V kommt auf jeder Stufe eine weitere Tier-2-Ressource dazu</strong>, in der Reihenfolge ihrer eigenen Forschungskette: Nanolegierungen (Mk V), Quantenchips (Mk VI), Hochenergiekristalle (Mk VII), Fusionskerne (Mk VIII), KI-Kerne (Mk IX), Metamaterial (Mk X). Die zugehörige Forschung ist jeweils die Voraussetzung der Stufe – wer ein Schiff auf Mk X bringen will, muss also alle sechs Tier-2-Fabrikketten laufen haben. Der Singularitätskern bleibt bewusst draußen; er ist die Währung der Tiefenflotte. <strong>Die drei obersten Marken verlangen zusätzlich je einen Expeditionsfund</strong>, der sich nicht produzieren lässt: 1x Kristallherz (Mk VIII), 1x Alte Technologie (Mk IX), 1x Resonanzkristall (Mk X). Diese Mengen sind fest und wachsen <em>nicht</em> mit der Klasse – ein Fusionsdreadnought braucht genauso ein Stück wie ein Jäger. Damit hängen die letzten Stufen nicht am Lagerbestand, sondern daran, dass man tatsächlich rausfliegt. <strong>Ein Umbau braucht Zeit</strong>, und die steigt je Stufe um rund das 1,55-Fache: Mk II ist beim Jäger nach 4 Minuten fertig, Mk X dauert 2 Std. 13 Min.; der ganze Weg Mk I → Mk X kostet einen Jäger gut 6 Stunden, ein Schlachtschiff knapp 12, einen Fusionsdreadnought knapp 17. Die <em>Kosten</em> skalieren voll mit der Klasse, die <em>Zeit</em> nur gedämpft – sonst wäre die Endstufe der schwersten Klassen tagelang blockiert. Es läuft immer nur <strong>ein Umbau gleichzeitig</strong> (wie bei der Forschung), damit die Reihenfolge eine echte Entscheidung bleibt; der Umbau belegt aber <em>keinen</em> der zehn Werftplätze, du kannst also nebenher weiterbauen. Werft-Boni verkürzen ihn genau wie den Schiffsbau – der Bauzeit-Rabatt der Marke selbst allerdings bewusst nicht, eine Stufe soll sich nicht selbst beschleunigen. <strong>Abbrechen geht jederzeit und gibt alles zurück</strong>, Ressourcen wie Expeditionsfund; ein Fehlklick kostet dich nur die bereits verstrichene Zeit. Fällt ein Umbau fertig, während du offline bist, ist er beim nächsten Einloggen erledigt. <strong>Sichtbar</strong> wird jede Stufe auch am Schiff selbst: Blechhaut, Panzerkante, längere Geschützrohre, ein Turm mehr, Sensormast, Systemlichter, stärkerer Antrieb, Silbersaum und zuletzt die goldene Zierlinie mit Bugscheinwerfer. Der Umriss bleibt über alle zehn Marken gleich, damit du deine Flotte weiter auf einen Blick erkennst; die Stufe steht als römische Ziffer auf der Plakette am Schiffssymbol. Marken <strong>überleben das Prestige</strong> (wie Offiziere und Schiffsmodule), und der Server rechnet sie im PvP genauso nach wie die Vorschau – Anzeige und Kampfergebnis bleiben synchron.' },
+      { title:'Werftmarken – zehn Ausbaustufen je Schiffsklasse', body:'Jede Schiffsklasse lässt sich in der <strong>Werft</strong> über zehn Stufen ausbauen. <strong>Mk I</strong> ist der Auslieferungszustand, darüber liegen neun bezahlte Schritte. Eine Marke gilt für die <strong>ganze Klasse</strong> – für jedes Schiff, das du schon hast, und für jedes künftig gebaute. Deshalb sind die Zuwächse bewusst klein: je Stufe <strong>+3% Angriff</strong>, <strong>+3% Schild</strong>, <strong>+2% Tempo</strong>, <strong>−1,5% Treibstoffverbrauch</strong> und <strong>−2% Bauzeit</strong>; auf Mk X also +27% Angriff und Schild, +18% Tempo, −13,5% Treibstoff, −18% Bauzeit. Angriff und Schild gelten für alle Klassen mit Kampfwert, <strong>Tempo und Treibstoff für jede der 40 Klassen</strong> – auch Frachter, Aufklärer und die Tiefenflotte haben also etwas davon. <strong>Wichtig beim Tempo:</strong> Die Flugzeit einer Mission bestimmt immer das <strong>langsamste</strong> beteiligte Schiff (wie ein Konvoi) – ein aufgerüsteter Jäger neben einem unaufgerüsteten Kolonieschiff bringt beim Tempo nichts. Wer schneller fliegen will, rüstet gezielt den Bremser auf. <strong>Kosten:</strong> Der Preis richtet sich nach der Bauzeit der Klasse (Bauzeit ÷ 50, gedeckelt bei 20) und steigt je Stufe um rund das 1,6-Fache. Der komplette Weg Mk I → Mk X kostet einen Jäger rund 2,3 Mio Erz, ein Schlachtschiff etwa 14,5 Mio, einen Fusionsdreadnought gut 40 Mio – eine echte Senke für spätes Material. <strong>Ab Mk V kommt auf jeder Stufe eine weitere Tier-2-Ressource dazu</strong>, in der Reihenfolge ihrer eigenen Forschungskette: Nanolegierungen (Mk V), Quantenchips (Mk VI), Hochenergiekristalle (Mk VII), Fusionskerne (Mk VIII), KI-Kerne (Mk IX), Metamaterial (Mk X). Die zugehörige Forschung ist jeweils die Voraussetzung der Stufe – wer ein Schiff auf Mk X bringen will, muss also alle sechs Tier-2-Fabrikketten laufen haben. Der Singularitätskern bleibt bewusst draußen; er ist die Währung der Tiefenflotte. <strong>Die drei obersten Marken verlangen zusätzlich je einen Expeditionsfund</strong>, der sich nicht produzieren lässt: 1x Kristallherz (Mk VIII), 1x Alte Technologie (Mk IX), 1x Resonanzkristall (Mk X). Diese Mengen sind fest und wachsen <em>nicht</em> mit der Klasse – ein Fusionsdreadnought braucht genauso ein Stück wie ein Jäger. Damit hängen die letzten Stufen nicht am Lagerbestand, sondern daran, dass man tatsächlich rausfliegt. <strong>Ein Umbau braucht Zeit</strong>, und die steigt je Stufe um rund das 1,55-Fache: Mk II ist beim Jäger nach 4 Minuten fertig, Mk X dauert 2 Std. 13 Min.; der ganze Weg Mk I → Mk X kostet einen Jäger gut 6 Stunden, ein Schlachtschiff knapp 12, einen Fusionsdreadnought knapp 17. Die <em>Kosten</em> skalieren voll mit der Klasse, die <em>Zeit</em> nur gedämpft – sonst wäre die Endstufe der schwersten Klassen tagelang blockiert. Es läuft immer nur <strong>ein Umbau gleichzeitig</strong> (wie bei der Forschung), damit die Reihenfolge eine echte Entscheidung bleibt; der Umbau belegt aber <em>keinen</em> der zehn Werftplätze, du kannst also nebenher weiterbauen. Werft-Boni verkürzen ihn genau wie den Schiffsbau – der Bauzeit-Rabatt der Marke selbst allerdings bewusst nicht, eine Stufe soll sich nicht selbst beschleunigen. <strong>Abbrechen geht jederzeit und gibt alles zurück</strong>, Ressourcen wie Expeditionsfund; ein Fehlklick kostet dich nur die bereits verstrichene Zeit. Fällt ein Umbau fertig, während du offline bist, ist er beim nächsten Einloggen erledigt. <strong>Sichtbar</strong> wird jede Stufe auch am Schiff selbst: Blechhaut, Panzerkante, längere Geschützrohre, ein Turm mehr, Sensormast, Systemlichter, stärkerer Antrieb, Silbersaum und zuletzt die goldene Zierlinie mit Bugscheinwerfer. Der Umriss bleibt über alle zehn Marken gleich, damit du deine Flotte weiter auf einen Blick erkennst; die Stufe steht als römische Ziffer auf der Plakette am Schiffssymbol. Marken <strong>überleben das Prestige</strong> (wie Offiziere und Schiffsmodule), und der Server rechnet sie im PvP genauso nach wie die Vorschau – Anzeige und Kampfergebnis bleiben synchron. <strong>Im Kampf sind sie ausgewiesen:</strong> Die NPC-Angriffsvorschau nennt die Marken deiner gewählten Flotte samt dem Prozentanteil, den sie an deiner Angriffskraft haben, und jeder Kampfbericht – NPC-Angriff, Spielerangriff, Angriff auf eine Allianzbasis und abgewehrter Überfall – führt sie in einer eigenen Zeile. Der Bericht zeigt dabei den Markenstand <em>zum Zeitpunkt des Kampfes</em>, nicht den heutigen: Eine mit Mk III gewonnene Schlacht bleibt eine Mk-III-Schlacht, auch wenn du danach weiter aufrüstest. Beim abgewehrten Überfall steht dort der Anteil an der <em>Flottenverteidigung</em> statt an der Angriffskraft – dort wirkt die Marke über den Angriffswert <em>und</em> den Schild, der reine Angriffsanteil wäre die falsche Zahl.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Sieben Klassen mit eigenen Slots (bis zu 3, und wie bei den Standort-Modulen <strong>je Typ nur eines gleichzeitig</strong> – unabhängig von der Seltenheit): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     // Eigener Abschnitt (v8.326.0). Vorher stand der gesamte Abgrund als EIN Absatz mit 581 Woertern
@@ -24798,6 +24890,9 @@
         body = (r.targetPlanet ? 'Angegriffener Planet: <strong>'+planetDisplayName(r.targetPlanet)+'</strong><br>' : '') + 'Angriffspunkte des Gegners: ~'+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
         body += '<br>Angegriffen mit: '+fleetBreakdownHtml(r.fleet);
         if (r.defenseBefore) body += '<br>Deine Verteidigung: '+defenseBreakdownHtml(r.defenseBefore, null);
+        // Werftmarken der stationierten Flotte. Hier zaehlt der VERTEIDIGUNGS-Anteil (Marke wirkt
+        // ueber Angriffswert UND Schild), nicht der Angriffsanteil - siehe stampShipMarks().
+        body += markReportLine(r.marken, r.markAtkShare, 'Flottenverteidigung');
         body += formationReportLine(r.formation, r.formationMult);
         // Nullfeldanker: Sein Beitrag taucht in KEINER Verteidigungsanzeige auf, weil er erst
         // feststeht, wenn die Stärke des Angreifers bekannt ist. Der Bericht ist damit die einzige
@@ -24828,6 +24923,7 @@
         body = '<strong>'+(r.result==='destroyed' ? 'DIE BASIS WURDE ZERSTÖRT! Schaden: '+fmt(r.damage||0)+'.' : (r.result==='win' ? 'Treffer! '+fmt(r.damage||0)+' Schaden an der Basis (Hülle danach: '+fmt(r.hullAfter||0)+'/'+fmt(r.hullMax||0)+').' : 'Abgewehrt - die Verteidigung ('+fmt(r.defensePower||0)+') hielt stand (Erfolgschance ~'+(r.chancePct||0)+'%).'))+'</strong>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt')+' · Angriffskraft: '+fmt(r.attackPower||0)+' vs. Verteidigung '+fmt(r.defensePower||0);
         body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        body += markReportLine(r.marken, r.markAtkShare);
         body += '<br>Kampfpunkte: +'+(r.battlePoints||0);
         if (r.ownLostShips && Object.keys(r.ownLostShips).length){
           body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
@@ -24921,6 +25017,7 @@
           const weaknessNameMap = { cruiser:'Kreuzer', destroyer:'Zerstörer', jaeger:'Jäger', bomber:'Bomber', schlachtschiff:'Schlachtschiff', superschlachtschiff:'Superschlachtschiff', leerenjaeger:'Leerenjäger' };
           body += '<br>Schwachstelle des Gegners: '+(weaknessNameMap[r.weaknessType]||shipDisplayName(r.weaknessType))+(r.hasWeakness?' (ausgenutzt, +25% Angriffskraft)':' (nicht mitgeführt)');
         }
+        body += markReportLine(r.marken, r.markAtkShare);
         body += counterReportLine(r.counterMult);
         body += battlePhaseReportHtml(r.phasen);
         body += boardingReportHtml(r.enterung);
@@ -24953,6 +25050,11 @@
         body = '<strong>'+(r.result==='win' ? 'Erfolgreich! Angriffskraft ('+r.attackPower+') war überlegen (vs. Verteidigungspunkte '+r.defensePower+').' : 'Gescheitert. Angriffskraft ('+r.attackPower+') reichte nicht (vs. Verteidigungspunkte '+r.defensePower+').')+'</strong>';
         if (r.warTag) body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
+        body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        // Im PvP rechnet der SERVER die Angriffskraft (rawFleetPower mit demselben Markenfaktor wie
+        // attackPowerRaw hier). Die Zeile erklaert also die Zahl, die oben steht - sie erfindet sie
+        // nicht nachtraeglich.
+        body += markReportLine(r.marken, r.markAtkShare);
         if (r.simulated) body += '<br><span class="bmeta">Simuliertes Duell (kein eigener Server aktiv) – kein echter Ressourcenverlust beim Gegner.</span>';
         if (r.loot){
           body += '<br>Beute: '+rewardHtml(r.loot);
@@ -42864,6 +42966,11 @@
       const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
       const kv = totalSelected > 0 ? counterVerdict(npcCounterPreview) : null;
+      // Werftmarken in der Vorschau (31.07.2026, Regel 6): Der Kampfbericht weist sie seit dieser
+      // Version aus - stuenden sie NUR dort, waere die Vorschau die Anzeigestelle, die die alte
+      // Annahme behaelt. Gerechnet wird mit derselben Funktion, die auch der Bericht nutzt.
+      const markenPreview = totalSelected > 0 ? fleetMarksSnapshot(attackFleet) : null;
+      const markAnteilPreview = markenPreview ? fleetMarkAtkShare(attackFleet) : 0;
       // Enter-Vorschau (26.07.2026): Ohne sie waere die Enterphase eine Ueberraschung im Bericht.
       // Gerechnet wird mit demselben boardingChance() wie spaeter im Kampf; als Widerstand dient der
       // Erwartungswert des ueberlebenden Rests bei dieser Kraefteverteilung - dieselbe Formel wie in
@@ -42890,6 +42997,7 @@
               <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
               ${kv && npcCounterPreview !== 1 ? `<div class="bmeta" style="color:${kv.farbe};"><i class="ti ${kv.icon}" aria-hidden="true"></i> ${kv.text} (${kv.pct>0?'+':''}${kv.pct}% Angriffskraft)</div>` : ''}
+              ${markenPreview ? `<div class="bmeta" style="color:#f0b556;"><i class="ti ti-arrow-up" aria-hidden="true"></i> Werftmarken: ${Object.entries(markenPreview).sort((x,y)=>y[1]-x[1]).map(([k,mk])=>shipDisplayName(k)+' Mk '+SHIP_MARK_ROMAN[mk-1]).join(', ')}${markAnteilPreview>0?` (+${(Math.round(markAnteilPreview*1000)/10).toString().replace('.',',')}% Angriffskraft, bereits eingerechnet)`:''}</div>` : ''}
               ${enterZeile}
               <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(flightTime)} Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
               <div class="bmeta" style="${atkCargoCapacity<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität: ${fmt(atkCargoCapacity)}${atkCargoCapacity<=0?' – ohne Frachter geht die Beute verloren!':''}</div>
