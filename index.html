@@ -671,6 +671,34 @@
     .mark-buy { display:flex; align-items:center; justify-content:space-between; gap:10px;
                 flex-wrap:wrap; margin-top:5px; }
     .mark-buy .buy { font-size:10.5px; padding:4px 10px; flex-shrink:0; }
+    .mark-row.laeuft { border-left-color:var(--c-info, #63c6e8); background:rgba(99,198,232,0.05); }
+    .mark-row.laeuft .mark-mk { color:var(--c-info, #63c6e8); }
+    .mark-fortschritt { height:4px; background:rgba(255,255,255,0.09); margin-top:5px; overflow:hidden; }
+    .mark-fortschritt i { display:block; height:100%; background:var(--c-info, #63c6e8); }
+    /* Kartenmenü (31.07.2026, Spieler-Wunsch: "wenn man einen Planeten auswählt soll sich ein
+       kleines Menü öffnen"). Es hängt bewusst an document.body und NICHT im Kartencontainer:
+       buildGalaxyMap() schreibt dessen Inhalt jedes Sekunden-Tick per innerHTML neu - ein Menü
+       darin wäre nach spätestens einer Sekunde wieder weg, mitsamt seinen Klick-Handlern.
+       position:fixed, weil die Karte selbst verschiebbar/zoombar ist: absolute Koordinaten im
+       Dokument würden beim nächsten Schwenk nicht mehr zum Marker passen. */
+    .kmenu { position:fixed; z-index:9000; min-width:170px; max-width:min(240px, 88vw);
+             background:rgba(13,18,36,0.97); border:var(--bw-1) solid rgba(var(--primary-rgb),0.45);
+             box-shadow:0 10px 30px rgba(0,0,0,0.45); padding:0; }
+    .kmenu-kopf { padding:7px 10px 6px; border-bottom:var(--bw-1) solid var(--line);
+                  font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.09em;
+                  text-transform:uppercase; color:var(--ink-dim); }
+    .kmenu-titel { display:block; font-family:var(--font-body, inherit); font-size:12.5px;
+                   letter-spacing:0; text-transform:none; color:#e9ecf5; font-weight:600;
+                   margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .kmenu button { display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+                    background:transparent; border:0; border-left:var(--bw-rail) solid transparent;
+                    padding:8px 10px; font-size:12px; color:#e9ecf5; cursor:pointer; }
+    .kmenu button:hover:not(:disabled) { background:rgba(255,255,255,0.06); border-left-color:#f0b556; }
+    .kmenu button:disabled { color:#6d7386; cursor:default; }
+    .kmenu button i { width:15px; flex-shrink:0; }
+    /* Der Grund, warum ein Eintrag grau ist, steht direkt darunter - ein deaktivierter Knopf ohne
+       Begründung ist die schlechtere Hälfte derselben Information. */
+    .kmenu-grund { padding:0 10px 7px 33px; margin-top:-4px; font-size:10px; color:#8b90a4; line-height:1.35; }
     /* Modul-Slot-Karten (Spieler-Report 25.07.2026 mit Screenshots vom Handy). Drei Probleme:
        (1) Die Karten nutzten .card-row, das ein geerbtes justify-content:space-between mitbringt -
            bei flex-direction:column verteilte das Name und Seltenheit an die Kartenränder und riss
@@ -5437,8 +5465,30 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.352.0';
+  const VERSION = '8.354.0';
   const PATCHNOTES = [
+    { version:'8.354.0', date:'31.07.2026', changes:[
+      '<strong>Werftmarken stehen jetzt im Kampfbericht.</strong> Sie flossen seit v8.350.0 in JEDE Kampfrechnung ein – Angriffskraft, Verteidigung, im PvP auch serverseitig –, aber kein Bericht sagte es. Wer eine Klasse teuer auf Mk VII gebracht hatte, sah danach dieselbe Zahl wie vorher und konnte nicht nachvollziehen, ob sie überhaupt gewirkt hat. Jetzt führt jeder Kampfbericht eine eigene Zeile: welche Klassen mit welcher Marke gekämpft haben und wie viel Prozent Angriffskraft daraus kamen.',
+      '<strong>Betroffen sind alle vier Kampfberichte:</strong> NPC-Angriff, Spielerangriff, Angriff auf eine Allianzbasis und der abgewehrte Überfall. Beim Überfall steht dort der Anteil an der <em>Flottenverteidigung</em> statt an der Angriffskraft – dort wirkt die Marke über den Angriffswert <em>und</em> den Schild, der reine Angriffsanteil wäre schlicht die falsche Größe.',
+      '<strong>Der Bericht zeigt den Markenstand von damals, nicht den von heute.</strong> Er wird beim Austragen des Kampfes hineingeschrieben, nicht beim Lesen ermittelt. Eine mit Mk III gewonnene Schlacht bleibt sonst nach dem nächsten Umbau ein Mk-IV-Sieg – und der Bericht wäre als Beleg wertlos.',
+      '<strong>Auch die NPC-Angriffsvorschau nennt sie</strong>, mitsamt dem Hinweis, dass sie in der angezeigten Angriffskraft bereits enthalten sind. Stünden sie nur im Bericht, wäre die Vorschau die Anzeigestelle, die die alte Annahme behält – genau der wiederkehrende Fehler dieses Projekts.',
+      '<strong>Der Prozentanteil wird gerechnet, nicht geschätzt:</strong> Dieselbe Flotte läuft zweimal durch dieselbe Funktion, einmal mit Marken und einmal auf Mk I gestellt. Eine zweite, nachgebaute Formel wäre beim nächsten neuen Schiff still falsch geworden – die Angriffswerte der 22 Kampfklassen stehen weiterhin genau einmal im Code.',
+      '<strong>Der Markenstand wird an einer einzigen Stelle in den Bericht gestempelt</strong>, durch die jeder Kampf läuft, statt in den zwölf einzelnen Bericht-Bausteinen. Ein dreizehnter Kampfpfad wäre sonst genau der, der es vergisst. Welche Flotte dabei die eigene ist, entscheidet die Berichtsart: Beim Überfall stehen unter „Flotte" die Schiffe der <em>Angreifer</em> – ein pauschaler Stempel hätte dem Spieler seine eigenen Marken auf den Gegner geschrieben.'
+    ] },
+    { version:'8.353.0', date:'31.07.2026', changes:[
+      '<strong>Ein Klick auf die Sektorkarte öffnet jetzt ein kleines Menü, statt sofort loszufliegen.</strong> Bisher löste jeder Kartenklick genau eine Sache aus – Planet: Erkundungsmission, auch auf dem eigenen längst kolonisierten Planeten; fremder Spieler: Angriffsvorbereitung; NPC: ein Systemdialog „angreifen?". Die jeweils zweite Möglichkeit gab es nur ganz woanders: Kolonisieren in der Planetenliste darunter, Spähen im Bestenlisten-Tab. Auf einer verschiebbaren Karte verklickt man sich leicht, und ein Fehlklick kostete Treibstoff.',
+      '<strong>Jedes Objekt bekommt die Aktionen, die es wirklich kennt.</strong> Planet: Erkunden, Kolonisieren (sobald entdeckt), bei eigenen Kolonien zusätzlich „Als aktive Basis wählen". Mond: dasselbe für den Mond. Fremder Spieler: Spähen, Angreifen, Monde belagern. Gegner: Angreifen. Unter jedem Eintrag stehen Flugzeit und Kosten – oder der Grund, warum er grau ist („Kein Kolonieschiff auf …", „Kolonie-Limit erreicht (3/3)", „Nichtangriffspakt aktiv").',
+      '<strong>Warum „angreifen" nicht beim Planeten steht:</strong> Andere Spieler wohnen im Spiel nicht auf den Planeten der Sektorkarte – sie haben ihren eigenen roten Marker nahe der Sonne. Ein Planet ist entweder unbewohnt oder deiner. Angreifen sitzt deshalb im Menü des Spielermarkers. Aus demselben Grund heißt „Spähen" je nach Ziel etwas anderes: beim Planeten die Erkundung (Erkundungsschiff), beim Spieler die Spionage (Spähschiff/Spionagekreuzer) – zwei verschiedene Missionen mit verschiedenen Schiffen.',
+      '<strong>Der native „NPC angreifen?"-Dialog ist weg.</strong> Er nannte weder Flugzeit noch Treibstoff und lag auf dem Handy als Systemfenster über der Karte. Das Menü sagt beides und sperrt den Eintrag, solange oben keine Angriffsflotte zusammengestellt ist – vorher lief der Angriff in diesem Fall wortlos ins Leere.',
+      '<strong>Das Menü hängt bewusst nicht in der Karte.</strong> Deren Inhalt wird jede Sekunde neu geschrieben; ein Menü darin wäre nach spätestens einer Sekunde samt seinen Knöpfen verschwunden. Es schließt mit Esc, per Klick daneben, beim Scrollen und beim Verschieben der Karte – ein Zieh-Klick öffnet es gar nicht erst.',
+      '<strong>Eine Werftmarke ist nicht mehr sofort fertig – der Umbau braucht Zeit, und die steigt je Stufe.</strong> Bisher war der Materialpreis die einzige Schranke: Wer genug im Lager hatte, klickte eine Klasse in einem Zug auf Mk X hoch, und die zehn Stufen fühlten sich an wie ein Kauf mit zehn Klicks. Jetzt dauert Mk II beim Jäger 4 Minuten, Mk X gut 2 Stunden – der ganze Weg Mk I → Mk X kostet einen Jäger rund 6 Stunden, ein Schlachtschiff knapp 12, einen Fusionsdreadnought knapp 17.',
+      '<strong>Die Zeit skaliert bewusst gedämpfter mit der Klasse als die Kosten.</strong> Ressourcen wachsen voll mit dem Klassenfaktor, die Dauer nur mit dessen 0,35-ter Potenz: Ein Fusionsdreadnought (Faktor 18) braucht knapp das Dreifache eines Jägers, nicht das Achtzehnfache. Bei linearer Skalierung wäre die Endstufe der schwersten Klassen tagelang blockiert gewesen – und genau die Klassen, für die man Marken am ehesten kauft, wären die unattraktivsten geworden.',
+      '<strong>Es läuft immer nur ein Umbau gleichzeitig</strong>, wie bei der Forschung – das macht die Reihenfolge zu einer echten Entscheidung; bei vierzig Klassen parallel wäre die Zeit keine Schranke mehr. Der Umbau belegt aber <em>keinen</em> der zehn Werftplätze: Er rüstet die bestehende Flotte um, es entsteht kein neues Schiff, also läuft der Schiffsbau ungestört weiter.',
+      '<strong>Abbrechen geht jederzeit und gibt alles vollständig zurück</strong> – Ressourcen wie Expeditionsfund. Ohne Rückgabe wäre ein Fehlklick bei einem mehrstündigen Umbau eine Strafe, die nichts lehrt, und der einzige Ausweg wäre gewesen, ihn auszusitzen.',
+      '<strong>Werft-Boni verkürzen den Umbau genau wie den Schiffsbau</strong> (Werft-Welt, Overdrive, Ingenieur, Werftgebäude). Der Bauzeit-Rabatt der Marke selbst ausdrücklich nicht: Eine Stufe, die sich selbst beschleunigt, ist beim Nachrechnen nicht mehr zu erklären.',
+      '<strong>Ein Umbau, der über Nacht fällig wird, ist beim Einloggen erledigt.</strong> Er läuft im Offline-Nachholpfad mit, nicht erst beim ersten sichtbaren Tick – sonst hätte man die Marke zwar bekommen, aber die Zeit dazwischen verschenkt.',
+      '<strong>Die Werftkarte zeigt Fortschrittsbalken und Restzeit</strong>, solange der Umbau läuft, und sagt bei den anderen Klassen, welche gerade umgebaut wird. Ein grauer Knopf ohne Begründung wäre die schlechtere Hälfte derselben Information gewesen. Im Kaufbereich steht die Dauer ab sofort neben dem Preis.'
+    ] },
     { version:'8.352.0', date:'31.07.2026', changes:[
       '<strong>Zwei tote Links repariert – die Patchnotes-Seite gab es nie.</strong> Die Startseite verlinkte an zwei Stellen auf „patchnotes.html": oben im Menü neben SPIEL und FRAKTIONEN, und unten in der Fußzeile neben Impressum und Datenschutz. Die Datei existierte nicht. Wer draufklickte, landete im Nichts – und zwar seit es die Startseite gibt. Jetzt gibt es die Seite wirklich: alle 768 Versionen mit 2.046 Einträgen, von 1.0.0 bis heute.',
       '<strong>Die Seite wird aus dem Spiel erzeugt, nicht von Hand gepflegt.</strong> Eine zweite, handgeschriebene Fassung wäre nach dem nächsten Patch veraltet gewesen, ohne dass es jemandem auffällt. Stattdessen liest ein Generator die Patchnotes direkt aus der Spieldatei – dieselbe Quelle, die auch das Patchnotes-Fenster im Spiel füllt. Es kann keine zwei Stände geben.',
@@ -15421,6 +15471,57 @@
   function shipMarkBonus(shipKey, feld){
     return (shipMarkOf(shipKey) - 1) * (SHIP_MARK_PER_STEP[feld] || 0);
   }
+  // ===== Aufruestzeit (31.07.2026) =====
+  // Eine Marke war bis v8.352.0 sofort fertig. Damit war die einzige Schranke der Materialpreis -
+  // wer genug im Lager hatte, klickte sich die ganze Klasse in einem Zug auf Mk X hoch, und die
+  // zehn Stufen fuehlten sich an wie ein einziger Kauf mit zehn Klicks.
+  //
+  // Die Dauer waechst je Stufe um das 1,55-Fache und mit der Klasse nur gedaempft (Faktor hoch
+  // 0,35): Ein Fusionsdreadnought (Klassenfaktor 18) braucht so knapp das Dreifache eines Jaegers,
+  // nicht das Achtzehnfache - bei linearer Skalierung waere die Endstufe der schwersten Klasse
+  // tagelang blockiert gewesen. Die RESSOURCEN skalieren voll mit der Klasse, die ZEIT gedaempft.
+  const SHIP_MARK_TIME_BASE = 240;      // Sekunden fuer Mk II beim Klassenfaktor 1,0
+  const SHIP_MARK_TIME_STEP = 1.55;     // je weitere Stufe
+  const SHIP_MARK_TIME_CLASS_EXP = 0.35;
+  const SHIP_MARK_TIME_CAP = 12*3600;   // kein Einzelschritt laenger als 12 Stunden
+  // Rohdauer ohne Werft-Boni. planetKey optional - mit ihm laufen Werft-Welt, Overdrive, Ingenieur
+  // und die Werftgebaeude mit hinein, genau wie beim Schiffsbau.
+  function shipMarkDuration(shipKey, ziel, planetKey){
+    const roh = Math.min(SHIP_MARK_TIME_CAP,
+      SHIP_MARK_TIME_BASE * Math.pow(SHIP_MARK_TIME_STEP, ziel-2)
+        * Math.pow(shipMarkClassFactor(shipKey), SHIP_MARK_TIME_CLASS_EXP));
+    // shipKey wird ABSICHTLICH nicht durchgereicht: effectiveBuildTimeEach() wuerde sonst den
+    // Bauzeit-Rabatt der Marke auf ihre eigene Aufruestung anwenden - eine Stufe, die sich selbst
+    // beschleunigt, ist beim Nachrechnen nicht mehr zu erklaeren.
+    const eff = planetKey ? effectiveBuildTimeEach('ship', planetKey, roh) : roh;
+    return Math.max(10, Math.round(eff));
+  }
+  function shipMarkJob(){
+    const j = state.shipMarkJob;
+    if (!j || typeof j !== 'object' || !j.key || typeof j.endsAt !== 'number') return null;
+    return j;
+  }
+  function shipMarkJobRest(){
+    const j = shipMarkJob();
+    return j ? Math.max(0, j.endsAt - Date.now()) : 0;
+  }
+  // Faellige Aufruestung abschliessen. Gibt true zurueck, wenn etwas passiert ist - der Aufrufer
+  // speichert dann. Bewusst eine eigene Funktion und nicht inline im Tick: Sie wird AUCH vom
+  // Offline-Nachholpfad gebraucht. Ohne das haette ein Umbau, der ueber Nacht faellig wurde, erst
+  // beim ersten sichtbaren Tick nach dem Einloggen gegriffen - der Spieler haette die Marke gehabt,
+  // aber die Zeit dazwischen waere verschenkt gewesen.
+  function processShipMarkJob(){
+    const j = shipMarkJob();
+    if (!j || Date.now() < j.endsAt) return false;
+    const def = SHIP_DEFS.find(d => d.key === j.key) || { name: j.key };
+    state.shipMarks[j.key] = Math.max(shipMarkOf(j.key), Math.min(SHIP_MARK_MAX, j.ziel));
+    state.shipMarkJob = null;
+    addXp(15);
+    const stufe = SHIP_MARK_STEPS[j.ziel-1] || { was:'' };
+    log(def.name+' trägt jetzt Werftmarke Mk '+SHIP_MARK_ROMAN[j.ziel-1]+' – '+stufe.was+'. '+shipMarkEffectText(j.ziel)+'.', 'ti-arrow-up');
+    pushToast(def.name+': Werftmarke Mk '+SHIP_MARK_ROMAN[j.ziel-1]+' fertig', 'ti-arrow-up', 'ok');
+    return true;
+  }
   function shipMarkGateOpen(ziel){
     const gate = SHIP_MARK_GATES[ziel];
     if (!gate) return true;
@@ -15464,14 +15565,36 @@
     if (mk >= SHIP_MARK_MAX){
       return `<div class="mark-row done">${kopf}${wirkung}<div class="mark-eff" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Endausbau erreicht – höher geht es nicht.</div></div>`;
     }
+    // Laeuft an DIESER Klasse gerade ein Umbau, zeigt die Karte Fortschritt statt Kaufknopf.
+    // Laeuft er an einer ANDEREN, sagt sie das - sonst waere der graue Knopf grundlos.
+    const job = shipMarkJob();
+    if (job && job.key === shipKey){
+      const rest = shipMarkJobRest();
+      const ganz = Math.max(1, job.endsAt - (job.startedAt || job.endsAt - 1));
+      const pct = Math.max(0, Math.min(100, 100 * (1 - rest/ganz)));
+      const st = SHIP_MARK_STEPS[job.ziel-1] || { was:'' };
+      return `<div class="mark-row laeuft">${kopf}${wirkung}
+        <div class="mark-eff"><i class="ti ti-clock" aria-hidden="true"></i> Umbau auf Mk ${SHIP_MARK_ROMAN[job.ziel-1]} – ${st.was} · noch ${fmtDuration(rest/1000)}</div>
+        <div class="mark-fortschritt"><i style="width:${pct.toFixed(1)}%;"></i></div>
+        <div class="mark-buy">
+          <span class="mark-eff" style="margin:0;">Material ist bereits abgebucht – ein Abbruch gibt es vollständig zurück.</span>
+          <button data-shipmark-cancel="1" style="font-size:10.5px; padding:4px 10px;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Abbrechen</button>
+        </div>
+      </div>`;
+    }
     const ziel = mk + 1;
     const cost = shipMarkCost(shipKey, ziel);
     const gateOk = shipMarkGateOpen(ziel);
     const item = shipMarkItem(ziel);
     const itemOk = shipMarkItemOk(ziel);
     const bezahlbar = canAfford(cost);
-    const kaufbar = gateOk && itemOk && bezahlbar;
+    const werftBelegt = !!job;   // an einer anderen Klasse
+    const kaufbar = gateOk && itemOk && bezahlbar && !werftBelegt;
     const naechste = SHIP_MARK_STEPS[ziel-1];
+    const dauer = shipMarkDuration(shipKey, ziel, state.activeBasePlanet);
+    const belegtZeile = werftBelegt
+      ? `<div class="mark-eff" style="color:#f0997b;"><i class="ti ti-clock" aria-hidden="true"></i> Die Werft baut gerade ${(SHIP_DEFS.find(d=>d.key===job.key)||{name:job.key}).name} um – es läuft immer nur ein Umbau.</div>`
+      : '';
     const gateZeile = gateOk ? '' :
       `<div class="mark-eff" style="color:#f0997b;"><i class="ti ti-flask" aria-hidden="true"></i> Benötigt: ${shipMarkGateName(ziel)}</div>`;
     // Der Expeditionsfund steht in einer EIGENEN Zeile mit Bestandsangabe, nicht in costHtml():
@@ -15481,9 +15604,9 @@
       : '';
     return `<div class="mark-row">${kopf}${wirkung}
       <div class="mark-eff"><i class="ti ti-arrow-up" aria-hidden="true"></i> Mk ${SHIP_MARK_ROMAN[ziel-1]} – ${naechste.was}: ${naechste.txt}</div>
-      ${gateZeile}${itemZeile}
+      ${gateZeile}${itemZeile}${belegtZeile}
       <div class="mark-buy">
-        <span class="bcost" style="margin:0;">${costHtml(cost)}</span>
+        <span class="bcost" style="margin:0;">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dauer)}</span>
         <button class="buy ${kaufbar?'affordable':''}" data-shipmark="${shipKey}" ${kaufbar?'':'disabled'}><i class="ti ti-arrow-up" aria-hidden="true" style="margin-right:4px;"></i>Aufrüsten</button>
       </div>
     </div>`;
@@ -15775,6 +15898,13 @@
   }
   function fuelCostText(fuel){
     return Object.entries(fuel).map(([r,a])=>a+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r)).join(' + ');
+  }
+  // Kostenobjekt als reiner Text ohne Markup (31.07.2026). Gebraucht an Stellen, die ihren Text
+  // escapen und deshalb mit dem Icon-Markup aus costHtml() nichts anfangen koennen - derzeit die
+  // Begruendungszeilen im Kartenmenue.
+  function costText(cost){
+    return Object.entries(cost).map(([r,a]) =>
+      fmt(a)+' '+(r === 'credits' ? 'Kredite' : ((RES_DEFS.find(x=>x.key===r)||{}).label||r))).join(' + ');
   }
   function fuelCostIconHtml(fuel){
     return Object.entries(fuel).map(([r,a])=>miniResIcon(r)+' '+a).join(' + ');
@@ -17173,6 +17303,55 @@
     return '<br><i class="ti '+v.icon+'" aria-hidden="true" style="color:'+v.farbe+';"></i> Konterwirkung: <span style="color:'+v.farbe+';">'
       + (v.pct>0?'+':'') + v.pct + '% Angriffskraft</span> – ' + v.text + '.';
   }
+  // ===== Werftmarken im Kampfbericht (31.07.2026) =====
+  // Die Marken flossen seit v8.350.0 in JEDE Kampfrechnung ein (attackPowerRaw, defensePower, PvP
+  // serverseitig) - aber kein Bericht sagte es. Wer eine Klasse teuer auf Mk VII gebracht hatte,
+  // sah danach dieselbe Zahl wie vorher und konnte nicht nachvollziehen, ob sie überhaupt gewirkt
+  // hat. Genau der Fall, den Regel 6 dieses Projekts meint: die Mechanik stimmte, die Anzeige fehlte.
+  //
+  // Der Stand wird BEIM AUSTRAGEN in den Bericht geschrieben, nicht beim Lesen ermittelt. Sonst
+  // zeigte ein alter Bericht den heutigen Markenstand - eine Schlacht, die mit Mk III gewonnen
+  // wurde, stünde nach dem nächsten Umbau als Mk IV-Sieg da.
+  function fleetMarksSnapshot(fleet){
+    if (!fleet) return null;
+    const m = {};
+    for (const [k,v] of Object.entries(fleet)){
+      if (!(v > 0)) continue;
+      const mk = shipMarkOf(k);
+      if (mk > 1) m[k] = mk;
+    }
+    return Object.keys(m).length ? m : null;
+  }
+  // Anteil, den die Marken an der Angriffskraft DIESER Flotte hatten. Aus zwei Durchläufen derselben
+  // Funktion statt aus einer nachgebauten Formel - eine zweite Formel wäre beim nächsten neuen
+  // Schiff still falsch geworden.
+  function fleetMarkAtkShare(fleet){
+    const mit = attackPowerRaw(fleet), ohne = attackPowerRaw(fleet, true);
+    if (!(ohne > 0)) return 0;
+    return mit/ohne - 1;
+  }
+  // Dasselbe für die Verteidigung. Eigene Funktion, weil die Marke dort auf ZWEI Wegen wirkt (der
+  // angriffsabgeleitete Anteil über atk, die Schildpunkte über shield) - der Angriffsanteil allein
+  // wäre in einem Abwehrbericht die falsche Zahl.
+  function fleetMarkDefShare(fleet){
+    const mit = shipDefenseContribution(fleet), ohne = shipDefenseContribution(fleet, true);
+    if (!(ohne > 0)) return 0;
+    return mit/ohne - 1;
+  }
+  // Eine Zeile für den Bericht. marken = Momentaufnahme aus fleetMarksSnapshot(), anteil = optional
+  // der vorberechnete Angriffsanteil (ebenfalls im Bericht gespeichert, damit die Zeile auch dann
+  // stimmt, wenn die Flotte inzwischen anders aussieht).
+  function markReportLine(marken, anteil, groesse){
+    if (!marken || !Object.keys(marken).length) return '';
+    const liste = Object.entries(marken)
+      .sort((a,b) => b[1]-a[1])
+      .map(([k,mk]) => shipDisplayName(k)+' <strong>Mk '+SHIP_MARK_ROMAN[mk-1]+'</strong>')
+      .join(', ');
+    const pct = (anteil > 0)
+      ? ' – <span style="color:#5dcaa5;">+'+(Math.round(anteil*1000)/10).toString().replace('.',',')+'% '+(groesse || 'Angriffskraft')+'</span>'
+      : '';
+    return '<br><i class="ti ti-arrow-up" aria-hidden="true" style="color:#f0b556;"></i> Werftmarken: '+liste+pct+'.';
+  }
   const COUNTER_BONUS = 0.25; // +25% Angriffskraft-Anteil, wenn im Vorteil
   const COUNTER_MALUS = 0.15; // -15% Angriffskraft-Anteil, wenn im Nachteil
   function counterMultiplier(ownFleet, enemyFleet){
@@ -17290,7 +17469,13 @@
     const balance = maxAbweichung > 0 ? Math.max(0, 1 - abweichung/maxAbweichung) : 1;
     return 1 + balance*FLEET_BALANCE_MAX_BONUS;
   }
-  function attackPowerRaw(fleet){
+  // ohneMarken (31.07.2026): rechnet dieselbe Flotte so, als stünde jede Klasse auf Mk I. Gebraucht
+  // wird das AUSSCHLIESSLICH für die Anzeige - der Kampfbericht soll sagen, wie viel die Marken
+  // tatsächlich beigetragen haben. Bewusst ein Schalter an DIESER Funktion statt einer zweiten,
+  // markenlosen Kopie: Die Angriffswerte der 22 Klassen stehen hier genau einmal, und eine Kopie
+  // wäre spätestens beim nächsten neuen Schiff auseinandergelaufen (der wiederkehrende Fehler
+  // dieses Projekts). Die Kampfauflösung ruft die Funktion weiterhin ohne den Schalter auf.
+  function attackPowerRaw(fleet, ohneMarken){
     const f = fleet || currentFleet();
     const df = deployableFighters(f);
     // Zielcomputer-Modulbonus lokal bei +100% gedeckelt (Balance-Review 17.07.2026) - dieselbe
@@ -17325,7 +17510,7 @@
     // 22 Kampfklassen. Ein Eintrag dort hätte die Marke bei Schlachtschiff und Tier-2 gedeckelt und
     // bei den anderen 19 ungedeckelt gelassen - dieselbe Größe, zwei Regeln. Der Markenfaktor ist
     // stattdessen durch SHIP_MARK_MAX baulich bei +27% begrenzt, für jede Klasse gleich.
-    const dm = (key, count) => diminishingShipCount(count||0) * (1 + shipMarkBonus(key,'atk'));
+    const dm = (key, count) => diminishingShipCount(count||0) * (ohneMarken ? 1 : (1 + shipMarkBonus(key,'atk')));
     let power = dm('cruisers',f.cruisers)*20 + dm('destroyers',f.destroyers)*45 + dm('ships',f.ships)*5 + dm('jaeger',df.jaeger)*10 + dm('bomber',df.bomber)*60 + dm('schlachtschiff',f.schlachtschiff)*90*schlachtschiffAtkMult + dm('carrier',f.carrier)*15 + dm('superschlachtschiff',f.superschlachtschiff)*220 + dm('waechter',f.waechter)*8 +
       dm('leerenjaeger',f.leerenjaeger)*140 + dm('kometenjaeger',f.kometenjaeger)*18 + dm('enterschiff',f.enterschiff)*25 + dm('phantomschiff',f.phantomschiff)*35 + dm('riftwaechter',f.riftwaechter)*20 +
       (dm('nanoklinge',f.nanoklinge)*55 + dm('quantenkreuzer',f.quantenkreuzer)*80 + dm('fusionsdreadnought',f.fusionsdreadnought)*180)*t2AtkMult +
@@ -18719,7 +18904,10 @@
     const col = state.colonies[planetKey];
     return col ? col.buildings : state.buildings;
   }
-  function shipDefenseContribution(fleet){
+  // ohneMarken (31.07.2026): dieselbe Flotte gerechnet, als stuende jede Klasse auf Mk I - nur
+  // fuer die Anzeige im Kampfbericht ("davon durch Werftmarken"). Wie bei attackPowerRaw() ein
+  // Schalter statt einer zweiten Kopie, damit die Gewichte hier genau einmal stehen.
+  function shipDefenseContribution(fleet, ohneMarken){
     if (!fleet) return 0;
     // Echte Verteidigungsspezialisierung (13.07.2026, Feature-Wunsch): vorher war die Verteidigung
     // jedes Schiffs reinrechnerisch 40% seines Angriffswerts plus Schild - Angriffs- und
@@ -18754,8 +18942,8 @@
       // attackPowerRaw() - er ist derselbe Angriffswert, nur mit defWeight verrechnet. Der
       // Schildanteil zieht den eigenen shield-Anteil der Marke. Beide additiv zum Modulbonus, damit
       // ein Schiff mit Modul UND Marke nicht das Produkt zweier Prozentfaktoren bekommt.
-      const markAtk = shipMarkBonus(def.key, 'atk');
-      const markShield = shipMarkBonus(def.key, 'shield');
+      const markAtk = ohneMarken ? 0 : shipMarkBonus(def.key, 'atk');
+      const markShield = ohneMarken ? 0 : shipMarkBonus(def.key, 'shield');
       atkDerivedSum += diminishingShipCount(count) * (def.atk||0) * weight * (1+hullBonus+markAtk);
       shieldSum += count * (def.shield ? def.shield*(1+shieldBonus+markShield) : (def.atk||0)*shieldBonus*0.5);
     }
@@ -18764,8 +18952,8 @@
       // Das Superschlachtschiff steht nicht in SHIP_DEFS und läuft deshalb an der Schleife oben
       // vorbei - seine Marke muss hier eigens angewandt werden, sonst wäre es die eine Klasse, bei
       // der die Marke in der Verteidigung stillschweigend wirkungslos bliebe.
-      const superMarkAtk = shipMarkBonus('superschlachtschiff','atk');
-      const superMarkShield = shipMarkBonus('superschlachtschiff','shield');
+      const superMarkAtk = ohneMarken ? 0 : shipMarkBonus('superschlachtschiff','atk');
+      const superMarkShield = ohneMarken ? 0 : shipMarkBonus('superschlachtschiff','shield');
       atkDerivedSum += diminishingShipCount(superCount) * 220 * SUPERSCHLACHTSCHIFF_DEF_WEIGHT * (1+superMarkAtk);
       shieldSum += superCount * SUPERSCHLACHTSCHIFF_SHIELD * (1+superMarkShield);
     }
@@ -20746,6 +20934,16 @@
     // Migration. Der Deckel wird hier trotzdem gezogen: Ein aus welchem Grund auch immer zu hoher
     // Wert wuerde sonst gespeichert und liefe in die Backend-Sanity-Pruefung, die den GESAMTEN
     // Spielstand mit HTTP 400 ablehnt (Vorfall 21.07.2026).
+    // Laufende Aufruestung: genau EINE gleichzeitig, wie bei der Forschung. Ein kaputter oder
+    // uralter Auftrag wird verworfen statt ewig stehenzubleiben.
+    if (state.shipMarkJob !== undefined && state.shipMarkJob !== null){
+      const j = state.shipMarkJob;
+      const gueltig = j && typeof j === 'object' && typeof j.key === 'string'
+        && typeof j.ziel === 'number' && j.ziel >= 2 && j.ziel <= SHIP_MARK_MAX
+        && typeof j.endsAt === 'number' && isFinite(j.endsAt);
+      if (!gueltig) state.shipMarkJob = null;
+    }
+    if (state.shipMarkJob === undefined) state.shipMarkJob = null;
     if (!state.shipMarks || typeof state.shipMarks !== 'object') state.shipMarks = {};
     for (const k of Object.keys(state.shipMarks)){
       const v = state.shipMarks[k];
@@ -22923,7 +23121,7 @@
     { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – wähle vorher deine Angriffsflotte aus. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
     // Ohne HTML: renderTutorialStep setzt den Text per textContent, ein <strong> stünde wörtlich im
     // Fenster. test_tutorial prüft das - und hat genau diesen Fehler bei v8.349.0 gemeldet.
-    { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab siehst du zuerst die ganze Galaxie. Klick ein System an, dann fährt die Karte hinein und seine Planeten gehen auf – dort erkundest du sie mit Erkundungsschiffen und kolonisierst sie später mit Kolonieschiffen. Zurück zur Übersicht mit Esc. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft oder Handel) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
+    { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab siehst du zuerst die ganze Galaxie. Klick ein System an, dann fährt die Karte hinein und seine Planeten gehen auf – ein Klick auf einen Planeten öffnet ein kleines Menü mit Erkunden und Kolonisieren. Zurück zur Übersicht mit Esc. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft oder Handel) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
     { icon:'ti-users', title:'Allianz & Gemeinschaft', text:'Im Allianz-Tab schließt du dich mit anderen zusammen für gemeinsame Technologien, Gebäude und sogar Kriege gegen andere Allianzen.' },
     { icon:'ti-diamond', title:'Kredite: die zweite Währung', text:'Neben Ressourcen gibt es Kredite als Handelswährung – dafür brauchst du keine Fabrik, sondern Aktivität. Die verlässlichste Quelle sind Handelsrouten (Markt-Tab): einmal eingerichtet, liefern sie dauernd Kredite. Dazu kommen der Verkauf überschüssiger Ressourcen am Markt, die Belohnungen der Tagesaufgaben, Fraktionsaufträge, Erfolge, eroberte Sternsysteme und der Schattenbund als Verbündeter. Ausgegeben werden sie im Kredit-Shop, für Tribute, am Markt und für einzelne Gebäude wie das Botschaftsviertel.' },
     { icon:'ti-list-details', title:'Tagesaufgaben: der tägliche Faden', text:'Unter der Ressourcenleiste liegen die Tagesaufgaben: fünf werden täglich aus 22 Vorlagen gezogen, quer durch alle Bereiche – Kampf, Forschung, Bau, Markt, Expeditionen, Fraktionen, und mit freigeschaltetem Abgrund auch Tauchgänge. Jede gibt Ressourcen oder Kredite, und wer an einem Tag alle abholt, bekommt einen Serien-Bonus, der über mehrere Komplett-Tage wächst. Eine offene Aufgabe kannst du antippen, um direkt zum passenden Menü zu springen. Das ist der schnellste Weg, das Spiel kennenzulernen: die Aufgaben führen dich von selbst durch alle Systeme.' },
@@ -23171,7 +23369,33 @@
     if (r.type === 'alliance-base-attack') return (r.result === 'win' || r.result === 'destroyed') ? 'win' : 'loss';
     return null;
   }
+  // Markenstand in den Bericht stempeln (31.07.2026). Bewusst HIER, an der einen Stelle, durch die
+  // jeder Bericht läuft, und nicht in den zwölf Bericht-Literalen einzeln: Ein dreizehnter Kampfpfad
+  // wäre sonst genau der, der es vergisst.
+  //
+  // Der Typ entscheidet, WELCHE Flotte die eigene ist - ein pauschales report.fleet wäre falsch:
+  // Bei einem Überfall ('raid') steht dort die Flotte der ANGREIFER, die eigenen Schiffe stehen in
+  // stationedFleet. Ein Markenstempel auf die Raiderflotte hätte dem Spieler die eigenen Marken auf
+  // den Gegner geschrieben.
+  function stampShipMarks(report){
+    if (!report || report.marken !== undefined) return report;
+    let eigene = null;
+    if (report.type === 'npc-attack' || report.type === 'player-attack' || report.type === 'alliance-base-attack') eigene = report.fleet;
+    else if (report.type === 'raid') eigene = report.stationedFleet;
+    if (!eigene) return report;
+    const marken = fleetMarksSnapshot(eigene);
+    if (!marken) return report;
+    report.marken = marken;
+    // Der Anteil wird mitgespeichert statt beim Lesen gerechnet: Ein alter Bericht soll die Zahl
+    // zeigen, die DAMALS galt, nicht die des heutigen Markenstands. Beim Überfall ist die eigene
+    // Flotte die VERTEIDIGENDE - dort zählt der Verteidigungsanteil (atk-abgeleitet plus Schild),
+    // der Angriffsanteil wäre schlicht die falsche Größe.
+    report.markAtkShare = Math.round((report.type === 'raid'
+      ? fleetMarkDefShare(eigene) : fleetMarkAtkShare(eigene)) * 10000) / 10000;
+    return report;
+  }
   async function pushReport(report){
+    stampShipMarks(report);
     // Läuft bewusst VOR dem useBackend-Check, damit die Kampf-Statistik auch ohne eigenen Server
     // funktioniert (die Berichte selbst werden dort zwar nicht gespeichert, die Zählung aber schon).
     const outcome = battleOutcomeOf(report);
@@ -24192,7 +24416,8 @@
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (Deckel bei 6 Sektoren). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
       { title:'Mondzerstörer & Mondbelagerung', body:'Endgame-Schiff (Flotte-Tab), das einen fremden, kolonisierten Mond dauerhaft zerstören kann. Voraussetzung: Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die höchste Forschungshürde im Spiel), danach ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Extrem teuer, extrem langsam (weit unter der Geschwindigkeit jedes anderen Schiffs, entsprechend lange Flugzeit und hoher Treibstoffverbrauch) und immer nur als einzelnes Exemplar besitzbar. Ein Ziel wählst du direkt über die Bestenliste (Schädel-Symbol bei einem fremden Spieler) - dort erscheinen dessen kolonisierte Monde zur Auswahl. Die Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes: eigene Gebäude/Flotte am Mond, der neue Mondschildgenerator (Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken sie zusätzlich; ein aktiver Allianz-Beitritt gibt dem Ziel ebenfalls einen kleinen Bonus. Nach jeder Belagerung - egal ob erfolgreich oder abgewehrt - braucht der Mondzerstörer 48 Std. Abklingzeit. Jeder Belagerungsschuss verbraucht zusätzlich eine <strong>Belagerungs-Ladung aus 25 Hochenergiekristallen</strong> (Tier-2-Ressource aus dem Kristalllabor) - sie wird bei der Ankunft serverseitig abgebucht; ohne ausreichende Ladung schlägt die Belagerung fehl. Erfolgschance und Ergebnis werden serverseitig berechnet.' },
-      { title:'Sektorkarte bedienen', body:'Es gibt <strong>eine</strong> Karte mit zwei Zuständen. Sie beginnt als Galaxie-Übersicht; ein <strong>Klick auf ein System</strong> fährt hinein, und die Planeten gehen an genau der Stelle auf, an der das System in der Galaxie steht - die Nachbarsysteme bleiben als schwache Punkte am Rand sichtbar. Zurück geht es über den Knopf <strong>„‹ Galaxie"</strong> oben links, mit <strong>Esc</strong>, mit einem Klick ins Leere oder über den ⟲-Knopf. Zoomen und Verschieben gilt in beiden Zuständen: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–-Knöpfe unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert; das aufgeklappte System wird bewusst nicht gespeichert - nach einem Neuladen beginnst du wieder in der Übersicht. Die Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen Systemen gleichzeitig. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne im aufgeklappten System.' },
+      { title:'Sektorkarte bedienen', body:'Es gibt <strong>eine</strong> Karte mit zwei Zuständen. Sie beginnt als Galaxie-Übersicht; ein <strong>Klick auf ein System</strong> fährt hinein, und die Planeten gehen an genau der Stelle auf, an der das System in der Galaxie steht - die Nachbarsysteme bleiben als schwache Punkte am Rand sichtbar. Ein Klick auf ein Objekt im aufgeklappten System – Planet, Mond, fremder Spieler, Gegner – öffnet ein <strong>kleines Menü</strong> mit den Aktionen, die dieses Objekt kennt (siehe „Das Kartenmenü"). Zurück geht es über den Knopf <strong>„‹ Galaxie"</strong> oben links, mit <strong>Esc</strong>, mit einem Klick ins Leere oder über den ⟲-Knopf. Zoomen und Verschieben gilt in beiden Zuständen: Ziehen zum Verschieben, Pinch-Geste (oder Scrollen mit Maus/Trackpad) zum Zoomen, alternativ die +/–-Knöpfe unten rechts. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert; das aufgeklappte System wird bewusst nicht gespeichert - nach einem Neuladen beginnst du wieder in der Übersicht. Die Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen Systemen gleichzeitig. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne im aufgeklappten System.' },
+      { title:'Das Kartenmenü – ein Klick löst nichts mehr sofort aus', body:'Ein Klick auf ein Objekt der Sektorkarte öffnet ein <strong>kleines Menü</strong>, statt wie früher direkt eine Mission loszuschicken. Das Menü zeigt nur die Aktionen, die das angeklickte Objekt wirklich kennt, und schreibt unter jeden Eintrag Flugzeit und Kosten – oder den Grund, warum er grau ist.<br><br><strong>Planet:</strong> Erkunden und, sobald er entdeckt ist, Kolonisieren. Ist es eine eigene Kolonie, steht ganz oben <em>Als aktive Basis wählen</em>.<br><strong>Mond:</strong> Kolonisieren bzw. Als aktive Basis wählen.<br><strong>Fremder Spieler:</strong> Spähen, Angreifen und Monde belagern.<br><strong>Gegner (NPC):</strong> Angreifen.<br><br><strong>Warum „angreifen" nicht beim Planeten steht:</strong> Andere Spieler wohnen im Spiel nicht auf den Planeten der Sektorkarte – sie haben ihren <strong>eigenen roten Marker</strong> nahe der Sonne des Systems. Ein Planet ist entweder unbewohnt oder deiner. Deshalb sitzt Angreifen im Menü des Spielermarkers, und beim eigenen Planeten steht dort, was dort sinnvoll ist. Ebenso heißt <em>Spähen</em> je nach Ziel etwas anderes: Beim Planeten ist es die <strong>Erkundung</strong> (Erkundungsschiff, deckt den Planeten auf), beim Spieler die <strong>Spionage</strong> (Spähschiff oder Spionagekreuzer, deckt Flotte und Verteidigung auf).<br><br>Das Menü schließt mit <strong>Esc</strong>, per Klick daneben oder sobald du die Karte verschiebst. Ein Klick, mit dem du die Karte nur ziehen wolltest, öffnet es nicht.' },
       { title:'Warum die Sterne kleiner werden, je größer die Galaxie wird', body:'Jedes System wird als kleiner Kern mit einem <strong>Leuchthof</strong> gezeichnet. Da die Karte anklickbar ist, müssen zwei Systeme weit genug auseinanderstehen, um getroffen werden zu können - im Spiel sind das <strong>mindestens 24 Pixel</strong>, die nach dem Setzen der Plätze einmalig erzwungen werden. Der Leuchthof schrumpft dabei mit der Größe der Galaxie: bei den heutigen 69 Systemen hat er seine volle Größe, im Vollausbau mit 277 nur noch die Hälfte. Bliebe er fest, bräuchten die Knoten 34 Pixel Abstand - und so viel Platz gibt die Karte nicht her; die Spiralarme würden zu einem gleichmäßigen Teppich. Ein Systemplatz <strong>verschiebt sich dadurch nie</strong>: Der Mindestabstand wird für alle 277 Plätze auf einmal hergestellt, auch für die noch leeren, sodass eine einmal gemerkte Stelle für immer stimmt.' },
       { title:'Die Galaxie wächst jede Woche', body:'Die Sternenkarte ist nicht fertig: Jeden <strong>Montag um 00:00 Uhr UTC</strong> kommen automatisch <strong>zwei weitere Sternsysteme</strong> am Außenrand der Galaxie dazu, jedes mit <strong>5 bis 10 Planeten</strong> nach denselben Regeln wie die bereits vorhandenen - eigene Namen, eigene Planetentypen, eigene Erkundungsdauern, Beute und Kolonisierungskosten in derselben Größenordnung wie die bestehenden Außensysteme. Es ist also dauerhaft neues Gebiet zu erkunden und zu besiedeln, ohne dass sich an irgendeinem bestehenden Planeten etwas ändert. Die Zeile unter der Galaxie-Übersicht zeigt, wie viele Systeme aktuell kartiert sind und wann die nächsten zwei erscheinen; sobald sie da sind, meldet das Log die neuen Namen. <strong>Bestehende Systeme rücken dabei nicht von der Stelle:</strong> Jedes System hat einen festen Platz auf der Karte, die neuen setzen sich weiter außen an. Alle Spieler sehen dieselben neuen Systeme zur selben Zeit - die Karte wird aus dem Kalender berechnet, nicht ausgewürfelt. <strong>Wichtig für Sammler:</strong> Erfolg „Grenzgänger" und die Kompendium-Kategorien „Sternenkarte"/„Sternensysteme" zählen ausdrücklich nur die fest eingetragene Kern-Galaxie - ein einmal abgeschlossenes Sammelziel reißt durch die wöchentlichen Neuzugänge also nicht wieder auf.' },
       { title:'Terraforming', body:'Jede Kolonie UND die Heimatbasis (nicht Monde) kann terraformt werden. Anders als früher wählst du zuerst frei einen <strong>Zieltyp</strong> (Todeswelt, Wüstenwelt, Eiswelt, Vulkanwelt, Wasserwelt, Kristallwelt oder Erdwelt - nicht Gasriese, Asteroid, Super oder Erdähnlich, deren Sonderrolle das sprengen würde). Die Zielwahl selbst ist auf JEDEM Standort jederzeit möglich, auch während anderswo bereits eine Stufe läuft - nur das tatsächliche Bezahlen/Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt, so lässt sich für mehrere Standorte vorausplanen. Danach läuft die Umwandlung in <strong>10 Stufen</strong> ab, jede Stufe ein eigener, mehrstündiger Vorgang mit exponentiell steigenden Kosten (Erz/Kristalle/Deuterium/Antimaterie). Jede einzelne Stufe gewährt nur einen kleinen Anteil (1/10) des vollen Zieltyp-Bonus; erst bei Stufe 10 ist die Umwandlung abgeschlossen und der Standort trägt den neuen Typ dauerhaft. Bei Kolonien UND der Heimatbasis ändert sich dabei sofort die Textur auf der Sektorkarte; die Heimatbasis behält zusätzlich ihren eigenen violetten Ring als Kennzeichnung, zeigt aber während des laufenden Terraformings denselben gestrichelten Fortschritts-Ring wie Kolonien. Insgesamt deutlich teurer als früher. Erdwelt (Bonus auf ALLE Ressourcen statt nur einer) kostet zusätzlich 80% mehr als jeder Spezialist - eine reine Fokus-Kolonie profitiert trotzdem meist mehr vom passenden Spezialisten. Zu finden im Basis-Tab. Ab Forschung <strong>Hochenergiephysik</strong> lässt sich eine laufende (und bereits voll bezahlte) Stufe optional per <strong>Energieschub</strong> beschleunigen: je Schub -10% der Stufendauer für 6 Hochenergiekristalle x Zielstufe, maximal 3 Schübe je Stufe (Deckel -30%). Rein optionaler Zeit-Abkauf - die regulären Kosten und Dauern ändern sich dadurch nicht.' },
@@ -24282,7 +24507,7 @@
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
       { title:'Standort-Module', body:'Ausrüstbare Module mit fünf Seltenheitsstufen (Gewöhnlich, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400% Wirkung). Dreizehn Typen: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Je Typ nur EIN Modul gleichzeitig:</strong> Du kannst an einem Standort nicht zweimal Panzerung einbauen – auch nicht in unterschiedlichen Seltenheitsstufen. Wer Slots füllen will, muss also <strong>verschiedene</strong> Typen kombinieren, statt den stärksten Bonus einfach zu stapeln. Genau deshalb lohnen sich die benannten Set-Boni weiter unten: Sie belohnen ausgerechnet die Vielfalt, die diese Regel erzwingt. <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente <em>oder</em> 60.000 Kredite je Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (bis Legendär; Level und Substats der Module bleiben dabei erhalten); überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Selten 3, Episch 8, Legendär 20, Mythisch 50) und fertigst daraus gezielt dein Wunschmodul (4/12/32/80 Fragmente je nach Seltenheit). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. Aufwerten geht sowohl im Inventar als auch <strong>direkt am eingebauten Modul</strong> – es bleibt dabei im Slot, du musst es nicht erst abnehmen. <strong>Substats:</strong> Gefundene Module ab Selten haben 0–2 zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
-      { title:'Werftmarken – zehn Ausbaustufen je Schiffsklasse', body:'Jede Schiffsklasse lässt sich in der <strong>Werft</strong> über zehn Stufen ausbauen. <strong>Mk I</strong> ist der Auslieferungszustand, darüber liegen neun bezahlte Schritte. Eine Marke gilt für die <strong>ganze Klasse</strong> – für jedes Schiff, das du schon hast, und für jedes künftig gebaute. Deshalb sind die Zuwächse bewusst klein: je Stufe <strong>+3% Angriff</strong>, <strong>+3% Schild</strong>, <strong>+2% Tempo</strong>, <strong>−1,5% Treibstoffverbrauch</strong> und <strong>−2% Bauzeit</strong>; auf Mk X also +27% Angriff und Schild, +18% Tempo, −13,5% Treibstoff, −18% Bauzeit. Angriff und Schild gelten für alle Klassen mit Kampfwert, <strong>Tempo und Treibstoff für jede der 40 Klassen</strong> – auch Frachter, Aufklärer und die Tiefenflotte haben also etwas davon. <strong>Wichtig beim Tempo:</strong> Die Flugzeit einer Mission bestimmt immer das <strong>langsamste</strong> beteiligte Schiff (wie ein Konvoi) – ein aufgerüsteter Jäger neben einem unaufgerüsteten Kolonieschiff bringt beim Tempo nichts. Wer schneller fliegen will, rüstet gezielt den Bremser auf. <strong>Kosten:</strong> Der Preis richtet sich nach der Bauzeit der Klasse (Bauzeit ÷ 50, gedeckelt bei 20) und steigt je Stufe um rund das 1,6-Fache. Der komplette Weg Mk I → Mk X kostet einen Jäger rund 2,3 Mio Erz, ein Schlachtschiff etwa 14,5 Mio, einen Fusionsdreadnought gut 40 Mio – eine echte Senke für spätes Material. <strong>Ab Mk V kommt auf jeder Stufe eine weitere Tier-2-Ressource dazu</strong>, in der Reihenfolge ihrer eigenen Forschungskette: Nanolegierungen (Mk V), Quantenchips (Mk VI), Hochenergiekristalle (Mk VII), Fusionskerne (Mk VIII), KI-Kerne (Mk IX), Metamaterial (Mk X). Die zugehörige Forschung ist jeweils die Voraussetzung der Stufe – wer ein Schiff auf Mk X bringen will, muss also alle sechs Tier-2-Fabrikketten laufen haben. Der Singularitätskern bleibt bewusst draußen; er ist die Währung der Tiefenflotte. <strong>Die drei obersten Marken verlangen zusätzlich je einen Expeditionsfund</strong>, der sich nicht produzieren lässt: 1x Kristallherz (Mk VIII), 1x Alte Technologie (Mk IX), 1x Resonanzkristall (Mk X). Diese Mengen sind fest und wachsen <em>nicht</em> mit der Klasse – ein Fusionsdreadnought braucht genauso ein Stück wie ein Jäger. Damit hängen die letzten Stufen nicht am Lagerbestand, sondern daran, dass man tatsächlich rausfliegt. <strong>Sichtbar</strong> wird jede Stufe auch am Schiff selbst: Blechhaut, Panzerkante, längere Geschützrohre, ein Turm mehr, Sensormast, Systemlichter, stärkerer Antrieb, Silbersaum und zuletzt die goldene Zierlinie mit Bugscheinwerfer. Der Umriss bleibt über alle zehn Marken gleich, damit du deine Flotte weiter auf einen Blick erkennst; die Stufe steht als römische Ziffer auf der Plakette am Schiffssymbol. Marken <strong>überleben das Prestige</strong> (wie Offiziere und Schiffsmodule), und der Server rechnet sie im PvP genauso nach wie die Vorschau – Anzeige und Kampfergebnis bleiben synchron.' },
+      { title:'Werftmarken – zehn Ausbaustufen je Schiffsklasse', body:'Jede Schiffsklasse lässt sich in der <strong>Werft</strong> über zehn Stufen ausbauen. <strong>Mk I</strong> ist der Auslieferungszustand, darüber liegen neun bezahlte Schritte. Eine Marke gilt für die <strong>ganze Klasse</strong> – für jedes Schiff, das du schon hast, und für jedes künftig gebaute. Deshalb sind die Zuwächse bewusst klein: je Stufe <strong>+3% Angriff</strong>, <strong>+3% Schild</strong>, <strong>+2% Tempo</strong>, <strong>−1,5% Treibstoffverbrauch</strong> und <strong>−2% Bauzeit</strong>; auf Mk X also +27% Angriff und Schild, +18% Tempo, −13,5% Treibstoff, −18% Bauzeit. Angriff und Schild gelten für alle Klassen mit Kampfwert, <strong>Tempo und Treibstoff für jede der 40 Klassen</strong> – auch Frachter, Aufklärer und die Tiefenflotte haben also etwas davon. <strong>Wichtig beim Tempo:</strong> Die Flugzeit einer Mission bestimmt immer das <strong>langsamste</strong> beteiligte Schiff (wie ein Konvoi) – ein aufgerüsteter Jäger neben einem unaufgerüsteten Kolonieschiff bringt beim Tempo nichts. Wer schneller fliegen will, rüstet gezielt den Bremser auf. <strong>Kosten:</strong> Der Preis richtet sich nach der Bauzeit der Klasse (Bauzeit ÷ 50, gedeckelt bei 20) und steigt je Stufe um rund das 1,6-Fache. Der komplette Weg Mk I → Mk X kostet einen Jäger rund 2,3 Mio Erz, ein Schlachtschiff etwa 14,5 Mio, einen Fusionsdreadnought gut 40 Mio – eine echte Senke für spätes Material. <strong>Ab Mk V kommt auf jeder Stufe eine weitere Tier-2-Ressource dazu</strong>, in der Reihenfolge ihrer eigenen Forschungskette: Nanolegierungen (Mk V), Quantenchips (Mk VI), Hochenergiekristalle (Mk VII), Fusionskerne (Mk VIII), KI-Kerne (Mk IX), Metamaterial (Mk X). Die zugehörige Forschung ist jeweils die Voraussetzung der Stufe – wer ein Schiff auf Mk X bringen will, muss also alle sechs Tier-2-Fabrikketten laufen haben. Der Singularitätskern bleibt bewusst draußen; er ist die Währung der Tiefenflotte. <strong>Die drei obersten Marken verlangen zusätzlich je einen Expeditionsfund</strong>, der sich nicht produzieren lässt: 1x Kristallherz (Mk VIII), 1x Alte Technologie (Mk IX), 1x Resonanzkristall (Mk X). Diese Mengen sind fest und wachsen <em>nicht</em> mit der Klasse – ein Fusionsdreadnought braucht genauso ein Stück wie ein Jäger. Damit hängen die letzten Stufen nicht am Lagerbestand, sondern daran, dass man tatsächlich rausfliegt. <strong>Ein Umbau braucht Zeit</strong>, und die steigt je Stufe um rund das 1,55-Fache: Mk II ist beim Jäger nach 4 Minuten fertig, Mk X dauert 2 Std. 13 Min.; der ganze Weg Mk I → Mk X kostet einen Jäger gut 6 Stunden, ein Schlachtschiff knapp 12, einen Fusionsdreadnought knapp 17. Die <em>Kosten</em> skalieren voll mit der Klasse, die <em>Zeit</em> nur gedämpft – sonst wäre die Endstufe der schwersten Klassen tagelang blockiert. Es läuft immer nur <strong>ein Umbau gleichzeitig</strong> (wie bei der Forschung), damit die Reihenfolge eine echte Entscheidung bleibt; der Umbau belegt aber <em>keinen</em> der zehn Werftplätze, du kannst also nebenher weiterbauen. Werft-Boni verkürzen ihn genau wie den Schiffsbau – der Bauzeit-Rabatt der Marke selbst allerdings bewusst nicht, eine Stufe soll sich nicht selbst beschleunigen. <strong>Abbrechen geht jederzeit und gibt alles zurück</strong>, Ressourcen wie Expeditionsfund; ein Fehlklick kostet dich nur die bereits verstrichene Zeit. Fällt ein Umbau fertig, während du offline bist, ist er beim nächsten Einloggen erledigt. <strong>Sichtbar</strong> wird jede Stufe auch am Schiff selbst: Blechhaut, Panzerkante, längere Geschützrohre, ein Turm mehr, Sensormast, Systemlichter, stärkerer Antrieb, Silbersaum und zuletzt die goldene Zierlinie mit Bugscheinwerfer. Der Umriss bleibt über alle zehn Marken gleich, damit du deine Flotte weiter auf einen Blick erkennst; die Stufe steht als römische Ziffer auf der Plakette am Schiffssymbol. Marken <strong>überleben das Prestige</strong> (wie Offiziere und Schiffsmodule), und der Server rechnet sie im PvP genauso nach wie die Vorschau – Anzeige und Kampfergebnis bleiben synchron. <strong>Im Kampf sind sie ausgewiesen:</strong> Die NPC-Angriffsvorschau nennt die Marken deiner gewählten Flotte samt dem Prozentanteil, den sie an deiner Angriffskraft haben, und jeder Kampfbericht – NPC-Angriff, Spielerangriff, Angriff auf eine Allianzbasis und abgewehrter Überfall – führt sie in einer eigenen Zeile. Der Bericht zeigt dabei den Markenstand <em>zum Zeitpunkt des Kampfes</em>, nicht den heutigen: Eine mit Mk III gewonnene Schlacht bleibt eine Mk-III-Schlacht, auch wenn du danach weiter aufrüstest. Beim abgewehrten Überfall steht dort der Anteil an der <em>Flottenverteidigung</em> statt an der Angriffskraft – dort wirkt die Marke über den Angriffswert <em>und</em> den Schild, der reine Angriffsanteil wäre die falsche Zahl.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. Sieben Klassen mit eigenen Slots (bis zu 3, und wie bei den Standort-Modulen <strong>je Typ nur eines gleichzeitig</strong> – unabhängig von der Seltenheit): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module.' }
     ]},
     // Eigener Abschnitt (v8.326.0). Vorher stand der gesamte Abgrund als EIN Absatz mit 581 Woertern
@@ -24413,7 +24638,7 @@
     expedition: { icon:'ti-rocket', help:'flotte',
       text:'Expeditionen schicken Schiffe ins Unerforschte. <strong>Typ, Wagnis-Regler und Eskorte</strong> bestimmen zusammen Risiko und Ausbeute: Spähschiffe tragen keine Kampfkraft bei, verbessern aber gezielt die Fundqualität, Frachter erweitern den Platz für große Ressourcenfunde.' },
     karte: { icon:'ti-map-2', help:'kolonien',
-      text:'Die Sektorkarte beginnt als Blick auf die ganze Galaxie. <strong>Klick ein System an</strong> - die Ansicht fährt hinein und die Planeten gehen auf; von dort erkundest du sie und schickst Kolonieschiffe los. Zurück mit <strong>Esc</strong> oder dem Knopf oben links. Die <strong>Entfernung</strong> bestimmt Flugzeit und Treibstoffverbrauch jeder Mission, nahe Ziele sind also deutlich günstiger als weit entfernte.' },
+      text:'Die Sektorkarte beginnt als Blick auf die ganze Galaxie. <strong>Klick ein System an</strong> - die Ansicht fährt hinein und die Planeten gehen auf. Ein Klick auf einen Planeten öffnet ein <strong>kleines Menü</strong> mit Erkunden und Kolonisieren; fremde Spieler und Gegner haben ihr eigenes Menü mit Spähen und Angreifen. Zurück mit <strong>Esc</strong> oder dem Knopf oben links. Die <strong>Entfernung</strong> bestimmt Flugzeit und Treibstoffverbrauch jeder Mission, nahe Ziele sind also deutlich günstiger als weit entfernte.' },
     galaxie: { icon:'ti-world', help:'galaxie',
       text:'Bestenliste, globaler Chat und der Zustand der lebendigen Galaxie. Tippe einen Spieler in der Liste an: sein Profil zeigt dir deine <strong>Siegchance in Prozent</strong>, bevor du eine Flotte losschickst - inklusive der Konterwirkung deiner aktuellen Zusammensetzung.' },
     allianz: { icon:'ti-users', help:'allianz',
@@ -24665,6 +24890,9 @@
         body = (r.targetPlanet ? 'Angegriffener Planet: <strong>'+planetDisplayName(r.targetPlanet)+'</strong><br>' : '') + 'Angriffspunkte des Gegners: ~'+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
         body += '<br>Angegriffen mit: '+fleetBreakdownHtml(r.fleet);
         if (r.defenseBefore) body += '<br>Deine Verteidigung: '+defenseBreakdownHtml(r.defenseBefore, null);
+        // Werftmarken der stationierten Flotte. Hier zaehlt der VERTEIDIGUNGS-Anteil (Marke wirkt
+        // ueber Angriffswert UND Schild), nicht der Angriffsanteil - siehe stampShipMarks().
+        body += markReportLine(r.marken, r.markAtkShare, 'Flottenverteidigung');
         body += formationReportLine(r.formation, r.formationMult);
         // Nullfeldanker: Sein Beitrag taucht in KEINER Verteidigungsanzeige auf, weil er erst
         // feststeht, wenn die Stärke des Angreifers bekannt ist. Der Bericht ist damit die einzige
@@ -24695,6 +24923,7 @@
         body = '<strong>'+(r.result==='destroyed' ? 'DIE BASIS WURDE ZERSTÖRT! Schaden: '+fmt(r.damage||0)+'.' : (r.result==='win' ? 'Treffer! '+fmt(r.damage||0)+' Schaden an der Basis (Hülle danach: '+fmt(r.hullAfter||0)+'/'+fmt(r.hullMax||0)+').' : 'Abgewehrt - die Verteidigung ('+fmt(r.defensePower||0)+') hielt stand (Erfolgschance ~'+(r.chancePct||0)+'%).'))+'</strong>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt')+' · Angriffskraft: '+fmt(r.attackPower||0)+' vs. Verteidigung '+fmt(r.defensePower||0);
         body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        body += markReportLine(r.marken, r.markAtkShare);
         body += '<br>Kampfpunkte: +'+(r.battlePoints||0);
         if (r.ownLostShips && Object.keys(r.ownLostShips).length){
           body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
@@ -24788,6 +25017,7 @@
           const weaknessNameMap = { cruiser:'Kreuzer', destroyer:'Zerstörer', jaeger:'Jäger', bomber:'Bomber', schlachtschiff:'Schlachtschiff', superschlachtschiff:'Superschlachtschiff', leerenjaeger:'Leerenjäger' };
           body += '<br>Schwachstelle des Gegners: '+(weaknessNameMap[r.weaknessType]||shipDisplayName(r.weaknessType))+(r.hasWeakness?' (ausgenutzt, +25% Angriffskraft)':' (nicht mitgeführt)');
         }
+        body += markReportLine(r.marken, r.markAtkShare);
         body += counterReportLine(r.counterMult);
         body += battlePhaseReportHtml(r.phasen);
         body += boardingReportHtml(r.enterung);
@@ -24820,6 +25050,11 @@
         body = '<strong>'+(r.result==='win' ? 'Erfolgreich! Angriffskraft ('+r.attackPower+') war überlegen (vs. Verteidigungspunkte '+r.defensePower+').' : 'Gescheitert. Angriffskraft ('+r.attackPower+') reichte nicht (vs. Verteidigungspunkte '+r.defensePower+').')+'</strong>';
         if (r.warTag) body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
+        body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        // Im PvP rechnet der SERVER die Angriffskraft (rawFleetPower mit demselben Markenfaktor wie
+        // attackPowerRaw hier). Die Zeile erklaert also die Zahl, die oben steht - sie erfindet sie
+        // nicht nachtraeglich.
+        body += markReportLine(r.marken, r.markAtkShare);
         if (r.simulated) body += '<br><span class="bmeta">Simuliertes Duell (kein eigener Server aktiv) – kein echter Ressourcenverlust beim Gegner.</span>';
         if (r.loot){
           body += '<br>Beute: '+rewardHtml(r.loot);
@@ -29801,6 +30036,10 @@
     let t = start;
     if (state.activeResearch && state.activeResearch.endTime > t) t = state.activeResearch.endTime;
     if (state.activeResearch && processResearch()) summe.forschungen++;
+    // Werftmarken-Umbau im Offline-Nachholpfad: sonst waere eine ueber Nacht faellige Marke erst
+    // beim ersten sichtbaren Tick da - und die Werft haette in der Zwischenzeit stillgestanden,
+    // obwohl der Umbau laengst durch war.
+    if (processShipMarkJob()) summe.markenUmbauten = (summe.markenUmbauten||0) + 1;
     let schutz = 60; // Warteschlange fasst höchstens 10 Einträge - der Deckel ist reine Vorsicht
     while (t < now && schutz-- > 0 && !state.activeResearch && state.researchQueue && state.researchQueue.length){
       const vorher = state.researchQueue.length;
@@ -29861,7 +30100,8 @@
     if (capped > 5){
       log('Willkommen zurück! Fortschritt für '+Math.floor(capped/60)+' Min. gutgeschrieben.', 'ti-clock');
       lastOfflineSummary = { minutes: Math.floor(capped/60), gained, missionsPending,
-                             bauten: queues.bauten, forschungen: queues.forschungen };
+                             bauten: queues.bauten, forschungen: queues.forschungen,
+                             markenUmbauten: queues.markenUmbauten||0 };
     }
   }
   // Tägliches Login-Belohnungssystem (16.07.2026, Feature-Wunsch: abwechslungsreiche Belohnungen
@@ -30352,6 +30592,10 @@
       // wäre die einzige Größe, die diese Zusammenfassung verschweigt.
       if (offlineSummary.bauten>0) html += `<div class="card-row"><div class="left"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i><span class="bname" style="font-size:12.5px;">Bauaufträge fertiggestellt</span></div><span class="lvl-pill">${offlineSummary.bauten}</span></div>`;
       if (offlineSummary.forschungen>0) html += `<div class="card-row"><div class="left"><i class="ti ti-flask" aria-hidden="true" style="color:#c3bef5;"></i><span class="bname" style="font-size:12.5px;">Forschungen abgeschlossen</span></div><span class="lvl-pill">${offlineSummary.forschungen}</span></div>`;
+      // Werftmarken-Umbau (31.07.2026): Er laeuft offline mit, also gehoert er auch in den
+      // Rueckkehrbericht. Ohne diese Zeile waere die Marke zwar da, aber der Bericht haette die
+      // Nacht so zusammengefasst, als waere die Werft leer gewesen.
+      if (offlineSummary.markenUmbauten>0) html += `<div class="card-row"><div class="left"><i class="ti ti-arrow-up" aria-hidden="true" style="color:#f0b556;"></i><span class="bname" style="font-size:12.5px;">Werftmarken aufgerüstet</span></div><span class="lvl-pill">${offlineSummary.markenUmbauten}</span></div>`;
     }
     if (loginBonus){
       const parts = Object.entries(loginBonus.reward).filter(([,v])=>v>0).map(([r,v]) => fmt(v)+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r));
@@ -37453,18 +37697,6 @@
       if (res.ok){ const data = await res.json(); otherPlayersInSystem = (data.players||[]).filter(p=>!p.isMe); buildMap(); }
     } catch(e){}
   }
-  // Vereinfachter Angriffsablauf (Feature-Wunsch 16.07.2026): Klick auf einen gegnerischen Planeten
-  // auf der Karte führt jetzt direkt zur Flottenauswahl (goToAttackPlayer, dieselbe Funktion, die
-  // schon der Direkt-Angriff-Knopf aus dem Spionagebericht nutzt) statt vorher einen nativen
-  // confirm()-Dialog zu zeigen und SOFORT mit einer eventuell noch gar nicht gewählten Flotte
-  // anzugreifen (schlug dann wortlos fehl, wenn oben in "Angriffsflotte zusammenstellen" noch nichts
-  // ausgewählt war). Die "Spieler angreifen"-Schaltfläche am Zielort dient jetzt selbst als
-  // Bestätigung - ein zusätzlicher Dialog davor wäre nur ein überflüssiger Zwischenschritt. Die
-  // bisherige "Abbrechen für Nachricht senden"-Abkürzung entfällt dadurch; eine Nachricht lässt sich
-  // weiterhin über das Spielerprofil (dort schon vorhanden) oder eine Antwort im Postfach senden.
-  function mapPlayerClick(userId, username){
-    goToAttackPlayer(userId, username);
-  }
   // Eigenständiges Klick-Ziel für den Mond-Marker auf der Karte (Spieler-Wunsch: Mond soll ein
   // klar unterscheidbares, eigenes Ziel sein statt nur ein dekoratives Abzeichen auf dem Planeten-
   // Knoten zu sein). Kolonisiert -> wechselt direkt die aktive Basis; noch nicht kolonisiert ->
@@ -37478,6 +37710,202 @@
     } else {
       pushToast(planetDisplayName(moonKey)+' ist noch nicht kolonisiert - siehe Monde-Liste im Karte-Tab.', 'ti-info-circle');
     }
+  }
+
+  // ===== Kartenmenü (31.07.2026) =====
+  // Spieler-Wunsch: "wenn man einen Planeten auswählt soll sich ein kleines Menü öffnen mit
+  // kolonisieren spähen und falls bewohnt angreifen".
+  //
+  // Bis hierher löste JEDER Kartenklick sofort genau eine Sache aus: Planet = Erkundungsmission
+  // (auch auf dem eigenen, längst kolonisierten Planeten), fremder Spieler = Angriffsvorbereitung,
+  // NPC = ein natives confirm(). Die zweite Möglichkeit gab es jeweils nur an einer ganz anderen
+  // Stelle - Kolonisieren in der Planetenliste darunter, Spähen im Bestenlisten-Tab. Ein Klick, der
+  // ungefragt Treibstoff ausgibt, ist auch deshalb unschön, weil man sich auf einer verschiebbaren
+  // Karte leicht verklickt.
+  //
+  // DREI EINSCHRÄNKUNGEN, die das Datenmodell vorgibt und die den Wortlaut des Wunsches nicht 1:1
+  // zulassen:
+  //   1. "falls bewohnt angreifen" kann NICHT heißen "auf diesem Planeten wohnt ein anderer
+  //      Spieler". Fremde Spieler sind eigene Kartenmarker (data-map-player, homeSlotXY um die
+  //      Sonne herum), sie sitzen nicht auf den PLANETS-Einträgen. Angreifen gehört deshalb ins
+  //      Menü des Spielermarkers, nicht in das eines Planeten.
+  //   2. "Spähen" heißt bei einem Planeten Erkunden (Erkundungsschiff, deckt den Planeten auf), bei
+  //      einem Spieler Spionage (Spähschiff/Spionagekreuzer, deckt die Flotte auf) - zwei
+  //      verschiedene Missionen. Jedes Objekt bekommt die, die es wirklich kennt.
+  //   3. Bewohnt im Sinne des Spiels ist ein Planet nur durch EINEN selbst. Dort ist die sinnvolle
+  //      Aktion "als Basis wählen", nicht "angreifen".
+  // Deshalb EIN gemeinsames Menü mit objektabhängigen Einträgen statt vier Sonderfälle.
+  let karteMenuEl = null;
+  function closeKarteMenu(){
+    if (karteMenuEl){ karteMenuEl.remove(); karteMenuEl = null; }
+  }
+  // eintraege: [{ icon, label, grund, disabled, fn }] - grund erscheint als kleine Zeile darunter
+  // und erklärt, warum ein Eintrag grau ist.
+  function openKarteMenu(ev, art, titel, eintraege){
+    closeKarteMenu();
+    const el = document.createElement('div');
+    el.className = 'kmenu';
+    el.setAttribute('role', 'menu');
+    el.innerHTML = `<div class="kmenu-kopf">${art}<span class="kmenu-titel">${escapeHtml(titel)}</span></div>` +
+      eintraege.map((e,i) =>
+        `<button data-kmenu-i="${i}" ${e.disabled?'disabled':''}><i class="ti ${e.icon}" aria-hidden="true"></i>${escapeHtml(e.label)}</button>` +
+        (e.grund ? `<div class="kmenu-grund">${escapeHtml(e.grund)}</div>` : '')
+      ).join('');
+    // An document.body, NICHT in den Kartencontainer: buildGalaxyMap() schreibt dessen innerHTML
+    // jede Sekunde neu und würde das Menü samt Handlern mitreißen.
+    document.body.appendChild(el);
+    el.querySelectorAll('[data-kmenu-i]').forEach(btn => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const eintrag = eintraege[parseInt(btn.getAttribute('data-kmenu-i'), 10)];
+      closeKarteMenu();
+      if (eintrag && !eintrag.disabled && eintrag.fn) eintrag.fn();
+    }));
+    // Erst nach dem Einhängen messen und dann so verschieben, dass das Menü vollständig im
+    // Fenster bleibt - auf dem Handy öffnet es sich sonst halb außerhalb.
+    const b = el.getBoundingClientRect();
+    const x = Math.max(6, Math.min((ev && ev.clientX !== undefined ? ev.clientX : 40) + 8, window.innerWidth - b.width - 6));
+    const y = Math.max(6, Math.min((ev && ev.clientY !== undefined ? ev.clientY : 40) + 8, window.innerHeight - b.height - 6));
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    karteMenuEl = el;
+  }
+  // Schließen bei Klick daneben, Escape, Scrollen und Tabwechsel. Der öffnende Klick selbst darf
+  // nicht sofort wieder schließen - deshalb capture:false und die Prüfung auf das Menü selbst.
+  document.addEventListener('click', (e) => {
+    if (karteMenuEl && !karteMenuEl.contains(e.target) && !e.target.closest('[data-planet],[data-map-player],[data-map-npc],[data-map-moon]')) closeKarteMenu();
+  });
+  // Esc gehört dem Menü, solange eines offen ist. stopImmediatePropagation, weil weiter unten ein
+  // zweiter Esc-Handler auf document das aufgeklappte System zuklappt: Ohne das Anhalten würde ein
+  // Tastendruck beides auf einmal schließen, und man käme aus einem versehentlich geöffneten Menü
+  // nur heraus, indem man nebenbei das System verliert. Dieser Block wird VOR jenem registriert,
+  // deshalb greift es. Ist kein Menü offen, passiert hier gar nichts.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !karteMenuEl) return;
+    closeKarteMenu();
+    e.stopImmediatePropagation();
+  });
+  window.addEventListener('scroll', closeKarteMenu, true);
+  window.addEventListener('resize', closeKarteMenu);
+
+  // --- Menü eines Planetenmarkers
+  function planetMapMenu(ev, planetId){
+    const p = PLANETS.find(x => x.id === planetId);
+    if (!p) return;
+    const cf = currentFleet();
+    const disc = !!state.discovered[planetId];
+    const meins = !!state.colonies[planetId];
+    const eintraege = [];
+    if (meins){
+      const aktiv = state.activeBasePlanet === planetId;
+      eintraege.push({ icon:'ti-home', label: aktiv ? 'Ist bereits deine aktive Basis' : 'Als aktive Basis wählen',
+        disabled: aktiv, fn: () => {
+          state.activeBasePlanet = planetId;
+          pushToast(planetDisplayName(planetId)+' als aktive Basis ausgewählt.', 'ti-planet', 'ok');
+          render(); save();
+        } });
+    }
+    // Erkunden: dieselben Bedingungen wie der "Schicken"-Knopf in der Planetenliste - eine zweite
+    // Anzeigestelle mit eigenen Regeln wäre genau der Fehler, den Regel 6 dieses Projekts meint.
+    const erkUnterwegs = cf.missions.some(m => m.type==='explore' && m.targetId === planetId);
+    const erkFrei = cf.missions.filter(m => m.type==='explore').length < cf.ships;
+    const erkDur = missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system);
+    eintraege.push({ icon:'ti-rocket', label: disc ? 'Erneut erkunden' : 'Erkunden',
+      grund: erkUnterwegs ? 'Bereits eine Erkundung zu diesem Ziel unterwegs.'
+        : (!erkFrei ? 'Kein freies Erkundungsschiff auf '+planetDisplayName(state.activeBasePlanet)+'.'
+        : 'Flugzeit '+fmtDuration(erkDur)+' · '+missionFuelCost(erkDur,1)+' Deuterium'),
+      disabled: erkUnterwegs || !erkFrei, fn: () => sendExploreMission(planetId) });
+    if (!meins){
+      const kolUnterwegs = cf.missions.some(m => m.type==='colonize' && m.targetId === planetId);
+      const limitVoll = currentColonyCount() + pendingColonyCount() >= maxColoniesAllowed();
+      const kolDur = missionDurationFor(p.duration, { colonyShips:1 }, ['colonyShips'], p.system);
+      const kolKosten = disc ? colonizeCostFor(planetId) : p.colonizeCost;
+      const gesamt = Object.assign({}, kolKosten);
+      for (const [r,a] of Object.entries(missionFuelCostSplit(kolDur, { colonyShips:1 }))) gesamt[r] = (gesamt[r]||0) + a;
+      let grund = 'Flugzeit '+fmtDuration(kolDur)+' · '+costText(gesamt);
+      let gesperrt = false;
+      if (!disc){ grund = 'Planet muss zuerst erkundet werden.'; gesperrt = true; }
+      else if (kolUnterwegs){ grund = 'Ein Kolonieschiff ist bereits unterwegs.'; gesperrt = true; }
+      else if (limitVoll){ grund = 'Kolonie-Limit erreicht ('+(currentColonyCount()+pendingColonyCount())+'/'+maxColoniesAllowed()+') – Kolonial-Logistik erforschen.'; gesperrt = true; }
+      else if ((cf.colonyShips||0) < 1){ grund = 'Kein Kolonieschiff auf '+planetDisplayName(state.activeBasePlanet)+'.'; gesperrt = true; }
+      else if (!canAfford(gesamt)){ grund = 'Nicht genug Ressourcen: '+costText(gesamt); gesperrt = true; }
+      eintraege.push({ icon:'ti-planet', label:'Kolonisieren', grund, disabled: gesperrt,
+        fn: () => colonizePlanet(planetId) });
+    }
+    const ti = planetTypeInfoFor(p);
+    openKarteMenu(ev, (meins ? 'Eigene Kolonie' : (disc ? 'Planet' : 'Unentdeckt')) + (ti.label ? ' · '+ti.label : ''),
+      p.name, eintraege);
+  }
+
+  // --- Menü eines Mondmarkers. Derselbe Mechanismus wie beim Planeten, damit nicht ausgerechnet
+  // das Objekt DANEBEN weiter sofort losfeuert.
+  function moonMapMenu(ev, parentKey){
+    const moonKey = 'moon_'+parentKey;
+    const meins = !!state.colonies[moonKey];
+    const cf = currentFleet();
+    const eintraege = [];
+    if (meins){
+      const aktiv = state.activeBasePlanet === moonKey;
+      eintraege.push({ icon:'ti-home', label: aktiv ? 'Ist bereits deine aktive Basis' : 'Als aktive Basis wählen',
+        disabled: aktiv, fn: () => moonMapClick(parentKey) });
+    } else {
+      const unterwegs = cf.missions.some(m => m.type==='colonize-moon' && m.targetId === parentKey);
+      const kolDur = missionDurationFor(moonBaseDuration(parentKey), { colonyShips:1 }, ['colonyShips']);
+      const gesamt = Object.assign({}, moonColonizeCostFor(parentKey));
+      for (const [r,a] of Object.entries(missionFuelCostSplit(kolDur, { colonyShips:1 }))) gesamt[r] = (gesamt[r]||0) + a;
+      let grund = 'Flugzeit '+fmtDuration(kolDur)+' · '+costText(gesamt);
+      let gesperrt = false;
+      if (unterwegs){ grund = 'Ein Kolonieschiff ist bereits unterwegs.'; gesperrt = true; }
+      else if ((cf.colonyShips||0) < 1){ grund = 'Kein Kolonieschiff auf '+planetDisplayName(state.activeBasePlanet)+'.'; gesperrt = true; }
+      else if (!canAfford(gesamt)){ grund = 'Nicht genug Ressourcen: '+costText(gesamt); gesperrt = true; }
+      eintraege.push({ icon:'ti-planet', label:'Kolonisieren', grund, disabled: gesperrt,
+        fn: () => colonizeMoon(parentKey) });
+    }
+    openKarteMenu(ev, meins ? 'Eigener Mond' : 'Mond', planetDisplayName(moonKey), eintraege);
+  }
+
+  // --- Menü eines fremden Spielers. Hier sitzen Spähen und Angreifen, nicht beim Planeten.
+  function playerMapMenu(ev, userId, username){
+    const name = username || 'Spieler';
+    const cf = currentFleet();
+    const pakt = activePactWith(userId);
+    const spaeher = (cf.spaeher||0) + (cf.spionageschiff||0);
+    const spyUnterwegs = cf.missions.filter(m => m.type==='spy-player').length >= spaeher;
+    const eintraege = [
+      { icon:'ti-target', label:'Spähen',
+        grund: pakt ? 'Nichtangriffspakt aktiv – Spionage ist blockiert.'
+          : (spaeher < 1 ? 'Kein Spähschiff oder Spionagekreuzer auf '+planetDisplayName(state.activeBasePlanet)+'.'
+          : (spyUnterwegs ? 'Alle Spähschiffe dort sind bereits im Einsatz.'
+          : 'Deckt Flottenstärke und Verteidigung auf.')),
+        disabled: !!pakt || spaeher < 1 || spyUnterwegs,
+        fn: () => sendSpyMission(userId, name) },
+      { icon:'ti-sword', label:'Angreifen',
+        grund: pakt ? 'Nichtangriffspakt aktiv – ein Angriff ist blockiert.'
+          : 'Öffnet die Flottenauswahl im Galaxie-Tab.',
+        disabled: !!pakt,
+        fn: () => goToAttackPlayer(userId, name) },
+      { icon:'ti-skull', label:'Monde belagern',
+        grund:'Lädt die Mondliste des Ziels – braucht Mondzerstörer.',
+        fn: () => goToMoonSiege(userId, name) }
+    ];
+    openKarteMenu(ev, 'Fremder Spieler', name, eintraege);
+  }
+
+  // --- Menü eines NPC. Ersetzt das native confirm(), das weder die Flugzeit noch den Treibstoff
+  // nannte und auf dem Handy als Systemdialog über der Karte lag.
+  function npcMapMenu(ev, npcId, npcName){
+    const npc = NPCS.find(n => n.id === npcId);
+    const cf = currentFleet();
+    const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
+    const gewaehlt = ATTACK_SHIP_KEYS.reduce((a,k) => a + (attackFleet[k]||0), 0);
+    const dur = npc ? missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS, npc.system) : 0;
+    const eintraege = [
+      { icon:'ti-sword', label:'Angreifen',
+        grund: gewaehlt < 1 ? 'Erst im Bereich „Angriffsflotte zusammenstellen" Schiffe auswählen.'
+          : 'Flugzeit '+fmtDuration(dur)+' · '+fuelCostText(missionFuelCostSplit(dur, attackFleet)),
+        disabled: gewaehlt < 1,
+        fn: () => sendAttackMission(npcId) }
+    ];
+    openKarteMenu(ev, npc && npc.boss ? 'Gegner · Boss' : 'Gegner', npcName || (npc?npc.name:'NPC'), eintraege);
   }
 
   const SUN_X = 350, SUN_Y = 115;
@@ -37758,7 +38186,7 @@
             : `<circle cx="${hcx}" cy="${hcy}" r="10" fill="rgba(126,119,221,0.3)"/>`; })()}
           <circle cx="${hcx}" cy="${hcy}" r="10" fill="none" stroke="#7f77dd" stroke-width="1.5"/>
           ${homeTfInProgress ? `<circle cx="${hcx}" cy="${hcy}" r="12" fill="none" stroke="${(PLANET_TYPE_INFO[homeTfState.targetType]||{}).color||'#5dcaa5'}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.8"><title>Terraforming Stufe ${homeTfState.level}/${TERRAFORM_MAX_LEVEL} Richtung ${(PLANET_TYPE_INFO[homeTfState.targetType]||{}).label||''}</title></circle>` : ''}
-          ${homeHasMoon ? `<g data-map-moon="home" style="cursor:pointer;"><title>${planetDisplayName('moon_home')}${state.colonies['moon_home']?' (kolonisiert - anklicken zum Wechseln)':' (noch nicht kolonisiert)'}</title>
+          ${homeHasMoon ? `<g data-map-moon="home" style="cursor:pointer;"><title>${planetDisplayName('moon_home')}${state.colonies['moon_home']?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_home' ? `<circle cx="${(hc.x+13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(hc.x+13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(hc.x+11.5).toFixed(1)}" cy="${(hc.y+12).toFixed(1)}" r="3.2" fill="#aeb1c4"/>
           </g>` : ''}
@@ -37819,7 +38247,7 @@
           ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-dasharray="2,2"/>`}
           ${isMine ? `<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="6" fill="#5dcaa5" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700;">★</text>` : ''}
           ${hasDebris ? `<g data-map-debris="${p.id}"><circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="7" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>` : ''}
-          ${hasMoon ? `<g data-map-moon="${p.id}" style="cursor:pointer;"><title>${planetDisplayName('moon_'+p.id)}${state.colonies['moon_'+p.id]?' (kolonisiert - anklicken zum Wechseln)':' (noch nicht kolonisiert)'}</title>
+          ${hasMoon ? `<g data-map-moon="${p.id}" style="cursor:pointer;"><title>${planetDisplayName('moon_'+p.id)}${state.colonies['moon_'+p.id]?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_'+p.id ? `<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(pos.x+r+2-1.5).toFixed(1)}" cy="${(pos.y+r+2-1).toFixed(1)}" r="3.2" fill="#aeb1c4"/>
           </g>` : ''}
@@ -37936,10 +38364,11 @@
     svg.querySelectorAll('[data-planet]').forEach(node => {
       const pid = node.getAttribute('data-planet');
       if (pid === '__home__') return;
-      node.addEventListener('click', () => { if (galaxyMapDidDrag) return; sendExploreMission(pid); });
+      // Seit v8.353.0 öffnet der Klick ein Menü, statt sofort eine Erkundung loszuschicken.
+      node.addEventListener('click', (e) => { if (galaxyMapDidDrag) return; planetMapMenu(e, pid); });
     });
     svg.querySelectorAll('[data-map-player]').forEach(node => {
-      node.addEventListener('click', () => { if (galaxyMapDidDrag) return; mapPlayerClick(node.getAttribute('data-map-player'), node.getAttribute('data-map-name')); });
+      node.addEventListener('click', (e) => { if (galaxyMapDidDrag) return; playerMapMenu(e, node.getAttribute('data-map-player'), node.getAttribute('data-map-name')); });
     });
     svg.querySelectorAll('[data-alliance-base]').forEach(node => {
       node.addEventListener('click', (e) => {
@@ -37951,9 +38380,9 @@
       });
     });
     svg.querySelectorAll('[data-map-npc]').forEach(node => {
-      node.addEventListener('click', () => {
+      node.addEventListener('click', (e) => {
         if (galaxyMapDidDrag) return;
-        if (confirm((node.getAttribute('data-map-npcname')||'NPC')+' angreifen?')) sendAttackMission(node.getAttribute('data-map-npc'));
+        npcMapMenu(e, node.getAttribute('data-map-npc'), node.getAttribute('data-map-npcname'));
       });
     });
     // Mond-Badge: eigenständiges Klick-Ziel (Spieler-Wunsch "Monde als eigenständige Planetenobjekte
@@ -37963,7 +38392,7 @@
       node.addEventListener('click', (e) => {
         e.stopPropagation();
         if (galaxyMapDidDrag) return;
-        moonMapClick(node.getAttribute('data-map-moon'));
+        moonMapMenu(e, node.getAttribute('data-map-moon'));
       });
     });
     // Trümmerfeld-Badge: eigener Klick-Handler, der NICHT die Erkundungsmission des darunterliegenden
@@ -42537,6 +42966,11 @@
       const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
       const kv = totalSelected > 0 ? counterVerdict(npcCounterPreview) : null;
+      // Werftmarken in der Vorschau (31.07.2026, Regel 6): Der Kampfbericht weist sie seit dieser
+      // Version aus - stuenden sie NUR dort, waere die Vorschau die Anzeigestelle, die die alte
+      // Annahme behaelt. Gerechnet wird mit derselben Funktion, die auch der Bericht nutzt.
+      const markenPreview = totalSelected > 0 ? fleetMarksSnapshot(attackFleet) : null;
+      const markAnteilPreview = markenPreview ? fleetMarkAtkShare(attackFleet) : 0;
       // Enter-Vorschau (26.07.2026): Ohne sie waere die Enterphase eine Ueberraschung im Bericht.
       // Gerechnet wird mit demselben boardingChance() wie spaeter im Kampf; als Widerstand dient der
       // Erwartungswert des ueberlebenden Rests bei dieser Kraefteverteilung - dieselbe Formel wie in
@@ -42563,6 +42997,7 @@
               <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
               ${kv && npcCounterPreview !== 1 ? `<div class="bmeta" style="color:${kv.farbe};"><i class="ti ${kv.icon}" aria-hidden="true"></i> ${kv.text} (${kv.pct>0?'+':''}${kv.pct}% Angriffskraft)</div>` : ''}
+              ${markenPreview ? `<div class="bmeta" style="color:#f0b556;"><i class="ti ti-arrow-up" aria-hidden="true"></i> Werftmarken: ${Object.entries(markenPreview).sort((x,y)=>y[1]-x[1]).map(([k,mk])=>shipDisplayName(k)+' Mk '+SHIP_MARK_ROMAN[mk-1]).join(', ')}${markAnteilPreview>0?` (+${(Math.round(markAnteilPreview*1000)/10).toString().replace('.',',')}% Angriffskraft, bereits eingerechnet)`:''}</div>` : ''}
               ${enterZeile}
               <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(flightTime)} Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
               <div class="bmeta" style="${atkCargoCapacity<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität: ${fmt(atkCargoCapacity)}${atkCargoCapacity<=0?' – ohne Frachter geht die Beute verloren!':''}</div>
@@ -43970,9 +44405,10 @@
       }
       render(); save();
     });
-    // Werftmarke aufrüsten (31.07.2026). Sofort wirksam, keine Bauzeit-Warteschlange: Die Marke
-    // rüstet die BESTEHENDE Flotte um, es entsteht kein neues Schiff. Ein Warteschlangeneintrag
-    // hätte einen der zehn Werftplätze belegt, ohne dass am Ende etwas gebaut worden wäre.
+    // Werftmarke aufrüsten (31.07.2026). Der Umbau braucht Zeit (shipMarkDuration), läuft aber als
+    // EIGENER Auftrag neben der Bauwarteschlange, nicht darin: Die Marke rüstet die BESTEHENDE
+    // Flotte um, es entsteht kein neues Schiff. Ein Warteschlangeneintrag hätte einen der zehn
+    // Werftplätze belegt, ohne dass am Ende etwas gebaut worden wäre.
     document.querySelectorAll('[data-shipmark]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-shipmark');
       const mk = shipMarkOf(key);
@@ -43987,16 +44423,42 @@
         log(def.name+': Werftmarke Mk '+SHIP_MARK_ROMAN[ziel-1]+' benötigt '+item.n+'x '+item.name+' (vorhanden: '+item.have+') – seltener Fund bei Expeditionen.', 'ti-diamond');
         return;
       }
+      // Nur EIN Umbau gleichzeitig - wie bei der Forschung. Das macht die Reihenfolge zu einer
+      // echten Entscheidung; bei vierzig Klassen parallel waere die Zeit keine Schranke mehr.
+      const laeuft = shipMarkJob();
+      if (laeuft){
+        const ldef = SHIP_DEFS.find(d => d.key === laeuft.key) || { name: laeuft.key };
+        log('Die Werft rüstet gerade '+ldef.name+' auf Mk '+SHIP_MARK_ROMAN[laeuft.ziel-1]+' um (noch '+fmtDuration(shipMarkJobRest()/1000)+'). Es läuft immer nur ein Umbau.', 'ti-clock');
+        return;
+      }
       const cost = shipMarkCost(key, ziel);
       if (!canAfford(cost)) return;
       pay(cost);
       if (item) state.rareItems[item.key] = (state.rareItems[item.key]||0) - item.n;
-      state.shipMarks[key] = ziel;
-      addXp(15);
-      const stufe = SHIP_MARK_STEPS[ziel-1];
-      log(def.name+' auf Werftmarke Mk '+SHIP_MARK_ROMAN[ziel-1]+' aufgerüstet – '+stufe.was+'. '+shipMarkEffectText(ziel)+'.', 'ti-arrow-up');
-      pushToast(def.name+': Werftmarke Mk '+SHIP_MARK_ROMAN[ziel-1]+' erreicht', 'ti-arrow-up', 'ok');
+      const dauer = shipMarkDuration(key, ziel, state.activeBasePlanet);
+      state.shipMarkJob = { key, ziel, startedAt: Date.now(), endsAt: Date.now() + dauer*1000, cost, item: item ? { key:item.key, n:item.n } : null };
+      log(def.name+': Umbau auf Werftmarke Mk '+SHIP_MARK_ROMAN[ziel-1]+' begonnen – fertig in '+fmtDuration(dauer)+'.', 'ti-arrow-up');
       playSound('build');
+      render(); save();
+    });
+    // Abbrechen mit VOLLER Rueckerstattung, Ressourcen wie Expeditionsfund. Ohne Rueckgabe waere
+    // ein Fehlklick bei einem mehrstuendigen Umbau eine Strafe, die nichts lehrt - und der einzige
+    // Ausweg waere, ihn auszusitzen.
+    document.querySelectorAll('[data-shipmark-cancel]').forEach(btn => btn.onclick = () => {
+      const j = shipMarkJob();
+      if (!j) return;
+      const def = SHIP_DEFS.find(d => d.key === j.key) || { name: j.key };
+      // Exaktes Gegenstueck zu pay(): credits und bergung liegen NICHT in state.resources. Ein
+      // pauschales state.resources[r] += v wuerde dort ein state.resources.credits erfinden - und
+      // ein erfundenes Zahlenfeld ist genau das, was die Backend-Sanity-Pruefung sieht.
+      if (j.cost) for (const [r, v] of Object.entries(j.cost)){
+        if (r === 'credits') state.credits = (state.credits||0) + v;
+        else if (r === 'bergung'){ const a = ensureAbgrund(); a.bergung = (a.bergung||0) + v; }
+        else state.resources[r] = (state.resources[r]||0) + v;
+      }
+      if (j.item) state.rareItems[j.item.key] = (state.rareItems[j.item.key]||0) + j.item.n;
+      state.shipMarkJob = null;
+      log(def.name+': Umbau abgebrochen – Material vollständig zurück.', 'ti-x');
       render(); save();
     });
     document.querySelectorAll('[data-queue]').forEach(btn => btn.onclick = () => addToQueue(state.activeBasePlanet, btn.getAttribute('data-queue')));
@@ -44873,6 +45335,7 @@
     processRaidScout();
     const debrisCollected = collectDebrisWithRecyclers();
     const researchDone = processResearch();
+    const markDone = processShipMarkJob();
     const researchQueued = tryStartQueuedResearch();
     const autoExplored = tryAutoExplore();
     syncCompletionReminders();
@@ -44882,7 +45345,7 @@
     // Leiste schon gesetzt oder der Hinweis weggeklickt, steigt maybeShowTabHint sofort wieder aus.
     if (tabVisible) maybeShowTabHint(activeTab);
     if (tabVisible) render();
-    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || researchQueued || autoExplored || rufVerfallen || neueSysteme) save();
+    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || researchDone || markDone || researchQueued || autoExplored || rufVerfallen || neueSysteme) save();
   }, 1000);
   // Nachhol-Render beim Zurückkehren in den Tab (Gegenstück zum tabVisible-Gate im Haupt-Tick):
   // der erste sichtbare Frame zeigt sofort den aktuellen Stand statt bis zu 1s alte Werte.

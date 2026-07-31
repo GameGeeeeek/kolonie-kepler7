@@ -1,4 +1,5 @@
-// Werftmarken v8.350.0-8.351.0 - zehn Ausbaustufen je Schiffsklasse, Tier-2-Kette und Expeditionsfunde.
+// Werftmarken v8.350.0-8.353.0 - zehn Ausbaustufen je Schiffsklasse, Tier-2-Kette,
+// Expeditionsfunde und die Aufruestzeit je Stufe (Abschnitt 11).
 //
 // Woran das Feature still danebengehen kann, und was dieser Test deshalb prueft:
 //
@@ -50,7 +51,8 @@ const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state',
   src.slice(von, bis) +
   '; return { SHIP_MARK_MAX, SHIP_MARK_PER_STEP, SHIP_MARK_ROMAN, SHIP_MARK_STEPS, SHIP_MARK_COST_BASE,' +
   ' SHIP_MARK_COST_KEYS, SHIP_MARK_GATES, SHIP_MARK_ITEMS, shipMarkClassFactor, shipMarkCost, shipMarkOf,' +
-  ' shipMarkBonus, shipMarkGateOpen, shipMarkRound };'
+  ' shipMarkBonus, shipMarkGateOpen, shipMarkRound, shipMarkDuration, shipMarkJob, shipMarkJobRest,' +
+  ' SHIP_MARK_TIME_BASE, SHIP_MARK_TIME_STEP, SHIP_MARK_TIME_CLASS_EXP, SHIP_MARK_TIME_CAP };'
 )(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state);
 
 // ---------------------------------------------------------------- 1. Struktur
@@ -217,7 +219,9 @@ check('JEDER shipStatBarsHtml-Aufruf gibt einen Schiffsschluessel mit (sonst zei
 
 // Die fuenf Rechenstellen muessen die Marke tatsaechlich lesen.
 const rechenstellen = [
-  ['Angriff (attackPowerRaw)', /const dm = \(key, count\) => diminishingShipCount\(count\|\|0\) \* \(1 \+ shipMarkBonus\(key,'atk'\)\)/],
+  // Seit v8.354.0 hat dm() einen ohneMarken-Schalter fuer die Bericht-Anzeige - der Markenfaktor
+  // steht weiterhin genau hier, nur eben hinter der Abfrage.
+  ['Angriff (attackPowerRaw)', /const dm = \(key, count\) => diminishingShipCount\(count\|\|0\) \* \(ohneMarken \? 1 : \(1 \+ shipMarkBonus\(key,'atk'\)\)\)/],
   ['Schild (defensePower)', /shipMarkBonus\(def\.key, 'shield'\)/],
   ['Tempo (effectiveShipSpeed)', /speed \*= \(1 \+ shipMarkBonus\(shipKey, 'speed'\)\)/],
   ['Treibstoff (fleetFuelModuleMult)', /shipMarkBonus\(k, 'fuel'\)/],
@@ -239,7 +243,7 @@ check('Werft hat einen Aufruest-Knopf', /data-shipmark="/.test(src));
 check('Aufruest-Knopf hat einen Handler', /\[data-shipmark\]/.test(src));
 check('Kauf prueft das Forschungstor', /if \(!shipMarkGateOpen\(ziel\)\)/.test(src));
 check('Kauf prueft die Bezahlbarkeit und zieht den Fund ab',
-  /if \(!canAfford\(cost\)\) return;[\s\S]{0,60}pay\(cost\);[\s\S]{0,140}state\.shipMarks\[key\] = ziel;/.test(src)
+  /if \(!canAfford\(cost\)\) return;[\s\S]{0,60}pay\(cost\);[\s\S]{0,200}state\.shipMarkJob = \{ key, ziel,/.test(src)
   && /state\.rareItems\[item\.key\] = \(state\.rareItems\[item\.key\]\|\|0\) - item\.n;/.test(src));
 // Reihenfolge ist wichtig: Erst pruefen, dann bezahlen. Andersherum waeren die Ressourcen weg und
 // die Marke trotzdem nicht da.
@@ -247,7 +251,8 @@ const kaufBlock = src.slice(src.indexOf("data-shipmark]"), src.indexOf("data-shi
 check('der Fund wird VOR der Bezahlung geprueft',
   kaufBlock.indexOf('item.have < item.n') > 0 && kaufBlock.indexOf('item.have < item.n') < kaufBlock.indexOf('pay(cost)'));
 check('Werftkarte zeigt den Fund mit Bestand', /vorhanden: \$\{item\.have\}/.test(src));
-check('Werftkarte sperrt den Knopf ohne Fund', /const kaufbar = gateOk && itemOk && bezahlbar;/.test(src));
+check('Werftkarte sperrt den Knopf ohne Fund und bei belegter Werft',
+  /const kaufbar = gateOk && itemOk && bezahlbar && !werftBelegt;/.test(src));
 check('Hilfe erklaert die Werftmarken', /title:'Werftmarken/.test(src));
 check('Hilfe nennt den Konvoi-Haken beim Tempo', /langsamste<\/strong> beteiligte Schiff/.test(src));
 // BEWUSST ohne feste Versionsnummer. Die erste Fassung dieses Tests prüfte auf '8.351.0' - und
@@ -274,6 +279,131 @@ check('Plakette traegt die Stufe in Listengroesse', /SHIP_MARK_ROMAN\[mk-1\]/.te
 for (const stufe of [2,3,4,5,6,7,8,9,10]){
   check('Maler reagiert auf Mk '+fe.SHIP_MARK_ROMAN[stufe-1], new RegExp('mk *>= *'+stufe+'\\b').test(src));
 }
+
+// ---------------------------------------------------------------- 11. Aufruestzeit (v8.353.0)
+// Was hier still danebengehen kann:
+//   a) EINE STUFE, DIE LAENGER DAUERT ALS DER SPIELER WACH IST. Die Kosten skalieren voll mit dem
+//      Klassenfaktor (bis 20). Wuerde die ZEIT das auch tun, waere der letzte Schritt eines
+//      Fusionsdreadnoughts ein Mehrtagesauftrag - und die schwersten Klassen, fuer die man Marken
+//      am ehesten kauft, waeren die unattraktivsten. Deshalb gedaempft (Exponent < 1) und gedeckelt.
+//   b) EINE MARKE, DIE SICH SELBST BESCHLEUNIGT. shipMarkDuration() darf den shipKey NICHT an
+//      effectiveBuildTimeEach() durchreichen, sonst zieht der Bauzeit-Rabatt der Marke auf ihre
+//      eigene Aufruestung.
+//   c) EIN AUFTRAG, DER OFFLINE STEHENBLEIBT. Ohne Aufruf im Nachholpfad waere ein ueber Nacht
+//      faelliger Umbau erst beim ersten sichtbaren Tick fertig - die Nacht waere verschenkt.
+//   d) EIN ABBRUCH, DER state.resources.credits ERFINDET. pay() legt Kredite und Bergungsgut
+//      ausserhalb von state.resources ab; ein pauschales += wuerde dort ein Feld erzeugen, das die
+//      Backend-Sanity-Pruefung sieht - und eine Ablehnung friert das Speichern KOMPLETT ein.
+check('Zeitkonstanten vorhanden', typeof fe.SHIP_MARK_TIME_BASE === 'number' && fe.SHIP_MARK_TIME_STEP > 1);
+check('die Zeit skaliert gedaempfter mit der Klasse als die Kosten (Exponent < 1)',
+  fe.SHIP_MARK_TIME_CLASS_EXP > 0 && fe.SHIP_MARK_TIME_CLASS_EXP < 1, fe.SHIP_MARK_TIME_CLASS_EXP);
+// Ohne planetKey rechnet shipMarkDuration die Rohdauer - genau das, was hier geprueft werden soll.
+for (const k of ['jaeger','schlachtschiff','fusionsdreadnought']){
+  let vorher = 0, summe = 0;
+  for (let ziel = 2; ziel <= fe.SHIP_MARK_MAX; ziel++){
+    const d = fe.shipMarkDuration(k, ziel);
+    check(k+' Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' dauert laenger als die Stufe davor', d > vorher, d);
+    check(k+' Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' bleibt unter dem 12-Stunden-Deckel',
+      d <= fe.SHIP_MARK_TIME_CAP, d);
+    vorher = d; summe += d;
+  }
+  // Der ganze Weg soll an einem langen Tag zu schaffen sein - sonst ist Mk X keine Senke mehr,
+  // sondern eine Wand.
+  check(k+': Mk I -> Mk X dauert insgesamt unter 24 Stunden', summe < 24*3600,
+    Math.round(summe/3600*10)/10 + ' h');
+}
+check('der Fusionsdreadnought braucht weniger als das Fuenffache eines Jaegers (gedaempft)',
+  fe.shipMarkDuration('fusionsdreadnought', 10) < 5 * fe.shipMarkDuration('jaeger', 10),
+  { jaeger: fe.shipMarkDuration('jaeger', 10), dread: fe.shipMarkDuration('fusionsdreadnought', 10) });
+check('die Marke beschleunigt ihre eigene Aufruestung NICHT (kein shipKey an effectiveBuildTimeEach)',
+  /effectiveBuildTimeEach\('ship', planetKey, roh\)/.test(src));
+check('Werft-Boni wirken trotzdem (planetKey wird durchgereicht)',
+  /const dauer = shipMarkDuration\(key, ziel, state\.activeBasePlanet\)/.test(src));
+
+// Auftrag, Tick und Offline-Nachholpfad
+check('der Kauf startet einen Auftrag statt die Marke sofort zu setzen',
+  /state\.shipMarkJob = \{ key, ziel, startedAt: Date\.now\(\), endsAt: Date\.now\(\) \+ dauer\*1000/.test(src));
+check('es laeuft nur EIN Umbau gleichzeitig', /const laeuft = shipMarkJob\(\);[\s\S]{0,80}if \(laeuft\)\{/.test(src));
+check('processShipMarkJob setzt die Marke erst bei Faelligkeit',
+  /if \(!j \|\| Date\.now\(\) < j\.endsAt\) return false;/.test(src));
+check('processShipMarkJob laeuft im Haupt-Tick', /const markDone = processShipMarkJob\(\);/.test(src));
+check('processShipMarkJob laeuft AUCH im Offline-Nachholpfad',
+  src.split('processShipMarkJob()').length - 1 >= 3);
+check('shipMarkJob bekommt einen Default in applyStateDefaults',
+  /if \(state\.shipMarkJob === undefined\) state\.shipMarkJob = null;/.test(src));
+check('ein kaputter oder uralter Auftrag wird beim Laden verworfen statt stehenzubleiben',
+  /if \(!gueltig\) state\.shipMarkJob = null;/.test(src));
+// Regel 6: Der Umbau laeuft offline mit - dann muss ihn auch der Rueckkehrbericht nennen. Ein
+// gezaehltes Feld, das nirgends ankommt, ist die typische zweite Anzeigestelle dieses Projekts.
+check('der Offline-Bericht bekommt die Umbauten durchgereicht',
+  /markenUmbauten: queues\.markenUmbauten\|\|0/.test(src));
+check('der Offline-Bericht zeigt sie auch an', /offlineSummary\.markenUmbauten>0/.test(src));
+
+// Abbruch mit vollstaendiger Rueckgabe - und ohne erfundenes Zahlenfeld.
+const abbruch = src.slice(src.indexOf('[data-shipmark-cancel]'), src.indexOf('[data-shipmark-cancel]') + 1400);
+check('Abbrechen gibt die Ressourcen zurueck', /state\.resources\[r\] = \(state\.resources\[r\]\|\|0\) \+ v;/.test(abbruch));
+check('Abbrechen behandelt Kredite und Bergungsgut wie pay() – kein state.resources.credits',
+  /if \(r === 'credits'\) state\.credits/.test(abbruch) && /r === 'bergung'/.test(abbruch));
+check('Abbrechen gibt auch den Expeditionsfund zurueck',
+  /state\.rareItems\[j\.item\.key\] = \(state\.rareItems\[j\.item\.key\]\|\|0\) \+ j\.item\.n;/.test(abbruch));
+check('Abbrechen loescht den Auftrag', /state\.shipMarkJob = null;/.test(abbruch));
+
+// Anzeige (Regel 6): Dauer am Kaufknopf, Restzeit waehrend des Umbaus, Grund bei fremder Belegung.
+check('die Kaufzeile nennt die Dauer neben dem Preis', /costHtml\(cost\)\} · <i class="ti ti-clock"[^>]*><\/i> \$\{fmtDuration\(dauer\)\}/.test(src));
+check('die laufende Karte zeigt Restzeit und Fortschrittsbalken',
+  /noch \$\{fmtDuration\(rest\/1000\)\}/.test(src) && /class="mark-fortschritt"/.test(src));
+check('andere Klassen sagen, warum ihr Knopf grau ist', /es läuft immer nur ein Umbau/.test(src));
+check('die Hilfe erklaert die Aufruestzeit', /<strong>Ein Umbau braucht Zeit<\/strong>/.test(src));
+check('die Hilfe nennt den Ein-Umbau-Grundsatz und die volle Rueckgabe',
+  /ein Umbau gleichzeitig<\/strong>/.test(src) && /Abbrechen geht jederzeit und gibt alles zurück<\/strong>/.test(src));
+
+// ---------------------------------------------------------------- 12. Marken im Kampfbericht (v8.354.0)
+// Die Marken flossen seit v8.350.0 in jede Kampfrechnung ein, aber kein Bericht sagte es. Was hier
+// still danebengehen kann:
+//   a) EIN KAMPFPFAD OHNE STEMPEL. Es gibt zwoelf Stellen, an denen ein Kampfbericht gebaut wird.
+//      Der Markenstand wird deshalb an der EINEN Stelle gesetzt, durch die alle laufen (pushReport).
+//   b) DIE FALSCHE FLOTTE GESTEMPELT. Bei einem Ueberfall steht unter report.fleet die Flotte der
+//      ANGREIFER - ein pauschaler Stempel haette dem Spieler seine eigenen Marken auf den Gegner
+//      geschrieben. Die eigene Flotte ist dort stationedFleet.
+//   c) DER HEUTIGE STAND IN EINEM ALTEN BERICHT. Wird der Stand beim LESEN ermittelt statt beim
+//      Austragen, wird eine mit Mk III gewonnene Schlacht nach dem naechsten Umbau zum Mk-IV-Sieg.
+//   d) EINE ZWEITE, NACHGEBAUTE PROZENTFORMEL. Sie waere beim naechsten neuen Schiff still falsch.
+//      Der Anteil kommt aus zwei Durchlaeufen DERSELBEN Funktion.
+//   e) NUR DER BERICHT, NICHT DIE VORSCHAU (Regel 6).
+check('attackPowerRaw kann markenlos rechnen (ein Schalter, keine zweite Kopie)',
+  /function attackPowerRaw\(fleet, ohneMarken\)/.test(src)
+  && /\(ohneMarken \? 1 : \(1 \+ shipMarkBonus\(key,'atk'\)\)\)/.test(src));
+check('shipDefenseContribution ebenso', /function shipDefenseContribution\(fleet, ohneMarken\)/.test(src));
+check('der Angriffsanteil kommt aus zwei Durchlaeufen derselben Funktion',
+  /const mit = attackPowerRaw\(fleet\), ohne = attackPowerRaw\(fleet, true\);/.test(src));
+check('der Verteidigungsanteil ebenso (Marke wirkt dort ueber atk UND Schild)',
+  /const mit = shipDefenseContribution\(fleet\), ohne = shipDefenseContribution\(fleet, true\);/.test(src));
+check('es gibt eine Momentaufnahme des Markenstands', /function fleetMarksSnapshot\(fleet\)/.test(src));
+check('und eine Berichtszeile dafuer', /function markReportLine\(marken, anteil, groesse\)/.test(src));
+// (a) Der Stempel sitzt an der einen Stelle, durch die jeder Bericht laeuft.
+check('der Markenstand wird zentral in pushReport gestempelt',
+  /async function pushReport\(report\)\{\s*stampShipMarks\(report\);/.test(src));
+check('stampShipMarks existiert genau einmal',
+  (src.match(/function stampShipMarks\(/g) || []).length === 1);
+// (b) Beim Ueberfall ist die eigene Flotte die stationierte, nicht report.fleet.
+check('beim Ueberfall wird die STATIONIERTE Flotte gestempelt, nicht die der Angreifer',
+  /else if \(report\.type === 'raid'\) eigene = report\.stationedFleet;/.test(src));
+check('und dort zaehlt der Verteidigungsanteil',
+  /report\.type === 'raid'\s*\?\s*fleetMarkDefShare\(eigene\) : fleetMarkAtkShare\(eigene\)/.test(src));
+// (c) Gespeichert, nicht beim Lesen gerechnet.
+check('der Anteil wird im Bericht gespeichert', /report\.markAtkShare = Math\.round\(/.test(src));
+check('die Berichtszeile liest den gespeicherten Stand', /markReportLine\(r\.marken, r\.markAtkShare/.test(src));
+// (e) Alle vier Kampfberichte und die Vorschau.
+const berichte = (src.match(/markReportLine\(r\.marken, r\.markAtkShare/g) || []).length;
+check('alle vier Kampfberichte zeigen die Zeile (NPC, Spieler, Allianzbasis, Ueberfall)',
+  berichte === 4, berichte);
+check('der Ueberfall-Bericht nennt ausdruecklich die Flottenverteidigung',
+  /markReportLine\(r\.marken, r\.markAtkShare, 'Flottenverteidigung'\)/.test(src));
+check('auch die NPC-Angriffsvorschau nennt die Marken',
+  /const markenPreview = totalSelected > 0 \? fleetMarksSnapshot\(attackFleet\) : null;/.test(src)
+  && /bereits eingerechnet/.test(src));
+check('die Hilfe sagt, dass Vorschau und Bericht sie ausweisen',
+  /<strong>Im Kampf sind sie ausgewiesen:<\/strong>/.test(src));
 
 console.log('\n' + (fail ? 'FAIL' : 'PASS'));
 process.exit(fail ? 1 : 0);
