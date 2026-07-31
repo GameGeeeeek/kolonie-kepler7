@@ -405,5 +405,78 @@ check('auch die NPC-Angriffsvorschau nennt die Marken',
 check('die Hilfe sagt, dass Vorschau und Bericht sie ausweisen',
   /<strong>Im Kampf sind sie ausgewiesen:<\/strong>/.test(src));
 
+// ---------------------------------------------------------------- 13. Marken im Punktestand (v8.355.0)
+// Ein Mk X-Jaeger zaehlte im Punktestand exakt so viel wie ein Mk I-Jaeger. Woran das jetzt still
+// danebengehen kann:
+//   a) DER SERVER RECHNET ANDERS. computeScoreServer() prueft den Punktestand nach und
+//      UEBERSCHREIBT den eingereichten Wert. Ohne den Nachzug dort waere die Frontend-Aenderung
+//      wirkungslos - die Bestenliste zeigte weiter den alten Wert. Genau dieser Fallstrick
+//      ("Backend-Kopie mitpflegen") hat bei SHIP_SCORE_WEIGHTS schon zweimal zugeschlagen.
+//   b) DER ZUSCHLAG LECKT IN DIE ANDEREN NUTZER DERSELBEN TABELLE. SHIP_SCORE_WEIGHTS bestimmt auch
+//      Truemmerfeld-Masse, Prisengut und die Kaper-Obergrenze. Dort darf die Marke NICHT wirken:
+//      Das Truemmerfeld eines abgeschossenen Raiders haengt nicht an MEINEN Marken, und eine
+//      markenabhaengige Kapergrenze machte eine Klasse allein durchs Aufruesten unkaperbar.
+//   c) EINE ZWEITE PUNKTE-ZAHL. Der Zuschlag wird aus SHIP_MARK_PER_STEP.atk gelesen; eine eigene
+//      Konstante daneben liefe beim naechsten Balance-Eingriff still auseinander.
+//   d) EIN UNERKLAERTER PUNKTESPRUNG. Wird eine Marke fertig, springt der Punktestand - ohne Zeile
+//      im Punkteprotokoll waere das der einzige Sprung im Spiel ohne Begruendung.
+check('shipScoreWeight existiert und nutzt den atk-Markenanteil',
+  /function shipScoreWeight\(key\)\{\s*return \(SHIP_SCORE_WEIGHTS\[key\]\|\|0\) \* \(1 \+ shipMarkBonus\(key,'atk'\)\);/.test(src));
+check('der Punktestand rechnet mit dem Markengewicht',
+  /total \+= \(f\[key\]\|\|0\) \* shipScoreWeight\(key\)/.test(src)
+  && /total \+= \(away\[key\]\|\|0\) \* shipScoreWeight\(key\)/.test(src));
+check('die Aufschluesselung nennt die Marke mit', /\(mk>1\?' \(Mk '\+SHIP_MARK_ROMAN\[mk-1\]\+'\)':''\)/.test(src));
+check('ein fertig gebautes Schiff meldet die Punkte MIT Marke',
+  /const weight = shipScoreWeight\(job\.key\);/.test(src));
+check('ein fertiger Umbau erscheint im Punkteprotokoll',
+  /const punkteVorher = computeShipScoreTotal\(\);/.test(src)
+  && /logScoreChange\(punkteDelta, def\.name\+' auf Werftmarke Mk '/.test(src));
+// (b) Die anderen Nutzer der Tabelle bleiben markenfrei.
+check('die Kaper-Obergrenze bleibt am Grundgewicht',
+  /function isBoardable\(shipKey\)\{ return \(SHIP_SCORE_WEIGHTS\[shipKey\]\|\|999\) <= BOARD_MAX_SHIP_WEIGHT; \}/.test(src));
+check('die Truemmerfeld-Masse bleibt am Grundgewicht',
+  !/debrisWeight \+= [^\n]*shipScoreWeight/.test(src));
+check('das Prisengut bleibt am Grundgewicht',
+  /ergebnis\.prisengut \+= nimm \* \(SHIP_SCORE_WEIGHTS\[k\]\|\|10\) \* PRISENGUT_PER_WEIGHT;/.test(src));
+
+// (a) Backend-Spiegel. Nutzt denselben bePfad wie Abschnitt 6 - ein zweiter Suchpfad daneben waere
+// genau die Sorte Zweitfassung, die dieses Projekt vermeidet. Ohne Backend wird uebersprungen.
+if (!bePfad){
+  console.log('SKIP - Backend nicht im Arbeitsbereich, Punktestand-Spiegel ausgelassen');
+} else {
+  const be = fs.readFileSync(bePfad, 'utf8');
+  check('BE: computeScoreServer zieht den Markenfaktor',
+    /shipScore \+= \(f\[key\] \|\| 0\) \* weight \* shipMarkAtkMult\(marks, key\);/.test(be));
+  check('BE: und liest die Marken aus dem gespeicherten Spielstand', /const marks = save\.shipMarks;/.test(be));
+  // Beim Nachziehen der Marken aufgefallen: Der Server kannte den Abgrund gar nicht und hat den
+  // eingereichten Punktestand jedem Taucher nach unten korrigiert (50 Punkte je Rekordtiefe seit
+  // v8.343.0). Der Test haelt fest, dass beide Seiten dieselbe Zahl verwenden.
+  const feJeTiefe = (src.match(/const ABGRUND_SCORE_JE_TIEFE = (\d+);/) || [])[1];
+  const beJeTiefe = (be.match(/const ABGRUND_SCORE_JE_TIEFE = (\d+);/) || [])[1];
+  check('BE: die Rekordtiefe zaehlt serverseitig mit', !!beJeTiefe && feJeTiefe === beJeTiefe,
+    { frontend: feJeTiefe, backend: beJeTiefe });
+  check('BE: und geht in die Summe ein', /\+ expansionScore \+ abgrundScore \+/.test(be));
+  // FE und BE muessen fuer dieselbe Flotte dieselbe Punktzahl liefern - sonst ueberschreibt der
+  // Server den eingereichten Wert mit einer anderen Zahl, und der Spieler sieht in der Bestenliste
+  // etwas anderes als in seinem Spiel.
+  const beWeights = new Function(be.slice(be.indexOf('const SHIP_SCORE_WEIGHTS = {'),
+    be.indexOf('};', be.indexOf('const SHIP_SCORE_WEIGHTS = {')) + 2) + '; return SHIP_SCORE_WEIGHTS;')();
+  const feWeights = new Function(src.slice(src.indexOf('const SHIP_SCORE_WEIGHTS = {'),
+    src.indexOf('};', src.indexOf('const SHIP_SCORE_WEIGHTS = {')) + 2) + '; return SHIP_SCORE_WEIGHTS;')();
+  const beAtkPerStep = Number((be.match(/const SHIP_MARK_ATK_PER_STEP = ([\d.]+);/) || [])[1]);
+  check('FE und BE nutzen denselben Zuschlag je Stufe',
+    beAtkPerStep === fe.SHIP_MARK_PER_STEP.atk, { fe: fe.SHIP_MARK_PER_STEP.atk, be: beAtkPerStep });
+  let ungleich = [];
+  for (const k of Object.keys(feWeights)){
+    for (let mk = 1; mk <= fe.SHIP_MARK_MAX; mk++){
+      const feP = feWeights[k] * (1 + (mk-1) * fe.SHIP_MARK_PER_STEP.atk);
+      const beP = (beWeights[k]||0) * (1 + (mk-1) * beAtkPerStep);
+      if (Math.abs(feP - beP) > 1e-9) ungleich.push(k+'@Mk'+mk);
+    }
+  }
+  check('FE und BE liefern fuer jede Klasse und jede Marke dieselbe Punktzahl',
+    ungleich.length === 0, ungleich.slice(0, 5));
+}
+
 console.log('\n' + (fail ? 'FAIL' : 'PASS'));
 process.exit(fail ? 1 : 0);
