@@ -153,7 +153,11 @@ const check=(n,c,x)=>{ console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | 
     // die Dateien kommen ins Repo, oder die Links müssen weg. Ein Impressum ist in Deutschland
     // keine Kür, und ein toter Link im Footer jeder Seite kostet zusätzlich Vertrauen bei der
     // Bewertung der Seite.
-    const AUSNAHMEN = ['patchnotes.html'];
+    // Leer, seit patchnotes.html am 31.07.2026 tatsächlich gebaut wurde (build-patchnotes.js).
+    // Die Datei stand hier als bekannt-fehlend geparkt - genau die Prüfung darunter hat gemeldet,
+    // dass der Eintrag nach dem Bauen überflüssig geworden ist. Wer wieder etwas hier einträgt,
+    // trägt eine Bringschuld ein, keine Ausnahme.
+    const AUSNAHMEN = [];
     const tot = [], ausgenommen = [];
     const pruefe = (datei, s) => {
       for (const m of s.matchAll(/href="([^"#?:]+\.(?:html|css))"/g)){
