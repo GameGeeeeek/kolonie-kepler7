@@ -115,4 +115,40 @@ if (!/const ICONS = \{/.test(html)) {
   }
 }
 
+// --- Check 4: keine unsichtbaren Striche in den ICONS-SVGs ---------------------------------
+// Befund 31.07.2026 beim Zeichnen der letzten fuenfzehn Forschungs-Icons: eine <line>, die EXAKT
+// senkrecht oder waagerecht laeuft, hat eine Bounding-Box ohne Breite bzw. ohne Hoehe. Ein
+// Farbverlauf in objectBoundingBox-Einheiten (und genau so sind gAmber/gSteel/... definiert) kann
+// darauf nicht abgebildet werden - der Browser zeichnet das Element deshalb GAR NICHT. Kein
+// Konsolenfehler, kein leeres Icon, nur ein fehlender Strich mitten im Bild.
+//
+// Deshalb war es zwoelf Monate lang unbemerkt: die Sonne rsolar hatte statt acht nur die vier
+// schraegen Strahlen, rkampf/rkampf2 fehlten ALLE VIER Fadenkreuz-Marken, der Quantenchipfabrik
+// alle acht Kontaktstifte, dem Deuterium-Atom die senkrechte Achse. Zusammen 28 Striche in elf
+// Icons - jedes davon sah fuer sich genommen plausibel aus.
+//
+// Die Regel lautet damit: achsenparallele Striche bekommen eine VOLLE Farbe (in der Regel den
+// 45%-Mittelton des Verlaufs, den sie vorher benutzt haben), schraege duerfen den Verlauf
+// behalten. Dieser Check haelt das fest, weil man den Fehler im Quelltext nicht sieht.
+{
+  const iconsBlock = html.slice(html.indexOf('  const ICONS = {'), html.indexOf('  function iconHtmlFor'));
+  const unsichtbar = [];
+  for (const eintrag of iconsBlock.matchAll(/^\s{4}(\w+):\s*`(<svg[\s\S]*?<\/svg>)`/gm)) {
+    for (const strich of eintrag[2].matchAll(/<line ([^>]*?)\/>/g)) {
+      const attr = strich[1];
+      if (!/stroke="url\(#g/.test(attr)) continue;
+      const z = n => { const m = attr.match(new RegExp(n + '="([-\\d.]+)"')); return m ? parseFloat(m[1]) : null; };
+      if (z('x1') === z('x2') || z('y1') === z('y2')) unsichtbar.push(`${eintrag[1]}  ${strich[0]}`);
+    }
+  }
+  if (unsichtbar.length) {
+    hasError = true;
+    console.error('FEHLER: achsenparallele <line> mit Farbverlauf - diese Striche werden NICHT gezeichnet:');
+    for (const u of unsichtbar) console.error('  - ' + u);
+    console.error('  Abhilfe: stroke="url(#gXyz)" durch die volle Mittelton-Farbe des Verlaufs ersetzen.');
+  } else {
+    console.log('OK: kein achsenparalleler Strich in den ICONS-SVGs haengt an einem Farbverlauf.');
+  }
+}
+
 process.exit(hasError ? 1 : 0);

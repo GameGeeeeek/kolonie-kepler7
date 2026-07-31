@@ -393,6 +393,62 @@ check('11: die Inventarzeile holt das Icon über das Präfix ab',
 check('11: die Ausnahmen sind im Code begründet',
   /würde EINE Zelle aus der Reihe herausbrechen/.test(src));
 
+// ------------------------------------------- 12: Forschungen (v8.357.0)
+// Letzte Gruppe des Icon-Durchgangs, und die einzige, die HALB umgestellt war: 32 der 47
+// Forschungen hatten seit jeher ein gezeichnetes Icon, die restlichen 15 fielen auf ti-flask
+// zurück - und weil alle 47 in EINER Liste untereinander stehen, sah man die flache Schrift-Kolbe
+// direkt neben den gezeichneten Karten. Genau die Verteilungs-Frage aus dem Kopfkommentar.
+//
+// Warum hier NICHT auf die Zwei-Stufen-Strichskala (4/1.6) geprüft wird, obwohl alle anderen
+// Gruppen das tun: die Forschungs-Icons sind die ÄLTESTEN im Spiel und benutzen zehn verschiedene
+// Stärken (1, 1.2, 1.4, 1.6, 2, 2.2, 2.4, 3, 4, 5). Eine strenge Prüfung wäre am Bestand rot -
+// und ein Test, der beim ersten Lauf rot ist, wird weggeklickt statt gelesen. Der Test hält
+// stattdessen fest, dass die Menge NICHT WEITER WÄCHST: neue Icons müssen sich in eine der schon
+// vorhandenen Stärken einfügen, und die fünfzehn neuen tun das (nur 4 und 1.6).
+const forschBlock = arrBlock('RESEARCH_DEFS');
+// Klammertiefe statt Regex: die Einträge enthalten verschachtelte Objekte (baseCost, requires),
+// und ein naives /key:'…'/ über den ganzen Block zählt die requires-Schlüssel mit - beim ersten
+// Anlauf kamen so 87 "Forschungen" heraus statt 47 (CLAUDE.md: naive Regex über Array-Literale).
+const forschDefs = (() => {
+  const out = []; let tiefe = 0, cur = '';
+  for (let i = forschBlock.indexOf('[') + 1; i < forschBlock.length; i++) {
+    const c = forschBlock[i];
+    if (c === '{') { if (!tiefe) cur = ''; tiefe++; }
+    if (tiefe > 0) cur += c;
+    if (c === '}') { tiefe--; if (!tiefe) out.push(cur); }
+  }
+  return out.map(t => (t.match(/key:'([a-z0-9_]+)'/) || [])[1]).filter(Boolean);
+})();
+check('12: alle Forschungen sind erfasst (Untergrenze)', forschDefs.length >= 47, forschDefs.length);
+const forschOhne = forschDefs.filter(k => !ICONS.has(k));
+check('12: jede Forschung hat ein eigenes gezeichnetes Icon', forschOhne.length === 0, forschOhne);
+
+const forschSvgs = forschDefs.map(k => (ICONS_BLOCK.match(new RegExp('\\b' + k + ":\\s*`(<svg[\\s\\S]*?<\\/svg>)`")) || [])[1]);
+// In EINER Liste untereinander ist Doppelung der eigentliche Fehler - zwei Forschungen mit
+// demselben Bild sind schlimmer als zwei mit demselben Schrift-Icon, weil das gezeichnete Bild
+// nach Absicht aussieht.
+check('12: und alle Bilder sind wirklich verschieden',
+  new Set(forschSvgs).size === forschSvgs.length, forschSvgs.length + ' Icons, ' + new Set(forschSvgs).size + ' Bilder');
+check('12: Forschungs-Icons haben Maße und Filter nach Hausstil',
+  forschSvgs.every(v => v && /viewBox="0 0 100 100" width="24" height="24"/.test(v) && /<g filter="url\(#ig\)">/.test(v)),
+  forschSvgs.map((v, i) => [forschDefs[i], v && /<g filter="url\(#ig\)">/.test(v)]).filter(x => !x[1]).map(x => x[0]));
+const STRICHE_BESTAND = ['1','1.2','1.4','1.6','2','2.2','2.4','3','4','5'];
+const neueStaerke = [];
+forschSvgs.forEach((v, i) => { if (!v) return;
+  for (const m of v.matchAll(/stroke-width="([\d.]+)"/g))
+    if (!STRICHE_BESTAND.includes(m[1])) neueStaerke.push(forschDefs[i] + ':' + m[1]); });
+check('12: kein neues Icon bringt eine elfte Strichstärke mit', neueStaerke.length === 0, neueStaerke);
+
+// Beide Anzeigestellen, nicht nur die Liste (Regel 6): die Karte der LAUFENDEN Forschung schrieb
+// bis v8.357.0 ein festes <i class="ti ti-flask"> hinein. Sie stand damit als einzige Karte im
+// Reiter mit einem anderen Bild da als ihr eigener Listeneintrag zwei Zeilen darunter - dieselbe
+// Falle, die der Offiziers-Durchgang (Abschnitt 2) schon einmal aufgedeckt hat.
+check('12: die Forschungsliste holt das Icon über den Schlüssel ab',
+  /iconHtmlFor\(r\.key, 'ti-flask', '#c3bef5'\)/.test(src));
+const laufend = src.slice(src.indexOf('${r.name} → Stufe ${ar.targetLevel}') - 400, src.indexOf('${r.name} → Stufe ${ar.targetLevel}'));
+check('12: auch die Karte der laufenden Forschung tut das', /iconHtmlFor\(r\.key, 'ti-flask'/.test(laufend));
+check('12: und schreibt kein Schrift-Icon mehr fest hinein', !/<i class="ti ti-flask"[^>]*><\/i> \$\{r\.name\} →/.test(src));
+
 // ---------------------------------------------------------------- offene Lücken benennen
 // Kein Fehlschlag - eine Standortbestimmung, damit die verbleibende Arbeit sichtbar bleibt.
 // Rechnet BEIDE Grafiksysteme mit (gezeichnetes SVG ODER Canvas), sonst zählt sie wieder falsch.
