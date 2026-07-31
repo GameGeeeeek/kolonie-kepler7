@@ -204,6 +204,14 @@ async function imBrowser(){
   check('8: die Planeten sind danach noch da', nachKlick.planeten === vorher, [vorher, nachKlick.planeten]);
 
   // 4) Schließen über Esc
+  // Der Planetenklick oben öffnet seit v8.353.0 das Kartenmenü, und Esc gehört dann zuerst DEM
+  // (siehe tests/test_kartenmenue.js): Ein Tastendruck darf nicht Menü und System auf einmal
+  // schließen, sonst verliert man beim Verlassen eines versehentlich geöffneten Menüs nebenbei
+  // das aufgeklappte System. Hier wird das Menü deshalb erst weggeklickt, bevor Esc dem System
+  // gilt - der Test prüft weiterhin genau das, was er immer geprüft hat.
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+  check('4: der erste Esc gilt dem Kartenmenü und lässt das System offen',
+    await page.evaluate(()=>!document.querySelector('.kmenu') && !!document.getElementById('galaxySystemLayer')));
   await page.keyboard.press('Escape'); await page.waitForTimeout(1200);
   const zu1 = await page.evaluate(()=>({ ebene: !!document.getElementById('galaxySystemLayer'),
     breite: +document.getElementById('galaxyMapSvg').getAttribute('viewBox').split(' ')[2],
