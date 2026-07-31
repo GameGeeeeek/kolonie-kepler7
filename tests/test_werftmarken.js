@@ -1,4 +1,4 @@
-// Werftmarken v8.350.0 - zehn Ausbaustufen je Schiffsklasse.
+// Werftmarken v8.350.0-8.351.0 - zehn Ausbaustufen je Schiffsklasse, Tier-2-Kette und Expeditionsfunde.
 //
 // Woran das Feature still danebengehen kann, und was dieser Test deshalb prueft:
 //
@@ -49,7 +49,7 @@ const state = { shipMarks: {}, research: {} };
 const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state',
   src.slice(von, bis) +
   '; return { SHIP_MARK_MAX, SHIP_MARK_PER_STEP, SHIP_MARK_ROMAN, SHIP_MARK_STEPS, SHIP_MARK_COST_BASE,' +
-  ' SHIP_MARK_COST_KEYS, SHIP_MARK_GATES, shipMarkClassFactor, shipMarkCost, shipMarkOf,' +
+  ' SHIP_MARK_COST_KEYS, SHIP_MARK_GATES, SHIP_MARK_ITEMS, shipMarkClassFactor, shipMarkCost, shipMarkOf,' +
   ' shipMarkBonus, shipMarkGateOpen, shipMarkRound };'
 )(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state);
 
@@ -92,10 +92,16 @@ for (const [ziel, gate] of Object.entries(fe.SHIP_MARK_GATES)){
 // ---------------------------------------------------------------- 4. Material braucht ein Tor (Fund 2)
 // Fuer jedes Material gilt: Auf der Stufe, auf der es ERSTMALS auftaucht, muss ein Tor stehen.
 // erz/kristalle sind Grundstoffe und brauchen keins.
-const materialTor = { nanolegierungen:'rnanotech', quantenchips:'rquantenphysik', fusionskerne:'rfusionskerne', metamaterial:'rmetamaterial' };
+const materialTor = {
+  nanolegierungen:'rnanotech', quantenchips:'rquantenphysik', hochenergiekristalle:'rhochenergie',
+  fusionskerne:'rfusionskerne', kikerne:'rkitech', metamaterial:'rmetamaterial'
+};
 const gesehen = new Set();
 for (let i = 0; i < fe.SHIP_MARK_COST_BASE.length; i++){
   const ziel = i + 2;
+  check('Preiszeile Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' hat so viele Spalten wie SHIP_MARK_COST_KEYS',
+    fe.SHIP_MARK_COST_BASE[i].length === fe.SHIP_MARK_COST_KEYS.length,
+    [fe.SHIP_MARK_COST_BASE[i].length, fe.SHIP_MARK_COST_KEYS.length]);
   fe.SHIP_MARK_COST_BASE[i].forEach((v, j) => {
     const res = fe.SHIP_MARK_COST_KEYS[j];
     if (v <= 0 || gesehen.has(res)) return;
@@ -106,8 +112,48 @@ for (let i = 0; i < fe.SHIP_MARK_COST_BASE.length; i++){
       !!gate && gate.key === materialTor[res], gate || null);
   });
 }
-check('alle vier Tier-2-Materialien kommen vor',
+check('alle sechs Tier-2-Materialien kommen vor',
   Object.keys(materialTor).every(r => gesehen.has(r)), [...gesehen]);
+// Der Singularitaetskern gehoert der Tiefenflotte und dem Vernichter - eine zweite Senke hier
+// waere eine Balance-Entscheidung, keine stille Ergaenzung.
+check('Singularitaetskerne bleiben aussen vor', !fe.SHIP_MARK_COST_KEYS.includes('singularitaetskern'));
+// Jede Ressource, die eine Stufe verlangt, muss auf allen HOEHEREN Stufen weiter verlangt werden -
+// eine Zutat, die auf Mk IX gefordert wird und auf Mk X wieder verschwindet, waere ein Tippfehler.
+let monoton = true, monoAbw = null;
+for (let i = 1; i < fe.SHIP_MARK_COST_BASE.length; i++){
+  fe.SHIP_MARK_COST_BASE[i].forEach((v, j) => {
+    const vor = fe.SHIP_MARK_COST_BASE[i-1][j];
+    if (vor > 0 && !(v > vor)){ monoton = false; monoAbw = { stufe:'Mk '+fe.SHIP_MARK_ROMAN[i+1], res:fe.SHIP_MARK_COST_KEYS[j], vor, v }; }
+  });
+}
+check('einmal verlangte Zutaten verschwinden auf hoeheren Stufen nicht', monoton, monoAbw);
+
+// ---------------------------------------------------------------- 4b. Expeditionsfunde
+// RARE_ITEMS mit chance > 0 sind die einzigen, die tatsaechlich bei Expeditionen fallen.
+const rareChance = {};
+for (const m of src.matchAll(/\{ key:'([a-z]+)', name:'([^']+)', chance:([0-9.]+)/g)) rareChance[m[1]] = Number(m[3]);
+check('RARE_ITEMS mit Fundchance gelesen', Object.keys(rareChance).length >= 5, Object.keys(rareChance));
+const itemStufen = Object.keys(fe.SHIP_MARK_ITEMS).map(Number).sort((a,b)=>a-b);
+check('genau die drei obersten Marken verlangen einen Fund',
+  itemStufen.join(',') === '8,9,10', itemStufen);
+for (const ziel of itemStufen){
+  const it = fe.SHIP_MARK_ITEMS[ziel];
+  check('Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+': '+it.key+' faellt wirklich bei Expeditionen (chance > 0)',
+    rareChance[it.key] > 0, { chance: rareChance[it.key] });
+  check('Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+': Menge ist klein und fest', it.n >= 1 && it.n <= 2, it.n);
+}
+check('jede Stufe verlangt ein ANDERES Material (nicht dreimal dasselbe)',
+  new Set(itemStufen.map(z=>fe.SHIP_MARK_ITEMS[z].key)).size === itemStufen.length);
+// Der Leerensplitter heisst zwar "Splitter", hat aber chance:0 - er kommt NICHT aus Expeditionen.
+check('Leerensplitter wird nicht als Expeditionsfund verlangt (chance:0, andere Quelle)',
+  !itemStufen.some(z => fe.SHIP_MARK_ITEMS[z].key === 'leerensplitter'));
+// Der Antimateriekern wird je Superschlachtschiff verbraucht - keine zweite Senke.
+check('Antimateriekern bleibt dem Superschlachtschiff vorbehalten',
+  !itemStufen.some(z => fe.SHIP_MARK_ITEMS[z].key === 'antimateriekern'));
+// Die Fundmenge darf NICHT mit dem Klassenfaktor wachsen - 18 Urmaterie waeren eine Mauer.
+check('Fundmenge haengt nicht am Klassenfaktor (steht nicht im Kostenobjekt)',
+  Object.keys(fe.shipMarkCost('fusionsdreadnought', 10)).every(k => !rareChance[k]),
+  Object.keys(fe.shipMarkCost('fusionsdreadnought', 10)));
 
 // ---------------------------------------------------------------- 5. Preise
 check('Jaeger hat Klassenfaktor 1,0', Math.abs(fe.shipMarkClassFactor('jaeger') - 1) < 1e-9);
@@ -192,11 +238,30 @@ check('Marken ueberleben das Prestige', /const keepShipMarks = state\.shipMarks;
 check('Werft hat einen Aufruest-Knopf', /data-shipmark="/.test(src));
 check('Aufruest-Knopf hat einen Handler', /\[data-shipmark\]/.test(src));
 check('Kauf prueft das Forschungstor', /if \(!shipMarkGateOpen\(ziel\)\)/.test(src));
-check('Kauf prueft die Bezahlbarkeit', /if \(!canAfford\(cost\)\) return;[\s\S]{0,40}pay\(cost\);[\s\S]{0,60}state\.shipMarks\[key\] = ziel;/.test(src));
+check('Kauf prueft die Bezahlbarkeit und zieht den Fund ab',
+  /if \(!canAfford\(cost\)\) return;[\s\S]{0,60}pay\(cost\);[\s\S]{0,140}state\.shipMarks\[key\] = ziel;/.test(src)
+  && /state\.rareItems\[item\.key\] = \(state\.rareItems\[item\.key\]\|\|0\) - item\.n;/.test(src));
+// Reihenfolge ist wichtig: Erst pruefen, dann bezahlen. Andersherum waeren die Ressourcen weg und
+// die Marke trotzdem nicht da.
+const kaufBlock = src.slice(src.indexOf("data-shipmark]"), src.indexOf("data-shipmark]") + 2000);
+check('der Fund wird VOR der Bezahlung geprueft',
+  kaufBlock.indexOf('item.have < item.n') > 0 && kaufBlock.indexOf('item.have < item.n') < kaufBlock.indexOf('pay(cost)'));
+check('Werftkarte zeigt den Fund mit Bestand', /vorhanden: \$\{item\.have\}/.test(src));
+check('Werftkarte sperrt den Knopf ohne Fund', /const kaufbar = gateOk && itemOk && bezahlbar;/.test(src));
 check('Hilfe erklaert die Werftmarken', /title:'Werftmarken/.test(src));
 check('Hilfe nennt den Konvoi-Haken beim Tempo', /langsamste<\/strong> beteiligte Schiff/.test(src));
-check('Patchnotes-Eintrag fuer 8.350.0 vorhanden', /version:'8\.350\.0'/.test(src));
-check('VERSION steht auf 8.350.0', /const VERSION = '8\.350\.0'/.test(src));
+// BEWUSST ohne feste Versionsnummer. Die erste Fassung dieses Tests prüfte auf '8.351.0' - und
+// schlug schon beim naechsten Patch fehl, obwohl an den Werftmarken nichts kaputt war. Ein Test,
+// der bei jeder Versionserhoehung rot wird, erzieht dazu, ihn wegzuklicken. Geprueft wird
+// stattdessen die Eigenschaft, um die es geht: dass VERSION und neuester Eintrag zusammenpassen
+// und dass die Werftmarken in den Patchnotes ueberhaupt vorkommen.
+const dateiVersion = (src.match(/const VERSION = '([\d.]+)'/) || [])[1];
+const neuesterEintrag = (src.match(/const PATCHNOTES = \[\s*\{ version:'([\d.]+)'/) || [])[1];
+check('VERSION und neuester Patchnotes-Eintrag stimmen ueberein',
+  !!dateiVersion && dateiVersion === neuesterEintrag, { version: dateiVersion, neuester: neuesterEintrag });
+const pnAnfang = src.indexOf('const PATCHNOTES = [');
+check('die Werftmarken sind in den Patchnotes dokumentiert',
+  /Werftmarke/.test(src.slice(pnAnfang, pnAnfang + 30000)));
 
 // ---------------------------------------------------------------- 10. Grafik
 check('Maler liest die Marke selbst aus dem Zustand', /const mk = \(typeof shipMarkOf === 'function'\) \? shipMarkOf\(key\) : 1;/.test(src));
