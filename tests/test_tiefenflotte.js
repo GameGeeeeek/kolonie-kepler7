@@ -212,8 +212,14 @@ check('5: der Kran traegt eigenen Laderaum, ohne fleetCargoCapacity anzufassen',
 // Vorher hatten sie je eine eigene Zeile, und die der Vorschau kannte den Kran gar nicht.
 check('5: und hebt zusaetzlich die geborgene Menge',
   /abgrundKanalBonus\('beute'\) \+ tiefenschiffBonus\(flotte, 'bergungskran'\)/.test(fnAus('abgrundBeuteFaktor')));
+// Die Zahl ist eine Untergrenze, keine feste Groesse: Seit dem Ballastspiegel (v8.356.0) ruft auch
+// der Niederlagen-Zweig die Funktion, um die gerettete Teilbeute zu rechnen - ein vierter, richtiger
+// Aufrufer. Worauf es ankommt, ist die Eigenschaft dahinter: dass die Formel genau EINMAL im Code
+// steht und jede Stelle sie holt, statt sie abzuschreiben. Das prueft die zweite Zeile.
 check('5: Vorschau und Abrechnung holen die Beute aus derselben Funktion',
-  (js.match(/abgrundBeuteFaktor\(/g)||[]).length === 3);
+  (js.match(/abgrundBeuteFaktor\(/g)||[]).length >= 3);
+check('5: und die Formel steht nur an dieser einen Stelle',
+  (js.match(/abgrundKanalBonus\('beute'\)/g)||[]).length === 1);
 check('5: das Lotsenboot erweitert die Sondenreichweite',
   /\+ lotsenbootSicht\(\)/.test(js) && /f\.lotsenboot\|\|0\) > 0\)? \? 1 : 0/.test(fnAus('lotsenbootSicht')));
 

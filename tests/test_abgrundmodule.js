@@ -168,8 +168,13 @@ check('6: ohne eingebauten Anker bleibt das Feld null, damit der Bericht schweig
 // ---- 7) Der Fundweg ----
 // Ohne ihn faellt keins der vier je - grantRandomModule() zieht aus normaler Herkunft.
 check('7: es gibt einen eigenen Abgrund-Fundweg', /function grantAbgrundModule/.test(js));
+// Seit 31.07.2026 zieht derselbe Fundweg aus BEIDEN Toepfen: Die sechs Abgrund-Schiffsmodule aus
+// v8.335.0 waren bis dahin nie gefallen, weil hier nur MODULE_DEFS stand (siehe
+// tests/test_abgrund_module2.js). Geprueft wird weiterhin, dass beide Ziehungen ueber fundPool()
+// mit Abgrund-Herkunft laufen - das ist die Eigenschaft, um die es hier geht.
 check('7: und der zieht ueber den gemeinsamen Pool mit Abgrund-Herkunft',
-  /zieheAusPool\(MODULE_DEFS, \{ quelle: HERKUNFT_ABGRUND \}\)/.test(fnAus('grantAbgrundModule')));
+  /fundPool\(MODULE_DEFS, \{ quelle: HERKUNFT_ABGRUND/.test(fnAus('grantAbgrundModule'))
+  && /fundPool\(SHIP_MODULE_DEFS, \{ quelle: HERKUNFT_ABGRUND/.test(fnAus('grantAbgrundModule')));
 const C = new Function('ABGRUND_MODUL_CHANCE_DECKEL', fnAus('abgrundModulChance')+'; return abgrundModulChance;')(zahl('ABGRUND_MODUL_CHANCE_DECKEL'));
 check('7: die Fundchance steigt mit der Tiefe',
   [1,10,50].every((t,i,a) => i===0 || C(t,false) > C(a[i-1],false)), [1,10,50].map(t=>t+':'+C(t,false).toFixed(3)));
