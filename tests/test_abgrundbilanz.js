@@ -181,17 +181,27 @@ check('C: die Verluste bleiben multiplikativ verrechnet (nie exakt null)',
   check('D: der Tiefenbonus wird an genau EINER Stelle angewandt',
     (js.match(/abgrundTiefenBonus\(\)/g)||[]).length === 2);   // Definition + Anwendung
 }
-// Die vier Standortmodule, die oben wirken - namentlich, damit ein fuenftes auffaellt.
+// Die Abgrund-Standortmodule, die oben wirken - namentlich, damit ein unbemerktes neues auffaellt.
+// Seit 31.07.2026 sind es acht (v8.356.0 hat vier ergaenzt); die Liste waechst hier bewusst mit,
+// statt zu einer blossen Anzahl zu verkommen: Ein neues Modul SOLL diesen Test einmal rot machen,
+// damit jemand die Frage darunter beantwortet - naemlich ob es PvP beruehrt.
 {
   const MD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund'; return "+arrAus('MODULE_DEFS'))();
   const obenWirksam = MD.filter(d => d.quelle === 'abgrund').map(d => d.key).sort();
-  check('D: es sind genau vier Abgrund-Standortmodule, und zwar diese',
-    obenWirksam.join() === ['drucktank','echolotmast','nullfeldanker','splitterofen'].join(), obenWirksam);
-  // Von den vieren gibt nur der Nullfeldanker Kampfwirkung - und der ist oben schon auf NPC
-  // eingegrenzt. Die anderen drei sind Lager, Signal und Fragmente: kein Kampf, kein PvP.
+  check('D: die Abgrund-Standortmodule sind genau diese',
+    obenWirksam.join() === ['drucktank','echolotmast','krustenpresse','nullfeldanker','prisenwaage','splitterofen','taktschmiede','wrackleser'].join(), obenWirksam);
+  // DER EIGENTLICHE PUNKT: Von allen gibt nur der Nullfeldanker Kampfwirkung - und der ist oben
+  // schon auf NPC und Unterzahl eingegrenzt. Alles andere sind Lager, Signal, Fragmente, Bauzeit,
+  // Terraforming, Truemmerabbau und Prisengut: kein Kampfwert, nichts davon erreicht das PvP.
   const effekte = MD.filter(d => d.quelle === 'abgrund').map(d => d.effect).sort();
-  check('D: ihre Effekte sind Lager, Signal, Ofen und Nullfeld - kein Angriffswert dabei',
-    effekte.join() === ['nullfeld','ofen','signal','storage'].join(), effekte);
+  check('D: ihre Effekte beruehren keinen Kampfwert ausser dem eingegrenzten Nullfeld',
+    effekte.join() === ['markenzeit','nullfeld','ofen','prise','signal','storage','terraform','wrack'].join(), effekte);
+  // Zusaetzlich unabhaengig von der Namensliste: Kein Abgrund-Standortmodul darf jemals einen der
+  // Effekte tragen, die in Angriff oder Verteidigung einfliessen. Diese Pruefung haelt auch dann,
+  // wenn jemand die Liste oben gedankenlos erweitert.
+  const pvpEffekte = ['atk','def','defatk','shield','hull','raidloss','siegechance'];
+  const verboten = MD.filter(d => d.quelle === 'abgrund' && pvpEffekte.includes(d.effect)).map(d=>d.key);
+  check('D: kein Abgrund-Standortmodul traegt einen PvP-wirksamen Kampfeffekt', verboten.length === 0, verboten);
 }
 
 // ---- E) Speicherbare Zahlenfelder ----
