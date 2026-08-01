@@ -129,5 +129,39 @@ const kryo = (src.match(/const KRYOARCHIV_KEEP_PER_LEVEL = \{([^}]*)\}/) || [])[
 check('die Tabelle deckt alle sieben Tier-2-Ketten ab',
   (kryo.match(/\w+:\s*\d+/g) || []).length === 7, (kryo.match(/\w+:\s*\d+/g) || []).length);
 
+// ---- I: DEFS-Arrays muessen reine DATEN bleiben --------------------------------------------------
+// Sechs Tests werten MODULE_DEFS/SHIP_MODULE_DEFS in einer Sandbox aus und injizieren dabei nur die
+// HERKUNFT_*-Konstanten. Das ist ein Vertrag: Die Arrays duerfen beim Anlegen nichts aufrufen und
+// nichts referenzieren, was erst spaeter im Skript entsteht.
+//
+// Am 01.08.2026 zweimal gebrochen, beide Male am selben Tag: Eine berechnete Zeitangabe in der
+// Taktschmiede-Beschreibung rief shipMarkTotalDurationText() (brach sechs Tests) und griff auf
+// ABGRUND_TAKT_DECKEL zu - eine const, die 14.000 Zeilen SPAETER deklariert ist. Letzteres ist
+// beim Laden ein "Cannot access before initialization": Das ganze Spiel startete nicht.
+//
+// Merksatz: In einer desc rechnet man nicht. Wo eine Zahl mitwachsen soll, gehoert sie in einen
+// Hilfetext (HELP_SECTIONS wird von keinem Test als Daten ausgewertet) - nicht in die Definition.
+const defsBloecke = ['MODULE_DEFS', 'SHIP_MODULE_DEFS'];
+for (const name of defsBloecke){
+  const von = src.indexOf('const ' + name + ' = [');
+  check(`${name} gefunden`, von > 0);
+  if (von < 0) continue;
+  const bis = src.indexOf('\n  ];', von);
+  const block = src.slice(von, bis > von ? bis : von + 200000);
+  // Funktionsaufrufe in Zeichenketten-Verkettung: '+irgendwas(...)+'
+  const aufrufe = [...block.matchAll(/'\s*\+\s*([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]);
+  check(`${name} ruft beim Anlegen keine Funktion auf`, aufrufe.length === 0, [...new Set(aufrufe)]);
+  // Verweise auf Konstanten, die erst SPAETER im Skript deklariert werden.
+  const verweise = [...new Set([...block.matchAll(/'\s*\+\s*([A-Z][A-Z0-9_]{3,})\b/g)].map(m => m[1]))];
+  const zuSpaet = verweise.filter(v => {
+    const decl = src.indexOf('const ' + v + ' =');
+    return decl > von;   // Deklaration liegt hinter dem Array -> beim Laden nicht verfuegbar
+  });
+  check(`${name} verweist auf keine erst spaeter deklarierte Konstante`, zuSpaet.length === 0, zuSpaet);
+}
+// Gegenprobe: Die Erkennung greift ueberhaupt.
+check('Gegenprobe: ein Funktionsaufruf in einer desc wuerde erkannt',
+  /'\s*\+\s*([A-Za-z_$][\w$]*)\s*\(/.test("desc:'Text '+fmtDuration(12)+' Ende'"));
+
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);

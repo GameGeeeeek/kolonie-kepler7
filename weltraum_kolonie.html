@@ -5522,7 +5522,8 @@
       '<strong>Werftmarken brauchen jetzt rund dreimal so lange (Spieler-Rückmeldung: „Verbesserungszeiten zu gering").</strong> Der ganze Weg Mk I → Mk X kostet einen <strong>Jäger 19½ Stunden</strong> statt gut 6, ein <strong>Schlachtschiff 1½ Tage</strong> statt knapp 12 Stunden und einen <strong>Fusionsdreadnought 2 Tage 6 Stunden</strong> statt knapp 17. Der letzte Einzelschritt eines Dreadnoughts dauert allein 22 Stunden. Eine voll ausgebaute Klasse ist damit ein Projekt über mehrere Tage – vorher war sie an einem Nachmittag erledigt, obwohl sie dauerhaft +27% Angriffskraft bringt.',
       '<strong>Angehoben wurden bewusst beide Stellschrauben.</strong> Nur den Grundwert zu verdreifachen hätte Mk II auf zwölf Minuten gebracht, ohne dass die Endstufe – die eigentliche Belohnung – spürbar schwerer geworden wäre. Stattdessen steigt auch der Faktor je Stufe, sodass die späten Marken überproportional zulegen: <strong>Mk II bleibt beim Jäger bei 7 Minuten</strong>, während Mk X von 2 auf 5½ Stunden geht. Der Deckel für einen Einzelschritt steigt von 12 auf 36 Stunden mit – bei 12 hätten die letzten zwei Stufen der schweren Klassen dieselbe Dauer gehabt, und die Steigerung wäre ausgerechnet dort verschwunden, wo sie wirken soll.',
       '<strong>Unverändert bleibt alles andere:</strong> Werft-Boni (Werft-Welt, Overdrive, Ingenieur, Werftgebäude) und die Taktschmiede kürzen wie bisher, es läuft weiterhin nur ein Umbau gleichzeitig, Abbrechen erstattet weiterhin vollständig, und ein über Nacht fälliger Umbau ist beim Einloggen erledigt.',
-      '<strong>Die Zeitangaben in Hilfe und Modulbeschreibung rechnen ab jetzt selbst.</strong> Sie nannten „gut 6 Stunden, ein Schlachtschiff knapp 12, einen Fusionsdreadnought knapp 17" als feste Zahlen – bei genau diesem Eingriff wären das drei stille Falschaussagen auf einmal gewesen. Sie leiten sich jetzt aus derselben Formel ab, die die Umbauzeit bestimmt.',
+      '<strong>Die Zeitangaben in der Hilfe rechnen ab jetzt selbst.</strong> Sie nannten „gut 6 Stunden, ein Schlachtschiff knapp 12, einen Fusionsdreadnought knapp 17" als feste Zahlen – bei genau diesem Eingriff wären das drei stille Falschaussagen auf einmal gewesen. Sie leiten sich jetzt aus derselben Formel ab, die die Umbauzeit bestimmt.',
+      '<strong>In der Beschreibung der Taktschmiede geht das ausdrücklich NICHT – und der Versuch hat zwei Dinge zerbrochen.</strong> Die Modul-Definitionen sind reine <em>Daten</em>: Sechs Tests werten sie in einer Sandbox für sich aus, und beim Laden entstehen sie, bevor es die meisten Funktionen gibt. Eine gerechnete Zeitangabe darin rief eine Funktion (die sechs Tests fielen aus) und griff auf eine Konstante zu, die 14.000 Zeilen später deklariert ist (das ganze Spiel startete nicht). Sie nennt jetzt wieder keine absolute Zahl, sondern nur die Größenordnung – eine Angabe, die nicht veralten kann. <strong>Merksatz: In einer Beschreibung wird nicht gerechnet.</strong> Ein Test hält das jetzt fest und prüft beide Modul-Arrays darauf, dass sie beim Anlegen nichts aufrufen und nichts referenzieren, was es noch nicht gibt.',
       '<strong>Dabei ist ein Fehler passiert, der das ganze Spiel lahmgelegt hätte – und der Pflichttest hat ihn durchgewinkt.</strong> Für die neue Rechnung griff die Beschreibung der Taktschmiede auf eine Konstante zu, die 14.000 Zeilen weiter unten deklariert ist. Das ist beim Laden ein „Cannot access before initialization": Kein Tab, keine Anzeige, nichts. Der Boot-Test meldete trotzdem <em>alle Tabs OK</em> – er verglich die Fehlerzahl nur vor und nach jedem Klick, und ein Fehler beim <em>Laden</em> steckte schon vor dem ersten Vergleich in der Liste. Die Tab-Knöpfe stehen im festen HTML, also ließen sie sich auch bei totem Skript anklicken, ohne dass etwas passierte.',
       '<strong>Der Boot-Test prüft jetzt zwei Dinge mehr:</strong> ob das Laden überhaupt fehlerfrei war, und ob ein Tab-Klick tatsächlich <em>wirkt</em> – gemessen daran, dass der angeklickte Tab danach der aktive ist. Beides wurde gegen eine absichtlich kaputte Kopie gegengeprüft: Sie fällt jetzt beim Laden <em>und</em> bei jedem einzelnen Tab durch, die heile Fassung läuft durch. Ein Test, der bei einem nicht startenden Spiel „bestanden" meldet, ist schlimmer als kein Test.'
     ] },
@@ -15628,7 +15629,6 @@
   // Klassen mit extremer Bauzeit und darf nicht selbst zur bindenden Schranke werden: Bei 12h
   // haetten die letzten zwei Stufen der schweren Klassen alle dieselbe Dauer gehabt, und die
   // Steigerung waere ausgerechnet dort verschwunden, wo sie wirken soll.
-  const ABGRUND_TAKT_DECKEL = 0.35;      // Taktschmiede: hoechstens -35% Werftmarken-Umbauzeit (hierher gezogen, siehe Deckel-Block weiter unten)
   const SHIP_MARK_TIME_BASE = 420;      // Sekunden fuer Mk II beim Klassenfaktor 1,0
   const SHIP_MARK_TIME_STEP = 1.70;     // je weitere Stufe
   const SHIP_MARK_TIME_CLASS_EXP = 0.35;
@@ -17925,7 +17925,7 @@
     // jedes einzelne der bekannten waere um ein Drittel seltener geworden, ohne Gegenwert. So
     // zerfaellt der Abstieg stattdessen in zwei Abschnitte.
     { key:'taktschmiede', name:'Taktschmiede', icon:'mod_taktschmiede', effect:'markenzeit', base:0.06, quelle:HERKUNFT_ABGRUND, minTiefe:40,
-      desc:'Verkürzt die <strong>Umbauzeit von Werftmarken</strong> an diesem Standort – und ausschließlich die. Der normale Schiffsbau bleibt unberührt, dafür gibt es das Werftmodul. Ein Fusionsdreadnought von Mk I auf Mk X kostet '+shipMarkTotalDurationText('fusionsdreadnought')+' Umbauzeit; voll ausgebaut werden daraus '+fmtDuration(shipMarkTotalDuration('fusionsdreadnought')*(1-ABGRUND_TAKT_DECKEL))+'. Gedeckelt bei −35%, imperiumsweit summiert.' },
+      desc:'Verkürzt die <strong>Umbauzeit von Werftmarken</strong> an diesem Standort – und ausschließlich die. Der normale Schiffsbau bleibt unberührt, dafür gibt es das Werftmodul. Der Weg einer schweren Klasse von Mk I auf Mk X kostet mehrere Tage Umbauzeit – voll ausgebaut spart die Schmiede davon gut ein Drittel. Gedeckelt bei −35%, imperiumsweit summiert.' },
     { key:'krustenpresse', name:'Krustenpresse', icon:'mod_krustenpresse', effect:'terraform', base:0.05, quelle:HERKUNFT_ABGRUND, minTiefe:40,
       desc:'Verkürzt die Dauer einer <strong>Terraforming-Stufe</strong> an diesem Standort. Terraforming läuft über zehn Stufen mit steigender Dauer – die letzte allein rund neun Stunden. Voll ausgebaut spart die Presse über den ganzen Weg mehr als einen Tag. Gedeckelt bei −30%; sie wirkt nur dort, wo sie eingebaut ist, denn Terraforming ist ein Vorhaben je Standort.' },
     { key:'wrackleser', name:'Wrackleser', icon:'mod_wrackleser', effect:'wrack', base:0.08, quelle:HERKUNFT_ABGRUND, minTiefe:40,
@@ -31956,11 +31956,7 @@
   const ABGRUND_NULLFELD_DECKEL = 0.50;
   // Deckel der zweiten Abgrund-Runde (31.07.2026). Bewusst hier neben den vorhandenen: Ein Deckel,
   // der bei seiner Rechenstelle steht, wird beim naechsten Balance-Pass uebersehen.
-  // ABGRUND_TAKT_DECKEL steht bewusst NICHT hier, sondern oben bei der Aufruestzeit: Die
-  // Beschreibung der Taktschmiede in MODULE_DEFS liest ihn beim Anlegen des Arrays, also rund
-  // 14.000 Zeilen VOR dieser Stelle. Als const hier unten waere das ein
-  // "Cannot access before initialization" - und zwar beim Laden, was das GANZE Spiel
-  // lahmlegt (01.08.2026 genau so passiert).
+  const ABGRUND_TAKT_DECKEL = 0.35;      // Taktschmiede: hoechstens -35% Werftmarken-Umbauzeit
   const ABGRUND_KRUSTE_DECKEL = 0.30;    // Krustenpresse: hoechstens -30% Terraforming-Dauer
   const ABGRUND_WRACK_DECKEL = 0.45;     // Wrackleser: hoechstens +45% Truemmerfeld-Ausbeute
   const ABGRUND_PRISE_DECKEL = 0.40;     // Prisenwaage: hoechstens +40% Prisengut
