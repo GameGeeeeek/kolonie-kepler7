@@ -180,8 +180,28 @@ function stand(store){
     /const queues = simulateOfflineQueues\(capped\);/.test(src));
   // Der Deckel ist Bedingung, nicht Zierde: Die Aufträge werden aus Ressourcen bezahlt, die für
   // genau dieses Fenster gutgeschrieben wurden.
-  check('Q: der Deckel ist derselbe wie für die Ressourcengutschrift',
-    (src.match(/const capped = Math\.min\(seconds, 8\*3600\);/g)||[]).length === 1);
+  // Bis 01.08.2026 stand hier das Literal 8*3600, und diese Prüfung hat genau darauf gezeigt. Seit
+  // das Offline-Fenster mit dem Autonomiekern ausbaubar ist, kommt der Deckel aus
+  // offlineWindowSec(). Die zu schützende Aussage ist dieselbe geblieben und sogar wichtiger
+  // geworden: Gutschrift und Simulation müssen aus EINER Quelle kommen. Ein längeres Fenster nur
+  // für die Warteschlange würde Aufträge aus Ressourcen bezahlen, die es nie gegeben hat.
+  //
+  // Geprüft wird deshalb die KETTE, nicht mehr eine Zahl: capped kommt aus offlineWindowSec(),
+  // offlineWindowSec() ist Grundwert plus gedeckeltem Bonus, und der Bonus hängt an den wirklich
+  // gebauten Stufen. Bräche irgendein Glied, stünden wieder zwei Fenster nebeneinander.
+  check('Q: der Deckel kommt aus offlineWindowSec()',
+    (src.match(/const capped = Math\.min\(seconds, offlineWindowSec\(\)\);/g)||[]).length === 1);
+  check('Q: es gibt kein zweites, hart kodiertes Offline-Fenster mehr',
+    !/Math\.min\(seconds,\s*\d+\*3600\)/.test(src));
+  check('Q: offlineWindowSec ist Grundwert plus gedeckeltem Bonus',
+    /function offlineWindowSec\(stufen\)\{ return OFFLINE_BASE_SEC \+ offlineWindowBonusSec\(stufen\); \}/.test(src)
+    && /return Math\.min\(OFFLINE_BONUS_CAP_SEC, n \* OFFLINE_BONUS_PER_LEVEL_SEC\);/.test(src));
+  check('Q: der Bonus zählt die wirklich gebauten Autonomiekern-Stufen',
+    /allBuildingSets\(\)\.reduce\(\(a,b\)=>a\+\(b\.autonomiekern\|\|0\),0\)/.test(src));
+  // Der Grundwert muss der sein, den die Verhaltensprüfungen oben unterstellen (dort wird mit
+  // 8 Stunden gerechnet) - sonst prüfen die vier Fälle darüber still gegen ein anderes Fenster.
+  const basis = Number((src.match(/const OFFLINE_BASE_SEC = (\d+)\*3600;/)||[])[1]);
+  check('Q: der Grundwert ist der, mit dem die Verhaltensprüfungen rechnen', basis === 8, basis);
   check('Q: beide Schleifen haben einen Endlos-Schutz',
     /let schutz = 200;/.test(src) && /let schutz = 60;/.test(src));
   check('Q: die Zusammenfassung führt beide Zahlen mit',
