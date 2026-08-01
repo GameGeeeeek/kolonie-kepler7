@@ -37,7 +37,16 @@ if (von < 0 || bis < von){ console.log('\nFAIL'); process.exit(1); }
 // die ECHTEN Bauzeiten sehen, nicht ausgedachte.
 const shipDefs = [];
 for (const m of src.matchAll(/\{ key:'([a-zA-Z]+)', name:'[^']*'[^\n]*?atk:(\d+)[^\n]*?buildTime:(\d+)/g)){
-  shipDefs.push({ key:m[1], atk:Number(m[2]), buildTime:Number(m[3]) });
+  // Die ganze Definitionszeile mitlesen: shipMarkFamily() braucht ausser atk auch das
+  // tiefenschiff-Kennzeichen und die Geschwindigkeit. Ohne sie landeten am 01.08.2026 alle
+  // Tiefenschiffe und Spaeher faelschlich bei "zivil" - die Attrappe war unvollstaendig, nicht
+  // die Zuordnung. Eine zu magere Attrappe prueft am Ende nur sich selbst.
+  const zeile = (src.slice(m.index).match(/^[^\n]*/) || [''])[0];
+  shipDefs.push({
+    key: m[1], atk: Number(m[2]), buildTime: Number(m[3]),
+    speed: Number((zeile.match(/speed:(\d+)/) || [])[1] || 0),
+    tiefenschiff: /tiefenschiff:true/.test(zeile)
+  });
 }
 check('SHIP_DEFS-Bauzeiten gelesen', shipDefs.length >= 35, shipDefs.length);
 
@@ -47,13 +56,20 @@ for (const m of src.matchAll(/\{ key:'(r[a-z0-9_]+)',[^\n]*?maxLevel:(\d+)/g)) r
 check('RESEARCH_DEFS maxLevel gelesen', Object.keys(researchMax).length >= 20, Object.keys(researchMax).length);
 
 const state = { shipMarks: {}, research: {} };
-const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state',
+// COUNTER_ROLE_OF steht ausserhalb des Markenblocks, wird von shipMarkFamily() aber gebraucht -
+// die drei Kampffamilien leiten sich daraus ab. Es wird aus der ECHTEN Datei gelesen und
+// hineingereicht, nicht nachgebaut: Eine hier getippte Rollenzuordnung waere genau die Zweitkopie,
+// gegen die dieser Test antritt.
+const rollenBlock = src.slice(src.indexOf('const COUNTER_ROLE_OF = {'), src.indexOf('};', src.indexOf('const COUNTER_ROLE_OF = {')) + 2);
+const COUNTER_ROLE_OF = new Function(rollenBlock + '; return COUNTER_ROLE_OF;')();
+const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state', 'COUNTER_ROLE_OF',
   src.slice(von, bis) +
   '; return { SHIP_MARK_MAX, SHIP_MARK_PER_STEP, SHIP_MARK_ROMAN, SHIP_MARK_STEPS, SHIP_MARK_COST_BASE,' +
   ' SHIP_MARK_COST_KEYS, SHIP_MARK_GATES, SHIP_MARK_ITEMS, shipMarkClassFactor, shipMarkCost, shipMarkOf,' +
   ' shipMarkBonus, shipMarkGateOpen, shipMarkRound, shipMarkDuration, shipMarkJob, shipMarkJobRest,' +
-  ' SHIP_MARK_TIME_BASE, SHIP_MARK_TIME_STEP, SHIP_MARK_TIME_CLASS_EXP, SHIP_MARK_TIME_CAP };'
-)(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state);
+  ' SHIP_MARK_TIME_BASE, SHIP_MARK_TIME_STEP, SHIP_MARK_TIME_CLASS_EXP, SHIP_MARK_TIME_CAP,' +
+  ' SHIP_MARK_STEP_TEXTE, shipMarkFamily, shipMarkStep };'
+)(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state, COUNTER_ROLE_OF);
 
 // ---------------------------------------------------------------- 1. Struktur
 check('zehn Marken', fe.SHIP_MARK_MAX === 10);
@@ -66,6 +82,46 @@ check('jede Stufe hat einen eigenen Namen',
 check('jede Stufe hat einen ganzen Satz als Beschreibung',
   fe.SHIP_MARK_STEPS.every(s => typeof s.txt === 'string' && s.txt.length >= 25 && s.txt.trim().endsWith('.')),
   fe.SHIP_MARK_STEPS.filter(s => !(s.txt||'').trim().endsWith('.')).map(s=>s.was));
+
+// ---------------------------------------------------------------- 1b. Stufentexte je Familie
+// Die Texte beschrieben bis zum 01.08.2026 fuer JEDES Schiff dasselbe - "Alle Geschuetzrohre
+// deutlich laenger" stand auch beim Frachter, der kein einziges Geschuetz hat. Der MALER zeichnet
+// weiterhin fuer alle Ruempfe dasselbe (drawShipMiniIcon kennt nur mk); individualisiert ist die
+// BENENNUNG. Deshalb prueft dieser Abschnitt zwei Dinge: dass jede Familie vollstaendig ist, und
+// dass die generische Reihe als Rueckfallebene erhalten bleibt.
+const familien = Object.keys(fe.SHIP_MARK_STEP_TEXTE);
+check('es gibt mehrere Schiffsfamilien mit eigenen Texten', familien.length >= 5, familien);
+for (const f of familien){
+  const e = fe.SHIP_MARK_STEP_TEXTE[f];
+  check(f+': zehn Stufen', e.length === 10, e.length);
+  check(f+': jede Stufe hat einen eigenen Namen', new Set(e.map(x=>x.was)).size === 10);
+  check(f+': jede Stufe hat einen ganzen Satz (Regel 7)',
+    e.every(x => typeof x.txt === 'string' && x.txt.length >= 25 && x.txt.trim().endsWith('.')),
+    e.filter(x => !(x.txt||'').trim().endsWith('.')).map(x=>x.was));
+}
+// Die Texte muessen sich zwischen den Familien WIRKLICH unterscheiden - sonst waere die ganze
+// Tabelle nur eine teure Kopie des generischen Textes.
+for (let stufe = 2; stufe <= 10; stufe++){
+  const texte = familien.map(f => fe.SHIP_MARK_STEP_TEXTE[f][stufe-1].txt);
+  check('Stufe '+stufe+': die Familien sagen nicht alle dasselbe',
+    new Set(texte).size === texte.length, new Set(texte).size + ' von ' + texte.length + ' verschieden');
+}
+// Zuordnung: JEDES Schiff muss in einer Familie landen, und die Kampfrollen in ihrer eigenen.
+const zuordnung = {};
+for (const d of shipDefs) zuordnung[fe.shipMarkFamily(d.key)] = (zuordnung[fe.shipMarkFamily(d.key)]||0) + 1;
+check('jede Familie bekommt mindestens ein Schiff',
+  familien.every(f => (zuordnung[f]||0) > 0), zuordnung);
+for (const [k, r] of Object.entries(COUNTER_ROLE_OF)){
+  if (!fe.SHIP_MARK_STEP_TEXTE[r]) continue;
+  check('Konterrolle entscheidet: '+k+' -> '+r, fe.shipMarkFamily(k) === r, fe.shipMarkFamily(k));
+}
+// Rueckfallebene: shipMarkStep darf NIE einen leeren Text liefern, auch fuer einen unbekannten
+// Schluessel nicht - eine fehlende Familienzeile waere sonst eine leere Karte im Spiel.
+const unbekannt = fe.shipMarkStep('gibtesnichtxyz', 5);
+check('unbekannte Klasse faellt auf den generischen Text zurueck',
+  !!unbekannt.was && !!unbekannt.txt && unbekannt.txt.length >= 25, unbekannt.was);
+check('und die generische Reihe existiert weiterhin als Rueckfallebene',
+  fe.SHIP_MARK_STEPS.length === 10);
 
 // ---------------------------------------------------------------- 2. Boni
 state.shipMarks = {};
@@ -274,7 +330,13 @@ check('die Werftmarken sind in den Patchnotes dokumentiert',
   pn350 > 0 && /Werftmarke/.test(src.slice(pn350, src.indexOf("{ version:'8.349.0'", pn350))));
 
 // ---------------------------------------------------------------- 10. Grafik
-check('Maler liest die Marke selbst aus dem Zustand', /const mk = \(typeof shipMarkOf === 'function'\) \? shipMarkOf\(key\) : 1;/.test(src));
+// Seit dem 01.08.2026 nimmt der Maler eine Uebersteuerung entgegen: Im Profil eines FREMDEN
+// Spielers wurde dessen Flotte sonst mit den Marken des eigenen Kontos gezeichnet. Ohne
+// Uebersteuerung gilt weiterhin die eigene Stufe - genau das prueft die zweite Zeile.
+check('Maler nimmt eine Marken-Uebersteuerung entgegen',
+  /function drawShipMiniIcon\(key, canvas, markOverride\)\{/.test(src));
+check('Maler liest ohne Uebersteuerung die Marke selbst aus dem Zustand',
+  /\(typeof markOverride === 'number'\) \? markOverride[\s\S]{0,120}shipMarkOf\(key\)/.test(src));
 check('Zusatzturm wird gegen den Rumpf geprueft (nichts schwebt daneben)',
   /if \(pointInHull\(cfg\.pts, k\[0\], k\[1\]\)\) turrets\.push\(k\)/.test(src));
 check('Sensormast sitzt auf der echten Oberkante', /hullTopAt\(cfg\.pts, mxU/.test(src));
@@ -308,14 +370,23 @@ for (const k of ['jaeger','schlachtschiff','fusionsdreadnought']){
   for (let ziel = 2; ziel <= fe.SHIP_MARK_MAX; ziel++){
     const d = fe.shipMarkDuration(k, ziel);
     check(k+' Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' dauert laenger als die Stufe davor', d > vorher, d);
-    check(k+' Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' bleibt unter dem 12-Stunden-Deckel',
+    check(k+' Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' bleibt unter dem Einzelschritt-Deckel',
       d <= fe.SHIP_MARK_TIME_CAP, d);
     vorher = d; summe += d;
   }
-  // Der ganze Weg soll an einem langen Tag zu schaffen sein - sonst ist Mk X keine Senke mehr,
-  // sondern eine Wand.
-  check(k+': Mk I -> Mk X dauert insgesamt unter 24 Stunden', summe < 24*3600,
-    Math.round(summe/3600*10)/10 + ' h');
+  // Zeitfenster des ganzen Weges. Angehoben am 01.08.2026 (Spieler-Rueckmeldung "Verbesserungs-
+  // zeiten zu gering"): vorher galt "unter 24 Stunden", jetzt liegt schon der Jaeger bei rund
+  // 20 Stunden und der Fusionsdreadnought bei gut zwei Tagen.
+  //
+  // Geprueft wird bewusst eine SPANNE, keine Punktzahl: Eine feste Zahl waere bei jedem Balance-
+  // Eingriff rot geworden, ohne dass etwas kaputt ist - genau daran ist dieser Test heute
+  // gescheitert. Die Grenzen sagen, was die Mechanik leisten soll: lange genug, dass Mk X ein
+  // mehrtaegiges Ziel bleibt, kurz genug, dass es keine Mauer wird.
+  const stunden = summe/3600;
+  check(k+': Mk I -> Mk X dauert mindestens 12 Stunden (sonst keine echte Senke)', stunden >= 12,
+    Math.round(stunden*10)/10 + ' h');
+  check(k+': Mk I -> Mk X dauert hoechstens 5 Tage (sonst eine Mauer)', stunden <= 120,
+    Math.round(stunden*10)/10 + ' h');
 }
 check('der Fusionsdreadnought braucht weniger als das Fuenffache eines Jaegers (gedaempft)',
   fe.shipMarkDuration('fusionsdreadnought', 10) < 5 * fe.shipMarkDuration('jaeger', 10),
