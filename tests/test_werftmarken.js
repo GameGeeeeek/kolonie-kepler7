@@ -123,6 +123,59 @@ check('unbekannte Klasse faellt auf den generischen Text zurueck',
 check('und die generische Reihe existiert weiterhin als Rueckfallebene',
   fe.SHIP_MARK_STEPS.length === 10);
 
+// ---------------------------------------------------------------- 1c. Markenstil je Familie
+// Der Maler kannte bis zum 01.08.2026 nur die Stufe, nicht den Schiffstyp: Ein Jaeger bekam
+// denselben breiten Guertelpanzer wie ein Schlachtschiff und denselben Geschuetzlauf wie ein
+// Bomber. MARK_STIL variiert die VORHANDENEN Aufbauten (Kielstreifen, Panzerkante, Rohrlaenge,
+// Zusatzturm, Sensormast, Lichterkette, Antriebsstrahl) - es kommt kein neues Bauteil dazu.
+const stilBlock = src.slice(src.indexOf('const MARK_STIL_STANDARD = {'), src.indexOf('function drawShipMiniIcon'));
+check('Standardwerte und Stiltabelle vorhanden',
+  stilBlock.includes('const MARK_STIL_STANDARD') && stilBlock.includes('const MARK_STIL = {'));
+const stilCtx = new Function(stilBlock + '; return { MARK_STIL_STANDARD, MARK_STIL };')();
+const stdSchluessel = Object.keys(stilCtx.MARK_STIL_STANDARD);
+check('die Standardtabelle deckt alle sieben Markenstufen ab, die etwas zeichnen',
+  stdSchluessel.length >= 12, stdSchluessel.length);
+const stilFamilien = Object.keys(stilCtx.MARK_STIL);
+check('jede Textfamilie hat auch einen Stil',
+  familien.every(f => stilFamilien.includes(f)), { texte: familien, stil: stilFamilien });
+// Jede Familie muss JEDEN Wert nennen - ein vergessener Wert faellt still auf den Standard zurueck
+// und die Familie saehe an dieser Stufe aus wie jede andere.
+for (const f of stilFamilien){
+  const fehlend = stdSchluessel.filter(k => stilCtx.MARK_STIL[f][k] === undefined);
+  check('Stil '+f+': nennt alle Werte', fehlend.length === 0, fehlend);
+}
+// Und die Werte muessen sich wirklich unterscheiden - sonst waere die Tabelle nur eine
+// aufwendige Kopie des Standards. Geprueft je Wert ueber alle Familien.
+for (const k of stdSchluessel){
+  const werte = stilFamilien.map(f => stilCtx.MARK_STIL[f][k]);
+  check('Wert "'+k+'" unterscheidet sich zwischen den Familien',
+    new Set(werte).size >= 3, new Set(werte).size + ' verschiedene bei ' + werte.length + ' Familien');
+}
+// Plausibilitaet statt blosser Verschiedenheit: Ein Aufklaerer traegt den hoechsten Mast (er IST
+// seine Antenne), ein Jaeger den niedrigsten, und die Lichterkette ist beim Grosskampfschiff am
+// dichtesten. Sagt die Grafik etwas anderes als der Text, ist einer von beiden falsch.
+check('der Aufklaerer hat den hoechsten Mast',
+  stilCtx.MARK_STIL.spaeher.mastHoch === Math.max(...stilFamilien.map(f=>stilCtx.MARK_STIL[f].mastHoch)),
+  stilFamilien.map(f=>f+':'+stilCtx.MARK_STIL[f].mastHoch));
+check('der Abfangjaeger hat den niedrigsten Mast',
+  stilCtx.MARK_STIL.abfang.mastHoch === Math.min(...stilFamilien.map(f=>stilCtx.MARK_STIL[f].mastHoch)));
+check('der Bomber hat die laengsten Geschuetzrohre',
+  stilCtx.MARK_STIL.bomber.rohrLang === Math.max(...stilFamilien.map(f=>stilCtx.MARK_STIL[f].rohrLang)),
+  stilFamilien.map(f=>f+':'+stilCtx.MARK_STIL[f].rohrLang));
+check('das Grosskampfschiff hat die dichteste Lichterkette',
+  stilCtx.MARK_STIL.kapital.lichtZahl === Math.max(...stilFamilien.map(f=>stilCtx.MARK_STIL[f].lichtZahl)));
+// Die Lichterkette braucht mindestens zwei Punkte - bei einem waere die Verteilung eine Division
+// durch null (i/(lN-1)).
+check('keine Familie hat weniger als zwei Systemlichter',
+  stilFamilien.every(f => stilCtx.MARK_STIL[f].lichtZahl >= 2),
+  stilFamilien.map(f=>f+':'+stilCtx.MARK_STIL[f].lichtZahl));
+// Der Maler muss die Werte auch WIRKLICH benutzen - eine Tabelle ohne Verbraucher waere der
+// teuerste Fehler hier, weil alle Pruefungen oben trotzdem gruen sind.
+const malerBlock = src.slice(src.indexOf('function drawShipMiniIcon'), src.indexOf('function refreshShipMiniIcons'));
+for (const k of ['kielY','kielDicke','kanteY','kanteFall','rohrLang','turmAbstand','mastX','mastHoch','lichtZahl','lichtY','strahlLang']){
+  check('der Maler liest stil.'+k, malerBlock.includes('stil.'+k));
+}
+
 // ---------------------------------------------------------------- 2. Boni
 state.shipMarks = {};
 check('Mk I gibt keinen Bonus', fe.shipMarkBonus('jaeger','atk') === 0);

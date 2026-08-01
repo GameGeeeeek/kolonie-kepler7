@@ -4871,6 +4871,62 @@
       for (let y=y0; y<=y1; y+=0.4) if (pointInHull(pts, px, y)) return y;
       return null;
     }
+    // ===== Markenstil je Schiffsfamilie (01.08.2026) =====
+    //
+    // Bis hierher zeichnete der Maler fuer JEDEN Rumpf exakt dieselben Markenaufbauten - er kennt
+    // nur die Stufe, nicht den Schiffstyp. Ein Jaeger bekam denselben breiten Guertelpanzer wie ein
+    // Schlachtschiff und denselben langen Geschuetzlauf wie ein Bomber. Diese Tabelle variiert die
+    // vorhandenen Aufbauten, sie erfindet keine neuen: dieselben Striche, Tuerme, Masten und
+    // Lichter, nur mit anderen Proportionen.
+    //
+    // Jeder Wert hat die bisherige Zahl als Vorgabe (siehe MARK_STIL_STANDARD). Eine Familie, die
+    // einen Wert nicht nennt, sieht damit exakt so aus wie vorher - und ein Schiff ohne Familie
+    // ebenfalls. Das ist Absicht: Eine Grafikaenderung, die man nicht rueckwaerts erklaeren kann,
+    // ist im Zweifel eine Regression.
+    //
+    //   kielY/kielDicke   Mk II  - Tiefe und Staerke des Kielstreifens
+    //   kanteY/kanteFall  Mk III - Hoehe der Panzerkante und ihr Gefaelle nach vorn
+    //   rohrLang          Mk IV  - Laengenfaktor der Geschuetzrohre
+    //   turmAbstand       Mk V   - wie weit achtern der Zusatzturm sitzt
+    //   mastX/mastHoch    Mk VI  - Position und Hoehe des Sensormasts
+    //   lichtZahl/lichtVon/lichtBis/lichtY   Mk VII - Anzahl und Lage der Systemlichter
+    //   strahlLang        Mk VIII- Verlaengerungsfaktor des Antriebsstrahls
+    const MARK_STIL_STANDARD = { kielY:0.86, kielDicke:1.7, kanteY:0.50, kanteFall:1.5, rohrLang:3.4,
+      turmAbstand:14, mastX:42, mastHoch:11, lichtZahl:7, lichtVon:0.24, lichtBis:0.74, lichtY:0.50, strahlLang:1.4 };
+    const MARK_STIL = {
+      // Abfangjaeger: schmaler Rumpf, alles knapper und weiter vorn. Der Kielstreifen sitzt tiefer
+      // und duenner (ein breites Band wuerde den schlanken Koerper erdruecken), die Rohre bleiben
+      // kurz, der Mast niedrig - ein hoher Mast auf einem Jaeger sieht aus wie ein Fahnenstock.
+      abfang:  { kielY:0.90, kielDicke:1.1, kanteY:0.44, kanteFall:2.2, rohrLang:2.9,
+                 turmAbstand:10, mastX:38, mastHoch:7,  lichtZahl:5, lichtVon:0.30, lichtBis:0.66, lichtY:0.46, strahlLang:1.7 },
+      // Bomber: schwer beladen, sitzt tief im Wasser. Betonte Rohre - das ist die Klasse, bei der
+      // die Laenge der Laeufe die Aussage ist.
+      bomber:  { kielY:0.88, kielDicke:2.1, kanteY:0.54, kanteFall:1.1, rohrLang:4.1,
+                 turmAbstand:16, mastX:44, mastHoch:9,  lichtZahl:6, lichtVon:0.26, lichtBis:0.70, lichtY:0.54, strahlLang:1.5 },
+      // Grosskampfschiffe: der Guertelpanzer liegt hoeher und breiter, die Kante laeuft fast
+      // waagerecht ueber die ganze Bordwand, und es ist Platz fuer die volle Lichterkette.
+      kapital: { kielY:0.84, kielDicke:2.4, kanteY:0.50, kanteFall:0.8, rohrLang:3.6,
+                 turmAbstand:18, mastX:46, mastHoch:13, lichtZahl:9, lichtVon:0.20, lichtBis:0.78, lichtY:0.50, strahlLang:1.3 },
+      // Tiefenschiffe: der Druckkiel ist das auffaelligste Bauteil, der Echomast ragt hoch heraus.
+      // Wenige, weit auseinanderliegende Lichter - unten sieht man ohnehin nur Punkte.
+      tiefe:   { kielY:0.92, kielDicke:2.8, kanteY:0.58, kanteFall:0.6, rohrLang:3.0,
+                 turmAbstand:12, mastX:40, mastHoch:15, lichtZahl:4, lichtVon:0.22, lichtBis:0.76, lichtY:0.58, strahlLang:1.2 },
+      // Aufklaerer: fast nichts am Rumpf, dafuer der hoechste Mast im Spiel - das Schiff IST seine
+      // Antenne. Kielstreifen und Kante bleiben zurueckhaltend (Signaturdaempfung).
+      spaeher: { kielY:0.89, kielDicke:0.9, kanteY:0.46, kanteFall:1.8, rohrLang:2.6,
+                 turmAbstand:9,  mastX:36, mastHoch:17, lichtZahl:3, lichtVon:0.34, lichtBis:0.62, lichtY:0.48, strahlLang:1.6 },
+      // Nutzschiffe: breiter, hoch beladener Rumpf. Kiel tief und kraeftig, Kante hoch, kurze
+      // Ausleger statt Geschuetzrohre, dichte Decklichter ueber die ganze Laenge.
+      zivil:   { kielY:0.91, kielDicke:2.2, kanteY:0.60, kanteFall:0.9, rohrLang:2.7,
+                 turmAbstand:13, mastX:41, mastHoch:10, lichtZahl:8, lichtVon:0.18, lichtBis:0.80, lichtY:0.60, strahlLang:1.15 }
+    };
+    // shipMarkFamily() steht weiter unten in der Datei und ist eine Funktionsdeklaration - beim
+    // Aufruf zur Zeichenzeit also laengst vorhanden. Der optional-Zugriff faengt den Fall ab, dass
+    // dieser Maler kuenftig aus einem anderen Kontext gerufen wird.
+    function markStil(key){
+      const f = (typeof shipMarkFamily === 'function') ? shipMarkFamily(key) : null;
+      return Object.assign({}, MARK_STIL_STANDARD, (f && MARK_STIL[f]) || {});
+    }
     function drawShipMiniIcon(key, canvas, markOverride){
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
@@ -4886,6 +4942,7 @@
       // anzeigen", weil unbekannt - was man nicht weiss, darf ein Icon nicht behaupten.
       const mk = (typeof markOverride === 'number') ? markOverride
         : ((typeof shipMarkOf === 'function') ? shipMarkOf(key) : 1);
+      const stil = markStil(key);
       const s = Math.min(w,h)/100;
       const P = (x,y) => [x*s, y*s];
       const stops = activeShipSkinStops() || SHIP_GRAD_STOPS[cfg.grad]; // aktiver Flotten-Anstrich überschreibt die Rumpffarbe (rein kosmetisch)
@@ -4899,7 +4956,7 @@
         const [px,py] = P(ex,ey);
         // Mk VIII: laengerer Strahl. Der Faktor bleibt bei 1,4 - bei 1,8 lief die Fahne aus der
         // 78x58-Leinwand der Werftkarte heraus und wurde am linken Rand abgeschnitten.
-        const len = er*s*5.2*(mk>=8 ? 1.4 : 1);
+        const len = er*s*5.2*(mk>=8 ? stil.strahlLang : 1);
         const pl = ctx.createLinearGradient(px,py,px-len,py);
         pl.addColorStop(0, 'rgba(255,255,255,0.85)');
         pl.addColorStop(0.25, hexToRgba(flameCore,0.55));
@@ -5001,16 +5058,16 @@
       // ueberstehen. Mk II ist der dunkle Kielstreifen unten plus ein heller Grat darueber, Mk III
       // eine zusaetzliche Laengskante auf halber Hoehe.
       if (mk >= 2){
-        const kielY = aoY0 + (aoY1-aoY0)*0.86;
-        ctx.strokeStyle = 'rgba(0,0,0,0.34)'; ctx.lineWidth = Math.max(1, s*1.7);
+        const kielY = aoY0 + (aoY1-aoY0)*stil.kielY;
+        ctx.strokeStyle = 'rgba(0,0,0,0.34)'; ctx.lineWidth = Math.max(1, s*stil.kielDicke);
         ctx.beginPath(); ctx.moveTo(hullX0, kielY); ctx.lineTo(hullX1, kielY); ctx.stroke();
         ctx.strokeStyle = 'rgba(210,222,240,0.22)'; ctx.lineWidth = Math.max(0.4, s*0.45);
         ctx.beginPath(); ctx.moveTo(hullX0, kielY-s*1.4); ctx.lineTo(hullX1, kielY-s*1.4); ctx.stroke();
       }
       if (mk >= 3){
-        const kanteY = aoY0 + (aoY1-aoY0)*0.50;
+        const kanteY = aoY0 + (aoY1-aoY0)*stil.kanteY;
         ctx.strokeStyle = 'rgba(232,240,255,0.30)'; ctx.lineWidth = Math.max(0.5, s*0.55);
-        ctx.beginPath(); ctx.moveTo(hullX0, kanteY); ctx.lineTo(hullX1, kanteY-s*1.5); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(hullX0, kanteY); ctx.lineTo(hullX1, kanteY-s*stil.kanteFall); ctx.stroke();
         ctx.strokeStyle = 'rgba(0,0,0,0.36)'; ctx.lineWidth = Math.max(0.5, s*0.8);
         ctx.beginPath(); ctx.moveTo(hullX0, kanteY+s*1.1); ctx.lineTo(hullX1, kanteY-s*0.4); ctx.stroke();
       }
@@ -5052,7 +5109,7 @@
       const turrets = (cfg.turrets||[]).slice();
       if (mk >= 5){
         const kandidaten = turrets.length
-          ? [[turrets[0][0]-14, turrets[0][1], turrets[0][2]*0.85, turrets[0][3]||2]]
+          ? [[turrets[0][0]-stil.turmAbstand, turrets[0][1], turrets[0][2]*0.85, turrets[0][3]||2]]
           : [[40,44,2.4,1],[40,56,2.4,1]];
         for (const k of kandidaten) if (pointInHull(cfg.pts, k[0], k[1])) turrets.push(k);
       }
@@ -5062,7 +5119,7 @@
         // Werftmarke IV: laengere Rohre. Bewusst nur der Lauf, nicht die Turmbasis - eine groessere
         // Basis haette die Silhouette veraendert, und genau das soll ueber alle zehn Marken gleich
         // bleiben.
-        const barLen = r*(mk>=4 ? 3.4 : 2.4), barW = Math.max(0.9, r*0.44);
+        const barLen = r*(mk>=4 ? stil.rohrLang : 2.4), barW = Math.max(0.9, r*0.44);
         const offs = n===1 ? [0] : [-r*0.46, r*0.46];
         ctx.fillStyle = '#39404e';
         offs.forEach(o => ctx.fillRect(px, py+o-barW/2, barLen, barW));
@@ -5081,10 +5138,10 @@
       // sie sonst wieder flachwaschen.
       if (mk >= 6){
         // Sensormast auf der ECHTEN Oberkante an dieser x-Position (siehe hullTopAt).
-        const mxU = 42;
+        const mxU = stil.mastX;
         const okU = hullTopAt(cfg.pts, mxU, Math.min(...cfg.pts.map(p=>p[1])), Math.max(...cfg.pts.map(p=>p[1])));
         if (okU !== null){
-          const [fx,fy] = P(mxU, okU+1), [spx,spy] = P(mxU, okU-11);
+          const [fx,fy] = P(mxU, okU+1), [spx,spy] = P(mxU, okU-stil.mastHoch);
           ctx.strokeStyle = SHIP_GRAD_STOPS.steel[1]; ctx.lineWidth = Math.max(0.6, s*0.9);
           ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(spx,spy); ctx.stroke();
           ctx.strokeStyle = 'rgba(190,225,255,0.8)'; ctx.lineWidth = Math.max(0.5, s*0.6);
@@ -5099,8 +5156,9 @@
         const lichtFarbe = (cfg.accent && cfg.accent.color) || '#c3e2ff';
         const lY0 = Math.min(...cfg.pts.map(p=>p[1])), lY1 = Math.max(...cfg.pts.map(p=>p[1]));
         const lX0 = Math.min(...cfg.pts.map(p=>p[0])), lX1 = Math.max(...cfg.pts.map(p=>p[0]));
-        for (let i=0; i<7; i++){
-          const lx = lX0 + (lX1-lX0)*(0.24+0.50*i/6), ly = lY0 + (lY1-lY0)*0.50;
+        const lN = Math.max(2, stil.lichtZahl);
+        for (let i=0; i<lN; i++){
+          const lx = lX0 + (lX1-lX0)*(stil.lichtVon+(stil.lichtBis-stil.lichtVon)*i/(lN-1)), ly = lY0 + (lY1-lY0)*stil.lichtY;
           if (!pointInHull(cfg.pts, lx, ly)) continue;
           const [ax,ay] = P(lx,ly), lr = Math.max(0.7, s*1.1);
           const lg = ctx.createRadialGradient(ax,ay,0,ax,ay,lr*2.6);
@@ -5516,8 +5574,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.364.0';
+  const VERSION = '8.365.0';
   const PATCHNOTES = [
+    { version:'8.365.0', date:'01.08.2026', changes:[
+      '<strong>Jetzt sehen die Werftmarken auch je Schiffsfamilie anders aus, nicht nur ihre Texte.</strong> v8.364.0 hatte die Beschreibungen individualisiert, das Bild aber bewusst unangetastet gelassen – der Maler kannte nur die Markenstufe, nicht den Schiffstyp, und legte jedem Rumpf denselben Aufbau an. Ein <strong>Jäger</strong> bekam denselben breiten Gürtelpanzer wie ein <strong>Schlachtschiff</strong> und denselben langen Geschützlauf wie ein <strong>Bomber</strong>.',
+      '<strong>Sieben Aufbauten variieren jetzt nach Familie</strong> – Tiefe und Stärke des Kielstreifens (Mk II), Höhe und Gefälle der Panzerkante (Mk III), Länge der Geschützrohre (Mk IV), Sitz des Zusatzturms (Mk V), Position und Höhe des Sensormasts (Mk VI), Anzahl und Streuung der Systemlichter (Mk VII) und die Verlängerung des Antriebsstrahls (Mk VIII).',
+      '<strong>Die Unterschiede folgen dem, was die Texte versprechen.</strong> Der <strong>Aufklärer</strong> trägt den höchsten Mast im Spiel – das Schiff <em>ist</em> seine Antenne –, der <strong>Abfangjäger</strong> den niedrigsten, weil ein hoher Mast auf einem Jäger wie ein Fahnenstock aussieht. Der <strong>Bomber</strong> hat die längsten Rohre, das <strong>Großkampfschiff</strong> die dichteste Lichterkette und den breitesten Gürtelpanzer, das <strong>Tiefenschiff</strong> den kräftigsten Druckkiel und nur vier weit auseinanderliegende Lichter – unten sieht man ohnehin nur Punkte.',
+      '<strong>Es kommt kein neues Bauteil dazu, und das ist Absicht.</strong> Variiert werden ausschließlich die Proportionen der vorhandenen Aufbauten. Jeder Wert hat die bisherige Zahl als Vorgabe: Eine Familie, die einen Wert nicht nennt, sieht exakt aus wie vorher – und ein Schiff ohne Familie ebenfalls. Eine Grafikänderung, die man nicht rückwärts erklären kann, ist im Zweifel eine Regression.',
+      '<strong>Der Test prüft nicht nur, dass sich die Werte unterscheiden, sondern dass sie das Richtige sagen:</strong> höchster Mast beim Aufklärer, niedrigster beim Jäger, längste Rohre beim Bomber, dichteste Lichter beim Großkampfschiff. Weicht die Grafik vom Text ab, ist einer von beiden falsch. Und er prüft, dass der Maler jeden Wert wirklich ausliest – eine Stiltabelle ohne Verbraucher wäre der teuerste Fehler hier, weil alle anderen Prüfungen trotzdem grün blieben. Genau das ist beim Bauen passiert: Die Masthöhe war eine Viertelstunde lang in der Tabelle, aber nicht im Maler.'
+    ] },
     { version:'8.364.0', date:'01.08.2026', changes:[
       '<strong>Die Werftmarken-Texte passen jetzt zum Schiff (Spieler-Rückmeldung: „die Texte sind für alle Schiffe gleich").</strong> Jede Stufe wurde bisher für jedes Schiff mit demselben Satz beschrieben – beim <strong>Großen Frachter</strong> stand auf Mk IV wörtlich „Alle Geschützrohre deutlich länger", obwohl er kein einziges Geschütz hat. Es gibt jetzt <strong>sechs Schiffsfamilien</strong> mit eigenen Beschreibungen: Abfangjäger, Bomber, Großkampfschiffe, Tiefenschiffe, Aufklärer und Nutzschiffe.',
       '<strong>Dieselbe Stufe heißt jetzt bei jeder Familie etwas anderes.</strong> Mk II ist beim Jäger ein <em>Kielband</em>, das dem schmalen Rumpf das Flattern im Anflug nimmt; beim Schlachtschiff ein <em>Gürtelpanzer</em> entlang der Wasserlinie; beim Tiefenschiff ein <em>Druckkiel</em> – „die erste Naht, die unten aufgibt"; beim Frachter ein <em>Lastkiel</em>, weil volle Laderäume auf die Unterkante drücken. Mk V gibt dem Jäger einen Heckstand gegen die alte Schwäche jedes Jägers, dem Bomber einen zweiten Schacht – und dem Frachter zwei Nahwehr-Kuppeln: „kein Gefechtsschiff, aber auch keine wehrlose Beute mehr".',
