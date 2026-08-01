@@ -960,7 +960,12 @@
          Leiste auf 390x844 frei, auf 360x740 rutscht die Klappe wieder hinein. Der Abstand muss an
          der Bildschirmunterkante hängen, nicht an einem Prozentwert. Auf beiden Größen nachgemessen:
          null verdeckte Reiter. */
-      .edge-tab { top:auto; bottom:20%; transform:none; }
+      /* 8% statt 20% (01.08.2026): Bei 20% verdeckte die Klappe auf einem kurzen Bildschirm
+         (360x640) selbst ohne Banner noch Reiter - das fiel erst auf, als der Prüflauf um diese
+         dritte Größe erweitert wurde. Der Prozentwert ist ohnehin der schwächere Anker: Die Leiste
+         endet bei einem festen Pixelwert, die Klappe skaliert mit der Fensterhöhe. 8% hält auf
+         allen drei geprüften Größen Abstand. */
+      .edge-tab { top:auto; bottom:8%; transform:none; }
     }
     .tab-badge { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--c-danger); box-shadow:0 0 6px var(--c-danger); animation: badgePulse 1.6s ease-in-out infinite; }
     /* Zwei Sorten Punkt (v8.348.0). Rot heißt „etwas ist PASSIERT" und verschwindet beim Hinsehen -
@@ -993,8 +998,24 @@
        unangetastet - der Modus kann deshalb nichts kaputt machen, was im Normalmodus funktioniert,
        und ist jederzeit umschaltbar. Standard: an auf schmalen Bildschirmen (dort ist das Problem),
        aus auf breiten (dort ist genug Platz und das Banner ist ein Gewinn). */
+    /* Das Banner bleibt auf dem Handy sichtbar (01.08.2026) - als flacher Streifen statt gar nicht.
+       Es war seit dem Grafik-Audit vom 24.07.2026 komplett ausgeblendet, und das war damals richtig:
+       Der Kopfbereich begann bei 721px, das Banner allein nahm 190px davon. Inzwischen liegt der
+       Kopfbereich bei rund 400px, und das Banner ist das EINZIGE Bild der eigenen Welt im ganzen
+       Spiel - ein Handyspieler bekam es nie zu sehen.
+       Der Ausschnitt (56px statt 190px) zeigt den Planeten samt Ring am rechten Rand: preserveAspectRatio ist
+       im Markup auf "xMidYMid slice" gesetzt, das Bild wird also beschnitten statt gestaucht. Kein
+       Textelement liegt darin - Titel und Knopfleiste stehen im Kompaktmodus ohnehin statisch
+       darunter (hero-bottom/hero-stats weiter unten), nicht absolut im Banner. */
     body.compact-head .hero { height:auto; margin-bottom:0.6rem; }
     body.compact-head .hero > svg { display:none; }
+    /* NUR auf hohen Geräten. Auf einem kurzen Bildschirm (etwa 360x640) schiebt der Streifen die
+       Reiterleiste so weit nach unten, dass die seitlichen Klappen wieder Reiter verdecken - das
+       hat der Prüflauf beim ersten Anlauf sofort gemeldet. Lieber kein Bild als ein unerreichbarer
+       Reiter. */
+    @media (min-height: 780px) {
+      body.compact-head .hero > svg { display:block; height:56px; opacity:0.85; }
+    }
     body.compact-head .hero-stats { position:static; padding:8px 12px 0; gap:6px; }
     body.compact-head .hero-bottom { position:static; padding:6px 12px 10px; gap:6px 10px; }
     body.compact-head .hero-title .name { font-size:15px; }
@@ -5659,8 +5680,18 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.370.0';
+  const VERSION = '8.371.0';
   const PATCHNOTES = [
+    { version:'8.371.0', date:'01.08.2026', changes:[
+      '<strong>Die Sektorkarte zeigt jetzt alle Flottenbewegungen, nicht nur Erkundungen.</strong> Ein Angriff, der zwei Stunden unterwegs war, sah auf der Karte aus wie gar nichts – dabei macht das Spiel um Flugzeiten viel Aufhebens (langsamstes Schiff, Werftmarken-Tempo, Allianzbasis −10%). Neu gezeichnet werden <strong>Angriff</strong>, <strong>Kolonisierung</strong>, <strong>Mondlandung</strong> und <strong>Verlegung</strong> – jeweils mit Linie, gleitendem Flottenmarker und Beschriftung, in eigener Farbe je Art.',
+      'Einwegflüge werden dabei als solche behandelt: Ein Kolonieschiff läuft nicht mehr auf halber Strecke sichtbar wieder heim, sondern fliegt die volle Zeit zum Ziel. Erkundung und Angriff kommen weiterhin zurück und zeigen an, ob es gerade Hin- oder Rückflug ist.',
+      'Bewusst <em>nicht</em> gezeichnet: Expedition, Abgrund-Tauchgang, Piratennest und Weltboss. Die haben keinen Ort im Sektor – Tiefraum, Abstieg, abstrakte Gegner. Eine Linie dorthin wäre erfunden.',
+      '<strong>Das Banner der eigenen Welt ist auf dem Handy wieder da</strong> – als flacher 56-Pixel-Streifen mit Planet und Ring. Es war seit dem 24.07.2026 auf schmalen Bildschirmen komplett ausgeblendet, und das war damals richtig: Der Kopfbereich begann bei 721 Pixeln, das Banner allein nahm 190 davon. Inzwischen liegt der Kopf bei rund 400 Pixeln – und es ist das einzige Bild der eigenen Welt im ganzen Spiel, das ein Handyspieler nie zu sehen bekam.',
+      '<strong>Die Flottenliste wird nicht mehr jede Sekunde komplett neu geschrieben.</strong> Gemessen war <strong>#fleet mit 157,5 kB die größte Box des Spiels</strong> – deutlich größer als die Forschungsliste (92,5 kB), die den Zwischenspeicher längst hat. Direkt danach lief zusätzlich eine Routine über <em>jede</em> Schiffsgrafik im Baum und zeichnete sie neu, auch wenn sich nichts geändert hatte. Beides passiert jetzt nur noch bei einer echten Änderung.',
+      'Das Banner erscheint nur auf ausreichend hohen Bildschirmen. Auf einem kurzen Gerät schöbe der Streifen die Reiterleiste so weit nach unten, dass die seitlichen Klappen „Chat" und „Status" wieder Reiter verdecken – lieber kein Bild als ein unerreichbarer Reiter. Der Prüflauf hat genau das beim ersten Anlauf gemeldet.',
+      'Dabei kam heraus, dass die Klappen auf sehr kurzen Bildschirmen (360x640) auch <em>ohne</em> Banner schon Reiter verdeckten – der Prüflauf kannte diese Größe bisher nicht. Sie sitzen jetzt tiefer und halten auf allen drei geprüften Größen Abstand.',
+      'Der Flotten-Skin steckt dabei im Zwischenspeicher-Schlüssel, nicht im Markup: Er wird per Skript als Filter auf die Grafiken gelegt und taucht im erzeugten HTML nirgends auf. Ohne ihn im Schlüssel wäre ein Skin-Wechsel bei sonst gleichem Inhalt wirkungslos geblieben.'
+    ] },
     { version:'8.370.0', date:'01.08.2026', changes:[
       '<strong>Werftmarken geben jetzt das, was zum Schiff passt.</strong> Bisher bekam jede der 40 Klassen dieselbe Zeile: +3% Angriff, +3% Schild, +2% Tempo, −1,5% Treibstoff, −2% Bauzeit. Ein <strong>Spähschiff ohne jeden Angriffswert</strong> wurde also für „mehr Angriff" aufgerüstet, und ein Großkampfschiff bekam denselben Tempozuwachs wie ein Abfangjäger. Die Marken-Texte und die Marken-Grafik unterscheiden seit Langem nach Schiffsfamilie – nur die Wirkung tat es nicht.',
       'Je Stufe gilt jetzt: <strong>Abfangjäger</strong> +4,5% Tempo, <strong>Bomber</strong> +4% Angriff, <strong>Großkampfschiffe</strong> +4% Schild und −3% Bauzeit, <strong>Tiefenflotte</strong> −4% Treibstoff, <strong>Späher</strong> +5,5% Tempo und −4% Treibstoff, <strong>Zivilschiffe</strong> −5% Treibstoff und −3,5% Bauzeit. Auf Mk X macht das beim Späher +49,5% Tempo statt +18%, beim Frachter −45% Treibstoff statt −13,5%.',
@@ -39023,6 +39054,45 @@
     const rad = ((slot||0) * 45) * Math.PI/180;
     return { x: SUN_X + r*Math.cos(rad), y: SUN_Y + r*Math.sin(rad) };
   }
+  // ===== Welche Missionen die Sektorkarte zeichnet (01.08.2026) =====
+  //
+  // Bis hierher zeichnete die Karte GENAU EINE Missionsart: die Erkundung. Ein Angriff, der zwei
+  // Stunden unterwegs ist, sah auf der Karte aus wie gar nichts - obwohl das Spiel um Flugzeiten
+  // viel Aufhebens macht (langsamstes Schiff, Werftmarken-Tempo, Allianzbasis −10%).
+  //
+  // Bewusst NICHT in dieser Tabelle: expedition, abgrund, piratelair, worldboss. Die haben keinen
+  // Zielort im Sektor - eine Expedition geht in den Tiefraum, ein Tauchgang nach unten, Weltboss
+  // und Piratennest sind abstrakte Gegner ohne Koordinate. Eine Linie dorthin wäre erfunden.
+  //
+  // `rundflug` unterscheidet Hin- und Rückweg: Erkundung und Angriff kommen zurück, eine
+  // Kolonisierung oder Verlegung nicht - dort endet die Reise am Ziel. Ohne diese Unterscheidung
+  // liefe ein Kolonieschiff auf halber Strecke sichtbar wieder heim.
+  //
+  // `ziel` liefert die Kartenposition ODER null. Null heisst: Ziel unbekannt (etwa ein Planet aus
+  // einem noch nicht geladenen System) - dann wird nichts gezeichnet statt an den falschen Ort.
+  const MISSION_LINIEN = {
+    explore:         { hin:'#378add', rueck:'#5dcaa5', rundflug:true,  was:'Erkundung' },
+    attack:          { hin:'#e24b4a', rueck:'#5dcaa5', rundflug:true,  was:'Angriff' },
+    colonize:        { hin:'#7f77dd', rueck:null,      rundflug:false, was:'Kolonisierung' },
+    'colonize-moon': { hin:'#af9ce6', rueck:null,      rundflug:false, was:'Mondlandung' },
+    relocate:        { hin:'#fac775', rueck:null,      rundflug:false, was:'Verlegung' }
+  };
+  // Zielposition einer Mission im aktuell gezeigten System. Gibt zusätzlich zurück, ob das Ziel
+  // ueberhaupt im Blick liegt - liegt es das nicht, nutzt der Zeichner die Sonne als Platzhalter
+  // (dasselbe Verhalten wie bisher bei der Erkundung).
+  function missionMapZiel(m){
+    if (m.type === 'attack'){
+      const npc = NPCS.find(n => n.id === m.targetId);
+      if (!npc) return null;
+      return { system: npc.system, pos: npcMarkerXY() };
+    }
+    // Alle uebrigen Arten zielen auf einen Planeten. Ein Mond liegt auf der Karte beim
+    // uebergeordneten Planeten (siehe planetSystemOf) - deshalb der Umweg ueber moonParentKey.
+    const pid = isMoonKey(m.targetId) ? moonParentKey(m.targetId) : m.targetId;
+    const p = PLANETS.find(pl => pl.id === pid);
+    if (!p) return null;
+    return { system: p.system, pos: planetOrbitXY(p), planet: p };
+  }
   function npcMarkerXY(){
     const rx = 78, ry = 24;
     const rad = 200 * Math.PI/180;
@@ -39393,12 +39463,13 @@
     }
     const now = Date.now();
     for (const { planet: originKey, fleet } of allFleetsWithPlanet()){
-      for (const m of fleet.missions.filter(mm=>mm.type==='explore')){
-        const p = PLANETS.find(pl=>pl.id===m.targetId);
-        if (!p) continue;
+      for (const m of fleet.missions.filter(mm=>MISSION_LINIEN[mm.type])){
+        const art = MISSION_LINIEN[m.type];
+        const ziel = missionMapZiel(m);
+        if (!ziel) continue;
         const originPlanet = originKey==='home' ? null : PLANETS.find(pl=>pl.id===originKey);
         const originInView = originKey==='home' ? (activeSystem === myHomeSystem) : (originPlanet && originPlanet.system===activeSystem);
-        const targetInView = p.system === activeSystem;
+        const targetInView = ziel.system === activeSystem;
         // Bugfix: Die beiden früheren `continue`-Bedingungen deckten zusammen JEDEN Fall von
         // "Ziel nicht im aktuellen System" ab, unabhängig vom Wert von originInView - eine Erkundung
         // vom sichtbaren Heimatsystem in ein fremdes System wurde dadurch nie als Linie angezeigt.
@@ -39406,27 +39477,34 @@
         // eines der beiden sichtbar, wird für das jeweils andere (analog zu originX/Y unten) die
         // Sonne als Platzhalterposition genutzt.
         if (!targetInView && !originInView) continue;
-        const targetPos = targetInView ? planetOrbitXY(p) : { x: SUN_X, y: SUN_Y };
+        const targetPos = targetInView ? ziel.pos : { x: SUN_X, y: SUN_Y };
         let originX, originY;
         if (originKey === 'home'){ originX = homeMarkerPos.x; originY = homeMarkerPos.y; }
         else if (originInView){ const oc = planetOrbitXY(originPlanet); originX = oc.x; originY = oc.y; }
         else { originX = SUN_X; originY = SUN_Y; }
-        const totalDur = Math.max(1000, m.endTime - (m.startTime || (m.endTime - missionDurationFor(p.duration, fleet, EXPLORE_SHIP_KEYS)*1000)));
+        // startTime fehlt nur bei sehr alten Spielstaenden. Der frueher hier stehende Rueckfall auf
+        // die Erkundungsdauer passt nur zur Erkundung - fuer die uebrigen Arten waere er geraten.
+        // Eine Stunde als neutraler Ersatz: Der Balken laeuft dann zwar nicht exakt, aber die Linie
+        // steht am richtigen Ort, und beim naechsten Missionsstart ist startTime ohnehin gesetzt.
+        const fallbackDur = (m.type === 'explore' && ziel.planet)
+          ? missionDurationFor(ziel.planet.duration, fleet, EXPLORE_SHIP_KEYS)*1000 : 3600*1000;
+        const totalDur = Math.max(1000, m.endTime - (m.startTime || (m.endTime - fallbackDur)));
         const st = m.endTime - totalDur;
         const frac = Math.max(0, Math.min(1, (now-st)/totalDur));
-        const returning = frac >= 0.5;
-        const f2 = returning ? (frac-0.5)/0.5 : frac/0.5;
+        // Einwegflug (Kolonisierung, Mondlandung, Verlegung): die volle Zeit ist der Hinweg.
+        const returning = art.rundflug && frac >= 0.5;
+        const f2 = art.rundflug ? (returning ? (frac-0.5)/0.5 : frac/0.5) : frac;
         const fromX = returning ? targetPos.x : originX, fromY = returning ? targetPos.y : originY;
         const toX = returning ? originX : targetPos.x, toY = returning ? originY : targetPos.y;
         const shipX = fromX + (toX-fromX)*f2;
         const shipY = fromY + (toY-fromY)*f2;
         const angle = Math.atan2(toY-fromY, toX-fromX) * 180/Math.PI + 90;
-        const color = returning ? '#5dcaa5' : '#378add';
+        const color = returning ? art.rueck : art.hin;
         inner += `
           <line x1="${originX.toFixed(1)}" y1="${originY.toFixed(1)}" x2="${targetPos.x.toFixed(1)}" y2="${targetPos.y.toFixed(1)}" stroke="${color}" stroke-opacity="0.5" stroke-width="1.5"/>
           <circle cx="${shipX.toFixed(1)}" cy="${shipY.toFixed(1)}" r="9" fill="${color}" opacity="0.18"/>
           <g transform="translate(${shipX.toFixed(1)},${shipY.toFixed(1)}) rotate(${angle.toFixed(1)})"><polygon points="0,-6 4,5 0,2 -4,5" fill="${color}"/></g>
-          <text class="planet-label" x="${shipX.toFixed(1)}" y="${(shipY-12).toFixed(1)}" text-anchor="middle" style="fill:${color};">${(m.fleetName||'Flotte')+' · '+(returning?'Rückflug':'Hinflug')}</text>
+          <text class="planet-label" x="${shipX.toFixed(1)}" y="${(shipY-12).toFixed(1)}" text-anchor="middle" style="fill:${color};">${art.rundflug ? (m.fleetName||art.was)+' · '+(returning?'Rückflug':'Hinflug') : (m.fleetName ? m.fleetName+' · '+art.was : art.was)}</text>
         `;
       }
     }
@@ -42699,8 +42777,28 @@
     // etwas ausblenden würde (sonst kein Mehrwert, z.B. wenn ohnehin alles freigeschaltet ist).
     const anyFilterable = hiddenShipCount > 0 || SHIP_DEFS.some(shipIsHiddenByFilter) || (!state.unlocked.superschlachtschiff && (cf.superschlachtschiff||0)===0);
     const shipFilterToggle = anyFilterable ? `<div class="bmeta" data-toggle-hide-locked style="cursor:pointer; margin-bottom:8px;"><i class="ti ${hideLockedShips?'ti-check':'ti-x'}" aria-hidden="true" style="color:${hideLockedShips?'#5dcaa5':'#7d8199'};"></i> Nur baubare Schiffe anzeigen: <strong style="color:${hideLockedShips?'#5dcaa5':'#7d8199'};">${hideLockedShips?'AN':'AUS'}</strong>${hideLockedShips&&hiddenShipCount>0?` <span style="color:#7d8199;">(${hiddenShipCount} gesperrte ausgeblendet)</span>`:''} <span style="color:#7d8199;">– antippen zum Umschalten</span></div>` : '';
-    document.getElementById('fleet').innerHTML = shipFilterToggle + leerlaufKarte('flotte') + constructionProgressCards(j=>j.kind==='ship' && j.planet===state.activeBasePlanet) + shipRows + superBlock;
-    refreshShipMiniIcons(document.getElementById('fleet'));
+    // Markup-Signatur statt blindem innerHTML (01.08.2026). Gemessen im laufenden Spiel war #fleet
+    // mit 157,5 kB die GRÖSSTE Box des Spiels - deutlich größer als #research (92,5 kB), das den
+    // Cache längst hat. Sie wurde jede Sekunde komplett neu geschrieben, und direkt danach lief
+    // refreshShipMiniIcons() über JEDES canvas[data-ship-icon] darin und zeichnete jede
+    // Schiffsgrafik neu, auch wenn sich nichts geändert hatte.
+    //
+    // Der Skin steckt im SCHLÜSSEL, nicht im Markup: activeFleetSkinFilter() wird per JS als
+    // canvas.style.filter gesetzt und taucht im erzeugten HTML nirgends auf. Ohne ihn im Schlüssel
+    // bliebe ein Skin-Wechsel bei sonst gleichem Markup wirkungslos - genau die Art stiller Fehler,
+    // die ein Markup-Vergleich sonst gerade verhindert.
+    //
+    // Klick-Handler sind hier unbedenklich: Sie werden weiter unten (data-buyship, data-scrapship,
+    // data-unlock, data-shipmark) über document.querySelectorAll bei JEDEM Render neu zugewiesen.
+    // Wird das Schreiben übersprungen, stehen die alten Knoten samt Handlern; die Zuweisung trifft
+    // dieselben Knoten noch einmal und ist folgenlos.
+    const fleetEl = document.getElementById('fleet');
+    if (setBoxHtml(fleetEl, 'fleet|' + activeFleetSkinFilter(),
+          shipFilterToggle + leerlaufKarte('flotte') + constructionProgressCards(j=>j.kind==='ship' && j.planet===state.activeBasePlanet) + shipRows + superBlock)){
+      // Nur nach einem echten Neuaufbau - frische Canvas-Knoten sind leer. Bleiben die alten stehen,
+      // behalten sie ihre Zeichnung, und ensureCanvasDpr() ist über dataset.dprDone ohnehin einmalig.
+      refreshShipMiniIcons(fleetEl);
+    }
 
     renderDebrisBox(cf);
     renderPrisenhofBox();

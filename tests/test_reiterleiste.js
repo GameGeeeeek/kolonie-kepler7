@@ -56,8 +56,13 @@ const SPEICHER = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   xp:64000, buffs:[], lastTick:Date.now(), colonyNames:{}, colonyNotes:{} });
 
 // Zwei Größen, und das ist keine Kür: siehe Falle 3 im Kopf dieser Datei.
+// DREI Groessen, und die dritte kam am 01.08.2026 dazu, weil zwei nicht genuegten: Das
+// Hero-Banner (v8.371.0) schob die Leiste nach unten, und auf einem KURZEN Bildschirm rutschten
+// dadurch wieder Reiter unter die seitlichen Klappen. Auf 390x844 und 360x740 blieb das unsichtbar.
+// Nachgemessen war 360x640 sogar schon VORHER betroffen - der Fehler war nur nie geprueft worden.
 const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
-                  { name:'klein      360x740', w:360, h:740 }];
+                  { name:'klein      360x740', w:360, h:740 },
+                  { name:'sehr kurz  360x640', w:360, h:640 }];
 
 (async () => {
   let fail = false;
