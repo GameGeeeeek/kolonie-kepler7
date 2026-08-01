@@ -116,7 +116,12 @@ async function vorschauText(browser, defensePower){
   const stark = await vorschauText(browser, 50);
   check('Bestenlisten-Zeile des Ziels gefunden', stark.geklickt);
   check('Vorschau ist sichtbar', !!stark.vorschau, stark.vorschau);
-  const prozentStark = stark.vorschau && stark.vorschau.match(/(\d+)\s*%/);
+  // Auf "Siegchance" verankert statt auf der ERSTEN Prozentzahl im Panel (01.08.2026). Seit dem
+  // Aufklärungsvorteil steht dort mehr als eine Prozentangabe - die Zeile über der Anzeige nennt
+  // entweder den aktiven Zuschlag oder, wenn noch nie gespäht wurde, was Spähen brächte. Der Test
+  // griff die und verglich sie mit dem 90%-Deckel: ein Testfehler, kein Spielfehler, aber genau der
+  // Sorte, die beim nächsten Zusatz wiederkommt. Jetzt zeigt der Ausdruck auf die gemeinte Größe.
+  const prozentStark = stark.vorschau && stark.vorschau.match(/Siegchance\s*~?\s*(\d+)\s*%/);
   check('a) haushoch überlegen: Vorschau nennt eine Prozentzahl', !!prozentStark, stark.vorschau);
   check('a) und zwar gedeckelt bei 90%, nicht "sicher"', !!prozentStark && parseInt(prozentStark[1], 10) <= 90 && parseInt(prozentStark[1], 10) >= 80,
     prozentStark ? prozentStark[1] + '%' : null);
@@ -124,7 +129,7 @@ async function vorschauText(browser, defensePower){
 
   // (b) Ziel mit erdrueckender Verteidigung -> darf NICHT "aussichtslos" heissen (Boden 10%).
   const schwach = await vorschauText(browser, 5000000);
-  const prozentSchwach = schwach.vorschau && schwach.vorschau.match(/(\d+)\s*%/);
+  const prozentSchwach = schwach.vorschau && schwach.vorschau.match(/Siegchance\s*~?\s*(\d+)\s*%/);
   check('b) hoffnungslos unterlegen: Vorschau nennt eine Prozentzahl', !!prozentSchwach, schwach.vorschau);
   check('b) und zwar mindestens 10%, nicht "aussichtslos"', !!prozentSchwach && parseInt(prozentSchwach[1], 10) >= 10,
     prozentSchwach ? prozentSchwach[1] + '%' : null);
