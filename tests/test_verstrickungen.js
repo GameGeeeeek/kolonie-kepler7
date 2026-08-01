@@ -189,7 +189,12 @@ const verdrahtung = [
   ['Veteran → Abgrundsplitter',   /veteranRoleExtra\(planetKey, 'abgrund'\)/, 1],
   ['Aufklärung → PvP-Vorschau',   /attackPower\(previewFleet, state\.activeBasePlanet\) \* \(1 \+ spyEdge\)/, 1],
   ['Aufklärung → Solo-Auflösung', /attackPower\(m\.composition\|\|fleet, planetKey\) \* \(1 \+ spyIntelEdge\(m\.targetId\)\)/, 1],
-  ['Aufklärung → Spionagebericht',/attackPower\(currentFleet\(\)\) \* \(1 \+ berichtEdge\)/, 1]
+  ['Aufklärung → Spionagebericht',/attackPower\(currentFleet\(\)\) \* \(1 \+ berichtEdge\)/, 1],
+  // Die Berichte-Box hat einen Wertlisten-Signatur-Cache. Der Aufklärungsvorteil fällt nach 30
+  // Minuten von selbst weg - steht er nicht in der Signatur, friert die Zeile ein und behauptet
+  // weiter einen Zuschlag, den es nicht mehr gibt.
+  ['Aufklärungsvorteil steht in der Signatur der Berichte-Box',
+   /reportsSig = statsHtml\+'\|'\+reportsCache\.map\(r=>r\.id\+':'\+\(r\.targetId \? spyIntelEdge\(r\.targetId\) : 0\)\)/, 1]
 ];
 for (const [name, re, mind] of verdrahtung){
   const n = re.global ? (src.match(re) || []).length : (re.test(src) ? 1 : 0);
@@ -207,8 +212,14 @@ check('alle vier Doktrin-Seiten laufen über doctrineMultOf()',
 
 // ================================================================= 3. FRONTEND/BACKEND-GLEICHSTAND
 const BE_PFAD = path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js');
+// Fehlt das Backend, SCHLÄGT der Test fehl statt still zwanzig Prüfungen zu überspringen
+// (Fehlerbehebung 01.08.2026). Vorher stand hier ein 'HINWEIS - '-Text, den tests/run.js nicht
+// auswertet: Der Ausfall des kompletten Gleichstands-Abschnitts wäre im Prüflauf unsichtbar
+// gewesen, und genau dieser Abschnitt ist der Grund, warum es den Test gibt. Beide Repos liegen in
+// diesem Projekt immer nebeneinander; fehlt eines, ist die Spiegelung ungeprüft - und das ist eine
+// Aussage, die laut sein muss.
 if (!fs.existsSync(BE_PFAD)){
-  console.log('HINWEIS - Backend-Repo nicht daneben ausgecheckt, Gleichstands-Prüfung übersprungen.');
+  check('Backend-Repo liegt daneben (ohne es ist die Frontend/Backend-Spiegelung UNGEPRÜFT)', false, BE_PFAD);
 } else {
   const be = fs.readFileSync(BE_PFAD, 'utf8');
   const feLegion = (blockFraktion.match(/legion:[^\n]*freundlich:([\d.]+),\s*verbuendet:([\d.]+)/) || []);
@@ -273,14 +284,102 @@ if (!fs.existsSync(BE_PFAD)){
     && Math.abs(beCtx.doc({ doctrine:'doc_offensive', planetSpecialization:{ a:'shipyard' } }, 'atk') - 1.20*1.08) < 1e-9
     && beCtx.doc({ doctrine:'doc_offensive', planetSpecialization:{ a:'fortress' } }, 'atk') === 1.20
     && beCtx.doc({}, 'atk') === 1);
-  // Der eigentliche Gleichstand: dieselbe Lage muss auf beiden Seiten dieselbe Zahl ergeben.
-  for (const [dk, rolle, seite] of [['doc_offensive','shipyard','atk'], ['doc_defensive','fortress','def'],
-                                    ['doc_logistics','trade','atk']]){
-    const feWert = doktrin(dk, [rolle]).m(seite + 'Mult');
-    const beWert = beCtx.doc({ doctrine:dk, planetSpecialization:{ a:rolle } }, seite);
-    check('gleiche Zahl auf beiden Seiten: ' + dk + ' + ' + rolle + ' (' + seite + ')',
-      Math.abs(feWert - beWert) < 1e-9, { feWert, beWert });
+  // Der eigentliche Gleichstand: dieselbe Lage muss auf beiden Seiten dieselbe Zahl ergeben. Je
+  // Doktrin wird BEIDE Seiten geprüft (atk UND def) - eine einzelne Seite zu vergleichen wäre bei
+  // doc_logistics eine Zeile gewesen, die konstruktionsbedingt immer 1===1 lautet und damit nie
+  // fehlschlagen kann (Fehlerbehebung 01.08.2026).
+  for (const [dk, rolle] of [['doc_offensive','shipyard'], ['doc_defensive','fortress'], ['doc_logistics','trade']]){
+    for (const seite of ['atk','def']){
+      const feWert = doktrin(dk, [rolle]).m(seite + 'Mult');
+      const beWert = beCtx.doc({ doctrine:dk, planetSpecialization:{ a:rolle } }, seite);
+      check('gleiche Zahl auf beiden Seiten: ' + dk + ' + ' + rolle + ' (' + seite + ')',
+        Math.abs(feWert - beWert) < 1e-9, { feWert, beWert });
+    }
   }
+  // Und der Gegenbeweis, dass diese Schleife überhaupt etwas messen KANN: mindestens eine der sechs
+  // Zahlen muss von 1 abweichen. Wären alle 1, verglichen die Zeilen oben nur Neutralwerte.
+  const abweichend = [['doc_offensive','shipyard'], ['doc_defensive','fortress'], ['doc_logistics','trade']]
+    .flatMap(([dk, rolle]) => ['atk','def'].map(s => beCtx.doc({ doctrine:dk, planetSpecialization:{ a:rolle } }, s)))
+    .filter(v => Math.abs(v - 1) > 1e-9);
+  check('die Gleichstands-Schleife vergleicht echte Werte, nicht lauter Neutralwerte',
+    abweichend.length >= 4, abweichend);
+  // doc_logistics ist serverseitig BEWUSST neutral (seine Synergie sind Treibstoff und Lager, die
+  // der Server nicht rechnet). Das wird hier festgehalten, damit die Neutralität eine geprüfte
+  // Aussage ist und nicht ein unbemerkter Ausfall.
+  check('doc_logistics ist serverseitig neutral - und das Frontend wirkt dafür auf Treibstoff/Lager',
+    beCtx.doc({ doctrine:'doc_logistics', planetSpecialization:{ a:'trade' } }, 'atk') === 1
+    && Math.abs(doktrin('doc_logistics', ['trade']).m('fuelMult') - 0.80*0.92) < 1e-9);
+
+  // ===== Prestige-Perks in den Kampfgruppen: eigenschaftsbasiert statt namentlich =====
+  // Zweiter Fund der Nachprüfung vom 01.08.2026: Das Backend spiegelte von den Prestige-Perks NUR
+  // 'combat'. Die stapelbaren 'schwarm' (+10% Angriff je Stapel) und 'sparwerft' (-5%) standen im
+  // Frontend in BEIDEN Kampfgruppen und im Backend gar nicht - bei drei Stapeln Schwarmtaktiker
+  // rechnete der Server 30 Prozentpunkte anders als die Vorschau anzeigte, das Zehnfache der
+  // Abweichung, die der Legion-Bonus daneben verursacht hätte.
+  //
+  // Die Prüfung ist bewusst EIGENSCHAFTSBASIERT: Sie liest die Perk-Namen aus dem Frontend-Code
+  // heraus und verlangt, dass jeder davon im Backend vorkommt. Eine Liste, die hier die Namen
+  // aufzählt, wäre eine dritte Kopie und würde beim nächsten neuen Perk genauso veralten wie die
+  // Backend-Kopie es getan hat.
+  const kampfQuellen = ['function attackCombatBonusRaw(planetKey){', 'function defenseCombatBonusRaw(planetKey){']
+    .map(m => schnitt(m, '\n  }') || '').join('\n');
+  check('beide Kampf-Bonusfunktionen im Frontend gefunden', kampfQuellen.length > 500, kampfQuellen.length);
+  const fePerks = [...new Set([...kampfQuellen.matchAll(/prestigePerkCount\('(\w+)'\)/g)].map(m => m[1]))];
+  check('Frontend nutzt Prestige-Perks in den Kampfgruppen', fePerks.length >= 2, fePerks);
+  const beGruppen = ['function combatBonusCommon(save) {', 'function attackBonusGroup(save) {', 'function defenseBonusGroup(save) {']
+    .map(m => { const a = be.indexOf(m); return a < 0 ? '' : be.slice(a, be.indexOf('\n}', a)); }).join('\n');
+  const fehlend = fePerks.filter(p => !beGruppen.includes("'" + p + "'"));
+  check('jeder im Frontend-Kampf verwendete Prestige-Perk wird auch serverseitig gerechnet',
+    fehlend.length === 0, { fehlend, feGefunden: fePerks });
+  // Die Kehrseite von 'schwarm' (Verteidigungsmalus) steht im Frontend AUSSERHALB der gedeckelten
+  // Gruppe, als eigener Multiplikator mit Untergrenze 0.5 - sie muss im Backend an derselben Art
+  // von Stelle stehen, sonst hält der Server die Verteidigung für zu hoch.
+  check('der Verteidigungsmalus des Schwarmtaktikers ist serverseitig gespiegelt',
+    /Math\.max\(0\.5, 1 - \(\(save\.prestigePerks \|\| \[\]\)\.filter\(k => k === 'schwarm'\)\.length\) \* 0\.06\)/.test(be));
+
+  // ===== Ruf-Schwellen über den GESAMTEN Bereich (Fehlerbehebung 01.08.2026) =====
+  // Der teuerste Fund dieser Nachprüfung: factionEffectLevel() verglich den Rang-SCHLÜSSEL statt der
+  // Ruf-Schwelle. Seit der Acht-Rang-Einführung liegt zwischen 'freundlich' (30) und 'verbuendet'
+  // (70) der Rang 'geachtet' (50) - und für den traf keiner der beiden Schlüssel zu. Ergebnis war
+  // ein totes Band von Ruf 50 bis 69, in dem JEDER Fraktionseffekt auf null fiel, während der
+  // Server numerisch weiterrechnete.
+  //
+  // Dieser Block prüft deshalb nicht drei Stützstellen, sondern JEDEN Ruf-Wert von -100 bis 100
+  // gegen die Backend-Regel. Damit fällt jede künftige Rang-Einfügung sofort auf, egal an welcher
+  // Stelle sie passiert - eine Stützstellen-Prüfung hätte genau diesen Fehler wieder durchgelassen.
+  const feEffekt = new Function('ctx', 'state',
+    schnitt('const REP_RANKS = [', '\n  ];') + '\n'
+    + schnitt('function repTierOf(rep){', '\n  }') + '\n'
+    + 'const REP_MIN = -100, REP_MAX = 100;\n'
+    + 'function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, (state.factionRep||{})[fid]||0)); }\n'
+    + 'const REP_ALLY_THRESHOLD = ' + (src.match(/REP_ALLY_THRESHOLD = (\d+)/) || [])[1] + ';\n'
+    + 'const REP_FRIENDLY_THRESHOLD = ' + (src.match(/REP_FRIENDLY_THRESHOLD = (\d+)/) || [])[1] + ';\n'
+    + schnitt('function factionEffectLevel(fid){', '\n  }')
+    + ';ctx.f=factionEffectLevel;');
+  const luecken = [];
+  for (let rep = -100; rep <= 100; rep++){
+    const ctxE = {}; feEffekt(ctxE, { factionRep:{ legion: rep } });
+    const fe = ctxE.f('legion');
+    const soll = rep >= 70 ? 2 : (rep >= 30 ? 1 : 0);
+    if (fe !== soll) luecken.push({ rep, frontend: fe, backendRegel: soll });
+  }
+  check('factionEffectLevel stimmt für JEDEN Ruf-Wert von -100 bis 100 mit der Backend-Regel überein',
+    luecken.length === 0, luecken.slice(0, 6));
+  // Der Bonus muss außerdem MONOTON sein: mehr Ruf darf nie weniger Wirkung bedeuten.
+  const nichtMonoton = [];
+  let letzter = 0;
+  for (let rep = -100; rep <= 100; rep++){
+    const ctxE = {}; feEffekt(ctxE, { factionRep:{ legion: rep } });
+    const fe = ctxE.f('legion');
+    if (fe < letzter) nichtMonoton.push({ rep, vorher: letzter, jetzt: fe });
+    letzter = fe;
+  }
+  check('mehr Ruf bedeutet nie weniger Wirkung', nichtMonoton.length === 0, nichtMonoton);
+  // Und die Stelle, die zuverlässig in die alte Lücke lief: enforceRivalExclusivity setzt den
+  // Rivalen auf genau REP_ALLY_THRESHOLD - 1 und meldet dabei "Der Ruf bleibt freundlich."
+  const ctx69 = {}; feEffekt(ctx69, { factionRep:{ legion: 69 } });
+  check('bei Ruf 69 (das, worauf enforceRivalExclusivity setzt) gilt die Freundlich-Stufe',
+    ctx69.f('legion') === 1, ctx69.f('legion'));
 }
 
 // ================================================================= 4. ANZEIGE (Browser)
@@ -333,19 +432,48 @@ function backendStub(store){ return async r => {
     await page.evaluate(t => { const el = document.querySelector('.tab-btn[data-tab="'+t+'"]'); if (el) el.click(); }, tab);
     await page.waitForTimeout(900);
   }
+  // document.body.textContent wäre hier eine TAUTOLOGIE (Fehlerbehebung 01.08.2026): Das <script>
+  // der Spieldatei steht INNERHALB von <body> - nachgemessen beginnt <body> bei Zeichen 27.048 und
+  // der Skriptblock bei 348.492 -, also enthält body.textContent den kompletten JS-Quelltext samt
+  // aller String-Literale. Der gesuchte Satz ist ein Literal in VETERAN_ROLE_EXTRA und stand damit
+  // unabhängig von jeder Anzeige darin: Der Prüfpunkt blieb selbst dann grün, wenn man die gesamte
+  // sichtbare Oberfläche aus dem DOM entfernte. Jetzt wird eine Kopie ohne <script>/<style>
+  // ausgewertet - das ist genau der Text, den ein Spieler lesen kann.
   const sicht = await page.evaluate(() => {
     const txt = id => { const e = document.getElementById(id); return e ? e.textContent : ''; };
-    return { doktrin: txt('doctrineBox'), body: document.body.textContent || '' };
+    const kopie = document.body.cloneNode(true);
+    kopie.querySelectorAll('script, style, template').forEach(e => e.remove());
+    return { doktrin: txt('doctrineBox'), sichtbar: kopie.textContent || '',
+             roh: (document.body.textContent || '').length };
   });
+  // Gegenprobe zur Gegenprobe: Wenn die Bereinigung nichts abschneidet, ist sie wirkungslos und der
+  // Prüfpunkt darunter wäre wieder eine Tautologie.
+  check('die Sichtbarkeits-Auswertung schneidet den Skript-Quelltext wirklich weg',
+    sicht.sichtbar.length < sicht.roh / 2 && !sicht.sichtbar.includes('VETERAN_ROLE_EXTRA'),
+    { sichtbar: sicht.sichtbar.length, roh: sicht.roh });
   check('Doktrin-Karte nennt die Synergie', /Synergie/.test(sicht.doktrin), sicht.doktrin.slice(0, 160));
   check('Doktrin-Karte weist aus, dass die Werft-Welt fehlt',
     /keine Werft-Welt/.test(sicht.doktrin), sicht.doktrin.slice(0, 200));
 
   // Veteranenkarte: der Rollen-Zusatz muss dastehen (Festungs-Welt mit Höchstrang im Spielstand).
   check('Veteranenkarte nennt die Rollen-Zusatzwirkung',
-    /zählt auf ihre Verteidigung ein zweites Mal/.test(sicht.body), null);
-  check('Hilfe kennt den Aufklärungsvorteil', /Aufklärungsvorteil/.test(src));
-  check('Hilfe kennt die Fundmeldung', /Fundmeldung/.test(src));
+    /zählt auf ihre Verteidigung ein zweites Mal/.test(sicht.sichtbar), null);
+
+  // Die Hilfe-Prüfungen sehen jetzt NUR in HELP_SECTIONS (Fehlerbehebung 01.08.2026). Vorher stand
+  // hier .test(src) über die GANZE Datei - und da beide Wörter in den Quellcode-Kommentaren und in
+  // der unveränderlichen PATCHNOTES-Historie vorkommen, wären die Prüfpunkte auch dann grün
+  // geblieben, wenn kein einziger Hilfe-Abschnitt sie je erwähnt hätte.
+  // Endmarker ist die nächste Deklaration NACH dem Array (helpOpenSections) - TUTORIAL_STEPS steht
+  // in dieser Datei davor, nicht dahinter.
+  const helpVon = src.indexOf('const HELP_SECTIONS');
+  const helpBis = src.indexOf('let helpOpenSections', helpVon);
+  const hilfe = (helpVon > 0 && helpBis > helpVon) ? src.slice(helpVon, helpBis) : '';
+  check('HELP_SECTIONS-Block ausgeschnitten (sonst wären die drei Prüfungen darunter wirkungslos)',
+    hilfe.length > 50000, hilfe.length);
+  check('Hilfe kennt den Aufklärungsvorteil', /Aufklärungsvorteil/.test(hilfe));
+  check('Hilfe kennt die Fundmeldung', /Fundmeldung/.test(hilfe));
+  check('Hilfe nennt die Veteranen-Rollen-Kopplung', /Festungs-Welt/.test(hilfe) && /Werft-Welt/.test(hilfe));
+  check('Hilfe nennt die Doktrin-Synergie', /Synergie/.test(hilfe));
 
   check('keine Skriptfehler', errs.length === 0, errs.slice(0, 3));
   await b.close();

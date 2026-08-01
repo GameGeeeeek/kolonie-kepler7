@@ -298,11 +298,43 @@ check('D: der Kartell-Marktrabatt hängt weiterhin an factionEffectLevel, nicht 
   const i = src.indexOf("const lvl = factionEffectLevel('kartell');");
   return i > 0 && !/factionRankOf/.test(src.slice(i, i + 400));
 })());
-check('D: factionEffectLevel prüft weiterhin nur verbuendet/freundlich', (() => {
-  const i = src.indexOf('function factionEffectLevel');
-  const body = src.slice(i, src.indexOf('\n  }', i));
-  return /verbuendet/.test(body) && /freundlich/.test(body) && !/geachtet|bekannt/.test(body);
+// Dieser Prüfpunkt hieß bis zum 01.08.2026 "factionEffectLevel prüft weiterhin nur
+// verbuendet/freundlich" und suchte nach genau diesen beiden Wörtern im Funktionsrumpf. Die ABSICHT
+// steht im Kommentar darüber und ist richtig: Die Schwellen 30/70 entscheiden, die acht Ränge sind
+// eine reine Anzeige-Verfeinerung und dürfen dazwischen nichts verschieben.
+//
+// Geprüft wurde aber die SCHREIBWEISE statt des Verhaltens - und damit ausgerechnet die Zeile
+// festgeschrieben, die die Absicht verletzte: `tier.key === 'freundlich'` traf für den Rang
+// "Geachtet" (Ruf 50-69) nicht zu, dort fiel jeder Fraktionseffekt auf null, während der Server
+// numerisch weiterrechnete. Der Test hat den Fehler nicht nur übersehen, er hat ihn verteidigt.
+//
+// Jetzt wird das VERHALTEN geprüft: Die Funktion wird mit den echten Rang-Daten ausgeführt und muss
+// für jeden Ruf-Wert dieselbe Antwort geben wie die Serverregel. Eine künftige Rang-Einfügung an
+// irgendeiner Stelle fällt damit sofort auf, statt still eine weitere Lücke aufzureißen.
+// (Die vollständige Fassung über den gesamten Bereich -100..100 steht in test_verstrickungen.js.)
+check('D: factionEffectLevel entscheidet an den Schwellen 30/70, nicht am Rangnamen', (() => {
+  const schnitt = (von, bis) => { const a = src.indexOf(von); if (a < 0) return ''; const b = src.indexOf(bis, a + von.length); return b < 0 ? '' : src.slice(a, b + bis.length); };
+  const quelle =
+    schnitt('const REP_RANKS = [', '\n  ];') + '\n'
+    + schnitt('function repTierOf(rep){', '\n  }') + '\n'
+    + 'const REP_MIN = -100, REP_MAX = 100;\n'
+    + 'function factionRepOf(fid){ return Math.max(REP_MIN, Math.min(REP_MAX, (state.factionRep||{})[fid]||0)); }\n'
+    + 'const REP_ALLY_THRESHOLD = ' + (src.match(/REP_ALLY_THRESHOLD = (\d+)/) || [])[1] + ';\n'
+    + 'const REP_FRIENDLY_THRESHOLD = ' + (src.match(/REP_FRIENDLY_THRESHOLD = (\d+)/) || [])[1] + ';\n'
+    + schnitt('function factionEffectLevel(fid){', '\n  }')
+    + ';ctx.f=factionEffectLevel;';
+  const stufeBei = rep => { const ctx = {}; new Function('ctx', 'state', quelle)(ctx, { factionRep:{ kartell: rep } }); return ctx.f('kartell'); };
+  try {
+    // Stützstellen an JEDER Rang-Grenze plus beide Ränder - keine Grenze darf etwas verschieben.
+    // 50 und 69 sind der Rang "Geachtet", an dem der Fehler saß.
+    for (const [rep, soll] of [[-100,0],[0,0],[29,0],[30,1],[49,1],[50,1],[69,1],[70,2],[100,2]]){
+      if (stufeBei(rep) !== soll) return false;
+    }
+  } catch (e) { return false; }
+  return true;
 })());
+check('D: die Freundlich-Schwelle liegt als eigene Konstante vor und steht auf 30',
+  /const REP_FRIENDLY_THRESHOLD = 30;/.test(src));
 check('D: REP_ALLY_THRESHOLD steht weiterhin auf 70', /const REP_ALLY_THRESHOLD = 70;/.test(src));
 
 console.log('\n' + (fail ? 'FAIL' : 'PASS'));
