@@ -274,7 +274,13 @@ check('die Werftmarken sind in den Patchnotes dokumentiert',
   pn350 > 0 && /Werftmarke/.test(src.slice(pn350, src.indexOf("{ version:'8.349.0'", pn350))));
 
 // ---------------------------------------------------------------- 10. Grafik
-check('Maler liest die Marke selbst aus dem Zustand', /const mk = \(typeof shipMarkOf === 'function'\) \? shipMarkOf\(key\) : 1;/.test(src));
+// Seit dem 01.08.2026 nimmt der Maler eine Uebersteuerung entgegen: Im Profil eines FREMDEN
+// Spielers wurde dessen Flotte sonst mit den Marken des eigenen Kontos gezeichnet. Ohne
+// Uebersteuerung gilt weiterhin die eigene Stufe - genau das prueft die zweite Zeile.
+check('Maler nimmt eine Marken-Uebersteuerung entgegen',
+  /function drawShipMiniIcon\(key, canvas, markOverride\)\{/.test(src));
+check('Maler liest ohne Uebersteuerung die Marke selbst aus dem Zustand',
+  /\(typeof markOverride === 'number'\) \? markOverride[\s\S]{0,120}shipMarkOf\(key\)/.test(src));
 check('Zusatzturm wird gegen den Rumpf geprueft (nichts schwebt daneben)',
   /if \(pointInHull\(cfg\.pts, k\[0\], k\[1\]\)\) turrets\.push\(k\)/.test(src));
 check('Sensormast sitzt auf der echten Oberkante', /hullTopAt\(cfg\.pts, mxU/.test(src));
@@ -308,14 +314,23 @@ for (const k of ['jaeger','schlachtschiff','fusionsdreadnought']){
   for (let ziel = 2; ziel <= fe.SHIP_MARK_MAX; ziel++){
     const d = fe.shipMarkDuration(k, ziel);
     check(k+' Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' dauert laenger als die Stufe davor', d > vorher, d);
-    check(k+' Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' bleibt unter dem 12-Stunden-Deckel',
+    check(k+' Mk '+fe.SHIP_MARK_ROMAN[ziel-1]+' bleibt unter dem Einzelschritt-Deckel',
       d <= fe.SHIP_MARK_TIME_CAP, d);
     vorher = d; summe += d;
   }
-  // Der ganze Weg soll an einem langen Tag zu schaffen sein - sonst ist Mk X keine Senke mehr,
-  // sondern eine Wand.
-  check(k+': Mk I -> Mk X dauert insgesamt unter 24 Stunden', summe < 24*3600,
-    Math.round(summe/3600*10)/10 + ' h');
+  // Zeitfenster des ganzen Weges. Angehoben am 01.08.2026 (Spieler-Rueckmeldung "Verbesserungs-
+  // zeiten zu gering"): vorher galt "unter 24 Stunden", jetzt liegt schon der Jaeger bei rund
+  // 20 Stunden und der Fusionsdreadnought bei gut zwei Tagen.
+  //
+  // Geprueft wird bewusst eine SPANNE, keine Punktzahl: Eine feste Zahl waere bei jedem Balance-
+  // Eingriff rot geworden, ohne dass etwas kaputt ist - genau daran ist dieser Test heute
+  // gescheitert. Die Grenzen sagen, was die Mechanik leisten soll: lange genug, dass Mk X ein
+  // mehrtaegiges Ziel bleibt, kurz genug, dass es keine Mauer wird.
+  const stunden = summe/3600;
+  check(k+': Mk I -> Mk X dauert mindestens 12 Stunden (sonst keine echte Senke)', stunden >= 12,
+    Math.round(stunden*10)/10 + ' h');
+  check(k+': Mk I -> Mk X dauert hoechstens 5 Tage (sonst eine Mauer)', stunden <= 120,
+    Math.round(stunden*10)/10 + ' h');
 }
 check('der Fusionsdreadnought braucht weniger als das Fuenffache eines Jaegers (gedaempft)',
   fe.shipMarkDuration('fusionsdreadnought', 10) < 5 * fe.shipMarkDuration('jaeger', 10),

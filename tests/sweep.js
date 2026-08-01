@@ -62,13 +62,36 @@ function backend(store){ return async r => {
   await page.addInitScript(()=>{ localStorage.setItem('kepler7_token','tok'); });
   await page.goto(FILE); await page.waitForTimeout(2000);
   await page.evaluate(()=>{ ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'].forEach(id=>{const o=document.getElementById(id); if(o)o.style.display='none';}); });
+  // ---- Boot-Fehler sind toedlich und wurden bis zum 01.08.2026 NICHT gemeldet ----------------
+  // Der Tab-Durchlauf unten vergleicht die Fehlerzahl nur VOR und NACH jedem Klick. Ein Fehler
+  // beim LADEN steckt schon vor dem ersten Vergleich in errs und setzt fail deshalb nie - und
+  // weil die Tab-Knoepfe statisches HTML sind, existieren sie auch dann, wenn das Skript gar nicht
+  // initialisiert hat. Ein Klick darauf tut dann nichts, wirft nichts, und JEDER Tab meldet OK.
+  //
+  // Real passiert am 01.08.2026: Eine const wurde 14.000 Zeilen nach ihrer ersten Verwendung
+  // deklariert ("Cannot access before initialization"). Das ganze Spiel startete nicht - der Sweep
+  // meldete SWEEP PASS mit allen Tabs gruen. Genau deshalb steht diese Pruefung VOR dem Durchlauf.
+  const bootFehler = errs.slice();
+  console.log((bootFehler.length?'FAIL':'OK  ')+' - Boot ohne Skriptfehler'
+    + (bootFehler.length?' | '+bootFehler.slice(0,2).join(' ~ '):''));
+  if (bootFehler.length) fail = true;
+
   const tabs = await page.evaluate(()=>Array.from(document.querySelectorAll('.tab-btn')).map(b=>b.getAttribute('data-tab')));
   console.log('Tabs gefunden:', tabs.length, tabs.join(','));
   for (const t of tabs){
     const before = errs.length;
-    await page.evaluate(tt=>{ const b=document.querySelector('.tab-btn[data-tab="'+tt+'"]'); if(b)b.click(); }, t);
+    // Der Rueckgabewert sagt, ob der Klick tatsaechlich den aktiven Tab gesetzt hat. Das ist die
+    // zweite Haelfte der Boot-Absicherung und unabhaengig von der Konsole: Die Tab-Knoepfe stehen
+    // im statischen HTML, ein toter Skriptblock laesst sie also stehen - anklickbar, aber wirkungslos.
+    // Ohne diese Pruefung meldet der Sweep bei einem nicht initialisierten Spiel jeden Tab als OK.
+    const gewechselt = await page.evaluate(tt=>{
+      const b=document.querySelector('.tab-btn[data-tab="'+tt+'"]'); if(b)b.click();
+      const a=document.querySelector('.tab-btn.active');
+      return !!a && a.getAttribute('data-tab')===tt;
+    }, t);
     await page.waitForTimeout(700);
-    const ok = errs.length===before;
+    const ok = errs.length===before && gewechselt;
+    if (!gewechselt) errs.push('Tab "'+t+'" liess sich nicht aktivieren - Skript tot?');
     console.log((ok?'OK  ':'FAIL')+' - Tab '+t+(ok?'':' | '+errs.slice(before).join(' ~ ')));
     if(!ok) fail=true;
   }
