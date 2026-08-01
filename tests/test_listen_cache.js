@@ -146,6 +146,55 @@ async function spiel(browser, zustand){
     await ctx.close();
   }
 
+  // ------------------------------------------------- 6) #fleet, die groesste Box des Spiels
+  // Nachgemessen am 01.08.2026: 157,5 kB Markup, jede Sekunde komplett neu geschrieben - deutlich
+  // mehr als #research (92,5 kB), das den Cache seit v8.310.0 hat. Direkt danach lief
+  // refreshShipMiniIcons() ueber JEDES canvas[data-ship-icon] darin.
+  {
+    const { page, ctx, errs } = await spiel(browser, { fleet:{ jaeger:600, bomber:120, frachter:80, missions:[] } });
+    await reiter(page, 'flotte');
+    const start = await page.evaluate(()=>{const b=document.getElementById('fleet'); return b?b.innerHTML.length:-1;});
+    check('6: #fleet ist gerendert und wirklich gross', start > 20000, start);
+    check('6: #fleet laesst sich markieren', await markiere(page, 'fleet') === true);
+    await page.waitForTimeout(3400);
+    const nach = await page.evaluate(()=>{const b=document.getElementById('fleet');
+      return { da:!!(b && b.firstElementChild && b.firstElementChild.__marke),
+               canvas: b?b.querySelectorAll('canvas[data-ship-icon]').length:-1 };});
+    check('6: #fleet wird ueber mehrere Ticks NICHT neu geschrieben', nach.da === true, nach);
+    // Gegenprobe zur gesparten Canvas-Arbeit: Die Schiffsgrafiken duerfen uebersprungene Ticks
+    // ueberleben - refreshShipMiniIcons() laeuft jetzt nur noch beim echten Neuaufbau.
+    check('6: die Schiffsgrafiken ueberleben uebersprungene Ticks', nach.canvas > 3, nach);
+
+    // Der Kaufknopf muss nach uebersprungenen Ticks weiter wirken. Die Handler dieser Liste werden
+    // zentral ueber document.querySelectorAll gesetzt, nicht im Schreibzweig - deshalb treffen sie
+    // die stehengebliebenen Knoten erneut.
+    // An der BAU-WARTESCHLANGE gemessen, nicht an der Laenge des Meldungs-Logs: Das Log rotiert,
+    // seine Zeichenzahl kann nach einem erfolgreichen Klick gleich bleiben oder sogar sinken. Beim
+    // ersten Durchlauf genau so passiert - der Knopf wirkte, die Sonde meldete trotzdem Rot.
+    const vorher = await page.evaluate(()=>document.querySelectorAll('[data-cancel-construction]').length);
+    await page.evaluate(()=>{const b=document.querySelector('[data-buyship="jaeger"]'); if(b) b.click();});
+    await page.waitForTimeout(1300);
+    const nachKlick = await page.evaluate((v)=>{
+      const b=document.getElementById('fleet');
+      return { auftraege: document.querySelectorAll('[data-cancel-construction]').length,
+               vorher: v,
+               marke: !!(b && b.firstElementChild && b.firstElementChild.__marke) };
+    }, vorher);
+    check('6: der Bauknopf wirkt auch nach uebersprungenen Ticks noch',
+      nachKlick.auftraege > nachKlick.vorher, nachKlick);
+    check('6: und der Bauauftrag hat die Flottenliste neu aufgebaut', nachKlick.marke === false, nachKlick);
+
+    // 7) DIE SKIN-FALLE. activeFleetSkinFilter() wird per JS als canvas.style.filter gesetzt und
+    // taucht im erzeugten Markup NIRGENDS auf. Stuende der Skin nicht im Cache-Schluessel, bliebe
+    // ein Skin-Wechsel bei sonst gleichem Markup wirkungslos - genau die Art stiller Fehler, die
+    // ein Markup-Vergleich sonst gerade verhindert.
+    check('7: der Skin steht im Cache-Schluessel, nicht nur im Markup',
+      /setBoxHtml\(fleetEl, 'fleet\|' \+ activeFleetSkinFilter\(\)/.test(
+        require('fs').readFileSync(SPIELDATEI, 'utf8')));
+    check('keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
   // ------------------------------------------------- 4) laufender Auftrag: Selbstkorrektur
   // Ein bezahlter Bauauftrag auf ein Verteidigungsgebäude erzeugt in der Liste eine Restzeit-Karte.
   // Deren Text ändert sich jede Sekunde - das Markup also auch, und die Box MUSS weiter neu

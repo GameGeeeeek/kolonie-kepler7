@@ -143,6 +143,34 @@ const TABS = ['basis','verteidigung','forschung','flotte','expedition','karte',
     res.ganz === res.alle, res);
   check('sie ist dafür ein Raster, keine Wischleiste', res.anzeige === 'grid' && !res.wischbar, res);
 
+  // ---- 4: Das Hero-Banner auf dem Handy ----------------------------------------------------------
+  // Es war seit dem Grafik-Audit vom 24.07.2026 auf schmalen Bildschirmen komplett ausgeblendet -
+  // und damals zu Recht: Der Kopfbereich begann bei 721px, das Banner allein nahm 190px davon.
+  // Inzwischen liegt der Kopf bei rund 400px, und das Banner ist das EINZIGE Bild der eigenen Welt
+  // im ganzen Spiel; ein Handyspieler bekam es nie zu sehen. Jetzt ein flacher Streifen.
+  const banner = await page.evaluate(() => {
+    const svg = document.querySelector('.hero > svg');
+    if (!svg) return null;
+    const cs = getComputedStyle(svg);
+    const r = svg.getBoundingClientRect();
+    return { anzeige: cs.display, hoehe: Math.round(r.height), breite: Math.round(r.width),
+             zuschnitt: svg.getAttribute('preserveAspectRatio') };
+  });
+  // Der Test laeuft auf 390x844. Das Banner haengt an einer Mindesthoehe (min-height:780px): Auf
+  // einem kurzen Bildschirm bleibt es bewusst aus, weil es dort die Reiterleiste so weit nach unten
+  // schoebe, dass die seitlichen Klappen wieder Reiter verdecken - lieber kein Bild als ein
+  // unerreichbarer Reiter. Genau das hat tests/test_reiterleiste.js beim ersten Anlauf gemeldet.
+  check('das Banner existiert und ist auf einem hohen Handy sichtbar',
+    !!banner && banner.anzeige !== 'none' && banner.hoehe > 20, banner);
+  check('es haengt an einer Mindesthoehe, damit kurze Bildschirme frei bleiben',
+    /@media \(min-height: 780px\)[\s\S]{0,220}body\.compact-head \.hero > svg \{ display:block/.test(src));
+  // Flach BLEIBEN ist die halbe Miete: Die volle Bannerhöhe war der Grund fürs Ausblenden.
+  check('es bleibt ein flacher Streifen, kein volles Banner', banner.hoehe <= 90, banner);
+  check('es nutzt die volle Breite', banner.breite > 250, banner);
+  // Ohne "slice" würde das Bild gestaucht statt beschnitten - der Planet wäre ein Ei.
+  check('der Ausschnitt wird beschnitten, nicht gestaucht',
+    /slice/.test(banner.zuschnitt || ''), banner.zuschnitt);
+
   check('keine Skriptfehler während des Laufs', errs.length === 0, errs.slice(0, 3));
   await b.close();
   console.log(fail ? '\nFAIL' : '\nPASS');
