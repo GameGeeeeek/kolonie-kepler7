@@ -37,7 +37,16 @@ if (von < 0 || bis < von){ console.log('\nFAIL'); process.exit(1); }
 // die ECHTEN Bauzeiten sehen, nicht ausgedachte.
 const shipDefs = [];
 for (const m of src.matchAll(/\{ key:'([a-zA-Z]+)', name:'[^']*'[^\n]*?atk:(\d+)[^\n]*?buildTime:(\d+)/g)){
-  shipDefs.push({ key:m[1], atk:Number(m[2]), buildTime:Number(m[3]) });
+  // Die ganze Definitionszeile mitlesen: shipMarkFamily() braucht ausser atk auch das
+  // tiefenschiff-Kennzeichen und die Geschwindigkeit. Ohne sie landeten am 01.08.2026 alle
+  // Tiefenschiffe und Spaeher faelschlich bei "zivil" - die Attrappe war unvollstaendig, nicht
+  // die Zuordnung. Eine zu magere Attrappe prueft am Ende nur sich selbst.
+  const zeile = (src.slice(m.index).match(/^[^\n]*/) || [''])[0];
+  shipDefs.push({
+    key: m[1], atk: Number(m[2]), buildTime: Number(m[3]),
+    speed: Number((zeile.match(/speed:(\d+)/) || [])[1] || 0),
+    tiefenschiff: /tiefenschiff:true/.test(zeile)
+  });
 }
 check('SHIP_DEFS-Bauzeiten gelesen', shipDefs.length >= 35, shipDefs.length);
 
@@ -47,13 +56,20 @@ for (const m of src.matchAll(/\{ key:'(r[a-z0-9_]+)',[^\n]*?maxLevel:(\d+)/g)) r
 check('RESEARCH_DEFS maxLevel gelesen', Object.keys(researchMax).length >= 20, Object.keys(researchMax).length);
 
 const state = { shipMarks: {}, research: {} };
-const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state',
+// COUNTER_ROLE_OF steht ausserhalb des Markenblocks, wird von shipMarkFamily() aber gebraucht -
+// die drei Kampffamilien leiten sich daraus ab. Es wird aus der ECHTEN Datei gelesen und
+// hineingereicht, nicht nachgebaut: Eine hier getippte Rollenzuordnung waere genau die Zweitkopie,
+// gegen die dieser Test antritt.
+const rollenBlock = src.slice(src.indexOf('const COUNTER_ROLE_OF = {'), src.indexOf('};', src.indexOf('const COUNTER_ROLE_OF = {')) + 2);
+const COUNTER_ROLE_OF = new Function(rollenBlock + '; return COUNTER_ROLE_OF;')();
+const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state', 'COUNTER_ROLE_OF',
   src.slice(von, bis) +
   '; return { SHIP_MARK_MAX, SHIP_MARK_PER_STEP, SHIP_MARK_ROMAN, SHIP_MARK_STEPS, SHIP_MARK_COST_BASE,' +
   ' SHIP_MARK_COST_KEYS, SHIP_MARK_GATES, SHIP_MARK_ITEMS, shipMarkClassFactor, shipMarkCost, shipMarkOf,' +
   ' shipMarkBonus, shipMarkGateOpen, shipMarkRound, shipMarkDuration, shipMarkJob, shipMarkJobRest,' +
-  ' SHIP_MARK_TIME_BASE, SHIP_MARK_TIME_STEP, SHIP_MARK_TIME_CLASS_EXP, SHIP_MARK_TIME_CAP };'
-)(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state);
+  ' SHIP_MARK_TIME_BASE, SHIP_MARK_TIME_STEP, SHIP_MARK_TIME_CLASS_EXP, SHIP_MARK_TIME_CAP,' +
+  ' SHIP_MARK_STEP_TEXTE, shipMarkFamily, shipMarkStep };'
+)(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state, COUNTER_ROLE_OF);
 
 // ---------------------------------------------------------------- 1. Struktur
 check('zehn Marken', fe.SHIP_MARK_MAX === 10);
@@ -66,6 +82,46 @@ check('jede Stufe hat einen eigenen Namen',
 check('jede Stufe hat einen ganzen Satz als Beschreibung',
   fe.SHIP_MARK_STEPS.every(s => typeof s.txt === 'string' && s.txt.length >= 25 && s.txt.trim().endsWith('.')),
   fe.SHIP_MARK_STEPS.filter(s => !(s.txt||'').trim().endsWith('.')).map(s=>s.was));
+
+// ---------------------------------------------------------------- 1b. Stufentexte je Familie
+// Die Texte beschrieben bis zum 01.08.2026 fuer JEDES Schiff dasselbe - "Alle Geschuetzrohre
+// deutlich laenger" stand auch beim Frachter, der kein einziges Geschuetz hat. Der MALER zeichnet
+// weiterhin fuer alle Ruempfe dasselbe (drawShipMiniIcon kennt nur mk); individualisiert ist die
+// BENENNUNG. Deshalb prueft dieser Abschnitt zwei Dinge: dass jede Familie vollstaendig ist, und
+// dass die generische Reihe als Rueckfallebene erhalten bleibt.
+const familien = Object.keys(fe.SHIP_MARK_STEP_TEXTE);
+check('es gibt mehrere Schiffsfamilien mit eigenen Texten', familien.length >= 5, familien);
+for (const f of familien){
+  const e = fe.SHIP_MARK_STEP_TEXTE[f];
+  check(f+': zehn Stufen', e.length === 10, e.length);
+  check(f+': jede Stufe hat einen eigenen Namen', new Set(e.map(x=>x.was)).size === 10);
+  check(f+': jede Stufe hat einen ganzen Satz (Regel 7)',
+    e.every(x => typeof x.txt === 'string' && x.txt.length >= 25 && x.txt.trim().endsWith('.')),
+    e.filter(x => !(x.txt||'').trim().endsWith('.')).map(x=>x.was));
+}
+// Die Texte muessen sich zwischen den Familien WIRKLICH unterscheiden - sonst waere die ganze
+// Tabelle nur eine teure Kopie des generischen Textes.
+for (let stufe = 2; stufe <= 10; stufe++){
+  const texte = familien.map(f => fe.SHIP_MARK_STEP_TEXTE[f][stufe-1].txt);
+  check('Stufe '+stufe+': die Familien sagen nicht alle dasselbe',
+    new Set(texte).size === texte.length, new Set(texte).size + ' von ' + texte.length + ' verschieden');
+}
+// Zuordnung: JEDES Schiff muss in einer Familie landen, und die Kampfrollen in ihrer eigenen.
+const zuordnung = {};
+for (const d of shipDefs) zuordnung[fe.shipMarkFamily(d.key)] = (zuordnung[fe.shipMarkFamily(d.key)]||0) + 1;
+check('jede Familie bekommt mindestens ein Schiff',
+  familien.every(f => (zuordnung[f]||0) > 0), zuordnung);
+for (const [k, r] of Object.entries(COUNTER_ROLE_OF)){
+  if (!fe.SHIP_MARK_STEP_TEXTE[r]) continue;
+  check('Konterrolle entscheidet: '+k+' -> '+r, fe.shipMarkFamily(k) === r, fe.shipMarkFamily(k));
+}
+// Rueckfallebene: shipMarkStep darf NIE einen leeren Text liefern, auch fuer einen unbekannten
+// Schluessel nicht - eine fehlende Familienzeile waere sonst eine leere Karte im Spiel.
+const unbekannt = fe.shipMarkStep('gibtesnichtxyz', 5);
+check('unbekannte Klasse faellt auf den generischen Text zurueck',
+  !!unbekannt.was && !!unbekannt.txt && unbekannt.txt.length >= 25, unbekannt.was);
+check('und die generische Reihe existiert weiterhin als Rueckfallebene',
+  fe.SHIP_MARK_STEPS.length === 10);
 
 // ---------------------------------------------------------------- 2. Boni
 state.shipMarks = {};

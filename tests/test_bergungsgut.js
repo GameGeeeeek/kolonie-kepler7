@@ -210,7 +210,17 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
           composition:{ jaeger:4000, schlachtschiff:400, frachter:200 }, fleetName:'Probe', power:200000 }
       ]}
     }));
-    await page.waitForTimeout(1800);
+    // Auf die BEDINGUNG warten, nicht auf die Uhr (01.08.2026). Hier stand ein festes
+    // waitForTimeout(1800). Isoliert reichte das, im vollen Pruefdurchlauf mit mehreren parallelen
+    // Browsern nicht immer - der Test schlug dort sporadisch fehl, obwohl nichts kaputt war. Ein
+    // Test, der je nach Systemlast rot wird, kostet genau das Vertrauen, das er aufbauen soll.
+    // Die Obergrenze bleibt: Kommt die Gutschrift gar nicht, faellt er weiterhin durch, nur eben
+    // aus dem richtigen Grund.
+    for (let i = 0; i < 40; i++){
+      const zw = (gespeichert(store).abgrund) || {};
+      if ((zw.bergung || 0) > 0 && (zw.splitter || 0) > 0) break;
+      await page.waitForTimeout(200);
+    }
     const a = (gespeichert(store).abgrund)||{};
     check('B2: der Tauchgang schreibt Bergungsgut gut', (a.bergung||0) > 0, { bergung:a.bergung });
     check('B2: und Splitter unabhaengig davon ebenfalls', (a.splitter||0) > 0, { splitter:a.splitter });
