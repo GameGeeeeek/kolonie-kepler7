@@ -312,8 +312,20 @@
       #game-root { max-width: min(1300px, calc(100vw - 470px)); }
     }
 
+    /* overflow:CLIP, nicht hidden (01.08.2026) - und das ist kein Schönheitsfehler gewesen.
+       `hidden` erzeugt einen Scroll-Container. Jedes `position:sticky` DARIN klebt dann an diesem
+       Container statt am Fenster - und weil .shell so hoch ist wie der gesamte Inhalt und selbst
+       mit der Seite scrollt, klebt es effektiv gar nicht. Genau daran ist die klebende Reiterleiste
+       aus dem Grafik-Audit vom 24.07.2026 gescheitert: Die Regel war da, sie hat nie gewirkt, und
+       niemand hat es gemerkt, weil an der Leiste selbst nichts falsch aussah.
+       `clip` beschneidet optisch identisch (Deko-Overlays, waagerechter Überhang der Wischleisten),
+       erzeugt aber KEINEN Scroll-Container. Nachgemessen auf 390x844 über alle zwölf Reiter:
+       mit `hidden` klebte die Leiste auf 1 von 12, mit `clip` auf 12 von 12 - bei unverändert
+       0 von 12 Reitern mit waagerechtem Überlauf.
+       Wer hier wieder `hidden` einträgt, macht die Leiste still kaputt - tests/test_klebeleiste.js
+       schlägt dann an. */
     .shell {
-      position:relative; overflow:hidden; border:var(--bw-1) solid rgba(255,255,255,0.08);
+      position:relative; overflow:clip; border:var(--bw-1) solid rgba(255,255,255,0.08);
       background:
         radial-gradient(ellipse 700px 450px at 12% 8%, rgba(var(--primary-rgb), 0.28), transparent 60%),
         radial-gradient(ellipse 550px 400px at 88% 15%, rgba(212,83,126,0.22), transparent 55%),
@@ -864,6 +876,12 @@
       .tabs::-webkit-scrollbar-track { background: var(--elev-1); }
       .tabs::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); }
       .tab-btn { flex-shrink:0; }
+      /* Weiche Kante statt hartem Abriss (01.08.2026). Die Leiste hält 1455px Inhalt in 348px
+         Sichtfenster - zwei von zwölf Reitern sind ganz sichtbar. Dass es rechts weitergeht, sagte
+         bisher nur der dünne Scrollbalken, und der ist auf iOS als Überlagerungs-Scrollbalken im
+         Ruhezustand unsichtbar. Der auslaufende Verlauf sagt es überall. */
+      .tabs { -webkit-mask-image: linear-gradient(90deg,#000 0,#000 calc(100% - 28px),transparent 100%);
+              mask-image: linear-gradient(90deg,#000 0,#000 calc(100% - 28px),transparent 100%); }
     }
     .tab-btn { background:var(--elev-1); border:var(--bw-1) solid rgba(255,255,255,0.1); color:#c7cbe0; padding:8px 14px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
     /* Navigation nach Domäne farbcodiert (Grafik-Audit 24.07.2026, Entwurf B). Zwölf optisch
@@ -950,8 +968,17 @@
     /* Ressourcen: eine dichte, waagerecht wischbare Zeile statt eines 2-3-zeiligen Kachelrasters.
        Die Karten behalten ihre Struktur und ihren Füllstandsbalken - nur Beschriftung und Polster
        fallen weg, der Wert bleibt gross und lesbar. */
-    body.compact-head .resbar { display:flex; gap:6px; overflow-x:auto; margin-bottom:0.6rem; padding-bottom:4px; scrollbar-width:thin; scrollbar-color:rgba(var(--info-rgb),0.55) transparent; }
-    body.compact-head .rescard { flex:0 0 auto; min-width:104px; padding:6px 9px; gap:7px; }
+    /* Ressourcen: RASTER, nicht Wischleiste (01.08.2026). Der Kompaktmodus hatte das ohnehin
+       vorhandene 3-Spalten-Raster (.resbar weiter unten) zugunsten einer Wischleiste aufgegeben, um
+       Höhe zu sparen. Nachgemessen auf 390x844: Von sechs Ressourcenkarten war dabei genau EINE
+       ganz sichtbar, der Rest lag hinter der Kante - in einem Idle-Spiel ausgerechnet die Zahlen,
+       auf die man am häufigsten schaut. Zurück aufs Raster kostet 39px Höhe (47 -> 86px) und zeigt
+       alle sechs Werte gleichzeitig.
+       Der Preis steht in der zweiten Zeile: Die Rate ("+0/s (Lager voll)") wird bei drei Spalten
+       abgeschnitten. Bewusst so herum - der WERT ist die Zahl, auf die man schaut, die Rate die
+       Ergänzung. min-width:0 ist Pflicht, sonst sprengen die Karten die Rasterspalte. */
+    body.compact-head .resbar { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; margin-bottom:0.6rem; }
+    body.compact-head .rescard { min-width:0; padding:5px 7px; gap:6px; }
     body.compact-head .rescard .icon-badge { width:22px; height:22px; font-size:12px; }
     body.compact-head .rescard .label { display:none; }
     body.compact-head .rescard .value { font-size:14px; }
@@ -962,7 +989,11 @@
     body.compact-head #dailyQuestBar > div > * { flex:0 0 auto; }
     body.compact-head #dailyQuestBar { margin-bottom:0.5rem !important; }
     /* Die Reiter bleiben beim Scrollen oben stehen - der haeufigste Handgriff im Spiel. */
-    body.compact-head .tabs { position:sticky; top:0; z-index:25; background:rgba(10,13,26,0.94); backdrop-filter:blur(6px); padding:6px 0; margin-bottom:0.8rem; }
+    /* Deckender Hintergrund statt 94% + Weichzeichner (01.08.2026): Sobald die Leiste wirklich
+       klebte (siehe .shell oben), lief der Tab-Inhalt sichtbar durch sie hindurch - das las sich wie
+       ein Darstellungsfehler, nicht wie Absicht. Der Weichzeichner allein trägt 6% Transparenz
+       nicht. Der Schlagschatten setzt die Leiste stattdessen sichtbar vor den Inhalt. */
+    body.compact-head .tabs { position:sticky; top:0; z-index:25; background:#0a0d1a; padding:6px 0 8px; margin-bottom:0.8rem; box-shadow:0 6px 14px -6px rgba(0,0,0,0.85); }
     .head-compact-toggle { font-size:10.5px; padding:4px 9px; margin-left:auto; }
     @media (prefers-reduced-motion: reduce) { body.compact-head .tabs { backdrop-filter:none; background:#0a0d1a; } }
     .resbar { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:1.5rem; }
@@ -5590,8 +5621,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.367.0';
+  const VERSION = '8.368.0';
   const PATCHNOTES = [
+    { version:'8.368.0', date:'01.08.2026', changes:[
+      '<strong>Die Reiterleiste bleibt auf dem Handy jetzt wirklich oben stehen.</strong> Sie sollte das seit dem 24.07.2026 – die Regel dafür stand die ganze Zeit in der Datei und hat nie gewirkt. Wer tief in einer Gebäude- oder Forschungsliste stand, musste zum Reiterwechsel den kompletten Weg nach oben zurückscrollen.',
+      'Die Ursache saß an einem ganz anderen Element: <strong>.shell</strong> hatte <strong>overflow:hidden</strong>. Das erzeugt einen Scroll-Container, und ein klebendes Element hängt sich immer an den nächsten Scroll-Container – hier also an eine Box, die selbst mit der Seite scrollt. Effektiv klebte gar nichts. <strong>overflow:clip</strong> beschneidet optisch identisch (Deko-Ebenen, waagerechter Überhang der Wischleisten), erzeugt aber keinen Scroll-Container. Nachgemessen über alle zwölf Reiter: vorher blieb die Leiste auf 1 von 12 stehen, jetzt auf 12 von 12 – bei unverändert 0 von 12 Reitern mit waagerechtem Überlauf.',
+      '<strong>Die Ressourcenleiste zeigt auf dem Handy wieder alle sechs Werte gleichzeitig.</strong> Der Kompaktmodus hatte das ohnehin vorhandene Drei-Spalten-Raster gegen eine Wischleiste getauscht, um Höhe zu sparen. Auf einem 390px-Bildschirm war davon genau <strong>eine</strong> Karte ganz sichtbar – ausgerechnet bei den Zahlen, auf die man in einem Idle-Spiel am häufigsten schaut. Zurück aufs Raster kostet 39 Pixel Höhe. Der Preis steht in der zweiten Zeile: Die Rate („+0/s") wird bei drei Spalten abgeschnitten, der Wert bleibt vollständig.',
+      'Die klebende Leiste war mit 94% Deckkraft hinterlegt – sobald sie tatsächlich klebte, lief der Tab-Inhalt sichtbar durch sie hindurch, was wie ein Darstellungsfehler aussah. Jetzt deckend, mit einem Schlagschatten, der sie vor den Inhalt setzt.',
+      'Die Reiterleiste hält 1.455 Pixel Inhalt in einem 348 Pixel breiten Fenster – zwei von zwölf Reitern sind ganz sichtbar. Dass es rechts weitergeht, sagte bisher nur der dünne Scrollbalken, und der ist auf iOS im Ruhezustand unsichtbar. Die rechte Kante <strong>läuft jetzt weich aus</strong> statt hart abzureißen.',
+      'Abgesichert durch einen neuen Prüflauf, der wirklich scrollt und auf JEDEM Reiter nachsieht, wo die Leiste dann steht. Eine reine Quelltext-Prüfung hätte hier ein Jahr lang grün gemeldet: Die Regel war ja da und buchstabengetreu richtig – kaputt war ihr Zusammenspiel mit einer Regel 650 Zeilen weiter oben.'
+    ] },
     { version:'8.367.0', date:'01.08.2026', changes:[
       '<strong>Ab Level 31 brachte ein Levelaufstieg nichts mehr – und die Levelkarte behauptete das Gegenteil.</strong> Drei Grenzen lagen dicht beieinander, ohne dass sie irgendwo zusammen betrachtet wurden: Der Fähigkeitsbaum kostete zusammen 18 Punkte und war damit auf <strong>Level 18</strong> ausgekauft, die Belohnungsleiter endete auf <strong>Level 20</strong>, der Produktionsbonus ist bei +30% und damit auf <strong>Level 30</strong> gedeckelt. Erfahrung fließt aber unverändert aus jeder Quelle weiter – der Balken füllte sich also bis in alle Ewigkeit und zahlte nichts mehr aus.',
       '<strong>Die Levelkarte im Fortschritt-Tab rechnete den Deckel gar nicht mit</strong> und schrieb auf Level 45 „+45% Gesamtproduktion" hin, wirksam waren +30%. Dieselbe Fehlerart wie beim Prestige-Bonus, der genau dafür vor ein paar Tagen eine eigene Funktion bekommen hat; das Kommandanten-Level hat jetzt ebenfalls eine, und beide Anzeigestellen lesen sie. Sobald der Deckel steht, sagt die Karte das auch.',
