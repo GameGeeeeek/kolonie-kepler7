@@ -89,14 +89,28 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
     // dort, wohin der Inhalt über ihr sie schiebt. Ein Element, das eine Zehntelsekunde später noch
     // einreiht (auf 390x844 z.B. das Banner), verschiebt sie und erzeugt eine Kollision, die es beim
     // Einzellauf nie gab - ein Fehlalarm, der schlimmer ist als kein Test, weil er echte Treffer
-    // unglaubwürdig macht. Jetzt wird gepollt, bis zwei Messungen im Abstand von 250 ms dasselbe
-    // Rechteck liefern.
-    await page.waitForFunction(() => new Promise(fertig => {
-      const rect = () => { const t = document.querySelector('.tabs'); if (!t) return null;
-        const r = t.getBoundingClientRect(); return [r.top, r.left, r.width, r.height].join(','); };
-      const a = rect();
-      setTimeout(() => fertig(!!a && rect() === a), 250);
-    }), null, { timeout: 8000 });
+    // unglaubwürdig macht.
+    //
+    // Die Schleife läuft bewusst HIER in Node und nicht als waitForFunction im Browser. Der erste
+    // Versuch übergab ein Prädikat, das ein Promise liefert - und Playwright ruft ein solches
+    // Prädikat GENAU EINMAL auf und löst auch bei `false` erfolgreich auf. Nachgemessen: ein
+    // Prädikat, das erst beim dritten Aufruf true liefert, wurde 1x aufgerufen und die Wartung
+    // endete nach 133 ms ohne Fehler. Aus der Stabilitätsprüfung wäre also ein fester 250-ms-Schlaf
+    // geworden - ein Test, der aussieht wie eine Wartung und keine ist.
+    const rechteck = () => page.evaluate(() => {
+      const t = document.querySelector('.tabs');
+      if (!t) return null;
+      const r = t.getBoundingClientRect();
+      return [r.top, r.left, r.width, r.height].join(',');
+    });
+    let vorher = null, gleich = 0;
+    for (let i = 0; i < 40 && gleich < 2; i++){
+      const jetzt = await rechteck();
+      gleich = (jetzt && jetzt === vorher) ? gleich + 1 : 0;
+      vorher = jetzt;
+      if (gleich < 2) await page.waitForTimeout(150);
+    }
+    if (gleich < 2) console.log('WARNUNG - die Reiterleiste kam in 6 s nicht zur Ruhe, gemessen wird trotzdem');
     return { ctx, page };
   }
 
