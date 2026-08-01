@@ -31,8 +31,16 @@ function baue(werte){
   const ctx = {};
   const w = werte || {};
   const state = { activeBasePlanet:'home', xp:0, prestige:0 };
+  // PRESTIGE_PROD_PER_LEVEL/-CAP werden seit dem 01.08.2026 gebraucht: Die Prestige-Gruppe liest
+  // ihren Deckel jetzt aus derselben Konstante wie die Produktionsrechnung, statt 0.40 hier ein
+  // zweites Mal hinzuschreiben. Sie werden mit den ECHTEN Werten aus der Spieldatei injiziert, nicht
+  // mit erfundenen - ein hier fest eingetippter Wert waere genau die Zweitkopie, die der Umbau
+  // beseitigt hat.
+  const prestigeStufe = Number((src.match(/PRESTIGE_PROD_PER_LEVEL = ([\d.]+)/) || [])[1]);
+  const prestigeDeckel = Number((src.match(/PRESTIGE_PROD_CAP = ([\d.]+)/) || [])[1]);
   new Function('ctx', 'state', 'PROD_BONUS_CAP', 'productionBonusRaw', 'attackCombatBonusRaw',
     'defenseCombatBonusRaw', 'moduleBonusAt', 'moduleBonusTotal', 'allBuildingSets', 'commanderLevel',
+    'PRESTIGE_PROD_PER_LEVEL', 'PRESTIGE_PROD_CAP',
     block + ';ctx.G=BONUS_GROUPS;'
   )(ctx, state, 1.0,
     () => w.prod || 0,
@@ -41,7 +49,8 @@ function baue(werte){
     (pk, eff) => (w.modAt || {})[eff] || 0,
     (eff) => (w.modTotal || {})[eff] || 0,
     () => [w.buildings || {}],
-    () => w.level || 0);
+    () => w.level || 0,
+    prestigeStufe, prestigeDeckel);
   return { ctx, state };
 }
 
@@ -102,7 +111,16 @@ const echt = [
   ['xpgain',     null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusTotal\('xpgain'\)\)/)||[])[1])],
   ['werftkern',  null, () => parseFloat((src.match(/Math\.min\(([\d.]+), werftkernLvl\*0\.015\)/)||[])[1])],
   ['commander',  null, () => parseFloat((src.match(/Math\.min\(([\d.]+), commanderLevel\(state\.xp\|\|0\)\*0\.01\)/)||[])[1])],
-  ['prestige',   null, () => parseFloat((src.match(/Math\.min\(([\d.]+), \(state\.prestige\|\|0\)\*0\.05\)/)||[])[1])]
+  // Der Prestige-Deckel steht seit dem 01.08.2026 nicht mehr als Literal in der Produktionsrechnung:
+  // Sie ruft prestigeProdBonus() auf, und BEIDE Seiten - Mechanik wie Bilanz - lesen aus
+  // PRESTIGE_PROD_CAP. Der Test folgt dieser Indirektion, statt weiter nach der alten Inline-Form zu
+  // suchen (er wuerde sonst "Verbrauchsstelle nicht gefunden" melden, obwohl der Umbau die
+  // Uebereinstimmung gerade erst BAULICH erzwungen hat). Geprueft wird zusaetzlich, dass die
+  // Produktionsrechnung wirklich ueber die Funktion laeuft - sonst waere die Konstante zwar da,
+  // aber wirkungslos.
+  ['prestige',   null, () => (/const metaMult = \(1 \+ prestigeProdBonus\(\)\)/.test(src)
+                               ? parseFloat((src.match(/PRESTIGE_PROD_CAP = ([\d.]+)/)||[])[1])
+                               : NaN)]
 ];
 const abweichung = [];
 echt.forEach(([key, , holen]) => {
