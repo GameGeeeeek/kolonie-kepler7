@@ -68,7 +68,7 @@ const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state', 'COUNTER_ROLE_OF'
   ' SHIP_MARK_COST_KEYS, SHIP_MARK_GATES, SHIP_MARK_ITEMS, shipMarkClassFactor, shipMarkCost, shipMarkOf,' +
   ' shipMarkBonus, shipMarkGateOpen, shipMarkRound, shipMarkDuration, shipMarkJob, shipMarkJobRest,' +
   ' SHIP_MARK_TIME_BASE, SHIP_MARK_TIME_STEP, SHIP_MARK_TIME_CLASS_EXP, SHIP_MARK_TIME_CAP,' +
-  ' SHIP_MARK_STEP_TEXTE, shipMarkFamily, shipMarkStep };'
+  ' SHIP_MARK_STEP_TEXTE, shipMarkFamily, shipMarkStep, SHIP_MARK_PER_STEP_FAMILIE, shipMarkStepBonus };'
 )(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state, COUNTER_ROLE_OF);
 
 // ---------------------------------------------------------------- 1. Struktur
@@ -181,10 +181,36 @@ state.shipMarks = {};
 check('Mk I gibt keinen Bonus', fe.shipMarkBonus('jaeger','atk') === 0);
 state.shipMarks = { jaeger: 10 };
 const mkXAtk = fe.shipMarkBonus('jaeger','atk');
-check('Mk X gibt +27% Angriff', Math.abs(mkXAtk - 0.27) < 1e-9, mkXAtk);
-check('Mk X gibt +18% Tempo', Math.abs(fe.shipMarkBonus('jaeger','speed') - 0.18) < 1e-9);
-check('Mk X gibt -13,5% Treibstoff', Math.abs(fe.shipMarkBonus('jaeger','fuel') - 0.135) < 1e-9);
-check('Mk X gibt -18% Bauzeit', Math.abs(fe.shipMarkBonus('jaeger','buildTime') - 0.18) < 1e-9);
+// Seit 01.08.2026 haengen die Zuwaechse an der SCHIFFSFAMILIE. Geprueft wird deshalb die
+// Eigenschaft - neun bezahlte Stufen ergeben das Neunfache des Stufenwerts DIESER Familie - und
+// nicht mehr eine feste Prozentzahl, die bei jedem Balance-Pass nachgezogen werden muesste.
+const FAM = fe.SHIP_MARK_PER_STEP_FAMILIE;
+check('die Familientabelle ist ausfuehrbar', !!FAM && Object.keys(FAM).length === 6, FAM && Object.keys(FAM));
+for (const feld of ['atk','shield','speed','fuel','buildTime']){
+  const erwartet = 9 * FAM[fe.shipMarkFamily('jaeger')][feld];
+  check('Mk X gibt beim Jaeger das Neunfache des Stufenwerts ('+feld+')',
+    Math.abs(fe.shipMarkBonus('jaeger',feld) - erwartet) < 1e-9,
+    { ist: fe.shipMarkBonus('jaeger',feld), erwartet });
+}
+// NICHTS DARF GESUNKEN SEIN. Marken werden gekauft; ein nachtraeglich kleinerer Zuwachs waere ein
+// stiller Wertverlust fuer jeden, der schon bezahlt hat. Die alten Werte sind hier bewusst als
+// Zahlen festgehalten - sie sind Geschichte und aendern sich nicht mehr.
+const ALT = { atk:0.03, shield:0.03, speed:0.02, fuel:0.015, buildTime:0.02 };
+const gesunken = [];
+for (const [famKey, fam] of Object.entries(FAM))
+  for (const [feld, altwert] of Object.entries(ALT))
+    if (fam[feld] < altwert - 1e-9) gesunken.push(famKey+'.'+feld+' '+fam[feld]+' < '+altwert);
+check('keine Familie bekommt weniger als vor der Umstellung', gesunken.length === 0, gesunken);
+
+// Und die Familien muessen sich WIRKLICH unterscheiden - sonst waere die Umstellung folgenlos.
+const profile = new Set(Object.values(FAM).map(f => [f.atk,f.shield,f.speed,f.fuel,f.buildTime].join('/')));
+check('die Familien haben unterschiedliche Profile', profile.size >= 5, [...profile]);
+check('ein Spaeher gewinnt mehr Tempo als ein Grosskampfschiff',
+  FAM.spaeher.speed > FAM.kapital.speed, { spaeher: FAM.spaeher.speed, kapital: FAM.kapital.speed });
+check('ein Bomber gewinnt mehr Angriff als ein Zivilschiff',
+  FAM.bomber.atk > FAM.zivil.atk, { bomber: FAM.bomber.atk, zivil: FAM.zivil.atk });
+check('ein Grosskampfschiff gewinnt mehr Schild als ein Abfangjaeger',
+  FAM.kapital.shield > FAM.abfang.shield, { kapital: FAM.kapital.shield, abfang: FAM.abfang.shield });
 // Deckel: ein manipulierter Spielstand darf nicht durch die Rechenstellen laufen.
 state.shipMarks = { jaeger: 9999 };
 check('ueberhoehte Marke wird auf Mk X gedeckelt', fe.shipMarkOf('jaeger') === 10, fe.shipMarkOf('jaeger'));
@@ -298,20 +324,50 @@ if (!bePfad){
   const bBis = beSrc.indexOf('function rawFleetPower', bVon);
   check('Markenblock im Backend gefunden', bVon > 0 && bBis > bVon);
   if (bVon > 0 && bBis > bVon){
-    const be = new Function(beSrc.slice(bVon, bBis) +
-      '; return { SHIP_MARK_MAX, shipMarkLevel, shipMarkAtkMult, shipMarkShieldMult };')();
+    // Das Backend braucht seit 01.08.2026 seine EIGENE Rollentabelle im Sandkasten: Die
+    // Markenzuwaechse haengen dort an COUNTER_ROLE_OF. Sie wird aus der echten Backend-Datei
+    // gelesen, nicht aus der Frontend-Datei uebernommen - sonst pruefte der Test die Spiegelung
+    // gegen sich selbst.
+    const beRollenVon = beSrc.indexOf('const COUNTER_ROLE_OF = {');
+    const beRollen = beSrc.slice(beRollenVon, beSrc.indexOf('};', beRollenVon) + 2);
+    check('Backend hat eine eigene Rollentabelle', beRollenVon > 0);
+    const be = new Function(beRollen + ';' + beSrc.slice(bVon, bBis) +
+      '; return { SHIP_MARK_MAX, shipMarkLevel, shipMarkAtkMult, shipMarkShieldMult, COUNTER_ROLE_OF };')();
     check('Backend deckelt bei derselben Stufe', be.SHIP_MARK_MAX === fe.SHIP_MARK_MAX);
-    let gleich = true, abw = null;
-    for (let mk = 1; mk <= 12; mk++){
-      state.shipMarks = { jaeger: mk };
-      const feMult = 1 + fe.shipMarkBonus('jaeger','atk');
-      const beMult = be.shipMarkAtkMult({ jaeger: mk }, 'jaeger');
-      if (Math.abs(feMult - beMult) > 1e-9){ gleich = false; abw = { mk, feMult, beMult }; }
+
+    // ALLE Klassen vergleichen, nicht nur den Jaeger. Bis 01.08.2026 stand hier genau ein
+    // Schluessel - das genuegte, solange jede Klasse denselben Zuwachs bekam. Mit Zuwaechsen je
+    // Familie prueft ein einzelner Schluessel nur noch eine von sechs Tabellenzeilen; die
+    // Abweichungen (Bomber beim Angriff, Grosskampfschiff beim Schild) laegen genau daneben.
+    const alleKeys = shipDefs.map(d => d.key).concat(['superschlachtschiff']);
+    const abwAtk = [], abwShield = [];
+    for (const key of alleKeys){
+      for (let mk = 1; mk <= 12; mk++){
+        state.shipMarks = { [key]: mk };
+        const feA = 1 + fe.shipMarkBonus(key,'atk');
+        const beA = be.shipMarkAtkMult({ [key]: mk }, key);
+        if (Math.abs(feA - beA) > 1e-9) abwAtk.push({ key, mk, fe:feA, be:beA });
+        const feS = 1 + fe.shipMarkBonus(key,'shield');
+        const beS = be.shipMarkShieldMult({ [key]: mk }, key);
+        if (Math.abs(feS - beS) > 1e-9) abwShield.push({ key, mk, fe:feS, be:beS });
+      }
     }
-    check('Angriffsfaktor stimmt bei Frontend und Backend ueber alle Stufen ueberein', gleich, abw);
-    state.shipMarks = { jaeger: 10 };
-    check('Schildfaktor stimmt ebenfalls ueberein',
-      Math.abs((1 + fe.shipMarkBonus('jaeger','shield')) - be.shipMarkAtkMult({ jaeger:10 }, 'jaeger')) < 1e-9);
+    check('Angriffsfaktor stimmt fuer JEDE Klasse und Stufe zwischen Frontend und Backend',
+      abwAtk.length === 0, abwAtk.slice(0, 4));
+    // Bis 01.08.2026 verglich diese Zeile den SCHILD des Frontends gegen die ANGRIFFS-Funktion des
+    // Backends. Das fiel nie auf, weil beide Felder auf 0,03 standen - mit unterschiedlichen Werten
+    // waere daraus ein stiller Fehlalarm bzw. eine uebersehene Abweichung geworden.
+    check('Schildfaktor stimmt fuer JEDE Klasse und Stufe ueberein',
+      abwShield.length === 0, abwShield.slice(0, 4));
+    check('Gegenprobe: es wurden wirklich viele Klassen geprueft', alleKeys.length >= 20, alleKeys.length);
+    // Und die Abweichungen muessen im Backend WIRKLICH ankommen - sonst waere die Gleichheit oben
+    // nur deshalb erfuellt, weil beide Seiten flach 0,03 rechnen.
+    check('das Backend rechnet dem Bomber mehr Angriff zu als dem Frachter',
+      be.shipMarkAtkMult({ bomber:10 }, 'bomber') > be.shipMarkAtkMult({ frachter:10 }, 'frachter'),
+      { bomber: be.shipMarkAtkMult({ bomber:10 },'bomber'), frachter: be.shipMarkAtkMult({ frachter:10 },'frachter') });
+    check('das Backend rechnet dem Schlachtschiff mehr Schild zu als dem Jaeger',
+      be.shipMarkShieldMult({ schlachtschiff:10 }, 'schlachtschiff') > be.shipMarkShieldMult({ jaeger:10 }, 'jaeger'),
+      { schlacht: be.shipMarkShieldMult({ schlachtschiff:10 },'schlachtschiff'), jaeger: be.shipMarkShieldMult({ jaeger:10 },'jaeger') });
     check('Backend kennt eine Sanity-Grenze fuer shipMarks',
       /maxShipMark/.test(beSrc) && /Werftmarke "/.test(beSrc));
     check('Backend liest shipMarks aus dem Spielstand',
