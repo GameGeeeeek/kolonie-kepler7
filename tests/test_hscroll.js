@@ -3,8 +3,11 @@
 // Hintergrund: .card-row bekommt unter 700px flex-wrap:wrap; zusammen mit dem inline gesetzten
 // flex-direction:column bildet sich die Flex-Zeile nach dem BREITESTEN Kind (dem langen
 // Beschreibungstext), und align-items:stretch zieht die Leiste auf diese Zeilenbreite statt auf
-// die Containerbreite. .shell kappt den Ueberhang per overflow-x:hidden - die Leiste behielt
-// dadurch nur einen Bruchteil ihres Scrollwegs und die hinteren Eintraege waren unerreichbar.
+// die Containerbreite. .shell kappt den Ueberhang - die Leiste behielt dadurch nur einen
+// Bruchteil ihres Scrollwegs und die hinteren Eintraege waren unerreichbar.
+// (Seit 01.08.2026 kappt .shell mit overflow:CLIP statt hidden. Fuer diesen Test aendert das
+//  nichts - clip beschneidet genauso -, es erzeugt nur keinen Scroll-Container mehr, damit die
+//  klebende Reiterleiste funktioniert. Siehe tests/test_klebeleiste.js.)
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
 const path = require('path');
 const FILE = SPIEL_URL;
@@ -101,7 +104,7 @@ async function swipeLeft(page, cdp, box, dist){
       }, name);
       const label = 'Leiste "'+name+'"';
       // 1) Die Leiste selbst darf nicht breiter sein als der Bildschirm - sonst liegt ihr rechter
-      //    Teil hinter der overflow-Kante von .shell und ist gar nicht bedienbar.
+      //    Teil hinter der Beschnittkante von .shell und ist gar nicht bedienbar.
       check(label+': passt in den Bildschirm', info.clientW <= info.win, {leiste:info.clientW, bildschirm:info.win});
       // 2) Der Scrollweg muss den GESAMTEN Inhalt erreichbar machen.
       const need = Math.max(0, info.lastRight - info.clientW);
