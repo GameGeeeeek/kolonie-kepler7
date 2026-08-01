@@ -83,6 +83,20 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
         .forEach(i => { const o = document.getElementById(i); if (o) o.style.display = 'none'; });
     });
     await page.waitForTimeout(900);
+    // Warten, bis die Leiste WIRKLICH steht (01.08.2026). Vorher standen hier nur feste Wartezeiten,
+    // und unter Last - im vollen Prüflauf hinter 99 anderen Tests - maß der Kollisionstest gelegentlich
+    // zu früh: Die Klappen sitzen an einem festen Prozentsatz der Fensterhöhe, die Leiste dagegen
+    // dort, wohin der Inhalt über ihr sie schiebt. Ein Element, das eine Zehntelsekunde später noch
+    // einreiht (auf 390x844 z.B. das Banner), verschiebt sie und erzeugt eine Kollision, die es beim
+    // Einzellauf nie gab - ein Fehlalarm, der schlimmer ist als kein Test, weil er echte Treffer
+    // unglaubwürdig macht. Jetzt wird gepollt, bis zwei Messungen im Abstand von 250 ms dasselbe
+    // Rechteck liefern.
+    await page.waitForFunction(() => new Promise(fertig => {
+      const rect = () => { const t = document.querySelector('.tabs'); if (!t) return null;
+        const r = t.getBoundingClientRect(); return [r.top, r.left, r.width, r.height].join(','); };
+      const a = rect();
+      setTimeout(() => fertig(!!a && rect() === a), 250);
+    }), null, { timeout: 8000 });
     return { ctx, page };
   }
 

@@ -273,14 +273,27 @@ function arrAus(name){
     /planetRoleOf\(planetKey\)/.test(fak) && /'deepport'/.test(fak));
   check('11: er ist ein SUMMAND der vorhandenen Splitter-Gruppe, keine eigene Multiplikation',
     /1 \+ abgrundKanalBonus\('splitter'\) \+ tiefenschiffBonus\(flotte, 'echoschnitter'\) \+ hafen/.test(fak));
-  const SF = new Function('state, abgrundKanalBonus, tiefenschiffBonus, planetRoleOf',
+  // Seit v8.372.0 zahlen zwei weitere Groessen auf dieselbe Summe ein: der Veteranenrang der
+  // Starthafen-Welt und ein Buendnis mit den Void-Marodeuren. Beide werden hier injiziert - so
+  // prueft der Test weiterhin NUR den Tiefenhafen und faellt nicht darauf herein, dass eine der
+  // beiden neuen Quellen den Unterschied macht.
+  const SF = new Function('state, abgrundKanalBonus, tiefenschiffBonus, planetRoleOf, veteranRoleExtra, factionOutsideBonus',
     'const PLANET_ROLE_TIEFENHAFEN = '+(js.match(/const PLANET_ROLE_TIEFENHAFEN = ([\d.]+);/)||[])[1]+';\n'
     + fak + '; return abgrundSplitterFaktor;');
-  const ohne = SF({}, ()=>0, ()=>0, ()=>null)({}, 'home');
-  const mit  = SF({}, ()=>0, ()=>0, ()=>({key:'deepport'}))({}, 'home');
+  const baue = (rolle, vet, voidB) => SF({}, ()=>0, ()=>0, ()=>(rolle?{key:rolle}:null), ()=>vet||0, ()=>voidB||0);
+  const ohne = baue(null, 0, 0)({}, 'home');
+  const mit  = baue('deepport', 0, 0)({}, 'home');
   check('11: mit Hafen faellt mehr ab als ohne', mit > ohne, { ohne, mit });
-  check('11: eine ANDERE Rolle bringt nichts',
-    SF({}, ()=>0, ()=>0, ()=>({key:'mining'}))({}, 'home') === ohne);
+  check('11: eine ANDERE Rolle bringt nichts', baue('mining', 0, 0)({}, 'home') === ohne);
+  // Die beiden neuen Quellen (v8.372.0) muessen ebenfalls SUMMANDEN derselben Gruppe sein - eine
+  // eigene Multiplikation waere genau das aufschaukelnde Muster, vor dem CLAUDE.md warnt.
+  check('11: der Veteranenrang des Starthafens zahlt additiv in dieselbe Gruppe ein',
+    Math.abs(baue('deepport', 0.16, 0)({}, 'home') - (mit + 0.16)) < 1e-9,
+    { mitRang: baue('deepport', 0.16, 0)({}, 'home'), ohneRang: mit });
+  check('11: ein Void-Buendnis ebenso',
+    Math.abs(baue(null, 0, 0.20)({}, 'home') - (ohne + 0.20)) < 1e-9);
+  check('11: und beide zusammen bleiben additiv, nicht multiplikativ',
+    Math.abs(baue('deepport', 0.16, 0.20)({}, 'home') - (mit + 0.36)) < 1e-9);
 }
 
 // ---- 12) Tiefenkartierung: eine Allianz-Technologie fuer den Abgrund ----
