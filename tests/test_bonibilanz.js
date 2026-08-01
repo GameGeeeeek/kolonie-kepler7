@@ -38,9 +38,15 @@ function baue(werte){
   // beseitigt hat.
   const prestigeStufe = Number((src.match(/PRESTIGE_PROD_PER_LEVEL = ([\d.]+)/) || [])[1]);
   const prestigeDeckel = Number((src.match(/PRESTIGE_PROD_CAP = ([\d.]+)/) || [])[1]);
+  // Und seit 01.08.2026 dasselbe fuer das Kommandanten-Level: Die Gruppe schrieb ihren Deckel
+  // vorher als 0.30 hin, obwohl die Produktionsrechnung ihren eigenen Wert hatte - dieselbe
+  // Zweitkopie wie beim Prestige, mit demselben Umbau beseitigt. Auch hier gilt: die ECHTEN Werte
+  // aus der Spieldatei injizieren, sonst prueft der Test gegen eine dritte Kopie.
+  const kmdStufe = Number((src.match(/COMMANDER_PROD_PER_LEVEL = ([\d.]+)/) || [])[1]);
+  const kmdDeckel = Number((src.match(/COMMANDER_PROD_CAP = ([\d.]+)/) || [])[1]);
   new Function('ctx', 'state', 'PROD_BONUS_CAP', 'productionBonusRaw', 'attackCombatBonusRaw',
     'defenseCombatBonusRaw', 'moduleBonusAt', 'moduleBonusTotal', 'allBuildingSets', 'commanderLevel',
-    'PRESTIGE_PROD_PER_LEVEL', 'PRESTIGE_PROD_CAP',
+    'PRESTIGE_PROD_PER_LEVEL', 'PRESTIGE_PROD_CAP', 'COMMANDER_PROD_PER_LEVEL', 'COMMANDER_PROD_CAP',
     block + ';ctx.G=BONUS_GROUPS;'
   )(ctx, state, 1.0,
     () => w.prod || 0,
@@ -50,7 +56,7 @@ function baue(werte){
     (eff) => (w.modTotal || {})[eff] || 0,
     () => [w.buildings || {}],
     () => w.level || 0,
-    prestigeStufe, prestigeDeckel);
+    prestigeStufe, prestigeDeckel, kmdStufe, kmdDeckel);
   return { ctx, state };
 }
 
@@ -110,7 +116,16 @@ const echt = [
   ['trade',      null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusTotal\('trade'\)\)/)||[])[1])],
   ['xpgain',     null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusTotal\('xpgain'\)\)/)||[])[1])],
   ['werftkern',  null, () => parseFloat((src.match(/Math\.min\(([\d.]+), werftkernLvl\*0\.015\)/)||[])[1])],
-  ['commander',  null, () => parseFloat((src.match(/Math\.min\(([\d.]+), commanderLevel\(state\.xp\|\|0\)\*0\.01\)/)||[])[1])],
+  // Dasselbe gilt seit 01.08.2026 fuer den Kommandanten-Deckel, und zwar aus demselben Anlass wie
+  // beim Prestige: Die Levelkarte im Fortschritt-Tab nannte den ungedeckelten Rohwert ("+45%" auf
+  // Level 45, wirksam +30%). Jetzt lesen Mechanik UND Anzeige aus COMMANDER_PROD_CAP. Der Test
+  // folgt der Indirektion und prueft zusaetzlich, dass die Produktionsrechnung wirklich ueber die
+  // Funktion laeuft und die Funktion wirklich deckelt - sonst waere die Konstante da, aber
+  // wirkungslos, und die Uebereinstimmung waere ein Zirkelschluss.
+  ['commander',  null, () => ((/const metaMult = .*\(1 \+ commanderProdBonus\(\)\)/.test(src)
+                               && /return Math\.min\(COMMANDER_PROD_CAP, n \* COMMANDER_PROD_PER_LEVEL\);/.test(src))
+                               ? parseFloat((src.match(/COMMANDER_PROD_CAP = ([\d.]+)/)||[])[1])
+                               : NaN)],
   // Der Prestige-Deckel steht seit dem 01.08.2026 nicht mehr als Literal in der Produktionsrechnung:
   // Sie ruft prestigeProdBonus() auf, und BEIDE Seiten - Mechanik wie Bilanz - lesen aus
   // PRESTIGE_PROD_CAP. Der Test folgt dieser Indirektion, statt weiter nach der alten Inline-Form zu
