@@ -4871,7 +4871,7 @@
       for (let y=y0; y<=y1; y+=0.4) if (pointInHull(pts, px, y)) return y;
       return null;
     }
-    function drawShipMiniIcon(key, canvas){
+    function drawShipMiniIcon(key, canvas, markOverride){
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -4879,10 +4879,13 @@
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0,0,w,h);
       if (!cfg) return;
-      // Werftmarke dieser Klasse (1..10). Die Stufe wird hier gelesen statt als Parameter
-      // durchgereicht - drawShipMiniIcon() wird an drei Stellen aufgerufen (Flottenliste, Werft,
-      // Profil-Modal), und jede haette den Wert sonst selbst besorgen muessen.
-      const mk = (typeof shipMarkOf === 'function') ? shipMarkOf(key) : 1;
+      // Werftmarke dieser Klasse (1..10). Ohne Uebersteuerung wird die EIGENE Stufe gelesen - das
+      // ist fuer Flottenliste und Werft richtig, war es im Profil eines FREMDEN Spielers aber nie:
+      // Dort stand dessen Flotte mit meinen Marken-Plaketten, also mit einer Aufruestung, die ich
+      // an seinem Konto gar nicht sehen kann (01.08.2026). markOverride=1 heisst "keine Marken
+      // anzeigen", weil unbekannt - was man nicht weiss, darf ein Icon nicht behaupten.
+      const mk = (typeof markOverride === 'number') ? markOverride
+        : ((typeof shipMarkOf === 'function') ? shipMarkOf(key) : 1);
       const s = Math.min(w,h)/100;
       const P = (x,y) => [x*s, y*s];
       const stops = activeShipSkinStops() || SHIP_GRAD_STOPS[cfg.grad]; // aktiver Flotten-Anstrich überschreibt die Rumpffarbe (rein kosmetisch)
@@ -5513,8 +5516,18 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.361.0';
+  const VERSION = '8.362.0';
   const PATCHNOTES = [
+    { version:'8.362.0', date:'01.08.2026', changes:[
+      '<strong>Die Kolonisierungs-Vorschau nannte einen zu hohen Treibstoffpreis – und sperrte dadurch den Knopf.</strong> Sie rechnete ohne Treibstoffdepot-Rabatt, ohne die Klassen-Treibstoffmodule und ohne Werftmarken und buchte alles auf Deuterium, während die echte Kolonisierung all das abzieht und auf Deuterium <em>und</em> Antimaterie verteilt. Weil der Knopf an der angezeigten Zahl hängt, war er bei knapper Kasse gesperrt, obwohl die Kolonisierung bezahlbar gewesen wäre. Das ist der einzige Fund dieser Runde, der nicht nur falsch informierte, sondern eine Aktion <em>verwehrte</em>. Planet und Mond waren gleichermaßen betroffen; beide rechnen jetzt mit derselben Funktion, die auch abbucht.',
+      '<strong>Die Flottenparade kannte 15 von 32 Schiffstypen.</strong> Die Liste war von Hand gepflegt und seit langem nicht mitgewachsen: Die gesamte moderne Kampflinie fehlte – Leerenjäger, Nanoklinge, Fusionsdreadnought, Singularitäts-Vernichter, Hyperjäger und Hyperbomber – und ebenso alle Tiefenschiffe. Sie fehlten nicht nur im Bild, sondern auch in „Schiffe gesamt": Wer eine reine Apex-Flotte teilte, zeigte eine <em>leere</em> Parade mit null Schiffen. Die Reihenfolge leitet sich jetzt aus dem echten Schiffsbestand ab, nach Angriffswert sortiert.',
+      '<strong>Das Profil eines fremden Spielers zeichnete dessen Flotte mit den Werftmarken des eigenen Kontos.</strong> Wer seine Jäger auf Mk X gebracht hatte, sah beim Gegner Mk-X-Jäger – eine Aufrüstung, die man an einem fremden Konto gar nicht einsehen kann. Dort stehen die Schiffe jetzt ohne Plakette: Was man nicht weiß, darf ein Icon nicht behaupten.',
+      '<strong>Die Frachtraum-Warnung vor Expeditionen schätzte bis zu 13% zu niedrig.</strong> Ihr fehlte der Kodex-Beutebonus, den die echte Fundauflösung enthält – sie meldete also „passt", wo die Beute in Wirklichkeit nicht mehr in den Laderaum ging. Genau dafür gibt es die Warnung. Die Formel stand zweimal im Code; jetzt einmal.',
+      '<strong>Der Angriffswert des Superschlachtschiffs stand noch an sieben weiteren Stellen einzeln.</strong> Es ist der einzige Schiffstyp ohne Eintrag in der Schiffsliste, weshalb überall dasselbe Ersatzobjekt von Hand nachgebaut wurde – und die Flottenparade hatte dabei als einzige gar kein Symbol bekommen. Icon und Angriffswert stehen jetzt in derselben Funktion wie der Name.',
+      '<strong>Die Boni-Bilanz verschwieg, was tatsächlich einzahlt.</strong> Bei der Verteidigung nannte sie 6 von 16 Quellen – Flaggschiff, Fähigkeitsbaum, Megaprojekte, Veteranen, Veteranenrang, Artefakt und Allianzprojekte fehlten, und weil mehrere davon direkt darüber bei der Angriffskraft standen, las es sich, als wirkten sie <em>nur</em> dort. Bei der Produktion fehlten Allianz-Toprang, Exotenforschung, Artefakt und Schürfschiffe.',
+      '<strong>Der Labor-Deckel wird bei 10 Laboren erreicht, nicht bei 15.</strong> Die Hilfe nannte beide Zahlen – „gedeckelt bei 45% (ab ca. 15 Laboren)" –, aber nur die erste stimmte noch. Die 15 stammten aus der Zeit, als der Deckel bei 65% lag; bei der Absenkung wurde die Mechanik nachgezogen, der Text nicht. Beide Zahlen kommen jetzt aus denselben zwei Konstanten wie die Rechnung.',
+      '<strong>Und das Kryo-Archiv bewahrt sieben Tier-2-Ketten, nicht fünf.</strong> Die Prestige-Hilfe zählte nur bis zu den KI-Kernen auf und ließ Metamaterial und Singularitätskerne weg – während die Beschreibung des Gebäudes selbst alle sieben nennt. Sie liest die Mengen jetzt aus derselben Tabelle, aus der das Archiv sie nimmt.'
+    ] },
     { version:'8.361.0', date:'01.08.2026', changes:[
       '<strong>Die Hilfe zählt jetzt selbst, statt sich auf Zahlen zu verlassen, die jemand einmal von Hand eingetragen hat.</strong> Sie behauptete „Dreizehn Typen" bei inzwischen 21 Standort-Modulen, „19 Techs, 370 Stufen" bei inzwischen 47 Forschungen mit 588 Stufen und „Sieben Klassen" bei acht Schiffsklassen. Das fällt nie auf, weil niemand nachzählt. An diesen Stellen steht jetzt kein Zahlwort mehr, sondern die Länge der jeweiligen Liste – die Angabe kann gar nicht mehr veralten. Dasselbe bei den Fraktions-Aufträgen, wo „sieben Auftragsarten" stand: Es sind acht bis neun, je nach Fraktion, und der Text liest sie jetzt aus den Auftragstöpfen selbst.',
       '<strong>Zwei Fraktionen, die es im Spiel nicht gibt.</strong> Die Hilfe schickte Spieler zum <em>„Void-Zirkel"</em> und zum <em>„Schatten-Syndikat"</em> – beide heißen in Wirklichkeit anders (<strong>Void-Marodeure</strong> und <strong>Schattenbund</strong>). Ein falscher Name ist schlimmer als eine falsche Zahl: Man sucht im Galaxie-Tab nach etwas, das dort nicht steht. Betroffen waren der Auftrags- und der Ladenabschnitt sowie ein Code-Kommentar.',
@@ -12768,13 +12781,13 @@
   // Niemals eine eigene Beitragsliste hier aufbauen - das waere die zweite Stelle, die veraltet.
   const BONUS_GROUPS = [
     { key:'prod', name:'Produktion', icon:'ti-bolt', richtung:'plus', ort:false,
-      quelle:'Allianz-Forschung, Saison-Events, Prestige-Perks, Fähigkeitsbaum, Territorium, Eroberungen, Megaprojekte, Pakte, Aufstieg, Allianzbasis, Weltprojekte',
+      quelle:'Allianz-Forschung, Saison-Events, Prestige-Perks, Fähigkeitsbaum, Allianz-Toprang, Territorium, Eroberungen, Megaprojekte, Exotenforschung, Artefakt, Pakte, Aufstieg, Allianzbasis, Weltprojekte, Schürfschiffe',
       roh:()=>productionBonusRaw(), deckel:()=>PROD_BONUS_CAP },
     { key:'atk', name:'Angriffskraft', icon:'ti-sword', richtung:'plus', ort:true,
       quelle:'Allianz-Forschung, Prestige-Perks, Flaggschiff, Aufstieg, Fähigkeitsbaum, Megaprojekte, Veteranen, Artefakt, Piratennester, Offiziere, Waffenmodule',
       roh:()=>attackCombatBonusRaw(state.activeBasePlanet), deckel:()=>1.0 },
     { key:'def', name:'Verteidigung', icon:'ti-shield', richtung:'plus', ort:true,
-      quelle:'Allianz-Forschung, Prestige-Perks, Aufstieg, Offiziere, Panzerungsmodule, Allianzbasis',
+      quelle:'Allianz-Forschung, Prestige-Perks, Flaggschiff, Aufstieg, Fähigkeitsbaum, Megaprojekte, Veteranen, Veteranenrang, Artefakt, Allianzprojekte, Offiziere, Panzerungsmodule, Allianzbasis',
       roh:()=>defenseCombatBonusRaw(state.activeBasePlanet), deckel:()=>1.0 },
     { key:'buildspeed', name:'Bauzeit (Module)', icon:'ti-building-factory-2', richtung:'minus', ort:true,
       quelle:'Werftmodule an diesem Standort', roh:()=>moduleBonusAt(state.activeBasePlanet,'buildspeed'), deckel:()=>0.5 },
@@ -15805,8 +15818,17 @@
   // Zweig in checkMissions). Bewusst separat gehalten, damit die Warnung ohne echte Auswürfelung
   // abschätzen kann, ob der Frachtraum bei einem Glücksfund knapp würde.
   const EXPEDITION_MAX_RESOURCE_FIND_BASE = 700;
+  // Der Beute-Multiplikator einer Expedition - EINE Stelle fuer Schaetzung und echte Auswuertung.
+  //
+  // Bis zum 01.08.2026 stand diese Formel zweimal im Code: hier fuer die Frachtraum-Warnung und in
+  // der Fundaufloesung. Der Frachtraum-Warnung fehlte dabei codexExpeditionBonus() - sie schaetzte
+  // den groessten moeglichen Fund also bis zu 13% zu NIEDRIG und meldete "passt", wo die Beute in
+  // Wirklichkeit nicht mehr in den Laderaum ging. Genau dafuer gibt es die Warnung.
+  function expeditionRewardMult(rewardMult){
+    return (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + Math.min(1.0, moduleBonusTotal('expedition')) + officerBonus('aufklaerer') + codexExpeditionBonus()) * seasonalLootMult();
+  }
   function expeditionMaxResourceFind(rewardMult){
-    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + Math.min(1.0, moduleBonusTotal('expedition')) + officerBonus('aufklaerer')) * seasonalLootMult());
+    return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * expeditionRewardMult(rewardMult));
   }
   // Frachter als Eskorte (20.07.2026, Spieler-Wunsch): tragen 0 Angriffspunkte bei (wie bei
   // ATTACK_SHIP_KEYS), erweitern aber den Frachtraum für Ressourcenfunde (siehe fleetCargoCapacity()
@@ -16125,9 +16147,15 @@
     });
   }
   function techUnlockedGeneric(requires){ return (requires||[]).every(k => (state.research[k]||0) >= 1); }
+  // Forschungszeit-Verkuerzung durch Labore. Als Konstanten seit 01.08.2026: Der Hilfetext nannte
+  // "gedeckelt bei 45% (ab ca. 15 Laboren erreicht)" - die 45% stimmten, die 15 nicht. Sie stammten
+  // aus der Zeit, als der Deckel noch bei 65% lag (0,65/0,045 = 14,4). Nach der Absenkung auf 45%
+  // ist er schon bei 10 Laboren erreicht, aber nur die Mechanik wurde nachgezogen. Jetzt rechnet
+  // der Hilfetext die Laborzahl aus denselben zwei Konstanten - sie kann nicht mehr auseinanderlaufen.
+  const LAB_TIME_PER_LAB = 0.045, LAB_TIME_CAP = 0.45;
   function researchDuration(r, targetLevel){
     const labs = allBuildingSets().reduce((a,b)=>a+(b.labor||0),0);
-    let labMult = Math.max(0.55, 1 - labs*0.045);
+    let labMult = Math.max(1 - LAB_TIME_CAP, 1 - labs*LAB_TIME_PER_LAB);
     if (state.allianceResearch) labMult *= (1-0.15*allianceTechFrac('a_res'));
     if (state.allianceResearch) labMult *= (1-0.10*allianceTechFrac('ab_forschungszentrum'));
     if (state.allianceResearch) labMult *= (1-0.20*allianceTechFrac('ep_forschung')); // Permanentes Allianzprojekt "Galaktische Forschung"
@@ -22976,7 +23004,7 @@
       // (cmpH/barH), damit man auf einen Blick sieht, wer tiefer war.
       (entry.abgrundBest ? prow('ti-infinity','#a89ef0','Abgrund', `Rekordtiefe ${fmt(entry.abgrundBest)}${cmpH(ensureAbgrund().best||0, entry.abgrundBest)}`, barH(ensureAbgrund().best||0, entry.abgrundBest, '#a89ef0')) : '');
     // Echte Schiffs-Sprites in die Flotten-Chips zeichnen (Canvas, nach dem innerHTML-Setzen).
-    document.getElementById('profileModalStats').querySelectorAll('.pfleet-canvas').forEach(cv => drawShipMiniIcon(cv.getAttribute('data-ship'), cv));
+    document.getElementById('profileModalStats').querySelectorAll('.pfleet-canvas').forEach(cv => drawShipMiniIcon(cv.getAttribute('data-ship'), cv, 1));
     // Bedrohungs-Banner (Idee 1): farbcodiertes Verdikt aus eigener Angriffskraft vs. gegnerischer Verteidigung.
     const threatEl = document.getElementById('profileThreatBanner');
     if (threatEl){
@@ -23790,7 +23818,7 @@
     const parts = Object.entries(fleet).filter(([k,v])=>v>0);
     if (!parts.length) return '';
     return parts.map(([k,v]) => {
-      const iconKey = k==='superschlachtschiff' ? 'ship_superschlachtschiff' : (SHIP_DEFS.find(d=>d.key===k)||{}).icon;
+      const iconKey = (shipDefOrSuper(k)||{}).icon;
       const svg = iconKey && ICONS[iconKey] ? ICONS[iconKey].replace('width="24" height="24"', 'width="14" height="14"') : '';
       // title/Hover funktioniert auf Touch-Geräten (iPad) nicht – data-ship-icon-key ermöglicht einen
       // Tap-Handler, der die Schiffsklasse zusätzlich als Einblendung zeigt (siehe Aufrufstellen).
@@ -24078,7 +24106,7 @@
     if (!el) return;
     const parts = Object.entries(fleet).filter(([k,v])=>v>0);
     el.innerHTML = parts.map(([k,v], idx) => {
-      const iconKey = k==='superschlachtschiff' ? 'ship_superschlachtschiff' : (SHIP_DEFS.find(d=>d.key===k)||{}).icon;
+      const iconKey = (shipDefOrSuper(k)||{}).icon;
       const sz = battleShipIconSize(k);
       const svg = iconKey && ICONS[iconKey] ? ICONS[iconKey].replace('width="24" height="24"', `width="${sz}" height="${sz}"`) : '';
       const remaining = remainingCounts[k] !== undefined ? remainingCounts[k] : v;
@@ -24775,7 +24803,7 @@
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
       { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum, ebenfalls 24 Std. je Stufe: Gefechtsanalyse 6.000 FP, Erfahrene Besatzungen 12.000 FP, Legendäre Kommandeure 20.000 FP - nur eine Ausbildung gleichzeitig; alle FP-Angaben sind Basiswerte, die Imperiums-Skalierung von +25% je weiterem Standort kommt hinzu) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE Forschungszweige ihre jeweilige Maximalstufe erreicht haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
-      { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei 45% (ab ca. 15 Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
+      { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei '+Math.round(LAB_TIME_CAP*100)+'% (ab '+Math.ceil(LAB_TIME_CAP/LAB_TIME_PER_LAB)+' Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
       { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
       { title:'Zwei neue, eigenständige Forschungszweige', body:'<strong>Diplomatie-Protokolle</strong> erhöht die Friedensdividende aus aktiven Nichtangriffspakten zusätzlich zum Grundbonus. <strong>Kolonial-Logistik</strong> erhöht das Kolonie-Limit: Ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere hinzu (bei Maximalstufe 20 also 11 Kolonien). Monde zählen nicht mit. Beide Forschungen sind von Anfang an verfügbar, unabhängig von der übrigen Technologie-Kette.' },
@@ -24842,7 +24870,7 @@
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln. Der Knopf <strong>„Max Kauf"</strong> trägt die größtmögliche Menge nach deinem Kreditstand ins Mengenfeld ein, <strong>„100%"</strong> deinen kompletten Bestand - ausgelöst wird der Handel erst mit einem bewussten zweiten Klick auf Kaufen/Verkaufen. Neben jedem Preis zeigt eine kleine <strong>Verlaufskurve</strong> (Sparkline) die Preisentwicklung der letzten Stunden - so erkennst du auf einen Blick, ob ein Preis gerade steigt oder fällt, und kannst Ein-/Verkäufe besser timen.' },
       { title:'Markt-Ereignisse', body:'Gelegentlich erschüttert ein <strong>Angebots- oder Nachfrageschock</strong> eine einzelne Ressource: Eine <strong>Knappheit</strong> treibt ihre Preise deutlich hoch (teuer im Einkauf, lohnend im Verkauf), eine <strong>Schwemme</strong> drückt sie stark (günstig zum Einkaufen). Das Ereignis wird als Banner oben im Markt-Tab und in der Galaxie-News angekündigt, betrifft immer nur eine Ressource für 2-4 Stunden und lässt die Preise organisch zum Schockniveau driften (kein harter Sprung). Wer aufpasst, macht damit den besten Schnitt.' },
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen (mit 20% Abschlag auf den Durchschnittspreis) und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Wer viel verkauft, drückt den Preis spürbar - bis auf rund 15% des Normalwerts. Preise erholen sich mit der Zeit: durch Käufe erhöhte Preise recht zügig, durch Verkäufe gedrückte Preise dagegen sehr langsam (mehrere Tage statt Stunden bis zur fast vollständigen Erholung). Ein großer Verkauf hat also eine lange spürbare Wirkung auf den Preis, ein großer Kauf nicht.' },
-      { title:'Keine Tier-2-Ressourcen am Markt', body:'Die fünf <strong>Tier-2-Ressourcen</strong> sind bewusst NICHT handelbar (nach kurzem Test wieder entfernt): Sie kommen ausschließlich aus den eigenen Fabriken - ergänzt nur durch die hart gedeckelten Pakt-Geschenke. Der Markt handelt ausschließlich die fünf Basis-Ressourcen.' },
+      { title:'Keine Tier-2-Ressourcen am Markt', body:'Die <strong>Tier-2-Ressourcen</strong> sind bewusst NICHT handelbar (nach kurzem Test wieder entfernt): Sie kommen ausschließlich aus den eigenen Fabriken - ergänzt nur durch die hart gedeckelten Pakt-Geschenke. Der Markt handelt ausschließlich die fünf Basis-Ressourcen.' },
       { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
       { title:'Limit-Orders', body:'Statt selbst auf den richtigen Preis zu warten, kannst du im Markt-Tab <strong>Limit-Orders</strong> anlegen: „Verkaufe X, sobald der Preis ≥ Schwelle steigt" oder „Kaufe X, sobald er ≤ Schwelle fällt". Sobald der Marktpreis die Schwelle erreicht, wird die Order automatisch über den regulären Markthandel ausgeführt (mit der üblichen Slippage und Kartell-/Allianz-Rabatt) und danach entfernt. Orders werden geprüft, <strong>während du online bist</strong> - im Markt-Tab laufend, sonst im Hintergrund alle 30 Sekunden, solange offene Orders bestehen. Reichen Kredite bzw. Bestand im Moment der Ausführung nicht, wartet die Order einfach auf den nächsten Zyklus. Maximal 10 gleichzeitig; jederzeit stornierbar. Kombiniert mit den neuen Markt-Ereignissen (Knappheit/Schwemme) und der Preis-Verlaufskurve lassen sich so Kauf-/Verkaufsstrategien automatisieren.' },
       { title:'Handelsrouten', body:'Binde Frachter (Kleine UND Große) dauerhaft an eine Route für passiven Ertrag. Gebundene Frachter stehen nicht mehr für Kämpfe/Missionen bereit und zählen nicht zur Lagerkapazität. Drei Typen: <strong>Kredit-Route</strong> (max. 15 Frachter je Route, Ertrag wächst mit abnehmendem Grenzertrag statt linear, kostet laufend Erz als Unterhalt; standardmäßig nur EINE gleichzeitig, die Forschung <strong>Frachtlogistik</strong> erhöht das auf bis zu 3), <strong>Markt-Verkaufsroute</strong> (verkauft automatisch eine Ressource am Markt, braucht Server) und <strong>Veredelungsroute</strong> (wandelt einen Rohstoff in einen wertvolleren um, feste Umwandlungskette Energie→Erz→Kristalle→Deuterium→Antimaterie mit Verlust, beliebig viele möglich). Die Forschung <strong>Routenoptimierung</strong> erhöht den Ertrag aller Routentypen zusätzlich. Ein Zyklus pro Minute, dabei besteht ein kleines <strong>Piratenrisiko</strong> (5% Chance auf null Ertrag diesen Zyklus) - "Routenschutz" pro Route senkt das Risiko auf 1%, kostet dafür 10% des Ertrags. Routen jederzeit auflösbar (Frachter werden wieder frei).' },
@@ -24892,7 +24920,7 @@
       { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag, sobald mindestens eine Tier-2-Fabrik existiert „5 Tier-2-Ressourcen produzieren" (gezählt wird die echte Fabrik-Produktion aller Ketten) sowie, ab 15 abgeschlossenen Expeditionen, „1 Peilung ansteuern"). Nach dem Fraktions-Ausbau kommen vier <strong>Fraktions-Aufgaben</strong> dazu: „1 Posten in einem Fraktionsladen kaufen" (sobald mindestens eine Fraktion freundlich ist), „In einem Fraktionskrieg Partei ergreifen" (nur solange wirklich ein Krieg läuft und du noch keine Seite gewählt hast), „1 Fraktionsrang aufsteigen" und „Bei 3 Fraktionen Kontakt halten" – letztere ist die Gegenaufgabe zum Ruf-Verfall: als Kontakt zählt jeder abgeschlossene Auftrag, Tribut, Ladenkauf, jede abgeholte Belohnung und jede Parteinahme. Botschaften zählen dabei bewusst nicht mit, sonst wäre die Aufgabe von selbst fast erledigt. Seit dem Abgrund-Ausbau kommen zwei <strong>Tiefen-Aufgaben</strong> hinzu: „1 Tauchgang in den Abgrund abschließen" und „Eine neue Rekordtiefe erreichen" – beide erscheinen erst, wenn du den Abgrund freigeschaltet hast. Insgesamt sind es damit 22 Vorlagen – jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Warten darüber hinaus noch weitere fällige Belohnungen aus anderen Systemen (abholbare <strong>Fraktionsgeschenke</strong>, erreichte <strong>Dominanz-Stufen</strong>), fasst der Knopf <strong>„Alles einsammeln"</strong> ab zwei fälligen Belohnungen insgesamt alles zusammen und holt es mit einem Klick ab. Offene (noch nicht erledigte) Aufgaben lassen sich außerdem antippen, um direkt zum passenden Menü zu springen. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen <strong>Komplett-Tag-Bonus</strong>, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt: Kredite (40 je Serientag, also bis 400), <strong>Modulfragmente</strong> (1 je zwei Serientage, mindestens 1, also 1 bis 5) und ab Serientag 3 auch <strong>Kommandopunkte</strong> (1 je drei Serientage, also bis 3). Modulfragmente und Kommandopunkte wachsen bewusst <em>nicht</em> mit deiner Wirtschaft mit – anders als die Einzelbelohnungen, die sich an deiner Produktion orientieren. Genau deshalb bleibt der Bonus auch für ein weit entwickeltes Imperium interessant: Fragmente und Kommandopunkte sind dort das Knappe, nicht Erz. Ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): Level = Wurzel aus (XP/50), abgerundet. Jedes erreichte Level gibt automatisch +1% auf alle Produktion sowie einen Fähigkeitspunkt für den Skill-Baum.' },
       { title:'Skill-Baum', body:'Drei Zweige (Wirtschaft, Krieg, weitere), jeweils linear aufeinander aufbauend – Knoten 2 braucht Knoten 1. Bleibt dauerhaft erhalten, auch über einen Prestige-Reset hinweg.' },
-      { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum, <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong> sowie den <strong>kompletten Abgrund-Fortschritt</strong> (Rekordtiefe, Werkstatt, Reliquien, Konstellationen, Splitter und Bergungsgut – der Abgrund ist in sich geschlossen und kann durch den Reset nichts verlieren, was oben noch gebraucht würde; die Forschung <em>Singularitätsphysik</em> musst du allerdings erneut abschließen, um wieder abtauchen zu können). Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Tier-2-Bestände gehen beim Prestige verloren</strong> - es sei denn, du errichtest vorher ein <strong>Kryo-Archiv</strong> (Basis-Tab, ab Hochenergiephysik, max. Stufe 5 je Standort): je Stufe bewahrt es 40 Nanolegierungen / 20 Quantenchips / 15 Hochenergiekristalle / 8 Fusionskerne / 5 KI-Kerne durchs Prestige (Stufen aller Standorte summiert, imperiumsweit bei Stufe 10 gedeckelt). Das Archiv selbst wird wie alle Gebäude zurückgesetzt - eine bewusste Einmal-Investition pro Durchlauf. <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie. Vom Abgrund bleiben beim Aufstieg nur die <strong>Aufzeichnungen</strong> (Rekordtiefe, Reliquien, Konstellationen, Bestiarium, Kartenraum): Sie müssen bleiben, weil die Kompendium-Kategorien einmalig abgeholt werden – eine gelöschte Sammlung ließe sich nie wieder füllen. Splitter, Bergungsgut und die Abgrund-Werkstatt gehen dagegen verloren.' },
+      { title:'Prestige', body:'Ab <strong>5.000 Punkten</strong> verfügbar. Setzt Gebäude, Forschung und Flotte zurück, behält aber Kommandantenname, seltene Items, Freischaltungen, Erfolge, Skill-Baum, <strong>Offiziere, Kommandopunkte und beide Modul-Inventare</strong> sowie den <strong>kompletten Abgrund-Fortschritt</strong> (Rekordtiefe, Werkstatt, Reliquien, Konstellationen, Splitter und Bergungsgut – der Abgrund ist in sich geschlossen und kann durch den Reset nichts verlieren, was oben noch gebraucht würde; die Forschung <em>Singularitätsphysik</em> musst du allerdings erneut abschließen, um wieder abtauchen zu können). Gibt dauerhaft +5% Produktion plus einen frei wählbaren Perk (stapelbar, +3% je Stufe). <strong>Tier-2-Bestände gehen beim Prestige verloren</strong> - es sei denn, du errichtest vorher ein <strong>Kryo-Archiv</strong> (Basis-Tab, ab Hochenergiephysik, max. Stufe 5 je Standort): je Stufe bewahrt es '+Object.entries(KRYOARCHIV_KEEP_PER_LEVEL).map(([k,n])=>n+' '+((TIER2_DEFS.find(d=>d.key===k)||{}).label||k)).join(' / ')+' durchs Prestige (Stufen aller Standorte summiert, imperiumsweit bei Stufe 10 gedeckelt). Das Archiv selbst wird wie alle Gebäude zurückgesetzt - eine bewusste Einmal-Investition pro Durchlauf. <strong>Hinweis (v8.7):</strong> Der Prestige-Produktionsbonus ist bei +40% gedeckelt (ab Stufe 9); darüber hinaus lohnt der Aufstieg mit seinem permanenten Meta-Baum. <strong>Wichtig:</strong> Der (härtere) Aufstieg weiter unten setzt davon abweichend wirklich ALLES zurück, auch Offiziere/Module/Skill-Baum - nur Prestige behält sie. Vom Abgrund bleiben beim Aufstieg nur die <strong>Aufzeichnungen</strong> (Rekordtiefe, Reliquien, Konstellationen, Bestiarium, Kartenraum): Sie müssen bleiben, weil die Kompendium-Kategorien einmalig abgeholt werden – eine gelöschte Sammlung ließe sich nie wieder füllen. Splitter, Bergungsgut und die Abgrund-Werkstatt gehen dagegen verloren.' },
       { title:'Galaktisches Kompendium', body:'Im <strong>Fortschritt-Tab</strong> bündelt das Kompendium deinen Sammel-Fortschritt über die ganze Galaxie in acht Kategorien: <strong>Sternenkarte</strong> (entdeckte Planeten), <strong>Sternensysteme</strong> (bereiste Systeme), <strong>Trophäensaal</strong> (besiegte Sektor-Bosse), <strong>Fraktionsarchiv</strong> (kennengelernte Fraktionen), <strong>Erfolgsregister</strong> (freigeschaltete Erfolge), <strong>Schiffsregister</strong> (Schiffstypen in deinem Besitz), <strong>Modulkabinett</strong> (Standort-Modularten im Inventar oder eingebaut) und <strong>Gebäudearchiv</strong> (Gebäudearten, die irgendwo bei dir stehen). Die letzten drei zählen den aktuellen <em>Besitz</em> – ein verlorenes Schiff oder ein verkauftes Modul lässt die Kategorie also wieder zurückfallen, solange du sie noch nicht eingelöst hast. Jede Kategorie zeigt einen Fortschrittsbalken; sobald du sie <strong>vollständig</strong> erschlossen hast, kannst du einmalig eine Belohnung abholen (Sternenessenz + Kredite). Die Belohnung gibt es pro Kategorie nur ein einziges Mal – der Marker bleibt auch über Prestige und Aufstieg erhalten.' },
       { title:'Boni-Bilanz: was deine Boni wirklich bringen', body:'Boni derselben Art werden nicht miteinander multipliziert, sondern <strong>zusammengezählt</strong> – sonst würden sich viele kleine Boni gegenseitig aufschaukeln. Ein Teil dieser Summen hat eine <strong>Obergrenze</strong>: ist sie erreicht, bringt jeder weitere Bonus derselben Art nichts mehr. Damit du das nicht raten musst, steht es an einer Stelle: der Abschnitt <strong>„Boni-Bilanz"</strong> im Fortschritt-Tab zeigt für jede Bonus-Gruppe, wie viel du gesammelt hast, wie viel davon tatsächlich ankommt, wo die Obergrenze liegt und wie viel Luft noch bleibt. Steht eine Gruppe an ihrer Grenze, sagt die Bilanz auch, wie viele Prozentpunkte gerade wirkungslos verpuffen. Deshalb wiederholen die einzelnen Modul- und Gebäudebeschreibungen die Grenzen nicht mehr – sie stünden sonst an zwanzig Stellen und wären beim nächsten Balance-Pass an neunzehn davon veraltet. Ortsgebundene Gruppen (Module eines Standorts) beziehen sich immer auf deinen gerade ausgewählten Standort; imperiumsweite zählen alle Standorte zusammen. <strong>Zeit-Effekte (Buffs) liegen außerhalb dieser Gruppen</strong> und wirken auch dann noch voll, wenn eine Gruppe längst an ihrer Grenze steht.' },
       { title:'Aktive Effekte (Buffs)', body:'Der Abschnitt <strong>„Aktive Effekte"</strong> im Fortschritt-Tab listet alle gerade laufenden Zeit-Boni mit Restlaufzeit. <strong>Woher sie kommen:</strong> <strong>Zufallsereignisse</strong> (die Pop-ups mit A/B-Entscheidung – die mit Abstand häufigste Quelle, im Schnitt alle paar Minuten; Vorsicht: die Option „Ignorieren" kann auch einen <em>negativen</em> Effekt bringen, z.B. Produktion x0,7), <strong>Sonderfunde auf Expeditionen</strong>, der <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% auf eine Ressource, 20 Min.), die <strong>Kredit-Shop-Booster</strong> (Markt-Tab) sowie die beiden Quantenchip-Verbrauchsgüter <strong>Quantensensoren</strong> (bessere Expeditions-Funde, 30 Min.) und <strong>Werft-Overdrive</strong> (-25% Schiffsbauzeit, 30 Min.). <strong>Booster-Items</strong> (Ressourcenschub, Schildüberladung, Antriebsmatrix) findest du auf Erkundungen und Expeditionen – die stehen erst im <strong>Inventar</strong> und werden zu einem Effekt, wenn du sie dort aktivierst. <strong>Stapeln:</strong> Effekte multiplizieren sich untereinander (zwei Angriffs-Effekte x1,2 und x1,4 ergeben zusammen x1,68) und liegen <em>außerhalb</em> des bei +100% gedeckelten Kampfbonus-Topfes – sie wirken also auch dann noch voll, wenn du diesen Deckel längst erreicht hast. Pro Art ist trotzdem nur eine Quelle gleichzeitig nachkaufbar: ein laufender Shop-Booster derselben Art lässt sich erst nach Ablauf erneut kaufen, ebenso Forschungs-Sprint, Quantensensoren und Werft-Overdrive. <strong>Wichtig fürs Timing – und hier gibt es zwei verschiedene Regeln:</strong> Bei Angriffen auf <strong>NPC-Ziele</strong> (NPC-Flotten, Piratennester, Weltboss, Piratenabfangen, Leerenriss, gegnerische Allianzbasis) wird die Angriffskraft <strong>beim Losschicken eingefroren</strong> – der Angriffs-Effekt muss also laufen, <em>wenn du startest</em>. Bei Angriffen auf <strong>andere Spieler</strong> rechnet der Server dagegen erst bei der Ankunft – dort muss der Effekt laufen, <em>wenn die Flotte eintrifft</em>. <strong>Verteidigungs-Effekte</strong> werden immer erst im Moment des Überfalls ausgewertet, also zählt dort ebenfalls die Ankunft. Reisezeit-Verkürzung, Quantensensoren und Werft-Overdrive gelten nur für Missionen bzw. Bauaufträge, die <em>während</em> des Fensters gestartet werden – dafür behalten die ihren Bonus auch, wenn das Fenster mitten im Flug abläuft.' },
@@ -35727,7 +35755,7 @@
           // Begegnungschance feindlicher Flotten für Expeditionen, die von DIESEM Standort
           // gestartet sind - gedeckelt bei -50%, damit Tiefenraum nie risikofrei wird.
           const encounterChance = (m.encounterChance!==undefined ? m.encounterChance : 0.35) * Math.max(0.5, 1 - moduleBonusAt(planetKey, 'exprisk'));
-          const baseRewardMult = (m.rewardMult!==undefined ? m.rewardMult : 1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + Math.min(1.0, moduleBonusTotal('expedition')) + officerBonus('aufklaerer') + codexExpeditionBonus()) * seasonalLootMult();
+          const baseRewardMult = expeditionRewardMult(m.rewardMult !== undefined ? m.rewardMult : 1);
           const encountered = Math.random() < encounterChance;
           let outcome = 'success';
           // Auf Funktionsebene gehoben (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe"): vorher nur im
@@ -37353,7 +37381,15 @@
     ctx.fillStyle = '#e8e9f0';
     ctx.font = '600 52px '+SHARE_FONT_MONO;
     ctx.fillText('Flotte von '+(state.player.name||'Kommandant').slice(0,16), W/2, 175+oy);
-    const order = ['superschlachtschiff','schlachtschiff','carrier','bomber','destroyers','cruisers','waechter','jaeger','frachtergross','frachter','recycler','spionageschiff','spaeher','forscher','colonyShips','ships'];
+    // Reihenfolge aus dem echten Schiffsbestand ableiten (01.08.2026). Hier stand eine von Hand
+    // gepflegte Liste aus 15 Schluesseln - die 17 seither dazugekommenen Klassen fehlten, darunter
+    // die gesamte moderne Kampflinie (Leerenjaeger, Nanoklinge, Fusionsdreadnought,
+    // Singularitaets-Vernichter, Hyperjaeger/-bomber) und alle Tiefenschiffe. Sie tauchten weder
+    // im Bild auf NOCH in "Schiffe gesamt": Wer eine reine Apex-Flotte teilte, zeigte eine leere
+    // Parade. SHIP_SCORE_WEIGHTS ist die vollstaendige Typenliste des Spiels; sortiert wird nach
+    // Angriffswert, damit die schwersten Schiffe wie bisher zuerst stehen, Zivilschiffe zuletzt.
+    const order = Object.keys(SHIP_SCORE_WEIGHTS)
+      .sort((a,b) => (shipBaseAtk(b) - shipBaseAtk(a)) || ((SHIP_SCORE_WEIGHTS[b]||0) - (SHIP_SCORE_WEIGHTS[a]||0)));
     const totals = {};
     for (const f of allFleets()) for (const k of order) totals[k] = (totals[k]||0) + (f[k]||0);
     const present = order.filter(k => totals[k] > 0);
@@ -37363,7 +37399,7 @@
       const row = present.slice(i, i+perRow);
       let x = (W - row.length*cell)/2 + cell/2;
       for (const k of row){
-        const iconKey = k==='superschlachtschiff' ? 'ship_superschlachtschiff' : (SHIP_DEFS.find(d=>d.key===k)||{}).icon;
+        const iconKey = (shipDefOrSuper(k)||{}).icon;
         try {
           if (iconKey && ICONS[iconKey]){
             const img = await loadSvgAsImage(ICONS[iconKey]);
@@ -37380,6 +37416,8 @@
       }
       y += cell;
     }
+    // ALLE Schiffe zaehlen, nicht nur die abgebildeten: Das Bild zeigt aus Platzgruenden hoechstens
+    // 16 Kacheln, "Schiffe gesamt" ist aber eine Gesamtzahl und darf nicht an der Bildgroesse haengen.
     const fleetTotal = present.reduce((a,k)=>a+totals[k],0);
     drawStatCardsRow(ctx, W, [
       { label:'Schiffe gesamt', value: fmtShare(fleetTotal) },
@@ -38934,8 +38972,14 @@
     render(); save();
   }
   const SCRAP_REFUND_PCT = 0.4; // Anteil der ursprünglichen Kosten, der beim Verschrotten/Abreißen zurückerstattet wird
+  // Das Superschlachtschiff ist der einzige Schiffstyp ohne SHIP_DEFS-Eintrag. icon und atk stehen
+  // seit dem 01.08.2026 hier mit drin: Ohne sie hat sich der Ausdruck
+  // "k==='superschlachtschiff' ? {…icon:'ship_superschlachtschiff'…} : SHIP_DEFS.find(…)"
+  // an SIEBEN Stellen wiederholt, jede mit einem eigenen nachgebauten Objekt - und die
+  // Flottenparade hatte dabei als einzige gar kein Icon bekommen. Ein Aufrufer, der nur den Namen
+  // braucht, stoert sich an den Zusatzfeldern nicht.
   function shipDefOrSuper(key){
-    if (key === 'superschlachtschiff') return { key:'superschlachtschiff', name:'Superschlachtschiff', costFn: superschlachtschiffCost };
+    if (key === 'superschlachtschiff') return { key:'superschlachtschiff', name:'Superschlachtschiff', icon:'ship_superschlachtschiff', atk:shipBaseAtk('superschlachtschiff'), costFn: superschlachtschiffCost };
     return SHIP_DEFS.find(d=>d.key===key);
   }
   function scrapShip(key, qty){
@@ -39973,7 +40017,7 @@
     const fleetName = resolveFleetName();
     const escortPower = attackPower(escortFleet);
     const escortSummary = ESCORT_KEYS.filter(k=>(escortFleet[k]||0)>0).map(k=>{
-      const def = k==='superschlachtschiff' ? {name:'Superschlachtschiff'} : SHIP_DEFS.find(d=>d.key===k);
+      const def = shipDefOrSuper(k);
       return escortFleet[k]+'x '+def.name;
     }).join(', ') || 'keine Eskorte';
     // escortFleet enthält das Forschungsschiff (forscher:1, Hyperraum -> Antimaterie) plus Eskorte -
@@ -42078,7 +42122,7 @@
       const canSendExp = forscherAvailable > 0 && usedExpSlots < maxExpSlots;
       const sendableNow = maxSendableExpeditionsNow();
       const escortRows = ESCORT_KEYS.filter(k => (cf[k]||0) > 0).map(k => {
-        const def = k==='superschlachtschiff' ? { key:'superschlachtschiff', name:'Superschlachtschiff', icon:'ship_superschlachtschiff', atk:shipBaseAtk('superschlachtschiff') } : SHIP_DEFS.find(d=>d.key===k);
+        const def = shipDefOrSuper(k);
         const owned = cf[k]||0;
         const away = expAway[k]||0;
         const available = Math.max(0, owned - away);
@@ -42348,7 +42392,7 @@
           relocateSourcePlanet = others[0].planet;
         }
         const sourceEntry = others.find(o=>o.planet===relocateSourcePlanet);
-        const shipOptions = SHIP_DEFS.concat([{ key:'superschlachtschiff', name:'Superschlachtschiff', icon:'ship_superschlachtschiff' }]);
+        const shipOptions = SHIP_DEFS.concat([shipDefOrSuper('superschlachtschiff')]);
         const availableHere = shipOptions.filter(d => (sourceEntry.fleet[d.key]||0) > 0);
         // Hangar-Hinweis (Spieler-Feedback 17.07.2026): der Hangar ist ortsgebunden (an die dort
         // stationierten Träger/Superschlachtschiffe, siehe hangarCapacity) - verlegte Jäger/Bomber
@@ -42525,9 +42569,16 @@
       const colonized = !!state.colonies[moonKey];
       const cost = moonColonizeCostFor(parentKey);
       const moonDur = missionDurationFor(moonBaseDuration(parentKey), { colonyShips:1 }, ['colonyShips']);
-      const moonFuel = missionFuelCost(moonDur, 1);
+      // missionFuelCostSplit statt missionFuelCost (01.08.2026): Nur die Split-Variante zieht den
+      // Treibstoffdepot-Rabatt, die Klassen-Treibstoffmodule und die Werftmarken ab - und sie
+      // verteilt auf Deuterium/Antimaterie statt alles auf Deuterium zu buchen. Genau sie zahlt
+      // auch die echte Kolonisierung. Die Vorschau nannte deshalb einen ZU HOHEN Betrag, und weil
+      // der Knopf per canAfford() an dieser Zahl haengt, war er bei knapper Kasse gesperrt, obwohl
+      // die Kolonisierung bezahlbar gewesen waere.
+      const moonFuelSplit = missionFuelCostSplit(moonDur, { colonyShips:1 });
       const moonBusy = cf.missions.some(m=>m.type==='colonize-moon' && m.targetId===parentKey);
-      const totalCost = Object.assign({}, cost, { deuterium:(cost.deuterium||0)+moonFuel });
+      const totalCost = Object.assign({}, cost);
+      for (const [fr,fa] of Object.entries(moonFuelSplit)) totalCost[fr] = (totalCost[fr]||0) + fa;
       const canColCost = !colonized && !moonBusy && canAfford(totalCost) && (cf.colonyShips||0) >= 1;
       const missingShip = !colonized && (cf.colonyShips||0) < 1;
       return `
@@ -42537,7 +42588,7 @@
             <div>
               <div class="bname"><i class="ti ti-planet" aria-hidden="true" style="font-size:12px; opacity:0.7;"></i> ${planetDisplayName(moonKey)}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
               <div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Mond: eigenständiges Ziel mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung (unabhängig vom Planeten) - produziert, verteidigt und lagert dafür nur ${Math.round(MOON_PENALTY*100)}% eines normalen Planeten</div>
-              ${!colonized ? `<div class="bcost">Kolonisierung: ${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(moonDur)} Flugzeit · ${miniResIcon('deuterium')} ${moonFuel} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +150 Punkte</div>` : ''}
+              ${!colonized ? `<div class="bcost">Kolonisierung: ${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(moonDur)} Flugzeit · ${fuelCostIconHtml(moonFuelSplit)} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +150 Punkte</div>` : ''}
               ${missingShip ? `<div class="bmeta" style="color:#f0997b;">Benötigt 1 Kolonieschiff (Flotte-Tab)</div>` : ''}
             </div>
           </div>
@@ -42564,9 +42615,10 @@
       const canSend = slotsFree && !busy;
       const colCost = disc ? colonizeCostFor(p.id) : p.colonizeCost;
       const colDur = missionDurationFor(p.duration, { colonyShips:1 }, ['colonyShips'], p.system);
-      const colFuel = missionFuelCost(colDur, 1);
+      const colFuelSplit = missionFuelCostSplit(colDur, { colonyShips:1 });  // siehe Mond oben
       const colonizeBusy = cf.missions.some(m=>m.type==='colonize' && m.targetId===p.id);
-      const colonizeCostTotal = Object.assign({}, colCost, { deuterium:(colCost.deuterium||0)+colFuel });
+      const colonizeCostTotal = Object.assign({}, colCost);
+      for (const [fr,fa] of Object.entries(colFuelSplit)) colonizeCostTotal[fr] = (colonizeCostTotal[fr]||0) + fa;
       const colonyLimitReached = currentColonyCount() + pendingColonyCount() >= maxColoniesAllowed();
       const canColonize = disc && !colonized && !colonizeBusy && !colonyLimitReached && canAfford(colonizeCostTotal) && (cf.colonyShips||0) >= 1;
       const missingShip = disc && !colonized && (cf.colonyShips||0) < 1;
@@ -42583,7 +42635,7 @@
               ${p.orbit ? `<div class="bmeta">${orbitBonusLabel(p.orbit)}</div>` : ''}
               <div class="bcost">${rewardHtml(p.reward)}</div>
               ${bonus ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Verborgener Bonus: ${bonus.labelText}</div>` : ''}
-              ${disc && !colonized ? `<div class="bcost">Kolonisierung: ${costHtml(colCost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(colDur)} Flugzeit · ${miniResIcon('deuterium')} ${colFuel} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +200 Punkte</div>` : ''}
+              ${disc && !colonized ? `<div class="bcost">Kolonisierung: ${costHtml(colCost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(colDur)} Flugzeit · ${fuelCostIconHtml(colFuelSplit)} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +200 Punkte</div>` : ''}
               ${missingShip ? `<div class="bmeta" style="color:#f0997b;">Benötigt 1 Kolonieschiff (Flotte-Tab)</div>` : ''}
               ${(disc && !colonized && colonyLimitReached) ? `<div class="bmeta" style="color:#f0997b;">Kolonie-Limit erreicht (inkl. unterwegs: ${currentColonyCount()+pendingColonyCount()}/${maxColoniesAllowed()}) - Kolonial-Logistik weiter erforschen</div>` : ''}
             </div>
@@ -43179,7 +43231,7 @@
       const attackFleetDf = deployableFighters(attackFleet);
       const attackAway = computeAwayByType(cf);
       const attackRows = ATTACK_SHIP_KEYS.filter(k => (cf[k]||0) > 0).map(k => {
-        const def = k==='superschlachtschiff' ? { key:'superschlachtschiff', name:'Superschlachtschiff', icon:'ship_superschlachtschiff', atk:shipBaseAtk('superschlachtschiff') } : SHIP_DEFS.find(d=>d.key===k);
+        const def = shipDefOrSuper(k);
         const owned = cf[k]||0;
         const away = attackAway[k]||0;
         const available = Math.max(0, owned - away);
@@ -43212,7 +43264,7 @@
       // Zusammenfassungs-Chips: zeigen die aktuelle Auswahl auf einen Blick, ohne durch alle
       // Schiffstypen scrollen zu müssen (häufige Rückmeldung: unklar, welche Flotte losgeschickt wird).
       const summaryChips = ATTACK_SHIP_KEYS.filter(k => (attackFleet[k]||0) > 0).map(k => {
-        const def = k==='superschlachtschiff' ? { name:'Superschlachtschiff', icon:'ship_superschlachtschiff' } : SHIP_DEFS.find(d=>d.key===k);
+        const def = shipDefOrSuper(k);
         return `<div class="chip"><span style="width:14px; height:14px; display:inline-flex;">${ICONS[def.icon]?ICONS[def.icon].replace('width="24" height="24"','width="14" height="14"'):''}</span><span class="chip-n">${attackFleet[k]}</span> ${def.name}</div>`;
       }).join('');
       // QoL "Flotten-Vorlagen": benannte Auswahlen speichern/anwenden/löschen, siehe saveFleetTemplate/
