@@ -91,13 +91,31 @@ check('es gibt weiterhin nur einen Fundaufruf je Tauchgang',
 // ---------------------------------------------------------------- 4. Fehler B: das Schloss
 check('die Standort-Schmelze filtert ueber fundPool', /fundPool\(MODULE_DEFS\)\.map\(def =>/.test(js));
 check('die Schiffs-Schmelze ebenso', /fundPool\(SHIP_MODULE_DEFS\)\.filter\(d=>d\.klasse===klasse\)/.test(js));
-check('die mythische Schmiede ebenso',
+check('die mythische SCHIFFS-Schmiede ebenso',
   (js.match(/fundPool\(SHIP_MODULE_DEFS\)\.filter\(d=>d\.klasse===klasse\)/g) || []).length === 2);
+// Die VIERTE Liste - nachgetragen am 01.08.2026, weil sie hier gefehlt hat.
+//
+// Dieser Test behauptete mit "die mythische Schmiede ebenso" seine Vollstaendigkeit, zaehlte aber
+// zweimal dieselbe SCHIFFS-Konstruktion (Schmiede + Schmelze). Die mythische STANDORT-Schmiede kam
+// darin nie vor - und war als einzige der vier bis zum 01.08.2026 ungesperrt geblieben, in der
+// Liste wie im Handler. Freigeschaltet wird sie durch rsingularitaet, dieselbe Forschung, die den
+// Abgrund oeffnet: Wer nie tauchte, konnte sich alle acht Abgrund-Standortmodule schlicht kaufen.
+// Deshalb steht hier jetzt eine Zaehlung ueber BEIDE MODULE_DEFS-Listen statt eines einzelnen
+// Treffers - ein blosses .test() waere schon vorher gruen gewesen, weil die Schmelze es erfuellt.
+check('die mythische STANDORT-Schmiede filtert ebenfalls ueber fundPool',
+  (js.match(/fundPool\(MODULE_DEFS\)\.map\(def =>/g) || []).length === 2,
+  (js.match(/fundPool\(MODULE_DEFS\)\.map\(def =>/g) || []).length);
+check('keine ungefilterte MODULE_DEFS-Knopfliste mehr',
+  !/\+ MODULE_DEFS\.map\(def => `<button/.test(js));
 // Und die Handler dahinter - eine Liste ohne Knopf ist keine Sperre.
 check('craftModuleFromFragments sperrt Abgrund-Module im HANDLER',
   /if \(\(def\.quelle\|\|HERKUNFT_NORMAL\) === HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht nachbauen/.test(js));
 check('craftMythicShipModule ebenso',
   /if \(\(def\.quelle\|\|HERKUNFT_NORMAL\) === HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht schmieden/.test(js));
+// Beide mythischen Handler muessen die Sperre tragen, nicht nur der fuer Schiffsmodule.
+check('craftMythicLocationModule ebenso',
+  (js.match(/=== HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht schmieden/g) || []).length === 2,
+  (js.match(/=== HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht schmieden/g) || []).length);
 // Der alte, handgeschriebene Filter darf nicht zurueckkommen.
 check('kein handgeschriebener Klassenfilter mehr, der die Herkunft uebersieht',
   !/SHIP_MODULE_DEFS\.filter\(d=>d\.klasse===klasse && !d\.craftOnly\)/.test(js));
@@ -162,9 +180,18 @@ check('die Hilfe nennt alle sechs Module', fehlend.length === 0, fehlend);
 check('sie ist auf zwei Eintraege verteilt (2000-Zeichen-Grenze)',
   /title:'Drucklot und Ballastspiegel/.test(js));
 check('sie sagt, dass sich keins nachbauen laesst', /Keins der sechs lässt sich nachbauen/.test(js));
-const pnAnfang = js.indexOf('const PATCHNOTES = [');
-const pnKopf = js.slice(pnAnfang, pnAnfang + 12000);
-check('die Patchnotes nennen beide Fehler', /nie gefallen/.test(pnKopf) && /Modulfragmenten nachbauen/.test(pnKopf));
+// Der Patchnotes-Eintrag von v8.356.0, in dem beide Fehler dokumentiert sind.
+//
+// Hier stand bis zum 01.08.2026 ein fester Ausschnitt: die ersten 12.000 Zeichen ab dem Array-
+// Anfang. Das Array waechst aber nach OBEN - jede neue Version schiebt v8.356.0 weiter nach hinten,
+// und der Test wurde zwei Versionen spaeter rot, ohne dass sich an der geprueften Sache etwas
+// geaendert hatte. Ein Test, der am Kalender scheitert statt an der Sache, verliert genau dann sein
+// Vertrauen, wenn man es braucht. Jetzt wird der Eintrag namentlich gesucht.
+const pn356 = js.indexOf("{ version:'8.356.0'");
+check('der Patchnotes-Eintrag zu v8.356.0 existiert noch', pn356 > 0);
+const eintrag356 = pn356 > 0 ? js.slice(pn356, js.indexOf("{ version:'8.355.0'", pn356)) : '';
+check('die Patchnotes nennen beide Fehler',
+  /nie gefallen/.test(eintrag356) && /Modulfragmenten nachbauen/.test(eintrag356));
 const version = (js.match(/const VERSION = '([\d.]+)'/) || [])[1];
 const neuester = (js.match(/const PATCHNOTES = \[\s*\{ version:'([\d.]+)'/) || [])[1];
 check('VERSION und neuester Patchnotes-Eintrag stimmen ueberein', version === neuester, { version, neuester });

@@ -118,9 +118,12 @@ check('die Hilfe erklaert das Kartenmenue', /title:'Das Kartenmenü – ein Klic
 // "angreifen" ewig im Planetenmenue.
 check('die Hilfe erklaert, warum Angreifen nicht beim Planeten steht',
   /eigenen roten Marker<\/strong> nahe der Sonne/.test(src));
-const pnAnfang = src.indexOf('const PATCHNOTES = [');
+// Der Eintrag wird namentlich gesucht, nicht in einem festen Ausschnitt ab dem Array-Anfang: Das
+// Patchnotes-Array waechst nach OBEN, ein Byte-Fenster rutscht mit jeder neuen Version am gesuchten
+// Eintrag vorbei und der Test wird rot, ohne dass sich an der Sache etwas geaendert hat. Genau das
+// ist am 01.08.2026 bei test_abgrund_module2.js passiert.
 check('das Kartenmenue steht in den Patchnotes',
-  /Ein Klick auf die Sektorkarte öffnet jetzt ein kleines Menü/.test(src.slice(pnAnfang, pnAnfang + 20000)));
+  /Ein Klick auf die Sektorkarte öffnet jetzt ein kleines Menü/.test(src));
 
 // ---------------------------------------------------------------- 8. Im Browser
 // Der statische Teil oben prueft, dass der Code so AUSSIEHT, wie er soll. Dass das Menue auch
