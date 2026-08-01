@@ -264,9 +264,14 @@ const dateiVersion = (src.match(/const VERSION = '([\d.]+)'/) || [])[1];
 const neuesterEintrag = (src.match(/const PATCHNOTES = \[\s*\{ version:'([\d.]+)'/) || [])[1];
 check('VERSION und neuester Patchnotes-Eintrag stimmen ueberein',
   !!dateiVersion && dateiVersion === neuesterEintrag, { version: dateiVersion, neuester: neuesterEintrag });
-const pnAnfang = src.indexOf('const PATCHNOTES = [');
+// Namentlich statt in einem festen Byte-Fenster ab dem Array-Anfang - siehe die Begruendung in
+// test_abgrund_module2.js: Das Array waechst nach oben, das Fenster rutscht vorbei. Geprueft wird
+// der Einfuehrungs-Eintrag v8.350.0 selbst, nicht "irgendwo steht Werftmarke" (das erfuellt
+// inzwischen jeder spaetere Eintrag, der sie nur erwaehnt).
+const pn350 = src.indexOf("{ version:'8.350.0'");
+check('der Einfuehrungs-Eintrag v8.350.0 existiert noch', pn350 > 0);
 check('die Werftmarken sind in den Patchnotes dokumentiert',
-  /Werftmarke/.test(src.slice(pnAnfang, pnAnfang + 30000)));
+  pn350 > 0 && /Werftmarke/.test(src.slice(pn350, src.indexOf("{ version:'8.349.0'", pn350))));
 
 // ---------------------------------------------------------------- 10. Grafik
 check('Maler liest die Marke selbst aus dem Zustand', /const mk = \(typeof shipMarkOf === 'function'\) \? shipMarkOf\(key\) : 1;/.test(src));
