@@ -868,21 +868,6 @@
     @media (prefers-reduced-motion: reduce) { .ach-pop-badge { animation:none; } .ach-pop-ring { animation:none; display:none; } }
 
     .tabs { display:flex; gap:6px; margin-bottom:1.1rem; flex-wrap:wrap; }
-    /* Auf schmalen Screens würden viele Tabs mehrzeilig umbrechen und oben viel Platz fressen -
-       stattdessen eine Wischleiste (nutzt denselben Scrollbalken-Stil wie [data-hscroll] oben). */
-    @media (max-width: 700px) {
-      .tabs { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin; scrollbar-color: rgba(var(--info-rgb),0.55) transparent; padding-bottom:4px; }
-      .tabs::-webkit-scrollbar { height:6px; }
-      .tabs::-webkit-scrollbar-track { background: var(--elev-1); }
-      .tabs::-webkit-scrollbar-thumb { background: rgba(var(--info-rgb),0.55); }
-      .tab-btn { flex-shrink:0; }
-      /* Weiche Kante statt hartem Abriss (01.08.2026). Die Leiste hält 1455px Inhalt in 348px
-         Sichtfenster - zwei von zwölf Reitern sind ganz sichtbar. Dass es rechts weitergeht, sagte
-         bisher nur der dünne Scrollbalken, und der ist auf iOS als Überlagerungs-Scrollbalken im
-         Ruhezustand unsichtbar. Der auslaufende Verlauf sagt es überall. */
-      .tabs { -webkit-mask-image: linear-gradient(90deg,#000 0,#000 calc(100% - 28px),transparent 100%);
-              mask-image: linear-gradient(90deg,#000 0,#000 calc(100% - 28px),transparent 100%); }
-    }
     .tab-btn { background:var(--elev-1); border:var(--bw-1) solid rgba(255,255,255,0.1); color:#c7cbe0; padding:8px 14px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
     /* Navigation nach Domäne farbcodiert (Grafik-Audit 24.07.2026, Entwurf B). Zwölf optisch
        identische Reiter konkurrierten um dieselbe Aufmerksamkeit - nichts sagte, dass "Basis"
@@ -923,7 +908,60 @@
        (raised), aktiver Tab wirkt hineingedrückt (inset) - verstärkt visuell "hier bist du gerade". */
     .tab-icon-badge { width:26px; height:26px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:#10131f; box-shadow:3px 3px 6px rgba(0,0,0,0.55), -2px -2px 5px rgba(255,255,255,0.07); transition:box-shadow 0.2s ease; }
     .tab-icon-badge i { font-size:15px; }
+    /* Handgezeichnetes Reiter-Icon (01.08.2026). Expedition und Sektorkarte trugen beide
+       ti-map-2 und unterschieden sich NUR in der Farbe - mit Beschriftung ging das durch, für
+       eine Symbolleiste ohne Text wäre es unbrauchbar gewesen. Im 72er-Icon-Subset war kein
+       freies passendes Glyph: ti-map-pin, ti-backpack, ti-ship und ti-target sind alle
+       mehrfach anderweitig belegt, und ein neues ti-* hätte einen Font-Neubau erzwungen.
+       BEWUSST IM STRICH-STIL, nicht im Verlaufs-Stil des ICONS-Objekts: Dieses Icon steht
+       zwischen elf Tabler-Glyphen und muss deren optisches Gewicht treffen - ein gefülltes
+       SVG mit Farbverlauf wäre dort der Fremdkörper gewesen. Daher currentColor, Strichstärke
+       2 auf 24er-Raster und dieselben 15px wie die Schrift-Glyphen daneben. */
+    .tab-icon-badge .tab-svg-icon { width:15px; height:15px; flex-shrink:0; fill:none;
+      stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
     .tab-btn.active .tab-icon-badge { box-shadow:inset 2px 2px 4px rgba(0,0,0,0.6), inset -2px -2px 4px rgba(255,255,255,0.08); }
+    /* ===== Reiter auf dem Handy: RASTER statt Wischleiste (01.08.2026) =====
+       Bis hierher war das eine waagerechte Wischleiste. Nachgemessen auf 390x844: Sie hielt
+       1.455px Inhalt in einem 348px breiten Fenster - genau ZWEI von zwölf Reitern waren ganz
+       sichtbar. Wer zum Markt oder zum Fortschritt wollte, musste blind durch eine Leiste wischen,
+       deren Ende man nicht sieht. Die weiche Auslaufkante von v8.368.0 hat das gemildert, aber
+       nicht behoben.
+       Jetzt sechs Spalten mal zwei Reihen mit Symbol UND Beschriftung: alle zwölf gleichzeitig
+       sichtbar, nichts zu wischen. Vier Anordnungen wurden dafür im laufenden Spiel gemessen:
+         6x2 nur Symbole   99px, alle sichtbar, aber ohne Text
+         6x2 mit Text     118px, alle sichtbar, KEINE Beschriftung abgeschnitten  <- gewählt
+         4x3 mit Text     186px, alle sichtbar, zu teuer (Inhalt erst ab y=524 von 844)
+         4x3 als Zeile    138px, zwei Beschriftungen abgeschnitten
+       Der Preis sind 60px Höhe (58 -> 118px). Die Leiste klebt beim Scrollen (siehe .shell weiter
+       oben), das gilt also auch während des Scrollens - dafür entfällt jedes Zurückscrollen und
+       jedes Wischen. Die 8,5px-Beschriftung ist klein, aber sie schneidet bei keinem der zwölf
+       Namen ab; das war die Bedingung, an der die Vierspalten-Zeilenvariante gescheitert ist.
+       KEINE Maske mehr: Die Auslaufkante von v8.368.0 zeigte an, dass es rechts weitergeht. Im
+       Raster geht es nirgends weiter - sie würde nur noch die rechte Spalte ausblenden.
+       DIESER BLOCK MUSS HINTER DER BASISREGEL .tab-btn STEHEN. Eine @media-Abfrage erhöht die
+       Spezifität NICHT: Stünde er davor, überschriebe die spätere Basisregel font-size, padding
+       und gap wieder, die Knöpfe würden 64px hoch und sechs der zwölf Beschriftungen brächen ab.
+       Genau so gemessen, bevor der Block hierher wanderte. */
+    @media (max-width: 700px) {
+      .tabs { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; flex-wrap:nowrap; overflow-x:visible; }
+      /* Die Trenner zwischen den vier Domänen sind fürs Fluss-Layout gedacht und würden im Raster
+         eigene Zellen belegen. Die Gruppierung trägt hier der farbige Balken, den .tab-btn über
+         data-tab-domain ohnehin hat. */
+      .tabs .tab-group-divider { display:none; }
+      .tab-btn { flex-shrink:1; min-width:0; flex-direction:column; gap:3px;
+                 padding:6px 2px 5px; font-size:8.5px; line-height:1.1; text-align:center;
+                 letter-spacing:-0.01em; }
+      .tab-icon-badge { width:24px; height:24px; }
+      /* Die seitlichen Klappen (.edge-tab) stehen fest auf halber Höhe und liegen mit z-index:50
+         ÜBER der Leiste (z-index:25) - ein Reiter darunter ist schlicht nicht antippbar. Das war
+         schon vor dem Raster so: gemessen verdeckten sie bereits „Basis" und „Forschung". Mit der
+         zweireihigen Leiste wären es vier geworden.
+         Von UNTEN verankert statt prozentual mittig, und das ist der Punkt: `top:64%` räumt die
+         Leiste auf 390x844 frei, auf 360x740 rutscht die Klappe wieder hinein. Der Abstand muss an
+         der Bildschirmunterkante hängen, nicht an einem Prozentwert. Auf beiden Größen nachgemessen:
+         null verdeckte Reiter. */
+      .edge-tab { top:auto; bottom:20%; transform:none; }
+    }
     .tab-badge { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--c-danger); box-shadow:0 0 6px var(--c-danger); animation: badgePulse 1.6s ease-in-out infinite; }
     /* Zwei Sorten Punkt (v8.348.0). Rot heißt „etwas ist PASSIERT" und verschwindet beim Hinsehen -
        so war der Punkt bisher gemeint. Bernstein heißt „etwas ist OFFEN" und bleibt, bis man es tut;
@@ -2713,7 +2751,7 @@
         <button class="tab-btn" data-tab="forschung" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-flask" aria-hidden="true" style="color:#85b7eb;"></i></span>Forschung<span class="tab-badge" data-tab-need="forschung" style="display:none;"></span></button>
         <button class="tab-btn" data-tab="flotte" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-rocket" aria-hidden="true" style="color:#5dcaa5;"></i></span>Flotte<span class="tab-badge" data-tab-need="flotte" style="display:none;"></span></button>
         <div class="tab-group-divider" aria-hidden="true"></div>
-        <button class="tab-btn" data-tab="expedition" data-tab-domain="erkundung" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-map-2" aria-hidden="true" style="color:#f0997b;"></i></span>Expedition<span id="expeditionBadge" class="tab-badge" data-tab-need="expedition" style="display:none;"></span></button>
+        <button class="tab-btn" data-tab="expedition" data-tab-domain="erkundung" style="position:relative;"><span class="tab-icon-badge"><svg class="tab-svg-icon" viewBox="0 0 24 24" aria-hidden="true" style="color:#f0997b;"><circle cx="12" cy="12" r="9"/><path d="M8.6 15.4l2.2-6.4 6.4-2.2-2.2 6.4z"/><path d="M12 3.2v1.4M12 19.4v1.4M3.2 12h1.4M19.4 12h1.4"/></svg></span>Expedition<span id="expeditionBadge" class="tab-badge" data-tab-need="expedition" style="display:none;"></span></button>
         <button class="tab-btn" data-tab="karte" data-tab-domain="erkundung"><span class="tab-icon-badge"><i class="ti ti-map-2" aria-hidden="true" style="color:#af9ce6;"></i></span>Sektorkarte</button>
         <button class="tab-btn" data-tab="galaxie" data-tab-domain="erkundung" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-users" aria-hidden="true" style="color:#ed93b1;"></i></span>Galaxie<span class="tab-badge" data-tab-need="galaxie" style="display:none;"></span></button>
         <div class="tab-group-divider" aria-hidden="true"></div>
@@ -5621,8 +5659,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.368.0';
+  const VERSION = '8.369.0';
   const PATCHNOTES = [
+    { version:'8.369.0', date:'01.08.2026', changes:[
+      '<strong>Alle zwölf Reiter sind auf dem Handy jetzt gleichzeitig sichtbar.</strong> Die Leiste war eine Wischleiste, die 1.455 Pixel Inhalt in einem 348 Pixel breiten Fenster hielt – <strong>zwei von zwölf</strong> Reitern waren ganz zu sehen. Wer zum Markt oder zum Fortschritt wollte, musste blind durch eine Leiste wischen, deren Ende man nicht sieht. Jetzt ein <strong>Raster aus sechs Spalten und zwei Reihen</strong>, jeder Reiter mit Symbol und Beschriftung.',
+      'Vier Anordnungen wurden dafür im laufenden Spiel ausgemessen: Nur Symbole (99px, aber ohne Text), <strong>sechs Spalten mit Text (118px, keine Beschriftung abgeschnitten)</strong>, vier Spalten mit Text (186px – zu teuer, der Tab-Inhalt begänne erst bei 524 von 844 Pixeln) und vier Spalten als Zeile (138px, zwei Beschriftungen abgeschnitten). Gewählt wurde die zweite. Der Preis sind 60 Pixel Höhe; dafür entfällt jedes Wischen, und weil die Leiste seit gestern beim Scrollen oben klebt, auch jedes Zurückscrollen.',
+      '<strong>Die Expedition hat ein eigenes Symbol – einen Kompass.</strong> Sie trug bisher dasselbe <em>ti-map-2</em> wie die Sektorkarte und unterschied sich nur in der Farbe. Mit Beschriftung ging das durch, in einer engen Rasterzelle ist das Symbol aber das Erkennungsmerkmal. Im eingebetteten Icon-Satz war kein freies passendes Zeichen: Rucksack, Kartennadel, Schiff und Zielscheibe sind alle mehrfach anderweitig belegt. Der Kompass ist deshalb von Hand gezeichnet – bewusst im <strong>Strich-Stil</strong> seiner elf Nachbarn und nicht im Verlaufs-Stil der übrigen Spielgrafiken, sonst wäre er in der Leiste der Fremdkörper gewesen.',
+      '<strong>Die seitlichen Klappen „Chat" und „Status" verdecken keine Reiter mehr.</strong> Sie stehen fest auf halber Bildschirmhöhe und liegen über der Reiterleiste – ein Reiter darunter ist schlicht nicht antippbar. Das war schon vorher so: Gemessen verdeckten sie bereits <strong>„Basis" und „Forschung"</strong>, mit der zweireihigen Leiste wären es vier geworden. Die Klappen hängen jetzt an der Bildschirm<em>unterkante</em> statt an einem Prozentwert der Höhe. Der Unterschied ist nicht kosmetisch: Ein Prozentwert räumt die Leiste auf einem großen Gerät frei und schiebt die Klappe auf einem kurzen wieder hinein.',
+      'Die weiche Auslaufkante von gestern ist wieder entfallen – sie zeigte an, dass es rechts weitergeht. Im Raster geht es nirgends weiter; sie würde nur noch die rechte Spalte ausblenden.',
+      'Auf breiten Bildschirmen ändert sich nichts: Dort bleibt es beim bisherigen Fluss-Layout mit voller Schriftgröße und den drei sichtbaren Domänen-Trennern.',
+      'Abgesichert durch einen neuen Prüflauf, der auf <strong>zwei</strong> Bildschirmgrößen misst und drei Dinge festhält, an denen der Umbau unterwegs jeweils gescheitert ist: dass kein Reiter sich sein Symbol mit einem anderen teilt, dass keine Beschriftung abbricht, und dass keine Klappe einen Reiter verdeckt.'
+    ] },
     { version:'8.368.0', date:'01.08.2026', changes:[
       '<strong>Die Reiterleiste bleibt auf dem Handy jetzt wirklich oben stehen.</strong> Sie sollte das seit dem 24.07.2026 – die Regel dafür stand die ganze Zeit in der Datei und hat nie gewirkt. Wer tief in einer Gebäude- oder Forschungsliste stand, musste zum Reiterwechsel den kompletten Weg nach oben zurückscrollen.',
       'Die Ursache saß an einem ganz anderen Element: <strong>.shell</strong> hatte <strong>overflow:hidden</strong>. Das erzeugt einen Scroll-Container, und ein klebendes Element hängt sich immer an den nächsten Scroll-Container – hier also an eine Box, die selbst mit der Seite scrollt. Effektiv klebte gar nichts. <strong>overflow:clip</strong> beschneidet optisch identisch (Deko-Ebenen, waagerechter Überhang der Wischleisten), erzeugt aber keinen Scroll-Container. Nachgemessen über alle zwölf Reiter: vorher blieb die Leiste auf 1 von 12 stehen, jetzt auf 12 von 12 – bei unverändert 0 von 12 Reitern mit waagerechtem Überlauf.',
