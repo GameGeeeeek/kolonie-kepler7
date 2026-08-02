@@ -130,6 +130,47 @@ check('Ewigkeitsforschungen haben eine unerreichbare maxLevel', ewig.every(r => 
   check('4: keine unbenutzte Gruppe', tot.length === 0, tot);
   const ohneGruppe = [...benutzt].filter(g => g !== 'all' && !MILESTONE_GROUPS[g]);
   check('4: jeder Meilenstein zeigt auf eine existierende Gruppe', ohneGruppe.length === 0, ohneGruppe);
+
+  // Umgekehrte Richtung, und die zaehlt am meisten: Seit v8.376.0 steht JEDE Forschung mit
+  // Maximalstufe in mindestens einer Gruppe. Vorher waren es 18 ohne - darunter zwei, die ein
+  // Meilenstein woertlich zu umfassen behauptete. Eine neue Forschung ohne Gruppe faellt sonst
+  // still durchs Raster: Sie erscheint in keinem Meilenstein, und niemand merkt es, weil nichts
+  // bricht. Genau deshalb steht die Pruefung hier und nicht als Kommentar irgendwo.
+  const inGruppe = new Set(Object.values(MILESTONE_GROUPS).flat());
+  const heimatlos = RESEARCH_DEFS.filter(r => !isEndlessResearch(r) && !inGruppe.has(r.key)).map(r => r.key);
+  check('4: jede Forschung mit Maximalstufe steht in einer Gruppe', heimatlos.length === 0, heimatlos);
+  // Und die Ewigkeitsforschungen bleiben bewusst draussen - sie koennen keinen Meilenstein
+  // erfuellen, deshalb waere ihre Aufnahme dasselbe wie der behobene allmax-Fehler.
+  check('4: Gegenprobe: die Ewigkeitsforschungen stehen in KEINER Gruppe',
+    ewig.every(r => !inGruppe.has(r.key)), ewig.filter(r => inGruppe.has(r.key)).map(r => r.key));
+}
+
+// ============================================== 4b) Die Ausbau-Gruppe
+{
+  const a1 = RESEARCH_MILESTONES.find(m => m.key === 'ausbau1');
+  const a2 = RESEARCH_MILESTONES.find(m => m.key === 'ausbau2');
+  check('4b: beide Ausbau-Meilensteine existieren', !!a1 && !!a2);
+  check('4b: sie teilen sich EINE Gruppe mit 0.5/1.0', a1.group === a2.group && a1.ratio === 0.5 && a2.ratio === 1.0,
+    [a1.group, a2.group, a1.ratio, a2.ratio]);
+
+  // Der Grund, warum das hier geht und bei den Werkstoffen nicht: Dort haben sieben von acht
+  // Forschungen maxLevel 1, ein ratio von 0.5 verlangt von ihnen also dasselbe wie 1.0 und die
+  // beiden Stufen waeren fast deckungsgleich. Hier sind drei von vier stufbar - die halbe Stufe
+  // ist eine echte Zwischenstation. Faellt diese Voraussetzung weg, muss die Gruppe geteilt
+  // werden wie bei den Werkstoffen.
+  const stufbar = MILESTONE_GROUPS.ausbau.filter(k => RESEARCH_DEFS.find(r => r.key === k).maxLevel > 1);
+  check('4b: die Mehrheit der Gruppe ist stufbar (sonst waere Stufe I geschenkt)',
+    stufbar.length > MILESTONE_GROUPS.ausbau.length / 2,
+    { stufbar: stufbar.length, gesamt: MILESTONE_GROUPS.ausbau.length });
+
+  // Die Beschreibungen zaehlen auf, statt zu pauschalisieren - jede Forschung der Gruppe muss
+  // beim Namen genannt sein. "Alle Ausbau-Forschungen" waere genau die Formel, die bei wirtschaft
+  // stillschweigend unwahr wurde.
+  for (const k of MILESTONE_GROUPS.ausbau){
+    const name = RESEARCH_DEFS.find(r => r.key === k).name;
+    check('4b: "' + name + '" wird in einer der beiden Beschreibungen genannt',
+      a1.desc.includes(name) || a2.desc.includes(name));
+  }
 }
 
 // ============================================== 5) Die neue Werkstoff-Gruppe
@@ -165,6 +206,47 @@ check('Ewigkeitsforschungen haben eine unerreichbare maxLevel', ewig.every(r => 
     return req.length > 0 && !req.some(q => k2.includes(q.key)) && k !== 'rnanotech';
   });
   check('5: die Gruppe ist eine zusammenhaengende Kette', fremd.length === 0, fremd);
+}
+
+// ============================================== 5b) Was die Singularitaetsphysik wirklich aufsperrt
+//
+// Ihre Beschreibung nannte bis v8.376.0 nur den Singularitaetsreaktor und den Geschuetzturm. Am
+// Code nachgezaehlt haengt daran deutlich mehr - und zwar alles, was das Spiel als "Endspiel"
+// fuehrt. Der Test rechnet die Gates aus der Datei nach, statt der Beschreibung zu glauben: Kommt
+// spaeter ein weiteres hinzu, faellt hier auf, dass die Zahl im Text nicht mehr stimmt.
+{
+  const gates = (src.match(/requires:\[\{key:'rsingularitaet',level:1\}\]/g) || []).length;
+  check('5b: die Singularitaetsphysik ist wirklich ein grosses Tor', gates >= 10, gates);
+
+  const ewigDaran = (src.match(/endless:true, requires:\[\{key:'rsingularitaet',level:1\}\]/g) || []).length;
+  check('5b: alle vier Ewigkeitsforschungen haengen daran', ewigDaran === ewig.length,
+    { daran: ewigDaran, ewig: ewig.length });
+
+  const tiefenschiffe = (src.match(/tiefenschiff:true[^\n]*rsingularitaet/g) || []).length;
+  check('5b: die Tiefenschiffe haengen daran', tiefenschiffe > 0, tiefenschiffe);
+  check('5b: der Abgrund haengt daran', /ABGRUND_REQ_RESEARCH = 'rsingularitaet'/.test(src));
+  check('5b: die Mythische Modulschmiede haengt daran',
+    /function mythicForgeUnlocked\(\)\{ return \(state\.research\.rsingularitaet/.test(src));
+
+  // Und die Beschreibung muss es sagen. Ein Gate, von dem der Spieler erst nach dem Erforschen
+  // erfaehrt, ist bei diesen Kosten (150k Erz, 100k Kristalle, 18k Forschungspunkte) keine
+  // Ueberraschung, sondern eine Fehlinformation.
+  const singZeile = src.split('\n').find(z => z.includes("key:'rsingularitaet'")) || '';
+  const desc = (singZeile.match(/desc:'([^']*)'/) || [])[1] || '';
+  for (const [was, wort] of [['Ewigkeitsforschungen', /Ewigkeitsforschungen/],
+                             ['Abgrund', /Abgrund/],
+                             ['Tiefenschiffe', /Tiefenschiff/],
+                             ['Mythische Modulschmiede', /Mythische Modulschmiede/]]){
+    check('5b: die Beschreibung nennt ' + was, wort.test(desc));
+  }
+  // Streng auf die HEUTIGE Zahl, nicht "Ziffer ODER irgendein Zahlwort": Ein Muster, das jedes
+  // Zahlwort durchgehen laesst, wuerde beim zehnten Tiefenschiff weiterhin "neun" akzeptieren -
+  // also genau den Fall nicht bemerken, fuer den es dasteht.
+  const zahlwoerter = { 7:'sieben', 8:'acht', 9:'neun', 10:'zehn', 11:'elf', 12:'zwölf' };
+  const erwartet = zahlwoerter[tiefenschiffe];
+  check('5b: die Beschreibung nennt die HEUTIGE Zahl der Tiefenschiffe',
+    !!erwartet && new RegExp('(\\b' + tiefenschiffe + '\\b|' + erwartet + ') Tiefenschiff').test(desc),
+    { tiefenschiffe, erwartet });
 }
 
 // ============================================== 6) Icon je Meilenstein (CLAUDE.md Regel 7)
