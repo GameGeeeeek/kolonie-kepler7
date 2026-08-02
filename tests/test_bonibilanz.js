@@ -158,7 +158,14 @@ check('4: ohne jeden Bonus steht alles auf 0', leer.every(g => g.roh() === 0), l
 
 // ---------------------------------------------------------------- 5) Anzeige verdrahtet
 check('5: die Box existiert im Fortschritt-Tab', /id="bonusBalanceBox"/.test(src) && /data-sec="bonibilanz"/.test(src));
-check('5: und wird gerendert', /renderBonusBalance\(\);/.test(src));
+// Die Aussage ist "render() ruft die Funktion auf", nicht "die Zeile sieht genau so aus". Seit
+// v8.379.0 laufen die Fortschritt-Boxen einzeln abgesichert ueber eine Tabelle
+// (FORTSCHRITT_BOXEN), damit der Sturz einer Box nicht alle darunter mitreisst - der nackte
+// Aufruf `renderBonusBalance();` existiert deshalb nicht mehr, die Box wird aber sehr wohl
+// gezeichnet. Ein Test, der die Schreibweise festnagelt statt der Aussage, blockiert genau solche
+// Umbauten; hier zaehlt beides als erfuellt.
+check('5: und wird von render() aufgerufen',
+  /renderBonusBalance\(\);/.test(src) || /\['bonusBalanceBox',\s*renderBonusBalance\]/.test(src));
 check('5: sie nutzt den Signatur-Cache (kein Live-Countdown in der Box)',
   /lastBonusBalanceSig/.test(src) && /if \(sig === lastBonusBalanceSig\) return;/.test(src));
 // Seit v8.315.0 stehen Rohwert und Obergrenze in ZWEI Zeilen statt einer (Layout-Fix, siehe

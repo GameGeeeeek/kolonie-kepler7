@@ -5693,8 +5693,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.378.1';
+  const VERSION = '8.379.0';
   const PATCHNOTES = [
+    { version:'8.379.0', date:'02.08.2026', changes:[
+      '<strong>Zwei Nachzügler aus dem Raid-Fehler von gestern.</strong>',
+      '<strong>Der Fortschritt-Tab hatte dieselbe ungeschützte Kette wie der Allianz-Tab.</strong> Acht Bereiche hintereinander gezeichnet – Ereigniskalender, Kommandantenprofil, Imperiumsübersicht, Bonusbilanz, Kompendium, Dominanz, Titel, Skins –, und mitten drin die Levelanzeige. Wäre einer davon gestürzt, hätte er alles darunter mitgenommen. Dass es hier nie gemeldet wurde, lag nur daran, dass diese Bereiche keinen „lädt…"-Platzhalter tragen: Ein Ausfall hätte leere Flächen hinterlassen statt eines ewigen Ladetextes – genauso großflächig, nur unauffälliger. Jeder Bereich ist jetzt einzeln abgesichert, mit demselben Helfer wie im Allianz-Tab.',
+      '<strong>Fix: Forschungs-Meilensteine wurden bei jedem Prestige erneut ausgezahlt.</strong> Die Marker, welche Meilensteine man schon erreicht hat, standen als einziges Feld ihrer Art nicht in der Liste der Dinge, die einen Reset überleben – Erfolge, Level-Belohnungen, Kompendium, Kodex, Boss-Abschüsse und Login-Meilensteine stehen alle drin. Nach jedem Prestige waren damit sämtliche Meilensteine wieder offen: <strong>86 Sternenessenz und 17.000 Kredite pro Durchlauf</strong>, bei der einzigen Währung, die Prestige und Aufstieg überhaupt überlebt.',
+      'Die Marker bleiben jetzt erhalten – über Prestige <em>und</em> Aufstieg, wie es bei den Login-Meilensteinen schon einmal richtiggestellt wurde. Ein Meilenstein ist damit endgültig das, was sein Name sagt: einmalig. <strong>Bereits eingesammelte Essenz wird nicht angetastet</strong> – wer sie hat, behält sie; nur künftige Durchläufe zahlen nicht noch einmal.'
+    ]},
     { version:'8.378.1', date:'02.08.2026', changes:[
       '<strong>Fix: Der Allianz-Raid zeigte dauerhaft „lädt…" und ließ sich nicht bedienen</strong> (Spieler-Report). Es war kein Ladevorgang, sondern ein Absturz: Die Anzeige griff im letzten Zweig blind auf die Verbandsdaten zu, die es in diesem Moment gar nicht geben muss. Der Server setzt sie beim Ausrufen jeder neuen Welle ausdrücklich zurück und füllt sie erst beim Abflug wieder – ein völlig regulärer Zustand. Jede Berechnung im Spiel berücksichtigte das längst, nur die Anzeige nicht.',
       'Weil der Fehler noch vor dem ersten Zeichnen auftrat, blieb der Kasten für immer auf seinem Anfangstext stehen. Ein ewiger Ladetext ist die irreführendste aller Fehlermeldungen – er sieht aus wie ein langsamer Server. Zusätzlich fängt derselbe Zweig jeden unerwarteten Zustand mit ab; auch dafür gibt es jetzt eine echte Anzeige statt eines Absturzes.',
@@ -22538,6 +22544,23 @@
     const keepId = state.player.id, keepName = state.player.name, keepTag = state.player.allianceTag, keepAvatar = state.player.avatarKey;
     const newPrestige = (state.prestige||0) + 1;
     const keepXp = state.xp, keepAch = state.achievements, keepRare = state.rareItems, keepUnlocked = state.unlocked, keepClaimed = state.levelRewardsClaimed, keepInventory = state.inventory, keepAllianceRes = state.allianceResearch, keepAllianceContrib = state.allianceContributed;
+    // researchMilestones bleibt erhalten (v8.379.0, Fehlerbehebung).
+    //
+    // Es war das EINZIGE Feld der "einmal verdient"-Familie, das in dieser Liste fehlte: achievements,
+    // levelRewardsClaimed, compendiumClaimed, codexClaimed, claimedBossKills, claimedStreakMilestones -
+    // alle stehen hier, nur die Forschungs-Meilensteine nicht. applyStateDefaults() legte sie danach
+    // als {} neu an, und damit waren saemtliche Meilensteine nach jedem Prestige erneut verdienbar:
+    // 86 Sternenessenz und 17.000 Kredite je Durchlauf. Sternenessenz ueberlebt Prestige UND Aufstieg,
+    // ist also die einzige dauerhafte Waehrung des Spiels - eine wiederholbare Quelle dafuer war
+    // nicht die Absicht, sondern eine Luecke in einer rund 40 Eintraege langen Aufzaehlung.
+    //
+    // Beleg fuer die Absicht aus dem eigenen Verlauf: Bei den Login-Meilensteinen wurde genau dieses
+    // Verhalten schon einmal als Fehler eingestuft und behoben ("Streak-Schutzschilde und eingeloeste
+    // Login-Meilensteine gehen beim Prestige/Aufstieg nicht mehr verloren").
+    //
+    // Bereits mehrfach eingesammelte Essenz wird NICHT nachtraeglich abgezogen - wer sie hat, behaelt
+    // sie. Nur kuenftige Durchlaeufe geben sie nicht noch einmal.
+    const keepResearchMilestones = state.researchMilestones;
     const keepPerks = perkKey ? (state.prestigePerks||[]).concat([perkKey]) : (state.prestigePerks||[]);
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
@@ -22603,7 +22626,7 @@
       research:{}, activeResearch:null,
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
-      xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
+      xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, researchMilestones:keepResearchMilestones||{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionLastContact:{}, embassySeats:{}, embassyOpenedAt:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true, vorboten:state.vorboten||{},
       prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
@@ -22760,6 +22783,23 @@
     if (!confirm('Wirklich sicher? Der Aufstieg ist endgültig. ('+gain+' Sternenessenz warten.)')) return;
     const keepId = state.player.id, keepName = state.player.name, keepTag = state.player.allianceTag, keepAvatar = state.player.avatarKey;
     const keepXp = state.xp, keepAch = state.achievements, keepRare = state.rareItems, keepUnlocked = state.unlocked, keepClaimed = state.levelRewardsClaimed, keepInventory = state.inventory, keepAllianceRes = state.allianceResearch, keepAllianceContrib = state.allianceContributed;
+    // researchMilestones bleibt erhalten (v8.379.0, Fehlerbehebung).
+    //
+    // Es war das EINZIGE Feld der "einmal verdient"-Familie, das in dieser Liste fehlte: achievements,
+    // levelRewardsClaimed, compendiumClaimed, codexClaimed, claimedBossKills, claimedStreakMilestones -
+    // alle stehen hier, nur die Forschungs-Meilensteine nicht. applyStateDefaults() legte sie danach
+    // als {} neu an, und damit waren saemtliche Meilensteine nach jedem Prestige erneut verdienbar:
+    // 86 Sternenessenz und 17.000 Kredite je Durchlauf. Sternenessenz ueberlebt Prestige UND Aufstieg,
+    // ist also die einzige dauerhafte Waehrung des Spiels - eine wiederholbare Quelle dafuer war
+    // nicht die Absicht, sondern eine Luecke in einer rund 40 Eintraege langen Aufzaehlung.
+    //
+    // Beleg fuer die Absicht aus dem eigenen Verlauf: Bei den Login-Meilensteinen wurde genau dieses
+    // Verhalten schon einmal als Fehler eingestuft und behoben ("Streak-Schutzschilde und eingeloeste
+    // Login-Meilensteine gehen beim Prestige/Aufstieg nicht mehr verloren").
+    //
+    // Bereits mehrfach eingesammelte Essenz wird NICHT nachtraeglich abgezogen - wer sie hat, behaelt
+    // sie. Nur kuenftige Durchlaeufe geben sie nicht noch einmal.
+    const keepResearchMilestones = state.researchMilestones;
     const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
     const keepReferredBy = state.referredBy, keepReferralRedeemed = state.referralRedeemed;
@@ -22785,7 +22825,7 @@
       research:{}, activeResearch:null,
       fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]},
       discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0,
-      xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
+      xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, researchMilestones:keepResearchMilestones||{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionLastContact:{}, embassySeats:{}, embassyOpenedAt:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true, vorboten:state.vorboten||{},
       prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
@@ -26091,7 +26131,7 @@
       { title:'Zwei neue, eigenständige Forschungszweige', body:'<strong>Diplomatie-Protokolle</strong> erhöht die Friedensdividende aus aktiven Nichtangriffspakten zusätzlich zum Grundbonus. <strong>Kolonial-Logistik</strong> erhöht das Kolonie-Limit: Ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere hinzu (bei Maximalstufe 20 also 11 Kolonien). Monde zählen nicht mit. Beide Forschungen sind von Anfang an verfügbar, unabhängig von der übrigen Technologie-Kette.' },
       { title:'Forschung abbrechen', body:'Eine laufende Forschung lässt sich über den Knopf "Abbrechen" direkt unter der Fortschrittsanzeige vorzeitig stoppen - dabei gibt es bewusst nur <strong>50% der eingesetzten Ressourcen</strong> zurück (im Gegensatz zum Bau-Abbruch mit voller Rückerstattung), da Forschung sonst risikofrei neu gestartet werden könnte, sobald sich z.B. die Laboranzahl ändert. Danach lässt sich sofort eine andere Forschung beginnen.' },
       { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss. Mit den Pfeil-Buttons an jedem Eintrag lässt sich die Reihenfolge nachträglich anpassen - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei immer automatisch korrekt (Stufe 5 kann nie vor Stufe 4 verarbeitet werden), und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde.' },
-      { title:'Forschungs-Meilensteine', body:'Sechs Forschungsgruppen (Wirtschaft, Krieg, Logistik/Spionage, Diplomatie, Werkstoffe, Ausbau) sowie ein Gesamt-Meilenstein belohnen zusammenhängenden Fortschritt: erreichen alle Forschungen einer Gruppe gemeinsam die halbe bzw. volle Maximalstufe, gibt es Sternenessenz und Kredite. Die Essenz ist die einzige Währung, die jeden Prestige- und Aufstiegs-Reset überlebt - Forschungs-Fortschritt bleibt so auch über Neuanfänge hinweg wertvoll. Seit den sechs Gruppen ist <strong>jede Forschung mit Maximalstufe genau einer davon zugeordnet</strong>; keine fällt mehr durchs Raster. <strong>Werkstoffe</strong> folgen der langen Grundlagenkette Nanotechnologie → Quantenphysik → Hochenergiephysik → Fusionskern-Synthese → KI-Technologie → Metamaterial-Synthese → Singularitätsphysik samt Raffinerie-Optimierung; Stufe I verlangt die erste Hälfte, Stufe II die ganze Kette - und mit ihr die Singularitätsphysik, an der das gesamte Endspiel hängt (Ewigkeitsforschungen, Abgrund, Mythische Modulschmiede). <strong>Ausbau</strong> fasst die vier Forschungen zusammen, die bestehende Systeme vertiefen, statt neue zu eröffnen: Mondstabilität, Modultechnik, Slot-Miniaturisierung und Diplomatische Doktrin. Der Gesamt-Meilenstein "Vollständige Forschung" zählt die <strong>Ewigkeitsforschungen nicht mit</strong> - die haben per Definition keine Maximalstufe und wären sonst eine Bedingung, die niemand je erfüllen kann.' },
+      { title:'Forschungs-Meilensteine', body:'Sechs Forschungsgruppen (Wirtschaft, Krieg, Logistik/Spionage, Diplomatie, Werkstoffe, Ausbau) sowie ein Gesamt-Meilenstein belohnen zusammenhängenden Fortschritt: erreichen alle Forschungen einer Gruppe gemeinsam die halbe bzw. volle Maximalstufe, gibt es Sternenessenz und Kredite. Die Essenz ist die einzige Währung, die jeden Prestige- und Aufstiegs-Reset überlebt - Forschungs-Fortschritt bleibt so auch über Neuanfänge hinweg wertvoll. <strong>Jeder Meilenstein ist einmalig:</strong> Einmal erreicht, bleibt er über Prestige und Aufstieg hinweg erreicht (wie Erfolge und Level-Belohnungen) und wird nach einem Neuanfang nicht ein zweites Mal ausgezahlt. Seit den sechs Gruppen ist <strong>jede Forschung mit Maximalstufe genau einer davon zugeordnet</strong>; keine fällt mehr durchs Raster. <strong>Werkstoffe</strong> folgen der langen Grundlagenkette Nanotechnologie → Quantenphysik → Hochenergiephysik → Fusionskern-Synthese → KI-Technologie → Metamaterial-Synthese → Singularitätsphysik samt Raffinerie-Optimierung; Stufe I verlangt die erste Hälfte, Stufe II die ganze Kette - und mit ihr die Singularitätsphysik, an der das gesamte Endspiel hängt (Ewigkeitsforschungen, Abgrund, Mythische Modulschmiede). <strong>Ausbau</strong> fasst die vier Forschungen zusammen, die bestehende Systeme vertiefen, statt neue zu eröffnen: Mondstabilität, Modultechnik, Slot-Miniaturisierung und Diplomatische Doktrin. Der Gesamt-Meilenstein "Vollständige Forschung" zählt die <strong>Ewigkeitsforschungen nicht mit</strong> - die haben per Definition keine Maximalstufe und wären sonst eine Bedingung, die niemand je erfüllen kann.' },
       { title:'Forschungsdauer: ein Langzeitziel', body:'Die komplette Forschung ('+RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).length+' Techs mit Maximalstufe, '+RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).reduce((a,r)=>a+(r.maxLevel||1),0)+' Stufen, dazu '+RESEARCH_DEFS.filter(isEndlessResearch).length+' Ewigkeitsforschungen ohne Obergrenze) ist bewusst ein Projekt für Wochen, nicht für einen Nachmittag: Bei guter Laborausstattung (15+) dauert sie insgesamt rund <strong>einen Monat</strong>, ganz ohne Labore rund <strong>zwei Monate</strong>. Frühe Forschungsstufen bleiben dabei fast unverändert schnell (Stufe 1 in Sekunden) - erst ab den höheren Stufen jeder Forschung wächst die Dauer spürbar, das späte Spiel bleibt also ein echtes Langzeitziel statt an einem Wochenende erledigt zu sein.' },
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.<br><br><strong>Jede Doktrin hat zusätzlich eine Synergie</strong> (seit 01.08.2026), die nur greift, wenn im Imperium <em>irgendeine</em> Welt die passende <strong>Planeten-Rolle</strong> trägt – eine genügt, mehrere bringen nichts extra. <strong>Offensiv + Werft-Welt:</strong> +8% Angriffskraft. <strong>Verteidigung + Festungs-Welt:</strong> +8% Verteidigungspunkte. <strong>Logistik + Handels-Welt:</strong> weitere −8% Treibstoff und +8% Lagerkapazität. Damit spricht die Doktrin eine Empfehlung aus, welche Welt du als Nächstes spezialisierst; auf jeder Doktrin-Karte steht, ob ihre Synergie erfüllt ist. Angriff und Verteidigung rechnet der Server im PvP genauso nach.' }
@@ -42179,6 +42219,33 @@
     }));
   }
 
+  // Zeichnet EINE Box so, dass ihr Scheitern nur sie selbst kostet (v8.378.1, verallgemeinert
+  // v8.379.0).
+  //
+  // Hintergrund ist der Spieler-Report "Allianz-Raid geht nicht": render() rief die acht
+  // Allianz-Boxen ungeschuetzt hintereinander auf, eine stuerzte an regulaeren Daten, und alles
+  // dahinter blieb ungezeichnet. Die stuerzende Box selbst blieb auf ihrem HTML-Platzhalter
+  // "laedt..." stehen - was wie ein langsamer Server aussieht und in Wahrheit ein Absturz ist.
+  //
+  // Zwei bewusste Entscheidungen:
+  //   - Eine bereits gezeichnete Box wird NICHT ueberschrieben. Ein Stand von vor einer Sekunde ist
+  //     brauchbarer als eine Fehlermeldung; der naechste Durchlauf holt sie ohnehin wieder ein.
+  //   - Nur eine Box, die es NIE ueber ihren Platzhalter geschafft hat, bekommt den Hinweis. Genau
+  //     dieser Fall ist der irrefuehrende, weil er sich als Ladevorgang tarnt.
+  //
+  // Die `boxId` muss die Kennung sein, die die Render-Funktion selbst beschreibt - sonst greift
+  // zwar das try/catch, aber der Hinweis landet im Nichts und das Symptom ist zurueck. Beim ersten
+  // Schreiben ist mir das prompt passiert; tests/test_allianzraid_anzeige.js prueft es deshalb.
+  function zeichneAbgesichert(boxId, fn){
+    try { fn(); }
+    catch(e){
+      console.error('Box "'+boxId+'" konnte nicht gezeichnet werden:', e);
+      const el = document.getElementById(boxId);
+      if (el && /^\s*lädt/.test(el.textContent||'')){
+        el.innerHTML = '<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>Dieser Bereich konnte nicht geladen werden. Die übrigen Bereiche funktionieren weiter; ein Neuladen der Seite behebt es meist.</div>';
+      }
+    }
+  }
   function render(){
     applyPowerSaveClass(); // Energiesparmodus-Klasse (billig: ein classList.toggle) - greift auch nach Laden/Sync eines fremden Spielstands
     applyCompactHeadClass(); // dito für die kompakte Kopfzeile - ebenfalls nur ein classList.toggle
@@ -45965,14 +46032,23 @@
     const xpNext = xpForLevel(lvl+1);
     const xpPct = Math.max(0, Math.min(100, ((curXp-xpBase)/(xpNext-xpBase))*100));
     const levelBox = document.getElementById('levelBox');
-    renderEventCalendarBox();
-    renderCommanderProfile();
-    renderEmpireOverview();
-    renderBonusBalance();
-    renderCompendium();
-    renderDominance();
-    renderAllianceTitlesBox();
-    renderAllianceSkinsBox();
+    // Dieselbe Absicherung wie beim Allianz-Tab (v8.379.0). Diese Kette hat genau dieselbe Form:
+    // acht Render-Aufrufe hintereinander, ungeschuetzt - und mitten drin die Levelanzeige, die
+    // beim Sturz einer der Boxen davor ebenfalls ausgefallen waere. Dass hier bisher nichts
+    // gemeldet wurde, liegt nur daran, dass diese Boxen keinen "laedt..."-Platzhalter tragen: Ein
+    // Ausfall haette leere Flaechen hinterlassen statt eines ewigen Ladetextes - genauso
+    // grossflaechig, nur weniger auffaellig in der Fehlerbeschreibung.
+    const FORTSCHRITT_BOXEN = [
+      ['eventCalendarBox',    renderEventCalendarBox],
+      ['commanderProfileBox', renderCommanderProfile],
+      ['empireOverviewBox',   renderEmpireOverview],
+      ['bonusBalanceBox',     renderBonusBalance],
+      ['compendiumBox',       renderCompendium],
+      ['dominanceBox',        renderDominance],
+      ['allianceTitlesBox',   renderAllianceTitlesBox],
+      ['allianceSkinsBox',    renderAllianceSkinsBox]
+    ];
+    for (const [boxId, fn] of FORTSCHRITT_BOXEN) zeichneAbgesichert(boxId, fn);
     if (levelBox) levelBox.innerHTML = `
       <div class="card-row" style="flex-direction:column; align-items:stretch;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -45984,7 +46060,7 @@
         ${levelRewardLadderHtml(lvl)}
       </div>
     `;
-    renderDailyLoginBox();
+    zeichneAbgesichert('dailyLoginBox', renderDailyLoginBox);
 
     const invBox = document.getElementById('inventoryBox');
     if (invBox){
@@ -46126,16 +46202,7 @@
         ['allianceEndgameBox',       renderAllianceEndgameBox],
         ['allianceWorldBox',         renderAllianceWorldProjectsBox]
       ];
-      for (const [boxId, fn] of ALLIANZ_BOXEN){
-        try { fn(); }
-        catch(e){
-          console.error('Allianz-Box "'+boxId+'" konnte nicht gezeichnet werden:', e);
-          const el = document.getElementById(boxId);
-          if (el && /^\s*lädt/.test(el.textContent||'')){
-            el.innerHTML = '<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>Dieser Bereich konnte nicht geladen werden. Die übrigen Allianz-Bereiche funktionieren weiter; ein Neuladen der Seite behebt es meist.</div>';
-          }
-        }
-      }
+      for (const [boxId, fn] of ALLIANZ_BOXEN) zeichneAbgesichert(boxId, fn);
     }
     renderReportsBox();
     renderIntelBox();

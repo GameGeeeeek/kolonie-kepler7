@@ -170,21 +170,85 @@ const textVon = (page, id) => page.evaluate(i => {
   // try/catch greift weiterhin, aber die Meldung landet im Nichts und der Spieler sieht wieder
   // ewig "lädt…" - also genau das Symptom, gegen das die Absicherung gebaut wurde. Beim ersten
   // Schreiben ist mir das prompt passiert (allianceWorldProjectsBox statt allianceWorldBox).
+  // Ab v8.379.0 gilt dasselbe fuer den Fortschritt-Tab, der dieselbe ungeschuetzte Kette hatte -
+  // deshalb werden BEIDE Tabellen geprueft, nicht nur die des Allianz-Tabs.
   {
     const src = fs.readFileSync(SPIELDATEI, 'utf8');
-    const tabelle = src.slice(src.indexOf('const ALLIANZ_BOXEN = ['), src.indexOf('];', src.indexOf('const ALLIANZ_BOXEN = [')));
-    const paare = [...tabelle.matchAll(/\['([a-zA-Z]+)',\s*(render[A-Za-z]+)\]/g)].map(m => [m[1], m[2]]);
-    check('4: die Tabelle wurde gelesen', paare.length === 8, paare.length);
-    for (const [id, fn] of paare){
+    const tabelleVon = name => {
+      const a = src.indexOf('const ' + name + ' = [');
+      return a < 0 ? '' : src.slice(a, src.indexOf('];', a));
+    };
+    const alle = [];
+    for (const [name, anzahl] of [['ALLIANZ_BOXEN', 8], ['FORTSCHRITT_BOXEN', 8]]){
+      const paare = [...tabelleVon(name).matchAll(/\['([a-zA-Z]+)',\s*(render[A-Za-z]+)\]/g)].map(m => [m[1], m[2]]);
+      check('4: ' + name + ' wurde gelesen', paare.length === anzahl, paare.length);
+      alle.push(...paare);
+    }
+    // Einzelaufrufe ausserhalb der Tabellen (z. B. renderDailyLoginBox) zaehlen mit.
+    for (const m of src.matchAll(/zeichneAbgesichert\('([a-zA-Z]+)',\s*(render[A-Za-z]+)\)/g)) alle.push([m[1], m[2]]);
+    check('4: mindestens 17 abgesicherte Boxen', alle.length >= 17, alle.length);
+
+    for (const [id, fn] of alle){
       // Die Kennung, die die Funktion selbst benutzt - aus ihren ersten Zeilen.
       const a = src.indexOf('function ' + fn + '(){');
-      const kopf = a < 0 ? '' : src.slice(a, a + 400);
+      const kopf = a < 0 ? '' : src.slice(a, a + 600);
       const echt = (kopf.match(/getElementById\('([a-zA-Z]+)'\)/) || [])[1];
       check('4: "' + fn + '" ist mit der richtigen Kennung eingetragen', id === echt, { tabelle:id, funktion:echt });
-    }
-    // Und die Kennungen existieren wirklich im HTML.
-    for (const [id] of paare){
       check('4: das Element "' + id + '" gibt es im HTML', src.includes('id="' + id + '"'));
+    }
+
+    // Innerhalb von render() darf keine dieser Funktionen mehr nackt aufgerufen werden - sonst
+    // waere die Absicherung halb, und genau daraus entsteht der naechste Fehler dieser Art.
+    //
+    // BEWUSST nur der Rumpf von render(): Dieselben Funktionen werden an vielen anderen Stellen
+    // einzeln aufgerufen (nach einer Spende, einem Kauf, einem Reiterwechsel). Dort ist ein nackter
+    // Aufruf voellig richtig - es gibt keine Kette, die mitgerissen werden koennte, und der Aufrufer
+    // hat ohnehin seinen eigenen Kontext. Die erste Fassung dieser Pruefung suchte ueber die ganze
+    // Datei und meldete prompt 13 solcher legitimen Stellen.
+    const rVon = src.indexOf('\n  function render(){');
+    const rBis = src.indexOf('\n  function ', rVon + 10);
+    const rumpf = src.slice(rVon, rBis);
+    // Strukturell pruefen statt nach Groesse: render() ist rund 414 kB lang (knapp 9% der Datei),
+    // eine Obergrenze aus dem Bauch waere nur eine Zahl, die beim naechsten Anbau kippt. Richtig
+    // eingegrenzt ist der Rumpf dann, wenn beide Ketten drinstehen UND er vor der naechsten
+    // Funktion endet - sonst suchte die Pruefung darunter im Nichts oder in der halben Datei.
+    check('4: der Rumpf von render() wurde eingegrenzt',
+      rBis > rVon && rumpf.includes('const ALLIANZ_BOXEN') && rumpf.includes('const FORTSCHRITT_BOXEN')
+        && !rumpf.includes('function zeichneAbgesichert'),
+      { laenge: rumpf.length, endetVor: src.slice(rBis, rBis + 30).trim() });
+    const abgesichert = new Set(alle.map(([, fn]) => fn));
+    const nackt = [];
+    for (const zeile of rumpf.split('\n')){
+      const m = /^\s*(render[A-Za-z]+)\(\);\s*$/.exec(zeile);
+      if (m && abgesichert.has(m[1])) nackt.push(m[1]);
+    }
+    check('4: in render() wird keine abgesicherte Box mehr nackt aufgerufen', nackt.length === 0, nackt);
+  }
+
+  // ============================================ 5) Fortschritt-Tab: gleiche Isolation
+  // Wie Abschnitt 3, nur fuer die zweite Kette. renderCompendium() steht dort VOR renderDominance,
+  // renderAllianceTitlesBox, renderAllianceSkinsBox, der Levelanzeige und renderDailyLoginBox -
+  // ohne Absicherung waeren die alle mit ausgefallen, inklusive der Levelanzeige mitten drin.
+  {
+    const kaputt = fs.readFileSync(SPIELDATEI, 'utf8').replace(
+      'function renderCompendium(){',
+      "function renderCompendium(){ throw new Error('Testsabotage');");
+    check('5: die Sabotage konnte eingesetzt werden', kaputt.includes('Testsabotage'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kepler-fortschritt-'));
+    const datei = path.join(dir, 'sabotiert.html');
+    fs.writeFileSync(datei, kaputt);
+    try {
+      const { page, ctx, errs } = await starte(browser, 'file://' + datei, null);
+      await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="fortschritt"]'); if (b) b.click(); });
+      await page.waitForTimeout(2500);
+      for (const id of ['dominanceBox', 'allianceTitlesBox', 'levelBox', 'dailyLoginBox']){
+        const t = await textVon(page, id);
+        check('5: "' + id + '" wird trotz kaputter Box davor gezeichnet', !!t, (t || '').slice(0, 40));
+      }
+      check('5: der Fehler wurde gefangen, nicht als Absturz durchgereicht', errs.length === 0, errs.slice(0, 2));
+      await ctx.close();
+    } finally {
+      fs.rmSync(dir, { recursive:true, force:true });
     }
   }
 
