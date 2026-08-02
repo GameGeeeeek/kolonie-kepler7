@@ -5695,8 +5695,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.382.0';
+  const VERSION = '8.383.0';
   const PATCHNOTES = [
+    { version:'8.383.0', date:'02.08.2026', changes:[
+      '<strong>Neu: „Recycler hinschicken" direkt im Kampfbericht.</strong> Nach einem Kampf liegt das Trümmerfeld an dem Planeten, von dem du losgeflogen bist. Steht dort kein Recycler, wird es <em>gar nicht</em> abgebaut – es gibt keinen passiven Selbstabbau. Bisher musste man das selbst bemerken und die Verlegung von Hand zusammenklicken; im Bericht stand darüber kein Wort.',
+      'Der Knopf erscheint nur, wenn dort wirklich noch etwas liegt <em>und</em> kein Recycler vor Ort ist – ein Knopf, der nichts tut, wäre schlimmer als keiner. Er nennt Zielort und Trümmermenge, verlegt alle Recycler von dem Standort, an dem du die meisten hast, und ist ausgegraut mit Begründung, falls du gar keine besitzt. Es ist eine normale Verlegung: Flugzeit, Treibstoff, ein Flottenslot.',
+      'Nebenbei behoben: Kampfberichte führten den Startplaneten nur als <em>Anzeigenamen</em> mit. Damit ließ sich das zugehörige Trümmerfeld gar nicht nachschlagen, und ein Umbenennen der Kolonie hätte die Zuordnung ohnehin zerrissen – jetzt steht auch der Planetenschlüssel im Bericht.'
+    ]},
     { version:'8.382.0', date:'02.08.2026', changes:[
       '<strong>Das Spiel schreibt pro Sekunde rund 124 kB weniger Markup ins Bildschirm-Gerüst.</strong> Dreizehn Anzeigebereiche wurden bei jedem Sekunden-Takt komplett neu aufgebaut, obwohl ihr Inhalt Zeichen für Zeichen derselbe blieb. Gemessen, nicht geschätzt: Die Erfolge-Liste allein war mit 56,9 kB/s größer als alle vier Bereiche zusammen, die dafür schon im Juli umgestellt wurden.',
       'Betroffen waren Erfolge, Forschungs-Meilensteine, Baukorb, Fähigkeitsbaum, Avatar- und Farbschema-Auswahl, Großprojekte, Punkte-Aufschlüsselung, Tagesmissionen, Aufstieg, Produktionsübersicht, Artefakt-Sets und die Levelkarte. Auf dem Fortschritt-Tab sank die Schreiblast von rund 100 auf 11 kB/s, auf der Basis von 48 auf 15. Spürbar wird das vor allem auf älteren Telefonen und im Akkubetrieb - am Verhalten ändert sich nichts, die Bereiche zeichnen sich weiterhin sofort neu, sobald sich wirklich etwas ändert.',
@@ -23565,7 +23570,7 @@
     const shieldNote = entry.spyShielded ? ' Achtung: Das Ziel betreibt Spionageabwehr – diese Werte können ungenau sein.' : '';
     const detNote = detected ? ' ⚠ Dein Späher wurde entdeckt – die Werte sind lückenhaft/verfälscht.' : '';
     if (showLog !== false) log((m.fleetName||'Spähschiff')+': Aufklärung von '+name+' abgeschlossen. Flotte: '+shipLine+defLine+lootLine+' · Punktestand: '+(entry.score||0)+'.'+shieldNote+detNote, 'ti-target');
-    pushReport({ type:'spy-report', targetId: m.targetId, targetName:name, ships:entry, score:entry.score||0, defensePower:storedEntry.defensePower, buildLvl:entry.buildLvl, colonyCount:entry.colonyCount, fromPlanet:planetDisplayName(planetKey), spyShielded:!!entry.spyShielded, deep, resTotal: deep?entry.resTotal:undefined, resBreak: deep?entry.resBreak:undefined, detected });
+    pushReport({ type:'spy-report', targetId: m.targetId, targetName:name, ships:entry, score:entry.score||0, defensePower:storedEntry.defensePower, buildLvl:entry.buildLvl, colonyCount:entry.colonyCount, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, spyShielded:!!entry.spyShielded, deep, resTotal: deep?entry.resTotal:undefined, resBreak: deep?entry.resBreak:undefined, detected });
     // Verteidiger benachrichtigen (Phase 2): meldet dem Ziel serverseitig "du wurdest ausgespäht".
     notifySpyTarget(m.targetId, deep);
     loadReports();
@@ -23729,7 +23734,7 @@
           log((m.fleetName||'Flotte')+': Angriff auf '+name+' erfolgreich! Erbeutet: '+lootTxt+'.'+cargoNote+(data.destroyedBuilding?(' '+(data.destroyedBuildingCount>1?(data.destroyedBuildingCount+' Verteidigungsgebäude wurden zerstört.'):'Ein Verteidigungsgebäude wurde zerstört.')):'')+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
-        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet };
+        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       } else {
@@ -23738,7 +23743,7 @@
         const ownLostLossBackend = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossBackend);
         if (showLog !== false) log((m.fleetName||'Flotte')+': Angriff auf '+name+' gescheitert.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')', 'ti-shield');
-        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet };
+        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       }
@@ -23786,7 +23791,7 @@
           log((m.fleetName||'Flotte')+': Duell gegen '+name+' gewonnen! +'+gained+' Kampfpunkte'+statLine+'.'+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' Kein echter Ressourcenverlust für den Gegner (kein eigener Server aktiv).'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
-        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostWinSim, debris:combatDebrisOf(ownLostWinSim), fleet:m.composition||fleet };
+        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostWinSim, debris:combatDebrisOf(ownLostWinSim), fleet:m.composition||fleet };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       } else {
@@ -23795,7 +23800,7 @@
         const ownLostLossSim = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossSim);
         if (showLog !== false) log((m.fleetName||'Flotte')+': Duell gegen '+name+' verloren. +3 Kampfpunkte für den Versuch'+statLine+'.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':''), 'ti-shield');
-        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), warTag, ownLostShips:ownLostLossSim, debris:combatDebrisOf(ownLostLossSim), fleet:m.composition||fleet };
+        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostLossSim, debris:combatDebrisOf(ownLostLossSim), fleet:m.composition||fleet };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       }
@@ -26155,7 +26160,7 @@
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
       { title:'Automatische Erkundung', body:'Schalter auf der Sektorkarte (mindestens 1 Erkundungsschiff nötig): sobald aktiviert, reserviert genau <strong>ein</strong> Erkundungsschiff vom gerade aktiven Planeten und fliegt eine durchgehende Rundreise - erst das nächstgelegene unentdeckte Ziel, danach automatisch weiter zum jeweils nächsten, bis alle erreichbaren Planeten erkundet sind. Direkt unter dem Schalter zeigt eine eigene Box jederzeit den Ausgangsplaneten, das aktuelle Ziel mit Countdown, eine Vorschau des nächsten Ziels und den Gesamtfortschritt (z.B. "5/12"). Reicht der Treibstoff (Deuterium) für den nächsten Abschnitt nicht, wartet die Rundreise automatisch und versucht es beim nächsten Ressourcenzuwachs erneut - ohne manuelles Eingreifen. Sind alle Ziele erledigt, fliegt das Schiff zurück zum Ausgangsplaneten und die Rundreise endet automatisch. Der Schalter lässt sich jederzeit wieder ausschalten - eine laufende Rundreise wird dadurch nicht abrupt abgebrochen, sondern das aktuelle Ziel noch fertig angeflogen, bevor das Schiff zurückkehrt. Manuelles Erkunden einzelner Planeten bleibt parallel dazu möglich, solange noch ein freies Erkundungsschiff übrig ist.' },
-      { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus.' },
+      { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus. <strong>Trümmerfelder entstehen immer an deinem Startplaneten</strong>, auch wenn du woanders angegriffen hast – greifst du also von einer Kolonie ohne Recycler aus an, bleibt die Beute dort liegen. Dafür steht im Kampfbericht jetzt ein Knopf <strong>„Recycler nach … schicken"</strong>: Er erscheint nur, wenn dort wirklich noch etwas liegt und kein Recycler vor Ort ist, und verlegt alle Recycler des Standorts, an dem du die meisten hast. Das ist eine normale Flottenverlegung – mit Flugzeit, Treibstoff und einem belegten Flottenslot.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (Deckel bei 6 Sektoren). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
       { title:'Mondzerstörer & Mondbelagerung', body:'Endgame-Schiff (Flotte-Tab), das einen fremden, kolonisierten Mond dauerhaft zerstören kann. Voraussetzung: Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die höchste Forschungshürde im Spiel), danach ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Extrem teuer, extrem langsam (weit unter der Geschwindigkeit jedes anderen Schiffs, entsprechend lange Flugzeit und hoher Treibstoffverbrauch) und immer nur als einzelnes Exemplar besitzbar. Ein Ziel wählst du direkt über die Bestenliste (Schädel-Symbol bei einem fremden Spieler) - dort erscheinen dessen kolonisierte Monde zur Auswahl. Die Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes: eigene Gebäude/Flotte am Mond, der neue Mondschildgenerator (Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken sie zusätzlich; ein aktiver Allianz-Beitritt gibt dem Ziel ebenfalls einen kleinen Bonus. Nach jeder Belagerung - egal ob erfolgreich oder abgewehrt - braucht der Mondzerstörer 48 Std. Abklingzeit. Jeder Belagerungsschuss verbraucht zusätzlich eine <strong>Belagerungs-Ladung aus 25 Hochenergiekristallen</strong> (Tier-2-Ressource aus dem Kristalllabor) - sie wird bei der Ankunft serverseitig abgebucht; ohne ausreichende Ladung schlägt die Belagerung fehl. Erfolgschance und Ergebnis werden serverseitig berechnet.' },
@@ -26581,7 +26586,19 @@
     // Ablauf unverändert, die Box würde nicht neu geschrieben, und der Bericht behauptete weiter
     // einen Zuschlag, den es nicht mehr gibt. Genau die Falle, vor der CLAUDE.md beim
     // Signatur-Cache-Muster warnt (kein Live-Countdown in einer Wertlisten-Signatur).
-    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult;
+    // Der Trümmerfeld-Knopf gehört ebenfalls in die Signatur (02.08.2026) - aus demselben Grund wie
+    // der Aufklärungsvorteil darüber: Seine Sichtbarkeit, sein Beschriftungstext und die genannte
+    // Menge hängen an state.debrisFields und am Recycler-Bestand, also an Werten, die sich ändern,
+    // ohne dass ein Bericht dazukommt. Ohne diesen Zusatz bliebe die Signatur gleich, die Box würde
+    // nicht neu geschrieben - und der Knopf stünde noch da, wenn das Feld längst abgebaut ist, oder
+    // fehlte, obwohl gerade eines entstanden ist. Nur der Knopf-Zustand geht ein, nicht das ganze
+    // Feld: Während des Abbaus ändert sich die Menge im Sekundentakt, und die Box deswegen jede
+    // Sekunde neu zu schreiben wäre genau die Verschwendung, die v8.382.0 abgestellt hat.
+    const truemmerSig = reportsCache.map(r => {
+      const z = reportDebrisTarget(r);
+      return z ? r.id+':'+Math.round(z.menge/1000)+':'+(z.quelle ? z.quelle.planet+z.quelle.anzahl : '-') : '';
+    }).filter(Boolean).join(',');
+    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig;
     if (reportsSig === lastReportsSig) return;
     lastReportsSig = reportsSig;
     if (!useBackend()){
@@ -26915,6 +26932,15 @@
       if (r.ownLostShips && Object.values(r.ownLostShips).some(v => v > 0)){
         actionsHtml += `<div style="margin-top:8px;"><button data-rebuild-losses="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:3px;"></i>Verluste nachbauen</button></div>`;
       }
+      // "Recycler hinschicken" (02.08.2026, Spieler-Wunsch). Erscheint NUR, wenn durch diesen Kampf
+      // wirklich noch ein Trümmerfeld an einem eigenen Standort liegt UND dort kein Recycler steht -
+      // sonst wäre es ein Knopf, der nichts tut. Menge und Zielname stehen dran, damit man vor dem
+      // Antippen weiß, worum es geht und wohin es geht.
+      const truemmerZiel = reportDebrisTarget(r);
+      if (truemmerZiel){
+        const ohneRecycler = !truemmerZiel.quelle;
+        actionsHtml += `<div style="margin-top:8px;"><button data-send-recyclers="${r.id}"${ohneRecycler?' disabled':''} style="font-size:10.5px; padding:5px 9px;" title="${ohneRecycler?'Du hast an keinem anderen Standort Recycler':'Verlegt alle Recycler von '+escapeHtml(planetDisplayName(truemmerZiel.quelle.planet))+' dorthin'}"><i class="ti ti-recycle" aria-hidden="true" style="margin-right:3px;"></i>${ohneRecycler?'Keine Recycler vorhanden':'Recycler nach '+escapeHtml(planetDisplayName(truemmerZiel.key))+' schicken'}</button> <span class="bmeta" style="font-size:10px;">${fmt(Math.round(truemmerZiel.menge))} im Trümmerfeld${ohneRecycler?'':' · '+truemmerZiel.quelle.anzahl+' Recycler bereit'}</span></div>`;
+      }
       const expeditionPositive = r.type==='expedition' && (r.result==='success' || r.result==='defended');
       const positive = reportIsPositive(r);
       const isSpecial = REPORT_SPECIAL_GREEN_TYPES.includes(r.type) || r.type==='expedition';
@@ -26969,6 +26995,9 @@
     }));
     document.querySelectorAll('[data-rebuild-losses]').forEach(btn => btn.addEventListener('click', () => {
       rebuildLostShips(btn.getAttribute('data-rebuild-losses'));
+    }));
+    document.querySelectorAll('[data-send-recyclers]').forEach(btn => btn.addEventListener('click', () => {
+      sendRecyclersToDebris(btn.getAttribute('data-send-recyclers'));
     }));
     document.querySelectorAll('[data-reports-filter-cat]').forEach(btn => btn.addEventListener('click', () => {
       reportsFilterCategory = btn.getAttribute('data-reports-filter-cat');
@@ -29367,7 +29396,7 @@
     const ownLostText = lostCountsToText(data.lostShips||{});
     logScoreChange(data.battlePoints*3, (data.destroyed?'Allianzbasis von ['+targetTag+'] ZERSTÖRT':'Angriff auf Allianzbasis ['+targetTag+']')+' (+'+data.battlePoints+' Kampfpunkte)', 'ti-sword');
     log((data.success?'Angriff auf die Allianzbasis von ['+targetTag+'] erfolgreich - '+fmt(data.damage)+' Schaden!':'Angriff auf die Allianzbasis von ['+targetTag+'] abgewehrt (Verteidigung '+fmt(data.defensePower)+').')+(data.destroyed?' DIE BASIS WURDE ZERSTÖRT!':'')+(ownLostText?' Eigene Verluste: '+ownLostText+'.':''), data.destroyed?'ti-skull':'ti-sword');
-    pushReport({ type:'alliance-base-attack', result: data.destroyed?'destroyed':(data.success?'win':'loss'), targetTag, damage: data.damage, hullAfter: data.hullAfter, hullMax: data.hullMax, defensePower: data.defensePower, attackPower: data.attackPower, chancePct: data.chancePct, fleet: m.composition||fleet, ownLostShips: data.lostShips, debris, battlePoints: data.battlePoints, fromPlanet: planetDisplayName(planetKey) });
+    pushReport({ type:'alliance-base-attack', result: data.destroyed?'destroyed':(data.success?'win':'loss'), targetTag, damage: data.damage, hullAfter: data.hullAfter, hullMax: data.hullMax, defensePower: data.defensePower, attackPower: data.attackPower, chancePct: data.chancePct, fleet: m.composition||fleet, ownLostShips: data.lostShips, debris, battlePoints: data.battlePoints, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey });
     playSound(data.success?'win':'raid');
     save();
   }
@@ -36804,7 +36833,7 @@
                 addVeteranXp(planetKey, 8 + bLevel);
                 if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(data.damage)+' Schaden!'+(data.killed?' LETZTER SCHLAG - der Leviathan fällt!':' Rest-HP: '+fmt(Math.round(data.bossHp))+'.')+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
                 playSound(data.killed ? 'achieve' : 'win');
-                const __battleReport = { type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:!!data.hasWeakness, weaknessType:data.weaknessType, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} };
+                const __battleReport = { type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:!!data.hasWeakness, weaknessType:data.weaknessType, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
               }
@@ -36883,7 +36912,7 @@
             const cargoNote = cargoCapacity <= 0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale < 1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
             if (showLog !== false) log('Sieg gegen '+lairLabel+'! +'+creditsGain+' Kredite.'+cargoNote+moduleMsg+(ownLostLairText?' Eigene Verluste: '+ownLostLairText+'.':'')+stageMsg, 'ti-sword');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, phasen: lairPhasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair };
+            const __battleReport = { type:'npc-attack', result:'win', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, phasen: lairPhasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostLair };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -36896,7 +36925,7 @@
             const lostText = lostCountsToText(lostShips);
             if (showLog !== false) log('Niederlage gegen '+lairLabel+'.'+(lostText?' Verluste: '+lostText+'.':'')+' Das Versteck bleibt auf Stufe '+stage+' - rüste auf und versuche es erneut.', 'ti-alert-triangle');
             playSound('lose');
-            const __battleReport = { type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, phasen: lairPhasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:lostShips };
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:lairLabel, npcLevel:stage, attackPower:Math.round(power), defensePower:lairDef, chancePct:Math.round(chance*100), hasWeakness:lairHasWeakness, weaknessType:lairWeakness, phasen: lairPhasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, battlePoints:bpGained, ownLostShips:lostShips };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
@@ -37073,7 +37102,7 @@
             if (showLog !== false) abgrundAnkunftBis = Date.now() + ABGRUND_ANKUNFT_MS;
             if (showLog !== false) log('Tauchgang erfolgreich: '+sektor.name+' (Tiefe '+tiefe+') bezwungen. +'+fmt(splitter)+' Abgrundsplitter, +'+fmt(bergungsgut)+' Bergungsgut'+(fragmente>0?', +'+fmt(fragmente)+' Modulfragmente (Splitterofen)':'')+'.'+(abgrundModulName?' Aus dem Wrackfeld geborgen: '+abgrundModulName+'!':'')+(abgrundItemName?' Gegenstand geborgen: '+abgrundItemName+'!':'')+cargoNote+(ownLostText?' Eigene Verluste: '+ownLostText+'.':'')+tiefenMsg+waechterMsg, 'ti-infinity');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLost, abgrundSplitter:splitter, abgrundBergung:bergungsgut, abgrundFragmente:fragmente, abgrundModul:abgrundModulName, abgrundItem:abgrundItemName, abgrundMutatoren:mutText };
+            const __battleReport = { type:'npc-attack', result:'win', npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLost, abgrundSplitter:splitter, abgrundBergung:bergungsgut, abgrundFragmente:fragmente, abgrundModul:abgrundModulName, abgrundItem:abgrundItemName, abgrundMutatoren:mutText };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -37107,7 +37136,7 @@
             const spiegelText = gerettetSumme > 0 ? ' Der Ballastspiegel hat '+fmt(gerettetSumme)+' Einheiten aus dem Wrackfeld gezogen.' : '';
             if (showLog !== false) log('Tauchgang gescheitert: '+sektor.name+' (Tiefe '+tiefe+') hat die Flotte zurückgeworfen.'+(ownLostText?' Verluste: '+ownLostText+'.':'')+spiegelText+' Die Tiefe bleibt erreichbar – rüste auf und tauche erneut.', 'ti-alert-triangle');
             playSound('lose');
-            const __battleReport = { type:'npc-attack', result:'loss', npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLost, abgrundMutatoren:mutText, loot: gerettetSumme > 0 ? geretteteBeute : undefined, abgrundBallast: gerettetSumme > 0 };
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, battlePoints:bpGained, ownLostShips:ownLost, abgrundMutatoren:mutText, loot: gerettetSumme > 0 ? geretteteBeute : undefined, abgrundBallast: gerettetSumme > 0 };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
@@ -37132,7 +37161,7 @@
             addVeteranXp(planetKey, 6);
             if (showLog !== false) log('Piratenflotte bei '+planetDisplayName(raid.planetKey)+' abgefangen und vertrieben!'+(lostPiratesText?' Zerstört: '+lostPiratesText+'.':'')+' Das Trümmerfeld bleibt erhalten.', 'ti-sword');
             playSound('win');
-            const __battleReport = { type:'pirate-debris-raid', result:'win', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, destroyedShips: lostPirates, fromPlanet: planetDisplayName(planetKey), flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: bpGained };
+            const __battleReport = { type:'pirate-debris-raid', result:'win', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, destroyedShips: lostPirates, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: bpGained };
             pushReport(__battleReport);
             state.pirateDebrisRaid = null;
           } else {
@@ -37141,7 +37170,7 @@
             addVeteranXp(planetKey, 2);
             if (showLog !== false) log('Abfangversuch gegen die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' gescheitert - sie setzen die Plünderung fort.'+(ownLostInterceptText?' Verluste: '+ownLostInterceptText+'.':''), 'ti-shield');
             playSound('lose');
-            const __battleReport = { type:'pirate-debris-raid', result:'loss', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, ownLostShips: ownLostIntercept, fromPlanet: planetDisplayName(planetKey), flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: 0 };
+            const __battleReport = { type:'pirate-debris-raid', result:'loss', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, ownLostShips: ownLostIntercept, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: 0 };
             pushReport(__battleReport);
             // Ein neuer Versuch bleibt möglich, solange noch Zeit bis raid.endTime bleibt.
             raid.interceptArrival = null;
@@ -37190,7 +37219,7 @@
             const ownLostRiftText = lostCountsToText(ownLostRift);
             if (showLog !== false) log('Leerenriss über '+planetDisplayName(rift.planetKey)+' geschlossen! +'+shardGain+'x Leerensplitter (gesamt: '+state.rareItems.leerensplitter+')'+(amGained>0?', +'+fmt(amGained)+' Antimaterie':'')+'.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':''), 'ti-diamond');
             playSound('win');
-            const __battleReport = { type:'void-rift', result:'win', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), phasen: riftPhasen.phasen, chancePct: Math.round(riftChance*100), shards: shardGain, loot: amGained>0?{ antimaterie: amGained }:null, fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), flightTime: riftFlightTime, battlePoints: bpGained };
+            const __battleReport = { type:'void-rift', result:'win', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), phasen: riftPhasen.phasen, chancePct: Math.round(riftChance*100), shards: shardGain, loot: amGained>0?{ antimaterie: amGained }:null, fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: riftFlightTime, battlePoints: bpGained };
             pushReport(__battleReport);
             state.voidRift = null;
           } else {
@@ -37199,7 +37228,7 @@
             addVeteranXp(planetKey, 3);
             if (showLog !== false) log('Die Flotte konnte den Leerenriss über '+planetDisplayName(rift.planetKey)+' nicht schließen - die Leere-Energie hat sie zurückgeschlagen.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':'')+' Ein neuer Versuch ist möglich, solange der Riss offen ist.', 'ti-alert-triangle');
             playSound('lose');
-            const __battleReport = { type:'void-rift', result:'loss', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), phasen: riftPhasen.phasen, chancePct: Math.round(riftChance*100), fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), flightTime: riftFlightTime, battlePoints: 0 };
+            const __battleReport = { type:'void-rift', result:'loss', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), phasen: riftPhasen.phasen, chancePct: Math.round(riftChance*100), fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: riftFlightTime, battlePoints: 0 };
             pushReport(__battleReport);
             rift.attackArrival = null;
             rift.attackSource = null;
@@ -37375,7 +37404,7 @@
             }
             if (showLog !== false) log('Sieg gegen '+npc.name+'! ('+planetDisplayName(planetKey)+')'+(hasWeakness?' Schwachstelle ausgenutzt.':'')+(destroyedNpcText?' Zerstörte Gegner-Schiffe: '+destroyedNpcText+'.':'')+' Trümmerfeld hinterlassen.'+cargoNote+(ownLostWinText?' Eigene Verluste: '+ownLostWinText+'.':'')+enterText+' '+npc.name+' wird ab jetzt härter und lohnender.', 'ti-sword');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(chance*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, phasen: phasenErgebnis.phasen, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin, enterung: enterung ? { chance:enterung.chance, erfolg:enterung.erfolg, gekapert:enterung.gekapert, prisengut:enterung.prisengut, verloren:enterung.verloren||null, grund:enterung.grund||null, enterschiffe:enterung.enterschiffe } : null };
+            const __battleReport = { type:'npc-attack', result:'win', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(chance*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, phasen: phasenErgebnis.phasen, fleet:m.composition||fleet, npcFleet, destroyedNpcShips, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLostWin, debris:totalDebrisWin, enterung: enterung ? { chance:enterung.chance, erfolg:enterung.erfolg, gekapert:enterung.gekapert, prisengut:enterung.prisengut, verloren:enterung.verloren||null, grund:enterung.grund||null, enterschiffe:enterung.enterschiffe } : null };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -37391,7 +37420,7 @@
             const ownLostLossText = lostCountsToText(ownLostLoss);
             const ownLossDebrisLoss = combatDebrisOf(ownLostLoss);
             if (showLog !== false) log('Angriff auf '+npc.name+' gescheitert. Flotte kehrt nach '+planetDisplayName(planetKey)+' zurück.'+(ownLostLossText?' Verluste: '+ownLostLossText+'. Trümmerfeld hinterlassen.':'')+(retreatNpc.retreated?' Ein Teil der Flotte konnte sich rechtzeitig zurückziehen.':''), 'ti-shield');
-            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(chance*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, phasen: phasenErgebnis.phasen, fleet:m.composition||fleet, npcFleet: m.npcFleet || npcFleetFor(npc).fleet, flightTime, fromPlanet:planetDisplayName(planetKey), battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
+            const __battleReport = { type:'npc-attack', result:'loss', npcName:npc.name, npcLevel:npc.level, attackPower:Math.round(power), defensePower:effDefense, chancePct:Math.round(chance*100), hasWeakness, weaknessType:npc.weakness, counterMult: npcCounterMult, phasen: phasenErgebnis.phasen, fleet:m.composition||fleet, npcFleet: m.npcFleet || npcFleetFor(npc).fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, battlePoints:bpGained, ownLostShips:ownLostLoss, debris:ownLossDebrisLoss };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
@@ -37467,7 +37496,7 @@
             // abgeschlossene Expedition (expeditionsCompleted) - die Crew hat ja nichts erkundet,
             // und der Erfahrungsbonus daraus soll nicht durch Abbrechen farmbar sein.
             if (showLog !== false) log((m.fleetName||'Expedition')+' hat bei '+planetDisplayName(planetKey)+' Feindkontakt gemeldet und ist wie befohlen abgedreht - ohne Beute, aber vollzählig zurück. (Gegnerstärke '+Math.round(enemyPower)+' gegen Eskorte '+Math.round(escortPower)+')', 'ti-arrows-shuffle');
-            pushReport({ type:'expedition', result:'withdrawn', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), encountered:true, fleet:m.composition||fleet, ownLostShips:{}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100), verlustfreiPct:Math.round(pVerlustfrei*100) });
+            pushReport({ type:'expedition', result:'withdrawn', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, encountered:true, fleet:m.composition||fleet, ownLostShips:{}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100), verlustfreiPct:Math.round(pVerlustfrei*100) });
             state.lastExpeditionEventTime = Date.now();
           } else if (outcome === 'destroyed'){
             // Ein Teil der Eskorte geht verloren (Anteil oben aus dem Kräfteverhältnis) - der Rest
@@ -37475,7 +37504,7 @@
             const lostEscort = applyCombatLosses(fleet, ESCORT_KEYS, schwerVerlustAnteil, planetKey, m.composition);
             const lostEscortTxt = lostCountsToText(lostEscort);
             if (showLog !== false) log((m.fleetName||'Expedition')+' von einer feindlichen Flotte überrascht und schwer getroffen! '+(forscherGerettet?'Die Rettungskapsel brachte das Forschungsschiff heraus, aber ':'Das Forschungsschiff und ')+Math.round(schwerVerlustAnteil*100)+'% der Eskorte gingen verloren, der Rest konnte sich absetzen. (Eskortstärke '+Math.round(escortPower)+' gegen '+Math.round(enemyPower)+', '+planetDisplayName(planetKey)+')'+(lostEscortTxt?' Verloren: '+lostEscortTxt+'. Trümmerfeld hinterlassen.':''), 'ti-alert-triangle');
-            pushReport({ type:'expedition', result:'destroyed', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), encountered:true, fleet:m.composition||fleet, ownLostShips:lostEscort, debris:combatDebrisOf(lostEscort), expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100), verlustfreiPct:Math.round(pVerlustfrei*100) });
+            pushReport({ type:'expedition', result:'destroyed', escortPower:Math.round(escortPower), fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, encountered:true, fleet:m.composition||fleet, ownLostShips:lostEscort, debris:combatDebrisOf(lostEscort), expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100), verlustfreiPct:Math.round(pVerlustfrei*100) });
             state.lastExpeditionEventTime = Date.now();
             playSound('raid');
           } else {
@@ -37702,7 +37731,7 @@
                   : EXPEDITION_WEAKENED_FLAVOR[Math.floor(Math.random()*EXPEDITION_WEAKENED_FLAVOR.length)])
               : (encountered ? ' '+EXPEDITION_DEFENDED_FLAVOR[Math.floor(Math.random()*EXPEDITION_DEFENDED_FLAVOR.length)] : '');
             if (showLog !== false) log((m.fleetName||'Expedition')+' zurück in '+planetDisplayName(planetKey)+'.'+outcomeMsg+' '+findText+sysMsg, findIcon);
-            pushReport(Object.assign({ type:'expedition', result:outcome, escortPower:Math.round(escortPower), findText, systemDiscovered: !!sysMsg, fromPlanet: planetDisplayName(planetKey), encountered, fleet:m.composition||fleet, ownLostShips: (outcome==='weakened' && !forscherGerettet) ? {forscher:1} : {}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), outcomeFlavor: outcomeMsg.trim() }, encountered ? { enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100), verlustfreiPct:Math.round(pVerlustfrei*100) } : {}, reportExtra));
+            pushReport(Object.assign({ type:'expedition', result:outcome, escortPower:Math.round(escortPower), findText, systemDiscovered: !!sysMsg, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, encountered, fleet:m.composition||fleet, ownLostShips: (outcome==='weakened' && !forscherGerettet) ? {forscher:1} : {}, expType:m.expType||'standard', durationSec: Math.round(((m.endTime||Date.now())-(m.startTime||Date.now()))/1000), outcomeFlavor: outcomeMsg.trim() }, encountered ? { enemyPower:Math.round(enemyPower), encounterChancePct:Math.round(ratio*100), verlustfreiPct:Math.round(pVerlustfrei*100) } : {}, reportExtra));
             // Inhaltspaket 5/5: Die heimkehrende Expedition bringt gelegentlich eine Peilung mit.
             // Bewusst NUR hier - eine vernichtete Expedition kommt gar nicht erst zurueck, und ein
             // Spawn aus dem Haupt-Tick heraus wuerde Signale ohne eigenes Zutun regnen lassen.
@@ -37841,6 +37870,51 @@
     return lostCounts;
   }
   function combatDebrisOf(lostCounts){ return lostCounts && lostCounts.__debris ? lostCounts.__debris : null; }
+  // ===== "Recycler hinschicken" aus dem Kampfbericht (02.08.2026, Spieler-Wunsch) =====
+  //
+  // Das Aergernis dahinter: Truemmerfelder entstehen IMMER am eigenen Startplaneten (jeder Kampf
+  // ruft applyCombatLosses mit dem eigenen planetKey), abgebaut werden sie aber nur dort, wo ein
+  // Recycler STATIONIERT ist - collectDebrisWithRecyclers laeuft je Flotte an ihrem Planeten und
+  // ueberspringt jede ohne Recycler ausdruecklich ("Feld bleibt liegen, bis tatsaechlich ein
+  // Recycler dort steht"). Greift man von einer Kolonie ohne Recycler an, liegt die Beute also
+  // herum, bis man von Hand eine Verlegung zusammenklickt - und im Bericht steht kein Wort davon.
+  //
+  // Der Schluessel des Planeten musste dafuer erst in die Berichte (debrisPlanet): Sie fuehrten
+  // bisher nur planetDisplayName() mit, also den ANZEIGENAMEN, und mit dem laesst sich
+  // state.debrisFields nicht nachschlagen. Ein Umbenennen der Kolonie haette jede Zuordnung ueber
+  // den Namen ohnehin zerrissen.
+  const REPORT_DEBRIS_TYPES = ['player-attack','npc-attack','expedition','raid','alliance-base-attack'];
+  function reportDebrisTarget(r){
+    if (!r || !REPORT_DEBRIS_TYPES.includes(r.type)) return null;
+    // 'raid' fuehrt den Schluessel seit jeher als targetPlanet (der eigene, ueberfallene Planet).
+    const key = r.debrisPlanet || (r.type === 'raid' ? r.targetPlanet : null);
+    if (!key) return null;   // Altbericht von vor dieser Aenderung - dann eben kein Knopf
+    const feld = (state.debrisFields||{})[key];
+    if (!feld) return null;
+    const menge = Object.values(feld).reduce((a,b)=>a+b,0);
+    if (menge <= 0) return null;
+    const eintrag = allFleetsWithPlanet().find(x => x.planet === key);
+    if (!eintrag) return null;                       // Kolonie zwischenzeitlich aufgegeben
+    if ((eintrag.fleet.recycler||0) > 0) return null; // baut bereits ab - kein Knopf noetig
+    // Herkunft: der eigene Standort mit den MEISTEN Recyclern. Nicht der naechstgelegene: Wer
+    // zwei Recycler nebenan und dreissig am anderen Ende hat, will die dreissig.
+    let quelle = null;
+    for (const x of allFleetsWithPlanet()){
+      if (x.planet === key) continue;
+      const n = x.fleet.recycler||0;
+      if (n > 0 && (!quelle || n > quelle.anzahl)) quelle = { planet: x.planet, anzahl: n };
+    }
+    return { key, menge, quelle };
+  }
+  function sendRecyclersToDebris(reportId){
+    const r = (reportsCache||[]).find(x => x.id === reportId);
+    const ziel = reportDebrisTarget(r);
+    if (!ziel){ log('Dort liegt kein Trümmerfeld mehr.', 'ti-info-circle'); render(); return; }
+    if (!ziel.quelle){ log('Du hast keine Recycler an einem anderen Standort - baue welche in der Werft.', 'ti-alert-triangle'); return; }
+    // Bewusst ALLE Recycler des Quellstandorts: Eine Teilmenge zu waehlen ist genau der Klickaufwand,
+    // den dieser Knopf abnehmen soll. Wer feiner steuern will, nutzt weiterhin die Flottenverlegung.
+    relocateFleetGroup(ziel.quelle.planet, ziel.key, { recycler: ziel.quelle.anzahl });
+  }
   // Erhoeht eine bereits abgelegte Truemmermenge (Strafexpeditionen, Paket 2/6). Legt die DIFFERENZ
   // wirklich am Planeten ab und gibt erst dann den erhoehten Wert zurueck - wuerde hier nur der
   // Rueckgabewert skaliert, naennte der Bericht eine Menge, die im Truemmerfeld gar nicht liegt
@@ -38030,7 +38104,7 @@
     if (destroyed) state.moonSiegesWon = (state.moonSiegesWon||0)+1;
     logScoreChange(bp*3, (destroyed?'Mond '+targetMoonName+' ZERSTÖRT':'Mondbelagerung gegen '+targetMoonName+' abgewehrt')+' (+'+bp+' Kampfpunkte)', 'ti-sword');
     log((destroyed?'Mondbelagerung erfolgreich - '+targetMoonName+' ('+(m.targetPlayerName||'Unbekannt')+') wurde ZERSTÖRT!':'Mondbelagerung gegen '+targetMoonName+' ('+(m.targetPlayerName||'Unbekannt')+') abgewehrt (Erfolgschance war nur '+chancePct+'%).'), destroyed?'ti-skull':'ti-sword');
-    pushReport({ type:'moon-siege', result: destroyed?'destroyed':'failed', targetMoonName, targetPlayerName: m.targetPlayerName, chancePct, battlePoints: bp, fromPlanet: planetDisplayName(planetKey) });
+    pushReport({ type:'moon-siege', result: destroyed?'destroyed':'failed', targetMoonName, targetPlayerName: m.targetPlayerName, chancePct, battlePoints: bp, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey });
     playSound(destroyed?'win':'raid');
     save();
   }
