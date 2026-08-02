@@ -5693,8 +5693,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.379.0';
+  const VERSION = '8.379.1';
   const PATCHNOTES = [
+    { version:'8.379.1', date:'02.08.2026', changes:[
+      '<strong>Fix: Der Allianz-Raid ließ sich nicht mehr ausrufen</strong> (Spieler-Report, Fortsetzung). Nachdem der Absturz von gestern behoben war, kam darunter ein Boss zum Vorschein, an dem niemand vorbeikam: 0 von 20.000 Lebenspunkten, Zeitfenster abgelaufen, Standort „undefined" – und kein einziger Knopf.',
+      '<strong>Die Ursache war eine Sackgasse im Zustandsmodell.</strong> Die drei Funktionen, die einen Raid weiterschalten, prüfen jede genau eine Phase: Sammelphase, Anflug, Wartezeit zwischen den Wellen. Ein Dokument, dessen Phase keine davon ist, fällt durch alle drei hindurch und bleibt für immer stehen – für die ganze Allianz. Ab jetzt gilt umgekehrt: Nur die drei erkennbar laufenden Fälle zählen als laufend, alles andere darf durch einen neuen Raid ersetzt werden. Ein unbekannter Zustand führt damit zum Ausrufe-Knopf statt in die Sackgasse.',
+      '<strong>Der Abschluss eines abgelaufenen Raids wurde nie gespeichert.</strong> Das Spiel setzte das gemeinsame Raid-Dokument selbst auf „beendet" – ein Schreibzugriff, den der Server seit der Sicherheits-Härtung im Juli ablehnt, weil Raid-Daten nur noch über geprüfte Endpunkte geschrieben werden dürfen. Die Ablehnung wurde stillschweigend verschluckt: Der eigene Bildschirm sah aufgeräumt aus, es ging sogar eine Chat-Meldung „ist ungenutzt entkommen" heraus, aber im gemeinsamen Speicher stand der alte Zustand unverändert weiter. Genau so konnte ein Raid dauerhaft festhängen. Das Aufräumen läuft jetzt über einen eigenen Server-Endpunkt, der vorher prüft, dass wirklich nichts mehr läuft – eine laufende Welle lässt sich damit nicht abbrechen. Die Chat-Meldung erscheint nur noch, wenn tatsächlich etwas geschrieben wurde.',
+      'Kleinigkeiten am Rand: Ein fehlender Standort steht als „unbekannt" da statt als „undefined". Und eine Wartezeit konnte aus einem kaputten Stand heraus in der Zukunft beginnen – 6 Stunden ab einem Zeitpunkt, der noch gar nicht erreicht war; sie startet jetzt spätestens jetzt.'
+    ]},
     { version:'8.379.0', date:'02.08.2026', changes:[
       '<strong>Zwei Nachzügler aus dem Raid-Fehler von gestern.</strong>',
       '<strong>Der Fortschritt-Tab hatte dieselbe ungeschützte Kette wie der Allianz-Tab.</strong> Acht Bereiche hintereinander gezeichnet – Ereigniskalender, Kommandantenprofil, Imperiumsübersicht, Bonusbilanz, Kompendium, Dominanz, Titel, Skins –, und mitten drin die Levelanzeige. Wäre einer davon gestürzt, hätte er alles darunter mitgenommen. Dass es hier nie gemeldet wurde, lag nur daran, dass diese Bereiche keinen „lädt…"-Platzhalter tragen: Ein Ausfall hätte leere Flächen hinterlassen statt eines ewigen Ladetextes – genauso großflächig, nur unauffälliger. Jeder Bereich ist jetzt einzeln abgesichert, mit demselben Helfer wie im Allianz-Tab.',
@@ -30707,6 +30713,37 @@
   const ALLIANCE_RAID_RESTART_COOLDOWN_MS = 6*60*60*1000;
   const ALLIANCE_RAID_WAVE_COOLDOWN_MS = 2*60*60*1000;
   function allianceRaidHpFor(level){ return Math.round(ALLIANCE_RAID_BASE_HP * Math.pow(1.4, Math.max(0, level-1))); }
+  // Ist an diesem Raid-Dokument nichts mehr dran? (v8.379.1, Spieler-Report "immer noch nicht
+  // startbar")
+  //
+  // Vorgeschichte: v8.378.1 hat den Absturz der Raid-Anzeige behoben, aber damit nur das Zeichnen
+  // gerettet. Zum Vorschein kam darunter ein Dokument in einem Zustand, den KEINE Stelle des Spiels
+  // aufloesen konnte: 0 von 20.000 HP, Zeitfenster abgelaufen, kein Standort, und eine Phase, die
+  // weder 'gathering' noch 'idle' noch 'enroute' ist. Die drei Aufraeum-Funktionen pruefen jede
+  // genau eine Phase (checkAllianceRaidDispatch -> 'gathering', checkAllianceRaidArrival ->
+  // 'enroute', checkAllianceRaidEscape -> 'idle'); ein Dokument mit irgendeiner anderen Phase faellt
+  // durch alle drei hindurch und bleibt fuer immer stehen. Der Anzeige-Zweig, den ich gestern als
+  // Auffangnetz gebaut habe, hatte zudem KEINEN Knopf - der Spieler sah einen toten Boss und kam
+  // nicht daran vorbei.
+  //
+  // Die Frage "laeuft hier noch etwas?" wird deshalb ab jetzt an EINER Stelle beantwortet, und zwar
+  // positiv formuliert: Nur die drei erkennbar laufenden Faelle gelten als laufend, alles andere ist
+  // vorbei. Ein unbekannter Zustand fuehrt damit automatisch zu "neuen Raid ausrufen" statt in eine
+  // Sackgasse - das ist die sichere Richtung, denn der Server prueft beim Ausrufen ohnehin selbst
+  // nach und lehnt ab, wenn doch noch eine Welle laeuft.
+  function allianceRaidVorbei(doc){
+    if (!doc) return true;
+    // Laufende Wellen NICHT abschreiben, auch wenn das Zeitfenster inzwischen abgelaufen ist -
+    // eine bereits abgeflogene Flotte soll ihren Kampf noch austragen duerfen (dieselbe Regel wie
+    // in checkAllianceRaidEscape seit jeher). Ausgewertet werden sie von den beiden Check-
+    // Funktionen, nicht von hier.
+    if (doc.phase === 'gathering') return false;
+    if (doc.phase === 'enroute' && doc.dispatch) return false;
+    if (doc.phase === 'resolved') return true;
+    if ((doc.hp || 0) <= 0) return true;                    // Boss ist tot
+    if ((doc.expiresAt || 0) <= Date.now()) return true;    // Zeitfenster abgelaufen
+    return doc.phase !== 'idle';                            // 'idle' = naechste Welle moeglich
+  }
   // ===== Raid-Bosse mit Gesicht (02.08.2026) =====
   // Nach der Weltboss-Erweiterung vom selben Tag war der Allianz-Raid der EINZIGE Boss des Spiels
   // ohne jede Variante: ein Gegner namens "Sternenfresser", der über die gesamte Kontolaufzeit nur
@@ -30918,19 +30955,43 @@
   // Ungenutztes Entkommen: nur wenn der Boss GERADE zwischen zwei Wellen ('idle') wartet, nicht
   // während eine Welle unterwegs ist (die bereits abgeflogene/eingesetzte Flotte soll ihren Kampf noch
   // austragen dürfen, statt mitten im Flug ins Leere zu laufen).
+  //
+  // Seit v8.379.1 raeumt dieselbe Funktion auch JEDEN anderen Zustand ab, an dem nichts mehr laeuft -
+  // ein Boss auf 0 HP ohne Ergebnis, eine Phase, die keine der drei bekannten ist, ein Dokument aus
+  // einer aelteren Spielversion. Vorher pruefte sie ausschliesslich `phase === 'idle'`, und weil die
+  // beiden Schwesterfunktionen genauso je genau eine Phase pruefen, fiel ein solches Dokument durch
+  // alle drei hindurch: Es blieb dauerhaft stehen, fuer die ganze Allianz, ohne dass irgendjemand
+  // etwas dagegen tun konnte (Spieler-Report 02.08.2026 - 0/20.000 HP, Standort "undefined",
+  // Zeitfenster abgelaufen).
+  //
+  // Die Bedingung ist bewusst allianceRaidVorbei() und keine eigene Liste: Die Anzeige entscheidet
+  // mit derselben Funktion, ob sie den "Raid ausrufen"-Knopf zeigt. Zwei getrennte Antworten auf
+  // dieselbe Frage waren in diesem Projekt schon oefter die eigentliche Fehlerursache.
+  // Der Abschluss laeuft ueber den Server (/allianceraid/cleanup) und NICHT mehr per storageSet.
+  //
+  // Bis hierher schrieb diese Funktion das Dokument selbst zurueck. Seit der Haertung vom
+  // 19.07.2026 lehnt der Server genau diesen Schreibvorgang mit 403 ab - richtig so, aber das
+  // `catch(e){}` schluckte die Ablehnung, der lokale Cache wurde trotzdem auf 'resolved' gesetzt
+  // und die Chat-Meldung "ist ungenutzt entkommen" ging heraus. Fuer den einzelnen Spieler sah es
+  // aufgeraeumt aus, im geteilten Speicher stand das Dokument unveraendert weiter - fuer die ganze
+  // Allianz, dauerhaft. Genau so kann der Zustand aus dem Spieler-Report entstanden sein.
+  //
+  // Chat-Meldung und lokaler Cache haengen jetzt an `data.changed`: Nur wer wirklich aufgeraeumt
+  // hat, meldet es. Damit kann die Anzeige nicht mehr etwas behaupten, was nie geschrieben wurde.
   async function checkAllianceRaidEscape(){
     const tag = myAllianceTag();
     const doc = allianceRaidCache;
-    if (!tag || !useBackend() || !doc || doc.phase !== 'idle' || doc.expiresAt > Date.now()) return;
+    if (!tag || !useBackend() || !doc || doc.result || !allianceRaidVorbei(doc)) return;
+    const abgelaufen = (doc.expiresAt || 0) <= Date.now();
     try {
-      const r = await storageGet('alliance:'+tag+':raid', true);
-      const fresh = (r && r.value) ? JSON.parse(r.value) : doc;
-      if (fresh.phase !== 'idle'){ allianceRaidCache = fresh; return; }
-      fresh.result = { destroyed:false, escaped:true, resolvedAt: Date.now() };
-      fresh.phase = 'resolved';
-      await storageSet('alliance:'+tag+':raid', JSON.stringify(fresh), true);
-      allianceRaidCache = fresh;
-      await postAllianceBaseNews('Der Sternenfresser "'+allianceRaidBossName(fresh.level)+'" ist ungenutzt entkommen (Zeitfenster abgelaufen).');
+      const res = await backendFetch('/allianceraid/cleanup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag }) });
+      const data = await res.json();
+      if (!res.ok || !data.ok) return;
+      if (data.doc) allianceRaidCache = data.doc;
+      if (!data.changed) return;
+      await postAllianceBaseNews(abgelaufen
+        ? 'Der Sternenfresser "'+allianceRaidBossName(doc.level)+'" ist ungenutzt entkommen (Zeitfenster abgelaufen).'
+        : 'Der Allianz-Raid gegen "'+allianceRaidBossName(doc.level)+'" wurde abgeschlossen - ein neuer Raid kann ausgerufen werden.');
     } catch(e){}
   }
   // Angreifer-Seite, pro Teilnehmer: eigene Belohnung/Verluste bzw. unversehrte Rückkehr (bei
@@ -31001,10 +31062,15 @@
     const canLead = amIAllianceMusterLeader();
     const durOptions = ALLIANCE_MUSTER_DURATIONS.map(s => `<option value="${s}"${selectedAttrFor('raidDuration', s, ALLIANCE_MUSTER_DURATIONS[0])}>${fmtDuration(s)}</option>`).join('');
 
-    if (!doc || doc.phase === 'resolved'){
+    if (allianceRaidVorbei(doc)){
       const res = doc ? doc.result : null;
       const nextLevel = res && res.destroyed ? (doc.level||1)+1 : (doc ? (doc.level||1) : 1);
-      const endedAt = doc ? (res ? res.resolvedAt : doc.expiresAt) : 0;
+      // Bei einem Dokument OHNE Ergebnis auf "jetzt" begrenzen (v8.379.1). Sonst kann ein kaputter
+      // Stand - Boss auf 0 HP, Zeitfenster aber noch offen - eine Wartezeit erzeugen, die es nie
+      // gab: 6 Stunden AB dem kuenftigen Ablauf. Fuer einen regulaer beendeten Raid aendert das
+      // nichts, denn dort gibt es immer ein `result` mit `resolvedAt`; und eine wirklich laufende
+      // Welle kommt hier gar nicht erst an (allianceRaidVorbei liefert dann false).
+      const endedAt = doc ? (res ? res.resolvedAt : Math.min(doc.expiresAt || 0, Date.now())) : 0;
       const restartCdLeft = doc ? Math.max(0, (endedAt||0) + ALLIANCE_RAID_RESTART_COOLDOWN_MS - Date.now()) : 0;
       let html = `<div class="bmeta" style="margin-bottom:8px;">${res ? (res.destroyed ? 'Der letzte Sternenfresser wurde besiegt!' : 'Der letzte Sternenfresser ist ungenutzt entkommen.') : 'Aktuell läuft kein Allianz-Raid.'} Nächster Gegner: <strong>${allianceRaidBossName(nextLevel)}</strong> (${fmt(allianceRaidHpFor(nextLevel))} HP).</div>`;
       // Die Kampfregel des naechsten Bosses VOR dem Ausrufen (02.08.2026) - eine Schwaeche, die
@@ -31031,7 +31097,7 @@
       </div>
       <div class="progress-outer" style="margin-bottom:6px;"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
       <div class="bmeta" style="margin-bottom:4px; color:#e0a548;"><i class="ti ${allianceRaidBoss(doc.level).icon}" aria-hidden="true" style="margin-right:3px;"></i>${allianceRaidBoss(doc.level).trait}</div>
-      <div class="bmeta" style="margin-bottom:4px;">Standort: <strong style="color:#fff;">${sys?sys.name:doc.targetSector}</strong> · Zeitfenster: noch ${fmtDuration(Math.max(0,doc.expiresAt-Date.now())/1000)} bis er endgültig entkommt.</div>`;
+      <div class="bmeta" style="margin-bottom:4px;">Standort: <strong style="color:#fff;">${sys ? sys.name : (doc.targetSector || 'unbekannt')}</strong> · Zeitfenster: noch ${fmtDuration(Math.max(0,doc.expiresAt-Date.now())/1000)} bis er endgültig entkommt.</div>`;
 
     if (doc.phase === 'idle'){
       const waveCdLeft = Math.max(0, (doc.lastWaveEndedAt||0) + ALLIANCE_RAID_WAVE_COOLDOWN_MS - Date.now());

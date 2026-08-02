@@ -118,14 +118,22 @@ const textVon = (page, id) => page.evaluate(i => {
     await ctx.close();
   }
 
-  // ============================================ 2) Der Fall, an dem es starb, zeigt echten Inhalt
+  // ============================================ 2) Ein LAUFENDER Boss zeigt echten Inhalt
   // Nicht nur "irgendwas statt lädt…": Bei einem laufenden Boss gehoeren Name und Lebenspunkte
   // dazu, sonst waere die Behebung nur ein stiller Platzhalter.
+  //
+  // Der Fall stand hier urspruenglich auf `enroute` mit `dispatch: null` - dem Zustand, an dem die
+  // Anzeige starb. Seit v8.379.1 gilt genau der als BEENDET (ein Dokument ohne Verbandsdaten
+  // beschreibt keinen fliegenden Verband, und /resolve kann damit nichts anfangen), landet also im
+  // Ausruf-Zweig statt in der Boss-Ansicht. Geprueft wird er jetzt in Abschnitt 6, wo es um den
+  // Ausweg geht; hier steht ein wirklich laufender Boss.
   {
-    const { page, ctx } = await starte(browser, SPIEL_URL, raidDoc({ phase:'enroute', dispatch:null }));
+    const { page, ctx } = await starte(browser, SPIEL_URL,
+      raidDoc({ phase:'idle', lastWaveEndedAt: Date.now()-1e5, lastWaveResult:{ damage:20000, participantCount:3 } }));
     const txt = await textVon(page, 'allianceRaidBox');
     check('2: der Bossname steht da', /Panzerhülle/.test(txt || ''), (txt || '').slice(0, 60));
     check('2: die Lebenspunkte stehen da', /30\.0k \/ 50\.0k HP/.test(txt || ''));
+    check('2: und die Eigenschaft des Bosses', /Massive Panzerung/.test(txt || ''));
     await ctx.close();
   }
 
@@ -249,6 +257,87 @@ const textVon = (page, id) => page.evaluate(i => {
       await ctx.close();
     } finally {
       fs.rmSync(dir, { recursive:true, force:true });
+    }
+  }
+
+  // ============================================ 6) Der Zustand aus dem zweiten Spieler-Report
+  //
+  // v8.378.1 hat den Absturz behoben - darunter kam ein Dokument zum Vorschein, das KEINE Stelle
+  // des Spiels aufloesen konnte: 0 von 20.000 HP, Zeitfenster abgelaufen, kein Standort, Phase
+  // 'enroute' ohne dispatch. Die drei Aufraeum-Funktionen pruefen je genau eine Phase, also fiel es
+  // durch alle drei; und der Auffangnetz-Zweig der Anzeige hatte KEINEN Knopf. Ergebnis: ein toter
+  // Boss, an dem niemand vorbeikam ("immer noch nicht startbar").
+  {
+    const totesDoc = raidDoc({ phase:'enroute', hp:0, expiresAt: Date.now()-8*3600*1000, targetSector: undefined });
+    const { page, ctx, errs } = await starte(browser, SPIEL_URL, totesDoc);
+    const txt = await textVon(page, 'allianceRaidBox');
+    check('6: die Box bietet einen Ausweg an', /Raid ausrufen|Bereit in/.test(txt || ''), (txt || '').slice(0, 90));
+    const knopf = await page.evaluate(() => !!document.querySelector('#allianceRaidBox [data-start-alliance-raid]'));
+    check('6: der Knopf existiert wirklich (nicht nur der Text)', knopf);
+    check('6: sie zeigt nicht mehr die Sackgassen-Meldung',
+      !/wird gerade neu geordnet/.test(txt || ''), (txt || '').slice(0, 90));
+    check('6: kein Absturz', errs.length === 0, errs.slice(0, 2));
+    await ctx.close();
+  }
+
+  // Und "undefined" darf nirgends als Standort stehen (im Screenshot war es zu sehen).
+  {
+    const { page, ctx } = await starte(browser, SPIEL_URL,
+      raidDoc({ phase:'idle', targetSector: undefined, lastWaveEndedAt: Date.now()-1e5 }));
+    const txt = await textVon(page, 'allianceRaidBox');
+    check('6: fehlender Standort steht als "unbekannt" da, nicht als "undefined"',
+      /Standort:\s*unbekannt/.test(txt || '') && !/undefined/.test(txt || ''),
+      (txt || '').replace(/\s+/g, ' ').slice(0, 110));
+    await ctx.close();
+  }
+
+  // ============================================ 7) Frontend und Backend antworten gleich
+  //
+  // allianceRaidVorbei() gibt es zweimal: einmal im Spiel (entscheidet, ob der Knopf erscheint) und
+  // einmal im Server (entscheidet, ob /create und /cleanup mitspielen). Laufen sie auseinander,
+  // zeigt das Spiel einen Knopf, den der Server ablehnt - der Spieler klickt ins Leere. Genau
+  // dieses Auseinanderlaufen zweier Kopien ist der wiederkehrende Fehler dieses Projekts, deshalb
+  // werden hier BEIDE ausgefuehrt und ueber dieselbe Falltabelle verglichen.
+  {
+    const src = fs.readFileSync(SPIELDATEI, 'utf8');
+    const fe = (src.match(/function allianceRaidVorbei\(doc\)\{[\s\S]*?\n  \}/) || [])[0];
+    check('7: die Frontend-Funktion wurde gefunden', !!fe);
+    const BE_PFAD = path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js');
+    if (!fs.existsSync(BE_PFAD)){
+      check('7: Backend-Repo liegt daneben (ohne es ist die Spiegelung UNGEPRUEFT)', false, BE_PFAD);
+    } else {
+      const be = fs.readFileSync(BE_PFAD, 'utf8');
+      const bf = (be.match(/function allianceRaidVorbeiServer\(doc\) \{[\s\S]*?\n\}/) || [])[0];
+      check('7: die Backend-Funktion wurde gefunden', !!bf);
+      const vorneFE = new Function(fe + '; return allianceRaidVorbei;')();
+      const vorneBE = new Function(bf + '; return allianceRaidVorbeiServer;')();
+      const jetzt = Date.now();
+      const FAELLE7 = [
+        ['kein Dokument', null],
+        ['resolved', { phase:'resolved', hp:5, expiresAt: jetzt+9e6 }],
+        ['gathering', { phase:'gathering', hp:5, expiresAt: jetzt+9e6, gatherEndsAt: jetzt+9e5 }],
+        ['gathering, Fenster zu', { phase:'gathering', hp:5, expiresAt: jetzt-1 }],
+        ['enroute mit dispatch', { phase:'enroute', hp:5, expiresAt: jetzt+9e6, dispatch:{ arrivalAt: jetzt+5e5 } }],
+        ['enroute ohne dispatch', { phase:'enroute', hp:5, expiresAt: jetzt+9e6 }],
+        ['idle, lebendig', { phase:'idle', hp:5, expiresAt: jetzt+9e6 }],
+        ['idle, Fenster zu', { phase:'idle', hp:5, expiresAt: jetzt-1 }],
+        ['idle, tot', { phase:'idle', hp:0, expiresAt: jetzt+9e6 }],
+        ['unbekannte Phase', { phase:'irgendwas', hp:5, expiresAt: jetzt+9e6 }],
+        ['ohne Phase', { hp:5, expiresAt: jetzt+9e6 }],
+        ['ganz leer', {}]
+      ];
+      let ungleich = 0;
+      for (const [name, d] of FAELLE7){
+        const a = !!vorneFE(d), b = !!vorneBE(d);
+        if (a !== b){ ungleich++; check('7: "' + name + '" - beide Seiten sind sich einig', false, { frontend:a, backend:b }); }
+      }
+      check('7: alle ' + FAELLE7.length + ' Faelle werden beidseitig gleich beurteilt', ungleich === 0, ungleich);
+      // Und die Antworten sind auch die richtigen - sonst waeren zwei gleich falsche Kopien gruen.
+      check('7: eine laufende Sammelphase gilt als laufend', vorneFE(FAELLE7[2][1]) === false);
+      check('7: ein fliegender Verband gilt als laufend', vorneFE(FAELLE7[4][1]) === false);
+      check('7: enroute OHNE dispatch gilt als vorbei', vorneFE(FAELLE7[5][1]) === true);
+      check('7: ein toter Boss gilt als vorbei', vorneFE(FAELLE7[8][1]) === true);
+      check('7: idle mit HP und offenem Fenster gilt als laufend', vorneFE(FAELLE7[6][1]) === false);
     }
   }
 
