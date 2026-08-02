@@ -110,7 +110,13 @@ function arrAus(name){
   check('3: sie gibt Bergungsgut und eine Gegenmassnahme',
     /a\.bergung = \(a\.bergung\|\|0\) \+ menge/.test(aufloesung) &&
     /a\.gegenmassnahmen = \(a\.gegenmassnahmen\|\|0\) \+ 1/.test(aufloesung));
-  const tiefeZweig = aufloesung.slice(aufloesung.indexOf("sig.kind === 'tiefe'"), aufloesung.indexOf("sig.kind === 'tiefe'")+900);
+  // Bis zum Ende des Zweigs statt fester 900 Zeichen (02.08.2026). Der Block ist derzeit rund 700
+  // Zeichen lang, das Fenster passte also - aber die Pruefung darunter ist VERNEINEND ("kein
+  // a.splitter ="), und bei einer verneinenden Pruefung ist ein zu kleines Fenster die gefaehrliche
+  // Richtung: Waechst der Zweig ueber 900 Zeichen, faellt eine spaeter eingefuegte Splitter-
+  // Zuweisung aus dem Fenster - und der Test wird still GRUEN, statt rot zu werden.
+  const tiefeVon = aufloesung.indexOf("sig.kind === 'tiefe'");
+  const tiefeZweig = aufloesung.slice(tiefeVon, aufloesung.indexOf('\n    }', tiefeVon) + 6);
   // Auf die ZUWEISUNG pruefen, nicht auf das Wort: Der Kommentar an dieser Stelle erklaert gerade,
   // WARUM es keine Splitter gibt - eine Suche nach /splitter/i waere daran gescheitert, obwohl der
   // Code richtig ist. (Genau so ist dieser Check beim ersten Anlauf rot geworden.)

@@ -93,7 +93,13 @@ check('5: der Umschulungsbefehl wird beim Doktrinwechsel eingelöst',
 // ---------------------------------------------------------------- Hilfe mitgezogen (CLAUDE.md 6)
 check('6: die Hilfe erklärt Gegenstände und Materialien',
   src.includes('Verbrauchsgegenstände & seltene Materialien'));
-const hilfe = src.slice(src.indexOf('Verbrauchsgegenstände & seltene Materialien'), src.indexOf('Verbrauchsgegenstände & seltene Materialien') + 2500);
+// Bis zum Ende des Hilfe-Eintrags statt fester 2500 Zeichen (02.08.2026 nachgemessen): Das Fenster
+// hatte noch 46 Zeichen Luft - der naechste ergaenzte Satz haette "je vier davon" hinausgeschoben
+// und diesen Test fehlschlagen lassen, obwohl der Text unveraendert dasteht. Ein Test, der bei
+// einer harmlosen Textergaenzung Alarm schlaegt, kostet mehr Zeit als er spart.
+const hilfeVon = src.indexOf('Verbrauchsgegenstände & seltene Materialien');
+const hilfe = src.slice(hilfeVon, src.indexOf("' },", hilfeVon) + 4);
+check('6: der Hilfe-Eintrag wurde vollstaendig geschnitten', hilfe.length > 2000 && hilfe.trimEnd().endsWith('},'), hilfe.length);
 check('6: die Hilfe nennt die neuen Materialien samt Senke',
   /Resonanzkristall/.test(hilfe) && /Urmaterie/.test(hilfe) && /Resonanzschild-Emitter/.test(hilfe));
 const frag = (src.match(/const FRAGMENTS_NEEDED = (\d+)/) || [])[1];
