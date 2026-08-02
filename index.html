@@ -5693,8 +5693,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.378.0';
+  const VERSION = '8.378.1';
   const PATCHNOTES = [
+    { version:'8.378.1', date:'02.08.2026', changes:[
+      '<strong>Fix: Der Allianz-Raid zeigte dauerhaft „lädt…" und ließ sich nicht bedienen</strong> (Spieler-Report). Es war kein Ladevorgang, sondern ein Absturz: Die Anzeige griff im letzten Zweig blind auf die Verbandsdaten zu, die es in diesem Moment gar nicht geben muss. Der Server setzt sie beim Ausrufen jeder neuen Welle ausdrücklich zurück und füllt sie erst beim Abflug wieder – ein völlig regulärer Zustand. Jede Berechnung im Spiel berücksichtigte das längst, nur die Anzeige nicht.',
+      'Weil der Fehler noch vor dem ersten Zeichnen auftrat, blieb der Kasten für immer auf seinem Anfangstext stehen. Ein ewiger Ladetext ist die irreführendste aller Fehlermeldungen – er sieht aus wie ein langsamer Server. Zusätzlich fängt derselbe Zweig jeden unerwarteten Zustand mit ab; auch dafür gibt es jetzt eine echte Anzeige statt eines Absturzes.',
+      '<strong>Ein einzelner Fehler reißt die Allianz-Seite nicht mehr mit.</strong> Die acht Bereiche des Allianz-Tabs wurden ungeschützt hintereinander gezeichnet – wer stürzte, nahm alle darunter mit. Beim Raid waren das die Allianzgebäude, die Großprojekte und die Weltprojekte, die aus demselben Grund leer blieben. Jeder Bereich ist jetzt einzeln abgesichert: Ein Ausfall kostet nur noch sich selbst und sagt es auch, statt sich als Ladevorgang zu tarnen.'
+    ]},
     { version:'8.378.0', date:'02.08.2026', changes:[
       '<strong>Fix: Wer mit der Forschung durch ist, bekam die neuen Meilensteine nie.</strong> Die Prüfung lief ausschließlich in dem Moment, in dem eine Forschung fertig wird – für ein Konto, das alles erforscht hat, gibt es diesen Moment nie wieder. Ausgerechnet die Änderungen der letzten beiden Versionen traf das am härtesten: „Vollständige Forschung" wurde gestern überhaupt erst erreichbar gemacht und blieb für die einzige Gruppe, die sie erfüllen kann, trotzdem unerreichbar. Dasselbe für die vier neuen Meilensteine.',
       'Die Meilensteine werden jetzt <strong>einmal beim Laden nachgetragen</strong>. Wer die Bedingungen längst erfüllt, bekommt Sternenessenz und Kredite beim nächsten Start gutgeschrieben – mit Eintrag im Protokoll und im Berichtsarchiv, damit nachvollziehbar bleibt, wofür. Fällt dabei mehr als einer auf einmal, spielt der Erfolgston trotzdem nur einmal.',
@@ -31049,10 +31054,34 @@
     }
 
     // phase === 'enroute'
-    const remainArr = Math.max(0, doc.dispatch.arrivalAt - Date.now());
+    //
+    // `doc.dispatch` MUSS hier geprueft werden (Fehlerbehebung 02.08.2026, Spieler-Report "Allianz-
+    // Raid geht nicht"). Der Server setzt beim Ausrufen einer neuen Welle ausdruecklich
+    // `doc.dispatch = null` und fuellt es erst wieder beim Abflug (/checkdispatch) - null ist also
+    // ein voellig regulaerer Zustand, kein Datenschaden. Jede LOGIK-Stelle beruecksichtigt das
+    // laengst (checkAllianceRaidArrival hat `!doc.dispatch` in der Wache); nur diese ANZEIGE-Stelle
+    // hat es vergessen und griff blind auf `doc.dispatch.arrivalAt` zu.
+    //
+    // Verschaerfend: Dieser Zweig ist der FALLTHROUGH. Er faengt nicht nur 'enroute', sondern jeden
+    // unerwarteten oder fehlenden phase-Wert - ein Dokument ohne `phase` landete ebenfalls hier.
+    // Und weil der Absturz VOR dem einzigen `box.innerHTML` dieses Zweigs passiert, blieb die Box
+    // fuer immer auf ihrem Anfangsinhalt "laedt..." stehen: Der Spieler sah einen ewigen Ladetext
+    // fuer ein Feature, das schlicht nie gezeichnet wurde.
+    if (doc.phase === 'enroute' && doc.dispatch){
+      const remainArr = Math.max(0, doc.dispatch.arrivalAt - Date.now());
+      box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:rgba(226,75,74,0.4);">${hpBarHtml}
+        <div class="bname"><i class="ti ti-rocket" aria-hidden="true" style="color:#e24b4a;"></i> Verband unterwegs <span class="lvl-pill">${fmtDuration(remainArr/1000)}</span></div>
+        <div class="bmeta">${doc.dispatch.participantCount} Kommandanten, ${fmt(doc.dispatch.totalShips)} Schiffe, ${fmt(doc.dispatch.totalPower)} Angriffskraft - trifft geschlossen am Ziel ein.</div>
+      </div>`;
+      return;
+    }
+
+    // Alles andere: Boss ist da, aber der Zustand passt in keine der bekannten Phasen. Statt zu
+    // stuerzen (und damit die Box UND alle Boxen darunter zu verlieren) wird gezeigt, was sicher
+    // bekannt ist - Name, Lebenspunkte, Standort - plus ein ehrlicher Hinweis. Der naechste
+    // Abgleich mit dem Server raeumt den Zustand ohnehin auf.
     box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:rgba(226,75,74,0.4);">${hpBarHtml}
-      <div class="bname"><i class="ti ti-rocket" aria-hidden="true" style="color:#e24b4a;"></i> Verband unterwegs <span class="lvl-pill">${fmtDuration(remainArr/1000)}</span></div>
-      <div class="bmeta">${doc.dispatch.participantCount} Kommandanten, ${fmt(doc.dispatch.totalShips)} Schiffe, ${fmt(doc.dispatch.totalPower)} Angriffskraft - trifft geschlossen am Ziel ein.</div>
+      <div class="bmeta">Der Verband wird gerade neu geordnet - der Zustand aktualisiert sich beim nächsten Abgleich von selbst.</div>
     </div>`;
   }
   // Koordinierte Allianzbasis-Angriffe: eigenständige Box (Sammelphase/Verband/Auflösung + Warnung
@@ -46071,14 +46100,42 @@
           btn.onclick = () => { state.allianceSubTab = btn.getAttribute('data-alliance-subtab'); render(); save(); };
         });
       } catch(e){ console.error('Allianz-Unterreiter-Umschaltung fehlgeschlagen:', e); }
-      renderAllianceTechBox();
-      renderAllianceBaseBox();
-      renderAllianceMusterBox();
-      renderAllianceFleetParadeBox();
-      renderAllianceRaidBox();
-      renderAllianceBuildingBox();
-      renderAllianceEndgameBox();
-      renderAllianceWorldProjectsBox();
+      // Jede Box EINZELN abgesichert (02.08.2026, Spieler-Report "Allianz-Raid geht nicht").
+      //
+      // Der Kommentar direkt darueber beschreibt genau diesen Fehler - "wenn eine dieser Boxen bei
+      // echten Serverdaten aus irgendeinem Grund eine Exception wirft, brach das komplette render()
+      // vorher an dieser Stelle ab" -, aber abgesichert wurde damals nur die Reiter-Umschaltung
+      // davor, nicht die acht Aufrufe selbst. Als es dann wirklich passierte (renderAllianceRaidBox
+      // stuerzte an einem regulaeren `dispatch: null`), riss ein einziger Fehler die Raid-Box UND
+      // alle drei Boxen darunter mit - und weil er bei JEDEM Durchlauf ab dem ersten auftrat, wurde
+      // die Raid-Box nie ein einziges Mal gezeichnet und zeigte dauerhaft ihren Anfangstext
+      // "laedt...". Ein ewiger Ladetext ist die irrefuehrendste aller Fehlermeldungen: Er sieht aus
+      // wie ein langsamer Server und ist in Wahrheit ein Absturz.
+      //
+      // Die Ursache ist behoben; diese Schleife sorgt dafuer, dass der naechste Fehler dieser Art
+      // nur seine eigene Box kostet und sich dabei zu erkennen gibt, statt sich als Ladevorgang zu
+      // tarnen. Eine bereits gezeichnete Box bleibt stehen (ein alter Stand ist besser als eine
+      // leere Flaeche); nur eine, die es nie ueber ihren Platzhalter geschafft hat, sagt es.
+      const ALLIANZ_BOXEN = [
+        ['allianceTechBox',          renderAllianceTechBox],
+        ['allianceBaseBox',          renderAllianceBaseBox],
+        ['allianceMusterBox',        renderAllianceMusterBox],
+        ['allianceFleetParadeBox',   renderAllianceFleetParadeBox],
+        ['allianceRaidBox',          renderAllianceRaidBox],
+        ['allianceBuildingBox',      renderAllianceBuildingBox],
+        ['allianceEndgameBox',       renderAllianceEndgameBox],
+        ['allianceWorldBox',         renderAllianceWorldProjectsBox]
+      ];
+      for (const [boxId, fn] of ALLIANZ_BOXEN){
+        try { fn(); }
+        catch(e){
+          console.error('Allianz-Box "'+boxId+'" konnte nicht gezeichnet werden:', e);
+          const el = document.getElementById(boxId);
+          if (el && /^\s*lädt/.test(el.textContent||'')){
+            el.innerHTML = '<div class="bmeta" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>Dieser Bereich konnte nicht geladen werden. Die übrigen Allianz-Bereiche funktionieren weiter; ein Neuladen der Seite behebt es meist.</div>';
+          }
+        }
+      }
     }
     renderReportsBox();
     renderIntelBox();
