@@ -5695,8 +5695,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.388.0';
+  const VERSION = '8.389.0';
   const PATCHNOTES = [
+    { version:'8.389.0', date:'02.08.2026', changes:[
+      '<strong>Zwei weitere Anzeigebereiche schreiben sich nicht mehr jede Sekunde selbst neu.</strong> Gemessen über acht Sekunden: die <strong>Offiziersliste</strong> baute sich acht Mal komplett neu auf (108,2 kB bei 13,5 kB Größe), die <strong>Statistik-Kacheln</strong> ebenfalls acht Mal (23,5 kB bei 2,9 kB) – jedes Mal Zeichen für Zeichen dasselbe. Jetzt null Mal.',
+      'Die Statistik-Kacheln liefen dabei auf <em>jedem</em> Reiter mit, auch dort, wo man sie gar nicht sieht – dieselbe Klasse wie die Gegnerliste vor der Umstellung im Juli.',
+      'Für die Bedienung ändert sich nichts: Die Knöpfe der Offiziersliste wirken auch dann noch, wenn die Liste sekundenlang nicht neu gebaut wurde. Genau das ist eigens geprüft – ein Knopf, der nach einem übersprungenen Takt nicht mehr reagiert, wäre der teuerste Fehler dieser Umstellung.'
+    ]},
     { version:'8.388.0', date:'02.08.2026', changes:[
       '<strong>Drei Kampfarten hatten eine funktionierende Wiedergabe, aber keinen Knopf dafür.</strong> Leerenriss, Piraten-Trümmerraub und der Angriff auf eine feindliche Allianzbasis liefen längst durch dieselbe Wiedergabe-Maschinerie wie Überfall, NPC-Kampf und Spielerduell – erreichbar waren sie über die Oberfläche aber nicht. Nachgemessen, bevor etwas geändert wurde: In einem Berichte-Bestand aus genau diesen drei Arten gab es <em>null</em> Knöpfe.',
       'Ursache war eine feste Liste im Markup der Berichtsliste, die drei Kampfarten weniger kannte als die Wiedergabe daneben darstellen konnte. Diese Frage beantwortet jetzt <em>eine</em> Stelle, damit die nächste Kampfart nicht wieder an einer zweiten vergessen wird.',
@@ -44848,7 +44853,16 @@
       renderFlagship();
       const officerBox = document.getElementById('officerBox');
       if (officerBox){
-        officerBox.innerHTML = OFFICERS.map(o => {
+        // setBoxHtml statt innerHTML (02.08.2026): GEMESSEN 8 Neuaufbaeuten in 8 Sekunden auf dem
+        // Offiziere-Reiter, 108,2 kB Markup bei 13,5 kB Boxgroesse - Zeichen fuer Zeichen identisch.
+        // Die groesste noch offene Liste nach der Runde v8.310.0/v8.311.0.
+        //
+        // Die beiden Verdrahtungslaeufe liegen bewusst IM if: Genau sie sind teuer. Wird das
+        // Schreiben uebersprungen, stehen die alten Knoten samt Handlern - beide Selektoren sind
+        // box-lokal (officerBox.querySelectorAll), treffen also nichts ausserhalb, das sonst
+        // unverdrahtet bliebe. Kein canvas[data-ship-icon] in dieser Box, der Flottenanstrich
+        // gehoert hier also nicht in den Schluessel (anders als bei #fleet/#expeditionBox).
+        const officerHtml = OFFICERS.map(o => {
           const lvl = officerLevel(o.key);
           const maxed = lvl >= OFFICER_MAX_LEVEL;
           const next = lvl + 1;
@@ -44885,8 +44899,10 @@
             </div>
           `;
         }).join('');
-        officerBox.querySelectorAll('[data-upgrade-officer]').forEach(btn => btn.onclick = () => upgradeOfficer(btn.getAttribute('data-upgrade-officer')));
-        officerBox.querySelectorAll('[data-pick-talent]').forEach(btn => btn.onclick = () => pickOfficerTalent(btn.getAttribute('data-pick-talent'), btn.getAttribute('data-talent')));
+        if (setBoxHtml(officerBox, 'officer', officerHtml)){
+          officerBox.querySelectorAll('[data-upgrade-officer]').forEach(btn => btn.onclick = () => upgradeOfficer(btn.getAttribute('data-upgrade-officer')));
+          officerBox.querySelectorAll('[data-pick-talent]').forEach(btn => btn.onclick = () => pickOfficerTalent(btn.getAttribute('data-pick-talent'), btn.getAttribute('data-talent')));
+        }
       }
       const moduleBox = document.getElementById('moduleBox');
       if (moduleBox){
@@ -46247,11 +46263,15 @@
         { label:'Kredite', value:fmt(Math.round(state.credits||0)), color:'#fac775', icon:'ti-diamond' },
         { label:'Frachter auf Routen', value:fmt(frachterBoundToRoutes()), color:'#9fe1cb', icon:'ti-truck' }
       ];
-      tilesBox.innerHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px;">` +
+      // setBoxHtml statt innerHTML (02.08.2026): GEMESSEN 8 Neuaufbaeuten in 8 Sekunden mit 23,5 kB
+      // bei 2,9 kB Boxgroesse - und zwar auf JEDEM Reiter, nicht nur dort, wo man sie sieht. Damit
+      // gehoert sie zu derselben reiterunabhaengigen Klasse wie #npcList vor v8.311.0. Keine
+      // Klick-Handler, keine Canvas: der risikoaermste Fall des Musters.
+      setBoxHtml(tilesBox, 'statsTiles', `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px;">` +
         tiles.map(t => `<div class="card-row" style="flex-direction:column; align-items:center; padding:0.6rem; gap:2px;">
           <div style="font-size:20px; font-weight:600; color:${t.color}; font-variant-numeric:tabular-nums;"><i class="ti ${t.icon}" aria-hidden="true" style="font-size:13px; margin-right:4px;"></i>${t.value}</div>
           <div class="bmeta">${t.label}</div>
-        </div>`).join('') + `</div>`;
+        </div>`).join('') + `</div>`);
     }
     // Aktuelle Produktion pro Sekunde als Balken je Ressource.
     const prodNowBox = document.getElementById('prodNowBox');
