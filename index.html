@@ -5693,8 +5693,19 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.375.0';
+  const VERSION = '8.376.0';
   const PATCHNOTES = [
+    { version:'8.376.0', date:'02.08.2026', changes:[
+      '<strong>Zwei Fehler in den Forschungs-Meilensteinen und die Gruppe, die es nie gab.</strong>',
+      '<strong>„Vollständige Forschung" war unerreichbar.</strong> Der größte Meilenstein des Spiels – 20 Sternenessenz, 5.000 Kredite – verlangte „jede einzelne Forschung auf Maximalstufe" und meinte das wörtlich: Auch die vier <strong>Ewigkeitsforschungen</strong> zählten mit. Die haben aber per Definition keine Obergrenze; ihre 999 Stufen kosten je Stufe 32% mehr als die davor. Rechnerisch war der Meilenstein damit für niemanden zu holen, und der Fortschrittsbalken stand bei jedem Spieler dauerhaft bei rund einem Zehntel fest. Direkt daneben steht seit v8.319.0 eine Funktion, die exakt dieselbe Frage stellt und die Ewigkeitsforschungen ausdrücklich ausnimmt – zwei Stellen, dieselbe Frage, zwei Antworten.',
+      'Der Meilenstein zählt jetzt die <strong>43 Forschungen mit echter Maximalstufe</strong>. Die Liste bilden Prüfung und Anzeige nicht mehr jede für sich, sondern gemeinsam an einer Stelle: Genau diese Doppelung war der Grund, warum derselbe Fehler an zwei Orten gleichzeitig stand.',
+      '<strong>„Alle Wirtschafts-Forschungen" waren nicht alle.</strong> Isotopen-Anreicherung und Vakuumfluktuationskompression – die zwei teuersten Vertiefungen des Wirtschaftszweigs – standen in keiner Gruppe und wurden vom Meilenstein daneben stillschweigend übersprungen. Beide zählen jetzt mit. Wer den Meilenstein bereits erreicht hat, behält ihn.',
+      '<strong>Neu: Werkstoff-Meisterschaft I und II.</strong> Die längste zusammenhängende Strecke des Spiels – Nanotechnologie → Quantenphysik → Hochenergiephysik → Fusionskern-Synthese → KI-Technologie → Metamaterial-Synthese → Singularitätsphysik, dazu die Raffinerie-Optimierung – war die einzige große Kette ganz ohne Meilenstein. Von 47 Forschungen standen 18 in gar keiner Gruppe; acht davon sind diese hier.',
+      'Stufe I verlangt die erste Hälfte der Kette und die Raffinerie-Optimierung auf Stufe 5 (3 Sternenessenz, 500 Kredite), Stufe II die vollständige Kette bis zur Singularitätsphysik und die Raffinerie voll ausgebaut (8 Sternenessenz, 1.500 Kredite) – dieselben Beträge wie bei den vier bestehenden Paaren. Die Teilung folgt der Kette und nicht wie sonst dem 50%/100%-Schema, weil sieben der acht Forschungen nur eine einzige Stufe haben: „zur Hälfte ausgebaut" hätte dort exakt dasselbe verlangt wie „voll ausgebaut", und Stufe I wäre ein Geschenk gewesen.',
+      'Bewusst eine <strong>eigene Gruppe</strong> statt einer Verteilung auf die vorhandenen: Wer kurz vor „Logistik-Meisterschaft II" steht, soll sie nicht plötzlich wieder verlieren sehen.',
+      'Jeder Meilenstein trägt jetzt außerdem das <strong>Symbol seines Gebiets</strong>, solange er offen ist – vorher zeigten alle neun Zeilen denselben Kolben.',
+      '<strong>Dieselbe Verwechslung stand auch im Hilfetext.</strong> „Die komplette Forschung (47 Techs, 4.580 Stufen) dauert rund einen Monat" – von diesen 4.580 Stufen gehörten 3.996 zu den vier Ewigkeitsforschungen, die gar keine Obergrenze haben. Der Satz zählt jetzt die 43 Techs mit Maximalstufe und ihre 584 Stufen und nennt die Ewigkeitsforschungen getrennt.'
+    ]},
     { version:'8.375.0', date:'02.08.2026', changes:[
       '<strong>Drei Lücken im Flottensystem, alle am Code nachgezählt statt geraten.</strong>',
       '<strong>Ein Frachter auf Mk X trug keinen Kubikmeter mehr als auf Mk I.</strong> 18 der 39 Schiffsklassen haben gar keinen Angriffswert – für sie waren zwei der fünf Markenzweige (Angriff, Schild) schlicht tot, und die übrigen drei betrafen nur Tempo, Treibstoff und Bauzeit. Der Frachter wurde also schneller und sparsamer, aber nie größer, obwohl Laderaum das Einzige ist, wofür er existiert: Die Ladekapazität kannte bis heute nur den Modul-Bonus.',
@@ -9780,11 +9791,54 @@
   // auslösen - der einzigen Währung, die Prestige UND Aufstieg überlebt. Macht "die Forschung
   // abschließen" zu einem Ziel mit dauerhaftem Wert, nicht nur zu wachsenden Zahlen.
   const MILESTONE_GROUPS = {
-    wirtschaft: ['rsolar','rsolar2','rerz','rerz2','rkristall','rkristall2','rdeuterium','rantimaterie','rlager','rlager2'],
+    // rdeuterium2 und rantimaterie2 nachgetragen (02.08.2026): Beide existieren seit Langem mit
+    // maxLevel 20, standen aber in keiner Gruppe - waehrend der Meilenstein daneben woertlich "Alle
+    // Wirtschafts-Forschungen auf Maximalstufe" verspricht. Die Beschreibung log also, und zwar
+    // ausgerechnet bei den zwei Vertiefungen, die am teuersten sind.
+    wirtschaft: ['rsolar','rsolar2','rerz','rerz2','rkristall','rkristall2','rdeuterium','rdeuterium2','rantimaterie','rantimaterie2','rlager','rlager2'],
     krieg: ['rkampf','rkampf2','rpanzer','rschildmatrix','rfruehwarnung','rnotfall'],
     logistik: ['rfusion','rbauplan','rscanner','rspyshield','rflottenkoord','rexpedition','rexpslots','rfrachtlogistik','rroutenoptim'],
-    diplomatie: ['rdiplomatie','rdiplokreis','rkolonisation','rleere']
+    diplomatie: ['rdiplomatie','rdiplokreis','rkolonisation','rleere'],
+    // ===== Werkstoffe (NEU 02.08.2026) =====
+    // Die laengste zusammenhaengende Forschungsstrecke des Spiels - eine strikt lineare Kette von
+    // rnanotech ueber rquantenphysik, rhochenergie, rfusionskerne, rkitech und rmetamaterial bis
+    // rsingularitaet, dazu die Raffinerie-Optimierung als einziger stufbarer Abzweig - war die
+    // einzige grosse Strecke ohne jeden Meilenstein. Von 47 Forschungen standen 18 in gar keiner
+    // Gruppe; acht davon sind diese hier.
+    //
+    // Bewusst eine EIGENE Gruppe und nicht in die vorhandenen verteilt: Wer "Wirtschafts-Meisterschaft
+    // II" schon erreicht hat, behaelt sie zwar (der Marker ist gesetzt), aber wer kurz davor steht,
+    // haette sie ploetzlich wieder verloren gesehen. Eine neue Gruppe macht keinen vorhandenen
+    // Meilenstein schwerer. Die beiden Nachtraege oben sind die begruendete Ausnahme - dort behebt
+    // der Zusatz eine falsche Beschreibung.
+    //
+    // ZWEI Gruppen statt einer mit ratio 0.5/1.0 wie ueberall sonst: Sieben der acht Forschungen
+    // haben maxLevel 1. Fuer die ist lvl/max entweder 0 oder 1 - ein Verhaeltnis von 0,5 verlangt
+    // von ihnen also exakt dasselbe wie 1,0. Eine Stufe I ueber ratio 0.5 waere damit fast
+    // deckungsgleich mit Stufe II gewesen und haette 3 Sternenessenz fuer nichts vergeben. Die
+    // Teilung folgt stattdessen der Kette selbst: erste Haelfte, dann alles.
+    werkstoff: ['rnanotech','rquantenphysik','rhochenergie','rraffinerieoptimierung'],
+    werkstoffvoll: ['rnanotech','rquantenphysik','rhochenergie','rfusionskerne','rkitech','rmetamaterial','rsingularitaet','rraffinerieoptimierung']
   };
+  // Die Forschungen, an denen ein Meilenstein haengt. Fuer 'all' werden die ENDLOSEN Forschungen
+  // herausgefiltert (Fehlerbehebung 02.08.2026).
+  //
+  // Der Fehler: Beide Stellen, die diese Liste brauchten - die Pruefung und die Fortschrittsanzeige -
+  // bildeten sie mit `RESEARCH_DEFS.map(r=>r.key)` selbst, also ungefiltert. Seit v8.319.0 stecken
+  // darin vier Ewigkeitsforschungen mit maxLevel 999. Der Meilenstein "Vollstaendige Forschung"
+  // (20 Sternenessenz, 5.000 Kredite) verlangte damit 999 Stufen mit costMult 1,32 je Zweig und war
+  // faktisch unerreichbar - obwohl seine Beschreibung "Jede einzelne Forschung im Spiel auf
+  // Maximalstufe" lautet und direkt daneben allResearchMaxed() dieselbe Frage stellt und die
+  // Ewigkeitsforschungen ausdruecklich ausnimmt ("Sie haben per Definition keine Maximalstufe").
+  // Zwei Stellen, dieselbe Frage, zwei Antworten.
+  //
+  // Als FUNKTION und nicht zweimal derselbe Ausdruck: Genau die Doppelung war der Grund, warum der
+  // Fehler an zwei Orten gleichzeitig stand.
+  function milestoneKeys(m){
+    return m.group === 'all'
+      ? RESEARCH_DEFS.filter(r => !isEndlessResearch(r)).map(r => r.key)
+      : MILESTONE_GROUPS[m.group];
+  }
   function groupProgress(keys){
     return keys.map(k => {
       const def = RESEARCH_DEFS.find(x=>x.key===k);
@@ -9796,22 +9850,35 @@
     const prog = groupProgress(keys);
     return Math.min(...prog.map(p => p.lvl / p.max));
   }
+  // `icon` je Meilenstein (v8.376.0): Vorher zeichnete die Anzeige jeden offenen Meilenstein mit
+  // demselben ti-flask und jeden erreichten mit demselben ti-medal - neun Zeilen, zwei Symbole, in
+  // denen sich das Thema nirgends wiederfand. Erreicht bleibt ti-medal (das ist die Aussage der
+  // Zeile), offen zeigt jetzt das Symbol seines Gebiets.
   const RESEARCH_MILESTONES = [
-    { key:'wirtschaft1', name:'Wirtschafts-Meisterschaft I', desc:'Alle Wirtschafts-Forschungen mindestens Stufe 10.', group:'wirtschaft', ratio:0.5, essence:3, credits:500 },
-    { key:'wirtschaft2', name:'Wirtschafts-Meisterschaft II', desc:'Alle Wirtschafts-Forschungen auf Maximalstufe.', group:'wirtschaft', ratio:1.0, essence:8, credits:1500 },
-    { key:'krieg1', name:'Kriegs-Meisterschaft I', desc:'Alle Kampf- und Verteidigungs-Forschungen mindestens Stufe 10.', group:'krieg', ratio:0.5, essence:3, credits:500 },
-    { key:'krieg2', name:'Kriegs-Meisterschaft II', desc:'Alle Kampf- und Verteidigungs-Forschungen auf Maximalstufe.', group:'krieg', ratio:1.0, essence:8, credits:1500 },
-    { key:'logistik1', name:'Logistik-Meisterschaft I', desc:'Alle Logistik- und Spionage-Forschungen mindestens zur Hälfte ihrer jeweiligen Maximalstufe ausgebaut.', group:'logistik', ratio:0.5, essence:3, credits:500 },
-    { key:'logistik2', name:'Logistik-Meisterschaft II', desc:'Alle Logistik- und Spionage-Forschungen auf Maximalstufe.', group:'logistik', ratio:1.0, essence:8, credits:1500 },
-    { key:'diplomatie1', name:'Diplomatie-Meisterschaft I', desc:'Diplomatie-Protokolle und Kolonial-Logistik mindestens Stufe 10.', group:'diplomatie', ratio:0.5, essence:3, credits:500 },
-    { key:'diplomatie2', name:'Diplomatie-Meisterschaft II', desc:'Diplomatie-Protokolle und Kolonial-Logistik auf Maximalstufe.', group:'diplomatie', ratio:1.0, essence:8, credits:1500 },
-    { key:'allmax', name:'Vollständige Forschung', desc:'Jede einzelne Forschung im Spiel auf Maximalstufe - das große Ziel.', group:'all', ratio:1.0, essence:20, credits:5000 }
+    { key:'wirtschaft1', name:'Wirtschafts-Meisterschaft I', desc:'Alle Wirtschafts-Forschungen mindestens Stufe 10.', group:'wirtschaft', ratio:0.5, essence:3, credits:500, icon:'ti-building-factory-2' },
+    { key:'wirtschaft2', name:'Wirtschafts-Meisterschaft II', desc:'Alle Wirtschafts-Forschungen auf Maximalstufe.', group:'wirtschaft', ratio:1.0, essence:8, credits:1500, icon:'ti-building-factory-2' },
+    { key:'krieg1', name:'Kriegs-Meisterschaft I', desc:'Alle Kampf- und Verteidigungs-Forschungen mindestens Stufe 10.', group:'krieg', ratio:0.5, essence:3, credits:500, icon:'ti-sword' },
+    { key:'krieg2', name:'Kriegs-Meisterschaft II', desc:'Alle Kampf- und Verteidigungs-Forschungen auf Maximalstufe.', group:'krieg', ratio:1.0, essence:8, credits:1500, icon:'ti-sword' },
+    { key:'logistik1', name:'Logistik-Meisterschaft I', desc:'Alle Logistik- und Spionage-Forschungen mindestens zur Hälfte ihrer jeweiligen Maximalstufe ausgebaut.', group:'logistik', ratio:0.5, essence:3, credits:500, icon:'ti-truck' },
+    { key:'logistik2', name:'Logistik-Meisterschaft II', desc:'Alle Logistik- und Spionage-Forschungen auf Maximalstufe.', group:'logistik', ratio:1.0, essence:8, credits:1500, icon:'ti-truck' },
+    { key:'diplomatie1', name:'Diplomatie-Meisterschaft I', desc:'Diplomatie-Protokolle und Kolonial-Logistik mindestens Stufe 10.', group:'diplomatie', ratio:0.5, essence:3, credits:500, icon:'ti-flag' },
+    { key:'diplomatie2', name:'Diplomatie-Meisterschaft II', desc:'Diplomatie-Protokolle und Kolonial-Logistik auf Maximalstufe.', group:'diplomatie', ratio:1.0, essence:8, credits:1500, icon:'ti-flag' },
+    // Werkstoff-Meisterschaft (NEU v8.376.0). Stufe I deckt die erste Haelfte der Werkstoff-Kette ab
+    // (Nanotechnologie, Quantenphysik, Hochenergiephysik) und verlangt die Raffinerie-Optimierung zur
+    // Haelfte; Stufe II die komplette Kette bis zur Singularitaetsphysik und die Raffinerie voll
+    // ausgebaut. Die Belohnungen liegen bewusst auf der Linie der anderen Paare (3/500 und 8/1500) -
+    // die Kette ist teurer als jede andere Gruppe, aber Sternenessenz ist die einzige Waehrung, die
+    // Prestige und Aufstieg ueberlebt, und ein Sonderweg nach oben wuerde die vier bestehenden Paare
+    // entwerten.
+    { key:'werkstoff1', name:'Werkstoff-Meisterschaft I', desc:'Nanotechnologie, Quantenphysik und Hochenergiephysik erforscht und die Raffinerie-Optimierung mindestens Stufe 5 - die erste Hälfte der Werkstoff-Kette.', group:'werkstoff', ratio:0.5, essence:3, credits:500, icon:'ti-atom' },
+    { key:'werkstoff2', name:'Werkstoff-Meisterschaft II', desc:'Die gesamte Werkstoff-Kette bis zur Singularitätsphysik erforscht und die Raffinerie-Optimierung auf Maximalstufe.', group:'werkstoffvoll', ratio:1.0, essence:8, credits:1500, icon:'ti-atom' },
+    { key:'allmax', name:'Vollständige Forschung', desc:'Jede einzelne Forschung im Spiel auf Maximalstufe - das große Ziel. Die Ewigkeitsforschungen zählen nicht mit, sie haben per Definition keine Maximalstufe.', group:'all', ratio:1.0, essence:20, credits:5000, icon:'ti-trophy' }
   ];
   function checkResearchMilestones(){
     if (!state.researchMilestones) state.researchMilestones = {};
     for (const m of RESEARCH_MILESTONES){
       if (state.researchMilestones[m.key]) continue;
-      const keys = m.group === 'all' ? RESEARCH_DEFS.map(r=>r.key) : MILESTONE_GROUPS[m.group];
+      const keys = milestoneKeys(m);
       if (groupMinRatio(keys) < m.ratio) continue;
       state.researchMilestones[m.key] = true;
       if (!state.ascension) state.ascension = { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0,leere:0} };
@@ -25976,8 +26043,8 @@
       { title:'Zwei neue, eigenständige Forschungszweige', body:'<strong>Diplomatie-Protokolle</strong> erhöht die Friedensdividende aus aktiven Nichtangriffspakten zusätzlich zum Grundbonus. <strong>Kolonial-Logistik</strong> erhöht das Kolonie-Limit: Ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere hinzu (bei Maximalstufe 20 also 11 Kolonien). Monde zählen nicht mit. Beide Forschungen sind von Anfang an verfügbar, unabhängig von der übrigen Technologie-Kette.' },
       { title:'Forschung abbrechen', body:'Eine laufende Forschung lässt sich über den Knopf "Abbrechen" direkt unter der Fortschrittsanzeige vorzeitig stoppen - dabei gibt es bewusst nur <strong>50% der eingesetzten Ressourcen</strong> zurück (im Gegensatz zum Bau-Abbruch mit voller Rückerstattung), da Forschung sonst risikofrei neu gestartet werden könnte, sobald sich z.B. die Laboranzahl ändert. Danach lässt sich sofort eine andere Forschung beginnen.' },
       { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss. Mit den Pfeil-Buttons an jedem Eintrag lässt sich die Reihenfolge nachträglich anpassen - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei immer automatisch korrekt (Stufe 5 kann nie vor Stufe 4 verarbeitet werden), und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde.' },
-      { title:'Forschungs-Meilensteine', body:'Vier Forschungsgruppen (Wirtschaft, Krieg, Logistik/Spionage, Diplomatie) sowie ein Gesamt-Meilenstein belohnen zusammenhängenden Fortschritt: erreichen alle Forschungen einer Gruppe gemeinsam Stufe 10 bzw. Maximalstufe, gibt es Sternenessenz und Kredite. Die Essenz ist die einzige Währung, die jeden Prestige- und Aufstiegs-Reset überlebt - Forschungs-Fortschritt bleibt so auch über Neuanfänge hinweg wertvoll.' },
-      { title:'Forschungsdauer: ein Langzeitziel', body:'Die komplette Forschung ('+RESEARCH_DEFS.length+' Techs, '+RESEARCH_DEFS.reduce((a,r)=>a+(r.maxLevel||1),0)+' Stufen) ist bewusst ein Projekt für Wochen, nicht für einen Nachmittag: Bei guter Laborausstattung (15+) dauert sie insgesamt rund <strong>einen Monat</strong>, ganz ohne Labore rund <strong>zwei Monate</strong>. Frühe Forschungsstufen bleiben dabei fast unverändert schnell (Stufe 1 in Sekunden) - erst ab den höheren Stufen jeder Forschung wächst die Dauer spürbar, das späte Spiel bleibt also ein echtes Langzeitziel statt an einem Wochenende erledigt zu sein.' },
+      { title:'Forschungs-Meilensteine', body:'Fünf Forschungsgruppen (Wirtschaft, Krieg, Logistik/Spionage, Diplomatie, Werkstoffe) sowie ein Gesamt-Meilenstein belohnen zusammenhängenden Fortschritt: erreichen alle Forschungen einer Gruppe gemeinsam Stufe 10 bzw. Maximalstufe, gibt es Sternenessenz und Kredite. Die Essenz ist die einzige Währung, die jeden Prestige- und Aufstiegs-Reset überlebt - Forschungs-Fortschritt bleibt so auch über Neuanfänge hinweg wertvoll. <strong>Werkstoffe</strong> folgen der langen Grundlagenkette Nanotechnologie → Quantenphysik → Hochenergiephysik → Fusionskern-Synthese → KI-Technologie → Metamaterial-Synthese → Singularitätsphysik samt Raffinerie-Optimierung; Stufe I verlangt die erste Hälfte, Stufe II die ganze Kette. Der Gesamt-Meilenstein "Vollständige Forschung" zählt die <strong>Ewigkeitsforschungen nicht mit</strong> - die haben per Definition keine Maximalstufe und wären sonst eine Bedingung, die niemand je erfüllen kann.' },
+      { title:'Forschungsdauer: ein Langzeitziel', body:'Die komplette Forschung ('+RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).length+' Techs mit Maximalstufe, '+RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).reduce((a,r)=>a+(r.maxLevel||1),0)+' Stufen, dazu '+RESEARCH_DEFS.filter(isEndlessResearch).length+' Ewigkeitsforschungen ohne Obergrenze) ist bewusst ein Projekt für Wochen, nicht für einen Nachmittag: Bei guter Laborausstattung (15+) dauert sie insgesamt rund <strong>einen Monat</strong>, ganz ohne Labore rund <strong>zwei Monate</strong>. Frühe Forschungsstufen bleiben dabei fast unverändert schnell (Stufe 1 in Sekunden) - erst ab den höheren Stufen jeder Forschung wächst die Dauer spürbar, das späte Spiel bleibt also ein echtes Langzeitziel statt an einem Wochenende erledigt zu sein.' },
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
       { title:'Doktrin – eine dauerhafte Grundsatzentscheidung', body:'<strong>Offensiv:</strong> +20% Angriff, -15% Verteidigung. <strong>Verteidigung:</strong> +20% Verteidigung, -15% Angriff. <strong>Logistik:</strong> -20% Treibstoffkosten, +20% Lagerkapazität, neutral im Kampf. Ein Wechsel kostet Ressourcen ("Umschulung") – im Gegensatz zur Taktik-Haltung, die kostenlos wechselbar ist.<br><br><strong>Jede Doktrin hat zusätzlich eine Synergie</strong> (seit 01.08.2026), die nur greift, wenn im Imperium <em>irgendeine</em> Welt die passende <strong>Planeten-Rolle</strong> trägt – eine genügt, mehrere bringen nichts extra. <strong>Offensiv + Werft-Welt:</strong> +8% Angriffskraft. <strong>Verteidigung + Festungs-Welt:</strong> +8% Verteidigungspunkte. <strong>Logistik + Handels-Welt:</strong> weitere −8% Treibstoff und +8% Lagerkapazität. Damit spricht die Doktrin eine Empfehlung aus, welche Welt du als Nächstes spezialisierst; auf jeder Doktrin-Karte steht, ob ihre Synergie erfüllt ist. Angriff und Verteidigung rechnet der Server im PvP genauso nach.' }
     ]},
@@ -46142,12 +46209,12 @@
     if (milestonesBox){
       milestonesBox.innerHTML = RESEARCH_MILESTONES.map(m => {
         const done = !!(state.researchMilestones && state.researchMilestones[m.key]);
-        const keys = m.group === 'all' ? RESEARCH_DEFS.map(r=>r.key) : MILESTONE_GROUPS[m.group];
+        const keys = milestoneKeys(m);
         const ratio = groupMinRatio(keys);
         const pct = Math.min(100, Math.round((ratio/m.ratio)*100));
         return `
           <div class="card-row ${done?'research-done':''}">
-            <div class="left"><div class="bicon" style="background:${done?'rgba(29,158,117,0.2)':'rgba(255,255,255,0.05)'}; color:${done?'#5dcaa5':'#c3bef5'};"><i class="ti ${done?'ti-medal':'ti-flask'}" aria-hidden="true"></i></div>
+            <div class="left"><div class="bicon" style="background:${done?'rgba(29,158,117,0.2)':'rgba(255,255,255,0.05)'}; color:${done?'#5dcaa5':'#c3bef5'};"><i class="ti ${done?'ti-medal':(m.icon||'ti-flask')}" aria-hidden="true"></i></div>
               <div style="min-width:0; flex:1;">
                 <div class="bname">${m.name}${done?' <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">Erreicht</span>':''}</div>
                 <div class="bmeta">${m.desc}</div>
