@@ -43,9 +43,20 @@ check('reine Bomberflotte erhaelt +0%', Math.abs(F({bomber:1000})-1)<1e-9, { wer
 check('reine Grosskampfflotte erhaelt +0%', Math.abs(F({schlachtschiff:500,cruisers:200})-1)<1e-9);
 
 // --- Absicht 3: die alte Checkliste zieht NICHT mehr. Fuenf Typen aus EINER Rolle sind kein Bonus.
-const fuenfTypenEineRolle = { cruisers:100, destroyers:100, schlachtschiff:100, carrier:100, waechter:100 };
+//
+// Die Beispielflotte wird seit dem 02.08.2026 AUS DER ROLLENTABELLE GEBAUT statt danebengeschrieben.
+// Vorher stand hier eine feste Liste mit dem Carrier darin - und als der bei der Neuverteilung der
+// Konterrollen (5/5/11 -> 7/6/8) vom Grosskampfschiff zum Abfangjaeger wurde, prueften diese Zeilen
+// stillschweigend etwas anderes als ihren eigenen Titel: fuenf Typen aus ZWEI Rollen, die
+// folgerichtig +1% Bonus ergaben. Der Test hat das gemeldet, was richtig war - aber eine Liste, die
+// bei jeder Rollenaenderung von Hand nachgezogen werden muss, meldet es beim naechsten Mal nur mit
+// Glueck wieder. Jetzt nimmt er einfach die ersten fuenf Klassen, die WIRKLICH dieselbe Rolle haben.
+const eineRolle = Object.keys(feCtx.OF).filter(k => feCtx.OF[k] === 'kapital').slice(0, 5);
+check('genug Klassen fuer die Ein-Rollen-Probe vorhanden', eineRolle.length === 5, eineRolle);
+const fuenfTypenEineRolle = {};
+for (const k of eineRolle) fuenfTypenEineRolle[k] = 100;
 check('fuenf Typen aus derselben Rolle geben keinen Bonus mehr', Math.abs(F(fuenfTypenEineRolle)-1)<1e-9,
-  { wert:F(fuenfTypenEineRolle), hinweis:'frueher waren das +8%' });
+  { wert:F(fuenfTypenEineRolle), klassen:eineRolle, hinweis:'frueher waren das +8%' });
 
 // --- Absicht 4: Gewichtung nach Angriffskraft, nicht nach Stueckzahl.
 // 500 Jaeger (5000 Kraft) + 1 Schlachtschiff (90) ist NICHT ausgewogen, auch wenn zwei Rollen da sind.
