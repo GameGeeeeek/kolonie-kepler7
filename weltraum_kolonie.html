@@ -5693,8 +5693,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.377.0';
+  const VERSION = '8.378.0';
   const PATCHNOTES = [
+    { version:'8.378.0', date:'02.08.2026', changes:[
+      '<strong>Fix: Wer mit der Forschung durch ist, bekam die neuen Meilensteine nie.</strong> Die Prüfung lief ausschließlich in dem Moment, in dem eine Forschung fertig wird – für ein Konto, das alles erforscht hat, gibt es diesen Moment nie wieder. Ausgerechnet die Änderungen der letzten beiden Versionen traf das am härtesten: „Vollständige Forschung" wurde gestern überhaupt erst erreichbar gemacht und blieb für die einzige Gruppe, die sie erfüllen kann, trotzdem unerreichbar. Dasselbe für die vier neuen Meilensteine.',
+      'Die Meilensteine werden jetzt <strong>einmal beim Laden nachgetragen</strong>. Wer die Bedingungen längst erfüllt, bekommt Sternenessenz und Kredite beim nächsten Start gutgeschrieben – mit Eintrag im Protokoll und im Berichtsarchiv, damit nachvollziehbar bleibt, wofür. Fällt dabei mehr als einer auf einmal, spielt der Erfolgston trotzdem nur einmal.',
+      'Der Nachtrag sitzt bewusst an der Ladestelle und nicht in der allgemeinen Feldauffüllung: Die läuft auch beim Prestige und beim Zurücksetzen, wo die Forschung gerade auf null steht.'
+    ]},
     { version:'8.377.0', date:'02.08.2026', changes:[
       '<strong>Die letzten vier heimatlosen Forschungen haben jetzt eine Gruppe – und die Singularitätsphysik sagt endlich, was an ihr hängt.</strong>',
       '<strong>Neu: Ausbau-Meisterschaft I und II.</strong> Nach der gestrigen Werkstoff-Gruppe standen noch vier Forschungen in gar keinem Meilenstein: <strong>Mondstabilität</strong>, <strong>Modultechnik</strong>, <strong>Slot-Miniaturisierung</strong> und <strong>Diplomatische Doktrin</strong>. Was sie verbindet, ist kein Ressourcen- oder Kampfzweig, sondern dass jede ein bestehendes System vertieft, ohne ein neues zu eröffnen. Stufe I verlangt sie zur Hälfte ausgebaut (3 Sternenessenz, 500 Kredite), Stufe II auf Maximalstufe (8 Sternenessenz, 1.500 Kredite).',
@@ -9904,8 +9909,11 @@
     { key:'ausbau2', name:'Ausbau-Meisterschaft II', desc:'Mondstabilität, Modultechnik und Diplomatische Doktrin auf Maximalstufe, dazu die Slot-Miniaturisierung erforscht.', group:'ausbau', ratio:1.0, essence:8, credits:1500, icon:'ti-adjustments' },
     { key:'allmax', name:'Vollständige Forschung', desc:'Jede einzelne Forschung im Spiel auf Maximalstufe - das große Ziel. Die Ewigkeitsforschungen zählen nicht mit, sie haben per Definition keine Maximalstufe.', group:'all', ratio:1.0, essence:20, credits:5000, icon:'ti-trophy' }
   ];
+  // Gibt die Zahl der NEU vergebenen Meilensteine zurueck (v8.378.0) - die Aufrufstelle beim Laden
+  // braucht sie, um nur dann zu speichern, wenn wirklich etwas gutgeschrieben wurde.
   function checkResearchMilestones(){
     if (!state.researchMilestones) state.researchMilestones = {};
+    let neu = 0;
     for (const m of RESEARCH_MILESTONES){
       if (state.researchMilestones[m.key]) continue;
       const keys = milestoneKeys(m);
@@ -9916,8 +9924,13 @@
       state.credits = (state.credits||0) + m.credits;
       log('Forschungs-Meilenstein erreicht: '+m.name+'! +'+m.essence+' Sternenessenz, +'+m.credits+' Kredite.', 'ti-medal');
       pushReport({ type:'item-found', itemName:'Forschungs-Meilenstein: '+m.name+' (+'+m.essence+' Sternenessenz, +'+m.credits+' Kredite)', itemIcon:'ti-medal', rare:true, foundAt:'Forschung' });
-      playSound('achieve');
+      // Nur EIN Ton, auch wenn mehrere Meilensteine gleichzeitig fallen. Beim Nachtragen alter
+      // Konten (siehe unten) koennen das drei oder vier auf einmal sein - vier uebereinander
+      // gelegte Fanfaren beim Laden sind kein Erfolgserlebnis, sondern Krach.
+      if (neu === 0) playSound('achieve');
+      neu++;
     }
+    return neu;
   }
   // Doktrinen: eine strategische Grundsatzentscheidung im Spätspiel, die sich gegenseitig ausschließt
   // (immer nur eine aktiv). Schaltet frei, sobald rkampf2 UND rschildmatrix Stufe 5 erreicht haben –
@@ -31608,6 +31621,21 @@
     // state.collapsedSections undefiniert, was beim ersten Antippen einer aufklappbaren Sektion zum
     // Absturz führte. applyStateDefaults() überschreibt nie vorhandene Werte, nur echte Lücken.
     applyStateDefaults();
+    // Forschungs-Meilensteine EINMAL beim Laden nachziehen (v8.378.0, Fehlerbehebung).
+    //
+    // checkResearchMilestones() lief bis hierher ausschliesslich in processResearch(), also nur im
+    // Moment, in dem eine Forschung fertig wird. Fuer jeden, der mit der Forschung durch ist, gibt
+    // es diesen Moment nie wieder - ein solches Konto konnte einen neu hinzugekommenen Meilenstein
+    // grundsaetzlich nicht mehr bekommen. Das traf ausgerechnet die zwei Aenderungen der letzten
+    // beiden Versionen am haertesten: "Vollstaendige Forschung" wurde in v8.376.0 ueberhaupt erst
+    // erreichbar gemacht - und war fuer die einzige Gruppe, die sie erfuellt (wer alles erforscht
+    // hat), weiterhin nicht zu holen. Dasselbe fuer die vier neuen Meilensteine aus v8.376.0/8.377.0.
+    //
+    // Hier und nicht in applyStateDefaults(): Die Funktion laeuft auch beim Prestige und beim
+    // Zuruecksetzen: dort ist die Forschung gerade auf null gesetzt worden, ein Meilenstein-Lauf
+    // waere also bestenfalls wirkungslos und schlimmstenfalls verwirrend. Diese Stelle hier ist die
+    // Ladestelle und laeuft genau einmal je Sitzung.
+    if (checkResearchMilestones() > 0) save();
     setTimeout(()=>{ document.getElementById('loadstate').textContent=''; }, 4000);
   }
 
