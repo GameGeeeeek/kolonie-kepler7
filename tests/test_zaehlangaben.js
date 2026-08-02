@@ -44,15 +44,52 @@ check('alle geprueften Listen gefunden', !!(M && R && C && P && T),
   { module: M && M.length, forschung: R && R.length, klassen: C && C.length, rollen: P && P.length, tier2: T && T.length });
 
 // ---- 1. Die gerechneten Stellen muessen gerechnet BLEIBEN --------------------------------------
+// Die Pruefung ist bewusst auf die ABSICHT gemuenzt ("hier steht ein Ausdruck ueber der echten
+// Liste") und nicht auf den Wortlaut des Ausdrucks. Am 02.08.2026 fiel auf, warum das noetig ist:
+// Die beiden Forschungsangaben zaehlten zwar - aber ueber ALLE Forschungen, also einschliesslich
+// der vier Ewigkeitsforschungen mit je 999 Stufen. Die Hilfe versprach damit "4.580 Stufen in rund
+// einem Monat", wovon 3.996 Stufen zu Forschungen ohne jede Obergrenze gehoerten. Die Korrektur
+// (ein .filter(r => !isEndlessResearch(r)) davor) liess diesen Test scheitern, obwohl sie den Text
+// erst wahr machte: Er hatte die Zeichenkette festgenagelt, nicht die Aussage. Ein Test, der eine
+// Fehlerbehebung blockiert, ist selbst der Fehler.
 const gerechnet = [
-  ["Forschungen", "Die komplette Forschung ('+RESEARCH_DEFS.length+' Techs"],
-  ["Forschungsstufen", "RESEARCH_DEFS.reduce((a,r)=>a+(r.maxLevel||1),0)+' Stufen)"],
+  ["Forschungen", /Die komplette Forschung \('\+RESEARCH_DEFS\.[^+]*\.length\+' Techs/],
+  ["Forschungsstufen", /RESEARCH_DEFS[^']*\.reduce\(\(a,r\)=>a\+\(r\.maxLevel\|\|1\),0\)\+' Stufen/],
   ["Standort-Modultypen", "'+MODULE_DEFS.length+' Typen"],
   ["Schiffsklassen", "'+SHIP_CLASS_DEFS.length+' Klassen mit eigenen Slots"],
   ["Fraktions-Auftragsarten", "Object.values(FACTION_QUEST_POOLS).map(p=>p.length)"],
 ];
 for (const [was, ausdruck] of gerechnet){
-  check(`${was}: die Hilfe rechnet, statt eine Ziffer zu nennen`, src.includes(ausdruck), ausdruck.slice(0, 46));
+  const da = ausdruck instanceof RegExp ? ausdruck.test(src) : src.includes(ausdruck);
+  check(`${was}: die Hilfe rechnet, statt eine Ziffer zu nennen`, da, String(ausdruck).slice(0, 56));
+}
+
+// ...und das Ergebnis muss stimmen. Genau diese Haelfte fehlte: "es rechnet" allein sagt nichts
+// darueber, ob es ueber die richtige Menge rechnet. Beide Forschungsangaben duerfen die
+// Ewigkeitsforschungen NICHT mitzaehlen - sie haben per Definition keine Maximalstufe, eine
+// Gesamtstufenzahl mit ihnen darin ist keine Zahl, sondern eine Verwechslung.
+{
+  // NUR im Hilfe-Abschnitt suchen. Die Patchnotes zitieren den alten, falschen Satz woertlich
+  // ("47 Techs, 4.580 Stufen") - das ist unveraenderliche Historie und soll so stehen bleiben.
+  // Ueber die ganze Datei gesucht findet indexOf() genau dieses Zitat zuerst, weil PATCHNOTES weit
+  // vor HELP_SECTIONS steht, und der Test misst dann die Vergangenheit statt den Live-Text.
+  const hVon = src.indexOf('const HELP_SECTIONS = [');
+  const hilfe = src.slice(hVon, src.indexOf('\n  ];', hVon));
+  // Bis zum Wort "Stufen" statt bis zur ersten schliessenden Klammer: Die Klammer kommt jetzt
+  // mitten im .filter() vor, und der naive Schnitt haette den Satz genau dort abgeschnitten, wo
+  // die zu pruefende Stelle steht.
+  const von = hilfe.indexOf('Die komplette Forschung (');
+  const forschungsSatz = von < 0 ? '' : hilfe.slice(von, hilfe.indexOf('Stufen', von) + 6);
+  // 'endless:true' steht bei den Ewigkeitsforschungen NICHT auf der key-Zeile, sondern zwei Zeilen
+  // tiefer - deshalb ueber den ganzen Block suchen und nicht ueber die von eintraege() gelieferten
+  // Kopfzeilen. Derselbe Erste-Zeile-Irrtum hat am 02.08.2026 schon einmal zu einer falschen
+  // Zaehlung gefuehrt.
+  const rVon = src.indexOf('const RESEARCH_DEFS');
+  const rBlock = src.slice(rVon, src.indexOf('\n  ];', rVon));
+  const ewigAnzahl = (rBlock.match(/endless:\s*true/g) || []).length;
+  check('Gegenprobe: es gibt Ewigkeitsforschungen zu vergessen', ewigAnzahl > 0, ewigAnzahl);
+  check('Forschungsangaben schliessen die Ewigkeitsforschungen aus',
+    (forschungsSatz.match(/!isEndlessResearch\(r\)/g) || []).length >= 2, forschungsSatz.slice(0, 240));
 }
 // Gegenprobe: Der Scan wuerde es merken, wenn eine dieser Stellen verschwaende.
 check('Gegenprobe: der Ausdrucks-Scan wuerde ein Fehlen bemerken',
