@@ -5695,8 +5695,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.381.0';
+  const VERSION = '8.382.0';
   const PATCHNOTES = [
+    { version:'8.382.0', date:'02.08.2026', changes:[
+      '<strong>Das Spiel schreibt pro Sekunde rund 124 kB weniger Markup ins Bildschirm-Gerüst.</strong> Dreizehn Anzeigebereiche wurden bei jedem Sekunden-Takt komplett neu aufgebaut, obwohl ihr Inhalt Zeichen für Zeichen derselbe blieb. Gemessen, nicht geschätzt: Die Erfolge-Liste allein war mit 56,9 kB/s größer als alle vier Bereiche zusammen, die dafür schon im Juli umgestellt wurden.',
+      'Betroffen waren Erfolge, Forschungs-Meilensteine, Baukorb, Fähigkeitsbaum, Avatar- und Farbschema-Auswahl, Großprojekte, Punkte-Aufschlüsselung, Tagesmissionen, Aufstieg, Produktionsübersicht, Artefakt-Sets und die Levelkarte. Auf dem Fortschritt-Tab sank die Schreiblast von rund 100 auf 11 kB/s, auf der Basis von 48 auf 15. Spürbar wird das vor allem auf älteren Telefonen und im Akkubetrieb - am Verhalten ändert sich nichts, die Bereiche zeichnen sich weiterhin sofort neu, sobald sich wirklich etwas ändert.',
+      '<strong>Neu: Benachrichtigung, wenn ein Weltboss erscheint.</strong> Bisher gab es nur die Meldung nach dem Sieg - also ausgerechnet für die, die ohnehin dabei waren. Der Weltboss ist serverweit und hat ein Zeitfenster; wer nicht zufällig online war, hat ihn schlicht nie gesehen. Die Meldung geht nur an Konten, die in der letzten Woche aktiv waren: Ein wiederkehrendes Ereignis an jeden je registrierten Spieler zu schicken wäre keine Information mehr, sondern Werbung. Nutzt die bestehende Kategorie „Weltboss-Kills".'
+    ]},
     { version:'8.381.0', date:'02.08.2026', changes:[
       '<strong>Benachrichtigungen führen jetzt dorthin, wo sie hingehören.</strong> „Expedition ist zurückgekehrt" antippen und dann auf der Basis-Übersicht landen, war die halbe Meldung wert. Push-Benachrichtigung und Postfach-Eintrag öffnen ab sofort den passenden Bereich - Expedition den Expeditions-Tab, Forschung den Forschungs-Tab, ein Allianz-Aufruf den Allianz-Tab samt richtigem Unterreiter. Läuft das Spiel schon, wechselt es nur den Tab (kein Neuladen); war es geschlossen, springt es nach dem Start dorthin.',
       'Die Einträge im Postfach sind damit anklickbar geworden - erkennbar am Hinweis „tippen zum Öffnen". Das Wegwisch-Kreuz löst den Sprung nicht mit aus, und Einträge ohne sinnvolles Ziel bleiben unverändert.',
@@ -23933,6 +23938,7 @@
     // Der Aufruf zum Allianz-Raid (02.08.2026). Text nennt die Sammelphase, weil genau die den
     // Eintrag zeitkritisch macht - wer sie verpasst, ist bei der Welle nicht dabei.
     'alliance-raid': { icon:'ti-alert-triangle', color:'#e0a548', text:(p)=>(p.byName||'Ein Kommandant')+' ruft '+((p.waveNumber||1)>1?'die nächste Welle gegen':'zum Angriff auf')+' "'+(p.bossName||'den Sternenfresser')+'" - Sammelphase '+Math.max(1,Math.round((p.gatherSeconds||0)/60))+' Min. Schließ deine Flotte im Allianz-Tab an!' },
+    'weltboss-spawn': { icon:'ti-skull', color:'#e0a548', text:(p)=>'Ein neuer Weltboss ist erschienen: Leviathan Stufe '+(p.level||1)+(p.maxHp?' ('+fmt(p.maxHp)+' HP)':'')+' - schließ dich dem Angriff an, bevor er wieder verschwindet.' },
     'alliance-muster': { icon:'ti-sword', color:'#e24b4a', text:(p)=>(p.byName||'Ein Kommandant')+' greift ['+(p.targetTag||'?')+'] an - Sammelphase '+Math.max(1,Math.round((p.gatherSeconds||0)/60))+' Min. Schließ deine Flotte im Allianz-Tab an!' },
     'alliance-base-attacked': { icon:'ti-building-castle', color:'#e24b4a', text:(p)=>p.destroyed?('['+(p.attackerTag||'?')+'] hat eure Allianzbasis ZERSTÖRT - alle Boni sind deaktiviert, bis die Reparatur bezahlt ist.'):('['+(p.attackerTag||'?')+'] hat eure Allianzbasis angegriffen - schickt Schiffe zur Verteidigung.') },
     'alliance-base-ready': { icon:'ti-building-castle', color:'#5dcaa5', text:(p)=>'Die Ressourcen für Allianzbasis-Stufe '+(p.level||'?')+' sind vollständig - die Bauzeit läuft jetzt.' },
@@ -44308,7 +44314,9 @@
         for (const [r,a] of Object.entries(c)) totalCost[r] = (totalCost[r]||0)+a;
       }
       const affordable = anyQty && canAfford(totalCost);
-      shipBasketBox.innerHTML = `
+      // Markup-Signatur (v8.382.0): mit 12,6 kB/s der groesste verbliebene Posten, ueber sechs Ticks
+      // byte-gleich gemessen. Die Handler werden nur bei tatsaechlichem Schreiben neu gesetzt.
+      const shipBasketHtml = `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
           <div class="bmeta">Trage bei mehreren Schiffstypen eine Stückzahl ein und baue anschließend alle zusammen – spart Klicks bei größeren Bestellungen.</div>
           <div style="display:flex; flex-direction:column; gap:6px;">
@@ -44329,38 +44337,40 @@
           <button class="buy ${affordable?'affordable':''}" id="shipBasketBuildBtn" ${anyQty?'':'disabled'} style="align-self:flex-start;"><i class="ti ti-ship" aria-hidden="true" style="margin-right:4px;"></i>Baukorb ${affordable?'bauen':'einreihen'}</button>
         </div>
       `;
-      refreshShipMiniIcons(shipBasketBox);
-      shipBasketBox.querySelectorAll('.basket-amount').forEach(inp => inp.oninput = () => {
-        const k = inp.getAttribute('data-basket-ship');
-        shipBasket[k] = Math.max(0, Math.floor(Number(inp.value||0)));
-        // Kosten SOFORT beim Tippen nachziehen (Spieler-Wunsch 28.07.2026: "wenn man 1000 Schiffe
-        // baut, sollen die Kosten direkt in der Spalte stehen"). Das geht bewusst NICHT ueber
-        // render(): Die ganze Box steht unter isTypingIn()-Schutz, weil ein innerHTML-Neuaufbau dem
-        // Eingabefeld den Fokus entreissen wuerde - genau der CLAUDE.md-Fallstrick. Geschrieben
-        // werden deshalb nur die beiden Textknoten, die sich wirklich aendern: die Kostenzeile
-        // dieses Schiffs und die Summe darunter. Das Eingabefeld selbst wird nicht angefasst.
-        aktualisiereKorbKosten(shipBasketBox, basketDefs, cf);
-        if (!isTypingIn('shipBasketBox')) render();
-      });
-      const basketBuildBtn = document.getElementById('shipBasketBuildBtn');
-      if (basketBuildBtn) basketBuildBtn.onclick = () => {
-        // Kein Vorab-canAfford/pay mehr (Balance-/Feature-Wunsch 13.07.2026) - jedes Schiff im Korb
-        // wird immer eingereiht, auch ohne ausreichende Ressourcen für den GESAMTEN Korb. Bezahlung
-        // und Start passieren pro Schiffstyp einzeln in activateQueuedJobs, sobald bezahlbar.
-        let any = false;
-        const skippedQueueFull = [];
-        for (const d of basketDefs){
-          const qty = shipBasket[d.key]||0;
-          if (qty <= 0) continue;
-          if (shipQueueCount() >= SHIP_QUEUE_MAX){ skippedQueueFull.push(d.name); continue; }
-          queueConstruction('ship', state.activeBasePlanet, d.key, qty, d.buildTime, d.name+' (+'+qty+', Baukorb)', 'ti-rocket', shipCostForRange(d, cf[d.key]||0, qty));
-          any = true;
-        }
-        if (skippedQueueFull.length) log(skippedQueueFull.join(', ')+' übersprungen - Flotten-Warteschlange voll (max. '+SHIP_QUEUE_MAX+').', 'ti-alert-triangle');
-        if (!any) return;
-        shipBasket = {};
-        render(); save();
-      };
+      if (setBoxHtml(shipBasketBox, 'shipBasket', shipBasketHtml)){
+        refreshShipMiniIcons(shipBasketBox);
+        shipBasketBox.querySelectorAll('.basket-amount').forEach(inp => inp.oninput = () => {
+          const k = inp.getAttribute('data-basket-ship');
+          shipBasket[k] = Math.max(0, Math.floor(Number(inp.value||0)));
+          // Kosten SOFORT beim Tippen nachziehen (Spieler-Wunsch 28.07.2026: "wenn man 1000 Schiffe
+          // baut, sollen die Kosten direkt in der Spalte stehen"). Das geht bewusst NICHT ueber
+          // render(): Die ganze Box steht unter isTypingIn()-Schutz, weil ein innerHTML-Neuaufbau dem
+          // Eingabefeld den Fokus entreissen wuerde - genau der CLAUDE.md-Fallstrick. Geschrieben
+          // werden deshalb nur die beiden Textknoten, die sich wirklich aendern: die Kostenzeile
+          // dieses Schiffs und die Summe darunter. Das Eingabefeld selbst wird nicht angefasst.
+          aktualisiereKorbKosten(shipBasketBox, basketDefs, cf);
+          if (!isTypingIn('shipBasketBox')) render();
+        });
+        const basketBuildBtn = document.getElementById('shipBasketBuildBtn');
+        if (basketBuildBtn) basketBuildBtn.onclick = () => {
+          // Kein Vorab-canAfford/pay mehr (Balance-/Feature-Wunsch 13.07.2026) - jedes Schiff im Korb
+          // wird immer eingereiht, auch ohne ausreichende Ressourcen für den GESAMTEN Korb. Bezahlung
+          // und Start passieren pro Schiffstyp einzeln in activateQueuedJobs, sobald bezahlbar.
+          let any = false;
+          const skippedQueueFull = [];
+          for (const d of basketDefs){
+            const qty = shipBasket[d.key]||0;
+            if (qty <= 0) continue;
+            if (shipQueueCount() >= SHIP_QUEUE_MAX){ skippedQueueFull.push(d.name); continue; }
+            queueConstruction('ship', state.activeBasePlanet, d.key, qty, d.buildTime, d.name+' (+'+qty+', Baukorb)', 'ti-rocket', shipCostForRange(d, cf[d.key]||0, qty));
+            any = true;
+          }
+          if (skippedQueueFull.length) log(skippedQueueFull.join(', ')+' übersprungen - Flotten-Warteschlange voll (max. '+SHIP_QUEUE_MAX+').', 'ti-alert-triangle');
+          if (!any) return;
+          shipBasket = {};
+          render(); save();
+        };
+      }
     }
     } // Ende Flotte-Baukorb-Guard (Performance: Baukorb nur im Flotte-Tab sichtbar/relevant)
 
@@ -45693,7 +45703,8 @@
       const collectCount = claimableRewardCount();
       const collectAllBtnHtml = collectCount >= 2 ? `<button id="collectAllBtn" style="font-size:10.5px; padding:5px 10px; background:rgba(93,202,165,0.18); border-color:rgba(93,202,165,0.55);"><i class="ti ti-check" aria-hidden="true" style="margin-right:3px;"></i>Alles einsammeln (${collectCount})</button>` : '';
       const claimAllBtnHtml = (!collectAllBtnHtml && claimableCount >= 2) ? `<button id="claimAllQuestsBtn" style="font-size:10.5px; padding:5px 10px; background:rgba(250,199,117,0.15); border-color:rgba(250,199,117,0.4);"><i class="ti ti-check" aria-hidden="true" style="margin-right:3px;"></i>Alle abholen (${claimableCount})</button>` : '';
-      dailyQuestBar.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${collectAllBtnHtml}${claimAllBtnHtml}${openDefs.map(d => {
+      // Markup-Signatur (v8.382.0): 3,9 kB/s, ueber sechs Ticks byte-gleich gemessen.
+      const dailyQuestHtml = `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${collectAllBtnHtml}${claimAllBtnHtml}${openDefs.map(d => {
         const prog = Math.min(d.target, dailyQuestProgress(d.key));
         const done = prog >= d.target;
         const bg = done ? 'rgba(250,199,117,0.18)' : 'rgba(255,255,255,0.06)';
@@ -45707,10 +45718,12 @@
           </span>
           ${!done ? `<i class="ti ti-refresh" data-reroll-quest="${d.key}" title="Gegen andere Tagesaufgabe tauschen (${DAILY_QUEST_REROLL_COST} KP)" style="cursor:pointer; color:#7d8199; font-size:11px; margin-left:2px;"></i>` : ''}
         </div>`;
-      }).join('')}${allClaimed ? `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:rgba(93,202,165,0.15); border:var(--bw-1) solid rgba(93,202,165,0.4);"><i class="ti ti-trophy" aria-hidden="true" style="color:#5dcaa5;"></i><span style="font-size:10.5px;">Alle Tagesmissionen erledigt${state.dailyQuestStreak?' · '+state.dailyQuestStreak+'-Tage-Serie':''} - morgen gibt's neue</span></div>` : ''}</div>`;
-      dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
-      dailyQuestBar.querySelectorAll('[data-quest-nav]').forEach(el => el.onclick = () => { const def = DAILY_QUEST_DEFS.find(d=>d.key===el.getAttribute('data-quest-nav')); if (def) navToQuestTarget(def.nav); });
-      dailyQuestBar.querySelectorAll('[data-reroll-quest]').forEach(el => el.onclick = (ev) => { ev.stopPropagation(); rerollDailyQuest(el.getAttribute('data-reroll-quest')); });
+      }).join('')}${allClaimed ? `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:rgba(93,202,165,0.15); border:var(--bw-1) solid rgba(93,202,165,0.4);"><i class="ti ti-trophy" aria-hidden="true" style="color:#5dcaa5;"></i><span style="font-size:10.5px;">Alle Tagesmissionen erledigt${state.dailyQuestStreak?' · '+state.dailyQuestStreak+'-Tage-Serie':''} - morgen gibt's neue</span></div>` : ''}</div>`
+      if (setBoxHtml(dailyQuestBar, 'dailyQuest', dailyQuestHtml)){
+        dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
+        dailyQuestBar.querySelectorAll('[data-quest-nav]').forEach(el => el.onclick = () => { const def = DAILY_QUEST_DEFS.find(d=>d.key===el.getAttribute('data-quest-nav')); if (def) navToQuestTarget(def.nav); });
+        dailyQuestBar.querySelectorAll('[data-reroll-quest]').forEach(el => el.onclick = (ev) => { ev.stopPropagation(); rerollDailyQuest(el.getAttribute('data-reroll-quest')); });
+      }
       const claimAllQuestsBtn = document.getElementById('claimAllQuestsBtn');
       if (claimAllQuestsBtn) claimAllQuestsBtn.onclick = claimAllDailyQuests;
       const collectAllBtn = document.getElementById('collectAllBtn');
@@ -45781,7 +45794,7 @@
     if (scoreBreakdownBox){
       const breakdown = computeScoreBreakdown();
       const scoreSum = Math.max(1, breakdown.reduce((a,b)=>a+b.points,0));
-      scoreBreakdownBox.innerHTML = breakdown.map(b => `
+      setBoxHtml(scoreBreakdownBox, 'scoreBreakdown', breakdown.map(b => `
         <div class="card-row" style="padding:0.6rem 0.85rem;">
           <div class="left">
             <div class="bicon" style="width:32px; height:32px; background:rgba(93,202,165,0.16); color:#5dcaa5;"><i class="ti ${b.icon}" aria-hidden="true"></i></div>
@@ -45792,7 +45805,7 @@
           </div>
           <span style="font-size:15px; font-weight:600; color:${b.points>0?'#5dcaa5':'#7d8199'};">${b.points>0?'+':''}${fmt(b.points)}</span>
         </div>
-      `).join('');
+      `).join(''));
     }
     const ascensionBox = document.getElementById('ascensionBox');
     if (ascensionBox){
@@ -45812,7 +45825,7 @@
           <button class="buy ${canBuy?'affordable':''}" data-asc-buy="${d.key}" ${canBuy?'':'disabled'}>+1 (${fmt(cost)} <i class="ti ti-sparkles" aria-hidden="true" style="font-size:10px;"></i>)</button>
         </div>`;
       }).join('');
-      ascensionBox.innerHTML = `
+      setBoxHtml(ascensionBox, 'ascension', `
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:9px; border-color:#fac775;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
             <span class="bname"><i class="ti ti-sparkles" aria-hidden="true" style="color:#fac775;"></i> Aufstiege: ${asc.count||0} · Sternenessenz: ${asc.essence||0}</span>
@@ -45822,7 +45835,7 @@
           <div class="bmeta" style="margin-bottom:8px;">${ready ? 'Bereit! Aktueller Ertrag: <strong style="color:#fac775;">'+essenceGainNow()+' Sternenessenz</strong> (aus Punkten, Prestige und Kampfpunkten).' : 'Noch nicht bereit: Prestige '+(state.prestige||0)+'/'+ASCENSION_MIN_PRESTIGE+' · Punkte '+fmt(computeScore())+'/'+fmt(ASCENSION_MIN_SCORE)+'.'}</div>
           <button id="doAscensionBtn" class="${ready?'affordable':''}" ${ready?'':'disabled'}><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Aufsteigen${ready?' (bis zu +'+essenceGainNow()+' Essenz)':''}</button>
         </div>
-        ${treeRows}`;
+        ${treeRows}`);
       const ascBtn = document.getElementById('doAscensionBtn');
       if (ascBtn) ascBtn.onclick = doAscension;
       ascensionBox.querySelectorAll('[data-asc-buy]').forEach(b => b.onclick = () => buyAscensionNode(b.getAttribute('data-asc-buy')));
@@ -45948,12 +45961,12 @@
       const fp = { def: RES_DEFS.find(r=>r.key==='forschungspunkte'), v: nowRates.forschungspunkte||0 };
       if (fp.def) entries.push(fp);
       const maxRate = Math.max(0.01, ...entries.map(e=>e.v));
-      prodNowBox.innerHTML = entries.map(e => `
+      setBoxHtml(prodNowBox, 'prodNow', entries.map(e => `
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
           <div class="bmeta" style="width:130px; flex-shrink:0;"><i class="ti ${e.def.icon}" aria-hidden="true" style="color:${e.def.color}; margin-right:4px;"></i>${e.def.label}</div>
           <div style="flex:1; height:10px; background:rgba(255,255,255,0.06); overflow:hidden;"><div style="width:${Math.round(e.v/maxRate*100)}%; height:100%; background:${e.def.color}; opacity:0.7;"></div></div>
           <div class="bmeta" style="width:70px; text-align:right; font-variant-numeric:tabular-nums;">${e.v.toFixed(2)}/s</div>
-        </div>`).join('');
+        </div>`).join(''));
     }
     const scoreLogBox = document.getElementById('scoreLogBox');
     if (scoreLogBox){
@@ -46011,16 +46024,23 @@
     }
     const avatarPicker = document.getElementById('avatarPicker');
     if (avatarPicker && !isTypingIn('avatarPicker')){
-      avatarPicker.innerHTML = AVATAR_DEFS.map(a => {
+      // Markup-Signatur (v8.382.0): 7,6 kB/s fuer eine Liste, die sich zur Laufzeit praktisch nie
+      // aendert - AVATAR_DEFS ist konstant, nur Auswahl und Freischaltung wechseln, und beides
+      // steht im Markup und damit in der Signatur.
+      const avatarHtml = AVATAR_DEFS.map(a => {
         const achLocked = a.unlockAch && !((state.achievements||{})[a.unlockAch]);
         const locked = (a.exclusive && !((state.unlockedCosmetics||{})[a.key])) || achLocked;
         const title = achLocked ? ('Freischaltbar über den Erfolg „'+(ACHIEVEMENTS.find(x=>x.key===a.unlockAch)||{}).name+'"') : (locked ? 'Exklusiv - nur per seltenem Expeditionsfund freischaltbar' : '');
         return `<button class="avatar-option ${state.player.avatarKey===a.key?'active':''}" data-avatar="${a.key}" ${locked?'data-locked="1" disabled':''} title="${title}" style="background:${a.bg}; ${locked?'opacity:0.35; cursor:not-allowed;':''}">${locked?'<i class="ti ti-lock" aria-hidden="true"></i>':a.svg}</button>`;
       }).join('');
-      document.querySelectorAll('[data-avatar]:not([data-locked])').forEach(btn => btn.onclick = () => {
-        state.player.avatarKey = btn.getAttribute('data-avatar');
-        render(); save();
-      });
+      // Handler NUR neu setzen, wenn wirklich geschrieben wurde. setBoxHtml() meldet das zurueck -
+      // sauberer als sich darauf zu verlassen, dass die alten Knoten samt Handler stehenbleiben.
+      if (setBoxHtml(avatarPicker, 'avatarPicker', avatarHtml)){
+        document.querySelectorAll('[data-avatar]:not([data-locked])').forEach(btn => btn.onclick = () => {
+          state.player.avatarKey = btn.getAttribute('data-avatar');
+          render(); save();
+        });
+      }
     }
     const emailRow = document.getElementById('emailAddRow');
     if (emailRow){
@@ -46132,17 +46152,20 @@
 
     const themePicker = document.getElementById('themePicker');
     if (themePicker){
-      themePicker.innerHTML = THEME_PRESETS.map(t => `
+      // dito (v8.382.0): 4,8 kB/s fuer eine vollstaendig statische Liste.
+      const themeHtml = THEME_PRESETS.map(t => `
         <button data-theme-key="${t.key}" title="${t.name}" style="flex-shrink:0; width:56px; height:56px; padding:0; overflow:hidden; ${((state.themeKey||'standard')===t.key)?'border-color:#fff; box-shadow:0 0 0 2px #fff;':''}">
           <div style="width:100%; height:50%; background:${t.primary};"></div>
           <div style="width:100%; height:50%; background:${t.secondary};"></div>
         </button>
       `).join('');
-      themePicker.querySelectorAll('[data-theme-key]').forEach(btn => btn.onclick = () => {
-        state.themeKey = btn.getAttribute('data-theme-key');
-        applyTheme(state.themeKey);
-        render(); save();
-      });
+      if (setBoxHtml(themePicker, 'themePicker', themeHtml)){
+        themePicker.querySelectorAll('[data-theme-key]').forEach(btn => btn.onclick = () => {
+          state.themeKey = btn.getAttribute('data-theme-key');
+          applyTheme(state.themeKey);
+          render(); save();
+        });
+      }
     }
 
     const lvl = commanderLevel(state.xp||0);
@@ -46168,7 +46191,7 @@
       ['allianceSkinsBox',    renderAllianceSkinsBox]
     ];
     for (const [boxId, fn] of FORTSCHRITT_BOXEN) zeichneAbgesichert(boxId, fn);
-    if (levelBox) levelBox.innerHTML = `
+    if (levelBox) setBoxHtml(levelBox, 'levelBox', `
       <div class="card-row" style="flex-direction:column; align-items:stretch;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span class="bname"><i class="ti ti-award" aria-hidden="true"></i> Level ${lvl}</span>
@@ -46178,7 +46201,7 @@
         <div class="bmeta" style="margin-top:6px;">${commanderProdBonusText(lvl)} Gesamtproduktion durch Kommandanten-Level${lvl >= COMMANDER_PROD_CAP_LEVEL ? '' : ` (Deckel bei +${Math.round(COMMANDER_PROD_CAP*100)}%, erreicht auf Level ${COMMANDER_PROD_CAP_LEVEL})`}</div>
         ${levelRewardLadderHtml(lvl)}
       </div>
-    `;
+    `);
     zeichneAbgesichert('dailyLoginBox', renderDailyLoginBox);
 
     const invBox = document.getElementById('inventoryBox');
@@ -46411,7 +46434,7 @@
     }
     const megaProjectsBox = document.getElementById('megaProjectsBox');
     if (megaProjectsBox){
-      megaProjectsBox.innerHTML = MEGA_PROJECTS.map(p => {
+      setBoxHtml(megaProjectsBox, 'megaProjects', MEGA_PROJECTS.map(p => {
         const built = hasMegaProject(p.key);
         // Ausbaustufen (v8.319.0): Die Karte bleibt nach dem Bau aktiv und zeigt die naechste Stufe.
         const stufe = megaStage(p.key);
@@ -46430,7 +46453,7 @@
           </div>
           ${!ausbaubar?`<div class="bmeta">Ausbaustufen gibt es erst, wenn alle drei Mega-Projekte einmal stehen.</div>`:`<div class="bmeta">${stufe?'Stufe '+(stufe+1)+' – jede weitere Stufe gibt die Hälfte der vorherigen. ':''}Kosten: ${costHtml(pCost)}${itemDef?' + 1x '+(itemDef.name||p.unlockItem)+' (vorhanden: '+have+')':''}${p.requiresAllResearchMaxed?(reqOk?' · <span style="color:#5dcaa5;">alle Forschungen maximiert ✓</span>':' · <span style="color:#f0997b;">benötigt alle Forschungszweige auf Stufe 20</span>'):''}</div>`}
         </div>`;
-      }).join('');
+      }).join(''));
       megaProjectsBox.querySelectorAll('[data-buy-mega]').forEach(btn => btn.onclick = () => buildMegaProject(btn.getAttribute('data-buy-mega')));
     }
     const artifactSetBox = document.getElementById('artifactSetBox');
@@ -46440,7 +46463,7 @@
       const haveAll = hasArtifactSet();
       const artifactScaledCost = scaleCostByEmpire(ARTIFACT_SET_COST);
       const artifactAffordable = haveAll && canAfford(artifactScaledCost);
-      artifactSetBox.innerHTML = `
+      setBoxHtml(artifactSetBox, 'artifactSet', `
         <div class="card-row" style="flex-direction:column; align-items:stretch; ${bonusActive?'border-color:#5dcaa5;':''}">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="left"><div class="bicon" style="background:rgba(237,147,177,0.18); color:#f3aec6;"><i class="ti ti-sparkles" aria-hidden="true"></i></div><div><div class="bname">${bonusActive?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}Erbe der Alten</div><div class="bmeta">+5% dauerhaft auf Produktion, Angriff und Verteidigung</div></div></div>
@@ -46449,7 +46472,7 @@
           ${bonusActive?'':`<div class="bmeta">Kosten: ${costHtml(artifactScaledCost)}</div>
           <div class="bmeta">Benötigt gleichzeitig im Inventar (werden beim Einlösen VERBRAUCHT): ${need.map(k=>{const d=RARE_ITEMS.find(r=>r.key===k)||{}; const have=state.rareItems[k]||0; return `<span style="color:${have>=1?'#5dcaa5':'#e24b4a'};">${d.name||k} (${have}x)</span>`;}).join(', ')}</div>`}
         </div>
-      `;
+      `);
       const claimBtn = document.getElementById('claimArtifactSetBtn');
       if (claimBtn) claimBtn.onclick = claimArtifactSet;
     }
@@ -46502,13 +46525,17 @@
         </div>`;
       }
       html += `</div>`;
-      skillTreeBox.innerHTML = html;
-      skillTreeBox.querySelectorAll('[data-skillnode]').forEach(btn => btn.onclick = () => buySkillNode(btn.getAttribute('data-skillnode')));
+      // Markup-Signatur (v8.382.0): 7,9 kB/s. Der Baum aendert sich nur beim Kauf eines Knotens
+      // oder wenn ein Levelaufstieg neue Punkte bringt - beides steckt im Markup (Punktzahl,
+      // affordable-Klasse, disabled) und damit in der Signatur.
+      if (setBoxHtml(skillTreeBox, 'skillTree', html)){
+        skillTreeBox.querySelectorAll('[data-skillnode]').forEach(btn => btn.onclick = () => buySkillNode(btn.getAttribute('data-skillnode')));
+      }
     }
 
     const milestonesBox = document.getElementById('researchMilestonesBox');
     if (milestonesBox){
-      milestonesBox.innerHTML = RESEARCH_MILESTONES.map(m => {
+      const milestonesHtml = RESEARCH_MILESTONES.map(m => {
         const done = !!(state.researchMilestones && state.researchMilestones[m.key]);
         const keys = milestoneKeys(m);
         const ratio = groupMinRatio(keys);
@@ -46526,6 +46553,8 @@
           </div>
         `;
       }).join('');
+      // dito (v8.382.0): 11,3 kB/s, aendert sich nur beim Erreichen eines Meilensteins.
+      setBoxHtml(milestonesBox, 'researchMilestones', milestonesHtml);
     }
     const achBox = document.getElementById('achievementsList');
     if (achBox){
@@ -46583,7 +46612,11 @@
         html += `<div class="ach-cat-head"><div class="ach-cat-title"><i class="ti ${cat.icon}" aria-hidden="true"></i>${cat.name}</div><span class="ach-cat-count ${cDone===list.length?'ach-cat-full':''}">${cDone}/${list.length}</span></div>`;
         html += sorted.map(renderAch).join('');
       });
-      achBox.innerHTML = html;
+      // Markup-Signatur statt blindem Neuschreiben (v8.382.0). Gemessen war das mit 56,9 kB/s der
+      // mit Abstand groesste Einzelposten des Haupt-Ticks - mehr als die vier Boxen zusammen, die
+      // v8.310.0 umgestellt hat. Die Liste aendert sich nur, wenn ein Erfolg faellt, also praktisch
+      // nie. Keine Klick-Handler in dieser Box, deshalb ist der Umbau hier folgenlos.
+      setBoxHtml(achBox, 'achievements', html);
     }
 
     const traderBox = document.getElementById('traderBox');
