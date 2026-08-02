@@ -62,14 +62,18 @@ const state = { shipMarks: {}, research: {} };
 // gegen die dieser Test antritt.
 const rollenBlock = src.slice(src.indexOf('const COUNTER_ROLE_OF = {'), src.indexOf('};', src.indexOf('const COUNTER_ROLE_OF = {')) + 2);
 const COUNTER_ROLE_OF = new Function(rollenBlock + '; return COUNTER_ROLE_OF;')();
-const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state', 'COUNTER_ROLE_OF',
+// allianceBuffLeft wird injiziert (v8.373.0): shipMarkDuration liest seit dem Werftkonvoi das
+// befristete Allianz-Projekt mit. Die Vorgabe ist 0 (kein Konvoi), damit alle Rohdauer-Pruefungen
+// weiter unten die UNGEBREMSTE Dauer messen - die Konvoi-Wirkung wird getrennt geprueft.
+let konvoiRest = 0;
+const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state', 'COUNTER_ROLE_OF', 'allianceBuffLeft',
   src.slice(von, bis) +
   '; return { SHIP_MARK_MAX, SHIP_MARK_PER_STEP, SHIP_MARK_ROMAN, SHIP_MARK_STEPS, SHIP_MARK_COST_BASE,' +
   ' SHIP_MARK_COST_KEYS, SHIP_MARK_GATES, SHIP_MARK_ITEMS, shipMarkClassFactor, shipMarkCost, shipMarkOf,' +
   ' shipMarkBonus, shipMarkGateOpen, shipMarkRound, shipMarkDuration, shipMarkJob, shipMarkJobRest,' +
   ' SHIP_MARK_TIME_BASE, SHIP_MARK_TIME_STEP, SHIP_MARK_TIME_CLASS_EXP, SHIP_MARK_TIME_CAP,' +
   ' SHIP_MARK_STEP_TEXTE, shipMarkFamily, shipMarkStep, SHIP_MARK_PER_STEP_FAMILIE, shipMarkStepBonus };'
-)(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state, COUNTER_ROLE_OF);
+)(shipDefs, Object.entries(researchMax).map(([key])=>({key, name:key})), state, COUNTER_ROLE_OF, () => konvoiRest);
 
 // ---------------------------------------------------------------- 1. Struktur
 check('zehn Marken', fe.SHIP_MARK_MAX === 10);
@@ -504,6 +508,23 @@ check('die Marke beschleunigt ihre eigene Aufruestung NICHT (kein shipKey an eff
   /effectiveBuildTimeEach\('ship', planetKey, roh\)/.test(src));
 check('Werft-Boni wirken trotzdem (planetKey wird durchgereicht)',
   /const dauer = shipMarkDuration\(key, ziel, state\.activeBasePlanet\)/.test(src));
+
+// ---------------------------------------------------------------- Werftkonvoi (v8.373.0)
+// Das befristete Allianz-Projekt halbiert die Umbauzeit. Es steht hier und nicht in einem eigenen
+// Test, weil es GENAU DIESE Groesse anfasst - eine Aenderung an der Markendauer, die den Konvoi
+// vergisst, faellt so an derselben Stelle auf wie jede andere.
+{
+  const ohne = fe.shipMarkDuration('jaeger', 5);
+  konvoiRest = 3600 * 1000;                     // laeuft noch eine Stunde
+  const mit = fe.shipMarkDuration('jaeger', 5);
+  konvoiRest = 0;
+  const wieder = fe.shipMarkDuration('jaeger', 5);
+  check('Werftkonvoi: laufender Konvoi halbiert die Umbauzeit', mit === Math.round(ohne * 0.5), { ohne, mit });
+  check('Werftkonvoi: ohne Konvoi wieder die volle Dauer', wieder === ohne, { ohne, wieder });
+  // Gegenprobe, dass die Injektion ueberhaupt greift - saehe der Sandkasten den Konvoi gar nicht,
+  // waeren beide Werte gleich und die Pruefung darueber waere eine Tautologie.
+  check('Werftkonvoi: die Injektion wirkt wirklich (beide Werte unterscheiden sich)', mit !== ohne, { ohne, mit });
+}
 
 // Auftrag, Tick und Offline-Nachholpfad
 check('der Kauf startet einen Auftrag statt die Marke sofort zu setzen',
