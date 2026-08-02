@@ -91,15 +91,33 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Klick auf die Benachrichtigung: vorhandenes Fenster fokussieren, sonst neues öffnen.
+// Klick auf die Benachrichtigung: vorhandenes Fenster fokussieren, sonst neues öffnen - und dabei
+// dorthin springen, wo das Ereignis hingehört (02.08.2026). "Expedition ist zurückgekehrt"
+// anzutippen und dann auf der Basis-Übersicht zu landen, ist die halbe Meldung wert.
+//
+// Das Ziel wird NICHT hier bestimmt: Der Server legt es als `ziel` in die Push-Nachricht
+// (notificationTarget() in server.js). Eine eigene Typ->Reiter-Tabelle in dieser Datei wäre eine
+// zweite Kopie, die beim nächsten neuen Ereignistyp still veraltet - und dieser Service Worker wird
+// zudem aggressiv gecacht, liefe also womöglich noch Wochen mit einer alten Tabelle.
+//
+// Zwei Wege, weil es zwei Situationen gibt:
+//   - Das Spiel läuft schon: fokussieren und das Ziel per postMessage schicken. Ein Neuladen würde
+//     hier unnötig den ganzen Spielstand neu holen.
+//   - Kein Fenster offen: mit ?ziel=… öffnen, das Spiel liest den Parameter beim Start aus.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const ziel = (event.notification.data && event.notification.data.ziel) || null;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ('focus' in client) return client.focus();
+        if ('focus' in client) {
+          // postMessage vor focus(): Auf manchen Browsern löst focus() den Wechsel sofort aus, und
+          // eine danach gesendete Nachricht kann in der Umschaltung untergehen.
+          if (ziel && client.postMessage) { try { client.postMessage({ kepler7Ziel: ziel }); } catch (e) {} }
+          return client.focus();
+        }
       }
-      if (self.clients.openWindow) return self.clients.openWindow('/');
+      if (self.clients.openWindow) return self.clients.openWindow(ziel ? '/?ziel=' + encodeURIComponent(ziel) : '/');
     })
   );
 });
