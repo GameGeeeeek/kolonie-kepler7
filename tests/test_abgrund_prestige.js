@@ -38,7 +38,11 @@ function fnAus(n){
 
 // ---- 1) Beide Resets tragen den Abgrund ueberhaupt weiter ----
 const prestige = fnAus('confirmPrestigeWithPerk');
-const aufstieg = fnAus('doAscension');
+// Seit v8.373.0 ist doAscension() nur noch die Pfad-AUSWAHL; der eigentliche Reset samt
+// Abgrund-Weitergabe und Sicherheitsabfragen steht in ascendWithPath(). Der Test zeigt bewusst auf
+// die Funktion, die den Reset wirklich ausfuehrt - auf doAscension zu zeigen haette ihn still zu
+// einem Test ueber ein Auswahlmenue gemacht.
+const aufstieg = fnAus('ascendWithPath');
 // Der Feldname wird an der GRENZE geprueft (Zeilenanfang oder Komma davor), nicht als beliebige
 // Teilzeichenkette. Beim ersten Anlauf stand hier nur /abgrund: .../ - und eine Rot-Probe, die das
 // Feld in `xabgrund:` verunstaltete, blieb gruen, weil `xabgrund: ` die gesuchte Zeichenkette
