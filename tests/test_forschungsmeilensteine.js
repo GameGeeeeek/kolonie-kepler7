@@ -265,7 +265,14 @@ check('Ewigkeitsforschungen haben eine unerreichbare maxLevel', ewig.every(r => 
 
 // ============================================== 7) Hilfetext sagt die Wahrheit
 {
-  const hilfe = src.slice(src.indexOf("{ title:'Forschungs-Meilensteine'"), src.indexOf("{ title:'Forschungs-Meilensteine'") + 1400);
+  // Bis zum ENDE des Eintrags schneiden, nicht nach einer festen Zeichenzahl: Mit 1400 Zeichen war
+  // der Ausschnitt schon zweimal knapp, und beim naechsten ergaenzten Satz faellt hinten etwas
+  // heraus, das durchaus dasteht - der Test meldet dann einen Fehler, den es nicht gibt. Das Ende
+  // ist der Abschluss des Eintrags: `' },` gefolgt vom naechsten { title:.
+  const hVon = src.indexOf("{ title:'Forschungs-Meilensteine'");
+  const hilfe = src.slice(hVon, src.indexOf("{ title:", hVon + 10));
+  check('7: der Hilfe-Eintrag wurde vollstaendig geschnitten',
+    hilfe.length > 400 && hilfe.trimEnd().endsWith('},'), hilfe.length);
   const gruppen = new Set(RESEARCH_MILESTONES.map(m => m.group).filter(g => g !== 'all'));
   // Die Werkstoff-Gruppen zaehlen als EIN Gebiet, auch wenn sie technisch zwei Schluessel sind.
   const gebiete = new Set([...gruppen].map(g => g.replace(/voll$/, '')));
