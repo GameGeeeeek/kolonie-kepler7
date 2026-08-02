@@ -5695,8 +5695,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.386.0';
+  const VERSION = '8.387.0';
   const PATCHNOTES = [
+    { version:'8.387.0', date:'02.08.2026', changes:[
+      '<strong>Während einer Kampf-Wiedergabe zeichnet das Spiel nicht mehr die ganze Oberfläche dahinter neu.</strong> Gemessen, nicht geschätzt: In acht Sekunden mit offener Wiedergabe schrieb der Sekunden-Takt <strong>505 Mal</strong> und rund <strong>95,6 kB</strong> Markup unter das Overlay – und das Overlay ist bildschirmfüllend und deckend. Niemand sah davon ein Zeichen. Jetzt sind es null.',
+      'Die Rechenzeit fehlte genau dort, wo sie gebraucht wird: in der Wiedergabe selbst, die daneben animiert. Auf schwächeren Geräten war das der Unterschied zwischen flüssig und ruckelig.',
+      'Es ist dieselbe Überlegung wie beim schon vorhandenen Sichtbarkeits-Gate (kein Neuzeichnen, wenn der Tab im Hintergrund liegt), nur mit einem anderen Auslöser: dort ist die Seite verdeckt, hier liegt ein Overlay darüber. <strong>Die Spielmechanik läuft unverändert weiter</strong> – Ressourcen wachsen, Missionen kommen an, Bauaufträge laufen ab. Gebremst wird ausschließlich die Anzeige, und beim Schließen wird sofort nachgezeichnet, damit dort keine veralteten Zahlen stehen.'
+    ]},
     { version:'8.386.0', date:'02.08.2026', changes:[
       '<strong>Ein durchgebrochener Spielerangriff kostet den Verteidiger jetzt auch Schiffe.</strong> Bisher zerstörte ein Angriff nur Verteidigungs<em>gebäude</em> – die stationierte Flotte des Ziels blieb unberührt, egal wie deutlich es verlor. Neu: rund <strong>6 bis 12,5 %</strong> der Verteidigungsflotte, also die Hälfte des Ressourcenverlusts. Das ist genau dieselbe Regel, nach der schon der NPC-Überfall die stationierte Flotte trifft – bewusst keine neue Zahl.',
       'Der Verlust betrifft <em>jeden</em> Standort mit Flotte, weil auch deine Verteidigungskraft aus allen Standorten zusammen gerechnet wird. An jedem entsteht ein <strong>Trümmerfeld</strong>, das du mit Recyclern wieder einsammeln kannst. Der Angreifer bekommt davon nichts: Die Änderung ist Abnutzung, kein neuer Beutekanal.',
@@ -26125,6 +26130,11 @@
   function closeBattleReplay(){
     clearBattleTimers();
     document.getElementById('battleModalOverlay').classList.remove('open');
+    // Nachhol-Render: Waehrend der Wiedergabe war die Anzeige gebremst (anzeigeVerdeckt), die
+    // Oberflaeche darunter ist also bis zu eine Sekunde alt. Ohne diese Zeile saehe man nach dem
+    // Schliessen kurz veraltete Ressourcenzahlen - genau das Gegenstueck zum
+    // visibilitychange-Listener beim Tabwechsel.
+    if (bootDataReady && !saveConflictDetected) render();
     const scene = document.getElementById('battleScene');
     if (scene){ scene.querySelectorAll('.battle-shot, .battle-plasma-orb, .battle-missile, .battle-impact, .battle-dmg-float, .battle-muzzle-flash, .battle-debris-particle, .battle-result-particle').forEach(el => el.remove()); scene.classList.remove('shake'); scene.classList.remove('climax'); scene.classList.remove('result-flash-win'); scene.classList.remove('result-flash-loss'); scene.classList.remove('phase-anflug','phase-flankenmanoever','phase-gefecht','phase-entscheidung','phase-rueckzug','phase-nachspiel'); }
     const bigResult = document.getElementById('battleBigResult');
@@ -47780,6 +47790,27 @@
   // der Galaxiekarte aufgeht, gibt es nur noch einen Ausschnitt, und der Block darüber bedient ihn
   // in beiden Zuständen mit.
 
+  // ===== Anzeige-Bremse bei bildschirmfuellender Wiedergabe (02.08.2026) =====
+  //
+  // GEMESSEN, nicht vermutet: Waehrend eine Kampf-Wiedergabe laeuft, schreibt der Haupt-Tick in acht
+  // Sekunden 505 Mal und rund 95,6 kB Markup UNTER das Overlay - und das Overlay ist
+  // `position:fixed; inset:0` mit deckendem Hintergrund. Niemand sieht davon ein Zeichen. Die
+  // Rechenzeit fehlt genau dort, wo sie gebraucht wird: in der Wiedergabe selbst, die daneben
+  // animiert.
+  //
+  // Das ist dieselbe Ueberlegung wie beim Sichtbarkeits-Gate des Tabs (siehe CLAUDE.md), nur mit
+  // einem anderen Ausloeser: Dort ist die Seite verdeckt, hier ein Overlay darueber. Die
+  // SPIELMECHANIK laeuft unveraendert weiter - gebremst wird ausschliesslich Anzeige-Arbeit
+  // (flashGains, maybeShowTabHint, render).
+  //
+  // Beim Schliessen holt closeBattleReplay() einen vollen render() nach, damit die Oberflaeche
+  // darunter nicht bis zu eine Sekunde alt aussieht - dasselbe Gegenstueck wie der
+  // visibilitychange-Listener beim Tabwechsel.
+  function anzeigeVerdeckt(){
+    const o = document.getElementById('battleModalOverlay');
+    return !!(o && o.classList.contains('open'));
+  }
+
   (function initBattleModal(){
     const overlay = document.getElementById('battleModalOverlay');
     const closeBtn = document.getElementById('battleModalCloseBtn');
@@ -47931,7 +47962,8 @@
     // Verschwendung. Die SPIELMECHANIK oben/unten läuft bewusst unverändert weiter (siehe CLAUDE.md,
     // "Sichtbarkeits-Gate für reines Anzeige-Polling"). Beim Sichtbarwerden holt der
     // visibilitychange-Listener (unten bei den Intervallen) sofort einen vollen render() nach.
-    const tabVisible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+    const tabVisible = (typeof document === 'undefined' || document.visibilityState !== 'hidden')
+                      && !anzeigeVerdeckt();
     if (tabVisible) flashGains(actualGains);
     maybeDetectRaid();
     if (state.nextRaidTime && Date.now() >= state.nextRaidTime){
