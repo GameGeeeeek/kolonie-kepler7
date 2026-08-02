@@ -132,10 +132,16 @@ function schnitt(von, bis){
     /Spieler-gegen-Spieler-Bericht<\/strong> jede Phase einzeln/.test(hilfe));
   check('5: die Hilfe erklaert, dass die Aufklaerung dadurch nichts verliert',
     /Aufklärung verliert dadurch nichts/.test(src));
+  // Geprueft wird die BEHAUPTUNG, nicht die Schreibweise: dass die Aenderung ueberhaupt in einem
+  // Patchnotes-Eintrag steht. Die erste Fassung nagelte hier VERSION === '8.384.0' fest - und ging
+  // schon beim naechsten, voellig unbeteiligten Versionssprung kaputt. Genau davor warnt CLAUDE.md:
+  // ein Test, der eine Schreibweise festhaelt statt einer Aussage, wird zum Hindernis fuer richtige
+  // Aenderungen statt zum Schutz vor falschen.
   const ver = (src.match(/const VERSION = '([\d.]+)'/) || [])[1];
-  check('5: VERSION wurde erhoeht', ver === '8.384.0', ver);
-  check('5: es gibt einen Patchnotes-Eintrag dazu',
-    new RegExp("version:'" + ver.replace(/\./g, '\\.') + "'").test(src));
+  const teile = (ver || '0.0.0').split('.').map(Number);
+  check('5: VERSION ist mindestens 8.384.0', teile[0] > 8 || (teile[0] === 8 && teile[1] >= 384), ver);
+  check('5: es gibt einen Patchnotes-Eintrag zu dieser Aenderung',
+    /Spieler-gegen-Spieler-Bericht zeigt endlich/.test(src));
 }
 
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');

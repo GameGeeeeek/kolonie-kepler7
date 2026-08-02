@@ -5695,8 +5695,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.384.0';
+  const VERSION = '8.385.0';
   const PATCHNOTES = [
+    { version:'8.385.0', date:'02.08.2026', changes:[
+      '<strong>Die Expeditions-Ansicht schreibt sich nicht mehr jede Sekunde selbst neu.</strong> Gemessen, nicht geschätzt: In acht Sekunden auf dem Expeditions-Reiter baute das Spiel die Box acht Mal komplett neu auf – 114,3 kB Markup, obwohl sich Zeichen für Zeichen nichts geändert hatte. Jetzt sind es null Neuaufbauten, solange sich wirklich nichts ändert.',
+      'Sie war die letzte große Liste, die noch fehlte. Bei der Umstellungsrunde im Juli blieb sie übrig, weil der damalige automatische Umbau hier zweimal scheiterte: Das Hilfsmittel hielt ein Semikolon <em>innerhalb</em> eines Textbausteins für ein Anweisungsende und setzte eine Klammer mitten in einen CSS-Wert. Diesmal von Hand.',
+      'Für dich ändert sich nichts an der Bedienung: Die waagerechte Wischleiste der Expeditionstypen behält ihre Position, das Flottenname-Feld verliert beim Tippen nicht den Fokus, und alle Knöpfe wirken auch dann noch, wenn die Box sekundenlang nicht neu gebaut wurde. Genau das ist eigens geprüft – ein Knopf, der nach einem übersprungenen Takt nicht mehr reagiert, wäre der teuerste Fehler dieser Umstellung.'
+    ]},
     { version:'8.384.0', date:'02.08.2026', changes:[
       '<strong>Der Spieler-gegen-Spieler-Bericht zeigt endlich, gegen wen du gekämpft hast.</strong> Er war der einzige Kampfbericht ohne Gegenseite: keine Flotte des Ziels, keine Verteidigungsanlagen, keine Phasenurteile – nur zwei Kraftzahlen und „gewonnen" oder „verloren". Dabei hatte der Server all das längst ausgerechnet und in seine eigenen Berichte geschrieben; er gab es dem Angreifer nur nie zurück.',
       'Neu im Bericht: die <strong>Flotte des Ziels</strong>, seine <strong>Verteidigungsanlagen</strong> samt der im Kampf zerstörten, die <strong>drei Phasenurteile</strong> mit ihren Einzelchancen, die Konterwirkung und die Verteidigungs-Aufstellung, gegen die du angetreten bist. Die Kampf-Wiedergabe zeigt den Gegner damit als echte Schiffe und Anlagen statt als abstraktes Personen-Icon.',
@@ -44108,7 +44113,30 @@
         `;
       }).join('');
       const expFuel = missionFuelCostSplit(dur, escortFleet);
-      setHtmlPreservingScroll(expeditionBox, `
+      // setBoxHtml statt setHtmlPreservingScroll (02.08.2026): Diese Box war mit rund 11,6 kB
+      // die letzte grosse Liste, die der Haupt-Tick jede Sekunde Zeichen fuer Zeichen
+      // identisch neu geschrieben hat. setBoxHtml vergleicht das fertige MARKUP - die
+      // Signatur kann also nicht unvollstaendig werden, wenn spaeter ein Anzeigefeld
+      // dazukommt, und Live-Countdowns stoeren nicht (bei laufender Uhr ist das Markup
+      // jede Sekunde ein anderes und die Box wird geschrieben). Der Helfer ruft intern
+      // weiterhin setHtmlPreservingScroll auf, die Scrollposition der Wischleisten
+      // (data-hscroll="exptype") bleibt also erhalten.
+      //
+      // Die gesamte Verdrahtung liegt bewusst IM if: Genau sie ist teuer (ein Dutzend
+      // querySelectorAll-Laeufe ueber die Box). Wird der Schreibvorgang uebersprungen,
+      // stehen die alten Knoten samt ihrer Handler unveraendert da - deshalb ist das
+      // sicher. Geprueft wurde vorher, dass jedes hier verdrahtete data-Attribut im
+      // ganzen Quelltext nur EINMAL vorkommt: die document.querySelectorAll-Aufrufe
+      // treffen also nichts ausserhalb dieser Box, das sonst unverdrahtet bliebe.
+      //
+      // Der FLOTTENANSTRICH steckt im SCHLUESSEL, nicht im Markup - genau wie bei #fleet
+      // daruber. activeFleetSkinFilter() wird von refreshShipMiniIcons() per JS als
+      // canvas.style.filter gesetzt und taucht im erzeugten HTML nirgends auf. Ohne ihn im
+      // Schluessel bliebe ein Skin-Wechsel bei sonst gleichem Markup wirkungslos: die
+      // Schiffe in der Flottenliste faerben sich um, die Eskorte-Schiffe hier nicht.
+      // Nicht als ueberfluessig entfernen - er ist der Grund, warum der Markup-Vergleich
+      // hier ueberhaupt vollstaendig ist.
+      if (setBoxHtml(expeditionBox, 'expedition|' + activeFleetSkinFilter(), `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px;">
           <div class="bmeta"><i class="ti ti-adjustments" aria-hidden="true"></i> Expeditionstyp:</div>
           <div data-hscroll="exptype" style="display:flex; overflow-x:auto; padding:0 12px 2px 0;">
@@ -44249,7 +44277,7 @@
             <div style="line-height:1.7;">${specialRows}</div>
           </div>`;
         })()}
-      `);
+      `)){
       refreshShipMiniIcons(expeditionBox);
       const cfnExp = document.getElementById('customFleetNameInputExp');
       if (cfnExp) cfnExp.oninput = () => { customFleetName = cfnExp.value; };
@@ -44331,7 +44359,8 @@
         log('Auto-Kalibrierung der Quantensensoren '+(state.autoSensorOn?'aktiviert - beim Expeditions-Start werden bei Bedarf automatisch '+QUANTENSENSOR_COST_CHIPS+' Quantenchips investiert':'deaktiviert')+'.', 'ti-sparkles');
         render(); save();
       };
-    }
+      }
+      }
     } // Ende Flotte/Expedition-Schiffsliste-Guard
 
     if (activeTab === 'flotte'){
@@ -44477,7 +44506,10 @@
           <button class="buy ${affordable?'affordable':''}" id="shipBasketBuildBtn" ${anyQty?'':'disabled'} style="align-self:flex-start;"><i class="ti ti-ship" aria-hidden="true" style="margin-right:4px;"></i>Baukorb ${affordable?'bauen':'einreihen'}</button>
         </div>
       `;
-      if (setBoxHtml(shipBasketBox, 'shipBasket', shipBasketHtml)){
+      // Skin im Schluessel aus demselben Grund wie bei #fleet und #expeditionBox:
+      // refreshShipMiniIcons() steht im if-Zweig und setzt canvas.style.filter, was im
+      // Markup nicht vorkommt. Das war hier seit der Umstellung offen.
+      if (setBoxHtml(shipBasketBox, 'shipBasket|' + activeFleetSkinFilter(), shipBasketHtml)){
         refreshShipMiniIcons(shipBasketBox);
         shipBasketBox.querySelectorAll('.basket-amount').forEach(inp => inp.oninput = () => {
           const k = inp.getAttribute('data-basket-ship');
