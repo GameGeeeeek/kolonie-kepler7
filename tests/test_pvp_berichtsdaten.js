@@ -112,8 +112,12 @@ function schnitt(von, bis){
   check('3: Wiedergabe-Block gefunden', seq.length > 300, seq.length);
   check('3: die Wiedergabe nutzt die Zielflotte, wenn sie da ist', /r\.defenderFleet/.test(seq));
   check('3: und die Anlagen des Ziels', /r\.defenseBefore/.test(seq));
+  // Geprueft wird die AUSSAGE (es gibt einen Rueckfall auf ein abstraktes Symbol), nicht das
+  // konkrete Symbol: Seit v8.388.0 haengt es von der Kampfart ab (Leerenriss, Truemmerraub,
+  // Allianzbasis haben eigene). Die erste Fassung nagelte 'ti-user' fest und ging bei dieser
+  // voellig richtigen Erweiterung kaputt.
   check('3: ohne beides bleibt es beim abstrakten Icon (aeltere Berichte)',
-    /abstractIcon:'ti-user'/.test(seq));
+    /abstractIcon: ?gegnerIcon/.test(seq) || /abstractIcon:'ti-/.test(seq), seq.slice(-160));
 }
 
 // ----------------------------------------- 4) Was bewusst NICHT drin steht

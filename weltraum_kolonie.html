@@ -5695,8 +5695,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.387.0';
+  const VERSION = '8.388.0';
   const PATCHNOTES = [
+    { version:'8.388.0', date:'02.08.2026', changes:[
+      '<strong>Drei Kampfarten hatten eine funktionierende Wiedergabe, aber keinen Knopf dafür.</strong> Leerenriss, Piraten-Trümmerraub und der Angriff auf eine feindliche Allianzbasis liefen längst durch dieselbe Wiedergabe-Maschinerie wie Überfall, NPC-Kampf und Spielerduell – erreichbar waren sie über die Oberfläche aber nicht. Nachgemessen, bevor etwas geändert wurde: In einem Berichte-Bestand aus genau diesen drei Arten gab es <em>null</em> Knöpfe.',
+      'Ursache war eine feste Liste im Markup der Berichtsliste, die drei Kampfarten weniger kannte als die Wiedergabe daneben darstellen konnte. Diese Frage beantwortet jetzt <em>eine</em> Stelle, damit die nächste Kampfart nicht wieder an einer zweiten vergessen wird.',
+      'Die Wiedergabe nennt dabei auch den richtigen Gegner: „Leerenriss bei &lt;Planet&gt;", „Piraten-Trümmerräuber", „Allianzbasis [TAG]". Diese drei Berichte führen keinen Gegnernamen mit – vorher hätte dort schlicht „Gegner" gestanden.',
+      'Kein Knopf erscheint dort, wo gar nicht gekämpft wurde: Ein entkommener oder von der KI-Abfangautomatik vertriebener Trümmerraub ist kein Gefecht, eine Expedition ohne Begegnung ebenso wenig.'
+    ]},
     { version:'8.387.0', date:'02.08.2026', changes:[
       '<strong>Während einer Kampf-Wiedergabe zeichnet das Spiel nicht mehr die ganze Oberfläche dahinter neu.</strong> Gemessen, nicht geschätzt: In acht Sekunden mit offener Wiedergabe schrieb der Sekunden-Takt <strong>505 Mal</strong> und rund <strong>95,6 kB</strong> Markup unter das Overlay – und das Overlay ist bildschirmfüllend und deckend. Niemand sah davon ein Zeichen. Jetzt sind es null.',
       'Die Rechenzeit fehlte genau dort, wo sie gebraucht wird: in der Wiedergabe selbst, die daneben animiert. Auf schwächeren Geräten war das der Unterschied zwischen flüssig und ruckelig.',
@@ -25422,6 +25428,32 @@
     }
     return raw;
   }
+  // Welcher Bericht bekommt einen „Zuschauen"-Knopf? (02.08.2026 erweitert)
+  //
+  // Die Bedingung stand vorher als feste Liste ['raid','npc-attack','player-attack'] direkt im
+  // Markup der Berichtsliste - und kannte damit DREI Kampfarten weniger als buildBattleSequence()
+  // daneben tatsaechlich darstellen kann. Leerenriss, Piraten-Truemmerraub und der Angriff auf eine
+  // feindliche Allianzbasis liefen also durch dieselbe Wiedergabe-Maschinerie, waren aber ueber die
+  // Oberflaeche gar nicht erreichbar. Nachgemessen: Es gab dort keinen einzigen Knopf.
+  //
+  // Als eigene Funktion statt als Liste im Markup, damit es genau EINE Stelle gibt, die diese Frage
+  // beantwortet - die naechste Kampfart soll nicht wieder an einer zweiten Stelle vergessen werden.
+  //
+  // Die Zusatzbedingungen sind kein Beiwerk: Ohne eigene Flotte gibt es nichts zu zeigen (ein
+  // 'escaped'-Truemmerraub ist gar kein Gefecht, dort wurde nie gekaempft), und eine Expedition ohne
+  // Begegnung ebenso wenig.
+  const ABSPIELBARE_BERICHTE = ['raid','npc-attack','player-attack','void-rift','pirate-debris-raid','alliance-base-attack'];
+  function istAbspielbar(r){
+    if (!r) return false;
+    if (r.type === 'expedition') return !!(r.encountered && r.fleet);
+    if (!ABSPIELBARE_BERICHTE.includes(r.type)) return false;
+    // 'raid' fuehrt die eigene Flotte unter stationedFleet, die Angreiferflotte unter fleet -
+    // fuer die Wiedergabe reicht eine von beiden.
+    if (r.type === 'raid') return !!(r.fleet || r.stationedFleet);
+    if (r.type === 'pirate-debris-raid') return r.result === 'win' || r.result === 'loss';
+    return !!r.fleet;
+  }
+
   function buildBattleSequence(r){
     let left, right, attackerWins;
     if (r.type === 'raid'){
@@ -25462,9 +25494,24 @@
       // Verteidigungsgebaeude, aber kein Schiff des Gegners. Eine Verlustliste waere erfunden.
       const zielFlotte = (r.defenderFleet && Object.keys(r.defenderFleet).length) ? {...r.defenderFleet} : null;
       const zielBauten = (r.defenseBefore && Object.keys(r.defenseBefore).length) ? r.defenseBefore : null;
+      // Wer steht da eigentlich gegenueber? Der Zweig hier faengt alles ab, was nicht Ueberfall,
+      // NPC-Kampf oder Expedition ist - seit der Knopf auch bei Leerenriss, Piraten-Truemmerraub und
+      // Allianzbasis-Angriff erscheint, sind das drei Gegner, die kein targetName fuehren. Ohne
+      // diese Zuordnung stuende dort schlicht "Gegner", und der Spieler saehe eine Wiedergabe, die
+      // nicht sagt, gegen wen sie lief.
+      const gegnerName =
+          r.type === 'void-rift'          ? ('Leerenriss' + (r.targetPlanet ? ' bei '+planetDisplayName(r.targetPlanet) : ''))
+        : r.type === 'pirate-debris-raid' ? 'Piraten-Trümmerräuber'
+        : r.type === 'alliance-base-attack' ? ('Allianzbasis' + (r.targetTag ? ' ['+r.targetTag+']' : ''))
+        : (r.targetName || 'Gegner');
+      const gegnerIcon =
+          r.type === 'void-rift'          ? 'ti-infinity'   // aus der 69er-Whitelist; ti-black-hole waere passender, fehlt aber im Subset-Font
+        : r.type === 'pirate-debris-raid' ? 'ti-skull'
+        : r.type === 'alliance-base-attack' ? 'ti-building-fortress'
+        : 'ti-user';
       right = (zielFlotte || zielBauten)
-        ? { label: escapeHtml(r.targetName)||'Gegner', power: r.defensePower, buildings: zielBauten, fleet: zielFlotte, losses:{} }
-        : { label: escapeHtml(r.targetName)||'Gegner', abstractIcon:'ti-user', power: r.defensePower, buildings:null, fleet:null, losses:{} };
+        ? { label: escapeHtml(gegnerName), power: r.defensePower, buildings: zielBauten, fleet: zielFlotte, losses:{} }
+        : { label: escapeHtml(gegnerName), abstractIcon: gegnerIcon, power: r.defensePower, buildings:null, fleet:null, losses:{} };
       attackerWins = r.result === 'win';
     }
     // Waffen-Pools: nur Waffen zeigen, die zur tatsächlich vorhandenen Ausrüstung passen (Schiffe
@@ -26277,7 +26324,7 @@
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
       { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes über <strong>12 Runden</strong> (Anflug → Flankenmanöver → Gefecht → Entscheidung → Rückzugsgefecht → Nachspiel) – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger, die Szene färbt sich kurz grün bzw. rot ein und Bruchstücke fliegen als Partikel-Burst nach außen. Gelegentliche <strong>kritische Treffer</strong> (größerer Einschlag, weißer Bildschirmblitz, goldene Schadenszahl) und <strong>Beinahe-Treffer</strong> (Fehlschüsse, kein Schaden), eine einmalige <strong>Alpha-Salve</strong> schwerer Schiffe (Schlachtschiff/Superschlachtschiff) in der Entscheidungsrunde, <strong>Einzelschiff-Duelle</strong> im Kampfprotokoll (nennt konkrete Schiffe statt nur "beide Seiten"), ein <strong>Spannungs-Ping</strong> vor der Entscheidungsrunde, leises <strong>Hintergrund-Ambiente</strong> das dichter wird, sichtbarer <strong>Schadenszustand</strong> bei Schiffstypen unter 25% Bestand, eine <strong>auflockernde Formation</strong> ab 50% Verlusten, <strong>Trümmerpartikel</strong> im Hintergrund die sich über den Kampf aufbauen, sowie ein Kurzfazit, welcher eigene Schiffstyp den größten Anteil an der Kampfkraft hatte. Zusätzlich: langsam driftender Sternenhintergrund, phasenabhängige Szenen-Stimmung (Farbschein je Kampfphase), Schiffe in gestaffelter Formation mit leichter Idle-Bewegung statt einer starren Reihe, und ein sanftes Eintreten der Flotten zu Kampfbeginn.' },
-      { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP- und Expeditions-Berichten (mit echter Begegnung). Läuft ein Kampf live ab, während man im Spiel aktiv ist - eigener Angriff oder eingehender Überfall -, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
+      { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während man im Spiel aktiv ist - eigener Angriff oder eingehender Überfall -, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
       { title:'Steuerung', body:'Pause/Weiter hält die Wiedergabe an, Tempo-Umschalter (1x/2x) beschleunigt, "Überspringen" springt direkt zum Endergebnis.' }
     ]},
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
@@ -27074,7 +27121,7 @@
         body = '<strong>Entscheidung:</strong> '+r.choice;
         body += '<br>'+r.outcome;
       }
-      if (['raid','npc-attack','player-attack'].includes(r.type) || (r.type==='expedition' && r.encountered && r.fleet)){
+      if (istAbspielbar(r)){
         actionsHtml += `<div style="margin-top:8px; display:flex; gap:6px;"><button data-watch-battle="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>Zuschauen</button>${battleCardData(r)?`<button data-share-battle="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:3px;"></i>Teilen</button>`:''}</div>`;
       } else if (battleCardData(r)){
         actionsHtml += `<div style="margin-top:8px;"><button data-share-battle="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:3px;"></i>Teilen</button></div>`;
