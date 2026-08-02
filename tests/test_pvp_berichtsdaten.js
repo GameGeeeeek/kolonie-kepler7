@@ -17,10 +17,12 @@
 //   3. Die Anzeige muss sie auch zeigen - Bericht UND Kampf-Wiedergabe. Eine Angabe ohne Abnehmer
 //      ist nur Ballast im Bericht, und die Wiedergabe daneben zeigte sonst weiter das abstrakte
 //      Personen-Icon (die zweite Anzeigestelle mit der alten Annahme).
-//   4. `defenderLostShips` darf es NICHT geben. Ein PvP-Angriff zerstoert Verteidigungsgebaeude,
-//      aber kein Schiff des Ziels - die Groesse existiert im Kampfmodell nicht. Dieser Punkt haelt
-//      fest, dass sie bewusst fehlt, damit sie niemand spaeter "der Vollstaendigkeit halber" mit
-//      einer erfundenen Zahl nachtraegt.
+//   4. `defenderLostShips` darf es NICHT geben. ACHTUNG, der Grund hat sich am 02.08.2026 geaendert
+//      (v8.386.0): Seitdem kostet ein erfolgreicher Angriff das Ziel sehr wohl Schiffe - der Server
+//      liefert dafuer aber bewusst nur einen PROZENTSATZ (defenderLossPct). Die Stueckzahlen
+//      entstehen erst, wenn der Client des ZIELS den Abzug anwendet und dabei an seinem echten
+//      Bestand deckelt; eine Stueckzahl im Bericht des Angreifers koennte davon abweichen und waere
+//      dann schlicht falsch. Die Zusicherung gilt also weiter, nur aus einem anderen Grund.
 const fs = require('fs');
 const { SPIELDATEI } = require('./lib/umgebung');
 
@@ -118,11 +120,14 @@ function schnitt(von, bis){
 {
   // Geprueft wird die ZUWEISUNG, nicht das Wort: Im Kommentar daneben steht ausdruecklich,
   // warum es das Feld nicht gibt - der Hinweis darf nicht seinen eigenen Test ausloesen.
-  check('4: es wird nirgends ein Feld "defenderLostShips" gesetzt - die Groesse existiert im Kampfmodell nicht',
+  check('4: es wird nirgends ein Feld "defenderLostShips" gesetzt - der Server liefert einen Prozentsatz',
     !/defenderLostShips\s*[:=]/.test(src));
   // Und die Begruendung steht im Code, damit sie niemand als Versehen nachtraegt.
   check('4: die Begruendung dafuer steht im Quelltext',
-    /zerstoert Verteidigungs-GEBAEUDE|zerstoert Verteidigungsgebaeude, aber kein Schiff/.test(src));
+    /WEITERHIN KEIN `defenderLostShips`/.test(src));
+  // Gegenprobe zur Aenderung von v8.386.0: den Prozentsatz gibt es, und er wird uebernommen.
+  check('4: stattdessen wird defenderLossPct uebernommen',
+    /if \(typeof data\.defenderLossPct === 'number' && data\.defenderLossPct > 0\) d\.defenderLossPct = data\.defenderLossPct;/.test(src));
 }
 
 // --------------------------------- 5) Hilfe und Patchnote sagen dasselbe
