@@ -48,8 +48,10 @@ for (const tot of ['colFuel', 'moonFuel']){
 // ---- B: Expeditions-Beutefaktor -----------------------------------------------------------------
 // Schaetzung und Aufloesung teilen sich jetzt eine Funktion. Geprueft wird beides: dass es sie
 // gibt, dass BEIDE sie rufen, und dass die Formel nur noch EINMAL im Code steht.
-check('expeditionRewardMult existiert', /function expeditionRewardMult\(rewardMult\)\{/.test(src));
-check('die Frachtraum-Schaetzung ruft sie', src.includes('EXPEDITION_MAX_RESOURCE_FIND_BASE * expeditionRewardMult(rewardMult)'));
+// Zweiter Parameter seit v8.374.0: der STARTPLANET, fuer den ortsgebundenen Signalring des
+// Orbitalrings. Der Ausdruck laesst ihn zu, verlangt aber weiterhin rewardMult an erster Stelle.
+check('expeditionRewardMult existiert', /function expeditionRewardMult\(rewardMult(, \w+)?\)\{/.test(src));
+check('die Frachtraum-Schaetzung ruft sie', /EXPEDITION_MAX_RESOURCE_FIND_BASE \* expeditionRewardMult\(rewardMult(, \w+)?\)/.test(src));
 check('die Fundaufloesung ruft sie', src.includes('const baseRewardMult = expeditionRewardMult('));
 const formelKopien = [...src.matchAll(/prestigePerkCount\('expedition'\)\*0\.04/g)];
 check('die Beute-Formel steht nur noch einmal im Code', formelKopien.length === 1, formelKopien.length);

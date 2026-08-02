@@ -72,8 +72,12 @@ check('2: die Vollständigkeits-Stufen zählen gegen den echten Bestand, nicht g
   ctx.need(TIERS.find(t => t.key === 'raresAll')) === RARE_FINDBAR);
 
 // ---------------------------------------------------------------- 3) Bonus in der richtigen Gruppe
+// Der Ausdruck zeigt auf die GRUPPE, nicht auf ihr Ende: Seit v8.374.0 steht hinter
+// codexExpeditionBonus() noch der Signalring des Orbitalrings. Ein Test, der die schliessende
+// Klammer mitverlangt, haette bei jedem weiteren Summanden fehlgeschlagen, obwohl genau das der
+// erwuenschte Weg ist - neue kleine Boni gehoeren in diese Gruppe.
 check('3: der Kodex-Bonus fließt in die additive Bonus-Gruppe des Expeditionsertrags',
-  /officerBonus\('aufklaerer'\) \+ codexExpeditionBonus\(\)\)/.test(src));
+  /officerBonus\('aufklaerer'\) \+ codexExpeditionBonus\(\)/.test(src));
 const summe = TIERS.reduce((a, t) => a + (t.reward.expBonus || 0), 0);
 check('3: der dauerhafte Gesamtbonus bleibt maßvoll (<= 15%)', summe > 0 && summe <= 0.15,
   { gesamt: +(summe * 100).toFixed(0) + '%' });
