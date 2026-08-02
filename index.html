@@ -5695,8 +5695,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.385.0';
+  const VERSION = '8.386.0';
   const PATCHNOTES = [
+    { version:'8.386.0', date:'02.08.2026', changes:[
+      '<strong>Ein durchgebrochener Spielerangriff kostet den Verteidiger jetzt auch Schiffe.</strong> Bisher zerstörte ein Angriff nur Verteidigungs<em>gebäude</em> – die stationierte Flotte des Ziels blieb unberührt, egal wie deutlich es verlor. Neu: rund <strong>6 bis 12,5 %</strong> der Verteidigungsflotte, also die Hälfte des Ressourcenverlusts. Das ist genau dieselbe Regel, nach der schon der NPC-Überfall die stationierte Flotte trifft – bewusst keine neue Zahl.',
+      'Der Verlust betrifft <em>jeden</em> Standort mit Flotte, weil auch deine Verteidigungskraft aus allen Standorten zusammen gerechnet wird. An jedem entsteht ein <strong>Trümmerfeld</strong>, das du mit Recyclern wieder einsammeln kannst. Der Angreifer bekommt davon nichts: Die Änderung ist Abnutzung, kein neuer Beutekanal.',
+      'Eine <em>abgewehrte</em> Attacke kostet dich weiterhin kein einziges Schiff – und bringt zusätzlich die Abwehrprämie in Kommandopunkten.',
+      '<strong>Anti-Farming nachgezogen:</strong> Der 30-Minuten-Schutzschild greift jetzt auch dann, wenn beim Ziel gar nichts mehr zu holen war. Sonst wäre ein leergeräumtes Konto ab sofort unbegrenzt auf reine Schiffszerstörung farmbar gewesen – genau das Dauer-Drangsalieren schwächerer Spieler, gegen das der Schild eingeführt wurde.',
+      'Technisch ungewöhnlich gebaut, aus einem Grund: Der Server rechnet den Verlust aus, <em>zieht ihn aber nicht selbst ab</em>. Ein direkter Eingriff in einen fremden Spielstand wird still zurückgenommen, sobald der Betroffene online ist – sein nächster Auto-Save überschreibt ihn mit seinem eigenen, älteren Stand. Stattdessen wird der Verlust in dieselbe Warteschlange gelegt, über die auch Modulbörsen-Erlöse laufen, und vom Client des Betroffenen angewendet. Übertragen wird nur ein Prozentsatz; die Stückzahlen entstehen erst beim Anwenden und werden dabei am tatsächlichen Bestand gedeckelt – eine Meldung kann also nie mehr Schiffe kosten, als wirklich dastehen.',
+      'Braucht ein mitgezogenes Backend. Läuft dort noch die alte Fassung, bleibt alles wie bisher.'
+    ]},
     { version:'8.385.0', date:'02.08.2026', changes:[
       '<strong>Die Expeditions-Ansicht schreibt sich nicht mehr jede Sekunde selbst neu.</strong> Gemessen, nicht geschätzt: In acht Sekunden auf dem Expeditions-Reiter baute das Spiel die Box acht Mal komplett neu auf – 114,3 kB Markup, obwohl sich Zeichen für Zeichen nichts geändert hatte. Jetzt sind es null Neuaufbauten, solange sich wirklich nichts ändert.',
       'Sie war die letzte große Liste, die noch fehlte. Bei der Umstellungsrunde im Juli blieb sie übrig, weil der damalige automatische Umbau hier zweimal scheiterte: Das Hilfsmittel hielt ein Semikolon <em>innerhalb</em> eines Textbausteins für ein Anweisungsende und setzte eine Klammer mitten in einen CSS-Wert. Diesmal von Hand.',
@@ -21308,6 +21316,45 @@
           save();
           continue;
         }
+        if (r.type === 'pvp-fleet-loss'){
+          // Ein anderer Spieler hat dich erfolgreich angegriffen und dabei Schiffe zerstoert
+          // (02.08.2026). Der Server schickt bewusst nur den PROZENTSATZ, nicht Stueckzahlen:
+          //   - Er darf den Abzug nicht selbst vornehmen. Ein direkter Eingriff in den eigenen
+          //     Spielstand wuerde beim naechsten Auto-Save still zurueckgenommen (saveGameStateVersioned
+          //     laedt bei 409 nur die Versionsnummer nach und schickt den eigenen, aelteren Wert
+          //     erneut) - dieselbe Begruendung wie beim Modulboersen-Erloes darueber.
+          //   - Stueckzahlen wuerden eine zweite Kopie von ATTACK_SHIP_KEYS im Backend erzwingen,
+          //     und genau solche Zweitlisten sind dort schon zweimal veraltet.
+          // Der Abzug trifft JEDEN Standort mit Flotte, weil auch die Verteidigungskraft, gegen die
+          // der Angriff lief, aus allen Standorten zusammen gerechnet wird - nicht nur aus dem
+          // Heimatplaneten. Je Standort entsteht dort ein eigenes Truemmerfeld, wie beim Ueberfall.
+          const rohPct = Math.max(0, Math.min(0.9, Number(r.pct) || 0));
+          if (rohPct > 0){
+            // Rueckzugs-Mechanik wie beim Ueberfall: bei hohen Quoten rettet sich ein Teil.
+            const gedaempft = applyRetreatDampening(rohPct).pct;
+            const verlusteGesamt = {};
+            let truemmerGesamt = 0;
+            for (const eintrag of allFleetsWithPlanet()){
+              // applyCombatLosses deckelt je Schiffstyp am echten Bestand - eine eingereihte
+              // Meldung kann also nie mehr Schiffe kosten, als wirklich dastehen, auch wenn sie
+              // tagelang in der Warteschlange lag.
+              const weg = applyCombatLosses(eintrag.fleet, ATTACK_SHIP_KEYS, gedaempft, eintrag.planet);
+              for (const [k,v] of Object.entries(weg)) if (v > 0) verlusteGesamt[k] = (verlusteGesamt[k]||0) + v;
+              const d = weg.__debris;
+              if (d) truemmerGesamt += Object.values(d).reduce((a,b)=>a+b,0);
+            }
+            const txt = lostCountsToText(verlusteGesamt);
+            if (txt){
+              log('Angriff von '+(r.attackerName||'einem Spieler')+': Deine Verteidigungsflotte hat '+txt+' verloren'+(truemmerGesamt>0?' – '+fmt(truemmerGesamt)+' Trümmer treiben an deinen Planeten':'')+'.', 'ti-shield', 'warn');
+              playSound('lose');
+              pushReport({ type:'pvp-fleet-loss', attackerName: r.attackerName||'Unbekannt',
+                           lossPct: Math.round(gedaempft*1000)/10, ownLostShips: verlusteGesamt,
+                           debrisTotal: truemmerGesamt });
+            }
+            save();
+          }
+          continue;
+        }
         if (r.type === 'bounty'){
           state.credits = (state.credits||0) + (r.credits||0);
           log('KOPFGELD KASSIERT: Du hast '+(r.targetName||'den Gejagten')+' bezwungen und '+fmt(r.credits||0)+' Kredite Prämie erhalten!', 'ti-award', 'ok');
@@ -23710,9 +23757,12 @@
     // zieht Frontend und Backend getrennt auf den Pi) liefert diese Felder nicht; dann darf im Bericht
     // auch nichts davon stehen, statt leerer Objekte, die eine gemessene Null vortaeuschen.
     //
-    // KEIN `defenderLostShips`: Ein PvP-Angriff zerstoert Verteidigungs-GEBAEUDE
-    // (destroyedBuilding/-Count), aber kein Schiff des Ziels - die Groesse gibt es im Kampfmodell
-    // nicht. Ein Feld dafuer waere entweder immer leer oder erfunden.
+    // WEITERHIN KEIN `defenderLostShips`: Seit dem 02.08.2026 kostet ein erfolgreicher Angriff das
+    // Ziel zwar Schiffe, aber der Server liefert dafuer bewusst nur einen PROZENTSATZ
+    // (defenderLossPct). Die Stueckzahlen entstehen erst, wenn der Client des ZIELS den Abzug
+    // anwendet und dabei an seinem echten Bestand deckelt - eine Stueckzahl im Bericht des
+    // Angreifers koennte davon abweichen und waere dann schlicht falsch. Zerstoerte
+    // Verteidigungs-GEBAEUDE stehen unveraendert in destroyedBuilding/-Count.
     function pvpKampfDetails(data){
       const d = {};
       if (!data) return d;
@@ -23723,6 +23773,7 @@
       if (typeof data.formationMult === 'number') d.formationMult = data.formationMult;
       if (data.defenseBefore && Object.keys(data.defenseBefore).length) d.defenseBefore = data.defenseBefore;
       if (data.defenderFleet && Object.keys(data.defenderFleet).length) d.defenderFleet = data.defenderFleet;
+      if (typeof data.defenderLossPct === 'number' && data.defenderLossPct > 0) d.defenderLossPct = data.defenderLossPct;
       if (data.destroyedBuilding) d.destroyedBuilding = data.destroyedBuilding;
       if (data.destroyedBuildingCount) d.destroyedBuildingCount = data.destroyedBuildingCount;
       return d;
@@ -26162,7 +26213,7 @@
       { title:'Kampfphasen', body:'Ein Kampf wird nicht mehr mit einem einzigen Wurf entschieden, sondern in <strong>drei Phasen</strong>: <strong>Anflug</strong>, <strong>Hauptgefecht</strong> und <strong>Rückzug</strong>. Wer zwei der drei Phasen gewinnt, gewinnt den Kampf. Der Clou ist die unterschiedliche Gewichtung: Im Anflug zählen die Konterrollen <strong>anderthalbfach</strong>, im Hauptgefecht normal, im Rückzug nur halb. Eine gut zusammengestellte Flotte entscheidet den Kampf also früh; wer gekontert wurde, kann sich im weiteren Verlauf noch fangen. <strong>Was sich dadurch ändert:</strong> Der Gesamt-Spielraum bleibt gleich (min. 5%, max. 95% Siegchance), aber der Stärkere gewinnt <em>verlässlicher</em> – bei doppelter Übermacht steigt die Siegchance von 67% auf 74%, bei dreifacher von 75% auf 84%. Weniger Zufall, mehr Vorbereitung. Der Kampfbericht zeigt jede Phase einzeln. <strong>Gegen andere Spieler</strong> ist der Spielraum bewusst enger: dort liegt die Siegchance immer zwischen <strong>10% und 90%</strong> – kein Angriff auf einen Mitspieler ist sicher, keiner chancenlos. Die Angriffs-Vorschau im Spielerprofil nennt genau diese Zahl – und seit dem 01.08.2026 auch der <strong>Spionagebericht</strong>, der dieselbe Lage vorher mit einer veralteten Formel und damit einer abweichenden Zahl bewertete. Sie bleibt aber eine Schätzung: Die <strong>Verteidigungs-Aufstellung</strong> des Ziels wird erst beim Eintreffen angewandt und ist vorher nicht einsehbar. Seit dem 02.08.2026 zeigt auch der <strong>Spieler-gegen-Spieler-Bericht</strong> jede Phase einzeln – er war bis dahin der einzige Kampfbericht, der nur das Endergebnis nannte, obwohl der Server die drei Phasen längst würfelte.' },
       { title:'Enterung – die vierte Phase', body:'Das <strong>Enterschiff</strong> (Event-Schiff des „Piratenüberfalls") kann als einziges Schiff <strong>entern</strong>. Fliegt mindestens eines im Angriff mit und ist der Kampf gegen einen <strong>NPC-Gegner</strong> gewonnen, folgt eine vierte, eigen gewürfelte Phase. Sie läuft gegen den <em>überlebenden</em> Rest der Gegnerflotte – wer knapp gewinnt, hat mehr Widerstand vor sich als wer überrannt hat. <strong>Bei Erfolg</strong> übernimmst du gegnerische Schiffe: zwei Enterschiffe tragen ein Prisenkommando, also einen Kaperplatz (maximal 10 je Kampf). Kaperbar sind nur kleine bis mittlere Klassen bis Bomber – Schlachtschiff, Leerenjäger und Superschlachtschiff lassen sich nicht übernehmen, die Enterung ist keine Abkürzung zu Großschiffen. <strong>Der Preis:</strong> Gekaperte Schiffe fehlen anschließend im <strong>Trümmerfeld</strong> – du tauschst Recycler-Beute gegen Schiffe, es gibt nichts obendrauf. <strong>Bei Fehlschlag</strong> kommen 30% der eingesetzten Enterschiffe nicht zurück. Die Angriffs-Vorschau nennt Chance und Kaperplätze vorher, der Kampfbericht zeigt die Phase einzeln. <strong>Nicht möglich</strong> ist die Enterung gegen andere Spieler (dort rechnet der Server den Kampf allein) und gegen Piratennester (die haben keine modellierte Flotte).' },
       { title:'Prisengut & Prisenhof', body:'Jede geglückte Enterung bringt neben den Schiffen auch <strong>Prisengut</strong> – so viel, wie die gekaperten Schiffe an Punktegewicht wert sind. Es ist die einzige Beute, die man <em>nur</em> übers Entern bekommt, und die einzige Verwendung dafür ist der <strong>Prisenhof</strong> im Flotte-Tab (Unterreiter „Flotte & Verlegen", erscheint, sobald du Enterschiffe besitzt). Drei feste Angebote, bewusst ohne jede Kopplung an deine Produktionsgröße: <strong>Beutegut ausschlachten</strong> (400 Prisengut → 1 Modulfragment; dasselbe Fragment kostet im Kredit-Shop 4.000 Kredite), <strong>Prise verhökern</strong> (25 Prisengut → 200 Kredite, der schnellere aber leicht schlechtere Kurs) und der <strong>Enterhaken-Ausbau</strong> in fünf Stufen (300/700/1.300/2.200/3.500 Prisengut), der dauerhaft je Stufe <strong>+1 Kaperplatz</strong> und <strong>+4 Prozentpunkte</strong> Enterchance gibt. Damit ist Prisengut eine geschlossene Schleife: Es entsteht nur beim Entern und fließt vor allem ins Entern zurück.' },
-      { title:'Verteidigungs-Aufstellung', body:'Im Verteidigung-Tab wählst du eine <strong>Aufstellung</strong>, die für alle deine Planeten gilt: <strong>Ausgewogen</strong> (keine Schwerpunkte, wirkt nie), <strong>Schilde vorn</strong> (+15% gegen Bomber, -10% gegen Abfangjäger) oder <strong>Geschütze vorn</strong> (+15% gegen Abfangjäger, -10% gegen Bomber). Sie ist das Gegenstück zur Konterrolle des Angreifers – nur legst du dich fest, <em>ohne</em> zu wissen, wer kommt. Genau das ist der Preis dafür, dass sie überhaupt etwas bringt. Wie die Konter wirkt sie anteilig: Ein einzelner Bomber in einer Abfangjäger-Flotte kippt nichts. Wirkt bei NPC-Überfällen und bei Spieler-Angriffen (dort serverseitig geprüft). Im Kampfbericht steht, wie stark deine Aufstellung gegen die konkrete Angriffsflotte getragen hat.<br><br><strong>Eine erfolgreiche Abwehr wird seit dem 02.08.2026 bezahlt.</strong> Vorher bekam der siegreiche Angreifer 25 Kampfpunkte, der <em>geschlagene</em> Angreifer 3 – und der erfolgreiche Verteidiger nichts. Der Verlierer wurde also besser bezahlt als der Sieger. Jetzt bringt jeder abgewehrte Spielerangriff <strong>5 bis 40 Kommandopunkte</strong>, gestaffelt danach, wie stark der Angriff im Verhältnis zu deiner Verteidigung war: eine chancenlose Belästigung bringt das Minimum, ein knapp gescheiterter Großangriff das Maximum. Bewusst <em>Kommandopunkte</em> und nicht Kampfpunkte – Kampfpunkte gehen in den Punktestand, und eine Verteidigung, die den Rang hebt, wäre über abgesprochene Angriffe farmbar. Damit steht der Offiziersausbau erstmals auch dem Spieler offen, der nie selbst angreift. Die Prämie steht im Kampfbericht, die Zahl der abgewehrten Angriffe in der Kampf-Bilanz im Berichte-Tab.' },
+      { title:'Verteidigungs-Aufstellung', body:'Im Verteidigung-Tab wählst du eine <strong>Aufstellung</strong>, die für alle deine Planeten gilt: <strong>Ausgewogen</strong> (keine Schwerpunkte, wirkt nie), <strong>Schilde vorn</strong> (+15% gegen Bomber, -10% gegen Abfangjäger) oder <strong>Geschütze vorn</strong> (+15% gegen Abfangjäger, -10% gegen Bomber). Sie ist das Gegenstück zur Konterrolle des Angreifers – nur legst du dich fest, <em>ohne</em> zu wissen, wer kommt. Genau das ist der Preis dafür, dass sie überhaupt etwas bringt. Wie die Konter wirkt sie anteilig: Ein einzelner Bomber in einer Abfangjäger-Flotte kippt nichts. Wirkt bei NPC-Überfällen und bei Spieler-Angriffen (dort serverseitig geprüft). Im Kampfbericht steht, wie stark deine Aufstellung gegen die konkrete Angriffsflotte getragen hat.<br><br><strong>Eine erfolgreiche Abwehr wird seit dem 02.08.2026 bezahlt.</strong> Vorher bekam der siegreiche Angreifer 25 Kampfpunkte, der <em>geschlagene</em> Angreifer 3 – und der erfolgreiche Verteidiger nichts. Der Verlierer wurde also besser bezahlt als der Sieger. Jetzt bringt jeder abgewehrte Spielerangriff <strong>5 bis 40 Kommandopunkte</strong>, gestaffelt danach, wie stark der Angriff im Verhältnis zu deiner Verteidigung war: eine chancenlose Belästigung bringt das Minimum, ein knapp gescheiterter Großangriff das Maximum. Bewusst <em>Kommandopunkte</em> und nicht Kampfpunkte – Kampfpunkte gehen in den Punktestand, und eine Verteidigung, die den Rang hebt, wäre über abgesprochene Angriffe farmbar. Damit steht der Offiziersausbau erstmals auch dem Spieler offen, der nie selbst angreift. Die Prämie steht im Kampfbericht, die Zahl der abgewehrten Angriffe in der Kampf-Bilanz im Berichte-Tab.<br><br><strong>Ein durchgebrochener Angriff kostet seit dem 02.08.2026 auch Schiffe.</strong> Bis dahin zerstörte ein Spielerangriff nur Verteidigungs<em>gebäude</em>; die stationierte Flotte blieb unberührt, egal wie hoch man verlor. Jetzt verliert sie bei einem <em>erfolgreichen</em> Angriff rund <strong>6 bis 12,5 %</strong> ihrer Schiffe – die Hälfte des Ressourcenverlusts, dieselbe Regel wie beim NPC-Überfall. Der Verlust trifft <em>jeden</em> Standort mit Flotte, weil auch deine Verteidigungskraft aus allen Standorten zusammen gerechnet wird, und an jedem entsteht ein <strong>Trümmerfeld</strong>, das du mit Recyclern wieder einsammeln kannst. Eine <em>abgewehrte</em> Attacke kostet dich weiterhin kein einziges Schiff. Der Angreifer bekommt von diesen Trümmern nichts – die Änderung ist Abnutzung, kein neuer Beutekanal.' },
       { title:'Flottenaufbau & Kampfbonus-Deckel', body:'<strong>Flottenaufbau:</strong> Wie gleichmäßig sich die Angriffskraft deiner Flotte über die drei Konterrollen verteilt, gibt bis zu <strong>+8%</strong> Angriffs- UND Verteidigungskraft – volle Prämie bei einer zu Dritteln ausgewogenen Flotte, nichts bei einer reinen Ein-Rollen-Flotte. Gewichtet wird nach Angriffskraft, nicht nach Stückzahl: ein einzelnes Alibi-Schiff macht eine Flotte nicht ausgewogen. Damit hast du eine echte Wahl: <strong>ausgewogen</strong> bringt die sichere Prämie, ist aber konterneutral; <strong>spezialisiert</strong> verzichtet darauf und holt dafür beim richtigen Ziel bis zu +25% Konterbonus (beim falschen -15%). Aufklären lohnt sich also. Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
       { title:'Flaggschiff', body:'Im <strong>Offiziere-Tab</strong> baust du dein <strong>einzigartiges Flaggschiff</strong> – ein Kapitalschiff getrennt von der Massenflotte, das nicht zerstört werden kann und keine Slots belegt. Jede Ausbaustufe (max. 20) gibt <strong>+1,5% Angriffs- UND Verteidigungskraft</strong>, die in die gedeckelte Kampf-Bonus-Gruppe einfließt (siehe „Flottenvielfalt & Kampfbonus-Deckel"). Bau und Ausbau kosten Ressourcen + Kredite (steigend je Stufe). Du kannst deinem Flaggschiff einen eigenen Namen geben. Es <strong>überlebt einen Prestige-Reset</strong> (wie Offiziere und Module); erst ein Aufstieg (Transzendenz) setzt es zurück.' },
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
@@ -26725,6 +26776,12 @@
         // Kampf-Bilanz: Der Verteidiger war offline, als der Angriff kam - der Bericht ist die
         // einzige Stelle, an der er überhaupt erfährt, dass es sie gibt.
         if (won && r.defendReward) body += '<br><span style="color:#5dcaa5;"><i class="ti ti-medal" aria-hidden="true"></i> Abwehrprämie: <strong>+'+r.defendReward+' Kommandopunkte</strong> (5 bis 40, je nachdem wie stark der abgewehrte Angriff im Verhältnis zu deiner Verteidigung war).</span>';
+        // Zweite Anzeigestelle desselben Vorgangs: Der Flottenverlust steht mit Stückzahlen im
+        // eigenen Bericht 'pvp-fleet-loss', den der Client beim Anwenden schreibt. Hier - im vom
+        // Server geschriebenen Bericht - kann er nur als Prozentsatz stehen, weil die Stückzahlen
+        // zu diesem Zeitpunkt noch gar nicht feststanden. Ohne diese Zeile wüsste ein Spieler, der
+        // nur den Server-Bericht liest, nichts von seinen Schiffsverlusten.
+        if (!won && r.defenderLossPct > 0) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Deine Verteidigungsflotte hat rund '+String(Math.round(r.defenderLossPct*1000)/10).replace('.',',')+'% ihrer Schiffe verloren – die genauen Stückzahlen stehen im Bericht „Flottenverluste durch Spielerangriff".';
       } else if (r.type === 'sabotage-sent'){
         title = (won?'Störmanöver erfolgreich':'Störmanöver fehlgeschlagen')+' – gegen '+escapeHtml(r.targetName||'Unbekannt');
         body = won
@@ -26784,6 +26841,16 @@
         body = '<strong>'+(r.result==='destroyed' ? 'Die Allianzbasis wurde von ['+escapeHtml(r.attackerTag||'??')+'] ZERSTÖRT! Alle Boni sind bis zur Reparatur deaktiviert.' : '['+escapeHtml(r.attackerTag||'??')+'] hat die Allianzbasis angegriffen - '+fmt(r.damage||0)+' Hüllenschaden.')+'</strong>';
         if (r.lostText) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Deine stationierten Verluste: '+r.lostText;
         body += '<br>Details und Reparatur im Allianz-Tab.';
+      } else if (r.type === 'pvp-fleet-loss'){
+        // Wird vom eigenen Client erzeugt, wenn er eine eingereihte Flottenverlust-Meldung abholt
+        // (siehe claimPendingRewards). Der Kampf selbst steht im Bericht 'attack-received', den der
+        // Server schreibt - dieser hier nennt die STUECKZAHLEN, die erst beim Anwenden feststanden.
+        title = '⚔ Flottenverluste durch Spielerangriff';
+        body = '<strong>'+escapeHtml(r.attackerName||'Ein Spieler')+' hat deine Verteidigung durchbrochen.</strong>';
+        body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Verlorene Schiffe: '+lostCountsToText(r.ownLostShips||{});
+        if (r.lossPct) body += ' (rund '+String(r.lossPct).replace('.',',')+'% der Verteidigungsflotte je Standort)';
+        if (r.debrisTotal > 0) body += '<br><i class="ti ti-recycle" aria-hidden="true" style="color:#5dcaa5;"></i> Trümmerfeld an deinen Planeten: '+fmt(r.debrisTotal)+' Einheiten – mit Recyclern abbaubar.';
+        body += '<br><span class="bmeta">Nur ein <em>erfolgreicher</em> Angriff kostet Schiffe. Eine abgewehrte Attacke lässt deine Flotte unberührt und bringt zusätzlich Kommandopunkte.</span>';
       } else if (r.type === 'pirate-debris-raid'){
         if (r.result === 'escaped'){
           title = 'Piraten-Trümmerräuber entkommen – '+planetDisplayName(r.targetPlanet);
@@ -26918,6 +26985,10 @@
         body += formationReportLine(r.formation, r.formationMult, 'des Ziels');
         body += battlePhaseReportHtml(r.phasen);
         if (r.defenderFleet && Object.keys(r.defenderFleet).length) body += '<br>Flotte des Ziels: '+fleetBreakdownHtml(r.defenderFleet);
+        // Bewusst als Prozentsatz und ohne Stueckzahlen: Der Abzug findet erst beim Ziel statt,
+        // gedeckelt an dessen echtem Bestand. Eine Stueckzahl hier waere eine Behauptung ueber
+        // etwas, das noch gar nicht passiert ist.
+        if (r.defenderLossPct > 0) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e0a548;"></i> Die Verteidigungsflotte verliert rund '+String(Math.round(r.defenderLossPct*1000)/10).replace('.',',')+'% ihrer Schiffe (Trümmer bleiben beim Verteidiger).';
         if (r.defenseBefore && Object.keys(r.defenseBefore).length) body += '<br>Verteidigung des Ziels: '+defenseBreakdownHtml(r.defenseBefore, r.destroyedBuilding);
         if (r.simulated) body += '<br><span class="bmeta">Simuliertes Duell (kein eigener Server aktiv) – kein echter Ressourcenverlust beim Gegner.</span>';
         if (r.loot){
