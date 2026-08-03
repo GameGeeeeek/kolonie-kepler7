@@ -102,8 +102,12 @@ const abdruck = page => page.evaluate(() => {
   const src = fs.readFileSync(SPIELDATEI, 'utf8');
   check('0: die Wiedergabe liegt in einer eigenen Kapsel',
     /const Wiedergabe = \(function\(\)\{/.test(src));
-  check('0: sie gibt genau starte() und beende() nach aussen',
-    /return \{ starte: starte, beende: beende \};/.test(src));
+  // Die Kapsel darf nur eine kleine, benannte Flaeche nach aussen geben - sie enthaelt
+  // rund 200 Namen auf oberster Ebene, von denen zehn in der Spieldatei bereits vergeben
+  // sind. zustand() kam am 03.08.2026 dazu: reine Auskunft fuer den Prueflauf, kein
+  // Schalter. Alles Weitere gehoert NICHT nach draussen.
+  check('0: sie gibt genau starte(), beende() und zustand() nach aussen',
+    /return \{ starte: starte, beende: beende, zustand: zustand \};/.test(src));
   // Die zehn Namen, die es in der Spieldatei bereits gibt - ohne Kapsel wuerde einer den
   // anderen still ueberschreiben.
   check('0: die alte Wiedergabe ist restlos entfernt',
@@ -250,8 +254,11 @@ const abdruck = page => page.evaluate(() => {
   check('3: unbekannte Angreiferverluste werden NICHT als „keine Verluste" ausgegeben',
     !/keine Verluste/.test(raidBilanz) && /führt die Verluste dieser Seite nicht mit/.test(raidBilanz),
     raidBilanz.slice(0, 200));
+  // Der Bestand (28) und die Aussage "standen bereit" sind der Kern; das Substantiv
+  // heisst seit 03.08.2026 "Anlagen" statt "Stellungen", weil "Stellung" jetzt die
+  // GEZEICHNETE Figur meint und mehrere Anlagen zusammenfassen kann.
   check('3: die Bodenabwehr nennt den Bestand, keine Ausfallquote',
-    /28 Stellungen standen bereit/.test(raidBilanz) && !/ausgefallen/.test(raidBilanz),
+    /28 (Anlagen|Stellungen) standen bereit/.test(raidBilanz) && !/ausgefallen/.test(raidBilanz),
     raidBilanz.slice(-90));
   await schliesse();
 

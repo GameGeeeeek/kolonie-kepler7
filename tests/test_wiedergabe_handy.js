@@ -217,30 +217,72 @@ async function spielStarten(browser, berichte, wartezeit){
   // Bodenabwehr wurde gezeichnet und war trotzdem nicht zu sehen.
   // Geprueft wird beides: dass Leinwand und Buehne gleich hoch sind (die Ursache), und
   // dass unten wirklich Anlagenfarbe im Bild liegt (die Wirkung).
+  //
+  // ZWEITER BEFUND an derselben Stelle (vierter Report, 03.08.2026): "Die Verteidigung
+  // sieht man kaum." Sie war jetzt IM Bild, aber rund 23 px hoch und in fuenf Silhouetten
+  // fuer 22 Anlagen. Seit v8.394.0 zeichnet die Wiedergabe die echten Gebaeudegrafiken des
+  // Spiels (drawDefenseMiniIcon) in Bildhoehen-Groesse. Die Messung folgt dem: gezaehlt
+  // werden STAHLGRAUE Punkte (Sockel #5b6570 -> #242a31) im Bodenband. Der Planet selbst
+  // ist dort satt gruen/blau getoent, faellt also nicht in diese Signatur.
+  //
+  // GEGENPROBE IM TEST SELBST: derselbe Bericht ohne defenseBefore. Findet die Messung
+  // dort aehnlich viel, misst sie den Planeten und nicht die Anlagen - dann ist der
+  // gruene Haken wertlos. Gemessen: 4.292 mit Abwehr, 1.328 ohne.
   {
-    const { page, errs, ctx } = await spielStarten(browser, [UEBERFALL], 3000);
-    const m = await page.evaluate(() => {
+    const messen = page => page.evaluate(() => {
       const cv = document.getElementById('osCv');
       const bu = document.getElementById('osBuehne').getBoundingClientRect();
       const cssH = parseFloat(cv.style.height) || cv.clientHeight;
       const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
-      // Anlagen tragen Warnton (#e0a548), Flieder (#c3bef5) oder Violett (#7f77dd).
-      // Gezaehlt wird NUR im unteren Fuenftel - dort steht der Boden.
-      let anlagen = 0;
+      let stahl = 0;
       for (let y = Math.floor(cv.height * 0.72); y < cv.height; y += 2)
         for (let x = 0; x < cv.width; x += 2){
           const i = (y*cv.width+x)*4, R = d[i], G = d[i+1], B = d[i+2];
-          if ((R > 150 && G > 120 && G < 200 && B < 130) || (R > 140 && G > 130 && B > 200)) anlagen++;
+          const mx = Math.max(R,G,B), mn = Math.min(R,G,B);
+          if (mn > 52 && mx - mn < 42) stahl++;
         }
-      return { cssH: Math.round(cssH), buehne: Math.round(bu.height), anlagen };
+      let z = null; try { z = JSON.parse(document.getElementById('osWrap').dataset.zustand); } catch(e){}
+      return { cssH: Math.round(cssH), buehne: Math.round(bu.height), stahl: stahl, z: z };
     });
+    const { page, errs, ctx } = await spielStarten(browser, [UEBERFALL], 3000);
+    const m = await messen(page);
     // Die Ursache: Wird zu frueh gemessen, ist die Leinwand hoeher als ihre Buehne.
     check('4: Leinwand und Bühne sind gleich hoch (es wird nach dem Tafelaufbau gemessen)',
       Math.abs(m.cssH - m.buehne) <= 2, { leinwand: m.cssH, buehne: m.buehne });
+    // Schwelle aus drei Messungen: 4.295 mit echten Gebaeudegrafiken, 2.636 mit den
+    // alten Notsilhouetten, 1.328 ganz ohne Bodenabwehr.
     check('4: die Bodenabwehr liegt sichtbar im unteren Bildbereich',
-      m.anlagen > 200, { anlagenPunkte: m.anlagen });
+      m.stahl > 3500, { stahlpunkte: m.stahl });
+    // Die echten Gebaeudegrafiken, nicht die Notsilhouetten. Gezaehlt werden STELLUNGEN
+    // mit Bild, nicht gebackene Bilder - letztere fuellen auch die Tafelzeilen, weshalb
+    // die Gegenprobe damit gruen blieb, obwohl auf dem Boden nichts davon ankam.
+    // EINE dokumentierte Ausnahme: der Resonanzschild-Emitter. Er ist die einzige der 22
+    // Anlagen mit einem handgezeichneten SVG in ICONS statt einer Canvas-Grafik - ihm eine
+    // zweite zu geben haette das SVG zu totem Code gemacht (siehe Kommentar bei DEFENSE_ART
+    // und tests/test_iconabdeckung.js). Er steht als Schildgenerator-Silhouette auf dem
+    // Boden. Kommt eine ZWEITE Anlage ohne Bild dazu, wird dieser Test rot - und genau das
+    // soll er, denn dann ist es keine bewusste Ausnahme mehr, sondern eine Luecke.
+    check('4: es sind die echten Gebäudegrafiken des Spiels (bis auf die eine Ausnahme)',
+      m.z && m.z.anlagen > 0 && m.z.anlagenMitBild >= m.z.anlagen - 1,
+      { mitBild: m.z && m.z.anlagenMitBild, stellungen: m.z && m.z.anlagen });
+    // Gross genug, um die Silhouette zu erkennen - 23 px waren es vorher.
+    check('4: sie sind groß genug, um sie zu unterscheiden (>= 34 px)',
+      m.z && m.z.anlagenHoehe >= 34, { hoehe: m.z && m.z.anlagenHoehe });
+    // Und nicht so viele, dass daraus wieder ein Strich am Horizont wird.
+    check('4: und nicht so viele, dass sie zum Strich verschmelzen (<= 16 auf dem Handy)',
+      m.z && m.z.anlagen > 0 && m.z.anlagen <= 16, { stellungen: m.z && m.z.anlagen });
     check('keine JS-Fehler (Bodenabwehr)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
+
+    // Gegenprobe: derselbe Kampf ohne jede Bodenabwehr.
+    const OHNE = Object.assign({}, UEBERFALL, { id:'r-ohne', defenseBefore: {} });
+    const g = await spielStarten(browser, [OHNE], 3000);
+    const mo = await messen(g.page);
+    check('4: die Messung misst wirklich die Anlagen (Gegenprobe ohne Abwehr)',
+      mo.stahl * 2 < m.stahl, { mitAbwehr: m.stahl, ohneAbwehr: mo.stahl });
+    check('4: ohne Bodenabwehr steht auch keine Stellung auf dem Boden',
+      mo.z && mo.z.anlagen === 0, { stellungen: mo.z && mo.z.anlagen });
+    await g.ctx.close();
   }
 
   // ============================== 3) Geraeteraender: nichts wird abgeschnitten
@@ -280,8 +322,110 @@ async function spielStarten(browser, berichte, wartezeit){
       { knoepfeUnten: m.knoepfeUnten, endeUnten: m.endeUnten, fenster: m.fenster });
     check('3: ' + geraet + ' - und die Bühne bleibt trotzdem brauchbar (>= 25%)',
       m.buehne >= m.fenster * 0.25, { buehne: m.buehne, anteil: Math.round(m.buehne/m.fenster*100)+'%' });
+
+    // ---- DER AUSGANG. Vierter Report, 03.08.2026: "man kann nicht aus dieser
+    // Simulation raus tappen." Ursache war eine Randabstands-Regel, die im Block mit
+    // `and (max-height:640px)` gelandet war und auf einem 932 px hohen iPhone deshalb
+    // NIE griff - Titelzeile samt × lag unter der Statusleiste. Geprueft wird die
+    // WIRKUNG, nicht die Regel: liegt der Knopf frei, ist er gross genug, und laesst
+    // sich die Wiedergabe damit wirklich schliessen.
+    const b = await page.evaluate(() => {
+      const e = document.getElementById('battleModalCloseBtn').getBoundingClientRect();
+      // Was liegt an der Mitte des Knopfes wirklich obenauf? Ein verdeckter Knopf
+      // sieht in getBoundingClientRect() genauso aus wie ein freier.
+      const oben = document.elementFromPoint(e.left + e.width/2, e.top + e.height/2);
+      return { oben: Math.round(e.top), breite: Math.round(e.width), hoehe: Math.round(e.height),
+               frei: !!(oben && (oben.id === 'battleModalCloseBtn' || oben.closest('#battleModalCloseBtn'))) };
+    });
+    check('3: ' + geraet + ' - der Schließen-Knopf liegt unterhalb des Geräterands',
+      b.oben >= 59, { oben: b.oben, rand: 59 });
+    check('3: ' + geraet + ' - er ist mit dem Daumen zu treffen (>= 44x40)',
+      b.breite >= 44 && b.hoehe >= 40, { breite: b.breite, hoehe: b.hoehe });
+    check('3: ' + geraet + ' - und nichts liegt darüber', b.frei, b);
+    await page.click('#battleModalCloseBtn');
+    await page.waitForTimeout(500);
+    check('3: ' + geraet + ' - der Klick darauf schließt die Wiedergabe wirklich',
+      await page.evaluate(() => !document.getElementById('battleModalOverlay').classList.contains('open')));
+    // Zweiter Ausgang: Escape. Ein bildschirmfuellendes Fenster mit genau EINEM Ziel
+    // war der Kern des Befunds - der Klick auf den Hintergrund greift auf dem Handy nie,
+    // weil #osWrap das Overlay restlos ausfuellt.
+    await page.evaluate(() => { const x = document.querySelector('[data-watch-battle]'); if (x) x.click(); });
+    await page.waitForTimeout(1200);
+    const offen = await page.evaluate(() => document.getElementById('battleModalOverlay').classList.contains('open'));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    check('3: ' + geraet + ' - Escape ist ein zweiter Weg hinaus',
+      offen && await page.evaluate(() => !document.getElementById('battleModalOverlay').classList.contains('open')));
+
+    // ---- UND DIE REGEL SELBST, per CSSOM. Diese eine Pruefung muss den Quelltext
+    // befragen, und zwar aus einem gemessenen Grund: Die Messungen darueber stellen die
+    // Geraeteraender mit einem eigenen `padding` NACH, weil env(safe-area-inset-*) im
+    // Emulator 0 meldet. Genau deshalb bleiben sie gruen, wenn man die echte env()-Regel
+    // aus der Datei entfernt - gegengeprueft am 03.08.2026, das Ergebnis war "Alles
+    // gruen". Der Fehler, der den Spieler eingesperrt hat, war aber KEIN fehlender Wert,
+    // sondern eine Regel im falschen Medienblock (`and (max-height:640px)`), die auf
+    // einem 932 px hohen iPhone nie griff. Gefragt wird deshalb genau das: Gibt es die
+    // Regel, und TRIFFT ihre Bedingung auf DIESEM Geraet zu?
+    const regel = await page.evaluate(() => {
+      const raus = { gefunden: false, bedingung: null, greift: false };
+      for (const bl of Array.from(document.styleSheets)){
+        let rules; try { rules = bl.cssRules; } catch(e){ continue; }
+        const geh = (liste, bedingung) => {
+          for (const r of Array.from(liste || [])){
+            if (r.media) { geh(r.cssRules, r.conditionText || r.media.mediaText); continue; }
+            if (!r.selectorText || !/(^|,)\s*#osWrap\s*$/.test(r.selectorText)) continue;
+            const t = r.style && r.style.getPropertyValue('padding-top');
+            if (!t || !/safe-area-inset-top/.test(t)) continue;
+            raus.gefunden = true;
+            raus.bedingung = bedingung || '(keine)';
+            raus.greift = raus.greift || !bedingung || window.matchMedia(bedingung).matches;
+          }
+        };
+        geh(rules, null);
+      }
+      return raus;
+    });
+    check('3: ' + geraet + ' - es gibt überhaupt ein Randpolster für den Gerätrand', regel.gefunden, regel);
+    check('3: ' + geraet + ' - und seine Medienbedingung trifft auf DIESES Gerät zu',
+      regel.greift, { bedingung: regel.bedingung, fenster: await page.evaluate(() => window.innerHeight) });
     check('keine JS-Fehler (' + geraet + ', Ränder)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
+  }
+
+  // ============================== 6) Wie viele Schiffe zeigt das Bild?
+  // BEFUND (vierter Report, 03.08.2026): "Die Schiffe, die angreifen, sind zu wenig."
+  // Der Massstab hing bis dahin ALLEIN an der Bildbreite - auf dem Telefon fest
+  // "1 Rumpf = 16 Schiffe". Ein Angriff mit 266 Schiffen wurde damit zu 17 Ruempfen:
+  // ein fast leeres Bild fuer eine volle Flotte. Seit v8.394.0 gibt die Bildflaeche die
+  // Zahl der Modelle vor und der Massstab ergibt sich aus der echten Flottengroesse.
+  //
+  // Geprueft mit ZWEI Flotten, denn genau daran haette man sich vertun koennen: eine
+  // kleine muss dicht gezeichnet werden, eine riesige darf das Bild nicht sprengen.
+  {
+    const KLEIN = { id:'k1', ts:Date.now(), type:'npc-attack', result:'win',
+      npcName:'Kryllid-Nest (Stufe 3)', attackPower:9000, defensePower:4000,
+      targetPlanet:'home', debrisPlanet:'home',
+      fleet:{ schlachtschiff:120, destroyers:96, jaeger:50 }, ownLostShips:{ jaeger:12 },
+      npcFleet:{ jaeger:80, cruisers:20 }, destroyedNpcShips:{ jaeger:80, cruisers:12 } };
+    for (const [name, bericht, mind, hoechst] of [['kleine Flotte (366 Schiffe)', KLEIN, 60, 200],
+                                                  ['Spätspiel (24.615 Schiffe)', UEBERFALL, 60, 200]]){
+      const { page, errs, ctx } = await spielStarten(browser, [bericht], 2600);
+      const z = await page.evaluate(() => { try { return JSON.parse(document.getElementById('osWrap').dataset.zustand); } catch(e){ return null; } });
+      check('6: ' + name + ' - genug Modelle im Bild (>= ' + mind + ')',
+        z && z.ruempfe >= mind, { schiffe: z && z.schiffe, modelle: z && z.ruempfe, massstab: z && z.massstab });
+      check('6: ' + name + ' - und nicht so viele, dass das Bild kippt (<= ' + hoechst + ')',
+        z && z.ruempfe <= hoechst, { modelle: z && z.ruempfe });
+      // Jede Seite muss sichtbar sein - bei 177 gegen 24.615 trug der gemeinsame
+      // Massstab dem Angreifer genau EINEN Rumpf zu.
+      check('6: ' + name + ' - beide Seiten haben einen eigenen Massstab, wenn nötig',
+        z && z.massA >= 1 && z.massD >= 1, { angreifer: z && z.massA, verteidiger: z && z.massD });
+      // Die echten Schiffsmodelle des Spiels, nicht die Notsilhouette.
+      check('6: ' + name + ' - es sind die Schiffsbilder des Spiels',
+        z && z.spielatlanten > 0 && z.spielatlanten === z.modellAtlanten,
+        { ausDemSpiel: z && z.spielatlanten, modelle: z && z.modellAtlanten });
+      check('keine JS-Fehler (' + name + ')', errs.length === 0, errs.slice(0,3));
+      await ctx.close();
+    }
   }
 
   // ============================== 2) „Grün ist meins" - in BEIDE Richtungen

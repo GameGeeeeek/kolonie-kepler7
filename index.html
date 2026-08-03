@@ -666,6 +666,21 @@
       #osWrap .plog:nth-child(-n+3){display:none;}
       #osWrap .kraft{padding:3px 7px 5px;}
       #osWrap .phase{padding:2px 5px 3px;}
+      /* Randbereiche des Geraets (Kerbe, Home-Leiste).
+         ACHTUNG, hier ist genau EIN Fehler passiert und er hat den Spieler eingesperrt:
+         Diese Regel stand zwischenzeitlich im Block darunter, der zusaetzlich
+         `and (max-height:640px)` verlangt. Auf einem 932 px hohen iPhone griff sie
+         deshalb NIE - Titelzeile und Schliessen-Knopf lagen unter der Statusleiste, und
+         man kam aus der Wiedergabe nicht mehr heraus. Sie gehoert in den ALLGEMEINEN
+         Handy-Zweig; der kurze Bildschirm ist ein Sonderfall davon, kein Ersatz. */
+      #osWrap{padding-top:env(safe-area-inset-top, 0px); padding-bottom:env(safe-area-inset-bottom, 0px);}
+      #osWrap .os-titelzeile{padding:6px 10px;}
+      /* Der Ausgang muss mit dem Daumen zu treffen sein. 44 px ist das Mindestmass,
+         das Apple und Google beide nennen; der Knopf war vorher rund 26 px hoch und
+         30 px breit - selbst ohne die Statusleisten-Ueberdeckung war das die kleinste
+         Flaeche im ganzen Fenster, und sie war die wichtigste. */
+      #osWrap .os-titelzeile #battleModalCloseBtn{min-width:44px; min-height:40px; font-size:15px;}
+      #osWrap .os-titelzeile > button{min-height:34px;}
     }
     /* Kurze Bildschirme (iPhone SE und aehnliche): Dort bleibt der Buehne sonst kaum etwas.
        Die Listen scrollen ohnehin in sich - ein kleinerer Ausschnitt kostet also nichts als
@@ -673,10 +688,6 @@
     @media (max-width:879px) and (max-height:640px){
       #osWrap .kopf{max-height:20vh;}
       #osWrap .os-titelzeile{padding:4px 10px;}
-      /* Randbereiche des Geraets (Kerbe, Home-Leiste): Ohne das lag der Titel unter der
-         Statusleiste und die Knopfreihe unter der Home-Leiste. */
-      #osWrap{padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);}
-      #osWrap .os-titelzeile{padding:6px 10px;}
     }
     /* Der Schalter ist nur dort noetig, wo die Tafeln wirklich Platz wegnehmen - in der
        Breitansicht schweben sie ueber der Buehne und stoeren nicht. */
@@ -4661,6 +4672,13 @@
     const DEFENSE_ART = {
       flak:              { base:'platform', top:'twinup',  col:'#c7cbe0' },
       ionenschild:       { base:'platform', top:'ringdome',col:'#a48bd9' },
+      // NICHT hier: resonanzschild. Am 03.08.2026 kurz eingetragen, weil er in der
+      // Kampf-Wiedergabe als einzige der 22 Anlagen ohne eigene Grafik dastand - und
+      // wieder entfernt, weil er als einziger ein handgezeichnetes SVG in ICONS hat.
+      // defIconHtml() nimmt die Canvas-Grafik VOR ICONS; ein Eintrag hier haette das
+      // SVG zu totem Code gemacht und zwei Bilder fuer dasselbe Gebaeude hinterlassen.
+      // Auf dem Planetenboden der Wiedergabe bleibt er deshalb die Schildgenerator-
+      // Silhouette. (tests/test_iconabdeckung.js haelt genau diese Regel fest.)
       laser:             { base:'platform', top:'emitter', col:'#5dcaa5' },
       plasma:            { base:'platform', top:'orb',     col:'#f3aec6' },
       gauss:             { base:'platform', top:'longgun', col:'#af9ce6' },
@@ -5178,7 +5196,11 @@
       const f = (typeof shipMarkFamily === 'function') ? shipMarkFamily(key) : null;
       return Object.assign({}, MARK_STIL_STANDARD, (f && MARK_STIL[f]) || {});
     }
-    function drawShipMiniIcon(key, canvas, markOverride){
+    // ohneAnstrich (03.08.2026): Die Kampf-Wiedergabe malt BEIDE Flotten mit demselben Zeichner.
+    // Fuer die Gegenseite muss der eigene Flotten-Anstrich draussen bleiben - sonst flaege die
+    // feindliche Flotte in meiner Lackierung, was genauso erfunden waere wie meine Werftmarken
+    // an fremden Schiffen (siehe markOverride).
+    function drawShipMiniIcon(key, canvas, markOverride, ohneAnstrich){
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -5196,7 +5218,7 @@
       const stil = markStil(key);
       const s = Math.min(w,h)/100;
       const P = (x,y) => [x*s, y*s];
-      const stops = activeShipSkinStops() || SHIP_GRAD_STOPS[cfg.grad]; // aktiver Flotten-Anstrich überschreibt die Rumpffarbe (rein kosmetisch)
+      const stops = (ohneAnstrich ? null : activeShipSkinStops()) || SHIP_GRAD_STOPS[cfg.grad]; // aktiver Flotten-Anstrich überschreibt die Rumpffarbe (rein kosmetisch)
       const pts = cfg.pts.map(p=>P(p[0],p[1]));
       const xs = pts.map(p=>p[0]);
       // --- Triebwerksfahnen: ZUERST, damit sie hinter dem Rumpf liegen. Radiale Verläufe statt
@@ -5825,8 +5847,20 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.393.0';
+  const VERSION = '8.394.0';
   const PATCHNOTES = [
+    { version:'8.394.0', date:'03.08.2026', changes:[
+      '<strong>Man kam aus der Kampf-Wiedergabe nicht mehr heraus.</strong> Auf einem hohen iPhone lagen Titelzeile und Schließen-Knopf unter der Statusleiste \u2013 und der Klick auf den Hintergrund hilft dort nicht, weil das Fenster den ganzen Bildschirm ausfüllt. Ursache war eine Randabstands-Regel, die in einem Block für <em>kurze</em> Bildschirme gelandet war und auf einem 932 Pixel hohen Gerät deshalb nie griff. Sie steht wieder im allgemeinen Handy-Zweig.',
+      'Der Schließen-Knopf ist auf dem Handy jetzt 44\u00d740 Pixel groß statt 30\u00d726 \u2013 er war die kleinste Fläche im ganzen Fenster und die wichtigste. Dazu kommt <strong>Escape</strong> als zweiter Weg hinaus. Ein bildschirmfüllendes Fenster mit genau einem Ausgang ist ein Ausgang zu wenig.',
+      '<strong>Die Schiffe sehen jetzt aus wie in deiner Flottenliste.</strong> Bisher übernahm die Wiedergabe nur den <em>Umriss</em> \u2013 dunkle Fläche, farbige Kante. Alles, was ein Schiff erkennbar macht, liegt aber darauf: Farbverlauf, Fenster, Hangartore, Kuppeln, Greifarme, Triebwerksfahne. Gezeichnet wird deshalb mit demselben Zeichner wie in der Flottenliste, statt mit einer zweiten Formenliste, die unweigerlich auseinanderläuft.',
+      'Die Parteifarbe gewinnt trotzdem: Der Rumpf wird eingefärbt, Schattierung und Aufbauten bleiben erhalten, der Farbton wird der der Partei. Ohne das war auf dem Bildschirmfoto nicht mehr zu erkennen, wer wer ist \u2013 die Schiffsklassen bringen ihre eigenen Farben mit. Die Gegenseite fliegt außerdem <strong>ohne</strong> deinen Flotten-Anstrich und ohne deine Werftmarken: Was du an einem fremden Konto nicht sehen kannst, behauptet das Bild nicht.',
+      '<strong>Es fliegen deutlich mehr Schiffe.</strong> Der Maßstab hing bisher allein an der Bildbreite \u2013 auf dem Telefon fest „1 Rumpf = 16 Schiffe", ein Angriff mit 266 Schiffen wurde damit zu 17 Modellen. Jetzt gibt die Bildfläche die Zahl der Modelle vor und der Maßstab ergibt sich aus der echten Flottengröße: dieselben 266 Schiffe ergeben rund 130 Modelle, eine 24.000er-Flotte wird auf dieselbe Zahl verdichtet.',
+      'Bei sehr ungleichen Flotten \u2013 177 Zerstörer greifen eine Heimatwelt mit 24.615 Schiffen an \u2013 bekommt jede Seite mindestens ein kleines Geschwader, sonst wäre der Angreifer ein einzelner Punkt. Dann nennt das Bild <strong>beide</strong> Maßstäbe, statt einer Zahl, die für eine Seite falsch wäre.',
+      '<strong>Die Verteidigungsanlagen sind die echten.</strong> Auf dem Planetenboden standen fünf Silhouetten für 22 Anlagen \u2013 Flak, Laserturm und Nanoplattform sahen identisch aus. Jetzt steht dort die Grafik aus deinem Verteidigungs-Tab, rund doppelt so groß wie vorher (43 statt 23 Pixel auf dem Handy) und mit einem Lichtsaum, der die Silhouette vom dunklen Planeten abhebt.',
+      'Auch die Bestandsliste nennt die Anlagen beim Namen: „Flak-Batterie 55", „Verteidigungsturm 50" statt „Lasergeschütze 150" \u2013 mit demselben Bild wie auf dem Boden. Stehen mehr Anlagen als Platz auf dem Boden ist, steht eine Stellung für ein Vielfaches, und auch das steht im Bild.',
+      'Aufgeräumt: eine zweite, nie aufgerufene Fassung der Bestandsliste ist entfallen. Sie war seit der Umstellung auf echte Berichtsdaten toter Code \u2013 gemerkt habe ich es erst, als ich sie umbaute und in der Messung nichts davon ankam.',
+      '<strong>Der Hilfe-Abschnitt „Kampf-Wiedergabe" beschrieb noch die alte Wiedergabe</strong> – „12 Runden", zwei Reihen, die sich gegenüberstehen, ein Knopf „Überspringen", den es gar nicht mehr gibt. Seit dem Neubau stimmte davon kein Satz. Er ist neu geschrieben: was die Wiedergabe zeigt, woher Schiffsmodelle und Maßstab kommen, und die Steuerung so, wie sie wirklich heißt.'
+    ]},
     { version:'8.393.0', date:'03.08.2026', changes:[
       '<strong>Die Fußleiste der Kampf-Wiedergabe lässt sich auf dem Handy zuklappen.</strong> Der neue Knopf „Daten" oben blendet Abschnitte, Kräfteverhältnis und Protokoll aus – zusammen mit „Listen" bekommt die Bühne damit 85 % des Bildschirms statt 30 %.',
       '<strong>Die Steuerknöpfe bleiben dabei immer stehen.</strong> Neustart, Pause, Tempo und „Ans Ende" verschwinden in keinem Zustand – wer beim Zuklappen die Steuerung verlöre, käme nur noch über „Schließen" wieder heraus. Genau das prüft der Prüflauf in allen drei Zuständen.',
@@ -26053,6 +26087,7 @@
     var W = 900, H = 500, dpr = 1, klein = false;
     var cxP = 0, cyP = 0, RAD = 0, THMAX = 0.3, kU = 1, kA = 1;
     var yBoden = 0, bodenSkala = 1, schiffSkala = 1, MASSSTAB = 6;
+    var SEITEN_MASS = { A: 6, D: 6 };
     var ALT_KUPPEL = 0.155, ALT_ATMO = 0.075;
 
     var mqRM = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : {matches:false};
@@ -26080,9 +26115,48 @@
 
       bodenSkala  = klemme(Math.min(W / 1150, H / 620), 0.66, 1.30);
       schiffSkala = klemme(Math.min(W / 1250, H / 640), 0.60, 1.15);
-      /* Je enger das Bild, desto mehr Schiffe fasst ein Rumpf zusammen - sonst
-         wird der Schwarm auf dem Telefon zu Rauschen. Der Massstab steht im Bild. */
-      MASSSTAB = W >= 1040 ? 6 : (W >= 760 ? 8 : (W >= 520 ? 12 : 16));
+      massstabSetzen();
+    }
+
+    /* --- Wie viele Schiffe fasst ein gezeichneter Rumpf zusammen? ---------------
+       Bis zum 03.08.2026 hing das AUSSCHLIESSLICH an der Bildbreite: auf dem Telefon
+       stand fest "1 Rumpf = 16 Schiffe". Das ergab bei einem Angriff mit 266 Schiffen
+       ganze 17 Ruempfe - ein fast leeres Bild fuer eine volle Flotte (Spieler-Report
+       Sascha: "Die Schiffe, die angreifen, sind zu wenig"). Der Fehler im Ansatz: der
+       Massstab war die Vorgabe und die Rumpfzahl das Ergebnis. Richtig herum ist es
+       andersherum - die BILDFLAECHE gibt vor, wie viele Ruempfe sie traegt, und der
+       Massstab ergibt sich aus der wirklichen Flottengroesse.
+
+       Damit stimmt der Bezug in beide Richtungen: eine kleine Flotte wird 1:1
+       gezeichnet (Massstab 1, jedes Schiff ein Rumpf), eine 24.000er-Flotte wird auf
+       dieselbe Zahl Ruempfe verdichtet und traegt dann eben ein hohes Vielfaches. Was
+       ein Rumpf bedeutet, steht weiterhin im Bild - die Bestandstafeln zeigen
+       unveraendert die exakten Stueckzahlen. */
+    function rumpfBudget(){
+      return W >= 1040 ? 300 : (W >= 760 ? 230 : (W >= 520 ? 165 : 120));
+    }
+    function massstabSetzen(){
+      var summe = { A:0, D:0 }, gesamt = 0, i;
+      for (i = 0; i < ALLE_K.length; i++){
+        var d0 = KLASSEN[ALLE_K[i]], n0 = d0.start || 0;
+        summe[d0.seite] += n0; gesamt += n0;
+      }
+      if (!(gesamt > 0)){ MASSSTAB = 1; SEITEN_MASS.A = SEITEN_MASS.D = 1; return; }
+      MASSSTAB = Math.max(1, Math.round(gesamt / rumpfBudget()));
+      /* Bodensatz je Seite. Bei sehr ungleichen Flotten - 177 Zerstoerer greifen
+         eine Heimatwelt mit 24.615 Schiffen an - traegt der gemeinsame Massstab dem
+         Angreifer genau EINEN Rumpf zu. Das ist rechnerisch richtig und als Bild
+         unbrauchbar: man sieht dem Gefecht nicht mehr an, dass ueberhaupt jemand
+         anfliegt. Jede Seite bekommt deshalb mindestens ein kleines Geschwader.
+         Der Preis ist ein zweiter Massstab, und der wird nicht verschwiegen -
+         zeichneMassstab() nennt dann BEIDE Zahlen. Lieber zwei ehrliche Angaben im
+         Bild als eine Seite, die unsichtbar ist. */
+      var mind = Math.max(6, Math.round(rumpfBudget() / 12));
+      ['A','D'].forEach(function(s){
+        var m = MASSSTAB;
+        if (summe[s] > 0 && summe[s] / m < mind) m = Math.max(1, Math.floor(summe[s] / Math.min(mind, summe[s])));
+        SEITEN_MASS[s] = m;
+      });
     }
 
     /* Welt -> Bildschirm.  u in [-1,1] laengs des Bogens, a = Hoehe in Bildhoehen. */
@@ -26193,9 +26267,129 @@
       var kanten = [punkte.concat([punkte[0], punkte[1]])];
       var heck = -(minX - mx) * mass;   // im Spielraster liegt das Heck bei kleinem x
       var motoren = [[0, heck * 0.9, Math.max(1.0, zielSpanne * 0.10)]];
-      var r = { spanne: zielSpanne, punkte: punkte, kanten: kanten, motoren: motoren };
+      var r = { spanne: zielSpanne, punkte: punkte, kanten: kanten, motoren: motoren,
+                schiff: shipKey, mass: mass, mitteX: mx, mitteY: my };
       modellSpeicher[merk] = r;
       return r;
+    }
+
+    /* --- Das Schiff so, wie es in der Flottenliste aussieht (03.08.2026) --------
+       Der Schritt davor uebernahm nur den UMRISS aus SHIP_HULL_DEFS: dunkle Flaeche,
+       farbige Kante. Damit war der Hyperbomber zwar ein Hyperbomber-Umriss, sah auf
+       dem Telefon aber aus wie jeder andere dunkle Tropfen (Spieler-Report Sascha:
+       "die Schiffe sollen wie die Schiffe im Spiel aussehen"). Alles, was ein Schiff
+       im Spiel erkennbar macht, steckt naemlich NICHT im Umriss, sondern in dem, was
+       drdrauf liegt - Farbverlauf, Fenster, Hangartore, Kuppeln, Greifarme, Antennen,
+       Triebwerksfahne. Diese Teile zeichnet drawShipMiniIcon(), und genau die Funktion
+       wird hier benutzt, statt sie ein zweites Mal nachzubauen.
+
+       Das Icon rechnet in einem festen 0..100-Raster mit s = min(Breite,Hoehe)/100 und
+       setzt selbst KEINE Transformation. Eine von aussen gesetzte bleibt deshalb
+       stehen - so wird aus dem 0..100-Raster hier ein -40..140-Raster, damit die
+       Triebwerksfahne hinter dem Heck nicht am Leinwandrand abgeschnitten wird.
+
+       Ehrlichkeit: die Gegenseite bekommt WEDER meinen Flotten-Anstrich (ohneAnstrich)
+       NOCH meine Werftmarken (markOverride 1). Was ich am fremden Konto nicht sehen
+       kann, darf das Bild nicht behaupten - dieselbe Regel wie im Fremdprofil. */
+    var SPRITE_KANTE = 168, SPRITE_RAND = 40;
+    var spielSprites = {}, EIGENE_SEITE = 'A';
+    /* Ein nicht erkannter Mischmodus faellt in Canvas stillschweigend auf
+       'source-over' zurueck - und das waere hier kein Schoenheitsfehler, sondern ein
+       zugedeckter Rumpf. Also einmal nachfragen statt annehmen. */
+    var mischCache = {};
+    function mischmodusKann(op){
+      if (mischCache[op] === undefined){
+        try {
+          var t = document.createElement('canvas').getContext('2d');
+          t.globalCompositeOperation = op;
+          mischCache[op] = (t.globalCompositeOperation === op);
+        } catch(e){ mischCache[op] = false; }
+      }
+      return mischCache[op];
+    }
+    function spielSprite(shipKey, eigen){
+      var merk = shipKey + (eigen ? '|m' : '|f');
+      if (spielSprites[merk] !== undefined) return spielSprites[merk];
+      var nc = null;
+      try {
+        if (typeof drawShipMiniIcon === 'function' && SHIP_HULL_DEFS[shipKey]){
+          nc = document.createElement('canvas');
+          nc.width = nc.height = SPRITE_KANTE;
+          var g = nc.getContext('2d');
+          var w = 100 + 2*SPRITE_RAND;
+          var k = 100 / w, t = SPRITE_RAND * SPRITE_KANTE / w;
+          g.setTransform(k, 0, 0, k, t, t);
+          drawShipMiniIcon(shipKey, nc, eigen ? undefined : 1, !eigen);
+          g.setTransform(1, 0, 0, 1, 0, 0);
+        }
+      } catch(e){ nc = null; }
+      spielSprites[merk] = nc;
+      return nc;
+    }
+    /* Wo im Sprite (in Sprite-Pixeln) liegt welcher Punkt des Spielrasters? */
+    function spritePx(v){ return (v + SPRITE_RAND) * SPRITE_KANTE / (100 + 2*SPRITE_RAND); }
+
+    /* Ein Bilderbogen aus dem Spiel-Icon: 32 Drehlagen, in jeder das gefertigte
+       Schiffsbild plus eine Parteikante. Ohne die Kante waeren im Getuemmel Freund
+       und Feind nicht auseinanderzuhalten - die Schiffsfarben des Spiels sind je
+       Klasse verschieden und sagen nichts ueber die Seite. */
+    function backeSpielAtlas(r, farbe, s, eigen){
+      var sp = spielSprite(r.schiff, eigen);
+      if (!sp) return null;
+      /* Rechenweg der Groesse, damit sie nicht geraten ist: die Sprite-Leinwand deckt
+         (100 + 2*RAND) Spieleinheiten ab. r.mass rechnet Spieleinheiten in
+         Rumpfeinheiten um, s skaliert Rumpfeinheiten in Pixel. Das ganze Sprite ist
+         also (100 + 2*RAND) * r.mass * s Pixel breit - dann ist der Rumpf darin
+         exakt r.spanne * s Pixel lang, genau wie beim gezeichneten Umriss. */
+      var voll = (100 + 2*SPRITE_RAND) * r.mass * s;
+      var kante = Math.ceil(r.spanne * s * 1.42) + 6;
+      var nc = document.createElement('canvas');
+      nc.width  = Math.max(8, Math.round(kante * SPALTEN * dpr));
+      nc.height = Math.max(8, Math.round(kante * (LAGEN/SPALTEN) * dpr));
+      var g = nc.getContext('2d');
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      // Mittelpunkt des Rumpfes innerhalb des Sprites, in Sprite-Pixeln
+      var cxs = spritePx(r.mitteX), cys = spritePx(r.mitteY);
+      var f = voll / SPRITE_KANTE;
+      for (var i = 0; i < LAGEN; i++){
+        g.save();
+        g.translate((i % SPALTEN)*kante + kante/2, ((i / SPALTEN)|0)*kante + kante/2);
+        g.rotate(i / LAGEN * TAU);
+        g.save();
+        /* Das Spielbild schaut nach RECHTS, die Wiedergabe fliegt nach OBEN. */
+        g.rotate(-Math.PI/2);
+        g.drawImage(sp, -cxs*f, -cys*f, voll, voll);
+        g.restore();
+        /* PARTEIFARBE. Sie muss gewinnen, und das ist nicht selbstverstaendlich:
+           die Spielbilder tragen ihre eigenen Klassenfarben (Tuerkis, Lachs, Gold),
+           und beim ersten Versuch mit einer duennen Kante plus 16 % Farbschleier
+           war auf dem Bildschirmfoto nicht mehr zu erkennen, welche Seite welche
+           war - genau der Fehler, der einen Tag zuvor schon einmal auftrat
+           ("die eigene Flotte flog in Gegnerrot"). Deshalb wird der Rumpf
+           EINGEFAERBT: der Mischmodus 'color' nimmt Farbton und Saettigung vom
+           Fuellwert und die Helligkeit vom Bild darunter - die Schattierung, die
+           Fenster, die Hangartore bleiben also erhalten, nur der Farbton wird der
+           der Partei. Kann der Browser das nicht, bleibt es beim Schleier; ein
+           unerkanntes 'color' wuerde sonst als 'source-over' den Rumpf zudecken. */
+        g.beginPath(); pfadZug(g, r.punkte, s); g.closePath();
+        g.save(); g.clip();
+        if (mischmodusKann('color')){
+          g.globalCompositeOperation = 'color';
+          g.globalAlpha = 0.85; g.fillStyle = farbe; g.fill();
+          g.globalCompositeOperation = 'source-over';
+          g.globalAlpha = 0.14; g.fill();
+        } else {
+          g.globalAlpha = 0.34; g.fillStyle = farbe; g.fill();
+        }
+        g.globalAlpha = 1;
+        g.restore();
+        g.lineWidth = Math.max(0.9, 0.75*s);
+        g.strokeStyle = farbe; g.globalAlpha = 0.95; g.stroke();
+        g.globalAlpha = 1;
+        g.restore();
+      }
+      return { bild: nc, kante: kante };
     }
 
     function atlasSchluessel(rumpfId, seite){ return rumpfId + '|' + seite; }
@@ -26227,8 +26421,14 @@
       return aus;
     }
 
+    var spielAtlasZahl = 0;
     function atlantenBauen(){
       atlanten = {};
+      spielAtlasZahl = 0;
+      /* Die Gebaeudebilder haengen an bodenSkala/dpr - nach einer Groessenaenderung
+         waeren die alten zu grob hochskaliert. Sie werden beim naechsten Zeichnen
+         von selbst neu gebacken. */
+      anlagenBilder = {};
       for (var i = 0; i < ALLE_K.length; i++){
         var k = ALLE_K[i], d = KLASSEN[k];
         atlanten[atlasSchluessel(k, d.seite)] = backeAtlas(k, d.farbe, schiffSkala * d.gr);
@@ -26252,9 +26452,19 @@
             if (!rr) continue;
             RUMPF[id] = rr;
           }
-          atlanten[atlasSchluessel(id, d.seite)] = backeAtlas(id, d.farbe, schiffSkala * d.gr);
+          var groesse = schiffSkala * d.gr;
+          /* Erst das echte Spielbild versuchen; nur wenn dafuer kein Icon zu backen
+             ist, bleibt es beim gezeichneten Umriss. Kein Aufruf ohne Rueckfalltuer. */
+          var sa = backeSpielAtlas(RUMPF[id], d.farbe, groesse, d.seite === EIGENE_SEITE);
+          if (sa) spielAtlasZahl++;
+          atlanten[atlasSchluessel(id, d.seite)] = sa || backeAtlas(id, d.farbe, groesse);
         }
       }
+      /* Die Spiel-Sprites waren nur Vorlage fuer die Bilderbogen und werden nicht
+         mehr gebraucht - 17 Leinwaende zu 168x168 sind rund 1,9 MB Bildspeicher, den
+         der JS-Heap nicht einmal ausweist. Beim naechsten Backen entstehen sie in
+         Sekundenbruchteilen neu. */
+      spielSprites = {};
       /* Beutestuecke: dieselbe Silhouette, aber in der Farbe des Angreifers. */
       atlanten[atlasSchluessel('dKreuzer','A')]    = backeAtlas('dKreuzer',    F.an, schiffSkala*KLASSEN.dKreuzer.gr);
       atlanten[atlasSchluessel('dZerstoerer','A')] = backeAtlas('dZerstoerer', F.an, schiffSkala*KLASSEN.dZerstoerer.gr);
@@ -26419,14 +26629,18 @@
     }
 
     /* --------------------------- Abwehranlagen --------------------------- */
-    var anlagen = [];
+    var anlagen = [], anlagenMassstab = 1;
+    /* Zaehlt, wie viele Stellungen im letzten Bild WIRKLICH mit der Gebaeudegrafik
+       gemalt wurden - nicht, wie viele Bilder im Speicher liegen. Der Unterschied ist
+       genau der, an dem eine Gegenprobe sonst gruen bleibt. */
+    var anlagenGemalt = 0, anlagenGemaltLetzt = 0;
     function anlagenBauen(){
       anlagen = [];
       for (var i = 0; i < ABWEHR_PLAN.length; i++){
-        var typ = ABWEHR_PLAN[i][0], us = ABWEHR_PLAN[i][1];
+        var typ = ABWEHR_PLAN[i][0], us = ABWEHR_PLAN[i][1], geb = ABWEHR_PLAN[i][2] || null;
         for (var j = 0; j < us.length; j++){
           anlagen.push({
-            typ: typ, nr: j, u: us[j], lebt: true, ziel: null, zielZeit: 0,
+            typ: typ, geb: geb, nr: j, u: us[j], lebt: true, ziel: null, zielZeit: 0,
             richt: 0, sollRicht: 0, lade: 0.6 + Math.random()*2.2, glut: 0,
             rueck: 0, klappe: 0, salve: 0, salveTakt: 0, ph: Math.random()*TAU,
             blitz: 0, sterben: 0
@@ -26437,6 +26651,11 @@
     function anlagenZahl(typ){
       var n = 0;
       for (var i = 0; i < anlagen.length; i++) if (anlagen[i].typ === typ && anlagen[i].lebt) n++;
+      return n;
+    }
+    function anlagenZahlGeb(geb){
+      var n = 0;
+      for (var i = 0; i < anlagen.length; i++) if (anlagen[i].geb === geb && anlagen[i].lebt) n++;
       return n;
     }
 
@@ -26469,6 +26688,40 @@
       return nc;
     }
 
+    /* Gebackene Gebaeudebilder: das Icon des Spiels animiert ueber Date.now(), auf
+       dem Boden stehen aber bis zu 30 Stellungen - jede je Bild neu zu malen waere
+       30 volle Icon-Zeichnungen pro Bild. Einmal backen, dann stempeln. Der Preis
+       ist der stehende Zeitpunkt der Icon-Animation; die Bewegung im Bild liefert
+       ohnehin die Muendungsglut daneben. */
+    var anlagenBilder = {};
+    function anlagenBildKante(){ return Math.max(48, Math.round(90 * bodenSkala * dpr)); }
+    function anlagenBild(geb){
+      if (!geb || typeof drawDefenseMiniIcon !== 'function') return null;
+      if (typeof DEFENSE_CANVAS_KEYS !== 'undefined' && DEFENSE_CANVAS_KEYS.indexOf(geb) < 0) return null;
+      if (anlagenBilder[geb] !== undefined) return anlagenBilder[geb];
+      var nc = null;
+      try {
+        var kn = anlagenBildKante();
+        nc = document.createElement('canvas');
+        nc.width = nc.height = kn;
+        drawDefenseMiniIcon(geb, nc);   // rechnet selbst auf min(w,h)/40 hoch
+      } catch(e){ nc = null; }
+      anlagenBilder[geb] = nc;
+      return nc;
+    }
+    /* Wie hoch steht die Anlage auf dem Boden? Der alte Wert (rund 11-16 px auf dem
+       Telefon) war der zweite Teil von "Die Verteidigung sieht man kaum": selbst mit
+       dem richtigen Bild ist bei 14 Pixeln nichts zu erkennen. Bezugsgroesse ist
+       jetzt die Bildhoehe, mit einem Boden, unter den es nicht faellt. */
+    function anlagenHoehe(typ){
+      var g = typ === 'gen' ? 1.3 : (typ === 'gauss' ? 1.12 : (typ === 'silo' ? 1.0 : (typ === 'plasma' ? 1.0 : 0.94)));
+      /* Bezugsgroesse ist die BILDHOEHE, nicht bodenSkala: unter dem Boden liegen
+         genau 20 % der Leinwand (yBoden = 0,80 * H), und dort muss die Anlage
+         hineinpassen, ohne unten anzustossen. 0,155 * H laesst dafuer Luft und
+         ergibt auf einer 295 px hohen Handy-Buehne rund 43 px - gegenueber den
+         23 px vorher, bei denen von der Silhouette nichts zu erkennen war. */
+      return klemme(H * 0.155, 34, 76) * g;
+    }
     function mitBoden(g, u, fn){
       var p = px(u, 0);
       g.save(); g.translate(p.x, p.y); g.rotate(lot(u));
@@ -26491,6 +26744,43 @@
           gg.drawImage(fleck(F.warn), -5*s, -8*s, 10*s, 10*s);
           gg.globalAlpha = 1;
           gg.globalCompositeOperation = 'source-over';
+        });
+        return;
+      }
+      /* --- Das Gebaeude so, wie es im Verteidigungs-Tab aussieht (03.08.2026) ----
+         Vorher zeichnete die Wiedergabe fuenf eigene Silhouetten fuer 22 Anlagen:
+         Flak, Laserturm und Nanoplattform standen als dasselbe Ding auf dem Boden,
+         und keines davon glich seinem Bild im Spiel (Spieler-Report Sascha: "die
+         Verteidigung genauso"). Das Spiel malt jede Anlage in drawDefenseMiniIcon()
+         auf einer 40x40-Flaeche - genau das wird hier verwendet, gebacken und dann
+         nur noch gestempelt. Die beweglichen Teile (Muendungsglut, Rauch, Trichter)
+         bleiben davor bzw. dahinter, weil ein gebackenes Bild sie nicht mitbringt. */
+      var bild = anlagenBild(an.geb);
+      if (bild){
+        anlagenGemalt++;
+        var hoehe = anlagenHoehe(an.typ);
+        mitBoden(g, an.u, function(gg){
+          /* Das Icon zeichnet in 0..40 mit dem Boden bei y=34; hier steht der Boden
+             bei y=0, also wird um genau diesen Betrag nach oben geschoben. */
+          var f = hoehe / 40;
+          /* Gegenlicht am Boden. Die Gebaeudebilder des Spiels sind auf helle
+             Kartenflaechen gezeichnet (Sockel #5b6570 auf #242a31) und stehen hier
+             auf einer dunklen Planetenoberflaeche - ohne diesen Saum verschwimmen
+             sie mit ihr, und das war der zweite Teil von "Die Verteidigung sieht man
+             kaum". Sehr flach gehalten: er soll die Silhouette abheben, nicht
+             leuchten. */
+          gg.globalCompositeOperation = 'lighter';
+          gg.globalAlpha = 0.30;
+          gg.drawImage(fleck(F.ver), -16*f, -30*f, 32*f, 32*f);
+          gg.globalAlpha = 1;
+          gg.globalCompositeOperation = 'source-over';
+          gg.drawImage(bild, -20*f, -34*f, 40*f, 40*f);
+          if (an.glut > 0 || an.klappe > 0.1 || an.salve > 0){
+            var st = Math.max(an.glut, an.klappe, an.salve);
+            gg.globalCompositeOperation = 'lighter';
+            glut(gg, 0, -26*f, 9*f*st, an.typ === 'gauss' ? F.flieder : (an.typ === 'gen' ? F.vio : F.ver), Math.min(1, st));
+            gg.globalCompositeOperation = 'source-over';
+          }
         });
         return;
       }
@@ -26608,7 +26898,10 @@
     function neueRumpfZahl(k){
       var d = KLASSEN[k];
       if (k === 'aEnter') return 3;
-      return Math.max(2, Math.round(d.start / MASSSTAB));
+      /* Nie mehr Ruempfe als Schiffe: bei "2 Kolosse" standen frueher trotzdem zwei
+         Ruempfe da, bei EINEM Koloss aber auch - der alte Mindestwert 2 log. */
+      var m = SEITEN_MASS[d.seite] || MASSSTAB;
+      return klemme(Math.round(d.start / m), 1, Math.max(1, d.start));
     }
 
     function aufbauen(){
@@ -27262,7 +27555,15 @@
         g.drawImage(glockeBild, 0, 0, W, H);
         g.globalAlpha = 1;
       }
+      anlagenGemalt = 0;
       for (var i = 0; i < anlagen.length; i++) zeichneAnlage(g, anlagen[i]);
+      if (anlagenGemalt !== anlagenGemaltLetzt){
+        anlagenGemaltLetzt = anlagenGemalt;
+        /* Nur bei Aenderung - das ist im Normalfall genau einmal je Wiedergabe.
+           Das Auskunftsfeld wird beim Start geschrieben, bevor das erste Bild steht;
+           ohne diese Zeile stuende dort dauerhaft eine 0. */
+        zustandSchreiben();
+      }
       zeichneKuppel(g);
       zeichneScherben(g);
       zeichneWracks(g);
@@ -27285,7 +27586,18 @@
       g.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace';
       g.textAlign = 'left'; g.textBaseline = 'bottom';
       g.fillStyle = rgba(F.grau, .62);
-      g.fillText('1 Rumpf ≈ ' + MASSSTAB + ' Schiffe · Bestandszahlen exakt', 10, H - 8);
+      /* „Modell", nicht „Rumpf": In den Bestandstafeln daneben steht „24.436 Rümpfe",
+         und dort meint das Wort die ECHTEN Schiffe. Zwei Bedeutungen desselben Worts
+         in einem Bild - die eine als Stueckzahl, die andere als gezeichnete Figur -
+         waeren genau die Sorte Doppeldeutigkeit, die Zahlen unlesbar macht. */
+      var je = function(m){ return m <= 1 ? '1 Modell = 1 Schiff' : ('1 Modell ≈ ' + m + ' Schiffe'); };
+      /* Zwei Massstaebe entstehen nur bei sehr ungleichen Flotten (siehe
+         massstabSetzen). Dann werden auch BEIDE genannt - eine einzelne Zahl waere
+         fuer die kleinere Seite schlicht falsch. */
+      var t = SEITEN_MASS.A === SEITEN_MASS.D ? je(SEITEN_MASS.A)
+            : ('Angreifer ' + je(SEITEN_MASS.A) + ' · Verteidiger ' + je(SEITEN_MASS.D));
+      if (anlagenMassstab > 1) t += ' · 1 Stellung ≈ ' + anlagenMassstab + ' Anlagen';
+      g.fillText(t + ' · Bestandszahlen exakt', 10, H - 8);
       g.textBaseline = 'alphabetic';
     }
 
@@ -27637,13 +27949,19 @@
        flach in einem 15-Pixel-Kaestchen stehen. Gezeichnet wird auf einem eigenen
        Canvas je Zeile, damit es scharf bleibt (devicePixelRatio) und ohne eine
        einzige externe Datei auskommt. */
-    function abwehrBild(typ){
+    function abwehrBild(typ, geb){
       var S = 15, q = Math.min(2, window.devicePixelRatio || 1);
       var cn = document.createElement('canvas');
       cn.className = 'zeile-bild';
       cn.width = S * q; cn.height = S * q;
       var g = cn.getContext('2d');
       if (!g) return cn;
+      /* Dasselbe Bild wie auf dem Boden und wie im Verteidigungs-Tab. Nur wenn es
+         das nicht gibt (Vorfuehrbild ohne echte Berichtsdaten), bleibt es bei der
+         gezeichneten Bauform-Silhouette darunter. */
+      if (geb && anlagenBild(geb)){
+        try { drawDefenseMiniIcon(geb, cn); return cn; } catch(e){ /* weiter unten */ }
+      }
       g.setTransform(q, 0, 0, q, 0, 0);
       g.translate(S / 2, S - 1.5);
       var dunkel = 'rgba(12,16,32,.96)';
@@ -27698,76 +28016,41 @@
       return cn;
     }
 
-    function tafelBauen(el, titel, rolle, farbe, klassen, mitAbwehr, seite){
-      el.innerHTML = '';
-      var kopf = neu('div', 'tafel-kopf');
-      var marke = neu('span', 'tafel-marke'); marke.style.background = farbe;
-      kopf.appendChild(marke);
-      kopf.appendChild(neu('span', 'tafel-name', titel));
-      kopf.appendChild(neu('span', 'tafel-rolle', rolle));
-      el.appendChild(kopf);
-
-      /* Rumpfsumme der Seite (aus Entwurf A) */
-      var startSumme = 0;
-      for (var s0 = 0; s0 < klassen.length; s0++) startSumme += KLASSEN[klassen[s0]].start;
-      var summenZeile = neu('div', 'tafel-summe');
-      var summenWert = neu('b', null, zahl(startSumme));
-      summenZeile.appendChild(summenWert);
-      summenZeile.appendChild(neu('span', null, '/ ' + zahl(startSumme) + ' Rümpfe'));
-      el.appendChild(summenZeile);
-      tafelSummen[seite] = { wert: summenWert, start: startSumme };
-
-      for (var i = 0; i < klassen.length; i++){
-        var k = klassen[i], d = KLASSEN[k];
-        var z = neu('div', 'zeile');
-        var nm = neu('span', 'zeile-name', d.name);
-        /* Der Startbestand steht dauerhaft neben dem aktuellen - so ist jede Zahl
-           auch ohne Gedaechtnis lesbar, statt erst im Vergleich zum Vorlauf.
-           Der aktuelle Wert steckt in einem eigenen <b>, damit die Fortschreibung
-           nicht per textContent den Startwert mit ueberschreibt. */
-        var zl = neu('span', 'zeile-zahl');
-        var jetzt = neu('b', null, zahl(d.start));
-        zl.appendChild(jetzt);
-        zl.appendChild(neu('span', 'zeile-start', ' /' + zahl(d.start)));
-        var bk = neu('div', 'balken');
-        var bi = neu('i'); bi.style.background = farbe; bi.style.width = '100%';
-        bk.appendChild(bi);
-        z.appendChild(nm); z.appendChild(zl); z.appendChild(bk);
-        el.appendChild(z);
-        zeilen[k] = { zahl: jetzt, balken: bi, name: nm };
+    /* tafelBauen() aus dem Entwurf ist am 03.08.2026 ersatzlos entfallen. Sie war seit
+       der Umstellung auf echte Berichtsdaten TOTER CODE - gerufen wird ausschliesslich
+       tafelBauenEcht(). Aufgefallen ist das erst, als ich ihren Abwehr-Teil auf die
+       echten Gebaeude umgebaut hatte und in der Messung nichts davon ankam: die Tafel
+       im Bild kommt aus abwehrTeilBauen(). Eine zweite, nie gerufene Fassung derselben
+       Anzeige ist genau die Dopplung, an der dieses Projekt regelmaessig auseinanderlaeuft. */
+    /* ALLE Anlagenarten des Verteidigers - mit echtem Namen, echter Stueckzahl und
+       der Zahl der dafuer gezeichneten Stellungen (die 0 sein darf: seltene Arten
+       bekommen keinen Platz auf dem Boden, siehe ABWEHR_PLAN). Bewusst NICHT aus
+       ABWEHR_PLAN abgeleitet: sonst fielen genau diese Arten auch aus der
+       Kraftberechnung, und der Verteidiger waere in der Kraftschiene schwaecher, als
+       er ist. Ohne echte Berichtsdaten (Vorfuehrbild) bleiben es die Bauformen. */
+    function abwehrArten(){
+      var aus = [], i;
+      var stellungenJe = {};
+      for (i = 0; i < ABWEHR_PLAN.length; i++){
+        var sl = ABWEHR_PLAN[i][2] || ('form:' + ABWEHR_PLAN[i][0]);
+        stellungenJe[sl] = (stellungenJe[sl] || 0) + ABWEHR_PLAN[i][1].length;
       }
-      if (mitAbwehr){
-        el.appendChild(neu('div', 'trenner'));
-        var ak = neu('div', 'abwehr-kopf');
-        ak.appendChild(neu('span', null, 'Planetare Abwehr'));
-        var summe = neu('span', 'abwehr-summe', '25 / 25 Stellungen');
-        ak.appendChild(summe);
-        el.appendChild(ak);
-        abwehrZeilen.summe = summe;
-        var typen = ['laser','plasma','silo','gauss','gen'];
-        for (var t = 0; t < typen.length; t++){
-          var ty = typen[t], td = ABWEHR_TYPEN[ty];
-          var n = 0;
-          for (var q = 0; q < ABWEHR_PLAN.length; q++) if (ABWEHR_PLAN[q][0] === ty) n = ABWEHR_PLAN[q][1].length;
-          /* Jede Stellungsart mit ihrer eigenen Silhouette (aus Entwurf A): der
-             Spieler soll den Namen in der Tafel mit dem Ding auf dem Boden
-             zusammenbringen koennen, ohne ihn zu lesen. */
-          var z2 = neu('div', 'zeile mit-bild');
-          z2.appendChild(abwehrBild(ty));
-          z2.appendChild(neu('span', 'zeile-name', td.kurz));
-          var zz = neu('span', 'zeile-zahl');
-          var jetzt2 = neu('b', null, String(n));
-          zz.appendChild(jetzt2);
-          zz.appendChild(neu('span', 'zeile-start', ' /' + n));
-          z2.appendChild(zz);
-          var bk2 = neu('div', 'balken');
-          var bi2 = neu('i'); bi2.style.background = ty === 'gauss' ? F.flieder : (ty === 'gen' ? F.vio : F.warn);
-          bi2.style.width = '100%';
-          bk2.appendChild(bi2); z2.appendChild(bk2);
-          el.appendChild(z2);
-          abwehrZeilen[ty] = { zahl: jetzt2, balken: bi2, start: n };
+      var echt = (DATEN && DATEN.abwehr && DATEN.abwehr.bekannt) ? DATEN.abwehr.arten : null;
+      if (echt){
+        for (i = 0; i < echt.length; i++){
+          aus.push({ key: echt[i].key, geb: echt[i].key, form: echt[i].form,
+                     name: echt[i].name, anzahl: echt[i].anzahl,
+                     stellungen: stellungenJe[echt[i].key] || 0 });
         }
+        return aus;
       }
+      for (i = 0; i < ABWEHR_PLAN.length; i++){
+        var form = ABWEHR_PLAN[i][0], n = ABWEHR_PLAN[i][1].length;
+        aus.push({ key: 'form:' + form, geb: null, form: form,
+                   name: ABWEHR_TYPEN[form] ? ABWEHR_TYPEN[form].kurz : form,
+                   anzahl: n, stellungen: n });
+      }
+      return aus;
     }
     function hudNeuAufbauen(){
       zeilen = {}; abwehrZeilen = {}; tafelSummen = {}; hudSig = '';
@@ -27810,27 +28093,35 @@
        die 9 zaehlten nur die von Bombern zerlegten Batterien, der mit der Kuppel
        ausgefallene Schildgenerator fehlte. Zwei Zahlen ueber dieselbe Sache, die
        sich widersprachen - genau der Fehlertyp, vor dem CLAUDE.md warnt. */
-    var ABWEHR_REIHE = ['laser','plasma','silo','gauss','gen'];
     function abwehrStand(){
       var je = {}, lebt = 0, gesamt = 0;
-      for (var i = 0; i < ABWEHR_REIHE.length; i++){
-        var ty = ABWEHR_REIHE[i];
-        var n = anlagenZahl(ty);
+      var arten = abwehrArten();
+      for (var i = 0; i < arten.length; i++){
+        var ar = arten[i];
+        var st = ar.geb ? anlagenZahlGeb(ar.geb) : anlagenZahl(ar.form);
         /* Der Schildgenerator gilt als ausgefallen, sobald die Kuppel steht -
            er ist dann wirkungslos, auch wenn sein Bau noch dasteht. */
-        if (ty === 'gen' && schild <= 0) n = 0;
-        var start = 0;
-        for (var q = 0; q < ABWEHR_PLAN.length; q++) if (ABWEHR_PLAN[q][0] === ty) start = ABWEHR_PLAN[q][1].length;
-        je[ty] = n; lebt += n; gesamt += start;
+        if (ar.form === 'gen' && schild <= 0) st = 0;
+        /* Auf dem Boden koennen WENIGER Stellungen stehen, als der Verteidiger
+           Anlagen hat (anlagenMassstab). Gemeldet wird trotzdem die echte Zahl,
+           anteilig zum Ausfall der Stellungen - die Tafel darf nie eine andere
+           Wahrheit zeigen als die Bestandsliste des Berichts. */
+        /* stellungen === 0 heisst: diese Art ist zu selten fuer einen Platz auf dem
+           Boden. Sie kann dort also auch nicht ausfallen und zaehlt voll mit -
+           sonst waere "nicht gezeichnet" stillschweigend zu "zerstoert" geworden. */
+        var n = ar.stellungen > 0 ? Math.round(ar.anzahl * st / ar.stellungen) : ar.anzahl;
+        je[ar.key] = n; lebt += n; gesamt += ar.anzahl;
       }
-      return { je: je, lebt: lebt, gesamt: gesamt };
+      return { je: je, lebt: lebt, gesamt: gesamt, arten: arten };
     }
 
     function hudAktualisieren(){
       var sig = '';
       for (var i = 0; i < ALLE_K.length; i++) sig += lebend[ALLE_K[i]] + ',';
-      sig += anlagen.length ? anlagenZahl('laser') + '/' + anlagenZahl('plasma') + '/' +
-            anlagenZahl('silo') + '/' + anlagenZahl('gauss') + '/' + anlagenZahl('gen') : '';
+      /* Je Stellung ein Zeichen: die Signatur kann dadurch nicht veralten, wenn die
+         Bodenabwehr - wie seit dem 03.08.2026 - nicht mehr aus fuenf festen
+         Bauformen besteht, sondern aus den echten Anlagen des Verteidigers. */
+      for (var s = 0; s < anlagen.length; s++) sig += anlagen[s].lebt ? '1' : '0';
       if (sig === hudSig) return;
       hudSig = sig;
 
@@ -27854,16 +28145,17 @@
       summeA += (gekapert.dKreuzer||0) * KLASSEN.dKreuzer.gewicht + (gekapert.dZerstoerer||0) * KLASSEN.dZerstoerer.gewicht;
 
       var stand = abwehrStand();
-      for (var t = 0; t < ABWEHR_REIHE.length; t++){
-        var ty = ABWEHR_REIHE[t], az = abwehrZeilen[ty];
-        if (!az) continue;
-        var n = stand.je[ty];
-        az.zahl.textContent = String(n);
-        az.balken.style.width = (100 * n / az.start).toFixed(0) + '%';
-        az.zahl.style.color = n < az.start ? F.ver : F.text;
-        summeD += n * ABWEHR_TYPEN[ty].gewicht;
+      for (var t = 0; t < stand.arten.length; t++){
+        var ar = stand.arten[t], az = abwehrZeilen[ar.key];
+        var n = stand.je[ar.key];
+        if (az){
+          az.zahl.textContent = zahl(n);
+          az.balken.style.width = (az.start > 0 ? (100 * n / az.start) : 0).toFixed(0) + '%';
+          az.zahl.style.color = n < az.start ? F.ver : F.text;
+        }
+        summeD += n * (ABWEHR_TYPEN[ar.form] ? ABWEHR_TYPEN[ar.form].gewicht : 0);
       }
-      if (abwehrZeilen.summe) abwehrZeilen.summe.textContent = stand.lebt + ' / ' + stand.gesamt + ' Stellungen';
+      if (abwehrZeilen.summe) abwehrZeilen.summe.textContent = zahl(stand.lebt) + ' / ' + zahl(stand.gesamt) + ' Anlagen';
 
       var ges = summeA + summeD || 1;
       var pa = Math.round(100 * summeA / ges);
@@ -28042,7 +28334,7 @@
       if (DATEN.abwehr.bekannt){
         /* Bewusst „standen bereit", nicht „ausgefallen": Der Bericht nennt den Bestand
            VOR dem Gefecht. Eine Ausfallzahl waere hier frei erfunden. */
-        fusszeile('Bodenabwehr: <b>' + DATEN.abwehr.gesamt + '</b> Stellungen standen bereit');
+        fusszeile('Bodenabwehr: <b>' + zahl(DATEN.abwehr.gesamt) + '</b> Anlagen standen bereit');
       }
       if (DATEN.chancePct !== null) fusszeile('Vorausberechnete Siegchance: <b>' + DATEN.chancePct + ' %</b>');
       if (etwas) elBilanz.appendChild(fu);
@@ -28129,12 +28421,21 @@
       }
     }
 
+    var abwehrPlan = '';
     function alleFlaechenNeu(){
       messen();
+      /* Auch die Bodenabwehr wird neu eingeteilt: nach "Listen"/"Daten" oder einer
+         Drehung ist die Buehne eine andere, und mit ihr die Zahl der Stellungen, die
+         darauf noch zu erkennen sind. Neu AUFGESTELLT wird nur, wenn sich der Plan
+         wirklich geaendert hat - sonst wuerde jeder Schalterdruck den Zustand der
+         Stellungen (Ausrichtung, Ladung, Ausfaelle) zuruecksetzen. */
+      var neuerPlan = abwehrPlanSetzen();
+      if (neuerPlan !== abwehrPlan){ abwehrPlan = neuerPlan; anlagenBauen(); glockeNeu = true; }
       grenzenSetzen();
       atlantenBauen();
       hgBild = backeHintergrund();
       glockeNeu = true;
+      zustandSchreiben();
       if (reduziert) zeichne();
     }
 
@@ -28243,11 +28544,84 @@
        gebacken werden. */
     var F_AN0 = F.an, F_VER0 = F.ver;
 
+    /* Bodenabwehr-Plan. Braucht die GEMESSENE Bildbreite (siehe Kommentar in
+       berichtUebernehmen) und wird deshalb erst nach messen() gerufen. Liefert eine
+       Kennung des erzeugten Plans zurueck, damit alleFlaechenNeu() die Stellungen nur
+       dann neu aufstellt, wenn sich wirklich etwas geaendert hat. */
+    function abwehrPlanSetzen(){
+      /* Bodenabwehr: nur der eingehende Ueberfall fuehrt sie mit (defenseBefore).
+         Ohne diese Angabe steht auf dem Planeten NICHTS - kein Platzhalter. */
+      /* Zwei Aenderungen am 03.08.2026, beide aus demselben Spieler-Report ("Die
+         Verteidigung sieht man kaum", "die Verteidigung genauso [wie im Spiel]"):
+
+         (a) Es wird nicht mehr nach FORM gruppiert, sondern nach dem echten
+             Gebaeudeschluessel. Vorher wurden 22 Anlagen auf fuenf Silhouetten
+             eingedampft - Flak, Nanoplattform und Laserturm standen als dasselbe
+             Bild da. Der Schluessel wandert jetzt mit; gezeichnet wird damit die
+             Grafik, die auch im Verteidigungs-Tab steht. Die FORM bleibt daneben
+             erhalten, weil an ihr das VERHALTEN haengt (Reichweite, Feuertakt).
+
+         (b) Die Zahl der gezeichneten Stellungen ist gedeckelt. Vorher stand je
+             Anlage eine Stellung auf dem Boden - bei einem ausgebauten Konto mit
+             ueber 200 Anlagen wurde daraus ein gedraengter Strich am Horizont, in
+             dem nichts mehr zu erkennen war. Jetzt gilt dieselbe Regel wie bei den
+             Schiffen: die Bildflaeche gibt die Zahl vor, eine Stellung steht fuer
+             ein Vielfaches, und das Vielfache steht im Bild. */
+      ABWEHR_PLAN = [];
+      anlagenMassstab = 1;
+      if (DATEN.abwehr.bekannt){
+        var budget = W >= 1040 ? 26 : (W >= 760 ? 20 : (W >= 520 ? 16 : 12));
+        var gesamtA = DATEN.abwehr.gesamt || 0;
+        budget = Math.min(budget, gesamtA);
+        anlagenMassstab = Math.max(1, Math.round(gesamtA / Math.max(1, budget)));
+        /* Groesste-Reste-Verteilung. BEWUSST OHNE Mindestanteil je Art: bei 20
+           Anlagenarten und 12 Plaetzen wuerde ein "jede Art mindestens einmal"
+           genau den Zustand wiederherstellen, der repariert werden soll - eine
+           gedraengte Reihe, in der nichts mehr zu erkennen ist. Seltene Arten
+           bleiben also ohne Stellung; sie stehen weiter mit ihrer exakten Zahl in
+           der Liste. Dieselbe Regel gilt bei den Schiffen (modellVerteilung). */
+        var teile = DATEN.abwehr.arten.map(function(x){
+          var exakt = x.anzahl / anlagenMassstab;
+          return { key:x.key, form:x.form, n: Math.floor(exakt), r: exakt - Math.floor(exakt) };
+        });
+        var summeA = 0;
+        for (var s2 = 0; s2 < teile.length; s2++) summeA += teile[s2].n;
+        var uebrigA = budget - summeA;
+        var nachRestA = teile.slice().sort(function(a, b){ return b.r - a.r; });
+        for (var w2 = 0; w2 < nachRestA.length && uebrigA > 0; w2++){ nachRestA[w2].n++; uebrigA--; }
+        /* Reihenfolge auf dem Boden nach Bauart: schwere Anlagen in die Mitte,
+           leichte an die Flanken - dieselbe Staffelung wie vorher, nur je Gebaeude. */
+        var rang = { gen:0, gauss:1, silo:2, plasma:3, laser:4 };
+        teile.sort(function(a, b){ return (rang[a.form]||9) - (rang[b.form]||9); });
+        var stellungen = [];
+        teile.forEach(function(t2){ for (var q2 = 0; q2 < t2.n; q2++) stellungen.push(t2); });
+        /* Plaetze gleichmaessig ueber den sichtbaren Bogen, in gemischter Folge -
+           sonst stuenden alle gleichen Anlagen als Block nebeneinander. */
+        var N = stellungen.length;
+        var proGeb = {};
+        for (var p2 = 0; p2 < N; p2++){
+          var st = stellungen[p2];
+          var u2 = -0.95 + (N > 1 ? (p2 / (N - 1)) * 1.9 : 0.95);
+          if (!proGeb[st.key]) proGeb[st.key] = { form: st.form, u: [] };
+          proGeb[st.key].u.push(u2 + ((rang[st.form]||0) - 2) * 0.02);
+        }
+        for (var gk in proGeb) if (Object.prototype.hasOwnProperty.call(proGeb, gk)){
+          ABWEHR_PLAN.push([proGeb[gk].form, proGeb[gk].u, gk]);
+        }
+      }
+      var kenn = '';
+      for (var kk2 = 0; kk2 < ABWEHR_PLAN.length; kk2++) kenn += ABWEHR_PLAN[kk2][2] + ':' + ABWEHR_PLAN[kk2][1].length + '|';
+      return kenn;
+    }
+
     function berichtUebernehmen(daten){
       DATEN = daten;
       GEGNER_UNBEKANNT = !DATEN.verteidiger.bekannt;
 
       var duIstA = DATEN.blick !== 'verteidigung';
+      /* Welche Seite bin ICH? Nur meine Schiffe duerfen mit meinem Flotten-Anstrich
+         und meinen Werftmarken gemalt werden (siehe spielSprite). */
+      EIGENE_SEITE = duIstA ? 'A' : 'D';
       F.an  = duIstA ? F_AN0 : F_VER0;
       F.ver = duIstA ? F_VER0 : F_AN0;
       /* KLASSEN[k].farbe wurde beim ANLEGEN des Objekts einmal aus F.an/F.ver gelesen -
@@ -28305,21 +28679,12 @@
         }
       }
 
-      /* Bodenabwehr: nur der eingehende Ueberfall fuehrt sie mit (defenseBefore).
-         Ohne diese Angabe steht auf dem Planeten NICHTS - kein Platzhalter. */
-      ABWEHR_PLAN = [];
-      if (DATEN.abwehr.bekannt){
-        var proForm = {};
-        DATEN.abwehr.arten.forEach(function(x){ proForm[x.form] = (proForm[x.form] || 0) + x.anzahl; });
-        var reihe = ['gen','gauss','silo','plasma','laser'];
-        for (var r = 0; r < reihe.length; r++){
-          var f = reihe[r], n = proForm[f] || 0;
-          if (!n) continue;
-          var u = [];
-          for (var j2 = 0; j2 < n; j2++) u.push(-0.95 + (n > 1 ? (j2 / (n - 1)) * 1.9 : 0.95) + (r - 2) * 0.028);
-          ABWEHR_PLAN.push([f, u]);
-        }
-      }
+      /* ABWEHR_PLAN wird NICHT hier gebaut, sondern in abwehrPlanSetzen() nach
+         messen(). Grund: die Zahl der Stellungen haengt an der Bildbreite, und die
+         steht hier noch gar nicht fest - berichtUebernehmen() laeuft vor der ersten
+         Messung. Baute man den Plan hier, rechnete er mit der Breite des VORIGEN
+         Aufrufs (bzw. mit dem Anfangswert 900) und stellte auf ein 388 px breites
+         Handy 20 Stellungen statt 12. Gemessen, nicht vermutet. */
       /* WELCHE Stellung wann ausfaellt, steht in KEINEM Bericht. Also faellt keine
          aus - lieber "25 standen da" als eine Ausfallquote, die niemand gemessen
          hat. Damit bleibt auch die Schildkuppel stehen. */
@@ -28342,7 +28707,7 @@
         : 'Angriffsverband erreicht ' + (wo || DATEN.verteidiger.name)]);
       if (DATEN.chancePct !== null) me.push([3.6, 'Vorausberechnete Siegchance: ' + DATEN.chancePct + ' Prozent']);
       me.push([4.6, DATEN.abwehr.bekannt
-        ? 'Bodenabwehr: ' + DATEN.abwehr.gesamt + ' Stellungen aktiv'
+        ? 'Bodenabwehr: ' + zahl(DATEN.abwehr.gesamt) + ' Anlagen aktiv'
         : 'Bodenabwehr des Ziels: nicht aufgeklärt']);
       if (GEGNER_UNBEKANNT) me.push([6.2, 'Gegnerflotte nicht aufgeklärt – bekannt ist nur die Abwehrkraft ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)]);
       ABSCHNITTE.forEach(function(x){ me.push([x.t1, 'Abschnitt ' + x.nr + ' – ' + x.name + ': ' + x.urteil]); });
@@ -28436,7 +28801,7 @@
       el.appendChild(neu('div', 'trenner'));
       var ak = neu('div', 'abwehr-kopf');
       ak.appendChild(neu('span', null, 'Planetare Abwehr'));
-      ak.appendChild(neu('span', 'abwehr-summe', DATEN.abwehr.gesamt + ' Stellungen'));
+      ak.appendChild(neu('span', 'abwehr-summe', zahl(DATEN.abwehr.gesamt) + ' Anlagen'));
       el.appendChild(ak);
       /* abwehrZeilen bleibt ABSICHTLICH leer. In E schrieb hudAktualisieren hier
          jede Sekunde "15 / 25 Stellungen" - eine gemessene Ausfallquote. Die gibt
@@ -28447,7 +28812,11 @@
          und den ehrlichen Text stehen. */
       DATEN.abwehr.arten.forEach(function(a){
         var z = neu('div', 'zeile mit-bild');
-        z.appendChild(abwehrBild(a.form));
+        /* Das ECHTE Gebaeudebild, dasselbe wie im Verteidigungs-Tab und auf dem
+           Boden. Vorher stand hier abwehrBild(a.form) - eine von fuenf Bauform-
+           Silhouetten fuer 22 Anlagen, sodass Flak, Laserturm und Nanoplattform in
+           der Liste als dasselbe Ding erschienen. */
+        z.appendChild(abwehrBild(a.form, a.key));
         z.appendChild(neu('span', 'zeile-name', a.name));
         var zz = neu('span', 'zeile-zahl');
         zz.appendChild(neu('b', null, String(a.anzahl)));
@@ -28573,6 +28942,8 @@
       titelSetzen();
       schlussbildSetzen();
       messen();
+      /* NACH messen(): der Plan haengt an der Bildbreite (siehe abwehrPlanSetzen). */
+      abwehrPlan = abwehrPlanSetzen();
       grenzenSetzen();
       atlantenBauen();
       hgBild = backeHintergrund();
@@ -28582,6 +28953,9 @@
       tempoIdx = 1; tempo = TEMPI[tempoIdx];
       btnTempo.textContent = 'Tempo 1×';
       neustart();
+      /* NACH neustart(): erst aufbauen() legt die Ruempfe an, davor waere die
+         Zahl im Auskunftsfenster eine Null und damit eine falsche Auskunft. */
+      zustandSchreiben();
       laeuft = !reduziert;
       btnPause.textContent = 'Pause';
       letzteZeit = 0;
@@ -28597,12 +28971,47 @@
          Zeilen blieben sie nach dem Schliessen dauerhaft liegen, obwohl niemand mehr
          hinsieht; starte() baut sie ohnehin bei jedem Oeffnen neu. */
       atlanten = {};
+      spielSprites = {};
+      anlagenBilder = {};
       hgBild = null;
       glockeBild = null;
       glockeNeu = true;
     }
 
-    return { starte: starte, beende: beende };
+    /* Auskunftsfenster fuer den Pruefflauf (und fuer die Entwicklerkonsole). Ohne das
+       koennte ein Test nur an Bildpunkten raten, ob wirklich Spielmodelle gebacken
+       wurden oder wieder die Notsilhouette gewonnen hat - und genau diese Art Raten
+       hat hier schon zweimal einen Fehler durchgelassen. Der Wert haengt als
+       data-zustand am #osWrap, damit dafuer kein globaler Name noetig ist; er ist
+       reine Auskunft und steuert nichts. */
+    function zustandSchreiben(){
+      try { document.getElementById('osWrap').dataset.zustand = JSON.stringify(zustand()); } catch(e){}
+    }
+    function zustand(){
+      var ruempfe = 0, modellAtlanten = 0, spielbilder = 0, gebBilder = 0, k;
+      for (k in flotte) if (Object.prototype.hasOwnProperty.call(flotte, k)) ruempfe += flotte[k].length;
+      for (k in atlanten) if (k.charAt(0) === 'm' && k.charAt(1) === '|') modellAtlanten++;
+      for (k in spielSprites) if (spielSprites[k]) spielbilder++;
+      for (k in anlagenBilder) if (anlagenBilder[k]) gebBilder++;
+      var schiffe = 0;
+      for (var i = 0; i < ALLE_K.length; i++) schiffe += KLASSEN[ALLE_K[i]].start || 0;
+      return { massstab: MASSSTAB, massA: SEITEN_MASS.A, massD: SEITEN_MASS.D,
+               anlagenMassstab: anlagenMassstab, ruempfe: ruempfe,
+               schiffe: schiffe, anlagen: anlagen.length, modellAtlanten: modellAtlanten,
+               spielbilder: spielbilder, spielatlanten: spielAtlasZahl, gebaeudebilder: gebBilder,
+               /* Nicht "wie viele Bilder liegen im Speicher", sondern "wie viele
+                  Stellungen auf dem Boden zeichnen wirklich eines". Der erste Wert
+                  wird auch von den Tafelzeilen gefuellt und war deshalb als Nachweis
+                  wertlos - die Gegenprobe (Bodenbild abgeschaltet) blieb gruen. */
+               anlagenMitBild: anlagenGemaltLetzt,
+               anlagenHoehe: Math.round(anlagenHoehe('laser')),
+               anlagenArten: abwehrArten().map(function(a){
+                 return { key:a.geb, name:a.name, anzahl:a.anzahl, stellungen:a.stellungen };
+               }),
+               W: W, H: H, yBoden: Math.round(yBoden) };
+    }
+
+    return { starte: starte, beende: beende, zustand: zustand };
 
   })();
 
@@ -28761,9 +29170,10 @@
       { title:'Tier-2-Schiffsfähigkeiten', body:'Jedes der sieben Tier-2-Schiffe hat eine <strong>einzigartige Fähigkeit</strong> (alle gedeckelt und identisch im server-autoritativen PvP wie in der Vorschau). <strong>Angriffs-Auren</strong> (zusammen max +30% effektive Angriffskraft der Flotte): Nanoklinge „Panzerbrecher" +2%/Schiff, Singularitäts-Vernichter „Gravitationssog" (volle Schild-Penetration) +5%/Schiff. <strong>Verteidigungs-Auren</strong> (zusammen max +30% Verteidigung des Standorts): Quantenkreuzer „Schildprojektor" +3%/Schiff, Metamaterial-Titan „Deflektor-Bollwerk" +5%/Schiff. <strong>Logistik/Sonstige:</strong> Fusionsdreadnought „Fusionsantrieb-Effizienz" (−4% Missions-Treibstoff je Schiff, max −20%), Hyperjäger „Ausweichmanöver" (−3% eigene Kampfverluste je Schiff, max −30%), Hyperbomber „Sprengladungen" (zerstört bei einem gewonnenen Spieler-Angriff je 4 Hyperbomber ein zusätzliches Verteidigungsgebäude, max +2). Ohne diese Schiffe ändert sich an bestehenden Kämpfen nichts. Wer alle sieben gleichzeitig besitzt, schaltet den Erfolg „Tier-2-Flottenkommandant" frei.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
-      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines bereits berechneten Kampfes über <strong>12 Runden</strong> (Anflug → Flankenmanöver → Gefecht → Entscheidung → Rückzugsgefecht → Nachspiel) – Angreifer und Verteidiger stehen sich gegenüber und beschießen sich mit Mündungsblitzen, Einschlägen und Explosionen. Das Ergebnis steht vorher fest, die Wiedergabe verändert nichts am Ausgang. Jede Waffenart (Energiestrahl, Plasma, Rakete) hat einen eigenen Sound für Schuss und Einschlag; beim Sieg/Niederlage-Moment am Ende erklingt ein passender Klang-Stinger, die Szene färbt sich kurz grün bzw. rot ein und Bruchstücke fliegen als Partikel-Burst nach außen. Gelegentliche <strong>kritische Treffer</strong> (größerer Einschlag, weißer Bildschirmblitz, goldene Schadenszahl) und <strong>Beinahe-Treffer</strong> (Fehlschüsse, kein Schaden), eine einmalige <strong>Alpha-Salve</strong> schwerer Schiffe (Schlachtschiff/Superschlachtschiff) in der Entscheidungsrunde, <strong>Einzelschiff-Duelle</strong> im Kampfprotokoll (nennt konkrete Schiffe statt nur "beide Seiten"), ein <strong>Spannungs-Ping</strong> vor der Entscheidungsrunde, leises <strong>Hintergrund-Ambiente</strong> das dichter wird, sichtbarer <strong>Schadenszustand</strong> bei Schiffstypen unter 25% Bestand, eine <strong>auflockernde Formation</strong> ab 50% Verlusten, <strong>Trümmerpartikel</strong> im Hintergrund die sich über den Kampf aufbauen, sowie ein Kurzfazit, welcher eigene Schiffstyp den größten Anteil an der Kampfkraft hatte. Zusätzlich: langsam driftender Sternenhintergrund, phasenabhängige Szenen-Stimmung (Farbschein je Kampfphase), Schiffe in gestaffelter Formation mit leichter Idle-Bewegung statt einer starren Reihe, und ein sanftes Eintreten der Flotten zu Kampfbeginn.' },
-      { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während man im Spiel aktiv ist - eigener Angriff oder eingehender Überfall -, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
-      { title:'Steuerung', body:'Pause/Weiter hält die Wiedergabe an, Tempo-Umschalter (1x/2x) beschleunigt, "Überspringen" springt direkt zum Endergebnis.' }
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl.' },
+      { title:'Schiffe, Anlagen und Maßstab', body:'Jedes Schiff fliegt mit <strong>seinem eigenen Modell</strong> – demselben Bild wie in deiner Flottenliste – und in der Farbe seiner Partei (grün ist immer deine Seite). Auf dem Planeten stehen die <strong>echten Verteidigungsanlagen</strong> mit der Grafik aus dem Verteidigung-Tab. Weil eine Flotte aus Zehntausenden Schiffen nicht Stück für Stück zu zeichnen ist, steht ein Modell für mehrere Schiffe; wie viele, steht unten links im Bild. Bei sehr ungleichen Flotten bekommt jede Seite trotzdem ein sichtbares Geschwader, und dann nennt das Bild beide Maßstäbe. <strong>Die Zahlen in den Bestandslisten sind davon unberührt und immer die echten.</strong>' },
+      { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während du im Spiel aktiv bist – eigener Angriff oder eingehender Überfall –, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
+      { title:'Steuerung', body:'Unten: <strong>Neustart</strong>, <strong>Pause/Weiter</strong>, <strong>Tempo</strong> (0,5× / 1× / 2×) und <strong>Ans Ende</strong> (springt sofort zur Schlussbilanz). Oben in der Titelzeile: <strong>Listen</strong> blendet die Bestandslisten aus, <strong>Daten</strong> die Abschnitte, das Kräfteverhältnis und das Protokoll – auf dem Handy bekommt die Bühne damit fast den ganzen Bildschirm. Hinaus kommst du über das <strong>×</strong> oben rechts oder mit <strong>Escape</strong>. Ist am Gerät „Bewegung reduzieren" eingestellt, läuft keine Animation: Dann steht sofort der Endzustand im Bild.' }
     ]},
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
@@ -50551,6 +50961,18 @@
     if (!overlay || !closeBtn) return;
     closeBtn.onclick = closeBattleReplay;
     overlay.onclick = (e) => { if (e.target === overlay) closeBattleReplay(); };
+    // Zweiter Weg hinaus (03.08.2026). Der Klick auf den Hintergrund ist auf dem Telefon
+    // KEINER: dort füllt #osWrap das Overlay restlos aus, e.target === overlay tritt nie ein.
+    // Blieb also genau ein Ziel - das × in der Titelzeile. Als eine Randabstands-Regel dieses
+    // eine Ziel unter die Statusleiste des Geräts schob, war der Spieler in der Wiedergabe
+    // gefangen (Spieler-Report Sascha: "man kann nicht aus dieser Simulation raus tappen").
+    // Ein einziger Ausgang ist bei einem bildschirmfüllenden Fenster zu wenig, unabhängig
+    // davon, ob die damalige Ursache behoben ist.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!overlay.classList.contains('open')) return;
+      closeBattleReplay();
+    });
   })();
 
   // Event-Delegation statt einzelner onclick-Bindungen: funktioniert unabhängig davon, ob die
