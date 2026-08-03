@@ -2057,7 +2057,16 @@
     .schiffchip .anlagensvg { display:inline-flex; width:21px; height:21px; flex:none; }
     .schiffchip .anlagensvg svg { width:21px; height:21px; }
     .schiffchip b { color:#fff; font-weight:700; }
-    @media (max-width:480px){ .schiffchip { font-size:10.5px; } .gbi-schiff { width:26px; height:17px; } .gbi-anlage, .schiffchip .anlagensvg, .schiffchip .anlagensvg svg { width:18px; height:18px; } }
+    /* Die ENGE Fassung (fleetIconRowHtml): Überfall-Banner, NPC-Liste, Allianzbasis, Parade und
+       Piraten-Trümmerräuber zeigen Bild + Stückzahl OHNE Namen, in Zeilen, die schon eng sind.
+       Gemessen auf einem iPhone 13: mit der vollen 30x20-Kachel wächst die Bannerzeile von 14 px
+       auf 53 px und bricht auf zwei Zeilen um; mit 22x15 bleibt sie einzeilig bei 22 px. Dieselbe
+       Kachelgröße benutzt der Flotten-Chip im Spielerprofil schon - also keine neu erfundene
+       Bildsprache, nur die kleinere von zweien. */
+    .schiffreihe-eng { gap:3px 4px; margin-top:2px; }
+    .schiffreihe-eng .schiffchip { padding:1px 5px 1px 2px; gap:2px; }
+    .schiffreihe-eng .gbi-schiff { width:22px; height:15px; }
+    @media (max-width:480px){ .schiffchip { font-size:10.5px; } .gbi-schiff { width:26px; height:17px; } .gbi-anlage, .schiffchip .anlagensvg, .schiffchip .anlagensvg svg { width:18px; height:18px; } .schiffreihe-eng .gbi-schiff { width:19px; height:13px; } }
     /* Angriffs-Vorschau */
     .profile-preview { margin-top:15px; padding:12px 14px; border:var(--bw-1) solid; }
     .profile-preview.pp-danger { background:linear-gradient(180deg,rgba(226,75,74,0.10),rgba(226,75,74,0.02)); border-color:rgba(226,75,74,0.3); }
@@ -5878,8 +5887,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.398.0';
+  const VERSION = '8.399.0';
   const PATCHNOTES = [
+    { version:'8.399.0', date:'05.08.2026', changes:[
+      '<strong>Die Geschütztürme zielen jetzt sichtbar.</strong> Sie taten es die ganze Zeit schon – die Anlagen suchen ihr Ziel, rechnen den Winkel und schwenken mit 1,6 rad/s darauf zu. Nur gezeichnet wurde das nie: Seit die Wiedergabe die echten Gebäudebilder stempelt statt der alten Platzhalter-Silhouetten, zeigte auf dem Boden jedes Rohr stur geradeaus, während im Hintergrund neun bis zehn Stellungen um bis zu 62 Grad geschwenkt standen. Flak, Verteidigungsturm und Lasergeschütz führen ihr Rohr ab sofort sichtbar nach – der Sockel bleibt dabei stehen, es kippt nicht das ganze Gebäude.',
+      '<strong>Der Mündungsblitz sitzt dort, wo der Schuss herauskommt.</strong> Er stand bisher fest über der Anlage, während der Laserstrahl daneben und bis zu 62 Grad davon weggedreht startete – Blitz und Schuss waren zwei verschiedene Orte.',
+      '<strong>Behoben: Bei weit entwickelten Konten verschwanden die Schiffsbilder aus den Kampfberichten.</strong> Die Bilder werden einmal je Schiff gebacken und von allen Zeilen geteilt; dafür gab es eine Obergrenze von 90. Ein ausgebautes Konto bringt aber bis zu 40 eigene und 40 gegnerische Schiffsklassen plus 21 Verteidigungsanlagen gleichzeitig in die Liste – 101. Beim Überlauf wurde der gesamte Bildspeicher gelöscht, auch die Bilder, die gerade angezeigt wurden, und sie kamen nicht zurück. Gemessen blieben <strong>316 von 322 Bildstellen leer</strong>. Die Grenze liegt jetzt bei 130.',
+      '<strong>Die Kampf-Wiedergabe hält an, wenn nichts mehr passiert.</strong> Bei Pause und beim stehenden Schlussbild wurde das Bild weiter 60-mal je Sekunde komplett neu gemalt, obwohl sich kein Bildpunkt änderte – die <em>Pause war damit teurer als das laufende Gefecht</em> (34.265 gegenüber 19.718 Zeichenaufrufen je Sekunde). Sie steht jetzt wirklich still und läuft über jeden Bedienweg wieder an: Weiter, Leertaste, Neustart, „Ans Ende" und nach einer Größenänderung. Auf dem Telefon ist das gesparter Akku.',
+      '<strong>Die Anzeigen der Wiedergabe schreiben nur noch, was sich geändert hat.</strong> Abschnittskacheln, Siegvermerk, Kräfteverhältnis und die Bestandstafeln wurden bei jedem Bild neu gesetzt, auch wenn derselbe Wert schon dastand. Zusammen mit dem Punkt darüber sank die Zahl der Änderungen am Seiteninhalt von 9,1 auf 1,9 je Bild.',
+      '<strong>Auch außerhalb des Kampfberichts stehen jetzt die echten Schiffsmodelle.</strong> In der NPC-Angriffsliste, im Überfall-Banner, an der Allianzbasis, in der Flottenparade und beim Piraten-Trümmerräuber waren es noch flache Dreiecke, während der Kampfbericht daneben längst die Rümpfe zeigte. Die Stückzahlen dort haben jetzt außerdem Tausenderpunkte („2.418" statt „2418").',
+      'Kleinigkeit am Rande: Wer „Bewegung reduzieren" bei geöffneter Wiedergabe wieder ausschaltete, landete bisher auf einer leeren Bühne mit leerem Protokoll.'
+    ]},
     { version:'8.398.0', date:'04.08.2026', changes:[
       '<strong>Im Gefecht schießt jetzt jede Schiffsgattung anders.</strong> Bisher feuerten alle Rümpfe dieselbe Streusalve – vom Jäger bis zum Koloss. Ab sofort entscheidet die <em>Konterrolle</em> des Schiffs, dieselbe, die auch das Konter-System benutzt: <strong>Abfangjäger</strong> hetzen kurze, schnelle Salven, <strong>Bomber</strong> schicken langsame, gelenkte <strong>Torpedos</strong>, die ihrem Ziel nachdrehen, und <strong>Großkampfschiffe</strong> laden lange und feuern dann einen schweren <strong>Lanzenstrahl</strong>.',
       '<strong>Im entscheidenden Abschnitt fahren die Großkampfschiffe eine Breitseite auf</strong> – drei Lanzen im Fächer statt einer, danach eine deutlich längere Ladezeit. Der mittlere Abschnitt trägt 55 % aller Verluste, und ihm sah man das bisher nicht an. Die beiden äußeren Strahlen gehen bewusst daneben: Das Bild darf mehr Feuer zeigen, nicht mehr Wirkung – am Ausgang ändert die ganze Darstellung nach wie vor nichts.',
@@ -25558,17 +25576,43 @@
   }
   // Kompakte Icon-Zeile (statt reinem Text) für die Schiffszusammensetzung einer Flotte – genutzt für
   // die Überfall-Anzeige, sobald die anfliegende Flotte ausgespäht wurde.
+  // Kurze Flottenzeile (Bild + Stückzahl, ohne Namen) für enge Stellen: Überfall-Banner,
+  // NPC-Liste, Allianzbasis, Flottenparade, Piraten-Trümmerräuber.
+  //
+  // BIS ZUM 05.08.2026 STANDEN HIER FLACHE DREIECKE: die 14x14 verkleinerten ICONS-SVGs, während
+  // der Kampfbericht daneben (shipCountRowHtml, seit v8.395.0) längst die echten Rumpfmodelle
+  // zeigte - dieselbe Flotte, zwei Bildsprachen. Genau das Muster aus CLAUDE.md Punkt 6: die
+  // Umstellung war gemacht, eine zweite Anzeigestelle behielt die alte Annahme.
+  //
+  // `fremd` ist bewusst KEIN Parameter mehr, sondern hier fest: Alle sechs Aufrufstellen zeigen
+  // FREMDE Flotten oder Sammelbestände mehrerer Spieler. Bei der Allianzbasis stehen die Summe
+  // aller Mitglieder und die eigenen stationierten Schiffe zwei Zeilen untereinander, und die
+  // Summe ist eine Obermenge der eigenen - mit unterschiedlichen Bildregeln stünde derselbe Jäger
+  // dort einmal lackiert mit Marken-Plakette und einmal grau. Das liest sich als zwei verschiedene
+  // Schiffstypen, nicht als Ehrlichkeit. Die eigene Lackierung bleibt deshalb dort, wo sie
+  // eindeutig ist: Flottenliste, Werft, Profil und Kampfbericht.
   function fleetIconRowHtml(fleet){
     if (!fleet) return '';
     const parts = Object.entries(fleet).filter(([k,v])=>v>0);
     if (!parts.length) return '';
-    return parts.map(([k,v]) => {
-      const iconKey = (shipDefOrSuper(k)||{}).icon;
-      const svg = iconKey && ICONS[iconKey] ? ICONS[iconKey].replace('width="24" height="24"', 'width="14" height="14"') : '';
+    return '<span class="schiffreihe schiffreihe-eng">' + parts.map(([k,v]) => {
+      const name = shipDisplayName(k);
+      const kl = schiffBildKlasse(k, true);
+      // Ohne Rumpfform gibt es kein Bild zu backen (NPC-eigene Schlüssel, ältere Berichte) -
+      // dann bleibt das alte flache Icon stehen. Ein leerer Kasten wäre schlechter als beides.
+      let bild;
+      if (kl){
+        bild = `<i class="gbi gbi-schiff ${kl}" aria-hidden="true"></i>`;
+      } else {
+        const iconKey = (shipDefOrSuper(k)||{}).icon;
+        bild = iconKey && ICONS[iconKey] ? ICONS[iconKey].replace('width="24" height="24"', 'width="14" height="14"') : '';
+      }
       // title/Hover funktioniert auf Touch-Geräten (iPad) nicht – data-ship-icon-key ermöglicht einen
       // Tap-Handler, der die Schiffsklasse zusätzlich als Einblendung zeigt (siehe Aufrufstellen).
-      return `<span data-ship-icon-key="${k}" style="display:inline-flex; align-items:center; gap:2px; margin-right:7px; cursor:pointer;" title="${shipDisplayName(k)}">${svg}${v}</span>`;
-    }).join('');
+      // KEIN cursor:pointer mehr im Stil: Von den sechs Aufrufstellen verdrahtet genau EINE einen
+      // Handler (raidScoutedFleetRow). An den übrigen fünf sah das Feld klickbar aus und tat nichts.
+      return `<span class="schiffchip" data-ship-icon-key="${k}" title="${escapeHtml(name)}">${bild}<b>${fmt(v)}</b></span>`;
+    }).join('') + '</span>';
   }
   // Dieselbe Aufzählung, aber mit dem ECHTEN Schiffsbild vor jeder Zahl (04.08.2026,
   // Spieler-Wunsch Sascha: „die Icons, die wir haben, dort wiederverwenden").
@@ -25599,7 +25643,15 @@
   // neuen Schluessel. Wer alle 40 Schiffe durch zehn Marken zieht, haette sonst irgendwann ein paar
   // hundert alte Bilder im Stilblock stehen, die niemand mehr benutzt. Beim Ueberlauf faengt der
   // Speicher von vorn an - die noch gebrauchten Bilder werden beim naechsten Aufbau neu gebacken.
-  const BILD_DECKEL = 90;
+  //
+  // 90 WAR ZU KNAPP, und das war ein echter Fehler im ausgelieferten Spiel (gemessen 05.08.2026):
+  // Ein weit entwickeltes Konto bringt bis zu 40 eigene + 40 fremde Schiffsklassen und 21
+  // Verteidigungsanlagen gleichzeitig in den Berichten unter - 101 Klassen, also elf ueber dem
+  // Deckel. Gemessen mit zwei Vollberichten plus einem Ueberfall-Bericht: Der Ueberlauf loeschte
+  // den Stilblock, und danach hatten 158 von 162 Bildstellen KEIN Hintergrundbild mehr. Sie kamen
+  // auch nicht zurueck, weil renderReportsBox bei unveraenderter Signatur gar nicht neu schreibt.
+  // 130 liegt klar ueber der harten Obergrenze und laesst Luft fuer Anstrich- und Markenstufen.
+  const BILD_DECKEL = 130;
   function bildStilAnhaengen(regel){
     let el = document.getElementById('gebackeneBildStile');
     if (!el){ el = document.createElement('style'); el.id = 'gebackeneBildStile'; document.head.appendChild(el); }
@@ -25609,6 +25661,21 @@
     }
     el.appendChild(document.createTextNode(regel));
   }
+  // WARUM HIER NICHT ZUSAETZLICH DIE SIGNATUR-BREMSEN GELOEST WERDEN, obwohl es naheliegt:
+  // Der Ueberlauf loescht Regeln, die GERADE IM DOM BENUTZT werden, und die Boxen, die sie zeigen,
+  // stehen hinter Signatur-Bremsen - ihre Signatur haengt an den ANGEZEIGTEN WERTEN, und die haben
+  // sich nicht geaendert. Der naechstliegende Gedanke ist deshalb, beim Verwerfen lastReportsSig,
+  // lastAllianceParadeSig und boxHtmlCache mitzureissen.
+  //
+  // GEMESSEN, und das Ergebnis spricht dagegen (05.08.2026): Allein bringt das GAR NICHTS - die
+  // 158 leeren Bildstellen bleiben 158, weil der Ueberlauf mitten in EINEN Aufbau faellt und der
+  // naechste Durchlauf in dasselbe Messer laeuft. Schlimmer noch, es macht daraus eine Endlos-
+  // schleife: geloeste Bremse -> Neuaufbau -> Ueberlauf -> geloeste Bremse, gemessen 1,5
+  // Ausloeschungen JE SEKUNDE, dauerhaft. Mit angehobenem Deckel dagegen faellt die Zahl der
+  // Ausloeschungen auf null und die der leeren Bildstellen ebenfalls - dann ist der Code hier tot.
+  //
+  // Also: Der grosszuegige Deckel IST die Behebung, nicht ein Zusatz dazu. Toter Code, der im
+  // Fehlerfall eine Dauerschleife dreht, waere schlechter als kein Code.
   function schiffBildKlasse(key, fremd){
     // Der Schluessel traegt Anstrich UND Werftmarke mit: Beides aendert das Bild, und ein Bild,
     // das nach dem Lackwechsel noch die alte Farbe zeigt, waere genau die Art stiller Veraltung,
@@ -27060,11 +27127,49 @@
           gg.drawImage(fleck(F.ver), -16*f, -30*f, 32*f, 32*f);
           gg.globalAlpha = 1;
           gg.globalCompositeOperation = 'source-over';
-          gg.drawImage(bild, -20*f, -34*f, 40*f, 40*f);
+          /* --- Das Rohr folgt dem Ziel (05.08.2026) ------------------------------------
+             Die Ausrichtung war schon immer da: anlagenSchritt() sucht ein Ziel, rechnet
+             sollRicht und fuehrt an.richt mit 1,6 rad/s nach, gedeckelt auf +-1,15 rad.
+             Gezeichnet wurde sie nur in den ALTEN Notsilhouetten - seit die Wiedergabe das
+             echte Gebaeudebild stempelt, kehrt dieser Zweig vorher zurueck und der
+             Schwenkzweig lief praktisch nie. Gemessen standen dauerhaft 9-10 Stellungen mit
+             bis zu 61,8 Grad Schwenk, und auf dem Boden zeigte jedes Rohr stur geradeaus.
+             Wieder der wiederkehrende Fehler des Projekts: die Mechanik stimmte, die zweite
+             Anzeigestelle behielt die alte Annahme.
+
+             Gedreht wird KEIN eigenes Bild: derselbe gebackene Sockel wird zweimal
+             gestempelt - unten unveraendert, oben mit gg.rotate um den Drehkranz. Das kostet
+             keinen Byte zusaetzlichen Bildspeicher (ein Winkelatlas wie bei den Schiffen
+             waere bei 16 Stufen rund 26 MB).
+
+             Innerhalb von mitBoden ist die lokale Senkrechte bereits die Bodennormale, und
+             an.richt ist ausdruecklich gegen sie definiert (sollRicht wird um lot(an.u)
+             bereinigt) - eine Neigungskorrektur fuer die Planetenkruemmung braucht es
+             deshalb nicht. */
+          var dreh = SCHWENK[an.geb];
+          if (dreh && Math.abs(an.richt) > 0.01){
+            var kn = bild.width, pT = kn * dreh.yT / 40;
+            gg.drawImage(bild, 0, pT, kn, kn - pT,
+                         -20*f, (dreh.yT - 34)*f, 40*f, (40 - dreh.yT)*f);
+            gg.save();
+            gg.translate((dreh.dx - 20)*f, (dreh.dy - 34)*f);
+            gg.rotate(an.richt);
+            gg.translate(-(dreh.dx - 20)*f, -(dreh.dy - 34)*f);
+            gg.drawImage(bild, 0, 0, kn, pT, -20*f, -34*f, 40*f, dreh.yT*f);
+            gg.restore();
+          } else {
+            gg.drawImage(bild, -20*f, -34*f, 40*f, 40*f);
+          }
           if (an.glut > 0 || an.klappe > 0.1 || an.salve > 0){
             var st = Math.max(an.glut, an.klappe, an.salve);
+            /* Der Blitz sitzt jetzt dort, wo der Schuss wirklich herauskommt - dieselbe
+               Tabelle, die die Feuerfunktionen benutzen. Beim Silo bleibt es beim alten
+               Ort ueber dem Bodenpunkt, weil die Rakete senkrecht steigt. */
+            var mL = (MUENDUNG_LAENGE[an.typ] || 0) * f;
+            var mx = mL ? Math.sin(an.richt) * mL : 0;
+            var my = mL ? -Math.cos(an.richt) * mL : -26*f;
             gg.globalCompositeOperation = 'lighter';
-            glut(gg, 0, -26*f, 9*f*st, an.typ === 'gauss' ? F.flieder : (an.typ === 'gen' ? F.vio : F.ver), Math.min(1, st));
+            glut(gg, mx, my, 9*f*st, an.typ === 'gauss' ? F.flieder : (an.typ === 'gen' ? F.vio : F.ver), Math.min(1, st));
             gg.globalCompositeOperation = 'source-over';
           }
         });
@@ -27964,6 +28069,33 @@
       }
       return best;
     }
+    /* Wie weit vor dem Bodenpunkt sitzt die Muendung? EINE Tabelle statt drei Literale in
+       drei Feuerfunktionen - der Muendungsblitz beim Zeichnen muss denselben Wert benutzen,
+       sonst driften Blitz und Schussursprung wieder auseinander (genau das war bis zum
+       05.08.2026 der Fall: der Blitz sass fest 26 Einheiten SENKRECHT ueber dem Bodenpunkt,
+       waehrend der Laserstrahl 11 Einheiten entfernt und bis zu 62 Grad davon weggedreht
+       startete). Silo und Generator bleiben bei 0: die Rakete steigt senkrecht. */
+    var MUENDUNG_LAENGE = { laser: 11, plasma: 7, gauss: 15, silo: 0, gen: 0 };
+    /* Welche Anlagen duerfen ihren Aufsatz schwenken, und wo liegt die Trennlinie?
+       yT = Hoehe des drehbaren Ausschnitts im 40er-Raster des Icons, dx/dy = Drehkranz.
+       Die Werte stammen aus drawDefenseMiniIcon, nicht aus dem Gefuehl.
+
+       BEWUSST NUR DREI. Von den 22 Verteidigungsgebaeuden tragen ueberhaupt nur fuenf ein
+       Rohr im gebackenen Bild, und von denen liegen gauss (longgun) und railgun (rails)
+       WAAGERECHT und reichen bis Icon-y 26,2, also unter das Plattformdach bei y=25: Jede
+       waagerechte Trennlinie schneidet dort entweder das Rohr an oder nimmt einen Streifen
+       Dachkante mit, der sichtbar mitkippt. Alle uebrigen Anlagen sind Kuppeln, Kristalle,
+       Raumrisse, Gitterpanele, Torusreaktoren und Akkretionsscheiben - die zu drehen waere
+       ein Fehler, kein Fortschritt.
+
+       Der Schluessel ist der GEBAEUDEschluessel, nicht DEFENSE_ART[geb].top: `turm` ist
+       handgezeichnet und steht gar nicht in DEFENSE_ART - er waere sonst still
+       herausgefallen, ausgerechnet einer der drei. */
+    var SCHWENK = {
+      flak:  { yT: 24, dx: 20, dy: 24 },
+      laser: { yT: 25, dx: 20, dy: 25 },
+      turm:  { yT: 13, dx: 20, dy: 13 }
+    };
     function muendung(an, laenge){
       var p = px(an.u, 0);
       var w = lot(an.u) + an.richt;
@@ -27972,7 +28104,7 @@
     function feuerLaser(an){
       var z = an.ziel; if (!z || z.tot) return;
       an.glut = 1;
-      var m = muendung(an, 11 * bodenSkala);
+      var m = muendung(an, MUENDUNG_LAENGE.laser * bodenSkala);
       var pz = px(z.u, z.a);
       geschossNeu({ typ:'strahl', x0:m.x, y0:m.y, x1:pz.x, y1:pz.y, t:0, dauer:0.2,
         u:z.u, a:z.a, vu:0, va:0, farbe:F.ver, dick:2.0 });
@@ -27982,7 +28114,7 @@
     function feuerPlasma(an){
       var z = an.ziel; if (!z || z.tot) return;
       an.glut = 1;
-      var m = muendung(an, 7 * bodenSkala);
+      var m = muendung(an, MUENDUNG_LAENGE.plasma * bodenSkala);
       var pz = px(z.u, z.a);
       var dx = pz.x - m.x, dy = pz.y - m.y, d = Math.sqrt(dx*dx+dy*dy) || 1;
       var sp = 430;
@@ -28001,7 +28133,7 @@
       var z = an.ziel; if (!z || z.tot) return;
       an.glut = 1; an.rueck = 1;
       kamShake = Math.max(kamShake, klein ? 3.2 : 5.4);
-      var m = muendung(an, 15 * bodenSkala);
+      var m = muendung(an, MUENDUNG_LAENGE.gauss * bodenSkala);
       var pz = px(z.u, z.a);
       var dx = pz.x - m.x, dy = pz.y - m.y, d = Math.sqrt(dx*dx+dy*dy) || 1;
       var sp = 2300;
@@ -28603,6 +28735,7 @@
 
     var zeilen = {}, abwehrZeilen = {}, tafelSummen = {}, phasenEl = [], protEl = [];
     var hudSig = '', phasenSig = '', protSig = '', bannerSig = '', bilanzGebaut = false;
+    var siegAnZuletzt = null, bilanzAnZuletzt = null, kraftAnteilZuletzt = null;
 
     function neu(tag, klasse, text){
       var e = document.createElement(tag);
@@ -28752,6 +28885,17 @@
       elBanner.className = 'banner';
       elSieg.className = 'sieg';
       phasenSig = ''; protSig = ''; bannerSig = '';
+      /* Zusammen mit den Klassen oben: Die Merker beschreiben, was im DOM steht - wer das
+         eine zuruecksetzt und das andere nicht, hat eine Anzeige, die sich fuer aktuell
+         haelt und es nicht ist.
+
+         `hudSig` gehoert seit dem 05.08.2026 dazu und war vorher die einzige Signatur, die
+         hier FEHLTE. Solange hudAktualisieren() seine Zeilen bedingungslos neu schrieb,
+         fiel das nicht auf. Jetzt schreibt es nur noch geaenderte Werte - und die frisch
+         gebauten, leeren Zeilen waeren leer geblieben, wenn die Signatur den ganzen
+         Durchlauf ueberspringt. */
+      siegAnZuletzt = null; bilanzAnZuletzt = null; kraftAnteilZuletzt = null;
+      hudSig = '';
     }
 
     /* EINE Stelle, die den Zustand der Bodenabwehr ermittelt - Tafel UND
@@ -28797,9 +28941,16 @@
         var k = ALLE_K[j], d = KLASSEN[k], z = zeilen[k];
         var lb = Math.max(0, lebend[k]);
         if (z){
-          z.zahl.textContent = zahl(lb);
-          z.balken.style.width = (100 * lb / d.start).toFixed(1) + '%';
-          z.zahl.style.color = lb === 0 ? F.ver : F.text;
+          /* Nur schreiben, was sich geaendert hat. Die Signatur oben laesst den ganzen
+             Durchlauf nur zu, wenn IRGENDEINE Klasse Verluste hatte - danach wurden aber
+             ALLE zwanzig Zeilen neu gesetzt, auch die unveraenderten. Gemessen war das
+             mit 612 Treffern in 12 s der groesste verbliebene Posten. */
+          var lbT = zahl(lb);
+          if (z.zahl.textContent !== lbT) z.zahl.textContent = lbT;
+          var lbB = (100 * lb / d.start).toFixed(1) + '%';
+          if (z.balken.style.width !== lbB) z.balken.style.width = lbB;
+          var lbF = lb === 0 ? F.ver : F.text;
+          if (z.zahl.style.color !== lbF) z.zahl.style.color = lbF;
         }
         var wert = lb * d.gewicht;
         if (d.seite === 'A'){ summeA += wert; rumpfA += lb; } else { summeD += wert; rumpfD += lb; }
@@ -28816,22 +28967,34 @@
         var ar = stand.arten[t], az = abwehrZeilen[ar.key];
         var n = stand.je[ar.key];
         if (az){
-          az.zahl.textContent = zahl(n);
-          az.balken.style.width = (az.start > 0 ? (100 * n / az.start) : 0).toFixed(0) + '%';
-          az.zahl.style.color = n < az.start ? F.ver : F.text;
+          var azT = zahl(n);
+          if (az.zahl.textContent !== azT) az.zahl.textContent = azT;
+          var azB = (az.start > 0 ? (100 * n / az.start) : 0).toFixed(0) + '%';
+          if (az.balken.style.width !== azB) az.balken.style.width = azB;
+          var azF = n < az.start ? F.ver : F.text;
+          if (az.zahl.style.color !== azF) az.zahl.style.color = azF;
         }
         summeD += n * (ABWEHR_TYPEN[ar.form] ? ABWEHR_TYPEN[ar.form].gewicht : 0);
       }
-      if (abwehrZeilen.summe) abwehrZeilen.summe.textContent = zahl(stand.lebt) + ' / ' + zahl(stand.gesamt) + ' Anlagen';
+      var sumT = zahl(stand.lebt) + ' / ' + zahl(stand.gesamt) + ' Anlagen';
+      if (abwehrZeilen.summe && abwehrZeilen.summe.textContent !== sumT) abwehrZeilen.summe.textContent = sumT;
 
+      /* Das Kraefteverhaeltnis ist auf ganze Prozent gerundet - es aendert sich also
+         hoechstens hundertmal im ganzen Gefecht, wurde aber bei jedem Durchlauf neu
+         geschrieben (je 153 Treffer in 12 s auf #osKraftA und #osKraftD). Die Farben
+         stehen fest und gehoeren gar nicht in eine Schleife; sie bleiben hier nur
+         stehen, damit ein Neuaufbau des HUD sie nicht verliert. */
       var ges = summeA + summeD || 1;
       var pa = Math.round(100 * summeA / ges);
-      elKbA.style.width = pa + '%'; elKbA.style.background = F.an;
-      elKbD.style.width = (100 - pa) + '%'; elKbD.style.background = F.ver;
-      elKraftA.textContent = kurzName(DATEN.angreifer) + ' ' + pa + '%';
-      elKraftA.style.color = F.an;
-      elKraftD.textContent = (100 - pa) + '% ' + kurzName(DATEN.verteidiger);
-      elKraftD.style.color = F.ver;
+      if (pa !== kraftAnteilZuletzt){
+        kraftAnteilZuletzt = pa;
+        elKbA.style.width = pa + '%'; elKbA.style.background = F.an;
+        elKbD.style.width = (100 - pa) + '%'; elKbD.style.background = F.ver;
+        elKraftA.textContent = kurzName(DATEN.angreifer) + ' ' + pa + '%';
+        elKraftA.style.color = F.an;
+        elKraftD.textContent = (100 - pa) + '% ' + kurzName(DATEN.verteidiger);
+        elKraftD.style.color = F.ver;
+      }
     }
 
     function phasenUrteil(a, p){ return p >= 1 ? a.urteil : (p > 0 ? 'läuft' : '—'); }
@@ -28852,6 +29015,17 @@
       }
       if (sig === phasenSig) return;
       phasenSig = sig;
+      /* Die Signatur oben bleibt bewusst FEIN (p.toFixed(3)) - sie groeber zu machen ist
+         genau der Fehler, den der Kommentar darueber beschreibt. Gespart wird stattdessen
+         eine Ebene tiefer: Von den drei Schreibvorgaengen je Kachel aendert sich nur die
+         Balkenbreite wirklich in jedem Bild. Urteilstext und Klasse aendern sich drei-,
+         viermal im ganzen Gefecht, wurden aber jedes Mal mitgeschrieben.
+
+         Gemessen (781 Bilder in 14 s): der #osPhasen-Teilbaum trug 4.423 der 7.128
+         DOM-Aenderungen, also 62 % - davon 1.168 Textknoten im Urteil und 1.798
+         Klassenzuweisungen. Die Balkenbreite (630) bleibt unbewacht: Sie ist der einzige
+         Wert, der sich wirklich laufend aendert, und gleiche Werte verwirft der Browser
+         von sich aus. */
       for (var j = 0; j < ABSCHNITTE.length; j++){
         var a2 = ABSCHNITTE[j], e = phasenEl[j];
         var p2 = klemme((tSim - a2.t0) / (a2.t1 - a2.t0), 0, 1);
@@ -28859,8 +29033,9 @@
         var kl = 'phase';
         if (p2 > 0 && p2 < 1) kl += ' laeuft';
         if (p2 >= 1) kl += a2.gut ? ' gewonnen' : ' verloren';
-        e.urteil.textContent = phasenUrteil(a2, p2);
-        e.wurzel.className = kl;
+        var ur = phasenUrteil(a2, p2);
+        if (e.urteil.textContent !== ur) e.urteil.textContent = ur;
+        if (e.wurzel.className !== kl) e.wurzel.className = kl;
       }
     }
 
@@ -28910,12 +29085,22 @@
         siegTonAb = true;
         if (typeof playBattleResultSound === 'function') playBattleResultSound(DATEN.ergebnis === 'sieg');
       }
-      elSieg.className = siegAn ? 'sieg an' : 'sieg';
-      if (tSim >= T_BILANZ){
-        if (!bilanzGebaut) bilanzBauen();
-        elBilanz.className = 'bilanz an';
-      } else if (bilanzGebaut && tSim < T_BILANZ){
-        elBilanz.className = 'bilanz';
+      /* Nur schreiben, wenn der Wahrheitswert KIPPT. Gemessen (781 Bilder in 14 s):
+         #osSieg bekam 782 Klassenzuweisungen - genau eine je Bild -, obwohl sich der
+         Zustand im ganzen Gefecht hoechstens einmal aendert. Dasselbe fuer die Bilanz.
+         Die Merker gehoeren in hudNeuAufbauen() zurueckgesetzt (dort, wo elSieg.className
+         wieder auf 'sieg' gestellt wird), sonst zeigte ein Neustart den Siegvermerk
+         weiter, weil der Merker noch true stuende. */
+      if (siegAn !== siegAnZuletzt){
+        siegAnZuletzt = siegAn;
+        elSieg.className = siegAn ? 'sieg an' : 'sieg';
+      }
+      var bilanzAn = tSim >= T_BILANZ;
+      if (bilanzAn && !bilanzGebaut) bilanzBauen();
+      if (bilanzAn !== bilanzAnZuletzt){
+        bilanzAnZuletzt = bilanzAn;
+        if (bilanzAn) elBilanz.className = 'bilanz an';
+        else if (bilanzGebaut) elBilanz.className = 'bilanz';
       }
     }
 
@@ -29062,11 +29247,57 @@
     }
 
     var letzteZeit = 0, messenNoetig = false, zustandZuletzt = -99;
-    function schleife(ts){
-      if (!offen) return;               /* Wiedergabe geschlossen - Bildrolle steht */
+    /* --- Die Bildrolle haelt an, wenn sich nichts mehr bewegt (05.08.2026) -------------
+       Vorher lief requestAnimationFrame IMMER weiter, auch bei Pause und beim stehenden
+       Schlussbild: hudAktualisieren/phasenAktualisieren/bannerSchritt/zeichne() standen
+       ausserhalb von `if (laeuft)`. Gemessen mit gehakten 2D-Aufrufen auf #osCv:
+
+         laeuft:      55,5 Vollbilder/s, 19.718 drawImage/s
+         PAUSE:       59,0 Vollbilder/s, 34.265 drawImage/s
+         Schlussbild: 57,6 Vollbilder/s
+
+       Die PAUSE war also TEURER als das laufende Gefecht - das Bild friert in dem Moment
+       mit den meisten Objekten ein, und genau die wurden 59-mal je Sekunde neu gemalt,
+       ohne dass sich ein Bildpunkt aenderte (Leinwand-Fingerabdruck vor und nach sechs
+       Sekunden identisch). Auf dem Telefon ist das reine Akkuverbrennung.
+
+       `schleifeLaeuft` ist absichtlich positiv benannt und macht weiterlaufen() idempotent:
+       zweimal wecken startet keine zweite Schleife. Das ist wichtig, weil mehrere Bedien-
+       wege dieselbe Zustandsaenderung ausloesen koennen (Knopf UND Leertaste). */
+    var schleifeLaeuft = false, dtVerwerfen = false, schleifeGen = 0;
+    function weiterlaufen(){
+      if (!offen || reduziert || schleifeLaeuft) return;
+      schleifeLaeuft = true;
+      /* Ohne das waere der erste dt nach der Pause die ganze Pausendauer. Der Deckel von
+         0,05 s faengt das zwar ab, aber das Gefecht spraenge trotzdem sichtbar. */
+      dtVerwerfen = true;
+      /* GENERATIONSMARKE statt blossem Merker. Ein Merker allein reicht nicht: Schliesst
+         und oeffnet jemand die Wiedergabe innerhalb DESSELBEN Bildes (im Pruefbrowser
+         durchaus moeglich, zwei evaluate-Aufrufe koennen in ein Bild fallen), dann sieht
+         das noch angemeldete Bild der alten Rolle beim Feuern bereits wieder offen=true
+         und meldet sich erneut an - waehrend die neue Rolle schon laeuft. Ergebnis waeren
+         zwei Bildrollen, die das Gefecht mit doppelter Geschwindigkeit vorantreiben.
+         Mit der Marke erkennt das alte Bild, dass es nicht mehr zustaendig ist. */
+      var meine = ++schleifeGen;
+      requestAnimationFrame(function bild(ts){
+        if (meine !== schleifeGen) return;
+        schleife(ts, bild);
+      });
+    }
+    /* Ein EINZELNES Bild nachziehen, waehrend die Bildrolle steht. Noetig ueberall dort,
+       wo sich das Standbild aendert, ohne dass die Zeit weiterlaeuft - vor allem nach
+       einer Groessenaenderung der Buehne. Ohne das bliebe nach „Listen"/„Daten" oder einer
+       Drehung im pausierten Zustand die alte, verzerrte Leinwand stehen. */
+    function standbildNeu(){
+      if (!offen || reduziert || schleifeLaeuft) return;
+      hudAktualisieren(); phasenAktualisieren(); bannerSchritt(); zeichne();
+    }
+    function schleife(ts, bild){
+      if (!offen){ schleifeLaeuft = false; return; }   /* Wiedergabe geschlossen - Bildrolle steht */
       if (messenNoetig){ messenNoetig = false; alleFlaechenNeu(); }
       var dt = (ts - letzteZeit) / 1000;
       letzteZeit = ts;
+      if (dtVerwerfen){ dtVerwerfen = false; dt = 0; }
       if (!isFinite(dt) || dt < 0) dt = 0;
       dt = Math.min(0.05, dt);
 
@@ -29096,7 +29327,12 @@
           zustandZuletzt = tSim;
           zustandSchreiben();
         }
-        requestAnimationFrame(schleife);
+        /* Genau EIN Bild nach dem Anhalten steht noch: `laeuft` kann in diesem Durchlauf
+           false geworden sein (Pausenknopf oder Ende des Berichts), und das Schlussbild
+           muss vollstaendig gemalt sein, bevor die Rolle steht. Danach weckt nur noch
+           weiterlaufen() - siehe die Aufrufer an Pause, Neustart, Ende und Leertaste. */
+        if (laeuft) requestAnimationFrame(bild);
+        else schleifeLaeuft = false;
       }
     }
 
@@ -29115,7 +29351,10 @@
       hgBild = backeHintergrund();
       glockeNeu = true;
       zustandSchreiben();
-      if (reduziert) zeichne();
+      /* Steht die Bildrolle (Pause oder Schlussbild), muss das Standbild hier von Hand
+         nachgezogen werden - sonst bliebe nach „Listen"/„Daten" oder einer Drehung die
+         alte Leinwand in der neuen Groesse stehen, also verzerrt. */
+      if (reduziert) zeichne(); else standbildNeu();
     }
 
     /* --------------------------- Bedienung --------------------------- */
@@ -29124,10 +29363,11 @@
     var TEMPI = [0.5, 1, 2], tempoIdx = 1;
 
     document.getElementById('osBtnNeustart').addEventListener('click', function(){
-      neustart(); laeuft = true; btnPause.textContent = 'Pause';
+      neustart(); laeuft = true; btnPause.textContent = 'Pause'; weiterlaufen();
     });
     btnPause.addEventListener('click', function(){
       laeuft = !laeuft; btnPause.textContent = laeuft ? 'Pause' : 'Weiter';
+      weiterlaufen();
     });
     btnTempo.addEventListener('click', function(){
       tempoIdx = (tempoIdx + 1) % TEMPI.length;
@@ -29142,6 +29382,7 @@
       laeuft = true; btnPause.textContent = 'Pause'; endeAufheben();
       hudAktualisieren(); phasenAktualisieren(); bannerSchritt();
       if (reduziert) zeichne();
+      weiterlaufen();
     });
     /* „Video": nimmt einen ganzen Durchlauf hochkant auf und uebergibt ihn dem Teilen-Dialog
        des Geraets - auf dem Telefon fuehrt der direkt nach TikTok, Instagram oder WhatsApp,
@@ -29188,20 +29429,35 @@
     document.addEventListener('keydown', function(ev){
       if (!offen) return;               /* sonst schluckte die Wiedergabe Tasten des Spiels */
       var t = ev.key;
-      if (t === ' '){ ev.preventDefault(); laeuft = !laeuft; btnPause.textContent = laeuft ? 'Pause' : 'Weiter'; }
-      else if (t === 'r' || t === 'R'){ neustart(); laeuft = true; }
+      if (t === ' '){ ev.preventDefault(); laeuft = !laeuft; btnPause.textContent = laeuft ? 'Pause' : 'Weiter'; weiterlaufen(); }
+      else if (t === 'r' || t === 'R'){ neustart(); laeuft = true; weiterlaufen(); }
     });
     window.addEventListener('resize', function(){
       if (!offen) return;
       messenNoetig = true;
-      if (reduziert){ messenNoetig = false; alleFlaechenNeu(); }
+      /* messenNoetig wird NUR in schleife() eingeloest. Steht die Bildrolle (Pause,
+         Schlussbild) oder laeuft sie gar nicht erst (Bewegung reduziert), bliebe die
+         Marke unbeachtet liegen - und die Leinwand behielte ihre alte Groesse, waehrend
+         der Rahmen schon der neue ist: verzerrtes Standbild. Beim Bau dieser Aenderung
+         genau so aufgetreten und von der Gegenprobe gefangen (Fingerabdruck der Leinwand
+         vor und nach der Groessenaenderung identisch). */
+      if (reduziert || !schleifeLaeuft){ messenNoetig = false; alleFlaechenNeu(); }
     });
     if (mqRM.addEventListener) mqRM.addEventListener('change', function(e){
       reduziert = !!e.matches;
       if (!offen) return;
       elRM.className = reduziert ? 'rmhinweis an' : 'rmhinweis';
       neustart();
-      if (!reduziert) requestAnimationFrame(schleife);
+      /* `laeuft` MUSS hier mitgezogen werden - starte() setzt es beim Oeffnen auf
+         !reduziert, dieser Zweig tat es bisher nicht. Schaltete jemand „Bewegung
+         reduzieren" bei OFFENER Wiedergabe wieder aus, blieb laeuft auf false: neustart()
+         nahm den Nicht-reduziert-Zweig (nur aufbauen(), kein vorspulen), und uebrig blieb
+         eine leere Buehne bei tSim = 0 mit leerem Protokoll, waehrend der Knopf „Pause"
+         anbot. Vorbestehend, aber seit die Bildrolle bei laeuft=false wirklich anhaelt,
+         faellt es auf, statt sich hinter einer endlos malenden Schleife zu verstecken. */
+      laeuft = !reduziert;
+      btnPause.textContent = 'Pause';
+      weiterlaufen();
     });
 
 
@@ -29557,12 +29813,21 @@
           var gefallenRolle = d ? (d.start - Math.max(0, lebend[e.platz])) : 0;
           var anteil = (d && d.verloren > 0) ? klemme(gefallenRolle / d.verloren, 0, 1) : 0;
           var ist = Math.max(0, k.start - Math.round(k.verloren * anteil));
-          e.zahl.textContent = zahl(ist);
-          e.zahl.style.color = ist === 0 ? F.ver : F.text;
-          e.balken.style.width = (k.start > 0 ? (100 * ist / k.start) : 0).toFixed(1) + '%';
+          /* Nur geaenderte Werte schreiben. Diese Schleife war nach dem Bremsen der
+             uebrigen Anzeigen der groesste verbliebene Posten (600 Textknoten in 12 s):
+             Sie laeuft ueber ALLE echten Klassen beider Seiten - bei einer Flotte mit
+             zwanzig Typen also zwanzig Zeilen -, waehrend je Durchlauf hoechstens ein
+             paar davon wirklich Verluste hatten. */
+          var istT = zahl(ist);
+          if (e.zahl.textContent !== istT) e.zahl.textContent = istT;
+          var istF = ist === 0 ? F.ver : F.text;
+          if (e.zahl.style.color !== istF) e.zahl.style.color = istF;
+          var istB = (k.start > 0 ? (100 * ist / k.start) : 0).toFixed(1) + '%';
+          if (e.balken.style.width !== istB) e.balken.style.width = istB;
           rumpf[kn] += ist;
         }
-        if (tafelSummen[kn]) tafelSummen[kn].wert.textContent = zahl(rumpf[kn]);
+        var sumT = zahl(rumpf[kn]);
+        if (tafelSummen[kn] && tafelSummen[kn].wert.textContent !== sumT) tafelSummen[kn].wert.textContent = sumT;
       });
     }
 
@@ -29667,7 +29932,7 @@
       laeuft = !reduziert;
       btnPause.textContent = 'Pause';
       letzteZeit = 0;
-      if (!reduziert) requestAnimationFrame(schleife);
+      weiterlaufen();
       return true;
     }
 
@@ -29685,6 +29950,10 @@
       hgBild = null;
       glockeBild = null;
       glockeNeu = true;
+      /* Bildrolle als angehalten vermerken und die Generationsmarke weiterdrehen, damit
+         ein noch angemeldetes Bild der alten Rolle beim Wiederoeffnen nicht mitlaeuft. */
+      schleifeLaeuft = false;
+      schleifeGen++;
       /* Die Partikelvorraete gehoeren mit auf null: Sie halten Verweise auf Schiffsobjekte
          (zielS) und damit die ganze abgeschlossene Flotte am Leben. */
       geschosse = []; funken = []; blitze = []; treffer = []; scherben = []; wracks = [];
@@ -29958,6 +30227,12 @@
       neustart();
       laeuft = true;
       btnPause.textContent = 'Pause';
+      /* PFLICHT, seit die Bildrolle bei Pause anhaelt: videoBild() kopiert nur die fertige
+         Buehne in die Aufnahmeflaeche, vorangetrieben wird das Gefecht ausschliesslich von
+         schleife(). Startet jemand die Aufnahme aus dem pausierten Zustand oder vom
+         Schlussbild, stuende die Rolle - tSim erreichte T_SCHLUSS nie und die Aufnahme
+         liefe endlos. */
+      weiterlaufen();
 
       return new Promise(function(fertig, schief){
         var stift = 0;

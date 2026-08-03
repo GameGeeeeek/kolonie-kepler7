@@ -150,12 +150,62 @@ const messen = page => page.evaluate(() => {
     const { page, errs, ctx } = await berichteOeffnen(browser, viele, null, 'iPhone 13');
     const m = await messen(page);
     check('3: bei 40 Berichten stehen viele Bildstellen im Dokument', m.schiffe > 500, { stellen: m.schiffe });
+    // Der Deckel steht seit dem 05.08.2026 auf 130 statt 90 - siehe Abschnitt 5, dort steht,
+    // warum 90 zu knapp war. Geprüft wird weiterhin das Verhältnis: eine Handvoll geteilter
+    // Bilder gegen Hunderte von Bildstellen.
     check('3: aber nur eine Handvoll Bilder dahinter (geteilt statt je Zeile gebacken)',
-      m.gebacken > 0 && m.gebacken <= 90, { gebacken: m.gebacken, stellen: m.schiffe });
+      m.gebacken > 0 && m.gebacken <= 130, { gebacken: m.gebacken, stellen: m.schiffe });
     check('3: und sie sind trotzdem alle sichtbar', m.schiffeMitBild === m.schiffe,
       { mitBild: m.schiffeMitBild, stellen: m.schiffe });
     check('3: nichts läuft auf dem Handy seitlich hinaus', m.ueberlauf <= 0, { ueberlauf: m.ueberlauf });
     check('keine JS-Fehler (40 Berichte)', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ============================== 4) Der Deckel darf im Vollausbau nicht überlaufen
+  //
+  // DAS WAR EIN ECHTER FEHLER IM AUSGELIEFERTEN SPIEL (gemessen 05.08.2026, BILD_DECKEL war 90):
+  // Ein weit entwickeltes Konto bringt bis zu 40 eigene + 40 fremde Schiffsklassen und 21
+  // Verteidigungsanlagen gleichzeitig in die Berichtsliste - 101 Klassen. Beim Überlauf löscht
+  // bildStilAnhaengen() den GESAMTEN Stilblock, auch die Regeln, die gerade im DOM benutzt werden.
+  // Gemessen waren danach 158 von 162 Bildstellen leer, und sie kamen nicht zurück: renderReportsBox
+  // schreibt bei unveränderter Signatur gar nicht neu.
+  //
+  // Der Fall braucht BEIDE Seiten gleichzeitig - zwei Berichte mit voller eigener UND fremder
+  // Flotte plus einen Überfall-Bericht, der die Verteidigungsanlagen mitbringt. Mit nur einer
+  // Seite bleibt man unter dem Deckel und der Test wäre grün, ohne etwas zu prüfen.
+  {
+    // ALLE 40 Rumpfklassen, nicht die 23 aus FLOTTE oben: Mit der kleineren Flotte kommt der
+    // Vollausbau nur auf 63 gebackene Klassen und bliebe damit auch unter dem ALTEN Deckel von
+    // 90 - der Test wäre grün, ohne den Fehler je berührt zu haben. Erst 40 eigene + 40 fremde
+    // + 21 Anlagen = 101 sprengen die 90 (Gegenprobe gemessen: 158 von 162 Bildstellen leer).
+    const ALLE = ['ships','jaeger','cruisers','destroyers','schlachtschiff','superschlachtschiff',
+      'lotsenboot','kessel','bergungskran','presslufthai','ankerwerfer','echoschnitter','bannschiff',
+      'nullkiel','grundgaenger','waechter','bomber','carrier','frachter','frachtergross','colonyShips',
+      'recycler','spaeher','spionageschiff','forscher','leerenjaeger','kometenjaeger','enterschiff',
+      'phantomschiff','riftwaechter','gesandtenschiff','schuerfschiff','nanoklinge','hyperjaeger',
+      'hyperbomber','quantenkreuzer','fusionsdreadnought','metamaterialtitan',
+      'singularitaetsvernichter','mondzerstoerer'];
+    const VOLL = {}; ALLE.forEach((k,i) => { VOLL[k] = 10 + i; });
+    const beide = [
+      Object.assign({}, NPC, { id:'v1', time:Date.now(),        fleet: VOLL, ownLostShips: VOLL,
+        npcFleet: VOLL, destroyedNpcShips: VOLL }),
+      Object.assign({}, NPC, { id:'v2', time:Date.now()-60000,  fleet: VOLL, ownLostShips: VOLL,
+        npcFleet: VOLL, destroyedNpcShips: VOLL }),
+      UEBERFALL
+    ];
+    const { page, errs, ctx } = await berichteOeffnen(browser, beide);
+    const m = await messen(page);
+    check('4: im Vollausbau stehen Schiffs- UND Anlagenbilder nebeneinander',
+      m.schiffe > 100 && m.anlagen > 10, { schiffe: m.schiffe, anlagen: m.anlagen });
+    // DER Punkt: keine einzige leere Bildstelle. Vor der Anhebung waren es 158 von 162.
+    check('4: KEINE Bildstelle bleibt ohne Bild (Deckel läuft nicht über)',
+      m.schiffeMitBild === m.schiffe, { ohneBild: m.schiffe - m.schiffeMitBild, stellen: m.schiffe });
+    check('4: auch die Anlagenbilder stehen alle',
+      m.anlagenMitBild + m.svgRueckfall >= m.anlagen,
+      { mitBild: m.anlagenMitBild, svg: m.svgRueckfall, stellen: m.anlagen });
+    check('4: und der Deckel ist dabei nicht erreicht', m.gebacken < 130, { gebacken: m.gebacken });
+    check('keine JS-Fehler (Vollausbau)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
