@@ -5518,7 +5518,16 @@
       // Sensormast und Zusatzturm sind bei 78x58 Pixeln ein paar graue Punkte, Mk II und Mk III
       // sind dort nicht auseinanderzuhalten. Verlaesslich lesbar bleibt nur die Ziffer. Die
       // Zeichnung darunter stimmt trotzdem und kommt in der Werftkarte gross zur Geltung.
-      if (mk >= 2){
+      //
+      // ohnePlakette (04.08.2026): Genau diese Ueberlegung dreht sich in der Kampf-Wiedergabe um.
+      // Dort ist ein Rumpf zwanzig Pixel gross und dreht sich - die Ziffer ist nicht mehr lesbar,
+      // die Plakette bleibt aber als oranger Klecks in der Ecke stehen und dreht mit, weil sie in
+      // den Bilderbogen eingebacken wird. Das Kennzeichen sitzt am CANVAS statt in der Signatur,
+      // weil ein fuenfter Parameter zwei Tests bricht, die die Aufrufform festschreiben
+      // (test_vorschau_konsistenz, test_werftmarken) - und markOverride=1 waere falsch: es wuerde
+      // auch Kielstreifen, Zusatzturm, Sensormast und Silbersaum abschalten, also genau die
+      // Aufruestung verstecken, die man im Gefecht sehen SOLL.
+      if (mk >= 2 && !(canvas.dataset && canvas.dataset.ohnePlakette)){
         const rz = SHIP_MARK_ROMAN[mk-1];
         const gr = Math.max(7, Math.round(h*0.22));
         ctx.font = '700 '+gr+'px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -5869,8 +5878,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.397.1';
+  const VERSION = '8.398.0';
   const PATCHNOTES = [
+    { version:'8.398.0', date:'04.08.2026', changes:[
+      '<strong>Im Gefecht schießt jetzt jede Schiffsgattung anders.</strong> Bisher feuerten alle Rümpfe dieselbe Streusalve – vom Jäger bis zum Koloss. Ab sofort entscheidet die <em>Konterrolle</em> des Schiffs, dieselbe, die auch das Konter-System benutzt: <strong>Abfangjäger</strong> hetzen kurze, schnelle Salven, <strong>Bomber</strong> schicken langsame, gelenkte <strong>Torpedos</strong>, die ihrem Ziel nachdrehen, und <strong>Großkampfschiffe</strong> laden lange und feuern dann einen schweren <strong>Lanzenstrahl</strong>.',
+      '<strong>Im entscheidenden Abschnitt fahren die Großkampfschiffe eine Breitseite auf</strong> – drei Lanzen im Fächer statt einer, danach eine deutlich längere Ladezeit. Der mittlere Abschnitt trägt 55 % aller Verluste, und ihm sah man das bisher nicht an. Die beiden äußeren Strahlen gehen bewusst daneben: Das Bild darf mehr Feuer zeigen, nicht mehr Wirkung – am Ausgang ändert die ganze Darstellung nach wie vor nichts.',
+      '<strong>Schiffssalven schlagen jetzt sichtbar ein.</strong> Vorher verschwanden sie einfach; nur die Bodengeschütze trafen jemals etwas. Jetzt blitzt der Treffer auf, das <strong>Schild des Getroffenen</strong> flammt kurz auf, und ein schwerer Lanzentreffer lässt das Bild leicht erzittern. Die Trefferblitze haben dafür einen eigenen, kleinen Vorrat bekommen – sonst hätten sie die großen, seltenen Explosionsblitze verdrängt und der Kampf hätte flacher ausgesehen statt voller.',
+      '<strong>Man erkennt den Antrieb.</strong> Verbrennung glimmt orange und flackert, Impuls steht ruhig und blau, Hyperraum zieht den längsten violetten Schweif – dieselbe Einteilung, die in der Werft an jeder Schiffskarte steht. Am Jägerschwarm bleibt die Fahne bewusst aus: Bei 295 von 330 Rümpfen wäre sie sechs Pixel groß gewesen und hätte den größten Teil der Rechenzeit gekostet.',
+      '<strong>Ein zerberstendes Großkampfschiff sieht endlich danach aus.</strong> Neu sind ein weißglühender Kern in den ersten Sekundenbruchteilen, eine Druckwelle, die weit über den Feuerball hinausläuft, und nachglühende Splitter, die davontrudeln und beim Eintritt in die Atmosphäre aufglühen.',
+      '<strong>Die Werftmarken-Plakette bleibt in der Wiedergabe draußen.</strong> Die römische Ziffer ist eine Listenbeschriftung: bei einem zwanzig Pixel großen, sich drehenden Rumpf war sie nicht mehr lesbar, drehte aber als oranger Klecks in der Ecke mit. Alles andere, was die Werftmarke am Schiff sichtbar macht – Kielstreifen, Panzerkante, Zusatzturm, Sensormast, Silbersaum, Bugscheinwerfer –, bleibt selbstverständlich drin.',
+      'Gemessen statt geschätzt: Auf dem Telefon kostet das alles nichts (unverändert 60 Bilder/s, längstes Bild 17 ms). Auf einer großen Bühne mit 330 Rümpfen und 445 Anlagen fallen im Prüfbrowser <em>ohne Grafikbeschleunigung</em> rund 27 auf 23 Bilder/s – ein Teil davon ist durch eine kleinere Vorlage für winzige Leuchtflecken schon wieder hereingeholt. Mit Grafikbeschleunigung, also auf so gut wie jedem echten Rechner, ist der Unterschied deutlich kleiner.'
+    ]},
     { version:'8.397.1', date:'04.08.2026', changes:[
       '<strong>Die Hilfe sagt jetzt, was eine verlorene Abgrund-Tiefe kostet.</strong> Dort stand nur „eine Niederlage kostet Schiffe, lässt die Tiefe aber erreichbar" – nicht, dass es dann <em>gar keine</em> Beute gibt: keine Abgrundsplitter, kein Bergungsgut, kein Modul, keine Reliquie. Kampfpunkte und Veteranen-Erfahrung bleiben, und der Ballastspiegel rettet einen Teil der Rohstoffe.',
       'Ebenfalls neu erklärt: <strong>Sicher ist ein Tauchgang nie.</strong> Jede der drei Kampfphasen ist bei 95 % gedeckelt – auch mit hundertfacher Übermacht. Unter dem Strich geht damit rund ein Tauchgang unter zwanzig verloren. Aufgefallen ist das beim Nachgehen eines Prüflauf-Tests, der genau daran sporadisch scheiterte: Er war so geschrieben, als wäre ein Sieg auf Tiefe 1 sicher. Ist er nicht – und das stand nirgends.'
@@ -26046,15 +26064,26 @@
       }
 
       /* Umgebung aus dem Spiel heraus - im Prototyp/Test wird sie nachgebaut. */
-      function umgebungAusSpiel(SHIP_DEFS, BUILDING_DEFS, SHIP_SCORE_WEIGHTS, planetDisplayName){
-        var sn = {}, bn = {};
-        (SHIP_DEFS || []).forEach(function(s){ sn[s.key] = s.name; });
+      function umgebungAusSpiel(SHIP_DEFS, BUILDING_DEFS, SHIP_SCORE_WEIGHTS, planetDisplayName, COUNTER_ROLE_OF){
+        var sn = {}, bn = {}, dr = {};
+        (SHIP_DEFS || []).forEach(function(s){ sn[s.key] = s.name; dr[s.key] = s.drive || null; });
         (BUILDING_DEFS || []).forEach(function(b){ bn[b.key] = b.name; });
+        var rollen = COUNTER_ROLE_OF || {};
         return {
           schiffName:    function(k){ return sn[k] || k; },
           gebaeudeName:  function(k){ return bn[k] || k; },
           schiffGewicht: function(k){ return (SHIP_SCORE_WEIGHTS || {})[k] || 20; },
-          ortName:       function(k){ return planetDisplayName ? planetDisplayName(k) : (k || 'Unbekannt'); }
+          ortName:       function(k){ return planetDisplayName ? planetDisplayName(k) : (k || 'Unbekannt'); },
+          /* Konterrolle und Antrieb (05.08.2026). Beides steht laengst im Spiel und war der
+             Wiedergabe bisher nicht zugaenglich - sie bekam nur Namen, Gewicht und Ort.
+             abfang/bomber/kapital entscheidet ueber die WAFFENGATTUNG im Bild, drive ueber die
+             Triebwerksfahne. Bewusst hier und nicht als zweite Tabelle in der Kapsel: eine
+             zweite Zuordnung liefe beim naechsten neuen Schiff sofort auseinander.
+             COUNTER_ROLE_OF deckt 21 der 40 Schluessel ab (die uebrigen sind Zivil- und
+             Tiefenschiffe, die im Bild ohnehin nicht schiessen); null heisst "keine Rolle",
+             und der Aufrufer faellt dann auf die Bildrolle zurueck. */
+          schiffRolle:   function(k){ return rollen[k] || null; },
+          schiffAntrieb: function(k){ return dr[k] || null; }
         };
       }
 
@@ -26074,6 +26103,17 @@
       grund:'#060812', an:'#5dcaa5', ver:'#e24b4a', warn:'#e0a548',
       vio:'#7f77dd', flieder:'#c3bef5', gold:'#fac775', grau:'#9296ac',
       text:'#e9ecf5', linie:'rgba(255,255,255,.09)'
+    };
+    /* Antriebsfahnen. Die drei Antriebsarten des Spiels bekommen je eine eigene Handschrift
+       aus Farbe, Laenge und Flackern - und zwar so, dass man sie auch ohne Beschriftung
+       auseinanderhaelt: Der Brenner ist kurz, orange und unruhig (chemische Verbrennung),
+       der Impulsantrieb steht ruhig und kuehl, der Hyperraumantrieb zieht den laengsten
+       Schweif und glimmt violett. Bewusst KEIN F.vio: das ist die Schildfarbe, und ein
+       Antrieb, der aussieht wie ein Schildtreffer, erklaert nichts, sondern verwirrt. */
+    var ANTRIEB_STIL = {
+      verbrennung: { farbe:'#e0a548', laenge: 0.85, flack: 0.45 },
+      impuls:      { farbe:'#7fc9ff', laenge: 1.15, flack: 0.14 },
+      hyperraum:   { farbe:'#b07fe8', laenge: 1.55, flack: 0.08 }
     };
     function rgba(hex, a){
       var n = parseInt(hex.slice(1), 16);
@@ -26461,6 +26501,10 @@
         if (typeof drawShipMiniIcon === 'function' && SHIP_HULL_DEFS[shipKey]){
           nc = document.createElement('canvas');
           nc.width = nc.height = SPRITE_KANTE;
+          /* Die Marken-Plakette ist eine Listenbeschriftung, kein Bauteil - im Gefecht waere
+             sie ein mitdrehender oranger Klecks an jedem eigenen Rumpf. Alles andere, was die
+             Werftmarke am Schiff sichtbar macht, bleibt drin. */
+          try { nc.dataset.ohnePlakette = '1'; } catch(e){}
           var g = nc.getContext('2d');
           var w = 100 + 2*SPRITE_RAND;
           var k = 100 / w, t = SPRITE_RAND * SPRITE_KANTE / w;
@@ -26646,7 +26690,9 @@
       /* Die Spiel-Sprites waren nur Vorlage fuer die Bilderbogen und werden nicht
          mehr gebraucht - 17 Leinwaende zu 168x168 sind rund 1,9 MB Bildspeicher, den
          der JS-Heap nicht einmal ausweist. Beim naechsten Backen entstehen sie in
-         Sekundenbruchteilen neu. */
+         Sekundenbruchteilen neu. VORHER wird noch nachgezaehlt, ob die Marken-Plakette
+         wirklich draussen geblieben ist - danach gibt es nichts mehr zu zaehlen. */
+      plakettePunkte();
       spielSprites = {};
       /* Beutestuecke: dieselbe Silhouette, aber in der Farbe des Angreifers. */
       atlanten[atlasSchluessel('dKreuzer','A')]    = backeAtlas('dKreuzer',    F.an, schiffSkala*KLASSEN.dKreuzer.gr);
@@ -26661,9 +26707,9 @@
     }
 
     /* --------------------------- Leuchtflecken --------------------------- */
-    var flecken = {};
-    function backeFleck(farbe){
-      var n = 64;
+    var flecken = {}, fleckenKlein = {};
+    function backeFleck(farbe, n){
+      n = n || 64;
       var nc = document.createElement('canvas'); nc.width = n; nc.height = n;
       var g = nc.getContext('2d');
       var gr = g.createRadialGradient(n/2, n/2, 0, n/2, n/2, n/2);
@@ -26678,9 +26724,20 @@
       if (!flecken[farbe]) flecken[farbe] = backeFleck(farbe);
       return flecken[farbe];
     }
+    /* Zweite, kleine Ausgabe desselben Flecks. Der Grund ist der Rasterer, nicht die Optik:
+       Ein Grossteil der Gluten im Gefecht ist winzig - Muendungsblitze, Trefferblitze,
+       Antriebsfahnen, Funkenglut liegen bei 6 bis 20 Pixeln. Die 64er-Vorlage dafuer
+       herunterzurechnen ist genau die Arbeit, die ein Browser ohne Grafikbeschleuniger
+       (und das ist jeder Rechner mit abgeschalteter Hardwarebeschleunigung, sowie der
+       Pruefbrowser hier) je Aufruf voll bezahlt. Bei 24 Pixeln Vorlage bleibt es fuer
+       diese Groessen beim Verkleinern - nie beim Vergroessern, das waere sichtbar matschig. */
+    function fleckKlein(farbe){
+      if (!fleckenKlein[farbe]) fleckenKlein[farbe] = backeFleck(farbe, 24);
+      return fleckenKlein[farbe];
+    }
     function glut(g, x, y, r, farbe, alpha){
       g.globalAlpha = alpha;
-      g.drawImage(fleck(farbe), x - r, y - r, r*2, r*2);
+      g.drawImage(r <= 12 ? fleckKlein(farbe) : fleck(farbe), x - r, y - r, r*2, r*2);
       g.globalAlpha = 1;
     }
 
@@ -27114,14 +27171,36 @@
     var tSim = 0, tempo = 1, laeuft = true, schild = 1, kuppelHeil = true;
     var flotte = {}, lebend = {}, totRumpf = {}, proSchiff = {};
     var geschosse = [], wracks = [], funken = [], blitze = [], marken = [], scherben = [], facetten = [];
+    var treffer = [];
     var gekapert = { dKreuzer: 0, dZerstoerer: 0 };
     var enterAuftrag = [], meldungIdx = 0, protokollListe = [];
     var kamShake = 0, kamZoom = 1, abschnittIdx = -1;
-    var MAXG = 460, MAXF = 520, MAXB = 90, MAXW = 140;
+    var MAXG = 460, MAXF = 520, MAXB = 90, MAXW = 140, MAXT = 24, MAXS = 160;
 
     function grenzenSetzen(){
       MAXG = klein ? 210 : 460; MAXF = klein ? 240 : 520;
       MAXB = klein ?  42 :  90; MAXW = klein ?  55 : 140;
+      MAXT = klein ?  12 :  24; MAXS = klein ?  70 : 160;
+    }
+
+    /* --- Warum die Treffer einen EIGENEN Vorrat haben ------------------------
+       Bis v8.397.1 schlugen nur Bodengeschosse ein; Schiffssalven verschwanden lautlos.
+       Sobald auch sie einschlagen, kommen in der Entscheidungsphase je nach Flottengroesse
+       ein paar hundert Einschlaege pro Sekunde dazu - gemessen, nicht geschaetzt.
+
+       Der naheliegende Weg waere blitzNeu() gewesen. Der ist falsch: blitze fasst 90 Stueck
+       und wird von Wrackaufschlaegen, Explosionen und Bodenfeuer mitbenutzt. Ein Strom aus
+       Salveneinschlaegen haette diesen Vorrat komplett belegt und damit genau die grossen,
+       seltenen Blitze verdraengt, die etwas bedeuten - der Kampf haette FLACHER ausgesehen,
+       nicht voller. Und MAXB einfach anzuheben verteuert jeden Zeichendurchlauf dauerhaft.
+
+       Also ein zweiter, kleiner Vorrat mit eigener Obergrenze und sehr kurzem Leben (0,18 s).
+       Er verdraengt den AELTESTEN statt den neuen abzulehnen: Bei einem Dauerfeuer waere
+       "neue ablehnen" gleichbedeutend mit "es blitzt einmal am Anfang und dann nie wieder",
+       weil die ersten Eintraege den Vorrat halten. */
+    function trefferNeu(u, a, staerke, farbe){
+      if (treffer.length >= MAXT) treffer.shift();
+      treffer.push({ u:u, a:a, t:0, dauer: 0.18, st: staerke, farbe: farbe });
     }
 
     function neueRumpfZahl(k){
@@ -27137,6 +27216,7 @@
       grenzenSetzen();
       flotte = {}; lebend = {}; totRumpf = {}; proSchiff = {};
       geschosse = []; wracks = []; funken = []; blitze = []; marken = []; scherben = []; facetten = [];
+      treffer = [];
       gekapert = { dKreuzer: 0, dZerstoerer: 0 };
       enterAuftrag = []; meldungIdx = 0; protokollListe = [];
       tSim = 0; schild = 1; kuppelHeil = true; kamShake = 0; kamZoom = 1; abschnittIdx = -1;
@@ -27160,8 +27240,14 @@
             sU: sU, sA: sA, ph: Math.random() * TAU, fr: 0.55 + Math.random() * 0.85,
             tot: false, schaden: 0, kalt: Math.random() * 1.6,
             unsterb: false, beute: false, gefesselt: null, atlasSeite: d.seite,
+            /* Beide Felder sind kurzlebige Anzeigewerte (0..1) und muessen hier stehen:
+               ohne Startwert waere der erste Zeichendurchlauf ein Radius von NaN. */
+            muendung: 0, prall: 0,
             modell: modelle[j] || null
           };
+          /* Antriebsart EINMAL beim Aufbau nachschlagen, nicht 60-mal je Sekunde je Rumpf:
+             Es sind zwei Objektzugriffe, aber bei 330 Ruempfen sind das 20.000 im Bild. */
+          arr[j].antrieb = antriebVon(arr[j]);
         }
         flotte[k] = arr;
       }
@@ -27269,7 +27355,12 @@
       var d = KLASSEN[s.k];
       var gross = d.gewicht >= 8;
       var p = px(s.u, s.a);
-      blitzNeu(s.u, s.a, gross ? 1.0 : 0.45, gross ? F.gold : (s.seite === 'A' ? F.an : F.ver), gross);
+      var bl = blitzNeu(s.u, s.a, gross ? 1.0 : 0.45, gross ? F.gold : (s.seite === 'A' ? F.an : F.ver), gross);
+      /* Ein zerberstendes Grosskampfschiff bekommt zwei Zutaten, die der kleine Rumpf nicht
+         hat: einen weissglueheden Kern in den ersten Sekundenbruchteilen und eine Druckwelle,
+         die weit ueber den Feuerball hinauslaeuft. Beides haengt am Blitzeintrag statt in
+         eigenen Vorraeten - es lebt exakt so lange wie er und kann darum nicht liegenbleiben. */
+      if (gross && bl){ bl.kern = 1; bl.welle = 1; }
       var nF = gross ? (klein ? 7 : 13) : (klein ? 2 : 4);
       for (var i = 0; i < nF; i++){
         var wk = Math.random() * TAU, sp = (0.05 + Math.random()*0.22) * (gross ? 1.5 : 1);
@@ -27286,7 +27377,25 @@
           w: s.w, dreh: (Math.random()-0.5) * 3.2, t: 0, brennt: 0, gross: gross
         });
       }
-      if (gross){ kamShake = Math.max(kamShake, klein ? 2.4 : 4.2); }
+      if (gross){
+        kamShake = Math.max(kamShake, klein ? 2.4 : 4.2);
+        /* Nachglühende Splitter: Das Wrack faellt als EIN Stueck, das reicht fuer den
+           Kadaver, nicht fuer das Zerbersten. Die Scherben trudeln davon, gluehen beim
+           Eintritt auf und sind nach sieben Sekunden weg (wrackSchritt/partikelSchritt).
+           Gedeckelt, weil der Vorrat sonst als einziger im Bild unbegrenzt waere - die
+           Kuppel fuellt ihn im Bruchmoment schon mit 54 Stueck auf einen Schlag. */
+        var nSch = klein ? 3 : 6;
+        for (var sc = 0; sc < nSch && scherben.length < MAXS; sc++){
+          var swk = Math.random() * TAU, ssp = 0.04 + Math.random()*0.10;
+          scherben.push({
+            u: s.u, a: s.a,
+            vu: s.vu * 0.5 + Math.cos(swk) * ssp * 0.55,
+            va: s.va * 0.4 + Math.sin(swk) * ssp * 0.5,
+            w: Math.random()*TAU, dreh: (Math.random()-0.5)*5,
+            gr: (2.5 + Math.random()*4) * schiffSkala, t: 0, gluehen: 0
+          });
+        }
+      }
     }
 
     /* --------------------------- Flugverhalten --------------------------- */
@@ -27314,6 +27423,13 @@
         for (var j = 0; j < arr.length; j++){
           var s = arr[j];
           if (s.tot) continue;
+          /* Muendungsblitz und Schildaufprall verklingen VOR allen Weichen: Ein gekapertes
+             oder geentertes Schiff kehrt in diese Schleife nie zurueck, sein letzter
+             Aufprall bliebe sonst fuer den Rest des Gefechts stehen. Zeitbasiert, weil
+             vorspulen() bis zu 4000 Schritte ohne einen einzigen Zeichendurchlauf macht -
+             ein Abzug je Bild waere dort um Groessenordnungen daneben. */
+          if (s.muendung) s.muendung = Math.max(0, s.muendung - dt * 7);
+          if (s.prall)    s.prall    = Math.max(0, s.prall    - dt * 4.5);
           if (s.beute){ beuteSchritt(s, dt, pxProS); continue; }
           if (s.entert) continue;               /* wird von der Enterphase gefuehrt */
 
@@ -27376,9 +27492,16 @@
        5  GESCHOSSE, WRACKS, PARTIKEL, SCHILDKUPPEL, BODENFEUER, ENTERN
        ===================================================================== */
 
+    /* Gibt den Eintrag zurueck, damit ein Aufrufer ihn nachtraeglich kennzeichnen kann
+       (Blendkern/Druckwelle beim Zerbersten). Ein sechster Parameter waere die Alternative
+       gewesen - dann muessten alle elf bestehenden Aufrufstellen ein Argument mitschleppen,
+       das nur eine einzige davon braucht. */
     function blitzNeu(u, a, staerke, farbe, ring){
       if (blitze.length >= MAXB) blitze.shift();
-      blitze.push({ u:u, a:a, t:0, dauer: 0.28 + staerke*0.5, st: staerke, farbe: farbe, ring: !!ring });
+      var b = { u:u, a:a, t:0, dauer: 0.28 + staerke*0.5, st: staerke, farbe: farbe, ring: !!ring,
+                kern: 0, welle: 0 };
+      blitze.push(b);
+      return b;
     }
     function funkeNeu(u, a, vu, va, leben, farbe){
       if (funken.length >= MAXF) return;
@@ -27420,16 +27543,129 @@
       }
       return best;
     }
+    /* --- Vom gezeichneten Rumpf zum echten Schiff ---------------------------
+       Ein Rumpf traegt seine BILDROLLE in s.k ('aJaeger' ... 'dSchlacht') - davon gibt
+       es neun fuer rund vierzig Schiffsklassen. Den echten Schluessel kennt nur s.modell,
+       und zwar als Kennung 'm|<schluessel>|<rolle>'; aufgeloest wird sie ueber RUMPF.
+
+       DREI Faelle, die sich am Feld selbst NICHT unterscheiden lassen und die deshalb hier
+       an einer Stelle behandelt werden, statt an jeder Verwendung neu:
+         (a) s.modell ist null - die Klasse fiel unter den Sechser-Deckel von atlantenBauen.
+         (b) s.modell ist der STELLVERTRETER einer nicht aufgeklaerten Gegenseite (v8.397.0).
+         (c) s.modell zeigt auf das echte Schiff.
+       In allen drei Faellen ist die Bildrolle die verlaessliche Rueckfalltuer - sie stimmt
+       immer, sie ist nur groeber. */
+    function schiffKeyVon(s){
+      var r = s && s.modell ? RUMPF[s.modell] : null;
+      return (r && r.schiff) ? r.schiff : null;
+    }
+
+    /* Waffengattung. Grundlage ist die KONTERROLLE des Spiels (abfang/bomber/kapital) -
+       dieselben drei Rollen, die das Konter-System und die Hilfe lehren. Damit zeigt das
+       Bild eine Mechanik, die der Spieler ohnehin kennt, statt eine erfundene vierte
+       Einteilung. Wo keine Konterrolle steht (Zivil- und Tiefenschiffe, 19 von 40) oder
+       kein Modell bekannt ist, entscheidet die Bildrolle - grob, aber nie falsch. */
+    /* Antriebsart des Schiffs (verbrennung/impuls/hyperraum) - dieselbe Einteilung, die in
+       der Werft an jeder Karte steht. 39 der 40 Klassen tragen sie; wo sie fehlt oder wo
+       kein Modell bekannt ist, bleibt es beim schlichten Verbrennungsstrahl. */
+    function antriebVon(s){
+      var k = schiffKeyVon(s);
+      return (k && UMGEBUNG && UMGEBUNG.schiffAntrieb) ? UMGEBUNG.schiffAntrieb(k) : null;
+    }
+
+    function waffeVon(s, d){
+      var k = schiffKeyVon(s);
+      var rolle = (k && UMGEBUNG && UMGEBUNG.schiffRolle) ? UMGEBUNG.schiffRolle(k) : null;
+      if (rolle === 'bomber')  return 'torpedo';
+      if (rolle === 'kapital') return 'lanze';
+      if (rolle === 'abfang')  return 'salve';
+      return d.rolle === 'schwarm' ? 'salve' : (d.gewicht >= 40 ? 'lanze' : 'salve');
+    }
+
+    /* Der Abschnitt, in dem die Sache kippt. Bei drei Phasen ist das der mittlere Abschnitt
+       (die Zeitfenster stehen in ABSCHNITTE und kommen aus dem echten Bericht); liefert der
+       Bericht nur EIN Urteil - PvP und Ueberfall tun das -, wird das mittlere Drittel des
+       einen Abschnitts genommen, statt die Breitseite ganz ausfallen zu lassen. */
+    function breitseiteZeit(){
+      if (ABSCHNITTE.length === 3){
+        var m = ABSCHNITTE[1];
+        return tSim >= m.t0 && tSim < m.t1;
+      }
+      var e = ABSCHNITTE[0];
+      if (!e) return false;
+      return tSim >= e.t0 + (e.t1 - e.t0) * 0.34 && tSim < e.t0 + (e.t1 - e.t0) * 0.74;
+    }
+
     function schiessSchritt(s, d, dt){
       if (tSim < 3.4 || tSim > 40.5) return;
       s.kalt -= dt;
       if (s.kalt > 0) return;
       var schwarm = d.rolle === 'schwarm';
-      s.kalt = schwarm ? (0.85 + Math.random()*0.8) : (1.5 + Math.random()*1.3);
+      var waffe = waffeVon(s, d);
+      /* Der Feuertakt gehoert zur Waffengattung, nicht zur Bildrolle: Abfangjaeger hetzen,
+         Grosskampfschiffe laden. Vorher unterschied nur `schwarm` - alle sieben uebrigen
+         Rollen vom Bomber bis zum Koloss feuerten identisch. */
+      s.kalt = waffe === 'lanze'   ? (2.4 + Math.random()*1.6)
+             : waffe === 'torpedo' ? (2.0 + Math.random()*1.4)
+             : schwarm             ? (0.85 + Math.random()*0.8)
+             :                       (1.4 + Math.random()*1.1);
       var ziel = findeGegner(s.seite, s.u, s.a, 0.44 * Math.max(W, H));
       if (!ziel) return;
       var dx = (ziel.u - s.u) * kU, dy = (ziel.a - s.a) * kA;
       var d0 = Math.sqrt(dx*dx + dy*dy) || 1;
+      var farbe = s.seite === 'A' ? F.an : F.ver;
+      /* Der Muendungsblitz sitzt am SCHIFF, nicht am Geschoss. Am Geschoss haette er bei
+         gestaffelten Salven 0,07 s und 0,14 s VOR dem zweiten und dritten Schuss geblitzt -
+         die tragen t: -n*0.07 und werden bis dahin uebersprungen. */
+      s.muendung = waffe === 'lanze' ? 1 : (waffe === 'torpedo' ? 0.8 : 0.55);
+
+      if (waffe === 'lanze'){
+        /* Grosskampfschiff: EIN schwerer Lanzenstrahl statt einer Streusalve. Er faedelt
+           langsam ein und schlaegt hart ein - genau das, was die Konterrolle "kapital"
+           im Spiel bedeutet.
+
+           In der ENTSCHEIDUNGSPHASE wird daraus eine Breitseite: drei Lanzen im Faecher,
+           danach eine deutlich laengere Ladezeit. Das ist kein Effekt um seiner selbst
+           willen - der mittlere Abschnitt traegt 55% aller Verluste (siehe die Gewichtung
+           in berichtUebernehmen), und bisher sah man diesem Abschnitt genau nichts an.
+           Der laengere Nachlauf haelt die Schusszahl im Rahmen: drei Schuss auf einmal,
+           dafuer seltener. */
+        var breit = breitseiteZeit() && Math.random() < 0.5;
+        if (breit){ s.kalt += 1.6; s.muendung = 1; }
+        var faecher = breit ? [-0.085, 0, 0.085] : [0];
+        for (var lf = 0; lf < faecher.length; lf++){
+          var lw = faecher[lf];
+          var lrx = (dx/d0) * Math.cos(lw) - (dy/d0) * Math.sin(lw);
+          var lry = (dx/d0) * Math.sin(lw) + (dy/d0) * Math.cos(lw);
+          geschossNeu({
+            typ: 'lanze', u: s.u, a: s.a,
+            vu: lrx * 520 / kU, va: lry * 520 / kA,
+            /* Nur der mittlere Strahl liegt auf dem Ziel - die beiden Flankenschuesse
+               gehen bewusst daneben. Wuerden alle drei treffen, waere die Breitseite
+               dreifacher Schaden im Bild, waehrend der Bericht unveraendert dieselben
+               Verluste vorgibt. Das Bild darf mehr FEUER zeigen, nicht mehr Wirkung.
+               Fehlschuesse fliegen ueber die Zielentfernung hinaus weiter und schlagen
+               NIRGENDS ein (fehl) - ein Blitz neben dem Gegner saehe aus wie ein Treffer
+               auf nichts, und der Spieler haette recht, wenn er das fuer einen Fehler
+               haelt. */
+            t: -lf * 0.05, dauer: d0 / 520 * (lw === 0 ? 1 : 2.2) + 0.02, farbe: farbe,
+            zielS: lw === 0 ? ziel : null, wucht: lw === 0 ? 1 : 0.55, fehl: lw !== 0
+          });
+        }
+        return;
+      }
+      if (waffe === 'torpedo'){
+        /* Bomber: langsame, gelenkte Torpedos mit Leuchtspur. Zwei je Anflug, versetzt. */
+        for (var tq = 0; tq < 2; tq++){
+          geschossNeu({
+            typ: 'schifftorpedo', u: s.u + (Math.random()-0.5)*0.012, a: s.a,
+            vu: dx/d0 * 300 / kU, va: dy/d0 * 300 / kA,
+            t: -tq * 0.16, dauer: d0 / 300 + 0.6, farbe: farbe,
+            zielS: ziel, wucht: 0.85
+          });
+        }
+        return;
+      }
       var tempoPx = schwarm ? 900 : 620;
       var salve = schwarm ? 1 : (d.gewicht >= 14 ? 3 : 2);
       for (var n = 0; n < salve; n++){
@@ -27440,8 +27676,9 @@
           typ: 'spur', u: s.u, a: s.a,
           vu: rx * tempoPx / kU, va: ry * tempoPx / kA,
           t: -n * 0.07, dauer: d0 / tempoPx + 0.02,
-          farbe: s.seite === 'A' ? F.an : F.ver,
-          dick: schwarm ? 1.0 : 1.7, len: schwarm ? 11 : 16, zielU: ziel.u, zielA: ziel.a
+          farbe: farbe,
+          dick: schwarm ? 1.0 : 1.7, len: schwarm ? 11 : 16,
+          zielS: ziel, wucht: schwarm ? 0.28 : 0.45
         });
       }
     }
@@ -27467,17 +27704,72 @@
           }
           if (Math.random() < 0.55) funkeNeu(g.u, g.a, -g.vu*0.06, -g.va*0.06, 0.45, F.grau);
         }
+        if (g.typ === 'schifftorpedo'){
+          /* Der Schiffstorpedo lenkt nach - traeger als die Bodenrakete (halbe Wendekraft,
+             Hoechsttempo 340 statt 760). Das ist der sichtbare Unterschied zur Salve: sie
+             fliegt geradeaus vorbei, er dreht hinterher. Verliert er sein Ziel (zerstoert
+             oder gekapert), fliegt er die eingeschlagene Bahn zu Ende aus. */
+          var zt = g.zielS && !g.zielS.tot && !g.zielS.beute ? g.zielS : null;
+          if (zt){
+            var tdx = (zt.u - g.u) * kU, tdy = (zt.a - g.a) * kA;
+            var tdd = Math.sqrt(tdx*tdx + tdy*tdy) || 1;
+            var tvx = g.vu * kU, tvy = g.va * kA;
+            var tsp = Math.min(340, (Math.sqrt(tvx*tvx + tvy*tvy) || 1) + 210 * dt);
+            tvx += (tdx/tdd * tsp - tvx) * Math.min(1, 1.3 * dt);
+            tvy += (tdy/tdd * tsp - tvy) * Math.min(1, 1.3 * dt);
+            var tm = Math.sqrt(tvx*tvx + tvy*tvy) || 1;
+            g.vu = tvx / tm * tsp / kU; g.va = tvy / tm * tsp / kA;
+          }
+          /* Leuchtspur sparsam: Torpedos leben lange, und der Funkenvorrat ist gedeckelt -
+             bei voller Ausschuettung frisst eine Bomberwelle ihn allein auf. */
+          if (Math.random() < 0.22) funkeNeu(g.u, g.a, -g.vu*0.05, -g.va*0.05, 0.4, F.gold);
+        }
         g.u += g.vu * dt; g.a += g.va * dt;
         /* Durchlass in der Schildkuppel fuer eigenes Feuer von unten */
         if (kuppelHeil && !g.durch && g.va > 0 && vorA < ALT_KUPPEL && g.a >= ALT_KUPPEL){
           g.durch = true; facetteTreffer(g.u, 0.55, true);
         }
+        /* Drei Enden, und nur EINES ist ein Treffer. Die Flugzeit g.dauer ist beim Abschuss
+           aus der Entfernung zum Ziel berechnet - laeuft sie ab, ist das Geschoss dort
+           angekommen. Wer stattdessen den Bildrand verlaesst oder in den Boden faehrt, hat
+           daneben geschossen; dort zu blitzen hiesse, am Rand des Bildes Einschlaege zu
+           zeigen, wo gar kein Schiff steht. */
         if (g.t >= g.dauer || g.a < -0.02 || Math.abs(g.u) > 1.2){
-          if (g.typ !== 'spur') einschlag(g);
+          var angekommen = g.t >= g.dauer;
+          if (g.typ !== 'spur' && g.typ !== 'lanze' && g.typ !== 'schifftorpedo') einschlag(g);
+          else if (angekommen && !g.fehl) schiffTreffer(g);
           geschosse.splice(i, 1);
         }
       }
     }
+    /* Einschlag eines SCHIFFSgeschosses. Bewusst getrennt von einschlag(): das dort erzeugte
+       Blitz-plus-sechs-Funken-Paket ist fuer die paar Bodengeschosse je Sekunde gebaut, nicht
+       fuer den Dauerregen einer Flottensalve. Hier zaehlt die Wucht - eine Jaegersalve soll
+       aufblitzen, ein Lanzentreffer soll man spueren. */
+    function schiffTreffer(g){
+      var w = g.wucht || 0.4;
+      trefferNeu(g.u, g.a, w, g.farbe);
+      /* Funken nur ab mittlerer Wucht und auch dann sparsam - der Vorrat ist gedeckelt,
+         und was ihn ein Schwarmjaeger fuellt, fehlt den Explosionen. */
+      if (w >= 0.4){
+        var n = w >= 0.9 ? (klein ? 2 : 4) : 1;
+        for (var i = 0; i < n; i++){
+          var a = Math.random() * TAU, sp = 0.04 + Math.random()*0.12;
+          funkeNeu(g.u, g.a, Math.cos(a)*sp*0.5, Math.sin(a)*sp*0.45, 0.3 + Math.random()*0.35, F.gold);
+        }
+      }
+      /* Schildaufprall am getroffenen Schiff: der Treffer bekommt dadurch einen Empfaenger
+         statt nur ein Blitzchen im Leeren. Gekaperte Ruempfe bleiben aussen vor - die haben
+         die Seite gewechselt und sind aus dem Gefecht heraus. */
+      var z = g.zielS;
+      if (z && !z.tot && !z.beute) z.prall = Math.min(1, (z.prall || 0) + w * 0.8);
+      /* Kameraruck NUR fuer die schweren Lanzentreffer, und auch da nur bei jedem fuenften.
+         Wuerde jeder Einschlag rucken, staende das Bild dauerhaft im Zittern und die grossen
+         Erschuetterungen (Wrackaufschlag: 4,2 / Kuppelbruch: 14) waeren nicht mehr die
+         Ausnahme, die sie sein sollen - der Ruck sagt dann nichts mehr. */
+      if (w >= 1 && Math.random() < 0.2) kamShake = Math.max(kamShake, klein ? 0.8 : 1.4);
+    }
+
     function einschlag(g){
       var stark = g.typ === 'gauss' ? 0.85 : (g.typ === 'rakete' ? 0.7 : (g.typ === 'torpedo' ? 0.75 : 0.5));
       blitzNeu(g.u, g.a, stark, g.farbe, g.typ === 'gauss');
@@ -27521,6 +27813,10 @@
       for (var j = blitze.length - 1; j >= 0; j--){
         blitze[j].t += dt;
         if (blitze[j].t >= blitze[j].dauer) blitze.splice(j, 1);
+      }
+      for (var tr = treffer.length - 1; tr >= 0; tr--){
+        treffer[tr].t += dt;
+        if (treffer[tr].t >= treffer[tr].dauer) treffer.splice(tr, 1);
       }
       for (var m = marken.length - 1; m >= 0; m--){
         marken[m].t += dt;
@@ -27796,11 +28092,13 @@
       zeichneKuppel(g);
       zeichneScherben(g);
       zeichneWracks(g);
+      zeichneAntriebe(g);
       zeichneFlotten(g);
       zeichneEnterleinen(g);
       zeichneGeschosse(g);
       g.globalCompositeOperation = 'lighter';
       zeichneFunken(g);
+      zeichneTreffer(g);
       zeichneBlitze(g);
       g.globalCompositeOperation = 'source-over';
       zeichneMarken(g);
@@ -27935,6 +28233,55 @@
     /* Reihenfolge: Verteidiger zuerst (tiefer), dann Angreifer - so ueberdeckt
        die einfliegende Flotte die haltende, was den Anflug betont.            */
     var ZEICHEN_ORDNUNG = ['dSchlacht','dKreuzer','dZerstoerer','dJaeger','aBomber','aKreuzer','aZerstoerer','aEnter','aJaeger'];
+    /* Antriebsfahnen hinter den Hecks - EIN eigener Durchlauf vor den Ruempfen.
+       Der gebackene Rumpf traegt zwar schon eine Fahne, die aber ist fuer alle Klassen
+       gleich gefaerbt (sie kommt aus dem Rumpfverlauf des Icons). Hier kommt die Farbe
+       aus der ANTRIEBSART: der Brenner glimmt orange und flackert, der Impulsantrieb
+       steht ruhig und blau, der Hyperraumantrieb zieht einen langen violetten Schweif.
+       Damit sieht man einer Formation an, was fuer Technik da fliegt - dieselbe Auskunft,
+       die in der Werft als Textzeile steht.
+
+       WARUM EIN EIGENER DURCHLAUF, gemessen statt vermutet: Innerhalb der Rumpfschleife
+       kostete die Fahne auf dem grossen Bild 35 -> 29 Bilder/s, davon rund ein Drittel
+       allein das Umschalten des Mischmodus - bei 330 Ruempfen sind das 660 Zustands-
+       wechsel je Bild. Hier wird einmal auf 'lighter' geschaltet und einmal zurueck.
+       Dass die Fahnen dadurch hinter ALLEN Ruempfen liegen statt nur hinter dem eigenen,
+       ist kein Verlust: sie gehoeren ohnehin nach hinten.
+
+       Ruempfe ohne bekanntes Modell haben keine Antriebsart und bekommen keine Fahne -
+       lieber keine Aussage als eine geratene.
+
+       UND NICHT AM JAEGERSCHWARM, ebenfalls gemessen: Bei der Beispielschlacht sind 295 der
+       330 Ruempfe Jaeger (1.860 Jaeger bei Massstab 7 ergeben allein 266 Ruempfe). Deren
+       Fahne ist rund sechs Pixel gross - sie kostet den groessten Teil der Rechenzeit und
+       ist genau das, was man am wenigsten sieht. Die Aussage steckt ohnehin in den grossen
+       Schiffen: Jaeger fahren durchweg Verbrennung, die Antriebsarten unterscheiden sich
+       erst weiter oben. Der gebackene Rumpf traegt seine Duesenglut weiterhin selbst. */
+    function zeichneAntriebe(g){
+      g.globalCompositeOperation = 'lighter';
+      for (var i = 0; i < ZEICHEN_ORDNUNG.length; i++){
+        var k = ZEICHEN_ORDNUNG[i], arr = flotte[k];
+        if (!arr) continue;
+        var d0 = KLASSEN[k];
+        if (d0.rolle === 'schwarm') continue;
+        var basis = (d0.gr * 5.4 + 2.4) * schiffSkala;
+        var kern  = (1.5 + d0.gr * 2.6) * schiffSkala;
+        for (var j = 0; j < arr.length; j++){
+          var s = arr[j];
+          if (s.tot) continue;
+          var ast = ANTRIEB_STIL[s.antrieb];
+          if (!ast) continue;
+          var x = pxX(s.u, s.a), y = pxY(s.u, s.a);
+          if (x < -60 || x > W + 60 || y < -70 || y > H + 40) continue;
+          var af = ast.flack ? (1 - ast.flack + ast.flack * Math.abs(Math.sin(tSim * 17 + s.ph * 4))) : 1;
+          var ah = basis * ast.laenge;
+          glut(g, x - Math.sin(s.w) * ah, y + Math.cos(s.w) * ah,
+               kern * ast.laenge * af, ast.farbe, 0.42 * af);
+        }
+      }
+      g.globalCompositeOperation = 'source-over';
+    }
+
     function zeichneFlotten(g){
       /* Bremszuendung des Anflugs: das Feuer schlaegt gegen die Flugrichtung nach
          unten aus, waehrend der Verband auf Gefechtshoehe abbremst.            */
@@ -27960,7 +28307,29 @@
             glut(g, bx, by, (2.6 + d0.gr * 4.4) * bodenSkala * bremsK * flack, F.flieder, 0.55 * bremsK * flack);
             g.globalCompositeOperation = 'source-over';
           }
+          /* Muendungsblitz VOR dem Rumpf: er sitzt an der Nase (s.w zeigt in Flugrichtung,
+             daher sin/-cos wie bei der Bremszuendung, nur mit umgekehrtem Vorzeichen) und
+             darf ruhig ein Stueck unter dem Rumpf durchscheinen. */
+          if (s.muendung > 0.02){
+            var mf = s.muendung, mn = (d0.gr * 6 + 3) * schiffSkala;
+            g.globalCompositeOperation = 'lighter';
+            glut(g, x + Math.sin(s.w) * mn, y - Math.cos(s.w) * mn,
+                 (1.8 + d0.gr * 3.2) * schiffSkala * (0.6 + mf), F.gold, Math.min(1, 0.75 * mf));
+            g.globalCompositeOperation = 'source-over';
+          }
           zeichneSchiff(g, atlas, x, y, s.w);
+          /* Schildaufprall NACH dem Rumpf: eine Huelle, die vor dem Schiff aufleuchtet.
+             Ein Ring statt einer Scheibe - die Scheibe haette das Schiff zugedeckt, und
+             genau dieses Zudecken war beim Anstrich-Versuch schon einmal das Problem. */
+          if (s.prall > 0.03){
+            var pf = s.prall, pr = (3.2 + d0.gr * 5.2) * schiffSkala * (1 + 0.28 * (1 - pf));
+            g.globalCompositeOperation = 'lighter';
+            g.strokeStyle = rgba(F.vio, Math.min(0.85, 0.75 * pf));
+            g.lineWidth = Math.max(0.8, 1.5 * schiffSkala * pf);
+            g.beginPath(); g.arc(x, y, pr, 0, TAU); g.stroke();
+            glut(g, x, y, pr * 0.7, F.flieder, 0.30 * pf);
+            g.globalCompositeOperation = 'source-over';
+          }
           if (s.schaden){
             var fl = 0.45 + 0.55 * Math.sin(tSim * 13 + s.ph * 3);
             if (fl > 0.35){
@@ -28070,6 +28439,38 @@
           g.globalCompositeOperation = 'lighter';
           glut(g, x2, y2, q.dick * bodenSkala, F.an, 0.9);
           g.globalCompositeOperation = 'source-over';
+        } else if (q.typ === 'lanze'){
+          /* Grosskampfschiff-Lanze: kein Punkt, sondern ein gleissender Balken. Zwei Zuege
+             uebereinander - breiter Kern in der Parteifarbe, darin ein duenner weissglueher
+             Faden. Der Doppelzug ist es, der den Strahl heiss statt bunt aussehen laesst;
+             eine einzelne dicke Linie wirkt wie ein Farbstrich. */
+          /* Der weisse Faden ist BEWUSST kurz und nicht ganz deckend: Bei 0,92 Deckkraft
+             ueber vier Fuenfteln der Laenge (erster Entwurf) sahen die Strahlen beider
+             Seiten gleich weiss aus - die Parteifarbe, die im Getuemmel Freund von Feind
+             trennt, ging genau an der auffaelligsten Stelle des Bildes verloren. */
+          var lx = vx2/m2, ly = vy2/m2, ll = 22 * schiffSkala;
+          g.globalCompositeOperation = 'lighter';
+          g.lineCap = 'round';
+          g.strokeStyle = rgba(q.farbe, 0.85); g.lineWidth = 3.4 * schiffSkala;
+          g.beginPath(); g.moveTo(x2, y2); g.lineTo(x2 - lx*ll, y2 - ly*ll); g.stroke();
+          g.strokeStyle = 'rgba(255,255,255,.72)'; g.lineWidth = 1.2 * schiffSkala;
+          g.beginPath(); g.moveTo(x2, y2); g.lineTo(x2 - lx*ll*0.5, y2 - ly*ll*0.5); g.stroke();
+          glut(g, x2, y2, 4.4 * schiffSkala, q.farbe, 0.9);
+          g.lineCap = 'butt';
+          g.globalCompositeOperation = 'source-over';
+        } else if (q.typ === 'schifftorpedo'){
+          /* Sichtbar traeger Koerper mit Farbkappe und Triebwerksglut hinten dran - er soll
+             sich schon an der Silhouette von der Salve unterscheiden, nicht nur am Tempo. */
+          var ts = schiffSkala;
+          g.save(); g.translate(x2, y2); g.rotate(Math.atan2(vy2, vx2) + Math.PI/2);
+          g.fillStyle = rgba(F.grau, .95);
+          g.fillRect(-1.0*ts, -3.4*ts, 2.0*ts, 6.8*ts);
+          g.fillStyle = rgba(q.farbe, .95);
+          g.fillRect(-1.0*ts, -3.4*ts, 2.0*ts, 2.0*ts);
+          g.restore();
+          g.globalCompositeOperation = 'lighter';
+          glut(g, x2 - vx2/m2*4*ts, y2 - vy2/m2*4*ts, 3.6 * ts, F.warn, 0.8);
+          g.globalCompositeOperation = 'source-over';
         }
       }
     }
@@ -28083,6 +28484,24 @@
         g.fillRect(x - f.gr/2, y - f.gr/2, f.gr, f.gr);
       }
     }
+    /* Treffer sind klein, hell und sofort wieder weg - der Gegenentwurf zum Blitz, der
+       gross ist und nachhallt. Zwei Groessen statt einer stufenlosen Kurve: ein Kern in
+       Weiss (die Hitze) und ein Hof in der Parteifarbe (wer geschossen hat). Bei stehendem
+       Bild - prefers-reduced-motion zeichnet genau EIN Bild - bleibt das ein sauberer
+       Lichtpunkt, kein halb verwischter Ring. */
+    function zeichneTreffer(g){
+      for (var i = 0; i < treffer.length; i++){
+        var t = treffer[i];
+        var p = t.t / t.dauer, rest = 1 - p;
+        var x = pxX(t.u, t.a), y = pxY(t.u, t.a);
+        var r = (2.6 + 7.5 * t.st) * schiffSkala * (0.55 + p * 0.9);
+        glut(g, x, y, r, t.farbe, rest * (0.5 + 0.45 * t.st));
+        if (t.st >= 0.8){
+          g.fillStyle = 'rgba(255,255,255,' + (rest * 0.85).toFixed(3) + ')';
+          g.beginPath(); g.arc(x, y, Math.max(0.6, r * 0.26), 0, TAU); g.fill();
+        }
+      }
+    }
     function zeichneBlitze(g){
       for (var i = 0; i < blitze.length; i++){
         var b = blitze[i];
@@ -28090,6 +28509,25 @@
         var x = pxX(b.u, b.a), y = pxY(b.u, b.a);
         var r = (5 + 34 * b.st) * bodenSkala * (0.3 + p2 * 1.5);
         glut(g, x, y, r, b.farbe, (1 - p2) * (0.55 + 0.45*b.st));
+        /* Blendkern: nur im ersten Drittel, dafuer rein weiss und deutlich kleiner als der
+           Feuerball. Das Auge liest die Reihenfolge weiss -> gold -> aus als Hitze, die
+           abkuehlt; ein Feuerball, der von Anfang an golden ist, wirkt wie eine Lampe. */
+        if (b.kern && p2 < 0.34){
+          var kf = 1 - p2/0.34;
+          g.fillStyle = 'rgba(255,255,255,' + (kf * 0.9).toFixed(3) + ')';
+          g.beginPath(); g.arc(x, y, r * 0.42 * (0.5 + kf * 0.5), 0, TAU); g.fill();
+        }
+        /* Druckwelle: laeuft schnell nach aussen und wird dabei duenn. Sie reicht bis zum
+           Vierfachen des Feuerballs - der Ring von b.ring bleibt mit 1,5 dicht daran, die
+           Welle ist ausdruecklich das, was DANEBEN noch weiterlaeuft. */
+        if (b.welle){
+          var wf = Math.min(1, p2 / 0.7);
+          if (wf < 1){
+            g.strokeStyle = rgba(F.flieder, (1 - wf) * 0.5);
+            g.lineWidth = Math.max(0.6, 2.6 * (1 - wf));
+            g.beginPath(); g.arc(x, y, r * (0.8 + wf * 3.4), 0, TAU); g.stroke();
+          }
+        }
         if (b.ring && p2 < 0.85){
           g.strokeStyle = rgba(b.farbe, (1 - p2/0.85) * 0.55);
           g.lineWidth = 1.6 * (1 - p2);
@@ -28623,7 +29061,7 @@
       }
     }
 
-    var letzteZeit = 0, messenNoetig = false;
+    var letzteZeit = 0, messenNoetig = false, zustandZuletzt = -99;
     function schleife(ts){
       if (!offen) return;               /* Wiedergabe geschlossen - Bildrolle steht */
       if (messenNoetig){ messenNoetig = false; alleFlaechenNeu(); }
@@ -28646,6 +29084,18 @@
         phasenAktualisieren();
         bannerSchritt();
         zeichne();
+        /* Auskunftsfeld einmal je Sekunde nachfuehren. Bis v8.397.1 wurde es genau
+           EINMAL geschrieben, weil darin nur Aufbauwerte standen (Massstab, Zahl der
+           Ruempfe, gebackene Bilder) - die aendern sich nicht. Seit die Auskunft auch
+           laufende Werte fuehrt (welche Geschossarten fliegen, wie voll die Partikel-
+           vorraete sind), waere ein einmaliger Stand wertlos: Beim Schreiben liegt der
+           Anflug an, geschossen wird noch gar nicht. Eine kleine JSON-Zeichenkette je
+           Sekunde ist dafuer der ganze Preis; im Vorlauf (vorspulen) faellt sie nicht
+           an, weil dort ueberhaupt nicht gezeichnet wird. */
+        if (tSim - zustandZuletzt >= 1 || tSim < zustandZuletzt){
+          zustandZuletzt = tSim;
+          zustandSchreiben();
+        }
         requestAnimationFrame(schleife);
       }
     }
@@ -29143,7 +29593,8 @@
         typeof SHIP_DEFS      !== 'undefined' ? SHIP_DEFS      : null,
         typeof BUILDING_DEFS  !== 'undefined' ? BUILDING_DEFS  : null,
         typeof SHIP_SCORE_WEIGHTS !== 'undefined' ? SHIP_SCORE_WEIGHTS : null,
-        typeof planetDisplayName === 'function' ? planetDisplayName : null);
+        typeof planetDisplayName === 'function' ? planetDisplayName : null,
+        typeof COUNTER_ROLE_OF !== 'undefined' ? COUNTER_ROLE_OF : null);
     }
 
     /* Das Siegwort stand im Prototyp fest im Markup („Sieg", „Orbit von Lumekx
@@ -29229,10 +29680,14 @@
          hinsieht; starte() baut sie ohnehin bei jedem Oeffnen neu. */
       atlanten = {};
       spielSprites = {};
+      plaketteMass = undefined;
       anlagenBilder = {};
       hgBild = null;
       glockeBild = null;
       glockeNeu = true;
+      /* Die Partikelvorraete gehoeren mit auf null: Sie halten Verweise auf Schiffsobjekte
+         (zielS) und damit die ganze abgeschlossene Flotte am Leben. */
+      geschosse = []; funken = []; blitze = []; treffer = []; scherben = []; wracks = [];
     }
 
     /* Auskunftsfenster fuer den Pruefflauf (und fuer die Entwicklerkonsole). Ohne das
@@ -29243,6 +29698,45 @@
        reine Auskunft und steuert nichts. */
     function zustandSchreiben(){
       try { document.getElementById('osWrap').dataset.zustand = JSON.stringify(zustand()); } catch(e){}
+    }
+    /* Wie viele Bildpunkte des gebackenen Schiffsbildes tragen das Gold der Marken-Plakette?
+       Gemessen wird das FERTIGE Bild, nicht der Quelltext - „das Kennzeichen wird gesetzt" und
+       „die Plakette ist wirklich weg" sind zwei verschiedene Aussagen, und nur die zweite
+       interessiert. Der Gegenwert steht in der Flottenliste: dieselbe Klasse, derselbe Zaehler,
+       dort MIT Plakette. Einmal gerechnet und gemerkt - getImageData je Sekunde waere teuer,
+       und das gebackene Bild aendert sich innerhalb einer Wiedergabe nicht mehr.
+
+       Der Zeitpunkt ist nicht frei waehlbar: atlantenBauen() wirft die Spiel-Sprites weg,
+       sobald die Bilderbogen daraus gebacken sind (1,9 MB Bildspeicher, die sonst liegen
+       blieben). Gezaehlt wird deshalb genau davor - danach gaebe es nichts mehr zu zaehlen. */
+    var plaketteMass;
+    function plakettePunkte(){
+      if (plaketteMass !== undefined) return plaketteMass;
+      var n = 0, bilder = 0, kk;
+      for (kk in spielSprites){
+        var bild = spielSprites[kk];
+        if (!bild) continue;
+        bilder++;
+        try {
+          var d = bild.getContext('2d').getImageData(0, 0, bild.width, bild.height).data;
+          for (var i = 0; i < d.length; i += 4) if (goldPunkt(d, i)) n++;
+        } catch(e){ plaketteMass = { punkte: -1, bilder: bilder }; return plaketteMass; }
+      }
+      if (!bilder) return null;
+      plaketteMass = { punkte: n, bilder: bilder };
+      return plaketteMass;
+    }
+    /* Das Gold der Plakette (#f0b556 bzw. #f6ce7c auf dunklem Kasten). Der Zaehler ist
+       bewusst NICHT auf null geeicht: Ein paar Schiffe tragen selbst einen Gold- oder
+       Bernsteinverlauf, und deren Rumpfpunkte fallen in dieselbe Farbprobe. Er taugt
+       trotzdem als Nachweis, weil die Plakette ein grosser, dichter Block ist - rund
+       55 Punkte je Schiff gegenueber einer Handvoll Rumpfpunkte. Ob sie da ist oder
+       nicht, entscheidet also nicht ein Schwellwert aus dem Bauch, sondern der
+       Vergleich mit demselben Zaehler auf einer Flottenlisten-Leinwand mal der Zahl
+       der gebackenen Bilder (siehe tests/test_kampfeffekte.js, Abschnitt 4). */
+    function goldPunkt(d, i){
+      return d[i+3] > 140 && d[i] > 205 && d[i] < 255 &&
+             d[i+1] > 150 && d[i+1] < 225 && d[i+2] > 55 && d[i+2] < 150;
     }
     function zustand(){
       var ruempfe = 0, mitModell = 0, modellAtlanten = 0, spielbilder = 0, gebBilder = 0, k;
@@ -29257,7 +29751,29 @@
       for (k in anlagenBilder) if (anlagenBilder[k]) gebBilder++;
       var schiffe = 0;
       for (var i = 0; i < ALLE_K.length; i++) schiffe += KLASSEN[ALLE_K[i]].start || 0;
+      /* Welche Geschossarten fliegen gerade, und wie voll sind die Partikelvorraete?
+         Ohne diese Auskunft koennte ein Test nur an Bildpunkten raten, ob die
+         Waffengattungen wirklich auseinandergehen - und ob die kurzlebigen Trefferblitze
+         den Vorrat der grossen Explosionsblitze in Ruhe lassen. Genau diese Art Raten
+         hat hier schon zweimal einen Fehler durchgelassen. */
+      var arten = {}, fahnen = 0;
+      for (var gq = 0; gq < geschosse.length; gq++){
+        var ty = geschosse[gq].typ;
+        arten[ty] = (arten[ty] || 0) + 1;
+      }
+      for (k in flotte) if (Object.prototype.hasOwnProperty.call(flotte, k)){
+        if (KLASSEN[k] && KLASSEN[k].rolle === 'schwarm') continue;
+        for (var fq = 0; fq < flotte[k].length; fq++){
+          if (!flotte[k][fq].tot && ANTRIEB_STIL[flotte[k][fq].antrieb]) fahnen++;
+        }
+      }
       return { massstab: MASSSTAB, massA: SEITEN_MASS.A, massD: SEITEN_MASS.D,
+               t: Math.round(tSim * 10) / 10,
+               geschossArten: arten, antriebsfahnen: fahnen, plakettePunkte: plakettePunkte(),
+               vorraete: { geschosse: geschosse.length, funken: funken.length,
+                           blitze: blitze.length, treffer: treffer.length,
+                           scherben: scherben.length, wracks: wracks.length },
+               grenzen: { MAXG: MAXG, MAXF: MAXF, MAXB: MAXB, MAXT: MAXT, MAXW: MAXW, MAXS: MAXS },
                anlagenMassstab: anlagenMassstab, ruempfe: ruempfe, ruempfeMitModell: mitModell,
                schiffe: schiffe, anlagen: anlagen.length, modellAtlanten: modellAtlanten,
                spielbilder: spielbilder, spielatlanten: spielAtlasZahl, gebaeudebilder: gebBilder,
@@ -29651,6 +30167,7 @@
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
       { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl.' },
       { title:'Schiffe, Anlagen und Maßstab', body:'Jedes Schiff fliegt mit <strong>seinem eigenen Modell</strong> – demselben Bild wie in deiner Flottenliste – und in der Farbe seiner Partei (grün ist immer deine Seite). Auf dem Planeten stehen die <strong>echten Verteidigungsanlagen</strong> mit der Grafik aus dem Verteidigung-Tab. Weil eine Flotte aus Zehntausenden Schiffen nicht Stück für Stück zu zeichnen ist, steht ein Modell für mehrere Schiffe; wie viele, steht unten links im Bild. Bei sehr ungleichen Flotten bekommt jede Seite trotzdem ein sichtbares Geschwader, und dann nennt das Bild beide Maßstäbe. <strong>Die Zahlen in den Bestandslisten sind davon unberührt und immer die echten.</strong>' },
+      { title:'Was du am Feuer ablesen kannst', body:'Geschossen wird nach der <strong>Konterrolle</strong> des Schiffs – denselben drei Rollen, die auch das Konter-System benutzt. <strong>Abfangjäger</strong> hetzen kurze, schnelle Salven. <strong>Bomber</strong> schicken je zwei langsame, gelenkte <strong>Torpedos</strong>, die ihrem Ziel nachdrehen. <strong>Großkampfschiffe</strong> laden lange und feuern dann einen schweren <strong>Lanzenstrahl</strong>; im entscheidenden Abschnitt wird daraus eine <strong>Breitseite</strong> aus drei Strahlen im Fächer – die beiden äußeren gehen bewusst daneben, denn das Bild darf mehr Feuer zeigen, nicht mehr Wirkung. Wer getroffen wird, dessen <strong>Schild</strong> flammt kurz auf. Auch der <strong>Antrieb</strong> ist zu erkennen: Verbrennung glimmt orange und flackert, Impuls steht ruhig und blau, Hyperraum zieht den längsten violetten Schweif. <strong>Am Ausgang ändert das alles nichts</strong> – Verluste und Ergebnis stehen aus dem Bericht fest, die Darstellung würfelt nichts nach.' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während du im Spiel aktiv bist – eigener Angriff oder eingehender Überfall –, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
       { title:'Steuerung', body:'Unten: <strong>Neustart</strong>, <strong>Pause/Weiter</strong>, <strong>Tempo</strong> (0,5× / 1× / 2×) und <strong>Ans Ende</strong> (springt sofort zur Schlussbilanz). Oben in der Titelzeile: <strong>Listen</strong> blendet die Bestandslisten aus, <strong>Daten</strong> die Abschnitte, das Kräfteverhältnis und das Protokoll – auf dem Handy bekommt die Bühne damit fast den ganzen Bildschirm. Hinaus kommst du über das <strong>×</strong> oben rechts oder mit <strong>Escape</strong>. Ist am Gerät „Bewegung reduzieren" eingestellt, läuft keine Animation: Dann steht sofort der Endzustand im Bild.' },
       { title:'Als Video teilen', body:'Der Knopf <strong>Video</strong> nimmt einen vollständigen Durchlauf als <strong>Hochkant-Clip (1080×1920, 9:16)</strong> auf – das Format von TikTok, Reels und Stories. Er läuft mit doppeltem Tempo, ein Gefecht wird dadurch rund <strong>25 Sekunden</strong> lang. Um das Bild herum stehen die beiden Namen, das Kräfteverhältnis, der Ausgang und – sobald das Gefecht durch ist – die Verluste beider Seiten. Am Ende öffnet sich der Teilen-Dialog deines Geräts; auf dem Handy geht es von dort direkt in TikTok, Instagram oder WhatsApp, am Rechner wird die Datei heruntergeladen. Der Knopf erscheint nur, wenn dein Browser Aufnahmen unterstützt, und bei „Bewegung reduzieren" wäre der Clip ein Standbild – dann sagt er das statt aufzunehmen. Wer lieber ein <strong>Bild</strong> teilt: der Knopf „Teilen" am Kampfbericht liefert dieselbe Schlacht als Standbild, ebenfalls im 9:16-Format.' }
