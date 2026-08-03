@@ -2037,6 +2037,21 @@
     .pfchip { display:flex; align-items:center; gap:5px; background:var(--elev-1); border:var(--bw-1) solid var(--line-1); padding:3px 8px 3px 5px; font-family:var(--font-mono); font-size:11.5px; color:#dfe3f2; }
     .pfchip canvas { width:22px; height:15px; }
     .pfchip b { color:#fff; font-weight:700; }
+    /* Schiffszeile im Kampfbericht (v8.395.0). Umbruchfähig statt einer Zeile: eine ausgewachsene
+       Flotte hat über zwanzig Klassen, und auf einem 390px-Telefon passen davon drei nebeneinander.
+       Die Chips sind bewusst dieselbe Bildsprache wie die Flotten-Chips im Spielerprofil darüber. */
+    .schiffreihe { display:flex; flex-wrap:wrap; gap:4px 5px; margin-top:3px; }
+    .schiffchip { display:inline-flex; align-items:center; gap:3px; background:var(--elev-1); border:var(--bw-1) solid var(--line-1); padding:2px 7px 2px 3px; font-size:11px; color:#cfd4e6; }
+    /* Gebackene Bilder: EIN Hintergrundbild je Schiff/Anlage, von allen Zeilen geteilt.
+       Die Bakflaeche ist quadratisch (siehe schiffBildKlasse), deshalb 100% auto + zentriert:
+       der leere Rand ueber und unter dem Rumpf wird weggeschnitten, nicht das Modell. */
+    .gbi { display:inline-block; flex:none; background-repeat:no-repeat; background-position:center; background-size:100% auto; }
+    .gbi-schiff { width:30px; height:20px; }
+    .gbi-anlage { width:21px; height:21px; background-size:contain; }
+    .schiffchip .anlagensvg { display:inline-flex; width:21px; height:21px; flex:none; }
+    .schiffchip .anlagensvg svg { width:21px; height:21px; }
+    .schiffchip b { color:#fff; font-weight:700; }
+    @media (max-width:480px){ .schiffchip { font-size:10.5px; } .gbi-schiff { width:26px; height:17px; } .gbi-anlage, .schiffchip .anlagensvg, .schiffchip .anlagensvg svg { width:18px; height:18px; } }
     /* Angriffs-Vorschau */
     .profile-preview { margin-top:15px; padding:12px 14px; border:var(--bw-1) solid; }
     .profile-preview.pp-danger { background:linear-gradient(180deg,rgba(226,75,74,0.10),rgba(226,75,74,0.02)); border-color:rgba(226,75,74,0.3); }
@@ -5847,8 +5862,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.394.0';
+  const VERSION = '8.395.0';
   const PATCHNOTES = [
+    { version:'8.395.0', date:'04.08.2026', changes:[
+      '<strong>Der Kampfbericht zeigt jetzt die echten Schiffe.</strong> Wo bisher „179x Zerstörer, 3.324x Großer Frachter" als reine Textzeile stand, steht jetzt vor jeder Zahl das Modell, das du auch in deiner Flottenliste und in der Werft siehst. Namen und Stückzahlen bleiben daneben stehen – ein Bild allein wäre auf dem Handy Raten.',
+      'Dasselbe für die <strong>Verteidigungsanlagen</strong>: statt eines Häkchens vor dem Namen jetzt die Grafik aus deinem Verteidigung-Tab. Häkchen und Kreuz bleiben zusätzlich stehen – sie sagen etwas anderes als das Bild („standgehalten" bzw. „beschädigt").',
+      'Betroffen sind alle Berichtsarten: eingesetzte Flotte, gegnerische Flotte, zerstörte Gegner, eigene Verluste, Piratenflotte, Eskorte, anfliegende Überfallflotte und die ausgespähte Flotte im Aufklärungsbericht.',
+      '<strong>Die Gegenseite fliegt ohne deinen Flotten-Anstrich und ohne deine Werftmarken.</strong> Dieselbe Regel wie im Profil eines fremden Spielers und in der Kampf-Wiedergabe: Was du an einem fremden Konto nicht sehen kannst, behauptet das Bild nicht.',
+      'Technisch bewusst anders gelöst als beim ersten Anlauf: Jedes Schiff wird <strong>einmal</strong> gebacken und von allen Zeilen geteilt. Gemessen am echten Deckel des Servers (40 Berichte mit voller Flotte) wären es sonst 2.000 einzeln gezeichnete Bildflächen auf einer Seite gewesen – jetzt sind es 25 Bilder für dieselben 2.000 Stellen.'
+    ]},
     { version:'8.394.0', date:'03.08.2026', changes:[
       '<strong>Man kam aus der Kampf-Wiedergabe nicht mehr heraus.</strong> Auf einem hohen iPhone lagen Titelzeile und Schließen-Knopf unter der Statusleiste \u2013 und der Klick auf den Hintergrund hilft dort nicht, weil das Fenster den ganzen Bildschirm ausfüllt. Ursache war eine Randabstands-Regel, die in einem Block für <em>kurze</em> Bildschirme gelandet war und auf einem 932 Pixel hohen Gerät deshalb nie griff. Sie steht wieder im allgemeinen Handy-Zweig.',
       'Der Schließen-Knopf ist auf dem Handy jetzt 44\u00d740 Pixel groß statt 30\u00d726 \u2013 er war die kleinste Fläche im ganzen Fenster und die wichtigste. Dazu kommt <strong>Escape</strong> als zweiter Weg hinaus. Ein bildschirmfüllendes Fenster mit genau einem Ausgang ist ein Ausgang zu wenig.',
@@ -25504,6 +25526,104 @@
       return `<span data-ship-icon-key="${k}" style="display:inline-flex; align-items:center; gap:2px; margin-right:7px; cursor:pointer;" title="${shipDisplayName(k)}">${svg}${v}</span>`;
     }).join('');
   }
+  // Dieselbe Aufzählung, aber mit dem ECHTEN Schiffsbild vor jeder Zahl (04.08.2026,
+  // Spieler-Wunsch Sascha: „die Icons, die wir haben, dort wiederverwenden").
+  //
+  // Der Kampfbericht listete Flotten als reinen Text: „179x Zerstörer, 3.324x Großer Frachter".
+  // Das Spiel führt für jedes der 40 Schiffe längst ein gezeichnetes Modell (SHIP_HULL_DEFS,
+  // gemalt von drawShipMiniIcon) – in der Flottenliste, in der Werft, im Spielerprofil und seit
+  // v8.394.0 auch in der Kampf-Wiedergabe. Der Bericht war die letzte Stelle, an der eine Flotte
+  // ohne Bild dastand.
+  //
+  // EINMAL BACKEN, NICHT JE ZEILE ZEICHNEN. Der erste Anlauf setzte je Schiffszeile eine eigene
+  // <canvas> und malte sie nach jedem innerHTML neu. Gemessen mit dem echten Deckel des Backends
+  // (40 Berichte, volle Flotte): 2.000 Leinwände auf einer Seite. Stattdessen wird jedes Schiff
+  // EINMAL in eine Bilddatei gebacken und als CSS-Klasse hinterlegt; die Zeile trägt dann nur noch
+  // einen Klassennamen. Aus 2.000 Leinwänden werden rund 60 Bilder, die sich alle Zeilen teilen –
+  // und das Neuzeichnen nach innerHTML entfällt ganz, weil ein Hintergrundbild nichts verliert.
+  //
+  // Die Bakleinwand ist QUADRATISCH, und das ist kein Detail: drawShipMiniIcon rechnet mit
+  // s = min(Breite,Höhe)/100. Auf einer 30x21-Fläche wäre der Maßstab also 0,21 und das Schiff
+  // stünde 21 px breit am linken Rand einer 30 px breiten Fläche – klein und verrutscht.
+  //
+  // `fremd` heißt: Diese Flotte gehört nicht mir. Dann wird OHNE meinen Flotten-Anstrich und
+  // OHNE meine Werftmarken gebacken – dieselbe Ehrlichkeitsregel wie im Fremdprofil und in der
+  // Wiedergabe: Was ich am fremden Konto nicht sehen kann, darf ein Bild nicht behaupten.
+  const BILD_BACKGROESSE = 96;
+  const gebackeneBilder = {};
+  // Deckel gegen langsames Volllaufen: Jede Lackierung und jede Werftmarken-Stufe erzeugt einen
+  // neuen Schluessel. Wer alle 40 Schiffe durch zehn Marken zieht, haette sonst irgendwann ein paar
+  // hundert alte Bilder im Stilblock stehen, die niemand mehr benutzt. Beim Ueberlauf faengt der
+  // Speicher von vorn an - die noch gebrauchten Bilder werden beim naechsten Aufbau neu gebacken.
+  const BILD_DECKEL = 90;
+  function bildStilAnhaengen(regel){
+    let el = document.getElementById('gebackeneBildStile');
+    if (!el){ el = document.createElement('style'); el.id = 'gebackeneBildStile'; document.head.appendChild(el); }
+    if (el.childNodes.length >= BILD_DECKEL){
+      el.textContent = '';
+      Object.keys(gebackeneBilder).forEach(k => { delete gebackeneBilder[k]; });
+    }
+    el.appendChild(document.createTextNode(regel));
+  }
+  function schiffBildKlasse(key, fremd){
+    // Der Schluessel traegt Anstrich UND Werftmarke mit: Beides aendert das Bild, und ein Bild,
+    // das nach dem Lackwechsel noch die alte Farbe zeigt, waere genau die Art stiller Veraltung,
+    // die ein Zwischenspeicher hier einschleppen kann. Bei der Gegenseite steht keins von beidem
+    // im Bild (fremd) - dort ist der Schluessel deshalb unabhaengig vom eigenen Zustand.
+    const eigenheit = fremd ? 'f'
+      : (((state && state.shipSkin) || 'std') + '-' + (typeof shipMarkOf === 'function' ? shipMarkOf(key) : 1));
+    const merk = 'schiff|' + key + '|' + eigenheit;
+    if (gebackeneBilder[merk] !== undefined) return gebackeneBilder[merk];
+    let klasse = null;
+    try {
+      if (typeof drawShipMiniIcon === 'function' && SHIP_HULL_DEFS[key]){
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = BILD_BACKGROESSE;
+        drawShipMiniIcon(key, cv, fremd ? 1 : undefined, !!fremd);
+        // Die Teile werden EINZELN entschaerft und dann mit '-' verbunden. Saeuberte man den
+        // zusammengesetzten Namen am Stueck, verschluckte die Regex genau den Trenner - aus
+        // 'jaeger-f' (fremd) wuerde 'jaegerf', und man koennte einem Klassennamen nicht mehr
+        // ansehen, welcher Seite er gehoert.
+        klasse = 'gbi-s-' + key.replace(/[^a-z0-9]/gi,'') + '-' + eigenheit.replace(/[^a-z0-9]/gi,'');
+        bildStilAnhaengen('.'+klasse+'{background-image:url('+cv.toDataURL('image/png')+')}');
+      }
+    } catch(e){ klasse = null; }
+    gebackeneBilder[merk] = klasse;
+    return klasse;
+  }
+  function anlageBildKlasse(key){
+    const merk = 'anlage|' + key;
+    if (gebackeneBilder[merk] !== undefined) return gebackeneBilder[merk];
+    let klasse = null;
+    try {
+      if (typeof drawDefenseMiniIcon === 'function' && typeof DEFENSE_CANVAS_KEYS !== 'undefined'
+          && DEFENSE_CANVAS_KEYS.includes(key)){
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = BILD_BACKGROESSE;
+        drawDefenseMiniIcon(key, cv);
+        klasse = 'gbi-a-' + key.replace(/[^a-z0-9]/gi,'');
+        bildStilAnhaengen('.'+klasse+'{background-image:url('+cv.toDataURL('image/png')+')}');
+      }
+    } catch(e){ klasse = null; }
+    gebackeneBilder[merk] = klasse;
+    return klasse;
+  }
+  // Der NAME BLEIBT stehen. Ein Icon allein wäre auf einem Handy raten müssen, und die
+  // Textfassung ist außerdem das, was in title-Attributen und Log-Zeilen weiterläuft
+  // (fleetBreakdownHtml/lostCountsToText bleiben deshalb unverändert bestehen).
+  function shipCountRowHtml(counts, fremd){
+    if (!counts) return '';
+    const parts = Object.entries(counts).filter(([k,v]) => v > 0);
+    if (!parts.length) return 'keine Kampfschiffe erkennbar';
+    return '<span class="schiffreihe">' + parts.map(([k,v]) => {
+      const name = shipDisplayName(k);
+      // Ohne Rumpfform gibt es kein Bild zu backen (NPC-eigene Schlüssel, ältere Berichte).
+      // Dann bleibt es beim Text – ein leerer Kasten wäre schlechter als gar keiner.
+      const kl = schiffBildKlasse(k, fremd);
+      const bild = kl ? `<i class="gbi gbi-schiff ${kl}" aria-hidden="true"></i>` : '';
+      return `<span class="schiffchip" title="${escapeHtml(name)}">${bild}<b>${fmt(v)}</b>&nbsp;${escapeHtml(name)}</span>`;
+    }).join('') + '</span>';
+  }
   // ===== Kampf-Wiedergabe (Icon-Szene + Text-Kampfprotokoll) =====
   // Der tatsächliche Kampfausgang steht bereits fest (im übergebenen Bericht gespeichert) – diese
   // Wiedergabe rekonstruiert ihn nur nachträglich in Runden zur Anschauung. Sie verändert keine
@@ -29045,10 +29165,25 @@
   function defenseBreakdownHtml(defenseBefore, destroyedKey){
 
     if (!defenseBefore || !Object.keys(defenseBefore).length) return 'Keine Verteidigungsanlagen vorhanden.';
-    return Object.entries(defenseBefore).map(([k,v]) => {
+    // Dieselbe Umstellung wie bei den Schiffen (04.08.2026): das ECHTE Gebäudebild statt eines
+    // Häkchens. Die Anlagen haben seit v8.284.0 alle eine eigene gezeichnete Grafik, und seit
+    // v8.394.0 stehen sie damit auch auf dem Planetenboden der Kampf-Wiedergabe. Bliebe der Bericht
+    // beim ti-check, zeigten drei Anzeigestellen derselben Sache zwei verschiedene Bilder.
+    // Häkchen und Kreuz bleiben als Zustandsmarke daneben - sie sagen etwas anderes als das Bild
+    // (standgehalten / beschädigt) und dürfen deshalb nicht dafür weichen.
+    return '<span class="schiffreihe">' + Object.entries(defenseBefore).map(([k,v]) => {
       const hit = k === destroyedKey;
-      return `<span style="color:${hit?'#e24b4a':'#5dcaa5'};"><i class="ti ${hit?'ti-x':'ti-check'}" aria-hidden="true"></i> ${v}x ${buildingDisplayName(k)}${hit?' (beschädigt)':' (standgehalten)'}</span>`;
-    }).join(', ');
+      const farbe = hit ? '#e24b4a' : '#5dcaa5';
+      // Reihenfolge wie in defIconHtml(): erst die animierte Canvas-Grafik, sonst das
+      // handgezeichnete SVG aus ICONS. Der Resonanzschild-Emitter ist die einzige Anlage im
+      // zweiten Fall - hier geht das SVG problemlos, weil es im Dokument steht und seine
+      // Verlaufs-Definitionen findet (in der Kampf-Wiedergabe auf der Leinwand ginge das nicht).
+      const geb = BUILDING_DEFS.find(b2 => b2.key === k);
+      const kl = anlageBildKlasse(k);
+      const bild = kl ? `<i class="gbi gbi-anlage ${kl}" aria-hidden="true"></i>`
+        : (geb ? `<span class="anlagensvg">${iconHtmlFor(k, geb.icon, farbe)}</span>` : '');
+      return `<span class="schiffchip" style="color:${farbe};" title="${escapeHtml(buildingDisplayName(k))}">${bild}<i class="ti ${hit?'ti-x':'ti-check'}" aria-hidden="true"></i><b>${fmt(v)}</b>&nbsp;${escapeHtml(buildingDisplayName(k))}</span>`;
+    }).join('') + '</span>';
   }
   function battleStatsHtml(){
     const stats = state.battleStats || { wins:0, losses:0 };
@@ -29616,7 +29751,14 @@
       const z = reportDebrisTarget(r);
       return z ? r.id+':'+Math.round(z.menge/1000)+':'+(z.quelle ? z.quelle.planet+z.quelle.anzahl : '-') : '';
     }).filter(Boolean).join(',');
-    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig;
+    // Anstrich und Werftmarken gehoeren seit v8.395.0 in die Signatur: Sie stecken im
+    // Schiffsbild der Berichtszeilen (siehe schiffBildKlasse). Ohne sie bliebe die Signatur
+    // nach einem Lackwechsel gleich, die Box wuerde nicht neu geschrieben - und die Berichte
+    // zeigten weiter die alte Lackierung. Genau die Falle, vor der CLAUDE.md beim
+    // Signatur-Cache-Muster warnt: ein neu hinzugekommenes Anzeigefeld, das die Wertliste
+    // stillschweigend veralten laesst.
+    const bildSig = ((state && state.shipSkin) || 'std') + '|' + JSON.stringify((state && state.shipMarks) || {});
+    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig+'|'+bildSig;
     if (reportsSig === lastReportsSig) return;
     lastReportsSig = reportsSig;
     if (!useBackend()){
@@ -29667,7 +29809,7 @@
       } else if (r.type === 'attack-received'){
         title = (won?'Erfolgreich abgewehrt':'Überfallen')+' – von '+escapeHtml(r.attackerName);
         body = 'Angreifer-Angriffspunkte: '+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
-        body += '<br>Angegriffen mit: '+fleetBreakdownHtml(r.fleet);
+        body += '<br>Angegriffen mit: '+shipCountRowHtml(r.fleet, true);
         // Aus Verteidigersicht: Die Phasen sind die des ANGREIFERS (so würfelt der Server sie), die
         // Aufstellung dagegen die eigene. Beides deshalb ausdrücklich beschriftet - eine Zeile
         // "1 von 3 Phasen gewonnen" im Bericht eines erfolgreichen Verteidigers wäre sonst genau
@@ -29700,7 +29842,7 @@
       } else if (r.type === 'raid'){
         title = (won?'Überfall abgewehrt':'Überfallen')+' – '+(r.faction||'NPC-Flotte')+(r.targetPlanet?' ('+planetDisplayName(r.targetPlanet)+')':'');
         body = (r.targetPlanet ? 'Angegriffener Planet: <strong>'+planetDisplayName(r.targetPlanet)+'</strong><br>' : '') + 'Angriffspunkte des Gegners: ~'+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
-        body += '<br>Angegriffen mit: '+fleetBreakdownHtml(r.fleet);
+        body += '<br>Angegriffen mit: '+shipCountRowHtml(r.fleet, true);
         if (r.defenseBefore) body += '<br>Deine Verteidigung: '+defenseBreakdownHtml(r.defenseBefore, null);
         // Werftmarken der stationierten Flotte. Hier zaehlt der VERTEIDIGUNGS-Anteil (Marke wirkt
         // ueber Angriffswert UND Schild), nicht der Angriffsanteil - siehe stampShipMarks().
@@ -29718,14 +29860,14 @@
         }
         if (won){
           if (r.destroyedShips && Object.keys(r.destroyedShips).length){
-            body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstört: '+lostCountsToText(r.destroyedShips)+' (Trümmerfeld hinterlassen)';
+            body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstört: '+shipCountRowHtml(r.destroyedShips, true)+' (Trümmerfeld hinterlassen)';
             body += debrisReportLine(r.debris);
           }
         } else {
           if (r.lossPct) body += '<br>Ressourcenverlust: ~'+r.lossPct+'%'+(r.lostResources && Object.keys(r.lostResources).length ? ' ('+rewardHtml(r.lostResources)+')' : '');
           if (r.sabotagedBuilding) body += '<br>Sabotiert: '+r.sabotagedBuilding+' (-40% Produktion für 15 Min.)';
           if (r.ownLostShips && Object.keys(r.ownLostShips).length){
-            body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Flottenverluste: '+lostCountsToText(r.ownLostShips);
+            body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Flottenverluste: '+shipCountRowHtml(r.ownLostShips);
             body += debrisReportLine(r.ownLossDebris);
           }
         }
@@ -29734,11 +29876,11 @@
         title = (r.result==='destroyed'?'💥 ':'')+'Angriff auf die Allianzbasis von ['+escapeHtml(r.targetTag||'?')+']';
         body = '<strong>'+(r.result==='destroyed' ? 'DIE BASIS WURDE ZERSTÖRT! Schaden: '+fmt(r.damage||0)+'.' : (r.result==='win' ? 'Treffer! '+fmt(r.damage||0)+' Schaden an der Basis (Hülle danach: '+fmt(r.hullAfter||0)+'/'+fmt(r.hullMax||0)+').' : 'Abgewehrt - die Verteidigung ('+fmt(r.defensePower||0)+') hielt stand (Erfolgschance ~'+(r.chancePct||0)+'%).'))+'</strong>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt')+' · Angriffskraft: '+fmt(r.attackPower||0)+' vs. Verteidigung '+fmt(r.defensePower||0);
-        body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        body += '<br>Eingesetzte Flotte: '+shipCountRowHtml(r.fleet||{});
         body += markReportLine(r.marken, r.markAtkShare);
         body += '<br>Kampfpunkte: +'+(r.battlePoints||0);
         if (r.ownLostShips && Object.keys(r.ownLostShips).length){
-          body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
+          body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+shipCountRowHtml(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
           body += debrisReportLine(r.debris);
         }
       } else if (r.type === 'alliance-base-defense'){
@@ -29752,7 +29894,7 @@
         // Server schreibt - dieser hier nennt die STUECKZAHLEN, die erst beim Anwenden feststanden.
         title = '⚔ Flottenverluste durch Spielerangriff';
         body = '<strong>'+escapeHtml(r.attackerName||'Ein Spieler')+' hat deine Verteidigung durchbrochen.</strong>';
-        body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Verlorene Schiffe: '+lostCountsToText(r.ownLostShips||{});
+        body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Verlorene Schiffe: '+shipCountRowHtml(r.ownLostShips||{});
         if (r.lossPct) body += ' (rund '+String(r.lossPct).replace('.',',')+'% der Verteidigungsflotte je Standort)';
         if (r.debrisTotal > 0) body += '<br><i class="ti ti-recycle" aria-hidden="true" style="color:#5dcaa5;"></i> Trümmerfeld an deinen Planeten: '+fmt(r.debrisTotal)+' Einheiten – mit Recyclern abbaubar.';
         body += '<br><span class="bmeta">Nur ein <em>erfolgreicher</em> Angriff kostet Schiffe. Eine abgewehrte Attacke lässt deine Flotte unberührt und bringt zusätzlich Kommandopunkte.</span>';
@@ -29764,13 +29906,13 @@
         } else if (r.result === 'ki-intercept'){
           title = 'KI-Abfangautomatik: Piraten vertrieben – '+planetDisplayName(r.targetPlanet);
           body = 'Die KI-Abfangdrohnen haben die Piraten-Trümmerräuber automatisch vertrieben, bevor sie Beute machen konnten. Einsatzkosten: <strong>'+(r.kikerneUsed||KI_INTERCEPT_COST_KERNE)+' KI-Kerne</strong>. Das Trümmerfeld bleibt erhalten - der automatische Einsatz bringt aber keine Kampfpunkte oder Veteranen-Erfahrung (manuelles Abfangen bleibt lohnender).';
-          body += '<br>Piratenflotte: '+fleetBreakdownHtml(r.fleet);
+          body += '<br>Piratenflotte: '+shipCountRowHtml(r.fleet, true);
         } else {
           title = (won?'Piraten abgefangen':'Abfangversuch gescheitert')+' – '+planetDisplayName(r.targetPlanet);
           body = 'Deine Angriffspunkte: '+r.attackPower+' vs. Begleitschutz-Kampfkraft: '+r.defensePower;
-          body += '<br>Piratenflotte: '+fleetBreakdownHtml(r.fleet);
-          if (won && r.destroyedShips && Object.keys(r.destroyedShips).length) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstört: '+lostCountsToText(r.destroyedShips);
-          if (!won && r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips);
+          body += '<br>Piratenflotte: '+shipCountRowHtml(r.fleet, true);
+          if (won && r.destroyedShips && Object.keys(r.destroyedShips).length) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstört: '+shipCountRowHtml(r.destroyedShips, true);
+          if (!won && r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+shipCountRowHtml(r.ownLostShips);
         }
       } else if (r.type === 'void-rift'){
         if (r.result === 'collapsed'){
@@ -29784,7 +29926,7 @@
           // kein phasen-Feld; battlePhaseReportHtml gibt dann von selbst nichts aus.
           body += battlePhaseReportHtml(r.phasen);
           if (won) body += '<br><i class="ti ti-diamond" aria-hidden="true" style="color:#c3bef5;"></i> Geborgen: <strong>'+(r.shards||0)+'x Leerensplitter</strong>'+(r.loot&&r.loot.antimaterie?' + '+fmt(r.loot.antimaterie)+' Antimaterie':'');
-          if (r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips);
+          if (r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+shipCountRowHtml(r.ownLostShips);
         }
       } else if (r.type === 'debris-cleared'){
         title = 'Trümmerfeld abgebaut: '+planetDisplayName(r.targetPlanet);
@@ -29797,7 +29939,7 @@
       } else if (r.type === 'raid-scout'){
         title = 'Aufklärung: Anfliegende Flotte ('+(r.faction||'Unbekannt')+')';
         body = 'Ziel: <strong>'+planetDisplayName(r.targetPlanet)+'</strong>'+(r.fromPlanet?' · Spähschiff von: '+r.fromPlanet:'')+'<br>Angriffspunkte: '+fmt(r.attackPower)+' vs. deine Verteidigungs-Angriffskraft (Gebäude): '+fmt(r.defenseAttackPower);
-        body += '<br>Herannahende Flotte: '+fleetBreakdownHtml(r.fleet);
+        body += '<br>Herannahende Flotte: '+shipCountRowHtml(r.fleet, true);
         body += '<br><i class="ti ti-planet" aria-hidden="true" style="color:#c3bef5;"></i> Bei erfolgreicher Abwehr geschätztes Trümmerfeld: ~'+fmt(r.estDebris)+' (Gesamtfeld danach: ~'+fmt(r.projectedTotal)+' / Schwelle für Mondbildung: '+fmt(r.moonThreshold)+')';
         body += '<br>Mondbildungs-Chance: '+(r.willCrossThreshold ? r.moonChancePerCheck+'% je Prüfung, sobald die Schwelle erreicht ist' : 'Schwelle wird voraussichtlich noch nicht erreicht – kein Mond zu erwarten');
         body += '<br><span class="bmeta">Das eingesetzte Spähschiff ist bei dieser Aufklärung verloren gegangen.</span>';
@@ -29817,12 +29959,12 @@
         title = 'Expedition – '+info.label;
         const etName = (EXPEDITION_TYPES.find(t=>t.key===r.expType)||{}).name || 'Standard-Expedition';
         body = 'Ausgangspunkt: <strong>'+(r.fromPlanet||'unbekannt')+'</strong> · '+etName+(r.durationSec?' · <i class="ti ti-clock" aria-hidden="true"></i> Dauer: '+fmtDuration(r.durationSec):'');
-        body += '<br>Eskorte: '+fleetBreakdownHtml(r.fleet)+' (Stärke: '+r.escortPower+')';
+        body += '<br>Eskorte: '+shipCountRowHtml(r.fleet)+' (Stärke: '+r.escortPower+')';
         if (r.encountered) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e0a548;"></i> Feindliche Flotte angetroffen'+(r.enemyPower!==undefined ? ' (geschätzte Stärke: '+r.enemyPower+', Kräfteverhältnis: '+(r.encounterChancePct!==undefined?r.encounterChancePct:'?')+'%'+(r.verlustfreiPct!==undefined?' · verlustfrei abgewehrt: ~'+r.verlustfreiPct+'%':'')+')' : '');
         if (r.outcomeFlavor) body += '<br>'+r.outcomeFlavor;
         if (r.findText) body += '<br>'+r.findText;
         else if (r.reward) body += '<br>Beute: '+rewardHtml(r.reward);
-        if (r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips);
+        if (r.ownLostShips && Object.keys(r.ownLostShips).length) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+shipCountRowHtml(r.ownLostShips);
         if (r.debris) body += debrisReportLine(r.debris);
         if (r.systemDiscovered) body += '<br><span style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Neues Sternsystem entdeckt!</span>';
       } else if (r.type === 'system-discovered'){
@@ -29838,10 +29980,10 @@
           : 'Deine Angriffskraft ('+r.attackPower+') reichte gegen die gegnerische Verteidigung ('+r.defensePower+') nicht aus (~'+r.chancePct+'% Erfolgschance).';
         body = '<strong>'+(r.result==='win'?reasonWin:reasonLoss)+'</strong>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt')+' · <i class="ti ti-clock" aria-hidden="true"></i> Flugzeit: '+fmtDuration(r.flightTime||0);
-        body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        body += '<br>Eingesetzte Flotte: '+shipCountRowHtml(r.fleet||{});
         if (r.npcFleet && Object.keys(r.npcFleet).length){
-          body += '<br>Gegnerische Flotte: '+fleetBreakdownHtml(r.npcFleet);
-          if (r.destroyedNpcShips && Object.keys(r.destroyedNpcShips).length) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstörte Gegner-Schiffe: '+lostCountsToText(r.destroyedNpcShips)+' (Rest ist geflohen)';
+          body += '<br>Gegnerische Flotte: '+shipCountRowHtml(r.npcFleet, true);
+          if (r.destroyedNpcShips && Object.keys(r.destroyedNpcShips).length) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstörte Gegner-Schiffe: '+shipCountRowHtml(r.destroyedNpcShips, true)+' (Rest ist geflohen)';
         }
         if (r.weaknessType){
           const weaknessNameMap = { cruiser:'Kreuzer', destroyer:'Zerstörer', jaeger:'Jäger', bomber:'Bomber', schlachtschiff:'Schlachtschiff', superschlachtschiff:'Superschlachtschiff', leerenjaeger:'Leerenjäger' };
@@ -29873,7 +30015,7 @@
         if (r.abgrundMutatoren) body += '<br><i class="ti ti-infinity" aria-hidden="true" style="color:#9fe1cb;"></i> Sektorbedingungen: '+r.abgrundMutatoren;
         body += '<br>Kampfpunkte: +'+(r.battlePoints||0);
         if (r.ownLostShips && Object.keys(r.ownLostShips).length){
-          body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
+          body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+shipCountRowHtml(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
           body += debrisReportLine(r.debris);
         }
       } else if (r.type === 'player-attack'){
@@ -29881,7 +30023,7 @@
         body = '<strong>'+(r.result==='win' ? 'Erfolgreich! Angriffskraft ('+r.attackPower+') war überlegen (vs. Verteidigungspunkte '+r.defensePower+').' : 'Gescheitert. Angriffskraft ('+r.attackPower+') reichte nicht (vs. Verteidigungspunkte '+r.defensePower+').')+'</strong>';
         if (r.warTag) body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
-        body += '<br>Eingesetzte Flotte: '+fleetBreakdownHtml(r.fleet||{});
+        body += '<br>Eingesetzte Flotte: '+shipCountRowHtml(r.fleet||{});
         // Im PvP rechnet der SERVER die Angriffskraft (rawFleetPower mit demselben Markenfaktor wie
         // attackPowerRaw hier). Die Zeile erklaert also die Zahl, die oben steht - sie erfindet sie
         // nicht nachtraeglich.
@@ -29893,7 +30035,7 @@
         body += counterReportLine(r.counterMult);
         body += formationReportLine(r.formation, r.formationMult, 'des Ziels');
         body += battlePhaseReportHtml(r.phasen);
-        if (r.defenderFleet && Object.keys(r.defenderFleet).length) body += '<br>Flotte des Ziels: '+fleetBreakdownHtml(r.defenderFleet);
+        if (r.defenderFleet && Object.keys(r.defenderFleet).length) body += '<br>Flotte des Ziels: '+shipCountRowHtml(r.defenderFleet, true);
         // Bewusst als Prozentsatz und ohne Stueckzahlen: Der Abzug findet erst beim Ziel statt,
         // gedeckelt an dessen echtem Bestand. Eine Stueckzahl hier waere eine Behauptung ueber
         // etwas, das noch gar nicht passiert ist.
@@ -29906,13 +30048,18 @@
           else if (r.cargoLimited) body += '<br><span style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Frachtraum war zu knapp (Kapazität: '+fmt(r.cargoCapacity)+') – ein Teil der Beute ging verloren.</span>';
         }
         if (r.ownLostShips && Object.keys(r.ownLostShips).length){
-          body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+lostCountsToText(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
+          body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+shipCountRowHtml(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
           body += debrisReportLine(r.debris);
         }
       } else if (r.type === 'spy-report'){
         title = 'Aufklärung: '+escapeHtml(r.targetName);
-        const shipLine = Object.keys(SHIP_SCORE_WEIGHTS)
-          .filter(k => (r.ships && r.ships[k]||0) > 0).map(k => (r.ships[k])+'x '+shipDisplayName(k)).join(', ') || 'keine bekannten Schiffe';
+        // Ausgespaehte Flotte: dieselben Schiffsbilder wie ueberall sonst, aber OHNE meine
+        // Werftmarken und ohne meinen Flotten-Anstrich - eine Aufklaerung sagt, WAS dort steht,
+        // nicht wie weit es ausgebaut ist. Gefiltert bleibt es ueber SHIP_SCORE_WEIGHTS, damit
+        // nur Schiffe erscheinen, die der Bericht wirklich fuehrt.
+        const spionierteFlotte = {};
+        Object.keys(SHIP_SCORE_WEIGHTS).forEach(k => { if ((r.ships && r.ships[k]||0) > 0) spionierteFlotte[k] = r.ships[k]; });
+        const shipLine = Object.keys(spionierteFlotte).length ? shipCountRowHtml(spionierteFlotte, true) : 'keine bekannten Schiffe';
         body = '<strong>Flotte aufgedeckt:</strong> '+shipLine;
         // Geschätzte Angriffspunkte der gegnerischen Flotte: Basiswerte je Schiffstyp, ohne die
         // unbekannte gegnerische Forschung. Seit 01.08.2026 über estimateEnemyFleetAtk() statt über

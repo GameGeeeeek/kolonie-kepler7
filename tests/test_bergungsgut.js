@@ -216,10 +216,15 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     // Test, der je nach Systemlast rot wird, kostet genau das Vertrauen, das er aufbauen soll.
     // Die Obergrenze bleibt: Kommt die Gutschrift gar nicht, faellt er weiterhin durch, nur eben
     // aus dem richtigen Grund.
-    for (let i = 0; i < 40; i++){
+    // Obergrenze am 04.08.2026 von 8 auf 20 Sekunden angehoben: Im vollen Pruefdurchlauf ist
+    // dieser Test EINMAL rot geworden (bergung:0) und liess sich danach weder allein noch unter
+    // kuenstlicher Last reproduzieren - auch nicht gegen den unveraenderten Stand. Acht Sekunden
+    // lagen also zu dicht an der Grenze. Die Aussage bleibt dieselbe: Kommt die Gutschrift gar
+    // nicht, faellt der Test weiterhin durch, nur eben aus dem richtigen Grund.
+    for (let i = 0; i < 80; i++){
       const zw = (gespeichert(store).abgrund) || {};
       if ((zw.bergung || 0) > 0 && (zw.splitter || 0) > 0) break;
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(250);
     }
     const a = (gespeichert(store).abgrund)||{};
     check('B2: der Tauchgang schreibt Bergungsgut gut', (a.bergung||0) > 0, { bergung:a.bergung });
