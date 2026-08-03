@@ -5815,8 +5815,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.391.2';
+  const VERSION = '8.392.0';
   const PATCHNOTES = [
+    { version:'8.392.0', date:'03.08.2026', changes:[
+      '<strong>Die Verteidigungsanlagen waren auf dem Handy nicht zu sehen.</strong> Sie wurden gezeichnet – nur außerhalb des Bildes: Die Leinwand wurde vermessen, <em>bevor</em> die Bestandslisten gefüllt waren. Zu dem Zeitpunkt war die Bühne noch 492 Pixel hoch, danach nur 295. Der Planetenboden liegt bei 80 % der Leinwandhöhe, also bei y=394 – unter dem Rand. Jetzt wird gemessen, nachdem die Listen stehen.',
+      '<strong>Jedes Schiff fliegt jetzt mit seinem eigenen Modell.</strong> Bisher zeigte die Wiedergabe sechs Silhouetten für vierzig Schiffstypen – ein Hyperbomber sah aus wie ein Bomber. Die Umrisse stammen ab sofort aus derselben Quelle wie die Bilder in deiner Flottenliste, umgerechnet statt neu gezeichnet: Ein künftiges Schiff bekommt sein Modell damit automatisch, statt still auf den Platzhalter zurückzufallen.',
+      'Gedeckelt auf die sechs häufigsten Typen je Rolle – eine Klasse mit zwei Schiffen von 24.000 trägt bei „1 Rumpf ≈ 16 Schiffe" ohnehin keinen eigenen Rumpf, und ein eigenes Bild dafür wäre Speicher für etwas, das niemand sieht. Gemessen: ohne Deckel 19,7 MB Bildspeicher auf dem Handy, mit Deckel 16,0 MB.',
+      'Beim Schließen der Wiedergabe wird der Bildspeicher jetzt freigegeben. Vorher blieben die gebackenen Rumpfbilder liegen, obwohl niemand mehr hinsah – rund 12 MB, die der übliche Speicherzähler nicht einmal ausweist.'
+    ]},
     { version:'8.391.2', date:'03.08.2026', changes:[
       '<strong>Auf Geräten mit Kerbe fehlte die Knopfreihe unter der Wiedergabe komplett</strong> – „Neustart", „Pause", „Tempo" und „Ans Ende" lagen außerhalb des Bildschirms, das Protokoll war abgeschnitten. Ursache war das Randpolster aus der letzten Version: Es kam <em>zusätzlich</em> zur vollen Höhe, statt in sie hineinzurechnen. Gemessen 757 Pixel Inhalt in einem 664 Pixel hohen Fenster.',
       'Zweiter Teil desselben Fehlers: Die Bühne bestand auf einer Mindesthöhe. Sie ist aber der einzige Teil, der nachgeben kann – also wurde die Fußleiste hinausgedrückt. Jetzt nimmt sie, was übrig bleibt, und Titelzeile wie Knopfreihe stehen immer.',
@@ -26134,12 +26140,104 @@
       }
       return { bild: nc, kante: kante };
     }
+    /* --- Echte Schiffsmodelle (03.08.2026, Spieler-Wunsch Sascha) --------------
+       Bis hierher zeichnete die Wiedergabe SECHS Silhouetten fuer 40 Schiffstypen -
+       der Rumpf sagte nur "leicht/mittel/schwer", nicht "Hyperbomber". Das Spiel
+       fuehrt in SHIP_HULL_DEFS fuer JEDES Schiff genau die Form, die der Spieler in
+       der Flottenliste sieht; es ist dasselbe Bild, nur in einem anderen Raster:
+       dort 0..100 mit der Nase RECHTS, hier zentriert mit der Nase OBEN.
+
+       Diese Funktion rechnet um, statt 40 Formen ein zweites Mal von Hand zu zeichnen -
+       eine zweite Formenliste waere genau die Art Dopplung, die in diesem Projekt
+       zuverlaessig auseinanderlaeuft: ein neues Schiff bekaeme sein Icon und haette
+       in der Wiedergabe weiter den Platzhalter. */
+    var modellSpeicher = {};
+    function modellRumpfId(shipKey, platz){ return 'm|' + shipKey + '|' + platz; }
+    function rumpfAusSpielmodell(shipKey, zielSpanne){
+      var merk = shipKey + '@' + zielSpanne;
+      if (modellSpeicher[merk] !== undefined) return modellSpeicher[merk];
+      var def = (typeof SHIP_HULL_DEFS !== 'undefined') ? SHIP_HULL_DEFS[shipKey] : null;
+      if (!def || !def.pts || def.pts.length < 3){ modellSpeicher[merk] = null; return null; }
+      var pts = def.pts, minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+      for (var i = 0; i < pts.length; i++){
+        if (pts[i][0] < minX) minX = pts[i][0];
+        if (pts[i][0] > maxX) maxX = pts[i][0];
+        if (pts[i][1] < minY) minY = pts[i][1];
+        if (pts[i][1] > maxY) maxY = pts[i][1];
+      }
+      var mass = zielSpanne / Math.max(1, maxX - minX);
+      var mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
+      var punkte = [];
+      for (var j = 0; j < pts.length; j++){
+        // Spiel +x (voraus) wird Wiedergabe -y (oben); Spiel +y wird +x.
+        punkte.push((pts[j][1] - my) * mass, -(pts[j][0] - mx) * mass);
+      }
+      /* Die farbige Kante zeichnet den Umriss nach. So traegt jedes Schiff die
+         Parteifarbe, ohne dass fuer 40 Formen eigene Kantenzuege noetig waeren. */
+      var kanten = [punkte.concat([punkte[0], punkte[1]])];
+      var heck = -(minX - mx) * mass;   // im Spielraster liegt das Heck bei kleinem x
+      var motoren = [[0, heck * 0.9, Math.max(1.0, zielSpanne * 0.10)]];
+      var r = { spanne: zielSpanne, punkte: punkte, kanten: kanten, motoren: motoren };
+      modellSpeicher[merk] = r;
+      return r;
+    }
+
     function atlasSchluessel(rumpfId, seite){ return rumpfId + '|' + seite; }
+    /* Verteilt die Ruempfe einer Bildrolle auf die echten Schiffstypen, die darin
+       stecken - anteilig an ihrer Stueckzahl, nach dem groessten Rest. Bei "1 Rumpf =
+       16 Schiffe" traegt ein Rumpf ohnehin mehrere Schiffe; er bekommt das Modell der
+       Klasse, fuer die er ueberwiegend steht. Klassen ohne Anteil bleiben ohne Rumpf -
+       das ist ehrlicher als ein Modell, das fuer drei Schiffe von zehntausend steht. */
+    function modellVerteilung(platz, d, n){
+      var aus = new Array(n);
+      var kl = d.klassen || [];
+      if (!kl.length || !(d.start > 0)){ for (var z = 0; z < n; z++) aus[z] = null; return aus; }
+      var zug = [];
+      for (var i = 0; i < kl.length; i++){
+        var exakt = n * kl[i].start / d.start;
+        zug.push({ key: kl[i].key, n: Math.floor(exakt), r: exakt - Math.floor(exakt) });
+      }
+      var summe = 0;
+      for (var q = 0; q < zug.length; q++) summe += zug[q].n;
+      var uebrig = n - summe;
+      var nachRest = zug.slice().sort(function(a, b){ return b.r - a.r; });
+      for (var w = 0; w < nachRest.length && uebrig > 0; w++){ nachRest[w].n++; uebrig--; }
+      var pos = 0;
+      for (var t = 0; t < zug.length; t++){
+        var id = modellRumpfId(zug[t].key, platz);
+        for (var c = 0; c < zug[t].n && pos < n; c++) aus[pos++] = RUMPF[id] ? id : null;
+      }
+      while (pos < n) aus[pos++] = null;
+      return aus;
+    }
+
     function atlantenBauen(){
       atlanten = {};
       for (var i = 0; i < ALLE_K.length; i++){
         var k = ALLE_K[i], d = KLASSEN[k];
         atlanten[atlasSchluessel(k, d.seite)] = backeAtlas(k, d.farbe, schiffSkala * d.gr);
+        /* Echte Modelle je Schiffstyp, der in dieser Bildrolle wirklich vorkommt.
+           Bewusst HIER und nicht bei Bedarf: alleFlaechenNeu() leert atlanten und
+           baut sie neu, ruft aber kein aufbauen() - ein nur bei Bedarf angelegter
+           Atlas waere nach jeder Groessenaenderung weg, und die Schiffe, die auf ihn
+           zeigen, verschwaenden aus dem Bild (zeichneFlotten ueberspringt sie dann).
+           GEDECKELT, und zwar gemessen: Ohne Deckel kostete die Wiedergabe auf dem
+           Handy 19,7 MB Bildspeicher statt 5,8 MB. Die Klassen sind nach Stueckzahl
+           sortiert - die haeufigsten bekommen ihr Modell, seltene die Silhouette ihrer
+           Rolle. Bei "1 Rumpf = 16 Schiffe" traegt eine Klasse mit zwei Schiffen von
+           24.000 ohnehin keinen eigenen Rumpf; ein eigener Atlas dafuer waere Speicher
+           fuer etwas, das niemand sieht. Mehr als neueRumpfZahl() Modelle koennte diese
+           Rolle ausserdem gar nicht benutzen. */
+        var deckel = Math.min((d.klassen || []).length, neueRumpfZahl(k), 6);
+        for (var mi = 0; mi < deckel; mi++){
+          var ck = d.klassen[mi].key, id = modellRumpfId(ck, k);
+          if (!RUMPF[id]){
+            var rr = rumpfAusSpielmodell(ck, RUMPF[k].spanne);
+            if (!rr) continue;
+            RUMPF[id] = rr;
+          }
+          atlanten[atlasSchluessel(id, d.seite)] = backeAtlas(id, d.farbe, schiffSkala * d.gr);
+        }
       }
       /* Beutestuecke: dieselbe Silhouette, aber in der Farbe des Angreifers. */
       atlanten[atlasSchluessel('dKreuzer','A')]    = backeAtlas('dKreuzer',    F.an, schiffSkala*KLASSEN.dKreuzer.gr);
@@ -26508,6 +26606,7 @@
       for (var i = 0; i < ALLE_K.length; i++){
         var k = ALLE_K[i], d = KLASSEN[k];
         var n = neueRumpfZahl(k), arr = new Array(n);
+        var modelle = modellVerteilung(k, d, n);
         proSchiff[k] = d.start / n;
         lebend[k] = d.start; totRumpf[k] = 0;
         var bahn0 = bahnWert(d.bahn, 0);
@@ -26522,7 +26621,8 @@
             vu: 0, va: -0.02 - Math.random() * 0.05, w: Math.PI,
             sU: sU, sA: sA, ph: Math.random() * TAU, fr: 0.55 + Math.random() * 0.85,
             tot: false, schaden: 0, kalt: Math.random() * 1.6,
-            unsterb: false, beute: false, gefesselt: null, atlasSeite: d.seite
+            unsterb: false, beute: false, gefesselt: null, atlasSeite: d.seite,
+            modell: modelle[j] || null
           };
         }
         flotte[k] = arr;
@@ -27111,6 +27211,10 @@
         }
         if (tSim >= e.tEnde && !e.fertig){
           e.fertig = true;
+          // Modell fallen lassen: Fuer die Gegenfarbe gibt es keinen Modell-Atlas (das
+          // waere die doppelte Zahl gebackener Bilder fuer einen seltenen Augenblick).
+          // Ohne diese Zeile faende zeichneFlotten keinen Atlas und liesse das Schiff weg.
+          o.modell = null;
           o.beute = true; o.atlasSeite = 'A'; o.seite = 'A'; o.unsterb = true;
           gekapert[o.k] = (gekapert[o.k] || 0) + 1;
           markeNeu(o.u, o.a + 0.035, 'GEKAPERT · ' + e.name, F.an, 3.0);
@@ -27289,7 +27393,8 @@
           if (s.tot) continue;
           var x = pxX(s.u, s.a), y = pxY(s.u, s.a);
           if (x < -60 || x > W + 60 || y < -70 || y > H + 40) continue;
-          var atlas = atlanten[atlasSchluessel(s.k, s.atlasSeite)];
+          // Eigenes Schiffsmodell, wo eines vorliegt - sonst die Silhouette der Bildrolle.
+          var atlas = atlanten[atlasSchluessel(s.modell || s.k, s.atlasSeite)];
           if (!atlas) continue;
           if (bremsK){
             var flack = 0.6 + 0.4 * Math.sin(tSim * 26 + s.ph * 5);
@@ -28091,12 +28196,19 @@
 
     function plaetzeFuellen(seite, zuordnung, plaetze){
       var s = {};
-      for (var i = 0; i < plaetze.length; i++) s[plaetze[i]] = { start:0, verloren:0 };
+      // klassen: WELCHE echten Schiffstypen in dieser Bildrolle stecken - fuer die
+      // Modellwahl je Rumpf. Ohne diese Liste weiss aufbauen() nur "leicht/schwer".
+      for (var i = 0; i < plaetze.length; i++) s[plaetze[i]] = { start:0, verloren:0, klassen:[] };
       var kl = (seite && seite.klassen) || [];
       for (var j = 0; j < kl.length; j++){
         var k = kl[j], p = zuordnung[k.form] || plaetze[0];
         s[p].start += k.start; s[p].verloren += k.verloren;
+        if (k.start > 0) s[p].klassen.push({ key: k.key, start: k.start });
       }
+      // Groesste zuerst: Bei wenigen Ruempfen bekommt die haeufigste Klasse ihr Modell,
+      // nicht eine zufaellige Randklasse.
+      for (var q = 0; q < plaetze.length; q++)
+        s[plaetze[q]].klassen.sort(function(a,b){ return b.start - a.start; });
       return s;
     }
 
@@ -28129,9 +28241,11 @@
       var pA = plaetzeFuellen(DATEN.angreifer,   FORM_PLATZ_A, FLOTTE_A);
       var pD = plaetzeFuellen(DATEN.verteidiger, FORM_PLATZ_D, FLOTTE_D);
       for (var i = 0; i < ALLE_K.length; i++){
-        var k = ALLE_K[i], q = pA[k] || pD[k] || { start:0, verloren:0 };
+        var k = ALLE_K[i], q = pA[k] || pD[k] || { start:0, verloren:0, klassen:[] };
         KLASSEN[k].start    = q.start;
         KLASSEN[k].verloren = Math.min(q.verloren, q.start);
+        // Welche echten Schiffstypen in dieser Bildrolle stecken - fuer die Modellwahl.
+        KLASSEN[k].klassen  = q.klassen || [];
       }
 
       /* Abschnitte aus den echten Phasenurteilen. Fehlen sie im Bericht (PvP und
@@ -28420,17 +28534,26 @@
       offen = true;
       berichtUebernehmen(d);
 
-      /* Reihenfolge ist nicht beliebig: messen() braucht ein sichtbares Canvas,
-         grenzenSetzen() die gemessene Flaeche, atlantenBauen() die Parteifarben aus
-         berichtUebernehmen() - und backeHintergrund() die gesetzten Grenzen. */
+      /* REIHENFOLGE - und der Grund, warum sie sich am 03.08.2026 geaendert hat:
+         hudNeuAufbauen() fuellt die Bestandstafeln. Auf dem Handy stehen die im
+         normalen Fluss, die Buehne schrumpft dadurch auf ihren Rest zusammen. Lief
+         messen() DAVOR, mass es die noch leere Anordnung: Leinwand 492 px hoch in
+         einer Buehne, die danach nur 295 px hatte. Der Planetenboden liegt bei 80 %
+         der Leinwandhoehe, also bei y=394 - ausserhalb des Sichtbaren. Die
+         Bodenabwehr wurde gezeichnet und war trotzdem nicht zu sehen
+         (Spieler-Report Sascha: "Verteidiger Geschütze sieht man nicht").
+         Deshalb ZUERST alles, was die Anordnung veraendert, DANN messen.
+         messen() braucht ein sichtbares Canvas, grenzenSetzen() die gemessene
+         Flaeche, atlantenBauen() die Parteifarben aus berichtUebernehmen(), und
+         backeHintergrund() die gesetzten Grenzen. */
+      hudNeuAufbauen();
+      titelSetzen();
+      schlussbildSetzen();
       messen();
       grenzenSetzen();
       atlantenBauen();
       hgBild = backeHintergrund();
       facettenSetzen();
-      hudNeuAufbauen();
-      titelSetzen();
-      schlussbildSetzen();
 
       elRM.className = reduziert ? 'rmhinweis an' : 'rmhinweis';
       tempoIdx = 1; tempo = TEMPI[tempoIdx];
@@ -28446,6 +28569,14 @@
     function beende(){
       offen = false;
       laeuft = false;
+      /* Bildspeicher freigeben. Die Rumpfatlanten sind gebackene Leinwaende - auf dem
+         Handy zusammen rund 12 MB, die der JS-Heap nicht einmal ausweist. Ohne diese
+         Zeilen blieben sie nach dem Schliessen dauerhaft liegen, obwohl niemand mehr
+         hinsieht; starte() baut sie ohnehin bei jedem Oeffnen neu. */
+      atlanten = {};
+      hgBild = null;
+      glockeBild = null;
+      glockeNeu = true;
     }
 
     return { starte: starte, beende: beende };

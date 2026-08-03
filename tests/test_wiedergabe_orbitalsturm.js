@@ -117,6 +117,53 @@ const abdruck = page => page.evaluate(() => {
                                ['Sieguntertitel des Prototyps', /Orbit von Lumekx gebrochen/]])
     check('0: kein Prototyp-Festwert im Code - ' + was, !muster.test(src));
 
+  // ------------------------------------------------- 0b) Echte Schiffsmodelle
+  // Die Wiedergabe zeichnete sechs Silhouetten fuer 40 Schiffstypen. Seit dem
+  // 03.08.2026 rechnet sie die Formen aus SHIP_HULL_DEFS um - dieselben Umrisse, die
+  // der Spieler in der Flottenliste sieht. Geprueft wird die UMRECHNUNG selbst,
+  // ausgefuehrt: Ob die Nase oben landet und die Laenge stimmt, ist Geometrie und
+  // laesst sich ausrechnen, statt es an einem Bild zu beurteilen.
+  {
+    const a = src.indexOf('function rumpfAusSpielmodell(');
+    const q = a < 0 ? '' : src.slice(a, src.indexOf('\n    }', a) + 6);
+    check('0b: rumpfAusSpielmodell() gefunden', q.length > 400, q.length);
+    check('0b: sie liest die Formen des Spiels, statt eine zweite Liste zu fuehren',
+      /SHIP_HULL_DEFS\[shipKey\]/.test(q));
+    if (q.length > 400){
+      // Ein Modell wie im Spiel: Nase rechts (x gross), Mitte bei y=50.
+      const HULL = { pruef: { pts: [[92,50],[60,40],[20,44],[20,56],[60,60]] } };
+      const f = new Function('SHIP_HULL_DEFS', 'var modellSpeicher={};\n' + q + '\n return rumpfAusSpielmodell;')(HULL);
+      const r = f('pruef', 30);
+      check('0b: ein unbekanntes Schiff liefert null statt eines Platzhalters', f('gibtesnicht', 30) === null);
+      check('0b: die Spannweite wird eingehalten', r && r.spanne === 30);
+      const xs = [], ys = [];
+      for (let i = 0; i < r.punkte.length; i += 2){ xs.push(r.punkte[i]); ys.push(r.punkte[i+1]); }
+      // Die Nase des Spielmodells (x=92) muss in der Wiedergabe ganz OBEN liegen (kleinstes y).
+      check('0b: die Nase zeigt nach oben', Math.abs(ys[0] - Math.min(...ys)) < 0.001, { nase: ys[0], min: Math.min(...ys) });
+      // Laenge = Spannweite, und das Modell ist um seine Mitte zentriert.
+      const laenge = Math.max(...ys) - Math.min(...ys);
+      check('0b: die Laenge entspricht der Spannweite', Math.abs(laenge - 30) < 0.001, laenge);
+      check('0b: es ist um seine Mitte zentriert',
+        Math.abs(Math.max(...ys) + Math.min(...ys)) < 0.001 && Math.abs(Math.max(...xs) + Math.min(...xs)) < 0.001);
+      check('0b: der Umriss wird als farbige Kante nachgezogen',
+        r.kanten.length === 1 && r.kanten[0].length === r.punkte.length + 2);
+      check('0b: das Triebwerk sitzt am Heck (hinter der Mitte)', r.motoren[0][1] > 0, r.motoren[0]);
+    }
+    // Jedes Schiff des Spiels muss ein Modell haben - sonst faellt ausgerechnet das
+    // neueste Schiff still auf die Platzhalter-Silhouette zurueck.
+    // Ausschnitt auf SHIP_DEFS begrenzen: Das erste Muster fing die BUILDING_DEFS mit
+    // (solar, mine, raffinerie ...) und meldete Gebaeude als Schiffe ohne Modell.
+    const hull = src.slice(src.indexOf('const SHIP_HULL_DEFS = {'), src.indexOf('const SHIP_DEFS'));
+    const sd = src.indexOf('const SHIP_DEFS');
+    const schiffBlock = src.slice(sd, src.indexOf('\n  ];', sd));
+    // Nur ZEILENANFAENGE: Schiffe fuehren ihre Freischaltung als requires:[{key:'r...'}],
+    // und ein Muster ohne Anker zog die Forschungsschluessel mit herein.
+    const schiffe = [...schiffBlock.matchAll(/^\s*\{ key:'([a-zA-Z_]+)'/gm)].map(m => m[1]);
+    check('0b: die Schiffsliste wurde gefunden', schiffe.length >= 20, schiffe.length);
+    const ohne = schiffe.filter(k => !new RegExp('\\b' + k + ':\\s*\\{ pts:').test(hull));
+    check('0b: jedes Schiff hat ein Modell (sonst Platzhalter)', ohne.length === 0, ohne.slice(0, 6));
+  }
+
   const browser = await starteBrowser();
   const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{ width:1280, height:900 } }));
   const page = await ctx.newPage(); const errs = [];
