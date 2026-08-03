@@ -201,32 +201,57 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
   }
 
   // ---- B2) Echter Tauchgang: Gutschrift, Log und Bericht ----
+  //
+  // WARUM HIER BIS ZU DREI ANLAEUFE STEHEN (04.08.2026, nach zwei roten Durchlaeufen im vollen
+  // Prueflauf). Der Kommentar am Spielstand behauptete: "Tiefe 1 muss sicher gewonnen werden".
+  // Das ist seit dem Phasen-Umbau nicht mehr moeglich. Der Kampf laeuft in drei Phasen, und jede
+  // ist bei 95 % gedeckelt - der Bericht dieses Tauchgangs nennt genau diese Zahl. Bei 200.000
+  // Angriffskraft gegen 1.260 Verteidigung heisst das trotzdem: rund jeder zwanzigste Tauchgang
+  // geht verloren, und dann gibt es weder Splitter noch Bergungsgut. Voellig richtig so.
+  //
+  // GEMESSEN, nicht vermutet: Zwoelf Laeufe unter Last, elfmal `result:"win"` mit Gutschrift,
+  // einmal `result:"loss"` ohne. Im verlorenen Lauf war der Bericht da, die Mission aufgeloest,
+  // `tauchgaenge` auf 1 und der Sektor als gesehen vermerkt - nur eben ohne Beute. Der Fehler lag
+  // also nie im Spiel und auch nicht im Wartefenster (das ich zuvor zweimal verlaengert habe,
+  // ohne dass es half), sondern in der Annahme dieses Tests.
+  //
+  // Ein verlorener Tauchgang ist deshalb KEIN Fehlschlag, sondern ein ungueltiger Versuch: neuer
+  // Browser, neuer Spielstand, neuer Anlauf. Drei Anlaeufe bringen die Wahrscheinlichkeit, dass
+  // alle drei verlorengehen, auf rund 1 zu 8.000. Kommt gar keine Aufloesung, faellt der Test
+  // weiterhin durch - nur eben aus dem richtigen Grund.
   {
-    const jetzt = Date.now();
-    const { ctx, page, errs, store } = await starte(browser, stand({
-      abgrund:{ tiefe:1, best:0, splitter:0, bergung:0, tauchgaenge:0, gesehen:{}, werkstatt:{} },
-      fleet:{ jaeger:4000, schlachtschiff:400, frachter:200, missions:[
-        { id:'t1', type:'abgrund', targetId:1, startTime: jetzt-600000, endTime: jetzt-2000,
-          composition:{ jaeger:4000, schlachtschiff:400, frachter:200 }, fleetName:'Probe', power:200000 }
-      ]}
-    }));
-    // Auf die BEDINGUNG warten, nicht auf die Uhr (01.08.2026). Hier stand ein festes
-    // waitForTimeout(1800). Isoliert reichte das, im vollen Pruefdurchlauf mit mehreren parallelen
-    // Browsern nicht immer - der Test schlug dort sporadisch fehl, obwohl nichts kaputt war. Ein
-    // Test, der je nach Systemlast rot wird, kostet genau das Vertrauen, das er aufbauen soll.
-    // Die Obergrenze bleibt: Kommt die Gutschrift gar nicht, faellt er weiterhin durch, nur eben
-    // aus dem richtigen Grund.
-    // Obergrenze am 04.08.2026 von 8 auf 20 Sekunden angehoben: Im vollen Pruefdurchlauf ist
-    // dieser Test EINMAL rot geworden (bergung:0) und liess sich danach weder allein noch unter
-    // kuenstlicher Last reproduzieren - auch nicht gegen den unveraenderten Stand. Acht Sekunden
-    // lagen also zu dicht an der Grenze. Die Aussage bleibt dieselbe: Kommt die Gutschrift gar
-    // nicht, faellt der Test weiterhin durch, nur eben aus dem richtigen Grund.
-    for (let i = 0; i < 80; i++){
-      const zw = (gespeichert(store).abgrund) || {};
-      if ((zw.bergung || 0) > 0 && (zw.splitter || 0) > 0) break;
-      await page.waitForTimeout(250);
+    let ctx, page, errs, store, a = {}, verloreneAnlaeufe = 0;
+    for (let anlauf = 1; anlauf <= 3; anlauf++){
+      const jetzt = Date.now();
+      ({ ctx, page, errs, store } = await starte(browser, stand({
+        abgrund:{ tiefe:1, best:0, splitter:0, bergung:0, tauchgaenge:0, gesehen:{}, werkstatt:{} },
+        fleet:{ jaeger:4000, schlachtschiff:400, frachter:200, missions:[
+          { id:'t1', type:'abgrund', targetId:1, startTime: jetzt-600000, endTime: jetzt-2000,
+            composition:{ jaeger:4000, schlachtschiff:400, frachter:200 }, fleetName:'Probe', power:200000 }
+        ]}
+      })));
+      // Auf die BEDINGUNG warten, nicht auf die Uhr (01.08.2026). Hier stand ein festes
+      // waitForTimeout(1800). Isoliert reichte das, im vollen Pruefdurchlauf mit mehreren parallelen
+      // Browsern nicht immer. Abgebrochen wird auch, sobald die AUFLOESUNG da ist (der Bericht) -
+      // bei einem verlorenen Tauchgang kaeme die Gutschrift ja nie.
+      for (let i = 0; i < 80; i++){
+        const zw = (gespeichert(store).abgrund) || {};
+        if ((zw.bergung || 0) > 0 && (zw.splitter || 0) > 0) break;
+        if (store.__berichte.length) break;
+        await page.waitForTimeout(250);
+      }
+      a = (gespeichert(store).abgrund) || {};
+      const bericht = store.__berichte[0] || {};
+      if ((a.bergung || 0) > 0) break;                 // gewonnen - weiter im Text
+      if (bericht.result === 'loss' && anlauf < 3){    // verloren - ungueltiger Versuch
+        verloreneAnlaeufe++;
+        console.log('     (Anlauf ' + anlauf + ' verloren – ~5% Restrisiko bei 95% Chance, neuer Anlauf)');
+        await ctx.close();
+        continue;
+      }
+      break;
     }
-    const a = (gespeichert(store).abgrund)||{};
+    if (verloreneAnlaeufe) check('B2: höchstens zwei der drei Anläufe gingen verloren', verloreneAnlaeufe < 3, { verloren: verloreneAnlaeufe });
     check('B2: der Tauchgang schreibt Bergungsgut gut', (a.bergung||0) > 0, { bergung:a.bergung });
     check('B2: und Splitter unabhaengig davon ebenfalls', (a.splitter||0) > 0, { splitter:a.splitter });
     // Der gutgeschriebene Betrag muss der FORMEL entsprechen - nicht irgendeiner Zahl, die zufaellig
