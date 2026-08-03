@@ -18,6 +18,18 @@
 //      war die eigene Verteidigung rot und der Angreifer gruen. Gemessen an den Bildpunkten
 //      der Leinwand: vorher 2.704 rote / 0 gruene im Verband, nachher 0 / 907.
 //
+//   3. DIE KNOPFREIHE FEHLTE AUF GERAETEN MIT KERBE (zweiter Report, 03.08.2026).
+//      #osWrap traegt height:100% UND - seit der ersten Reparatur - ein Rand-Polster fuer
+//      Kerbe und Home-Leiste. Es fehlte aber box-sizing:border-box AUF #osWrap SELBST:
+//      "#osWrap *" trifft die Nachfahren, nie das Element. Das Polster addierte sich also
+//      zur vollen Hoehe - gemessen 757 px in einem 664 px hohen Fenster -, und
+//      overflow:hidden schnitt unten Protokoll und Knopfreihe ab. Im Emulator faellt das
+//      NICHT auf: env(safe-area-inset-*) meldet dort 0. Dieser Test stellt die Raender
+//      deshalb ausdruecklich nach.
+//      Zweiter Teil desselben Fehlers: min-height:40vh auf der Buehne. Sie ist der einzige
+//      Teil, der nachgeben kann - bestand sie auf ihrer Hoehe, wurde die Fussleiste
+//      hinausgedrueckt.
+//
 // Beide Punkte werden hier GEMESSEN, nicht am Quelltext behauptet: eine Regel, die im CSS
 // steht, aber von einer spaeteren Regel ueberschrieben wird, bestuende jede Textpruefung.
 // Genau das ist beim ersten Reparaturversuch passiert - der Medienblock lag vor den
@@ -146,6 +158,47 @@ async function spielStarten(browser, berichte, wartezeit){
     check('1: die Leinwand wird dabei neu vermessen und zeichnet weiter',
       nach.cvHoehe > 0 && nach.gemalt > 100, { cvHoehe: nach.cvHoehe, gemalt: nach.gemalt });
     check('keine JS-Fehler (Handy-Aufbau)', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ============================== 3) Geraeteraender: nichts wird abgeschnitten
+  // env(safe-area-inset-*) meldet im Emulator 0 - die Raender werden hier ausdruecklich
+  // nachgestellt, sonst prueft dieser Abschnitt genau den Fall NICHT, wegen dem es ihn gibt.
+  for (const geraet of ['iPhone 13', 'iPhone SE']){
+    if (!devices[geraet]) continue;
+    const ctx = await browser.newContext(Object.assign({}, devices[geraet]));
+    const page = await ctx.newPage(); const errs = [];
+    page.on('pageerror', e => errs.push(String(e)));
+    await page.route('**/api/**', backend({ 'kepler7-save-v3': save() }, [UEBERFALL]));
+    await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
+    await page.goto(SPIEL_URL); await page.waitForTimeout(3400);
+    await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }); });
+    await page.evaluate(() => { const x = document.getElementById('headerReportsBtn'); if (x) x.click(); });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => { const x = document.querySelector('[data-watch-battle]'); if (x) x.click(); });
+    await page.waitForTimeout(1800);
+    // Ein iPhone mit Dynamic Island: oben ~59 px, unten ~34 px.
+    await page.addStyleTag({ content: '#osWrap{padding-top:59px !important;padding-bottom:34px !important;}' });
+    await page.waitForTimeout(700);
+
+    const m = await page.evaluate(() => {
+      const w = document.getElementById('osWrap');
+      const k = document.querySelector('#osWrap .knoepfe').getBoundingClientRect();
+      const e = document.getElementById('osBtnEnde').getBoundingClientRect();
+      return { fenster: window.innerHeight, ueberlauf: w.scrollHeight - w.clientHeight,
+               boxSizing: getComputedStyle(w).boxSizing,
+               knoepfeUnten: Math.round(k.bottom), endeUnten: Math.round(e.bottom),
+               buehne: Math.round(document.getElementById('osBuehne').getBoundingClientRect().height) };
+    });
+    check('3: ' + geraet + ' - box-sizing liegt auf #osWrap selbst', m.boxSizing === 'border-box', m.boxSizing);
+    check('3: ' + geraet + ' - nichts wird unten abgeschnitten', m.ueberlauf <= 0, { ueberlauf: m.ueberlauf });
+    // Der eigentliche Befund: Die Knopfreihe war ganz aus dem Bild.
+    check('3: ' + geraet + ' - die Knopfreihe ist vollständig sichtbar',
+      m.knoepfeUnten <= m.fenster && m.endeUnten <= m.fenster,
+      { knoepfeUnten: m.knoepfeUnten, endeUnten: m.endeUnten, fenster: m.fenster });
+    check('3: ' + geraet + ' - und die Bühne bleibt trotzdem brauchbar (>= 25%)',
+      m.buehne >= m.fenster * 0.25, { buehne: m.buehne, anteil: Math.round(m.buehne/m.fenster*100)+'%' });
+    check('keine JS-Fehler (' + geraet + ', Ränder)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
