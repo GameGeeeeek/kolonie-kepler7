@@ -132,8 +132,16 @@ const lies = page => page.evaluate(()=>{
     check('4: es gibt genau eine renderDebrisBox-Definition',
       (src.match(/function renderDebrisBox/g)||[]).length === 1, (src.match(/function renderDebrisBox/g)||[]).length);
     check('4: der angezeigte Name steckt in der Signatur', /const sig = name\+'\|'/.test(fn));
+    // Die Signatur DARF wachsen - sie muss nur die angezeigten Werte fuehren. Seit v8.391.0
+    // haengen der Sammelauftrag und die Zahl der anfliegenden Recycler mit dran, weil beide
+    // im Text der Box stehen; ein auf das Semikolon festgenagelter Vergleich haette genau
+    // diese richtige Erweiterung als Fehler gemeldet.
     check('4: ebenso die Recycler-Zahl und die formatierten Werte',
-      /const sig = name\+'\|'\+recyclerCount\+'\|'\+gesamt\+'\|'\+inhalt;/.test(fn));
+      /const sig = name\+'\|'\+recyclerCount\+'\|'\+gesamt\+'\|'\+inhalt/.test(fn));
+    // Was im Text steht, MUSS in der Signatur stehen - sonst behaelt die Box ihren alten
+    // Satz, bis sich zufaellig eine Zahl aendert.
+    const imText = /Sammelauftrag von/.test(fn), imSig = /auftrag\?\('A'\+auftrag\.heimat\)/.test(fn);
+    check('4: der Auftragszustand steht in Text UND Signatur', imText === imSig, { imText, imSig });
     check('4: bei leerem Feld wird der Zwischenspeicher zurückgesetzt', /lastDebrisSig = null;\n      return;/.test(fn));
   }
 

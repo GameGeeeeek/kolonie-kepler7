@@ -64,8 +64,13 @@ check('der NPC-Bericht ruft die Phasen weiterhin ohne Zusatz auf',
 // Der Code ist die Wahrheit: activeFleetMissionCount zaehlt die Verlegungen ueber ein Set von
 // groupIds mit und addiert dessen Groesse.
 const zaehler = schnitt('function activeFleetMissionCount(){', '\n  }');
+// Geprueft wird die AUSSAGE (Verlegungen gehen ueber ein groupId-Set in die Summe ein), nicht
+// der exakte Rueckgabeausdruck: Seit v8.391.0 addiert dieselbe Zeile zusaetzlich die
+// Recycler-Sammelauftraege. Die erste Fassung nagelte 'return n + relocateGroupIds.size;'
+// fest und ging bei dieser voellig richtigen Erweiterung kaputt - derselbe Fehlertyp wie
+// beim festgenagelten abstractIcon in test_pvp_berichtsdaten.
 check('der Code zaehlt Verlegungen wirklich mit',
-  zaehler.includes('relocateGroupIds') && /return n \+ relocateGroupIds\.size;/.test(zaehler));
+  zaehler.includes('relocateGroupIds') && /return n \+ relocateGroupIds\.size(\s*\+[^;]*)?;/.test(zaehler));
 
 const alteBehauptung = (src.match(/Flottenverlegungen zwischen eigenen Planeten zählen nicht mit/g) || []);
 check('kein Text behauptet mehr, Verlegungen zaehlten nicht mit', alteBehauptung.length === 0, alteBehauptung.length);
