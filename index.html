@@ -684,6 +684,15 @@
     @media (max-width:879px){ #osWrap #osToggleTafeln{display:inline-block;} }
     #osWrap.tafeln-aus .kopf{display:none;}
     #osWrap.tafeln-aus #osToggleTafeln{color:var(--os-grau);}
+    /* Die Fussleiste klappt nur ihren DATENTEIL weg - Abschnitte, Kraftschiene, Protokoll.
+       Die Knopfreihe bleibt: Ohne sie verlaere man beim Zuklappen die Steuerung der
+       Wiedergabe und kaeme nur noch ueber „Schliessen" wieder heraus. */
+    #osWrap.leiste-aus .phasen,
+    #osWrap.leiste-aus .kraft,
+    #osWrap.leiste-aus .protokoll{display:none;}
+    #osWrap.leiste-aus #osToggleLeiste{color:var(--os-grau);}
+    #osWrap #osToggleLeiste{display:none;}
+    @media (max-width:879px){ #osWrap #osToggleLeiste{display:inline-block;} }
     @media (prefers-reduced-motion:reduce){
       #osWrap .banner, #osWrap .sieg, #osWrap .bilanz, #osWrap .balken i, #osWrap .kraft-schiene i, #osWrap .phase .fort{transition:none}
     }
@@ -2767,6 +2776,7 @@
       <div class="os-titelzeile">
         <b id="battleModalTitle">Kampf-Wiedergabe</b>
         <button id="osToggleTafeln" aria-label="Bestandslisten ein-/ausblenden" title="Bestandslisten ein-/ausblenden" style="padding:5px 9px; font-size:10px; flex:none; margin-left:auto;">Listen</button>
+        <button id="osToggleLeiste" aria-label="Abschnitte, Kräfteverhältnis und Protokoll ein-/ausblenden" title="Abschnitte, Kräfteverhältnis und Protokoll ein-/ausblenden – die Steuerknöpfe bleiben" style="padding:5px 9px; font-size:10px; flex:none;">Daten</button>
         <button aria-label="Schließen" id="battleModalCloseBtn" style="padding:5px 9px; font-size:11px; flex:none;"><i class="ti ti-x" aria-hidden="true"></i></button>
       </div>
       <div class="os-flaeche">
@@ -5815,8 +5825,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.392.0';
+  const VERSION = '8.393.0';
   const PATCHNOTES = [
+    { version:'8.393.0', date:'03.08.2026', changes:[
+      '<strong>Die Fußleiste der Kampf-Wiedergabe lässt sich auf dem Handy zuklappen.</strong> Der neue Knopf „Daten" oben blendet Abschnitte, Kräfteverhältnis und Protokoll aus – zusammen mit „Listen" bekommt die Bühne damit 85 % des Bildschirms statt 30 %.',
+      '<strong>Die Steuerknöpfe bleiben dabei immer stehen.</strong> Neustart, Pause, Tempo und „Ans Ende" verschwinden in keinem Zustand – wer beim Zuklappen die Steuerung verlöre, käme nur noch über „Schließen" wieder heraus. Genau das prüft der Prüflauf in allen drei Zuständen.',
+      'Die Leinwand wird nach jedem Umschalten neu vermessen. Ohne das bliebe sie in ihrer alten Größe: Das Bild wäre verzerrt statt größer, und der Planetenboden mit der Bodenabwehr läge wieder außerhalb.',
+      'Nebenbei ein Prüflauf-Test entschärft, der zufällig rot werden konnte: Er maß, ob die seitlichen Klappen einen Reiter verdecken – und erwischte sie unter Last gelegentlich mitten im Einfahren. Er misst jetzt zweimal und meldet nur, was in beiden Messungen verdeckt war. Eine dauerhafte Verdeckung findet er unverändert; das ist eigens gegengeprüft.'
+    ]},
     { version:'8.392.0', date:'03.08.2026', changes:[
       '<strong>Die Verteidigungsanlagen waren auf dem Handy nicht zu sehen.</strong> Sie wurden gezeichnet – nur außerhalb des Bildes: Die Leinwand wurde vermessen, <em>bevor</em> die Bestandslisten gefüllt waren. Zu dem Zeitpunkt war die Bühne noch 492 Pixel hoch, danach nur 295. Der Planetenboden liegt bei 80 % der Leinwandhöhe, also bei y=394 – unter dem Rand. Jetzt wird gemessen, nachdem die Listen stehen.',
       '<strong>Jedes Schiff fliegt jetzt mit seinem eigenen Modell.</strong> Bisher zeigte die Wiedergabe sechs Silhouetten für vierzig Schiffstypen – ein Hyperbomber sah aus wie ein Bomber. Die Umrisse stammen ab sofort aus derselben Quelle wie die Bilder in deiner Flottenliste, umgerechnet statt neu gezeichnet: Ein künftiges Schiff bekommt sein Modell damit automatisch, statt still auf den Platzhalter zurückzufallen.',
@@ -28152,6 +28168,13 @@
        bliebe sie in der alten Groesse, und das Bild waere verzerrt statt groesser. */
     document.getElementById('osToggleTafeln').addEventListener('click', function(){
       document.getElementById('osWrap').classList.toggle('tafeln-aus');
+      alleFlaechenNeu();
+    });
+    /* „Daten": klappt Abschnitte, Kraftschiene und Protokoll weg. Wie bei „Listen" muss
+       die Leinwand danach neu vermessen werden - sonst bliebe sie in der alten Groesse
+       und das Bild waere verzerrt statt groesser. */
+    document.getElementById('osToggleLeiste').addEventListener('click', function(){
+      document.getElementById('osWrap').classList.toggle('leiste-aus');
       alleFlaechenNeu();
     });
     document.addEventListener('keydown', function(ev){

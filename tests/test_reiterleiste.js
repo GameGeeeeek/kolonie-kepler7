@@ -152,7 +152,14 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
   // ---- 2 + 3: Das Raster auf beiden Handy-Größen ------------------------------------------------
   for (const g of GROESSEN){
     const { ctx, page } = await oeffne(g.w, g.h);
-    const m = await page.evaluate(() => {
+    // ZWEIMAL messen, mit Pause dazwischen, und die Verdeckung nur melden, wenn BEIDE
+    // Messungen sie sehen. Grund (03.08.2026): Die seitlichen Klappen fahren beim Aufbau
+    // ein; unter Last - im vollen Prueflauf laufen mehrere Browser gleichzeitig - erwischte
+    // eine einzelne Messung sie gelegentlich mitten in der Bewegung und meldete drei
+    // verdeckte Reiter, die es eine Zehntelsekunde spaeter nicht mehr gab. Allein lief der
+    // Test jedes Mal gruen. Ein Test, der am Zufall scheitert statt an der Sache, verliert
+    // sein Vertrauen genau dann, wenn man es braucht.
+    const messen = () => page.evaluate(() => {
       const bar = document.querySelector('.tabs'), bb = bar.getBoundingClientRect();
       const btns = [...bar.querySelectorAll('.tab-btn')];
       const drin = el => { const r = el.getBoundingClientRect();
@@ -174,6 +181,11 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
         klappen: klappen.length
       };
     });
+    const m1 = await messen();
+    await page.waitForTimeout(400);
+    const m = await messen();
+    // Nur was in BEIDEN Messungen verdeckt war, gilt als verdeckt.
+    m.verdeckt = m.verdeckt.filter(t => m1.verdeckt.includes(t));
     const p = g.name + ': ';
     check(p + 'die Leiste ist ein Raster, keine Wischleiste', m.anzeige === 'grid' && !m.wischbar, m);
     check(p + 'ALLE zwölf Reiter sind gleichzeitig sichtbar', m.ganz === m.alle && m.alle === 12, { ganz: m.ganz, alle: m.alle });

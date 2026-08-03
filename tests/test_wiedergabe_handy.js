@@ -161,6 +161,53 @@ async function spielStarten(browser, berichte, wartezeit){
     await ctx.close();
   }
 
+  // ============================== 5) Beide Schalter, und die Steuerung bleibt
+  // „Daten" klappt Abschnitte, Kraftschiene und Protokoll weg - die Knopfreihe NICHT.
+  // Das ist der Punkt, an dem dieser Schalter kaputtgehen koennte: Wer beim Zuklappen
+  // die Steuerung verliert, kommt nur noch ueber „Schliessen" wieder heraus.
+  {
+    const { page, errs, ctx } = await spielStarten(browser, [UEBERFALL]);
+    const mess = () => page.evaluate(() => {
+      const bu = document.getElementById('osBuehne').getBoundingClientRect();
+      const kn = document.querySelector('#osWrap .knoepfe').getBoundingClientRect();
+      const w = document.getElementById('osWrap');
+      const cv = document.getElementById('osCv');
+      let hell = 0;
+      const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      for (let i = 0; i < d.length; i += 4000) if (d[i] > 12 || d[i+1] > 12 || d[i+2] > 24) hell++;
+      return { buehne: Math.round(bu.height), fenster: window.innerHeight,
+               knoepfe: kn.height > 10 && kn.bottom <= window.innerHeight + 1,
+               ueberlauf: w.scrollHeight - w.clientHeight,
+               cvPasst: Math.abs((parseFloat(cv.style.height) || 0) - bu.height) <= 2,
+               gemalt: hell };
+    });
+    const a = await mess();
+    await page.evaluate(() => document.getElementById('osToggleLeiste').click());
+    await page.waitForTimeout(900);
+    const b2 = await mess();
+    await page.evaluate(() => document.getElementById('osToggleTafeln').click());
+    await page.waitForTimeout(900);
+    const c = await mess();
+
+    check('5: „Daten" vergrößert die Bühne spürbar', b2.buehne > a.buehne + 40,
+      { vorher: a.buehne, nachher: b2.buehne });
+    check('5: beide Schalter zusammen räumen sie fast frei (>= 60%)',
+      c.buehne >= c.fenster * 0.60, { hoehe: c.buehne, anteil: Math.round(c.buehne/c.fenster*100)+'%' });
+    // Der eigentliche Risikopunkt.
+    check('5: die Steuerknöpfe bleiben in JEDEM Zustand sichtbar',
+      a.knoepfe && b2.knoepfe && c.knoepfe, { alles: a.knoepfe, ohneDaten: b2.knoepfe, ohneBeides: c.knoepfe });
+    check('5: nichts läuft dabei über den Rand hinaus',
+      a.ueberlauf <= 0 && b2.ueberlauf <= 0 && c.ueberlauf <= 0,
+      { a: a.ueberlauf, b: b2.ueberlauf, c: c.ueberlauf });
+    // Ohne Neumessung bliebe die Leinwand in der alten Groesse - das Bild waere verzerrt
+    // statt groesser, und der Boden landete wieder ausserhalb.
+    check('5: die Leinwand wird nach jedem Umschalten neu vermessen',
+      b2.cvPasst && c.cvPasst, { ohneDaten: b2.cvPasst, ohneBeides: c.cvPasst });
+    check('5: und es wird weiter gezeichnet', c.gemalt > 100, c.gemalt);
+    check('keine JS-Fehler (Schalter)', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
   // ============================== 4) Die Bodenabwehr ist wirklich im Bild
   // BEFUND (dritter Report, 03.08.2026): "Verteidiger Geschütze sieht man nicht."
   // starte() rief messen() BEVOR hudNeuAufbauen() die Bestandstafeln fuellte. Auf dem
