@@ -459,6 +459,45 @@ async function spielStarten(browser, berichte, wartezeit){
     await ctx.close();
   }
 
+  // ============================== 7) Auch die NICHT AUFGEKLÄRTE Gegenseite fliegt als Schiff
+  // BEFUND (fünfter Report, 04.08.2026, Bildschirmfoto IMG_3338): Bei einem Leerenriss und im
+  // PvP führt der Bericht die Zusammensetzung des Gegners gar nicht mit - er nennt nur eine
+  // Abwehrkraft. Diese Rümpfe fielen deshalb auf die abstrakte Rollensilhouette zurück, und die
+  // besteht aus einer dunklen Fläche mit farbiger Kante: Auf dem dunklen Hintergrund blieb davon
+  // eine dünne rote Kontur übrig. Der Spieler sah "komische rote Schiffe" - es sah nach einem
+  // Fehler aus, war aber der Platzhalter.
+  //
+  // Jetzt steht dort ein echtes Modell DER GRÖSSENKLASSE, die die Bildrolle ohnehin schon
+  // festlegte. Die Aussage ändert sich dadurch nicht: Die Bestandstafel sagt weiterhin
+  // "Zusammensetzung nicht aufgeklärt", das Protokoll ebenfalls. Der Test prüft beides -
+  // das Modell UND dass die Ehrlichkeitsangabe stehen geblieben ist.
+  {
+    const LEERENRISS = { id:'v1', ts:Date.now(), time:Date.now(), type:'void-rift', result:'win',
+      targetPlanet:'home', attackPower:41000, defensePower:12809, chancePct:64,
+      fleet: FLOTTE, ownLostShips:{ jaeger:150, destroyers:22, schlachtschiff:67 } };
+    const { page, errs, ctx } = await spielStarten(browser, [LEERENRISS], 2600);
+    const m = await page.evaluate(() => {
+      let z = null; try { z = JSON.parse(document.getElementById('osWrap').dataset.zustand); } catch(e){}
+      const tafeln = (document.getElementById('osKopf')||{}).textContent || '';
+      return { z, tafeln: tafeln.replace(/\s+/g,' ') };
+    });
+    check('7: die Wiedergabe läuft trotz unbekannter Gegenseite', !!m.z && m.z.ruempfe > 0,
+      { ruempfe: m.z && m.z.ruempfe });
+    // DER Punkt: KEIN Rumpf bleibt beim Platzhalter.
+    check('7: jeder Rumpf trägt ein echtes Schiffsmodell – auch der Gegner',
+      m.z && m.z.ruempfe > 0 && m.z.ruempfeMitModell === m.z.ruempfe,
+      { mitModell: m.z && m.z.ruempfeMitModell, ruempfe: m.z && m.z.ruempfe });
+    check('7: und die Modelle stammen aus dem Spiel, nicht aus einer zweiten Formenliste',
+      m.z && m.z.spielatlanten > 0 && m.z.spielatlanten === m.z.modellAtlanten,
+      { ausDemSpiel: m.z && m.z.spielatlanten, modelle: m.z && m.z.modellAtlanten });
+    // Das Bild darf die Ehrlichkeitsangabe nicht überschreiben: Ein Modell heißt "ein Schiff
+    // dieser Klasse", nicht "genau dieser Typ" - und die Tafel muss das weiterhin sagen.
+    check('7: die Bestandstafel sagt weiterhin, dass der Gegner nicht aufgeklärt ist',
+      /nicht aufgeklärt/i.test(m.tafeln), m.tafeln.slice(0, 160));
+    check('keine JS-Fehler (unbekannte Gegenseite)', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
   await browser.close();
   console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
   process.exit(fail ? 1 : 0);

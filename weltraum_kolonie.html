@@ -5869,8 +5869,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.396.0';
+  const VERSION = '8.397.0';
   const PATCHNOTES = [
+    { version:'8.397.0', date:'04.08.2026', changes:[
+      '<strong>Auch der nicht aufgeklärte Gegner fliegt jetzt als echtes Schiff.</strong> Bei einem Leerenriss und im Spieler-gegen-Spieler-Kampf führt der Bericht die Zusammensetzung des Gegners gar nicht mit – er nennt nur eine Abwehrkraft. Diese Rümpfe fielen deshalb auf einen Platzhalter zurück, und der bestand aus einer dunklen Fläche mit farbiger Kante: Auf dem dunklen Hintergrund blieb davon eine dünne rote Kontur übrig, die nach einem Fehler aussah.',
+      'Jetzt steht dort ein echtes Modell <em>der Größenklasse</em>, die die Bildrolle ohnehin schon festlegte – ein leichtes Schiff sieht aus wie ein leichtes Schiff. Behauptet wird damit nichts Neues: In der Bestandsliste steht unverändert „Zusammensetzung nicht aufgeklärt", und das Protokoll sagt es ebenfalls. Ein rotes Schiff heißt „ein gegnerisches Schiff dieser Klasse", nicht „genau dieser Typ".',
+      '<strong>Die Parteifarbe deckt die Schiffe nicht mehr zu.</strong> Die Einfärbung stand auf 85 % – auf dem Telefon verschwanden dadurch die Aufbauten im Farbton und aus den Schiffen wurden grüne und rote Blätter. Sie steht jetzt auf 62 %, die kräftige Umrisskante trägt den größeren Teil der Unterscheidung. Wer zu wem gehört, bleibt auf einen Blick klar, das Schiff ist aber wieder als Schiff zu erkennen.',
+      '<strong>Die Kolonie auf dem Planeten sieht aus wie eine Kolonie.</strong> Wo der Bericht keine Bodenabwehr führt, wird bewusst keine erfunden – übrig bleibt die Stadt, und die bestand aus drei Pixel breiten schwarzen Balken mit einem Punkt obenauf. Jetzt stehen dort vier Bauformen: Wohntürme mit Fensterband, Stufenbauten, Kuppelhallen und Antennenmasten. Führt der Bericht die Abwehr mit, stehen davor unverändert die echten Anlagengrafiken aus deinem Verteidigung-Tab.'
+    ]},
     { version:'8.396.0', date:'04.08.2026', changes:[
       '<strong>Recycler sammeln jetzt auch offline.</strong> Bisher liefen sie ausschließlich bei geöffnetem Spiel: Wer abends einen Sammelauftrag losschickte, fand am Morgen einen belegten Flottenslot und ein unverändertes Trümmerfeld vor – während Produktion, Bauaufträge und Forschung längst offline weiterliefen.',
       'Auch Recycler, die <strong>während</strong> deiner Abwesenheit erst ankommen, arbeiten ab ihrer Ankunft – nicht erst ab deiner Rückkehr. Genau dieser Fall war der ärgerliche: über Nacht losgeschickt, morgens nichts passiert.',
@@ -26511,12 +26517,17 @@
         g.beginPath(); pfadZug(g, r.punkte, s); g.closePath();
         g.save(); g.clip();
         if (mischmodusKann('color')){
+          /* 0,62 statt 0,85 (04.08.2026): Bei voller Einfaerbung verschwanden auf dem
+             Telefon die Aufbauten im Farbton - aus den Schiffen wurden gruene und rote
+             Blaetter (Spieler-Report Sascha). Die Seite muss erkennbar bleiben, das
+             Schiff aber auch; die kraeftige Kante darunter traegt den groesseren Teil
+             der Unterscheidung. */
           g.globalCompositeOperation = 'color';
-          g.globalAlpha = 0.85; g.fillStyle = farbe; g.fill();
+          g.globalAlpha = 0.62; g.fillStyle = farbe; g.fill();
           g.globalCompositeOperation = 'source-over';
-          g.globalAlpha = 0.14; g.fill();
+          g.globalAlpha = 0.10; g.fill();
         } else {
-          g.globalAlpha = 0.34; g.fillStyle = farbe; g.fill();
+          g.globalAlpha = 0.30; g.fillStyle = farbe; g.fill();
         }
         g.globalAlpha = 1;
         g.restore();
@@ -26534,10 +26545,38 @@
        16 Schiffe" traegt ein Rumpf ohnehin mehrere Schiffe; er bekommt das Modell der
        Klasse, fuer die er ueberwiegend steht. Klassen ohne Anteil bleiben ohne Rumpf -
        das ist ehrlicher als ein Modell, das fuer drei Schiffe von zehntausend steht. */
+    /* Stellvertreter je Bildrolle, wenn der Bericht die Zusammensetzung der Gegenseite
+       gar nicht fuehrt (PvP, Leerenriss, Abgrund - dort steht nur eine Abwehrkraft).
+       Bis zum 04.08.2026 flogen diese Ruempfe als abstrakte Silhouette: auf dunklem
+       Grund blieb davon eine duenne rote Kontur uebrig, und die sah nach Fehler aus
+       (Spieler-Report Sascha: "diese komischen roten Schiffe").
+
+       Die Aussage bleibt dieselbe wie vorher. Die Bildrolle sagte schon immer, ob es
+       sich um leichte, mittlere oder schwere Schiffe handelt - nur gezeichnet wurde
+       ein Platzhalter statt eines Schiffs. Jetzt steht dort ein echtes Modell DIESER
+       Groessenklasse. Behauptet wird damit nichts Neues: In der Bestandstafel steht
+       unveraendert "Zusammensetzung nicht aufgeklärt", und das Protokoll sagt es
+       ebenfalls. Ein rotes Schiff heisst "ein gegnerisches Schiff dieser Klasse",
+       nicht "genau dieser Typ". */
+    var PLATZ_STELLVERTRETER = {
+      aJaeger:'jaeger', aKreuzer:'cruisers', aZerstoerer:'destroyers',
+      aBomber:'bomber', aEnter:'enterschiff',
+      dJaeger:'jaeger', dKreuzer:'cruisers', dZerstoerer:'destroyers',
+      dSchlacht:'schlachtschiff'
+    };
+    function stellvertreterFuer(platz){
+      var k = PLATZ_STELLVERTRETER[platz];
+      return (k && typeof SHIP_HULL_DEFS !== 'undefined' && SHIP_HULL_DEFS[k]) ? k : null;
+    }
     function modellVerteilung(platz, d, n){
       var aus = new Array(n);
       var kl = d.klassen || [];
-      if (!kl.length || !(d.start > 0)){ for (var z = 0; z < n; z++) aus[z] = null; return aus; }
+      if (!kl.length || !(d.start > 0)){
+        var sv = stellvertreterFuer(platz);
+        var svId = sv ? modellRumpfId(sv, platz) : null;
+        for (var z = 0; z < n; z++) aus[z] = (svId && RUMPF[svId]) ? svId : null;
+        return aus;
+      }
       var zug = [];
       for (var i = 0; i < kl.length; i++){
         var exakt = n * kl[i].start / d.start;
@@ -26580,9 +26619,13 @@
            24.000 ohnehin keinen eigenen Rumpf; ein eigener Atlas dafuer waere Speicher
            fuer etwas, das niemand sieht. Mehr als neueRumpfZahl() Modelle koennte diese
            Rolle ausserdem gar nicht benutzen. */
-        var deckel = Math.min((d.klassen || []).length, neueRumpfZahl(k), 6);
-        for (var mi = 0; mi < deckel; mi++){
-          var ck = d.klassen[mi].key, id = modellRumpfId(ck, k);
+        /* Ohne bekannte Zusammensetzung wird der Stellvertreter der Bildrolle gebacken -
+           sonst bliebe fuer diese Seite nur die abstrakte Silhouette uebrig. */
+        var modellKeys = (d.klassen || []).length
+          ? d.klassen.slice(0, Math.min(d.klassen.length, neueRumpfZahl(k), 6)).map(function(x){ return x.key; })
+          : (stellvertreterFuer(k) ? [stellvertreterFuer(k)] : []);
+        for (var mi = 0; mi < modellKeys.length; mi++){
+          var ck = modellKeys[mi], id = modellRumpfId(ck, k);
           if (!RUMPF[id]){
             var rr = rumpfAusSpielmodell(ck, RUMPF[k].spanne);
             if (!rr) continue;
@@ -26748,16 +26791,62 @@
           g.fillRect(lx2, ly2, 1.1 + zuf(), 1.1);
           if (l < 3) funkelPunkte.push({ x: lx2, y: ly2, ph: zuf()*TAU });
         }
-        /* Tuerme */
-        for (var tw = 0; tw < 3; tw++){
-          var tu = cu + (zuf()-0.5)*breite*1.6;
+        /* --- Tuerme der Kolonie -----------------------------------------------
+           Sie standen bis zum 04.08.2026 als drei Pixel breite schwarze Balken mit
+           einem gelben Punkt obenauf da. Auf dem Telefon las Sascha sie als
+           Verteidigungstuerme und fragte, warum die nicht wie im Spiel aussehen -
+           sie SIND keine: Wo der Bericht die Bodenabwehr fuehrt, stehen dort die
+           echten Anlagengrafiken (v8.394.0); wo er sie nicht fuehrt, wird bewusst
+           keine erfunden, und uebrig bleibt die Stadt. Dann soll sie aber auch wie
+           eine Stadt aussehen und nicht wie ein Zaunpfahl.
+
+           Vier Bauformen, aus dem Zufall dieser Welt gezogen (saatZ ist fest, das
+           Bild bleibt also von Aufruf zu Aufruf dasselbe): Wohnturm mit Fensterband,
+           Stufenbau, Kuppelhalle und Antennenmast. */
+        var nT = klein ? 4 : 6;
+        for (var tw = 0; tw < nT; tw++){
+          var tu = cu + (zuf()-0.5)*breite*1.8;
           var tp = px(tu, 0);
-          var th2 = (5 + zuf()*11) * bodenSkala;
+          var art = (zuf()*4) | 0;
+          var bs = bodenSkala;
+          var th2 = (5 + zuf()*13) * bs;
+          var tb = (1.6 + zuf()*2.2) * bs;
           g.save(); g.translate(tp.x, tp.y); g.rotate(lot(tu));
-          g.fillStyle = '#070a15'; g.fillRect(-1.5, -th2, 3, th2 + 2);
-          g.strokeStyle = 'rgba(146,150,172,.3)'; g.lineWidth = 0.7;
-          g.strokeRect(-1.5, -th2, 3, th2 + 2);
-          g.fillStyle = rgba(F.warn, .85); g.fillRect(-0.9, -th2 - 1.6, 1.8, 1.6);
+          g.fillStyle = '#080b17';
+          g.strokeStyle = 'rgba(146,150,172,.28)'; g.lineWidth = 0.7;
+          if (art === 1){
+            /* Stufenbau: zwei abgesetzte Bloecke */
+            g.beginPath();
+            g.moveTo(-tb, 2); g.lineTo(-tb, -th2*0.6); g.lineTo(-tb*0.55, -th2*0.6);
+            g.lineTo(-tb*0.55, -th2); g.lineTo(tb*0.55, -th2); g.lineTo(tb*0.55, -th2*0.6);
+            g.lineTo(tb, -th2*0.6); g.lineTo(tb, 2); g.closePath();
+            g.fill(); g.stroke();
+          } else if (art === 2){
+            /* Kuppelhalle: flacher Sockel mit Halbrund */
+            g.fillRect(-tb*1.3, -th2*0.45, tb*2.6, th2*0.45 + 2);
+            g.strokeRect(-tb*1.3, -th2*0.45, tb*2.6, th2*0.45 + 2);
+            g.beginPath(); g.arc(0, -th2*0.45, tb*1.3, Math.PI, TAU); g.closePath();
+            g.fill(); g.stroke();
+          } else if (art === 3){
+            /* Antennenmast: schmaler Schaft mit Querstreben */
+            g.fillRect(-tb*0.35, -th2, tb*0.7, th2 + 2);
+            g.strokeRect(-tb*0.35, -th2, tb*0.7, th2 + 2);
+            g.strokeStyle = 'rgba(146,150,172,.34)';
+            for (var qs = 1; qs <= 2; qs++){
+              var qy = -th2 * (0.35 + qs*0.22);
+              g.beginPath(); g.moveTo(-tb*1.1, qy); g.lineTo(tb*1.1, qy); g.stroke();
+            }
+          } else {
+            /* Wohnturm mit Fensterband */
+            g.fillRect(-tb, -th2, tb*2, th2 + 2);
+            g.strokeRect(-tb, -th2, tb*2, th2 + 2);
+            g.fillStyle = rgba(F.warn, .30);
+            for (var fz = 1; fz*3.2*bs < th2 - 1.5; fz++)
+              g.fillRect(-tb*0.6, -fz*3.2*bs, tb*1.2, 0.9*bs);
+          }
+          /* Positionslicht auf der Spitze - dasselbe Warnrot wie die Stadtlichter. */
+          g.fillStyle = rgba(F.warn, .85);
+          g.fillRect(-0.7*bs, -th2 - 1.6*bs, 1.4*bs, 1.6*bs);
           g.restore();
         }
       }
@@ -29152,15 +29241,20 @@
       try { document.getElementById('osWrap').dataset.zustand = JSON.stringify(zustand()); } catch(e){}
     }
     function zustand(){
-      var ruempfe = 0, modellAtlanten = 0, spielbilder = 0, gebBilder = 0, k;
-      for (k in flotte) if (Object.prototype.hasOwnProperty.call(flotte, k)) ruempfe += flotte[k].length;
+      var ruempfe = 0, mitModell = 0, modellAtlanten = 0, spielbilder = 0, gebBilder = 0, k;
+      for (k in flotte) if (Object.prototype.hasOwnProperty.call(flotte, k)){
+        ruempfe += flotte[k].length;
+        /* Wieviele Ruempfe zeigen ein echtes Schiffsmodell und nicht die abstrakte
+           Rollensilhouette? Genau daran haengt der Fall "Gegner nicht aufgeklaert". */
+        for (var mq = 0; mq < flotte[k].length; mq++) if (flotte[k][mq].modell) mitModell++;
+      }
       for (k in atlanten) if (k.charAt(0) === 'm' && k.charAt(1) === '|') modellAtlanten++;
       for (k in spielSprites) if (spielSprites[k]) spielbilder++;
       for (k in anlagenBilder) if (anlagenBilder[k]) gebBilder++;
       var schiffe = 0;
       for (var i = 0; i < ALLE_K.length; i++) schiffe += KLASSEN[ALLE_K[i]].start || 0;
       return { massstab: MASSSTAB, massA: SEITEN_MASS.A, massD: SEITEN_MASS.D,
-               anlagenMassstab: anlagenMassstab, ruempfe: ruempfe,
+               anlagenMassstab: anlagenMassstab, ruempfe: ruempfe, ruempfeMitModell: mitModell,
                schiffe: schiffe, anlagen: anlagen.length, modellAtlanten: modellAtlanten,
                spielbilder: spielbilder, spielatlanten: spielAtlasZahl, gebaeudebilder: gebBilder,
                /* Nicht "wie viele Bilder liegen im Speicher", sondern "wie viele
