@@ -679,6 +679,12 @@
          das Apple und Google beide nennen; der Knopf war vorher rund 26 px hoch und
          30 px breit - selbst ohne die Statusleisten-Ueberdeckung war das die kleinste
          Flaeche im ganzen Fenster, und sie war die wichtigste. */
+      /* Fuenf Steuerknoepfe seit v8.396.0 („Video"). Auf einem 375 px breiten Bildschirm
+         brach die Reihe damit um, und die zweite Zeile ging der Buehne verloren - gemessen
+         128 px statt 169 (23 % statt 30 % des Fensters). Enger gesetzt passen sie wieder in
+         EINE Zeile. Gilt nur fuer die Steuerreihe: Der Schliessen-Knopf darunter bleibt bei
+         seinen 44x40 px, denn der muss mit dem Daumen zu treffen sein. */
+      #osWrap .knoepfe button{min-width:0; padding:8px 5px; letter-spacing:.05em; font-size:9px;}
       #osWrap .os-titelzeile #battleModalCloseBtn{min-width:44px; min-height:40px; font-size:15px;}
       #osWrap .os-titelzeile > button{min-height:34px;}
     }
@@ -2831,6 +2837,7 @@
           <button id="osBtnPause">Pause</button>
           <button id="osBtnTempo">Tempo 1&times;</button>
           <button id="osBtnEnde">Ans Ende</button>
+          <button id="osBtnVideo" title="Das Gefecht als Hochkant-Video aufnehmen (9:16) – zum Teilen auf TikTok, Reels oder in Stories">Video</button>
         </div>
       </footer>
     </div>
@@ -5862,8 +5869,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.395.0';
+  const VERSION = '8.396.0';
   const PATCHNOTES = [
+    { version:'8.396.0', date:'04.08.2026', changes:[
+      '<strong>Recycler sammeln jetzt auch offline.</strong> Bisher liefen sie ausschließlich bei geöffnetem Spiel: Wer abends einen Sammelauftrag losschickte, fand am Morgen einen belegten Flottenslot und ein unverändertes Trümmerfeld vor – während Produktion, Bauaufträge und Forschung längst offline weiterliefen.',
+      'Auch Recycler, die <strong>während</strong> deiner Abwesenheit erst ankommen, arbeiten ab ihrer Ankunft – nicht erst ab deiner Rückkehr. Genau dieser Fall war der ärgerliche: über Nacht losgeschickt, morgens nichts passiert.',
+      'Wird ein Trümmerfeld dabei leer, kehren die Recycler von selbst zurück und geben den Flottenslot frei, ganz wie im laufenden Spiel. Was bei vollem Lager nicht hineinpasst, bleibt im Feld liegen und geht nicht verloren. Der Ertrag steht im <strong>„Willkommen zurück"</strong>-Fenster – sonst stünden dort gestiegene Rohstoffe ohne Erklärung.',
+      '<strong>Die Kampf-Wiedergabe lässt sich als Video aufnehmen.</strong> Der neue Knopf „Video" nimmt einen vollständigen Durchlauf als Hochkant-Clip im <strong>9:16-Format (1080×1920)</strong> auf – das Format von TikTok, Reels und Stories. Er läuft mit doppeltem Tempo, ein Gefecht wird dadurch rund 25 Sekunden lang.',
+      'Um das Gefecht herum stehen die beiden Namen, der Ort, das Kräfteverhältnis, der Ausgang und – sobald der Kampf durch ist – die Verluste beider Seiten. Führt ein Bericht die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt eine Null zu behaupten. Am Ende öffnet sich der Teilen-Dialog deines Geräts; auf dem Handy geht es von dort direkt in TikTok, Instagram oder WhatsApp.',
+      'Der Video-Knopf erscheint nur, wenn der Browser Aufnahmen unterstützt – ein Knopf, der nichts tut, ist schlechter als kein Knopf. Bei der Einstellung „Bewegung reduzieren" wäre der Clip ein Standbild; dann sagt er das, statt aufzunehmen.',
+      'Die <strong>Teilen-Karte</strong> am Kampfbericht kommt ebenfalls im 9:16-Format statt wie bisher in 4:5 – hochkant wird sie auf TikTok und in Stories nicht mehr beschnitten. Nebenbei behoben: Der Teilen-Weg nannte jede Datei „kolonie-kepler7.png", auch wenn es gar kein Bild war.'
+    ]},
     { version:'8.395.0', date:'04.08.2026', changes:[
       '<strong>Der Kampfbericht zeigt jetzt die echten Schiffe.</strong> Wo bisher „179x Zerstörer, 3.324x Großer Frachter" als reine Textzeile stand, steht jetzt vor jeder Zahl das Modell, das du auch in deiner Flottenliste und in der Werft siehst. Namen und Stückzahlen bleiben daneben stehen – ein Bild allein wäre auf dem Handy Raten.',
       'Dasselbe für die <strong>Verteidigungsanlagen</strong>: statt eines Häkchens vor dem Namen jetzt die Grafik aus deinem Verteidigung-Tab. Häkchen und Kreuz bleiben zusätzlich stehen – sie sagen etwas anderes als das Bild („standgehalten" bzw. „beschädigt").',
@@ -28584,6 +28600,34 @@
       hudAktualisieren(); phasenAktualisieren(); bannerSchritt();
       if (reduziert) zeichne();
     });
+    /* „Video": nimmt einen ganzen Durchlauf hochkant auf und uebergibt ihn dem Teilen-Dialog
+       des Geraets - auf dem Telefon fuehrt der direkt nach TikTok, Instagram oder WhatsApp,
+       am Rechner faellt es auf einen Download zurueck (derselbe Weg wie bei den Teilen-Karten,
+       shareCardBlobFlow). Der Knopf verschwindet, wo der Browser keine Aufnahme kann - ein
+       Knopf, der nichts tut, ist schlechter als kein Knopf. */
+    var btnVideo = document.getElementById('osBtnVideo');
+    if (btnVideo){
+      if (!videoMoeglich()) btnVideo.style.display = 'none';
+      else btnVideo.addEventListener('click', function(){
+        if (reduziert){
+          toast('Bei „Bewegung reduzieren" zeigt die Wiedergabe nur das Schlussbild – ein Video daraus wäre ein Standbild.');
+          return;
+        }
+        btnVideo.disabled = true;
+        var urText = btnVideo.textContent;
+        videoAufnehmen(function(p){ btnVideo.textContent = 'Aufnahme ' + Math.round(p*100) + '%'; })
+          .then(function(blob){
+            btnVideo.disabled = false; btnVideo.textContent = urText;
+            if (!blob){ toast('Die Aufnahme ist leer geblieben.'); return; }
+            var endung = (blob.type.indexOf('mp4') >= 0) ? 'mp4' : 'webm';
+            shareCardBlobFlow(Promise.resolve(blob), 'kepler7-gefecht.' + endung);
+          })
+          .catch(function(){
+            btnVideo.disabled = false; btnVideo.textContent = urText;
+            toast('Dieses Gerät kann die Wiedergabe nicht aufnehmen.');
+          });
+      });
+    }
     /* „Listen": raeumt auf dem Handy die Bestandstafeln weg, damit die Buehne den ganzen
        Bildschirm bekommt. Die Leinwand wird in Bildpunkten bemessen - ohne alleFlaechenNeu()
        bliebe sie in der alten Groesse, und das Bild waere verzerrt statt groesser. */
@@ -29131,7 +29175,209 @@
                W: W, H: H, yBoden: Math.round(yBoden) };
     }
 
-    return { starte: starte, beende: beende, zustand: zustand };
+    /* =====================================================================
+       9  HOCHKANT-VIDEO (04.08.2026, Spieler-Wunsch Sascha: "Kampfbericht
+          exportierbar machen damit man sie auf TikTok posten kann")
+       =====================================================================
+       Ein Standbild reicht dafuer nicht: Was diese Wiedergabe sehenswert macht,
+       ist die Bewegung. Aufgenommen wird deshalb ein echtes Video - und zwar
+       NICHT die Leinwand des Spiels, sondern eine eigene 1080x1920-Flaeche.
+       Zwei Gruende:
+
+         (a) 9:16. TikTok, Reels und Stories sind hochkant. Die Buehne des Spiels
+             ist je nach Geraet 1,3:1 bis 1,6:1 - direkt aufgenommen bekaeme man
+             einen Balken oben und unten und ein winziges Bild dazwischen.
+         (b) Der Rand traegt, was ein Video ohne Oberflaeche sonst verliert: wer
+             gegen wen, das Kraefteverhaeltnis, der Ausgang - und den Namen des
+             Spiels, denn genau dafuer wird es ja geteilt.
+
+       Das Gefecht selbst wird BILDGENAU uebernommen (drawImage der laufenden
+       Leinwand), nicht nachgebaut. Eine zweite Zeichenroutine fuer dasselbe Bild
+       waere die Art Dopplung, die in diesem Projekt zuverlaessig auseinanderlaeuft. */
+    var VID_B = 1080, VID_H = 1920;
+    var videoLaeuft = false;
+
+    /* Erst fragen, dann anbieten: Ohne diese beiden Bausteine gibt es kein Video,
+       und ein Knopf, der nichts tut, ist schlechter als kein Knopf. */
+    function videoMoeglich(){
+      return typeof MediaRecorder !== 'undefined'
+        && typeof HTMLCanvasElement !== 'undefined'
+        && !!HTMLCanvasElement.prototype.captureStream;
+    }
+    /* Der erste Behaelter, den der Browser wirklich kann. Safari/iOS liefert mp4,
+       Chromium und Firefox webm - die Reihenfolge stellt mp4 nach vorn, weil es
+       ueberall hochladbar ist. Ein fest verdrahtetes 'video/webm' waere auf dem
+       iPhone ein stiller Fehlschlag. */
+    function videoFormat(){
+      var kandidaten = [
+        { typ:'video/mp4;codecs=avc1.42E01E', endung:'mp4' },
+        { typ:'video/mp4',                    endung:'mp4' },
+        { typ:'video/webm;codecs=vp9',        endung:'webm' },
+        { typ:'video/webm;codecs=vp8',        endung:'webm' },
+        { typ:'video/webm',                   endung:'webm' }
+      ];
+      for (var i = 0; i < kandidaten.length; i++){
+        try { if (MediaRecorder.isTypeSupported(kandidaten[i].typ)) return kandidaten[i]; } catch(e){}
+      }
+      return null;
+    }
+
+    function vidText(g, txt, x, y, groesse, farbe, mittig, fett){
+      g.font = (fett ? '600 ' : '400 ') + groesse + 'px ui-monospace, SFMono-Regular, Menlo, monospace';
+      g.textAlign = mittig ? 'center' : 'left';
+      g.fillStyle = farbe;
+      g.fillText(txt, x, y);
+    }
+
+    /* Ein Bild des Videos. Absichtlich ohne jeden Zugriff auf den Zeichenzustand
+       der Buehne - es wird nur gelesen und gestempelt. */
+    function videoBild(g){
+      g.fillStyle = '#080b16';
+      g.fillRect(0, 0, VID_B, VID_H);
+
+      // --- Kopf
+      vidText(g, 'KOLONIE KEPLER-7', VID_B/2, 96, 34, rgba(F.flieder, .95), true, true);
+      var titel = kurzName(DATEN.angreifer) + '  vs.  ' + kurzName(DATEN.verteidiger);
+      vidText(g, titel.slice(0, 34), VID_B/2, 168, 40, '#e8e9f0', true, true);
+      if (DATEN.ortName && DATEN.ortName !== 'Unbekannt')
+        vidText(g, DATEN.ortName, VID_B/2, 216, 28, rgba(F.grau, .8), true, false);
+
+      // --- Das Gefecht, bildgenau und vollstaendig (kein Beschnitt: was am Rand
+      //     fliegt, gehoert zur Schlacht). Die Bildhoehe richtet sich nach der Buehne
+      //     des Geraets und BESTIMMT die Anordnung darunter - eine feste Fensterhoehe
+      //     liess je nach Seitenverhaeltnis 300 px schwarzes Nichts ueber und unter dem
+      //     Gefecht stehen, waehrend unten die Kraftschiene weit abgesetzt schwebte.
+      var raumY = 250, raumH = 1310;
+      var mass = Math.min(VID_B / cv.width, raumH / cv.height);
+      var bw = cv.width * mass, bh = cv.height * mass;
+      /* OBEN buendig, nicht mittig: Bei einer breiten Buehne (Rechner, quer gehaltenes
+         Telefon) bleibt sonst ein schwarzer Streifen zwischen Kopf und Gefecht stehen und
+         ein zweiter darunter. So sammelt sich der freie Platz an EINER Stelle - unter dem
+         Ausgang, wo er als Luft wirkt statt als Loch. */
+      var bx = (VID_B - bw) / 2, by = raumY;
+      g.fillStyle = '#05070f';
+      g.fillRect(0, by, VID_B, bh);
+      try { g.drawImage(cv, bx, by, bw, bh); } catch(e){}
+
+      // --- Kraefteverhaeltnis: dieselbe Zahl wie in der Schiene der Oberflaeche.
+      var y = Math.min(by + bh + 96, VID_H - 300);
+      var summeA = 0, summeD = 0;
+      for (var i = 0; i < ALLE_K.length; i++){
+        var k = ALLE_K[i], d = KLASSEN[k], lb = Math.max(0, lebend[k] || 0);
+        if (d.seite === 'A') summeA += lb * d.gewicht; else summeD += lb * d.gewicht;
+      }
+      var ges = summeA + summeD || 1, pa = Math.round(100 * summeA / ges);
+      var sx = 90, sw = VID_B - 180;
+      vidText(g, kurzName(DATEN.angreifer).slice(0,16) + '  ' + pa + '%', sx, y - 24, 30, F.an, false, true);
+      g.textAlign = 'right';
+      g.fillStyle = F.ver;
+      g.fillText((100 - pa) + '%  ' + kurzName(DATEN.verteidiger).slice(0,16), sx + sw, y - 24);
+      g.textAlign = 'left';
+      g.fillStyle = F.an; g.fillRect(sx, y, sw * pa / 100, 16);
+      g.fillStyle = F.ver; g.fillRect(sx + sw * pa / 100, y, sw * (100 - pa) / 100, 16);
+
+      // --- Abschnitt und Ausgang
+      var ab = ABSCHNITTE[Math.max(0, abschnittIdx)] || ABSCHNITTE[0];
+      if (ab) vidText(g, (ab.name || '').toUpperCase(), VID_B/2, y + 84, 32, rgba(F.grau, .9), true, false);
+      if (tSim >= T_SIEG){
+        /* F_AN0/F_VER0 sind die UNGETAUSCHTEN Grundfarben. F.an/F.ver werden je nach
+           Blickrichtung getauscht (gruen ist immer meine Seite) - fuer "Sieg" und
+           "Niederlage" waere das falsch herum, sobald ich der Verteidiger bin. */
+        var gut = DATEN.ergebnis === 'sieg';
+        vidText(g, gut ? 'SIEG' : 'NIEDERLAGE', VID_B/2, y + 168, 76, gut ? F_AN0 : F_VER0, true, true);
+      }
+
+      /* Der freie Platz darunter (auf einem breiten Bildschirm ueber 700 px, weil die Buehne
+         dort flach ist) bekommt die Bilanz - was das Video ohne die Oberflaeche sonst
+         verschweigt. Nur was der Bericht WIRKLICH fuehrt: Wo verlusteBekannt false ist,
+         steht kein Wert, statt eine Null zu behaupten, die niemand gemessen hat. */
+      var rest = (VID_H - 110) - (y + (tSim >= T_SIEG ? 210 : 120));
+      if (rest > 200){
+        var by2 = y + (tSim >= T_SIEG ? 250 : 160);
+        [[DATEN.angreifer, F.an], [DATEN.verteidiger, F.ver]].forEach(function(paar, si){
+          var seite = paar[0];
+          if (!seite || !seite.bekannt) return;
+          var sx2 = si === 0 ? 90 : VID_B/2 + 20;
+          vidText(g, kurzName(seite).slice(0,14).toUpperCase(), sx2, by2, 28, paar[1], false, true);
+          if (!seite.verlusteBekannt){
+            vidText(g, 'Verluste nicht im Bericht', sx2, by2 + 46, 24, rgba(F.grau, .7), false, false);
+            return;
+          }
+          var zeilen2 = (seite.klassen || []).filter(function(k){ return k.verloren > 0; }).slice(0, 5);
+          if (!zeilen2.length){ vidText(g, 'ohne Verluste', sx2, by2 + 46, 24, rgba(F.grau, .7), false, false); return; }
+          for (var q = 0; q < zeilen2.length; q++){
+            var kk2 = zeilen2[q];
+            vidText(g, '-' + zahl(kk2.verloren) + '  ' + String(kk2.name).slice(0, 16),
+              sx2, by2 + 46 + q*42, 26, rgba(F.text, .85), false, false);
+          }
+        });
+      }
+      vidText(g, 'gamegeeeeek.de', VID_B/2, VID_H - 54, 30, rgba(F.grau, .75), true, false);
+    }
+
+    /* Nimmt einen vollstaendigen Durchlauf auf und uebergibt ihn an den
+       Teilen-Dialog des Spiels (auf dem Telefon direkt weiter nach TikTok &Co.,
+       sonst als Download). Laeuft mit doppeltem Tempo: 50 Sekunden Gefecht sind
+       fuer eine Kurzvideo-Plattform zu lang, 25 passen. */
+    function videoAufnehmen(fortschritt){
+      if (videoLaeuft) return Promise.resolve(null);
+      if (!videoMoeglich()) return Promise.reject(new Error('nicht unterstuetzt'));
+      var fmt = videoFormat();
+      if (!fmt) return Promise.reject(new Error('kein Format'));
+
+      var rc = document.createElement('canvas');
+      rc.width = VID_B; rc.height = VID_H;
+      var g = rc.getContext('2d');
+      g.textBaseline = 'alphabetic';
+
+      var strom = rc.captureStream(30);
+      var teile = [];
+      var rec;
+      try { rec = new MediaRecorder(strom, { mimeType: fmt.typ, videoBitsPerSecond: 6000000 }); }
+      catch(e){ return Promise.reject(e); }
+      rec.ondataavailable = function(ev){ if (ev.data && ev.data.size) teile.push(ev.data); };
+
+      videoLaeuft = true;
+      var vorherTempo = tempo, vorherIdx = tempoIdx;
+      tempoIdx = 2; tempo = TEMPI[2];
+      btnTempo.textContent = 'Tempo 2×';
+      neustart();
+      laeuft = true;
+      btnPause.textContent = 'Pause';
+
+      return new Promise(function(fertig, schief){
+        var stift = 0;
+        function aufraeumen(){
+          if (stift) cancelAnimationFrame(stift);
+          videoLaeuft = false;
+          tempoIdx = vorherIdx; tempo = vorherTempo;
+          btnTempo.textContent = 'Tempo ' + (tempo === 0.5 ? '0,5' : tempo) + '×';
+        }
+        rec.onstop = function(){
+          aufraeumen();
+          /* rec.mimeType ist die AUSKUNFT des Browsers, nicht meine Anfrage: Er darf einen
+             anderen Codec waehlen, als er zugesagt hat (Chromium ohne H.264-Encoder legt
+             VP9 in denselben MP4-Behaelter). Der Dateiname soll dem folgen, was wirklich
+             drinsteckt, nicht dem, was ich angefragt habe. */
+          fertig(teile.length ? new Blob(teile, { type: rec.mimeType || fmt.typ }) : null);
+        };
+        rec.onerror = function(e){ aufraeumen(); schief(e); };
+        function bild(){
+          /* Schliesst jemand die Wiedergabe mitten in der Aufnahme, endet sie hier -
+             sonst liefe die Bildrolle in ein leeres Canvas und die Aufnahme nie ab. */
+          if (!offen){ try { rec.stop(); } catch(e){} return; }
+          videoBild(g);
+          if (fortschritt) fortschritt(Math.min(1, tSim / T_SCHLUSS));
+          if (tSim >= T_SCHLUSS){ try { rec.stop(); } catch(e){} return; }
+          stift = requestAnimationFrame(bild);
+        }
+        rec.start();
+        stift = requestAnimationFrame(bild);
+      });
+    }
+
+    return { starte: starte, beende: beende, zustand: zustand,
+             videoAufnehmen: videoAufnehmen, videoMoeglich: videoMoeglich };
 
   })();
 
@@ -29308,7 +29554,8 @@
       { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl.' },
       { title:'Schiffe, Anlagen und Maßstab', body:'Jedes Schiff fliegt mit <strong>seinem eigenen Modell</strong> – demselben Bild wie in deiner Flottenliste – und in der Farbe seiner Partei (grün ist immer deine Seite). Auf dem Planeten stehen die <strong>echten Verteidigungsanlagen</strong> mit der Grafik aus dem Verteidigung-Tab. Weil eine Flotte aus Zehntausenden Schiffen nicht Stück für Stück zu zeichnen ist, steht ein Modell für mehrere Schiffe; wie viele, steht unten links im Bild. Bei sehr ungleichen Flotten bekommt jede Seite trotzdem ein sichtbares Geschwader, und dann nennt das Bild beide Maßstäbe. <strong>Die Zahlen in den Bestandslisten sind davon unberührt und immer die echten.</strong>' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während du im Spiel aktiv bist – eigener Angriff oder eingehender Überfall –, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
-      { title:'Steuerung', body:'Unten: <strong>Neustart</strong>, <strong>Pause/Weiter</strong>, <strong>Tempo</strong> (0,5× / 1× / 2×) und <strong>Ans Ende</strong> (springt sofort zur Schlussbilanz). Oben in der Titelzeile: <strong>Listen</strong> blendet die Bestandslisten aus, <strong>Daten</strong> die Abschnitte, das Kräfteverhältnis und das Protokoll – auf dem Handy bekommt die Bühne damit fast den ganzen Bildschirm. Hinaus kommst du über das <strong>×</strong> oben rechts oder mit <strong>Escape</strong>. Ist am Gerät „Bewegung reduzieren" eingestellt, läuft keine Animation: Dann steht sofort der Endzustand im Bild.' }
+      { title:'Steuerung', body:'Unten: <strong>Neustart</strong>, <strong>Pause/Weiter</strong>, <strong>Tempo</strong> (0,5× / 1× / 2×) und <strong>Ans Ende</strong> (springt sofort zur Schlussbilanz). Oben in der Titelzeile: <strong>Listen</strong> blendet die Bestandslisten aus, <strong>Daten</strong> die Abschnitte, das Kräfteverhältnis und das Protokoll – auf dem Handy bekommt die Bühne damit fast den ganzen Bildschirm. Hinaus kommst du über das <strong>×</strong> oben rechts oder mit <strong>Escape</strong>. Ist am Gerät „Bewegung reduzieren" eingestellt, läuft keine Animation: Dann steht sofort der Endzustand im Bild.' },
+      { title:'Als Video teilen', body:'Der Knopf <strong>Video</strong> nimmt einen vollständigen Durchlauf als <strong>Hochkant-Clip (1080×1920, 9:16)</strong> auf – das Format von TikTok, Reels und Stories. Er läuft mit doppeltem Tempo, ein Gefecht wird dadurch rund <strong>25 Sekunden</strong> lang. Um das Bild herum stehen die beiden Namen, das Kräfteverhältnis, der Ausgang und – sobald das Gefecht durch ist – die Verluste beider Seiten. Am Ende öffnet sich der Teilen-Dialog deines Geräts; auf dem Handy geht es von dort direkt in TikTok, Instagram oder WhatsApp, am Rechner wird die Datei heruntergeladen. Der Knopf erscheint nur, wenn dein Browser Aufnahmen unterstützt, und bei „Bewegung reduzieren" wäre der Clip ein Standbild – dann sagt er das statt aufzunehmen. Wer lieber ein <strong>Bild</strong> teilt: der Knopf „Teilen" am Kampfbericht liefert dieselbe Schlacht als Standbild, ebenfalls im 9:16-Format.' }
     ]},
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
@@ -35253,13 +35500,43 @@
     const queues = simulateOfflineQueues(capped);
     let missionsPending = 0;
     for (const { fleet } of allFleetsWithPlanet()) missionsPending += fleet.missions.filter(m => Date.now() >= m.endTime).length;
+    // VOR checkMissions: danach sind die angekommenen Verlegungen samt ihrer Ankunftszeit weg.
+    const sammelzeiten = offlineSammelzeiten(capped);
     checkMissions(false);
+    // Trümmerabbau nachholen (Spieler-Wunsch Sascha, 04.08.2026). Bis hierher liefen Recycler
+    // ausschliesslich im Haupt-Tick: Wer abends einen Sammelauftrag losschickte, fand am Morgen
+    // einen belegten Flottenslot und ein unveraendertes Feld vor.
+    //
+    // Die Reihenfolge ist Absicht: ERST die Produktion gutschreiben und die Warteschlangen
+    // abarbeiten, DANN sammeln. Die Bauauftraege verbrauchen Rohstoffe und machen damit Lagerplatz
+    // frei, den der Abbau sonst nicht haette. Was bei vollem Lager nicht hineinpasst, bleibt wie
+    // im laufenden Spiel im Feld liegen und geht nicht verloren.
+    //
+    // NACH checkMissions: Recycler, die waehrend der Abwesenheit angekommen sind, stehen erst
+    // danach wirklich am Planeten - ihre Ankunftszeit steckt in sammelzeiten.
+    const truemmerVorher = {};
+    for (const rk of Object.keys(state.resources)) truemmerVorher[rk] = state.resources[rk] || 0;
+    const truemmerAbgebaut = collectDebrisWithRecyclers(sammelzeiten);
+    const truemmerErtrag = {};
+    let truemmerSumme = 0;
+    if (truemmerAbgebaut){
+      for (const rk of Object.keys(state.resources)){
+        const plus = Math.round((state.resources[rk]||0) - (truemmerVorher[rk]||0));
+        if (plus > 0){ truemmerErtrag[rk] = plus; truemmerSumme += plus; }
+      }
+    }
+    // Und der Rueckflug: Ein Feld, das waehrend der Abwesenheit leergeraeumt wurde, schickt seine
+    // Recycler jetzt nach Hause und gibt den Flottenslot frei - sonst haette das Nachholen zwar
+    // gesammelt, der Auftrag haenge aber weiter fest.
+    processRecyclerAuftraege();
     if (returningBoostGranted) log('Willkommen zurück! Du warst über 24 Stunden weg – die nächsten 24 Stunden gibt es +50% Produktion auf alle Ressourcen.', 'ti-sparkles');
     if (capped > 5){
       log('Willkommen zurück! Fortschritt für '+Math.floor(capped/60)+' Min. gutgeschrieben.', 'ti-clock');
       lastOfflineSummary = { minutes: Math.floor(capped/60), gained, missionsPending,
                              bauten: queues.bauten, forschungen: queues.forschungen,
-                             markenUmbauten: queues.markenUmbauten||0 };
+                             markenUmbauten: queues.markenUmbauten||0,
+                             truemmer: truemmerSumme > 0 ? truemmerErtrag : null,
+                             truemmerSumme: truemmerSumme };
     }
   }
   // Tägliches Login-Belohnungssystem (16.07.2026, Feature-Wunsch: abwechslungsreiche Belohnungen
@@ -35754,6 +36031,14 @@
       // Rueckkehrbericht. Ohne diese Zeile waere die Marke zwar da, aber der Bericht haette die
       // Nacht so zusammengefasst, als waere die Werft leer gewesen.
       if (offlineSummary.markenUmbauten>0) html += `<div class="card-row"><div class="left"><i class="ti ti-arrow-up" aria-hidden="true" style="color:#f0b556;"></i><span class="bname" style="font-size:12.5px;">Werftmarken aufgerüstet</span></div><span class="lvl-pill">${offlineSummary.markenUmbauten}</span></div>`;
+      // Trümmerabbau (04.08.2026): Seit Recycler auch offline sammeln, gehört ihr Ertrag hierher -
+      // aus demselben Grund wie die Bauaufträge darüber. Ohne diese Zeile stünde der Spieler vor
+      // einem geschrumpften Trümmerfeld und gestiegenen Rohstoffen, ohne dass irgendwo stünde,
+      // woher sie kommen.
+      if (offlineSummary.truemmer){
+        const tLine = Object.entries(offlineSummary.truemmer).map(([r,v]) => fmt(v)+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r)).join(', ');
+        html += `<div class="card-row"><div class="left"><i class="ti ti-recycle" aria-hidden="true" style="color:#c9c7bd;"></i><span class="bname" style="font-size:12.5px;">Recycler haben abgebaut</span></div><span class="lvl-pill" style="font-size:10px;">${tLine}</span></div>`;
+      }
     }
     if (loginBonus){
       const parts = Object.entries(loginBonus.reward).filter(([,v])=>v>0).map(([r,v]) => fmt(v)+' '+((RES_DEFS.find(x=>x.key===r)||{}).label||r));
@@ -41772,7 +42057,37 @@
     return etwas;
   }
 
-  function collectDebrisWithRecyclers(){
+  // Wie lange konnte an jedem Planeten waehrend der Abwesenheit wirklich gesammelt werden?
+  //
+  // Zwei Faelle, und der zweite ist der, wegen dem es diese Funktion gibt (Spieler-Wunsch Sascha,
+  // 04.08.2026 - "Recycler sollen offline auch sammeln"):
+  //   a) Die Recycler STANDEN schon am Feld, als das Spiel geschlossen wurde. Dann haben sie die
+  //      ganze angerechnete Zeit gearbeitet.
+  //   b) Sie waren noch im ANFLUG und sind waehrend der Abwesenheit angekommen. Dann zaehlt nur
+  //      die Zeit ab ihrer Ankunft. Ohne diesen Fall haette ein ueber Nacht losgeschickter
+  //      Sammelauftrag am Morgen einen Flottenslot belegt und null Fortschritt vorzuweisen -
+  //      genau die Beschwerde, die dahintersteht.
+  //
+  // MUSS aufgerufen werden, BEVOR checkMissions() die Ankuenfte aufloest: Danach sind die
+  // Verlegungen aus der Liste verschwunden und ihre Ankunftszeit mit ihnen.
+  function offlineSammelzeiten(capped){
+    const jetzt = Date.now();
+    const zeiten = {};
+    for (const { planet, fleet } of allFleetsWithPlanet()){
+      if (fleet.recycler > 0) zeiten[planet] = capped;
+      for (const m of fleet.missions){
+        if (m.type !== 'relocate' || m.shipKey !== 'recycler' || !m.targetId) continue;
+        if (m.endTime > jetzt) continue;                       // noch unterwegs
+        const sek = Math.min(capped, Math.max(0, (jetzt - m.endTime)/1000));
+        zeiten[m.targetId] = Math.max(zeiten[m.targetId] || 0, sek);
+      }
+    }
+    return zeiten;
+  }
+
+  // sekundenJePlanet: nur fuer das Nachholen nach einer Pause. Ohne den Wert rechnet die Funktion
+  // wie eh und je mit EINER Sekunde - das ist der Haupt-Tick, der sie jede Sekunde ruft.
+  function collectDebrisWithRecyclers(sekundenJePlanet){
     let any = false;
     for (const { planet: planetKey, fleet } of allFleetsWithPlanet()){
       const field = state.debrisFields[planetKey];
@@ -41780,10 +42095,12 @@
       // Ohne stationierten Recycler wird ein Trümmerfeld gar nicht abgebaut – kein passiver
       // Grund-Abbau mehr (Feld bleibt liegen, bis tatsächlich ein Recycler dort steht).
       if (!(fleet.recycler > 0)) continue;
+      const sekunden = sekundenJePlanet ? (sekundenJePlanet[planetKey] || 0) : 1;
+      if (sekunden <= 0) continue;
       // Wrackleser (31.07.2026): erhoeht die Abbaurate, also wieviel je Sekunde aus dem Feld kommt.
       // Bewusst die RATE und nicht die Feldmenge - das Feld gehoert nicht dem Modul, und eine
       // vergroesserte Feldmenge waere aus dem Nichts erzeugte Materie statt besserer Bergung.
-      const rate = fleet.recycler * 8 * (1 + Math.min(ABGRUND_WRACK_DECKEL, moduleBonusTotal('wrack')));
+      const rate = fleet.recycler * 8 * (1 + Math.min(ABGRUND_WRACK_DECKEL, moduleBonusTotal('wrack'))) * sekunden;
       const tracker = (state.debrisFieldTrackers && state.debrisFieldTrackers[planetKey]) || null;
       let leftover = rate;
       for (const r of Object.keys(field)){
@@ -42797,23 +43114,30 @@
   async function shareCardBlobFlow(blobPromise, filename){
     try {
       const blob = await blobPromise;
-      if (!blob){ log('Bild konnte nicht erzeugt werden.', 'ti-alert-triangle'); return; }
-      const file = new File([blob], filename || 'kolonie-kepler7.png', { type:'image/png' });
+      if (!blob){ log('Datei konnte nicht erzeugt werden.', 'ti-alert-triangle'); return; }
+      // Der Typ kommt aus dem Blob, nicht aus einer festen Zeichenkette: Seit v8.396.0 laeuft hier
+      // auch ein VIDEO durch (Kampf-Wiedergabe als Hochkant-Clip). Ein fest gesetztes 'image/png'
+      // haette TikTok & Co. eine mp4-Datei als Bild angeboten - und der Download-Zweig darunter
+      // hat den uebergebenen Dateinamen ohnehin nie benutzt, jede Datei hiess 'kolonie-kepler7.png'.
+      const name = filename || 'kolonie-kepler7.png';
+      const istVideo = /^video\//.test(blob.type || '');
+      const file = new File([blob], name, { type: blob.type || 'image/png' });
       // Web Share API mit Datei bevorzugt (v.a. mobil - direkter Weg in TikTok/Instagram/WhatsApp
       // usw.), sonst Download-Fallback.
       if (navigator.canShare && navigator.canShare({ files:[file] })){
         try {
-          await navigator.share({ files:[file], title:'Kolonie Kepler-7', text:'Meine Kolonie in Kepler-7!' });
+          await navigator.share({ files:[file], title:'Kolonie Kepler-7',
+            text: istVideo ? 'Mein Gefecht in Kolonie Kepler-7!' : 'Meine Kolonie in Kepler-7!' });
           return;
         } catch(e){ if (e && e.name === 'AbortError') return; /* Nutzer hat Teilen-Dialog abgebrochen - kein Fehler */ }
       }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = 'kolonie-kepler7.png';
+      a.href = url; a.download = name;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 5000);
-      log('Bild heruntergeladen.', 'ti-check');
-    } catch(e){ log('Bild konnte nicht erzeugt werden.', 'ti-alert-triangle'); }
+      log((istVideo ? 'Video' : 'Bild') + ' heruntergeladen.', 'ti-check');
+    } catch(e){ log('Datei konnte nicht erzeugt werden.', 'ti-alert-triangle'); }
   }
   async function shareColonyImage(){
     const btn = document.getElementById('shareColonyBtn');
@@ -42824,7 +43148,10 @@
   }
   async function shareBattleReportImage(r){
     trackEvent('share_battle_clicked');
-    await shareCardBlobFlow(generateBattleCard(SHARE_FORMATS.post, r), 'kepler7-kampf.png');
+    // 9:16 statt 4:5 (04.08.2026): TikTok, Reels und Stories sind hochkant; ein 1080x1350-Bild
+    // wird dort oben und unten beschnitten oder mit Balken gefuellt. Die Karte selbst ist
+    // unveraendert - generateBattleCard zentriert ihren Inhalt im hoeheren Format (siehe `oy`).
+    await shareCardBlobFlow(generateBattleCard(SHARE_FORMATS.story, r), 'kepler7-kampf.png');
   }
 
   // Zoom/Pan-Zustand der Galaxie-Übersichtskarte – bleibt für die restliche Sitzung erhalten

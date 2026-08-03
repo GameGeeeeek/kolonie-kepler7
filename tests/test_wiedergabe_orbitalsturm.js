@@ -106,8 +106,11 @@ const abdruck = page => page.evaluate(() => {
   // rund 200 Namen auf oberster Ebene, von denen zehn in der Spieldatei bereits vergeben
   // sind. zustand() kam am 03.08.2026 dazu: reine Auskunft fuer den Prueflauf, kein
   // Schalter. Alles Weitere gehoert NICHT nach draussen.
-  check('0: sie gibt genau starte(), beende() und zustand() nach aussen',
-    /return \{ starte: starte, beende: beende, zustand: zustand \};/.test(src));
+  // Die Liste waechst absichtlich nur langsam: videoAufnehmen/videoMoeglich kamen am
+  // 04.08.2026 dazu (Hochkant-Clip zum Teilen). Geprueft wird, dass es GENAU diese
+  // Namen sind - eine Kapsel, aus der nach und nach alles herausfaellt, waere keine.
+  check('0: sie gibt genau starte(), beende(), zustand() und die Videoaufnahme nach aussen',
+    /return \{ starte: starte, beende: beende, zustand: zustand,\s*videoAufnehmen: videoAufnehmen, videoMoeglich: videoMoeglich \};/.test(src));
   // Die zehn Namen, die es in der Spieldatei bereits gibt - ohne Kapsel wuerde einer den
   // anderen still ueberschreiben.
   check('0: die alte Wiedergabe ist restlos entfernt',
