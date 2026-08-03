@@ -79,6 +79,21 @@ async function lauf(browser, schreibfehler){
   await page.evaluate(() => { const b = document.querySelector('[data-galaxy-subtab="diplo"]'); if (b) b.click(); });
   await page.waitForTimeout(1600);
 
+  // Das Protokoll MITSCHREIBEN statt am Ende einmal hineinzusehen (04.08.2026): #log haelt
+  // nur die letzten Eintraege. Feuert zwischen Klick und Ablesen ein Zufallsereignis
+  // („Neues Ereignis: Reiche Kristalladern entdeckt ..."), verdraengt es die Meldung, auf die
+  // dieser Test wartet - der Lauf wird rot, obwohl das Geschenk sich richtig verhalten hat.
+  // Genau so ist es im Sammellauf vom 04.08.2026 passiert, und beim Einzelstart mit
+  // demselben Stand lief er sofort wieder gruen.
+  await page.evaluate(() => {
+    window.__protokoll = '';
+    const el = document.getElementById('log');
+    if (!el) return;
+    window.__protokoll = el.textContent || '';
+    new MutationObserver(() => { window.__protokoll += '\n' + (el.textContent || ''); })
+      .observe(el, { childList: true, subtree: true, characterData: true });
+  });
+
   const knopf = await page.locator('#diplomacyBox [data-pact-gift-send]').count();
   if (!knopf) console.log('   [Debug] diplomacyBox:', await page.evaluate(() => { const b = document.getElementById('diplomacyBox'); return b ? b.innerText.slice(0, 250) : 'FEHLT'; }));
   // Erz auswaehlen (erste Option ist bereits Erz oder Energie - explizit setzen macht den Test stabil)
@@ -91,7 +106,7 @@ async function lauf(browser, schreibfehler){
   }) : false;
   await page.waitForTimeout(1800);
 
-  const log = await page.evaluate(() => (document.getElementById('log') || {}).textContent || '');
+  const log = await page.evaluate(() => window.__protokoll || (document.getElementById('log') || {}).textContent || '');
   let erzNachher = null, gespeicherterPakt = null;
   try { erzNachher = JSON.parse(store['kepler7-save-v3']).resources.erz; } catch (e) {}
   try { gespeicherterPakt = JSON.parse(store[PAKT_KEY]); } catch (e) {}
