@@ -460,6 +460,13 @@
       --os-vio:#7f77dd; --os-flieder:#c3bef5; --os-gold:#fac775; --os-grau:#9296ac;
       --os-text:#e9ecf5; --os-linie:rgba(255,255,255,.09);
       --os-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      /* box-sizing GEHOERT AUF #osWrap SELBST, nicht nur auf seine Kinder: "#osWrap *"
+         trifft die Nachfahren, nie das Element. #osWrap traegt height:100% UND auf
+         Geraeten mit Kerbe ein Rand-Polster - ohne border-box addiert sich das Polster
+         zur vollen Hoehe (gemessen 757 px in einem 664 px hohen Fenster), und
+         overflow:hidden schneidet unten die Knopfreihe ab. Spieler-Report 03.08.2026;
+         dieselbe Falle steht beim Chat-Panel bereits dokumentiert. */
+      box-sizing:border-box;
       position:relative;display:flex;flex-direction:column;overflow:hidden;
       width:100%;height:100%;max-width:1180px;
       background:var(--os-grund);color:var(--os-text);
@@ -646,9 +653,26 @@
     @media (max-width:879px){
       /* overflow:hidden zusaetzlich zum Deckel - sonst zeichnet die Tafel ueber ihren
          Rand hinaus weiter, auch wenn der Kasten selbst begrenzt ist. */
-      #osWrap .kopf{max-height:30vh; overflow:hidden; align-items:stretch;}
+      #osWrap .kopf{max-height:26vh; overflow:hidden; align-items:stretch; flex:0 1 auto;}
       #osWrap .tafel{min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
-      #osWrap .buehne{min-height:40vh;}
+      /* KEIN min-height auf dem Handy: Die Buehne ist der einzige Teil, der nachgeben
+         KANN. Bestand sie auf 40vh, wurde die Fussleiste samt Knopfreihe aus dem Bild
+         gedrueckt - der zweite Teil desselben Fehlers. Sie nimmt jetzt, was uebrig
+         bleibt; ueber "Listen" bekommt sie fast alles. */
+      #osWrap .buehne{min-height:0;}
+      #osWrap .fuss{flex:none; gap:4px; padding:4px 6px 5px;}
+      /* Jeder in der Fussleiste gesparte Pixel geht an die Buehne. */
+      #osWrap .protokoll{min-height:0; padding:3px 6px 4px;}
+      #osWrap .plog:nth-child(-n+3){display:none;}
+      #osWrap .kraft{padding:3px 7px 5px;}
+      #osWrap .phase{padding:2px 5px 3px;}
+    }
+    /* Kurze Bildschirme (iPhone SE und aehnliche): Dort bleibt der Buehne sonst kaum etwas.
+       Die Listen scrollen ohnehin in sich - ein kleinerer Ausschnitt kostet also nichts als
+       etwas mehr Wischen, waehrend die Buehne spuerbar gewinnt. */
+    @media (max-width:879px) and (max-height:640px){
+      #osWrap .kopf{max-height:20vh;}
+      #osWrap .os-titelzeile{padding:4px 10px;}
       /* Randbereiche des Geraets (Kerbe, Home-Leiste): Ohne das lag der Titel unter der
          Statusleiste und die Knopfreihe unter der Home-Leiste. */
       #osWrap{padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);}
@@ -5791,8 +5815,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.391.1';
+  const VERSION = '8.391.2';
   const PATCHNOTES = [
+    { version:'8.391.2', date:'03.08.2026', changes:[
+      '<strong>Auf Geräten mit Kerbe fehlte die Knopfreihe unter der Wiedergabe komplett</strong> – „Neustart", „Pause", „Tempo" und „Ans Ende" lagen außerhalb des Bildschirms, das Protokoll war abgeschnitten. Ursache war das Randpolster aus der letzten Version: Es kam <em>zusätzlich</em> zur vollen Höhe, statt in sie hineinzurechnen. Gemessen 757 Pixel Inhalt in einem 664 Pixel hohen Fenster.',
+      'Zweiter Teil desselben Fehlers: Die Bühne bestand auf einer Mindesthöhe. Sie ist aber der einzige Teil, der nachgeben kann – also wurde die Fußleiste hinausgedrückt. Jetzt nimmt sie, was übrig bleibt, und Titelzeile wie Knopfreihe stehen immer.',
+      'Die Fußleiste ist auf dem Handy gedrängter (weniger Polster, eine Protokollzeile statt zwei), und auf kurzen Bildschirmen bekommen die Bestandslisten einen kleineren Ausschnitt. Beides geht direkt an die Bühne: Sie ist jetzt auf jedem geprüften Gerät mindestens 30 % groß, mit ausgeblendeten Listen 50–70 %.',
+      'Der Prüflauf stellt die Geräteränder jetzt ausdrücklich nach. Im Emulator meldet das System dort null – genau deshalb war der Fehler bei der letzten Prüfung unsichtbar geblieben.'
+    ]},
     { version:'8.391.1', date:'03.08.2026', changes:[
       '<strong>Auf dem Handy war vom Gefecht nichts zu sehen.</strong> Die Bestandslisten stehen dort im normalen Fluss – bei einer ausgewachsenen Flotte sind das über vierzig Zeilen, gemessen 880 Pixel in einem 666 Pixel hohen Fenster. Die Bühne begann dadurch <em>unterhalb</em> des Bildschirms. Jetzt sind die Listen gedeckelt und scrollen in sich, die Bühne bekommt mindestens 40 % der Fläche, und über den neuen Knopf <strong>„Listen"</strong> lässt sie sich ganz freiräumen (dann 68 %).',
       'Getestet hatte ich mit Musterflotten aus sechs Schiffsklassen – die passten noch. Der Prüflauf rechnet jetzt mit 22 Schiffsklassen und 20 Abwehrarten, also mit dem, was ein weit entwickeltes Konto wirklich hat.',
