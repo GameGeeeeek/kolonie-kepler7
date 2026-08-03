@@ -161,6 +161,41 @@ async function spielStarten(browser, berichte, wartezeit){
     await ctx.close();
   }
 
+  // ============================== 4) Die Bodenabwehr ist wirklich im Bild
+  // BEFUND (dritter Report, 03.08.2026): "Verteidiger Geschütze sieht man nicht."
+  // starte() rief messen() BEVOR hudNeuAufbauen() die Bestandstafeln fuellte. Auf dem
+  // Handy stehen die im Fluss - die Buehne schrumpft dadurch. Gemessen wurde also die
+  // NOCH LEERE Anordnung: Leinwand 492 px hoch, Buehne danach 295 px. Der Planetenboden
+  // liegt bei 80 % der LEINWANDhoehe, also bei y=394 - ausserhalb des Sichtbaren. Die
+  // Bodenabwehr wurde gezeichnet und war trotzdem nicht zu sehen.
+  // Geprueft wird beides: dass Leinwand und Buehne gleich hoch sind (die Ursache), und
+  // dass unten wirklich Anlagenfarbe im Bild liegt (die Wirkung).
+  {
+    const { page, errs, ctx } = await spielStarten(browser, [UEBERFALL], 3000);
+    const m = await page.evaluate(() => {
+      const cv = document.getElementById('osCv');
+      const bu = document.getElementById('osBuehne').getBoundingClientRect();
+      const cssH = parseFloat(cv.style.height) || cv.clientHeight;
+      const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      // Anlagen tragen Warnton (#e0a548), Flieder (#c3bef5) oder Violett (#7f77dd).
+      // Gezaehlt wird NUR im unteren Fuenftel - dort steht der Boden.
+      let anlagen = 0;
+      for (let y = Math.floor(cv.height * 0.72); y < cv.height; y += 2)
+        for (let x = 0; x < cv.width; x += 2){
+          const i = (y*cv.width+x)*4, R = d[i], G = d[i+1], B = d[i+2];
+          if ((R > 150 && G > 120 && G < 200 && B < 130) || (R > 140 && G > 130 && B > 200)) anlagen++;
+        }
+      return { cssH: Math.round(cssH), buehne: Math.round(bu.height), anlagen };
+    });
+    // Die Ursache: Wird zu frueh gemessen, ist die Leinwand hoeher als ihre Buehne.
+    check('4: Leinwand und Bühne sind gleich hoch (es wird nach dem Tafelaufbau gemessen)',
+      Math.abs(m.cssH - m.buehne) <= 2, { leinwand: m.cssH, buehne: m.buehne });
+    check('4: die Bodenabwehr liegt sichtbar im unteren Bildbereich',
+      m.anlagen > 200, { anlagenPunkte: m.anlagen });
+    check('keine JS-Fehler (Bodenabwehr)', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
   // ============================== 3) Geraeteraender: nichts wird abgeschnitten
   // env(safe-area-inset-*) meldet im Emulator 0 - die Raender werden hier ausdruecklich
   // nachgestellt, sonst prueft dieser Abschnitt genau den Fall NICHT, wegen dem es ihn gibt.
