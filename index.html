@@ -633,6 +633,33 @@
       #osWrap .bilanz p{font-size:9px;line-height:1.4}
       #osWrap .bilanz-fuss{font-size:8.5px;gap:2px 10px}
     }
+    /* --- Handy: die Buehne muss die Buehne bleiben ---------------------------
+       BEFUND (Spieler-Report Sascha, 03.08.2026, mit einer echten Spaetspiel-Flotte):
+       Die Bestandstafeln stehen auf dem Handy im normalen Fluss. Bei 22 Schiffsklassen
+       PLUS 22 Abwehrarten sind das 44 Zeilen - gemessen 880 px hoch in einem 666 px
+       hohen Fenster. Die Buehne begann dadurch bei y=934, also vollstaendig unterhalb
+       des Bildschirms: Vom Gefecht war NICHTS zu sehen. Getestet hatte ich mit
+       Musterflotten aus sechs Klassen, und genau die passten noch.
+       Deshalb: Die Tafeln bekommen einen Deckel und scrollen in sich, die Buehne
+       bekommt einen garantierten Anteil - und ueber „Listen" laesst sie sich ganz
+       freiraeumen. */
+    @media (max-width:879px){
+      /* overflow:hidden zusaetzlich zum Deckel - sonst zeichnet die Tafel ueber ihren
+         Rand hinaus weiter, auch wenn der Kasten selbst begrenzt ist. */
+      #osWrap .kopf{max-height:30vh; overflow:hidden; align-items:stretch;}
+      #osWrap .tafel{min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+      #osWrap .buehne{min-height:40vh;}
+      /* Randbereiche des Geraets (Kerbe, Home-Leiste): Ohne das lag der Titel unter der
+         Statusleiste und die Knopfreihe unter der Home-Leiste. */
+      #osWrap{padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);}
+      #osWrap .os-titelzeile{padding:6px 10px;}
+    }
+    /* Der Schalter ist nur dort noetig, wo die Tafeln wirklich Platz wegnehmen - in der
+       Breitansicht schweben sie ueber der Buehne und stoeren nicht. */
+    #osWrap #osToggleTafeln{display:none;}
+    @media (max-width:879px){ #osWrap #osToggleTafeln{display:inline-block;} }
+    #osWrap.tafeln-aus .kopf{display:none;}
+    #osWrap.tafeln-aus #osToggleTafeln{color:var(--os-grau);}
     @media (prefers-reduced-motion:reduce){
       #osWrap .banner, #osWrap .sieg, #osWrap .bilanz, #osWrap .balken i, #osWrap .kraft-schiene i, #osWrap .phase .fort{transition:none}
     }
@@ -2715,6 +2742,7 @@
     <div id="osWrap">
       <div class="os-titelzeile">
         <b id="battleModalTitle">Kampf-Wiedergabe</b>
+        <button id="osToggleTafeln" aria-label="Bestandslisten ein-/ausblenden" title="Bestandslisten ein-/ausblenden" style="padding:5px 9px; font-size:10px; flex:none; margin-left:auto;">Listen</button>
         <button aria-label="Schließen" id="battleModalCloseBtn" style="padding:5px 9px; font-size:11px; flex:none;"><i class="ti ti-x" aria-hidden="true"></i></button>
       </div>
       <div class="os-flaeche">
@@ -5763,8 +5791,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.391.0';
+  const VERSION = '8.391.1';
   const PATCHNOTES = [
+    { version:'8.391.1', date:'03.08.2026', changes:[
+      '<strong>Auf dem Handy war vom Gefecht nichts zu sehen.</strong> Die Bestandslisten stehen dort im normalen Fluss – bei einer ausgewachsenen Flotte sind das über vierzig Zeilen, gemessen 880 Pixel in einem 666 Pixel hohen Fenster. Die Bühne begann dadurch <em>unterhalb</em> des Bildschirms. Jetzt sind die Listen gedeckelt und scrollen in sich, die Bühne bekommt mindestens 40 % der Fläche, und über den neuen Knopf <strong>„Listen"</strong> lässt sie sich ganz freiräumen (dann 68 %).',
+      'Getestet hatte ich mit Musterflotten aus sechs Schiffsklassen – die passten noch. Der Prüflauf rechnet jetzt mit 22 Schiffsklassen und 20 Abwehrarten, also mit dem, was ein weit entwickeltes Konto wirklich hat.',
+      '<strong>Bei einem eingehenden Überfall flog die eigene Verteidigung in Gegnerrot</strong> und der Angreifer in Grün – genau verkehrt herum. Ursache: Die Farbe jeder Schiffsklasse wurde beim Anlegen einmal festgeschrieben; der Farbtausch, der „Grün ist meins" auch beim Verteidigen sicherstellt, erreichte die gezeichneten Rümpfe nie. Nachgemessen an den Bildpunkten der Leinwand: vorher 2.704 rote und null grüne im eigenen Verband.',
+      'Randbereiche des Geräts werden jetzt berücksichtigt – Titelzeile und Knopfreihe lagen auf Geräten mit Kerbe unter der Statusleiste bzw. der Home-Leiste.'
+    ]},
     { version:'8.391.0', date:'03.08.2026', changes:[
       '<strong>Recycler kommen von selbst zurück.</strong> Wer sie zu einem fremden Trümmerfeld schickt, hatte sie danach dort stehen – bis er sie von Hand wieder einsammelte. Jetzt wird daraus ein <strong>Sammelauftrag</strong>: Ist am Ziel nichts mehr abzubauen, fliegen sie selbständig zum Ausgangsort zurück. Auch dann, wenn das Feld auf anderem Weg verschwindet (Bergungsdrohnen, entkommene Piraten).',
       '<strong>Ein laufender Sammelauftrag belegt einen Flottenslot</strong> – einen, nicht zwei: Anflug und Sammelphase sind dieselbe Flotte. Er hat dafür eine eigene Zeile in der Missionsliste und im Seitenmenü, damit im Zähler keine Zahl steht, zu der es keine Zeile gibt.',
@@ -27978,6 +28012,13 @@
       hudAktualisieren(); phasenAktualisieren(); bannerSchritt();
       if (reduziert) zeichne();
     });
+    /* „Listen": raeumt auf dem Handy die Bestandstafeln weg, damit die Buehne den ganzen
+       Bildschirm bekommt. Die Leinwand wird in Bildpunkten bemessen - ohne alleFlaechenNeu()
+       bliebe sie in der alten Groesse, und das Bild waere verzerrt statt groesser. */
+    document.getElementById('osToggleTafeln').addEventListener('click', function(){
+      document.getElementById('osWrap').classList.toggle('tafeln-aus');
+      alleFlaechenNeu();
+    });
     document.addEventListener('keydown', function(ev){
       if (!offen) return;               /* sonst schluckte die Wiedergabe Tasten des Spiels */
       var t = ev.key;
@@ -28044,6 +28085,16 @@
       var duIstA = DATEN.blick !== 'verteidigung';
       F.an  = duIstA ? F_AN0 : F_VER0;
       F.ver = duIstA ? F_VER0 : F_AN0;
+      /* KLASSEN[k].farbe wurde beim ANLEGEN des Objekts einmal aus F.an/F.ver gelesen -
+         ein spaeterer Tausch erreicht sie nicht mehr, und atlantenBauen() backt die
+         Rumpfbilder genau aus diesem Feld. Ohne diese Zeilen flog bei einem eingehenden
+         Ueberfall die EIGENE Verteidigung in Gegnerrot und der Angreifer in Gruen - im
+         ganzen Spiel heisst Gruen "meins". Gemessen an den Bildpunkten der Leinwand
+         (Spieler-Report Sascha, 03.08.2026), nicht vermutet. */
+      for (var fc = 0; fc < ALLE_K.length; fc++){
+        var fk = ALLE_K[fc];
+        KLASSEN[fk].farbe = KLASSEN[fk].seite === 'A' ? F.an : F.ver;
+      }
 
       var pA = plaetzeFuellen(DATEN.angreifer,   FORM_PLATZ_A, FLOTTE_A);
       var pD = plaetzeFuellen(DATEN.verteidiger, FORM_PLATZ_D, FLOTTE_D);
