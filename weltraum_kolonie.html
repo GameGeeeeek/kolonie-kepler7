@@ -449,10 +449,6 @@
        Rekonstruktion in Runden, keine erneute Berechnung. */
     .battle-modal-overlay { position:fixed; inset:0; z-index:210; display:none; align-items:center; justify-content:center; background:rgba(4,6,14,0.82); padding:16px; }
     .battle-modal-overlay.open { display:flex; }
-    .battle-modal { width:100%; max-width:440px; max-height:88vh; overflow-y:auto; background:#0d1224; border:var(--bw-1) solid rgba(var(--primary-rgb), 0.35); padding:1.1rem; box-shadow:0 20px 60px rgba(0,0,0,0.55); }
-    .battle-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
-    .battle-modal-title { font-size:14px; font-weight:700; }
-
     /* ---------- Kampf-Wiedergabe "Orbitalsturm" ----------
        Gekapselt unter #osWrap: KEINE dieser Regeln kann nach draussen wirken, und weil
        das Spiel-CSS fuer keinen der hier benutzten Klassennamen eine eigene Regel
@@ -641,136 +637,41 @@
       #osWrap .banner, #osWrap .sieg, #osWrap .bilanz, #osWrap .balken i, #osWrap .kraft-schiene i, #osWrap .phase .fort{transition:none}
     }
 
-    .battle-scene { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; background:radial-gradient(ellipse at 50% 40%, rgba(var(--primary-rgb),0.14), transparent 70%), radial-gradient(ellipse at 50% 40%, #1c2140, #080a14 75%); background-repeat:no-repeat; padding:0.85rem 0.6rem; margin-bottom:0.75rem; min-height:130px; overflow:hidden; transition:transform 0.4s ease, box-shadow 1.3s ease; }
     /* Bewegliche Hintergrund-Tiefe (13.07.2026, Feature-Wunsch: optisch aufwerten) - die Sterne liegen
        jetzt auf einer eigenen Ebene (statt fest im Haupt-Hintergrund) und driften langsam hin und her,
        gibt der Szene mehr Räumlichkeit als ein komplett statischer Sternenhimmel. */
-    .battle-scene::after {
-      content:''; position:absolute; inset:-12px; pointer-events:none; z-index:-1;
-      background: radial-gradient(1px 1px at 12% 22%, #fff, transparent), radial-gradient(1px 1px at 78% 18%, #fff, transparent), radial-gradient(1px 1px at 34% 78%, #fff, transparent), radial-gradient(1.5px 1.5px at 90% 65%, #fff, transparent), radial-gradient(1px 1px at 55% 40%, #fff, transparent), radial-gradient(1px 1px at 20% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 65% 85%, #fff, transparent);
-      animation: battleStarDrift 26s ease-in-out infinite;
-    }
-    @keyframes battleStarDrift { 0%,100%{ transform:translate(0,0); } 50%{ transform:translate(-9px,5px); } }
     /* Phasen-abhängige Szenen-Stimmung (13.07.2026) - dezenter Innenschein je Kampfphase, sanft
-       überblendet statt hart umzuschalten (siehe transition oben auf .battle-scene). */
-    .battle-scene.phase-anflug { box-shadow: inset 0 0 55px rgba(80,90,150,0.22); }
-    .battle-scene.phase-flankenmanoever { box-shadow: inset 0 0 55px rgba(175,156,230,0.18); }
-    .battle-scene.phase-gefecht { box-shadow: inset 0 0 55px rgba(226,140,80,0.10); }
-    .battle-scene.phase-entscheidung { box-shadow: inset 0 0 65px rgba(226,75,74,0.24); }
-    .battle-scene.phase-rueckzug { box-shadow: inset 0 0 55px rgba(90,95,120,0.20); }
-    .battle-scene.phase-nachspiel { box-shadow: inset 0 0 45px rgba(60,70,105,0.16); }
-    .battle-scene::before { content:''; position:absolute; inset:0; background-image:radial-gradient(1px 1px at 8% 45%, rgba(255,255,255,0.7), transparent), radial-gradient(1px 1px at 45% 15%, rgba(255,255,255,0.6), transparent), radial-gradient(1px 1px at 92% 40%, rgba(255,255,255,0.7), transparent), radial-gradient(1px 1px at 70% 92%, rgba(255,255,255,0.5), transparent), radial-gradient(1px 1px at 25% 90%, rgba(255,255,255,0.6), transparent); animation: battleStarDrift 14s linear infinite; opacity:0.8; pointer-events:none; }
-    @keyframes battleStarDrift { 0%{ background-position:0 0; } 100%{ background-position:-30px 20px; } }
-    .battle-scene.shake { animation: battleShake 0.3s ease-in-out; }
-    @keyframes battleShake { 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(calc(-1 * var(--shake-amp, 3px))); } 75%{ transform:translateX(var(--shake-amp, 3px)); } }
-    .battle-scene.climax { animation: battleClimaxPulse 1.4s ease-in-out infinite; }
-    @keyframes battleClimaxPulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.025); } }
-    .battle-round-counter { position:absolute; top:6px; left:10px; font-size:10px; color:var(--ink-dim); background:rgba(0,0,0,0.35); padding:2px 7px; z-index:2; letter-spacing:0.3px; }
-    .battle-big-result { position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:6; pointer-events:none; }
-    .battle-big-result.play { display:flex; }
-    .battle-big-result span { font-family:var(--font-mono); font-size:24px; font-weight:700; letter-spacing:6px; text-transform:uppercase; animation: battleBigResultPop 1.3s ease-out forwards; text-shadow:0 0 16px currentColor, 0 0 32px currentColor; }
-    @keyframes battleBigResultPop { 0%{ transform:scale(0.3); opacity:0; } 15%{ transform:scale(1.15); opacity:1; } 30%{ transform:scale(1); opacity:1; } 70%{ opacity:1; } 100%{ transform:scale(1); opacity:0; } }
-    .battle-dmg-float { position:absolute; font-size:10px; font-weight:700; font-family:var(--font-mono); letter-spacing:0.02em; pointer-events:none; z-index:4; text-shadow:0 0 3px #000; animation: battleDmgFloat 0.9s ease-out forwards; }
-    @keyframes battleDmgFloat { 0%{ opacity:1; transform:translate(-50%,-50%); } 100%{ opacity:0; transform:translate(-50%,-150%); } }
-    .battle-shot { position:absolute; top:48%; left:0; height:2px; width:0; background:linear-gradient(90deg, transparent, currentColor 45%, #fff 100%); box-shadow:0 0 5px currentColor, 0 0 2px #fff; opacity:0; pointer-events:none; transform-origin:left center; }
-    .battle-shot.fly-right { animation: battleShotFlyRight 0.4s ease-out forwards; }
-    .battle-shot.fly-left { animation: battleShotFlyLeft 0.4s ease-out forwards; }
-    @keyframes battleShotFlyRight { 0%{ width:0; opacity:1; } 75%{ opacity:1; } 100%{ opacity:0; } }
-    @keyframes battleShotFlyLeft { 0%{ width:0; opacity:1; transform:scaleX(-1); } 75%{ opacity:1; } 100%{ opacity:0; } }
+       überblendet statt hart umzuschalten. */
     /* Railgun: sehr schneller, dünner Streak */
-    .battle-shot.weapon-railgun { height:1px; animation-duration:0.22s; }
     /* Gauss-Kanone: kurzer, kräftiger Puls */
-    .battle-shot.weapon-gauss { height:3px; animation-duration:0.28s; }
     /* Plasma: runder, glühender Ball statt Linie */
-    .battle-plasma-orb { position:absolute; top:48%; width:9px; height:9px; margin-top:-4.5px; border-radius:50%; background:radial-gradient(circle, #fff, currentColor 60%, transparent 85%); box-shadow:0 0 8px currentColor; opacity:0; pointer-events:none; }
-    .battle-plasma-orb.fly-right { animation: battlePlasmaRight 0.55s ease-in forwards; }
-    .battle-plasma-orb.fly-left { animation: battlePlasmaLeft 0.55s ease-in forwards; }
-    @keyframes battlePlasmaRight { 0%{ opacity:1; transform:scale(0.6); } 15%{ opacity:1; transform:scale(1.1); } 100%{ left:var(--to); opacity:0.9; transform:scale(0.9); } }
-    @keyframes battlePlasmaLeft { 0%{ opacity:1; transform:scale(0.6); } 15%{ opacity:1; transform:scale(1.1); } 100%{ left:var(--to); opacity:0.9; transform:scale(0.9); } }
     /* Rakete: kleines Geschoss mit Abgasspur, etwas langsamer als Energiewaffen */
-    .battle-missile { position:absolute; top:48%; width:7px; height:4px; margin-top:-2px; 4px 4px 1px; background:currentColor; box-shadow:-6px 0 6px -1px currentColor, -12px 0 5px -2px currentColor; opacity:0; pointer-events:none; }
-    .battle-missile.fly-right { animation: battleMissileRight 0.65s ease-in forwards; }
-    .battle-missile.fly-left { animation: battleMissileLeft 0.65s ease-in forwards; transform:scaleX(-1); }
-    @keyframes battleMissileRight { 0%{ opacity:1; } 90%{ opacity:1; } 100%{ left:var(--to); opacity:0.8; } }
-    @keyframes battleMissileLeft { 0%{ opacity:1; } 90%{ opacity:1; } 100%{ left:var(--to); opacity:0.8; } }
-    .battle-impact { position:absolute; top:48%; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; background:radial-gradient(circle, #fff, currentColor 55%, transparent 75%); opacity:0; pointer-events:none; }
-    .battle-impact.play { animation: battleImpactBurst 0.4s ease-out forwards; }
-    @keyframes battleImpactBurst { 0%{ transform:scale(0.25); opacity:1; } 100%{ transform:scale(2.3); opacity:0; } }
     /* Mündungsblitz am Schuss-Ursprung (13.07.2026, Feature-Wunsch) - kurzer, kleiner Aufblitzer
        BEVOR das Projektil sichtbar losfliegt, macht den Feuerpunkt selbst sichtbar statt dass
        Schüsse einfach mitten in der Szene "erscheinen". */
-    .battle-muzzle-flash { position:absolute; top:48%; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:radial-gradient(circle, #fff, currentColor 50%, transparent 70%); opacity:0; pointer-events:none; }
-    .battle-muzzle-flash.play { animation: battleMuzzleFlash 0.18s ease-out forwards; }
-    @keyframes battleMuzzleFlash { 0%{ transform:scale(0.3); opacity:1; } 100%{ transform:scale(1.6); opacity:0; } }
     /* Bildschirm-Farbwisch beim Sieg-/Niederlage-Reveal (13.07.2026) - kurzer, dezenter Farbschein
        über der ganzen Szene, synchron zum großen SIEG/NIEDERLAGE-Banner. */
-    .battle-scene.result-flash-win::before, .battle-scene.result-flash-loss::before {
-      content:''; position:absolute; inset:0; pointer-events:none; z-index:5;
-      animation: battleResultFlash 0.9s ease-out forwards;
-    }
-    .battle-scene.result-flash-win::before { background:radial-gradient(ellipse at 50% 50%, rgba(93,202,165,0.35), transparent 70%); }
-    .battle-scene.result-flash-loss::before { background:radial-gradient(ellipse at 50% 50%, rgba(226,75,74,0.32), transparent 70%); }
-    @keyframes battleResultFlash { 0%{ opacity:0; } 15%{ opacity:1; } 100%{ opacity:0; } }
     /* Partikel-Burst beim Sieg/Niederlage-Finale (13.07.2026, Feature-Wunsch: optisch aufwerten) -
        kleine Bruchstücke fliegen vom Zentrum nach außen, ergänzt den bereits vorhandenen Farbwisch
        um ein aufwändigeres Finale statt nur einer flächigen Einfärbung. */
-    .battle-result-particle { position:absolute; top:50%; left:50%; width:4px; height:4px; border-radius:50%; pointer-events:none; z-index:4; opacity:0; }
-    .battle-result-particle.play { animation: battleResultParticleBurst 0.85s ease-out forwards; }
-    @keyframes battleResultParticleBurst {
-      0% { opacity:1; transform:translate(-50%,-50%) translate(0,0) scale(1); }
-      100% { opacity:0; transform:translate(-50%,-50%) translate(var(--burst-x), var(--burst-y)) scale(0.3); }
-    }
     /* Kritische Treffer (13.07.2026, Feature-Wunsch: Wiedergabe komplexer/spannender gestalten) -
        gelegentlicher Volltreffer mit größerem Einschlag, kurzem weißem Bildschirmblitz und größerer,
        goldener Schadenszahl statt der normalgroßen weißen. */
-    .battle-impact.critical { width:26px; height:26px; margin:-13px 0 0 -13px; }
-    .battle-impact.miss { width:8px; height:8px; margin:-4px 0 0 -4px; opacity:0.5; }
-    .battle-impact.miss.play { animation: battleMissFizzle 0.35s ease-out forwards; }
-    @keyframes battleMissFizzle { 0%{ transform:scale(0.3); opacity:0.6; } 100%{ transform:scale(1.4); opacity:0; } }
-    .battle-scene.crit-flash::before {
-      content:''; position:absolute; inset:0; pointer-events:none; z-index:6; background:rgba(255,255,255,0.5);
-      animation: battleCritFlash 0.22s ease-out forwards;
-    }
-    @keyframes battleCritFlash { 0%{ opacity:0.9; } 100%{ opacity:0; } }
-    .battle-dmg-float.critical { position:absolute; font-size:15px; font-weight:700; color:var(--gold) !important; text-shadow:0 0 6px rgba(250,199,117,0.6); }
     /* Grafik-Runde "High-End", Vorschlag 33 "Farbversatz-Flash": kurzer Rot/Cyan-Versatz nur bei
        kritischen Treffern, baut auf der schon vorhandenen .critical-Zahl auf. */
-    .battle-dmg-float.critical::before, .battle-dmg-float.critical::after { content:attr(data-text); position:absolute; left:0; top:0; pointer-events:none; }
-    .battle-dmg-float.critical::before { color:#ff3860; animation: dmgChromaR 0.5s ease-out forwards; }
-    .battle-dmg-float.critical::after { color:#3ad6ff; animation: dmgChromaL 0.5s ease-out forwards; }
-    @keyframes dmgChromaR { 0%{ transform:translateX(0); opacity:0.65; } 40%{ transform:translateX(2px); opacity:0.45; } 100%{ transform:translateX(2px); opacity:0; } }
-    @keyframes dmgChromaL { 0%{ transform:translateX(0); opacity:0.65; } 40%{ transform:translateX(-2px); opacity:0.45; } 100%{ transform:translateX(-2px); opacity:0; } }
-    @media (prefers-reduced-motion: reduce) { .battle-dmg-float.critical::before, .battle-dmg-float.critical::after { display:none; } }
     /* Alpha-Salve: einmalige, größere Sonderattacke schwerer Schiffe (Schlachtschiff/Superschlachtschiff)
        - breiterer, kräftigerer Strahl statt der normalen Schuss-Breite. */
-    .battle-shot.alpha { height:4px; margin-top:-2px; filter:drop-shadow(0 0 3px currentColor); }
     /* Formations-Auflockerung ab schweren Verlusten - größerer Abstand zwischen den verbleibenden
        Schiffs-Icons, wirkt wie eine angeschlagene, nicht mehr geschlossene Formation. */
-    .battle-ship-icons.loose { gap:9px; }
     /* Hintergrund-Trümmerpartikel (13.07.2026, Feature-Wunsch: grafisch aufwändiger/Umgebungseffekte) -
        kleine, langsam driftende und verblassende Bruchstücke, werden mit fortschreitendem Kampf
        häufiger gespawnt und vermitteln so den Eindruck eines sich aufbauenden Trümmerfelds, ohne
        dass die Elemente selbst unbegrenzt im DOM verbleiben. */
-    .battle-debris-particle { position:absolute; background:#5a5f78; pointer-events:none; opacity:0; z-index:1; }
-    .battle-debris-particle.play { animation: battleDebrisDrift 4.5s linear forwards; }
-    @keyframes battleDebrisDrift {
-      0% { opacity:0; transform:translate(0,0) rotate(0deg); }
-      10% { opacity:0.55; }
-      85% { opacity:0.4; }
-      100% { opacity:0; transform:translate(var(--drift-x), var(--drift-y)) rotate(var(--drift-r)); }
-    }
-    .battle-side { flex:1; min-width:0; position:relative; z-index:1; }
-    .battle-side-label { font-size:10.5px; color:var(--ink-dim); text-align:center; margin-bottom:6px; font-weight:600; }
-    .battle-side-sublabel { font-size:8.5px; color:#7d8199; text-align:center; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px; }
     /* Grafik-Runde "High-End", Vorschlag 32 "3D-Flottenformation": baut auf der bestehenden
        Formations-Staffelung (--stagger-y, siehe Kommentar weiter unten) auf - dieselbe idx%3-
        Gruppierung bekommt jetzt zusätzlich eine --stagger-z-Tiefe, per perspective auf dem Container
        sichtbar gemacht. Bewusst nur Z-Versatz, kein rotateX der ganzen Formation - bleibt bei
        Zeilenumbruch (viele Schiffstypen) weiterhin lesbar statt zu kippen. */
-    .battle-ship-icons { display:flex; flex-wrap:wrap; gap:3px; justify-content:center; perspective:280px; }
-    .battle-ship-icon { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; transition:opacity 0.4s ease, transform 0.4s ease; transform-style:preserve-3d; }
-    .battle-ship-icon.destroyed { opacity:0.12; transform:scale(0.55); filter:grayscale(1); }
-    .battle-ship-icon { position:relative; }
     /* Schiffs-Idle-Bewegung (13.07.2026, Feature-Wunsch: optisch aufwerten) - sehr dezentes,
        durchgehendes Schweben zwischen Treffern, damit die Formation nicht komplett starr wirkt.
        Nutzt --stagger-y als Basis-Offset (siehe Formations-Staffelung weiter unten), damit sich
@@ -778,53 +679,18 @@
        Schiffe (bereits erstarrtes Wrack) bekommen keine Idle-Bewegung mehr.
        Zufällige --idle-delay (per Icon inline gesetzt) verhindert perfekt synchrones Wippen aller
        Schiffe im Gleichtakt. */
-    .battle-ship-icon:not(.destroyed) { animation: battleShipIdle 3.2s ease-in-out infinite; animation-delay: var(--idle-delay, 0s); }
-    @keyframes battleShipIdle { 0%,100%{ transform:translateY(var(--stagger-y,0px)) translateZ(var(--stagger-z,0px)); } 50%{ transform:translateY(calc(var(--stagger-y,0px) - 1.8px)) translateZ(var(--stagger-z,0px)); } }
     /* Eintritts-Animation (13.07.2026) - Schiffe gleiten beim ersten Aufbau der Szene (vor Runde 1)
        sanft ein, statt sofort komplett und regungslos dazustehen. Läuft nur beim allerersten Render
        (siehe renderBattleFleetIcons isIntro-Parameter), nicht bei den Runden-Updates danach. */
-    .battle-ship-icon.entering { animation: battleShipEnter 0.5s ease-out backwards; animation-delay: var(--enter-delay, 0s); }
-    @keyframes battleShipEnter { 0%{ opacity:0; transform:translateY(var(--stagger-y,0px)) translateZ(var(--stagger-z,0px)) scale(0.4); } 100%{ opacity:1; transform:translateY(var(--stagger-y,0px)) translateZ(var(--stagger-z,0px)) scale(1); } }
-    .battle-ship-icon.pre-hit { animation: battlePreHit 0.5s ease-in-out; }
-    @keyframes battlePreHit { 0%,100%{ filter:none; } 30%,70%{ filter:brightness(2) drop-shadow(0 0 4px #ff6b5e); } }
     /* Grafik-Runde 3, Vorschlag "Ziel-Reticle": kurze Eckklammer-Zielerfassung um das Schiffs-Icon,
        exakt synchron zur bestehenden pre-hit-Aufblitz-Animation (kein neuer JS-Trigger nötig - die
        Klasse wird schon dafür gesetzt/entfernt). Icon wird durch renderBattleFleetIcons() bei jedem
        Rundenwechsel komplett neu gerendert, pre-hit und .exploding::after landen daher nie auf
        demselben DOM-Element - kein Konflikt um den ::after-Pseudo-Element-Slot. */
-    .battle-ship-icon.pre-hit::before, .battle-ship-icon.pre-hit::after {
-      content:''; position:absolute; width:7px; height:7px; pointer-events:none; opacity:0;
-      border:var(--bw-2) solid var(--c-info); filter:drop-shadow(0 0 3px rgba(var(--info-rgb),0.8));
-      animation: battleReticleFlash 0.5s ease-in-out;
-    }
-    .battle-ship-icon.pre-hit::before { top:-3px; left:-3px; border-right:none; border-bottom:none; }
-    .battle-ship-icon.pre-hit::after { bottom:-3px; right:-3px; border-left:none; border-top:none; }
-    @keyframes battleReticleFlash { 0%,100%{ opacity:0; } 30%,70%{ opacity:1; } }
     /* Angeschlagen-Zustand (13.07.2026, Feature-Wunsch: sichtbarer Schaden vor Zerstörung) - dezentes,
        dauerhaftes Flackern für Schiffstypen mit niedrigem Bestand, die aber noch nicht komplett
        zerstört sind. Unterscheidet sich vom kurzen pre-hit-Aufblitzen (das nur EINMAL beim Treffer
        läuft) durch die Endlosschleife. */
-    .battle-ship-icon.damaged { animation: battleDamagedFlicker 1.6s ease-in-out infinite; }
-    @keyframes battleDamagedFlicker { 0%,100%{ filter:none; opacity:1; } 50%{ filter:brightness(1.4) sepia(0.3) hue-rotate(-20deg); opacity:0.75; } }
-    .battle-ship-icon.exploding::after {
-      content:''; position:absolute; top:50%; left:50%; width:30%; height:30%; margin:-15% 0 0 -15%;
-      border-radius:50%; background:radial-gradient(circle, #fff, var(--gold) 45%, var(--c-danger) 70%, transparent 80%);
-      animation: battleShipExplode 0.5s ease-out forwards; pointer-events:none;
-    }
-    @keyframes battleShipExplode { 0%{ transform:scale(0.4); opacity:1; } 100%{ transform:scale(6); opacity:0; } }
-    .battle-building-icon.flicker { animation: battleBuildingFlicker 0.6s ease-in-out; }
-    @keyframes battleBuildingFlicker { 0%,100%{ filter:none; } 30%,70%{ filter:brightness(1.9) drop-shadow(0 0 4px var(--c-secondary)); } }
-    .battle-abstract-side { display:flex; flex-direction:column; align-items:center; gap:6px; }
-    .battle-abstract-icon { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:22px; background:rgba(255,255,255,0.06); border:var(--bw-2) solid rgba(255,255,255,0.15); }
-    .battle-hp-bar { width:80px; height:6px; background:rgba(255,255,255,0.1); overflow:hidden; margin-left:auto; margin-right:auto; }
-    .battle-hp-bar-fill { height:100%; background:linear-gradient(90deg,var(--c-secondary),#3fae8a); transition:width 0.5s ease; }
-    .battle-vs { flex-shrink:0; font-size:16px; color:var(--c-secondary); padding:0 4px; position:relative; z-index:1; }
-    .battle-log { background:rgba(255,255,255,0.03); padding:0.6rem 0.75rem; max-height:180px; overflow-y:auto; margin-bottom:0.75rem; display:flex; flex-direction:column; gap:5px; }
-    .battle-log-line { font-size:11.5px; color:#c7cbe0; opacity:0; animation: battleLogFadeIn 0.35s ease forwards; }
-    @keyframes battleLogFadeIn { from{ opacity:0; transform:translateY(4px); } to{ opacity:1; transform:translateY(0); } }
-    .battle-controls { display:flex; gap:8px; }
-    .battle-result-banner { margin-top:0.75rem; padding:0.7rem 0.8rem; font-size:12.5px; }
-
     .hero { position:relative; overflow:hidden; height:190px; margin-bottom:1.1rem; background:radial-gradient(ellipse at 70% 35%, #171c34, #0a0d1a 70%); }
     .hero svg { width:100%; height:100%; display:block; }
     /* Bugfix 24.07.2026 (Grafik-Audit): Titel und Kopfzeilen-Knöpfe waren BEIDE einzeln absolut auf
@@ -2001,19 +1867,19 @@
        Positionierung eindeutig und ohne Verifikations-Screenshot sicher richtig herzuleiten. Diese
        Regel steht bewusst NACH den einzelnen .card-row/.profile-card/... Deklarationen, damit sie
        deren border-radius zuverlässig überschreibt (gleiche Selektor-Spezifität, spätere Regel gewinnt). */
-    .card-row, .profile-card, .toast, .battle-modal, .login-card, .rescard, .rank-row, .dash-colony-card, .profile-hero-card, .alliance-hero-card, .ab-hero {
+    .card-row, .profile-card, .toast, .login-card, .rescard, .rank-row, .dash-colony-card, .profile-hero-card, .alliance-hero-card, .ab-hero {
       position:relative; border-radius:0;
       clip-path: polygon(var(--corner) 0, 100% 0, 100% calc(100% - var(--corner)), calc(100% - var(--corner)) 100%, 0 100%, 0 var(--corner));
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before, .ab-hero::before,
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after, .ab-hero::after {
+    .card-row::before, .profile-card::before, .toast::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before, .ab-hero::before,
+    .card-row::after, .profile-card::after, .toast::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after, .ab-hero::after {
       content:''; position:absolute; width:9px; height:9px; pointer-events:none;
       border:var(--bw-2) solid rgba(var(--primary-rgb),0.7);
     }
-    .card-row::before, .profile-card::before, .toast::before, .battle-modal::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before, .ab-hero::before {
+    .card-row::before, .profile-card::before, .toast::before, .login-card::before, .rescard::before, .rank-row::before, .dash-colony-card::before, .profile-hero-card::before, .alliance-hero-card::before, .ab-hero::before {
       top:0; right:0; border-left:none; border-bottom:none;
     }
-    .card-row::after, .profile-card::after, .toast::after, .battle-modal::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after, .ab-hero::after {
+    .card-row::after, .profile-card::after, .toast::after, .login-card::after, .rescard::after, .rank-row::after, .dash-colony-card::after, .profile-hero-card::after, .alliance-hero-card::after, .ab-hero::after {
       bottom:0; left:0; border-right:none; border-top:none;
     }
     /* Runde 1 "Profilkarte überarbeiten" (Spieler-Wunsch): eigenständige HUD-Karte statt generischem
@@ -2283,7 +2149,7 @@
     .hud-cut,
     button, select, .tab-btn, .chip, .jumpnav, .jumpnav a, .hstat, .card-row, .mod-slot,
     .bicon, .bicon-def, .tab-icon-badge, .rescard, .icon-badge,
-    .raid-banner, .event-banner, .summary-bar, .battle-log, .battle-result-banner,
+    .raid-banner, .event-banner, .summary-bar,
     .fp-colony-btn, .login-teaser-item, .help-category, .help-jump-btn,
     .lvl-pill, .ach-pts, .ach-cat-count, .lock-badge, .tab-hint, .map-wrap,
     .ach-summary, .ach-rank, .login-tabs, .login-tab, .ll-fac-sig, .ll-bul i,
@@ -2297,8 +2163,7 @@
     input[type=text], input[type=email], input[type=password], input[type=number], textarea { --cut: var(--cut-sm); }
     .chip, .jumpnav a, .icon-badge, .help-jump-btn,
     .lvl-pill, .ach-pts, .ach-cat-count, .lock-badge, .ll-bul i { --cut: var(--cut-xs); }
-    .card-row, .mod-slot, .raid-banner, .event-banner, .summary-bar, .battle-log,
-    .battle-result-banner, .fp-colony-btn, .login-teaser-item, .help-category,
+    .card-row, .mod-slot, .raid-banner, .event-banner, .summary-bar, .fp-colony-btn, .login-teaser-item, .help-category,
     .tab-hint, .map-wrap { --cut: var(--cut-md); }
     .bicon-def { --cut: var(--cut-lg); }
     @media (max-width:520px){ .bicon-def { --cut: var(--cut-md); } }
@@ -2306,7 +2171,7 @@
        ein 5px-Schnitt würde sie sichtbar zerschneiden statt sie zu formen. Stattdessen einfach
        gerade Enden - runde Balkenkappen sind das klassischste "weiche App"-Merkmal überhaupt und
        genau das, was neben den geschnittenen Flächen fremd wirkte. */
-    .progress-outer, .progress-inner, .battle-hp-bar, .battle-hp-fill { border-radius:0; }
+    .progress-outer, .progress-inner { border-radius:0; }
     /* Dinge, die WIRKLICH rund sein müssen, dürfen nicht mitgeschnitten werden: Avatare, Punkte,
        Mondsichel-Pille und der Schließen-Knopf des Flottenpanels sind Kreise, keine Konsolenflächen. */
     button.pill-moon-btn, button.fp-close-btn, .bicon.round, .rescard .icon-badge.round {
@@ -5898,8 +5763,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.390.0';
+  const VERSION = '8.390.1';
   const PATCHNOTES = [
+    { version:'8.390.1', date:'03.08.2026', changes:[
+      'Aufräumen nach dem Umbau der Kampf-Wiedergabe: Die 105 Gestaltungsregeln der alten Fassung – Schüsse, Einschläge, Trümmerflug, Schadenszahlen, Bühnenrahmen – trug jede Seite noch mit, obwohl kein Element sie mehr benutzt. Zusammen 15,5 kB, die bei jedem Aufruf über die Leitung gingen und nichts mehr taten.'
+    ]},
     { version:'8.390.0', date:'03.08.2026', changes:[
       '<strong>Die Kampf-Wiedergabe ist neu gebaut.</strong> Statt zweier Symbolreihen, die sich in einem schmalen Kasten beschießen, fliegt der Verband jetzt auf den Planeten zu: Rümpfe mit eigener Silhouette je Schiffsklasse, Bodenabwehr auf der Planetenoberfläche, Schildkuppel, Trümmer und eine Kamera, die zu den Höhepunkten heranfährt. Die Wiedergabe nimmt den ganzen Bildschirm ein – sie ist ein Bild, keine Meldung.',
       '<strong>Die Zahlen stammen ausnahmslos aus dem Kampfbericht und werden nirgends ergänzt.</strong> Jede Bestandszahl steht neben ihrem Startwert („148 / 160"), die Rumpfsumme wird aus genau den Zeilen darüber gebildet, und was der Bericht nicht hergibt, wird als solches benannt: Für Spielerduelle, Expeditionen, Leerenrisse und Angriffe auf Allianzbasen führt er die Gegnerflotte gar nicht mit – dort steht die Abwehrkraft und der Hinweis, dass die Zusammensetzung nicht aufgeklärt ist. Eine erfundene Gegnerflotte sähe genauso gut aus wie eine echte und wäre dabei gelogen.',
