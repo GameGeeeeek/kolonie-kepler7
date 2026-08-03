@@ -107,17 +107,32 @@ function schnitt(von, bis){
   check('3: der Bericht zeigt die Anlagen des Ziels samt zerstoerter',
     /defenseBreakdownHtml\(r\.defenseBefore, r\.destroyedBuilding\)/.test(bericht));
 
-  // Die Wiedergabe ist die zweite Anzeigestelle derselben Groesse.
-  const seq = schnitt("      left = { label: 'Deine Flotte', fleet: {...(r.fleet||{})}, losses: {...(r.ownLostShips||{})}, accentColor: null };\n      // Seit dem 02.08.2026", 'attackerWins = r.result === \'win\';');
-  check('3: Wiedergabe-Block gefunden', seq.length > 300, seq.length);
-  check('3: die Wiedergabe nutzt die Zielflotte, wenn sie da ist', /r\.defenderFleet/.test(seq));
-  check('3: und die Anlagen des Ziels', /r\.defenseBefore/.test(seq));
-  // Geprueft wird die AUSSAGE (es gibt einen Rueckfall auf ein abstraktes Symbol), nicht das
-  // konkrete Symbol: Seit v8.388.0 haengt es von der Kampfart ab (Leerenriss, Truemmerraub,
-  // Allianzbasis haben eigene). Die erste Fassung nagelte 'ti-user' fest und ging bei dieser
-  // voellig richtigen Erweiterung kaputt.
-  check('3: ohne beides bleibt es beim abstrakten Icon (aeltere Berichte)',
-    /abstractIcon: ?gegnerIcon/.test(seq) || /abstractIcon:'ti-/.test(seq), seq.slice(-160));
+  // Die Wiedergabe ist die zweite Anzeigestelle derselben Groesse. Seit v8.390.0 baut sie
+  // ihr Bild nicht mehr selbst aus dem Bericht, sondern ueber den Adapter schlachtDaten() -
+  // die frueher hier geprueften Zeilen (buildBattleSequence, abstractIcon) gibt es nicht
+  // mehr. Geprueft wird jetzt dieselbe AUSSAGE an ihrem neuen Ort: dass die Zielflotte
+  // benutzt wird, wenn der Bericht sie fuehrt, und dass ohne sie NICHTS erfunden wird.
+  // Anker OHNE fuehrende Leerzeichen: Der Adapter liegt in der Wiedergabe-Kapsel und ist
+  // dadurch tiefer eingerueckt als in seiner Quelldatei. Die erste Fassung dieser Pruefung
+  // nahm die Einrueckung mit und fand deshalb nichts.
+  const adapter = schnitt("if (r.defenderFleet && Object.keys(zahlenObjekt(r.defenderFleet)).length){",
+                          "d.abwehr = abwehrBauen(r.defenseBefore, u);");
+  check('3: der Adapter-Block der Wiedergabe wurde gefunden', adapter.length > 300, adapter.length);
+  check('3: die Wiedergabe nutzt die Zielflotte, wenn sie da ist',
+    /d\.verteidiger = seiteBauen\(gegnerName, 'gegner', r\.defenderFleet/.test(adapter));
+  // Ein PvP-Angriff zerstoert Verteidigungsgebaeude, aber kein Schiff des Ziels - die
+  // Zielflotte bleibt also vollstaendig stehen. Das ist keine Luecke, sondern das
+  // Kampfmodell, und die Wiedergabe muss es so kennzeichnen statt Verluste zu erfinden.
+  check('3: sie behauptet dabei KEINE Schiffsverluste des Ziels',
+    /d\.verteidiger\.ohneSchiffsverluste = true;/.test(adapter));
+  // Ohne Zielflotte (aelteres Backend) kein Platzhalterverband, sondern die nackte
+  // Abwehrkraft und ein Vermerk, dass die Zusammensetzung unbekannt ist.
+  check('3: ohne Zielflotte wird nichts erfunden, sondern die Luecke benannt',
+    /d\.verteidiger = unbekannteSeite\(gegnerName, 'gegner'/.test(adapter)
+    && /d\.luecken\.push\('Flotte des Gegners'\)/.test(adapter), adapter.slice(-170));
+  // Die Anlagen des Ziels stehen im Bericht (defenseBefore) und werden dort gezeigt -
+  // die Wiedergabe fuehrt sie nur beim eingehenden Ueberfall, wo der Bericht sie hergibt.
+  check('3: die Anlagen kommen aus defenseBefore', /d\.abwehr = abwehrBauen\(r\.defenseBefore, u\);/.test(src));
 }
 
 // ----------------------------------------- 4) Was bewusst NICHT drin steht
