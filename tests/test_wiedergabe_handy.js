@@ -196,7 +196,13 @@ async function spielStarten(browser, berichte, wartezeit){
     // Der eigentliche Risikopunkt.
     check('5: die Steuerknöpfe bleiben in JEDEM Zustand sichtbar',
       a.knoepfe && b2.knoepfe && c.knoepfe, { alles: a.knoepfe, ohneDaten: b2.knoepfe, ohneBeides: c.knoepfe });
-    check('5: nichts läuft dabei über den Rand hinaus',
+    // NAME GESCHAERFT (05.08.2026): Hier stand „nichts läuft über den Rand hinaus". Gemessen
+    // wurde aber nur scrollHeight-clientHeight, also ausschliesslich die HOEHE. Die Wiedergabe
+    // lief zu diesem Zeitpunkt seit Monaten 75 px zu BREIT aus dem Telefon heraus, mit einem
+    // vollstaendig unerreichbaren Bedienknopf - und dieser Test war gruen. Ein Prueftext, der
+    // mehr verspricht als er misst, ist schlimmer als keiner: Man liest ihn und hoert auf zu
+    // suchen. Die Breite prueft jetzt Abschnitt 8.
+    check('5: nichts läuft dabei in der HÖHE über den Rand hinaus',
       a.ueberlauf <= 0 && b2.ueberlauf <= 0 && c.ueberlauf <= 0,
       { a: a.ueberlauf, b: b2.ueberlauf, c: c.ueberlauf });
     // Ohne Neumessung bliebe die Leinwand in der alten Groesse - das Bild waere verzerrt
@@ -495,6 +501,111 @@ async function spielStarten(browser, berichte, wartezeit){
     check('7: die Bestandstafel sagt weiterhin, dass der Gegner nicht aufgeklärt ist',
       /nicht aufgeklärt/i.test(m.tafeln), m.tafeln.slice(0, 160));
     check('keine JS-Fehler (unbekannte Gegenseite)', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ============================== 8) Die Wiedergabe passt in die BREITE des Telefons
+  // BEFUND 05.08.2026: Auf einem 390 px breiten iPhone waren alle vier Kinder der Fussleiste
+  // 458 px breit - 75 px ueber den Bildschirmrand hinaus. Der fuenfte Bedienknopf („Video")
+  // begann bei x=388 und war damit VOLLSTAENDIG unerreichbar; Phasenleiste, Kraftschiene und
+  // Protokollzeile liefen rechts einfach aus dem Bild.
+  //
+  // URSACHE, kausal eingegrenzt (jedes Kind der Fussleiste einzeln ausgeblendet und neu
+  // gemessen): Nur ohne #osProtokoll fiel der Rest auf 376 px. Ein Rasterkind hat von Haus aus
+  // min-width:auto, und das ist bei .plog mit white-space:nowrap die volle Textbreite. Die
+  // Fussleiste konnte also nie schmaler werden als die laengste Protokollmeldung, und weil
+  // alle vier Kinder in derselben Rasterspalte stehen, zog eine lange Meldung alle drei
+  // anderen mit. Nebenwirkung: Das text-overflow:ellipsis auf .plog konnte NIE greifen - der
+  // Kasten war nie zu schmal fuer seinen Text, er wuchs stattdessen ueber den Bildschirm.
+  //
+  // Warum das jahrelang durchrutschte: Abschnitt 5 hiess „nichts läuft über den Rand hinaus",
+  // mass aber nur die Hoehe. Und die kurzen Meldungen der Musterberichte passten - erst die
+  // Enterbeute mit vier Schiffstypen ist lang genug. Dieser Abschnitt nimmt deshalb einen
+  // Bericht MIT Enterbeute und prueft die Breite jedes einzelnen Elements.
+  {
+    const BEUTE = { id:'b1', ts:Date.now(), type:'npc-attack', result:'win',
+      npcName:'Vorhut der Zerschlagenen Sichel', attackPower:184000, defensePower:96000,
+      chancePct:74, targetPlanet:'home', debrisPlanet:'home',
+      phasen:[{nr:1,name:'Vorhutgefecht',gewonnen:true},{nr:2,name:'Hauptgefecht',gewonnen:true},
+              {nr:3,name:'Nachhut',gewonnen:false}],
+      fleet:{ schlachtschiff:3000, destroyers:1200, jaeger:4000, cruisers:900, carrier:200 },
+      ownLostShips:{ jaeger:400 },
+      npcFleet:{ jaeger:2000, cruisers:400 }, destroyedNpcShips:{ jaeger:2000, cruisers:250 },
+      gekapert:{ destroyers:4, cruisers:3, schlachtschiff:2, carrier:2 } };
+
+    const { page, errs, ctx } = await spielStarten(browser, [BEUTE]);
+    // Bis nach der Enter-Meldung laufen lassen (sie faellt bei Simulationszeit 36,6).
+    for (let i = 0; i < 60; i++){
+      await page.waitForTimeout(700);
+      const t = await page.evaluate(() => { try { return JSON.parse(document.getElementById('osWrap').dataset.zustand).t; } catch(e){ return 0; } });
+      if (t >= 37.5) break;
+    }
+    await page.evaluate(() => { const b = document.getElementById('osBtnPause'); if (b) b.click(); });
+    await page.waitForTimeout(300);
+
+    // Misst JEDES Element unter #osWrap gegen die Bildschirmbreite und liefert die Uebeltaeter.
+    const breitMessen = () => page.evaluate(() => {
+      const W = document.documentElement.clientWidth;
+      const wrap = document.getElementById('osWrap');
+      const raus = [];
+      (function gehe(el){
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && (r.right > W + 1 || r.left < -1)){
+          raus.push({ was: el.id ? '#'+el.id : '.'+String(el.className||el.tagName).trim().split(/\s+/)[0],
+                      breite: Math.round(r.width), ragt: Math.round(r.right - W) });
+        }
+        for (const k of el.children) gehe(k);
+      })(wrap);
+      const v = document.getElementById('osBtnVideo');
+      const zeile = [...document.querySelectorAll('#osProtokoll .plog')]
+        .filter(x => getComputedStyle(x).display !== 'none')
+        .map(x => ({ text:(x.textContent||'').trim(),
+                     ganzDa: x.scrollHeight <= x.clientHeight + 1 && x.scrollWidth <= x.clientWidth + 1 }));
+      return { W, raus: raus.slice(0, 8), anzahl: raus.length,
+               videoGanzImBild: !!v && v.getBoundingClientRect().right <= W + 1 && v.getBoundingClientRect().left >= -1,
+               zeile };
+    });
+
+    const m = await breitMessen();
+    // DER Punkt.
+    check('8: kein Teil der Wiedergabe ragt seitlich aus dem Telefon',
+      m.anzahl === 0, { bildschirm: m.W, uebeltaeter: m.raus,
+        hinweis:'Rasterkinder der Fussleiste brauchen min-width:0, sonst erzwingt die laengste Protokollmeldung die Breite.' });
+    // Die konkrete, fuer den Spieler spuerbare Folge - eigene Pruefung, damit im Fehlerfall
+    // sofort dasteht, was er nicht mehr anfassen kann.
+    check('8: der letzte Bedienknopf ist vollständig erreichbar', m.videoGanzImBild === true);
+    // Und die Meldung, die den Fehler ausgeloest hat, ist auch wirklich lesbar.
+    check('8: die längste Protokollmeldung steht vollständig da',
+      m.zeile.length > 0 && m.zeile.every(z => z.ganzDa), m.zeile);
+    check('8: es ist auch wirklich die lange Enter-Meldung', m.zeile.some(z => /Geentert/.test(z.text)),
+      m.zeile.map(z => z.text));
+
+    // ---- GEGENPROBE: Im alten Zustand MUSS die Pruefung anschlagen.
+    // Ohne sie waere nicht bewiesen, dass oben ueberhaupt etwas geprueft wird - eine Messung,
+    // die immer 0 Uebeltaeter findet, weil sie am falschen Element haengt, saehe genauso aus.
+    //
+    // Es muessen BEIDE Schutzmassnahmen zurueckgedreht werden, und das ist selbst ein Befund:
+    // Der erste Versuch drehte nur min-width zurueck und blieb gruen. Grund: Der zweizeilige
+    // Umbruch auf dem Telefon setzt white-space:normal, und damit ist die Mindestbreite der
+    // Zeile nur noch das laengste WORT - min-width:auto richtet dann keinen Schaden mehr an.
+    // Auf dem Telefon sichern also zwei unabhaengige Massnahmen dasselbe ab. min-width:0 ist
+    // trotzdem kein totes Gewicht: Auf dem Desktop bleibt die Zeile einzeilig (nowrap), dort
+    // ist es die einzige Bremse gegen eine Protokollmeldung, die das Raster auseinanderzieht.
+    await page.evaluate(() => {
+      const st = document.createElement('style');
+      st.id = 'gegenprobe';
+      st.textContent = '#osWrap .fuss > *{min-width:auto !important}' +
+                       '#osWrap .plog{white-space:nowrap !important; display:block !important; min-height:0 !important}';
+      document.head.appendChild(st);
+    });
+    await page.waitForTimeout(200);
+    const g = await breitMessen();
+    check('8: Gegenprobe – im alten Zustand ragt die Fussleiste wieder heraus',
+      g.anzahl > 0 && g.videoGanzImBild === false,
+      { uebeltaeter: g.anzahl, breitestes: g.raus[0], videoImBild: g.videoGanzImBild });
+    await page.evaluate(() => { const s = document.getElementById('gegenprobe'); if (s) s.remove(); });
+
+    check('keine JS-Fehler (Breite)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
