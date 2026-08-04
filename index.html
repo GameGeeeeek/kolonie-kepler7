@@ -6039,8 +6039,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.406.0';
+  const VERSION = '8.407.0';
   const PATCHNOTES = [
+    { version:'8.407.0', date:'05.08.2026', changes:[
+      '<strong>Die Welt unter dem Gefecht sieht jetzt aus wie die Welt, um die gekämpft wird.</strong> Bisher zeigte die Kampfwiedergabe bei <em>jedem</em> Gefecht denselben dunkelblauen Halbkreis - ob man einen Eismond umkreiste, einen Vulkanplaneten oder ein Trümmerfeld, machte im Bild keinen Unterschied. Dabei weiß das Spiel für alle 499 Planeten längst, was für eine Welt das ist; die Angabe kam nur nie in der Wiedergabe an. Jetzt hat jede der zehn Planetensorten ihr eigenes Aussehen, dazu Heimatbasis und Monde: <em>Wasserwelten</em> tiefblau mit wenigen Inseln, <em>Wüsten</em> ockerbraun, <em>Eiswelten</em> hellblau-weiß, <em>Kristallwelten</em> violett, <em>Ruinenwelten</em> staubgrau. Drei Sorten bekommen zusätzlich eigene Oberflächen: der <em>Gasriese</em> waagerechte Wolkenbänder statt Kontinenten, die <em>Vulkanwelt</em> glühende Adern, die vom Horizont nach unten laufen, und <em>Asteroiden wie Monde</em> Einschlagkrater mit hellem Wall. Berichte ohne Ortsangabe sehen unverändert aus wie bisher.'
+    ]},
     { version:'8.406.0', date:'05.08.2026', changes:[
       '<strong>Behoben: Wer zu früh auf „Freischalten" geklickt hat, wurde nie automatisch nachgeprüft.</strong> Die eingetippte Ko-fi-Adresse wurde bisher <em>nur bei Erfolg</em> gemerkt. Klickt man aber, bevor Ko-fi die Spende gemeldet hat - und Ko-fi stellt nicht in derselben Sekunde zu -, kam eine Absage, und die Adresse war danach nirgends gespeichert. Die automatische Nachprüfung steigt bei fehlender Adresse sofort aus, lief für diesen Spieler also <strong>nie an</strong>; das seit dem 28.07.2026 gegebene Versprechen „du musst hier nichts mehr tun" galt ausgerechnet für den ungeduldigsten Fall nicht. Sichtbar war es auch: Die getippte Adresse verschwand nach dem Klick wieder aus dem Feld. Sie wird jetzt gemerkt, und die Meldung sagt das auch. Nicht gemerkt wird sie, wenn die Adresse bereits einem anderen Konto gehört oder gar keine gültige Adresse ist - da wäre Weiterprobieren zwecklos.',
       '<strong>Behoben: Der Kasten „Aktueller Top-Unterstützer" konnte eine zu kleine Summe und den falschen Namen zeigen.</strong> Die Spendennamen wurden zeichengenau gespeichert, die E-Mail-Adressen daneben aber kleingeschrieben - zwei Zahlungen desselben Menschen, bei Gast-Zahlungen jedes Mal neu eingetippt, landeten dadurch auf zwei getrennten Einträgen und ihre Summen addierten sich nicht. Gemessen an einem Beispiel: 5 € und 12 € desselben Spenders ergaben im Kasten 12 statt 17, und bei mehreren Spendern konnte dadurch der Falsche an der Spitze stehen. Abzeichen und Medaillenstufe waren davon nicht betroffen. Bereits entstandene Doppeleinträge werden beim nächsten Serverstart einmalig zusammengeführt.'
@@ -26591,12 +26594,19 @@
         u.gebaeudeName  = u.gebaeudeName  || function(k){ return k; };
         u.schiffGewicht = u.schiffGewicht || function(){ return 20; };
         u.ortName       = u.ortName       || function(k){ return k || 'Unbekannt'; };
+        u.ortTyp        = u.ortTyp        || function(){ return null; };
 
         var d = {
           art: r.type,
           abspielbar: true,
           ergebnis: null,          // 'sieg' | 'niederlage'  - aus SICHT DES SPIELERS
           ortName: null,
+          /* Welche ART Welt der Kampf umkreist - 'erdaehnlich', 'wueste', 'eis', 'vulkan',
+             'kristall', 'gasriese', 'asteroid', 'wasserwelt', 'todeswelt', 'super', dazu
+             'heimat' und 'mond'. null heisst "nicht bekannt"; die Wiedergabe faellt dann auf
+             ihr bisheriges Aussehen zurueck. Spieler-Wunsch Sascha (05.08.2026): "die optik des
+             planeten im hintergrund anpassen je nachdem wo der kampf stattfindet". */
+          ortTyp: null,
           angreifer: null,
           verteidiger: null,
           abwehr: { bekannt:false, verlusteBekannt:false, arten:[], gesamt:0, lebt:0 },
@@ -26616,6 +26626,7 @@
              result:'win' heisst hier, die VERTEIDIGUNG (also der Spieler) gewann. */
           d.ergebnis = (r.result === 'win') ? 'sieg' : 'niederlage';
           d.ortName = u.ortName(r.targetPlanet);
+          d.ortTyp  = u.ortTyp(r.targetPlanet);
           d.angreifer   = seiteBauen(r.faction || 'Angreifer', 'gegner',
                                      r.fleet, r.result === 'win' ? r.destroyedShips : null, u);
           d.verteidiger = seiteBauen('Deine Verteidigung', 'du',
@@ -26638,6 +26649,7 @@
           d.blick = 'angriff';
           d.ergebnis = (r.result === 'win' || r.result === 'defended') ? 'sieg' : 'niederlage';
           d.ortName = u.ortName(r.targetPlanet || r.debrisPlanet);
+          d.ortTyp  = u.ortTyp(r.targetPlanet || r.debrisPlanet);
           d.angreifer = seiteBauen('Deine Flotte', 'du', r.fleet, r.ownLostShips, u);
 
           var gegnerName = r.npcName || r.targetName || r.faction ||
@@ -26697,6 +26709,16 @@
           gebaeudeName:  function(k){ return bn[k] || k; },
           schiffGewicht: function(k){ return (SHIP_SCORE_WEIGHTS || {})[k] || 20; },
           ortName:       function(k){ return planetDisplayName ? planetDisplayName(k) : (k || 'Unbekannt'); },
+          /* Weltentyp fuer das Hintergrundbild. Kommt aus PLANETS, wo er ohnehin fuer jeden der
+             499 Planeten steht - keine zweite Tabelle, die veralten koennte. Heimatbasis und
+             Monde haben dort keinen Eintrag und bekommen ihre eigenen Kennungen. */
+          ortTyp:        function(k){
+            if (!k) return null;
+            if (k === 'home') return 'heimat';
+            if (typeof isMoonKey === 'function' && isMoonKey(k)) return 'mond';
+            var p = (typeof PLANETS !== 'undefined') ? PLANETS.find(function(x){ return x.id === k; }) : null;
+            return (p && p.type) || null;
+          },
           /* Konterrolle und Antrieb (05.08.2026). Beides steht laengst im Spiel und war der
              Wiedergabe bisher nicht zugaenglich - sie bekam nur Namen, Gewicht und Ort.
              abfang/bomber/kapital entscheidet ueber die WAFFENGATTUNG im Bild, drive ueber die
@@ -27375,6 +27397,38 @@
 
     var hgBild = null, funkelPunkte = [];
 
+    /* ===== Wie die Welt unter dem Gefecht aussieht (05.08.2026) =====
+       Spieler-Wunsch Sascha: "die optik des planeten im hintergrund anpassen je nachdem wo der
+       kampf stattfindet". Bis hierher war der Boden bei JEDEM Kampf derselbe dunkelblaue Halbkreis,
+       egal ob man einen Eismond, einen Vulkanplaneten oder ein Truemmerfeld umkreiste - und das
+       Spiel weiss die Art der Welt fuer alle 499 Planeten laengst (PLANETS[].type).
+
+       Je Typ drei Farben fuer den Bodenverlauf (aussen/mitte/tief), eine Landmassenfarbe und zwei
+       Regler:
+         land   - wie viele Landflecken gezeichnet werden (0 = keine, bei Gasriesen und Wasserwelten)
+         baender- waagerechte Wolkenbaender statt Landmassen (nur Gasriese)
+         glut   - gluehende Adern auf der Oberflaeche (nur Vulkanwelt)
+         krater - Einschlagkrater (Asteroid, Mond)
+       Unbekannter oder fehlender Typ faellt auf 'heimat' zurueck - das ist exakt das bisherige
+       Aussehen, ein alter Bericht ohne Ortsangabe sieht also aus wie immer. */
+    var ORT_STIL = {
+      heimat:      { a:'#101830', b:'#0a1020', c:'#05070f', land:'rgba(24,34,58,', flecken:9 },
+      erdaehnlich: { a:'#12304a', b:'#0b2136', c:'#05121f', land:'rgba(34,74,52,', flecken:11 },
+      wasserwelt:  { a:'#0d3350', b:'#082438', c:'#04121d', land:'rgba(28,70,92,', flecken:3 },
+      wueste:      { a:'#4a3a20', b:'#332714', c:'#1b140a', land:'rgba(104,80,42,', flecken:10 },
+      eis:         { a:'#2c4a5e', b:'#1d3242', c:'#0c1a24', land:'rgba(150,186,206,', flecken:8 },
+      vulkan:      { a:'#3a1810', b:'#26100a', c:'#120705', land:'rgba(74,28,18,', flecken:9, glut:true },
+      kristall:    { a:'#2a2350', b:'#1b1638', c:'#0c0a1c', land:'rgba(96,84,176,', flecken:8 },
+      gasriese:    { a:'#3d2c4e', b:'#2a1d38', c:'#150e1e', land:'rgba(120,92,150,', flecken:0, baender:true },
+      asteroid:    { a:'#2e2e33', b:'#1f1f23', c:'#101013', land:'rgba(70,70,78,', flecken:7, krater:true },
+      todeswelt:   { a:'#33302a', b:'#22201c', c:'#111010', land:'rgba(66,60,50,', flecken:9 },
+      super:       { a:'#2b1c36', b:'#1c1224', c:'#0d0812', land:'rgba(64,44,80,', flecken:12 },
+      mond:        { a:'#33363c', b:'#232529', c:'#111214', land:'rgba(84,88,96,', flecken:6, krater:true }
+    };
+    function ortStil(){
+      return ORT_STIL[(DATEN && DATEN.ortTyp) || ''] || ORT_STIL.heimat;
+    }
+
     function backeHintergrund(){
       saatZ = 20260802;
       var nc = document.createElement('canvas');
@@ -27421,20 +27475,59 @@
       /* Planetenkoerper */
       g.save();
       g.beginPath(); g.arc(cxP, cyP, RAD, 0, TAU); g.clip();
+      var ST = ortStil();
       var kb = g.createLinearGradient(0, yBoden, 0, H);
-      kb.addColorStop(0, '#101830'); kb.addColorStop(0.45, '#0a1020'); kb.addColorStop(1, '#05070f');
+      kb.addColorStop(0, ST.a); kb.addColorStop(0.45, ST.b); kb.addColorStop(1, ST.c);
       g.fillStyle = kb; g.fillRect(0, yBoden - 4, W, H - yBoden + 8);
 
-      /* Landmassen als weiche Flecken */
-      for (var c = 0; c < 9; c++){
+      /* Landmassen als weiche Flecken - Anzahl und Farbe je nach Weltentyp. Eine Wasserwelt
+         bekommt drei Inseln, ein Gasriese gar keine (er hat stattdessen Baender). */
+      for (var c = 0; c < (ST.flecken || 0); c++){
         var lu = -1.15 + zuf()*2.3;
         var lx = pxX(lu, 0), ly = yBoden + 6 + zuf()*H*0.16;
         var lr = (0.05 + zuf()*0.13) * W;
         var lg = g.createRadialGradient(lx, ly, 0, lx, ly, lr);
-        lg.addColorStop(0, 'rgba(24,34,58,.55)');
-        lg.addColorStop(0.6, 'rgba(18,26,46,.28)');
-        lg.addColorStop(1, 'rgba(18,26,46,0)');
+        lg.addColorStop(0, ST.land + '.55)');
+        lg.addColorStop(0.6, ST.land + '.28)');
+        lg.addColorStop(1, ST.land + '0)');
         g.fillStyle = lg; g.beginPath(); g.arc(lx, ly, lr, 0, TAU); g.fill();
+      }
+      /* Gasriese: waagerechte Wolkenbaender statt Kontinenten. */
+      if (ST.baender){
+        for (var bd = 0; bd < 7; bd++){
+          var by = yBoden + 8 + bd * (H * 0.028) + zuf()*3;
+          g.fillStyle = ST.land + (0.10 + zuf()*0.16).toFixed(3) + ')';
+          g.fillRect(0, by, W, (H * 0.012) * (0.6 + zuf()*0.9));
+        }
+      }
+      /* Vulkanwelt: gluehende Adern, die sich vom Horizont nach unten ziehen. */
+      if (ST.glut){
+        for (var ad = 0; ad < 7; ad++){
+          var au = -1.0 + zuf()*2.0;
+          var ap = px(au, 0);
+          g.strokeStyle = 'rgba(226,110,60,' + (0.20 + zuf()*0.35).toFixed(3) + ')';
+          g.lineWidth = 0.8 + zuf()*1.6;
+          g.beginPath(); g.moveTo(ap.x, ap.y + 2);
+          var axx = ap.x, ayy = ap.y + 2;
+          for (var seg = 0; seg < 5; seg++){
+            axx += (zuf()-0.5) * W * 0.05; ayy += H * 0.022;
+            g.lineTo(axx, ayy);
+          }
+          g.stroke();
+        }
+      }
+      /* Asteroid und Mond: Einschlagkrater mit hellem Wall und dunklem Grund. */
+      if (ST.krater){
+        for (var kr = 0; kr < 10; kr++){
+          var ku = -1.05 + zuf()*2.1;
+          var kp = px(ku, 0);
+          var kx = kp.x + (zuf()-0.5)*W*0.04, ky = kp.y + 4 + zuf()*H*0.12;
+          var krr = (0.008 + zuf()*0.022) * W;
+          g.fillStyle = 'rgba(12,12,15,.45)';
+          g.beginPath(); g.arc(kx, ky, krr, 0, TAU); g.fill();
+          g.strokeStyle = ST.land + '.5)'; g.lineWidth = 0.9;
+          g.beginPath(); g.arc(kx, ky - krr*0.12, krr, Math.PI*1.05, Math.PI*1.95); g.stroke();
+        }
       }
       /* Meridiane als Kruemmungshilfe */
       g.strokeStyle = 'rgba(146,150,172,.07)'; g.lineWidth = 1;
