@@ -116,8 +116,24 @@ async function swipeLeft(page, cdp, box, dist){
         await page.waitForTimeout(200);
         const inView = info.y >= 0 && info.y + info.h <= 851;
         check(label+': liegt fuer die Wischprobe im Sichtbereich', inView, {y:Math.round(info.y), h:Math.round(info.h)});
-        await swipeLeft(page, cdp, {x:info.x,y:info.y,w:info.w,h:info.h}, Math.min(200, have));
-        const after = await warteAufRuhe(page, name, 3000);
+        // BIS ZU DREI VERSUCHE (05.08.2026). Die Wartelogik oben war schon geduldig genug, der
+        // Fehler lag woanders: Unter Volllast im Sammellauf werden die einzelnen Touch-Punkte der
+        // Geste so weit auseinandergezogen, dass der Browser sie nicht mehr als Schwung liest -
+        // die Leiste rutschte dann 18 px statt 185 und blieb unter der Schwelle. Einzeln
+        // gestartet lief derselbe Test sofort gruen.
+        // Die SCHWELLE bleibt bei 20 px: Sie abzusenken hiesse, eine kaputte Leiste durchzulassen,
+        // die sich einen Pixel bewegt. Stattdessen darf die Geste es noch einmal versuchen - kommt
+        // sie dreimal nicht vom Fleck, ist es wirklich die Leiste und nicht die Maschine.
+        let after = 0;
+        for (let versuch = 0; versuch < 3; versuch++){
+          if (versuch > 0){
+            await page.evaluate(n=>{ document.querySelector(`[data-hscroll="${n}"]`).scrollLeft = 0; }, name);
+            await page.waitForTimeout(300);
+          }
+          await swipeLeft(page, cdp, {x:info.x,y:info.y,w:info.w,h:info.h}, Math.min(200, have));
+          after = await warteAufRuhe(page, name, 3000);
+          if (after > 20) break;
+        }
         check(label+': Wischen bewegt die Leiste', after > 20, {scrollLeftNachWisch:after});
       }
       // 4) Der hinterste Eintrag laesst sich per Antippen wirklich auswaehlen (nur bei Button-Leisten).

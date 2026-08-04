@@ -91,8 +91,16 @@ check('2: nur der Leerenriss laesst den ganzen Reiter pulsieren',
     !/badge\.style\.display/.test(rift) && /updateTabBedarfBadges\(\)/.test(rift));
   check('3: aber es behaelt das Reiter-Pulsieren', /tab-btn-alert/.test(rift));
   // Genau EINE Stelle schreibt die Punkte.
-  const schreiber = (js.match(/el\.style\.display = b \? 'block' : 'none'/g)||[]).length;
-  check('3: genau eine Stelle schreibt die Reiterpunkte', schreiber === 1, schreiber);
+  //
+  // Geprüft wird das seit dem 05.08.2026 an der SACHE statt am Wortlaut: Vorher stand hier die
+  // wörtliche Zeile `el.style.display = b ? 'block' : 'none'`, und der Test wurde rot, als genau
+  // diese Zuweisung einen Wächter bekam (sie lief jeden Tick, auch unverändert). Die Aussage, auf
+  // die es ankommt, blieb dabei wahr - eine Prüfung, die bei einer korrekten Umformulierung
+  // anschlägt, prüft die Formulierung und nicht die Regel.
+  const selektor = (js.match(/\[data-tab-need\]/g)||[]).length;
+  check('3: genau eine Stelle greift die Reiterpunkte überhaupt ab', selektor === 1, selektor);
+  const schreiber = (fnAus('updateTabBedarfBadges').match(/style\.display\s*=/g)||[]).length;
+  check('3: und dort setzt genau eine Zuweisung ihre Sichtbarkeit', schreiber === 1, schreiber);
 }
 
 // ---- 4) Pruefung A: alle vier Anzeigen lesen aus derselben Liste ----

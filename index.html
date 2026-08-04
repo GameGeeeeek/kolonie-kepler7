@@ -5887,8 +5887,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.399.0';
+  const VERSION = '8.400.0';
   const PATCHNOTES = [
+    { version:'8.400.0', date:'05.08.2026', changes:[
+      '<strong>Die Rohstoffanzeige oben kostet fast nichts mehr.</strong> Die hochzählenden Zahlen wurden 60-mal je Sekunde und Rohstoff komplett neu zusammengebaut – samt dem „/ Lager"-Teil, der sich dabei nie ändert. Gemessen war das mit 55–66 Änderungen je Sekunde der <em>größte</em> Posten im ganzen Spiel, auf jedem Reiter und dauerhaft. Jetzt wird nur noch die Zahl selbst geschrieben, und auch die nur, wenn sich die angezeigte Ziffer wirklich ändert. Sichtbar ist der Unterschied nicht – die Animation läuft unverändert.',
+      '<strong>Lanze und Torpedo klingen jetzt auch verschieden.</strong> Seit v8.398.0 unterscheiden sich die drei Waffengattungen im Bild, im Ton aber nicht: Der schwere Lanzenstrahl der Großkampfschiffe und die Bombertorpedos klangen beide exakt wie eine Jägersalve. Der Torpedo teilt sich den Klang jetzt mit der Bodenrakete – er ist dasselbe: ein langsamer, gelenkter Körper –, und die Lanze hat einen eigenen, tiefen Ton mit Anlauf bekommen.',
+      '<strong>Weniger Leerlauf im Hintergrund.</strong> Die Schalterzeilen in den Einstellungen, die Punkte an den Reitern und die Produktionsraten wurden jede Sekunde neu gesetzt, auch wenn sich nichts geändert hatte. Zusammen mit dem Punkt oben sank die Zahl der Änderungen an der Seite von 147 auf 67 je Sekunde.',
+      '<strong>Das Ziehen am Fensterrand ruckelt nicht mehr.</strong> Die Kampf-Wiedergabe hat dabei bei jedem einzelnen Bild ihre kompletten Schiffsbilderbogen neu gebacken – gemessen 20–23 ms je Durchgang. Jetzt passiert das einmal, 130 ms nachdem man losgelassen hat.',
+      'Aufgeräumt: Ein Drehbuch aus der Prototyp-Zeit, das während des Gefechts einzelne Geschützstellungen zu festen Zeitpunkten sprengte, war seit der Umstellung auf echte Kampfberichte unerreichbar geworden – es lief bei jedem Bild über eine leere Liste. Es ist samt seiner beiden Hilfsfunktionen entfernt.'
+    ]},
     { version:'8.399.0', date:'05.08.2026', changes:[
       '<strong>Die Geschütztürme zielen jetzt sichtbar.</strong> Sie taten es die ganze Zeit schon – die Anlagen suchen ihr Ziel, rechnen den Winkel und schwenken mit 1,6 rad/s darauf zu. Nur gezeichnet wurde das nie: Seit die Wiedergabe die echten Gebäudebilder stempelt statt der alten Platzhalter-Silhouetten, zeigte auf dem Boden jedes Rohr stur geradeaus, während im Hintergrund neun bis zehn Stellungen um bis zu 62 Grad geschwenkt standen. Flak, Verteidigungsturm und Lasergeschütz führen ihr Rohr ab sofort sichtbar nach – der Sockel bleibt dabei stehen, es kippt nicht das ganze Gebäude.',
       '<strong>Der Mündungsblitz sitzt dort, wo der Schuss herauskommt.</strong> Er stand bisher fest über der Anlage, während der Laserstrahl daneben und bis zu 62 Grad davon weggedreht startete – Blitz und Schuss waren zwei verschiedene Orte.',
@@ -23330,6 +23337,15 @@
         o.type = 'sawtooth';
         if (isImpact){ o.frequency.setValueAtTime(140,now); o.frequency.exponentialRampToValueAtTime(35,now+0.35); g.gain.setValueAtTime(0.08,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.4); o.start(now); o.stop(now+0.41); }
         else { o.frequency.setValueAtTime(90,now); o.frequency.linearRampToValueAtTime(60,now+0.3); g.gain.setValueAtTime(0.02,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.32); o.start(now); o.stop(now+0.33); }
+      } else if (weaponKind === 'lanze'){
+        // Grosskampfschiff-Lanze (05.08.2026). Seit v8.398.0 gibt es drei sichtbar verschiedene
+        // Waffengattungen, aber schussTon() kannte nur 'orb', 'missile' und sonst 'laser' - Lanze
+        // und Schiffstorpedo klangen beide exakt wie die Jaegersalve. Derselbe wiederkehrende
+        // Fehler wie sonst bei zweiten ANZEIGEstellen, diesmal beim Ton.
+        // Der Gegenentwurf zum kurzen, hellen Laser: tief, lang und mit Anlauf statt Klick.
+        o.type = 'sawtooth';
+        if (isImpact){ o.frequency.setValueAtTime(240,now); o.frequency.exponentialRampToValueAtTime(45,now+0.3); g.gain.setValueAtTime(0.07,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.32); o.start(now); o.stop(now+0.33); }
+        else { o.frequency.setValueAtTime(420,now); o.frequency.exponentialRampToValueAtTime(150,now+0.26); g.gain.setValueAtTime(0.0001,now); g.gain.linearRampToValueAtTime(0.035,now+0.05); g.gain.exponentialRampToValueAtTime(0.001,now+0.28); o.start(now); o.stop(now+0.29); }
       } else {
         o.type = isImpact ? 'sawtooth' : 'square';
         if (isImpact){ o.frequency.setValueAtTime(200,now); o.frequency.exponentialRampToValueAtTime(60,now+0.15); g.gain.setValueAtTime(0.045,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.16); o.start(now); o.stop(now+0.17); }
@@ -26304,11 +26320,6 @@
       ['plasma',[-0.79, -0.47, -0.07, 0.27, 0.52, 0.81]],
       ['laser', [-0.95,-0.86,-0.70,-0.54,-0.38,-0.22,-0.08,0.10,0.26,0.44,0.62,0.89]]
     ];
-    /* Welche Batterie wann von den Bombern ausgeschaltet wird (9 von 25). */
-    var ABWEHR_TOD = [
-      ['laser',1,29.2], ['laser',6,30.4], ['plasma',0,31.3], ['laser',9,32.1], ['silo',2,33.4],
-      ['laser',4,34.6], ['gauss',1,36.0], ['plasma',3,37.2], ['laser',11,38.6]
-    ];
 
     /* --- Zeitachse --- */
     var ABSCHNITTE = [
@@ -26995,8 +27006,7 @@
           anlagen.push({
             typ: typ, geb: geb, nr: j, u: us[j], lebt: true, ziel: null, zielZeit: 0,
             richt: 0, sollRicht: 0, lade: 0.6 + Math.random()*2.2, glut: 0,
-            rueck: 0, klappe: 0, salve: 0, salveTakt: 0, ph: Math.random()*TAU,
-            blitz: 0, sterben: 0
+            rueck: 0, klappe: 0, salve: 0, salveTakt: 0, ph: Math.random()*TAU
           });
         }
       }
@@ -27624,7 +27634,14 @@
       if (t - letzterSchuss < 110) return;
       letzterSchuss = t;
       if (typeof playWeaponSound !== 'function') return;
-      playWeaponSound(typ === 'plasma' ? 'orb' : typ === 'rakete' ? 'missile' : 'laser', false);
+      /* Die Zuordnung deckt seit dem 05.08.2026 auch die Schiffs-Waffengattungen ab. Vorher fielen
+         `lanze` und `schifftorpedo` beide in den Standardzweig und klangen wie die Jaegersalve -
+         sichtbar waren die drei Gattungen unterschieden, hoerbar nicht. Der Schiffstorpedo teilt
+         sich den Klang mit der Bodenrakete, weil er dasselbe IST: ein langsamer, gelenkter Koerper. */
+      playWeaponSound(
+        typ === 'plasma' ? 'orb' :
+        (typ === 'rakete' || typ === 'schifftorpedo') ? 'missile' :
+        typ === 'lanze' ? 'lanze' : 'laser', false);
     }
 
     function geschossNeu(g){
@@ -28034,40 +28051,13 @@
         if (an.typ === 'plasma') feuerPlasma(an);
         if (an.typ === 'gauss')  feuerGauss(an);
       }
-      /* Bomber schalten nach dem Kuppelbruch einzelne Batterien aus. */
-      for (var d2 = 0; d2 < ABWEHR_TOD.length; d2++){
-        var e = ABWEHR_TOD[d2];
-        var an2 = findeAnlage(e[0], e[1]);
-        if (!an2 || !an2.lebt) continue;
-        if (tSim >= e[2] - 0.9 && !an2.bombeAb){
-          an2.bombeAb = true;
-          var b = naechsterBomber(an2.u);
-          if (b) geschossNeu({ typ:'torpedo', u:b.u, a:b.a,
-            vu:(an2.u - b.u)/0.9, va:(0.004 - b.a)/0.9, t:0, dauer:0.88,
-            farbe:F.an, dick:2.2, len:9 });
-        }
-        if (tSim >= e[2]){
-          an2.lebt = false; glockeNeu = true;
-          blitzNeu(an2.u, 0.012, 0.9, F.warn, true);
-          for (var q = 0; q < (klein ? 5 : 10); q++){
-            var wq = Math.random()*Math.PI;
-            funkeNeu(an2.u, 0.008, Math.cos(wq)*0.05, Math.abs(Math.sin(wq))*0.14, 1.1, F.warn);
-          }
-          kamShake = Math.max(kamShake, klein ? 2 : 3.4);
-        }
-      }
-    }
-    function findeAnlage(typ, nr){
-      for (var i = 0; i < anlagen.length; i++) if (anlagen[i].typ === typ && anlagen[i].nr === nr) return anlagen[i];
-      return null;
-    }
-    function naechsterBomber(u){
-      var arr = flotte.aBomber, best = null, bd = 9;
-      for (var i = 0; i < arr.length; i++){
-        var s = arr[i]; if (s.tot) continue;
-        var d = Math.abs(s.u - u); if (d < bd){ bd = d; best = s; }
-      }
-      return best;
+      /* HIER STAND: „Bomber schalten nach dem Kuppelbruch einzelne Batterien aus" - ein Drehbuch
+         aus dem Prototyp, das neun feste Batterien zu festen Zeitpunkten sprengte. Es war seit
+         der Umstellung auf echte Berichte UNERREICHBAR: berichtUebernehmen() setzt ABWEHR_TOD
+         bedingungslos auf die leere Liste (kein Bericht fuehrt mit, WELCHE Stellung wann
+         ausfiel), und starte() ruft berichtUebernehmen() auf jedem Pfad. Die Schleife lief also
+         jeden Tick ueber ein leeres Feld. Entfernt am 05.08.2026 samt der beiden Helfer
+         findeAnlage() und naechsterBomber(), die nur von ihr benutzt wurden. */
     }
     /* Wie weit vor dem Bodenpunkt sitzt die Muendung? EINE Tabelle statt drei Literale in
        drei Feuerfunktionen - der Muendungsblitz beim Zeichnen muss denselben Wert benutzen,
@@ -29246,7 +29236,7 @@
       }
     }
 
-    var letzteZeit = 0, messenNoetig = false, zustandZuletzt = -99;
+    var letzteZeit = 0, zustandZuletzt = -99;
     /* --- Die Bildrolle haelt an, wenn sich nichts mehr bewegt (05.08.2026) -------------
        Vorher lief requestAnimationFrame IMMER weiter, auch bei Pause und beim stehenden
        Schlussbild: hudAktualisieren/phasenAktualisieren/bannerSchritt/zeichne() standen
@@ -29294,7 +29284,6 @@
     }
     function schleife(ts, bild){
       if (!offen){ schleifeLaeuft = false; return; }   /* Wiedergabe geschlossen - Bildrolle steht */
-      if (messenNoetig){ messenNoetig = false; alleFlaechenNeu(); }
       var dt = (ts - letzteZeit) / 1000;
       letzteZeit = ts;
       if (dtVerwerfen){ dtVerwerfen = false; dt = 0; }
@@ -29432,16 +29421,26 @@
       if (t === ' '){ ev.preventDefault(); laeuft = !laeuft; btnPause.textContent = laeuft ? 'Pause' : 'Weiter'; weiterlaufen(); }
       else if (t === 'r' || t === 'R'){ neustart(); laeuft = true; weiterlaufen(); }
     });
+    /* ENTPRELLT (05.08.2026). alleFlaechenNeu() kostet gemessen 20-23 ms - der grosse Posten
+       darin ist atlantenBauen(), das saemtliche Schiffsbilderbogen in 32 Drehlagen neu backt.
+       Vorher lief das beim Ziehen am Fensterrand potenziell in JEDEM Bild: Der resize-Handler
+       setzte die Marke, und schleife() loeste sie einmal je Bild ein. Bei angehaltener
+       Bildrolle war es sogar noch haeufiger, naemlich einmal je resize-Ereignis - und die
+       feuern schneller als 60-mal je Sekunde.
+       130 ms nach dem letzten Ereignis: Beim Loslassen wirkt es unmittelbar, waehrend des
+       Ziehens wird die Leinwand kurz gedehnt statt neu gebacken. */
+    var messTimer = 0;
     window.addEventListener('resize', function(){
       if (!offen) return;
-      messenNoetig = true;
-      /* messenNoetig wird NUR in schleife() eingeloest. Steht die Bildrolle (Pause,
-         Schlussbild) oder laeuft sie gar nicht erst (Bewegung reduziert), bliebe die
-         Marke unbeachtet liegen - und die Leinwand behielte ihre alte Groesse, waehrend
-         der Rahmen schon der neue ist: verzerrtes Standbild. Beim Bau dieser Aenderung
-         genau so aufgetreten und von der Gegenprobe gefangen (Fingerabdruck der Leinwand
-         vor und nach der Groessenaenderung identisch). */
-      if (reduziert || !schleifeLaeuft){ messenNoetig = false; alleFlaechenNeu(); }
+      if (messTimer) clearTimeout(messTimer);
+      messTimer = setTimeout(function(){
+        messTimer = 0;
+        if (!offen) return;
+        /* alleFlaechenNeu() zieht am Ende selbst das Standbild nach, wenn die Bildrolle
+           steht (Pause, Schlussbild, „Bewegung reduzieren") - sonst behielte die Leinwand
+           ihre alte Groesse im neuen Rahmen und das Standbild waere verzerrt. */
+        alleFlaechenNeu();
+      }, 130);
     });
     if (mqRM.addEventListener) mqRM.addEventListener('change', function(e){
       reduziert = !!e.matches;
@@ -29650,8 +29649,9 @@
          Handy 20 Stellungen statt 12. Gemessen, nicht vermutet. */
       /* WELCHE Stellung wann ausfaellt, steht in KEINEM Bericht. Also faellt keine
          aus - lieber "25 standen da" als eine Ausfallquote, die niemand gemessen
-         hat. Damit bleibt auch die Schildkuppel stehen. */
-      ABWEHR_TOD = [];
+         hat. Damit bleibt auch die Schildkuppel stehen. (Bis zum 05.08.2026 stand hier
+         `ABWEHR_TOD = []`, das den Drehbuch-Ausfall des Prototyps abschaltete - Drehbuch
+         und Variable sind jetzt ganz entfernt, siehe anlagenSchritt.) */
       T_KUPPEL_BRUCH = 1e9;
       SCHILD_KEY = [[0,1],[41,1]];
 
@@ -36694,11 +36694,15 @@
     const bedarf = spielBedarfGecacht();
     const jeTab = {};
     for (const b of bedarf) if (!jeTab[b.tab]) jeTab[b.tab] = b;
+    // Ebenfalls nur bei Aenderung schreiben: Der Bedarf wechselt ein paar Mal je Sitzung, die
+    // Schleife lief aber jeden Tick und setzte Titel, Sichtbarkeit und Klasse blind neu
+    // (gemessen 5 Titel-Schreibvorgaenge je Sekunde).
     document.querySelectorAll('[data-tab-need]').forEach(el => {
       const b = jeTab[el.getAttribute('data-tab-need')];
-      el.style.display = b ? 'block' : 'none';
+      const anzeige = b ? 'block' : 'none';
+      if (el.style.display !== anzeige) el.style.display = anzeige;
       el.classList.toggle('tab-badge-aktion', !!b && b.art === 'aktion');
-      if (b) el.title = b.text;
+      if (b && el.title !== b.text) el.title = b.text;
     });
   }
   // Der Erfolgs-Scan ist bewusst auf ~alle 4s gedrosselt (nextGoalCache), da a.progress(state) über
@@ -46777,10 +46781,41 @@
     applyCompactHeadClass();
     save();
   }
+  // Der Zahlenwert und der „/ Lager"-Teil sind ZWEI Knoten, nicht ein innerHTML-String.
+  //
+  // GEMESSEN (05.08.2026, MutationObserver über 12 s je Reiter): Die Zähler-Animation lief mit
+  // 60 Bildern je Sekunde und Rohstoff und schrieb dabei jedes Mal innerHTML - der ganze String
+  // samt <span> wurde je Bild neu geparst. Mit 55-66 Mutationen je Sekunde war das der GRÖSSTE
+  // DOM-Schreiber des ganzen Spiels, auf jedem Reiter und dauerhaft, solange das Spiel offen ist.
+  //
+  // Der „/ Lager"-Teil ändert sich während einer Animation überhaupt nicht. Jetzt bekommt nur
+  // noch der Zahlknoten einen neuen Text; die Animation selbst bleibt unverändert.
+  //
+  // Die Struktur wird WIEDERERKANNT, nicht blind neu gebaut: Die beiden HTML-Vorlagen der
+  // Rohstoffkarte erzeugen genau dieselbe Form (Textknoten + <span>), also greift der schnelle
+  // Weg auch direkt nach einem Neuaufbau der Leiste.
+  function resWertKnoten(el){
+    let zahl = el.firstChild, deckel = el.lastElementChild;
+    if (!zahl || zahl.nodeType !== 3 || !deckel || deckel.tagName !== 'SPAN'){
+      el.textContent = '';
+      zahl = document.createTextNode('');
+      deckel = document.createElement('span');
+      deckel.style.cssText = 'font-size:10px; color:#7d8199; font-weight:400;';
+      el.appendChild(zahl); el.appendChild(deckel);
+    }
+    return { zahl, deckel };
+  }
+  function resWertSchreiben(el, val, cap){
+    const k = resWertKnoten(el);
+    const t = fmt(val) + ' ';
+    if (k.zahl.nodeValue !== t) k.zahl.nodeValue = t;
+    const d = '/ ' + fmt(cap);
+    if (k.deckel.textContent !== d) k.deckel.textContent = d;
+  }
   function animateResValue(el, from, to, cap){
     if (resValAnimFrames.has(el)) cancelAnimationFrame(resValAnimFrames.get(el));
     if ((prefersReducedMotionMq && prefersReducedMotionMq.matches) || powerSaveActive()){
-      el.innerHTML = fmt(to)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
+      resWertSchreiben(el, to, cap);
       return;
     }
     const dur = 380, t0 = performance.now();
@@ -46788,7 +46823,7 @@
       const p = Math.min(1, (t-t0)/dur);
       const eased = 1-Math.pow(1-p,3);
       const val = from + (to-from)*eased;
-      el.innerHTML = fmt(val)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
+      resWertSchreiben(el, val, cap);
       if (p<1) resValAnimFrames.set(el, requestAnimationFrame(step));
       else resValAnimFrames.delete(el);
     }
@@ -47092,9 +47127,11 @@
         const valEl = card.querySelector('.value');
         const newVal = state.resources[d.key]||0;
         const st = resCardState(d, newVal, cap, rates[d.key]);
-        rateEl.innerHTML = st.rateHtml;
+        // Auch die Rate wurde jeden Tick neu geparst (gemessen 6 Schreibvorgänge/s), obwohl sie
+        // sich nur ändert, wenn sich die Produktion ändert.
+        if (rateEl.innerHTML !== st.rateHtml) rateEl.innerHTML = st.rateHtml;
         const oldVal = lastResRenderVal[d.key]!==undefined ? lastResRenderVal[d.key] : newVal;
-        if (Math.abs(newVal-oldVal) > 0.001) animateResValue(valEl, oldVal, newVal, cap); else valEl.innerHTML = fmt(newVal)+' <span style="font-size:10px; color:#7d8199; font-weight:400;">/ '+fmt(cap)+'</span>';
+        if (Math.abs(newVal-oldVal) > 0.001) animateResValue(valEl, oldVal, newVal, cap); else resWertSchreiben(valEl, newVal, cap);
         lastResRenderVal[d.key] = newVal;
         // Füllstands-Balken UND Warn-Rahmen (t2-full/t2-near) auch im Teil-Update-Pfad mitziehen
         // (der Rebuild oben läuft nur, wenn die Kartenstruktur nicht mehr passt - im Normalbetrieb
@@ -52375,11 +52412,19 @@
   // aria-pressed an den Schalter-Zeilen mit dem sichtbaren Zustand gleichhalten. Bewusst zentral
   // beim Neuzeichnen statt an den rund fuenfzehn Stellen, die classList.toggle('on', ...) aufrufen -
   // so kann keine davon vergessen werden, und der sichtbare Schalter bleibt die einzige Wahrheit.
+  // NUR schreiben, was sich geaendert hat. Der Kommentar darueber sprach seit jeher von „je ein
+  // Attributvergleich" - verglichen wurde aber nichts, setAttribute lief bedingungslos. Gemessen
+  // (05.08.2026): acht Schalterzeilen, je ein Schreibvorgang je Sekunde, ohne dass sich je etwas
+  // aenderte. Derselbe Waechter wie in der Kampf-Wiedergabe.
   function syncTogglePressedState(){
     document.querySelectorAll('.card-row[role="button"]').forEach(row => {
       const sw = row.querySelector('.toggle-switch');
-      if (sw) row.setAttribute('aria-pressed', sw.classList.contains('on') ? 'true' : 'false');
-      else row.removeAttribute('aria-pressed'); // Zeilen ohne Schalter sind Knoepfe, keine Schalter
+      if (sw){
+        const soll = sw.classList.contains('on') ? 'true' : 'false';
+        if (row.getAttribute('aria-pressed') !== soll) row.setAttribute('aria-pressed', soll);
+      } else if (row.hasAttribute('aria-pressed')){
+        row.removeAttribute('aria-pressed'); // Zeilen ohne Schalter sind Knoepfe, keine Schalter
+      }
     });
   }
 
