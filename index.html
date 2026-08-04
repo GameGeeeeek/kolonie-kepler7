@@ -6118,8 +6118,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.410.0';
+  const VERSION = '8.411.0';
   const PATCHNOTES = [
+    { version:'8.411.0', date:'05.08.2026', changes:[
+      '<strong>Die Admin-Listen sagen jetzt, was zu tun ist, statt nur eine Fehlernummer zu zeigen.</strong> Gemeldet von Sascha mit Bild: In beiden Kästen des Admin-Bereichs stand nur „Liste konnte nicht geladen werden (404)". Die Ursache war eindeutig bestimmbar, ohne den Server zu fragen – beide Endpunkte antworten bei fehlenden Rechten mit <em>403</em>, nie mit 404. Ein 404 kann also nur heißen, dass der Server die Adresse gar nicht kennt: Das Backend lief zwei Versionen hinterher. Die Meldung nennt jetzt genau das, samt dem Befehl, der es behebt. Andere Fehlerarten werden dabei ausdrücklich <em>unterschieden</em> – fehlende Rechte, abgelaufene Sitzung und ein abgebrochener Verbindungsversuch sagen jeweils etwas anderes, statt alle unter derselben Pauschale zu verschwinden.',
+      'Das war an einem Tag der <strong>dritte Fall derselben Sorte</strong>: erst die zwei Benachrichtigungs-Kategorien, die sich nicht aktivieren ließen, dann diese beiden Listen – jedes Mal ein zurückliegendes Backend, und jedes Mal zeigte die Anzeige ein Symptom statt der Ursache.'
+    ]},
     { version:'8.410.0', date:'05.08.2026', changes:[
       '<strong>Das Unterstützer-Abzeichen ist wieder eine Kaffeetasse</strong> (Wunsch Sascha). Seit dem 20.07.2026 trugen die drei Stufen Medaillen – 🥉 Bronze, 🥈 Silber, 🥇 Gold. Jetzt steht überall ☕, also dasselbe Symbol, mit dem das Spiel Unterstützung ohnehin durchgehend bezeichnet: der Kaffee-Knopf in der Kopfleiste, die Abschnittsüberschrift, der Top-Unterstützer-Kasten. Ko-fi heißt schließlich „ein Kaffee". <strong>Die drei Stufen bleiben unterscheidbar</strong>, sie hängen nur nicht mehr am Symbol: Bronze trägt die Pille in Kupfer, Silber in Hell, Gold in Gold <em>mit Leuchten</em>, dazu die Beschriftung „Unterstützer" gegenüber „Top-Unterstützer" – und beim Darüberfahren steht die Stufe ausgeschrieben. In den schmalen Listen (Status-Seitenmenü, Freundesliste) steht die Tasse deshalb in einer gefärbten Pille statt nackt: Das System zeichnet Emoji in ihrer eigenen Farbe, drei nackte Tassen sähen identisch aus.',
       'Geändert wurde das an <strong>einer</strong> Stelle, der Stufen-Tabelle – damit wechselt auch die Zeile „Abzeichen aktiv (Bronze)" im Unterstützer-Kasten automatisch mit und kann nicht als einzige bei der alten Medaille hängenbleiben.'
@@ -25503,6 +25507,24 @@
     const el = document.getElementById('adminSupporterName');
     return el ? el.value.trim() : '';
   }
+  /* Warum eine eigene Funktion fuer zwei Zeilen (05.08.2026, Spieler-Report Sascha mit Bild):
+     In beiden Admin-Listen stand nur "Liste konnte nicht geladen werden (404)". Ein nackter
+     Statuscode sagt dem Betreiber nicht, was zu tun ist - und die Ursache war GENAU BESTIMMBAR:
+     Beide Endpunkte (/admin/kofi-unlinked, /admin/supporters) antworten bei fehlenden Rechten mit
+     403, NIE mit 404. Ein 404 kann deshalb nur eines heissen: Der Server kennt die Adresse gar
+     nicht, weil das Backend auf dem Pi hinterherlaeuft (beide Endpunkte kamen erst in den
+     Backend-PRs #72 und #73). Das war an EINEM Tag der dritte Fall derselben Sorte - erst die
+     zwei Benachrichtigungs-Kategorien, dann diese beiden Listen.
+     Die Meldung nennt jetzt die Ursache UND den naechsten Handgriff. Als Funktion, damit die
+     naechste Admin-Liste sie mitbenutzt statt eine dritte Variante zu erfinden. */
+  function adminListenFehler(res, was){
+    const s = res ? res.status : 0;
+    if (s === 404) return `<div class="bmeta">Dieser Server kennt <strong>${escapeHtml(was)}</strong> noch nicht (404) – das Backend auf dem Pi läuft hinterher. Dort <code>cd /DATA/kepler7/backend &amp;&amp; git pull origin master</code> ausführen, dann diese Seite neu laden.</div>`;
+    if (s === 403) return `<div class="bmeta">Kein Admin-Zugriff auf diese Liste (403).</div>`;
+    if (s === 401) return `<div class="bmeta">Sitzung abgelaufen oder nicht angemeldet (401) – bitte neu anmelden.</div>`;
+    if (!s) return `<div class="bmeta">Keine Verbindung zum Server – die Liste konnte nicht geladen werden.</div>`;
+    return `<div class="bmeta">Liste konnte nicht geladen werden (${s}).</div>`;
+  }
   // Spenden ohne E-Mail (05.08.2026). Auf dem Pi gemessen: kofiDonationsByEmail hatte 0 Einträge,
   // kofiSupporters 2 Namen - beide entstehen im selben Webhook. Die Spende kam also an, nur die
   // Zuordnung zum Konto nicht, und nichts hat es gemeldet. Diese Liste macht daraus eine sichtbare
@@ -25512,7 +25534,7 @@
     if (!box) return;
     try {
       const res = await backendFetch('/admin/kofi-unlinked');
-      if (!res.ok){ box.innerHTML = `<div class="bmeta">Liste konnte nicht geladen werden (${res.status}).</div>`; return; }
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Liste der nicht zugeordneten Spenden'); return; }
       const offen = (await res.json()).offen || [];
       if (!offen.length){ box.innerHTML = `<div class="bmeta">Nichts offen - alle eingegangenen Spenden trugen eine E-Mail-Adresse.</div>`; return; }
       box.innerHTML = offen.map(e => {
@@ -25543,7 +25565,7 @@
           loadAdminKofiUnlinked();
         } catch(e){ log('Konnte nicht abgehakt werden.', 'ti-alert-triangle'); }
       });
-    } catch(e){ box.innerHTML = `<div class="bmeta">Liste konnte nicht geladen werden.</div>`; }
+    } catch(e){ box.innerHTML = adminListenFehler(null, ''); }   // null = Netzfehler, siehe adminListenFehler
   }
   async function loadAdminSupporters(){
     renderAdminGrantAuswahl();
@@ -25553,7 +25575,7 @@
     box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
     try {
       const res = await backendFetch('/admin/supporters');
-      if (!res.ok){ box.innerHTML = `<div class="bmeta">Liste konnte nicht geladen werden (${res.status}).</div>`; return; }
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Unterstützer-Liste'); return; }
       const data = await res.json();
       const liste = data.supporters || [];
       if (!liste.length){ box.innerHTML = `<div class="bmeta">Zurzeit hat niemand den Unterstützer-Rang.</div>`; return; }
@@ -25571,7 +25593,7 @@
         const el = document.getElementById('adminSupporterName');
         if (el) el.value = b.getAttribute('data-supporter-pick');
       });
-    } catch(e){ box.innerHTML = `<div class="bmeta">Liste konnte nicht geladen werden.</div>`; }
+    } catch(e){ box.innerHTML = adminListenFehler(null, ''); }   // null = Netzfehler, siehe adminListenFehler
   }
   async function adminGrantSupporter(){
     const name = adminSupporterZielname();
