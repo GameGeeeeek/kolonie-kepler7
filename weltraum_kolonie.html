@@ -3982,9 +3982,13 @@
       if (res.ok && data.ok) return { ok:true, active: !!data.active, tier: data.tier||'', daysLeft: data.daysLeft||0 };
       // Der häufigste Grund für eine abgelehnte Freischaltung ist eine andere Adresse als die bei
       // Ko-fi hinterlegte - das muss dastehen, sonst rät der Spieler (Report 28.07.2026).
-      return { ok:false, error: data.error || 'Freischaltung fehlgeschlagen. Ko-fi meldet Spenden nur unter der E-Mail-Adresse, mit der bezahlt wurde - trage genau diese ein.' };
+      // `status` wird mitgereicht, weil der Aufrufer die Fälle unterscheiden MUSS: 404 heißt „noch
+      // keine Spende unter dieser Adresse" - die Adresse ist womöglich völlig richtig und die
+      // Meldung von Ko-fi steht nur noch aus. 409 heißt „gehört einem anderen Konto", da wäre
+      // Weiterprobieren sinnlos und würde nur das Ablehnungs-Protokoll füllen.
+      return { ok:false, status: res.status, error: data.error || 'Freischaltung fehlgeschlagen. Ko-fi meldet Spenden nur unter der E-Mail-Adresse, mit der bezahlt wurde - trage genau diese ein.' };
     } catch(e){
-      return { ok:false, error:'Server nicht erreichbar.' };
+      return { ok:false, status: 0, error:'Server nicht erreichbar.' };
     }
   }
 
@@ -6035,8 +6039,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.405.0';
+  const VERSION = '8.406.0';
   const PATCHNOTES = [
+    { version:'8.406.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Wer zu früh auf „Freischalten" geklickt hat, wurde nie automatisch nachgeprüft.</strong> Die eingetippte Ko-fi-Adresse wurde bisher <em>nur bei Erfolg</em> gemerkt. Klickt man aber, bevor Ko-fi die Spende gemeldet hat - und Ko-fi stellt nicht in derselben Sekunde zu -, kam eine Absage, und die Adresse war danach nirgends gespeichert. Die automatische Nachprüfung steigt bei fehlender Adresse sofort aus, lief für diesen Spieler also <strong>nie an</strong>; das seit dem 28.07.2026 gegebene Versprechen „du musst hier nichts mehr tun" galt ausgerechnet für den ungeduldigsten Fall nicht. Sichtbar war es auch: Die getippte Adresse verschwand nach dem Klick wieder aus dem Feld. Sie wird jetzt gemerkt, und die Meldung sagt das auch. Nicht gemerkt wird sie, wenn die Adresse bereits einem anderen Konto gehört oder gar keine gültige Adresse ist - da wäre Weiterprobieren zwecklos.',
+      '<strong>Behoben: Der Kasten „Aktueller Top-Unterstützer" konnte eine zu kleine Summe und den falschen Namen zeigen.</strong> Die Spendennamen wurden zeichengenau gespeichert, die E-Mail-Adressen daneben aber kleingeschrieben - zwei Zahlungen desselben Menschen, bei Gast-Zahlungen jedes Mal neu eingetippt, landeten dadurch auf zwei getrennten Einträgen und ihre Summen addierten sich nicht. Gemessen an einem Beispiel: 5 € und 12 € desselben Spenders ergaben im Kasten 12 statt 17, und bei mehreren Spendern konnte dadurch der Falsche an der Spitze stehen. Abzeichen und Medaillenstufe waren davon nicht betroffen. Bereits entstandene Doppeleinträge werden beim nächsten Serverstart einmalig zusammengeführt.'
+    ]},
     { version:'8.405.0', date:'05.08.2026', changes:[
       '<strong>Alle 37 Allianz-Einträge haben jetzt ein eigenes, gezeichnetes Symbol.</strong> Gemeldet von Sascha: „hier sind keine richtigen Icons". Nachgezählt stimmte das genauer, als es aussah - die Allianz war die <em>einzige</em> große Inhaltsfamilie des Spiels ohne eigene Zeichnungen, während Forschung, Gebäude, Schiffe und Module längst welche haben. Und elf Einträge teilten sich ihr Symbol sogar mit einem Nachbarn: <strong>alle fünf Expansions-Stufen sahen buchstäblich identisch aus</strong>, ebenso Verteidigungspakt/Bollwerk-Protokoll, Flottendoktrin/Elite-Flottendoktrin und Sternenwerft/Verbundraffinerie. Jetzt hat jede Struktur ihr eigenes Bild, und die vier Familien tragen vier Handschriften: Technologien schematisch in Violett und Cyan, Gebäude als gebaute Silhouetten auf einer gemeinsamen Standlinie, Großprojekte als Netzwerke mit Knoten, Weltprojekte monumental in Gold. Die Expansions-Stufen zählen sichtbar hoch - ein Ring mehr je Stufe, dazu die Stufenzahl im Bild.',
       '<strong>Die Beitrags-Karten sind kompakter.</strong> Ziel und eigener Anteil standen bisher in zwei getrennten Zeilen, durch das ganze Beitrags-Formular voneinander getrennt - obwohl sie zusammengehören („wie weit ist es, und wie viel davon war ich"). Sie stehen jetzt nebeneinander in einer Zeile, und das Eingabefeld nimmt nicht mehr die volle Breite ein. Bei 37 Karten spart das rund eine Bildschirmhöhe.',
@@ -51867,8 +51875,28 @@
           save();
           loadLeaderboard();
         } else {
+          // ===== Die Adresse wird auch bei Misserfolg gemerkt (05.08.2026) =====
+          //
+          // Bis hierher stand `state.kofiEmail = email` NUR im Erfolgszweig. Wer auf „Freischalten"
+          // klickte, BEVOR Ko-fi die Spende gemeldet hatte, bekam 404 - und die eingetippte Adresse
+          // war danach weder hier noch auf dem Server gespeichert. Die automatische Nachprüfung
+          // steigt aber bei leerem state.kofiEmail sofort aus, lief für diesen Spieler also NIE an.
+          // Die seit dem 28.07.2026 versprochene Selbstfreischaltung („du musst hier nichts mehr
+          // tun") galt damit ausgerechnet für den ungeduldigsten Fall nicht. Sichtbar war das auch:
+          // Der render()-Aufruf unten zeichnete die Box aus dem leeren Wert neu, die getippte
+          // Adresse verschwand vor den Augen des Spielers wieder aus dem Feld.
+          //
+          // NICHT gemerkt wird bei 409 (die Adresse gehört einem anderen Konto) und bei 400
+          // (unsinnige Eingabe) - dort wäre Weiterprobieren zwecklos.
+          const merken = erg.status === 404 || erg.status === 0;
+          if (merken){
+            state.kofiEmail = email;
+            save();
+          }
           kofiClaimStatusOk = false;
-          kofiClaimStatusMsg = erg.error;
+          kofiClaimStatusMsg = erg.status === 404
+            ? 'Noch keine Spende unter dieser Adresse gefunden. Sie ist gemerkt - sobald Ko-fi die Spende meldet, schaltet sich das Abzeichen von selbst frei. Stimmt die Adresse nicht, trage einfach die richtige ein.'
+            : erg.error;
         }
         claimBtn.disabled = false;
         render();
