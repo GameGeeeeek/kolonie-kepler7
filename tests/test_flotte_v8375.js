@@ -70,12 +70,25 @@ function rollen(text, muster){
 // ================================================================== 2) KONTERROLLEN
 {
   const fe = rollen(src, /(\w+):'(abfang|bomber|kapital)'/g);
-  check('2: alle 21 Angriffsklassen haben weiterhin eine Rolle', fe.summe === 21, fe.summe);
-  check('2: die Verteilung ist ausgeglichener als 5/5/11',
-    fe.z.abfang === 7 && fe.z.bomber === 6 && fe.z.kapital === 8, fe.z);
-  // Keine Rolle darf mehr als die Haelfte aller Klassen halten - das war der eigentliche Befund.
+  // 05.08.2026: Hier standen bis heute die LITERALE 21 und 7/6/8 - die Zahlen vom Tag des Umbaus.
+  // Mit der Allianzflotte (drei neue Klassen) wurden daraus 24 und 8/7/9, und der Test schlug an,
+  // obwohl die Verteilung sogar besser geworden war. Das ist derselbe Fehlertyp wie bei
+  // test_bedarfsliste.js: geprueft wurde die MOMENTAUFNAHME statt der REGEL. Ein Test, der bei
+  // jedem neuen Schiff von Hand nachgezogen werden muss, schuetzt beim naechsten Mal nur mit Glueck.
+  //
+  // Die Regel, um die es wirklich geht, steht im Kommentar der Tabelle selbst: Keine Rolle darf die
+  // spaeten Klassen an sich ziehen, sonst faellt Schere-Stein-Papier im Endspiel auf "Stein gegen
+  // Stein" zusammen. Messbar ist das als (a) Deckel bei der Haelfte und (b) enger Abstand zwischen
+  // groesster und kleinster Rolle. Historie zum Vergleich: 5/5/11 war der Missstand (Abstand 6),
+  // 7/6/8 die Reparatur (Abstand 2), 8/7/9 der heutige Stand (Abstand 2).
+  check('2: es gibt ueberhaupt Angriffsklassen mit Rolle (sonst misst der Rest nichts)', fe.summe >= 21, fe.summe);
   const groesste = Math.max(fe.z.abfang, fe.z.bomber, fe.z.kapital);
-  check('2: keine Rolle haelt mehr als die Haelfte aller Angriffsklassen', groesste <= Math.ceil(21/2), groesste);
+  const kleinste = Math.min(fe.z.abfang, fe.z.bomber, fe.z.kapital);
+  check('2: keine Rolle haelt mehr als die Haelfte aller Angriffsklassen', groesste <= Math.ceil(fe.summe/2), { groesste, summe: fe.summe });
+  check('2: und der Abstand zwischen groesster und kleinster Rolle bleibt eng (hoechstens 3)',
+    groesste - kleinste <= 3, Object.assign({ abstand: groesste - kleinste }, fe.z));
+  check('2: jede der drei Rollen ist ueberhaupt besetzt',
+    fe.z.abfang > 0 && fe.z.bomber > 0 && fe.z.kapital > 0, fe.z);
   for (const [k, r] of [['carrier','abfang'], ['riftwaechter','abfang'], ['enterschiff','bomber']]){
     check('2: ' + k + ' ist jetzt ' + r, (fe.paare.find(p => p[0] === k) || [])[1] === r,
       (fe.paare.find(p => p[0] === k) || [])[1]);
