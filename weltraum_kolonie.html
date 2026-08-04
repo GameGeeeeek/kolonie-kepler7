@@ -6118,8 +6118,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.416.0';
+  const VERSION = '8.417.0';
   const PATCHNOTES = [
+    { version:'8.417.0', date:'05.08.2026', changes:[
+      '<strong>Auswahlfelder bleiben jetzt auch auf dem Handy offen.</strong> Sascha meldete das Zuklappen des Gegner-Auswahlfelds ein zweites Mal – die Behebung aus v8.416.0 fragte, ob das Feld den <em>Fokus</em> hat. Am Rechner reicht das; auf dem Telefon nicht: Dort öffnet ein Auswahlfeld ein <strong>Systemmenü außerhalb der Seite</strong>, und die Seite kann dabei den Fokus vollständig verlieren. Dann griff der Schutz nicht, die Karte wurde weiter jede Sekunde neu geschrieben, und das Menü schloss sich wieder – auf dem Telefon war also gar nichts behoben.',
+      'Statt des Fokus wird jetzt der <em>Beginn der Benutzung</em> gemerkt: Antippen und Tastendruck melden sich zuverlässig, <strong>bevor</strong> das Menü aufgeht. Beendet wird die Pause durch die Auswahl selbst oder durch das Verlassen des Feldes, jeweils mit kurzem Nachlauf – die Karte samt Countdown läuft also sofort danach weiter. Ein Sicherheitsnetz nach 30 Sekunden verhindert, dass ein vergessenes offenes Menü die Anzeige dauerhaft einfriert.',
+      'Dieselbe Schwäche steckte in <strong>allen</strong> Karten mit Auswahlfeldern: Allianz-Raid, koordinierter Angriff, Diplomatie, Markt und Handelsrouten. Alle fünf laufen jetzt über dieselbe Prüfung. Die vier davon, die niemand gemeldet hat, hätten sich auf dem Telefon genauso verhalten.'
+    ]},
     { version:'8.416.0', date:'05.08.2026', changes:[
       '<strong>Behoben: Das Auswahlfeld für den Raid-Gegner klappte nach einer Sekunde von selbst wieder zu.</strong> Gemeldet von Sascha unmittelbar nach der Einführung: „du klickst sie an, sie schließt aber innerhalb von einer Sekunde wieder". Ursache ist ein bekannter Fallstrick dieses Spiels: Der Haupt-Takt schreibt die Raid-Karte jede Sekunde komplett neu, und ein <em>geöffnetes</em> Auswahlfeld ist ein Zustand, den ausschließlich der Browser kennt – er lässt sich nicht ins erzeugte HTML zurückschreiben. Die Absicherung, die die getroffene <em>Wahl</em> rettet, war vorhanden und richtig; sie kann aber kein offenes Menü retten, weil beim Neuaufbau das ganze Element verschwindet. Die Karte pausiert das Neuzeichnen jetzt, solange ein Auswahlfeld darin benutzt wird – dieselbe Lösung, die die Musterangriff-Karte direkt daneben seit jeher hat.',
       'Beim Nachsehen fiel <strong>dieselbe Lücke in der Diplomatie-Karte</strong> auf: Die Auswahlfelder für das Pakt-Geschenk hätten sich genauso verhalten. Nicht gemeldet, aber derselbe Fehler – mit behoben. Wichtig dabei: Ohne Benutzung wird beides weiterhin jede Sekunde aufgefrischt, Countdowns und Zustände bleiben also aktuell.'
@@ -12993,7 +12998,7 @@
     // neu aufgebaut - wer beim Tippen nicht "schnell genug" war, verlor mitten im Tippen den Fokus,
     // weitere Tastatureingaben gingen ins Leere. isTypingIn() (gleiches Muster wie bei Allianz-Boxen,
     // Umsiedlung, Schiffskorb, Avatar) überspringt den Re-Render, solange im Mengenfeld getippt wird.
-    if (isTypingIn('marketBox')) return;
+    if (bedienungLaeuft('marketBox')) return;
     if (!useBackend()){
       box.innerHTML = '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Der Marktplatz ist nur mit Serververbindung verfügbar (im Gastmodus nicht nutzbar). Handelsrouten vom Typ Kredit/Transport funktionieren aber auch ohne Server.</div>';
       return;
@@ -13213,7 +13218,7 @@
     // Gleicher Fehler wie bei renderMarket() direkt daneben (siehe dortiger Kommentar): wird jeden
     // Sekunden-Tick neu aufgerufen und enthält das Frachter-Mengenfeld für neue Handelsrouten -
     // ohne diesen Schutz würde Tippen dort denselben Fokus-Verlust verursachen.
-    if (isTypingIn('tradeRouteBox')) return;
+    if (bedienungLaeuft('tradeRouteBox')) return;
     const avail = availableFrachter();
     const totalFrachter = allFleets().reduce((a,f)=>a+(f.frachter||0),0);
     const colonyKeys = Object.keys(state.colonies||{}).filter(k=>!isMoonKey(k));
@@ -17925,6 +17930,37 @@
     const within = el === active || el.contains(active);
     return within && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
   }
+  /* ===== Ein Auswahlfeld IN BENUTZUNG - ohne sich auf den Fokus zu verlassen (05.08.2026) =====
+     isTypingIn() oben fragt document.activeElement. Das genuegt am Rechner, ist aber die falsche
+     Frage auf dem Handy: Dort oeffnet ein <select> ein Systemmenue AUSSERHALB der Seite, und die
+     Seite kann dabei den Fokus ganz verlieren. Der Schutz griffe dann nicht, die Box wuerde weiter
+     jede Sekunde neu geschrieben - und das Menue schloesse sich wieder, genau wie gemeldet.
+     Nachstellen kann ich das mit einem gesteuerten Browser nicht (ein Klick dort oeffnet kein
+     echtes Systemmenue), deshalb verlasse ich mich nicht auf den Fokus.
+
+     Stattdessen wird der Beginn der Benutzung gemerkt - mousedown/touchstart/keydown feuern
+     ZUVERLAESSIG, BEVOR das Menue aufgeht. Beendet wird die Sperre durch die Auswahl selbst
+     (change) oder das Verlassen (focusout), jeweils mit kurzem Nachlauf.
+     Die 30 Sekunden sind ein Sicherheitsnetz: Wer das Menue offen liegen laesst und weggeht, soll
+     die Box nicht dauerhaft einfrieren. */
+  let _selMerk = null, _selBis = 0;
+  function _merkeSelect(el){
+    if (el && el.tagName === 'SELECT'){ _selMerk = el; _selBis = Date.now() + 30000; }
+  }
+  document.addEventListener('mousedown',  e => _merkeSelect(e.target), true);
+  document.addEventListener('touchstart', e => _merkeSelect(e.target), true);
+  document.addEventListener('keydown',    e => _merkeSelect(e.target), true);
+  // Nach der Auswahl bzw. beim Verlassen nur noch kurz nachlaufen lassen: Das Neuzeichnen soll so
+  // schnell wie moeglich wieder greifen, damit Countdowns nicht sichtbar haengen.
+  document.addEventListener('change',   e => { if (e.target === _selMerk) _selBis = Math.min(_selBis, Date.now() + 600); }, true);
+  document.addEventListener('focusout', e => { if (e.target === _selMerk) _selBis = Math.min(_selBis, Date.now() + 600); }, true);
+  function auswahlInBenutzung(containerId){
+    if (!_selMerk || Date.now() > _selBis) return false;
+    const c = document.getElementById(containerId);
+    return !!(c && c.contains(_selMerk));
+  }
+  // Beide Fragen zusammen - das benutzen die Boxen mit Auswahlfeldern.
+  function bedienungLaeuft(containerId){ return isTypingIn(containerId) || auswahlInBenutzung(containerId); }
   // Aufklappzustand von <details>-Blöcken über die Sekunden-Neuzeichnung retten.
   // Problem (Spielerbericht 25.07.2026, gesperrte Event-Schiff-Karte "Enterschiff"): Ein natives
   // <details> hält seinen Zustand ausschließlich im DOM. Jede Box, die der Haupt-Tick per innerHTML
@@ -36465,7 +36501,7 @@
     // aber nicht das offene Menue: Beim Neuaufbau ist das alte Element samt Menue weg.
     // isTypingIn() deckt SELECT bereits ab (ein offenes Auswahlfeld hat den Fokus) - die Box
     // musste es nur benutzen. Die Musterangriff-Box daneben hatte den Schutz laengst.
-    if (!box || isTypingIn('allianceRaidBox')) return;
+    if (!box || bedienungLaeuft('allianceRaidBox')) return;
     const tag = myAllianceTag();
     if (!tag){ box.innerHTML = `<div class="bmeta">Keiner Allianz beigetreten.</div>`; return; }
     if (!state.allianceBase || !state.allianceBase.foundedAt){ box.innerHTML = `<div class="bmeta">Der Allianz-Raid braucht eine gegründete Allianzbasis als Treffpunkt (siehe Allianzbasis oben).</div>`; return; }
@@ -36622,7 +36658,7 @@
   // Rollen (Angreifer und mögliches Ziel) unabhängig voneinander gleichzeitig relevant sein können.
   function renderAllianceMusterBox(){
     const box = document.getElementById('allianceMusterBox');
-    if (!box || isTypingIn('allianceMusterBox')) return;
+    if (!box || bedienungLaeuft('allianceMusterBox')) return;
     const tag = myAllianceTag();
     if (!tag || !useBackend() || !state.allianceBase){ box.innerHTML = ''; return; }
     let html = `<div class="section-title"><i class="ti ti-users" aria-hidden="true"></i>Koordinierter Allianzbasis-Angriff</div>`;
@@ -41598,7 +41634,7 @@
     // das Pakt-Geschenk (data-keep-value="pactGift:..."), wird im Haupt-Tick neu geschrieben und
     // hatte keinen Schutz. Nicht gemeldet, aber derselbe Fehler - beim Aufklappen waere das Menue
     // nach einer Sekunde wieder zu.
-    if (!box || isTypingIn('diplomacyBox')) return;
+    if (!box || bedienungLaeuft('diplomacyBox')) return;
     const myId = state.player.id;
     if (!myId){ box.innerHTML = '<div class="bmeta">Diplomatie ist verfügbar, sobald dein Spielerprofil angelegt ist.</div>'; return; }
     const actives = diploCache.filter(e => pactIsActive(e.data));
