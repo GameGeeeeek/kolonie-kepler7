@@ -42,19 +42,29 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
   check('supporterPille() existiert', /function supporterPille\(/.test(js));
   check('supporterPilleKlein() existiert (schmale Listen)', /function supporterPilleKlein\(/.test(js));
 
-  // Wo wird die CSS-Klasse `pill-supporter-<stufe>` ERZEUGT? Gemeint sind Vorlagen-Ausdruecke und
-  // Verkettungen, nicht die CSS-Regeln selbst - deshalb auf die Stellen mit eingesetzter Stufe
-  // eingegrenzt.
+  // Wo wird die CSS-Klasse `pill-supporter-<stufe>` ERZEUGT? Gemeint sind Vorlagen-Ausdruecke,
+  // nicht die CSS-Regeln selbst - deshalb auf die Stellen mit eingesetzter Stufe eingegrenzt.
+  //
+  // Die Regel ist NICHT "genau ein Vorkommen" (es sind zwei: die volle und die schmale Variante),
+  // sondern: JEDES Vorkommen liegt INNERHALB der beiden Helfer. Genau das ist die Eigenschaft, die
+  // zaehlt - eine Kopie in einer Listenfunktion ist der Anfang des naechsten Auseinanderlaufens,
+  // eine zweite Variante im Helfer selbst ist es nicht.
+  const bereich = (name) => {
+    const a = js.indexOf('function ' + name + '(');
+    return a < 0 ? null : [a, js.indexOf('\n  }', a)];
+  };
+  const helfer = [bereich('supporterPille'), bereich('supporterPilleKlein')].filter(Boolean);
+  check('1: beide Helfer im Quelltext gefunden', helfer.length === 2);
   const erzeuger = [...js.matchAll(/pill-supporter-\$\{/g)];
-  check('1: das Pillen-Markup entsteht an genau EINER Stelle', erzeuger.length === 1,
-    { stellen: erzeuger.length,
+  const ausserhalb = erzeuger.filter(m => !helfer.some(([a,b]) => m.index > a && m.index < b));
+  check('1: das Pillen-Markup entsteht NUR in den beiden Helfern', ausserhalb.length === 0,
+    { stellenGesamt: erzeuger.length, davonAusserhalb: ausserhalb.length,
       hinweis:'Neue Spielerliste? supporterPille(e) bzw. supporterPilleKlein(e) aufrufen statt das Markup zu kopieren.' });
 
-  // Gegenprobe zu 1: Der Suchausdruck muss ueberhaupt etwas finden koennen - eine Regex, die auf
-  // nichts passt, meldet ebenfalls "genau eine"... nein, sie meldet 0. Aber sie darf auch nicht an
-  // den CSS-Regeln haengenbleiben und dadurch zufaellig zaehlen.
-  check('1: Gegenprobe – der Suchausdruck findet die eine Stelle wirklich',
-    erzeuger.length > 0 && js.indexOf('pill-supporter-${') > 0);
+  // Gegenprobe zu 1: Der Suchausdruck muss ueberhaupt etwas finden - sonst waere "nichts
+  // ausserhalb" trivial wahr, auch wenn das Abzeichen komplett verschwunden ist.
+  check('1: Gegenprobe – der Suchausdruck findet die Stellen wirklich', erzeuger.length >= 2,
+    { gefunden: erzeuger.length });
 
   // Und die fuenf Listen rufen die Funktion auch auf. Statisch geprueft, damit ein Wegfall sofort
   // auffaellt und nicht erst im Browserteil unten.
@@ -62,6 +72,37 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
   // 2 Definitionen + mindestens 5 Aufrufstellen
   check('1: die Pille wird an mindestens fünf Stellen abgerufen', aufrufe >= 7,
     { vorkommen: aufrufe, davonDefinitionen: 2 });
+
+  // ---- Kaffeetasse statt Medaille (05.08.2026, Wunsch Sascha)
+  // Die Stufen-Tabelle ist die eine Quelle - auch fuer die Zeile "Abzeichen aktiv (Bronze)" im
+  // Unterstuetzer-Kasten, die dasselbe `icon` benutzt. Beide zusammen halten oder beide zusammen
+  // fallen; ein Rueckfall auf Medaillen an nur einer Stelle waere genau der Bruch, der hier auffallen soll.
+  const tab = js.slice(js.indexOf('const KOFI_STUFEN = {'), js.indexOf('};', js.indexOf('const KOFI_STUFEN = {')));
+  const stufen = [...tab.matchAll(/(bronze|silver|gold):\s*\{\s*icon:'([^']*)'/g)].map(m => ({ stufe:m[1], icon:m[2] }));
+  check('1: alle drei Stufen tragen die Kaffeetasse', stufen.length === 3 && stufen.every(s => s.icon === '☕'), stufen);
+
+  // DIE WICHTIGE FOLGEFRAGE: Wenn das Symbol die Stufe nicht mehr unterscheidet, muss es etwas
+  // anderes tun - sonst sind Bronze, Silber und Gold ununterscheidbar geworden und die Stufen
+  // waeren faktisch abgeschafft, ohne dass es jemand beschlossen haette.
+  // ACHTUNG, hier lag der Test zuerst falsch: Gesucht wurde in `js` (dem <script>-Inhalt), die
+  // Farbregeln stehen aber im <style>-Block. Ergebnis waren drei "FEHLT" bei voellig gesundem Code.
+  // Deshalb hier ueber `src`, die ganze Datei.
+  const farben = ['bronze','silver','gold'].map(t => {
+    const m = src.match(new RegExp('\\.pill-supporter-' + t + '\\s*\\{([^}]*)\\}'));
+    return { stufe:t, regel: m ? m[1].trim() : null };
+  });
+  check('1: jede Stufe hat eine eigene Farbregel', farben.every(f => f.regel), farben.map(f => f.stufe + (f.regel?'':' FEHLT')));
+  const verschieden = new Set(farben.map(f => f.regel)).size;
+  check('1: die drei Farbregeln unterscheiden sich voneinander', verschieden === 3,
+    { verschiedene: verschieden, hinweis:'Gleiches Symbol UND gleiche Farbe = die Stufen waeren nicht mehr unterscheidbar.' });
+
+  // Und die Farbe muss auch in den SCHMALEN Listen ankommen. Dort stand die Tasse zwischenzeitlich
+  // nackt in einem <span> ohne Klasse - drei nackte Tassen sehen identisch aus, weil das System
+  // Emoji in ihrer eigenen Farbe zeichnet und CSS-`color` daran nicht greift.
+  const kleinBlock = js.slice(js.indexOf('function supporterPilleKlein('), js.indexOf('function supporterPilleKlein(') + 700);
+  check('1: auch die schmale Variante trägt die Stufen-Klasse',
+    /pill-supporter-\$\{/.test(kleinBlock),
+    { hinweis:'Ohne Klasse waeren Bronze/Silber/Gold im Seitenmenue nicht auseinanderzuhalten.' });
 }
 
 // ============================================================================
@@ -103,15 +144,18 @@ const save = () => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   friends:[{id:'u-lume',name:'Lumekx'},{id:'u-ohne',name:'Aryen82'}],
   xp:9e6, credits:5e6, buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{} });
 
-// Zaehlt je Liste, wie viele Unterstuetzer-Symbole darin stehen. Die drei Stufen-Symbole sind
-// eindeutig und stehen sonst nirgends in diesen Boxen.
+// Zaehlt je Liste, wie viele Unterstuetzer-Abzeichen darin stehen.
+// Gezaehlt wird die Stufen-KLASSE, nicht das Symbol: Seit dem 05.08.2026 tragen alle drei Stufen
+// dieselbe Kaffeetasse (Wunsch Sascha), und die Tasse taucht im Spiel auch ausserhalb der
+// Abzeichen auf (Kopfleisten-Knopf, Abschnittsueberschrift). Die Klasse pill-supporter-<stufe>
+// entsteht dagegen ausschliesslich in supporterPille()/supporterPilleKlein().
 const ZAEHLEN = (sel) => {
   const box = document.querySelector(sel);
   if (!box) return null;
   const html = box.innerHTML || '';
   const txt = (box.textContent || '');
   return { pillen: (html.match(/pill-supporter-\w+/g) || []).length,
-           symbole: (txt.match(/🥇|🥈|🥉/g) || []).length,
+           tassen: (txt.match(/☕/g) || []).length,
            hatLumekx: /Lumekx/.test(txt), hatAryen: /Aryen82/.test(txt) };
 };
 
@@ -138,12 +182,12 @@ const ZAEHLEN = (sel) => {
   check('2: die volle Rangliste zeigt beide Unterstützer',
     seite.volleListe && seite.volleListe.pillen === 2, seite.volleListe);
   check('2: das Status-Seitenmenü zeigt sie auch (die Liste aus dem Spieler-Report)',
-    seite.seitenmenue && seite.seitenmenue.symbole === 2, seite.seitenmenue);
+    seite.seitenmenue && seite.seitenmenue.pillen === 2, seite.seitenmenue);
   // GEGENPROBE, eingebaut: Der Nicht-Unterstützer steht in beiden Listen und darf KEINS haben.
   // Ohne diese Zeile wäre der Test auch dann grün, wenn überall bedingungslos eine Tasse stünde.
   check('2: Gegenprobe – Aryen82 steht in den Listen und trägt KEIN Abzeichen',
     !!(seite.volleListe && seite.volleListe.hatAryen && seite.seitenmenue.hatAryen &&
-       seite.volleListe.pillen === 2 && seite.seitenmenue.symbole === 2),
+       seite.volleListe.pillen === 2 && seite.seitenmenue.pillen === 2),
     { volleListe: seite.volleListe, seitenmenue: seite.seitenmenue });
   // Freundesliste: beide Freunde stehen drin, genau einer ist Unterstützer.
   check('2: die Freundesliste zeigt genau ein Abzeichen (ein Freund von zweien)',

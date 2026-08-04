@@ -2221,11 +2221,15 @@
        (.card-row, .profile-card, ..., .rank-row) übernimmt das jetzt; stünde hier noch border-radius,
        würde es die dortige border-radius:0 wegen späterer Textposition ueberschreiben. */
     .rank-row.me { background:rgba(var(--primary-rgb), 0.18); border:var(--bw-1) solid var(--c-primary); }
-    /* Unterstützer-Kennzeichnung (20.07.2026, Spieler-Wunsch, finale Runde: Vorschlag D "gestaffelte
-       Medaillen"): eine Medaillen-Pille direkt neben dem Namen, Farbe/Symbol je nach Gesamt-
-       Spendenbetrag (Bronze/Silber/Gold, siehe supporterTierFor() im Backend und renderLeaderboardList
-       im Frontend). Zeitlich befristet auf 30 Tage ab der letzten Ko-fi-Spende - serverseitig
-       berechnet, siehe isSupporter/supporterTier im Bestenlisten-Eintrag. */
+    /* Unterstützer-Kennzeichnung (20.07.2026, Spieler-Wunsch): eine Pille direkt neben dem Namen,
+       Farbe je nach Gesamt-Spendenbetrag (Bronze/Silber/Gold, siehe supporterTierFor() im Backend).
+       Zeitlich befristet auf 30 Tage ab der letzten Ko-fi-Spende - serverseitig berechnet, siehe
+       isSupporter/supporterTier im Bestenlisten-Eintrag.
+       Seit 05.08.2026 tragen alle drei Stufen dieselbe KAFFEETASSE (Wunsch Sascha) - diese drei
+       Farbregeln sind damit der Hauptträger des Stufenunterschieds und nicht mehr nur Beiwerk.
+       Sie erreichen den Rahmen und die Schrift der Pille; das Emoji selbst zeichnet das System in
+       seiner eigenen Farbe. Gold behält zusätzlich sein Leuchten. Das Markup dazu entsteht an
+       genau einer Stelle, in supporterPille()/supporterPilleKlein(). */
     .pill-supporter-bronze { color:#c9885a; border-color:rgba(201,136,90,0.5); }
     .pill-supporter-silver { color:#c7cbe0; border-color:rgba(199,203,224,0.5); }
     .pill-supporter-gold { color:#fac775; border-color:rgba(250,199,117,0.5); box-shadow:0 0 6px rgba(250,199,117,0.35); }
@@ -3986,13 +3990,29 @@
   }
 
   // Die drei Unterstützer-Stufen an EINER Stelle (28.07.2026). Vorher standen sie zweimal im Code:
-  // einmal als Medaillen-Pille in der Bestenliste (SUPPORTER_TIER_META) und einmal als Klartextname
-  // in der Freischalt-Meldung - beide mussten bei jeder Änderung von Hand nachgezogen werden.
-  // `icon` ist die Medaille, `name` der Stufenname für Meldungen, `badge` die Beschriftung der Pille.
+  // einmal als Pille in der Bestenliste (SUPPORTER_TIER_META) und einmal als Klartextname in der
+  // Freischalt-Meldung - beide mussten bei jeder Änderung von Hand nachgezogen werden.
+  // `icon` ist das Abzeichensymbol, `name` der Stufenname für Meldungen, `badge` die Beschriftung
+  // der Pille.
+  //
+  // KAFFEETASSE STATT MEDAILLE (05.08.2026, Wunsch Sascha: "die unterstützer medallie in
+  // kaffeetasse umwandeln"). Alle drei Stufen tragen dasselbe Symbol - und das ist Absicht, nicht
+  // Nachlässigkeit: Es ist das Symbol, das im ganzen Spiel für Unterstützung steht (Kopfleisten-
+  // Knopf, Abschnittsüberschrift, Top-Unterstützer-Kasten) und mit dem Sascha das Abzeichen selbst
+  // durchgehend benennt ("das Tassen Abzeichen"). Ko-fi heißt schließlich "ein Kaffee".
+  //
+  // DIE STUFE GEHT DABEI NICHT VERLOREN, sie hängt nur nicht mehr am Symbol:
+  //   - Farbe der Pille - Bronze kupfer, Silber hell, Gold golden MIT Leuchten
+  //     (siehe .pill-supporter-bronze/-silver/-gold im Stilblock)
+  //   - Beschriftung - "Unterstützer" gegenüber "Top-Unterstützer" bei Gold
+  //   - Titeltext beim Darüberfahren nennt die Stufe ausgeschrieben
+  // Genau deshalb steht in den schmalen Listen unten die Tasse in einer GEFÄRBTEN Pille und nicht
+  // nackt: Emoji werden vom System in ihrer eigenen Farbe gezeichnet, ein CSS-`color` erreicht sie
+  // nicht - drei nackte Tassen sähen identisch aus.
   const KOFI_STUFEN = {
-    bronze: { icon:'🥉', name:'Bronze', badge:'Unterstützer' },
-    silver: { icon:'🥈', name:'Silber', badge:'Unterstützer' },
-    gold:   { icon:'🥇', name:'Gold',   badge:'Top-Unterstützer' }
+    bronze: { icon:'☕', name:'Bronze', badge:'Unterstützer' },
+    silver: { icon:'☕', name:'Silber', badge:'Unterstützer' },
+    gold:   { icon:'☕', name:'Gold',   badge:'Top-Unterstützer' }
   };
   function kofiStufenText(tier){
     const s = KOFI_STUFEN[tier];
@@ -4017,15 +4037,18 @@
   function supporterPille(e){
     if (!e || !e.isSupporter) return '';
     const s = KOFI_STUFEN[e.supporterTier] || KOFI_STUFEN.bronze;
-    return ` <span class="lvl-pill pill-supporter-${e.supporterTier||'bronze'}" style="font-size:10px;" title="${s.badge} - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt">${s.icon} ${s.badge}</span>`;
+    return ` <span class="lvl-pill pill-supporter-${e.supporterTier||'bronze'}" style="font-size:10px;" title="${s.badge} (${s.name}) - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt">${s.icon} ${s.badge}</span>`;
   }
-  /* Fuer die schmalen Listen (Seitenmenue, Freundesliste): nur das Symbol, kein Wort. Der Platz
-     dort ist knapp - "🥇 Top-Unterstützer" haette den Namen verdraengt, und ein verdraengter Name
-     ist schlimmer als ein knappes Abzeichen. Titel-Text traegt die volle Erklaerung. */
+  /* Fuer die schmalen Listen (Seitenmenue, Freundesliste): nur die Tasse, kein Wort. Der Platz dort
+     ist knapp - "☕ Top-Unterstützer" haette den Namen verdraengt, und ein verdraengter Name ist
+     schlimmer als ein knappes Abzeichen. Titel-Text traegt die volle Erklaerung.
+     Die Stufen-Klasse bleibt trotzdem dran: Sie faerbt Rahmen und Grund der Pille und ist damit
+     der EINZIGE Stufenunterschied, der hier noch ankommt - das Tassen-Emoji selbst zeichnet das
+     System in seiner eigenen Farbe, CSS-`color` greift daran nicht. */
   function supporterPilleKlein(e){
     if (!e || !e.isSupporter) return '';
     const s = KOFI_STUFEN[e.supporterTier] || KOFI_STUFEN.bronze;
-    return ` <span title="${s.badge} - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt" style="flex-shrink:0;">${s.icon}</span>`;
+    return ` <span class="lvl-pill pill-supporter-${e.supporterTier||'bronze'}" title="${s.badge} (${s.name}) - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt" style="font-size:9px; padding:0 4px; min-width:0; flex-shrink:0;">${s.icon}</span>`;
   }
 
   // Eine Anfrage, zwei Aufrufer: der Knopf im Fortschritt-Tab und die automatische Freischaltung
@@ -6095,8 +6118,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.409.0';
+  const VERSION = '8.410.0';
   const PATCHNOTES = [
+    { version:'8.410.0', date:'05.08.2026', changes:[
+      '<strong>Das Unterstützer-Abzeichen ist wieder eine Kaffeetasse</strong> (Wunsch Sascha). Seit dem 20.07.2026 trugen die drei Stufen Medaillen – 🥉 Bronze, 🥈 Silber, 🥇 Gold. Jetzt steht überall ☕, also dasselbe Symbol, mit dem das Spiel Unterstützung ohnehin durchgehend bezeichnet: der Kaffee-Knopf in der Kopfleiste, die Abschnittsüberschrift, der Top-Unterstützer-Kasten. Ko-fi heißt schließlich „ein Kaffee". <strong>Die drei Stufen bleiben unterscheidbar</strong>, sie hängen nur nicht mehr am Symbol: Bronze trägt die Pille in Kupfer, Silber in Hell, Gold in Gold <em>mit Leuchten</em>, dazu die Beschriftung „Unterstützer" gegenüber „Top-Unterstützer" – und beim Darüberfahren steht die Stufe ausgeschrieben. In den schmalen Listen (Status-Seitenmenü, Freundesliste) steht die Tasse deshalb in einer gefärbten Pille statt nackt: Das System zeichnet Emoji in ihrer eigenen Farbe, drei nackte Tassen sähen identisch aus.',
+      'Geändert wurde das an <strong>einer</strong> Stelle, der Stufen-Tabelle – damit wechselt auch die Zeile „Abzeichen aktiv (Bronze)" im Unterstützer-Kasten automatisch mit und kann nicht als einzige bei der alten Medaille hängenbleiben.'
+    ]},
     { version:'8.409.0', date:'05.08.2026', changes:[
       '<strong>Behoben: Das Unterstützer-Abzeichen fehlte in vier von fünf Spielerlisten.</strong> Gemeldet von Sascha mit zwei Bildern: die Bestenliste im Status-Seitenmenü ohne Kaffeetasse, daneben der Unterstützer-Kasten, der „Abzeichen aktiv (Bronze) – noch 30 Tage" meldet. Der Rang war also da und wurde trotzdem nicht gezeigt. Nachgezählt an allen fünf Stellen, die einen Spielernamen aus den Bestenlisten-Daten zeichnen, hatte es <em>genau eine</em>: die große Rangliste im Punkte-Tab. Es fehlte im <strong>Status-Seitenmenü</strong> (die Liste auf dem Bild), in der <strong>Wochenliga</strong>, in der <strong>Freundesliste</strong> und im <strong>Spielerprofil</strong>. Der Server war unschuldig – er liefert die Unterstützer-Kennzeichnung seit jeher korrekt, für gespendete wie für manuell vergebene Ränge; es war reine Anzeige. In den schmalen Listen steht nur das Stufen-Symbol ohne Wort, damit es den Namen nicht verdrängt; der volle Text erscheint beim Darüberfahren.',
       'Damit sich das nicht wiederholt, entsteht das Abzeichen jetzt an <strong>einer einzigen Stelle</strong> im Code statt an fünf. Wer künftig eine neue Spielerliste baut, ruft sie auf und muss nichts nachziehen – und eine Prüfung schlägt an, sobald doch wieder eine zweite Kopie entsteht. Es ist derselbe Fehlertyp, der am selben Tag schon die Allianz-Symbole erwischt hatte, wo vier Stellen dieselbe Kachel fest eingebaut hatten.'
@@ -47764,10 +47791,11 @@
       const rank = leaderboardCache.indexOf(e)+1;
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
       const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4c5661'}; box-shadow:${isOnline?'0 0 4px rgba(93,202,165,0.7)':'none'};"></span>`;
-      // Vorschlag D "gestaffelte Medaillen" (20.07.2026, finale Auswahl): Symbol/Farbe/Label je nach
-      // vom Server ermittelter Stufe (supporterTier, aus der Gesamt-Spendensumme, siehe Backend
-      // supporterTierFor). Stufen-Tabelle seit 28.07.2026 in der globalen KOFI_STUFEN - vorher lag
-      // hier eine eigene Kopie, die bei jeder Änderung getrennt nachgezogen werden musste.
+      // Farbe/Beschriftung je nach vom Server ermittelter Stufe (supporterTier, aus der
+      // Gesamt-Spendensumme, siehe Backend supporterTierFor). Stufen-Tabelle seit 28.07.2026 in der
+      // globalen KOFI_STUFEN - vorher lag hier eine eigene Kopie, die bei jeder Änderung getrennt
+      // nachgezogen werden musste. Das Symbol ist seit 05.08.2026 bei allen drei Stufen die
+      // Kaffeetasse; die Stufe steckt in Farbe und Beschriftung.
       // 05.08.2026: Auch das Markup steht nicht mehr hier, sondern in supporterPille() - es war die
       // EINZIGE von fünf Spielerlisten mit Abzeichen, und das fiel nur auf, weil Sascha es meldete.
       const supporterBadge = supporterPille(e);
