@@ -586,6 +586,21 @@
 
     /* ---------- Fussleiste ---------- */
     #osWrap .fuss{flex:none;padding:6px 6px 8px;display:grid;gap:6px}
+    /* min-width:0 auf die Rasterkinder - sonst sprengt die Fussleiste das Telefon (05.08.2026).
+       BEFUND, gemessen auf einem 390 px breiten iPhone: Alle vier Kinder der Fussleiste waren
+       458 px breit, ragten also 75 px ueber den Bildschirm hinaus. Der Video-Knopf stand
+       vollstaendig ausserhalb (linke Kante bei 388 px) und war nicht erreichbar; Phasenleiste,
+       Kraftschiene und Protokollzeile liefen rechts einfach aus dem Bild.
+       URSACHE, kausal eingegrenzt (jedes Kind einzeln ausgeblendet): Nur beim Ausblenden von
+       #osProtokoll fiel der Rest auf 376 px. Ein Rasterkind hat von Haus aus min-width:auto,
+       und das ist bei .plog mit white-space:nowrap die VOLLE Textbreite. Die Fussleiste konnte
+       also gar nicht schmaler werden als die laengste Protokollmeldung - und weil alle vier
+       Kinder in derselben Rasterspalte stehen, zog eine lange Meldung alle drei anderen mit.
+       Bitterste Folge: Das text-overflow:ellipsis auf .plog konnte NIE greifen. Der Kasten war
+       nie zu schmal fuer seinen Text, er wuchs stattdessen ueber den Bildschirm hinaus.
+       Mit min-width:0 duerfen die Kinder schrumpfen: gemessen 458 -> 376 px, der Video-Knopf
+       endet wieder bei 383 statt 465, und die Auslassungspunkte tun endlich ihre Arbeit. */
+    #osWrap .fuss > *{min-width:0}
     #osWrap .phasen{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
     #osWrap .phasen.einzeln{grid-template-columns:1fr}
     #osWrap .phase{border:var(--bw-1) solid var(--os-linie);padding:4px 6px 5px;
@@ -677,6 +692,18 @@
       /* Jeder in der Fussleiste gesparte Pixel geht an die Buehne. */
       #osWrap .protokoll{min-height:0; padding:3px 6px 4px;}
       #osWrap .plog:nth-child(-n+3){display:none;}
+      /* Die EINE Zeile, die auf dem Telefon uebrig bleibt, darf zwei Zeilen hoch werden.
+         Gemessen: Sechs der sieben Meldungen brauchen 195-272 px und passen in die 362 px des
+         Kastens. Genau eine passt nicht - die Enterbeute ("Geentert: 4x Zerstoerer, 3x Kreuzer,
+         2x Schlachtschiff, 2x Traegerschiff", 437 px), und das ist ausgerechnet die Meldung mit
+         dem meisten Inhalt. Bei einer Zeile blieben davon 82 % stehen, der Rest verschwand hinter
+         den Auslassungspunkten.
+         Die Hoehe ist FEST auf zwei Zeilen reserviert, nicht wachsend: Waechst der Kasten nur
+         dann, wenn eine lange Meldung kommt, springt die Buehne darueber jedes Mal um 12 px -
+         und die Buehne ist auf dem Telefon der einzige Teil, der nachgibt (siehe oben). Lieber
+         einmal 12 px kosten als bei jeder Meldung zappeln. */
+      #osWrap .plog{white-space:normal; display:-webkit-box; -webkit-box-orient:vertical;
+        -webkit-line-clamp:2; line-clamp:2; min-height:2.56em;}
       #osWrap .kraft{padding:3px 7px 5px;}
       #osWrap .phase{padding:2px 5px 3px;}
       /* Randbereiche des Geraets (Kerbe, Home-Leiste).
@@ -6039,8 +6066,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.407.0';
+  const VERSION = '8.408.0';
   const PATCHNOTES = [
+    { version:'8.408.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Die Kampfwiedergabe war auf dem Telefon 75 Pixel zu breit – ein Bedienknopf lag komplett außerhalb des Bildschirms.</strong> Gemeldet war „die Protokollzeile wird abgeschnitten", und das stimmte, war aber nur die sichtbarste Ecke: Auf einem 390 Pixel breiten Gerät waren <em>alle vier</em> Teile der Fußleiste 458 Pixel breit. Phasenleiste, Kraftschiene und Protokollzeile liefen rechts aus dem Bild, und der fünfte Knopf („Video") begann bei Pixel 388 – er war schlicht <strong>nicht erreichbar</strong>. Ursache war eine Feinheit des Rasterlayouts: Ein Rasterkind darf von sich aus nie schmaler werden als sein Inhalt, und der Inhalt der Protokollzeile ist eine Textzeile ohne Umbruch. Die Fußleiste konnte deshalb nie schmaler sein als die <em>längste</em> Meldung, und weil alle vier Teile in derselben Spalte stehen, zog eine lange Meldung die drei anderen mit hinaus. Bitter daran: Die Auslassungspunkte („…"), die genau diesen Fall abfangen sollten, konnten nie greifen – der Kasten war nie zu schmal für seinen Text, er wuchs stattdessen über den Bildschirm.',
+      '<strong>Die Protokollzeile darf auf dem Telefon zwei Zeilen hoch sein.</strong> Dort ist nur eine Zeile sichtbar, und sechs der sieben Meldungen passen bequem hinein. Genau eine passte nicht – die Enterbeute („Geentert: 4× Zerstörer, 3× Kreuzer, 2× Schlachtschiff, 2× Trägerschiff"), also ausgerechnet die Meldung mit dem meisten Inhalt; von ihr blieben 82 Prozent stehen. Sie steht jetzt vollständig da. Die Höhe ist dabei fest für zwei Zeilen reserviert statt mitzuwachsen: Sonst würde das Kampfbild darüber bei jeder langen Meldung um zwölf Pixel springen. Gemessen kostet es die Bühne keinen Pixel.',
+      'Nebenbei aufgefallen: Die Prüfung, die „nichts läuft über den Rand hinaus" hieß, maß ausschließlich die <em>Höhe</em>. Sie war grün, während die Wiedergabe seit Monaten seitlich aus dem Telefon lief. Sie heißt jetzt, was sie tut, und eine zweite prüft die Breite jedes einzelnen Bauteils.'
+    ]},
     { version:'8.407.0', date:'05.08.2026', changes:[
       '<strong>Die Welt unter dem Gefecht sieht jetzt aus wie die Welt, um die gekämpft wird.</strong> Bisher zeigte die Kampfwiedergabe bei <em>jedem</em> Gefecht denselben dunkelblauen Halbkreis - ob man einen Eismond umkreiste, einen Vulkanplaneten oder ein Trümmerfeld, machte im Bild keinen Unterschied. Dabei weiß das Spiel für alle 499 Planeten längst, was für eine Welt das ist; die Angabe kam nur nie in der Wiedergabe an. Jetzt hat jede der zehn Planetensorten ihr eigenes Aussehen, dazu Heimatbasis und Monde: <em>Wasserwelten</em> tiefblau mit wenigen Inseln, <em>Wüsten</em> ockerbraun, <em>Eiswelten</em> hellblau-weiß, <em>Kristallwelten</em> violett, <em>Ruinenwelten</em> staubgrau. Drei Sorten bekommen zusätzlich eigene Oberflächen: der <em>Gasriese</em> waagerechte Wolkenbänder statt Kontinenten, die <em>Vulkanwelt</em> glühende Adern, die vom Horizont nach unten laufen, und <em>Asteroiden wie Monde</em> Einschlagkrater mit hellem Wall. Berichte ohne Ortsangabe sehen unverändert aus wie bisher.'
     ]},
