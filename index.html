@@ -6118,8 +6118,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.413.0';
+  const VERSION = '8.414.0';
   const PATCHNOTES = [
+    { version:'8.414.0', date:'05.08.2026', changes:[
+      '<strong>Ihr wählt den Raid-Gegner jetzt selbst</strong> (Wunsch Sascha: „vielleicht auch mehrere Raid-Bosse auswählbar mit verschiedenen Belohnungen?"). Die fünf Ausprägungen mit ihren eigenen Kampfregeln gibt es seit dem 02.08.2026 – sie ergaben sich aber stur aus der Bossstufe, die Allianz konnte also nie entscheiden, wogegen sie zieht. Beim Ausrufen eines neuen Raids steht jetzt ein Auswahlfeld bereit. Bei einer <em>Folgewelle</em> bewusst nicht: Der Boss ist dann schon angeschlagen, und man könnte sich sonst nachträglich den mit der besseren Beute aussuchen.',
+      '<strong>Jeder Gegner wirft etwas anderes ab.</strong> Der <em>Schwerpunkt</em> bestimmt, welche Ressource reichlicher fällt – Panzerhülle Erz, Schwarmmutter Kristalle, Phasenwandler Deuterium, Gluthorn Antimaterie. Die <strong>Gesamtmenge bleibt dabei gleich</strong>, es verschiebt sich nur die Zusammensetzung; der Ertrag folgt stattdessen dem <em>Risiko</em>: Wer sich den härteren Gegner vornimmt, bekommt insgesamt mehr. Der Sternenfresser ist der ausgewogene und als einziger <em>ohne</em> Trefferschwäche – die Wahl, wenn die Flotte gemischt ist. Damit ist die Entscheidung eine Frage des Bedarfs und hat keine offensichtlich richtige Antwort.',
+      'Beim Bauen ist mir dabei ein eigener Fehler aufgefallen: Zuerst hatte ich feste Faktoren benutzt (betonte Ressource ×1,7, übrige ×0,8). Das ist <em>nicht</em> mengenneutral, weil Erz die mit Abstand größte Grundmenge hat – Erz zu betonen hätte 26 % mehr Gesamtertrag gebracht, Deuterium nur 5 %. Die Panzerhülle wäre damit stillschweigend die beste Wahl gewesen. Jetzt wird der Zuschlag den anderen Ressourcen im Verhältnis ihrer Größe abgezogen, die Summe bleibt exakt gleich.'
+    ]},
     { version:'8.413.0', date:'05.08.2026', changes:[
       '<strong>Allianz-Raid: Die Belohnung richtet sich jetzt nach der Platzierung</strong> (Wunsch Sascha: „Platz 1 bekommt am meisten, nach unten immer weniger, auch der Schwächste bekommt Belohnung"). Nach jeder Welle werden alle Teilnehmer nach ihrer eingebrachten Angriffskraft sortiert. Bisher gab es einen einzigen Sprung an der Spitze – nachgerechnet an einem Verband aus zehn Teilnehmern lagen <strong>Platz 2 bis Platz 10 nur 19 % auseinander</strong>, wer Zweiter wurde, merkte praktisch keinen Unterschied zum Letzten. Jetzt hängt die Belohnung an <em>zwei</em> Größen – dem tatsächlichen Anteil an der Gesamtkraft <em>und</em> dem Platz –, und dieselbe Rechnung ergibt eine Spanne von <strong>121 %</strong>. Jeder Platz unterscheidet sich sichtbar vom nächsten, und der letzte Platz hat eine feste Untergrenze: Er bekommt in jedem Fall etwas, und zwar nicht als Nebenwirkung der Formel, sondern als Zusage.',
       '<strong>Und es gibt endlich etwas Wertvolles zu holen.</strong> Neben Krediten und Kampfpunkten fallen jetzt <strong>Erz, Kristalle und Deuterium</strong>; bei einem erlegten Boss zusätzlich <strong>Antimaterie</strong> und <strong>Modulfragmente</strong> – beides in den oberen Rängen ein Vielfaches. Die <strong>Erfahrung</strong> hing bisher weder an der Bossstufe noch am Beitrag, sondern war fest 20: Ein Stufe-20-Boss brachte genauso viel wie Stufe 1. Jetzt hängt sie an beidem (Stufe 1 rund 15, Stufe 20 rund 119). Alle Mengen richten sich ausschließlich nach Bossstufe und Platzierung und <em>nie</em> nach der eigenen Wirtschaft – ein Raid kann sich also nicht mit dem Reichtum der Teilnehmer aufschaukeln.',
@@ -23143,8 +23148,23 @@
            -> nicht blockieren. Der Eintrag BLEIBT an seiner Stelle (das Lager kann ausgebaut
               werden, dann wird er wieder bezahlbar), aber die dahinter stehenden Forschungen
               duerfen loslaufen. */
+  /* storageCap() ist teuer: Es laeuft ueber ALLE Flotten, ALLE Gebaeudesaetze, Planetenrollen und
+     Schiffsmodule. Seit forschungUeberLager() in affordEtaHtml() sitzt, wird es fuer JEDE Karte
+     mit Kosten aufgerufen - in der Flotten-Box sind das dutzende Aufrufe pro Sekunde. Das war ein
+     handfester Ruecklauf, den ich mir am 05.08.2026 selbst eingebaut habe.
+     Gleiche Loesung wie bei affordRatesCached() direkt darueber: eine Sekunde zwischenspeichern.
+     Der Deckel aendert sich nur beim Bau/Abriss oder bei Flottenbewegungen - eine Sekunde Verzug
+     ist dort folgenlos. */
+  let _capCache = null, _capCacheAt = 0;
+  function storageCapCached(){
+    const now = Date.now();
+    if (_capCache !== null && (now - _capCacheAt) < 900) return _capCache;
+    _capCache = storageCap();
+    _capCacheAt = now;
+    return _capCache;
+  }
   function forschungUeberLager(cost){
-    const cap = storageCap();
+    const cap = storageCapCached();
     const drueber = [];
     for (const [res, menge] of Object.entries(cost || {})){
       // NUR die sechs Grundressourcen: Sie teilen sich storageCap(). Kredite haben gar keinen
@@ -31350,7 +31370,7 @@
       { title:'Allianz-Spendenrangliste', body:'Im rechten Seitenmen\u00fc (Button "Status" am Bildschirmrand) zeigt der Abschnitt "Allianz-Spenden" die <strong>Top 3 der laufenden Woche</strong> plus deine eigene Platzierung, deine Wochenspende, die Allianz-Gesamtspende und deinen prozentualen Anteil. \u00dcber "Komplette Rangliste anzeigen" siehst du alle Mitglieder sortiert. <strong>Gez\u00e4hlt wird jede Ressourcen-Spende</strong> an gemeinsame Allianz-Projekte: Allianzbasis, Allianz-Techs/-Geb\u00e4ude und die t\u00e4glichen Allianz-Eins\u00e4tze. Die Wertung setzt sich <strong>montags 00:00 Uhr</strong> zur\u00fcck; die Top 3 der abgelaufenen Woche erhalten automatisch eine kleine Belohnung (Kredite/Forschungspunkte, ein Ressourcenpaket bzw. einen Produktions-Booster), und alle Mitglieder bekommen einen zusammenfassenden Bericht im Allianz-Chat.' },
       { title:'Allianzbasis - das gemeinsame Endgame-Großprojekt', body:'Jede Allianz kann EINE zentrale <strong>Allianzbasis</strong> errichten. Der <strong>Admin wählt das Sternsystem</strong> - diese Entscheidung ist <strong>dauerhaft</strong>, die Basis kann nie verlegt werden (strategisch wählen: ab Stufe 4 sinken die Flugzeiten für Missionen in dieses System um 10%!). Danach tragen alle Mitglieder Ressourcen bei (Allianz-Tab). Die Basis hat <strong>10 Ausbaustufen</strong>: Kosten wachsen je Stufe um das 2,2-fache (Stufe 1: 2 Mio. Energie / 2 Mio. Erz / 1,2 Mio. Kristalle / 600k Deuterium / 60k Antimaterie - Stufe 10 allein kostet rund das 1.200-fache der Basis), und jede Stufe hat danach eine eigene <strong>Bauzeit</strong> (ab 8 Std., je Stufe ×1,5, Stufe 10 allein ~19 Tage): die Uhr für eine Stufe startet erst, sobald ihre Ressourcen VOLLSTÄNDIG beisammen sind, nicht schon bei der Gründung. <strong>Boni für ALLE Mitglieder:</strong> +1% Produktion & Verteidigung je Stufe, dazu Meilensteine: St. 2/6 je +5% Lager, St. 3/7 je -4% Bauzeit, St. 5/9 je -4% Forschungszeit, St. 4 -10% Flugzeit ins Basis-System, St. 8 -8% Treibstoff, St. 10 (Monument) zusätzlich +4% Produktion & Verteidigung. <strong>Krieg um die Basis:</strong> Die Basis kann von Mitgliedern FREMDER Allianzen angegriffen werden (Allianz-Tab, Ziel-Tag eingeben, 8 Std. Abklingzeit je Spieler). Ihre Hülle hat 12.000 Punkte je Stufe; die Verteidigung besteht aus einem Sockel (600 je Stufe) plus allen von Mitgliedern <strong>zur Basis entsandten Schiffen</strong> (Button im Allianz-Tab, echte Flugzeit, jederzeit zurückrufbar - stationierte Schiffe erleiden bei Angriffen Verluste). Leichte Schäden repariert die Basis selbst (3%/Std.); fällt die Hülle auf 0, ist die Basis <strong>ZERSTÖRT</strong>: alle Boni sind deaktiviert, bis die Allianz die hohen Reparaturkosten (30% der kumulierten Baukosten) gemeinsam aufgebracht hat. Bei allen wichtigen Basis-Ereignissen (Baubeginn, erreichte Ausbaustufe, Angriff, Zerstörung, abgeschlossene Reparatur) erscheint automatisch eine <strong>System-Nachricht im Allianz-Chat</strong>, damit alle Mitglieder informiert sind. Die Basis ist auf der <strong>Sektorkarte</strong> ihres Systems als wachsende Modul-Raumstation sichtbar - jede Stufe montiert sichtbar neue Teile an (nichts verschwindet wieder): der Gitterträger wächst in die Breite, Wohn- und Labormodule docken einzeln an, dann zwei Paar große Solarflügel, die verglaste Aussichtskuppel, Roboterarm mit Positionslichtern, der pulsierende Schild und zuletzt das goldene Monument mit Krone. Da die Kartenansicht standardmäßig dein eigenes Heimatsystem zeigt (nicht zwangsläufig das der Basis), bringt dich der Link "auf der Karte anzeigen" direkt neben der Systemangabe in der Basis-Box zum richtigen System. Ganz oben im Allianz-Tab zeigt zusätzlich ein großes, animiertes <strong>Stationsdiorama</strong> dasselbe wachsende Modell in groß (langsam rotierend, mit Sternenfeld) - darunter eine <strong>Modul-Übersichtsleiste</strong> mit vier klickbaren Kacheln (Technologien, Gebäude, Großprojekte, Weltprojekte), die den echten Ausbaufortschritt jedes Bereichs zeigt und direkt zum jeweiligen Abschnitt springt.' },
       { title:'Koordinierte Allianzbasis-Angriffe', body:'Erweitert den Basis-Krieg um eine geplante Großschlacht: nur <strong>Admins/Offiziere</strong> können einen koordinierten Angriff starten (Allianz-Tab, Ziel-Tag + Sammelzeit 30 Min./1 Std./2 Std. + optionale Nachricht). Während der Sammelphase kann JEDES Mitglied freiwillig seine im Galaxie-Tab zusammengestellte Angriffsflotte anschließen (Schiffe sind bis zum Abschluss gebunden, ein Rückzug ist nur während der laufenden Sammelphase möglich - die Schiffe kehren dann sofort zurück). Sichtbar sind laufend Teilnehmerzahl, Gesamtschiffe und Gesamt-Angriffskraft. Nach Ablauf der Sammelzeit fliegt der GESAMTE Verband gemeinsam los und trifft geschlossen am Ziel ein - die verteidigende Allianz bekommt sofort eine Warnung mit Angreifer-Tag und Ankunftszeit, kann in dieser Zeit Verteidigungsflotten entsenden und Ressourcen spenden (dieselben Werkzeuge wie beim normalen Basis-Krieg). Die Schlacht läuft nach derselben Formel wie ein einzelner Basis-Angriff, nur mit der aggregierten Gesamtstärke des Verbands; Ergebnis (Schaden, Erfolg/Zerstörung) landet in derselben Basis-Verteidigungs-Historie. Jede Ziel-Basis hat danach <strong>24 Std. Schutz</strong> vor dem nächsten koordinierten Angriff. Belohnung (Kredite, Forschungspunkte, Kampfpunkte) und Verluste verteilen sich anteilig zum eigenen Beitrag an der Gesamt-Angriffskraft - wer nicht mitgeflogen ist, bekommt nichts.' },
-      { title:'Allianz-Raid', body:'Ein eigener Boss-Gegner NUR für die eigene Allianz ("Sternenfresser", im Allianz-Tab, braucht eine gegründete Allianzbasis als Treffpunkt) - anders als der serverweite Weltboss (Leviathan der Leere, Galaxie-Tab) und das rein solo spielbare Piratenversteck. <strong>Admins/Offiziere</strong> rufen eine Angriffswelle aus (Sammelphase 30 Min./1 Std./2 Std., wählbar): jedes Mitglied kann seine Angriffsflotte anschließen, sie fliegt dann MIT ECHTER FLUGZEIT (nach Entfernung) zur Allianzbasis - nur wer rechtzeitig vor Ende der Sammelphase dort eintrifft, gehört zum Verband. Nach Sammelphasenende fliegt der komplette Verband gemeinsam - wieder mit echter Flugzeit - zum Standort des Bosses (ein zufälliges Sternsystem). Bei Ankunft: Schaden = Gesamt-Angriffskraft des Verbands, GEGEN echtes Flottenverlustrisiko (der Boss "kontert" - je schwächer der Verband im Verhältnis zur Bossstufe, desto höhere eigene Verluste). Übersteht der Boss die Welle, wartet er angeschlagen auf die nächste Welle (2 Std. Cooldown); erst der Kill schließt die Stufe ab (6 Std. Cooldown bis zum nächsten, stärkeren Sternenfresser). Ganzes Zeitfenster: 72 Std. seit der ersten Ausrufung, sonst entkommt er ungenutzt. <strong>Belohnung nach Platzierung</strong> (seit 05.08.2026): Nach der Welle werden alle Teilnehmer nach ihrer eingebrachten Angriffskraft sortiert. Wie viel du bekommst, hängt an <em>zwei</em> Größen – deinem tatsächlichen Anteil an der Gesamtkraft <em>und</em> deinem Platz. Platz 1 erhält das obere Ende, und es wird von Platz zu Platz gleichmäßig weniger; der Letzte bekommt eine feste Untergrenze, also in jedem Fall etwas. Vorher gab es nur einen einzigen Sprung an der Spitze, wodurch sich Platz 2 bis zum letzten Platz kaum unterschieden. Ausgezahlt werden <strong>Kredite, Kampfpunkte, Erfahrung</strong> (beides hängt jetzt auch an der Bossstufe) sowie <strong>Erz, Kristalle und Deuterium</strong>; bei einem erlegten Boss zusätzlich <strong>Antimaterie</strong> und <strong>Modulfragmente</strong> – beides in den oberen Rängen deutlich mehr. Ein erlegter Boss kann außerdem ein <strong>Modul</strong> abwerfen; Chance und Seltenheit steigen mit Platzierung und Bossstufe. Eine nicht-tödliche Welle zahlt durchgehend weniger als ein Kill. Alle Mengen hängen ausschließlich an Bossstufe und Platzierung, nie an deiner eigenen Wirtschaft – ein Raid kann sich also nicht mit dem Reichtum der Teilnehmer aufschaukeln. Dazu Chronik-Meldungen zu jeder Phase.<br><br><strong>Der Raid-Boss hat seit dem 02.08.2026 fünf Ausprägungen</strong>, die sich aus seiner Stufe ergeben und sich nach fünf Stufen wiederholen: <strong>Sternenfresser</strong> (keine Besonderheit), <strong>Panzerhülle</strong> (ohne Bomber nur 75% Schaden, schlägt schwächer zurück), <strong>Schwarmmutter</strong> (ohne Jäger 80% Schaden, ein Viertel mehr Verluste), <strong>Phasenwandler</strong> (ohne Zerstörer 75% Schaden, trifft selbst schlechter), <strong>Gluthorn</strong> (ohne Schlachtschiffe 80% Schaden, ein Fünftel mehr Verluste). Damit zählt zum ersten Mal, <em>was</em> die Allianz schickt und nicht nur wie viel – vorher war der Kampf eine einzige Zeile (Schaden = Angriffskraft des Verbands). Die Eigenschaft steht vor dem Ausrufen in der Raid-Karte. <strong>Wichtig:</strong> Die Trefferschwäche ist ein Malus bei fehlendem Schiffstyp, kein Bonus bei vorhandenem – ein gut zusammengestellter Verband richtet genau so viel Schaden an wie vorher.' },
+      { title:'Allianz-Raid', body:'Ein eigener Boss-Gegner NUR für die eigene Allianz ("Sternenfresser", im Allianz-Tab, braucht eine gegründete Allianzbasis als Treffpunkt) - anders als der serverweite Weltboss (Leviathan der Leere, Galaxie-Tab) und das rein solo spielbare Piratenversteck. <strong>Admins/Offiziere</strong> rufen eine Angriffswelle aus (Sammelphase 30 Min./1 Std./2 Std., wählbar): jedes Mitglied kann seine Angriffsflotte anschließen, sie fliegt dann MIT ECHTER FLUGZEIT (nach Entfernung) zur Allianzbasis - nur wer rechtzeitig vor Ende der Sammelphase dort eintrifft, gehört zum Verband. Nach Sammelphasenende fliegt der komplette Verband gemeinsam - wieder mit echter Flugzeit - zum Standort des Bosses (ein zufälliges Sternsystem). Bei Ankunft: Schaden = Gesamt-Angriffskraft des Verbands, GEGEN echtes Flottenverlustrisiko (der Boss "kontert" - je schwächer der Verband im Verhältnis zur Bossstufe, desto höhere eigene Verluste). Übersteht der Boss die Welle, wartet er angeschlagen auf die nächste Welle (2 Std. Cooldown); erst der Kill schließt die Stufe ab (6 Std. Cooldown bis zum nächsten, stärkeren Sternenfresser). Ganzes Zeitfenster: 72 Std. seit der ersten Ausrufung, sonst entkommt er ungenutzt. <strong>Belohnung nach Platzierung</strong> (seit 05.08.2026): Nach der Welle werden alle Teilnehmer nach ihrer eingebrachten Angriffskraft sortiert. Wie viel du bekommst, hängt an <em>zwei</em> Größen – deinem tatsächlichen Anteil an der Gesamtkraft <em>und</em> deinem Platz. Platz 1 erhält das obere Ende, und es wird von Platz zu Platz gleichmäßig weniger; der Letzte bekommt eine feste Untergrenze, also in jedem Fall etwas. Vorher gab es nur einen einzigen Sprung an der Spitze, wodurch sich Platz 2 bis zum letzten Platz kaum unterschieden. Ausgezahlt werden <strong>Kredite, Kampfpunkte, Erfahrung</strong> (beides hängt jetzt auch an der Bossstufe) sowie <strong>Erz, Kristalle und Deuterium</strong>; bei einem erlegten Boss zusätzlich <strong>Antimaterie</strong> und <strong>Modulfragmente</strong> – beides in den oberen Rängen deutlich mehr. Ein erlegter Boss kann außerdem ein <strong>Modul</strong> abwerfen; Chance und Seltenheit steigen mit Platzierung und Bossstufe. Eine nicht-tödliche Welle zahlt durchgehend weniger als ein Kill. Alle Mengen hängen ausschließlich an Bossstufe und Platzierung, nie an deiner eigenen Wirtschaft – ein Raid kann sich also nicht mit dem Reichtum der Teilnehmer aufschaukeln. Dazu Chronik-Meldungen zu jeder Phase.<br><br><strong>Seit dem 05.08.2026 wählt ihr den Gegner selbst.</strong> Beim Ausrufen eines neuen Raids steht ein Auswahlfeld mit allen fünf Ausprägungen bereit (bei einer <em>Folgewelle</em> nicht – der Boss ist dann schon angeschlagen und wechselt nicht mehr). Jede hat eigene Kampfregeln <em>und</em> ein eigenes Beuteprofil: Der <strong>Schwerpunkt</strong> bestimmt, welche Ressource reichlicher fällt – die Gesamtmenge bleibt dabei gleich, es verschiebt sich nur die Zusammensetzung. Der <strong>Ertrag</strong> folgt dagegen dem Risiko: Wer sich den härteren Gegner vornimmt, bekommt insgesamt mehr. Damit ist die Wahl eine Frage des Bedarfs statt eine mit einer offensichtlich richtigen Antwort. Die fünf Ausprägungen: <strong>Sternenfresser</strong> (keine Besonderheit), <strong>Panzerhülle</strong> (ohne Bomber nur 75% Schaden, schlägt schwächer zurück), <strong>Schwarmmutter</strong> (ohne Jäger 80% Schaden, ein Viertel mehr Verluste), <strong>Phasenwandler</strong> (ohne Zerstörer 75% Schaden, trifft selbst schlechter), <strong>Gluthorn</strong> (ohne Schlachtschiffe 80% Schaden, ein Fünftel mehr Verluste). <strong>Beuteprofile:</strong> Sternenfresser ausgewogen und als einziger <em>ohne</em> Trefferschwäche – die Wahl, wenn die Flotte gemischt ist; Panzerhülle Schwerpunkt Erz; Schwarmmutter Schwerpunkt Kristalle und der höchste Gesamtertrag, dafür die höchsten Verluste; Phasenwandler Schwerpunkt Deuterium; Gluthorn Schwerpunkt Antimaterie. Damit zählt zum ersten Mal, <em>was</em> die Allianz schickt und nicht nur wie viel – vorher war der Kampf eine einzige Zeile (Schaden = Angriffskraft des Verbands). Die Eigenschaft steht vor dem Ausrufen in der Raid-Karte. <strong>Wichtig:</strong> Die Trefferschwäche ist ein Malus bei fehlendem Schiffstyp, kein Bonus bei vorhandenem – ein gut zusammengestellter Verband richtet genau so viel Schaden an wie vorher.' },
       { title:'Allianz-Flottenparade', body:'Reine Live-Anzeige (im Allianz-Tab, direkt unter den koordinierten Angriffen) der gemeinsamen Flotte ALLER Mitglieder - bewusst KEIN Beitritts-Fenster und keine Kampf-/Belohnungsmechanik wie bei den koordinierten Angriffen, sondern ein fortlaufend aktualisiertes Schaufenster wie die Allianz-Dominanz oder -Chronik. Jedes Mitglied meldet automatisch alle paar Minuten seine aktuelle Flottenstärke; die Box zeigt die addierten Schiffszahlen aller Mitglieder als Icon-Übersicht, die gemeinsame <strong>Paradestärke</strong> (Summe der individuellen Punktzahlen, dieselbe Formel wie beim eigenen Punktestand) sowie die Top-Beitragenden. Erreicht die Allianz einen neuen Bestwert bei der Paradestärke, gibt es dafür eine Feier-Meldung in der Allianz-Chronik - der Bestwert bleibt dauerhaft erhalten, auch wenn später Mitglieder austreten.' },
       { title:'Allianz-Einsätze: Tag/Woche/Monat (ab Basis-Stufe 3/6/10)', body:'Drei parallele Kadenzen desselben Prinzips (im Allianz-Tab unterhalb der Basis): <strong>Tages-Einsatz</strong> (ab Stufe 3), <strong>Wochenprojekt</strong> (ab Stufe 6, ~5× größeres Ziel, ~4× Belohnung, garantiert zusätzlich mind. ein <strong>Episches</strong> Modul) und <strong>Großprojekt</strong> (ab Stufe 10, ~18× größeres Ziel, ~12× Belohnung, garantiert mind. ein <strong>Legendäres</strong> Modul mit kleiner Chance auf <strong>Mythisch</strong> - bislang die einzige Quelle für diese beiden Seltenheitsstufen). Jeder Einsatz ist zufällig einer von fünf Typen: <strong>Versorgungskonvoi</strong> (Erz liefern), <strong>Kristall-Kontingent</strong>, <strong>Treibstoff-Depot</strong> (Deuterium), <strong>Kampfoperation</strong> (gemeinsam Kämpfe gewinnen - NPCs, Piraten, Abwehr und Leerenrisse zählen automatisch) oder <strong>Forschungsvorstoß</strong> (gemeinsam Expeditionen abschließen). Einsatz und Ziel sind für alle Mitglieder identisch und skalieren zusätzlich mit der <strong>aktiven Mitgliederzahl</strong> der Allianz (Referenz 10 Mitglieder), damit kleine Allianzen nicht benachteiligt sind. Ist das Team-Ziel erreicht, holt sich jeder mit <strong>mindestens 1% eigenem Beitrag zum Ziel</strong> die Belohnung ab: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich Leerensplitter. Wer nicht (ausreichend) beigetragen hat, geht leer aus - auch wer die Allianz vor Abschluss verlässt. Kampf-/Expeditions-Fortschritt wird beim Öffnen des Allianz-Tabs übertragen. Eine zerstörte Basis pausiert den Einsatzbetrieb bis zur Reparatur.' },
       { title:'Allianzpunkte & Allianz-Projekte', body:'Jeder abgeschlossene Einsatz (Tag/Woche/Monat) füllt zusätzlich einen gemeinsamen Vorrat an <strong>Allianzpunkten</strong> - unabhängig von der persönlichen Belohnung, einmal pro Einsatz für die ganze Allianz. Admins/Offiziere geben diese Punkte im Allianz-Tab für <strong>Allianz-Projekte</strong> aus: dauerhafte Boni für alle Mitglieder, aktuell <strong>Kriegsrat</strong> (+1% Angriffs- UND Verteidigungspunkte je Stufe, bis Stufe 10, fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein).<br><br><strong>Seit dem 02.08.2026 gibt es eine zweite, WIEDERHOLBARE Ausgabe: den Werftkonvoi.</strong> Für 150 Allianzpunkte zieht 24 Stunden lang ein Konvoi mobiler Werftmeister durch die Allianz – der Umbau von Werftmarken dauert in dieser Zeit für <em>jedes</em> Mitglied nur die Hälfte. Er lässt sich beliebig oft wiederholen und verlängern (Restzeit wird addiert, höchstens eine Woche im Voraus). Der Grund: Der Kriegsrat kostet über alle zehn Stufen 2.050 Punkte, eine aktive Allianz verdient je nach Basis-Stufe rund 300 bis 460 Punkte im Monat – nach vier bis sieben Monaten war er fertig und die Währung damit tot, obwohl weiter Punkte hereinkamen. Ein Projekt ohne Maximalstufe kann nicht fertig werden.' },
@@ -36043,19 +36063,44 @@
   // Schaden an wie bisher, ein blind zusammengewürfelter weniger. Damit kann die Belohnungsrate
   // durch die Neuerung nur sinken, nie steigen - und Zusammensetzung zählt zum ersten Mal überhaupt.
   const ALLIANCE_RAID_BOSSE = [
-    { key:'sternenfresser', name:'Sternenfresser',  schwaeche:null,             ohneMult:1.0,  verlustMult:1.0,  icon:'ti-skull',
+    { key:'sternenfresser', name:'Sternenfresser',  schwaeche:null,             ohneMult:1.0,  verlustMult:1.0,  beuteMult:1.00, schwerpunkt:null,          icon:'ti-skull',
       trait:'Der klassische Gegner ohne Besonderheiten – jede Zusammensetzung richtet vollen Schaden an.' },
-    { key:'panzerhuelle',   name:'Panzerhülle',     schwaeche:'bomber',         ohneMult:0.75, verlustMult:0.90, icon:'ti-shield-lock',
+    { key:'panzerhuelle',   name:'Panzerhülle',     schwaeche:'bomber',         ohneMult:0.75, verlustMult:0.90, beuteMult:0.92, schwerpunkt:'erz',         icon:'ti-shield-lock',
       trait:'Massive Panzerung: Ohne Bomber im Verband richtet ihr nur 75% Schaden an. Sie schlägt dafür etwas schwächer zurück.' },
-    { key:'schwarmmutter',  name:'Schwarmmutter',   schwaeche:'jaeger',         ohneMult:0.80, verlustMult:1.25, icon:'ti-bolt',
+    { key:'schwarmmutter',  name:'Schwarmmutter',   schwaeche:'jaeger',         ohneMult:0.80, verlustMult:1.25, beuteMult:1.20, schwerpunkt:'kristalle',   icon:'ti-bolt',
       trait:'Eine Wolke aus Begleitern: Ohne Jäger, die sie abfangen, richtet ihr nur 80% Schaden an – und verliert ein Viertel mehr Schiffe.' },
-    { key:'phasenwandler',  name:'Phasenwandler',   schwaeche:'destroyers',     ohneMult:0.75, verlustMult:0.90, icon:'ti-atom-2',
+    { key:'phasenwandler',  name:'Phasenwandler',   schwaeche:'destroyers',     ohneMult:0.75, verlustMult:0.90, beuteMult:0.92, schwerpunkt:'deuterium',   icon:'ti-atom-2',
       trait:'Ständig versetzt: Nur Zerstörer treffen ihn zuverlässig – ohne sie richtet ihr 75% Schaden an. Er trifft selbst ebenfalls schlechter.' },
-    { key:'gluthorn',       name:'Gluthorn',        schwaeche:'schlachtschiff', ohneMult:0.80, verlustMult:1.20, icon:'ti-sun',
+    { key:'gluthorn',       name:'Gluthorn',        schwaeche:'schlachtschiff', ohneMult:0.80, verlustMult:1.20, beuteMult:1.15, schwerpunkt:'antimaterie', icon:'ti-sun',
       trait:'Brennende Salven: Ohne Schlachtschiffe an der Spitze richtet ihr 80% Schaden an, und die Verluste liegen ein Fünftel höher.' }
   ];
   function allianceRaidBoss(level){ return ALLIANCE_RAID_BOSSE[(Math.max(1, level|0) - 1) % ALLIANCE_RAID_BOSSE.length]; }
+  /* Der Gegner EINES Raids (05.08.2026, Wunsch Sascha "mehrere raid bosse auswaehlbar").
+     Bis hierher ergab er sich stur aus der Stufe - die Allianz konnte nie entscheiden, wogegen sie
+     zieht, obwohl fuenf ausgearbeitete Gegner mit eigenen Kampfregeln laengst da waren.
+     Die Wahl steht in doc.bossKey und wird ausschliesslich vom Server geschrieben (Endpunkt
+     /allianceraid/create, der sie gegen die feste Liste prueft); `alliance:<TAG>:raid` ist fuer
+     Clients schreibgeschuetzt. Ohne bossKey bleibt es bei der Stufen-Ableitung - ein noch
+     laufender alter Raid wechselt seinen Gegner nicht mitten im Zeitfenster. */
+  function allianceRaidBossVon(doc){
+    const g = doc && doc.bossKey && ALLIANCE_RAID_BOSSE.find(b => b.key === doc.bossKey);
+    return g || allianceRaidBoss(doc ? (doc.level||1) : 1);
+  }
+  // Was dieser Gegner bevorzugt abwirft - fuer die Auswahl VOR dem Ausrufen. Der Schwerpunkt
+  // verschiebt die Zusammensetzung der Beute, beuteMult den Gesamtertrag (er folgt dem Risiko).
+  function bossBeuteText(b){
+    const res = b.schwerpunkt ? ((RES_DEFS.find(r=>r.key===b.schwerpunkt)||{}).label || b.schwerpunkt) : null;
+    const ertrag = b.beuteMult > 1 ? 'mehr Beute insgesamt' : (b.beuteMult < 1 ? 'etwas weniger Beute insgesamt' : 'ausgewogene Beute');
+    return res ? ('Schwerpunkt ' + res + ', ' + ertrag) : ertrag;
+  }
   function allianceRaidBossName(level){ return allianceRaidBoss(level).name + ' - Stufe ' + level; }
+  // Der Name des Gegners EINES Raids. Seit der Boss waehlbar ist (05.08.2026), reicht die Stufe
+  // nicht mehr: Zwei Raids auf derselben Stufe koennen verschiedene Gegner haben. Elf Stellen
+  // zeigten den Namen - alle, die ein Dokument haben, gehen jetzt hierueber.
+  function allianceRaidBossNameVon(doc){
+    const b = allianceRaidBossVon(doc);
+    return b.name + ' - Stufe ' + ((doc && doc.level) || 1);
+  }
   function allianceRaidWaveKey(doc){ return doc ? doc.id+'-w'+(doc.waveNumber||1) : null; }
   let allianceRaidCache = null;
   async function loadAllianceRaidDoc(){
@@ -36093,13 +36138,17 @@
   // die Flugzeit (travelSec) wird vom Client berechnet und nur unverändert an den Server gereicht -
   // dieselbe Vertrauensannahme wie bei jeder anderen Missionsart in diesem Spiel (siehe Kommentar im
   // Backend).
-  async function createAllianceRaid(gatherSeconds){
+  // bossKey nur beim AUSRUFEN eines neuen Raids (05.08.2026). Eine Folgewelle laesst ihn weg -
+  // der Server uebernimmt ihn dort ohnehin nicht, weil der Gegner zwischen zwei Wellen nicht
+  // wechseln darf (er ist bereits angeschlagen, und man koennte sich sonst nachtraeglich den mit
+  // der besseren Beute aussuchen).
+  async function createAllianceRaid(gatherSeconds, bossKey){
     if (!amIAllianceMusterLeader()){ log('Nur Admins/Offiziere können einen Allianz-Raid ausrufen.', 'ti-alert-triangle'); return; }
     const tag = myAllianceTag();
     if (!tag || !useBackend()) return;
     let res, data;
     try {
-      res = await backendFetch('/allianceraid/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, gatherSeconds }) });
+      res = await backendFetch('/allianceraid/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, gatherSeconds, bossKey: bossKey || undefined }) });
       data = await res.json();
     } catch(e){ log('Verbindungsfehler beim Ausrufen des Allianz-Raids.', 'ti-alert-triangle'); return; }
     if (!res.ok || !data.ok){ log(data && data.error || 'Allianz-Raid konnte nicht ausgerufen werden.', 'ti-alert-triangle'); return; }
@@ -36109,9 +36158,9 @@
     const sys = STAR_SYSTEMS.find(s=>s.id===doc.targetSector);
     const isNewWaveOnly = doc.waveNumber > 1;
     postAllianceBaseNews(isNewWaveOnly
-      ? '⚔ '+(state.player.name||'Ein Kommandant')+' ruft die nächste Welle gegen "'+allianceRaidBossName(doc.level)+'" auf ('+fmt(Math.max(0,Math.round(doc.hp)))+'/'+fmt(doc.maxHp)+' HP übrig) - Sammelphase '+fmtDuration(gatherSeconds)+'. Schließt eure Flotten im Allianz-Tab an!'
-      : '👾 '+(state.player.name||'Ein Mitglied')+' hat den Allianz-Raid "'+allianceRaidBossName(doc.level)+'" ('+fmt(doc.maxHp)+' HP, Standort: '+(sys?sys.name:doc.targetSector)+') ausgerufen - Sammelphase '+fmtDuration(gatherSeconds)+', schließt eure Flotten im Allianz-Tab an!');
-    log('Sammelphase gegen '+allianceRaidBossName(doc.level)+' gestartet ('+fmtDuration(gatherSeconds)+').', 'ti-alert-triangle');
+      ? '⚔ '+(state.player.name||'Ein Kommandant')+' ruft die nächste Welle gegen "'+allianceRaidBossNameVon(doc)+'" auf ('+fmt(Math.max(0,Math.round(doc.hp)))+'/'+fmt(doc.maxHp)+' HP übrig) - Sammelphase '+fmtDuration(gatherSeconds)+'. Schließt eure Flotten im Allianz-Tab an!'
+      : '👾 '+(state.player.name||'Ein Mitglied')+' hat den Allianz-Raid "'+allianceRaidBossNameVon(doc)+'" ('+fmt(doc.maxHp)+' HP, Standort: '+(sys?sys.name:doc.targetSector)+') ausgerufen - Sammelphase '+fmtDuration(gatherSeconds)+', schließt eure Flotten im Allianz-Tab an!');
+    log('Sammelphase gegen '+allianceRaidBossNameVon(doc)+' gestartet ('+fmtDuration(gatherSeconds)+').', 'ti-alert-triangle');
     render(); save();
   }
   // Beitreten: Flugzeit zum Treffpunkt wird lokal (nach echter Entfernung) berechnet und dem Server
@@ -36208,7 +36257,7 @@
       const fresh = data.doc;
       if (fresh.phase === 'enroute' && fresh.dispatch && allianceRaidWaveKey(fresh) === allianceRaidWaveKey(doc)){
         const sys = STAR_SYSTEMS.find(s=>s.id===fresh.targetSector);
-        postAllianceBaseNews('⚔ Verband bricht von der Allianzbasis auf gegen "'+allianceRaidBossName(fresh.level)+'" (Standort: '+(sys?sys.name:fresh.targetSector)+')! '+fresh.dispatch.participantCount+' Kommandanten, '+fmt(fresh.dispatch.totalShips)+' Schiffe, '+fmt(fresh.dispatch.totalPower)+' Angriffskraft. Ankunft in ~'+fmtDuration(Math.max(0,(fresh.dispatch.arrivalAt-Date.now())/1000))+'.');
+        postAllianceBaseNews('⚔ Verband bricht von der Allianzbasis auf gegen "'+allianceRaidBossNameVon(fresh)+'" (Standort: '+(sys?sys.name:fresh.targetSector)+')! '+fresh.dispatch.participantCount+' Kommandanten, '+fmt(fresh.dispatch.totalShips)+' Schiffe, '+fmt(fresh.dispatch.totalPower)+' Angriffskraft. Ankunft in ~'+fmtDuration(Math.max(0,(fresh.dispatch.arrivalAt-Date.now())/1000))+'.');
       }
       allianceRaidCache = fresh;
     } catch(e){}
@@ -36227,8 +36276,8 @@
       if (fresh.phase !== 'enroute' && fresh.lastWaveResult && fresh.lastWaveResult.waveNumber === doc.waveNumber){
         const destroyed = fresh.lastWaveResult.destroyed;
         postAllianceBaseNews(destroyed
-          ? '💀 Die Allianz hat gemeinsam "'+allianceRaidBossName(doc.level)+'" besiegt! ('+fmt(fresh.lastWaveResult.damage)+' Schaden mit dem letzten Schlag)'
-          : '⚔ Welle gegen "'+allianceRaidBossName(doc.level)+'" beendet: '+fmt(fresh.lastWaveResult.damage)+' Schaden, noch '+fmt(fresh.hp)+'/'+fmt(fresh.maxHp)+' HP übrig.');
+          ? '💀 Die Allianz hat gemeinsam "'+allianceRaidBossNameVon(doc)+'" besiegt! ('+fmt(fresh.lastWaveResult.damage)+' Schaden mit dem letzten Schlag)'
+          : '⚔ Welle gegen "'+allianceRaidBossNameVon(doc)+'" beendet: '+fmt(fresh.lastWaveResult.damage)+' Schaden, noch '+fmt(fresh.hp)+'/'+fmt(fresh.maxHp)+' HP übrig.');
       }
       allianceRaidCache = fresh;
     } catch(e){}
@@ -36271,8 +36320,8 @@
       if (data.doc) allianceRaidCache = data.doc;
       if (!data.changed) return;
       await postAllianceBaseNews(abgelaufen
-        ? 'Der Sternenfresser "'+allianceRaidBossName(doc.level)+'" ist ungenutzt entkommen (Zeitfenster abgelaufen).'
-        : 'Der Allianz-Raid gegen "'+allianceRaidBossName(doc.level)+'" wurde abgeschlossen - ein neuer Raid kann ausgerufen werden.');
+        ? 'Der Sternenfresser "'+allianceRaidBossNameVon(doc)+'" ist ungenutzt entkommen (Zeitfenster abgelaufen).'
+        : 'Der Allianz-Raid gegen "'+allianceRaidBossNameVon(doc)+'" wurde abgeschlossen - ein neuer Raid kann ausgerufen werden.');
     } catch(e){}
   }
   // Angreifer-Seite, pro Teilnehmer: eigene Belohnung/Verluste bzw. unversehrte Rückkehr (bei
@@ -36347,9 +36396,9 @@
     if (data.modulSeltenheit){ const mod = grantRandomModule(data.modulSeltenheit); moduleMsg = ' Modul erbeutet: '+mod+'!'; }
     const lostText = lostParts.join(', ');
     const platzText = (data.platz && data.teilnehmer) ? ' Platz '+data.platz+' von '+data.teilnehmer+'.' : '';
-    logScoreChange(data.battlePoints*3, allianceRaidBossName(level)+(data.destroyed?' erlegt':' angeschlagen')+' (Platz '+(data.platz||'?')+', Beitrag '+data.share+'%)', 'ti-sword');
+    logScoreChange(data.battlePoints*3, (data.boss ? data.boss.name+' - Stufe '+level : allianceRaidBossName(level))+(data.destroyed?' erlegt':' angeschlagen')+' (Platz '+(data.platz||'?')+', Beitrag '+data.share+'%)', 'ti-sword');
     log('Allianz-Raid-Belohnung:'+platzText+' '+(data.destroyed?'Boss besiegt! ':'Welle beendet, Boss angeschlagen. ')+data.credits+' Kredite, '+data.battlePoints+' Kampfpunkte, +'+data.xp+' XP.'+beuteText+moduleMsg+(lostText?' Eigene Verluste: '+lostText+'.':' Alle eigenen Schiffe zurückgekehrt.'), data.destroyed?'ti-skull':'ti-sword');
-    pushReport({ type:'item-found', itemName:'Allianz-Raid: Platz '+(data.platz||'?')+' von '+(data.teilnehmer||'?')+' – '+data.credits+' Kredite, '+data.battlePoints+' Kampfpunkte'+(beuteText?','+beuteText.replace(/^ Beute:/,'').replace(/\.$/,''):'')+(data.destroyed?' (Boss besiegt)':' (Boss angeschlagen)'), itemIcon:'ti-sword', rare: data.destroyed && data.platz === 1, foundAt: allianceRaidBossName(level) });
+    pushReport({ type:'item-found', itemName:'Allianz-Raid: Platz '+(data.platz||'?')+' von '+(data.teilnehmer||'?')+' – '+data.credits+' Kredite, '+data.battlePoints+' Kampfpunkte'+(beuteText?','+beuteText.replace(/^ Beute:/,'').replace(/\.$/,''):'')+(data.destroyed?' (Boss besiegt)':' (Boss angeschlagen)'), itemIcon:'ti-sword', rare: data.destroyed && data.platz === 1, foundAt: (data.boss ? data.boss.name+' - Stufe '+level : allianceRaidBossName(level)) });
     playSound(data.destroyed?'achieve':'raid');
     state.allianceRaidContribution = null;
     render(); save();
@@ -36363,6 +36412,13 @@
     const doc = allianceRaidCache;
     const canLead = amIAllianceMusterLeader();
     const durOptions = ALLIANCE_MUSTER_DURATIONS.map(s => `<option value="${s}"${selectedAttrFor('raidDuration', s, ALLIANCE_MUSTER_DURATIONS[0])}>${fmtDuration(s)}</option>`).join('');
+    // Gegner-Wahl (05.08.2026). data-keep-value ist hier PFLICHT und nicht Kosmetik: Die Box wird
+    // im Haupt-Tick neu geschrieben, und der Startknopf liest den Wert erst im Moment des Klicks -
+    // ohne den Schutz spraenge die Auswahl jede Sekunde auf den ersten Eintrag zurueck und der Raid
+    // startete still gegen den falschen Gegner. Genau dieser Fehler ist beim Raid schon einmal
+    // passiert (Sammeldauer, siehe CLAUDE.md).
+    const bossOptions = ALLIANCE_RAID_BOSSE.map(b =>
+      `<option value="${b.key}"${selectedAttrFor('raidBoss', b.key, ALLIANCE_RAID_BOSSE[0].key)}>${b.name} – ${bossBeuteText(b)}</option>`).join('');
 
     if (allianceRaidVorbei(doc)){
       const res = doc ? doc.result : null;
@@ -36374,19 +36430,28 @@
       // Welle kommt hier gar nicht erst an (allianceRaidVorbei liefert dann false).
       const endedAt = doc ? (res ? res.resolvedAt : Math.min(doc.expiresAt || 0, Date.now())) : 0;
       const restartCdLeft = doc ? Math.max(0, (endedAt||0) + ALLIANCE_RAID_RESTART_COOLDOWN_MS - Date.now()) : 0;
-      let html = `<div class="bmeta" style="margin-bottom:8px;">${res ? (res.destroyed ? 'Der letzte Sternenfresser wurde besiegt!' : 'Der letzte Sternenfresser ist ungenutzt entkommen.') : 'Aktuell läuft kein Allianz-Raid.'} Nächster Gegner: <strong>${allianceRaidBossName(nextLevel)}</strong> (${fmt(allianceRaidHpFor(nextLevel))} HP).</div>`;
+      // REGEL 6 (05.08.2026): Diese Vorschau leitete den Boss aus der STUFE ab. Seit er waehlbar
+      // ist, waere das die zweite Anzeigestelle mit der alten Annahme - sie haette die Kampfregel
+      // eines anderen Gegners genannt als den, der im Auswahlfeld direkt darunter steht. Sie liest
+      // deshalb dieselbe gemerkte Auswahl wie das Feld.
+      const gewaehlterBoss = ALLIANCE_RAID_BOSSE.find(b => b.key === (rememberedSelectValues.get('raidBoss') || ALLIANCE_RAID_BOSSE[0].key)) || ALLIANCE_RAID_BOSSE[0];
+      let html = `<div class="bmeta" style="margin-bottom:8px;">${res ? (res.destroyed ? 'Der letzte Sternenfresser wurde besiegt!' : 'Der letzte Sternenfresser ist ungenutzt entkommen.') : 'Aktuell läuft kein Allianz-Raid.'} Nächster Gegner: <strong>${gewaehlterBoss.name} - Stufe ${nextLevel}</strong> (${fmt(allianceRaidHpFor(nextLevel))} HP).</div>`;
       // Die Kampfregel des naechsten Bosses VOR dem Ausrufen (02.08.2026) - eine Schwaeche, die
       // man erst nach der Welle erfaehrt, kann die Allianz nicht einplanen, und genau das
       // Einplanen ist der Zweck der Bosse.
-      html += `<div class="bmeta" style="margin-bottom:8px; color:#e0a548;"><i class="ti ${allianceRaidBoss(nextLevel).icon}" aria-hidden="true" style="margin-right:3px;"></i>${allianceRaidBoss(nextLevel).trait}</div>`;
+      html += `<div class="bmeta" style="margin-bottom:8px; color:#e0a548;"><i class="ti ${gewaehlterBoss.icon}" aria-hidden="true" style="margin-right:3px;"></i><strong>${gewaehlterBoss.name}</strong> – ${gewaehlterBoss.trait} <span style="color:#9fe1f5;">Beute: ${bossBeuteText(gewaehlterBoss)}.</span></div>`;
       if (canLead){
-        html += `<div style="display:flex; gap:6px; align-items:center;"><select id="raidDurationSelect" data-keep-value="raidDuration" style="font-size:12px;">${durOptions}</select><button data-start-alliance-raid ${restartCdLeft>0?'disabled':''}><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>${restartCdLeft>0?'Bereit in '+fmtDuration(restartCdLeft/1000):'Raid ausrufen'}</button></div>`;
+        html += `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"><select id="raidBossSelect" data-keep-value="raidBoss" style="font-size:12px; flex:1 1 200px; min-width:0;">${bossOptions}</select><select id="raidDurationSelect" data-keep-value="raidDuration" style="font-size:12px;">${durOptions}</select><button data-start-alliance-raid ${restartCdLeft>0?'disabled':''}><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>${restartCdLeft>0?'Bereit in '+fmtDuration(restartCdLeft/1000):'Raid ausrufen'}</button></div>`;
       } else {
         html += `<div class="bmeta" style="color:#6b6f85;">Nur Admins/Offiziere können einen neuen Raid ausrufen.</div>`;
       }
       box.innerHTML = html;
       const startBtn = box.querySelector('[data-start-alliance-raid]');
-      if (startBtn) startBtn.onclick = () => { const sel = box.querySelector('#raidDurationSelect'); createAllianceRaid(sel?parseInt(sel.value,10):ALLIANCE_MUSTER_DURATIONS[0]); };
+      if (startBtn) startBtn.onclick = () => {
+        const sel = box.querySelector('#raidDurationSelect');
+        const bsel = box.querySelector('#raidBossSelect');
+        createAllianceRaid(sel?parseInt(sel.value,10):ALLIANCE_MUSTER_DURATIONS[0], bsel ? bsel.value : null);
+      };
       return;
     }
 
@@ -36394,11 +36459,11 @@
     const sys = STAR_SYSTEMS.find(s=>s.id===doc.targetSector);
     const hpBarHtml = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <span class="bname"><i class="ti ${allianceRaidBoss(doc.level).icon}" aria-hidden="true" style="color:#e24b4a;"></i> ${allianceRaidBossName(doc.level)}</span>
+        <span class="bname"><i class="ti ${allianceRaidBossVon(doc).icon}" aria-hidden="true" style="color:#e24b4a;"></i> ${allianceRaidBossNameVon(doc)}</span>
         <span class="lvl-pill">${fmt(Math.max(0,Math.round(doc.hp)))} / ${fmt(doc.maxHp)} HP</span>
       </div>
       <div class="progress-outer" style="margin-bottom:6px;"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
-      <div class="bmeta" style="margin-bottom:4px; color:#e0a548;"><i class="ti ${allianceRaidBoss(doc.level).icon}" aria-hidden="true" style="margin-right:3px;"></i>${allianceRaidBoss(doc.level).trait}</div>
+      <div class="bmeta" style="margin-bottom:4px; color:#e0a548;"><i class="ti ${allianceRaidBossVon(doc).icon}" aria-hidden="true" style="margin-right:3px;"></i>${allianceRaidBossVon(doc).trait}</div>
       <div class="bmeta" style="margin-bottom:4px;">Standort: <strong style="color:#fff;">${sys ? sys.name : (doc.targetSector || 'unbekannt')}</strong> · Zeitfenster: noch ${fmtDuration(Math.max(0,doc.expiresAt-Date.now())/1000)} bis er endgültig entkommt.</div>`;
 
     if (doc.phase === 'idle'){
