@@ -85,8 +85,19 @@ function schnitt(text, von, bis, ohneEnde){
   }
   // Anzeige: eine Regel, die man erst nach der Welle erfaehrt, kann die Allianz nicht einplanen.
   // Beide Karten: die laufende (doc.level) und die Vorschau auf den naechsten (nextLevel).
-  check('1: die Boss-Eigenschaft steht in BEIDEN Raid-Karten',
-    /allianceRaidBoss\(doc\.level\)\.trait/.test(src) && /allianceRaidBoss\(nextLevel\)\.trait/.test(src));
+  // 05.08.2026 neu gefasst: Die Pruefung hing an den LITERALEN Aufrufen
+  // `allianceRaidBoss(doc.level).trait` / `allianceRaidBoss(nextLevel).trait`. Seit der Boss
+  // waehlbar ist, leitet ihn keine Anzeigestelle mehr aus der Stufe ab - die Eigenschaft steht
+  // weiterhin in beiden Karten, nur anders geschrieben. Ein Test, der die Schreibweise festhaelt
+  // statt der Eigenschaft, wird bei jedem Umbau rot, ohne dass etwas kaputt ist.
+  // Geprueft wird jetzt die Eigenschaft: In der Zeichenfunktion der Raid-Box steht die
+  // Boss-Regel zweimal - einmal fuer den laufenden Raid, einmal in der Vorschau.
+  {
+    const box = schnitt(src, 'function renderAllianceRaidBox(){', '\n  }\n');
+    const treffer = (box.match(/\.trait/g) || []).length;
+    check('1: die Boss-Eigenschaft steht in BEIDEN Raid-Karten', treffer >= 2,
+      { vorkommen: treffer, hinweis:'laufender Raid UND Vorschau auf den naechsten' });
+  }
 }
 
 // ================================================================== 2) STRAFEXPEDITIONEN
