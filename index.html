@@ -3999,6 +3999,35 @@
     return s ? s.name+' '+s.icon : '';
   }
 
+  /* Die Unterstuetzer-Pille - EINE Quelle fuer ALLE Listen (05.08.2026).
+     SPIELER-REPORT Sascha, mit zwei Bildern: "Das Tassen Abzeichen wird immernoch nicht in der
+     Bestenliste angezeigt". Nachgemessen an fuenf Stellen, die einen Spielernamen aus den
+     Bestenlisten-Daten zeichnen - genau EINE zeigte es:
+        Punkte-Tab, volle Rangliste .... ja
+        Status-Seitenmenue ............. nein   <- die Liste auf Saschas Bild
+        Wochenliga ..................... nein
+        Freundesliste .................. nein
+        Spielerprofil .................. nein
+     Der Server lieferte isSupporter die ganze Zeit korrekt (mit echten HTTP-Anfragen gegen
+     server.js geprueft: Spender true/silver, manuell Beschenkter true/silver, ohne alles false).
+     Es war reine Anzeige - dieselbe Falle wie bei den Allianz-Icons am selben Tag, wo vier
+     Stellen dieselbe Kachel fest eingebaut hatten.
+     Deshalb steht die Pille jetzt an EINER Stelle. Wer eine neue Spielerliste baut, ruft sie auf
+     und braucht nichts nachzuziehen. */
+  function supporterPille(e){
+    if (!e || !e.isSupporter) return '';
+    const s = KOFI_STUFEN[e.supporterTier] || KOFI_STUFEN.bronze;
+    return ` <span class="lvl-pill pill-supporter-${e.supporterTier||'bronze'}" style="font-size:10px;" title="${s.badge} - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt">${s.icon} ${s.badge}</span>`;
+  }
+  /* Fuer die schmalen Listen (Seitenmenue, Freundesliste): nur das Symbol, kein Wort. Der Platz
+     dort ist knapp - "🥇 Top-Unterstützer" haette den Namen verdraengt, und ein verdraengter Name
+     ist schlimmer als ein knappes Abzeichen. Titel-Text traegt die volle Erklaerung. */
+  function supporterPilleKlein(e){
+    if (!e || !e.isSupporter) return '';
+    const s = KOFI_STUFEN[e.supporterTier] || KOFI_STUFEN.bronze;
+    return ` <span title="${s.badge} - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt" style="flex-shrink:0;">${s.icon}</span>`;
+  }
+
   // Eine Anfrage, zwei Aufrufer: der Knopf im Fortschritt-Tab und die automatische Freischaltung
   // unten. Vorher lag der fetch nur im Knopf-Handler; damit gab es die Freischaltung ausschließlich
   // als Handgriff.
@@ -6066,8 +6095,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.408.0';
+  const VERSION = '8.409.0';
   const PATCHNOTES = [
+    { version:'8.409.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Das Unterstützer-Abzeichen fehlte in vier von fünf Spielerlisten.</strong> Gemeldet von Sascha mit zwei Bildern: die Bestenliste im Status-Seitenmenü ohne Kaffeetasse, daneben der Unterstützer-Kasten, der „Abzeichen aktiv (Bronze) – noch 30 Tage" meldet. Der Rang war also da und wurde trotzdem nicht gezeigt. Nachgezählt an allen fünf Stellen, die einen Spielernamen aus den Bestenlisten-Daten zeichnen, hatte es <em>genau eine</em>: die große Rangliste im Punkte-Tab. Es fehlte im <strong>Status-Seitenmenü</strong> (die Liste auf dem Bild), in der <strong>Wochenliga</strong>, in der <strong>Freundesliste</strong> und im <strong>Spielerprofil</strong>. Der Server war unschuldig – er liefert die Unterstützer-Kennzeichnung seit jeher korrekt, für gespendete wie für manuell vergebene Ränge; es war reine Anzeige. In den schmalen Listen steht nur das Stufen-Symbol ohne Wort, damit es den Namen nicht verdrängt; der volle Text erscheint beim Darüberfahren.',
+      'Damit sich das nicht wiederholt, entsteht das Abzeichen jetzt an <strong>einer einzigen Stelle</strong> im Code statt an fünf. Wer künftig eine neue Spielerliste baut, ruft sie auf und muss nichts nachziehen – und eine Prüfung schlägt an, sobald doch wieder eine zweite Kopie entsteht. Es ist derselbe Fehlertyp, der am selben Tag schon die Allianz-Symbole erwischt hatte, wo vier Stellen dieselbe Kachel fest eingebaut hatten.'
+    ]},
     { version:'8.408.0', date:'05.08.2026', changes:[
       '<strong>Behoben: Die Kampfwiedergabe war auf dem Telefon 75 Pixel zu breit – ein Bedienknopf lag komplett außerhalb des Bildschirms.</strong> Gemeldet war „die Protokollzeile wird abgeschnitten", und das stimmte, war aber nur die sichtbarste Ecke: Auf einem 390 Pixel breiten Gerät waren <em>alle vier</em> Teile der Fußleiste 458 Pixel breit. Phasenleiste, Kraftschiene und Protokollzeile liefen rechts aus dem Bild, und der fünfte Knopf („Video") begann bei Pixel 388 – er war schlicht <strong>nicht erreichbar</strong>. Ursache war eine Feinheit des Rasterlayouts: Ein Rasterkind darf von sich aus nie schmaler werden als sein Inhalt, und der Inhalt der Protokollzeile ist eine Textzeile ohne Umbruch. Die Fußleiste konnte deshalb nie schmaler sein als die <em>längste</em> Meldung, und weil alle vier Teile in derselben Spalte stehen, zog eine lange Meldung die drei anderen mit hinaus. Bitter daran: Die Auslassungspunkte („…"), die genau diesen Fall abfangen sollten, konnten nie greifen – der Kasten war nie zu schmal für seinen Text, er wuchs stattdessen über den Bildschirm.',
       '<strong>Die Protokollzeile darf auf dem Telefon zwei Zeilen hoch sein.</strong> Dort ist nur eine Zeile sichtbar, und sechs der sieben Meldungen passen bequem hinein. Genau eine passte nicht – die Enterbeute („Geentert: 4× Zerstörer, 3× Kreuzer, 2× Schlachtschiff, 2× Trägerschiff"), also ausgerechnet die Meldung mit dem meisten Inhalt; von ihr blieben 82 Prozent stehen. Sie steht jetzt vollständig da. Die Höhe ist dabei fest für zwei Zeilen reserviert statt mitzuwachsen: Sonst würde das Kampfbild darüber bei jeder langen Meldung um zwölf Pixel springen. Gemessen kostet es die Bühne keinen Pixel.',
@@ -25047,8 +25080,10 @@
       const score = e ? fmt(e.score||0)+' Pkt.' : 'offline gemerkt';
       const name = escapeHtml(e ? (e.name||f.name) : f.name);
       const tag = (e && e.allianceTag) || f.allianceTag || '';
-      return { sig: f.id+':'+(online?'1':'0')+':'+(e?e.score:'-'), html:
-        `<div class="card-row"><div class="left"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-right:6px;background:${online?'#5dcaa5':'#5a5f73'};box-shadow:${online?'0 0 6px #5dcaa5':'none'};"></span><div><span class="bname">${name}${tag?' ['+escapeHtml(tag)+']':''}</span><div class="bmeta">${online?'<span style="color:#5dcaa5;">online</span> · ':''}${score}</div></div></div><div style="display:flex; gap:4px;"><button data-friend-msg="${f.id}" data-friend-name="${escapeHtml(f.name)}" style="font-size:10px; padding:5px 7px;" title="Nachricht schreiben"><i class="ti ti-mail" aria-hidden="true"></i></button><button data-friend-profile="${f.id}" style="font-size:10px; padding:5px 7px;" title="Profil öffnen"><i class="ti ti-user" aria-hidden="true"></i></button><button data-friend-remove="${f.id}" style="font-size:10px; padding:5px 7px;" title="Entfernen"><i class="ti ti-x" aria-hidden="true"></i></button></div></div>` };
+      // isSupporter in der Signatur, sonst friert ein ablaufender Rang hier fest (die Box zeichnet
+      // nur bei geänderter Signatur neu).
+      return { sig: f.id+':'+(online?'1':'0')+':'+(e?e.score:'-')+':'+((e&&e.isSupporter)?e.supporterTier||'b':''), html:
+        `<div class="card-row"><div class="left"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-right:6px;background:${online?'#5dcaa5':'#5a5f73'};box-shadow:${online?'0 0 6px #5dcaa5':'none'};"></span><div><span class="bname">${name}${tag?' ['+escapeHtml(tag)+']':''}${supporterPille(e)}</span><div class="bmeta">${online?'<span style="color:#5dcaa5;">online</span> · ':''}${score}</div></div></div><div style="display:flex; gap:4px;"><button data-friend-msg="${f.id}" data-friend-name="${escapeHtml(f.name)}" style="font-size:10px; padding:5px 7px;" title="Nachricht schreiben"><i class="ti ti-mail" aria-hidden="true"></i></button><button data-friend-profile="${f.id}" style="font-size:10px; padding:5px 7px;" title="Profil öffnen"><i class="ti ti-user" aria-hidden="true"></i></button><button data-friend-remove="${f.id}" style="font-size:10px; padding:5px 7px;" title="Entfernen"><i class="ti ti-x" aria-hidden="true"></i></button></div></div>` };
     });
     const sig = rows.map(r => r.sig).join('|');
     if (sig === lastFriendsSig) return;
@@ -25063,7 +25098,9 @@
     const av = avatarSvg(entry.avatarKey);
     if (av){ avatarEl.innerHTML = av; avatarEl.style.background = (AVATAR_DEFS.find(a=>a.key===entry.avatarKey)||{}).bg || 'rgba(126,119,221,0.25)'; }
     else { avatarEl.textContent = (entry.name||'?').slice(0,2).toUpperCase(); avatarEl.style.background = 'rgba(126,119,221,0.25)'; }
-    document.getElementById('profileModalName').textContent = entry.name || 'Unbekannt';
+    // Name als HTML, damit die Unterstuetzer-Pille danebenpasst (05.08.2026). escapeHtml ist hier
+    // PFLICHT und nicht kosmetisch: entry.name kommt aus einem fremden Spielerkonto.
+    document.getElementById('profileModalName').innerHTML = escapeHtml(entry.name || 'Unbekannt') + supporterPille(entry);
     document.getElementById('profileModalAlliance').textContent = (entry.allianceTag ? 'Allianz ['+entry.allianceTag+']' : 'Keine Allianz') + (entry.title ? ' · '+entry.title : '') + (entry.allianceTitle ? ' · '+entry.allianceTitle : '');
     // Runde 1 "Profilkarte überarbeiten": Hintergrund-Sternenfeld pro Öffnung neu verstreut (Modal wird
     // nur bei echtem Öffnen neu befüllt, nicht im Haupt-Tick - kein Performance-Thema), plus Rahmen-
@@ -47540,7 +47577,9 @@
     }
     // Online-Punkt hängt von Date.now() ab - auf ein 30-Sekunden-Zeitfenster gerundet in der Signatur,
     // damit er noch regelmäßig auffrischt, aber nicht jede Sekunde einen vollen Neuaufbau auslöst.
-    const fpLbSig = Math.floor(Date.now()/30000)+'|'+leaderboardCache.slice(0,5).map(e=>e.id+':'+e.score+':'+e.lastSeen).join(',');
+    // isSupporter gehört in die Signatur: Läuft der Rang ab oder wird er vergeben, ändert sich
+    // sonst kein Wert dieser Liste, und die Box bliebe mit dem alten Abzeichen stehen.
+    const fpLbSig = Math.floor(Date.now()/30000)+'|'+leaderboardCache.slice(0,5).map(e=>e.id+':'+e.score+':'+e.lastSeen+':'+(e.isSupporter?e.supporterTier||'b':'')).join(',');
     if (fpLbSig === lastFpLeaderboardSig) return;
     lastFpLeaderboardSig = fpLbSig;
     box.innerHTML = leaderboardCache.slice(0,5).map((e,i) => {
@@ -47550,7 +47589,7 @@
       const isMe = !!(state.player.id && e.id === state.player.id);
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
       const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4c5661'}; box-shadow:${isOnline?'0 0 3px rgba(93,202,165,0.7)':'none'};"></span>`;
-      return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style="color:#7d8199;">['+escapeHtml(e.allianceTag)+']</span>':''}</span><span>${e.score||0}</span></div>`;
+      return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style="color:#7d8199;">['+escapeHtml(e.allianceTag)+']</span>':''}</span>${supporterPilleKlein(e)}<span>${e.score||0}</span></div>`;
     }).join('');
     box.querySelectorAll('[data-fp-profile]').forEach(row => row.addEventListener('click', () => {
       const id = row.getAttribute('data-fp-profile');
@@ -47653,9 +47692,17 @@
     const nowKey = weekKeyOf(Date.now());
     const myId = state.player.id;
     // Wochen-Rangliste: geteilte Einträge der laufenden Woche; eigener Eintrag notfalls lokal ergänzt.
+    // isSupporter/supporterTier MUESSEN hier mitkopiert werden: Die Liste wird auf drei Felder
+    // eingedampft, und was hier fehlt, kann die Zeile unten nicht zeichnen - das Abzeichen fehlte
+    // aus genau diesem Grund (05.08.2026).
     let list = (leaderboardCache||[]).filter(e => e.weekKey === nowKey && typeof e.weekScore === 'number')
-      .map(e => ({ id: e.id, name: e.name || 'Unbekannt', weekScore: e.weekScore }));
-    if (myId && !list.some(e => e.id === myId)) list.push({ id: myId, name: state.player.name || 'Du', weekScore: myWeekScore() });
+      .map(e => ({ id: e.id, name: e.name || 'Unbekannt', weekScore: e.weekScore,
+                   isSupporter: e.isSupporter, supporterTier: e.supporterTier }));
+    if (myId && !list.some(e => e.id === myId)){
+      const mich = (leaderboardCache||[]).find(e => e.id === myId);
+      list.push({ id: myId, name: state.player.name || 'Du', weekScore: myWeekScore(),
+                  isSupporter: mich && mich.isSupporter, supporterTier: mich && mich.supporterTier });
+    }
     list.sort((a,b) => (b.weekScore||0) - (a.weekScore||0));
     const myIdx = myId ? list.findIndex(e => e.id === myId) : -1;
     const myRank = myIdx >= 0 ? myIdx+1 : list.length;
@@ -47670,7 +47717,7 @@
         <div style="display:flex; align-items:center; gap:10px; min-width:0;">
           <span class="rank-num">${i+1}</span>
           <span class="lvl-pill" style="color:${lg.color}; border-color:${lg.color}; font-size:10px;">${lg.name}</span>
-          <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name)}</span>
+          <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name)}${supporterPille(e)}</span>
         </div>
         <span style="color:#9296ac; flex-shrink:0;">${fmt(e.weekScore||0)} Wochenpunkte</span>
       </div>`;
@@ -47721,8 +47768,9 @@
       // vom Server ermittelter Stufe (supporterTier, aus der Gesamt-Spendensumme, siehe Backend
       // supporterTierFor). Stufen-Tabelle seit 28.07.2026 in der globalen KOFI_STUFEN - vorher lag
       // hier eine eigene Kopie, die bei jeder Änderung getrennt nachgezogen werden musste.
-      const supporterMeta = e.isSupporter ? (KOFI_STUFEN[e.supporterTier] || KOFI_STUFEN.bronze) : null;
-      const supporterBadge = supporterMeta ? ` <span class="lvl-pill pill-supporter-${e.supporterTier||'bronze'}" style="font-size:10px;" title="${supporterMeta.badge} - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt">${supporterMeta.icon} ${supporterMeta.badge}</span>` : '';
+      // 05.08.2026: Auch das Markup steht nicht mehr hier, sondern in supporterPille() - es war die
+      // EINZIGE von fünf Spielerlisten mit Abzeichen, und das fiel nur auf, weil Sascha es meldete.
+      const supporterBadge = supporterPille(e);
       return `
         <div class="rank-row ${isMe?'me':''}" data-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};">
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
