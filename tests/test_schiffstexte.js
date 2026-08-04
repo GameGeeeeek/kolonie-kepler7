@@ -100,11 +100,60 @@ if (/<details/.test(bruecke)){
 // die Karte schweigt zum Grund. Gelesen werden die def-Felder, die die Funktion abfragt.
 const srm = fnAus('shipRequirementsMet');
 const gelesen = [...new Set([...srm.matchAll(/def\.([a-zA-Z]+)/g)].map(m => m[1]))];
-const genannt = new Set(['requires','tiefe']);
-const unbenannt = gelesen.filter(f => !genannt.has(f));
-check('4: shipRequirementsMet prueft keine Bedingung, die die Karte nicht nennt',
-  unbenannt.length === 0,
-  { unbenannt, hinweis:'Neue Freischaltbedingung? In reqNames UND allReqNames einen Namen dafuer ergaenzen, sonst ist die Karte gesperrt und sagt nicht warum.' });
+// 05.08.2026: Hier stand bis heute eine HANDGEPFLEGTE Freigabeliste (`new Set(['requires','tiefe'])`).
+// Sie war rot, sobald jemand ein neues Feld abfragte - aber sie war auch dann rot, wenn er die
+// Anzeigestelle korrekt mitgebaut hatte, und sie waere gruen geblieben, wenn jemand ein Feld in die
+// Liste eingetragen haette, ohne es je anzuzeigen. Geprueft wurde also die Buchfuehrung, nicht die
+// Sache. Mit der Allianzflotte (allianzSchiff/allianzWerft) ist genau der erste Fall eingetreten.
+//
+// Jetzt wird die REGEL gemessen: Jedes Feld, das shipRequirementsMet() abfragt, muss in dem
+// Abschnitt der Werftkarte auftauchen, der die Anforderungs-Zeilen baut - also dort, wo reqNames
+// und allReqNames entstehen. Damit kann die Pruefung weder falsch-rot noch falsch-gruen sein, und
+// niemand muss sie beim naechsten Schiff von Hand nachziehen.
+// Es sind ZWEI Zeilen, und sie haben verschiedene Aufgaben:
+//   reqNames    - was JETZT noch fehlt (steht auf der gesperrten Karte hinter „Benoetigt:")
+//   allReqNames - was das Schiff ueberhaupt verlangt (steht auf der freigeschalteten Karte)
+// Eine Bedingung muss in BEIDEN vorkommen. Der erste Anlauf dieser Pruefung schnitt beide Zeilen
+// als EINEN Block aus und suchte darin - und war damit blind dafuer, dass eine Bedingung aus genau
+// einer der beiden herausfaellt. Gegengeprueft: Beim testweisen Entfernen der Werftstufe aus
+// reqNames blieb sie gruen, weil allReqNames sie noch nannte. Deshalb jetzt getrennt.
+// Anker ist reqNameFor - die Hilfsfunktion, die es NUR im Werft-Block gibt. Ohne sie traf
+// `indexOf('const reqNames =')` die gleichnamige Zeile der GEBAEUDE-Karte, die zufaellig weiter
+// oben steht und mit Schiffen nichts zu tun hat; die Pruefung war dadurch gruen an der falschen
+// Stelle. Beim naechsten Umbau also am Anker denken, nicht am Variablennamen.
+const werftBlock = js.indexOf('const reqNameFor = req =>');
+const zeileVon = (name) => {
+  const a = js.indexOf('const ' + name + ' = (def.requires||[])', werftBlock);
+  return a < 0 ? '' : js.slice(a, js.indexOf('\n', a));
+};
+check('4: der Werft-Block wurde gefunden (Anker reqNameFor)', werftBlock > 0, werftBlock);
+const reqZeile = zeileVon('reqNames');
+const allZeile = zeileVon('allReqNames');
+check('4: beide Anforderungs-Zeilen wurden gefunden', reqZeile.length > 80 && allZeile.length > 40,
+  { req: reqZeile.length, all: allZeile.length });
+// 'requires' ist der Regelfall und wird von reqNameFor generisch aufgeloest - alles andere ist eine
+// SONDERbedingung. Sie taucht in der Zeile selbst oder in einer direkt davor gebauten Hilfsliste auf
+// (tiefeOffen/tiefeAlle, allianzOffen/allianzAlle), deshalb wird die jeweilige Hilfsliste mitgelesen.
+const mitHilfslisten = (zeile) => {
+  let t = zeile;
+  for (const h of (zeile.match(/\.concat\((\w+)\)/g) || []).map(x => x.slice(8, -1))){
+    const a = js.indexOf('const ' + h + ' =');
+    if (a >= 0) t += '\n' + js.slice(a, js.indexOf(';', a));
+  }
+  return t;
+};
+const reqText = mitHilfslisten(reqZeile), allText = mitHilfslisten(allZeile);
+const fehltIn = (text) => gelesen.filter(f => f !== 'requires' && text.indexOf('def.' + f) < 0);
+check('4: die „Benoetigt"-Zeile nennt jede Bedingung, die die Sperre prueft',
+  fehltIn(reqText).length === 0,
+  { unbenannt: fehltIn(reqText), geprueft: gelesen,
+    hinweis:'Neue Freischaltbedingung? In reqNames einen Namen dafuer ergaenzen, sonst ist die Karte gesperrt und sagt nicht warum.' });
+check('4: und die Voraussetzungs-Zeile ebenso',
+  fehltIn(allText).length === 0,
+  { unbenannt: fehltIn(allText), hinweis:'dasselbe fuer allReqNames.' });
+// GEGENPROBE: Der Ausschnitt muss ueberhaupt etwas enthalten - ein leerer Text waere sonst still gruen.
+check('4: die Gegenprobe greift (leerer Ausschnitt waere aufgefallen)',
+  reqText.indexOf('def.') >= 0 && allText.indexOf('def.') >= 0 && gelesen.length >= 3, gelesen);
 // Und die Tiefe muss in BEIDEN Zeilen vorkommen: „Voraussetzung" steht dauerhaft (auch nach dem
 // Freischalten, damit man es nachschlagen kann), „Benoetigt" nur solange gesperrt.
 check('4: die Voraussetzungs-Zeile nennt die Rekordtiefe',
