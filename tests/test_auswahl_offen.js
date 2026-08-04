@@ -162,6 +162,48 @@ const save = () => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
     check('die getroffene Wahl ueberlebt das Neuzeichnen', !!w && w === erwartet, { gewaehlt: w });
   }
 
+  // ---- DER FALL, DEN DIE FOKUS-PRUEFUNG NICHT ABDECKT (05.08.2026, zweiter Report)
+  // Auf dem Handy oeffnet ein Auswahlfeld ein SYSTEMMENUE ausserhalb der Seite - die Seite kann
+  // dabei den Fokus ganz verlieren. Dann greift isTypingIn() nicht, die Box wird weiter jede
+  // Sekunde neu geschrieben, und das Menue schliesst sich wieder. Genau das hat Sascha ein zweites
+  // Mal gemeldet.
+  // Ein gesteuerter Browser kann kein echtes Systemmenue oeffnen. Nachgestellt wird deshalb die
+  // messbare Eigenschaft: mousedown auf dem Auswahlfeld (das feuert immer, BEVOR das Menue
+  // aufgeht), danach Fokus ausdruecklich WEGNEHMEN - also der schlimmste Fall.
+  {
+    await page.evaluate(() => {
+      const b = document.getElementById('allianceRaidBox');
+      const sel = b && b.querySelector('#raidBossSelect');
+      if (sel) sel.dispatchEvent(new MouseEvent('mousedown', { bubbles:true }));
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      if (b && b.firstElementChild) b.firstElementChild.__marke2 = true;
+    });
+    await page.waitForTimeout(3200);
+    const ohneFokus = await page.evaluate(() => {
+      const b = document.getElementById('allianceRaidBox');
+      return { marke: !!(b && b.firstElementChild && b.firstElementChild.__marke2),
+               aktiv: document.activeElement ? document.activeElement.tagName : null };
+    });
+    check('auch OHNE Fokus bleibt der Kasten stehen, wenn das Auswahlfeld angetippt wurde',
+      ohneFokus.marke === true, Object.assign(ohneFokus,
+        { hinweis:'Das ist der Handy-Fall: Systemmenue ausserhalb der Seite, Fokus weg.' }));
+
+    // Und die Sperre loest sich nach der Auswahl wieder - sonst bliebe die Box haengen.
+    await page.evaluate(() => {
+      const sel = document.querySelector('#raidBossSelect');
+      if (sel){ sel.dispatchEvent(new Event('change', { bubbles:true })); }
+      const b = document.getElementById('allianceRaidBox');
+      if (b && b.firstElementChild) b.firstElementChild.__marke3 = true;
+    });
+    await page.waitForTimeout(3200);
+    const danach = await page.evaluate(() => {
+      const b = document.getElementById('allianceRaidBox');
+      return !(b && b.firstElementChild && b.firstElementChild.__marke3);
+    });
+    check('nach getroffener Auswahl laeuft das Neuzeichnen wieder an', danach === true,
+      { hinweis:'Sonst bliebe die Karte samt Countdown fuer immer stehen.' });
+  }
+
   check('keine JS-Fehler', errs.length === 0, errs.slice(0,3));
   await ctx.close(); await browser.close();
   console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
