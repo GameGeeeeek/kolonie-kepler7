@@ -2535,6 +2535,11 @@
           <button id="adminSupporterGrantBtn" class="login-submit" style="flex:1; padding:8px 16px;"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:5px;"></i>Rang vergeben</button>
           <button id="adminSupporterRevokeBtn" style="padding:8px 14px; font-size:11.5px; background:rgba(226,75,74,0.12); border-color:rgba(226,75,74,0.35); color:#f0997b;"><i class="ti ti-x" aria-hidden="true" style="margin-right:4px;"></i>Entziehen</button>
         </div>
+        <!-- Arbeitsliste, keine Statistik: Spenden, die ohne E-Mail ankamen und deshalb keinem
+             Konto zugeordnet werden konnten. Steht bewusst ÜBER der Unterstützer-Liste - es ist
+             das, was zu tun ist, nicht das, was schon erledigt ist. -->
+        <div class="section-title" style="font-size:12px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Nicht zugeordnete Spenden</div>
+        <div id="adminKofiUnlinked" style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;"></div>
         <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Aktuelle Unterstützer</div>
         <div id="adminSupporterList" style="display:flex; flex-direction:column; gap:6px;"></div>
       </div>
@@ -5972,8 +5977,18 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.402.0';
+  const VERSION = '8.404.0';
   const PATCHNOTES = [
+    { version:'8.404.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Die drei neuen Allianzschiffe trugen im Kampf gar keine Angriffskraft bei.</strong> Sie waren in der Angriffsflotte auswählbar, fehlten aber in der Formel, die die Angriffskraft bildet - in jedem Kampf, den dein Browser selbst auflöst (NPC, Weltboss, Piraten, Leerenriss, Abgrund, Expeditions-Eskorte), zählten sie null. Der Server rechnete sie dagegen korrekt mit, die Vorschau zeigte also etwas anderes als das Ergebnis. Wer 200 Sternenbanner gebaut hätte, hätte Angriffskraft 0 gesehen. <strong>Das war dieselbe Lücke in derselben Formel zum dritten Mal</strong> (20.07. fehlten acht Klassen, 24.07. der Singularitäts-Vernichter) - deshalb wacht jetzt eine Prüfung darüber, dass jede Klasse, die angreifen darf, dort auch vorkommt. Eine vierte Wiederholung fällt künftig beim Prüflauf auf und nicht im Spiel.',
+      '<strong>Behoben: Mit bestimmten Flotten ließ sich überhaupt kein Angriff starten.</strong> Die Zählung „wie viele Kampfschiffe stehen hier" führte eine eigene, von Hand gepflegte Liste mit neun Klassen - während es zweiundzwanzig gibt. Es fehlten neben den drei neuen Allianzschiffen auch <em>Leerenjäger, Wächter, Kometenjäger, Enterschiff, Phantomschiff, Riftwächter, Nanoklinge, Quantenkreuzer, Fusionsdreadnought und Singularitäts-Vernichter</em>. Wer an einem Standort ausschließlich solche Schiffe stehen hatte, bekam auf jeden Angriffsversuch „Alle Kampfschiffe dort sind bereits im Einsatz." - obwohl gar keine Mission lief. Bei gemischter Flotte waren zu wenige Kampfmissionen gleichzeitig möglich, und die Werftkarte des Leerenjägers bewarb einen gemeinsamen Slot-Pool, den er selbst nicht vergrößerte. Die Zählung leitet sich jetzt aus der Kampfschiff-Liste ab, statt danebengeschrieben zu werden.'
+    ]},
+    { version:'8.403.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Wer gespendet hat, bekam trotzdem keine Kaffeetasse in der Bestenliste.</strong> Aufgefallen an einem einzelnen Spieler, der in der Unterstützer-Box stand, in der Bestenliste aber kein Abzeichen trug. Nachgemessen auf dem Server: Die Liste der Spenden <em>mit E-Mail-Adresse</em> war <strong>vollständig leer</strong>, während die Namensliste zwei Einträge hatte - und beide entstehen im selben Arbeitsschritt, wenige Zeilen auseinander. Ko-fi liefert bei diesen Zahlungen also gar keine E-Mail-Adresse mit, und die Zuordnung zum Spielkonto läuft ausschließlich darüber. Das heißt: Das Abzeichen war seit seiner Einführung für <em>niemanden</em> erreichbar, und seit heute Vormittag hingen auch drei Spielfunktionen daran.',
+      '<strong>Der eigentliche Fehler war das Schweigen.</strong> Die Spende wurde zur Hälfte verbucht (Name ja, Zuordnung nein), und nichts im System hat das je gemeldet - weder ein Protokolleintrag noch eine Anzeige. Genau dasselbe Muster wie bei den zwei Benachrichtigungsschaltern heute früh. Eine Spende, die sich nicht zuordnen lässt, wird jetzt ausdrücklich als solche festgehalten und laut protokolliert.',
+      'Der Admin-Bereich zeigt diese Fälle als <strong>Arbeitsliste</strong> direkt über der Rang-Vergabe: Spendername, Betrag, Zeitpunkt und die Namen der Felder, die der Webhook tatsächlich mitgeliefert hat - letzteres beantwortet auf einen Blick, ob und wie Ko-fi die Adresse überhaupt schickt. Ein Klick auf „Name übernehmen" füllt das Vergabefeld, danach genügen Laufzeit und Bestätigen. <strong>Bei anonymen Spenden wird weiterhin kein Name gespeichert</strong>, auch hier nicht - die Karte weist sie nur als anonym aus.',
+      'Bewusst NICHT gebaut: eine automatische Zuordnung über den Spendernamen. Der Kommandantenname ist frei wählbar; wer sich in den Namen eines Spenders umbenennt, bekäme dessen Rang. Genau deshalb fiel die Wahl damals auf die E-Mail-Adresse. Die Zuordnung bleibt eine bewusste Entscheidung eines Menschen - das System legt sie nur noch sichtbar vor, statt sie stillschweigend fallenzulassen.'
+    ]},
     { version:'8.402.0', date:'05.08.2026', changes:[
       '<strong>Neu: Allianzforschung - ein eigener Forschungsbaum, den nur Allianzmitglieder betreiben können.</strong> Fünf Zweige zu je 10 Stufen, im Forschung-Tab direkt unter den bisherigen Projekten. Nicht zu verwechseln mit den Allianz-Technologien: Die sind ein gemeinsamer Topf, in den die ganze Allianz einzahlt - <em>diese</em> hier erforscht jeder für sich selbst, im eigenen Labor, mit eigener Bauzeit und Kosten aus Rohstoffen <strong>und</strong> Forschungspunkten. <strong>Verbundprotokolle</strong> (+0,8% Angriffskraft je Stufe) sind der Grundstein, darauf bauen <strong>Werftnormung</strong> (−1,2% Schiffsbauzeit), <strong>Geteiltes Schildnetz</strong> (+1,2% Verteidigung), <strong>Konvoi-Doktrin</strong> (−1% Dauer aller Missionen) und zuoberst die <strong>Sternenschmiede</strong> (+1,2% Angriffskraft). Wer die Allianz verlässt, behält seine erforschten Stufen - Wissen nimmt man mit -, ihre Wirkung fällt aber auf null und neue Stufen lassen sich nicht mehr starten. Beim nächsten Beitritt ist alles sofort wieder da.',
       '<strong>Neu: drei Allianzschiffe.</strong> Sie haben je zwei Tore, und die sind bewusst verschieden: die eigene Allianzforschung <strong>und</strong> eine Mindeststufe der Gemeinsamen Flottenwerft, die die Allianz gemeinsam hochbaut. Das eine ist Eigenleistung, das andere die Allianz - und man braucht beides. Die <strong>Paktkorvette</strong> (40 Angriff, Schild 14, Tempo 115 - der schnellste Großserien-Angreifer im Spiel) ab Verbundprotokolle 3 und Flottenwerft 2. Der <strong>Bundeskreuzer</strong> (110 Angriff, Schild 60, Verteidigungsgewicht 1,7 - hält deutlich mehr aus als ein Leerenjäger) ab Schildnetz 5, Werftnormung 3 und Flottenwerft 6. Und das <strong>Sternenbanner</strong> (240 Angriff, Schild 100 - zwischen Superschlachtschiff und Singularitäts-Vernichter) ab Sternenschmiede 6 und Flottenwerft 12. Alle drei mit eigenem Rumpf, eigener Silhouette in der Kampf-Wiedergabe und über alle drei Konterrollen verteilt, damit die Rollenbalance nicht kippt. <strong>Bereits gebaute Allianzschiffe bleiben auch nach einem Austritt</strong> und kämpfen normal weiter - nur neue lassen sich dann nicht mehr bauen.',
@@ -18528,10 +18543,29 @@
     const bomber = Math.min(f.bomber||0, Math.max(0, cap-jaeger));
     return { jaeger, bomber, idleJaeger: (f.jaeger||0)-jaeger, idleBomber: (f.bomber||0)-bomber };
   }
+  // Wie viele Kampfschiffe stehen hier? Der Wert ist an zehn Stellen die harte Sperre
+  // `if (slotsUsed >= combatFleetCount(cf))` - Spielerangriff, NPC-Angriff, Piratenversteck,
+  // Piratenabfang, Weltboss, Leerenriss, Abgrund, Allianzbasis - und zugleich der Nenner der
+  // "belegt/gesamt Kampf-Slots"-Zeile auf den Werftkarten.
+  //
+  // BIS ZUM 05.08.2026 stand hier eine handgeschriebene Liste mit NEUN Schluesseln, waehrend
+  // KAMPF_SHIP_KEYS 22 fuehrt. Es fehlten nicht nur die drei neuen Allianzschiffe, sondern auch
+  // Leerenjaeger, Waechter, Kometenjaeger, Enterschiff, Phantomschiff, Riftwaechter, Nanoklinge,
+  // Quantenkreuzer, Fusionsdreadnought und Singularitaets-Vernichter. Folge: Wer an einem Standort
+  // AUSSCHLIESSLICH solche Schiffe stehen hatte, bekam auf jeden Angriffsversuch die Meldung
+  // "Alle Kampfschiffe dort sind bereits im Einsatz." - obwohl gar keine Mission lief. Bei
+  // gemischter Flotte war die Zahl gleichzeitiger Kampfmissionen zu klein, und die Werftkarte des
+  // Leerenjaegers bewarb einen gemeinsamen Pool, den er selbst nicht vergroesserte.
+  //
+  // Jetzt aus KAMPF_SHIP_KEYS abgeleitet statt von Hand gefuehrt - damit kann keine kuenftige
+  // Kampfklasse mehr an dieser zweiten Liste vorbeilaufen. Jaeger und Bomber weiterhin ueber
+  // deployableFighters(), weil sie nur mit Hangarplatz zaehlen; Frachter sind in KAMPF_SHIP_KEYS
+  // ohnehin nicht enthalten.
   function combatFleetCount(fleet){
     const f = fleet || currentFleet();
     const df = deployableFighters(f);
-    return f.cruisers + (f.destroyers||0) + (f.schlachtschiff||0) + (f.carrier||0) + (f.superschlachtschiff||0) + df.jaeger + df.bomber + (f.hyperjaeger||0) + (f.hyperbomber||0);
+    return KAMPF_SHIP_KEYS.reduce((summe, k) =>
+      summe + (k === 'jaeger' ? df.jaeger : k === 'bomber' ? df.bomber : (f[k]||0)), 0);
   }
   // ===== Schiffs-Kontersystem (Schere-Stein-Papier) =====
   // Wirkt NUR bei Überfällen, wo beide Flottenzusammensetzungen bekannt sind (Angreifer-Flotte aus
@@ -19297,7 +19331,17 @@
       // bei. Backend rawFleetPower() synchron nachgezogen. Metamaterial-Titan bleibt bewusst draußen
       // (reines Verteidigungsschiff). Die Offensiv-Aura "Gravitationssog" (+5%/Schiff) kommt zusätzlich
       // oben drauf und ist davon unberührt.
-      dm('singularitaetsvernichter',f.singularitaetsvernichter)*280*t2AtkMult;
+      dm('singularitaetsvernichter',f.singularitaetsvernichter)*280*t2AtkMult +
+      // Allianzflotte (05.08.2026). ZUM DRITTEN MAL dieselbe Luecke in genau dieser Summe: erst
+      // fehlten 8 Klassen (20.07.2026), dann der Singularitaets-Vernichter (24.07.2026, siehe
+      // Kommentar darueber), jetzt diese drei. Die Schiffe standen bereits in ATTACK_SHIP_KEYS,
+      // waren also in der Angriffsflotte waehlbar - und trugen in JEDEM clientseitig aufgeloesten
+      // Kampf 0 Angriffskraft bei, waehrend das Backend sie korrekt mitrechnete. Ein Spieler mit
+      // 200 Sternenbannern haette in der Vorschau 0 gesehen und den NPC-Kampf sicher verloren.
+      // Bewusst ohne t2AtkMult (keine Tier-2-Schiffe) und ohne schlachtschiffAtkMult.
+      // tests/test_angriffssumme.js prueft ab sofort, dass JEDER Schluessel aus ATTACK_SHIP_KEYS
+      // hier vorkommt - eine vierte Wiederholung faellt damit beim Prueflauf auf, nicht im Spiel.
+      dm('paktkorvette',f.paktkorvette)*40 + dm('bundeskreuzer',f.bundeskreuzer)*110 + dm('sternenbanner',f.sternenbanner)*240;
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
     if (k2Lvl) power *= (1+k2Lvl*RESEARCH_DEFS.find(r=>r.key==='rkampf2').effectPerLevel);
@@ -25289,8 +25333,51 @@
     const el = document.getElementById('adminSupporterName');
     return el ? el.value.trim() : '';
   }
+  // Spenden ohne E-Mail (05.08.2026). Auf dem Pi gemessen: kofiDonationsByEmail hatte 0 Einträge,
+  // kofiSupporters 2 Namen - beide entstehen im selben Webhook. Die Spende kam also an, nur die
+  // Zuordnung zum Konto nicht, und nichts hat es gemeldet. Diese Liste macht daraus eine sichtbare
+  // Aufgabe: Name übernehmen, Laufzeit wählen, vergeben, abhaken.
+  async function loadAdminKofiUnlinked(){
+    const box = document.getElementById('adminKofiUnlinked');
+    if (!box) return;
+    try {
+      const res = await backendFetch('/admin/kofi-unlinked');
+      if (!res.ok){ box.innerHTML = `<div class="bmeta">Liste konnte nicht geladen werden (${res.status}).</div>`; return; }
+      const offen = (await res.json()).offen || [];
+      if (!offen.length){ box.innerHTML = `<div class="bmeta">Nichts offen - alle eingegangenen Spenden trugen eine E-Mail-Adresse.</div>`; return; }
+      box.innerHTML = offen.map(e => {
+        const wann = new Date(e.at).toLocaleString('de-DE');
+        const wer = e.name ? escapeHtml(e.name) : '<span style="color:#7d8199;">anonym gespendet</span>';
+        // Die Feldnamen des Webhooks beantworten in einem Blick, ob Ko-fi das E-Mail-Feld
+        // überhaupt schickt - und zwar ohne dass irgendein Inhalt davon gespeichert würde.
+        return `<div class="card-row" style="padding:0.5rem 0.85rem; border-color:rgba(224,165,72,0.35);">
+          <div class="left"><div style="min-width:0;">
+            <div class="bname">${wer} · ${e.amount} ${escapeHtml(e.currency||'')}</div>
+            <div class="bmeta">${wann}${e.type?' · '+escapeHtml(e.type):''} · keine E-Mail im Webhook</div>
+            <div class="bmeta" style="color:#6b6f85;">gelieferte Felder: ${escapeHtml((e.felder||[]).join(', ')) || '(keine)'}</div>
+          </div></div>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            ${e.name ? `<button data-kofi-pick="${escapeHtml(e.name)}" style="font-size:10.5px; padding:4px 8px;">Name übernehmen</button>` : ''}
+            <button data-kofi-dismiss="${e.id}" style="font-size:10.5px; padding:4px 8px;">Erledigt</button>
+          </div>
+        </div>`;
+      }).join('');
+      box.querySelectorAll('[data-kofi-pick]').forEach(b => b.onclick = () => {
+        const el = document.getElementById('adminSupporterName');
+        if (el){ el.value = b.getAttribute('data-kofi-pick'); el.focus(); }
+      });
+      box.querySelectorAll('[data-kofi-dismiss]').forEach(b => b.onclick = async () => {
+        try {
+          await backendFetch('/admin/kofi-unlinked/dismiss', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ id: b.getAttribute('data-kofi-dismiss') }) });
+          loadAdminKofiUnlinked();
+        } catch(e){ log('Konnte nicht abgehakt werden.', 'ti-alert-triangle'); }
+      });
+    } catch(e){ box.innerHTML = `<div class="bmeta">Liste konnte nicht geladen werden.</div>`; }
+  }
   async function loadAdminSupporters(){
     renderAdminGrantAuswahl();
+    loadAdminKofiUnlinked();
     const box = document.getElementById('adminSupporterList');
     if (!box) return;
     box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
@@ -25325,7 +25412,7 @@
       const data = await res.json().catch(()=>({}));
       if (!res.ok){ log(data.error || ('Vergabe fehlgeschlagen ('+res.status+').'), 'ti-alert-triangle'); return; }
       log(data.username+' hat den Unterstützer-Rang ('+adminGrantTier+') für '+data.days+' Tage - läuft ab am '+new Date(data.until).toLocaleDateString('de-DE')+'.', 'ti-diamond', 'ok');
-      loadAdminSupporters();
+      loadAdminSupporters();   // lädt die Arbeitsliste gleich mit
     } catch(e){ log('Vergabe fehlgeschlagen - Server nicht erreichbar.', 'ti-alert-triangle'); }
   }
   async function adminRevokeSupporter(){
