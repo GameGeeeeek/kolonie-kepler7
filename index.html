@@ -6118,8 +6118,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.411.0';
+  const VERSION = '8.412.0';
   const PATCHNOTES = [
+    { version:'8.412.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Eine zu teure Forschung konnte die Warteschlange für immer anhalten.</strong> Gefunden bei der Untersuchung eines Spieler-Reports („nach dem Update wird die Forschung nicht wieder gestartet"). Die vier <em>Ewigkeitsforschungen</em> haben keine Maximalstufe, und ihre Kosten wachsen je Stufe um 32–38 % – das Lager hat dagegen einen harten Deckel. Sobald der erste Eintrag der Warteschlange bei einer Ressource mehr kostet, als dein Lager überhaupt fassen kann, war er <strong>nie wieder</strong> bezahlbar; und weil immer nur der vorderste Eintrag betrachtet wurde, stand ab da die <strong>ganze Warteschlange still</strong> – dauerhaft und ohne jede Erklärung. Nachgerechnet trifft das ab Stufe 16–18 bei einem Lager von einer Million, ab Stufe 25–29 bei zwanzig Millionen; da die Kosten exponentiell und der Lagerbonus nur logarithmisch wachsen, ist die Wand unausweichlich – es war nur eine Frage, wann.',
+      '<strong>Jetzt werden zwei Fälle unterschieden, die vorher gleich aussahen.</strong> Reichen die Ressourcen nur <em>vorübergehend</em> nicht, wartet die Warteschlange weiterhin auf den Eintrag – die Reihenfolge, die du festgelegt hast, behält also ihre Bedeutung. Ist er dagegen <em>dauerhaft</em> unmöglich, wird er übersprungen, und die Forschungen dahinter laufen. Der Eintrag bleibt dabei an seinem Platz und startet automatisch, sobald dein Lager groß genug ist.',
+      'Nebenbei aufgefallen und mit behoben: Die Zeile „leistbar in …" auf den Karten rechnete stur Fehlmenge geteilt durch Produktionsrate und versprach damit auch dann eine Wartezeit, wenn die Kosten über der Lagerkapazität lagen und der Bestand diese Höhe <em>nie</em> erreichen kann. Sie war also ausgerechnet dort falsch, wo man sie am dringendsten braucht – und riet zum Warten, obwohl nur ein größeres Lager hilft. Jetzt sagt sie das auch.'
+    ]},
     { version:'8.411.0', date:'05.08.2026', changes:[
       '<strong>Die Admin-Listen sagen jetzt, was zu tun ist, statt nur eine Fehlernummer zu zeigen.</strong> Gemeldet von Sascha mit Bild: In beiden Kästen des Admin-Bereichs stand nur „Liste konnte nicht geladen werden (404)". Die Ursache war eindeutig bestimmbar, ohne den Server zu fragen – beide Endpunkte antworten bei fehlenden Rechten mit <em>403</em>, nie mit 404. Ein 404 kann also nur heißen, dass der Server die Adresse gar nicht kennt: Das Backend lief zwei Versionen hinterher. Die Meldung nennt jetzt genau das, samt dem Befehl, der es behebt. Andere Fehlerarten werden dabei ausdrücklich <em>unterschieden</em> – fehlende Rechte, abgelaufene Sitzung und ein abgebrochener Verbindungsversuch sagen jeweils etwas anderes, statt alle unter derselben Pauschale zu verschwinden.',
       'Das war an einem Tag der <strong>dritte Fall derselben Sorte</strong>: erst die zwei Benachrichtigungs-Kategorien, die sich nicht aktivieren ließen, dann diese beiden Listen – jedes Mal ein zurückliegendes Backend, und jedes Mal zeigte die Anzeige ein Symptom statt der Ursache.'
@@ -18117,6 +18122,19 @@
   }
   function affordEtaHtml(cost){
     if (!cost || canAfford(cost)) return '';
+    // ZUERST die Frage, ob es ueberhaupt je erreichbar ist (05.08.2026). Vorher rechnete diese
+    // Funktion stur "Fehlmenge / Produktionsrate" und schrieb dann z.B. "leistbar in 3 Tagen" -
+    // auch dann, wenn die Kosten ueber der Lagerkapazitaet lagen und der Bestand deshalb NIE so
+    // hoch werden kann (harter Deckel, SOFT_CAP_OVERFLOW_RATE = 0). Die Zahl war in genau dem
+    // Fall falsch, in dem der Spieler sie am dringendsten gebraucht haette: Sie versprach
+    // Warten als Loesung, obwohl nur ein groesseres Lager hilft.
+    // Das ist der Fehlertyp aus CLAUDE.md Regel 6 - die Mechanik stimmte, eine zweite
+    // Anzeigestelle behielt die alte Annahme.
+    const ueberLager = forschungUeberLager(cost);
+    if (ueberLager.length){
+      const namen = ueberLager.map(w => (resDefFor(w.res)||{label:w.res}).label).join(', ');
+      return ` · <span style="color:#e0a548;">übersteigt dein Lager (${namen}) – erst mit größerer Lagerkapazität möglich</span>`;
+    }
     const rates = affordRatesCached();
     let maxT = 0;
     const notProduced = [];
@@ -23082,20 +23100,82 @@
     state.researchQueue = proposed;
     render(); save();
   }
+  /* ===== "Zu arm gerade" ist nicht dasselbe wie "kann nie bezahlt werden" (05.08.2026) =====
+     Aufgefallen bei der Untersuchung des Reports "nach dem Update wird die Forschung nicht wieder
+     gestartet". Der Report selbst hat eine andere Ursache (siehe unten), aber die Suche legte eine
+     echte Sackgasse frei:
+
+     Die vier Ewigkeitsforschungen (rewig_prod/-bau/-def/-lager) haben `maxLevel:999` und Kosten
+     x1,32 bis x1,38 JE STUFE. Das Lager hat einen HARTEN Deckel (SOFT_CAP_OVERFLOW_RATE = 0) -
+     ueber `storageCap()` hinaus kann nichts angesammelt werden, auch nicht durch Einmal-Gutschriften.
+     Sobald der Kopf der Warteschlange bei IRGENDEINER Ressource mehr kostet, als das Lager fasst,
+     ist er NIE WIEDER bezahlbar. Und weil nur `researchQueue[0]` betrachtet wird und kein
+     bezahlbarer Eintrag vorgezogen wird, stand ab da die GANZE Schlange still - dauerhaft, ohne
+     jede Erklaerung.
+
+     Nachgerechnet mit der echten Kostenformel (base * costMult^(stufe-1)):
+        Lagerdeckel   1 Mio.  -> Wand ab Stufe 16-18
+        Lagerdeckel   5 Mio.  -> Wand ab Stufe 21-24
+        Lagerdeckel  20 Mio.  -> Wand ab Stufe 25-29
+        Lagerdeckel 100 Mio.  -> Wand ab Stufe 30-35
+     Die Kosten wachsen exponentiell, der Lagerbonus der Ewigkeitsforschung nur logarithmisch - die
+     Wand ist also unausweichlich, es ist nur eine Frage, WANN. Sie trifft ausgerechnet die weit
+     entwickelten Konten.
+
+     Die Regel unterscheidet jetzt zwei Faelle, die vorher gleich aussahen:
+       VORUEBERGEHEND zu arm (Kosten > Bestand, aber Kosten <= Lagerdeckel)
+           -> warten, genau wie bisher. Das ist der Sinn einer Warteschlange.
+       DAUERHAFT unmoeglich (Kosten > Lagerdeckel)
+           -> nicht blockieren. Der Eintrag BLEIBT an seiner Stelle (das Lager kann ausgebaut
+              werden, dann wird er wieder bezahlbar), aber die dahinter stehenden Forschungen
+              duerfen loslaufen. */
+  function forschungUeberLager(cost){
+    const cap = storageCap();
+    const drueber = [];
+    for (const [res, menge] of Object.entries(cost || {})){
+      // NUR die sechs Grundressourcen: Sie teilen sich storageCap(). Kredite haben gar keinen
+      // Deckel, Tier-2-Ressourcen einen eigenen, viel kleineren (tier2Cap) - beide hier gegen
+      // storageCap zu pruefen waere schlicht falsch und haette Karten faelschlich als "unmoeglich"
+      // markiert.
+      if (!RES_DEFS.some(d => d.key === res)) continue;
+      if (menge > cap) drueber.push({ res, menge, cap });
+    }
+    return drueber;
+  }
+  // Damit der Hinweis nicht jede Sekunde erneut im Protokoll steht (tryStartQueuedResearch laeuft
+  // im Haupt-Tick): je Forschung+Stufe genau einmal melden.
+  let lagerWandGemeldet = {};
   function tryStartQueuedResearch(){
     if (state.activeResearch) return false;
     if (!state.researchQueue || !state.researchQueue.length) return false;
-    const key = state.researchQueue[0];
-    const r = findeForschung(key);
-    const curLvl = r ? (state.research[key]||0) : 0;
-    // Eine Allianzforschung ohne Allianz wird aus der Warteschlange geworfen statt sie zu blockieren -
-    // sonst stünde die ganze Schlange still, bis man wieder beitritt.
-    if (!r || (istAllianzForschung(key) && !inAllianz()) || !techUnlocked(r) || curLvl>=r.maxLevel){ state.researchQueue.shift(); return true; }
-    const cost = researchCostFor(r, curLvl+1);
-    if (!canAfford(cost)) return false;
-    state.researchQueue.shift();
-    startResearch(key);
-    return true;
+    for (let i = 0; i < state.researchQueue.length; i++){
+      const key = state.researchQueue[i];
+      const r = findeForschung(key);
+      const curLvl = r ? (state.research[key]||0) : 0;
+      // Eine Allianzforschung ohne Allianz wird aus der Warteschlange geworfen statt sie zu blockieren -
+      // sonst stünde die ganze Schlange still, bis man wieder beitritt.
+      if (!r || (istAllianzForschung(key) && !inAllianz()) || !techUnlocked(r) || curLvl>=r.maxLevel){ state.researchQueue.splice(i,1); return true; }
+      const cost = researchCostFor(r, curLvl+1);
+      const wand = forschungUeberLager(cost);
+      if (wand.length){
+        // Dauerhaft unbezahlbar: ueberspringen statt die Schlange anzuhalten. Einmal erklaeren,
+        // damit der Spieler weiss, dass er das Lager ausbauen muss - und nicht ratlos davorsteht.
+        const merk = key+':'+(curLvl+1);
+        if (!lagerWandGemeldet[merk]){
+          lagerWandGemeldet[merk] = true;
+          const t = wand.map(w => fmt(w.menge)+' '+(RES_DEFS.find(x=>x.key===w.res)||{label:w.res}).label).join(', ');
+          log(r.name+' (Stufe '+(curLvl+1)+') kostet '+t+' und übersteigt damit deine Lagerkapazität ('+fmt(wand[0].cap)+') - sie kann nie starten, solange dein Lager nicht größer ist. Die Warteschlange läuft ohne sie weiter.', 'ti-alert-triangle', 'warn');
+        }
+        continue;   // naechsten Eintrag versuchen
+      }
+      // Nur voruebergehend zu arm: hier bewusst ANHALTEN, nicht ueberspringen. Wer eine teure
+      // Forschung nach vorne zieht, will auf sie warten - das ist die Bedeutung der Reihenfolge.
+      if (!canAfford(cost)) return false;
+      state.researchQueue.splice(i,1);
+      startResearch(key);
+      return true;
+    }
+    return false;
   }
 
   // Prestige-Kosten skalieren (Bugfix 23.07.2026): früher fixe 5000 Punkte je Prestige. Da computeScore()
@@ -31245,7 +31325,7 @@
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
       { title:'Zwei neue, eigenständige Forschungszweige', body:'<strong>Diplomatie-Protokolle</strong> erhöht die Friedensdividende aus aktiven Nichtangriffspakten zusätzlich zum Grundbonus. <strong>Kolonial-Logistik</strong> erhöht das Kolonie-Limit: Ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere hinzu (bei Maximalstufe 20 also 11 Kolonien). Monde zählen nicht mit. Beide Forschungen sind von Anfang an verfügbar, unabhängig von der übrigen Technologie-Kette.' },
       { title:'Forschung abbrechen', body:'Eine laufende Forschung lässt sich über den Knopf "Abbrechen" direkt unter der Fortschrittsanzeige vorzeitig stoppen - dabei gibt es bewusst nur <strong>50% der eingesetzten Ressourcen</strong> zurück (im Gegensatz zum Bau-Abbruch mit voller Rückerstattung), da Forschung sonst risikofrei neu gestartet werden könnte, sobald sich z.B. die Laboranzahl ändert. Danach lässt sich sofort eine andere Forschung beginnen.' },
-      { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss. Mit den Pfeil-Buttons an jedem Eintrag lässt sich die Reihenfolge nachträglich anpassen - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei immer automatisch korrekt (Stufe 5 kann nie vor Stufe 4 verarbeitet werden), und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde.' },
+      { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss. Mit den Pfeil-Buttons an jedem Eintrag lässt sich die Reihenfolge nachträglich anpassen - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei immer automatisch korrekt (Stufe 5 kann nie vor Stufe 4 verarbeitet werden), und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde. <strong>Zwei Fälle werden dabei unterschieden:</strong> Reichen die Ressourcen für den ersten Eintrag gerade nur <em>vorübergehend</em> nicht, wartet die Warteschlange auf ihn – die Reihenfolge, die du festgelegt hast, bleibt also gültig. Übersteigen seine Kosten dagegen deine <strong>Lagerkapazität</strong>, könnte er nie starten (über den Lagerdeckel hinaus lässt sich nichts ansammeln); ein solcher Eintrag wird deshalb <em>übersprungen</em>, damit er nicht die ganze Warteschlange dauerhaft anhält. Er bleibt an seinem Platz stehen und wird automatisch gestartet, sobald dein Lager groß genug ist – die Karte sagt dir währenddessen, welche Ressource fehlt. Relevant wird das vor allem bei den Ewigkeitsforschungen, deren Kosten je Stufe exponentiell wachsen.' },
       { title:'Forschungs-Meilensteine', body:'Sechs Forschungsgruppen (Wirtschaft, Krieg, Logistik/Spionage, Diplomatie, Werkstoffe, Ausbau) sowie ein Gesamt-Meilenstein belohnen zusammenhängenden Fortschritt: erreichen alle Forschungen einer Gruppe gemeinsam die halbe bzw. volle Maximalstufe, gibt es Sternenessenz und Kredite. Die Essenz ist die einzige Währung, die jeden Prestige- und Aufstiegs-Reset überlebt - Forschungs-Fortschritt bleibt so auch über Neuanfänge hinweg wertvoll. <strong>Jeder Meilenstein ist einmalig:</strong> Einmal erreicht, bleibt er über Prestige und Aufstieg hinweg erreicht (wie Erfolge und Level-Belohnungen) und wird nach einem Neuanfang nicht ein zweites Mal ausgezahlt. Seit den sechs Gruppen ist <strong>jede Forschung mit Maximalstufe genau einer davon zugeordnet</strong>; keine fällt mehr durchs Raster. <strong>Werkstoffe</strong> folgen der langen Grundlagenkette Nanotechnologie → Quantenphysik → Hochenergiephysik → Fusionskern-Synthese → KI-Technologie → Metamaterial-Synthese → Singularitätsphysik samt Raffinerie-Optimierung; Stufe I verlangt die erste Hälfte, Stufe II die ganze Kette - und mit ihr die Singularitätsphysik, an der das gesamte Endspiel hängt (Ewigkeitsforschungen, Abgrund, Mythische Modulschmiede). <strong>Ausbau</strong> fasst die vier Forschungen zusammen, die bestehende Systeme vertiefen, statt neue zu eröffnen: Mondstabilität, Modultechnik, Slot-Miniaturisierung und Diplomatische Doktrin. Der Gesamt-Meilenstein "Vollständige Forschung" zählt die <strong>Ewigkeitsforschungen nicht mit</strong> - die haben per Definition keine Maximalstufe und wären sonst eine Bedingung, die niemand je erfüllen kann.' },
       { title:'Forschungsdauer: ein Langzeitziel', body:'Die komplette Forschung ('+RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).length+' Techs mit Maximalstufe, '+RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).reduce((a,r)=>a+(r.maxLevel||1),0)+' Stufen, dazu '+RESEARCH_DEFS.filter(isEndlessResearch).length+' Ewigkeitsforschungen ohne Obergrenze) ist bewusst ein Projekt für Wochen, nicht für einen Nachmittag: Bei guter Laborausstattung (15+) dauert sie insgesamt rund <strong>einen Monat</strong>, ganz ohne Labore rund <strong>zwei Monate</strong>. Frühe Forschungsstufen bleiben dabei fast unverändert schnell (Stufe 1 in Sekunden) - erst ab den höheren Stufen jeder Forschung wächst die Dauer spürbar, das späte Spiel bleibt also ein echtes Langzeitziel statt an einem Wochenende erledigt zu sein.' },
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
@@ -37124,7 +37204,10 @@
     let schutz = 60; // Warteschlange fasst höchstens 10 Einträge - der Deckel ist reine Vorsicht
     while (t < now && schutz-- > 0 && !state.activeResearch && state.researchQueue && state.researchQueue.length){
       const vorher = state.researchQueue.length;
-      if (!tryStartQueuedResearch()) break; // Kosten nicht gedeckt - ab hier stand die Schlange wirklich
+      // false heisst hier: Vorrat reicht (noch) nicht ODER es gibt gar keinen startbaren Eintrag
+      // mehr. Dauerhaft unbezahlbare Eintraege ueberspringt tryStartQueuedResearch inzwischen von
+      // selbst, sie halten die Schlange also nicht mehr an (siehe forschungUeberLager).
+      if (!tryStartQueuedResearch()) break;
       if (!state.activeResearch){
         // Eintrag war ungültig oder schon auf Maximalstufe und wurde nur verworfen (kostet keine
         // Zeit). Nur weitermachen, wenn die Schlange dabei wirklich kürzer wurde - sonst drehte
@@ -48127,12 +48210,19 @@
       }
       const totalRQCost = {};
       const queueTargetLevels = [];
+      // Welche Eintraege sind DAUERHAFT unbezahlbar, weil ihre Kosten ueber die Lagerkapazitaet
+      // hinausgehen? (05.08.2026 - siehe forschungUeberLager/tryStartQueuedResearch.) Ohne diese
+      // Kennzeichnung stuende der Spieler vor einer Schlange, aus der stillschweigend ein Eintrag
+      // uebersprungen wird, ohne zu erfahren warum.
+      const queueWand = [];
       let totalRQDurSec = 0; // Gesamt-Bauzeit der Warteschlange (Komfort-ETA)
       for (const key of rq){
         const r = findeForschung(key);
-        if (!r){ queueTargetLevels.push(null); continue; }
+        if (!r){ queueTargetLevels.push(null); queueWand.push(null); continue; }
         const curLvl = rLevelSim[key] !== undefined ? rLevelSim[key] : (state.research[key]||0);
         const c = researchCostFor(r, curLvl+1);
+        const w = forschungUeberLager(c);
+        queueWand.push(w.length ? w : null);
         for (const [res,a] of Object.entries(c)) totalRQCost[res] = (totalRQCost[res]||0)+a;
         totalRQDurSec += researchDuration(r, curLvl+1);
         rLevelSim[key] = curLvl+1;
@@ -48153,8 +48243,12 @@
             // Stufen-Simulation wie die Kostenberechnung direkt darüber, die die Warteschlangen-
             // Position korrekt berücksichtigt.
             const nextLvl = queueTargetLevels[i];
-            return `<div class="card-row" style="padding:0.5rem 0.85rem;">
-              <div class="left"><span class="lvl-pill">${i+1}</span><span class="bname" style="font-size:12.5px;">${r.name||key} → Stufe ${nextLvl}</span></div>
+            const wand = queueWand[i];
+            const wandText = wand
+              ? `<div class="bmeta" style="color:#fac775; margin-top:2px; font-size:11px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Kostet ${wand.map(w => fmt(w.menge)+' '+((RES_DEFS.find(x=>x.key===w.res)||{label:w.res}).label)).join(', ')} – mehr als dein Lager fasst (${fmt(wand[0].cap)}). Startet erst mit größerem Lager; die Warteschlange läuft solange ohne sie weiter.</div>`
+              : '';
+            return `<div class="card-row" style="padding:0.5rem 0.85rem;${wand?' border-color:rgba(250,199,117,0.45);':''}">
+              <div class="left" style="min-width:0;"><span class="lvl-pill">${i+1}</span><div style="min-width:0;"><span class="bname" style="font-size:12.5px;">${r.name||key} → Stufe ${nextLvl}</span>${wandText}</div></div>
               <div style="display:flex; gap:4px;">
                 <button data-researchqueue-up="${i}" ${i===0?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach oben"><i class="ti ti-arrow-up" aria-hidden="true"></i></button>
                 <button data-researchqueue-down="${i}" ${i===rq.length-1?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach unten"><i class="ti ti-arrow-up" aria-hidden="true" style="transform:rotate(180deg); display:inline-block;"></i></button>
