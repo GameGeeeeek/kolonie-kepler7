@@ -86,8 +86,17 @@ const fingerabdruck = page => page.evaluate(() => {
   await page.waitForTimeout(2500);
   await page.evaluate(haken);
 
+  // SCHWELLEN: Die Aussage ist BINÄR - „steht" ist exakt 0 (das wird eigenständig geprüft),
+  // „läuft" ist alles darüber. Hier stand zuerst > 30 Bilder in 1,5 s, also gut 20 Bilder/s;
+  // auf einer ausgelasteten Maschine liefert derselbe, völlig gesunde Zustand aber auch mal 25.
+  // Der Test wurde dadurch rot, während die Messung daneben 30 / 0 / 25 zeigte - Mechanik in
+  // Ordnung, Schwelle zu dicht an der Maschinenleistung. LAEUFT = 5 ist von 0 immer noch
+  // eindeutig zu unterscheiden und lässt keinen kaputten Zustand durch: Eine angehaltene
+  // Bildrolle malt nicht fünf Bilder, sie malt keins.
+  const LAEUFT = 5;
+
   // ============================== 1) Das laufende Gefecht malt, die Pause nicht
-  check('1: im laufenden Gefecht wird gemalt', await bilder(page, 1500) > 30);
+  check('1: im laufenden Gefecht wird gemalt', await bilder(page, 1500) > LAEUFT);
   await page.click('#osBtnPause');
   await page.waitForTimeout(300);
   check('1: bei Pause steht die Bildrolle vollstaendig still', await bilder(page, 1500) === 0);
@@ -97,13 +106,13 @@ const fingerabdruck = page => page.evaluate(() => {
   // einem der beiden haengt, faellt beim anderen nicht auf, bis ein Spieler ihn benutzt.
   await page.click('#osBtnPause');
   await page.waitForTimeout(200);
-  check('2: „Weiter" weckt sie wieder', await bilder(page, 1500) > 30);
+  check('2: „Weiter" weckt sie wieder', await bilder(page, 1500) > LAEUFT);
 
   await page.click('#osBtnPause'); await page.waitForTimeout(300);
   check('2: Pause wirkt auch beim zweiten Mal', await bilder(page, 1200) === 0);
   await page.keyboard.press(' ');
   await page.waitForTimeout(200);
-  check('2: die Leertaste weckt sie ebenfalls', await bilder(page, 1200) > 25);
+  check('2: die Leertaste weckt sie ebenfalls', await bilder(page, 1200) > LAEUFT);
 
   // ============================== 3) Groessenaenderung im STEHENDEN Zustand
   // Der Fehler, der beim Bau wirklich auftrat: messenNoetig wird nur in schleife() eingeloest,
@@ -120,7 +129,7 @@ const fingerabdruck = page => page.evaluate(() => {
   // ============================== 4) Neustart und Schlussbild
   await page.click('#osBtnNeustart');
   await page.waitForTimeout(200);
-  check('4: „Neustart" weckt sie wieder', await bilder(page, 1200) > 25);
+  check('4: „Neustart" weckt sie wieder', await bilder(page, 1200) > LAEUFT);
 
   await page.click('#osBtnEnde');
   // „Ans Ende" spult nur bis T_BILANZ+0,6 (43,2 s) vor; bis T_SCHLUSS (50,5 s) laeuft die
@@ -130,7 +139,7 @@ const fingerabdruck = page => page.evaluate(() => {
   check('4: das stehende Schlussbild malt nicht weiter', await bilder(page, 1500) === 0);
   await page.click('#osBtnNeustart');
   await page.waitForTimeout(200);
-  check('4: und auch daraus weckt „Neustart" sie wieder', await bilder(page, 1200) > 25);
+  check('4: und auch daraus weckt „Neustart" sie wieder', await bilder(page, 1200) > LAEUFT);
 
   check('keine JS-Fehler', errs.length === 0, errs.slice(0,3));
   await ctx.close(); await browser.close();
