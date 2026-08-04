@@ -566,10 +566,23 @@
       letter-spacing:.05em}
     #osWrap .bilanz-fuss b{color:var(--os-flieder);font-weight:600}
 
-    #osWrap .rmhinweis{position:absolute;left:8px;top:8px;font:500 10px/1.4 var(--os-mono);letter-spacing:.1em;
-      color:var(--os-grau);border:var(--bw-1) solid var(--os-linie);padding:3px 7px;
-      background:rgba(8,11,24,.8);display:none}
+    /* „Bewegung reduzieren"-Hinweis. Er stand bis zum 05.08.2026 als 10-px-Graukasten in der
+       linken oberen Ecke - auf einer vollen Buehne praktisch unsichtbar. Ein Spieler meldete
+       daraufhin „der Kampf startet nicht am PC, am Handy aber schon": Am Rechner war die
+       System-Einstellung an, die Wiedergabe sprang sofort auf das Schlussbild, und der Hinweis
+       dazu war nicht zu finden. Jetzt sitzt er mittig ueber der Buehne, sagt WOHER es kommt,
+       und bietet den Ausweg gleich mit an. */
+    #osWrap .rmhinweis{position:absolute;left:50%;top:14px;transform:translateX(-50%);
+      max-width:min(92%,420px);text-align:center;
+      font:500 11px/1.5 var(--os-mono);letter-spacing:.04em;
+      color:var(--os-text);border:var(--bw-1) solid var(--os-flieder);padding:8px 12px;
+      background:rgba(8,11,24,.94);display:none;z-index:4}
     #osWrap .rmhinweis.an{display:block}
+    #osWrap .rmhinweis b{color:var(--os-flieder);font-weight:600;letter-spacing:.08em}
+    #osWrap .rmhinweis span{display:block;color:var(--os-grau);margin-top:3px}
+    #osWrap .rmhinweis button{margin-top:7px;font:600 11px/1 var(--os-mono);letter-spacing:.06em;
+      color:var(--os-text);background:rgba(127,119,221,.18);border:var(--bw-1) solid var(--os-flieder);
+      padding:7px 12px;min-height:34px;cursor:pointer}
 
     /* ---------- Fussleiste ---------- */
     #osWrap .fuss{flex:none;padding:6px 6px 8px;display:grid;gap:6px}
@@ -2491,6 +2504,7 @@
         <button id="adminTabReportsBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Meldungen</button>
         <button id="adminTabAnalyticsBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-atom" aria-hidden="true" style="margin-right:4px;"></i>Analytics</button>
         <button id="adminTabBroadcastBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-building-broadcast-tower" aria-hidden="true" style="margin-right:4px;"></i>Ankündigung</button>
+        <button id="adminTabSupporterBtn" style="flex:1; font-size:11.5px;"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:4px;"></i>Unterstützer</button>
       </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
       <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
@@ -2501,6 +2515,28 @@
           <span class="bmeta" id="adminBroadcastCount">0/300</span>
           <button id="adminBroadcastSendBtn" class="login-submit" style="width:auto; padding:8px 16px;"><i class="ti ti-building-broadcast-tower" aria-hidden="true" style="margin-right:5px;"></i>An alle Spieler senden</button>
         </div>
+      </div>
+      <!-- Unterstützer-Rang manuell vergeben (05.08.2026, Wunsch Sascha). Drei feste Laufzeiten
+           statt eines freien Zahlenfelds - der Server nimmt auch nur diese drei an. -->
+      <div id="adminSupporterView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Gibt einem Spieler den <strong>Unterstützer-Rang</strong> - für Spenden, die nicht über Ko-fi kamen, für Fehlerfälle bei der E-Mail-Zuordnung oder als Dankeschön. Schaltet dieselben drei Automatiken frei wie eine Ko-fi-Spende und zeigt dasselbe Abzeichen in der Bestenliste. Eine bereits laufende Ko-fi-Unterstützung bleibt davon unberührt.</div>
+        <input id="adminSupporterName" type="text" placeholder="Benutzername (Registrierungsname)" autocomplete="off" style="width:100%; font-size:13px; margin-bottom:8px;">
+        <div style="display:flex; gap:6px; margin-bottom:8px;">
+          <button class="admin-grant-days" data-grant-days="30" style="flex:1; font-size:11.5px;">30 Tage</button>
+          <button class="admin-grant-days" data-grant-days="60" style="flex:1; font-size:11.5px;">60 Tage</button>
+          <button class="admin-grant-days" data-grant-days="90" style="flex:1; font-size:11.5px;">90 Tage</button>
+        </div>
+        <div style="display:flex; gap:6px; margin-bottom:10px;">
+          <button class="admin-grant-tier" data-grant-tier="bronze" style="flex:1; font-size:11.5px;">Bronze</button>
+          <button class="admin-grant-tier" data-grant-tier="silver" style="flex:1; font-size:11.5px;">Silber</button>
+          <button class="admin-grant-tier" data-grant-tier="gold" style="flex:1; font-size:11.5px;">Gold</button>
+        </div>
+        <div style="display:flex; gap:6px; margin-bottom:12px;">
+          <button id="adminSupporterGrantBtn" class="login-submit" style="flex:1; padding:8px 16px;"><i class="ti ti-diamond" aria-hidden="true" style="margin-right:5px;"></i>Rang vergeben</button>
+          <button id="adminSupporterRevokeBtn" style="padding:8px 14px; font-size:11.5px; background:rgba(226,75,74,0.12); border-color:rgba(226,75,74,0.35); color:#f0997b;"><i class="ti ti-x" aria-hidden="true" style="margin-right:4px;"></i>Entziehen</button>
+        </div>
+        <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Aktuelle Unterstützer</div>
+        <div id="adminSupporterList" style="display:flex; flex-direction:column; gap:6px;"></div>
       </div>
     </div>
   </div>
@@ -2831,7 +2867,7 @@
         <div class="banner" id="osBanner"><b id="osBannerTitel"></b><s></s><i id="osBannerUrteil"></i></div>
         <div class="sieg" id="osSieg"><b></b><i id="osSiegUnter"></i></div>
         <div class="bilanz" id="osBilanz"></div>
-        <div class="rmhinweis" id="osRm">Bewegung reduziert &ndash; Endzustand</div>
+        <div class="rmhinweis" id="osRm"><b>Bewegung reduziert</b><span>Dein Ger&auml;t hat &bdquo;Animationen reduzieren&ldquo; eingeschaltet &ndash; darum steht hier gleich das Schlussbild statt des Gefechts.</span><button type="button" id="osRmTrotzdem">Gefecht trotzdem abspielen</button></div>
       </div>
       </div>
       <footer class="fuss">
@@ -3045,6 +3081,9 @@
         <div id="researchQueueBox"></div>
         <div class="section-title"><i class="ti ti-flask" aria-hidden="true"></i>Forschungsprojekte</div>
         <div class="research-list" id="research"></div>
+        <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-users" aria-hidden="true"></i>Allianzforschung</div>
+        <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Ein eigener Baum, den nur Allianzmitglieder betreiben können - erforscht wird er im eigenen Labor, wie jede andere Forschung. Erforschte Stufen bleiben beim Austritt erhalten, ihre Wirkung nicht. Schaltet die drei Allianzschiffe frei (Flotte-Tab).</div>
+        <div class="research-list" id="allianceResearch"></div>
         <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-medal" aria-hidden="true"></i>Forschungs-Meilensteine</div>
         <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Belohnen zusammenhängenden Fortschritt mit Sternenessenz - überlebt jeden Prestige- und Aufstiegs-Reset.</div>
         <div id="researchMilestonesBox"></div>
@@ -3828,6 +3867,7 @@
       accountWantsPatchnotes = me.wantsPatchnotes !== false;
       accountUsername = me.username||'';
       accountLastLoginAt = me.lastLoginAt || null;
+      supporterStatusUebernehmen(me);
     } catch(e){}
   }
 
@@ -3851,6 +3891,30 @@
   // unveränderlichen Namen nutzen, da die Backend-Suche (db.users) nur darüber funktioniert - eine
   // Namensänderung würde sonst den bisherigen Einladungscode/Link stillschweigend ungültig machen.
   let accountUsername = '';
+  // ===== Unterstützer-Rang (05.08.2026) =====
+  //
+  // Drei Automatiken im Verteidigung-Tab (Automatische Verstärkung, Automatische Reparatur,
+  // KI-Abfangautomatik) sind seit heute an den Unterstützer-Rang gebunden.
+  //
+  // WARUM DAS NICHT IN `state` LIEGT: `state` gehört dem Spieler, wird lokal gespeichert und ist mit
+  // den Entwicklerwerkzeugen in fünf Sekunden umgeschrieben. Der Rang kommt deshalb bei JEDEM Start
+  // frisch aus /api/me (Server: supporterFeaturesFor) und lebt nur hier im Speicher - ein alter
+  // Spielstand kann ihn nicht mitbringen, und ein Ausloggen nimmt ihn zuverlässig wieder mit.
+  //
+  // Solo-Modus ohne Server: kein Rang, also gesperrt. Das ist bewusst so - der Rang entsteht durch
+  // eine Ko-fi-Spende, die dem Konto zugeordnet ist, und ein Konto gibt es ohne Server nicht.
+  let supporterAktiv = false;
+  let supporterStufe = null;   // 'bronze' | 'silver' | 'gold' | null
+  function supporterStatusUebernehmen(me){
+    const s = (me && me.supporter) || null;
+    supporterAktiv = !!(s && s.active);
+    supporterStufe = (s && s.tier) || null;
+  }
+  // Die EINE Stelle, die "darf dieser Spieler die Automatiken nutzen" beantwortet. Schalter,
+  // Beschriftung und die drei Mechaniken fragen alle hierher - eine zweite Stelle wäre genau die
+  // Anzeigestelle, die beim nächsten Umbau still veraltet (CLAUDE.md, Regel 6).
+  function automatikFreigeschaltet(){ return supporterAktiv; }
+  const AUTOMATIK_GESPERRT_TEXT = 'Diese Automatik ist Unterstützern vorbehalten. Wer das Projekt per Ko-fi unterstützt und seine Ko-fi-E-Mail im Allianz-Tab hinterlegt, schaltet sie für 30 Tage je Spende frei.';
 
   async function checkBackend(){
     if (backendAvailable !== null) return backendAvailable;
@@ -4290,6 +4354,14 @@
     rerz2: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="50,8 64,28 58,82 42,82 36,28" fill="url(#gSteel)"/></g><polygon points="40,60 60,60 52,90 48,90" fill="url(#gRed)"><animate attributeName="opacity" values="0.4;1;0.4" dur="0.8s" repeatCount="indefinite"/></polygon></svg>`,
     rkristall: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="50,8 74,28 64,80 36,80 26,28" fill="url(#gViolet)"/><polygon points="50,8 74,28 50,42" fill="#ffffff" opacity="0.2"/><polygon points="50,8 26,28 50,42" fill="#000000" opacity="0.14"/><line x1="50" y1="42" x2="50" y2="80" stroke="#3a2360" stroke-width="1.4" opacity="0.5"/><line x1="26" y1="28" x2="74" y2="28" stroke="#3a2360" stroke-width="1.2" opacity="0.4"/></g></svg>`,
     rkristall2: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="50,6 78,26 66,82 34,82 22,26" fill="url(#gViolet)"/><polygon points="50,6 78,26 50,40" fill="#ffffff" opacity="0.24"/><polygon points="50,6 22,26 50,40" fill="#000000" opacity="0.14"/></g><circle cx="63" cy="34" r="2.4" fill="#f0e8ff"><animate attributeName="opacity" values="1;0.2;1" dur="1.3s" repeatCount="indefinite"/></circle><circle cx="38" cy="52" r="1.8" fill="#f0e8ff"><animate attributeName="opacity" values="0.2;1;0.2" dur="1.6s" repeatCount="indefinite"/></circle></svg>`,
+    // ===== Allianzforschung (05.08.2026) =====
+    // Durchgaengiges Motiv: etwas GETEILTES oder VERBUNDENES - drei Knoten, zwei Messschenkel,
+    // ein Schild mit Seitenboegen, ein Konvoi, eine Schmiede unter einem Stern.
+    ra_verbund: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><line x1="50" y1="24" x2="26" y2="70" stroke="url(#gCyan)" stroke-width="5"/><line x1="50" y1="24" x2="74" y2="70" stroke="url(#gCyan)" stroke-width="5"/><line x1="26" y1="70" x2="74" y2="70" stroke="#6ec6dd" stroke-width="5"/><circle cx="50" cy="24" r="9" fill="#0d1b24" stroke="url(#gCyan)" stroke-width="4"/><circle cx="26" cy="70" r="9" fill="#0d1b24" stroke="url(#gCyan)" stroke-width="4"/><circle cx="74" cy="70" r="9" fill="#0d1b24" stroke="url(#gCyan)" stroke-width="4"/></g><circle cx="50" cy="52" r="3.5" fill="#9fe1f5"><animate attributeName="opacity" values="0.25;1;0.25" dur="1.8s" repeatCount="indefinite"/></circle></svg>`,
+    ra_werftnorm: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="88,50 52,38 24,42 18,50 24,58 52,62" fill="none" stroke="url(#gSteel)" stroke-width="4"/><path d="M 24,20 L 24,80" stroke="#c8ccd8" stroke-width="4" stroke-linecap="round"/><path d="M 88,20 L 88,80" stroke="#c8ccd8" stroke-width="4" stroke-linecap="round"/><path d="M 24,26 L 88,26" stroke="#c8ccd8" stroke-width="3"/><polygon points="32,26 24,26 28,20" fill="#c8ccd8"/><polygon points="80,26 88,26 84,20" fill="#c8ccd8"/></g></svg>`,
+    ra_schildnetz: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><path d="M 36,20 L 62,20 L 62,50 Q 62,74 49,84 Q 36,74 36,50 Z" fill="rgba(120,170,235,0.18)" stroke="url(#gBlue)" stroke-width="4"/><path d="M 20,32 Q 12,54 24,74" fill="none" stroke="#8fb6e8" stroke-width="4" stroke-linecap="round"/><path d="M 78,32 Q 86,54 74,74" fill="none" stroke="#8fb6e8" stroke-width="4" stroke-linecap="round"/><path d="M 36,40 L 62,40" stroke="#8fb6e8" stroke-width="3"/><path d="M 49,20 L 49,84" stroke="#8fb6e8" stroke-width="3"/></g></svg>`,
+    ra_konvoi: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="84,30 62,22 68,30 62,38" fill="url(#gSky)"/><polygon points="70,50 48,42 54,50 48,58" fill="url(#gSky)"/><polygon points="84,70 62,62 68,70 62,78" fill="url(#gSky)"/><path d="M 14,30 L 58,30" stroke="#8fd0ea" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 5"/><path d="M 14,50 L 44,50" stroke="#8fd0ea" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 5"/><path d="M 14,70 L 58,70" stroke="#8fd0ea" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 5"/></g></svg>`,
+    ra_sternenschmiede: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><path d="M 16,58 L 74,58 Q 84,58 84,50 L 84,44 L 62,44 Q 54,44 48,50 L 16,50 Z" fill="url(#gSteel)"/><rect x="34" y="58" width="16" height="22" fill="url(#gSteel)"/><rect x="24" y="80" width="36" height="8" rx="3" fill="url(#gSteel)"/></g><polygon points="66,10 71,24 85,24 74,32 78,46 66,38 54,46 58,32 47,24 61,24" fill="url(#gGold)"><animate attributeName="opacity" values="0.55;1;0.55" dur="2.2s" repeatCount="indefinite"/></polygon></svg>`,
     rleere: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><circle cx="50" cy="50" r="26" fill="#0d0a20" stroke="url(#gViolet)" stroke-width="5"/><circle cx="50" cy="50" r="9" fill="url(#gViolet)"/><path d="M 50,10 A 40,40 0 0 1 90,50" fill="none" stroke="#c3bef5" stroke-width="4" stroke-linecap="round"/><path d="M 50,90 A 40,40 0 0 1 10,50" fill="none" stroke="#c3bef5" stroke-width="4" stroke-linecap="round"/></g></svg>`,
     rdeuterium: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><line x1="50" y1="10" x2="50" y2="90" stroke="#7bafe0" stroke-width="5"/><line x1="16" y1="27" x2="84" y2="73" stroke="url(#gBlue)" stroke-width="5"/><line x1="84" y1="27" x2="16" y2="73" stroke="url(#gBlue)" stroke-width="5"/></g><circle cx="50" cy="50" r="6" fill="#eaf3fa"/></svg>`,
     rantimaterie: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><ellipse cx="50" cy="50" rx="38" ry="14" fill="none" stroke="url(#gViolet)" stroke-width="4" transform="rotate(0 50 50)"/><ellipse cx="50" cy="50" rx="38" ry="14" fill="none" stroke="url(#gViolet)" stroke-width="4" transform="rotate(60 50 50)"/><ellipse cx="50" cy="50" rx="38" ry="14" fill="none" stroke="url(#gViolet)" stroke-width="4" transform="rotate(120 50 50)"/></g><circle cx="50" cy="50" r="7" fill="#f3aec6"><animate attributeName="r" values="5;9;5" dur="1.5s" repeatCount="indefinite"/></circle></svg>`,
@@ -4340,6 +4412,13 @@
     rewig_lager: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><path d="M50 30 C58 18 80 18 80 30 C80 42 58 42 50 30 C42 18 20 18 20 30 C20 42 42 42 50 30 Z" fill="none" stroke="url(#gViolet)" stroke-width="4"/></g><rect x="28" y="52" width="44" height="38" rx="3" fill="url(#gGold)"/><rect x="28" y="52" width="44" height="8" fill="#4a3405" opacity="0.35"/><rect x="28" y="82" width="44" height="8" fill="#4a3405" opacity="0.35"/><circle cx="50" cy="30" r="3.5" fill="#e6e2ff"><animate attributeName="opacity" values="1;0.25;1" dur="2s" repeatCount="indefinite"/></circle></svg>`,
     /* ===== SCHIFFE ===== */
     ship_explorer: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="82,50 44,42 24,46 24,54 44,58" fill="url(#gCyan)"/><circle cx="60" cy="50" r="4" fill="#dceeff"/></g></svg>`,
+    // ===== Allianzflotte (05.08.2026) =====
+    // Eigene Bildsprache: heller Cyan-/Goldrumpf statt des Kampfschiff-Rots, dazu bei jedem ein
+    // aufgesetztes Verbands-Zeichen (Doppelfinne, Schildkuppel, Standarte). Man soll in der Liste
+    // auf einen Blick sehen, dass das Allianzgeraet ist.
+    ship_paktkorvette: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="90,50 54,38 30,40 16,46 16,54 30,60 54,62" fill="url(#gCyan)"/><polygon points="46,40 40,26 34,40" fill="#7fc9e0"/><polygon points="46,60 40,74 34,60" fill="#7fc9e0"/></g><circle cx="66" cy="50" r="2.6" fill="#dcf4ff"><animate attributeName="opacity" values="1;0.3;1" dur="1.1s" repeatCount="indefinite"/></circle></svg>`,
+    ship_bundeskreuzer: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="92,50 64,40 40,36 20,38 12,46 12,54 20,62 40,64 64,60" fill="url(#gBlue)"/><path d="M 44,30 L 62,30 L 62,44 Q 62,54 53,58 Q 44,54 44,44 Z" fill="rgba(180,214,255,0.85)" stroke="#dbe9ff" stroke-width="2"/></g><circle cx="30" cy="44" r="2.4" fill="#dbe9ff"/><circle cx="30" cy="56" r="2.4" fill="#dbe9ff"/></svg>`,
+    ship_sternenbanner: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="96,50 70,40 48,34 22,34 8,44 8,56 22,66 48,66 70,60" fill="url(#gGold)"/><rect x="40" y="14" width="4" height="24" fill="#f0dca4"/><polygon points="44,16 70,22 44,28" fill="#f0dca4"/></g><circle cx="24" cy="44" r="2.6" fill="#fff3cf"/><circle cx="24" cy="56" r="2.6" fill="#fff3cf"/><circle cx="72" cy="50" r="3" fill="#fff8e2"><animate attributeName="opacity" values="1;0.35;1" dur="1.4s" repeatCount="indefinite"/></circle></svg>`,
     ship_jaeger: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="86,50 40,36 18,44 18,56 40,64" fill="url(#gRed)"/></g><circle cx="58" cy="50" r="2.6" fill="#ffd8c8"><animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite"/></circle></svg>`,
     ship_cruiser: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="88,50 50,38 20,32 12,44 20,50 12,56 20,68 50,62" fill="url(#gRed)"/><circle cx="22" cy="34" r="3.4" fill="#4c5661"/><circle cx="22" cy="66" r="3.4" fill="#4c5661"/></g></svg>`,
     ship_destroyer: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="88,50 46,40 16,44 16,56 46,60" fill="url(#gRed)"/><rect x="60" y="46" width="16" height="8" fill="url(#gSteel)"/></g></svg>`,
@@ -5067,6 +5146,12 @@
       // Tiefenflotte, Staffel I (v8.337.0): eigene Formsprache, damit man sie in der Flottenliste
       // sofort von den Kampfschiffen unterscheidet - gedrungen und rund statt gepfeilt, mit
       // 'steel'-Verlauf statt Rot oder Gold. Keine Geschuetztuerme: Diese drei tragen keine Waffen.
+      // ===== Allianzflotte (05.08.2026) =====
+      // Eigene Formsprache: ein aufgesetzter Bugkeil, den keine andere Familie hat, dazu 'cyan' und
+      // 'gold' statt des Kampfschiff-Rots - im Gefecht soll man Allianzgeraet erkennen.
+      paktkorvette:  { pts:[[92,50],[64,42],[44,38],[26,40],[16,46],[16,54],[26,60],[44,62],[64,58]], grad:'cyan', turrets:[[46,50,2.8,1]], accent:{x:70,y:50,r:2.8,color:'#dcf4ff',pulse:true} },
+      bundeskreuzer: { pts:[[94,50],[70,42],[56,38],[54,30],[36,30],[34,38],[18,40],[10,46],[10,54],[18,60],[34,62],[36,70],[54,70],[56,62],[70,58]], grad:'cyan', dome:true, turrets:[[42,42,3.0],[42,58,3.0]] },
+      sternenbanner: { pts:[[98,50],[78,42],[62,38],[60,28],[34,28],[32,38],[12,36],[4,44],[4,56],[12,64],[32,62],[34,72],[60,72],[62,62],[78,58]], grad:'gold', noCanopy:true, turrets:[[44,40,3.4],[44,60,3.4],[64,50,4.0]] },
       lotsenboot:   { pts:[[88,50],[70,44],[46,42],[26,44],[18,50],[26,56],[46,58],[70,56]], grad:'cyan', accent:{x:64,y:50,r:3.4,color:'#9fe1cb',pulse:true} },
       kessel:       { pts:[[78,50],[70,36],[52,30],[32,32],[18,42],[14,50],[18,58],[32,68],[52,70],[70,64]], grad:'steel', dome:true, noCanopy:true },
       bergungskran: { pts:[[86,50],[74,40],[60,34],[38,34],[24,40],[18,50],[24,60],[38,66],[60,66],[74,60]], grad:'steel', turrets:[[46,42,3.0,1],[46,58,3.0,1]], noCanopy:true },
@@ -5887,8 +5972,19 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.400.0';
+  const VERSION = '8.402.0';
   const PATCHNOTES = [
+    { version:'8.402.0', date:'05.08.2026', changes:[
+      '<strong>Neu: Allianzforschung - ein eigener Forschungsbaum, den nur Allianzmitglieder betreiben können.</strong> Fünf Zweige zu je 10 Stufen, im Forschung-Tab direkt unter den bisherigen Projekten. Nicht zu verwechseln mit den Allianz-Technologien: Die sind ein gemeinsamer Topf, in den die ganze Allianz einzahlt - <em>diese</em> hier erforscht jeder für sich selbst, im eigenen Labor, mit eigener Bauzeit und Kosten aus Rohstoffen <strong>und</strong> Forschungspunkten. <strong>Verbundprotokolle</strong> (+0,8% Angriffskraft je Stufe) sind der Grundstein, darauf bauen <strong>Werftnormung</strong> (−1,2% Schiffsbauzeit), <strong>Geteiltes Schildnetz</strong> (+1,2% Verteidigung), <strong>Konvoi-Doktrin</strong> (−1% Dauer aller Missionen) und zuoberst die <strong>Sternenschmiede</strong> (+1,2% Angriffskraft). Wer die Allianz verlässt, behält seine erforschten Stufen - Wissen nimmt man mit -, ihre Wirkung fällt aber auf null und neue Stufen lassen sich nicht mehr starten. Beim nächsten Beitritt ist alles sofort wieder da.',
+      '<strong>Neu: drei Allianzschiffe.</strong> Sie haben je zwei Tore, und die sind bewusst verschieden: die eigene Allianzforschung <strong>und</strong> eine Mindeststufe der Gemeinsamen Flottenwerft, die die Allianz gemeinsam hochbaut. Das eine ist Eigenleistung, das andere die Allianz - und man braucht beides. Die <strong>Paktkorvette</strong> (40 Angriff, Schild 14, Tempo 115 - der schnellste Großserien-Angreifer im Spiel) ab Verbundprotokolle 3 und Flottenwerft 2. Der <strong>Bundeskreuzer</strong> (110 Angriff, Schild 60, Verteidigungsgewicht 1,7 - hält deutlich mehr aus als ein Leerenjäger) ab Schildnetz 5, Werftnormung 3 und Flottenwerft 6. Und das <strong>Sternenbanner</strong> (240 Angriff, Schild 100 - zwischen Superschlachtschiff und Singularitäts-Vernichter) ab Sternenschmiede 6 und Flottenwerft 12. Alle drei mit eigenem Rumpf, eigener Silhouette in der Kampf-Wiedergabe und über alle drei Konterrollen verteilt, damit die Rollenbalance nicht kippt. <strong>Bereits gebaute Allianzschiffe bleiben auch nach einem Austritt</strong> und kämpfen normal weiter - nur neue lassen sich dann nicht mehr bauen.',
+      '<strong>Die drei Automatiken im Verteidigung-Tab sind ab sofort Unterstützern vorbehalten.</strong> Betroffen sind <em>Automatische Verstärkung</em>, <em>Automatische Reparatur</em> und die <em>KI-Abfangautomatik</em>. Den Unterstützer-Rang gibt es über eine Ko-fi-Spende (Ko-fi-E-Mail im Allianz-Tab hinterlegen, gilt 30 Tage ab der letzten Spende und verlängert sich mit jeder weiteren). Die Schalter bleiben sichtbar und erklären das an Ort und Stelle. <strong>Am Spielinhalt ändert sich dadurch nichts:</strong> Jede der drei nimmt nur Handarbeit ab, die man auch selbst erledigen kann - verlegen, reparieren, abfangen. Keine davon gibt Ressourcen, Kampfkraft oder Punkte, die es sonst nicht gäbe.',
+      '<strong>Behoben: „Allianz-Raid ausgerufen" und „Allianzbasis" ließen sich nicht einschalten.</strong> Gemeldet von Sascha. Nachgestellt und gemessen: Beide standen auf Aus, der Klick schickte sauber ein Ja an den Server - und danach standen sie wieder auf Aus. Der Fehler lag nicht am Schalter, sondern daran, dass der Server die beiden Kategorien noch gar nicht kannte (sie kamen am 02.08.2026 dazu) und sie beim Speichern stillschweigend wegließ. Diese Antwort hat den lokalen Stand <em>kommentarlos</em> ersetzt. Das Spiel sagt jetzt in so einem Fall, was los ist, statt den Schalter wortlos zurückspringen zu lassen - dieselbe Lehre wie beim verschluckten Speicher-Fehler vom 21.07.2026: Eine Server-Antwort, die etwas anderes sagt als die Anfrage, darf nicht still übernommen werden.',
+      'Für den Admin-Bereich: ein vierter Reiter „Unterstützer". Damit lässt sich der Unterstützer-Rang direkt vergeben - für Spenden, die nicht über Ko-fi kamen, für Fehlerfälle bei der E-Mail-Zuordnung oder als Dankeschön. Laufzeit 30, 60 oder 90 Tage, Stufe wählbar, jederzeit wieder entziehbar; eine parallel laufende Ko-fi-Unterstützung bleibt davon unberührt. Die Liste zeigt alle aktuellen Unterstützer samt Restlaufzeit und woher der Rang kommt.'
+    ]},
+    { version:'8.401.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: „Rohstoffe knapp" stand da, obwohl das Lager voll war.</strong> Gemeldet von Sascha. Die Beschriftung der Tier-2-Fabriken leitete den Grund aus der Rate ab, statt ihn zu kennen: „Lager voll" verlangte eine Rate von <em>exakt</em> null. Ein volles Tier-2-Lager steht im Betrieb aber fast nie genau am Deckel – es wird laufend ein wenig verbraucht und sofort wieder aufgefüllt. Die Fabrik produzierte dann den letzten Rest Platz voll, die Rate war positiv, und die Anzeige schob es auf Rohstoffmangel. Gemessen mit Rohstoffen bei 900 Millionen, Mangel also ausgeschlossen: Bestand 2.449,5 von 2.450 zeigte „+0,050/s (Rohstoffe knapp)". Der Grund wird jetzt dort ermittelt, wo gedrosselt wird, und mitgereicht.',
+      '<strong>Behoben: Bei „Animationen reduzieren" startete das Gefecht scheinbar nicht.</strong> Ebenfalls von Sascha gemeldet („der Kampf startet nicht am PC, am Handy aber schon"). Es war kein Fehler am Rechner: Wer die System-Einstellung „Bewegung reduzieren" gesetzt hat, bekommt bewusst sofort das Schlussbild statt des Gefechts – das ist so gebaut und bleibt auch so. Falsch war nur, dass man es nicht erkennen konnte: Der Hinweis darauf stand als winziger Graukasten in der linken oberen Ecke, nannte den Grund nicht und bot keinen Ausweg. Er steht jetzt gut sichtbar mitten auf der Bühne, sagt, woher es kommt, und hat einen Knopf <em>„Gefecht trotzdem abspielen"</em>. Vorgabe bleibt das Schlussbild – niemand bekommt ungefragt eine Animation.'
+    ]},
     { version:'8.400.0', date:'05.08.2026', changes:[
       '<strong>Die Rohstoffanzeige oben kostet fast nichts mehr.</strong> Die hochzählenden Zahlen wurden 60-mal je Sekunde und Rohstoff komplett neu zusammengebaut – samt dem „/ Lager"-Teil, der sich dabei nie ändert. Gemessen war das mit 55–66 Änderungen je Sekunde der <em>größte</em> Posten im ganzen Spiel, auf jedem Reiter und dauerhaft. Jetzt wird nur noch die Zahl selbst geschrieben, und auch die nur, wenn sich die angezeigte Ziffer wirklich ändert. Sichtbar ist der Unterschied nicht – die Animation läuft unverändert.',
       '<strong>Lanze und Torpedo klingen jetzt auch verschieden.</strong> Seit v8.398.0 unterscheiden sich die drei Waffengattungen im Bild, im Ton aber nicht: Der schwere Lanzenstrahl der Großkampfschiffe und die Bombertorpedos klangen beide exakt wie eine Jägersalve. Der Torpedo teilt sich den Klang jetzt mit der Bodenrakete – er ist dasselbe: ein langsamer, gelenkter Körper –, und die Lanze hat einen eigenen, tiefen Ton mit Anlauf bekommen.',
@@ -10068,6 +10164,76 @@
   // Maximalstufe, und ohne diese Ausnahme waeren der Forschungs-Nexus (MEGA_PROJECTS) und der
   // Erfolg "Forschungs-Meister" ab ihrer Einfuehrung dauerhaft unerreichbar gewesen.
   function allResearchMaxed(){ return RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).every(r => (state.research[r.key]||0) >= r.maxLevel); }
+
+  // ===================== Allianzforschung (05.08.2026, Spieler-Wunsch) =====================
+  //
+  // Ein EIGENER Forschungsbaum, den nur Allianzmitglieder betreiben können - und die Voraussetzung
+  // für die drei Allianzschiffe weiter unten (paktkorvette/bundeskreuzer/sternenbanner).
+  //
+  // ABGRENZUNG ZU DEN ALLIANZ-TECHS (ALLIANCE_TECH_DEFS, a_*/ab_*): Die sind ein GEMEINSAMER Topf -
+  // die ganze Allianz zahlt Rohstoffe ein, die Stufe gilt für alle, jeder Beitrag ist verloren, wenn
+  // man geht. Diese hier sind das Gegenteil: Jeder erforscht sie SELBST, im eigenen Labor, mit
+  // eigener Bauzeit - genau wie die normale Forschung, nur eben mit einer Mitgliedskarte als
+  // Eintrittskarte. Zwei Systeme, zwei Namen; verwechselbar wären sie nur, wenn beide "Allianz-
+  // Forschung" hießen, deshalb steht dieser Baum im Spiel unter „Allianzforschung" und der andere
+  // unter „Allianz-Technologien".
+  //
+  // WO DIE STUFEN LIEGEN: in state.research, wie jede andere Forschung, unter dem Präfix `ra_`.
+  // Das ist eine bewusste Entscheidung und keine Bequemlichkeit - dadurch gilt für sie ohne eine
+  // einzige weitere Zeile: die Speicher-Plausibilitätsprüfung des Backends (SAVE_SANITY_LIMITS
+  // kennt save.research), die 8 Punkte je Forschungsstufe im Bestenlisten-Score (serverseitig
+  // nachgerechnet), die Voraussetzungsprüfung der Schiffe (shipRequirementsMet liest
+  // state.research) und die Warteschlange. Ein eigenes Feld hätte alle vier Stellen einzeln
+  // gebraucht - und wäre die fünfte Stelle gewesen, die beim nächsten Umbau vergessen wird.
+  //
+  // WAS BEIM AUSTRITT PASSIERT: Die Stufen bleiben - Wissen nimmt man mit. Die WIRKUNG nicht, und
+  // neue Stufen lassen sich ohne Allianz auch nicht starten (siehe allianzForschungFrac und den
+  // Riegel in startResearch). Wer zurück in eine Allianz geht, hat alles sofort wieder.
+  //
+  // WARUM SIE NICHT IN RESEARCH_DEFS STEHEN: Der Erfolg „Wissenschaftler"/„Forschungs-Meister" und
+  // der Forschungs-Nexus verlangen ALLE Zweige auf Maximalstufe. Stünden diese fünf dort, wären
+  // drei Endgame-Ziele für jeden Solospieler dauerhaft unerreichbar - eine stille Bestrafung dafür,
+  // dass man keiner Allianz beitritt. Das eigene Array hält sie da heraus.
+  const ALLIANZ_FORSCHUNG_MAX = 10;
+  const ALLIANCE_RESEARCH_DEFS = [
+    { key:'ra_verbund', name:'Verbundprotokolle', icon:'ra_verbund',
+      baseCost:{ erz:6000, kristalle:4000, deuterium:1500, forschungspunkte:60 }, costMult:1.55,
+      baseDuration:900, durationMult:1.5, maxLevel:ALLIANZ_FORSCHUNG_MAX, requires:[],
+      desc:'Gemeinsame Feuerleit- und Kennungsprotokolle: Deine Schiffe wissen im Gefecht, wo die der Verbündeten stehen, und müssen nicht mehr um sie herum zielen. +0,8% Angriffskraft je Stufe (max. +8% bei Stufe 10). Der Grundstein des Baums - alles Weitere setzt darauf auf. Wirkt nur, solange du in einer Allianz bist.' },
+    { key:'ra_werftnorm', name:'Werftnormung', icon:'ra_werftnorm',
+      baseCost:{ erz:9000, kristalle:5000, deuterium:2500, forschungspunkte:80 }, costMult:1.55,
+      baseDuration:900, durationMult:1.5, maxLevel:ALLIANZ_FORSCHUNG_MAX, requires:[{key:'ra_verbund',level:3}],
+      desc:'Einheitliche Spanten, Schotten und Steckmaße über alle Werften der Allianz hinweg: Ein Bauteil passt überall, niemand fertigt mehr Einzelstücke. −1,2% Schiffsbauzeit je Stufe (max. −12% bei Stufe 10), zusätzlich zu allen anderen Bauzeit-Boni. Wirkt nur, solange du in einer Allianz bist.' },
+    { key:'ra_schildnetz', name:'Geteiltes Schildnetz', icon:'ra_schildnetz',
+      baseCost:{ erz:8000, kristalle:6500, deuterium:2200, forschungspunkte:80 }, costMult:1.55,
+      baseDuration:900, durationMult:1.5, maxLevel:ALLIANZ_FORSCHUNG_MAX, requires:[{key:'ra_verbund',level:3}],
+      desc:'Die Schildgeneratoren aller Standorte takten auf dieselbe Frequenz - fällt einer aus, stützen die übrigen die Lücke. +1,2% Verteidigungspunkte je Stufe (max. +12% bei Stufe 10) an allen deinen Standorten. Wirkt nur, solange du in einer Allianz bist.' },
+    { key:'ra_konvoi', name:'Konvoi-Doktrin', icon:'ra_konvoi',
+      baseCost:{ erz:7000, kristalle:5000, deuterium:4000, forschungspunkte:90 }, costMult:1.55,
+      baseDuration:900, durationMult:1.5, maxLevel:ALLIANZ_FORSCHUNG_MAX, requires:[{key:'ra_werftnorm',level:3}],
+      desc:'Flugpläne, Sprungfenster und Tankstopps werden allianzweit abgestimmt statt für jede Mission neu ausgehandelt. −1% Dauer ALLER Missionen je Stufe (max. −10% bei Stufe 10) - Angriffe, Expeditionen, Verlegungen, Erkundungen. Wirkt nur, solange du in einer Allianz bist.' },
+    { key:'ra_sternenschmiede', name:'Sternenschmiede', icon:'ra_sternenschmiede',
+      baseCost:{ erz:14000, kristalle:10000, deuterium:6000, antimaterie:250, forschungspunkte:140 }, costMult:1.55,
+      baseDuration:1500, durationMult:1.5, maxLevel:ALLIANZ_FORSCHUNG_MAX,
+      requires:[{key:'ra_werftnorm',level:6},{key:'ra_schildnetz',level:6}],
+      desc:'Die Spitze des Baums: Waffenkammern, Zielrechner und Reaktorkerne werden nicht mehr gekauft, sondern in der eigenen Allianzschmiede gegossen. +1,2% Angriffskraft je Stufe (max. +12% bei Stufe 10), zusätzlich zu den Verbundprotokollen. Stufe 6 schaltet außerdem das Sternenbanner frei, das schwerste Schiff der Allianzflotte. Wirkt nur, solange du in einer Allianz bist.' }
+  ];
+  // Die eine Stelle, an der "bin ich in einer Allianz" für diesen Baum beantwortet wird.
+  function inAllianz(){ return !!myAllianceTag(); }
+  // Anteil (0..1) des vollen Bonus, den die aktuelle Stufe bereits gibt - 0 ohne Mitgliedschaft.
+  // Serverseitig in allianzForschungBonus() gespiegelt (server.js), damit die Angriffs- und
+  // Verteidigungsvorschau im PvP nicht mehr verspricht, als der Kampf einlöst.
+  function allianzForschungFrac(key){
+    if (!inAllianz()) return 0;
+    return Math.min(1, (state.research[key]||0) / ALLIANZ_FORSCHUNG_MAX);
+  }
+  function findAllianzForschung(key){ return ALLIANCE_RESEARCH_DEFS.find(r => r.key === key) || null; }
+  function istAllianzForschung(key){ return !!findAllianzForschung(key); }
+  // Forschungs-Nachschlag über BEIDE Bäume. Alles, was eine LAUFENDE oder EINGEREIHTE Forschung
+  // auflöst (startResearch, processResearch, Warteschlange, Fortschrittskarte), muss hierher fragen
+  // statt direkt in RESEARCH_DEFS - sonst stünde eine gestartete Allianzforschung als "undefined"
+  // im Fortschritt und liefe nie fertig.
+  function findeForschung(key){ return RESEARCH_DEFS.find(r => r.key === key) || findAllianzForschung(key); }
 
   // ===== Weitere Verwendungen für Forschungspunkte (13.07.2026) =====
   // Bisher landeten Forschungspunkte ausschließlich in den 20 Forschungszweigen oben - war die Kette
@@ -16244,6 +16410,17 @@
     return Math.round(basis * (n||1) * (1 + 0.004*Math.max(0, (n||1)-1)));
   }
   function leerenjaegerCost(n){ return scaledShipCost({ erz: 2600, kristalle: 1900, deuterium: 1200, antimaterie: 300 }, 'leerenjaeger', n); }
+  // ===== Allianzflotte (05.08.2026, Spieler-Wunsch) =====
+  // Baukosten aus GRUNDSTOFFEN, nicht aus Tier-2 - das Gate dieser drei ist nicht die Fabrikkette,
+  // sondern die Allianz selbst (Mitgliedschaft + Allianzforschung + Stufe der Gemeinsamen
+  // Flottenwerft). Ein zweites Gate darüber hätte sie unerreichbar gemacht.
+  // Gegengerechnet an der bestehenden Kurve "Marktwert je Angriffspunkt" (Zerstörer ~10,
+  // Schlachtschiff ~16, Superschlachtschiff ~32, Leerenjäger/Tier-2 ~85-95): Die Paktkorvette liegt
+  // mit ~41 bewusst im Mittelfeld (frühes Allianzschiff), der Bundeskreuzer mit ~94 auf
+  // Leerenjäger-Niveau, das Sternenbanner mit ~138 darüber - es ist das Ziel des ganzen Baums.
+  function paktkorvetteCost(n){ return scaledShipCost({ erz: 500, kristalle: 340, deuterium: 150 }, 'paktkorvette', n); }
+  function bundeskreuzerCost(n){ return scaledShipCost({ erz: 2400, kristalle: 2000, deuterium: 900, antimaterie: 120 }, 'bundeskreuzer', n); }
+  function sternenbannerCost(n){ return scaledShipCost({ erz: 6500, kristalle: 5200, deuterium: 3400, antimaterie: 600 }, 'sternenbanner', n); }
   // Tier-2-Schiffe (19.07.2026, Spieler-Wunsch "Schiffe, die nur Tier-2-Ressourcen verlangen"):
   // Baukosten bestehen KOMPLETT aus raffinierten Ressourcen - die Fabrik-Kette selbst ist das Gate.
   // Wert-je-Angriff vorab gegen die bestehende Kurve gerechnet (Kreuzer ~18, Leerenjäger ~173
@@ -16450,6 +16627,32 @@
     { key:'grundgaenger', name:'Der Grundgänger', icon:'ship_grundgaenger', atk:0, costFn:(n)=>({ bergung: tiefenschiffKosten('grundgaenger', n) }), tiefenschiff:true, buildTime:720, requires:[{key:'rsingularitaet',level:1}], tiefe:100, drive:'hyperraum', speed:45, defWeight:0,
       desc:'Hebt den Abschlag auf wiederholte Tauchgänge an, je mehr davon mitfliegen: Eine längst bezwungene Tiefe gibt statt 35% wieder bis zu 70% ihrer Ausbeute. Damit bleibt jede Tiefe dauerhaft brauchbar, statt nur einmal. Die Grundberührung hebt den Abschlag für einen einzigen Tauchgang ganz auf – der Grundgänger tut es dauerhaft, dafür nur teilweise. Wirkt nur im Abgrund.' },
     { key:'leerenjaeger', name:'Leerenjäger', icon:'ship_leerenjaeger', atk:140, costFn:leerenjaegerCost, buildTime:420, requires:[{key:'rleere',level:5}], drive:'hyperraum', speed:75, defWeight:1.1 },
+    // ===== Allianzflotte (05.08.2026, Spieler-Wunsch) =====
+    // Drei Schiffe, die es NUR mit Allianzmitgliedschaft gibt. Zwei Tore je Schiff, und sie sind
+    // bewusst verschieden: die eigene Allianzforschung (ALLIANCE_RESEARCH_DEFS, `requires` unten)
+    // und die Stufe der Gemeinsamen Flottenwerft (`allianzWerft`), die die ganze Allianz gemeinsam
+    // hochbaut. Das erste ist Eigenleistung, das zweite ist die Allianz - und man braucht beides.
+    //
+    // Die Prüfung selbst steht in shipRequirementsMet() und NUR dort, damit Bauknopf, Baukorb,
+    // Warteschlange und die Bauleisten-Vorschläge dieselbe Antwort bekommen. Wer hier ein viertes
+    // Schiff ergänzt, muss nichts weiter tun - `allianzSchiff:true` genügt.
+    //
+    // BEREITS GEBAUTE SCHIFFE BLEIBEN beim Austritt. Sie fliegen, kämpfen und zählen weiter; nur
+    // NEUE lassen sich dann nicht mehr bauen. Alles andere wäre eine Enteignung für einen
+    // Allianzwechsel, und die Flotte ist das Einzige im Spiel, das man wirklich verliert.
+    //
+    // Rollenverteilung bewusst über alle drei Konterrollen gestreut (siehe COUNTER_ROLE_OF): Die
+    // mühsam auf 7/6/8 gebrachte Verteilung wäre sofort wieder schief, wenn drei neue Schiffe
+    // geschlossen im Kapital-Lager landeten.
+    { key:'paktkorvette', name:'Paktkorvette', icon:'ship_paktkorvette', atk:40, shield:14, costFn:paktkorvetteCost, buildTime:150,
+      requires:[{key:'ra_verbund',level:3}], allianzSchiff:true, allianzWerft:2, drive:'impuls', speed:115, defWeight:0.7,
+      nicheDesc:'Einstiegsschiff der Allianzflotte - schnellster Rumpf unter den Großserien-Angreifern (Tempo 115), günstig zu bauen und schon mit Verbundprotokollen Stufe 3 und einer Gemeinsamen Flottenwerft auf Stufe 2 verfügbar. Nur baubar, solange du in einer Allianz bist.' },
+    { key:'bundeskreuzer', name:'Bundeskreuzer', icon:'ship_bundeskreuzer', atk:110, shield:60, costFn:bundeskreuzerCost, buildTime:380,
+      requires:[{key:'ra_schildnetz',level:5},{key:'ra_werftnorm',level:3}], allianzSchiff:true, allianzWerft:6, drive:'impuls', speed:62, defWeight:1.7,
+      nicheDesc:'Das zähe Rückgrat der Allianzflotte: Schildwert 60 bei Verteidigungsgewicht 1,7 - hält deutlich mehr aus als ein Leerenjäger, teilt dafür weniger aus. Braucht Geteiltes Schildnetz Stufe 5, Werftnormung Stufe 3 und eine Gemeinsame Flottenwerft auf Stufe 6. Nur baubar, solange du in einer Allianz bist.' },
+    { key:'sternenbanner', name:'Sternenbanner', icon:'ship_sternenbanner', atk:240, shield:100, costFn:sternenbannerCost, buildTime:1000,
+      requires:[{key:'ra_sternenschmiede',level:6}], allianzSchiff:true, allianzWerft:12, drive:'hyperraum', speed:42, defWeight:1.5,
+      nicheDesc:'Das Flaggschiff der Allianz und das Ziel des ganzen Forschungsbaums: 240 Angriff bei Schild 100, damit zwischen Superschlachtschiff (220) und Singularitäts-Vernichter (280). Braucht Sternenschmiede Stufe 6 und eine Gemeinsame Flottenwerft auf Stufe 12 - ein Ziel für gewachsene Allianzen, nicht für die erste Woche. Nur baubar, solange du in einer Allianz bist.' },
     // Tier-2-Schiffe (19.07.2026): Freischaltung über die jeweilige Tier-2-Forschung, Kosten rein aus
     // raffinierten Ressourcen (siehe Cost-Funktionen oben).
     { key:'nanoklinge', name:'Nanoklinge', icon:'ship_nanoklinge', atk:55, costFn:nanoklingeCost, buildTime:240, requires:['rnanotech'], drive:'impuls', speed:95, defWeight:0.8, nicheDesc:'erstes Tier-2-Schiff - schneller Angreifer, Baukosten komplett aus Nanolegierungen. Einzigartige Fähigkeit „Panzerbrecher": +2% effektive Angriffskraft der ganzen Flotte je Nanoklinge (Schild-Penetration, mit dem Vernichter gemeinsam gedeckelt bei +30%).' },
@@ -17017,7 +17220,7 @@
   // Angriffsschiffe OHNE die beiden Frachterklassen - fuer alles, was echte Gefechtsbeteiligung meint
   // (aktuell: der Erfahrungsanteil, den eine Verlegung mitnimmt). Aus ATTACK_SHIP_KEYS abgeleitet
   // statt danebengeschrieben, damit eine neue Kampfklasse nicht an einer zweiten Liste vorbeilaeuft.
-  const ATTACK_SHIP_KEYS = ['jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','frachter','frachtergross','waechter','kometenjaeger','enterschiff','phantomschiff','riftwaechter','nanoklinge','quantenkreuzer','fusionsdreadnought','hyperjaeger','hyperbomber','singularitaetsvernichter'];
+  const ATTACK_SHIP_KEYS = ['jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','frachter','frachtergross','waechter','kometenjaeger','enterschiff','phantomschiff','riftwaechter','nanoklinge','quantenkreuzer','fusionsdreadnought','hyperjaeger','hyperbomber','singularitaetsvernichter','paktkorvette','bundeskreuzer','sternenbanner'];
   const KAMPF_SHIP_KEYS = ATTACK_SHIP_KEYS.filter(k => k !== 'frachter' && k !== 'frachtergross');
   // ===== Angriffswert einer Klasse / Schätzung fremder Flotten (01.08.2026) =====
   // shipBaseAtk() ist die EINE Stelle, an der der Sonderfall Superschlachtschiff steht: Es ist der
@@ -17304,6 +17507,12 @@
     // hier und nicht als eigene Pruefung daneben, damit es keine zweite Stelle gibt, die "darf ich
     // dieses Schiff bauen" beantwortet - Bauknopf, Baukorb und Warteschlange fragen alle hierher.
     if (typeof def.tiefe === 'number' && ((state.abgrund||{}).best||0) < def.tiefe) return false;
+    // Allianzflotte (05.08.2026): zwei zusaetzliche Tore, beide nur hier. Bereits GEBAUTE Schiffe
+    // sind davon nicht betroffen - diese Funktion beantwortet ausschliesslich "darf ich NEUE bauen".
+    if (def.allianzSchiff){
+      if (!inAllianz()) return false;
+      if (allianceTechLevel('ab_werft') < (def.allianzWerft||0)) return false;
+    }
     return (def.requires||[]).every(req => {
       if (typeof req === 'string') return (state.research[req]||0) >= 1;
       return (state.research[req.key]||0) >= req.level;
@@ -18119,7 +18328,15 @@
   // Stabilisator, -2%/Stufe imperiumsweit, max -20%). Direkte, harte Deckel - keine stapelnde Bonus-Gruppe.
   function raffinerieThroughputMult(){ return 1 + 0.03 * Math.min(10, (state.research && state.research.rraffinerieoptimierung) || 0); }
   function gravInputMult(){ const lvl = allBuildingSets().reduce((a,b)=>a+(b.gravkompressor||0),0); return 1 - Math.min(0.20, 0.02 * lvl); }
-  function tier2Step(def, resources, seconds){
+  // `grund` (optional) nimmt auf, WELCHE Grenze den Durchsatz gebunden hat: 'lager', 'rohstoffe'
+  // oder 'voll' (nichts gebunden, Fabrik läuft am Anschlag). Die Anzeige darf das nämlich nicht
+  // selbst herleiten - sie hat es bis zum 05.08.2026 versucht und lag falsch: Sie schloss aus
+  // "Rate kleiner als das Maximum" auf Rohstoffmangel und nannte den vollen Lagerplatz nur dann
+  // beim Namen, wenn die Rate GENAU null war. Ein volles Tier-2-Lager steht im Betrieb aber fast
+  // nie exakt am Deckel - es wird laufend ein wenig verbraucht und wieder aufgefüllt. Gemessen mit
+  // Inputs bei 900 Millionen (Mangel also ausgeschlossen): Bestand 2449,5 von 2450 zeigte
+  // "+0,050/s (Rohstoffe knapp)". Das war der Dauerzustand jedes vollen Lagers.
+  function tier2Step(def, resources, seconds, grund){
     const totalLevel = tier2TotalLevel(def);
     if (totalLevel <= 0) return 0;
     // Weltprojekt "Galaktische Verbundraffinerie": +10% Durchsatz aller Ketten. Sitzt bewusst HIER
@@ -18135,6 +18352,15 @@
     // ("stoppt komplett", siehe applySoftCappedGain/SOFT_CAP_OVERFLOW_RATE=0).
     const maxBySpace = Math.max(0, tier2StorageCap(def) - (resources[def.key]||0));
     const produced = Math.max(0, Math.min(maxByStock, maxBySpace));
+    if (grund){
+      // Bei Gleichstand gewinnt das LAGER: Wer am Deckel steht, dem nützen mehr Rohstoffe nichts,
+      // und "Lager voll" ist die Auskunft, die dem Spieler sagt, was zu tun ist (ausbauen oder
+      // verbrauchen). Der Vergleich läuft gegen `want`, nicht gegen die Basisrate - `want` ist
+      // das, was diese Fabrik hier und jetzt schaffen wollte, inklusive aller Boni.
+      if (maxBySpace <= maxByStock && maxBySpace < want - 1e-9) grund.art = 'lager';
+      else if (maxByStock < want - 1e-9) grund.art = 'rohstoffe';
+      else grund.art = 'voll';
+    }
     if (produced <= 0) return 0;
     for (const res of Object.keys(def.inputs)) resources[res] = Math.max(0, (resources[res]||0) - produced*def.inputs[res]*inMult);
     resources[def.key] = (resources[def.key]||0) + produced;
@@ -18155,10 +18381,16 @@
   // 19.07.2026): Trockenlauf von 1 Sekunde auf einer Kopie des Ressourcenstands - berücksichtigt
   // dadurch automatisch Rohstoff-Drosselung, Lager-Pause UND die Ketten-Reihenfolge (Fusion sieht
   // die im selben Tick produzierten Nanos, exakt wie im echten Tick).
-  function tier2RatesPerSecond(){
+  // Liefert zusätzlich je Kette den GRUND der Drosselung - aus derselben Rechnung, die auch der
+  // echte Tick benutzt. Die Anzeige soll ihn ablesen, nicht erraten.
+  function tier2RatesPerSecond(gruende){
     const sim = Object.assign({}, state.resources);
     const rates = {};
-    for (const def of TIER2_DEFS) rates[def.key] = tier2Step(def, sim, 1);
+    for (const def of TIER2_DEFS){
+      const g = {};
+      rates[def.key] = tier2Step(def, sim, 1, g);
+      if (gruende) gruende[def.key] = g.art || 'voll';
+    }
     return rates;
   }
   // fmt() floort auf 1 Nachkommastelle - Tier-2-Raten (0,0005-0,09/s) würden dort alle als "0"
@@ -18186,15 +18418,20 @@
     el.style.marginBottom = '1.5rem';
     // Effektive Rate je Kette (Spieler-Wunsch 19.07.2026) inkl. ehrlichem Status: "Lager voll"
     // (Fabrik pausiert) bzw. "Rohstoffe knapp" (gedrosselt unter das theoretische Maximum).
-    const rates = tier2RatesPerSecond();
+    const gruende = {};
+    const rates = tier2RatesPerSecond(gruende);
     const rateLine = (d) => {
       const lvl = tier2TotalLevel(d);
       if (lvl <= 0) return '';
       const eff = rates[d.key]||0;
-      const wantMax = lvl * d.ratePerLevel;
-      const full = (state.resources[d.key]||0) >= tier2StorageCap(d) - 1e-9;
-      if (full && eff <= 0) return `<div class="rate"><span style="color:#e0a548;">+0/s (Lager voll)</span></div>`;
-      if (eff < wantMax - 1e-9) return `<div class="rate"><span style="color:#e0a548;">+${fmtTier2Rate(eff)}/s (Rohstoffe knapp)</span></div>`;
+      // Der Grund kommt aus tier2Step, wird also nicht mehr aus der Rate geraten. Vorher stand
+      // bei einem vollen Lager "Rohstoffe knapp", solange die Fabrik noch den letzten Rest Platz
+      // füllte - und das ist der Normalzustand eines vollen Lagers, nicht die Ausnahme.
+      const art = gruende[d.key];
+      // Steht die Fabrik wirklich still, ist "+0/s" die klarere Auskunft als "+0.0000/s".
+      const rateTxt = eff > 1e-9 ? fmtTier2Rate(eff) : '0';
+      if (art === 'lager') return `<div class="rate"><span style="color:#e0a548;">+${rateTxt}/s (Lager voll)</span></div>`;
+      if (art === 'rohstoffe') return `<div class="rate"><span style="color:#e0a548;">+${rateTxt}/s (Rohstoffe knapp)</span></div>`;
       return `<div class="rate">+${fmtTier2Rate(eff)}/s</div>`;
     };
     const sig = visible.map(d => d.key+':'+Math.floor(state.resources[d.key]||0)+':'+tier2StorageCap(d)+':'+fmtTier2Rate(rates[d.key]||0)+':'+((state.resources[d.key]||0) >= tier2StorageCap(d) - 1e-9 ? 1 : 0)).join('|');
@@ -18265,6 +18502,7 @@
     mult *= fleetSpeedMultiplier(f, relevantKeys);
     if (state.allianceResearch) mult *= (1-0.10*allianceTechFrac('a_speed'));
     if (state.allianceResearch) mult *= (1-0.15*allianceTechFrac('ep_logistik')); // Permanentes Allianzprojekt "Logistiknetzwerk"
+    mult *= (1 - 0.10*allianzForschungFrac('ra_konvoi')); // Allianzforschung "Konvoi-Doktrin"
     if (state.allianceResearch && state.allianceResearch['wp_sprungtor']) mult *= 0.90; // Weltprojekt "Intergalaktisches Sprungtor"
     mult *= Math.max(0.5, 1 - prestigePerkCount('speed')*0.03);
     mult *= Math.max(0.5, 1 - ascBonus('speed')*0.02);
@@ -18347,6 +18585,12 @@
     // (shipMarkFamily liest es als Erstes). Ein Rollenwechsel verschiebt also zugleich, welche
     // Zuwächse eine Klasse je Marke bekommt - und beides muss im Backend mitgezogen werden.
     ,carrier:'abfang', riftwaechter:'abfang', enterschiff:'bomber'
+    // Allianzflotte (05.08.2026): bewusst auf alle drei Rollen verteilt statt geschlossen ins
+    // Kapital-Lager - sonst waere die oben muehsam auf 7/6/8 gebrachte Verteilung sofort wieder
+    // schief. Die Paktkorvette ist ein leichter, schneller Rumpf (Abfangjaeger), der Bundeskreuzer
+    // ein gepanzerter Verband (Grosskampfschiff), das Sternenbanner schlaegt auf grosse Ziele
+    // (Bomber). Neue Verteilung: 8 / 7 / 9.
+    ,paktkorvette:'abfang', bundeskreuzer:'kapital', sternenbanner:'bomber'
     // Bewusst OHNE Rolle (Multiplikator 1): Frachter, Späher, Spionageschiff, Forscher, Recycler,
     // Kolonieschiff, Gesandtenschiff, Schürfschiff - alles Schiffe ohne oder ohne nennenswerte
     // Kampfkraft. Sie sollen weder kontern noch gekontert werden.
@@ -20459,6 +20703,11 @@
       combatBonus += 0.08*allianceTechFrac('ab_werft');
       combatBonus += 0.10*allianceTechFrac('ab_flotte2');
     }
+    // Allianzforschung (05.08.2026): eigener Baum, selbst erforscht - steht deshalb AUSSERHALB des
+    // state.allianceResearch-Blocks darueber (der prueft, ob ueberhaupt Allianz-Techdaten geladen
+    // sind). allianzForschungFrac() prueft die Mitgliedschaft selbst und gibt sonst 0.
+    combatBonus += 0.08*allianzForschungFrac('ra_verbund');
+    combatBonus += 0.12*allianzForschungFrac('ra_sternenschmiede');
     combatBonus += prestigePerkCount('combat')*0.03;
     combatBonus += flagshipCombatBonus();
     combatBonus += ascBonus('combat')*0.02;
@@ -20584,6 +20833,7 @@
       combatBonus += 0.15*allianceTechFrac('a_def');
       combatBonus += 0.20*allianceTechFrac('a_def2');
     }
+    combatBonus += 0.12*allianzForschungFrac('ra_schildnetz');   // Allianzforschung "Geteiltes Schildnetz"
     combatBonus += prestigePerkCount('combat')*0.03;
     combatBonus += flagshipCombatBonus();
     combatBonus += ascBonus('combat')*0.02;
@@ -21148,6 +21398,9 @@
   // die Koordination der Verlegung läuft über dieselbe KI-Infrastruktur.
   const AUTO_REINFORCE_COST_KERNE = 3;
   function maybeAutoReinforce(){
+    // Der Rang wird HIER geprüft und nicht nur am Schalter: state.autoReinforceOn liegt im
+    // Spielstand und kann aus der Zeit vor der Umstellung stammen (oder von Hand gesetzt sein).
+    if (!automatikFreigeschaltet()) return;
     if (!state.autoReinforceOn || !state.incomingRaid || state.incomingRaid.reinforceSent) return;
     const targetPlanet = state.incomingRaid.planet;
     const remainMs = (state.nextRaidTime||0) - Date.now();
@@ -21423,6 +21676,7 @@
   const KI_INTERCEPT_TRIGGER_FRAC = 0.6;
   function kiInterceptTriggerTime(raid){ return raid.startTime + (raid.endTime - raid.startTime) * KI_INTERCEPT_TRIGGER_FRAC; }
   function maybeKiInterceptPirates(raid){
+    if (!automatikFreigeschaltet()) return;   // Unterstützer-Rang, siehe automatikFreigeschaltet()
     if (!state.kiInterceptOn || (state.research.rkitech||0) < 1) return;
     if (raid.interceptArrival) return; // eigene Abfangflotte unterwegs - die KI hält sich zurück
     if (Date.now() < kiInterceptTriggerTime(raid)) return;
@@ -21744,7 +21998,10 @@
     // Bugfix (20.07.2026, Bug-Sweep): fehlte komplett - maxOwned:1, 10 Tage Bauzeit, Top-Tier-
     // Forschung nötig, atk 300 (höchster Wert im Spiel) - Gewicht proportional zum Superschlachtschiff
     // (atk 220 -> 180), plus Aufschlag für die Einzigartigkeit.
-    mondzerstoerer:250
+    mondzerstoerer:250,
+    // Allianzflotte (05.08.2026) - Gewichte proportional zum Angriffswert entlang der bestehenden
+    // Kurve; Backend-Kopie in server.js MUSS identisch bleiben (test_paritaet_tabellen.js prueft das).
+    paktkorvette:42, bundeskreuzer:105, sternenbanner:195
   };
   // Eigene Schiffe, die gerade NICHT in einer stationierten Flotte stehen, dem Spieler aber weiterhin
   // gehören: unterwegs bei Verlegung/Basisverteidigung/Solo-Allianzbasis-Angriff, an der Allianzbasis
@@ -22200,7 +22457,11 @@
 
   function startResearch(key){
     if (state.activeResearch){ log('Es läuft bereits eine Forschung.', 'ti-alert-triangle'); return; }
-    const r = RESEARCH_DEFS.find(x=>x.key===key);
+    const r = findeForschung(key);
+    if (!r){ log('Unbekannte Forschung.', 'ti-alert-triangle'); return; }
+    // Riegel für die Allianzforschung: ohne Mitgliedschaft gar nicht erst starten. Steht hier und
+    // nicht nur an der Karte, weil auch die Warteschlange über startResearch läuft.
+    if (istAllianzForschung(key) && !inAllianz()){ log('Allianzforschung braucht eine Allianz - tritt einer bei oder gründe eine (Allianz-Tab).', 'ti-lock'); return; }
     if (!techUnlocked(r)){ log('Voraussetzung nicht erfüllt.', 'ti-alert-triangle'); return; }
     const curLvl = state.research[key]||0;
     if (curLvl >= r.maxLevel){ log('Maximale Stufe bereits erreicht.', 'ti-alert-triangle'); return; }
@@ -22221,7 +22482,7 @@
   function cancelResearch(){
     if (!state.activeResearch) return;
     const ar = state.activeResearch;
-    const r = RESEARCH_DEFS.find(x=>x.key===ar.key);
+    const r = findeForschung(ar.key);
     if (!r){ state.activeResearch = null; render(); save(); return; }
     const cost = researchCostFor(r, ar.targetLevel);
     const refund = {};
@@ -22538,7 +22799,8 @@
   function processResearch(){
     if (!state.activeResearch) return false;
     if (Date.now() < state.activeResearch.endTime) return false;
-    const r = RESEARCH_DEFS.find(x=>x.key===state.activeResearch.key);
+    const r = findeForschung(state.activeResearch.key);
+    if (!r){ state.activeResearch = null; return true; }
     const prevLvl = state.research[r.key]||0;
     const newLvl = state.activeResearch.targetLevel;
     state.research[r.key] = newLvl;
@@ -22570,10 +22832,10 @@
   // vorgeschlagenen Reihenfolge simuliert.
   function validateResearchQueueOrder(queue){
     const simLevels = {};
-    for (const r of RESEARCH_DEFS) simLevels[r.key] = state.research[r.key]||0;
+    for (const r of RESEARCH_DEFS.concat(ALLIANCE_RESEARCH_DEFS)) simLevels[r.key] = state.research[r.key]||0;
     for (let i=0;i<queue.length;i++){
       const key = queue[i];
-      const r = RESEARCH_DEFS.find(x=>x.key===key);
+      const r = findeForschung(key);
       if (!r) continue;
       const reqOk = (r.requires||[]).every(req => {
         if (typeof req === 'string') return (simLevels[req]||0) >= 1;
@@ -22594,7 +22856,7 @@
     const tmp = proposed[index]; proposed[index] = proposed[newIndex]; proposed[newIndex] = tmp;
     const check = validateResearchQueueOrder(proposed);
     if (!check.ok){
-      const blockedName = (RESEARCH_DEFS.find(r=>r.key===proposed[check.invalidIndex])||{}).name || proposed[check.invalidIndex];
+      const blockedName = (findeForschung(proposed[check.invalidIndex])||{}).name || proposed[check.invalidIndex];
       log('Umsortieren nicht möglich: '+blockedName+' hätte an dieser Stelle seine Voraussetzung noch nicht erfüllt.', 'ti-alert-triangle');
       return;
     }
@@ -22605,9 +22867,11 @@
     if (state.activeResearch) return false;
     if (!state.researchQueue || !state.researchQueue.length) return false;
     const key = state.researchQueue[0];
-    const r = RESEARCH_DEFS.find(x=>x.key===key);
+    const r = findeForschung(key);
     const curLvl = r ? (state.research[key]||0) : 0;
-    if (!r || !techUnlocked(r) || curLvl>=r.maxLevel){ state.researchQueue.shift(); return true; }
+    // Eine Allianzforschung ohne Allianz wird aus der Warteschlange geworfen statt sie zu blockieren -
+    // sonst stünde die ganze Schlange still, bis man wieder beitritt.
+    if (!r || (istAllianzForschung(key) && !inAllianz()) || !techUnlocked(r) || curLvl>=r.maxLevel){ state.researchQueue.shift(); return true; }
     const cost = researchCostFor(r, curLvl+1);
     if (!canAfford(cost)) return false;
     state.researchQueue.shift();
@@ -22763,7 +23027,7 @@
     // Überschreitung mehr zu - diese Korrektur fängt nur ALTE, bereits über dem heutigen Limit
     // liegende Werte im Spielstand ab (z.B. aus einer Version mit anderem/fehlendem maxLevel, oder
     // durch manuelle Bearbeitung der Speicherdatei).
-    for (const r of RESEARCH_DEFS){
+    for (const r of RESEARCH_DEFS.concat(ALLIANCE_RESEARCH_DEFS)){
       if (r.maxLevel && (state.research[r.key]||0) > r.maxLevel) state.research[r.key] = r.maxLevel;
     }
     for (const def of SHIP_DEFS) if (state.fleet[def.key] === undefined) state.fleet[def.key] = 0;
@@ -23627,6 +23891,7 @@
     e *= Math.max(0.5, 1 - ewigBonus('rewig_bau', 0.05));
     e *= (1 + prestigePerkCount('blitzforscher')*0.06); // ... und dafuer langsamer bauen (Kehrseite oben)
     if (state.allianceResearch) e *= (1 - 0.20*allianceTechFrac('ep_werft')); // Allianz-Flottenwerft
+    if (kind === 'ship') e *= (1 - 0.12*allianzForschungFrac('ra_werftnorm')); // Allianzforschung "Werftnormung" - nur Schiffe
     if (state.allianceResearch && state.allianceResearch['wp_sternenwerft']) e *= 0.90; // Weltprojekt "Gigantische Sternenwerft"
     return e;
   }
@@ -24244,7 +24509,10 @@
     if (!useBackend()) return;
     try {
       const r = await backendFetch('/me');
-      if (r.ok){ const me = await r.json(); if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } }
+      // Der Unterstützer-Rang läuft 30 Tage nach der letzten Spende ab. Diese Auffrischung läuft
+      // ohnehin regelmäßig - sie nimmt den Rang mit, damit ein Ablauf nicht erst beim nächsten
+      // Neuladen sichtbar wird (und eine frische Spende umgekehrt sofort greift).
+      if (r.ok){ const me = await r.json(); if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } supporterStatusUebernehmen(me); }
     } catch(e){}
   }
   async function loadReports(){
@@ -24304,13 +24572,50 @@
       if (res.ok){ notifPrefsCache = await res.json(); renderNotifPrefs(); }
     } catch(e){}
   }
+  // ===== Warum hier ein Abgleich steht (05.08.2026, Spieler-Report Sascha) =====
+  //
+  // Gemeldet war: „die beiden Benachrichtigungen lassen sich nicht aktivieren" (Allianz-Raid
+  // ausgerufen, Allianzbasis). Nachgestellt und gemessen: Beide standen auf Aus, der Klick schickte
+  // sauber `true` an den Server - und danach standen sie wieder auf Aus.
+  //
+  // Die Ursache liegt NICHT in diesem Schalter. Die Server-Route baut die Einstellungen bei jedem
+  // Speichern komplett neu auf; kennt sie eine Kategorie nicht, fehlt sie in der Antwort. Und diese
+  // Antwort hat den lokalen Stand bisher KOMMENTARLOS ERSETZT. Ergebnis: ein Schalter, der auf Aus
+  // zurückspringt und keinen Grund nennt - stundenlang nicht zuzuordnen, weil im Spiel alles richtig
+  // aussieht. Genau derselbe Fehlertyp wie der verschluckte Speicher-Fehler vom 21.07.2026, und
+  // dieselbe Lehre: Eine Server-Antwort, die etwas anderes sagt als die Anfrage, darf nicht still
+  // übernommen werden.
+  //
+  // Die Antwort bleibt maßgeblich (der Server entscheidet, was gespeichert ist - alles andere wäre
+  // ein Schalter, der ANgezeigt wird und trotzdem nichts tut). Aber die Abweichung wird jetzt
+  // benannt, und zwar mit dem, was der Spieler damit anfangen kann.
+  function notifPrefsAbgleich(gesendet, antwort){
+    const fehlend = Object.keys(gesendet).filter(k => !(k in antwort));
+    if (fehlend.length){
+      log('Der Server kennt diese Benachrichtigungs-Einstellung noch nicht ('+fehlend.join(', ')+') und speichert sie deshalb nicht - der Schalter bleibt wirkungslos, bis das Backend aktualisiert ist.', 'ti-alert-triangle');
+      return;
+    }
+    const abweichend = Object.keys(gesendet).filter(k => !!gesendet[k] !== !!antwort[k]);
+    if (abweichend.length){
+      log('Der Server hat diese Benachrichtigungs-Einstellung anders gespeichert als angefragt ('+abweichend.join(', ')+').', 'ti-alert-triangle');
+    }
+  }
   async function saveNotificationPrefs(){
     if (!useBackend()) return;
     try {
-      const res = await backendFetch('/notification-prefs', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(notifPrefsCache) });
-      if (res.ok) notifPrefsCache = await res.json();
+      const gesendet = Object.assign({}, notifPrefsCache);
+      const res = await backendFetch('/notification-prefs', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(gesendet) });
+      if (res.ok){
+        const antwort = await res.json();
+        notifPrefsCache = antwort;
+        notifPrefsAbgleich(gesendet, antwort);
+      } else {
+        log('Die Benachrichtigungs-Einstellung konnte nicht gespeichert werden (Server antwortete mit '+res.status+').', 'ti-alert-triangle');
+      }
       renderNotifPrefs();
-    } catch(e){}
+    } catch(e){
+      log('Die Benachrichtigungs-Einstellung konnte nicht gespeichert werden - der Server war nicht erreichbar.', 'ti-alert-triangle');
+    }
   }
   // Fertigstellungs-Erinnerungen ans Backend melden (Retention, 21.07.2026): sammelt die Endzeiten der
   // laufenden Aufträge und meldet sie per POST /api/reminders (replace-all). Der Server pusht dann eine
@@ -24939,25 +25244,97 @@
     const reportsList = document.getElementById('adminReportsList');
     const analyticsView = document.getElementById('adminAnalyticsView');
     const broadcastView = document.getElementById('adminBroadcastView');
+    const supporterView = document.getElementById('adminSupporterView');
     const sub = document.getElementById('adminPanelSub');
     const reportsBtn = document.getElementById('adminTabReportsBtn');
     const analyticsBtn = document.getElementById('adminTabAnalyticsBtn');
     const broadcastBtn = document.getElementById('adminTabBroadcastBtn');
+    const supporterBtn = document.getElementById('adminTabSupporterBtn');
     if (reportsBtn) reportsBtn.classList.toggle('fb-type-active', tab==='reports');
     if (analyticsBtn) analyticsBtn.classList.toggle('fb-type-active', tab==='analytics');
     if (broadcastBtn) broadcastBtn.classList.toggle('fb-type-active', tab==='broadcast');
+    if (supporterBtn) supporterBtn.classList.toggle('fb-type-active', tab==='supporter');
     if (reportsList) reportsList.style.display = tab==='reports' ? 'flex' : 'none';
     if (analyticsView) analyticsView.style.display = tab==='analytics' ? 'block' : 'none';
     if (broadcastView) broadcastView.style.display = tab==='broadcast' ? 'block' : 'none';
+    if (supporterView) supporterView.style.display = tab==='supporter' ? 'block' : 'none';
     if (tab === 'reports'){
       if (sub) sub.textContent = 'Gemeldete Spieler';
       loadAdminReports();
     } else if (tab === 'broadcast'){
       if (sub) sub.textContent = 'Nachricht an alle Spieler';
+    } else if (tab === 'supporter'){
+      if (sub) sub.textContent = 'Unterstützer-Rang vergeben';
+      loadAdminSupporters();
     } else {
       if (sub) sub.textContent = 'Nutzungsstatistik';
       loadAdminAnalytics();
     }
+  }
+  // ===== Unterstützer-Rang manuell vergeben (05.08.2026, Wunsch Sascha) =====
+  // Laufzeit und Stufe sind Auswahl, kein Freitext - der Server nimmt ohnehin nur 30/60/90 an, und
+  // ein freies Zahlenfeld wäre genau die Stelle, an der ein Vertipper einen Rang auf 3000 Tage setzt.
+  let adminGrantDays = 30;
+  let adminGrantTier = 'bronze';
+  function renderAdminGrantAuswahl(){
+    document.querySelectorAll('[data-grant-days]').forEach(b => b.classList.toggle('fb-type-active', parseInt(b.getAttribute('data-grant-days'),10) === adminGrantDays));
+    document.querySelectorAll('[data-grant-tier]').forEach(b => b.classList.toggle('fb-type-active', b.getAttribute('data-grant-tier') === adminGrantTier));
+  }
+  function adminSupporterZielname(){
+    const el = document.getElementById('adminSupporterName');
+    return el ? el.value.trim() : '';
+  }
+  async function loadAdminSupporters(){
+    renderAdminGrantAuswahl();
+    const box = document.getElementById('adminSupporterList');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/supporters');
+      if (!res.ok){ box.innerHTML = `<div class="bmeta">Liste konnte nicht geladen werden (${res.status}).</div>`; return; }
+      const data = await res.json();
+      const liste = data.supporters || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta">Zurzeit hat niemand den Unterstützer-Rang.</div>`; return; }
+      const rest = (bis) => bis > Date.now() ? 'noch '+fmtDuration((bis-Date.now())/1000) : 'abgelaufen';
+      box.innerHTML = liste.map(s => {
+        const teile = [];
+        if (s.gespendet) teile.push('<span style="color:#5dcaa5;">Ko-fi ('+escapeHtml(s.gespendetStufe||'')+', '+rest(s.gespendetBis)+')</span>');
+        if (s.vergeben) teile.push('<span style="color:'+(s.vergebenAktiv?'#85b7eb':'#7d8199')+';">vergeben ('+escapeHtml(s.vergebenStufe||'')+', '+rest(s.vergebenBis)+(s.vergebenVon?', von '+escapeHtml(s.vergebenVon):'')+')</span>');
+        return `<div class="card-row" style="padding:0.5rem 0.85rem;">
+          <div class="left"><div style="min-width:0;"><div class="bname">${escapeHtml(s.username)}</div><div class="bmeta">${teile.join(' · ')}</div></div></div>
+          <button data-supporter-pick="${escapeHtml(s.username)}" style="font-size:10.5px; padding:4px 8px;">Übernehmen</button>
+        </div>`;
+      }).join('');
+      box.querySelectorAll('[data-supporter-pick]').forEach(b => b.onclick = () => {
+        const el = document.getElementById('adminSupporterName');
+        if (el) el.value = b.getAttribute('data-supporter-pick');
+      });
+    } catch(e){ box.innerHTML = `<div class="bmeta">Liste konnte nicht geladen werden.</div>`; }
+  }
+  async function adminGrantSupporter(){
+    const name = adminSupporterZielname();
+    if (!name){ log('Bitte einen Benutzernamen eingeben.', 'ti-alert-triangle'); return; }
+    try {
+      const res = await backendFetch('/admin/grant-supporter', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: name, days: adminGrantDays, tier: adminGrantTier }) });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok){ log(data.error || ('Vergabe fehlgeschlagen ('+res.status+').'), 'ti-alert-triangle'); return; }
+      log(data.username+' hat den Unterstützer-Rang ('+adminGrantTier+') für '+data.days+' Tage - läuft ab am '+new Date(data.until).toLocaleDateString('de-DE')+'.', 'ti-diamond', 'ok');
+      loadAdminSupporters();
+    } catch(e){ log('Vergabe fehlgeschlagen - Server nicht erreichbar.', 'ti-alert-triangle'); }
+  }
+  async function adminRevokeSupporter(){
+    const name = adminSupporterZielname();
+    if (!name){ log('Bitte einen Benutzernamen eingeben.', 'ti-alert-triangle'); return; }
+    if (!confirm('Den vergebenen Unterstützer-Rang von "'+name+'" entziehen? Eine echte Ko-fi-Unterstützung bleibt davon unberührt.')) return;
+    try {
+      const res = await backendFetch('/admin/revoke-supporter', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: name }) });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok){ log(data.error || ('Entziehen fehlgeschlagen ('+res.status+').'), 'ti-alert-triangle'); return; }
+      log('Vergebener Rang von '+data.username+' entzogen.'+(data.nochAktiv?' Der Rang bleibt trotzdem aktiv - dieses Konto unterstützt per Ko-fi.':''), 'ti-check', 'ok');
+      loadAdminSupporters();
+    } catch(e){ log('Entziehen fehlgeschlagen - Server nicht erreichbar.', 'ti-alert-triangle'); }
   }
   // Admin-Ankündigung an alle Spieler (Spieler-Wunsch): nutzt bewusst KEINEN neuen Backend-Endpunkt,
   // sondern den bereits vorhandenen globalen Chat-Kanal (globalchat:msg:) - jeder Spieler liest den
@@ -26355,6 +26732,13 @@
     var ALT_KUPPEL = 0.155, ALT_ATMO = 0.075;
 
     var mqRM = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : {matches:false};
+    /* `reduziert` ist die EFFEKTIVE Entscheidung, nicht die Systemeinstellung: Der Spieler darf
+       sie je Wiedergabe uebergehen („Gefecht trotzdem abspielen"). Die Systemeinstellung bleibt
+       die Vorgabe - wer sie gesetzt hat, bekommt weiterhin zuerst das Schlussbild -, aber sie ist
+       kein Riegel mehr. Zurueckgesetzt wird bei jedem Oeffnen und bei jeder Aenderung der
+       Systemeinstellung: Eine Zustimmung von gestern soll die Voreinstellung von heute nicht
+       stillschweigend aushebeln. Einen eigenen Merker dafuer gibt es bewusst NICHT - er waere
+       nur geschrieben und nie gelesen, und diese Variable hier sagt bereits alles. */
     var reduziert = !!mqRM.matches;
 
     function messen(){
@@ -29354,6 +29738,19 @@
     document.getElementById('osBtnNeustart').addEventListener('click', function(){
       neustart(); laeuft = true; btnPause.textContent = 'Pause'; weiterlaufen();
     });
+    /* „Gefecht trotzdem abspielen". Die Systemeinstellung bleibt die Vorgabe, aber sie ist kein
+       Riegel: Wer ausdruecklich zuschauen will, darf. neustart() muss NACH dem Umschalten von
+       `reduziert` laufen - sonst spulte es wieder auf das Schlussbild vor, und der Knopf haette
+       das Gegenteil dessen getan, was er verspricht. */
+    var btnRmTrotzdem = document.getElementById('osRmTrotzdem');
+    if (btnRmTrotzdem) btnRmTrotzdem.addEventListener('click', function(){
+      reduziert = false;
+      elRM.className = 'rmhinweis';
+      neustart();
+      laeuft = true;
+      btnPause.textContent = 'Pause';
+      weiterlaufen();
+    });
     btnPause.addEventListener('click', function(){
       laeuft = !laeuft; btnPause.textContent = laeuft ? 'Pause' : 'Weiter';
       weiterlaufen();
@@ -29443,6 +29840,9 @@
       }, 130);
     });
     if (mqRM.addEventListener) mqRM.addEventListener('change', function(e){
+      /* Aendert das System seine Einstellung, gilt wieder sie - eine frueher erteilte
+         Zustimmung ist damit verbraucht. Schaltet jemand die Reduzierung waehrend einer
+         laufenden Wiedergabe EIN, soll sie auch greifen. */
       reduziert = !!e.matches;
       if (!offen) return;
       elRM.className = reduziert ? 'rmhinweis an' : 'rmhinweis';
@@ -29922,6 +30322,9 @@
       hgBild = backeHintergrund();
       facettenSetzen();
 
+      /* Bei jedem Oeffnen wieder die Systemvorgabe: Wer "trotzdem abspielen" einmal gedrueckt
+         hat, hat das fuer JENE Wiedergabe entschieden, nicht fuer alle kuenftigen. */
+      reduziert = !!mqRM.matches;
       elRM.className = reduziert ? 'rmhinweis an' : 'rmhinweis';
       tempoIdx = 1; tempo = TEMPI[tempoIdx];
       btnTempo.textContent = 'Tempo 1×';
@@ -30358,7 +30761,7 @@
       { title:'Freundesliste', body:'Du kannst andere Spieler als <strong>Freunde merken</strong>: Öffne ihr Profil (in der Bestenliste auf den Namen tippen) und wähle im „···"-Menü <strong>„Als Freund merken"</strong>. Deine Freunde erscheinen dann gebündelt im Galaxie-Tab unter <strong>Rangliste & Ruhm → Nachrichten → Freunde</strong> - mit Online-Status (grüner Punkt = in den letzten Minuten aktiv) und aktuellem Punktestand. Direkt daneben kannst du ihnen eine <strong>Nachricht schreiben</strong>, ihr <strong>Profil öffnen</strong> oder sie wieder <strong>entfernen</strong>. Die Liste ist eine persönliche Merkliste (max. 30), liegt in deinem Spielstand und übersteht Prestige und Aufstieg. Nur mit eigenem Server verfügbar.' },
       { title:'Rahmen-Stufen im Spielerprofil', body:'Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>Silber</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert. Dazu kommt ab dem Lategame eine erste Tier-2-Ressource, Nanolegierungen (siehe eigener Eintrag unten) - eigenes, kleineres Lager, getrennt von den sechs Basis-Ressourcen.' },
-      { title:'Tier-2-Ressourcen: Nanolegierungen & Quantenchips', body:'Tier-2-Ressourcen werden nicht kostenlos produziert, sondern in speziellen Fabriken laufend <strong>aus Basis-Ressourcen hergestellt</strong> - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig und gilt <strong>je Standort</strong> (Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Tier-2-Ressourcen bleiben dauerhaft knapp und haben eigene, kleine Lager. <strong>Nanolegierungen</strong> (ab Forschung „Nanotechnologie", über „Effiziente Baupläne" Stufe 10): Nanolegierungsfabrik, max. Stufe 15, verbraucht 8 Erz + 5 Kristalle + 4 Energie je Einheit, max. ca. 0,09/s. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab) - der Einstieg in die Tier-2-Verteidigung (150 Verteidigung je Stufe), inzwischen von fünf stärkeren Bauten überholt; eingereihte Plattformen starten automatisch, sobald genug Nanolegierungen angesammelt sind. <strong>Quantenchips</strong> (ab Forschung „Quantenphysik", benötigt Nanotechnologie UND „Nanoschliff-Kristalle" Stufe 10): Quantenchipfabrik, max. Stufe 15, verbraucht 12 Kristalle + 5 Deuterium + 6 Energie je Chip und ist bewusst 3x langsamer (max. ca. 0,03/s) - die höherwertige, knappere zweite Stufe. Erste Verwendung: die <strong>Quanten-Sensorphalanx</strong> (Verteidigung-Tab) - jede Stufe gibt +120 Sekunden Überfall-Vorwarnzeit (imperiumsweit gedeckelt bei +20 Minuten, zusätzlich zu Langstrecken-Scanner/Allianz/Pakten) plus etwas Verteidigung; eingereihte Phalanxen starten automatisch, sobald genug Quantenchips angesammelt sind. <strong>Hochenergiekristalle</strong> (ab Forschung „Hochenergiephysik", benötigt Quantenphysik UND „Vakuumfluktuationskompression" Stufe 5): Kristalllabor, max. Stufe 15, verbraucht 18 Kristalle + 12 Energie + 1 Antimaterie je Einheit - die erste Kette mit Antimaterie als Zutat und mit 0,0015/s je Stufe die langsamste. Verwendung: die <strong>Hochenergie-Schildkuppel</strong> (Verteidigung-Tab) - der stärkste reine Schild des Spiels (220 Verteidigung je Stufe, kein Angriff), Baukosten enthalten Hochenergiekristalle. <strong>Fusionskerne</strong> (ab Forschung „Fusionskern-Synthese", benötigt Hochenergiephysik UND „Isotopen-Anreicherung" Stufe 5): die Fusionsschmiede ist die erste <strong>mehrstufige</strong> Kette - sie verbraucht 20 Deuterium + 2 Antimaterie + <strong>3 Nanolegierungen</strong> je Kern, eine Tier-2-Ressource wird also selbst zur Zutat. Mit 0,0008/s je Stufe die langsamste Kette. Verwendung: die <strong>Fusionsbastion</strong> (Verteidigung-Tab) - starkes Kombigebäude (250 Verteidigung + 120 Angriff je Stufe), Baukosten enthalten Fusionskerne. <strong>KI-Kerne</strong> (ab Forschung „KI-Technologie", benötigt Fusionskern-Synthese): das KI-Labor ist die Spitze der Kette - die einzige Fabrik mit <strong>zwei Tier-2-Zutaten</strong> (2 Quantenchips + 2 Nanolegierungen + 3 Antimaterie je Kern) und mit 0,0005/s je Stufe die langsamste. Verwendung: der <strong>KI-Verteidigungskern</strong> (Verteidigung-Tab) - lange die Spitze der Verteidigungsleiter (300 Verteidigung + 150 Angriff je Stufe); inzwischen stehen Resonanzschild-Emitter (420), Kristallfestung (350), Metamaterial-Panzerwall (340) und Singularitäts-Geschützturm (330) darüber. Hinweis für alle Tier-2-Fabriken: Ist das jeweilige Tier-2-Lager voll, <strong>pausiert</strong> die Fabrik (verbraucht dann auch keine Rohstoffe mehr), bis wieder Platz ist. Das Tier-2-Badge unter der Ressourcenleiste zeigt je Kette die aktuelle <strong>effektive Produktionsrate pro Sekunde</strong> - inklusive Hinweis, wenn die Fabrik wegen Rohstoffmangel gedrosselt läuft ("Rohstoffe knapp") oder wegen vollem Lager pausiert ("Lager voll"). Neben den Verteidigungsgebäuden gibt es drei <strong>Nutzgebäude</strong> als weitere Verbraucher (Basis-Tab): das <strong>Hochsicherheitslager</strong> (+80 Tier-2-Lagerkapazität je Stufe auf jede Kette, Kosten enthalten Nanolegierungen), das <strong>Kryolager</strong> (+2.000 Basis-Lagerkapazität je Stufe, Kosten enthalten Hochenergiekristalle) den <strong>Fusions-Werftkern</strong> (-1,5% Schiffsbauzeit je Stufe, Kosten enthalten Fusionskerne) und die <strong>Quanten-Assemblierwerft</strong> (ebenfalls -1,5% Schiffsbauzeit je Stufe, Kosten enthalten Quantenchips) - beide Werft-Gebäude teilen sich einen gemeinsamen, imperiumsweiten Schiffsbauzeit-Deckel von -20%. Dazu drei <strong>Tier-2-Schiffe</strong> (Flotte-Tab, Baukosten bestehen KOMPLETT aus raffinierten Ressourcen): die <strong>Nanoklinge</strong> (55 Angriff, schnell - 130 Nanolegierungen), der <strong>Quantenkreuzer</strong> (80 Angriff + Schildwert - 60 Quantenchips + 60 Nanolegierungen) und der <strong>Fusionsdreadnought</strong> (180 Angriff, zwischen Leerenjäger und Superschlachtschiff - 45 Fusionskerne + 60 Hochenergiekristalle). Alle drei sind in Angriffen, Allianz-Raids und Musterangriffen voll einsetzbar. Erster <strong>Verbrauchsgegenstand</strong>: „Quantensensoren kalibrieren" im Expeditions-Bereich (ab Forschung Quantenphysik) verbraucht 10 Quantenchips und gibt 30 Minuten lang allen in diesem Fenster GESTARTETEN Expeditionen einen spürbaren Glücksbonus auf die Fundqualität - laufende Expeditionen profitieren nicht rückwirkend. Die <strong>Auto-Kalibrierung</strong> (Schalter direkt darunter) investiert die 10 Chips beim Expeditions-Start automatisch, falls gerade kein Fenster läuft - reichen die Chips nicht, startet die Expedition normal ohne Bonus. Ebenfalls Quantenchip-basiert: der <strong>Werft-Overdrive</strong> (Flotte-Tab, direkt unter der Schiffswerft, ab Quantenphysik) verbraucht 12 Quantenchips und senkt 30 Minuten lang die Schiffsbauzeit imperiumsweit um 25%. Zweiter laufender Verbraucher: die <strong>KI-Abfangautomatik</strong> (Verteidigung-Tab, ab KI-Technologie) vertreibt Piraten-Trümmerräuber automatisch für 3 KI-Kerne je Einsatz - Details im Abschnitt „Piraten-Trümmerräuber". Dritter: der <strong>Terraforming-Energieschub</strong> (ab Hochenergiephysik) verkürzt eine laufende Terraforming-Stufe um je 10% für 6 Hochenergiekristalle x Zielstufe (max. 3 Schübe je Stufe) - Details im Abschnitt „Terraforming". Außerdem lassen sich Tier-2-Ressourcen als hart gedeckeltes <strong>Pakt-Geschenk</strong> an Paktpartner senden (ab Handelsabkommen, Details unter „Diplomatie") und es gibt eine eigene <strong>Tagesaufgabe</strong> „5 Tier-2-Ressourcen produzieren", sobald mindestens eine Fabrik existiert. Für Allianzen: Das Weltprojekt <strong>Galaktische Verbundraffinerie</strong> verlangt 600 Fusionskerne als Materialschwelle und belohnt mit dauerhaft +10% Durchsatz aller Tier-2-Fabriken (Details unter „Allianzen"). Am galaktischen Markt sind Tier-2-Ressourcen bewusst <strong>nicht</strong> handelbar - sie kommen ausschließlich aus den eigenen Fabriken. Fürs Prestige: das <strong>Kryo-Archiv</strong> (viertes Nutzgebäude, ab Hochenergiephysik) bewahrt je Stufe feste Tier-2-Mengen durch den Reset - ohne Archiv geht der Bestand verloren (Details unter „Fortschritt & Prestige"). Und für die Tier-2-Schiffe gibt es eine eigene Schiffsklassen-Modul-Kategorie mit <strong>gefertigten</strong> Modulen aus Tier-2-Ressourcen (Details unter „Offiziere").' },
+      { title:'Tier-2-Ressourcen: Nanolegierungen & Quantenchips', body:'Tier-2-Ressourcen werden nicht kostenlos produziert, sondern in speziellen Fabriken laufend <strong>aus Basis-Ressourcen hergestellt</strong> - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig und gilt <strong>je Standort</strong> (Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Tier-2-Ressourcen bleiben dauerhaft knapp und haben eigene, kleine Lager. <strong>Nanolegierungen</strong> (ab Forschung „Nanotechnologie", über „Effiziente Baupläne" Stufe 10): Nanolegierungsfabrik, max. Stufe 15, verbraucht 8 Erz + 5 Kristalle + 4 Energie je Einheit, max. ca. 0,09/s. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab) - der Einstieg in die Tier-2-Verteidigung (150 Verteidigung je Stufe), inzwischen von fünf stärkeren Bauten überholt; eingereihte Plattformen starten automatisch, sobald genug Nanolegierungen angesammelt sind. <strong>Quantenchips</strong> (ab Forschung „Quantenphysik", benötigt Nanotechnologie UND „Nanoschliff-Kristalle" Stufe 10): Quantenchipfabrik, max. Stufe 15, verbraucht 12 Kristalle + 5 Deuterium + 6 Energie je Chip und ist bewusst 3x langsamer (max. ca. 0,03/s) - die höherwertige, knappere zweite Stufe. Erste Verwendung: die <strong>Quanten-Sensorphalanx</strong> (Verteidigung-Tab) - jede Stufe gibt +120 Sekunden Überfall-Vorwarnzeit (imperiumsweit gedeckelt bei +20 Minuten, zusätzlich zu Langstrecken-Scanner/Allianz/Pakten) plus etwas Verteidigung; eingereihte Phalanxen starten automatisch, sobald genug Quantenchips angesammelt sind. <strong>Hochenergiekristalle</strong> (ab Forschung „Hochenergiephysik", benötigt Quantenphysik UND „Vakuumfluktuationskompression" Stufe 5): Kristalllabor, max. Stufe 15, verbraucht 18 Kristalle + 12 Energie + 1 Antimaterie je Einheit - die erste Kette mit Antimaterie als Zutat und mit 0,0015/s je Stufe die langsamste. Verwendung: die <strong>Hochenergie-Schildkuppel</strong> (Verteidigung-Tab) - der stärkste reine Schild des Spiels (220 Verteidigung je Stufe, kein Angriff), Baukosten enthalten Hochenergiekristalle. <strong>Fusionskerne</strong> (ab Forschung „Fusionskern-Synthese", benötigt Hochenergiephysik UND „Isotopen-Anreicherung" Stufe 5): die Fusionsschmiede ist die erste <strong>mehrstufige</strong> Kette - sie verbraucht 20 Deuterium + 2 Antimaterie + <strong>3 Nanolegierungen</strong> je Kern, eine Tier-2-Ressource wird also selbst zur Zutat. Mit 0,0008/s je Stufe die langsamste Kette. Verwendung: die <strong>Fusionsbastion</strong> (Verteidigung-Tab) - starkes Kombigebäude (250 Verteidigung + 120 Angriff je Stufe), Baukosten enthalten Fusionskerne. <strong>KI-Kerne</strong> (ab Forschung „KI-Technologie", benötigt Fusionskern-Synthese): das KI-Labor ist die Spitze der Kette - die einzige Fabrik mit <strong>zwei Tier-2-Zutaten</strong> (2 Quantenchips + 2 Nanolegierungen + 3 Antimaterie je Kern) und mit 0,0005/s je Stufe die langsamste. Verwendung: der <strong>KI-Verteidigungskern</strong> (Verteidigung-Tab) - lange die Spitze der Verteidigungsleiter (300 Verteidigung + 150 Angriff je Stufe); inzwischen stehen Resonanzschild-Emitter (420), Kristallfestung (350), Metamaterial-Panzerwall (340) und Singularitäts-Geschützturm (330) darüber. Hinweis für alle Tier-2-Fabriken: Ist das jeweilige Tier-2-Lager voll, <strong>pausiert</strong> die Fabrik (verbraucht dann auch keine Rohstoffe mehr), bis wieder Platz ist. Das Tier-2-Badge unter der Ressourcenleiste zeigt je Kette die aktuelle <strong>effektive Produktionsrate pro Sekunde</strong> - inklusive Hinweis, wenn die Fabrik wegen Rohstoffmangel gedrosselt läuft ("Rohstoffe knapp") oder wegen vollem Lager pausiert ("Lager voll"). Neben den Verteidigungsgebäuden gibt es drei <strong>Nutzgebäude</strong> als weitere Verbraucher (Basis-Tab): das <strong>Hochsicherheitslager</strong> (+80 Tier-2-Lagerkapazität je Stufe auf jede Kette, Kosten enthalten Nanolegierungen), das <strong>Kryolager</strong> (+2.000 Basis-Lagerkapazität je Stufe, Kosten enthalten Hochenergiekristalle) den <strong>Fusions-Werftkern</strong> (-1,5% Schiffsbauzeit je Stufe, Kosten enthalten Fusionskerne) und die <strong>Quanten-Assemblierwerft</strong> (ebenfalls -1,5% Schiffsbauzeit je Stufe, Kosten enthalten Quantenchips) - beide Werft-Gebäude teilen sich einen gemeinsamen, imperiumsweiten Schiffsbauzeit-Deckel von -20%. Dazu drei <strong>Tier-2-Schiffe</strong> (Flotte-Tab, Baukosten bestehen KOMPLETT aus raffinierten Ressourcen): die <strong>Nanoklinge</strong> (55 Angriff, schnell - 130 Nanolegierungen), der <strong>Quantenkreuzer</strong> (80 Angriff + Schildwert - 60 Quantenchips + 60 Nanolegierungen) und der <strong>Fusionsdreadnought</strong> (180 Angriff, zwischen Leerenjäger und Superschlachtschiff - 45 Fusionskerne + 60 Hochenergiekristalle). Alle drei sind in Angriffen, Allianz-Raids und Musterangriffen voll einsetzbar. Erster <strong>Verbrauchsgegenstand</strong>: „Quantensensoren kalibrieren" im Expeditions-Bereich (ab Forschung Quantenphysik) verbraucht 10 Quantenchips und gibt 30 Minuten lang allen in diesem Fenster GESTARTETEN Expeditionen einen spürbaren Glücksbonus auf die Fundqualität - laufende Expeditionen profitieren nicht rückwirkend. Die <strong>Auto-Kalibrierung</strong> (Schalter direkt darunter) investiert die 10 Chips beim Expeditions-Start automatisch, falls gerade kein Fenster läuft - reichen die Chips nicht, startet die Expedition normal ohne Bonus. Ebenfalls Quantenchip-basiert: der <strong>Werft-Overdrive</strong> (Flotte-Tab, direkt unter der Schiffswerft, ab Quantenphysik) verbraucht 12 Quantenchips und senkt 30 Minuten lang die Schiffsbauzeit imperiumsweit um 25%. Zweiter laufender Verbraucher: die <strong>KI-Abfangautomatik</strong> (Verteidigung-Tab, ab KI-Technologie, <strong>nur mit Unterstützer-Rang</strong>) vertreibt Piraten-Trümmerräuber automatisch für 3 KI-Kerne je Einsatz - Details im Abschnitt „Piraten-Trümmerräuber". Dritter: der <strong>Terraforming-Energieschub</strong> (ab Hochenergiephysik) verkürzt eine laufende Terraforming-Stufe um je 10% für 6 Hochenergiekristalle x Zielstufe (max. 3 Schübe je Stufe) - Details im Abschnitt „Terraforming". Außerdem lassen sich Tier-2-Ressourcen als hart gedeckeltes <strong>Pakt-Geschenk</strong> an Paktpartner senden (ab Handelsabkommen, Details unter „Diplomatie") und es gibt eine eigene <strong>Tagesaufgabe</strong> „5 Tier-2-Ressourcen produzieren", sobald mindestens eine Fabrik existiert. Für Allianzen: Das Weltprojekt <strong>Galaktische Verbundraffinerie</strong> verlangt 600 Fusionskerne als Materialschwelle und belohnt mit dauerhaft +10% Durchsatz aller Tier-2-Fabriken (Details unter „Allianzen"). Am galaktischen Markt sind Tier-2-Ressourcen bewusst <strong>nicht</strong> handelbar - sie kommen ausschließlich aus den eigenen Fabriken. Fürs Prestige: das <strong>Kryo-Archiv</strong> (viertes Nutzgebäude, ab Hochenergiephysik) bewahrt je Stufe feste Tier-2-Mengen durch den Reset - ohne Archiv geht der Bestand verloren (Details unter „Fortschritt & Prestige"). Und für die Tier-2-Schiffe gibt es eine eigene Schiffsklassen-Modul-Kategorie mit <strong>gefertigten</strong> Modulen aus Tier-2-Ressourcen (Details unter „Offiziere").' },
       { title:'Synthese-Kette: Metamaterial & Singularitätskerne (Tier-2-Erweiterung)', body:'Die Kette setzt sich über die KI-Kerne hinaus fort - zwei <strong>Apex-Ressourcen</strong>, die je ZWEI bestehende Tier-2-Ressourcen bündeln und noch langsamer produzieren (reines Endgame). <strong>Metamaterial-Gewebe</strong> (ab Forschung „Metamaterial-Synthese", benötigt KI-Technologie): Metamaterialweberei, max. Stufe 15, verbraucht 2 Hochenergiekristalle + 1 Fusionskern + 30 Kristalle je Einheit (0,0004/s je Stufe). Verwendung: der <strong>Metamaterial-Panzerwall</strong> (Verteidigung-Tab) - schwerer reiner Schutz (340 Verteidigung, kein Angriff) – nur der Resonanzschild-Emitter mit 420 steht darüber, der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, s. u.) und der <strong>Metamaterial-Titan</strong> (Flotte-Tab, 150 Angriff + höchster Schildwert). <strong>Singularitätskerne</strong> (ab Forschung „Singularitätsphysik", benötigt Metamaterial-Synthese): Singularitätsreaktor, max. Stufe 15, verbraucht 2 KI-Kerne + 2 Fusionskerne + 5 Antimaterie je Kern (0,0003/s je Stufe) - die rarste Ressource des Spiels. Verwendung: der <strong>Singularitäts-Geschützturm</strong> (Verteidigung-Tab, 330 Verteidigung + 180 Angriff - der beste BAUBARE Kombiwert, knapp unter der seltenen Kristallfestung) und der <strong>Singularitäts-Vernichter</strong> (Flotte-Tab, 280 Angriff - stärkster regulärer Angriffswert). Neue <strong>Effizienz-Achse:</strong> Die Forschung <strong>Raffinerie-Optimierung</strong> (ab Quantenphysik, bis Stufe 10) erhöht den Durchsatz ALLER Tier-2-Fabriken um +3% je Stufe (max. +30%); der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, ab Metamaterial-Synthese, bis Stufe 10) senkt den Rohstoffverbrauch aller Fabriken um -2% je Stufe (imperiumsweit max. -20%). Das Kryo-Archiv bewahrt beide neuen Ressourcen ebenfalls durchs Prestige (3 Metamaterial / 2 Singularitätskerne je Stufe). Zwei neue <strong>Verbrauchsgegenstände</strong> (Flotte-Tab, unter „Aktive Missionen", sobald du die jeweilige Ressource besitzt): der <strong>Metamaterial-Reparaturschwarm</strong> behebt eine aktive Sabotage (Produktions-Debuff nach verlorenem Überfall) sofort für 6 Metamaterial-Gewebe, und die <strong>Singularitäts-Sprungladung</strong> verkürzt die Restflugzeit deiner längsten laufenden Flottenmission um 25% für 3 Singularitätskerne. Und zwei neue <strong>gefertigte Module</strong> (Tier-2-Modulfertigung): Metamaterial-Panzerplatte (+14% Verteidigungsbeitrag) und Singularitäts-Fokusarray (+14% Angriffskraft).' },
       { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. <strong>Streak-Schutzschilde:</strong> verpasst du GENAU einen Tag, rettet ein vorhandener Schutzschild deine Serie (statt Reset auf Tag 1) - für jeden vollständig durchgehaltenen 7-Tage-Zyklus bekommst du automatisch +1 Schild (max. 3 auf Vorrat). Ohne Schild oder bei mehr als einem verpassten Tag beginnt die Serie neu. <strong>Treue-Meilensteine:</strong> erreicht deine Serie 14/30/60/100 Tage am Stück, gibt es je einmal pro Lauf eine große Zusatzbelohnung (Ressourcen, Kredite, ab Tag 60 auch Schiffe). Schild-Vorrat, nächster Meilenstein samt Countdown und die komplette 7-Tage-Vorschau stehen im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
       { title:'Happy Hour (Flash-Events)', body:'Zweimal pro Tag - um <strong>12:00 und 20:00 Uhr Ortszeit, je 60 Minuten</strong> - ist eine „Happy Hour" mit einem wechselnden Produktionsbonus aktiv. Vier Typen rotieren: <strong>Bergbau-Rausch</strong> (+40% Erz/Kristalle), <strong>Energie-Hoch</strong> (+40% Energie/Deuterium), <strong>Produktionsschub</strong> (+25% auf alle Grundressourcen) und <strong>Forschungsfieber</strong> (+60% Forschungspunkte). Die Termine sind fest aus dem Datum berechnet (kein Zufall, kein Server nötig), sodass du dich gezielt darauf einstellen kannst - ein Banner oben im <strong>Basis-Tab</strong> zeigt das gerade laufende bzw. das nächste Fenster samt Countdown, beim Start kommt eine Benachrichtigung. Der Bonus wirkt nur auf die laufende Live-Produktion, <strong>nicht</strong> auf die Offline-Gutschrift.' },
@@ -30419,7 +30822,7 @@
       { title:'Weltboss: fünf Namen, vier Archetypen', body:'<strong>Seit dem 02.08.2026 hat der Weltboss Varianten.</strong> Name und Archetyp leiten sich aus seiner Stufe ab, wiederholen sich also erst nach 20 Stufen: fünf Namen (Leviathan der Leere, Chronos-Verschlinger, Die Singularität, Wächter des Abgrunds, Nova-Titan) und vier Archetypen. <strong>Wandelnder Koloss</strong> ist der Normalfall. <strong>Panzer-Bastion</strong> lässt den Schwächen-Bonus kaum greifen (+15% statt +25%) und kostet rund ein Drittel mehr Schiffe. <strong>Schwarm-Titan</strong> trifft schlechter – ein Drittel weniger Verluste. <strong>Phasen-Phantom</strong> macht die Schwäche entscheidend: +50% statt +25%. Die <strong>Trefferschwäche</strong> (ein bestimmter Schiffstyp) steht jetzt <em>vor</em> dem Angriff in der Boss-Karte, samt Hinweis, ob deine Angriffsflotte sie überhaupt dabeihat – vorher erfuhr man sie erst aus dem Bericht danach. Die <strong>HP bleiben bewusst allein von der Stufe abhängig</strong>: Die Belohnung hängt an der Stufe, ein zäherer oder dünnerer Boss würde also still die Belohnungsrate verschieben.<br><br>Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
       { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
-      { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (die Flugzeit muss innerhalb der verbleibenden Zeit liegen), bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab. Ab Forschung <strong>KI-Technologie</strong> gibt es als Sicherheitsnetz die <strong>KI-Abfangautomatik</strong> (Schalter im Verteidigung-Tab): Ist sie an und fängst du nicht selbst ab, vertreiben KI-Abfangdrohnen die Piraten automatisch, sobald 60% der Zeit verstrichen sind - Kosten: 3 KI-Kerne je Einsatz. Der KI-Einsatz gelingt garantiert, bringt aber bewusst <strong>keine Kampfpunkte, keine Veteranen-Erfahrung und keine zerstörten Piratenschiffe</strong> - manuelles Abfangen bleibt immer lohnender, die KI verhindert nur den Beute-Verlust.' },
+      { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (die Flugzeit muss innerhalb der verbleibenden Zeit liegen), bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab. Ab Forschung <strong>KI-Technologie</strong> gibt es als Sicherheitsnetz die <strong>KI-Abfangautomatik</strong> (Schalter im Verteidigung-Tab, <strong>nur mit Unterstützer-Rang</strong> - siehe „Die drei Automatiken sind Unterstützern vorbehalten"): Ist sie an und fängst du nicht selbst ab, vertreiben KI-Abfangdrohnen die Piraten automatisch, sobald 60% der Zeit verstrichen sind - Kosten: 3 KI-Kerne je Einsatz. Der KI-Einsatz gelingt garantiert, bringt aber bewusst <strong>keine Kampfpunkte, keine Veteranen-Erfahrung und keine zerstörten Piratenschiffe</strong> - manuelles Abfangen bleibt immer lohnender, die KI verhindert nur den Beute-Verlust.' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Kopfgeld', body:'Jede Woche liegt ein <strong>Kopfgeld auf dem aktuellen Bestenlisten-Ersten</strong> – dem stärksten Spieler der Galaxie. Wer ihn in dieser Woche als Erster im Kampf schlägt, kassiert eine <strong>Kredit-Prämie</strong> (die Belohnung wird beim nächsten Login gutgeschrieben). Danach ist das Kopfgeld für diese Woche vergeben; ein neues wird zum Wochenwechsel ausgesetzt. Auf sich selbst kann man kein Kopfgeld kassieren. Das aktuelle Kopfgeld siehst du oben im Galaxie-Tab unter „Nachrichten". Bist du selbst der Gejagte, weist dich ein roter Hinweis darauf hin – Zeit, die Verteidigung hochzufahren. Nur mit eigenem Server.' },
       { title:'Angriffs-Schutzschild (Anti-Ganking)', body:'Wirst du erfolgreich <strong>überfallen (mit Beute) oder sabotiert</strong>, erhältst du automatisch einen <strong>Angriffs-Schutzschild für 30 Minuten</strong>: In dieser Zeit prallen weitere Spieler-Angriffe und Störmanöver gegen dich ab (keine Beute, kein Schaden). Das gibt dir Zeit, wieder aufzubauen, statt im Minutentakt weitergefarmt zu werden. <strong>Anfängerschutz:</strong> Frisch registrierte Konten starten zusätzlich mit einem <strong>4 Tage langen Schild</strong>, damit du in Ruhe aufbauen kannst, bevor dich etablierte Spieler angreifen dürfen. Ein aktiver Schild wird oben im <strong>Verteidigung-Tab</strong> mit Countdown angezeigt. <strong>Wichtig:</strong> Sobald du selbst offensiv wirst (ein eigener Angriff oder ein eigenes Störmanöver), verfällt dein Schild sofort – der Schutz ist als Erholung/Startphase gedacht, nicht als Deckung, um selbst gefahrlos zuzuschlagen. Der Schild wird serverseitig vergeben und geprüft.' },
@@ -30496,6 +30899,7 @@
       { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
       { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt bis zu +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf, wächst mit der Stufe) für alle Mitglieder. Kombiniert sich mit dem permanenten Allianzprojekt „Galaktisches Handelsnetzwerk" (bis zu +10%) und einem eigenen Fraktions-Marktrabatt (bis zu +10%), insgesamt gedeckelt bei 30%.' },
       { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' },
+      { title:'Allianzforschung (eigener Baum) und die drei Allianzschiffe', body:'Seit dem 05.08.2026 gibt es im Forschung-Tab einen <strong>zweiten Forschungsbaum</strong>: die <strong>Allianzforschung</strong> mit fünf Zweigen zu je 10 Stufen. <strong>Nicht zu verwechseln mit den Allianz-Technologien darunter:</strong> Die sind ein gemeinsamer Topf, in den die ganze Allianz Rohstoffe einzahlt. Die Allianzforschung dagegen erforscht <strong>jeder für sich selbst</strong>, im eigenen Labor, mit eigener Bauzeit und Kosten aus Rohstoffen <strong>und</strong> Forschungspunkten - sie belegt denselben Forschungsplatz wie die normale Forschung, es läuft also immer nur eines von beidem. Voraussetzung ist einzig, dass du <strong>in einer Allianz bist</strong>. Die fünf Zweige: <strong>Verbundprotokolle</strong> (+0,8% Angriffskraft je Stufe, der Grundstein), <strong>Werftnormung</strong> (−1,2% Schiffsbauzeit je Stufe, ab Verbundprotokolle 3), <strong>Geteiltes Schildnetz</strong> (+1,2% Verteidigung je Stufe, ab Verbundprotokolle 3), <strong>Konvoi-Doktrin</strong> (−1% Dauer aller Missionen je Stufe, ab Werftnormung 3) und <strong>Sternenschmiede</strong> (+1,2% Angriffskraft je Stufe, ab Werftnormung 6 und Schildnetz 6). <strong>Was beim Austritt passiert:</strong> Die erforschten Stufen bleiben - Wissen nimmt man mit -, ihre Wirkung fällt aber auf null, und neue Stufen lassen sich nicht mehr starten. Wer wieder beitritt, hat sofort alles zurück. Darauf bauen drei <strong>Allianzschiffe</strong> auf (Flotte-Tab), die je zwei Tore haben: die eigene Allianzforschung <strong>und</strong> eine Mindeststufe der <strong>Gemeinsamen Flottenwerft</strong>, die die Allianz zusammen hochbaut. Die <strong>Paktkorvette</strong> (40 Angriff, Schild 14, Tempo 115 - der schnellste Großserien-Angreifer) braucht Verbundprotokolle 3 und Flottenwerft 2. Der <strong>Bundeskreuzer</strong> (110 Angriff, Schild 60, Verteidigungsgewicht 1,7 - das zähe Rückgrat) braucht Schildnetz 5, Werftnormung 3 und Flottenwerft 6. Das <strong>Sternenbanner</strong> (240 Angriff, Schild 100 - zwischen Superschlachtschiff und Singularitäts-Vernichter) braucht Sternenschmiede 6 und Flottenwerft 12 und ist damit das Ziel des ganzen Baums. <strong>Bereits gebaute Allianzschiffe bleiben auch nach einem Austritt</strong> und kämpfen normal weiter - nur neue lassen sich dann nicht mehr bauen.' },
       { title:'Allianz-Technologien & -Gebäude: 20 Stufen', body:'Die 17 normalen Allianz-Technologien/-Gebäude (nicht: Allianz-Expansion) sind gestuft - bis zu <strong>Stufe 20</strong>, jede Stufe steigert den Effekt um einen Bruchteil des Gesamtbonus (z.B. Stufe 10/20 = die Hälfte des angegebenen Maximalbonus). Die Kosten verdoppeln sich mit jeder Stufe - frühe Stufen sind für eine aktive Allianz in überschaubarer Zeit erreichbar, die letzten paar Stufen (18-20) sind echte Langzeit-/Elite-Ziele, die nur die ausdauerndsten Allianzen je vollständig erreichen. Beiträge sind kumulativ und gehen nie verloren - wer mehr einzahlt, als für die nächste Stufe nötig ist, beschleunigt einfach die übernächste. Die 7 <strong>Allianz-Gebäude</strong> (nicht die Technologien) schalten eine erreichte Stufe zusätzlich erst nach einer echten <strong>Bauzeit</strong> frei, analog zur Allianzbasis - Stufe 1 dauert 3 Std., jede weitere ×1,35 länger. Jedes Gebäude baut unabhängig von den anderen, die Bauzeit beginnt erst, sobald die Ressourcen für die jeweilige Stufe vollständig beisammen sind.' },
       { title:'Permanente Allianzprojekte: 100 Stufen für vollständig ausgebaute Basen', body:'Sobald die Allianzbasis <strong>Stufe 10 (Maximalstufe)</strong> erreicht hat, schalten sich im Allianz-Tab unterhalb der Allianz-Gebäude sieben permanente Projekte frei, jedes mit <strong>100 Ausbaustufen</strong> (deutlich sanfteres Kostenwachstum als bei den 20-stufigen Technologien - ein Langzeitziel für Monate, kein Endpunkt): <strong>Galaktische Forschung</strong> (-Forschungsdauer), <strong>Allianz-Flottenwerft</strong> (-Bauzeit für Schiffe UND Gebäude), <strong>Galaktisches Handelsnetzwerk</strong> (+Marktrabatt, Deckel dafür von 20% auf 30% angehoben), <strong>Verteidigungsnetzwerk</strong> (+Verteidigungspunkte, fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein), <strong>Logistiknetzwerk</strong> (-Flugzeiten aller Missionen), <strong>Expeditionsprogramm</strong> (+Fundchance bei Expeditionen) und <strong>Terraforming-Initiative</strong> (-Terraforming-Kosten UND -Dauer). Es können immer nur <strong>bis zu 2 Projekte gleichzeitig aktiv</strong> sein und Beiträge annehmen - nur Admins/Offiziere entscheiden, welche. Beiträge zählen wie bei allen anderen Allianz-Zielen automatisch für die wöchentliche Allianz-Spendenrangliste. Jedes aktive Projekt zeigt zusätzlich eine <strong>projektinterne Rangliste der größten Spender</strong> (Top 3) sowie, sobald genug Datenbasis vorliegt (mind. 1 Std. seit Aktivierung), eine <strong>geschätzte Fertigstellungszeit</strong> für die nächste Stufe, hochgerechnet aus der bisherigen Beitragsrate.' },
       { title:'Weltprojekte: seltene Mega-Projekte', body:'Zusätzlich zu den 100-stufigen Allianzprojekten gibt es die <strong>Weltprojekte</strong> - einmalige Mega-Bauwerke mit enormen Einzelkosten ("mehrere Wochen bis Monate" gemeinsamer Beiträge), ebenfalls erst ab voll ausgebauter Allianzbasis: <strong>Dyson-Sphäre</strong> (+5% Produktion), <strong>Intergalaktisches Sprungtor</strong> (-10% Flugzeit), <strong>Gigantische Sternenwerft</strong> (-10% Bauzeit), <strong>Wurmlochgenerator</strong> (-10% Treibstoffkosten), <strong>Allianz-Ringwelt</strong> (+10% Lagerkapazität), <strong>Galaktisches Archiv</strong> (verleiht der gesamten Allianz - auch künftigen Mitgliedern - dauerhaft den exklusiven Ehrentitel „Archivar der Allianz", einsehbar im Fortschritt-Tab) und die <strong>Galaktische Verbundraffinerie</strong> (+10% Durchsatz aller Tier-2-Fabriken für alle Mitglieder). Anders als bei den normalen Allianzprojekten kann immer nur <strong>EIN einziges</strong> Weltprojekt gleichzeitig in Arbeit sein - nach Fertigstellung wird automatisch der Aktiv-Slot frei für das nächste. Ein vollendetes Weltprojekt bleibt für immer als Prestigeobjekt der Allianz sichtbar. Auch hier zeigt die aktive Baustelle die größten Spender und eine geschätzte Fertigstellungszeit. <strong>Zusätzlich zu den Ressourcen</strong> braucht jedes Weltprojekt noch 3x ein seltenes Fund-Item aus dem PERSÖNLICHEN Inventar (Beute aus Erkundungen): Dyson-Sphäre und Sternenwerft je 3x <strong>Antimateriekern</strong>, Sprungtor und Archiv je 3x <strong>Alte Technologie</strong>, Wurmlochgenerator und Ringwelt je 3x <strong>Kristallherz</strong> - diese Items spendet man über eine eigene Zeile direkt in der Weltprojekt-Box (nicht über den normalen Ressourcen-Beitrag). Die Verbundraffinerie verlangt stattdessen als erste ein <strong>Tier-2-Material</strong>: 600 Fusionskerne aus den Beständen der Spendenden (eigene Spendenzeile, gleiche Bedienung).' },
@@ -30588,8 +30992,9 @@
       { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator (Stufe 1-8), dann Galaktische Legende 1-12 (Stufe 9-20), Sternenherrscher 1-12 (Stufe 21-32), Kosmischer Souverän 1-12 (Stufe 33-44) und ab Stufe 45 zählt "Kosmischer Souverän" endlos weiter hoch. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
-      { title:'Automatische Verstärkung', body:'Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Kostet 3 KI-Kerne je Einsatz (gleiche Automatik-Familie wie KI-Abfangautomatik) - reicht der Vorrat nicht, unterbleibt die Verlegung und du musst manuell reagieren. Im Verteidigung-Tab an-/abschaltbar.' },
-      { title:'Automatische Reparatur', body:'Behebt eine aktive Sabotage sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne, statt auf das automatische Ende zu warten - egal ob Produktions-Drosselung (nach verlorenem Überfall oder feindlichem Störmanöver) oder eine durch ein Störmanöver geschwächte Verteidigung. Reicht der KI-Kerne-Vorrat nicht, bleibt die Sabotage bis zum manuellen Beheben oder Ablaufen aktiv.' },
+      { title:'Die drei Automatiken sind Unterstützern vorbehalten', body:'<strong>Automatische Verstärkung</strong>, <strong>Automatische Reparatur</strong> und die <strong>KI-Abfangautomatik</strong> stehen seit dem 05.08.2026 nur Spielern mit <strong>Unterstützer-Rang</strong> zur Verfügung. Den bekommt man über eine Ko-fi-Spende: Trage im Allianz-Tab unter „Unterstützer" die E-Mail-Adresse ein, mit der gespendet wurde - der Rang gilt dann <strong>30 Tage ab der letzten Spende</strong> und verlängert sich mit jeder weiteren. Alle drei Schalter bleiben sichtbar und erklären das an Ort und Stelle; ohne Rang tun sie nichts. <strong>Am Spielinhalt ändert das nichts:</strong> Jede der drei Automatiken nimmt einem nur Handarbeit ab, die man auch selbst erledigen kann (verlegen, reparieren, abfangen) - keine davon gibt Ressourcen, Kampfkraft oder Punkte, die es sonst nicht gäbe. Wer im Solo-Modus ohne Server spielt, hat kein Konto und damit auch keinen Rang.' },
+      { title:'Automatische Verstärkung', body:'<strong>Nur mit Unterstützer-Rang</strong> (siehe oben). Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Kostet 3 KI-Kerne je Einsatz (gleiche Automatik-Familie wie KI-Abfangautomatik) - reicht der Vorrat nicht, unterbleibt die Verlegung und du musst manuell reagieren. Im Verteidigung-Tab an-/abschaltbar.' },
+      { title:'Automatische Reparatur', body:'<strong>Nur mit Unterstützer-Rang</strong> (siehe oben). Behebt eine aktive Sabotage sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne, statt auf das automatische Ende zu warten - egal ob Produktions-Drosselung (nach verlorenem Überfall oder feindlichem Störmanöver) oder eine durch ein Störmanöver geschwächte Verteidigung. Reicht der KI-Kerne-Vorrat nicht, bleibt die Sabotage bis zum manuellen Beheben oder Ablaufen aktiv.' },
       { title:'Live-Kampf-Wiedergabe', body:'Steuert, ob sich die Kampf-Wiedergabe automatisch öffnet, sobald ein Überfall abläuft, während man aktiv im Spiel ist. Standardmäßig an, im Verteidigung-Tab abschaltbar.' },
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
@@ -37189,7 +37594,7 @@
     }},
     { key:'forschungsdurchbruch', name:'Forschungsdurchbruch', icon:'ti-microscope', desc:'Ein vollständiger Datensatz einer fremden Zivilisation zu genau der Frage, an der deine Labore gerade arbeiten: Die LAUFENDE Forschung ist sofort abgeschlossen, egal wie viel Zeit noch offen war. Das Gegenstück zum Werftkommando – und genauso selten.', chance:0.004, rarity:'mythisch', activate: () => {
         if (!state.activeResearch) return 'Kein laufendes Forschungsprojekt – der Datensatz wandert ins Archiv und wartet auf seinen Moment.';
-        const r = RESEARCH_DEFS.find(x => x.key === state.activeResearch.key);
+        const r = findeForschung(state.activeResearch.key);
         state.activeResearch.endTime = Date.now();
         return 'Forschungsdurchbruch: '+((r&&r.name)||'Das laufende Projekt')+' ist sofort abgeschlossen.';
     }},
@@ -43043,6 +43448,7 @@
   // "einmalig warnen"-Flag am Debuff selbst statt bei jedem Tick erneut zu loggen.
   const AUTO_REPAIR_COST_KERNE = 3;
   function maybeAutoRepair(){
+    if (!automatikFreigeschaltet()) return;   // Unterstützer-Rang, siehe automatikFreigeschaltet()
     if (!state.autoRepairOn) return;
     const md = state.mineDebuff && state.mineDebuff.until > Date.now() ? state.mineDebuff : null;
     const ds = state.defenseSabotage && state.defenseSabotage.until > Date.now() ? state.defenseSabotage : null;
@@ -47331,7 +47737,7 @@
       const queueTargetLevels = [];
       let totalRQDurSec = 0; // Gesamt-Bauzeit der Warteschlange (Komfort-ETA)
       for (const key of rq){
-        const r = RESEARCH_DEFS.find(x=>x.key===key);
+        const r = findeForschung(key);
         if (!r){ queueTargetLevels.push(null); continue; }
         const curLvl = rLevelSim[key] !== undefined ? rLevelSim[key] : (state.research[key]||0);
         const c = researchCostFor(r, curLvl+1);
@@ -47349,7 +47755,7 @@
         <div class="bmeta" style="margin-bottom:0.5rem;">${rq.length ? 'Geschätzte Gesamtkosten: '+costHtml(totalRQCost)+' · <i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> fertig in ~'+fmtDuration(totalRQDurSec + activeResRemainSec) : 'Noch leer - Forschung über "Warteschlange" hinzufügen.'}</div>
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
           ${rq.map((key,i) => {
-            const r = RESEARCH_DEFS.find(x=>x.key===key) || {};
+            const r = findeForschung(key) || {};
             // Bug behoben: zeigte bisher bei mehrfach eingereihter gleicher Forschung überall
             // "aktuelle Stufe + 1" (z.B. zweimal "Stufe 16" statt 16 dann 17) – nutzt jetzt dieselbe
             // Stufen-Simulation wie die Kostenberechnung direkt darüber, die die Warteschlangen-
@@ -47550,8 +47956,8 @@
       let defReqLine = '';
       if ((def.requires||[]).length){
         const defReqNames = def.requires.map(req => {
-          if (typeof req === 'string') return (RESEARCH_DEFS.find(r=>r.key===req)||{}).name;
-          return (RESEARCH_DEFS.find(r=>r.key===req.key)||{}).name+' Stufe '+req.level;
+          if (typeof req === 'string') return (findeForschung(req)||{}).name;
+          return (findeForschung(req.key)||{}).name+' Stufe '+req.level;
         }).join(', ');
         defReqLine = `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${defReqNames}</div>`;
       }
@@ -47847,13 +48253,74 @@
       renderAbhorchpostenBox();
     }
 
+    // Allianzforschung (05.08.2026). Nutzt setBoxHtml (Markup-Signatur) wie die grosse Liste
+    // darueber - die Klick-Verdrahtung laeuft ohnehin dokumentweit ueber [data-research] und
+    // [data-research-queue] und trifft diese Karten damit automatisch mit.
+    function renderAllianzForschung(){
+      const box = document.getElementById('allianceResearch');
+      if (!box) return;
+      const drin = inAllianz();
+      // Ohne Allianz wird der Baum trotzdem GEZEIGT, nur gesperrt. Ein leerer Kasten haette die
+      // Frage aufgeworfen, was dort eigentlich hingehoert - und der Baum ist ein Grund, ueberhaupt
+      // einer Allianz beizutreten. Genau dafuer muss man ihn vorher sehen koennen.
+      const kopf = drin ? '' : `
+        <div class="card-row research-locked">
+          <div class="left">
+            <div class="bicon" style="background:rgba(255,255,255,0.04);"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i></div>
+            <div><div class="bname">Allianzforschung gesperrt</div>
+            <div class="bmeta">Diese fünf Zweige lassen sich nur erforschen, solange du in einer Allianz bist - tritt einer bei oder gründe eine im Allianz-Tab. Bereits erforschte Stufen bleiben dir auch nach einem Austritt erhalten, ihre Wirkung setzt aber erst mit dem nächsten Beitritt wieder ein.</div></div>
+          </div>
+        </div>`;
+      const werftLvl = allianceTechLevel('ab_werft');
+      setBoxHtml(box, 'allianceResearch', kopf + ALLIANCE_RESEARCH_DEFS.map(r => {
+        const lvl = state.research[r.key]||0;
+        const maxed = lvl >= r.maxLevel;
+        const unlocked = techUnlocked(r);
+        const cost = maxed ? {} : researchCostFor(r, lvl+1);
+        const dur = maxed ? 0 : researchDuration(r, lvl+1);
+        const ok = drin && unlocked && !maxed && !state.activeResearch && canAfford(cost);
+        const reqNames = (r.requires||[]).filter(req => (state.research[req.key]||0) < req.level)
+          .map(req => (findAllianzForschung(req.key)||{}).name+' Stufe '+req.level).join(', ');
+        const gesperrt = (!unlocked && lvl===0) || !drin;
+        const iconBox = gesperrt ? `<i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i>` : iconHtmlFor(r.key, 'ti-users', '#9fe1f5');
+        // Was die Stufe HEUTE bringt - dieselbe Zahl, mit der die Kampfrechnung arbeitet
+        // (allianzForschungFrac), damit die Karte nicht etwas anderes behauptet als sie tut.
+        const stand = lvl > 0 ? ' · aktuell '+(r.key==='ra_werftnorm'||r.key==='ra_konvoi' ? '−' : '+')
+          +(Math.round(lvl*({ra_verbund:0.8, ra_werftnorm:1.2, ra_schildnetz:1.2, ra_konvoi:1.0, ra_sternenschmiede:1.2}[r.key])*10)/10).toString().replace('.',',')+'%'
+          +(drin ? '' : ' <span style="color:#e0a548;">(ohne Allianz wirkungslos)</span>') : '';
+        // Welche Schiffe an dieser Stufe haengen - sonst muesste man im Flotte-Tab nachsehen,
+        // warum man ausgerechnet diesen Zweig weitertreiben sollte.
+        const schiffe = SHIP_DEFS.filter(d => d.allianzSchiff && (d.requires||[]).some(q => q.key === r.key));
+        const schiffZeile = schiffe.length ? `<div class="bmeta" style="color:#9fe1f5;"><i class="ti ti-rocket" aria-hidden="true"></i> Schaltet frei: ${schiffe.map(d => d.name+' (Stufe '+((d.requires.find(q=>q.key===r.key)||{}).level)+' + Gemeinsame Flottenwerft '+d.allianzWerft+', aktuell '+werftLvl+')').join(' · ')}</div>` : '';
+        return `
+          <div class="card-row ${maxed?'research-done':''}${gesperrt?' research-locked':''}">
+            <div class="left">
+              <div class="bicon" style="background:${gesperrt?'rgba(255,255,255,0.04)':'rgba(110,198,221,0.18)'};">${iconBox}</div>
+              <div style="min-width:0;">
+                <div class="bname">${r.name} <span class="lvl-pill">Lv. ${lvl}/${r.maxLevel}</span></div>
+                <div class="bmeta">${r.desc}${stand}</div>
+                ${schiffZeile}
+                ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dur)} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte${affordEtaHtml(cost)}</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+              </div>
+            </div>
+            ${maxed ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max. Stufe</span>` : `
+              <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
+                <button class="buy ${ok?'affordable':''}" data-research="${r.key}" ${ok?'':'disabled'}><i class="ti ti-flask" aria-hidden="true" style="margin-right:4px;"></i>Erforschen</button>
+                ${(drin && unlocked) ? `<button data-research-queue="${r.key}" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:3px;"></i>Warteschlange</button>` : ''}
+              </div>
+            `}
+          </div>
+        `;
+      }).join(''));
+    }
+
     // Performance: Forschungsliste (18 Technologien mit Kosten-/Dauer-Berechnung je Tick) nur im
     // Forschung-Tab sichtbar – wird deshalb nur bei aktivem Tab neu berechnet.
     if (activeTab === 'forschung'){
     const labCount = allBuildingSets().reduce((a,b)=>a+(b.labor||0),0);
     const researchProgressHtml = state.activeResearch ? (() => {
       const ar = state.activeResearch;
-      const r = RESEARCH_DEFS.find(x=>x.key===ar.key);
+      const r = findeForschung(ar.key) || { key:ar.key, name:ar.key };
       const total = ar.endTime - (ar.startShown||ar.endTime);
       const remain = Math.max(0, ar.endTime-Date.now());
       const durTotal = researchDuration(r, ar.targetLevel);
@@ -47910,6 +48377,7 @@
         </div>
       `;
     }).join(''));
+    renderAllianzForschung();
     const cancelResearchBtn = document.getElementById('cancelResearchBtn');
     if (cancelResearchBtn) cancelResearchBtn.onclick = () => cancelResearch();
     const doctrineBox = document.getElementById('doctrineBox');
@@ -48430,8 +48898,8 @@
         const haveAll = def.unlockItems.every(it => (state.rareItems[it]||0) >= 1);
         const itemList = def.unlockItems.map(it => (RARE_ITEMS.find(r=>r.key===it)||{}).name||it).join(', ');
         const reqList = (def.requires||[]).map(req => {
-          if (typeof req === 'string') return (RESEARCH_DEFS.find(r=>r.key===req)||{}).name;
-          return (RESEARCH_DEFS.find(r=>r.key===req.key)||{}).name+' Stufe '+req.level;
+          if (typeof req === 'string') return (findeForschung(req)||{}).name;
+          return (findeForschung(req.key)||{}).name+' Stufe '+req.level;
         }).join(' + ');
         return `
           <div class="card-row research-locked">
@@ -48523,7 +48991,7 @@
       else if (def.key==='recycler') meta = '+8 Ressourcen/s Trümmerfeld-Sammlung am stationierten Planeten · an ein fremdes Feld geschickt: belegt einen Flottenslot und kehrt nach dem Abbau selbständig zurück';
       else if (def.key==='forscher') meta = `Angriffspunkte 0 – für Langzeit-Expeditionen, muss von Kampfschiffen eskortiert werden · ${slotsUsedExpedition}/${count} Expeditions-Slots belegt`;
       else if (def.key==='mondzerstoerer') meta = `Angriffspunkte ${def.atk} · ultimatives Endgame-Schiff, ausschließlich für die Mondbelagerung (Verteidigung-Tab bei einem Mond) · kann nie mehr als ${def.maxOwned} gleichzeitig existieren (gebaut + in Auftrag)${awayNote('mondzerstoerer')}`;
-      const reqNameFor = req => typeof req === 'string' ? (RESEARCH_DEFS.find(r=>r.key===req)||{}).name : (RESEARCH_DEFS.find(r=>r.key===req.key)||{}).name+' Stufe '+req.level;
+      const reqNameFor = req => typeof req === 'string' ? (findeForschung(req)||{}).name : (findeForschung(req.key)||{}).name+' Stufe '+req.level;
       // Die Tiefenflotte wird über die REKORDTIEFE freigeschaltet, nicht über Forschung –
       // shipRequirementsMet() weiß das seit v8.337.0, aber diese beiden Zeilen lasen ausschließlich
       // def.requires. Folge (Spieler-Report 30.07.2026): Bei einem gesperrten Tiefenschiff mit
@@ -48534,8 +49002,17 @@
       const tiefeAlle = typeof def.tiefe === 'number' ? ['Rekordtiefe '+def.tiefe+' im Abgrund'] : [];
       const tiefeOffen = (typeof def.tiefe === 'number' && tiefeErreicht < def.tiefe)
         ? ['Rekordtiefe '+def.tiefe+' im Abgrund (aktuell '+tiefeErreicht+')'] : [];
-      const reqNames = (def.requires||[]).filter(req => typeof req === 'string' ? (state.research[req]||0)<1 : (state.research[req.key]||0)<req.level).map(reqNameFor).concat(tiefeOffen).join(', ');
-      const allReqNames = (def.requires||[]).map(reqNameFor).concat(tiefeAlle).join(', ');
+      // Allianzflotte (05.08.2026): dieselbe Pflicht wie bei der Tiefe darueber - shipRequirementsMet()
+      // sperrt das Schiff, also MUSS diese Zeile den Grund auch nennen, sonst steht wieder "Benoetigt:"
+      // und dahinter nichts (Spieler-Report 30.07.2026, damals fuer die Tiefenflotte).
+      const werftLvl = allianceTechLevel('ab_werft');
+      const allianzAlle = def.allianzSchiff
+        ? ['Mitgliedschaft in einer Allianz', 'Gemeinsame Flottenwerft Stufe '+(def.allianzWerft||0)] : [];
+      const allianzOffen = !def.allianzSchiff ? []
+        : (!inAllianz() ? ['Mitgliedschaft in einer Allianz'] : [])
+          .concat(werftLvl < (def.allianzWerft||0) ? ['Gemeinsame Flottenwerft Stufe '+(def.allianzWerft||0)+' (aktuell '+werftLvl+')'] : []);
+      const reqNames = (def.requires||[]).filter(req => typeof req === 'string' ? (state.research[req]||0)<1 : (state.research[req.key]||0)<req.level).map(reqNameFor).concat(tiefeOffen).concat(allianzOffen).join(', ');
+      const allReqNames = (def.requires||[]).map(reqNameFor).concat(tiefeAlle).concat(allianzAlle).join(', ');
       const drive = DRIVE_INFO[def.drive] || {};
       // Geschwindigkeit steht jetzt als "Tempo"-Balken im Datenblatt darüber und wird hier bewusst
       // NICHT mehr zusätzlich als Zahl wiederholt (war doppelt).
@@ -50417,8 +50894,11 @@
           const haveCombatShips = ATTACK_SHIP_KEYS.some(k=>(cf[k]||0) > 0);
           // KI-Abfangautomatik-Hinweis: zeigt an, wann (und ob) die KI eingreifen wird, damit der
           // Spieler weiß, wie viel Zeit ihm fürs lohnendere manuelle Abfangen bleibt.
+          // Ohne Unterstützer-Rang greift die KI nicht ein (siehe maybeKiInterceptPirates) - dann
+          // darf hier auch nicht stehen, dass sie es tut. Zweite Anzeigestelle derselben Mechanik,
+          // CLAUDE.md Regel 6.
           let kiHint = '';
-          if (state.kiInterceptOn && (state.research.rkitech||0) >= 1){
+          if (automatikFreigeschaltet() && state.kiInterceptOn && (state.research.rkitech||0) >= 1){
             const kiInSec = Math.max(0, Math.ceil((kiInterceptTriggerTime(pdr) - Date.now())/1000));
             kiHint = (state.resources.kikerne||0) >= KI_INTERCEPT_COST_KERNE
               ? ' KI-Abfangautomatik greift in '+fmtDuration(kiInSec)+' ein ('+KI_INTERCEPT_COST_KERNE+' KI-Kerne).'
@@ -50913,24 +51393,35 @@
     if (autoExploreLabel) autoExploreLabel.textContent = (state.autoExploreOn || state.autoExploreTour) ? 'An – nutzt '+totalExplorerShipsOwned()+' Erkundungsschiff(e) im Bestand' : 'Aus – benötigt 1 Erkundungsschiff';
     renderAutoExploreTourBox();
 
+    // Unterstützer-Automatiken (05.08.2026): Ohne Rang bleibt die Zeile sichtbar - sie soll ja
+    // erklären, was es gibt und wie man drankommt -, aber der Schalter steht auf Aus, die Karte ist
+    // gedimmt, und die Beschriftung sagt den GRUND statt der Wirkung. Ein unsichtbarer Schalter
+    // hätte die Frage "wo ist meine Automatik hin?" erzeugt statt sie zu beantworten.
+    const automatikFrei = automatikFreigeschaltet();
+    const automatikZeile = (row, an) => { if (row) row.classList.toggle('research-locked', !automatikFrei); return automatikFrei && an; };
+    const autoReinforceRow = document.getElementById('autoReinforceRow');
     const autoReinforceSwitch = document.getElementById('autoReinforceSwitch');
-    if (autoReinforceSwitch) autoReinforceSwitch.classList.toggle('on', !!state.autoReinforceOn);
+    if (autoReinforceSwitch) autoReinforceSwitch.classList.toggle('on', automatikZeile(autoReinforceRow, !!state.autoReinforceOn));
     const autoReinforceLabel = document.getElementById('autoReinforceLabel');
-    if (autoReinforceLabel) autoReinforceLabel.textContent = (state.autoReinforceOn ? 'An' : 'Aus') + ' – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten ('+AUTO_REINFORCE_COST_KERNE+' KI-Kerne je Einsatz; Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
+    if (autoReinforceLabel) autoReinforceLabel.textContent = !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
+      : (state.autoReinforceOn ? 'An' : 'Aus') + ' – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten ('+AUTO_REINFORCE_COST_KERNE+' KI-Kerne je Einsatz; Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
 
     const kiInterceptRow = document.getElementById('kiInterceptRow');
     if (kiInterceptRow){
       kiInterceptRow.style.display = (state.research.rkitech||0) >= 1 ? '' : 'none';
       const kiInterceptSwitch = document.getElementById('kiInterceptSwitch');
-      if (kiInterceptSwitch) kiInterceptSwitch.classList.toggle('on', !!state.kiInterceptOn);
+      if (kiInterceptSwitch) kiInterceptSwitch.classList.toggle('on', automatikZeile(kiInterceptRow, !!state.kiInterceptOn));
       const kiInterceptLabel = document.getElementById('kiInterceptLabel');
-      if (kiInterceptLabel) kiInterceptLabel.textContent = (state.kiInterceptOn ? 'An' : 'Aus') + ' – vertreibt Piraten-Trümmerräuber automatisch, falls du nicht selbst rechtzeitig abfängst ('+KI_INTERCEPT_COST_KERNE+' KI-Kerne je Einsatz, keine Kampfpunkte; Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
+      if (kiInterceptLabel) kiInterceptLabel.textContent = !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
+        : (state.kiInterceptOn ? 'An' : 'Aus') + ' – vertreibt Piraten-Trümmerräuber automatisch, falls du nicht selbst rechtzeitig abfängst ('+KI_INTERCEPT_COST_KERNE+' KI-Kerne je Einsatz, keine Kampfpunkte; Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
     }
 
+    const autoRepairRow = document.getElementById('autoRepairRow');
     const autoRepairSwitch = document.getElementById('autoRepairSwitch');
-    if (autoRepairSwitch) autoRepairSwitch.classList.toggle('on', !!state.autoRepairOn);
+    if (autoRepairSwitch) autoRepairSwitch.classList.toggle('on', automatikZeile(autoRepairRow, !!state.autoRepairOn));
     const autoRepairLabel = document.getElementById('autoRepairLabel');
-    if (autoRepairLabel) autoRepairLabel.textContent = (state.autoRepairOn ? 'An' : 'Aus') + ' – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne statt 15 Min. zu warten (Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
+    if (autoRepairLabel) autoRepairLabel.textContent = !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
+      : (state.autoRepairOn ? 'An' : 'Aus') + ' – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne statt 15 Min. zu warten (Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
     const autoWatchLiveRaidSwitch = document.getElementById('autoWatchLiveRaidSwitch');
     if (autoWatchLiveRaidSwitch) autoWatchLiveRaidSwitch.classList.toggle('on', !!state.autoWatchLiveRaid);
     const autoWatchLiveRaidLabel = document.getElementById('autoWatchLiveRaidLabel');
@@ -51557,7 +52048,10 @@
       }
     }
 
-    document.getElementById('heroResearch').textContent = Object.values(state.research).filter(Boolean).length+'/'+RESEARCH_DEFS.length;
+    // Zaehlt AUSDRUECKLICH nur RESEARCH_DEFS: Seit es die Allianzforschung gibt, stehen in
+    // state.research auch ra_*-Schluessel - ein Object.values() ueber alles haette hier "45/42"
+    // ergeben, sobald jemand drei Allianzzweige angefangen hat.
+    document.getElementById('heroResearch').textContent = RESEARCH_DEFS.filter(r=>state.research[r.key]).length+'/'+RESEARCH_DEFS.length;
     document.getElementById('heroFleet').textContent = cf.ships+' Schiff'+(cf.ships===1?'':'e')+' · '+cf.cruisers+' Kreuzer ('+planetDisplayName(state.activeBasePlanet)+')';
     const heroExp = document.getElementById('heroExpedition');
     if (heroExp) heroExp.textContent = cf.missions.filter(m=>m.type==='expedition').length+'/'+(cf.forscher||0);
@@ -51919,6 +52413,14 @@
     if (adminTabAnalyticsBtn) adminTabAnalyticsBtn.onclick = () => switchAdminTab('analytics');
     const adminTabBroadcastBtn = document.getElementById('adminTabBroadcastBtn');
     if (adminTabBroadcastBtn) adminTabBroadcastBtn.onclick = () => switchAdminTab('broadcast');
+    const adminTabSupporterBtn = document.getElementById('adminTabSupporterBtn');
+    if (adminTabSupporterBtn) adminTabSupporterBtn.onclick = () => switchAdminTab('supporter');
+    document.querySelectorAll('[data-grant-days]').forEach(b => b.onclick = () => { adminGrantDays = parseInt(b.getAttribute('data-grant-days'),10); renderAdminGrantAuswahl(); });
+    document.querySelectorAll('[data-grant-tier]').forEach(b => b.onclick = () => { adminGrantTier = b.getAttribute('data-grant-tier'); renderAdminGrantAuswahl(); });
+    const adminSupporterGrantBtn = document.getElementById('adminSupporterGrantBtn');
+    if (adminSupporterGrantBtn) adminSupporterGrantBtn.onclick = adminGrantSupporter;
+    const adminSupporterRevokeBtn = document.getElementById('adminSupporterRevokeBtn');
+    if (adminSupporterRevokeBtn) adminSupporterRevokeBtn.onclick = adminRevokeSupporter;
     const adminBroadcastSendBtn = document.getElementById('adminBroadcastSendBtn');
     if (adminBroadcastSendBtn) adminBroadcastSendBtn.onclick = sendAdminBroadcast;
     const adminBroadcastInput = document.getElementById('adminBroadcastInput');
@@ -52093,20 +52595,27 @@
       }
       render(); save();
     };
+    // Die drei Unterstützer-Automatiken (05.08.2026): Der Klick wird bei fehlendem Rang gar nicht
+    // erst ausgeführt - er erklärt stattdessen einmal, woran es liegt. Die Sperre steht zusätzlich
+    // in der Mechanik selbst (maybeAutoReinforce/maybeKiInterceptPirates/maybeAutoRepair); hier ist
+    // sie die freundliche, dort die verbindliche.
     const autoReinforceBtn = document.getElementById('autoReinforceRow');
     if (autoReinforceBtn) autoReinforceBtn.onclick = () => {
+      if (!automatikFreigeschaltet()){ log(AUTOMATIK_GESPERRT_TEXT, 'ti-lock'); return; }
       state.autoReinforceOn = !state.autoReinforceOn;
       log('Automatische Verstärkung '+(state.autoReinforceOn?'aktiviert':'deaktiviert')+'.', 'ti-shield-lock');
       render(); save();
     };
     const kiInterceptBtn = document.getElementById('kiInterceptRow');
     if (kiInterceptBtn) kiInterceptBtn.onclick = () => {
+      if (!automatikFreigeschaltet()){ log(AUTOMATIK_GESPERRT_TEXT, 'ti-lock'); return; }
       state.kiInterceptOn = !state.kiInterceptOn;
       log('KI-Abfangautomatik '+(state.kiInterceptOn?'aktiviert - Abfangdrohnen greifen ein, wenn du Piraten-Trümmerräuber nicht selbst rechtzeitig abfängst ('+KI_INTERCEPT_COST_KERNE+' KI-Kerne je Einsatz)':'deaktiviert')+'.', 'ti-shield-lock');
       render(); save();
     };
     const autoRepairBtn = document.getElementById('autoRepairRow');
     if (autoRepairBtn) autoRepairBtn.onclick = () => {
+      if (!automatikFreigeschaltet()){ log(AUTOMATIK_GESPERRT_TEXT, 'ti-lock'); return; }
       state.autoRepairOn = !state.autoRepairOn;
       log('Automatische Reparatur '+(state.autoRepairOn?'aktiviert':'deaktiviert')+'.', 'ti-refresh');
       render(); save();
@@ -53120,7 +53629,7 @@
       await load();
       bootDataReady = true;
       state.player.id = data.userId;
-      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; accountLastLoginAt = me.lastLoginAt || null; if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
+      try { const meRes = await backendFetch('/me'); if (meRes.ok){ const me = await meRes.json(); accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; } accountMaskedEmail = me.maskedEmail||''; accountPendingEmail = me.pendingEmail||null; accountWantsPatchnotes = me.wantsPatchnotes !== false; accountUsername = me.username||''; accountLastLoginAt = me.lastLoginAt || null; supporterStatusUebernehmen(me); if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; } } } catch(e){}
       render();
       // Sitzungsführung: Diese Anmeldung hat ein anderes, noch angemeldetes Gerät verdrängt. Das
       // offen sagen, damit niemand rätselt, warum das Tablet nebenan plötzlich abgemeldet ist.
@@ -53266,6 +53775,7 @@
           accountWantsPatchnotes = me.wantsPatchnotes !== false;
           accountUsername = me.username||'';
           accountLastLoginAt = me.lastLoginAt || null;
+          supporterStatusUebernehmen(me);
           if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; }
           if (!state.player.name) state.player.name = me.username;
           showLogoutBtn();
