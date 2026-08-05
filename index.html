@@ -6118,8 +6118,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.419.0';
+  const VERSION = '8.420.0';
   const PATCHNOTES = [
+    { version:'8.420.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Eine dem Allianz-Raid angeschlossene Flotte war unsichtbar.</strong> Wer seine Schiffe einer Raid-Welle anschloss, fand sie danach nirgends wieder – nicht in der Flottenposition im rechten Seitenmenü, nicht in der Missionsliste im Flotte-Tab. Sie tauchten ausschließlich in der Allianz-Box auf. Ursache: Der Beitritt zieht die Schiffe direkt aus der Flotte ab, legt aber <em>keine Mission</em> an – und alle drei Anzeigen speisen sich aus der Missionsliste. Wo nichts steht, wird nichts gezeigt. <strong>Derselbe Fehler steckte im koordinierten Angriff (Musterangriff)</strong> und ist gleich mit behoben.',
+      '<strong>Und sie belegen jetzt einen Flottenslot.</strong> Bisher zählte ein angeschlossener Verband <em>gar nicht</em> gegen das Flottenentsendelimit – wer am Raid teilnahm, hatte sein volles Missionskontingent obendrauf, obwohl die Schiffe real weg waren. In der Praxis merkt man das selten: Wer seine Kampfflotte anschließt, hat ohnehin keine Schiffe mehr für einen zweiten Angriff.',
+      'Technischer Hintergrund für Interessierte: Der Eintrag ist bewusst <em>keine</em> Schein-Mission. Eine solche wäre genau bei Ankunft am Sammelpunkt verschwunden – also bevor die Welle überhaupt ausgefochten ist –, und wäre sie hängengeblieben, hätte sie dauerhaft einen Flottenslot blockiert. Stattdessen wird die Zeile bei jeder Anzeige aus dem Beitrag selbst abgeleitet; sie existiert damit exakt so lange wie der Beitrag, dasselbe Muster wie beim Recycler-Sammelauftrag.'
+    ]},
     { version:'8.419.0', date:'05.08.2026', changes:[
       '<strong>Nachtrag zu 8.418.0: die Reparatur war selbst noch löchrig.</strong> Der Eintrag von eben versprach, die Erkennungsschwelle liege „hoch genug, dass normale Schwankungen des Takts sie nie auslösen" – sie lag bei 90 Sekunden und damit ausgerechnet <em>über</em> dem Takt, in dem ein Browser einen länger im Hintergrund liegenden Tab überhaupt noch aufweckt: rund einmal pro Minute. Die Lücke war also dauerhaft 60 Sekunden und blieb stabil <em>unter</em> der Schwelle. Verbucht wurde die eine Sekunde des Takts, die übrigen 59 wurden mit dem Zeitstempel weggeworfen – gemessen <strong>1,5 % der Produktion</strong>. Das Spiel offen liegen zu lassen war damit weiterhin deutlich schlechter, als es zu schließen. <strong>Jetzt geht unterhalb der Schwelle nichts mehr verloren:</strong> Der Rest bleibt stehen, sammelt sich an und wird nachgeholt, sobald er die Schwelle reißt. Nachgemessen: <strong>100 % statt 1,5 %</strong>, unabhängig davon, in welchem Takt der Browser den Tab noch laufen lässt.',
       '<strong>Und die Gegenrichtung gleich mit.</strong> Bei jeder Nachholung wurde eine Sekunde <em>doppelt</em> gutgeschrieben – 61 für 60 vergangene. Bei einem gedrosselten Tab wären das dauerhaft +1,7 % fürs bloße Im-Hintergrund-Liegenlassen gewesen, also genau das Spiegelbild des eben behobenen Fehlers. Beide Richtungen sind jetzt nachgemessen: nicht weniger und nicht mehr, als Zeit vergangen ist.',
@@ -21392,7 +21397,17 @@
         else n++;
       }
     }
-    return n + relocateGroupIds.size + recyclerAuftragSlots();
+    // Angeschlossene Allianz-Verbaende (Raid/Musterangriff) zaehlen mit (05.08.2026). Die Schiffe
+    // sind real weg - sie stehen weder am Planeten noch koennen sie etwas anderes tun -, also
+    // belegen sie einen Slot, genau wie die Verlegung zur Allianzbasis (sendDefendBaseMission), die
+    // dieselbe Form hat. Bis hierher zaehlten sie GAR NICHT, weil sie in keinem missions-Array
+    // stehen; wer am Raid teilnahm, hatte sein volles Missionskontingent obendrauf.
+    // In der Praxis bindet das selten: Wer seine Kampfflotte anschliesst, hat ohnehin keine Schiffe
+    // mehr fuer einen zweiten Angriff. ALLIANZ_VERBAND_BELEGT_SLOT auf false setzen, falls das
+    // trotzdem unerwuenscht ist - die Anzeige bleibt davon unberuehrt.
+    const ALLIANZ_VERBAND_BELEGT_SLOT = true;
+    const verbandSlots = ALLIANZ_VERBAND_BELEGT_SLOT ? allianzVerbandEintraege().length : 0;
+    return n + relocateGroupIds.size + recyclerAuftragSlots() + verbandSlots;
   }
   // Eigenständiges Expeditions-Limit (Spieler-Wunsch 17.07.2026), global über alle eigenen Planeten/
   // Monde summiert wie activeFleetMissionCount() - zusätzlich zum allgemeinen Flottenentsendelimit
@@ -31391,7 +31406,7 @@
       { title:'Hangar-Kapazität – häufigste Verwechslung', body:'Jäger brauchen Trägerschiffe, um überhaupt im Kampf mitzuzählen: <strong>1 Träger = 6 Jäger-Plätze</strong>. Hat man 100 Jäger aber nur 5 Träger, zählen nur 30 Jäger als "einsatzbereit" – der Rest bleibt zuhause, egal wie viele man besitzt. Das <strong>Superschlachtschiff</strong> bringt zusätzlich einen kleinen Eigenhangar mit (2 Plätze je Schiff) - genug für eine winzige Eigen-Eskorte, aber kein Ersatz für dedizierte Träger bei größeren Jäger-/Bomber-Flotten. <strong>Ausnahme:</strong> Die Tier-2-Schiffe <strong>Hyperjäger</strong> (ab Nanotechnologie) und <strong>Hyperbomber</strong> (ab Quantenphysik) sind aufgemotzte Jäger/Bomber mit Hyperraumantrieb, die <strong>keinen Trägerhangar</strong> benötigen - sie zählen wie Kreuzer direkt zum Kampf. Dafür sind sie teurer (Tier-2-Baukosten) und tanken Antimaterie.' },
       { title:'Missionen & Flugzeit', body:'Angriffe, Überfälle, Expeditionen und Kolonisierungen laufen über Missionen mit echter Flugzeit (abhängig von Entfernung und langsamstem Schiff in der Flotte). Während der Flugzeit ist die Flotte unterwegs und zählt nicht zur Verteidigung am Ausgangsplaneten.' },
       { title:'Treibstoffkosten (Deuterium & Antimaterie)', body:'Jede Flottenmission (Angriff, Expedition, Erkundung, Kolonisierung, Verlegung) kostet Treibstoff, abhängig von der tatsächlichen Flugzeit (nach allen Geschwindigkeitsboni) und der Gesamtschiffszahl der Flotte - mehr Schiffe kosten mehr, aber mit abnehmendem Grenzeffekt (doppelte Schiffszahl kostet nicht doppelten, sondern nur ca. 41% mehr Treibstoff). <strong>Welche Ressource verbraucht wird, hängt vom Antrieb ab:</strong> Schiffe mit Verbrennungs- oder Impulstriebwerk tanken Deuterium, Schiffe mit Hyperraumtriebwerk (Schlachtschiff, Superschlachtschiff, Spähschiff, Spionagekreuzer, Forschungsschiff) tanken Antimaterie. Gemischte Flotten zahlen anteilig nach Schiffszahl in beiden Ressourcen. Die Logistik-Doktrin senkt die Kosten um 20%, die Allianz-Forschung "Expeditionslogistik" um bis zu weitere 15%. Schnellere Missionen (durch Forschung, Doktrin, Items oder Boni) verbrauchen automatisch weniger Treibstoff, da sie kürzer unterwegs sind.' },
-      { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig belegte Flottenslots, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Seit dem 03.08.2026 zählt außerdem jede zu einem fremden Trümmerfeld entsandte <strong>Recycler-Gruppe</strong> mit, solange sie dort sammelt – sie gibt den Slot erst frei, wenn sie von selbst zurückfliegt (oder du den Auftrag von Hand beendest). Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren, Spionage UND Flottenverlegungen zwischen eigenen Planeten - ein per "Verband versenden" gemeinsam losgeschickter Verband zählt dabei nur als EIN Slot, unabhängig davon, wie viele Schiffstypen er enthält. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
+      { title:'Flottenentsendelimit', body:'Zusätzlich zu den einzelnen Slot-Grenzen je Missionsart (z.B. Kampfschiffe fürs Angreifen, Kolonieschiffe fürs Kolonisieren) gibt es ein <strong>Gesamtlimit</strong> für gleichzeitig belegte Flottenslots, über alle eigenen Planeten und Missionsarten hinweg summiert: anfangs <strong>2</strong>, erforschbar (Flottenkoordination, eigenständiger Forschungszweig) bis maximal <strong>10</strong> bei Stufe 8 (+1 je Stufe). Seit dem 03.08.2026 zählt außerdem jede zu einem fremden Trümmerfeld entsandte <strong>Recycler-Gruppe</strong> mit, solange sie dort sammelt – sie gibt den Slot erst frei, wenn sie von selbst zurückfliegt (oder du den Auftrag von Hand beendest). Seit dem 05.08.2026 zählt ebenso eine Flotte, die du einem <strong>Allianz-Raid</strong> oder einem <strong>koordinierten Angriff</strong> angeschlossen hast: Die Schiffe sind real weg und stehen bis zum Ende der Welle nirgends sonst zur Verfügung. Sie erscheinen jetzt auch in der Flottenposition und in der Missionsliste – vorher waren sie ausschließlich in der Allianz-Box zu sehen. Zählt Angriffe, Erkunden, Expeditionen, Kolonisieren, Spionage UND Flottenverlegungen zwischen eigenen Planeten - ein per "Verband versenden" gemeinsam losgeschickter Verband zählt dabei nur als EIN Slot, unabhängig davon, wie viele Schiffstypen er enthält. Der aktuelle Stand steht als kleines Badge neben "Aktive Missionen" im Flotte-Tab.' },
       { title:'Alle Flotten hierhin/heim verlegen (Schnellbuttons)', body:'Sammelt mit einem Klick alle verfügbaren Schiffe von JEDEM anderen eigenen Standort (Heimatbasis, Kolonien, Monde) am gewählten Ziel - statt jede Verlegung einzeln anzustoßen. Zu finden im Flotte-Tab (oberhalb der einzelnen Verlegen-Auswahl) und im Basis-Tab direkt unter der Standort-Übersicht. Vor dem Start erscheint eine Sicherheitsabfrage mit Anzahl der einbezogenen Flotten, Gesamtschiffszahl, Treibstoffkosten und voraussichtlicher Flugzeit (Tempo richtet sich je Standort nach dem langsamsten dort stationierten Schiffstyp). Schiffe, die gerade unterwegs sind (Angriffe, Spionage, andere Missionen), werden nie mitgenommen - nur tatsächlich stationierte, freie Schiffe zählen. Reicht das Flottenentsendelimit nicht für alle Standorte gleichzeitig, werden nur so viele mitgenommen wie freie Slots vorhanden sind; die übersprungenen Standorte stehen explizit in der Sicherheitsabfrage und lassen sich per erneutem Klick nachholen, sobald wieder ein Slot frei ist.' },
       { title:'Expeditionstypen, Wagnis & Eskorte', body:'Vor dem Start wählst du <strong>Expeditionstyp</strong>, <strong>Wagnis</strong> und <strong>Eskorte</strong> – alle drei formen Risiko und Beute. <strong>Typen:</strong> Kurz (schnell/sicher, wenig), Standard (ausgewogen), Tiefenraum (lang/riskant, viel) sowie drei spezialisierte: <strong>Bergungsexpedition</strong> (viel mehr Module und verlassene Schiffe, weniger Rohstoffe), <strong>Forschungsexpedition</strong> (viel mehr Items/Fragmente/Materialien und bevorzugt Forschungspunkte, kaum Rohstoffe) und <strong>Schürfexpedition</strong> (fast nur Rohstoffe, sehr sicher). <strong>Wagnis-Regler:</strong> Vorsichtig (−30% Begegnungsrisiko, −15% Beute), Normal, oder Wagemutig (+40% Risiko, +35% Beute). <strong>Eskorte:</strong> Kampfschiffe entscheiden, wie eine Begegnung <em>ausgeht</em> (die Wahrscheinlichkeit, überhaupt auf jemanden zu treffen, hängt nur vom Typ, vom Wagnis und vom Modul „Eskorten-Leitsystem" ab); <strong>Spähschiffe</strong> tragen keine Kampfkraft bei, verbessern aber gezielt die Ausbeute (mehr Sonderfunde und bessere Fund-Qualität); <strong>Frachter/Große Frachter</strong> erweitern den Frachtraum für große Ressourcenfunde.' },
       { title:'Rückzug & Rettungskapsel', body:'Zwei Sicherheitsnetze für vorsichtige Kommandanten. Der Schalter <strong>„Bei Feindkontakt abbrechen"</strong> über dem Startknopf legt fest, dass die Expedition sofort abdreht, sobald sie auf eine feindliche Flotte trifft: keine Beute, aber garantiert keine Verluste – und die Expedition zählt dann auch nicht als abgeschlossen, der Erfahrungsbonus lässt sich damit also nicht erschleichen. Die Einstellung wird beim <strong>Start</strong> in die Mission eingebacken; änderst du den Schalter, gilt das erst für die nächste Expedition, nicht für bereits fliegende. Unabhängig davon gibt es die <strong>Rettungskapsel</strong>: Geht eine Begegnung schief, hatte das Forschungsschiff bisher keine Überlebenschance. Jetzt kommt es mit 35% Wahrscheinlichkeit durch, und jede Stufe der Forschung <strong>Expeditionsanalytik</strong> hebt das um 3 Prozentpunkte an, gedeckelt bei 75% – ein Forschungsschiff mitzuschicken bleibt also ein echter Einsatz, nur kein sicherer Totalverlust mehr.' },
@@ -44048,6 +44063,73 @@
   // activeFleetMissionCount().
   function recyclerAuftragSlots(){ return Object.keys(recyclerAuftraege()).length; }
 
+  /* ===== Angeschlossene Allianz-Verbaende (Raid und Musterangriff), 05.08.2026 =====
+     FEHLER (Spieler-Report Sascha): Wer seine Flotte einem Allianz-Raid anschliesst, sieht sie
+     nirgends ausser in der Raid-Box - nicht in der Flottenposition, nicht in der Missionsliste,
+     und sie belegt keinen Flottenslot.
+
+     URSACHE: joinAllianceRaid zieht die Schiffe direkt aus der Flotte ab und legt KEINE Mission an
+     (das Backend macht dasselbe im Spielstand). Alle drei Anzeigen speisen sich aber aus
+     fleet.missions - dort steht nichts, also zeigen sie nichts.
+     ZWEITE STELLE, gleicher Fehler: der Musterangriff (state.allianceMusterContribution).
+
+     WARUM HIER KEIN ECHTER MISSIONSEINTRAG ERZEUGT WIRD, obwohl sendDefendBaseMission genau das
+     tut: checkMissions entfernt faellige Missionen unbekannten Typs stillschweigend. Ein Eintrag
+     mit endTime = Ankunft an der Basis verschwaende also genau dann, wenn der Verband dort
+     eintrifft - also BEVOR die Welle ueberhaupt ausgefochten ist. Und ein Eintrag, den niemand
+     mehr aufraeumt, blockierte dauerhaft einen Flottenslot; genau so ein festgefahrener Zustand
+     war der Spieler-Report vom 02.08.2026.
+     Stattdessen dasselbe Muster wie beim Recycler-Sammelauftrag (03.08.2026, siehe dort): Der
+     Eintrag wird bei jeder Anzeige AUS DEM BEITRAG ABGELEITET. Er existiert damit exakt so lange
+     wie der Beitrag selbst - er kann weder zu frueh verschwinden noch haengenbleiben.
+
+     EINE Quelle fuer alle drei Stellen (Missionsliste im Flotte-Tab, Flottenposition im rechten
+     Seitenmenue, Slot-Zaehler). Drei getrennte Antworten auf dieselbe Frage waren in diesem
+     Projekt schon oefter die eigentliche Fehlerursache. */
+  function allianzVerbandEintraege(){
+    const out = [];
+    const raid = state.allianceRaidContribution;
+    if (raid && raid.composition && Object.keys(raid.composition).length){
+      out.push({ art:'raid', composition: raid.composition, power: raid.power||0,
+                 originPlanet: raid.originPlanet || 'home',
+                 ankunft: raid.arrivesAtBaseAt || 0, start: raid.joinedAt || 0,
+                 ziel: 'Allianz-Raid' });
+    }
+    const muster = state.allianceMusterContribution;
+    if (muster && muster.composition && Object.keys(muster.composition).length){
+      // Der Musterangriff fuehrt keine Ankunftszeit mit - deshalb ankunft:0, die Zeile zeigt dann
+      // bewusst keinen Countdown statt einen erfundenen.
+      out.push({ art:'muster', composition: muster.composition, power: muster.power||0,
+                 originPlanet: muster.originPlanet || 'home',
+                 ankunft: 0, start: muster.joinedAt || 0,
+                 ziel: 'Musterangriff auf ['+(muster.targetTag||'?')+']' });
+    }
+    return out;
+  }
+  // Die Zeile - EINE Quelle fuer beide Anzeigestellen, wie recyclerAuftragZeile().
+  function allianzVerbandZeile(e){
+    const now = Date.now();
+    const schiffe = Object.values(e.composition).reduce((a,b)=>a+(typeof b==='number'?b:0),0);
+    const imAnflug = e.ankunft > now;
+    const rest = Math.max(0, e.ankunft - now);
+    const dauer = Math.max(1, (e.ankunft - (e.start || e.ankunft)) / 1000);
+    const pct = imAnflug ? Math.max(0, Math.min(100, 100 - (rest/(dauer*1000)*100))) : 100;
+    const farbe = e.art === 'raid' ? '#c98bdb' : '#e24b4a';
+    const lage = imAnflug ? 'Anflug auf den Sammelpunkt'
+                          : (e.art === 'raid' ? 'Am Sammelpunkt, wartet auf den Abflug' : 'Verband angeschlossen');
+    return `
+      <div class="card-row" style="flex-direction:column; align-items:stretch;" title="Angeschlossen: ${fleetBreakdownHtml(e.composition)}">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="bname"><i class="ti ti-users" aria-hidden="true" style="color:${farbe};"></i>${e.ziel} · ${fmt(schiffe)} Schiffe</div>
+          ${imAnflug ? `<span class="lvl-pill">${fmtDuration(rest/1000)}</span>`
+                     : `<span class="lvl-pill" style="color:${farbe};">gebunden</span>`}
+        </div>
+        <div class="bmeta">${lage} · von ${planetDisplayName(e.originPlanet)} · ${fmt(Math.round(e.power))} Angriffskraft</div>
+        <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+      </div>
+    `;
+  }
+
   // Sind noch Recycler zu diesem Ziel unterwegs? Solange ja, darf der Rueckflug nicht
   // starten - sonst flieget die erste Haelfte heim, waehrend die zweite noch anfliegt.
   function recyclerUnterwegsZu(zielKey){
@@ -49406,12 +49488,21 @@
       if (recyclerUnterwegsZu(zielKey) > 0) continue;
       nonExpeditionMissions.push({ type:'recycler-auftrag', zielKey: zielKey, auftrag: a });
     }
+    // Angeschlossene Allianz-Verbaende (Raid/Musterangriff) - siehe allianzVerbandEintraege().
+    // Wie beim Sammelauftrag ihrem AUSGANGSORT zugeordnet, passend zur Ueberschrift "Missionen von X".
+    for (const e of allianzVerbandEintraege()){
+      if (e.originPlanet !== state.activeBasePlanet) continue;
+      nonExpeditionMissions.push({ type:'allianz-verband', eintrag: e });
+    }
     if (!nonExpeditionMissions.length){
       activeM.innerHTML = `<div class="bmeta" style="padding:0.5rem 0;">Keine aktiven Missionen von ${planetDisplayName(state.activeBasePlanet)}.</div>`;
     } else {
       activeM.innerHTML = nonExpeditionMissions.map(m => {
         if (m.type === 'recycler-auftrag'){
           return recyclerAuftragZeile(m.zielKey, m.auftrag);
+        }
+        if (m.type === 'allianz-verband'){
+          return allianzVerbandZeile(m.eintrag);
         }
         if (m.type === 'relocate-group'){
           const remaining = Math.max(0, m.endTime-now);
@@ -51489,6 +51580,12 @@
         if (recyclerUnterwegsZu(zielKey) > 0) continue;
         allMissions.push({ originKey: a.heimat, m: { type:'recycler-auftrag', zielKey: zielKey, auftrag: a } });
       }
+      // Angeschlossene Allianz-Verbaende - hier OHNE Filter auf den aktiven Planeten, weil das
+      // Seitenmenue ausdruecklich alle Standorte zusammen zeigt (anders als die Missionsliste im
+      // Flotte-Tab, die nur "Missionen von X" auflistet).
+      for (const e of allianzVerbandEintraege()){
+        allMissions.push({ originKey: e.originPlanet, m: { type:'allianz-verband', eintrag: e } });
+      }
       if (!allMissions.length){
         fpList.innerHTML = `<div class="fleet-position-item" style="color:#7d8199;">Alle Schiffe stationiert, keine Missionen unterwegs.</div>`;
       } else {
@@ -51506,6 +51603,13 @@
                      : r.leer ? 'abgebaut – Rückflug wird eingeleitet'
                      : 'noch ~'+fmtDuration(r.sek);
           }
+          // Ein angeschlossener Allianz-Verband hat ebenfalls kein endTime: Nach der Ankunft am
+          // Sammelpunkt steht er dort, bis die Welle ausgefochten ist - und wann das ist, weiss
+          // erst der Server. Ein heruntergezaehlter Countdown waere an dieser Stelle geraten.
+          if (m.type === 'allianz-verband'){
+            const e = m.eintrag;
+            restText = e.ankunft > nowT ? fmtDuration((e.ankunft - nowT)/1000) : 'gebunden';
+          }
           const ss = restText || fmtDuration(remain/1000);
           let icon = 'ti-rocket', color = '#378add', label, shipsTooltip;
           if (m.type === 'attack'){
@@ -51517,6 +51621,14 @@
             icon = 'ti-map-2'; color = '#5dcaa5';
             label = (m.fleetName?m.fleetName+' · ':'')+'Expedition (Eskorte '+Math.round(m.escortPower||0)+')';
             shipsTooltip = m.escortComposition ? 'Eskorte: '+fleetBreakdownHtml(m.escortComposition) : '';
+          } else if (m.type === 'allianz-verband'){
+            const e = m.eintrag;
+            icon = 'ti-users'; color = e.art === 'raid' ? '#c98bdb' : '#e24b4a';
+            const anz = Object.values(e.composition).reduce((a,b)=>a+(typeof b==='number'?b:0),0);
+            label = e.ziel+' · '+fmt(anz)+' Schiffe';
+            shipsTooltip = 'Angeschlossen: '+fleetBreakdownHtml(e.composition)
+                         + (e.ankunft > nowT ? ' – im Anflug auf den Sammelpunkt.'
+                                             : ' – am Sammelpunkt, gebunden bis die Welle ausgefochten ist.');
           } else if (m.type === 'recycler-auftrag'){
             icon = 'ti-recycle'; color = '#5dcaa5';
             const flotte = fleetAtPlanet(m.zielKey);

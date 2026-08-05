@@ -101,8 +101,20 @@ async function starteSpiel(browser, spielstand, berichte){
                    'vielleichtSammelauftrag','beendeRecyclerAuftrag','processRecyclerAuftraege'])
     check('5: ' + f + '() ist genau einmal definiert',
       (src.match(new RegExp('function ' + f + '\\b', 'g')) || []).length === 1);
-  check('5: der Auftrag zaehlt in activeFleetMissionCount() mit',
-    /return n \+ relocateGroupIds\.size \+ recyclerAuftragSlots\(\);/.test(src));
+  // ZUERST auf die ganze Zeile geprueft:
+  //   /return n \+ relocateGroupIds\.size \+ recyclerAuftragSlots\(\);/
+  // Das war eine MOMENTAUFNAHME, keine Regel - und sie ist am 05.08.2026 prompt gebrochen, als
+  // angeschlossene Allianz-Verbaende als weiterer Summand dazukamen. Der Sammelauftrag zaehlte
+  // unveraendert mit, der Test schlug trotzdem an: ein Fehlalarm, der nichts ueber die Mechanik
+  // aussagte. Geprueft wird deshalb jetzt die EIGENSCHAFT - was auch immer die Funktion sonst noch
+  // aufsummiert, die Sammelauftrags-Slots muessen Teil ihres Rueckgabewerts sein.
+  {
+    const von = src.indexOf('function activeFleetMissionCount(');
+    const rumpf = von < 0 ? '' : src.slice(von, src.indexOf('\n  }', von));
+    const ret = (rumpf.match(/return [^;]+;/) || [''])[0];
+    check('5: der Auftrag zaehlt in activeFleetMissionCount() mit',
+      /recyclerAuftragSlots\(\)/.test(ret), ret.trim());
+  }
   check('5: die Hinflug-Verlegung wird dabei NICHT doppelt gezaehlt',
     /if \(m\.groupId && auftragsGruppen\.has\(m\.groupId\)\) continue;/.test(src));
   check('5: der Rueckflug umgeht die Slot-Pruefung (sonst blockiert er sich selbst)',
