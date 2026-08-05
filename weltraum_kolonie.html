@@ -6118,8 +6118,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.421.0';
+  const VERSION = '8.422.0';
   const PATCHNOTES = [
+    { version:'8.422.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Der Angriffsknopf schickte dich auf den falschen Reiter.</strong> Wer in der <strong>Bestenliste</strong> auf das Schwert-Symbol klickte, blieb danach in „Rangliste &amp; Ruhm" stehen – während die Meldung darunter sagte, man solle „die Angriffsflotte wählen und dann auf <em>Spieler angreifen</em> klicken". Beides liegt aber im Reiter „Kampf &amp; Eroberung", und nichts sagte einem das. Der Tab-Wechsel setzte den <em>Unter</em>-Reiter schlicht nicht mit. Betroffen waren alle vier Wege, ein Ziel zu markieren – Bestenliste, Spielerprofil, Spionagebericht und Sektorkarte – sowie die Mondbelagerung. Man landet jetzt direkt bei Auswahl und Startknopf.',
+      'Gefunden beim Kartieren aller Angriffswege für den kommenden Umbau der Flottenauswahl. Es gibt im ganzen Spiel <strong>zwölf</strong> Stellen, an denen eine Flotte losgeschickt wird, und <strong>eine einzige</strong>, an der man Schiffe auswählen kann – dass die beiden nicht zusammenfanden, war der eigentliche Grund für das umständliche Gefühl.'
+    ]},
     { version:'8.421.0', date:'05.08.2026', changes:[
       '<strong>Exotische Forschung und Veteranen-Ausbildung überstehen jetzt das Prestige.</strong> Bisher löschte der Reset beide stillschweigend – während ihre Beschreibungen ausdrücklich „(dauerhaft)" versprachen und der Bestätigungsdialog sie mit keinem Wort erwähnte. Er zählt sorgfältig auf, was verloren geht und was bleibt; in <em>keiner</em> der beiden Listen standen sie. Das waren bis zu <strong>86.000 Forschungspunkte</strong>, die ohne Vorwarnung verschwanden. Die Kopplung ist bewusst dieselbe wie beim Skill-Baum: Es soll genau eine Antwort auf die Frage geben, was einen Reset überlebt.',
       '<strong>Und beide Dialoge sagen es endlich.</strong> Der Prestige-Dialog nennt sie jetzt bei dem, was erhalten bleibt. Der Aufstiegs-Dialog sagte bisher nur „Der Aufstieg ist endgültig" – er benennt jetzt, dass Skill-Baum, Exotische Forschung und Veteranen-Ausbildung dabei sehr wohl verloren gehen. Der Aufstieg setzt sie weiterhin zurück; er ist der tiefere Schnitt, und das war schon immer so.',
@@ -32378,7 +32382,18 @@
   // Zusammenstellung ein prominenter "Spieler angreifen"-Knopf erscheint – vorher musste man erst bis
   // zur Bestenliste am Ende der Seite scrollen und dort das kleine Schwert-Symbol treffen.
   let pendingAttackTarget = null;
+  /* Der UNTER-Reiter muss mitgesetzt werden (Bugfix 05.08.2026, Spieler-Report Sascha: "ich finde
+     es umstaendlich"). switchTab('galaxie') allein laesst state.galaxySubTab stehen, wo er war -
+     und wer aus der BESTENLISTE heraus angreift, stand danach zwangslaeufig weiter in
+     "Rangliste & Ruhm". Die Meldung darunter schickte ihn zu einer Auswahl und einem Knopf, die
+     beide auf einem anderen Unter-Reiter liegen, ohne zu sagen wo. Betroffen waren alle vier Wege,
+     ein Ziel zu markieren: Bestenliste, Spielerprofil, Spionagebericht und Sektorkarte.
+     Gesetzt wird nur, wenn das Panel wirklich existiert - gleiche Vorsicht wie in oeffneZiel(). */
+  function setzeGalaxieUnterreiter(unter){
+    if (document.querySelector('[data-galaxy-sub="' + unter + '"]')) state.galaxySubTab = unter;
+  }
   function goToAttackPlayer(playerId, name){
+    setzeGalaxieUnterreiter('kampf');
     switchTab('galaxie');
     pendingAttackTarget = { id: playerId, name: name || 'Unbekannt' };
     render();
@@ -32387,6 +32402,9 @@
   let pendingMoonSiegeTarget = null; // { id, name }
   let pendingMoonSiegeMoons = null; // Array oder null (noch nicht geladen)
   async function goToMoonSiege(playerId, name){
+    // Gleicher Fall wie bei goToAttackPlayer: Der Belagerungs-Knopf steht ebenfalls im
+    // Kampf-Unterreiter, und die Wege dorthin fuehren ueber die Bestenliste.
+    setzeGalaxieUnterreiter('kampf');
     switchTab('galaxie');
     pendingMoonSiegeTarget = { id: playerId, name: name || 'Unbekannt' };
     pendingMoonSiegeMoons = null;
