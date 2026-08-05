@@ -69,7 +69,26 @@ Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Op
 
 ## Deploy
 
-Push nach `main` landet im Repo; live geht es erst, wenn Sascha die Änderungen manuell auf seinem Raspberry Pi zieht (dort läuft nginx und bedient `gamegeeeeek.de`/`www.gamegeeeeek.de`, per DynDNS bei Domain-Offensive). **GitHub Pages ist nicht aktiviert** (Settings → Pages: Source = „None") und deployt nichts – im Zweifel nachfragen statt einen automatischen Pull anzunehmen.
+**Ein Push nach `main` geht von selbst live** (verifiziert 05.08.2026 am Container-Log des Pi und am Quelltext). Bis dahin stand hier „live geht es erst, wenn Sascha manuell zieht" – das war überholt und hat zu falschen Auskünften geführt.
+
+Der Weg: GitHub ruft nach jedem Push den **Deploy-Webhook** des Backends auf (`POST /api/deploy-webhook`, `server.js:6297`, abgesichert per HMAC-SHA256 gegen `DEPLOY_WEBHOOK_SECRET`). Der Repo-**Name** aus dem Payload wählt einen von zwei **fest verdrahteten** Befehlen aus `DEPLOY_TARGETS` – nie etwas aus dem Request-Body, das schützt gegen Command-Injection:
+
+```
+'kolonie-kepler7'         → cd /deploy/kolonie-kepler7 && git pull -q && cp weltraum_kolonie.html /deploy/web/ && (cp manifest.json /deploy/web/ || true) && (cp icon-*.png …) && (cp apple-touch-icon.png …) && (cp service-worker.js …)
+'kolonie-kepler7-backend' → cd /app && git pull -q
+```
+
+Der Webhook feuert bei **jedem** Push, auch auf Feature-Branches; dort findet der `git pull` auf dem ausgecheckten `main` schlicht nichts (`Deploy-Webhook erfolgreich für kolonie-kepler7: (keine Änderungen)`). Erst der Merge nach `main` liefert wirklich aus. **GitHub Pages** ist weiterhin nicht aktiviert (Settings → Pages: Source = „None") und deployt nichts.
+
+Zwei Folgen daraus, beide am 05.08.2026 als echte Probleme aufgetreten:
+
+- **Die Kopierliste ist unvollständig.** Kopiert werden nur `weltraum_kolonie.html`, `manifest.json`, die Icons und `service-worker.js` – **nicht** `index.html`, **nicht** `patchnotes.html`, und keine der übrigen Seiten (`spielanleitung.html`, `impressum.html`, `datenschutzerklaerung.html`, `nutzungsbedingungen.html`, `allianzen-pvp.html`, `idle-spiel-browser.html`, `weltraum-browsergame.html`, `robots.txt`, `sitemap.xml`, `og-image.png`). Das Spiel aktualisiert sich also automatisch, die Patchnotes-Seite und die Rechtstexte aber nie – obwohl die Spieldatei im Kopfmenü und in der Fußzeile auf `patchnotes.html` verlinkt. Was wirklich ausgeliefert wird, zeigt `docker exec kepler7-nginx ls -la /usr/share/nginx/html/` (an den Zeitstempeln sieht man, welche Dateien stillstehen).
+- **Der Backend-Pull läuft als root und sperrt Sascha aus.** `/app` **ist** per Bind-Mount `/DATA/kepler7/backend`, und der Container läuft als root. Jeder Backend-Push legt damit root-eigene Objekte in `.git/objects` an; ein danach von Hand ausgeführtes `git`/`git stash` scheitert an „Unzureichende Berechtigung zum Hinzufügen eines Objektes zur Repository-Datenbank .git/objects". Bricht so ein Webhook-Pull mitten im Merge ab, bleiben zusätzlich `HEAD.lock`/`AUTO_MERGE.lock` und ein halb angewendeter, **vorgemerkter** Stand liegen – dann ist `git diff` leer (zeigt nur Nicht-Vorgemerktes), `git checkout -- server.js` wirkungslos (holt aus dem Index zurück, nicht aus HEAD), und der Pull bricht dauerhaft ab. Aufräumen:
+  ```
+  sudo chown -R sascha:sascha /DATA/kepler7/backend
+  cd /DATA/kepler7/backend && rm -f .git/*.lock && git merge --abort 2>/dev/null; git stash && git pull origin master
+  ```
+  Das `chown` ist eine Reparatur, keine Vorsorge – der nächste Backend-Push erzeugt wieder root-eigene Objekte. **Nie `sudo git …` auf dem Pi ausführen**, das verschlimmert es nur.
 
 ### Pi-Laufzeit-Setup (Docker) und TLS-Zertifikat
 
@@ -87,4 +106,4 @@ Der „nginx auf dem Pi" ist **kein systemd-nginx**, sondern läuft als **Docker
 - **Auto-Erneuerung** läuft per root-crontab (`certbot renew --quiet` im certbot-Container mit denselben Volumes, danach nginx-Reload/Restart). `certbot renew` nutzt die gespeicherte Renewal-Config und erneuert damit automatisch **beide** Domains – die `-d`-Namen nicht erneut angeben.
 - Der Host `certbot.timer` (systemd) ist eine **harmlose Altlast** und kennt die Docker-Volume-Zertifikate nicht – ignorieren.
 
-**PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main` und Sascha kann sie gar nicht erst auf den Pi ziehen. Gilt für Frontend- und Backend-Repo gleichermaßen.
+**PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main`. Gilt für Frontend- und Backend-Repo gleichermaßen. **Seit der Webhook bekannt ist, wiegt das schwerer als gedacht**: Der Merge ist nicht bloß ein Zwischenschritt zu einem späteren manuellen Deploy, sondern die Auslieferung selbst – was gemerged wird, steht Sekunden später auf `gamegeeeeek.de`. Der Prüflauf (`node tests/run.js`, grün) ist deshalb keine Formalie, sondern das einzige, was zwischen einer Änderung und den Spielern steht.
