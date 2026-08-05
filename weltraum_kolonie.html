@@ -6118,8 +6118,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.417.0';
+  const VERSION = '8.418.0';
   const PATCHNOTES = [
+    { version:'8.418.0', date:'05.08.2026', changes:[
+      '<strong>Behoben: Ein schlafendes Gerät verlor seine ganze Produktionszeit.</strong> Wer das Spiel offen liegen ließ und das Gerät in den Ruhezustand ging, bekam beim Aufwachen <em>nichts</em> für die Zwischenzeit gutgeschrieben – gemessen an einer nachgestellten Nacht: <strong>339 statt 163.386 Erz</strong>, also 0,2 %. Der Rest war ersatzlos weg. Die Ursache war eine Fehlbenennung mit Folgen: Das Feld, das den Zeitfortschritt hätte festhalten sollen, wurde in Wahrheit beim <em>Speichern</em> gestellt – und gespeichert wird alle zehn Sekunden. Beim Aufwachen war die Nacht damit binnen Sekunden aus dem Spielstand gelöscht, ohne je verrechnet worden zu sein. Nachgeholt wurde ausschließlich beim Neuladen der Seite; wer einfach weiterspielte, hatte Pech.',
+      '<strong>Jetzt stellt die Uhr nur noch, wer die Zeit auch verrechnet hat.</strong> Bemerkt das Spiel im laufenden Betrieb eine Lücke, holt es sie sofort nach – ohne Neuladen – und sagt dazu, was passiert ist. Ein „Willkommen zurück"-Fenster erscheint dabei bewusst nicht; das gehört zum Start und wäre mitten im Spiel fehl am Platz. Die Erkennungsschwelle liegt hoch genug, dass normale Schwankungen des Takts sie nie auslösen.',
+      'Ausdrücklich mitgeprüft ist die Gegenrichtung: Ein zweiter Durchlauf ohne neue Pause schreibt <em>nichts</em> mehr gut. Genau dieser Fehler – bei jedem Neuladen erneut eine volle Offline-Gutschrift – hat das Spiel am 21.07.2026 schon einmal getroffen, und die abgeschnittene Zeit über dem Offline-Fenster verfällt jetzt nachweislich, statt sich aufzustauen.'
+    ]},
     { version:'8.417.0', date:'05.08.2026', changes:[
       '<strong>Auswahlfelder bleiben jetzt auch auf dem Handy offen.</strong> Sascha meldete das Zuklappen des Gegner-Auswahlfelds ein zweites Mal – die Behebung aus v8.416.0 fragte, ob das Feld den <em>Fokus</em> hat. Am Rechner reicht das; auf dem Telefon nicht: Dort öffnet ein Auswahlfeld ein <strong>Systemmenü außerhalb der Seite</strong>, und die Seite kann dabei den Fokus vollständig verlieren. Dann griff der Schutz nicht, die Karte wurde weiter jede Sekunde neu geschrieben, und das Menü schloss sich wieder – auf dem Telefon war also gar nichts behoben.',
       'Statt des Fokus wird jetzt der <em>Beginn der Benutzung</em> gemerkt: Antippen und Tastendruck melden sich zuverlässig, <strong>bevor</strong> das Menü aufgeht. Beendet wird die Pause durch die Auswahl selbst oder durch das Verlassen des Feldes, jeweils mit kurzem Nachlauf – die Karte samt Countdown läuft also sofort danach weiter. Ein Sicherheitsnetz nach 30 Sekunden verhindert, dass ein vergessenes offenes Menü die Anzeige dauerhaft einfriert.',
@@ -36880,7 +36885,16 @@
   async function doSave(){
     if (saveConflictDetected) return null;
     if (!bootDataReady) return null;
-    state.lastTick = Date.now();
+    /* HIER STAND `state.lastTick = Date.now();` - und das war der eigentliche Fehler (05.08.2026).
+       Trotz seines Namens war lastTick nie ein Tick-Zeitstempel, sondern ein SPEICHER-Zeitstempel:
+       Genau eine Stelle schrieb ihn (diese), genau eine las ihn (load()). Der Haupt-Tick fasste
+       ihn nie an.
+       Folge: Schlief ein Geraet mit offenem Spiel, feuerte beim Aufwachen binnen zehn Sekunden ein
+       regulaeres Speichern und stellte die Uhr auf jetzt - obwohl die Nacht nie gutgeschrieben
+       worden war (der Tick rechnet in festen Ein-Sekunden-Schritten). Ein Playwright-Lauf mit acht
+       Stunden Uhrsprung ohne Ticks ergab 339 Erz statt 163.386, also 0,2 %.
+       Speichern ist kein Zeitfortschritt. Die Uhr stellt jetzt ausschliesslich, wer die Zeit auch
+       wirklich verrechnet hat: der Haupt-Tick und applyOfflineProgress(). */
     let saveResult = null;
     try {
       saveResult = await saveGameStateVersioned(JSON.stringify(state));
@@ -37422,9 +37436,24 @@
   // Sammelt Ressourcen-/Missions-Infos während der Offline-Berechnung, damit anschließend eine
   // "Willkommen zurück"-Zusammenfassung gezeigt werden kann statt nur einer Logzeile.
   let lastOfflineSummary = null;
-  function applyOfflineProgress(seconds){
+  /* imLauf (05.08.2026): Aufruf aus dem laufenden Spiel statt beim Seitenstart.
+     Hintergrund - GEMESSEN, nicht vermutet: Schlaeft ein Geraet mit offenem Spiel, frieren die
+     Timer ein. Beim Aufwachen laufen sie weiter, aber der Haupt-Tick rechnet in festen
+     Ein-Sekunden-Schritten und holt die Luecke nicht nach; nachgeholt wurde bisher ausschliesslich
+     beim Seitenstart. Ein Playwright-Lauf mit acht Stunden Uhrsprung ohne Ticks ergab: 339 Erz
+     gutgeschrieben statt der erwarteten 163.386 - also 0,2 %. Der Rest war weg.
+     Der Aufruf aus dem Tick schliesst genau diese Luecke. Er darf aber NICHT das
+     "Willkommen zurueck"-Fenster aufreissen: Das gehoert zum Seitenstart und waere mitten im
+     Spiel schlicht falsch. Deshalb setzt er lastOfflineSummary nicht - die Gutschrift meldet sich
+     ueber das Protokoll, mit eigener Formulierung. */
+  function applyOfflineProgress(seconds, imLauf){
     lastOfflineSummary = null;
-    if (seconds < 2) return;
+    // Auch der Frueh-Ausstieg muss die Uhr stellen, sonst bliebe sie bei einer Luecke unter zwei
+    // Sekunden stehen und die Differenz wuechse ueber viele Durchlaeufe unbemerkt an.
+    // Die Uhr wird BEWUSST erst am Ende der Funktion gestellt, nicht hier oben: Erst gutschreiben,
+    // dann die Zeit als verbraucht markieren - bricht etwas dazwischen ab, ist die Zeit nicht
+    // stillschweigend weg.
+    if (seconds < 2){ state.lastTick = Date.now(); return; }
     const capped = Math.min(seconds, offlineWindowSec());
     // Rückkehrer-Boost: wer mindestens 24h weg war, bekommt für die nächsten 24h spielinterne Zeit
     // +50% Produktion auf alle Ressourcen – sonst wird der Abstand zu Dauerspielern irgendwann
@@ -37486,13 +37515,26 @@
     processRecyclerAuftraege();
     if (returningBoostGranted) log('Willkommen zurück! Du warst über 24 Stunden weg – die nächsten 24 Stunden gibt es +50% Produktion auf alle Ressourcen.', 'ti-sparkles');
     if (capped > 5){
-      log('Willkommen zurück! Fortschritt für '+Math.floor(capped/60)+' Min. gutgeschrieben.', 'ti-clock');
-      lastOfflineSummary = { minutes: Math.floor(capped/60), gained, missionsPending,
-                             bauten: queues.bauten, forschungen: queues.forschungen,
-                             markenUmbauten: queues.markenUmbauten||0,
-                             truemmer: truemmerSumme > 0 ? truemmerErtrag : null,
-                             truemmerSumme: truemmerSumme };
+      if (imLauf){
+        // Mitten im Spiel: melden, aber ohne "Willkommen zurueck" und ohne Fenster.
+        log('Dein Gerät war '+Math.floor(capped/60)+' Min. im Ruhezustand – die Produktion dieser Zeit wurde nachgetragen.', 'ti-clock');
+      } else {
+        log('Willkommen zurück! Fortschritt für '+Math.floor(capped/60)+' Min. gutgeschrieben.', 'ti-clock');
+        lastOfflineSummary = { minutes: Math.floor(capped/60), gained, missionsPending,
+                               bauten: queues.bauten, forschungen: queues.forschungen,
+                               markenUmbauten: queues.markenUmbauten||0,
+                               truemmer: truemmerSumme > 0 ? truemmerErtrag : null,
+                               truemmerSumme: truemmerSumme };
+      }
     }
+    /* DIE DOPPELGUTSCHRIFT-FALLE, und warum hier Date.now() steht und nicht start+capped:
+       `capped` ist durch offlineWindowSec() gedeckelt. Wuerde die Uhr nur um `capped` vorgestellt,
+       bliebe die abgeschnittene Zeit stehen und wuerde beim naechsten Durchlauf ERNEUT angeboten -
+       bei jedem Laden gaebe es wieder eine volle Offline-Gutschrift. Genau dieser Fehler ist dem
+       Projekt am 21.07.2026 schon einmal passiert ("bei jedem Reload 8h-Offline-Gutschrift,
+       gleicher Login-Bonus und immer derselbe Kampfbericht"), siehe der Kommentar in load().
+       Die Uhr steht deshalb auf JETZT: Die gedeckelte Zeit ist verfallen, nicht aufgeschoben. */
+    state.lastTick = Date.now();
   }
   // Tägliches Login-Belohnungssystem (16.07.2026, Feature-Wunsch: abwechslungsreiche Belohnungen
   // statt nur linear skalierender Ressourcen) - 7-Tage-Zyklus mit unterschiedlichen Belohnungsarten
@@ -53722,6 +53764,26 @@
     // kurz auf dem noch nicht geladenen Platzhalter-State (Ressourcenproduktion, Missionsauflösung,
     // Raid-Erkennung auf leerem Spielstand), bevor load() ihn überschreibt.
     if (!bootDataReady) return;
+    /* ===== Die Luecke schliessen, bevor irgendetwas anderes rechnet (05.08.2026) =====
+       Der Tick rechnet in festen Ein-Sekunden-Schritten. Solange er jede Sekunde laeuft, stimmt
+       das. Friert das Geraet ihn ein (Bildschirm aus, Tab im Hintergrund) und weckt ihn spaeter
+       wieder, fehlt die ganze Zwischenzeit - und nachgeholt wurde sie bisher NUR beim Seitenstart.
+       ZUERST nachholen, dann die normale Sekunde: sonst rechnete die Sekunde noch mit den alten
+       Bestaenden, und bei vollem Lager waere die Reihenfolge sogar spuerbar.
+       Die Schwelle liegt bewusst hoch genug, dass normale Timer-Ungenauigkeit sie nie erreicht -
+       ein Tick, der mal 1,2 statt 1,0 Sekunden braucht, darf keine "Offline"-Gutschrift ausloesen.
+       Unterhalb der Schwelle wird die Uhr einfach nachgezogen; die paar Millisekunden Drift sind
+       gegenueber der bereits verbuchten Sekunde bedeutungslos. */
+    const TICK_LUECKE_SCHWELLE_SEK = 90;
+    {
+      const jetzt = Date.now();
+      const luecke = Math.max(0, (jetzt - (state.lastTick || jetzt)) / 1000);
+      if (luecke >= TICK_LUECKE_SCHWELLE_SEK){
+        applyOfflineProgress(luecke, true);   // true = im laufenden Spiel, kein "Willkommen zurueck"
+        save();
+      }
+      state.lastTick = Date.now();
+    }
     const rates = ratesPerSecond();
     const cap = storageCap();
     // Bugfix (Spieler-Report 20.07.2026): flashGains() bekam bisher die THEORETISCHE Rate übergeben,
