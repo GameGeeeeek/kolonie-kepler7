@@ -448,6 +448,31 @@
        Kampfausgang steht bereits fest (aus dem Bericht) – das hier ist nur eine visuelle
        Rekonstruktion in Runden, keine erneute Berechnung. */
     .battle-modal-overlay { position:fixed; inset:0; z-index:210; display:none; align-items:center; justify-content:center; background:rgba(4,6,14,0.82); padding:16px; }
+    /* Flottenwahl-Feld (05.08.2026). Haengt an document.body, NICHT in einer Box: render()
+       beschreibt Boxen per getElementById/setBoxHtml und kann das Overlay damit gar nicht
+       erreichen - dieselbe Begruendung wie beim Karten-Kontextmenue. z-index ueber dem
+       Kampf-Modal (210), weil es aus jedem Tab heraus geoeffnet wird.
+       Der Rumpf scrollt fuer sich; Kopf und Fuss (Startknopf) bleiben stehen, damit der Knopf bei
+       24 Schiffstypen nicht ausser Sicht geraet. */
+    .fwahl-overlay { position:fixed; inset:0; z-index:9200; display:none; align-items:center; justify-content:center; background:rgba(4,6,14,0.86); padding:14px; }
+    .fwahl-overlay.open { display:flex; }
+    .fwahl-karte { width:min(560px, 96vw); max-height:min(88vh, 900px); display:flex; flex-direction:column;
+                   background:rgba(13,18,36,0.98); border:var(--bw-1) solid rgba(var(--primary-rgb),0.45);
+                   box-shadow:0 18px 50px rgba(0,0,0,0.6); }
+    .fwahl-kopf { padding:9px 12px 8px; border-bottom:var(--bw-1) solid var(--line);
+                  display:flex; align-items:flex-start; gap:10px; flex:0 0 auto; }
+    .fwahl-art { font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.09em;
+                 text-transform:uppercase; color:var(--ink-dim); }
+    .fwahl-titel { display:block; font-size:13.5px; color:#e9ecf5; font-weight:600; margin-top:2px; }
+    .fwahl-zu { margin-left:auto; background:none; border:none; color:var(--ink-dim); font-size:18px;
+                line-height:1; padding:2px 6px; cursor:pointer; }
+    .fwahl-zu:hover { color:#e9ecf5; }
+    .fwahl-reiter { display:flex; gap:6px; padding:8px 12px; overflow-x:auto; flex:0 0 auto;
+                    border-bottom:var(--bw-1) solid var(--line); scrollbar-width:thin; }
+    .fwahl-reiter button { white-space:nowrap; font-size:11px; padding:5px 10px; }
+    .fwahl-rumpf { overflow-y:auto; padding:8px 12px; flex:1 1 auto; }
+    .fwahl-fuss { padding:10px 12px; border-top:var(--bw-1) solid var(--line); flex:0 0 auto; }
+    .fwahl-warn { color:#e24b4a; font-size:11.5px; margin-bottom:6px; }
     .battle-modal-overlay.open { display:flex; }
     /* ---------- Kampf-Wiedergabe "Orbitalsturm" ----------
        Gekapselt unter #osWrap: KEINE dieser Regeln kann nach draussen wirken, und weil
@@ -6118,8 +6143,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.422.0';
+  const VERSION = '8.423.0';
   const PATCHNOTES = [
+    { version:'8.423.0', date:'05.08.2026', changes:[
+      '<strong>Neu: Das Flottenwahl-Feld erscheint dort, wo du angreifst.</strong> Bisher gab es im ganzen Spiel <strong>zwölf</strong> Stellen, an denen eine Flotte losfliegt – und <strong>genau eine</strong>, an der man Schiffe auswählen konnte. Wer aus der Bestenliste, der Sektorkarte, einem Bericht oder dem Allianz-Tab angriff, schickte etwas los, das er woanders eingestellt hatte und im Moment des Klicks gar nicht sah. Jetzt öffnet sich beim Angriff ein Feld mit allen Schiffstypen, den Reitern <strong>„Komplette Flotte"</strong>, <strong>„Ohne Zivilschiffe"</strong> und <strong>„Nichts"</strong>, deinen gespeicherten Flotten-Vorlagen sowie Schiffszahl, Angriffskraft und Frachtraum auf einen Blick.',
+      '<strong>Und es warnt, bevor es zu spät ist.</strong> Fliegst du ohne Frachter los, sagt das Feld dir das vorher – bisher erfuhr man „Keine Frachter mitgeführt, Beute ging verloren" erst im Bericht <em>nach</em> dem Kampf. Fehlt die Auswahl ganz, ist der Startknopf gesperrt und der Grund steht ausgeschrieben daneben, statt dass man rätselt.',
+      'Erster Schritt: Vorerst nur beim <strong>Spielerangriff</strong>. Die übrigen elf Startstellen folgen in den nächsten Versionen – Piraten abfangen und Leerenriss zuerst, denn dort ist der Umweg über den Galaxie-Tab am teuersten: Beide prüfen beim Start, ob die Flotte es überhaupt rechtzeitig schafft.',
+      'Technisch ohne zweite Wahrheit gebaut: Das Feld hat <em>keinen</em> eigenen Auswahlspeicher, sondern schreibt in dieselbe Auswahl, aus der alle 22 Stellen im Spiel ohnehin ihre Flotte ziehen. Es entsteht eine zweite Bedienstelle, keine zweite Quelle – damit kann keine davon der neuen Bedienung widersprechen.'
+    ]},
     { version:'8.422.0', date:'05.08.2026', changes:[
       '<strong>Behoben: Der Angriffsknopf schickte dich auf den falschen Reiter.</strong> Wer in der <strong>Bestenliste</strong> auf das Schwert-Symbol klickte, blieb danach in „Rangliste &amp; Ruhm" stehen – während die Meldung darunter sagte, man solle „die Angriffsflotte wählen und dann auf <em>Spieler angreifen</em> klicken". Beides liegt aber im Reiter „Kampf &amp; Eroberung", und nichts sagte einem das. Der Tab-Wechsel setzte den <em>Unter</em>-Reiter schlicht nicht mit. Betroffen waren alle vier Wege, ein Ziel zu markieren – Bestenliste, Spielerprofil, Spionagebericht und Sektorkarte – sowie die Mondbelagerung. Man landet jetzt direkt bei Auswahl und Startknopf.',
       'Gefunden beim Kartieren aller Angriffswege für den kommenden Umbau der Flottenauswahl. Es gibt im ganzen Spiel <strong>zwölf</strong> Stellen, an denen eine Flotte losgeschickt wird, und <strong>eine einzige</strong>, an der man Schiffe auswählen kann – dass die beiden nicht zusammenfanden, war der eigentliche Grund für das umständliche Gefühl.'
@@ -17695,6 +17726,223 @@
     const virtual = emptyFleet();
     for (const k of ATTACK_SHIP_KEYS) virtual[k] = Math.min(sel[k]||0, avail[k]||0);
     return capFighterSelection(virtual);
+  }
+
+  /* ===== Die Schiffsauswahl als wiederverwendbare Bausteine (05.08.2026, Schritt 1) =====
+     Herausgeloest aus dem Inline-Block der #attackFleetBox, VORERST OHNE JEDE SICHTBARE AENDERUNG -
+     die Box ruft jetzt diese Funktionen auf, statt dasselbe Markup selbst zu bauen.
+     Hintergrund: Es gibt zwoelf Stellen im Spiel, an denen eine Flotte losgeschickt wird, und
+     genau EINE, an der man Schiffe waehlen kann. Das Feld soll kuenftig ueberall dort erscheinen,
+     wo man startet - dafuer muss der Baustein erst einmal einer sein.
+     WICHTIG: Nur das MARKUP wird geteilt, NICHT der Zustand. Die Angriffsauswahl startet voll
+     (getAttackSelection), die Expeditions-Eskorte bewusst leer - ein gemeinsamer Zustand wuerde
+     eine der beiden Vorgaben still umdrehen. */
+  function flottenwahlZeilenHtml(planetKey, cf, keys){
+    const sel = getAttackSelection(planetKey, cf);
+    const df = deployableFighters(buildAttackFleet(planetKey, cf));
+    const away = computeAwayByType(cf);
+    return (keys || ATTACK_SHIP_KEYS).filter(k => (cf[k]||0) > 0).map(k => {
+      const def = shipDefOrSuper(k);
+      const owned = cf[k]||0;
+      const weg = away[k]||0;
+      const available = Math.max(0, owned - weg);
+      const selected = Math.min(sel[k]||0, available);
+      let capNote = '';
+      if (k==='jaeger') capNote = selected>df.jaeger ? ` <span style="color:#e24b4a;">(nur ${df.jaeger} passen in den Hangar)</span>` : '';
+      if (k==='bomber') capNote = selected>df.bomber ? ` <span style="color:#e24b4a;">(nur ${df.bomber} passen in den Hangar)</span>` : '';
+      const awayNote = weg>0 ? ` · <span style="color:#e24b4a;">${weg} bereits unterwegs</span>` : '';
+      return `
+          <div class="card-row" style="padding:0.55rem 0.75rem;">
+            <div class="left" style="gap:9px;">
+              <div class="bicon" style="width:28px; height:28px; background:rgba(255,255,255,0.06); border:var(--bw-1) solid var(--line-2);"><canvas data-ship-icon="${def.key}" width="24" height="24" style="display:block;"></canvas></div>
+              <div>
+                <div class="bname" style="font-size:12px;">${def.name}</div>
+                <div class="bmeta">verfügbar: ${available} von ${owned}${awayNote} · Angriffspunkte je Schiff: ${def.atk}${capNote}</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:5px;">
+              <button data-atksel-dec="${k}" style="padding:3px 8px; font-size:12px;">−</button>
+              <span class="lvl-pill" style="min-width:30px; text-align:center;">${selected}</span>
+              <button data-atksel-inc="${k}" style="padding:3px 8px; font-size:12px;">+</button>
+              <button data-atksel-max="${k}" style="font-size:10px; padding:3px 6px;">Max</button>
+              <button data-atksel-none="${k}" style="font-size:10px; padding:3px 6px;">Keine</button>
+            </div>
+          </div>
+        `;
+    }).join('');
+  }
+  /* `neuZeichnen` statt eines festen render()-Aufrufs: Die alte Box liegt IM Sekunden-Tick und
+     braucht den vollen Durchlauf; das kuenftige Overlay haengt an document.body und darf pro Klick
+     nicht das ganze Spiel neu zeichnen. Wer den Baustein benutzt, sagt selbst, was danach passiert. */
+  /* ===== Das Flottenwahl-Feld (05.08.2026, Schritt 2) =====
+     WARUM ES DAS GIBT: Es gibt zwoelf Stellen im Spiel, an denen eine Flotte losgeschickt wird,
+     und bis hierher genau EINE, an der man Schiffe waehlen konnte - die Box im Galaxie-Tab. Wer
+     aus der Bestenliste, der Sektorkarte, einem Bericht oder dem Allianz-Tab angriff, schickte
+     etwas los, das er woanders eingestellt hatte und im Moment des Klicks nicht sah.
+
+     DER AUFTRAG beschreibt, was sich je Angriffsart unterscheidet:
+       titel        'Nyra angreifen'              Kopfzeile
+       art          'Gegner · Boss'               Kleinzeile darueber
+       keys         ATTACK_SHIP_KEYS              welche Schiffstypen erlaubt sind
+       ziehtAb      true|false                    verlassen die Schiffe den Standort sofort?
+       fracht       true|false                    Frachtraum-Zeile und Beute-Warnung zeigen
+       vorschau     (flotte) => html              Flugzeit, Treibstoff, Siegchance - je Aufrufer
+       sperre       (flotte) => null | 'Grund'    graut den Startknopf aus, mit Begruendung
+       startLabel   'Angriff starten'
+       start        (flotte) => void              ruft die UNVERAENDERTE vorhandene send*-Funktion
+
+     DREI REGELN GEGEN DEN SEKUNDEN-TICK, der in diesem Projekt schon oft Bedienzustand gefressen hat:
+     (1) Das Overlay haengt an document.body. render() beschreibt Boxen ueber getElementById und
+         setBoxHtml - es kann das Overlay gar nicht erreichen.
+     (2) Die Zahlen leben in attackFleetSelection, nicht im DOM, und werden bei jedem Neuzeichnen
+         wieder ins Markup geschrieben. Das ist der Gegenentwurf zur Verlegungs-Oberflaeche, deren
+         Mengen nur im DOM stehen und die der Tick still zuruecksetzt.
+     (3) Neu gezeichnet wird das Overlay ausschliesslich von seinen eigenen Handlern, nie vom Tick -
+         deshalb bekommt verdrahteFlottenwahlZeilen() hier zeichneFlottenwahl statt render(). */
+  let fwahlAuftrag = null;
+  function fwahlFlotte(){
+    return buildAttackFleet(state.activeBasePlanet, currentFleet());
+  }
+  // Auf die erlaubten Typen beschnitten - buildAttackFleet fuellt immer ATTACK_SHIP_KEYS.
+  function fwahlErlaubteFlotte(){
+    const voll = fwahlFlotte();
+    if (!fwahlAuftrag || !fwahlAuftrag.keys || fwahlAuftrag.keys === ATTACK_SHIP_KEYS) return voll;
+    const eng = emptyFleet();
+    for (const k of fwahlAuftrag.keys) eng[k] = voll[k]||0;
+    return eng;
+  }
+  function oeffneFlottenwahl(auftrag){
+    fwahlAuftrag = Object.assign({ keys: ATTACK_SHIP_KEYS, startLabel: 'Losschicken' }, auftrag || {});
+    let ov = document.getElementById('fwahlOverlay');
+    if (!ov){
+      ov = document.createElement('div');
+      ov.id = 'fwahlOverlay';
+      ov.className = 'fwahl-overlay';
+      // Klick auf den dunklen Rand schliesst - aber nur dort, nicht auf der Karte selbst.
+      ov.addEventListener('click', e => { if (e.target === ov) schliesseFlottenwahl(); });
+      document.body.appendChild(ov);
+    }
+    zeichneFlottenwahl();
+    ov.classList.add('open');
+  }
+  function schliesseFlottenwahl(){
+    fwahlAuftrag = null;
+    const ov = document.getElementById('fwahlOverlay');
+    if (ov) ov.classList.remove('open');
+  }
+  function zeichneFlottenwahl(){
+    const ov = document.getElementById('fwahlOverlay');
+    if (!ov || !fwahlAuftrag) return;
+    const a = fwahlAuftrag;
+    const cf = currentFleet();
+    const flotte = fwahlErlaubteFlotte();
+    const anzahl = a.keys.reduce((n,k) => n + (flotte[k]||0), 0);
+    const kraft = attackPower(flotte, state.activeBasePlanet);
+    const vorlagen = (state.fleetTemplates||[]).map(t =>
+      `<button data-fwahl-vorlage="${t.id}" title="Vorlage anwenden"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(t.name)}</button>`).join('');
+    const gesperrt = a.sperre ? a.sperre(flotte) : null;
+    // Frachtraum: die Warnung, die es bis heute NIRGENDS vor dem Start gab - der Spieler erfuhr
+    // "Keine Frachter mitgefuehrt - Beute ging verloren!" erst im Bericht danach.
+    let frachtHtml = '';
+    if (a.fracht){
+      const raum = fleetCargoCapacity(flotte);
+      frachtHtml = raum > 0
+        ? `<div class="bmeta">Frachtraum: <strong>${fmt(raum)}</strong></div>`
+        : `<div class="fwahl-warn"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>Ohne Frachter geht die gesamte Beute verloren.</div>`;
+    }
+    ov.innerHTML = `
+      <div class="fwahl-karte">
+        <div class="fwahl-kopf">
+          <div style="flex:1; min-width:0;">
+            <div class="fwahl-art">${escapeHtml(a.art||'Flotte zusammenstellen')}</div>
+            <span class="fwahl-titel">${escapeHtml(a.titel||'Flotte wählen')}</span>
+          </div>
+          <button class="fwahl-zu" data-fwahl-zu aria-label="Schließen">✕</button>
+        </div>
+        <div class="fwahl-reiter" data-hscroll="fwahl">
+          <button data-fwahl-alle class="primary">Komplette Flotte</button>
+          <button data-fwahl-kampf>Ohne Zivilschiffe</button>
+          <button data-fwahl-nichts>Nichts</button>
+          ${vorlagen}
+        </div>
+        <div class="fwahl-rumpf">
+          ${flottenwahlZeilenHtml(state.activeBasePlanet, cf, a.keys) || '<div class="bmeta">An diesem Standort stehen keine passenden Schiffe.</div>'}
+        </div>
+        <div class="fwahl-fuss">
+          <div class="bmeta" style="margin-bottom:6px;"><strong>${fmt(anzahl)}</strong> Schiffe · <span style="color:#e24b4a;"><i class="ti ti-sword" aria-hidden="true"></i> ${fmt(Math.round(kraft))}</span> Angriffskraft · von ${planetDisplayName(state.activeBasePlanet)}</div>
+          ${frachtHtml}
+          ${a.ziehtAb ? '<div class="fwahl-warn">Diese Schiffe verlassen deinen Standort sofort und fehlen dort in der Verteidigung.</div>' : ''}
+          ${a.vorschau ? a.vorschau(flotte) : ''}
+          ${gesperrt ? `<div class="fwahl-warn" data-fwahl-sperre>${escapeHtml(gesperrt)}</div>` : ''}
+          <button class="buy ${gesperrt?'':'affordable'}" data-fwahl-start ${gesperrt?'disabled':''} style="width:100%;">${escapeHtml(a.startLabel)}</button>
+        </div>
+      </div>`;
+    // Schiffsbilder nachzeichnen - dieselben canvas[data-ship-icon] wie in der alten Box. Ohne
+    // diesen Aufruf blieben sie leer; refreshShipMiniIcons nimmt eine Wurzel entgegen, damit nur
+    // das Overlay durchlaufen wird und nicht das ganze Dokument.
+    refreshShipMiniIcons(ov);
+    verdrahteFlottenwahlZeilen(ov, state.activeBasePlanet, cf, zeichneFlottenwahl);
+    const sel = getAttackSelection(state.activeBasePlanet, cf);
+    const avail = attackAvailableByType(cf);
+    ov.querySelector('[data-fwahl-zu]').onclick = schliesseFlottenwahl;
+    ov.querySelector('[data-fwahl-alle]').onclick = () => {
+      for (const k of a.keys) sel[k] = avail[k]||0;
+      zeichneFlottenwahl();
+    };
+    ov.querySelector('[data-fwahl-kampf]').onclick = () => {
+      for (const k of a.keys) sel[k] = KAMPF_SHIP_KEYS.includes(k) ? (avail[k]||0) : 0;
+      zeichneFlottenwahl();
+    };
+    ov.querySelector('[data-fwahl-nichts]').onclick = () => {
+      for (const k of a.keys) sel[k] = 0;
+      zeichneFlottenwahl();
+    };
+    ov.querySelectorAll('[data-fwahl-vorlage]').forEach(b => b.onclick = () => {
+      applyFleetTemplate(b.getAttribute('data-fwahl-vorlage'));
+      zeichneFlottenwahl();
+    });
+    const startBtn = ov.querySelector('[data-fwahl-start]');
+    if (startBtn && !gesperrt) startBtn.onclick = () => {
+      const start = a.start;
+      // ERST schliessen, DANN starten: Die send*-Funktionen zeigen teils eigene confirm()-Dialoge
+      // und rufen render() - ein noch offenes Overlay laege darueber.
+      schliesseFlottenwahl();
+      if (start) start(flotte);
+    };
+  }
+
+  function verdrahteFlottenwahlZeilen(wurzel, planetKey, cf, neuZeichnen){
+    if (!wurzel) return;
+    const sel = getAttackSelection(planetKey, cf);
+    const avail = attackAvailableByType(cf);
+    /* Die Rechenweise ist ABSICHTLICH Zeichen fuer Zeichen die der alten Inline-Handler - dieser
+       Schritt ist eine reine Extraktion und darf sich nicht anders verhalten als vorher.
+       Dabei faellt allerdings etwas auf, das hier bewusst NICHT mitrepariert wird:
+       "−" rechnet vom GESPEICHERTEN Wert herunter, angezeigt wird aber der auf das Verfuegbare
+       gekappte. Wer 100 Jaeger gewaehlt hat und 90 davon unterwegs hat, sieht "10" und muss
+       neunzig Mal auf "−" druecken, bevor sich sichtbar etwas tut. Das ist eine Folge davon, dass
+       getAttackSelection die Auswahl bewusst ungekappt als "Wunsch" haelt (siehe Kommentar dort) -
+       richtig gedacht, an dieser Stelle aber unangenehm. Eigenes Ticket, eigener Patchnotes-Eintrag. */
+    wurzel.querySelectorAll('[data-atksel-inc]').forEach(b => b.onclick = () => {
+      const k = b.getAttribute('data-atksel-inc');
+      sel[k] = Math.min(avail[k]||0, (sel[k]||0)+1);
+      neuZeichnen();
+    });
+    wurzel.querySelectorAll('[data-atksel-dec]').forEach(b => b.onclick = () => {
+      const k = b.getAttribute('data-atksel-dec');
+      sel[k] = Math.max(0, (sel[k]||0)-1);
+      neuZeichnen();
+    });
+    wurzel.querySelectorAll('[data-atksel-max]').forEach(b => b.onclick = () => {
+      const k = b.getAttribute('data-atksel-max');
+      sel[k] = avail[k]||0;
+      neuZeichnen();
+    });
+    wurzel.querySelectorAll('[data-atksel-none]').forEach(b => b.onclick = () => {
+      const k = b.getAttribute('data-atksel-none');
+      sel[k] = 0;
+      neuZeichnen();
+    });
   }
   // QoL-Vorschlag (20.07.2026, "Flotten-Vorlagen"): benannte, gespeicherte Angriffsauswahlen. Speichert
   // absolute Schiffszahlen (wie die manuelle Auswahl selbst); beim Anwenden wird jeder Wert auf das an
@@ -51221,35 +51469,9 @@
       const attackFleetPower = attackPower(attackFleet, state.activeBasePlanet);
       const attackFleetDf = deployableFighters(attackFleet);
       const attackAway = computeAwayByType(cf);
-      const attackRows = ATTACK_SHIP_KEYS.filter(k => (cf[k]||0) > 0).map(k => {
-        const def = shipDefOrSuper(k);
-        const owned = cf[k]||0;
-        const away = attackAway[k]||0;
-        const available = Math.max(0, owned - away);
-        const selected = Math.min(attackSel[k]||0, available);
-        let capNote = '';
-        if (k==='jaeger') capNote = selected>attackFleetDf.jaeger ? ` <span style="color:#e24b4a;">(nur ${attackFleetDf.jaeger} passen in den Hangar)</span>` : '';
-        if (k==='bomber') capNote = selected>attackFleetDf.bomber ? ` <span style="color:#e24b4a;">(nur ${attackFleetDf.bomber} passen in den Hangar)</span>` : '';
-        const awayNote = away>0 ? ` · <span style="color:#e24b4a;">${away} bereits unterwegs</span>` : '';
-        return `
-          <div class="card-row" style="padding:0.55rem 0.75rem;">
-            <div class="left" style="gap:9px;">
-              <div class="bicon" style="width:28px; height:28px; background:rgba(255,255,255,0.06); border:var(--bw-1) solid var(--line-2);"><canvas data-ship-icon="${def.key}" width="24" height="24" style="display:block;"></canvas></div>
-              <div>
-                <div class="bname" style="font-size:12px;">${def.name}</div>
-                <div class="bmeta">verfügbar: ${available} von ${owned}${awayNote} · Angriffspunkte je Schiff: ${def.atk}${capNote}</div>
-              </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:5px;">
-              <button data-atksel-dec="${k}" style="padding:3px 8px; font-size:12px;">−</button>
-              <span class="lvl-pill" style="min-width:30px; text-align:center;">${selected}</span>
-              <button data-atksel-inc="${k}" style="padding:3px 8px; font-size:12px;">+</button>
-              <button data-atksel-max="${k}" style="font-size:10px; padding:3px 6px;">Max</button>
-              <button data-atksel-none="${k}" style="font-size:10px; padding:3px 6px;">Keine</button>
-            </div>
-          </div>
-        `;
-      }).join('');
+      // Markup aus flottenwahlZeilenHtml() - siehe dort. Bis zum 05.08.2026 stand es hier
+      // inline; das kuenftige Auswahlfeld an den zwoelf Startstellen braucht dieselben Zeilen.
+      const attackRows = flottenwahlZeilenHtml(state.activeBasePlanet, cf, ATTACK_SHIP_KEYS);
       const vetRank = veteranRankOf(state.activeBasePlanet);
       const vetNext = nextVeteranRankOf(state.activeBasePlanet);
       // Zusammenfassungs-Chips: zeigen die aktuelle Auswahl auf einen Blick, ohne durch alle
@@ -51309,32 +51531,10 @@
       refreshShipMiniIcons(attackFleetBox);
       const cfnAttack = document.getElementById('customFleetNameInputAttack');
       if (cfnAttack) cfnAttack.oninput = () => { customFleetName = cfnAttack.value; };
-      attackFleetBox.querySelectorAll('[data-atksel-inc]').forEach(btn => btn.onclick = () => {
-        const k = btn.getAttribute('data-atksel-inc');
-        const sel = getAttackSelection(state.activeBasePlanet, cf);
-        const avail = attackAvailableByType(cf);
-        sel[k] = Math.min(avail[k]||0, (sel[k]||0)+1);
-        render();
-      });
-      attackFleetBox.querySelectorAll('[data-atksel-dec]').forEach(btn => btn.onclick = () => {
-        const k = btn.getAttribute('data-atksel-dec');
-        const sel = getAttackSelection(state.activeBasePlanet, cf);
-        sel[k] = Math.max(0, (sel[k]||0)-1);
-        render();
-      });
-      attackFleetBox.querySelectorAll('[data-atksel-max]').forEach(btn => btn.onclick = () => {
-        const k = btn.getAttribute('data-atksel-max');
-        const sel = getAttackSelection(state.activeBasePlanet, cf);
-        const avail = attackAvailableByType(cf);
-        sel[k] = avail[k]||0;
-        render();
-      });
-      attackFleetBox.querySelectorAll('[data-atksel-none]').forEach(btn => btn.onclick = () => {
-        const k = btn.getAttribute('data-atksel-none');
-        const sel = getAttackSelection(state.activeBasePlanet, cf);
-        sel[k] = 0;
-        render();
-      });
+      // Verdrahtung aus verdrahteFlottenwahlZeilen() - siehe dort. Bis zum 05.08.2026 standen
+      // hier vier gleichfoermige Bloecke inline. render() als Neuzeichner, weil diese Box im
+      // Sekunden-Tick liegt und den vollen Durchlauf braucht.
+      verdrahteFlottenwahlZeilen(attackFleetBox, state.activeBasePlanet, cf, render);
       const atkSelClearBtn = document.getElementById('atkSelClearBtn');
       if (atkSelClearBtn) atkSelClearBtn.onclick = () => {
         const sel = getAttackSelection(state.activeBasePlanet, cf);
@@ -51383,11 +51583,26 @@
             ${!canSendPending ? `<div class="bmeta">Wähle oben mindestens ein Kampfschiff für die Angriffsflotte aus.</div>` : `<div class="bmeta">Wird mit ${ATTACK_SHIP_KEYS.filter(k=>(attackFleetForTarget[k]||0)>0).map(k=>attackFleetForTarget[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ')} angegriffen · Angriffskraft ${attackPower(attackFleetForTarget, state.activeBasePlanet)}</div>`}
           </div>
         `;
+        /* Der Knopf startet nicht mehr direkt, sondern oeffnet das Flottenwahl-Feld (05.08.2026,
+           Schritt 2). Bis hierher schickte er los, was irgendwann einmal weiter oben eingestellt
+           worden war - sichtbar nur, wenn man gerade auf diesen Unterreiter schaute.
+           Der Auftrag ruft am Ende die UNVERAENDERTE attackPlayer()-Funktion; die Flotte kommt
+           dort weiterhin aus buildAttackFleet, das Feld hat sie nur vorher bearbeitet. Deshalb
+           koennen die 22 Lesestellen von buildAttackFleet der Bedienung nicht widersprechen:
+           Es entsteht eine zweite BEDIENSTELLE, keine zweite QUELLE. */
         const pendingBtn = document.getElementById('pendingAttackBtn');
         if (pendingBtn) pendingBtn.onclick = () => {
           const target = pendingAttackTarget;
-          pendingAttackTarget = null;
-          attackPlayer(target.id, target.name);
+          oeffneFlottenwahl({
+            art: 'Angriff auf einen Spieler',
+            titel: target.name + ' angreifen',
+            keys: ATTACK_SHIP_KEYS,
+            fracht: true,
+            startLabel: 'Angriff starten',
+            sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((n,k)=>n+(flotte[k]||0),0) > 0
+              ? null : 'Wähle mindestens ein Schiff aus.',
+            start: () => { pendingAttackTarget = null; attackPlayer(target.id, target.name); }
+          });
         };
         const cancelBtn = pendingAttackBox.querySelector('[data-cancel-pending-attack]');
         if (cancelBtn) cancelBtn.onclick = () => { pendingAttackTarget = null; render(); };
