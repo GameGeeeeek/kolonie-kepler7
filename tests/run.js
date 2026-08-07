@@ -93,9 +93,14 @@ if (!nurPflicht) {
     melde(datei.padEnd(28) + dauer.padStart(5) + (uebersprungen ? '  [übersprungen]' : ''), ok);
     if (!ok) {
       // Bei Fehlschlag die FAIL-Zeilen zeigen, damit man nicht erst einzeln nachstarten muss.
-      const zeilen = ausgabe.split('\n').filter(l => /^FAIL|Error|Cannot find/.test(l)).slice(0, 6);
+      // `FEHLER` gehört mit ins Muster: umgebung.js bricht mit "FEHLER: Playwright nicht gefunden"
+      // ab, und genau diese Zeile fiel vorher durch den Filter. Der erste CI-Lauf (07.08.2026)
+      // meldete deshalb 123-mal "Zeitüberschreitung oder Absturz" - beides falsch, die Ursache
+      // stand die ganze Zeit in der Ausgabe und wurde nur weggefiltert. Ein Diagnosewerkzeug, das
+      // die eine vorhandene Fehlermeldung verschweigt, ist schlimmer als keines.
+      const zeilen = ausgabe.split('\n').filter(l => /^FAIL|FEHLER|Error|Cannot find/.test(l)).slice(0, 6);
       for (const l of zeilen) console.log('         ' + l.slice(0, 160));
-      if (!zeilen.length) console.log('         (keine FAIL-Zeile - Zeitüberschreitung oder Absturz)');
+      if (!zeilen.length) console.log('         (keine Fehlerzeile - Zeitüberschreitung oder stiller Absturz)');
     }
   }
 }
