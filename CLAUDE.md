@@ -29,6 +29,85 @@ abwandern – ein neuer Test gehört ins Repo, sonst gibt es ihn beim nächsten 
 6. **Nach jeder Mechanik-Änderung ALLE Anzeigestellen derselben Größe suchen, nicht nur die eine, die man gerade im Kopf hat.** Der wiederkehrende Fehler dieses Projekts ist nicht die kaputte Mechanik – die stimmte jedes Mal –, sondern eine **zweite Anzeigestelle, die die alte Annahme behielt**. Vier Belege in einer einzigen Session (25.07.2026): (a) die PvP-Angriffsvorschau urteilte noch binär („erfolgversprechend"/„aussichtslos"), obwohl der Kampf seit v8.295.0 in drei Phasen mit 10–90%-Deckel läuft – die NPC-Vorschau war längst umgestellt, PvP nicht; (b) direkt daneben hatte das Bedrohungs-Banner eigene Schwellen und konnte der Vorschau widersprechen; (c) der Hilfe-Abschnitt „Kampfphasen" nannte nur die 5%/95% der NPC-Kämpfe; (d) 15 Event-Texte schickten Spieler auf Erkundungen, obwohl die Teile nur auf Expeditionen fallen. Konkretes Vorgehen: nach dem Umbau **erst greppen, dann committen** – nach dem Namen der geänderten Funktion/Konstante (`grep -n "battleWinChance\|PHASE_CHANCE"`), nach den Wörtern, mit denen die Größe dem Spieler präsentiert wird (Chance, Prozent, „%", Verdikt-Formulierungen), und nach den Grenzwerten als Literal („95%", „5%"). Jede Fundstelle einzeln prüfen: sagt sie noch die Wahrheit? Betroffen sind erfahrungsgemäß Vorschau, Banner/Kurzurteil, Bericht, HELP_SECTIONS, TUTORIAL_STEPS und die `desc`-Texte der DEFS-Arrays.
 7. **Jeder neue Inhalt braucht Icon UND vollständige Beschreibung (Pflicht, keine Ausnahme).** Wird irgendetwas Neues hinzugefügt – Forschung (`RESEARCH_DEFS`), Gebäude (`BUILDING_DEFS`), Schiff (`SHIP_DEFS`/Superschiffe), Modul, Offizier, Doktrin, Event, Item usw. –, gehört von Anfang an dazu: (a) ein **eigenes Icon** (handgezeichnetes SVG in `ICONS`/`RES_ICONS`/`SHIP_HULL_DEFS` per Key, oder ein gültiges `ti-*`-Icon aus der 69er-Whitelist; der `iconHtmlFor`-Fallback auf `ti-flask` ist nur Notnagel, kein Ersatz) **und** (b) eine **vollständige, selbsterklärende `desc`/`effectDesc`** – ein ganzer Satz, der Wirkung und ggf. Stapelverhalten/Deckel nennt (Vorbild: `rexpedition`), **nicht** nur ein knapper Kürzel-Text wie „Lagerkapazität (vertieft)" (Spieler-Report 22.07.2026: das las sich wie eine fehlende Beschreibung). Nach dem Einfügen prüfen: `node check-icons.js` (Icon) und einen Render-Blick auf die Karte (Beschreibung erscheint vollständig).
 
+## Arbeitsregeln aus gemachten Fehlern (05.–06.08.2026, auf Wunsch von Sascha festgehalten)
+
+Jede dieser Regeln ist die Destillation eines Fehlers, der in diesen zwei Tagen WIRKLICH passiert
+ist. Sie gelten ab sofort, nicht als Empfehlung. **Diese Liste ist fortlaufend**: Wer (auch in
+künftigen Sitzungen) einen eigenen Fehler macht, der eine übertragbare Regel hergibt, trägt ihn
+hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
+
+**Tests:**
+1. **Jeder neue Test braucht eine Gegenprobe, und sie wird in BEIDE Richtungen ausgeführt** –
+   grün am neuen Stand, rot am alten (per `git show HEAD:datei` oder gezielt kaputtgemachter
+   Kopie). Der Prestige-Test war DREIMAL hintereinander scheinbar grün, ohne irgendetwas zu
+   belegen: Knopf hieß „Zurücksetzen" statt „Prestige" (kein Klick, kein Reset, „hat überlebt"
+   bestand trivial), dann Knopf disabled (Testspielstand unter der Punktschwelle), dann fehlte der
+   Klick auf die Bonus-Auswahl, die den Reset erst schreibt. Aufgefallen ist alles NUR an der
+   Gegenprobe.
+2. **Gegenproben vergleichen gegen den GEMESSENEN Ausgangsstand, nie gegen eingetippte Zahlen.**
+   Die Prestige-Gegenprobe verglich gegen feste `28`/`8` und wurde selbst wertlos, als der
+   Spielstand angehoben wurde – sie meldete „zurückgesetzt", obwohl nichts geschehen war.
+3. **Tests prüfen die REGEL, nicht die Momentaufnahme.** `test_recycler_sammelauftrag` verglich
+   eine Rückgabezeile Zeichen für Zeichen und schlug an, sobald ein weiterer Summand dazukam –
+   obwohl die geprüfte Eigenschaft unverändert galt. Richtig: prüfen, dass der Term Teil des
+   Rückgabewerts IST, egal was sonst noch dort steht.
+4. **Fixture-Schlüssel und Bediennamen aus dem Code ablesen, nie raten.** Erfunden wurden:
+   Unter-Reiter `'rangliste'` (heißt `'rang'`; bei unbekanntem Schlüssel blendet die Anzeige stur
+   ALLE Panels aus), Knopftext „Prestige" (heißt „Zurücksetzen"), Funktionsname
+   `zeichneSchiffsIcons` (heißt `refreshShipMiniIcons`). Vor Benutzung: `grep`.
+5. **`document.querySelector` in Tests IMMER auf den Container beschränken.** Die
+   `data-atksel-*`-Knöpfe existieren doppelt (alte Box UND Overlay); der ungescopte Selektor traf
+   die Box, änderte den GEMEINSAMEN Zustand, und das Overlay stand scheinbar still – der Test
+   verglich zweimal denselben Stand und schien zu beweisen, die Vorschau sei tot.
+6. **Ein Slice mit `indexOf`-Endanker prüft zuerst, dass der Anker EXISTIERT.** Fehlt er (genau
+   der Fall im alten Stand, gegen den der Test anschlagen soll), liefert `indexOf` −1, der Slice
+   läuft fast bis zum Dateiende, und die Prüfung wird vacuous. Ebenso: `lastIndexOf` statt
+   `indexOf`, wenn ein KOMMENTAR denselben Text zitieren könnte wie der Code.
+7. **Messen, was gemessen werden soll – nicht den Deckel.** Ein Testspielstand mit kleinem Lager
+   maß den Lagerdeckel statt der Offline-Nachholung (Endstand landete exakt auf der Kappe, jeder
+   weitere Sprung ergab zwangsläufig 0). Erwartungswerte aus dem Spiel ableiten (Rate messen),
+   nicht raten; Zeitachse ist `lastTick` aus dem Spielstand, nicht die Wanduhr des Tests.
+8. **Eingefrorene Tabs simuliert man, indem man NUR `Date.now()` vorstellt** – nie die Uhr-Hilfen
+   des Browsertreibers (die feuern versäumte Timer nach und heilen das Spiel künstlich) und nie
+   per Proxy um `Date` (Endlosrekursion, und die Doppelgutschrift-Prüfung war dadurch scheinbar
+   grün, weil nie etwas gutgeschrieben wurde).
+9. **Erwartungen im Test mitziehen, wenn sich der Testablauf ändert.** Nach Umbau des Ablaufs auf
+   „nur Kreuzer wählen" prüfte die Endkontrolle noch auf die Jäger des alten Ablaufs – der Test
+   fiel auf korrektem Code durch.
+
+**Befunde und Auslieferung:**
+10. **Befunde von Hilfsläufen erst am Code verifizieren, DANN weitergeben.** Zwei als
+    „Hausregel-Verstoß" gemeldete Funde (`exoticFpProdMult` als rohe Multiplikation, fehlender
+    Boden bei `tiefenraum`) hielten der Nachprüfung nicht stand – die ganze FP-Kette ist bewusst
+    multiplikativ, und der Boden fehlt nur bei Termen, die mit Stufenzahlen skalieren. Beides war
+    an Sascha schon weitergegeben und musste zurückgenommen werden. Ebenso prüfen, ob ein Melder
+    die veraltete `index.html` statt `weltraum_kolonie.html` gelesen hat (Zeilennummern passen
+    dann auf die falsche Datei).
+11. **Patchnotes sind Versprechen – Behauptungen darin vorher messen.** Der Eintrag zu v8.418.0
+    versprach, die Erkennungsschwelle liege „hoch genug" – sie lag bei 90 s und damit ÜBER dem
+    Takt, in dem Browser gedrosselte Tabs wecken (~60 s); der eigene Patchnote-Eintrag war eine
+    Stunde später die „zweite Anzeigestelle mit der alten Annahme".
+12. **Bei jeder neuen Schwelle beide Seiten durchdenken: Was passiert KNAPP DARUNTER – und wirft
+    der Zweig darunter Zustand weg?** Die 90-s-Schwelle mit bedingungslosem
+    `lastTick = Date.now()` darunter löschte dauerhaft 59 von 60 Sekunden (gemessen 1,5 %).
+    Eine Schwelle entscheidet den Rechenweg, nie, ob Zeit/Zustand zählt. Und die Gegenrichtung
+    mitprüfen: dieselbe Behebung schrieb zunächst eine Sekunde je Nachholung DOPPELT gut (+1,7 %).
+13. **Nach einem Squash-Merge ist ein später aus der Oberfläche erzeugter PR desselben Branches
+    ein DUPLIKAT** – vor dem Mergen `git diff origin/master <branch>` prüfen; ist er leer,
+    schließen statt mergen (passiert bei Backend-PR #79).
+
+**Arbeitsumgebung:**
+14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
+    live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
+    Auslieferung selbst).
+15. **Auf das Suite-Ende über eine Marker-Zeile warten (`EXIT=` in der Log-Datei), nicht per
+    `pgrep`** – das eigene Warte-Kommando enthält den Suchbegriff und meldet ewig „läuft".
+    Kein `pkill` mit breitem Muster: es traf die eigenen Wartejobs und einmal die eigene Shell
+    mitsamt dem anstehenden Commit (Exit 144).
+16. **Python-Ersetzskripte brechen bei `count != 1` ab, bevor sie schreiben** – genau das hat
+    einen stillen Fehlgriff verhindert, als das Veteranen-Icon-Markup anders aussah als erwartet.
+    Dieses Muster beibehalten.
+
 ## Icon-Font ist ein SUBSET (seit v8.296.0)
 
 Der eingebettete Icon-Font enthält **nur die 69 tatsächlich verwendeten Icons** (10,8 KB), nicht mehr den kompletten Tabler-Font (446,7 KB / 5.071 Glyphen). Das spart bei jedem Seitenaufruf rund ein Drittel der Übertragung (gzip 1.345 KB → 919 KB), weil Base64 um ein Drittel aufbläht und WOFF2 als bereits komprimiertes Format von gzip kaum noch profitiert.
