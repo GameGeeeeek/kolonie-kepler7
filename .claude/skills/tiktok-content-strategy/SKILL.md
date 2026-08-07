@@ -187,7 +187,7 @@ mindestens drei davon.
 | Säule | Was es zeigt | Ab wann filmbar | Beispielaufhänger |
 |---|---|---|---|
 | **Tagebuch** | Dasselbe Konto wächst | Tag 1 | „Tag 6. Immer noch ein Schiff." |
-| **Entscheidung** | Zwei Wege, ein Zug | Tag 1 | „Mine oder Forschungslabor?" |
+| **Entscheidung** | Zwei Wege, ein Zug | Tag 1 | „Solarkraftwerk oder Erzmine?" |
 | **Patch-Video** | Was diese Woche neu ist | jederzeit | Neues Feld, neues Schiff, behobener Ärger |
 | **Erklärstück** | Eine Mechanik in 30 s | Tag 1 | Warum Offline-Ertrag gedeckelt ist |
 | **Galaxie lebt** | Dass andere real mitspielen | Tag 1 (klein) / später (groß) | Fraktionsgebiet, Bestenliste – später Weltboss |
@@ -224,7 +224,14 @@ Brauchbare Muster für dieses Spiel:
 - **Widerspruch:** „Ein Weltraumspiel ohne einen einzigen 3D-Effekt. Und ich
   komme trotzdem nicht davon los."
 - **Entscheidung an den Zuschauer:** „Du hast Rohstoffe für genau ein Gebäude.
-  Mine oder Forschungslabor?" – Antwort erst am Ende.
+  Welches?" – Antwort erst am Ende. **Gegenprobe nicht vergessen, welche
+  Antworten überhaupt möglich sind:** Der Startbestand ist Energie 10 und Erz 10
+  (`:16380`), das Solarkraftwerk kostet 10 Erz, die Erzmine 15 Energie und das
+  Forschungslabor 150 Energie plus 80 Kristalle (`BUILDING_DEFS`; auf Stufe 0
+  ist die Kosten gleich `baseCost`, `costFor` `:16579`). An Tag 1 ist also **nur
+  das Solarkraftwerk** bezahlbar – ein Hook, der Mine oder Labor zur Wahl
+  stellt, beschreibt eine Entscheidung, die es nicht gibt. Diese Skill hatte
+  genau den Fehler im ersten Entwurf.
 - **Fehler zugeben:** „Ich habe alles in einen Schiffstyp gesteckt. Das war
   falsch." (Konterrollen: reine Masse eines Typs ist selten die beste Antwort –
   echte Mechanik, keine erfundene Pointe. Zahl erst nennen, wenn sie im eigenen
