@@ -6143,8 +6143,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.423.0';
+  const VERSION = '8.424.0';
   const PATCHNOTES = [
+    { version:'8.424.0', date:'06.08.2026', changes:[
+      '<strong>Das Flottenwahl-Feld jetzt auch bei den beiden zeitkritischen Einsätzen:</strong> <strong>Piraten abfangen</strong> und <strong>Leerenriss schließen</strong>. Ausgerechnet dort war der alte Umweg am teuersten – zum Zusammenstellen musste man in den Galaxie-Tab wechseln, während der Countdown lief, und die Flugzeitprüfung scheiterte dann an genau den Sekunden, die der Tab-Wechsel gekostet hatte. Jetzt öffnet sich das Feld direkt am Knopf, <strong>mit live tickendem Countdown</strong>: „Die Piraten ziehen ab in 8m 51s – die Flotte muss vorher ankommen."',
+      'Damit sind drei der zwölf Startstellen auf das neue Feld umgestellt (Spielerangriff, Piraten abfangen, Leerenriss). Die übrigen folgen; danach verschwindet die alte Auswahl-Box im Galaxie-Tab.'
+    ]},
     { version:'8.423.0', date:'05.08.2026', changes:[
       '<strong>Neu: Das Flottenwahl-Feld erscheint dort, wo du angreifst.</strong> Bisher gab es im ganzen Spiel <strong>zwölf</strong> Stellen, an denen eine Flotte losfliegt – und <strong>genau eine</strong>, an der man Schiffe auswählen konnte. Wer aus der Bestenliste, der Sektorkarte, einem Bericht oder dem Allianz-Tab angriff, schickte etwas los, das er woanders eingestellt hatte und im Moment des Klicks gar nicht sah. Jetzt öffnet sich beim Angriff ein Feld mit allen Schiffstypen, den Reitern <strong>„Komplette Flotte"</strong>, <strong>„Ohne Zivilschiffe"</strong> und <strong>„Nichts"</strong>, deinen gespeicherten Flotten-Vorlagen sowie Schiffszahl, Angriffskraft und Frachtraum auf einen Blick.',
       '<strong>Und es warnt, bevor es zu spät ist.</strong> Fliegst du ohne Frachter los, sagt das Feld dir das vorher – bisher erfuhr man „Keine Frachter mitgeführt, Beute ging verloren" erst im Bericht <em>nach</em> dem Kampf. Fehlt die Auswahl ganz, ist der Startknopf gesperrt und der Grund steht ausgeschrieben daneben, statt dass man rätselt.',
@@ -17824,9 +17828,29 @@
     }
     zeichneFlottenwahl();
     ov.classList.add('open');
+    fwahlCountdownStart();
+  }
+  /* Countdown fuer zeitkritische Auftraege (Piraten abfangen, Leerenriss): NUR der Textknoten
+     wird im Sekundentakt beschrieben, nie das Markup - ein voller Neuaufbau je Sekunde waere
+     exakt die Tick-Falle, gegen die dieses Overlay gebaut ist. Der Zeiger liegt ausserhalb der
+     Zeichenfunktion, damit ein Neuzeichnen (Klick auf +/-) keinen zweiten Zaehler startet. */
+  let fwahlCountdownTimer = null;
+  function fwahlCountdownStart(){
+    if (fwahlCountdownTimer){ clearInterval(fwahlCountdownTimer); fwahlCountdownTimer = null; }
+    if (!fwahlAuftrag || !fwahlAuftrag.countdownBis) return;
+    const tick = () => {
+      const el = document.querySelector('#fwahlOverlay [data-fwahl-count]');
+      if (!el){ clearInterval(fwahlCountdownTimer); fwahlCountdownTimer = null; return; }
+      const rest = Math.max(0, (fwahlAuftrag && fwahlAuftrag.countdownBis || 0) - Date.now());
+      el.textContent = fmtDuration(rest/1000);
+      if (rest <= 0){ clearInterval(fwahlCountdownTimer); fwahlCountdownTimer = null; }
+    };
+    fwahlCountdownTimer = setInterval(tick, 1000);
+    tick();
   }
   function schliesseFlottenwahl(){
     fwahlAuftrag = null;
+    if (fwahlCountdownTimer){ clearInterval(fwahlCountdownTimer); fwahlCountdownTimer = null; }
     const ov = document.getElementById('fwahlOverlay');
     if (ov) ov.classList.remove('open');
   }
@@ -52073,8 +52097,29 @@
               <div style="margin-top:6px;">${fleetTooltip}</div>
             </div>
           `;
+          /* Oeffnet das Flottenwahl-Feld statt direkt zu starten (05.08.2026, Schritt 4b).
+             GERADE WEIL es hier zeitkritisch ist: Bis hierher musste man zum Zusammenstellen in
+             den Galaxie-Tab wechseln, waehrend der Countdown lief - der Umweg kostete genau die
+             Sekunden, an denen die Flugzeitpruefung dann scheiterte. Das Feld zeigt den
+             Countdown live (nur der Textknoten tickt, siehe fwahlCountdownStart).
+             sendInterceptPirateMission prueft beim Start selbst noch einmal alles
+             (Flugzeit, Treibstoff, Slots) - die Sperre hier ist Komfort, keine Autoritaet. */
           const interceptBtn = document.getElementById('interceptPiratesBtn');
-          if (interceptBtn) interceptBtn.onclick = sendInterceptPirateMission;
+          if (interceptBtn) interceptBtn.onclick = () => {
+            const raid = state.pirateDebrisRaid;
+            if (!raid) return;
+            oeffneFlottenwahl({
+              art: 'Zeitkritisch · Piraten abfangen',
+              titel: 'Piraten bei '+planetDisplayName(raid.planetKey)+' abfangen',
+              keys: ATTACK_SHIP_KEYS,
+              countdownBis: raid.endTime,
+              vorschau: () => `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Die Piraten ziehen ab in <strong data-fwahl-count>…</strong> – die Flotte muss vorher ankommen.</div>`,
+              startLabel: 'Abfangen',
+              sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((n,k)=>n+(flotte[k]||0),0) > 0
+                ? null : 'Wähle mindestens ein Schiff aus.',
+              start: sendInterceptPirateMission
+            });
+          };
         }
       } else {
         pirateDebrisRaidBox.innerHTML = '';
@@ -52106,8 +52151,23 @@
               </div>
             </div>
           `;
+          // Gleiches Muster wie beim Piraten-Abfangen direkt darueber - zweiter zeitkritischer Fall.
           const vrBtn = document.getElementById('closeVoidRiftBtn');
-          if (vrBtn) vrBtn.onclick = sendVoidRiftMission;
+          if (vrBtn) vrBtn.onclick = () => {
+            const rift = state.voidRift;
+            if (!rift) return;
+            oeffneFlottenwahl({
+              art: 'Zeitkritisch · Leerenriss',
+              titel: 'Leerenriss über '+planetDisplayName(rift.planetKey)+' schließen',
+              keys: ATTACK_SHIP_KEYS,
+              countdownBis: rift.endTime,
+              vorschau: () => `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Der Riss kollabiert in <strong data-fwahl-count>…</strong> – die Flotte muss vorher ankommen.</div>`,
+              startLabel: 'Riss schließen',
+              sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((n,k)=>n+(flotte[k]||0),0) > 0
+                ? null : 'Wähle mindestens ein Schiff aus.',
+              start: sendVoidRiftMission
+            });
+          };
         }
       } else {
         voidRiftBox.innerHTML = '';
