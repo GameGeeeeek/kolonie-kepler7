@@ -39,6 +39,17 @@ check('1b: beide Beitragstellen (Basis + Handelswelt) nutzen die per-Klasse-Mult
 check('1c: fleetCargoCapacity nutzt dieselben Marken-Terme (eine Größe, zwei Stellen, EIN Term)',
   fcc.includes("shipMarkBonus('frachter', 'cargo')") && fcc.includes("shipMarkBonus('frachtergross', 'cargo')"));
 
+// ---- 1d) Anzeige (v8.432.0, Wunsch Sascha): die Frachter-Karten zeigen die AKTUELLEN Werte,
+// gerechnet mit DENSELBEN Termen (Cargo-Modul klassenweit, Marke je Klasse) - keine dritte Formel.
+{
+  const fKarte = (JS.match(/else if \(def\.key==='frachter'\)\{[\s\S]{0,900}?\n      \}/) || [''])[0];
+  const gKarte = (JS.match(/else if \(def\.key==='frachtergross'\)\{[\s\S]{0,900}?\n      \}/) || [''])[0];
+  check('1d: beide Karten zeigen "Frachtraum aktuell" mit den echten Multiplikatoren',
+    fKarte.includes('Frachtraum aktuell') && fKarte.includes("shipMarkBonus('frachter','cargo')") &&
+    gKarte.includes('Frachtraum aktuell') && gKarte.includes("shipMarkBonus('frachtergross','cargo')") &&
+    fKarte.includes("shipModuleBonusFor('frachter','cargo')") && gKarte.includes("shipModuleBonusFor('frachter','cargo')"));
+}
+
 // ---- 2) Erwartung aus der Datei rechnen: Zivil-Familie, cargo je Stufe, Mk-Maximum
 const cargoStep = Number((JS.match(/zivil:\s*\{[^}]*cargo:([\d.]+)/) || [])[1]);
 const mkMax = Number((JS.match(/const SHIP_MARK_MAX = (\d+)/) || [])[1]);
