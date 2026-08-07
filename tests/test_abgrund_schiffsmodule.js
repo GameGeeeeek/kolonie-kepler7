@@ -41,7 +41,7 @@ function arrAus(name){
   return js.slice(s, k+1);
 }
 const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1]);
-const lade = n => new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund'; return "+arrAus(n))();
+const lade = n => new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss'; return "+arrAus(n))();
 
 const SHIP_MODULE_DEFS = lade('SHIP_MODULE_DEFS');
 const SHIP_CLASS_DEFS  = lade('SHIP_CLASS_DEFS');

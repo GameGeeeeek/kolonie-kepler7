@@ -181,7 +181,7 @@ const MD = (() => {
   for (; k<js.length; k++){ if(js[k]==='[')d++; else if(js[k]===']'){d--; if(!d)break;} }
   // Die desc-Texte enthalten HTML, aber keine Funktionsaufrufe - das Array ist als Literal lesbar,
   // sobald die beiden Herkunfts-Konstanten definiert sind.
-  return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund'; return "+js.slice(s,k+1))();
+  return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss'; return "+js.slice(s,k+1))();
 })();
 const abgrundKeys = MD.filter(d => d.quelle === 'abgrund').map(d => d.key);
 check('C: die echten MODULE_DEFS tragen die Abgrund-Module', abgrundKeys.length >= 4, abgrundKeys);
