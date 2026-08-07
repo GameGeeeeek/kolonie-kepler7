@@ -40,8 +40,13 @@ function backend(){ return async r => {
   // KEIN benanntes Set darf 'raidloss' (server-nachgerechnete PvP-Beute) oder 'atk' (Schiffsklassen-Angriff) tragen.
   const fs = require('fs');
   const src = fs.readFileSync(SPIELDATEI,'utf8');
-  const defsBlock = src.slice(src.indexOf('const MODULE_SET_DEFS = ['), src.indexOf('// Welche benannten Sets'));
-  check('MODULE_SET_DEFS-Block gefunden', defsBlock.length>100);
+  // Endanker seit v8.433.0 das Array-Ende selbst (Arbeitsregel 6: der alte Kommentar-Anker
+  // "// Welche benannten Sets" fiel mit activeSetsAt weg, und der Slice lief bis fast ans
+  // Dateiende - die atk-Pruefung schlug auf fremdem Code an, "Block gefunden" blieb vacuous gruen).
+  const defsStart = src.indexOf('const MODULE_SET_DEFS = [');
+  const defsEnde = src.indexOf('\n  ];', defsStart);
+  const defsBlock = (defsStart >= 0 && defsEnde > defsStart) ? src.slice(defsStart, defsEnde + 5) : '';
+  check('MODULE_SET_DEFS-Block gefunden (mit existierendem Endanker)', defsBlock.length > 100 && defsBlock.length < 20000, defsBlock.length);
   check('kein Set berührt raidloss (PvP-Parität)', !/raidloss\s*:/.test(defsBlock));
   check('kein Set berührt atk (PvP-Parität)', !/\batk\s*:/.test(defsBlock));
   check('moduleBonusAt integriert setBonusAt additiv', /moduleSetMult\(planetKey\)\s*\+\s*setBonusAt\(planetKey,\s*effect\)/.test(src));
