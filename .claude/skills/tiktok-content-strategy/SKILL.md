@@ -71,10 +71,20 @@ Vorteil als Einschränkung:
   (rund 4 Tage, endet vorzeitig beim ersten eigenen Angriff), und ein
   **Tutorial über 10 Schritte**.
 
-Was **nicht** geht, und das ehrlich einplanen: Weltboss, Allianz-Raid und
-große Flottenkämpfe sind an echten Fortschritt gebunden, nicht an die
-Oberfläche. Sie sind in Woche 1 nicht filmbar. Zwei zulässige Auswege,
-**beide nur so**:
+Was **nicht** geht, und das ehrlich einplanen. Hier ist genau zu trennen
+zwischen **sehen** und **schaffen** – am laufenden Tag-1-Konto nachgesehen:
+
+- **Sichtbar ist fast alles.** Der Galaxie-Reiter zeigt an Tag 1 den Weltboss
+  („Leviathan der Leere – Stufe 1", mit HP-Balken und Angriffsknopf), das
+  Piratenversteck und alle vier NPC-Fraktionen mit Flottenstärke und Beute.
+  Das ist filmbar, und zwar sofort.
+- **Zu schaffen ist nichts davon.** Neben jedem Ziel steht „Erfolgschance ~5%"
+  und „Deine Angriffskraft: 0 (keine Schiffe gewählt)". Genau das ist der
+  ehrliche Stoff: nicht der Sieg, sondern die 5 %.
+
+Ein Video darf also den Weltboss zeigen – es darf nur nicht so tun, als sei er
+zu gewinnen. Zwei zulässige Auswege für alles, was wirklich Fortschritt
+braucht, **beide nur so**:
 
 1. **Warten und die Serie tragen lassen.** Das Konto reift mit dem Kanal; der
    Weltboss-Clip ist dann Folge 20 und keine Behauptung.
