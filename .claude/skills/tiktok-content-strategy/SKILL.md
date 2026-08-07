@@ -21,6 +21,46 @@ sondern **Entscheidung, Fortschritt und geteilte Galaxie**.
 Nicht dafür: bezahlte Werbung, TikTok-Shop, Influencer-Verträge. Dafür fehlen
 im Repo die Grundlagen, und geraten wird hier nichts.
 
+## Festgelegt: alle Aufnahmen von einem frischen Konto
+
+Entscheidung von Sascha (07.08.2026). Gefilmt wird **nicht** von einem weit
+entwickelten Konto, sondern von einem neuen – der Zuschauer sieht genau das,
+was er nach dem Klick selbst bekommt. Das ist die Prämisse, unter der jedes
+Skript entsteht, und sie ist mehr Vorteil als Einschränkung:
+
+- **Der Einstieg ist der Inhalt.** Die häufigste Enttäuschung bei Spiel-Videos
+  ist die Lücke zwischen Aufnahme und eigenem Konto. Die gibt es hier nicht.
+- **Alle zwölf Reiter sind ab Sekunde eins offen.** Im Code existiert keine
+  Tab-Sperre (kein `tabLocked`/`isTabUnlocked`), die Knöpfe stehen alle
+  unbedingt im Markup (`weltraum_kolonie.html:3052–3066`). Auch **Galaxie** und
+  **Sektorkarte** sind an Tag 1 begehbar – die geteilte Galaxie, die
+  Fraktionsgebiete und die anderen Spieler sind also von Anfang an filmbar.
+- **Das Startkonto hat genau ein Schiff** – ein Erkundungsschiff, sonst nichts
+  (`fleet: { ships: 1, … }` im Startzustand, `weltraum_kolonie.html:16396`;
+  `key:'ships'` heißt „Erkundungsschiffe", `:16832`). Diese Zahl ist ein
+  Geschenk für Hooks und stimmt nachprüfbar. **Achtung beim Nachschlagen:**
+  `ships:1` steht dreimal in der Datei – die beiden anderen Stellen (`:24131`,
+  `:24330`) sind Prestige- und Aszensions-Reset, nicht der Neustart. Genau so
+  ein Fehlgriff ist der Grund für die Belegzeile im Ausgabeformat.
+
+Was **nicht** geht, und das ehrlich einplanen: Weltboss, Allianz-Raid und
+große Flottenkämpfe sind an echten Fortschritt gebunden, nicht an die
+Oberfläche. Sie sind in Woche 1 nicht filmbar. Zwei zulässige Auswege,
+**beide nur so**:
+
+1. **Warten und die Serie tragen lassen.** Das Konto reift mit dem Kanal; der
+   Weltboss-Clip ist dann Folge 20 und keine Behauptung.
+2. **Fremdes Endgame nur zitieren, nie als eigenes zeigen** – z. B. die
+   Bestenliste oder ein Fraktionsgebiet im Galaxie-Reiter filmen und sagen,
+   dass dort andere stehen. Was der eigene Kanal nicht erreicht hat, wird nicht
+   so geschnitten, als hätte er es.
+
+**Aufnahmedisziplin, die daraus folgt: Tag 1 gibt es genau einmal.** Ab dem
+ersten Login wird mehr gefilmt, als je gesendet wird – die ersten Klicks, das
+erste Gebäude, das erste Rückkehr-Fenster. Material lässt sich später schneiden,
+aber nicht nachdrehen. Wer erst nach vier Wochen anfängt zu filmen, hat den
+gesamten Einstieg verloren, also genau das, worauf diese Ausrichtung setzt.
+
 ## Grundhaltung: jede Behauptung hat einen Beleg im Repo
 
 Dieses Projekt hat eine Hausregel, die für Marketing genauso gilt wie für Code:
@@ -77,20 +117,29 @@ Sprechsprache, nicht neu erfinden.
 Fünf Säulen, bewusst unterschiedlich im Aufwand. Eine gesunde Woche mischt
 mindestens drei davon.
 
-| Säule | Was es zeigt | Aufwand | Beispielaufhänger |
+| Säule | Was es zeigt | Ab wann filmbar | Beispielaufhänger |
 |---|---|---|---|
-| **Patch-Video** | Was diese Woche neu ist | niedrig | Neues Feld, neues Schiff, behobener Ärger |
-| **Entscheidung** | Zwei Wege, ein Zug | mittel | „Bergbau-Welt oder Festungs-Welt?" |
-| **Fortschritt** | Vorher/nachher am selben Konto | mittel | Tag 1 gegen Tag 30 derselben Kolonie |
-| **Galaxie lebt** | Dass andere real mitspielen | hoch | Fraktionskrieg, Weltboss, Allianz-Raid |
-| **Erklärstück** | Eine Mechanik in 30 s | mittel | Warum Offline-Ertrag gedeckelt ist |
+| **Tagebuch** | Dasselbe Konto wächst | Tag 1 | „Tag 6. Immer noch ein Schiff." |
+| **Entscheidung** | Zwei Wege, ein Zug | Tag 1 | „Mine oder Forschungslabor?" |
+| **Patch-Video** | Was diese Woche neu ist | jederzeit | Neues Feld, neues Schiff, behobener Ärger |
+| **Erklärstück** | Eine Mechanik in 30 s | Tag 1 | Warum Offline-Ertrag gedeckelt ist |
+| **Galaxie lebt** | Dass andere real mitspielen | Tag 1 (klein) / später (groß) | Fraktionsgebiet, Bestenliste – später Weltboss |
 
-**Warum „Galaxie lebt" trotz Aufwand wichtig ist:** Der stärkste Unterschied zu
-den hundert anderen Idle-Spielen ist, dass die Galaxie geteilt und nicht
-generiert ist – NPC-Fraktionen erweitern ihr Gebiet und führen Krieg weiter,
-auch wenn niemand zusieht, und montags kommen Systeme dazu. Das kann kein
-Einzelspieler-Idler behaupten. Diese Säule nicht aus Bequemlichkeit ausfallen
-lassen.
+**Das Tagebuch ist die Wirbelsäule des Kanals**, nicht eine Säule unter fünf.
+Ein frisches Konto hat genau eine Geschichte, die kein anderes Video hat: die
+eigene. Serientitel festlegen („Kolonie-Tagebuch: Tag N"), gleicher
+Bildausschnitt, gleiche Endkachel, gleiche Schlusszahl – die Wiedererkennung
+über Folgen hinweg ist bei einem neuen Kanal wertvoller als jeder einzelne
+Treffer.
+
+**„Galaxie lebt" fällt trotz frischem Konto nicht aus**, sie wechselt nur die
+Perspektive. Der stärkste Unterschied zu den hundert anderen Idle-Spielen ist,
+dass die Galaxie geteilt und nicht generiert ist – NPC-Fraktionen erweitern ihr
+Gebiet und führen Krieg weiter, auch wenn niemand zusieht, und montags kommen
+Systeme dazu. Vom kleinen Konto aus zeigt man das nicht als Machtdemonstration,
+sondern **als Größenverhältnis**: ein Punkt neben Gebieten, die anderen gehören.
+„Ich bin hier der Kleinste" ist als Video ehrlicher und für den Zuschauer
+näher als jeder Endgame-Flex – und er kann es sofort nachstellen.
 
 ## Schritt 3 – Hook (0–3 s)
 
@@ -99,21 +148,31 @@ Der Hook ist der einzige Teil, an dem sich der Erfolg entscheidet. Er muss
 
 Brauchbare Muster für dieses Spiel:
 
-- **Widerspruch:** „Ein Weltraumspiel ohne einen einzigen 3D-Effekt – und ich
-  spiele es seit acht Monaten täglich."
-- **Konkrete Zahl im Bild:** „Diese Kolonie produziert 40.000 Erz pro Stunde.
-  Vor vier Wochen waren es 200." (Zahlen vorher am echten Spielstand ablesen.)
+- **Die kleine Zahl:** „Ich habe genau ein Schiff." (Stimmt am Tag 1 wörtlich –
+  `fleet:{ships:1,…}`. Kleine Zahlen sind für einen neuen Kanal **stärker** als
+  große: nachprüfbar, sofort nachstellbar, und sie erzeugen die Frage „und
+  dann?", die zur nächsten Folge führt.)
+- **Größenverhältnis:** „Das hier gehört alles anderen. Das da bin ich." –
+  Galaxie-Reiter, Fraktionsgebiet, dann der eigene Punkt.
+- **Widerspruch:** „Ein Weltraumspiel ohne einen einzigen 3D-Effekt. Und ich
+  komme trotzdem nicht davon los."
 - **Entscheidung an den Zuschauer:** „Du hast Rohstoffe für genau ein Gebäude.
   Mine oder Forschungslabor?" – Antwort erst am Ende.
-- **Fehler zugeben:** „Ich habe 300 Jäger gebaut. Das war der teuerste Fehler
-  meiner Kolonie." (Konterrollen: reine Masse eines Typs ist selten die beste
-  Antwort – das ist echte Mechanik, keine erfundene Pointe.)
+- **Fehler zugeben:** „Ich habe alles in einen Schiffstyp gesteckt. Das war
+  falsch." (Konterrollen: reine Masse eines Typs ist selten die beste Antwort –
+  echte Mechanik, keine erfundene Pointe. Zahl erst nennen, wenn sie im eigenen
+  Spielstand wirklich so steht.)
 - **Gegen das Genre:** „Kein Download, kein Konto-Zwang, keine Energie-Leiste,
   die dich rauswirft."
 
 Was hier **nicht** funktioniert: „Schaut euch mal dieses Spiel an", jede Form
 von „Du wirst nicht glauben", und alles, was erst nach dem Spielnamen
 interessant wird.
+
+**Vom frischen Konto aus verboten:** jeder Hook, der Erfahrung oder Größe
+behauptet, die das Konto nicht hat – „seit Monaten täglich", „meine Flotte",
+„nach 500 Stunden". Das ist der naheliegendste Griff, weil er Autorität
+vortäuscht, und der erste, den ein Zuschauer im nächsten Bild widerlegt sieht.
 
 ## Schritt 4 – Aufbau
 
@@ -146,7 +205,21 @@ können"). Deshalb:
   lassen, Reiter wechseln. Ein Standbild mit Voiceover verliert.
 - **Untertitel sind Pflicht**, nicht Kür – ein großer Teil schaut ohne Ton.
 - Der Offline-Fortschritt liefert die dankbarste Bildidee überhaupt: das
-  Rückkehr-Fenster mit der Aufstellung dessen, was zusammengekommen ist.
+  Rückkehr-Fenster mit der Aufstellung dessen, was zusammengekommen ist. Auf
+  einem frischen Konto sind die Zahlen darin klein – **das ist kein Mangel,
+  sondern der Beweis, dass ehrlich gefilmt wird.** Nicht auf ein starkes Konto
+  ausweichen, um das Fenster voller aussehen zu lassen.
+
+**Rohmaterial sammeln, nicht pro Video drehen.** Bei jeder Spielsitzung
+mitlaufen lassen und wegsichern; geschnitten wird später. Zwei Dinge dabei
+konsequent festhalten, weil sie sich nie wiederholen:
+
+- **Jeden Sitzungsanfang** – das Rückkehr-Fenster mit der Zeit seit dem letzten
+  Login. Das ist die Zeitachse der ganzen Serie.
+- **Jedes „erste Mal"** – erstes Gebäude, erste Forschung, erstes zweites
+  Schiff, erste Expedition, erster Kontakt mit einem anderen Spieler, erste
+  Niederlage. Diese Aufnahmen sind später der Serienkern und lassen sich mit
+  keinem Aufwand der Welt nachholen.
 
 ## Schritt 6 – Caption, Hashtags, CTA
 
@@ -171,12 +244,19 @@ können"). Deshalb:
 - **3 Videos pro Woche** ist die realistische Untergrenze, bei der ein Kanal
   überhaupt Fahrt aufnimmt. Zwei davon sollten billig produzierbar sein
   (Patch-Video, Erklärstück), damit die Kadenz nicht am Aufwand stirbt.
-- **Ein Serienformat festlegen und durchhalten**, z. B. „Kolonie-Tagebuch:
-  Tag N" mit demselben Konto, derselben Kachel, derselben Endzahl. Serien
-  sammeln Wiedererkennung, Einzelvideos nicht.
+- **Feste Wochenform**, solange das Konto jung ist: eine Tagebuch-Folge
+  (Wirbelsäule), ein Erklärstück oder eine Entscheidung (aus vorhandenem
+  Material schneidbar), ein Patch-Video (Thema kommt von selbst).
+- **Die Tagebuch-Nummerierung ist die Kontozeit, nicht die Sendezeit.** „Tag 6"
+  heißt Tag 6 im Spiel. Wird eine Folge später gesendet, bleibt die Nummer –
+  sonst stimmt die einzige Zahl nicht mehr, die die Serie zusammenhält.
 - **Patch-Tag als Anker:** Jeder Push nach `main` geht sofort live. Ein Video
   am selben Tag zum sichtbarsten Punkt des Patches kostet wenig und hat immer
-  ein Thema.
+  ein Thema. Vorsicht bei der einen Reibung mit dem frischen Konto: Betrifft
+  der Patch etwas, das ein junges Konto gar nicht sieht (Allianzbasis,
+  Superschiffe, späte Forschung), wird es **erklärt statt vorgeführt** – oder
+  es fällt aus. Ein Patch-Video, das Zugriff vortäuscht, kippt die ganze
+  Ausrichtung.
 
 ## Was nicht geht
 
@@ -189,6 +269,11 @@ können"). Deshalb:
   Teilen-Zwang, „kommentiere X für einen Vorteil im Spiel").
 - **Spielvorteile für Social-Media-Aktionen** – das ist auch mechanisch eine
   schlechte Idee, weil belohnte Aktionen im Spiel bewusst gedeckelt sind.
+- **Fortschritt vortäuschen, den das Konto nicht hat.** Kein Umschnitt auf ein
+  starkes Konto, keine Aufnahme aus einer alten Sitzung als „heute", keine
+  Tagesnummer, die nicht der Kontozeit entspricht. Die ganze Ausrichtung „Du
+  siehst genau, was du selbst bekommst" hält nur, solange das ausnahmslos gilt –
+  ein einziger geschönter Clip macht rückwirkend jede vorherige Zahl fraglich.
 
 ## Ausgabeformat
 
@@ -218,5 +303,6 @@ Veröffentlichungsplan mit Sascha klären:
 - Gibt es bereits einen TikTok-Kanal, und wenn ja, mit welchem Bestand?
 - Erscheint eine Person im Bild oder bleibt es reine Bildschirmaufnahme mit
   Stimme/Text?
-- Ein Konto für Aufnahmen (weit entwickelt, hohe Zahlen) oder ein frisches
-  Konto, damit Zuschauer den Einstieg sehen?
+
+Geklärt (07.08.2026): **frisches Konto** – siehe den Abschnitt „Festgelegt"
+oben.
