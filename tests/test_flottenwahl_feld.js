@@ -251,6 +251,73 @@ const MENGEN = () => {
     check('7: keine JS-Fehler', errs2.length === 0, errs2.slice(0,3));
     await ctx2.close();
   }
+
+  // ---- 8) DER NPC-EINSTIEG: Angriffs-Knopf im Galaxie-Tab, mit LIVE-Vorschau.
+  // Flugzeit und Treibstoff standen bisher nur im Kartenmenue, eingefroren auf den Stand beim
+  // Oeffnen. Im Feld muessen sie mit der Auswahl MITZIEHEN - das ist der Kern der Pruefung:
+  // andere Auswahl -> andere Flugzeit.
+  {
+    const ctx3 = await browser.newContext({ viewport:{width:1400,height:1000} });
+    const p3 = await ctx3.newPage(); const errs3 = [];
+    p3.on('pageerror', e => errs3.push(String(e)));
+    const store3 = { 'kepler7-save-v3': SAVE() };
+    await p3.route('**/api/**', backend(store3));
+    await p3.addInitScript(() => localStorage.setItem('kepler7_token','tok'));
+    p3.on('dialog', d => d.accept());
+    await p3.goto(SPIEL_URL); await p3.waitForTimeout(4500);
+    await p3.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(i=>{const o=document.getElementById(i); if(o)o.style.display='none';}));
+    await p3.evaluate(() => {
+      const b=[...document.querySelectorAll('[data-tab]')].find(x=>x.getAttribute('data-tab')==='galaxie');
+      if(b)b.click();
+    });
+    await p3.waitForTimeout(2200);
+    const npcGeklickt = await p3.evaluate(() => {
+      const b = document.querySelector('[data-attack]');
+      if (!b) return null;
+      b.click(); return b.getAttribute('data-attack');
+    });
+    check('8: der NPC-Angriffsknopf öffnet das Feld', !!npcGeklickt && await p3.evaluate(OFFEN), { npc: npcGeklickt });
+    const vorschau = () => {
+      const f = document.querySelector('#fwahlOverlay .fwahl-fuss');
+      const m = (f && f.textContent || '').match(/Flugzeit ~([^·]+)·/);
+      return m ? m[1].trim() : null;
+    };
+    // ALLE Klicks aufs Overlay beschraenkt: Die data-atksel-Knoepfe existieren ZWEIMAL im
+    // Dokument - einmal in der alten Galaxie-Box, einmal im Overlay - und die Box kommt im DOM
+    // zuerst. Der erste Anlauf klickte per document.querySelector die BOX-Knoepfe: Die Auswahl
+    // aenderte sich (gemeinsamer Zustand!), aber das Overlay zeichnete nicht neu, und die
+    // Flugzeit-Pruefung verglich zweimal denselben stehengebliebenen Stand.
+    const imFeld = (sel) => `document.querySelector('#fwahlOverlay ${sel}').click()`;
+    await p3.evaluate(new Function(imFeld('[data-fwahl-alle]')));
+    await p3.waitForTimeout(300);
+    const flugVoll = await p3.evaluate(vorschau);
+    // Die Kreuzer (speed 70, am langsamsten) raus - das langsamste Schiff bestimmt das Tempo,
+    // die Flugzeit MUSS sinken. (Die Jaeger sind ohnehin vom Hangar-Deckel auf 0 gekappt: ohne
+    // Traeger fliegen sie nicht mit - deshalb zaehlt der Fuss hier 40 Schiffe, nicht 100.)
+    await p3.evaluate(new Function(imFeld('[data-atksel-none="cruisers"]')));
+    await p3.waitForTimeout(300);
+    const flugSchnell = await p3.evaluate(vorschau);
+    check('8: die Flugzeit-Vorschau zieht live mit der Auswahl mit',
+      !!flugVoll && !!flugSchnell && flugVoll !== flugSchnell, { flugVoll, flugSchnell });
+    // Fuer den Start: nur die Kreuzer.
+    await p3.evaluate(new Function(imFeld('[data-fwahl-nichts]')));
+    await p3.evaluate(new Function(imFeld('[data-atksel-max="cruisers"]')));
+    await p3.waitForTimeout(300);
+    await p3.evaluate(new Function(imFeld('[data-fwahl-start]')));
+    await p3.waitForTimeout(2000);
+    let npcMission = null;
+    try {
+      const st = JSON.parse(store3['kepler7-save-v3']);
+      npcMission = ((st.fleet||{}).missions||[]).find(x => x.type === 'attack') || null;
+    } catch(e){}
+    // Erwartet werden die 30 KREUZER, die oben gewaehlt wurden - und null Jaeger. (Die Jaeger
+    // koennten hier ohnehin nicht mitfliegen: ohne Traeger kappt der Hangar-Deckel sie auf 0.)
+    check('8: der Start schickt die NPC-Mission mit genau dieser Flotte los',
+      !!npcMission && (npcMission.composition||{}).cruisers === 30 && !((npcMission.composition||{}).jaeger > 0),
+      npcMission ? { ziel: npcMission.targetId, cruisers: npcMission.composition.cruisers, jaeger: npcMission.composition.jaeger||0 } : '(keine Mission)');
+    check('8: keine JS-Fehler', errs3.length === 0, errs3.slice(0,3));
+    await ctx3.close();
+  }
   await browser.close();
   console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
   process.exit(fail ? 1 : 0);

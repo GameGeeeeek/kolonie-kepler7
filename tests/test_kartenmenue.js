@@ -77,7 +77,12 @@ const aktionen = [
   ['Kolonisieren (Mond)', /fn: \(\) => colonizeMoon\(parentKey\)/],
   ['Spaehen', /fn: \(\) => sendSpyMission\(userId, name\)/],
   ['Angreifen (Spieler)', /fn: \(\) => goToAttackPlayer\(userId, name\)/],
-  ['Angreifen (NPC)', /fn: \(\) => sendAttackMission\(npcId\)/]
+  // Seit v8.425.0 fuehrt der Eintrag ueber das Flottenwahl-Feld - die Eigenschaft "fuehrt
+  // wirklich zum NPC-Angriff" gilt weiter, nur als Kette: Menue -> oeffneNpcAngriff -> Feld-Start
+  // -> sendAttackMission. BEIDE Glieder werden geprueft, sonst koennte das Menue ein Feld
+  // oeffnen, dessen Startknopf ins Leere zeigt.
+  ['Angreifen (NPC, oeffnet Feld)', /fn: \(\) => oeffneNpcAngriff\(npcId\)/],
+  ['Angreifen (NPC, Feld startet echt)', /start: \(\) => sendAttackMission\(npcId\)/]
 ];
 for (const [name, re] of aktionen) check('Aktion verdrahtet: '+name, re.test(src));
 

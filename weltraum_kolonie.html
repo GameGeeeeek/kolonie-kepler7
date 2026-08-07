@@ -6143,8 +6143,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.424.0';
+  const VERSION = '8.425.0';
   const PATCHNOTES = [
+    { version:'8.425.0', date:'06.08.2026', changes:[
+      '<strong>Das Flottenwahl-Feld jetzt auch bei allen NPC-Angriffen:</strong> Gegner im Galaxie-Tab, Sektorkarte, <strong>Piratenversteck</strong> und <strong>Weltboss</strong>. Damit sind sieben der zwölf Startstellen umgestellt.',
+      '<strong>Flugzeit und Treibstoff ziehen live mit der Auswahl mit.</strong> Beide standen bisher nur im Kartenmenü, eingefroren auf den Stand beim Öffnen – wer danach die Flotte änderte, sah veraltete Zahlen. Im Feld rechnet jede Änderung sofort nach: Kreuzer raus (das langsamste Schiff bestimmt das Tempo), und aus 58s Flugzeit werden 50s, sichtbar noch vor dem Start.',
+      'Der „Angreifen"-Eintrag im Sektorkarten-Menü war bisher <em>gesperrt</em>, solange im Galaxie-Tab nichts ausgewählt war – mit dem Hinweis, man möge erst dort Schiffe wählen. Diese Sperre ist gegenstandslos geworden: Der Eintrag öffnet jetzt einfach das Feld, und die Auswahl passiert an Ort und Stelle.'
+    ]},
     { version:'8.424.0', date:'06.08.2026', changes:[
       '<strong>Das Flottenwahl-Feld jetzt auch bei den beiden zeitkritischen Einsätzen:</strong> <strong>Piraten abfangen</strong> und <strong>Leerenriss schließen</strong>. Ausgerechnet dort war der alte Umweg am teuersten – zum Zusammenstellen musste man in den Galaxie-Tab wechseln, während der Countdown lief, und die Flugzeitprüfung scheiterte dann an genau den Sekunden, die der Tab-Wechsel gekostet hatte. Jetzt öffnet sich das Feld direkt am Knopf, <strong>mit live tickendem Countdown</strong>: „Die Piraten ziehen ab in 8m 51s – die Flotte muss vorher ankommen."',
       'Damit sind drei der zwölf Startstellen auf das neue Feld umgestellt (Spielerangriff, Piraten abfangen, Leerenriss). Die übrigen folgen; danach verschwindet die alte Auswahl-Box im Galaxie-Tab.'
@@ -17933,6 +17938,32 @@
       schliesseFlottenwahl();
       if (start) start(flotte);
     };
+  }
+
+  // Die Standard-Sperre fast aller Angriffe - einmal definiert statt an jedem Einstieg kopiert.
+  function fwahlMindestensEins(flotte){
+    return ATTACK_SHIP_KEYS.reduce((n,k)=>n+(flotte[k]||0),0) > 0 ? null : 'Wähle mindestens ein Schiff aus.';
+  }
+  /* Gemeinsamer Oeffner fuer NPC-Angriffe (Galaxie-Knoepfe UND Sektorkarten-Menue, 06.08.2026).
+     Die Vorschau rechnet Flugzeit und Treibstoff mit der GERADE GEWAEHLTEN Flotte - jedes +/-
+     zeichnet das Feld neu, die Zahlen ziehen also live mit. Genau diese Zahlen standen bisher nur
+     im Kartenmenue, eingefroren auf den Stand beim Oeffnen. */
+  function oeffneNpcAngriff(npcId){
+    const npc = NPCS.find(n => n.id === npcId);
+    if (!npc) return;
+    oeffneFlottenwahl({
+      art: npc.boss ? 'Gegner · Boss' : 'Gegner',
+      titel: npc.name + ' angreifen',
+      keys: ATTACK_SHIP_KEYS,
+      fracht: true,
+      vorschau: (flotte) => {
+        const dur = missionDurationFor(npc.duration, flotte, ATTACK_SHIP_KEYS, npc.system);
+        return `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Flugzeit ~${fmtDuration(dur)} · Treibstoff ${fuelCostText(missionFuelCostSplit(dur, flotte))}</div>`;
+      },
+      startLabel: 'Angriff starten',
+      sperre: fwahlMindestensEins,
+      start: () => sendAttackMission(npcId)
+    });
   }
 
   function verdrahteFlottenwahlZeilen(wurzel, planetKey, cf, neuZeichnen){
@@ -42307,7 +42338,11 @@
         <button data-attack-worldboss ${(busy||cdLeft>0)?'disabled':''}>${busy?'Angriff läuft ...':cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Leviathan angreifen'}</button>
       </div>`;
     const btn = box.querySelector('[data-attack-worldboss]');
-    if (btn) btn.onclick = () => sendWorldBossMission();
+    if (btn) btn.onclick = () => oeffneFlottenwahl({
+      art: 'Gemeinsamer Boss', titel: worldBossName(b.level)+' angreifen',
+      keys: ATTACK_SHIP_KEYS, startLabel: 'Leviathan angreifen',
+      vorschau: () => `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-info-circle" aria-hidden="true"></i> Einmal pro Tag · Schaden nach Angriffskraft · der Boss schlägt zurück.</div>`,
+      sperre: fwahlMindestensEins, start: () => sendWorldBossMission() });
   }
   function orbitalStationOf(planetKey){ return (state.orbitalStations||{})[planetKey] || null; }
   function orbitalJobFor(planetKey){ return (state.constructionQueue||[]).find(j=>j.kind==='orbital' && j.planet===planetKey) || null; }
@@ -46322,11 +46357,14 @@
     const gewaehlt = ATTACK_SHIP_KEYS.reduce((a,k) => a + (attackFleet[k]||0), 0);
     const dur = npc ? missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS, npc.system) : 0;
     const eintraege = [
+      // Seit v8.425.0 oeffnet der Eintrag das Flottenwahl-Feld - die alte Sperre "erst im
+      // Galaxie-Tab Schiffe waehlen" ist damit gegenstandslos, genau dafuer ist das Feld da.
+      // Flugzeit/Treibstoff stehen jetzt IM Feld und ziehen live mit der Auswahl mit, statt hier
+      // auf den Stand beim Oeffnen eingefroren zu sein.
       { icon:'ti-sword', label:'Angreifen',
-        grund: gewaehlt < 1 ? 'Erst im Bereich „Angriffsflotte zusammenstellen" Schiffe auswählen.'
-          : 'Flugzeit '+fmtDuration(dur)+' · '+fuelCostText(missionFuelCostSplit(dur, attackFleet)),
-        disabled: gewaehlt < 1,
-        fn: () => sendAttackMission(npcId) }
+        grund: 'Öffnet die Flottenwahl.',
+        disabled: false,
+        fn: () => oeffneNpcAngriff(npcId) }
     ];
     openKarteMenu(ev, npc && npc.boss ? 'Gegner · Boss' : 'Gegner', npcName || (npc?npc.name:'NPC'), eintraege);
   }
@@ -51700,7 +51738,10 @@
           <button data-attack-lair ${plCan?'':'disabled'}>${plBusy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Versteck angreifen'}</button>
         </div>`);
       const lairBtn = pirateLairBox.querySelector('[data-attack-lair]');
-      if (lairBtn) lairBtn.onclick = () => sendPirateLairMission();
+      if (lairBtn) lairBtn.onclick = () => oeffneFlottenwahl({
+        art: 'Piratenversteck · Stufe '+(state.pirateLairStage||1), titel: 'Piratenversteck angreifen',
+        keys: ATTACK_SHIP_KEYS, fracht: true, startLabel: 'Versteck angreifen',
+        sperre: fwahlMindestensEins, start: () => sendPirateLairMission() });
     }
     renderAbgrundBox(cf);
     setBoxHtml(document.getElementById('npcList'), 'npcList', NPCS.filter(n => !n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1).map(n => {
@@ -53489,7 +53530,8 @@
     document.querySelectorAll('[data-reloc-all-home]').forEach(btn => btn.onclick = () => relocateAllFleetsHome());
     document.querySelectorAll('[data-research]').forEach(btn => btn.onclick = () => startResearch(btn.getAttribute('data-research')));
     document.querySelectorAll('[data-send]').forEach(btn => btn.onclick = () => sendExploreMission(btn.getAttribute('data-send')));
-    document.querySelectorAll('[data-attack]').forEach(btn => btn.onclick = () => sendAttackMission(btn.getAttribute('data-attack')));
+    // Oeffnet seit v8.425.0 das Flottenwahl-Feld statt direkt zu starten - siehe oeffneNpcAngriff.
+    document.querySelectorAll('[data-attack]').forEach(btn => btn.onclick = () => oeffneNpcAngriff(btn.getAttribute('data-attack')));
     document.querySelectorAll('[data-toggle-hide-locked]').forEach(el => el.onclick = () => { state.uiHideLockedShips = !state.uiHideLockedShips; render(); save(); });
     document.querySelectorAll('[data-buyship]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-buyship');
