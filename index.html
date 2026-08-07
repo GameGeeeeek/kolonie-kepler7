@@ -550,6 +550,17 @@
     #osWrap .abwehr-summe{color:var(--os-grau);letter-spacing:.06em}
     #osWrap .unbekannt{font:400 8.8px/1.35 var(--os-mono);color:var(--os-grau);margin:4px 0 2px;
       border-left:var(--bw-2) solid var(--os-linie);padding-left:6px}
+    /* Aufgabe #11 (07.08.2026, gemessen: scrollHeight 245 zu clientHeight 167): Die Tafeln
+       scrollen auf dem Handy in sich, aber nichts zeigte das an - die letzte Zeile war
+       mittendurch geschnitten und sah wie ein Darstellungsfehler aus. Der Hinweis klebt
+       per position:sticky am unteren Rand des Scrollbereichs und verschwindet am Listenende.
+       position:relative auf der Tafel, damit offsetTop der Zeilen tafelbezogen misst. */
+    #osWrap .tafel{position:relative}
+    #osWrap .tafel-mehr{position:sticky;bottom:-7px;display:block;text-align:center;
+      font:500 8.5px/1.2 var(--os-mono);letter-spacing:.08em;color:var(--os-grau);
+      padding:16px 0 3px;margin:-10px -7px 0;pointer-events:none;transition:opacity .2s;
+      background:linear-gradient(to bottom, rgba(9,12,26,0), rgba(9,12,26,.95) 60%)}
+    #osWrap .tafel.am-ende .tafel-mehr{opacity:0}
 
     /* ---------- Buehne ---------- */
     #osWrap .buehne{position:relative;flex:1 1 auto;min-height:200px;overflow:hidden}
@@ -6169,8 +6180,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.439.0';
+  const VERSION = '8.440.0';
   const PATCHNOTES = [
+    { version:'8.440.0', date:'07.08.2026', changes:[
+      '<strong>Der Leerenriss ist in der Kampf-Wiedergabe jetzt ein Riss.</strong> Bisher standen dort zwei erfundene rote Platzhalter-Schiffe (gemessen: rund 26.600 grüne gegen 1.300 rote Bildpunkte) – der Bericht führt für diese Gefechtsart gar keine Gegnerflotte. Jetzt steht ein pulsierender Riss über dem Planeten, der zurückschießt und sich im Kampfverlauf sichtbar schließt (bei einer Niederlage bleibt er geschwächt stehen). Die Bestandstafel sagt weiterhin ehrlich, dass nur seine Kraft bekannt ist.',
+      '<strong>Die Kraftschiene widerspricht der Gegner-Tafel nicht mehr.</strong> Bei nicht aufgeklärter Gegenseite (Leerenriss, Raid-Boss, PvP im Solo-Modus) zeigte sie stur „Du 100% / 0%", während die Tafel daneben die gemeldete Abwehrkraft nannte – die Schiene zählte nur Schiffsrümpfe, und die Gegenseite hat keine. Sie rechnet jetzt mit den <strong>Kampfkraft-Zahlen des Berichts</strong>: die eigene Seite anteilig zu ihren Verlusten, der Riss zusätzlich mit seinem Schwächerwerden. Dieselbe Rechnung gilt im geteilten Video – eine Helferfunktion für beide Anzeigestellen, damit sie nie wieder auseinanderlaufen können.',
+      '<strong>Die Bestandstafeln zeigen an, dass sie scrollen.</strong> Auf dem Telefon war die letzte Zeile einer langen Flottenliste mittendurch geschnitten und sah wie ein Darstellungsfehler aus – die Tafel scrollte längst, nur sah man es ihr nicht an. Jetzt: weicher Verlauf am unteren Rand plus „▾ N weitere Zeilen"; am Listenende verschwindet beides.'
+    ]},
     { version:'8.439.0', date:'07.08.2026', changes:[
       '<strong>Kampf-Nachwirkungen – Etappe 3 des Modul-Großausbaus.</strong> Drei neue Standort-Module belohnen den Sieg selbst: <strong>Siegesschmiede</strong> (nach jedem gewonnenen NPC-Kampf +Produktion aller Ressourcen für 10 Minuten, gedeckelt +25%), <strong>Kampfrausch-Verstärker</strong> (+Angriffskraft für 10 Minuten, gedeckelt +15%) und <strong>Siegesschirm</strong> (+Verteidigung für 10 Minuten, gedeckelt +25%). Die Wirkung summiert sich imperiumsweit über alle Standorte und läuft über das normale Effekte-System (sichtbar in der Effekte-Leiste im Fortschritt-Tab); ein neuer Sieg <em>erneuert</em> den Schub, er stapelt nicht. Wer von Kampf zu Kampf zieht, hält ihn dauerhaft aufrecht – genau das ist der Build, den diese Module tragen.',
       'Als Sieg zählt jeder gewonnene <strong>NPC-Kampf</strong>: Angriffe auf Piraten, Fraktionen und Nester, abgewehrte Überfälle, abgefangene Trümmerräuber, geschlossene Leerenrisse, verteidigte Expeditionen, Abgrund- und Weltboss-Gefechte. Spieler- und Allianzkämpfe lösen bewusst nichts aus – eine Allianz-Raid-Welle etwa kann nie verloren gehen und wäre ein Dauer-Schub ohne Risiko. Die Angriffskraft-Nachwirkung wirkt wie jeder Angriffs-Effekt auch in PvP-Kämpfen, weil der Server aktive Effekte aus dem Spielstand mitrechnet.'
@@ -27862,6 +27878,12 @@
             d.verteidiger = unbekannteSeite(gegnerName, 'gegner',
                                             r.defensePower || r.enemyPower || r.escortPower || r.riftPower);
             d.luecken.push('Flotte des Gegners');
+            /* Leerenriss (v8.440.0, Aufgabe #8): Diese Gefechtsart hat WIRKLICH keine
+               Gegnerflotte - statt Stellvertreter-Ruempfen zeichnet die Buehne den Riss
+               selbst (zeichneRiss), mit Abwehrfeuer und sichtbarem Schwaecherwerden.
+               PvP bleibt bewusst bei den Stellvertretern: dort gibt es eine echte,
+               nur nicht aufgeklaerte Flotte. */
+            if (r.type === 'void-rift') d.verteidiger.riss = true;
           }
           /* Seit v8.384.0 liefert der Spielerangriff auch die Anlagen des Ziels.
              Im Solo-Modus und bei allen anderen Kampfarten fehlen sie weiterhin -
@@ -29161,9 +29183,12 @@
 
       for (var i = 0; i < ALLE_K.length; i++){
         var k = ALLE_K[i], d = KLASSEN[k];
-        var n = neueRumpfZahl(k), arr = new Array(n);
+        /* Leerenriss (Aufgabe #8): Die Gegenseite bekommt KEINE Stellvertreter-Ruempfe -
+           der Bericht fuehrt keine Flotte, und zwei erfundene Schiffe sahen nach Fehler
+           aus. An ihrer Stelle steht der gezeichnete Riss (zeichneRiss). */
+        var n = (RISS && d.seite === 'D') ? 0 : neueRumpfZahl(k), arr = new Array(n);
         var modelle = modellVerteilung(k, d, n);
-        proSchiff[k] = d.start / n;
+        proSchiff[k] = n > 0 ? d.start / n : 0;
         lebend[k] = d.start; totRumpf[k] = 0;
         var bahn0 = bahnWert(d.bahn, 0);
         for (var j = 0; j < n; j++){
@@ -29206,6 +29231,8 @@
       enterAuftrag = [];
       for (var i = 0; i < kandidaten.length; i++){
         var arr = flotte[kandidaten[i].k];
+        /* Riss-Gefecht: die Gegenseite hat keine Ruempfe - nichts zu entern. */
+        if (!arr || !arr.length) continue;
         var idx = Math.min(arr.length - 1, Math.floor(arr.length * (i === 0 ? 0.38 : 0.62)));
         var opfer = arr[idx];
         opfer.unsterb = true;
@@ -29475,6 +29502,9 @@
 
     /* Zufaelliges Gegnerschiff aus einer kleinen Stichprobe - O(1) statt O(n). */
     function findeGegner(seite, u, a, maxDist){
+      /* Leerenriss: die Gegenseite hat keine Ruempfe - Ziel der Angreifer ist der Riss
+         selbst, bis er (fast) geschlossen ist. */
+      if (seite === 'A' && RISS) return rissStaerke() > 0.03 ? RISS : null;
       var listen = seite === 'A' ? FLOTTE_D : FLOTTE_A;
       var best = null, bestD = maxDist * maxDist;
       for (var n = 0; n < 3; n++){
@@ -30037,6 +30067,7 @@
       zeichneKuppel(g);
       zeichneScherben(g);
       zeichneWracks(g);
+      zeichneRiss(g);
       zeichneAntriebe(g);
       zeichneFlotten(g);
       zeichneEnterleinen(g);
@@ -30665,12 +30696,46 @@
       }
       return aus;
     }
+    /* Aufgabe #11: Weicher Verlauf + Zahl der verborgenen Zeilen an jeder Tafel, die in
+       sich scrollt. Der Listener haengt EINMAL am Element (die Tafeln ueberleben jeden
+       Neuaufbau, nur ihr Inhalt wird ersetzt); der Hinweis selbst wird je Neuaufbau frisch
+       bemessen. Auf dem Rechner (kein Deckel, nichts scrollt) passiert schlicht nichts. */
+    function tafelScrollPruefen(el){
+      if (!el) return;
+      var alt = el.querySelector('.tafel-mehr');
+      if (alt) alt.remove();
+      var scrollt = el.scrollHeight > el.clientHeight + 4;
+      el.classList.toggle('kann-scrollen', scrollt);
+      if (!scrollt){ el.classList.remove('am-ende'); return; }
+      el.appendChild(neu('div', 'tafel-mehr'));
+      if (!el._hinweisDran){
+        el._hinweisDran = true;
+        el.addEventListener('scroll', function(){ tafelHinweisSetzen(el); }, { passive: true });
+      }
+      tafelHinweisSetzen(el);
+    }
+    function tafelHinweisSetzen(el){
+      var mehr = el.querySelector('.tafel-mehr');
+      if (!mehr) return;
+      var unten = el.scrollTop + el.clientHeight >= el.scrollHeight - 6;
+      el.classList.toggle('am-ende', unten);
+      if (unten) return;
+      var versteckt = 0, zs = el.querySelectorAll('.zeile');
+      for (var i = 0; i < zs.length; i++){
+        if (zs[i].offsetTop + zs[i].offsetHeight > el.scrollTop + el.clientHeight) versteckt++;
+      }
+      mehr.textContent = versteckt > 0
+        ? ('▾ ' + versteckt + ' weitere ' + (versteckt === 1 ? 'Zeile' : 'Zeilen'))
+        : '▾ mehr';
+    }
     function hudNeuAufbauen(){
       zeilen = {}; abwehrZeilen = {}; tafelSummen = {}; hudSig = '';
       /* Bildseite A ist immer die anfliegende Partei, D die am Planeten - wer
          davon "Du" ist, steckt in seite.rolle und in der getauschten Farbe. */
       tafelBauenEcht(elTafelA, DATEN.angreifer,   F.an,  false, 'A');
       tafelBauenEcht(elTafelD, DATEN.verteidiger, F.ver, true,  'D');
+      tafelScrollPruefen(elTafelA);
+      tafelScrollPruefen(elTafelD);
 
       elPhasen.innerHTML = ''; phasenEl = [];
       elPhasen.className = ABSCHNITTE.length === 1 ? 'phasen einzeln' : 'phasen';
@@ -30746,6 +30811,10 @@
          Bodenabwehr - wie seit dem 03.08.2026 - nicht mehr aus fuenf festen
          Bauformen besteht, sondern aus den echten Anlagen des Verteidigers. */
       for (var s = 0; s < anlagen.length; s++) sig += anlagen[s].lebt ? '1' : '0';
+      /* Riss-Gefecht: die Kraftschiene haengt an rissStaerke() und damit an der ZEIT, nicht
+         nur an Bestaenden - ohne Sekundenmarke stuende sie zwischen zwei Verlust-Ereignissen
+         still, waehrend der Riss sichtbar schrumpft. */
+      if (RISS) sig += '|' + Math.round(tSim);
       if (sig === hudSig) return;
       hudSig = sig;
 
@@ -30797,8 +30866,7 @@
          geschrieben (je 153 Treffer in 12 s auf #osKraftA und #osKraftD). Die Farben
          stehen fest und gehoeren gar nicht in eine Schleife; sie bleiben hier nur
          stehen, damit ein Neuaufbau des HUD sie nicht verliert. */
-      var ges = summeA + summeD || 1;
-      var pa = Math.round(100 * summeA / ges);
+      var pa = kraftAnteilA(summeA, summeD);
       if (pa !== kraftAnteilZuletzt){
         kraftAnteilZuletzt = pa;
         elKbA.style.width = pa + '%'; elKbA.style.background = F.an;
@@ -31005,6 +31073,81 @@
       if (etwas) elBilanz.appendChild(fu);
     }
 
+    /* Abwehrfeuer des Risses (Aufgabe #8): Er schiesst im eigenen Takt auf die
+       Angreifer zurueck - Salvenrate und Wucht sinken mit seiner Restschwaeche, kurz vor
+       dem Schliessen verstummt er. Nutzt dieselben Geschoss- und Einschlagwege wie die
+       Schiffe (typ 'spur', zielS mit prall). */
+    function rissSchritt(dt){
+      if (!RISS) return;
+      if (RISS.prall) RISS.prall = Math.max(0, RISS.prall - dt * 3.2);
+      var st = rissStaerke();
+      if (st <= 0.04 || tSim < 3.8 || tSim > 40.5) return;
+      RISS.kalt -= dt;
+      if (RISS.kalt > 0) return;
+      RISS.kalt = (0.7 + Math.random() * 1.1) / (0.35 + 0.65 * st);
+      var ziel = findeGegner('D', RISS.u, RISS.a, 0.6 * Math.max(W, H));
+      if (!ziel) return;
+      var dx = (ziel.u - RISS.u) * kU, dy = (ziel.a - RISS.a) * kA;
+      var d0 = Math.sqrt(dx*dx + dy*dy) || 1;
+      var salve = st > 0.55 ? 3 : 2;
+      for (var n = 0; n < salve; n++){
+        var streu = (Math.random() - 0.5) * 0.14;
+        var rx = (dx/d0) * Math.cos(streu) - (dy/d0) * Math.sin(streu);
+        var ry = (dx/d0) * Math.sin(streu) + (dy/d0) * Math.cos(streu);
+        geschossNeu({
+          typ: 'spur', u: RISS.u, a: RISS.a,
+          vu: rx * 680 / kU, va: ry * 680 / kA,
+          t: -n * 0.09, dauer: d0 / 680 + 0.02,
+          farbe: F.ver, dick: 1.5, len: 14,
+          zielS: ziel, wucht: 0.4 * (0.5 + 0.5 * st)
+        });
+      }
+    }
+
+    /* Der Riss selbst (Aufgabe #8, Vorlage: drawDefenseMiniIcon case 'rift'): senkrechter
+       dunkler Spalt mit pulsierender Kante und Blitzader, mittig ueber dem Planeten auf
+       der Hoehe, wo sonst die Verteidigerflotte stuende. Er schrumpft und verblasst mit
+       rissStaerke(); Treffer der Angreifer zeigen sich als Prall-Ring wie an Schiffen. */
+    function zeichneRiss(g){
+      if (!RISS) return;
+      var st = rissStaerke();
+      if (st <= 0.01) return;
+      var x = pxX(RISS.u, RISS.a), y = pxY(RISS.u, RISS.a);
+      var puls = 0.8 + 0.2 * Math.sin(tSim * 2.4);
+      var hoehe = H * 0.30 * (0.30 + 0.70 * st);
+      var breite = Math.max(3, hoehe * 0.15 * (0.35 + 0.65 * st));
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      glut(g, x, y, hoehe * 0.5 * puls, F.vio, (0.16 + 0.20 * st) * puls);
+      g.globalCompositeOperation = 'source-over';
+      g.fillStyle = '#0a0713';
+      g.beginPath();
+      g.moveTo(x, y - hoehe / 2);
+      g.quadraticCurveTo(x + breite, y - hoehe * 0.10, x, y + hoehe / 2);
+      g.quadraticCurveTo(x - breite, y + hoehe * 0.10, x, y - hoehe / 2);
+      g.closePath(); g.fill();
+      g.strokeStyle = rgba(F.ver, klemme(0.45 + 0.5 * st * puls, 0, 1));
+      g.lineWidth = Math.max(0.8, 1.7 * st);
+      g.stroke();
+      g.globalCompositeOperation = 'lighter';
+      g.strokeStyle = rgba(F.vio, 0.5 * st * puls);
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(x, y - hoehe * 0.42);
+      g.lineTo(x + breite * 0.4, y - hoehe * 0.15);
+      g.lineTo(x - breite * 0.3, y + hoehe * 0.12);
+      g.lineTo(x, y + hoehe * 0.42);
+      g.stroke();
+      if (RISS.prall > 0.03){
+        var pr = hoehe * 0.32 * (1 + 0.25 * (1 - RISS.prall));
+        g.strokeStyle = rgba(F.vio, Math.min(0.85, 0.8 * RISS.prall));
+        g.lineWidth = Math.max(0.8, 1.6 * RISS.prall);
+        g.beginPath(); g.arc(x, y, pr, 0, TAU); g.stroke();
+      }
+      g.globalCompositeOperation = 'source-over';
+      g.restore();
+    }
+
     /* --------------------------- Ablauf --------------------------- */
     function schritt(dt){
       tSim += dt;
@@ -31016,6 +31159,7 @@
       schiffeSchritt(dt);
       enterSchritt(dt);
       anlagenSchritt(dt);
+      rissSchritt(dt);
       kuppelSchritt(dt);
       geschosseSchritt(dt);
       wrackSchritt(dt);
@@ -31276,6 +31420,9 @@
            steht (Pause, Schlussbild, „Bewegung reduzieren") - sonst behielte die Leinwand
            ihre alte Groesse im neuen Rahmen und das Standbild waere verzerrt. */
         alleFlaechenNeu();
+        /* Nach einer Groessenaenderung kann eine Tafel neu scrollen oder eben nicht mehr. */
+        tafelScrollPruefen(elTafelA);
+        tafelScrollPruefen(elTafelD);
       }, 130);
     });
     if (mqRM.addEventListener) mqRM.addEventListener('change', function(e){
@@ -31307,6 +31454,45 @@
     var UMGEBUNG = null;   /* wird beim ersten Start aus den echten DEFS gebaut */
 
     var DATEN = null, GEGNER_UNBEKANNT = true;
+    /* Leerenriss (v8.440.0, Aufgabe #8): Pseudo-Ziel fuer die Zeichenmaschine. Die Gegenseite
+       hat KEINE Ruempfe - die A-Schiffe feuern auf dieses Objekt (findeGegner), es feuert
+       zurueck (rissSchritt) und wird als Riss gezeichnet (zeichneRiss). Es traegt dieselben
+       Felder wie ein Rumpf (u/a/tot/beute/prall), damit die Einschlag- und Zielverfolgung
+       unveraendert funktioniert. */
+    var RISS = null;
+    /* Startsumme der Rumpfgewichte der A-Seite - Bezug fuer den Verlustanteil in kraftAnteilA. */
+    var KRAFT_START_A = 0;
+    /* Staerke des Risses 1 -> 0 ueber den Kampfverlauf (bei Sieg schliesst er sich ganz,
+       bei Niederlage bleibt er geschwaecht stehen). Zeitbasiert, weil der Bericht fuer den
+       Riss keine Verlustkurve fuehrt - das Schwaecherwerden ist die Aussage "der Kampf
+       arbeitet an ihm", nicht eine gemessene Restkraft. */
+    function rissStaerke(){
+      if (!RISS || !DATEN) return 0;
+      var p = klemme((tSim - 2.6) / (41.0 - 2.6), 0, 1);
+      var rest = DATEN.ergebnis === 'sieg' ? 0 : 0.55;
+      return 1 - (1 - rest) * p;
+    }
+    /* Aufgabe #9 (07.08.2026, gemessen): Die Kraftschiene zaehlte NUR Schiffsruempfe. Bei
+       nicht aufgeklaerter Gegenseite (Leerenriss, Raid-Boss, PvP im Solo-Modus) ist deren
+       Rumpfsumme null - die Schiene behauptete "Du 100% / 0%", waehrend die Tafel daneben
+       "12.809 Abwehrkraft" nannte. Zwei Anzeigen derselben Sache, die sich widersprachen.
+       Hier die EINE Rechnung fuer beide Anzeigestellen (HUD-Schiene UND Video): Ist die
+       Gegenseite unbekannt, aber ihre Kraft gemeldet, wird das Verhaeltnis aus den
+       KAMPFKRAFT-Zahlen des Berichts gebildet - die eigene Seite anteilig zu ihren
+       Verlusten (Rumpfgewichte jetzt/Start), der Riss zusaetzlich mit seinem
+       Schwaecherwerden. Sonst bleibt es bei der bisherigen Rumpfgewichts-Rechnung. */
+    function kraftAnteilA(summeA, summeD){
+      if (GEGNER_UNBEKANNT && summeD === 0 && DATEN){
+        var kraftD = DATEN.verteidiger.kraft || DATEN.abwehrkraft || 0;
+        var eigenKraft = DATEN.angriffskraft || 0;
+        if (kraftD > 0 && eigenKraft > 0){
+          var eigen = eigenKraft * (KRAFT_START_A > 0 ? summeA / KRAFT_START_A : 1);
+          var gegner = kraftD * (RISS ? rissStaerke() : 1);
+          return Math.round(100 * eigen / Math.max(1, eigen + gegner));
+        }
+      }
+      return Math.round(100 * summeA / (summeA + summeD || 1));
+    }
 
     /* Rumpfform -> Bildrolle. Die Zeichenmaschine kennt fuenf Angreifer- und vier
        Verteidigerplaetze; die 39 Schiffsklassen des Spiels werden darauf verteilt.
@@ -31418,6 +31604,8 @@
     function berichtUebernehmen(daten){
       DATEN = daten;
       GEGNER_UNBEKANNT = !DATEN.verteidiger.bekannt;
+      RISS = (GEGNER_UNBEKANNT && DATEN.verteidiger.riss)
+        ? { u: 0, a: 0.40, tot: false, beute: false, prall: 0, kalt: 1.2 } : null;
 
       var duIstA = DATEN.blick !== 'verteidigung';
       /* Welche Seite bin ICH? Nur meine Schiffe duerfen mit meinem Flotten-Anstrich
@@ -31444,6 +31632,11 @@
         KLASSEN[k].verloren = Math.min(q.verloren, q.start);
         // Welche echten Schiffstypen in dieser Bildrolle stecken - fuer die Modellwahl.
         KLASSEN[k].klassen  = q.klassen || [];
+      }
+      KRAFT_START_A = 0;
+      for (var ka2 = 0; ka2 < ALLE_K.length; ka2++){
+        var kk9 = ALLE_K[ka2];
+        if (KLASSEN[kk9].seite === 'A') KRAFT_START_A += KLASSEN[kk9].start * KLASSEN[kk9].gewicht;
       }
 
       /* Abschnitte aus den echten Phasenurteilen. Fehlen sie im Bericht (PvP und
@@ -31511,7 +31704,9 @@
       me.push([4.6, DATEN.abwehr.bekannt
         ? 'Bodenabwehr: ' + zahl(DATEN.abwehr.gesamt) + ' Anlagen aktiv'
         : 'Bodenabwehr des Ziels: nicht aufgeklärt']);
-      if (GEGNER_UNBEKANNT) me.push([6.2, 'Gegnerflotte nicht aufgeklärt – bekannt ist nur die Abwehrkraft ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)]);
+      if (GEGNER_UNBEKANNT) me.push([6.2, RISS
+        ? 'Der Riss steht im Orbit – bekannt ist nur seine Kraft: ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)
+        : 'Gegnerflotte nicht aufgeklärt – bekannt ist nur die Abwehrkraft ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)]);
       ABSCHNITTE.forEach(function(x){ me.push([x.t1, 'Abschnitt ' + x.nr + ' – ' + x.name + ': ' + x.urteil]); });
       if (kaper.length) me.push([36.6, 'Geentert: ' + kaper.map(function(k3){ return DATEN.gekapert[k3] + '× ' + UMGEBUNG.schiffName(k3); }).join(', ')]);
       if (DATEN.truemmer > 0) me.push([39.0, 'Trümmerfeld: ' + zahl(DATEN.truemmer) + ' Einheiten treiben im Orbit']);
@@ -31991,7 +32186,7 @@
         var k = ALLE_K[i], d = KLASSEN[k], lb = Math.max(0, lebend[k] || 0);
         if (d.seite === 'A') summeA += lb * d.gewicht; else summeD += lb * d.gewicht;
       }
-      var ges = summeA + summeD || 1, pa = Math.round(100 * summeA / ges);
+      var pa = kraftAnteilA(summeA, summeD);
       var sx = 90, sw = VID_B - 180;
       vidText(g, kurzName(DATEN.angreifer).slice(0,16) + '  ' + pa + '%', sx, y - 24, 30, F.an, false, true);
       g.textAlign = 'right';
@@ -32282,7 +32477,7 @@
       { title:'Tier-2-Schiffsfähigkeiten', body:'Jedes der sieben Tier-2-Schiffe hat eine <strong>einzigartige Fähigkeit</strong> (alle gedeckelt und identisch im server-autoritativen PvP wie in der Vorschau). <strong>Angriffs-Auren</strong> (zusammen max +30% effektive Angriffskraft der Flotte): Nanoklinge „Panzerbrecher" +2%/Schiff, Singularitäts-Vernichter „Gravitationssog" (volle Schild-Penetration) +5%/Schiff. <strong>Verteidigungs-Auren</strong> (zusammen max +30% Verteidigung des Standorts): Quantenkreuzer „Schildprojektor" +3%/Schiff, Metamaterial-Titan „Deflektor-Bollwerk" +5%/Schiff. <strong>Logistik/Sonstige:</strong> Fusionsdreadnought „Fusionsantrieb-Effizienz" (−4% Missions-Treibstoff je Schiff, max −20%), Hyperjäger „Ausweichmanöver" (−3% eigene Kampfverluste je Schiff, max −30%), Hyperbomber „Sprengladungen" (zerstört bei einem gewonnenen Spieler-Angriff je 4 Hyperbomber ein zusätzliches Verteidigungsgebäude, max +2). Ohne diese Schiffe ändert sich an bestehenden Kämpfen nichts. Wer alle sieben gleichzeitig besitzt, schaltet den Erfolg „Tier-2-Flottenkommandant" frei.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
-      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl.' },
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl. Ein <strong>Leerenriss</strong> wird als Riss über dem Planeten gezeichnet – er schießt zurück und schwächt sich im Kampfverlauf sichtbar ab (bei einer Niederlage bleibt er geschwächt stehen). Das <strong>Kräfteverhältnis</strong> unten rechnet bei nicht aufgeklärter Gegenseite mit der gemeldeten Abwehrkraft aus dem Bericht – die eigene Seite anteilig zu ihren Verlusten – statt fälschlich mit null.' },
       { title:'Schiffe, Anlagen und Maßstab', body:'Jedes Schiff fliegt mit <strong>seinem eigenen Modell</strong> – demselben Bild wie in deiner Flottenliste – und in der Farbe seiner Partei (grün ist immer deine Seite). Auf dem Planeten stehen die <strong>echten Verteidigungsanlagen</strong> mit der Grafik aus dem Verteidigung-Tab. Weil eine Flotte aus Zehntausenden Schiffen nicht Stück für Stück zu zeichnen ist, steht ein Modell für mehrere Schiffe; wie viele, steht unten links im Bild. Bei sehr ungleichen Flotten bekommt jede Seite trotzdem ein sichtbares Geschwader, und dann nennt das Bild beide Maßstäbe. <strong>Die Zahlen in den Bestandslisten sind davon unberührt und immer die echten.</strong>' },
       { title:'Was du am Feuer ablesen kannst', body:'Geschossen wird nach der <strong>Konterrolle</strong> des Schiffs – denselben drei Rollen, die auch das Konter-System benutzt. <strong>Abfangjäger</strong> hetzen kurze, schnelle Salven. <strong>Bomber</strong> schicken je zwei langsame, gelenkte <strong>Torpedos</strong>, die ihrem Ziel nachdrehen. <strong>Großkampfschiffe</strong> laden lange und feuern dann einen schweren <strong>Lanzenstrahl</strong>; im entscheidenden Abschnitt wird daraus eine <strong>Breitseite</strong> aus drei Strahlen im Fächer – die beiden äußeren gehen bewusst daneben, denn das Bild darf mehr Feuer zeigen, nicht mehr Wirkung. Wer getroffen wird, dessen <strong>Schild</strong> flammt kurz auf. Auch der <strong>Antrieb</strong> ist zu erkennen: Verbrennung glimmt orange und flackert, Impuls steht ruhig und blau, Hyperraum zieht den längsten violetten Schweif. <strong>Am Ausgang ändert das alles nichts</strong> – Verluste und Ergebnis stehen aus dem Bericht fest, die Darstellung würfelt nichts nach.' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während du im Spiel aktiv bist – eigener Angriff oder eingehender Überfall –, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
