@@ -42,7 +42,9 @@ const basisStand = zusatz => JSON.stringify(Object.assign({
   buildings:{solar:20,mine:18,lager:20,werft:12,labor:12},
   research:{}, colonies:{}, activeBasePlanet:'home',
   player:{id:'u',name:'A',avatarKey:null},
-  fleet:{ jaeger:4000, schlachtschiff:400, frachter:200, missions:[] },
+  // kessel/lotsenboot (v8.436.0): Die Tiefenflotte muss im Tauchgang MITFLIEGEN - Task #23 war,
+  // dass sie es nie konnte. Check 4 unten prueft die Zusammensetzung der gebuchten Mission.
+  fleet:{ jaeger:4000, schlachtschiff:400, frachter:200, kessel:5, lotsenboot:3, missions:[] },
   battleStats:{wins:9,losses:2}, xp:20000, credits:50000, buffs:[], lastTick:Date.now(),
   colonyNames:{}
 }, zusatz));
@@ -167,6 +169,11 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
       mission ? { typ:mission.type, tiefe:mission.targetId, name:mission.fleetName } : null);
     check('4: die Mission fuehrt eine Flottenzusammensetzung mit',
       !!mission && mission.composition && Object.keys(mission.composition).length > 0);
+    // v8.436.0 (Task #23): Die Tiefenschiffe reisen in der Zusammensetzung mit - vorher kannten
+    // Auswahlfeld und Flottenbau nur ATTACK_SHIP_KEYS, alle neun Tiefenschiffe waren wirkungslos.
+    check('4: die Tiefenflotte fliegt mit (Kessel und Lotsenboot in der Zusammensetzung)',
+      !!mission && mission.composition && mission.composition.kessel === 5 && mission.composition.lotsenboot === 3,
+      mission && { kessel: mission.composition.kessel, lotsenboot: mission.composition.lotsenboot });
     const zweiter = await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-start]'); return !!b && b.disabled; });
     check('4: waehrend eines laufenden Tauchgangs ist der Knopf gesperrt', zweiter);
     check('4: keine Konsolenfehler bis hierhin', errs.length === 0, errs.slice(0,3));
