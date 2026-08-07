@@ -81,10 +81,22 @@ jobs:
       # hier ändern und den Prüflauf einmal durchlaufen lassen.
       # `--with-deps` installiert die Systembibliotheken, die Chromium auf einem nackten
       # ubuntu-latest-Runner sonst fehlen (ohne das startet der Browser nicht).
+      #
+      # NODE_PATH ist hier NICHT optional (gelernt am ersten roten Lauf, 07.08.2026):
+      # tests/lib/umgebung.js sucht Playwright über `require('playwright')` und danach an drei
+      # fest verdrahteten globalen Pfaden (/opt/node22/..., /usr/lib/..., /usr/local/lib/...).
+      # `actions/setup-node` legt globale Pakete aber in den Hostedtoolcache
+      # (/opt/hostedtoolcache/node/<version>/x64/lib/node_modules) - keiner der drei Pfade trifft,
+      # und im Repo gibt es bewusst kein node_modules. Ergebnis war: 123 der 148 Prüfungen
+      # scheiterten in 0 Sekunden, weil umgebung.js mit `process.exit(2)` abbricht.
+      # `npm root -g` liefert das tatsächliche Verzeichnis, wo immer setup-node es hinlegt -
+      # verlässlicher, als die Pfadliste in umgebung.js zu erweitern (die müsste bei jedem
+      # Runner-Umbau nachgezogen werden).
       - name: Playwright installieren
         run: |
           npm install -g playwright@1.62.1
           npx playwright install --with-deps chromium
+          echo "NODE_PATH=$(npm root -g)" >> "$GITHUB_ENV"
 
       # tests/lib/umgebung.js sucht das Backend zuerst über diese Variable, dann erst über feste
       # Pfade - explizit gesetzt ist verlässlicher, als sich auf die Verzeichnisnachbarschaft des
