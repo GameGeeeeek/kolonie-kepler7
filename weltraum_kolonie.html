@@ -6165,8 +6165,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.434.0';
+  const VERSION = '8.435.0';
   const PATCHNOTES = [
+    { version:'8.435.0', date:'07.08.2026', changes:[
+      '<strong>Behoben: Das „−" in der Flottenauswahl schien nicht zu reagieren.</strong> Die gespeicherte Auswahl ist bewusst ein ungekappter „Wunsch" (damit sie nach der Rückkehr von Missionen nicht bei null steht) – angezeigt wird aber der auf die verfügbaren Schiffe gekappte Wert. Wer 100 Jäger gewählt und 90 davon unterwegs hatte, sah „10" und musste <em>neunzig Mal</em> auf „−" drücken, bevor sich sichtbar etwas tat. Jetzt rechnet „−" vom angezeigten Wert herunter: Ein Klick macht aus 10 sichtbar 9. Wer aktiv herunterzählt, meint die Zahl, die er sieht – der alte Wunsch darüber wird dabei bewusst aufgegeben.'
+    ]},
     { version:'8.434.0', date:'07.08.2026', changes:[
       '<strong>Die Soundeffekte sind massiv erweitert</strong> (Wunsch aus der Spielerschaft). Statt eines einzelnen Piep-Tons je Ereignis spielt das Spiel jetzt <strong>kleine Klangmotive</strong>: eine aufsteigende Fanfare beim Sieg, eine fallende Moll-Folge bei der Niederlage, ein Münz-Doppelklang beim Handel, ein dreitöniges Arpeggio bei abgeschlossener Forschung, eine Alarm-Sirene beim Überfall und eine vierstufige Fanfare bei Erfolgen – alles weiterhin winzig, im Browser erzeugt (WebAudio) und ohne ein Byte zusätzlicher Downloads.',
       '<strong>Vier Ereignisse waren bis heute praktisch stumm:</strong> Niederlagen, „erledigt"-Momente, Auswahl-Klicks und die Warnung bei schlechten Zufallsereignissen riefen Klang-Arten auf, die nie definiert waren – sie spielten alle denselben unauffälligen Standardton. Jetzt hat jede ihr eigenes Motiv.',
@@ -18071,14 +18074,13 @@
     if (!wurzel) return;
     const sel = getAttackSelection(planetKey, cf);
     const avail = attackAvailableByType(cf);
-    /* Die Rechenweise ist ABSICHTLICH Zeichen fuer Zeichen die der alten Inline-Handler - dieser
-       Schritt ist eine reine Extraktion und darf sich nicht anders verhalten als vorher.
-       Dabei faellt allerdings etwas auf, das hier bewusst NICHT mitrepariert wird:
-       "−" rechnet vom GESPEICHERTEN Wert herunter, angezeigt wird aber der auf das Verfuegbare
-       gekappte. Wer 100 Jaeger gewaehlt hat und 90 davon unterwegs hat, sieht "10" und muss
-       neunzig Mal auf "−" druecken, bevor sich sichtbar etwas tut. Das ist eine Folge davon, dass
-       getAttackSelection die Auswahl bewusst ungekappt als "Wunsch" haelt (siehe Kommentar dort) -
-       richtig gedacht, an dieser Stelle aber unangenehm. Eigenes Ticket, eigener Patchnotes-Eintrag. */
+    /* "+"/"Max"/"Keine" arbeiten unveraendert auf dem gespeicherten "Wunsch" (getAttackSelection
+       haelt die Auswahl bewusst ungekappt, siehe Kommentar dort). "−" rechnet seit v8.435.0
+       (Spieler-Report #26) vom ANGEZEIGTEN, auf das Verfuegbare gekappten Wert herunter: Wer 100
+       Jaeger gewaehlt und 90 unterwegs hatte, sah "10" und musste neunzig Mal druecken, ehe sich
+       sichtbar etwas tat. Ein Klick gibt jetzt sichtbar avail-1; der Wunsch darueber ist damit
+       bewusst aufgegeben - wer aktiv herunterzaehlt, meint die Zahl, die er sieht.
+       tests/test_flottenwahl_minus.js fuehrt beide Handler im Sandkasten aus. */
     wurzel.querySelectorAll('[data-atksel-inc]').forEach(b => b.onclick = () => {
       const k = b.getAttribute('data-atksel-inc');
       sel[k] = Math.min(avail[k]||0, (sel[k]||0)+1);
@@ -18086,7 +18088,8 @@
     });
     wurzel.querySelectorAll('[data-atksel-dec]').forEach(b => b.onclick = () => {
       const k = b.getAttribute('data-atksel-dec');
-      sel[k] = Math.max(0, (sel[k]||0)-1);
+      const sichtbar = Math.min(avail[k]||0, sel[k]||0);
+      sel[k] = Math.max(0, sichtbar - 1);
       neuZeichnen();
     });
     wurzel.querySelectorAll('[data-atksel-max]').forEach(b => b.onclick = () => {
