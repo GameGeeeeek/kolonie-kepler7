@@ -599,10 +599,12 @@ check('und dort zaehlt der Verteidigungsanteil',
 // (c) Gespeichert, nicht beim Lesen gerechnet.
 check('der Anteil wird im Bericht gespeichert', /report\.markAtkShare = Math\.round\(/.test(src));
 check('die Berichtszeile liest den gespeicherten Stand', /markReportLine\(r\.marken, r\.markAtkShare/.test(src));
-// (e) Alle vier Kampfberichte und die Vorschau.
+// (e) Alle Kampfberichte und die Vorschau. Seit v8.430.0 zeigen auch die beiden Verbandsberichte
+// (Allianz-Raid, Musterangriff) die Zeile - dort stempelt stampShipMarks ueber myComposition,
+// weil report.fleet die GEMEINSAME Verbandsflotte ist und die Marken auf die eigene gehoeren.
 const berichte = (src.match(/markReportLine\(r\.marken, r\.markAtkShare/g) || []).length;
-check('alle vier Kampfberichte zeigen die Zeile (NPC, Spieler, Allianzbasis, Ueberfall)',
-  berichte === 4, berichte);
+check('alle sechs Kampfberichte zeigen die Zeile (NPC, Spieler, Allianzbasis, Ueberfall, Raid, Musterangriff)',
+  berichte === 6, berichte);
 check('der Ueberfall-Bericht nennt ausdruecklich die Flottenverteidigung',
   /markReportLine\(r\.marken, r\.markAtkShare, 'Flottenverteidigung'\)/.test(src));
 check('auch die NPC-Angriffsvorschau nennt die Marken',
