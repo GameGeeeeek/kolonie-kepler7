@@ -105,6 +105,8 @@ const BERICHTE = [
     totalPower: 61000, totalShips: 168, participantCount: 3, platz: 2, teilnehmer: 3, share: 24,
     ranking: [ { platz: 1, name: 'Alpha', power: 40000, ich: false }, { platz: 2, name: 'Ich', power: 15000, ich: true }, { platz: 3, name: 'Gamma', power: 6000, ich: false } ],
     ownLostShips: { cruisers: 3 }, credits: 240, battlePoints: 18, xp: 120,
+    // Boss-Status (v8.438.0): server-gesetzte Felder - die Karte muss alle drei Zeilen zeigen.
+    brandSchaden: 3000, statusVorher: ['frost'], statusNeu: ['brand', 'schock'],
     resources: { erz: 4000, kristalle: 2500 }, fragmente: 0, modulName: null },
   // ALTES Format (vor v8.430.0): nur ownLostText, keine Flottenobjekte - genau die Karte, die
   // frueher leer blieb. Sie muss lesbar rendern, nicht perfekt.
@@ -158,6 +160,14 @@ function backend(){ return async r => {
     !!raidKarte && raidKarte.text.includes('Rangliste: 1. Alpha') && raidKarte.text.includes('NICHT gedeckt (kein Jäger') && raidKarte.text.includes('rund 18%'),
     raidKarte && raidKarte.text.slice(90, 300));
   check('5e: die Welle gilt als gewonnen (nie "Verloren")', !!raidKarte && raidKarte.pill === 'Gewonnen');
+  // Boss-Status (v8.438.0): drei server-gesetzte Zeilen auf der Karte - Brand-Schaden der
+  // Vorwelle, wirkende Status (frost), hinterlassene Status (brand+schock).
+  check('5m: Brand-Schaden der Vorwelle steht mit Zahl auf der Karte',
+    !!raidKarte && /Brand aus der Vorwelle: [−-]\s*3(\.0k|[.,]000) Hülle/.test(raidKarte.text), raidKarte && raidKarte.text.slice(300, 600));
+  check('5n: wirkende und hinterlassene Status stehen benannt auf der Karte',
+    !!raidKarte && raidKarte.text.includes('Wirkende Status aus der Vorwelle: Frost') &&
+    /hinterlässt für die nächste Welle: Brand .*Schock/.test(raidKarte.text),
+    raidKarte && raidKarte.text.slice(300, 700));
   const musterKarte = (karten || []).find(k => k.text.includes('Koordinierter Angriff auf [FEIND]'));
   check('5f: die ALTE Musterangriff-Karte rendert lesbar statt leer',
     !!musterKarte && musterKarte.text.includes('DIE BASIS WURDE ZERSTÖRT') && musterKarte.text.includes('5x Kreuzer'),

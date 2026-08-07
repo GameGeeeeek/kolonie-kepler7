@@ -76,8 +76,11 @@ function schnitt(text, von, bis, ohneEnde){
     // Der Malus-statt-Bonus-Punkt, woertlich am Server geprueft.
     check('1: der Server gibt vollen Schaden, WENN der Schiffstyp da ist (Malus statt Bonus)',
       /const schadenMult = hatSchwaeche \? 1 : raidBoss\.ohneMult;/.test(be));
+    // 07.08.2026 (v8.438.0) neu gefasst: Der Schock-Status darf die Schwaeche zusaetzlich decken
+    // (statusVorher.schock ? true : ...), die REGEL "ohne Schwaeche immer voller Schaden" bleibt -
+    // geprueft wird der Term IN der Zuweisung, nicht mehr die woertliche alte Zeile (Arbeitsregel 3).
     check('1: ... und ein Boss ohne Schwaeche gibt immer vollen Schaden',
-      /const hatSchwaeche = !raidBoss\.schwaeche \|\| \(comp\[raidBoss\.schwaeche\] \|\| 0\) > 0;/.test(be));
+      /const hatSchwaeche = [^\n]*!raidBoss\.schwaeche \|\| \(comp\[raidBoss\.schwaeche\] \|\| 0\) > 0/.test(be));
     check('1: die Verlustquote bekommt den Boss-Faktor, die alte Spanne bleibt aussen',
       /Math\.max\(0\.05, Math\.min\(0\.6, \(counter \/ \(counter \+ power\)\) \* raidBoss\.verlustMult\)\)/.test(be));
     check('1: der Server liest die Zusammensetzung des abgeflogenen Verbands',
