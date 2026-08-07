@@ -144,6 +144,7 @@ for (const tab of ['basis','flotte','forschung']){
     function officerLevel(k){ return (state.officers||{})[k]||0; }
     function officerTalent(k){ return (state.officerTalents||{})[k]||null; }
     function skillPointsAvailable(){ return fp; }
+    function skillBaumOffen(){ return true; }
     function abgrundFreigeschaltet(){ return tiefeFrei; }
     function weeklyDealClaimed(){ return dealGenutzt; }
     function currentWeeklyDeal(){ return deal; }

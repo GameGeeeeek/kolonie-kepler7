@@ -127,7 +127,10 @@ const stellen = [
   // Nur im planetKey-Zweig: Die Rohdauer bleibt bonusfrei und isoliert nachrechenbar.
   ['Taktschmiede haengt am Standortzweig', /if \(planetKey\)\{\s*eff = effectiveBuildTimeEach/],
   ['Krustenpresse → terraformDuration', /Math\.min\(ABGRUND_KRUSTE_DECKEL, moduleBonusAt\(state\.activeBasePlanet, 'terraform'\)\)/],
-  ['Wrackleser → Truemmerabbau', /fleet\.recycler \* 8 \* \(1 \+ Math\.min\(ABGRUND_WRACK_DECKEL, moduleBonusTotal\('wrack'\)\)\)/],
+  // Ohne schliessende Klammer am Ende: geprueft wird, dass der gedeckelte Wrack-Term Teil der
+  // Ratenformel IST - nicht, dass er der einzige Summand bleibt (Arbeitsregel 3: Regel statt
+  // Momentaufnahme; seit v8.429.0 steht dort zusaetzlich der Faehigkeitsbaum-Bonus eco8).
+  ['Wrackleser → Truemmerabbau', /fleet\.recycler \* 8 \* \(1 \+ Math\.min\(ABGRUND_WRACK_DECKEL, moduleBonusTotal\('wrack'\)\)/],
   ['Prisenwaage → Prisengut-Auszahlung', /const waage = 1 \+ Math\.min\(ABGRUND_PRISE_DECKEL, moduleBonusTotal\('prise'\)\);/],
   ['Drucklot → Bann', /function drucklotAktiv\(flotte\)\{[\s\S]{0,200}'raffiniert', 'drucklot'/],
   ['Ballastspiegel → Niederlage', /Math\.min\(ABGRUND_BALLAST_DECKEL, abgrundSchiffsmodul\(m\.composition \|\| fleet, 'frachter', 'ballast'\)\)/]

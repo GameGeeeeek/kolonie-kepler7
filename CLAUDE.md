@@ -107,6 +107,17 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
 16. **Python-Ersetzskripte brechen bei `count != 1` ab, bevor sie schreiben** – genau das hat
     einen stillen Fehlgriff verhindert, als das Veteranen-Icon-Markup anders aussah als erwartet.
     Dieses Muster beibehalten.
+17. **Einen Suite-Lauf über seine Task-ID und Logdatei verfolgen und VOR jedem Edit an der
+    Spieldatei gezielt diesen einen Lauf beenden – nie den Zustand per `pgrep` auf den Befehlstext
+    „bestätigen".** Vorfall 07.08.2026: Nach einem Fehlschlag wurde der falsche (längst beendete)
+    Hintergrund-Lauf gestoppt und die Spieldatei editiert, während der eigentliche Lauf noch las –
+    dessen Restergebnis war damit wertlos, und zeitweise liefen ZWEI Suiten parallel (Playwright-
+    Flake-Risiko durch Ressourcenkonkurrenz). Verschärfend meldete `pgrep -f "node tests/run.js"`
+    in beide Richtungen Falsches: Es traf den EIGENEN alten Warte-Job (dessen Kommandozeile den
+    Suchtext enthält) und meldete „läuft" nach dem Stopp bzw. lieferte dessen PID für ein `kill`.
+    Das ist derselbe Mechanismus wie in Regel 15, nur auf Prozess- statt Log-Ebene – wer wissen
+    will, ob die Suite lebt, prüft die Marker-Zeile ihrer Logdatei oder `ps` nach echten
+    `node`-Prozessen, nie ein Muster, das die eigenen Werkzeuge selbst enthalten.
 
 ## Icon-Font ist ein SUBSET (seit v8.296.0)
 

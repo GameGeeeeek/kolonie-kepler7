@@ -109,7 +109,10 @@ const echt = [
   ['buildspeed', null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(planetKey, 'buildspeed'\)\)/)||[])[1])],
   ['defatk',     null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusAt\(planetKey, 'defatk'\)\)/)||[])[1])],
   ['raidloss',   null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(targetPlanet, 'raidloss'\)\)/)||[])[1])],
-  ['fuelcost',   null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(state\.activeBasePlanet, 'fuelcost'\)\)/)||[])[1])],
+  // Ohne schliessende Klammer am Ende: seit v8.429.0 sitzt der Faehigkeitsbaum-Treibstoffbonus als
+  // weiterer Subtrahend im selben Boden - geprueft wird der BODEN, nicht die vollstaendige Formel
+  // (Arbeitsregel 3). Die Bilanz-Zeile heisst weiterhin "(Module)" und zeigt nur den Modulanteil.
+  ['fuelcost',   null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(state\.activeBasePlanet, 'fuelcost'\)/)||[])[1])],
   ['exprisk',    null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(planetKey, 'exprisk'\)\)/)||[])[1])],
   ['research',   null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusTotal\('research'\)\)/)||[])[1])],
   ['expedition', null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusTotal\('expedition'\)\)/)||[])[1])],
