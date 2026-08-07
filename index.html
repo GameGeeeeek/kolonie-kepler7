@@ -3198,6 +3198,7 @@
           <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning: bei der Flotte lag
                besonders viel dazwischen - Angriffspunkte, Missionen, Flottenverlegung). -->
           <div class="qty-select" id="qtySelectFleet"></div>
+          <div id="veteranRankBox"></div>
           <div class="fleet" id="fleet"></div>
           <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Baukorb (mehrere Schiffstypen zusammen bauen)</div>
           <div id="shipBasketBox"></div>
@@ -3258,8 +3259,6 @@
 
         <div class="galaxy-subpanel" data-galaxy-sub="kampf">
           <div class="section-title"><i class="ti ti-alien" aria-hidden="true"></i>NPC-Fraktionen (angreifbar)</div>
-          <div class="section-title" style="font-size:12px; margin-top:0;"><i class="ti ti-ship" aria-hidden="true"></i>Angriffsflotte zusammenstellen</div>
-          <div id="attackFleetBox"></div>
           <div id="pendingAttackBox"></div>
           <div id="pendingMoonSiegeBox"></div>
           <div class="section-title"><i class="ti ti-skull" aria-hidden="true"></i>Weltboss - gemeinsame Jagd aller Spieler</div>
@@ -6143,8 +6142,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.426.0';
+  const VERSION = '8.428.0';
   const PATCHNOTES = [
+    { version:'8.428.0', date:'06.08.2026', changes:[
+      '<strong>Neu im Flottenwahl-Feld (Idee aus der Spielerschaft): die Gesamt-Frachtmenge.</strong> Sobald Transporter in der Auswahl sind, steht im Fuß des Felds „Frachtraum gesamt: 3.0k (10× Kleiner Frachter)" – aufgeschlüsselt nach Frachtertyp, und die Zahl zieht live mit jedem Plus und Minus mit, genau wie die Flugzeit. Das gilt bei <em>jeder</em> Auftragsart, nicht nur bei Beutezügen. Die rote Warnung „Ohne Frachter geht die gesamte Beute verloren" bleibt dagegen den Aufträgen mit Beute vorbehalten – bei einem Tauchgang wäre sie schlicht falsch.'
+    ]},
+    { version:'8.427.0', date:'06.08.2026', changes:[
+      '<strong>Die alte „Angriffsflotte zusammenstellen"-Box ist Geschichte.</strong> Sie war die eine Stelle im Galaxie-Tab, an der man vor jedem Angriff erst Schiffe wählen musste – der Kern des „umständlich"-Gefühls. Das <strong>Flottenwahl-Feld</strong> ersetzt sie vollständig: Es öffnet sich seit den letzten Versionen an allen zwölf Startstellen direkt am jeweiligen Knopf, und dort ist jetzt auch alles zuhause, was in der Box wohnte.',
+      '<strong>Umgezogen ins Feld:</strong> der <strong>Flottenname</strong> (kleines Eingabefeld im Fuß) und die komplette <strong>Vorlagen-Pflege</strong> – Anwenden per Chip war schon da, jetzt auch Speichern (Name eintippen, „Vorlage") und Löschen (✕ am Chip). <strong>Umgezogen in den Flotte-Tab:</strong> die <strong>Veteranenrang</strong>-Karte, denn der Rang ist Information über den Standort, nicht über einen einzelnen Angriff.',
+      'Alle Meldungen und Hilfetexte, die noch auf den entfernten Bereich verwiesen („Bereich Angriffsflotte zusammenstellen"), sind auf das Feld umformuliert – zehn Meldungen, die PvP-Vorschau und zwei Hilfe-Abschnitte. Die Auswahl selbst ist übrigens nie umgezogen: Es war immer dieselbe, das Feld ist nur die Bedienung davor.'
+    ]},
     { version:'8.426.0', date:'06.08.2026', changes:[
       '<strong>Das Flottenwahl-Feld jetzt an ALLEN zwölf Startstellen.</strong> Die letzten fünf sind umgestellt: <strong>Abgrund-Tauchgang</strong>, <strong>fremde Allianzbasis angreifen</strong>, <strong>Basis verteidigen</strong>, <strong>Musterangriff</strong> und <strong>Allianz-Raid</strong>. Die drei Einsätze, bei denen die Schiffe deinen Standort wirklich sofort verlassen (Basis-Verteidigung, Raid- und Muster-Beitritt), zeigen dabei eine rote Warnzeile: „Diese Schiffe verlassen deinen Standort sofort und fehlen dort in der Verteidigung."',
       '<strong>Behoben: Die Basis-Verteidigung stationierte ungewollt Frachter.</strong> Der Entsende-Knopf benutzte die Angriffsauswahl – wer dort Frachter für einen Angriff gewählt hatte, schickte sie mit zur Allianzbasis, wo sie nichts nützen und zuhause fehlten. Es fliegen jetzt nur noch <strong>Kampfschiffe</strong>, und das Feld zeigt von vornherein nur diese an. Der Knopf heißt jetzt schlicht „Verteidigungsflotte zur Basis entsenden".',
@@ -17815,6 +17822,7 @@
      (3) Neu gezeichnet wird das Overlay ausschliesslich von seinen eigenen Handlern, nie vom Tick -
          deshalb bekommt verdrahteFlottenwahlZeilen() hier zeichneFlottenwahl statt render(). */
   let fwahlAuftrag = null;
+  let fwahlVorlageName = '';
   function fwahlFlotte(){
     return buildAttackFleet(state.activeBasePlanet, currentFleet());
   }
@@ -17874,16 +17882,24 @@
     const anzahl = a.keys.reduce((n,k) => n + (flotte[k]||0), 0);
     const kraft = attackPower(flotte, state.activeBasePlanet);
     const vorlagen = (state.fleetTemplates||[]).map(t =>
-      `<button data-fwahl-vorlage="${t.id}" title="Vorlage anwenden"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(t.name)}</button>`).join('');
+      `<span style="display:inline-flex;"><button data-fwahl-vorlage="${t.id}" title="Vorlage anwenden"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(t.name)}</button><button data-fwahl-vorlage-weg="${t.id}" title="Vorlage löschen" style="padding:5px 6px; margin-left:-1px;"><i class="ti ti-x" aria-hidden="true"></i></button></span>`).join('');
     const gesperrt = a.sperre ? a.sperre(flotte) : null;
-    // Frachtraum: die Warnung, die es bis heute NIRGENDS vor dem Start gab - der Spieler erfuhr
-    // "Keine Frachter mitgefuehrt - Beute ging verloren!" erst im Bericht danach.
+    /* Frachtraum-Zeile. Zwei Regeln (die zweite ist die Idee von Sascha, 06.08.2026):
+       (a) Sobald Transporter mitfliegen, steht die GESAMT-Frachtmenge da - bei JEDER Auftragsart,
+           samt Aufschluesselung nach Frachtertyp. Jedes +/- zeichnet das Feld neu, die Zahl zieht
+           also live mit der Auswahl mit.
+       (b) Die rote Beute-Warnung bei NULL Frachtraum bleibt den Auftraegen mit Beute vorbehalten
+           (a.fracht) - "Keine Frachter mitgefuehrt, Beute ging verloren" erfuhr man frueher erst
+           im Bericht nach dem Kampf. Bei Auftraegen ohne Beute waere die Warnung falsch. */
     let frachtHtml = '';
-    if (a.fracht){
-      const raum = fleetCargoCapacity(flotte);
-      frachtHtml = raum > 0
-        ? `<div class="bmeta">Frachtraum: <strong>${fmt(raum)}</strong></div>`
-        : `<div class="fwahl-warn"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>Ohne Frachter geht die gesamte Beute verloren.</div>`;
+    const frachtRaum = fleetCargoCapacity(flotte);
+    if (frachtRaum > 0){
+      const teile = [];
+      if ((flotte.frachter||0) > 0) teile.push(fmt(flotte.frachter)+'× Kleiner Frachter');
+      if ((flotte.frachtergross||0) > 0) teile.push(fmt(flotte.frachtergross)+'× Großer Frachter');
+      frachtHtml = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-truck" aria-hidden="true"></i> Frachtraum gesamt: <strong>${fmt(frachtRaum)}</strong>${teile.length?' ('+teile.join(', ')+')':''}</div>`;
+    } else if (a.fracht){
+      frachtHtml = `<div class="fwahl-warn"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>Ohne Frachter geht die gesamte Beute verloren.</div>`;
     }
     ov.innerHTML = `
       <div class="fwahl-karte">
@@ -17909,6 +17925,13 @@
           ${a.ziehtAb ? '<div class="fwahl-warn">Diese Schiffe verlassen deinen Standort sofort und fehlen dort in der Verteidigung.</div>' : ''}
           ${a.vorschau ? a.vorschau(flotte) : ''}
           ${gesperrt ? `<div class="fwahl-warn" data-fwahl-sperre>${escapeHtml(gesperrt)}</div>` : ''}
+          <div style="display:flex; gap:6px; margin-bottom:6px;">
+            <input type="text" data-fwahl-name placeholder="Flottenname (optional)" maxlength="24" value="${escapeHtml(customFleetName)}" style="flex:1; min-width:0;"/>
+          </div>
+          <div style="display:flex; gap:6px; margin-bottom:8px;">
+            <input type="text" data-fwahl-vorlage-name placeholder="Auswahl als Vorlage speichern" maxlength="30" value="${escapeHtml(fwahlVorlageName)}" style="flex:1; min-width:0;"/>
+            <button data-fwahl-vorlage-speichern style="font-size:11px; white-space:nowrap;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>Vorlage</button>
+          </div>
           <button class="buy ${gesperrt?'':'affordable'}" data-fwahl-start ${gesperrt?'disabled':''} style="width:100%;">${escapeHtml(a.startLabel)}</button>
         </div>
       </div>`;
@@ -17936,6 +17959,23 @@
       applyFleetTemplate(b.getAttribute('data-fwahl-vorlage'));
       zeichneFlottenwahl();
     });
+    ov.querySelectorAll('[data-fwahl-vorlage-weg]').forEach(b => b.onclick = () => {
+      deleteFleetTemplate(b.getAttribute('data-fwahl-vorlage-weg'));
+      zeichneFlottenwahl();
+    });
+    /* Beide Eingaben leben in Modulvariablen, nicht im DOM: Ein Klick auf +/- zeichnet das ganze
+       Feld neu, und das Markup schreibt die Werte aus den Variablen zurueck. Tippen selbst
+       zeichnet NICHT neu - deshalb kein Fokusverlust. */
+    const nameEingabe = ov.querySelector('[data-fwahl-name]');
+    if (nameEingabe) nameEingabe.oninput = () => { customFleetName = nameEingabe.value; };
+    const vorlageEingabe = ov.querySelector('[data-fwahl-vorlage-name]');
+    if (vorlageEingabe) vorlageEingabe.oninput = () => { fwahlVorlageName = vorlageEingabe.value; };
+    const vorlageSpeichern = ov.querySelector('[data-fwahl-vorlage-speichern]');
+    if (vorlageSpeichern) vorlageSpeichern.onclick = () => {
+      saveFleetTemplate(fwahlVorlageName);
+      fwahlVorlageName = '';
+      zeichneFlottenwahl();
+    };
     const startBtn = ov.querySelector('[data-fwahl-start]');
     if (startBtn && !gesperrt) startBtn.onclick = () => {
       const start = a.start;
@@ -22403,7 +22443,7 @@
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff aus, um die Piraten abzufangen (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff im Flottenwahl-Feld aus, um die Piraten abzufangen.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='void-rift').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const relevantKeys = ATTACK_SHIP_KEYS.filter(k=>(attackFleet[k]||0) > 0);
@@ -22472,7 +22512,7 @@
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff aus, um den Leerenriss zu schließen (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff im Flottenwahl-Feld aus, um den Leerenriss zu schließen.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='void-rift').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const relevantKeys = ATTACK_SHIP_KEYS.filter(k=>(attackFleet[k]||0) > 0);
@@ -25055,7 +25095,7 @@
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen" im Galaxie-Tab).', 'ti-alert-triangle'); return; }
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss'||m.type==='attack-alliance-base').length;
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
@@ -25888,7 +25928,7 @@
       if (!isMeForCompare && useBackend() && previewPower!==null){
         if (previewPower <= 0){
           preEl.className = 'profile-preview pp-danger'; preEl.style.display = 'block';
-          preEl.innerHTML = `<div class="pp-h">⚔ Angriffs-Vorschau</div><div class="pp-verdict">✕ Keine Angriffsflotte ausgewählt (Galaxie-Tab → „Angriffsflotte zusammenstellen").</div>`;
+          preEl.innerHTML = `<div class="pp-h">⚔ Angriffs-Vorschau</div><div class="pp-verdict">✕ Keine Angriffsflotte ausgewählt – der Angreifen-Knopf öffnet das Flottenwahl-Feld.</div>`;
         } else if (defVal===null){
           preEl.style.display = 'none';
         } else {
@@ -31773,7 +31813,7 @@
       { title:'Verluste nachbauen', body:'Enthält ein Kampfbericht eigene Schiffsverluste, erscheint darunter der Knopf <strong>„Verluste nachbauen"</strong>: reiht alle verlorenen Schiffstypen in der passenden Menge am aktuell gewählten Standort in die Bauwarteschlange ein - zu den regulären Kosten ab dem heutigen Bestand. Seltene, itemgebundene Einheiten werden bewusst nicht automatisch nachgebaut (kein stiller Item-Verbrauch per Klick), ebenso wenig Schiffe, die bereits am Maximalbestand sind - dafür erscheint ein Hinweis.' },
       { title:'Berichte-Filter', body:'Im Berichte-Tab lässt sich die Liste über zwei Filterzeilen eingrenzen: eine <strong>Kategorie</strong> (Alle, Kämpfe, Expeditionen, Spionage, Sonstiges - jeweils mit Trefferzahl in Klammern) und ein <strong>Ergebnis</strong> (Alle Ergebnisse, Nur Erfolge, Nur Rückschläge). Praktisch, sobald die Liste über die Zeit lang wird - z.B. nur fehlgeschlagene Kämpfe zum Nachjustieren der Verteidigung ansehen, oder nur Expeditionsfunde durchgehen. Die Auswahl gilt nur für die aktuelle Sitzung, kein Teil des gespeicherten Spielstands.' },
       { title:'Schiffsbau beschleunigen (Tier-2)', body:'Zwei Quantenchip-basierte Wege verkürzen die <strong>Schiffsbauzeit imperiumsweit</strong>: <strong>(1) Quanten-Assemblierwerft</strong> (Nutzgebäude, Basis-Tab, ab Forschung Quantenphysik) - -1,5% je Stufe, dauerhaft. Sie teilt sich einen <strong>gemeinsamen Deckel</strong> mit dem <strong>Fusions-Werftkern</strong>: die Stufen beider Gebäude über alle Standorte werden zusammengezählt und sind gemeinsam bei <strong>-20%</strong> gekappt (additiv, kein Aufschaukeln). <strong>(2) Werft-Overdrive</strong> (Verbrauchs-Boost, direkt unter der Schiffswerft im Flotte-Tab): 12 Quantenchips → <strong>-25% Schiffsbauzeit für 30 Minuten</strong>, gilt für alle in dieser Zeit laufenden und neu eingereihten Aufträge. Beide wirken zusätzlich zu Werft-Rolle, Offizier Ingenieur, Orbitalstation-Dock und den Allianz-Werftboni. Der Overdrive zählt für den Erfolg „Verbrauchsstratege".' },
-      { title:'Flotten-Vorlagen', body:'Im Bereich „Angriffsflotte zusammenstellen" (Galaxie-Tab) lässt sich die aktuelle Schiffsauswahl unter einem Namen als <strong>Vorlage</strong> speichern und später mit einem Klick wieder anwenden - praktisch für wiederkehrende Zusammenstellungen wie „Nur Jäger" oder „Vollangriff ohne Frachter". Vorlagen speichern absolute Schiffszahlen, werden beim Anwenden aber immer auf die am jeweiligen Standort <strong>aktuell verfügbare</strong> Menge gekappt - sie bleiben so auch nutzbar, wenn die Flotte seither gewachsen, geschrumpft oder anderswo unterwegs ist.' },
+      { title:'Flotten-Vorlagen', body:'Direkt im <strong>Flottenwahl-Feld</strong> (öffnet sich bei jedem Angriff) lässt sich die aktuelle Schiffsauswahl unter einem Namen als <strong>Vorlage</strong> speichern und später mit einem Klick wieder anwenden - praktisch für wiederkehrende Zusammenstellungen wie „Nur Jäger" oder „Vollangriff ohne Frachter". Vorlagen speichern absolute Schiffszahlen, werden beim Anwenden aber immer auf die am jeweiligen Standort <strong>aktuell verfügbare</strong> Menge gekappt - sie bleiben so auch nutzbar, wenn die Flotte seither gewachsen, geschrumpft oder anderswo unterwegs ist.' },
       { title:'Tier-2-Schiffsfähigkeiten', body:'Jedes der sieben Tier-2-Schiffe hat eine <strong>einzigartige Fähigkeit</strong> (alle gedeckelt und identisch im server-autoritativen PvP wie in der Vorschau). <strong>Angriffs-Auren</strong> (zusammen max +30% effektive Angriffskraft der Flotte): Nanoklinge „Panzerbrecher" +2%/Schiff, Singularitäts-Vernichter „Gravitationssog" (volle Schild-Penetration) +5%/Schiff. <strong>Verteidigungs-Auren</strong> (zusammen max +30% Verteidigung des Standorts): Quantenkreuzer „Schildprojektor" +3%/Schiff, Metamaterial-Titan „Deflektor-Bollwerk" +5%/Schiff. <strong>Logistik/Sonstige:</strong> Fusionsdreadnought „Fusionsantrieb-Effizienz" (−4% Missions-Treibstoff je Schiff, max −20%), Hyperjäger „Ausweichmanöver" (−3% eigene Kampfverluste je Schiff, max −30%), Hyperbomber „Sprengladungen" (zerstört bei einem gewonnenen Spieler-Angriff je 4 Hyperbomber ein zusätzliches Verteidigungsgebäude, max +2). Ohne diese Schiffe ändert sich an bestehenden Kämpfen nichts. Wer alle sieben gleichzeitig besitzt, schaltet den Erfolg „Tier-2-Flottenkommandant" frei.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
@@ -31933,7 +31973,7 @@
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
-      { title:'Vier Unterreiter', body:'Der Galaxie-Tab ist in vier klickbare Bereiche unterteilt, ganz oben auf der Seite: <strong>Kampf & Eroberung</strong> (Angriffsflotte zusammenstellen, angreifbare NPC-Fraktionen, Weltboss, Piraten-Versteck, Territorien-Kontrolle), <strong>Diplomatie & Handel</strong> (NPC-Fraktionen-Übersicht, Nichtangriffspakte, Schwarzmarkt), <strong>Rangliste & Ruhm</strong> (Bestenliste, Ruhmeshalle, Wochenliga) und <strong>Nachrichten</strong> (Galaxie-Nachrichten, eigenes Profil). Die Auswahl bleibt über einen Tab-Wechsel hinweg erhalten.' },
+      { title:'Vier Unterreiter', body:'Der Galaxie-Tab ist in vier klickbare Bereiche unterteilt, ganz oben auf der Seite: <strong>Kampf & Eroberung</strong> (angreifbare NPC-Fraktionen, Weltboss, Piraten-Versteck, Territorien-Kontrolle – die Flottenwahl öffnet sich seit dem 06.08.2026 direkt am jeweiligen Angreifen-Knopf), <strong>Diplomatie & Handel</strong> (NPC-Fraktionen-Übersicht, Nichtangriffspakte, Schwarzmarkt), <strong>Rangliste & Ruhm</strong> (Bestenliste, Ruhmeshalle, Wochenliga) und <strong>Nachrichten</strong> (Galaxie-Nachrichten, eigenes Profil). Die Auswahl bleibt über einen Tab-Wechsel hinweg erhalten.' },
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. In den letzten 24h vor Ablauf lässt sich ein Pakt stattdessen auch direkt um weitere 7 Tage <strong>verlängern</strong>, ohne die Angebot-Warten-Annehmen-Prozedur erneut zu durchlaufen. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (mehr mit der Forschung „Diplomatie-Protokolle"), standardmäßig zählen bis zu 2 Pakte, die Forschung „Diplomatischer Kontaktkreis" erhöht das auf bis zu 4 - additiv zu den anderen globalen Boni. <strong>Diplomatische Doktrin</strong> (Endgame-Anschluss, ab „Diplomatie-Protokolle" Stufe 15 und „Diplomatischer Kontaktkreis" Stufe 2) vertieft die Friedensdividende ein weiteres Mal UND erhöht den Ruf-Zuwachs bei allen Fraktionen um 1%/Stufe. <strong>Pakt-Stufen:</strong> Ein bestehender Pakt lässt sich mit Zustimmung beider Seiten auf „Handelsabkommen" (Stufe 2, schaltet einmal täglich ein gedeckeltes Ressourcengeschenk an den Partner frei) und weiter auf „Frühwarnpartnerschaft" (Stufe 3, zusätzliche Überfall-Vorwarnzeit) anheben. Verschenken lassen sich auch <strong>Tier-2-Ressourcen</strong> (sobald du welche besitzt) - mit bewusst harten Fixdeckeln je Geschenk (20 Nanolegierungen, 10 Quantenchips, 8 Hochenergiekristalle, 4 Fusionskerne, 3 KI-Kerne), damit Geschenke eine Geste bleiben und kein zweiter Produktionskanal; beim Empfänger gilt zudem das kleine Tier-2-Lager. Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
       { title:'Spieler melden', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du unangemessenes Verhalten (z.B. einen anstößigen Namen) melden - kurze Begründung reicht. Spieler-/Allianznamen werden außerdem automatisch beim Anlegen auf eindeutig unangemessene Begriffe geprüft. Nur mit eigenem Server verfügbar.' },
       { title:'Private Nachrichten', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) oder direkt bei einer erhaltenen Nachricht im Berichte-Tab ("Antworten") kannst du einem einzelnen Spieler schreiben - unabhängig von Allianz und ohne den öffentlichen Chat. Erhaltene Nachrichten stehen im Berichte-Tab, die letzten 60 werden aufgehoben. Nur mit eigenem Server verfügbar.' },
@@ -32685,7 +32725,7 @@
   }
   // Springt für den "Direkt Angriff"-Smart-Button aus einem Bericht in den Galaxie-Tab und filtert die
   // Bestenliste direkt auf den Zielspieler. Feuert bewusst KEINEN Angriff automatisch aus – der Spieler
-  // wählt oben in "Angriffsflotte zusammenstellen" weiterhin selbst Schiffstypen/-mengen und über den
+  // wählt im Flottenwahl-Feld (oeffnet am "Spieler angreifen"-Knopf) selbst Schiffstypen/-mengen und über den
   // Planeten-Wechsler den Ausgangsplaneten, bevor er unten auf das Schwert-Symbol beim Ziel klickt.
   // Merkt sich das Ziel eines "Direkt Angriff"-Smart-Buttons, damit direkt unter der Angriffsflotten-
   // Zusammenstellung ein prominenter "Spieler angreifen"-Knopf erscheint – vorher musste man erst bis
@@ -34996,7 +35036,7 @@
     // Basis - dort nuetzen sie nichts und fehlen zuhause. Dieselbe Liste wie im Flottenwahl-Feld.
     for (const k of ATTACK_SHIP_KEYS) if (!KAMPF_SHIP_KEYS.includes(k)) defFleet[k] = 0;
     const total = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(defFleet[k]||0),0);
-    if (total < 1){ log('Wähle zuerst Schiffe aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (total < 1){ log('Wähle zuerst Schiffe im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
     const sameSys = planetSystemOf(state.activeBasePlanet) === base.sector;
     const dur = missionDurationFor(sameSys ? 90 : 420, defFleet, ATTACK_SHIP_KEYS, base.sector);
     const fuel = missionFuelCostSplit(dur, defFleet);
@@ -35033,7 +35073,7 @@
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss'||m.type==='intercept-pirates'||m.type==='void-rift'||m.type==='attack-alliance-base').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     // Ziel-Basis prüfen (existiert + mindestens Stufe 1)
@@ -35149,7 +35189,7 @@
     const cf = currentFleet();
     const composition = buildAttackFleet(state.activeBasePlanet, cf);
     const totalShips = Object.values(composition).reduce((a,b)=>a+(typeof b==='number'?b:0),0);
-    if (totalShips < 1){ log('Wähle mindestens ein Kampfschiff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (totalShips < 1){ log('Wähle mindestens ein Kampfschiff im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
     if (!confirm('Deine zusammengestellte Angriffsflotte ('+totalShips+' Schiffe von '+planetDisplayName(state.activeBasePlanet)+') dem koordinierten Angriff gegen ['+doc.targetTag+'] anschließen? Die Schiffe sind bis zum Abschluss des Angriffs gebunden (Rückzug nur, solange die Sammelphase noch läuft).')) return;
     let res, data;
     try {
@@ -36654,7 +36694,7 @@
     const cf = currentFleet();
     const composition = buildAttackFleet(state.activeBasePlanet, cf);
     const totalShips = Object.values(composition).reduce((a,b)=>a+(typeof b==='number'?b:0),0);
-    if (totalShips < 1){ log('Wähle mindestens ein Kampfschiff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (totalShips < 1){ log('Wähle mindestens ein Kampfschiff im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
     const sameSys = planetSystemOf(state.activeBasePlanet) === state.allianceBase.sector;
     const travelSec = missionDurationFor(sameSys ? 90 : 360, composition, ATTACK_SHIP_KEYS, state.allianceBase.sector);
     const arrivesAtBaseAt = Date.now() + travelSec*1000;
@@ -42312,7 +42352,7 @@
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss'||m.type==='attack-alliance-base').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     if (cf.missions.some(m=>m.type==='worldboss')){ log('Es läuft bereits ein Angriff auf den Weltboss von diesem Standort.', 'ti-alert-triangle'); return; }
@@ -47246,7 +47286,7 @@
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss'||m.type==='attack-alliance-base').length;
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
@@ -47277,7 +47317,7 @@
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff aus (Bereich "Angriffsflotte zusammenstellen").', 'ti-alert-triangle'); return; }
+    if (totalSelected < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
     const slotsUsed = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss'||m.type==='attack-alliance-base').length;
     if (slotsUsed >= combatFleetCount(cf)){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     if (cf.missions.some(m=>m.type==='piratelair')){ log('Es läuft bereits ein Angriff auf das Piratenversteck von diesem Standort.', 'ti-alert-triangle'); return; }
@@ -51556,112 +51596,29 @@
       });
     } catch(e){ console.error('Galaxie-Unterreiter-Umschaltung fehlgeschlagen:', e); }
     renderGalaxyNews();
-    const attackFleetBox = document.getElementById('attackFleetBox');
-    if (attackFleetBox && !isTypingIn('attackFleetBox')){
-      // Gleicher Fehler wie bei renderMarket()/renderTradeRoutes()/renderFactions(): enthält das
-      // Flottenname-Feld (customFleetNameInputAttack) und wird bei aktivem Galaxie-Tab jeden
-      // Sekunden-Tick neu aufgebaut - ohne diesen Schutz würde Tippen den Fokus verlieren.
-      const attackSel = getAttackSelection(state.activeBasePlanet, cf);
-      const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
-      const attackFleetPower = attackPower(attackFleet, state.activeBasePlanet);
-      const attackFleetDf = deployableFighters(attackFleet);
-      const attackAway = computeAwayByType(cf);
-      // Markup aus flottenwahlZeilenHtml() - siehe dort. Bis zum 05.08.2026 stand es hier
-      // inline; das kuenftige Auswahlfeld an den zwoelf Startstellen braucht dieselben Zeilen.
-      const attackRows = flottenwahlZeilenHtml(state.activeBasePlanet, cf, ATTACK_SHIP_KEYS);
+    /* Die "Angriffsflotte zusammenstellen"-Box ist entfernt (v8.427.0, Entscheidung Sascha:
+       das Flottenwahl-Feld ERSETZT sie, es ergaenzt sie nicht). Ihre Bestandteile sind umgezogen:
+       Schiffszeilen, Schnellwahl und Vorlagen ins Flottenwahl-Feld (oeffnet an allen zwoelf
+       Startstellen), der Flottenname ebenfalls ins Feld, der Veteranenrang in den Flotte-Tab -
+       er ist Information ueber den STANDORT, nicht ueber einen einzelnen Angriff. Der
+       Auswahlzustand attackFleetSelection lebt unveraendert weiter; es gab nie eine zweite Quelle. */
+    const veteranRankBox = document.getElementById('veteranRankBox');
+    if (veteranRankBox){
       const vetRank = veteranRankOf(state.activeBasePlanet);
       const vetNext = nextVeteranRankOf(state.activeBasePlanet);
-      // Zusammenfassungs-Chips: zeigen die aktuelle Auswahl auf einen Blick, ohne durch alle
-      // Schiffstypen scrollen zu müssen (häufige Rückmeldung: unklar, welche Flotte losgeschickt wird).
-      const summaryChips = ATTACK_SHIP_KEYS.filter(k => (attackFleet[k]||0) > 0).map(k => {
-        const def = shipDefOrSuper(k);
-        return `<div class="chip"><span style="width:14px; height:14px; display:inline-flex;">${ICONS[def.icon]?ICONS[def.icon].replace('width="24" height="24"','width="14" height="14"'):''}</span><span class="chip-n">${attackFleet[k]}</span> ${def.name}</div>`;
-      }).join('');
-      // QoL "Flotten-Vorlagen": benannte Auswahlen speichern/anwenden/löschen, siehe saveFleetTemplate/
-      // applyFleetTemplate/deleteFleetTemplate weiter oben.
-      const fleetTemplateRows = (state.fleetTemplates||[]).map(t => {
-        const partsText = Object.entries(t.composition).map(([k,v]) => v+'× '+(k==='superschlachtschiff'?'Superschlachtschiff':(SHIP_DEFS.find(d=>d.key===k)||{}).name||k)).join(', ');
-        return `<div class="card-row" style="padding:0.4rem 0.6rem;">
-          <div class="left" style="gap:6px;"><i class="ti ti-list-details" aria-hidden="true" style="color:#7d8199;"></i>
-            <div><div class="bname" style="font-size:11.5px;">${t.name}</div><div class="bmeta" style="font-size:10px;">${partsText||'leer'}</div></div>
-          </div>
-          <div style="display:flex; gap:5px;">
-            <button data-apply-fleet-template="${t.id}" style="font-size:10px; padding:4px 7px;" title="Anwenden"><i class="ti ti-check" aria-hidden="true"></i></button>
-            <button data-delete-fleet-template="${t.id}" style="font-size:10px; padding:4px 7px;" title="Löschen"><i class="ti ti-trash" aria-hidden="true"></i></button>
-          </div>
-        </div>`;
-      }).join('') || '<div class="bmeta" style="margin-bottom:0.3rem;">Noch keine Vorlagen gespeichert - Auswahl unten benennen und speichern.</div>';
-      setBoxHtml(attackFleetBox, 'attackFleetBox', `
+      setBoxHtml(veteranRankBox, 'veteranRankBox', `
         <div class="card-row" style="margin-bottom:0.5rem; border-color:${vetRank.color};">
           <div class="left" style="gap:8px;"><i class="ti ti-award" aria-hidden="true" style="color:${vetRank.color}; font-size:18px;"></i>
             <div><div class="bname" style="font-size:12px;">Veteranenrang: <span style="color:${vetRank.color};">${vetRank.name}</span>${vetRank.bonus>0?' (+'+Math.round(vetRank.bonus*100)+'% Angriff & Verteidigung)':''}</div>
             <div class="bmeta">${fmt(veteranXpOf(state.activeBasePlanet))} Kampferfahrung${vetNext?' · nächster Rang "'+vetNext.name+'" ab '+fmt(vetNext.xp):' · Höchstrang erreicht'}. Überlebte Gefechte bringen Erfahrung, schwere Verluste kosten welche.</div>
             ${veteranRoleExtraText(state.activeBasePlanet) ? `<div class="bmeta" style="color:${vetRank.color}; margin-top:3px;"><i class="ti ti-target" aria-hidden="true" style="margin-right:3px;"></i>${veteranRoleExtraText(state.activeBasePlanet)}</div>` : ''}</div>
           </div>
-        </div>
-        <div class="summary-bar">
-          <div class="summary-top">
-            <div class="summary-title"><i class="ti ti-check" aria-hidden="true"></i> Aktuelle Auswahl</div>
-            <span style="font-size:12px; font-weight:700; color:#e24b4a;"><i class="ti ti-sword" aria-hidden="true"></i> ${attackFleetPower}</span>
-          </div>
-          <div class="summary-chips">${summaryChips || '<span class="bmeta">Noch nichts ausgewählt.</span>'}</div>
-        </div>
-        <div class="quick-actions">
-          <button id="atkSelAllBtn" class="primary"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Alle Kampfschiffe</button>
-          <button id="atkSelClearBtn" class="danger"><i class="ti ti-x" aria-hidden="true" style="margin-right:4px;"></i>Nichts</button>
-        </div>
-        <div class="section-title" style="font-size:12px; margin-top:0.4rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Flotten-Vorlagen</div>
-        ${fleetTemplateRows}
-        <div style="display:flex; gap:6px; margin-bottom:0.5rem;">
-          <input type="text" id="fleetTemplateNameInput" placeholder="Name für aktuelle Auswahl speichern" maxlength="30" style="flex:1; min-width:0;"/>
-          <button id="saveFleetTemplateBtn" style="font-size:11px; padding:5px 9px; white-space:nowrap;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>Speichern</button>
-        </div>
-        <div class="bmeta" style="margin-bottom:0.5rem;">Wähle aus, welche Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} für den nächsten Angriff eingesetzt werden. Wirkt sich auf Angriffskraft und Flugzeit je Ziel unten aus.</div>
-        ${attackRows || `<div class="bmeta" style="padding:0.5rem 0;">Keine Kampfschiffe auf ${planetDisplayName(state.activeBasePlanet)} verfügbar.</div>`}
-        <input type="text" id="customFleetNameInputAttack" placeholder="Flottenname (optional, sonst automatisch)" maxlength="30" style="width:100%; margin-top:0.5rem;" value="${customFleetName}"/>
-        <div class="card-row" style="flex-direction:column; align-items:stretch; gap:4px; margin-top:0.5rem; background:rgba(226,75,74,0.08); border-color:rgba(226,75,74,0.3);">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:15px; font-weight:600; color:#e24b4a;"><i class="ti ti-sword" aria-hidden="true"></i> Angriffskraft: ${attackFleetPower}</span>
-          </div>
-        </div>
-      `);
-      refreshShipMiniIcons(attackFleetBox);
-      const cfnAttack = document.getElementById('customFleetNameInputAttack');
-      if (cfnAttack) cfnAttack.oninput = () => { customFleetName = cfnAttack.value; };
-      // Verdrahtung aus verdrahteFlottenwahlZeilen() - siehe dort. Bis zum 05.08.2026 standen
-      // hier vier gleichfoermige Bloecke inline. render() als Neuzeichner, weil diese Box im
-      // Sekunden-Tick liegt und den vollen Durchlauf braucht.
-      verdrahteFlottenwahlZeilen(attackFleetBox, state.activeBasePlanet, cf, render);
-      const atkSelClearBtn = document.getElementById('atkSelClearBtn');
-      if (atkSelClearBtn) atkSelClearBtn.onclick = () => {
-        const sel = getAttackSelection(state.activeBasePlanet, cf);
-        for (const k of ATTACK_SHIP_KEYS) sel[k] = 0;
-        render();
-      };
-      const atkSelAllBtn = document.getElementById('atkSelAllBtn');
-      if (atkSelAllBtn) atkSelAllBtn.onclick = () => {
-        const sel = getAttackSelection(state.activeBasePlanet, cf);
-        const avail = attackAvailableByType(cf);
-        for (const k of ATTACK_SHIP_KEYS) sel[k] = avail[k]||0;
-        render();
-      };
-      const saveFleetTemplateBtn = document.getElementById('saveFleetTemplateBtn');
-      const fleetTemplateNameInput = document.getElementById('fleetTemplateNameInput');
-      if (saveFleetTemplateBtn) saveFleetTemplateBtn.onclick = () => {
-        saveFleetTemplate(fleetTemplateNameInput ? fleetTemplateNameInput.value : '');
-        if (fleetTemplateNameInput) fleetTemplateNameInput.value = '';
-      };
-      attackFleetBox.querySelectorAll('[data-apply-fleet-template]').forEach(btn => btn.onclick = () => {
-        applyFleetTemplate(btn.getAttribute('data-apply-fleet-template'));
-      });
-      attackFleetBox.querySelectorAll('[data-delete-fleet-template]').forEach(btn => btn.onclick = () => {
-        deleteFleetTemplate(btn.getAttribute('data-delete-fleet-template'));
-      });
+        </div>`);
     }
 
     // Direkter "Spieler angreifen"-Knopf: erscheint, sobald über den "Direkt Angriff"-Smart-Button
     // aus einem Spionagebericht ein Ziel markiert wurde. Nutzt exakt dieselbe Angriffsflotte, die oben
-    // in "Angriffsflotte zusammenstellen" gewählt wurde – kein Scrollen bis zur Bestenliste mehr nötig.
+    // im Flottenwahl-Feld gewählt wird – kein Scrollen bis zur Bestenliste mehr nötig.
     const pendingAttackBox = document.getElementById('pendingAttackBox');
     if (pendingAttackBox){
       if (!pendingAttackTarget){

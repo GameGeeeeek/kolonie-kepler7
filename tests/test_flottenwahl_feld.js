@@ -146,12 +146,27 @@ const MENGEN = () => {
   check('3: "Komplette Flotte" wählt alles - auch die Frachter',
     alle.jaeger === 60 && alle.cruisers === 30 && alle.frachter === 10, alle);
 
+  // Frachtraum-Zeile (Idee Sascha 06.08.2026): Mit Transportern steht die Gesamt-Frachtmenge
+  // samt Aufschluesselung im Fuss - 10 Kleine Frachter x 300 = 3.0k.
+  const fussText = () => (document.querySelector('#fwahlOverlay .fwahl-fuss')||{}).textContent.replace(/\s+/g,' ') || '';
+  const fussMit = await page.evaluate(fussText);
+  check('3: mit Transportern steht die Gesamt-Frachtmenge im Fuß',
+    /Frachtraum gesamt: 3\.0k/.test(fussMit) && /10× Kleiner Frachter/.test(fussMit),
+    fussMit.match(/Frachtraum[^A-Z]*/)?.[0]?.trim());
+
   // Und "Ohne Zivilschiffe" laesst die Frachter stehen - der Unterschied ist der Punkt.
   await page.evaluate(() => document.querySelector('[data-fwahl-kampf]').click());
   await page.waitForTimeout(400);
   const kampf = await page.evaluate(MENGEN);
   check('3: "Ohne Zivilschiffe" lässt die Frachter daheim',
     kampf.jaeger === 60 && kampf.cruisers === 30 && kampf.frachter === 0, kampf);
+  // DIE GEGENPROBE zur Frachtzeile ist die Live-Umschaltung selbst: Ohne Frachter verschwindet
+  // die Mengenzeile, und weil dieser Auftrag Beute fuehrt (fracht:true), erscheint stattdessen
+  // die rote Warnung. Ohne diese Pruefung waere die Zeile auch gruen, wenn sie immer da stuende.
+  const fussOhne = await page.evaluate(fussText);
+  check('3: ohne Frachter weicht die Zeile der Beute-Warnung',
+    !/Frachtraum gesamt/.test(fussOhne) && /Ohne Frachter geht die gesamte Beute verloren/.test(fussOhne),
+    fussOhne.match(/(Frachtraum|Ohne Frachter)[^·]*/)?.[0]?.trim());
 
   // ---- 4) "Nichts" sperrt den Start, mit Begründung.
   await page.evaluate(() => document.querySelector('[data-fwahl-nichts]').click());
