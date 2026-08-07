@@ -21,12 +21,20 @@ sondern **Entscheidung, Fortschritt und geteilte Galaxie**.
 Nicht dafür: bezahlte Werbung, TikTok-Shop, Influencer-Verträge. Dafür fehlen
 im Repo die Grundlagen, und geraten wird hier nichts.
 
-## Festgelegt: alle Aufnahmen von einem frischen Konto
+## Festgelegt (Entscheidungen von Sascha, 07.08.2026)
 
-Entscheidung von Sascha (07.08.2026). Gefilmt wird **nicht** von einem weit
-entwickelten Konto, sondern von einem neuen – der Zuschauer sieht genau das,
-was er nach dem Klick selbst bekommt. Das ist die Prämisse, unter der jedes
-Skript entsteht, und sie ist mehr Vorteil als Einschränkung:
+Drei Festlegungen, unter denen jedes Skript entsteht. Sie sind keine
+Randbedingungen, sondern die Form des Kanals:
+
+1. **Aufnahmen von einem frischen Spielkonto**, nicht von einem weit
+   entwickelten.
+2. **Der TikTok-Kanal existiert bereits** – es ist kein Start bei null.
+3. **Keine Person im Bild.** Bildschirmaufnahme plus Stimme, sonst nichts.
+
+### 1 – Frisches Spielkonto
+
+Der Zuschauer sieht genau das, was er nach dem Klick selbst bekommt. Mehr
+Vorteil als Einschränkung:
 
 - **Der Einstieg ist der Inhalt.** Die häufigste Enttäuschung bei Spiel-Videos
   ist die Lücke zwischen Aufnahme und eigenem Konto. Die gibt es hier nicht.
@@ -60,6 +68,65 @@ ersten Login wird mehr gefilmt, als je gesendet wird – die ersten Klicks, das
 erste Gebäude, das erste Rückkehr-Fenster. Material lässt sich später schneiden,
 aber nicht nachdrehen. Wer erst nach vier Wochen anfängt zu filmen, hat den
 gesamten Einstieg verloren, also genau das, worauf diese Ausrichtung setzt.
+
+### 2 – Bestehender Kanal
+
+Der Kanal ist da, es wird also nicht bei null angefangen. **Was darauf liegt,
+kann diese Skill nicht sehen** – vor der ersten Tagebuch-Folge nachsehen und
+danach entscheiden:
+
+- **Liegt dort schon Spielmaterial von einem entwickelten Konto?** Dann ist der
+  Neuanfang eine Aussage, die ausgesprochen werden muss, nicht verschwiegen:
+  „Neues Konto, ich fange bei null an." Die alten Videos bleiben sichtbar und
+  auffindbar; ein Tagebuch, das so tut, als hätte es nie etwas anderes gegeben,
+  wird vom eigenen Kanal widerlegt. Genau derselbe Fehlertyp wie eine zweite
+  Anzeigestelle im Code.
+- **Geht es dort um etwas ganz anderes?** Dann bewusst entscheiden: sauberer
+  Themenwechsel mit einer Folge, die ihn benennt – oder ein eigener Kanal.
+  Beides ist vertretbar, ein stilles Nebeneinander nicht.
+- **Ist der Kanal praktisch leer?** Dann verhält es sich wie ein Neustart, und
+  es ist nichts weiter zu beachten.
+
+**Nichts löschen, um „aufzuräumen".** Alte Videos sind Kanalhistorie und
+kosten nichts; die Serie wird stattdessen angepinnt und trägt sich über ihre
+eigene Nummerierung.
+
+Für den Zuschnitt der Videos ändert der bestehende Kanal wenig: Der weit
+überwiegende Teil der Aufrufe kommt über den Vorschlags-Feed, nicht über
+Abonnenten. **Jede Folge muss deshalb für jemanden funktionieren, der weder
+den Kanal noch das Spiel kennt** – kein „wie letzte Woche besprochen", kein
+Rückverweis, der Vorwissen verlangt. Ein Satz Einordnung im Hook („Tag 6 in
+diesem Weltraum-Aufbauspiel") reicht und kostet nichts.
+
+### 3 – Bild und Stimme, keine Person
+
+Ohne Gesicht trägt die Stimme die gesamte Persönlichkeit des Kanals, und das
+Bild trägt die gesamte Aufmerksamkeit. Beides hat Folgen:
+
+- **Gesprochene Sätze, keine geschriebenen.** Die Texte des Spiels sind
+  Schriftdeutsch – vorgelesen klingt das nach Bedienungsanleitung. Jedes Skript
+  wird in Sprechsprache umgeschrieben: kurze Hauptsätze, keine verschachtelten
+  Relativsätze, keine Abkürzungen, Zahlen ausgeschrieben, wie man sie sagt.
+  **Probe: einmal laut lesen.** Wer stolpert, hat den Satz falsch gebaut.
+- **Die Stimme ist das Wiedererkennungsmerkmal.** Eigene Stimme ist einer
+  Computerstimme vorzuziehen – bei einem Projekt, das von einer Person gebaut
+  wird, ist sie das einzige persönliche Element, das bleibt. Fällt die
+  Entscheidung für eine synthetische Stimme, dann **eine einzige, dauerhaft
+  dieselbe**; wechselnde Stimmen zerstören genau das, was hier den Kanal
+  zusammenhält.
+- **Das Bild muss die fehlende Person ersetzen.** Ohne Gesicht gibt es keinen
+  Ruhepunkt, an dem ein Zuschauer hängenbleibt. Also: Schnitt bei jedem neuen
+  Gedanken, Zoom auf die Stelle, über die gerade gesprochen wird, nie länger
+  als zwei bis drei Sekunden dasselbe unbewegte Bild.
+- **Ton im Spiel vor der Aufnahme ausschalten.** Das Spiel erzeugt eigene
+  Klänge (`playSound`, `weltraum_kolonie.html:24384` – Oszillatortöne für Bau,
+  Forschung, Treffer, Erfolg), und `soundOn` steht im Startzustand auf `true`
+  (`:16453`). Ein frisch aufgesetztes Konto piept also von sich aus ins
+  Voiceover. Der Schalter sitzt im Kopfbereich („Sound"). Bewusste Ausnahme:
+  eine Folge, in der es *um* den Ton geht – dann ohne Sprache.
+- **Stimme getrennt aufnehmen**, nicht während des Spielens. Sonst stecken
+  Bediengeräusche und Denkpausen im Ton, und jede Korrektur erzwingt eine neue
+  Bildschirmaufnahme.
 
 ## Grundhaltung: jede Behauptung hat einen Beleg im Repo
 
@@ -203,7 +270,9 @@ können"). Deshalb:
   6-Punkt-Schrift ist auf einem Handy unlesbar. Lieber eine Box formatfüllend.
 - **Wenig, aber sichtbare Bewegung:** Warteschlange füllen, Zahl hochlaufen
   lassen, Reiter wechseln. Ein Standbild mit Voiceover verliert.
-- **Untertitel sind Pflicht**, nicht Kür – ein großer Teil schaut ohne Ton.
+- **Untertitel sind Pflicht**, nicht Kür. Bei diesem Kanal mehr als sonst: Ohne
+  Person im Bild steckt die gesamte Aussage in der Stimme – wer stumm schaut,
+  sieht ohne Untertitel nur Zahlen, die sich ändern, und weiß nicht, warum.
 - Der Offline-Fortschritt liefert die dankbarste Bildidee überhaupt: das
   Rückkehr-Fenster mit der Aufstellung dessen, was zusammengekommen ist. Auf
   einem frischen Konto sind die Zahlen darin klein – **das ist kein Mangel,
@@ -295,14 +364,17 @@ Beleg:          <Datei:Zeile oder Landingpage-Absatz für jede harte Aussage>
 Die Zeile **Beleg** ist nicht optional. Sie ist der ganze Unterschied zwischen
 dieser Skill und einer allgemeinen TikTok-Beratung.
 
-## Offene Punkte
+## Was diese Skill nicht wissen kann
 
-Diese Skill trifft bewusst keine Annahme dazu – vor dem ersten
-Veröffentlichungsplan mit Sascha klären:
+Alle drei Grundfragen sind am 07.08.2026 geklärt und stehen oben unter
+„Festgelegt". Offen bleibt nur, was außerhalb des Repos liegt und deshalb
+**nachgesehen statt angenommen** werden muss:
 
-- Gibt es bereits einen TikTok-Kanal, und wenn ja, mit welchem Bestand?
-- Erscheint eine Person im Bild oder bleibt es reine Bildschirmaufnahme mit
-  Stimme/Text?
-
-Geklärt (07.08.2026): **frisches Konto** – siehe den Abschnitt „Festgelegt"
-oben.
+- **Der Bestand des Kanals** – wie viele Videos, welches Thema, welcher Ton.
+  Danach richtet sich, ob die erste Tagebuch-Folge einen Neuanfang benennen
+  muss (siehe „Festgelegt 2"). Wer diese Skill benutzt, sieht selbst nach oder
+  fragt Sascha; geraten wird es nicht.
+- **Der Spielstand des Aufnahmekontos** – Tagesnummer und alle Zahlen im Video
+  kommen aus dem laufenden Konto, nicht aus dieser Datei. Die Datei liefert die
+  Mechanik und den Beleg dafür, dass eine Zahl möglich ist, nie den Messwert
+  selbst.
