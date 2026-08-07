@@ -40,12 +40,17 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     # Der Deckel ist eine Notbremse, keine Erwartung: Er greift, bevor ein hängender Browser das
-    # Actions-Kontingent auf die 6 Stunden der Voreinstellung verbrennt. Der Wert stammt aus einem
-    # vollständigen Lauf dieser Suite (07.08.2026) mit reichlich Luft nach oben, weil GitHubs
-    # Runner langsamer sein können als die Entwicklungsumgebung. Schlägt der Lauf künftig
-    # regelmäßig an dieser Grenze fehl, ist nicht der Deckel zu klein, sondern ein Test hängt -
-    # run.js gibt jedem Test ohnehin nur 5 Minuten und meldet dann "(keine FAIL-Zeile)".
-    timeout-minutes: 30
+    # Actions-Kontingent auf die 6 Stunden der Voreinstellung verbrennt.
+    #
+    # GEMESSEN, NICHT GESCHÄTZT (07.08.2026): Hier standen zuerst 30 Minuten - mit dem Kommentar,
+    # der Wert stamme "aus einem vollständigen Lauf dieser Suite". Das war schlicht falsch, einen
+    # vollständigen Lauf hatte es nie gegeben. Lauf Nr. 2 ist prompt nach 29 min 38 s in genau
+    # diesen Deckel gelaufen und wurde abgebrochen, ohne je ein Ergebnis zu liefern. Die Suite
+    # braucht auf ubuntu-latest also NACHWEISLICH mehr als eine halbe Stunde; 60 Minuten geben
+    # Luft, bis eine echte Gesamtzeit vorliegt.
+    # Schlägt der Lauf künftig regelmäßig an dieser Grenze fehl, ist nicht der Deckel zu klein,
+    # sondern ein Test hängt - run.js gibt jedem Test ohnehin nur 5 Minuten.
+    timeout-minutes: 60
 
     steps:
       - name: Spiel-Repo auschecken
@@ -67,6 +72,23 @@ jobs:
           repository: GameGeeeeek/kolonie-kepler7-backend
           ref: master
           path: backend-repo
+
+      # WARUM DER UMWEG ÜBER `backend-repo` UND EIN `mv`:
+      # `KEPLER_BACKEND_SERVER` allein genügt NICHT. Die Variable liest nur tests/lib/umgebung.js;
+      # test_verstrickungen.js baut sich seinen Pfad selbst zusammen (Zeile 214:
+      # `path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js')`) und
+      # kennt die Variable gar nicht. Beim ersten Versuch lag das Backend unter `backend-repo`
+      # INNERHALB des Arbeitsverzeichnisses - der Test meldete daraufhin zu Recht
+      # "Backend-Repo liegt daneben ... UNGEPRÜFT" und riss den Lauf mit ins Rot.
+      # actions/checkout weigert sich, direkt neben das Arbeitsverzeichnis auszuchecken (`path`
+      # muss darunter liegen), deshalb erst hinein, dann daneben schieben. Damit stimmen BEIDE
+      # Wege: die Geschwister-Erwartung der Tests und die Variable unten.
+      - name: Backend an die Geschwisterstelle schieben
+        run: |
+          ZIEL="$(dirname "$GITHUB_WORKSPACE")/kolonie-kepler7-backend"
+          mv "$GITHUB_WORKSPACE/backend-repo" "$ZIEL"
+          test -f "$ZIEL/server.js" || { echo "server.js fehlt unter $ZIEL"; exit 1; }
+          echo "Backend liegt unter $ZIEL"
 
       - name: Node einrichten
         uses: actions/setup-node@v4
@@ -99,12 +121,12 @@ jobs:
           echo "NODE_PATH=$(npm root -g)" >> "$GITHUB_ENV"
 
       # tests/lib/umgebung.js sucht das Backend zuerst über diese Variable, dann erst über feste
-      # Pfade - explizit gesetzt ist verlässlicher, als sich auf die Verzeichnisnachbarschaft des
-      # Runners zu verlassen.
+      # Pfade. Sie zeigt jetzt auf die Geschwisterstelle aus dem `mv`-Schritt oben - beide Wege
+      # führen also zum selben Verzeichnis, und kein Test kann mehr danebengreifen.
       # Den Browser findet Playwright selbst: umgebung.js probiert die Container-Pfade dieser
       # Entwicklungsumgebung (/opt/pw-browsers) und fällt sonst auf den mitgelieferten zurück -
       # genau der Fall hier.
       - name: Prüflauf
         env:
-          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/backend-repo/server.js
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/../kolonie-kepler7-backend/server.js
         run: node tests/run.js
