@@ -53,8 +53,20 @@ for (const key of neu){
       code: (d.ep * 100) + '%/Stufe, ' + (d.ep * d.max * 100).toFixed(1) + '% bei ' + d.max });
 }
 
-// Stapelhinweise muessen auf real existierende Forschungen zeigen.
+// Stapelhinweise muessen auf real existierende Forschungen zeigen. Seit v8.429.0 darf eine
+// Forschung auch einen FAEHIGKEITSBAUM-Knoten nennen (rflottenkoord -> „Parallelkommando", der
+// +1-Flottenslot) - deshalb zaehlen die Namen aus SKILL_TREE/SKILL_MASTERY mit. Die Schutzwirkung
+// bleibt: ein Tippfehler oder ein spaeter umbenannter Knoten faellt weiterhin auf.
 const namen = new Set(zeilen.slice(s + 1, e).map(l => (l.match(/name:'([^']+)'/) || [])[1]).filter(Boolean));
+for (const arr of ['SKILL_TREE', 'SKILL_MASTERY']){
+  const von = zeilen.findIndex(l => l.includes('const ' + arr + ' = ['));
+  if (von < 0) continue;
+  for (let i = von + 1; i < zeilen.length; i++){
+    if (/^  \];/.test(zeilen[i])) break;
+    const m = zeilen[i].match(/name:'([^']+)'/);
+    if (m) namen.add(m[1]);
+  }
+}
 let stapelFehler = [];
 for (const d of defs){
   for (const m of d.desc.matchAll(/„([^"]+)"/g)) if (!namen.has(m[1])) stapelFehler.push(d.key + ' -> ' + m[1]);

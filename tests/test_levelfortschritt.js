@@ -91,8 +91,10 @@ check('"Naechstes Ziel" rechnet, was der naechste Aufstieg bringt',
 check('das alte, unbedingte Versprechen ist weg',
   !ohnePatchnotes.includes('Nächstes Level: +1% Gesamtproduktion und ein Fähigkeitspunkt.'));
 // Beide Bedingungen muessen gerechnet sein - eine hart kodierte Levelzahl waere derselbe Fehler.
+// Seit v8.429.0 zaehlen die wiederholbaren Meisterschaften mit in die Grenze - der Punkt bleibt
+// nuetzlich, bis WIRKLICH alles ausgekauft ist, und beide Summanden sind gerechnete Konstanten.
 check('der Faehigkeitspunkt haengt an den Baumkosten, nicht an einer Levelzahl',
-  src.includes('if (skillPointsSpent() < SKILL_TREE_TOTAL_COST) teile.push('));
+  src.includes('if (skillPointsSpent() < SKILL_TREE_TOTAL_COST + SKILL_MASTERY_TOTAL_COST) teile.push('));
 check('die Produktionszeile haengt am Deckel-Level',
   src.includes('if (lvl + 1 <= COMMANDER_PROD_CAP_LEVEL) teile.push('));
 

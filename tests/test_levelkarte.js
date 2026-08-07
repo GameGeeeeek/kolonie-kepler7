@@ -50,6 +50,15 @@ const BAUM_KNOTEN = (() => {
   const block = src.slice(von, src.indexOf('\n  ];', von));
   return [...block.matchAll(/key:'(\w+)'/g)].map(m => m[1]);
 })();
+// Seit v8.429.0 gibt es zusaetzlich wiederholbare Meisterschaften (SKILL_MASTERY, Stufenzahl statt
+// true im Spielstand). Das "alles ausgekauft"-Szenario dieses Tests muss sie MAXIEREN - sonst ist
+// das Versprechen "ein Faehigkeitspunkt" ja wieder wahr und die Kernaussage unten prueft nichts.
+const MEISTERSCHAFTEN = (() => {
+  const von = src.indexOf('const SKILL_MASTERY = [');
+  if (von < 0) return [];
+  const block = src.slice(von, src.indexOf('\n  ];', von));
+  return [...block.matchAll(/key:'(\w+)'[^\n]*?maxStufen:(\d+)/g)].map(m => ({ key: m[1], max: Number(m[2]) }));
+})();
 // commanderLevel = floor(sqrt(xp/50)). Ein Level deutlich UEBER Deckel und Baumkosten, damit beide
 // Grenzen sicher ueberschritten sind - gerechnet, nicht als 45 hingeschrieben.
 const LEVEL = Math.max(DECKEL_PCT, BAUM_KOSTEN) + 5;
@@ -63,6 +72,7 @@ const AUTONOMIE_STUFEN = 3;
   const errs = [];
   const store = {};
   const skillTree = {}; for (const k of BAUM_KNOTEN) skillTree[k] = true;
+  for (const m of MEISTERSCHAFTEN) skillTree[m.key] = m.max;
   store['kepler7-save-v3'] = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
     resources:{ energie:9e5, erz:9e5, kristalle:9e5, deuterium:9e5, antimaterie:9e4, forschungspunkte:9e4 },
     buildings:{ solar:20, mine:18, labor:12, werft:12, hangar:8, lager:12, autonomiekern:AUTONOMIE_STUFEN },
