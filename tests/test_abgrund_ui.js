@@ -150,7 +150,14 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
       { rekord: vorher ? vorher.best : null });
 
     // ---- 4) Tauchgang starten ----
+    // Seit v8.426.0 oeffnet der Abtauchen-Knopf das Flottenwahl-Feld; der eigentliche Start ist
+    // der zweite Klick IM Feld. Der Test folgt dem echten Bedienweg - und prueft damit nebenbei,
+    // dass die Kette Knopf -> Feld -> Start am Abgrund wirklich zusammenhaengt.
     await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-start]'); if(b) b.click(); });
+    await page.waitForTimeout(500);
+    const feldOffen = await page.evaluate(()=>{ const o=document.getElementById('fwahlOverlay'); return !!(o && o.classList.contains('open')); });
+    check('4: der Abtauchen-Knopf oeffnet das Flottenwahl-Feld', feldOffen);
+    await page.evaluate(()=>{ const b=document.querySelector('#fwahlOverlay [data-fwahl-start]'); if(b) b.click(); });
     // Auf die gebuchte Mission warten statt auf die Uhr - siehe warteAufStand() oben.
     await warteAufStand(page, store, st => (((st.fleet||{}).missions)||[]).some(m=>m.type==='abgrund'));
     const nachStart = gespeichert(store);
