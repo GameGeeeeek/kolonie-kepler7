@@ -73,6 +73,14 @@ check('3a: reportIsPositive kennt destroyed',
 check('3b: die Icon-Wahl (won) kennt destroyed',
   JS.includes("const won = r.result === 'win' || r.result === 'destroyed';"));
 
+// ---- 3c) Zuschauen (v8.432.0): der Raid ist abspielbar, mit ehrlichem Schlachtdaten-Zweig
+check('3c: alliance-raid steht in den abspielbaren Berichten',
+  /const ABSPIELBARE_BERICHTE = \[[^\]]*'alliance-raid'[^\]]*\];/.test(JS));
+check('3d: schlachtDaten hat einen eigenen Raid-Zweig (Verband + abgeleitete Verluste)',
+  JS.includes("} else if (r.type === 'alliance-raid'){") &&
+  /vbVerluste\[vbk\] = vbn;/.test(JS) &&
+  JS.includes("seiteBauen('Verband deiner Allianz', 'du', r.fleet, vbVerluste, u)"));
+
 // ---- 4) Backend-Parität (überspringt sich nur selbst, wenn das Backend-Repo fehlt)
 if (SERVER_JS) {
   const srv = fs.readFileSync(SERVER_JS, 'utf8');
@@ -155,6 +163,24 @@ function backend(){ return async r => {
     !!musterKarte && musterKarte.text.includes('DIE BASIS WURDE ZERSTÖRT') && musterKarte.text.includes('5x Kreuzer'),
     musterKarte && musterKarte.text.slice(0, 140));
   check('5g: die zerstörte Basis färbt positiv ("Gewonnen"-Pille)', !!musterKarte && musterKarte.pill === 'Gewonnen', musterKarte && musterKarte.pill);
+
+  // Zuschauen (v8.432.0): Der Knopf steht auf der Raid-Karte, und ein Klick öffnet wirklich die
+  // Bühne (kein "kein Gefecht"-Toast, Overlay offen) - das Versprechen der Patchnote, gemessen.
+  const zuschauen = await page.evaluate(() => {
+    const karte = [...document.querySelectorAll('#reportsBox .card-row')]
+      .find(c => c.textContent.includes('Allianz-Raid: Schwarmmutter'));
+    const btn = karte && karte.querySelector('[data-watch-battle]');
+    if (btn) btn.click();
+    return { knopf: !!btn };
+  });
+  await page.waitForTimeout(800);
+  const buehne = await page.evaluate(() => ({
+    offen: document.getElementById('battleModalOverlay').classList.contains('open'),
+    text: (document.getElementById('battleModalOverlay').textContent.match(/Verband deiner Allianz|Schwarmmutter/g) || []).length
+  }));
+  check('5j: die Raid-Karte hat einen Zuschauen-Knopf', zuschauen.knopf === true);
+  check('5k: der Klick öffnet die Kampf-Bühne mit dem Verband', buehne.offen && buehne.text >= 1, buehne);
+  await page.evaluate(() => { const b = document.getElementById('battleModalOverlay'); if (b) b.classList.remove('open'); });
 
   // Kämpfe-Filter: beide Typen müssen darunter erscheinen (vorher: Raid unter "Sonstiges").
   await page.evaluate(() => { const f = document.querySelector('[data-reports-filter-cat="combat"]'); if (f) f.click(); });

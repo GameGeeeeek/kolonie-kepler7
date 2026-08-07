@@ -51,6 +51,10 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
     f({ type:'expedition', encountered:false, fleet:{jaeger:5} }) === false);
   check('1: ohne eigene Flotte gibt es nichts zu zeigen',
     f({ type:'void-rift' }) === false && f({ type:'npc-attack' }) === false);
+  // Allianz-Raid (v8.432.0): abspielbar NUR mit Verbandsflotte - aeltere Berichte (vor v8.430.0)
+  // fuehren keine und bekommen keinen Knopf, statt eine leere Buehne zu zeigen.
+  check('1: Allianz-Raid mit Verbandsflotte', f({ type:'alliance-raid', fleet:{jaeger:5} }) === true);
+  check('1: Allianz-Raid-Altbericht ohne Flotte -> kein Knopf', f({ type:'alliance-raid' }) === false);
   check('1: ein Spionagebericht ist kein Gefecht', f({ type:'spy-report', fleet:{jaeger:5} }) === false);
   check('1: ohne Bericht kein Absturz', f(null) === false && f(undefined) === false);
 }
