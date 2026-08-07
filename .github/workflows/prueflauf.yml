@@ -1,0 +1,98 @@
+# Prüflauf für jeden Pull Request.
+#
+# WARUM ES DIESE DATEI GIBT
+# -------------------------
+# Ein Merge nach `main` ist bei diesem Projekt nicht der Zwischenschritt zu einem späteren Deploy,
+# sondern die Auslieferung selbst: GitHub ruft den Deploy-Webhook des Backends auf, der Pi zieht
+# und kopiert `weltraum_kolonie.html` ins Ausgabeverzeichnis - Sekunden später steht die Änderung
+# auf gamegeeeeek.de. CLAUDE.md sagt dazu: "Der Prüflauf ist deshalb keine Formalie, sondern das
+# einzige, was zwischen einer Änderung und den Spielern steht."
+# Genau dieses eine Sicherungsseil hing bis hierher an der Disziplin, `node tests/run.js` von Hand
+# aufzurufen. Diese Datei hängt es an den Pull Request, damit ein vergessener Prüflauf nicht mehr
+# unbemerkt live gehen kann.
+#
+# BEWUSST NUR AUF PULL REQUESTS
+# -----------------------------
+# Kein `on: push` für `main`. Der Webhook liefert ohnehin schon aus, wenn dieser Lauf startet - ein
+# Fehlschlag dort käme zu spät und wäre nur noch ein rotes Kreuz an einer Änderung, die die Spieler
+# längst sehen. Nützlich ist die Prüfung genau davor, im Pull Request. `workflow_dispatch` bleibt
+# für einen Lauf von Hand ("Run workflow" im Actions-Reiter).
+
+name: Prüflauf
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Nur Lesen. Der Lauf braucht keine Schreibrechte am Repo; fällt der Token doch einmal in falsche
+# Hände (kompromittierte Action-Abhängigkeit), kann damit nichts verändert werden.
+permissions:
+  contents: read
+
+# Schiebt jemand einen Nachbesserungs-Commit auf denselben PR, ist der Lauf für den alten Stand
+# wertlos - er wird abgebrochen statt zu Ende bezahlt.
+concurrency:
+  group: prueflauf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    # Der Deckel ist eine Notbremse, keine Erwartung: Er greift, bevor ein hängender Browser das
+    # Actions-Kontingent auf die 6 Stunden der Voreinstellung verbrennt. Der Wert stammt aus einem
+    # vollständigen Lauf dieser Suite (07.08.2026) mit reichlich Luft nach oben, weil GitHubs
+    # Runner langsamer sein können als die Entwicklungsumgebung. Schlägt der Lauf künftig
+    # regelmäßig an dieser Grenze fehl, ist nicht der Deckel zu klein, sondern ein Test hängt -
+    # run.js gibt jedem Test ohnehin nur 5 Minuten und meldet dann "(keine FAIL-Zeile)".
+    timeout-minutes: 30
+
+    steps:
+      - name: Spiel-Repo auschecken
+        uses: actions/checkout@v4
+
+      # Sieben Tests vergleichen Frontend und Backend Zeile für Zeile - genau die Stellen, an denen
+      # das Backend eigene Kopien von Frontend-Formeln hält und die laut CLAUDE.md mitgepflegt
+      # werden müssen. Ohne das zweite Repo verhalten sie sich in zwei Stufen, beide schlecht:
+      #   - test_flottenbalance, test_kampfphasen, test_konter_paritaet, test_paritaet_tabellen
+      #     überspringen sich mit Exit-Code 0 (immerhin sichtbar als "[übersprungen]");
+      #   - test_angriffssumme, test_hilfe_effekte, test_pvp_vorschau lassen ihre Backend-Vergleiche
+      #     hinter einem `if (fs.existsSync(...))` STILL weg - kein SKIP, kein Hinweis, der Test
+      #     meldet einfach weniger Prüfungen als grün.
+      # Ein grüner Haken sähe in beiden Fällen gleich aus. Deshalb wird das Backend mitausgecheckt.
+      # Beide Repos sind öffentlich, deshalb genügt der normale Token - kein Secret nötig.
+      - name: Backend-Repo daneben auschecken (für die Paritätstests)
+        uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: master
+          path: backend-repo
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Version bewusst festgenagelt statt `@latest`. Dasselbe Motiv, aus dem
+      # `tabler-icons-full.woff2` im Repo liegt und nicht per npm gezogen wird: ein stiller
+      # Versionssprung soll den Prüflauf nicht rot färben, ohne dass jemand etwas geändert hat.
+      # Diese Zeile ist die EINZIGE Stelle mit einer Playwright-Version - tests/lib/umgebung.js
+      # nennt bewusst keine, es sucht die Bibliothek nur an den üblichen Orten. Zum Anheben also
+      # hier ändern und den Prüflauf einmal durchlaufen lassen.
+      # `--with-deps` installiert die Systembibliotheken, die Chromium auf einem nackten
+      # ubuntu-latest-Runner sonst fehlen (ohne das startet der Browser nicht).
+      - name: Playwright installieren
+        run: |
+          npm install -g playwright@1.62.1
+          npx playwright install --with-deps chromium
+
+      # tests/lib/umgebung.js sucht das Backend zuerst über diese Variable, dann erst über feste
+      # Pfade - explizit gesetzt ist verlässlicher, als sich auf die Verzeichnisnachbarschaft des
+      # Runners zu verlassen.
+      # Den Browser findet Playwright selbst: umgebung.js probiert die Container-Pfade dieser
+      # Entwicklungsumgebung (/opt/pw-browsers) und fällt sonst auf den mitgelieferten zurück -
+      # genau der Fall hier.
+      - name: Prüflauf
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/backend-repo/server.js
+        run: node tests/run.js
