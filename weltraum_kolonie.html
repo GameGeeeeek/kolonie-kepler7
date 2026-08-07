@@ -6165,8 +6165,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.433.0';
+  const VERSION = '8.434.0';
   const PATCHNOTES = [
+    { version:'8.434.0', date:'07.08.2026', changes:[
+      '<strong>Die Soundeffekte sind massiv erweitert</strong> (Wunsch aus der Spielerschaft). Statt eines einzelnen Piep-Tons je Ereignis spielt das Spiel jetzt <strong>kleine Klangmotive</strong>: eine aufsteigende Fanfare beim Sieg, eine fallende Moll-Folge bei der Niederlage, ein Münz-Doppelklang beim Handel, ein dreitöniges Arpeggio bei abgeschlossener Forschung, eine Alarm-Sirene beim Überfall und eine vierstufige Fanfare bei Erfolgen – alles weiterhin winzig, im Browser erzeugt (WebAudio) und ohne ein Byte zusätzlicher Downloads.',
+      '<strong>Vier Ereignisse waren bis heute praktisch stumm:</strong> Niederlagen, „erledigt"-Momente, Auswahl-Klicks und die Warnung bei schlechten Zufallsereignissen riefen Klang-Arten auf, die nie definiert waren – sie spielten alle denselben unauffälligen Standardton. Jetzt hat jede ihr eigenes Motiv.',
+      '<strong>Drei neue Klänge mit eigenen Momenten:</strong> ein Level-Aufstiegs-Motiv (Kommandanten-Level und Veteranen-Rang), eine helle <strong>Seltenheits-Fanfare</strong>, wenn ein episches oder legendäres Modul fällt, und ein tiefer <strong>Boss-Beute-Klang</strong>, wenn ein Boss-Set-Teil aus einer Raid-Welle kommt. Der Sound-Schalter in den Einstellungen wirkt unverändert auf alles.'
+    ]},
     { version:'8.433.0', date:'07.08.2026', changes:[
       '<strong>Boss-Modul-Sets – das neue Endgame-Sammelziel (Idee Sascha).</strong> Jeder der fünf Allianz-Raid-Bosse besitzt jetzt ein eigenes, exklusives <strong>4-Teile-Modul-Set</strong>, das ausschließlich ER droppt: <strong>Fresserherz</strong> (Sternenfresser – Produktion/Lager), <strong>Panzerschale</strong> (Panzerhülle – Verteidigung/Gegenschlag), <strong>Schwarmgeflecht</strong> (Schwarmmutter – Expedition), <strong>Phasengitter</strong> (Phasenwandler – Treibstoff/Forschung/Handel) und <strong>Glutkern</strong> (Gluthorn – Forschung/Erfahrung). Der Modul-Drop nach einer Raid-Welle liefert ab sofort ein zufälliges Teil des bekämpften Bosses; Chance und Seltenheit bestimmt weiterhin der Server nach Platz und Bossstufe.',
       '<strong>Teilstufen-Boni:</strong> Schon 2 Teile desselben Sets an einem Standort schalten die erste Bonusstufe frei, 3 die zweite, alle 4 die volle Wirkung – die Stufen zählen zusammen. Die Standort-Ansicht zeigt den Fortschritt („Boss-Set Panzerschale 2/4") samt der nächsten Stufe. Ein volles Set belegt 4 Slots und ist damit eine echte Entscheidung gegen gemischte Aufstellungen. Alle Set-Wirkungen nutzen bestehende, gedeckelte Effektkanäle und sind PvP-paritätssicher (kein Angriffs- und kein Überfall-Schutz-Feld – der Server rechnet nichts davon nach).',
@@ -20650,6 +20655,7 @@
     const subs = rollModuleSubs(rarity, false, (MODULE_DEFS.find(d=>d.key===type)||{}).effect);
     const instKey = subs ? (type+':'+rarity+':1:'+subs) : (type+':'+rarity);
     state.modules[instKey] = (state.modules[instKey]||0) + 1;
+    if (rarity==='episch' || rarity==='legendaer') playSound('rare');
     const info = moduleInstanceInfo(instKey);
     return info ? (info.rar.label+' '+info.def.name) : 'Modul';
   }
@@ -20667,6 +20673,7 @@
     const subs = rollModuleSubs(rarity, false, def.effect);
     const instKey = subs ? (def.key+':'+rarity+':1:'+subs) : (def.key+':'+rarity);
     state.modules[instKey] = (state.modules[instKey]||0) + 1;
+    playSound('bossdrop');
     const info = moduleInstanceInfo(instKey);
     return info ? (info.rar.label+' '+info.def.name) : def.name;
   }
@@ -21364,6 +21371,7 @@
     const subs = rollModuleSubs(rarity, true, def.effect);
     const instKey = subs ? (def.key+':'+rarity+':1:'+subs) : (def.key+':'+rarity);
     state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
+    if (rarity==='episch' || rarity==='legendaer' || rarity==='mythisch') playSound('rare');
     const info = shipModuleInstanceInfo(instKey);
     return info ? (info.rar.label+' '+info.def.name) : 'Schiffsklassen-Modul';
   }
@@ -23368,6 +23376,7 @@
     const after = commanderLevel(state.xp);
     if (after > before){
       log('Level aufgestiegen! Jetzt Kommandanten-Level '+after+'.', 'ti-award');
+      playSound('levelup');
       tryClaimPendingReferral();
       // Einmaliger Hinweis auf den Einladungs-Link (20.07.2026, Wachstums-Idee "praktisch fast ohne
       // Aufwand"): die Funktion existiert schon lange (Einstellungen -> Freunde einladen), war aber nie
@@ -24623,21 +24632,47 @@
     } catch(e){}
   }
 
+  /* Klangmotive (v8.434.0, "sound effekte massiv erweitern"): Jede Klang-Art ist eine kleine
+     Notenfolge statt eines einzelnen Piep-Tons - f Frequenz (Hz), t Startzeit (s), d Dauer (s),
+     w Wellenform, g Lautstaerke. Alles WebAudio, kein Byte Download.
+     WICHTIG: Jede Art, die irgendwo per playSound('...') gerufen wird, MUSS hier stehen -
+     bis v8.433.0 riefen 'lose', 'complete', 'click' und 'alarm' ins Leere und spielten stumm
+     den 440-Hz-Standardton (tests/test_klangmotive.js prueft die Abdeckung in beide Richtungen).
+     'shot'/'impact'/'explosion' gehoeren der Kampf-Wiedergabe (via playSound(kind)). */
+  const SOUND_MOTIVE = {
+    build:     [{f:392,t:0,d:0.10,w:'triangle',g:0.05},{f:294,t:0.09,d:0.16,w:'triangle',g:0.05}],
+    research:  [{f:523,t:0,d:0.09,w:'sine',g:0.05},{f:659,t:0.09,d:0.09,w:'sine',g:0.05},{f:784,t:0.18,d:0.18,w:'sine',g:0.05}],
+    win:       [{f:523,t:0,d:0.12,w:'sine',g:0.06},{f:659,t:0.11,d:0.12,w:'sine',g:0.06},{f:784,t:0.22,d:0.24,w:'sine',g:0.06}],
+    lose:      [{f:330,t:0,d:0.16,w:'sawtooth',g:0.04},{f:262,t:0.15,d:0.16,w:'sawtooth',g:0.04},{f:196,t:0.30,d:0.30,w:'sawtooth',g:0.045}],
+    raid:      [{f:220,t:0,d:0.18,w:'sawtooth',g:0.055},{f:175,t:0.20,d:0.18,w:'sawtooth',g:0.055},{f:220,t:0.40,d:0.18,w:'sawtooth',g:0.055}],
+    alarm:     [{f:466,t:0,d:0.14,w:'square',g:0.03},{f:349,t:0.15,d:0.14,w:'square',g:0.03},{f:466,t:0.30,d:0.14,w:'square',g:0.03}],
+    achieve:   [{f:523,t:0,d:0.09,w:'sine',g:0.055},{f:659,t:0.08,d:0.09,w:'sine',g:0.055},{f:784,t:0.16,d:0.09,w:'sine',g:0.055},{f:1046,t:0.24,d:0.30,w:'sine',g:0.06}],
+    trade:     [{f:880,t:0,d:0.07,w:'triangle',g:0.05},{f:1174,t:0.08,d:0.16,w:'triangle',g:0.05}],
+    complete:  [{f:659,t:0,d:0.10,w:'sine',g:0.05},{f:880,t:0.10,d:0.20,w:'sine',g:0.05}],
+    click:     [{f:988,t:0,d:0.05,w:'triangle',g:0.03}],
+    levelup:   [{f:392,t:0,d:0.09,w:'triangle',g:0.05},{f:523,t:0.09,d:0.09,w:'triangle',g:0.05},{f:659,t:0.18,d:0.09,w:'triangle',g:0.05},{f:784,t:0.27,d:0.28,w:'triangle',g:0.055}],
+    rare:      [{f:784,t:0,d:0.08,w:'sine',g:0.05},{f:988,t:0.08,d:0.08,w:'sine',g:0.05},{f:1319,t:0.16,d:0.26,w:'sine',g:0.055},{f:1568,t:0.28,d:0.34,w:'sine',g:0.035}],
+    bossdrop:  [{f:147,t:0,d:0.20,w:'sawtooth',g:0.055},{f:196,t:0.18,d:0.16,w:'sawtooth',g:0.05},{f:392,t:0.34,d:0.30,w:'sine',g:0.055}],
+    shot:      [{f:1200,t:0,d:0.08,w:'sine',g:0.03}],
+    impact:    [{f:150,t:0,d:0.18,w:'sawtooth',g:0.05}],
+    explosion: [{f:90,t:0,d:0.40,w:'sawtooth',g:0.07},{f:55,t:0.05,d:0.45,w:'sawtooth',g:0.05}]
+  };
   function playSound(kind){
     if (!state.soundOn) return;
     try {
       if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      const freqs = { build:440, research:660, win:880, raid:220, achieve:1046, trade:550, shot:1200, impact:150, explosion:90 };
-      o.frequency.value = freqs[kind]||440;
-      o.type = (kind==='raid'||kind==='impact'||kind==='explosion') ? 'sawtooth' : 'sine';
-      g.gain.value = kind==='shot' ? 0.03 : kind==='impact' ? 0.05 : kind==='explosion' ? 0.07 : 0.06;
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start();
-      const dur = kind==='shot' ? 0.08 : kind==='impact' ? 0.18 : kind==='explosion' ? 0.4 : 0.35;
-      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
-      o.stop(audioCtx.currentTime+dur+0.01);
+      const noten = SOUND_MOTIVE[kind] || SOUND_MOTIVE.build;
+      const jetzt = audioCtx.currentTime;
+      for (const n of noten){
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = n.w; o.frequency.value = n.f;
+        g.gain.setValueAtTime(n.g, jetzt + n.t);
+        g.gain.exponentialRampToValueAtTime(0.001, jetzt + n.t + n.d);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(jetzt + n.t);
+        o.stop(jetzt + n.t + n.d + 0.02);
+      }
     } catch(e){}
   }
   // Waffentyp-spezifischer Schuss-/Einschlagston (13.07.2026, Feature-Wunsch: Kampf-Wiedergabe optisch
@@ -42304,7 +42339,7 @@
     const after = veteranRankOf(pk);
     if (after.xp > before.xp){
       log('Veteranen-Aufstieg auf '+planetDisplayName(pk)+': Die Flotte ist jetzt "'+after.name+'" (+' + Math.round(after.bonus*100) + '% Angriff & Verteidigung).', 'ti-award');
-      playSound('achieve');
+      playSound('levelup');
     } else if (after.xp < before.xp){
       log('Veteranen-Rang auf '+planetDisplayName(pk)+' gesunken: nach den schweren Verlusten nur noch "'+after.name+'"'+(after.bonus>0?' (+'+Math.round(after.bonus*100)+'%)':'')+'.', 'ti-alert-triangle');
     }
