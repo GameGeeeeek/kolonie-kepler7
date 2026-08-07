@@ -195,7 +195,63 @@ const MENGEN = () => {
     gesendet || '(Mission nicht gefunden - siehe Hinweis im Test)');
 
   check('keine JS-Fehler', errs.length === 0, errs.slice(0,3));
-  await ctx.close(); await browser.close();
+  await ctx.close();
+
+  // ---- 7) DIE ZEITKRITISCHEN EINSTIEGE: Piraten abfangen, mit LIVE-Countdown.
+  // Hier war der alte Umweg am teuersten: Zum Zusammenstellen musste man in den Galaxie-Tab,
+  // waehrend der Abzugs-Countdown lief - und die Flugzeitpruefung scheiterte dann an genau den
+  // Sekunden, die der Tab-Wechsel gekostet hatte.
+  // Eigener Kontext mit laufendem Piraten-Ueberfall im Spielstand.
+  {
+    const ctx2 = await browser.newContext({ viewport:{width:1400,height:1000} });
+    const p2 = await ctx2.newPage(); const errs2 = [];
+    p2.on('pageerror', e => errs2.push(String(e)));
+    const mitRaid = JSON.parse(SAVE());
+    mitRaid.pirateDebrisRaid = { planetKey:'home', fleet:{jaeger:14}, power:900,
+      startTime: Date.now()-30000, endTime: Date.now()+540000, interceptArrival: null, interceptSource: null };
+    await p2.route('**/api/**', backend({ 'kepler7-save-v3': JSON.stringify(mitRaid) }));
+    await p2.addInitScript(() => localStorage.setItem('kepler7_token','tok'));
+    p2.on('dialog', d => d.accept());
+    await p2.goto(SPIEL_URL); await p2.waitForTimeout(4500);
+    await p2.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(i=>{const o=document.getElementById(i); if(o)o.style.display='none';}));
+    // Der Abfangen-Knopf steht im Verteidigung-Tab.
+    await p2.evaluate(() => {
+      const b=[...document.querySelectorAll('[data-tab]')].find(x=>x.getAttribute('data-tab')==='verteidigung');
+      if(b)b.click();
+    });
+    await p2.waitForTimeout(2200);
+    const knopfDa = await p2.evaluate(() => {
+      const b = document.getElementById('interceptPiratesBtn');
+      if (!b) return false;
+      b.click(); return true;
+    });
+    check('7: der Abfangen-Knopf öffnet das Feld', knopfDa && await p2.evaluate(OFFEN));
+    // Der Countdown muss WIRKLICH ticken - zwei Ablesungen im Abstand von gut zwei Sekunden
+    // muessen verschiedene Werte zeigen. Eine stehende Zahl waere bei einem zeitkritischen
+    // Einsatz gefaehrlicher als gar keine.
+    const ablesung = () => {
+      const el = document.querySelector('#fwahlOverlay [data-fwahl-count]');
+      return el ? el.textContent.trim() : null;
+    };
+    const t1 = await p2.evaluate(ablesung);
+    await p2.waitForTimeout(2400);
+    const t2 = await p2.evaluate(ablesung);
+    check('7: der Countdown im Feld tickt live', !!t1 && !!t2 && t1 !== t2, { t1, t2 });
+    // Und der Start schickt die Abfangmission wirklich los.
+    await p2.evaluate(() => document.querySelector('[data-fwahl-alle]').click());
+    await p2.waitForTimeout(300);
+    await p2.evaluate(() => document.querySelector('[data-fwahl-start]').click());
+    await p2.waitForTimeout(2000);
+    const abgefangen = await p2.evaluate(() => {
+      // Ueber die Anzeige messen: Nach dem Start zeigt die Box die anfliegende Abfangflotte.
+      const box = document.getElementById('pirateDebrisRaidBox');
+      return box ? /abfangen|Abfang|unterwegs/i.test(box.textContent||'') : false;
+    });
+    check('7: nach dem Start ist die Abfangflotte unterwegs', abgefangen);
+    check('7: keine JS-Fehler', errs2.length === 0, errs2.slice(0,3));
+    await ctx2.close();
+  }
+  await browser.close();
   console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
   process.exit(fail ? 1 : 0);
 })();
