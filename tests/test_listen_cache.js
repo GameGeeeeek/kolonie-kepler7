@@ -281,7 +281,7 @@ async function spiel(browser, zustand){
   check('Q: auch die reiterunabhängigen Boxen laufen über den Helfer',
     /setBoxHtml\(document\.getElementById\('npcList'\), 'npcList'/.test(src)
     && /setBoxHtml\(box, 'factionBox'/.test(src)
-    && /setBoxHtml\(attackFleetBox, 'attackFleetBox'/.test(src)
+    && /setBoxHtml\(veteranRankBox, 'veteranRankBox'/.test(src)  // Nachfolger der 05.08. entfernten attackFleetBox
     && /setBoxHtml\(pirateLairBox, 'pirateLairBox'/.test(src)
     && (src.match(/setBoxHtml\(terraBox, 'terraformBox'/g)||[]).length === 2
     && (src.match(/setBoxHtml\(orbitalBox, 'orbitalStationBox'/g)||[]).length === 2

@@ -105,12 +105,15 @@ const SICHTBARES_PANEL = () => {
   });
   check('2: und der Knopf "Spieler angreifen" ist sichtbar', knopfSichtbar);
 
-  // Die Angriffsauswahl ebenfalls - die Protokollzeile verweist ausdruecklich darauf.
-  const auswahlSichtbar = await page.evaluate(() => {
-    const b = document.getElementById('attackFleetBox');
-    return !!(b && b.offsetParent !== null && b.textContent.trim().length > 0);
+  // Seit v8.427.0 gibt es die alte Auswahl-Box nicht mehr - die Flottenwahl oeffnet sich am
+  // Knopf selbst. Geprueft wird also der neue echte Weg: Klick -> Feld offen.
+  await page.evaluate(() => { const b = document.getElementById('pendingAttackBtn'); if (b) b.click(); });
+  await page.waitForTimeout(700);
+  const feldOffen = await page.evaluate(() => {
+    const o = document.getElementById('fwahlOverlay');
+    return !!(o && o.classList.contains('open'));
   });
-  check('2: und die Angriffsauswahl ist sichtbar', auswahlSichtbar);
+  check('2: und der Knopf öffnet das Flottenwahl-Feld', feldOffen);
 
   check('keine JS-Fehler', errs.length === 0, errs.slice(0,3));
   await ctx.close(); await browser.close();
