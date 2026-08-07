@@ -43,13 +43,33 @@ Vorteil als Einschränkung:
   unbedingt im Markup (`weltraum_kolonie.html:3052–3066`). Auch **Galaxie** und
   **Sektorkarte** sind an Tag 1 begehbar – die geteilte Galaxie, die
   Fraktionsgebiete und die anderen Spieler sind also von Anfang an filmbar.
-- **Das Startkonto hat genau ein Schiff** – ein Erkundungsschiff, sonst nichts
-  (`fleet: { ships: 1, … }` im Startzustand, `weltraum_kolonie.html:16396`;
-  `key:'ships'` heißt „Erkundungsschiffe", `:16832`). Diese Zahl ist ein
-  Geschenk für Hooks und stimmt nachprüfbar. **Achtung beim Nachschlagen:**
-  `ships:1` steht dreimal in der Datei – die beiden anderen Stellen (`:24131`,
-  `:24330`) sind Prestige- und Aszensions-Reset, nicht der Neustart. Genau so
-  ein Fehlgriff ist der Grund für die Belegzeile im Ausgabeformat.
+- **Das Startkonto hat genau ein Schiff** – ein Erkundungsschiff (`key:'ships'`
+  heißt „Erkundungsschiffe", `:16832`). Am laufenden Spiel nachgemessen: Der
+  Kopfbereich zeigt „FLOTTE 1 Schiff". Diese Zahl ist ein Geschenk für Hooks.
+- **Die Startressourcen sind Energie 10, Erz 130, Kristalle 60**, Deuterium,
+  Antimaterie und Forschungspunkte 0. Lager 800 je Ressource.
+
+> **Diese Zahlen NICHT aus der Quelldatei ablesen.** In `weltraum_kolonie.html`
+> steht bei `let state = { … }` (`:16380`) `energie: 10, erz: 10, kristalle: 0`
+> – das ist nur der Modul-Initialwert und **nicht**, was ein echtes neues Konto
+> sieht. Gemessen wurde am laufenden Spiel mit frisch registriertem Konto,
+> dreimal hintereinander (direkt nach der Anmeldung, nach „Kolonie betreten",
+> nach dem Tutorial): unverändert 10 / 130 / 60. Ein Video, das mit den 10 Erz
+> aus dem Quelltext arbeitet, zeigt einen Zustand, den kein Spieler je hat.
+> **Regel daraus: Zahlen, die der Spieler SIEHT, werden im laufenden Spiel
+> abgelesen – die Quelldatei belegt nur, dass es die Größe gibt.** Der erste
+> Entwurf dieser Skill hatte genau diesen Fehler, und zwei fertige Videoskripte
+> hingen daran.
+
+- **Achtung beim Nachschlagen:** `ships:1` steht dreimal in der Datei – die
+  beiden anderen Stellen (`:24131`, `:24330`) sind Prestige- und
+  Aszensions-Reset, nicht der Neustart.
+- **Weitere echte Tag-1-Fakten**, alle in der Aufnahme sichtbar: ein
+  **Erstkontakt-Schirm** („Willkommen, Kommandant"), ein zugewiesenes
+  **Heimatsystem in der Randzone** mit dem Hinweis, der nächste bewohnte
+  Nachbar sei weit entfernt, **Anfängerschutz** mit sichtbarem Countdown
+  (rund 4 Tage, endet vorzeitig beim ersten eigenen Angriff), und ein
+  **Tutorial über 10 Schritte**.
 
 Was **nicht** geht, und das ehrlich einplanen: Weltboss, Allianz-Raid und
 große Flottenkämpfe sind an echten Fortschritt gebunden, nicht an die
@@ -168,6 +188,15 @@ for(const n of ['SHIP_DEFS','RESEARCH_DEFS','BUILDING_DEFS']){
   console.log(n.padEnd(15), (body.match(/^\s*\{\s*key:'/gm)||[]).length, 'Einträge');
 }"
 
+# Angezeigte Zahlen NIE aus der Quelldatei, sondern aus dem laufenden Spiel.
+# Aufnahme-Aufbau ohne Produktivsystem (Wegwerf-DB, nichts wird veröffentlicht):
+#   1. Backend lokal: DB_FILE=/tmp/db.json PORT=3011 node server.js
+#   2. Konto per POST /api/register anlegen, in der eigenen DB emailVerified=true setzen
+#   3. Spieldatei über denselben Ursprung ausliefern (das Frontend ruft /api/... relativ auf)
+#   4. Chromium mit 1080x1920 anmelden; Erstkontakt per "Kolonie betreten",
+#      Tutorial per #tutorialSkipBtn beenden - sonst verdecken beide alles.
+# Ohne Server startet das Spiel NICHT (kein Solo-Modus mehr, siehe :55086).
+
 # Fertig formulierte, geprüfte Beschreibungstexte
 sed -e 's/<[^>]*>//g' weltraum-browsergame.html   # Gesamtüberblick
 sed -e 's/<[^>]*>//g' idle-spiel-browser.html     # Offline-Fortschritt
@@ -224,14 +253,13 @@ Brauchbare Muster für dieses Spiel:
 - **Widerspruch:** „Ein Weltraumspiel ohne einen einzigen 3D-Effekt. Und ich
   komme trotzdem nicht davon los."
 - **Entscheidung an den Zuschauer:** „Du hast Rohstoffe für genau ein Gebäude.
-  Welches?" – Antwort erst am Ende. **Gegenprobe nicht vergessen, welche
-  Antworten überhaupt möglich sind:** Der Startbestand ist Energie 10 und Erz 10
-  (`:16380`), das Solarkraftwerk kostet 10 Erz, die Erzmine 15 Energie und das
-  Forschungslabor 150 Energie plus 80 Kristalle (`BUILDING_DEFS`; auf Stufe 0
-  ist die Kosten gleich `baseCost`, `costFor` `:16579`). An Tag 1 ist also **nur
-  das Solarkraftwerk** bezahlbar – ein Hook, der Mine oder Labor zur Wahl
-  stellt, beschreibt eine Entscheidung, die es nicht gibt. Diese Skill hatte
-  genau den Fehler im ersten Entwurf.
+  Welches?" – Antwort erst am Ende. **Vorher im laufenden Spiel gegenprüfen,
+  welche Antworten überhaupt möglich sind.** Mit dem echten Startbestand
+  (Energie 10, Erz 130, Kristalle 60) ist mehr als eines bezahlbar, die
+  Entscheidung ist also real – aber welche Karten offen sind, entscheidet die
+  Aufnahme, nicht die Kostenformel im Kopf. Baukosten auf Stufe 0 sind gleich
+  `baseCost` (`costFor` `:16579`, `rbauplan` ist noch 0): Solarkraftwerk 10 Erz,
+  Erzmine 15 Energie, Forschungslabor 150 Energie plus 80 Kristalle.
 - **Fehler zugeben:** „Ich habe alles in einen Schiffstyp gesteckt. Das war
   falsch." (Konterrollen: reine Masse eines Typs ist selten die beste Antwort –
   echte Mechanik, keine erfundene Pointe. Zahl erst nennen, wenn sie im eigenen
