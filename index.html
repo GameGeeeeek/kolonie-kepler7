@@ -6180,8 +6180,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.447.0';
+  const VERSION = '8.448.0';
   const PATCHNOTES = [
+    { version:'8.448.0', date:'08.08.2026', changes:[
+      '<strong>Modul-Inventare sortieren jetzt auch innerhalb derselben Seltenheit sinnvoll.</strong> Bisher galt dort schlicht die alphabetische Reihenfolge des internen Schlüssels – Stufe 10 stand vor Stufe 2 (weil „10" als Text vor „2" kommt), und mehrere Exemplare desselben Moduls mit unterschiedlichem Hauptwert-Wurf standen in zufälliger Reihenfolge zueinander. Seit der Wert-Streuung (v8.444.0) ist aber genau das der häufigste Vergleich: drei Zielcomputer „Selten" mit 93%, 100% und 107% – welchen behalte ich? Jetzt sortieren beide Inventare (Standort- und Schiffsklassen-Module) einheitlich: <strong>Seltenheit absteigend → Modultyp → Stufe absteigend → Hauptwert absteigend</strong>. Gleiche Typen stehen beieinander, und das jeweils beste Exemplar steht in seiner Gruppe oben – ein Blick statt Suchen.'
+    ]},
     { version:'8.447.0', date:'08.08.2026', changes:[
       '<strong>Ausrüstungs-Vorlagen jetzt auch für Schiffsklassen-Module.</strong> Die Klassen-Module (Offiziere-Tab) hatten bisher gar kein Vorlagen-System – wer z.B. seine Frachter zwischen einem Logistik- und einem Abgrund-Profil wechseln wollte, musste jedes Modul einzeln ab- und wieder anbauen. Jetzt gibt es je Schiffsklasse dieselben <strong>drei speicherbaren Profile (A/B/C)</strong> wie bei den Standort-Modulen: Speichern merkt sich die aktuelle Ausrüstung der Klasse und vergibt automatisch einen sprechenden Namen aus der Modul-Zusammensetzung (z.B. „Verteidigung", „Logistik", „Abgrund"), Anwenden wechselt mit einem Klick – nach den echten Regeln (Slots, nur ein Modul je Typ, nur noch vorhandene Module).',
       'Und wie seit v8.446.0 am Standort steht auch hier unter jeder gespeicherten Vorlage die <strong>Wechselvorschau</strong>: welche Klassen-Boni sich beim Anwenden ändern würden – je Effekt „vorher → nachher", grün wenn es mehr wird, orange wenn weniger, die größten Änderungen zuerst, inzwischen verschmolzene oder zerlegte Module als „nicht mehr im Besitz" ausgewiesen. Gerechnet wird mit derselben Bonus-Funktion wie das Spiel selbst, inklusive Substats und Klassen-Synergien.'
@@ -20217,6 +20220,26 @@
   }
   function wertWuerfeln(){
     return MODULE_WERT_MIN + Math.floor(Math.random() * (MODULE_WERT_MAX - MODULE_WERT_MIN + 1));
+  }
+  /* Inventar-Sortierung (v8.448.0): EIN Vergleich fuer beide Modul-Inventare (Standort und
+     Schiffsklasse), statt zweier Inline-Kopien, die auseinanderdriften koennten. Reihenfolge:
+     Seltenheit absteigend (Rang aus der MODULE_RARITY-Reihenfolge, damit neue Stufen automatisch
+     richtig einsortiert werden) -> Modultyp alphabetisch (gleiche Typen beieinander, denn DIE
+     vergleicht man) -> Stufe absteigend -> Hauptwert-Wurf absteigend (seit der Wert-Streuung der
+     haeufigste Vergleich: welches der drei gleichen behalte ich?). Vorher galt ab gleicher
+     Seltenheit der rohe instKey alphabetisch - dort ordnete Stufe "10" vor "2", und der
+     Wert-Wurf stand zufaellig. */
+  function moduleInvVergleich(a, b){
+    const order = Object.keys(MODULE_RARITY);
+    const ra = order.indexOf(String(a).split(':')[1]), rb = order.indexOf(String(b).split(':')[1]);
+    if (rb !== ra) return rb - ra;
+    const ta = String(a).split(':')[0], tb = String(b).split(':')[0];
+    if (ta !== tb) return ta.localeCompare(tb);
+    const lu = moduleLevelOf(b) - moduleLevelOf(a);
+    if (lu !== 0) return lu;
+    const wu = moduleWertOf(b) - moduleWertOf(a);
+    if (wu !== 0) return wu;
+    return String(a).localeCompare(String(b));   // stabiler Rest (Substat-Segment)
   }
   /* Haengt den Wurf an ein (ggf. leeres) Substat-Segment - EINE Stelle fuer alle Fundpfade. */
   function mitWertWurf(subs){
@@ -52682,14 +52705,9 @@
           html += `<div class="lb-note"><i class="ti ti-info-circle" aria-hidden="true"></i>Noch keine Module im Inventar. Schick Expeditionen los oder untersuche treibende Sonden.</div>`;
         } else {
           html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
-          // Sortierung nach Seltenheit ABSTEIGEND (seltenstes zuerst), Spieler-Wunsch. Rang wird aus der
-          // MODULE_RARITY-Reihenfolge abgeleitet (gewoehnlich..mythisch), damit neue Stufen automatisch
-          // korrekt einsortiert werden; bei gleicher Seltenheit alphabetisch stabil nach Typ.
-          const rarityRankDesc = r => { const order = Object.keys(MODULE_RARITY); const i = order.indexOf(r); return i < 0 ? -1 : i; };
-          html += invKeys.sort((a,b) => {
-            const rb = rarityRankDesc(b.split(':')[1]) - rarityRankDesc(a.split(':')[1]);
-            return rb !== 0 ? rb : a.localeCompare(b);
-          }).map(instKey => {
+          // Seltenstes zuerst, dann Typ/Stufe/Hauptwert - ein gemeinsamer Vergleich fuer beide
+          // Inventare, siehe moduleInvVergleich.
+          html += invKeys.sort(moduleInvVergleich).map(instKey => {
             const info = moduleInstanceInfo(instKey);
             if (!info) return '';
             const count = state.modules[instKey];
@@ -52925,12 +52943,8 @@
             : `<div class="lb-note"><i class="ti ti-info-circle" aria-hidden="true"></i>Noch keine Module dieser Klasse im Inventar. Erhältlich über die Schiffsklassen-Blaupause im Kredit-Shop (max. "Selten") oder später über Allianzmissionen (höhere Seltenheiten).</div>`;
         } else {
           html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
-          // Wie beim Standort-Modul-Inventar: seltenstes zuerst (Rang aus MODULE_RARITY-Reihenfolge).
-          const rarityRankShip = r => { const order = Object.keys(MODULE_RARITY); const i = order.indexOf(r); return i < 0 ? -1 : i; };
-          html += invKeys.sort((a,b) => {
-            const rb = rarityRankShip(b.split(':')[1]) - rarityRankShip(a.split(':')[1]);
-            return rb !== 0 ? rb : a.localeCompare(b);
-          }).map(instKey => {
+          // Wie beim Standort-Modul-Inventar: derselbe Vergleich (moduleInvVergleich).
+          html += invKeys.sort(moduleInvVergleich).map(instKey => {
             const info = shipModuleInstanceInfo(instKey);
             if (!info) return '';
             const count = state.shipModules[instKey];
