@@ -6180,8 +6180,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.444.0';
+  const VERSION = '8.445.0';
   const PATCHNOTES = [
+    { version:'8.445.0', date:'08.08.2026', changes:[
+      '<strong>Der Abgrund-Wächter hat jetzt eine eigene Gestalt in der Kampf-Wiedergabe.</strong> Tauchgang-Berichte führen keine Gegnerflotte – bisher standen dort dieselben erfundenen Stellvertreter-Rümpfe wie früher bei Leerenriss, Raid- und Weltboss. Jetzt hängt der <strong>Sektor-Wächter</strong> als dunkler Obelisk mit glühendem Sehschlitz über dem Gefecht – <strong>mit der Tiefe größer und dunkler</strong> (Deckel bei Tiefe 120, dieselbe Skala wie der Drucktank). Ein gewonnener Tauchgang räumt den Sektor: die Gestalt vergeht im Kampfverlauf ganz. Ein verlorener lässt sie ungebrochen stehen. Er wehrt sich, die Tafel nennt seine Zahl „Wächterkraft", und die Kraftschiene rechnet mit ihr statt mit null.',
+      'Damit ist die Runde komplett: <strong>Jede Gefechtsart ohne aufgeklärte Gegnerflotte zeigt jetzt eine gezeichnete Gestalt</strong> – Leerenriss (v8.440.0), die fünf Raid-Bosse (v8.441.0), die fünf Weltbosse (v8.442.0) und der Abgrund-Wächter. Nur PvP behält bewusst die Stellvertreter-Rümpfe: dort existiert eine echte, nur nicht aufgeklärte Flotte. Tauchgang-Berichte aus der Zeit vor dem Update zeigen mangels Markierung weiterhin die Stellvertreter.'
+    ]},
     { version:'8.444.0', date:'08.08.2026', changes:[
       '<strong>Hauptwert-Streuung – Etappe 2 des Build-System-Ausbaus.</strong> Jedes <em>gefundene</em> Modul (Expedition, Sonde, Abgrund, Boss-Drop, Event, Blaupause) würfelt ab sofort seinen Hauptwert zwischen <strong>90% und 110%</strong> des Normwerts – zwei Funde desselben Moduls sind damit nicht mehr identisch, und ein Spitzenwurf ist ein Grund zur Freude. Der Wurf steht an der Modulkarte in denselben Güte-Farben wie die Zweitwerte (Spitzenwurf/guter Wurf/mittel/schwach). <strong>Gefertigte Module liegen immer exakt bei 100%</strong> – Fragmente bleiben der planbare Weg, der Fund der glückliche.',
       'Damit die <strong>Schmelze</strong> nicht an der neuen Vielfalt erstickt, verlangt sie nur noch <strong>denselben Typ in derselben Seltenheit und Stufe</strong> – Zweitwerte und Hauptwert-Wurf dürfen abweichen. Verbraucht wird zuerst das angeklickte Modul, dann seine Geschwister; das Ergebnis behält die Zweitwerte des angeklickten und den <strong>besten Hauptwert-Wurf der drei</strong>. Der Substat-Reroll lässt den Hauptwert unangetastet. Der Server rechnet den Wurf bei PvP-Kampfmodulen und beim Überfall-Schutz mit – angezeigt wird nur, was auch ausgezahlt wird. Module aus der Zeit vor dem Update gelten unverändert als 100%.'
@@ -28013,6 +28017,21 @@
                 d.abwehrkraft = Math.round(wbVorher);
               }
             }
+            /* Abgrund-Tauchgang (v8.445.0, Task #36): der LETZTE Fall ohne Gegnerflotte.
+               Der Sektor-Waechter erscheint als eigene Gestalt (zeichneBoss 'abgrund',
+               mit der Tiefe groesser/dunkler). Ein GEWONNENER Tauchgang raeumt den
+               Sektor - die Gestalt vergeht im Kampfverlauf ganz -, ein verlorener
+               laesst sie ungebrochen stehen. Altberichte ohne Markierung behalten
+               ehrlich die Stellvertreter. */
+            if (r.abgrund){
+              d.verteidiger.boss = true;
+              d.verteidiger.abgrund = true;
+              d.verteidiger.tiefe = (typeof r.npcLevel === 'number') ? r.npcLevel : 1;
+              d.bossHuelle = (typeof r.defensePower === 'number' && r.defensePower > 0)
+                ? { vorher: r.defensePower,
+                    nachher: (r.result === 'win') ? 0 : r.defensePower,
+                    zerstoert: r.result === 'win' } : null;
+            }
           }
           /* Seit v8.384.0 liefert der Spielerangriff auch die Anlagen des Ziels.
              Im Solo-Modus und bei allen anderen Kampfarten fehlen sie weiterhin -
@@ -31388,6 +31407,26 @@
         g.globalCompositeOperation = 'lighter';
         glut(g, x, y + s * 0.3, s * 0.55 * puls, F.warn, 0.35 * anteil * puls);
         g.globalCompositeOperation = 'source-over';
+      } else if (BOSS.key === 'abgrund'){
+        /* Sektor-Waechter: dunkler Obelisk mit gluehendem Sehschlitz und Seitenflossen -
+           mit der TIEFE groesser und dunkler (Deckel bei Tiefe 120, dieselbe Skala wie
+           die Drucktank-Tiefenwirkung). */
+        var tf = Math.min(1, (BOSS.tiefe || 1) / 120);
+        var so = s * (1 + 0.5 * tf);
+        g.fillStyle = tf > 0.5 ? '#0a0510' : '#150a12';
+        g.beginPath();
+        g.moveTo(x, y - so * 1.4); g.lineTo(x + so * 0.55, y - so * 0.7);
+        g.lineTo(x + so * 0.42, y + so * 1.1); g.lineTo(x - so * 0.42, y + so * 1.1);
+        g.lineTo(x - so * 0.55, y - so * 0.7);
+        g.closePath(); g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(x - so * 0.55, y - so * 0.5); g.lineTo(x - so * 0.95, y + so * 0.2); g.lineTo(x - so * 0.45, y + so * 0.32); g.closePath(); g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(x + so * 0.55, y - so * 0.5); g.lineTo(x + so * 0.95, y + so * 0.2); g.lineTo(x + so * 0.45, y + so * 0.32); g.closePath(); g.fill(); g.stroke();
+        g.globalCompositeOperation = 'lighter';
+        g.strokeStyle = rgba(F.vio, klemme(0.5 + 0.45 * puls * anteil, 0, 1));
+        g.lineWidth = Math.max(1.2, so * 0.06);
+        g.beginPath(); g.moveTo(x - so * 0.3, y - so * 0.55); g.lineTo(x + so * 0.3, y - so * 0.55); g.stroke();
+        glut(g, x, y - so * 0.55, so * 0.5 * puls, F.vio, 0.3 * anteil * puls);
+        g.globalCompositeOperation = 'source-over';
       } else if (BOSS.key === 'wb0'){
         /* Leviathan der Leere: geschlaengelter Leib mit Tentakeln, wogend. */
         var wg = Math.sin(tSim * 1.1) * s * 0.18;
@@ -31970,7 +32009,9 @@
            Spielumgebung laeuft; dann gibt es die generische Gestalt. */
         var bossName = String(DATEN.verteidiger.name || '');
         var bossKey = 'generisch';
-        if (DATEN.verteidiger.weltboss){
+        if (DATEN.verteidiger.abgrund){
+          bossKey = 'abgrund';
+        } else if (DATEN.verteidiger.weltboss){
           /* Weltboss: Zuordnung ueber die NAMENSLISTE des Spiels per Index (wb0..wb4) -
              keine zweite Liste, die beim sechsten Namen veralten koennte; ein unbekannter
              Name faellt auf die generische Gestalt zurueck. */
@@ -31984,6 +32025,7 @@
         }
         var bh = DATEN.bossHuelle;
         BOSS = { key: bossKey,
+                 tiefe: DATEN.verteidiger.tiefe || 1,
                  endAnteil: (bh && bh.vorher > 0) ? (bh.zerstoert ? 0 : klemme((bh.nachher !== null ? bh.nachher : bh.vorher) / bh.vorher, 0, 1)) : 1,
                  u: 0, a: 0.40, tot: false, beute: false, prall: 0, kalt: 1.6 };
       }
@@ -32087,6 +32129,8 @@
         : 'Bodenabwehr des Ziels: nicht aufgeklärt']);
       if (GEGNER_UNBEKANNT) me.push([6.2, RISS
         ? 'Der Riss steht im Orbit – bekannt ist nur seine Kraft: ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)
+        : (BOSS && BOSS.key === 'abgrund')
+        ? 'Der Wächter des Sektors stellt sich – bekannt ist nur seine Kraft: ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)
         : BOSS
         ? 'Der Boss hat keine Flotte – seine Hülle: ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)
         : 'Gegnerflotte nicht aufgeklärt – bekannt ist nur die Abwehrkraft ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)]);
@@ -32131,7 +32175,7 @@
       if (!seite.bekannt){
         var hin = neu('div', 'tafel-summe');
         hin.appendChild(neu('b', null, zahl(seite.kraft || 0)));
-        hin.appendChild(neu('span', null, seite.boss ? 'Boss-Hülle' : 'Abwehrkraft'));
+        hin.appendChild(neu('span', null, seite.abgrund ? 'Wächterkraft' : (seite.boss ? 'Boss-Hülle' : 'Abwehrkraft')));
         el.appendChild(hin);
         el.appendChild(neu('div', 'unbekannt', 'Zusammensetzung nicht aufgeklärt – der Kampfbericht führt für diese Gefechtsart keine Flotte des Gegners mit.'));
         tafelSummen[kennung] = null;
@@ -32860,7 +32904,7 @@
       { title:'Tier-2-Schiffsfähigkeiten', body:'Jedes der sieben Tier-2-Schiffe hat eine <strong>einzigartige Fähigkeit</strong> (alle gedeckelt und identisch im server-autoritativen PvP wie in der Vorschau). <strong>Angriffs-Auren</strong> (zusammen max +30% effektive Angriffskraft der Flotte): Nanoklinge „Panzerbrecher" +2%/Schiff, Singularitäts-Vernichter „Gravitationssog" (volle Schild-Penetration) +5%/Schiff. <strong>Verteidigungs-Auren</strong> (zusammen max +30% Verteidigung des Standorts): Quantenkreuzer „Schildprojektor" +3%/Schiff, Metamaterial-Titan „Deflektor-Bollwerk" +5%/Schiff. <strong>Logistik/Sonstige:</strong> Fusionsdreadnought „Fusionsantrieb-Effizienz" (−4% Missions-Treibstoff je Schiff, max −20%), Hyperjäger „Ausweichmanöver" (−3% eigene Kampfverluste je Schiff, max −30%), Hyperbomber „Sprengladungen" (zerstört bei einem gewonnenen Spieler-Angriff je 4 Hyperbomber ein zusätzliches Verteidigungsgebäude, max +2). Ohne diese Schiffe ändert sich an bestehenden Kämpfen nichts. Wer alle sieben gleichzeitig besitzt, schaltet den Erfolg „Tier-2-Flottenkommandant" frei.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
-      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl. Ein <strong>Leerenriss</strong> wird als Riss über dem Planeten gezeichnet – er schießt zurück und schwächt sich im Kampfverlauf sichtbar ab (bei einer Niederlage bleibt er geschwächt stehen). Das <strong>Kräfteverhältnis</strong> unten rechnet bei nicht aufgeklärter Gegenseite mit der gemeldeten Abwehrkraft aus dem Bericht – die eigene Seite anteilig zu ihren Verlusten – statt fälschlich mit null. Beim <strong>Allianz-Raid</strong> steht der Boss als eigene gezeichnete <strong>Silhouette</strong> über dem Gefecht (jeder der fünf Bosse hat seine eigene Gestalt); sie nimmt entlang des gemeldeten Hüllenverlaufs sichtbar Schaden, schießt zurück, und die Tafel nennt ihre Zahl als „Boss-Hülle". Ältere Berichte ohne Hüllen-Angaben zeigen die Gestalt in voller Stärke, ohne einen Verlauf zu erfinden. Auch die fünf <strong>Weltbosse</strong> (Leviathan der Leere, Chronos-Verschlinger, Die Singularität, Wächter des Abgrunds, Nova-Titan) erscheinen als eigene Gestalten – ihr Hüllenverlauf ist der deiner Welle (Rest plus dein Schaden → gemeldeter Rest); Weltboss-Berichte aus der Zeit vor v8.442.0 zeigen mangels Hüllen-Feldern weiterhin die Stellvertreter-Rümpfe.' },
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl. Ein <strong>Leerenriss</strong> wird als Riss über dem Planeten gezeichnet – er schießt zurück und schwächt sich im Kampfverlauf sichtbar ab (bei einer Niederlage bleibt er geschwächt stehen). Das <strong>Kräfteverhältnis</strong> unten rechnet bei nicht aufgeklärter Gegenseite mit der gemeldeten Abwehrkraft aus dem Bericht – die eigene Seite anteilig zu ihren Verlusten – statt fälschlich mit null. Beim <strong>Allianz-Raid</strong> steht der Boss als eigene gezeichnete <strong>Silhouette</strong> über dem Gefecht (jeder der fünf Bosse hat seine eigene Gestalt); sie nimmt entlang des gemeldeten Hüllenverlaufs sichtbar Schaden, schießt zurück, und die Tafel nennt ihre Zahl als „Boss-Hülle". Ältere Berichte ohne Hüllen-Angaben zeigen die Gestalt in voller Stärke, ohne einen Verlauf zu erfinden. Auch die fünf <strong>Weltbosse</strong> (Leviathan der Leere, Chronos-Verschlinger, Die Singularität, Wächter des Abgrunds, Nova-Titan) erscheinen als eigene Gestalten – ihr Hüllenverlauf ist der deiner Welle (Rest plus dein Schaden → gemeldeter Rest); Weltboss-Berichte aus der Zeit vor v8.442.0 zeigen mangels Hüllen-Feldern weiterhin die Stellvertreter-Rümpfe. Auch der <strong>Abgrund-Wächter</strong> jedes Tauchgang-Sektors ist eine eigene Gestalt – mit der Tiefe größer und dunkler; ein gewonnener Tauchgang lässt ihn ganz vergehen, ein verlorener nicht, und die Tafel nennt seine Zahl „Wächterkraft". Damit zeigt <em>jede</em> Gefechtsart ohne aufgeklärte Gegnerflotte eine gezeichnete Gestalt – nur PvP behält bewusst die Stellvertreter-Rümpfe, denn dort existiert eine echte, nur nicht aufgeklärte Flotte.' },
       { title:'Schiffe, Anlagen und Maßstab', body:'Jedes Schiff fliegt mit <strong>seinem eigenen Modell</strong> – demselben Bild wie in deiner Flottenliste – und in der Farbe seiner Partei (grün ist immer deine Seite). Auf dem Planeten stehen die <strong>echten Verteidigungsanlagen</strong> mit der Grafik aus dem Verteidigung-Tab. Weil eine Flotte aus Zehntausenden Schiffen nicht Stück für Stück zu zeichnen ist, steht ein Modell für mehrere Schiffe; wie viele, steht unten links im Bild. Bei sehr ungleichen Flotten bekommt jede Seite trotzdem ein sichtbares Geschwader, und dann nennt das Bild beide Maßstäbe. <strong>Die Zahlen in den Bestandslisten sind davon unberührt und immer die echten.</strong>' },
       { title:'Was du am Feuer ablesen kannst', body:'Geschossen wird nach der <strong>Konterrolle</strong> des Schiffs – denselben drei Rollen, die auch das Konter-System benutzt. <strong>Abfangjäger</strong> hetzen kurze, schnelle Salven. <strong>Bomber</strong> schicken je zwei langsame, gelenkte <strong>Torpedos</strong>, die ihrem Ziel nachdrehen. <strong>Großkampfschiffe</strong> laden lange und feuern dann einen schweren <strong>Lanzenstrahl</strong>; im entscheidenden Abschnitt wird daraus eine <strong>Breitseite</strong> aus drei Strahlen im Fächer – die beiden äußeren gehen bewusst daneben, denn das Bild darf mehr Feuer zeigen, nicht mehr Wirkung. Wer getroffen wird, dessen <strong>Schild</strong> flammt kurz auf. Auch der <strong>Antrieb</strong> ist zu erkennen: Verbrennung glimmt orange und flackert, Impuls steht ruhig und blau, Hyperraum zieht den längsten violetten Schweif. <strong>Am Ausgang ändert das alles nichts</strong> – Verluste und Ergebnis stehen aus dem Bericht fest, die Darstellung würfelt nichts nach.' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während du im Spiel aktiv bist – eigener Angriff oder eingehender Überfall –, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
@@ -44263,7 +44307,7 @@
             if (showLog !== false) abgrundAnkunftBis = Date.now() + ABGRUND_ANKUNFT_MS;
             if (showLog !== false) log('Tauchgang erfolgreich: '+sektor.name+' (Tiefe '+tiefe+') bezwungen. +'+fmt(splitter)+' Abgrundsplitter, +'+fmt(bergungsgut)+' Bergungsgut'+(fragmente>0?', +'+fmt(fragmente)+' Modulfragmente (Splitterofen)':'')+'.'+(abgrundModulName?' Aus dem Wrackfeld geborgen: '+abgrundModulName+'!':'')+(abgrundItemName?' Gegenstand geborgen: '+abgrundItemName+'!':'')+cargoNote+(ownLostText?' Eigene Verluste: '+ownLostText+'.':'')+tiefenMsg+waechterMsg, 'ti-infinity');
             playSound('win');
-            const __battleReport = { type:'npc-attack', result:'win', npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLost, abgrundSplitter:splitter, abgrundBergung:bergungsgut, abgrundFragmente:fragmente, abgrundModul:abgrundModulName, abgrundItem:abgrundItemName, abgrundMutatoren:mutText };
+            const __battleReport = { type:'npc-attack', result:'win', abgrund: true, npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, loot:lootGiven, cargoCapacity, cargoLimited: cargoScale<1, battlePoints:bpGained, ownLostShips:ownLost, abgrundSplitter:splitter, abgrundBergung:bergungsgut, abgrundFragmente:fragmente, abgrundModul:abgrundModulName, abgrundItem:abgrundItemName, abgrundMutatoren:mutText };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           } else {
@@ -44297,7 +44341,7 @@
             const spiegelText = gerettetSumme > 0 ? ' Der Ballastspiegel hat '+fmt(gerettetSumme)+' Einheiten aus dem Wrackfeld gezogen.' : '';
             if (showLog !== false) log('Tauchgang gescheitert: '+sektor.name+' (Tiefe '+tiefe+') hat die Flotte zurückgeworfen.'+(ownLostText?' Verluste: '+ownLostText+'.':'')+spiegelText+' Die Tiefe bleibt erreichbar – rüste auf und tauche erneut.', 'ti-alert-triangle');
             playSound('lose');
-            const __battleReport = { type:'npc-attack', result:'loss', npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, battlePoints:bpGained, ownLostShips:ownLost, abgrundMutatoren:mutText, loot: gerettetSumme > 0 ? geretteteBeute : undefined, abgrundBallast: gerettetSumme > 0 };
+            const __battleReport = { type:'npc-attack', result:'loss', abgrund: true, npcName:sektor.name+' (Tiefe '+tiefe+')', npcLevel:tiefe, attackPower:Math.round(kraft), defensePower:sektor.defense, chancePct:Math.round(chance*100), phasen: phasen.phasen, fleet:m.composition||fleet, flightTime, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, battlePoints:bpGained, ownLostShips:ownLost, abgrundMutatoren:mutText, loot: gerettetSumme > 0 ? geretteteBeute : undefined, abgrundBallast: gerettetSumme > 0 };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
