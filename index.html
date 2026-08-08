@@ -6180,8 +6180,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.441.0';
+  const VERSION = '8.442.0';
   const PATCHNOTES = [
+    { version:'8.442.0', date:'08.08.2026', changes:[
+      '<strong>Auch die fünf Weltbosse haben jetzt eigene Silhouetten in der Kampf-Wiedergabe.</strong> Der Weltboss-Bericht führt keine Gegnerflotte – bisher standen dort dieselben erfundenen Stellvertreter-Rümpfe wie früher beim Raid-Boss. Jetzt hängt die Gestalt des jeweiligen Bosses über dem Gefecht: der <strong>Leviathan der Leere</strong> als geschlängelter Leib mit Tentakeln, der <strong>Chronos-Verschlinger</strong> als Uhrenring mit wanderndem Zeiger, <strong>Die Singularität</strong> als schwarze Scheibe mit Akkretionsring, der <strong>Wächter des Abgrunds</strong> als wachsames Auge, der <strong>Nova-Titan</strong> als achtstrahliger Stern. Wie beim Raid-Boss folgt die Silhouette dem echten Hüllenverlauf der eigenen Welle (Rest + verursachter Schaden → gemeldeter Rest; der letzte Schlag lässt den Boss ganz vergehen), sie schießt zurück, und Tafel wie Kraftschiene rechnen mit der Hülle statt mit null.',
+      'Berichte aus der Zeit vor diesem Update tragen die Hüllen-Felder nicht – sie zeigen weiterhin die Stellvertreter-Rümpfe, statt einen Verlauf zu erfinden.'
+    ]},
     { version:'8.441.0', date:'08.08.2026', changes:[
       '<strong>Die fünf Raid-Bosse haben jetzt eigene Silhouetten in der Kampf-Wiedergabe.</strong> Beim Allianz-Raid stand die Gegenseite bisher als Stellvertreter-Rümpfe da – der Boss hat aber gar keine Flotte. Jetzt hängt seine gezeichnete Gestalt über dem Gefecht: der <strong>Sternenfresser</strong> als aufgerissenes Maul, die <strong>Panzerhülle</strong> als plattenbesetzter Panzer, die <strong>Schwarmmutter</strong> mit kreisenden Begleitern, der <strong>Phasenwandler</strong> als doppeltes Phantombild, das <strong>Gluthorn</strong> als glühendes Horn. Die Silhouette nimmt sichtbar Schaden – Risse und Flackern folgen dem echten Hüllenverlauf der Welle (von der Hülle vor dem Angriff bis zum gemeldeten Rest; ein erlegter Boss vergeht ganz) – und der Boss schießt zurück.',
       'Die Bestandstafel nennt seine Zahl jetzt <strong>„Boss-Hülle"</strong> statt „Abwehrkraft", und die Kraftschiene rechnet den Boss mit seiner <em>aktuellen</em> Hülle statt mit einem festen Wert – dieselbe ehrliche Rechnung wie beim Leerenriss aus v8.440.0. Ältere Berichte ohne Hüllen-Angaben zeigen die Silhouette in voller Stärke, ohne einen Verlauf zu erfinden.'
@@ -27897,6 +27901,25 @@
                PvP bleibt bewusst bei den Stellvertretern: dort gibt es eine echte,
                nur nicht aufgeklaerte Flotte. */
             if (r.type === 'void-rift') d.verteidiger.riss = true;
+            /* Weltboss (v8.442.0, Task #33): traegt der Bericht die Markierung (seit
+               v8.442.0), bekommt er die Boss-Silhouette der Buehne. Der Hueellenverlauf
+               kommt aus REST + VERURSACHTEM SCHADEN -> REST; die angezeigte Kraft ist
+               dann die Huelle VOR dem eigenen Angriff, nicht das Maximum des Bosses.
+               Altberichte ohne Markierung behalten die Stellvertreter - ohne die Felder
+               gaebe es keinen Verlauf zu zeigen. */
+            if (r.weltboss){
+              d.verteidiger.boss = true;
+              d.verteidiger.weltboss = true;
+              var wbNachher = (typeof r.bossHpNachher === 'number') ? r.bossHpNachher : null;
+              var wbVorher = (wbNachher !== null && typeof r.attackPower === 'number')
+                ? wbNachher + r.attackPower : null;
+              d.bossHuelle = (wbVorher !== null && wbVorher > 0)
+                ? { vorher: wbVorher, nachher: wbNachher, zerstoert: !!r.bossZerstoert } : null;
+              if (wbVorher !== null && wbVorher > 0){
+                d.verteidiger.kraft = Math.round(wbVorher);
+                d.abwehrkraft = Math.round(wbVorher);
+              }
+            }
           }
           /* Seit v8.384.0 liefert der Spielerangriff auch die Anlagen des Ziels.
              Im Solo-Modus und bei allen anderen Kampfarten fehlen sie weiterhin -
@@ -31272,6 +31295,75 @@
         g.globalCompositeOperation = 'lighter';
         glut(g, x, y + s * 0.3, s * 0.55 * puls, F.warn, 0.35 * anteil * puls);
         g.globalCompositeOperation = 'source-over';
+      } else if (BOSS.key === 'wb0'){
+        /* Leviathan der Leere: geschlaengelter Leib mit Tentakeln, wogend. */
+        var wg = Math.sin(tSim * 1.1) * s * 0.18;
+        g.beginPath();
+        g.moveTo(x - s * 1.6, y + wg);
+        g.quadraticCurveTo(x - s * 0.8, y - s * 0.75 - wg, x, y - wg * 0.6);
+        g.quadraticCurveTo(x + s * 0.8, y + s * 0.6 + wg, x + s * 1.45, y - s * 0.35);
+        g.quadraticCurveTo(x + s * 1.1, y + s * 0.15, x + s * 0.7, y + s * 0.05);
+        g.quadraticCurveTo(x, y + s * 0.85, x - s * 0.9, y + s * 0.45);
+        g.quadraticCurveTo(x - s * 1.4, y + s * 0.35, x - s * 1.6, y + wg);
+        g.closePath(); g.fill(); g.stroke();
+        g.strokeStyle = rgba(F.vio, 0.6 * kante); g.lineWidth = 1.2;
+        for (var tk = 0; tk < 3; tk++){
+          var tx = x - s * 0.6 + tk * s * 0.6, tw2 = Math.sin(tSim * 1.6 + tk * 2.1) * s * 0.22;
+          g.beginPath();
+          g.moveTo(tx, y + s * 0.5);
+          g.quadraticCurveTo(tx + tw2, y + s * 0.95, tx - tw2 * 0.6, y + s * 1.3);
+          g.stroke();
+        }
+      } else if (BOSS.key === 'wb1'){
+        /* Chronos-Verschlinger: Uhrenring mit wanderndem Zeiger und Verschlinger-Maul. */
+        g.beginPath(); g.arc(x, y, s * 1.05, 0.5, TAU - 0.5); g.stroke();
+        g.beginPath(); g.arc(x, y, s * 1.05, 0.5, TAU - 0.5); g.lineTo(x, y); g.closePath(); g.fill();
+        g.strokeStyle = rgba(F.ver, 0.5 * kante); g.lineWidth = 1;
+        for (var zi = 0; zi < 6; zi++){
+          var za = zi * TAU / 6 + 0.35;
+          g.beginPath();
+          g.moveTo(x + Math.cos(za) * s * 0.85, y + Math.sin(za) * s * 0.85);
+          g.lineTo(x + Math.cos(za) * s * 1.0, y + Math.sin(za) * s * 1.0);
+          g.stroke();
+        }
+        var zw2 = tSim * 0.55;
+        g.strokeStyle = rgba(F.warn, 0.7 * kante); g.lineWidth = 1.4;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(zw2) * s * 0.7, y + Math.sin(zw2) * s * 0.7); g.stroke();
+      } else if (BOSS.key === 'wb2'){
+        /* Die Singularitaet: schwarze Scheibe mit Akkretionsring. */
+        g.beginPath(); g.ellipse(x, y, s * 1.5, s * 0.45, -0.28, 0, TAU); g.stroke();
+        g.fillStyle = '#04030a';
+        g.beginPath(); g.arc(x, y, s * 0.75, 0, TAU); g.fill();
+        g.strokeStyle = rgba(F.vio, 0.85 * kante); g.lineWidth = Math.max(1, 2 * anteil);
+        g.beginPath(); g.arc(x, y, s * 0.75, 0, TAU); g.stroke();
+        g.globalCompositeOperation = 'lighter';
+        glut(g, x, y, s * 1.1 * puls, F.vio, 0.22 * anteil * puls);
+        g.globalCompositeOperation = 'source-over';
+      } else if (BOSS.key === 'wb3'){
+        /* Waechter des Abgrunds: wachsames Auge, die Pupille wandert. */
+        g.beginPath();
+        g.moveTo(x - s * 1.5, y);
+        g.quadraticCurveTo(x, y - s * 0.95, x + s * 1.5, y);
+        g.quadraticCurveTo(x, y + s * 0.95, x - s * 1.5, y);
+        g.closePath(); g.fill(); g.stroke();
+        var pu = x + Math.sin(tSim * 0.8) * s * 0.45;
+        g.fillStyle = rgba(F.ver, 0.85 * kante);
+        g.beginPath(); g.arc(pu, y, s * 0.34, 0, TAU); g.fill();
+        g.fillStyle = '#04030a';
+        g.beginPath(); g.arc(pu, y, s * 0.15, 0, TAU); g.fill();
+      } else if (BOSS.key === 'wb4'){
+        /* Nova-Titan: achtstrahliger Stern, pulsierend. */
+        g.beginPath();
+        for (var st8 = 0; st8 < 16; st8++){
+          var sa = st8 * TAU / 16 - TAU / 4;
+          var sr = (st8 % 2 === 0 ? s * 1.45 : s * 0.55) * (0.92 + 0.08 * puls);
+          var sx2 = x + Math.cos(sa) * sr, sy2 = y + Math.sin(sa) * sr;
+          if (st8 === 0) g.moveTo(sx2, sy2); else g.lineTo(sx2, sy2);
+        }
+        g.closePath(); g.fill(); g.stroke();
+        g.globalCompositeOperation = 'lighter';
+        glut(g, x, y, s * 0.8 * puls, F.warn, 0.3 * anteil * puls);
+        g.globalCompositeOperation = 'source-over';
       } else {
         /* Generische Gestalt (Prototyp/unbekannter Boss): breite Raute. */
         g.beginPath();
@@ -31784,10 +31876,21 @@
            Tabellenzugriff ist typeof-geschuetzt, weil die Buehne auch im Prototyp ohne
            Spielumgebung laeuft; dann gibt es die generische Gestalt. */
         var bossName = String(DATEN.verteidiger.name || '');
-        var bossDef = (typeof ALLIANCE_RAID_BOSSE !== 'undefined')
-          ? ALLIANCE_RAID_BOSSE.find(function(b){ return bossName.indexOf(b.name) === 0; }) : null;
+        var bossKey = 'generisch';
+        if (DATEN.verteidiger.weltboss){
+          /* Weltboss: Zuordnung ueber die NAMENSLISTE des Spiels per Index (wb0..wb4) -
+             keine zweite Liste, die beim sechsten Namen veralten koennte; ein unbekannter
+             Name faellt auf die generische Gestalt zurueck. */
+          var wbIdx = (typeof WORLDBOSS_NAMEN !== 'undefined')
+            ? WORLDBOSS_NAMEN.findIndex(function(n){ return bossName.indexOf(n) === 0; }) : -1;
+          if (wbIdx >= 0 && wbIdx <= 4) bossKey = 'wb' + wbIdx;
+        } else {
+          var bossDef = (typeof ALLIANCE_RAID_BOSSE !== 'undefined')
+            ? ALLIANCE_RAID_BOSSE.find(function(b){ return bossName.indexOf(b.name) === 0; }) : null;
+          if (bossDef) bossKey = bossDef.key;
+        }
         var bh = DATEN.bossHuelle;
-        BOSS = { key: bossDef ? bossDef.key : 'generisch',
+        BOSS = { key: bossKey,
                  endAnteil: (bh && bh.vorher > 0) ? (bh.zerstoert ? 0 : klemme((bh.nachher !== null ? bh.nachher : bh.vorher) / bh.vorher, 0, 1)) : 1,
                  u: 0, a: 0.40, tot: false, beute: false, prall: 0, kalt: 1.6 };
       }
@@ -32664,7 +32767,7 @@
       { title:'Tier-2-Schiffsfähigkeiten', body:'Jedes der sieben Tier-2-Schiffe hat eine <strong>einzigartige Fähigkeit</strong> (alle gedeckelt und identisch im server-autoritativen PvP wie in der Vorschau). <strong>Angriffs-Auren</strong> (zusammen max +30% effektive Angriffskraft der Flotte): Nanoklinge „Panzerbrecher" +2%/Schiff, Singularitäts-Vernichter „Gravitationssog" (volle Schild-Penetration) +5%/Schiff. <strong>Verteidigungs-Auren</strong> (zusammen max +30% Verteidigung des Standorts): Quantenkreuzer „Schildprojektor" +3%/Schiff, Metamaterial-Titan „Deflektor-Bollwerk" +5%/Schiff. <strong>Logistik/Sonstige:</strong> Fusionsdreadnought „Fusionsantrieb-Effizienz" (−4% Missions-Treibstoff je Schiff, max −20%), Hyperjäger „Ausweichmanöver" (−3% eigene Kampfverluste je Schiff, max −30%), Hyperbomber „Sprengladungen" (zerstört bei einem gewonnenen Spieler-Angriff je 4 Hyperbomber ein zusätzliches Verteidigungsgebäude, max +2). Ohne diese Schiffe ändert sich an bestehenden Kämpfen nichts. Wer alle sieben gleichzeitig besitzt, schaltet den Erfolg „Tier-2-Flottenkommandant" frei.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
-      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl. Ein <strong>Leerenriss</strong> wird als Riss über dem Planeten gezeichnet – er schießt zurück und schwächt sich im Kampfverlauf sichtbar ab (bei einer Niederlage bleibt er geschwächt stehen). Das <strong>Kräfteverhältnis</strong> unten rechnet bei nicht aufgeklärter Gegenseite mit der gemeldeten Abwehrkraft aus dem Bericht – die eigene Seite anteilig zu ihren Verlusten – statt fälschlich mit null. Beim <strong>Allianz-Raid</strong> steht der Boss als eigene gezeichnete <strong>Silhouette</strong> über dem Gefecht (jeder der fünf Bosse hat seine eigene Gestalt); sie nimmt entlang des gemeldeten Hüllenverlaufs sichtbar Schaden, schießt zurück, und die Tafel nennt ihre Zahl als „Boss-Hülle". Ältere Berichte ohne Hüllen-Angaben zeigen die Gestalt in voller Stärke, ohne einen Verlauf zu erfinden.' },
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl. Ein <strong>Leerenriss</strong> wird als Riss über dem Planeten gezeichnet – er schießt zurück und schwächt sich im Kampfverlauf sichtbar ab (bei einer Niederlage bleibt er geschwächt stehen). Das <strong>Kräfteverhältnis</strong> unten rechnet bei nicht aufgeklärter Gegenseite mit der gemeldeten Abwehrkraft aus dem Bericht – die eigene Seite anteilig zu ihren Verlusten – statt fälschlich mit null. Beim <strong>Allianz-Raid</strong> steht der Boss als eigene gezeichnete <strong>Silhouette</strong> über dem Gefecht (jeder der fünf Bosse hat seine eigene Gestalt); sie nimmt entlang des gemeldeten Hüllenverlaufs sichtbar Schaden, schießt zurück, und die Tafel nennt ihre Zahl als „Boss-Hülle". Ältere Berichte ohne Hüllen-Angaben zeigen die Gestalt in voller Stärke, ohne einen Verlauf zu erfinden. Auch die fünf <strong>Weltbosse</strong> (Leviathan der Leere, Chronos-Verschlinger, Die Singularität, Wächter des Abgrunds, Nova-Titan) erscheinen als eigene Gestalten – ihr Hüllenverlauf ist der deiner Welle (Rest plus dein Schaden → gemeldeter Rest); Weltboss-Berichte aus der Zeit vor v8.442.0 zeigen mangels Hüllen-Feldern weiterhin die Stellvertreter-Rümpfe.' },
       { title:'Schiffe, Anlagen und Maßstab', body:'Jedes Schiff fliegt mit <strong>seinem eigenen Modell</strong> – demselben Bild wie in deiner Flottenliste – und in der Farbe seiner Partei (grün ist immer deine Seite). Auf dem Planeten stehen die <strong>echten Verteidigungsanlagen</strong> mit der Grafik aus dem Verteidigung-Tab. Weil eine Flotte aus Zehntausenden Schiffen nicht Stück für Stück zu zeichnen ist, steht ein Modell für mehrere Schiffe; wie viele, steht unten links im Bild. Bei sehr ungleichen Flotten bekommt jede Seite trotzdem ein sichtbares Geschwader, und dann nennt das Bild beide Maßstäbe. <strong>Die Zahlen in den Bestandslisten sind davon unberührt und immer die echten.</strong>' },
       { title:'Was du am Feuer ablesen kannst', body:'Geschossen wird nach der <strong>Konterrolle</strong> des Schiffs – denselben drei Rollen, die auch das Konter-System benutzt. <strong>Abfangjäger</strong> hetzen kurze, schnelle Salven. <strong>Bomber</strong> schicken je zwei langsame, gelenkte <strong>Torpedos</strong>, die ihrem Ziel nachdrehen. <strong>Großkampfschiffe</strong> laden lange und feuern dann einen schweren <strong>Lanzenstrahl</strong>; im entscheidenden Abschnitt wird daraus eine <strong>Breitseite</strong> aus drei Strahlen im Fächer – die beiden äußeren gehen bewusst daneben, denn das Bild darf mehr Feuer zeigen, nicht mehr Wirkung. Wer getroffen wird, dessen <strong>Schild</strong> flammt kurz auf. Auch der <strong>Antrieb</strong> ist zu erkennen: Verbrennung glimmt orange und flackert, Impuls steht ruhig und blau, Hyperraum zieht den längsten violetten Schweif. <strong>Am Ausgang ändert das alles nichts</strong> – Verluste und Ergebnis stehen aus dem Bericht fest, die Darstellung würfelt nichts nach.' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während du im Spiel aktiv bist – eigener Angriff oder eingehender Überfall –, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
@@ -43798,7 +43901,7 @@
                 addVeteranXp(planetKey, 8 + bLevel);
                 if (showLog !== false) log((m.fleetName||'Flotte')+' trifft den '+worldBossName(bLevel)+': '+fmt(data.damage)+' Schaden!'+(data.killed?' LETZTER SCHLAG - der Leviathan fällt!':' Rest-HP: '+fmt(Math.round(data.bossHp))+'.')+(lostWbText?' Eigene Verluste: '+lostWbText+'.':''), 'ti-skull');
                 playSound(data.killed ? 'achieve' : 'win');
-                const __battleReport = { type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, hasWeakness:!!data.hasWeakness, weaknessType:data.weaknessType, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} };
+                const __battleReport = { type:'npc-attack', result:'win', npcName: worldBossName(bLevel), npcLevel: bLevel, attackPower: Math.round(data.damage), defensePower: data.bossMaxHp||0, chancePct: 100, weltboss: true, bossHpNachher: Math.round(data.bossHp||0), bossZerstoert: !!data.killed, hasWeakness:!!data.hasWeakness, weaknessType:data.weaknessType, fleet: m.composition||fleet, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, loot: {}, cargoCapacity: 0, cargoLimited: false, battlePoints: 3+bLevel, ownLostShips: data.lostShips||{} };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
               }
