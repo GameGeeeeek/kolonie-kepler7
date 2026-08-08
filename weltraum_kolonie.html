@@ -6180,8 +6180,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.443.0';
+  const VERSION = '8.444.0';
   const PATCHNOTES = [
+    { version:'8.444.0', date:'08.08.2026', changes:[
+      '<strong>Hauptwert-Streuung – Etappe 2 des Build-System-Ausbaus.</strong> Jedes <em>gefundene</em> Modul (Expedition, Sonde, Abgrund, Boss-Drop, Event, Blaupause) würfelt ab sofort seinen Hauptwert zwischen <strong>90% und 110%</strong> des Normwerts – zwei Funde desselben Moduls sind damit nicht mehr identisch, und ein Spitzenwurf ist ein Grund zur Freude. Der Wurf steht an der Modulkarte in denselben Güte-Farben wie die Zweitwerte (Spitzenwurf/guter Wurf/mittel/schwach). <strong>Gefertigte Module liegen immer exakt bei 100%</strong> – Fragmente bleiben der planbare Weg, der Fund der glückliche.',
+      'Damit die <strong>Schmelze</strong> nicht an der neuen Vielfalt erstickt, verlangt sie nur noch <strong>denselben Typ in derselben Seltenheit und Stufe</strong> – Zweitwerte und Hauptwert-Wurf dürfen abweichen. Verbraucht wird zuerst das angeklickte Modul, dann seine Geschwister; das Ergebnis behält die Zweitwerte des angeklickten und den <strong>besten Hauptwert-Wurf der drei</strong>. Der Substat-Reroll lässt den Hauptwert unangetastet. Der Server rechnet den Wurf bei PvP-Kampfmodulen und beim Überfall-Schutz mit – angezeigt wird nur, was auch ausgezahlt wird. Module aus der Zeit vor dem Update gelten unverändert als 100%.'
+    ]},
     { version:'8.443.0', date:'08.08.2026', changes:[
       '<strong>Sieben Modul-Seltenheiten – Etappe 1 des Build-System-Ausbaus (Wunsch aus der Spielerschaft).</strong> Neu sind <strong>Ungewöhnlich</strong> (+30% Wirkung, zwischen Gewöhnlich und Selten) und <strong>Exotisch</strong> (+600%, über Mythisch). Ungewöhnlich fällt ab sofort in den normalen Fundtöpfen (rund 28% der Funde; Gewöhnlich 22%, Selten 30%, Episch 15%, Legendär 5%) und im Abgrund, steht im Tagesangebot (22.000 Kr.) und lässt sich für 7 Fragmente fertigen. <strong>Exotisch fällt nirgends und ist nicht fertigbar – es entsteht ausschließlich durch Verschmelzen von 3 Mythischen.</strong> Damit hat die höchste Fundstufe erstmals einen Weiterverwendungszweck, und die Schmelzkette reicht jetzt von Gewöhnlich bis Exotisch (Mythisch selbst entsteht weiterhin nur in der Schmiede und über Allianzmissionen, nie durch Verschmelzen).',
       'Alle Systeme kennen die neuen Stufen: Zerlegewerte (Ungewöhnlich 2, Exotisch 120 Fragmente), Verkaufswerte (9.000 bzw. 750.000 Kr.), Zweitwert-Anzahl (Ungewöhnlich bis 1, Exotisch 2–3), Schnell-Verschrotten, Schmelze, Börse und die Seltenheits-Rahmenfarben. Der Server rechnet die neuen Faktoren beim PvP-Überfall-Schutz mit – Client und Server bleiben synchron.'
@@ -20179,8 +20183,38 @@
     const seg = String(instKey||'').split(':')[3] || '';
     if (!seg) return [];
     const out = [];
-    for (const tok of seg.split('.')){ const m = tok.match(/^([a-z]+)(\d+)$/); if (m) out.push({ effect:m[1], value: parseInt(m[2],10)/1000 }); }
+    for (const tok of seg.split('.')){
+      const m = tok.match(/^([a-z]+)(\d+)$/);
+      // 'w' ist RESERVIERT fuer den Hauptwert-Wurf (v8.444.0) und kein Zweitwert.
+      if (m && m[1] !== 'w') out.push({ effect:m[1], value: parseInt(m[2],10)/1000 });
+    }
     return out;
+  }
+  /* ===== Hauptwert-Streuung (v8.444.0, Build-System Etappe 2) =====
+     Jeder FUND wuerfelt seinen Hauptwert zwischen WERT_MIN und WERT_MAX Prozent; kodiert als
+     Token "wNN" im Substat-Segment - bewusst KEIN fuenftes Segment, damit die strenge
+     instKey-Validierung der Modulboerse (MODULE_INSTKEY_RE in server.js) unveraendert passt.
+     Gefertigte Module tragen kein Token und gelten als 100% - ebenso jeder Altbestand.
+     Der SERVER rechnet den Wurf in moduleWertMultServer mit (PvP-Kampfmodule, Ueberfall-
+     Schutz) - wer die Spanne aendert, zieht die Backend-Kopie mit. */
+  const MODULE_WERT_MIN = 90, MODULE_WERT_MAX = 110;
+  function moduleWertOf(instKey){
+    const seg = String(instKey||'').split(':')[3] || '';
+    const m = seg.match(/(?:^|\.)w(\d{2,3})(?:\.|$)/);
+    if (!m) return 100;
+    return Math.max(MODULE_WERT_MIN, Math.min(MODULE_WERT_MAX, parseInt(m[1], 10)));
+  }
+  function wertWuerfeln(){
+    return MODULE_WERT_MIN + Math.floor(Math.random() * (MODULE_WERT_MAX - MODULE_WERT_MIN + 1));
+  }
+  /* Haengt den Wurf an ein (ggf. leeres) Substat-Segment - EINE Stelle fuer alle Fundpfade. */
+  function mitWertWurf(subs){
+    const w = wertWuerfeln();
+    return subs ? subs + '.w' + w : 'w' + w;
+  }
+  /* Guete des Hauptwert-Wurfs auf derselben 0..1-Skala wie die Zweitwerte. */
+  function moduleWertGuete(wert){
+    return Math.max(0, Math.min(1, (wert - MODULE_WERT_MIN) / (MODULE_WERT_MAX - MODULE_WERT_MIN)));
   }
   // Würfelt das Substat-Segment (String) für einen Fund. primaryEffect wird ausgeschlossen (Vielfalt).
   /* ===== Die Spanne der Zweitwerte, benannt statt eingestreut (05.08.2026) =====
@@ -20216,15 +20250,21 @@
      die Guete waere sonst an drei Stellen nachzutragen gewesen und irgendwann an einer vergessen.
      Jeder Wert bekommt seine eigene Einordnung ueber die Faerbung, dahinter die Gesamtgüte -
      damit ist auf einen Blick klar, ob sich das Neu-Wuerfeln lohnt. */
-  function substatZeile(subs){
-    if (!subs || !subs.length) return '';
+  function substatZeile(subs, wert){
+    /* Seit v8.444.0 traegt die Zeile auch den HAUPTWERT-Wurf (falls vorhanden und nicht
+       100%), in denselben Guete-Farben - eine Stelle fuer alle vier Anzeigeorte. */
+    const wurfTeil = (wert && wert !== 100) ? (() => {
+      const st = modulGueteStufe(moduleWertGuete(wert));
+      return `<span style="color:${st.farbe}; font-weight:600;" title="${st.label} – Hauptwert-Wurf dieses Funds, möglich sind ${MODULE_WERT_MIN}% bis ${MODULE_WERT_MAX}%">Hauptwert ${wert}%</span>`;
+    })() : '';
+    if (!subs || !subs.length) return wurfTeil;
     const teile = subs.map(s => {
       const st = modulGueteStufe(moduleSubGuete(s.value));
       return `<span style="color:${st.farbe};" title="${st.label} – möglich sind ${(MODULE_SUB_MIN/10).toFixed(1)}% bis ${(MODULE_SUB_MAX/10).toFixed(1)}%">+${(s.value*100).toFixed(1)}% ${MODULE_SUB_EFFECT_LABEL[s.effect]||s.effect}</span>`;
     });
     const g = moduleGuete(subs);
     const st = modulGueteStufe(g);
-    return teile.join(', ') + ` <span style="color:${st.farbe}; font-weight:600;">· ${st.label} (${Math.round(g*100)}%)</span>`;
+    return (wurfTeil ? wurfTeil + ', ' : '') + teile.join(', ') + ` <span style="color:${st.farbe}; font-weight:600;">· ${st.label} (${Math.round(g*100)}%)</span>`;
   }
   function rollModuleSubs(rarity, isShip, primaryEffect){
     const rng = MODULE_SUB_RANGE[rarity] || [0,0];
@@ -20443,7 +20483,8 @@
     // jeden vorhandenen Pfad (Summe, Karten-Anzeige, Set-Boni, Deckel, Schmelze), ohne dass irgendwo
     // eine zweite Stelle entsteht, die die Skalierung vergessen kann.
     return { type, rarity, level, lvlMult, def, rar, subs: moduleSubsOf(instKey),
-             bonus: def.base * rar.mult * lvlMult * (def.tiefenSkala ? abgrundTiefenSkala() : 1) };
+             wert: moduleWertOf(instKey),
+             bonus: def.base * rar.mult * lvlMult * (moduleWertOf(instKey) / 100) * (def.tiefenSkala ? abgrundTiefenSkala() : 1) };
   }
   function moduleSlotCount(planetKey){ return (state.moduleSlotLevel||{})[planetKey||'home'] || 0; }
   function equippedAt(planetKey){ return (state.equippedModules||{})[planetKey||'home'] || []; }
@@ -20754,7 +20795,7 @@
     else if (roll < 0.78) rarity = 'ungewoehnlich';
     if (vorgabeSeltenheit && MODULE_RARITY[vorgabeSeltenheit]) rarity = vorgabeSeltenheit;
     const subs = rollModuleSubs(rarity, false, (MODULE_DEFS.find(d=>d.key===type)||{}).effect);
-    const instKey = subs ? (type+':'+rarity+':1:'+subs) : (type+':'+rarity);
+    const instKey = type+':'+rarity+':1:'+mitWertWurf(subs);
     state.modules[instKey] = (state.modules[instKey]||0) + 1;
     if (rarity==='episch' || rarity==='legendaer') playSound('rare');
     const info = moduleInstanceInfo(instKey);
@@ -20772,7 +20813,7 @@
     const def = teile[Math.floor(Math.random()*teile.length)];
     const rarity = (vorgabeSeltenheit && MODULE_RARITY[vorgabeSeltenheit]) ? vorgabeSeltenheit : 'selten';
     const subs = rollModuleSubs(rarity, false, def.effect);
-    const instKey = subs ? (def.key+':'+rarity+':1:'+subs) : (def.key+':'+rarity);
+    const instKey = def.key+':'+rarity+':1:'+mitWertWurf(subs);
     state.modules[instKey] = (state.modules[instKey]||0) + 1;
     playSound('bossdrop');
     const info = moduleInstanceInfo(instKey);
@@ -20815,7 +20856,7 @@
     else if (roll > 0.42) rarity = 'selten';
     else if (roll > 0.20) rarity = 'ungewoehnlich';
     const subs = rollModuleSubs(rarity, istSchiff, gezogen.effect);
-    const instKey = subs ? (gezogen.key+':'+rarity+':1:'+subs) : (gezogen.key+':'+rarity);
+    const instKey = gezogen.key+':'+rarity+':1:'+mitWertWurf(subs);
     const inv = istSchiff ? state.shipModules : state.modules;
     inv[instKey] = (inv[instKey]||0) + 1;
     const info = istSchiff ? shipModuleInstanceInfo(instKey) : moduleInstanceInfo(instKey);
@@ -20864,22 +20905,46 @@
     const i = order.indexOf(rarity);
     return (i >= 0 && i < order.length-1) ? order[i+1] : null;
   }
+  /* Geschwister eines Moduls: gleicher Typ, gleiche Seltenheit, gleiche Stufe - Zweitwerte
+     und Hauptwert-Wurf duerfen abweichen. Seit der Wert-Streuung (v8.444.0) ist das die
+     Zaehl- und Verbrauchseinheit der Schmelze: identische Schluessel gibt es bei Funden
+     faktisch nicht mehr. */
+  function fuseGeschwister(inv, instKey){
+    const teile = String(instKey).split(':');
+    const lvl = moduleLevelOf(instKey);
+    return Object.keys(inv).filter(k => {
+      const q = k.split(':');
+      return q[0] === teile[0] && q[1] === teile[1] && moduleLevelOf(k) === lvl;
+    });
+  }
+  function fuseAnzahl(inv, instKey){
+    return fuseGeschwister(inv, instKey).reduce((a, k) => a + (inv[k] || 0), 0);
+  }
   function fuseModules(isShip, instKey){
     const inv = isShip ? state.shipModules : state.modules;
     const [key, rarity] = instKey.split(':');
     const next = nextRarityOf(rarity);
     if (!next){ log('Höchste Seltenheit - Verschmelzen nicht möglich.', 'ti-alert-triangle'); return; }
     if (next === 'mythisch'){ log('Mythisch entsteht nicht durch Verschmelzen - nutze die Mythische Modulschmiede oder hochstufige Allianzmissionen.', 'ti-alert-triangle'); return; }
-    if ((inv[instKey]||0) < MODULE_FUSE_COUNT){ log('Zum Verschmelzen brauchst du '+MODULE_FUSE_COUNT+'× dasselbe Modul in derselben Seltenheit.', 'ti-alert-triangle'); return; }
-    inv[instKey] -= MODULE_FUSE_COUNT;
-    if (inv[instKey] <= 0) delete inv[instKey];
-    // Bugfix (24.07.2026): Level UND Substats beim Verschmelzen ERHALTEN. Vorher verwarf `key+':'+next`
-    // beide stillschweigend - wer 3 aufgewertete/substat-Module verschmolz, verlor die investierten
-    // Fragmente und die gewürfelten Zweitboni ohne Hinweis. Da alle 3 Eingänge denselben instKey haben
-    // (Fusion verlangt 3 identische), sind Level und Substats eindeutig aus instKey ablesbar. Fair, weil
-    // 3 Module auf ein Level zu bringen mehr Fragmente kostet, als der eine höherwertige Fund wert ist.
+    if (fuseAnzahl(inv, instKey) < MODULE_FUSE_COUNT){ log('Zum Verschmelzen brauchst du '+MODULE_FUSE_COUNT+'× denselben Modultyp in derselben Seltenheit und Stufe (Zweitwerte dürfen abweichen).', 'ti-alert-triangle'); return; }
+    /* Verbraucht wird zuerst das angeklickte Modul, dann seine Geschwister; der beste
+       Hauptwert-Wurf der drei wandert ins Ergebnis. */
+    let uebrigZuVerbrauchen = MODULE_FUSE_COUNT, besterWert = 100;
+    const verbrauchsfolge = [instKey].concat(fuseGeschwister(inv, instKey).filter(k => k !== instKey));
+    for (const vk2 of verbrauchsfolge){
+      if (uebrigZuVerbrauchen <= 0) break;
+      const n2 = Math.min(uebrigZuVerbrauchen, inv[vk2] || 0);
+      if (n2 <= 0) continue;
+      besterWert = Math.max(besterWert, moduleWertOf(vk2));
+      inv[vk2] -= n2;
+      if (inv[vk2] <= 0) delete inv[vk2];
+      uebrigZuVerbrauchen -= n2;
+    }
+    // Level und Substats beim Verschmelzen ERHALTEN (Bugfix 24.07.2026) - massgeblich ist das
+    // ANGEKLICKTE Modul. Sein w-Token wird durch den besten Wurf der drei ersetzt (v8.444.0).
     const fuseLevel = moduleLevelOf(instKey);
-    const fuseSubs = String(instKey).split(':')[3] || '';
+    let fuseSubs = (String(instKey).split(':')[3] || '').split('.').filter(t => t && !/^w\d+$/.test(t)).join('.');
+    if (besterWert !== 100) fuseSubs = fuseSubs ? fuseSubs + '.w' + besterWert : 'w' + besterWert;
     let newKey = key + ':' + next;
     if (fuseLevel > 1 || fuseSubs) newKey += ':' + fuseLevel;
     if (fuseSubs) newKey += ':' + fuseSubs;
@@ -21064,6 +21129,9 @@
     if (!newSubs){ const pool=(isShip?MODULE_SUB_POOL_SHIP:MODULE_SUB_POOL_LOC).filter(e=>e!==primary); newSubs = pool[Math.floor(Math.random()*pool.length)]+(10+Math.floor(Math.random()*16)); } // bezahlter Reroll gibt garantiert min. 1 Substat
     state.moduleFragments -= cost;
     inv[instKey] -= 1; if (inv[instKey] <= 0) delete inv[instKey];
+    /* Der Hauptwert-Wurf ist NICHT Teil des Rerolls - er wandert unveraendert mit. */
+    const wAlt = moduleWertOf(instKey);
+    if (wAlt !== 100) newSubs += '.w' + wAlt;
     const newKey = baseType+':'+info.rarity+':'+info.level+':'+newSubs;
     inv[newKey] = (inv[newKey]||0) + 1;
     log(info.rar.label+' '+info.def.name+': Substats neu gewürfelt (−'+cost+' Fragmente, Rest: '+state.moduleFragments+').', 'ti-atom-2', 'ok');
@@ -21361,7 +21429,7 @@
     if (!def) return null;
     const rarity = rollEventModuleRarity();
     const subs = rollModuleSubs(rarity, true, def.effect);
-    const instKey = subs ? (def.key+':'+rarity+':1:'+subs) : (def.key+':'+rarity);
+    const instKey = def.key+':'+rarity+':1:'+mitWertWurf(subs);
     state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
     state.eventModulesFound = (state.eventModulesFound||0) + 1;   // für den Erfolg
     const info = shipModuleInstanceInfo(instKey);
@@ -21374,7 +21442,9 @@
     const rar = MODULE_RARITY[rarity];
     if (!def || !rar) return null;
     const level = moduleLevelOf(instKey), lvlMult = moduleLevelMult(level);
-    return { key, rarity, level, lvlMult, def, rar, subs: moduleSubsOf(instKey), bonus: def.base * rar.mult * lvlMult };
+    return { key, rarity, level, lvlMult, def, rar, subs: moduleSubsOf(instKey),
+             wert: moduleWertOf(instKey),
+             bonus: def.base * rar.mult * lvlMult * (moduleWertOf(instKey) / 100) };
   }
   function shipModuleSlotCount(klasse){ return (state.shipModuleSlotLevel||{})[klasse] || 0; }
   function equippedShipModulesAt(klasse){ return (state.equippedShipModules||{})[klasse] || []; }
@@ -21527,7 +21597,7 @@
     idx = Math.min(idx, Math.max(0, capIdx));
     const rarity = SHIP_MODULE_RARITY_ORDER[idx];
     const subs = rollModuleSubs(rarity, true, def.effect);
-    const instKey = subs ? (def.key+':'+rarity+':1:'+subs) : (def.key+':'+rarity);
+    const instKey = def.key+':'+rarity+':1:'+mitWertWurf(subs);
     state.shipModules[instKey] = (state.shipModules[instKey]||0) + 1;
     if (rarity==='episch' || rarity==='legendaer' || rarity==='mythisch') playSound('rare');
     const info = shipModuleInstanceInfo(instKey);
@@ -32895,7 +32965,7 @@
       { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
-      { title:'Standort-Module', body:'Ausrüstbare Module mit sieben Seltenheitsstufen (Gewöhnlich, Ungewöhnlich +30%, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400%, Exotisch +600% Wirkung). '+MODULE_DEFS.length+' Typen, darunter: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Je Typ nur EIN Modul gleichzeitig:</strong> Du kannst an einem Standort nicht zweimal Panzerung einbauen – auch nicht in unterschiedlichen Seltenheitsstufen. Wer Slots füllen will, muss also <strong>verschiedene</strong> Typen kombinieren, statt den stärksten Bonus einfach zu stapeln. Genau deshalb lohnen sich die benannten Set-Boni weiter unten: Sie belohnen ausgerechnet die Vielfalt, die diese Regel erzwingt. <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Boss-Sets:</strong> Jeder der fünf Allianz-Raid-Bosse droppt exklusiv die vier Teile seines eigenen Sets (Fresserherz, Panzerschale, Schwarmgeflecht, Phasengitter, Glutkern) – schon 2 Teile desselben Sets an einem Standort schalten die erste Bonusstufe frei, 3 die zweite, alle 4 die volle Wirkung (Stufen zählen zusammen; die Standort-Ansicht zeigt den Fortschritt, z.B. „2/4"). Boss-Teile fallen in keinem anderen Fundtopf, lassen sich aber normal aufwerten, verschmelzen und zerlegen. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente <em>oder</em> 60.000 Kredite je Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (Level und Substats bleiben dabei erhalten). Der Sprung <em>nach</em> Mythisch bleibt der Schmiede und den Allianzmissionen vorbehalten – aber <strong>3 Mythische verschmelzen zu einem Exotischen</strong>, der einzigen Quelle der höchsten Stufe. Überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Ungewöhnlich 2, Selten 3, Episch 8, Legendär 20, Mythisch 50, Exotisch 120) und fertigst daraus gezielt dein Wunschmodul (4/7/12/32/80 Fragmente je nach Seltenheit; Exotisch ist nicht fertigbar). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. Aufwerten geht sowohl im Inventar als auch <strong>direkt am eingebauten Modul</strong> – es bleibt dabei im Slot, du musst es nicht erst abnehmen. <strong>Substats:</strong> Gefundene Module ab Ungewöhnlich haben zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Ungewöhnlich und Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2, Exotisch 2–3. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Jeder Zweit-Bonus würfelt zwischen +1,0 % und +2,5 %</strong> – seit dem 05.08.2026 steht neben dem Wert, wie gut der Wurf ausgefallen ist (<em>Spitzenwurf</em>, <em>guter Wurf</em>, <em>mittel</em>, <em>schwach</em>) und dahinter die Gesamtgüte des Moduls in Prozent. Vorher stand dort nur die nackte Zahl, und man konnte nicht beurteilen, ob sich das Neu-Würfeln überhaupt lohnt – die Einordnung beantwortet genau diese Frage. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
+      { title:'Standort-Module', body:'Ausrüstbare Module mit sieben Seltenheitsstufen (Gewöhnlich, Ungewöhnlich +30%, Selten +60%, Episch +140%, Legendär +250%, Mythisch +400%, Exotisch +600% Wirkung). '+MODULE_DEFS.length+' Typen, darunter: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Je Typ nur EIN Modul gleichzeitig:</strong> Du kannst an einem Standort nicht zweimal Panzerung einbauen – auch nicht in unterschiedlichen Seltenheitsstufen. Wer Slots füllen will, muss also <strong>verschiedene</strong> Typen kombinieren, statt den stärksten Bonus einfach zu stapeln. Genau deshalb lohnen sich die benannten Set-Boni weiter unten: Sie belohnen ausgerechnet die Vielfalt, die diese Regel erzwingt. <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Boss-Sets:</strong> Jeder der fünf Allianz-Raid-Bosse droppt exklusiv die vier Teile seines eigenen Sets (Fresserherz, Panzerschale, Schwarmgeflecht, Phasengitter, Glutkern) – schon 2 Teile desselben Sets an einem Standort schalten die erste Bonusstufe frei, 3 die zweite, alle 4 die volle Wirkung (Stufen zählen zusammen; die Standort-Ansicht zeigt den Fortschritt, z.B. „2/4"). Boss-Teile fallen in keinem anderen Fundtopf, lassen sich aber normal aufwerten, verschmelzen und zerlegen. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente <em>oder</em> 60.000 Kredite je Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (Level und Substats bleiben dabei erhalten). Der Sprung <em>nach</em> Mythisch bleibt der Schmiede und den Allianzmissionen vorbehalten – aber <strong>3 Mythische verschmelzen zu einem Exotischen</strong>, der einzigen Quelle der höchsten Stufe. Überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Ungewöhnlich 2, Selten 3, Episch 8, Legendär 20, Mythisch 50, Exotisch 120) und fertigst daraus gezielt dein Wunschmodul (4/7/12/32/80 Fragmente je nach Seltenheit; Exotisch ist nicht fertigbar). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. Aufwerten geht sowohl im Inventar als auch <strong>direkt am eingebauten Modul</strong> – es bleibt dabei im Slot, du musst es nicht erst abnehmen. <strong>Substats:</strong> Gefundene Module ab Ungewöhnlich haben zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Ungewöhnlich und Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2, Exotisch 2–3. <strong>Hauptwert-Streuung:</strong> Jedes <em>gefundene</em> Modul würfelt zusätzlich seinen Hauptwert zwischen <strong>90% und 110%</strong> des Normwerts – der Wurf steht an der Karte in den Güte-Farben. Gefertigte Module liegen immer exakt bei 100%, Module aus der Zeit vor der Streuung ebenfalls. Die <strong>Schmelze</strong> verlangt seither nur noch denselben Typ in derselben Seltenheit und Stufe (Zweitwerte und Wurf dürfen abweichen), verbraucht zuerst das angeklickte Modul und übernimmt den <strong>besten Hauptwert-Wurf der drei</strong>; der Substat-Reroll lässt den Hauptwert unangetastet. Gilt für beide Modulsysteme. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln. <strong>Jeder Zweit-Bonus würfelt zwischen +1,0 % und +2,5 %</strong> – seit dem 05.08.2026 steht neben dem Wert, wie gut der Wurf ausgefallen ist (<em>Spitzenwurf</em>, <em>guter Wurf</em>, <em>mittel</em>, <em>schwach</em>) und dahinter die Gesamtgüte des Moduls in Prozent. Vorher stand dort nur die nackte Zahl, und man konnte nicht beurteilen, ob sich das Neu-Würfeln überhaupt lohnt – die Einordnung beantwortet genau diese Frage. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
       { title:'Kampf-Nachwirkungen (Sieges-Module)', body:'Drei Standort-Module belohnen den <strong>Sieg selbst</strong> statt eines Dauerwerts: <strong>Siegesschmiede</strong> (+Produktion aller Ressourcen), <strong>Kampfrausch-Verstärker</strong> (+Angriffskraft) und <strong>Siegesschirm</strong> (+Verteidigung). Nach jedem gewonnenen <strong>NPC-Kampf</strong> zünden sie einen Schub für <strong>10 Minuten</strong> – als Sieg zählen Angriffe auf Piraten, Fraktionen und Nester, abgewehrte Überfälle, abgefangene Trümmerräuber, geschlossene Leerenrisse, verteidigte Expeditionen, Abgrund- und Weltboss-Gefechte. <strong>Spieler- und Allianzkämpfe lösen nichts aus.</strong> Die Wirkung summiert sich imperiumsweit über alle Standorte, je Art gedeckelt (+25% Produktion, +15% Angriff, +25% Verteidigung). Ein neuer Sieg <em>erneuert</em> den Schub, er stapelt nicht – wer von Kampf zu Kampf zieht, hält ihn dauerhaft aufrecht. Aktive Nachwirkungen stehen als „Sieges-Nachwirkung" in der Effekte-Leiste im Fortschritt-Tab; die Angriffskraft-Nachwirkung wirkt dort wie jeder Angriffs-Effekt auch in PvP-Kämpfen mit, weil der Server aktive Effekte aus dem Spielstand mitrechnet.' },
       { title:'Werftmarken – zehn Ausbaustufen je Schiffsklasse', body:'Jede Schiffsklasse lässt sich in der <strong>Werft</strong> über zehn Stufen ausbauen. <strong>Mk I</strong> ist der Auslieferungszustand, darüber liegen neun bezahlte Schritte. Eine Marke gilt für die <strong>ganze Klasse</strong> – für jedes Schiff, das du schon hast, und für jedes künftig gebaute. Deshalb sind die Zuwächse bewusst klein. <strong>Und sie richten sich seit dem 01.08.2026 nach der Schiffsfamilie</strong> – vorher bekam jede der 40 Klassen dieselbe Zeile, ein Spähschiff ohne Angriffswert wurde also für „mehr Angriff" aufgerüstet. Je Stufe gilt jetzt: '+shipMarkFamilienText()+'. Der Schwerpunkt jeder Familie ist der Zweig, der zu ihr passt; <strong>gesunken ist dabei nichts</strong> – jeder Wert liegt auf oder über dem vorherigen. Angriff und Schild gelten für alle Klassen mit Kampfwert, <strong>Tempo und Treibstoff für jede der 40 Klassen</strong> – auch Frachter, Aufklärer und die Tiefenflotte haben also etwas davon. <strong>Wichtig beim Tempo:</strong> Die Flugzeit einer Mission bestimmt immer das <strong>langsamste</strong> beteiligte Schiff (wie ein Konvoi) – ein aufgerüsteter Jäger neben einem unaufgerüsteten Kolonieschiff bringt beim Tempo nichts. Wer schneller fliegen will, rüstet gezielt den Bremser auf. <strong>Kosten:</strong> Der Preis richtet sich nach der Bauzeit der Klasse (Bauzeit ÷ 50, gedeckelt bei 20) und steigt je Stufe um rund das 1,6-Fache. Der komplette Weg Mk I → Mk X kostet einen Jäger rund 2,3 Mio Erz, ein Schlachtschiff etwa 14,5 Mio, einen Fusionsdreadnought gut 40 Mio – eine echte Senke für spätes Material. <strong>Ab Mk V kommt auf jeder Stufe eine weitere Tier-2-Ressource dazu</strong>, in der Reihenfolge ihrer eigenen Forschungskette: Nanolegierungen (Mk V), Quantenchips (Mk VI), Hochenergiekristalle (Mk VII), Fusionskerne (Mk VIII), KI-Kerne (Mk IX), Metamaterial (Mk X). Die zugehörige Forschung ist jeweils die Voraussetzung der Stufe – wer ein Schiff auf Mk X bringen will, muss also alle sechs Tier-2-Fabrikketten laufen haben. Der Singularitätskern bleibt bewusst draußen; er ist die Währung der Tiefenflotte. <strong>Die drei obersten Marken verlangen zusätzlich je einen Expeditionsfund</strong>, der sich nicht produzieren lässt: 1x Kristallherz (Mk VIII), 1x Alte Technologie (Mk IX), 1x Resonanzkristall (Mk X). Diese Mengen sind fest und wachsen <em>nicht</em> mit der Klasse – ein Fusionsdreadnought braucht genauso ein Stück wie ein Jäger. Damit hängen die letzten Stufen nicht am Lagerbestand, sondern daran, dass man tatsächlich rausfliegt. <strong>Ein Umbau braucht Zeit</strong>, und die steigt je Stufe um rund das 1,55-Fache: Mk II ist beim Jäger nach '+fmtDuration(shipMarkDuration('jaeger',2))+' fertig, Mk X dauert '+fmtDuration(shipMarkDuration('jaeger',SHIP_MARK_MAX))+'; der ganze Weg Mk I → Mk X kostet einen Jäger '+shipMarkTotalDurationText('jaeger')+', ein Schlachtschiff '+shipMarkTotalDurationText('schlachtschiff')+', einen Fusionsdreadnought '+shipMarkTotalDurationText('fusionsdreadnought')+'. Die <em>Kosten</em> skalieren voll mit der Klasse, die <em>Zeit</em> nur gedämpft – sonst wäre die Endstufe der schwersten Klassen tagelang blockiert. Es läuft immer nur <strong>ein Umbau gleichzeitig</strong> (wie bei der Forschung), damit die Reihenfolge eine echte Entscheidung bleibt; der Umbau belegt aber <em>keinen</em> der zehn Werftplätze, du kannst also nebenher weiterbauen. Werft-Boni verkürzen ihn genau wie den Schiffsbau – der Bauzeit-Rabatt der Marke selbst allerdings bewusst nicht, eine Stufe soll sich nicht selbst beschleunigen. <strong>Abbrechen geht jederzeit und gibt alles zurück</strong>, Ressourcen wie Expeditionsfund; ein Fehlklick kostet dich nur die bereits verstrichene Zeit. Fällt ein Umbau fertig, während du offline bist, ist er beim nächsten Einloggen erledigt. <strong>Sichtbar</strong> wird jede Stufe auch am Schiff selbst: Blechhaut, Panzerkante, längere Geschützrohre, ein Turm mehr, Sensormast, Systemlichter, stärkerer Antrieb, Silbersaum und zuletzt die goldene Zierlinie mit Bugscheinwerfer. Der Umriss bleibt über alle zehn Marken gleich, damit du deine Flotte weiter auf einen Blick erkennst; die Stufe steht als römische Ziffer auf der Plakette am Schiffssymbol. Marken <strong>überleben das Prestige</strong> (wie Offiziere und Schiffsmodule), und der Server rechnet sie im PvP genauso nach wie die Vorschau – Anzeige und Kampfergebnis bleiben synchron. <strong>Marken zählen im Punktestand mit:</strong> Ein Schiff bringt seine Grundpunkte <em>mal</em> dem Markenzuschlag – auf Mk X also +27%, genau derselbe Anteil, um den es auch stärker ist. Der Punktestand-Tab zeigt die Marke in der Detailzeile mit (z.B. „Jäger (Mk V): 400 × 13,4 = 5.360"), damit die Summe nachrechenbar bleibt, und ein fertiger Umbau erscheint als eigene Zeile im Punkteprotokoll. Der Server rechnet denselben Zuschlag nach – die Bestenliste zeigt also dieselbe Zahl wie dein Spiel. <strong>Im Kampf sind sie ausgewiesen:</strong> Die NPC-Angriffsvorschau nennt die Marken deiner gewählten Flotte samt dem Prozentanteil, den sie an deiner Angriffskraft haben, und jeder Kampfbericht – NPC-Angriff, Spielerangriff, Angriff auf eine Allianzbasis und abgewehrter Überfall – führt sie in einer eigenen Zeile. Der Bericht zeigt dabei den Markenstand <em>zum Zeitpunkt des Kampfes</em>, nicht den heutigen: Eine mit Mk III gewonnene Schlacht bleibt eine Mk-III-Schlacht, auch wenn du danach weiter aufrüstest. Beim abgewehrten Überfall steht dort der Anteil an der <em>Flottenverteidigung</em> statt an der Angriffskraft – dort wirkt die Marke über den Angriffswert <em>und</em> den Schild, der reine Angriffsanteil wäre die falsche Zahl.<br><br><strong>Zivilschiffe haben seit dem 02.08.2026 einen sechsten Zweig: Laderaum.</strong> Der Anlass war ein Missverhältnis – 18 der 39 Schiffsklassen haben gar keinen Angriffswert, für sie waren zwei der fünf Zweige (Angriff, Schild) schlicht tot. Ein Frachter wurde auf dem Weg Mk I bis Mk X zwar schneller und sparsamer, aber <em>nie größer</em>, obwohl Laderaum das Einzige ist, wofür er existiert. Jetzt bringt jede Marke <strong>+4% Ladekapazität</strong>, auf Mk X also +36% – auf den Missions-Frachtraum UND auf den Lager-Beitrag der Frachter (+250/+1000 je Schiff), beides je Klasse getrennt. Das gilt für die beiden Frachterklassen, bei denen es etwas bewirkt – auf einem Späher oder Kolonieschiff wird der Zweig gar nicht erst beworben.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. '+SHIP_CLASS_DEFS.length+' Klassen mit eigenen Slots (bis zu 3, und wie bei den Standort-Modulen <strong>je Typ nur eines gleichzeitig</strong> – unabhängig von der Seltenheit): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen, überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module. <strong>Synergien:</strong> Sechs benannte Modul-Kombinationen über die Klassen hinweg (z.B. Konvoi-Doktrin: Verbesserte Triebwerke + Langstreckensensoren) geben zusätzliche Boni, sobald beide Teile eingebaut sind – ausschließlich Tempo, Treibstoff-Ersparnis und Frachtraum, nie Kampfwerte (die liest der Server direkt, eine Client-Zulage dort wäre eine leere Behauptung). Aktive Synergien stehen grün über der Klassen-Auswahl, fast fertige nennen das fehlende Teil.' }
@@ -52291,7 +52361,7 @@
               <div class="mod-head">${moduleIconHtml(info&&info.def, false, info?info.rar.color:'#c7cbe0')}<span class="bname">${info?info.def.name:'?'}</span></div>
               <div class="mod-eff" style="color:${info?info.rar.color:'#7d8199'};">+${info?Math.round(info.bonus*100):0}% ${info?moduleEffectLabel(info.def.effect):''}</div>
               <div class="bmeta">${info?info.rar.label:''}${info&&info.level>1?' · Stufe '+info.level+'/'+MODULE_LEVEL_MAX:''}</div>
-              ${(info&&info.subs.length)?`<div class="mod-sub"><i class="ti ti-sparkles" aria-hidden="true"></i> ${substatZeile(info.subs)}</div>`:''}
+              ${(info&&(info.subs.length||(info.wert&&info.wert!==100)))?`<div class="mod-sub"><i class="ti ti-sparkles" aria-hidden="true"></i> ${substatZeile(info.subs, info.wert)}</div>`:''}
               <div class="mod-acts">
                 ${canUp?`<button data-upgrade-module="${instKey}" ${haveFrag?'':'disabled'} title="Aufwerten auf Stufe ${info.level+1}/${MODULE_LEVEL_MAX} – kostet ${upCost} Modulfragmente (du hast ${state.moduleFragments||0})"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:3px;"></i>Stufe ↑ (${upCost})</button>`:''}
                 <button data-unequip-module="${i}"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Abnehmen</button>
@@ -52420,7 +52490,7 @@
             const knopfTitel = typBelegt ? info.def.name+' ist hier bereits eingebaut - je Typ ist nur eines erlaubt, unabhängig von der Seltenheit' : '';
             // Schmelze-Aktionen (24.07.2026): 3→1-Fusion bei genug Duplikaten (bis Legendär) + Zerlegen.
             const nextRar = nextRarityOf(instKey.split(':')[1]);
-            const canFuse = count >= MODULE_FUSE_COUNT && nextRar && nextRar !== 'mythisch';
+            const canFuse = fuseAnzahl(state.modules, instKey) >= MODULE_FUSE_COUNT && nextRar && nextRar !== 'mythisch';
             const fragVal = MODULE_FRAGMENT_VALUE[instKey.split(':')[1]] || 1;
             return `<div class="card-row">
               <div class="left"><div class="bicon" style="background:${info.rar.color}22; color:${info.rar.color};">${moduleIconHtml(info.def, false, info.rar.color)}</div>
@@ -52429,7 +52499,7 @@
                   const l = moduleEffectLabel(info.def.effect);  // 01.08.2026: war eine eigene, seit v8.356.0
                   // veraltete Kopie der Beschriftungstabelle - acht der 21 Standortmodule zeigten
                   // dem Spieler dadurch den rohen Programmier-Schluessel statt einer Wirkung.
-                  return '+'+Math.round(info.bonus*100)+'% '+l; })()} · ${info.def.desc}${info.subs.length?`<div style="margin-top:2px; color:#9fe1cb;"><i class="ti ti-sparkles" aria-hidden="true"></i> Substats: ${substatZeile(info.subs)}</div>`:''}</div></div>
+                  return '+'+Math.round(info.bonus*100)+'% '+l; })()} · ${info.def.desc}${(info.subs.length||(info.wert&&info.wert!==100))?`<div style="margin-top:2px; color:#9fe1cb;"><i class="ti ti-sparkles" aria-hidden="true"></i> Substats: ${substatZeile(info.subs, info.wert)}</div>`:''}</div></div>
               </div>
               <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
                 <button data-equip-module="${instKey}" ${einbaubar?'':'disabled'} title="${knopfTitel}" style="font-size:10.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>${knopfText}</button>
@@ -52558,7 +52628,7 @@
               <div class="mod-head">${moduleIconHtml(info&&info.def, true, info?info.rar.color:'#c7cbe0')}<span class="bname">${info?info.def.name:'?'}</span></div>
               <div class="mod-eff" style="color:${info?info.rar.color:'#7d8199'};">${info?shipModuleEffectText(info.def.effect, info.bonus):''}</div>
               <div class="bmeta">${info?info.rar.label:''}${info&&info.level>1?' · Stufe '+info.level+'/'+MODULE_LEVEL_MAX:''}</div>
-              ${(info&&info.subs.length)?`<div class="mod-sub"><i class="ti ti-sparkles" aria-hidden="true"></i> ${substatZeile(info.subs)}</div>`:''}
+              ${(info&&(info.subs.length||(info.wert&&info.wert!==100)))?`<div class="mod-sub"><i class="ti ti-sparkles" aria-hidden="true"></i> ${substatZeile(info.subs, info.wert)}</div>`:''}
               <div class="mod-acts">
                 ${canUp?`<button data-upgrade-shipmodule="${instKey}" ${haveFrag?'':'disabled'} title="Aufwerten auf Stufe ${info.level+1}/${MODULE_LEVEL_MAX} – kostet ${upCost} Modulfragmente (du hast ${state.moduleFragments||0})"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:3px;"></i>Stufe ↑ (${upCost})</button>`:''}
                 <button data-unequip-shipmodule="${i}"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Abnehmen</button>
@@ -52634,12 +52704,12 @@
             // Inline-Kopie wie bei den Standortmodulen - ALLE acht Abgrund-Schiffsmodule zeigten
             // hier den rohen Effekt-Schluessel.
             const nextRarS = nextRarityOf(instKey.split(':')[1]);
-            const canFuseS = count >= MODULE_FUSE_COUNT && nextRarS && nextRarS !== 'mythisch';
+            const canFuseS = fuseAnzahl(state.shipModules, instKey) >= MODULE_FUSE_COUNT && nextRarS && nextRarS !== 'mythisch';
             const fragValS = MODULE_FRAGMENT_VALUE[instKey.split(':')[1]] || 1;
             return `<div class="card-row">
               <div class="left"><div class="bicon" style="background:${info.rar.color}22; color:${info.rar.color};">${moduleIconHtml(info.def, true, info.rar.color)}</div>
                 <div><div class="bname">${info.def.name} <span class="lvl-pill" style="background:${info.rar.color}22; color:${info.rar.color};">${info.rar.label}</span>${info.level>1?` <span class="lvl-pill" style="background:rgba(250,199,117,0.18); color:#fac775;">Lvl ${info.level}</span>`:''} ${count>1?`<span class="bmeta">×${count}</span>`:''}</div>
-                <div class="bmeta">${shipModuleEffectText(info.def.effect, info.bonus)} · ${info.def.desc}${info.subs.length?`<div style="margin-top:2px; color:#9fe1cb;"><i class="ti ti-sparkles" aria-hidden="true"></i> Substats: ${substatZeile(info.subs)}</div>`:''}</div></div>
+                <div class="bmeta">${shipModuleEffectText(info.def.effect, info.bonus)} · ${info.def.desc}${(info.subs.length||(info.wert&&info.wert!==100))?`<div style="margin-top:2px; color:#9fe1cb;"><i class="ti ti-sparkles" aria-hidden="true"></i> Substats: ${substatZeile(info.subs, info.wert)}</div>`:''}</div></div>
               </div>
               <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
                 <button data-equip-shipmodule="${instKey}" ${einbaubarS?'':'disabled'} title="${knopfTitelS}" style="font-size:10.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:3px;"></i>${knopfTextS}</button>
