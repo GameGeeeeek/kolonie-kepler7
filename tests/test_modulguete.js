@@ -72,7 +72,9 @@ const JS = SPIEL.match(/<script>([\s\S]*)<\/script>/)[1];
 // ---- 3) eine Quelle fuer alle Anzeigestellen
 {
   check('3: substatZeile() existiert', /function substatZeile\(/.test(JS));
-  const aufrufe = (JS.match(/substatZeile\(info\.subs\)/g) || []).length;
+  // Seit v8.444.0 (Hauptwert-Streuung) bekommen alle vier Stellen zusaetzlich info.wert
+  // durchgereicht - die Aussage "EINE Quelle" bleibt dieselbe (Arbeitsregel 9).
+  const aufrufe = (JS.match(/substatZeile\(info\.subs, info\.wert\)/g) || []).length;
   check('3: alle vier Anzeigestellen gehen darueber', aufrufe === 4, aufrufe);
   // Und keine baut die Zeile noch selbst.
   const selbstgebaut = (JS.match(/subs\.map\(s=>'\+'\+\(s\.value\*100\)/g) || []).length;

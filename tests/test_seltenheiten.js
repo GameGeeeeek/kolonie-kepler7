@@ -69,8 +69,12 @@ check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
     return b > a ? JS.slice(a, b + 4) : '';
   };
   const qNext = fnAus('function nextRarityOf(rarity){');
-  const qFuse = fnAus('function fuseModules(isShip, instKey){');
-  check('3a: nextRarityOf und fuseModules gefunden', qNext.length > 100 && qFuse.length > 500);
+  // Seit v8.444.0 (Wert-Streuung) matcht die Schmelze GESCHWISTER - die beiden Helfer
+  // gehoeren mit in die Sandbox, sonst wirft fuseModules einen ReferenceError (Arbeitsregel 9).
+  const qFuse = fnAus('function fuseGeschwister(inv, instKey){') + '\n' +
+                fnAus('function fuseAnzahl(inv, instKey){') + '\n' +
+                fnAus('function fuseModules(isShip, instKey){');
+  check('3a: nextRarityOf und fuseModules gefunden', qNext.length > 100 && qFuse.length > 900);
   const naechste = new Function('MODULE_RARITY', qNext + '\nreturn nextRarityOf;')(RAR);
   check('3b: die Kette laeuft luecklos von gewoehnlich bis exotisch und endet dort',
     ORDNUNG.every((k, i) => naechste(k) === (ORDNUNG[i+1] || null)));
@@ -78,10 +82,10 @@ check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
     const logs = [];
     const state = { modules: inv, shipModules: {} };
     const fn = new Function('state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf',
-      'moduleLevelOf', 'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'playSound', 'render', 'save',
+      'moduleLevelOf', 'moduleWertOf', 'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'playSound', 'render', 'save',
       qFuse + '\nreturn fuseModules;')(
       state, RAR, 3, naechste,
-      (k) => parseInt(String(k).split(':')[2] || '1', 10),
+      (k) => parseInt(String(k).split(':')[2] || '1', 10), () => 100,
       (k) => ({ rar: RAR[String(k).split(':')[1]] || { label: '?' }, def: { name: 'Testmodul' } }),
       () => null, (t) => logs.push(t), () => {}, () => {}, () => {});
     return { fn, state, logs };
