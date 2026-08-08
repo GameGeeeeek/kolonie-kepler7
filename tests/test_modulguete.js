@@ -15,7 +15,8 @@
 //   2. Die Guete-Rechnung ist richtig verankert: schlechtester Wurf = 0, bester = 1, dazwischen
 //      monoton. Und OHNE Zweitwerte gibt es null statt 0 - "kein Wurf" ist nicht "schlechtester
 //      Wurf", das waere schlicht gelogen.
-//   3. Alle vier Anzeigestellen gehen ueber dieselbe Funktion.
+//   3. Alle Anzeigestellen (5 seit v8.449.0: Slot-Karten und Inventare beider Modulsysteme
+//      plus Modulboerse) gehen ueber dieselbe Funktion.
 //   4. Im Browser: ein Spitzenwurf und ein schwacher Wurf sind wirklich zu UNTERSCHEIDEN.
 //      Das ist der Punkt - ohne diese Pruefung waere der Test auch gruen, wenn ueberall dasselbe
 //      Wort staende.
@@ -72,10 +73,11 @@ const JS = SPIEL.match(/<script>([\s\S]*)<\/script>/)[1];
 // ---- 3) eine Quelle fuer alle Anzeigestellen
 {
   check('3: substatZeile() existiert', /function substatZeile\(/.test(JS));
-  // Seit v8.444.0 (Hauptwert-Streuung) bekommen alle vier Stellen zusaetzlich info.wert
-  // durchgereicht - die Aussage "EINE Quelle" bleibt dieselbe (Arbeitsregel 9).
+  // Seit v8.444.0 (Hauptwert-Streuung) bekommen alle Stellen zusaetzlich info.wert
+  // durchgereicht; seit v8.449.0 ist die Modulboerse die fuenfte Aufrufstelle -
+  // die Aussage "EINE Quelle" bleibt dieselbe (Arbeitsregel 9).
   const aufrufe = (JS.match(/substatZeile\(info\.subs, info\.wert\)/g) || []).length;
-  check('3: alle vier Anzeigestellen gehen darueber', aufrufe === 4, aufrufe);
+  check('3: alle fuenf Anzeigestellen gehen darueber', aufrufe === 5, aufrufe);
   // Und keine baut die Zeile noch selbst.
   const selbstgebaut = (JS.match(/subs\.map\(s=>'\+'\+\(s\.value\*100\)/g) || []).length;
   check('3: keine Anzeigestelle baut die Zeile mehr selbst', selbstgebaut === 0, selbstgebaut);
