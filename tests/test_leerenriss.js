@@ -65,11 +65,14 @@ const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
   const qK = fnAus('function kraftAnteilA(summeA, summeD){');
   check('2a: rissStaerke und kraftAnteilA gefunden', qR.length > 100 && qK.length > 300,
     [qR.length, qK.length]);
+  // Seit v8.441.0 kennt kraftAnteilA auch den Raid-Boss (BOSS/bossHpAnteil) - die Sandbox
+  // stellt beide, sonst wirft der Nicht-Riss-Zweig einen ReferenceError (Arbeitsregel 9).
+  const qB = fnAus('function bossHpAnteil(){');
   const rechne = (ctx) => new Function('ctx',
     'var GEGNER_UNBEKANNT = ctx.unbekannt, DATEN = ctx.daten, KRAFT_START_A = ctx.startA,' +
-    ' RISS = ctx.riss || null, tSim = ctx.t || 0;' +
+    ' RISS = ctx.riss || null, BOSS = ctx.boss || null, tSim = ctx.t || 0;' +
     ' function klemme(v, a, b){ return Math.min(b, Math.max(a, v)); }\n' +
-    qR + '\n' + qK + '\nreturn kraftAnteilA(ctx.summeA, ctx.summeD);')(ctx);
+    qR + '\n' + qB + '\n' + qK + '\nreturn kraftAnteilA(ctx.summeA, ctx.summeD);')(ctx);
   const daten = { verteidiger: { kraft: 12809, riss: true }, angriffskraft: 20000, abwehrkraft: 12809, ergebnis: 'sieg' };
   // Erwartungen aus derselben Formel unabhaengig hergeleitet, nicht aus dem Code abgelesen.
   check('2b: zu Kampfbeginn gilt das Berichtsverhaeltnis (statt "Du 100%")',
@@ -93,24 +96,27 @@ const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 }
 
 // ---- 3) Verdrahtung in der Buehne
-check('3a: die Riss-Gegenseite bekommt KEINE Stellvertreter-Ruempfe',
-  JS.includes("var n = (RISS && d.seite === 'D') ? 0 : neueRumpfZahl(k), arr = new Array(n);") &&
+check('3a: die Riss-Gegenseite bekommt KEINE Stellvertreter-Ruempfe (seit v8.441.0 auch der Boss)',
+  JS.includes("var n = ((RISS || BOSS) && d.seite === 'D') ? 0 : neueRumpfZahl(k), arr = new Array(n);") &&
   JS.includes('proSchiff[k] = n > 0 ? d.start / n : 0;'));
 check('3b: die Angreifer zielen auf den Riss',
   JS.includes("if (seite === 'A' && RISS) return rissStaerke() > 0.03 ? RISS : null;"));
 {
-  // Reihenfolge im Zeichenpfad: Riss zwischen Wracks und Antrieben (Anker-Existenz zuerst,
-  // Arbeitsregel 6).
-  const w = JS.indexOf('zeichneWracks(g);\n      zeichneRiss(g);\n      zeichneAntriebe(g);');
-  check('3c: zeichneRiss haengt im Zeichenpfad zwischen Wracks und Antrieben', w > 0);
+  // Reihenfolge im Zeichenpfad: Riss nach den Wracks und vor den Antrieben. Die REGEL wird
+  // geprueft, nicht die woertliche Dreierfolge (Arbeitsregel 3) - seit v8.441.0 steht
+  // zwischen Riss und Antrieben zusaetzlich die Boss-Silhouette.
+  const w = JS.indexOf('zeichneWracks(g);\n      zeichneRiss(g);');
+  const antriebe = w > 0 ? JS.indexOf('zeichneAntriebe(g);', w) : -1;
+  check('3c: zeichneRiss haengt im Zeichenpfad zwischen Wracks und Antrieben',
+    w > 0 && antriebe > 0 && antriebe - w < 120, antriebe - w);
 }
 check('3d: rissSchritt laeuft im Simulationsschritt neben der Bodenabwehr',
   JS.includes('anlagenSchritt(dt);\n      rissSchritt(dt);'));
 check('3e: BEIDE Kraft-Anzeigestellen nutzen kraftAnteilA (HUD und Video), die alte Formel ist weg',
   (JS.match(/var pa = kraftAnteilA\(summeA, summeD\);/g) || []).length === 2 &&
   !JS.includes('var ges = summeA + summeD || 1, pa ='));
-check('3f: die HUD-Signatur traegt bei Riss eine Sekundenmarke (Schiene haengt an der Zeit)',
-  JS.includes("if (RISS) sig += '|' + Math.round(tSim);"));
+check('3f: die HUD-Signatur traegt bei Riss/Boss eine Sekundenmarke (Schiene haengt an der Zeit)',
+  JS.includes("if (RISS || BOSS) sig += '|' + Math.round(tSim);"));
 check('3g: enterZiele uebersteht leere Gegner-Arrays', JS.includes('if (!arr || !arr.length) continue;'));
 check('3h: die Hilfe nennt Riss-Zeichnung und ehrliche Kraftschiene (zweite Anzeigestelle)',
   JS.includes('wird als Riss über dem Planeten gezeichnet') &&

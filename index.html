@@ -6180,8 +6180,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.440.0';
+  const VERSION = '8.441.0';
   const PATCHNOTES = [
+    { version:'8.441.0', date:'08.08.2026', changes:[
+      '<strong>Die fünf Raid-Bosse haben jetzt eigene Silhouetten in der Kampf-Wiedergabe.</strong> Beim Allianz-Raid stand die Gegenseite bisher als Stellvertreter-Rümpfe da – der Boss hat aber gar keine Flotte. Jetzt hängt seine gezeichnete Gestalt über dem Gefecht: der <strong>Sternenfresser</strong> als aufgerissenes Maul, die <strong>Panzerhülle</strong> als plattenbesetzter Panzer, die <strong>Schwarmmutter</strong> mit kreisenden Begleitern, der <strong>Phasenwandler</strong> als doppeltes Phantombild, das <strong>Gluthorn</strong> als glühendes Horn. Die Silhouette nimmt sichtbar Schaden – Risse und Flackern folgen dem echten Hüllenverlauf der Welle (von der Hülle vor dem Angriff bis zum gemeldeten Rest; ein erlegter Boss vergeht ganz) – und der Boss schießt zurück.',
+      'Die Bestandstafel nennt seine Zahl jetzt <strong>„Boss-Hülle"</strong> statt „Abwehrkraft", und die Kraftschiene rechnet den Boss mit seiner <em>aktuellen</em> Hülle statt mit einem festen Wert – dieselbe ehrliche Rechnung wie beim Leerenriss aus v8.440.0. Ältere Berichte ohne Hüllen-Angaben zeigen die Silhouette in voller Stärke, ohne einen Verlauf zu erfinden.'
+    ]},
     { version:'8.440.0', date:'07.08.2026', changes:[
       '<strong>Der Leerenriss ist in der Kampf-Wiedergabe jetzt ein Riss.</strong> Bisher standen dort zwei erfundene rote Platzhalter-Schiffe (gemessen: rund 26.600 grüne gegen 1.300 rote Bildpunkte) – der Bericht führt für diese Gefechtsart gar keine Gegnerflotte. Jetzt steht ein pulsierender Riss über dem Planeten, der zurückschießt und sich im Kampfverlauf sichtbar schließt (bei einer Niederlage bleibt er geschwächt stehen). Die Bestandstafel sagt weiterhin ehrlich, dass nur seine Kraft bekannt ist.',
       '<strong>Die Kraftschiene widerspricht der Gegner-Tafel nicht mehr.</strong> Bei nicht aufgeklärter Gegenseite (Leerenriss, Raid-Boss, PvP im Solo-Modus) zeigte sie stur „Du 100% / 0%", während die Tafel daneben die gemeldete Abwehrkraft nannte – die Schiene zählte nur Schiffsrümpfe, und die Gegenseite hat keine. Sie rechnet jetzt mit den <strong>Kampfkraft-Zahlen des Berichts</strong>: die eigene Seite anteilig zu ihren Verlusten, der Riss zusätzlich mit seinem Schwächerwerden. Dieselbe Rechnung gilt im geteilten Video – eine Helferfunktion für beide Anzeigestellen, damit sie nie wieder auseinanderlaufen können.',
@@ -27818,9 +27822,10 @@
              fuer jeden Teilnehmer gleich (deterministische Server-Rechnung) - die
              Verbandsverluste je Typ sind round(n*lossPct), ABGELEITET und nicht erfunden.
              Der Boss selbst hat KEINE Flotte (nur HP und Multiplikatoren, server-seitig) -
-             die Gegenseite ist deshalb ehrlich "unbekannt" und zeigt die Stellvertreter-
-             Ruempfe. Eine echte Boss-Silhouette ist dieselbe Baustelle wie Aufgabe #8
-             (Leerenriss als Riss statt Platzhalter-Schiffe). */
+             die Gegenseite ist deshalb ehrlich "unbekannt". Seit v8.441.0 zeichnet die
+             Buehne dafuer seine SILHOUETTE (zeichneBoss, je Boss eine eigene Gestalt);
+             der Hueellenverlauf kommt aus dem Bericht (bossHuelle unten), nichts wird
+             erfunden - Altberichte ohne Zahlen zeigen die Gestalt in voller Staerke. */
           d.blick = 'angriff';
           d.ergebnis = 'sieg'; /* eine Welle kann nicht verloren werden - siehe Berichtszweig */
           d.ortName = (r.bossName || 'Raid-Boss') + (r.level ? ' (Stufe ' + r.level + ')' : '');
@@ -27837,6 +27842,14 @@
           var bossKraft = (typeof r.hpNachher === 'number' && typeof r.damage === 'number')
             ? (r.hpNachher + r.damage) : null;
           d.verteidiger = unbekannteSeite(r.bossName || 'Raid-Boss', 'gegner', bossKraft);
+          d.verteidiger.boss = true;
+          /* Hueellenverlauf der Welle, NUR aus Berichtsfeldern: vorher = Rest + Schaden,
+             nachher = gemeldeter Rest, zerstoert = Boss fiel in dieser Welle. Fehlen die
+             Zahlen (Altbericht), bleibt es bei null - die Buehne erfindet dann keinen
+             Verlauf, sondern zeigt die Silhouette in voller Staerke. */
+          d.bossHuelle = (bossKraft !== null) ? { vorher: bossKraft,
+            nachher: (typeof r.hpNachher === 'number') ? r.hpNachher : null,
+            zerstoert: !!r.destroyed } : null;
           d.luecken.push('Der Boss hat keine Flotte - Gegenseite symbolisch');
           d.angriffskraft = r.totalPower || 0;
           d.abwehrkraft = bossKraft || 0;
@@ -29186,7 +29199,7 @@
         /* Leerenriss (Aufgabe #8): Die Gegenseite bekommt KEINE Stellvertreter-Ruempfe -
            der Bericht fuehrt keine Flotte, und zwei erfundene Schiffe sahen nach Fehler
            aus. An ihrer Stelle steht der gezeichnete Riss (zeichneRiss). */
-        var n = (RISS && d.seite === 'D') ? 0 : neueRumpfZahl(k), arr = new Array(n);
+        var n = ((RISS || BOSS) && d.seite === 'D') ? 0 : neueRumpfZahl(k), arr = new Array(n);
         var modelle = modellVerteilung(k, d, n);
         proSchiff[k] = n > 0 ? d.start / n : 0;
         lebend[k] = d.start; totRumpf[k] = 0;
@@ -29505,6 +29518,7 @@
       /* Leerenriss: die Gegenseite hat keine Ruempfe - Ziel der Angreifer ist der Riss
          selbst, bis er (fast) geschlossen ist. */
       if (seite === 'A' && RISS) return rissStaerke() > 0.03 ? RISS : null;
+      if (seite === 'A' && BOSS) return bossHpAnteil() > 0.03 ? BOSS : null;
       var listen = seite === 'A' ? FLOTTE_D : FLOTTE_A;
       var best = null, bestD = maxDist * maxDist;
       for (var n = 0; n < 3; n++){
@@ -30068,6 +30082,7 @@
       zeichneScherben(g);
       zeichneWracks(g);
       zeichneRiss(g);
+      zeichneBoss(g);
       zeichneAntriebe(g);
       zeichneFlotten(g);
       zeichneEnterleinen(g);
@@ -30814,7 +30829,7 @@
       /* Riss-Gefecht: die Kraftschiene haengt an rissStaerke() und damit an der ZEIT, nicht
          nur an Bestaenden - ohne Sekundenmarke stuende sie zwischen zwei Verlust-Ereignissen
          still, waehrend der Riss sichtbar schrumpft. */
-      if (RISS) sig += '|' + Math.round(tSim);
+      if (RISS || BOSS) sig += '|' + Math.round(tSim);
       if (sig === hudSig) return;
       hudSig = sig;
 
@@ -31148,6 +31163,149 @@
       g.restore();
     }
 
+    /* Gegenwehr des Bosses (Task #32): schwere, langsame Salven auf die Angreifer -
+       dieselben Geschoss- und Einschlagwege wie Schiffe und Riss. Der Takt haengt an der
+       Rest-Huelle: ein fast erlegter Boss feuert seltener und verstummt am Ende. */
+    function bossSchritt(dt){
+      if (!BOSS) return;
+      if (BOSS.prall) BOSS.prall = Math.max(0, BOSS.prall - dt * 3.2);
+      var anteil = bossHpAnteil();
+      if (anteil <= 0.05 || tSim < 3.8 || tSim > 40.5) return;
+      BOSS.kalt -= dt;
+      if (BOSS.kalt > 0) return;
+      BOSS.kalt = (1.5 + Math.random() * 1.3) / (0.4 + 0.6 * anteil);
+      var ziel = findeGegner('D', BOSS.u, BOSS.a, 0.6 * Math.max(W, H));
+      if (!ziel) return;
+      var dx = (ziel.u - BOSS.u) * kU, dy = (ziel.a - BOSS.a) * kA;
+      var d0 = Math.sqrt(dx*dx + dy*dy) || 1;
+      /* Ein schwerer Schuss aufs Ziel, zwei leichte gestreut daneben. */
+      for (var n = 0; n < 3; n++){
+        var streu = n === 0 ? 0 : (Math.random() - 0.5) * 0.22;
+        var rx = (dx/d0) * Math.cos(streu) - (dy/d0) * Math.sin(streu);
+        var ry = (dx/d0) * Math.sin(streu) + (dy/d0) * Math.cos(streu);
+        geschossNeu({
+          typ: 'spur', u: BOSS.u, a: BOSS.a,
+          vu: rx * 560 / kU, va: ry * 560 / kA,
+          t: -n * 0.12, dauer: d0 / 560 + 0.02,
+          farbe: F.ver, dick: n === 0 ? 2.2 : 1.2, len: n === 0 ? 20 : 12,
+          zielS: n === 0 ? ziel : null, wucht: n === 0 ? 0.9 : 0.3, fehl: n !== 0
+        });
+      }
+    }
+
+    /* Die Boss-Gestalt (Task #32): je Boss eine eigene Silhouette, dunkler Koerper mit
+       roter Kante ueber dem Gefecht, dort wo sonst die Verteidigerflotte stuende. Sie
+       folgt dem ECHTEN Hueellenverlauf des Berichts (bossHpAnteil): Risse ab 70%, mehr ab
+       40%, Flackern und Schrumpfen zum Ende, ein erlegter Boss vergeht ganz. Treffer der
+       Angreifer zeigen sich als Prall-Ring wie an Schiffen und Riss. */
+    function zeichneBoss(g){
+      if (!BOSS) return;
+      var anteil = bossHpAnteil();
+      if (anteil <= 0.01) return;
+      var x = pxX(BOSS.u, BOSS.a), y = pxY(BOSS.u, BOSS.a);
+      var s = H * 0.085 * (0.6 + 0.4 * anteil);
+      var puls = 0.8 + 0.2 * Math.sin(tSim * 1.9);
+      var kante = klemme(0.45 + 0.5 * anteil * puls, 0, 1);
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      glut(g, x, y, s * 1.8 * puls, F.ver, (0.10 + 0.14 * anteil) * puls);
+      g.globalCompositeOperation = 'source-over';
+      g.fillStyle = '#150a12';
+      g.strokeStyle = rgba(F.ver, kante);
+      g.lineWidth = Math.max(1, 0.6 + 1.6 * anteil);
+      if (BOSS.key === 'sternenfresser'){
+        /* Aufgerissenes Maul: Kreiskoerper mit Keil, Zaehne als Dreiecke. */
+        g.beginPath(); g.arc(x, y, s, 0.42, TAU - 0.42); g.lineTo(x, y); g.closePath();
+        g.fill(); g.stroke();
+        g.fillStyle = rgba(F.ver, 0.75 * kante);
+        for (var z = 0; z < 3; z++){
+          var zw = 0.42 - z * 0.28;
+          g.beginPath();
+          g.moveTo(x + Math.cos(zw) * s * 0.95, y + Math.sin(zw) * s * 0.95);
+          g.lineTo(x + Math.cos(zw) * s * 0.55, y + Math.sin(zw) * s * 0.62);
+          g.lineTo(x + Math.cos(zw - 0.14) * s * 0.9, y + Math.sin(zw - 0.14) * s * 0.9);
+          g.closePath(); g.fill();
+          g.beginPath();
+          g.moveTo(x + Math.cos(-zw) * s * 0.95, y + Math.sin(-zw) * s * 0.95);
+          g.lineTo(x + Math.cos(-zw) * s * 0.55, y + Math.sin(-zw) * s * 0.62);
+          g.lineTo(x + Math.cos(-zw + 0.14) * s * 0.9, y + Math.sin(-zw + 0.14) * s * 0.9);
+          g.closePath(); g.fill();
+        }
+      } else if (BOSS.key === 'panzerhuelle'){
+        /* Breiter Panzer: flaches Sechseck mit Plattenfugen. */
+        g.beginPath();
+        g.moveTo(x - s * 1.5, y); g.lineTo(x - s * 0.9, y - s * 0.7); g.lineTo(x + s * 0.9, y - s * 0.7);
+        g.lineTo(x + s * 1.5, y); g.lineTo(x + s * 0.9, y + s * 0.7); g.lineTo(x - s * 0.9, y + s * 0.7);
+        g.closePath(); g.fill(); g.stroke();
+        g.strokeStyle = rgba(F.ver, 0.45 * kante); g.lineWidth = 1;
+        g.beginPath(); g.moveTo(x - s * 1.16, y - s * 0.28); g.lineTo(x + s * 1.16, y - s * 0.28); g.stroke();
+        g.beginPath(); g.moveTo(x - s * 1.16, y + s * 0.28); g.lineTo(x + s * 1.16, y + s * 0.28); g.stroke();
+      } else if (BOSS.key === 'schwarmmutter'){
+        /* Ovaler Leib mit kreisenden Begleitern. */
+        g.beginPath(); g.ellipse(x, y, s * 1.15, s * 0.75, 0, 0, TAU); g.fill(); g.stroke();
+        g.fillStyle = rgba(F.ver, 0.8 * kante);
+        for (var b = 0; b < 6; b++){
+          var bw = tSim * 0.9 + b * (TAU / 6);
+          g.beginPath();
+          g.arc(x + Math.cos(bw) * s * 1.7, y + Math.sin(bw) * s * 1.05, Math.max(1.2, s * 0.09), 0, TAU);
+          g.fill();
+        }
+      } else if (BOSS.key === 'phasenwandler'){
+        /* Doppeltes Phantombild: dieselbe Raute zweimal, versetzt und halb durchsichtig. */
+        var vers = s * 0.35 * Math.sin(tSim * 1.3);
+        g.globalAlpha = 0.45;
+        g.beginPath();
+        g.moveTo(x + vers, y - s * 1.1); g.lineTo(x + vers + s * 0.85, y);
+        g.lineTo(x + vers, y + s * 1.1); g.lineTo(x + vers - s * 0.85, y);
+        g.closePath(); g.fill(); g.stroke();
+        g.globalAlpha = 1;
+        g.beginPath();
+        g.moveTo(x, y - s * 1.1); g.lineTo(x + s * 0.85, y);
+        g.lineTo(x, y + s * 1.1); g.lineTo(x - s * 0.85, y);
+        g.closePath(); g.fill(); g.stroke();
+      } else if (BOSS.key === 'gluthorn'){
+        /* Gluehendes Horn: hohe Spitze mit innerem Gluts. */
+        g.beginPath();
+        g.moveTo(x, y - s * 1.35); g.lineTo(x + s * 0.75, y + s * 0.75);
+        g.quadraticCurveTo(x, y + s * 1.05, x - s * 0.75, y + s * 0.75);
+        g.closePath(); g.fill(); g.stroke();
+        g.globalCompositeOperation = 'lighter';
+        glut(g, x, y + s * 0.3, s * 0.55 * puls, F.warn, 0.35 * anteil * puls);
+        g.globalCompositeOperation = 'source-over';
+      } else {
+        /* Generische Gestalt (Prototyp/unbekannter Boss): breite Raute. */
+        g.beginPath();
+        g.moveTo(x, y - s * 0.9); g.lineTo(x + s * 1.3, y);
+        g.lineTo(x, y + s * 0.9); g.lineTo(x - s * 1.3, y);
+        g.closePath(); g.fill(); g.stroke();
+      }
+      /* Schadensbild: Risse folgen dem echten Hueellenverlauf. */
+      if (anteil < 0.7){
+        g.strokeStyle = rgba(F.gold, 0.55 * (1 - anteil) + 0.2); g.lineWidth = 1;
+        g.beginPath(); g.moveTo(x - s * 0.5, y - s * 0.3); g.lineTo(x - s * 0.15, y + s * 0.1); g.lineTo(x - s * 0.35, y + s * 0.5); g.stroke();
+        g.beginPath(); g.moveTo(x + s * 0.55, y - s * 0.45); g.lineTo(x + s * 0.25, y); g.stroke();
+      }
+      if (anteil < 0.4){
+        g.strokeStyle = rgba(F.gold, 0.75 * (1 - anteil)); g.lineWidth = 1.2;
+        g.beginPath(); g.moveTo(x, y - s * 0.7); g.lineTo(x + s * 0.2, y - s * 0.2); g.lineTo(x - s * 0.1, y + s * 0.3); g.stroke();
+        var fl = 0.5 + 0.5 * Math.sin(tSim * 11);
+        if (fl > 0.4){
+          g.globalCompositeOperation = 'lighter';
+          glut(g, x + s * 0.2, y - s * 0.2, s * 0.3 * fl, F.gold, 0.4 * fl * (1 - anteil));
+          g.globalCompositeOperation = 'source-over';
+        }
+      }
+      if (BOSS.prall > 0.03){
+        var pr = s * 1.5 * (1 + 0.25 * (1 - BOSS.prall));
+        g.globalCompositeOperation = 'lighter';
+        g.strokeStyle = rgba(F.vio, Math.min(0.85, 0.8 * BOSS.prall));
+        g.lineWidth = Math.max(0.8, 1.6 * BOSS.prall);
+        g.beginPath(); g.arc(x, y, pr, 0, TAU); g.stroke();
+        g.globalCompositeOperation = 'source-over';
+      }
+      g.restore();
+    }
+
     /* --------------------------- Ablauf --------------------------- */
     function schritt(dt){
       tSim += dt;
@@ -31160,6 +31318,7 @@
       enterSchritt(dt);
       anlagenSchritt(dt);
       rissSchritt(dt);
+      bossSchritt(dt);
       kuppelSchritt(dt);
       geschosseSchritt(dt);
       wrackSchritt(dt);
@@ -31472,6 +31631,18 @@
       var rest = DATEN.ergebnis === 'sieg' ? 0 : 0.55;
       return 1 - (1 - rest) * p;
     }
+    /* Raid-Boss-Silhouette (v8.441.0, Task #32, Fortsetzung von Aufgabe #8): dasselbe
+       Muster wie der Riss - die Gegenseite hat keine Ruempfe, an ihrer Stelle steht eine
+       gezeichnete Gestalt je Boss (zeichneBoss), die zurueckschiesst (bossSchritt). */
+    var BOSS = null;
+    /* Hueellenanteil des Bosses 1 -> endAnteil ueber den Kampfverlauf. endAnteil kommt aus
+       dem BERICHT (Rest-Huelle / Huelle vor dem Angriff, 0 bei erlegtem Boss); ohne die
+       Zahlen (Altbericht) bleibt er bei 1 - kein erfundener Verlauf. */
+    function bossHpAnteil(){
+      if (!BOSS) return 0;
+      var p = klemme((tSim - 2.6) / (41.0 - 2.6), 0, 1);
+      return 1 - (1 - BOSS.endAnteil) * p;
+    }
     /* Aufgabe #9 (07.08.2026, gemessen): Die Kraftschiene zaehlte NUR Schiffsruempfe. Bei
        nicht aufgeklaerter Gegenseite (Leerenriss, Raid-Boss, PvP im Solo-Modus) ist deren
        Rumpfsumme null - die Schiene behauptete "Du 100% / 0%", waehrend die Tafel daneben
@@ -31487,7 +31658,7 @@
         var eigenKraft = DATEN.angriffskraft || 0;
         if (kraftD > 0 && eigenKraft > 0){
           var eigen = eigenKraft * (KRAFT_START_A > 0 ? summeA / KRAFT_START_A : 1);
-          var gegner = kraftD * (RISS ? rissStaerke() : 1);
+          var gegner = kraftD * (RISS ? rissStaerke() : (BOSS ? bossHpAnteil() : 1));
           return Math.round(100 * eigen / Math.max(1, eigen + gegner));
         }
       }
@@ -31606,6 +31777,20 @@
       GEGNER_UNBEKANNT = !DATEN.verteidiger.bekannt;
       RISS = (GEGNER_UNBEKANNT && DATEN.verteidiger.riss)
         ? { u: 0, a: 0.40, tot: false, beute: false, prall: 0, kalt: 1.2 } : null;
+      BOSS = null;
+      if (GEGNER_UNBEKANNT && DATEN.verteidiger.boss){
+        /* Welcher der fuenf Bosse es ist, steht ueber den NAMEN in der Boss-Tabelle des
+           Spiels - keine zweite Zuordnung, die beim sechsten Boss veralten koennte. Der
+           Tabellenzugriff ist typeof-geschuetzt, weil die Buehne auch im Prototyp ohne
+           Spielumgebung laeuft; dann gibt es die generische Gestalt. */
+        var bossName = String(DATEN.verteidiger.name || '');
+        var bossDef = (typeof ALLIANCE_RAID_BOSSE !== 'undefined')
+          ? ALLIANCE_RAID_BOSSE.find(function(b){ return bossName.indexOf(b.name) === 0; }) : null;
+        var bh = DATEN.bossHuelle;
+        BOSS = { key: bossDef ? bossDef.key : 'generisch',
+                 endAnteil: (bh && bh.vorher > 0) ? (bh.zerstoert ? 0 : klemme((bh.nachher !== null ? bh.nachher : bh.vorher) / bh.vorher, 0, 1)) : 1,
+                 u: 0, a: 0.40, tot: false, beute: false, prall: 0, kalt: 1.6 };
+      }
 
       var duIstA = DATEN.blick !== 'verteidigung';
       /* Welche Seite bin ICH? Nur meine Schiffe duerfen mit meinem Flotten-Anstrich
@@ -31706,6 +31891,8 @@
         : 'Bodenabwehr des Ziels: nicht aufgeklärt']);
       if (GEGNER_UNBEKANNT) me.push([6.2, RISS
         ? 'Der Riss steht im Orbit – bekannt ist nur seine Kraft: ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)
+        : BOSS
+        ? 'Der Boss hat keine Flotte – seine Hülle: ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)
         : 'Gegnerflotte nicht aufgeklärt – bekannt ist nur die Abwehrkraft ' + zahl(DATEN.verteidiger.kraft || DATEN.abwehrkraft)]);
       ABSCHNITTE.forEach(function(x){ me.push([x.t1, 'Abschnitt ' + x.nr + ' – ' + x.name + ': ' + x.urteil]); });
       if (kaper.length) me.push([36.6, 'Geentert: ' + kaper.map(function(k3){ return DATEN.gekapert[k3] + '× ' + UMGEBUNG.schiffName(k3); }).join(', ')]);
@@ -31748,7 +31935,7 @@
       if (!seite.bekannt){
         var hin = neu('div', 'tafel-summe');
         hin.appendChild(neu('b', null, zahl(seite.kraft || 0)));
-        hin.appendChild(neu('span', null, 'Abwehrkraft'));
+        hin.appendChild(neu('span', null, seite.boss ? 'Boss-Hülle' : 'Abwehrkraft'));
         el.appendChild(hin);
         el.appendChild(neu('div', 'unbekannt', 'Zusammensetzung nicht aufgeklärt – der Kampfbericht führt für diese Gefechtsart keine Flotte des Gegners mit.'));
         tafelSummen[kennung] = null;
@@ -32477,7 +32664,7 @@
       { title:'Tier-2-Schiffsfähigkeiten', body:'Jedes der sieben Tier-2-Schiffe hat eine <strong>einzigartige Fähigkeit</strong> (alle gedeckelt und identisch im server-autoritativen PvP wie in der Vorschau). <strong>Angriffs-Auren</strong> (zusammen max +30% effektive Angriffskraft der Flotte): Nanoklinge „Panzerbrecher" +2%/Schiff, Singularitäts-Vernichter „Gravitationssog" (volle Schild-Penetration) +5%/Schiff. <strong>Verteidigungs-Auren</strong> (zusammen max +30% Verteidigung des Standorts): Quantenkreuzer „Schildprojektor" +3%/Schiff, Metamaterial-Titan „Deflektor-Bollwerk" +5%/Schiff. <strong>Logistik/Sonstige:</strong> Fusionsdreadnought „Fusionsantrieb-Effizienz" (−4% Missions-Treibstoff je Schiff, max −20%), Hyperjäger „Ausweichmanöver" (−3% eigene Kampfverluste je Schiff, max −30%), Hyperbomber „Sprengladungen" (zerstört bei einem gewonnenen Spieler-Angriff je 4 Hyperbomber ein zusätzliches Verteidigungsgebäude, max +2). Ohne diese Schiffe ändert sich an bestehenden Kämpfen nichts. Wer alle sieben gleichzeitig besitzt, schaltet den Erfolg „Tier-2-Flottenkommandant" frei.' }
     ]},
     { key:'wiedergabe', icon:'ti-target', title:'Kampf-Wiedergabe', entries:[
-      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl. Ein <strong>Leerenriss</strong> wird als Riss über dem Planeten gezeichnet – er schießt zurück und schwächt sich im Kampfverlauf sichtbar ab (bei einer Niederlage bleibt er geschwächt stehen). Das <strong>Kräfteverhältnis</strong> unten rechnet bei nicht aufgeklärter Gegenseite mit der gemeldeten Abwehrkraft aus dem Bericht – die eigene Seite anteilig zu ihren Verlusten – statt fälschlich mit null.' },
+      { title:'Was sie zeigt', body:'Eine visuelle Rekonstruktion eines <strong>bereits berechneten</strong> Kampfes: Der Verband fliegt auf den Planeten zu, die Bodenabwehr feuert dagegen, die Schildkuppel hält oder bricht. Der Ausgang steht vorher fest – die Wiedergabe verändert nichts daran und würfelt nichts nach. Sie zeigt so viele <strong>Abschnitte</strong>, wie der Bericht wirklich führt: bei NPC- und Leerenriss-Kämpfen die drei Kampfphasen mit ihren echten Namen und Urteilen, sonst ein einziges Gefecht mit dem tatsächlichen Ergebnis. Erfunden wird nichts: Führt ein Bericht die Zusammensetzung des Gegners oder die Verluste einer Seite nicht mit, steht das dort ausdrücklich, statt einer geschätzten Zahl. Ein <strong>Leerenriss</strong> wird als Riss über dem Planeten gezeichnet – er schießt zurück und schwächt sich im Kampfverlauf sichtbar ab (bei einer Niederlage bleibt er geschwächt stehen). Das <strong>Kräfteverhältnis</strong> unten rechnet bei nicht aufgeklärter Gegenseite mit der gemeldeten Abwehrkraft aus dem Bericht – die eigene Seite anteilig zu ihren Verlusten – statt fälschlich mit null. Beim <strong>Allianz-Raid</strong> steht der Boss als eigene gezeichnete <strong>Silhouette</strong> über dem Gefecht (jeder der fünf Bosse hat seine eigene Gestalt); sie nimmt entlang des gemeldeten Hüllenverlaufs sichtbar Schaden, schießt zurück, und die Tafel nennt ihre Zahl als „Boss-Hülle". Ältere Berichte ohne Hüllen-Angaben zeigen die Gestalt in voller Stärke, ohne einen Verlauf zu erfinden.' },
       { title:'Schiffe, Anlagen und Maßstab', body:'Jedes Schiff fliegt mit <strong>seinem eigenen Modell</strong> – demselben Bild wie in deiner Flottenliste – und in der Farbe seiner Partei (grün ist immer deine Seite). Auf dem Planeten stehen die <strong>echten Verteidigungsanlagen</strong> mit der Grafik aus dem Verteidigung-Tab. Weil eine Flotte aus Zehntausenden Schiffen nicht Stück für Stück zu zeichnen ist, steht ein Modell für mehrere Schiffe; wie viele, steht unten links im Bild. Bei sehr ungleichen Flotten bekommt jede Seite trotzdem ein sichtbares Geschwader, und dann nennt das Bild beide Maßstäbe. <strong>Die Zahlen in den Bestandslisten sind davon unberührt und immer die echten.</strong>' },
       { title:'Was du am Feuer ablesen kannst', body:'Geschossen wird nach der <strong>Konterrolle</strong> des Schiffs – denselben drei Rollen, die auch das Konter-System benutzt. <strong>Abfangjäger</strong> hetzen kurze, schnelle Salven. <strong>Bomber</strong> schicken je zwei langsame, gelenkte <strong>Torpedos</strong>, die ihrem Ziel nachdrehen. <strong>Großkampfschiffe</strong> laden lange und feuern dann einen schweren <strong>Lanzenstrahl</strong>; im entscheidenden Abschnitt wird daraus eine <strong>Breitseite</strong> aus drei Strahlen im Fächer – die beiden äußeren gehen bewusst daneben, denn das Bild darf mehr Feuer zeigen, nicht mehr Wirkung. Wer getroffen wird, dessen <strong>Schild</strong> flammt kurz auf. Auch der <strong>Antrieb</strong> ist zu erkennen: Verbrennung glimmt orange und flackert, Impuls steht ruhig und blau, Hyperraum zieht den längsten violetten Schweif. <strong>Am Ausgang ändert das alles nichts</strong> – Verluste und Ergebnis stehen aus dem Bericht fest, die Darstellung würfelt nichts nach.' },
       { title:'Öffnen', body:'"Zuschauen"-Button bei Überfall-, NPC-, PvP-, Leerenriss-, Piraten-Trümmerraub-, Allianzbasis- und Expeditions-Berichten (bei Expeditionen nur mit echter Begegnung, beim Trümmerraub nur wenn wirklich gekämpft wurde). Läuft ein Kampf live ab, während du im Spiel aktiv bist – eigener Angriff oder eingehender Überfall –, öffnet sich die Wiedergabe automatisch (abschaltbar, siehe Automatisierung).' },
