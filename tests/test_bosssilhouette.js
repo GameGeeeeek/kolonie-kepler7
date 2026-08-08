@@ -65,6 +65,24 @@ const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
     attackPower: 50000, defensePower: 400000, fleet:{ jaeger: 200 } }, null);
   check('1g: Weltboss-ALTBERICHT ohne Markierung bleibt bei den Stellvertretern (kein boss-Feld)',
     wbAlt && wbAlt.verteidiger && !wbAlt.verteidiger.boss && !wbAlt.verteidiger.weltboss);
+
+  // Abgrund-Waechter (v8.445.0): Sieg raeumt den Sektor (Gestalt vergeht), Niederlage nicht.
+  const ab1 = sd({ type:'npc-attack', result:'win', abgrund: true, npcName:'Schattengraben (Tiefe 44)',
+    npcLevel: 44, attackPower: 30000, defensePower: 22000, fleet:{ tiefenkreuzer: 10, jaeger: 40 },
+    ownLostShips: {} }, null);
+  check('1h: Tauchgang-Sieg markiert abgrund+tiefe, der Waechter vergeht (nachher 0, zerstoert)',
+    ab1 && ab1.verteidiger && ab1.verteidiger.boss === true && ab1.verteidiger.abgrund === true &&
+    ab1.verteidiger.tiefe === 44 && ab1.bossHuelle &&
+    ab1.bossHuelle.vorher === 22000 && ab1.bossHuelle.nachher === 0 && ab1.bossHuelle.zerstoert === true,
+    ab1 && { tiefe: ab1.verteidiger && ab1.verteidiger.tiefe, huelle: ab1.bossHuelle });
+  const ab2 = sd({ type:'npc-attack', result:'loss', abgrund: true, npcName:'Schattengraben (Tiefe 44)',
+    npcLevel: 44, attackPower: 9000, defensePower: 22000, fleet:{ jaeger: 40 } }, null);
+  check('1i: bei der Niederlage bleibt der Waechter ungebrochen (nachher = vorher)',
+    ab2 && ab2.bossHuelle && ab2.bossHuelle.nachher === 22000 && ab2.bossHuelle.zerstoert === false);
+  const ab3 = sd({ type:'npc-attack', result:'win', npcName:'Schattengraben (Tiefe 44)',
+    npcLevel: 44, attackPower: 30000, defensePower: 22000, fleet:{ jaeger: 40 } }, null);
+  check('1j: Tauchgang-ALTBERICHT ohne Markierung bleibt bei den Stellvertretern',
+    ab3 && ab3.verteidiger && !ab3.verteidiger.boss && !ab3.verteidiger.abgrund);
 }
 
 // ---- 2) Die Schiene rechnet mit der aktuellen Boss-Huelle
@@ -122,6 +140,12 @@ check('3g: fuenf Weltboss-Gestalten wb0-wb4 plus Namens-Zuordnung ueber WORLDBOS
   JS.includes('bossName.indexOf(n) === 0'));
 check('3h: der Weltboss-Bericht traegt die neuen Felder',
   JS.includes("weltboss: true, bossHpNachher: Math.round(data.bossHp||0), bossZerstoert: !!data.killed,"));
+// Abgrund-Waechter (v8.445.0): Gestalt mit Tiefenskala, markierte Berichte, eigene Tafel-Beschriftung.
+check('3i: die Waechter-Gestalt existiert und skaliert mit der Tiefe (Deckel 120)',
+  JS.includes("BOSS.key === 'abgrund'") && JS.includes('Math.min(1, (BOSS.tiefe || 1) / 120)'));
+check('3j: BEIDE Tauchgang-Berichte tragen die Markierung, die Tafel nennt "Wächterkraft"',
+  (JS.match(/result:'(?:win|loss)', abgrund: true, npcName:sektor\.name/g) || []).length === 2 &&
+  JS.includes("seite.abgrund ? 'Wächterkraft'"));
 
 // ---- 4) Browser: Allianz-Raid-Wiedergabe mit Silhouette statt Stellvertretern
 const BERICHT = { id: 'r1', time: Date.now(), type: 'alliance-raid', result: 'win', destroyed: false,
@@ -137,12 +161,22 @@ const WB_BERICHT = { id: 'r2', time: Date.now() - 60000, type: 'npc-attack', res
   fleet: { jaeger: 200, cruisers: 30 }, ownLostShips: { jaeger: 4 }, battlePoints: 5,
   fromPlanet: 'Heimatbasis', debrisPlanet: 'p1', flightTime: 60, loot: {} };
 
+// Abgrund-Bericht (v8.445.0): der Waechter von Tiefe 44, gewonnen.
+const AB_BERICHT = { id: 'r3', time: Date.now() - 120000, type: 'npc-attack', result: 'win',
+  abgrund: true, npcName: 'Schattengraben (Tiefe 44)', npcLevel: 44, attackPower: 30000,
+  defensePower: 22000, chancePct: 72,
+  phasen: [ { name:'Abstieg', chance:0.7, gewonnen:true, power:30000 },
+            { name:'Kern', chance:0.65, gewonnen:true, power:30000 },
+            { name:'Aufstieg', chance:0.8, gewonnen:true, power:30000 } ],
+  fleet: { jaeger: 80, cruisers: 20 }, ownLostShips: { jaeger: 6 }, battlePoints: 8,
+  fromPlanet: 'Heimatbasis', debrisPlanet: 'p1', flightTime: 90, loot: {} };
+
 function backend(){ return async r => {
   const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
   const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
   if (p === 'health') return j({ ok: true });
   if (p === 'me') return j({ userId: 'u', username: 'A', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0, hasEmail: true, wantsPatchnotes: true, supporter: { active: false, tier: null } });
-  if (p === 'reports') return j({ reports: [BERICHT, WB_BERICHT] });
+  if (p === 'reports') return j({ reports: [BERICHT, WB_BERICHT, AB_BERICHT] });
   if (p === 'storage-list') return j({ keys: [] });
   if (p.startsWith('storage/')) return j({ e: 1 }, 404);
   return j([]);
@@ -216,6 +250,27 @@ function backend(){ return async r => {
   const wbProzD = wbStand.kraftD ? parseInt(wbStand.kraftD, 10) : NaN;
   check('4h: die Schiene gibt dem Weltboss echte Prozent', Number.isFinite(wbProzD) && wbProzD > 5 && wbProzD < 95, wbStand.kraftD);
   check('4i: auch die Weltboss-Wiedergabe laeuft ohne JS-Fehler', errs.length === 0, errs.slice(0, 3));
+
+  // ---- Abgrund-Waechter (v8.445.0): dritter Durchlauf.
+  await page.evaluate(() => { const b = document.getElementById('battleModalCloseBtn'); if (b) b.click(); });
+  await page.waitForTimeout(600);
+  const abGeklickt = await page.evaluate(() => {
+    const karte = [...document.querySelectorAll('#reportsBox .card-row')]
+      .find(c => c.textContent.includes('Schattengraben'));
+    const btn = karte && karte.querySelector('[data-watch-battle]');
+    if (btn) btn.click();
+    return !!btn;
+  });
+  check('4j: der Tauchgang-Bericht hat einen Zuschauen-Knopf', abGeklickt === true);
+  await page.waitForTimeout(2500);
+  const abStand = await page.evaluate(() => {
+    const tafelD = document.getElementById('osTafelD');
+    return { tafelD: tafelD ? tafelD.textContent.replace(/\s+/g, ' ') : null };
+  });
+  check('4k: die Tafel nennt die Waechterkraft mit der Zahl des Berichts',
+    !!abStand.tafelD && abStand.tafelD.includes('Wächterkraft') && abStand.tafelD.includes('22.000'),
+    abStand.tafelD && abStand.tafelD.slice(0, 120));
+  check('4l: auch die Waechter-Wiedergabe laeuft ohne JS-Fehler', errs.length === 0, errs.slice(0, 3));
 
   await ende(async () => { await ctx.close(); await browser.close(); });
 })();
