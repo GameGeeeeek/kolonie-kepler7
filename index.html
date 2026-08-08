@@ -6180,8 +6180,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.454.0';
+  const VERSION = '8.455.0';
   const PATCHNOTES = [
+    { version:'8.455.0', date:'08.08.2026', changes:[
+      '<strong>Der Erfolg „Legendäre Ausrüstung" war für die meisten unerreichbar – repariert.</strong> Die Prüfung verlangte, dass der Modul-Schlüssel auf „:legendaer" <em>endet</em>. Seit Module Stufen und Substats tragen (und das tut praktisch jedes gefundene Modul), enden ihre Schlüssel aber auf ganz andere Segmente – nur ein nacktes, nie aufgewertetes Legendär-Modul zählte. Und wer direkt Mythisch oder Exotisch ausrüstete, ohne je ein Legendäres zu tragen, ging ebenfalls leer aus. Jetzt prüft der Erfolg das Seltenheits-Segment und wertet <strong>„Legendär oder besser"</strong> – in beiden Modulsystemen (Standort und Schiffsklasse). Wer die Bedingung längst erfüllt, bekommt den Erfolg automatisch beim nächsten Spielstart gutgeschrieben. Nebenbei richtiggestellt: Der Erfolg „Aufgerüstet" sprach von einem „Schiffsmodul", gemeint und geprüft sind die Standort-Module.'
+    ]},
     { version:'8.454.0', date:'08.08.2026', changes:[
       '<strong>Neue Tagesaufgabe: die Modul-Werkbank.</strong> Der Tages-Pool deckte 22 Bereiche ab – Kampf, Forschung, Bau, Markt, Fraktionen, Abgrund –, aber das Modul-System kam nicht vor, obwohl das Tutorial verspricht, die Tagesaufgaben führten „durch alle Systeme". Die neue Vorlage „1 Modul aufwerten, verschmelzen, zerlegen oder neu würfeln" ist mit jeder dieser Werkbank-Aktionen in beiden Modulsystemen erfüllt – auch das Hauptwert-Neuschmieden zählt. <em>Ausrüsten</em> zählt bewusst nicht: Ein kostenloser Ein-/Ausbau-Doppelklick wäre keine Pflege. Die Aufgabe erscheint erst, sobald überhaupt ein Modul im Besitz ist (Inventar oder eingebaut), und springt beim Antippen direkt in den Offiziere-Tab. Damit sind es 23 Vorlagen – Tutorial und Hilfe nennen die neue Zahl, und die Test-Suite prüft sie gegen den echten Pool.'
     ]},
@@ -16239,6 +16242,19 @@
     return out;
   }
 
+  /* Erfolgs-Helfer (v8.455.0, Task #46): "Legendaer oder besser" ueber den RANG aus der
+     MODULE_RARITY-Reihenfolge statt k.endsWith(':legendaer'). Seit Modul-Level und Substats
+     tragen ausgeruestete Schluessel weitere Segmente (waffen:legendaer:3:atk15.w107) - die
+     endsWith-Pruefung traf nur nackte, unaufgewertete Module, und wer direkt Mythisch/Exotisch
+     ausruestete, ging ebenfalls leer aus. Beide Modulsysteme zaehlen. (MODULE_RARITY steht
+     weiter unten in der Datei - unproblematisch, der Helfer laeuft erst zur Spielzeit.) */
+  function equippedMindestensLegendaer(s){
+    const order = Object.keys(MODULE_RARITY);
+    const ab = order.indexOf('legendaer');
+    const rangOk = k => order.indexOf(String(k).split(':')[1]) >= ab;
+    return Object.values(s.equippedModules||{}).some(arr => Array.isArray(arr) && arr.some(rangOk))
+        || Object.values(s.equippedShipModules||{}).some(arr => Array.isArray(arr) && arr.some(rangOk));
+  }
   const ACHIEVEMENTS = [
     { key:'firstbuild', name:'Erster Spatenstich', desc:'Baue dein erstes Gebäude aus.', check: s => allBuildingSets().some(b => Object.values(b).some(v=>v>0)), progress: s => [allBuildingSets().some(b => Object.values(b).some(v=>v>0))?1:0, 1] },
     { key:'firstcolony', name:'Neue Heimat', desc:'Kolonisiere deinen ersten Planeten.', check: s => Object.keys(s.colonies||{}).length >= 1, progress: s => [Math.min(1,Object.keys(s.colonies||{}).length), 1] },
@@ -16285,8 +16301,8 @@
     { key:'terraform10', name:'Paradies erschaffen', desc:'Bringe einen Standort auf Terraforming-Stufe 10.', check: s => Object.values(s.terraforming||{}).some(v=>(typeof v==='number'?v:(v&&v.level)||0)>=10), progress: s => [Math.min(10, Math.max(0, ...Object.values(s.terraforming||{}).map(v=>(typeof v==='number'?v:(v&&v.level)||0)), 0)), 10] },
     { key:'officer1', name:'Erster Offizier', desc:'Heuere einen Offizier an.', check: s => Object.values(s.officers||{}).some(v=>v>=1), progress: s => [Math.min(1, Object.values(s.officers||{}).filter(v=>v>=1).length), 1] },
     { key:'officer_all', name:'Kompletter Stab', desc:'Heuere alle Offiziere an.', check: s => Object.values(s.officers||{}).filter(v=>v>=1).length >= OFFICERS.length, progress: s => [Object.values(s.officers||{}).filter(v=>v>=1).length, OFFICERS.length] },
-    { key:'module1', name:'Aufgerüstet', desc:'Rüste ein Schiffsmodul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.length>0), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.length>0).length), 1] },
-    { key:'module_legendary', name:'Legendäre Ausrüstung', desc:'Rüste ein legendäres Modul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.some(k=>k.endsWith(':legendaer'))), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.some(k=>k.endsWith(':legendaer'))).length), 1] },
+    { key:'module1', name:'Aufgerüstet', desc:'Rüste ein Standort-Modul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.length>0), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.length>0).length), 1] },
+    { key:'module_legendary', name:'Legendäre Ausrüstung', desc:'Rüste ein Modul der Seltenheit Legendär oder besser aus – Standort- oder Schiffsklassen-Modul, Stufen und Substats ändern daran nichts.', check: s => equippedMindestensLegendaer(s), progress: s => [equippedMindestensLegendaer(s) ? 1 : 0, 1] },
     { key:'allroles', name:'Vielseitiges Imperium', desc:'Nutze sechs verschiedene Planeten-Rollen gleichzeitig.', check: s => new Set(Object.values(s.planetSpecialization||{})).size >= 6, progress: s => [new Set(Object.values(s.planetSpecialization||{})).size, 6] },
     { key:'explorer25', name:'Weitgereist', desc:'Entdecke mindestens 25 Planeten.', check: s => Object.keys(s.discovered||{}).length >= 25, progress: s => [Math.min(25,Object.keys(s.discovered||{}).length), 25] },
     { key:'colonizer10', name:'Kolonialmacht', desc:'Kolonisiere mindestens 10 Planeten.', check: s => Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 10, progress: s => [Math.min(10,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 10] },
