@@ -50,9 +50,11 @@ check('2a: Fortschritts-Fall vorhanden', JS.includes("if (key==='modul') return 
 check('2b: Tagesbeginn-Reset setzt modulCount auf 0', JS.includes('tier2Produced:0, modulCount:0, claimed:{}'));
 const HOOK = 'state.dailyQuests.modulCount = (state.dailyQuests.modulCount||0) + 1';
 const hooks = (JS.match(new RegExp(HOOK.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
-check('2c: GENAU fuenf Hooks (die fuenf geteilten Werkbank-Pfade)', hooks === 5, hooks);
+// Sechs seit v8.457.0: Reroll+ (rerollModuleSubsBehalte) ist die sechste Werkbank-Aktion -
+// vom Aufgaben-Namen "neu wuerfeln" bereits abgedeckt (Arbeitsregel 9: Erwartung mitgezogen).
+check('2c: GENAU sechs Hooks (die sechs geteilten Werkbank-Pfade)', hooks === 6, hooks);
 // Jeder Hook sitzt in der richtigen Funktion (Slices mit existenzgeprueften Grenzen, Regel 6).
-const funktionen = ['upgradeModule', 'fuseModules', 'dismantleModule', 'rerollModuleSubs', 'rerollModuleWert'];
+const funktionen = ['upgradeModule', 'fuseModules', 'dismantleModule', 'rerollModuleSubs', 'rerollModuleSubsBehalte', 'rerollModuleWert'];
 for (let i = 0; i < funktionen.length; i++){
   const fn = funktionen[i];
   const von = JS.indexOf('function ' + fn + '(isShip, instKey){');
