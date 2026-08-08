@@ -79,12 +79,13 @@ const u = baue();
 const defOf = k => u.ctx.DEFS.find(d => d.key === k);
 
 // ---------------------------------------------------------------- 1: vier neue Vorlagen
-// 22 seit v8.342.0 (zwei Abgrund-Aufgaben kamen dazu). Die Zahl steht hier bewusst als feste
-// Groesse und nicht als "mindestens 20": Sie wird an ZWEI weiteren Stellen dem Spieler genannt
-// (Tutorial-Schritt, Hilfe-Abschnitt "Tagesaufgaben"), und genau die vergisst man beim Erweitern.
-// Deshalb werden beide hier gleich mitgeprueft - ein neuer Eintrag im Pool muss diesen Test rot
-// machen, sonst laeuft die Zahl im Text still davon.
-check('1: der Pool hat 22 Vorlagen', u.ctx.DEFS.length === 22, u.ctx.DEFS.length);
+// 23 seit v8.454.0 (Modul-Werkbank kam dazu; 22 seit v8.342.0 mit den zwei Abgrund-Aufgaben).
+// Die Zahl steht hier bewusst als feste Groesse und nicht als "mindestens 20": Sie wird an ZWEI
+// weiteren Stellen dem Spieler genannt (Tutorial-Schritt, Hilfe-Abschnitt "Tagesaufgaben"), und
+// genau die vergisst man beim Erweitern. Deshalb werden beide hier gleich mitgeprueft - ein
+// neuer Eintrag im Pool muss diesen Test rot machen, sonst laeuft die Zahl im Text still davon.
+// (Genau so geschehen bei v8.454.0: dieser Test schlug an, bis Tutorial und Hilfe 23 nannten.)
+check('1: der Pool hat 23 Vorlagen', u.ctx.DEFS.length === 23, u.ctx.DEFS.length);
 {
   const fs2 = require('fs');
   const { SPIELDATEI: DATEI } = require('./lib/umgebung');
