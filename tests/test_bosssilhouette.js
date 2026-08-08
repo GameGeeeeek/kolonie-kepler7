@@ -45,6 +45,26 @@ const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
   const d3 = sd({ type:'alliance-raid', bossName:'Gluthorn', fleet:{ jaeger:5 }, myComposition:{} }, null);
   check('1d: Altbericht ohne Huellen-Zahlen -> bossHuelle null (kein erfundener Verlauf)',
     d3 && d3.verteidiger && d3.verteidiger.boss === true && d3.bossHuelle === null, d3 && d3.bossHuelle);
+
+  // Weltboss (v8.442.0): markierte Berichte bekommen die Silhouette, der Verlauf ist
+  // Rest + eigener Schaden -> Rest, und die angezeigte Kraft ist die Huelle VOR dem
+  // eigenen Angriff (nicht das Maximum des Bosses).
+  const wb = sd({ type:'npc-attack', result:'win', npcName:'Leviathan der Leere - Stufe 2',
+    attackPower: 50000, defensePower: 400000, weltboss: true, bossHpNachher: 150000,
+    bossZerstoert: false, fleet:{ jaeger: 200 }, ownLostShips:{} }, null);
+  check('1e: Weltboss-Bericht markiert boss+weltboss, Verlauf aus Rest+Schaden',
+    wb && wb.verteidiger && wb.verteidiger.boss === true && wb.verteidiger.weltboss === true &&
+    wb.bossHuelle && wb.bossHuelle.vorher === 200000 && wb.bossHuelle.nachher === 150000 &&
+    wb.verteidiger.kraft === 200000 && wb.abwehrkraft === 200000,
+    wb && { huelle: wb.bossHuelle, kraft: wb.verteidiger && wb.verteidiger.kraft });
+  const wbKill = sd({ type:'npc-attack', result:'win', npcName:'Nova-Titan - Stufe 5',
+    attackPower: 90000, defensePower: 400000, weltboss: true, bossHpNachher: 0,
+    bossZerstoert: true, fleet:{ jaeger: 200 } }, null);
+  check('1f: der letzte Schlag traegt zerstoert', wbKill && wbKill.bossHuelle && wbKill.bossHuelle.zerstoert === true);
+  const wbAlt = sd({ type:'npc-attack', result:'win', npcName:'Leviathan der Leere - Stufe 2',
+    attackPower: 50000, defensePower: 400000, fleet:{ jaeger: 200 } }, null);
+  check('1g: Weltboss-ALTBERICHT ohne Markierung bleibt bei den Stellvertretern (kein boss-Feld)',
+    wbAlt && wbAlt.verteidiger && !wbAlt.verteidiger.boss && !wbAlt.verteidiger.weltboss);
 }
 
 // ---- 2) Die Schiene rechnet mit der aktuellen Boss-Huelle
@@ -95,6 +115,13 @@ check('3e: die Tafel nennt die Zahl des Bosses "Boss-Huelle"',
 check('3f: die Hilfe nennt die Silhouetten und den ehrlichen Altbericht-Fall (zweite Anzeigestelle)',
   JS.includes('steht der Boss als eigene gezeichnete') &&
   JS.includes('Ältere Berichte ohne Hüllen-Angaben zeigen die Gestalt in voller Stärke'));
+// Weltboss (v8.442.0): fuenf Gestalten wb0-wb4, Zuordnung ueber die Namensliste des Spiels.
+check('3g: fuenf Weltboss-Gestalten wb0-wb4 plus Namens-Zuordnung ueber WORLDBOSS_NAMEN',
+  ['wb0','wb1','wb2','wb3','wb4'].every(k => JS.includes("BOSS.key === '" + k + "'")) &&
+  JS.includes("(typeof WORLDBOSS_NAMEN !== 'undefined')") &&
+  JS.includes('bossName.indexOf(n) === 0'));
+check('3h: der Weltboss-Bericht traegt die neuen Felder',
+  JS.includes("weltboss: true, bossHpNachher: Math.round(data.bossHp||0), bossZerstoert: !!data.killed,"));
 
 // ---- 4) Browser: Allianz-Raid-Wiedergabe mit Silhouette statt Stellvertretern
 const BERICHT = { id: 'r1', time: Date.now(), type: 'alliance-raid', result: 'win', destroyed: false,
@@ -103,13 +130,19 @@ const BERICHT = { id: 'r1', time: Date.now(), type: 'alliance-raid', result: 'wi
   fleet: { jaeger: 120, cruisers: 40, schlachtschiff: 8 }, myComposition: { cruisers: 15 },
   totalPower: 61000, totalShips: 168, participantCount: 3, platz: 2, teilnehmer: 3, share: 24,
   ownLostShips: { cruisers: 2 }, credits: 240, battlePoints: 18, xp: 120 };
+// Weltboss-Bericht (v8.442.0): Huelle vor dem Angriff = 150.000 + 50.000 = 200.000.
+const WB_BERICHT = { id: 'r2', time: Date.now() - 60000, type: 'npc-attack', result: 'win',
+  npcName: 'Leviathan der Leere - Stufe 2', npcLevel: 2, attackPower: 50000, defensePower: 400000,
+  chancePct: 100, weltboss: true, bossHpNachher: 150000, bossZerstoert: false,
+  fleet: { jaeger: 200, cruisers: 30 }, ownLostShips: { jaeger: 4 }, battlePoints: 5,
+  fromPlanet: 'Heimatbasis', debrisPlanet: 'p1', flightTime: 60, loot: {} };
 
 function backend(){ return async r => {
   const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
   const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
   if (p === 'health') return j({ ok: true });
   if (p === 'me') return j({ userId: 'u', username: 'A', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0, hasEmail: true, wantsPatchnotes: true, supporter: { active: false, tier: null } });
-  if (p === 'reports') return j({ reports: [BERICHT] });
+  if (p === 'reports') return j({ reports: [BERICHT, WB_BERICHT] });
   if (p === 'storage-list') return j({ keys: [] });
   if (p.startsWith('storage/')) return j({ e: 1 }, 404);
   return j([]);
@@ -128,8 +161,9 @@ function backend(){ return async r => {
   await page.waitForTimeout(1200);
 
   const geklickt = await page.evaluate(() => {
-    const box = document.getElementById('reportsBox');
-    const btn = box && box.querySelector('[data-watch-battle]');
+    const karte = [...document.querySelectorAll('#reportsBox .card-row')]
+      .find(c => c.textContent.includes('Schwarmmutter'));
+    const btn = karte && karte.querySelector('[data-watch-battle]');
     if (btn) btn.click();
     return !!btn;
   });
@@ -154,6 +188,34 @@ function backend(){ return async r => {
   check('4d: die Schiene gibt dem Boss echte Prozent (Berichtszahlen, nicht 0)',
     Number.isFinite(prozD) && prozD > 5 && prozD < 95, stand.kraftD);
   check('4e: keine JS-Fehler in der Boss-Wiedergabe (leere Gegner-Arrays!)', errs.length === 0, errs.slice(0, 3));
+
+  // ---- Weltboss (v8.442.0): Wiedergabe schliessen, den Leviathan-Bericht oeffnen.
+  await page.evaluate(() => { const b = document.getElementById('battleModalCloseBtn'); if (b) b.click(); });
+  await page.waitForTimeout(600);
+  const wbGeklickt = await page.evaluate(() => {
+    const karte = [...document.querySelectorAll('#reportsBox .card-row')]
+      .find(c => c.textContent.includes('Leviathan der Leere'));
+    const btn = karte && karte.querySelector('[data-watch-battle]');
+    if (btn) btn.click();
+    return !!btn;
+  });
+  check('4f: der Weltboss-Bericht hat einen Zuschauen-Knopf', wbGeklickt === true);
+  await page.waitForTimeout(2500);
+  const wbStand = await page.evaluate(() => {
+    const kraftD = document.getElementById('osKraftD');
+    const tafelD = document.getElementById('osTafelD');
+    return {
+      kraftD: kraftD ? kraftD.textContent : null,
+      tafelD: tafelD ? tafelD.textContent.replace(/\s+/g, ' ') : null
+    };
+  });
+  check('4g: die Tafel nennt die Weltboss-Huelle VOR dem Angriff (Rest + Schaden, nicht das Maximum)',
+    !!wbStand.tafelD && wbStand.tafelD.includes('Boss-Hülle') && wbStand.tafelD.includes('200.000') &&
+    !wbStand.tafelD.includes('400.000'),
+    wbStand.tafelD && wbStand.tafelD.slice(0, 120));
+  const wbProzD = wbStand.kraftD ? parseInt(wbStand.kraftD, 10) : NaN;
+  check('4h: die Schiene gibt dem Weltboss echte Prozent', Number.isFinite(wbProzD) && wbProzD > 5 && wbProzD < 95, wbStand.kraftD);
+  check('4i: auch die Weltboss-Wiedergabe laeuft ohne JS-Fehler', errs.length === 0, errs.slice(0, 3));
 
   await ende(async () => { await ctx.close(); await browser.close(); });
 })();
