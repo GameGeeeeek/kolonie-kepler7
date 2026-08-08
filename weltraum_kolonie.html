@@ -6180,8 +6180,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.455.0';
+  const VERSION = '8.456.0';
   const PATCHNOTES = [
+    { version:'8.456.0', date:'08.08.2026', changes:[
+      '<strong>Drei neue Erfolge für das Build-System.</strong> Die Erfolgsliste kannte vom Modul-Ausbau der letzten Versionen noch nichts – weder Exotisch noch die Wert-Streuung noch die Vorlagen hatten ein sichtbares Ziel. Neu: <strong>„Jenseits von Mythisch"</strong> (besitze ein Exotisch-Modul – die einzige Quelle ist das Verschmelzen von 3 Mythischen), <strong>„Perfekter Wurf"</strong> (besitze ein Modul mit dem maximalen Hauptwert-Wurf von 110% – gefunden oder hartnäckig neu geschmiedet) und <strong>„Gut sortiert"</strong> (speichere eine Ausrüstungs-Vorlage). Alle drei zählen Inventar UND eingebaute Module beider Modulsysteme; wer die Bedingung längst erfüllt, bekommt den Erfolg beim nächsten Spielstart automatisch gutgeschrieben.'
+    ]},
     { version:'8.455.0', date:'08.08.2026', changes:[
       '<strong>Der Erfolg „Legendäre Ausrüstung" war für die meisten unerreichbar – repariert.</strong> Die Prüfung verlangte, dass der Modul-Schlüssel auf „:legendaer" <em>endet</em>. Seit Module Stufen und Substats tragen (und das tut praktisch jedes gefundene Modul), enden ihre Schlüssel aber auf ganz andere Segmente – nur ein nacktes, nie aufgewertetes Legendär-Modul zählte. Und wer direkt Mythisch oder Exotisch ausrüstete, ohne je ein Legendäres zu tragen, ging ebenfalls leer aus. Jetzt prüft der Erfolg das Seltenheits-Segment und wertet <strong>„Legendär oder besser"</strong> – in beiden Modulsystemen (Standort und Schiffsklasse). Wer die Bedingung längst erfüllt, bekommt den Erfolg automatisch beim nächsten Spielstart gutgeschrieben. Nebenbei richtiggestellt: Der Erfolg „Aufgerüstet" sprach von einem „Schiffsmodul", gemeint und geprüft sind die Standort-Module.'
     ]},
@@ -16255,6 +16258,27 @@
     return Object.values(s.equippedModules||{}).some(arr => Array.isArray(arr) && arr.some(rangOk))
         || Object.values(s.equippedShipModules||{}).some(arr => Array.isArray(arr) && arr.some(rangOk));
   }
+  /* Build-System-Erfolge (v8.456.0, Task #47): drei rein zustandsbasierte Pruefungen ueber
+     Inventar UND Slots BEIDER Modulsysteme - kein neuer Zaehler, kein Hook. "Besitzen" heisst
+     hier ausdruecklich auch "eingebaut": equipModule nimmt Module aus der Inventar-Zaehlkarte
+     heraus (siehe ownsShipModuleKey), wer sein einziges Exotisch-Modul einbaut, darf den
+     Erfolg nicht dadurch verlieren. */
+  function besitztModulMitSeltenheit(s, rarKey){
+    const istRar = k => String(k).split(':')[1] === rarKey;
+    return Object.keys(s.modules||{}).some(istRar) || Object.keys(s.shipModules||{}).some(istRar)
+        || Object.values(s.equippedModules||{}).some(arr => Array.isArray(arr) && arr.some(istRar))
+        || Object.values(s.equippedShipModules||{}).some(arr => Array.isArray(arr) && arr.some(istRar));
+  }
+  function besitztModulMitWert(s, wert){
+    const hatWert = k => moduleWertOf(k) === wert;
+    return Object.keys(s.modules||{}).some(hatWert) || Object.keys(s.shipModules||{}).some(hatWert)
+        || Object.values(s.equippedModules||{}).some(arr => Array.isArray(arr) && arr.some(hatWert))
+        || Object.values(s.equippedShipModules||{}).some(arr => Array.isArray(arr) && arr.some(hatWert));
+  }
+  function hatVorlageGespeichert(s){
+    const nichtLeer = lo => Object.values(lo||{}).some(slots => Object.values(slots||{}).some(pr => Array.isArray(pr)));
+    return nichtLeer(s.moduleLoadouts) || nichtLeer(s.shipModuleLoadouts);
+  }
   const ACHIEVEMENTS = [
     { key:'firstbuild', name:'Erster Spatenstich', desc:'Baue dein erstes Gebäude aus.', check: s => allBuildingSets().some(b => Object.values(b).some(v=>v>0)), progress: s => [allBuildingSets().some(b => Object.values(b).some(v=>v>0))?1:0, 1] },
     { key:'firstcolony', name:'Neue Heimat', desc:'Kolonisiere deinen ersten Planeten.', check: s => Object.keys(s.colonies||{}).length >= 1, progress: s => [Math.min(1,Object.keys(s.colonies||{}).length), 1] },
@@ -16303,6 +16327,12 @@
     { key:'officer_all', name:'Kompletter Stab', desc:'Heuere alle Offiziere an.', check: s => Object.values(s.officers||{}).filter(v=>v>=1).length >= OFFICERS.length, progress: s => [Object.values(s.officers||{}).filter(v=>v>=1).length, OFFICERS.length] },
     { key:'module1', name:'Aufgerüstet', desc:'Rüste ein Standort-Modul aus.', check: s => Object.values(s.equippedModules||{}).some(arr=>Array.isArray(arr)&&arr.length>0), progress: s => [Math.min(1, Object.values(s.equippedModules||{}).filter(arr=>Array.isArray(arr)&&arr.length>0).length), 1] },
     { key:'module_legendary', name:'Legendäre Ausrüstung', desc:'Rüste ein Modul der Seltenheit Legendär oder besser aus – Standort- oder Schiffsklassen-Modul, Stufen und Substats ändern daran nichts.', check: s => equippedMindestensLegendaer(s), progress: s => [equippedMindestensLegendaer(s) ? 1 : 0, 1] },
+    // Build-System-Erfolge (v8.456.0): Exotisch, Wert-Streuung und Vorlagen hatten kein
+    // sichtbares Ziel. "110%" in der Beschreibung ist MODULE_WERT_MAX - test_erfolge_buildsystem
+    // prueft, dass Text und Konstante nicht auseinanderlaufen.
+    { key:'module_exotic', name:'Jenseits von Mythisch', desc:'Besitze ein Modul der Seltenheit Exotisch – die einzige Quelle ist das Verschmelzen von 3 Mythischen.', check: s => besitztModulMitSeltenheit(s, 'exotisch'), progress: s => [besitztModulMitSeltenheit(s, 'exotisch') ? 1 : 0, 1], reward:{erz:15000,kristalle:9000,deuterium:4000,credits:500}, xpReward:500 },
+    { key:'module_wurf110', name:'Perfekter Wurf', desc:'Besitze ein Modul mit dem maximalen Hauptwert-Wurf von 110% – gefunden oder hartnäckig neu geschmiedet.', check: s => besitztModulMitWert(s, MODULE_WERT_MAX), progress: s => [besitztModulMitWert(s, MODULE_WERT_MAX) ? 1 : 0, 1], reward:{erz:8000,kristalle:5000,credits:300}, xpReward:300 },
+    { key:'module_vorlage', name:'Gut sortiert', desc:'Speichere eine Ausrüstungs-Vorlage – am Standort oder für eine Schiffsklasse.', check: s => hatVorlageGespeichert(s), progress: s => [hatVorlageGespeichert(s) ? 1 : 0, 1] },
     { key:'allroles', name:'Vielseitiges Imperium', desc:'Nutze sechs verschiedene Planeten-Rollen gleichzeitig.', check: s => new Set(Object.values(s.planetSpecialization||{})).size >= 6, progress: s => [new Set(Object.values(s.planetSpecialization||{})).size, 6] },
     { key:'explorer25', name:'Weitgereist', desc:'Entdecke mindestens 25 Planeten.', check: s => Object.keys(s.discovered||{}).length >= 25, progress: s => [Math.min(25,Object.keys(s.discovered||{}).length), 25] },
     { key:'colonizer10', name:'Kolonialmacht', desc:'Kolonisiere mindestens 10 Planeten.', check: s => Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length >= 10, progress: s => [Math.min(10,Object.keys(s.colonies||{}).filter(k=>!isMoonKey(k)).length), 10] },
@@ -16416,7 +16446,7 @@
     firstbuild:'aufbau', firstcolony:'aufbau', nanopionier:'aufbau', industriemagnat:'aufbau', kettenmeister:'aufbau', verbrauchsstratege:'aufbau', modulschmied:'aufbau', terraform1:'aufbau', terraform10:'aufbau', erdweltmaster:'aufbau', leerenweltmaster:'aufbau', colonizer10:'aufbau', allcolonyslots:'aufbau', credits5k:'aufbau', planetrole:'aufbau', allroles:'aufbau',
     abgrund10:'krieg', abgrund25:'krieg', abgrund50:'krieg', abgrundmutatoren:'krieg', abgrundkonst:'krieg', abgrundkabinett:'krieg',
     tiefenflotte1:'krieg', tiefenflotteAll:'krieg',
-    allresearch:'forschung', allresearchmax:'forschung', allexotic:'forschung', skilltreemax:'forschung', forschungsnexus:'forschung', allmegaprojects:'forschung', module1:'forschung', module_legendary:'forschung', raffinerieoptimierer:'forschung',
+    allresearch:'forschung', allresearchmax:'forschung', allexotic:'forschung', skilltreemax:'forschung', forschungsnexus:'forschung', allmegaprojects:'forschung', module1:'forschung', module_legendary:'forschung', module_exotic:'forschung', module_wurf110:'forschung', module_vorlage:'forschung', raffinerieoptimierer:'forschung',
     synthesemeister:'aufbau', singularitaetsarchitekt:'aufbau',
     tenkills:'krieg', bossdown:'krieg', abyssdown:'krieg', nyradown:'krieg', allbosses:'krieg', moonsiegewin:'krieg', basewarwin:'krieg', warvictor:'krieg', kriegsheld:'krieg', ligameister:'krieg', allveteran:'krieg',
     allsystems:'expansion', explorer25:'expansion', conquer1:'expansion', conquer5:'expansion',
@@ -16446,7 +16476,8 @@
     firstprestige:'ti-refresh', level10:'ti-arrow-up', doctrine:'ti-target',
     planetrole:'ti-adjustments', terraform1:'ti-droplet', terraform10:'ti-sun',
     officer1:'ti-user', officer_all:'ti-users', module1:'ti-backpack',
-    module_legendary:'ti-sparkles', allroles:'ti-adjustments', explorer25:'ti-map-pin',
+    module_legendary:'ti-sparkles', module_exotic:'ti-infinity', module_wurf110:'ti-diamond',
+    module_vorlage:'ti-box', allroles:'ti-adjustments', explorer25:'ti-map-pin',
     colonizer10:'ti-planet', warvictor:'ti-sword', tier2fleet:'ti-anchor',
     trade1:'ti-truck', trade50:'ti-truck', route1:'ti-arrows-shuffle',
     trade_empire:'ti-diamond', trade_longrun:'ti-clock', conquer1:'ti-flag',
