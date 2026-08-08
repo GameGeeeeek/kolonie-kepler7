@@ -127,9 +127,9 @@ check('4: der Verfallssatz wird nicht halb zitiert',
 }
 
 // ---------------------------------------------------------------- 7: alle Schritte formal in Ordnung
-check('7: es sind zehn Schritte', STEPS.length === 10, STEPS.length);
+check('7: es sind elf Schritte (v8.453.0: + Offiziere & Module)', STEPS.length === 11, STEPS.length);
 check('7: der Kommentar über TUTORIAL_STEPS nennt die richtige Anzahl',
-  /Einführungstutorial für neue Spieler: zehn kurze Schritte/.test(src));
+  /Einführungstutorial für neue Spieler: elf kurze Schritte/.test(src));
 check('7: alle Titel sind verschieden', new Set(STEPS.map(s=>s.title)).size === STEPS.length);
 for (const s of STEPS){
   check('7: "'+s.title.slice(0,28)+'" hat ein Icon aus der Whitelist',
@@ -171,6 +171,53 @@ for (const s of STEPS){
       tag.text.includes(ZAHLWORT[AKTIV]+' werden täglich'), { konstante: AKTIV });
     check('9: der Schritt nennt den Serien-Bonus', /Serien-Bonus/.test(tag.text));
     check('9: der Schritt nennt das Antippen zum Springen', /antippen/.test(tag.text));
+  }
+}
+
+// ---------------------------------------------------------------- 10: Offiziere & Module
+// Dieselbe Luecke wie einst bei Fraktionen/Krediten/Tagesaufgaben (v8.453.0): Das Modul-System
+// war zum zentralen Build-System gewachsen (zwei Systeme, sieben Seltenheiten, Wert-Streuung,
+// Schmelze, Vorlagen), aber das Wort "Modul" kam im Rundgang NULL Mal vor und der Offiziere-Tab
+// wurde nirgends vorgestellt. Auch hier gilt: jede Zahl im Text gegen die Konstanten.
+{
+  const mod = STEPS.find(s => /Offiziere & Module/.test(s.title));
+  check('10: es gibt einen Offiziere-&-Module-Schritt', !!mod, mod && mod.title);
+  if (mod){
+    // Position: nach "Forschung & Doktrin", vor "Flotte & Kampf" - der Baukasten kommt vor dem
+    // Kampf, in dem seine Boni wirken.
+    const iForsch = STEPS.findIndex(s => /Forschung & Doktrin/.test(s.title));
+    const iFlotte = STEPS.findIndex(s => /Flotte & Kampf/.test(s.title));
+    const iMod = STEPS.indexOf(mod);
+    check('10: der Schritt steht zwischen Forschung und Flotte',
+      iForsch > -1 && iFlotte > -1 && iForsch < iMod && iMod < iFlotte, [iForsch, iMod, iFlotte]);
+    // Beide Modulsysteme und die tragenden Begriffe des Build-Systems.
+    for (const begriff of ['Standort-Module', 'Schiffsklassen-Module', 'Kommandopunkten',
+                            'Fragmenten', 'Vorlagen', 'Wechselvorschau']){
+      check('10: der Schritt nennt "'+begriff+'"', mod.text.includes(begriff));
+    }
+    // ZAHLEN gegen die Konstanten - nicht gegen mein Gedaechtnis.
+    const offBlock = src.slice(src.indexOf('  const OFFICERS = ['), src.indexOf('\n  ];', src.indexOf('  const OFFICERS = [')) + 5);
+    const OFF = new Function(offBlock + ';return OFFICERS;')();
+    check('10: die Offiziers-Zahl stimmt mit OFFICERS überein',
+      new RegExp(ZAHLWORT[OFF.length] + ' Offiziere', 'i').test(mod.text),
+      { imText: ZAHLWORT[OFF.length] + ' Offiziere', konstante: OFF.length });
+    const rarBlock = src.slice(src.indexOf('  const MODULE_RARITY = {'), src.indexOf('\n  };', src.indexOf('  const MODULE_RARITY = {')) + 5);
+    const RAR = new Function(rarBlock + ';return MODULE_RARITY;')();
+    const rarKeys = Object.keys(RAR);
+    check('10: die Seltenheits-Zahl stimmt mit MODULE_RARITY überein',
+      new RegExp(ZAHLWORT[rarKeys.length] + ' Seltenheiten', 'i').test(mod.text),
+      { konstante: rarKeys.length });
+    check('10: "von X bis Y" nennt wirklich die erste und letzte Stufe',
+      mod.text.includes('von ' + RAR[rarKeys[0]].label + ' bis ' + RAR[rarKeys[rarKeys.length - 1]].label),
+      { erste: RAR[rarKeys[0]].label, letzte: RAR[rarKeys[rarKeys.length - 1]].label });
+    const FUSE = Number((src.match(/const MODULE_FUSE_COUNT = (\d+);/) || [])[1]);
+    check('10: Konstante MODULE_FUSE_COUNT gefunden', Number.isFinite(FUSE), FUSE);
+    check('10: die Verschmelz-Zahl stimmt mit MODULE_FUSE_COUNT überein',
+      new RegExp(ZAHLWORT[FUSE] + ' gleichartige', 'i').test(mod.text), { konstante: FUSE });
+    // Und die Kommandopunkte-Behauptung ("verdienst du fürs Kämpfen") muss zur Offiziers-UI passen,
+    // die genau das verspricht.
+    check('10: die Kommandopunkte-Quelle deckt sich mit der Offiziers-UI',
+      /Kommandopunkte<\/strong> – die verdienst du fürs Kämpfen/.test(src));
   }
 }
 
