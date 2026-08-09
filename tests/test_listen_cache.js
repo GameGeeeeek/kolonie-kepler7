@@ -225,9 +225,14 @@ async function spiel(browser, zustand){
   }
 
   // ------------------------------------------------- 4) laufender Auftrag: Selbstkorrektur
-  // Ein bezahlter Bauauftrag auf ein Verteidigungsgebäude erzeugt in der Liste eine Restzeit-Karte.
-  // Deren Text ändert sich jede Sekunde - das Markup also auch, und die Box MUSS weiter neu
-  // geschrieben werden. Das ist der Beleg dafür, dass eine Markup-Signatur nichts einfrieren kann.
+  // Ein bezahlter Bauauftrag auf ein Verteidigungsgebäude erzeugt eine Restzeit-Karte, deren Text
+  // sich jede Sekunde ändert - das Markup also auch, und DIESE Box MUSS weiter neu geschrieben
+  // werden. Das ist der Beleg dafür, dass eine Markup-Signatur nichts einfrieren kann. Seit
+  // v8.460.0 wohnt die Karte in der eigenen kleinen #defenseJobs-Box (Splitbox-Muster wie
+  // fleetJobs): der Countdown tickt dort sekündlich weiter, während die großen Anlagen-Kacheln
+  // in #defenseBuildings stillstehen. Erwartungen mitgezogen (Arbeitsregel 9) - vorher prüfte
+  // dieser Abschnitt, dass die KACHELLISTE sekündlich neu geschrieben wird; genau das war die
+  // gemessene Verschwendung (21,3 kB je Sekunde), die die Splitbox abstellt.
   {
     const { page, ctx, errs } = await spiel(browser, {});
     await reiter(page, 'verteidigung');
@@ -237,18 +242,26 @@ async function spiel(browser, zustand){
     // Zustand geprüft, den es im Spiel nie gibt.
     await page.evaluate(()=>{const b=document.querySelector('[data-build="turm"]'); if(b) b.click();});
     await page.waitForTimeout(1300);
-    const start = await page.evaluate(()=>{const b=document.getElementById('defenseBuildings');
-      return { laenge:b?b.innerHTML.length:-1, karte:/Verteidigungsturm \(\+1\)/.test(b?b.textContent:''),
-               undef:/undefined/.test(b?b.textContent:'') };});
-    check('4: die Verteidigungsliste zeigt den laufenden Auftrag als Fortschrittskarte',
-      start.laenge > 2000 && start.karte === true, start);
+    const start = await page.evaluate(()=>{const j=document.getElementById('defenseJobs');
+      const b=document.getElementById('defenseBuildings');
+      return { laenge:b?b.innerHTML.length:-1, karte:/Verteidigungsturm \(\+1\)/.test(j?j.textContent:''),
+               inListe:/Verteidigungsturm \(\+1\)/.test(b?b.textContent:''),
+               undef:/undefined/.test(j?j.textContent:'') };});
+    check('4: der laufende Auftrag steht als Fortschrittskarte in der defenseJobs-Splitbox',
+      start.laenge > 2000 && start.karte === true && start.inListe === false, start);
     check('4: und die Karte enthält kein undefined', start.undef === false, start);
-    check('4: die Liste lässt sich markieren', await markiere(page, 'defenseBuildings') === true);
+    check('4: beide Boxen lassen sich markieren',
+      await markiere(page, 'defenseJobs') === true && await markiere(page, 'defenseBuildings') === true);
     await page.waitForTimeout(3400);
-    const nach = await page.evaluate(()=>{const b=document.getElementById('defenseBuildings');
-      return { da:!!(b && b.firstElementChild && b.firstElementChild.__marke), canvas:b?b.querySelectorAll('canvas').length:-1 };});
-    check('4: bei laufendem Countdown wird sie weiterhin jede Sekunde neu geschrieben',
-      nach.da === false, nach);
+    const nach = await page.evaluate(()=>{const j=document.getElementById('defenseJobs');
+      const b=document.getElementById('defenseBuildings');
+      return { jobsDa:!!(j && j.firstElementChild && j.firstElementChild.__marke),
+               listeDa:!!(b && b.firstElementChild && b.firstElementChild.__marke),
+               canvas:b?b.querySelectorAll('canvas').length:-1 };});
+    check('4: bei laufendem Countdown wird die Splitbox weiterhin jede Sekunde neu geschrieben',
+      nach.jobsDa === false, nach);
+    check('4: die Kachelliste steht dabei still (der Countdown zwingt sie nicht mehr zum Neuaufbau)',
+      nach.listeDa === true, nach);
     check('4: und die animierten Grafiken sind dabei erhalten geblieben', nach.canvas > 0, nach);
     check('4: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
     await ctx.close();

@@ -3124,6 +3124,9 @@
         <div class="section-title" style="justify-content:space-between;"><span><i class="ti ti-shield" aria-hidden="true"></i>Verteidigungsanlagen</span><button class="help-jump-btn" data-jump-help="kampf"><i class="ti ti-info-circle" aria-hidden="true"></i>Erklärung</button></div>
         <!-- Direkt vor der Liste statt ganz oben im Tab (Bug-Report holyhenning). -->
         <div class="qty-select" id="qtySelectDef"></div>
+        <!-- Bauauftraege getrennt von den Anlagen-Kacheln (v8.460.0, gleiches Muster wie
+             fleetJobs im Flotten-Tab). -->
+        <div id="defenseJobs"></div>
         <div class="buildings" id="defenseBuildings"></div>
         <div id="festungBox"></div>
         <div id="abhorchpostenBox"></div>
@@ -3210,6 +3213,10 @@
                besonders viel dazwischen - Angriffspunkte, Missionen, Flottenverlegung). -->
           <div class="qty-select" id="qtySelectFleet"></div>
           <div id="veteranRankBox"></div>
+          <!-- Bauauftraege getrennt von der Schiffsliste (v8.460.0, Vorbild buildQueueBox): der
+               Sekunden-Countdown eines laufenden Baus soll nur diese kleine Box neu schreiben,
+               nicht das komplette #fleet-Markup darunter. -->
+          <div id="fleetJobs"></div>
           <div class="fleet" id="fleet"></div>
           <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Baukorb (mehrere Schiffstypen zusammen bauen)</div>
           <div id="shipBasketBox"></div>
@@ -6180,8 +6187,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.459.0';
+  const VERSION = '8.460.0';
   const PATCHNOTES = [
+    { version:'8.460.0', date:'09.08.2026', changes:[
+      '<strong>Mess-Session unter der Haube: eine Markt-Anfragenschleife entschärft und die größte Box des Spiels vom Bau-Countdown entkoppelt.</strong> Eine Messung mit Mutations-Zähler über alle zehn Reiter hat zwei Dinge aufgedeckt. Erstens: Antwortete der Server auf die Marktpreis-Abfrage jemals mit einer gültigen, aber leeren Antwort, riefen sich Markt-Anzeige und Markt-Nachladen ungebremst gegenseitig auf – im Prüfstand rund 570 Umläufe je Sekunde (3.220 Server-Anfragen in 6 Sekunden), jeder davon ein kompletter Neuaufbau der Handelsrouten- und Marktbox. Ein Riegel lässt jetzt immer nur eine Markt-Anfrage gleichzeitig laufen; der nächste Versuch kommt frühestens mit dem nächsten Sekundentakt. Zweitens: Der Sekunden-Countdown eines laufenden Schiffsbaus stand mitten im Markup der Flottenliste – mit 148,8 kB die größte Box des Spiels –, die deshalb während eines Baus jede Sekunde komplett neu geschrieben und jede Schiffsgrafik neu gezeichnet wurde. Bauaufträge und Leerlauf-Hinweis wohnen jetzt in einer eigenen kleinen Box über der Liste (0,8 kB je Sekunde statt 148,8 kB, gemessen), die Verteidigungsanlagen bekommen dieselbe Trennung. Sichtbar ändert sich nichts – der Countdown tickt weiter sekundengenau, nur schreibt er nicht mehr die ganze Liste um; ein neuer Test misst Anfragenzahl und Schreibverhalten in beide Richtungen nach.'
+    ]},
     { version:'8.459.0', date:'09.08.2026', changes:[
       '<strong>Phantom-Sekunden abgestellt: Die Sekunden-Gutschrift ist jetzt an den echten Uhr-Fortschritt gekoppelt.</strong> Bisher schrieb jeder Tick-<em>Aufruf</em> eine volle Sekunde Produktion gut, die Spieluhr rückte aber höchstens bis zur tatsächlichen Zeit vor. Feuert der Browser gedrosselte Timer gebündelt nach – ein Hintergrund-Tab wacht auf, das Gerät ist unter Last –, entstanden dadurch Gutschriften <em>ohne</em> Uhr-Fortschritt: Produktion für Sekunden, die es nicht gab. Im Prüfstand war das messbar (121–125% statt 100% unter künstlicher Last). Jetzt verbucht jeder Aufruf exakt den Anteil, um den die Uhr wirklich vorrückt (0 bis 1 Sekunde) – ein Aufruf ohne Uhr-Fortschritt verbucht nichts, und die Summe der Gutschriften deckt sich per Konstruktion mit der vergangenen Zeit. Die Offline-Nachholung und ihre Regeln bleiben unverändert; ein neuer Test friert die Uhr ein und misst nach, dass bei stehender Uhr wirklich nichts mehr zufließt und danach alles normal weiterläuft.'
     ]},
@@ -13553,8 +13563,19 @@
     };
   }
 
+  // In-Flight-Riegel (v8.460.0, MutationObserver-Mess-Session): renderMarket() ruft bei leerem
+  // marketCache loadMarketState() auf, und loadMarketState() ruft nach der Antwort renderMarket()
+  // - liefert der Server je eine 200er-Antwort OHNE market-Feld (Wartung, Proxy, unerwartete
+  // Form), bleibt marketCache null und die beiden riefen sich UNGEBREMST gegenseitig auf:
+  // gemessen ~570 Umlaeufe je Sekunde, jeder davon ein kompletter Neuaufbau von tradeRouteBox
+  // und marketBox UND eine neue /market-Anfrage an den Server - ein offener Markt-Tab haette
+  // den Pi mit Anfragen geflutet. Der Riegel faellt bewusst erst im finally, also NACH dem
+  // renderMarket()-Aufruf: der verschachtelte loadMarketState()-Aufruf laeuft dadurch ins
+  // Leere, und der naechste Versuch kommt fruehestens mit dem naechsten Sekunden-Tick.
+  let marketLoadLaeuft = false;
   async function loadMarketState(){
-    if (!useBackend()) return;
+    if (!useBackend() || marketLoadLaeuft) return;
+    marketLoadLaeuft = true;
     try {
       const res = await backendFetch('/market', { method:'GET' });
       if (!res.ok) return;
@@ -13564,7 +13585,7 @@
       if (activeTab === 'markt') renderMarket();
       // Frische Preise -> fällige Limit-Orders prüfen/ausführen (fire-and-forget).
       processLimitOrders();
-    } catch(e){}
+    } catch(e){} finally { marketLoadLaeuft = false; }
   }
   // Führt einen Handel über das Backend aus. Das Backend ist Autorität über den Preis; wir buchen erst
   // nach erfolgreicher Antwort die Ressourcen/Kredite lokal.
@@ -13647,14 +13668,21 @@
   let moduleMarketCache = null;      // { listings, limits } - zuletzt geladener Stand
   let moduleMarketInFlight = false;
   const moduleListDraft = { instKey:null, isShip:false, price:0 };
+  // Gleicher In-Flight-Riegel wie bei loadMarketState() direkt darueber: renderModuleMarket()
+  // ruft bei leerem moduleMarketCache hierher, und dieser Aufruf ruft zurueck. Die Rekursion
+  // zuendet hier nur, wenn der Server je ein nacktes JSON-null liefert (jede andere ok-Antwort
+  // macht den Cache truthy) - aber genau solche "kann eigentlich nie passieren"-Antworten
+  // waren beim Markt der Ausloeser. Ein Riegel, beide Stellen, gleiches Muster.
+  let moduleMarketLoadLaeuft = false;
   async function loadModuleMarket(){
-    if (!useBackend()) return;
+    if (!useBackend() || moduleMarketLoadLaeuft) return;
+    moduleMarketLoadLaeuft = true;
     try {
       const res = await backendFetch('/modulemarket', { method:'GET' });
       if (!res.ok) return;
       moduleMarketCache = await res.json();
       if (activeTab === 'markt') renderModuleMarket();
-    } catch(e){}
+    } catch(e){} finally { moduleMarketLoadLaeuft = false; }
   }
   // Ein Modul aus dem Inventar zum Verkauf stellen.
   // Ist dieses Modul im Abgrund gefunden worden? (v8.336.0)
@@ -51149,9 +51177,14 @@
     if (activeTab === 'verteidigung'){
       // refreshDefenseMiniIcons() setzt die animierten Canvas-Grafiken neu auf - das muss nur laufen,
       // wenn die Kacheln tatsächlich neu gebaut wurden. Deshalb am Rückgabewert von setBoxHtml.
+      // Bauauftraege in der eigenen kleinen defenseJobs-Box (v8.460.0, gleiches Muster wie
+      // fleetJobs im Flotten-Tab): der Sekunden-Countdown eines laufenden Anlagen-Baus schrieb
+      // sonst jede Sekunde die kompletten 21,3 kB Anlagen-Kacheln neu und setzte danach alle
+      // animierten Verteidigungs-Grafiken neu auf.
+      setBoxHtml(document.getElementById('defenseJobs'), 'defenseJobs',
+        constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense'));
       const defNeu = setBoxHtml(document.getElementById('defenseBuildings'), 'defenseBuildings',
-        constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense')
-        + BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join(''));
+        BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join(''));
       if (defNeu) refreshDefenseMiniIcons();
       renderAbhorchpostenBox();
     }
@@ -52036,9 +52069,20 @@
     // data-unlock, data-shipmark) über document.querySelectorAll bei JEDEM Render neu zugewiesen.
     // Wird das Schreiben übersprungen, stehen die alten Knoten samt Handlern; die Zuweisung trifft
     // dieselben Knoten noch einmal und ist folgenlos.
+    // Bauauftraege + Leerlaufkarte in einer EIGENEN kleinen Box (v8.460.0, Vorbild buildQueueBox
+    // auf dem Basis-Tab): Der Sekunden-Countdown eines laufenden Schiffsbaus aenderte sonst jede
+    // Sekunde das Markup der GANZEN Flottenliste (gemessen 148,8 kB je Sekunde, groesste Box des
+    // Spiels) - die Signatur darunter konnte waehrend eines Baus nie greifen, und
+    // refreshShipMiniIcons() zeichnete sekuendlich jede Schiffsgrafik neu. Jetzt schreibt der
+    // Countdown nur noch diese ~1-2 kB; die Schiffsliste steht still, bis sich dort wirklich
+    // etwas aendert (der fertige Bau aendert die Stueckzahl im Markup, die Signatur greift also
+    // von selbst). leerlaufKarte() ist eine reine Hinweiskarte ohne Eingabefeld/Verdrahtung,
+    // die Abbrechen-Knoepfe verdrahtet constructionProgressCards() selbst dokumentweit.
+    setBoxHtml(document.getElementById('fleetJobs'), 'fleetJobs',
+      leerlaufKarte('flotte') + constructionProgressCards(j=>j.kind==='ship' && j.planet===state.activeBasePlanet));
     const fleetEl = document.getElementById('fleet');
     if (setBoxHtml(fleetEl, 'fleet|' + activeFleetSkinFilter(),
-          shipFilterToggle + leerlaufKarte('flotte') + constructionProgressCards(j=>j.kind==='ship' && j.planet===state.activeBasePlanet) + shipRows + superBlock)){
+          shipFilterToggle + shipRows + superBlock)){
       // Nur nach einem echten Neuaufbau - frische Canvas-Knoten sind leer. Bleiben die alten stehen,
       // behalten sie ihre Zeichnung, und ensureCanvasDpr() ist über dataset.dprDone ohnehin einmalig.
       refreshShipMiniIcons(fleetEl);
