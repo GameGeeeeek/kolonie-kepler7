@@ -6190,8 +6190,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.466.0';
+  const VERSION = '8.467.0';
   const PATCHNOTES = [
+    { version:'8.467.0', date:'09.08.2026', changes:[
+      '<strong>Weniger Arbeit pro Sekunde: vierzehn kleine Anzeigen schreiben sich nur noch neu, wenn sich wirklich etwas geändert hat.</strong> Die Messung aus v8.460.0 hatte ein Grüppchen kleiner Boxen aufgedeckt, die im Sekundentakt komplett neu aufgebaut wurden – jede für sich unauffällig, zusammen aber je nach Reiter <strong>3,8 bis 11,8 kB Markup in fünf bis acht Schreibvorgängen pro Sekunde</strong> (gemessen, Spitzenwert im Forschungs-Reiter): Taktik-Haltung, Forschungs-Sprint, Exotische Forschung, Veteranen-Ausbildung, Weltboss, Kampfkraft-Deckel, Flotten-Schnellbuttons, Kampfstatistik, Prestige, Bau- und Forschungs-Warteschlange, Unterstützer-Hinweis, Happy Hour und Event-Kalender. Alle laufen jetzt über denselben Markup-Vergleich, den die großen Listen seit v8.310.0 nutzen: Ist das erzeugte Markup identisch, entfällt das Schreiben komplett. Laufende Countdowns stören dabei nicht – deren Markup ist jede Sekunde ein anderes, die Box wird also weiter aktualisiert. Sichtbar ändert sich nichts; das Spiel wird auf schwächeren Geräten nur ruhiger – im Forschungs-Reiter sank die Schreiblast von 17,4 auf 8,0 kB je Sekunde.'
+    ]},
     { version:'8.466.0', date:'09.08.2026', changes:[
       '<strong>Neuer Erfolg „Kronjuwelen": Berge alle Unikate.</strong> Die drei Unikate hatten seit ihrer Einführung zwar einen Sammel-Fortschritt im Kompendium, tauchten im <strong>Erfolgsregister</strong> aber gar nicht auf – obwohl sie die vielleicht aufwendigste Jagd des Spiels sind: Leviathanherz vom Weltboss, Wächterauge aus Tiefe 40 abwärts, Korsarenkrone vom Piraten-Endboss. Der Erfolg zählt jedes Unikat einzeln (die Fortschrittsanzeige zeigt also „2/3"), rechnet <strong>eingebaute</strong> Stücke mit und wächst automatisch mit: Kommt später ein viertes Unikat dazu, hebt sich das Ziel von selbst an, statt dass der Erfolg still bei den alten drei stehen bleibt. Belohnung: Ressourcen, Kredite und Erfahrung im Rahmen der übrigen Endgame-Erfolge.'
     ]},
@@ -14122,7 +14125,7 @@
           <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:${def.color};"></div></div>
           <div class="bmeta" style="margin-top:6px;">${shipUnlocked ? 'Event-Schiff „'+shipName+'" bereits freigeschaltet - im Flotte-Tab baubar.' : 'Event-Schiff „'+shipName+'" wird im Flotte-Tab freischaltbar, sobald genug Teile gesammelt sind.'}</div>`;
       }
-      box.innerHTML = `
+      setBoxHtml(box, 'eventCalendarBox', `
         <div class="card-row" style="flex-direction:column; align-items:stretch; border-color:${def.color};">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
             <div class="bname" style="color:${def.color};"><i class="ti ${def.icon}" aria-hidden="true"></i> ${def.name}</div>
@@ -14131,10 +14134,10 @@
           <div class="bmeta" style="margin-top:4px;">${def.desc}</div>
           ${partsHtml}
           ${eventModuleHtml(def, true)}
-        </div>`;
+        </div>`);
     } else {
       const remain = Math.max(0, ce.nextStartsAt - Date.now());
-      box.innerHTML = `
+      setBoxHtml(box, 'eventCalendarBox', `
         <div class="card-row" style="flex-direction:column; align-items:stretch; opacity:0.7;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
             <div class="bname"><i class="ti ${ce.nextDef.icon}" aria-hidden="true"></i> ${ce.nextDef.name}</div>
@@ -14142,7 +14145,7 @@
           </div>
           <div class="bmeta" style="margin-top:4px;">${ce.nextDef.desc}</div>
           ${eventModuleHtml(ce.nextDef, false)}
-        </div>`;
+        </div>`);
     }
   }
   // Zeile zum exklusiven Event-Modul in der Kalender-Box. Zeigt Name, Wirkung, betroffene Klasse und
@@ -40228,23 +40231,23 @@
     if (hh){
       const t = hh.type;
       const left = fmtDuration((hh.endsAt - Date.now())/1000);
-      box.innerHTML = `
+      setBoxHtml(box, 'happyHourBox', `
         <div class="card-row" style="margin:6px 0; background:linear-gradient(90deg, ${t.color}26, transparent); border-color:${t.color}88;">
           <div class="left" style="min-width:0;"><i class="ti ${t.icon}" aria-hidden="true" style="color:${t.color};"></i><span class="bname" style="font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Happy Hour: ${t.label}</span></div>
           <span class="lvl-pill" style="font-size:10px; background:${t.color}22; border-color:${t.color}66; color:${t.color};">noch ${left}</span>
         </div>
-        <div class="bmeta" style="margin:-2px 0 6px;">${t.desc} – aktiv, solange das Fenster läuft. Jetzt ist der beste Moment, Produktion abzugreifen!</div>`;
+        <div class="bmeta" style="margin:-2px 0 6px;">${t.desc} – aktiv, solange das Fenster läuft. Jetzt ist der beste Moment, Produktion abzugreifen!</div>`);
     } else {
       const nx = nextHappyHour();
-      if (!nx){ box.innerHTML = ''; return; }
+      if (!nx){ setBoxHtml(box, 'happyHourBox', ''); return; }
       const until = fmtDuration((nx.startsAt - Date.now())/1000);
       const t = nx.type;
-      box.innerHTML = `
+      setBoxHtml(box, 'happyHourBox', `
         <div class="card-row" style="margin:6px 0;">
           <div class="left" style="min-width:0;"><i class="ti ${t.icon}" aria-hidden="true" style="color:${t.color};"></i><span class="bname" style="font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Nächste Happy Hour: ${t.label}</span></div>
           <span class="lvl-pill" style="font-size:10px;">in ${until}</span>
         </div>
-        <div class="bmeta" style="margin:-2px 0 6px;">${t.desc} – schau in ${until} wieder rein und nutze das Zeitfenster.</div>`;
+        <div class="bmeta" style="margin:-2px 0 6px;">${t.desc} – schau in ${until} wieder rein und nutze das Zeitfenster.</div>`);
     }
   }
   let lastDailyLoginSig = null;
@@ -44189,7 +44192,7 @@
     const box = document.getElementById('worldBossBox');
     if (!box) return;
     const b = worldBossCache;
-    if (!b){ box.innerHTML = '<div class="bmeta">Weltboss lädt…</div>'; return; }
+    if (!b){ setBoxHtml(box, 'worldBossBox', '<div class="bmeta">Weltboss lädt…</div>'); return; }
     const cf = currentFleet();
     const myId = state.player.id;
     const my = myId ? (b.contributions||{})[myId] : null;
@@ -44199,13 +44202,13 @@
     const cdLeft = Math.max(0, (state.worldBossLastAttack||0) + 24*60*60*1000 - Date.now());
     if (b.defeatedAt){
       const respawnIn = Math.max(0, b.defeatedAt + WORLDBOSS_RESPAWN_DELAY_MS - Date.now());
-      box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#5dcaa5;">
+      setBoxHtml(box, 'worldBossBox', `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#5dcaa5;">
         <div class="bname"><i class="ti ti-skull" aria-hidden="true" style="color:#5dcaa5;"></i> ${worldBossName(b.level)} - BESIEGT!</div>
         <div class="bmeta">Als Nächstes erscheint <strong>${worldBossName(b.level+1)}</strong> (${worldBossArchetype(b.level+1).label}, ${fmt(worldBossHpFor(b.level+1))} HP, Schwäche ${shipDisplayName(worldBossSchwaeche(b.level+1))}) in ~${fmtDuration(respawnIn/1000)}.</div>
-      </div>`;
+      </div>`);
       return;
     }
-    box.innerHTML = `
+    setBoxHtml(box, 'worldBossBox', `
       <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:#e24b4a;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
           <span class="bname"><i class="ti ${worldBossArchetype(b.level).icon}" aria-hidden="true" style="color:#e24b4a;"></i> ${worldBossName(b.level)}</span>
@@ -44228,7 +44231,7 @@
         ${top3.length ? `<div class="bmeta" style="margin-bottom:4px;">Top-Schaden: ${top3.map((t,i)=>(i+1)+'. '+escapeHtml(t.name||'?')+' ('+fmt(t.dmg)+')').join(' · ')}</div>` : ''}
         ${my ? `<div class="bmeta" style="margin-bottom:6px; color:#5dcaa5;">Dein Beitrag: ${fmt(my.dmg)} Schaden</div>` : ''}
         <button data-attack-worldboss ${(busy||cdLeft>0)?'disabled':''}>${busy?'Angriff läuft ...':cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Leviathan angreifen'}</button>
-      </div>`;
+      </div>`);
     const btn = box.querySelector('[data-attack-worldboss]');
     if (btn) btn.onclick = () => oeffneFlottenwahl({
       art: 'Gemeinsamer Boss', titel: worldBossName(b.level)+' angreifen',
@@ -50833,7 +50836,7 @@
       }
       const qMinSlots = 3;
       const qPlaceholders = Math.max(0, qMinSlots - bq.length);
-      qBox.innerHTML = `
+      setBoxHtml(qBox, 'buildQueueBox', `
         <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Bau-Warteschlange (${bq.length}/10)</div>
         <div class="bmeta" style="margin-bottom:0.5rem;">${bq.length ? 'Geschätzte Gesamtkosten: '+costHtml(totalQCost) : 'Noch leer - Gebäude über "Warteschlange" hinzufügen.'}</div>
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
@@ -50846,7 +50849,7 @@
           }).join('')}
           ${Array.from({length: qPlaceholders}).map(() => `<div class="card-row" style="padding:0.5rem 0.85rem; opacity:0.35; border-style:dashed;"><span class="bmeta">– frei –</span></div>`).join('')}
         </div>
-      `;
+      `);
     }
     const rqBox = document.getElementById('researchQueueBox');
     if (rqBox){
@@ -50886,7 +50889,7 @@
       const activeResRemainSec = (state.activeResearch && state.activeResearch.endTime) ? Math.max(0, state.activeResearch.endTime - Date.now())/1000 : 0;
       const rqMinSlots = 3;
       const rqPlaceholders = Math.max(0, rqMinSlots - rq.length);
-      rqBox.innerHTML = `
+      setBoxHtml(rqBox, 'researchQueueBox', `
         <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Forschungs-Warteschlange (${rq.length}/10)</div>
         <div class="bmeta" style="margin-bottom:0.5rem;">${rq.length ? 'Geschätzte Gesamtkosten: '+costHtml(totalRQCost)+' · <i class="ti ti-clock" aria-hidden="true" style="color:#5dcaa5;"></i> fertig in ~'+fmtDuration(totalRQDurSec + activeResRemainSec) : 'Noch leer - Forschung über "Warteschlange" hinzufügen.'}</div>
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
@@ -50912,7 +50915,7 @@
           }).join('')}
           ${Array.from({length: rqPlaceholders}).map(() => `<div class="card-row" style="padding:0.5rem 0.85rem; opacity:0.35; border-style:dashed;"><span class="bmeta">– frei –</span></div>`).join('')}
         </div>
-      `;
+      `);
     }
 
     const qtyHtml = [1,5,10,'max'].map(v => `<button class="qty-btn ${buildQtyMode===v?'active':''}" data-qty="${v}">${v==='max'?'Max':'x'+v}</button>`).join('');
@@ -51562,7 +51565,7 @@
     const stanceBox = document.getElementById('stanceBox');
     if (stanceBox){
       const activeKey = state.combatStance || 'ausgewogen';
-      stanceBox.innerHTML = Object.entries(COMBAT_STANCES).map(([key,s]) => {
+      setBoxHtml(stanceBox, 'stanceBox', Object.entries(COMBAT_STANCES).map(([key,s]) => {
         const isActive = activeKey === key;
         return `
           <div class="card-row ${isActive?'research-done':''}">
@@ -51576,7 +51579,7 @@
             ${isActive ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Gewählt</span>` : `<button class="buy affordable" data-choose-stance="${key}"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Wählen</button>`}
           </div>
         `;
-      }).join('');
+      }).join(''));
       stanceBox.querySelectorAll('[data-choose-stance]').forEach(btn => btn.onclick = () => {
         state.combatStance = btn.getAttribute('data-choose-stance');
         log('Taktik-Haltung gewechselt: '+COMBAT_STANCES[state.combatStance].name+'.', 'ti-sword');
@@ -51589,21 +51592,21 @@
       const activeSprint = activeResearchSprint();
       if (activeSprint){
         const remain = Math.max(0, activeSprint.expiresAt - Date.now());
-        researchSprintBox.innerHTML = `<div class="card-row" style="border-color:#5dcaa5;">
+        setBoxHtml(researchSprintBox, 'researchSprintBox', `<div class="card-row" style="border-color:#5dcaa5;">
           <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-flask" aria-hidden="true"></i></div>
             <div><div class="bname">Sprint aktiv: +${Math.round((RESEARCH_SPRINT_MULT-1)*100)}% ${(RES_DEFS.find(r=>r.key===activeSprint.res)||{}).label}</div>
             <div class="bmeta">Noch ${fmtDuration(remain/1000)}</div></div>
           </div>
-        </div>`;
+        </div>`);
       } else {
         const have = state.resources.forschungspunkte||0;
         const affordable = have >= RESEARCH_SPRINT_COST;
-        researchSprintBox.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch;">
+        setBoxHtml(researchSprintBox, 'researchSprintBox', `<div class="card-row" style="flex-direction:column; align-items:stretch;">
           <div class="bmeta" style="margin-bottom:8px;">${fmt(RESEARCH_SPRINT_COST)} Forschungspunkte → +${Math.round((RESEARCH_SPRINT_MULT-1)*100)}% Produktion einer gewählten Ressource für ${fmtDuration(RESEARCH_SPRINT_DURATION_MS/1000)} (vorhanden: ${fmt(have)}).</div>
           <div style="display:flex; flex-wrap:wrap; gap:6px;">
             ${RES_DEFS.map(r => `<button data-start-sprint="${r.key}" ${affordable?'':'disabled'} style="font-size:10.5px; flex:1; min-width:100px;"><i class="ti ${r.icon}" aria-hidden="true" style="margin-right:3px; color:${r.fg||r.color||''};"></i>${r.label}</button>`).join('')}
           </div>
-        </div>`;
+        </div>`);
         researchSprintBox.querySelectorAll('[data-start-sprint]').forEach(btn => btn.onclick = () => startResearchSprint(btn.getAttribute('data-start-sprint')));
       }
     }
@@ -51611,7 +51614,7 @@
     const exoticResearchBox = document.getElementById('exoticResearchBox');
     if (exoticResearchBox){
       const job = state.exoticResearchJob;
-      exoticResearchBox.innerHTML = EXOTIC_RESEARCH.map(e => {
+      setBoxHtml(exoticResearchBox, 'exoticResearchBox', EXOTIC_RESEARCH.map(e => {
         const done = hasExoticResearch(e.key);
         const running = job && job.key === e.key;
         const otherRunning = job && job.key !== e.key;
@@ -51636,14 +51639,14 @@
           </div>
           ${running?`<div class="progress-outer" style="margin-top:8px;"><div class="progress-inner" style="width:${Math.max(0,Math.min(100,100-((job.endTime-Date.now())/job.totalDuration*100)))}%; background:#c3bef5;"></div></div>`:''}
         </div>`;
-      }).join('');
+      }).join(''));
       exoticResearchBox.querySelectorAll('[data-unlock-exotic]').forEach(btn => btn.onclick = () => startExoticResearch(btn.getAttribute('data-unlock-exotic')));
     }
 
     const veteranTrainingBox = document.getElementById('veteranTrainingBox');
     if (veteranTrainingBox){
       const vJob = state.veteranTrainingJob;
-      veteranTrainingBox.innerHTML = VETERAN_TRAINING.map(v => {
+      setBoxHtml(veteranTrainingBox, 'veteranTrainingBox', VETERAN_TRAINING.map(v => {
         const done = hasVeteranTraining(v.key);
         const reqOk = !v.requires || hasVeteranTraining(v.requires);
         const running = vJob && vJob.key === v.key;
@@ -51669,7 +51672,7 @@
           </div>
           ${running?`<div class="progress-outer" style="margin-top:8px;"><div class="progress-inner" style="width:${Math.max(0,Math.min(100,100-((vJob.endTime-Date.now())/vJob.totalDuration*100)))}%; background:#e24b4a;"></div></div>`:''}
         </div>`;
-      }).join('');
+      }).join(''));
       veteranTrainingBox.querySelectorAll('[data-buy-veteran]').forEach(btn => btn.onclick = () => startVeteranTraining(btn.getAttribute('data-buy-veteran')));
     }
     } // Ende Forschung-Tab-Guard
@@ -52601,7 +52604,7 @@
 
     if (activeTab === 'flotte'){
     const relocateAllBox = document.getElementById('relocateAllBox');
-    if (relocateAllBox) relocateAllBox.innerHTML = relocateAllQuickButtonsHtml();
+    if (relocateAllBox) setBoxHtml(relocateAllBox, 'relocateAllBox', relocateAllQuickButtonsHtml());
     const relocateBox = document.getElementById('relocateBox');
     if (relocateBox && !isTypingIn('relocateBox')){
       const others = allFleetsWithPlanet().filter(x=>x.planet!==state.activeBasePlanet);
@@ -52946,12 +52949,12 @@
             <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:rgb(${color});"></div></div>
           </div>`;
         };
-        combatBonusCapBox.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch;">
+        setBoxHtml(combatBonusCapBox, 'combatBonusCapBox', `<div class="card-row" style="flex-direction:column; align-items:stretch;">
           <div class="bname" style="margin-bottom:8px; font-size:12.5px;"><i class="ti ti-sword" aria-hidden="true"></i> Kampfbonus-Übersicht (${planetDisplayName(pk)})</div>
           ${capRow('Angriffsbonus', atkRaw, '226,75,74')}
           ${capRow('Verteidigungsbonus', defRaw, '93,202,165')}
           <div class="bmeta" style="margin-top:8px; font-size:11px;">Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module und Allianz-Techs speisen zusammen diesen gedeckelten Topf - bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.</div>
-        </div>`;
+        </div>`);
       }
       renderFlagship();
       const officerBox = document.getElementById('officerBox');
@@ -54334,14 +54337,14 @@
           <div style="font-size:8px; color:#7d8199;">${h.day.slice(8)}</div>
         </div>`;
       }).join('');
-      battleStatsBox.innerHTML = `
+      setBoxHtml(battleStatsBox, 'battleStatsBox', `
         <div class="card-row" style="flex-direction:column; align-items:stretch;">
           <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
             <span class="bname"><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> ${fmt(bs.wins)} Siege · <span style="color:#e24b4a;">${fmt(bs.losses)} Niederlagen</span></span>
             <span class="lvl-pill">Siegquote ${winRate}%</span>
           </div>
           ${hist.length ? `<div class="bmeta" style="margin-bottom:4px;">Kämpfe der letzten ${hist.length} Tage (grün Siege, rot Niederlagen - Balken antippen für Details):</div><div style="display:flex; gap:3px; align-items:flex-end;">${bars}</div>` : '<div class="bmeta">Die Tages-Historie füllt sich ab morgen: jeden Tag wird automatisch bilanziert, was du erreicht hast (Punkte, Kämpfe, Kredite).</div>'}
-        </div>`;
+        </div>`);
     }
     const scoreHistorySvg = document.getElementById('scoreHistorySvg');
     if (scoreHistorySvg){
@@ -54878,7 +54881,7 @@
       } else {
         zustandHtml = `<div class="bmeta">Schon gespendet? Trage die E-Mail-Adresse ein, mit der du bei Ko-fi bezahlt hast – nur darüber lässt sich die Spende deinem ☕-Abzeichen in der Bestenliste zuordnen (gilt jeweils 30 Tage ab der letzten Spende).</div>`;
       }
-      claimBox.innerHTML = `
+      setBoxHtml(claimBox, 'kofiClaimSupporterBox', `
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px;">
           ${zustandHtml}
           <div style="display:flex; gap:6px;">
@@ -54887,7 +54890,7 @@
           </div>
           ${statusHtml}
         </div>
-      `;
+      `);
       const claimInput = document.getElementById('kofiClaimEmailInput');
       const claimBtn = document.getElementById('kofiClaimBtn');
       if (claimBtn) claimBtn.onclick = async () => {
@@ -54994,7 +54997,7 @@
     if (prestigeBox){
       const ready = canPrestige();
       const perkCounts = PRESTIGE_PERKS.map(p => ({ ...p, count: prestigePerkCount(p.key) })).filter(p=>p.count>0);
-      prestigeBox.innerHTML = `
+      setBoxHtml(prestigeBox, 'prestigeBox', `
         <div class="card-row">
           <div class="left">
             <div class="bicon" style="background:rgba(126,119,221,0.2); color:#c3bef5;"><i class="ti ti-infinity" aria-hidden="true"></i></div>
@@ -55006,7 +55009,7 @@
           <button class="buy ${ready?'affordable':''}" id="prestigeBtn" ${ready?'':'disabled'}><i class="ti ti-refresh" aria-hidden="true" style="margin-right:4px;"></i>Zurücksetzen</button>
         </div>
         ${perkCounts.length ? `<div class="bmeta" style="margin-top:0.5rem;">${perkCounts.map(p => `<i class="ti ${p.icon}" aria-hidden="true"></i> ${p.name}: +${p.count*3}%`).join(' · ')}</div>` : ''}
-      `;
+      `);
       const pBtn = document.getElementById('prestigeBtn');
       if (pBtn) pBtn.onclick = doPrestige;
     }
