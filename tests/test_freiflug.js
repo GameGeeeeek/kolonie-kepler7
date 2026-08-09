@@ -24,6 +24,12 @@
 //      grün. Jetzt wird gegen die je Ressource abgerundete Ladung verglichen.
 //   3. Laderaum-Deckel: Die Füll-Schleife brach beim Erreichen der Kapazität selbst ab – der Test
 //      hörte genau dort auf zu messen, wo der Fehler beginnt. Jetzt wird darüber hinaus gebohrt.
+//
+// NACHTRAG Notsprung (drei weitere Sabotagen, ebenfalls in beide Richtungen ausgeführt):
+//   * Notsprung-Zweig entfernt (`if (!lage.heimwaerts)` -> `if (true)`)
+//                                           -> "Notsprung bringt das Schiff aus dem Sektor heraus"
+//   * B.notsprungLadung 0.4 -> 0            -> "Notsprung kostet Ladung"
+//   * heimwaerts immer wahr                 -> "ohne Deuterium ist kein Sprung in die Tiefe möglich"
 const fs = require('fs');
 const path = require('path');
 const { starteBrowser, WURZEL, pruefer, ueberspringen } = require('./lib/umgebung');
@@ -346,6 +352,58 @@ const summe = o => Object.keys(o).reduce((n,k) => n + o[k], 0);
     Object.keys(seltenheiten).every((k, i, a) =>
       i === 0 || seltenheiten[k].mult > seltenheiten[a[i-1]].mult),
     Object.keys(seltenheiten).map(k => seltenheiten[k].mult).join('<'));
+
+  // ------------------------------------------------- 9b. Notsprung (keine Sackgasse)
+  // Die beiden tiefsten Sektoren haben KEINE Station und KEINE Deuterium-Asteroiden. Ohne
+  // Notsprung wäre ein Spieler dort ohne Treibstoff gefangen, und der einzige Ausweg wäre die
+  // eigene Zerstörung – ohne dass ihm das irgendwo gesagt würde. Geprüft wird beides: dass die
+  // Sackgasse überhaupt entstehen KANN (sonst prüft der Rest nichts) und dass sie einen Ausgang hat.
+  const tiefeOhneTreibstoff = await page.evaluate(() => {
+    const s = window.FREIFLUG.sektoren.find(x => x.key === 'saum');
+    return { station: !!s.station, hatDeuterium: s.asteroiden.arten.indexOf('deuteriumeis') >= 0 };
+  });
+  check('der tiefste Sektor hat weder Station noch Deuterium-Quelle (die Sackgasse ist real)',
+    !tiefeOhneTreibstoff.station && !tiefeOhneTreibstoff.hatDeuterium, tiefeOhneTreibstoff);
+
+  await page.evaluate(() => {
+    window.FREIFLUG.betrete('saum', null);
+    window.FREIFLUG.heile();
+    window.FREIFLUG.setzeLager('deuterium', 0);
+    window.FREIFLUG.setzeFracht('deuterium', 0);
+    window.FREIFLUG.setzeFracht('xenit', 120);
+  });
+  await page.waitForTimeout(150);
+  const lage = await page.evaluate(() => window.FREIFLUG.torLage('schwelle'));
+  check('ohne Deuterium reicht der Vorrat für keinen regulären Sprung',
+    lage && lage.reicht === false && lage.heimwaerts === true, lage);
+
+  const vorNot = await zustand(page);
+  await page.evaluate(() => window.FREIFLUG.anTor('schwelle'));
+  await page.evaluate(() => window.FREIFLUG.sprung());
+  await page.waitForTimeout(300);
+  const nachNot = await zustand(page);
+  check('Notsprung bringt das Schiff aus dem Sektor heraus',
+    nachNot.sektor === 'schwelle', { vorher: vorNot.sektor, nachher: nachNot.sektor });
+  check('Notsprung kostet Ladung',
+    nachNot.frachtSumme < vorNot.frachtSumme,
+    { vorher: Math.round(vorNot.frachtSumme), nachher: Math.round(nachNot.frachtSumme) });
+  check('Notsprung verbrennt nicht die ganze Ladung', nachNot.frachtSumme > 0,
+    { rest: Math.round(nachNot.frachtSumme) });
+
+  // Die Gegenrichtung muss gesperrt bleiben – sonst wäre der Notsprung ein Gratis-Weg nach unten.
+  await page.evaluate(() => {
+    window.FREIFLUG.setzeLager('deuterium', 0);
+    window.FREIFLUG.setzeFracht('deuterium', 0);
+  });
+  const abwaerts = await page.evaluate(() => window.FREIFLUG.torLage('saum'));
+  check('abwärts führendes Tor gilt nicht als heimwärts',
+    abwaerts && abwaerts.heimwaerts === false, abwaerts);
+  const vorAb = await zustand(page);
+  await page.evaluate(() => { window.FREIFLUG.anTor('saum'); window.FREIFLUG.sprung(); });
+  await page.waitForTimeout(300);
+  const nachAb = await zustand(page);
+  check('ohne Deuterium ist kein Sprung in die Tiefe möglich',
+    nachAb.sektor === vorAb.sektor, { vorher: vorAb.sektor, nachher: nachAb.sektor });
 
   // -------------------------------------------------------- 10. Inhalte vollständig
   const inhalt = await page.evaluate(() => ({

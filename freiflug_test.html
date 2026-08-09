@@ -326,7 +326,7 @@ body.touch #touchPad, body.touch #touchKnopf { display:flex; }
             <span class="taste">H</span><span>Hangar</span>
             <span class="taste">M</span><span>Sektorkarte</span>
             <span class="taste">P</span><span>Pause</span>
-            <span class="taste">F</span><span>Sprungtor benutzen (in Reichweite)</span>
+            <span class="taste">F</span><span>Sprungtor benutzen (kostet Deuterium) – ohne Treibstoff heimwärts als Notsprung, der Ladung verbrennt</span>
           </div>
         </div>
       </div>
@@ -336,6 +336,9 @@ body.touch #touchPad, body.touch #touchKnopf { display:flex; }
         Kolonie-Station im Heimatorbit schreibt die Beute dem Koloniespeicher gut. Wird das
         Schiff vorher zerstört, geht ein Teil der Ladung verloren. Je tiefer der Sektor, desto
         wertvoller die Brocken – und desto teurer der Rückweg.
+        Jeder Sprung kostet Deuterium; in den beiden tiefsten Sektoren gibt es keines zu holen.
+        Wer dort ohne Vorrat ankommt, kommt nur noch per <b>Notsprung</b> heim – der verbrennt
+        einen Teil der Ladung als Treibstoff und führt ausschließlich nach oben.
       </p>
     </div>
   </div>
@@ -753,7 +756,8 @@ const B = {
   ereignisTaktMin: 34,      // Sekunden zwischen zwei Ereignis-Würfen
   ereignisTaktMax: 62,
   respawnGegner: 26,        // Sekunden bis Nachschub in bewohnten Sektoren
-  drohnenSchaden: 0.45      // Anteil des Schiffsschadens je Drohne
+  drohnenSchaden: 0.45,     // Anteil des Schiffsschadens je Drohne
+  notsprungLadung: 0.4      // Anteil der Rohstoffladung, den ein Notsprung als Treibstoff verbrennt
 };
 // Schwenkbereich der Bordkanone um die Schiffsachse (rad). Gemessen, nicht geraten: Bei 0,55 rad
 // verfehlte ein erfasstes Ziel, das die KI umkreiste, dauerhaft – 8 Sekunden Dauerfeuer brachten
@@ -1883,19 +1887,55 @@ function wiedereinstieg(){
   S.schiff.energie = v.energieMax; S.schiff.raketen = v.def.raketen;
 }
 
+// Sprungkosten und Deuteriumvorrat als EINE Auskunft – Tor-Beschriftung und Sprunglogik lesen
+// beide hier. Getrennte Rechnungen wären genau die "zweite Anzeigestelle mit der alten Annahme",
+// an der dieses Projekt regelmäßig hängengeblieben ist.
+function sprungLage(tor){
+  const b = boni();
+  const kosten = Math.max(4, Math.round(B.sprungDeuterium * (1 - klemme(b.sprung, 0, 0.6))));
+  const vorrat = (S.lager.deuterium || 0) + (S.fracht.deuterium || 0);
+  const ziel = tor ? SEKTOR_VON(tor.ziel) : null;
+  const heimwaerts = !!(ziel && W && ziel.tiefe < W.sek.tiefe);
+  return { kosten, vorrat, ziel, heimwaerts, reicht: vorrat >= kosten };
+}
+
 function sprung(){
   const p = S.schiff;
   const tor = W.tore.find(t => abstand(p.x,p.y,t.x,t.y) < t.r + B.torReichweite);
   if (!tor){ hinweis('Kein Sprungtor in Reichweite.'); return; }
-  const b = boni();
-  const kosten = Math.max(4, Math.round(B.sprungDeuterium * (1 - klemme(b.sprung,0,0.6))));
-  const vorrat = (S.lager.deuterium||0) + (S.fracht.deuterium||0);
-  if (vorrat < kosten){ hinweis('Zu wenig Deuterium für den Sprung (' + kosten + ' nötig).'); return; }
-  let rest = kosten;
+  const lage = sprungLage(tor);
+  const von = S.sektorKey;
+
+  if (!lage.reicht){
+    // NOTSPRUNG. Ohne diesen Zweig ist der Leerensaum eine Sackgasse: Dort gibt es weder Station
+    // noch Deuterium-Asteroiden (siehe SEKTOREN: station:false, kein 'deuteriumeis' in arten), und
+    // wer ohne Treibstoff ankommt, kommt nur durch die EIGENE ZERSTÖRUNG wieder heim – ohne dass
+    // ihm das irgendwo gesagt würde. Das ist kein Risiko mehr, sondern ein Fehler.
+    // Der Notsprung macht daraus wieder eine Entscheidung: Der Reaktor knackt die Rohstoffladung
+    // zu Treibstoff. Bewusst NUR heimwärts, sonst wäre er ein billiger Weg in die Tiefe.
+    if (!lage.heimwaerts){
+      hinweis('Zu wenig Deuterium (' + lage.kosten + ' nötig). Ein Notsprung geht nur heimwärts.');
+      return;
+    }
+    let verbrannt = 0;
+    for (const res in S.fracht){
+      if (res === 'credits' || res === 'fragmente') continue;  // passt in keinen Reaktor
+      const ab = S.fracht[res] * B.notsprungLadung;
+      if (ab > 0){ S.fracht[res] -= ab; verbrannt += ab; }
+    }
+    protokoll(verbrannt > 0
+      ? 'NOTSPRUNG: Der Reaktor verbrennt ' + Math.round(B.notsprungLadung*100) + ' % der Ladung (' + zahl(verbrannt) + ') als Treibstoff.'
+      : 'NOTSPRUNG mit leerem Laderaum – nichts zu verbrennen, nichts gewonnen.', 'crit');
+    hinweis('Notsprung nach ' + lage.ziel.name);
+    explosion(p.x, p.y, 150, '#e0a548', 46);
+    betrete(tor.ziel, von);
+    return;
+  }
+
+  let rest = lage.kosten;
   const ausFracht = Math.min(rest, S.fracht.deuterium||0);
   if (ausFracht > 0){ S.fracht.deuterium -= ausFracht; rest -= ausFracht; }
   if (rest > 0) S.lager.deuterium -= rest;
-  const von = S.sektorKey;
   explosion(p.x, p.y, 120, '#7f77dd', 40);
   betrete(tor.ziel, von);
 }
@@ -2197,8 +2237,18 @@ function zeichneTor(t){
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,t.r*0.8,0,6.283); ctx.fill();
   ctx.fillStyle = '#e9ecf5'; ctx.font = '600 13px ui-monospace, monospace'; ctx.textAlign = 'center';
   ctx.fillText((ziel?ziel.name:'?').toUpperCase(), 0, -t.r-16);
-  ctx.fillStyle = '#9296ac'; ctx.font = '11px ui-monospace, monospace';
-  ctx.fillText(t.fluechtig ? 'WURMLOCH · ' + Math.max(0,Math.ceil(t.fluechtig-S.zeit)) + ' s' : 'SPRUNGTOR · F', 0, -t.r-2);
+  // Zweite Anzeigestelle derselben Größe: Sie liest die Sprungkosten aus DERSELBEN Funktion wie
+  // sprung() selbst. Ohne den Hinweis „NOTSPRUNG" sieht ein gestrandeter Spieler nicht, dass es
+  // ueberhaupt einen Ausweg gibt – und genau das war der Fehler, den dieser Zweig behebt.
+  const lage = sprungLage(t);
+  let zeile;
+  if (t.fluechtig) zeile = 'WURMLOCH · ' + Math.max(0, Math.ceil(t.fluechtig - S.zeit)) + ' s';
+  else if (lage.reicht) zeile = 'SPRUNGTOR · F · ' + lage.kosten + ' DEUT';
+  else if (lage.heimwaerts) zeile = 'NOTSPRUNG · F · ' + Math.round(B.notsprungLadung*100) + ' % LADUNG';
+  else zeile = 'GESPERRT · ' + lage.kosten + ' DEUT NÖTIG';
+  ctx.fillStyle = (!t.fluechtig && !lage.reicht) ? (lage.heimwaerts ? '#e0a548' : '#e24b4a') : '#9296ac';
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.fillText(zeile, 0, -t.r-2);
   ctx.restore();
 }
 
@@ -3026,6 +3076,9 @@ window.FREIFLUG = {
     S.schiff.winkel = Math.atan2(z.y - S.schiff.y, z.x - S.schiff.x); return true; },
   sprung, andocken, betrete, zerstoere: schiffZerstoert,
   gibModul: (key, selt) => modulInsInventar({key, selt, wert:100}),
+  setzeLager: (res, wert) => { S.lager[res] = wert; },
+  setzeFracht: (res, wert) => { if (wert <= 0) delete S.fracht[res]; else S.fracht[res] = wert; },
+  torLage: (zielKey) => { const t = W.tore.find(t => t.ziel === zielKey); return t ? sprungLage(t) : null; },
   eingebauteIds: () => (S.ausgeruestet[S.schiffKey]||[]).slice(),
   leereSlots: () => { S.ausgeruestet[S.schiffKey] = []; nachRuestung(); },
   einbauen, ausbauen, sektoren: SEKTOREN, schiffe: SCHIFFE, module: MODUL_DEFS, sets: SET_DEFS,

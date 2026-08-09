@@ -279,6 +279,16 @@ Zerstörung kostet die Hälfte (im Prototyp gemessen: 38 an Bord → 19 gerettet
 Frage aus dem Auftrag: *heimfliegen oder noch ein Feld weiter?* Der Schürferbund-Set-Bonus
 (4 Teile: nur die Hälfte geht verloren) ist die erste Antwort darauf, die man sich erspielen kann.
 
+**Der Notsprung – aus einer Sackgasse eine Entscheidung machen.** Die beiden tiefsten Sektoren haben
+weder Station noch Deuterium-Asteroiden. Wer dort ohne Treibstoff ankommt, konnte im ersten Entwurf
+weder springen noch andocken noch tanken; der einzige Ausweg war die eigene Zerstörung – und nichts
+im Spiel sagte das. Das ist kein Risiko, sondern ein Fehler. Seither gilt: Reicht das Deuterium
+nicht, öffnet ein **heimwärts** führendes Tor trotzdem, verbrennt aber 40 % der Rohstoffladung als
+Treibstoff (Kredite und Fragmente passen in keinen Reaktor). Abwärts bleibt gesperrt, sonst wäre der
+Notsprung ein billiger Weg in die Tiefe. Die Tor-Beschriftung sagt beides an und liest ihre Zahlen
+aus derselben Funktion wie der Sprung selbst (`sprungLage()`) – eine zweite Anzeigestelle mit der
+alten Annahme ist der wiederkehrende Fehler dieses Projekts, und hier ist sie bewusst ausgeschlossen.
+
 ### 7.4 Was NICHT passieren darf
 * **Kein PvP im Freiflug**, solange der Server nichts nachrechnet. Die Kampfkraft im Freiflug ist
   rein clientseitig – ein manipulierter Client könnte sonst echte Spieler schädigen. Die Hausregel
@@ -336,7 +346,8 @@ ist Pflicht und schnell, Punkt 7 erst nötig, wenn es ruckelt.
 | Ist Kampf gewinnbar und gefährlich? | Späher tötet einen Piratenjäger in 4,8 s; im Riff fällt sein Schild in 6 s von 123 auf 0 |
 | Lösen alle Fundstücke aus? | Alle 6 Anomalietypen, alle 9 Ereignisse, Wrackplünderung mit Falle – 0 Konsolenfehler |
 | Zählen Set-Stufen additiv? | 1 Teil: +0,400 · 2 Teile: +0,550 (Modul 0,400 + Set 0,150) · 3 Teile: zusätzlich +0,200 Glück |
-| Läuft es sauber? | 42 Prüfungen grün, keine Konsolenfehler in keinem Sektor |
+| Gibt es eine Sackgasse? | Nein mehr: Notsprung aus dem Leerensaum gemessen 407 → 271 Ladung, abwärts weiterhin gesperrt |
+| Läuft es sauber? | 49 Prüfungen grün, keine Konsolenfehler in keinem Sektor |
 
 ---
 
@@ -349,7 +360,9 @@ ist Pflicht und schnell, Punkt 7 erst nötig, wenn es ruckelt.
 2. **Eigene Rümpfe oder bestehende Schiffe?** Der Prototyp hat fünf eigene. Alternative: vorhandene
    `SHIP_DEFS`-Einträge fliegbar machen. Dagegen spricht, dass dort ein `cargo`-Feld pro Schiff
    fehlt (es gibt nur zwei Frachter-Konstanten, Z. 17811/17812).
-3. **Zeitbegrenzung je Ausflug?** Ohne sie kann man beliebig lange draußen bleiben. Eine
-   Treibstoffuhr wäre die naheliegende Bremse und würde Deuterium weiter aufwerten.
+3. **Zeitbegrenzung je Ausflug?** Ohne sie kann man beliebig lange draußen bleiben. Der Notsprung
+   ist bereits eine weiche Bremse (irgendwann ist der Rückweg teuer), eine echte Treibstoffuhr
+   wäre die harte – sie würde Deuterium weiter aufwerten, aber auch Frust erzeugen, wenn sie
+   mitten im Gefecht abläuft. Vor der Einbindung entscheiden, nicht danach.
 4. **Bestenliste?** Erst sinnvoll mit serverseitiger Plausibilitätsprüfung – sonst ist sie am ersten
    Tag manipuliert.
