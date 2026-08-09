@@ -118,6 +118,23 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     Das ist derselbe Mechanismus wie in Regel 15, nur auf Prozess- statt Log-Ebene – wer wissen
     will, ob die Suite lebt, prüft die Marker-Zeile ihrer Logdatei oder `ps` nach echten
     `node`-Prozessen, nie ein Muster, das die eigenen Werkzeuge selbst enthalten.
+18. **Ein Anzeige-Test, der „diese Box schreibt NICHT neu" misst, friert für sein Messfenster
+    die Uhr ein (`Date.now` festhalten, dann einen Tick verstreichen lassen, DANN markieren) –
+    sonst misst er Wanduhr-Glück statt der Regel.** Vorfall 08./09.08.2026: `test_listen_cache`
+    fiel in Serie, an altem wie neuem Stand identisch. Per `innerHTML`-Setter-Falle (Setter am
+    Element überschreiben, `new Error().stack` je Schreiber sammeln) auf zwei echte Ursachen
+    zurückverfolgt: (a) Beim frischen Fixture feuert der ERSTE Planeten-Ereignis-Check
+    GARANTIERT (kein Wahrscheinlichkeits-Gate bei `nextPlanetEventCheck` 0) – Fixtures pinnen
+    solche Ereignis-Uhren in die Zukunft; (b) lief real ein Kalender-Event, tickte in `#fleet`
+    ein sekundengenauer Countdown, und `setBoxHtml` schrieb völlig KORREKT jede Sekunde neu –
+    der Test war nur außerhalb der Event-Zeitfenster grün. Mit stehender Uhr steht jeder
+    legitime Countdown still, und ein kaputter Cache fällt weiterhin durch (die Marke stirbt
+    am Schreiben, nicht am Inhalt).
+19. **`echo EXIT=$?` hinter einer Pipe misst das LETZTE Pipe-Glied, nie den Test** – `node
+    test.js | grep FAIL; echo EXIT=$?` meldet den grep-Status (0 = Treffer gefunden!). Vorfall
+    09.08.2026: Ein roter Test schien dadurch grün gemeldet. Exit-Codes immer ohne Pipe messen
+    (Ausgabe in Datei umleiten, `echo EXIT=$?` direkt dahinter) oder `${PIPESTATUS[0]}` nutzen –
+    dieselbe Familie wie Regel 15/17: nie ein Messwerkzeug, das sich selbst im Weg steht.
 
 ## Icon-Font ist ein SUBSET (seit v8.296.0)
 
