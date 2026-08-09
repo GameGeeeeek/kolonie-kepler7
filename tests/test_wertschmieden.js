@@ -46,11 +46,12 @@ function macheWelt(inv, fragmente, wurf, isShip){
     return { key: typ, type: typ, rarity, level: isNaN(lvlSeg) ? 1 : lvlSeg,
              rar: { label: 'Test' }, def: { name: typ } };
   };
-  const api = new Function('state', 'MODULE_FRAGMENT_VALUE', 'moduleInstanceInfo',
+  // moduleLockMitnehmen-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss), siehe test_modulschloss.
+  const api = new Function('state', 'MODULE_FRAGMENT_VALUE', 'moduleLockMitnehmen', 'moduleInstanceInfo',
     'shipModuleInstanceInfo', 'wertWuerfeln', 'log', 'playSound', 'render', 'save',
     konstanten + '\n' + wertQuelle + '\n' + quelle
     + '\nreturn { moduleWertRerollCost, rerollModuleWert };')(
-    state, FRAG_VALUE, infoStub, infoStub, () => wurf,
+    state, FRAG_VALUE, () => {}, infoStub, infoStub, () => wurf,
     (m) => logs.push(m), () => {}, () => {}, () => {});
   return { api, state, logs };
 }

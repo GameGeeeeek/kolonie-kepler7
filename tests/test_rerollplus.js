@@ -55,14 +55,16 @@ function macheWelt(inv, fragmente){
     return { key: typ, type: typ, rarity, level: parseInt(String(instKey).split(':')[2] || '1', 10),
              rar: { label: 'Test' }, def: { name: typ, effect: 'atk' } };
   };
+  // moduleLockMitnehmen-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss): die Migration selbst
+  // prueft test_modulschloss.
   const api = new Function('state', 'Math', 'MODULE_FRAGMENT_VALUE', 'MODULE_SUB_POOL_LOC',
-    'MODULE_SUB_POOL_SHIP', 'MODULE_SUB_EFFECT_LABEL', 'moduleRerollCost',
+    'MODULE_SUB_POOL_SHIP', 'MODULE_SUB_EFFECT_LABEL', 'moduleRerollCost', 'moduleLockMitnehmen',
     'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'playSound', 'render', 'save',
     konst + '\n' + subsQuelle + '\n' + wertQuelle + '\n' + quelle
     + '\nreturn { moduleRerollPlusCost, rerollModuleSubsBehalte };')(
     state, mathFest, FRAG_VALUE, ['def', 'prod', 'lager', 'atk'], ['hull'],
     { def: 'Verteidigung' },
-    (r) => (FRAG_VALUE[r] || 1) * 3,
+    (r) => (FRAG_VALUE[r] || 1) * 3, () => {},
     infoStub, infoStub, (m) => logs.push(m), () => {}, () => {}, () => {});
   return { api, state, logs };
 }
