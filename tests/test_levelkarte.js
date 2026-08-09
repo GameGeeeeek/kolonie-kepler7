@@ -119,11 +119,18 @@ const AUTONOMIE_STUFEN = 3;
   await page.waitForTimeout(1400);
   const karte = platt(await page.evaluate(() => { const b = document.getElementById('levelBox'); return b ? b.textContent : null; }));
   check('die Levelkarte wurde gerendert', karte.includes('Gesamtproduktion'), karte.slice(0, 120));
-  check('sie nennt den GEDECKELTEN Wert', karte.includes('+' + DECKEL_PCT + '%'), { erwartet: DECKEL_PCT, text: karte.slice(0, 160) });
+  // Der wirksame Wert liegt seit v8.468.0 zwischen Deckel und Deckel+Ueberlauf (25%): Ueber
+// dem Deckel verpufft nichts mehr, es waechst nur noch stark gebremst weiter. Geprueft wird
+// deshalb die SPANNE, nicht mehr die eine Zahl - die Aussage bleibt: die Karte nennt den
+// wirksamen Wert, nicht den Rohwert (das war der urspruenglich gemeldete Fehler).
+const gezeigt = Number((karte.match(/\+(\d+)% \(im Überlauf\)/) || karte.match(/\+(\d+)% Gesamtproduktion/) || [])[1]);
+check('sie nennt den WIRKSAMEN Wert (Deckel bis Deckel+Überlauf)',
+  gezeigt >= DECKEL_PCT && gezeigt <= Math.round(DECKEL_PCT * 1.25),
+  { gezeigt, deckel: DECKEL_PCT, obergrenze: Math.round(DECKEL_PCT * 1.25), text: karte.slice(0, 160) });
   // Genau der gemeldete Fehler: der Rohwert des Levels darf dort nicht stehen.
   check('sie nennt NICHT den ungedeckelten Rohwert', !karte.includes('+' + LEVEL + '% Gesamtproduktion'),
     { rohwert: LEVEL, text: karte.slice(0, 160) });
-  check('sie sagt, dass der Deckel erreicht ist', /Deckel erreicht/.test(karte), karte.slice(0, 160));
+  check('sie sagt, dass der Deckel überschritten ist', /im Überlauf/.test(karte), karte.slice(0, 160));
   // Die Belohnungsleiter muss sichtbar sein - sie war es vorher nirgends.
   check('sie nennt die naechste Levelbelohnung', /Nächste Levelbelohnung auf Level \d+/.test(karte), karte.slice(-140));
   const naechste = Number((karte.match(/Nächste Levelbelohnung auf Level (\d+)/) || [])[1]);

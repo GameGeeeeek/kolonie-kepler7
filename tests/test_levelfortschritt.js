@@ -79,8 +79,10 @@ check('die Levelkarte nutzt commanderProdBonusText statt den Rohwert',
   src.includes('${commanderProdBonusText(lvl)} Gesamtproduktion'));
 check('der ungedeckelte Rohwert steht nirgends mehr in einer Anzeige',
   !ohnePatchnotes.includes('+${lvl}% Gesamtproduktion'));
+// Seit v8.468.0 deckelt die Funktion WEICH (Ueberlauf statt Klippe) - die Zusage bleibt
+// dieselbe: der Bonus laeuft nicht ungebremst weiter. test_weicherdeckel misst die Kurve.
 check('commanderProdBonus deckelt wirklich',
-  src.includes('return Math.min(COMMANDER_PROD_CAP, n * COMMANDER_PROD_PER_LEVEL);'));
+  src.includes('return weicherDeckel(n * COMMANDER_PROD_PER_LEVEL, COMMANDER_PROD_CAP);'));
 check('die Produktionsrechnung nutzt dieselbe Funktion',
   src.includes('(1 + prestigeProdBonus()) * (1 + commanderProdBonus())'));
 check('die Boni-Bilanz liest die Konstanten statt eigener Ziffern',
@@ -197,7 +199,7 @@ check('state.vorboten wird beim Laden normalisiert',
 // ---- 6: Der Werftkern-Deckel -------------------------------------------------------------------
 // Die Gebaeudekarte nannte -15%, gerechnet wurde mit -20% (effectiveBuildTimeEach und Boni-Bilanz).
 // Sie hat ihren eigenen Effekt um ein Viertel zu klein ausgewiesen.
-const wkMech = /Math\.min\(0\.20, werftkernLvl\*0\.015\)/.test(src);
+const wkMech = /weicherDeckel\(werftkernLvl\*0\.015, 0\.20\)/.test(src);
 check('die Mechanik deckelt bei 20%', wkMech);
 check('die Karte nennt denselben Deckel', src.includes('nach Ausbau (Deckel: -20%)'));
 check('die alte 15%-Angabe ist weg', !ohnePatchnotes.includes('nach Ausbau (Deckel: -15%)'));
