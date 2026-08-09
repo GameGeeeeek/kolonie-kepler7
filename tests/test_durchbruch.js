@@ -61,7 +61,7 @@ function macheWelt(inv, fragmente){
     'moduleInstanceInfo', 'shipModuleInstanceInfo', 'findEquippedModuleSlot',
     'log', 'playSound', 'render', 'save',
     konst + '\n' + quelle
-    + '\nreturn { upgradeModule, modulDurchbruch, durchbruchHinweis };')(
+    + '\nreturn { upgradeModule, modulDurchbruch, durchbruchHinweis, durchbruchPille };')(
     state, mathFest, FRAG_VALUE, ['def', 'prod', 'lager', 'atk'], ['hull', 'shield'],
     { def: 'Verteidigung', prod: 'Produktion', lager: 'Lager', hull: 'Huelle' },
     (r, l) => (FRAG_VALUE[r] || 1) * Math.max(1, l), () => {},
@@ -138,6 +138,22 @@ function macheWelt(inv, fragmente){
     w.api.durchbruchHinweis(4, 'gewoehnlich') === '' &&
     w.api.durchbruchHinweis(4, 'legendaer').includes('DURCHBRUCH') &&
     w.api.durchbruchHinweis(5, 'legendaer') === '');
+}
+
+// ---- 7) Kartenpille (v8.462.0): naechstes Durchbruch-Ziel sichtbar an der Karte
+{
+  const w = macheWelt({}, 0);
+  const p1 = w.api.durchbruchPille(1, 'legendaer');
+  const p3 = w.api.durchbruchPille(3, 'legendaer');
+  check('7a: unter dem Ziel zeigt die Pille das naechste Durchbruch-Level (gedaempft)',
+    p1.includes('Durchbruch St. 4') && !p1.includes('nächste Stufe'), p1);
+  check('7b: eine Stufe davor wird sie golden und sagt es deutlich',
+    p3.includes('Durchbruch nächste Stufe!') && p3.includes('#fac775'), p3);
+  check('7c: Gewoehnlich und Maximalstufe zeigen keine Pille',
+    w.api.durchbruchPille(3, 'gewoehnlich') === '' && w.api.durchbruchPille(10, 'legendaer') === '');
+  check('7d: alle vier Kartenstellen tragen die Pille (2x Slot-Karte, 2x Inventarkarte)',
+    (JS.match(/\$\{info\?durchbruchPille\(info\.level, info\.rarity\):''\}/g) || []).length === 2 &&
+    (JS.match(/\$\{durchbruchPille\(info\.level, info\.rarity\)\}/g) || []).length === 2);
 }
 
 // ---- 6) Verdrahtung der Anzeige (statisch)
