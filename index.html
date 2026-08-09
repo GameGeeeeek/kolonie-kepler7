@@ -6187,8 +6187,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.461.0';
+  const VERSION = '8.462.0';
   const PATCHNOTES = [
+    { version:'8.462.0', date:'09.08.2026', changes:[
+      '<strong>Durchbruch jetzt an der Modulkarte sichtbar.</strong> Die neuen Durchbruch-Stufen (4/7/10) standen bisher nur im Tooltip der Aufwerten-Knöpfe – wer nicht mit der Maus darüberfährt (am Telefon: niemand), hat sie nie gesehen. Jetzt trägt jede Modulkarte in beiden Modulsystemen eine kleine Pille: gedämpft „Durchbruch St. 4/7/10" mit dem nächsten Ziel, und golden hervorgehoben <strong>„Durchbruch nächste Stufe!"</strong>, wenn genau die nächste Aufwertung ihn auslöst – der Moment, in dem sich die Fragmente doppelt lohnen. Gewöhnliche Module (ohne Zweitwerte) und Module auf Maximalstufe zeigen nichts; die Pille erklärt die Regel beim Antippen/Hovern selbst.'
+    ]},
     { version:'8.461.0', date:'09.08.2026', changes:[
       '<strong>Build-System: Durchbruch-Stufen beim Aufwerten.</strong> Aufwerten war bisher ein reiner Hauptwert-Verstärker (+10% je Stufe) – die Zweitwerte blieben schlicht stehen. Jetzt macht jedes Modul bei den Stufen <strong>4, 7 und 10</strong> einen <strong>Durchbruch</strong>: Es gewinnt einen zusätzlichen, zufällig gewürfelten Zweitwert – höchstens bis zur Zweitwert-Obergrenze seiner Seltenheit (ein Legendäres kann so von einer auf zwei Zeilen kommen, ein Exotisches auf drei). Ist die Obergrenze schon erreicht, wird stattdessen der <em>schwächste</em> Zweitwert um 0,2 Prozentpunkte verstärkt, nie über die normale Bestmarke von +2,5% hinaus. Ein Durchbruch erreicht also nur, was ein perfekter Fund ohnehin könnte – Aufwerten ist damit ein zweiter Weg zum Spitzen-Build, kein Weg darüber hinaus. Gewöhnliche Module (ohne Zweitwerte) haben keinen Durchbruch; Angriffskraft würfelt wie bei allen Zweitwerten nie mit. Die Aufwerten-Knöpfe kündigen einen anstehenden Durchbruch im Tooltip an, die Meldung nach dem Aufwerten nennt das Ergebnis, und der Hilfe-Abschnitt „Standort-Module" erklärt die Regeln.'
     ]},
@@ -21307,6 +21310,19 @@
     const kopie = subToks.slice(); kopie[idx] = m[1] + neu;
     return { seg: baue(kopie),
              text: (MODULE_SUB_EFFECT_LABEL[m[1]]||m[1]) + ' verstärkt auf +' + (neu/10).toFixed(1) + '%' };
+  }
+  // Kartenpille (v8.462.0): naechstes Durchbruch-Ziel des Moduls - gedaempft, wenn noch
+  // entfernt, golden wenn die NAECHSTE Aufwertung ihn ausloest. Gewoehnlich (Obergrenze 0)
+  // und Maximalstufe zeigen nichts. Der title erklaert die Regel, die Pille selbst bleibt kurz.
+  function naechsterDurchbruch(level){ return MODULE_DURCHBRUCH_LEVELS.find(l => l > (level||1)) || 0; }
+  function durchbruchPille(level, rarity){
+    if (((MODULE_SUB_RANGE[rarity]||[0,0])[1]) === 0) return '';
+    const ziel = naechsterDurchbruch(level);
+    if (!ziel) return '';
+    const gleich = ziel === (level||1) + 1;
+    const farbe = gleich ? '#fac775' : '#9296ac';
+    const grund = gleich ? 'rgba(250,199,117,0.18)' : 'rgba(146,150,172,0.14)';
+    return ` <span class="lvl-pill" style="background:${grund}; color:${farbe};" title="Durchbruch bei Stufe ${ziel}: zusätzlicher Zweitwert (bis zur Obergrenze der Seltenheit), sonst wird der schwächste verstärkt${gleich?' – die nächste Aufwertung löst ihn aus!':''}">${gleich?'Durchbruch nächste Stufe!':'Durchbruch St. '+ziel}</span>`;
   }
   // Tooltip-Zusatz der Aufwerten-Knoepfe: nur wenn die NAECHSTE Stufe ein Durchbruch ist und
   // die Seltenheit ueberhaupt Zweitwerte kennt (Gewoehnlich nicht - dort waere er gelogen).
@@ -52894,7 +52910,7 @@
             html += `<div class="mod-slot" style="border-color:${info?info.rar.color:'#5a5f7a'};">
               <div class="mod-head">${moduleIconHtml(info&&info.def, false, info?info.rar.color:'#c7cbe0')}<span class="bname">${info?info.def.name:'?'}</span></div>
               <div class="mod-eff" style="color:${info?info.rar.color:'#7d8199'};">+${info?Math.round(info.bonus*100):0}% ${info?moduleEffectLabel(info.def.effect):''}</div>
-              <div class="bmeta">${info?info.rar.label:''}${info&&info.level>1?' · Stufe '+info.level+'/'+MODULE_LEVEL_MAX:''}</div>
+              <div class="bmeta">${info?info.rar.label:''}${info&&info.level>1?' · Stufe '+info.level+'/'+MODULE_LEVEL_MAX:''}${info?durchbruchPille(info.level, info.rarity):''}</div>
               ${(info&&(info.subs.length||(info.wert&&info.wert!==100)))?`<div class="mod-sub"><i class="ti ti-sparkles" aria-hidden="true"></i> ${substatZeile(info.subs, info.wert)}</div>`:''}
               <div class="mod-acts">
                 ${canUp?`<button data-upgrade-module="${instKey}" ${haveFrag?'':'disabled'} title="Aufwerten auf Stufe ${info.level+1}/${MODULE_LEVEL_MAX} – kostet ${upCost} Modulfragmente (du hast ${state.moduleFragments||0})${durchbruchHinweis(info.level+1, info.rarity)}"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:3px;"></i>Stufe ↑ (${upCost})</button>`:''}
@@ -53034,7 +53050,7 @@
             const fragVal = MODULE_FRAGMENT_VALUE[instKey.split(':')[1]] || 1;
             return `<div class="card-row">
               <div class="left"><div class="bicon" style="background:${info.rar.color}22; color:${info.rar.color};">${moduleIconHtml(info.def, false, info.rar.color)}</div>
-                <div><div class="bname">${info.def.name} <span class="lvl-pill" style="background:${info.rar.color}22; color:${info.rar.color};">${info.rar.label}</span>${info.level>1?` <span class="lvl-pill" style="background:rgba(250,199,117,0.18); color:#fac775;">Lvl ${info.level}</span>`:''} ${count>1?`<span class="bmeta">×${count}</span>`:''}</div>
+                <div><div class="bname">${info.def.name} <span class="lvl-pill" style="background:${info.rar.color}22; color:${info.rar.color};">${info.rar.label}</span>${info.level>1?` <span class="lvl-pill" style="background:rgba(250,199,117,0.18); color:#fac775;">Lvl ${info.level}</span>`:''}${durchbruchPille(info.level, info.rarity)} ${count>1?`<span class="bmeta">×${count}</span>`:''}</div>
                 <div class="bmeta">${(()=>{ // Bugfix (24.07.2026, Modul-Text-Audit): die alte Dreier-Kette zeigte für ALLE neueren Effekte (Lager, Abwehr, Forschung, Sonde, sogar das Schildmodul) fälschlich "Bauspeed" an
                   const l = moduleEffectLabel(info.def.effect);  // 01.08.2026: war eine eigene, seit v8.356.0
                   // veraltete Kopie der Beschriftungstabelle - acht der 21 Standortmodule zeigten
@@ -53174,7 +53190,7 @@
             html += `<div class="mod-slot" style="border-color:${info?info.rar.color:'#5a5f7a'};">
               <div class="mod-head">${moduleIconHtml(info&&info.def, true, info?info.rar.color:'#c7cbe0')}<span class="bname">${info?info.def.name:'?'}</span></div>
               <div class="mod-eff" style="color:${info?info.rar.color:'#7d8199'};">${info?shipModuleEffectText(info.def.effect, info.bonus):''}</div>
-              <div class="bmeta">${info?info.rar.label:''}${info&&info.level>1?' · Stufe '+info.level+'/'+MODULE_LEVEL_MAX:''}</div>
+              <div class="bmeta">${info?info.rar.label:''}${info&&info.level>1?' · Stufe '+info.level+'/'+MODULE_LEVEL_MAX:''}${info?durchbruchPille(info.level, info.rarity):''}</div>
               ${(info&&(info.subs.length||(info.wert&&info.wert!==100)))?`<div class="mod-sub"><i class="ti ti-sparkles" aria-hidden="true"></i> ${substatZeile(info.subs, info.wert)}</div>`:''}
               <div class="mod-acts">
                 ${canUp?`<button data-upgrade-shipmodule="${instKey}" ${haveFrag?'':'disabled'} title="Aufwerten auf Stufe ${info.level+1}/${MODULE_LEVEL_MAX} – kostet ${upCost} Modulfragmente (du hast ${state.moduleFragments||0})${durchbruchHinweis(info.level+1, info.rarity)}"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:3px;"></i>Stufe ↑ (${upCost})</button>`:''}
@@ -53280,7 +53296,7 @@
             const fragValS = MODULE_FRAGMENT_VALUE[instKey.split(':')[1]] || 1;
             return `<div class="card-row">
               <div class="left"><div class="bicon" style="background:${info.rar.color}22; color:${info.rar.color};">${moduleIconHtml(info.def, true, info.rar.color)}</div>
-                <div><div class="bname">${info.def.name} <span class="lvl-pill" style="background:${info.rar.color}22; color:${info.rar.color};">${info.rar.label}</span>${info.level>1?` <span class="lvl-pill" style="background:rgba(250,199,117,0.18); color:#fac775;">Lvl ${info.level}</span>`:''} ${count>1?`<span class="bmeta">×${count}</span>`:''}</div>
+                <div><div class="bname">${info.def.name} <span class="lvl-pill" style="background:${info.rar.color}22; color:${info.rar.color};">${info.rar.label}</span>${info.level>1?` <span class="lvl-pill" style="background:rgba(250,199,117,0.18); color:#fac775;">Lvl ${info.level}</span>`:''}${durchbruchPille(info.level, info.rarity)} ${count>1?`<span class="bmeta">×${count}</span>`:''}</div>
                 <div class="bmeta">${shipModuleEffectText(info.def.effect, info.bonus)} · ${info.def.desc}${(info.subs.length||(info.wert&&info.wert!==100))?`<div style="margin-top:2px; color:#9fe1cb;"><i class="ti ti-sparkles" aria-hidden="true"></i> Substats: ${substatZeile(info.subs, info.wert)}</div>`:''}</div></div>
               </div>
               <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
