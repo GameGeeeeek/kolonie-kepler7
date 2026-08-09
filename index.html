@@ -6190,8 +6190,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.468.0';
+  const VERSION = '8.469.0';
   const PATCHNOTES = [
+    { version:'8.469.0', date:'09.08.2026', changes:[
+      '<strong>Behoben: Der Chat rutschte auf dem iPhone beim Schreiben in die obere linke Ecke.</strong> Sobald die Tastatur aufging, war vom Chat-Fenster nur noch ein Streifen mit der letzten Nachricht und der Eingabezeile zu sehen – quer über der Statusleiste, der Rest lag außerhalb des Bildschirms. Grund war ein halber Bugfix vom 13.07.2026: Das Fenster passte damals zwar seine Höhe an den durch die Tastatur verkleinerten Bereich an, nicht aber seine Position. Ein fest positioniertes Element hängt am Seiten-Layout, und iOS verschiebt genau dieses Layout nach oben, um das Eingabefeld freizuhalten – das Chat-Fenster wanderte um denselben Betrag mit hinaus. Es folgt dem sichtbaren Bereich jetzt vollständig (Höhe <em>und</em> Versatz), fasst nach dem Antippen des Eingabefeldes zweimal kurz nach, weil iOS den Versatz verzögert meldet, und die Abdunkel-Schicht dahinter wandert mit – vorher konnte ein Tipper am unteren Rand an ihr vorbei ins Spiel durchgehen.'
+    ]},
     { version:'8.468.0', date:'09.08.2026', changes:[
       '<strong>Überlauf statt Klippe: Kein Bonus verpufft mehr am Deckel.</strong> Bisher galt überall dieselbe harte Regel – der Punkt unter dem Deckel zählte voll, der nächste <em>exakt null</em>. Das zwang dich, vor jeder Entscheidung nachzusehen, und entwertete jeden guten Fund, der in einen vollen Topf fiel. Ab sofort läuft jeder Bonus über dem Deckel <strong>weich aus</strong>, statt abzubrechen: Der erste Punkt darüber zählt noch voll, mit wachsendem Überschuss wird jeder weitere sanft weniger wert – aber keiner ist mehr wertlos. Beispiel Produktion (Deckel +100%): 110% roh ergeben 108% wirksam, 125% ergeben 116%, 150% ergeben 122%. <strong>Unterhalb des Deckels ändert sich nichts</strong> – niemand wird geschwächt. Und der Deckel tut weiter seine Arbeit: Der Überlauf ist hart auf ein Viertel des Deckels begrenzt, die Bauzeit-Ersparnis endet also bei −62,5% statt −50% und läuft nie gegen null. Umgestellt sind zwölf Töpfe: Produktion, Bauzeit, Forschungszeit, Treibstoff, Expeditions-Risiko, Gegenschlag, Expeditions-Ausbeute, Handel, Erfahrung, Prestige, Kommandanten-Level und Schiffsbauzeit. Angriff, Verteidigung und Überfall-Schutz folgen im nächsten Schritt – die rechnet der Server mit, und beide Seiten müssen gleichzeitig umgestellt werden. Die Boni-Bilanz zeigt den Überlauf jetzt als eigene Zeile.'
     ]},
@@ -55973,10 +55976,41 @@
       if (badge) badge.style.display = 'none';
       save();
     }
+    // Panel und Abdunkel-Schicht exakt auf den SICHTBAREN Bereich legen. Zwei Größen, nicht eine:
+    // die Höhe (die Tastatur verkleinert den sichtbaren Bereich) UND der Versatz. Der Versatz
+    // fehlte bis v8.469.0 und war der Fehler aus dem Report vom 09.08.2026 ("Chat buggt beim
+    // Schreiben nach oben links"): position:fixed hängt am LAYOUT-Viewport, nicht am sichtbaren.
+    // Öffnet iOS die Tastatur, scrollt Safari das Layout, damit das fokussierte Feld sichtbar wird
+    // - offsetTop wird dabei > 0. Das Panel blieb bei Layout-y 0 und rutschte um genau diesen
+    // Betrag über den oberen Bildrand hinaus; sichtbar blieb nur sein unteres Ende (letzte
+    // Nachricht + Eingabezeile) in der linken oberen Ecke, über der Statusleiste.
+    // Höhe UND top sind gesetzt, das CSS-bottom:0 wird dadurch nach CSS-Regel übergangen - top
+    // gewinnt, das Panel deckt danach genau den sichtbaren Bereich. Das ist zugleich der stabile
+    // Zustand, in dem Safari nicht weiter nachscrollt.
+    function fitPanelToViewport(){
+      const vv = window.visualViewport;
+      if (!vv) return;
+      panel.style.height = vv.height + 'px';
+      panel.style.top = vv.offsetTop + 'px';
+      panel.style.left = vv.offsetLeft + 'px';
+      if (overlay){
+        overlay.style.height = vv.height + 'px';
+        overlay.style.width = vv.width + 'px';
+        overlay.style.top = vv.offsetTop + 'px';
+        overlay.style.left = vv.offsetLeft + 'px';
+      }
+    }
+    // Beim Schließen ALLE gesetzten Werte zurücknehmen, nicht nur die Höhe - ein liegen
+    // gebliebenes top/left würde das Panel beim nächsten Öffnen an der alten Stelle zeigen,
+    // falls der Browser gar keine visualViewport-API hat.
+    function releasePanelViewportFit(){
+      panel.style.height = ''; panel.style.top = ''; panel.style.left = '';
+      if (overlay){ overlay.style.height = ''; overlay.style.width = ''; overlay.style.top = ''; overlay.style.left = ''; }
+    }
     function openPanel(){
       panel.classList.add('open');
       overlay.classList.add('open');
-      panel.style.height = window.visualViewport ? window.visualViewport.height + 'px' : '';
+      fitPanelToViewport();
       loadAllianceMessages();
       loadGlobalChat();
       markChatSeen();
@@ -55984,7 +56018,7 @@
     function closePanel(){
       panel.classList.remove('open');
       overlay.classList.remove('open');
-      panel.style.height = ''; // zurück auf CSS-Standard (top:0/bottom:0), kein Rest-Inline-Style
+      releasePanelViewportFit(); // zurück auf CSS-Standard (top:0/bottom:0), kein Rest-Inline-Style
       markChatSeen(); // deckt auch eigene, während des Offenseins gesendete Nachrichten ab
     }
     tab.onclick = openPanel;
@@ -56008,13 +56042,21 @@
     // resizes-content) behebt das bereits in modernen Chrome/Android-Versionen; dieser Teil hier ist
     // die zusätzliche Absicherung über die VisualViewport-API für Browser ohne diese Unterstützung.
     if (window.visualViewport){
-      const adjustPanelHeight = () => {
+      const folgeSichtbaremBereich = () => {
         if (!panel.classList.contains('open')) return;
-        panel.style.height = window.visualViewport.height + 'px';
+        fitPanelToViewport();
       };
-      window.visualViewport.addEventListener('resize', adjustPanelHeight);
-      window.visualViewport.addEventListener('scroll', adjustPanelHeight);
+      window.visualViewport.addEventListener('resize', folgeSichtbaremBereich);
+      window.visualViewport.addEventListener('scroll', folgeSichtbaremBereich);
     }
+    // iOS scrollt das Layout erst NACH dem Fokus und meldet den Versatz teils verzögert - ohne
+    // Nachfassen stünde das Panel bis zum nächsten Ereignis an der falschen Stelle. Zwei kurze
+    // Nachläufe decken beide beobachteten Zeitpunkte ab (Tastatur fährt auf / Scroll ist fertig).
+    panel.addEventListener('focusin', () => {
+      if (!panel.classList.contains('open')) return;
+      setTimeout(fitPanelToViewport, 100);
+      setTimeout(fitPanelToViewport, 400);
+    });
   })();
 
   // Kampf-Wiedergabe-Modal: einmalig verdrahtet, da außerhalb des normalen Tab-Systems.
