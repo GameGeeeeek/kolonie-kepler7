@@ -181,6 +181,40 @@ check('5e: der Waechter gibt sein garantiertes Modul weiterhin unabhaengig vom U
     JS.includes("grantUnikatModul('korsarenkrone')"), { garantie: iGarantie, unikat: iUnikat });
 }
 
+// ---- 7) Erfolg "Kronjuwelen" (v8.466.0): AUSGEFUEHRT, nicht nur gegreppt.
+// Der Erfolg zaehlt ueber unikatDefs() statt ueber eine getippte Schluesselliste - genau das
+// wird hier gemessen: Mit einer erfundenen VIERTEN Definition muss das Ziel von selbst auf 4
+// steigen. Eine feste Liste wuerde weiter "3/3" melden und der Test bliebe gruen, obwohl der
+// Erfolg dann eine Unwahrheit anzeigt.
+{
+  const iUb = JS.indexOf('function unikateBesessen(s){');
+  check('7a: unikateBesessen gefunden', iUb > 0);
+  const ubQuelle = iUb > 0 ? JS.slice(iUb, JS.indexOf('\n', iUb) + 1) : '';
+  const iBmt2 = JS.indexOf('function besitztModulTyp(s, typKey){');
+  const bmtQuelle = JS.slice(iBmt2, JS.indexOf('\n  }', iBmt2) + 4);
+  const DREI = [{ key:'leviathanherz' }, { key:'waechterauge' }, { key:'korsarenkrone' }];
+  const bau = (defs) => new Function('unikatDefs', bmtQuelle + '\n' + ubQuelle
+    + '\nreturn unikateBesessen;')(() => defs);
+  const zaehle = bau(DREI);
+  // Eines im Inventar, eines eingebaut, eines gar nicht - die Vier-Quellen-Regel muss greifen.
+  const teilStand = { modules:{ 'leviathanherz:exotisch:1:w110':1 }, shipModules:{},
+    equippedModules:{ home:['waechterauge:exotisch:2:def12.w110'] }, equippedShipModules:{} };
+  check('7b: der Zaehler findet Inventar UND eingebaute Stuecke', zaehle(teilStand) === 2, zaehle(teilStand));
+  const vollStand = { modules:{ 'leviathanherz:exotisch:1:w110':1, 'korsarenkrone:exotisch:1:w110':1 },
+    shipModules:{}, equippedModules:{ home:['waechterauge:exotisch:1:w110'] }, equippedShipModules:{} };
+  check('7c: mit allen dreien ist der Erfolg erfuellt', zaehle(vollStand) === DREI.length);
+  // Das Mitwachsen: dieselbe Funktion, ein Def mehr - das Ziel steigt, der Bestand nicht.
+  const zaehleVier = bau(DREI.concat([{ key:'kuenftiges_unikat' }]));
+  check('7d: ein viertes Unikat hebt das Ziel an, statt still "vollstaendig" zu melden',
+    zaehleVier(vollStand) === 3 && DREI.concat([0]).length === 4, zaehleVier(vollStand));
+  check('7e: der Erfolgs-Eintrag nutzt den Helfer in check UND progress und zaehlt gegen unikatDefs()',
+    /key:'module_unikate'[\s\S]{0,400}check: s => unikateBesessen\(s\) >= unikatDefs\(\)\.length/.test(JS) &&
+    /progress: s => \[unikateBesessen\(s\), unikatDefs\(\)\.length\]/.test(JS));
+  check('7f: der Erfolg hat Kategorie und Icon aus der Font-Whitelist',
+    /module_unikate:'meister'/.test(JS) && /module_unikate:'ti-star'/.test(JS) &&
+    new Set([...HTML.matchAll(/^\s*\.(ti-[a-z0-9-]+):before/gm)].map(m => m[1])).has('ti-star'));
+}
+
 // ---- 6) Anzeige + Hilfe (statisch)
 check('6a: die Unikat-Zeile haengt an allen fuenf Kartenstellen',
   (JS.match(/\$\{info\?unikatZeile\(info\.def\):''\}/g) || []).length === 3 &&
