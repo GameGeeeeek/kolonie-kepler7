@@ -53,6 +53,18 @@ check('Bestandszahlen Abgrund gelesen',
   DEFS.ABGRUND_RELIKTE.length > 0 && DEFS.ABGRUND_KONSTELLATIONEN.length > 0,
   { relikte:DEFS.ABGRUND_RELIKTE.length, konstellationen:DEFS.ABGRUND_KONSTELLATIONEN.length });
 
+// Unikate (v8.464.0, Arbeitsregel 9 - Erwartungen mitgezogen): Anzahl aus der Spieldatei
+// ablesen, nicht raten. Die Kategorie zaehlt Modul-TYPEN, deshalb tragen die Attrappen
+// Fundort-Texte wie die echten Defs.
+const UNIKAT_ANZAHL = (src.match(/quelle:HERKUNFT_UNIKAT,/g) || []).length;
+check('Unikat-Anzahl gelesen', UNIKAT_ANZAHL >= 2, UNIKAT_ANZAHL);
+DEFS.UNIKATE = new Array(UNIKAT_ANZAHL).fill(0).map((_, i) => ({ key:'uni'+i, name:'Unikat '+i, fundort:'Ort '+i }));
+// besitztModulTyp kommt als ECHTE Funktion aus der Spieldatei - genau ihre Vier-Quellen-Regel
+// ("Inventar UND eingebaut, beide Modulsysteme") ist das, was hier gedeckt sein soll.
+const iBmt = src.indexOf('function besitztModulTyp(s, typKey){');
+const bmtQuelle = iBmt > 0 ? src.slice(iBmt, src.indexOf('\n  }', iBmt) + 4) : '';
+check('besitztModulTyp aus der Spieldatei gelesen', bmtQuelle.length > 80);
+
 function baue(state){
   const ctx = {};
   const allFleets = () => [state.fleet || {}].concat(Object.values(state.colonies || {}).map(c => c.fleet || {}));
@@ -65,21 +77,22 @@ function baue(state){
   const BASE_STAR_SYSTEM_COUNT = DEFS.STAR_SYSTEMS.length;
   const BASE_PLANET_IDS = new Set(DEFS.PLANETS.map(p => p.id));
   const baseStarSystems = () => DEFS.STAR_SYSTEMS;
+  const unikatDefs = () => DEFS.UNIKATE;
   new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'ACHIEVEMENTS', 'SHIP_DEFS', 'MODULE_DEFS',
     'BUILDING_DEFS', 'FACTION_DIPLOMACY', 'allFleets', 'allBuildingSets',
     'BASE_PLANET_COUNT', 'BASE_STAR_SYSTEM_COUNT', 'BASE_PLANET_IDS', 'baseStarSystems',
-    'ABGRUND_RELIKTE', 'ABGRUND_KONSTELLATIONEN',
-    block + ';ctx.CATS=COMPENDIUM_CATS;')(ctx, state, DEFS.PLANETS, DEFS.STAR_SYSTEMS, DEFS.ACHIEVEMENTS,
+    'ABGRUND_RELIKTE', 'ABGRUND_KONSTELLATIONEN', 'unikatDefs',
+    bmtQuelle + '\n' + block + ';ctx.CATS=COMPENDIUM_CATS;')(ctx, state, DEFS.PLANETS, DEFS.STAR_SYSTEMS, DEFS.ACHIEVEMENTS,
     DEFS.SHIP_DEFS, DEFS.MODULE_DEFS, DEFS.BUILDING_DEFS, DEFS.FACTION_DIPLOMACY, allFleets, allBuildingSets,
     BASE_PLANET_COUNT, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_IDS, baseStarSystems,
-    DEFS.ABGRUND_RELIKTE, DEFS.ABGRUND_KONSTELLATIONEN);
+    DEFS.ABGRUND_RELIKTE, DEFS.ABGRUND_KONSTELLATIONEN, unikatDefs);
   return ctx.CATS;
 }
 
 // ---------------------------------------------------------------- 1) Form
 const leerState = { discovered:{}, npcScaling:{}, factionRep:{}, achievements:{}, fleet:{}, buildings:{}, colonies:{}, modules:{}, equippedModules:{}, abgrund:{ relikte:{}, konstGesehen:{} } };
 const cats = baue(leerState);
-check('1: zehn Kategorien', cats.length === 10, cats.length);
+check('1: elf Kategorien', cats.length === 11, cats.length);
 check('1: jede Kategorie hat ein Icon aus der Whitelist',
   cats.every(c => whitelist.has(c.icon)), cats.filter(c => !whitelist.has(c.icon)).map(c => c.key + '=' + c.icon));
 check('1: jede Kategorie hat Name, Beschreibung und Belohnung',
@@ -114,6 +127,12 @@ DEFS.MODULE_DEFS.forEach((m, i) => {
   if (i % 2 === 0) vollState.modules[m.key + ':selten'] = 1;
   else vollState.equippedModules.home.push(m.key + ':episch');
 });
+// Unikate gemischt wie die Module darueber: gerade Indizes ins Inventar, ungerade in einen
+// Slot - die Kategorie ist nur erfuellt, wenn sie beide Quellen zusammenfuehrt.
+DEFS.UNIKATE.forEach((u, i) => {
+  if (i % 2 === 0) vollState.modules[u.key + ':exotisch:1:w110'] = 1;
+  else vollState.equippedModules.home.push(u.key + ':exotisch:1:w110');
+});
 fehler = [];
 const vollCats = baue(vollState);
 const vollWerte = vollCats.map(c => { try { return { key:c.key, have:c.have(), total:c.total() }; } catch(e){ fehler.push(c.key+': '+e.message); return null; } });
@@ -130,6 +149,19 @@ const kCats = baue(nurKolonie);
 check('4: Schiffsregister und Gebäudearchiv zählen auch Kolonien mit',
   kCats.find(c => c.key === 'ships').have() === 1 && kCats.find(c => c.key === 'buildings').have() === 1,
   { ships: kCats.find(c => c.key === 'ships').have(), buildings: kCats.find(c => c.key === 'buildings').have() });
+
+// Unikat-Zeile: `desc` ist hier bewusst eine FUNKTION, weil sie mit dem Spielstand mitwaechst.
+const uniLeer = cats.find(c => c.key === 'unikate');
+const uniVoll = vollCats.find(c => c.key === 'unikate');
+check('4u: die Unikat-Kategorie existiert und beschreibt sich per Funktion',
+  !!uniLeer && typeof uniLeer.desc === 'function');
+check('4u: ohne Unikate stehen alle auf offen (Kreis) und nennen ihren Fundort',
+  uniLeer.desc().includes('\u25CB Unikat 0 \u2013 Ort 0') && !uniLeer.desc().includes('\u2713'),
+  uniLeer.desc());
+check('4u: mit vollem Bestand sind alle abgehakt - auch das EINGEBAUTE',
+  uniVoll.desc().includes('\u2713 Unikat 0') && !uniVoll.desc().includes('\u25CB') &&
+  uniVoll.have() === DEFS.UNIKATE.length,
+  { zeile: uniVoll.desc(), have: uniVoll.have() });
 
 // ---------------------------------------------------------------- 5) Hilfe mitgezogen
 check('5: die Hilfe nennt acht Kategorien', /Kompendium deinen Sammel-Fortschritt über die ganze Galaxie in acht Kategorien/.test(src));
