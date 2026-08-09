@@ -6180,8 +6180,11 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.458.0';
+  const VERSION = '8.459.0';
   const PATCHNOTES = [
+    { version:'8.459.0', date:'09.08.2026', changes:[
+      '<strong>Phantom-Sekunden abgestellt: Die Sekunden-Gutschrift ist jetzt an den echten Uhr-Fortschritt gekoppelt.</strong> Bisher schrieb jeder Tick-<em>Aufruf</em> eine volle Sekunde Produktion gut, die Spieluhr rückte aber höchstens bis zur tatsächlichen Zeit vor. Feuert der Browser gedrosselte Timer gebündelt nach – ein Hintergrund-Tab wacht auf, das Gerät ist unter Last –, entstanden dadurch Gutschriften <em>ohne</em> Uhr-Fortschritt: Produktion für Sekunden, die es nicht gab. Im Prüfstand war das messbar (121–125% statt 100% unter künstlicher Last). Jetzt verbucht jeder Aufruf exakt den Anteil, um den die Uhr wirklich vorrückt (0 bis 1 Sekunde) – ein Aufruf ohne Uhr-Fortschritt verbucht nichts, und die Summe der Gutschriften deckt sich per Konstruktion mit der vergangenen Zeit. Die Offline-Nachholung und ihre Regeln bleiben unverändert; ein neuer Test friert die Uhr ein und misst nach, dass bei stehender Uhr wirklich nichts mehr zufließt und danach alles normal weiterläuft.'
+    ]},
     { version:'8.458.0', date:'08.08.2026', changes:[
       '<strong>Neu: das Modul-Schloss.</strong> Es gab fünf Wege, ein wertvolles Modul zu verlieren: einzeln zerlegen, Schnell-Verschrotten (ganze Seltenheit oder „Duplikate"), Kredit-Verkauf, Modulbörse – und das stille Verheizen als <em>Schmelz-Futter</em>, wenn ein Geschwister-Modul verschmolzen wird. Das neue <strong>Schloss-Symbol an jeder Inventar-Karte</strong> (beide Modulsysteme) sperrt alle fünf: Gesperrte Module lassen sich weder zerlegen noch verkaufen noch anbieten, das Schnell-Verschrotten überspringt sie, und sie zählen nicht mehr als Verschmelz-Geschwister – der 3→1-Knopf und der „2/3"-Hinweis rechnen automatisch ohne sie. <strong>Aufwerten und Neuwürfeln bleiben möglich</strong>: Diese Aktionen verbessern das Modul, und weil sie den internen Schlüssel ändern, wandert das Schloss dabei auf den neuen Stand mit. Ein Klick aufs Schloss entsperrt jederzeit wieder.'
     ]},
@@ -56072,6 +56075,24 @@
     }
     const rates = ratesPerSecond();
     const cap = storageCap();
+    /* Phantom-Sekunden-Fix (v8.459.0, Task #50): Die Gutschrift ist an den ECHTEN Uhr-
+       Fortschritt gekoppelt statt fix "eine Sekunde je Aufruf". Vorher schrieb JEDER Aufruf
+       eine volle Sekunde gut, die Uhr rueckte unten aber nur um min(tickJetzt, lastTick+1000)
+       vor - feuerte der Browser gedrosselte Timer gebuendelt nach (Hintergrund-Tab wacht auf,
+       Maschine unter Last), entstanden Gutschriften OHNE Uhr-Fortschritt. Gemessen hat das
+       test_kleine_luecken 1c unter Suite-Last: 121-125% statt 100%. Jetzt wird exakt der
+       Anteil verbucht, um den die Uhr DIESEN Aufruf wirklich vorrueckt (0..1 Sekunde) - ein
+       Aufruf ohne Uhr-Fortschritt verbucht nichts, und die Summe der Gutschriften deckt sich
+       per Konstruktion mit der vergangenen Zeit. Der Vertrag mit der Nachholung oben bleibt
+       exakt erhalten: nach applyOfflineProgress(luecke-1) steht die Uhr auf tickJetzt-1000,
+       der Anteil ist hier also genau 1 - die eine regulaere Sekunde, die die Nachholung
+       bewusst ausgelassen hat. Und die Gegenrichtung (Regel 12): Bei Luecken UNTER der
+       Nachhol-Schwelle rueckt die Uhr um genau 1 s vor, der Anteil ist 1, der Rest der
+       Luecke bleibt wie bisher als Restschuld stehen und wird ab der Schwelle am Stueck
+       nachgeholt - dieser Fix verliert also keine Zeit, er erfindet nur keine mehr. */
+    const uhrVorher = state.lastTick || tickJetzt;
+    const uhrDanach = Math.min(tickJetzt, uhrVorher + 1000);
+    const tickAnteil = Math.max(0, (uhrDanach - uhrVorher) / 1000);
     // Bugfix (Spieler-Report 20.07.2026): flashGains() bekam bisher die THEORETISCHE Rate übergeben,
     // nicht den tatsächlich gutgeschriebenen Betrag - bei vollem Lager (SOFT_CAP_OVERFLOW_RATE=0, also
     // effektiv +0) ploppte die "+N"-Einflug-Animation trotzdem weiter mit der vollen Rate auf, obwohl
@@ -56079,10 +56100,10 @@
     const actualGains = {};
     for (const r of Object.keys(rates)){
       const before = state.resources[r]||0;
-      applySoftCappedGain(state.resources, r, rates[r], cap);
+      if (tickAnteil > 0) applySoftCappedGain(state.resources, r, rates[r] * tickAnteil, cap);
       actualGains[r] = (state.resources[r]||0) - before;
     }
-    processTier2Factories(1);
+    if (tickAnteil > 0) processTier2Factories(tickAnteil);
     /* Die Uhr rueckt ERST JETZT um die eben verbuchte Sekunde vor - nach der Gutschrift, nicht
        davor. Das ist dieselbe Regel, die applyOfflineProgress fuer sich selbst aufgeschrieben hat
        ("erst gutschreiben, dann die Zeit als verbraucht markieren"), und im ersten Anlauf hat der
@@ -56094,8 +56115,10 @@
        Der Vorruecken gilt fuer BEIDE Zweige: unterhalb der Schwelle ist es die einzige Buchung
        dieses Ticks, oberhalb setzt es genau die eine Sekunde obendrauf, die die Nachholung
        ausgelassen hat (`luecke - 1`, siehe oben). In beiden Faellen deckt sich am Ende die
-       gutgeschriebene Zeit mit der vergangenen. */
-    state.lastTick = Math.min(tickJetzt, (state.lastTick || tickJetzt) + 1000);
+       gutgeschriebene Zeit mit der vergangenen. (Seit v8.459.0 ist `uhrDanach` oben aus genau
+       dieser Formel berechnet und die Gutschrift daran gekoppelt - Uhr und Buchung koennen
+       nicht mehr auseinanderlaufen.) */
+    state.lastTick = uhrDanach;
     const missionsResolved = checkMissions();
     processPirateDebrisRaid();
     processVoidRift();
