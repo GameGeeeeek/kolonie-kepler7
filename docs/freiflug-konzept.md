@@ -3,9 +3,12 @@
 Technische Bestandsaufnahme und Umsetzungsentwurf. Stand 09.08.2026, Spielversion v8.462.0.
 Zeilennummern beziehen sich auf `weltraum_kolonie.html` bzw. `kolonie-kepler7-backend/server.js`.
 
-Der spielbare Prototyp dazu liegt als **`freiflug_test.html`** im Repo – eigenständig, ohne eine
-Zeile an der Spieldatei zu ändern. Er ist der Beleg dafür, dass die hier beschriebenen Annahmen
-tragen; alle Zahlen in diesem Papier sind an ihm gemessen, nicht geschätzt.
+> **Der Prototyp wurde am 09.08.2026 auf Wunsch wieder entfernt.** Diese Bestandsaufnahme bleibt
+> stehen, weil ihr Inhalt nicht am Prototyp hängt: Die Analyse beider Repositories, die
+> Architektur-Grenzen des Backends und die Liste der wiederverwendbaren Systeme gelten unabhängig
+> davon, ob und wie die Ebene je gebaut wird. Alle Zahlen in Abschnitt 9 wurden seinerzeit am
+> laufenden Prototyp **gemessen** und sind als Messprotokoll zu lesen, nicht als Beschreibung
+> vorhandenen Codes. Wer ihn wiederhaben will: `git show 9a1695a -- freiflug_test.html`.
 
 ---
 
