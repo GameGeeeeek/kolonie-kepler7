@@ -206,9 +206,13 @@ Der „nginx auf dem Pi" ist **kein systemd-nginx**, sondern läuft als **Docker
 - **Das Zertifikat MUSS immer BEIDE Domains abdecken**: `gamegeeeeek.de` **und** `www.gamegeeeeek.de` (Canonical/OG-Tags, sitemap.xml, robots.txt zeigen alle auf `www.` als kanonische Domain). Zertifikats-Linie heißt `gamegeeeeek.de` (`live/gamegeeeeek.de/`); die `ssl_certificate`-Pfade in der nginx.conf zeigen dorthin.
 - **Neu ausstellen/erweitern** (downtime-frei, Webroot-Challenge über den laufenden Container – **kein** nginx.conf-Edit nötig, `--cert-name` hält die Linie stabil):
   ```
-  docker run --rm -v /DATA/kepler7/certbot/conf:/etc/letsencrypt -v /DATA/kepler7/certbot/www:/var/www/certbot certbot/certbot certonly --webroot -w /var/www/certbot --cert-name gamegeeeeek.de -d gamegeeeeek.de -d www.gamegeeeeek.de --expand --non-interactive --agree-tos -m luftsascha@icloud.com
+  docker run --rm -v /DATA/kepler7/certbot/conf:/etc/letsencrypt -v /DATA/kepler7/certbot/www:/var/www/certbot certbot/certbot certonly --webroot -w /var/www/certbot --cert-name gamegeeeeek.de -d gamegeeeeek.de -d www.gamegeeeeek.de --expand --non-interactive --agree-tos -m "$CERTBOT_MAIL"
   docker exec kepler7-nginx nginx -s reload
   ```
+  `$CERTBOT_MAIL` ist Saschas Kontaktadresse für die Ablauf-Warnungen von Let's Encrypt – sie steht
+  bewusst **nicht** im Repo (der Quelltext ist öffentlich), sondern wird beim Aufruf gesetzt bzw. ist
+  in der bestehenden Renewal-Config unter `/DATA/kepler7/certbot/conf/renewal/gamegeeeeek.de.conf`
+  bereits hinterlegt – bei einer reinen Erneuerung braucht es sie deshalb gar nicht.
   (Vorher risikofrei mit `--dry-run` testen.) Prüfen: `echo | openssl s_client -connect www.gamegeeeeek.de:443 -servername www.gamegeeeeek.de 2>/dev/null | openssl x509 -noout -text | grep -A1 "Subject Alternative Name"` → beide DNS-Namen müssen erscheinen.
 - **Auto-Erneuerung** läuft per root-crontab (`certbot renew --quiet` im certbot-Container mit denselben Volumes, danach nginx-Reload/Restart). `certbot renew` nutzt die gespeicherte Renewal-Config und erneuert damit automatisch **beide** Domains – die `-d`-Namen nicht erneut angeben.
 - Der Host `certbot.timer` (systemd) ist eine **harmlose Altlast** und kennt die Docker-Volume-Zertifikate nicht – ignorieren.

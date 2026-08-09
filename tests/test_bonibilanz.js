@@ -103,22 +103,22 @@ check('2: die Kommandanten-Gruppe hängt am Level', Math.abs(w('commander') - 0.
 const D = {};
 G.forEach(g => { D[g.key] = g.deckel(); });
 const echt = [
-  ['prod',       /globalBonus = Math\.min\(PROD_BONUS_CAP, globalBonus\)/, () => parseFloat((src.match(/const PROD_BONUS_CAP = ([\d.]+)/)||[])[1])],
+  ['prod',       /globalBonus = weicherDeckel\(globalBonus, PROD_BONUS_CAP\)/, () => parseFloat((src.match(/const PROD_BONUS_CAP = ([\d.]+)/)||[])[1])],
   ['atk',        null, () => parseFloat((src.match(/Math\.min\(([\d.]+), attackCombatBonusRaw\(planetKey\)\)/)||[])[1])],
   ['def',        null, () => parseFloat((src.match(/Math\.min\(([\d.]+), defenseCombatBonusRaw\(planetKey\)\)/)||[])[1])],
-  ['buildspeed', null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(planetKey, 'buildspeed'\)\)/)||[])[1])],
-  ['defatk',     null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusAt\(planetKey, 'defatk'\)\)/)||[])[1])],
+  ['buildspeed', null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(planetKey, 'buildspeed'\), ([\d.]+)\)/)||[])[1])],
+  ['defatk',     null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(planetKey, 'defatk'\), ([\d.]+)\)/)||[])[1])],
   ['raidloss',   null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(targetPlanet, 'raidloss'\)\)/)||[])[1])],
   // Ohne schliessende Klammer am Ende: seit v8.429.0 sitzt der Faehigkeitsbaum-Treibstoffbonus als
   // weiterer Subtrahend im selben Boden - geprueft wird der BODEN, nicht die vollstaendige Formel
   // (Arbeitsregel 3). Die Bilanz-Zeile heisst weiterhin "(Module)" und zeigt nur den Modulanteil.
-  ['fuelcost',   null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(state\.activeBasePlanet, 'fuelcost'\)/)||[])[1])],
-  ['exprisk',    null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(planetKey, 'exprisk'\)\)/)||[])[1])],
-  ['research',   null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusTotal\('research'\)\)/)||[])[1])],
-  ['expedition', null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusTotal\('expedition'\)\)/)||[])[1])],
-  ['trade',      null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusTotal\('trade'\)\)/)||[])[1])],
-  ['xpgain',     null, () => parseFloat((src.match(/Math\.min\(([\d.]+), moduleBonusTotal\('xpgain'\)\)/)||[])[1])],
-  ['werftkern',  null, () => parseFloat((src.match(/Math\.min\(([\d.]+), werftkernLvl\*0\.015\)/)||[])[1])],
+  ['fuelcost',   null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(state\.activeBasePlanet, 'fuelcost'\) \+ skillFuelBonus\(\), ([\d.]+)\)/)||[])[1])],
+  ['exprisk',    null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(planetKey, 'exprisk'\), ([\d.]+)\)/)||[])[1])],
+  ['research',   null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusTotal\('research'\), ([\d.]+)\)/)||[])[1])],
+  ['expedition', null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusTotal\('expedition'\), ([\d.]+)\)/)||[])[1])],
+  ['trade',      null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusTotal\('trade'\), ([\d.]+)\)/)||[])[1])],
+  ['xpgain',     null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusTotal\('xpgain'\), ([\d.]+)\)/)||[])[1])],
+  ['werftkern',  null, () => parseFloat((src.match(/weicherDeckel\(werftkernLvl\*0\.015, ([\d.]+)\)/)||[])[1])],
   // Dasselbe gilt seit 01.08.2026 fuer den Kommandanten-Deckel, und zwar aus demselben Anlass wie
   // beim Prestige: Die Levelkarte im Fortschritt-Tab nannte den ungedeckelten Rohwert ("+45%" auf
   // Level 45, wirksam +30%). Jetzt lesen Mechanik UND Anzeige aus COMMANDER_PROD_CAP. Der Test
@@ -126,7 +126,7 @@ const echt = [
   // Funktion laeuft und die Funktion wirklich deckelt - sonst waere die Konstante da, aber
   // wirkungslos, und die Uebereinstimmung waere ein Zirkelschluss.
   ['commander',  null, () => ((/const metaMult = .*\(1 \+ commanderProdBonus\(\)\)/.test(src)
-                               && /return Math\.min\(COMMANDER_PROD_CAP, n \* COMMANDER_PROD_PER_LEVEL\);/.test(src))
+                               && /return weicherDeckel\(n \* COMMANDER_PROD_PER_LEVEL, COMMANDER_PROD_CAP\);/.test(src))
                                ? parseFloat((src.match(/COMMANDER_PROD_CAP = ([\d.]+)/)||[])[1])
                                : NaN)],
   // Der Prestige-Deckel steht seit dem 01.08.2026 nicht mehr als Literal in der Produktionsrechnung:
