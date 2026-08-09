@@ -83,11 +83,12 @@ check('3b: die Fragment-Fertigung bleibt bei 100% (kein Token im gefertigten Sch
   const mach = (inv) => {
     const logs = [];
     const state = { modules: inv, shipModules: {} };
-    const fn = new Function('state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf',
+    // modulGesperrt-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss): immer offen, siehe test_modulschloss.
+    const fn = new Function('state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf', 'modulGesperrt',
       'moduleLevelOf', 'moduleWertOf', 'moduleInstanceInfo', 'shipModuleInstanceInfo',
       'log', 'playSound', 'render', 'save',
       quelle + '\nreturn fuseModules;')(
-      state, RAR, 3, (r) => r === 'selten' ? 'episch' : null,
+      state, RAR, 3, (r) => r === 'selten' ? 'episch' : null, () => false,
       (k) => parseInt(String(k).split(':')[2] || '1', 10), wertVon,
       (k) => ({ rar: RAR[String(k).split(':')[1]] || { label: '?' }, def: { name: 'Testmodul' } }),
       () => null, (t) => logs.push(t), () => {}, () => {}, () => {});

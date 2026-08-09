@@ -81,10 +81,12 @@ check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
   const mach = (inv) => {
     const logs = [];
     const state = { modules: inv, shipModules: {} };
-    const fn = new Function('state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf',
+    // modulGesperrt-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss): die Schmelze fragt jetzt
+    // das Schloss ab; hier immer offen - die Sperr-Faelle prueft test_modulschloss.
+    const fn = new Function('state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf', 'modulGesperrt',
       'moduleLevelOf', 'moduleWertOf', 'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'playSound', 'render', 'save',
       qFuse + '\nreturn fuseModules;')(
-      state, RAR, 3, naechste,
+      state, RAR, 3, naechste, () => false,
       (k) => parseInt(String(k).split(':')[2] || '1', 10), () => 100,
       (k) => ({ rar: RAR[String(k).split(':')[1]] || { label: '?' }, def: { name: 'Testmodul' } }),
       () => null, (t) => logs.push(t), () => {}, () => {}, () => {});

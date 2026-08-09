@@ -57,7 +57,16 @@ function backend(store){ return async r => {
 };}
 
 function save(zusatz){
+  // nextPlanetEventCheck/nextTraderCheck in die Zukunft (Befund 08.08.2026): Bei 0 feuert der
+  // ERSTE Planeten-Ereignis-Check GARANTIERT ein Ereignis (kein Wahrscheinlichkeits-Gate) - und
+  // je nach Phasenlage der langsamen Verarbeitungsspur landet Log+render() mitten im Messfenster
+  // und vernichtet die Marke. Der Test schien dann zu beweisen, der Cache sei tot ("da:false"),
+  // obwohl der Neuaufbau voellig korrekt war. Mehrfach als Suite-Flake aufgetreten, an diesem Tag
+  // erstmals BEIDSEITIG reproduziert (alter wie neuer Stand rot) und damit als Fixture-Luecke
+  // erkannt: Der Cache-Test muss CACHING messen, nicht Ereignis-Glueck - echte Langzeit-Speicher
+  // haben diese Felder ohnehin gesetzt.
   return JSON.stringify(Object.assign({ tutorialSeen:true, newbieWelcomeSeen:true,
+    nextPlanetEventCheck: Date.now() + 3600000, nextTraderCheck: Date.now() + 3600000,
     resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
     buildings:{solar:22,mine:20,kristallmine:18,labor:14,lager:16,werft:14,turm:8,laser:10,schild:6},
     research:{rkampf:9,rsolar:9,rerz:8}, fleet:{jaeger:600,missions:[]},
@@ -155,11 +164,31 @@ async function spiel(browser, zustand){
     await reiter(page, 'flotte');
     const start = await page.evaluate(()=>{const b=document.getElementById('fleet'); return b?b.innerHTML.length:-1;});
     check('6: #fleet ist gerendert und wirklich gross', start > 20000, start);
+    // Uhr fuer das Messfenster einfrieren (Befund 08.08.2026, im Geist von Arbeitsregel 8):
+    // Laeuft REAL gerade ein Kalender-Event (z.B. Void-Anomalie), zeigt die Event-Schiff-Karte
+    // in #fleet einen SEKUNDENGENAUEN Countdown - das Markup aendert sich dann jede Sekunde,
+    // setBoxHtml schreibt voellig KORREKT neu (das Muster ist selbstkorrigierend), und die
+    // Marke stirbt. Der Test war damit nur ausserhalb der Event-Zeitfenster gruen - an diesem
+    // Abend erstmals als Serie aufgefallen und per innerHTML-Setter-Falle auf genau diese
+    // Countdown-Zeile zurueckverfolgt (alter wie neuer Stand identisch rot). Mit stehender Uhr
+    // steht jeder legitime Countdown still, und gemessen wird die REGEL: keine Neuschreibung
+    // bei unveraendertem Inhalt. Ein kaputter Cache (schreibt trotz gleichem Markup) faellt
+    // weiterhin durch, denn die Marke stirbt am Schreiben, nicht am Inhalt.
+    // Erst einfrieren, DANN markieren - zwischen Markieren und Einfrieren kann sonst noch ein
+    // echter Tick mit tickendem Countdown feuern und die Marke vor Messbeginn vernichten
+    // (beim Einfuehren im ersten Lauf genau so passiert).
+    await page.evaluate(() => { window.__dateEcht = Date.now; const fest = Date.now(); Date.now = () => fest; });
+    // Nach dem Einfrieren schreibt der NAECHSTE Tick noch genau einmal (das Markup springt vom
+    // letzten echten auf den eingefrorenen Zeitpunkt) - erst danach steht es still. Deshalb einen
+    // Tick verstreichen lassen, BEVOR markiert wird.
+    await page.waitForTimeout(1300);
     check('6: #fleet laesst sich markieren', await markiere(page, 'fleet') === true);
     await page.waitForTimeout(3400);
     const nach = await page.evaluate(()=>{const b=document.getElementById('fleet');
       return { da:!!(b && b.firstElementChild && b.firstElementChild.__marke),
                canvas: b?b.querySelectorAll('canvas[data-ship-icon]').length:-1 };});
+    // Uhr wieder freigeben - der Bauknopf-Teil unten braucht echte Zeit.
+    await page.evaluate(() => { if (window.__dateEcht) Date.now = window.__dateEcht; });
     check('6: #fleet wird ueber mehrere Ticks NICHT neu geschrieben', nach.da === true, nach);
     // Gegenprobe zur gesparten Canvas-Arbeit: Die Schiffsgrafiken duerfen uebersprungene Ticks
     // ueberleben - refreshShipMiniIcons() laeuft jetzt nur noch beim echten Neuaufbau.

@@ -80,10 +80,11 @@ for (const fn of ['equipModule', 'equipShipModule']){
   const macheWelt = (inv, mitDaily) => {
     const state = { modules: Object.assign({}, inv), shipModules: {}, moduleFragments: 0,
                     dailyQuests: mitDaily ? { modulCount: 0 } : null };
-    const fn = new Function('state', 'MODULE_FRAGMENT_VALUE', 'moduleLevelOf',
+    // modulGesperrt-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss): immer offen.
+    const fn = new Function('state', 'MODULE_FRAGMENT_VALUE', 'moduleLevelOf', 'modulGesperrt',
       'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'render', 'save',
       quelle + '\nreturn dismantleModule;')(
-      state, { selten: 3 }, () => 1,
+      state, { selten: 3 }, () => 1, () => false,
       () => ({ rar: { label: 'Selten' }, def: { name: 'Waffen' }, level: 1 }), () => null,
       () => {}, () => {}, () => {});
     return { fn, state };
