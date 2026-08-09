@@ -27,7 +27,7 @@ function arrAus(name){
   if (i < 0) return null;
   let d = 0, st = JS.indexOf('[', i), k = st;
   for (; k < JS.length; k++){ if (JS[k]==='[') d++; else if (JS[k]===']'){ d--; if(!d) break; } }
-  try { return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss'; return "+JS.slice(st, k+1)+';')(); }
+  try { return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+JS.slice(st, k+1)+';')(); }
   catch(e){ return null; }
 }
 function fnAus(name){

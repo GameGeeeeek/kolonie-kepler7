@@ -181,7 +181,9 @@ const MD = (() => {
   for (; k<js.length; k++){ if(js[k]==='[')d++; else if(js[k]===']'){d--; if(!d)break;} }
   // Die desc-Texte enthalten HTML, aber keine Funktionsaufrufe - das Array ist als Literal lesbar,
   // sobald die beiden Herkunfts-Konstanten definiert sind.
-  return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss'; return "+js.slice(s,k+1))();
+  // HERKUNFT_UNIKAT dazu (Arbeitsregel 9, v8.463.0): Die Unikat-Defs nutzen die vierte
+  // Herkunfts-Konstante - ohne sie bricht das Literal-Parsen mit ReferenceError ab.
+  return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+js.slice(s,k+1))();
 })();
 const abgrundKeys = MD.filter(d => d.quelle === 'abgrund').map(d => d.key);
 check('C: die echten MODULE_DEFS tragen die Abgrund-Module', abgrundKeys.length >= 4, abgrundKeys);
@@ -193,6 +195,13 @@ const abgrundPool = G.fundPool(MD, { quelle:'abgrund' }).map(d => d.key);
 check('C: und der Abgrund-Pool enthaelt AUSSCHLIESSLICH sie (keine normalen Module von unten)',
   abgrundPool.length === abgrundKeys.length && abgrundPool.every(k => abgrundKeys.includes(k)),
   abgrundPool);
+// Unikate (v8.463.0): vierte Herkunft, gleiche Gegenprobe - kein Unikat darf aus dem normalen
+// Fundpool kommen (einziger Vergabeweg ist grantUnikatModul an Weltboss/Waechter).
+const unikatKeys = MD.filter(d => d.quelle === 'unikat').map(d => d.key);
+check('C: die echten MODULE_DEFS tragen die Unikate', unikatKeys.length >= 2, unikatKeys);
+check('C: KEIN Unikat liegt im normalen Fundpool',
+  unikatKeys.every(k => !normalerPool.includes(k)),
+  unikatKeys.filter(k => normalerPool.includes(k)));
 
 // ---- D) chance:0 - der Nebenbefund, der den Umbau bezahlt hat ----
 // Beim Zusammenziehen der Ziehstellen fiel auf: RARE_ITEMS hat SECHS Eintraege, einer davon

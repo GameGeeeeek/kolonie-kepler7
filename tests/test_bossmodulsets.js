@@ -32,9 +32,12 @@ function parseArray(name) {
   const bis = JS.indexOf('\n  ];', von);
   if (bis < 0) return null;
   // HERKUNFT_*-Konstanten werden im Literal referenziert - als Parameter hereinreichen.
+  // HERKUNFT_UNIKAT nachgezogen (Arbeitsregel 9, v8.463.0): Fehlt eine Konstante, wirft das
+  // Literal einen ReferenceError, der hier still zu `null` wird - der Test meldete dann
+  // "MODULE_DEFS nicht geparst" statt der eigentlichen Ursache.
   try {
-    return new Function('HERKUNFT_NORMAL', 'HERKUNFT_ABGRUND', 'HERKUNFT_BOSS',
-      'return ' + JS.slice(von + ('const ' + name + ' = ').length, bis + 5))('normal', 'abgrund', 'boss');
+    return new Function('HERKUNFT_NORMAL', 'HERKUNFT_ABGRUND', 'HERKUNFT_BOSS', 'HERKUNFT_UNIKAT',
+      'return ' + JS.slice(von + ('const ' + name + ' = ').length, bis + 5))('normal', 'abgrund', 'boss', 'unikat');
   } catch (e) { return null; }
 }
 function funktionsRumpf(name) {

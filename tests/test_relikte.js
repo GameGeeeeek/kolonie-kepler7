@@ -231,7 +231,14 @@ check('5: die Tiefensonde bleibt ein reiner Werkstattzweig',
 // vier Fehlschlaege gemeldet, obwohl der Code stimmte.
 const iRelikt = js.indexOf('const relikt = abgrundReliktDef(tiefe);');
 check('6: die Aufloesung fragt ueberhaupt nach einer Reliquie', iRelikt > 0);
-const aufloesung = js.slice(iRelikt, iRelikt + 1600);
+// Endanker statt fester Laenge (Arbeitsregel 6, nachgezogen 09.08.2026): Der Slice lief bis
+// iRelikt+1600 - eine Zahl, die niemand nachrechnet. Als in v8.463.0 ein Kommentarblock in
+// diesen Abschnitt kam, rutschte die Meldung aus dem Fenster und der Test fiel auf korrektem
+// Code durch. Jetzt endet er an der Zeile, die den Waechter-Block abschliesst; ihre Existenz
+// wird geprueft, sonst liefert indexOf -1 und der Slice liefe bis Dateiende (vacuous).
+const iEnde = js.indexOf("registerShareMoment('Wächter bezwungen'", iRelikt);
+check('6: der Endanker des Waechter-Blocks existiert', iEnde > iRelikt);
+const aufloesung = js.slice(iRelikt, iEnde > iRelikt ? iEnde : iRelikt + 1600);
 check('6: der Erstsieg wird am Kabinett erkannt, nicht an der Tiefe',
   /const reliktNeu = relikt && !a\.relikte\[relikt\.key\]/.test(aufloesung));
 check('6: bei einer Wiederholung faellt weiterhin ein Modul',
