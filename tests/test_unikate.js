@@ -51,13 +51,34 @@ const SUB_MIN = Number(JS.match(/const MODULE_SUB_MIN = (\d+);/)[1]);
 const WERT_MAX = Number(JS.match(/const MODULE_WERT_MIN = \d+, MODULE_WERT_MAX = (\d+);/)[1]);
 
 // ---- 1) Defs, Icons, PvP-Paritaet (statisch, am echten Stand - Regel 4)
-check('1a: beide Unikat-Defs mit quelle:HERKUNFT_UNIKAT und festem unikatSub',
+check('1a: die bekannten Unikat-Defs tragen Herkunft und festen unikatSub',
   /key:'leviathanherz'[^\n]*quelle:HERKUNFT_UNIKAT,\n\s*unikatSub:\{ effect:'xpgain', value:0\.03 \}/.test(JS) &&
-  /key:'waechterauge'[^\n]*quelle:HERKUNFT_UNIKAT,\n\s*unikatSub:\{ effect:'expedition', value:0\.03 \}/.test(JS));
+  /key:'waechterauge'[^\n]*quelle:HERKUNFT_UNIKAT,\n\s*unikatSub:\{ effect:'expedition', value:0\.03 \}/.test(JS) &&
+  /key:'korsarenkrone'[^\n]*quelle:HERKUNFT_UNIKAT,\n\s*unikatSub:\{ effect:'fuelcost', value:0\.03 \}/.test(JS));
 check('1b: kein unikatSub wuerfelt atk oder raidloss (PvP-Paritaet wie bei den Boss-Sets)',
   !(JS.match(/unikatSub:\{ effect:'(atk|raidloss)'/)));
-check('1c: beide Icons sind handgezeichnete ICONS-Eintraege',
-  JS.includes('mod_leviathanherz: `<svg') && JS.includes('mod_waechterauge: `<svg'));
+// Die folgenden drei Pruefungen laufen ueber ALLE Unikat-Defs statt ueber eine getippte Liste
+// (Arbeitsregel 3: die Regel pruefen, nicht die Momentaufnahme) - ein viertes Unikat ohne
+// Icon, ohne Fundort oder ohne festen Bonus faellt damit von selbst auf, ohne dass jemand
+// diesen Test anfassen muss.
+const unikatBloecke = [...JS.matchAll(/\{ key:'([a-z_]+)', name:'([^']+)', icon:'([a-z_]+)'[\s\S]{0,400}?quelle:HERKUNFT_UNIKAT,\n\s*unikatSub:\{ effect:'([a-z]+)', value:[\d.]+ \}, fundort:'([^']+)'/g)]
+  .map(m => ({ key:m[1], name:m[2], icon:m[3], sub:m[4], fundort:m[5] }));
+check('1c: jedes Unikat-Def hat Icon-Schluessel, festen Bonus und Fundort',
+  unikatBloecke.length === (JS.match(/quelle:HERKUNFT_UNIKAT,/g) || []).length && unikatBloecke.length >= 3,
+  unikatBloecke.map(u => u.key));
+check('1d: jedes Unikat-Icon ist ein handgezeichneter ICONS-Eintrag im Hausstil',
+  unikatBloecke.every(u => {
+    const m = JS.match(new RegExp('\\b' + u.icon + ": `(<svg[\\s\\S]*?<\\/svg>)`"));
+    if (!m) return false;
+    const gehaeuse = /M50 8 L86 29 V71 L50 92 L14 71 V29 Z/.test(m[1]);
+    return gehaeuse && [...m[1].matchAll(/stroke-width="([\d.]+)"/g)].every(x => x[1] === '4' || x[1] === '1.6');
+  }), unikatBloecke.map(u => u.icon));
+check('1e: jedes Unikat nennt in seiner Beschreibung Fundstelle und Spitzenwurf',
+  unikatBloecke.every(u => {
+    const i = JS.indexOf("key:'" + u.key + "'");
+    const block = JS.slice(i, i + 1400);
+    return /UNIKAT/.test(block) && /Exotisch mit festem Spitzenwurf/.test(block);
+  }), unikatBloecke.map(u => u.key));
 
 // ---- Sandbox
 function macheWelt(){
@@ -149,6 +170,16 @@ check('5d: die Drop-Haken existieren an Weltboss und Waechter mit den dokumentie
 // Erwartung nachziehen, sondern den Code, wenn die alte Erwartung eine Zusage schuetzt).
 check('5e: der Waechter gibt sein garantiertes Modul weiterhin unabhaengig vom Unikat',
   /const modName = reliktNeu \? null : grantRandomModule\(\);/.test(JS));
+// Drittes Unikat (v8.465.0) mit einer ANDEREN Jagdart: am Ende der Piratenkette. Auch hier
+// zusaetzlich - der Endboss "laesst garantiert eines fallen" steht als Zusage im Code, und
+// die Reihenfolge belegt es: erst der garantierte Wurf, dann der Unikat-Wurf obendrauf.
+{
+  const iGarantie = JS.indexOf('if (stage >= PIRATE_LAIR_MAX_STAGE || Math.random() < (0.10 + stage*0.02)){');
+  const iUnikat = JS.indexOf("if (stage >= PIRATE_LAIR_MAX_STAGE && Math.random() < 0.15){");
+  check('5f: der Piraten-Endboss wirft die Korsarenkrone ZUSAETZLICH zum garantierten Modul',
+    iGarantie > 0 && iUnikat > iGarantie &&
+    JS.includes("grantUnikatModul('korsarenkrone')"), { garantie: iGarantie, unikat: iUnikat });
+}
 
 // ---- 6) Anzeige + Hilfe (statisch)
 check('6a: die Unikat-Zeile haengt an allen fuenf Kartenstellen',
