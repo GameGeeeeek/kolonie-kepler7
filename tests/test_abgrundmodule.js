@@ -40,7 +40,7 @@ function arrAus(name){
 }
 const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1]);
 
-const MODULE_DEFS = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss'; return "+arrAus('MODULE_DEFS'))();
+const MODULE_DEFS = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+arrAus('MODULE_DEFS'))();
 const VIER = ['drucktank','echolotmast','splitterofen','nullfeldanker'];
 const defOf = k => MODULE_DEFS.find(d => d.key === k);
 

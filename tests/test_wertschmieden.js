@@ -31,7 +31,11 @@ const quelle = JS.slice(von, bis);
 const wertVon = JS.indexOf('function moduleWertOf(instKey){');
 const wertQuelle = JS.slice(wertVon, JS.indexOf('\n  }', wertVon) + 4);
 const konstanten = [
-  JS.match(/const MODULE_WERT_MIN = \d+, MODULE_WERT_MAX = \d+;/)[0]
+  JS.match(/const MODULE_WERT_MIN = \d+, MODULE_WERT_MAX = \d+;/)[0],
+  // Unikat-Sperre in rerollModuleWert (Arbeitsregel 9, v8.463.0): Die Funktion prueft seither
+  // die Herkunft - die Konstanten muessen in der Sandbox existieren. Die Sperre selbst prueft
+  // test_unikate; die Info-Stubs hier haben kein quelle-Feld und gelten damit als 'normal'.
+  "const HERKUNFT_NORMAL = 'normal'; const HERKUNFT_UNIKAT = 'unikat';"
 ].join('\n');
 
 // Sandbox: Wuerfel deterministisch, Info-Stubs mit den Feldern, die die Funktion nutzt.

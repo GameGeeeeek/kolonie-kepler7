@@ -186,7 +186,7 @@ check('C: die Verluste bleiben multiplikativ verrechnet (nie exakt null)',
 // statt zu einer blossen Anzahl zu verkommen: Ein neues Modul SOLL diesen Test einmal rot machen,
 // damit jemand die Frage darunter beantwortet - naemlich ob es PvP beruehrt.
 {
-  const MD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss'; return "+arrAus('MODULE_DEFS'))();
+  const MD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+arrAus('MODULE_DEFS'))();
   const obenWirksam = MD.filter(d => d.quelle === 'abgrund').map(d => d.key).sort();
   check('D: die Abgrund-Standortmodule sind genau diese',
     obenWirksam.join() === ['drucktank','echolotmast','krustenpresse','nullfeldanker','prisenwaage','splitterofen','taktschmiede','wrackleser'].join(), obenWirksam);
