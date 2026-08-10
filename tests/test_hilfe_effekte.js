@@ -41,7 +41,7 @@ check('def-Buffs werden multipliziert', /buff\.kind=='?='?'def'.*power \*= buff\
 // Eigenschaft ist davon unberuehrt: Es geht um die REIHENFOLGE, nicht um die Form des Deckels.
 // Die Zeilensuche wandert deshalb an die neue Schreibweise mit, statt zu entfallen; sonst faende
 // findIndex -1, `i > capZeile` waere fuer JEDE Zeile wahr, und die Pruefung bestuende trivial.
-const capZeile = zeilen.findIndex(l => l.includes("weicherDeckel(attackCombatBonusRaw"));
+const capZeile = zeilen.findIndex(l => l.includes("deckelWeich(attackCombatBonusRaw"));
 const buffZeile = zeilen.findIndex((l, i) => i > capZeile && /buff\.kind==='atk'/.test(l));
 check('der +100%-Deckel greift VOR den Buffs (sie liegen also ausserhalb)',
   capZeile > 0 && buffZeile > capZeile, { deckel: capZeile + 1, buffs: buffZeile + 1 });

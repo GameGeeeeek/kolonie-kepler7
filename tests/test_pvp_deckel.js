@@ -27,11 +27,11 @@ const BE = hatBackend ? fs.readFileSync(BE_PFAD, 'utf8') : '';
 
 // ---- 1) Die fuenf Verbrauchsstellen im Spiel laufen ueber den weichen Deckel
 const STELLEN = [
-  ['Angriffsbonus',            'const combatBonus = weicherDeckel(attackCombatBonusRaw(planetKey), 1.0);'],
-  ['Verteidigungsbonus',       'const combatBonus = weicherDeckel(defenseCombatBonusRaw(planetKey), 1.0);'],
-  ['Schlachtschiff-Angriff',   "weicherDeckel(shipModuleBonusFor('schlachtschiff','atk'), 1.0)"],
-  ['T2-Fokusarray-Angriff',    "weicherDeckel(shipModuleBonusFor('raffiniert','atk'), 1.0)"],
-  ['Ueberfall-Schutz',         "1 - weicherDeckel(moduleBonusAt(targetPlanet, 'raidloss'), 0.6)"]
+  ['Angriffsbonus',            'const combatBonus = deckelWeich(attackCombatBonusRaw(planetKey), 1.0);'],
+  ['Verteidigungsbonus',       'const combatBonus = deckelWeich(defenseCombatBonusRaw(planetKey), 1.0);'],
+  ['Schlachtschiff-Angriff',   "deckelWeich(shipModuleBonusFor('schlachtschiff','atk'), 1.0)"],
+  ['T2-Fokusarray-Angriff',    "deckelWeich(shipModuleBonusFor('raffiniert','atk'), 1.0)"],
+  ['Ueberfall-Schutz',         "1 - deckelWeich(moduleBonusAt(targetPlanet, 'raidloss'), 0.6)"]
 ];
 for (const [name, fragment] of STELLEN)
   check('1: ' + name.padEnd(24) + ' laeuft ueber den weichen Deckel', JS.includes(fragment));
@@ -95,12 +95,12 @@ if (hatBackend){
 
   // ---- 3) Die vier Backend-Stellen sind ebenfalls umgestellt
   for (const [name, fragment] of [
-    ['Angriffsgruppe',        'return weicherDeckel(b, 1.0);'],
-    ['Schiffsmodul-Angriff',  "return effect === 'atk' ? weicherDeckel(sum, 1.0) : sum;"],
-    ['Ueberfall-Schutz',      'return 1 - weicherDeckel(roh, 0.6);']
+    ['Angriffsgruppe',        'return weicherDeckel(b, 1.0 * deckelAusbauServer(save));'],
+    ['Schiffsmodul-Angriff',  "return effect === 'atk' ? weicherDeckel(sum, 1.0 * deckelAusbauServer(save)) : sum;"],
+    ['Ueberfall-Schutz',      'return 1 - weicherDeckel(roh, 0.6 * deckelAusbauServer(save));']
   ]) check('3: Backend - ' + name.padEnd(22) + ' laeuft ueber den weichen Deckel', BE.includes(fragment));
   check('3: Backend - Angriff UND Verteidigung (zwei Gruppen, nicht eine)',
-    (BE.match(/return weicherDeckel\(b, 1\.0\);/g) || []).length === 2);
+    (BE.match(/return weicherDeckel\(b, 1\.0 \* deckelAusbauServer\(save\)\);/g) || []).length === 2);
   for (const [name, muster] of [
     ['Bonus-Gruppen',   'return Math.min(1.0, b);'],
     ['Schiffsmodule',   'Math.min(1.0, sum)'],

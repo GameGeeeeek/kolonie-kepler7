@@ -89,18 +89,18 @@ const DECKEL = [1.0, 0.5, 0.4, 0.3, 0.2];
 
 // ---- 2) Verdrahtung: zwoelf Toepfe umgestellt (die PvP-Toepfe seit v8.477.0 ebenfalls)
 const UMGESTELLT = [
-  ['Produktion', 'weicherDeckel(globalBonus, PROD_BONUS_CAP)'],
-  ['Handel', "weicherDeckel(moduleBonusTotal('trade'), 0.3)"],
-  ['Expeditions-Ausbeute', "weicherDeckel(moduleBonusTotal('expedition'), 1.0)"],
-  ['Gegenschlag', "weicherDeckel(moduleBonusAt(planetKey, 'defatk'), 1.0)"],
-  ['Erfahrung', "weicherDeckel(moduleBonusTotal('xpgain'), 1.0)"],
-  ['Treibstoff', "weicherDeckel(moduleBonusAt(state.activeBasePlanet, 'fuelcost') + skillFuelBonus(), 0.5)"],
-  ['Forschungszeit', "weicherDeckel(moduleBonusTotal('research'), 0.4)"],
-  ['Bauzeit', "weicherDeckel(moduleBonusAt(planetKey, 'buildspeed'), 0.5)"],
-  ['Expeditions-Risiko', "weicherDeckel(moduleBonusAt(planetKey, 'exprisk'), 0.5)"],
-  ['Schiffsbauzeit', 'weicherDeckel(werftkernLvl*0.015, 0.20)'],
-  ['Prestige', 'weicherDeckel(n * PRESTIGE_PROD_PER_LEVEL, PRESTIGE_PROD_CAP)'],
-  ['Kommandanten-Level', 'weicherDeckel(n * COMMANDER_PROD_PER_LEVEL, COMMANDER_PROD_CAP)']
+  ['Produktion', 'deckelWeich(globalBonus, PROD_BONUS_CAP)'],
+  ['Handel', "deckelWeich(moduleBonusTotal('trade'), 0.3)"],
+  ['Expeditions-Ausbeute', "deckelWeich(moduleBonusTotal('expedition'), 1.0)"],
+  ['Gegenschlag', "deckelWeich(moduleBonusAt(planetKey, 'defatk'), 1.0)"],
+  ['Erfahrung', "deckelWeich(moduleBonusTotal('xpgain'), 1.0)"],
+  ['Treibstoff', "deckelWeich(moduleBonusAt(state.activeBasePlanet, 'fuelcost') + skillFuelBonus(), 0.5)"],
+  ['Forschungszeit', "deckelWeich(moduleBonusTotal('research'), 0.4)"],
+  ['Bauzeit', "deckelWeich(moduleBonusAt(planetKey, 'buildspeed'), 0.5)"],
+  ['Expeditions-Risiko', "deckelWeich(moduleBonusAt(planetKey, 'exprisk'), 0.5)"],
+  ['Schiffsbauzeit', 'deckelWeich(werftkernLvl*0.015, 0.20)'],
+  ['Prestige', 'deckelWeich(n * PRESTIGE_PROD_PER_LEVEL, PRESTIGE_PROD_CAP)'],
+  ['Kommandanten-Level', 'deckelWeich(n * COMMANDER_PROD_PER_LEVEL, COMMANDER_PROD_CAP)']
 ];
 for (const [name, fragment] of UMGESTELLT)
   check('2: ' + name.padEnd(22) + ' laeuft ueber den weichen Deckel', JS.includes(fragment));
@@ -113,8 +113,8 @@ for (const [name, fragment] of UMGESTELLT)
 // ueber einen Wertebereich. Das ist die staerkere Pruefung: Sie faellt auch dann, wenn beide
 // Seiten `weicherDeckel` heissen, aber verschieden rechnen.
 check('2: die PvP-Toepfe sind ebenfalls umgestellt (Paritaet prueft test_pvp_deckel.js)',
-  JS.includes('weicherDeckel(attackCombatBonusRaw(planetKey), 1.0)') &&
-  JS.includes("weicherDeckel(moduleBonusAt(targetPlanet, 'raidloss'), 0.6)"));
+  JS.includes('deckelWeich(attackCombatBonusRaw(planetKey), 1.0)') &&
+  JS.includes("deckelWeich(moduleBonusAt(targetPlanet, 'raidloss'), 0.6)"));
 check('2: es gibt keinen hart gedeckelten Topf mehr in der Bilanz',
   !JS.includes('hart:true'));
 

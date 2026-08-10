@@ -132,11 +132,11 @@ check('3e: raidDetectionLead addiert skillWarnBonusSec',
   funktionsRumpf('raidDetectionLead').includes('skillWarnBonusSec()'));
 const fuelRumpf = funktionsRumpf('missionFuelCostSplit');
 // Seit v8.468.0 ist der Deckel weich (Ueberlauf statt Klippe) und steht als
-// weicherDeckel(<summe>, 0.5) statt als Boden auf dem Multiplikator. Die gepruefte REGEL ist
+// deckelWeich(<summe>, 0.5) statt als Boden auf dem Multiplikator. Die gepruefte REGEL ist
 // unveraendert: Der Faehigkeitsbaum-Bonus liegt IM selben Deckel wie der Modul-Bonus und hat
 // keinen eigenen Kanal - deshalb muss er INNERHALB des weicherDeckel-Aufrufs stehen.
 check('3f: Treibstoff-Bonus sitzt IM Deckel des Depots (kein eigener Kanal)',
-  /weicherDeckel\([^\n]*skillFuelBonus\(\), 0\.5\)/.test(fuelRumpf));
+  /deckelWeich\([^\n]*skillFuelBonus\(\), 0\.5\)/.test(fuelRumpf));
 check('3g: maxConcurrentFleets addiert skillFleetSlots',
   funktionsRumpf('maxConcurrentFleets').includes('skillFleetSlots()'));
 

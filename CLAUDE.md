@@ -137,6 +137,40 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     der sich überspringt, ist keine Gegenprobe (dieselbe Familie wie Regel 15/17/19: nie ein
     Messwerkzeug, das sich selbst im Weg steht).
 
+22. **Vor JEDER Messung BEIDE Repos auf ihren Ursprung ziehen – nicht nur das, an dem man gerade
+    arbeitet.** Vorfall 10.08.2026, zweimal am selben Tag: `test_randkriege_front` und
+    `test_randkriege_beitrag` lesen `server.js` aus dem Nachbarverzeichnis. Das Backend-
+    Arbeitsverzeichnis stand aber noch auf einem eigenen Branch von vor einer Stunde – beim ersten
+    Mal fehlten die geprüften Funktionen komplett, beim zweiten Mal stimmte eine Schwelle nicht.
+    Beide Male sah es nach einem echten Fehler im Spiel aus und war ein veralteter Nachbar. Das ist
+    dieselbe Familie wie Regel 10 („hat der Melder die veraltete `index.html` gelesen?"), nur eine
+    Ebene höher: nicht die falsche Datei, sondern das falsche Repo-Verzeichnis.
+23. **Die Versionsnummer erst unmittelbar VOR dem Commit vergeben – und `main` in diesem Moment
+    noch einmal ansehen.** Am 10.08.2026 wurde dieselbe Änderung FÜNFMAL umnummeriert (v8.472.0 →
+    8.473 → 8.475 → 8.476 → 8.477 → 8.483), weil parallel ausgeliefert wurde und jede fremde
+    Version die eigene überholte. Jede Kollision kostet einen vollen Prüflauf (~25 Min) – bei einem
+    Auslieferungstakt darunter konvergiert das nicht von selbst; irgendwann ist Warten auf ein
+    ruhiges Fenster die schnellere Lösung. Gemerkt hat man es jedes Mal erst an Konflikten beim
+    Cherry-Pick; **die aufzulösen wäre der Fehler gewesen** – dabei verschwindet still entweder die
+    fremde oder die eigene Arbeit. Richtig: neu auf den aktuellen `main` aufsetzen, umnummerieren,
+    Patchnote HINTER der fremden einsortieren. Und: Ein neuer Commit auf `main` heißt nicht
+    automatisch Kollision – erst prüfen, ob er die eigene Nummer oder dieselben Dateien überhaupt
+    berührt (PR #321 war reine Dokumentation).
+24. **Ein pauschaler Ersetzer über TESTDATEIEN braucht dieselbe Sorgfalt wie einer über den
+    Spielcode.** Beim Umbenennen der Aufrufstelle (`weicherDeckel(` → `deckelWeich(`) am 10.08.2026
+    gingen in einem Rutsch drei Dinge schief: (a) eine zu breite Ausnahme (`weicherDeckel(d`)
+    schützte versehentlich `weicherDeckel(defenseCombatBonusRaw`; (b) die **Backend**-Erwartungen
+    wurden mit umbenannt, obwohl dort bewusst die alte Schreibweise gilt; (c) die zwei Stellen, an
+    denen der Test die aus der Datei geholte Funktion **ausführt**, wurden mit umbenannt – der Test
+    stürzte danach mit `ReferenceError` ab. In einer Testdatei stehen Suchmuster für fremden Code
+    und ausgeführter eigener Code nebeneinander; ein Textersetzer sieht den Unterschied nicht.
+    Nach so einem Lauf jede Datei einzeln per **Exit-Code** prüfen (siehe Regel 25).
+25. **Der Exit-Code ist die Wahrheit, ein `grep` über die Ausgabe ist nur Beiwerk.** Aus demselben
+    Vorfall: `node test.js 2>&1 | grep -E "^FAIL"` blieb leer, und das wurde als „grün" gemeldet –
+    der Test war in Wirklichkeit mit einem `ReferenceError` abgestürzt, dessen Meldung auf kein
+    `FAIL`-Muster passt. Dieselbe Familie wie Regel 19 (Exit-Code hinter einer Pipe): Ein
+    Messwerkzeug, das nur einen Teil der möglichen Ausgaben kennt, meldet Erfolg, wo keiner ist.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
