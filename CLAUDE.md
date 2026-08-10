@@ -96,6 +96,32 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     ein DUPLIKAT** – vor dem Mergen `git diff origin/master <branch>` prüfen; ist er leer,
     schließen statt mergen (passiert bei Backend-PR #79).
 
+20. **Eine Korrelation ist keine Ursache – und ein Befund wird erst weitergegeben, wenn der
+    MECHANISMUS benannt ist.** Vorfall 09./10.08.2026: `test_kleine_luecken` 1c meldete mal 121,5 %,
+    mal 100 %. Weil die roten Läufe zufällig in der Suite lagen und die grünen einzeln, wurde
+    „unter Suite-Last" zur Ursache erklärt und Sascha zweimal als echter Spielfehler gemeldet
+    („zweiter Überzahlungs-Pfad neben v8.459.0"). Beides war falsch: Die Suite fährt ihre Tests
+    **sequenziell** (`spawnSync` in einer Schleife), und mit vier CPU-Lasterzeugern kam sauber
+    100,0 % heraus. Die echte Ursache fand erst eine Messung, die MEHRERE Verdächtige gleichzeitig
+    abfragte (Rate am Anfang **und** am Ende, Einmalzahlungen, Schnappschuss-Rennen): Der gemeldete
+    Anteil war exakt `Rate_Ende / Rate_Anfang` (0,870 → 87,0 %; 1,000 → 100,0 %; 1,250 → 121,5 %).
+    Nicht die Gutschrift schwankte, sondern die Bezugsgröße. Konkret: Innerhalb eines Laufs war die
+    Produktion exakt konstant, zwischen den Läufen nicht – ein zufälliges Planeten-Ereignis (siehe
+    Regel 18: `nextPlanetEventCheck` ist 0, der erste Check feuert GARANTIERT) multiplizierte die
+    Produktion und lief mitten im Test ab. **Vorgehen daraus:** (a) Bei schwankenden Messwerten
+    zuerst prüfen, ob die BEZUGSGRÖSSE stabil ist, bevor der Messgegenstand verdächtigt wird;
+    (b) die vermutete Ursache aktiv zu widerlegen versuchen (hier: Last künstlich erzeugen) statt
+    nur bestätigende Fälle zu zählen; (c) einen Verdacht erst weitergeben, wenn er als Mechanismus
+    im Code benannt werden kann – „korreliert mit X" ist noch kein Befund. Das ist dieselbe Familie
+    wie Regel 10, dort für Befunde aus Hilfsläufen, hier für eigene.
+21. **Ein Test, dessen Aussage von einer über Minuten konstanten Größe abhängt, misst diese Größe
+    mit – also selbst nachmessen und die Konstanz zur eigenen Prüfung machen.** Aus demselben
+    Vorfall: 1c verglich gegen eine Rate, die EINMAL ganz am Anfang gemessen wurde, und schlug
+    deshalb in BEIDE Richtungen falsch an (87 % hätte auch 1a mit seiner 90-%-Schranke gerissen).
+    Seit der Behebung misst 1c seine Bezugsgröße unmittelbar vor und nach dem Messfenster und
+    prüft ZUERST, ob sie sich gehalten hat (`1c-vorab`). Fällt die, weiß man sofort, dass die
+    Bezugsgröße gewandert ist – statt tagelang den Messgegenstand zu verdächtigen.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
