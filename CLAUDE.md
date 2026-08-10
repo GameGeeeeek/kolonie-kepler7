@@ -171,6 +171,31 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     `FAIL`-Muster passt. Dieselbe Familie wie Regel 19 (Exit-Code hinter einer Pipe): Ein
     Messwerkzeug, das nur einen Teil der möglichen Ausgaben kennt, meldet Erfolg, wo keiner ist.
 
+26. **Eine Gegenprobe, die am ALTEN Stand grün bleibt, ist kein Beweis – sie ist der Befund.** Nicht
+    nachbessern, bis sie zufällig rot wird, sondern fragen, WARUM sie grün war: Meist misst der Test
+    einen Zustand, der sich von selbst wieder einrenkt. Vorfall 10.08.2026: `test_weltboss_rennen`
+    prüfte den Inhalt der Weltboss-Box, nachdem der Server die Schreibung abgelehnt hatte – grün an
+    beiden Ständen, weil `loadWorldBoss()` bei jedem Bestenlisten-Durchlauf erneut läuft und den
+    lokalen Notnagel überschreibt. Der Unterschied lebte nur im Fenster zwischen Ablehnung und
+    nächstem Abruf. Belegbar wurde er erst an etwas, das BLEIBT: der Ansage „<Name> - Stufe 7 ist
+    erschienen!" für einen Boss, den es nie gab (mitgeschnitten per MutationObserver auf die
+    Einblendungen). Faustregel: Heilt sich der Messgegenstand beim nächsten Takt, miss stattdessen
+    das, was der Spieler in diesem Takt zu SEHEN bekommen hat.
+27. **Eine Endstands-Prüfung nach mehreren Schreibversuchen misst nur den LETZTEN.** Aus demselben
+    Vorfall: Der Weltboss-Test schrieb fünf Fälschungen und prüfte danach einmal die Datenbank. Die
+    letzte Fälschung schrieb zufällig wieder Stufe 1 mit vollem maxHp – also sah der Endstand
+    unauffällig aus und alle vier Prüfungen waren grün, während Fälschung 1 einen Boss mit 2,08e45
+    HP durchgelassen hatte. Gemessen wird hinter JEDEM einzelnen Schreibversuch, nicht am Ende.
+28. **Eine Prüfung, die aus dem falschen Grund grün ist, ist so schlecht wie eine rote.** Die
+    „übersprungene Stufe wird abgelehnt"-Prüfung stand hinter dem bereits gesetzten lebenden Boss
+    und schlug deshalb im Zweig „Boss lebt" an – ein Duplikat der Prüfung davor, die Stufenregel war
+    überhaupt nicht belegt. Wenn eine Sperre mehrere Gründe kennt, den GRUND mitprüfen (hier: der
+    Fehlertext muss „Stufe 4" nennen), nicht nur den Statuscode.
+29. **Neue Testports gegen die vorhandenen prüfen.** `test_geteilter_speicher_http.js` startet zwei
+    Server und belegte mit Port+1 die 3199 von `test_systemliste_http.js`; der fiel danach mit
+    ECONNREFUSED aus und der Fehler sah aus, als läge er an der gerade gebauten Härtung.
+    `grep -n "PORT = " tests/*.js` vor der Wahl.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
@@ -205,6 +230,15 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     der Test war nur außerhalb der Event-Zeitfenster grün. Mit stehender Uhr steht jeder
     legitime Countdown still, und ein kaputter Cache fällt weiterhin durch (die Marke stirbt
     am Schreiben, nicht am Inhalt).
+30. **Ein Hintergrundlauf, der eine Subshell mit `&` startet, meldet den Abschluss der SUBSHELL –
+    nicht den des Tests darin.** Vorfall 10.08.2026: `(node tests/run.js > log; echo EXIT=$? >> log) &`
+    wurde als Hintergrundbefehl gestartet; die Werkzeugmeldung „completed, exit code 0" kam nach
+    Sekunden und bezog sich auf die äußere Shell, während die Suite noch minutenlang lief. Um ein
+    Haar wurde auf dieser Grundlage committet. Dieselbe Familie wie Regel 15/17: Es gilt weiterhin
+    ausschließlich die Marker-Zeile `EXIT=` in der Logdatei – eine Abschlussmeldung des Werkzeugs
+    ist kein Ersatz dafür, wenn zwischen ihr und dem Test noch eine Shell steht. Entweder den Test
+    OHNE umschließende Subshell in den Hintergrund geben, oder auf den Marker warten
+    (`until grep -q "^EXIT=" log; do sleep 10; done`).
 19. **`echo EXIT=$?` hinter einer Pipe misst das LETZTE Pipe-Glied, nie den Test** – `node
     test.js | grep FAIL; echo EXIT=$?` meldet den grep-Status (0 = Treffer gefunden!). Vorfall
     09.08.2026: Ein roter Test schien dadurch grün gemeldet. Exit-Codes immer ohne Pipe messen

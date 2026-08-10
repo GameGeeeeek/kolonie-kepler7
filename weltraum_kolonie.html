@@ -6280,8 +6280,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.483.0';
+  const VERSION = '8.484.0';
   const PATCHNOTES = [
+    { version:'8.484.0', date:'10.08.2026', changes:[
+      '<strong>Der gemeinsame Weltboss ist jetzt gegen Fremdzugriff geschützt.</strong> Der Boss lebt im geteilten Speicher, damit alle Spieler denselben sehen – und dieser eine Eintrag lief bisher durch keine Rechteprüfung. Die Kampfauflösung war längst serverseitig, der Eintrag selbst aber nicht: Wer die Schnittstelle direkt ansprach, konnte den Boss auf eine <strong>frei erfundene Stufe</strong> setzen. Weil die Trefferpunkte mit 1,6 je Stufe wachsen, hätte schon Stufe 200 einen Boss mit rund 2·10⁴⁵ Trefferpunkten ergeben – nie zu erlegen. Und da ein neuer Boss nur nach einem Kill erscheint, wäre der Weltboss damit <strong>für alle Spieler dauerhaft erledigt</strong> gewesen. Ebenso ließen sich <strong>fremde Konten in die Beitragsliste eintragen</strong> (die Belohnung nach dem Kill richtet sich allein danach) oder der Boss ohne einen einzigen Kampf für besiegt erklären.<br><br>Der Server nimmt an dieser Stelle jetzt nur noch zwei Dinge an: den <strong>allerersten Boss</strong> und den <strong>Nachfolger eines wirklich gefallenen</strong> – und auch den nur mit der richtigen Stufe, den dazu passenden Trefferpunkten und leerer Beitragsliste. Alles andere läuft ohnehin über den Kampf. <strong>Am Spiel ändert sich nichts</strong>: gleiche Stufen, gleiche Trefferpunkte, gleiche Belohnung.',
+      '<strong>Flottenmeldungen können nicht mehr unter fremdem Namen abgesetzt werden.</strong> Die Bewegungen, die dein Abhorchposten anzeigt, meldet jeder Spieler selbst in den geteilten Speicher. Auch dieser Eintrag hatte keine Prüfung: Man konnte unter der Kennung eines <em>anderen</em> Spielers beliebige Flotten veröffentlichen und damit in den Abhorchposten der ganzen Galaxie Angriffe erscheinen lassen, die es nie gab – oder die echte Meldung eines Dritten überschreiben und ihn unsichtbar machen. Melden darf jetzt nur noch jeder für sich; gelesen wird weiterhin von allen, sonst hätte der Abhorchposten nichts auszuwerten.',
+      '<strong>Nebenbei behoben: der Weltboss, den es nie gab.</strong> Erscheint ein neuer Boss, setzt ihn schlicht der erste Client, der den alten gefallen sieht. Melden zwei im selben Augenblick, nimmt der Server seit heute nur einen an – der andere bekommt eine Absage. Die wurde bisher still geschluckt und der selbst gebaute Boss <em>lokal</em> weiterverwendet: Der Spieler bekam „Stufe 7 ist erschienen" angesagt, während in Wahrheit ein ganz anderer Boss dastand, und eine Flotte dorthin wäre als „zu spät angekommen" mit 50 Kredite Trostpreis zurückgekommen. Bei einer Absage wird jetzt der echte Boss nachgelesen und dieser angesagt. Dasselbe gilt, wenn die <strong>Verbindung abreißt</strong>: Dann weiß niemand, was auf dem Server steht – also wird gar nichts angesagt und der bisherige Stand bleibt stehen, statt den unbestätigten eigenen Boss auszurufen. Und angesagt wird ohnehin nur ein <em>wirklich neuer, lebender</em> Boss – vorher konnte im Netzfehlerfall bei jedem Durchlauf erneut „ist erschienen" für einen längst besiegten Boss herausgehen.'
+    ]},
     { version:'8.483.0', date:'11.08.2026', changes:[
       '<strong>Der Deckel ist nicht mehr in Stein gemeißelt – er lässt sich ausbauen.</strong> Schritt 1 (v8.468.0) hat der Grenze die Klippe genommen: Darüber zählt jeder Punkt noch etwas. Was blieb, war die Grenze selbst – sie stand fest, egal wie weit man kam. Der neue Aufstiegs-Zweig <strong>„Verschobene Grenzen"</strong> hebt sie um <strong>3% je Stufe</strong>, und zwar bei <em>allen</em> gedeckelten Töpfen gleichzeitig: Produktion, Handel, Expeditionen, Bau-, Forschungs- und Schiffsbauzeit, Treibstoff, Erfahrung, Prestige, Kommandanten-Level, Angriff, Verteidigung und Überfall-Schutz. Genau das war die Beschwerde – nicht <em>ein</em> Deckel nervt, sondern dass man überall auf einen stößt. Der Überlauf wächst automatisch mit, weil er ein Viertel der jeweiligen Grenze beträgt. Wie die anderen Zweige ist er nach oben offen: bis Stufe 10 volle Wirkung, darüber ein Fünftel je Stufe bei steil steigenden Kosten – er läuft von selbst aus, ohne je zu enden. <strong>Spiel und Server rechnen die verschobene Grenze mit derselben Formel</strong>, auch im Kampf; ein Test vergleicht beide Fassungen über 60 Stufen und schlägt an, wenn sie auseinanderlaufen. Wer den Zweig nicht kauft, merkt nichts: Ohne gekaufte Stufe ist der Faktor exakt 1.'
     ]},
@@ -45272,7 +45277,37 @@
   const WORLDBOSS_SCHWAECHE = ['jaeger','cruisers','bomber','destroyers','jaeger','schlachtschiff','cruisers','bomber','destroyers','jaeger'];
   function worldBossSchwaeche(level){ return WORLDBOSS_SCHWAECHE[(Math.max(1, level|0) - 1) % WORLDBOSS_SCHWAECHE.length]; }
   function worldBossName(level){ return WORLDBOSS_NAMEN[(Math.max(1, level|0) - 1) % WORLDBOSS_NAMEN.length] + ' - Stufe ' + level; }
-  async function saveWorldBoss(b){ try { await storageSet(WORLDBOSS_KEY, JSON.stringify(b), true); worldBossCache = b; } catch(e){} }
+  async function saveWorldBoss(b){
+    // Ohne Server ist der lokale Speicher die Wahrheit - dort ist der selbst gebaute Boss richtig.
+    if (!useBackend()){
+      try { await storageSet(WORLDBOSS_KEY, JSON.stringify(b), true); } catch(e){}
+      worldBossCache = b;
+      return b;
+    }
+    // Mit Server gilt: NUR ein bestätigtes Schreiben macht den eigenen Boss gültig. Jeder andere
+    // Ausgang - Ablehnung, abgerissene Verbindung, kaputte Antwort - heißt „wir wissen nicht, was
+    // dort steht", und dann wird nichts zurückgegeben. Der erste Entwurf hatte hier ein
+    // umschließendes try mit `return b` dahinter: Bei einem Netzfehler wäre der unbestätigte
+    // eigene Boss durchgereicht und angesagt worden - genau der Fehler, den diese Funktion
+    // verhindern soll, nur über den Netzweg statt über die Ablehnung (Hinweis aus der
+    // PR-Durchsicht zu #331, am Code nachgeprüft).
+    let angenommen = false;
+    try {
+      const res = await backendFetch('/storage/'+encodeURIComponent(WORLDBOSS_KEY)+'?shared=true', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: JSON.stringify(b) })
+      });
+      angenommen = !!(res && res.ok);
+    } catch(e){ angenommen = false; }
+    if (angenommen){ worldBossCache = b; return b; }
+    // Abgelehnt oder unklar: den echten Boss nachlesen. Klappt auch das nicht, bleibt es bei nichts -
+    // loadWorldBoss lässt dann den alten Stand stehen und sagt nichts an.
+    try {
+      const r = await storageGet(WORLDBOSS_KEY, true);
+      if (r && r.value){ worldBossCache = JSON.parse(r.value); return worldBossCache; }
+    } catch(e){}
+    return null;
+  }
   function newWorldBoss(level){
     return { bossId: 'wb'+level+'_'+Date.now(), level, maxHp: worldBossHpFor(level), hp: worldBossHpFor(level), spawnedAt: Date.now(), contributions: {}, defeatedAt: null };
   }
@@ -45281,12 +45316,25 @@
       let b = null;
       try { const r = await storageGet(WORLDBOSS_KEY, true); if (r && r.value) b = JSON.parse(r.value); } catch(e){}
       if (!b || !b.bossId){
-        b = newWorldBoss(1);
-        await saveWorldBoss(b);
+        b = (await saveWorldBoss(newWorldBoss(1))) || b;
       } else if (b.defeatedAt && Date.now() - b.defeatedAt > WORLDBOSS_RESPAWN_DELAY_MS){
-        b = newWorldBoss((b.level||1) + 1);
-        await saveWorldBoss(b);
-        log(worldBossName(b.level)+' ist erschienen – '+worldBossArchetype(b.level).label+' mit '+fmt(b.maxHp)+' HP, Schwäche '+shipDisplayName(worldBossSchwaeche(b.level))+'. Die gemeinsame Jagd geht weiter!', worldBossArchetype(b.level).icon);
+        // Der Rückgabewert kann ein ANDERER Boss sein als der eben gebaute (Rennen verloren, siehe
+        // saveWorldBoss) - oder gar keiner, wenn der Server nicht erreichbar war. Übernommen wird,
+        // was zurückkommt; angesagt wird aber NUR ein wirklich neuer, LEBENDER Boss.
+        //
+        // Beide Bedingungen stammen aus einem echten Fehlschlag des Tests: Reisst die Verbindung ab,
+        // liefert die Rückfrage denselben, weiterhin GEFALLENEN Boss zurück - ohne die Prüfung
+        // meldete das Spiel dann bei jedem Durchlauf erneut „Stufe 6 ist erschienen!" für eine
+        // Leiche. Die bossId-Prüfung verhindert die Wiederholung, die defeatedAt-Prüfung die
+        // Falschaussage.
+        const vorherId = b.bossId;
+        const neu = await saveWorldBoss(newWorldBoss((b.level||1) + 1));
+        if (neu && neu.bossId){
+          b = neu;
+          if (neu.bossId !== vorherId && !neu.defeatedAt){
+            log(worldBossName(b.level)+' ist erschienen – '+worldBossArchetype(b.level).label+' mit '+fmt(b.maxHp)+' HP, Schwäche '+shipDisplayName(worldBossSchwaeche(b.level))+'. Die gemeinsame Jagd geht weiter!', worldBossArchetype(b.level).icon);
+          }
+        }
       }
       worldBossCache = b;
       maybeClaimWorldBossReward(b);
