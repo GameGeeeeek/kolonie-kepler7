@@ -6225,8 +6225,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.471.0';
+  const VERSION = '8.472.0';
   const PATCHNOTES = [
+    { version:'8.472.0', date:'10.08.2026', changes:[
+      '<strong>Die Fraktionen haben endlich ein Gebiet – und man sieht, wo sie aneinandergeraten.</strong> Territorium, Ausdehnung und gegenseitige Eroberung laufen serverseitig seit Monaten: Die vier Fraktionen nehmen einander im Weltentakt Grenzsysteme ab und dehnen sich in freie Nachbarsysteme aus. Zu sehen war davon ein <em>Ring</em> am Systemknoten – punktuell, ohne Ausdehnung, ohne Grenze. Auf der Galaxiekarte liegt jetzt eine <strong>Fläche</strong>: Wo mehrere Systeme derselben Fraktion beieinanderstehen, fließen sie zu einem Gebiet zusammen, ein einzelnes vorgeschobenes System bleibt ein Fleck. Am Knoten steht zusätzlich das <strong>Wappen</strong> der Fraktion, damit man sie erkennt, ohne Farben auseinanderhalten zu müssen. Und wo zwei <strong>verfeindete</strong> Gebiete einander berühren – Kartell gegen Schatten, Legion gegen Void –, zieht sich eine Kette leuchtender Riegel quer zwischen die Sterne: je enger die beiden stehen, desto länger, heller und schneller läuft der Riegel. Das ist keine neue Mechanik, sondern die vorhandene, endlich sichtbar.',
+      '<strong>Behoben: Die Fraktionsfarben widersprachen sich an drei Stellen.</strong> Die Karte las die Farbe roh vom Server und zeigte die Eisenlegion <em>blau</em> – ihr Wappen ist rot; die Void-Marodeure waren auf der Karte rot, im Überfall-Banner dagegen lavendel. In der Fraktionsübersicht stand deshalb das rote Legions-Wappen direkt neben einem blau eingefärbten Namen. Ab jetzt gilt überall dieselbe Farbe, und zwar die, die zu den Wappen passt. Die Fläche der Legion trägt auf der Karte einen leicht entsättigten Rotton: Das kräftige Rot gehört dem eigenen Heimatstern und den Warnhinweisen – eine Legionsfläche in genau dieser Farbe hätte auf derselben Karte gelegen wie beides.',
+      '<strong>Behoben: 28 von 69 Sternsystemen waren serverseitig unbespielbar.</strong> Die Systemliste des Servers kannte nur 41 Systeme – es fehlten alle acht äußersten und alle zwanzig Systeme der letzten Karten-Erweiterung. Dort konnte <strong>kein neuer Spieler starten</strong>, <strong>keine Fraktion Territorium halten oder ausdehnen</strong>, keine Supernova und kein Wurmloch entstehen, keine Piratenbasis gegründet und kein Allianz-Raid angesetzt werden: rund 40 % der Karte, und ausgerechnet die Randsektoren, waren für alles Serverseitige tot. Der Server kennt jetzt die vollständige Liste – und rechnet die <strong>wöchentlich hinzukommenden</strong> Systeme selbst mit, damit die Lücke nicht am nächsten Montag von vorn aufläuft.'
+    ]},
     { version:'8.471.0', date:'10.08.2026', changes:[
       '<strong>Die Profile stehen jetzt auch auf der Startseite.</strong> Wer die Seite zum ersten Mal öffnet – also noch gar keinen Zugang hat –, findet in der Fußzeile jetzt <strong>TikTok</strong>, <strong>Instagram</strong>, <strong>YouTube</strong> und den <strong>Discord-Server</strong>, dazu einen Satz dazu, dass hinter dem Spiel eine einzelne Person steht und es ohne Werbebudget nur durch Weitersagen wächst. Bisher waren die Profile erst nach dem Einloggen zu sehen (Willkommens-Fenster und Einstellungen) – ausgerechnet die Besucher, die noch überlegen, kamen also nie daran vorbei.'
     ]},
@@ -14089,11 +14094,20 @@
     }).join('');
   }
   // Welche NPC-Fraktion besitzt ein System (aus der Backend-Territorium-Simulation)? null = herrenlos.
+  // Liefert die besitzende Fraktion samt ANZEIGEFARBEN. Der rohe Server-Eintrag wird bewusst nicht
+  // mehr direkt weitergereicht: Seine color ist die Serverfarbe, und die widerspricht den Wappen
+  // (siehe factionColorOf). Beide Aufrufer - Angriffsdialog und Galaxiekarte - bekommen dadurch
+  // ohne eigenes Zutun dieselbe Farbe wie der Rest des Spiels.
   function factionOwning(systemId){
     const factions = galaxyCache.factions;
     if (!factions) return null;
     for (const f of Object.values(factions)){
-      if (Array.isArray(f.systems) && f.systems.includes(systemId)) return f;
+      if (Array.isArray(f.systems) && f.systems.includes(systemId)){
+        return Object.assign({}, f, {
+          color: factionColorOf(f.id, f.color),
+          mapColor: factionMapColorOf(f.id, f.color)
+        });
+      }
     }
     return null;
   }
@@ -15361,12 +15375,34 @@
   // Klare Trennung ab jetzt: INHALT (welche Fraktionen es gibt, wie sie heissen, ihre Farbe) ist
   // lokal. ZUSTAND (welche Systeme sie halten, ihre Militaerstaerke, laufende Kriege) kommt vom
   // Server und fehlt einfach, wenn er nicht antwortet - ohne den Rest mitzunehmen.
+  // mapColor ist die FLAECHENfarbe auf der Galaxiekarte, color die Farbe ueberall sonst. Bei drei
+  // der vier Fraktionen ist das dieselbe; die Legion bekommt einen entsaettigten Rotton, weil
+  // #e24b4a zugleich --c-danger IST und die Kernfarbe des eigenen Heimatsterns - eine rote Flaeche
+  // in dieser Farbe laege auf derselben Karte wie der rote Heimatkern und die roten Kollaps-Ringe.
   const FACTION_DIPLOMACY = {
-    kartell:  { name:'Aschen-Kartell',   color:'#e0a548', effectLabel:'Marktrabatt', friendly:'5% bessere Marktpreise', allied:'10% bessere Marktpreise' },
-    void:     { name:'Void-Marodeure',   color:'#c3bef5', effectLabel:'Raid-Schutz', friendly:'25% seltener Überfälle', allied:'50% seltener Überfälle' },
-    legion:   { name:'Eisenlegion',      color:'#e24b4a', effectLabel:'Ressourcen-Geschenke', friendly:'Belohnung 1x täglich abholbar (klein)', allied:'Belohnung 1x täglich abholbar (groß)' },
-    schatten: { name:'Schattenbund',     color:'#6fd0c0', effectLabel:'Kredit-Geschenke', friendly:'Belohnung 1x täglich abholbar (60 Kr.)', allied:'Belohnung 1x täglich abholbar (150 Kr.)' }
+    kartell:  { name:'Aschen-Kartell',   color:'#e0a548', mapColor:'#e0a548', effectLabel:'Marktrabatt', friendly:'5% bessere Marktpreise', allied:'10% bessere Marktpreise' },
+    void:     { name:'Void-Marodeure',   color:'#c3bef5', mapColor:'#9d8fe0', effectLabel:'Raid-Schutz', friendly:'25% seltener Überfälle', allied:'50% seltener Überfälle' },
+    legion:   { name:'Eisenlegion',      color:'#e24b4a', mapColor:'#c0504f', effectLabel:'Ressourcen-Geschenke', friendly:'Belohnung 1x täglich abholbar (klein)', allied:'Belohnung 1x täglich abholbar (groß)' },
+    schatten: { name:'Schattenbund',     color:'#6fd0c0', mapColor:'#6fd0c0', effectLabel:'Kredit-Geschenke', friendly:'Belohnung 1x täglich abholbar (60 Kr.)', allied:'Belohnung 1x täglich abholbar (150 Kr.)' }
   };
+  // Die Fraktionsfarbe, verbindlich fuer ALLE Anzeigen. Vorher gab es drei Quellen, die sich
+  // widersprachen (Befund 10.08.2026):
+  //   (a) Die Karte las galaxyCache roh aus und nahm die SERVERfarbe - dort ist die Legion blau
+  //       (#85b7eb) und der Void rot (#e24b4a), also gegenueber dem Frontend vertauscht.
+  //   (b) Das Wappen ICONS.fac_legion ist rot gezeichnet und ignoriert jeden Farbparameter.
+  //   (c) Das Ueberfall-Banner (factionAccentColor) nahm ausdruecklich die FRONTEND-Farbe.
+  // Folge: In der Fraktionskarte stand das rote Legions-Wappen direkt neben dem blau eingefaerbten
+  // Namen, und derselbe Void war im Banner lavendel und auf der Karte rot. Ab jetzt gewinnt immer
+  // die Frontend-Farbe, weil nur sie zu den Wappen passt; die Serverfarbe bleibt Rueckfall fuer
+  // Kriegsparteien ohne Diplomatie-Eintrag (Piratenflotte, Rote Klaue).
+  function factionColorOf(fid, serverFarbe){
+    const d = FACTION_DIPLOMACY[fid];
+    return (d && d.color) || serverFarbe || '#7d8199';
+  }
+  function factionMapColorOf(fid, serverFarbe){
+    const d = FACTION_DIPLOMACY[fid];
+    return (d && d.mapColor) || (d && d.color) || serverFarbe || '#7d8199';
+  }
   // Die anzuzeigenden Fraktionen: die vier Diplomatie-Fraktionen IMMER (aus FACTION_DIPLOMACY),
   // angereichert mit dem Server-Zustand wo vorhanden - plus alles, was der Server zusaetzlich kennt
   // (Piratenflotte, Rote Klaue und andere Kriegsparteien ohne Diplomatie).
@@ -15378,7 +15414,10 @@
       out[fid] = {
         id: fid,
         name: s.name || d.name,
-        color: s.color || d.color,
+        // Lokale Farbe VOR der Serverfarbe (Umkehrung vom 10.08.2026, siehe factionColorOf):
+        // Vorher gewann s.color, und damit stand das rote Legions-Wappen neben einem blauen Namen.
+        color: factionColorOf(fid, s.color),
+        mapColor: factionMapColorOf(fid, s.color),
         systems: Array.isArray(s.systems) ? s.systems : [],
         strength: s.strength || 0,
         // Damit die Anzeige den Unterschied benennen kann: stehen hier ueberhaupt Server-Daten?
@@ -47956,6 +47995,14 @@
         <stop offset="50%" stop-color="#7a2020" stop-opacity="0.35"/>
         <stop offset="100%" stop-color="#7a2020" stop-opacity="0"/>
       </radialGradient>
+      ${Object.keys(FACTION_DIPLOMACY).map(fid => {
+        const c = factionMapColorOf(fid);
+        return `<radialGradient id="terrGlow-${fid}" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${c}" stop-opacity="0.30"/>
+          <stop offset="55%" stop-color="${c}" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="${c}" stop-opacity="0"/>
+        </radialGradient>`;
+      }).join('')}
     </defs>`;
     // Sternenfeld-Hintergrund. Bis 26.07.2026 mit Math.random() erzeugt - und weil die Karte bei
     // geoeffnetem Karte-Tab JEDE SEKUNDE neu aufgebaut wird, sprangen diese 25 Sterne im Sekundentakt
@@ -48021,6 +48068,36 @@
     // trägt die Orientierung, ohne sich als Objekt anzubieten.
     inner += `<circle cx="${CX}" cy="${CY}" r="70" fill="url(#miniSunGlow-gelb)" opacity="${offen?0.22:0.5}"/>`;
     if (!offen) inner += `<circle cx="${CX}" cy="${CY}" r="16" fill="#fff7d6" opacity="0.85"/>`;
+
+    // ===== Fraktionsterritorium als FLÄCHE (10.08.2026) =========================================
+    // Bis hierher war NPC-Territorium auf der Karte ein 16-px-Ring am Systemknoten - punktuell,
+    // ohne Grenze, ohne Ausdehnung. Die Simulation dahinter läuft seit Monaten: Fraktionen
+    // expandieren im galaxyTick in freie Nachbarsysteme und nehmen einander Grenzsysteme ab.
+    // Zu sehen war davon praktisch nichts, weil ein Ring keine Fläche ist und zwei benachbarte
+    // Ringe nicht zeigen, dass dort ein zusammenhängendes Gebiet liegt.
+    //
+    // Ein weicher Verlaufskreis je besessenem System, r = 30 × Knotenskala: Wo mehrere Systeme
+    // beieinanderstehen, fließen die Kreise ineinander und ergeben ein Gebiet; ein einzelnes
+    // vorgeschobenes System bleibt ein Fleck - was es ja auch ist.
+    //
+    // Bewusst KEIN Metaball-Filter für eine harte Kante: feGaussianBlur + feColorMatrix über bis
+    // zu 277 Kreise ist auf einem Handy beim Verschieben der Karte teuer, und der Gewinn wäre rein
+    // ästhetisch. Erst messen, dann verschärfen.
+    const territorien = {};
+    for (const s2 of visSys){
+      const o = factionOwning(s2.id);
+      if (!o || !FACTION_DIPLOMACY[o.id]) continue;
+      (territorien[o.id] = territorien[o.id] || []).push(s2.id);
+    }
+    for (const fid in territorien){
+      let flaechen = '';
+      for (const sid of territorien[fid]){
+        const p = spiralPos[sid];
+        if (!p) continue;
+        flaechen += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(30*galaxyNodeScale()).toFixed(1)}" fill="url(#terrGlow-${fid})"/>`;
+      }
+      if (flaechen) inner += `<g class="terr-${fid}">${flaechen}</g>`;
+    }
     for (let arm=0; arm<3; arm++){
       let path = '';
       for (let step=0; step<=20; step++){
@@ -48104,7 +48181,18 @@
 
       const factionRing = controlledByMe
         ? `<circle cx="${x}" cy="${y}" r="${(16*knotenSkala).toFixed(1)}" fill="#5dcaa514" stroke="#5dcaa5" stroke-width="2" stroke-opacity="0.9"><title>Von dir kontrolliert</title></circle>`
-        : (owner ? `<circle cx="${x}" cy="${y}" r="${(16*knotenSkala).toFixed(1)}" fill="${owner.color}14" stroke="${owner.color}" stroke-width="1.6" stroke-opacity="0.8"><title>${owner.name} – Territorium</title></circle>` : '');
+        : (owner ? `<circle cx="${x}" cy="${y}" r="${(16*knotenSkala).toFixed(1)}" fill="none" stroke="${owner.mapColor||owner.color}" stroke-width="1.2" stroke-opacity="0.55"><title>${owner.name} – Territorium</title></circle>` : '');
+      // Wappen statt Füllung: Die Fläche darunter trägt jetzt die Farbe, der Ring muss sie nicht
+      // noch einmal erzählen - deshalb ohne Füllung und dünner. Das Wappen sagt dafür, WELCHE
+      // Fraktion es ist, ohne dass man Farben auseinanderhalten muss; die vier gibt es seit dem
+      // Icon-Audit als handgezeichnetes SVG in ICONS.
+      //
+      // Als verschachteltes <svg>, nicht als Emoji wie die übrigen Kartenabzeichen: Die
+      // Verlaufsdefinitionen (gGold, gViolet, gRed, gCyan) stehen in #sharedIconDefsSvg und sind
+      // dokumentweit gültig, url(#…) löst also auch aus diesem SVG heraus auf.
+      const ownerWappen = (owner && ICONS['fac_'+owner.id] && !isCollapsed)
+        ? `<svg x="${(pos.x + 10*knotenSkala).toFixed(1)}" y="${(pos.y - 18*knotenSkala).toFixed(1)}" width="${(13*knotenSkala).toFixed(1)}" height="${(13*knotenSkala).toFixed(1)}" viewBox="0 0 100 100" opacity="0.85">${ICONS['fac_'+owner.id].replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</svg>`
+        : '';
       const statusText = isCollapsed ? 'Kollabiert' : (controlledByMe ? '★ Kontrolle' : (owner ? owner.name : (discCount+'/'+planetsInSys.length+(colCount?' · '+colCount+' Kol.':''))));
       const statusColor = isCollapsed ? '#e24b4a' : (controlledByMe ? '#5dcaa5' : (owner ? owner.color : '#7d8199'));
       const sunType = sunTypeFor(s.id);
@@ -48129,7 +48217,7 @@
       inner += `
         <g class="galaxy-node" data-system-node="${s.id}" style="cursor:pointer;">
           <title>${s.name} (${sunType.label})${isCollapsed?' – Supernova-Kollaps, 48h unzugänglich':(owner?' – '+owner.name+' (NPC-Territorium)':'')} · ${statusText}</title>
-          ${factionRing}
+          ${factionRing}${ownerWappen}
           <circle cx="${x}" cy="${y}" r="${glowR}" fill="url(#${isCollapsed?'miniSunGlowCollapsed':'miniSunGlow-'+sunType.key})" opacity="${isCollapsed?0.9:(0.35+pct*0.6)}"/>
           ${isCollapsed ? '' : pulsarRing}
           <circle cx="${x}" cy="${y}" r="${ringR.toFixed(1)}" fill="none" stroke="${isCollapsed?'#e24b4a':(active?'#afa9ec':'#5a5f7a')}" stroke-width="${active?2:1.1}" stroke-dasharray="${ringDash}"/>
@@ -48141,6 +48229,77 @@
         </g>
       `;
     }
+    // ===== Frontsegmente zwischen verfeindeten Gebieten (10.08.2026) ============================
+    // FACTION_RIVALS legt die Feindschaften seit jeher fest (Kartell ↔ Schatten, Legion ↔ Void),
+    // aber auf der Karte war nie zu sehen, WO zwei verfeindete Gebiete aneinanderstoßen.
+    //
+    // Gezeichnet werden Segmente, nicht eine durchgehende Linie - und das ist keine Bequemlichkeit,
+    // sondern die Geometrie: Die Gebiete sind Sektoren eines schmalen Rings, ihre Nahtstellen laufen
+    // radial und sind an der heutigen Galaxie gemessen nur rund 90 Bildpunkte lang. Drei Anläufe im
+    // Entwurf (nach Radius sortiert, auf den Nahtwinkel projiziert, bis Kern und Rand verlängert)
+    // haben eine durchgezogene Linie jedes Mal ins eigene Gebiet gebogen. Was es wirklich gibt,
+    // sind Berührungen - je Systempaar ein Riegel quer zur Verbindung, länger und heller je enger
+    // die beiden stehen.
+    //
+    // Die Positionen kommen aus spiralPos, also aus BILDSCHIRMabständen. Aus gx/gy gebaut ergäbe
+    // das ein Spinnennetz quer über die Karte: Die Kartenposition hängt an den Spiralplätzen, nicht
+    // an gx/gy.
+    if (!offen){
+      const FRONT_NAH = 135;
+      const besitzer = {};
+      for (const s2 of visSys){
+        const o = factionOwning(s2.id);
+        if (o && FACTION_DIPLOMACY[o.id] && spiralPos[s2.id]) besitzer[s2.id] = o.id;
+      }
+      // Je System nur die ENGSTE Berührung, sonst häufen sich in dichten Ecken fünf Riegel
+      // übereinander. Der Schlüssel ist das Paar in fester Reihenfolge - so entsteht jeder Riegel
+      // genau einmal, egal von welcher Seite er gefunden wurde.
+      const riegel = {};
+      for (const a in besitzer){
+        const feind = FACTION_RIVALS[besitzer[a]];
+        if (!feind) continue;
+        let best = Infinity, partner = null;
+        for (const b in besitzer){
+          if (besitzer[b] !== feind) continue;
+          const d = Math.hypot(spiralPos[a].x-spiralPos[b].x, spiralPos[a].y-spiralPos[b].y);
+          if (d < best){ best = d; partner = b; }
+        }
+        if (partner && best < FRONT_NAH){
+          const schluessel = a < partner ? a+'|'+partner : partner+'|'+a;
+          if (!riegel[schluessel] || best < riegel[schluessel].d) riegel[schluessel] = { a, b:partner, d:best };
+        }
+      }
+      let frontMarkup = '';
+      for (const k in riegel){
+        const { a, b, d } = riegel[k];
+        const pa = spiralPos[a], pb = spiralPos[b];
+        const mx = (pa.x+pb.x)/2, my = (pa.y+pb.y)/2;
+        const vx = pb.x-pa.x, vy = pb.y-pa.y, L = Math.hypot(vx,vy) || 1;
+        const nx = -vy/L, ny = vx/L;
+        const naehe = 1 - d/FRONT_NAH;                 // 0 = gerade noch Berührung, 1 = Tuchfühlung
+        const halb = (13 + naehe*13) * galaxyNodeScale();
+        const x1 = (mx-nx*halb).toFixed(1), y1 = (my-ny*halb).toFixed(1);
+        const x2 = (mx+nx*halb).toFixed(1), y2 = (my+ny*halb).toFixed(1);
+        const gid = 'frontSeg-'+a+'-'+b;
+        const fa = factionMapColorOf(besitzer[a]), fb = factionMapColorOf(besitzer[b]);
+        const namenA = (FACTION_DIPLOMACY[besitzer[a]]||{}).name, namenB = (FACTION_DIPLOMACY[besitzer[b]]||{}).name;
+        frontMarkup += `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">
+            <stop offset="0%" stop-color="${fa}"/><stop offset="100%" stop-color="${fb}"/></linearGradient>`;
+        frontMarkup += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="url(#${gid})" stroke-width="${(7+naehe*5).toFixed(1)}" stroke-opacity="${(0.10+naehe*0.13).toFixed(2)}" stroke-linecap="round"/>`;
+        // Dunkler Grat: Ohne ihn verschwindet die Linie zwischen den beiden Territoriumsfarben,
+        // die direkt darunter liegen.
+        frontMarkup += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#060812" stroke-width="3.2" stroke-opacity="0.55" stroke-linecap="round"/>`;
+        // Bewegung ausschliesslich per SMIL, nie als pro Tick gerechneter Wert: Ein Wert, der sich
+        // jede Sekunde ändert, macht das Markup jede Sekunde anders und setzt den Zwischenspeicher
+        // am Ende dieser Funktion dauerhaft ausser Kraft - alle Knoten würden im Sekundentakt neu
+        // gebaut.
+        frontMarkup += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="url(#${gid})" stroke-width="${(1.5+naehe*1.4).toFixed(1)}" stroke-dasharray="6 4" stroke-linecap="round" opacity="${(0.55+naehe*0.45).toFixed(2)}">
+            <title>Front: ${namenA} gegen ${namenB}</title>
+            <animate attributeName="stroke-dashoffset" from="20" to="0" dur="${(3.4-naehe*1.6).toFixed(1)}s" repeatCount="indefinite"/></line>`;
+      }
+      if (frontMarkup) inner += frontMarkup;
+    }
+
     // Die Systemebene: eine leere Gruppe an der Stelle des geöffneten Knotens, verschoben und
     // skaliert. buildMap() füllt sie gleich - in SEINEN Koordinaten (700×230, Sonne bei 350/115),
     // die der transform in Galaxie-Koordinaten übersetzt.
