@@ -98,7 +98,19 @@ const save = () => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   buildings:{solar:30, mine:28, raffinerie:25, synth:20, labor:10, lager:5000, werft:10},
   research:{}, activeResearch:null, researchQueue:[], fleet:{missions:[]}, colonies:{},
   activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null},
-  xp:1000, credits:1000, buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{} });
+  xp:1000, credits:1000, buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{},
+  // EREIGNIS-UHREN PINNEN (Arbeitsregel 18) - ohne das misst dieser Test den Zufall mit.
+  // maybeSpawnPlanetEvent() prueft `now < nextPlanetEventCheck`; die Vorgabe ist 0, der erste
+  // Check feuert also GARANTIERT und legt ein ZUFAELLIGES Ereignis auf die Heimatwelt, das die
+  // Produktion fuer seine Laufzeit multipliziert (prodAll/res, gute UND schlechte). Der Test
+  // stellt die Uhr um ueber 800 Spielsekunden vor - das Ereignis laeuft also mitten im Lauf ab
+  // und die Produktion aendert sich genau einmal. Gemessen (vier Laeufe): die Rate war INNERHALB
+  // eines Laufs exakt konstant, unterschied sich aber ZWISCHEN den Laeufen (6,05 / 7,57 / 8,70 /
+  // 10,59 Erz/s), und der gemeldete Anteil folgte exakt dem Verhaeltnis Rate-Ende/Rate-Anfang:
+  // 0,870 -> 87,0 %, 1,000 -> 100,0 %, 1,250 -> 121,5 %. Nicht die Gutschrift schwankte, sondern
+  // die Bezugsgroesse. Der naechste Check liegt danach 2-4 h entfernt, ein Tag Vorlauf reicht also.
+  nextPlanetEventCheck: Date.now() + 24*3600*1000,
+  nextTraderCheck: Date.now() + 24*3600*1000 });
 
 function backend(store){ return async r => {
   const req=r.request(); const p=req.url().split('/api/')[1].split('?')[0];
@@ -160,15 +172,15 @@ const UHR_VOR = (sek) => {
   // defined"). Also aus zwei gespeicherten Staenden ableiten. Als Zeitachse dient `lastTick` aus
   // dem Spielstand selbst und nicht die Wanduhr des Tests - damit misst der Quotient genau das,
   // was das Spiel als "eine Sekunde" verbucht hat.
-  let rate = 0;
-  {
+  const messeRate = async (ms = 12000) => {
     const a = lies();
-    await page.waitForTimeout(12000);           // sicher ueber einen Autosave hinweg
+    await page.waitForTimeout(ms);              // sicher ueber einen Autosave hinweg
     const b = lies();
     const sek = (b.lastTick - a.lastTick) / 1000;
-    rate = sek > 0 ? (b.resources.erz - a.resources.erz) / sek : 0;
-    check('Erz-Rate am laufenden Spiel gemessen', rate > 1 && sek > 5, { rate: rate.toFixed(1), sek });
-  }
+    return { rate: sek > 0 ? (b.resources.erz - a.resources.erz) / sek : 0, sek };
+  };
+  const { rate, sek: rateSek } = await messeRate();
+  check('Erz-Rate am laufenden Spiel gemessen', rate > 1 && rateSek > 5, { rate: rate.toFixed(1), sek: rateSek });
 
   // ---- 1) DER GEDROSSELTE HINTERGRUND-TAB
   // Zehnmal je 60 Sekunden Luecke = 10 Minuten. Genau das Muster, das der Browser erzeugt.
@@ -225,7 +237,16 @@ const UHR_VOR = (sek) => {
   // ABSICHTLICH VIELE KLEINE SPRUENGE knapp ueber der Schwelle: Der Fehler betraegt eine Sekunde je
   // Nachholung, faellt also bei kurzen Luecken am staerksten ins Gewicht. Bei den 60er-Spruengen aus
   // Pruefung 1 waeren es nur ~1,7 % und damit im Messrauschen; hier sind es rund 8 %.
+  // DIE BEZUGSGROESSE WIRD HIER NEU GEMESSEN, unmittelbar vor und nach dem Messfenster - und die
+  // Prueffrage lautet zuerst: hat sich die Produktion ueberhaupt gehalten? Diese Schranke ist mit
+  // 5 % die engste des Tests; sie ist damit die einzige, bei der eine still verschobene
+  // Produktionsrate als "zu viel gutgeschrieben" durchschlaegt. Genau so ist der Test frueher in
+  // Serie umgefallen (siehe Fixture-Kommentar): gegen eine EINMAL am Anfang gemessene Rate
+  // verglichen, waehrend ein zufaelliges Planeten-Ereignis sie mittendrin veraendert hatte.
+  // Faellt 1c-vorab, weiss man sofort, dass die BEZUGSGROESSE gewandert ist und nicht die
+  // Nachholung schuld ist - der Unterschied, der beim ersten Mal Tage gekostet hat.
   {
+    const { rate: rateVor } = await messeRate();
     const a = lies();
     const N = 15, SPRUNG = 12;   // knapp ueber der Schwelle (10 s)
     for (let i = 0; i < N; i++){
@@ -234,8 +255,13 @@ const UHR_VOR = (sek) => {
     }
     await page.waitForTimeout(2500);
     const b = lies();
+    const { rate: rateNach } = await messeRate();
     const spielzeit = (b.lastTick - a.lastTick) / 1000;
-    const anteil = (b.resources.erz - a.resources.erz) / (rate * spielzeit);
+    const anteil = (b.resources.erz - a.resources.erz) / (rateVor * spielzeit);
+    const abweichung = rateVor > 0 ? Math.abs(rateNach - rateVor) / rateVor : 1;
+    check('1c-vorab: die Produktionsrate haelt sich ueber das Messfenster (sonst misst 1c sie mit)',
+      abweichung < 0.02, { vor: rateVor.toFixed(2), nach: rateNach.toFixed(2),
+                           abweichung: (abweichung*100).toFixed(1)+' %' });
     check('1c: und nicht mehr, als Zeit vergangen ist (keine Sekunde je Nachholung obendrauf)',
       anteil < 1.05, { nachholungen: N, spielzeit: Math.round(spielzeit),
                        anteil: (anteil*100).toFixed(1)+' %' });
