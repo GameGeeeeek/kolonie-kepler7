@@ -8,6 +8,10 @@
 // verfeindeten Fraktionen, und der Farbwechsel (Legion muss auf der Karte den entsättigten Ton
 // tragen, nicht die Serverfarbe Blau).
 //
+// NACHTRAG v8.476.0: Das Fixture liefert jetzt die Form, die der Server nach galaxyFuerClient()
+// wirklich schickt, und der Test misst zusaetzlich die goldene Beteiligungslinie und den Tooltip
+// mit der Zahl der Kommandanten je Seite.
+//
 // GEGENPROBE (beide Richtungen, 10.08.2026): Gegen `git show HEAD:weltraum_kolonie.html` fallen
 // „Territoriumsflächen gezeichnet", „Wappen im Knoten", „Frontsegment vorhanden" und
 // „Legion trägt NICHT die Serverfarbe". Die Kontrollprüfungen („Karte überhaupt gezeichnet",
@@ -57,10 +61,13 @@ const GALAXIE = {
     kartell:  { id:'kartell',  name:'Aschen-Kartell', color:'#fac775', systems:[sysA], strength:2 },
     schatten: { id:'schatten', name:'Schattenbund',   color:'#6fd0c0', systems:[sysB], strength:2 }
   },
+  // Genau die Form, die galaxyFuerClient() im Server erzeugt - puffer und beitragende gehen seit
+  // v8.476.0 NICHT mehr an den Client, dafuer die Anzahl je Seite und das eigene Dabeisein. Ein
+  // Fixture in der alten Rohform wuerde eine Schnittstelle pruefen, die es nicht mehr gibt.
   randkriege: { fronten: [ { a:'kartell', b:'schatten', systeme: [
-    { sys:sysA, kp:KP[sysA], puffer:{a:0,b:0}, beitragende:{} },
-    { sys:sysB, kp:KP[sysB], puffer:{a:0,b:0}, beitragende:{} }
-  ] } ] },
+    { sys:sysA, kp:KP[sysA], beitragendeA:3, beitragendeB:1, dabei:true },
+    { sys:sysB, kp:KP[sysB], beitragendeA:0, beitragendeB:2, dabei:false }
+  ] } ], meinTag: { 'kartell|schatten': 60 } },
   collapsedSystems:{}, controlledSystems:{}, news:[], activeWar:null, activeWormhole:null,
   npcEmpireStrength:1, marketTrend:1, lastTick:Date.now()
 };
@@ -98,7 +105,7 @@ const GALAXIE = {
   check('Systemknoten vorhanden', /data-system-node=/.test(svg));
 
   // ---- Der Balken --------------------------------------------------------------------------------
-  const titel = [...svg.matchAll(/<title>([^<]*umk&#228;mpft zwischen 300 und 700|[^<]*umkämpft zwischen 300 und 700)<\/title>/g)];
+  const titel = [...svg.matchAll(/umk(&#228;|ä)mpft zwischen 300 und 700/g)];
   check('Kontrollbalken vorhanden (ein Titel je Frontsystem)', titel.length === 2, titel.length);
   check('der Titel nennt beide Seiten mit ihren Werten',
     /Aschen-Kartell 812 : 188 Schattenbund/.test(svg), (svg.match(/Aschen-Kartell \d+ : \d+ Schattenbund/g)||[]).slice(0,3));
@@ -124,6 +131,26 @@ const GALAXIE = {
   // Ein Frontsystem zeigt seinen Namen immer - ohne ihn schwebte der Balken ohne Bezug im Raum.
   const namen = P.STAR_SYSTEMS.filter(x => x.id === sysA || x.id === sysB).map(x => x.name);
   check('beide Frontsysteme sind beschriftet', namen.every(n => svg.includes('>' + n + '<')), namen);
+
+  // ---- Die eigene Beteiligung (v8.476.0) --------------------------------------------------------
+  // Eine goldene Linie unter dem Balken markiert die Abschnitte, an denen man selbst beigetragen hat.
+  // Genau EINE, denn nur sysA traegt dabei:true - eine Linie an beiden waere derselbe Fehler wie
+  // gar keine, nur andersherum.
+  // Kein `\/>` im Muster: innerHTML serialisiert SVG-Elemente OHNE den schliessenden Schraegstrich
+  // (`<rect ...>`), der erste Versuch fand deshalb null Treffer bei korrektem Markup.
+  const goldlinien = [...svg.matchAll(/<rect [^>]*fill="#fac775"[^>]*>/g)];
+  check('genau eine goldene Beteiligungslinie', goldlinien.length === 1, goldlinien.map(m=>m[0]));
+  // Sie liegt unter dem GANZEN Balken, nicht nur unter dem gefuellten Teil - sonst waere sie eine
+  // zweite Fuellstandsanzeige statt einer Beteiligungsmarke.
+  if (goldlinien.length === 1){
+    const gw = Number((goldlinien[0][0].match(/width="([\d.]+)"/)||[])[1]);
+    check('die Linie spannt den ganzen Balken', gw > Math.max(...breiten), { gold: gw, fuellung: breiten });
+  }
+  check('der Tooltip nennt die Kommandanten je Seite',
+    /Kommandanten dahinter: 3 f(&#252;|ü)r Aschen-Kartell, 1 f(&#252;|ü)r Schattenbund/.test(svg),
+    (svg.match(/Kommandanten dahinter: \d+ [^,]+, \d+ [^<\n]+/g)||[]).slice(0,2));
+  check('"du bist dabei" steht nur am eigenen Abschnitt',
+    (svg.match(/du bist dabei/g)||[]).length === 1, (svg.match(/du bist dabei/g)||[]).length);
 
   check('keine Konsolenfehler', fehler.length === 0, fehler.slice(0, 3));
   await browser.close();

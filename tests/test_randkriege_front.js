@@ -14,6 +14,10 @@
 //     - Auslöschung entfernt (netto = puffer.a) ..... „gleich starke Gegenseiten bewegen nichts"
 //     - Sperre auf `aufGewinnerseite < 1` ........... „ein Einzelkonto kippt keine Schwelle"
 //     - Wächter `systems.length < 2` entfernt ....... „keine Fraktion verliert ihr letztes System"
+//   Nachtrag 10.08.2026: rkAktiveSpieler las `u.lastSeen` - ein Feld, das es gar nicht gibt. Der Test
+//   hat es nicht bemerkt, weil sein Fixture denselben erfundenen Schlüssel setzte. Seit baueDb()
+//   liegt der Zeitstempel dort, wo der Server ihn wirklich sucht; die Prüfungen 7 und 9 messen
+//   damit erstmals etwas.
 
 const { SERVER_JS, ueberspringen, pruefer } = require('./lib/umgebung');
 const fs = require('fs');
@@ -50,7 +54,7 @@ function holeKonstante(name) {
   const kette = src.match(new RegExp('^const [^;\n]*\\b' + name + ' = ([^;,\n]+)[;,]', 'm'));
   return kette ? 'const ' + name + ' = ' + kette[1].trim() + ';' : null;
 }
-const FN = ['rkGrenzsysteme', 'loadOrInitRandkriege', 'rkAktiveSpieler', 'rkTick'];
+const FN = ['rkGrenzsysteme', 'loadOrInitRandkriege', 'getUserLastSeen', 'rkAktiveSpieler', 'rkTick'];
 const KONST = ['FACTION_RIVALS', 'RK_FRONT_PAARE', 'RK_SYSTEME_JE_FRONT', 'RK_MAX', 'RK_UNTEN',
   'RK_OBEN', 'RK_TICK_DECKEL', 'RK_MIN_BEITRAGENDE', 'RK_BEITRAG_FENSTER'];
 const fnQ = FN.map(n => ({ n, q: holeFunktion(n) }));
@@ -78,6 +82,21 @@ if (fnQ.some(x => !x.q) || kQ.some(x => !x.q)) ende();
 // ---- Gestellte Umgebung ------------------------------------------------------------------------
 // Sieben Systeme in einer Reihe; a hält s1..s3, b hält s5..s7, s4 ist die Naht. So ist jede Grenze
 // von Hand nachvollziehbar.
+// db.users fuehrt KEIN lastSeen - der Zeitstempel eines Kontos liegt in db.shared['leaderboard:<id>'],
+// und jede Stelle im Server liest ihn ueber getUserLastSeen(). Im ersten Anlauf war das hier geraten
+// statt abgelesen: Das Fixture setzte `lastSeen` direkt aufs Benutzerobjekt, rkAktiveSpieler las
+// ebenfalls dort - beide Seiten teilten dieselbe falsche Annahme, und die Pruefungen 7/9 waren gruen,
+// obwohl die Funktion auf dem echten Server IMMER 0 lieferte (Hausregel 4: Fixture-Schluessel aus dem
+// Code ablesen, nie raten). Jetzt baut das Fixture beide Orte so, wie der Server sie fuehrt.
+function baueDb(users) {
+  const raus = { users: {}, shared: {} };
+  for (const [name, wert] of Object.entries(users || {})) {
+    const uid = wert.userId || name;
+    raus.users[name] = { userId: uid };
+    if (wert.lastSeen) raus.shared['leaderboard:' + uid] = JSON.stringify({ lastSeen: wert.lastSeen });
+  }
+  return raus;
+}
 function baueUmgebung(opt) {
   const o = opt || {};
   const NACHBARN = { s1:['s2'], s2:['s1','s3'], s3:['s2','s4'], s4:['s3','s5'], s5:['s4','s6'], s6:['s5','s7'], s7:['s6'] };
@@ -94,7 +113,7 @@ function baueUmgebung(opt) {
     occupiedSystems: () => new Set(o.spielerHeimat || []),
     loadOrInitFactions: () => factions,
     pushGalaxyNews: (icon, text) => nachrichten.push({ icon, text }),
-    db: { users: o.users || {} },
+    db: baueDb(o.users),
     Math: o.mathe || Math,
     Date: o.datum || Date
   };
