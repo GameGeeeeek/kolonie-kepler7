@@ -80,9 +80,9 @@ Entscheidung muss **vor** der ersten Zeile Code fallen, nicht danach.
 ## 1. Was das Konzept vorschlägt, in fünf Sätzen
 
 Die Basis hört auf, die Hauptquelle für Material zu sein, und wird stattdessen **Kraftwerk und
-Hütte**: Sie liefert Energie und veredelt, was die Flotte heranschafft. In jedem der 69 Sternsysteme
-liegen **Vorkommen** – reine Asteroiden mit einem einzigen Rohstoff und seltenere
-**Legierungsasteroiden mit zwei**. Man fliegt sie an: früh als Einzelflug mit begrenztem Laderaum,
+Hütte**: Sie liefert Energie und veredelt, was die Flotte heranschafft. In etwa zwanzig der
+69 Sternsysteme liegen **Gürtel mit Vorkommen** – reine Asteroiden mit einem einzigen Rohstoff und
+seltenere **Legierungsasteroiden mit zwei**. Man fliegt sie an: früh als Einzelflug mit begrenztem Laderaum,
 später indem man Schürfschiffe **dort stationiert** und ein **Schürfrecht** anmeldet, das dann
 dauerhaft fördert. Schürfrechte sind für alle Spieler dieselben Objekte, ihre Zahl ist knapp, und
 wer eins will, das schon jemandem gehört, muss es sich **erkämpfen**. Der Durchsatz nach Hause ist
@@ -171,9 +171,33 @@ voll besetzter Koloss **54/s**.
 
 ### 3.3 Wo sie liegen und wie sie entstehen
 
-Jedes der 69 Systeme trägt **4–9 Vorkommen** in einem Gürtel zwischen den Orbit-Positionen der
-Sektorkarte (`WEEKLY_ORBIT_POS` Z. 12425 zeigt das vorhandene Raster). Galaxieweit sind das rund
-**450 Vorkommen**.
+**Nicht jedes System hat einen Gürtel.** Rund **20 der 69 Systeme** tragen einen, mit je **4–6
+Vorkommen** – galaxieweit also etwa **90**. Die übrigen 49 Systeme haben keine, und das ist der
+Punkt: Ein Gürtelsystem ist damit ein *Ort*, kein Hintergrundrauschen. Wer einen guten hat, hat
+etwas, das ein anderer haben will.
+
+Die Begründung für diese Zahlen steht in Abschnitt 3.5 – sie ist gemessen, nicht geschätzt, und die
+erste Fassung dieses Konzepts hatte sie um den Faktor fünf falsch.
+
+**Verteilung.** Die Gürtelsysteme werden deterministisch gewählt, aber **räumlich gestreut**: Die
+Galaxiekarte wird in ein Raster gelegt, und je Rasterzelle wird genau ein System zum Gürtelsystem
+bestimmt. Ohne diese Streuung könnte der Zufall alle zwanzig in eine Ecke legen, und die Spieler am
+anderen Ende hätten keinen erreichbaren Gürtel – bei zehn Konten wäre das kein Balance-Problem
+mehr, sondern ein kaputtes Feature.
+
+**Qualität wächst mit der Entfernung von `kepler`.** Im Startsystem und seinen direkten Nachbarn
+liegen überwiegend Splitter und Brocken; Kerne und Kolosse häufen sich weit draußen. Das bindet drei
+vorhandene Systeme ohne eine einzige neue Regel zusammen: Ein weiter Flug kostet mehr Zeit und
+Treibstoff (`missionDurationFor`, `missionFuelCostSplit`), macht Navigator und den neuen
+Schürfleitstand wertvoll, und sorgt dafür, dass Anfänger in Reichweite immer *etwas* finden, während
+sich die entwickelten Konten um die großen Brocken draußen streiten. Die Knappheit sitzt damit
+da, wo sie hingehört – bei der Qualität, nicht beim Zugang.
+
+**Die Kartengeometrie ist dabei kein Engpass** (nachgerechnet an `planetOrbitXY()` Z. 48682): Die
+Planeten sitzen auf Ellipsen mit `rx = 42 + orbit·43`, jede Bahn trägt genau **einen** Planeten, der
+Rest der Bahn ist leer. Eine Gürtelbahn zwischen zwei Orbits fasst bei 34 px Markerabstand je nach
+Lage **19 bis 52** Marker. Sechs sind daneben komfortabel – die Zahl 4–6 kommt aus der Wirtschaft,
+nicht aus dem Platz.
 
 Sie werden **berechnet, nicht gespeichert.** Anzahl, Sorte, Größe und Position eines Systems ergeben
 sich aus `hashStringToFloat(systemId + ':' + epoche)` – dasselbe Verfahren, mit dem der Abgrund seine
@@ -183,8 +207,9 @@ ausschließlich, was davon **abweicht**: wer ein Vorkommen hält und wie viel Vo
 
 Das ist keine Eleganz um ihrer selbst willen, sondern eine harte Anforderung: Der geteilte Speicher
 hat ein Schlüssel- und ein Größenlimit (`MAX_SHARED_KEYS`/`MAX_SHARED_VALUE_BYTES`, definiert Z. 286/287, geprüft in der
-Storage-PUT-Route). 450 einzelne Vorkommen-Dokumente wären eine schlechte Idee; **69 System-Dokumente**
-mit je einer Handvoll Einträgen sind unauffällig.
+Storage-PUT-Route). Einzeldokumente je Vorkommen wären auch bei 90 Stück die falsche Form, weil die
+Zahl mit der Spielerschaft wachsen soll; **ein Dokument je Gürtelsystem** – also rund 20 – mit je
+einer Handvoll Einträgen ist unauffällig und bleibt es auch beim Zehnfachen.
 
 **Erschöpfung und Nachwachsen.** Ist ein Vorkommen leer, verschwindet es und der Platz bleibt
 **6 Stunden** leer, danach liegt dort ein neues – Sorte und Größe aus `epoche+1` desselben Platzes.
@@ -197,7 +222,66 @@ Ein Vorkommen ist nur zu sehen, wenn man das System schon kennt (dieselbe Regel 
 Sorte und Größe stehen nach dem ersten **Anflug oder Scan** fest; vorher zeigt die Karte einen
 grauen, unbeschrifteten Brocken. Das gibt dem **Spähschiff** und der neuen Forschung
 **Tiefenscan-Array** (Abschnitt 7) einen zweiten Nutzen und verhindert, dass man mit einem Blick auf
-die Karte 450 Vorkommen sortiert.
+die Karte alle Vorkommen auf einmal sortiert.
+
+---
+
+### 3.5 Warum 20 Systeme und nicht 69 – die Zahl ist gemessen
+
+**Die erste Fassung dieses Konzepts lag hier um den Faktor fünf daneben.** Sie schrieb „jedes der
+69 Systeme trägt 4–9 Vorkommen", also rund 450, ohne die Gegenprobe zu machen, für wie viele Spieler
+das eigentlich reichen soll. Nachgeholt am **10.08.2026** über den öffentlichen Health-Endpunkt
+(`GET /api/health`, server.js Z. 3220 – liefert bewusst nur die Kontenzahl, keine Namen):
+
+> **10 registrierte Konten.**
+
+Damit rechnet sich das Angebot so:
+
+| Anspruchslimit | maximale Nachfrage (10 Konten) | Auslastung bei 450 Vorkommen | bei 90 |
+|---|---|---|---|
+| 8 | 80 | 18 % | 89 % |
+| **5** | **50** | 11 % | **56 %** |
+
+Bei 450 Vorkommen wäre nie irgendetwas umkämpft – die gesamte Anfechtungs-Mechanik aus Abschnitt 6
+wäre toter Code, und genau sie war die zweite der beiden vorab entschiedenen Weichen. Bei rund 90
+Vorkommen und einem Limit von 5 liegt die Auslastung bei voller Beteiligung aller zehn Konten bei
+gut der Hälfte: Die guten Brocken sind knapp, irgendein Splitter ist immer frei.
+
+**Zwei Einschränkungen, ehrlich benannt.** Der Endpunkt zählt *registrierte*, nicht *aktive* Konten –
+sind real nur vier Leute unterwegs, ist die Auslastung entsprechend niedriger, und dann darf die Zahl
+der Gürtelsysteme eher auf 15 als auf 20. Und zehn Konten sind eine kleine Grundgesamtheit: Zwei neue
+Spieler verschieben die Rechnung spürbar. Deshalb gehört die Zahl **nicht** als Literal in den Code,
+sondern als benannte Konstante an genau eine Stelle:
+
+```js
+// Faustformel: rund 2 Vorkommen je erwartetem Konto, gestreut auf ~5 Vorkommen je Gürtelsystem.
+const GUERTEL_SYSTEME = 20;      // von 69 - bei wachsender Spielerschaft erhöhen
+const VORKOMMEN_JE_GUERTEL = [4, 6];
+```
+
+Ein Wachstum auf 30 Spieler heißt dann: `GUERTEL_SYSTEME` auf 60 setzen, fertig. Kein Umbau.
+
+### 3.6 Das Anspruchslimit ergibt sich aus der Aufbereitung, nicht aus dem Angebot
+
+Dieselbe Nachrechnung hat einen **Widerspruch im Konzept selbst** aufgedeckt. Die Aufbereitungsanlage
+deckelt den Durchsatz bei 60/s (Abschnitt 5.2). Dagegen gehalten:
+
+| Größe | Förderrate | sättigt die Aufbereitung zu | mehr als … ist wirkungslos |
+|---|---|---|---|
+| Splitter | 2,4/s | 4 % | 25 Stück |
+| Brocken | 6,7/s | 11 % | 9 Stück |
+| Kern | 19,2/s | 32 % | **3 Stück** |
+| Koloss | 54,0/s | 90 % | **1 Stück** |
+
+**Ein einziger Koloss lastet eine vollausgebaute Aufbereitung zu 90 % aus.** Ein Anspruchslimit von 8
+war damit von vornherein sinnlos – niemand hätte je acht gute Vorkommen gleichzeitig verarbeiten
+können. Das Limit sinkt deshalb auf **5**, und seine Begründung ändert sich: Es geht nicht um Menge,
+sondern um **Vielfalt**. Vier Rohstoffe wollen bedient werden, und fünf Rechte lassen genau das zu –
+mit einem Platz Spielraum für einen zweiten Erz- oder Kristallposten.
+
+Das ist zugleich die ehrlichere Kopplung: Wer mehr fördern will, baut die **Aufbereitung** aus, nicht
+die Zahl der Ansprüche. Der Ausbau der Basis bleibt damit der Engpass – was das erklärte Ziel des
+ganzen Umbaus war.
 
 ---
 
@@ -350,13 +434,16 @@ gehört genau einem Spieler. Es hält, solange dort mindestens ein eigenes Schü
 | Quelle | Rechte |
 |---|---|
 | Grundstock | 2 |
-| Forschung `rschuerfrecht` (6 Stufen) | +1 je Stufe |
-| **Maximum** | **8** |
+| Forschung `rschuerfrecht` (3 Stufen) | +1 je Stufe |
+| **Maximum** | **5** |
 
-Bei rund 450 Vorkommen und 8 Rechten je Spieler trägt die Galaxie etwa **50 vollausgebaute
-Schürf-Imperien**, bevor es wirklich eng wird. Ob das passt, hängt an der echten Spielerzahl – es ist
-**eine Konstante**, kein Umbau, und lässt sich nach den ersten Wochen nachziehen. Der Wert gehört
-deshalb als benannte Konstante an eine Stelle, nicht verstreut in Formeln.
+Warum 5 und nicht 8, steht in **Abschnitt 3.6**: Die Aufbereitungsanlage kann nicht mehr verarbeiten,
+und ein Limit, das über den Durchsatz hinausgeht, ist eine Zahl ohne Wirkung. Fünf Rechte decken die
+vier Rohstoffe ab und lassen einen Platz Spielraum.
+
+Bei rund 90 Vorkommen und 5 Rechten je Spieler trägt die Galaxie etwa **18 vollausgebaute
+Schürf-Imperien** – bei heute 10 registrierten Konten also mit Luft, aber ohne Überfluss. Der Wert
+gehört als benannte Konstante an genau eine Stelle, nicht verstreut in Formeln; er wird sich ändern.
 
 ### 6.2 Wer fördert und wer bewacht
 
@@ -456,7 +543,7 @@ ganzer Satz, der Wirkung und Deckel nennt, kein Kürzel-Text.
 | `key` | Name | Stufen | Wirkung |
 |---|---|---|---|
 | `rschuerftechnik` | Schürftechnik | 1 | Schaltet Schürfschiff, Aufbereitungsanlage und den Missionstyp Schürfflug frei. |
-| `rschuerfrecht` | Bergbaurecht | 6 | +1 gleichzeitiges Schürfrecht je Stufe (2 → 8). |
+| `rschuerfrecht` | Bergbaurecht | 3 | +1 gleichzeitiges Schürfrecht je Stufe (2 → 5); mehr könnte die Aufbereitungsanlage ohnehin nicht verarbeiten, siehe Abschnitt 3.6. |
 | `rfoerderung` | Fördertechnik | 10 | +3 % Förderrate je Stufe, additiv in die gedeckelte Bonus-Gruppe (max. +30 %). |
 | `rtiefenscan` | Tiefenscan-Array | 5 | Deckt Sorte und Größe unerkundeter Vorkommen im eigenen und je Stufe einem weiteren Nachbarsystem auf, ohne Anflug. |
 | `raufbereitung` | Aufbereitungstechnik | 8 | −4 % Energieverbrauch je aufbereiteter Einheit je Stufe, Boden bei −32 %. |
@@ -623,8 +710,8 @@ Drei Fallen, die bei diesen Tests konkret drohen und die dieses Repo alle schon 
 Gebäudestufen und verliert am meisten. Der Ausgleich in 4.3 ist deshalb keine Geste, sondern Teil der
 Mechanik – und der Patchnote nennt die Zahl, statt sie zu umschreiben.
 
-**Der Wettlauf um Schürfrechte begünstigt, wer zuerst da ist.** Bei rund 450 Vorkommen und einem
-Limit von 8 ist das in den ersten Tagen kein Problem, in einem Jahr vielleicht schon. Gegenmittel
+**Der Wettlauf um Schürfrechte begünstigt, wer zuerst da ist.** Bei rund 90 Vorkommen und einem
+Limit von 5 ist das in den ersten Tagen kein Problem, in einem Jahr vielleicht schon. Gegenmittel
 sind vorhanden und billig: Anspruchslimit senken, Vorkommen je System erhöhen, Nachwachszeit
 verkürzen. Alle drei sind Konstanten. Sie sollten **von Anfang an als benannte Konstanten an einer
 Stelle stehen**, damit ein Nachziehen ein Einzeiler bleibt.
