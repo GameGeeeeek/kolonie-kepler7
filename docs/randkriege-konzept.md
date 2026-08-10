@@ -511,11 +511,34 @@ sieht danach am echten Spielerverhalten, ob die tiefere Fassung überhaupt gebra
 
 ## 9. Reihenfolge, wenn gebaut wird
 
-1. **Systemlisten angleichen** (41 gegen 69) und Paritätstest ergänzen — Pflicht, unabhängig davon
-2. **Farbkonflikt auflösen** — eine Entscheidung, zwei Zeilen
-3. **Sichtbarkeit** (Abschnitt 8) — Fläche, Frontbalken, Nachrichten
+1. ✅ **Systemlisten angleichen** und Paritätstest ergänzen — *gebaut am 10.08.2026.* Aus „41 gegen
+   69" wurde beim Bauen mehr, als der Entwurf annahm: Die Folgen reichten weit über die
+   400-Ablehnung hinaus (kein Spawn, kein Territorium, keine Supernova, kein Wurmloch, keine
+   Piratenbasis, kein Allianz-Raid in 28 Systemen), und ein einmaliges Nachtragen hätte nicht
+   gereicht — der Server rechnet die wöchentlich hinzukommenden Systeme jetzt selbst mit.
+   Belegt durch `tests/test_systemparitaet.js` (Frontend, statisch, inkl. Wochenformel bis
+   Index 207) und `tests/test_systemliste_http.js` (Backend, echter Server: 9 von 12 Spawns landen
+   in vorher toten Sektoren).
+2. ✅ **Farbkonflikt auflösen** — *gebaut.* Es waren nicht zwei Stellen, sondern drei, und die
+   Karte ging gar nicht durch `diplomacyFactions()`. Jetzt gibt es `factionColorOf()` und
+   `factionMapColorOf()` als einzige Quelle; die lokale Farbe gewinnt, weil nur sie zu den Wappen
+   passt. Legion-Fläche `#c0504f` statt `#e24b4a`.
+3. ✅ **Sichtbarkeit** — *gebaut.* Territorium als Fläche (ein `radialGradient` je Fraktion,
+   r = 30 × Knotenskala), Wappen am Knoten als verschachteltes `<svg>`, Frontsegmente zwischen
+   verfeindeten Nachbarn aus Bildschirmabständen. Bewusst **ohne** Kontrollbalken: Kontrollpunkte
+   gibt es noch nicht, ein Balken ohne Mechanik dahinter wäre eine Behauptung.
+   Belegt durch `tests/test_fraktionsgebiet.js` (Quelltext) und
+   `tests/test_fraktionsgebiet_karte.js` (Browser, misst das erzeugte SVG).
 4. `activeWar` an `f.systems` koppeln — der Krieg bewegt erstmals etwas
 5. Kontrollpunkte, Puffer, Tickdeckel — die eigentliche Frontmechanik
-6. Die sieben Handlungen, beginnend mit dem Bollwerk (als einzige server-autoritativ)
+6. Die sieben Handlungen, beginnend mit dem Bollwerk (als einzige server-autoritativ).
+   **Achtung, Korrektur aus der Nachprüfung:** Nur die Expedition dockt wirklich ohne neuen Hook
+   an. Piratennest und Fundmeldung brauchen einen, und das Piratenversteck braucht überhaupt erst
+   einen Ort in der Galaxie.
 7. Dienstgrade, Frontmarken, Wochendeckel
 8. Kriegsraum-Ansicht und Wappenfamilie
+
+> **Vor Schritt 5 zu entscheiden, nicht danach:** Ob täglich drei verschiedene Spieler
+> zusammenkommen. Steht die Front sonst still, sind die Schritte 5–8 gebaute Deko. Die Schritte
+> 1–3 sind davon unabhängig wertvoll — 1 war ein echter Fehler, 2 ein sichtbarer Widerspruch,
+> 3 macht eine seit Monaten laufende Simulation erstmals erlebbar.
