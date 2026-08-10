@@ -39,6 +39,30 @@ check('1d: der Link nutzt accountUsername, nicht state.player.name',
   /function einladungsLink\(\)\{[\s\S]{0,200}accountUsername/.test(JS) &&
   !/function einladungsLink\(\)\{[\s\S]{0,200}state\.player\.name/.test(JS));
 
+// ---- 1e) Die Startseite trägt dieselben Adressen (v8.471.0)
+// Die Landing-Fusszeile hat ihre Links BEWUSST statisch im Markup - die oeffentliche Startseite
+// soll ohne JS-Ausfuehrung lesbar sein, und rel="me" zaehlt nur im ausgelieferten HTML. Der Preis
+// ist eine zweite Stelle mit denselben Adressen; genau davor warnt CLAUDE.md Punkt 6. Deshalb wird
+// hier verglichen: Die Liste bleibt die Quelle, das Markup ist ihre ueberwachte Kopie.
+{
+  const listeRoh = JS.slice(JS.indexOf('const SOCIAL_PROFILE = ['));
+  const ausListe = (listeRoh.slice(0, listeRoh.indexOf('];')).match(/url:'([^']+)'/g) || [])
+    .map(x => x.slice(5, -1)).sort();
+  const fussVon = HTML.indexOf('<span class="ll-social">');
+  const fussBis = fussVon < 0 ? -1 : HTML.indexOf('</span>', fussVon);
+  check('1e-a: die Social-Zeile der Startseite existiert', fussVon > 0 && fussBis > fussVon);
+  const ausFuss = fussVon < 0 ? [] :
+    (HTML.slice(fussVon, fussBis).match(/href="([^"]+)"/g) || []).map(x => x.slice(6, -1)).sort();
+  check('1e-b: sie traegt genau dieselben Adressen wie SOCIAL_PROFILE (keine zweite Wahrheit)',
+    ausFuss.length === 4 && JSON.stringify(ausFuss) === JSON.stringify(ausListe),
+    { startseite: ausFuss, liste: ausListe });
+  // rel="me" ordnet die Profile derselben Person zu - bei der Discord-EINLADUNG waere es falsch,
+  // die gehoert keiner Person.
+  const mitMe = (HTML.slice(Math.max(0,fussVon), Math.max(0,fussBis)).match(/rel="me /g) || []).length;
+  check('1e-c: die drei Personen-Profile sind mit rel="me" ausgezeichnet, die Discord-Einladung nicht',
+    mitMe === 3, mitMe);
+}
+
 function backend(store){ return async r => {
   const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
   const j = (o, s2=200) => r.fulfill({status:s2, contentType:'application/json', body:JSON.stringify(o)});
