@@ -632,7 +632,22 @@ sieht danach am echten Spielerverhalten, ob die tiefere Fassung überhaupt gebra
      jeden Schlüssel in `db.private[userId]` — auch die serverinternen `__`-Felder. Gemessen ließen
      sich damit abgerechnete Beiträge ein zweites Mal einlösen und die Nachschub-Sperrzeit umgehen.
      Behoben und mit `tests/test_privatschluessel_http.js` abgesichert (Backend-PR #94).
-8. Kriegsraum-Ansicht und Wappenfamilie
+8. ✅ **Kriegsraum-Ansicht und Wappenfamilie** — *gebaut am 10.08.2026.* Der Unterreiter „Front"
+   im Galaxie-Tab zeigt beide Fronten mit jedem Abschnitt (Halter, Kontrollwert, Kommandanten je
+   Seite, eigene Beteiligung), oben den höchsten Dienstgrad samt Frontmarken, unten die Dienstgrade
+   je Fraktion. **Er bedient nichts** – geliefert wird weiterhin genau an einer Stelle; eine zweite
+   Bedienstelle wäre die nächste Gelegenheit für zwei Wahrheiten, und `tests/test_kriegsraum.js`
+   prüft ausdrücklich, dass dort kein einziger Knopf steht.
+   - Die elf Symbole der `facw_*`-Familie kamen fertig aus `docs/randkriege-entwuerfe/wappen.js`,
+     wo sie an gerenderten Bildern korrigiert worden waren. Beim Einbau sind ihre Verläufe auf die
+     **vorhandenen** des Spiels umgehängt (`gGold`, `gViolet`, `gRed`, `gCyan`, `gSteel`, Filter
+     `ig`) statt eine zweite Verlaufsfamilie mitzubringen.
+   - Die Dienstgrad-Abzeichen sind eine **Leiter**, keine sechs beliebigen Zeichen: derselbe
+     Träger, wachsende Auszeichnung – Balken bis Stufe 3, größerer goldener Stern ab 4, Kranz ab 5,
+     Krone ab 6.
+
+**Damit ist die Reihenfolge abgearbeitet.** Was aus 4.2 offen bleibt (fünf weitere Wochendeckel),
+steht dort mit der Begründung, warum es nach den Sperren aus 2.1 womöglich gar nicht mehr nötig ist.
 
 > **Vor Schritt 5 zu entscheiden, nicht danach:** Ob täglich drei verschiedene Spieler
 > zusammenkommen. Steht die Front sonst still, sind die Schritte 5–8 gebaute Deko. Die Schritte

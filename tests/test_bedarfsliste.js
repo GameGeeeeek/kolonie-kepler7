@@ -136,8 +136,13 @@ for (const tab of ['basis','flotte','forschung']){
 {
   const OFFICERS = [{ key:'ingenieur', name:'Ingenieur' }, { key:'admiral', name:'Admiral' }];
   const SHIP_DEFS = [{ key:'jaeger', name:'Jäger' },
-                     { key:'kometenjaeger', name:'Kometenjäger', unlockEventParts:{ eventKey:'meteorsturm' } }];
-  const EVENT_CALENDAR = [{ key:'meteorsturm', name:'Meteoritensturm', partKey:'meteorsturm_teil', partsNeeded:6 }];
+                     { key:'kometenjaeger', name:'Kometenjäger', unlockEventParts:{ eventKey:'meteorsturm' } },
+                     // Seit v8.482.0 kann ein Event-Schiff ZUSAETZLICH ueber eine Forschung frei sein
+                     // (Minenschiff/Minentechnik). Dann darf die Bedarfsliste nicht mehr zum
+                     // Teilesammeln auffordern - das Schiff ist ja bereits baubar.
+                     { key:'schuerfschiff', name:'Schürfschiff', unlockEventParts:{ eventKey:'goldrausch' }, forschungUnlock:'rminentechnik' }];
+  const EVENT_CALENDAR = [{ key:'meteorsturm', name:'Meteoritensturm', partKey:'meteorsturm_teil', partsNeeded:6 },
+                          { key:'goldrausch', name:'Goldrausch', partKey:'goldrausch_teil', partsNeeded:6 }];
   const bau = new Function('state','OFFICERS','SHIP_DEFS','EVENT_CALENDAR','umgebung', `
     const { billigGebaeude, billigSchiff, forschung, tiefeFrei, dealGenutzt, deal, fp } = umgebung;
     const OFFICER_TALENT_LEVEL = 5;
@@ -151,12 +156,15 @@ for (const tab of ['basis','flotte','forschung']){
     function suggestNextResearch(){ return forschung; }
     function bedarfBilligstesGebaeude(){ return billigGebaeude; }
     function bedarfBilligstesSchiff(){ return billigSchiff; }
+    // Originalgetreu nachgebildet, nicht als "gibt immer false" gestubbt: Ein Stub, der die echte
+    // Bedingung nicht kennt, haette die Pruefung unten wertlos gemacht.
+    function schiffPerForschungFrei(def){ return !!(def && def.forschungUnlock && ((state.research||{})[def.forschungUnlock]||0) >= 1); }
     ${fnAus('spielBedarf')}
     return spielBedarf;
   `);
   const grund = () => ({ buildQueue:[{}], constructionQueue:[{kind:'ship',planet:'home'}], activeResearch:{},
     activeBasePlanet:'home', officers:{}, officerTalents:{}, abgrund:{ woche:{ key:'x', best:5 } },
-    eventParts:{}, unlocked:{}, credits:0 });
+    eventParts:{}, unlocked:{}, credits:0, research:{} });
   const umg = () => ({ billigGebaeude:{name:'Mine'}, billigSchiff:{name:'Jäger'},
     forschung:{name:'Antrieb', affordable:true}, tiefeFrei:true, dealGenutzt:true,
     deal:{name:'Turbo', cost:500}, fp:0 });
@@ -169,6 +177,19 @@ for (const tab of ['basis','flotte','forschung']){
   // Ruhezustand: alles laeuft, nichts offen. Ein Test, der das nicht prueft, wuerde einen Dauer-Punkt
   // nicht bemerken - und ein Punkt, der immer leuchtet, ist schlimmer als keiner.
   check('5: im Ruhezustand ist die Liste leer', lauf().length === 0, lauf().map(b=>b.tab));
+  /* Ein Event-Schiff, das ueber eine FORSCHUNG frei ist, darf nicht mehr zum Teilesammeln auffordern
+     (v8.482.0). Ohne diese Regel stuende im Flotte-Reiter ein Punkt fuer ein Schiff, das man laengst
+     bauen kann - ein Punkt, der auf nichts zeigt, ist schlimmer als keiner. Geprueft in BEIDE
+     Richtungen: ohne die Forschung muss der Punkt weiterhin erscheinen, sonst belegt der Test nichts. */
+  // Vollstaendige Teile (6 von 6) - der Punkt erscheint erst, wenn das Schiff zusammenbaubar ist,
+  // nicht schon beim Sammeln. Abgelesen am bestehenden Meteoritensturm-Fall darueber, nicht geraten.
+  const teileVoll = st => { st.eventParts = { goldrausch_teil: 6 }; };
+  const textVon = liste => liste.map(b => b.text || '').join(' | ');
+  check('5: ohne die Forschung meldet das Event-Schiff weiterhin "zusammenbaubar"',
+    /Schürfschiff/.test(textVon(lauf(st => teileVoll(st)))), textVon(lauf(st => teileVoll(st))));
+  check('5: mit der Forschung nicht mehr - es ist ja laengst baubar',
+    !/Schürfschiff/.test(textVon(lauf(st => { teileVoll(st); st.research = { rminentechnik: 1 }; }))),
+    textVon(lauf(st => { teileVoll(st); st.research = { rminentechnik: 1 }; })));
   const hat = (liste, tab) => liste.some(b => b.tab === tab);
   check('5: leere Bau-Wunschliste meldet die Basis', hat(lauf(s => { s.buildQueue = []; }), 'basis'));
   check('5: aber nur, wenn etwas bezahlbar ist',
