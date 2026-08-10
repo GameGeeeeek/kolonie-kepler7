@@ -65,11 +65,31 @@ if (hatBackend){
     else faelle.push([t, t, {}]);
   }
 
+  // Ziele, die KEIN Reiter sind (seit v8.472.0): Der globale Chat ist ein Einschub-Fenster, kein
+  // Reiter - `geheZuZiel` oeffnet ihn ueber dieselben Bedienelemente, die auch ein Spieler
+  // antippt. Die Zusage dieses Tests bleibt damit unveraendert - jedes Ziel fuehrt an einen Ort,
+  // den es wirklich gibt -, nur die Art des Ortes ist eine zweite geworden. Wer ein weiteres
+  // Nicht-Reiter-Ziel einfuehrt, traegt es hier ein; ein unbekanntes faellt weiterhin durch.
+  const SONDERZIELE = {
+    'chat:global':  ['chatEdgeTab', 'chatPanelTabGlobal'],
+    'chat:allianz': ['chatEdgeTab', 'chatPanelTabAlliance']
+  };
+  // Die Elemente allein genuegen nicht: Ohne den Sonderfall in geheZuZiel faende sie niemand,
+  // die Funktion gaebe false zurueck und das Antippen taete still gar nichts.
+  check('1: geheZuZiel kennt den Chat-Sonderfall (sonst zeigt das Ziel ins Leere)',
+    /if \(reiter === 'chat'\)/.test(src) && src.includes("getElementById('chatEdgeTab')"));
+
   let mitZiel = 0;
   for (const [name, typ, nutzlast] of faelle){
     const ziel = notificationTarget(typ, nutzlast);
     if (ziel === null) continue;   // bewusst ohne Ziel (patchnotes, Admin-Meldungen)
     mitZiel++;
+    if (SONDERZIELE[ziel]){
+      const fehlend = SONDERZIELE[ziel].filter(id => !src.includes('id="' + id + '"'));
+      check('1: "' + name + '" -> Chat-Fenster, alle Bedienelemente vorhanden',
+        fehlend.length === 0, { ziel, fehlend });
+      continue;
+    }
     const [reiter, unter] = String(ziel).split(':');
     check('1: "' + name + '" -> Reiter "' + reiter + '" existiert', REITER.has(reiter), ziel);
     if (unter){
