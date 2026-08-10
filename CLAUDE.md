@@ -122,6 +122,21 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     prüft ZUERST, ob sie sich gehalten hat (`1c-vorab`). Fällt die, weiß man sofort, dass die
     Bezugsgröße gewandert ist – statt tagelang den Messgegenstand zu verdächtigen.
 
+22. **Fällt ein Test, der das BACKEND liest, ist der erste Verdacht der eigene Backend-Klon – und
+    ein Kontrollversuch im `git worktree` beweist dort gar nichts.** Vorfall 10.08.2026, zweimal am
+    selben Tag: `test_randkriege_*` fielen nach einem Merge. Sie lesen `RK_HANDLUNGEN` &Co. aus
+    `server.js`; das Backend-Repo daneben stand zwei bzw. drei Commits zurück, während `main` im
+    Frontend schon die passende Fassung hatte. Die Tests waren korrekt, das Spiel war korrekt, nur
+    die Nachbardatei war alt. **Verschärfend war der Kontrollversuch selbst wertlos:** Ein
+    `git worktree` unter `/tmp` hat kein Nachbarverzeichnis `kolonie-kepler7-backend`, `umgebung.js`
+    findet den Backend-Quelltext dort nicht, und die Tests **überspringen sich still und melden
+    grün**. Damit schien bewiesen, der Merge sei schuld. **Vorgehen:** (a) Bei jedem Fehlschlag
+    eines Tests, der `SERVERDATEI`/`server.js` liest, zuerst
+    `cd ../kolonie-kepler7-backend && git fetch && git log --oneline -1 origin/master` vergleichen;
+    (b) einen Kontrollversuch nie in einem Worktree fahren, dem die Nachbar-Repos fehlen – ein Test,
+    der sich überspringt, ist keine Gegenprobe (dieselbe Familie wie Regel 15/17/19: nie ein
+    Messwerkzeug, das sich selbst im Weg steht).
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
