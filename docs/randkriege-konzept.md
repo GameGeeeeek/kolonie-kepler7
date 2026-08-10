@@ -122,13 +122,14 @@ jedem Prozessstart (server.js:4474), und nodemon startet den Container bei jedem
 
 ## 2. Wie ein Spieler wirkt
 
-Sieben Handlungen, so weit wie möglich an bereits gezählte Ereignisse angedockt. Vorbild ist die
+~~Sieben~~ **Sechs** Handlungen, so weit wie möglich an bereits gezählte Ereignisse angedockt.
+(Der Text sagte „sieben", die Tabelle darunter listet sechs. Es sind sechs; korrigiert beim Bauen.) Vorbild ist die
 Bauregel der Fraktionsaufträge (Kommentar Z. 14903–14907): Fortschritt wird über **vorhandene
 Lebenszeit-Zähler per Differenz** gemessen, statt neue Hooks in den Kampf-/Expeditionscode zu legen.
 
 | Handlung | Kriegspunkte | Tagesdeckel |
 |---|---|---|
-| Konvoi eskortieren oder überfallen (je Routen-Tick) | 1 | 40 |
+| ~~Konvoi eskortieren oder überfallen (je Routen-Tick)~~ → **Konvoi umleiten** (je 2.000 Kredite Routenertrag) | ~~1~~ 25 | (Tagesdegression) |
 | Expedition in ein Frontsystem | 40 | – |
 | **Bollwerk schleifen** (über `/api/faction/attack`) | 250 / 60 | – |
 | Piratennest im Frontsektor räumen | 30 | – |
@@ -165,6 +166,40 @@ einen *monotonen Lebenszeit-Zähler*, und den hat von den sieben Handlungen nur 
 
 Für diese vier ist es also sehr wohl ein neuer Hook. Das ist machbar, muss aber im Aufwand stehen
 und nicht als „dockt an Vorhandenes an" verbucht werden.
+
+### 2.0 Was beim Bauen aus den sechs wurde (10.08.2026)
+
+Die Kartierung am echten Code hat drei Annahmen dieses Abschnitts widerlegt — zwei davon meine
+eigenen aus der Korrektur weiter oben.
+
+- **`expeditionsCompleted` ist NICHT monoton.** Oben steht, von den Handlungen docke „nur die
+  Expedition" sauber an einen Lebenszeit-Zähler an. Der Zähler existiert und hat genau eine
+  Erhöhungsstelle, wird aber an **drei** Stellen auf 0 gesetzt: Prestige, Aufstieg und der
+  Zurücksetzen-Knopf. Eine blinde Differenz hätte ein Konto mit 400 Expeditionen nach dem Prestige
+  **dauerhaft ausgesperrt**. Gebaut ist deshalb eine Rücksetz-Erkennung: Steht der Zähler unter dem
+  gemerkten Basiswert, wandert der Basiswert mit nach unten und es wird nichts gutgeschrieben. Das
+  gilt für alle vier Differenz-Handlungen gleichermaßen — eine Regel statt vier Sonderfällen.
+- **Der Konvoi „eskortieren oder überfallen" gibt es im Spiel nicht**, und ein Punkt je Routen-Tick
+  wäre auch inhaltlich falsch gewesen: Handelsrouten sind ausdrücklich passiv gebaut (Kommentar im
+  Code: „bewusst kein Kampf-/Eskorte-System (Routen bleiben passiv)"), der Tagesdeckel wäre bei drei
+  Routen nach 14 Minuten ohne eine einzige Entscheidung ausgeschöpft gewesen. Gebaut ist stattdessen
+  **Konvoi umleiten**: 25 Kriegspunkte je 2.000 Kredite Routenertrag, gemessen an
+  `tradeRouteLifetimeCredits` — einem Zähler, an dem der Fraktionsauftrag „routen" seit dem
+  26.07.2026 bereits per Differenz misst.
+- **Die Nachschubspende ist server-autoritativ geworden**, nicht bloß clientgemessen. Der Server
+  hält den Spielstand, zählt die Rohstoffe darin nach und **bucht sie selbst ab** (dieselbe Bauform
+  wie beim Markt und bei den Flottenverlusten des Fraktionsangriffs); die Sperrzeit von vier Stunden
+  liegt ebenfalls serverseitig. Sie ist damit eine eigene, wiederholbare Handlung neben
+  `supportWarSide` — das bleibt unverändert die einmalige Parteinahme je Krieg.
+- **Zwei neue Lebenszeit-Zähler** waren unvermeidlich, weil es für Piratennester und Fundmeldungen
+  schlicht keinen gab: `pirateLairStage` fällt nach dem Endboss auf 1 zurück, `pirateLairPrestige`
+  zählt ganze Zehnerketten, und bei der Fundmeldung stand bisher nur ein überschriebener
+  Zeitstempel. Beide neuen Zähler haben genau eine Erhöhungsstelle und einen Vorgabewert in
+  `applyStateDefaults`.
+- **Ein Rückstand wird nicht verbrannt.** Verbraucht wird nur so viel Zählerfortschritt, wie am
+  selben Tag noch wirken kann; der Rest bleibt stehen. Ohne diese Regel hätte ein Rückstand von zehn
+  geräumten Nestern acht Kriegspunkte gebracht statt über mehrere Tage volle dreihundert — gemessen
+  in der Gegenprobe von `tests/test_randkriege_handlungen_http.js`.
 
 ### 2.1 Fünf Sperren gegen das Großkonto
 
@@ -555,7 +590,15 @@ sieht danach am echten Spielerverhalten, ob die tiefere Fassung überhaupt gebra
      Schranke war damit auf „einer reicht" geklemmt. Der Test hat es nicht gemerkt, weil sein
      Fixture denselben erfundenen Schlüssel setzte – eine Annahme, gegen sich selbst geprüft.
      Behoben, und das Fixture baut die Ablage jetzt so, wie der Server sie führt.
-   - Offen bleiben die sechs übrigen Handlungen.
+   - ✅ **Die übrigen Handlungen** — *gebaut am 10.08.2026.* Ein Endpunkt
+     (`POST /api/randkriege/handlung`) für alle, weil sie sich nur in Träger und Gewicht
+     unterscheiden: Aufklärungsertrag 40, Fundmeldung 45, Piratennest 30, Konvoi 25 je 2.000
+     Kredite, Nachschub 60. Bedient werden sie an einem Ort, der Box „An die Front liefern" im
+     Diplomatie-Reiter. Was dabei anders kam als im Entwurf, steht in Abschnitt 2.0.
+     Belegt durch `tests/test_randkriege_handlungen.js` (Frontend↔Backend↔Hilfe↔Patchnote),
+     `tests/test_frontlieferung_box.js` (Browser, misst die offenen Mengen und was der Klick
+     wirklich verschickt) und `tests/test_randkriege_handlungen_http.js` im Backend-Repo
+     (echter Server, 44 Prüfungen: Rücksetzung, Tagesdeckel, Abbuchung, Sperrzeit, Randfälle).
 7. Dienstgrade, Frontmarken, Wochendeckel
 8. Kriegsraum-Ansicht und Wappenfamilie
 
