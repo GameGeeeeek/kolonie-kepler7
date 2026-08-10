@@ -6246,8 +6246,15 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.480.0';
+  const VERSION = '8.481.0';
   const PATCHNOTES = [
+    { version:'8.481.0', date:'10.08.2026', changes:[
+      '<strong>Expeditionen finden jetzt Koordinaten besonders seltener und großer Asteroiden.</strong> Eine <strong>Schürfpeilung</strong> ist ein privates Sondervorkommen: immer <strong>Kern oder Koloss</strong>, die Sorte stark zu den Legierungen gewichtet – rund 44% davon führen Antimaterie statt der sonstigen 13%. Sie erscheint als eigener Marker mit gestricheltem grünen Ring auf der Sektorkarte, in einem System, das du schon kennst. <strong>Niemand sonst sieht sie</strong>, und sie ist nicht anfechtbar. Angeflogen wird sie wie jedes andere Vorkommen, mit derselben Abbaumission.',
+      '<strong>Sieben Tage gültig, höchstens drei gleichzeitig.</strong> Danach sind die Koordinaten veraltet und die Peilung verfällt – im Ereignisprotokoll steht dann, welche. Findest du eine vierte, während drei offen sind, geht sie nicht verloren: Die Daten werden in Rohstoffe gewandelt, mit einem eigenen Satz im Expeditionsbericht. Ein Fund, der stillschweigend verfällt, wäre schlimmer als gar keiner.',
+      '<strong>Die Schürfexpedition hat damit endlich ein eigenes Profil.</strong> Sie war der blasseste der sieben Typen – „fast nur Ressourcenfunde und geringes Begegnungsrisiko", also mehr vom Immergleichen. Jetzt hat sie mit 3% die <strong>dreifache Peilungschance</strong> (Tiefenraum 2%, alle übrigen 1%), und der Risiko-Regler zieht wie bei der Beute mit.',
+      'Warum die Obergrenze von drei der eigentliche Regler ist und nicht die Prozentzahl: Es laufen höchstens fünf Expeditionen gleichzeitig, eine Schürfexpedition dauert 18 Minuten. Im Dauerbetrieb sind das rund 400 am Tag, ein Gelegenheitsspieler schafft zehn – Faktor vierzig. Jede Prozentzahl, die für den einen stimmt, wäre für den anderen um zwei Größenordnungen daneben. Die drei offenen Peilungen deckeln also, die Chance bestimmt nur, wie schnell man nach dem Verbrauch wieder auffüllt.',
+      'Technisch hängt der Fund als <em>unabhängige Zusatzchance</em> an erfolgreichen Expeditionen und verändert <strong>keine</strong> der regulären Fund-Wahrscheinlichkeiten – dieselbe Bauart wie die Event-Bauteile und die Entdeckung versteckter Sternsysteme. Ein siebtes Fund-Band hätte alle sieben Expeditionstypen neu austarieren müssen, weil ihre Bänder je Typ exakt 1,0 ergeben müssen.'
+    ]},
     { version:'8.480.0', date:'10.08.2026', changes:[
       '<strong>Die Front zahlt jetzt auf etwas ein, das bleibt: Dienstgrade und Frontmarken.</strong> Jeder wirksame Kriegspunkt zählt doppelt – als <strong>Dienstpunkt</strong> bei der Fraktion, für die du geliefert hast, und auf deine <strong>Frontmarken</strong>. Dienstpunkte werden nie zurückgesetzt (auch Prestige und Aufstieg rühren sie nicht an, weil der Server sie führt) und ergeben sechs Dienstgrade: <strong>Melder</strong> 250, <strong>Feldwacht</strong> 750, <strong>Grenzwächter</strong> 1.750, <strong>Frontenhauptmann</strong> 3.500, <strong>Frontoberst</strong> 6.500, <strong>Marschall der Ränder</strong> 11.000. Das ist absichtlich ein langer Weg: An einer Front sind höchstens 210 wirksame Punkte am Tag möglich, der Marschall ist damit rund zwei Monate täglichen Dienstes für <em>eine</em> Fraktion. <strong>Kein Dienstgrad gibt einen Prozentbonus</strong> – sie öffnen das Frontlager.',
       '<strong>Das Frontlager.</strong> Eine Frontmarke je <strong>200 wirksame Kriegspunkte</strong>, höchstens <strong>zwölf in der Woche</strong> – ein angefangener Rest verfällt dabei nicht, er zählt beim nächsten Mal weiter. Dafür gibt es sieben Posten, jeder mit einem Mindest-Dienstgrad: Frontdepot (30 Modulfragmente), Grenzpatrouille (seltenes Waffenmodul), Aufklärungsflug (eine Peilung), Feldlazarett (60 Kommandopunkte), Frontbergung (episches Panzerungsmodul), Kriegsanleihe (40.000 Kredite) und – nur für Marschälle – das <strong>Frontabzeichen</strong>. Das Abzeichen ist der einzige Titel im Spiel, der <em>beide</em> Zurücksetzungen übersteht: Es liegt bei den Freischaltungen, wo sonst nur Schiffe und Gebäude stehen, und erscheint dauerhaft im Profil.',
@@ -12037,6 +12044,11 @@
     return raus;
   }
   function asteroidAn(sysId, platz){
+    // Peilungen tragen eine ID mit 'p'-Praefix und liegen nicht im Guertelfeld (siehe Peilungs-Block).
+    if (String(platz).charAt(0) === 'p'){
+      const pe = peilungAn(String(platz));
+      return (pe && pe.system === sysId && peilungLebt(pe)) ? Object.assign({ platz: pe.id, peilung: true }, pe) : null;
+    }
     const feld = state.asteroidFeld && state.asteroidFeld[sysId];
     const p = feld && feld.plaetze[platz];
     return (p && !p.frei && p.vorrat > 0) ? Object.assign({ platz: +platz, system: sysId }, p) : null;
@@ -12046,6 +12058,15 @@
      Balance-Aenderung trifft keine schon fliegende Flotte. Ist der Vorrat damit erschoepft, wird der
      Platz frei und bekommt seinen Nachschub-Termin (siehe asteroidNachschub). */
   function asteroidEntnehmen(sysId, platz, menge){
+    if (String(platz).charAt(0) === 'p'){
+      const pe = peilungAn(String(platz));
+      if (!pe || !peilungLebt(pe)) return 0;
+      const echt = Math.max(0, Math.min(menge, pe.vorrat));
+      pe.vorrat -= echt;
+      // Eine leergefoerderte Peilung waechst NICHT nach - anders als ein Guertel-Vorkommen. Sie war
+      // ein einmaliger Fund; das Aufraeumen im Haupt-Tick nimmt sie aus der Liste.
+      return echt;
+    }
     const feld = state.asteroidFeld && state.asteroidFeld[sysId];
     const p = feld && feld.plaetze[platz];
     if (!p || p.frei) return 0;
@@ -12067,6 +12088,88 @@
     for (const [r, anteil] of Object.entries(s.res)) raus[r] = Math.floor(menge * anteil);
     return raus;
   }
+  /* ===== Schuerfpeilungen (v8.481.0) ==========================================================
+     Expeditionen finden Koordinaten besonders seltener und grosser Asteroiden. Eine Peilung ist ein
+     PRIVATES Sondervorkommen: immer Kern oder Koloss, Sorte stark zu den Legierungen gewichtet,
+     nicht anfechtbar, sieben Tage haltbar, hoechstens drei gleichzeitig offen.
+
+     WARUM DIE OBERGRENZE DER REGLER IST UND NICHT DIE PROZENTZAHL: Es laufen hoechstens fuenf
+     Expeditionen gleichzeitig (maxConcurrentExpeditions), eine Schuerfexpedition dauert 1200s*0,9.
+     Im Dauerbetrieb sind das rund 400 am Tag, ein Gelegenheitsspieler schafft zehn - Faktor vierzig.
+     Jede Prozentzahl, die fuer den einen stimmt, ist fuer den anderen zwei Groessenordnungen daneben.
+     Die drei offenen Peilungen deckeln also, die Chance bestimmt nur das Nachfuellen.
+
+     ADRESSIERUNG: Peilungen haben eine eigene ID ('p1', 'p2', ...) und werden ueber denselben
+     Missions- und Kartenweg angefahren wie Guertel-Vorkommen (asteroidAn/asteroidEntnehmen routen
+     am Praefix). Bewusst eine ID und kein Array-Index: Verschwindet eine leergefoerderte Peilung,
+     wuerden sich sonst die Indizes aller anderen verschieben - und ein offenes Kartenmenue zeigte
+     danach auf den falschen Brocken. */
+  const PEILUNG_MAX_OFFEN = 3;
+  const PEILUNG_TAGE = 7;
+  const PEILUNG_CHANCE = { mining:0.030, deep:0.020, salvage:0.010 };
+  const PEILUNG_CHANCE_STANDARD = 0.010;
+  const PEILUNG_KOLOSS_ANTEIL = 0.35;
+
+  function peilungListe(){ return Array.isArray(state.peilungen) ? state.peilungen : (state.peilungen = []); }
+  function peilungLebt(p){ return !!p && p.vorrat > 0 && p.verfaelltAm > Date.now(); }
+  function peilungOffen(){ return peilungListe().filter(peilungLebt).length; }
+  function peilungAn(id){ return peilungListe().find(p => p.id === id) || null; }
+  // Nur lesend - dieselbe Regel wie bei asteroidenImSystem: Der Render darf keinen Zustand aendern.
+  function peilungenImSystem(sysId){
+    return peilungListe().filter(p => p.system === sysId && peilungLebt(p));
+  }
+  // Verfallene und leergefoerderte Peilungen entfernen. Laeuft im Haupt-Tick, nicht im Render.
+  function peilungenAufraeumen(){
+    const liste = peilungListe();
+    const weg = liste.filter(p => !peilungLebt(p) && p.vorrat > 0);   // wirklich VERFALLEN, nicht leer
+    if (weg.length && typeof log === 'function'){
+      for (const p of weg) log('Die Peilung auf einen ' + asteroidSorte(p.sorte).name + ' ist verfallen – die Koordinaten sind veraltet.', 'ti-clock', 'warn');
+    }
+    const vorher = liste.length;
+    state.peilungen = liste.filter(peilungLebt);
+    return vorher - state.peilungen.length;
+  }
+  /* Sorte einer Peilung: stark zu den Legierungen gewichtet, die antimateriehaltigen vierfach.
+     Ergibt rund 44% antimateriehaltig statt der sonstigen 13% - das ist es, was eine Peilung
+     wertvoll macht, nicht die blosse Groesse. Reine Sorten bleiben moeglich, aber selten. */
+  function zieheePeilungSorte(){
+    return zieheGewichtet(ASTEROID_SORTEN, Math.random(), s => {
+      const rein = Object.keys(s.res).length === 1;
+      return s.gewicht * (rein ? 0.35 : (s.res.antimaterie ? 4 : 1.5));
+    });
+  }
+  // Systeme, in denen der Spieler schon war - eine Peilung in ein voellig unbekanntes System waere
+  // ein Marker im Nichts.
+  function peilungSystemWaehlen(){
+    const bekannt = new Set(['kepler']);
+    for (const pl of PLANETS) if (state.discovered && state.discovered[pl.id]) bekannt.add(pl.system);
+    const liste = [...bekannt];
+    return liste[Math.floor(Math.random() * liste.length)];
+  }
+  /* Vergibt eine Peilung. Sind bereits drei offen, wird der Fund NICHT verworfen, sondern in
+     Rohstoffe gewandelt - ein Fund, der stillschweigend verfaellt, ist schlimmer als gar keiner. */
+  function gewaehrePeilung(){
+    const groesse = asteroidGroesse(Math.random() < PEILUNG_KOLOSS_ANTEIL ? 'koloss' : 'kern');
+    const sorte = zieheePeilungSorte();
+    if (peilungOffen() >= PEILUNG_MAX_OFFEN){
+      const menge = Math.round(asteroidGroesse('splitter').vorrat * 0.5);
+      gainResources(asteroidResListe({ sorte: sorte.key }, menge));
+      return { ersatz: true, menge, sorte, groesse };
+    }
+    state.peilungCounter = (state.peilungCounter||0) + 1;
+    const p = {
+      id: 'p' + state.peilungCounter,
+      sorte: sorte.key, groesse: groesse.key,
+      system: peilungSystemWaehlen(),
+      vorrat: groesse.vorrat,
+      gefundenAm: Date.now(),
+      verfaelltAm: Date.now() + PEILUNG_TAGE * 24 * 3600 * 1000
+    };
+    peilungListe().push(p);
+    return { peilung: p, sorte, groesse };
+  }
+  function peilungRestTage(p){ return Math.max(0, (p.verfaelltAm - Date.now()) / (24*3600*1000)); }
+
   // Versteckte Systeme (hidden:true) tauchen erst nach ihrer Entdeckung durch eine Expedition
   // in Übersichtskarte und System-Navigation auf.
   function visibleSystems(){
@@ -25751,6 +25854,7 @@
     // Sonst haengt der Zeitpunkt der Erstbelegung davon ab, wann jemand zufaellig hinsieht, und ein
     // Spielstand, der die Karte nie offen hatte, traegt ein leeres Feld mit sich herum.
     if (!state.asteroidFeld) state.asteroidFeld = {};
+    if (!Array.isArray(state.peilungen)) state.peilungen = [];
     asteroidFeldSicherstellen();
     if (!state.moons) state.moons = {};
     if (!state.npcScaling) state.npcScaling = {};
@@ -34375,7 +34479,7 @@
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
       { title:'Automatische Erkundung', body:'Schalter auf der Sektorkarte (mindestens 1 Erkundungsschiff nötig): sobald aktiviert, reserviert genau <strong>ein</strong> Erkundungsschiff vom gerade aktiven Planeten und fliegt eine durchgehende Rundreise - erst das nächstgelegene unentdeckte Ziel, danach automatisch weiter zum jeweils nächsten, bis alle erreichbaren Planeten erkundet sind. Direkt unter dem Schalter zeigt eine eigene Box jederzeit den Ausgangsplaneten, das aktuelle Ziel mit Countdown, eine Vorschau des nächsten Ziels und den Gesamtfortschritt (z.B. "5/12"). Reicht der Treibstoff (Deuterium) für den nächsten Abschnitt nicht, wartet die Rundreise automatisch und versucht es beim nächsten Ressourcenzuwachs erneut - ohne manuelles Eingreifen. Sind alle Ziele erledigt, fliegt das Schiff zurück zum Ausgangsplaneten und die Rundreise endet automatisch. Der Schalter lässt sich jederzeit wieder ausschalten - eine laufende Rundreise wird dadurch nicht abrupt abgebrochen, sondern das aktuelle Ziel noch fertig angeflogen, bevor das Schiff zurückkehrt. Manuelles Erkunden einzelner Planeten bleibt parallel dazu möglich, solange noch ein freies Erkundungsschiff übrig ist.' },
-      { title:'Asteroiden und Abbaumissionen', body:'In etwa <strong>zwanzig der 69 Sternsysteme</strong> liegt ein <strong>Asteroidengürtel</strong>. Auf der Sektorkarte siehst du ihn als gestrichelte Bahn zwischen den Planeten-Orbits, darin die Vorkommen als gezeichnete Brocken – Farbe und Größe des Markers verraten die Größe, das Symbol die Sorte. Ein Klick öffnet das Kartenmenü mit <strong>Abbaumission</strong>.<br><br><strong>Neun Sorten:</strong> drei reine (Eisenbrocken → Erz, Prismenbrocken → Kristalle, Eiskern → Deuterium) und sechs seltenere <strong>Legierungsasteroiden</strong> mit zwei Rohstoffen. Drei davon führen eine Spur <strong>Antimaterie</strong> – bewusst nur eine Spur, denn Antimaterie ist der Engpass, der die ganze Tier-2-Kette trägt.<br><br><strong>Vier Größen:</strong> Splitter (50.000 Vorrat, Platz für 4 Minenschiffe), Brocken (150.000 / 8), Kern (500.000 / 16), Koloss (1.500.000 / 30). Die Plätze begrenzen, wie viele Minenschiffe gleichzeitig graben können – mehr mitzuschicken ist erlaubt, sie tragen Ladung, erhöhen aber die Rate nicht. Die Startvorschau sagt es dir.<br><br><strong>So läuft eine Abbaumission:</strong> Du brauchst <strong>mindestens ein Minenschiff</strong> (Forschung <em>Minentechnik</em>); Frachter erweitern den Laderaum. Die Flotte fliegt hin, gräbt <strong>bis der Laderaum voll ist</strong>, und fliegt zurück. <strong>Die Rohstoffe bekommst du erst bei der Rückkehr</strong> – währenddessen ist die Ladung schon aus dem Vorkommen entnommen, damit derselbe Brocken nicht zweimal vergeben wird. Ist dein Lager bei der Ankunft voll, geht der Überschuss verloren wie bei jeder anderen Beute auch; der Bericht sagt dir, wie viel.<br><br><strong>Fördertechnik</strong> (10 Stufen) hebt Abbaurate <em>und</em> Laderaum um je 4% pro Stufe. Beides zusammen heißt: gleiche Fahrtdauer, mehr Ladung.<br><br><strong>Ein leergefördertes Vorkommen kommt woanders wieder</strong> – nach 3 Stunden (Splitter) bis 48 Stunden (Koloss), auf einem anderen freien Platz, zu 30% sogar in einem anderen Gürtelsystem, mit neu gezogener Sorte und Größe. Der Gürtel ist also ein Revier, das man immer wieder absuchen muss, kein fester Fahrplan.' },
+      { title:'Asteroiden und Abbaumissionen', body:'In etwa <strong>zwanzig der 69 Sternsysteme</strong> liegt ein <strong>Asteroidengürtel</strong>. Auf der Sektorkarte siehst du ihn als gestrichelte Bahn zwischen den Planeten-Orbits, darin die Vorkommen als gezeichnete Brocken – Farbe und Größe des Markers verraten die Größe, das Symbol die Sorte. Ein Klick öffnet das Kartenmenü mit <strong>Abbaumission</strong>.<br><br><strong>Neun Sorten:</strong> drei reine (Eisenbrocken → Erz, Prismenbrocken → Kristalle, Eiskern → Deuterium) und sechs seltenere <strong>Legierungsasteroiden</strong> mit zwei Rohstoffen. Drei davon führen eine Spur <strong>Antimaterie</strong> – bewusst nur eine Spur, denn Antimaterie ist der Engpass, der die ganze Tier-2-Kette trägt.<br><br><strong>Vier Größen:</strong> Splitter (50.000 Vorrat, Platz für 4 Minenschiffe), Brocken (150.000 / 8), Kern (500.000 / 16), Koloss (1.500.000 / 30). Die Plätze begrenzen, wie viele Minenschiffe gleichzeitig graben können – mehr mitzuschicken ist erlaubt, sie tragen Ladung, erhöhen aber die Rate nicht. Die Startvorschau sagt es dir.<br><br><strong>So läuft eine Abbaumission:</strong> Du brauchst <strong>mindestens ein Minenschiff</strong> (Forschung <em>Minentechnik</em>); Frachter erweitern den Laderaum. Die Flotte fliegt hin, gräbt <strong>bis der Laderaum voll ist</strong>, und fliegt zurück. <strong>Die Rohstoffe bekommst du erst bei der Rückkehr</strong> – währenddessen ist die Ladung schon aus dem Vorkommen entnommen, damit derselbe Brocken nicht zweimal vergeben wird. Ist dein Lager bei der Ankunft voll, geht der Überschuss verloren wie bei jeder anderen Beute auch; der Bericht sagt dir, wie viel.<br><br><strong>Fördertechnik</strong> (10 Stufen) hebt Abbaurate <em>und</em> Laderaum um je 4% pro Stufe. Beides zusammen heißt: gleiche Fahrtdauer, mehr Ladung.<br><br><strong>Ein leergefördertes Vorkommen kommt woanders wieder</strong> – nach 3 Stunden (Splitter) bis 48 Stunden (Koloss), auf einem anderen freien Platz, zu 30% sogar in einem anderen Gürtelsystem, mit neu gezogener Sorte und Größe. Der Gürtel ist also ein Revier, das man immer wieder absuchen muss, kein fester Fahrplan.<br><br><strong>Schürfpeilungen:</strong> Erfolgreiche <strong>Expeditionen</strong> finden gelegentlich die Koordinaten eines besonders seltenen und großen Asteroiden – immer Kern oder Koloss, meist eine Legierungssorte, oft mit Antimaterie. Die <strong>Schürfexpedition</strong> hat mit 3% die dreifache Chance darauf (Tiefenraum 2%, übrige 1%); der Risiko-Regler zieht mit. Eine Peilung erscheint als Marker mit <strong>gestricheltem grünen Ring</strong> in einem System, das du bereits kennst, gehört <strong>nur dir</strong> und ist nicht anfechtbar. Sie ist <strong>sieben Tage gültig</strong> und du kannst <strong>höchstens drei</strong> gleichzeitig offen haben – eine vierte wird in Rohstoffe gewandelt statt zu verfallen. Angeflogen wird sie mit derselben Abbaumission wie jedes andere Vorkommen; leergefördert verschwindet sie und wächst nicht nach.' },
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. <strong>Schickst du Recycler zu einem fremden Trümmerfeld, wird daraus ein Sammelauftrag:</strong> Er belegt einen Flottenslot, und sobald dort nichts mehr liegt, fliegen die Recycler von selbst zum Ausgangsort zurück – du musst sie nicht mehr von Hand einsammeln. Steht der Abbau still, weil dein Lager voll ist, sagt die Auftragszeile das ausdrücklich; über „Auftrag beenden" bleiben die Recycler dort und der Slot wird sofort frei. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus. <strong>Trümmerfelder entstehen immer an deinem Startplaneten</strong>, auch wenn du woanders angegriffen hast – greifst du also von einer Kolonie ohne Recycler aus an, bleibt die Beute dort liegen. Dafür steht im Kampfbericht jetzt ein Knopf <strong>„Recycler nach … schicken"</strong>: Er erscheint nur, wenn dort wirklich noch etwas liegt und kein Recycler vor Ort ist, und verlegt alle Recycler des Standorts, an dem du die meisten hast. Das ist eine normale Flottenverlegung – mit Flugzeit, Treibstoff und einem belegten Flottenslot.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (Deckel bei 6 Sektoren). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
@@ -35075,6 +35179,10 @@
         // Rueckflug der Treibstoff, waere eine vollzogene Rueckkehr eine Behauptung, die sich
         // nie mehr korrigiert - der Rueckflug wird dann bloss spaeter angetreten.
         if (r.heimflugNach) body += '<br><i class="ti ti-recycle" aria-hidden="true"></i> Rückflug nach '+escapeHtml(planetDisplayName(r.heimflugNach))+' wird eingeleitet.';
+      } else if (r.type === 'peilung'){
+        title = 'Schürfpeilung: '+asteroidSorte(r.sorte).name+' ('+asteroidGroesse(r.groesse).name+')';
+        body = '<i class="ti ti-target" aria-hidden="true" style="color:#5dcaa5;"></i> Koordinaten in <strong>'+escapeHtml(r.systemName||r.system||'')+'</strong> · Vorrat '+fmt(r.vorrat||0);
+        body += '<br>Nur du kennst dieses Vorkommen – es ist nicht anfechtbar. <strong>Gültig bis '+new Date(r.verfaelltAm).toLocaleDateString('de-DE')+'</strong>, danach sind die Koordinaten veraltet.';
       } else if (r.type === 'mining'){
         title = 'Abbaumission zurück: '+asteroidSorte(r.sorte).name+' ('+asteroidGroesse(r.groesse).name+')';
         body = '<i class="ti ti-pick" aria-hidden="true" style="color:#e0a548;"></i> '+escapeHtml(r.systemName||r.system||'')+' · Ladung <strong>'+fmt(r.ladung||0)+'</strong>';
@@ -46452,6 +46560,30 @@
                 const found = grantEventShipModule(activeEv.key);
                 if (found) findText += ' Und ein Fund von bleibendem Wert: '+found+'!';
               }
+              /* Schuerfpeilung (v8.481.0): dritte unabhaengige Zusatzchance - Koordinaten eines
+                 besonders seltenen und grossen Asteroiden. Aus demselben Grund wie die zwei
+                 darueber OBEN DRAUF statt als siebtes Fund-Band: Die Baender sind kumulative
+                 Schwellen und muessen je Expeditionstyp zusammen mit nothingBase exakt 1,0 ergeben -
+                 ein neues Band haette alle sieben Typen neu austariert. Der naechste Praezedenzfall
+                 steht direkt darunter: die Entdeckung eines versteckten Sternsystems deckt ebenfalls
+                 einen ORT auf. Die Schuerfexpedition hat die dreifache Chance und bekommt damit
+                 endlich ein eigenes Profil. */
+              const peilBasis = PEILUNG_CHANCE[m.expType] !== undefined ? PEILUNG_CHANCE[m.expType] : PEILUNG_CHANCE_STANDARD;
+              const peilRisiko = (EXPEDITION_RISK_MODES[m.riskMode||'normal'] || EXPEDITION_RISK_MODES.normal).rew;
+              if (Math.random() < peilBasis * peilRisiko){
+                const pf = gewaehrePeilung();
+                if (pf.ersatz){
+                  findText += ' Außerdem eine Schürfpeilung – doch mit drei offenen Peilungen war für eine vierte kein Platz; die Daten brachten immerhin '+fmt(pf.menge)+' '+asteroidSorte(pf.sorte.key).name.replace(/brocken|kern$/i,'')+'-Material ein.';
+                } else {
+                  const sysName = (STAR_SYSTEMS.find(x => x.id === pf.peilung.system) || { name: pf.peilung.system }).name;
+                  findText += ' <strong>Schürfpeilung!</strong> Koordinaten eines '+asteroidSorte(pf.peilung.sorte).name+' der Größe '+asteroidGroesse(pf.peilung.groesse).name+' in '+sysName+' – sieben Tage gültig, nur du kennst sie.';
+                  findIcon = 'ti-target';
+                  pushReport({ type:'peilung', sorte:pf.peilung.sorte, groesse:pf.peilung.groesse,
+                    system:pf.peilung.system, systemName:sysName, vorrat:pf.peilung.vorrat,
+                    verfaelltAm:pf.peilung.verfaelltAm });
+                  playSound('achieve');
+                }
+              }
             }
             let sysMsg = '';
             if (outcome === 'success'){
@@ -49627,6 +49759,25 @@
           </g>`;
       }
     }
+    // Schuerfpeilungen (v8.481.0). Eigene, weiter aussen liegende Bahn und ein gestrichelter Ring -
+    // sie sind privat und gehoeren sichtbar NICHT zum Guertel. Koennen in JEDEM bekannten System
+    // liegen, deshalb ausserhalb des istGuertelSystem-Zweigs.
+    for (const pe of peilungenImSystem(activeSystem)){
+      const winkel = (hashStringToFloat('peil:' + pe.id) * 360) * Math.PI / 180;
+      const rxP = GUERTEL_RX * 1.28, ryP = rxP * 0.3;
+      const px = SUN_X + rxP * Math.cos(winkel), py = SUN_Y + ryP * Math.sin(winkel);
+      const g = asteroidGroesse(pe.groesse), so = asteroidSorte(pe.sorte);
+      const r = asteroidMarkerR(pe.groesse);
+      const ecken = [[-1,-0.35],[-0.45,-1],[0.55,-0.85],[1,0.1],[0.45,0.95],[-0.5,0.9]]
+        .map(([dx,dy]) => (px + dx*r).toFixed(1) + ',' + (py + dy*r).toFixed(1)).join(' ');
+      inner += `
+        <g class="planet-node" data-map-asteroid="${pe.id}" style="cursor:pointer;">
+          <title>Schürfpeilung: ${escapeHtml(asteroidName(pe))} – Vorrat ${fmt(pe.vorrat)}, noch ${Math.ceil(peilungRestTage(pe))} Tage gültig</title>
+          <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(r+6).toFixed(1)}" fill="none" stroke="#5dcaa5" stroke-width="1.4" stroke-dasharray="3,3" opacity="0.85"/>
+          <polygon points="${ecken}" fill="${g.farbe}" stroke="#0a0d1a" stroke-width="1.2"/>
+          <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(r*0.32).toFixed(1)}" fill="${so.res.antimaterie ? '#f3aec6' : '#0a0d1a'}" opacity="${so.res.antimaterie ? 0.95 : 0.35}"/>
+        </g>`;
+    }
     // Innerer Heimat-Ring (nur angedeutet, falls Spieler-Marker vorhanden)
     if (activeSystem === myHomeSystem || otherPlayersInSystem.length){
       inner += `<ellipse cx="${SUN_X}" cy="${SUN_Y}" rx="58" ry="17" fill="none" stroke="#e24b4a" stroke-opacity="0.15" stroke-dasharray="1,4"/>`;
@@ -49934,7 +50085,8 @@
       node.addEventListener('click', (e) => {
         e.stopPropagation();
         if (galaxyMapDidDrag) return;
-        asteroidMapMenu(e, activeSystem, parseInt(node.getAttribute('data-map-asteroid'), 10));
+        // Kein parseInt: Peilungen tragen eine ID wie 'p3', Guertelplaetze eine Zahl - asteroidAn routet.
+        asteroidMapMenu(e, activeSystem, node.getAttribute('data-map-asteroid'));
       });
     });
     svg.querySelectorAll('[data-map-moon]').forEach(node => {
@@ -50337,7 +50489,8 @@
     const fleetName = resolveFleetName();
     cf.missions.push({
       id: nextMissionId(), type:'mining', targetId: sysId + ':' + platz,
-      system: sysId, platz: +platz, sorte: a.sorte, groesse: a.groesse,
+      // platz NICHT in eine Zahl wandeln: Peilungen tragen eine ID wie 'p3' (+'p3' waere NaN).
+      system: sysId, platz: platz, sorte: a.sorte, groesse: a.groesse, peilung: !!a.peilung,
       startTime: jetzt,
       hinBis: jetzt + (plan.flug/2)*1000,
       abbauBis: jetzt + (plan.flug/2 + plan.abbau)*1000,
@@ -50363,7 +50516,10 @@
         disabled: gesperrt || !frei,
         fn: () => oeffneAbbaumission(sysId, platz) }
     ];
-    openKarteMenu(ev, 'Asteroid · ' + g.name, asteroidName(a) + ' · Vorrat ' + fmt(a.vorrat), eintraege);
+    const kopf = a.peilung ? 'Schürfpeilung · ' + g.name : 'Asteroid · ' + g.name;
+    const zeile = asteroidName(a) + ' · Vorrat ' + fmt(a.vorrat)
+      + (a.peilung ? ' · noch ' + Math.ceil(peilungRestTage(a)) + ' Tage gültig' : '');
+    openKarteMenu(ev, kopf, zeile, eintraege);
   }
 
   function sendAttackMission(npcId){
@@ -57691,6 +57847,7 @@
     state.lastTick = uhrDanach;
     const missionsResolved = checkMissions();
     asteroidNachschub();   // faellige Vorkommen wieder auffuellen (wandert, siehe asteroidNachschub)
+    peilungenAufraeumen(); // verfallene/leergefoerderte Schuerfpeilungen entfernen
     processPirateDebrisRaid();
     processVoidRift();
     // Performance (24.07.2026): Anzeige-Arbeit nur bei sichtbarem Tab - im Hintergrund (Handy-Screen
