@@ -8,6 +8,21 @@ Randsektoren. Systeme wechseln über Tage den Besitzer. Spieler wählen keine fe
 wirken durch ihr Handeln – und ernten Vorteile oder Strafexpeditionen, je nachdem, wem der Sektor
 gehört, in dem sie leben.
 
+> **Nachgeprüft am Code, 10.08.2026.** 78 Behauptungen dieses Entwurfs wurden gegen
+> `weltraum_kolonie.html` und `server.js` gehalten; 44 gingen glatt durch, 34 wurden beanstandet,
+> 15 davon adversarisch gegengeprüft (5 Beanstandungen fielen dabei wieder weg). Die sachlichen
+> Korrekturen sind unten **an Ort und Stelle eingearbeitet**, nicht in einem Anhang gesammelt –
+> ein Anhang wäre genau die „zweite Anzeigestelle mit der alten Annahme", vor der `CLAUDE.md`
+> warnt.
+>
+> **Zu den Zeilennummern:** Sie waren beim Schreiben richtig und sind seither um rund **35 Zeilen**
+> abgewandert, weil die Datei zwischen v8.466.0 und v8.468.0 gewachsen ist. Nachgewiesen an einem
+> Anker: `git show 124aa71:weltraum_kolonie.html | sed -n '47983p'` liefert wörtlich
+> `const factionRing = controlledByMe`. Über sechs Commits wandert derselbe Anker
+> 47934 → 47958 → 47973 → 47983 → 47986 → 48018. **Lehre für künftige Entwürfe:** Zeilennummern in
+> einem Dokument, das länger lebt als ein Commit, gehören mit Commit-Stand notiert oder durch einen
+> Suchbegriff ersetzt – eine nackte Zahl ist nach zwei Wochen ein Fehlverweis.
+
 ---
 
 ## 0. Zwei Befunde vorweg, die den Entwurf umkrempeln
@@ -19,7 +34,7 @@ Eroberung, Rückeroberung gegen Spieler und ein Spieler-Angriffsendpunkt laufen 
 
 | Was | Wo |
 |---|---|
-| `FACTION_DEFS` mit `systems[]` und `strength` | server.js:3773 |
+| `FACTION_DEFS` (Stammdaten) + `loadOrInitFactions()`, das `systems[]`/`strength` anlegt | server.js:3773 / 3779 |
 | Expansion und gegenseitige Eroberung im `galaxyTick` | server.js:4239–4281 |
 | Rückeroberung eines Spielersystems durch die Fraktion | server.js:4289–4309 |
 | Spieler erobert ein Fraktionssystem | `POST /api/faction/attack`, server.js:6311 |
@@ -42,12 +57,31 @@ Krieg und Territorium sind vollständig entkoppelt. Die Randkriege würden sie e
 dem Server **28 Basis-Systeme** – darunter **alle acht äußersten** (`sys_pandora_saum` bis
 `sys_meridian_kern`) und alle 20 `sysn_*`-Systeme.
 
-Das sind genau die geografischen Randsektoren, um die es gehen soll. `/api/faction/attack` lehnt sie
-heute mit HTTP 400 ab (server.js:6313). Der Backend-Kommentar bei server.js:1214 behauptet dagegen
-Gleichheit, und `tests/test_paritaet_tabellen.js` deckt die Systemliste **nicht** ab.
+Das sind genau die geografischen Randsektoren, um die es gehen soll.
 
-> **Erster Arbeitsschritt, vor jeder Zeile Randkriege:** Systemlisten angleichen und einen
-> Paritätstest ergänzen. Das ist unabhängig von diesem Entwurf ein echter Fehler.
+**Die Folgen sind erheblich größer, als hier zuerst stand.** Die genannte 400-Ablehnung von
+`/api/faction/attack` (server.js:6313) ist der *unwichtigste* Fall – über die Oberfläche lässt sie
+sich gar nicht auslösen. Heute schon wirksam ist dagegen: In diesen 28 Systemen kann **kein neuer
+Spieler spawnen**, **keine Fraktion Territorium halten oder ausdehnen**, **keine Supernova und kein
+Wurmloch entstehen**, **keine Piratenbasis gegründet** und **kein Allianz-Raid angesetzt** werden.
+`SYSTEM_NEIGHBORS` baut seinen K=4-Graphen (server.js:1270) ebenfalls nur über die 41. Rund
+**40 % der Karte sind für jeden serverseitigen Galaxie-Inhalt tot** – und zwar genau die äußeren
+Randsektoren, also die Bühne der Randkriege.
+
+**Und die Lücke wächst.** „41 gegen 69" beschreibt nur die statischen Listen. Zur Laufzeit hat das
+Frontend heute bereits **75** Systeme (69 + 6 wöchentliche, `WEEKLY_SYSTEMS_PER_WEEK = 2` ab
+`WEEKLY_SYSTEM_EPOCH`), die echte Lücke ist also **34** – und sie wächst jeden Montag um zwei, bis
+zum Deckel 69 + 208 = 277.
+
+Der Backend-Kommentar bei server.js:1214 behauptet dagegen Gleichheit, und
+`tests/test_paritaet_tabellen.js` deckt die Systemliste **nicht** ab.
+
+> **Erster Arbeitsschritt, vor jeder Zeile Randkriege:** Systemlisten angleichen – aber **nicht** als
+> einmaliges Nachtragen der 28 IDs. Das schlösse die Lücke nur für einen Moment; am Montag darauf
+> laufen die Galaxien wieder auseinander, und ein Paritätstest, der bloß die statischen Listen
+> vergleicht, würde nicht anschlagen. Der Server muss die wöchentliche Erzeugung **mitrechnen**
+> (dieselbe Epoche, dieselbe Formel) oder die Systemliste vom Client übernehmen. Der Paritätstest
+> gehört auf den Laufzeit-Bestand, nicht auf die Literale.
 
 ---
 
@@ -88,8 +122,9 @@ jedem Prozessstart (server.js:4474), und nodemon startet den Container bei jedem
 
 ## 2. Wie ein Spieler wirkt
 
-Sieben Handlungen, **alle an bereits gezählte Ereignisse angedockt** – kein neuer Hook an einer
-Abschlussstelle. Das ist dieselbe Bauregel, die die Fraktionsaufträge tragen (Kommentar Z. 14903–14905).
+Sieben Handlungen, so weit wie möglich an bereits gezählte Ereignisse angedockt. Vorbild ist die
+Bauregel der Fraktionsaufträge (Kommentar Z. 14903–14907): Fortschritt wird über **vorhandene
+Lebenszeit-Zähler per Differenz** gemessen, statt neue Hooks in den Kampf-/Expeditionscode zu legen.
 
 | Handlung | Kriegspunkte | Tagesdeckel |
 |---|---|---|
@@ -98,11 +133,38 @@ Abschlussstelle. Das ist dieselbe Bauregel, die die Fraktionsaufträge tragen (K
 | **Bollwerk schleifen** (über `/api/faction/attack`) | 250 / 60 | – |
 | Piratennest im Frontsektor räumen | 30 | – |
 | Nachschubspende (feste Rohstoffmenge) | 60 | – |
-| Tiefenfund aus dem Abgrund abliefern | 45 | – |
+| **Fundmeldung** an die Fraktion (150 Abgrundsplitter) | 45 | – |
 
 Nur das Bollwerk ist echt server-autoritativ. Die übrigen hängen am clientseitig geführten
 Spielstand – deshalb sind ihre Gewichte bewusst klein gehalten (40/30 gegen 250), statt eine
 Scheinvalidierung zu bauen, die keine ist.
+
+**Korrektur nach der Codeprüfung: „alle ohne neuen Hook" trifft nicht zu.** Die Bauregel verlangt
+einen *monotonen Lebenszeit-Zähler*, und den hat von den sieben Handlungen nur die **Expedition**
+(`expeditionsCompleted`). Konkret:
+
+- **Piratennest** – die Abschlussstelle existiert (`checkMissions`, `m.type === 'piratelair'`), aber
+  `pirateLairStage` **fällt nach Stufe 10 auf 1 zurück** und `pirateLairPrestige` zählt nur
+  vollständige Zehnerketten; eine Differenzmessung ist damit unmöglich. Schwerer wiegt: Das
+  Piratenversteck hat **überhaupt keinen Ort in der Galaxie** – die Mission trägt nur
+  `targetId: stage` und startet von `state.activeBasePlanet`. „Im Frontsektor" lässt sich heute an
+  nichts prüfen. Entweder man gibt dem Versteck ein System, oder die Handlung fällt weg.
+- **Fundmeldung** – hier war der Entwurf gleich doppelt daneben. „Tiefenfund" ist ein erfundener
+  Name; die Währung heißt `state.abgrund.splitter` (**Abgrundsplitter**). Und die Handlung muss
+  nicht gebaut werden, **sie existiert bereits**: 150 Splitter an eine Fraktion gegen Ruf, mit
+  Sperrzeit je Fraktion über `state.fundmeldungLastAt`. Sie ist damit auch nicht „eine zweite
+  Senke", sondern bereits die vierte von vier. Richtig ist nur, dort einen Kriegspunkt-Ertrag
+  anzuhängen – ein Lebenszeit-Zähler fehlt allerdings auch hier (nur Zeitstempel).
+- **Nachschubspende** – `WAR_SUPPORT_COST` ist tatsächlich ein Literal mit festen Mengen
+  (`{ erz:4000, kristalle:2500, deuterium:1200 }`) und taugt als Vorbild gegen „N Minuten
+  Produktion". Aber `supportWarSide` ist durch `if (warSupportedSide()){ … return; }` genau
+  **einmal je Krieg** möglich, nicht wiederholbar-täglich – und schickt nicht einmal etwas an den
+  Server. Das zweite Spendenmuster (`recordAllianceDonation`) arbeitet mit frei gewählter Menge,
+  ist also gerade **kein** Vorbild für einen festen Betrag.
+- **Konvoi** – Routen-Ticks haben keinen passenden Zähler.
+
+Für diese vier ist es also sehr wohl ein neuer Hook. Das ist machbar, muss aber im Aufwand stehen
+und nicht als „dockt an Vorhandenes an" verbucht werden.
 
 ### 2.1 Fünf Sperren gegen das Großkonto
 
@@ -138,12 +200,18 @@ der Krieg ist nach zwei Tagen entschieden.
 
 Der Befund „Endgame-Senken fehlen" stimmt so nicht. Der Aufstiegsbaum ist seit dem 27.07.2026
 **unendlich** (`ascNodeCost`, Z. 25284–25286), und es gibt vier endlose Forschungszweige
-(Z. 10625–10636). Was fehlt, ist die **wiederholbare Essenz-QUELLE**: Zwischen zwei Aufstiegen ist
-der Zufluss exakt null.
+(Z. 10631–10642, alle vier mit `endless:true`). Was fehlt, ist die **wiederholbare Essenz-QUELLE**.
+
+**Korrektur:** Hier stand zuerst „zwischen zwei Aufstiegen ist der Zufluss exakt null". Das ist
+falsch – und widersprach sogar Abschnitt 6.5 dieses Dokuments. Es gibt drei aufstiegsunabhängige
+Quellen: Forschungs-Meilensteine (86), Kompendium (47) und Expeditions-Kodex (54), zusammen rund
+**187 Essenz**. Alle drei sind aber **einmalig je Konto** – ihre Marker überleben seit v8.379.0
+Prestige *und* Aufstieg. Richtig ist also: Es gibt keine **wiederholbare** Quelle, nicht: keine.
 
 Der Krieg speist deshalb drei Töpfe:
 
-- **Gunstmarken** – der dünnste Zufluss im Spiel (heute nur Aufträge 1/2/4 und Kriegsparteinahme 3)
+- **Gunstmarken** – der dünnste Zufluss im Spiel: genau zwei Zuflusspunkte im ganzen Code, Aufträge
+  (1/2/4, ab Rang 7 „Geachtet" 2/3/5 durch `RANK_FAVOR_BONUS_FROM`) und Kriegsparteinahme (3)
 - **Frontmarken** – eine neue, fraktionsneutrale Währung
 - **Sternenessenz** – ausschließlich als Wochenprämie mit absolutem Deckel 3, **nie pro Aktion**
 
@@ -166,8 +234,13 @@ Fraktion mit sechs Stufen bei 25 / 75 / 175 / 350 / 650 / 1100 Dienstpunkten.
 
 **Kein Dienstgrad gibt einen eigenen Prozentbonus.** Alle Freischaltungen sind Sachwerte – ein
 Schiff, ein Modul, ein Gebäude, ein Titel, ein Anstrich –, deren Wirkung durch die bereits
-gedeckelten Gruppen `productionBonusRaw()` (`PROD_BONUS_CAP` 1.0, Z. 19086) und
-`attackCombatBonusRaw()` (Z. 22462) läuft.
+gedeckelten Gruppen `productionBonusRaw()` und `attackCombatBonusRaw()` läuft.
+
+**Wichtig, weil die beiden Töpfe seit v8.468.0 nicht mehr gleich gebaut sind:** Der Kampfbonus ist
+weiterhin ein hartes `Math.min(1.0, …)`. Die Produktion läuft dagegen durch `weicherDeckel()` –
+Werte über 1.0 brechen nicht ab, sondern laufen exponentiell aus und sind erst bei
+Deckel + Spielraum = 1.25 hart begrenzt, effektiv also **+125 %, nicht +100 %**. Wer einen neuen
+Produktionsbonus in diese Gruppe legt, muss mit dem weichen Auslauf rechnen, nicht mit einer Klippe.
 
 ### 4.4 Drei Dinge, die der Krieg ausdrücklich NICHT tun darf
 
@@ -176,7 +249,11 @@ gedeckelten Gruppen `productionBonusRaw()` (`PROD_BONUS_CAP` 1.0, Z. 19086) und
   `computeScore()` und mit /200 in `essenceGainNow()`. Das wäre eine PvP-freie Abkürzung in
   Bestenliste *und* Sternenessenz zugleich.
 - **Kein „N Minuten eigene Produktion".** Dieses Muster lebt ausgerechnet im Fraktionssystem weiter
-  (`factionGiftPreview`, Z. 15259–15262, schüttet `ratesPerSecond().erz * 900` aus). Vorlage sind
+  (`factionGiftPreview`, Z. 15272–15281). Genau genommen betrifft es **eine** Fraktion und **eine**
+  Stufe: Die Legion zahlt auf „Verbündet" `ratesPerSecond().erz * 900` (15 Minuten) plus 60 % davon
+  in Kristallen, auf „Freundlich" `* 400` (rund 6,7 Minuten); der Schattenbund zahlt feste Kredite.
+  Das `Math.max` davor ist ein **Boden, kein Deckel** – begrenzt wird nur durch die 24-Stunden-
+  Abklingzeit je Fraktion. Vorlage sind
   stattdessen die **festen** Beträge bei `WAR_SUPPORT_*` (Z. 15098–15099).
 - **Kein Ruf-Zuwachs an `changeFactionRep()` vorbei** (Z. 15546). Sonst greifen `applyRivalSpill`
   (0,35 gegenläufig) und `enforceRivalExclusivity` nicht – und der Krieg wird still zum Weg, mit
@@ -196,11 +273,28 @@ gedeckelten Gruppen `productionBonusRaw()` (`PROD_BONUS_CAP` 1.0, Z. 19086) und
 
 ### 5.1 Zuerst: der Farbkonflikt
 
-Frontend (`FACTION_DIPLOMACY`, Z. 15305–15308) und Backend (`FACTION_DEFS`, server.js:3773–3778)
-vergeben **verschiedene Fraktionsfarben**, und `diplomacyFactions()` lässt bei Z. 15321 die
-Serverfarbe gewinnen. Folge heute: Legion-Territorium ist auf der Karte blau, ihr Wappen
-(`ICONS.fac_legion`, Z. 4875) ist rot – Rot und Blau sind zwischen Legion und Void schlicht
-vertauscht. Bei einer Karte, die über Farbe gelesen wird, ist das vorher zu klären.
+Frontend (`FACTION_DIPLOMACY`, Z. 15320–15325) und Backend (`FACTION_DEFS`, server.js:3773–3778)
+vergeben **verschiedene Fraktionsfarben**. Der Konflikt ist schärfer und breiter, als hier zuerst
+stand – nachgeprüft am Code:
+
+- **Die Karte kennt die Frontend-Farbe überhaupt nicht.** Sie geht gar nicht durch
+  `diplomacyFactions()`: `factionOwning()` liest `galaxyCache.factions` roh aus, und der
+  Territoriumsring benutzt `owner.color` direkt. Es gibt dort **keinen Rückfall** auf die lokale
+  Farbe. (`diplomacyFactions()` mit `s.color || d.color` betrifft nur den Diplomatie-Reiter.)
+- **Rot ist wirklich vertauscht:** `#e24b4a` gehört im Frontend der **Legion**, im Backend dem
+  **Void**. „Rot und Blau vertauscht" war aber ungenau: Im Frontend gibt es gar kein Blau – Void
+  ist dort `#c3bef5`, ein blasses Lavendel, und das Wappen `fac_void` ist violett gezeichnet. Das
+  Blau `#85b7eb` der Legion ist keine vertauschte, sondern eine **im Backend neu erfundene** Farbe,
+  die im Frontend nirgends vorkommt.
+- **Es gibt eine dritte Farbquelle.** Das Überfall-Banner färbt über `factionAccentColor()`
+  ausdrücklich mit der **Frontend**-Farbe („Echte Fraktionsfarbe vor der gehashten Ersatzfarbe").
+  Void erscheint dort lavendel und auf der Karte rot. Und in der Fraktionskarte steht der
+  Widerspruch in *einer* Zeile: Der Name wird mit `f.color` (Serverfarbe, Legion blau) eingefärbt,
+  während `iconHtmlFor()` bei vorhandenem `ICONS`-Eintrag das SVG unverändert zurückgibt und den
+  Farbparameter ignoriert – das rote Wappen steht direkt neben dem blauen Namen.
+
+Wer den Konflikt auflöst, muss also **drei** Stellen mitnehmen, nicht zwei. Bei einer Karte, die
+über Farbe gelesen wird, ist das vorher zu klären.
 
 Zusätzlich: Die Flächenfarbe der Legion muss von `#e24b4a` abweichen (Vorschlag `#c0504f`), weil
 `#e24b4a` identisch mit `--c-danger` und mit der Kernfarbe des eigenen Heimatsterns (Z. 48014) ist.
@@ -260,18 +354,33 @@ Emoji, wie es die heutigen Abzeichen (Z. 47961–47981) noch sind.
 ### 5.4 Meldungen
 
 Frontverschiebungen **anderer** Fraktionen gehören in die Galaxie-Nachrichten (Z. 14010–14040,
-serverseitig auf 40 Einträge begrenzt), nie in `pushToast` (Z. 23688) – dort gibt es nur drei
-Plätze, und die werden für eigene Ereignisse gebraucht.
+serverseitig auf 40 Einträge begrenzt), nie in `pushToast` – dort gibt es nur drei Plätze, sie
+werden für eigene Ereignisse gebraucht, und `log()` belegt selbst einen davon.
+
+**Der engere Deckel steht aber woanders:** Angezeigt werden nur die neuesten **zwölf** Einträge
+(`news.slice(0,12)`, zweimal – für die Signatur und fürs Markup). Der Server hält 40 vor, der
+Spieler sieht 12. Eine aktive Front würde diese zwölf Plätze schnell allein belegen und Weltboss-,
+Liga- und Allianzkriegsmeldungen verdrängen. Frontmeldungen brauchen deshalb entweder eine eigene
+Rubrik oder eine harte Quote innerhalb der zwölf.
 
 ### 5.5 Handy
 
 Auf 390 px rendert die Karte wegen des Vorgabewerts von `preserveAspectRatio` (Z. 3241) nur rund
-184 px hoch in einem 420-px-Kasten. Die Front bekommt diese Briefkastenfläche als **HTML-Leiste**
-im `.map-wrap` (Bauweise wie `.map-radar-overlay`, CSS Z. 1995) – nicht mehr Kartenhöhe.
+184 px hoch in einem 420-px-Kasten. **Achtung beim Nachlesen:** Die CSS-Klasse `.map-wrap` gibt
+230 px vor; die 420 px kommen aus dem Inline-Stil genau dieser einen Instanz (Z. 3240). Für die
+Rechnung ist 420 richtig, aber wer nur die Regel liest, findet 230.
+
+Die Front bekommt diese Briefkastenfläche als **HTML-Leiste** im `.map-wrap` (Bauweise wie
+`.map-radar-overlay`) – nicht mehr Kartenhöhe.
 
 Der neue Unterreiter heißt kurz **„Front"** und läuft ohne eine Zeile neue Schaltlogik im
-vorhandenen generischen Werk mit (Leiste Z. 3270–3276, Umschaltung Z. 53536–53545); bei 350 px
-bricht die Leiste sonst in eine zweite Reihe um.
+vorhandenen generischen Werk mit (Leiste Z. 3270–3276, Umschaltung Z. 53571).
+
+Die Begründung „bei 350 px bricht die Leiste sonst in eine zweite Reihe um" ist allerdings
+**nicht gemessen**, und die Formulierung unterstellt einen einzeiligen Ist-Zustand, den das Markup
+nicht hergibt: Die Leiste hat `flex-wrap:wrap`, und die fünf vorhandenen Pillen stehen bei 350 px
+mit einiger Wahrscheinlichkeit schon heute mehrzeilig. Vor dem Bau im Browser nachmessen – ein
+kurzer Name ist trotzdem richtig, aber die Begründung muss stimmen.
 
 ---
 
@@ -294,8 +403,14 @@ Clients**, weil `loadGalaxyState()` (Z. 13983) den Zustand 1:1 übernimmt.
 Ein neuer Präfix im geteilten Speicher ist ohne eigene Prüfung für **jeden eingeloggten Nutzer**
 schreibbar: Alle fünf Prüffunktionen geben bei Nicht-Treffer `null` zurück (server.js:528, 549, 562,
 607, 612), und die Kette ist `a() || b() || …`. Falls doch etwas nach `db.shared` muss, braucht es
-`checkRandkriegKeyPermission` mit **deny-by-default**, verdrahtet an **drei** Stellen: 1685 (GET),
-1717 (PUT) und im guarded-Block von `storage-list` (1837–1846).
+`checkRandkriegKeyPermission` mit **deny-by-default** an **drei** Orten: 1685 (GET), 1717 (PUT) und
+im guarded-Block von `storage-list` (1837–1845).
+
+**Zur Vorsicht, weil das Vorbild hier trügt:** `checkAllianceKeyPermission` selbst hat nur **zwei**
+Aufrufstellen (1685 und 1717). Der dritte Ort ruft sie *nicht* auf, sondern wiederholt die
+Rollenprüfung von Hand über `allianceRoleOf`. Als Bauanweisung stimmen die drei Orte – als
+Beschreibung des Ist-Zustands wäre „an drei Stellen verdrahtet" falsch, und wer beim Nachbauen nur
+der Funktion folgt, übersieht `storage-list`.
 
 ### 6.3 Polling – eine Messkorrektur
 
