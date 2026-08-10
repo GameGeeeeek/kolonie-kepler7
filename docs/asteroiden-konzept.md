@@ -186,52 +186,98 @@ sich damit spürbar anders an: schnelle, schwere Fahrten statt langem Warten.
 > dieselbe Art Folgefehler wie beim Anspruchslimit in 3.6: eine Zahl, die ihre Begründung verloren
 > hat, ohne sich selbst zu ändern.
 
-### 3.3 Wo sie liegen und wie sie entstehen
+### 3.3 Wo sie liegen
 
-**Nicht jedes System hat einen Gürtel.** Rund **20 der 69 Systeme** tragen einen, mit je **4–6
-Vorkommen** – galaxieweit also etwa **90**. Die übrigen 49 Systeme haben keine, und das ist der
-Punkt: Ein Gürtelsystem ist damit ein *Ort*, kein Hintergrundrauschen. Wer einen guten hat, hat
-etwas, das ein anderer haben will.
+**Nicht jedes System hat einen Gürtel.** Rund **20 der 69 Systeme** tragen einen. Jeder Gürtel hat
+**10 feste Plätze** auf seiner Bahn, von denen zu jedem Zeitpunkt **4 bis 6** ein Vorkommen tragen –
+galaxieweit also etwa **90 belegte von 200 möglichen Plätzen**. Die übrigen 49 Systeme haben keinen
+Gürtel, und das ist der Punkt: Ein Gürtelsystem ist damit ein *Ort*, kein Hintergrundrauschen. Wer
+einen guten hat, hat etwas, das ein anderer haben will.
 
 Die Begründung für diese Zahlen steht in Abschnitt 3.5 – sie ist gemessen, nicht geschätzt, und die
 erste Fassung dieses Konzepts hatte sie um den Faktor fünf falsch.
 
-**Verteilung.** Die Gürtelsysteme werden deterministisch gewählt, aber **räumlich gestreut**: Die
+**Verteilung der Gürtelsysteme.** Sie werden deterministisch gewählt, aber **räumlich gestreut**: Die
 Galaxiekarte wird in ein Raster gelegt, und je Rasterzelle wird genau ein System zum Gürtelsystem
 bestimmt. Ohne diese Streuung könnte der Zufall alle zwanzig in eine Ecke legen, und die Spieler am
-anderen Ende hätten keinen erreichbaren Gürtel – bei zehn Konten wäre das kein Balance-Problem
-mehr, sondern ein kaputtes Feature.
+anderen Ende hätten keinen erreichbaren Gürtel – bei zehn Konten wäre das kein Balance-Problem mehr,
+sondern ein kaputtes Feature.
 
 **Qualität wächst mit der Entfernung von `kepler`.** Im Startsystem und seinen direkten Nachbarn
 liegen überwiegend Splitter und Brocken; Kerne und Kolosse häufen sich weit draußen. Das bindet drei
 vorhandene Systeme ohne eine einzige neue Regel zusammen: Ein weiter Flug kostet mehr Zeit und
 Treibstoff (`missionDurationFor`, `missionFuelCostSplit`), macht Navigator und den neuen
 Schürfleitstand wertvoll, und sorgt dafür, dass Anfänger in Reichweite immer *etwas* finden, während
-sich die entwickelten Konten um die großen Brocken draußen streiten. Die Knappheit sitzt damit
-da, wo sie hingehört – bei der Qualität, nicht beim Zugang.
+sich die entwickelten Konten um die großen Brocken draußen streiten. Die Knappheit sitzt damit da,
+wo sie hingehört – bei der Qualität, nicht beim Zugang.
 
 **Die Kartengeometrie ist dabei kein Engpass** (nachgerechnet an `planetOrbitXY()` Z. 48685): Die
 Planeten sitzen auf Ellipsen mit `rx = 42 + orbit·43`, jede Bahn trägt genau **einen** Planeten, der
-Rest der Bahn ist leer. Eine Gürtelbahn zwischen zwei Orbits fasst bei 34 px Markerabstand je nach
-Lage **19 bis 52** Marker. Sechs sind daneben komfortabel – die Zahl 4–6 kommt aus der Wirtschaft,
-nicht aus dem Platz.
+Rest der Bahn ist leer. Eine Gürtelbahn fasst bei 34 px Markerabstand je nach Lage **19 bis 52**
+Marker. Zehn Plätze sind daneben komfortabel – die Zahlen kommen aus der Wirtschaft, nicht aus dem
+Platz.
 
-Sie werden **berechnet, nicht gespeichert.** Anzahl, Sorte, Größe und Position eines Systems ergeben
-sich aus `hashStringToFloat(systemId + ':' + epoche)` – dasselbe Verfahren, mit dem der Abgrund seine
-Sektoren aus der Tiefe ableitet („Ein Sektor wird aus seiner Tiefe **berechnet**, nicht gewürfelt",
-HELP_SECTIONS Z. 33851). Client und Server rechnen unabhängig dasselbe Feld aus. Gespeichert wird
-ausschließlich, was davon **abweicht**: wer ein Vorkommen hält und wie viel Vorrat noch drin ist.
+### 3.3.1 Erschöpfung und Nachschub – nie wieder am selben Fleck
 
-Das ist keine Eleganz um ihrer selbst willen, sondern eine harte Anforderung: Der geteilte Speicher
-hat ein Schlüssel- und ein Größenlimit (`MAX_SHARED_KEYS`/`MAX_SHARED_VALUE_BYTES`, definiert Z. 286/287, geprüft in der
-Storage-PUT-Route). Einzeldokumente je Vorkommen wären auch bei 90 Stück die falsche Form, weil die
-Zahl mit der Spielerschaft wachsen soll; **ein Dokument je Gürtelsystem** – also rund 20 – mit je
-einer Handvoll Einträgen ist unauffällig und bleibt es auch beim Zehnfachen.
+Ist ein Vorkommen leergefördert, verschwindet es. **Der Nachschub erscheint nicht dort, wo es lag.**
 
-**Erschöpfung und Nachwachsen.** Ist ein Vorkommen leer, verschwindet es und der Platz bleibt
-**6 Stunden** leer, danach liegt dort ein neues – Sorte und Größe aus `epoche+1` desselben Platzes.
-Das Nachwachsen läuft **faul**: Es passiert beim nächsten Lesen des Feldes, nicht in einem Timer.
-Auf dem Pi läuft kein Hintergrundjob, und es gibt nichts, was bei einem Neustart hängenbleiben kann.
+| Erschöpfte Größe | Nachschub nach | Wo |
+|---|---|---|
+| Splitter | **3 Std.** | ein **anderer freier Platz** – zu 70 % im selben System, zu 30 % in einem anderen Gürtelsystem |
+| Brocken | **8 Std.** | dito |
+| Kern | **20 Std.** | dito |
+| Koloss | **48 Std.** | dito |
+
+Drei Regeln dazu, jede mit einem Grund:
+
+**Der Platz wechselt immer.** Der neue Brocken landet auf einem Platz, der gerade frei ist – nie auf
+dem gerade geräumten. Ohne diese Regel wäre die Karte statisch: Man merkt sich zehn Koordinaten und
+fliegt sie für immer ab. Mit ihr ist das Gürtelsystem ein Revier, das man **absuchen** muss, und der
+Tiefenscan (Abschnitt 7) sowie die Sichtbarkeitsregel aus 3.4 bekommen dadurch überhaupt erst Sinn.
+
+**Die Sorte und Größe werden neu gezogen**, unabhängig von dem, was dort war. Ein leergeförderter
+Koloss kommt nicht als Koloss wieder. Über Wochen pendelt sich die Zusammensetzung des Feldes damit
+von selbst auf die Verteilung aus 3.1/3.2 ein – es braucht keine Ausgleichslogik, die man falsch
+bauen könnte.
+
+**30 % wandern in ein anderes System.** Damit verschiebt sich über Wochen auch die Landkarte des
+Reichtums: Ein System, das heute vier Kerne trägt, kann in zwei Wochen mager sein. Das ist die
+langsamste Bewegung im ganzen Entwurf und die, die das Erkunden dauerhaft am Leben hält. **Grenzen:
+kein Gürtelsystem fällt unter 3 oder steigt über 8 Vorkommen** – sonst könnte ein System leerlaufen
+und ein anderes alles auf sich ziehen.
+
+**Läuft das Feld dadurch leer?** Nein, nachgerechnet nach Little's Law – leere Plätze im Mittel =
+Erschöpfungen pro Stunde × mittlere Nachschubzeit:
+
+| gleichzeitig aktiv abgebaute Vorkommen | Erschöpfungen/Std. | im Mittel leer | Anteil des Feldes |
+|---|---|---|---|
+| 10 (realistisch bei 10 Konten) | 0,85 | 6,3 Plätze | 7 % |
+| 20 | 1,71 | 12,7 Plätze | 14 % |
+| 35 (Vollauslastung) | 2,99 | 22,2 Plätze | 25 % |
+
+Selbst bei Vollauslastung steht ein Viertel des Feldes leer und drei Viertel tragen etwas. Das ist
+genau die Mischung, die gewollt ist: sichtbar in Bewegung, nie leergeräumt.
+
+### 3.3.2 Was das für die Speicherung heißt
+
+Die erste Fassung wollte das Feld **berechnen statt speichern** – Sorte, Größe und Platz aus
+`hashStringToFloat(systemId + ':' + epoche)`, so wie der Abgrund seine Sektoren aus der Tiefe
+ableitet (HELP_SECTIONS Z. 33851: „Ein Sektor wird aus seiner Tiefe **berechnet**, nicht gewürfelt").
+Client und Server hätten unabhängig dasselbe Feld ausgerechnet, gespeichert worden wäre nur die
+Abweichung.
+
+**Mit wanderndem Nachschub geht das nicht mehr**, und das ist die Folge, die diese Änderung wirklich
+hat: Ein Feld, das sich bei jeder Erschöpfung an einer zufälligen Stelle neu bildet, ist Geschichte,
+keine Formel. Es **muss** gespeichert werden.
+
+Das ist bezahlbar, und zwar mit Abstand: Ein System-Dokument führt 10 Plätze mit je einer Handvoll
+Feldern – rund **800 Byte**, bei 20 Gürtelsystemen zusammen etwa **16 KB**. Das Limit liegt bei
+64 KB **je Schlüssel** (`MAX_SHARED_VALUE_BYTES`, server.js Z. 286), und jedes System ist ein eigener
+Schlüssel. Es ist also nicht knapp, sondern um zwei Größenordnungen unkritisch.
+
+Berechnet wird weiterhin die **Erstbelegung** (welche 20 Systeme, welche Plätze, was liegt dort am
+ersten Tag) – ab da lebt das Feld. Im Solo-Modus liegt dieselbe Struktur lokal in `state`, mit
+derselben Nachschublogik; der Kreislauf funktioniert dort vollständig (Abschnitt 8).
 
 ### 3.4 Sichtbarkeit
 
@@ -240,6 +286,11 @@ Sorte und Größe stehen nach dem ersten **Anflug oder Scan** fest; vorher zeigt
 grauen, unbeschrifteten Brocken. Das gibt dem **Spähschiff** und der neuen Forschung
 **Tiefenscan-Array** (Abschnitt 7) einen zweiten Nutzen und verhindert, dass man mit einem Blick auf
 die Karte alle Vorkommen auf einmal sortiert.
+
+**Seit der Nachschub wandert (3.3.1), ist das keine einmalige Aufgabe mehr.** Ein Gürtelsystem, das
+man vorige Woche durchgescannt hat, sieht heute anders aus – der Tiefenscan ist damit kein Häkchen,
+das man einmal setzt, sondern ein Werkzeug, das dauerhaft etwas wert bleibt. Das war beim
+nachwachsenden Platz aus der ersten Fassung nicht so.
 
 ---
 
@@ -271,9 +322,13 @@ Spieler verschieben die Rechnung spürbar. Deshalb gehört die Zahl **nicht** al
 sondern als benannte Konstante an genau eine Stelle:
 
 ```js
-// Faustformel: rund 2 Vorkommen je erwartetem Konto, gestreut auf ~5 Vorkommen je Gürtelsystem.
-const GUERTEL_SYSTEME = 20;      // von 69 - bei wachsender Spielerschaft erhöhen
-const VORKOMMEN_JE_GUERTEL = [4, 6];
+// Faustformel: rund 2 Vorkommen je erwartetem Konto, gestreut auf ~5 je Gürtelsystem.
+const GUERTEL_SYSTEME       = 20;      // von 69 - bei wachsender Spielerschaft erhöhen
+const PLAETZE_JE_GUERTEL    = 10;      // feste Positionen auf der Bahn, davon belegt:
+const VORKOMMEN_JE_GUERTEL  = [4, 6];  // Startbelegung
+const VORKOMMEN_GRENZEN     = [3, 8];  // untere/obere Schranke beim Wandern (3.3.1)
+const NACHSCHUB_STD         = { splitter: 3, brocken: 8, kern: 20, koloss: 48 };
+const NACHSCHUB_SYSTEMWECHSEL = 0.30;  // Anteil, der in ein anderes Gürtelsystem wandert
 ```
 
 Ein Wachstum auf 30 Spieler heißt dann: `GUERTEL_SYSTEME` auf 60 setzen, fertig. Kein Umbau.
@@ -299,6 +354,95 @@ Dazu kommt eine **natürliche** Bremse, die kein Limit braucht: Jede Abbaumissio
 für eine halbe bis ganze Stunde. Wer fünf Vorkommen wirklich bewirtschaften will, braucht fünf
 Flotten und die Schiffe dafür. Das Limit ist damit die Obergrenze, nicht der Alltag – der Alltag ist
 die Werft.
+
+---
+
+### 3.7 Schürfpeilungen – die Vorkommen, die nicht auf der Karte stehen
+
+**Expeditionen finden Koordinaten besonders seltener und großer Asteroiden.** Das ist die zweite
+Quelle für Vorkommen neben den Gürteln – und die einzige, die auch im Solo-Modus große Brocken
+liefert.
+
+Eine **Schürfpeilung** ist ein privates Sondervorkommen:
+
+| Eigenschaft | Wert |
+|---|---|
+| Größe | **Kern** (65 %) oder **Koloss** (35 %) – nie klein |
+| Sorte | stark gewichtet zu den **Legierungen**, die antimateriehaltigen dreifach: Pechblende, Resonanz, Kometenkern zusammen ~45 % statt sonst 13 % |
+| Sichtbarkeit | **nur für den Finder** – erscheint als eigener Marker in einem bereits entdeckten System |
+| Anfechtbar | **nein**. Niemand sonst sieht oder erreicht sie. |
+| Haltbarkeit | **7 Tage** ab Fund, dann verfällt die Peilung samt Restvorrat |
+| Gleichzeitig offen | **höchstens 3** |
+
+Sie zählt **nicht** gegen das Anspruchslimit von 5 (Abschnitt 3.6) – ein Schürfrecht ist ein Anspruch
+auf ein geteiltes Objekt, eine Peilung ist eigenes Wissen. Wer gerade drei Peilungen offen hat, kann
+also kurzzeitig acht Vorkommen bewirtschaften. Das ist Absicht und trotzdem kein Rückfall hinter
+Abschnitt 3.6: Peilungen laufen ab, Schürfrechte nicht. Es ist ein **Ausschlag**, kein Dauerzustand.
+
+### Warum die Obergrenze der Regler ist und nicht die Fundchance
+
+Die naheliegende Stellschraube wäre die Prozentzahl. Sie taugt hier nicht, und der Grund ist
+nachgerechnet: Es laufen höchstens **5 Expeditionen gleichzeitig**
+(`maxConcurrentExpeditions()` Z. 22944 – `1 + rexpslots`, `maxLevel: 4`), eine Schürfexpedition
+dauert `1200 s × 0,9`. Im theoretischen Dauerbetrieb sind das **rund 400 Expeditionen am Tag**; ein
+Gelegenheitsspieler schafft zehn. **Zwischen beiden liegt Faktor vierzig.** Jede Prozentzahl, die für
+den einen stimmt, ist für den anderen um zwei Größenordnungen falsch.
+
+Deshalb regelt die **harte Obergrenze von 3 offenen Peilungen**, und die Fundchance bestimmt nur noch,
+wie schnell man nach dem Verbrauch einer wieder auffüllt:
+
+| Expeditionstyp | Chance je erfolgreicher Expedition |
+|---|---|
+| **Schürfexpedition** (`mining`) | **3,0 %** |
+| Tiefenraum-Expedition (`deep`) | 2,0 % |
+| Bergungsexpedition (`salvage`) | 1,0 % |
+| alle übrigen | 1,0 % |
+
+Der Risiko-Regler (`EXPEDITION_RISK_MODES` Z. 49604) skaliert sie mit seinem vorhandenen
+`rew`-Faktor mit – wagemutig +35 %, vorsichtig −15 %. Kein eigener Kanal.
+
+**Das gibt der Schürfexpedition endlich ein Profil.** Sie ist heute der blasseste der sieben Typen:
+„fast nur Ressourcenfunde und geringes Begegnungsrisiko" – also mehr vom Immergleichen. Mit der
+dreifachen Peilungschance wird sie das, wonach sie klingt.
+
+**Findet man eine vierte, während drei offen sind**, ist sie nicht verloren: Sie wird in eine
+Rohstoffgutschrift in Höhe eines halben Splitter-Vorrats umgewandelt, mit einem eigenen Satz im
+Expeditionsbericht („Die Peilung war schon bekannt – die Daten waren trotzdem etwas wert"). Ein Fund,
+der stillschweigend verfällt, ist schlimmer als gar keiner.
+
+### Wo das im Code einhängt
+
+**Nicht als siebtes Fund-Band.** Die Bänder in `EXPEDITION_TYPES` sind kumulative Schwellen
+(`b_nothing < b_resource < b_special < b_item < b_rare < b_module`, Z. 45613–45617) und müssen je Typ
+zusammen mit `nothingBase` **exakt 1,0** ergeben. Ein neues Band hieße, alle sieben Expeditionstypen
+neu auszutarieren – viel Risiko für einen Zusatzfund.
+
+Stattdessen als **unabhängige Zusatzchance oben drauf**, im `outcome === 'success'`-Zweig. Dieses
+Muster steht dort bereits zweimal: die Event-Bauteile und das Event-Modul (Z. 45755 ff.), beide
+ausdrücklich kommentiert mit „verändert bewusst KEINE der b_nothing..b_module-Wahrscheinlichkeiten".
+Und der noch nähere Präzedenzfall steht direkt darunter: die **Entdeckung eines versteckten
+Sternsystems** mit 4 % Chance (Z. 45778 ff.) – eine Expedition, die einen *Ort* auf der Karte
+aufdeckt, gibt es also schon. Die Schürfpeilung ist derselbe Griff, nur mit einem Vorkommen statt
+einem System.
+
+Gespeichert wird sie in `state.peilungen` als kleines Array – Sorte, Größe, System, Restvorrat,
+Verfallszeitpunkt. Kein Backend, kein geteilter Speicher, **funktioniert im Solo-Modus vollständig**.
+
+### Warum privat und nicht geteilt
+
+Die Alternative wäre reizvoll: Die Peilung deckt ein Vorkommen auf, das **allen** gehört, der Finder
+hat nur einen Vorsprung von ein paar Stunden. Das erzeugt Wettrennen und passt zur umkämpften
+Grundidee.
+
+Dagegen sprechen drei Dinge, und das dritte gibt den Ausschlag:
+
+1. **Frust.** Man fliegt zwanzig Minuten und findet den Brocken leergeräumt vor. Bei zehn Konten, die
+   sich alle kennen, wird das schnell persönlich.
+2. **Backend-Arbeit.** Ein geteiltes Sondervorkommen braucht Feld-Dokumente, Sichtbarkeitsfristen und
+   eine Rechteprüfung – es rutscht damit von Phase 2 nach Phase 4.
+3. **Der Solo-Modus.** Er hat keine Gürtel-Konkurrenz und keine Schürfrechte (Abschnitt 8). Die
+   private Peilung ist der Weg, auf dem ein Solo-Spieler an große Brocken kommt. Als geteiltes Objekt
+   wäre sie genau dort wirkungslos, wo sie am meisten gebraucht wird.
 
 ---
 
@@ -598,18 +742,26 @@ Missionstyp **`asteroid-contest`**: eine Kampfflotte gegen die stationierte Esko
 
 ```json
 {
-  "epoche": 3,
   "plaetze": {
-    "4": { "halter": "<userId>", "halterName": "Sascha", "tag": "KEP",
-           "vorrat": 1743200, "seit": 1754800000000, "schutzBis": 1754807200000,
+    "4": { "sorte": "magnetit", "groesse": "kern", "vorrat": 431200,
+           "halter": "<userId>", "halterName": "Sascha", "tag": "KEP",
+           "seit": 1754800000000, "schutzBis": 1754807200000,
            "eskorte": { "jaeger": 40, "waechter": 8 } },
-    "7": { "vorrat": 84000, "leerSeit": null }
+    "7": { "sorte": "eiskern", "groesse": "splitter", "vorrat": 8400 },
+    "9": { "frei": true, "nachschubAb": 1754880000000 }
   }
 }
 ```
 
-Nur belegte oder angebrochene Plätze stehen drin. Alles andere ist berechnet. Ein System-Dokument
-bleibt damit weit unter jedem Größenlimit, und es gibt **69** davon.
+**Jetzt steht das ganze Feld drin, nicht nur die Abweichung** – seit der Nachschub wandert (3.3.2),
+ist es Geschichte statt Formel. Ein Dokument führt 10 Plätze, rund 800 Byte; es gibt **20** davon,
+zusammen etwa 16 KB. Das Limit sind 64 KB **je Schlüssel**.
+
+Ein Platz mit `nachschubAb` ist ein reservierter Wiederbelegungs-Termin: Beim nächsten Lesen des
+Feldes (`GET /api/asteroid/field`) prüft der Server, welche Termine fällig sind, und würfelt dort
+neu aus. **Faul, ohne Timer** – auf dem Pi läuft kein Hintergrundjob, und es gibt nichts, was bei
+einem Neustart hängenbleiben kann. Liest wochenlang niemand ein System, holt der erste Blick alles
+auf einmal nach.
 
 Vier eigene Endpunkte statt generischem Shared-Storage – CLAUDE.md ist an dieser Stelle unmissverständlich
 („Generischer Shared-Storage ohne Sonderregel ist für JEDEN eingeloggten Nutzer weit offen"):
@@ -721,6 +873,11 @@ und ein drittes Frachtschiff, bevor die Mechanik steht, ist Ballast.
   Frachter – dort ist nichts zu bauen.
 - Neun gezeichnete Asteroiden-Icons (eins je Sorte) plus ein Icon für die Aufbereitungsanlage und
   eins für den Schürfleitstand.
+- Ein eigenes Icon für die **Schürfpeilung** (Abschnitt 3.7) – ein markierter Brocken mit Peilkreuz,
+  damit sie sich auf der Karte auf einen Blick von einem regulären Vorkommen unterscheidet. Dazu ein
+  vollständiger Beschreibungssatz in der Berichtszeile, der Größe, Sorte **und Verfallsdatum** nennt:
+  Eine Peilung, die stillschweigend abläuft, wäre genau der Fehler, den CLAUDE.md-Regel 7 mit
+  „vollständige, selbsterklärende `desc`" meint.
 
 **Zu den `ti-*`-Icons:** Die Whitelist umfasst 69 Glyphen, und `ti-pick`, `ti-mountain`, `ti-diamond`,
 `ti-droplet`, `ti-atom-2`, `ti-target` und `ti-flag` sind alle dabei – für die UI-Beschriftungen ist
@@ -827,9 +984,9 @@ steht Sekunden später auf `gamegeeeeek.de`.
 | Phase | Inhalt | Backend? | Risiko |
 |---|---|---|---|
 | **1** | Feldgenerierung, Darstellung auf der Karte, Kartenmenü, **Abbaumission** mit Vorschau und Bericht, Minenschiff regulär freigeschaltet | nein | gering – rein additiv, nichts Bestehendes ändert sich |
-| **2** | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, Hilfe/Tutorial | nein | gering–mittel – die **1,5 Energie je Einheit** vorher an einem echten Spielstand messen (Abschnitt 5.4) |
+| **2** | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, **Schürfpeilungen aus Expeditionen**, Hilfe/Tutorial | nein | gering–mittel – die **1,5 Energie je Einheit** vorher an einem echten Spielstand messen (Abschnitt 5.4) |
 | **3** | **Deckel + Bestandskonten-Ausgleich** | nein | **hoch** – der einzige Schritt, der Spielern etwas wegnimmt |
-| **4** | Geteilter Vorrat: Feld-Dokumente, `mine`, Schürfrechte, Anspruchslimit | **ja** | mittel |
+| **4** | Geteilter Vorrat: Feld-Dokumente, wandernder Nachschub, `mine`, Schürfrechte, Anspruchslimit | **ja** | mittel |
 | **5** | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | mittel |
 
 **Phase 1 ist eigenständig spielbar.** Ohne Backend, ohne Schürfrechte, ohne Deckel: Man sucht sich
@@ -853,12 +1010,14 @@ Stand, rot am alten (`git show HEAD:weltraum_kolonie.html`).
 
 | Test | Prüft | Gegenprobe |
 |---|---|---|
-| `test_asteroidenfeld.js` | Feldgenerierung ist deterministisch: gleiche `systemId` + Epoche ⇒ identisches Feld über zwei getrennte Läufe; die ~20 Gürtelsysteme sind über das Raster gestreut, nicht geklumpt | – (neuer Inhalt) |
+| `test_asteroidenfeld.js` | **Erstbelegung** ist deterministisch (gleicher Seed ⇒ identisches Feld über zwei Läufe) und die ~20 Gürtelsysteme sind über das Raster gestreut, nicht geklumpt | – (neuer Inhalt) |
+| `test_asteroiden_nachschub.js` | Nach dem Leerfördern: (a) der Platz bleibt bis `nachschubAb` frei, (b) das neue Vorkommen liegt auf einem **anderen** Platz – über 200 Durchläufe **kein einziges Mal** auf demselben, (c) kein System verlässt das Band 3–8, (d) über 2.000 Durchläufe nähert sich die Größenverteilung 46/34/16/4 | mit Nachwachsen am selben Platz fällt (b) sofort |
 | `test_abbaumission.js` | Der ganze Kreislauf: Mission starten, Uhr vorstellen, `checkMissions()` auflösen – **vorher keine Ressourcen, nachher genau die Ladung**. Prüft ausdrücklich, dass zur Halbzeit noch **nichts** gutgeschrieben ist | mit Sofortgutschrift beim Start wäre die Zwischenprüfung rot |
 | `test_abbau_laderaum.js` | Frachter erhöhen die Ladung, Fördertechnik erhöht Rate **und** Laderaum, und die Abbauzeit bleibt dabei konstant (Tabelle in Abschnitt 7) | ohne Laderaum-Anteil der Forschung sinkt die Abbauzeit statt gleich zu bleiben |
 | `test_abbau_vorschau.js` | Die Startvorschau nennt dieselben Zahlen, die die Auflösung dann bucht – Ladung, Ausbeute, Energie. Prüft die **Regel** (Vorschau == Abrechnung), nicht einen Zeichenkettenvergleich | Vorschau mit eigener Formel weicht ab |
 | `test_asteroiden_deckel.js` | Eine Mine auf Stufe 40 liefert nach dem Umbau die gerechnete Rate. Erwartungswert **im Test aus dem Spiel abgeleitet** (Rate messen), nicht eingetippt – Arbeitsregeln 2 und 7 | am alten Stand liefert sie die volle Rate |
 | `test_aufbereitung.js` | Ausbeute steigt mit der Stufe; reicht die Energie nicht, sinkt sie anteilig **und die Meldung sagt es** | ohne Anlage-Stufe im Nenner bleibt die Ausbeute konstant |
+| `test_peilung.js` | Eine Peilung erscheint als eigenes, **nur lokal** sichtbares Vorkommen; die vierte bei drei offenen wird in Rohstoffe gewandelt statt zu verfallen; nach 7 Tagen ist sie weg. Die Fundchance wird über 10.000 simulierte Expeditionen gegen die Sollwerte aus 3.7 geprüft, **nicht** an einer einzelnen Ziehung | ohne Obergrenze staut sich die vierte Peilung an |
 | `test_schuerf_lagerdeckel.js` | Bei vollem Lager verfällt der Überschuss über dieselbe `cargoScale`-Kappung wie bei Expeditionen – kein Sonderweg | – |
 | `test_schuerfbox_zustand.js` | Auswahl und Eingabefeld der Schürfbetrieb-Box überleben zehn Ticks (die `<select>`-Falle) | ohne `data-keep-value` springt die Auswahl zurück |
 | `tests/asteroid.sh` (Backend) | `mine` zieht den Vorrat **beim Start** ab; zwei gleichzeitige Anfragen auf dasselbe Vorkommen können zusammen nie mehr entnehmen als drin war; Anspruchslimit; Anfechtung mit Schutzfrist. Echte HTTP-Requests gegen einen lokal gestarteten Server mit Test-DB in `/tmp` | – |
