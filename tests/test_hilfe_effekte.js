@@ -37,7 +37,11 @@ check('def-Buffs werden multipliziert', /buff\.kind=='?='?'def'.*power \*= buff\
 
 // (c) "liegen ausserhalb des bei +100% gedeckelten Kampfbonus-Topfes":
 // Im Quelltext muss der Deckel VOR der Buff-Schleife angewendet werden.
-const capZeile = zeilen.findIndex(l => l.includes("Math.min(1.0, attackCombatBonusRaw"));
+// Seit v8.477.0 ist es ein WEICHER Deckel (gemeinsam mit dem Backend umgestellt) - die gepruefte
+// Eigenschaft ist davon unberuehrt: Es geht um die REIHENFOLGE, nicht um die Form des Deckels.
+// Die Zeilensuche wandert deshalb an die neue Schreibweise mit, statt zu entfallen; sonst faende
+// findIndex -1, `i > capZeile` waere fuer JEDE Zeile wahr, und die Pruefung bestuende trivial.
+const capZeile = zeilen.findIndex(l => l.includes("weicherDeckel(attackCombatBonusRaw"));
 const buffZeile = zeilen.findIndex((l, i) => i > capZeile && /buff\.kind==='atk'/.test(l));
 check('der +100%-Deckel greift VOR den Buffs (sie liegen also ausserhalb)',
   capZeile > 0 && buffZeile > capZeile, { deckel: capZeile + 1, buffs: buffZeile + 1 });

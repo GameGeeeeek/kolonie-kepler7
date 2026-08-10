@@ -104,11 +104,17 @@ const D = {};
 G.forEach(g => { D[g.key] = g.deckel(); });
 const echt = [
   ['prod',       /globalBonus = weicherDeckel\(globalBonus, PROD_BONUS_CAP\)/, () => parseFloat((src.match(/const PROD_BONUS_CAP = ([\d.]+)/)||[])[1])],
-  ['atk',        null, () => parseFloat((src.match(/Math\.min\(([\d.]+), attackCombatBonusRaw\(planetKey\)\)/)||[])[1])],
-  ['def',        null, () => parseFloat((src.match(/Math\.min\(([\d.]+), defenseCombatBonusRaw\(planetKey\)\)/)||[])[1])],
+  // Seit v8.477.0 laufen auch diese beiden ueber den weichen Deckel - gemeinsam mit dem Backend.
+  // Die Pruefung wandert an die neue Verbrauchsstelle mit, statt zu entfallen: Sie soll weiterhin
+  // anschlagen, wenn die Bilanz eine Obergrenze anzeigt, die die Mechanik nicht kennt.
+  ['atk',        null, () => parseFloat((src.match(/weicherDeckel\(attackCombatBonusRaw\(planetKey\), ([\d.]+)\)/)||[])[1])],
+  ['def',        null, () => parseFloat((src.match(/weicherDeckel\(defenseCombatBonusRaw\(planetKey\), ([\d.]+)\)/)||[])[1])],
   ['buildspeed', null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(planetKey, 'buildspeed'\), ([\d.]+)\)/)||[])[1])],
   ['defatk',     null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(planetKey, 'defatk'\), ([\d.]+)\)/)||[])[1])],
-  ['raidloss',   null, () => 1 - parseFloat((src.match(/Math\.max\(([\d.]+), 1 - moduleBonusAt\(targetPlanet, 'raidloss'\)\)/)||[])[1])],
+  // Der Ueberfall-Schutz wird jetzt am BONUS gedeckelt statt ueber einen Boden auf dem
+  // Multiplikator - der Deckel steht damit direkt da und muss nicht mehr aus 1 minus Boden
+  // errechnet werden.
+  ['raidloss',   null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(targetPlanet, 'raidloss'\), ([\d.]+)\)/)||[])[1])],
   // Ohne schliessende Klammer am Ende: seit v8.429.0 sitzt der Faehigkeitsbaum-Treibstoffbonus als
   // weiterer Subtrahend im selben Boden - geprueft wird der BODEN, nicht die vollstaendige Formel
   // (Arbeitsregel 3). Die Bilanz-Zeile heisst weiterhin "(Module)" und zeigt nur den Modulanteil.

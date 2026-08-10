@@ -11,9 +11,9 @@
 //      b) stetig am Deckel und Steigung 1 (der erste Punkt darueber zaehlt noch voll),
 //      c) streng monoton - mehr ist IMMER mehr, es gibt keinen wertlosen Punkt,
 //      d) hart begrenzt bei deckel+spielraum - der Deckel bremst weiter.
-//   2) Verdrahtung: die zwoelf umgestellten Toepfe laufen ueber weicherDeckel, und die drei
-//      PvP-Toepfe (Angriff, Verteidigung, Ueberfall-Schutz) laufen NOCH NICHT darueber -
-//      das Backend rechnet sie mit, sie kommen erst gemeinsam mit ihm.
+//   2) Verdrahtung: die zwoelf Toepfe laufen ueber weicherDeckel. Die PvP-Toepfe blieben hier
+//      zunaechst bewusst hart (das Backend rechnet sie mit) und sind seit v8.477.0 gemeinsam mit
+//      ihm umgestellt - die Paritaet beider Fassungen prueft tests/test_pvp_deckel.js.
 //   3) die Zeit-Ersparnisse rechnen am BONUS, nicht am Multiplikator (sonst am falschen Ende).
 //   4) Anzeige: Boni-Bilanz nutzt dieselbe Funktion und weist den Ueberlauf aus; Hilfe erklaert.
 //
@@ -87,7 +87,7 @@ const DECKEL = [1.0, 0.5, 0.4, 0.3, 0.2];
     [weicherDeckel(1.10,1), weicherDeckel(1.25,1), weicherDeckel(1.50,1)].map(x=>(x*100).toFixed(1)));
 }
 
-// ---- 2) Verdrahtung: zwoelf Toepfe umgestellt, drei bewusst noch nicht
+// ---- 2) Verdrahtung: zwoelf Toepfe umgestellt (die PvP-Toepfe seit v8.477.0 ebenfalls)
 const UMGESTELLT = [
   ['Produktion', 'weicherDeckel(globalBonus, PROD_BONUS_CAP)'],
   ['Handel', "weicherDeckel(moduleBonusTotal('trade'), 0.3)"],
@@ -105,17 +105,18 @@ const UMGESTELLT = [
 for (const [name, fragment] of UMGESTELLT)
   check('2: ' + name.padEnd(22) + ' laeuft ueber den weichen Deckel', JS.includes(fragment));
 
-// Die drei PvP-Toepfe MUESSEN noch hart sein - das Backend rechnet sie mit (server.js:
-// Math.min(1.0, b) zweimal, raidlossProtectionMult mit 0.4-Boden). Faellt diese Pruefung,
-// hat jemand sie einseitig umgestellt und Client und Server rechnen im PvP verschieden.
-check('2: Angriff und Verteidigung sind NOCH hart gedeckelt (Backend-Paritaet)',
-  JS.includes('const combatBonus = Math.min(1.0, attackCombatBonusRaw(planetKey));') &&
-  !JS.includes('weicherDeckel(attackCombatBonusRaw'));
-check('2: der Ueberfall-Schutz ist NOCH hart gedeckelt (Backend-Paritaet)',
-  /Math\.max\(0\.4, 1 - moduleBonusAt\(targetPlanet, 'raidloss'\)\)/.test(JS) &&
-  !JS.includes("weicherDeckel(moduleBonusAt(targetPlanet, 'raidloss')"));
-check('2: die Bilanz kennzeichnet genau diese drei als hart',
-  (JS.match(/deckel:\(\)=>[0-9.]+, hart:true/g) || []).length === 3);
+// SEIT v8.477.0 sind auch die PvP-Toepfe umgestellt - gemeinsam mit dem Backend, das dieselbe
+// Formel bekommen hat. Bis dahin stand hier die Gegenprobe "die drei MUESSEN noch hart sein",
+// und sie war richtig: Eine einseitige Umstellung haette Client und Server im Kampf verschieden
+// rechnen lassen. Die Aussage ist damit nicht weggefallen, sondern umgezogen - tests/
+// test_pvp_deckel.js holt BEIDE Fassungen aus den Dateien, fuehrt sie aus und vergleicht sie
+// ueber einen Wertebereich. Das ist die staerkere Pruefung: Sie faellt auch dann, wenn beide
+// Seiten `weicherDeckel` heissen, aber verschieden rechnen.
+check('2: die PvP-Toepfe sind ebenfalls umgestellt (Paritaet prueft test_pvp_deckel.js)',
+  JS.includes('weicherDeckel(attackCombatBonusRaw(planetKey), 1.0)') &&
+  JS.includes("weicherDeckel(moduleBonusAt(targetPlanet, 'raidloss'), 0.6)"));
+check('2: es gibt keinen hart gedeckelten Topf mehr in der Bilanz',
+  !JS.includes('hart:true'));
 
 // ---- 3) Die Zeit-Ersparnisse rechnen am BONUS, nicht am Multiplikator.
 // Der alte Code stand als Boden auf dem Multiplikator (Math.max(0.5, 1 - bonus)). Wer den
@@ -137,17 +138,21 @@ for (const [name, muster] of [
 }
 
 // ---- 4) Anzeige und Hilfe (Regel 6: alle Anzeigestellen derselben Groesse)
+// Seit v8.477.0 gibt es keinen harten Topf mehr - die Fallunterscheidung `g.hart ? ... : ...`
+// ist damit entfallen, die Bilanz rechnet fuer alle Toepfe gleich.
 check('4a: die Boni-Bilanz nutzt dieselbe Funktion und weist den Ueberlauf aus',
-  JS.includes('const weich = g.hart ? Math.min(deckel, roh) : weicherDeckel(roh, deckel);') &&
+  JS.includes('const weich = weicherDeckel(roh, deckel);') &&
   JS.includes('ueberlauf: Math.max(0, weich - Math.min(roh, deckel))'));
 check('4b: "ohne Wirkung" steht nur noch bei den harten Toepfen',
   JS.includes('der Überlauf bringt noch ${vz}${pct(ueberlauf)}') &&
   JS.includes('const verpufft = Math.max(0, roh - deckel - (ueberlauf||0));'));
 check('4c: die beiden Kurztexte sagen "im Ueberlauf" statt "Deckel erreicht"',
   !JS.includes("' (Deckel erreicht)'") && (JS.match(/' \(im Überlauf\)'/g) || []).length === 2);
-check('4d: die Hilfe erklaert die Regel und nennt die PvP-Ausnahme',
+// Die PvP-Ausnahme ist seit v8.477.0 aufgehoben; der Hilfetext sagt jetzt, dass Spiel und Server
+// dieselbe Formel benutzen. Die Pruefung wandert mit dem Text mit, statt ihn nicht mehr zu pruefen.
+check('4d: die Hilfe erklaert die Regel und dass sie inzwischen ueberall gilt',
   JS.includes('keine Klippe mehr</strong>') &&
   JS.includes('auf ein Viertel der Obergrenze begrenzt') &&
-  JS.includes('Angriff, Verteidigung und Überfall-Schutz haben noch die harte Grenze'));
+  JS.includes('folgen seit v8.477.0 derselben Regel'));
 
 ende();

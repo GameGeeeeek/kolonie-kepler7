@@ -352,10 +352,20 @@ const FRONT_KEY = 'kartell|schatten';
       hilfe.includes(String(breite)) && (faktor === 1 || hilfe.includes(Math.round(faktor * 100) + '%')));
   }
   // Und die Patchnote verspricht dieselben Zahlen - sie ist die Stelle, die am ehesten veraltet.
-  const pn = (fe.match(/\{ version:'[\d.]+', date:'[^']*', changes:\[[\s\S]{0,4000}?\n    \]\},/) || [''])[0];
-  check('G3: die oberste Patchnote nennt dieselben Gewichte',
-    pn.includes(String(api.RK_BOLLWERK_ERFOLG)) && pn.includes(String(api.RK_BOLLWERK_FEHLSCHLAG)));
-  check('G3: und denselben Tagesdeckel', pn.includes(String(deckel)), deckel);
+  //
+  // GEPRUEFT WIRD DIE REGEL, NICHT DIE MOMENTAUFNAHME (Arbeitsregel 3): Der erste Anlauf griff sich
+  // die OBERSTE Patchnote und setzte damit voraus, dass sie die eigene ist. Das gilt genau bis zur
+  // naechsten Version - hier war es v8.477.0 (weicher Deckel im PvP), die sich davorschob und den
+  // Test auf voellig korrektem Code rot werden liess. Jetzt wird JEDER Eintrag geprueft und
+  // verlangt, dass EINER von ihnen alle drei Zahlen zusammen nennt (nicht ueber mehrere verteilt).
+  // Die Zusage bleibt damit dieselbe: Aendern sich die Zahlen im Code, findet sich kein Eintrag
+  // mehr, der die neuen nennt - es muss also eine neue Patchnote geschrieben werden.
+  const eintraege = fe.match(/\{ version:'[\d.]+', date:'[^']*', changes:\[[\s\S]{0,4000}?\n    \]\},/g) || [];
+  const nennt = (t) => t.includes(String(api.RK_BOLLWERK_ERFOLG)) && t.includes(String(api.RK_BOLLWERK_FEHLSCHLAG));
+  check('G3: eine Patchnote nennt dieselben Gewichte',
+    eintraege.some(nennt), { eintraege: eintraege.length });
+  check('G3: und dieselbe Patchnote denselben Tagesdeckel',
+    eintraege.some(t => nennt(t) && t.includes(String(deckel))), deckel);
 }
 
 ende();
