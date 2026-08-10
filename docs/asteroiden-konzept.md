@@ -1,9 +1,9 @@
 # Konzept: Asteroiden-Bergbau und der Umbau der Basiswirtschaft
 
-Stand: 10.08.2026 · Spielversion beim Verfassen: v8.476.0 · Zielversion: ab v8.480.0 (fünf Phasen)
+Stand: 10.08.2026 · Zeilennummern geprüft gegen v8.477.0 · Zielversion: ab v8.480.0 (fünf Phasen)
 
 Zeilennummern beziehen sich auf `weltraum_kolonie.html` bzw. `kolonie-kepler7-backend/server.js` im
-Stand v8.476.0 (Commit 9e3ce47). Alle Aussagen über vorhandenen Code sind am Code nachgeprüft, nicht
+Stand v8.477.0 (Commit 50eb264). Alle Aussagen über vorhandenen Code sind am Code nachgeprüft, nicht
 aus dem Gedächtnis geschrieben – die eine Stelle, an der das Konzept eine Entscheidung offenlässt,
 ist als solche markiert (Abschnitt 12.2).
 
@@ -30,50 +30,41 @@ weicher Deckel, aber eben nur ein weicher – und er wandert mit jeder neuen Pro
 oben. Ein harter Deckel ist deshalb ein echter Eingriff und kein Formalismus.
 
 **(2) Die Extraktions-Ökonomie ist bereits zweimal gebaut.** Trümmerfelder mit stationierten
-Recyclern (`state.debrisFields`, `addDebris` Z. 45853, `renderDebrisBox` Z. 20096) sind exakt das
+Recyclern (`state.debrisFields`, `addDebris` Z. 45856, `renderDebrisBox` Z. 20099) sind exakt das
 Muster „endlicher Vorrat an einem Ort, wird von dort stationierten Schiffen mit fester Rate/Sekunde
 abgebaut, Lagerdeckel bremst, Piraten können ihn streitig machen". Expeditionen
-(`EXPEDITION_TYPES` Z. 49584) sind das Muster „ausfliegen, am Frachtraum gedeckelt heimkehren", und
+(`EXPEDITION_TYPES` Z. 49587) sind das Muster „ausfliegen, am Frachtraum gedeckelt heimkehren", und
 es gibt dort seit dem 24.07.2026 sogar schon einen Typ **`mining` „Schürfexpedition"**. Beide Muster
 werden hier wiederverwendet statt neu erfunden – das ist der Hauptgrund, warum der Frontend-Teil
 trotz seines Umfangs überschaubar bleibt.
 
-**(3) Die gefährlichste Stelle ist `ratesPerSecond()` – und zwar nicht als Mechanik, sondern als
-Anzeige- und Belohnungsquelle.** Die Funktion (Z. 19146) hat **13 echte Aufrufstellen** (21 Treffer
-im Grep, davon 7 Kommentare und die Definition selbst), und sie zerfallen in **drei** Gruppen, die
-sich beim Umbau unterschiedlich verhalten:
+**(3) `ratesPerSecond()` hat 13 Aufrufstellen in drei Gruppen – und die dritte ist eine Falle.** Die
+Funktion (Z. 19149) wird 13-mal echt aufgerufen (21 Grep-Treffer, davon 7 Kommentare und die
+Definition):
 
-| Gruppe | Aufrufstellen | Verhalten beim Umbau |
-|---|---|---|
-| **Gutschrift** (2) | Haupt-Tick (56773), **Offline-Nachholung** `applyOfflineProgress` (39970) | Hier wird real gebucht. Der Asteroiden-Ertrag **muss** an beiden Stellen mitlaufen – sonst fördert man im Hintergrund-Tab und beim Wiederkommen nichts. |
-| **Anzeige** (5) | `renderEmpireOverview` (14431), Bedarfslisten-Cache (19031), Ressourcenleiste in `render()` (51024), Ressourcen-Balken (54840), Statistik-Schnappschuss (56856) | Zeigen ohne Anpassung dauerhaft **zu wenig** an: Der Spieler liest „12 Erz/s" und sieht sein Lager viel schneller volllaufen – die klassische zweite Anzeigestelle mit der alten Annahme (CLAUDE.md-Regel 6). |
-| **Belohnungsformeln** (6) | Fraktionsgeschenk (15378), Wochenliga **zweimal** (23745 serverautoritativ, 43773 lokaler Pfad), Tagesaufgaben (24695), Piratennest-Beute (41307), Pakt-Geschenk (44053) | Zahlen „N Minuten eigene Produktion" aus. Taucht der Asteroiden-Ertrag hier **auf**, wachsen alle diese Belohnungen mit – genau das explosive Muster, vor dem CLAUDE.md unter „Bekannte Fallstricke" ausdrücklich warnt. |
+| Gruppe | Aufrufstellen |
+|---|---|
+| **Gutschrift** (2) | Haupt-Tick (56773), Offline-Nachholung `applyOfflineProgress` (39970) |
+| **Anzeige** (5) | `renderEmpireOverview` (14431), Bedarfslisten-Cache (19031), Ressourcenleiste in `render()` (51024), Ressourcen-Balken (54840), Statistik-Schnappschuss (56856) |
+| **Belohnungsformeln** (6) | Fraktionsgeschenk (15378), Wochenliga **zweimal** (23748 serverautoritativ, 43776 lokaler Pfad), Tagesaufgaben (24695), Piratennest-Beute (41307), Pakt-Geschenk (44053) |
 
-Die drei Gruppen brauchen also **verschiedene** Zahlen. Deshalb ist die zentrale
-Architektur-Entscheidung dieses Konzepts nicht „wie viel Erz gibt ein Asteroid", sondern:
+Die dritte Gruppe zahlt „N Minuten eigene Produktion" aus. **Jede Mechanik, die diese Zahl erhöht,
+erhöht damit stillschweigend sechs Belohnungen mit** – das explosive Muster, vor dem CLAUDE.md unter
+„Bekannte Fallstricke" ausdrücklich warnt.
 
-> `ratesPerSecond()` behält **unverändert** die Bedeutung „Produktion aus Gebäuden" und bleibt damit
-> die Bezugsgröße aller Belohnungsformeln. Für Anzeige **und Gutschrift** kommt **eine neue Funktion**
-> `gesamtRatenProSekunde()` hinzu, die Gebäude- und Asteroidenrate addiert. Die fünf Anzeigestellen
-> und die zwei Gutschriftstellen werden auf sie umgestellt, die sechs Belohnungsstellen bleiben, wo
-> sie sind.
+Für dieses Konzept ist die Sache seit der Entscheidung für den **Rundflug** (Abschnitt 5) entschärft:
+Asteroidenertrag ist keine laufende Rate, sondern eine Gutschrift bei Rückkehr. `ratesPerSecond()`
+behält seine Bedeutung „Produktion aus Gebäuden", bleibt überall korrekt und wird **an keiner
+einzigen Stelle angefasst**. Abschnitt 5.5 rechnet auf, was dadurch alles wegfällt.
 
-Wer das umdreht (Asteroiden in `ratesPerSecond()` hineinrechnen), bekommt korrekte Anzeigen und eine
-Wochenliga, die im Endgame ein Vielfaches ausschüttet. Wer beides gleich lässt, bekommt eine
-Wirtschaft, die das Spiel dem Spieler falsch berichtet. Es gibt hier keinen dritten Weg, und die
-Entscheidung muss **vor** der ersten Zeile Code fallen, nicht danach.
+Der Befund bleibt trotzdem hier stehen, weil er die nächste Person warnt, die auf die naheliegende
+Idee kommt, den Asteroidenertrag „der Vollständigkeit halber" in die Rate einzurechnen. Das wäre
+kein Anzeige-Feinschliff, sondern eine Balance-Änderung an sechs Belohnungen gleichzeitig.
 
-**Zwei Nebenbefunde aus derselben Durchsicht,** beide unabhängig von diesem Konzept:
-
-- Die Wochenliga-Ausschüttung („N Minuten Produktion") steht **zweimal** im Code, in zwei Kopien
-  derselben Schleife (Z. 23745 und Z. 43773). Wer die eine anfasst, muss die andere mitnehmen – das
-  ist exakt die Fehlerfamilie, die CLAUDE.md-Regel 6 beschreibt. Für dieses Konzept ist es unkritisch
-  (beide bleiben unverändert), für die nächste Balance-Änderung an der Wochenliga nicht.
-- `applyOfflineProgress()` (39970) ist die Funktion mit der dichtesten Regel-Geschichte des
-  Projekts – Phantom-Sekunden (v8.459.0), die 90-s-Schwelle, die Doppelgutschrift-Gegenrichtung
-  (CLAUDE.md-Regeln 11, 12, 20, 21). Sie ist der Ort, an dem beim Asteroiden-Ertrag am ehesten etwas
-  schiefgeht, und der Ort, an dem ein Fehler am schwersten zu bemerken ist. Abschnitt 12.1 sagt, was
-  dort konkret zu prüfen ist.
+**Ein Nebenbefund aus derselben Durchsicht,** unabhängig von diesem Konzept: Die
+Wochenliga-Ausschüttung steht **zweimal** im Code, in zwei Kopien derselben Schleife (Z. 23748 und
+Z. 43776). Wer die eine anfasst, muss die andere mitnehmen – exakt die Fehlerfamilie, die
+CLAUDE.md-Regel 6 beschreibt.
 
 ---
 
@@ -82,12 +73,13 @@ Entscheidung muss **vor** der ersten Zeile Code fallen, nicht danach.
 Die Basis hört auf, die Hauptquelle für Material zu sein, und wird stattdessen **Kraftwerk und
 Hütte**: Sie liefert Energie und veredelt, was die Flotte heranschafft. In etwa zwanzig der
 69 Sternsysteme liegen **Gürtel mit Vorkommen** – reine Asteroiden mit einem einzigen Rohstoff und
-seltenere **Legierungsasteroiden mit zwei**. Man fliegt sie an: früh als Einzelflug mit begrenztem Laderaum,
-später indem man Schürfschiffe **dort stationiert** und ein **Schürfrecht** anmeldet, das dann
-dauerhaft fördert. Schürfrechte sind für alle Spieler dieselben Objekte, ihre Zahl ist knapp, und
-wer eins will, das schon jemandem gehört, muss es sich **erkämpfen**. Der Durchsatz nach Hause ist
-nicht die Fördermenge, sondern die **Aufbereitungsanlage** auf der Basis – dort entscheidet sich,
-wie viel von dem, was draußen liegt, überhaupt ankommt.
+seltenere **Legierungsasteroiden mit zwei**. Man **wählt eines aus und schickt eine Flotte hin**:
+mindestens ein **Minenschiff**, dazu Frachter für mehr Laderaum und Kampfschiffe als Eskorte; sie
+gräbt, bis der Laderaum voll ist, und **die Ressourcen gibt es erst, wenn sie wieder zu Hause ist**.
+Ein **Schürfrecht** reserviert ein Vorkommen für einen Spieler – es ist knapp, es wird von einer
+zurückgelassenen Eskorte gehalten, und wer eins will, das schon jemandem gehört, muss es sich
+**erkämpfen**. Wie viel von einer Ladung am Ende im Lager landet, entscheidet die
+**Aufbereitungsanlage** auf der Basis.
 
 ---
 
@@ -95,19 +87,19 @@ wie viel von dem, was draußen liegt, überhaupt ankommt.
 
 | Bereich | Vorhanden | Wiederverwendung |
 |---|---|---|
-| **Karte** | `buildGalaxyMap()` Z. 48047, `galaxyOeffne()` Z. 48029, Objekte als `data-map-npc`/`-moon`/`-debris` (Z. 48942, 49067, 49111), Handler Z. 49208–49230 | Ein neues `data-map-asteroid` reiht sich exakt in dieses Muster ein: SVG-Gruppe im aufgeklappten System, Klick öffnet das Kartenmenü |
-| **Kartenmenü** | `npcMapMenu`/`moonMapMenu`, Schließen per Esc/Klick daneben (Z. 48541) | Neues `asteroidMapMenu(e, id)` mit denselben Konventionen (Flugzeit und Kosten unter jedem Eintrag, graue Einträge nennen den Grund) |
-| **Missionen** | `cf.missions.push({type, targetId, startTime, endTime, composition})`, Auflösung in `checkMissions()` Z. 44790 | Vier neue `type`-Werte, kein neuer Missions-Mechanismus |
-| **Flugzeit / Treibstoff** | `missionDurationFor()` Z. 19645, `missionFuelCostSplit()` Z. 18640 | Unverändert übernommen – Navigator, Allianzforschung, Treibstoffdepot wirken damit automatisch mit |
-| **Laderaum** | `fleetCargoCapacity()` Z. 18039, `CARGO_PER_FRACHTER` 300 (Z. 18027) | Begrenzt den Einzelflug, exakt wie bei Expeditionen |
-| **Gutschrift** | `gainResources()` Z. 18692 | **Einziger** Weg, Ertrag zu buchen. Lagerdeckel kommt damit gratis mit (CLAUDE.md: „Lager-Deckel konsequent auf ALLE Ressourcen-Quellen") |
-| **Abbau am Ort** | `state.debrisFields`, 8 Ressourcen/s je Recycler, Sammelauftrag mit belegtem Flottenslot und Selbstrückkehr | Vorbild für den Förderposten – inklusive der Feinheiten (Lager voll ⇒ Abbau steht **und die Zeile sagt das**) |
+| **Karte** | `buildGalaxyMap()` Z. 48052, `galaxyOeffne()` Z. 48031, Objekte als `data-map-npc`/`-moon`/`-debris` (Z. 48945, 49070, 49114), Handler Z. 49211–49233 | Ein neues `data-map-asteroid` reiht sich exakt in dieses Muster ein: SVG-Gruppe im aufgeklappten System, Klick öffnet das Kartenmenü |
+| **Kartenmenü** | `npcMapMenu`/`moonMapMenu`, Schließen per Esc/Klick daneben (Z. 48544) | Neues `asteroidMapMenu(e, id)` mit denselben Konventionen (Flugzeit und Kosten unter jedem Eintrag, graue Einträge nennen den Grund) |
+| **Missionen** | `cf.missions.push({type, targetId, startTime, endTime, composition})`, Auflösung in `checkMissions()` Z. 44793 | Vier neue `type`-Werte, kein neuer Missions-Mechanismus |
+| **Flugzeit / Treibstoff** | `missionDurationFor()` Z. 19648, `missionFuelCostSplit()` Z. 18643 | Unverändert übernommen – Navigator, Allianzforschung, Treibstoffdepot wirken damit automatisch mit |
+| **Laderaum** | `fleetCargoCapacity()` Z. 18042, `CARGO_PER_FRACHTER` 300 (Z. 18030) | Begrenzt die Ladung einer Abbaumission, exakt wie bei Expeditionen die Beute |
+| **Gutschrift** | `gainResources()` Z. 18695 | **Einziger** Weg, Ertrag zu buchen. Lagerdeckel kommt damit gratis mit (CLAUDE.md: „Lager-Deckel konsequent auf ALLE Ressourcen-Quellen") |
+| **Auftrag am fremden Ort** | `state.debrisFields`, Sammelauftrag mit belegtem Flottenslot und selbstständiger Rückkehr | Vorbild für die stationierte Eskorte (Abschnitt 6.2) – belegt einen Slot, kommt allein heim, sagt in der Zeile was los ist |
 | **Serverautorität** | `/api/market/trade` Z. 5122, `/api/attack` Z. 2920, `getSaveValue`/`setSaveValue` Z. 1268/1273 | Fertiges Muster „Server liest den Spielstand, rechnet selbst, schreibt zurück" |
 | **Optimistisches Sperren** | `expectedVersion` + HTTP 409 in `PUT /api/storage/:key` (Z. 1996) | Für die Feld-Dokumente, wo kein eigener Endpunkt nötig ist |
 | **Rechteprüfung** | `checkAllianceKeyPermission()` Z. 614, aufgerufen in der Storage-PUT-Route (Z. 1890) | Muster für `checkAsteroidKeyPermission()` |
-| **Seltenheitsziehung** | `pickWeightedByRarity` Z. 40650, `hashStringToFloat` Z. 47823 | Deterministische Felderzeugung ohne gespeicherte Daten |
-| **Schiff** | `schuerfschiff` Z. 17320 – existiert, hat ein Icon, **und hat bis heute keine Aufgabe**: sein gesamter Nutzen sind +3 % Gesamtproduktion fürs bloße Besitzen (Z. 19298) | Bekommt endlich seinen Beruf (Abschnitt 6.2) |
-| **Planeten-Rolle** | `mining` „Bergbau-Welt", +25 % Produktion (Z. 41145) | Wirkt künftig auch auf den Aufbereitungs-Durchsatz |
+| **Seltenheitsziehung** | `pickWeightedByRarity` Z. 40653, `hashStringToFloat` Z. 47826 | Deterministische Felderzeugung ohne gespeicherte Daten |
+| **Schiff** | `schuerfschiff` Z. 17323 – existiert, hat ein Icon, **und hat bis heute keine Aufgabe**: sein gesamter Nutzen sind +3 % Gesamtproduktion fürs bloße Besitzen (Z. 19301) | Bekommt endlich seinen Beruf (Abschnitt 6.2) |
+| **Planeten-Rolle** | `mining` „Bergbau-Welt", +25 % Produktion (Z. 41148) | Wirkt künftig auch auf die Ausbeute der Aufbereitung |
 
 Und die Zahlen der Welt, in die das eingebettet wird: **499 Planeten in 69 Systemen**, davon
 **56 vom Typ `asteroid`** – Asteroiden sind im Spiel also längst ein etabliertes Motiv, bisher aber
@@ -141,10 +133,10 @@ nur ein Etikett.
 
 **Warum keine Energie und keine Forschungspunkte.** `RES_DEFS` (Z. 4283) führt sechs Ressourcen. Vier
 davon sind Material und passen in einen Felsen. **Energie** bleibt bewusst draußen: Sie wird die
-Währung, mit der die Basis das Material verarbeitet (Abschnitt 5.2) – das gibt dem Solarkraftwerk
+Währung, mit der die Basis das Material verarbeitet (Abschnitt 5.4) – das gibt dem Solarkraftwerk
 eine dauerhafte Rolle statt eines Deckels und ist der eigentliche „Umbau der Basis".
 **Forschungspunkte** bleiben draußen, weil sie schon nach Balance-Pass v8.12 (Kommentar bei
-Z. 19197) bewusst von der Wirtschaftsentwicklung entkoppelt wurden; sie hier wieder anzukoppeln
+Z. 19200) bewusst von der Wirtschaftsentwicklung entkoppelt wurden; sie hier wieder anzukoppeln
 würde diese Entscheidung still rückgängig machen.
 
 **Warum Antimaterie nie rein vorkommt.** Antimaterie ist mit `baseRate` 0,015 (Fusionsreaktor,
@@ -154,20 +146,45 @@ Tier-2-Kette. Ein reiner Antimaterie-Asteroid würde sie in einem Zug entwerten.
 
 ### 3.2 Vier Größen
 
-| Größe | Vorrat | Schürf-Plätze | Güte | Häufigkeit | Leergefördert nach (voll besetzt) |
-|---|---|---|---|---|---|
-| Splitter | 150.000 | 4 | ×1,0 | 46 % | ~17 Std. |
-| Brocken | 600.000 | 8 | ×1,4 | 34 % | ~25 Std. |
-| Kern | 2.000.000 | 16 | ×2,0 | 16 % | ~29 Std. |
-| Koloss | 8.000.000 | 30 | ×3,0 | 4 % | ~41 Std. |
+| Größe | Vorrat | Minenschiff-Plätze | Güte | Häufigkeit |
+|---|---|---|---|---|
+| Splitter | 50.000 | 4 | ×1,0 | 46 % |
+| Brocken | 150.000 | 8 | ×1,4 | 34 % |
+| Kern | 500.000 | 16 | ×2,0 | 16 % |
+| Koloss | 1.500.000 | 30 | ×3,0 | 4 % |
 
-Die Laufzeiten sind mit Absicht **in derselben Größenordnung** gehalten: Ein Koloss ist nicht
-„länger", er ist „mehr pro Stunde". Wer einen hält, verdient deutlich mehr – aber er muss ihn
-genauso oft neu suchen wie jeder andere, und das hält die Karte in Bewegung.
+**Die Plätze begrenzen, wie viele Minenschiffe gleichzeitig an einem Vorkommen arbeiten können** –
+mehr als vier passen an einen Splitter nicht heran. Das ist der Grund, warum ein Koloss nicht nur
+mehr Vorrat hat, sondern grundsätzlich eine andere Größenordnung bedient.
 
-**Förderrate je Schürfschiff: 0,60/s**, multipliziert mit der Güte, den Boni aus Abschnitt 7 und bei
-Legierungen mit 1,15. Ein voll besetzter Kern (16 Schiffe, Güte ×2,0) liefert damit **19,2/s**, ein
-voll besetzter Koloss **54/s**.
+Was das im Rundflug-Betrieb bedeutet (Abschnitt 5), gerechnet mit einer für die jeweilige Größe
+passenden Flotte – Plätze voll besetzt, ebenso viele Frachter dabei, Fördertechnik Stufe 5, 8 Minuten
+Flug je Richtung:
+
+| Größe | Ladung je Fahrt | Abbauzeit | Fahrtdauer gesamt | Fahrten bis leer | erschöpft nach | Ertrag je Stunde |
+|---|---|---|---|---|---|---|
+| Splitter | 3.120 | 18 min | 34 min | 17 | ~10 Std. | ~5.500 |
+| Brocken | 6.240 | 13 min | 29 min | 25 | ~12 Std. | ~13.000 |
+| Kern | 12.480 | 9 min | 25 min | 41 | ~17 Std. | ~30.000 |
+| Koloss | 23.400 | 6 min | 22 min | 65 | ~24 Std. | ~64.000 |
+
+Zwei Dinge, die diese Tabelle zeigt und die so beabsichtigt sind:
+
+**Ein größeres Vorkommen ist nicht „dasselbe, nur länger".** Es liefert je Stunde rund das
+Zwölffache eines Splitters, hält dabei aber nur gut doppelt so lange. Ein Koloss ist eine
+Gelegenheit, kein Dauerzustand – und wer einen hat, weiß, dass er in einem Tag weg ist.
+
+**Die Fahrten werden mit der Größe kürzer, nicht länger.** Weil die Güte die Abbaurate stärker hebt
+als die Plätze den Laderaum, schrumpft die Abbauzeit von 18 auf 6 Minuten. Ein großer Brocken fühlt
+sich damit spürbar anders an: schnelle, schwere Fahrten statt langem Warten.
+
+> **Die Vorräte sind gegenüber dem ersten Entwurf um den Faktor vier gesunken** (Kern von 2 Mio. auf
+> 500.000). Der Grund ist der Wechsel zum Rundflug: Ein stationierter Förderposten hätte einen Kern
+> mit 19,2/s in 29 Stunden geleert. Im Rundflug liegt der effektive Durchsatz wegen Flugzeit und
+> Laderaum bei knapp 5/s – dieselben 2 Mio. hätten **über 120 Stunden** gereicht, das Vorkommen wäre
+> praktisch unerschöpflich gewesen und die ganze Nachwachs-Mechanik aus 3.3 toter Code. Das ist
+> dieselbe Art Folgefehler wie beim Anspruchslimit in 3.6: eine Zahl, die ihre Begründung verloren
+> hat, ohne sich selbst zu ändern.
 
 ### 3.3 Wo sie liegen und wie sie entstehen
 
@@ -193,7 +210,7 @@ Schürfleitstand wertvoll, und sorgt dafür, dass Anfänger in Reichweite immer 
 sich die entwickelten Konten um die großen Brocken draußen streiten. Die Knappheit sitzt damit
 da, wo sie hingehört – bei der Qualität, nicht beim Zugang.
 
-**Die Kartengeometrie ist dabei kein Engpass** (nachgerechnet an `planetOrbitXY()` Z. 48682): Die
+**Die Kartengeometrie ist dabei kein Engpass** (nachgerechnet an `planetOrbitXY()` Z. 48685): Die
 Planeten sitzen auf Ellipsen mit `rx = 42 + orbit·43`, jede Bahn trägt genau **einen** Planeten, der
 Rest der Bahn ist leer. Eine Gürtelbahn zwischen zwei Orbits fasst bei 34 px Markerabstand je nach
 Lage **19 bis 52** Marker. Sechs sind daneben komfortabel – die Zahl 4–6 kommt aus der Wirtschaft,
@@ -202,7 +219,7 @@ nicht aus dem Platz.
 Sie werden **berechnet, nicht gespeichert.** Anzahl, Sorte, Größe und Position eines Systems ergeben
 sich aus `hashStringToFloat(systemId + ':' + epoche)` – dasselbe Verfahren, mit dem der Abgrund seine
 Sektoren aus der Tiefe ableitet („Ein Sektor wird aus seiner Tiefe **berechnet**, nicht gewürfelt",
-HELP_SECTIONS Z. 33848). Client und Server rechnen unabhängig dasselbe Feld aus. Gespeichert wird
+HELP_SECTIONS Z. 33851). Client und Server rechnen unabhängig dasselbe Feld aus. Gespeichert wird
 ausschließlich, was davon **abweicht**: wer ein Vorkommen hält und wie viel Vorrat noch drin ist.
 
 Das ist keine Eleganz um ihrer selbst willen, sondern eine harte Anforderung: Der geteilte Speicher
@@ -261,27 +278,27 @@ const VORKOMMEN_JE_GUERTEL = [4, 6];
 
 Ein Wachstum auf 30 Spieler heißt dann: `GUERTEL_SYSTEME` auf 60 setzen, fertig. Kein Umbau.
 
-### 3.6 Das Anspruchslimit ergibt sich aus der Aufbereitung, nicht aus dem Angebot
+### 3.6 Das Anspruchslimit: 5
 
-Dieselbe Nachrechnung hat einen **Widerspruch im Konzept selbst** aufgedeckt. Die Aufbereitungsanlage
-deckelt den Durchsatz bei 60/s (Abschnitt 5.2). Dagegen gehalten:
+Das Limit lag im ersten Entwurf bei 8 und sinkt auf **5**. Die Begründung dafür hat sich im Lauf
+dieses Dokuments **zweimal geändert**, und weil das genau die Sorte stiller Verschiebung ist, an der
+Konzepte unbemerkt falsch werden, steht sie hier vollständig:
 
-| Größe | Förderrate | sättigt die Aufbereitung zu | mehr als … ist wirkungslos |
-|---|---|---|---|
-| Splitter | 2,4/s | 4 % | 25 Stück |
-| Brocken | 6,7/s | 11 % | 9 Stück |
-| Kern | 19,2/s | 32 % | **3 Stück** |
-| Koloss | 54,0/s | 90 % | **1 Stück** |
+1. *Erster Entwurf:* 8, ohne Begründung – geraten.
+2. *Zweiter Entwurf:* 5, begründet mit dem Durchsatz der Aufbereitungsanlage (60/s), den ein einziger
+   Koloss zu 90 % ausgelastet hätte.
+3. **Jetzt:** 5, begründet mit dem **Angebot** – denn der Durchsatz-Deckel ist mit dem Förderposten
+   weggefallen (Abschnitt 5.5). Die Aufbereitung ist keine Rate mehr, sondern eine Ausbeute je
+   Ladung; ein „Sättigen" gibt es nicht mehr, und das Argument aus Schritt 2 gilt **nicht** weiter.
 
-**Ein einziger Koloss lastet eine vollausgebaute Aufbereitung zu 90 % aus.** Ein Anspruchslimit von 8
-war damit von vornherein sinnlos – niemand hätte je acht gute Vorkommen gleichzeitig verarbeiten
-können. Das Limit sinkt deshalb auf **5**, und seine Begründung ändert sich: Es geht nicht um Menge,
-sondern um **Vielfalt**. Vier Rohstoffe wollen bedient werden, und fünf Rechte lassen genau das zu –
-mit einem Platz Spielraum für einen zweiten Erz- oder Kristallposten.
+Was trägt, ist die Rechnung aus Abschnitt 3.5: Bei rund 90 Vorkommen und 10 Konten ergibt ein Limit
+von 5 eine Auslastung von 56 % – knapp genug für echten Streit, weit genug für einen freien Splitter.
+Ein Limit von 8 ergäbe 89 % und damit faktische Vollbelegung durch die ersten drei aktiven Spieler.
 
-Das ist zugleich die ehrlichere Kopplung: Wer mehr fördern will, baut die **Aufbereitung** aus, nicht
-die Zahl der Ansprüche. Der Ausbau der Basis bleibt damit der Engpass – was das erklärte Ziel des
-ganzen Umbaus war.
+Dazu kommt eine **natürliche** Bremse, die kein Limit braucht: Jede Abbaumission bindet Minenschiffe
+für eine halbe bis ganze Stunde. Wer fünf Vorkommen wirklich bewirtschaften will, braucht fünf
+Flotten und die Schiffe dafür. Das Limit ist damit die Obergrenze, nicht der Alltag – der Alltag ist
+die Werft.
 
 ---
 
@@ -303,12 +320,12 @@ Zwei Dinge daran sind Absicht:
 Knopf, der nichts tut. Die halbe Rate ab 16 sagt dem Spieler stattdessen über zehn Stufen hinweg
 „hier ist die Luft raus" – und genau in diesem Bereich soll er anfangen, nach draußen zu schauen.
 
-**Solar bleibt weitgehend frei.** Energie ist ab jetzt Verbrauchsgut (Abschnitt 5.2). Wer seine
+**Solar bleibt weitgehend frei.** Energie ist ab jetzt Verbrauchsgut (Abschnitt 5.4). Wer seine
 Aufbereitung auslasten will, braucht Kraftwerke – die Basis verliert also keine Aufgabe, sie
 **tauscht** eine gegen eine andere.
 
 Zu beachten: Der Deckel wirkt **je Standort**, nicht imperiumsweit (`ratesPerSecond` summiert über
-`allBuildingSetsWithPlanet()`, Z. 19150). Wer viele Kolonien hat, produziert weiter mehr. Das ist
+`allBuildingSetsWithPlanet()`, Z. 19153). Wer viele Kolonien hat, produziert weiter mehr. Das ist
 gewollt: Ein imperiumsweiter Deckel würde neue Kolonien wertlos machen, und Kolonien sind teuer und
 langsam genug, um kein Schlupfloch zu sein.
 
@@ -321,14 +338,22 @@ Habitat 20 (×1,40), Bergbau-Rolle (×1,25), Vulkanwelt (×1,15), Produktionsrin
 - **neu (Bestandsschutz, s.u.):** 15 × 0,225 + 10 × 0,1125 + 15 Stufen darüber × 0,1125 = 6,188/s roh → **≈ 13,6 Erz/s**
 - **Verlust: rund 31 %** an diesem Standort.
 
-Dagegen steht ein einziger gehaltener **Kern** mit 16 Schürfschiffen: **19,2/s** – mehr als der
-gesamte Standort vorher. Wer sich auf das neue System einlässt, steht nach dem Umbau **besser** da,
-und zwar deutlich. Wer es ignoriert, verliert rund ein Drittel. Genau dieses Gefälle ist der Zweck
-der Übung; es darf nur nicht als Überraschung kommen (Abschnitt 4.3).
+Der Standort verliert damit **6,1 Erz/s**, also rund 22.000 in der Stunde.
+
+Dagegen steht ein **Kern**, der bei laufendem Betrieb rund **30.000 je Stunde** liefert (Tabelle in
+3.2) – eine einzige gut bewirtschaftete Fundstelle holt den Verlust eines vollentwickelten Standorts
+mehr als heraus, und ein Koloss das Doppelte davon. Wer sich auf das neue System einlässt, steht nach
+dem Umbau **deutlich besser** da. Wer es ignoriert, verliert rund ein Drittel.
+
+Genau dieses Gefälle ist der Zweck der Übung. Es hat aber eine Kehrseite, die der Rundflug mitbringt
+und die der Förderposten nicht hatte: **Der Ertrag hängt jetzt daran, dass jemand Flotten schickt.**
+Ein Spieler, der eine Woche nicht hereinschaut, hat nach dem Umbau spürbar weniger als vorher – die
+Grundlast läuft weiter, die 30.000/Std. nicht. Das ist eine bewusste Verschiebung von *passiv* zu
+*aktiv*, und sie gehört so in den Patchnote, statt sie zu verschweigen (Abschnitt 4.3).
 
 ### 4.3 Bestandskonten
 
-`maxLevel` blockiert im Spiel nur den **Ausbau** (`if (cur >= def.maxLevel)` Z. 12898) – vorhandene
+`maxLevel` blockiert im Spiel nur den **Ausbau** (`if (cur >= def.maxLevel)` Z. 12901) – vorhandene
 Stufen werden nirgends abgesenkt. Für die Rate braucht es trotzdem eine ausdrückliche Regel, sonst
 entscheidet der Zufall der Formel:
 
@@ -357,60 +382,113 @@ lediglich an einen Tag, an dem kein Patchnote mehr danebensteht.
 
 ---
 
-## 5. Der Weg nach Hause
+## 5. Die Abbaumission – der Kern des Spiels
 
-Zwischen „im Felsen" und „im Lager" liegen zwei Engpässe. Beide sind bewusst gesetzt, denn ohne sie
-wäre das Ganze nur eine größere Zahl.
+**Man wählt ein Vorkommen aus, schickt eine Flotte hin, und bekommt die Ressourcen erst, wenn sie
+wieder zu Hause ist.** Kein Tröpfeln, keine Rate, die im Hintergrund läuft: eine Fahrt, eine Ladung,
+eine Gutschrift. Das ist die Entscheidung, die dieses Kapitel trägt – und sie räumt drei der
+riskantesten Teile der ersten Konzeptfassung ersatzlos ab (Abschnitt 5.5).
 
-### 5.1 Der Einzelflug (früh, ohne Schürfrecht)
+### 5.1 Der Ablauf
 
-Missionstyp **`mining`**. Ablauf wie eine Expedition: hinfliegen, laden, zurück. Ertrag ist das
-Minimum aus drei Größen – Förderleistung × Abbauzeit, **Laderaum der Flotte**
-(`fleetCargoCapacity()` Z. 18039), und Restvorrat des Vorkommens.
+1. **Auswählen.** Klick auf den Brocken in der Sektorkarte öffnet das Kartenmenü (`data-map-asteroid`,
+   Muster wie `data-map-npc`) mit dem Eintrag **Abbaumission**.
+2. **Flotte zusammenstellen.** Im vorhandenen Flottenwahl-Feld: **mindestens ein Minenschiff**
+   (Pflicht – ohne eins ist der Eintrag grau und sagt das auch), dazu wahlweise Frachter für mehr
+   Laderaum und Kampfschiffe als Eskorte.
+3. **Vorschau lesen.** Vor dem Start steht da, was zu erwarten ist: Hinflug, **Abbauzeit**, Rückflug,
+   Ladung, Treibstoff und die fällige Energie fürs Aufbereiten. Alles aus denselben Funktionen
+   gerechnet, die es hinterher auch wirklich abrechnen – die Vorschau kann gar nicht abweichen.
+4. **Starten.** `missionFuelCostSplit()` zieht den Treibstoff, die Mission geht als
+   `type:'mining'` in `cf.missions`.
+5. **Abbauen.** Die Flotte ist die ganze Zeit unterwegs; der Missionseintrag zeigt, in welcher Phase
+   sie steckt (Anflug / Abbau / Rückflug).
+6. **Heimkehr.** `checkMissions()` löst auf, die Ladung geht durch `gainResources()`, es gibt einen
+   Bericht. **Erst jetzt** hat der Spieler die Rohstoffe.
 
-Er funktioniert auf **jedem unbeanspruchten** Vorkommen, ohne Server, ohne Anspruch, ohne Kampf. Das
-ist die Einstiegsschleife und zugleich der Solo-Modus (Abschnitt 8). Anders als bei Expeditionen gibt
-es hier **keinen kostenlosen Basis-Frachtraum** wie `EXPEDITION_BASE_CARGO` (Z. 18053): Wer Erz
-holen will, braucht Frachter. Das ist der Punkt, an dem der Frachter vom Lagerraum-Statisten zum
-Werkzeug wird.
+### 5.2 Die Flotte: wer was beiträgt
 
-### 5.2 Der Förderposten (später, mit Schürfrecht) – und die Aufbereitung
+| Schiff | Abbaurate | Laderaum | Rolle |
+|---|---|---|---|
+| **Minenschiff** (`schuerfschiff`) | **0,60/s** je Schiff | **400** je Schiff | Pflicht. Bricht das Gestein und hat einen eigenen Bunker. |
+| Frachter | – | 300 je Schiff | Reine Laderaum-Erweiterung (`CARGO_PER_FRACHTER` Z. 18030). |
+| Großer Frachter | – | 1.500 je Schiff | dito (`CARGO_PER_FRACHTER_GROSS` Z. 18031). |
+| Kampfschiffe | – | – | Eskorte. Ohne Belang für den Ertrag, aber siehe Abschnitt 6.3. |
 
-Missionstyp **`mining-station`**: Schürfschiffe fliegen hin und **bleiben dort**. Ab dann fördert das
-Vorkommen dauerhaft in Richtung Heimat – kein Klicken mehr, es ist ein Idle-Spiel.
+**Das Minenschiff ist das vorhandene Schürfschiff** (`schuerfschiff` Z. 17323). Es existiert bereits
+samt Icon, Rumpf-Silhouette und Kostenfunktion – und hat bis heute keine einzige Aufgabe außer
++3 % Produktion fürs bloße Besitzen (Z. 19301). Ein zweites, funktionsgleiches Schiff daneben zu
+stellen wäre doppelte Arbeit und doppelte Erklärung. Der bestehende Bonus bleibt unangetastet, das
+ist gewachsene Balance. Nur die Freischaltung ändert sich: heute ist es ein reines Event-Schiff
+(`unlockEventParts:{ eventKey:'goldrausch' }`), was für eine Kernmechanik nicht geht – künftig
+schaltet es die Forschung **Minentechnik** regulär frei, und die Event-Teile bleiben als schnellerer
+Weg mit eigenem Rumpf-Skin.
 
-Zwischen Förderung und Lager sitzt das neue Gebäude:
+### 5.3 Wie lange sie bleibt und was sie mitbringt
 
-**Aufbereitungsanlage** (`key:'aufbereitung'`, eigenes gezeichnetes Icon in `ICONS`,
-`category:'refine'`, `maxLevel: 20`)
+```
+Abbaurate  = Anzahl Minenschiffe × 0,60/s × Güte des Vorkommens × (1 + Fördertechnik)
+Laderaum   = Minenschiffe × 400 × (1 + Fördertechnik) + Frachter × 300 + Großfrachter × 1.500
+Ladung     = min(Laderaum, Restvorrat des Vorkommens)
+Abbauzeit  = Ladung ÷ Abbaurate            (gedeckelt bei 4 Std., die Vorschau sagt es)
+Gesamtzeit = Hinflug + Abbauzeit + Rückflug
+```
 
-- **Durchsatz: 3,0 Einheiten/s je Stufe**, imperiumsweit gemeinsam – Vollausbau **60/s**.
-- **Verbrauch: 0,35 Energie je aufbereiteter Einheit.** Bei Vollauslastung sind das **21 Energie/s**
-  – der erste echte Dauerverbraucher für Energie im Spiel.
-- Die **Bergbau-Welt-Rolle** (Z. 41145) und der **Produktionsring** der Orbitalstation wirken auch
-  hier, damit die vorhandenen Standort-Entscheidungen im neuen System etwas bedeuten.
+Die Flotte gräbt also **so lange, bis der Laderaum voll ist** – nicht eine feste Zeit lang. Das macht
+beide Werte gleichzeitig lesbar: Mehr Abbaurate heißt *schneller fertig*, mehr Laderaum heißt *mehr
+pro Fahrt, aber länger unterwegs*. Zwei Schrauben, die sich nicht gegenseitig verstecken.
 
-**Wird der Durchsatz oder die Energie knapp, drosselt die Förderung – und der Rest bleibt im
-Felsen.** Nichts verfällt still. Das ist dieselbe Regel, die der Recycler bei vollem Lager schon
-befolgt, und sie wird genauso ausdrücklich angezeigt („Aufbereitung ausgelastet: 42 von 61/s werden
-verarbeitet, der Rest bleibt im Vorkommen").
+Ein Rechenbeispiel – 5 Minenschiffe und 10 Frachter an einem Kern (Güte ×2,0), Fördertechnik Stufe 5:
 
-Damit ist die Basis umgebaut, ohne dass eine einzige Ressource dazuerfunden werden musste:
+- Abbaurate: 5 × 0,60 × 2,0 × 1,20 = **7,2/s**
+- Laderaum: 5 × 400 × 1,20 + 10 × 300 = 2.400 + 3.000 = **5.400**
+- Abbauzeit: 5.400 ÷ 7,2 = 750 s = **12,5 Minuten**, dazu Hin- und Rückflug
+
+**Die Kappung bei Rückkehr ist die bestehende.** Übersteigt die Ladung den Lagerdeckel, verfällt der
+Überschuss – dieselbe `cargoScale`-Rechnung, die Expeditionen, NPC-Beute und Abgrund-Bergung schon
+benutzen (Z. 44915, 45082, 45368) und die seit v8.168 ausdrücklich für **alle** Ressourcenquellen
+gilt. Kein neuer Sonderweg.
+
+### 5.4 Die Aufbereitungsanlage – was die Basis noch zu tun hat
+
+Eine heimgekehrte Ladung ist Gestein, kein fertiger Rohstoff. Wie viel daraus wird, entscheidet das
+neue Gebäude:
+
+**Aufbereitungsanlage** (`key:'aufbereitung'`, eigenes gezeichnetes Icon, `category:'refine'`,
+`maxLevel: 20`)
+
+- **Ausbeute: 70 % ohne Anlage, +1,5 Prozentpunkte je Stufe** – bei Vollausbau **100 %**. Wer nie
+  eine baut, verliert dauerhaft knapp ein Drittel jeder Fahrt.
+- **Verbrauch: 1,5 Energie je aufbereiteter Einheit**, fällig beim Entladen über `pay()`.
+- **Reicht die Energie nicht, sinkt die Ausbeute anteilig** – der unaufbereitete Rest ist Schlacke und
+  weg. Deshalb nennt die **Startvorschau** die voraussichtlichen Energiekosten, genau wie sie heute
+  schon vor knappem Frachtraum warnt (`EXPEDITION_MAX_RESOURCE_FIND_BASE` Z. 18062 existiert für
+  exakt diesen Zweck). Eine Warnung vorher ist ehrlich; ein stiller Verlust nachher wäre es nicht.
+- **Bergbau-Welt-Rolle** (Z. 41148) und **Produktionsring** der Orbitalstation wirken auch hier.
+
+> **Die 1,5 sind der Stellknopf dieses Konzepts und ausdrücklich noch nicht gemessen.** Bei einer
+> Ladung von 5.400 sind das 8.100 Energie – für ein Imperium mit mehreren Kolonien gut eine Minute
+> Stromproduktion, also spürbar, aber keine Bremse. Ob das die richtige Höhe ist, lässt sich nicht
+> am Reißbrett entscheiden, sondern nur an einem echten, weit entwickelten Spielstand. Vor der
+> Auslieferung von Phase 2 gehört genau diese Zahl gemessen – CLAUDE.md-Regel 11: Behauptungen in
+> Patchnotes werden vorher gemessen, und „Energie ist jetzt der Engpass" wäre eine.
+
+Damit ist die Basis umgebaut, ohne eine einzige neue Ressource:
 
 | | vorher | nachher |
 |---|---|---|
-| **Erz, Kristalle, Deuterium, Antimaterie** | Mine/Raffinerie/Synth/Reaktor | Asteroiden (Hauptteil) + gedeckelte Grundlast |
-| **Energie** | ein Rohstoff wie jeder andere | **Treibstoff der Aufbereitung** – wer mehr verarbeiten will, baut Kraftwerke |
+| **Erz, Kristalle, Deuterium, Antimaterie** | Mine/Raffinerie/Synth/Reaktor | Abbaumissionen (Hauptteil) + gedeckelte Grundlast |
+| **Energie** | ein Rohstoff wie jeder andere | **Betriebsstoff der Aufbereitung** – wer mehr verarbeiten will, baut Kraftwerke |
 | **Rolle der Basis** | Bergwerk | **Kraftwerk und Hütte** |
 | **Rolle der Flotte** | Kämpfen, erkunden, plündern | **plus: Nachschub** |
 
 **Ausdrücklich nicht vorgeschlagen: eine neue Zwischenressource „Rohgestein".** Sie wäre thematisch
-naheliegend, würde aber **zwei getrennte Pfade** anfassen, die beide bedient werden müssen und von
-denen keiner den anderen absichert: `costAmountAvailable()` (Z. 18600, „kann ich das bezahlen") und
-`pay()` (Z. 18674, „bezahle es"). Dazu den Lagerdeckel, die Tier-2-Klemmung in `gainResources()`
-(Z. 18692) und jede Anzeige, die eine Ressourcenliste aufzählt. Die Aufbereitung erreicht denselben
-Design-Effekt (Basis = Hütte, Energie = Senke) über eine **Rate**, nicht über einen neuen Bestand.
-Rate statt Bestand ist hier zehnmal billiger und nicht einen Deut schwächer.
+naheliegend – die Ladung *ist* ja Gestein –, würde aber **zwei getrennte Pfade** anfassen, die beide
+bedient werden müssen und von denen keiner den anderen absichert: `costAmountAvailable()` (Z. 18603,
+„kann ich das bezahlen") und `pay()` (Z. 18677, „bezahle es"). Dazu den Lagerdeckel, die
+Tier-2-Klemmung in `gainResources()` (Z. 18695) und jede Anzeige, die eine Ressourcenliste aufzählt.
+Die Ausbeute-Rechnung beim Entladen erreicht denselben Design-Effekt für einen Bruchteil des
+Aufwands: Das Gestein existiert nur für die Dauer eines Entladevorgangs, nie als Bestand.
 
 > Anmerkung zur Quellenlage: `docs/freiflug-konzept.md` nennt für diese Verdrahtung einen Wächter
 > `tests/test_kostenschluessel.js`. **Den gibt es im Repo nicht** (Stand v8.476.0, geprüft) – ebenso
@@ -420,14 +498,40 @@ Rate statt Bestand ist hier zehnmal billiger und nicht einen Deut schwächer.
 > Datei mit 57.686 Zeilen – und ein Beleg dafür, warum CLAUDE.md-Regel 10 verlangt, Befunde aus
 > zweiter Hand vor dem Weitergeben am Code nachzuprüfen.
 
+### 5.5 Was durch den Rundflug ersatzlos wegfällt
+
+Die erste Fassung dieses Konzepts hatte einen **Förderposten**: stationierte Schiffe, die dauerhaft
+in Richtung Heimat fördern. Das klang nach Idle-Spiel, zog aber eine lange Kette Folgeprobleme nach
+sich. Der Rundflug löst sie alle drei auf einmal – nicht durch eine bessere Lösung, sondern indem er
+die Fragen gar nicht erst stellt:
+
+| Weggefallen | Warum es weg ist |
+|---|---|
+| **`gesamtRatenProSekunde()`** und die Umstellung von sieben Aufrufstellen | Es gibt keine laufende Asteroidenrate mehr. `ratesPerSecond()` bedeutet weiterhin „Produktion aus Gebäuden" und stimmt damit auch weiterhin. Eine heimgebrachte Ladung ist ein Ereignis wie Expeditionsbeute – dass die nicht in der Rate/Sekunde auftaucht, ist seit jeher so und hat noch nie jemanden verwirrt. |
+| **Die Anbindung an `applyOfflineProgress()`** | Missionen laufen über `checkMissions()`, das Rückkehrzeiten ohnehin gegen `Date.now()` prüft – eine Flotte, die während der Abwesenheit heimkommt, wird beim nächsten Laden ganz normal aufgelöst. Die Funktion mit der dichtesten Regel-Geschichte des Projekts (Phantom-Sekunden, 90-s-Schwelle, Doppelgutschrift) wird **gar nicht angefasst**. |
+| **Der `collect`-Endpunkt und das Save-Wettrennen** | Der Server schreibt den Spielstand nie. Er entscheidet beim **Start** der Mission, wie viel dem Vorkommen entnommen wird (Abschnitt 6.4), und das war's. Die Gutschrift passiert rein clientseitig bei Rückkehr, wie bei jeder anderen Mission. |
+
+Das waren zusammen die zwei größten Risiken aus Abschnitt 12.1 und die fehleranfälligste Phase des
+Umsetzungsplans. **Der Rundflug ist damit nicht nur die schönere Spielidee, sondern auch die
+deutlich billigere.**
+
+Was er kostet: Das Spiel wird an dieser Stelle *aktiver*. Wer acht Stunden weg ist, findet seine
+Flotte zu Hause stehen statt ein volles Lager. Genau dafür gibt es die lange Abbauzeit großer
+Ladungen – wer vor dem Schlafengehen einen Kern mit vollem Laderaum anfliegt, hat am Morgen die
+Ladung und ein Schiff, das auf den nächsten Befehl wartet.
+
 ---
 
 ## 6. Anspruch, Besitz und Streit
 
 ### 6.1 Das Schürfrecht
 
-Ein **Schürfrecht** entsteht, wenn Schürfschiffe an einem unbeanspruchten Vorkommen ankommen, und
-gehört genau einem Spieler. Es hält, solange dort mindestens ein eigenes Schürfschiff steht.
+Ein **Schürfrecht** reserviert ein Vorkommen für genau einen Spieler: Nur er darf dort
+Abbaumissionen fliegen. Es entsteht mit der Anmeldung und hält, bis er es aufgibt oder verliert.
+
+Ohne Schürfrecht ist ein Vorkommen **für jeden offen** – dann ist es ein Wettrennen um den Vorrat,
+und wer zuerst da ist, hat ihn. Das Recht ist also kein Zugangstor zum Abbau, sondern der Schutz
+einer Investition: Es lohnt sich für die Brocken, die man dauerhaft bewirtschaften will.
 
 **Anspruchslimit** – der wichtigste Balance-Hebel des ganzen Systems:
 
@@ -437,29 +541,32 @@ gehört genau einem Spieler. Es hält, solange dort mindestens ein eigenes Schü
 | Forschung `rschuerfrecht` (3 Stufen) | +1 je Stufe |
 | **Maximum** | **5** |
 
-Warum 5 und nicht 8, steht in **Abschnitt 3.6**: Die Aufbereitungsanlage kann nicht mehr verarbeiten,
-und ein Limit, das über den Durchsatz hinausgeht, ist eine Zahl ohne Wirkung. Fünf Rechte decken die
-vier Rohstoffe ab und lassen einen Platz Spielraum.
+Warum 5 und nicht 8 – und warum sich die Begründung dafür im Lauf dieses Dokuments zweimal geändert
+hat – steht in **Abschnitt 3.6**.
 
 Bei rund 90 Vorkommen und 5 Rechten je Spieler trägt die Galaxie etwa **18 vollausgebaute
 Schürf-Imperien** – bei heute 10 registrierten Konten also mit Luft, aber ohne Überfluss. Der Wert
 gehört als benannte Konstante an genau eine Stelle, nicht verstreut in Formeln; er wird sich ändern.
 
-### 6.2 Wer fördert und wer bewacht
+### 6.2 Wer hält ein Schürfrecht
 
-**Schürfschiff** (`schuerfschiff` Z. 17320) bekommt endlich seinen Beruf. Es behält seinen
-+3 %-Produktionsbonus (Z. 19298 – das ist bestehende Balance, an der grundlos nichts geändert wird)
-und wird zusätzlich das Förderschiff: **0,60/s**, ein Schürfplatz je Schiff.
+Ein Schürfrecht wird **nicht** von den Minenschiffen gehalten – die kommen ja mit jeder Fahrt wieder
+heim. Es wird von einer **zurückgelassenen Eskorte** gehalten: Kampfschiffe, die vor Ort bleiben.
 
-Heute ist es ein **Event-Schiff** (`unlockEventParts:{ eventKey:'goldrausch' }`) – wer das Event nie
-mitgenommen hat, kommt gar nicht an eins. Für eine Kernmechanik geht das nicht. Vorschlag: Das
-Schürfschiff wird mit der Forschung **Schürftechnik** (Abschnitt 7) regulär freigeschaltet; die
-Event-Teile bleiben als **zweiter, schnellerer** Weg bestehen und geben zusätzlich einen kosmetischen
-Rumpf-Skin, damit die Goldrausch-Veteranen nichts verlieren.
+Das trennt die beiden Rollen sauber, und zwar so, wie es sich auch spielt:
 
-**Eskorte:** Kampfschiffe können mitstationiert werden. Sie fördern nichts, aber sie sind das, was
-eine Anfechtung schlagen muss. Ein unbewachtes Schürfrecht ist eine offene Einladung – und das soll
-man auf der Karte sehen (Abschnitt 9).
+- **Minenschiffe holen.** Sie fliegen hin, graben, kommen zurück (Abschnitt 5).
+- **Eskorte hält.** Sie bleibt liegen, produziert nichts und ist das Einzige, was zwischen dem
+  Vorkommen und einem fremden Angriff steht.
+
+Wer ein Recht ohne Eskorte anmeldet, hält es trotzdem – aber jeder Angreifer nimmt es ihm mit einem
+einzigen Jäger ab. **Ein unbewachtes Schürfrecht ist eine offene Einladung, und man sieht es auf der
+Karte** (gestrichelter Ring, Abschnitt 9). Fällt die Eskorte auf null, ohne dass jemand angreift,
+bleibt das Recht bestehen; es ist dann nur wehrlos.
+
+Missionstyp **`mining-escort`** bringt die Eskorte hin, **`mining-recall`** holt sie zurück. Beides
+sind gewöhnliche Verlegungen mit Flugzeit, Treibstoff und einem Flottenslot – dasselbe Muster wie der
+Recycler-Sammelauftrag, der ebenfalls einen Slot belegt, solange er läuft.
 
 ### 6.3 Anfechtung
 
@@ -468,10 +575,15 @@ Missionstyp **`asteroid-contest`**: eine Kampfflotte gegen die stationierte Esko
 - **Serverautoritativ** aufgelöst, Muster von `/api/attack` (Z. 2920) und `/api/moonsiege/resolve`
   (Z. 6845). Der Angreifer schickt **keine Stärke mit** – der Server rechnet sie aus dem gespeicherten
   Spielstand nach, wie es `computeScoreServer()` für die Bestenliste tut.
-- **Verliert der Halter**, geht das Schürfrecht über; seine überlebenden Schürfschiffe fliegen
-  automatisch heim (dasselbe Muster wie die selbstständige Rückkehr des Recycler-Sammelauftrags).
+- **Verliert der Halter**, geht das Schürfrecht über; seine überlebende Eskorte fliegt automatisch
+  heim (dasselbe Muster wie die selbstständige Rückkehr des Recycler-Sammelauftrags).
   **Der Vorrat bleibt, wo er ist** – man erobert eine Quelle, keine Beute. Das ist wichtig, sonst
   wird Anfechtung zum Raubzug statt zum Revierkampf.
+- **Eine gerade laufende Abbaumission des Halters wird nicht abgefangen.** Ihre Ladung ist beim Start
+  bereits dem Vorkommen entnommen und serverseitig verbucht (Abschnitt 6.4); sie kommt normal heim.
+  Wer ein Recht erobert, gewinnt die *Zukunft* des Vorkommens, nicht die Fahrt, die schon läuft. Die
+  Gegenregel wäre verlockend, hieße aber, dass ein Angriff im richtigen Moment eine fremde Ladung
+  klaut – und damit wäre die Anfechtung wieder ein Raubzug.
 - **Schutzfrist 2 Std.** nach jedem Besitzwechsel: kein Ping-Pong im Minutentakt.
 - **Abklingzeit 4 Std.** je Angreifer und Vorkommen: kein Zermürben durch Wiederholung.
 - **Allianzmitglieder des Halters können nicht anfechten.** Sonst wird jede Allianz zum
@@ -490,8 +602,7 @@ Missionstyp **`asteroid-contest`**: eine Kampfflotte gegen die stationierte Esko
   "plaetze": {
     "4": { "halter": "<userId>", "halterName": "Sascha", "tag": "KEP",
            "vorrat": 1743200, "seit": 1754800000000, "schutzBis": 1754807200000,
-           "schiffe": { "schuerfschiff": 16, "jaeger": 40, "waechter": 8 },
-           "geerntetBis": 1754812345000 },
+           "eskorte": { "jaeger": 40, "waechter": 8 } },
     "7": { "vorrat": 84000, "leerSeit": null }
   }
 }
@@ -506,9 +617,24 @@ Vier eigene Endpunkte statt generischem Shared-Storage – CLAUDE.md ist an dies
 | Endpunkt | Aufgabe | Serverseitig geprüft |
 |---|---|---|
 | `GET /api/asteroid/field/:systemId` | Feld lesen (mit fauler Nachwachs-Auflösung) | – |
-| `POST /api/asteroid/claim` | Schürfrecht anmelden | Platz frei? Anspruchslimit? Schiffe wirklich im Spielstand? |
-| `POST /api/asteroid/collect` | Ertrag gutschreiben | **Menge rechnet der Server** aus `geerntetBis`, Rate und Restvorrat – der Client nennt keine Zahl |
+| `POST /api/asteroid/mine` | **Beim Start** einer Abbaumission: Ladung aus dem Vorkommen entnehmen | Recht frei oder eigenes? Restvorrat? **Der Server entscheidet die Menge** und zieht sie sofort ab; der Client bekommt sie mitgeteilt |
+| `POST /api/asteroid/claim` / `release` | Schürfrecht an- oder abmelden | Platz frei? Anspruchslimit? Eskorte wirklich im Spielstand? |
 | `POST /api/asteroid/contest` | Anfechten | Schutzfrist, Abklingzeit, Allianz, Stärke aus dem Spielstand |
+
+**Die Entnahme passiert beim START, nicht bei der Rückkehr** – das ist der Kern des Entwurfs. Der
+Server führt Buch über den geteilten Vorrat und nichts sonst; die Gutschrift beim Spieler macht der
+Client bei Heimkehr über `gainResources()`, genau wie bei jeder anderen Mission. Zwei Folgen:
+
+- **Der Server schreibt nie den Spielstand.** Das Wettrennen zwischen Server-Gutschrift und
+  Client-Save, das `/api/market/trade` bis heute hat, entsteht hier gar nicht erst.
+- **Derselbe Brocken kann nicht zweimal verkauft werden.** Fliegen zwei Spieler gleichzeitig auf ein
+  freies Vorkommen, bekommt der zweite nur, was der erste übrig gelassen hat – und er erfährt es beim
+  Start, nicht nach einer halben Stunde Flug.
+
+Der Preis dafür ist ehrlich zu benennen: Bricht die Verbindung zwischen `mine` und dem tatsächlichen
+Missionsstart ab, ist die Ladung dem Vorkommen entnommen, ohne dass eine Flotte fliegt. Deshalb wird
+`mine` **erst gerufen, wenn Treibstoff und Slots bereits geprüft sind**, und die Antwort ist das,
+was die Mission in `m.ladung` einfriert. Schlägt der Aufruf fehl, startet die Mission nicht.
 
 **Warum das ohne Sperren sicher ist:** Derselbe Grund, den der Kommentar über der Modulbörse
 (server.js Z. 5202 ff.) bereits ausformuliert – der gesamte Zustandswechsel eines Endpunkts läuft
@@ -523,12 +649,13 @@ Client geschrieben. Wer ihn manipuliert, kann Schiffe behaupten, die er nicht ha
 behauptet dieses Konzept auch nicht. Das ist dieselbe Grenze wie überall sonst im Spiel; sie durch
 das Asteroidensystem zu verschieben, wäre ein eigenes Vorhaben.
 
-**Neue Zahlenfelder im Spielstand** (Schürfrechte, Stationierungen) sind gegen `saveSanityViolation()`
+**Neue Zahlenfelder im Spielstand** (Schürfrechte, eingefrorene Ladungen) sind gegen `saveSanityViolation()`
 (Z. 2535) zu prüfen, **bevor** sie live gehen. CLAUDE.md hält den Vorfall vom 21.07.2026 fest, bei
 dem ein zu enges Limit das Speichern für entwickelte Konten komplett eingefroren hat – mehrere
 Stunden Fehlersuche, Symptom „immer 8 Std. offline". Konkret: `asteroidClaims` ist ein kleines
-Objekt und fällt unter keine bestehende Prüfschleife, die stationierten Schiffszahlen laufen als
-Flotte durch `maxShipsPerType` (1e9, unkritisch). **Trotzdem vor dem Merge einmal mit einem
+Objekt und fällt unter keine bestehende Prüfschleife, die Eskorten-Schiffszahlen laufen als
+Flotte durch `maxShipsPerType` (1e9, unkritisch); `m.ladung` ist eine Ressourcenmenge und muss unter
+`maxResourceValue` (1e15) bleiben, was bei Laderäumen im Tausenderbereich nie eng wird. **Trotzdem vor dem Merge einmal mit einem
 Vollausbau-Spielstand gegen den echten Endpunkt geprüft**, nicht nur überlegt.
 
 ---
@@ -538,34 +665,60 @@ Vollausbau-Spielstand gegen den echten Endpunkt geprüft**, nicht nur überlegt.
 Jeder Eintrag bringt laut CLAUDE.md-Regel 7 **eigenes Icon und vollständige Beschreibung** mit – ein
 ganzer Satz, der Wirkung und Deckel nennt, kein Kürzel-Text.
 
-### Forschungen (`RESEARCH_DEFS`, Z. 10572)
+### Forschungen (`RESEARCH_DEFS`, Z. 10575)
 
 | `key` | Name | Stufen | Wirkung |
 |---|---|---|---|
-| `rschuerftechnik` | Schürftechnik | 1 | Schaltet Schürfschiff, Aufbereitungsanlage und den Missionstyp Schürfflug frei. |
-| `rschuerfrecht` | Bergbaurecht | 3 | +1 gleichzeitiges Schürfrecht je Stufe (2 → 5); mehr könnte die Aufbereitungsanlage ohnehin nicht verarbeiten, siehe Abschnitt 3.6. |
-| `rfoerderung` | Fördertechnik | 10 | +3 % Förderrate je Stufe, additiv in die gedeckelte Bonus-Gruppe (max. +30 %). |
+| `rminentechnik` | Minentechnik | 1 | Schaltet das Minenschiff, die Aufbereitungsanlage und den Missionstyp Abbaumission frei. Erste Stufe des ganzen Zweigs. |
+| `rfoerderung` | **Fördertechnik** | 10 | **+4 % Abbaurate und +4 % Laderaum des Minenschiffs je Stufe** (bei Vollausbau je +40 %). Beide Werte additiv in die bestehende gedeckelte Bonus-Gruppe – keine eigene Multiplikation. |
+| `rschuerfrecht` | Bergbaurecht | 3 | +1 gleichzeitiges Schürfrecht je Stufe (2 → 5). |
 | `rtiefenscan` | Tiefenscan-Array | 5 | Deckt Sorte und Größe unerkundeter Vorkommen im eigenen und je Stufe einem weiteren Nachbarsystem auf, ohne Anflug. |
 | `raufbereitung` | Aufbereitungstechnik | 8 | −4 % Energieverbrauch je aufbereiteter Einheit je Stufe, Boden bei −32 %. |
+
+**`rfoerderung` ist die Forschung, die das Minenschiff wirklich besser macht** – und sie hebt
+bewusst **beide** Werte zugleich, statt sie auf zwei Zweige zu verteilen. Der Grund steht in
+Abschnitt 5.3: Abbaurate und Laderaum bestimmen gemeinsam die Abbauzeit
+(`Ladung ÷ Rate`). Wüchse nur der Laderaum, würde jede Stufe die Fahrten *länger* machen und sich
+wie eine Verschlechterung anfühlen; wüchse nur die Rate, brächte jede Fahrt gleich viel und nur
+schneller. Zusammen ergeben sie das, was ein Spieler erwartet: **mehr pro Fahrt bei gleicher
+Fahrtdauer.**
+
+Konkret, an einer Flotte aus 5 Minenschiffen an einem Kern (Güte ×2,0), ohne Frachter:
+
+| Fördertechnik | Abbaurate | Laderaum | Abbauzeit | Ertrag je Stunde Abbau |
+|---|---|---|---|---|
+| Stufe 0 | 6,00/s | 2.000 | 5,6 min | 21.600 |
+| Stufe 5 | 7,20/s | 2.400 | 5,6 min | 25.920 |
+| Stufe 10 | 8,40/s | 2.800 | 5,6 min | 30.240 |
+
+Die Abbauzeit bleibt konstant, der Ertrag steigt um 40 %. Genau so soll sich eine Forschung anfühlen.
 
 ### Gebäude (`BUILDING_DEFS`)
 
 | `key` | Name | maxLevel | Wirkung |
 |---|---|---|---|
-| `aufbereitung` | Aufbereitungsanlage | 20 | +3,0 Einheiten/s Aufbereitungsdurchsatz je Stufe (imperiumsweit gemeinsam); verbraucht 0,35 Energie je Einheit. |
-| `schuerfleitstand` | Schürfleitstand | 10 | −2 % Flugzeit für Schürf- und Anfechtungsmissionen je Stufe (Boden −20 %), zahlt in dieselbe Gruppe wie Navigator und Konvoi-Doktrin ein. |
+| `aufbereitung` | Aufbereitungsanlage | 20 | Ausbeute einer heimgebrachten Ladung: 70 % ohne Anlage, **+1,5 Prozentpunkte je Stufe** (Vollausbau 100 %). Verbraucht 1,5 Energie je aufbereiteter Einheit. |
+| `schuerfleitstand` | Schürfleitstand | 10 | −2 % Flugzeit für Abbau- und Anfechtungsmissionen je Stufe (Boden −20 %), zahlt in dieselbe Gruppe wie Navigator und Konvoi-Doktrin ein. |
 
-### Schiff
+### Schiffe
 
-**Bergungsfrachter** (`bergungsfrachter`) – der Frachter für die lange Strecke: doppelter Laderaum des
-Großen Frachters, halbe Geschwindigkeit, kein Angriffswert. Für den Einzelflug zu weit entfernten
-Vorkommen, bevor man dort ein Schürfrecht halten kann.
+**Minenschiff** – das vorhandene **Schürfschiff** (`schuerfschiff` Z. 17323), siehe Abschnitt 5.2:
+0,60/s Abbaurate und 400 Laderaum je Schiff, künftig regulär über `rminentechnik` freigeschaltet
+statt nur über das Goldrausch-Event.
+
+**Bergungsfrachter** (`bergungsfrachter`) – optional, für später: doppelter Laderaum des Großen
+Frachters (3.000), halbe Geschwindigkeit, kein Angriffswert. Er lohnt sich genau dann, wenn die
+Flugzeit klein gegen die Abbauzeit ist – also bei den großen Brocken weit draußen. Bewusst als
+**Phase-5-Inhalt** markiert: Frachter und Großfrachter decken den Bedarf zunächst vollständig ab,
+und ein drittes Frachtschiff, bevor die Mechanik steht, ist Ballast.
 
 ### Module und Kosmetik
 
-- Standort-Modul **Förderleitwerk** (`foerder`): +% Förderrate der von diesem Standort aus
-  stationierten Schürfschiffe – reiht sich in die vorhandene `moduleBonusAt()`-Familie ein.
-- Schiffs-Modul **Bohrkopfverstärkung** für die Schürfschiff-Klasse.
+- Standort-Modul **Förderleitwerk** (`foerder`): +% Abbaurate für Abbaumissionen, die von diesem
+  Standort starten – reiht sich in die vorhandene `moduleBonusAt()`-Familie ein.
+- Schiffs-Modul **Bohrkopfverstärkung** für die Minenschiff-Klasse (Abbaurate), und **Erweiterter
+  Laderaum** wirkt über `shipModuleBonusFor('frachter','cargo')` bereits heute auf die mitgeschickten
+  Frachter – dort ist nichts zu bauen.
 - Neun gezeichnete Asteroiden-Icons (eins je Sorte) plus ein Icon für die Aufbereitungsanlage und
   eins für den Schürfleitstand.
 
@@ -581,18 +734,23 @@ einzubauen reicht seit v8.296.0 nicht mehr aus, der Glyph fehlt sonst im Subset-
 
 CLAUDE.md-Regel 6 in Listenform – nach dem Umbau **erst greppen, dann committen**:
 
-- Die **fünf Anzeige- und zwei Gutschriftstellen** aus Abschnitt 0 auf `gesamtRatenProSekunde()`
-  umstellen – die sechs Belohnungsformeln ausdrücklich **nicht**.
+- **`ratesPerSecond()` wird nicht angefasst** – siehe Abschnitt 0 (3) und 5.5. Es gibt keine
+  laufende Asteroidenrate, also auch keine Anzeigestelle, die dadurch veralten könnte. Wer beim Bauen
+  auf die Idee kommt, den Ertrag „der Vollständigkeit halber" doch einzurechnen: Das sind sechs
+  Belohnungsformeln, keine Anzeige.
 - **HELP_SECTIONS**: neuer Abschnitt „Asteroiden und Schürfrechte"; **bestehende** Abschnitte
-  „Trümmerfelder" (Z. 33738) und „Planetentypen" (Z. 33747) prüfen – letzterer sagt heute
+  „Trümmerfelder" (Z. 33741) und „Planetentypen" (Z. 33750) prüfen – letzterer sagt heute
   „Asteroiden … haben keinen Typ-Bonus", und dieser Satz meint den *Planetentyp*, nicht das neue
   Vorkommen. Er wird mit einem Halbsatz entschärft, sonst widerspricht er der neuen Mechanik dem
   Anschein nach.
-- **TUTORIAL_STEPS**: Der Schritt „Erkunden & Kolonisieren" (Z. 27830) beschreibt das Kartenmenü und
+- **TUTORIAL_STEPS**: Der Schritt „Erkunden & Kolonisieren" (Z. 27833) beschreibt das Kartenmenü und
   muss die neue Aktion nennen.
 - **`effectDesc`** der fünf gedeckelten Gebäude: Sie nennen heute keinen Deckel, weil es keinen gab.
-- Die **Lagerdeckel-Restzeit** (Z. 23745) rechnet mit der Gebäuderate und meldet nach dem Umbau eine
-  zu lange Zeit bis „Lager voll".
+- Die **Startvorschau der Abbaumission** ist selbst eine Anzeigestelle und muss aus denselben
+  Funktionen rechnen wie die Auflösung – Flugzeit, Ladung, Ausbeute, Energiekosten. Die
+  Frachtraum-Warnung der Expeditionen ist der Präzedenzfall: Ihr fehlte bis zum 01.08.2026
+  `codexExpeditionBonus()`, sie schätzte deshalb bis zu 13 % zu niedrig und meldete „passt", wo die
+  Beute nicht mehr in den Laderaum ging. Genau dafür gibt es die Warnung, und genau so bricht sie.
 - **Tagesaufgaben und Erfolge**: bewusst zuerst *ohne* Asteroiden-Bezug ausliefern und erst in Phase 5
   ergänzen – ein Erfolg, der eine Mechanik voraussetzt, die noch nicht rund läuft, ist eine
   Beschwerde mit Ankündigung.
@@ -605,15 +763,19 @@ CLAUDE.md-Regel 6 in Listenform – nach dem Umbau **erst greppen, dann committe
 „Solo-Modus funktioniert ohne Server" eine Architektur-Zusage, keine Nebenbemerkung. Umkämpfte
 Schürfrechte gibt es dort nicht.
 
-**Vorschlag – die kleine Lösung:** Im Solo-Modus sind alle Vorkommen unbeansprucht und frei
-abbaubar. Der Einzelflug (5.1) läuft vollständig, der Förderposten (5.2) auch – nur eben ohne
-Anspruch, ohne Anfechtung und ohne Anspruchslimit. Die Deckelung durch die **Aufbereitungsanlage**
-greift trotzdem, und sie ist der eigentliche Balance-Riegel. Solo-Spieler verlieren damit die
-soziale Ebene, aber keinen Spielinhalt und keine Progression.
+**Der Rundflug macht das leicht.** Die Abbaumission (Abschnitt 5) ist von Anfang bis Ende
+Client-Mechanik: Flotte los, Abbauzeit, `checkMissions()` löst auf, `gainResources()` bucht. Der
+Server wird ausschließlich für den **geteilten Vorrat** und die **Schürfrechte** gebraucht.
+
+Im Solo-Modus fällt beides weg: Alle Vorkommen sind unbeansprucht, der Vorrat lebt lokal in `state`,
+es gibt keine Anfechtung und kein Anspruchslimit. **Der komplette Kernkreislauf läuft trotzdem** –
+Auswählen, Flotte schicken, Ladung heimbringen, Aufbereitung ausbauen. Solo-Spieler verlieren die
+soziale Ebene und sonst nichts. Das ist ein deutlich besseres Ergebnis als beim Förderposten-Entwurf,
+wo der Solo-Modus ein Sonderfall der Ertragsbuchung geworden wäre.
 
 **Die große Lösung** – NPC-Konkurrenzsyndikate, die im Solo-Modus Vorkommen halten und anfechten –
 wäre reizvoll, ist aber ein eigenes Vorhaben in der Größenordnung der Piraten-Trümmerräuber
-(`maybeSchedulePirateDebrisRaid` Z. 23517 und die Auflösungskette daran). Sie gehört **nicht** in
+(`maybeSchedulePirateDebrisRaid` Z. 23520 und die Auflösungskette daran). Sie gehört **nicht** in
 dieses Konzept; wenn sie kommt, dann als Phase 6 mit eigener Bewertung.
 
 ---
@@ -625,17 +787,23 @@ als gezeichnete Brocken in der Farbe ihrer Sorte. Am Rand jedes beanspruchten Br
 Ring in der Farbe des Halters – **eigene grün, Allianz blau, fremde rot**, unbewacht (keine Eskorte)
 **gestrichelt**. Damit ist die Antwort auf „wo lohnt sich eine Anfechtung" ein Blick, kein Menü.
 
-**Im Kartenmenü**: Anfliegen (Schürfflug) · Schürfrecht anmelden · Anfechten · Schiffe abziehen –
-jeweils mit Flugzeit und Kosten darunter oder dem Grund, warum der Eintrag grau ist. Exakt die
-Konvention, die HELP_SECTIONS Z. 33743 für das Kartenmenü schon festschreibt.
+**Im Kartenmenü**: **Abbaumission** · Schürfrecht anmelden · Eskorte verlegen · Anfechten – jeweils
+mit Flugzeit und Kosten darunter oder dem Grund, warum der Eintrag grau ist („Kein Minenschiff auf
+diesem Standort"). Exakt die Konvention, die HELP_SECTIONS Z. 33746 für das Kartenmenü schon
+festschreibt.
 
-**Neue Box „Schürfbetrieb"** im Flotte-Tab, Unterreiter „Missionen": je gehaltenes Vorkommen eine
-Zeile mit Sorte, Größe, Restvorrat, aktueller Rate, stationierten Schiffen und Schutzfrist. Sie
-enthält einen Countdown (Schutzfrist), gehört also **nicht** unter das Signatur-Cache-Muster mit
-Wertliste, sondern unter **`setBoxHtml()` mit Markup-Signatur** (Z. 20096 ff. beschreibt die
-Unterscheidung): Läuft ein Countdown, ist das Markup jede Sekunde anders und die Box wird neu
-geschrieben; steht keiner, steht sie still. Die Prüfung ist selbstkorrigierend – genau der Grund,
-warum es dieses Muster gibt.
+**Die Startvorschau** ist der wichtigste Bildschirm des ganzen Features, weil dort die Entscheidung
+fällt. Sie nennt in einer Zeile: *Hinflug 4:12 · Abbau 12:30 · Rückflug 4:12 · Ladung 5.400
+(Erz 3.240 / Kristalle 2.160) · Treibstoff 612 Deuterium · Aufbereitung ~8.100 Energie.* Jede dieser
+Zahlen kommt aus derselben Funktion, die sie hinterher abrechnet.
+
+**Neue Box „Schürfbetrieb"** im Flotte-Tab, Unterreiter „Missionen": oben die laufenden
+Abbaumissionen mit Phase (Anflug / Abbau / Rückflug) und Restzeit, darunter die gehaltenen
+Schürfrechte mit Sorte, Größe, Restvorrat, Eskorte und Schutzfrist. Sie enthält Countdowns, gehört
+also **nicht** unter das Signatur-Cache-Muster mit Wertliste, sondern unter **`setBoxHtml()` mit
+Markup-Signatur** (Z. 20099 ff. beschreibt die Unterscheidung): Läuft ein Countdown, ist das Markup
+jede Sekunde anders und die Box wird neu geschrieben; steht keiner, steht sie still. Die Prüfung ist
+selbstkorrigierend – genau der Grund, warum es dieses Muster gibt.
 
 **Achtung bei der Bedienung:** Die Box bekommt eine Schiffszahl-Eingabe und eine Vorkommens-Auswahl.
 Beides sind Bedienzustände, die nur im DOM stecken und den Neuaufbau im Sekundentakt nicht überleben
@@ -643,8 +811,10 @@ Beides sind Bedienzustände, die nur im DOM stecken und den Neuaufbau im Sekunde
 25.07.2026 real aufgetretene Spielerfehler. Also von Anfang an `isTypingIn()` für das Eingabefeld,
 `data-keep-value` + `selectedAttrFor()` für die Auswahl.
 
-**Im Basis-Tab**: die Aufbereitungsanlage mit einer ehrlichen Auslastungszeile („42 von 61/s
-verarbeitet – 19/s bleiben im Vorkommen liegen. Grund: Energie reicht nicht.").
+**Im Basis-Tab**: die Aufbereitungsanlage mit einer ehrlichen Ausbeute-Zeile („Stufe 12 – deine
+Aufbereitung holt **88 %** aus dem Gestein. Vollausbau: 100 %.") und, nach jeder Heimkehr, der
+tatsächlichen Abrechnung im Bericht: *Ladung 5.400 · aufbereitet 4.752 (88 %) · 7.128 Energie
+verbraucht.*
 
 ---
 
@@ -656,11 +826,16 @@ steht Sekunden später auf `gamegeeeeek.de`.
 
 | Phase | Inhalt | Backend? | Risiko |
 |---|---|---|---|
-| **1** | Feldgenerierung, Darstellung auf der Karte, Kartenmenü, Einzelflug (`mining`), Schürfschiff regulär freigeschaltet | nein | gering – rein additiv, nichts Bestehendes ändert sich |
-| **2** | Aufbereitungsanlage, `gesamtRatenProSekunde()` + Umstellung der fünf Anzeige- und zwei Gutschriftstellen, Forschungen, Hilfe/Tutorial | nein | **mittel** – Anzeigestellen und Offline-Nachholung sind die Fehlerquellen |
+| **1** | Feldgenerierung, Darstellung auf der Karte, Kartenmenü, **Abbaumission** mit Vorschau und Bericht, Minenschiff regulär freigeschaltet | nein | gering – rein additiv, nichts Bestehendes ändert sich |
+| **2** | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, Hilfe/Tutorial | nein | gering–mittel – die **1,5 Energie je Einheit** vorher an einem echten Spielstand messen (Abschnitt 5.4) |
 | **3** | **Deckel + Bestandskonten-Ausgleich** | nein | **hoch** – der einzige Schritt, der Spielern etwas wegnimmt |
-| **4** | Schürfrechte: Feld-Dokumente, `claim`/`collect`, Anspruchslimit, Förderposten | **ja** | mittel |
-| **5** | Anfechtung, Schutzfristen, Benachrichtigungen, Erfolge, Tagesaufgaben, Berichte | **ja** | mittel |
+| **4** | Geteilter Vorrat: Feld-Dokumente, `mine`, Schürfrechte, Anspruchslimit | **ja** | mittel |
+| **5** | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | mittel |
+
+**Phase 1 ist eigenständig spielbar.** Ohne Backend, ohne Schürfrechte, ohne Deckel: Man sucht sich
+einen Brocken, schickt eine Flotte, bekommt eine Ladung. Wenn nach Phase 1 klar wird, dass sich der
+Kreislauf nicht gut anfühlt, ist alles Weitere hinfällig – und es sind erst rund 600 Zeilen
+geschrieben statt viertausend. Diese Reihenfolge ist der eigentliche Wert des Phasenplans.
 
 **Phase 3 kommt bewusst nach Phase 2 und vor Phase 4.** Der Deckel darf erst greifen, wenn die
 Alternative im Spiel **bereits sichtbar und benutzbar** ist – sonst ist es für ein paar Tage eine
@@ -676,16 +851,22 @@ Repo, nicht ins Scratchpad – CLAUDE.md ist an dem Punkt aus schmerzhafter Erfa
 neue Test braucht eine Gegenprobe, und sie wird in beide Richtungen ausgeführt:** grün am neuen
 Stand, rot am alten (`git show HEAD:weltraum_kolonie.html`).
 
-| Test | Prüft | Gegenprobe am alten Stand muss ROT werden |
+| Test | Prüft | Gegenprobe |
 |---|---|---|
-| `test_asteroidenfeld.js` | Feldgenerierung ist deterministisch: gleiche `systemId`+Epoche ⇒ identisches Feld, über zwei getrennte Läufe | – (neuer Inhalt) |
-| `test_asteroiden_deckel.js` | Eine Mine auf Stufe 40 liefert nach dem Umbau die **gerechnete** Rate. Erwartungswert wird **im Test aus dem Spiel abgeleitet** (Rate messen), nicht eingetippt – Regel 2 und 7 der Arbeitsregeln | Stufe-40-Mine liefert dort die volle Rate |
-| `test_asteroiden_anzeige.js` | Die fünf Anzeige- und zwei Gutschriftstellen nennen Gebäude **+** Asteroidenrate, die sechs Belohnungsformeln **nur** die Gebäuderate (Wochenliga-Ausschüttung bei laufendem Förderposten gegen die reine Gebäuderate prüfen) | alte Stellen zeigen bei aktivem Förderposten zu wenig |
-| `test_asteroiden_offline.js` | Nach 3 Std. simulierter Abwesenheit ist der Asteroiden-Ertrag **genau einmal** gutgeschrieben – Uhr nur über `Date.now()` vorstellen, nie über Treiber-Uhrhilfen (Arbeitsregel 8), und die Gegenrichtung (Doppelgutschrift) mitmessen | ohne Anbindung an `applyOfflineProgress` kommt 0 heraus |
-| `test_aufbereitung_drossel.js` | Bei zu kleinem Durchsatz **bleibt** der Rest im Vorkommen (Vorrat vorher/nachher messen), und die Box **sagt** es | – |
-| `test_schuerf_lagerdeckel.js` | Bei vollem Lager wird der Vorrat **nicht** angetastet – dieselbe Regel wie beim Recycler | – |
-| `test_schuerfbox_zustand.js` | Auswahl und Eingabefeld überleben zehn Ticks (die `<select>`-Falle) | ohne `data-keep-value` springt die Auswahl zurück |
-| `tests/asteroid.sh` (Backend) | Anspruch, Doppelanspruch (zweiter muss scheitern), Anspruchslimit, `collect` rechnet serverseitig, Anfechtung mit Schutzfrist – echte HTTP-Requests gegen einen lokal gestarteten Server mit Test-DB in `/tmp` | – |
+| `test_asteroidenfeld.js` | Feldgenerierung ist deterministisch: gleiche `systemId` + Epoche ⇒ identisches Feld über zwei getrennte Läufe; die ~20 Gürtelsysteme sind über das Raster gestreut, nicht geklumpt | – (neuer Inhalt) |
+| `test_abbaumission.js` | Der ganze Kreislauf: Mission starten, Uhr vorstellen, `checkMissions()` auflösen – **vorher keine Ressourcen, nachher genau die Ladung**. Prüft ausdrücklich, dass zur Halbzeit noch **nichts** gutgeschrieben ist | mit Sofortgutschrift beim Start wäre die Zwischenprüfung rot |
+| `test_abbau_laderaum.js` | Frachter erhöhen die Ladung, Fördertechnik erhöht Rate **und** Laderaum, und die Abbauzeit bleibt dabei konstant (Tabelle in Abschnitt 7) | ohne Laderaum-Anteil der Forschung sinkt die Abbauzeit statt gleich zu bleiben |
+| `test_abbau_vorschau.js` | Die Startvorschau nennt dieselben Zahlen, die die Auflösung dann bucht – Ladung, Ausbeute, Energie. Prüft die **Regel** (Vorschau == Abrechnung), nicht einen Zeichenkettenvergleich | Vorschau mit eigener Formel weicht ab |
+| `test_asteroiden_deckel.js` | Eine Mine auf Stufe 40 liefert nach dem Umbau die gerechnete Rate. Erwartungswert **im Test aus dem Spiel abgeleitet** (Rate messen), nicht eingetippt – Arbeitsregeln 2 und 7 | am alten Stand liefert sie die volle Rate |
+| `test_aufbereitung.js` | Ausbeute steigt mit der Stufe; reicht die Energie nicht, sinkt sie anteilig **und die Meldung sagt es** | ohne Anlage-Stufe im Nenner bleibt die Ausbeute konstant |
+| `test_schuerf_lagerdeckel.js` | Bei vollem Lager verfällt der Überschuss über dieselbe `cargoScale`-Kappung wie bei Expeditionen – kein Sonderweg | – |
+| `test_schuerfbox_zustand.js` | Auswahl und Eingabefeld der Schürfbetrieb-Box überleben zehn Ticks (die `<select>`-Falle) | ohne `data-keep-value` springt die Auswahl zurück |
+| `tests/asteroid.sh` (Backend) | `mine` zieht den Vorrat **beim Start** ab; zwei gleichzeitige Anfragen auf dasselbe Vorkommen können zusammen nie mehr entnehmen als drin war; Anspruchslimit; Anfechtung mit Schutzfrist. Echte HTTP-Requests gegen einen lokal gestarteten Server mit Test-DB in `/tmp` | – |
+
+**Der wichtigste Test ist `test_abbaumission.js`, und zwar wegen seiner Zwischenprüfung.** „Ressourcen
+erst bei Rückkehr" ist eine Regel, die man nur bemerkt, wenn man sie verletzt – ein Test, der bloß
+den Endstand prüft, wäre auch bei sofortiger Gutschrift grün. Er muss zur Halbzeit ausdrücklich
+nachsehen, dass noch nichts gebucht wurde.
 
 Drei Fallen, die bei diesen Tests konkret drohen und die dieses Repo alle schon einmal bezahlt hat:
 
@@ -704,7 +885,11 @@ Drei Fallen, die bei diesen Tests konkret drohen und die dieses Repo alle schon 
 
 ## 12. Risiken
 
-### 12.1 Die vier, die wirklich wehtun
+### 12.1 Die zwei, die wirklich wehtun
+
+Es waren vier. Zwei davon – das Wettrennen zwischen Server-Gutschrift und Client-Save und die
+Anbindung an `applyOfflineProgress()` – sind mit der Entscheidung für den Rundflug **ersatzlos
+verschwunden**, nicht gelöst (Abschnitt 5.5). Was bleibt:
 
 **Der Deckel trifft die treuesten Spieler am härtesten.** Wer am längsten spielt, hat die höchsten
 Gebäudestufen und verliert am meisten. Der Ausgleich in 4.3 ist deshalb keine Geste, sondern Teil der
@@ -716,53 +901,33 @@ sind vorhanden und billig: Anspruchslimit senken, Vorkommen je System erhöhen, 
 verkürzen. Alle drei sind Konstanten. Sie sollten **von Anfang an als benannte Konstanten an einer
 Stelle stehen**, damit ein Nachziehen ein Einzeiler bleibt.
 
-**Die Gutschrift läuft über den Server, der Spielstand über den Client.** `POST /api/asteroid/collect`
-schreibt in den Spielstand (`setSaveValue`), während der Client denselben Spielstand im Sekundentakt
-weiterschreibt. Das ist ein echtes Wettrennen – dieselbe Klasse Problem, die `/api/market/trade`
-schon hat. Empfohlene Auflösung: Der Endpunkt **schreibt den Spielstand nicht selbst**, sondern gibt
-den gutzuschreibenden Betrag zurück und bucht ihn serverseitig nur im Feld-Dokument als „bis hierher
-geerntet" ab; der Client verbucht ihn über `gainResources()` und speichert im normalen Takt. Bei
-einem Verbindungsabbruch zwischen beidem geht höchstens **ein** Intervall verloren, nie mehr – und
-niemals doppelt, weil `geerntetBis` serverseitig schon fortgeschrieben ist. Die Gegenrichtung
-(Doppelgutschrift) ist dabei genauso zu prüfen wie der Verlust; CLAUDE.md-Regel 12 hält fest, dass
-dieselbe Behebung einmal zuerst eine Sekunde je Nachholung **doppelt** gutgeschrieben hat.
-
-**Die Offline-Nachholung ist die heikelste einzelne Codestelle des Vorhabens.**
-`applyOfflineProgress()` (Z. 39970) trägt mehr hart erarbeitete Regeln als jede andere Funktion im
-Projekt: den Phantom-Sekunden-Fix (v8.459.0, der Anteil wird an den echten Uhr-Fortschritt gekoppelt),
-die Nachhol-Schwelle und die Restschuld darunter, und die ausdrückliche Warnung, dass dieselbe
-Behebung in der Gegenrichtung einmal doppelt gutgeschrieben hat. Der Asteroiden-Ertrag muss dort
-mitlaufen – sonst fördert ein Förderposten über Nacht nichts, was niemand sofort bemerkt, weil die
-Zahl ja irgendwie steigt. Konkret zu beachten:
-
-- Der Ertrag hängt am **Restvorrat**, und der ist endlich. Eine achtstündige Nachholung darf nicht
-  mehr fördern, als im Felsen lag – die Kappung gehört in dieselbe Schleife, nicht dahinter.
-- Bei geteilten Vorkommen ist der Vorrat **Servereigentum**. Die Nachholung darf ihn nicht lokal
-  fortschreiben, sondern holt beim ersten `collect` nach dem Wiederkommen den echten Stand –
-  andernfalls rechnen zwei Geräte desselben Kontos denselben Vorrat zweimal ab.
-- Der Test dazu (`test_asteroiden_offline.js`) simuliert die Abwesenheit **nur** durch Vorstellen von
-  `Date.now()`, nie über Uhr-Hilfen des Browsertreibers: Die feuern versäumte Timer nach und heilen
-  das Spiel künstlich, und ein `Date`-Proxy erzeugt Endlosrekursion (Arbeitsregel 8 – beide Fehler
-  sind hier schon einmal gemacht worden).
+Dazu ein kleineres, aber konkretes Risiko: **`POST /api/asteroid/mine` entnimmt den Vorrat, bevor die
+Mission steht.** Bricht dazwischen etwas ab, ist Erz aus dem Felsen verschwunden, ohne dass jemand es
+bekommt. Deshalb wird der Aufruf als **letzter** Schritt des Missionsstarts gemacht – nach
+Treibstoff-, Slot- und Schiffsprüfung – und sein Ergebnis ist das, was die Mission einfriert.
+Schlägt er fehl, startet nichts. Der umgekehrte Entwurf (erst Mission, dann Server fragen) wäre
+schlimmer: Dann flögen zwei Spieler los und einer käme leer zurück.
 
 ### 12.2 Die offene Entscheidung
 
-**Bleibt die Förderung im gedrosselten Zustand stehen oder läuft sie weiter?** Wenn die Aufbereitung
-ausgelastet ist, bleibt der Rest laut 5.2 im Vorkommen. Das ist spielerfreundlich (nichts verfällt),
-hat aber eine Folge: Ein Spieler kann acht Kolosse halten, deren Ertrag zu 80 % ungenutzt liegen
-bleibt, und blockiert sie damit für alle anderen, ohne selbst etwas davon zu haben. Die Alternative
-– Förderung läuft weiter, Überschuss verfällt – erzeugt Druck, nur so viel zu halten, wie man
-verarbeiten kann, ist aber die unfreundlichere Regel.
+Die frühere offene Frage (was bei ausgelasteter Aufbereitung mit dem Überschuss geschieht) hat sich
+mit dem Förderposten erledigt – es gibt keinen Durchsatz mehr, an dem sich etwas stauen könnte.
 
-Empfehlung: **erst die freundliche Variante ausliefern** und beobachten. Wird Horten zum Problem,
-ist die Gegenmaßnahme kein Verfall, sondern eine **Nutzungspflicht** (ein Schürfrecht, dessen Ertrag
-über 72 Std. zu weniger als 25 % abgerufen wird, wird frei) – das trifft genau das Verhalten, um das
-es geht, statt alle zu bestrafen. Diese Entscheidung braucht Daten und gehört deshalb bewusst nicht
-in Phase 4.
+Offen ist jetzt genau eine Zahl: **die 1,5 Energie je aufbereiteter Einheit** (Abschnitt 5.4). Sie
+entscheidet, ob die Aufbereitung ein echter Engpass ist oder eine Formalität, und damit, ob der
+Umbau der Basis sein erklärtes Ziel erreicht. Sie lässt sich **nicht am Reißbrett festlegen**: Zu
+niedrig, und Energie bleibt der Rohstoff, den man ignoriert; zu hoch, und jede Fahrt wartet auf den
+Stromzähler.
+
+Vorgehen: Phase 1 ausliefern, dann an einem echten, weit entwickelten Spielstand messen, wie viel
+Energie tatsächlich pro Stunde entsteht und wie viele Fahrten in derselben Stunde heimkommen. Die
+Zielgröße ist **ein knappes Drittel der stündlichen Energieproduktion für die Aufbereitung** – genug,
+um Kraftwerke zu bauen, zu wenig, um zu blockieren. Erst danach geht Phase 2 live, und erst dann
+darf ein Patchnote behaupten, Energie sei jetzt wichtig.
 
 ### 12.3 Was dieses Konzept ausdrücklich nicht vorschlägt
 
-- **Keine neue Ressource** (siehe 5.2).
+- **Keine neue Ressource** (siehe 5.4).
 - **Keine „N Minuten eigene Produktion"-Belohnungen** irgendwo im neuen System – das Muster ist in
   CLAUDE.md als explosiv markiert, und ein Asteroidensystem ist genau der Ort, an dem es explodieren
   würde.
@@ -778,12 +943,17 @@ in Phase 4.
 
 | Phase | Frontend | Backend | Tests |
 |---|---|---|---|
-| 1 | ~600 Zeilen (Felderzeugung, SVG-Darstellung, Kartenmenü, Missionstyp) | – | 2 |
-| 2 | ~400 Zeilen (Gebäude, Rate-Funktion, 7 Umstellungen, Forschung, Hilfe) | – | 4 |
+| 1 | ~600 Zeilen (Felderzeugung, SVG-Darstellung, Kartenmenü, Missionstyp, Vorschau, Bericht) | – | 4 |
+| 2 | ~250 Zeilen (Gebäude, Ausbeute-Rechnung, Forschungen, Hilfe/Tutorial) | – | 2 |
 | 3 | ~150 Zeilen (Deckel, Ausgleichsroutine, Patchnote) | – | 1 |
-| 4 | ~500 Zeilen | ~350 Zeilen (3 Endpunkte, Feld-Logik, Rechteprüfung) | 2 + Backend-Test |
-| 5 | ~400 Zeilen | ~250 Zeilen | 2 |
+| 4 | ~350 Zeilen | ~300 Zeilen (3 Endpunkte, Feld-Logik, Rechteprüfung) | 1 + Backend-Test |
+| 5 | ~400 Zeilen | ~250 Zeilen | 1 |
 
-Das Größte ist nicht das Neue, sondern das Bestehende: die sieben Anzeigestellen in Phase 2 und die
-Bestandskonten in Phase 3. Beides sind kleine Diffs mit großer Reichweite – und beides ist genau die
-Sorte Änderung, bei der dieses Projekt seine Fehler gemacht hat.
+Gegenüber der Förderposten-Fassung sind das rund **550 Zeilen weniger**, und die eingesparten Zeilen
+sind ausgerechnet die schwierigsten gewesen: die Umstellung von sieben `ratesPerSecond()`-Stellen,
+die Anbindung an die Offline-Nachholung und der `collect`-Endpunkt mit seinem Save-Wettrennen.
+
+Das Größte ist damit nicht mehr die Mechanik, sondern zwei alte Bekannte: die **Bestandskonten** in
+Phase 3 und die **Startvorschau**, die dieselben Zahlen nennen muss wie die Abrechnung. Beides sind
+kleine Diffs mit großer Reichweite – und beides ist genau die Sorte Änderung, bei der dieses Projekt
+seine Fehler gemacht hat.
