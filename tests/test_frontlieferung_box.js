@@ -36,7 +36,11 @@ const GALAXIE = {
   },
   randkriege: {
     fronten: [{ a: 'kartell', b: 'schatten', systeme: [{ sys: 'orion', kp: 610, beitragendeA: 1, beitragendeB: 0, dabei: false }] }],
-    meinTag: {}, meineBasis: BASIS, tagesBreite: 300, nachschubZuletzt: 0
+    meinTag: {}, meineBasis: BASIS, tagesBreite: 300, nachschubZuletzt: 0,
+    // Dienstgrade und Frontmarken (v8.479.0). Kartell steht auf Grenzwächter (Stufe 3), Schatten
+    // knapp darunter auf Feldwacht (Stufe 2) - so lassen sich beide Zeilen unterscheiden, und der
+    // Laden öffnet nach dem HÖCHSTEN Grad, hier also Stufe 3.
+    meinKonto: { marken: 4, dienst: { kartell: 2000, schatten: 900 }, wocheMarken: 4, wocheDeckel: 12, markeJePunkte: 200 }
   },
   collapsedSystems: {}, controlledSystems: {}, news: [], activeWar: null, activeWormhole: null,
   npcEmpireStrength: 1, marketTrend: 1, lastTick: Date.now()
@@ -46,6 +50,7 @@ let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
 const gesendet = [];
+const gekauft = [];
 function backend(store) {
   return async r => {
     const req = r.request();
@@ -53,6 +58,12 @@ function backend(store) {
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok: true });
     if (p === 'me') return j({ userId: 'u', username: 'A', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0, hasEmail: true, wantsPatchnotes: true });
+    if (p === 'randkriege/lager') {
+      let body = {};
+      try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
+      gekauft.push(body);
+      return j({ ok: true, posten: body.posten, kosten: 2, bestand: 2 });
+    }
     if (p === 'randkriege/handlung') {
       let body = {};
       try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
@@ -152,6 +163,49 @@ function backend(store) {
   });
   await page.waitForTimeout(600);
   check('ein gesperrter Knopf verschickt nichts', gesendet.length === 1, gesendet.map(g => g.art));
+
+  // ---- Dienstgrade und Frontlager (v8.479.0) -----------------------------------------------------
+  const lager = await page.evaluate(() => {
+    const box = document.getElementById('frontLieferBox');
+    const raus = {};
+    box.querySelectorAll('[data-front-lager]').forEach(btn => {
+      const zeile = btn.closest('.card-row');
+      const pille = btn.parentElement.querySelector('.lvl-pill');
+      raus[btn.getAttribute('data-front-lager')] = {
+        gesperrt: btn.disabled, grund: pille ? pille.textContent.trim() : null,
+        preis: btn.textContent.trim().split(' ')[0],
+        name: zeile ? (zeile.querySelector('.bname') || {}).textContent : null
+      };
+    });
+    return { posten: raus, text: box.textContent };
+  });
+  check('das Frontlager wird gezeigt', Object.keys(lager.posten).length >= 5, Object.keys(lager.posten));
+  check('der Markenbestand steht da', /Bestand:\s*4\s*Marken/.test(lager.text.replace(/\s+/g,' ')), lager.text.slice(0,0));
+  check('der Wochenstand steht da', lager.text.replace(/\s+/g,' ').includes('diese Woche verdient: 4 von 12'));
+  // Die Dienstgrade: Kartell = Grenzwächter (2000 >= 1750), Schatten = Feldwacht (900 >= 750).
+  check('der Dienstgrad je Fraktion wird genannt',
+    lager.text.includes('Grenzwächter') && lager.text.includes('Feldwacht'), null);
+  check('und wie weit es bis zur nächsten Stufe ist', /noch\s*[\d.]+\s*bis/.test(lager.text));
+  // Bei 4 Marken und Grad 3: depot (2/Grad1) und peilung (3/Grad3) bezahlbar, lazarett (4/Grad3)
+  // auch; bergung (Grad 4) und anleihe (Grad 5) und abzeichen (Grad 6) gesperrt.
+  check('bezahlbare Posten im erreichten Grad sind bedienbar',
+    lager.posten.depot && !lager.posten.depot.gesperrt && lager.posten.lazarett && !lager.posten.lazarett.gesperrt,
+    { depot: lager.posten.depot, lazarett: lager.posten.lazarett });
+  check('ein Posten über dem Dienstgrad ist gesperrt',
+    lager.posten.bergung && lager.posten.bergung.gesperrt, lager.posten.bergung);
+  check('und nennt den nötigen Dienstgrad als Grund',
+    lager.posten.bergung && /^ab /.test(lager.posten.bergung.grund || ''), lager.posten.bergung);
+
+  await page.click('#frontLieferBox [data-front-lager="depot"]');
+  await page.waitForTimeout(1200);
+  check('der Kauf verschickt genau einen Posten', gekauft.length === 1, gekauft);
+  check('und zwar den geklickten', gekauft[0] && gekauft[0].posten === 'depot', gekauft[0]);
+  await page.evaluate(() => {
+    const b = document.querySelector('#frontLieferBox [data-front-lager="bergung"]');
+    if (b) b.click();
+  });
+  await page.waitForTimeout(600);
+  check('ein gesperrter Posten verschickt nichts', gekauft.length === 1, gekauft.map(g => g.posten));
 
   check('keine Konsolenfehler', fehler.length === 0, fehler.slice(0, 3));
   await browser.close();

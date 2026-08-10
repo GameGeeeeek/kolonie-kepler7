@@ -257,9 +257,15 @@ Der Krieg speist deshalb drei Töpfe:
 
 ### 4.2 Wochendeckel (konkret)
 
+**Stand nach dem Bauen (10.08.2026):** Gebaut ist der Frontmarken-Deckel. Die übrigen fünf Zeilen
+sind **nicht** gebaut und stehen hier weiterhin als Entwurf – wer sie angeht, sollte vorher prüfen,
+ob sie nach den Sperren aus 2.1 überhaupt noch nötig sind: Tagesdegression und Tickdeckel begrenzen
+die Frontverschiebung bereits, und ein zweiter Deckel auf dieselbe Größe wäre die klassische zweite
+Anzeigestelle, die irgendwann der ersten widerspricht.
+
 | Topf | Deckel je Woche |
 |---|---|
-| Frontmarken | 12 |
+| Frontmarken | 12 ✅ gebaut |
 | Sternenessenz | 3 (absolut, erst ab dem ersten Aufstieg) |
 | Gunstmarken je Fraktion | 4 (erst ab Rang 6, weil der Laden erst dort öffnet) |
 | Ruf je Fraktion | 20 |
@@ -270,7 +276,17 @@ Der Krieg speist deshalb drei Töpfe:
 
 `REP_RANKS` bekommt **keine** neunte Stufe – die Schwellen 30 und 70 sind im Backend gespiegelt
 (`marketDiscountPctFor`, server.js:4502). Stattdessen eine **parallele Dienstgrad-Leiter** je
-Fraktion mit sechs Stufen bei 25 / 75 / 175 / 350 / 650 / 1100 Dienstpunkten.
+Fraktion mit sechs Stufen bei ~~25 / 75 / 175 / 350 / 650 / 1100~~ **250 / 750 / 1.750 / 3.500 /
+6.500 / 11.000** Dienstpunkten.
+
+**Die Zahlen des Entwurfs waren um den Faktor zehn zu klein.** Ein Konto kann an einer Front
+höchstens 210 *wirksame* Kriegspunkte am Tag beitragen (das ist die Summe der Tagesstufen). Mit
+1.100 wäre die höchste Stufe nach fünfeinhalb Tagen erreicht gewesen, mit 25 die erste nach zwei
+Stunden – für eine Leiter, die das Langzeitziel des ganzen Systems sein soll, ist das nichts.
+Gebaut sind 11.000, also **rund 52 Tage** täglichen Dienstes für *eine* Fraktion. Die Rechnung steht
+nicht als Behauptung im Code, sondern wird in `tests/test_randkriege_dienstgrade.js` aus
+`RK_TAGESSTUFEN` und `RK_DIENSTGRADE` nachgerechnet und auf 30–90 Tage eingegrenzt; verschiebt
+jemand eine der beiden Größen, fällt die Prüfung.
 
 **Kein Dienstgrad gibt einen eigenen Prozentbonus.** Alle Freischaltungen sind Sachwerte – ein
 Schiff, ein Modul, ein Gebäude, ein Titel, ein Anstrich –, deren Wirkung durch die bereits
@@ -599,7 +615,23 @@ sieht danach am echten Spielerverhalten, ob die tiefere Fassung überhaupt gebra
      `tests/test_frontlieferung_box.js` (Browser, misst die offenen Mengen und was der Klick
      wirklich verschickt) und `tests/test_randkriege_handlungen_http.js` im Backend-Repo
      (echter Server, 44 Prüfungen: Rücksetzung, Tagesdeckel, Abbuchung, Sperrzeit, Randfälle).
-7. Dienstgrade, Frontmarken, Wochendeckel
+7. ✅ **Dienstgrade, Frontmarken, Wochendeckel** — *gebaut am 10.08.2026.* Jeder wirksame
+   Kriegspunkt zählt jetzt doppelt: als **Dienstpunkt** bei der belieferten Fraktion (Lebenszeit,
+   sechs Grade) und auf die **Frontmarken** (eine je 200 Punkte, zwölf je Woche). Beides führt der
+   Server in `db.galaxy.randkriege` und schreibt es in `rkBeitrag` fort — nicht in den Endpunkten,
+   von denen es zwei gibt und der nächste es vergessen hätte. Dazu das **Frontlager**: sieben
+   Posten, je mit Mindest-Dienstgrad; der Server kennt davon nur Preis und Schranke, den Inhalt
+   allein das Frontend.
+   - **Der einzige Sachwert, der beide Zurücksetzungen übersteht, ist `state.unlocked`.** Titel,
+     Anstriche, Kosmetika und Saison-Titel gehen bei Prestige *und* Aufstieg verloren — von sieben
+     vorhandenen Sachwert-Behältern überlebt genau einer. Das **Frontabzeichen** (Stufe 6) liegt
+     deshalb dort und ist damit der einzige Titel im Profil, der bleibt.
+   - **Die Marken liegen serverseitig, nicht im Spielstand.** Eine Währung, die beim Prestige
+     verschwindet, wäre für eine Leiter über zwei Monate der falsche Ort gewesen.
+   - **Nebenbefund beim Kartieren, sofort behoben:** `PUT /api/storage/:key?shared=false` schrieb
+     jeden Schlüssel in `db.private[userId]` — auch die serverinternen `__`-Felder. Gemessen ließen
+     sich damit abgerechnete Beiträge ein zweites Mal einlösen und die Nachschub-Sperrzeit umgehen.
+     Behoben und mit `tests/test_privatschluessel_http.js` abgesichert (Backend-PR #94).
 8. Kriegsraum-Ansicht und Wappenfamilie
 
 > **Vor Schritt 5 zu entscheiden, nicht danach:** Ob täglich drei verschiedene Spieler

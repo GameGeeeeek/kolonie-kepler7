@@ -56,10 +56,16 @@ function holeKonstante(name) {
   return kette ? 'const ' + name + ' = ' + kette[1].trim() + ';' : null;
 }
 
+// rkGutschrift, rkWochenKonto und serverWeekKey sind seit v8.479.0 dazugekommen: rkBeitrag ruft
+// rkGutschrift auf, und ohne die drei stirbt der herausgeschnittene Code mit
+// "rkGutschrift is not defined". Das ist der Preis dafuer, echten Quelltext auszufuehren statt ihn
+// nachzubauen - dafuer faellt hier auf, wenn rkBeitrag eine neue Abhaengigkeit bekommt.
 const FN = ['loadOrInitRandkriege', 'rkTagesSchluessel', 'rkTagesKonto', 'rkDegression',
-  'rkZielEintrag', 'rkBeitrag', 'galaxyFuerClient', 'getUserLastSeen', 'rkAktiveSpieler'];
+  'rkZielEintrag', 'serverWeekKey', 'rkWochenKonto', 'rkGutschrift', 'rkBeitrag',
+  'galaxyFuerClient', 'getUserLastSeen', 'rkAktiveSpieler'];
 const KONST = ['FACTION_RIVALS', 'RK_FRONT_PAARE', 'RK_OBEN', 'RK_UNTEN', 'RK_TAGESSTUFEN',
-  'RK_BOLLWERK_ERFOLG', 'RK_BOLLWERK_FEHLSCHLAG', 'RK_BEITRAG_FENSTER', 'RK_HANDLUNGEN'];
+  'RK_BOLLWERK_ERFOLG', 'RK_BOLLWERK_FEHLSCHLAG', 'RK_BEITRAG_FENSTER', 'RK_HANDLUNGEN',
+  'RK_MARKE_JE_PUNKTE', 'RK_MARKEN_WOCHE', 'RK_DIENSTGRADE'];
 const fnQ = FN.map(n => ({ n, q: holeFunktion(n) }));
 const kQ = KONST.map(n => ({ n, q: holeKonstante(n) }));
 for (const { n, q } of fnQ) check(n + ' gefunden', !!q && q.length > 40, q ? q.length : 0);
