@@ -59,7 +59,7 @@ function holeKonstante(name) {
 const FN = ['loadOrInitRandkriege', 'rkTagesSchluessel', 'rkTagesKonto', 'rkDegression',
   'rkZielEintrag', 'rkBeitrag', 'galaxyFuerClient', 'getUserLastSeen', 'rkAktiveSpieler'];
 const KONST = ['FACTION_RIVALS', 'RK_FRONT_PAARE', 'RK_OBEN', 'RK_UNTEN', 'RK_TAGESSTUFEN',
-  'RK_BOLLWERK_ERFOLG', 'RK_BOLLWERK_FEHLSCHLAG', 'RK_BEITRAG_FENSTER'];
+  'RK_BOLLWERK_ERFOLG', 'RK_BOLLWERK_FEHLSCHLAG', 'RK_BEITRAG_FENSTER', 'RK_HANDLUNGEN'];
 const fnQ = FN.map(n => ({ n, q: holeFunktion(n) }));
 const kQ = KONST.map(n => ({ n, q: holeKonstante(n) }));
 for (const { n, q } of fnQ) check(n + ' gefunden', !!q && q.length > 40, q ? q.length : 0);
@@ -88,7 +88,11 @@ function baueApi(opt) {
     if (wert.lastSeen) shared['leaderboard:' + uid] = JSON.stringify({ lastSeen: wert.lastSeen });
     if (wert.nurAmBenutzer) users[name].lastSeen = wert.nurAmBenutzer;   // die falsche Annahme von damals
   }
-  const kontext = { db: { users, shared }, Date: festeUhr(o.jetzt || T0) };
+  // `private` gehört dazu, auch wenn dieser Test es lange nicht brauchte: galaxyFuerClient liest
+  // seit den Frontbeiträgen db.private[userId].__rkBasis. Ein Fixture ohne den Bereich ist keine
+  // schlanke Nachbildung, sondern eine falsche - der Test starb mit
+  // "Cannot read properties of undefined". Der echte Server legt db.private immer an.
+  const kontext = { db: { users, shared, private: o.private || {} }, Date: festeUhr(o.jetzt || T0) };
   const namen = Object.keys(kontext);
   const koerper = kQ.map(x => x.q).join('\n') + '\n' + fnQ.map(x => x.q).join('\n\n')
     + '\nreturn { ' + FN.join(', ') + ', ' + KONST.join(', ') + ' };';
@@ -292,6 +296,21 @@ const FRONT_KEY = 'kartell|schatten';
     && api.galaxyFuerClient(g, 'fremder').randkriege.fronten[0].systeme[0].dabei === false);
   check('E4: die Tagessumme ist die eigene', raus.randkriege.meinTag[FRONT_KEY] === 60,
     raus.randkriege.meinTag);
+  // Der Basiswert der Differenz-Handlungen geht als KOPIE mit raus - der Client rechnet die offene
+  // Menge daraus gegen seinen eigenen Spielstand aus. Fremde Basiswerte haben dort nichts verloren.
+  const mitBasis = baueApi({ private: { ich: { __rkBasis: { expeditionsCompleted: 7 } },
+    fremder: { __rkBasis: { expeditionsCompleted: 99 } } } });
+  const rausB = mitBasis.galaxyFuerClient(g, 'ich');
+  check('E4: der eigene Basiswert wird mitgeliefert',
+    rausB.randkriege.meineBasis.expeditionsCompleted === 7, rausB.randkriege.meineBasis);
+  check('E4: jede Handlung hat einen Eintrag, auch ohne Fortschritt',
+    Object.keys(rausB.randkriege.meineBasis).length === Object.keys(mitBasis.RK_HANDLUNGEN).length,
+    rausB.randkriege.meineBasis);
+  check('E4: kein fremder Basiswert in der Antwort',
+    !JSON.stringify(rausB.randkriege).includes('99'), rausB.randkriege.meineBasis);
+  check('E4: die Tagesbreite kommt aus den Stufen',
+    rausB.randkriege.tagesBreite === api.RK_TAGESSTUFEN.reduce((a, st) => a + st[0], 0),
+    rausB.randkriege.tagesBreite);
   check('E4: ein Fremder sieht seine eigene (leere) Summe',
     JSON.stringify(api.galaxyFuerClient(g, 'fremder').randkriege.meinTag) === '{}');
   // Eine Galaxie ohne Front darf unverändert durchgehen - sonst bräche der erste Start.
