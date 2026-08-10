@@ -168,8 +168,13 @@ und nicht als „dockt an Vorhandenes an" verbucht werden.
 
 ### 2.1 Fünf Sperren gegen das Großkonto
 
-1. **Tagesdegression** 100 / 70 / 40 / 0 Prozent – die ersten hundert Punkte sind viermal so viel
-   wert wie die letzten. Effektiver Deckel: 265 Kriegspunkte je Front und Tag.
+1. **Tagesdegression** 100 / 70 / 40 / 0 Prozent. ~~Die ersten hundert Punkte sind viermal so viel
+   wert wie die letzten. Effektiver Deckel: 265 Kriegspunkte je Front und Tag.~~ **Beim Bauen
+   nachgerechnet, beide Zahlen waren falsch:** 100 % gegen 40 % ist der Faktor **2,5**, nicht 4, und
+   der wirksame Deckel ist die Summe der Stufen, also 100 + 70 + 40 = **210** Kriegspunkte je Front
+   und Tag (rund 52 Kontrollpunkte). Woher die 265 kamen, lässt sich nicht mehr rekonstruieren – sie
+   passen zu keiner Lesart der Stufen. Die Zahl steht jetzt an genau EINER Stelle im Code
+   (`RK_TAGESSTUFEN`); Hilfetext, Patchnote und Test leiten sie daraus ab, statt sie zu wiederholen.
 2. **Tickdeckel** 3 KP je System.
 3. **Anteilsdeckel je Konto und Phase.**
 4. **Wochendeckel** auf alle Belohnungen (siehe 4.2).
@@ -535,6 +540,22 @@ sieht danach am echten Spielerverhalten, ob die tiefere Fassung überhaupt gebra
    **Achtung, Korrektur aus der Nachprüfung:** Nur die Expedition dockt wirklich ohne neuen Hook
    an. Piratennest und Fundmeldung brauchen einen, und das Piratenversteck braucht überhaupt erst
    einen Ort in der Galaxie.
+   - ✅ **Das Bollwerk** — *gebaut am 10.08.2026.* `/api/faction/attack` trägt jetzt für den Rivalen
+     des Besitzers bei, 250 bei Erfolg / 60 bei Fehlschlag, über `rkBeitrag()` mit Tagesdegression.
+     Zwei Dinge kamen beim Bauen dazu, die der Entwurf nicht vorhergesehen hatte: (a) Ein
+     **erfolgreicher** Angriff nimmt das System aus der Front heraus (es gehört dann dem Spieler,
+     und `rkGrenzsysteme` schließt `controlledSystems` aus) – der Beitrag wäre im nächsten Takt
+     ersatzlos verfallen. Er geht deshalb an den Frontabschnitt, an dem die eigene Seite dem
+     nächsten Schritt am nächsten ist. (b) Wer nichts **Wirksames** beiträgt (Tagesdeckel
+     ausgeschöpft), darf nicht als Beitragender zählen – sonst schlösse ein Großkonto die
+     Mehr-Konten-Sperre mit wertlosen Punkten auf.
+   - ⚠️ **Dabei aufgefallen:** Die Mehr-Konten-Sperre aus Schritt 5 war praktisch **aus**.
+     `rkAktiveSpieler()` las `u.lastSeen` – ein Feld, das es auf den Benutzerobjekten nicht gibt
+     (der Zeitstempel liegt in `db.shared['leaderboard:<id>']`). Die Funktion lieferte immer 0, die
+     Schranke war damit auf „einer reicht" geklemmt. Der Test hat es nicht gemerkt, weil sein
+     Fixture denselben erfundenen Schlüssel setzte – eine Annahme, gegen sich selbst geprüft.
+     Behoben, und das Fixture baut die Ablage jetzt so, wie der Server sie führt.
+   - Offen bleiben die sechs übrigen Handlungen.
 7. Dienstgrade, Frontmarken, Wochendeckel
 8. Kriegsraum-Ansicht und Wappenfamilie
 
