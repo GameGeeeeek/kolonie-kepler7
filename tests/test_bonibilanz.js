@@ -103,28 +103,28 @@ check('2: die Kommandanten-Gruppe hängt am Level', Math.abs(w('commander') - 0.
 const D = {};
 G.forEach(g => { D[g.key] = g.deckel(); });
 const echt = [
-  ['prod',       /globalBonus = weicherDeckel\(globalBonus, PROD_BONUS_CAP\)/, () => parseFloat((src.match(/const PROD_BONUS_CAP = ([\d.]+)/)||[])[1])],
+  ['prod',       /globalBonus = deckelWeich\(globalBonus, PROD_BONUS_CAP\)/, () => parseFloat((src.match(/const PROD_BONUS_CAP = ([\d.]+)/)||[])[1])],
   // Seit v8.477.0 laufen auch diese beiden ueber den weichen Deckel - gemeinsam mit dem Backend.
   // Die Pruefung wandert an die neue Verbrauchsstelle mit, statt zu entfallen: Sie soll weiterhin
   // anschlagen, wenn die Bilanz eine Obergrenze anzeigt, die die Mechanik nicht kennt.
-  ['atk',        null, () => parseFloat((src.match(/weicherDeckel\(attackCombatBonusRaw\(planetKey\), ([\d.]+)\)/)||[])[1])],
-  ['def',        null, () => parseFloat((src.match(/weicherDeckel\(defenseCombatBonusRaw\(planetKey\), ([\d.]+)\)/)||[])[1])],
-  ['buildspeed', null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(planetKey, 'buildspeed'\), ([\d.]+)\)/)||[])[1])],
-  ['defatk',     null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(planetKey, 'defatk'\), ([\d.]+)\)/)||[])[1])],
+  ['atk',        null, () => parseFloat((src.match(/deckelWeich\(attackCombatBonusRaw\(planetKey\), ([\d.]+)\)/)||[])[1])],
+  ['def',        null, () => parseFloat((src.match(/deckelWeich\(defenseCombatBonusRaw\(planetKey\), ([\d.]+)\)/)||[])[1])],
+  ['buildspeed', null, () => parseFloat((src.match(/deckelWeich\(moduleBonusAt\(planetKey, 'buildspeed'\), ([\d.]+)\)/)||[])[1])],
+  ['defatk',     null, () => parseFloat((src.match(/deckelWeich\(moduleBonusAt\(planetKey, 'defatk'\), ([\d.]+)\)/)||[])[1])],
   // Der Ueberfall-Schutz wird jetzt am BONUS gedeckelt statt ueber einen Boden auf dem
   // Multiplikator - der Deckel steht damit direkt da und muss nicht mehr aus 1 minus Boden
   // errechnet werden.
-  ['raidloss',   null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(targetPlanet, 'raidloss'\), ([\d.]+)\)/)||[])[1])],
+  ['raidloss',   null, () => parseFloat((src.match(/deckelWeich\(moduleBonusAt\(targetPlanet, 'raidloss'\), ([\d.]+)\)/)||[])[1])],
   // Ohne schliessende Klammer am Ende: seit v8.429.0 sitzt der Faehigkeitsbaum-Treibstoffbonus als
   // weiterer Subtrahend im selben Boden - geprueft wird der BODEN, nicht die vollstaendige Formel
   // (Arbeitsregel 3). Die Bilanz-Zeile heisst weiterhin "(Module)" und zeigt nur den Modulanteil.
-  ['fuelcost',   null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(state\.activeBasePlanet, 'fuelcost'\) \+ skillFuelBonus\(\), ([\d.]+)\)/)||[])[1])],
-  ['exprisk',    null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusAt\(planetKey, 'exprisk'\), ([\d.]+)\)/)||[])[1])],
-  ['research',   null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusTotal\('research'\), ([\d.]+)\)/)||[])[1])],
-  ['expedition', null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusTotal\('expedition'\), ([\d.]+)\)/)||[])[1])],
-  ['trade',      null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusTotal\('trade'\), ([\d.]+)\)/)||[])[1])],
-  ['xpgain',     null, () => parseFloat((src.match(/weicherDeckel\(moduleBonusTotal\('xpgain'\), ([\d.]+)\)/)||[])[1])],
-  ['werftkern',  null, () => parseFloat((src.match(/weicherDeckel\(werftkernLvl\*0\.015, ([\d.]+)\)/)||[])[1])],
+  ['fuelcost',   null, () => parseFloat((src.match(/deckelWeich\(moduleBonusAt\(state\.activeBasePlanet, 'fuelcost'\) \+ skillFuelBonus\(\), ([\d.]+)\)/)||[])[1])],
+  ['exprisk',    null, () => parseFloat((src.match(/deckelWeich\(moduleBonusAt\(planetKey, 'exprisk'\), ([\d.]+)\)/)||[])[1])],
+  ['research',   null, () => parseFloat((src.match(/deckelWeich\(moduleBonusTotal\('research'\), ([\d.]+)\)/)||[])[1])],
+  ['expedition', null, () => parseFloat((src.match(/deckelWeich\(moduleBonusTotal\('expedition'\), ([\d.]+)\)/)||[])[1])],
+  ['trade',      null, () => parseFloat((src.match(/deckelWeich\(moduleBonusTotal\('trade'\), ([\d.]+)\)/)||[])[1])],
+  ['xpgain',     null, () => parseFloat((src.match(/deckelWeich\(moduleBonusTotal\('xpgain'\), ([\d.]+)\)/)||[])[1])],
+  ['werftkern',  null, () => parseFloat((src.match(/deckelWeich\(werftkernLvl\*0\.015, ([\d.]+)\)/)||[])[1])],
   // Dasselbe gilt seit 01.08.2026 fuer den Kommandanten-Deckel, und zwar aus demselben Anlass wie
   // beim Prestige: Die Levelkarte im Fortschritt-Tab nannte den ungedeckelten Rohwert ("+45%" auf
   // Level 45, wirksam +30%). Jetzt lesen Mechanik UND Anzeige aus COMMANDER_PROD_CAP. Der Test
@@ -132,7 +132,7 @@ const echt = [
   // Funktion laeuft und die Funktion wirklich deckelt - sonst waere die Konstante da, aber
   // wirkungslos, und die Uebereinstimmung waere ein Zirkelschluss.
   ['commander',  null, () => ((/const metaMult = .*\(1 \+ commanderProdBonus\(\)\)/.test(src)
-                               && /return weicherDeckel\(n \* COMMANDER_PROD_PER_LEVEL, COMMANDER_PROD_CAP\);/.test(src))
+                               && /return deckelWeich\(n \* COMMANDER_PROD_PER_LEVEL, COMMANDER_PROD_CAP\);/.test(src))
                                ? parseFloat((src.match(/COMMANDER_PROD_CAP = ([\d.]+)/)||[])[1])
                                : NaN)],
   // Der Prestige-Deckel steht seit dem 01.08.2026 nicht mehr als Literal in der Produktionsrechnung:
