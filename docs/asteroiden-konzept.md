@@ -473,21 +473,35 @@ Zu beachten: Der Deckel wirkt **je Standort**, nicht imperiumsweit (`ratesPerSec
 gewollt: Ein imperiumsweiter Deckel würde neue Kolonien wertlos machen, und Kolonien sind teuer und
 langsam genug, um kein Schlupfloch zu sein.
 
-### 4.2 Was der Deckel konkret kostet
+### 4.2 Was der Deckel konkret kostet – gemessen (11.08.2026, v8.486.0)
 
-Eine Beispielrechnung für einen entwickelten Standort mit Mine auf Stufe 40 (heute realistisch),
-Habitat 20 (×1,40), Bergbau-Rolle (×1,25), Vulkanwelt (×1,15), Produktionsring Stufe 3 (×1,09):
+Die Rechnung darunter stand hier als Schätzung. **Sie ist jetzt nachgemessen** (CLAUDE.md-Regel 11),
+an einem Standort mit Solar 35, Mine 40, Raffinerie 34, Synth 30, Fusionsreaktor 26, Habitat 20,
+Forschung rsolar/rerz 15 – abgelesen an den Gebäudekarten des laufenden Spiels, einmal gegen
+v8.485.0 und einmal gegen den neuen Stand:
 
-- **heute:** 40 × 0,225 = 9,000/s roh → **× 2,19 ≈ 19,7 Erz/s**
-- **neu (Bestandsschutz, s.u.):** 15 × 0,225 + 10 × 0,1125 + 15 Stufen darüber × 0,1125 = 6,188/s roh → **≈ 13,6 Erz/s**
-- **Verlust: rund 31 %** an diesem Standort.
+| Gebäude | Stufe | vorher | nachher | Verlust |
+|---|---|---|---|---|
+| Erzmine | 40 | 17,3/s | 11,9/s | **−31,2 %** |
+| Kristallraffinerie | 34 | 4,64/s | 3,34/s | −28,0 % |
+| Deuteriumsynthetisierer | 30 | 3,28/s | 2,46/s | −25,0 % |
+| Fusionsreaktor | 26 | 0,655/s | 0,517/s | −21,1 % |
+| Solarkraftwerk | 35 | 20,2/s | 20,2/s | **0 %** |
 
-Der Standort verliert damit **6,1 Erz/s**, also rund 22.000 in der Stunde.
+Die geschätzten „rund 31 %" für die Erzmine waren also richtig; die übrigen Gebäude verlieren
+weniger, weil sie weniger weit über der Schwelle stehen. Der Verlust wächst mit der Stufe – wer
+seine Basis nie über 15 gebaut hat, merkt gar nichts.
 
-Dagegen steht ein **Kern**, der bei laufendem Betrieb rund **30.000 je Stunde** liefert (Tabelle in
-3.2) – eine einzige gut bewirtschaftete Fundstelle holt den Verlust eines vollentwickelten Standorts
-mehr als heraus, und ein Koloss das Doppelte davon. Wer sich auf das neue System einlässt, steht nach
-dem Umbau **deutlich besser** da. Wer es ignoriert, verliert rund ein Drittel.
+Der Standort verliert an Erz **5,4/s**, also rund **19.400 in der Stunde**.
+
+Dagegen steht ein **Kern**, der bei durchgehendem Betrieb **35.584 je Stunde** liefert – ebenfalls
+gemessen, im Zuge von v8.485.0 (Abschnitt 12.2). **Eine einzige durchgehend laufende Abbaumission
+holt den Verlust eines vollentwickelten Standorts also fast doppelt heraus.**
+
+Damit das nicht schöner klingt, als es ist: Bei **sechs** ausgebauten Standorten summiert sich der
+Verlust auf rund **116.000 Erz je Stunde**, und das sind **gut drei durchgehend laufende
+Schürfflotten**. Wer sich auf das neue System einlässt, steht danach besser da – aber es ist Arbeit,
+kein Geschenk. Genau das ist der Zweck der Übung, und genau so gehört es in den Patchnote.
 
 Genau dieses Gefälle ist der Zweck der Übung. Es hat aber eine Kehrseite, die der Rundflug mitbringt
 und die der Förderposten nicht hatte: **Der Ertrag hängt jetzt daran, dass jemand Flotten schickt.**
@@ -510,8 +524,10 @@ Dazu einmalig, automatisch beim ersten Laden nach dem Update:
    dieser Stufe gutgeschrieben (über `gainResources()`, also am Lagerdeckel geklemmt wie alles
    andere). Bei Mine 40 sind das 15 Stufen – ein spürbarer Batzen, mit dem sich die erste
    Schürfflotte sofort bauen lässt.
-2. **Starthilfe Schürfflotte.** **6 Schürfschiffe** und **1 zusätzliches Schürfrecht** (also 3 statt
-   2 zu Beginn) für jedes Konto, das mindestens ein Produktionsgebäude über dem Deckel hat.
+2. **Starthilfe Schürfflotte.** **6 Schürfschiffe** ~~und **1 zusätzliches Schürfrecht** (also 3 statt
+   2 zu Beginn)~~ für jedes Konto, das mindestens ein Produktionsgebäude über dem Deckel hat.
+   *Umgesetzt bis auf das Schürfrecht: Schürfrechte entstehen erst mit dem geteilten Feld in Phase 4;
+   ein Anspruch auf etwas, das es noch nicht gibt, wäre eine leere Zusage gewesen.*
 3. **Ein Patchnote, der die Zahl nennt.** Nicht „die Produktion wurde angepasst", sondern: *„Deine
    Erzmine auf Stufe 40 liefert künftig rund 31 % weniger. Dafür liefert ein einziger gehaltener
    Asteroidenkern mehr als dieser Standort vorher – hier steht, wie du an einen kommst."* CLAUDE.md
@@ -1024,7 +1040,7 @@ steht Sekunden später auf `gamegeeeeek.de`.
 |---|---|---|---|
 | **1** ✅ | Feldgenerierung, Darstellung auf der Karte, Kartenmenü, **Abbaumission** mit Vorschau und Bericht, Minenschiff regulär freigeschaltet | nein | ausgeliefert mit v8.479.0 |
 | **2** ✅ | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, **Schürfpeilungen aus Expeditionen**, Hilfe/Tutorial | nein | ausgeliefert: Peilungen v8.482.0, Anlage v8.485.0. Die Energie je Einheit ist **gemessen** und liegt bei 12 statt der veranschlagten 1,5 (Abschnitt 12.2) |
-| **3** | **Deckel + Bestandskonten-Ausgleich** | nein | **hoch** – der einzige Schritt, der Spielern etwas wegnimmt |
+| **3** ✅ | **Deckel + Bestandskonten-Ausgleich** | nein | ausgeliefert mit v8.486.0. Der Verlust ist **gemessen** (Abschnitt 4.2), der Ausgleich läuft einmalig beim Laden. **Nicht** umgesetzt: das zusätzliche Schürfrecht aus 4.3 – Schürfrechte gibt es erst mit Phase 4 |
 | **4** | Geteilter Vorrat: Feld-Dokumente, wandernder Nachschub, `mine`, Schürfrechte, Anspruchslimit | **ja** | mittel |
 | **5** | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | mittel |
 
