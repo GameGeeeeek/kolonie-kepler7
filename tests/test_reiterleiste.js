@@ -97,6 +97,18 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
     // Prädikat, das erst beim dritten Aufruf true liefert, wurde 1x aufgerufen und die Wartung
     // endete nach 133 ms ohne Fehler. Aus der Stabilitätsprüfung wäre also ein fester 250-ms-Schlaf
     // geworden - ein Test, der aussieht wie eine Wartung und keine ist.
+    await warteBisRuhe(page);
+    return { ctx, page };
+  }
+
+  // Wartet, bis die Reiterleiste zweimal hintereinander an derselben Stelle steht.
+  // Ausgelagert (10.08.2026), weil sie ZWEIMAL gebraucht wird: einmal beim Öffnen und einmal vor
+  // der Kontrollmessung der Klappen-Kollision. Vorher lag zwischen den beiden Messungen nur ein
+  // fester 400-ms-Schlaf - unter Last reichte der nicht, beide Messungen fielen in dieselbe noch
+  // nicht fertige Layout-Phase, und die Doppelmessung bestätigte den Fehlalarm, statt ihn zu
+  // entlarven. Gemessen: im Einzellauf 10 von 11 grün, der eine Fehlschlag unmittelbar nach einem
+  // vollen Prüflauf (also unter Restlast); auf `main` 5 von 5 grün.
+  async function warteBisRuhe(page){
     const rechteck = () => page.evaluate(() => {
       const t = document.querySelector('.tabs');
       if (!t) return null;
@@ -111,7 +123,7 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
       if (gleich < 2) await page.waitForTimeout(150);
     }
     if (gleich < 2) console.log('WARNUNG - die Reiterleiste kam in 6 s nicht zur Ruhe, gemessen wird trotzdem');
-    return { ctx, page };
+    return gleich >= 2;
   }
 
   // ---- 1: Kein Reiter teilt sich sein Symbol mit einem anderen ----------------------------------
@@ -182,6 +194,10 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
       };
     });
     const m1 = await messen();
+    // Vor der Kontrollmessung erneut abwarten, bis die Leiste steht - NICHT bloß 400 ms schlafen.
+    // Eine echte Kollision ist eine Eigenschaft des fertigen Layouts und übersteht das Warten;
+    // ein Fehlalarm aus einem verspäteten Umbruch nicht.
+    await warteBisRuhe(page);
     await page.waitForTimeout(400);
     const m = await messen();
     // Nur was in BEIDEN Messungen verdeckt war, gilt als verdeckt.
