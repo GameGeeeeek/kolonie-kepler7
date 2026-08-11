@@ -145,6 +145,20 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     Beide Male sah es nach einem echten Fehler im Spiel aus und war ein veralteter Nachbar. Das ist
     dieselbe Familie wie Regel 10 („hat der Melder die veraltete `index.html` gelesen?"), nur eine
     Ebene höher: nicht die falsche Datei, sondern das falsche Repo-Verzeichnis.
+
+    **Nachtrag 11.08.2026 – drittes Mal, jetzt maschinell sichtbar.** Wieder dasselbe Bild: Nach
+    einem vollen Prüflauf (25 Min.) standen `test_ausbaubarer_deckel` und `test_pvp_deckel` rot,
+    beide nach einem `git pull` im Backend-Klon sofort grün. Die Regel „vorher beide Repos ziehen"
+    hat beim dritten Mal genauso wenig geholfen wie beim zweiten – eine Regel, an die man sich
+    erinnern muss, ist bei einer Aufgabe, die man mehrmals täglich macht, keine Absicherung.
+    `tests/run.js` meldet deshalb seit v8.485.0 als fünfte Pflichtprüfung, ob der Nachbar-Klon
+    hinter `origin/master` steht, **bevor** der erste Test läuft. Bewusst ohne `git fetch` (der
+    Prüflauf soll nicht ans Netz) und bewusst gegen `origin/master` statt `@{u}`: Genau im
+    Fehlerfall steht der Klon auf einem eigenen Branch ohne Fernbezug, und `@{u}` bricht dort mit
+    „no upstream configured" ab – das Messwerkzeug stünde sich wieder selbst im Weg (Regel
+    15/17/19). Kein Fehlschlag, nur eine Zeile – aber eine, die in Zeile fünf des Protokolls steht
+    statt eine halbe Stunde später. Gegenprobe beidseitig gefahren: mit zurückgesetztem Klon meldet
+    sie „ist 2 Commit(s) HINTER origin/master", danach ist sie still.
 23. **Die Versionsnummer erst unmittelbar VOR dem Commit vergeben – und `main` in diesem Moment
     noch einmal ansehen.** Am 10.08.2026 wurde dieselbe Änderung FÜNFMAL umnummeriert (v8.472.0 →
     8.473 → 8.475 → 8.476 → 8.477 → 8.483), weil parallel ausgeliefert wurde und jede fremde

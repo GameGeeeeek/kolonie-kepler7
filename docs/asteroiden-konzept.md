@@ -601,9 +601,48 @@ neue Gebäude:
 **Aufbereitungsanlage** (`key:'aufbereitung'`, eigenes gezeichnetes Icon, `category:'refine'`,
 `maxLevel: 20`)
 
-- **Ausbeute: 70 % ohne Anlage, +1,5 Prozentpunkte je Stufe** – bei Vollausbau **100 %**. Wer nie
-  eine baut, verliert dauerhaft knapp ein Drittel jeder Fahrt.
-- **Verbrauch: 1,5 Energie je aufbereiteter Einheit**, fällig beim Entladen über `pay()`.
+> **Umgesetzt am 11.08.2026 (v8.485.0) – mit zwei bewussten Abweichungen von dem, was hier stand.**
+> Die Absätze darunter geben den ursprünglichen Entwurf wieder; was wirklich gebaut wurde, steht
+> direkt dahinter und ist begründet.
+
+- ~~**Ausbeute: 70 % ohne Anlage, +1,5 Prozentpunkte je Stufe** – bei Vollausbau **100 %**. Wer nie
+  eine baut, verliert dauerhaft knapp ein Drittel jeder Fahrt.~~
+- ~~**Verbrauch: 1,5 Energie je aufbereiteter Einheit**, fällig beim Entladen über `pay()`.~~
+
+**Abweichung 1 – Zuschlag statt Grundausbeute.** Gebaut ist: **volle Ladung bleibt die Grundlage,
+die Anlage legt +1,5 Prozentpunkte je Stufe OBEN DRAUF** (Vollausbau **+30 %**). Grund: Die
+Abbaumission ist seit dem 09.08.2026 (v8.479.0) im Spiel und liefert 100 %. Eine Grundausbeute von
+70 % nachzuschieben wäre für jeden, der sie benutzt, eine **stille Kürzung um 30 %** gewesen – eine
+bestehende Mechanik schlechter zu machen, um Platz für ein neues Gebäude zu schaffen, kommt als
+Strafe an, nicht als Inhalt. Der Design-Effekt ist derselbe (die Basis entscheidet, wie viel aus dem
+Gestein wird), nur ohne Enteignung. `tests/test_aufbereitung.js` Punkt 2a hält genau das fest.
+
+**Abweichung 2 – der Preis fällt nur auf die Zusatzeinheiten an**, nicht auf die ganze Ladung: **12
+Energie je zusätzlich gewonnener Einheit** (`AUFBEREITUNG_ENERGIE`, gemessen – siehe 12.2). Folgt aus
+Abweichung 1: Wer nichts baut, zahlt nichts, und Stufe 1 ist dadurch ein kleines gutes Geschäft statt
+eines schlechten. Reicht die Energie nicht, fällt **nur der Zuschlag** anteilig kleiner aus – die
+geschürfte Ladung selbst kommt immer vollständig an.
+
+**Und die Reihenfolge beim Entladen ist Teil der Zusage:** Der Zuschlag wird *vor* der Gutschrift
+gerechnet (er bestimmt ja, wie viel gutzuschreiben ist), **bezahlt wird aber erst danach** – und nur
+für die Zusatzeinheiten, die wirklich eingelagert wurden. Wer vorher bezahlt, gibt bei vollem Lager
+Energie für Einheiten aus, die `gainResources()` im selben Augenblick wegwirft: doppelte Strafe für
+ein volles Lager, und im Bericht stünde sie nicht einmal. `tests/test_aufbereitung.js` Punkt 6 hält
+das fest; die Gegenprobe mit der alten Reihenfolge verlor 19.440 Energie für null angekommene
+Einheiten.
+
+**Ebenfalls abweichend: die höchste Anlage im Imperium zählt**, nicht die des Planeten, auf dem die
+Flotte landet, und erst recht nicht die Summe. Eine Summe wäre bei sechs Kolonien das Sechsfache des
+Deckels; „auf jedem Planeten eine bauen" wäre keine Entscheidung, sondern Fleißarbeit – und eine
+Falle für jeden, dessen Minenschiffe auf einer Kolonie ohne Anlage stehen.
+
+**Nicht gebaut: die Forschung `raufbereitung`** (−4 % Energieverbrauch je Stufe, Abschnitt 7). Sie
+war die Entlastung gegen einen Preis, der auf der **ganzen** Ladung lag. Mit Abweichung 2 gibt es
+diese Last nicht mehr: Wer den Energiepreis nicht zahlen will, baut die Anlage einfach nicht weiter
+aus. Dazu kam ein konkreter Nebeneffekt – die Meilenstein-Gruppe `bergbau` besteht aus
+`rminentechnik` + `rfoerderung`, und eine dritte Forschung darin hätte den Fortschrittsanteil aller
+bestehenden Spieler von 6/11 auf 6/19 gedrückt und den bereits verdienten Meilenstein
+„Bergbau-Meisterschaft I" wieder aberkannt.
 - **Reicht die Energie nicht, sinkt die Ausbeute anteilig** – der unaufbereitete Rest ist Schlacke und
   weg. Deshalb nennt die **Startvorschau** die voraussichtlichen Energiekosten, genau wie sie heute
   schon vor knappem Frachtraum warnt (`EXPEDITION_MAX_RESOURCE_FIND_BASE` Z. 18062 existiert für
@@ -825,7 +864,7 @@ ganzer Satz, der Wirkung und Deckel nennt, kein Kürzel-Text.
 | `rfoerderung` | **Fördertechnik** | 10 | **+4 % Abbaurate und +4 % Laderaum des Minenschiffs je Stufe** (bei Vollausbau je +40 %). Beide Werte additiv in die bestehende gedeckelte Bonus-Gruppe – keine eigene Multiplikation. |
 | `rschuerfrecht` | Bergbaurecht | 3 | +1 gleichzeitiges Schürfrecht je Stufe (2 → 5). |
 | `rtiefenscan` | Tiefenscan-Array | 5 | Deckt Sorte und Größe unerkundeter Vorkommen im eigenen und je Stufe einem weiteren Nachbarsystem auf, ohne Anflug. |
-| `raufbereitung` | Aufbereitungstechnik | 8 | −4 % Energieverbrauch je aufbereiteter Einheit je Stufe, Boden bei −32 %. |
+| ~~`raufbereitung`~~ | Aufbereitungstechnik | 8 | **Nicht gebaut** (Begründung in 5.4): Der Energiepreis liegt nur auf den Zusatzeinheiten, eine Entlastung dagegen braucht es nicht – und eine dritte Forschung in der Gruppe `bergbau` hätte den bereits verdienten Meilenstein „Bergbau-Meisterschaft I" wieder aberkannt. |
 
 **`rfoerderung` ist die Forschung, die das Minenschiff wirklich besser macht** – und sie hebt
 bewusst **beide** Werte zugleich, statt sie auf zwei Zweige zu verteilen. Der Grund steht in
@@ -849,7 +888,7 @@ Die Abbauzeit bleibt konstant, der Ertrag steigt um 40 %. Genau so soll sich ein
 
 | `key` | Name | maxLevel | Wirkung |
 |---|---|---|---|
-| `aufbereitung` | Aufbereitungsanlage | 20 | Ausbeute einer heimgebrachten Ladung: 70 % ohne Anlage, **+1,5 Prozentpunkte je Stufe** (Vollausbau 100 %). Verbraucht 1,5 Energie je aufbereiteter Einheit. |
+| `aufbereitung` ✅ | Aufbereitungsanlage | 20 | **Gebaut (v8.485.0), abweichend:** Zuschlag auf die volle Ladung, **+1,5 Prozentpunkte je Stufe** (Vollausbau **+30 %**), **12 Energie je Zusatzeinheit**. Es zählt die höchste Anlage im Imperium. Siehe 5.4 und 12.2. |
 | `schuerfleitstand` | Schürfleitstand | 10 | −2 % Flugzeit für Abbau- und Anfechtungsmissionen je Stufe (Boden −20 %), zahlt in dieselbe Gruppe wie Navigator und Konvoi-Doktrin ein. |
 
 ### Schiffe
@@ -983,8 +1022,8 @@ steht Sekunden später auf `gamegeeeeek.de`.
 
 | Phase | Inhalt | Backend? | Risiko |
 |---|---|---|---|
-| **1** | Feldgenerierung, Darstellung auf der Karte, Kartenmenü, **Abbaumission** mit Vorschau und Bericht, Minenschiff regulär freigeschaltet | nein | gering – rein additiv, nichts Bestehendes ändert sich |
-| **2** | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, **Schürfpeilungen aus Expeditionen**, Hilfe/Tutorial | nein | gering–mittel – die **1,5 Energie je Einheit** vorher an einem echten Spielstand messen (Abschnitt 5.4) |
+| **1** ✅ | Feldgenerierung, Darstellung auf der Karte, Kartenmenü, **Abbaumission** mit Vorschau und Bericht, Minenschiff regulär freigeschaltet | nein | ausgeliefert mit v8.479.0 |
+| **2** ✅ | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, **Schürfpeilungen aus Expeditionen**, Hilfe/Tutorial | nein | ausgeliefert: Peilungen v8.482.0, Anlage v8.485.0. Die Energie je Einheit ist **gemessen** und liegt bei 12 statt der veranschlagten 1,5 (Abschnitt 12.2) |
 | **3** | **Deckel + Bestandskonten-Ausgleich** | nein | **hoch** – der einzige Schritt, der Spielern etwas wegnimmt |
 | **4** | Geteilter Vorrat: Feld-Dokumente, wandernder Nachschub, `mine`, Schürfrechte, Anspruchslimit | **ja** | mittel |
 | **5** | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | mittel |
@@ -1067,22 +1106,54 @@ Treibstoff-, Slot- und Schiffsprüfung – und sein Ergebnis ist das, was die Mi
 Schlägt er fehl, startet nichts. Der umgekehrte Entwurf (erst Mission, dann Server fragen) wäre
 schlimmer: Dann flögen zwei Spieler los und einer käme leer zurück.
 
-### 12.2 Die offene Entscheidung
+### 12.2 Die offene Entscheidung – erledigt, gemessen (11.08.2026, v8.485.0)
 
 Die frühere offene Frage (was bei ausgelasteter Aufbereitung mit dem Überschuss geschieht) hat sich
 mit dem Förderposten erledigt – es gibt keinen Durchsatz mehr, an dem sich etwas stauen könnte.
 
-Offen ist jetzt genau eine Zahl: **die 1,5 Energie je aufbereiteter Einheit** (Abschnitt 5.4). Sie
+Offen war danach genau eine Zahl: **die Energie je aufbereiteter Einheit** (Abschnitt 5.4). Sie
 entscheidet, ob die Aufbereitung ein echter Engpass ist oder eine Formalität, und damit, ob der
-Umbau der Basis sein erklärtes Ziel erreicht. Sie lässt sich **nicht am Reißbrett festlegen**: Zu
+Umbau der Basis sein erklärtes Ziel erreicht. Sie ließ sich **nicht am Reißbrett festlegen**: Zu
 niedrig, und Energie bleibt der Rohstoff, den man ignoriert; zu hoch, und jede Fahrt wartet auf den
-Stromzähler.
+Stromzähler. Die Zielgröße war **ein knappes Drittel der stündlichen Energieproduktion**.
 
-Vorgehen: Phase 1 ausliefern, dann an einem echten, weit entwickelten Spielstand messen, wie viel
-Energie tatsächlich pro Stunde entsteht und wie viele Fahrten in derselben Stunde heimkommen. Die
-Zielgröße ist **ein knappes Drittel der stündlichen Energieproduktion für die Aufbereitung** – genug,
-um Kraftwerke zu bauen, zu wenig, um zu blockieren. Erst danach geht Phase 2 live, und erst dann
-darf ein Patchnote behaupten, Energie sei jetzt wichtig.
+**Gemessen wurde an einem konstruierten, weit entwickelten Spielstand** – nicht an einem echten
+Konto, was hier ausdrücklich zur Aussage gehört: Heimat plus fünf Kolonien, Solar 35, Mine 30,
+Raffinerie 30, Synth 28, Fusionsreaktor 22, Habitat 20, Lager 45, Labor 10, Forschung rsolar 15 /
+rerz 15 / rkristall 12 / rdeuterium 12 / rantimaterie 8, dazu 16 Minenschiffe und 20 Frachter. Die
+Zahlen kommen aus dem laufenden Spiel, nicht aus einer Nachrechnung:
+
+| | pro Sekunde | pro Stunde |
+|---|---|---|
+| Energie | 186,25 | 670.516 |
+| Erz | 104,57 | 376.462 |
+| Kristalle | 30,57 | 110.050 |
+| Deuterium | 22,66 | 81.568 |
+| Antimaterie | 3,31 | 11.909 |
+
+Eine durchgehend laufende Abbaumission an einem **Kern** (Vorschau des Spiels: Hinflug 6m 36s ·
+Abbau 9m 54s · Rückflug 6m 36s, Ladung 13.700 bei 13.700 Laderaum) bringt damit **35.584 Erz je
+Stunde – 9,5 % der eigenen Erzproduktion**. Bei +30 % Ausbeute sind das **10.675 Zusatzeinheiten je
+Stunde**. Daraus die Preistabelle, die die Entscheidung getragen hat:
+
+| Energie je Zusatzeinheit | Energiebedarf/Std | 1 Fahrt | 2 Fahrten | 3 Fahrten |
+|---|---|---|---|---|
+| 6 | 64.052 | 10 % | 19 % | 29 % |
+| 9 | 96.078 | 14 % | 29 % | 43 % |
+| **12** | **128.104** | **19 %** | **38 %** | **57 %** |
+| 15 | 160.130 | 24 % | 48 % | 72 % |
+| 21 | 224.182 | 33 % | 67 % | 100 % |
+
+**Gewählt: 12 Energie je Zusatzeinheit** (`AUFBEREITUNG_ENERGIE`). Wer eine Flotte durchgehend
+schürfen lässt, gibt ein Fünftel seiner Energie dafür aus; wer drei Flotten fahren lässt, mehr als
+die Hälfte und muss Kraftwerke bauen. Das ist die Zielgröße, und der Patchnote darf sie deshalb
+behaupten. **Die ursprünglich veranschlagten 1,5 wären 1,3 % gewesen** – unbemerkbar, also
+wirkungslos; die Zahl war um den Faktor acht zu klein geraten, weil sie ohne Messung entstand.
+
+Zwei Abweichungen vom Entwurf sind dabei bewusst entstanden, beide in Abschnitt 5.4 nachgetragen:
+**Zuschlag statt Grundausbeute**, und der Preis fällt **nur auf die Zusatzeinheiten** an (bei 70 %
+Grundausbeute hätte er auf die ganze Ladung gelegen; auf den Zuschlag gerechnet ist Stufe 1 kein
+schlechtes Geschäft, sondern ein kleines gutes).
 
 ### 12.3 Was dieses Konzept ausdrücklich nicht vorschlägt
 

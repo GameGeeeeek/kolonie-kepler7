@@ -151,4 +151,57 @@ if (!/const ICONS = \{/.test(html)) {
   }
 }
 
+// --- Check 5: dieselbe Falle bei <path> ------------------------------------------------------
+// Check 4 sieht nur <line>. Beim Zeichnen der Aufbereitungsanlage (11.08.2026) entstand exakt
+// derselbe Fehler als <path d="M26 88 H74" stroke="url(#gGold)">: ein waagerechter Barren, dessen
+// Bounding-Box keine Hoehe hat und der deshalb gar nicht gezeichnet wird. Check 4 blieb gruen -
+// das Icon haette einen unsichtbaren Strich gehabt, und genau diese Sorte Fehler soll hier nicht
+// mehr am Auge des Zeichners haengen (CLAUDE.md-Regel 6: die zweite Stelle mit derselben Annahme).
+//
+// Beurteilt wird die Bounding-Box des GANZEN Pfades, nicht das einzelne Segment: 'M52 16 V30 M18 50
+// H32' besteht aus lauter achsenparallelen Stuecken, hat zusammen aber Breite UND Hoehe und wird
+// tadellos gezeichnet. Ein Pfad mit einem Kommando, das dieser Parser nicht kennt (relative
+// Kommandos benutzt das Spiel nicht), wird bewusst NICHT beurteilt statt geraten.
+{
+  const iconsBlock = html.slice(html.indexOf('  const ICONS = {'), html.indexOf('  function iconHtmlFor'));
+  const bbox = (d) => {
+    const xs = [], ys = [];
+    let x = 0, y = 0, i = 0, cmd = '';
+    const toks = d.match(/[A-Za-z]|-?[\d.]+/g) || [];
+    const num = () => parseFloat(toks[i++]);
+    while (i < toks.length) {
+      if (/[A-Za-z]/.test(toks[i])) cmd = toks[i++];
+      if (cmd === 'M' || cmd === 'L') { x = num(); y = num(); xs.push(x); ys.push(y); }
+      else if (cmd === 'H') { x = num(); xs.push(x); ys.push(y); }
+      else if (cmd === 'V') { y = num(); xs.push(x); ys.push(y); }
+      else if (cmd === 'Q') { const cx = num(), cy = num(); x = num(); y = num(); xs.push(cx, x); ys.push(cy, y); }
+      else if (cmd === 'C') { const a = num(), b = num(), c = num(), e = num(); x = num(); y = num(); xs.push(a, c, x); ys.push(b, e, y); }
+      else if (cmd === 'A') { num(); num(); num(); num(); num(); x = num(); y = num(); xs.push(x); ys.push(y); }
+      else if (cmd === 'Z' || cmd === 'z') { /* schliesst nur */ }
+      else return null;
+    }
+    if (!xs.length) return null;
+    return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  };
+  const flach = [];
+  for (const eintrag of iconsBlock.matchAll(/^\s{4}(\w+):\s*`(<svg[\s\S]*?<\/svg>)`/gm)) {
+    for (const pfad of eintrag[2].matchAll(/<path\b([^>]*)>/g)) {
+      const attr = pfad[1];
+      if (!/stroke="url\(#g/.test(attr)) continue;
+      const d = (attr.match(/\bd="([^"]*)"/) || [])[1];
+      if (!d) continue;
+      const b = bbox(d);
+      if (b && (b.w === 0 || b.h === 0)) flach.push(`${eintrag[1]}  ${pfad[0].slice(0, 120)}`);
+    }
+  }
+  if (flach.length) {
+    hasError = true;
+    console.error('FEHLER: <path> mit Farbverlauf und flacher Bounding-Box - wird NICHT gezeichnet:');
+    for (const f of flach) console.error('  - ' + f);
+    console.error('  Abhilfe: stroke="url(#gXyz)" durch die volle Mittelton-Farbe des Verlaufs ersetzen.');
+  } else {
+    console.log('OK: kein <path> mit Farbverlauf hat eine flache Bounding-Box.');
+  }
+}
+
 process.exit(hasError ? 1 : 0);
