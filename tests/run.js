@@ -71,6 +71,44 @@ try {
   melde('VERSION passt zum obersten Patchnotes-Eintrag', false, String(e.message).slice(0, 80));
 }
 
+// 5. Steht der Backend-Klon nebenan auf dem Stand seines Ursprungs? KEIN Fehlschlag, nur eine
+//    Meldung - aber eine, die drei verlorene Prüfläufe erklärt hätte. Mehrere Tests lesen
+//    `server.js` aus `../kolonie-kepler7-backend` (Randkriege, PvP-Deckel, ausbaubarer Deckel).
+//    Ist dieser Klon älter als das Frontend, schlagen sie an, obwohl Spiel UND Test stimmen - am
+//    10.08.2026 zweimal, am 11.08.2026 erneut, jedes Mal mit dem Verdacht auf einen echten
+//    Spielfehler (CLAUDE.md-Arbeitsregel 22). Die Antwort auf "warum ist das rot" soll nicht mehr
+//    eine halbe Stunde später kommen, sondern in Zeile drei des Protokolls stehen.
+//    Bewusst OHNE `git fetch`: Der Prüflauf soll nicht ans Netz. Verglichen wird gegen die zuletzt
+//    geholte Fernreferenz - fehlt die oder gibt es den Klon nicht, sagt die Zeile genau das.
+try {
+  const backend = path.resolve(WURZEL, '..', 'kolonie-kepler7-backend');
+  if (!fs.existsSync(path.join(backend, 'server.js'))) {
+    console.log('  ----  Backend-Klon: nicht vorhanden - die server.js-Tests überspringen sich');
+  } else {
+    const git = (...a) => spawnSync('git', a, { cwd: backend, encoding: 'utf8' });
+    const kopf = (git('log', '--oneline', '-1').stdout || '').trim();
+    // Verglichen wird gegen origin/master, NICHT gegen @{u}: Genau im Fehlerfall steht der Klon auf
+    // einem eigenen Branch ohne Fernbezug, und @{u} bricht dann mit "no upstream configured" ab -
+    // das Werkzeug stünde sich wieder selbst im Weg. Gemessen wird ohnehin gegen das, was live ist.
+    const fern = ['origin/master', 'origin/main']
+      .find(r => git('rev-parse', '--verify', '--quiet', r).status === 0);
+    const zweig = (git('rev-parse', '--abbrev-ref', 'HEAD').stdout || '').trim();
+    const hinten = fern ? (git('rev-list', '--count', 'HEAD..' + fern).stdout || '').trim() : '';
+    if (!fern || !/^\d+$/.test(hinten)) {
+      console.log('  ----  Backend-Klon: ' + kopf + ' (kein Vergleich möglich - noch nie geholt?)');
+    } else if (Number(hinten) > 0) {
+      console.log('  !!!!  Backend-Klon ist ' + hinten + ' Commit(s) HINTER ' + fern + ': ' + kopf);
+      console.log('        Erst `cd ../kolonie-kepler7-backend && git fetch && git pull origin master`,');
+      console.log('        sonst prüfen die server.js-Tests gegen einen veralteten Nachbarn.');
+    } else {
+      console.log('  ----  Backend-Klon auf Höhe von ' + fern
+        + (zweig && zweig !== 'master' && zweig !== 'main' ? ' (Zweig ' + zweig + ')' : '') + ': ' + kopf);
+    }
+  }
+} catch (e) {
+  console.log('  ----  Backend-Klon: nicht prüfbar (' + String(e.message).slice(0, 60) + ')');
+}
+
 // ---------------------------------------------------------------------------------- Testdateien
 if (!nurPflicht) {
   const dateien = fs.readdirSync(__dirname)
