@@ -163,7 +163,16 @@ async function karte(t, name){
       const prod = (row.querySelector('.prodline')||{}).textContent || '';
       const m = prod.match(/Produktion: \+([\d.,]+)\/s/);
       return {
-        rate: m ? parseFloat(m[1].replace(/\./g,'').replace(',','.')) : null,
+        // Zahl aus dem Anzeigetext: Das Spiel schreibt kleine Raten als "8.66" (Punkt = Dezimal),
+        // grosse als "1.234,5" (Punkt = Tausender). Ein blindes Entfernen aller Punkte machte aus
+        // 8.66 die Zahl 866 - der Test war jahrelang nur deshalb gruen, weil beide Messwerte
+        // zufaellig gleich viele Nachkommastellen hatten (gemessen 14.08.2026, Faktor 10 daneben).
+        rate: m ? (() => {
+          const s = m[1];
+          if (/,/.test(s)) return parseFloat(s.replace(/\./g, '').replace(',', '.'));   // deutsches Format
+          if (/^\d{1,3}(\.\d{3})+$/.test(s)) return parseFloat(s.replace(/\./g, ''));   // reine Tausendergruppen
+          return parseFloat(s);                                                          // Dezimalpunkt
+        })() : null,
         prodline: prod,
         maxed: /Maximalstufe erreicht/.test(row.textContent),
         kaufbar: !!row.querySelector('button.buy:not([disabled])')
@@ -189,6 +198,7 @@ async function karte(t, name){
     st.research = Object.assign(st.research || {}, { rsolar:15, rerz:15 });
     st.fleet.schuerfschiff = 0;
     delete st.deckelAusgleich2026;   // ein Bestandskonto kennt die Marke nicht
+    delete st.deckelKappung2026;
     const fern = Date.now() + 365*24*3600*1000;
     for (const k of ['nextPlanetEventCheck','lastEventTime','nextTraderCheck','nextRaidTime','nextFactionGift']) if (st[k] !== undefined) st[k] = fern;
     st.activeEvent = null; st.buffs = [];
@@ -201,15 +211,18 @@ async function karte(t, name){
   const t15 = await tab(browser, fixture(15));
   const k15 = await karte(t15, 'Erzmine');
   await t15.ctx.close();
-  const t40 = await tab(browser, fixture(40));
+  // Stufe 25 statt 40: Hoehere Bestandsstufen gibt es seit v8.493.0 nicht mehr (sie werden beim
+  // Laden gekappt). Die Abflachung ist damit weiterhin messbar - 25 Stufen wirken wie 20, ohne
+  // Abflachung waeren es 25 - nur eben im Bereich, den es wirklich noch gibt.
+  const t40 = await tab(browser, fixture(25));
   const k40 = await karte(t40, 'Erzmine');
   check('3a: beide Laeufe liefern eine Rate', !!(k15 && k15.rate) && !!(k40 && k40.rate), { k15: k15 && k15.rate, k40: k40 && k40.rate });
   if (k15 && k15.rate && k40 && k40.rate){
     const gemessen = k40.rate / k15.rate;
-    // 40 Stufen ergeben wirksam 15 + 25*0,5 = 27,5. Ohne Abflachung stuende hier 40/15 = 2,667.
-    const erwartet = wirksameStufen({ flachAb:15 }, 40) / 15;
-    check('3b: Stufe 40 bringt das 27,5/15-fache von Stufe 15, nicht das 40/15-fache',
-      Math.abs(gemessen - erwartet) < 0.02, { gemessen: +gemessen.toFixed(4), erwartet, ohneAbflachung: +(40/15).toFixed(4) });
+    // 25 Stufen ergeben wirksam 15 + 10*0,5 = 20. Ohne Abflachung stuende hier 25/15 = 1,667.
+    const erwartet = wirksameStufen({ flachAb:15 }, 25) / 15;
+    check('3b: Stufe 25 bringt das 20/15-fache von Stufe 15, nicht das 25/15-fache',
+      Math.abs(gemessen - erwartet) < 0.02, { gemessen: +gemessen.toFixed(4), erwartet, ohneAbflachung: +(25/15).toFixed(4) });
   }
   check('3c: die Karte erklaert die Abflachung, statt sie nur zu tun',
     !!k40 && /zählt jede weitere Stufe nur noch halb/.test(k40.prodline), k40 && k40.prodline.slice(0, 160));
@@ -226,21 +239,38 @@ async function karte(t, name){
   // "Maximalstufe erreicht - Effekt voll ausgeschoepft" behaupten (neben einem Lv.-100-Pill ist
   // das die zweite Anzeigestelle mit der falschen Aussage), sondern muss sagen, dass die
   // Bestandsstufen erhalten bleiben und abgeflacht weiterzaehlen.
-  const t100 = await tab(browser, fixture(100));
+  // AB v8.493.0 gilt hier die umgekehrte Regel: Ein Stufe-100-Konto wird beim Laden auf den Deckel
+  // gekappt. Der Test misst deshalb nicht mehr die 57,5-Rate, sondern DASS gekappt wurde - und dass
+  // die Karte danach die Wahrheit sagt. Die Formel selbst (1g) bleibt unveraendert gueltig, sie
+  // beschreibt weiterhin, wie Stufen 16-25 zaehlen.
+  const store100 = { __berichte: [] };
+  const t100 = await tab(browser, fixture(100), store100);
+  await wartenAufMarke(t100, 'deckelKappung2026', 25);
+  const stand100 = t100.stand();
+  check('5b: ein Stufe-100-Konto steht nach dem Laden auf dem Deckel',
+    (stand100.buildings.mine || 0) === 25 && (stand100.buildings.raffinerie || 0) === 25,
+    { mine: stand100.buildings.mine, raffinerie: stand100.buildings.raffinerie, synth: stand100.buildings.synth });
   const k100 = await karte(t100, 'Erzmine');
-  check('5b: bei Stufe 100 gibt es keinen Kaufknopf, aber die Rate ist die 57,5-Stufen-Rate',
-    !!k100 && k100.kaufbar === false && k100.rate > 0
-    && Math.abs(k100.rate / (k15 ? k15.rate : 1) - wirksameStufen({ flachAb:15 }, 100) / 15) < 0.05,
-    { rate: k100 && k100.rate, verhaeltnis: k100 && k15 ? +(k100.rate / k15.rate).toFixed(3) : null, erwartet: +(57.5/15).toFixed(3) });
+  check('5b2: nach der Kappung steht die Karte auf Maximalstufe und lässt keinen Ausbau mehr zu',
+    !!k100 && k100.kaufbar === false && k100.maxed === true && k100.rate > 0,
+    { maxed: k100 && k100.maxed, kaufbar: k100 && k100.kaufbar, rate: k100 && k100.rate });
   const kartenText = await t100.page.evaluate(() => {
     for (const row of document.querySelectorAll('#buildings .card-row')){
       if (((row.querySelector('.bname')||{}).textContent||'').trim().startsWith('Erzmine')) return row.textContent;
     }
     return '';
   });
-  check('5c: die Karte behauptet NICHT "Effekt voll ausgeschöpft", sondern erklärt den Bestandsschutz',
-    !/voll ausgeschöpft/.test(kartenText) && /bleiben dir erhalten/.test(kartenText),
-    kartenText.match(/Ausbau-Deckel[^·]*/) ? kartenText.match(/Ausbau-Deckel[^·]*/)[0].slice(0, 120) : kartenText.slice(0, 120));
+  // Nach der Kappung steht das Gebaeude auf dem Deckel - "Maximalstufe erreicht" ist dort die
+  // WAHRE Aussage, und der Bestandsschutz-Satz waere jetzt die falsche (genau andersherum als
+  // vor v8.493.0). Geprueft wird deshalb, dass die Karte nicht mehr von erhaltenen Stufen spricht.
+  check('5c: die Karte spricht nach der Kappung nicht mehr von erhaltenen Bestandsstufen',
+    !/bleiben dir erhalten/.test(kartenText) && /Maximalstufe|voll ausgeschöpft/.test(kartenText),
+    kartenText.match(/Maximalstufe[^·]*/) ? kartenText.match(/Maximalstufe[^·]*/)[0].slice(0, 120) : kartenText.slice(0, 120));
+  // Und der Spieler erfaehrt es: ein eigener Bericht, der die Erstattung von v8.486.0 benennt.
+  const kappBericht = (store100.__berichte || []).find(b => b && b.type === 'deckelkappung');
+  check('5d: es gibt einen Kappungs-Bericht mit den betroffenen Gebäuden',
+    !!kappBericht && (kappBericht.gekappt||[]).length >= 2 && kappBericht.summe > 0,
+    kappBericht ? { anzahl: kappBericht.gekappt.length, summe: kappBericht.summe } : null);
   await t100.ctx.close();
 
   // ---- 4) Der einmalige Ausgleich ------------------------------------------------------------
@@ -265,9 +295,17 @@ async function karte(t, name){
   // kleines Lager, der groessere Teil passt gar nicht hinein.
   check('4e: was am vollen Lager verfaellt, steht im Bericht',
     !!b && Object.keys(b.verfallen||{}).length > 0, b && b.verfallen);
-  // Die bestehenden Stufen bleiben stehen - der Deckel nimmt niemandem etwas ab, was schon da ist.
-  check('4f: die Gebaeudestufen ueber dem Deckel wurden NICHT abgesenkt',
-    (nach.buildings||{}).mine === 40, (nach.buildings||{}).mine);
+  // UMGEKEHRTE REGEL SEIT v8.493.0: Frueher blieben die Stufen ueber dem Deckel stehen ("der Deckel
+  // nimmt niemandem etwas ab"), jetzt werden sie gekappt - der Ausgleich von damals war die
+  // Bezahlung dafuer. Der Test prueft deshalb das Gegenteil von vorher, und zwar mitsamt der
+  // REIHENFOLGE: Erst muss erstattet worden sein (4d), dann gekappt. Waere es andersherum, faende
+  // der Ausgleich keine Stufen mehr vor und zahlte nichts aus.
+  check('4f: die Gebaeudestufen ueber dem Deckel wurden auf den Deckel gekappt',
+    (nach.buildings||{}).mine === 25 && nach.deckelKappung2026 === true,
+    { mine: (nach.buildings||{}).mine, marke: nach.deckelKappung2026 });
+  const erwarteteStufen = [40, 34, 30, 26].reduce((s, l) => s + Math.max(0, l - 25), 0);
+  check('4f2: die Erstattung lief ueber ALLE Stufen ueber dem Deckel, nicht nur die der Mine',
+    !!b && b.stufen === erwarteteStufen, { gemeldet: b && b.stufen, erwartet: erwarteteStufen });
   await t.ctx.close();
 
   // Zweites Laden mit demselben (jetzt fortgeschriebenen) Spielstand: nichts darf noch einmal
