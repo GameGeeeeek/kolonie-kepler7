@@ -69,6 +69,10 @@ const { wirksameStufen, PROD_FLACH_FAKTOR } = new Function(
   check('1e: streng monoton - keine Stufe ist wertlos', monoton);
   check('1f: negative oder fehlende Stufen ergeben 0, nicht NaN',
     wirksameStufen(def, -5) === 0 && wirksameStufen(def, undefined) === 0);
+  // Es GIBT Konten mit Minen auf Stufe 100 (Hinweis von Sascha, 11.08.2026) - weit ueber dem
+  // Deckel. Die Formel muss dort dasselbe tun wie ueberall: 15 voll + 85 halb = 57,5.
+  check('1g: Stufe 100 (echte Bestandskonten!) ergibt 57,5 wirksame Stufen',
+    wirksameStufen(def, 100) === 57.5, wirksameStufen(def, 100));
 }
 
 // ---- 2) Die Definitionen ------------------------------------------------------------------
@@ -217,6 +221,27 @@ async function karte(t, name){
   check('5a: auf dem Deckel ist die Karte "maxed" und hat keinen Kaufknopf mehr',
     !!kMax && kMax.maxed === true && kMax.kaufbar === false, kMax && { maxed: kMax.maxed, kaufbar: kMax.kaufbar });
   await tMax.ctx.close();
+
+  // Es gibt Konten mit Minen auf Stufe 100 - WEIT ueber dem Deckel. Die Karte darf dort nicht
+  // "Maximalstufe erreicht - Effekt voll ausgeschoepft" behaupten (neben einem Lv.-100-Pill ist
+  // das die zweite Anzeigestelle mit der falschen Aussage), sondern muss sagen, dass die
+  // Bestandsstufen erhalten bleiben und abgeflacht weiterzaehlen.
+  const t100 = await tab(browser, fixture(100));
+  const k100 = await karte(t100, 'Erzmine');
+  check('5b: bei Stufe 100 gibt es keinen Kaufknopf, aber die Rate ist die 57,5-Stufen-Rate',
+    !!k100 && k100.kaufbar === false && k100.rate > 0
+    && Math.abs(k100.rate / (k15 ? k15.rate : 1) - wirksameStufen({ flachAb:15 }, 100) / 15) < 0.05,
+    { rate: k100 && k100.rate, verhaeltnis: k100 && k15 ? +(k100.rate / k15.rate).toFixed(3) : null, erwartet: +(57.5/15).toFixed(3) });
+  const kartenText = await t100.page.evaluate(() => {
+    for (const row of document.querySelectorAll('#buildings .card-row')){
+      if (((row.querySelector('.bname')||{}).textContent||'').trim().startsWith('Erzmine')) return row.textContent;
+    }
+    return '';
+  });
+  check('5c: die Karte behauptet NICHT "Effekt voll ausgeschöpft", sondern erklärt den Bestandsschutz',
+    !/voll ausgeschöpft/.test(kartenText) && /bleiben dir erhalten/.test(kartenText),
+    kartenText.match(/Ausbau-Deckel[^·]*/) ? kartenText.match(/Ausbau-Deckel[^·]*/)[0].slice(0, 120) : kartenText.slice(0, 120));
+  await t100.ctx.close();
 
   // ---- 4) Der einmalige Ausgleich ------------------------------------------------------------
   const store = { __berichte: [] };

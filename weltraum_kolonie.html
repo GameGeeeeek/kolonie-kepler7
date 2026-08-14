@@ -6301,8 +6301,17 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.486.0';
+  const VERSION = '8.487.0';
   const PATCHNOTES = [
+    { version:'8.487.0', date:'11.08.2026', changes:[
+      '<strong>Die Asteroidengürtel gehören jetzt allen gemeinsam.</strong> Bisher hatte jeder Spieler sein eigenes, nur lokal geführtes Feld – zwei Spieler konnten denselben Brocken abbauen, ohne sich je in die Quere zu kommen. Ab jetzt <strong>führt der Server den Vorrat</strong>: Alle sehen dieselben Vorkommen, mit demselben Restvorrat, und was einer herausholt, fehlt dem nächsten.',
+      '<strong>Wer zuerst da ist, hat ihn – und du erfährst es beim Start, nicht nach dem Flug.</strong> Die Ladung wird dem Vorkommen im Moment des Missionsstarts entnommen, serverseitig. Fliegen zwei gleichzeitig auf denselben Kern, bekommt der Zweite nur, was übrig ist; ist gar nichts mehr da, startet die Mission erst gar nicht, es wird kein Treibstoff fällig, und die Karte aktualisiert sich sofort. Eine halbe Stunde zu fliegen und leer heimzukommen wäre die schlechtere Lösung gewesen.',
+      '<strong>Der Nachschub wandert jetzt für alle gleich.</strong> Ein leergefördertes Vorkommen bekommt seinen Termin (3 Stunden beim Splitter bis 48 beim Koloss) und kommt danach an einer <em>anderen</em> Stelle wieder – zu 30% sogar in einem anderen Gürtelsystem. Aufgelöst wird das faul beim Lesen des Feldes: Schaut wochenlang niemand hin, holt der erste Blick alles auf einmal nach. Auf dem Raspberry Pi läuft dafür kein Hintergrundjob, der bei einem Neustart hängenbleiben könnte.',
+      '<strong>Der Solo-Modus bleibt vollständig spielbar.</strong> Wer die Datei ohne Server öffnet, bekommt wie bisher sein eigenes Feld, eigenen Nachschub und eigene Abbaumissionen. Dasselbe gilt, wenn der Server gerade nicht erreichbar ist: Das lokale Feld trägt das Spiel, bis die Verbindung wieder steht – der Bergbau verschwindet nie, er ist dann nur nicht geteilt. <strong>Schürfpeilungen bleiben ohnehin privat</strong>, sie gehören weiterhin nur ihrem Finder.',
+      'Technisch dahinter: Der Server prüft jede Entnahme gegen den echten Restvorrat <em>und</em> gegen eine großzügige Obergrenze aus deiner tatsächlich gespeicherten Flotte – ein manipulierter Client kann also nicht mit einem einzigen Minenschiff einen Koloss leersaugen. Er schreibt dabei nie deinen Spielstand: Die Gutschrift macht wie bisher dein eigenes Spiel bei der Heimkehr. Damit entsteht das Wettrennen zwischen Server-Gutschrift und Speichern gar nicht erst.',
+      '<strong>Für die Kommandanten mit Minen jenseits von Stufe 100:</strong> Nachgemessen an einem Stufe-100-Konto – nichts geht kaputt, eure Stufen bleiben alle erhalten (wirksam zählt Stufe 100 wie 57,5, also −43% gegenüber vorher; der Verlust wächst mit der Stufe). Behoben ist die Gebäudekarte: Sie behauptete bei einer Mine über dem Deckel „Maximalstufe erreicht (25) – Effekt voll ausgeschöpft" direkt neben dem Stufe-100-Abzeichen. Jetzt sagt sie, was stimmt: Der <em>Ausbau</em> endet bei 25, die Bestandsstufen bleiben und zählen abgeflacht weiter. Und zur Rückerstattung von gestern: Bei einer Stufe-100-Mine stehen rechnerisch mehrere hundert Millionen Energie auf dem Zettel – ins Lager passt davon nur der Lagerdeckel, der Bericht nennt beide Zahlen. Wer den Ausgleich noch vor sich hat: erst Lager leeren, dann neu laden.',
+      'Was hier NOCH nicht drin ist und als Nächstes kommt: <strong>Schürfrechte</strong> (ein Vorkommen für sich reservieren), die <strong>zurückgelassene Eskorte</strong>, die es hält, und die <strong>Anfechtung</strong> durch andere Spieler. Bis dahin ist jedes Vorkommen für jeden offen – es ist ein Wettrennen, noch kein Revierkampf.'
+    ]},
     { version:'8.486.0', date:'11.08.2026', changes:[
       '<strong>Der Umbau der Basiswirtschaft: Die Basis liefert die Grundlast, der Weg nach oben führt über die Asteroiden.</strong> Die vier Rohstoff-Gebäude – Erzmine, Kristallraffinerie, Deuteriumsynthetisierer, Fusionsreaktor – haben ab jetzt einen Deckel: <strong>Ab Stufe 16 zählt jede weitere Stufe nur noch halb</strong>, ab Stufe 25 lassen sie sich nicht mehr ausbauen. Kein harter Schnitt, sondern eine Abflachung über zehn Stufen – ein Schnitt hätte Stufe 26 zu einem Knopf gemacht, der nichts tut.',
       '<strong>Was dich das konkret kostet – nachgemessen, nicht geschätzt.</strong> An einem entwickelten Standort (Mine 40, Raffinerie 34, Synth 30, Fusionsreaktor 26): Erzmine <strong>17,3/s → 11,9/s (−31%)</strong>, Kristallraffinerie 4,64 → 3,34 (−28%), Deuteriumsynthetisierer 3,28 → 2,46 (−25%), Fusionsreaktor 0,655 → 0,517 (−21%). Der Verlust wächst mit der Stufe: Wer nie über 15 gebaut hat, merkt <em>gar nichts</em>. Und er wirkt <strong>je Standort</strong>, nicht imperiumsweit – neue Kolonien bringen weiterhin voll.',
@@ -12053,8 +12062,60 @@
     }
     return { plaetze };
   }
+  /* ===== Geteiltes Feld oder Solo-Feld? (v8.487.0, Konzept Phase 4) =========================
+     Mit Backend fuehrt der SERVER den Vorrat: Alle Spieler sehen dieselben Brocken, und derselbe
+     Brocken kann nicht zweimal vergeben werden. Ohne Backend (Solo-Modus, Datei lokal geoeffnet)
+     bleibt alles wie bisher - das Feld entsteht lokal und waechst lokal nach.
+
+     WARUM DER CLIENT DAS FELD NICHT MEHR NACHRECHNET, wenn ein Server da ist: Seit der Nachschub
+     wandert, ist das Feld Geschichte statt Formel. Zwei Implementierungen derselben Geschichte
+     muessten dauerhaft synchron bleiben - genau die Fehlerklasse, an der dieses Projekt schon
+     mehrfach hing. Der Server erzeugt und fuehrt, der Client zeigt an. Die einzige verbleibende
+     Paritaet sind die SCHLUESSEL der Sorten und Groessen (tests/test_asteroid_paritaet.js).
+
+     Die Schuerfpeilungen bleiben davon unberuehrt: Sie liegen in state.peilungen, gehoeren nur
+     ihrem Finder und funktionieren im Solo-Modus vollstaendig (Konzept 3.7). */
+  /* Der Server ABLOEST das lokale Feld, er ersetzt es nicht von vornherein.
+
+     Die erste Fassung liess den Guertel leer, bis der erste Abruf da war, und rief den mine-Endpunkt
+     unbedingt auf, sobald ein Backend erreichbar schien. Das waere der Fehler gewesen: Frontend und
+     Backend werden UNABHAENGIG ausgeliefert (zwei Repos, zwei Webhooks). Geht das Frontend zuerst
+     live - oder antwortet der Endpunkt aus irgendeinem Grund nicht -, waere der komplette
+     Asteroidenbergbau fuer alle verschwunden statt nur nicht geteilt.
+
+     Deshalb: Das lokale Feld entsteht wie bisher und traegt das Spiel. Erst wenn der Server einmal
+     erfolgreich geantwortet hat, uebernimmt SEIN Feld (_astFeldVomServer) - ab da laeuft auch der
+     Nachschub und die Entnahme ueber ihn. Ohne Server bleibt alles Solo-Verhalten. */
+  let _astFeldVomServer = false;   // hat der Server je erfolgreich geliefert?
+  let _astFeldGeholt = 0;          // Zeitpunkt des letzten erfolgreichen Abrufs
+  let _astFeldLaeuft = false;      // schuetzt gegen ueberlappende Abrufe
+  const AST_FELD_TAKT_MS = 45000;  // Anzeige-Polling; der Vorrat aendert sich nicht im Sekundentakt
+  function asteroidFeldGeteilt(){ return _astFeldVomServer; }
+  async function ladeAsteroidfeld(erzwingen){
+    if (!useBackend() || _astFeldLaeuft) return false;
+    // Sichtbarkeits-Gate wie bei jedem reinen Anzeige-Polling (CLAUDE.md) - ausser wenn der Aufrufer
+    // die Antwort JETZT braucht, etwa nach einer abgelehnten Entnahme.
+    if (!erzwingen && typeof document !== 'undefined' && document.visibilityState !== 'visible') return false;
+    if (!erzwingen && Date.now() - _astFeldGeholt < AST_FELD_TAKT_MS) return false;
+    _astFeldLaeuft = true;
+    try {
+      const res = await backendFetch('/asteroid/field');
+      if (!res.ok) return false;
+      const daten = await res.json();
+      if (!daten || !daten.felder || !Object.keys(daten.felder).length) return false;
+      // Vollstaendig ERSETZEN, nicht verschmelzen: Was der Server nicht mehr fuehrt, ist weg. Ein
+      // Verschmelzen liesse abgebaute Brocken lokal stehen und die Karte wuerde luegen.
+      state.asteroidFeld = daten.felder;
+      _astFeldVomServer = true;
+      _astFeldGeholt = Date.now();
+      return true;
+    } catch(e){ return false; }
+    finally { _astFeldLaeuft = false; }
+  }
   function asteroidFeldSicherstellen(){
     if (!state.asteroidFeld) state.asteroidFeld = {};
+    // Sobald der Server liefert, gehoert ihm das Feld - dann hier nichts mehr erzeugen.
+    if (_astFeldVomServer) return state.asteroidFeld;
     for (const sysId of guertelSysteme()){
       if (!state.asteroidFeld[sysId]) state.asteroidFeld[sysId] = asteroidFeldFuerSystem(sysId);
     }
@@ -12089,6 +12150,11 @@
      es gibt nichts, was bei einem Neustart haengenbleiben kann. Liest wochenlang niemand ein System,
      holt der erste Blick alles auf einmal nach. */
   function asteroidNachschub(){
+    // Anstossen, dass das geteilte Feld nachgeladen wird (selbst gedrosselt). Hat der Server je
+    // geliefert, loest ER den Nachschub auf - liefe er hier zusaetzlich, wuerde der Client Brocken
+    // erfinden, die beim naechsten Abruf wieder verschwinden.
+    ladeAsteroidfeld();
+    if (_astFeldVomServer) return;
     asteroidFeldSicherstellen();
     const jetzt = Date.now();
     for (const sysId of guertelSysteme()){
@@ -12115,6 +12181,9 @@
   }
   function asteroidenImSystem(sysId){
     if (!istGuertelSystem(sysId)) return [];
+    // Hat der Server geliefert, zeigt die Karte NUR sein Feld - ein System, das er nicht fuehrt,
+    // bleibt leer statt lokal erfunden zu werden.
+    if (_astFeldVomServer && !(state.asteroidFeld && state.asteroidFeld[sysId])) return [];
     // Bewusst NUR lesend: Der Nachschub laeuft im Haupt-Tick, nicht hier. Diese Funktion wird von
     // buildGalaxyMap jede Sekunde gerufen - Zustand im Render zu aendern waere genau die Sorte
     // versteckter Nebenwirkung, die man spaeter stundenlang sucht.
@@ -34813,7 +34882,7 @@
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
       { title:'Automatische Erkundung', body:'Schalter auf der Sektorkarte (mindestens 1 Erkundungsschiff nötig): sobald aktiviert, reserviert genau <strong>ein</strong> Erkundungsschiff vom gerade aktiven Planeten und fliegt eine durchgehende Rundreise - erst das nächstgelegene unentdeckte Ziel, danach automatisch weiter zum jeweils nächsten, bis alle erreichbaren Planeten erkundet sind. Direkt unter dem Schalter zeigt eine eigene Box jederzeit den Ausgangsplaneten, das aktuelle Ziel mit Countdown, eine Vorschau des nächsten Ziels und den Gesamtfortschritt (z.B. "5/12"). Reicht der Treibstoff (Deuterium) für den nächsten Abschnitt nicht, wartet die Rundreise automatisch und versucht es beim nächsten Ressourcenzuwachs erneut - ohne manuelles Eingreifen. Sind alle Ziele erledigt, fliegt das Schiff zurück zum Ausgangsplaneten und die Rundreise endet automatisch. Der Schalter lässt sich jederzeit wieder ausschalten - eine laufende Rundreise wird dadurch nicht abrupt abgebrochen, sondern das aktuelle Ziel noch fertig angeflogen, bevor das Schiff zurückkehrt. Manuelles Erkunden einzelner Planeten bleibt parallel dazu möglich, solange noch ein freies Erkundungsschiff übrig ist.' },
-      { title:'Asteroiden und Abbaumissionen', body:'In etwa <strong>zwanzig der 69 Sternsysteme</strong> liegt ein <strong>Asteroidengürtel</strong>. Auf der Sektorkarte siehst du ihn als gestrichelte Bahn zwischen den Planeten-Orbits, darin die Vorkommen als gezeichnete Brocken – Farbe und Größe des Markers verraten die Größe, das Symbol die Sorte. Ein Klick öffnet das Kartenmenü mit <strong>Abbaumission</strong>.<br><br><strong>Neun Sorten:</strong> drei reine (Eisenbrocken → Erz, Prismenbrocken → Kristalle, Eiskern → Deuterium) und sechs seltenere <strong>Legierungsasteroiden</strong> mit zwei Rohstoffen. Drei davon führen eine Spur <strong>Antimaterie</strong> – bewusst nur eine Spur, denn Antimaterie ist der Engpass, der die ganze Tier-2-Kette trägt.<br><br><strong>Vier Größen:</strong> Splitter (50.000 Vorrat, Platz für 4 Minenschiffe), Brocken (150.000 / 8), Kern (500.000 / 16), Koloss (1.500.000 / 30). Die Plätze begrenzen, wie viele Minenschiffe gleichzeitig graben können – mehr mitzuschicken ist erlaubt, sie tragen Ladung, erhöhen aber die Rate nicht. Die Startvorschau sagt es dir.<br><br><strong>So läuft eine Abbaumission:</strong> Du brauchst <strong>mindestens ein Minenschiff</strong> (Forschung <em>Minentechnik</em>); Frachter erweitern den Laderaum. Die Flotte fliegt hin, gräbt <strong>bis der Laderaum voll ist</strong>, und fliegt zurück. <strong>Die Rohstoffe bekommst du erst bei der Rückkehr</strong> – währenddessen ist die Ladung schon aus dem Vorkommen entnommen, damit derselbe Brocken nicht zweimal vergeben wird. Ist dein Lager bei der Ankunft voll, geht der Überschuss verloren wie bei jeder anderen Beute auch; der Bericht sagt dir, wie viel.<br><br><strong>Fördertechnik</strong> (10 Stufen) hebt Abbaurate <em>und</em> Laderaum um je 4% pro Stufe. Beides zusammen heißt: gleiche Fahrtdauer, mehr Ladung.<br><br><strong>Die Aufbereitungsanlage</strong> (20 Stufen, Forschung <em>Minentechnik</em>) holt mehr aus dem heimgebrachten Gestein: <strong>+1,5% Ausbeute je Stufe</strong> auf jede eintreffende Ladung, bei Vollausbau also +30%. Bezahlt wird das beim Entladen mit <strong>12 Energie je zusätzlich gewonnener Einheit</strong> – bei einer durchgehend laufenden Abbaumission und voll ausgebauter Anlage sind das rund ein Fünftel deiner Energieproduktion, bei drei Flotten schon alles davon. Energie ist damit der Betriebsstoff des Bergbaus: Wer mehr verarbeiten will, baut Kraftwerke. Reicht die Energie nicht, fällt <em>nur der Zuschlag</em> kleiner aus – die geschürfte Ladung selbst kommt immer vollständig an. Es zählt die <strong>höchste Anlage im Imperium</strong>, nicht die Summe: eine genügt für alle Kolonien, eine zweite unterhalb der besten bringt nichts. Die Startvorschau nennt den Zuschlag und seine Energiekosten, bevor du losschickst.<br><br><strong>Ein leergefördertes Vorkommen kommt woanders wieder</strong> – nach 3 Stunden (Splitter) bis 48 Stunden (Koloss), auf einem anderen freien Platz, zu 30% sogar in einem anderen Gürtelsystem, mit neu gezogener Sorte und Größe. Der Gürtel ist also ein Revier, das man immer wieder absuchen muss, kein fester Fahrplan.<br><br><strong>Schürfpeilungen:</strong> Erfolgreiche <strong>Expeditionen</strong> finden gelegentlich die Koordinaten eines besonders seltenen und großen Asteroiden – immer Kern oder Koloss, meist eine Legierungssorte, oft mit Antimaterie. Die <strong>Schürfexpedition</strong> hat mit 3% die dreifache Chance darauf (Tiefenraum 2%, übrige 1%); der Risiko-Regler zieht mit. Eine Peilung erscheint als Marker mit <strong>gestricheltem grünen Ring</strong> in einem System, das du bereits kennst, gehört <strong>nur dir</strong> und ist nicht anfechtbar. Sie ist <strong>sieben Tage gültig</strong> und du kannst <strong>höchstens drei</strong> gleichzeitig offen haben – eine vierte wird in Rohstoffe gewandelt statt zu verfallen. Angeflogen wird sie mit derselben Abbaumission wie jedes andere Vorkommen; leergefördert verschwindet sie und wächst nicht nach.' },
+      { title:'Asteroiden und Abbaumissionen', body:'In etwa <strong>zwanzig der 69 Sternsysteme</strong> liegt ein <strong>Asteroidengürtel</strong>. Auf der Sektorkarte siehst du ihn als gestrichelte Bahn zwischen den Planeten-Orbits, darin die Vorkommen als gezeichnete Brocken – Farbe und Größe des Markers verraten die Größe, das Symbol die Sorte. Ein Klick öffnet das Kartenmenü mit <strong>Abbaumission</strong>.<br><br><strong>Neun Sorten:</strong> drei reine (Eisenbrocken → Erz, Prismenbrocken → Kristalle, Eiskern → Deuterium) und sechs seltenere <strong>Legierungsasteroiden</strong> mit zwei Rohstoffen. Drei davon führen eine Spur <strong>Antimaterie</strong> – bewusst nur eine Spur, denn Antimaterie ist der Engpass, der die ganze Tier-2-Kette trägt.<br><br><strong>Vier Größen:</strong> Splitter (50.000 Vorrat, Platz für 4 Minenschiffe), Brocken (150.000 / 8), Kern (500.000 / 16), Koloss (1.500.000 / 30). Die Plätze begrenzen, wie viele Minenschiffe gleichzeitig graben können – mehr mitzuschicken ist erlaubt, sie tragen Ladung, erhöhen aber die Rate nicht. Die Startvorschau sagt es dir.<br><br><strong>So läuft eine Abbaumission:</strong> Du brauchst <strong>mindestens ein Minenschiff</strong> (Forschung <em>Minentechnik</em>); Frachter erweitern den Laderaum. Die Flotte fliegt hin, gräbt <strong>bis der Laderaum voll ist</strong>, und fliegt zurück. <strong>Die Rohstoffe bekommst du erst bei der Rückkehr</strong> – währenddessen ist die Ladung schon aus dem Vorkommen entnommen, damit derselbe Brocken nicht zweimal vergeben wird. Ist dein Lager bei der Ankunft voll, geht der Überschuss verloren wie bei jeder anderen Beute auch; der Bericht sagt dir, wie viel.<br><br><strong>Fördertechnik</strong> (10 Stufen) hebt Abbaurate <em>und</em> Laderaum um je 4% pro Stufe. Beides zusammen heißt: gleiche Fahrtdauer, mehr Ladung.<br><br><strong>Die Aufbereitungsanlage</strong> (20 Stufen, Forschung <em>Minentechnik</em>) holt mehr aus dem heimgebrachten Gestein: <strong>+1,5% Ausbeute je Stufe</strong> auf jede eintreffende Ladung, bei Vollausbau also +30%. Bezahlt wird das beim Entladen mit <strong>12 Energie je zusätzlich gewonnener Einheit</strong> – bei einer durchgehend laufenden Abbaumission und voll ausgebauter Anlage sind das rund ein Fünftel deiner Energieproduktion, bei drei Flotten schon alles davon. Energie ist damit der Betriebsstoff des Bergbaus: Wer mehr verarbeiten will, baut Kraftwerke. Reicht die Energie nicht, fällt <em>nur der Zuschlag</em> kleiner aus – die geschürfte Ladung selbst kommt immer vollständig an. Es zählt die <strong>höchste Anlage im Imperium</strong>, nicht die Summe: eine genügt für alle Kolonien, eine zweite unterhalb der besten bringt nichts. Die Startvorschau nennt den Zuschlag und seine Energiekosten, bevor du losschickst.<br><br><strong>Die Gürtel gehören allen gemeinsam</strong> (seit v8.487.0): Solange du mit dem Server verbunden bist, führt <em>er</em> den Vorrat – alle Spieler sehen dieselben Vorkommen mit demselben Restbestand. Die Ladung wird beim <strong>Start</strong> der Mission entnommen; wer zuerst da ist, hat sie. War jemand schneller, startet deine Mission gar nicht erst, es wird kein Treibstoff fällig und die Karte aktualisiert sich sofort. Ohne Server (Solo-Modus oder Verbindungsabbruch) läuft alles lokal weiter – der Bergbau verschwindet nie, er ist dann nur nicht geteilt. <strong>Schürfpeilungen sind davon ausgenommen</strong> und bleiben privat.<br><br><strong>Ein leergefördertes Vorkommen kommt woanders wieder</strong> – nach 3 Stunden (Splitter) bis 48 Stunden (Koloss), auf einem anderen freien Platz, zu 30% sogar in einem anderen Gürtelsystem, mit neu gezogener Sorte und Größe. Der Gürtel ist also ein Revier, das man immer wieder absuchen muss, kein fester Fahrplan.<br><br><strong>Schürfpeilungen:</strong> Erfolgreiche <strong>Expeditionen</strong> finden gelegentlich die Koordinaten eines besonders seltenen und großen Asteroiden – immer Kern oder Koloss, meist eine Legierungssorte, oft mit Antimaterie. Die <strong>Schürfexpedition</strong> hat mit 3% die dreifache Chance darauf (Tiefenraum 2%, übrige 1%); der Risiko-Regler zieht mit. Eine Peilung erscheint als Marker mit <strong>gestricheltem grünen Ring</strong> in einem System, das du bereits kennst, gehört <strong>nur dir</strong> und ist nicht anfechtbar. Sie ist <strong>sieben Tage gültig</strong> und du kannst <strong>höchstens drei</strong> gleichzeitig offen haben – eine vierte wird in Rohstoffe gewandelt statt zu verfallen. Angeflogen wird sie mit derselben Abbaumission wie jedes andere Vorkommen; leergefördert verschwindet sie und wächst nicht nach.' },
       { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. <strong>Schickst du Recycler zu einem fremden Trümmerfeld, wird daraus ein Sammelauftrag:</strong> Er belegt einen Flottenslot, und sobald dort nichts mehr liegt, fliegen die Recycler von selbst zum Ausgangsort zurück – du musst sie nicht mehr von Hand einsammeln. Steht der Abbau still, weil dein Lager voll ist, sagt die Auftragszeile das ausdrücklich; über „Auftrag beenden" bleiben die Recycler dort und der Slot wird sofort frei. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus. <strong>Trümmerfelder entstehen immer an deinem Startplaneten</strong>, auch wenn du woanders angegriffen hast – greifst du also von einer Kolonie ohne Recycler aus an, bleibt die Beute dort liegen. Dafür steht im Kampfbericht jetzt ein Knopf <strong>„Recycler nach … schicken"</strong>: Er erscheint nur, wenn dort wirklich noch etwas liegt und kein Recycler vor Ort ist, und verlegt alle Recycler des Standorts, an dem du die meisten hast. Das ist eine normale Flottenverlegung – mit Flugzeit, Treibstoff und einem belegten Flottenslot.' },
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (Deckel bei 6 Sektoren). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
@@ -50948,7 +51017,7 @@
       start: () => sendMiningMission(sysId, platz)
     });
   }
-  function sendMiningMission(sysId, platz){
+  async function sendMiningMission(sysId, platz){
     const cf = currentFleet();
     const a = asteroidAn(sysId, platz);
     if (!a){ log('Dieses Vorkommen ist nicht mehr da.', 'ti-alert-triangle'); return; }
@@ -50963,7 +51032,38 @@
     // nicht zweimal vergeben werden, und die Mission traegt ihre Ladung eingefroren mit sich: Eine
     // spaetere Balance-Aenderung trifft keine Flotte, die schon unterwegs ist. Dieselbe Reihenfolge
     // gilt spaeter serverseitig (Konzept 6.4) - erst Treibstoff und Slots pruefen, dann entnehmen.
-    const echt = asteroidEntnehmen(sysId, platz, plan.ladung);
+    /* Mit Backend entscheidet der SERVER die Menge (Konzept 6.4). Der Client nennt nur seinen
+       Wunsch; zurueck kommt, was wirklich noch dastand. Fliegen zwei Spieler gleichzeitig auf
+       dasselbe Vorkommen, erfaehrt der Zweite es HIER - beim Start - und nicht nach einer halben
+       Stunde Flug. Schlaegt der Aufruf fehl, startet nichts: Treibstoff wird erst danach gezahlt.
+       Schuerfpeilungen laufen weiter lokal - sie gehoeren nur ihrem Finder (Konzept 3.7). */
+    let echt = 0;
+    if (asteroidFeldGeteilt() && String(platz).charAt(0) !== 'p'){
+      let daten = null;
+      try {
+        const res = await backendFetch('/asteroid/mine', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ system: sysId, platz: String(platz), wunsch: plan.ladung })
+        });
+        daten = await res.json().catch(() => null);
+        if (!res.ok) daten = null;
+      } catch(e){ daten = null; }
+      if (!daten || !(daten.menge > 0)){
+        log('Dieses Vorkommen ist nicht mehr verfügbar – jemand war schneller oder die Verbindung brach ab. Die Karte wird aktualisiert.', 'ti-alert-triangle', 'warn');
+        await ladeAsteroidfeld(true);
+        render();
+        return;
+      }
+      echt = daten.menge;
+      // Die Anzeige sofort nachziehen, statt bis zum naechsten Abruf eine veraltete Karte zu zeigen.
+      const feld = state.asteroidFeld && state.asteroidFeld[sysId];
+      if (feld && feld.plaetze[platz]){
+        if (daten.rest > 0) feld.plaetze[platz].vorrat = daten.rest;
+        else feld.plaetze[platz] = { frei: true };
+      }
+    } else {
+      echt = asteroidEntnehmen(sysId, platz, plan.ladung);
+    }
     if (echt <= 0){ log('Das Vorkommen ist bereits erschöpft.', 'ti-alert-triangle'); return; }
     pay(fuel);
     const jetzt = Date.now();
@@ -53025,7 +53125,9 @@
               ${malusLine}
               ${specialItemLine}
               ${defReqLine}
-              ${maxed ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe erreicht (${def.maxLevel}) - Effekt ist bereits voll ausgeschöpft, weiterer Ausbau würde nichts mehr bringen</div>` : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(effectiveBuildTimeEach('building', state.activeBasePlanet, def.buildTime||20)*qty))}`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte${affordEtaHtml(cost)}</div>`}
+              ${maxed ? (lvl > def.maxLevel
+                ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Ausbau-Deckel (${def.maxLevel}) erreicht – deine ${lvl} Stufen bleiben dir erhalten und zählen abgeflacht weiter, neu bauen lässt sich hier nichts mehr</div>`
+                : `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Maximalstufe erreicht (${def.maxLevel}) - Effekt ist bereits voll ausgeschöpft, weiterer Ausbau würde nichts mehr bringen</div>`) : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(effectiveBuildTimeEach('building', state.activeBasePlanet, def.buildTime||20)*qty))}`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte${affordEtaHtml(cost)}</div>`}
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
