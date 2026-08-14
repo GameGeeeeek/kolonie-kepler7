@@ -15,9 +15,14 @@
 //   2. Dasselbe für die Größen, inklusive der Zahlen, die BEIDE Seiten benutzen: Vorrat und
 //      Nachschubdauer. (Plätze und Güte braucht nur der Client, Gewichte nur der Server - die
 //      werden bewusst nicht verglichen.)
+//   3. Die Schürfrecht-Konstanten (v8.489.0): Grundstock und Deckel des Anspruchslimits stehen auf
+//      beiden Seiten - der Server ERZWINGT sie (claim lehnt ab), der Client ZEIGT sie (X/Y am
+//      Kartenmenü, Grund-Text am gesperrten Eintrag). Laufen sie auseinander, verspricht die
+//      Anzeige Rechte, die der Server verweigert - oder verschweigt welche.
 //
 // GEGENPROBE (beidseitig ausgeführt): Nimmt man im Backend eine Sorte aus AST_SORTEN heraus, meldet
-// 1b sie als fehlend; ändert man dort einen Vorrat, schlägt 2c mit beiden Zahlen an.
+// 1b sie als fehlend; ändert man dort einen Vorrat, schlägt 2c mit beiden Zahlen an. Ändert man
+// AST_RECHTE_MAX im Backend auf 6, schlägt 3a an.
 const fs = require('fs');
 const { SPIELDATEI, SERVER_JS, pruefer, ueberspringen } = require('./lib/umgebung');
 if (!SERVER_JS) ueberspringen('Backend-Quelltext nicht gefunden (Nachbarverzeichnis kolonie-kepler7-backend fehlt).');
@@ -77,6 +82,20 @@ const B_GROESSEN = new Function(bGroessen + '\nreturn AST_GROESSEN;')();
     if (fg.plaetze !== g.plaetze) abweichung.push({ groesse: g.key, feld: 'plaetze', front: fg.plaetze, back: g.plaetze });
   }
   check('2c: Vorrat, Plätze und Nachschubdauer stimmen je Größe überein', abweichung.length === 0, abweichung);
+}
+
+// ---- 3) Schürfrecht-Konstanten -------------------------------------------------------------
+{
+  const zahl = (quelle, name) => {
+    const m = quelle.match(new RegExp('const ' + name + ' = (\\d+);'));
+    return m ? Number(m[1]) : null;
+  };
+  const fBasis = zahl(FRONT, 'ASTEROID_RECHTE_BASIS'), fMax = zahl(FRONT, 'ASTEROID_RECHTE_MAX');
+  const bBasis = zahl(BACK, 'AST_RECHTE_BASIS'), bMax = zahl(BACK, 'AST_RECHTE_MAX');
+  check('3-0: alle vier Konstanten gefunden', fBasis !== null && fMax !== null && bBasis !== null && bMax !== null,
+    { fBasis, fMax, bBasis, bMax });
+  check('3a: Grundstock und Deckel des Anspruchslimits stimmen überein',
+    fBasis === bBasis && fMax === bMax, { front: [fBasis, fMax], back: [bBasis, bMax] });
 }
 
 return ende();
