@@ -1032,9 +1032,29 @@ CLAUDE.md-Regel 6 in Listenform – nach dem Umbau **erst greppen, dann committe
   Frachtraum-Warnung der Expeditionen ist der Präzedenzfall: Ihr fehlte bis zum 01.08.2026
   `codexExpeditionBonus()`, sie schätzte deshalb bis zu 13 % zu niedrig und meldete „passt", wo die
   Beute nicht mehr in den Laderaum ging. Genau dafür gibt es die Warnung, und genau so bricht sie.
-- **Tagesaufgaben und Erfolge**: bewusst zuerst *ohne* Asteroiden-Bezug ausliefern und erst in Phase 5
-  ergänzen – ein Erfolg, der eine Mechanik voraussetzt, die noch nicht rund läuft, ist eine
-  Beschwerde mit Ankündigung.
+- **Tagesaufgaben und Erfolge** ✅ (v8.499.0): bewusst zuerst *ohne* Asteroiden-Bezug ausgeliefert und
+  erst in Phase 5 ergänzt – ein Erfolg, der eine Mechanik voraussetzt, die noch nicht rund läuft, ist
+  eine Beschwerde mit Ankündigung. Umgesetzt sind zwei Tagesaufgaben (2 Abbaumissionen / 6.000
+  geschürfte Rohstoffe) und vier Erfolge (erste Ladung, 50 Missionen, eine Million geschürft, drei
+  gewonnene Anfechtungen), alle auf zwei neue Lebenszähler in `state.asteroidStats`.
+
+  Drei Entscheidungen dabei:
+
+  - **Gezählt wird die geschürfte Ladung, nicht das im Lager Angekommene.** Wer mit vollem Lager
+    heimkommt, hat trotzdem geschürft; sonst hinge der Fortschrittsbalken an etwas, das mit dem
+    Bergbau nichts zu tun hat. Der Zuschlag der Aufbereitungsanlage zählt aus demselben Grund nicht
+    mit – er entsteht beim Entladen, nicht am Brocken.
+  - **Die Zähler überleben Prestige UND Aufstieg**, wie der Abgrund. Nicht aus Großzügigkeit,
+    sondern aus Erreichbarkeit: „Schürfbaron" verlangt eine Million, und wer regelmäßig prestigt,
+    käme mit einem zurückgesetzten Zähler nie an. Folge davon sind drei Anzeigestellen, die
+    auflisten, was ein Reset erhält (beide Dialoge, Hilfe-Abschnitt „Prestige") – alle drei
+    mitgezogen.
+  - **Keine Tagesaufgabe auf Schürfrechte oder Anfechtungen.** Beide brauchen den Server; im
+    Solo-Modus – laut CLAUDE.md eine Architektur-Zusage – wären sie unerfüllbar, und ein
+    `available`-Prädikat auf `useBackend()` hätte den Tag verdorben, an dem jemand zwischendurch die
+    Sitzung verliert (genau der Fehler vom 14.08., behoben in v8.490.0). Der Erfolg
+    „Revierkämpfer" darf das, weil ein Erfolg keine Tagesfrist hat – dasselbe gilt für die
+    vorhandenen Allianz- und Mond-Erfolge.
 
 ---
 
@@ -1111,7 +1131,7 @@ steht Sekunden später auf `gamegeeeeek.de`.
 | **2** ✅ | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, **Schürfpeilungen aus Expeditionen**, Hilfe/Tutorial | nein | ausgeliefert: Peilungen v8.482.0, Anlage v8.485.0. Die Energie je Einheit ist **gemessen** und liegt bei 12 statt der veranschlagten 1,5 (Abschnitt 12.2) |
 | **3** ✅ | **Deckel + Bestandskonten-Ausgleich** | nein | ausgeliefert mit v8.486.0. Der Verlust ist **gemessen** (Abschnitt 4.2), der Ausgleich läuft einmalig beim Laden. **Nicht** umgesetzt: das zusätzliche Schürfrecht aus 4.3 – Schürfrechte gibt es erst mit Phase 4 |
 | **4** ✅ | Geteilter Vorrat: Feld-Dokumente, wandernder Nachschub, `mine`, Schürfrechte, Anspruchslimit | **ja** | Schritt 1 (geteilter Vorrat) ausgeliefert mit v8.487.0/#98, Schritt 2 (Schürfrechte, Eskorte, Anspruchslimit) mit v8.489.0/#100. Abweichungen: (a) `schutzBis` wird noch NICHT geschrieben – das ist ein Phase-5-Feld, der claim-Endpunkt legt es erst mit der Anfechtung an; (b) die Eskorte wird über den claim-Endpunkt abgeglichen statt über eine eigene Route – der Server liest sie aus `save.asteroidEskorten` des GESPEICHERTEN Spielstands, nie aus dem Request (beim Stationieren haben die Schiffe die Heimflotte längst verlassen, eine Prüfung gegen `save.fleet` würde den ehrlichen Fall ablehnen); (c) `rschuerfrecht` steht bewusst in KEINER Meilenstein-Gruppe – „Bergbau-Meisterschaft“ ist mit den zwei Bestandsforschungen verdienbar, und eine nachträglich wachsende Gruppe würde einen erreichten Meilenstein wegrücken (derselbe Grund, aus dem `raufbereitung` nie gebaut wurde) |
-| **5** ◐ | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | **Anfechtung ausgeliefert** (Backend #101, Frontend v8.491.0): `asteroid-contest`, Schutzfrist 2 Std., Abklingzeit 4 Std., Allianz-Sperre, Verluste beidseitig, Vorrat unangetastet. **Benachrichtigung ausgeliefert** (Backend #102, Frontend v8.494.0): `asteroid-contested` an den Halter, Kategorie `attack` statt eigener Einstellung, Sprungziel Sektorkarte. Entscheidungen zu beidem in 6.3.1. **Bergungsfrachter ausgeliefert** (v8.497.0): 3.000 Frachtraum, Geschwindigkeit 25, kein Lagerbeitrag, nicht routenbindbar – Begründungen im Schiffsabschnitt. **Noch offen:** Erfolge und Tagesaufgaben mit Asteroiden-Bezug |
+| **5** ◐ | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | **Anfechtung ausgeliefert** (Backend #101, Frontend v8.491.0): `asteroid-contest`, Schutzfrist 2 Std., Abklingzeit 4 Std., Allianz-Sperre, Verluste beidseitig, Vorrat unangetastet. **Benachrichtigung ausgeliefert** (Backend #102, Frontend v8.494.0): `asteroid-contested` an den Halter, Kategorie `attack` statt eigener Einstellung, Sprungziel Sektorkarte. Entscheidungen zu beidem in 6.3.1. **Bergungsfrachter ausgeliefert** (v8.497.0): 3.000 Frachtraum, Geschwindigkeit 25, kein Lagerbeitrag, nicht routenbindbar – Begründungen im Schiffsabschnitt. **Erfolge und Tagesaufgaben ausgeliefert** (v8.499.0): zwei Tagesaufgaben, vier Erfolge, zwei Lebenszähler, die beide Resets überleben. **Phase 5 damit abgeschlossen.** |
 
 **Phase 1 ist eigenständig spielbar.** Ohne Backend, ohne Schürfrechte, ohne Deckel: Man sucht sich
 einen Brocken, schickt eine Flotte, bekommt eine Ladung. Wenn nach Phase 1 klar wird, dass sich der
