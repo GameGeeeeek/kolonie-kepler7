@@ -33,13 +33,24 @@ function schnitt(von, bis){
 // Endmarke ist das Array-Ende selbst (Einrueckung mit drei Leerzeichen), nicht die naechste
 // Konstante: Dazwischen steht Code, der BUILDING_DEFS anfasst und hier nichts zu suchen hat.
 const defsSlice   = schnitt('const SHIP_DEFS = [', '\n  ];\n  const SUPER_SPEED') + '\n  ];';
-const keysSlice   = schnitt("const EXPLORE_SHIP_KEYS = ['ships'];", 'const CARGO_PER_FRACHTER = 300');
+// Endmarke: die Stelle, an der bis v8.497.0 'const CARGO_PER_FRACHTER = 300' stand - die Konstante
+// ist in der Tabelle CARGO_PER_SHIP aufgegangen, an ihrem Platz steht jetzt der Verweis darauf.
+// Die Marke muss GENAU dort bleiben: Der Ausschnitt braucht alles bis dahin, unter anderem
+// shipBaseAtk. Eine zu frueh gesetzte Endmarke (erster Versuch: der Kommentar hinter
+// KAMPF_SHIP_KEYS) laesst den Test mit "shipBaseAtk is not defined" abstuerzen - laut, nicht still,
+// und das ist der Grund, warum hier ein Anker und kein Suchmuster steht.
+const keysSlice   = schnitt("const EXPLORE_SHIP_KEYS = ['ships'];", '// Die Zahlen stehen in CARGO_PER_SHIP weiter oben');
+// KAMPF_SHIP_KEYS leitet sich seit v8.497.0 aus CARGO_SHIP_KEYS ab, und das steht weiter oben in
+// der Datei - ohne diesen Zusatz wirft der Ausschnitt beim Ausfuehren einen ReferenceError. Auch
+// hier aus der Datei geholt statt nachgebaut: Eine eingetippte Kopie waere beim vierten Frachter
+// wieder falsch, und zwar unbemerkt, weil der Test dann nur mit den falschen Schluesseln rechnete.
+const cargoSlice  = schnitt('const CARGO_PER_SHIP = {', '\n  /* Passiver Lagerbeitrag');
 const dimSlice    = schnitt('const MEGA_FLEET_THRESHOLD = 300;', '\n  // Flotten-Diversitäts-Bonus');
 const kostenNamen = [...new Set([...defsSlice.matchAll(/costFn:\s*(\w+)/g)].map(m => m[1]))];
 
 const ctx = {};
 const superWeight = schnitt('const SUPERSCHLACHTSCHIFF_DEF_WEIGHT = ', '\n');
-new Function('ctx', 'var ' + kostenNamen.join(', ') + ';\n' + defsSlice + '\n' + superWeight + '\n' + dimSlice + '\n' + keysSlice
+new Function('ctx', 'var ' + kostenNamen.join(', ') + ';\n' + defsSlice + '\n' + superWeight + '\n' + dimSlice + '\n' + cargoSlice + '\n' + keysSlice
   + ';ctx.SHIP_DEFS=SHIP_DEFS; ctx.KEYS=ATTACK_SHIP_KEYS; ctx.atk=shipBaseAtk;'
   + 'ctx.eAtk=estimateEnemyFleetAtk; ctx.eDef=estimateEnemyFleetDefense; ctx.dim=diminishingShipCount;')(ctx);
 

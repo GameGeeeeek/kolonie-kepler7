@@ -959,11 +959,34 @@ Die Abbauzeit bleibt konstant, der Ertrag steigt um 40 %. Genau so soll sich ein
 0,60/s Abbaurate und 400 Laderaum je Schiff, künftig regulär über `rminentechnik` freigeschaltet
 statt nur über das Goldrausch-Event.
 
-**Bergungsfrachter** (`bergungsfrachter`) – optional, für später: doppelter Laderaum des Großen
-Frachters (3.000), halbe Geschwindigkeit, kein Angriffswert. Er lohnt sich genau dann, wenn die
-Flugzeit klein gegen die Abbauzeit ist – also bei den großen Brocken weit draußen. Bewusst als
-**Phase-5-Inhalt** markiert: Frachter und Großfrachter decken den Bedarf zunächst vollständig ab,
-und ein drittes Frachtschiff, bevor die Mechanik steht, ist Ballast.
+**Bergungsfrachter** (`bergungsfrachter`) ✅ – **gebaut (v8.497.0)**, wie entworfen: doppelter
+Laderaum des Großen Frachters (3.000), halbe Geschwindigkeit (25 statt 50), kein Angriffswert.
+Er lohnt sich genau dann, wenn die Flugzeit klein gegen die Abbauzeit ist – also bei den großen
+Brocken weit draußen. War bewusst als **Phase-5-Inhalt** markiert: Frachter und Großfrachter decken
+den Bedarf zunächst vollständig ab, und ein drittes Frachtschiff, bevor die Mechanik steht, ist
+Ballast.
+
+Drei Entscheidungen kamen beim Bauen dazu, alle drei stehen als Kommentar im Code:
+
+- **Kein passiver Lagerbeitrag**, anders als bei den beiden anderen Frachtern (250 bzw. 1.000 je
+  Schiff). Sein Nachteil ist die halbe Geschwindigkeit – und Lager fliegt nicht mit. Ein
+  Lagerbeitrag ginge an diesem Nachteil vollständig vorbei und machte aus einem Spezialisten für
+  weite Strecken das billigste Lagerhaus des Spiels (2.000 Lager für den 1,5-fachen Preis eines
+  Großen Frachters, der 1.000 gibt). `LAGER_PER_SHIP` ist deshalb bewusst kürzer als
+  `CARGO_PER_SHIP`, mit der Begründung an Ort und Stelle.
+- **Nicht an Handelsrouten bindbar.** Eine Route zahlt je *Schiff*, nicht je Frachtraum – ein
+  3.000er-Rumpf brächte dort exakt so viel wie ein Kleiner Frachter für 300. Das wäre keine Wahl,
+  sondern eine Falle. `availableFrachter()` trägt dazu einen Kommentar, damit die Auslassung nicht
+  mit dem Fehler von 13.07.2026 verwechselt wird, bei dem der Große Frachter dort *versehentlich*
+  fehlte.
+- **Kosten 1,5× des Großen Frachters** (1.200/600/300) für den doppelten Laderaum. Bei glatt
+  doppeltem Preis wäre er strikt schlechter als zwei Große Frachter – gleiche Ladung, halbes Tempo,
+  kein Lager – und niemand hätte ihn gebaut.
+
+Nebenbei aufgeräumt: Frachtraum und Lagerbeitrag lagen bis dahin in zwei Konstanten *und* einer
+Schlüsselliste, die sich gegenseitig nicht kannten (`CARGO_PER_FRACHTER`, `CARGO_PER_FRACHTER_GROSS`,
+`CARGO_SHIP_KEYS`). Beim dritten Frachter wären das drei Stellen gewesen, die einzeln zu treffen
+sind; jetzt sind es zwei Tabellen, aus denen die Schlüssel abgeleitet werden.
 
 ### Module und Kosmetik
 
@@ -1088,7 +1111,7 @@ steht Sekunden später auf `gamegeeeeek.de`.
 | **2** ✅ | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, **Schürfpeilungen aus Expeditionen**, Hilfe/Tutorial | nein | ausgeliefert: Peilungen v8.482.0, Anlage v8.485.0. Die Energie je Einheit ist **gemessen** und liegt bei 12 statt der veranschlagten 1,5 (Abschnitt 12.2) |
 | **3** ✅ | **Deckel + Bestandskonten-Ausgleich** | nein | ausgeliefert mit v8.486.0. Der Verlust ist **gemessen** (Abschnitt 4.2), der Ausgleich läuft einmalig beim Laden. **Nicht** umgesetzt: das zusätzliche Schürfrecht aus 4.3 – Schürfrechte gibt es erst mit Phase 4 |
 | **4** ✅ | Geteilter Vorrat: Feld-Dokumente, wandernder Nachschub, `mine`, Schürfrechte, Anspruchslimit | **ja** | Schritt 1 (geteilter Vorrat) ausgeliefert mit v8.487.0/#98, Schritt 2 (Schürfrechte, Eskorte, Anspruchslimit) mit v8.489.0/#100. Abweichungen: (a) `schutzBis` wird noch NICHT geschrieben – das ist ein Phase-5-Feld, der claim-Endpunkt legt es erst mit der Anfechtung an; (b) die Eskorte wird über den claim-Endpunkt abgeglichen statt über eine eigene Route – der Server liest sie aus `save.asteroidEskorten` des GESPEICHERTEN Spielstands, nie aus dem Request (beim Stationieren haben die Schiffe die Heimflotte längst verlassen, eine Prüfung gegen `save.fleet` würde den ehrlichen Fall ablehnen); (c) `rschuerfrecht` steht bewusst in KEINER Meilenstein-Gruppe – „Bergbau-Meisterschaft“ ist mit den zwei Bestandsforschungen verdienbar, und eine nachträglich wachsende Gruppe würde einen erreichten Meilenstein wegrücken (derselbe Grund, aus dem `raufbereitung` nie gebaut wurde) |
-| **5** ◐ | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | **Anfechtung ausgeliefert** (Backend #101, Frontend v8.491.0): `asteroid-contest`, Schutzfrist 2 Std., Abklingzeit 4 Std., Allianz-Sperre, Verluste beidseitig, Vorrat unangetastet. **Benachrichtigung ausgeliefert** (Backend #102, Frontend v8.494.0): `asteroid-contested` an den Halter, Kategorie `attack` statt eigener Einstellung, Sprungziel Sektorkarte. Entscheidungen zu beidem in 6.3.1. **Noch offen:** Bergungsfrachter, Erfolge und Tagesaufgaben mit Asteroiden-Bezug |
+| **5** ◐ | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | **Anfechtung ausgeliefert** (Backend #101, Frontend v8.491.0): `asteroid-contest`, Schutzfrist 2 Std., Abklingzeit 4 Std., Allianz-Sperre, Verluste beidseitig, Vorrat unangetastet. **Benachrichtigung ausgeliefert** (Backend #102, Frontend v8.494.0): `asteroid-contested` an den Halter, Kategorie `attack` statt eigener Einstellung, Sprungziel Sektorkarte. Entscheidungen zu beidem in 6.3.1. **Bergungsfrachter ausgeliefert** (v8.497.0): 3.000 Frachtraum, Geschwindigkeit 25, kein Lagerbeitrag, nicht routenbindbar – Begründungen im Schiffsabschnitt. **Noch offen:** Erfolge und Tagesaufgaben mit Asteroiden-Bezug |
 
 **Phase 1 ist eigenständig spielbar.** Ohne Backend, ohne Schürfrechte, ohne Deckel: Man sucht sich
 einen Brocken, schickt eine Flotte, bekommt eine Ladung. Wenn nach Phase 1 klar wird, dass sich der

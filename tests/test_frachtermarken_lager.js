@@ -36,8 +36,15 @@ check('1a: storageCap kennt den Markenzweig beider Frachterklassen',
 check('1b: beide Beitragstellen (Basis + Handelswelt) nutzen die per-Klasse-Multiplikatoren',
   (sc.match(/frachterLagerMult/g) || []).length >= 2 && (sc.match(/grossLagerMult/g) || []).length >= 2,
   { frachter: (sc.match(/frachterLagerMult/g) || []).length, gross: (sc.match(/grossLagerMult/g) || []).length });
-check('1c: fleetCargoCapacity nutzt dieselben Marken-Terme (eine Größe, zwei Stellen, EIN Term)',
-  fcc.includes("shipMarkBonus('frachter', 'cargo')") && fcc.includes("shipMarkBonus('frachtergross', 'cargo')"));
+// Seit v8.497.0 summiert fleetCargoCapacity ueber CARGO_SHIP_KEYS, der Marken-Term steht also
+// einmal mit dem Schleifenschluessel da statt zweimal mit festen Klassennamen. Die geprüfte REGEL
+// ist unverändert: Lager und Frachtraum benutzen denselben Term JE KLASSE, keinen pauschalen.
+// Beide Schreibweisen erfüllen sie - die Schleifenform sogar strenger, weil sie keine Klasse
+// vergessen KANN. Das eigentliche Verhalten misst ohnehin 3c im Browser.
+check('1c: fleetCargoCapacity nutzt denselben Marken-Term je Klasse (eine Größe, zwei Stellen)',
+  (fcc.includes("shipMarkBonus(k, 'cargo')") && fcc.includes('CARGO_SHIP_KEYS'))
+  || (fcc.includes("shipMarkBonus('frachter', 'cargo')") && fcc.includes("shipMarkBonus('frachtergross', 'cargo')")),
+  fcc.replace(/\s+/g, ' ').slice(0, 220));
 
 // ---- 1d) Anzeige (v8.432.0, Wunsch Sascha): die Frachter-Karten zeigen die AKTUELLEN Werte,
 // gerechnet mit DENSELBEN Termen (Cargo-Modul klassenweit, Marke je Klasse) - keine dritte Formel.

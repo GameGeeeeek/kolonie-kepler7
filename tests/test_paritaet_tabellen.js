@@ -115,7 +115,59 @@ for (const feld of ['shipsAtAllianceBase', 'allianceMusterContribution']) {
 const beScore = (beSrc.match(/function computeScoreServer\(save\) \{([\s\S]*?)\n\}/) || [])[1] || '';
 check('computeScoreServer ruft awayShipTotalsServer auf', beScore.includes('awayShipTotalsServer('));
 
-// ---- 4. Gegenprobe -----------------------------------------------------------------------------
+// ---- 4. Punktegewichte je Schiffstyp ------------------------------------------------------------
+// Der Server ueberschreibt den eingereichten Punktestand BEDINGUNGSLOS mit seiner eigenen Rechnung.
+// Ein Schiff, das nur die Frontend-Tabelle kennt, zaehlt in der Bestenliste deshalb NULL - der
+// Spieler sieht seinen Punktestand fallen, sobald er es baut, und findet dafuer keine Erklaerung.
+// Genau das ist am 23.07.2026 mit Metamaterial-Titan und Singularitaets-Vernichter passiert und am
+// 20.07.2026 mit dem Mondzerstoerer; beide Male stand die Ursache erst im Nachhinein im Kommentar.
+// Verglichen werden MENGEN, nicht einzelne Namen - ein kuenftiges Schiff faellt damit von selbst auf.
+const gewichteLesen = (quelle) => {
+  const block = (quelle.match(/const SHIP_SCORE_WEIGHTS = \{([\s\S]*?)\n\s*\};/) || [])[1] || '';
+  const raus = {};
+  // Kommentare vorher weg: Sie enthalten Zahlen und Schiffsnamen ("atk 300", "-> 180") und wuerden
+  // sonst als Eintraege gelesen - ein Messwerkzeug, das sich selbst im Weg steht.
+  for (const zeile of block.split('\n')) {
+    const ohneKommentar = zeile.replace(/\/\/.*$/, '');
+    for (const t of ohneKommentar.matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\d+)/g)) raus[t[1]] = Number(t[2]);
+  }
+  return raus;
+};
+const feGew = gewichteLesen(feSrc);
+const beGew = gewichteLesen(beSrc);
+const gewFehlen = Object.keys(feGew).filter(k => !(k in beGew));
+const gewZuviel = Object.keys(beGew).filter(k => !(k in feGew));
+const gewAbweich = Object.keys(feGew).filter(k => k in beGew && beGew[k] !== feGew[k]);
+check('Backend kennt jeden Schiffstyp der Frontend-Punktetabelle', gewFehlen.length === 0, gewFehlen);
+check('Backend fuehrt keinen Schiffstyp, den das Frontend nicht kennt', gewZuviel.length === 0, gewZuviel);
+check('Die Punktegewichte stimmen ueberein', gewAbweich.length === 0,
+  gewAbweich.map(k => k + ': FE=' + feGew[k] + ' BE=' + beGew[k]));
+// Und die Tabelle muss auch die SCHIFFE des Spiels abdecken - eine in sich stimmige, aber
+// unvollstaendige Kopie waere hier sonst gruen. SHIP_DEFS ist die Wahrheit darueber, was es gibt.
+//
+// AUSGENOMMEN ist die TIEFENFLOTTE (tiefenschiff:true, neun Schiffe). Das ist keine Luecke, sondern
+// die Bauart, und sie steht so im Code: Diese Schiffe werden in der eigenen Waehrung `bergung`
+// bezahlt statt in Ressourcen, stehen bewusst NICHT in ATTACK_SHIP_KEYS ("die Trennung ist nicht
+// behauptet, sondern baulich unmoeglich zu verletzen", Kommentar an SHIP_DEFS), und der Abgrund
+// zahlt ueber abgrundScoreTotal() - die Rekordtiefe, nicht die Flotte - in den Punktestand ein.
+// Wuerde diese Pruefung sie mitzaehlen, bliebe sie so lange rot, bis jemand neun Gewichte erfindet
+// und damit die Bestenliste verschiebt. Die Regel, die hier wirklich gilt, ist die engere:
+// Ein Schiff, das im NORMALEN Spiel gebaut und geflogen wird, braucht ein Gewicht.
+const feSchiffe = [];
+const feTiefenschiffe = [];
+for (const z of feZeilen) {
+  const m = z.match(/^\s*\{ key:'([a-z0-9_]+)', name:'[^']*', icon:'ship_/);
+  if (!m) continue;
+  feSchiffe.push(m[1]);
+  if (/tiefenschiff:\s*true/.test(z)) feTiefenschiffe.push(m[1]);
+}
+const ohneGewicht = feSchiffe.filter(k => !(k in feGew) && !feTiefenschiffe.includes(k));
+check('Gegenprobe: SHIP_DEFS wurde ueberhaupt gelesen', feSchiffe.length > 30, feSchiffe.length);
+check('Gegenprobe: die Tiefenflotte wurde als solche erkannt (sonst prueft die Ausnahme nichts)',
+  feTiefenschiffe.length === 9, feTiefenschiffe);
+check('Jedes regulaere Schiff aus SHIP_DEFS hat ein Punktegewicht', ohneGewicht.length === 0, ohneGewicht);
+
+// ---- 5. Gegenprobe -----------------------------------------------------------------------------
 // Ohne sie waeren gruene Haken oben auch dann zu sehen, wenn die Leseregeln gar nichts finden.
 check('Gegenprobe: die Leseregeln finden ueberhaupt etwas',
   Object.keys(feDef).length > 0 && Object.keys(beDef).length > 0

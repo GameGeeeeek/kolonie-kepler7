@@ -219,6 +219,20 @@ function ereignisUhrenPinnen(st){
   check('4c keine Konsolenfehler', fehler.length === 0, fehler.slice(0, 3));
   await c.ctx.close();
 
+  /* Die Oberflaeche zeigt Zahlen durch fmt(): ab 1.000 als "4.6k", ab 1.000.000 als "1.23M",
+     darunter roh. Wer nur /([\d.]+)/ liest, bekommt aus "4.6k" die 46 - Faktor 100 daneben, und
+     zwar STILL: Verhaeltnisse zwischen zwei so gelesenen Werten stimmen trotzdem, der Fehler faellt
+     also erst auf, wenn man die absoluten Zahlen ansieht (gemessen 14.08.2026, genau so passiert).
+     Diese Funktion kennt alle drei Formen. Was sie NICHT heilen kann, ist die Aufloesung: Bei
+     "4.6k" steht die Zahl auf 100 genau. Jede Pruefung darunter muss ihre Flottengroesse deshalb so
+     waehlen, dass der gesuchte Unterschied deutlich groesser ist als diese Koernung. */
+  const zahlAus = (txt) => {
+    const m = String(txt).match(/(\d+(?:\.\d+)?)\s*(k|M)?/);
+    if (!m) return null;
+    const n = Number(m[1]);
+    return m[2] === 'M' ? n * 1000000 : m[2] === 'k' ? n * 1000 : n;
+  };
+
   // ---- 5) Foerdertechnik hebt Rate UND Laderaum ---------------------------------------------
   async function vorschauMit(stufe){
     const t = await tab(browser, abgewandelt(stA, st => {
@@ -235,7 +249,7 @@ function ereignisUhrenPinnen(st){
     const txt = await t.page.evaluate(() => { const o = document.querySelector('#fwahlOverlay'); return o ? o.innerText : ''; });
     await t.ctx.close();
     return {
-      ladung: parseInt(((txt.match(/Ladung\s+([\d.]+)/) || [])[1] || '0').replace(/\./g, ''), 10),
+      ladung: zahlAus((txt.match(/Ladung\s+([\d.]+[kM]?)/) || [])[1] || '0'),
       abbau: ((txt.match(/Abbau\s+([^\u00b7]+)\u00b7/) || [])[1] || '').trim(),
       txt
     };
@@ -243,6 +257,83 @@ function ereignisUhrenPinnen(st){
   const s0 = await vorschauMit(0), s10 = await vorschauMit(10);
   check('5a Foerdertechnik erhoeht die Ladung um ~40%', s0.ladung > 0 && Math.abs(s10.ladung / s0.ladung - 1.4) < 0.08, { s0: s0.ladung, s10: s10.ladung });
   check('5b die Abbauzeit bleibt dabei gleich', !!s0.abbau && s0.abbau === s10.abbau, { s0: s0.abbau, s10: s10.abbau });
+
+  // ---- 6) Bergungsfrachter: doppelte Ladung, halbes Tempo, KEIN Lager ------------------------
+  // Der Bergungsfrachter ist kein Upgrade, sondern ein Tausch. Alle drei Seiten davon werden hier
+  // GEMESSEN und nicht aus den Konstanten abgelesen: die Ladung gegen den Grossen Frachter, die
+  // Flugzeit gegen denselben Lauf, und der Lagerdeckel gegen einen Lauf ganz ohne Frachter.
+  // Der Lagerdeckel ist der Teil, der am leichtesten still kaputtgeht - beide anderen Frachter
+  // zahlen darauf ein, und ein "der Vollstaendigkeit halber"-Eintrag in LAGER_PER_SHIP wuerde den
+  // Geschwindigkeits-Nachteil des Schiffs komplett aushebeln, ohne dass irgendwo etwas rot wird.
+  const sekunden = (txt) => {
+    // fmtDuration kennt drei Formen: "42s", "5m 30s", "2h 7m".
+    let m;
+    if ((m = txt.match(/^(\d+)h (\d+)m$/))) return Number(m[1])*3600 + Number(m[2])*60;
+    if ((m = txt.match(/^(\d+)m (\d+)s$/))) return Number(m[1])*60 + Number(m[2]);
+    if ((m = txt.match(/^(\d+)s$/))) return Number(m[1]);
+    return null;
+  };
+  // 40 Schiffe, nicht zwei: Der Unterschied, um den es geht, muss deutlich ueber der Koernung der
+  // Anzeige liegen (siehe zahlAus). Bei zwei Schiffen waere der Lagerbeitrag eines fehlerhaften
+  // Bergungsfrachters unter Umstaenden komplett in der Rundung verschwunden - die Pruefung waere
+  // dann aus dem falschen Grund gruen gewesen.
+  const ANZAHL = 40;
+  async function messungMit(flottenAenderung){
+    const t = await tab(browser, abgewandelt(stA, st => {
+      st.research = st.research || {};
+      st.research.rminentechnik = 1;
+      st.research.rfoerderung = 0;
+      st.fleet.schuerfschiff = 4;
+      st.fleet.frachter = 0; st.fleet.frachtergross = 0; st.fleet.bergungsfrachter = 0;
+      st.buildings.lager = 120;
+      flottenAenderung(st);
+      for (const r of ['energie','erz','kristalle','deuterium','antimaterie']) st.resources[r] = 4000;
+    }));
+    // Der Lagerdeckel steht auf jeder Ressourcenkarte als "/ Zahl" - gescopt auf die Erz-Karte
+    // (Arbeitsregel 5), sonst trifft der Selektor die erstbeste Karte irgendeines Reiters.
+    const lagerTxt = await t.page.evaluate(() => {
+      const el = document.querySelector('.rescard[data-res="erz"] .value span');
+      return el ? el.textContent : '';
+    });
+    await aufKarte(t);
+    await oeffneMenue(t);
+    const txt = await t.page.evaluate(() => { const o = document.querySelector('#fwahlOverlay'); return o ? o.innerText : ''; });
+    await t.ctx.close();
+    const lz = txt.match(/Ladung\s+([\d.]+[kM]?) von ([\d.]+[kM]?) Laderaum/) || [];
+    return {
+      lager: zahlAus(lagerTxt.replace('/', '')),
+      ladung: zahlAus(lz[1] || '0'),
+      raum: zahlAus(lz[2] || '0'),
+      hinflug: sekunden(((txt.match(/Hinflug\s+([^\u00b7]+)\u00b7/) || [])[1] || '').trim())
+    };
+  }
+  const ohne = await messungMit(() => {});
+  const gross = await messungMit(st => { st.fleet.frachtergross = ANZAHL; });
+  const bergung = await messungMit(st => { st.fleet.bergungsfrachter = ANZAHL; });
+  check('6-vorab: die Vorschau liefert ueberhaupt Zahlen (sonst misst 6a-6d nichts)',
+    ohne.ladung > 0 && ohne.lager > 0 && ohne.hinflug > 0, ohne);
+  /* Gemessen wird der LADERAUM, nicht die Ladung - und das ist kein Detail, sondern der Grund,
+     aus dem diese Pruefung ueberhaupt hier steht. Bei 40 Schiffen ist der VORRAT DES BROCKENS die
+     engere Schranke: In beiden Laeufen steht dieselbe Ladung (gemessen 48.400), waehrend der
+     Frachtraum sauber mitwaechst (61.600 gegen 121.600). Wer die Ladung verglichen haette, haette
+     den Brocken gemessen statt das Schiff - genau Arbeitsregel 7 ("messen, was gemessen werden
+     soll, nicht den Deckel"). Die Pruefung haelt beides fest, damit niemand sie "vereinfacht":
+     Wird der Testbrocken irgendwann groesser, faellt sie auf und der Kommentar erklaert, warum. */
+  check('6-vorab2: die Ladung ist hier vom Brocken gedeckelt - deshalb wird der Laderaum verglichen',
+    gross.ladung === bergung.ladung && bergung.raum > gross.raum && gross.raum > ohne.raum,
+    { ladungGross: gross.ladung, ladungBergung: bergung.ladung, raumGross: gross.raum, raumBergung: bergung.raum });
+  // Gegen den GEMESSENEN Ausgangsstand statt gegen eingetippte Zahlen (Arbeitsregel 2).
+  const zuwachsGross = gross.raum - ohne.raum;
+  const zuwachsBergung = bergung.raum - ohne.raum;
+  check('6a der Bergungsfrachter traegt doppelt so viel wie der Grosse Frachter',
+    zuwachsGross > 0 && Math.abs(zuwachsBergung / zuwachsGross - 2) < 0.02,
+    { ohne: ohne.raum, gross: gross.raum, bergung: bergung.raum, zuwachsGross, zuwachsBergung });
+  check('6b und er bremst die Flotte aus - der Hinflug dauert laenger als mit dem Grossen',
+    bergung.hinflug > gross.hinflug, { gross: gross.hinflug, bergung: bergung.hinflug });
+  check('6c der Grosse Frachter hebt den Lagerdeckel (Gegenprobe zu 6d)',
+    gross.lager > ohne.lager, { ohne: ohne.lager, gross: gross.lager });
+  check('6d der Bergungsfrachter hebt ihn NICHT - sein Rumpf ist Frachtraum, kein Lager',
+    bergung.lager === ohne.lager, { ohne: ohne.lager, bergung: bergung.lager, zumVergleichGross: gross.lager });
 
   await browser.close();
   console.log(fail ? '\nERGEBNIS: FEHLER' : '\nERGEBNIS: alles gruen');

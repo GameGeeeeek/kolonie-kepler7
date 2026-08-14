@@ -38,7 +38,14 @@ const ATTACK = (zeile.match(/'([a-zA-Z]+)'/g) || []).map(x => x.slice(1, -1));
 check('ATTACK_SHIP_KEYS gefunden', ATTACK.length >= 20, ATTACK.length);
 // Frachter dürfen mitfliegen, kämpfen aber nicht - sie sind bewusst in ATTACK_SHIP_KEYS und
 // bewusst nicht in der Angriffssumme. KAMPF_SHIP_KEYS zieht genau diese Grenze.
-const NUR_TRANSPORT = ['frachter', 'frachtergross'];
+// Aus der Spieldatei gelesen statt danebengeschrieben: Das Spiel leitet KAMPF_SHIP_KEYS seit
+// v8.497.0 selbst aus CARGO_SHIP_KEYS ab (= den Schluesseln von CARGO_PER_SHIP). Eine eigene Liste
+// hier waere genau die Zweitkopie, gegen die dieser Test antritt - und sie ist es beim dritten
+// Frachter auch prompt geworden: Der Bergungsfrachter fehlte, und der Test meldete ihn als
+// Kampfklasse ohne Angriffswert, obwohl er gar keine ist.
+const CARGO_TABELLE = schnitt('const CARGO_PER_SHIP = {', '};');
+const NUR_TRANSPORT = (CARGO_TABELLE.match(/(\w+)\s*:/g) || []).map(x => x.replace(/\s*:$/, ''));
+check('Transport-Ausnahme aus CARGO_PER_SHIP gelesen', NUR_TRANSPORT.length >= 2, NUR_TRANSPORT);
 const KAMPF = ATTACK.filter(k => NUR_TRANSPORT.indexOf(k) < 0);
 
 // ---- 1) attackPowerRaw(): jede Kampfklasse trägt einen Angriffswert bei
