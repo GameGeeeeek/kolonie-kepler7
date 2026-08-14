@@ -217,7 +217,25 @@ async function imBrowser(){
     breite: +document.getElementById('galaxyMapSvg').getAttribute('viewBox').split(' ')[2],
     zurueck: document.getElementById('galaxyBackBtn').style.display }));
   check('4: Esc klappt das System wieder zu', !zu1.ebene);
-  check('4: die Kamera fährt heraus', zu1.breite > 900, zu1.breite);
+  // Bis v8.493.0 stand hier `zu1.breite > 900` - die Momentaufnahme "Rückflug aufs Gesamtfeld
+  // (950x500)". Seit Richtung A fliegt das Zuklappen auf den BELEGTEN Ausschnitt (das Feld ist zu
+  // drei Vierteln für künftige Systeme reserviert; das Gesamtfeld zeigte die Galaxie als Fleck).
+  // Die REGEL lautet: deutlich weiter draußen als die Systemansicht (410), und alle Systeme im
+  // Bild - Letzteres misst die eigene Prüfung darunter am Bildschirm, nicht an einer Literalzahl.
+  check('4: die Kamera fährt heraus', zu1.breite > 450, zu1.breite);
+  const alleImBild = await page.evaluate(()=>{
+    const svg = document.getElementById('galaxyMapSvg');
+    const r = svg.getBoundingClientRect();
+    let drin = 0, gesamt = 0;
+    svg.querySelectorAll('[data-system-node]').forEach(n => {
+      const c = n.querySelector('circle'); if (!c) return;
+      const b = c.getBoundingClientRect(); gesamt++;
+      if (b.x >= r.x-2 && b.x+b.width <= r.x+r.width+2 && b.y >= r.y-2 && b.y+b.height <= r.y+r.height+2) drin++;
+    });
+    return { drin, gesamt };
+  });
+  check('4: nach dem Zuklappen sind alle Systeme im Bild',
+    alleImBild.gesamt > 0 && alleImBild.drin === alleImBild.gesamt, alleImBild);
   check('4: und der Zurück-Knopf verschwindet', zu1.zurueck === 'none', zu1.zurueck);
 
   // 4b) Schließen über den Zurück-Knopf

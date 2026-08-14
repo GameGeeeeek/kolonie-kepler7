@@ -130,7 +130,11 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   await page.evaluate(()=>{
     const svg = document.getElementById('galaxyMapSvg');
     const r = svg.getBoundingClientRect();
-    svg.dispatchEvent(new WheelEvent('wheel', { deltaY:-240, clientX:r.left+r.width/2, clientY:r.top+r.height/2, bubbles:true, cancelable:true }));
+    // ctrlKey seit v8.493.0 (Richtung A): Rollen ohne Strg scrollt die Seite und zoomt bewusst
+    // NICHT mehr - die geprüfte Eigenschaft dieses Tests (der Zwischenspeicher friert den Zoom
+    // nicht ein) bleibt dieselbe, nur der Bedienweg ist mitgezogen (Hausregel 9). Das Verhalten
+    // OHNE Strg prüft tests/test_kartenbedienung.js in beide Richtungen.
+    svg.dispatchEvent(new WheelEvent('wheel', { deltaY:-240, ctrlKey:true, clientX:r.left+r.width/2, clientY:r.top+r.height/2, bubbles:true, cancelable:true }));
   });
   await page.waitForTimeout(500);
   const nachZoom = await page.evaluate(()=>document.getElementById('galaxyMapSvg').getAttribute('viewBox'));
