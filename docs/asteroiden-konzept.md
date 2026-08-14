@@ -821,6 +821,22 @@ Frontend die **Gegenrichtung**: Meldet der Server weniger Schiffe als lokal steh
 Kampfverlust – ausdrücklich **nur nach unten**, sonst könnte ein veraltetes Felddokument Schiffe
 herbeizaubern.
 
+**Bekommt die Benachrichtigung eine eigene Einstellung?** Der Entwurf oben sagt ja („mit eigener
+Einstellung in den Benachrichtigungs-Präferenzen"). Bei der Umsetzung (14.08.2026) ist bewusst
+davon abgewichen worden: Die Meldung läuft unter der vorhandenen Kategorie **`attack`**. Es *ist*
+ein Angriff auf ihn, und wer Angriffs-Pushes abgestellt hat, will auch diesen nicht – eine eigene
+Einstellung für eine einzelne Angriffsart wäre eine, die niemand findet. Die Liste in den
+Einstellungen hat heute dreizehn Schalter; der vierzehnte hätte weniger erklärt als verwässert.
+Zwei Folgen, beide erwünscht: Es gilt dieselbe **Anti-Flut-Drosselung** wie bei `/api/attack`
+(`allowAttackPush`, Postfach-Eintrag immer, Handy-Push höchstens alle 30 Min.), und die
+Beschreibung des Schalters musste mitgezogen werden – sie sagte „Wenn dich ein Spieler angreift"
+und wäre sonst die nächste zweite Anzeigestelle mit der alten Annahme gewesen.
+
+Der **Verteidiger bekommt bewusst keinen Bericht**, nur die Benachrichtigung: Ein Bericht wäre ein
+Schreibvorgang in seinen Spielstand, und genau den vermeidet der Absatz darüber. Das Sprungziel der
+Meldung ist deshalb die **Sektorkarte** (`karte`), wo der Rechtezustand steht – nicht der
+Berichte-Reiter, in dem für ihn nichts läge.
+
 ### 6.4 Datenmodell und Endpunkte
 
 **Ein Dokument je System**, `db.shared['asteroids:<systemId>']`:
@@ -1072,7 +1088,7 @@ steht Sekunden später auf `gamegeeeeek.de`.
 | **2** ✅ | Aufbereitungsanlage (Ausbeute + Energiekosten), Forschungen, **Schürfpeilungen aus Expeditionen**, Hilfe/Tutorial | nein | ausgeliefert: Peilungen v8.482.0, Anlage v8.485.0. Die Energie je Einheit ist **gemessen** und liegt bei 12 statt der veranschlagten 1,5 (Abschnitt 12.2) |
 | **3** ✅ | **Deckel + Bestandskonten-Ausgleich** | nein | ausgeliefert mit v8.486.0. Der Verlust ist **gemessen** (Abschnitt 4.2), der Ausgleich läuft einmalig beim Laden. **Nicht** umgesetzt: das zusätzliche Schürfrecht aus 4.3 – Schürfrechte gibt es erst mit Phase 4 |
 | **4** ✅ | Geteilter Vorrat: Feld-Dokumente, wandernder Nachschub, `mine`, Schürfrechte, Anspruchslimit | **ja** | Schritt 1 (geteilter Vorrat) ausgeliefert mit v8.487.0/#98, Schritt 2 (Schürfrechte, Eskorte, Anspruchslimit) mit v8.489.0/#100. Abweichungen: (a) `schutzBis` wird noch NICHT geschrieben – das ist ein Phase-5-Feld, der claim-Endpunkt legt es erst mit der Anfechtung an; (b) die Eskorte wird über den claim-Endpunkt abgeglichen statt über eine eigene Route – der Server liest sie aus `save.asteroidEskorten` des GESPEICHERTEN Spielstands, nie aus dem Request (beim Stationieren haben die Schiffe die Heimflotte längst verlassen, eine Prüfung gegen `save.fleet` würde den ehrlichen Fall ablehnen); (c) `rschuerfrecht` steht bewusst in KEINER Meilenstein-Gruppe – „Bergbau-Meisterschaft“ ist mit den zwei Bestandsforschungen verdienbar, und eine nachträglich wachsende Gruppe würde einen erreichten Meilenstein wegrücken (derselbe Grund, aus dem `raufbereitung` nie gebaut wurde) |
-| **5** ◐ | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | **Anfechtung ausgeliefert** (Backend #101, Frontend v8.491.0): `asteroid-contest`, Schutzfrist 2 Std., Abklingzeit 4 Std., Allianz-Sperre, Verluste beidseitig, Vorrat unangetastet. Entscheidungen dazu in 6.3.1. **Noch offen:** Push-Benachrichtigung an den Halter (er erfährt den Angriff bisher über das Felddokument, sobald sein Spiel das Feld neu liest), Bergungsfrachter, Erfolge und Tagesaufgaben mit Asteroiden-Bezug |
+| **5** ◐ | Anfechtung, Schutzfristen, Benachrichtigungen, Bergungsfrachter, Erfolge, Tagesaufgaben | **ja** | **Anfechtung ausgeliefert** (Backend #101, Frontend v8.491.0): `asteroid-contest`, Schutzfrist 2 Std., Abklingzeit 4 Std., Allianz-Sperre, Verluste beidseitig, Vorrat unangetastet. **Benachrichtigung ausgeliefert** (Backend #102, Frontend v8.494.0): `asteroid-contested` an den Halter, Kategorie `attack` statt eigener Einstellung, Sprungziel Sektorkarte. Entscheidungen zu beidem in 6.3.1. **Noch offen:** Bergungsfrachter, Erfolge und Tagesaufgaben mit Asteroiden-Bezug |
 
 **Phase 1 ist eigenständig spielbar.** Ohne Backend, ohne Schürfrechte, ohne Deckel: Man sucht sich
 einen Brocken, schickt eine Flotte, bekommt eine Ladung. Wenn nach Phase 1 klar wird, dass sich der

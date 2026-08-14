@@ -120,6 +120,12 @@ function backend(store, opt){
       if (store[k] !== undefined) return j({ key:k, value:store[k], version:1 });
       return j({ e:1 }, 404);
     }
+    // Das Postfach. Der echte Server rechnet 'ziel' erst beim Ausliefern aus (notificationTarget),
+    // deshalb steht es hier auch nicht in den Fixture-Eintraegen.
+    if (p === 'notifications'){
+      if (req.method() === 'POST') return j({ ok:true });
+      return j({ notifications: (store.__meldungen || []).map(n => Object.assign({ ziel:'karte' }, n)) });
+    }
     if (p === 'reports'){
       if (req.method() === 'POST'){ try { store.__berichte.unshift(JSON.parse(req.postData()||'{}').report || {}); } catch(e){} return j({ ok:true }); }
       return j({ reports: store.__berichte });
@@ -413,6 +419,63 @@ async function marker(t){
   check('8f: es gibt einen Bericht mit Ausgang und beiden Verlustseiten',
     !!anfBericht && anfBericht.gewonnen === true && !!anfBericht.eigeneVerluste && !!anfBericht.gegnerVerluste,
     anfBericht ? { gewonnen: anfBericht.gewonnen, eigene: anfBericht.eigeneVerluste } : null);
+
+  // ---- 9) Was der Spieler danach zu SEHEN bekommt (v8.494.0) -----------------------------------
+  // 8f belegt, dass der Bericht ENTSTEHT. Hier geht es um die drei Anzeigestellen, die ihn danach
+  // falsch oder gar nicht zeigten - die typische zweite Anzeigestelle mit der alten Annahme:
+  //   (a) Der Ausgang steht in 'gewonnen', nicht in result:'win'. reportIsPositive kannte nur
+  //       'win'/'destroyed' - eine GEWONNENE Anfechtung bekam den roten Streifen samt Pille
+  //       "Verloren", und der Filter "Nur Erfolge" blendete sie aus.
+  //   (b) Keine Filterkategorie beanspruchte 'asteroid-contest'; reportCategoryOf faellt dann auf
+  //       'other' zurueck, der Kampfbericht lag also unter "Sonstiges".
+  //   (c) Ohne Eintrag in NOTIF_EVENT_INFO greift der Notnagel der Tabelle: GEMESSEN stand am alten
+  //       Stand zweimal das nackte Wort "Ereignis" im Postfach - fuer beide Ausgaenge derselbe Text,
+  //       der weder sagt, was passiert ist, noch ob das Recht noch steht. (Der 'chat'-Kommentar in
+  //       der Spieldatei spricht von einer leeren Zeile; das galt vor dem Notnagel.)
+  t6.store.__meldungen = [
+    { id:'n1', type:'asteroid-contested', time: Date.now(), payload:{ angreiferName:'Rivale', verloren:true,  sorte:'eiskern', system:SERVER_SYSTEM } },
+    { id:'n2', type:'asteroid-contested', time: Date.now(), payload:{ angreiferName:'Rivale', verloren:false, sorte:'eiskern', system:SERVER_SYSTEM } }
+  ];
+  await t6.page.evaluate(() => { const b = document.getElementById('headerReportsBtn'); if (b) b.click(); });
+  await t6.page.waitForTimeout(1500);
+  // Gescopt auf #reportsBox (Arbeitsregel 5) - Kartenzeilen und Filterknoepfe gibt es im Spiel an
+  // mehreren Stellen.
+  const anfKarte = await t6.page.evaluate(() => {
+    const box = document.getElementById('reportsBox'); if (!box) return { box:false };
+    const k = [...box.querySelectorAll('.card-row')].find(e => /Anfechtung gewonnen/.test(e.textContent));
+    if (!k) return { box:true, gefunden:false, hat: box.textContent.slice(0, 120) };
+    const pille = [...k.querySelectorAll('span')].map(x => x.textContent.trim()).find(t => /^(Gewonnen|Verloren)$/.test(t));
+    return { box:true, gefunden:true, pille, gruen: /#5dcaa5/.test(k.getAttribute('style') || '') };
+  });
+  check('9a: die gewonnene Anfechtung steht als Erfolg da - gruener Streifen, Pille "Gewonnen"',
+    anfKarte.gefunden === true && anfKarte.pille === 'Gewonnen' && anfKarte.gruen === true, anfKarte);
+
+  const nachFilter = async (attr, wert) => {
+    await t6.page.evaluate(([a, w]) => {
+      const box = document.getElementById('reportsBox'); if (!box) return;
+      const b = box.querySelector('[' + a + '="' + w + '"]'); if (b) b.click();
+    }, [attr, wert]);
+    await t6.page.waitForTimeout(900);
+    return t6.page.evaluate(() => {
+      const box = document.getElementById('reportsBox'); if (!box) return null;
+      return [...box.querySelectorAll('.card-row')].some(e => /Anfechtung gewonnen/.test(e.textContent));
+    });
+  };
+  check('9b: unter "Kaempfe" ist der Anfechtungsbericht zu finden (nicht unter Sonstiges)',
+    (await nachFilter('data-reports-filter-cat', 'combat')) === true);
+  check('9c: und der Ergebnisfilter "Nur Erfolge" behaelt ihn ebenfalls',
+    (await nachFilter('data-reports-filter-result', 'win')) === true);
+
+  const postfach = await t6.page.evaluate(() => {
+    const box = document.getElementById('notificationEventsBox'); if (!box) return null;
+    return [...box.querySelectorAll('.bname')].map(e => e.textContent.trim());
+  });
+  check('9d: das Postfach erklaert beide Ausgaenge - kein leerer Eintrag, und die Texte sind verschieden',
+    Array.isArray(postfach) && postfach.length === 2 &&
+    postfach.every(t => t.length > 30 && /Rivale/.test(t) && /Eiskern/.test(t)) &&
+    postfach[0] !== postfach[1] &&
+    postfach.some(t => /abgenommen/.test(t)) && postfach.some(t => /bleibt deins/.test(t)),
+    postfach);
   await t6.ctx.close();
 
   // 409 und 404 sind in den Läufen 3 und 4 ABSICHT - der Browser protokolliert jede Nicht-2xx-Antwort
