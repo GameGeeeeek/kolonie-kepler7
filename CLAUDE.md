@@ -326,18 +326,37 @@ Der „nginx auf dem Pi" ist **kein systemd-nginx**, sondern läuft als **Docker
 
 - **Container**: `kepler7-nginx` (Image `nginx:alpine`) bedient 80+443; `kepler7-backend` ist das Node-Backend (nginx proxyt `/api/` intern auf `http://kepler7-backend:3001/api/`). Ein **systemd-`nginx`** existiert auf dem Host nur als Altlast und ist bewusst **deaktiviert** (`systemctl disable --now nginx`) – ihn zu starten scheitert an „Address already in use", weil Docker die Ports hält. **Nicht** versuchen, den systemd-nginx zu benutzen.
 - **Host-Mounts des nginx-Containers**: `/DATA/kepler7/certbot/conf → /etc/letsencrypt` (**hier liegen die Zertifikate**), `/DATA/kepler7/certbot/www → /var/www/certbot` (ACME-Webroot), `/DATA/kepler7/nginx/nginx.conf → /etc/nginx/conf.d/default.conf`, `/DATA/kepler7/web → /usr/share/nginx/html` (die Spieldateien).
-- **Das Zertifikat MUSS immer BEIDE Domains abdecken**: `gamegeeeeek.de` **und** `www.gamegeeeeek.de` (Canonical/OG-Tags, sitemap.xml, robots.txt zeigen alle auf `www.` als kanonische Domain). Zertifikats-Linie heißt `gamegeeeeek.de` (`live/gamegeeeeek.de/`); die `ssl_certificate`-Pfade in der nginx.conf zeigen dorthin.
-- **Neu ausstellen/erweitern** (downtime-frei, Webroot-Challenge über den laufenden Container – **kein** nginx.conf-Edit nötig, `--cert-name` hält die Linie stabil):
+- **Das Zertifikat MUSS ALLE genutzten Namen abdecken**: `gamegeeeeek.de`, `www.gamegeeeeek.de` (Canonical/OG-Tags, sitemap.xml, robots.txt zeigen alle auf `www.` als kanonische Domain) und inzwischen `social.gamegeeeeek.de`. Zertifikats-Linie heißt `gamegeeeeek.de` (`live/gamegeeeeek.de/`); die `ssl_certificate`-Pfade in der nginx.conf zeigen dorthin.
+
+  **Vorfall 14.08.2026 – dasselbe wie am 21.07.2026, nur andersherum.** Beim Live-Check nach einem
+  Merge antwortete `https://www.gamegeeeeek.de/` gar nicht mehr, sondern brach mit „SSL: no
+  alternative certificate subject name matches target host name" ab; der Apex lieferte im selben
+  Lauf sauber 200. Gemessen am ausgelieferten Zertifikat (ausgestellt 10.08.2026, gültig bis
+  08.11.2026):
   ```
-  docker run --rm -v /DATA/kepler7/certbot/conf:/etc/letsencrypt -v /DATA/kepler7/certbot/www:/var/www/certbot certbot/certbot certonly --webroot -w /var/www/certbot --cert-name gamegeeeeek.de -d gamegeeeeek.de -d www.gamegeeeeek.de --expand --non-interactive --agree-tos -m "$CERTBOT_MAIL"
+  X509v3 Subject Alternative Name:
+      DNS:gamegeeeeek.de, DNS:social.gamegeeeeek.de
+  ```
+  `www.` fehlt – bei einer Ausstellung am 10.08. wurde `social.` aufgenommen und `www.` dabei
+  fallengelassen. Weil `certbot` die `-d`-Namen in der Renewal-Config **speichert**, zieht jedes
+  spätere `certbot renew` diesen Satz weiter fort; das heilt nicht von selbst. Wirkung: Genau der
+  Hostname, auf den Canonical-Tag, OG-Tags, sitemap.xml und robots.txt zeigen – also der, über den
+  Suchmaschinen und geteilte Links kommen –, zeigt jedem Besucher eine Zertifikatswarnung.
+  **Zwei Lehren:** (a) Wer eine Subdomain hinzufügt, gibt **alle** bisherigen `-d`-Namen erneut mit
+  (der Befehl unten ist deshalb die vollständige Liste, nicht der Zusatz); (b) der Live-Check nach
+  einem Merge läuft über `www.` – über den Apex geprüft wäre der Ausfall unsichtbar geblieben,
+  genau das ist hier fast passiert.
+- **Neu ausstellen/erweitern** (downtime-frei, Webroot-Challenge über den laufenden Container – **kein** nginx.conf-Edit nötig, `--cert-name` hält die Linie stabil). Immer die VOLLSTÄNDIGE Namensliste angeben, nie nur den neuen Namen:
+  ```
+  docker run --rm -v /DATA/kepler7/certbot/conf:/etc/letsencrypt -v /DATA/kepler7/certbot/www:/var/www/certbot certbot/certbot certonly --webroot -w /var/www/certbot --cert-name gamegeeeeek.de -d gamegeeeeek.de -d www.gamegeeeeek.de -d social.gamegeeeeek.de --expand --non-interactive --agree-tos -m "$CERTBOT_MAIL"
   docker exec kepler7-nginx nginx -s reload
   ```
   `$CERTBOT_MAIL` ist Saschas Kontaktadresse für die Ablauf-Warnungen von Let's Encrypt – sie steht
   bewusst **nicht** im Repo (der Quelltext ist öffentlich), sondern wird beim Aufruf gesetzt bzw. ist
   in der bestehenden Renewal-Config unter `/DATA/kepler7/certbot/conf/renewal/gamegeeeeek.de.conf`
   bereits hinterlegt – bei einer reinen Erneuerung braucht es sie deshalb gar nicht.
-  (Vorher risikofrei mit `--dry-run` testen.) Prüfen: `echo | openssl s_client -connect www.gamegeeeeek.de:443 -servername www.gamegeeeeek.de 2>/dev/null | openssl x509 -noout -text | grep -A1 "Subject Alternative Name"` → beide DNS-Namen müssen erscheinen.
-- **Auto-Erneuerung** läuft per root-crontab (`certbot renew --quiet` im certbot-Container mit denselben Volumes, danach nginx-Reload/Restart). `certbot renew` nutzt die gespeicherte Renewal-Config und erneuert damit automatisch **beide** Domains – die `-d`-Namen nicht erneut angeben.
+  (Vorher risikofrei mit `--dry-run` testen.) Prüfen: `echo | openssl s_client -connect www.gamegeeeeek.de:443 -servername www.gamegeeeeek.de 2>/dev/null | openssl x509 -noout -ext subjectAltName` → **alle drei** DNS-Namen müssen erscheinen. Aus dieser Sitzung heraus geht dasselbe durch den Agent-Proxy mit `-proxy 127.0.0.1:$PORT` (der Port steht in `$HTTPS_PROXY`) – ohne den Zusatz kommt `s_client` gar nicht erst hinaus, und der Fehlschlag sähe aus wie ein Serverproblem.
+- **Auto-Erneuerung** läuft per root-crontab (`certbot renew --quiet` im certbot-Container mit denselben Volumes, danach nginx-Reload/Restart). `certbot renew` nutzt die gespeicherte Renewal-Config und erneuert damit automatisch **den dort gespeicherten Namenssatz** – die `-d`-Namen nicht erneut angeben. Kehrseite und Grund des Vorfalls oben: Ist der Satz einmal falsch, erneuert `renew` den Fehler unbefristet weiter; korrigieren lässt er sich nur über ein `certonly --expand` mit vollständiger Liste.
 - Der Host `certbot.timer` (systemd) ist eine **harmlose Altlast** und kennt die Docker-Volume-Zertifikate nicht – ignorieren.
 
 **PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main`. Gilt für Frontend- und Backend-Repo gleichermaßen. **Seit der Webhook bekannt ist, wiegt das schwerer als gedacht**: Der Merge ist nicht bloß ein Zwischenschritt zu einem späteren manuellen Deploy, sondern die Auslieferung selbst – was gemerged wird, steht Sekunden später auf `gamegeeeeek.de`. Der Prüflauf (`node tests/run.js`, grün) ist deshalb keine Formalie, sondern das einzige, was zwischen einer Änderung und den Spielern steht.
