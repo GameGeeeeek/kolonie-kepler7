@@ -47,15 +47,19 @@ function rollen(text, muster){
   check('1: und nur sie', (fam.match(/cargo:/g) || []).length === 1, fam.match(/cargo:/g));
   // Die Luecke selbst: die Ladekapazitaet kannte den Markenbonus nicht.
   const cap = schnitt(src, 'function fleetCargoCapacity(fleet){', '\n  }');
-  check('1: die Ladekapazitaet liest jetzt die Marke', /shipMarkBonus\('frachter', 'cargo'\)/.test(cap));
-  check('1: PRO KLASSE, nicht pauschal - Grossfrachter mit eigener Marke',
-    /shipMarkBonus\('frachtergross', 'cargo'\)/.test(cap));
+  // Seit v8.497.0 (dritter Frachttyp) summiert die Funktion ueber CARGO_SHIP_KEYS statt zwei
+  // Klassen aufzuzaehlen - der Marken-Term steht deshalb einmal mit dem Schluessel der Schleife da
+  // und gilt damit fuer JEDE Klasse. Die gepruefte Eigenschaft ist unveraendert "die Marke wirkt
+  // PRO KLASSE" (Arbeitsregel 3: die Regel pruefen, nicht die Schreibweise); die Rechnung darunter
+  // belegt sie ohnehin am Ergebnis.
+  check('1: die Ladekapazitaet liest die Marke - und zwar je Klasse',
+    /shipMarkBonus\(k, 'cargo'\)/.test(cap) && /CARGO_SHIP_KEYS/.test(cap), cap.replace(/\s+/g, ' ').slice(0, 200));
   check('1: der Modul-Bonus bleibt daneben bestehen', /shipModuleBonusFor\('frachter', 'cargo'\)/.test(cap));
   // Und rechnen: die Formel wird ausgefuehrt, nicht nur gelesen.
   const ctx = {};
-  new Function('ctx', 'shipModuleBonusFor', 'shipMarkBonus', 'CARGO_PER_FRACHTER', 'CARGO_PER_FRACHTER_GROSS',
+  new Function('ctx', 'shipModuleBonusFor', 'shipMarkBonus', 'CARGO_SHIP_KEYS', 'CARGO_PER_SHIP',
     cap + ';ctx.f=fleetCargoCapacity;')
-    (ctx, () => 0, (k) => k === 'frachter' ? 0.36 : 0, 300, 1000);
+    (ctx, () => 0, (k) => k === 'frachter' ? 0.36 : 0, ['frachter','frachtergross'], { frachter:300, frachtergross:1000 });
   const nurKlein = ctx.f({ frachter: 10 });
   const nurGross = ctx.f({ frachtergross: 10 });
   check('1: Mk X (+36%) hebt den kleinen Frachter von 3.000 auf 4.080', nurKlein === 4080, nurKlein);
@@ -63,8 +67,10 @@ function rollen(text, muster){
   // Anzeige: nur dort bewerben, wo er wirkt.
   const txt = schnitt(src, 'function shipMarkEffectText(shipKey, mk){', '\n  }');
   check('1: der Zweig wird nur bei Klassen mit Ladung beworben', /CARGO_SHIP_KEYS\.includes\(shipKey\)/.test(txt));
+  // Die Liste wird seit v8.497.0 aus der Frachttabelle abgeleitet - EINE Quelle statt zweier
+  // Aufzaehlungen, die auseinanderlaufen koennen. Geprueft wird genau das, nicht ihr Inhalt.
   check('1: und die Liste dafuer ist dieselbe, die die Kapazitaet summiert',
-    /const CARGO_SHIP_KEYS = \['frachter', 'frachtergross'\];/.test(src));
+    /const CARGO_SHIP_KEYS = Object\.keys\(CARGO_PER_SHIP\);/.test(src));
 }
 
 // ================================================================== 2) KONTERROLLEN
@@ -106,8 +112,11 @@ function rollen(text, muster){
 
 // ================================================================== 3) ERFAHRUNG ZIEHT MIT UM
 {
+  // Die Ausnahme wird seit v8.497.0 nicht mehr aufgezaehlt, sondern aus CARGO_SHIP_KEYS gelesen -
+  // sonst haette der dritte Frachter hier still als Kampfschiff gezaehlt. Geprueft wird weiterhin
+  // die Eigenschaft "aus den Angriffsklassen ABGELEITET, Transporter ausgenommen".
   check('3: es gibt eine Kampfschiff-Liste, aus den Angriffsklassen abgeleitet',
-    /const KAMPF_SHIP_KEYS = ATTACK_SHIP_KEYS\.filter\(k => k !== 'frachter' && k !== 'frachtergross'\);/.test(src));
+    /const KAMPF_SHIP_KEYS = ATTACK_SHIP_KEYS\.filter\(k => !CARGO_SHIP_KEYS\.includes\(k\)\);/.test(src));
   const ab = schnitt(src, 'const vetMit = (() => {', '})();');
   check('3: der Abzug beim Abflug existiert', ab.length > 200);
   check('3: er rechnet nur mit Kampfschiffen', /KAMPF_SHIP_KEYS\.includes\(shipKey\)/.test(ab));
