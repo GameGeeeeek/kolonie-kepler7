@@ -29,6 +29,11 @@
 //   - Für Abschnitt 6 (Schürfrechte, v8.489.0): Am Stand v8.488.0 fallen 6a-6g geschlossen, und 6b
 //     zeigt dabei die Lücke, die die UI schließt - das fremd reservierte Vorkommen bot dort
 //     freundlich "Öffnet die Flottenwahl" an.
+//   - Für Abschnitt 7 (v8.490.0, Spieler-Report Sascha): Am Stand v8.489.0 fallen BEIDE - 7a
+//     findet useBackend() nicht in asteroidFeldGeteilt(), und 7b findet keine eigene Formulierung
+//     im Protokoll, weil das Spiel dort die Serverantwort ungefiltert weiterreicht (gemessen:
+//     im Protokoll steht die Meldung gar nicht, sie geht als Toast raus - in beiden Faellen
+//     bekommt der Spieler den Servertext statt einer Auskunft).
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
@@ -82,6 +87,7 @@ function backend(store, opt){
       let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch(e){}
       store.__claims = (store.__claims || []).concat([body]);
       if (opt.claim404) return j({ error:'Cannot POST' }, 404);
+      if (opt.claim401) return j({ error:'Nicht angemeldet.' }, 401);
       const feld = store.__feld || serverFeld();
       const vork = feld.felder[body.system] && feld.felder[body.system].plaetze[String(body.platz)];
       if (!vork || vork.frei) return j({ error:'Dieses Vorkommen ist nicht mehr da.', weg:true }, 409);
@@ -316,10 +322,36 @@ async function marker(t){
     .map(n => ({ platz: n.getAttribute('data-map-asteroid'), eigenRing: n.innerHTML.includes('#5dcaa5') })));
   check('6h: danach ist der Ring wieder weg', !(ringeFrei.find(r => r.platz === SERVER_PLATZ) || {}).eigenRing, ringeFrei);
 
+  // ---- 7) Sitzung weg: keine rohen Servertexte, keine toten Knöpfe (v8.490.0) ---------------
+  // WAS HIER AUF DEM SPIEL STEHT (Spieler-Report 14.08.2026): _astFeldVomServer wird einmal true
+  // und nie wieder false, authToken dagegen faellt beim Abmelden/Verdraengen auf null. Ohne die
+  // Sitzungspruefung blieben die Rechte-Knoepfe stehen und der Spieler bekam die rohe
+  // Serverantwort "Nicht angemeldet." zu lesen - eine Auskunft, mit der niemand etwas anfangen kann.
+  check('7a: das geteilte Feld verlangt eine bestehende Sitzung, nicht nur eine frühere Antwort',
+    /function asteroidFeldGeteilt\(\)\s*\{\s*return _astFeldVomServer && useBackend\(\);/.test(JS));
+
+  const t5 = await tab(browser, fixture(), { claim401: true, feldInit: { systeme: [SERVER_SYSTEM], felder: { [SERVER_SYSTEM]: { plaetze: {
+    [SERVER_PLATZ]: { sorte: 'kometenkern', groesse: 'kern', vorrat: SERVER_VORRAT }
+  } } } } });
+  await t5.page.waitForTimeout(2500);
+  await aufKarte(t5, SERVER_SYSTEM);
+  await t5.page.evaluate(pl => { const n = document.querySelector('[data-map-asteroid="' + pl + '"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true, clientX:200, clientY:200 })); }, SERVER_PLATZ);
+  await t5.page.waitForTimeout(400);
+  await t5.page.evaluate(() => { const x = [...document.querySelectorAll('.kmenu button')].find(y => /Schürfrecht anmelden/.test(y.textContent)); if (x) x.click(); });
+  await t5.page.waitForTimeout(2000);
+  const protokoll = await t5.page.evaluate(() => {
+    const el = document.getElementById('log') || document.querySelector('.plog');
+    return el ? el.innerText.slice(0, 600) : '';
+  });
+  check('7b: bei abgelaufener Sitzung sagt das Spiel das in eigenen Worten - nicht mit dem Servertext',
+    /Sitzung ist abgelaufen/.test(protokoll) && !/Nicht angemeldet\./.test(protokoll),
+    protokoll.split('\n').slice(0, 3));
+  await t5.ctx.close();
+
   // 409 und 404 sind in den Läufen 3 und 4 ABSICHT - der Browser protokolliert jede Nicht-2xx-Antwort
   // als Konsolenfehler. Gefiltert wird deshalb die Netzwerkmeldung, nicht der Fehlerfall selbst;
   // ein echter JS-Fehler (pageerror) kommt weiterhin durch.
-  const fehler = [...t1.errs, ...t2.errs, ...t3.errs, ...t4.errs]
+  const fehler = [...t1.errs, ...t2.errs, ...t3.errs, ...t4.errs, ...t5.errs]
     .filter(e => !/favicon|net::ERR|CORS|Failed to load resource/i.test(e));
   check('5: keine Konsolenfehler', fehler.length === 0, fehler.slice(0, 3));
   await t3.ctx.close();
