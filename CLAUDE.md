@@ -210,6 +210,16 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     ECONNREFUSED aus und der Fehler sah aus, als läge er an der gerade gebauten Härtung.
     `grep -n "PORT = " tests/*.js` vor der Wahl.
 
+31. **Die Kollisionsprüfung nie mit dem Commit in EINEM Befehl verketten – sie ist eine
+    Entscheidung, kein Log-Output.** Vorfall 14.08.2026: `git log merge-base..origin/main && git
+    commit && git push` zeigte den fremden Commit (#352 hatte v8.499.0 belegt) korrekt an, aber
+    die `&&`-Kette lief ungerührt weiter und pushte die eigene v8.499.0 hinterher – nur weil der
+    Merge ein separater Schritt war, fiel die Kollision VOR der Auslieferung auf. Beim ersten Mal
+    am selben Tag (#350) war die Prüfung ein eigener Befehl, und die Kollision wurde sauber
+    abgefangen. Richtig: Prüfbefehl absetzen, Ausgabe LESEN, erst dann in einem neuen Befehl
+    committen. Dieselbe Familie wie Regel 25: Ein Werkzeug, dessen Ergebnis niemand auswertet,
+    prüft nichts.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
