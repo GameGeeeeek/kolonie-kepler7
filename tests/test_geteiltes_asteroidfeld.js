@@ -26,6 +26,9 @@
 //     (die Mission trägt die eigene Vorschaumenge statt der Server-Antwort) und 3.
 //   - Lässt man asteroidFeldSicherstellen() auch nach der Server-Antwort lokal erzeugen, fällt 1c
 //     (zusätzliche Brocken in Systemen, die der Server gar nicht führt).
+//   - Für Abschnitt 6 (Schürfrechte, v8.489.0): Am Stand v8.488.0 fallen 6a-6g geschlossen, und 6b
+//     zeigt dabei die Lücke, die die UI schließt - das fremd reservierte Vorkommen bot dort
+//     freundlich "Öffnet die Flottenwahl" an.
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
@@ -73,6 +76,28 @@ function backend(store, opt){
       store.__feld = serverFeld(rest);
       return j({ ok:true, menge, sorte:'kometenkern', groesse:'kern', rest });
     }
+    // Schürfrechte (v8.489.0): der Mock spielt den echten Server nach - Halter ist der angemeldete
+    // Nutzer 'u' (siehe /me oben), ein fremd reservierter Platz lehnt mit 409 und Namen ab.
+    if (p === 'asteroid/claim'){
+      let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch(e){}
+      store.__claims = (store.__claims || []).concat([body]);
+      if (opt.claim404) return j({ error:'Cannot POST' }, 404);
+      const feld = store.__feld || serverFeld();
+      const vork = feld.felder[body.system] && feld.felder[body.system].plaetze[String(body.platz)];
+      if (!vork || vork.frei) return j({ error:'Dieses Vorkommen ist nicht mehr da.', weg:true }, 409);
+      if (vork.halter && vork.halter !== 'u') return j({ error:'Bereits reserviert von ' + (vork.halterName||'?') + '.' }, 409);
+      Object.assign(vork, { halter:'u', halterName:'A', tag:'', seit:1, eskorte:{} });
+      store.__feld = feld;
+      return j({ ok:true, halter:'u', halterName:'A', tag:'', seit:1, eskorte:{} });
+    }
+    if (p === 'asteroid/release'){
+      let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch(e){}
+      store.__releases = (store.__releases || []).concat([body]);
+      const feld = store.__feld || serverFeld();
+      const vork = feld.felder[body.system] && feld.felder[body.system].plaetze[String(body.platz)];
+      if (vork){ delete vork.halter; delete vork.halterName; delete vork.tag; delete vork.seit; delete vork.eskorte; store.__feld = feld; }
+      return j({ ok:true });
+    }
     if (p.startsWith('storage/')){
       const k = decodeURIComponent(p.slice(8));
       if (req.method() === 'PUT'){ try { store[k] = JSON.parse(req.postData()||'{}').value; } catch(e){} return j({ ok:true }); }
@@ -90,6 +115,7 @@ function backend(store, opt){
 
 async function tab(browser, startSave, opt){
   const store = { __berichte: [] };
+  if (opt && opt.feldInit) store.__feld = opt.feldInit;   // VOR dem Boot setzen - der erste Feld-Abruf laeuft schon beim Laden
   if (startSave) store[SAVE_KEY] = startSave;
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
@@ -230,13 +256,74 @@ async function marker(t){
   check('4d: und der mine-Endpunkt wurde dabei GAR NICHT gerufen - lokal entnommen',
     (t3.store.__mine || []).length === 0, (t3.store.__mine || []).length);
 
+  // ---- 6) Schürfrechte (v8.489.0): fremd gesperrt, eigenes anmelden und aufgeben --------------
+  // Feld mit ZWEI Plätzen: 7 frei, 3 von 'Rivale' reserviert und mit Eskorte bewacht.
+  const t4 = await tab(browser, fixture(), { feldInit: { systeme: [SERVER_SYSTEM], felder: { [SERVER_SYSTEM]: { plaetze: {
+    [SERVER_PLATZ]: { sorte: 'kometenkern', groesse: 'kern', vorrat: SERVER_VORRAT },
+    '3': { sorte: 'eisen', groesse: 'brocken', vorrat: 90000,
+           halter: 'x2', halterName: 'Rivale', tag: 'RIV', seit: 1, eskorte: { jaeger: 10 } }
+  } } } } });
+  await t4.page.waitForTimeout(2500);
+  await aufKarte(t4, SERVER_SYSTEM);
+  const ringe = await t4.page.evaluate(() => [...document.querySelectorAll('[data-map-asteroid]')]
+    .map(n => ({ platz: n.getAttribute('data-map-asteroid'), fremdRing: n.innerHTML.includes('#e0667a'), eigenRing: n.innerHTML.includes('#5dcaa5') })));
+  const fremdMarker = ringe.find(r => r.platz === '3'), freiMarker = ringe.find(r => r.platz === SERVER_PLATZ);
+  check('6a: das fremde Recht trägt einen roten Ring, das freie Vorkommen keinen',
+    !!fremdMarker && fremdMarker.fremdRing && !!freiMarker && !freiMarker.fremdRing && !freiMarker.eigenRing, ringe);
+
+  const menuAuf = async (platz) => {
+    await t4.page.evaluate(pl => { const n = document.querySelector('[data-map-asteroid="' + pl + '"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true, clientX:200, clientY:200 })); }, platz);
+    await t4.page.waitForTimeout(400);
+    return t4.page.evaluate(() => {
+      const m = document.querySelector('.kmenu');
+      if (!m) return null;
+      return { text: m.innerText, knoepfe: [...m.querySelectorAll('button')].map(b => ({ label: b.textContent, disabled: b.disabled })) };
+    });
+  };
+  // Fremdes Recht: Abbau gesperrt, und der Grund nennt den Halter (Regel 28 fuer die Anzeige).
+  const menuFremd = await menuAuf('3');
+  const abbauFremd = menuFremd && menuFremd.knoepfe.find(k => /Abbaumission/.test(k.label));
+  check('6b: am fremd reservierten Vorkommen ist der Abbau gesperrt und der Halter wird genannt',
+    !!abbauFremd && abbauFremd.disabled && /Rivale/.test(menuFremd.text) && !menuFremd.knoepfe.some(k => /Schürfrecht anmelden/.test(k.label)),
+    menuFremd && { disabled: abbauFremd && abbauFremd.disabled, text: menuFremd.text.slice(0, 160) });
+
+  // Freies Vorkommen: anmelden - der Aufruf geht an /asteroid/claim, danach zeigt die Karte den
+  // eigenen (gruenen) Ring, GESTRICHELT, denn eine Eskorte steht dort nicht.
+  const menuFrei = await menuAuf(SERVER_PLATZ);
+  check('6c: das freie Vorkommen bietet die Anmeldung mit Stand 0/2 an',
+    !!menuFrei && menuFrei.knoepfe.some(k => /Schürfrecht anmelden \(0\/2\)/.test(k.label) && !k.disabled), menuFrei && menuFrei.knoepfe);
+  await t4.page.evaluate(() => { const x = [...document.querySelectorAll('.kmenu button')].find(y => /Schürfrecht anmelden/.test(y.textContent)); if (x) x.click(); });
+  await t4.page.waitForTimeout(2000);
+  check('6d: der Klick hat /api/asteroid/claim mit System und Platz gerufen',
+    (t4.store.__claims || []).length === 1 && (t4.store.__claims[0] || {}).system === SERVER_SYSTEM && String((t4.store.__claims[0] || {}).platz) === SERVER_PLATZ,
+    t4.store.__claims);
+  const ringeNach = await t4.page.evaluate(() => [...document.querySelectorAll('[data-map-asteroid]')]
+    .map(n => ({ platz: n.getAttribute('data-map-asteroid'), eigenRing: n.innerHTML.includes('#5dcaa5'), gestrichelt: n.innerHTML.includes('stroke-dasharray') })));
+  const meinMarker = ringeNach.find(r => r.platz === SERVER_PLATZ);
+  check('6e: das eigene Recht trägt den grünen Ring - gestrichelt, denn es ist unbewacht',
+    !!meinMarker && meinMarker.eigenRing && meinMarker.gestrichelt, ringeNach);
+
+  // Eigenes Recht: Menue bietet Eskorte und Aufgeben; Aufgeben ruft /asteroid/release und der Ring geht.
+  const menuMein = await menuAuf(SERVER_PLATZ);
+  check('6f: das eigene Recht bietet Eskorte stationieren und Aufgeben an',
+    !!menuMein && menuMein.knoepfe.some(k => /Eskorte stationieren/.test(k.label)) && menuMein.knoepfe.some(k => /Schürfrecht aufgeben/.test(k.label)),
+    menuMein && menuMein.knoepfe);
+  await t4.page.evaluate(() => { const x = [...document.querySelectorAll('.kmenu button')].find(y => /Schürfrecht aufgeben/.test(y.textContent)); if (x) x.click(); });
+  await t4.page.waitForTimeout(2000);
+  check('6g: das Aufgeben hat /api/asteroid/release gerufen',
+    (t4.store.__releases || []).length === 1, t4.store.__releases);
+  const ringeFrei = await t4.page.evaluate(() => [...document.querySelectorAll('[data-map-asteroid]')]
+    .map(n => ({ platz: n.getAttribute('data-map-asteroid'), eigenRing: n.innerHTML.includes('#5dcaa5') })));
+  check('6h: danach ist der Ring wieder weg', !(ringeFrei.find(r => r.platz === SERVER_PLATZ) || {}).eigenRing, ringeFrei);
+
   // 409 und 404 sind in den Läufen 3 und 4 ABSICHT - der Browser protokolliert jede Nicht-2xx-Antwort
   // als Konsolenfehler. Gefiltert wird deshalb die Netzwerkmeldung, nicht der Fehlerfall selbst;
   // ein echter JS-Fehler (pageerror) kommt weiterhin durch.
-  const fehler = [...t1.errs, ...t2.errs, ...t3.errs]
+  const fehler = [...t1.errs, ...t2.errs, ...t3.errs, ...t4.errs]
     .filter(e => !/favicon|net::ERR|CORS|Failed to load resource/i.test(e));
   check('5: keine Konsolenfehler', fehler.length === 0, fehler.slice(0, 3));
   await t3.ctx.close();
+  await t4.ctx.close();
 
   await browser.close();
   return ende();

@@ -276,7 +276,7 @@ check('Ewigkeitsforschungen haben eine unerreichbare maxLevel', ewig.every(r => 
   const gruppen = new Set(RESEARCH_MILESTONES.map(m => m.group).filter(g => g !== 'all'));
   // Die Werkstoff-Gruppen zaehlen als EIN Gebiet, auch wenn sie technisch zwei Schluessel sind.
   const gebiete = new Set([...gruppen].map(g => g.replace(/voll$/, '')));
-  const zahlwort = { 4:'Vier', 5:'Fünf', 6:'Sechs', 7:'Sieben' }[gebiete.size];
+  const zahlwort = { 4:'Vier', 5:'Fünf', 6:'Sechs', 7:'Sieben', 8:'Acht', 9:'Neun' }[gebiete.size];
   check('7: der Hilfetext nennt die richtige Anzahl Gebiete',
     hilfe.includes(zahlwort + ' Forschungsgruppen'), { gebiete: gebiete.size, erwartet: zahlwort });
   check('7: der Hilfetext erwaehnt die Werkstoffe', /Werkstoffe/.test(hilfe));
