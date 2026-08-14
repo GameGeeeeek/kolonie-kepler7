@@ -84,8 +84,10 @@ const defOf = k => u.ctx.DEFS.find(d => d.key === k);
 // weiteren Stellen dem Spieler genannt (Tutorial-Schritt, Hilfe-Abschnitt "Tagesaufgaben"), und
 // genau die vergisst man beim Erweitern. Deshalb werden beide hier gleich mitgeprueft - ein
 // neuer Eintrag im Pool muss diesen Test rot machen, sonst laeuft die Zahl im Text still davon.
-// (Genau so geschehen bei v8.454.0: dieser Test schlug an, bis Tutorial und Hilfe 23 nannten.)
-check('1: der Pool hat 23 Vorlagen', u.ctx.DEFS.length === 23, u.ctx.DEFS.length);
+// (Genau so geschehen bei v8.454.0: dieser Test schlug an, bis Tutorial und Hilfe 23 nannten -
+// und noch einmal bei den zwei Guertel-Aufgaben, die den Pool auf 25 gehoben haben. Der Mechanismus
+// funktioniert also; die Zahl hier wird BEWUSST mitgezogen und nicht durch ein ">= 20" ersetzt.)
+check('1: der Pool hat 25 Vorlagen', u.ctx.DEFS.length === 25, u.ctx.DEFS.length);
 {
   const fs2 = require('fs');
   const { SPIELDATEI: DATEI } = require('./lib/umgebung');
