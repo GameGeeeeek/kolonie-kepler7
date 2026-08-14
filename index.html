@@ -2038,6 +2038,13 @@
     .system-nav-label { text-align:center; flex:1; }
     .system-nav-name { font-size:14px; font-weight:600; color:#f2f3f8; }
     .system-nav-meta { font-size:11px; color:#7d8199; margin-top:1px; }
+    /* Detailtafel (v8.500.0, Etappe B-3): Systemkopf, Basis-Schnellzugriff, Planetenliste und
+       Monde bilden EINE Fläche - der erste Schritt zur Detailtafel aus dem Sektorkarten-Zielbild.
+       Der Kopf behält die system-nav-Struktur, verliert aber Rahmen und Abstand nach unten. */
+    .system-tafel { background:var(--elev-1); border:var(--bw-1) solid var(--line-1); padding:10px 10px 12px; margin-bottom:1rem; }
+    .system-tafel .system-nav { background:none; border:0; margin-bottom:0.6rem; padding:2px 0; }
+    .system-tafel .planet-list { margin-bottom:0; }
+    .sun-disc { display:inline-block; width:12px; height:12px; border-radius:50%; background:#fac775; margin-right:6px; vertical-align:-1px; }
     .map-wrap svg { width:100%; height:100%; }
     /* Grafik-Runde 9, Vorschlag 35 "Sektorkarte als Radar-Display": bewusst NICHT Teil des SVG-Inhalts
        (der bei jedem buildMap()-Aufruf komplett per innerHTML ersetzt wird, siehe Kommentar dort, und
@@ -3334,17 +3341,23 @@
           </div>
         </div>
         <div class="bmeta" id="galaxyGrowthLine" style="margin:-0.5rem 0 0.9rem; text-align:center;"></div>
+        <!-- Detailtafel (v8.500.0, Etappe B-3): Kopf + Schnellzugriff + Planetenliste + Monde als
+             EINE Fläche. Die Sonnen-Scheibe bekommt ihre Farbe in buildMap() aus sunTypeFor() -
+             das alte ti-sun-Icon war für jedes System gelb, auch für Pulsare und Blaue Riesen. -->
+        <div class="system-tafel" id="systemTafel">
         <div class="system-nav">
           <button id="systemPrevBtn" title="Vorheriges System"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
           <div class="system-nav-label">
-            <div class="system-nav-name"><i class="ti ti-sun" aria-hidden="true" style="color:#fac775; margin-right:5px;"></i><span id="systemNavName">Kepler-System</span></div>
+            <div class="system-nav-name"><span class="sun-disc" id="systemSunDisc"></span><span id="systemNavName">Kepler-System</span></div>
             <div class="system-nav-meta" id="systemNavMeta">0/5 erkundet</div>
+            <div class="system-nav-meta" id="systemNavKenn"></div>
           </div>
           <button id="systemNextBtn" title="Nächstes System"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
         </div>
         <div class="planet-switch" id="mapBaseLinks" style="margin-bottom:0.75rem;"></div>
         <div class="planet-list" id="planetList"></div>
         <div id="moonListWrap"></div>
+        </div>
         <div class="card-row" id="autoExploreRow" role="button" tabindex="0" style="cursor:pointer; margin-top:0.75rem;">
           <div class="left"><div class="bicon" style="background:rgba(93,202,165,0.18); color:#5dcaa5;"><i class="ti ti-target" aria-hidden="true"></i></div><div><div class="bname">Automatische Erkundung</div><div class="bmeta" id="autoExploreLabel">Aus – benötigt 1 Erkundungsschiff</div></div></div>
           <div class="toggle-switch" id="autoExploreSwitch"><div class="toggle-knob"></div></div>
@@ -6362,8 +6375,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.499.0';
+  const VERSION = '8.500.0';
   const PATCHNOTES = [
+    { version:'8.500.0', date:'14.08.2026', changes:[
+      '<strong>Die Sektorkarte hat jetzt eine Detailtafel.</strong> Systemkopf, Basis-Schnellzugriff, Planetenliste und die Monde-Liste standen bisher als vier lose Blöcke untereinander – jetzt bilden sie eine zusammenhängende Tafel unter der Karte: Was zum aufgeklappten System gehört, sieht auch so aus. Das ist die erste Ausbaustufe der Detailtafel aus dem Zielbild; weitere Spalten (Status, Aktionen) folgen.',
+      '<strong>Die Sonne im Systemkopf hat jetzt ihre echte Farbe.</strong> Bisher stand dort für jedes System dasselbe gelbe Sonnen-Symbol – auch bei einem Pulsar oder einem Blauen Riesen, und selbst das Kepler-Heimatsystem ist in Wahrheit ein Weißer Zwerg. Jetzt zeigt eine kleine Scheibe Kern- und Glühfarbe des tatsächlichen Sonnentyps, derselben Zuordnung, die auch die große Sonne in der Systemansicht nutzt.',
+      '<strong>Neue Kennzahlenzeile im Systemkopf:</strong> Entfernung zum Heimatsystem in Sektoren (die Einheit, die das Spiel überall sonst nutzt), die kürzeste Erkundungs-Flugzeit deiner aktuellen Flotte in dieses System und die Zahl deiner eigenen Basen dort (Kolonien, kolonisierte Monde, im Heimatsystem die Heimatbasis). Genau die drei Angaben, nach denen man entscheidet, ob sich der Weg lohnt.',
+      'Vierte Etappe des Sektorkarten-Umbaus (B-3). Als Nächstes: Status- und Aktionen-Bereich der Tafel, danach die schaltbaren Ebenen auf der Karte.'
+    ]},
     { version:'8.499.0', date:'14.08.2026', changes:[
       '<strong>Der Asteroidenbergbau zählt endlich mit.</strong> Bis jetzt lief er neben den Tagesaufgaben und Erfolgen her, ohne dort je vorzukommen. Neu sind zwei <strong>Gürtel-Tagesaufgaben</strong> – „2 Abbaumissionen abschließen" und „6.000 Rohstoffe aus Asteroiden schürfen" – und vier <strong>Erfolge</strong>: <em>Erste Ladung</em>, <em>Gürtelfahrer</em> (50 Missionen), <em>Schürfbaron</em> (eine Million geschürft) und <em>Revierkämpfer</em> (drei gewonnene Anfechtungen).',
       '<strong>Gezählt wird, was du schürfst – nicht, was ins Lager passt.</strong> Wer mit vollem Lager heimkommt, hat trotzdem geschürft; sonst hinge dein Fortschritt an etwas, das mit dem Bergbau nichts zu tun hat. Der Zuschlag der Aufbereitungsanlage zählt aus demselben Grund nicht mit: Er entsteht beim Entladen, nicht am Brocken.',
@@ -51098,6 +51117,27 @@
         metaText += ' · 🌀 Wurmloch → '+(otherSys?otherSys.name:'unbekanntes System');
       }
       metaEl.textContent = metaText;
+    }
+    // Detailtafel-Kopf (v8.500.0, Etappe B-3): echte Sonnenfarbe und die Kennzahlen aus dem
+    // Zielbild. Entfernung in Sektoren (systemSectorDistance, dieselbe Einheit wie überall),
+    // kürzeste Erkundungs-Flugzeit der aktuellen Flotte, eigene Basen im System (Kolonien,
+    // kolonisierte Monde, im Heimatsystem die Heimatbasis samt Mond).
+    const sunEl = document.getElementById('systemSunDisc');
+    if (sunEl){
+      const st = sunTypeFor(activeSystem);
+      sunEl.style.background = 'radial-gradient(circle at 35% 35%, '+st.core+', '+st.glow+')';
+      sunEl.style.boxShadow = '0 0 7px '+st.glow;
+    }
+    const kennEl = document.getElementById('systemNavKenn');
+    if (kennEl){
+      const cfKenn = currentFleet();
+      const flug = sysPlanetsAll.length ? Math.min(...sysPlanetsAll.map(p=>missionDurationFor(p.duration, cfKenn, EXPLORE_SHIP_KEYS, p.system))) : 0;
+      let basen = sysPlanetsAll.filter(p=>state.colonies[p.id]).length;
+      sysPlanetsAll.forEach(p=>{ if (state.colonies['moon_'+p.id]) basen++; });
+      if (curSys.id===myHomeSystem){ basen++; if (state.colonies['moon_home']) basen++; }
+      const entf = curSys.id===myHomeSystem ? 'Heimatsystem'
+        : systemSectorDistance(myHomeSystem, curSys.id).toFixed(1).replace('.', ',')+' Sektoren entfernt';
+      kennEl.textContent = entf+' · Erkundung ab '+fmtDuration(flug)+' · '+(basen===1?'1 eigene Basis':basen+' eigene Basen');
     }
     // Zeile unter der Galaxie-Übersicht: aktueller Umfang der Galaxie plus der Countdown bis zur
     // nächsten Erweiterung. Ohne sie wären die wöchentlich hinzukommenden Systeme etwas, das man nur
