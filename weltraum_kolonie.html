@@ -6302,8 +6302,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.489.0';
+  const VERSION = '8.490.0';
   const PATCHNOTES = [
+    { version:'8.490.0', date:'14.08.2026', changes:[
+      '<strong>Behoben: „Nicht angemeldet" beim Anmelden eines Schürfrechts.</strong> Wer sich abmeldet, dessen Sitzung durch ein zweites Gerät verdrängt wird oder in einen Speicherkonflikt läuft, hatte die Schürfrecht-Knöpfe weiterhin im Kartenmenü stehen – ein Klick schickte dann eine Anfrage ohne gültige Anmeldung los, und das Spiel reichte die nackte Serverantwort durch. „Nicht angemeldet." ist keine Auskunft, mit der ein Spieler etwas anfangen kann. Ursache war eine Merkgröße, die sich nur in eine Richtung umlegen ließ: Einmal hatte der Server das Asteroidenfeld geliefert, galt es für den Rest der Sitzung als geteilt – auch dann noch, wenn die Anmeldung längst weg war.',
+      '<strong>Jetzt fällt das Spiel bei Sitzungsverlust sauber in den Solo-Betrieb zurück.</strong> Der Abbau läuft lokal weiter (der Bergbau verschwindet nie), die Schürfrecht-Knöpfe verschwinden aus dem Kartenmenü, statt ins Leere zu führen, und wo doch eine abgelaufene Sitzung auffliegt, sagt das Spiel es in eigenen Worten: „Deine Sitzung ist abgelaufen – bitte neu anmelden." Wer gar nicht angemeldet ist, liest jetzt den Grund statt einer Server-Fehlermeldung.'
+    ]},
     { version:'8.489.0', date:'14.08.2026', changes:[
       '<strong>Schürfrechte: Reserviere dir die Brocken, die du dauerhaft bewirtschaften willst.</strong> Über das Kartenmenü eines Vorkommens meldest du ab jetzt ein <strong>Schürfrecht</strong> an – von da an darfst nur noch du dort abbauen, bis du es aufgibst oder das Vorkommen erschöpft ist. Jeder Kommandant hat einen <strong>Grundstock von 2 Rechten</strong>; die neue Forschung <strong>Bergbaurecht</strong> (3 Stufen, ab Minentechnik) gibt je +1 dazu, insgesamt also höchstens 5. Der Server erzwingt beides: Wer fremdes Revier anfliegt, erfährt es beim Start – mit dem Namen des Halters, nicht mit einer anonymen Fehlermeldung.',
       '<strong>Die Eskorte hält das Recht.</strong> Minenschiffe holen, Kampfschiffe halten: Über das Kartenmenü stationierst du eine <strong>Eskorte dauerhaft am Vorkommen</strong>. Sie fliegt einmal hin (Flugzeit und Treibstoff wie üblich), bleibt dort stehen, belegt einen Flottenslot und erscheint in Missionsliste und Flottenposition – zurückrufen geht jederzeit, der Rückflug kostet eigenen Treibstoff. Ein Recht <em>ohne</em> Eskorte hältst du trotzdem, aber jeder sieht es: Auf der Karte trägt ein reserviertes Vorkommen einen <strong>Ring</strong> (grün = deins, rot = fremd), und der Ring ist <strong>gestrichelt, solange niemand Wache steht</strong>. Noch ist das nur eine Ansage – die <strong>Anfechtung</strong> durch andere Spieler kommt im nächsten Schritt, und dann zählt, wer vorgesorgt hat.',
@@ -12115,7 +12119,16 @@
   let _astFeldGeholt = 0;          // Zeitpunkt des letzten erfolgreichen Abrufs
   let _astFeldLaeuft = false;      // schuetzt gegen ueberlappende Abrufe
   const AST_FELD_TAKT_MS = 45000;  // Anzeige-Polling; der Vorrat aendert sich nicht im Sekundentakt
-  function asteroidFeldGeteilt(){ return _astFeldVomServer; }
+  /* Geteilt ist das Feld nur, solange der Server geliefert hat UND eine Sitzung besteht.
+     WARUM die zweite Bedingung (Spieler-Report 14.08.2026, v8.490.0): _astFeldVomServer wird
+     einmal true und nie wieder false - authToken dagegen faellt an vier Stellen auf null zurueck
+     (Abmelden, Speicherkonflikt, vom Server verdraengte Sitzung). Ohne useBackend() blieben die
+     Schuerfrecht-Knoepfe danach sichtbar, der claim-Aufruf ging mit ungueltigem Token raus, und
+     der Spieler bekam den ROHEN Servertext "Nicht angemeldet." zu sehen. Mit dieser Bedingung
+     faellt das Spiel bei Sitzungsverlust sauber auf den Solo-Betrieb zurueck: Abbau laeuft lokal
+     weiter, Rechte verschwinden aus dem Menue - statt eine Serverantwort zu zeigen, mit der
+     niemand etwas anfangen kann. */
+  function asteroidFeldGeteilt(){ return _astFeldVomServer && useBackend(); }
   async function ladeAsteroidfeld(erzwingen){
     if (!useBackend() || _astFeldLaeuft) return false;
     // Sichtbarkeits-Gate wie bei jedem reinen Anzeige-Polling (CLAUDE.md) - ausser wenn der Aufrufer
@@ -12143,7 +12156,7 @@
   function asteroidFeldSicherstellen(){
     if (!state.asteroidFeld) state.asteroidFeld = {};
     // Sobald der Server liefert, gehoert ihm das Feld - dann hier nichts mehr erzeugen.
-    if (_astFeldVomServer) return state.asteroidFeld;
+    if (asteroidFeldGeteilt()) return state.asteroidFeld;
     for (const sysId of guertelSysteme()){
       if (!state.asteroidFeld[sysId]) state.asteroidFeld[sysId] = asteroidFeldFuerSystem(sysId);
     }
@@ -12182,7 +12195,7 @@
     // geliefert, loest ER den Nachschub auf - liefe er hier zusaetzlich, wuerde der Client Brocken
     // erfinden, die beim naechsten Abruf wieder verschwinden.
     ladeAsteroidfeld();
-    if (_astFeldVomServer) return;
+    if (asteroidFeldGeteilt()) return;
     asteroidFeldSicherstellen();
     const jetzt = Date.now();
     for (const sysId of guertelSysteme()){
@@ -12211,7 +12224,7 @@
     if (!istGuertelSystem(sysId)) return [];
     // Hat der Server geliefert, zeigt die Karte NUR sein Feld - ein System, das er nicht fuehrt,
     // bleibt leer statt lokal erfunden zu werden.
-    if (_astFeldVomServer && !(state.asteroidFeld && state.asteroidFeld[sysId])) return [];
+    if (asteroidFeldGeteilt() && !(state.asteroidFeld && state.asteroidFeld[sysId])) return [];
     // Bewusst NUR lesend: Der Nachschub laeuft im Haupt-Tick, nicht hier. Diese Funktion wird von
     // buildGalaxyMap jede Sekunde gerufen - Zustand im Render zu aendern waere genau die Sorte
     // versteckter Nebenwirkung, die man spaeter stundenlang sucht.
@@ -12303,7 +12316,11 @@
   // liest Limit-Forschung und Eskorte aus dem GESPEICHERTEN Spielstand, nie aus dem Request -
   // ein veralteter Save würde sonst die falsche Eskorte ins Felddokument schreiben.
   async function asteroidClaim(sysId, platz, still){
-    if (!asteroidFeldGeteilt()) { if (!still) log('Schürfrechte gibt es nur im Mehrspieler-Betrieb mit Server.', 'ti-alert-triangle'); return false; }
+    if (!asteroidFeldGeteilt()) {
+      if (!still) log(authToken ? 'Schürfrechte gibt es nur im Mehrspieler-Betrieb mit Server.'
+                                : 'Dafür musst du angemeldet sein – im abgemeldeten Spiel gehört jedes Vorkommen allen.', 'ti-alert-triangle');
+      return false;
+    }
     try {
       await save();
       const res = await backendFetch('/asteroid/claim', {
@@ -12314,6 +12331,8 @@
       if (!res.ok){
         if (!still) log(res.status === 404
           ? 'Der Server kennt Schürfrechte noch nicht - das Server-Update steht noch aus.'
+          : res.status === 401
+          ? 'Deine Sitzung ist abgelaufen - bitte neu anmelden, dann geht die Reservierung wieder.'
           : ((daten && daten.error) || 'Reservierung fehlgeschlagen.'), 'ti-alert-triangle', 'warn');
         // 409 = jemand war schneller: Karte sofort auf den echten Stand bringen.
         if (res.status === 409){ await ladeAsteroidfeld(true); render(); }
@@ -12339,7 +12358,8 @@
       });
       const daten = await res.json().catch(() => null);
       if (!res.ok){
-        log((daten && daten.error) || 'Aufgeben fehlgeschlagen.', 'ti-alert-triangle', 'warn');
+        log(res.status === 401 ? 'Deine Sitzung ist abgelaufen - bitte neu anmelden.'
+                               : ((daten && daten.error) || 'Aufgeben fehlgeschlagen.'), 'ti-alert-triangle', 'warn');
         await ladeAsteroidfeld(true); render();
         return false;
       }
