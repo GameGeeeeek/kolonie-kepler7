@@ -791,6 +791,36 @@ Missionstyp **`asteroid-contest`**: eine Kampfflotte gegen die stationierte Esko
   genutzt u.a. in `handleSharedStorageWrite` Z. 1089) mit eigener Einstellung in den
   Benachrichtigungs-Präferenzen – wer nicht geweckt werden will, wird nicht geweckt.
 
+#### 6.3.1 Umsetzungsentscheidungen (14.08.2026, vor der Implementierung)
+
+Beim Ausschreiben des Endpunkts sind vier Fragen aufgefallen, die der Entwurf oben offen lässt.
+Sie stehen hier, weil jede von ihnen den Unterschied zwischen „funktioniert" und „ist ausnutzbar"
+ausmacht.
+
+**Wo steht die Angriffsflotte, während sie fliegt?** Nicht in `save.fleet` – sie ist unterwegs.
+Hätte der Server die Stärke von dort gelesen, würde er jede *ehrliche* Anfechtung als „keine
+Schiffe" ablehnen. Das ist dieselbe Falle wie bei der Eskorte in Phase 4 (Abschnitt 6.2): Sie
+steht in `save.fleet.missions[].composition`, und genau von dort liest der Server sie. Der
+Angreifer schickt weiterhin **keine Stärke** mit, er nennt nur die Missions-ID.
+
+**Derselbe Anflug darf nicht zweimal eingelöst werden.** Ohne eine Merkung je Missions-ID genügte
+ein wiederholter Aufruf mit derselben ID, um eine Eskorte in Sekunden aufzureiben. Das Felddokument
+führt deshalb `abgerechnet: { <missionId>: ts }`.
+
+**Auch ein gewonnener Angriff kostet Schiffe.** Fielen die Verluste des Siegers auf null, wäre eine
+Übermacht ein Freifahrtschein und das Bewachen eines Rechts sinnlos. Der Verlustanteil des
+Angreifers hängt deshalb an der Stärke der Eskorte; die Trefferchance liegt im selben 10–90-%-Band
+wie der PvP-Kampf.
+
+**Wer verbucht die Verluste?** Das naheliegende Vorbild `/api/moonsiege/resolve` schreibt den
+Spielstand des Angreifers direkt (`setSaveValue`) – genau das Wettrennen zwischen Server-Schreibung
+und Client-Save, das Abschnitt 6.4 vermeidet. Hier nicht: Der **Angreifer** bekommt seine Verluste
+in der Antwort und bucht sie selbst (Muster `mine`), der **Halter** erfährt sie über das
+Felddokument, das ihm der nächste Feld-Abruf liefert. Dafür braucht der Eskorten-Abgleich im
+Frontend die **Gegenrichtung**: Meldet der Server weniger Schiffe als lokal stehen, ist das ein
+Kampfverlust – ausdrücklich **nur nach unten**, sonst könnte ein veraltetes Felddokument Schiffe
+herbeizaubern.
+
 ### 6.4 Datenmodell und Endpunkte
 
 **Ein Dokument je System**, `db.shared['asteroids:<systemId>']`:
