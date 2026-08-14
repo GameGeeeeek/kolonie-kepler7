@@ -6362,8 +6362,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.497.0';
+  const VERSION = '8.498.0';
   const PATCHNOTES = [
+    { version:'8.498.0', date:'14.08.2026', changes:[
+      '<strong>Die aufgeklappte Systemansicht steht jetzt still, solange nichts passiert.</strong> Die Galaxie-Übersicht hat ihren Zwischenspeicher seit langem – die Ebene des geöffneten Systems wurde aber weiterhin jede Sekunde komplett neu geschrieben und alle Klickziele neu verdrahtet: gemessen 53,9 kB Markup und 95 SVG-Knoten pro Sekunde, bei jedem Spieler mit offenem Kartenreiter. Jetzt wird sie nur noch geschrieben, wenn sich sichtbar etwas ändert; laufende Countdowns (Missionslinien, Terraforming) ändern das Markup von selbst und bleiben dadurch sekundengenau. Die Klickziele bleiben voll bedienbar – abgesichert durch einen Test, der nach mehreren übersprungenen Ticks klickt.',
+      '<strong>Die Hintergrundsterne der Systemansicht springen nicht mehr.</strong> Die 30 Sterne hinter Sonne und Planeten wurden bei jedem Neuaufbau neu ausgewürfelt und sprangen deshalb im Sekundentakt an andere Stellen – derselbe Fehler, der bei den Sternen der Galaxie-Übersicht schon einmal behoben wurde. Jetzt hat jedes System seinen eigenen, festen Sternenhimmel. Nebenbei ist das die Voraussetzung für den Zwischenspeicher darüber: mit Zufallssternen wäre das Markup nie zweimal gleich gewesen.',
+      '<strong>Auch die Liste „Weitere Monde (anderes System)" nutzt jetzt den Zwischenspeicher</strong> statt jede Sekunde neu geschrieben zu werden – der letzte Nachzügler des Kartenreiters (in Etappe B-1 bewusst zurückgestellt, bis der zugehörige Klick-Test existiert; der kam mit dieser Etappe).',
+      'Dritte Etappe des Sektorkarten-Umbaus (B-2, technisches Fundament): Eine Fläche, die im Ruhezustand still steht, kann zur Detailtafel aus dem Zielbild ausgebaut werden, ohne dass jeder Ausbau die Sekundenlast weiter erhöht. Die Detailtafel selbst folgt als nächste Etappe.'
+    ]},
     { version:'8.497.0', date:'14.08.2026', changes:[
       '<strong>Neues Schiff: der Bergungsfrachter.</strong> Der dritte und letzte Frachttyp, gedacht für den Asteroidenbergbau auf große Entfernung: <strong>3.000 Frachtraum</strong> – doppelt so viel wie der Große Frachter – bei <strong>Geschwindigkeit 25</strong>, also der Hälfte. Freigeschaltet über <em>Minentechnik</em> und Fusionsantrieb Stufe 5, Kosten 1.200 Erz / 600 Kristalle / 300 Deuterium.',
       '<strong>Er ist ausdrücklich kein Upgrade, sondern ein Tausch.</strong> Eine Flotte fliegt immer im Tempo ihres langsamsten Schiffs – ein Bergungsfrachter verdoppelt die Flugzeit gegenüber dem Großen Frachter also fast. Er lohnt sich genau dort, wo <em>lange gegraben und selten geflogen</em> wird: bei Kern- und Kolossbrocken weit draußen, wo du sonst mehrere Fahrten brauchst. Auf der kurzen Strecke kostet er mehr Zeit, als sein Laderaum einspart, und die Startvorschau zeigt dir das vorher.',
@@ -50985,6 +50991,12 @@
     if (imAnflug > 0) return 'Trümmerfeld: '+fmt(debrisTotal)+' – '+imAnflug+'x Recycler im Anflug';
     return 'Trümmerfeld: '+fmt(debrisTotal)+' – kein Recycler stationiert, wird nicht abgebaut';
   }
+  // Markup-Zwischenspeicher der Systemebene (v8.498.0, Etappe B-2). Der Galaxie-Zwischenspeicher
+  // von v8.310.0 sparte nur die GALAXIE - die Systemebene wurde laut ihrem eigenen Kommentar
+  // "IMMER neu gefüllt", damit Countdowns weiterlaufen. Mit Markup-Vergleich geht beides: Läuft
+  // ein Countdown, ist das Markup jede Sekunde ein anderes und die Ebene wird geschrieben; läuft
+  // keiner, steht sie still. Voraussetzung waren die deterministischen Sterne (siehe oben).
+  let lastSystemLayerMarkup = null;
   function buildMap(){
     renderMapBaseLinks();
     // Ziel ist seit v8.349.0 die Gruppe INNERHALB der Galaxiekarte, nicht mehr ein eigenes SVG in
@@ -51064,8 +51076,14 @@
         <stop offset="100%" stop-color="${activeSunType.glow}" stop-opacity="0"/>
       </radialGradient>
     </defs>`;
+    // Aus hashStringToFloat statt Math.random (v8.498.0): mit Zufallswerten war das erzeugte Markup
+    // bei jedem Aufbau ein anderes - die Sterne sprangen im Sekundentakt, und der Markup-Vergleich
+    // an der Schreibstelle unten könnte nie greifen (dieselbe Behebung wie bei den Galaxie-Sternen
+    // am 26.07.2026). Der Systemname im Schlüssel gibt jedem System seinen eigenen Himmel.
     for (let i=0;i<30;i++){
-      inner += `<circle cx="${(Math.random()*700).toFixed(1)}" cy="${(Math.random()*230).toFixed(1)}" r="${(Math.random()*1+0.3).toFixed(1)}" fill="#fff" opacity="${(Math.random()*0.4+0.15).toFixed(2)}"/>`;
+      const sx = hashStringToFloat(activeSystem+':sysstern'+i+'x')*700, sy = hashStringToFloat(activeSystem+':sysstern'+i+'y')*230;
+      const sr = hashStringToFloat(activeSystem+':sysstern'+i+'r')*1+0.3, so = hashStringToFloat(activeSystem+':sysstern'+i+'o')*0.4+0.15;
+      inner += `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${sr.toFixed(1)}" fill="#fff" opacity="${so.toFixed(2)}"/>`;
     }
 
     // Orbit-Ringe
@@ -51400,6 +51418,13 @@
     // Kein eigener viewBox mehr: Der Ausschnitt gehört jetzt der Galaxiekarte, und die Gruppe sitzt
     // über ihren transform darin. Ein zweiter viewBox hier hätte gar keine Wirkung (<g> kennt das
     // Attribut nicht) und würde nur so aussehen, als gäbe es noch zwei Ausschnitte.
+    // Geschrieben (und verdrahtet) wird nur bei geändertem Markup ODER leerer Gruppe: Die
+    // Galaxie-Ebene erzeugt die Gruppe bei jedem eigenen Neuaufbau frisch und leer - dann muss der
+    // Inhalt trotz gleicher Signatur wieder hinein (dieselbe childElementCount-Logik wie
+    // setBoxHtml). Bei einem Skip bleiben die alten Knoten samt Klick-Handler stehen; der Klick
+    // nach übersprungenen Ticks ist in tests/test_systemebene_cache.js abgedeckt.
+    if (inner === lastSystemLayerMarkup && svg.childElementCount) return;
+    lastSystemLayerMarkup = inner;
     svg.innerHTML = inner;
     svg.querySelectorAll('[data-planet]').forEach(node => {
       const pid = node.getAttribute('data-planet');
@@ -55901,9 +55926,12 @@
     const moonWrap = document.getElementById('moonListWrap');
     if (moonWrap){
       if (!moonKeys.length){
-        moonWrap.innerHTML = '';
+        setBoxHtml(moonWrap, 'moonListWrap', '');
       } else {
-        moonWrap.innerHTML = `
+        // setBoxHtml statt innerHTML (v8.498.0): Klickziel [data-colonize-moon] wird ohnehin im
+        // render() jede Sekunde dokumentweit neu verdrahtet - ein übersprungener Tick lässt also
+        // keine toten Knöpfe zurück; die lokale Verdrahtung hier ist nur der zweite Riemen.
+        const moonWrapHtml = `
           <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-planet" aria-hidden="true"></i>Weitere Monde (anderes System)</div>
           <div class="planet-list">
             ${moonKeys.map(parentKey => {
@@ -55911,8 +55939,10 @@
             }).join('')}
           </div>
         `;
-        refreshPlanetMiniIcons(moonWrap);
-        moonWrap.querySelectorAll('[data-colonize-moon]').forEach(btn => btn.onclick = () => colonizeMoon(btn.getAttribute('data-colonize-moon')));
+        if (setBoxHtml(moonWrap, 'moonListWrap', moonWrapHtml)){
+          refreshPlanetMiniIcons(moonWrap);
+          moonWrap.querySelectorAll('[data-colonize-moon]').forEach(btn => btn.onclick = () => colonizeMoon(btn.getAttribute('data-colonize-moon')));
+        }
       }
     }
     }
