@@ -6360,8 +6360,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.495.0';
+  const VERSION = '8.496.0';
   const PATCHNOTES = [
+    { version:'8.496.0', date:'14.08.2026', changes:[
+      '<strong>Die Planetenliste nennt jetzt den Erstfund.</strong> Bei einem unentdeckten Planeten stand bisher nur der Wiederholungs-Ertrag – der einmalige Entdeckungsbonus, den die erste Erkundung zusätzlich gutschreibt, fehlte ausgerechnet dort, wo man entscheidet, wohin man zuerst fliegt. Jetzt steht beides da: „Erstfund: … (einmalig) · danach: …".',
+      '<strong>Die eigene Kolonie hat ihren Wechsel-Knopf direkt in der Liste.</strong> Die verschachtelte Mondkarte eine Zeile darunter hatte ihn längst – auf der besiedelten Kolonie selbst war „Schicken" (erneut erkunden) die einzige angebotene Handlung; zum Wechseln musste man den Umweg über das Kartenmenü oder das Seitenpanel gehen. Jetzt steht „Wechseln" bzw. „aktive Basis" direkt auf der Planetenkarte, mit demselben Verhalten wie überall sonst.',
+      '<strong>Die Planetenliste wird nicht mehr jede Sekunde neu geschrieben.</strong> Sie war die einzige Fläche des Kartenreiters ohne Markup-Zwischenspeicher – jetzt nutzt sie dasselbe Muster wie Forschung und Gebäude: neu geschrieben wird nur, wenn sich sichtbar etwas ändert. Die Knöpfe bleiben dabei voll bedienbar (abgesichert durch einen Test, der nach mehreren übersprungenen Ticks klickt).',
+      'Zweite Etappe des Sektorkarten-Umbaus (B-1). Als Nächstes wächst die Liste mit der Karte zur Detailtafel aus dem Zielbild zusammen; die schaltbaren Ebenen folgen danach.'
+    ]},
     { version:'8.495.0', date:'14.08.2026', changes:[
       '<strong>Die Sektorkarte klebt jetzt am Finger.</strong> Bisher rechnete das Verschieben Breite und Höhe getrennt um und nahm dabei an, die Zeichnung fülle den Kartenkasten - tat sie aber nie: Auf dem Handy bewegte sich die Karte senkrecht nur mit knapp halber Geschwindigkeit unter dem Finger, auf breiten Bildschirmen kippte derselbe Fehler auf die Waagerechte. Jetzt gilt ein einziger Maßstab für beide Achsen - die Karte bewegt sich exakt so weit, wie man zieht, auf jedem Gerät.',
       '<strong>Keine leere Fläche mehr im Kartenkasten.</strong> Der Kartenausschnitt hatte ein fest verdrahtetes Seitenverhältnis (950:500), der Kasten aber ein anderes - auf dem Handy blieben dadurch 56% der reservierten Kartenfläche dauerhaft leerer Hintergrund. Der Ausschnitt folgt jetzt dem Kasten: Die Karte füllt ihre Fläche auf jedem Bildschirm vollständig.',
@@ -55800,7 +55806,8 @@
       shownMoonParents.add('home');
       homeMoonHtml = moonCardHtml('home', false);
     }
-    document.getElementById('planetList').innerHTML = homeMoonHtml + PLANETS.filter(p=>p.system===activeSystem).map(p => {
+    const planetListBox = document.getElementById('planetList');
+    const planetListHtml = homeMoonHtml + PLANETS.filter(p=>p.system===activeSystem).map(p => {
       const disc = state.discovered[p.id];
       const colonized = !!state.colonies[p.id];
       const busy = cf.missions.some(m=>m.type==='explore' && m.targetId===p.id);
@@ -55826,7 +55833,7 @@
               <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
               <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system))} Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system), 1)} Treibstoff</div>
               ${p.orbit ? `<div class="bmeta">${orbitBonusLabel(p.orbit)}</div>` : ''}
-              <div class="bcost">${rewardHtml(p.reward)}</div>
+              <div class="bcost">${(!disc && p.discoveryBonus) ? 'Erstfund: '+rewardHtml(p.discoveryBonus)+' <span class="bmeta" style="display:inline;">(einmalig)</span> · danach: '+rewardHtml(p.reward) : rewardHtml(p.reward)}</div>
               ${bonus ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Verborgener Bonus: ${bonus.labelText}</div>` : ''}
               ${disc && !colonized ? `<div class="bcost">Kolonisierung: ${costHtml(colCost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(colDur)} Flugzeit · ${fuelCostIconHtml(colFuelSplit)} Treibstoff · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +200 Punkte</div>` : ''}
               ${missingShip ? `<div class="bmeta" style="color:#f0997b;">Benötigt 1 Kolonieschiff (Flotte-Tab)</div>` : ''}
@@ -55834,6 +55841,7 @@
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+            ${colonized ? `<button class="buy ${state.activeBasePlanet===p.id?'':'affordable'}" data-planet-switch="${p.id}" ${state.activeBasePlanet===p.id?'disabled':''} title="${p.name} – als aktive Basis wählen"><i class="ti ti-home" aria-hidden="true" style="margin-right:4px;"></i>${state.activeBasePlanet===p.id?'aktive Basis':'Wechseln'}</button>` : ''}
             <button class="buy ${canSend?'affordable':''}" data-send="${p.id}" ${canSend?'':'disabled'}>${busy?'unterwegs':'Schicken'}</button>
             ${disc && !colonized ? `<button class="buy ${canColonize?'affordable':''}" data-colonize="${p.id}" ${canColonize?'':'disabled'}><i class="ti ti-planet" aria-hidden="true" style="margin-right:4px;"></i>${colonizeBusy?'unterwegs':'Kolonisieren'}</button>` : ''}
           </div>
@@ -55841,7 +55849,7 @@
         ${hasMoon ? moonCardHtml(p.id, true) : ''}
       `;
     }).join('');
-    refreshPlanetMiniIcons(document.getElementById('planetList'));
+    if (setBoxHtml(planetListBox, 'planetList', planetListHtml)) refreshPlanetMiniIcons(planetListBox);
 
     // Fallback für Monde, deren Planet gerade nicht im angezeigten System liegt (v.a. der
     // Heimatbasis-Mond, da "home" kein Eintrag in PLANETS/planetList ist) - bleiben so weiterhin
