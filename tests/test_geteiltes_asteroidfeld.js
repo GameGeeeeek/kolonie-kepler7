@@ -96,6 +96,16 @@ function backend(store, opt){
       store.__feld = feld;
       return j({ ok:true, halter:'u', halterName:'A', tag:'', seit:1, eskorte:{} });
     }
+    if (p === 'asteroid/contest'){
+      let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch(e){}
+      store.__contests = (store.__contests || []).concat([body]);
+      if (opt.contest403) return j({ error: 'Dieses Vorkommen steht noch unter Schutz.', schutz: true }, 403);
+      // Sieg mit Verlusten: so laesst sich pruefen, dass der Client GENAU die Verluste des Servers
+      // bucht und nicht seine eigene Rechnung.
+      return j({ ok: true, gewonnen: true, chance: 0.9, halterVorher: 'Rivale',
+        eigeneVerluste: { cruisers: 4 }, gegnerVerluste: { jaeger: 10 },
+        halter: 'u', halterName: 'A', schutzBis: Date.now() + 7200000 });
+    }
     if (p === 'asteroid/release'){
       let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch(e){}
       store.__releases = (store.__releases || []).concat([body]);
@@ -162,7 +172,7 @@ async function marker(t){
   function fixture(){
     const st = JSON.parse(JSON.stringify(basis));
     st.research = st.research || {}; st.research.rminentechnik = 1;
-    st.fleet.schuerfschiff = 6; st.fleet.frachter = 10;
+    st.fleet.schuerfschiff = 6; st.fleet.frachter = 10; st.fleet.jaeger = 60; st.fleet.cruisers = 20;
     st.buildings.lager = 2000;
     for (const g of ['solar','mine','raffinerie','synth','fusionsreaktor','labor']) st.buildings[g] = 0;
     const fern = Date.now() + 365*24*3600*1000;
@@ -348,10 +358,67 @@ async function marker(t){
     protokoll.split('\n').slice(0, 3));
   await t5.ctx.close();
 
+  // ---- 8) Anfechtung (v8.491.0) ---------------------------------------------------------------
+  // WAS HIER AUF DEM SPIEL STEHT: Der Kampf wird SERVERSEITIG entschieden. Der Client darf sein
+  // eigenes Ergebnis nicht erfinden - er schickt nur die Missions-ID und bucht danach GENAU die
+  // Verluste, die der Server nennt. Und die Flotte darf unter keinen Umstaenden verschwinden.
+  const t6 = await tab(browser, fixture(), { feldInit: { systeme: [SERVER_SYSTEM], felder: { [SERVER_SYSTEM]: { plaetze: {
+    '3': { sorte: 'eisen', groesse: 'brocken', vorrat: 90000,
+           halter: 'x2', halterName: 'Rivale', tag: 'RIV', seit: 1, eskorte: { jaeger: 30 } }
+  } } } } });
+  await t6.page.waitForTimeout(2500);
+  await aufKarte(t6, SERVER_SYSTEM);
+  await t6.page.evaluate(() => { const n = document.querySelector('[data-map-asteroid="3"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true, clientX:200, clientY:200 })); });
+  await t6.page.waitForTimeout(400);
+  const anfMenu = await t6.page.evaluate(() => { const m = document.querySelector('.kmenu'); return m ? [...m.querySelectorAll('button')].map(b => ({ t: b.textContent, disabled: b.disabled })) : null; });
+  check('8a: am fremden Recht steht die Anfechtung zur Wahl',
+    !!anfMenu && anfMenu.some(k => /anfechten/i.test(k.t) && !k.disabled), anfMenu);
+
+  await t6.page.evaluate(() => { const x = [...document.querySelectorAll('.kmenu button')].find(y => /anfechten/i.test(y.textContent)); if (x) x.click(); });
+  await t6.page.waitForTimeout(700);
+  const anfWahl = await t6.page.evaluate(() => { const o = document.querySelector('#fwahlOverlay.open'); return o ? o.innerText : ''; });
+  check('8b: die Flottenwahl nennt die Wache und verspricht KEINE Prozentzahl',
+    /Anfechtung starten/.test(anfWahl) && /30 Schiff/.test(anfWahl) && !/Erfolgsaussicht \d/.test(anfWahl),
+    anfWahl.slice(0, 200));
+  await t6.page.evaluate(() => { const x = [...document.querySelectorAll('#fwahlOverlay button')].find(y => /Anfechtung starten/.test(y.textContent)); if (x) x.click(); });
+  await t6.page.waitForTimeout(1500);
+  const anfVor = t6.stand();
+  const anfMission = (anfVor.fleet.missions || []).find(m => m.type === 'asteroid-contest');
+  check('8c: die Anfechtungs-Mission steht mit Ziel und Flotte im Spielstand',
+    !!anfMission && anfMission.targetId === SERVER_SYSTEM + ':3' && !!mission.composition,
+    anfMission ? { targetId: anfMission.targetId, schiffe: Object.keys(anfMission.composition||{}).length } : null);
+  if (!anfMission){ await t6.ctx.close(); await browser.close(); return ende(); }
+
+  // Die Uhr vorstellen, damit die Mission ankommt - NUR Date.now (Arbeitsregel 8).
+  const anfFlugSek = Math.ceil((anfMission.endTime - anfMission.startTime) / 1000) + 5;
+  await t6.page.evaluate(sek => {
+    const echt = Date.now, versatz = sek * 1000;
+    Date.now = () => echt.call(Date) + versatz;
+  }, anfFlugSek);
+  await t6.page.waitForTimeout(4000);
+  const anfAnfragen = t6.store.__contests || [];
+  check('8d: bei Ankunft ruft der Client /asteroid/contest - mit System, Platz und Missions-ID',
+    anfAnfragen.length === 1 && anfAnfragen[0].system === SERVER_SYSTEM && String(anfAnfragen[0].platz) === '3' && !!anfAnfragen[0].missionId,
+    anfAnfragen[0]);
+  const anfNach = t6.stand();
+  // Gemessen statt geraten: capFighterSelection kappt Jaeger ohne Hangar auf null - ein fest
+  // eingetippter Schiffstyp haette hier die Kappung gemessen statt der Verlustbuchung.
+  const flogMit = anfMission.composition.cruisers || 0;
+  check('8e-vorab: es sind wirklich Kreuzer mitgeflogen (sonst misst 8e nichts)', flogMit > 4, flogMit);
+  check('8e: die Mission ist beendet und die Schiffe sind zurück - abzüglich GENAU der Verluste des Servers',
+    !(anfNach.fleet.missions || []).some(m => m.type === 'asteroid-contest') &&
+    (anfNach.fleet.cruisers || 0) === Math.max(0, (anfVor.fleet.cruisers || 0) + flogMit - 4),
+    { vorher: anfVor.fleet.cruisers, mitgeflogen: flogMit, nachher: anfNach.fleet.cruisers });
+  const anfBericht = (t6.store.__berichte || []).find(b => b && b.type === 'asteroid-contest');
+  check('8f: es gibt einen Bericht mit Ausgang und beiden Verlustseiten',
+    !!anfBericht && anfBericht.gewonnen === true && !!anfBericht.eigeneVerluste && !!anfBericht.gegnerVerluste,
+    anfBericht ? { gewonnen: anfBericht.gewonnen, eigene: anfBericht.eigeneVerluste } : null);
+  await t6.ctx.close();
+
   // 409 und 404 sind in den Läufen 3 und 4 ABSICHT - der Browser protokolliert jede Nicht-2xx-Antwort
   // als Konsolenfehler. Gefiltert wird deshalb die Netzwerkmeldung, nicht der Fehlerfall selbst;
   // ein echter JS-Fehler (pageerror) kommt weiterhin durch.
-  const fehler = [...t1.errs, ...t2.errs, ...t3.errs, ...t4.errs, ...t5.errs]
+  const fehler = [...t1.errs, ...t2.errs, ...t3.errs, ...t4.errs, ...t5.errs, ...t6.errs]
     .filter(e => !/favicon|net::ERR|CORS|Failed to load resource/i.test(e));
   check('5: keine Konsolenfehler', fehler.length === 0, fehler.slice(0, 3));
   await t3.ctx.close();
