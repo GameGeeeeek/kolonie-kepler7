@@ -6418,8 +6418,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.515.0';
+  const VERSION = '8.516.0';
   const PATCHNOTES = [
+    { version:'8.516.0', date:'15.08.2026', changes:[
+      '<strong>Behoben: Die Tier-2-Fabrikkarte rechnete deine Boni nicht mit.</strong> Sie zeigte die nackte Grundrate – ohne das Weltprojekt <em>Galaktische Verbundraffinerie</em> (+10%), den Fähigkeitsbaum-Knoten <em>Raffinerie-Taktgeber</em> (+10%) und die <em>Raffinerie-Optimierung</em> (bis +30%). Bei vollem Ausbau stand dort damit gut ein Drittel zu wenig Produktion. Umgekehrt beim Verbrauch: Der <em>Gravitations-Stabilisator</em> senkt den Rohstoff-Einsatz um bis zu 20%, die Karte wies ihn trotzdem voll aus.',
+      '<strong>Die Ressourcenleiste daneben zeigte im selben Moment den richtigen Wert.</strong> Sie geht über einen Trockenlauf durch dieselbe Rechnung, die auch die Fabrik benutzt – die Karte rechnete als einzige Stelle eigenständig. Wer beide Anzeigen verglich, sah zwei verschiedene Zahlen für dieselbe Fabrik und konnte nicht wissen, welche gilt.',
+      'Beide Anzeigen laufen jetzt über dieselbe Funktion wie die Fabrik selbst. Wer künftig einen Durchsatz-Bonus ergänzt, ändert damit automatisch alle drei Stellen mit.'
+    ]},
     { version:'8.515.0', date:'15.08.2026', changes:[
       '<strong>Die Sprungmarken-Leiste gibt es jetzt auch in Basis und Forschung.</strong> Die Einstellung „Sprungmarken" (unter Anzeige) zeigte ihre Klick-Leiste bisher nur in Punktestand, Fortschritt und Einstellungen – ausgerechnet die beiden längsten Reiter hatten keine. Jetzt steht sie auch dort: ein Tipp auf „Planeten-Rolle", „Terraforming" oder einen Forschungs-Abschnitt springt direkt hin, und ein eingeklappter Abschnitt wird dabei automatisch aufgeklappt.',
       'Die neue Leiste pflegt keine eigene Abschnittsliste, die veralten könnte: Sie baut sich aus genau den Überschriften, die der Klapp-Mechanismus ohnehin kennt – kommt ein Abschnitt dazu oder fällt einer weg, stimmt die Leiste automatisch. Dritte Etappe des Kompakt-Umbaus („überall muss man richtig lange scrollen").'
@@ -21238,6 +21243,19 @@
   // Stabilisator, -2%/Stufe imperiumsweit, max -20%). Direkte, harte Deckel - keine stapelnde Bonus-Gruppe.
   function raffinerieThroughputMult(){ return 1 + 0.03 * Math.min(10, (state.research && state.research.rraffinerieoptimierung) || 0); }
   function gravInputMult(){ const lvl = allBuildingSets().reduce((a,b)=>a+(b.gravkompressor||0),0); return 1 - Math.min(0.20, 0.02 * lvl); }
+  /* Der GESAMTE Durchsatz-Aufschlag einer Tier-2-Kette. Steht seit dem 15.08.2026 als eigene
+     Funktion da, weil die Fabrikkarte im Basis-Tab ihn brauchte und ihn vorher schlicht wegliess:
+     Sie zeigte `totalLevel * ratePerLevel` roh und damit bis zu 56% zu wenig Produktion, waehrend
+     sie den Verbrauch um bis zu 25% zu hoch auswies (der Gravitations-Stabilisator fehlte dort
+     ebenso). Die Ressourcenleiste daneben zeigte im selben Moment den echten Wert, weil sie ueber
+     den Trockenlauf tier2RatesPerSecond geht - zwei Anzeigen derselben Groesse, die sich
+     widersprachen. Weltprojekt (+10%) und Faehigkeitsbaum eco7 (+10%) zaehlen ADDITIV zusammen
+     (Hausregel: additive Gruppen statt Multiplikator-Ketten), die Raffinerie-Optimierung (+3% je
+     Stufe, max +30%) multiplikativ darauf. */
+  function tier2DurchsatzMult(){
+    const additiv = 1 + ((state.allianceResearch && state.allianceResearch['wp_verbundraffinerie']) ? 0.10 : 0) + skillTier2Bonus();
+    return additiv * raffinerieThroughputMult();
+  }
   // `grund` (optional) nimmt auf, WELCHE Grenze den Durchsatz gebunden hat: 'lager', 'rohstoffe'
   // oder 'voll' (nichts gebunden, Fabrik läuft am Anschlag). Die Anzeige darf das nämlich nicht
   // selbst herleiten - sie hat es bis zum 05.08.2026 versucht und lag falsch: Sie schloss aus
@@ -21254,8 +21272,7 @@
     // Weltprojekt (+10%) und Fähigkeitsbaum eco7 "Raffinerie-Taktgeber" (+10%) zaehlen ADDITIV
     // zusammen (Hausregel: additive Gruppen statt Multiplikator-Ketten) - beide sitzen hier in der
     // gemeinsamen Wahrheitsquelle, damit echter Tick und Anzeige-Trockenlauf identisch bleiben.
-    const wpMult = 1 + ((state.allianceResearch && state.allianceResearch['wp_verbundraffinerie']) ? 0.10 : 0) + skillTier2Bonus();
-    const want = totalLevel * def.ratePerLevel * seconds * wpMult * raffinerieThroughputMult();
+    const want = totalLevel * def.ratePerLevel * seconds * tier2DurchsatzMult();
     const inMult = gravInputMult(); // effektiver Input je Einheit (<=1)
     let maxByStock = want;
     for (const res of Object.keys(def.inputs)) maxByStock = Math.min(maxByStock, (resources[res]||0) / (def.inputs[res]*inMult));
@@ -54476,9 +54493,14 @@
         const t2def = TIER2_DEFS.find(t2=>t2.buildingKey===def.key);
         const totalNow = tier2TotalLevel(t2def);
         const totalNext = totalNow - lvl + (lvl+qty);
-        const rateNow = totalNow*t2def.ratePerLevel;
-        const rateNext = totalNext*t2def.ratePerLevel;
-        const inputsText = rate => Object.entries(t2def.inputs).map(([res,amt]) => `${fmtTier2Rate(rate*amt)} ${resLabel(res)}/s`).join(', ');
+        // Dieselben Faktoren wie die Engine (tier2Step): Ohne sie zeigte diese Karte bis v8.514.0
+        // die nackte Grundrate - bei vollem Ausbau bis zu 56% zu wenig Produktion und 25% zu viel
+        // Verbrauch, waehrend die Ressourcenleiste daneben den echten Wert nannte.
+        const t2Durchsatz = tier2DurchsatzMult();
+        const t2InMult = gravInputMult();
+        const rateNow = totalNow*t2def.ratePerLevel*t2Durchsatz;
+        const rateNext = totalNext*t2def.ratePerLevel*t2Durchsatz;
+        const inputsText = rate => Object.entries(t2def.inputs).map(([res,amt]) => `${fmtTier2Rate(rate*amt*t2InMult)} ${resLabel(res)}/s`).join(', ');
         prodLine = `Produktion: +${fmtTier2Rate(rateNow)}/s ${t2def.label} → <span style="color:#5dcaa5;">+${fmtTier2Rate(rateNext)}/s</span> nach Ausbau (imperiumsweit) · Verbraucht dafür: ${inputsText(rateNow)} → <span style="color:#5dcaa5;">${inputsText(rateNext)}</span>`;
       } else if (def.key==='hochsicherheitslager'){
         const hsNow = allBuildingSets().reduce((a,b)=>a+(b.hochsicherheitslager||0),0);
