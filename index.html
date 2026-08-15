@@ -4494,7 +4494,16 @@
       return;
     }
     if (!kosmetikKatalog){
-      setBoxHtml(box, 'kosmetikBox', `<div class="bmeta">Lädt…</div>`);
+      // "Lädt…" DARF NICHT DER ENDZUSTAND SEIN (Befund 15.08.2026): Antwortet der Server nicht -
+      // weil er gerade neu startet, weil das Netz weg ist oder weil sein Stand die Route noch nicht
+      // kennt -, stand hier vorher dauerhaft "Lädt…". Genau so sah es an dem Tag live aus, an dem
+      // der Frontend-Deploy durchlief und der Backend-Deploy hängen blieb: Die Auswahlfläche war
+      // stumm, und nichts sagte, woran es lag. Nach dem ersten gescheiterten Versuch steht deshalb
+      // hier, dass es am Server liegt und dass es von selbst weitergeht.
+      const versuchtes = kosmetikLetzterVersuch > 0 && !kosmetikLaedt;
+      setBoxHtml(box, 'kosmetikBox', versuchtes
+        ? `<div class="bmeta">Die Farb- und Emblem-Auswahl ist gerade nicht erreichbar – der Server hat nicht geantwortet. Das Spiel versucht es von selbst alle ${Math.round(KOSMETIK_ABRUF_PAUSE/1000)} Sekunden erneut; dein Aussehen und dein Sternenstaub sind davon nicht betroffen, sie liegen auf dem Server.</div>`
+        : `<div class="bmeta">Lädt…</div>`);
       ladeKosmetik();
       return;
     }
@@ -6849,8 +6858,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.519.0';
+  const VERSION = '8.520.0';
   const PATCHNOTES = [
+    { version:'8.520.0', date:'15.08.2026', changes:[
+      '<strong>Behoben: Der Abschnitt „Aussehen" konnte dauerhaft auf „Lädt…" stehen bleiben.</strong> Antwortet der Server nicht – weil er gerade neu startet, weil das Netz weg ist oder weil sein Stand die Abfrage noch nicht kennt –, blieb die Farb- und Emblem-Auswahl stumm. Kein Fehler, keine Erklärung, nur ein Ladehinweis, der nie verschwand. Genau das war heute für eine Weile live zu sehen: Die Spieldatei war schon aktualisiert, der Server noch nicht.',
+      '<strong>Ein Ladezustand, aus dem es kein Entkommen gibt, ist eine Falschaussage</strong> – er behauptet, es gehe gleich weiter. Nach dem ersten gescheiterten Abruf steht jetzt da, was los ist: dass der Server nicht geantwortet hat, dass das Spiel es von selbst alle 30 Sekunden erneut versucht, und dass <strong>weder dein Aussehen noch dein Sternenstaub davon betroffen sind</strong> – beides liegt auf dem Server, es geht nichts verloren. Sobald er wieder antwortet, ist die Auswahl ohne Neuladen wieder da.'
+    ]},
     { version:'8.519.0', date:'15.08.2026', changes:[
       '<strong>Neu: Sternenstaub – eine Währung, die es nur für Kosmetik gibt.</strong> Der Abschnitt „Aussehen" im Fortschritt-Tab zeigt jetzt oben deinen Stand, und fünf neue Stücke lassen sich davon kaufen: <em>Koralle</em> (40), <em>Orbitalring</em> (60), <em>Nebel</em> (90), <em>Saat</em> (150) und <em>Signal</em> (200). Damit gibt es neben Fortschritt und Unterstützung einen dritten Weg zu neuen Farben und Emblemen – und den einzigen, der jedem offensteht, ohne auf Prestige oder eine Spende zu warten.',
       '<strong>Verdient wird er aus zwei Quellen: der täglichen Anmeldung und jedem abgewehrten Spielerangriff.</strong> Die Anmeldung bringt 5 Sternenstaub, je Tag ununterbrochener Serie einen mehr (bis 9 ab dem fünften Tag in Folge). Eine erfolgreich abgewehrte Attacke bringt 3 – dabei zählt jeder Gegner nur einmal am Tag und höchstens drei verschiedene, damit zwei abgesprochene Konten daraus keine Gelddruckmaschine machen. Wie viel du heute schon hast und woher, steht vollständig in der Box.',

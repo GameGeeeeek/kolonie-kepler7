@@ -70,7 +70,12 @@ function backend(opt){
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok: true });
     if (p === 'me') return j({ userId: 'u', username: 'Farbtest', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0, hasEmail: true });
-    if (p === 'cosmetics') return j({ katalog: KATALOG, besitz: opt.besitz || BESITZ, getragen: opt.getragen, vorgabe: { namensfarbe: 'nf_standard', emblem: 'em_keins' }, staub: opt.staub || STAUB });
+    // opt.katalogAntwort erlaubt es, den Server die Route NICHT kennen zu lassen - der Fall, der am
+    // 15.08.2026 wirklich live war (Frontend ausgeliefert, Backend-Deploy hängen geblieben).
+    if (p === 'cosmetics') {
+      if (opt.katalogAntwort) return j(opt.katalogAntwort.body, opt.katalogAntwort.status);
+      return j({ katalog: KATALOG, besitz: opt.besitz || BESITZ, getragen: opt.getragen, vorgabe: { namensfarbe: 'nf_standard', emblem: 'em_keins' }, staub: opt.staub || STAUB });
+    }
     if (p === 'cosmetics/buy') {
       let body = {};
       try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
@@ -235,6 +240,20 @@ const boxText = page => page.evaluate(() => {
   check('6: dafür einen zum Tragen', tragen.indexOf('nf_koralle') !== -1, tragen);
   check('6: keine JS-Fehler', c.errs.length === 0, c.errs.slice(0, 3));
   await c.ctx.close();
+
+  // ---- Teil 7: der Server antwortet nicht ------------------------------------------------------
+  // DAS IST KEIN GEDACHTER FALL: Am 15.08.2026 lief der Frontend-Deploy durch und der
+  // Backend-Deploy blieb hängen. /api/cosmetics antwortete mit 404, und die Auswahlfläche stand
+  // dauerhaft auf "Lädt…" - stumm, ohne jeden Hinweis, woran es lag. Ein Ladezustand, aus dem es
+  // kein Entkommen gibt, ist eine Falschaussage: Er behauptet, es gehe gleich weiter.
+  const d = await oeffne(browser, { getragen: { namensfarbe: 'nf_standard', emblem: 'em_keins' }, gesendet: [],
+    katalogAntwort: { status: 404, body: { error: 'Cannot GET /api/cosmetics' } } });
+  const t7 = await boxText(d.page);
+  check('7: nach einem gescheiterten Abruf steht NICHT mehr "Lädt…" da', !/^Lädt/.test(t7 || ''), (t7 || '').slice(0, 80));
+  check('7: sondern der Grund', /nicht erreichbar/.test(t7 || ''), (t7 || '').slice(0, 200));
+  check('7: und dass es von selbst weitergeht', /erneut/.test(t7 || ''), (t7 || '').slice(0, 220));
+  check('7: keine JS-Fehler', d.errs.length === 0, d.errs.slice(0, 3));
+  await d.ctx.close();
 
   await browser.close();
   console.log(fail ? '\nFAIL' : '\nPASS');
