@@ -1,176 +1,156 @@
-// Kleine Sekunden-Schreiber auf Markup-Signatur (v8.467.0, Task #58).
+// Die kleinen Dauerläufer: Zwischenspeicher für vier Boxen, die auf JEDEM Reiter mitlaufen.
 //
-// HINTERGRUND: Die MutationObserver-Messung aus v8.460.0 hatte ein Gruppchen kleiner Boxen
-// aufgedeckt, die im Sekundentakt komplett neu geschrieben wurden - je fuer sich unauffaellig,
-// zusammen gemessene 3,8 bis 11,8 kB Markup je Sekunde und Reiter. Seit v8.467.0 laufen sie
-// ueber setBoxHtml (Markup-Signatur), wie die grossen Listen seit v8.310.0.
+// GEMESSEN, nicht geschätzt (14.08.2026, dritte Runde nach v8.310.0 und v8.311.0). Ein
+// MutationObserver über acht Reiter zeigt, was heute noch je Sekunde neu geschrieben wird - die
+// grossen Listen sind laengst erledigt, geblieben waren vier kleine, die dafuer ueberall mitliefen:
 //
-// GEPRUEFT WIRD:
-//   1) statisch: keine der vierzehn Boxen schreibt noch per innerHTML= (die Regel, nicht die
-//      Momentaufnahme - eine neu hinzugefuegte innerHTML-Zuweisung faellt damit auf)
-//   2) im BROWSER gemessen: die Boxen stehen ueber mehrere Ticks still (Marke ueberlebt),
-//      und die Bedienung wirkt danach noch - stellvertretend der Taktik-Haltungs-Wechsel,
-//      dessen Handler im selben Zweig wie das Schreiben verdrahtet wird.
-//   3) Selbstkorrektur: Laeuft ein Countdown (Bau-Warteschlange), MUSS die Box weiter
-//      geschrieben werden - eine Markup-Signatur kann nichts einfrieren.
+//     #socialProfileRow   1,1 kB   auf JEDEM der acht Reiter
+//     #buffsBox           0,5 kB   auf JEDEM Reiter
+//     #shareTypeChips     0,3 kB   auf JEDEM Reiter
+//     #shareFormatChips   0,3 kB   auf JEDEM Reiter
 //
-// UHR: Das Messfenster friert Date.now ein (Arbeitsregel 18) - sonst misst Abschnitt 2
-// Wanduhr-Glueck statt der Regel, sobald irgendwo ein legitimer Countdown laeuft.
+// Zusammen 41,3 kB je Sekunde ueber die acht Reiter, danach 23,6 kB - beide Zahlen mit demselben
+// Messskript erhoben. Der teure Teil ist nicht der Aufbau der Zeichenkette, sondern innerHTML samt
+// Neuaufbau der Kindknoten und den anschliessenden querySelectorAll-Verdrahtungslaeufen.
 //
-// GEGENPROBE (Arbeitsregel 1, beidseitig ausgefuehrt): am alten Stand (v8.466.0) fallen 1
-// und 2 durch - dort schreibt jede dieser Boxen jede Sekunde neu.
-const fs = require('fs');
-const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
+// WARUM DIESE VIER UEBERHAUPT: socialLinksHtml() speist sich aus der KONSTANTE SOCIAL_PROFILE und
+// aendert sich nie. Die Effekte-Box schreibt im Normalfall (keine aktiven Effekte) jede Sekunde
+// denselben Satz. Die zwei Chip-Leisten aendern sich nur, wenn der Spieler eine andere Karte oder
+// ein anderes Format waehlt.
+//
+// GEPRUEFT WIRD - und zwar BEIDE Richtungen, denn die Gefahr bei einer Bremse ist nicht, dass sie
+// zu wenig bremst, sondern dass sie zu viel bremst:
+//   1) Ohne Aenderung bleiben alle vier Boxen stehen (Marke am DOM-Knoten ueberlebt).
+//   2) MIT laufendem Effekt schreibt die Effekte-Box weiter jede Sekunde - der Countdown darin
+//      macht das Markup jede Sekunde zu einem anderen, die Signatur korrigiert sich also selbst.
+//      Ohne diese Pruefung waere eine eingefrorene Restzeit-Anzeige das wahrscheinlichste Ergebnis.
+//   3) Die Chip-Leisten bleiben nach uebersprungenen Sekunden BEDIENBAR und wechseln die Auswahl.
+//      Das ist der Fall, den CLAUDE.md ausdruecklich als testpflichtig markiert: Ihre Klick-Handler
+//      werden im SELBEN Zweig gesetzt wie das Schreiben, laufen bei einem uebersprungenen Tick also
+//      nicht - das geht nur gut, weil dann auch die alten Knoten samt Handlern stehen bleiben.
+//
+// GEGENPROBE (Arbeitsregel 1, in beide Richtungen ausgefuehrt - Ergebnisse im PR):
+//   - Am Stand davor (v8.499.0) fallen 1a-1d: die Marke stirbt bei jedem Tick.
+//   - Setzt man buffsBox wieder auf ein bedingungsloses innerHTML, faellt 1b - und NUR 1b.
+//   - Nimmt man die `if (typeNeu)`-Bedingung vor der Verdrahtung heraus, bleibt 3 gruen (die
+//     Handler werden dann eben jede Sekunde neu gesetzt) - 3 misst also die Bedienbarkeit, nicht
+//     die Ersparnis. Deshalb steht Punkt 1 daneben: erst beide zusammen belegen die Aenderung.
+const { starteBrowser, devices, SPIEL_URL, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
-const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
-const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
-
-// Die umgebauten Boxen mit dem Variablennamen, unter dem sie im Code geschrieben werden.
-const BOXEN = [
-  ['stanceBox', 'stanceBox'], ['researchSprintBox', 'researchSprintBox'],
-  ['exoticResearchBox', 'exoticResearchBox'], ['veteranTrainingBox', 'veteranTrainingBox'],
-  ['combatBonusCapBox', 'combatBonusCapBox'], ['relocateAllBox', 'relocateAllBox'],
-  ['battleStatsBox', 'battleStatsBox'], ['prestigeBox', 'prestigeBox'],
-  ['qBox', 'buildQueueBox'], ['rqBox', 'researchQueueBox'], ['claimBox', 'kofiClaimSupporterBox']
-];
-
-// ---- 1) statisch: kein innerHTML= mehr, dafuer setBoxHtml mit dem richtigen Schluessel
-for (const [variable, schluessel] of BOXEN){
-  const direkt = new RegExp('(^|[^\\w$])' + variable + '\\.innerHTML\\s*=').test(JS);
-  const ueberHelfer = JS.includes('setBoxHtml(' + variable + ", '" + schluessel + "'");
-  check('1: ' + schluessel.padEnd(22) + ' laeuft ueber setBoxHtml, nicht ueber innerHTML=',
-    !direkt && ueberHelfer, { direkt, ueberHelfer });
-}
-// Die drei Boxen mit generischer Variable `box` - hier zaehlt der Schluessel im Aufruf.
-for (const schluessel of ['eventCalendarBox', 'happyHourBox', 'worldBossBox']){
-  check('1: ' + schluessel.padEnd(22) + ' laeuft ueber setBoxHtml',
-    JS.includes("setBoxHtml(box, '" + schluessel + "'"));
-}
-
 function backend(store){ return async r => {
-  const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
-  const j = (o, s2=200) => r.fulfill({status:s2, contentType:'application/json', body:JSON.stringify(o)});
-  if (p === 'health') return j({ok:true});
-  if (p === 'me') return j({userId:'u',username:'A',homeSystem:'kepler',homeSlot:0,attackShieldMs:0,hasEmail:true,wantsPatchnotes:true,supporter:{active:false,tier:null}});
-  if (p === 'reports') return j({reports:[]});
-  if (p === 'pending-rewards/claim') return j({reward:null});
-  if (p === 'storage-list') return j({keys:[]});
-  if (p.startsWith('storage/')){
-    const k = decodeURIComponent(p.slice(8));
-    if (req.method() === 'PUT'){ try { store[k] = JSON.parse(req.postData()).value; } catch(e){} return j({ok:true,version:2}); }
-    if (store[k] !== undefined) return j({key:k,value:store[k],version:1});
-    return j({e:1},404);
-  }
-  return j([]);
+  const req=r.request(); const p=req.url().split('/api/')[1].split('?')[0];
+  const j=(o,s=200)=>r.fulfill({status:s,contentType:'application/json',body:JSON.stringify(o)});
+  if(p==='health')return j({ok:true});
+  if(p==='me')return j({userId:'u',username:'A',homeSystem:'kepler',homeSlot:0,attackShieldMs:0,hasEmail:true,wantsPatchnotes:true});
+  if(p.startsWith('storage/')){const k=decodeURIComponent(p.slice(8));if(req.method()==='PUT'){try{store[k]=JSON.parse(req.postData()||'{}').value;}catch(e){}return j({ok:true});}if(store[k]!==undefined)return j({key:k,value:store[k],version:1});return j({e:1},404);}
+  if(/leaderboard|reports|messages|ranking|wars|halloffame|bounty|friends|pending|notifications/.test(p))return j(p.includes('pending')?{reward:null}:[]);
+  return j({});
 };}
 
-const jetzt = Date.now();
-const save = (mitBau) => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
-  resources:{energie:48000, erz:52000, kristalle:31000, deuterium:20000, antimaterie:900, forschungspunkte:9000},
-  buildings:{solar:18, mine:17, kristallmine:15, deutsynth:12, labor:10, lager:12, werft:9, geschuetz:8},
-  research:{rsolar:8, rerz:8, rkampf:6},
-  // Laufende Forschung = sekundengenauer Countdown in researchQueueBox. Feldname endTime aus
-  // der Spieldatei abgelesen (Regel 4), nicht geraten. Die Restzeit steht dort im Zweig
-  // `rq.length ? ... : 'Noch leer'` - bei LEERER Warteschlange gibt es also gar keinen
-  // Countdown, und die Box stuende voellig zu Recht still. Der erste Anlauf mass genau das
-  // und schlug auf korrektem Code an (dieselbe Familie wie Arbeitsregel 7: nicht messen, was
-  // man messen will). Deshalb hier eine echte Warteschlange.
-  activeResearch: mitBau ? { key:'rsolar', targetLevel:9, endTime: jetzt + 900000 } : null,
-  researchQueue: mitBau ? ['rerz'] : [],
-  constructionQueue:[],
-  fleet:{jaeger:200, missions:[]}, colonies:{}, activeBasePlanet:'home',
-  player:{id:'u', name:'A', avatarKey:null}, xp:52000, credits:184000, prestige:3, buffs:[],
-  battleStats:{wins:42, losses:7}, lastTick:jetzt, colonyNames:{}, modules:{}, shipModules:{},
-  // Ereignis-Uhren pinnen (Arbeitsregel 18): der erste Planeten-Ereignis-Check feuert sonst
-  // GARANTIERT und schreibt Boxen um, die hier gerade stillstehen sollen.
-  nextPlanetEventCheck: jetzt + 3600000, nextTraderCheck: jetzt + 3600000 });
+// Ereignis-Uhren in die Zukunft: Bei 0 feuert der erste Planeten-Ereignis-Check GARANTIERT, und
+// dessen render() wuerde die Marke mitten im Messfenster vernichten - der Test schiene dann zu
+// beweisen, der Zwischenspeicher sei tot. Derselbe Fixture-Fehler wie in test_listen_cache.
+function save(zusatz){
+  return JSON.stringify(Object.assign({ tutorialSeen:true, newbieWelcomeSeen:true,
+    nextPlanetEventCheck: Date.now() + 3600000, nextTraderCheck: Date.now() + 3600000,
+    resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
+    buildings:{solar:22,mine:20,labor:14,lager:16,werft:14,turm:8},
+    research:{rkampf:9,rsolar:9}, fleet:{jaeger:600,missions:[]},
+    colonies:{}, activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null},
+    xp:260000, credits:180000, buffs:[], lastTick:Date.now(),
+    colonyNames:{}, modules:{}, shipModules:{} }, zusatz));
+}
+
+const markiere = (page, id) => page.evaluate(x => {
+  const b=document.getElementById(x); if(!b || !b.firstElementChild) return false;
+  b.firstElementChild.__marke = 1; return true;
+}, id);
+const markeDa = (page, id) => page.evaluate(x => {
+  const b=document.getElementById(x);
+  return !!(b && b.firstElementChild && b.firstElementChild.__marke);
+}, id);
+
+async function spiel(browser, zustand){
+  const store={'kepler7-save-v3':save(zustand)};
+  const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{width:900,height:1200} }));
+  const page = await ctx.newPage(); const errs=[];
+  page.on('pageerror', e=>errs.push(String(e)));
+  page.on('console', m=>{ if(m.type()==='error' && !/Failed to load resource|CORS|ERR_/.test(m.text())) errs.push(m.text()); });
+  await page.route('**/api/**', backend(store));
+  await page.addInitScript(()=>localStorage.setItem('kepler7_token','tok'));
+  await page.goto(SPIEL_URL); await page.waitForTimeout(2900);
+  await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
+  return { page, ctx, errs };
+}
 
 (async () => {
   const browser = await starteBrowser();
 
-  // ---- 2) still ueber mehrere Ticks + Bedienung wirkt danach noch
+  // ---------------------------------------------- 1) Ohne Aenderung stehen alle vier still
   {
-    const store = { 'kepler7-save-v3': save(false) };
-    const ctx = await browser.newContext({ viewport:{width:1280,height:900} });
-    const page = await ctx.newPage(); const errs = [];
-    page.on('pageerror', e => errs.push(String(e)));
-    await page.route('**/api/**', backend(store));
-    await page.addInitScript(() => localStorage.setItem('kepler7_token','tok'));
-    await page.goto(SPIEL_URL); await page.waitForTimeout(3000);
-    await page.evaluate(() => {
-      ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => {
-        const o = document.getElementById(id); if (o) o.style.display = 'none'; });
-      const b = document.querySelector('.tab-btn[data-tab="forschung"]'); if (b) b.click();
-    });
-    await page.waitForTimeout(1200);
-    // Uhr einfrieren, einen Tick verstreichen lassen, DANN markieren (Arbeitsregel 18).
-    await page.evaluate(() => { const fest = Date.now(); window.__echt = Date.now; Date.now = () => fest; });
-    await page.waitForTimeout(1300);
-    const IDS = ['stanceBox','researchSprintBox','exoticResearchBox','veteranTrainingBox',
-                 'battleStatsBox','prestigeBox','buildQueueBox','researchQueueBox','eventCalendarBox'];
-    const markiert = await page.evaluate(ids => {
-      const da = [];
-      for (const id of ids){ const el = document.getElementById(id);
-        if (el && el.firstElementChild){ el.firstElementChild.__marke = true; da.push(id); } }
-      return da;
-    }, IDS);
-    check('2a: die Boxen sind gerendert und markierbar', markiert.length >= 7, markiert);
-    await page.waitForTimeout(3400);
-    const stehen = await page.evaluate(ids => ids.filter(id => {
-      const el = document.getElementById(id);
-      return !!(el && el.firstElementChild && el.firstElementChild.__marke);
-    }), markiert);
-    check('2b: sie werden ueber mehrere Ticks NICHT neu geschrieben',
-      stehen.length === markiert.length, { erwartet: markiert, still: stehen });
-    // Bedienung nach uebersprungenen Ticks: die Taktik-Haltung verdrahtet ihre Knoepfe im
-    // selben Zweig wie das Schreiben - genau der Fall, den CLAUDE.md pruefen laesst.
-    await page.evaluate(() => { if (window.__echt) Date.now = window.__echt; });
-    const gewechselt = await page.evaluate(() => {
-      const box = document.getElementById('stanceBox');
-      const btn = box && box.querySelector('[data-choose-stance]');
-      if (!btn) return null;
-      const ziel = btn.getAttribute('data-choose-stance');
-      btn.click();
-      return { ziel, jetzt: window.__stanceTest === undefined ? null : null };
-    });
-    await page.waitForTimeout(600);
-    const stand = await page.evaluate(() => (document.getElementById('stanceBox')||{}).textContent||'');
-    check('2c: der Haltungs-Knopf wirkt auch nach uebersprungenen Ticks noch',
-      gewechselt && /Aktiv/.test(stand), { geklickt: gewechselt, hatAktiv: /Aktiv/.test(stand) });
-    check('2d: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
+    const { page, ctx, errs } = await spiel(browser, {});
+    const IDS = ['socialProfileRow', 'buffsBox', 'shareTypeChips', 'shareFormatChips'];
+    const gerendert = {};
+    for (const id of IDS) gerendert[id] = await page.evaluate(x=>{const b=document.getElementById(x); return b?b.innerHTML.length:-1;}, id);
+    check('1-vorab: alle vier Boxen sind ueberhaupt gerendert (sonst misst 1a-1d nichts)',
+      IDS.every(id => gerendert[id] > 20), gerendert);
+    const konnte = {};
+    for (const id of IDS) konnte[id] = await markiere(page, id);
+    check('1-vorab2: alle vier lassen sich markieren', IDS.every(id => konnte[id] === true), konnte);
+    await page.waitForTimeout(3600); // mindestens drei Sekunden-Ticks
+    for (const id of IDS){
+      check('1: #' + id + ' wurde NICHT neu geschrieben', await markeDa(page, id) === true);
+    }
+    const f = errs.filter(e=>!/favicon/i.test(e));
+    check('1: keine Konsolenfehler', f.length === 0, f.slice(0,3));
     await ctx.close();
   }
 
-  // ---- 3) Selbstkorrektur: laufender Bau-Countdown MUSS weiter schreiben
+  // ---------------------------------------------- 2) MIT laufendem Effekt schreibt sie weiter
   {
-    const store = { 'kepler7-save-v3': save(true) };
-    const ctx = await browser.newContext({ viewport:{width:1280,height:900} });
-    const page = await ctx.newPage(); const errs = [];
-    page.on('pageerror', e => errs.push(String(e)));
-    await page.route('**/api/**', backend(store));
-    await page.addInitScript(() => localStorage.setItem('kepler7_token','tok'));
-    await page.goto(SPIEL_URL); await page.waitForTimeout(3000);
-    await page.evaluate(() => {
-      ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => {
-        const o = document.getElementById(id); if (o) o.style.display = 'none'; });
+    // Der Countdown im Markup ist sekundengenau - die Signatur ist damit jede Sekunde eine andere.
+    const { page, ctx } = await spiel(browser, { buffs:[{ kind:'prod_all', mult:2, expiresAt: Date.now() + 25*60000 }] });
+    const inhalt = await page.evaluate(()=>{const b=document.getElementById('buffsBox'); return b?b.innerText:'';});
+    check('2-vorab: der Effekt ist wirklich aktiv (sonst misst 2 den leeren Fall)',
+      /Alle Ressourcen/.test(inhalt), inhalt.slice(0, 80));
+    check('2-vorab2: die Box laesst sich markieren', await markiere(page, 'buffsBox') === true);
+    await page.waitForTimeout(2600);
+    check('2: mit laufendem Effekt wird die Box weiter neu geschrieben - der Countdown friert nicht ein',
+      await markeDa(page, 'buffsBox') === false);
+    await ctx.close();
+  }
+
+  // ---------------------------------------------- 3) Nach uebersprungenen Ticks noch bedienbar
+  {
+    const { page, ctx } = await spiel(browser, {});
+    const vorher = await page.evaluate(()=>{
+      const b=document.getElementById('shareFormatChips');
+      return b ? [...b.querySelectorAll('[data-share-format]')].map(x=>({ k:x.getAttribute('data-share-format'), aktiv:x.classList.contains('buy') })) : null;
     });
-    const text0 = await page.evaluate(() => (document.getElementById('researchQueueBox')||{}).textContent||'');
-    await page.evaluate(() => { const el = document.getElementById('researchQueueBox');
-      if (el && el.firstElementChild) el.firstElementChild.__marke = true; });
-    await page.waitForTimeout(3400);
-    const nach = await page.evaluate(() => {
-      const el = document.getElementById('researchQueueBox');
-      return { marke: !!(el && el.firstElementChild && el.firstElementChild.__marke),
-               text: el ? el.textContent : '' };
+    check('3-vorab: die Format-Chips stehen da, genau einer ist aktiv',
+      Array.isArray(vorher) && vorher.length >= 2 && vorher.filter(x=>x.aktiv).length === 1, vorher);
+    if (!vorher || vorher.length < 2){ await ctx.close(); await browser.close(); return ende(); }
+    // Erst mehrere Sekunden verstreichen lassen - in denen wird die Leiste NICHT neu geschrieben
+    // und ihre Handler folglich auch nicht neu gesetzt. Genau danach wird geklickt.
+    await page.waitForTimeout(3600);
+    const ziel = vorher.find(x=>!x.aktiv).k;
+    await page.evaluate(k=>{
+      const b=document.getElementById('shareFormatChips');
+      const btn = b && b.querySelector('[data-share-format="'+k+'"]');
+      if (btn) btn.click();
+    }, ziel);
+    await page.waitForTimeout(400);
+    const nachher = await page.evaluate(()=>{
+      const b=document.getElementById('shareFormatChips');
+      return b ? [...b.querySelectorAll('[data-share-format]')].map(x=>({ k:x.getAttribute('data-share-format'), aktiv:x.classList.contains('buy') })) : null;
     });
-    check('3a: bei laufendem Forschungs-Countdown wird die Box weiterhin neu geschrieben',
-      nach.marke === false, nach.marke);
-    check('3b: und ihr Text zaehlt dabei sichtbar herunter', nach.text !== text0 && text0.length > 0);
-    check('3c: keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
+    const jetztAktiv = (nachher||[]).find(x=>x.aktiv);
+    check('3: nach uebersprungenen Sekunden schaltet ein Klick die Auswahl weiterhin um',
+      !!jetztAktiv && jetztAktiv.k === ziel, { geklickt: ziel, aktiv: jetztAktiv && jetztAktiv.k, nachher });
     await ctx.close();
   }
 
   await browser.close();
-  ende();
-})().catch(e => { console.error(e); process.exit(1); });
+  return ende();
+})();
