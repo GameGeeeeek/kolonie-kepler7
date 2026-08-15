@@ -42,9 +42,15 @@ const KATALOG = [
   { key: 'nf_asche',    art: 'namensfarbe', bedingung: { typ: 'prestige', wert: 1 } },
   { key: 'em_keins',    art: 'emblem',      bedingung: { typ: 'immer' } },
   { key: 'em_komet',    art: 'emblem',      bedingung: { typ: 'spender', stufe: 'gold' } },
-  { key: 'em_klinge',   art: 'emblem',      bedingung: { typ: 'kampfpunkte', wert: 5000 } }
+  { key: 'em_klinge',   art: 'emblem',      bedingung: { typ: 'kampfpunkte', wert: 5000 } },
+  // Zwei käufliche Stücke, bewusst eines DIESSEITS und eines JENSEITS des Guthabens: Nur so lässt
+  // sich prüfen, dass der Knopf den Unterschied kennt, statt immer bedienbar zu sein.
+  { key: 'nf_koralle',  art: 'namensfarbe', bedingung: { typ: 'kauf', preis: 40 } },
+  { key: 'nf_signal',   art: 'namensfarbe', bedingung: { typ: 'kauf', preis: 200 } }
 ];
 const BESITZ = ['nf_standard', 'nf_asche', 'em_keins'];
+const STAUB = { menge: 55, serie: 3, heuteAngemeldet: true, abwehrHeute: 1,
+  saetze: { anmeldung: 5, serieBonus: 1, serieMax: 5, abwehr: 3, abwehrMaxProTag: 3 } };
 
 // Der fremde Spieler in der Bestenliste TRÄGT Kosmetik - so, wie der Server sie in den Eintrag
 // schreibt. Daran wird Prüfung 4 gemessen.
@@ -64,7 +70,18 @@ function backend(opt){
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok: true });
     if (p === 'me') return j({ userId: 'u', username: 'Farbtest', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0, hasEmail: true });
-    if (p === 'cosmetics') return j({ katalog: KATALOG, besitz: BESITZ, getragen: opt.getragen, vorgabe: { namensfarbe: 'nf_standard', emblem: 'em_keins' } });
+    if (p === 'cosmetics') return j({ katalog: KATALOG, besitz: opt.besitz || BESITZ, getragen: opt.getragen, vorgabe: { namensfarbe: 'nf_standard', emblem: 'em_keins' }, staub: opt.staub || STAUB });
+    if (p === 'cosmetics/buy') {
+      let body = {};
+      try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
+      (opt.gekauft || []).push(body.key);
+      const def = KATALOG.find(d => d.key === body.key);
+      const preis = (def && def.bedingung && def.bedingung.preis) || 0;
+      const staub = Object.assign({}, opt.staub || STAUB, { menge: ((opt.staub || STAUB).menge) - preis });
+      opt.staub = staub;
+      opt.besitz = (opt.besitz || BESITZ).concat([body.key]);
+      return j({ ok: true, key: body.key, staub, besitz: opt.besitz });
+    }
     if (p === 'cosmetics/equip') {
       let body = {};
       try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
@@ -185,6 +202,39 @@ const boxText = page => page.evaluate(() => {
   check('5: die Ablehnung des Servers steht in der Box', /noch nicht freigeschaltet/.test(t5 || ''), (t5 || '').slice(-160));
   check('5: keine JS-Fehler', b.errs.length === 0, b.errs.slice(0, 3));
   await b.ctx.close();
+
+  // ---- Teil 6: der Laden --------------------------------------------------------------------
+  // Guthaben 55: nf_koralle (40) ist bezahlbar, nf_signal (200) nicht. Beide müssen sichtbar sein -
+  // ein Katalog, der nur zeigt, was man sich gerade leisten kann, verschweigt das Ziel.
+  const gekauft = [];
+  const c = await oeffne(browser, { getragen: { namensfarbe: 'nf_standard', emblem: 'em_keins' }, gesendet: [], gekauft });
+  const t6 = await boxText(c.page);
+  check('6: der Staub-Stand steht in der Box', /55 Sternenstaub/.test(t6 || ''), (t6 || '').slice(0, 140));
+  // Die Sätze kommen vom Server - geprüft wird, dass sie ANKOMMEN, nicht ihr genauer Wortlaut.
+  check('6: die Herkunft des Staubs wird erklärt',
+    /Anmeldung/.test(t6 || '') && /abgewehrten/.test(t6 || ''), (t6 || '').slice(0, 400));
+  check('6: das teure Stück ist trotzdem sichtbar', /Signal/.test(t6 || ''));
+  check('6: und sein Preis steht dabei', /200 Sternenstaub/.test(t6 || ''), (t6 || '').slice(0, 600));
+
+  const kaufKnoepfe = await c.page.evaluate(() => Array.from(document.querySelectorAll('#kosmetikBox [data-kosm-kauf]'))
+    .map(b => ({ key: b.getAttribute('data-kosm-kauf'), aus: b.disabled })));
+  check('6: bezahlbares Stück hat einen bedienbaren Kauf-Knopf',
+    kaufKnoepfe.some(b => b.key === 'nf_koralle' && !b.aus), kaufKnoepfe);
+  // DER PUNKT: Der Knopf des zu teuren Stücks ist gesperrt, statt beim Klick "zu wenig" zu sagen.
+  check('6: unbezahlbares Stück hat einen GESPERRTEN Knopf',
+    kaufKnoepfe.some(b => b.key === 'nf_signal' && b.aus), kaufKnoepfe);
+
+  await c.page.evaluate(() => { const b = document.querySelector('#kosmetikBox [data-kosm-kauf="nf_koralle"]'); if (b) b.click(); });
+  await c.page.waitForTimeout(1200);
+  check('6: der Kauf geht an den Server', gekauft.length === 1 && gekauft[0] === 'nf_koralle', gekauft);
+  const t6b = await boxText(c.page);
+  check('6: der abgebuchte Stand wird übernommen', /15 Sternenstaub/.test(t6b || ''), (t6b || '').slice(0, 140));
+  const nachKauf = await c.page.evaluate(() => Array.from(document.querySelectorAll('#kosmetikBox [data-kosm-kauf]')).map(b => b.getAttribute('data-kosm-kauf')));
+  check('6: das gekaufte Stück hat keinen Kauf-Knopf mehr', nachKauf.indexOf('nf_koralle') === -1, nachKauf);
+  const tragen = await c.page.evaluate(() => Array.from(document.querySelectorAll('#kosmetikBox [data-kosm-key]')).map(b => b.getAttribute('data-kosm-key')));
+  check('6: dafür einen zum Tragen', tragen.indexOf('nf_koralle') !== -1, tragen);
+  check('6: keine JS-Fehler', c.errs.length === 0, c.errs.slice(0, 3));
+  await c.ctx.close();
 
   await browser.close();
   console.log(fail ? '\nFAIL' : '\nPASS');
