@@ -6388,8 +6388,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.502.0';
+  const VERSION = '8.503.0';
   const PATCHNOTES = [
+    { version:'8.503.0', date:'15.08.2026', changes:[
+      '<strong>Vier kleine Boxen hören auf, jede Sekunde neu zu rechnen.</strong> Eine Messung über alle acht Reiter zeigte, dass die <em>Sozial-Leiste</em>, die <em>Effekte-Box</em> und die beiden <em>Teilen-Chipleisten</em> im Sekundentakt neu aufgebaut wurden – auf jedem Reiter, auch wo sich nichts geändert hatte. Die Sozial-Leiste kann sich gar nicht ändern (sie steht in einer Konstante), und die Effekte-Box schrieb im Normalfall jede Sekunde denselben Satz „Gerade keine aktiven Effekte". Gemessen: <strong>41,3 kB auf 23,6 kB</strong> Markup je Sekunde.',
+      'Das ist die dritte Runde dieser Aufräumarbeit – die großen Listen (Forschung, Gebäude, Verteidigung, NPC-Liste) sind seit v8.310.0 und v8.311.0 erledigt. Was jetzt noch jede Sekunde schreibt, tut das zu Recht: die Orbitalstation zeigt eine Restzeit, und wenn ein <em>Effekt läuft</em>, tickt der Countdown in der Effekte-Box weiterhin sekundengenau weiter. Genau das prüft der neue Test mit – eine eingefrorene Restzeit wäre der wahrscheinlichste Fehler einer solchen Bremse.',
+      'Für dich ändert sich nichts Sichtbares: weniger Arbeit im Hintergrund, dieselbe Anzeige.'
+    ]},
     { version:'8.502.0', date:'15.08.2026', changes:[
       '<strong>Die Sektorkarte hat jetzt eine Ebenen-Leiste.</strong> Drei Schalter über der Karte blenden ganze Anzeige-Ebenen der Galaxie-Übersicht aus und ein: <strong>Fraktionen</strong> (die farbigen Gebiets-Flächen), <strong>Ereignisse</strong> (Piratenbasis, Alien-Sichtungen, Kriegs-Schauplatz und die Wurmloch-Linie) und <strong>Aufklärung</strong> (Späh-Marker und Expeditions-Peilungen). Bei 69 Systemen mit Gebieten, Abzeichen und Linien übereinander war die Übersicht je nach Spielphase schlicht voll – jetzt entscheidest du, was du gerade sehen willst. Das ist die Ebenen-Idee aus dem Sektorkarten-Zielbild, angewandt auf die Ebenen, die es im Spiel wirklich gibt.',
       'Standard ist <strong>alles an</strong> – wer nichts umschaltet, sieht die Karte exakt wie bisher. Die Auswahl wird im Spielstand gespeichert und überlebt Neuladen und Gerätewechsel. Der Hilfe-Abschnitt „Sektorkarte bedienen" beschreibt die Leiste mit.',
@@ -49930,12 +49935,21 @@
     if (!typeBox || !fmtBox) return;
     const avail = SHARE_CARD_TYPES.filter(t => t.avail());
     if (!avail.some(t=>t.key===shareCardType)) shareCardType = 'profil';
-    typeBox.innerHTML = avail.map(t => `<button data-share-type="${t.key}" class="${shareCardType===t.key?'affordable buy':''}" style="font-size:11px; padding:5px 10px;">${t.name}</button>`).join('');
+    /* Markup-Signatur (setBoxHtml): Die beiden Chip-Leisten schrieben je 0,3 kB pro Sekunde neu,
+       auf jedem Reiter - dabei aendert sich ihr Markup nur, wenn der Spieler eine andere Karte oder
+       ein anderes Format waehlt (die Auswahl steckt als Klasse "affordable buy" drin, geht also in
+       die Signatur ein). Genau darum wird bei einem Wechsel weiterhin geschrieben.
+       WICHTIG, weil die Handler im SELBEN Zweig gesetzt werden: Wird ein Tick uebersprungen, laufen
+       die querySelectorAll-Zeilen darunter nicht - das geht gut, weil dann auch die alten Knoten
+       samt ihrer Handler stehen bleiben. CLAUDE.md verlangt fuer genau diesen Fall einen Test, der
+       NACH uebersprungenen Sekunden klickt; er steht in tests/test_kleinboxen_cache.js. */
+    const typeHtml = avail.map(t => `<button data-share-type="${t.key}" class="${shareCardType===t.key?'affordable buy':''}" style="font-size:11px; padding:5px 10px;">${t.name}</button>`).join('');
+    const typeNeu = setBoxHtml(typeBox, 'shareTypeChips', typeHtml);
     const fmts = Object.values(SHARE_FORMATS).filter(f => f.key !== 'quer' || shareCardType === 'profil');
     if (!fmts.some(f=>f.key===shareCardFormat)) shareCardFormat = 'post';
-    fmtBox.innerHTML = fmts.map(f => `<button data-share-format="${f.key}" class="${shareCardFormat===f.key?'affordable buy':''}" style="font-size:11px; padding:5px 10px;">${f.name}</button>`).join('');
-    typeBox.querySelectorAll('[data-share-type]').forEach(b => b.onclick = () => { shareCardType = b.getAttribute('data-share-type'); renderShareCardBar(); });
-    fmtBox.querySelectorAll('[data-share-format]').forEach(b => b.onclick = () => { shareCardFormat = b.getAttribute('data-share-format'); renderShareCardBar(); });
+    const fmtNeu = setBoxHtml(fmtBox, 'shareFormatChips', fmts.map(f => `<button data-share-format="${f.key}" class="${shareCardFormat===f.key?'affordable buy':''}" style="font-size:11px; padding:5px 10px;">${f.name}</button>`).join(''));
+    if (typeNeu) typeBox.querySelectorAll('[data-share-type]').forEach(b => b.onclick = () => { shareCardType = b.getAttribute('data-share-type'); renderShareCardBar(); });
+    if (fmtNeu) fmtBox.querySelectorAll('[data-share-format]').forEach(b => b.onclick = () => { shareCardFormat = b.getAttribute('data-share-format'); renderShareCardBar(); });
   }
   async function generateColonyShareImage(){
     const t = SHARE_CARD_TYPES.find(x=>x.key===shareCardType) || SHARE_CARD_TYPES[0];
@@ -58015,15 +58029,22 @@
     const buffsBox = document.getElementById('buffsBox');
     if (buffsBox){
       const activeBuffs = (state.buffs||[]).filter(b=>b.expiresAt>Date.now());
+      let buffHtml;
+      /* Markup-Signatur statt Wertliste (setBoxHtml): Der Fall ist genau der, fuer den der Helfer
+         gebaut ist. Laufen Effekte, enthaelt das Markup einen sekundengenauen Countdown - es ist
+         jede Sekunde ein anderes und die Box wird geschrieben. Laeuft keiner, steht dieselbe
+         Zeichenkette da und der Schreibvorgang entfaellt. Gemessen wurden 0,5 kB je Sekunde auf
+         jedem Reiter, obwohl im Normalfall (keine Effekte) nichts zu tun war.
+         Keine Klick-Handler im erzeugten Markup - nachgesehen, nicht angenommen. */
       if (!activeBuffs.length){
         // Der frühere Text ("Finde welche bei Erkundungsmissionen!") nannte nur die schwächste von
         // mehreren Quellen - und dort findet man auch keine Effekte, sondern ITEMS, die erst im
         // Fortschritt-Tab aktiviert werden müssen. Wer nach dem Text erkundete und die Box leer sah,
         // musste das für einen Fehler halten. Jetzt stehen die tatsächlichen Quellen da, die
         // häufigste zuerst.
-        buffsBox.innerHTML = `<div class="bmeta">Gerade keine aktiven Effekte. Sie entstehen sofort durch: <strong>Zufallsereignisse</strong> (die Pop-ups mit A/B-Entscheidung, im Schnitt alle paar Minuten), <strong>Sonderfunde auf Expeditionen</strong>, den <strong>Forschungs-Sprint</strong> und <strong>Booster aus dem Kredit-Shop</strong>. Zusätzlich findest du auf Erkundungen und Expeditionen Booster-<em>Items</em> (Ressourcenschub, Schildüberladung, Antriebsmatrix) – die wirken erst, wenn du sie oben unter „Inventar" aktivierst.</div>`;
+        buffHtml = `<div class="bmeta">Gerade keine aktiven Effekte. Sie entstehen sofort durch: <strong>Zufallsereignisse</strong> (die Pop-ups mit A/B-Entscheidung, im Schnitt alle paar Minuten), <strong>Sonderfunde auf Expeditionen</strong>, den <strong>Forschungs-Sprint</strong> und <strong>Booster aus dem Kredit-Shop</strong>. Zusätzlich findest du auf Erkundungen und Expeditionen Booster-<em>Items</em> (Ressourcenschub, Schildüberladung, Antriebsmatrix) – die wirken erst, wenn du sie oben unter „Inventar" aktivierst.</div>`;
       } else {
-        buffsBox.innerHTML = activeBuffs.map(b => {
+        buffHtml = activeBuffs.map(b => {
           const remain = Math.max(0, b.expiresAt-Date.now());
           const mm = String(Math.floor(remain/60000)).padStart(2,'0');
           const ss = String(Math.floor((remain%60000)/1000)).padStart(2,'0');
@@ -58042,6 +58063,7 @@
           return `<div class="card-row"><div class="left"><div class="bicon" style="background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-bolt" aria-hidden="true"></i></div><div><div class="bname">${label}${quelle}</div><div class="bmeta">läuft noch ${mm}:${ss}</div></div></div></div>`;
         }).join('');
       }
+      setBoxHtml(buffsBox, 'buffsBox', buffHtml);
     }
     // Performance (18.07.2026, dieselbe Idee wie schon bei den Fortschritt-Tab-Boxen in v8.97.0):
     // diese acht Allianz-Boxen wurden bisher JEDE Sekunde neu aufgebaut, auch wenn ein völlig anderer
@@ -58932,8 +58954,11 @@
     };
     const referralShareBtn = document.getElementById('referralShareBtn');
     if (referralShareBtn) referralShareBtn.onclick = teileEinladung;
-    const socialProfileRow = document.getElementById('socialProfileRow');
-    if (socialProfileRow) socialProfileRow.innerHTML = socialLinksHtml();
+    // Gemessen (14.08.2026, dritte Messrunde nach v8.310.0/v8.311.0): Diese Zeile schrieb 1,1 kB
+    // Markup je Sekunde neu, und zwar auf JEDEM Reiter - obwohl socialLinksHtml() sich aus der
+    // Konstante SOCIAL_PROFILE speist und sich damit nie aendert. Der teure Teil ist nicht der
+    // Aufbau der Zeichenkette, sondern innerHTML samt Neuaufbau der Kindknoten.
+    setBoxHtml(document.getElementById('socialProfileRow'), 'socialProfileRow', socialLinksHtml());
     const addEmailBtn = document.getElementById('addEmailBtn');
     if (addEmailBtn) addEmailBtn.onclick = async () => {
       const email = document.getElementById('addEmailInput').value.trim();

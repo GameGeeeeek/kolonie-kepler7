@@ -96,6 +96,23 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     ein DUPLIKAT** – vor dem Mergen `git diff origin/master <branch>` prüfen; ist er leer,
     schließen statt mergen (passiert bei Backend-PR #79).
 
+    **Nachtrag 15.08.2026 – derselbe Squash, anderer Schaden: ein Patch gegen die falsche Basis.**
+    Beim Umsetzen einer Änderung auf einen inzwischen weitergelaufenen `main` wurde der eigene
+    Änderungssatz als `git diff <main-Commit> HEAD` gebildet. Das sieht richtig aus und ist es
+    nicht: Der Eltern-Commit der eigenen Arbeit war ein **lokaler** Commit mit gleichem Inhalt, der
+    gesquashte auf `main` ein anderer – und **dazwischen lag eine fremde Auslieferung** (v8.500.0
+    „Detailtafel"), die beim Blick auf nur den obersten Commit von `main` übersehen worden war. Der
+    so erzeugte Patch hatte 8 statt der eigenen 5 Hunks; die drei zusätzlichen waren **Löschungen
+    der fremden Arbeit** (`.system-tafel`, die farbige Sonnenscheibe, der fremde Patchnote-Eintrag).
+    Angewandt hätte er sie spurlos entfernt – und der Prüflauf wäre grün geblieben, weil gelöschte
+    Grafik-Arbeit keinen Test reißt.
+    **Vorgehen:** (a) Den eigenen Änderungssatz IMMER gegen den **Eltern des eigenen Commits**
+    bilden (`git diff <commit>^ <commit> -- datei`), nie gegen einen Fremdstand, den man für
+    inhaltsgleich hält; (b) **abgelehnte Hunks in Bereichen, die man nie angefasst hat, sind ein
+    Alarmsignal** – nicht wegräumen, sondern nachsehen, was der Patch dort will (genau daran ist es
+    aufgefallen); (c) nach dem Umsetzen beide Seiten belegen: eine Handvoll Markierungen der FREMDEN
+    Arbeit zählen und die eigenen Änderungen zählen, bevor committet wird.
+
 20. **Eine Korrelation ist keine Ursache – und ein Befund wird erst weitergegeben, wenn der
     MECHANISMUS benannt ist.** Vorfall 09./10.08.2026: `test_kleine_luecken` 1c meldete mal 121,5 %,
     mal 100 %. Weil die roten Läufe zufällig in der Suite lagen und die grünen einzeln, wurde
