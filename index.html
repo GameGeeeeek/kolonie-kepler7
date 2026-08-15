@@ -3205,6 +3205,7 @@
       <div id="tabHintBar" style="display:none;"></div>
 
       <div class="tab-panel active" id="tab-basis">
+        <div class="jumpnav" id="jumpnav-basis" style="display:none;"></div>
         <div id="colonyDashboard"></div>
         <div id="comebackQuestBox"></div>
         <div id="happyHourBox"></div>
@@ -3275,6 +3276,7 @@
       </div>
 
       <div class="tab-panel" id="tab-forschung">
+        <div class="jumpnav" id="jumpnav-forschung" style="display:none;"></div>
         <div id="researchQueueBox"></div>
         <div class="section-title"><i class="ti ti-flask" aria-hidden="true"></i>Forschungsprojekte</div>
         <div class="research-list" id="research"></div>
@@ -6416,8 +6418,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.514.0';
+  const VERSION = '8.515.0';
   const PATCHNOTES = [
+    { version:'8.515.0', date:'15.08.2026', changes:[
+      '<strong>Die Sprungmarken-Leiste gibt es jetzt auch in Basis und Forschung.</strong> Die Einstellung „Sprungmarken" (unter Anzeige) zeigte ihre Klick-Leiste bisher nur in Punktestand, Fortschritt und Einstellungen – ausgerechnet die beiden längsten Reiter hatten keine. Jetzt steht sie auch dort: ein Tipp auf „Planeten-Rolle", „Terraforming" oder einen Forschungs-Abschnitt springt direkt hin, und ein eingeklappter Abschnitt wird dabei automatisch aufgeklappt.',
+      'Die neue Leiste pflegt keine eigene Abschnittsliste, die veralten könnte: Sie baut sich aus genau den Überschriften, die der Klapp-Mechanismus ohnehin kennt – kommt ein Abschnitt dazu oder fällt einer weg, stimmt die Leiste automatisch. Dritte Etappe des Kompakt-Umbaus („überall muss man richtig lange scrollen").'
+    ]},
     { version:'8.514.0', date:'15.08.2026', changes:[
       '<strong>Die Hilfe zum Aufstiegs-Baum verschwieg einen ganzen Zweig.</strong> Sie zählte „sechs Zweige" auf – es sind sieben; <strong>Verschobene Grenzen</strong> (+3% auf jede Bonus-Obergrenze) fehlte in der Aufzählung komplett, obwohl er seit Wochen im Baum steht. Im selben Atemzug stand dort „je max. Stufe 10", während derselbe Abschnitt drei Sätze später schreibt, dass die Zweige seit v8.319.0 gar keine Maximalstufe mehr haben. Die Zahl kommt jetzt aus der Zweig-Tabelle selbst.',
       '<strong>„Ausgereizt" stimmte bei zwei Produktionsboni nicht.</strong> Die Hilfe schrieb, der Kommandanten-Bonus sei ab Level 30 und der Prestige-Bonus ab Stufe 8 „ausgereizt". Die Zahlen stimmen – aber beide Deckel sind seit dem Deckel-Umbau <em>weich</em>: Darüber zählt jede weitere Stufe noch etwas, nur immer weniger. Das Spiel weiß das an anderer Stelle längst und schreibt dort „(im Überlauf)" dazu; die Hilfe sagt es jetzt auch.',
@@ -58834,10 +58840,46 @@
             if (box) groupContainers.push({ el: box, prefix: 'tab-basis:' + boxId + ':' });
           }
         }
+        // Sprungleiste (v8.515.0, Etappe S-3): dieselben Überschriften, die das Akkordeon
+        // einsammelt, als Leiste oben im Tab - selbstwartend, keine zweite Liste. Beschriftung
+        // ist der Überschriftentext bis zum Doppelpunkt (aus "Planeten-Rolle: Heimatbasis" wird
+        // "Planeten-Rolle"), ohne Knopf-/Chevron-Texte. Signatur-Vergleich: neu geschrieben wird
+        // nur, wenn sich die Abschnittsliste wirklich ändert (Sekundentakt!).
+        const jumpNavEl = document.getElementById('jumpnav-'+activeTab);
+        if (jumpNavEl){
+          jumpNavEl.style.display = state.uiJumpNav ? 'flex' : 'none';
+          if (state.uiJumpNav){
+            const eintraege = [];
+            groupContainers.forEach(({ el:container, prefix }) => {
+              Array.from(container.children).filter(el => el.classList && el.classList.contains('section-title')).forEach((t, idx) => {
+                const label = Array.from(t.childNodes)
+                  .filter(n => n.nodeType === 3 || (n.nodeType === 1 && n.tagName !== 'BUTTON' && n.tagName !== 'A' && !(n.classList && n.classList.contains('prog-chevron'))))
+                  .map(n => n.textContent).join('').trim().split(':')[0].trim();
+                if (label) eintraege.push({ key: prefix+idx, label });
+              });
+            });
+            const sig = eintraege.map(e => e.key+'='+e.label).join('|');
+            if (jumpNavEl.dataset.sig !== sig){
+              jumpNavEl.dataset.sig = sig;
+              jumpNavEl.innerHTML = eintraege.map(e => `<a href="#" data-jump-acc="${e.key}">${e.label}</a>`).join('');
+              jumpNavEl.querySelectorAll('[data-jump-acc]').forEach(a => a.onclick = (ev) => {
+                ev.preventDefault();
+                const k = a.getAttribute('data-jump-acc');
+                if (state.uiCollapsibleSections && state.collapsedSections[k]){
+                  state.collapsedSections[k] = false;
+                  render(); save();
+                }
+                const ziel = document.querySelector('[data-acc-key="'+CSS.escape(k)+'"]');
+                if (ziel) ziel.scrollIntoView({ behavior:'smooth', block:'start' });
+              });
+            }
+          }
+        }
         groupContainers.forEach(({ el:container, prefix }) => {
         const titles = Array.from(container.children).filter(el => el.classList && el.classList.contains('section-title'));
         titles.forEach((title, idx) => {
           const key = prefix+idx;
+          title.dataset.accKey = key;
           if (state.uiCollapsibleSections && !title.querySelector('.prog-chevron')){
             const chev = document.createElement('i');
             chev.className = 'ti ti-chevron-right prog-chevron';
