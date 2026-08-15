@@ -43,9 +43,19 @@ check('1d: der Tick schreibt Leerlaufkarte+Bauauftraege nach fleetJobs, und #fle
   JS.includes("setBoxHtml(document.getElementById('fleetJobs'), 'fleetJobs',") &&
   JS.includes("leerlaufKarte('flotte') + constructionProgressCards(j=>j.kind==='ship'") &&
   JS.includes('shipFilterToggle + shipRows + superBlock)'));
+// 1e prueft die REGEL statt der alten Quelltext-Momentaufnahme (Hausregel 3/9, Umbau bei
+// Etappe S-4): Die defenseBuildings-Schreibstelle darf sich formen (Filter-Chip davor), solange
+// sie weiter die Gebaeudekacheln rendert und KEINE Bauauftrags-Karten enthaelt - die stehen in
+// der eigenen defenseJobs-Box. Anker-Existenz zuerst (Hausregel 6: sonst vacuous Slice).
+const defWriteStart = JS.indexOf("setBoxHtml(document.getElementById('defenseBuildings'), 'defenseBuildings',");
+const defWriteEnd = JS.indexOf('refreshDefenseMiniIcons', defWriteStart);
+check('1e-vorab: die defenseBuildings-Schreibstelle und ihr Endanker existieren',
+  defWriteStart >= 0 && defWriteEnd > defWriteStart, { defWriteStart, defWriteEnd });
+const defWrite = defWriteStart >= 0 && defWriteEnd > defWriteStart ? JS.slice(defWriteStart, defWriteEnd) : '';
 check('1e: Verteidigung analog - defenseJobs eigene Box, Kacheln ohne Bauauftraege',
   JS.includes("setBoxHtml(document.getElementById('defenseJobs'), 'defenseJobs',") &&
-  JS.includes("'defenseBuildings',\n        BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join(''));"));
+  defWrite.includes(".map(buildingRowHtml).join('')") &&
+  !defWrite.includes('constructionProgressCards'));
 
 // ---- Kalender-Event-Fenster aus der Spieldatei ablesen (Regel 4: nie raten)
 const aktiveTage = Number(JS.match(/const EVENT_ACTIVE_DAYS = (\d+)/)[1]);
