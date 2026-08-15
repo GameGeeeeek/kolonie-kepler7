@@ -6858,8 +6858,12 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.520.0';
+  const VERSION = '8.521.0';
   const PATCHNOTES = [
+    { version:'8.521.0', date:'15.08.2026', changes:[
+      '<strong>Fertiges lässt sich jetzt ausblenden.</strong> Über der Gebäude-, Verteidigungs- und Forschungsliste steht ein neuer Umschalter „Fertig Ausgebautes ausblenden" (in der Forschung: „Fertig Erforschtes") – derselbe Griff wie „Nur baubare Schiffe anzeigen" in der Werft. Ist er an, verschwinden fertig ausgebaute Karten aus der Liste und der Umschalter nennt, wie viele gerade ausgeblendet sind. Gesperrte Karten bleiben sichtbar – sie sind Ziele, fertige Karten sind nur noch Scrollweg. Ein Schalter wirkt auf alle drei Listen, wird gespeichert und erscheint erst, sobald es überhaupt etwas Fertiges gibt.',
+      '<strong>Jeder Tab merkt sich seine Scrollposition.</strong> Beim Tab-Wechsel blieb bisher schlicht die Scrollhöhe des alten Tabs stehen – wer in der Basis tief unten war, landete in der Karte im Nirgendwo. Jetzt startet ein neu besuchter Tab oben, und beim Zurückkommen steht die Seite wieder genau dort, wo man sie verlassen hat (gemerkt für die Dauer der Sitzung). Vierte und letzte Etappe des Kompakt-Umbaus („überall muss man richtig lange scrollen").'
+    ]},
     { version:'8.520.0', date:'15.08.2026', changes:[
       '<strong>Behoben: Der Abschnitt „Aussehen" konnte dauerhaft auf „Lädt…" stehen bleiben.</strong> Antwortet der Server nicht – weil er gerade neu startet, weil das Netz weg ist oder weil sein Stand die Abfrage noch nicht kennt –, blieb die Farb- und Emblem-Auswahl stumm. Kein Fehler, keine Erklärung, nur ein Ladehinweis, der nie verschwand. Genau das war heute für eine Weile live zu sehen: Die Spieldatei war schon aktualisiert, der Server noch nicht.',
       '<strong>Ein Ladezustand, aus dem es kein Entkommen gibt, ist eine Falschaussage</strong> – er behauptet, es gehe gleich weiter. Nach dem ersten gescheiterten Abruf steht jetzt da, was los ist: dass der Server nicht geantwortet hat, dass das Spiel es von selbst alle 30 Sekunden erneut versucht, und dass <strong>weder dein Aussehen noch dein Sternenstaub davon betroffen sind</strong> – beides liegt auf dem Server, es geht nichts verloren. Sobald er wieder antwortet, ist die Auswahl ohne Neuladen wieder da.'
@@ -19046,6 +19050,7 @@
   // gespeicherte Spielstand überhaupt geladen wurde - das hätte den echten Spielstand überschrieben.
   let bootDataReady = false;
   let activeTab = 'basis';
+  const tabScrollPos = {};
   let buildQtyMode = 1;
   // Baukorb: mehrere Schiffstypen gleichzeitig mit gewünschter Stückzahl vormerken und in einem Schritt
   // bauen (analog zum Flottenverband beim Verlegen). Rein transient (nicht gespeichert) – setzt sich
@@ -27381,6 +27386,7 @@
     if (state.uiCollapsibleSections === undefined) state.uiCollapsibleSections = false;
     if (state.uiTwoColumn === undefined) state.uiTwoColumn = false;
     if (state.uiHideLockedShips === undefined) state.uiHideLockedShips = false;
+    if (state.uiHideMaxed === undefined) state.uiHideMaxed = false;
     if (!state.collapsedSections) state.collapsedSections = {};
     if (!state.favoritePlanets) state.favoritePlanets = {};
     if (state.lastLoginDate === undefined) state.lastLoginDate = null;
@@ -53970,6 +53976,9 @@
     return true;
   }
   function switchTab(tab){
+    // Scrollposition je Tab merken (Etappe S-4): beim Verlassen sichern, beim Zurückkommen
+    // wiederherstellen. Bisher blieb schlicht die Höhe des alten Tabs stehen.
+    tabScrollPos[activeTab] = window.scrollY;
     activeTab = tab;
     trackEvent('tab_view:'+tab);
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab')===tab));
@@ -54005,6 +54014,7 @@
     }
     maybeShowTabHint(tab);
     render();
+    window.scrollTo(0, tabScrollPos[tab] || 0);
   }
   document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', ()=>switchTab(b.getAttribute('data-tab'))));
 
@@ -54812,6 +54822,12 @@
     setBoxHtml(document.getElementById('qtySelectFleet'), 'qtySelectFleet', qtyHtml);
 
     const activeB = currentBuildings();
+    // „Fertig Ausgebautes ausblenden" (Etappe S-4, Muster: uiHideLockedShips-Schiffsfilter):
+    // maxed heißt hier dasselbe wie auf der Karte selbst (def.maxLevel erreicht). Gesperrte
+    // Karten (moonOnly, special, fehlende Forschung) bleiben bewusst sichtbar - sie sind Ziele,
+    // fertige Karten sind nur noch Scrollweg.
+    const buildingIstMax = def => !!(def.maxLevel && (activeB[def.key]||0) >= def.maxLevel);
+    const hideMaxedChip = (anzahl) => `<div class="bmeta" data-toggle-hide-maxed style="cursor:pointer; margin-bottom:8px;"><i class="ti ${state.uiHideMaxed?'ti-check':'ti-x'}" aria-hidden="true" style="color:${state.uiHideMaxed?'#5dcaa5':'#7d8199'};"></i> Fertig Ausgebautes ausblenden: <strong style="color:${state.uiHideMaxed?'#5dcaa5':'#7d8199'};">${state.uiHideMaxed?'AN':'AUS'}</strong>${state.uiHideMaxed&&anzahl>0?` <span style="color:#7d8199;">(${anzahl} fertige ausgeblendet)</span>`:''} <span style="color:#7d8199;">– antippen zum Umschalten</span></div>`;
     function buildingRowHtml(def){
       // Mond-exklusive Gebäude (Spieler-Wunsch "Monde um einzigartige Gebäude erweitern"): erstes
       // deklaratives moonOnly-Flag auf einem BUILDING_DEFS-Eintrag - bisher liefen alle Planet/Mond-
@@ -55049,7 +55065,11 @@
     // Performance: Gebäudelisten (bis zu 19 Definitionen mit Kosten-/Punkte-Berechnung je Tick)
     // nur bei sichtbarem jeweiligem Tab neu berechnen.
     if (activeTab === 'basis'){
-      setBoxHtml(document.getElementById('buildings'), 'buildings', leerlaufKarte('basis') + BUILDING_DEFS.filter(d=>d.category!=='defense').map(buildingRowHtml).join(''));
+      const basisDefs = BUILDING_DEFS.filter(d=>d.category!=='defense');
+      const basisFertig = basisDefs.filter(buildingIstMax).length;
+      setBoxHtml(document.getElementById('buildings'), 'buildings', leerlaufKarte('basis')
+        + ((basisFertig>0 || state.uiHideMaxed) ? hideMaxedChip(basisFertig) : '')
+        + basisDefs.filter(d=>!state.uiHideMaxed || !buildingIstMax(d)).map(buildingRowHtml).join(''));
       const roleBox = document.getElementById('planetRoleBox');
       if (roleBox){
         if (isMoonKey(state.activeBasePlanet)){
@@ -55314,8 +55334,11 @@
       // animierten Verteidigungs-Grafiken neu auf.
       setBoxHtml(document.getElementById('defenseJobs'), 'defenseJobs',
         constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense'));
+      const defDefs = BUILDING_DEFS.filter(d=>d.category==='defense');
+      const defFertig = defDefs.filter(buildingIstMax).length;
       const defNeu = setBoxHtml(document.getElementById('defenseBuildings'), 'defenseBuildings',
-        BUILDING_DEFS.filter(d=>d.category==='defense').map(buildingRowHtml).join(''));
+        ((defFertig>0 || state.uiHideMaxed) ? hideMaxedChip(defFertig) : '')
+        + defDefs.filter(d=>!state.uiHideMaxed || !buildingIstMax(d)).map(buildingRowHtml).join(''));
       if (defNeu) refreshDefenseMiniIcons();
       renderAbhorchpostenBox();
     }
@@ -55409,7 +55432,10 @@
       `;
     })() : `<div class="bmeta" style="margin-bottom:0.75rem;">Kein aktives Forschungsprojekt. ${labCount>0?'Forschungslabore ('+labCount+') verkürzen die Dauer um bis zu '+Math.round(Math.min(LAB_TIME_CAP, labCount*LAB_TIME_PER_LAB)*100)+'% und produzieren Forschungspunkte.':'Baue Forschungslabore, um Forschungszeit zu verkürzen und Forschungspunkte zu produzieren.'}</div>`;
 
-    setBoxHtml(document.getElementById('research'), 'research', leerlaufKarte('forschung') + researchProgressHtml + RESEARCH_DEFS.map(r => {
+    const forschungFertig = RESEARCH_DEFS.filter(r => (state.research[r.key]||0) >= r.maxLevel).length;
+    setBoxHtml(document.getElementById('research'), 'research', leerlaufKarte('forschung') + researchProgressHtml
+      + ((forschungFertig>0 || state.uiHideMaxed) ? `<div class="bmeta" data-toggle-hide-maxed style="cursor:pointer; margin-bottom:8px;"><i class="ti ${state.uiHideMaxed?'ti-check':'ti-x'}" aria-hidden="true" style="color:${state.uiHideMaxed?'#5dcaa5':'#7d8199'};"></i> Fertig Erforschtes ausblenden: <strong style="color:${state.uiHideMaxed?'#5dcaa5':'#7d8199'};">${state.uiHideMaxed?'AN':'AUS'}</strong>${state.uiHideMaxed&&forschungFertig>0?` <span style="color:#7d8199;">(${forschungFertig} fertige ausgeblendet)</span>`:''} <span style="color:#7d8199;">– antippen zum Umschalten</span></div>` : '')
+      + RESEARCH_DEFS.filter(r => !state.uiHideMaxed || (state.research[r.key]||0) < r.maxLevel).map(r => {
       const lvl = state.research[r.key]||0;
       const maxed = lvl >= r.maxLevel;
       const unlocked = techUnlocked(r);
@@ -59602,6 +59628,7 @@
     // Oeffnet seit v8.425.0 das Flottenwahl-Feld statt direkt zu starten - siehe oeffneNpcAngriff.
     document.querySelectorAll('[data-attack]').forEach(btn => btn.onclick = () => oeffneNpcAngriff(btn.getAttribute('data-attack')));
     document.querySelectorAll('[data-toggle-hide-locked]').forEach(el => el.onclick = () => { state.uiHideLockedShips = !state.uiHideLockedShips; render(); save(); });
+    document.querySelectorAll('[data-toggle-hide-maxed]').forEach(el => el.onclick = () => { state.uiHideMaxed = !state.uiHideMaxed; render(); save(); });
     document.querySelectorAll('[data-buyship]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-buyship');
       const def = SHIP_DEFS.find(d=>d.key===key);

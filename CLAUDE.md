@@ -351,9 +351,22 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     byteweise wieder stimmte (`git status` leer), hilft nicht – die Tests dazwischen haben einen
     anderen Stand gelesen. **Vorgehen:** Gegenproben laufen VOR dem vollen Lauf oder NACH ihm, nie
     daneben; wer während eines Laufs unbedingt messen muss, tut es an einer KOPIE unter anderem
-    Pfad (die Testumgebung nimmt `SPIELDATEI` per Env entgegen), nie am Original. Und: Wenn der
-    Lauf ohnehin schon einen Fehlschlag gemeldet hat, ist er wertlos – dann diesen einen Lauf über
-    seine Task-ID beenden (Regel 17), erst danach editieren.
+    Pfad (`KEPLER_SPIELDATEI`, siehe Korrektur unten), nie am Original. Und: Wenn der Lauf ohnehin
+    schon einen Fehlschlag gemeldet hat, ist er wertlos – dann diesen einen Lauf über seine
+    Task-ID beenden (Regel 17), erst danach editieren.
+
+    **Korrektur 15.08.2026 – der Env-Name lautet `KEPLER_SPIELDATEI`, ein nacktes `SPIELDATEI=`
+    wird still ignoriert.** Hier stand „die Testumgebung nimmt `SPIELDATEI` per Env entgegen" –
+    zum Zeitpunkt der Niederschrift stimmte das gar nicht (der Pfad war fest verdrahtet), und
+    genau einmal hat es in die Irre geführt: Eine Gegenprobe mit `SPIELDATEI=/tmp/kaputt.html`
+    las die ECHTE Datei und blieb grün; verraten haben es erst die identischen Anker-Indizes in
+    beiden Läufen (dieselbe Familie wie Regel 15/17/19: das Messwerkzeug stand sich selbst im
+    Weg). Zwei Sessions fanden das unabhängig am selben Tag; seit #369 gibt es den Env-Weg
+    wirklich – als `KEPLER_SPIELDATEI` in `tests/lib/umgebung.js`, wirksam für alle Tests, die
+    `SPIELDATEI`/`SPIEL_URL` von dort beziehen (Playwright-Boot UND Quelltext-Lesen). Wer eine
+    Umleitung setzt, prüft am Messergebnis, dass sie GRIFF (z. B. an verschobenen Anker-Indizes
+    oder einem Wert, der nur in der Kopie steht) – eine still ignorierte Env-Variable sieht aus
+    wie eine bestandene Gegenprobe.
 15. **Auf das Suite-Ende über eine Marker-Zeile warten (`EXIT=` in der Log-Datei), nicht per
     `pgrep`** – das eigene Warte-Kommando enthält den Suchbegriff und meldet ewig „läuft".
     Kein `pkill` mit breitem Muster: es traf die eigenen Wartejobs und einmal die eigene Shell
