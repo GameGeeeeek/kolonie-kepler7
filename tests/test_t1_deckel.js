@@ -197,8 +197,13 @@ async function karte(t, name){
     Object.assign(st.buildings, { solar:35, mine:mineStufe, raffinerie:34, synth:30, fusionsreaktor:26, habitat:20, lager:45, labor:10 });
     st.research = Object.assign(st.research || {}, { rsolar:15, rerz:15 });
     st.fleet.schuerfschiff = 0;
-    delete st.deckelAusgleich2026;   // ein Bestandskonto kennt die Marke nicht
-    delete st.deckelKappung2026;
+    // Ein Bestandskonto kennt KEINE der Marken. Sie werden namentlich abgestreift, weil das
+    // Fixture auf einem echten Boot aufsetzt - und der hat sie inzwischen gesetzt.
+    // ACHTUNG, hier ist der Test am 15.08.2026 einmal falsch rot geworden: Mit dem zweiten
+    // Kappungs-Durchgang kam `deckelKappung2026b` dazu, blieb hier stehen, und die Kappung kehrte
+    // beim Laden sofort zurueck - der Test meldete "nichts gekappt" und sah aus wie ein echter
+    // Spielfehler. Wer einen dritten Durchgang baut, ergaenzt seine Marke HIER mit.
+    for (const marke of ['deckelAusgleich2026', 'deckelKappung2026', 'deckelKappung2026b']) delete st[marke];
     const fern = Date.now() + 365*24*3600*1000;
     for (const k of ['nextPlanetEventCheck','lastEventTime','nextTraderCheck','nextRaidTime','nextFactionGift']) if (st[k] !== undefined) st[k] = fern;
     st.activeEvent = null; st.buffs = [];
@@ -272,6 +277,41 @@ async function karte(t, name){
     !!kappBericht && (kappBericht.gekappt||[]).length >= 2 && kappBericht.summe > 0,
     kappBericht ? { anzahl: kappBericht.gekappt.length, summe: kappBericht.summe } : null);
   await t100.ctx.close();
+
+  /* ---- 5e-5h) Der ZWEITE Kappungs-Durchgang (Spieler-Report Sascha 15.08.2026, Foto)
+     Der erste Durchgang filterte auf `maxLevel && flachAb` und traf damit nur die VIER abgeflachten
+     T1-Produzenten - von 23 gedeckelten Gebaeuden. Ein Solarkraftwerk (maxLevel 40, KEIN flachAb)
+     stand danach weiterhin auf Stufe 100, und die Karte behauptete obendrein, die Stufen zaehlten
+     "abgeflacht weiter": Ohne flachAb gibt wirksameStufen() die volle Stufenzahl zurueck, sie
+     zaehlten also zu 100%. Der Deckel bedeutete fuer Altkonten schlicht nichts.
+     Geprueft wird beides - die Kappung UND dass der Bericht nicht faelschlich eine Erstattung
+     behauptet, die es fuer diese Gebaeude nie gab (der Ausgleich von v8.486.0 nutzte denselben zu
+     engen Filter). */
+  {
+    const storeSol = { __berichte: [] };
+    const tSol = await tab(browser, fixture(30, st => {
+      st.buildings.solar = 100;          // maxLevel 40, ohne flachAb - der gemeldete Fall
+      st.buildings.habitat = 40;         // maxLevel 20
+      st.buildings.aufbereitung = 35;    // maxLevel 20
+    }), storeSol);
+    await wartenAufMarke(tSol, 'deckelKappung2026b', 25);
+    const st = tSol.stand();
+    check('5e: ein Solarkraftwerk ueber dem Deckel wird auf 40 gekappt',
+      (st.buildings.solar || 0) === 40, { solar: st.buildings.solar });
+    check('5f: und die uebrigen gedeckelten Gebaeude ebenso (Habitat und Aufbereitung auf 20)',
+      (st.buildings.habitat || 0) === 20 && (st.buildings.aufbereitung || 0) === 20,
+      { habitat: st.buildings.habitat, aufbereitung: st.buildings.aufbereitung });
+    const ber = (storeSol.__berichte || []).find(r => r && r.type === 'deckelkappung');
+    const solEintrag = ber && (ber.gekappt || []).find(g => /Solar/.test(g.name || ''));
+    const mineEintrag = ber && (ber.gekappt || []).find(g => /Erzmine/.test(g.name || ''));
+    check('5g: der Bericht nennt das Solarkraftwerk und kennzeichnet es als OHNE Erstattung',
+      !!solEintrag && solEintrag.erstattet === false, solEintrag);
+    // Gegenprobe in derselben Messung: Fuer die Minen gab es die Erstattung wirklich - stuende dort
+    // dasselbe "ohne Erstattung", waere die Kennzeichnung wertlos, weil sie nichts trennt.
+    check('5h: dieselbe Kennzeichnung trennt wirklich - die Erzmine gilt als erstattet',
+      !!mineEintrag && mineEintrag.erstattet === true, mineEintrag);
+    await tSol.ctx.close();
+  }
 
   // ---- 4) Der einmalige Ausgleich ------------------------------------------------------------
   const store = { __berichte: [] };

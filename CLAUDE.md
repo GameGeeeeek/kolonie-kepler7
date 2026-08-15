@@ -187,6 +187,34 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     Patchnote HINTER der fremden einsortieren. Und: Ein neuer Commit auf `main` heißt nicht
     automatisch Kollision – erst prüfen, ob er die eigene Nummer oder dieselben Dateien überhaupt
     berührt (PR #321 war reine Dokumentation).
+
+    **Nachtrag 15.08.2026 – vierte Kollision in Folge, jetzt maschinell abgesichert.** Dieselbe
+    Änderung musste v8.500.0 → 8.502.0 → 8.503.0 durchlaufen, weil die Sektorkarten-Reihe parallel
+    lieferte, während der 25-Minuten-Lauf lief. Die Regel „main noch einmal ansehen" hat beim
+    vierten Mal so wenig geholfen wie beim zweiten – eine Regel, an die man sich erinnern muss, ist
+    bei einer Aufgabe, die man mehrmals täglich macht, keine Absicherung (dieselbe Begründung wie
+    bei der Backend-Klon-Prüfung, Regel 22). **Der Ablauf ist deshalb umgedreht: Die Nummer wird
+    erst NACH dem grünen vollen Prüflauf vergeben.**
+
+    ```
+    1. Änderung bauen (VERSION und PATCHNOTES noch NICHT anfassen)
+    2. node tests/run.js                 der volle Lauf, ~25 Min
+    3. node naechste-version.js          holt origin/main, nennt die freie Nummer, Exit 1 bei Kollision
+    4. VERSION + Patchnote eintragen, node build-patchnotes.js, cp weltraum_kolonie.html index.html
+    5. node tests/run.js --nummer        Pflichtprüfungen + die 4 Tests am Patchnotes-Block, ~15 s
+    6. committen, PR, mergen
+    ```
+
+    Schritt 5 schließt die Lücke, die Schritt 4 aufreißt: Nach dem vollen Lauf ist die Spieldatei
+    noch einmal angefasst worden, „der Lauf war grün" gilt also streng genommen für einen anderen
+    Stand. `--nummer` prüft genau das, was eine Nummernvergabe kaputtmachen kann – Syntax,
+    Dateigleichheit, VERSION-zu-Patchnote, die erzeugte `patchnotes.html` und die vier Tests, die den
+    Patchnotes-Block lesen. Der Modus meldet außerdem, wenn eine dieser vier Dateien fehlt: sonst
+    liefe er still mit weniger Tests durch und meldete trotzdem „sauber".
+
+    `naechste-version.js` liest **alle** Versionen aus `origin/main` – die Konstante UND jeden
+    Patchnotes-Eintrag. Genau daran ist es aufgefallen: v8.500.0 kam zusammen mit v8.501.0 in EINEM
+    Commit, und wer nur die `VERSION`-Konstante ansieht, übersieht die erste.
 24. **Ein pauschaler Ersetzer über TESTDATEIEN braucht dieselbe Sorgfalt wie einer über den
     Spielcode.** Beim Umbenennen der Aufrufstelle (`weicherDeckel(` → `deckelWeich(`) am 10.08.2026
     gingen in einem Rutsch drei Dinge schief: (a) eine zu breite Ausnahme (`weicherDeckel(d`)
