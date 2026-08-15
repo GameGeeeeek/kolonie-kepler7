@@ -51,7 +51,13 @@ if (BROWSER) STARTOPTIONEN.executablePath = BROWSER;
 const starteBrowser = (extra) => chromium.launch(Object.assign({}, STARTOPTIONEN, extra || {}));
 
 // --- Spieldatei
-const SPIELDATEI = path.join(WURZEL, 'weltraum_kolonie.html');
+// KEPLER_SPIELDATEI zeigt auf eine KOPIE unter anderem Pfad. Gebraucht wird das für Gegenproben
+// (CLAUDE.md-Regel 1): Der übliche Griff dafür war bisher `cp alt.html weltraum_kolonie.html` …
+// messen … zurückkopieren - also ein Edit an der Spieldatei, das jeden gleichzeitig laufenden
+// Prüflauf wertlos macht (Regel 14, Nachtrag vom 15.08.2026). CLAUDE.md beschrieb diesen Env-Weg
+// schon als vorhanden; er war es nicht. Gilt für alle Tests, die ihre Datei von hier beziehen -
+// Tests mit eigenem `path.join(__dirname, '..', ...)` bleiben davon unberührt.
+const SPIELDATEI = process.env.KEPLER_SPIELDATEI || path.join(WURZEL, 'weltraum_kolonie.html');
 const SPIEL_URL = 'file://' + SPIELDATEI;
 
 // --- Backend-Quelltext (optional)

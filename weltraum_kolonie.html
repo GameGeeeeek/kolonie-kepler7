@@ -4060,7 +4060,12 @@
         <div class="prog-section" data-sec="unterstuetzer">
           <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="unterstuetzer"><span aria-hidden="true" style="margin-right:2px;">☕</span>Unterstützer<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
           <div class="prog-sec-body">
-            <div id="kofiTopSupporterBox"></div>
+            <!-- Der Spender-Bereich steht bewusst GANZ OBEN in diesem Abschnitt: Er beantwortet
+                 "was habe ich davon und habe ich es gerade?", und das ist die Frage, mit der man
+                 hierherkommt. Der Top-Unterstützer-Kasten und das E-Mail-Feld darunter sind
+                 Nachschlagewerk bzw. Handgriff und dürfen weiter unten stehen. -->
+            <div id="supporterHubBox"></div>
+            <div id="kofiTopSupporterBox" style="margin-top:0.75rem;"></div>
             <div id="kofiClaimSupporterBox" style="margin-top:0.75rem;"></div>
           </div>
         </div>
@@ -4142,16 +4147,57 @@
   // eine Ko-fi-Spende, die dem Konto zugeordnet ist, und ein Konto gibt es ohne Server nicht.
   let supporterAktiv = false;
   let supporterStufe = null;   // 'bronze' | 'silver' | 'gold' | null
+  // Woher die Freigabe kommt und wie lange sie noch gilt (15.08.2026). Vorher wusste das Frontend
+  // nur, DASS sie gilt - der Spender-Bereich musste die Antwort auf "warum eigentlich?" und "wie
+  // lange noch?" also erraten. Beides liefert der Server jetzt mit (supporterFeaturesFor).
+  let supporterQuelle = null;      // 'kofi' | 'vergeben' | 'testphase' | 'betreiber' | null
+  let supporterBis = 0;            // ms-Zeitstempel des Ablaufs, 0 = unbefristet (Betreiber) oder keine
+  let supporterTestphase = null;   // {verfuegbar, genutztAm, aktiv, bis, tage} - null bei altem Server
   function supporterStatusUebernehmen(me){
     const s = (me && me.supporter) || null;
     supporterAktiv = !!(s && s.active);
     supporterStufe = (s && s.tier) || null;
+    supporterQuelle = (s && s.quelle) || null;
+    supporterBis = (s && s.until) || 0;
+    supporterTestphase = (s && s.trial) || null;
   }
   // Die EINE Stelle, die "darf dieser Spieler die Automatiken nutzen" beantwortet. Schalter,
   // Beschriftung und die drei Mechaniken fragen alle hierher - eine zweite Stelle wäre genau die
   // Anzeigestelle, die beim nächsten Umbau still veraltet (CLAUDE.md, Regel 6).
   function automatikFreigeschaltet(){ return supporterAktiv; }
-  const AUTOMATIK_GESPERRT_TEXT = 'Diese Automatik ist Unterstützern vorbehalten. Wer das Projekt per Ko-fi unterstützt und seine Ko-fi-E-Mail im Allianz-Tab hinterlegt, schaltet sie für 30 Tage je Spende frei.';
+  const AUTOMATIK_GESPERRT_TEXT = 'Diese Automatik ist Unterstützern vorbehalten. Im Fortschritt-Tab unter „Unterstützer" schaltest du sie einmalig fünf Tage kostenlos zum Ausprobieren frei; dauerhaft gibt es sie über eine Ko-fi-Spende (30 Tage je Spende).';
+
+  // ===== Die EINE Liste der Unterstützer-Vorteile (15.08.2026) =====
+  // Bis heute stand nirgends im Spiel, was der Rang eigentlich mitbringt - die drei Automatiken
+  // erklärten sich nur an ihren eigenen Schaltern im Verteidigung-Tab, und wer den Tab nicht
+  // aufhatte, erfuhr es nie. Diese Liste ist die Quelle für den Spender-Bereich; kommt ein Vorteil
+  // dazu, gehört er HIERHIN und erscheint dann von selbst überall, wo die Liste gezeigt wird.
+  // `desc` ist bewusst ein ganzer Satz mit Wirkung UND Kosten (CLAUDE.md, Regel 7) - ein Kürzel wie
+  // "Verstärkung (automatisch)" liest sich wie eine fehlende Beschreibung.
+  //
+  // WARUM `desc` eine FUNKTION ist und keine Zeichenkette: Die Kosten-Konstanten stehen weit weiter
+  // unten in der Datei (AUTO_REINFORCE_COST_KERNE bei ~25.100, AUTO_REPAIR_COST_KERNE bei ~49.100).
+  // Eine hier direkt zusammengebaute Zeichenkette würde sie beim Laden in ihrer Temporal Dead Zone
+  // erwischen - das Spiel stürbe mit einem ReferenceError, bevor irgendetwas rendert. Erst beim
+  // Aufruf sind sie da. Die Zahl trotzdem aus der Konstante zu ziehen ist Absicht: Eine
+  // hineingetippte 3 wäre die klassische zweite Anzeigestelle, die still veraltet.
+  const UNTERSTUETZER_VORTEILE = [
+    { key:'autoReinforce', icon:'ti-shield', name:'Automatische Verstärkung',
+      desc:()=>'Verlegt bei einem erkannten Überfall von selbst Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, sofern sie rechtzeitig ankommen – kostet '+AUTO_REINFORCE_COST_KERNE+' KI-Kerne je Einsatz.' },
+    { key:'autoRepair', icon:'ti-refresh', name:'Automatische Reparatur',
+      desc:()=>'Behebt eine Sabotage sofort gegen 300 Erz + 150 Kristalle + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne, statt sie 15 Minuten aussitzen zu müssen – gilt für gedrosselte Produktion ebenso wie für geschwächte Verteidigung.' },
+    { key:'kiIntercept', icon:'ti-bolt', name:'KI-Abfangautomatik',
+      desc:()=>'Vertreibt Piraten-Trümmerräuber automatisch, wenn du nicht selbst rechtzeitig abfängst, und rettet damit das Trümmerfeld – '+KI_INTERCEPT_COST_KERNE+' KI-Kerne je Einsatz, bewusst ohne Kampfpunkte. Braucht die Forschung KI-Technologie.' }
+  ];
+  // Wie der laufende Rang zustande kommt, in Worten. Der Server nennt die Quelle, damit hier nicht
+  // aus `active` geraten werden muss - "aktiv" allein hätte einem Spender in der Testphase erzählt,
+  // seine Spende sei angekommen.
+  const SUPPORTER_QUELLE_TEXT = {
+    kofi:      'über deine Ko-fi-Spende',
+    vergeben:  'vom Betreiber vergeben',
+    testphase: 'über deine kostenlose Testphase',
+    betreiber: 'als Betreiber des Spiels'
+  };
 
   async function checkBackend(){
     if (backendAvailable !== null) return backendAvailable;
@@ -4270,6 +4316,128 @@
     } catch(e){
       return { ok:false, status: 0, error:'Server nicht erreichbar.' };
     }
+  }
+
+  // Testphase starten (15.08.2026). Der Server entscheidet, ob sie noch zu haben ist - hier wird
+  // NICHT vorab aus supporterTestphase.verfuegbar geschlossen, dass der Aufruf gelingt. Der Wert
+  // stammt aus dem letzten /api/me und kann veraltet sein (zweites Gerät, langer Tab); die 409 des
+  // Servers ist die Wahrheit, und sie wird dem Spieler auch so gezeigt statt als "Serverfehler".
+  let testphaseStatusMsg = '';
+  let testphaseLaeuft = false;
+  async function testphaseStarten(){
+    if (testphaseLaeuft) return;
+    testphaseLaeuft = true;
+    try {
+      const res = await backendFetch('/supporter/trial', { method:'POST' });
+      const data = await res.json().catch(()=>({}));
+      if (res.ok && data.ok){
+        // Den Status aus der Antwort übernehmen statt auf das nächste /api/me zu warten - sonst
+        // stünden die Schalter im Verteidigung-Tab bis zum nächsten Neustart weiter auf "gesperrt",
+        // obwohl die Freigabe längst gilt.
+        supporterStatusUebernehmen({ supporter: data.supporter });
+        testphaseStatusMsg = '';
+        log('Testphase gestartet – die Unterstützer-Automatiken sind '+(data.tage||0)+' Tage lang freigeschaltet. Du findest ihre Schalter im Verteidigung-Tab.', 'ti-lock-open', 'good');
+        render();
+      } else {
+        testphaseStatusMsg = data.error || 'Die Testphase konnte nicht gestartet werden.';
+        // 409 heißt "schon verbraucht" - der Server hat damit gerade die Wahrheit über einen Wert
+        // gesagt, den wir aus einem womöglich alten /api/me hatten. Ohne diese Übernahme bliebe der
+        // Knopf stehen und lüde zum nächsten vergeblichen Klick ein, der wieder 409 bekäme.
+        if (res.status === 409 && supporterTestphase){
+          supporterTestphase = Object.assign({}, supporterTestphase, {
+            verfuegbar: false, aktiv: false,
+            genutztAm: data.genutztAm || supporterTestphase.genutztAm || Date.now(),
+            bis: data.bis || supporterTestphase.bis || 0
+          });
+        }
+        render();
+      }
+    } catch(e){
+      testphaseStatusMsg = 'Server nicht erreichbar.';
+      render();
+    } finally {
+      testphaseLaeuft = false;
+    }
+  }
+
+  // Restlaufzeit in Worten. Ab zwei Tagen in Tagen (mehr Genauigkeit hilft niemandem, wenn es um
+  // "noch 27 Tage" geht), darunter in Stunden - da wird die Angabe erst wieder interessant.
+  function supporterRestText(bis){
+    const ms = (bis||0) - Date.now();
+    if (ms <= 0) return '';
+    if (ms >= 2*86400000) return 'noch '+Math.ceil(ms/86400000)+' Tage';
+    const std = Math.ceil(ms/3600000);
+    return 'noch '+std+' Stunde'+(std===1?'':'n');
+  }
+  // Der Spender-Bereich (15.08.2026). Beantwortet die drei Fragen, die das Spiel bisher nirgends
+  // beantwortet hat: Habe ich die Vorteile gerade? Warum? Und WAS sind sie überhaupt?
+  //
+  // Bewusst dieselbe Liste für beide Zustände: Wer die Vorteile nicht hat, sieht sie trotzdem
+  // vollständig - nur mit Schloss statt Haken. Eine Werbefläche, die verschweigt, wofür sie wirbt,
+  // wäre der Grund, warum bis heute niemand wusste, was der Rang mitbringt.
+  function renderUnterstuetzerHub(){
+    const box = document.getElementById('supporterHubBox');
+    if (!box) return;
+    if (!useBackend()){
+      // Solo-Modus: kein Konto, also kein Rang und keine Testphase. Das gehört hingeschrieben,
+      // sonst sucht man den Knopf, den es hier nie geben kann.
+      setBoxHtml(box, 'supporterHubBox', `<div class="bmeta">Die Unterstützer-Vorteile hängen an einem Konto – im Solo-Modus ohne Server gibt es sie deshalb nicht.</div>`);
+      return;
+    }
+    const aktiv = automatikFreigeschaltet();
+    const quelleText = SUPPORTER_QUELLE_TEXT[supporterQuelle] || '';
+    const rest = supporterRestText(supporterBis);
+    const kopfMeta = aktiv
+      ? ['Aktiv', quelleText, rest].filter(Boolean).join(' · ')
+      : 'Zurzeit nicht aktiv';
+    const vorteile = UNTERSTUETZER_VORTEILE.map(v => `
+      <div class="card-row${aktiv?'':' research-locked'}" style="align-items:flex-start; gap:8px; padding:7px 9px;">
+        <div class="left" style="align-items:flex-start;">
+          <div class="bicon" style="flex-shrink:0;"><i class="ti ${v.icon}" aria-hidden="true"></i></div>
+          <div>
+            <div class="bname" style="display:flex; align-items:center; gap:5px;">
+              <i class="ti ${aktiv?'ti-check':'ti-lock'}" aria-hidden="true" style="font-size:12px; color:${aktiv?'#5dcaa5':'#7d8199'};"></i>${escapeHtml(v.name)}
+            </div>
+            <div class="bmeta">${escapeHtml(v.desc())}</div>
+          </div>
+        </div>
+      </div>`).join('');
+
+    // Der Testphase-Zweig. Vier unterscheidbare Lagen, und jede bekommt ihren eigenen Satz - ein
+    // gemeinsamer Text hätte in mindestens einer davon gelogen.
+    let testphaseHtml = '';
+    const tp = supporterTestphase;
+    if (tp && tp.aktiv){
+      testphaseHtml = `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-clock" aria-hidden="true" style="margin-right:4px;"></i>Deine kostenlose Testphase läuft – ${escapeHtml(supporterRestText(tp.bis) || 'sie endet gleich')}. Danach halten nur eine Ko-fi-Spende oder ein vergebener Rang die Vorteile am Laufen.</div>`;
+    } else if (tp && tp.verfuegbar){
+      testphaseHtml = `<div style="display:flex; flex-direction:column; gap:5px;">
+        <div class="bmeta">Noch nie ausprobiert? Du kannst die Vorteile <strong>einmalig ${tp.tage} Tage kostenlos</strong> testen – ohne Spende, ohne Konto-Verknüpfung, ohne dass danach irgendetwas weiterläuft.</div>
+        <button id="supporterTrialBtn" style="align-self:flex-start;"${testphaseLaeuft?' disabled':''}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>${tp.tage} Tage kostenlos testen</button>
+      </div>`;
+    } else if (tp){
+      testphaseHtml = `<div class="bmeta">Deine einmalige Testphase ist aufgebraucht. Die Vorteile gibt es weiterhin über eine <a href="https://ko-fi.com/gamegeeeeek" target="_blank" rel="noopener" style="color:#c3bef5;">Ko-fi-Spende</a> (30 Tage je Spende).</div>`;
+    }
+    const fehlerHtml = testphaseStatusMsg
+      ? `<div class="bmeta" style="color:#f0997b;">${escapeHtml(testphaseStatusMsg)}</div>` : '';
+    // Der Hinweis, der aus dem Spender-Bereich keine Bezahlschranke macht: Keiner dieser Vorteile
+    // gibt Ressourcen, Kampfkraft oder Punkte - sie nehmen Handarbeit ab. Das steht schon im
+    // Hilfe-Abschnitt, aber der wird an dieser Stelle nicht gelesen.
+    const fairHtml = `<div class="bmeta" style="opacity:0.8;">Keiner dieser Vorteile gibt Ressourcen, Kampfkraft oder Punkte, die es sonst nicht gäbe – sie nehmen nur Handarbeit ab, die man auch selbst erledigen kann.</div>`;
+
+    setBoxHtml(box, 'supporterHubBox', `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px; ${aktiv?'border-color:rgba(93,202,165,0.4);':''}">
+        <div class="left">
+          <div class="bicon" style="${aktiv?'background:rgba(93,202,165,0.18); color:#5dcaa5;':''} font-size:16px;"><i class="ti ${aktiv?'ti-lock-open':'ti-lock'}" aria-hidden="true"></i></div>
+          <div><div class="bname">Unterstützer-Vorteile</div><div class="bmeta">${escapeHtml(kopfMeta)}</div></div>
+        </div>
+        ${vorteile}
+        ${testphaseHtml}
+        ${fehlerHtml}
+        ${fairHtml}
+      </div>
+    `);
+    const trialBtn = document.getElementById('supporterTrialBtn');
+    if (trialBtn) trialBtn.onclick = () => { testphaseStatusMsg = ''; testphaseStarten(); };
   }
 
   // Automatische Unterstützer-Freischaltung (28.07.2026, Spieler-Report: hat gespendet, aber nie
@@ -35922,7 +36090,7 @@
       { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator (Stufe 1-8), dann Galaktische Legende 1-12 (Stufe 9-20), Sternenherrscher 1-12 (Stufe 21-32), Kosmischer Souverän 1-12 (Stufe 33-44) und ab Stufe 45 zählt "Kosmischer Souverän" endlos weiter hoch. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
-      { title:'Die drei Automatiken sind Unterstützern vorbehalten', body:'<strong>Automatische Verstärkung</strong>, <strong>Automatische Reparatur</strong> und die <strong>KI-Abfangautomatik</strong> stehen seit dem 05.08.2026 nur Spielern mit <strong>Unterstützer-Rang</strong> zur Verfügung. Den bekommt man über eine Ko-fi-Spende: Trage im Allianz-Tab unter „Unterstützer" die E-Mail-Adresse ein, mit der gespendet wurde - der Rang gilt dann <strong>30 Tage ab der letzten Spende</strong> und verlängert sich mit jeder weiteren. Alle drei Schalter bleiben sichtbar und erklären das an Ort und Stelle; ohne Rang tun sie nichts. <strong>Am Spielinhalt ändert das nichts:</strong> Jede der drei Automatiken nimmt einem nur Handarbeit ab, die man auch selbst erledigen kann (verlegen, reparieren, abfangen) - keine davon gibt Ressourcen, Kampfkraft oder Punkte, die es sonst nicht gäbe. Wer im Solo-Modus ohne Server spielt, hat kein Konto und damit auch keinen Rang.' },
+      { title:'Die drei Automatiken sind Unterstützern vorbehalten', body:'<strong>Automatische Verstärkung</strong>, <strong>Automatische Reparatur</strong> und die <strong>KI-Abfangautomatik</strong> stehen seit dem 05.08.2026 nur Spielern mit <strong>Unterstützer-Rang</strong> zur Verfügung. Alles dazu steht gebündelt im <strong>Fortschritt-Tab unter „Unterstützer"</strong>: welche Vorteile es gibt, ob sie bei dir gerade laufen und wie lange noch. Es gibt drei Wege dorthin. <strong>Kostenlos testen:</strong> Einmal je Konto lassen sich alle Vorteile <strong>fünf Tage</strong> lang ausprobieren - ein Knopf im selben Bereich, ohne Spende und ohne dass danach etwas weiterläuft. <strong>Ko-fi-Spende:</strong> Trage dort die E-Mail-Adresse ein, mit der gespendet wurde - der Rang gilt dann <strong>30 Tage ab der letzten Spende</strong> und verlängert sich mit jeder weiteren. <strong>Vergeben:</strong> Für Spenden außerhalb von Ko-fi kann der Betreiber den Rang direkt eintragen. Alle drei Schalter im Verteidigung-Tab bleiben sichtbar und erklären das an Ort und Stelle; ohne Freigabe tun sie nichts. <strong>Am Spielinhalt ändert das nichts:</strong> Jede der drei Automatiken nimmt einem nur Handarbeit ab, die man auch selbst erledigen kann (verlegen, reparieren, abfangen) - keine davon gibt Ressourcen, Kampfkraft oder Punkte, die es sonst nicht gäbe. Wer im Solo-Modus ohne Server spielt, hat kein Konto und damit weder Rang noch Testphase.' },
       { title:'Automatische Verstärkung', body:'<strong>Nur mit Unterstützer-Rang</strong> (siehe oben). Verlegt bei erkanntem, noch nicht ausgeführtem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten, falls die Ankunft rechtzeitig gelingt. Kostet 3 KI-Kerne je Einsatz (gleiche Automatik-Familie wie KI-Abfangautomatik) - reicht der Vorrat nicht, unterbleibt die Verlegung und du musst manuell reagieren. Im Verteidigung-Tab an-/abschaltbar.' },
       { title:'Automatische Reparatur', body:'<strong>Nur mit Unterstützer-Rang</strong> (siehe oben). Behebt eine aktive Sabotage sofort gegen 300 Erz + 150 Kristalle + 3 KI-Kerne, statt auf das automatische Ende zu warten - egal ob Produktions-Drosselung (nach verlorenem Überfall oder feindlichem Störmanöver) oder eine durch ein Störmanöver geschwächte Verteidigung. Reicht der KI-Kerne-Vorrat nicht, bleibt die Sabotage bis zum manuellen Beheben oder Ablaufen aktiv.' },
       { title:'Live-Kampf-Wiedergabe', body:'Steuert, ob sich die Kampf-Wiedergabe automatisch öffnet, sobald ein Überfall abläuft, während man aktiv im Spiel ist. Standardmäßig an, im Verteidigung-Tab abschaltbar.' },
@@ -58440,6 +58608,7 @@
     }
     renderReportsBox();
     renderIntelBox();
+    renderUnterstuetzerHub();
     const kofiBox = document.getElementById('kofiTopSupporterBox');
     if (kofiBox){
       if (kofiTopSupporterCache === undefined){
