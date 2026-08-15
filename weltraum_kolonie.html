@@ -2044,6 +2044,9 @@
     .system-tafel { background:var(--elev-1); border:var(--bw-1) solid var(--line-1); padding:10px 10px 12px; margin-bottom:1rem; }
     .system-tafel .system-nav { background:none; border:0; margin-bottom:0.6rem; padding:2px 0; }
     .system-tafel .planet-list { margin-bottom:0; }
+    /* Status-Chips der Detailtafel: Rahmen über var(--bw-1) und currentColor - bewusst OHNE
+       border-radius und ohne px-Rahmen, die Formensprache-Prüfung wacht darüber. */
+    .status-chip { font-size:10.5px; padding:2px 8px; border:var(--bw-1) solid; display:inline-block; }
     .sun-disc { display:inline-block; width:12px; height:12px; border-radius:50%; background:#fac775; margin-right:6px; vertical-align:-1px; }
     .map-wrap svg { width:100%; height:100%; }
     /* Grafik-Runde 9, Vorschlag 35 "Sektorkarte als Radar-Display": bewusst NICHT Teil des SVG-Inhalts
@@ -3354,6 +3357,7 @@
           </div>
           <button id="systemNextBtn" title="Nächstes System"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
         </div>
+        <div id="systemStatusChips" style="display:none; flex-wrap:wrap; gap:6px; justify-content:center; margin:0 0 10px;"></div>
         <div class="planet-switch" id="mapBaseLinks" style="margin-bottom:0.75rem;"></div>
         <div class="planet-list" id="planetList"></div>
         <div id="moonListWrap"></div>
@@ -6375,8 +6379,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.500.0';
+  const VERSION = '8.501.0';
   const PATCHNOTES = [
+    { version:'8.501.0', date:'15.08.2026', changes:[
+      '<strong>Die Detailtafel hat jetzt einen Status-Bereich.</strong> Unter dem Systemkopf zeigen Chips auf einen Blick, was in diesem System los ist – alles aus Daten, die das Spiel längst kennt: Gegner samt Namen (Bosse eigens markiert), Supernova-Kollaps, Fraktions-Territorium, Asteroidengürtel mit Bestand, Trümmerfelder und deine eigenen Missionen, die gerade dorthin unterwegs sind. Zweite Ausbaustufe der Detailtafel aus dem Zielbild.',
+      '<strong>Eroberung heißt jetzt nur noch dann „deine":</strong> Die Chips unterscheiden „★ Von dir erobert" (grün) von „★ Erobert (fremder Spieler)" (rot) – und damit ist auch ein echter Anzeigefehler der Galaxie-Übersicht behoben: Sie prüfte bisher nur, OB ein System erobert ist, nicht von wem, und färbte deshalb jedes von irgendeinem Spieler eroberte System grün mit Kontroll-Stern, grünem Ring und dem Hinweis „Von dir kontrolliert". Gemessen im Test: ein von einem fremden Spieler gehaltenes System trug exakt diese Markierung. Jetzt gilt der grüne Stern nur noch für deine eigenen Eroberungen.',
+      'Fünfte Etappe des Sektorkarten-Umbaus (B-4). Als Nächstes: die schaltbaren Ebenen auf der Karte (Kolonien, Routen, Ressourcen, Fraktionen, Ereignisse).'
+    ]},
     { version:'8.500.0', date:'14.08.2026', changes:[
       '<strong>Die Sektorkarte hat jetzt eine Detailtafel.</strong> Systemkopf, Basis-Schnellzugriff, Planetenliste und die Monde-Liste standen bisher als vier lose Blöcke untereinander – jetzt bilden sie eine zusammenhängende Tafel unter der Karte: Was zum aufgeklappten System gehört, sieht auch so aus. Das ist die erste Ausbaustufe der Detailtafel aus dem Zielbild; weitere Spalten (Status, Aktionen) folgen.',
       '<strong>Die Sonne im Systemkopf hat jetzt ihre echte Farbe.</strong> Bisher stand dort für jedes System dasselbe gelbe Sonnen-Symbol – auch bei einem Pulsar oder einem Blauen Riesen, und selbst das Kepler-Heimatsystem ist in Wahrheit ein Weißer Zwerg. Jetzt zeigt eine kleine Scheibe Kern- und Glühfarbe des tatsächlichen Sonnentyps, derselben Zuordnung, die auch die große Sonne in der Systemansicht nutzt.',
@@ -50487,7 +50496,10 @@
       const pct = planetsInSys.length ? discCount/planetsInSys.length : 0;
       const isCollapsed = !!(galaxyCache.collapsedSystems && galaxyCache.collapsedSystems[s.id]);
       const owner = factionOwning(s.id);
-      const controlledByMe = !!(galaxyCache.controlledSystems && galaxyCache.controlledSystems[s.id]);
+      // Nur die EIGENE Eroberung zählt als "★ Kontrolle" (v8.501.0): controlledSystems ist die
+      // globale Karte systemId -> userId ALLER Spieler - der bloße Existenz-Check färbte jedes
+      // von irgendwem eroberte System grün, samt Stern und grünem Ring.
+      const controlledByMe = !!(galaxyCache.controlledSystems && state.player && galaxyCache.controlledSystems[s.id] === state.player.id);
 
       // Allianzbasis-Markierung (Spieler-Wunsch: "jedes Allianzmitglied soll bei der Sektorübersicht
       // Allianz-Sektor stehen haben, damit man schnell zur Allianzbasis zugreifen kann") - spiegelt
@@ -51138,6 +51150,40 @@
       const entf = curSys.id===myHomeSystem ? 'Heimatsystem'
         : systemSectorDistance(myHomeSystem, curSys.id).toFixed(1).replace('.', ',')+' Sektoren entfernt';
       kennEl.textContent = entf+' · Erkundung ab '+fmtDuration(flug)+' · '+(basen===1?'1 eigene Basis':basen+' eigene Basen');
+    }
+    // Status-Chips der Detailtafel (v8.501.0, Etappe B-4): alles aus vorhandenen Datenquellen,
+    // reine Anzeige. WICHTIG bei der Eroberung: controlledSystems ist die globale Karte
+    // systemId -> userId ALLER Spieler - eigene und fremde Eroberung sind zwei verschiedene
+    // Aussagen (dieselbe Unterscheidung, die myConqueredSystems() längst trifft).
+    const chipsEl = document.getElementById('systemStatusChips');
+    if (chipsEl){
+      chipsEl.style.display = galaxyOpenSystem ? 'flex' : 'none';
+      if (galaxyOpenSystem){
+        const chips = [];
+        if (galaxyCache.collapsedSystems && galaxyCache.collapsedSystems[activeSystem]) chips.push(['#e24b4a', 'Kollabiert (Supernova)']);
+        const erobererId = galaxyCache.controlledSystems ? galaxyCache.controlledSystems[activeSystem] : null;
+        if (erobererId) chips.push(erobererId === (state.player && state.player.id)
+          ? ['#5dcaa5', '★ Von dir erobert']
+          : ['#e24b4a', '★ Erobert (fremder Spieler)']);
+        const gebiet = factionOwning(activeSystem);
+        if (gebiet) chips.push([gebiet.color || '#c3bef5', 'Territorium: ' + gebiet.name]);
+        const npcsHier = NPCS.filter(n => n.system === activeSystem && (!n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1));
+        for (const n of npcsHier) chips.push([n.boss ? '#f3aec6' : '#f0997b', (n.boss ? 'Boss: ' : 'Gegner: ') + n.name]);
+        if (istGuertelSystem(activeSystem)){
+          const anzahlAst = asteroidenImSystem(activeSystem).length;
+          if (anzahlAst) chips.push(['#c9c7bd', 'Gürtel: ' + anzahlAst + ' Asteroiden']);
+        }
+        const sysIdSet = new Set(sysPlanetsAll.map(p => p.id));
+        const truemmer = Object.keys(state.debrisFields || {}).filter(k => sysIdSet.has(k)).length;
+        if (truemmer) chips.push(['#5dcaa5', truemmer === 1 ? '1 Trümmerfeld' : truemmer + ' Trümmerfelder']);
+        let missionenHier = 0;
+        for (const { fleet: fl } of allFleetsWithPlanet()){
+          missionenHier += fl.missions.filter(m => sysIdSet.has(m.targetId) || sysIdSet.has(String(m.targetId||'').replace(/^moon_/, ''))).length;
+        }
+        if (missionenHier) chips.push(['#7bafe0', missionenHier === 1 ? '1 eigene Mission unterwegs' : missionenHier + ' eigene Missionen unterwegs']);
+        setBoxHtml(chipsEl, 'systemStatusChips', chips.map(c =>
+          `<span class="status-chip" style="color:${c[0]}; background:${c[0]}18;">${c[1]}</span>`).join(''));
+      }
     }
     // Zeile unter der Galaxie-Übersicht: aktueller Umfang der Galaxie plus der Countdown bis zur
     // nächsten Erweiterung. Ohne sie wären die wöchentlich hinzukommenden Systeme etwas, das man nur
