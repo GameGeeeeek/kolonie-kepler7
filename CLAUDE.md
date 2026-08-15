@@ -304,6 +304,39 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     ausgeben lassen – und die Gegenrichtung mitprüfen (verschwindet eine erlaubte Stelle, ist das
     genauso ein Befund wie eine neue).
 
+35. **Ein Ladezustand, aus dem es kein Entkommen gibt, ist eine Falschaussage – er behauptet, es
+    gehe gleich weiter.** Vorfall 15.08.2026: Der neue Abschnitt „Aussehen" zeigte „Lädt…", solange
+    der Katalog fehlte, und rief den Abruf erneut auf. Antwortete der Server dauerhaft nicht, stand
+    dort für immer „Lädt…" – stumm, ohne Hinweis auf die Ursache. Genau das war live zu sehen, als
+    der Frontend-Deploy durchlief und der Backend-Deploy hängen blieb: Die Spieldatei fragte
+    `/api/cosmetics` ab, bekam 404, und die Fläche war tot. **Vorgehen:** Jede Box, die auf den
+    Server wartet, braucht drei Zustände statt zwei – lädt, da, und *nicht erreichbar*. Der dritte
+    nennt den Grund, sagt, dass es von selbst weitergeht, und sagt, was NICHT verloren ist. Und er
+    gehört in den Test: `test_kosmetik_auswahl.js` Abschnitt 7 lässt den Server mit 404 antworten,
+    genau wie an dem Tag.
+36. **Ein Test, der eine Hilfsfunktion des Spiels durch einen Platzhalter ersetzt, prüft nicht mehr
+    das Spiel.** Vorfall 15.08.2026: `test_kosmetik_paritaet` schnitt `kosmetikBedingungText()` aus
+    der Datei und führte sie mit `fmt = String` aus, weil die echte `fmt` nicht im Zugriff schien.
+    Die Prüfung „die Schwelle steht im Text" war damit grün – im Spiel stand aber „5.0k
+    Kampfpunkte", denn `fmt()` rundet, und für eine Freischaltschwelle ist das wertlos. Aufgefallen
+    ist es nur, weil ein zweiter Test daneben den ECHTEN gerenderten Text las. **Vorgehen:** Fehlt
+    einer geschnittenen Funktion eine Abhängigkeit, wird auch die aus der Datei geschnitten und
+    mitgegeben – nie durch etwas Ähnliches ersetzt. Dieselbe Familie wie Regel 22 (veralteter
+    Nachbar) und 25 (unvollständiges Messwerkzeug): Was gemessen wird, ist dann nicht, was läuft.
+    Zweite Hälfte desselben Vorfalls: Die Prüfung verlangte den Schwellenwert als `String(wert)` und
+    schlug an, als 5000 völlig korrekt als „5.000" ausgegeben wurde – ein Test darf die REGEL
+    verlangen („die Schwelle steht da"), nicht eine Schreibweise (Regel 3).
+37. **Eine Prüfung, die hinter einer Bedingung steht, die nicht eintrat, ist grün ohne Aussage –
+    also gehört die Bedingung selbst geprüft, und ihr Fehlschlag muss den GRUND nennen.** Vorfall
+    15.08.2026: `test_sternenstaub_http` Abschnitt 5 zählte abgewehrte Angriffe und prüfte die
+    Gutschrift dagegen. Alle fünf Angriffe prallten am **Anfängerschutz** ab (403), `abgewehrt` war
+    0, und die beiden Folgeprüfungen wurden dadurch trivial grün – nur die Vorab-Prüfung war rot,
+    und sie meldete lediglich `{"abgewehrt":0}`. Woran es lag, musste von Hand gesucht werden.
+    **Vorgehen:** Die Antworten des Servers mitführen und im Fehlschlag ausgeben (jetzt:
+    `["403:Ziel steht unter Angriffs-Schutzschild.", …]`) – dann steht die Ursache im Protokoll
+    statt in einer späteren Sitzung. Und für Tests am Angriffs-Endpunkt gilt: Frisch angelegte
+    Konten sind unangreifbar, `db.private[<id>].__attackShieldUntil` muss in der Vorbereitung auf 0.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
