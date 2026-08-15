@@ -54,10 +54,46 @@ check('2b: weicherDeckel selbst kennt den Ausbau NICHT (sonst waere die Paritaet
 check('2c: es gibt einen Huellenaufruf, der ihn anwendet',
   quelle.includes('function deckelWeich(roh, basisDeckel, spielraum){') &&
   quelle.includes('weicherDeckel(roh, basisDeckel * deckelAusbau(), spielraum)'));
-// Alle Toepfe laufen ueber den Huellenaufruf, keiner mehr direkt.
-const direkt = (JS.match(/(^|[^a-zA-Z])weicherDeckel\(/gm) || []).length;
-check('2d: nur Definition, Huellenaufruf und die Bilanz rufen weicherDeckel direkt',
-  direkt === 3, { direkteAufrufe: direkt });
+// Alle Toepfe laufen ueber den Huellenaufruf, keiner mehr direkt. Erlaubt sind nur:
+//   (a) die Definition selbst,
+//   (b) der Huellenaufruf deckelWeich, der den Ausbau aufschlaegt,
+//   (c) ANZEIGEN, die ihren Deckel bereits ausgebaut in der Hand halten (Boni-Bilanz im
+//       Fortschritt-Tab, Kampfbonus-Uebersicht im Offiziere-Tab). Sie MUESSEN weicherDeckel
+//       nehmen - der Huellenaufruf wuerde den Ausbau ein zweites Mal aufschlagen.
+// Wer einen echten Bonus-TOPF direkt anschliesst, faellt hier durch.
+//
+// ZWEI FALLEN, beide am 15.08.2026 wirklich zugeschnappt:
+//   1. Kommentare mitgezaehlt. Der urspruengliche Zaehler lief ueber den rohen Quelltext, und ein
+//      erklaerender Kommentar, der den Aufruf ZITIERT ("= weicherDeckel(roh, 1.0 * deckelAusbau())"),
+//      zaehlte als Aufrufstelle. Genau davor warnt CLAUDE.md Punkt 6. Deshalb werden Kommentare
+//      jetzt vorher entfernt.
+//   2. Eine blosse ZAHL als Erwartung. "=== 3" sagt beim Fehlschlag nur "jetzt sind es 5" und
+//      nicht, WELCHE dazugekommen ist - man muss von Hand greppen, um zu sehen, ob der Zuwachs
+//      legitim ist. Deshalb steht hier die Liste der erlaubten Stellen und der Fehlschlag nennt
+//      die Zeilen, die nicht darauf passen.
+{
+  // Zeilenkommentare und Blockkommentare raus, damit nur echter Code gezaehlt wird. Die
+  // Zeilennummern bleiben erhalten, weil nur der Inhalt geleert wird, nicht die Zeile.
+  const ohneKommentar = JS
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/^([^\n]*?)\/\/[^\n]*$/gm, (m, vor) => vor);
+  const ERLAUBT = [
+    { was: 'Definition',                muster: /function weicherDeckel\(/ },
+    { was: 'Huellenaufruf deckelWeich', muster: /return weicherDeckel\(roh, basisDeckel \* deckelAusbau\(\), spielraum\)/ },
+    { was: 'Boni-Bilanz',               muster: /const weich = weicherDeckel\(roh, deckel\)/ },
+    { was: 'Kampfbonus-Uebersicht',     muster: /const wirksam = weicherDeckel\(raw, deckel\)/ }
+  ];
+  const zeilen = ohneKommentar.split('\n');
+  const treffer = [];
+  zeilen.forEach((z, i) => { if (/(^|[^a-zA-Z])weicherDeckel\(/.test(z)) treffer.push({ zeile: i + 1, text: z.trim().slice(0, 90) }); });
+  const unbekannt = treffer.filter(t => !ERLAUBT.some(e => e.muster.test(t.text)));
+  check('2d: jede direkte weicherDeckel-Stelle steht auf der benannten Liste',
+    unbekannt.length === 0, unbekannt);
+  // Gegenrichtung: Verschwindet eine der erlaubten Stellen (etwa weil jemand die Kampfbonus-Box
+  // wieder auf Math.min zurueckbaut), soll das genauso auffallen wie eine neue.
+  const fehlend = ERLAUBT.filter(e => !treffer.some(t => e.muster.test(t.text))).map(e => e.was);
+  check('2e: keine der erlaubten Stellen ist verschwunden', fehlend.length === 0, fehlend);
+}
 
 // ---- 3) Der Ausbau WIRKT - die echte Rechnung ausgefuehrt
 {
