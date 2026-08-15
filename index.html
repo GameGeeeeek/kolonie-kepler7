@@ -4171,6 +4171,18 @@
     supporterQuelle = (s && s.quelle) || null;
     supporterBis = (s && s.until) || 0;
     supporterTestphase = (s && s.trial) || null;
+    // Der Sternenstaub reist in derselben Antwort und wird bewusst HIER mit übernommen, nicht in
+    // einer eigenen Funktion: /api/me wird an VIER Stellen ausgewertet (Start, Kontodaten
+    // auffrischen, Schild-Abgleich, Anmeldung). Eine fünfte Anlaufstelle wäre genau die, die beim
+    // nächsten Umbau eine davon vergisst - der wiederkehrende Fehler dieses Projekts.
+    if (me && me.staub){
+      staubStand = me.staub;
+      // `neu` meldet der Server nur bei der ERSTEN Auswertung des Tages. Ohne diese Ansage bliebe
+      // die Tagesgutschrift unsichtbar, bis jemand zufällig in den Aussehen-Abschnitt scrollt.
+      if (me.staub.neu > 0){
+        log('Tagesgutschrift: +'+me.staub.neu+' Sternenstaub'+((me.staub.serie||0) > 1 ? ' (Serie: '+me.staub.serie+' Tage)' : '')+'. Ausgeben kannst du ihn im Fortschritt-Tab unter „Aussehen".', 'ti-sparkles', 'good');
+      }
+    }
   }
   // Die EINE Stelle, die "darf dieser Spieler die Automatiken nutzen" beantwortet. Schalter,
   // Beschriftung und die drei Mechaniken fragen alle hierher - eine zweite Stelle wäre genau die
@@ -4340,7 +4352,14 @@
     em_zirkel:   { art:'emblem',      name:'Zirkel',      icon:'ti-atom-2',  desc:'Der Kreislauf des Prestiges als Zeichen.' },
     em_aufstieg: { art:'emblem',      name:'Aufstieg',    icon:'ti-arrow-up',desc:'Der Pfeil nach oben – nur für Kommandanten mit mindestens einem Aufstieg.' },
     em_klinge:   { art:'emblem',      name:'Klinge',      icon:'ti-sword',   desc:'Für eine Kampfbilanz, die für sich spricht.' },
-    em_lot:      { art:'emblem',      name:'Senklot',     icon:'ti-anchor',  desc:'Das Lot der Tiefensonden – für sehr weit unten Gewesene.' }
+    em_lot:      { art:'emblem',      name:'Senklot',     icon:'ti-anchor',  desc:'Das Lot der Tiefensonden – für sehr weit unten Gewesene.' },
+    // Für Sternenstaub zu kaufen (15.08.2026). Der einzige Weg, der jedem offensteht - Staub kommt
+    // aus der täglichen Anmeldung und aus abgewehrten Angriffen, nicht aus Prestige oder Spende.
+    nf_koralle:  { art:'namensfarbe', name:'Koralle',     farbe:'#e8836b', desc:'Warmes Korallenrot – der erste Farbton, den man sich schon nach wenigen Tagen leisten kann.' },
+    nf_nebel:    { art:'namensfarbe', name:'Nebel',       farbe:'#8fa6c9', desc:'Kühles Blaugrau wie der Staub zwischen den Sternen, zurückhaltend statt auffällig.' },
+    nf_signal:   { art:'namensfarbe', name:'Signal',      farbe:'#ff6b9d', desc:'Grelles Magenta – die auffälligste Namensfarbe im Katalog und entsprechend teuer.' },
+    em_ring:     { art:'emblem',      name:'Orbitalring', icon:'ti-atom',   desc:'Ein Ring um einen Kern – das Zeichen für eine gefestigte Kolonie.' },
+    em_saat:     { art:'emblem',      name:'Saat',        icon:'ti-plant',  desc:'Ein Keimling als Zeichen dafür, dass aus einem Außenposten eine Heimat geworden ist.' }
   };
   // Die Bedingung des Servers in Worte fassen. Bewusst ohne eigene Zahlen: Jede Zahl hier kommt aus
   // dem `bedingung`-Objekt, das der Server mitschickt.
@@ -4355,6 +4374,7 @@
     // 5400 braucht. fmt() ist für Ressourcenstände gedacht, wo die Größenordnung reicht.
     if (b.typ === 'kampfpunkte') return b.wert.toLocaleString('de-DE')+' Kampfpunkte.';
     if (b.typ === 'abgrund') return 'Rekordtiefe '+b.wert+' im Abgrund.';
+    if (b.typ === 'kauf') return 'Für '+b.preis.toLocaleString('de-DE')+' Sternenstaub zu kaufen.';
     return 'Freischaltbedingung unbekannt.';
   }
   // --- Was ein Spieler TRÄGT, gezeichnet ---
@@ -4381,6 +4401,10 @@
   let kosmetikGetragen = {};
   let kosmetikStatusMsg = '';
   let kosmetikLaeuft = false;
+  // Sternenstaub (15.08.2026). Kommt aus /api/me und /api/cosmetics, liegt bewusst NICHT in `state`:
+  // Er ist eine Währung, und eine Währung im Spielstand wäre in fünf Sekunden gefälscht. Was hier
+  // steht, ist eine Anzeige des Serverkontos - der Server rechnet, das Spiel zeigt.
+  let staubStand = null;          // {menge, serie, heuteAngemeldet, abwehrHeute, saetze} | null
   // Abrufbremse. OHNE DIE WÄRE DAS EIN ANFRAGE-STURM: renderKosmetikBox() läuft im Haupt-Tick, also
   // jede Sekunde, und stößt den Abruf an, solange der Katalog fehlt. Antwortet der Server einmal
   // nicht (Neustart, Netzabbruch), bliebe kosmetikKatalog null - und das Spiel fragte im
@@ -4402,8 +4426,37 @@
       kosmetikKatalog = d.katalog || [];
       kosmetikBesitz = d.besitz || [];
       kosmetikGetragen = d.getragen || {};
+      if (d.staub) staubStand = d.staub;
     } catch(e){ /* Server nicht erreichbar - die Auswahlfläche bleibt bei "Lädt…" */ }
     finally { kosmetikLaedt = false; }
+  }
+  // Kaufen. Der Server bucht ab und trägt den Besitz ein; hier wird nur seine Antwort übernommen -
+  // eine lokale Abbuchung wäre eine zweite Buchhaltung, die auseinanderlaufen kann.
+  async function kosmetikKaufen(key){
+    if (kosmetikLaeuft) return;
+    kosmetikLaeuft = true;
+    try {
+      const res = await backendFetch('/cosmetics/buy', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key })
+      });
+      const d = await res.json().catch(()=>({}));
+      if (res.ok && d.ok){
+        kosmetikBesitz = d.besitz || kosmetikBesitz;
+        if (d.staub) staubStand = d.staub;
+        kosmetikStatusMsg = '';
+        const look = KOSMETIK_LOOK[key];
+        log('„'+((look&&look.name)||key)+'" gekauft – du kannst es jetzt im Abschnitt „Aussehen" tragen.', 'ti-sparkles', 'good');
+      } else {
+        // 402 nennt den Fehlbetrag - den zu zeigen ist der Unterschied zwischen "geht nicht" und
+        // "dir fehlen noch 35".
+        kosmetikStatusMsg = (d.error || 'Kauf fehlgeschlagen.') + (typeof d.fehlt === 'number' ? ' Es fehlen noch '+d.fehlt.toLocaleString('de-DE')+'.' : '');
+      }
+    } catch(e){
+      kosmetikStatusMsg = 'Server nicht erreichbar.';
+    } finally {
+      kosmetikLaeuft = false;
+      render();
+    }
   }
   async function kosmetikAusruesten(art, key){
     if (kosmetikLaeuft) return;
@@ -4453,6 +4506,12 @@
         if (!look) return '';
         const hat = kosmetikBesitz.indexOf(d.key) !== -1;
         const traegt = kosmetikGetragen[art] === d.key;
+        // Käuflich und noch nicht besessen: Der Knopf sagt den Preis und ist nur dann bedienbar,
+        // wenn der Staub reicht. Ein Knopf, der beim Klick "zu wenig" antwortet, wäre eine
+        // Einladung zum Ausprobieren statt einer Auskunft (der Server lehnt trotzdem ab - hier
+        // wird nur nicht so getan, als ginge es).
+        const kaufbar = !hat && d.bedingung && d.bedingung.typ === 'kauf';
+        const genugStaub = kaufbar && staubStand && (staubStand.menge||0) >= d.bedingung.preis;
         const probe = art === 'namensfarbe'
           ? `<span style="${look.farbe?'color:'+look.farbe+';':''} font-weight:600;">${escapeHtml(state.player&&state.player.name||'Kommandant')}</span>`
           : (look.emoji ? `<span aria-hidden="true">${look.emoji}</span>`
@@ -4467,19 +4526,38 @@
             </div>
           </div>
           ${hat && !traegt ? `<button data-kosm-art="${art}" data-kosm-key="${d.key}" style="white-space:nowrap; font-size:11px;"${kosmetikLaeuft?' disabled':''}>Tragen</button>` : ''}
+          ${kaufbar ? `<button data-kosm-kauf="${d.key}" style="white-space:nowrap; font-size:11px;"${(kosmetikLaeuft||!genugStaub)?' disabled':''} title="${genugStaub?'Kaufen':'Dafür fehlt dir noch Sternenstaub'}"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>${d.bedingung.preis.toLocaleString('de-DE')}</button>` : ''}
         </div>`;
       }).join('');
       return `<div class="section-title" style="font-size:12px; margin-top:10px;">${ueberschrift}</div><div class="bmeta" style="margin-bottom:6px;">${hinweis}</div>${stuecke}`;
     };
     const fehler = kosmetikStatusMsg ? `<div class="bmeta" style="color:#f0997b; margin-top:6px;">${escapeHtml(kosmetikStatusMsg)}</div>` : '';
+    // Der Staub-Stand samt Herkunft. Die Sätze kommen vom Server mit, damit hier keine zweite
+    // Zahlenliste steht, die bei einer Balance-Änderung still veraltet.
+    const s = staubStand;
+    const sz = (s && s.saetze) || {};
+    const staubHtml = s ? `<div class="card-row" style="align-items:flex-start; gap:8px; padding:7px 9px; border-color:rgba(195,190,245,0.4);">
+        <div class="left" style="align-items:flex-start;">
+          <div class="bicon" style="flex-shrink:0; color:#c3bef5;"><i class="ti ti-sparkles" aria-hidden="true"></i></div>
+          <div>
+            <div class="bname">${(s.menge||0).toLocaleString('de-DE')} Sternenstaub</div>
+            <div class="bmeta">Kommt aus zwei Quellen, die der Server selbst sieht: der <strong>täglichen Anmeldung</strong> (${sz.anmeldung||0} pro Tag, +${sz.serieBonus||0} je Tag Serie bis +${(sz.serieMax||1)-1}; deine Serie: ${s.serie||0}) und jedem <strong>abgewehrten Spielerangriff</strong> (${sz.abwehr||0} je Gegner, höchstens ${sz.abwehrMaxProTag||0} verschiedene am Tag; heute: ${s.abwehrHeute||0}).</div>
+            <div class="bmeta" style="opacity:0.8;">${s.heuteAngemeldet?'Die heutige Anmeldung ist bereits gutgeschrieben.':'Die heutige Anmeldung wird beim nächsten Start gutgeschrieben.'}</div>
+          </div>
+        </div>
+      </div>` : '';
     setBoxHtml(box, 'kosmetikBox', `
-      <div class="bmeta">Namensfarbe und Emblem erscheinen überall, wo andere deinen Namen sehen – Bestenliste, Profil, Freundesliste. Freigeschaltet wird über <strong>Fortschritt</strong> (Prestige, Aufstieg, Kampfpunkte, Rekordtiefe) oder über den <strong>Unterstützer-Rang</strong>. Rein optisch: nichts davon wirkt auf Produktion, Kampf oder Punkte.</div>
+      <div class="bmeta">Namensfarbe und Emblem erscheinen überall, wo andere deinen Namen sehen – Bestenliste, Profil, Freundesliste. Freigeschaltet wird über <strong>Fortschritt</strong> (Prestige, Aufstieg, Kampfpunkte, Rekordtiefe), über den <strong>Unterstützer-Rang</strong> oder gegen <strong>Sternenstaub</strong>. Rein optisch: nichts davon wirkt auf Produktion, Kampf oder Punkte.</div>
+      ${staubHtml}
       ${gruppe('namensfarbe', 'Namensfarbe', 'Färbt deinen Namen in allen Listen.')}
       ${gruppe('emblem', 'Emblem', 'Ein kleines Zeichen direkt hinter dem Namen.')}
       ${fehler}
     `);
     box.querySelectorAll('[data-kosm-key]').forEach(btn => {
       btn.onclick = () => { kosmetikStatusMsg = ''; kosmetikAusruesten(btn.getAttribute('data-kosm-art'), btn.getAttribute('data-kosm-key')); };
+    });
+    box.querySelectorAll('[data-kosm-kauf]').forEach(btn => {
+      btn.onclick = () => { kosmetikStatusMsg = ''; kosmetikKaufen(btn.getAttribute('data-kosm-kauf')); };
     });
   }
 
@@ -6771,8 +6849,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.518.0';
+  const VERSION = '8.519.0';
   const PATCHNOTES = [
+    { version:'8.519.0', date:'15.08.2026', changes:[
+      '<strong>Neu: Sternenstaub – eine Währung, die es nur für Kosmetik gibt.</strong> Der Abschnitt „Aussehen" im Fortschritt-Tab zeigt jetzt oben deinen Stand, und fünf neue Stücke lassen sich davon kaufen: <em>Koralle</em> (40), <em>Orbitalring</em> (60), <em>Nebel</em> (90), <em>Saat</em> (150) und <em>Signal</em> (200). Damit gibt es neben Fortschritt und Unterstützung einen dritten Weg zu neuen Farben und Emblemen – und den einzigen, der jedem offensteht, ohne auf Prestige oder eine Spende zu warten.',
+      '<strong>Verdient wird er aus zwei Quellen: der täglichen Anmeldung und jedem abgewehrten Spielerangriff.</strong> Die Anmeldung bringt 5 Sternenstaub, je Tag ununterbrochener Serie einen mehr (bis 9 ab dem fünften Tag in Folge). Eine erfolgreich abgewehrte Attacke bringt 3 – dabei zählt jeder Gegner nur einmal am Tag und höchstens drei verschiedene, damit zwei abgesprochene Konten daraus keine Gelddruckmaschine machen. Wie viel du heute schon hast und woher, steht vollständig in der Box.',
+      '<strong>Warum ausgerechnet diese zwei Quellen – und nicht Tagesaufgaben oder Wochenliga?</strong> Weil der Server nur bestätigen kann, was er selbst sieht. Tagesaufgaben und Ligaplatzierung stehen in deinem Spielstand, und den rechnet der Server nicht nach; eine Währung daraus hätte nur so <em>ausgesehen</em>, als läge sie sicher. Anmeldezeitpunkt und Kampfausgang entstehen dagegen auf dem Server – ein abgewehrter Angriff wird dort ausgewürfelt, der Verteidiger kann ihn weder auslösen noch beeinflussen. Dieselbe Überlegung wie bei der Kosmetik selbst: Was alle sehen, muss der Server verantworten.',
+      'Zwei Kleinigkeiten an der Bedienung: Ein Stück, für das der Staub noch nicht reicht, bleibt <strong>sichtbar samt Preis</strong> – ein Laden, der nur zeigt, was man sich gerade leisten kann, verschweigt das Ziel. Sein Kauf-Knopf ist aber <strong>gesperrt</strong> statt beim Klick abzulehnen. Und die Tagesgutschrift wird beim Start angesagt, damit sie nicht unbemerkt liegen bleibt.'
+    ]},
     { version:'8.518.0', date:'15.08.2026', changes:[
       '<strong>Neu: Namensfarbe und Emblem – dein Name sieht ab sofort nicht mehr aus wie jeder andere.</strong> Im Fortschritt-Tab gibt es den neuen Abschnitt <strong>„Aussehen"</strong> mit <strong>neun Namensfarben und sieben Emblemen</strong>. Was du trägst, erscheint überall, wo andere deinen Namen sehen: Bestenliste, Seitenmenü, Forschungspunkte-Rangliste, Freundesliste und Profilkarte. Rein optisch – nichts davon wirkt auf Produktion, Kampf oder Punkte.',
       '<strong>Der größere Teil wird über Fortschritt freigeschaltet, nicht über eine Spende.</strong> <em>Asche</em> ab Prestige 1, <em>Zirkel</em> ab Prestige 3, <em>Glut</em> ab Prestige 5, <em>Leere</em> und <em>Aufstieg</em> ab dem ersten Aufstieg, <em>Stahl</em> ab 2.000 und <em>Klinge</em> ab 5.000 Kampfpunkten, <em>Tiefe</em> ab Rekordtiefe 40 und das <em>Senklot</em> ab Rekordtiefe 60. Dazu drei Farben und zwei Embleme für Unterstützer. Deshalb steht „Aussehen" auch als eigener Abschnitt <em>neben</em> „Unterstützer" und nicht darin – als Bezahlschranke wäre es falsch beschrieben.',
