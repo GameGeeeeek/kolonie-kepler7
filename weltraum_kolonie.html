@@ -4069,6 +4069,17 @@
             <div id="kofiClaimSupporterBox" style="margin-top:0.75rem;"></div>
           </div>
         </div>
+
+        <!-- Aussehen steht bewusst als EIGENER Abschnitt neben "Unterstützer" und nicht darin:
+             Der größere Teil des Katalogs wird über Fortschritt freigeschaltet (Prestige, Aufstieg,
+             Kampfpunkte, Rekordtiefe), nicht über eine Spende. Unter "Unterstützer" einsortiert
+             läse sich das wie eine Bezahlschranke, die es nicht ist. -->
+        <div class="prog-section" data-sec="aussehen">
+          <div class="section-title prog-sec-header" style="margin-top:1.5rem;" data-sec-toggle="aussehen"><i class="ti ti-sparkles" aria-hidden="true"></i>Aussehen<i class="ti ti-chevron-right prog-chevron" aria-hidden="true"></i></div>
+          <div class="prog-sec-body">
+            <div id="kosmetikBox"></div>
+          </div>
+        </div>
       </div>
 
       <div class="tab-panel" id="tab-update">
@@ -4296,6 +4307,180 @@
     if (!e || !e.isSupporter) return '';
     const s = KOFI_STUFEN[e.supporterTier] || KOFI_STUFEN.bronze;
     return ` <span class="lvl-pill pill-supporter-${e.supporterTier||'bronze'}" title="${s.badge} (${s.name}) - hat das Projekt innerhalb der letzten 30 Tage per Ko-fi unterstützt" style="font-size:9px; padding:0 4px; min-width:0; flex-shrink:0;">${s.icon}</span>`;
+  }
+
+  // ===== Kosmetik: Namensfarbe und Emblem (15.08.2026) =====
+  //
+  // Hier steht NUR das Aussehen. Wer ein Stück besitzt, entscheidet ausschließlich der Server
+  // (KOSMETIK_DEFS in server.js) - eine Namensfarbe steht in der Bestenliste und damit auf einer
+  // Fläche, die allen gehört; im Spielstand wäre sie in fünf Sekunden gefälscht.
+  //
+  // DIE FREISCHALT-BEDINGUNG STEHT BEWUSST NICHT IN DIESER LISTE. Sie kommt mit dem Katalog vom
+  // Server und wird von kosmetikBedingungText() in Worte gefasst. Eine zweite Liste hier wäre exakt
+  // die Anzeigestelle, die beim nächsten Umbau still veraltet (CLAUDE.md, Regel 6) - mit dem
+  // besonders üblen Ausgang, dass der Text eine Bedingung verspricht, die der Server anders
+  // durchsetzt, und der Spieler auf etwas hinspielt, das ihm danach verweigert wird.
+  //
+  // `farbe: null` bei nf_standard heißt: gar keine Farbangabe, der Name erbt seine normale Farbe.
+  // Das ist etwas anderes als "weiß" - im Profil, im Seitenmenü und in der Bestenliste ist die
+  // Grundfarbe jeweils eine andere.
+  const KOSMETIK_LOOK = {
+    nf_standard: { art:'namensfarbe', name:'Standard',    farbe:null,      desc:'Die gewohnte Namensfarbe – der Name erbt die Farbe der jeweiligen Liste.' },
+    nf_kupfer:   { art:'namensfarbe', name:'Kupfer',      farbe:'#c9885a', desc:'Warmes Kupfer, dieselbe Farbe wie die Bronze-Unterstützerpille.' },
+    nf_silber:   { art:'namensfarbe', name:'Silber',      farbe:'#c7cbe0', desc:'Helles Silber, dieselbe Farbe wie die Silber-Unterstützerpille.' },
+    nf_gold:     { art:'namensfarbe', name:'Gold',        farbe:'#fac775', desc:'Leuchtendes Gold, dieselbe Farbe wie die Gold-Unterstützerpille.' },
+    nf_asche:    { art:'namensfarbe', name:'Asche',       farbe:'#9aa0b5', desc:'Gedecktes Grau – für alle, die schon einmal alles hinter sich gelassen haben.' },
+    nf_glut:     { art:'namensfarbe', name:'Glut',        farbe:'#f0997b', desc:'Glühendes Orange für ein Imperium, das mehrfach neu aufgebaut wurde.' },
+    nf_leere:    { art:'namensfarbe', name:'Leere',       farbe:'#c3bef5', desc:'Das Violett des Aufstiegs – sichtbar nur für die, die einmal jenseits des Prestiges waren.' },
+    nf_stahl:    { art:'namensfarbe', name:'Stahl',       farbe:'#7fb3d5', desc:'Kühles Blaugrau für eine lange Kampfbilanz.' },
+    nf_tiefe:    { art:'namensfarbe', name:'Tiefe',       farbe:'#5dcaa5', desc:'Das Grün der Abgrund-Sonden – für nachgewiesene Rekordtiefe.' },
+    em_keins:    { art:'emblem',      name:'Kein Emblem', icon:null,         desc:'Kein Zeichen neben dem Namen.' },
+    em_tasse:    { art:'emblem',      name:'Kaffeetasse', emoji:'☕',        desc:'Dasselbe Zeichen, mit dem das Spiel Unterstützung durchgehend benennt.' },
+    em_komet:    { art:'emblem',      name:'Komet',       icon:'ti-sparkles',desc:'Ein Funkenschweif neben dem Namen – das auffälligste Stück im Katalog.' },
+    em_zirkel:   { art:'emblem',      name:'Zirkel',      icon:'ti-atom-2',  desc:'Der Kreislauf des Prestiges als Zeichen.' },
+    em_aufstieg: { art:'emblem',      name:'Aufstieg',    icon:'ti-arrow-up',desc:'Der Pfeil nach oben – nur für Kommandanten mit mindestens einem Aufstieg.' },
+    em_klinge:   { art:'emblem',      name:'Klinge',      icon:'ti-sword',   desc:'Für eine Kampfbilanz, die für sich spricht.' },
+    em_lot:      { art:'emblem',      name:'Senklot',     icon:'ti-anchor',  desc:'Das Lot der Tiefensonden – für sehr weit unten Gewesene.' }
+  };
+  // Die Bedingung des Servers in Worte fassen. Bewusst ohne eigene Zahlen: Jede Zahl hier kommt aus
+  // dem `bedingung`-Objekt, das der Server mitschickt.
+  function kosmetikBedingungText(b){
+    if (!b) return 'Freischaltbedingung unbekannt.';
+    if (b.typ === 'immer') return 'Von Anfang an verfügbar.';
+    if (b.typ === 'spender') return 'Unterstützer-Rang '+({bronze:'Bronze',silver:'Silber',gold:'Gold'}[b.stufe]||b.stufe)+' (per Ko-fi-Spende; die kostenlose Testphase schaltet Kosmetik bewusst nicht frei).';
+    if (b.typ === 'prestige') return 'Prestige-Stufe '+b.wert+'.';
+    if (b.typ === 'aufstieg') return b.wert+' Aufstieg'+(b.wert===1?'':'e')+'.';
+    // Bewusst NICHT fmt(): Das rundet auf "5.0k" ab, und eine Freischaltschwelle ist genau der
+    // Ort, an dem eine gerundete Zahl nichts wert ist - der Spieler will wissen, ob er 5000 oder
+    // 5400 braucht. fmt() ist für Ressourcenstände gedacht, wo die Größenordnung reicht.
+    if (b.typ === 'kampfpunkte') return b.wert.toLocaleString('de-DE')+' Kampfpunkte.';
+    if (b.typ === 'abgrund') return 'Rekordtiefe '+b.wert+' im Abgrund.';
+    return 'Freischaltbedingung unbekannt.';
+  }
+  // --- Was ein Spieler TRÄGT, gezeichnet ---
+  // Beide Helfer lesen `e.cosmetics` aus dem Bestenlisten-Eintrag. Den füllt der SERVER bei jedem
+  // Lesen neu; ein selbst gesetzter Wert im eingereichten Eintrag wird dabei überschrieben.
+  function kosmetikFarbAttr(e){
+    const key = e && e.cosmetics && e.cosmetics.namensfarbe;
+    const look = key && KOSMETIK_LOOK[key];
+    if (!look || look.art !== 'namensfarbe' || !look.farbe) return '';
+    return ' style="color:'+look.farbe+';"';
+  }
+  function kosmetikEmblem(e){
+    const key = e && e.cosmetics && e.cosmetics.emblem;
+    const look = key && KOSMETIK_LOOK[key];
+    if (!look || look.art !== 'emblem') return '';
+    if (look.emoji) return ' <span title="'+escapeHtml(look.name)+'" aria-hidden="true">'+look.emoji+'</span>';
+    if (look.icon) return ' <i class="ti '+look.icon+'" title="'+escapeHtml(look.name)+'" aria-hidden="true" style="font-size:11px; opacity:0.9;"></i>';
+    return '';
+  }
+  // Eigener Besitz und eigene Auswahl. Wie der Unterstützer-Rang bewusst NICHT in `state`: beides
+  // gehört dem Server, ein alter Spielstand darf es nicht mitbringen.
+  let kosmetikKatalog = null;     // [{key, art, bedingung}] - null = noch nicht geladen
+  let kosmetikBesitz = [];
+  let kosmetikGetragen = {};
+  let kosmetikStatusMsg = '';
+  let kosmetikLaeuft = false;
+  // Abrufbremse. OHNE DIE WÄRE DAS EIN ANFRAGE-STURM: renderKosmetikBox() läuft im Haupt-Tick, also
+  // jede Sekunde, und stößt den Abruf an, solange der Katalog fehlt. Antwortet der Server einmal
+  // nicht (Neustart, Netzabbruch), bliebe kosmetikKatalog null - und das Spiel fragte im
+  // Sekundentakt weiter, für jeden geöffneten Tab. Zwei Bremsen, weil sie Verschiedenes verhindern:
+  // `kosmetikLaedt` fängt die parallelen Anfragen INNERHALB eines Abrufs ab, der Zeitstempel die
+  // Wiederholung danach.
+  let kosmetikLaedt = false;
+  let kosmetikLetzterVersuch = 0;
+  const KOSMETIK_ABRUF_PAUSE = 30000;
+  async function ladeKosmetik(){
+    if (!useBackend() || kosmetikLaedt) return;
+    if (Date.now() - kosmetikLetzterVersuch < KOSMETIK_ABRUF_PAUSE) return;
+    kosmetikLaedt = true;
+    kosmetikLetzterVersuch = Date.now();
+    try {
+      const res = await backendFetch('/cosmetics');
+      if (!res.ok) return;
+      const d = await res.json();
+      kosmetikKatalog = d.katalog || [];
+      kosmetikBesitz = d.besitz || [];
+      kosmetikGetragen = d.getragen || {};
+    } catch(e){ /* Server nicht erreichbar - die Auswahlfläche bleibt bei "Lädt…" */ }
+    finally { kosmetikLaedt = false; }
+  }
+  async function kosmetikAusruesten(art, key){
+    if (kosmetikLaeuft) return;
+    kosmetikLaeuft = true;
+    try {
+      const res = await backendFetch('/cosmetics/equip', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ auswahl: { [art]: key } })
+      });
+      const d = await res.json().catch(()=>({}));
+      if (res.ok && d.ok){
+        kosmetikGetragen = d.getragen || kosmetikGetragen;
+        kosmetikBesitz = d.besitz || kosmetikBesitz;
+        kosmetikStatusMsg = '';
+        // Die eigene Zeile in der Bestenliste trägt die Kosmetik erst, nachdem der Server sie neu
+        // ausgeliefert hat - deshalb wird sie hier angestoßen und nicht darauf gewartet.
+        loadLeaderboard();
+      } else {
+        kosmetikStatusMsg = d.error || 'Auswahl konnte nicht gespeichert werden.';
+      }
+    } catch(e){
+      kosmetikStatusMsg = 'Server nicht erreichbar.';
+    } finally {
+      kosmetikLaeuft = false;
+      render();
+    }
+  }
+  // Die Auswahlfläche. Gesperrte Stücke bleiben SICHTBAR und nennen ihre Bedingung - eine Liste,
+  // die nur zeigt, was man schon hat, gibt keinen Grund, etwas anzustreben.
+  function renderKosmetikBox(){
+    const box = document.getElementById('kosmetikBox');
+    if (!box) return;
+    if (!useBackend()){
+      setBoxHtml(box, 'kosmetikBox', `<div class="bmeta">Namensfarbe und Emblem hängen an einem Konto – im Solo-Modus ohne Server gibt es sie nicht.</div>`);
+      return;
+    }
+    if (!kosmetikKatalog){
+      setBoxHtml(box, 'kosmetikBox', `<div class="bmeta">Lädt…</div>`);
+      ladeKosmetik();
+      return;
+    }
+    const gruppe = (art, ueberschrift, hinweis) => {
+      const stuecke = kosmetikKatalog.filter(d => d.art === art).map(d => {
+        const look = KOSMETIK_LOOK[d.key];
+        // Ein Stück, das der Server kennt und diese Fassung nicht: lieber ehrlich auslassen als mit
+        // erfundenem Namen zeichnen. Der Paritätstest schlägt an, bevor das je live geht.
+        if (!look) return '';
+        const hat = kosmetikBesitz.indexOf(d.key) !== -1;
+        const traegt = kosmetikGetragen[art] === d.key;
+        const probe = art === 'namensfarbe'
+          ? `<span style="${look.farbe?'color:'+look.farbe+';':''} font-weight:600;">${escapeHtml(state.player&&state.player.name||'Kommandant')}</span>`
+          : (look.emoji ? `<span aria-hidden="true">${look.emoji}</span>`
+            : (look.icon ? `<i class="ti ${look.icon}" aria-hidden="true"></i>` : '<span class="bmeta">–</span>'));
+        return `<div class="card-row${hat?'':' research-locked'}" style="align-items:flex-start; gap:8px; padding:7px 9px; ${traegt?'border-color:rgba(93,202,165,0.5);':''}">
+          <div class="left" style="align-items:flex-start;">
+            <div class="bicon" style="flex-shrink:0;">${probe}</div>
+            <div>
+              <div class="bname" style="display:flex; align-items:center; gap:5px;">${escapeHtml(look.name)}${traegt?' <span class="lvl-pill" style="font-size:9px; color:#5dcaa5;">getragen</span>':''}</div>
+              <div class="bmeta">${escapeHtml(look.desc)}</div>
+              ${hat?'':`<div class="bmeta" style="color:#7d8199;"><i class="ti ti-lock" aria-hidden="true" style="margin-right:4px;"></i>${escapeHtml(kosmetikBedingungText(d.bedingung))}</div>`}
+            </div>
+          </div>
+          ${hat && !traegt ? `<button data-kosm-art="${art}" data-kosm-key="${d.key}" style="white-space:nowrap; font-size:11px;"${kosmetikLaeuft?' disabled':''}>Tragen</button>` : ''}
+        </div>`;
+      }).join('');
+      return `<div class="section-title" style="font-size:12px; margin-top:10px;">${ueberschrift}</div><div class="bmeta" style="margin-bottom:6px;">${hinweis}</div>${stuecke}`;
+    };
+    const fehler = kosmetikStatusMsg ? `<div class="bmeta" style="color:#f0997b; margin-top:6px;">${escapeHtml(kosmetikStatusMsg)}</div>` : '';
+    setBoxHtml(box, 'kosmetikBox', `
+      <div class="bmeta">Namensfarbe und Emblem erscheinen überall, wo andere deinen Namen sehen – Bestenliste, Profil, Freundesliste. Freigeschaltet wird über <strong>Fortschritt</strong> (Prestige, Aufstieg, Kampfpunkte, Rekordtiefe) oder über den <strong>Unterstützer-Rang</strong>. Rein optisch: nichts davon wirkt auf Produktion, Kampf oder Punkte.</div>
+      ${gruppe('namensfarbe', 'Namensfarbe', 'Färbt deinen Namen in allen Listen.')}
+      ${gruppe('emblem', 'Emblem', 'Ein kleines Zeichen direkt hinter dem Namen.')}
+      ${fehler}
+    `);
+    box.querySelectorAll('[data-kosm-key]').forEach(btn => {
+      btn.onclick = () => { kosmetikStatusMsg = ''; kosmetikAusruesten(btn.getAttribute('data-kosm-art'), btn.getAttribute('data-kosm-key')); };
+    });
   }
 
   // Eine Anfrage, zwei Aufrufer: der Knopf im Fortschritt-Tab und die automatische Freischaltung
@@ -29213,7 +29398,7 @@
       // isSupporter in der Signatur, sonst friert ein ablaufender Rang hier fest (die Box zeichnet
       // nur bei geänderter Signatur neu).
       return { sig: f.id+':'+(online?'1':'0')+':'+(e?e.score:'-')+':'+((e&&e.isSupporter)?e.supporterTier||'b':''), html:
-        `<div class="card-row"><div class="left"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-right:6px;background:${online?'#5dcaa5':'#5a5f73'};box-shadow:${online?'0 0 6px #5dcaa5':'none'};"></span><div><span class="bname">${name}${tag?' ['+escapeHtml(tag)+']':''}${supporterPille(e)}</span><div class="bmeta">${online?'<span style="color:#5dcaa5;">online</span> · ':''}${score}</div></div></div><div style="display:flex; gap:4px;"><button data-friend-msg="${f.id}" data-friend-name="${escapeHtml(f.name)}" style="font-size:10px; padding:5px 7px;" title="Nachricht schreiben"><i class="ti ti-mail" aria-hidden="true"></i></button><button data-friend-profile="${f.id}" style="font-size:10px; padding:5px 7px;" title="Profil öffnen"><i class="ti ti-user" aria-hidden="true"></i></button><button data-friend-remove="${f.id}" style="font-size:10px; padding:5px 7px;" title="Entfernen"><i class="ti ti-x" aria-hidden="true"></i></button></div></div>` };
+        `<div class="card-row"><div class="left"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-right:6px;background:${online?'#5dcaa5':'#5a5f73'};box-shadow:${online?'0 0 6px #5dcaa5':'none'};"></span><div><span class="bname"><span${kosmetikFarbAttr(e)}>${name}</span>${tag?' ['+escapeHtml(tag)+']':''}${kosmetikEmblem(e)}${supporterPille(e)}</span><div class="bmeta">${online?'<span style="color:#5dcaa5;">online</span> · ':''}${score}</div></div></div><div style="display:flex; gap:4px;"><button data-friend-msg="${f.id}" data-friend-name="${escapeHtml(f.name)}" style="font-size:10px; padding:5px 7px;" title="Nachricht schreiben"><i class="ti ti-mail" aria-hidden="true"></i></button><button data-friend-profile="${f.id}" style="font-size:10px; padding:5px 7px;" title="Profil öffnen"><i class="ti ti-user" aria-hidden="true"></i></button><button data-friend-remove="${f.id}" style="font-size:10px; padding:5px 7px;" title="Entfernen"><i class="ti ti-x" aria-hidden="true"></i></button></div></div>` };
     });
     const sig = rows.map(r => r.sig).join('|');
     if (sig === lastFriendsSig) return;
@@ -29230,7 +29415,7 @@
     else { avatarEl.textContent = (entry.name||'?').slice(0,2).toUpperCase(); avatarEl.style.background = 'rgba(126,119,221,0.25)'; }
     // Name als HTML, damit die Unterstuetzer-Pille danebenpasst (05.08.2026). escapeHtml ist hier
     // PFLICHT und nicht kosmetisch: entry.name kommt aus einem fremden Spielerkonto.
-    document.getElementById('profileModalName').innerHTML = escapeHtml(entry.name || 'Unbekannt') + supporterPille(entry);
+    document.getElementById('profileModalName').innerHTML = '<span'+kosmetikFarbAttr(entry)+'>'+escapeHtml(entry.name || 'Unbekannt')+'</span>' + kosmetikEmblem(entry) + supporterPille(entry);
     document.getElementById('profileModalAlliance').textContent = (entry.allianceTag ? 'Allianz ['+entry.allianceTag+']' : 'Keine Allianz') + (entry.title ? ' · '+entry.title : '') + (entry.allianceTitle ? ' · '+entry.allianceTitle : '');
     // Runde 1 "Profilkarte überarbeiten": Hintergrund-Sternenfeld pro Öffnung neu verstreut (Modal wird
     // nur bei echtem Öffnen neu befüllt, nicht im Haupt-Tick - kein Performance-Thema), plus Rahmen-
@@ -53974,7 +54159,7 @@
       const isMe = !!(state.player.id && e.id === state.player.id);
       const isOnline = (Date.now() - (e.lastSeen||0)) < ONLINE_THRESHOLD_MS;
       const onlineDot = `<span title="${isOnline?'Online':'Offline'}" style="display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; flex-shrink:0; background:${isOnline?'#5dcaa5':'#4c5661'}; box-shadow:${isOnline?'0 0 3px rgba(93,202,165,0.7)':'none'};"></span>`;
-      return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style="color:#7d8199;">['+escapeHtml(e.allianceTag)+']</span>':''}</span>${supporterPilleKlein(e)}<span>${e.score||0}</span></div>`;
+      return `<div class="fp-lb-row ${isMe?'me':''}" data-fp-profile="${e.id||''}" style="cursor:${e.id?'pointer':'default'};"><span class="fp-lb-rank">${i+1}.</span>${onlineDot}<span class="fp-lb-name"><span${kosmetikFarbAttr(e)}>${escapeHtml(e.name||'Unbekannt')}</span>${e.allianceTag?' <span style="color:#7d8199;">['+escapeHtml(e.allianceTag)+']</span>':''}${kosmetikEmblem(e)}</span>${supporterPilleKlein(e)}<span>${e.score||0}</span></div>`;
     }).join('');
     box.querySelectorAll('[data-fp-profile]').forEach(row => row.addEventListener('click', () => {
       const id = row.getAttribute('data-fp-profile');
@@ -54102,7 +54287,7 @@
         <div style="display:flex; align-items:center; gap:10px; min-width:0;">
           <span class="rank-num">${i+1}</span>
           <span class="lvl-pill" style="color:${lg.color}; border-color:${lg.color}; font-size:10px;">${lg.name}</span>
-          <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name)}${supporterPille(e)}</span>
+          <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span${kosmetikFarbAttr(e)}>${escapeHtml(e.name)}</span>${kosmetikEmblem(e)}${supporterPille(e)}</span>
         </div>
         <span style="color:#9296ac; flex-shrink:0;">${fmt(e.weekScore||0)} Wochenpunkte</span>
       </div>`;
@@ -54162,7 +54347,7 @@
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             <span class="rank-num">${rank}</span>
             ${onlineDot}
-            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.name||'Unbekannt')}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+escapeHtml(e.allianceTag)+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+escapeHtml(e.title)+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${e.abgrundBest?' <span class="lvl-pill" style="font-size:10px; color:#a89ef0; border-color:#a89ef0;" title="Rekordtiefe '+e.abgrundBest+' im Abgrund - so tief ist dieser Kommandant im Abgrund gekommen"><i class="ti ti-infinity" aria-hidden="true"></i> T'+e.abgrundBest+'</span>':''}${supporterBadge}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
+            <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span${kosmetikFarbAttr(e)}>${escapeHtml(e.name||'Unbekannt')}</span>${kosmetikEmblem(e)}${e.allianceTag?' <span style=\"color:#9296ac; font-weight:400;\">['+escapeHtml(e.allianceTag)+']</span>':''}${e.title?' <span class="lvl-pill" style="font-size:10px;"><i class="ti ti-award" aria-hidden="true"></i> '+escapeHtml(e.title)+'</span>':''}${e.ascensionCount?' <span class="lvl-pill" style="font-size:10px; color:#fac775; border-color:#fac775;" title="'+e.ascensionCount+'x aufgestiegen (Transzendenz)"><i class="ti ti-sparkles" aria-hidden="true"></i> A'+e.ascensionCount+'</span>':''}${e.abgrundBest?' <span class="lvl-pill" style="font-size:10px; color:#a89ef0; border-color:#a89ef0;" title="Rekordtiefe '+e.abgrundBest+' im Abgrund - so tief ist dieser Kommandant im Abgrund gekommen"><i class="ti ti-infinity" aria-hidden="true"></i> T'+e.abgrundBest+'</span>':''}${supporterBadge}${activePactWith(e.id)?' <span class="lvl-pill" style="font-size:10px; color:#5dcaa5; border-color:#5dcaa5;" title="Nichtangriffspakt aktiv - Angriffe und Spionage blockiert"><i class="ti ti-shield" aria-hidden="true"></i> Pakt</span>':''}</span>
           </div>
           <div style="display:flex; gap:10px; color:#9296ac; flex-shrink:0; align-items:center;">
             <span><i class="ti ti-rocket" aria-hidden="true"></i> ${e.ships||0}</span>
@@ -58615,6 +58800,7 @@
     renderReportsBox();
     renderIntelBox();
     renderUnterstuetzerHub();
+    renderKosmetikBox();
     const kofiBox = document.getElementById('kofiTopSupporterBox');
     if (kofiBox){
       if (kofiTopSupporterCache === undefined){
