@@ -5,6 +5,16 @@
  *   node tests/run.js              alles
  *   node tests/run.js selects      nur Tests, deren Dateiname "selects" enthält
  *   node tests/run.js --nur-pflicht   nur Syntax + Icon-Whitelist + Dateigleichheit (Sekunden statt Minuten)
+ *   node tests/run.js --nummer     Pflichtprüfungen + die vier Tests, die an VERSION/PATCHNOTES hängen
+ *
+ * --nummer ist fuer EINEN bestimmten Ablauf da (eingefuehrt 15.08.2026): Die Versionsnummer wird
+ * erst NACH dem gruenen vollen Prueflauf vergeben, unmittelbar vor dem Commit - sonst ueberholt bei
+ * parallelem Auslieferungstakt jede fremde Version die eigene, und jede Kollision kostet einen
+ * weiteren vollen Lauf (viermal in Folge am 14./15.08.2026, fuenfmal am 10.08.). Danach ist die
+ * Spieldatei aber angefasst worden, und "der volle Lauf war gruen" gilt streng genommen fuer einen
+ * anderen Stand. Dieser Modus schliesst genau diese Luecke: Er prueft, was eine Nummernvergabe
+ * ueberhaupt kaputtmachen KANN - Syntax, Dateigleichheit, VERSION-zu-Patchnote, die erzeugte
+ * patchnotes.html und die Tests, die den Patchnotes-Block lesen. In Sekunden statt in 25 Minuten.
  *
  * Exit-Code 0 = alles sauber. Damit taugt der Aufruf auch für eine spätere CI oder einen
  * Git-Hook, ohne dass jemand die Ausgabe lesen muss.
@@ -16,6 +26,11 @@ const path = require('path');
 const WURZEL = path.resolve(__dirname, '..');
 const argumente = process.argv.slice(2);
 const nurPflicht = argumente.includes('--nur-pflicht');
+// Die vier Tests, die WIRKLICH am Patchnotes-Block oder an VERSION haengen - ermittelt per
+// `grep -l "PATCHNOTES\|const VERSION" tests/*.js` und danach einzeln nachgesehen, welche den
+// Inhalt auch benutzen statt ihn nur zu erwaehnen. Zusammen rund 14 Sekunden.
+const NUMMER_TESTS = ['test_patchnotesseite.js', 'test_patchnotes_lazy.js', 'test_zaehlangaben.js', 'test_seo.js'];
+const nurNummer = argumente.includes('--nummer');
 const filter = argumente.filter(a => !a.startsWith('--'));
 
 let fehler = 0;
@@ -113,8 +128,16 @@ try {
 if (!nurPflicht) {
   const dateien = fs.readdirSync(__dirname)
     .filter(f => f.endsWith('.js') && f !== 'run.js')
+    .filter(f => !nurNummer || NUMMER_TESTS.includes(f))
     .filter(f => !filter.length || filter.some(t => f.includes(t)))
     .sort();
+  if (nurNummer){
+    // Gegenprobe gegen eine still leere Auswahl: Wird eine dieser Dateien umbenannt, liefe der
+    // Modus mit null Tests durch und meldete trotzdem "sauber" - genau die Sorte Messwerkzeug, das
+    // sich selbst im Weg steht (CLAUDE.md-Arbeitsregeln 15/17/19).
+    const fehlen = NUMMER_TESTS.filter(f => !fs.existsSync(path.join(__dirname, f)));
+    melde('Nummern-Modus: alle vier Tests vorhanden', fehlen.length === 0, fehlen.join(', '));
+  }
 
   console.log('\n=== Tests (' + dateien.length + ') ===');
   for (const datei of dateien) {
