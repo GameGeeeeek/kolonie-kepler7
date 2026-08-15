@@ -114,6 +114,12 @@ const SPIELSTAND = JSON.stringify({
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="forschung"]'); if (b) b.click(); });
   await page.waitForTimeout(1200);
 
+  // Seit v8.506.0 (Kompaktkarten) stecken die Beschreibungen hinter dem "Details"-Griff der
+  // Karte - für die Messung werden alle Griffe geöffnet (am alten Stand ohne Griffe ein No-op,
+  // die Gegenprobe-Richtung dieses Tests bleibt also intakt). Die geschützte Eigenschaft ist
+  // dieselbe wie seit dem 22.07.2026: die VOLLSTÄNDIGE Beschreibung kommt beim Spieler an -
+  // jetzt eben einen Tipp entfernt statt immer sichtbar.
+  await page.evaluate(() => { document.querySelectorAll('#research details.karten-info').forEach(d => { d.open = true; }); });
   const seite = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
   let fehlend = [];
   for (const key of neu){
