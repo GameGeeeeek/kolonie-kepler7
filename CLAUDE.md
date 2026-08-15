@@ -265,10 +265,48 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     committen. Dieselbe Familie wie Regel 25: Ein Werkzeug, dessen Ergebnis niemand auswertet,
     prüft nichts.
 
+32. **Eine gemeldete Anzeigezahl ist erst widerlegt, wenn auch nach ihrer RECHENFORM gesucht wurde
+    – nicht nur nach dem gerenderten Literal.** Vorfall 15.08.2026: Ein Hilfslauf meldete, der
+    Forschung-Tab werbe mit „6% je Labor, Deckel 75%", während die Konstanten 4,5% und 45% lauten.
+    Die Gegenprüfung suchte `grep "6% je Labor"` und `grep "75%"` im Forschungsbereich, fand nichts
+    und stand kurz davor, den Fund als widerlegt zurückzugeben. Im Code steht aber
+    `Math.min(75,labCount*6)+'%'` – die Zahl entsteht erst zur Laufzeit und kommt als Text nirgends
+    vor. Gefunden hat sie erst eine Suche nach dem UMFELD (`verkürz`, `Zeitersparnis`) statt nach
+    dem Wert. **Vorgehen:** Beim Nachprüfen einer Zahl immer beides suchen – das Literal UND die
+    Rechenform (`*6`, `Math.min(75`, `PER_LEVEL`, den Konstantennamen). Ein „nicht gefunden" ist
+    sonst kein Beweis, sondern nur eine zu enge Suche. Das ist die Gegenrichtung zu Regel 10: Dort
+    wird ein Fund zu Unrecht geglaubt, hier zu Unrecht verworfen – und ein zu Unrecht verworfener
+    Fund fällt nie wieder auf, weil niemand mehr hinsieht.
+33. **Eine Prüfung, die Aufrufstellen im Quelltext ZÄHLT, muss Kommentare vorher entfernen – und
+    darf ihre Erwartung nicht als blanke Zahl führen.** Vorfall 15.08.2026, beide Hälften am selben
+    Test: `test_ausbaubarer_deckel` 2d zählte `weicherDeckel(`-Treffer über den rohen Quelltext und
+    verlangte genau 3. Ein neuer, völlig legitimer vierter Aufruf ließ ihn auf 5 springen, weil der
+    erklärende Kommentar daneben den Aufruf ZITIERT – der Zähler sah den Unterschied nicht (das ist
+    Regel 6, zweite Hälfte, nur auf einen Zähler statt auf einen Slice angewandt). Und die Meldung
+    lautete `{"direkteAufrufe":5}` – sie sagte nicht, WELCHE Stelle dazugekommen war, also musste
+    von Hand gegriffen werden, um überhaupt zu beurteilen, ob der Zuwachs erlaubt ist. Ein Zähler
+    ist außerdem eine Momentaufnahme (Regel 3). **Richtig:** Kommentare vor dem Zählen leeren, die
+    erlaubten Stellen NAMENTLICH als Musterliste führen, den Fehlschlag die nicht passenden Zeilen
+    ausgeben lassen – und die Gegenrichtung mitprüfen (verschwindet eine erlaubte Stelle, ist das
+    genauso ein Befund wie eine neue).
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
     Auslieferung selbst).
+
+    **Nachtrag 15.08.2026 – die Ausnahme, an die niemand denkt: die eigene GEGENPROBE.** Regel 1
+    verlangt, jede neue Prüfung auch am alten Stand zu fahren, und der übliche Griff dafür ist
+    `cp alt.html weltraum_kolonie.html` … messen … zurückkopieren. Das sind **Edits an der
+    Spieldatei** – während eines laufenden Prüflaufs also genau das, was Regel 14 verbietet. Genau
+    so passiert: Ein Lauf war bei 144 von 211 Tests, als für eine Gegenprobe zweimal die Datei
+    getauscht wurde; sein Ergebnis war damit wertlos und die 20 Minuten weg. Dass die Datei danach
+    byteweise wieder stimmte (`git status` leer), hilft nicht – die Tests dazwischen haben einen
+    anderen Stand gelesen. **Vorgehen:** Gegenproben laufen VOR dem vollen Lauf oder NACH ihm, nie
+    daneben; wer während eines Laufs unbedingt messen muss, tut es an einer KOPIE unter anderem
+    Pfad (die Testumgebung nimmt `SPIELDATEI` per Env entgegen), nie am Original. Und: Wenn der
+    Lauf ohnehin schon einen Fehlschlag gemeldet hat, ist er wertlos – dann diesen einen Lauf über
+    seine Task-ID beenden (Regel 17), erst danach editieren.
 15. **Auf das Suite-Ende über eine Marker-Zeile warten (`EXIT=` in der Log-Datei), nicht per
     `pgrep`** – das eigene Warte-Kommando enthält den Suchbegriff und meldet ewig „läuft".
     Kein `pkill` mit breitem Muster: es traf die eigenen Wartejobs und einmal die eigene Shell
