@@ -969,6 +969,11 @@
     /* Der Grund, warum ein Eintrag grau ist, steht direkt darunter - ein deaktivierter Knopf ohne
        Begründung ist die schlechtere Hälfte derselben Information. */
     .kmenu-grund { padding:0 10px 7px 33px; margin-top:-4px; font-size:10px; color:#8b90a4; line-height:1.35; }
+    /* Asteroiden-Info im Kartenmenü (v8.512.0, Etappe AS-1): Ressourcen-Anteile + Vorrats-Balken. */
+    .kmenu-info { padding:7px 10px 6px; border-bottom:var(--bw-1) solid var(--line); font-size:11px; color:#c7cbe0; }
+    .kmenu-info .progress-outer { margin:5px 0 3px; }
+    .kmenu-info-res { display:flex; gap:9px; flex-wrap:wrap; align-items:center; }
+    .kmenu-info-zahl { font-size:10px; color:#8b90a4; font-family:var(--font-mono); }
     /* Modul-Slot-Karten (Spieler-Report 25.07.2026 mit Screenshots vom Handy). Drei Probleme:
        (1) Die Karten nutzten .card-row, das ein geerbtes justify-content:space-between mitbringt -
            bei flex-direction:column verteilte das Name und Seltenheit an die Kartenränder und riss
@@ -6411,8 +6416,16 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.511.0';
+  const VERSION = '8.513.0';
   const PATCHNOTES = [
+    { version:'8.513.0', date:'15.08.2026', changes:[
+      '<strong>„Einklappbare Abschnitte" wirkt jetzt auch auf Planeten-Rolle, Orbitalstation und Terraforming.</strong> Die Einstellung (unter Anzeige) macht seit Juli überall im Spiel die Abschnitts-Überschriften klappbar – ausgerechnet die drei großen Blöcke des Basis-Tabs blieben aber immer offen, weil ihre Überschriften technisch innerhalb ihrer eigenen Boxen liegen und der Klapp-Mechanismus sie dort nie sah. Jetzt tragen auch sie den Klapp-Pfeil, merken sich ihren Zustand dauerhaft und bleiben über das sekündliche Neuzeichnen hinweg zu.',
+      'Läuft in einem eingeklappten Bereich etwas Aktives – ein Rollen-Umbau oder ein Planeten-Ereignis mit Countdown –, bleibt genau dieser Teil sichtbar: Eingeklappt wird nur, was NACH der Überschrift steht, und die laufenden Vorgänge stehen davor. Zweite Etappe des Kompakt-Umbaus („überall muss man richtig lange scrollen"); wer die Einstellung noch nicht nutzt: Einstellungen → Anzeige → Einklappbare Abschnitte.'
+    ]},
+    { version:'8.512.0', date:'15.08.2026', changes:[
+      '<strong>Der Asteroiden-Klick zeigt jetzt, was drinsteckt und wie viel übrig ist.</strong> Das Kartenmenü eines Asteroiden hat einen neuen Info-Block: die Ressourcen des Vorkommens mit ihren Anteilen (z. B. Magnetitkern: 60% Erz, 40% Kristalle – dieselben Zahlen, nach denen der Abbau wirklich auszahlt), darunter ein <strong>Vorrats-Balken</strong> in der Farbe der Asteroidengröße und die genaue Zahl „Vorrat: X von Y (Z%)". Vorher stand der Vorrat in der Titelzeile des Menüs – die auf dem Handy regelmäßig abgeschnitten wurde, während die Ressourcen-Zusammensetzung nirgends stand.',
+      'Die Titelzeile ist damit entlastet und wieder lesbar: Sie nennt Name, bei Peilungen die Restgültigkeit und bei reservierten Vorkommen den Halter samt Eskorte. Der Maßstab des Balkens ist der Maximal-Vorrat der jeweiligen Größe (Splitter 50k bis Koloss 1,5M) – dieselbe Zahl, mit der ein Vorkommen entsteht und nachfüllt. Umgesetzt auf Spieler-Wunsch („welche Ressourcen es dort gibt und wieviel übrig ist, am liebsten so ein Balken").'
+    ]},
     { version:'8.511.0', date:'15.08.2026', changes:[
       '<strong>Behoben: Die Wochenliga-Box versprach das Fünffache der echten Belohnung.</strong> Sie nannte „Platin 1.500 Kredite + 60 Min. Produktion, Gold 800 + 30 Min., Silber 400 + 15 Min." – das sind die Werte von vor der Absenkung; ausgezahlt werden seither 12/6/3 Minuten. Das ist die einzige Stelle, an der man VOR der Abrechnung liest, wofür sich das Wochenrennen lohnt, und montags kam dann ein Fünftel davon an. Der Hilfe-Abschnitt hatte die richtigen Zahlen längst – die Box war allein zurückgeblieben. Sie rechnet ihre Zeile jetzt aus derselben Tabelle, aus der auch ausgezahlt wird.',
       '<strong>Die Krustenpresse versprach „mehr als einen Tag" Ersparnis.</strong> Terraforming kostet über alle zehn Stufen rund 61 Stunden; die gedeckelten −30% davon sind 18 Stunden. Der Text nennt jetzt die echte Größenordnung.',
@@ -51038,12 +51051,13 @@
   }
   // eintraege: [{ icon, label, grund, disabled, fn }] - grund erscheint als kleine Zeile darunter
   // und erklärt, warum ein Eintrag grau ist.
-  function openKarteMenu(ev, art, titel, eintraege){
+  function openKarteMenu(ev, art, titel, eintraege, infoHtml){
     closeKarteMenu();
     const el = document.createElement('div');
     el.className = 'kmenu';
     el.setAttribute('role', 'menu');
     el.innerHTML = `<div class="kmenu-kopf">${art}<span class="kmenu-titel">${escapeHtml(titel)}</span></div>` +
+      (infoHtml ? `<div class="kmenu-info">${infoHtml}</div>` : '') +
       eintraege.map((e,i) =>
         `<button data-kmenu-i="${i}" ${e.disabled?'disabled':''}><i class="ti ${e.icon}" aria-hidden="true"></i>${escapeHtml(e.label)}</button>` +
         (e.grund ? `<div class="kmenu-grund">${escapeHtml(e.grund)}</div>` : '')
@@ -52474,10 +52488,20 @@
     const kopf = a.peilung ? 'Schürfpeilung · ' + g.name : 'Asteroid · ' + g.name;
     const halterText = asteroidHalterText(a);
     const eskorteHier = asteroidFeldGeteilt() && a.eskorte ? eskorteSchiffssumme(a.eskorte) : 0;
-    const zeile = asteroidName(a) + ' · Vorrat ' + fmt(a.vorrat)
+    // Der Vorrat wandert aus der (auf dem Handy abgeschnittenen) Titelzeile in den Info-Block
+    // mit Balken (v8.512.0). Anteil gegen den Maximal-Vorrat der GRÖSSE - dieselbe Zahl, mit der
+    // das Vorkommen entsteht und nachschubt; Deckel bei 100%, falls ein Altbestand darüber liegt.
+    const so = asteroidSorte(a.sorte);
+    const anteil = Math.max(0, Math.min(1, (a.vorrat || 0) / g.vorrat));
+    const resTeile = Object.entries(so.res || {}).map(([rk, teil]) =>
+      '<span style="white-space:nowrap;">' + miniResIcon(rk) + ' ' + Math.round(teil * 100) + '%</span>').join('');
+    const infoHtml = '<div class="kmenu-info-res">' + resTeile + '</div>'
+      + '<div class="progress-outer"><div class="progress-inner" style="width:' + Math.round(anteil * 100) + '%; background:' + g.farbe + ';"></div></div>'
+      + '<div class="kmenu-info-zahl">Vorrat: ' + fmt(a.vorrat) + ' von ' + fmt(g.vorrat) + ' (' + Math.round(anteil * 100) + '%)</div>';
+    const zeile = asteroidName(a)
       + (a.peilung ? ' · noch ' + Math.ceil(peilungRestTage(a)) + ' Tage gültig' : '')
       + (halterText ? ' · ' + halterText + (eskorteHier ? ' (Eskorte: ' + eskorteHier + ' Schiffe)' : (a.halter ? ' (unbewacht)' : '')) : '');
-    openKarteMenu(ev, kopf, zeile, eintraege);
+    openKarteMenu(ev, kopf, zeile, eintraege, infoHtml);
   }
 
   function sendAttackMission(npcId){
@@ -58792,6 +58816,17 @@
         const groupContainers = subpanelClass
           ? Array.from(panel.querySelectorAll('.'+subpanelClass)).map(sub => ({ el:sub, prefix:'tab-'+activeTab+':'+sub.getAttribute('data-'+(activeTab==='allianz'?'alliance-sub':'galaxy-sub'))+':' }))
           : [{ el:panel, prefix:'tab-'+activeTab+':' }];
+        // Basis-Boxen (v8.513.0, Etappe S-2): Planeten-Rolle, Orbitalstation und Terraforming
+        // rendern ihre Überschrift INNERHALB der eigenen Box - als Container mit eigenem Präfix
+        // nimmt derselbe Algorithmus sie mit (dieselbe Lösung wie bei den Allianz-/Galaxie-
+        // Unterpanels). Inhalte VOR der Überschrift (laufender Umbau, Ereignis-Banner) bleiben
+        // beim Einklappen sichtbar, weil nur nachfolgende Geschwister versteckt werden.
+        if (activeTab === 'basis'){
+          for (const boxId of ['planetRoleBox', 'orbitalStationBox', 'terraformBox']){
+            const box = document.getElementById(boxId);
+            if (box) groupContainers.push({ el: box, prefix: 'tab-basis:' + boxId + ':' });
+          }
+        }
         groupContainers.forEach(({ el:container, prefix }) => {
         const titles = Array.from(container.children).filter(el => el.classList && el.classList.contains('section-title'));
         titles.forEach((title, idx) => {

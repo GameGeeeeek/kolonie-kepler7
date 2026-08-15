@@ -27,7 +27,10 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 
 // ---------------------------------------------------------------- 1. Der Traeger
-check('openKarteMenu existiert', /function openKarteMenu\(ev, art, titel, eintraege\)/.test(src));
+// Regel statt Momentaufnahme (Hausregel 3): Die Signatur beginnt mit den vier Kernparametern,
+// darf aber wachsen - v8.510.0 kam der optionale infoHtml-Block (Asteroiden-Vorrat) dazu, und
+// die alte exakte Klammer-Prüfung fiel auf korrektem Code durch.
+check('openKarteMenu existiert', /function openKarteMenu\(ev, art, titel, eintraege[,)]/.test(src));
 check('closeKarteMenu existiert', /function closeKarteMenu\(\)/.test(src));
 check('das Menue haengt an document.body, nicht in der Karte',
   /document\.body\.appendChild\(el\);/.test(src));
