@@ -119,8 +119,17 @@ check('2c: neue Wirkungsarten haben ganze Sätze als Beschreibung', knappeDesc.l
 
 // --- 3) Verdrahtung der Einbaustellen
 check('3a: storageCap ruft skillLagerBonus', funktionsRumpf('storageCap').includes('skillLagerBonus()'));
-check('3b: tier2Step ruft skillTier2Bonus (additiv mit dem Weltprojekt)',
-  funktionsRumpf('tier2Step').includes('skillTier2Bonus()'));
+// Der Aufruf sass bis v8.514.0 direkt in tier2Step. Seit die Tier-2-Fabrikkarte denselben
+// Durchsatz braucht (sie rechnete ihn vorher gar nicht mit), steht er in tier2DurchsatzMult, das
+// tier2Step ruft. Die gepruefte REGEL ist unveraendert - der Skill-Bonus zaehlt additiv mit dem
+// Weltprojekt -, nur ihr Ort hat sich verschoben; der Test folgt dem, statt auf der alten Stelle
+// zu bestehen (Arbeitsregel 3: die Regel pruefen, nicht die Momentaufnahme). Geprueft wird
+// deshalb BEIDES, sonst koennte die Funktion den Bonus tragen, ohne dass die Fabrik sie ruft.
+const durchsatzRumpf = funktionsRumpf('tier2DurchsatzMult');
+check('3b: der Tier-2-Durchsatz nimmt skillTier2Bonus additiv mit dem Weltprojekt auf',
+  durchsatzRumpf.includes('skillTier2Bonus()') && /\+ skillTier2Bonus\(\)/.test(durchsatzRumpf));
+check('3b2: und tier2Step bildet seinen Durchsatz über genau diese Funktion',
+  funktionsRumpf('tier2Step').includes('tier2DurchsatzMult()'));
 check('3c: skillRecyclerBonus an BEIDEN Ratenformeln (Wahrheit + ETA-Anzeige)',
   (JS.match(/(?<!function )skillRecyclerBonus\(\)/g) || []).length === 2 &&
   funktionsRumpf('collectDebrisWithRecyclers').includes('skillRecyclerBonus()') &&

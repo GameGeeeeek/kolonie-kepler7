@@ -265,6 +265,20 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     committen. Dieselbe Familie wie Regel 25: Ein Werkzeug, dessen Ergebnis niemand auswertet,
     prüft nichts.
 
+34. **Ein Test, der beim AUFBAU seiner Messvorrichtung abstürzt, hat seine übrigen Prüfungen nicht
+    ausgeführt – und der rote Exit-Code verdeckt genau das.** Vorfall 15.08.2026: Die Gegenprobe zu
+    `test_tier2_karte` schnitt einen Funktionsblock aus der Spieldatei und führte ihn per
+    `new Function` aus. Am ALTEN Stand gibt es die geprüfte Funktion nicht – der Aufbau warf einen
+    `ReferenceError`, der Test brach mitten drin ab, und die wichtigste Prüfung (die Aufrufer-Suche,
+    die alle drei rohen Rechenstellen benennen sollte) lief nie. Exit-Code 1 sah aus wie eine
+    gelungene Gegenprobe; in Wahrheit war nur ein Viertel der Prüfungen gefahren, und was die
+    übrigen gesagt hätten, hat niemand gesehen. Das ist die Gegenrichtung zu Regel 25: Dort meldet
+    ein Absturz fälschlich GRÜN, hier fälschlich „rot aus dem richtigen Grund".
+    **Vorgehen:** Jeden `new Function`/`require`/Parser-Aufruf im Test in `try/catch` fassen und den
+    Fehlschlag als eigene, benannte Prüfung melden (`3-bau: der Block lässt sich ausführen`), statt
+    ihn den Testlauf beenden zu lassen. Und bei jeder Gegenprobe die ANZAHL der gelaufenen
+    Prüfungen mit dem grünen Lauf vergleichen – fehlen welche, ist die Gegenprobe unvollständig,
+    egal wie rot sie aussieht.
 32. **Eine gemeldete Anzeigezahl ist erst widerlegt, wenn auch nach ihrer RECHENFORM gesucht wurde
     – nicht nur nach dem gerenderten Literal.** Vorfall 15.08.2026: Ein Hilfslauf meldete, der
     Forschung-Tab werbe mit „6% je Labor, Deckel 75%", während die Konstanten 4,5% und 45% lauten.
