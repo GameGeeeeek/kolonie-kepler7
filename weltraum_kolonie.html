@@ -2047,6 +2047,15 @@
     /* Status-Chips der Detailtafel: Rahmen über var(--bw-1) und currentColor - bewusst OHNE
        border-radius und ohne px-Rahmen, die Formensprache-Prüfung wacht darüber. */
     .status-chip { font-size:10.5px; padding:2px 8px; border:var(--bw-1) solid; display:inline-block; }
+    /* Mobiler Feinschliff (v8.505.0, Etappe B-7): Die Ebenen-Leiste bricht auf schmalen
+       Bildschirmen nicht mehr in zwei Zeilen, sondern wird einzeilig wischbar. Statisches HTML,
+       nie per innerHTML neu geschrieben - die Wischposition überlebt deshalb von selbst. */
+    #karteEbenenLeiste { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:0.75rem; }
+    @media (max-width: 700px) {
+      #karteEbenenLeiste { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+      #karteEbenenLeiste::-webkit-scrollbar { display:none; }
+      #karteEbenenLeiste .planet-pill { flex:0 0 auto; }
+    }
     .sun-disc { display:inline-block; width:12px; height:12px; border-radius:50%; background:#fac775; margin-right:6px; vertical-align:-1px; }
     .map-wrap svg { width:100%; height:100%; }
     /* Grafik-Runde 9, Vorschlag 35 "Sektorkarte als Radar-Display": bewusst NICHT Teil des SVG-Inhalts
@@ -3337,7 +3346,7 @@
              Vorgabe alles an - der Standard sieht exakt aus wie vorher. Der aktive Zustand wird in
              buildGalaxyMap() aus state.karteEbenen gespiegelt (überlebt so auch den Spielstand-Load
              NACH dem Verdrahten). -->
-        <div id="karteEbenenLeiste" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:0.75rem;">
+        <div id="karteEbenenLeiste">
           <button class="planet-pill" data-karte-ebene="routen" title="Eigene Missionslinien zwischen den Systemen ein-/ausblenden"><i class="ti ti-rocket" aria-hidden="true"></i>Routen</button>
           <button class="planet-pill" data-karte-ebene="fraktionen" title="Fraktionsgebiete als Flächen ein-/ausblenden"><i class="ti ti-flag" aria-hidden="true"></i>Fraktionen</button>
           <button class="planet-pill" data-karte-ebene="ereignisse" title="Ereignis-Abzeichen (Piratenbasis, Aliens, Krieg) und Wurmloch ein-/ausblenden"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Ereignisse</button>
@@ -3366,6 +3375,7 @@
             <div class="system-nav-meta" id="systemNavKenn"></div>
           </div>
           <button id="systemNextBtn" title="Nächstes System"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+          <button id="systemTafelZu" title="System schließen (zurück zur Galaxie-Übersicht)" style="margin-left:2px;"><i class="ti ti-x" aria-hidden="true"></i></button>
         </div>
         <div id="systemStatusChips" style="display:none; flex-wrap:wrap; gap:6px; justify-content:center; margin:0 0 10px;"></div>
         <div class="planet-switch" id="mapBaseLinks" style="margin-bottom:0.75rem;"></div>
@@ -6389,8 +6399,14 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.504.0';
+  const VERSION = '8.505.0';
   const PATCHNOTES = [
+    { version:'8.505.0', date:'15.08.2026', changes:[
+      '<strong>Die Detailtafel hat jetzt einen Schließen-Knopf (✕).</strong> Bisher ließ sich ein aufgeklapptes System nur über Wege AUF der Karte schließen – der „‹ Galaxie"-Knopf, Esc oder ein Klick ins Leere. Wer auf dem Handy zur Tafel gescrollt hatte, erreichte davon keinen einzigen. Das ✕ sitzt im Tafelkopf neben der ◀/▶-Navigation und führt zurück zur Galaxie-Übersicht.',
+      '<strong>Auf dem Handy zieht die Tafel jetzt auf.</strong> Nach dem Antippen eines Systems lag die Detailtafel unter dem Kartenkasten oft unterhalb des sichtbaren Bereichs – man tippte und sah nichts passieren. Auf schmalen Bildschirmen wird die Tafel jetzt sanft ins Bild geholt, und das ✕ scrollt zurück zur Karte: die „aufziehende Lade" aus dem Zielbild, ohne die Karte zu überdecken. Auf breiten Bildschirmen ändert sich nichts – dort stehen Karte und Tafel ohnehin zusammen im Bild.',
+      '<strong>Die Ebenen-Leiste wischt statt umzubrechen.</strong> Auf schmalen Bildschirmen brauchten die vier Ebenen-Schalter zwei Zeilen; jetzt bleiben sie in einer wischbaren Zeile.',
+      'Achte Etappe des Sektorkarten-Umbaus (B-7, mobiler Feinschliff). Damit sind alle Kernpunkte des Zielbilds umgesetzt: reparierte Bedienung, Detailtafel mit Kopf, Kennzahlen und Status, vier schaltbare Ebenen und die mobile Aufbereitung.'
+    ]},
     { version:'8.504.0', date:'15.08.2026', changes:[
       '<strong>Deine Flotten sind jetzt auf der Galaxie-Übersicht zu sehen.</strong> Eine unterwegs befindliche Mission war bisher nur in der aufgeklappten Systemansicht sichtbar – auf der Übersicht verschwand sie schlicht. Jetzt zeichnet die neue Ebene „Routen" jede systemübergreifende Mission als gestrichelte, wandernde Linie vom Start- zum Zielsystem, in derselben Farbe, die die Systemansicht für diese Missionsart nutzt (Erkundung blau, Angriff rot, Kolonisierung violett, Verlegung gold). Missionen innerhalb eines Systems zeigt weiterhin die Systemansicht – auf Galaxie-Maßstab wären Start und Ziel derselbe Punkt.',
       'Die Linie ist bewusst <strong>ohne Restzeit und ohne Fortschritts-Punkt</strong> gebaut: Beides würde das Kartenbild jede Sekunde ändern und den Zwischenspeicher der Übersicht aushebeln – die Restzeit steht dort, wo man sie zum Handeln braucht (Flotten-Reiter und aufgeklapptes System). Der Schalter sitzt als vierte Ebene in der Leiste über der Karte und wird wie die anderen im Spielstand gespeichert.',
@@ -50326,6 +50342,15 @@
     buildGalaxyMap();
     loadPlayersInSystem();
     updateGalaxyBackButton();
+    // Mobiler Feinschliff (v8.505.0, Etappe B-7): Auf schmalen Bildschirmen liegt die Detailtafel
+    // unter dem 420px hohen Kartenkasten oft unterhalb der Falz - wer ein System antippt, will
+    // dessen Inhalt sehen. Die Tafel wird deshalb sanft ins Bild geholt ("die Lade" aus dem
+    // Zielbild, ohne Overlay-Architektur); das ✕ der Tafel führt zurück zur Karte. Auf breiten
+    // Bildschirmen passiert nichts - dort stehen Karte und Tafel ohnehin zusammen im Bild.
+    if (window.innerWidth <= 700){
+      const tafel = document.getElementById('systemTafel');
+      if (tafel) tafel.scrollIntoView({ behavior:'smooth', block:'start' });
+    }
   }
   function galaxySchliesse(){
     if (!galaxyOpenSystem) return;
@@ -59439,6 +59464,16 @@
       buildGalaxyMap();
       save();
     });
+    const tafelZuBtn = document.getElementById('systemTafelZu');
+    if (tafelZuBtn) tafelZuBtn.onclick = () => {
+      galaxySchliesse();
+      // Auf dem Handy steht man beim ✕ typischerweise an der Tafel - zurück zur Karte scrollen,
+      // sonst schaut man nach dem Schließen auf eine Liste, die zur Übersicht gehört.
+      if (window.innerWidth <= 700){
+        const kasten = document.querySelector('#tab-karte .map-wrap');
+        if (kasten) kasten.scrollIntoView({ behavior:'smooth', block:'start' });
+      }
+    };
     const zoomInBtn = document.getElementById('galaxyZoomInBtn');
     if (zoomInBtn) zoomInBtn.onclick = () => zoomBy(1.4);
     const zoomOutBtn = document.getElementById('galaxyZoomOutBtn');
