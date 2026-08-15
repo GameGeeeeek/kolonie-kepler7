@@ -15665,8 +15665,10 @@
       const deckel = g.deckel() * deckelAusbau();
       // Weicher Deckel (v8.468.0): Die Bilanz MUSS dieselbe Funktion nutzen wie die Rechnung -
       // sonst waere sie die zweite Anzeigestelle mit der alten Annahme. `ueberlauf` ist der
-      // Anteil, der frueher verpufft waere; die drei PvP-Toepfe (Angriff, Verteidigung,
-      // Ueberfall-Schutz) haben ihn noch nicht und weisen ihn deshalb mit 0 aus.
+      // Anteil, der frueher verpufft waere. Angriff, Verteidigung und Ueberfall-Schutz waren
+      // davon zunaechst ausgenommen; seit v8.477.0 rufen attackPower/defensePower ebenfalls
+      // deckelWeich, es gilt also fuer ALLE Toepfe hier - der Satz "haben ihn noch nicht" stand
+      // bis v8.507.0 an dieser Stelle und war da schon ein halbes Jahr ueberholt.
       // ACHTUNG: hier weicherDeckel und NICHT deckelWeich - `deckel` ist oben bereits ausgebaut,
       // der Huellenaufruf wuerde den Ausbau ein zweites Mal aufschlagen.
       const weich = weicherDeckel(roh, deckel);
@@ -21490,6 +21492,45 @@
   // p_gesamt = 3p²(1-p) + p³. Bei p=0,14 ergibt das 5,3%, bei p=0,86 ergibt das 94,7% - also
   // praktisch exakt die früheren Grenzen. Wer hier an den Phasen-Deckeln dreht, verschiebt damit
   // auch die Gesamtgrenzen und muss sie neu ausrechnen.
+  /* Die ausgenutzte Schwachstelle wirkt in ZWEI Schritten: 1,25 auf die angezeigte Angriffskraft
+     und zusaetzlich 1,1 auf die Phasenbasis - zusammen also das 1,375-fache auf die Siegchance.
+     BIS ZUM 15.08.2026 stand diese Regel nur in der Kampfaufloesung. Die Vorschauen daneben - die
+     NPC-Karte und die Piratennest-Box - rechneten ohne sie, obwohl der Kommentar an beiden Stellen
+     ausdruecklich "dieselbe Rechnung wie die Aufloesung" versprach. Weil ALLE 18 NPCs und alle
+     zehn Nest-Stufen eine Schwaeche tragen, war das nicht der Sonderfall, sondern der Regelfall:
+     Wer den passenden Schiffstyp mitschickte - also genau das, wozu das Kontersystem erziehen
+     will -, bekam eine zu niedrige Erfolgschance angezeigt und las im Bericht danach eine andere
+     Zahl als auf der Karte. Gemessen am Titan-Waechter (Verteidigung 320, Angriffskraft 320):
+     Vorschau 50%, tatsaechlich 62%.
+     Deshalb steht die Regel jetzt hier, einmal, und beide Seiten rufen sie. */
+  const WEAKNESS_POWER_MULT = 1.25;   // Aufschlag auf die Angriffskraft (steht so auch im Bericht)
+  const WEAKNESS_PHASE_MULT = 1.1;    // zusaetzlicher Aufschlag auf die Phasenbasis
+  const WEAKNESS_NAMEN = { cruiser:'Kreuzer', destroyer:'Zerstörer', jaeger:'Jäger', bomber:'Bomber',
+    schlachtschiff:'Schlachtschiff', superschlachtschiff:'Superschlachtschiff', leerenjaeger:'Leerenjäger' };
+  function weaknessName(k){ return WEAKNESS_NAMEN[k] || shipDisplayName(k); }
+  // Nutzt DIESE Flotte die Schwachstelle DIESES Gegners aus? Jaeger und Bomber zaehlen nur, soweit
+  // sie ueberhaupt starten koennen (Hangarplaetze) - deshalb deployableFighters und nicht der
+  // rohe Bestand.
+  function npcWeaknessAusgenutzt(npc, flotte){
+    if (!npc || !npc.weakness || !flotte) return false;
+    const df = deployableFighters(flotte);
+    const w = npc.weakness;
+    if (w === 'jaeger') return df.jaeger > 0;
+    if (w === 'bomber') return df.bomber > 0;
+    if (w === 'cruiser') return (flotte.cruisers||0) > 0;
+    if (w === 'destroyer') return (flotte.destroyers||0) > 0;
+    if (w === 'schlachtschiff') return (flotte.schlachtschiff||0) > 0;
+    if (w === 'superschlachtschiff') return (flotte.superschlachtschiff||0) > 0;
+    // Riftwaechter (Event-Schiff "Leerenriss-Welle", 18.07.2026) exploitet dieselbe
+    // Leerenjaeger-Schwachstelle - zweiter, frueherer Zugang zum Bonus ohne die
+    // Leerenjaeger-Forschungsvoraussetzung.
+    if (w === 'leerenjaeger') return (flotte.leerenjaeger||0) > 0 || (flotte.riftwaechter||0) > 0;
+    return false;
+  }
+  // Die Grundkraft, mit der die Phasen gewuerfelt werden. Vorschau und Aufloesung rufen sie beide.
+  function weaknessPhasenBasis(powerRoh, ausgenutzt){
+    return powerRoh * (ausgenutzt ? WEAKNESS_POWER_MULT * WEAKNESS_PHASE_MULT : 1);
+  }
   const PHASE_CHANCE_MIN = 0.14, PHASE_CHANCE_MAX = 0.86;
   // Spieler-gegen-Spieler nutzt engere Grenzen als NPC-Kämpfe (gesamt 10% bis 90% statt 5% bis 95%) -
   // gegen einen echten Menschen soll weder ein Übermacht-Angriff sicher sein noch ein hoffnungsloser
@@ -35574,7 +35615,7 @@
       { title:'Enterung – die vierte Phase', body:'Das <strong>Enterschiff</strong> (Event-Schiff des „Piratenüberfalls") kann als einziges Schiff <strong>entern</strong>. Fliegt mindestens eines im Angriff mit und ist der Kampf gegen einen <strong>NPC-Gegner</strong> gewonnen, folgt eine vierte, eigen gewürfelte Phase. Sie läuft gegen den <em>überlebenden</em> Rest der Gegnerflotte – wer knapp gewinnt, hat mehr Widerstand vor sich als wer überrannt hat. <strong>Bei Erfolg</strong> übernimmst du gegnerische Schiffe: zwei Enterschiffe tragen ein Prisenkommando, also einen Kaperplatz (maximal 10 je Kampf). Kaperbar sind nur kleine bis mittlere Klassen bis Bomber – Schlachtschiff, Leerenjäger und Superschlachtschiff lassen sich nicht übernehmen, die Enterung ist keine Abkürzung zu Großschiffen. <strong>Der Preis:</strong> Gekaperte Schiffe fehlen anschließend im <strong>Trümmerfeld</strong> – du tauschst Recycler-Beute gegen Schiffe, es gibt nichts obendrauf. <strong>Bei Fehlschlag</strong> kommen 30% der eingesetzten Enterschiffe nicht zurück. Die Angriffs-Vorschau nennt Chance und Kaperplätze vorher, der Kampfbericht zeigt die Phase einzeln. <strong>Nicht möglich</strong> ist die Enterung gegen andere Spieler (dort rechnet der Server den Kampf allein) und gegen Piratennester (die haben keine modellierte Flotte).' },
       { title:'Prisengut & Prisenhof', body:'Jede geglückte Enterung bringt neben den Schiffen auch <strong>Prisengut</strong> – so viel, wie die gekaperten Schiffe an Punktegewicht wert sind. Es ist die einzige Beute, die man <em>nur</em> übers Entern bekommt, und die einzige Verwendung dafür ist der <strong>Prisenhof</strong> im Flotte-Tab (Unterreiter „Flotte & Verlegen", erscheint, sobald du Enterschiffe besitzt). Drei feste Angebote, bewusst ohne jede Kopplung an deine Produktionsgröße: <strong>Beutegut ausschlachten</strong> (400 Prisengut → 1 Modulfragment; dasselbe Fragment kostet im Kredit-Shop 4.000 Kredite), <strong>Prise verhökern</strong> (25 Prisengut → 200 Kredite, der schnellere aber leicht schlechtere Kurs) und der <strong>Enterhaken-Ausbau</strong> in fünf Stufen (300/700/1.300/2.200/3.500 Prisengut), der dauerhaft je Stufe <strong>+1 Kaperplatz</strong> und <strong>+4 Prozentpunkte</strong> Enterchance gibt. Damit ist Prisengut eine geschlossene Schleife: Es entsteht nur beim Entern und fließt vor allem ins Entern zurück.' },
       { title:'Verteidigungs-Aufstellung', body:'Im Verteidigung-Tab wählst du eine <strong>Aufstellung</strong>, die für alle deine Planeten gilt: <strong>Ausgewogen</strong> (keine Schwerpunkte, wirkt nie), <strong>Schilde vorn</strong> (+15% gegen Bomber, -10% gegen Abfangjäger) oder <strong>Geschütze vorn</strong> (+15% gegen Abfangjäger, -10% gegen Bomber). Sie ist das Gegenstück zur Konterrolle des Angreifers – nur legst du dich fest, <em>ohne</em> zu wissen, wer kommt. Genau das ist der Preis dafür, dass sie überhaupt etwas bringt. Wie die Konter wirkt sie anteilig: Ein einzelner Bomber in einer Abfangjäger-Flotte kippt nichts. Wirkt bei NPC-Überfällen und bei Spieler-Angriffen (dort serverseitig geprüft). Im Kampfbericht steht, wie stark deine Aufstellung gegen die konkrete Angriffsflotte getragen hat.<br><br><strong>Eine erfolgreiche Abwehr wird seit dem 02.08.2026 bezahlt.</strong> Vorher bekam der siegreiche Angreifer 25 Kampfpunkte, der <em>geschlagene</em> Angreifer 3 – und der erfolgreiche Verteidiger nichts. Der Verlierer wurde also besser bezahlt als der Sieger. Jetzt bringt jeder abgewehrte Spielerangriff <strong>5 bis 40 Kommandopunkte</strong>, gestaffelt danach, wie stark der Angriff im Verhältnis zu deiner Verteidigung war: eine chancenlose Belästigung bringt das Minimum, ein knapp gescheiterter Großangriff das Maximum. Bewusst <em>Kommandopunkte</em> und nicht Kampfpunkte – Kampfpunkte gehen in den Punktestand, und eine Verteidigung, die den Rang hebt, wäre über abgesprochene Angriffe farmbar. Damit steht der Offiziersausbau erstmals auch dem Spieler offen, der nie selbst angreift. Die Prämie steht im Kampfbericht, die Zahl der abgewehrten Angriffe in der Kampf-Bilanz im Berichte-Tab.<br><br><strong>Ein durchgebrochener Angriff kostet seit dem 02.08.2026 auch Schiffe.</strong> Bis dahin zerstörte ein Spielerangriff nur Verteidigungs<em>gebäude</em>; die stationierte Flotte blieb unberührt, egal wie hoch man verlor. Jetzt verliert sie bei einem <em>erfolgreichen</em> Angriff rund <strong>6 bis 12,5 %</strong> ihrer Schiffe – die Hälfte des Ressourcenverlusts, dieselbe Regel wie beim NPC-Überfall. Der Verlust trifft <em>jeden</em> Standort mit Flotte, weil auch deine Verteidigungskraft aus allen Standorten zusammen gerechnet wird, und an jedem entsteht ein <strong>Trümmerfeld</strong>, das du mit Recyclern wieder einsammeln kannst. Eine <em>abgewehrte</em> Attacke kostet dich weiterhin kein einziges Schiff. Der Angreifer bekommt von diesen Trümmern nichts – die Änderung ist Abnutzung, kein neuer Beutekanal.' },
-      { title:'Flottenaufbau & Kampfbonus-Deckel', body:'<strong>Flottenaufbau:</strong> Wie gleichmäßig sich die Angriffskraft deiner Flotte über die drei Konterrollen verteilt, gibt bis zu <strong>+8%</strong> Angriffs- UND Verteidigungskraft – volle Prämie bei einer zu Dritteln ausgewogenen Flotte, nichts bei einer reinen Ein-Rollen-Flotte. Gewichtet wird nach Angriffskraft, nicht nach Stückzahl: ein einzelnes Alibi-Schiff macht eine Flotte nicht ausgewogen. Damit hast du eine echte Wahl: <strong>ausgewogen</strong> bringt die sichere Prämie, ist aber konterneutral; <strong>spezialisiert</strong> verzichtet darauf und holt dafür beim richtigen Ziel bis zu +25% Konterbonus (beim falschen -15%). Aufklären lohnt sich also. Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. Bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.' },
+      { title:'Flottenaufbau & Kampfbonus-Deckel', body:'<strong>Flottenaufbau:</strong> Wie gleichmäßig sich die Angriffskraft deiner Flotte über die drei Konterrollen verteilt, gibt bis zu <strong>+8%</strong> Angriffs- UND Verteidigungskraft – volle Prämie bei einer zu Dritteln ausgewogenen Flotte, nichts bei einer reinen Ein-Rollen-Flotte. Gewichtet wird nach Angriffskraft, nicht nach Stückzahl: ein einzelnes Alibi-Schiff macht eine Flotte nicht ausgewogen. Damit hast du eine echte Wahl: <strong>ausgewogen</strong> bringt die sichere Prämie, ist aber konterneutral; <strong>spezialisiert</strong> verzichtet darauf und holt dafür beim richtigen Ziel bis zu +25% Konterbonus (beim falschen -15%). Aufklären lohnt sich also. Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. <strong>Über dem Deckel ist nicht Schluss:</strong> Seit v8.477.0 läuft er weich aus – der erste Punkt darüber zählt noch fast voll, jeder weitere weniger, insgesamt kommen bis zu einem Viertel des Deckels zusätzlich an. Weiter zu investieren lohnt sich also, es lohnt sich nur immer weniger. Der Aufstiegs-Zweig <strong>Verschobene Grenzen</strong> hebt den Deckel zusätzlich um 3% je Stufe.' },
       { title:'Flaggschiff', body:'Im <strong>Offiziere-Tab</strong> baust du dein <strong>einzigartiges Flaggschiff</strong> – ein Kapitalschiff getrennt von der Massenflotte, das nicht zerstört werden kann und keine Slots belegt. Jede Ausbaustufe (max. 20) gibt <strong>+1,5% Angriffs- UND Verteidigungskraft</strong>, die in die gedeckelte Kampf-Bonus-Gruppe einfließt (siehe „Flottenvielfalt & Kampfbonus-Deckel"). Bau und Ausbau kosten Ressourcen + Kredite (steigend je Stufe). Du kannst deinem Flaggschiff einen eigenen Namen geben. Es <strong>überlebt einen Prestige-Reset</strong> (wie Offiziere und Module); erst ein Aufstieg (Transzendenz) setzt es zurück.' },
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.<br><br><strong>Aufklärungsvorteil (seit 01.08.2026):</strong> Frische Aufklärung ist nicht mehr nur Information, sondern ein <strong>echter Kampfvorteil</strong>. Ist dein Bericht über ein Ziel <strong>keine 30 Minuten alt</strong> und wurde dein Späher <strong>nicht entdeckt</strong>, greifst du dieses Ziel mit <strong>+8% Angriffskraft</strong> an. Der Zuschlag steht in der Angriffs-Vorschau und im Spionagebericht ausgewiesen, und der Server rechnet ihn im PvP genauso nach – Vorschau und Kampfergebnis meinen dieselbe Zahl. Zwei Folgen: Wer angreifen will, späht <em>kurz vorher</em> statt irgendwann; und die <strong>Spionageabwehr</strong> des Ziels verteidigt jetzt zweimal – sie schiebt dem ertappten Späher aufgeblähte Verteidigungswerte unter <em>und</em> nimmt dem Angreifer den Zuschlag. Ein <strong>Bündnis mit dem Schattenbund</strong> senkt die Entdeckungschance um 25% bzw. 50% und schützt damit genau diesen Vorteil.<br><br><strong>Nach dem Kampf siehst du ohnehin, was dort stand.</strong> Seit dem 02.08.2026 führt der Bericht eines Spielerangriffs die <strong>Flotte</strong> und die <strong>Verteidigungsanlagen</strong> des Ziels mit – du hast ihnen gegenübergestanden, also stehen sie im Bericht. Die Aufklärung verliert dadurch nichts: Sie klärt <em>vorher</em> auf, also genau dann, wenn die Auskunft die Entscheidung noch beeinflussen kann – und nur sie bringt den +8%-Zuschlag.' },
@@ -35610,7 +35651,7 @@
       { title:'Kopfgeld', body:'Jede Woche liegt ein <strong>Kopfgeld auf dem aktuellen Bestenlisten-Ersten</strong> – dem stärksten Spieler der Galaxie. Wer ihn in dieser Woche als Erster im Kampf schlägt, kassiert eine <strong>Kredit-Prämie</strong> (die Belohnung wird beim nächsten Login gutgeschrieben). Danach ist das Kopfgeld für diese Woche vergeben; ein neues wird zum Wochenwechsel ausgesetzt. Auf sich selbst kann man kein Kopfgeld kassieren. Das aktuelle Kopfgeld siehst du oben im Galaxie-Tab unter „Nachrichten". Bist du selbst der Gejagte, weist dich ein roter Hinweis darauf hin – Zeit, die Verteidigung hochzufahren. Nur mit eigenem Server.' },
       { title:'Angriffs-Schutzschild (Anti-Ganking)', body:'Wirst du erfolgreich <strong>überfallen (mit Beute) oder sabotiert</strong>, erhältst du automatisch einen <strong>Angriffs-Schutzschild für 30 Minuten</strong>: In dieser Zeit prallen weitere Spieler-Angriffe und Störmanöver gegen dich ab (keine Beute, kein Schaden). Das gibt dir Zeit, wieder aufzubauen, statt im Minutentakt weitergefarmt zu werden. <strong>Anfängerschutz:</strong> Frisch registrierte Konten starten zusätzlich mit einem <strong>4 Tage langen Schild</strong>, damit du in Ruhe aufbauen kannst, bevor dich etablierte Spieler angreifen dürfen. Ein aktiver Schild wird oben im <strong>Verteidigung-Tab</strong> mit Countdown angezeigt. <strong>Wichtig:</strong> Sobald du selbst offensiv wirst (ein eigener Angriff oder ein eigenes Störmanöver), verfällt dein Schild sofort – der Schutz ist als Erholung/Startphase gedacht, nicht als Deckung, um selbst gefahrlos zuzuschlagen. Der Schild wird serverseitig vergeben und geprüft.' },
       { title:'Echte NPC-Flotten', body:'NPC-Gegner im Galaxie-Tab haben eine <strong>konkrete Flottenzusammensetzung</strong> (in der Angriffsvorschau sichtbar), deren Gesamt-Angriffskraft ihrem Verteidigungswert entspricht. Bei einem Sieg wird ein Teil dieser Flotte zerstört – je überlegener dein Angriff, desto mehr (40–90%), der Rest flieht. <strong>Das Trümmerfeld entsteht aus den tatsächlich zerstörten Gegner-Schiffen</strong> (dieselbe Formel wie bei allen anderen Kämpfen) statt aus einer Pauschale – schwere Gegner-Schiffe hinterlassen entsprechend mehr Trümmer. Nach jedem Sieg formiert sich der Gegner neu und stärker (Skalierung).' },
-      { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln.' },
+      { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln. Der Deckel ist dabei <strong>weich</strong>: Was darüber liegt, verpufft nicht, sondern läuft aus - bis zu einem Viertel des Deckels kommt zusätzlich an. Und er ist <strong>verschiebbar</strong>: Der Aufstiegs-Zweig „Verschobene Grenzen" hebt ihn um 3% je Stufe. Was für dich gilt, steht in der Boni-Bilanz im Fortschritt-Tab und in der Kampfbonus-Übersicht im Offiziere-Tab.' },
       { title:'Verteidigungsbunker – reine Flächenverteidigung', body:'Der <strong>Verteidigungsbunker</strong> (ab Schildmatrix-Forschung, Verteidigung-Tab) hat mit 135 Verteidigungspunkten den höchsten Wert aller regulären Verteidigungsgebäude - noch vor der Void-Barriere (110). Wie diese trägt er keine eigene Angriffskraft, sondern dient rein dem Schutz der Basis. Die spezielle, itemgebundene Kristallfestung (350 Verteidigung, 190 Angriff je Stufe) übertrifft ihn deutlich - passend zur Seltenheit des dafür nötigen Kristallherzens (0,6% Fundchance je Erkundung, dieselbe Seltenheit wie der Antimateriekern des Superschlachtschiffs).' },
       { title:'Schutz für schwächere Spieler', body:'Ist dein Punktestand mehr als <strong>3x</strong> so hoch wie der eines Ziels, sinkt deine Beute bei einem erfolgreichen Angriff anteilig (nie unter 30%). Ab <strong>5x</strong> Unterschied ist der Angriff komplett blockiert - du kannst dann gar nicht mehr angreifen, egal wie stark deine Flotte ist. Verhindert, dass weit entwickelte Accounts neue Spieler grundlos plattmachen.' },
       { title:'Tresor: Ressourcenschutz bei Überfällen', body:'Ein erfolgreicher NPC-Überfall stiehlt normalerweise 5-50% jeder Ressource (abhängig von Angriffs-/Verteidigungskraft, weiter gesenkt durch Notfallprotokolle-Forschung, Allianz-Grenzbollwerk und Module). Der <strong>Tresor</strong> (Gebäude, benötigt Notfallprotokolle-Forschung) schützt zusätzlich <strong>400 jeder Ressource pro Stufe</strong> komplett vor diesem Verlust, unabhängig vom Prozentsatz - nur der Überschuss darüber hinaus ist noch gefährdet. Da Ressourcen über alle Planeten hinweg gemeinsam verwaltet werden, zählt die Summe aller deiner Tresore, egal welcher Planet gerade angegriffen wird.' },
@@ -36435,8 +36476,7 @@
           if (r.destroyedNpcShips && Object.keys(r.destroyedNpcShips).length) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#5dcaa5;"></i> Zerstörte Gegner-Schiffe: '+shipCountRowHtml(r.destroyedNpcShips, true)+' (Rest ist geflohen)';
         }
         if (r.weaknessType){
-          const weaknessNameMap = { cruiser:'Kreuzer', destroyer:'Zerstörer', jaeger:'Jäger', bomber:'Bomber', schlachtschiff:'Schlachtschiff', superschlachtschiff:'Superschlachtschiff', leerenjaeger:'Leerenjäger' };
-          body += '<br>Schwachstelle des Gegners: '+(weaknessNameMap[r.weaknessType]||shipDisplayName(r.weaknessType))+(r.hasWeakness?' (ausgenutzt, +25% Angriffskraft)':' (nicht mitgeführt)');
+          body += '<br>Schwachstelle des Gegners: '+weaknessName(r.weaknessType)+(r.hasWeakness?' (ausgenutzt, +25% Angriffskraft)':' (nicht mitgeführt)');
         }
         body += markReportLine(r.marken, r.markAtkShare);
         body += counterReportLine(r.counterMult);
@@ -47510,20 +47550,12 @@
           // selbst. Nur für Anzeige/Bericht wird der einfach gewichtete Wert mitgeführt.
           const powerRoh = power;
           power = Math.round(power * npcCounterMult);
-          const df = deployableFighters(fleet);
-          const hasWeakness = (npc.weakness==='jaeger' && df.jaeger>0) || (npc.weakness==='bomber' && df.bomber>0) ||
-            (npc.weakness==='cruiser' && fleet.cruisers>0) || (npc.weakness==='destroyer' && (fleet.destroyers||0)>0) ||
-            (npc.weakness==='schlachtschiff' && (fleet.schlachtschiff||0)>0) ||
-            (npc.weakness==='superschlachtschiff' && (fleet.superschlachtschiff||0)>0) ||
-            // Riftwächter (Event-Schiff "Leerenriss-Welle", 18.07.2026) exploitet dieselbe
-            // Leerenjäger-Schwachstelle - zweiter, früherer Zugang zum Bonus ohne die Leerenjäger-
-            // Forschungsvoraussetzung.
-            (npc.weakness==='leerenjaeger' && ((fleet.leerenjaeger||0)>0 || (fleet.riftwaechter||0)>0));
-          if (hasWeakness) power *= 1.25;
+          const hasWeakness = npcWeaknessAusgenutzt(npc, fleet);
+          if (hasWeakness) power *= WEAKNESS_POWER_MULT;
           // Kampfphasen (25.07.2026): drei Wuerfe mit unterschiedlicher Kontergewichtung statt
           // einem. Die ausgenutzte Schwachstelle wirkt weiterhin als flacher Aufschlag auf die
           // Grundkraft - sie beschreibt eine Luecke des Gegners, keine Zusammensetzungsfrage.
-          const phasenBasis = powerRoh * (hasWeakness ? 1.25 : 1) * (hasWeakness ? 1.1 : 1);
+          const phasenBasis = weaknessPhasenBasis(powerRoh, hasWeakness);
           const phasenErgebnis = resolveBattlePhases(phasenBasis, effDefense, npcCounterMult);
           const chance = battleWinChance(phasenBasis, effDefense, npcCounterMult);
           const success = phasenErgebnis.success;
@@ -56323,22 +56355,35 @@
         const pk = state.activeBasePlanet;
         const atkRaw = attackCombatBonusRaw(pk);
         const defRaw = defenseCombatBonusRaw(pk);
+        /* Dieselbe Rechnung wie attackPower/defensePower, nicht eine zweite: deckelWeich(roh, 1.0)
+           = weicherDeckel(roh, 1.0 * deckelAusbau()). Bis v8.507.0 stand hier Math.min(100, ...)
+           gegen einen festen 100%-Deckel - der Balken blieb bei 100% stehen, obwohl der Aufstieg
+           ("Verschobene Grenzen") die Grenze laengst verschoben hatte, und die Zeile darunter
+           behauptete, weitere Investition wirke nicht mehr. Sie wirkt: Oberhalb des Deckels laeuft
+           der Bonus weich aus statt abzuschneiden.
+           ACHTUNG wie in der Boni-Bilanz: hier weicherDeckel und NICHT deckelWeich - `deckel` ist
+           bereits ausgebaut, der Huellenaufruf schlueg den Ausbau ein zweites Mal auf. */
         const capRow = (label, raw, color) => {
-          const pct = Math.min(100, Math.round(raw*100));
-          const capped = raw >= 1.0;
+          const deckel = 1.0 * deckelAusbau();
+          const wirksam = weicherDeckel(raw, deckel);
+          const ueberlauf = Math.max(0, wirksam - Math.min(raw, deckel));
+          const pct = Math.round(raw*100);
+          const deckelPct = Math.round(deckel*100);
+          const balken = Math.max(0, Math.min(100, Math.round(deckel > 0 ? raw/deckel*100 : 0)));
+          const drueber = raw > deckel;
           return `<div style="margin-bottom:${label==='Angriffsbonus'?'10px':'0'};">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <span class="bmeta">${label}${capped?' <span style="color:#e0a548;">(Deckel erreicht!)</span>':''}</span>
-              <span class="lvl-pill" style="background:rgba(${color},0.18); color:rgb(${color});">${pct}% von 100%</span>
+              <span class="bmeta">${label}${drueber?` <span style="color:#e0a548;">(über der Obergrenze – der Überlauf bringt noch +${Math.round(ueberlauf*100)}%)</span>`:''}</span>
+              <span class="lvl-pill" style="background:rgba(${color},0.18); color:rgb(${color});">${pct}% von ${deckelPct}%</span>
             </div>
-            <div class="progress-outer"><div class="progress-inner" style="width:${pct}%; background:rgb(${color});"></div></div>
+            <div class="progress-outer"><div class="progress-inner" style="width:${balken}%; background:rgb(${color});"></div></div>
           </div>`;
         };
         setBoxHtml(combatBonusCapBox, 'combatBonusCapBox', `<div class="card-row" style="flex-direction:column; align-items:stretch;">
           <div class="bname" style="margin-bottom:8px; font-size:12.5px;"><i class="ti ti-sword" aria-hidden="true"></i> Kampfbonus-Übersicht (${planetDisplayName(pk)})</div>
           ${capRow('Angriffsbonus', atkRaw, '226,75,74')}
           ${capRow('Verteidigungsbonus', defRaw, '93,202,165')}
-          <div class="bmeta" style="margin-top:8px; font-size:11px;">Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module und Allianz-Techs speisen zusammen diesen gedeckelten Topf - bei 100% wirkt weitere Investition in diese Quellen nicht mehr zusätzlich auf die Kampfkraft.</div>
+          <div class="bmeta" style="margin-top:8px; font-size:11px;">Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module und Allianz-Techs speisen zusammen diesen gedeckelten Topf. Über der Obergrenze ist nicht Schluss: Der erste Punkt darüber zählt noch fast voll, jeder weitere weniger, insgesamt kommen bis zu einem Viertel der Obergrenze zusätzlich an. Der Aufstiegs-Zweig „Verschobene Grenzen" hebt die Obergrenze selbst um 3% je Stufe – deshalb steht rechts dein Deckel und nicht pauschal 100%.</div>
         </div>`);
       }
       renderFlagship();
@@ -57048,8 +57093,12 @@
       const plSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(plAttackFleet[k]||0),0);
       const plPower = attackPower(plAttackFleet, state.activeBasePlanet);
       // Gleiche Rechnung wie die Auflösung (Phasen, Konter neutral) - sonst weicht die
-      // angezeigte Siegchance vom tatsächlichen Kampf ab.
-      const plChance = plSelected > 0 ? battleWinChance(plPower, lairDef, 1) : 0;
+      // angezeigte Siegchance vom tatsächlichen Kampf ab. Der Schwachstellen-Aufschlag gehoert
+      // dazu: Die Aufloesung rechnet ihn seit den Kampfphasen mit, diese Zeile bis v8.507.0 nicht.
+      const plSchwaeche = pirateLairWeakness(stage);
+      const plSchwaecheGenutzt = fleetHasShipType(plAttackFleet, plSchwaeche);
+      const plPhasenBasis = weaknessPhasenBasis(plPower, plSchwaecheGenutzt);
+      const plChance = plSelected > 0 ? battleWinChance(plPhasenBasis, lairDef, 1) : 0;
       const plBusy = cf.missions.some(m=>m.type==='piratelair');
       const plLoot = pirateLairLoot(stage);
       const plCan = !plBusy && plSelected > 0;
@@ -57062,7 +57111,8 @@
             <span class="lvl-pill">Stärke ${fmt(lairDef)}</span>
           </div>
           <div class="bmeta" style="margin-bottom:4px;">Sieg: ~${fmt(plLoot.erz)} Erz, ${fmt(plLoot.kristalle)} Kristalle, ${fmt(plLoot.deuterium)} Deuterium (Frachter nötig!) · +${30+stage*20} Kredite · +${5+stage*3} Kampfpunkte · ${stage>=PIRATE_LAIR_MAX_STAGE?'garantiertes Modul + 500 Bonus-Kredite + Ketten-Neustart mit dauerhaftem Angriffsbonus':Math.round((0.10+stage*0.02)*100)+'% Modul-Chance'}${prestigeNote}</div>
-          <div class="bmeta" style="margin-bottom:6px;">Niederlage: 20-35% Flottenverluste, Stufe bleibt. ${plSelected>0?'Deine Angriffsflotte: Kraft '+fmt(plPower)+' → Siegchance ~'+Math.round(plChance*100)+'%':'Stelle unten eine Angriffsflotte zusammen.'}</div>
+          <div class="bmeta" style="margin-bottom:6px;">Niederlage: 20-35% Flottenverluste, Stufe bleibt. ${plSelected>0?'Deine Angriffsflotte: Kraft '+fmt(Math.round(plPower*(plSchwaecheGenutzt?WEAKNESS_POWER_MULT:1)))+' → Siegchance ~'+Math.round(plChance*100)+'%':'Stelle unten eine Angriffsflotte zusammen.'}</div>
+          <div class="bmeta" style="margin-bottom:6px; color:${plSchwaecheGenutzt?'#5dcaa5':'#7d8199'};"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle dieser Stufe: ${weaknessName(plSchwaeche)}${plSchwaecheGenutzt?' – ausgenutzt (+25% Angriffskraft, bereits eingerechnet)':' – nicht mitgeführt'}</div>
           <button data-attack-lair ${plCan?'':'disabled'}>${plBusy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Versteck angreifen'}</button>
         </div>`);
       const lairBtn = pirateLairBox.querySelector('[data-attack-lair]');
@@ -57086,13 +57136,16 @@
       const npcFleetPreview = npcFleetFor(n).fleet;
       const npcCounterPreview = counterMultiplier(attackFleet, npcFleetPreview);
       const powerRohPreview = attackPower(attackFleet);
-      const power = Math.round(powerRohPreview * npcCounterPreview);
+      // Schwachstelle: dieselbe Pruefung und dieselbe Phasenbasis wie die Aufloesung - sie ist der
+      // Grund, warum diese Karte bis v8.507.0 zu niedrige Chancen nannte.
+      const schwaecheGenutzt = npcWeaknessAusgenutzt(n, attackFleet);
+      const power = Math.round(powerRohPreview * npcCounterPreview * (schwaecheGenutzt ? WEAKNESS_POWER_MULT : 1));
       const effDefense = npcEffectiveDefense(n);
       const effLoot = npcEffectiveLoot(n);
       const wins = npcScalingCount(n.id);
       // Dieselbe Rechnung wie die Auflösung (resolveBattlePhases/battleWinChance) - "zwei von drei
       // Phasen" ergibt eine andere Zahl als ein einzelner Wurf, und die Karte muss die echte nennen.
-      const chance = Math.round(battleWinChance(powerRohPreview, effDefense, npcCounterPreview)*100);
+      const chance = Math.round(battleWinChance(weaknessPhasenBasis(powerRohPreview, schwaecheGenutzt), effDefense, npcCounterPreview)*100);
       const flightTime = missionDurationFor(n.duration, attackFleet, ATTACK_SHIP_KEYS, n.system);
       const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
       const atkCargoCapacity = fleetCargoCapacity(attackFleet);
@@ -57128,6 +57181,7 @@
               <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
               ${kv && npcCounterPreview !== 1 ? `<div class="bmeta" style="color:${kv.farbe};"><i class="ti ${kv.icon}" aria-hidden="true"></i> ${kv.text} (${kv.pct>0?'+':''}${kv.pct}% Angriffskraft)</div>` : ''}
+              ${n.weakness ? `<div class="bmeta" style="color:${schwaecheGenutzt?'#5dcaa5':'#7d8199'};"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle: ${weaknessName(n.weakness)}${schwaecheGenutzt?' – ausgenutzt (+25% Angriffskraft, bereits eingerechnet)':' – nicht mitgeführt'}</div>` : ''}
               ${markenPreview ? `<div class="bmeta" style="color:#f0b556;"><i class="ti ti-arrow-up" aria-hidden="true"></i> Werftmarken: ${Object.entries(markenPreview).sort((x,y)=>y[1]-x[1]).map(([k,mk])=>shipDisplayName(k)+' Mk '+SHIP_MARK_ROMAN[mk-1]).join(', ')}${markAnteilPreview>0?` (+${(Math.round(markAnteilPreview*1000)/10).toString().replace('.',',')}% Angriffskraft, bereits eingerechnet)`:''}</div>` : ''}
               ${enterZeile}
               <div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(flightTime)} Flugzeit · ${fuelCostIconHtml(atkFuel)} Treibstoff${!canAfford(atkFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>
