@@ -54,6 +54,12 @@ ist. Sie gelten ab sofort, nicht als Empfehlung. **Diese Liste ist fortlaufend**
 künftigen Sitzungen) einen eigenen Fehler macht, der eine übertragbare Regel hergibt, trägt ihn
 hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
 
+**Und nicht nur Fehler (ausdrücklicher Wunsch von Sascha, 16.08.2026: „Speichere alles immer in
+Claude md"):** Auch Architektur-Entscheidungen, neue Muster und der jeweils gültige Stand größerer
+Umbauten gehören NOCH IN DERSELBEN SESSION hierher – nicht erst auf Nachfrage. Was nur im
+Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtnis des Projekts
+(genau so, wie die Tests seit dem 25.07.2026 ins Repo gehören statt ins Scratchpad).
+
 **Tests:**
 1. **Jeder neue Test braucht eine Gegenprobe, und sie wird in BEIDE Richtungen ausgeführt** –
    grün am neuen Stand, rot am alten (per `git show HEAD:datei` oder gezielt kaputtgemachter
@@ -462,6 +468,32 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     `new Function` mit einem Mini-Fixture gefahren und gemessen, dass Abgrund-Modul und Unikat
     abgelehnt werden und ein normales Modul entsteht. „Der Code sieht gleich aus" ist kein Beleg.
 
+44. **Wird ein MODUS abgeschaltet, ist der tote Zweig kein totes Gewicht, sondern ein Inventar –
+    dort leben Inhalte und Aufräumarbeiten, die sonst NIRGENDS existieren.** Vorfall 16.08.2026,
+    dreimal in EINER Etappe (KB-4, „nur noch die Sektoren-Karte"): (a) Sämtliche Knoten-Extras der
+    Galaxie-Übersicht (Ereignis-Abzeichen 🏴‍☠️👽⚔️🏰, Aufklärung 🔎📡, Fraktions-Wappen,
+    Kontroll-Ring, Kollaps, Randkriege-Balken) lebten NUR im Übersichts-Zweig des
+    Freiflug-Renderers – der „offen"-Zweig zeichnet Nachbarn als nackte Punkte – und wären mit dem
+    Abschalten still aus dem Spiel verschwunden (gefunden von test_karte_ebenen 1b: Abzeichen weg,
+    Territorium noch da); (b) die Frontsegmente hingen an `if (!offen)` und wären tot gewesen;
+    (c) buildMap() versteckt nebenbei die ◀/▶-Tafelzeile samt ✕ – im Sektor-Zweig läuft buildMap
+    nie, die Zeile blieb nach dem Schließen sichtbar stehen (test_karte_mobil 3). **Vorgehen:**
+    Nach dem Abschalten eines Modus alle Bedingungen auf den Moduszustand greppen (`!offen`,
+    `uiX &&`, `galaxyOpenSystem`) und je Zweig ZWEI Fragen stellen: Welcher INHALT lebt nur hier –
+    und welche AUFRÄUMARBEIT (style.display-Rückstellung, Handler-Abbau) lief nur hier? Portiertes
+    gehört in EINE gemeinsame Quelle für beide Renderer (karteSystemBadges/karteFrontStand), nicht
+    in eine zweite Kopie.
+45. **Der Betroffenheits-Sweep über die Tests greppt nach dem DOM-MERKMAL, nicht nach dem
+    Container – und nach den QUELLTEXT-Ankern, die der Umbau entfernt.** Aus derselben Etappe:
+    Gesucht wurde nach `galaxyMapSvg|buildGalaxyMap` – sechs Bergbau-/Peilungs-Tests klicken aber
+    nur `[data-system-node="…"]`, ohne den Container je zu nennen; der volle Prüflauf fiel nach
+    Minuten an test_abbaumission und war verloren (~25 Min). Ein zweiter Lauf fiel an einer
+    Erwartung, die eine BEWUSSTE Verhaltensänderung derselben Etappe noch verneinte
+    (test_sektoransicht: „Ebenen-Leiste zu") – wer ein Verhalten absichtlich ändert, sucht sofort
+    nach Tests, die das ALTE Verhalten als Regel prüfen (`grep -ln "eiste" tests/*.js`), nicht erst
+    nach dem Fehlschlag. Dieselbe Familie wie Regel 32/40: Eine zu enge Suche ist kein Beweis –
+    hier kostet sie je einen vollen Lauf.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
@@ -579,6 +611,7 @@ Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:befor
 - Backend-Kommunikation optional (`useBackend()`) – Solo-Modus funktioniert ohne Server, Allianzen/Markt/Weltboss brauchen ihn
 - Geteilter Speicher (Allianzen, Markt, Weltboss) läuft über generische `storageGet/storageSet/storageList`-Aufrufe gegen das Backend, mit Schlüsselpräfixen wie `alliance:<TAG>:...`
 - Rendering: kein virtuelles DOM, direktes `innerHTML`-Neuschreiben pro Box, getriggert vom Haupt-Tick (1×/Sekunde) und bei Nutzeraktionen
+- **Die Sektoren-Karte ist seit KB-4 (16.08.2026, Auftrag Sascha: „Es soll nur noch die Sektoren Modus Karte geben") die EINZIGE Karte.** Feste Ansichten: Übersicht (8 Regionen, `SEKTOR_DEFS`/`sektorVon`) → Sektoransicht (`sektorAnsichtBauen`, daumengroße Plätze, freie Gürtelfelder) → aufgeklapptes System → Gürtelansicht. Die frühere Freiflug-Zeichnung in `buildGalaxyMap` ist **nicht tot** – sie ist der Renderer der GEÖFFNETEN Systemebene (`galaxyOpenSystem`) samt Zoom/Pan, Kartenmenü, Routen, Territorien, Wurmloch, Frontsegmenten. Die Einstellung `uiSektorKarte` existiert nicht mehr (altes Feld im Spielstand ist inert). Knoten-Extras (Abzeichen, Fraktions-Wappen/-Ring, Kontroll-Ring, Kollaps, Randkriege-Balken) kommen für BEIDE Renderer aus `karteSystemBadges()`/`karteFrontStand()` – wer dort etwas ergänzt, versorgt automatisch beide (Regel 44). Die Ebenen-Leiste wirkt und erscheint auch in der Sektoransicht; nur der Routen-Knopf gehört der Systemebene (dort verborgen = keine Falschaussage). `galaxyOeffne` merkt sich die Region des Systems – jeder Sprung (Suchfeld, Berichte-Knöpfe, Allianz) landet beim Schließen in der richtigen Sektoransicht. Browser-SEITEN-Zoom ist abgestellt (Viewport-Meta `maximum-scale=1`/`user-scalable=no`, `touch-action:manipulation` auf html/body, `gesturestart`-Abfang für iOS) – der Karten-Zoom lebt im Spiel. **Tests navigieren über `tests/lib/karte.js`** (`oeffneSystemUeberSektoren`/`oeffneSektorMitSystem` – Spielerweg per DOM-Klicks, Region wird nie geraten, wartet die Kamerafahrt samt Folge-Tick ab).
 - **Signatur-Cache-Muster für `render*Box()`-Funktionen ohne Live-Countdown**: `let lastXSig = null;` vor der Funktion, am Anfang eine Signatur aus allen angezeigten Werten bilden, bei Gleichheit zum Vorlauf `return` statt `innerHTML` neu zu schreiben (Beispiele: `renderAllianceBaseHero`, `renderDominance`, `renderGalaxyNews`, `renderReportsBox`, `renderAllianceTitlesBox`/`renderAllianceSkinsBox`, `renderDailyLoginBox`, `renderFpAllianceDonation`, `renderFpLeaderboard`). **Nur anwenden, wenn die Box KEINEN Live-Countdown (`Date.now()`-Differenz, die sichtbar hochzählt) enthält** – sonst würde die Anzeige sichtbar einfrieren (bewusst NICHT angewendet auf `renderAutoExploreTourBox`, `renderAbhorchpostenBox`, `renderFactions`/`renderMarket`/`renderTradeRoutes`, die stattdessen `isTypingIn()` nutzen). Neue `render*Box()`-Funktionen ohne Countdown sollten dieses Muster von Anfang an übernehmen statt jeden Tick blind neu aufzubauen.
 - **`setBoxHtml(box, schluessel, html)` – die Variante mit MARKUP-Signatur (seit v8.310.0)**, für große Listen, die im Haupt-Tick per `innerHTML` neu geschrieben werden. Statt einer Wertliste ist die Signatur das fertige Markup. Zwei Folgen: (a) Sie kann nicht unvollständig sein – kein neu hinzugekommenes Anzeigefeld kann sie stillschweigend veralten lassen, was bei einer Wertliste die typische Falle ist; (b) **die Countdown-Einschränkung von oben gilt hier NICHT** – läuft ein Countdown, ist das Markup jede Sekunde ein anderes und die Box wird neu geschrieben, läuft keiner, steht sie still. Die Prüfung ist selbstkorrigierend. Der Aufbau der Zeichenkette ist billig; teuer sind `innerHTML` und die anschließenden `querySelectorAll`-Verdrahtungsläufe, und genau die entfallen. Angewandt auf `#research` (73,9 kB), `#buildings` (27,7 kB), `#defenseBuildings` (21,3 kB), `#planetRoleBox` (3,9 kB) – zusammen rund 127 kB Markup pro Sekunde. `childElementCount` als zweite Bedingung im Helfer: Räumt irgendwer die Box von außen leer, muss der Neuaufbau trotz gleicher Signatur laufen. **Vor jeder neuen Anwendung prüfen, WO die Klick-Handler gesetzt werden**: Laufen sie im selben Zweig wie das Schreiben (wie bei den Modul-Boxen), sind sie nach einem übersprungenen Tick nicht neu gesetzt – das geht gut, weil die alten Knoten samt Handler stehen bleiben, muss aber getestet werden (`tests/test_modulbox_cache.js`, `tests/test_listen_cache.js` klicken beide nach mehreren übersprungenen Sekunden). **Messen statt schätzen**: Welche Box wirklich jeden Tick neu geschrieben wird, zeigt ein `MutationObserver` auf `document.body` mit `childList:true, subtree:true`, der die Treffer je Ziel-Element zählt – die statische Suche nach `render*`-Funktionen übersieht die großen Listen, weil die gar keine eigenen Funktionen sind, sondern inline im Haupt-Tick stehen.
 - **Sichtbarkeits-Gate für reines Anzeige-Polling**: `setInterval`s, die nur Daten zum ANZEIGEN nachladen (Bestenliste, Berichte, Nachrichten, Galaxie-Zustand, Allianzbasis-Kriegszustand/Spenden-Rangliste, Versions-Check), prüfen `document.visibilityState === 'visible'`, bevor sie feuern – spart Server-Anfragen/Akku im Hintergrund-Tab. **Bewusst NICHT** auf Timer mit echter Spielmechanik angewendet (`maybeScheduleRaid`, `maybeSchedulePirateDebrisRaid`, `maybeSpawnVoidRift`, `maybeSpawnTrader`, `refreshAllianceMusterAttack`) – deren Timing soll auch im Hintergrund-Tab real weiterlaufen.

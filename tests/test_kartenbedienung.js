@@ -14,6 +14,7 @@
 //   rot:   git show HEAD~1:weltraum_kolonie.html > /tmp/alt.html
 //          KEPLER_TESTDATEI=file:///tmp/alt.html node tests/test_kartenbedienung.js
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -72,6 +73,9 @@ function backend(store) {
   const svgDa = await page.evaluate(() => !!document.getElementById('galaxyMapSvg'));
   check('0-vorab: Karte vorhanden', svgDa);
   if (!svgDa) return ende(async () => browser.close());
+  // Seit KB-4 gelten Zoomen/Verschieben nur in der geöffneten Systemebene - dorthin navigieren
+  // (Übersicht -> Region -> System), alle Bedienungs-Prüfungen laufen dort.
+  await oeffneSystemUeberSektoren(page, 'kepler');
 
   // ---- 1) Ausschnitt und Kasten haben dasselbe Seitenverhältnis --------------------------------
   const verh = await page.evaluate(() => {
@@ -157,28 +161,18 @@ function backend(store) {
   check('3: 15 Zeigerbewegungen schreiben die Karte kein einziges Mal neu',
     bau.neuschriebe === 0, bau);
 
-  // ---- 4) Zurücksetzen zeigt den belegten Bereich ------------------------------------------------
+  // ---- 4) Zurücksetzen schält eine Ebene nach außen (seit KB-4: System -> Sektoransicht) --------
   const reset = await page.evaluate(async () => {
     const b = document.getElementById('galaxyZoomResetBtn');
     if (b) b.click();
-    await new Promise(r => setTimeout(r, 400));
-    const svg = document.getElementById('galaxyMapSvg');
-    const vb = svg.getAttribute('viewBox').split(/\s+/).map(Number);
-    // Umschließt der Ausschnitt alle sichtbaren Knoten?
-    const r2 = svg.getBoundingClientRect();
-    let drin = 0, gesamt = 0;
-    svg.querySelectorAll('[data-system-node]').forEach(n => {
-      const bb = n.getBoundingClientRect();
-      gesamt++;
-      if (bb.x >= r2.x - 2 && bb.x + bb.width <= r2.x + r2.width + 2
-        && bb.y >= r2.y - 2 && bb.y + bb.height <= r2.y + r2.height + 2) drin++;
-    });
-    return { breite: vb[2], drin, gesamt };
+    await new Promise(r => setTimeout(r, 1400));
+    return { ebene: !!document.getElementById('galaxySystemLayer'),
+             sektorSys: document.querySelectorAll('#galaxyMapSvg [data-sektor-sys]').length };
   });
-  check('4a: Zurücksetzen zoomt nicht auf das volle Feld heraus', reset.breite < 900,
-    { ausschnittBreite: reset.breite, vollesFeld: 950 });
-  check('4b: nach dem Zurücksetzen sind alle Systeme im Bild',
-    reset.gesamt > 0 && reset.drin === reset.gesamt, reset);
+  check('4: Zurücksetzen schließt das System und führt in die Sektoransicht',
+    !reset.ebene && reset.sektorSys >= 1, reset);
+  // Für die Rad-Prüfungen wieder hinein ins System.
+  await oeffneSystemUeberSektoren(page, 'kepler');
 
   // ---- 5) Rad hält die Seite nicht mehr fest ------------------------------------------------------
   const rad = await page.evaluate(async () => {

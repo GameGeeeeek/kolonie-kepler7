@@ -1,7 +1,8 @@
-// Ebenen-Leiste der Sektorkarte (Etappe B-5, v8.502.0): drei schaltbare Zeichen-Ebenen der
-// Galaxie-Übersicht - Fraktionen (Territorium-Flächen), Ereignisse (Piratenbasis/Aliens/Krieg +
-// Wurmloch), Aufklärung (Spähberichte/Peilungen). Vorgabe alles an; die Auswahl wird im
-// Spielstand gespeichert (state.karteEbenen).
+// Ebenen-Leiste der Sektorkarte (Etappe B-5, v8.502.0; seit KB-4b auch in der Sektoransicht):
+// schaltbare Zeichen-Ebenen - Fraktionen (Ring/Wappen in der Sektoransicht, Territorium-Flächen
+// in der Systemebene), Ereignisse (Piratenbasis/Aliens/Krieg), Aufklärung (Spähberichte/
+// Peilungen). Routen zeichnet nur die Systemebene, ihr Knopf ist in der Sektoransicht verborgen.
+// Vorgabe alles an; die Auswahl wird im Spielstand gespeichert (state.karteEbenen).
 //
 // GEGENPROBE (beide Richtungen gefahren, Hausregel 1):
 //   grün:  node tests/test_karte_ebenen.js
@@ -14,6 +15,7 @@
 // heißt <g class="terr-<fid>">. Piratenbasis-Abzeichen 🏴‍☠️ hängt an
 // galaxyCache.activePirateFaction.system, Krieg ⚔️ an activeWar.system.
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { oeffneSektorMitSystem } = require('./lib/karte');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -24,11 +26,11 @@ function backend(store) {
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok: true });
     if (p === 'me') return j({ userId: 'u', username: 'A', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0 });
-    // Alle drei Ebenen haben etwas zu zeigen: Kartell-Territorium um vega, Piratenbasis in vega,
-    // Krieg in orion. Aufklärung kommt aus dem Spielstand (spyIntel), nicht vom Server.
+    // Alle Ebenen zeigen an EINEM Knoten etwas: Kartell besitzt vega (Ring/Wappen/Fläche),
+    // Piratenbasis und Krieg ebenfalls in vega - so genügt die Sektoransicht der vega-Region.
     if (p === 'galaxy') return j({ npcEmpireStrength: 1, marketTrend: 1,
       activePirateFaction: { system: 'vega', name: 'Testpiraten' },
-      unlockedAlienRaces: [], activeWar: { system: 'orion', factionA: 'Kartell', factionB: 'Legion' },
+      unlockedAlienRaces: [], activeWar: { system: 'vega', factionA: 'Kartell', factionB: 'Legion' },
       collapsedSystems: {}, activeWormhole: null, news: [], controlledSystems: {},
       factions: { kartell: { id: 'kartell', name: 'Das Kartell', color: '#e0a548', systems: ['vega'] } } });
     if (p.startsWith('storage/')) {
@@ -71,45 +73,57 @@ function backend(store) {
   });
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
   await page.waitForTimeout(1800);
+  // Seit KB-4b leben Abzeichen und Fraktions-Markierungen in der SEKTORANSICHT - dorthin
+  // navigieren, wo der Fixture-Knoten (vega) liegt.
+  const sektorDa = await oeffneSektorMitSystem(page, 'vega');
+  await page.waitForTimeout(800);
 
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
+  check('0-vorab: die Sektoransicht mit vega steht', sektorDa === true, { sektorDa });
 
   const messung = () => page.evaluate(() => {
     const svg = document.getElementById('galaxyMapSvg');
+    const leiste = document.getElementById('karteEbenenLeiste');
     const knopf = k => {
-      const b = document.querySelector('#karteEbenenLeiste [data-karte-ebene="' + k + '"]');
-      return b ? { da: true, an: b.classList.contains('active') } : { da: false };
+      const b = leiste && leiste.querySelector('[data-karte-ebene="' + k + '"]');
+      return b ? { da: true, an: b.classList.contains('active'), sichtbar: b.style.display !== 'none' } : { da: false };
     };
     return {
+      leisteSichtbar: !!leiste && leiste.style.display !== 'none',
       terr: !!svg.querySelector('g.terr-kartell'),
+      ring: !!svg.querySelector('[data-ring="fraktion"]'),
+      wappen: svg.innerHTML.includes('viewBox="0 0 100 100"'),
       pirat: svg.textContent.includes('🏴'),
       krieg: svg.textContent.includes('⚔'),
+      routen: knopf('routen'),
       fraktionen: knopf('fraktionen'), ereignisse: knopf('ereignisse'), aufklaerung: knopf('aufklaerung')
     };
   });
 
-  // ---- 1) Vorgabe: Leiste da, alle drei an, alle Ebenen sichtbar ------------------------------
+  // ---- 1) Vorgabe: Leiste sichtbar, alle drei an, Routen-Knopf verborgen ----------------------
   const vorgabe = await messung();
-  check('1: die Ebenen-Leiste existiert und alle drei Knöpfe stehen auf AN',
-    vorgabe.fraktionen.da && vorgabe.fraktionen.an && vorgabe.ereignisse.an && vorgabe.aufklaerung.an, vorgabe);
+  check('1: die Ebenen-Leiste ist in der Sektoransicht sichtbar und alle drei Knöpfe stehen auf AN',
+    vorgabe.leisteSichtbar && vorgabe.fraktionen.da && vorgabe.fraktionen.an && vorgabe.ereignisse.an && vorgabe.aufklaerung.an, vorgabe);
   if (!vorgabe.fraktionen.da) return ende(async () => browser.close());
-  check('1b: mit allem an zeigt die Karte Territorium, Piratenbasis und Krieg',
-    vorgabe.terr && vorgabe.pirat && vorgabe.krieg, vorgabe);
+  check('1a: der Routen-Knopf ist hier verborgen (Routen zeichnet nur die Systemebene)',
+    vorgabe.routen.da && vorgabe.routen.sichtbar === false, vorgabe.routen);
+  check('1b: mit allem an zeigt die Sektoransicht Piratenbasis, Krieg und die Fraktions-Markierung',
+    vorgabe.pirat && vorgabe.krieg && vorgabe.ring && vorgabe.wappen, vorgabe);
 
-  // ---- 2) Ereignisse aus: Abzeichen weg, Territorium bleibt -----------------------------------
+  // ---- 2) Ereignisse aus: Abzeichen weg, Fraktions-Markierung bleibt --------------------------
   await page.evaluate(() => document.querySelector('#karteEbenenLeiste [data-karte-ebene="ereignisse"]').click());
   await page.waitForTimeout(600);
   const ohneEreignisse = await messung();
-  check('2: Ereignisse AUS nimmt Piraten- und Kriegs-Abzeichen von der Karte, Territorium bleibt',
-    !ohneEreignisse.pirat && !ohneEreignisse.krieg && ohneEreignisse.terr && !ohneEreignisse.ereignisse.an,
+  check('2: Ereignisse AUS nimmt Piraten- und Kriegs-Abzeichen aus der Sektoransicht, die Fraktions-Markierung bleibt',
+    !ohneEreignisse.pirat && !ohneEreignisse.krieg && ohneEreignisse.ring && !ohneEreignisse.ereignisse.an,
     ohneEreignisse);
 
-  // ---- 3) Fraktionen aus: Fläche weg --------------------------------------------------------
+  // ---- 3) Fraktionen aus: Ring und Wappen weg -------------------------------------------------
   await page.evaluate(() => document.querySelector('#karteEbenenLeiste [data-karte-ebene="fraktionen"]').click());
   await page.waitForTimeout(600);
   const ohneFraktionen = await messung();
-  check('3: Fraktionen AUS nimmt die Territoriums-Fläche von der Karte',
-    !ohneFraktionen.terr && !ohneFraktionen.fraktionen.an, ohneFraktionen);
+  check('3: Fraktionen AUS nimmt Ring und Wappen aus der Sektoransicht',
+    !ohneFraktionen.ring && !ohneFraktionen.wappen && !ohneFraktionen.fraktionen.an, ohneFraktionen);
 
   // ---- 4) Persistenz: die Auswahl steht im gespeicherten Spielstand ---------------------------
   // Gemessen am tatsächlich zum Server geschickten Save (der Testserver fängt das PUT ab) -
@@ -127,9 +141,20 @@ function backend(store) {
   });
   await page.waitForTimeout(600);
   const wiederAn = await messung();
-  check('5: Wieder-Einschalten bringt Abzeichen und Fläche zurück',
-    wiederAn.terr && wiederAn.pirat && wiederAn.krieg && wiederAn.ereignisse.an && wiederAn.fraktionen.an,
+  check('5: Wieder-Einschalten bringt Abzeichen und Fraktions-Markierung zurück',
+    wiederAn.ring && wiederAn.pirat && wiederAn.krieg && wiederAn.ereignisse.an && wiederAn.fraktionen.an,
     wiederAn);
+
+  // ---- 6) Systemebene: Territorium-Fläche hängt weiter am Fraktionen-Schalter -----------------
+  await page.evaluate(() => { document.querySelector('#galaxyMapSvg [data-sektor-sys="vega"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+  await page.waitForTimeout(1200);
+  const imSystem = await messung();
+  check('6: im geöffneten System ist die Territoriums-Fläche da und der Routen-Knopf wieder sichtbar',
+    imSystem.terr && imSystem.leisteSichtbar && imSystem.routen.sichtbar === true, imSystem);
+  await page.evaluate(() => document.querySelector('#karteEbenenLeiste [data-karte-ebene="fraktionen"]').click());
+  await page.waitForTimeout(600);
+  const systemOhneFrak = await messung();
+  check('6b: Fraktionen AUS nimmt die Territoriums-Fläche auch dort', !systemOhneFrak.terr, systemOhneFrak);
 
   check('6: bis hierher keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
   await ende(async () => browser.close());

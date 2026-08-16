@@ -12,12 +12,13 @@
 // wirklich schickt, und der Test misst zusaetzlich die goldene Beteiligungslinie und den Tooltip
 // mit der Zahl der Kommandanten je Seite.
 //
-// GEGENPROBE (beide Richtungen, 10.08.2026): Gegen `git show HEAD:weltraum_kolonie.html` fallen
-// „Territoriumsflächen gezeichnet", „Wappen im Knoten", „Frontsegment vorhanden" und
-// „Legion trägt NICHT die Serverfarbe". Die Kontrollprüfungen („Karte überhaupt gezeichnet",
-// „Knoten vorhanden") bleiben in beiden Läufen grün - der Test misst den Unterschied.
+// GEGENPROBE (beide Richtungen, 10.08.2026; auf die Sektoransicht umgezogen mit KB-4):
+// Am Stand vor KB-4b tragen die Sektorknoten keinen Kontrollbalken - „Kontrollbalken vorhanden"
+// und alles Weitere fallen. Die Kontrollprüfungen („Karte gezeichnet", „Sektorregionen
+// vorhanden") bleiben in beiden Läufen grün - der Test misst den Unterschied.
 
 const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
+const { oeffneSektorMitSystem } = require('./lib/karte');
 // Die Spiel-Interna liegen in einer IIFE und sind aus page.evaluate nicht erreichbar. Die
 // Kartenpositionen kommen deshalb aus demselben Helfer, den die Entwurfsbilder benutzen: Er
 // schneidet galaxySlotPositions & Co. als Quelltext aus der Spieldatei und fuehrt sie aus - also
@@ -98,59 +99,77 @@ const GALAXIE = {
   }, null, { timeout: 20000 });
   await page.waitForTimeout(2500);
 
-  const svg = await page.evaluate(() => document.getElementById('galaxyMapSvg').innerHTML);
+  // Seit KB-4 lebt der Kontrollbalken in der SEKTORANSICHT (die Freiflug-Galaxie-Übersicht ist
+  // unerreichbar; die Systemebene zeichnet Nachbarn nur als nackte Punkte). Je Frontsystem wird
+  // die Sektoransicht seiner Region geöffnet und der Balken am Knoten selbst gemessen - sysA und
+  // sysB können in verschiedenen Regionen liegen, deshalb zwei Messungen statt einer.
+  const uebersicht = await page.evaluate(() => document.getElementById('galaxyMapSvg').innerHTML);
+  check('Karte gezeichnet', uebersicht.length > 2000, uebersicht.length);
+  check('Sektorregionen vorhanden', /data-sektor=/.test(uebersicht));
 
-  // ---- Kontrollpruefungen: greifen auch am alten Stand ------------------------------------------
-  check('Karte gezeichnet', svg.length > 2000, svg.length);
-  check('Systemknoten vorhanden', /data-system-node=/.test(svg));
+  const knotenHtml = async (sysId) => {
+    if (!await oeffneSektorMitSystem(page, sysId)) return null;
+    await page.waitForTimeout(800);
+    return page.evaluate(id => {
+      const n = document.querySelector('#galaxyMapSvg [data-sektor-sys="' + id + '"]');
+      return n ? n.outerHTML : null;
+    }, sysId);
+  };
+  const htmlA = await knotenHtml(sysA);
+  const htmlB = await knotenHtml(sysB);
+  check('beide Frontsysteme sind in ihrer Sektoransicht auffindbar', !!htmlA && !!htmlB, { a: !!htmlA, b: !!htmlB });
+  if (!htmlA || !htmlB){ await browser.close(); console.log('\nFEHLGESCHLAGEN'); process.exit(1); }
 
   // ---- Der Balken --------------------------------------------------------------------------------
-  const titel = [...svg.matchAll(/umk(&#228;|ä)mpft zwischen 300 und 700/g)];
-  check('Kontrollbalken vorhanden (ein Titel je Frontsystem)', titel.length === 2, titel.length);
+  const titelZahl = h => [...h.matchAll(/umk(&#228;|ä)mpft zwischen 300 und 700/g)].length;
+  check('Kontrollbalken vorhanden (ein Titel je Frontsystem)',
+    titelZahl(htmlA) === 1 && titelZahl(htmlB) === 1, { a: titelZahl(htmlA), b: titelZahl(htmlB) });
   check('der Titel nennt beide Seiten mit ihren Werten',
-    /Aschen-Kartell 812 : 188 Schattenbund/.test(svg), (svg.match(/Aschen-Kartell \d+ : \d+ Schattenbund/g)||[]).slice(0,3));
+    /Aschen-Kartell 812 : 188 Schattenbund/.test(htmlA) && /Aschen-Kartell 503 : 497 Schattenbund/.test(htmlB),
+    { a: (htmlA.match(/Aschen-Kartell \d+ : \d+ Schattenbund/)||[])[0], b: (htmlB.match(/Aschen-Kartell \d+ : \d+ Schattenbund/)||[])[0] });
 
   // Die Fuellung muss zum Wert passen. Gemessen wird das VERHAELTNIS der beiden Balken
-  // zueinander - so haengt die Pruefung nicht an Knotenskala oder Pixelbreite.
-  // Die gefuellten Anteile: Rechtecke in der KARTENfarbe des Kartells (#e0a548 - nicht die
-  // Serverfarbe #fac775, die hier absichtlich im Fixture steht). Der Ausdruck greift nur die
-  // Breite heraus und macht keine Annahme ueber die Reihenfolge der uebrigen Attribute.
-  const breiten = [...svg.matchAll(/<rect [^>]*width="([\d.]+)"[^>]*fill="#e0a548"/g)].map(m => Number(m[1]));
-  check('zwei gefüllte Anteile gefunden', breiten.length === 2, breiten);
-  if (breiten.length === 2){
-    const hoch = Math.max(...breiten), niedrig = Math.min(...breiten);
+  // zueinander - so haengt die Pruefung nicht an der Balkenbreite. Die gefuellten Anteile:
+  // Rechtecke in der KARTENfarbe des Kartells (#e0a548 - nicht die Serverfarbe #fac775, die hier
+  // absichtlich im Fixture steht).
+  const breiteVon = h => [...h.matchAll(/<rect [^>]*width="([\d.]+)"[^>]*fill="#e0a548"/g)].map(m => Number(m[1]));
+  const bA = breiteVon(htmlA), bB = breiteVon(htmlB);
+  check('je Frontsystem genau ein gefüllter Anteil', bA.length === 1 && bB.length === 1, { bA, bB });
+  if (bA.length === 1 && bB.length === 1){
     const erwartet = 812 / 503;
-    check('die Füllung folgt dem Kontrollwert', Math.abs((hoch/niedrig) - erwartet) < 0.05,
-      { verhaeltnis: (hoch/niedrig).toFixed(3), erwartet: erwartet.toFixed(3) });
+    check('die Füllung folgt dem Kontrollwert', Math.abs((bA[0]/bB[0]) - erwartet) < 0.05,
+      { verhaeltnis: (bA[0]/bB[0]).toFixed(3), erwartet: erwartet.toFixed(3) });
   }
 
-  // Die Kerben: zwei je Balken, also vier insgesamt.
-  const kerben = [...svg.matchAll(/width="0.8" height="[\d.]+" fill="#060812" opacity="0.9"/g)];
-  check('zwei Besitzschwellen je Balken', kerben.length === 4, kerben.length);
+  // Die Kerben: zwei je Balken.
+  const kerbenZahl = h => [...h.matchAll(/width="0.8" height="[\d.]+" fill="#060812" opacity="0.9"/g)].length;
+  check('zwei Besitzschwellen je Balken', kerbenZahl(htmlA) === 2 && kerbenZahl(htmlB) === 2,
+    { a: kerbenZahl(htmlA), b: kerbenZahl(htmlB) });
 
-  // Ein Frontsystem zeigt seinen Namen immer - ohne ihn schwebte der Balken ohne Bezug im Raum.
-  const namen = P.STAR_SYSTEMS.filter(x => x.id === sysA || x.id === sysB).map(x => x.name);
-  check('beide Frontsysteme sind beschriftet', namen.every(n => svg.includes('>' + n + '<')), namen);
+  // Sektorknoten sind immer beschriftet - der Balken schwebt nie ohne Namen im Raum.
+  const nameVon = id => (P.STAR_SYSTEMS.find(x => x.id === id)||{}).name;
+  check('beide Frontsysteme sind beschriftet',
+    htmlA.includes('>' + nameVon(sysA) + '<') && htmlB.includes('>' + nameVon(sysB) + '<'),
+    [nameVon(sysA), nameVon(sysB)]);
 
   // ---- Die eigene Beteiligung (v8.476.0) --------------------------------------------------------
-  // Eine goldene Linie unter dem Balken markiert die Abschnitte, an denen man selbst beigetragen hat.
-  // Genau EINE, denn nur sysA traegt dabei:true - eine Linie an beiden waere derselbe Fehler wie
-  // gar keine, nur andersherum.
-  // Kein `\/>` im Muster: innerHTML serialisiert SVG-Elemente OHNE den schliessenden Schraegstrich
-  // (`<rect ...>`), der erste Versuch fand deshalb null Treffer bei korrektem Markup.
-  const goldlinien = [...svg.matchAll(/<rect [^>]*fill="#fac775"[^>]*>/g)];
-  check('genau eine goldene Beteiligungslinie', goldlinien.length === 1, goldlinien.map(m=>m[0]));
-  // Sie liegt unter dem GANZEN Balken, nicht nur unter dem gefuellten Teil - sonst waere sie eine
-  // zweite Fuellstandsanzeige statt einer Beteiligungsmarke.
-  if (goldlinien.length === 1){
-    const gw = Number((goldlinien[0][0].match(/width="([\d.]+)"/)||[])[1]);
-    check('die Linie spannt den ganzen Balken', gw > Math.max(...breiten), { gold: gw, fuellung: breiten });
+  // Eine goldene Linie unter dem Balken markiert die Abschnitte, an denen man selbst beigetragen
+  // hat - nur sysA traegt dabei:true. Kein `\/>` im Muster: innerHTML/outerHTML serialisiert SVG
+  // ohne schliessenden Schraegstrich.
+  const goldVon = h => [...h.matchAll(/<rect [^>]*fill="#fac775"[^>]*>/g)];
+  check('genau eine goldene Beteiligungslinie, nur am eigenen Abschnitt',
+    goldVon(htmlA).length === 1 && goldVon(htmlB).length === 0,
+    { a: goldVon(htmlA).length, b: goldVon(htmlB).length });
+  if (goldVon(htmlA).length === 1){
+    const gw = Number((goldVon(htmlA)[0][0].match(/width="([\d.]+)"/)||[])[1]);
+    check('die Linie spannt den ganzen Balken', gw > bA[0], { gold: gw, fuellung: bA });
   }
   check('der Tooltip nennt die Kommandanten je Seite',
-    /Kommandanten dahinter: 3 f(&#252;|ü)r Aschen-Kartell, 1 f(&#252;|ü)r Schattenbund/.test(svg),
-    (svg.match(/Kommandanten dahinter: \d+ [^,]+, \d+ [^<\n]+/g)||[]).slice(0,2));
+    /Kommandanten dahinter: 3 f(&#252;|ü)r Aschen-Kartell, 1 f(&#252;|ü)r Schattenbund/.test(htmlA),
+    (htmlA.match(/Kommandanten dahinter: \d+ [^,]+, \d+ [^<\n]+/g)||[]).slice(0,2));
   check('"du bist dabei" steht nur am eigenen Abschnitt',
-    (svg.match(/du bist dabei/g)||[]).length === 1, (svg.match(/du bist dabei/g)||[]).length);
+    (htmlA.match(/du bist dabei/g)||[]).length === 1 && !(htmlB.match(/du bist dabei/g)),
+    { a: (htmlA.match(/du bist dabei/g)||[]).length, b: (htmlB.match(/du bist dabei/g)||[]).length });
 
   check('keine Konsolenfehler', fehler.length === 0, fehler.slice(0, 3));
   await browser.close();

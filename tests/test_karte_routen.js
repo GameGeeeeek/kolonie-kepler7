@@ -15,6 +15,7 @@
 // System vega, home in kepler -> systemübergreifend. Uhr-Regel (Hausregel 18) für die
 // Cache-Messung: Date.now() einfrieren, dann markieren.
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -70,6 +71,9 @@ function backend(store) {
   });
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
   await page.waitForTimeout(1800);
+  // Seit KB-4 zeichnet nur die geöffnete Systemebene die Routen-Linien und [data-system-node] -
+  // also zuerst auf dem Spielerweg ein System öffnen.
+  await oeffneSystemUeberSektoren(page, 'kepler');
 
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
 

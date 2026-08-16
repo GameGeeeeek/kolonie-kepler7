@@ -1,9 +1,9 @@
 // Kuratierte Sektoransicht (Modell B, Etappe KB-2): Ein geöffneter Sektor zeigt seine Systeme auf
 // festen Plätzen (Überlappung konstruktiv unmöglich), mit Sonnenfarben, Ringen (Heimat/Basis/
 // Gürtel), ‹ ›/⌂-Navigation; ein System-Tipp öffnet die BESTEHENDE Systemebene (galaxyOeffne),
-// deren Schließen führt in die Sektoransicht zurück. Die Ebenen-Leiste ist in den Sektor-
-// Ansichten ausgeblendet (ihre Schalter wirken dort noch nicht - sichtbar ohne Wirkung wäre
-// eine Falschaussage).
+// deren Schließen führt in die Sektoransicht zurück. Die Ebenen-Leiste ist seit KB-4c in der
+// SEKTORANSICHT sichtbar (ihre Schalter wirken dort auf Abzeichen und Fraktions-Markierung);
+// nur der Routen-Knopf bleibt der Systemebene vorbehalten.
 //
 // GEGENPROBE (beide Richtungen gefahren, Hausregel 1):
 //   grün:  node tests/test_sektoransicht.js
@@ -42,7 +42,6 @@ function backend(store) {
   const now = Date.now();
   store['kepler7-save-v3'] = JSON.stringify({
     tutorialSeen: true, newbieWelcomeSeen: true,
-    uiSektorKarte: true,
     resources: { energie: 48000, erz: 52000, kristalle: 31000, deuterium: 20000, antimaterie: 900, forschungspunkte: 2200 },
     buildings: { solar: 18, mine: 17, kristallmine: 15, labor: 10, lager: 12, werft: 9 },
     research: {}, fleet: { jaeger: 100, ships: 3, missions: [] },
@@ -73,7 +72,7 @@ function backend(store) {
 
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
 
-  // ---- 1) Region öffnen: kuratierte Knoten in Regionsstärke, Leiste ausgeblendet --------------
+  // ---- 1) Region öffnen: kuratierte Knoten in Regionsstärke, Leiste sichtbar (KB-4c) ----------
   const erwartet = await page.evaluate(() => {
     const g = document.querySelector('#galaxyMapSvg [data-sektor="kepler"]');
     return g ? +g.dataset.anzahl : null;
@@ -85,10 +84,11 @@ function backend(store) {
     const leiste = document.getElementById('karteEbenenLeiste');
     return { knoten: svg.querySelectorAll('[data-sektor-sys]').length,
              titel: !!svg.querySelector('[data-kb-titel="kepler"]'),
-             leisteZu: leiste ? getComputedStyle(leiste).display === 'none' : null };
+             leisteDa: leiste ? getComputedStyle(leiste).display !== 'none' : null,
+             routenZu: leiste ? (leiste.querySelector('[data-karte-ebene="routen"]')||{style:{}}).style.display === 'none' : null };
   });
-  check('1: der Region-Tipp öffnet die kuratierte Sektoransicht (Knoten = Regionsstärke, Titel da, Ebenen-Leiste zu)',
-    erwartet > 0 && ansicht.knoten === erwartet && ansicht.titel && ansicht.leisteZu === true,
+  check('1: der Region-Tipp öffnet die kuratierte Sektoransicht (Knoten = Regionsstärke, Titel da, Ebenen-Leiste sichtbar, Routen-Knopf verborgen)',
+    erwartet > 0 && ansicht.knoten === erwartet && ansicht.titel && ansicht.leisteDa === true && ansicht.routenZu === true,
     { erwartet, ...ansicht });
   if (ansicht.knoten === 0) return ende(async () => browser.close());
 

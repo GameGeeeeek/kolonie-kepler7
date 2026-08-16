@@ -339,8 +339,10 @@ check('8: ohne Peilung erklärt die Box, wie man an eine kommt',
 // Kein Signatur-Cache: die Box hat einen sichtbar herunterzaehlenden Countdown (CLAUDE.md).
 check('8: die Signal-Box nutzt bewusst KEINEN Signatur-Cache (Live-Countdown)',
   !/lastSignalSig/.test(src) && /Verfällt in \$\{fmtDuration/.test(src));
-check('8: die Galaxie-Karte markiert Systeme mit Peilung',
-  /signalBySystem\[s\.id\]/.test(src) && /badges\.push\(\{ icon:'📡'/.test(src));
+// Seit KB-4 baut karteSystemBadges die Abzeichen fuer BEIDE Renderer (Sektoransicht und
+// Systemebene) - die Regel bleibt: Systeme mit Peilung tragen das 📡-Abzeichen.
+check('8: die Karte markiert Systeme mit Peilung',
+  /activeSignals\(\)\.find\(sg => sg\.systemId === sysId\)/.test(src) && /badges\.push\(\{ icon:'📡'/.test(src));
 check('8: der Start meldet das angesteuerte Ziel im Protokoll',
   /Kurs auf die Peilung: /.test(src));
 check('8: die Ankunft meldet eine neu aufgefangene Peilung',

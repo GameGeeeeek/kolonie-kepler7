@@ -42,6 +42,7 @@
 //     deshalb steht 2a als eigene Pruefung daneben und nicht als Anhaengsel von 2b.
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
@@ -191,8 +192,7 @@ function ereignisUhrenPinnen(st){
     const t = await tab(browser, fixture(stufe, energie));
     await t.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
     await t.page.waitForTimeout(700);
-    await t.page.evaluate(id => { const n = document.querySelector('[data-system-node="' + id + '"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true })); }, zielSystem);
-    await t.page.waitForTimeout(1200);
+    await oeffneSystemUeberSektoren(t.page, zielSystem);
     await t.page.evaluate(pl => { const n = document.querySelector('[data-map-asteroid="' + pl + '"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true, clientX:200, clientY:200 })); }, zielPlatz);
     await t.page.waitForTimeout(400);
     await t.page.evaluate(() => { const x = [...document.querySelectorAll('.kmenu button')].find(y => /Abbaumission/.test(y.textContent)); if (x) x.click(); });
@@ -299,8 +299,7 @@ function ereignisUhrenPinnen(st){
     const t = voll;
     await t.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
     await t.page.waitForTimeout(700);
-    await t.page.evaluate(id => { const n = document.querySelector('[data-system-node="' + id + '"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true })); }, zielSystem);
-    await t.page.waitForTimeout(1200);
+    await oeffneSystemUeberSektoren(t.page, zielSystem);
     await t.page.evaluate(pl => { const n = document.querySelector('[data-map-asteroid="' + pl + '"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true, clientX:200, clientY:200 })); }, zielPlatz);
     await t.page.waitForTimeout(400);
     await t.page.evaluate(() => { const x = [...document.querySelectorAll('.kmenu button')].find(y => /Abbaumission/.test(y.textContent)); if (x) x.click(); });

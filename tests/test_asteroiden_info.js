@@ -15,6 +15,7 @@
 // klickt sich mit ▶ durch die Systeme, bis die Systemebene [data-map-asteroid]-Knoten trägt
 // (20 von ~77 Systemen sind Gürtel; die Schleife ist gedeckelt und meldet sonst sauber rot).
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -65,11 +66,9 @@ function backend(store) {
   });
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
   await page.waitForTimeout(1200);
-  await page.evaluate(() => {
-    const n = document.querySelector('#galaxyMapSvg [data-system-node="kepler"]');
-    if (n) n.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
-  await page.waitForTimeout(1800);
+  // Seit KB-4: über die Sektoren hinein - danach ist die ◀/▶-Zeile sichtbar und die
+  // Gürtel-Suche über systemNextBtn läuft wie zuvor auf der Systemebene.
+  await oeffneSystemUeberSektoren(page, 'kepler');
 
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
 

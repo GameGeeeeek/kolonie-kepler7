@@ -14,6 +14,7 @@
 // Gemessen wird, was der Spieler sieht (Regel 26): die Scroll-Position der Seite und die
 // Sichtbarkeit der Knöpfe - nicht interner Zustand.
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -78,10 +79,8 @@ function backend(store) {
   if (!vorab.da) return ende(async () => browser.close());
 
   // ---- 2) Aufklappen: ✕ wird sichtbar, die Tafel wird ins Bild geholt -------------------------
-  await page.evaluate(() => {
-    const n = document.querySelector('#galaxyMapSvg [data-system-node="kepler"]');
-    if (n) n.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
+  // Seit KB-4 führt der Spielerweg über die Sektoren (Übersicht -> Region -> System).
+  await oeffneSystemUeberSektoren(page, 'kepler');
   await page.waitForTimeout(2200);   // Kamerafahrt + sanftes Scrollen ausklingen lassen
   const offen = await page.evaluate(() => {
     const b = document.getElementById('systemTafelZu');

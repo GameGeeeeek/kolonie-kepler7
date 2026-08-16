@@ -19,6 +19,7 @@
 //   5. DER TEXT ERZAEHLT ETWAS ANDERES ALS DER CODE (Regel 6). Die Mond-Tooltips sagten
 //      "anklicken zum Wechseln" - das stimmte, solange der Klick genau das tat.
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const fs = require('fs');
 
 let fail = false;
@@ -175,8 +176,8 @@ async function imBrowser(){
   }
   await page.evaluate(()=>{ const b=document.querySelector('.tab-btn[data-tab="karte"]'); if(b) b.click(); });
   await page.waitForTimeout(1200);
-  await page.evaluate(()=>{ const n=document.querySelector('[data-system-node="kepler"]'); if(n) n.dispatchEvent(new MouseEvent('click',{bubbles:true})); });
-  await page.waitForTimeout(1300);
+  // Seit KB-4: über die Sektoren hinein (Übersicht -> Region -> System).
+  await oeffneSystemUeberSektoren(page, 'kepler');
 
   // Klick auf einen fremden Planeten
   const auf = await page.evaluate(()=>{

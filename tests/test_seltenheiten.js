@@ -153,10 +153,20 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - MODULE_
 // aufzuzaehlen - vorher stand dort "sieben Seltenheitsstufen" samt Namen und Prozentwerten, und
 // jede neue Stufe machte den Satz zur Falschaussage. Geprueft wird jetzt die Ableitung selbst:
 // Sie kann per Bauart nicht veralten, und eine zurueckgebaute Aufzaehlung faellt hier auf.
+// Die Negativpruefung ("die alte Aufzaehlung ist weg") gilt den LIVE-Texten: Der Patchnote-
+// Eintrag zu v8.532.0 ZITIERT die alte Formulierung "sieben Seltenheitsstufen" als Beschreibung
+// des Umbaus, und Patchnotes sind unveraenderliche Historie - ueber die ganze Datei gesucht
+// risse die Pruefung am eigenen Zitat (Hausregel 6/33: ein Zitat neben dem Code ist kein
+// Rueckfall). Anker-Existenz zuerst (Hausregel 6), sonst wuerde der Slice vacuous.
+const pnA = JS.indexOf('const PATCHNOTES = [');
+const pnEnde = pnA >= 0 ? JS.slice(pnA).search(/\n\s*\];/) : -1;
+check('6a-vorab: der PATCHNOTES-Block ist auffindbar (fuer die gescopte Negativpruefung)',
+  pnA > 0 && pnEnde > 0, { pnA, pnEnde });
+const JSohneNotes = (pnA > 0 && pnEnde > 0) ? JS.slice(0, pnA) + JS.slice(pnA + pnEnde) : JS;
 check('6a: die Hilfe leitet ihre Stufenliste aus der Tabelle ab, statt sie aufzuzaehlen',
   JS.includes("Object.keys(MODULE_RARITY).length + ' Seltenheitsstufen")
   && JS.includes("Object.values(MODULE_RARITY).map(r => r.label")
-  && !JS.includes('sieben Seltenheitsstufen'));
+  && !JSohneNotes.includes('sieben Seltenheitsstufen'));
 check('6b: die Hilfe nennt die Exotisch-Quelle und die Fragment-Staffel',
   JS.includes('3 Mythische verschmelzen zu einem Exotischen') &&
   JS.includes('Exotisch ' + frag.exotisch) && JS.includes('Exotisch ist nicht fertigbar'));

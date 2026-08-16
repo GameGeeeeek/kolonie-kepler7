@@ -16,6 +16,7 @@
 // (Hausregel 2). Beide Anker werden vorab auf Existenz geprüft (Hausregel 6).
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -86,11 +87,9 @@ function hexZuRgb(hex) {
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
   await page.waitForTimeout(1200);
   // System aufklappen, damit die system-nav-Zeile sichtbar ist (sie hängt an galaxyOpenSystem).
-  await page.evaluate(() => {
-    const n = document.querySelector('#galaxyMapSvg [data-system-node="kepler"]');
-    if (n) n.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
-  await page.waitForTimeout(2000);
+  // Seit KB-4 führt der Weg über die Sektoren (Übersicht -> Region -> System).
+  await oeffneSystemUeberSektoren(page, 'kepler');
+  await page.waitForTimeout(1200);
 
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
 

@@ -15,6 +15,7 @@
 //   3) das Sternenfeld steht still
 //   4) Zoom wirkt weiterhin, obwohl er das Markup nicht ändert
 const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 
 function backend(store){ return async r => {
   const req=r.request(); const p=req.url().split('/api/')[1].split('?')[0];
@@ -48,6 +49,10 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   await page.evaluate(()=>{ ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id); if(o)o.style.display='none';}); });
   await page.evaluate(()=>{ const b=document.querySelector('.tab-btn[data-tab="karte"]'); if(b)b.click(); });
   await page.waitForTimeout(1500);
+  // Seit KB-4 (nur noch Sektoren-Karte) zeichnet erst die geöffnete Systemebene die
+  // [data-system-node]-Knoten - der Zwischenspeicher, den dieser Test misst, gehört zu genau
+  // dieser Freiflug-Zeichnung. Also zuerst auf dem Spielerweg ein System öffnen.
+  await oeffneSystemUeberSektoren(page, 'kepler');
 
   const grundlage = await page.evaluate(()=>{
     const svg = document.getElementById('galaxyMapSvg');

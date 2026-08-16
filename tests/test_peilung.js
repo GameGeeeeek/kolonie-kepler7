@@ -21,6 +21,7 @@
 // fallen sofort. Setzt man die Nachwachs-Logik versehentlich auch auf Peilungen an, faellt 3.
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); if (!c) fail = true; };
@@ -121,8 +122,8 @@ function ereignisUhrenPinnen(st){
 
   await c.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
   await c.page.waitForTimeout(700);
-  await c.page.evaluate(id => { const n = document.querySelector('[data-system-node="' + id + '"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true })); }, zielSystem);
-  await c.page.waitForTimeout(1500);
+  // Seit KB-4: über die Sektoren hinein (Übersicht -> Region -> System).
+  await oeffneSystemUeberSektoren(c.page, zielSystem);
 
   const marker = await c.page.evaluate(() => [...document.querySelectorAll('[data-map-asteroid]')].map(n => n.getAttribute('data-map-asteroid')));
   check('1a die lebende Peilung steht auf der Karte', marker.indexOf('p1') >= 0, { marker });
