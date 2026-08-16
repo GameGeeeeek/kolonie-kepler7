@@ -33,8 +33,15 @@ const tabBis = JS.indexOf('\n  };', tabVon);
 check('1a: MODULE_RARITY gefunden', tabVon > 0 && tabBis > tabVon);
 const RAR = new Function(JS.slice(tabVon, tabBis + 5) + '\nreturn MODULE_RARITY;')();
 const ORDNUNG = Object.keys(RAR);
-check('1b: sieben Stufen in Rang-Reihenfolge (Schmelzkette haengt an Object.keys!)',
-  ORDNUNG.join(',') === 'gewoehnlich,ungewoehnlich,selten,episch,legendaer,mythisch,exotisch', ORDNUNG);
+// Auf die REGEL umgestellt (16.08.2026, Arbeitsregel 3): Vorher stand hier die Liste der sieben
+// Stufen Zeichen fuer Zeichen. Mit Primordial als achter riss sie, obwohl die gepruefte
+// Eigenschaft - Rang-Reihenfolge - unveraendert galt. Die Reihenfolge selbst belegt 1c ueber die
+// streng steigenden Faktoren; hier bleibt, was das nicht abdeckt: Der Anfang der Kette steht fest
+// (die Fundwuerfe darunter setzen darauf auf), und keine der bekannten Stufen darf verschwinden.
+const PFLICHTSTUFEN = ['gewoehnlich','ungewoehnlich','selten','episch','legendaer','mythisch','exotisch'];
+check('1b: die Kette beginnt bei Gewoehnlich und keine bekannte Stufe fehlt',
+  ORDNUNG[0] === 'gewoehnlich' && PFLICHTSTUFEN.every(k => ORDNUNG.includes(k))
+  && PFLICHTSTUFEN.every((k, i) => ORDNUNG.indexOf(k) === i), ORDNUNG);
 check('1c: Multiplikatoren streng steigend',
   ORDNUNG.every((k, i) => i === 0 || RAR[k].mult > RAR[ORDNUNG[i-1]].mult),
   ORDNUNG.map(k => RAR[k].mult));
@@ -54,8 +61,12 @@ check('2a: JEDE Stufe hat Zerlegewert, Verkaufspreis und Zweitwert-Spanne',
   ORDNUNG.filter(k => !(frag && frag[k]) || !(sell && sell[k]) || !(subR && subR[k])));
 check('2b: Zerlegewerte und Verkaufspreise steigen mit dem Rang',
   ORDNUNG.every((k, i) => i === 0 || (frag[k] > frag[ORDNUNG[i-1]] && sell[k] > sell[ORDNUNG[i-1]])));
-check('2c: die Fertigungstabelle laesst GENAU mythisch und exotisch aus',
-  !!craft && ORDNUNG.filter(k => craft[k] === undefined).join(',') === 'mythisch,exotisch',
+// Die drei Stufen ohne Fragment-Fertigung, namentlich gefuehrt: Jede kommt ueber einen eigenen
+// Weg (Mythisch Schmiede/Allianzmissionen, Exotisch Verschmelzen, Primordial Urmaterie-Schmiede).
+// Eine vierte hier einzutragen ist eine Entscheidung und soll auffallen.
+const NICHT_FERTIGBAR = ['mythisch','exotisch','primordial'];
+check('2c: die Fertigungstabelle laesst GENAU die drei Sonderwege aus',
+  !!craft && ORDNUNG.filter(k => craft[k] === undefined).join(',') === NICHT_FERTIGBAR.join(','),
   craft && ORDNUNG.filter(k => craft[k] === undefined));
 const shipOrder = (JS.match(/const SHIP_MODULE_RARITY_ORDER = \[([^\]]*)\];/) || ['', ''])[1];
 check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
@@ -104,8 +115,16 @@ check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
     b.logs.some(t => t.includes('Mythisch entsteht nicht durch Verschmelzen')), b.logs);
   const c = mach({ 'waffen:exotisch': 3 });
   c.fn(false, 'waffen:exotisch');
-  check('3e: Exotisch ist das Ende der Kette',
-    c.state.modules['waffen:exotisch'] === 3 && c.logs.some(t => t.includes('Höchste Seltenheit')), c.logs);
+  // Seit dem 16.08.2026 ist Exotisch nicht mehr das Ende - darueber steht Primordial, und der
+  // Sprung dorthin ist gesperrt wie der nach Mythisch (sonst waere die staerkste Modulstufe des
+  // Spiels ueber drei Exotische erreichbar, ganz ohne Bergbau und Tier 3).
+  check('3e: der Sprung nach Primordial ist gesperrt - drei Exotische bleiben drei Exotische',
+    c.state.modules['waffen:exotisch'] === 3
+    && c.logs.some(t => t.includes('Primordial entsteht nicht durch Verschmelzen')), c.logs);
+  const d = mach({ 'waffen:primordial': 3 });
+  d.fn(false, 'waffen:primordial');
+  check('3f: und Primordial selbst ist das Ende der Kette',
+    d.state.modules['waffen:primordial'] === 3 && d.logs.some(t => t.includes('Höchste Seltenheit')), d.logs);
 }
 
 // ---- 4) Fundwuerfe
@@ -130,10 +149,14 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - MODULE_
 }
 
 // ---- 6) Hilfe (zweite Anzeigestelle)
-check('6a: die Hilfe nennt sieben Stufen mit den echten Faktoren',
-  JS.includes('sieben Seltenheitsstufen') &&
-  JS.includes('Ungewöhnlich +' + Math.round((RAR.ungewoehnlich.mult - 1) * 100) + '%') &&
-  JS.includes('Exotisch +' + Math.round((RAR.exotisch.mult - 1) * 100) + '%'));
+// Die Hilfe LEITET ihre Stufenliste seit dem 16.08.2026 aus MODULE_RARITY ab, statt sie
+// aufzuzaehlen - vorher stand dort "sieben Seltenheitsstufen" samt Namen und Prozentwerten, und
+// jede neue Stufe machte den Satz zur Falschaussage. Geprueft wird jetzt die Ableitung selbst:
+// Sie kann per Bauart nicht veralten, und eine zurueckgebaute Aufzaehlung faellt hier auf.
+check('6a: die Hilfe leitet ihre Stufenliste aus der Tabelle ab, statt sie aufzuzaehlen',
+  JS.includes("Object.keys(MODULE_RARITY).length + ' Seltenheitsstufen")
+  && JS.includes("Object.values(MODULE_RARITY).map(r => r.label")
+  && !JS.includes('sieben Seltenheitsstufen'));
 check('6b: die Hilfe nennt die Exotisch-Quelle und die Fragment-Staffel',
   JS.includes('3 Mythische verschmelzen zu einem Exotischen') &&
   JS.includes('Exotisch ' + frag.exotisch) && JS.includes('Exotisch ist nicht fertigbar'));
