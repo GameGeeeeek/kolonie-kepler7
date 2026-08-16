@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="google-site-verification" content="m68y_ThdsrVt0aZZ-mbl8GeqNOAh5AhWKQgv7xgahDI" />
 <meta name="description" content="Kolonie Kepler-7 ist ein kostenloses browserbasiertes Weltraum-Idle-Spiel: baue deine Kolonie auf, erforsche Technologien, baue eine Flotte, erkunde die Galaxie und kämpfe gemeinsam mit Allianzen gegen den Weltboss. Direkt im Browser spielbar, kein Download nötig.">
 <meta name="keywords" content="Weltraum-Idle-Spiel, Weltraum Browsergame, Weltraumspiel kostenlos, Weltraum-Aufbauspiel, Weltraum-Strategiespiel, Idle Game deutsch, Browsergame kostenlos, Kolonie aufbauen, Weltraum Allianz Spiel, Kepler-7">
@@ -433,6 +433,12 @@
        z-index:0 zusammen mit #game-root{z-index:1} hält die Reihenfolge, die vorher die
        Verschachtelung erledigt hat: Himmel hinter allem, Inhalt davor. */
     #bgstars { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+    /* Browser-Zoom der SEITE abgestellt (KB-4d): Das Spiel hat seinen eigenen Karten-Zoom, der
+       Seiten-Pinch daneben zoomte versehentlich den ganzen Browser und die Vollbild-Karte
+       (100dvh) passte danach nicht mehr ins Bild. manipulation laesst Scrollen zu, nimmt aber
+       den Doppeltipp-Zoom; den Pinch regeln Viewport-Meta (Android) und der
+       gesturestart-Abfang (iOS, siehe Skript). */
+    html, body { touch-action: manipulation; }
     /* iPhone-Notch/Dynamic-Island: viewport-fit=cover (siehe <meta name="viewport">) lässt den Inhalt
        jetzt bis unter den Notch reichen, statt den Bereich ungenutzt schwarz zu lassen - dafür braucht
        der oberste Inhalt einen Sicherheitsabstand, sonst rutscht er optisch darunter. env(...) ist auf
@@ -3620,10 +3626,6 @@
         <div class="card-row" id="uiTwoColToggleRow" role="button" tabindex="0" style="cursor:pointer; margin-top:8px;">
           <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-adjustments" aria-hidden="true"></i></div><div><div class="bname">Zweispaltiges Layout</div><div class="bmeta">Kurze Abschnitte nebeneinander (nur auf breiten Bildschirmen)</div></div></div>
           <div class="toggle-switch" id="uiTwoColSwitch"><div class="toggle-knob"></div></div>
-        </div>
-        <div class="card-row" id="uiSektorKarteToggleRow" role="button" tabindex="0" style="cursor:pointer; margin-top:8px;">
-          <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-map-2" aria-hidden="true"></i></div><div><div class="bname">Sektoren-Karte</div><div class="bmeta">Die Galaxiekarte in festen Ansichten: Übersicht mit acht antippbaren Sektorregionen statt freiem Zoomen - „Zurücksetzen" führt zur Übersicht zurück</div></div></div>
-          <div class="toggle-switch" id="uiSektorKarteSwitch"><div class="toggle-knob"></div></div>
         </div>
 <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-bell" aria-hidden="true"></i>Server-Ereignis-Benachrichtigungen</div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;" id="notifPrefsCard">
@@ -6964,8 +6966,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.532.0';
+  const VERSION = '8.533.0';
   const PATCHNOTES = [
+    { version:'8.533.0', date:'16.08.2026', changes:[
+      '<strong>Es gibt nur noch die Sektoren-Karte.</strong> Der bisherige Freiflug-Modus (die ganze Galaxie als zoombares Sternfeld) ist als wählbare Alternative entfallen – die Einstellung „Sektoren-Karte" verschwindet aus den Einstellungen, und JEDER sieht im Karte-Tab jetzt die festen Ansichten des Karten-Modells B: Übersicht mit acht Regionen → Sektoransicht mit daumengroßen Zielen → aufgeklapptes System → Gürtel. Zoomen und Verschieben gibt es weiterhin, und zwar dort, wo es etwas zu zoomen gibt: im aufgeklappten System. Wer über das Suchfeld, „Zeigen, wo das war" oder den Allianz-Sprungknopf direkt in ein System springt, landet beim Schließen jetzt immer in der Sektoransicht der richtigen Region.',
+      '<strong>Die Sektoransicht erbt alles, was bisher nur die Galaxie-Übersicht zeigte.</strong> Ereignis-Abzeichen (Piratenbasis 🏴‍☠️, Alien-Sichtung 👽, Krieg ⚔️, Allianzbasis 🏰), Aufklärungs-Marker (🔎 ausgespähte Spieler, 📡 Schürfpeilungen), das Fraktions-Wappen samt farbigem Ring für NPC-Territorium, der grüne Kontroll-Ring für eigene Eroberungen, die Supernova-Kollaps-Markierung und der Kontrollbalken der Randkriege (mit Besitzschwellen-Kerben und goldener Beteiligungslinie) stehen jetzt direkt an den Systemknoten der Sektoransicht – nichts davon ist mit dem Freiflug verschwunden. Beide Karten-Renderer speisen sich dabei aus EINER gemeinsamen Quelle, damit keine zweite Anzeigestelle veralten kann.',
+      'Die Ebenen-Leiste (Fraktionen, Ereignisse, Aufklärung) wirkt jetzt auch in der Sektoransicht und ist dort sichtbar; nur der Routen-Knopf bleibt dem aufgeklappten System vorbehalten, wo die Missionslinien tatsächlich gezeichnet werden – ein sichtbarer Knopf ohne Wirkung wäre eine Falschaussage. Die Frontsegmente zwischen verfeindeten Fraktionsgebieten bleiben im aufgeklappten System sichtbar, und die ◀/▶-Systemzeile unter der Karte räumt sich beim Schließen jetzt sauber weg. Hilfe („Sektorkarte bedienen", „Aufklärung auf der Sektorkarte"), Tutorial und der Karte-Reiter-Hinweis beschreiben durchgehend den neuen Weg.',
+      '<strong>Und der Browser zoomt nicht mehr dazwischen.</strong> Direktes Feedback aus dieser Runde: Die Karte hat ihren eigenen Zoom, aber wer daneben doppeltippte oder die Pinch-Geste knapp neben dem Kartenkasten ansetzte, zoomte die ganze SEITE – und die Vollbild-Karte passte danach nicht mehr ins Bild. Der Seiten-Zoom des Browsers ist jetzt abgestellt (Viewport-Einstellung für Android, Gesten-Abfang für iOS Safari, Doppeltipp-Zoom überall) – das Spiel bedient sich damit wie eine App; der Karten-Zoom im aufgeklappten System bleibt selbstverständlich erhalten.'
+    ]},
     { version:'8.532.0', date:'16.08.2026', changes:[
       '<strong>Primordial – eine neue höchste Modulstufe, und der dritte Abnehmer der Tier-3-Kette.</strong> Über Exotisch steht jetzt eine achte Seltenheit mit <strong>+850% Wirkung</strong>. Sie fällt nie, sie lässt sich nicht aus Fragmenten fertigen, und – das ist der Kern – <strong>Verschmelzen führt ausdrücklich nicht hin</strong>, auch nicht mit drei Exotischen. Der einzige Weg ist die neue <strong>Urmaterie-Schmiede</strong> (ab der Forschung <em>Kausalanker-Theorie</em>): 4 Hohlraumgitter + 3 Kausalanker je Modul, für Standort- und Schiffsklassen-Module gleichermaßen.',
       'Damit hängt die stärkste Ausrüstung des Spiels am Bergbau: Die beiden Tier-3-Fabriken kosten beim Bau Protomaterie, und die gibt es nur an Asteroiden. Ohne die Verschmelzungs-Sperre wäre genau das umgangen worden – <em>nextRarityOf</em> läuft über die Reihenfolge der Seltenheitstabelle, eine neue Stufe am Ende wird also automatisch zum Verschmelzungsziel der vorletzten.',
@@ -27817,7 +27825,6 @@
     if (state.uiTwoColumn === undefined) state.uiTwoColumn = false;
     if (state.uiHideLockedShips === undefined) state.uiHideLockedShips = false;
     if (state.uiHideMaxed === undefined) state.uiHideMaxed = false;
-    if (state.uiSektorKarte === undefined) state.uiSektorKarte = false;
     if (!state.collapsedSections) state.collapsedSections = {};
     if (!state.favoritePlanets) state.favoritePlanets = {};
     if (state.lastLoginDate === undefined) state.lastLoginDate = null;
@@ -30800,7 +30807,7 @@
     { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – wähle vorher deine Angriffsflotte aus. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
     // Ohne HTML: renderTutorialStep setzt den Text per textContent, ein <strong> stünde wörtlich im
     // Fenster. test_tutorial prüft das - und hat genau diesen Fehler bei v8.349.0 gemeldet.
-    { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab siehst du zuerst die ganze Galaxie. Klick ein System an, dann fährt die Karte hinein und seine Planeten gehen auf – ein Klick auf einen Planeten öffnet ein kleines Menü mit Erkunden und Kolonisieren. In manchen Systemen liegt zusätzlich ein Asteroidengürtel – dort schickst du mit einem Klick auf einen Brocken eine Abbaumission los (Forschung Minentechnik nötig). Zurück zur Übersicht mit Esc. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft, Handel, Forschung, Logistik oder Tiefenhafen) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
+    { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab siehst du zuerst die Galaxie als acht benannte Sektorregionen. Tippe eine Region an, dann zeigt der Sektor seine Systeme; ein Tipp auf ein System klappt seine Planeten auf – ein Klick auf einen Planeten öffnet ein kleines Menü mit Erkunden und Kolonisieren. Asteroidengürtel liegen als eigene Felder im Sektor – ein Tipp öffnet den Gürtel, und ein Klick auf einen Brocken schickt eine Abbaumission los (Forschung Minentechnik nötig). Zurück geht es Ebene für Ebene mit ‹, ⌂ oder Esc. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft, Handel, Forschung, Logistik oder Tiefenhafen) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
     { icon:'ti-users', title:'Allianz & Gemeinschaft', text:'Im Allianz-Tab schließt du dich mit anderen zusammen für gemeinsame Technologien, Gebäude und sogar Kriege gegen andere Allianzen.' },
     { icon:'ti-diamond', title:'Kredite: die zweite Währung', text:'Neben Ressourcen gibt es Kredite als Handelswährung – dafür brauchst du keine Fabrik, sondern Aktivität. Die verlässlichste Quelle sind Handelsrouten (Markt-Tab): einmal eingerichtet, liefern sie dauernd Kredite. Dazu kommen der Verkauf überschüssiger Ressourcen am Markt, die Belohnungen der Tagesaufgaben, Fraktionsaufträge, Erfolge, eroberte Sternsysteme und der Schattenbund als Verbündeter. Ausgegeben werden sie im Kredit-Shop, für Tribute, am Markt und für einzelne Gebäude wie das Botschaftsviertel.' },
     { icon:'ti-list-details', title:'Tagesaufgaben: der tägliche Faden', text:'Unter der Ressourcenleiste liegen die Tagesaufgaben: fünf werden täglich aus 25 Vorlagen gezogen, quer durch alle Bereiche – Kampf, Forschung, Bau, Markt, Expeditionen, Fraktionen, Module, und mit freigeschaltetem Abgrund auch Tauchgänge. Jede gibt Ressourcen oder Kredite, und wer an einem Tag alle abholt, bekommt einen Serien-Bonus, der über mehrere Komplett-Tage wächst. Eine offene Aufgabe kannst du antippen, um direkt zum passenden Menü zu springen. Das ist der schnellste Weg, das Spiel kennenzulernen: die Aufgaben führen dich von selbst durch alle Systeme.' },
@@ -36653,7 +36660,7 @@
       { title:'Flaggschiff', body:'Im <strong>Offiziere-Tab</strong> baust du dein <strong>einzigartiges Flaggschiff</strong> – ein Kapitalschiff getrennt von der Massenflotte, das nicht zerstört werden kann und keine Slots belegt. Jede Ausbaustufe (max. 20) gibt <strong>+1,5% Angriffs- UND Verteidigungskraft</strong>, die in die gedeckelte Kampf-Bonus-Gruppe einfließt (siehe „Flottenvielfalt & Kampfbonus-Deckel"). Bau und Ausbau kosten Ressourcen + Kredite (steigend je Stufe). Du kannst deinem Flaggschiff einen eigenen Namen geben. Es <strong>überlebt einen Prestige-Reset</strong> (wie Offiziere und Module); erst ein Aufstieg (Transzendenz) setzt es zurück.' },
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.<br><br><strong>Aufklärungsvorteil (seit 01.08.2026):</strong> Frische Aufklärung ist nicht mehr nur Information, sondern ein <strong>echter Kampfvorteil</strong>. Ist dein Bericht über ein Ziel <strong>keine 30 Minuten alt</strong> und wurde dein Späher <strong>nicht entdeckt</strong>, greifst du dieses Ziel mit <strong>+8% Angriffskraft</strong> an. Der Zuschlag steht in der Angriffs-Vorschau und im Spionagebericht ausgewiesen, und der Server rechnet ihn im PvP genauso nach – Vorschau und Kampfergebnis meinen dieselbe Zahl. Zwei Folgen: Wer angreifen will, späht <em>kurz vorher</em> statt irgendwann; und die <strong>Spionageabwehr</strong> des Ziels verteidigt jetzt zweimal – sie schiebt dem ertappten Späher aufgeblähte Verteidigungswerte unter <em>und</em> nimmt dem Angreifer den Zuschlag. Ein <strong>Bündnis mit dem Schattenbund</strong> senkt die Entdeckungschance um 25% bzw. 50% und schützt damit genau diesen Vorteil.<br><br><strong>Nach dem Kampf siehst du ohnehin, was dort stand.</strong> Seit dem 02.08.2026 führt der Bericht eines Spielerangriffs die <strong>Flotte</strong> und die <strong>Verteidigungsanlagen</strong> des Ziels mit – du hast ihnen gegenübergestanden, also stehen sie im Bericht. Die Aufklärung verliert dadurch nichts: Sie klärt <em>vorher</em> auf, also genau dann, wenn die Auskunft die Entscheidung noch beeinflussen kann – und nur sie bringt den +8%-Zuschlag.' },
-      { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war. Auf der <strong>Galaxie-Übersichtskarte</strong> tragen zusätzlich alle Systeme, in denen ein ausgespähter Spieler wohnt, ein 🔎-Abzeichen (Anzahl im Tooltip) - so siehst du auch aus der Distanz, wo du bereits Aufklärung hast.' },
+      { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war. Im aufgeklappten System tragen zusätzlich alle als Punkte sichtbaren Nachbarsysteme, in denen ein ausgespähter Spieler wohnt, ein 🔎-Abzeichen (Anzahl im Tooltip) - so siehst du auch aus der Distanz, wo du bereits Aufklärung hast.' },
       { title:'Störmanöver (Sabotage)', body:'Mit einem <strong>Spionagekreuzer</strong> kannst du im Spielerprofil (Menü "···" → Störmanöver) eine verdeckte Sabotage gegen einen anderen Spieler ausführen. Es wird <strong>nichts gestohlen</strong> - stattdessen richtet ein erfolgreiches Störmanöver <strong>echten Schaden</strong> beim Ziel an: zufällig entweder wird ein <strong>Produktionsgebäude für 30 Minuten um 50% gedrosselt</strong> oder die <strong>Verteidigung des Ziels ist 30 Minuten lang um 30% geschwächt</strong> (leichter angreifbar). <strong>Ohne Flottenkampf und ohne Flottenrisiko</strong>, aber pro Ziel gilt eine <strong>2-Stunden-Abklingzeit</strong>. Die Erfolgschance sinkt mit der <strong>Spionageabwehr-Forschung des Ziels</strong> (von 85% bis herunter auf 25%) - wer viel in Spionageabwehr investiert, ist also nicht nur gegen Ausspähen, sondern auch gegen Sabotage geschützt. Das Ziel wird benachrichtigt und kann die Sabotage aussitzen oder sofort beheben (Automatische Reparatur bzw. Metamaterial-Reparaturschwarm). Serverseitig aufgelöst und gehärtet.' },
       { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
       { title:'Wächter – reine Verteidigungsklasse', body:'Der <strong>Wächter</strong> (ab Kampfforschung) hat wenig Angriffskraft, aber einen deutlich höheren Schildwert als jedes andere Schiff seiner Kategorie. Jedes Schiff trägt automatisch mit der Hälfte seines Angriffswerts zur Verteidigung bei – der Wächter ist bewusst die Ausnahme mit einem festen, viel höheren Schildwert. Ideal, um eine Basis gezielt zu befestigen, ohne selbst offensiv stark zu sein.' },
@@ -36728,7 +36735,7 @@
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (mehr geht nicht: Stufe 4 ist die letzte). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
       { title:'Mondzerstörer & Mondbelagerung', body:'Endgame-Schiff (Flotte-Tab), das einen fremden, kolonisierten Mond dauerhaft zerstören kann. Voraussetzung: Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die höchste Forschungshürde im Spiel), danach ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Extrem teuer, extrem langsam (weit unter der Geschwindigkeit jedes anderen Schiffs, entsprechend lange Flugzeit und hoher Treibstoffverbrauch) und immer nur als einzelnes Exemplar besitzbar. Ein Ziel wählst du direkt über die Bestenliste (Schädel-Symbol bei einem fremden Spieler) - dort erscheinen dessen kolonisierte Monde zur Auswahl. Die Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes: eigene Gebäude/Flotte am Mond, der neue Mondschildgenerator (Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken sie zusätzlich; ein aktiver Allianz-Beitritt gibt dem Ziel ebenfalls einen kleinen Bonus. Nach jeder Belagerung - egal ob erfolgreich oder abgewehrt - braucht der Mondzerstörer 48 Std. Abklingzeit. Jeder Belagerungsschuss verbraucht zusätzlich eine <strong>Belagerungs-Ladung aus 25 Hochenergiekristallen</strong> (Tier-2-Ressource aus dem Kristalllabor) - sie wird bei der Ankunft serverseitig abgebucht; ohne ausreichende Ladung schlägt die Belagerung fehl. Erfolgschance und Ergebnis werden serverseitig berechnet.' },
-      { title:'Sektorkarte bedienen', body:'Es gibt <strong>eine</strong> Karte mit zwei Zuständen. Sie beginnt als Galaxie-Übersicht; ein <strong>Klick auf ein System</strong> fährt hinein, und die Planeten gehen an genau der Stelle auf, an der das System in der Galaxie steht - die Nachbarsysteme bleiben als schwache Punkte am Rand sichtbar. Ein Klick auf ein Objekt im aufgeklappten System – Planet, Mond, fremder Spieler, Gegner – öffnet ein <strong>kleines Menü</strong> mit den Aktionen, die dieses Objekt kennt (siehe „Das Kartenmenü"). Zurück geht es über den Knopf <strong>„‹ Galaxie"</strong> oben links, mit <strong>Esc</strong>, mit einem Klick ins Leere oder über den ⟲-Knopf. Zoomen und Verschieben gilt in beiden Zuständen: Ziehen zum Verschieben, Pinch-Geste zum Zoomen (am Rechner: Strg bzw. Cmd gedrückt halten und scrollen - das Trackpad-Kneifen zählt automatisch dazu; ohne Taste scrollt die Seite normal weiter), alternativ die +/–-Knöpfe unten rechts. Der ⟲-Knopf passt die Ansicht auf alle bekannten Systeme ein. Der Zoom-Zustand bleibt für den Rest der Spielsitzung erhalten, wird aber nicht dauerhaft gespeichert; das aufgeklappte System wird bewusst nicht gespeichert - nach einem Neuladen beginnst du wieder in der Übersicht. Die Übersicht startet fokussiert auf die Nachbarschaft deines aktiven Systems statt sofort mit allen Systemen gleichzeitig. Namen werden nur für Heimat-/aktives System und dessen direkte Nachbarn dauerhaft angezeigt, alle anderen zeigen ihren Namen (und Status) beim Antippen bzw. sobald ausreichend hereingezoomt wird - hält die Karte auch bei vielen Systemen lesbar. Über der Karte sitzt die <strong>Ebenen-Leiste</strong>: „Routen" (deine eigenen Missionslinien zwischen den Systemen, in den Missionsfarben der Systemansicht), „Fraktionen" (Gebiets-Flächen), „Ereignisse" (Piratenbasis, Aliens, Krieg, Wurmloch) und „Aufklärung" (Spähberichte, Peilungen) lassen sich einzeln aus- und einschalten, wenn die Übersicht zu voll wird - die Auswahl wird im Spielstand gespeichert, Standard ist alles an. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar sowohl als kleiner Punkt in der Übersicht als auch als große Sonne im aufgeklappten System.' },
+      { title:'Sektorkarte bedienen', body:'Die Karte führt in <strong>festen Ansichten</strong> von der ganzen Galaxie bis zum einzelnen Planeten. Sie beginnt als <strong>Übersicht</strong>: die Galaxie, aufgeteilt in acht benannte Sektorregionen (die Heimatregion trägt das 🏠), jede mit ihren Systemen als Punkten und ihrer Systemzahl. Ein <strong>Tipp auf eine Region</strong> öffnet die <strong>Sektoransicht</strong>: jedes System auf einem festen, daumengroßen Platz mit Sonnenfarbe, Namen und Erkundungsstand - Heimat mit goldenem, eigene Kolonien mit grünem Ring; Asteroidengürtel liegen als eigene, frei antippbare Felder im Sektor (ein Tipp öffnet den Gürtel mit seinen Vorkommen). Mit <strong>‹ ›</strong> oder Wischen wechselst du zum Nachbarsektor, <strong>⌂</strong> führt zur Übersicht. Ein <strong>Tipp auf ein System</strong> klappt es auf: Die Planeten gehen an ihrer echten Position in der Galaxie auf, die Nachbarsysteme bleiben als schwache Punkte am Rand sichtbar. Ein Klick auf ein Objekt im aufgeklappten System – Planet, Mond, fremder Spieler, Gegner – öffnet ein <strong>kleines Menü</strong> mit den Aktionen, die dieses Objekt kennt (siehe „Das Kartenmenü"). <strong>Nur im aufgeklappten System</strong> gilt Zoomen und Verschieben: Ziehen zum Verschieben, Pinch-Geste zum Zoomen (am Rechner: Strg bzw. Cmd gedrückt halten und scrollen), alternativ die +/–-Knöpfe unten rechts; hier sitzt auch die <strong>Ebenen-Leiste</strong>: „Routen" (deine eigenen Missionslinien), „Fraktionen" (Gebiets-Flächen), „Ereignisse" (Piratenbasis, Aliens, Krieg, Wurmloch) und „Aufklärung" (Spähberichte, Peilungen) lassen sich einzeln aus- und einschalten - die Auswahl wird im Spielstand gespeichert, Standard ist alles an. Zurück geht es Ebene für Ebene: aus dem System über <strong>„‹ Galaxie"</strong>, <strong>Esc</strong> oder einen Klick ins Leere in die Sektoransicht, von dort mit ⌂ zur Übersicht; der <strong>⟲-Knopf</strong> schält immer genau eine Ebene nach außen. Die geöffnete Ansicht wird bewusst nicht gespeichert - nach einem Neuladen beginnst du wieder in der Übersicht. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar als farbiger Stern in der Sektoransicht wie als große Sonne im aufgeklappten System.' },
       { title:'Das Kartenmenü – ein Klick löst nichts mehr sofort aus', body:'Ein Klick auf ein Objekt der Sektorkarte öffnet ein <strong>kleines Menü</strong>, statt wie früher direkt eine Mission loszuschicken. Das Menü zeigt nur die Aktionen, die das angeklickte Objekt wirklich kennt, und schreibt unter jeden Eintrag Flugzeit und Kosten – oder den Grund, warum er grau ist.<br><br><strong>Planet:</strong> Erkunden und, sobald er entdeckt ist, Kolonisieren. Ist es eine eigene Kolonie, steht ganz oben <em>Als aktive Basis wählen</em>.<br><strong>Mond:</strong> Kolonisieren bzw. Als aktive Basis wählen.<br><strong>Fremder Spieler:</strong> Spähen, Angreifen und Monde belagern.<br><strong>Gegner (NPC):</strong> Angreifen.<br><br><strong>Warum „angreifen" nicht beim Planeten steht:</strong> Andere Spieler wohnen im Spiel nicht auf den Planeten der Sektorkarte – sie haben ihren <strong>eigenen roten Marker</strong> nahe der Sonne des Systems. Ein Planet ist entweder unbewohnt oder deiner. Deshalb sitzt Angreifen im Menü des Spielermarkers, und beim eigenen Planeten steht dort, was dort sinnvoll ist. Ebenso heißt <em>Spähen</em> je nach Ziel etwas anderes: Beim Planeten ist es die <strong>Erkundung</strong> (Erkundungsschiff, deckt den Planeten auf), beim Spieler die <strong>Spionage</strong> (Spähschiff oder Spionagekreuzer, deckt Flotte und Verteidigung auf).<br><br>Das Menü schließt mit <strong>Esc</strong>, per Klick daneben oder sobald du die Karte verschiebst. Ein Klick, mit dem du die Karte nur ziehen wolltest, öffnet es nicht.' },
       { title:'Warum die Sterne kleiner werden, je größer die Galaxie wird', body:'Jedes System wird als kleiner Kern mit einem <strong>Leuchthof</strong> gezeichnet. Da die Karte anklickbar ist, müssen zwei Systeme weit genug auseinanderstehen, um getroffen werden zu können - im Spiel sind das <strong>mindestens 24 Pixel</strong>, die nach dem Setzen der Plätze einmalig erzwungen werden. Der Leuchthof schrumpft dabei mit der Größe der Galaxie: bei den heutigen 69 Systemen hat er seine volle Größe, im Vollausbau mit 277 nur noch die Hälfte. Bliebe er fest, bräuchten die Knoten 34 Pixel Abstand - und so viel Platz gibt die Karte nicht her; die Spiralarme würden zu einem gleichmäßigen Teppich. Ein Systemplatz <strong>verschiebt sich dadurch nie</strong>: Der Mindestabstand wird für alle 277 Plätze auf einmal hergestellt, auch für die noch leeren, sodass eine einmal gemerkte Stelle für immer stimmt.' },
       { title:'Die Galaxie wächst jede Woche', body:'Die Sternenkarte ist nicht fertig: Jeden <strong>Montag um 00:00 Uhr UTC</strong> kommen automatisch <strong>zwei weitere Sternsysteme</strong> am Außenrand der Galaxie dazu, jedes mit <strong>5 bis 10 Planeten</strong> nach denselben Regeln wie die bereits vorhandenen - eigene Namen, eigene Planetentypen, eigene Erkundungsdauern, Beute und Kolonisierungskosten in derselben Größenordnung wie die bestehenden Außensysteme. Es ist also dauerhaft neues Gebiet zu erkunden und zu besiedeln, ohne dass sich an irgendeinem bestehenden Planeten etwas ändert. Die Zeile unter der Galaxie-Übersicht zeigt, wie viele Systeme aktuell kartiert sind und wann die nächsten zwei erscheinen; sobald sie da sind, meldet das Log die neuen Namen. <strong>Bestehende Systeme rücken dabei nicht von der Stelle:</strong> Jedes System hat einen festen Platz auf der Karte, die neuen setzen sich weiter außen an. Alle Spieler sehen dieselben neuen Systeme zur selben Zeit - die Karte wird aus dem Kalender berechnet, nicht ausgewürfelt. <strong>Wichtig für Sammler:</strong> Erfolg „Grenzgänger" und die Kompendium-Kategorien „Sternenkarte"/„Sternensysteme" zählen ausdrücklich nur die fest eingetragene Kern-Galaxie - ein einmal abgeschlossenes Sammelziel reißt durch die wöchentlichen Neuzugänge also nicht wieder auf.' },
@@ -36964,7 +36971,7 @@
     expedition: { icon:'ti-rocket', help:'flotte',
       text:'Expeditionen schicken Schiffe ins Unerforschte. <strong>Typ, Wagnis-Regler und Eskorte</strong> bestimmen zusammen Risiko und Ausbeute: Spähschiffe tragen keine Kampfkraft bei, verbessern aber gezielt die Fundqualität, Frachter erweitern den Platz für große Ressourcenfunde.' },
     karte: { icon:'ti-map-2', help:'kolonien',
-      text:'Die Sektorkarte beginnt als Blick auf die ganze Galaxie. <strong>Klick ein System an</strong> - die Ansicht fährt hinein und die Planeten gehen auf. Ein Klick auf einen Planeten öffnet ein <strong>kleines Menü</strong> mit Erkunden und Kolonisieren; fremde Spieler und Gegner haben ihr eigenes Menü mit Spähen und Angreifen. Zurück mit <strong>Esc</strong> oder dem Knopf oben links. Die <strong>Entfernung</strong> bestimmt Flugzeit und Treibstoffverbrauch jeder Mission, nahe Ziele sind also deutlich günstiger als weit entfernte.' },
+      text:'Die Sektorkarte beginnt als Übersicht der ganzen Galaxie in <strong>acht Sektorregionen</strong>. Tippe eine Region an, dann zeigt der Sektor seine Systeme - <strong>Klick auf ein System</strong>, und die Planeten gehen auf. Ein Klick auf einen Planeten öffnet ein <strong>kleines Menü</strong> mit Erkunden und Kolonisieren; fremde Spieler und Gegner haben ihr eigenes Menü mit Spähen und Angreifen. Zurück geht es Ebene für Ebene mit <strong>Esc</strong>, ‹ oder ⌂. Die <strong>Entfernung</strong> bestimmt Flugzeit und Treibstoffverbrauch jeder Mission, nahe Ziele sind also deutlich günstiger als weit entfernte.' },
     galaxie: { icon:'ti-world', help:'galaxie',
       text:'Bestenliste, globaler Chat und der Zustand der lebendigen Galaxie. Tippe einen Spieler in der Liste an: sein Profil zeigt dir deine <strong>Siegchance in Prozent</strong>, bevor du eine Flotte losschickst - inklusive der Konterwirkung deiner aktuellen Zusammensetzung.' },
     allianz: { icon:'ti-users', help:'allianz',
@@ -51403,7 +51410,7 @@
       // erschienen. Das Feld ist klein (wenige kB) - der stringify kostet Mikrosekunden.
       JSON.stringify(state.asteroidFeld||{}),
       JSON.stringify(state.peilungen||[]),
-      (state.uiSektorKarte ? 'S' : 'F') + (karteSektorOffen || '') + ':' + (karteGuertelOffen || '')
+      (karteSektorOffen || '') + ':' + (karteGuertelOffen || '')
     ].join('§');
   }
   function galaxyBauNachGeste(){
@@ -51655,6 +51662,13 @@
   function galaxyOeffne(systemId){
     galaxyOpenSystem = systemId;
     activeSystem = systemId;
+    // Nur-Sektoren-Karte (KB-4): Der Rückweg aus dem System führt immer in die Sektoransicht
+    // SEINER Region - auch wenn das System nicht über die Karte geöffnet wurde (Suchfeld,
+    // „Zeigen, wo das war", Allianz-Sprungknopf). Ohne diese Zeilen landete man beim Schließen
+    // in der zuletzt offenen (oder gar keiner) Region.
+    const kbSy = STAR_SYSTEMS.find(sy => sy.id === systemId);
+    if (kbSy) karteSektorOffen = sektorVon(kbSy).key;
+    karteGuertelOffen = null;
     lastGalaxyMapMarkup = null;   // der Zustandswechsel MUSS neu zeichnen
     galaxyCamFahre();
     buildGalaxyMap();
@@ -51848,6 +51862,53 @@
     const ziel = SEKTOR_DEFS[(idx + richtung + SEKTOR_DEFS.length) % SEKTOR_DEFS.length];
     sektorOeffnenKB(ziel.key);
   }
+  // ===== Gemeinsame Knoten-Extras beider Karten-Renderer (KB-4b) ==============================
+  // Randkriege-Frontstaende und System-Abzeichen (Allianzbasis, Piratenbasis, Alien, Krieg,
+  // Aufklaerung, Peilung) werden von der Sektoransicht UND der Systemebenen-Zeichnung gebraucht.
+  // EINE Quelle statt zwei Kopien - zwei Anzeigestellen derselben Groesse laufen in diesem
+  // Projekt erfahrungsgemaess auseinander (CLAUDE.md Pflichtpunkt 6).
+  function karteFrontStand(){
+    // Der Server fuehrt je umkaempftem Grenzsystem einen Wert 0..1000 mit Besitzschwellen bei
+    // 300/700; beitragendeA/B und dabei kommen seit dem Bollwerk mit (nur ZAHLEN je Seite, keine
+    // Namensliste - wer sie saehe, koennte Mitspieler gezielt aussitzen).
+    const stand = {};
+    for (const f of ((galaxyCache.randkriege || {}).fronten || [])){
+      if (!FACTION_DIPLOMACY[f.a] || !FACTION_DIPLOMACY[f.b]) continue;
+      for (const e of (f.systeme || [])){
+        if (!e || !e.sys) continue;
+        stand[e.sys] = { kp: Math.max(0, Math.min(1000, Math.round(e.kp || 0))), a: f.a, b: f.b,
+          bA: e.beitragendeA || 0, bB: e.beitragendeB || 0, dabei: !!e.dabei };
+      }
+    }
+    return stand;
+  }
+  function karteSystemBadges(sysId){
+    const badges = [];
+    if (state.allianceBase && state.allianceBase.foundedAt && myAllianceTag() && sysId === state.allianceBase.sector)
+      badges.push({ icon:'🏰', title:'Allianzbasis ['+myAllianceTag()+'] - hier klicken zum Wechseln' });
+    if (karteEbeneAn('ereignisse') && galaxyCache.activePirateFaction && galaxyCache.activePirateFaction.system === sysId)
+      badges.push({ icon:'🏴‍☠️', title:galaxyCache.activePirateFaction.name+' – Piratenbasis' });
+    const alienHere = (galaxyCache.unlockedAlienRaces||[]).find(r=>r.system===sysId);
+    if (alienHere && karteEbeneAn('ereignisse')) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
+    if (karteEbeneAn('ereignisse') && galaxyCache.activeWar && galaxyCache.activeWar.system === sysId)
+      badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
+    if (karteEbeneAn('aufklaerung')){
+      // Fog-of-War auf System-Ebene: Systeme, in denen ein von dir ausgespaehter Spieler wohnt
+      // (Heimatsystem beim Ausspaehen gemerkt, siehe resolveSpyMission), bekommen ein 🔎-Abzeichen.
+      let intel = 0;
+      for (const k in (state.spyIntel||{})){
+        const it = state.spyIntel[k];
+        if (it && it.entry && it.system === sysId) intel++;
+      }
+      if (intel) badges.push({ icon:'🔎', title: intel+' ausgespähte'+(intel===1?'r Spieler':' Spieler')+' in diesem System (Aufklärung liegt vor)' });
+      // Peilung bewusst OHNE Restzeit im Tooltip: eine laufende Restzeit wuerde sekuendlich den
+      // Neuaufbau der ganzen Karte erzwingen (siehe Zwischenspeicher in buildGalaxyMap). Sie steht
+      // im Expeditions-Reiter, wo man sie ohnehin braucht, um das Ziel anzusteuern.
+      const sig = activeSignals().find(sg => sg.systemId === sysId);
+      if (sig) badges.push({ icon:'📡', title:'Peilung: '+signalTypeOf(sig.kind).name+' – '+(sig.enRoute?'bereits angesteuert':'im Expeditions-Reiter ansteuern, dort steht auch die Restzeit') });
+    }
+    return badges;
+  }
   function sektorAnsichtBauen(svg){
     const sk = SEKTOR_DEFS.find(x => x.key === karteSektorOffen);
     if (!sk){ karteSektorOffen = null; return sektorUebersichtBauen(svg); }
@@ -51860,6 +51921,7 @@
     const kbRect = svg.getBoundingClientRect();
     const H = Math.max(560, Math.min(960, Math.round(400 * ((kbRect.height || 560) / (kbRect.width || 400)))));
     svg.setAttribute('viewBox', '0 0 400 ' + H);
+    const kbFront = karteFrontStand();
     // Asteroidenfelder liegen FREI im Sektor (Spieler-Wunsch am Entwurf: "nicht um den Planeten
     // rumkreisen") - eine eigene Reihe unter den Systemplätzen, jedes Feld so groß und tippbar
     // wie ein System. Höchstens drei; mehr gibt es je Sektor derzeit nicht (20 Gürtel auf 8
@@ -51908,20 +51970,62 @@
       const eigene = planeten.some(pl => state.colonies[pl.id]);
       const heim = sy.id === myHomeSystem;
       const guertel = istGuertelSystem(sy.id);
+      // Knoten-Extras der frueheren Galaxie-Uebersicht (KB-4b): Kollaps, NPC-Eigner samt Wappen,
+      // eigene Eroberung, Ereignis-/Aufklaerungs-Abzeichen und der Randkriege-Kontrollbalken
+      // leben jetzt hier - die Sektoransicht IST die Uebersichtsebene der Karte.
+      const kollabiert = !!(galaxyCache.collapsedSystems && galaxyCache.collapsedSystems[sy.id]);
+      const eigner = factionOwning(sy.id);
+      const kontrolle = !!(galaxyCache.controlledSystems && state.player && galaxyCache.controlledSystems[sy.id] === state.player.id);
+      const kbBadges = karteSystemBadges(sy.id);
       let ringe = '';
       if (heim) ringe += '<circle data-ring="heim" cx="' + x + '" cy="' + y + '" r="' + (r+8) + '" fill="none" stroke="#fac775" stroke-width="2"/>';
       else if (eigene) ringe += '<circle data-ring="basis" cx="' + x + '" cy="' + y + '" r="' + (r+8) + '" fill="none" stroke="#5dcaa5" stroke-width="2"/>';
       if (guertel) ringe += '<circle data-ring="guertel" cx="' + x + '" cy="' + y + '" r="' + (r+13) + '" fill="none" stroke="#fac775" stroke-width="1.3" stroke-dasharray="3 4"/>';
-      const meta = heim ? 'Heimat · ' + entdeckt + '/' + planeten.length
+      if (kollabiert) ringe += '<circle data-ring="kollaps" cx="' + x + '" cy="' + y + '" r="' + (r+8) + '" fill="none" stroke="#e24b4a" stroke-width="1.5" stroke-dasharray="3 3"/>';
+      else if (kontrolle) ringe += '<circle data-ring="kontrolle" cx="' + x + '" cy="' + y + '" r="' + (r + (heim || eigene ? 18 : 8)) + '" fill="#5dcaa514" stroke="#5dcaa5" stroke-width="2" stroke-opacity="0.9"/>';
+      else if (eigner && karteEbeneAn('fraktionen')) ringe += '<circle data-ring="fraktion" cx="' + x + '" cy="' + y + '" r="' + (r + (heim || eigene ? 18 : 8)) + '" fill="none" stroke="' + (eigner.mapColor || eigner.color) + '" stroke-width="1.4" stroke-opacity="0.7"/>';
+      // Wappen als verschachteltes <svg> wie auf der Systemebene: Die Verlaufsdefinitionen stehen
+      // in #sharedIconDefsSvg und sind dokumentweit gueltig, url(#…) loest also auch hier auf.
+      const wappen = (eigner && karteEbeneAn('fraktionen') && ICONS['fac_' + eigner.id] && !kollabiert)
+        ? '<svg x="' + (x+12) + '" y="' + (y-26) + '" width="14" height="14" viewBox="0 0 100 100" opacity="0.85">' + ICONS['fac_' + eigner.id].replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') + '</svg>'
+        : '';
+      let abzeichen = '';
+      kbBadges.forEach(function(b, i){
+        abzeichen += '<text x="' + (x - 16 - i*14) + '" y="' + (y - 14) + '" text-anchor="middle" style="font-size:11px;"><title>' + b.title + '</title>' + b.icon + '</text>';
+      });
+      const meta = kollabiert ? 'Kollabiert – 48h unzugänglich'
+        : heim ? 'Heimat · ' + entdeckt + '/' + planeten.length
         : eigene ? 'Eigene Basis · ' + entdeckt + '/' + planeten.length
+        : kontrolle ? '★ Kontrolle · ' + entdeckt + '/' + planeten.length
+        : eigner ? eigner.name + ' · ' + entdeckt + '/' + planeten.length
         : guertel ? 'Gürtelsystem · ' + entdeckt + '/' + planeten.length
         : entdeckt + '/' + planeten.length + ' erkundet';
+      // Der Kontrollbalken der Randkriege - dieselbe Zeichnung wie frueher auf der Uebersicht
+      // (Fuellung = eigener Anteil, Kerben bei 300/700, goldene Linie = selbst beigetragen),
+      // nur ohne Knotenskala, denn die Sektoransicht hat feste, daumengrosse Plaetze.
+      const fsr = kollabiert ? null : kbFront[sy.id];
+      let frontBalken = '';
+      if (fsr){
+        const bw = 46, bh = 5, bx = x - bw/2, by = y + r + 33;
+        const anteil = fsr.kp/1000;
+        const fa = factionMapColorOf(fsr.a), fb = factionMapColorOf(fsr.b);
+        frontBalken = '<rect x="' + (bx-1) + '" y="' + (by-1) + '" width="' + (bw+2) + '" height="' + (bh+2) + '" rx="1.5" fill="#060812" opacity="0.7"/>'
+          + '<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + bh + '" rx="1" fill="' + fb + '" fill-opacity="0.5"/>'
+          + '<rect x="' + bx + '" y="' + by + '" width="' + (bw*anteil).toFixed(1) + '" height="' + bh + '" rx="1" fill="' + fa + '"/>'
+          + [0.3, 0.7].map(function(t){ return '<rect x="' + (bx + bw*t - 0.4).toFixed(1) + '" y="' + (by-1.2).toFixed(1) + '" width="0.8" height="' + (bh+2.4).toFixed(1) + '" fill="#060812" opacity="0.9"/>'; }).join('')
+          + (fsr.dabei ? '<rect x="' + bx + '" y="' + (by+bh+1.2).toFixed(1) + '" width="' + bw + '" height="1.1" rx="0.4" fill="#fac775"/>' : '')
+          + '<title>' + (FACTION_DIPLOMACY[fsr.a]||{}).name + ' ' + fsr.kp + ' : ' + (1000-fsr.kp) + ' ' + (FACTION_DIPLOMACY[fsr.b]||{}).name + ' – umkämpft zwischen 300 und 700'
+          + '\nKommandanten dahinter: ' + fsr.bA + ' für ' + (FACTION_DIPLOMACY[fsr.a]||{}).name + ', ' + fsr.bB + ' für ' + (FACTION_DIPLOMACY[fsr.b]||{}).name + (fsr.dabei ? ' · du bist dabei' : '') + '</title>';
+      }
       knoten += '<g class="sektor-sys" data-sektor-sys="' + sy.id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + sy.name + ' öffnen"' + (entdeckt === 0 && !heim ? ' opacity="0.6"' : '') + '>'
+        + '<title>' + sy.name + (kollabiert ? ' – Supernova-Kollaps, 48h unzugänglich' : (eigner ? ' – ' + eigner.name + ' (NPC-Territorium)' : '')) + '</title>'
         + '<circle cx="' + x + '" cy="' + y + '" r="26" fill="url(#sekGlow-' + st.key + ')"/>'
         + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="url(#sekSun-' + st.key + ')"/>'
-        + ringe
+        + ringe + wappen + abzeichen
+        + (kollabiert ? '<text x="' + x + '" y="' + (y+4) + '" text-anchor="middle" style="font-size:10px;">💥</text>' : '')
         + '<text x="' + x + '" y="' + (y+r+16) + '" text-anchor="middle" style="font:600 11px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + sy.name + '</text>'
         + '<text x="' + x + '" y="' + (y+r+28) + '" text-anchor="middle" style="font:8.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + meta + '</text>'
+        + frontBalken
         + '</g>';
     });
     const li = SEKTOR_DEFS[(idx + SEKTOR_DEFS.length - 1) % SEKTOR_DEFS.length];
@@ -52019,22 +52123,32 @@
     // Ist das SVG leer (erster Aufbau, Tab-Wechsel, Wiederherstellung nach einem Fehler), muss neu
     // geschrieben werden, auch wenn das Markup identisch waere.
     if (!svg.firstChild) lastGalaxyMapMarkup = null;
-    // Sektoren-Karte (Modell B, Etappe KB-1): Mit aktiver Einstellung ersetzt die Sektoren-
-    // Übersicht die Freiflug-Galaxie, solange kein Sektor geöffnet ist. Ein geöffneter Sektor
-    // nutzt in KB-1 die bestehende Freiflug-Zeichnung auf den Sektor-Ausschnitt gezoomt.
+    // Sektoren-Karte (Modell B; seit KB-4 die EINZIGE Karte): Solange kein System geöffnet ist,
+    // zeigt die Karte Übersicht, Sektoransicht oder Gürtelansicht. Die Freiflug-Zeichnung darunter
+    // ist NICHT tot - sie rendert das geöffnete System (galaxyOpenSystem) samt Zoom/Pan,
+    // Ebenen-Leiste und Kartenmenü und bleibt deshalb vollständig erhalten.
     const kbLeiste = document.getElementById('karteEbenenLeiste');
-    // Bildschirm füllen (Spieler-Wunsch am Live-Stand): Im Sektoren-Modus wächst der Kasten auf
-    // die Sichthöhe; im Freiflug (und in der Systemebene) bleibt es bei den bewährten 420px.
+    // Bildschirm füllen (Spieler-Wunsch am Live-Stand): In den Sektor-Ansichten wächst der Kasten
+    // auf die Sichthöhe; in der geöffneten Systemebene bleibt es bei den bewährten 420px.
     // Die Zoom-Knöpfe sind in den Sektor-Ansichten wirkungslos und deshalb ausgeblendet.
     const kbWrap = svg.closest('.map-wrap');
-    const kbSektorModus = state.uiSektorKarte && !galaxyOpenSystem;
+    const kbSektorModus = !galaxyOpenSystem;
     if (kbWrap) kbWrap.style.height = kbSektorModus ? 'max(480px, calc(100dvh - 175px))' : '420px';
     ['galaxyZoomInBtn','galaxyZoomOutBtn'].forEach(function(id){
       const b = document.getElementById(id);
       if (b) b.style.display = kbSektorModus ? 'none' : '';
     });
-    if (state.uiSektorKarte && !galaxyOpenSystem){
-      if (kbLeiste) kbLeiste.style.display = 'none';
+    // Der Routen-Knopf gehoert zur Systemebene (nur dort werden Missionslinien gezeichnet);
+    // die uebrigen drei Ebenen-Schalter wirken seit KB-4b auch in der Sektoransicht.
+    const kbRoutenKnopf = kbLeiste ? kbLeiste.querySelector('[data-karte-ebene="routen"]') : null;
+    if (kbRoutenKnopf) kbRoutenKnopf.style.display = kbSektorModus ? 'none' : '';
+    if (kbSektorModus){
+      if (kbLeiste) kbLeiste.style.display = (karteSektorOffen && !karteGuertelOffen) ? '' : 'none';
+      // Die ◀/▶-Tafelzeile (samt ✕) gehört zum aufgeklappten System. buildMap(), das sie sonst
+      // versteckt, läuft in den Sektor-Ansichten nie - ohne diese Zeile bliebe sie nach dem
+      // Schließen eines Systems sichtbar stehen (gefunden von test_karte_mobil 3).
+      const kbNavRow = document.querySelector('#tab-karte .system-nav');
+      if (kbNavRow) kbNavRow.style.display = 'none';
       if (!karteSektorOffen){
         svg.ontouchstart = svg.ontouchend = null;
         karteGuertelOffen = null;
@@ -52081,18 +52195,6 @@
     }
     const visSys = visibleSystems();
     const spiralPos = galaxySpiralLayout(visSys);
-    // Fog-of-War-Layer auf System-Ebene (20.07.2026): Systeme, in denen ein von dir ausgespähter Spieler
-    // wohnt (Heimatsystem beim Ausspähen gemerkt, siehe resolveSpyMission), bekommen ein 🔎-Abzeichen -
-    // die Sektorkarten-Verzahnung (einzelner Marker) auf die Galaxie-Übersicht gehoben.
-    const intelBySystem = {};
-    for (const k in (state.spyIntel||{})){
-      const it = state.spyIntel[k];
-      if (it && it.entry && it.system) intelBySystem[it.system] = (intelBySystem[it.system]||0) + 1;
-    }
-    // Expeditions-Signale (Inhaltspaket 5/5) auf derselben badges-Infrastruktur - so sieht man die
-    // aufgefangene Peilung dort, wo man ohnehin auf die Galaxie schaut, ohne neue Positionierungslogik.
-    const signalBySystem = {};
-    for (const sig of activeSignals()) signalBySystem[sig.systemId] = sig;
     // Fokussierter Start-Ausschnitt (Spieler-Wunsch: nicht von Anfang an mit der vollen, dichten
     // Galaxie starten und erst zoomen müssen) - beim allerersten Kartenaufbau dieser Sitzung auf die
     // Nachbarschaft des aktiven Systems zentrieren. "Zurücksetzen" bleibt die volle 950×500-Ansicht.
@@ -52154,18 +52256,7 @@
     // Die Umrechnung von Fraktions-ID auf Farbe laeuft ueber factionMapColorOf - dieselbe Quelle wie
     // die Flaeche darunter. Zwei Farbwege fuer dieselbe Sache waeren genau die zweite Anzeigestelle,
     // die in diesem Projekt regelmaessig auseinanderlaeuft.
-    const frontStand = {};
-    for (const f of ((galaxyCache.randkriege || {}).fronten || [])){
-      if (!FACTION_DIPLOMACY[f.a] || !FACTION_DIPLOMACY[f.b]) continue;
-      for (const e of (f.systeme || [])){
-        if (!e || !e.sys) continue;
-        // beitragendeA/B und dabei liefert der Server seit dem Bollwerk mit. Er schickt bewusst nur
-        // die ZAHL der Konten je Seite und ob man selbst dabei ist - nicht die Liste; wer sie saehe,
-        // koennte Mitspieler gezielt aussitzen.
-        frontStand[e.sys] = { kp: Math.max(0, Math.min(1000, Math.round(e.kp || 0))), a: f.a, b: f.b,
-          bA: e.beitragendeA || 0, bB: e.beitragendeB || 0, dabei: !!e.dabei };
-      }
-    }
+    const frontStand = karteFrontStand();
 
     const territorien = {};
     for (const s2 of visSys){
@@ -52268,21 +52359,7 @@
       // Krieg-Symbole), keine neue Positionierungslogik nötig - Systemname bleibt wie bei isHome
       // dauerhaft sichtbar statt nur im Hover.
       const isAllianceBase = !!(state.allianceBase && state.allianceBase.foundedAt && myAllianceTag() && s.id === state.allianceBase.sector);
-      const badges = [];
-      if (isAllianceBase) badges.push({ icon:'🏰', title:'Allianzbasis ['+myAllianceTag()+'] - hier klicken zum Wechseln' });
-      if (karteEbeneAn('ereignisse') && galaxyCache.activePirateFaction && galaxyCache.activePirateFaction.system === s.id) badges.push({ icon:'🏴‍☠️', title:galaxyCache.activePirateFaction.name+' – Piratenbasis' });
-      const alienHere = (galaxyCache.unlockedAlienRaces||[]).find(r=>r.system===s.id);
-      if (alienHere && karteEbeneAn('ereignisse')) badges.push({ icon:'👽', title:alienHere.name+' gesichtet' });
-      if (karteEbeneAn('ereignisse') && galaxyCache.activeWar && galaxyCache.activeWar.system === s.id) badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
-      if (karteEbeneAn('aufklaerung') && intelBySystem[s.id]) badges.push({ icon:'🔎', title: intelBySystem[s.id]+' ausgespähte'+(intelBySystem[s.id]===1?'r Spieler':' Spieler')+' in diesem System (Aufklärung liegt vor)' });
-      if (karteEbeneAn('aufklaerung') && signalBySystem[s.id]){
-        // Bewusst OHNE Restzeit im Tooltip: die stuende hier in einem <title>, das man nur beim
-        // Darueberfahren sieht, wuerde aber sekuendlich den Neuaufbau der ganzen Karte erzwingen
-        // (siehe Zwischenspeicher in buildGalaxyMap). Die laufende Restzeit steht im Expeditions-
-        // Reiter, wo man sie ohnehin braucht, um das Ziel anzusteuern.
-        const sg = signalBySystem[s.id];
-        badges.push({ icon:'📡', title:'Peilung: '+signalTypeOf(sg.kind).name+' – '+(sg.enRoute?'bereits angesteuert':'im Expeditions-Reiter ansteuern, dort steht auch die Restzeit') });
-      }
+      const badges = karteSystemBadges(s.id);
       // Abzeichen wandern mit dem Knoten nach innen, schrumpfen aber nur bis zu einer Untergrenze:
       // ein Piraten- oder Kriegssymbol bei 5,5 px wäre nicht mehr zu erkennen, und es trägt Inhalt,
       // nicht nur Atmosphäre.
@@ -52379,7 +52456,12 @@
     // Die Positionen kommen aus spiralPos, also aus BILDSCHIRMabständen. Aus gx/gy gebaut ergäbe
     // das ein Spinnennetz quer über die Karte: Die Kartenposition hängt an den Spiralplätzen, nicht
     // an gx/gy.
-    if (!offen){
+    //
+    // Bis KB-4 nur im Übersichts-Zustand gezeichnet (if (!offen)) - seit die Sektoren-Karte die
+    // einzige Karte ist, IST die geöffnete Systemebene der einzige Freiflug-Zustand, und das Gate
+    // hätte die Segmente unerreichbar gemacht. Sie bleiben dezent (Deckkraft 0,10-0,23) und liegen
+    // unter den Knoten.
+    {
       const FRONT_NAH = 135;
       const besitzer = {};
       for (const s2 of visSys){
@@ -59699,8 +59781,6 @@
     if (uiCollapsibleSwitch) uiCollapsibleSwitch.classList.toggle('on', !!state.uiCollapsibleSections);
     const uiTwoColSwitch = document.getElementById('uiTwoColSwitch');
     if (uiTwoColSwitch) uiTwoColSwitch.classList.toggle('on', !!state.uiTwoColumn);
-    const uiSektorKarteSwitch = document.getElementById('uiSektorKarteSwitch');
-    if (uiSektorKarteSwitch) uiSektorKarteSwitch.classList.toggle('on', !!state.uiSektorKarte);
 
     const autoExploreSwitch = document.getElementById('autoExploreSwitch');
     if (autoExploreSwitch) autoExploreSwitch.classList.toggle('on', !!state.autoExploreOn || !!state.autoExploreTour);
@@ -61062,12 +61142,6 @@
     if (uiCollapsibleToggleBtn) uiCollapsibleToggleBtn.onclick = () => { state.uiCollapsibleSections = !state.uiCollapsibleSections; render(); save(); };
     const uiTwoColToggleBtn = document.getElementById('uiTwoColToggleRow');
     if (uiTwoColToggleBtn) uiTwoColToggleBtn.onclick = () => { state.uiTwoColumn = !state.uiTwoColumn; render(); save(); };
-    const uiSektorKarteToggleBtn = document.getElementById('uiSektorKarteToggleRow');
-    if (uiSektorKarteToggleBtn) uiSektorKarteToggleBtn.onclick = () => {
-      state.uiSektorKarte = !state.uiSektorKarte;
-      karteSektorOffen = null; karteGuertelOffen = null; lastGalaxyMapMarkup = null;
-      render(); save();
-    };
     const notifToggleBtn = document.getElementById('notifToggleRow');
     if (notifToggleBtn) notifToggleBtn.onclick = async () => {
       if (!state.notifOn){
@@ -61342,8 +61416,8 @@
     const zoomResetBtn = document.getElementById('galaxyZoomResetBtn');
     if (zoomResetBtn) zoomResetBtn.onclick = () => {
       if (galaxyOpenSystem){ galaxySchliesse(); return; }
-      if (state.uiSektorKarte && karteGuertelOffen){ karteGuertelOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); return; }
-      if (state.uiSektorKarte && karteSektorOffen){ karteSektorOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); return; }
+      if (karteGuertelOffen){ karteGuertelOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); return; }
+      if (karteSektorOffen){ karteSektorOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); return; }
       // Der belegte Bereich statt des vollen Feldes: Von 277 Plätzen sind 69 vergeben, das volle
       // Feld zeigte die Galaxie deshalb als kleinen Fleck in der Bildmitte - ausgerechnet der Knopf,
       // den man drückt, um wieder Übersicht zu bekommen.
@@ -61362,6 +61436,13 @@
       galaxySchliesse();
     });
   })();
+  // Browser-Pinch der SEITE auf iOS abstellen (KB-4d): Safari ignoriert user-scalable=no seit
+  // iOS 10 aus Bedienhilfe-Gruenden - fuer eine App-artige Spieloberflaeche mit EIGENEM
+  // Karten-Zoom ist der gaengige Weg, die nur auf iOS existierenden gesture-Ereignisse
+  // abzufangen. Auf allen anderen Browsern feuern sie nie und die Zeile ist wirkungslos.
+  ['gesturestart', 'gesturechange'].forEach(function(ev){
+    document.addEventListener(ev, function(e){ e.preventDefault(); });
+  });
   // Esc schließt das offene System - dieselbe Taste, die überall sonst im Spiel einen Kasten
   // zumacht. Nur wenn gerade nichts getippt wird, sonst nähme sie dem Suchfeld das Abbrechen weg.
   document.addEventListener('keydown', (e) => {

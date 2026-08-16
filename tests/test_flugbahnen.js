@@ -23,6 +23,7 @@
 // der Galaxiekarte und entsteht erst beim Öffnen. In der Übersicht gibt es keine Flugbahnen - beim
 // ersten Durchlauf genau daran gescheitert und dabei fälschlich "nichts wird gezeichnet" gemessen.
 const { starteBrowser, SPIELDATEI, SPIEL_URL } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const fs = require('fs');
 
 let fail = false;
@@ -104,11 +105,9 @@ function backend(store){ return async r => {
     const t = document.querySelector('.tab-btn[data-tab="karte"]'); if (t) t.click();
   });
   await page.waitForTimeout(1500);
-  await page.evaluate(() => {
-    const n = document.querySelector('[data-system-node="kepler"]') || document.querySelector('[data-system-node]');
-    if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true }));
-  });
-  await page.waitForTimeout(2200);
+  // Seit KB-4: über die Sektoren hinein (Übersicht -> Region -> System).
+  await oeffneSystemUeberSektoren(page, 'kepler');
+  await page.waitForTimeout(600);
 
   const r = await page.evaluate(() => {
     const g = document.getElementById('galaxySystemLayer');

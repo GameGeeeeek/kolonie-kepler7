@@ -16,6 +16,7 @@
 // forschungsfrei in kepler, raider2 "Schrottgarde-Klan" in vega (NPCS-Array); /api/galaxy
 // speist galaxyCache (loadGalaxyState) - der Test serviert dort eine FREMDE Eroberung von vega.
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -74,11 +75,9 @@ function backend(store) {
   });
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
   await page.waitForTimeout(1200);
-  await page.evaluate(() => {
-    const n = document.querySelector('#galaxyMapSvg [data-system-node="kepler"]');
-    if (n) n.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
-  await page.waitForTimeout(2000);
+  // Seit KB-4: über die Sektoren hinein (Übersicht -> Region -> System).
+  await oeffneSystemUeberSektoren(page, 'kepler');
+  await page.waitForTimeout(1000);
 
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
 
@@ -107,18 +106,19 @@ function backend(store) {
     /Schrottgarde-Klan/.test(chipsVega.text || '') && !/Trümmerfeld/.test(chipsVega.text || ''),
     chipsVega);
 
-  // ---- 4) Galaxie-Übersicht: KEIN Kontroll-Stern für die fremde Eroberung ---------------------
-  // Zurück zur Übersicht (Galaxie-Knopf), dann den Vega-Knoten lesen. Am alten Stand steht dort
-  // "★ Kontrolle" in grün, obwohl 'jemand-anderes' das System hält - genau der Befund.
+  // ---- 4) Sektoransicht: KEIN Kontroll-Stern für die fremde Eroberung -------------------------
+  // Seit KB-4 führt das Schließen in die Sektoransicht der Region - dort trägt der Vega-Knoten
+  // Meta-Text und ggf. den Kontroll-Ring. Am alten Befund (v8.501.0) stand "★ Kontrolle" für
+  // JEDE Eroberung; die Regel bleibt: fremde Eroberung -> keine Kontroll-Markierung.
   const knoten = await page.evaluate(async () => {
     const zurueck = document.getElementById('galaxyBackBtn');
     if (zurueck) zurueck.click();
     await new Promise(r => setTimeout(r, 1600));
-    const n = document.querySelector('#galaxyMapSvg [data-system-node="vega"]');
-    return n ? { text: n.textContent } : null;
+    const n = document.querySelector('#galaxyMapSvg [data-sektor-sys="vega"]');
+    return n ? { text: n.textContent, kontrollRing: !!n.querySelector('[data-ring="kontrolle"]') } : null;
   });
-  check('4: der Vega-Knoten der Übersicht trägt KEINEN Kontroll-Stern für die fremde Eroberung',
-    !!knoten && !/Kontrolle/.test(knoten.text), knoten);
+  check('4: der Vega-Knoten der Sektoransicht trägt KEINEN Kontroll-Stern für die fremde Eroberung',
+    !!knoten && !/Kontrolle/.test(knoten.text) && !knoten.kontrollRing, knoten);
 
   check('5: bis hierher keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
   await ende(async () => browser.close());

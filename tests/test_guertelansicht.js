@@ -40,7 +40,6 @@ function backend(store) {
   const now = Date.now();
   store['kepler7-save-v3'] = JSON.stringify({
     tutorialSeen: true, newbieWelcomeSeen: true,
-    uiSektorKarte: true,
     resources: { energie: 48000, erz: 52000, kristalle: 31000, deuterium: 20000, antimaterie: 900, forschungspunkte: 2200 },
     buildings: { solar: 18, mine: 17, kristallmine: 15, labor: 10, lager: 12, werft: 9 },
     research: {}, fleet: { jaeger: 100, ships: 3, missions: [] },

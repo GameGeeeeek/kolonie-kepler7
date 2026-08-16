@@ -20,6 +20,7 @@
 // Fixture-Schlüssel aus dem Code abgelesen (Hausregel 4): thessa liegt im System vega, nicht in
 // kepler - sein Mond landet deshalb im moonListWrap ("Weitere Monde"), nicht in der Planetenliste.
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -76,10 +77,7 @@ function backend(store) {
   await page.waitForTimeout(1200);
   // Heimatsystem aufklappen (galaxyOeffne öffnet immer, kein Toggle) und die Kamerafahrt
   // ausklingen lassen, BEVOR die Uhr steht.
-  await page.evaluate(() => {
-    const n = document.querySelector('#galaxyMapSvg [data-system-node="kepler"]');
-    if (n) n.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
+  await oeffneSystemUeberSektoren(page, 'kepler');
   await page.waitForTimeout(2000);
 
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));

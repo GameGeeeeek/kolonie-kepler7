@@ -14,6 +14,7 @@
 // „Knoten vorhanden") bleiben in beiden Läufen grün - der Test misst den Unterschied.
 
 const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
+const { oeffneSektorMitSystem, oeffneSystemUeberSektoren } = require('./lib/karte');
 // Die Spiel-Interna liegen in einer IIFE und sind aus page.evaluate nicht erreichbar. Die
 // Kartenpositionen kommen deshalb aus demselben Helfer, den die Entwurfsbilder benutzen: Er
 // schneidet galaxySlotPositions & Co. als Quelltext aus der Spieldatei und fuehrt sie aus - also
@@ -110,6 +111,21 @@ const GALAXIE = {
   }, null, { timeout: 20000 });
   await page.waitForTimeout(2500);   // ein Galaxie-Poll (120 s Intervall feuert beim Laden sofort)
 
+  // Seit KB-4 (nur noch Sektoren-Karte) verteilt sich das Bild: Wappen und Fraktions-Ring stehen
+  // am Knoten der SEKTORANSICHT, die Territoriums-Flächen und Frontsegmente zeichnet weiterhin
+  // die Freiflug-Zeichnung - erreichbar als geöffnete Systemebene. Beides wird nacheinander
+  // gemessen.
+  const wappenDa = await oeffneSektorMitSystem(page, sysA);
+  await page.waitForTimeout(800);
+  const knotenA = await page.evaluate(id => {
+    const n = document.querySelector('#galaxyMapSvg [data-sektor-sys="' + id + '"]');
+    return n ? n.outerHTML : '';
+  }, sysA);
+  check('die Sektoransicht mit dem Legion-System steht', wappenDa && knotenA.length > 0, { wappenDa, len: knotenA.length });
+  check('Wappen im Knoten', /viewBox="0 0 100 100"/.test(knotenA));
+  check('Fraktions-Ring am Knoten', /data-ring="fraktion"/.test(knotenA));
+
+  await oeffneSystemUeberSektoren(page, sysA);
   const svg = await page.evaluate(() => {
     const el = document.getElementById('galaxyMapSvg');
     return el ? el.innerHTML : '';
@@ -123,7 +139,6 @@ const GALAXIE = {
   check('Territoriumsflächen gezeichnet', /url\(#terrGlow-legion\)/.test(svg) && /url\(#terrGlow-void\)/.test(svg));
   check('drei Gebiete gleichzeitig', /url\(#terrGlow-kartell\)/.test(svg));
   check('Verläufe je Fraktion in den defs', /id="terrGlow-legion"/.test(svg));
-  check('Wappen im Knoten', /viewBox="0 0 100 100"/.test(svg));
   check('Frontsegment vorhanden', /id="frontSeg-/.test(svg));
   check('Frontsegment nennt beide Parteien', /Front: (Eisenlegion gegen Void-Marodeure|Void-Marodeure gegen Eisenlegion)/.test(svg));
   check('Front bewegt sich per SMIL', /<animate attributeName="stroke-dashoffset"/.test(svg));

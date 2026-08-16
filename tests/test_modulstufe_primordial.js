@@ -139,7 +139,14 @@ for (const attr of ['data-craft-primordial-loc', 'data-craft-primordial-ship']) 
 // ---- 7) Der Hilfetext kann nicht mehr veralten ------------------------------------------------
 check('7: der Hilfe-Abschnitt leitet seine Stufenliste aus MODULE_RARITY ab, statt sie aufzuzählen',
   /Ausrüstbare Module mit ' \+ Object\.keys\(MODULE_RARITY\)\.length \+ ' Seltenheitsstufen/.test(S));
+// Gescopt auf die LIVE-Texte: Der Patchnote-Eintrag zu v8.532.0 zitiert die alte Formulierung
+// als Beschreibung des Umbaus, und Patchnotes sind unveraenderliche Historie (Hausregel 6/33).
+const pnA = S.indexOf('const PATCHNOTES = [');
+const pnEnde = pnA >= 0 ? S.slice(pnA).search(/\n\s*\];/) : -1;
+check('7b-vorab: der PATCHNOTES-Block ist auffindbar (fuer die gescopte Negativpruefung)',
+  pnA > 0 && pnEnde > 0, { pnA, pnEnde });
+const SohneNotes = (pnA > 0 && pnEnde > 0) ? S.slice(0, pnA) + S.slice(pnA + pnEnde) : S;
 check('7b: und es steht keine feste Stufenzahl mehr daneben',
-  !/sieben Seltenheitsstufen/.test(S));
+  !/sieben Seltenheitsstufen/.test(SohneNotes));
 
 ende();

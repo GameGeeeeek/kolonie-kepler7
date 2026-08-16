@@ -38,9 +38,11 @@ function backend(store) {
   const browser = await starteBrowser();
   const store = {};
   const now = Date.now();
+  // Seit KB-4 ("nur noch die Sektoren-Karte") gibt es die Einstellung uiSektorKarte nicht mehr -
+  // ein Spielstand OHNE das Feld muss die Übersicht zeigen. Alte Spielstände, die noch
+  // uiSektorKarte:false tragen, prüft Abschnitt 4 gesondert.
   store['kepler7-save-v3'] = JSON.stringify({
     tutorialSeen: true, newbieWelcomeSeen: true,
-    uiSektorKarte: true,
     resources: { energie: 48000, erz: 52000, kristalle: 31000, deuterium: 20000, antimaterie: 900, forschungspunkte: 2200 },
     buildings: { solar: 18, mine: 17, kristallmine: 15, labor: 10, lager: 12, werft: 9 },
     research: {}, fleet: { jaeger: 100, ships: 3, missions: [] },
@@ -103,23 +105,31 @@ function backend(store) {
   const zurueck = await page.evaluate(() => document.querySelectorAll('#galaxyMapSvg [data-sektor]').length);
   check('3: „Zurücksetzen" zeigt wieder die Sektoren-Übersicht', zurueck === 8, { regionen: zurueck });
 
-  // ---- 4) Einstellung AUS über die echte Schalter-Zeile: Freiflug kehrt zurück ----------------
+  // ---- 4) Die Einstellung ist ersatzlos weg (KB-4): keine Schalter-Zeile mehr, und selbst ein
+  //         ALTER Spielstand mit uiSektorKarte:false bekommt die Sektoren-Karte -----------------
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="einstellungen"]'); if (b) b.click(); });
   await page.waitForTimeout(900);
   const zeile = await page.evaluate(() => !!document.getElementById('uiSektorKarteToggleRow'));
-  check('4a: die Einstellungs-Zeile „Sektoren-Karte" existiert', zeile === true, { zeile });
-  await page.evaluate(() => document.getElementById('uiSektorKarteToggleRow').click());
-  await page.waitForTimeout(600);
-  await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
-  await page.waitForTimeout(1200);
-  const frei = await page.evaluate(() => document.querySelectorAll('#galaxyMapSvg [data-sektor]').length);
-  check('4b: mit ausgeschalteter Einstellung zeigt die Karte wieder den Freiflug (keine Regionen)', frei === 0, { regionen: frei });
+  check('4a: die frühere Einstellungs-Zeile „Sektoren-Karte" existiert nicht mehr', zeile === false, { zeile });
 
-  // ---- 5) Persistenz --------------------------------------------------------------------------
-  await page.waitForTimeout(1200);
-  let gespeichert = null;
-  try { gespeichert = JSON.parse(store['kepler7-save-v3']).uiSektorKarte; } catch (e) {}
-  check('5: der Spielstand speichert den ausgeschalteten Zustand', gespeichert === false, { gespeichert });
+  const ctx2 = await browser.newContext({ viewport: { width: 1000, height: 900 } });
+  const page2 = await ctx2.newPage();
+  const store2 = {};
+  store2['kepler7-save-v3'] = JSON.stringify(Object.assign(JSON.parse(store['kepler7-save-v3']), { uiSektorKarte: false }));
+  await page2.route('**/api/**', backend(store2));
+  await page2.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); });
+  await page2.goto(DATEI);
+  await page2.waitForTimeout(2500);
+  await page2.evaluate(() => {
+    ['tutorialOverlay', 'welcomeNewOverlay', 'welcomeBackOverlay', 'updateNoticeOverlay',
+     'kofiEmailPromptOverlay', 'conflictOverlay', 'prestigePerkOverlay']
+      .forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; });
+    const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click();
+  });
+  await page2.waitForTimeout(1500);
+  const alt = await page2.evaluate(() => document.querySelectorAll('#galaxyMapSvg [data-sektor]').length);
+  check('4b: auch ein alter Spielstand mit uiSektorKarte:false zeigt die Sektoren-Übersicht', alt === 8, { regionen: alt });
+  await ctx2.close();
 
   check('6: bis hierher keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
   await ende(async () => browser.close());

@@ -16,6 +16,7 @@
 //   8) Die Planeten im offenen System sind anklickbar (Erkundungsmission) und tragen echte Texturen
 //   9) Der zweite Zoom/Pan-Block ist weg, und die Hilfe beschreibt die neue Bedienung
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const fs = require('fs');
 
 const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
@@ -51,14 +52,16 @@ function quelltext(){
   // Die Hilfe MUSS die neue Bedienung beschreiben. Das ist der wiederkehrende Fehler dieses Projekts:
   // die Mechanik stimmt, eine zweite Anzeigestelle behält die alte Annahme.
   const hilfe = (src.match(/\{ title:'Sektorkarte bedienen', body:'([\s\S]*?)' \},/)||[])[1] || '';
-  check('9: die Hilfe nennt den Klick auf ein System', /Klick auf ein System|Klick ein System/.test(hilfe), hilfe.slice(0,60));
+  // Seit KB-4 (nur noch Sektoren-Karte) heißt der Weg "Tipp auf ein System" - die REGEL bleibt:
+  // die Hilfe muss benennen, wie man ein System öffnet.
+  check('9: die Hilfe nennt den Klick/Tipp auf ein System', /Tipp auf ein System|Klick auf ein System|Klick ein System/.test(hilfe), hilfe.slice(0,60));
   check('9: die Hilfe nennt den Weg zurück', /Esc/.test(hilfe));
   check('9: die Hilfe behauptet nicht mehr zwei Karten übereinander',
     !/Galaxie-Übersicht oben als auch die Einzelsystem-Ansicht darunter/.test(src));
   const hint = (src.match(/karte: \{ icon:'ti-map-2'[\s\S]*?text:'([\s\S]*?)' \}/)||[])[1] || '';
   check('9: der Reiter-Hinweis nennt sie ebenfalls', /Klick ein System an|Klick auf ein System/.test(hint), hint.slice(0,60));
   const tut = (src.match(/title:'Erkunden & Kolonisieren', text:'([\s\S]*?)' \}/)||[])[1] || '';
-  check('9: das Tutorial ebenso', /Klick ein System an|Klick auf ein System/.test(tut), tut.slice(0,60));
+  check('9: das Tutorial ebenso', /Tipp auf ein System|Klick ein System an|Klick auf ein System/.test(tut), tut.slice(0,60));
 
   check('9: der Mindestabstand steht als benannte Konstante im Code', /const GALAXY_MIN_NODE_DIST = 24;/.test(src));
   check('9: der Leuchthof-Faktor hat eine eigene Funktion', /function galaxyNodeScale\(\)/.test(src));
@@ -148,22 +151,25 @@ async function imBrowser(){
   await page.evaluate(()=>{ const b=document.querySelector('.tab-btn[data-tab="karte"]'); if(b) b.click(); });
   await page.waitForTimeout(1500);
 
+  // Seit KB-4 ist die Sektoren-Karte die einzige Karte: Der Grundzustand ist die Übersicht mit
+  // den Sektorregionen, keine Systemknoten mehr (die zeichnet erst die geöffnete Systemebene).
   const grund = await page.evaluate(()=>{
     const svg = document.getElementById('galaxyMapSvg');
     return { galaxie: !!svg, zweiteKarte: !!document.getElementById('mapSvg'),
-             knoten: svg ? svg.querySelectorAll('[data-system-node]').length : 0,
+             regionen: svg ? svg.querySelectorAll('[data-sektor]').length : 0,
              ebene: !!document.getElementById('galaxySystemLayer'),
              zurueck: (document.getElementById('galaxyBackBtn')||{}).style ? document.getElementById('galaxyBackBtn').style.display : 'fehlt' };
   });
   check('1: die Galaxiekarte ist da', grund.galaxie);
   check('1: es gibt keine zweite Karte mehr', !grund.zweiteKarte);
-  check('1: die Systeme sind als Knoten gezeichnet', grund.knoten > 30, grund.knoten);
+  check('1: der Grundzustand ist die Sektoren-Übersicht', grund.regionen >= 1, grund.regionen);
   check('1: im Grundzustand ist kein System aufgeklappt', !grund.ebene);
   check('1: und der Zurück-Knopf ist verborgen', grund.zurueck === 'none', grund.zurueck);
 
-  // 2) Öffnen
-  await page.evaluate(()=>{ const n=document.querySelector('[data-system-node="kepler"]'); if(n) n.dispatchEvent(new MouseEvent('click',{bubbles:true})); });
-  await page.waitForTimeout(1300);
+  // 2) Öffnen - auf dem Spielerweg: Übersicht -> Region -> System (Helfer aus lib/karte)
+  const geoeffnet = await oeffneSystemUeberSektoren(page, 'kepler');
+  check('2: das Heimatsystem lässt sich über die Sektoren öffnen', geoeffnet);
+  await page.waitForTimeout(600);
   const auf = await page.evaluate(()=>{
     const svg = document.getElementById('galaxyMapSvg');
     const g = document.getElementById('galaxySystemLayer');
@@ -212,40 +218,9 @@ async function imBrowser(){
   await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   check('4: der erste Esc gilt dem Kartenmenü und lässt das System offen',
     await page.evaluate(()=>!document.querySelector('.kmenu') && !!document.getElementById('galaxySystemLayer')));
-  await page.keyboard.press('Escape'); await page.waitForTimeout(1200);
-  const zu1 = await page.evaluate(()=>({ ebene: !!document.getElementById('galaxySystemLayer'),
-    breite: +document.getElementById('galaxyMapSvg').getAttribute('viewBox').split(' ')[2],
-    zurueck: document.getElementById('galaxyBackBtn').style.display }));
-  check('4: Esc klappt das System wieder zu', !zu1.ebene);
-  // Bis v8.493.0 stand hier `zu1.breite > 900` - die Momentaufnahme "Rückflug aufs Gesamtfeld
-  // (950x500)". Seit Richtung A fliegt das Zuklappen auf den BELEGTEN Ausschnitt (das Feld ist zu
-  // drei Vierteln für künftige Systeme reserviert; das Gesamtfeld zeigte die Galaxie als Fleck).
-  // Die REGEL lautet: deutlich weiter draußen als die Systemansicht (410), und alle Systeme im
-  // Bild - Letzteres misst die eigene Prüfung darunter am Bildschirm, nicht an einer Literalzahl.
-  check('4: die Kamera fährt heraus', zu1.breite > 450, zu1.breite);
-  const alleImBild = await page.evaluate(()=>{
-    const svg = document.getElementById('galaxyMapSvg');
-    const r = svg.getBoundingClientRect();
-    let drin = 0, gesamt = 0;
-    svg.querySelectorAll('[data-system-node]').forEach(n => {
-      const c = n.querySelector('circle'); if (!c) return;
-      const b = c.getBoundingClientRect(); gesamt++;
-      if (b.x >= r.x-2 && b.x+b.width <= r.x+r.width+2 && b.y >= r.y-2 && b.y+b.height <= r.y+r.height+2) drin++;
-    });
-    return { drin, gesamt };
-  });
-  check('4: nach dem Zuklappen sind alle Systeme im Bild',
-    alleImBild.gesamt > 0 && alleImBild.drin === alleImBild.gesamt, alleImBild);
-  check('4: und der Zurück-Knopf verschwindet', zu1.zurueck === 'none', zu1.zurueck);
-
-  // 4b) Schließen über den Zurück-Knopf
-  await page.evaluate(()=>{ document.querySelector('[data-system-node="kepler"]').dispatchEvent(new MouseEvent('click',{bubbles:true})); });
-  await page.waitForTimeout(1200);
-  await page.evaluate(()=>document.getElementById('galaxyBackBtn').click());
-  await page.waitForTimeout(1200);
-  check('4: der Zurück-Knopf schließt ebenfalls', await page.evaluate(()=>!document.getElementById('galaxySystemLayer')));
-
-  // 5) Am gezeichneten Markup nachmessen (nicht nur gerechnet)
+  // 5) Am gezeichneten Markup nachmessen (nicht nur gerechnet) - SOLANGE das System offen ist:
+  //    nur die Systemebene zeichnet [data-system-node]; nach dem Schließen steht seit KB-4 die
+  //    Sektoransicht, und dort gibt es diese Knoten nicht mehr.
   const gemessen = await page.evaluate(()=>{
     const kn = [...document.querySelectorAll('#galaxyMapSvg [data-system-node]')];
     const p = kn.map(n => { const c = n.querySelector('circle'); return { x:+c.getAttribute('cx'), y:+c.getAttribute('cy') }; });
@@ -257,6 +232,24 @@ async function imBrowser(){
   });
   // Die Koordinaten stehen im Markup auf eine Nachkommastelle gerundet, deshalb 23.8 statt 24.
   check('5: auch im gezeichneten Markup liegt kein Paar zu eng', gemessen.min >= 23.8, gemessen);
+
+  await page.keyboard.press('Escape'); await page.waitForTimeout(1200);
+  // Seit KB-4 führt das Zuklappen nicht mehr auf die Freiflug-Galaxie hinaus, sondern in die
+  // Sektoransicht der Region des Systems - die Kamera-/Ausschnitt-Prüfungen von früher sind
+  // durch die Prüfung "die Sektoransicht steht" ersetzt.
+  const zu1 = await page.evaluate(()=>({ ebene: !!document.getElementById('galaxySystemLayer'),
+    sektorSys: document.querySelectorAll('#galaxyMapSvg [data-sektor-sys]').length,
+    zurueck: document.getElementById('galaxyBackBtn').style.display }));
+  check('4: Esc klappt das System wieder zu', !zu1.ebene);
+  check('4: und führt in die Sektoransicht der Region', zu1.sektorSys >= 1, zu1.sektorSys);
+  check('4: und der Zurück-Knopf verschwindet', zu1.zurueck === 'none', zu1.zurueck);
+
+  // 4b) Schließen über den Zurück-Knopf (Öffnen jetzt über den Systemknoten der Sektoransicht)
+  await page.evaluate(()=>{ document.querySelector('#galaxyMapSvg [data-sektor-sys="kepler"]').dispatchEvent(new MouseEvent('click',{bubbles:true})); });
+  await page.waitForTimeout(1200);
+  await page.evaluate(()=>document.getElementById('galaxyBackBtn').click());
+  await page.waitForTimeout(1200);
+  check('4: der Zurück-Knopf schließt ebenfalls', await page.evaluate(()=>!document.getElementById('galaxySystemLayer')));
 
   check('Keine Konsolenfehler auf der Karte', errs.length === 0, errs.slice(0,3));
   await ctx.close(); await browser.close();

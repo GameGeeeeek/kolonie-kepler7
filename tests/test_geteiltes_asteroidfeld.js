@@ -36,6 +36,7 @@
 //     bekommt der Spieler den Servertext statt einer Auskunft).
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
+const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
@@ -158,8 +159,8 @@ async function tab(browser, startSave, opt){
 async function aufKarte(t, sysId){
   await t.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
   await t.page.waitForTimeout(700);
-  await t.page.evaluate(id => { const n = document.querySelector('[data-system-node="' + id + '"]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true })); }, sysId);
-  await t.page.waitForTimeout(1200);
+  // Seit KB-4: über die Sektoren hinein (Übersicht -> Region -> System).
+  await oeffneSystemUeberSektoren(t.page, sysId);
 }
 async function marker(t){
   return t.page.evaluate(() => [...document.querySelectorAll('[data-map-asteroid]')].map(n => n.getAttribute('data-map-asteroid')));
