@@ -4400,7 +4400,14 @@
     nf_nebel:    { art:'namensfarbe', name:'Nebel',       farbe:'#8fa6c9', desc:'Kühles Blaugrau wie der Staub zwischen den Sternen, zurückhaltend statt auffällig.' },
     nf_signal:   { art:'namensfarbe', name:'Signal',      farbe:'#ff6b9d', desc:'Grelles Magenta – die auffälligste Namensfarbe im Katalog und entsprechend teuer.' },
     em_ring:     { art:'emblem',      name:'Orbitalring', icon:'ti-atom',   desc:'Ein Ring um einen Kern – das Zeichen für eine gefestigte Kolonie.' },
-    em_saat:     { art:'emblem',      name:'Saat',        icon:'ti-plant',  desc:'Ein Keimling als Zeichen dafür, dass aus einem Außenposten eine Heimat geworden ist.' }
+    em_saat:     { art:'emblem',      name:'Saat',        icon:'ti-plant',  desc:'Ein Keimling als Zeichen dafür, dass aus einem Außenposten eine Heimat geworden ist.' },
+    // Zwei weitere Fortschritts-Wege (16.08.2026): Bis dahin hing der Fortschritts-Zweig allein an
+    // Prestige, Aufstieg, Kampfpunkten und Rekordtiefe - den Größen der SPÄTEN Laufbahn. Wer
+    // sammelt oder Bosse jagt, statt zu prestigen, hatte gar keinen Weg zu einem eigenen Stück.
+    nf_chronik:  { art:'namensfarbe', name:'Chronik',     farbe:'#d8c9a3', desc:'Gealtertes Pergament – für Kommandanten, die das Erfolgsregister ernst nehmen.' },
+    em_kranz:    { art:'emblem',      name:'Lorbeerkranz',icon:'ti-award',  desc:'Die Auszeichnung für eine weit gefüllte Erfolgsliste.' },
+    nf_trophae:  { art:'namensfarbe', name:'Trophäe',     farbe:'#c98f4f', desc:'Mattes Bronzegold – die Farbe des Trophäensaals, für erlegte Sektor-Bosse.' },
+    em_schaedel: { art:'emblem',      name:'Bosstrophäe', icon:'ti-skull',  desc:'Der Schädel eines Wächters – nur für Jäger mit einer langen Liste.' }
   };
   // Die Bedingung des Servers in Worte fassen. Bewusst ohne eigene Zahlen: Jede Zahl hier kommt aus
   // dem `bedingung`-Objekt, das der Server mitschickt.
@@ -4416,6 +4423,8 @@
     if (b.typ === 'kampfpunkte') return b.wert.toLocaleString('de-DE')+' Kampfpunkte.';
     if (b.typ === 'abgrund') return 'Rekordtiefe '+b.wert+' im Abgrund.';
     if (b.typ === 'kauf') return 'Für '+b.preis.toLocaleString('de-DE')+' Sternenstaub zu kaufen.';
+    if (b.typ === 'erfolge') return b.wert+' freigeschaltete Erfolge.';
+    if (b.typ === 'bosse') return b.wert+' besiegte Sektor-Bosse.';
     return 'Freischaltbedingung unbekannt.';
   }
   // --- Was ein Spieler TRÄGT, gezeichnet ---
@@ -4595,7 +4604,7 @@
           <div>
             <div class="bname">${(s.menge||0).toLocaleString('de-DE')} Sternenstaub</div>
             <div class="bmeta">Kommt aus zwei Quellen, die der Server selbst sieht: der <strong>täglichen Anmeldung</strong> (${sz.anmeldung||0} pro Tag, +${sz.serieBonus||0} je Tag Serie bis +${(sz.serieMax||1)-1}; deine Serie: ${s.serie||0}) und jedem <strong>abgewehrten Spielerangriff</strong> (${sz.abwehr||0} je Gegner, höchstens ${sz.abwehrMaxProTag||0} verschiedene am Tag; heute: ${s.abwehrHeute||0}).</div>
-            <div class="bmeta" style="opacity:0.8;">${s.heuteAngemeldet?'Die heutige Anmeldung ist bereits gutgeschrieben.':'Die heutige Anmeldung wird beim nächsten Start gutgeschrieben.'}</div>
+            <div class="bmeta" style="opacity:0.8;">${s.heuteAngemeldet?'Die heutige Anmeldung ist bereits gutgeschrieben.':'Die heutige Anmeldung wird beim nächsten Start gutgeschrieben.'}${typeof s.dieseWoche === 'number' ? ' Diese Woche verdient: <strong>'+s.dieseWoche.toLocaleString('de-DE')+'</strong>.' : ''}</div>
           </div>
         </div>
       </div>` : '';
@@ -6902,8 +6911,13 @@
     kikerne: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="21" r="12" fill="none" stroke="#c3bef5" stroke-width="2.5"/><circle cx="21" cy="21" r="4" fill="#c3bef5"/><line x1="21" y1="9" x2="21" y2="14" stroke="#c3bef5" stroke-width="2"/><line x1="21" y1="28" x2="21" y2="33" stroke="#c3bef5" stroke-width="2"/><line x1="9" y1="21" x2="14" y2="21" stroke="#c3bef5" stroke-width="2"/><line x1="28" y1="21" x2="33" y2="21" stroke="#c3bef5" stroke-width="2"/><circle cx="21" cy="11" r="1.5" fill="#c3bef5"/><circle cx="21" cy="31" r="1.5" fill="#c3bef5"/><circle cx="11" cy="21" r="1.5" fill="#c3bef5"/><circle cx="31" cy="21" r="1.5" fill="#c3bef5"/></svg>`
   };
 
-  const VERSION = '8.524.0';
+  const VERSION = '8.525.0';
   const PATCHNOTES = [
+    { version:'8.525.0', date:'16.08.2026', changes:[
+      '<strong>Vier neue Namensfarben und Embleme – und zwei ganz neue Wege, überhaupt an welche zu kommen.</strong> Bisher hing der Fortschritts-Zweig im Abschnitt „Aussehen" komplett an Prestige, Aufstieg, Kampfpunkten und Rekordtiefe – also an den Größen der <em>späten</em> Laufbahn. Wer lieber sammelt oder Bosse jagt, statt zu prestigen, hatte schlicht keinen Weg zu einem eigenen Stück. Neu zählen deshalb auch <strong>freigeschaltete Erfolge</strong> und <strong>besiegte Sektor-Bosse</strong>: <em>Chronik</em> ab 25 Erfolgen, <em>Lorbeerkranz</em> ab 60, <em>Trophäe</em> ab 10 erlegten Sektor-Bossen und die <em>Bosstrophäe</em> ab 30.',
+      '<strong>Die Sternenstaub-Box zeigt jetzt auch, was du <em>diese Woche</em> verdient hast</strong> – bisher stand dort nur der Gesamtstand, und wie ergiebig eine Woche war, ließ sich nicht ablesen.',
+      '<strong>Kein Wochenpass – und das mit Absicht.</strong> Angedacht war einer; beim Bauen zeigte sich, dass er nicht ehrlich zu machen ist. Ein Pass misst Fortschritt („5 Angriffe geflogen", „10 Forschungen abgeschlossen"), und all diese Zahlen stehen in deinem Spielstand, den der Server nicht nachrechnet – die Belohnungen hätte sich jeder selbst ausstellen können. Ein Pass nur aus den zwei nachprüfbaren Quellen (Anmeldung, abgewehrte Angriffe) wiederum wäre bloß eine Fortschrittsleiste vor dem gewesen, was der Sternenstaub schon tut. Statt einer Schauseite gibt es deshalb mehr von dem, was wirklich trägt: neue Freischaltwege und mehr Stücke.'
+    ]},
     { version:'8.524.0', date:'16.08.2026', changes:[
       '<strong>Unterstützer bekommen mehr Platz in vier Listen.</strong> Bau-Wunschliste und Forschungs-Warteschlange fassen <strong>25 statt 10</strong> Einträge, die Notiz je Kolonie <strong>200 statt 48</strong> Zeichen, die Freundesliste <strong>60 statt 30</strong> Namen, und das <strong>Berichts-Archiv 150 statt 40</strong> Kampf- und Ereignisberichte. Reiner Komfort: Eine längere Warteschlange baut nichts Zusätzliches, sie erspart das Nachlegen.',
       '<strong>Nichts davon löscht jemals etwas – auch nicht, wenn der Rang ausläuft.</strong> Gedeckelt ist ausschließlich das <em>Hinzufügen</em>: Wer 25 Bauten eingereiht hat, behält sie alle, es lässt sich danach nur nichts Neues mehr über 10 hinaus anhängen. Gespeicherte Notizen und Freunde bleiben ebenso stehen. Und das Berichts-Archiv <strong>friert auf seiner erreichten Größe ein</strong>, statt ältere Berichte wegzuwerfen – ein Deckel, der Kampfhistorie vernichtet, sobald jemand aufhört zu unterstützen, wäre der falsche Anreiz gewesen.',
