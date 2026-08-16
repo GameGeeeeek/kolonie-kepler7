@@ -126,7 +126,10 @@ const hilfeText = src.slice(hilfeVon, src.indexOf('\n  ];', hilfeVon));
 const tier2Namen = T.map(z => (z.match(/label:'([^']*)'/) || [])[1]).filter(Boolean);
 const fehlendeKetten = tier2Namen.filter(n => !hilfeText.includes(n));
 check('jede Tier-2-Kette kommt in der Hilfe vor', fehlendeKetten.length === 0, fehlendeKetten);
-check('Gegenprobe: es wurden sieben Ketten gelesen', tier2Namen.length === 7, tier2Namen.length);
+// Untergrenze statt fester Zahl (16.08.2026): Mit Tier 3 sind es neun Ketten, und jede weitere
+// ist legitim. Die Aussage dieser Gegenprobe ist "es wurde ueberhaupt etwas gelesen", nicht
+// "es sind genau sieben" - eine Zahl waere hier eine Momentaufnahme (Arbeitsregel 3).
+check('Gegenprobe: es wurden ueberhaupt Ketten gelesen', tier2Namen.length >= 7, tier2Namen.length);
 
 // ---- 3. Fraktionsnamen -------------------------------------------------------------------------
 // Die Hilfe nannte zwei Fraktionen, die es im Spiel nicht gibt ("Void-Zirkel", "Schatten-Syndikat").

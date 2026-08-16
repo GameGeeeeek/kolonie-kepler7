@@ -163,7 +163,10 @@ check('5: der Zeitschätzer liest denselben Bestand', /const have = costAmountAv
   }
   check('7: canAfford fragt jeden Schluessel ueber costAmountAvailable ab',
     /function canAfford\(cost\)\{ return Object\.entries\(cost\)\.every\(\(\[r,amt\]\) => costAmountAvailable\(r\) >= amt\); \}/.test(src));
-  const erlaubt = new Set([...resKeys, ...t2Keys, 'credits', 'bergung']);
+  // protomaterie (16.08.2026) steht bewusst weder in RES_DEFS (nicht produzierbar) noch in
+// TIER2_DEFS (keine Fabrik, keine Rate) - ist aber seit der Tier-3-Kette ein gueltiger
+// Kostenschluessel in baseCost. Ohne diesen Eintrag meldet die Pruefung sie als Tippfehler.
+const erlaubt = new Set([...resKeys, ...t2Keys, 'credits', 'bergung', 'protomaterie']);
   check('7: die Liste der erlaubten Kostenschlüssel ist plausibel gefüllt', erlaubt.size >= 8, [...erlaubt]);
   let verstoesse = [];
   for (const m of src.matchAll(/baseCost:\{([^}]*)\}/g)){

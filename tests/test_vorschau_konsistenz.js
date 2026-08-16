@@ -130,8 +130,22 @@ if (lm){
 check('die Prestige-Hilfe liest die bewahrten Mengen aus KRYOARCHIV_KEEP_PER_LEVEL',
   src.includes("Object.entries(KRYOARCHIV_KEEP_PER_LEVEL)"));
 const kryo = (src.match(/const KRYOARCHIV_KEEP_PER_LEVEL = \{([^}]*)\}/) || [])[1] || '';
-check('die Tabelle deckt alle sieben Tier-2-Ketten ab',
-  (kryo.match(/\w+:\s*\d+/g) || []).length === 7, (kryo.match(/\w+:\s*\d+/g) || []).length);
+// Gegen die TABELLE gerechnet statt gegen eine Zahl (16.08.2026): Genau DAS ist die Aussage -
+// das Kryo-Archiv muss jede Kette kennen, egal wie viele es gibt. Vorher stand hier eine 7, die
+// bei der ersten neuen Kette riss, ohne dass die gepruefte Eigenschaft verletzt war.
+const kryoKeys = (kryo.match(/(\w+):\s*\d+/g) || []).map(x => x.split(':')[0].trim());
+// AUF DEN TABELLENBLOCK BESCHRAENKT (Arbeitsregel 39): Ungescopt traf dieses Muster auch
+// Reiter-, Abschnitts- und Ressourcen-Listen - die erste Fassung las 35 vermeintliche Ketten
+// und meldete das Kryo-Archiv als lueckenhaft, obwohl es vollstaendig war.
+const t2Von = src.indexOf("  const TIER2_DEFS = [");
+const t2Bis = t2Von < 0 ? -1 : src.indexOf('\n  ];', t2Von);
+check('Gegenprobe: der TIER2_DEFS-Block ist abgegrenzt', t2Von >= 0 && t2Bis > t2Von, { t2Von, t2Bis });
+const t2Ketten = (t2Von >= 0 && t2Bis > t2Von)
+  ? [...src.slice(t2Von, t2Bis).matchAll(/\{ key:'(\w+)', label:'/g)].map(m => m[1]) : [];
+check('Gegenprobe: beide Listen wurden gelesen', kryoKeys.length >= 7 && t2Ketten.length >= 7,
+  { kryo: kryoKeys.length, ketten: t2Ketten.length });
+check('das Kryo-Archiv deckt JEDE Tier-2-Kette ab',
+  t2Ketten.every(k => kryoKeys.includes(k)), t2Ketten.filter(k => !kryoKeys.includes(k)));
 
 // ---- I: DEFS-Arrays muessen reine DATEN bleiben --------------------------------------------------
 // Sechs Tests werten MODULE_DEFS/SHIP_MODULE_DEFS in einer Sandbox aus und injizieren dabei nur die

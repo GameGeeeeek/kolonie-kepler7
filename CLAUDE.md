@@ -454,6 +454,18 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     ist kein Ersatz dafür, wenn zwischen ihr und dem Test noch eine Shell steht. Entweder den Test
     OHNE umschließende Subshell in den Hintergrund geben, oder auf den Marker warten
     (`until grep -q "^EXIT=" log; do sleep 10; done`).
+
+    **Nachtrag 16.08.2026 – dasselbe noch einmal, und die Formulierung oben ist schuld.** Gestartet
+    wurde `nohup node tests/run.js > log 2>&1 &` – und zwar über den Hintergrund-Modus des
+    Werkzeugs. Da steht keine Klammer-Subshell, die Regel schien also eingehalten; in Wahrheit sind
+    `&` und der Hintergrund-Modus ZWEI Ebenen, und die Meldung „completed, exit code 0" kam nach
+    Sekunden für die äußere. Verraten hat es erst, dass das Protokoll nach dem ersten Test aufhörte
+    – `ps` zeigte den echten `node`-Prozess mit 35 Sekunden Laufzeit noch quicklebendig.
+    **Die Regel schärfer gefasst:** Wer den Hintergrund-Modus des Werkzeugs benutzt, schreibt den
+    Befehl NACKT hin (`node tests/run.js > log 2>&1`) – kein `&`, kein `nohup`, keine Klammern.
+    Beides zusammen ist immer eine Ebene zu viel. Und wer sich nicht sicher ist, prüft die
+    Zeilenzahl des Protokolls gegen die angekündigte Testzahl, bevor er der Meldung glaubt: Ein
+    voller Lauf hat gut zweihundert Zeilen, nicht fünf.
 19. **`echo EXIT=$?` hinter einer Pipe misst das LETZTE Pipe-Glied, nie den Test** – `node
     test.js | grep FAIL; echo EXIT=$?` meldet den grep-Status (0 = Treffer gefunden!). Vorfall
     09.08.2026: Ein roter Test schien dadurch grün gemeldet. Exit-Codes immer ohne Pipe messen
