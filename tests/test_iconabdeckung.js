@@ -286,7 +286,9 @@ const RESICONS = new Set([...resIconBlock.matchAll(/(\w+):\s*`<svg/g)].map(m=>m[
 const resKeys  = [...arrBlock('RES_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
 const t2Keys   = [...arrBlock('TIER2_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
 check('9: die sechs Kern-Rohstoffe sind gefunden', resKeys.length === 6, resKeys);
-check('9: die sieben Tier-2-Rohstoffe sind gefunden', t2Keys.length === 7, t2Keys);
+// Untergrenze statt fester Zahl: seit Tier 3 sind es neun. Geprueft wird, dass die Tabelle
+// gelesen wurde - die Icon-Pruefung darunter faengt jede Kette einzeln ab.
+check('9: die Tier-2-Rohstoffe sind gefunden', t2Keys.length >= 7, t2Keys);
 const resOhne = [...resKeys, ...t2Keys].filter(k => !RESICONS.has(k));
 check('9: jeder Rohstoff, der in einer Kostenzeile landen kann, hat ein RES_ICONS-Symbol',
   resOhne.length === 0, resOhne);
