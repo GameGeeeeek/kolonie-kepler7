@@ -493,6 +493,33 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     nach Tests, die das ALTE Verhalten als Regel prüfen (`grep -ln "eiste" tests/*.js`), nicht erst
     nach dem Fehlschlag. Dieselbe Familie wie Regel 32/40: Eine zu enge Suche ist kein Beweis –
     hier kostet sie je einen vollen Lauf.
+46. **Ein Patchnote, der eine Behebung beschreibt, ZITIERT die alte Formulierung – und reißt damit
+    den Test für genau diese Behebung.** Vorfall 16.08.2026: Der Hilfetext sagte „sieben
+    Seltenheitsstufen"; die Behebung stellte ihn auf eine Ableitung um, und der Test hielt das mit
+    `!JS.includes('sieben Seltenheitsstufen')` fest. Grün. Eine Stunde später fiel er – weil der
+    Patchnote zu eben dieser Auslieferung den alten Wortlaut zitiert, um zu erklären, was behoben
+    wurde. Die Prüfung durchsuchte die GANZE Datei und fand ihren eigenen Behebungs-Eintrag wieder.
+    Das ist dieselbe Familie wie Punkt 6, zweite Hälfte (ein Kommentar zitiert denselben Text), nur
+    eine Etage größer und mit einer Besonderheit: **PATCHNOTES sind unveränderliche Historie**, man
+    kann den Wortlaut dort also nicht anpassen – die Prüfung muss sich anpassen.
+    **Vorgehen:** Jede Prüfung der Form „dieser Text steht NICHT mehr in der Datei" schneidet den
+    PATCHNOTES-Block vorher heraus:
+    ```js
+    const OHNE_HISTORIE = (() => {
+      const v = S.indexOf('  const PATCHNOTES = [');
+      const b = v < 0 ? -1 : S.indexOf('\n  ];', v);
+      return (v >= 0 && b > v) ? S.slice(0, v) + S.slice(b) : S;
+    })();
+    ```
+    Positive Prüfungen („der Text steht da") sind unkritisch – nur die verneinenden. Und beim
+    Schreiben eines Patchnotes lohnt der Gedanke: Zitiere ich hier gerade eine Zeichenkette, auf
+    die ein Test negativ prüft?
+
+    **Nachtrag zur Fehlersuche selbst:** Der erste Verdacht war regelkonform der veraltete
+    Backend-Klon (Regel 22) – er war tatsächlich zwei Commits zurück, und nach dem Nachziehen
+    blieben die Tests trotzdem rot, nur mit ANDEREN Fehlschlägen. Ein bestätigter erster Verdacht
+    ist nicht automatisch die Ursache; erst der zweite Blick auf die konkrete Fehlermeldung führte
+    zum Patchnote. Ein veralteter Nachbar kann gleichzeitig wahr und irrelevant sein.
 
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
