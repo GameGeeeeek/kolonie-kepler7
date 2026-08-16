@@ -3621,6 +3621,10 @@
           <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-adjustments" aria-hidden="true"></i></div><div><div class="bname">Zweispaltiges Layout</div><div class="bmeta">Kurze Abschnitte nebeneinander (nur auf breiten Bildschirmen)</div></div></div>
           <div class="toggle-switch" id="uiTwoColSwitch"><div class="toggle-knob"></div></div>
         </div>
+        <div class="card-row" id="uiSektorKarteToggleRow" role="button" tabindex="0" style="cursor:pointer; margin-top:8px;">
+          <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-map-2" aria-hidden="true"></i></div><div><div class="bname">Sektoren-Karte</div><div class="bmeta">Die Galaxiekarte in festen Ansichten: Übersicht mit acht antippbaren Sektorregionen statt freiem Zoomen - „Zurücksetzen" führt zur Übersicht zurück</div></div></div>
+          <div class="toggle-switch" id="uiSektorKarteSwitch"><div class="toggle-knob"></div></div>
+        </div>
 <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-bell" aria-hidden="true"></i>Server-Ereignis-Benachrichtigungen</div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;" id="notifPrefsCard">
           <div class="bmeta" style="margin-bottom:8px;">Bestimmt, ob und für welche Ereignisse der Server ein Postfach-Ereignis (Berichte-Tab) UND eine echte Push-Benachrichtigung an dieses Gerät schickt.</div>
@@ -6960,8 +6964,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.528.0';
+  const VERSION = '8.529.0';
   const PATCHNOTES = [
+    { version:'8.529.0', date:'16.08.2026', changes:[
+      '<strong>Neue Einstellung „Sektoren-Karte": die Galaxie in festen Ansichten statt freiem Zoomen.</strong> Wer sie einschaltet (Einstellungen → Übersichtlichkeit), sieht im Karte-Tab zuerst eine Übersicht der ganzen Galaxie, aufgeteilt in acht benannte Sektorregionen – Kepler-Kern, Wispern-Drift, Solmark-Reichweite, Obsidian-Saum, Meridian-Weiten, Pulsar-Felder, Ilyra-Tiefen und Randmarken. Jede Region zeigt ihre Systeme als Punkte, ihren Namen und die Systemzahl; die Heimatregion trägt das 🏠. Ein Tipp auf die Region springt direkt in den passenden Kartenausschnitt, „Zurücksetzen" führt zur Übersicht zurück.',
+      'Die Zuordnung der Systeme zu ihren Sektoren rechnet das Spiel selbst über die Sternpositionen aus – es gibt keine zweite gepflegte Liste, die beim nächsten neuen System veralten könnte; ein künftiges System gehört automatisch zur nächstgelegenen Region. Das ist die erste Etappe des abgenommenen Karten-Modells B („eine echte Sternkarte in festen Ansichten"): Als Nächstes bekommt der geöffnete Sektor seine eigene, kuratierte Ansicht mit daumengroßen Zielen und frei liegenden Asteroidenfeldern. Standardmäßig aus – am bisherigen Freiflug ändert sich ohne die Einstellung nichts.'
+    ]},
     { version:'8.528.0', date:'16.08.2026', changes:[
       '<strong>Tier 3 ist da – und diesmal steht der Abnehmer von Anfang an fest.</strong> Zwei neue Stoffe eine Etage über Metamaterial und Singularitätskernen: <strong>Hohlraumgitter</strong> (Forschung <em>Hohlraum-Geometrie</em>) aus Metamaterial-Gewebe, Hochenergiekristallen und Kristallen, und <strong>Kausalanker</strong> (Forschung <em>Kausalanker-Theorie</em>) aus Singularitätskernen, KI-Kernen und Antimaterie. Beide bündeln vorhandenes Tier-2-Material, statt eine parallele Insel zu bauen.',
       '<strong>Der Kausalitätsbrecher</strong> – das stärkste Schiff des Spiels: <strong>340 Angriff und 120 Schild</strong>, beides Höchstwerte. Gebaut aus 6 Hohlraumgittern und 4 Kausalankern. Der Preis steht in seiner Geschwindigkeit: mit 34 ist er das langsamste Kampfschiff und bremst jede Flotte aus, in der er mitfliegt. Er ist das einzige Schiff, das man ohne Bergbau überhaupt nicht bauen kann.',
@@ -12947,6 +12955,29 @@
      Streuung koennte der Zufall alle zwanzig in eine Ecke legen - bei zehn Konten waere das kein
      Balance-Problem, sondern ein kaputtes Feature. Versteckte Systeme (Endgame-Anomalien) bleiben
      aussen vor. */
+  // ===== Sektoren der Galaxiekarte (Modell B, Etappe KB-1) =====================================
+  // Acht Regionen mit festen Zentren im gx/gy-Raum. Die Zuordnung eines Systems ist IMMER das
+  // nächstgelegene Zentrum - bewusst keine Liste je System, die beim nächsten neuen System
+  // veralten würde. Namen lehnen sich an prominente Mitglieder an; desc erscheint auf der
+  // Übersichts-Tafel (Hausregel 7: neuer Inhalt braucht vollständige Beschreibung).
+  const SEKTOR_DEFS = [
+    { key:'kepler',   name:'Kepler-Kern',        cx:459, cy:289, tint:'#fac775', desc:'Der Heimatcluster um das Kepler-System - dichter besiedelt als jede andere Region, hier beginnt jede Kolonie.' },
+    { key:'wispern',  name:'Wispern-Drift',      cx:441, cy:89,  tint:'#85b7eb', desc:'Der stille Norden um Wispern-Nebel und Chronos-Gürtel - weite Wege, ergiebige Gürtelbahnen.' },
+    { key:'solmark',  name:'Solmark-Reichweite', cx:652, cy:137, tint:'#e05a58', desc:'Das Grenzland um Solmark und die Nyra-Weiten - umkämpft, aber reich an Anomalien.' },
+    { key:'obsidian', name:'Obsidian-Saum',      cx:811, cy:151, tint:'#f0997b', desc:'Der äußerste Ostrand um den Obsidian-Gürtel - wer hier ankommt, hat die halbe Galaxie hinter sich.' },
+    { key:'meridian', name:'Meridian-Weiten',    cx:812, cy:403, tint:'#e0e4f5', desc:'Die Südost-Ausläufer um den Meridian-Kern - alte Handelspfade, verstreute Höfe.' },
+    { key:'pulsar',   name:'Pulsar-Felder',      cx:597, cy:355, tint:'#8f86e8', desc:'Das Strahlungsfeld um den Pulsar-Ring - Navigation verlangt Erfahrung, belohnt sie aber.' },
+    { key:'ilyra',    name:'Ilyra-Tiefen',       cx:251, cy:411, tint:'#9fe1cb', desc:'Der tiefe Südwesten um Ilyra-Strom und die Dunwich-Passage - dünn kartiert, voller Passagen.' },
+    { key:'rand',     name:'Randmarken',         cx:227, cy:192, tint:'#8d92ae', desc:'Der Westsaum um Der Rand und die Oort-Schleuse - die letzte Reihe Sterne vor der Leere.' }
+  ];
+  function sektorVon(sy){
+    let best = SEKTOR_DEFS[0], bd = Infinity;
+    for (const sk of SEKTOR_DEFS){
+      const d = (sy.gx - sk.cx)*(sy.gx - sk.cx) + (sy.gy - sk.cy)*(sy.gy - sk.cy);
+      if (d < bd){ bd = d; best = sk; }
+    }
+    return best;
+  }
   let _guertelCache = null;
   function guertelSysteme(){
     if (_guertelCache) return _guertelCache;
@@ -27735,6 +27766,7 @@
     if (state.uiTwoColumn === undefined) state.uiTwoColumn = false;
     if (state.uiHideLockedShips === undefined) state.uiHideLockedShips = false;
     if (state.uiHideMaxed === undefined) state.uiHideMaxed = false;
+    if (state.uiSektorKarte === undefined) state.uiSektorKarte = false;
     if (!state.collapsedSections) state.collapsedSections = {};
     if (!state.favoritePlanets) state.favoritePlanets = {};
     if (state.lastLoginDate === undefined) state.lastLoginDate = null;
@@ -51318,7 +51350,8 @@
       // render(), aber ohne diesen Signatur-Anteil wäre der grüne Ring erst mit dem 5-s-Vollbau
       // erschienen. Das Feld ist klein (wenige kB) - der stringify kostet Mikrosekunden.
       JSON.stringify(state.asteroidFeld||{}),
-      JSON.stringify(state.peilungen||[])
+      JSON.stringify(state.peilungen||[]),
+      (state.uiSektorKarte ? 'S' : 'F') + (karteSektorOffen || '')
     ].join('§');
   }
   function galaxyBauNachGeste(){
@@ -51602,6 +51635,74 @@
   // dem Zustand gespiegelt (drei classList-Toggles, billig) - so stimmt die Anzeige auch nach
   // einem Spielstand-Load, der NACH der Verdrahtung passiert.
   function karteEbeneAn(k){ const e = state.karteEbenen || {}; return e[k] !== false; }
+  // ===== Sektoren-Übersicht (Modell B, Etappe KB-1) ============================================
+  // Ebene 1 der Sektoren-Karte: alle Regionen als konvexe Hüllen um ihre Mitgliedssysteme,
+  // direkt antippbar. karteSektorOffen hält den geöffneten Sektor (KB-1: gezoomter Freiflug-
+  // Ausschnitt; KB-2 ersetzt das durch die kuratierte Sektoransicht).
+  let karteSektorOffen = null;
+  function konvexeHuelle(punkte){
+    const p = punkte.slice().sort((a,b) => a[0]-b[0] || a[1]-b[1]);
+    const kreuz = (o,a,b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+    const unten = [], oben = [];
+    for (const q of p){ while (unten.length >= 2 && kreuz(unten[unten.length-2], unten[unten.length-1], q) <= 0) unten.pop(); unten.push(q); }
+    for (let i = p.length-1; i >= 0; i--){ const q = p[i]; while (oben.length >= 2 && kreuz(oben[oben.length-2], oben[oben.length-1], q) <= 0) oben.pop(); oben.push(q); }
+    unten.pop(); oben.pop();
+    return unten.concat(oben);
+  }
+  function sektorMitglieder(){
+    const gruppen = new Map(SEKTOR_DEFS.map(sk => [sk.key, []]));
+    for (const sy of STAR_SYSTEMS.filter(x => !x.hidden)) gruppen.get(sektorVon(sy).key).push(sy);
+    return gruppen;
+  }
+  function sektorUebersichtBauen(svg){
+    const gruppen = sektorMitglieder();
+    const alle = STAR_SYSTEMS.filter(x => !x.hidden);
+    const xs = alle.map(x => x.gx), ys = alle.map(x => x.gy);
+    const x0 = Math.min.apply(null, xs) - 45, x1 = Math.max.apply(null, xs) + 45;
+    const y0 = Math.min.apply(null, ys) - 45, y1 = Math.max.apply(null, ys) + 45;
+    svg.setAttribute('viewBox', x0.toFixed(1) + ' ' + y0.toFixed(1) + ' ' + (x1-x0).toFixed(1) + ' ' + (y1-y0).toFixed(1));
+    let inner = '', gesamt = 0;
+    for (const sk of SEKTOR_DEFS){
+      const mg = gruppen.get(sk.key);
+      if (!mg.length) continue;
+      gesamt += mg.length;
+      const schwerX = mg.reduce((a,p) => a+p.gx, 0) / mg.length;
+      const schwerY = mg.reduce((a,p) => a+p.gy, 0) / mg.length;
+      const huelle = konvexeHuelle(mg.map(p => [p.gx, p.gy]));
+      const auf = huelle.map(function(q){
+        const dx = q[0]-schwerX, dy = q[1]-schwerY, l = Math.hypot(dx,dy) || 1;
+        return (q[0] + dx/l*22).toFixed(1) + ',' + (q[1] + dy/l*22).toFixed(1);
+      });
+      const heimDrin = mg.some(p => p.id === myHomeSystem);
+      inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + sk.name + ' öffnen">'
+        + '<path d="M' + auf.join(' L') + ' Z" fill="' + sk.tint + '" fill-opacity="0.10" stroke="#39426b" stroke-width="1.4" stroke-linejoin="round"/>'
+        + mg.map(p => '<circle cx="' + p.gx + '" cy="' + p.gy + '" r="2.4" fill="' + sk.tint + '" opacity="0.85"/>').join('')
+        + '<text x="' + schwerX.toFixed(0) + '" y="' + schwerY.toFixed(0) + '" text-anchor="middle" style="font:600 15px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;">' + (heimDrin ? '🏠 ' : '') + sk.name + '</text>'
+        + '<text x="' + schwerX.toFixed(0) + '" y="' + (schwerY+16).toFixed(0) + '" text-anchor="middle" style="font:10.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + mg.length + ' Systeme</text>'
+        + '</g>';
+    }
+    svg.dataset.sektorSumme = gesamt;
+    svg.innerHTML = inner;
+    // Der Freiflug-Zwischenspeicher gilt fuer dieses Markup nicht - beim naechsten Freiflug-Aufbau
+    // MUSS neu gezeichnet werden.
+    lastGalaxyMapMarkup = null;
+    svg.querySelectorAll('[data-sektor]').forEach(function(g){
+      g.onclick = function(){ sektorOeffnenKB(g.getAttribute('data-sektor')); };
+      g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); sektorOeffnenKB(g.getAttribute('data-sektor')); } };
+    });
+  }
+  function sektorOeffnenKB(key){
+    const mg = sektorMitglieder().get(key) || [];
+    if (!mg.length) return;
+    karteSektorOffen = key;
+    const xs = mg.map(p => p.gx), ys = mg.map(p => p.gy);
+    const x0 = Math.min.apply(null, xs) - 55, x1 = Math.max.apply(null, xs) + 55;
+    const y0 = Math.min.apply(null, ys) - 55, y1 = Math.max.apply(null, ys) + 55;
+    galaxyMapViewBox = { x: x0, y: y0, w: x1-x0, h: y1-y0 };
+    clampGalaxyViewBox();
+    lastGalaxyMapMarkup = null;
+    buildGalaxyMap();
+  }
   function buildGalaxyMap(){
     // Messpunkt (Etappe G-1): zählt die String-Aufbauten. Von außen beobachtbar, weil der
     // Markup-Vergleich am Ende eingesparte wie durchgeführte Aufbauten sonst unsichtbar macht -
@@ -51615,6 +51716,10 @@
     // Ist das SVG leer (erster Aufbau, Tab-Wechsel, Wiederherstellung nach einem Fehler), muss neu
     // geschrieben werden, auch wenn das Markup identisch waere.
     if (!svg.firstChild) lastGalaxyMapMarkup = null;
+    // Sektoren-Karte (Modell B, Etappe KB-1): Mit aktiver Einstellung ersetzt die Sektoren-
+    // Übersicht die Freiflug-Galaxie, solange kein Sektor geöffnet ist. Ein geöffneter Sektor
+    // nutzt in KB-1 die bestehende Freiflug-Zeichnung auf den Sektor-Ausschnitt gezoomt.
+    if (state.uiSektorKarte && !karteSektorOffen){ sektorUebersichtBauen(svg); return; }
     let inner = `<defs>
       ${SUN_TYPES.map(t => `<radialGradient id="miniSunGlow-${t.key}" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="${t.core}" stop-opacity="0.9"/>
@@ -59246,6 +59351,8 @@
     if (uiCollapsibleSwitch) uiCollapsibleSwitch.classList.toggle('on', !!state.uiCollapsibleSections);
     const uiTwoColSwitch = document.getElementById('uiTwoColSwitch');
     if (uiTwoColSwitch) uiTwoColSwitch.classList.toggle('on', !!state.uiTwoColumn);
+    const uiSektorKarteSwitch = document.getElementById('uiSektorKarteSwitch');
+    if (uiSektorKarteSwitch) uiSektorKarteSwitch.classList.toggle('on', !!state.uiSektorKarte);
 
     const autoExploreSwitch = document.getElementById('autoExploreSwitch');
     if (autoExploreSwitch) autoExploreSwitch.classList.toggle('on', !!state.autoExploreOn || !!state.autoExploreTour);
@@ -60607,6 +60714,12 @@
     if (uiCollapsibleToggleBtn) uiCollapsibleToggleBtn.onclick = () => { state.uiCollapsibleSections = !state.uiCollapsibleSections; render(); save(); };
     const uiTwoColToggleBtn = document.getElementById('uiTwoColToggleRow');
     if (uiTwoColToggleBtn) uiTwoColToggleBtn.onclick = () => { state.uiTwoColumn = !state.uiTwoColumn; render(); save(); };
+    const uiSektorKarteToggleBtn = document.getElementById('uiSektorKarteToggleRow');
+    if (uiSektorKarteToggleBtn) uiSektorKarteToggleBtn.onclick = () => {
+      state.uiSektorKarte = !state.uiSektorKarte;
+      karteSektorOffen = null; lastGalaxyMapMarkup = null;
+      render(); save();
+    };
     const notifToggleBtn = document.getElementById('notifToggleRow');
     if (notifToggleBtn) notifToggleBtn.onclick = async () => {
       if (!state.notifOn){
@@ -60881,6 +60994,7 @@
     const zoomResetBtn = document.getElementById('galaxyZoomResetBtn');
     if (zoomResetBtn) zoomResetBtn.onclick = () => {
       if (galaxyOpenSystem){ galaxySchliesse(); return; }
+      if (state.uiSektorKarte && karteSektorOffen){ karteSektorOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); return; }
       // Der belegte Bereich statt des vollen Feldes: Von 277 Plätzen sind 69 vergeben, das volle
       // Feld zeigte die Galaxie deshalb als kleinen Fleck in der Bildmitte - ausgerechnet der Knopf,
       // den man drückt, um wieder Übersicht zu bekommen.

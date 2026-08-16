@@ -174,7 +174,14 @@ check('5b-3: Minentechnik ist nicht-endlos und hat eine Maximalstufe - allResear
 if (K) {
   // Jede Größe braucht einen Eintrag. Eine fünfte Größe ohne Eintrag ergäbe still 0 Protomaterie -
   // der Brocken wäre da, gäbe nichts, und niemand wüsste warum. Aus den Daten abgeleitet.
-  const groessen = [...S.matchAll(/\{ key:'(splitter|brocken|kern|koloss)',\s+name:'/g)].map(m => m[1]);
+  // Auf den ASTEROID_GROESSEN-Block begrenzt (16.08.2026, Hausregel 33): Der Zähler lief vorher
+  // über den GESAMTEN Quelltext und riss, als ein Sektor-Schlüssel 'kern' hieß - die Größen-Keys
+  // sind keine dateiweit eindeutigen Wörter. Anker-Existenz zuerst (Hausregel 6).
+  const grStart = S.indexOf('ASTEROID_GROESSEN');
+  const grEnde = S.indexOf('];', grStart);
+  check('6a-vorab: der ASTEROID_GROESSEN-Block ist auffindbar', grStart >= 0 && grEnde > grStart, { grStart, grEnde });
+  const grBlock = grStart >= 0 && grEnde > grStart ? S.slice(grStart, grEnde) : '';
+  const groessen = [...grBlock.matchAll(/\{ key:'(splitter|brocken|kern|koloss)',\s+name:'/g)].map(m => m[1]);
   const fehlend = groessen.filter(g => K.fuhre[g] === undefined);
   check('6a: jede Asteroidengröße hat einen Eintrag (eine ohne gäbe still 0)',
     groessen.length === 4 && fehlend.length === 0, { groessen, fehlend });
