@@ -337,6 +337,33 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     statt in einer späteren Sitzung. Und für Tests am Angriffs-Endpunkt gilt: Frisch angelegte
     Konten sind unangreifbar, `db.private[<id>].__attackShieldUntil` muss in der Vorbereitung auf 0.
 
+38. **Eine Zahl in einem Text aus einer Konstante ABZULEITEN geht nur, wenn die Konstante WEITER
+    OBEN in der Datei steht – und der Syntax-Check sagt das nicht.** Vorfall 16.08.2026, dreimal am
+    selben Tag. Der richtige Reflex („die Zahl aus der Konstante holen, dann kann sie nicht
+    veralten") läuft in eine Falle, sobald der Text in einem Array-Literal steht, das beim LADEN
+    ausgewertet wird: `CREDIT_SHOP`, `HELP_SECTIONS`, `MEGA_PROJECTS`, jedes `*_DEFS`. Eine
+    `const`, die weiter unten steht, liegt zu diesem Zeitpunkt in der temporalen Todeszone – der
+    Zugriff wirft einen `ReferenceError`, und das Spiel startet gar nicht erst. Konkret beinahe
+    passiert bei den Fragment-Fertigungskosten (`MODULE_FRAGMENT_CRAFT_COST` steht hinter
+    `CREDIT_SHOP`) und beim Hilfetext zu den Mega-Ausbaustufen (`MEGA_STAGE_COST_MULT` steht hinter
+    `HELP_SECTIONS`). **Der Syntax-Check findet das NICHT**, weil `new Function(...)` nur parst und
+    nie ausführt; erst der JSDOM-Boot des vollen Prüflaufs würde es fangen – eine halbe Stunde
+    später. **Vorgehen:** Vor jeder Ableitung die Reihenfolge messen, nicht schätzen –
+    `node -e "const s=…; console.log(s.indexOf('const ZIEL') < s.indexOf('const QUELLE'))"`. Steht
+    die Quelle dahinter, gehört dort ein fester, korrekter Wert hin (mit Kommentar, warum nicht
+    abgeleitet). Funktionsaufrufe sind unkritisch, die sind hochgezogen – nur `const`/`let` nicht.
+39. **Ein Schlüssel kann in MEHREREN Tabellen vorkommen – eine ungescopte Suche greift die
+    falsche.** Vorfall 16.08.2026: `test_mega_tier2` suchte die Zeile mit `key:'forschungsnexus'`
+    über die ganze Datei. Der Schlüssel existiert aber zweimal: einmal als Mega-Projekt
+    (Zeile 43671) und einmal als ERFOLG „Wächter des Wissens" (Zeile 18789). `.find()` liefert den
+    ersten Treffer, also den Erfolg – der Test prüfte die falsche Tabelle und fiel durch, obwohl
+    der Code stimmte. Das ist dieselbe Familie wie Regel 6 (Kommentar zitiert denselben Text) und
+    Regel 5 (ungescopter `querySelector`), nur eine Ebene höher: nicht ein Kommentar neben dem
+    Code, sondern eine zweite Tabelle mit denselben Schlüsseln. **Vorgehen:** Jede Suche nach einem
+    Eintrag zuerst auf den Block seiner Tabelle beschränken (`S.slice(vonTabelle, bisTabelle)`), und
+    beim Anlegen eines neuen Schlüssels kurz `grep -c "key:'<name>'"` – ist die Zahl größer als 1,
+    muss jede Prüfung darauf gescopt sein.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
