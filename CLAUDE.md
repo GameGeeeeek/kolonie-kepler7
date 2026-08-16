@@ -571,6 +571,33 @@ Der „nginx auf dem Pi" ist **kein systemd-nginx**, sondern läuft als **Docker
   (der Befehl unten ist deshalb die vollständige Liste, nicht der Zusatz); (b) der Live-Check nach
   einem Merge läuft über `www.` – über den Apex geprüft wäre der Ausfall unsichtbar geblieben,
   genau das ist hier fast passiert.
+
+  **BEHOBEN am 16.08.2026 – der Ausfall lief sechs Tage.** Er wurde am 14.08. gefunden und
+  dokumentiert, aber nicht repariert; die Renewal-Config schrieb den unvollständigen Namenssatz
+  bis dahin unbefristet fort. Der Befehl unten (mit `--expand` und der VOLLSTÄNDIGEN Liste) hat ihn
+  in einem Zug korrigiert – Trockenlauf sauber, echter Lauf ohne Ausfall, `nginx -s reload`, fertig.
+  Danach von außen gegengemessen:
+  ```
+  X509v3 Subject Alternative Name:
+      DNS:gamegeeeeek.de, DNS:social.gamegeeeeek.de, DNS:www.gamegeeeeek.de
+  notBefore=Aug 16 08:01:09 2026 GMT   notAfter=Nov 14 08:01:08 2026 GMT
+  ```
+  Alle drei Namen antworten wieder mit 200; `www.` hatte vorher mit einem TLS-Fehler abgebrochen
+  (curl-Exit 60). Weil `--expand` die Liste IN DIE RENEWAL-CONFIG schreibt, zieht das nächtliche
+  `certbot renew` ab jetzt alle drei Namen fort – das ist die eigentliche Reparatur, nicht das
+  einzelne Zertifikat.
+
+  **Zwei Vorprüfungen, die vor so einem Lauf zwei Minuten kosten und einen Fehlschlag ersparen**
+  (beide vorher gefahren): (a) Lösen alle Namen auf DIESELBE Adresse? (`getent hosts <name>` je
+  Name – zeigt einer woandershin, scheitert dessen Challenge und der ganze Lauf bricht ab);
+  (b) wird `http://<name>/.well-known/acme-challenge/x` direkt bedient? Erwartet ist **404 ohne
+  Umleitung** – eine 301 auf https hieße, dass die `.well-known`-Ausnahme in der nginx.conf fehlt
+  und die Webroot-Challenge nicht durchkommt.
+
+  **Und der Grund, warum `--cert-name gamegeeeeek.de` im Befehl steht:** Ohne diesen Zusatz legt
+  certbot eine ZWEITE Linie an (`gamegeeeeek.de-0001`), während die `ssl_certificate`-Pfade der
+  nginx.conf weiter auf die alte zeigen. Der Lauf meldete dann Erfolg, und live änderte sich
+  nichts – ein Fehlschlag, der wie ein Erfolg aussieht.
 - **Neu ausstellen/erweitern** (downtime-frei, Webroot-Challenge über den laufenden Container – **kein** nginx.conf-Edit nötig, `--cert-name` hält die Linie stabil). Immer die VOLLSTÄNDIGE Namensliste angeben, nie nur den neuen Namen:
   ```
   docker run --rm -v /DATA/kepler7/certbot/conf:/etc/letsencrypt -v /DATA/kepler7/certbot/www:/var/www/certbot certbot/certbot certonly --webroot -w /var/www/certbot --cert-name gamegeeeeek.de -d gamegeeeeek.de -d www.gamegeeeeek.de -d social.gamegeeeeek.de --expand --non-interactive --agree-tos -m "$CERTBOT_MAIL"
