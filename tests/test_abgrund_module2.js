@@ -102,19 +102,46 @@ check('die mythische SCHIFFS-Schmiede ebenso',
 // Abgrund oeffnet: Wer nie tauchte, konnte sich alle acht Abgrund-Standortmodule schlicht kaufen.
 // Deshalb steht hier jetzt eine Zaehlung ueber BEIDE MODULE_DEFS-Listen statt eines einzelnen
 // Treffers - ein blosses .test() waere schon vorher gruen gewesen, weil die Schmelze es erfuellt.
-check('die mythische STANDORT-Schmiede filtert ebenfalls ueber fundPool',
-  (js.match(/fundPool\(MODULE_DEFS\)\.map\(def =>/g) || []).length === 2,
+// Untergrenze statt fester Zahl (16.08.2026, Arbeitsregel 33): Mit der Urmaterie-Schmiede sind es
+// drei MODULE_DEFS-Knopflisten, und jede weitere Schmiede bringt eine weitere. Die Aussage ist
+// "jede dieser Listen ist gefiltert", nicht "es sind genau zwei" - und das Gegenstueck dazu, die
+// Pruefung auf eine UNGEFILTERTE Liste, steht direkt darunter und faengt den eigentlichen Fehler.
+check('jede MODULE_DEFS-Knopfliste filtert ueber fundPool',
+  (js.match(/fundPool\(MODULE_DEFS\)\.map\(def =>/g) || []).length >= 2,
   (js.match(/fundPool\(MODULE_DEFS\)\.map\(def =>/g) || []).length);
 check('keine ungefilterte MODULE_DEFS-Knopfliste mehr',
   !/\+ MODULE_DEFS\.map\(def => `<button/.test(js));
 // Und die Handler dahinter - eine Liste ohne Knopf ist keine Sperre.
 check('craftModuleFromFragments sperrt Abgrund-Module im HANDLER',
   /if \(\(def\.quelle\|\|HERKUNFT_NORMAL\) === HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht nachbauen/.test(js));
-check('craftMythicShipModule ebenso',
-  /if \(\(def\.quelle\|\|HERKUNFT_NORMAL\) === HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht schmieden/.test(js));
-// Beide mythischen Handler muessen die Sperre tragen, nicht nur der fuer Schiffsmodule.
-check('craftMythicLocationModule ebenso',
-  (js.match(/=== HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht schmieden/g) || []).length === 2,
+/* Seit dem 16.08.2026 laufen ALLE VIER Schmiede-Knoepfe (Standort/Schiff x mythisch/primordial)
+   durch eine einzige Funktion, craftForgedModule - genau deshalb, weil die Dopplung diese Sperre
+   schon einmal verschluckt hat (siehe der Absatz oben). Die Pruefung ist damit staerker als
+   vorher: Sie verlangt die Sperre an der EINEN Stelle UND dass jeder Einstieg dorthin delegiert.
+   Ein neuer fuenfter Schmiede-Knopf, der die Sperre umgeht, faellt hier auf; vorher haette man ihn
+   nur bemerkt, wenn jemand eine weitere namentliche Pruefung nachgetragen haette. */
+const schmiedeVon = js.indexOf('function craftForgedModule(isShip, defKey, plan){');
+const schmiedeBis = schmiedeVon < 0 ? -1 : js.indexOf('\n  }', schmiedeVon);
+const schmiede = (schmiedeVon >= 0 && schmiedeBis > schmiedeVon) ? js.slice(schmiedeVon, schmiedeBis) : '';
+check('die gemeinsame Schmiede-Funktion ist auffindbar', schmiede.length > 200, schmiede.length);
+check('sie sperrt Abgrund-Ausruestung im HANDLER',
+  /=== HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht schmieden/.test(schmiede));
+check('und Unikate ebenso',
+  /=== HERKUNFT_UNIKAT\)\{ log\('Unikate lassen sich nicht schmieden/.test(schmiede));
+// JEDER Einstieg muss dorthin delegieren - eine Kopie mit eigenem Rumpf waere wieder die Wette,
+// die 2026 einmal verloren wurde.
+const einstiege = ['craftMythicLocationModule','craftMythicShipModule','craftPrimordialLocationModule','craftPrimordialShipModule'];
+const ohneDelegation = einstiege.filter(fn => {
+  const i = js.indexOf('function ' + fn + '(defKey){');
+  return i < 0 || js.slice(i, i + 200).indexOf('craftForgedModule(') < 0;
+});
+check('alle vier Schmiede-Einstiege delegieren an die gesperrte Funktion', ohneDelegation.length === 0, ohneDelegation);
+// Und sie steht GENAU EINMAL. Das ist die eigentliche Lehre aus dem Vorfall: Nicht die fehlende
+// Sperre war das Problem, sondern dass es zwei Stellen gab, an denen sie haette stehen muessen -
+// eine zweite Kopie kann wieder auseinanderlaufen. Taucht hier jemals wieder eine zweite auf, ist
+// das ein Befund, auch wenn beide im selben Moment noch identisch sind.
+check('die Schmiede-Sperre existiert genau EINMAL (keine zweite Kopie, die driften kann)',
+  (js.match(/=== HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht schmieden/g) || []).length === 1,
   (js.match(/=== HERKUNFT_ABGRUND\)\{ log\('Ausrüstung aus dem Abgrund lässt sich nicht schmieden/g) || []).length);
 // Der alte, handgeschriebene Filter darf nicht zurueckkommen.
 check('kein handgeschriebener Klassenfilter mehr, der die Herkunft uebersieht',

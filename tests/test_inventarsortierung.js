@@ -42,8 +42,12 @@ const rarBis = rarVon < 0 ? -1 : JS.indexOf('};', rarVon);
 check('1d: MODULE_RARITY-Block gefunden', rarVon > 0 && rarBis > rarVon);
 const rarBlock = JS.slice(rarVon, rarBis);
 const rarKeys = [...rarBlock.matchAll(/^\s{4}(\w+):\s*\{/gm)].map(m => m[1]);
-check('1e: die Seltenheits-Reihenfolge enthaelt alle sieben Stufen in Aufwaertsfolge',
-  rarKeys.length === 7 && rarKeys[0] === 'gewoehnlich' && rarKeys[6] === 'exotisch', rarKeys);
+// Auf die REGEL umgestellt: Die Sortierung braucht eine Aufwaertsfolge, die bei Gewoehnlich
+// beginnt - nicht eine bestimmte Laenge. Exotisch ist seit dem 16.08.2026 nicht mehr das Ende
+// (Primordial steht darueber), die gepruefte Eigenschaft gilt aber unveraendert.
+check('1e: die Seltenheits-Reihenfolge beginnt bei Gewoehnlich und enthaelt alle bekannten Stufen',
+  rarKeys.length >= 7 && rarKeys[0] === 'gewoehnlich'
+  && ['gewoehnlich','ungewoehnlich','selten','episch','legendaer','mythisch','exotisch'].every((k,i) => rarKeys[i] === k), rarKeys);
 
 const levelVon = JS.indexOf('function moduleLevelOf(instKey){');
 const wertVon = JS.indexOf('function moduleWertOf(instKey){');

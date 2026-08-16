@@ -402,6 +402,65 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     Eintrag zuerst auf den Block seiner Tabelle beschränken (`S.slice(vonTabelle, bisTabelle)`), und
     beim Anlegen eines neuen Schlüssels kurz `grep -c "key:'<name>'"` – ist die Zahl größer als 1,
     muss jede Prüfung darauf gescopt sein.
+40. **Eine namensbasierte Suche nach Anzeigestellen findet nur, woran man schon gedacht hat – die
+    musterbasierten Tests finden den Rest. Deshalb gehören sie VOR den vollen Lauf, nicht danach.**
+    Vorfall 16.08.2026, eine einzige Lieferung (achte Modulstufe): Vor dem ersten Zeichen Code wurde
+    ausdrücklich der Anzeigestellen-Durchgang gefahren, mit den drei Suchen aus der Checkliste. Er
+    fand neun Stellen – und übersah **neun weitere**, jede aus einem anderen Grund:
+    (a) Drei Nebentabellen heißen anders als das, wonach gesucht wurde (`MODULE_SELL_CREDITS`,
+    `MODULE_SUB_RANGE`, `SHIP_MODULE_RARITY_ORDER` – gesucht worden war nach `MODULE_RARITY` und
+    `MODULE_FRAGMENT_*`); (b) der Tutorial-Text nennt überhaupt keine Konstante, nur das Zahlwort
+    „sieben Seltenheiten von Gewöhnlich bis Exotisch" – nach *Zahlwörtern* hatte niemand gesucht,
+    obwohl `TUTORIAL_STEPS` wörtlich auf der Checkliste steht; (c) das Icon des neuen Erfolgs liegt
+    in einer eigenen Map (`ACH_ICONS`) weit weg vom Erfolg selbst.
+    Gefunden hat alle drei Gruppen **kein** Grep, sondern Tests, die *keine Namen kennen*:
+    `test_seltenheiten.js` prüft JEDE Nebentabelle gegen die geparste Rang-Ordnung,
+    `test_erfolgsicons.js` JEDEN `ACHIEVEMENTS`-Schlüssel gegen `ACH_ICONS`, `test_tutorial.js` die
+    Zahlwörter im Text gegen `Object.keys(...)`. Genau darin liegt ihr Wert: Sie finden auch, woran
+    niemand gedacht hat.
+    **Vorgehen:** Nach dem Bauen und **vor** dem vollen Lauf die Tests einzeln fahren, die den
+    geänderten Bereich anfassen – `grep -ln "GEAENDERTE_KONSTANTE\|Nachbarbegriff" tests/*.js`, dann
+    jeden Treffer starten. Das kostet zwei Minuten und hat an diesem Tag fünf Fehlschläge in EINEM
+    Rutsch sichtbar gemacht, die sonst über drei 25-Minuten-Läufe einzeln hereingetröpfelt wären
+    (jeder Lauf war nach dem ersten Fehlschlag ohnehin wertlos). Der volle Lauf bleibt Pflicht – er
+    ist die Absicherung, nicht das Suchwerkzeug.
+41. **Ein Konzept ist kein Messergebnis. Bevor eine Konzept-Zahl umgesetzt wird, wird sie
+    nachgerechnet – auch wenn das Konzept aus derselben Feder stammt.** Vorfall 16.08.2026: Das
+    Tier-3-Konzept sah Protomaterie als laufenden Eingangsstoff der beiden neuen Fabriken vor
+    (`protomaterie: 1` bzw. `2` je Einheit). Nachgerechnet frisst eine EINZIGE voll ausgebaute Kette
+    bei den üblichen Kettenraten rund 16 Protomaterie je Stunde, über zehn Standorte 162 – gegen
+    eine Einnahme von 11 bis 32. Der Bestand hätte dauerhaft bei null gestanden, rund um die Uhr
+    abgesaugt, und die Senke, die zwei Stunden vorher ausgeliefert worden war (Mega-Ausbaustufen ab
+    Stufe 6), wäre nie bezahlbar gewesen. Die Ursache war strukturell, nicht eine Frage der
+    Feinjustierung: **Eine Dauerfabrik skaliert mit Standorten und Stufen, eine flugzeitgebundene
+    Ressource tut das nicht** – die beiden Größen laufen zwangsläufig auseinander.
+    Dasselbe Konzept sprach außerdem von der „vierten Modulstufe über Legendär"; tatsächlich gab es
+    darüber längst zwei (Mythisch, Exotisch), es wäre die achte gewesen. **Vorgehen:** Jede Zahl und
+    jede Mengenangabe aus einem Konzept vor dem Umsetzen einmal gegen den echten Stand rechnen bzw.
+    greppen. Ein Konzept beschreibt die Absicht, nicht den Code.
+42. **Ein gezeichnetes Symbol in `RES_ICONS`/`ICONS` heißt nicht, dass die Oberfläche es auch
+    zeigt.** Vorfall 16.08.2026 (Spieler-Report Sascha mit Screenshot): Die Ressourcenkarte der
+    Protomaterie trug eine **Spitzhacke** – also das Werkzeug statt des Stoffes. Das handgezeichnete
+    SVG lag längst in `RES_ICONS`, die Karte hatte aber ein festes `<i class="ti ti-pick">` im
+    Markup. Zwei Wahrheiten für dasselbe Symbol, und die sichtbare war die falsche. Der eigene Test
+    hatte nur geprüft, DASS ein `RES_ICONS`-Eintrag existiert – nicht, dass ihn jemand benutzt.
+    **Vorgehen:** Nach dem Anlegen eines Symbols `grep -n "<schluessel>" weltraum_kolonie.html` und
+    nachsehen, ob die Anzeigestelle es wirklich einbindet; im Zweifel das Symbol aus der
+    ausgelieferten Datei ziehen und rendern (Playwright-Screenshot), statt es zu behaupten. Und
+    beim Zeichnen selbst: erst ansehen, dann behaupten – der erste Entwurf wirkte gerendert wie eine
+    Münze, der zweite war bei 20 px kaum von Erz zu unterscheiden. Beides fiel nur am Bild auf.
+43. **Wer zwei Kopien zu einer Funktion zusammenführt, macht die Tests darauf STÄRKER – nicht
+    passend.** Vorfall 16.08.2026: Die zwei fast wortgleichen Schmiede-Funktionen wurden auf eine
+    zusammengezogen (ihr eigener Kommentar dokumentierte, dass genau diese Dopplung schon einmal
+    eine Sicherheitssperre verschluckt hatte). Danach fiel `test_abgrund_module2`, weil er die
+    Sperre **wörtlich in beiden benannten Funktionen** verlangte. Die bequeme Lösung wäre gewesen,
+    die Prüfung auf „irgendwo vorhanden" abzuschwächen. Richtig war das Gegenteil: Sie prüft jetzt,
+    dass die Sperre **genau einmal** existiert (eine zweite Kopie kann wieder auseinanderlaufen –
+    das war der Vorfall) und dass **jeder** Einstieg dorthin delegiert. Ein fünfter Schmiede-Knopf
+    ohne Sperre fällt damit auf; vorher hätte ihn niemand bemerkt.
+    **Und die Verhaltensgleichheit wird ausgeführt, nicht gelesen:** Der Block wurde per
+    `new Function` mit einem Mini-Fixture gefahren und gemessen, dass Abgrund-Modul und Unikat
+    abgelehnt werden und ein normales Modul entsteht. „Der Code sieht gleich aus" ist kein Beleg.
 
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie

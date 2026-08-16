@@ -154,8 +154,17 @@ check('5a: die Boerse lehnt Unikate im Handler UND an beiden Knoepfen ab',
   /istUnikatModul\(isShip, instKey\)/.test(fnAus('listModuleOnMarket', 'moduleMarketInFlight = true')) &&
   JS.includes('!istUnikatModul(false, instKey) && !istAbgrundModul(false, instKey)?`<button data-offer-module') &&
   JS.includes('!istUnikatModul(true, instKey) && !istAbgrundModul(true, instKey)?`<button data-offer-shipmodule'));
-check('5b: alle drei Schmiede-Handler sperren Unikate',
-  (JS.match(/=== HERKUNFT_UNIKAT\)\{ log\('Unikate lassen sich nicht (fertigen|schmieden)/g) || []).length === 3);
+/* Seit dem 16.08.2026 laufen alle vier Schmiede-Knoepfe durch EINE Funktion (craftForgedModule),
+   die Sperre steht dort also nur noch einmal statt zweimal; die Fragment-Schmelze hat weiterhin
+   ihre eigene. Gezaehlt wird deshalb nicht mehr auf 3, sondern geprueft, dass JEDER Weg zu einem
+   Modul die Sperre passiert - das ist die eigentliche Aussage und haelt auch, wenn eine fuenfte
+   Schmiede dazukommt. */
+const unikatSperren = (JS.match(/=== HERKUNFT_UNIKAT\)\{ log\('Unikate lassen sich nicht (fertigen|schmieden)/g) || []).length;
+check('5b: jeder Fertigungsweg sperrt Unikate', unikatSperren >= 2, { sperren: unikatSperren });
+const einstiegeU = ['craftMythicLocationModule','craftMythicShipModule','craftPrimordialLocationModule','craftPrimordialShipModule'];
+check('5b2: und alle Schmiede-Einstiege gehen durch die gesperrte Funktion',
+  einstiegeU.every(fn => { const i = JS.indexOf('function ' + fn + '(defKey){'); return i >= 0 && JS.slice(i, i+200).indexOf('craftForgedModule(') >= 0; }),
+  einstiegeU.filter(fn => { const i = JS.indexOf('function ' + fn + '(defKey){'); return i < 0 || JS.slice(i, i+200).indexOf('craftForgedModule(') < 0; }));
 check('5c: beide Wurf-Knoepfe verschwinden fuer Unikate',
   JS.includes("${istUnikatModul(false, instKey)?'':`<button data-wertreroll-module=") &&
   JS.includes("${istUnikatModul(true, instKey)?'':`<button data-wertreroll-shipmodule="));

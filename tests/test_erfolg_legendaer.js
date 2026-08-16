@@ -33,7 +33,9 @@ const quelle = JS.slice(von, bis + 4);
 const rarVon = JS.indexOf('const MODULE_RARITY = {');
 const rarBis = JS.indexOf('};', rarVon);
 const rarKeys = [...JS.slice(rarVon, rarBis).matchAll(/^\s{4}(\w+):\s*\{/gm)].map(m => m[1]);
-check('1b: MODULE_RARITY-Reihenfolge extrahiert (7 Stufen)', rarKeys.length === 7, rarKeys);
+// Untergrenze statt fester Zahl (16.08.2026): Die Aussage ist "die Tabelle wurde gelesen", nicht
+// "es sind genau sieben" - mit Primordial sind es acht (Arbeitsregel 3).
+check('1b: MODULE_RARITY-Reihenfolge extrahiert', rarKeys.length >= 7, rarKeys);
 const RARITY_STUB = '{' + rarKeys.map(k => k + ':{}').join(',') + '}';
 const helfer = new Function('const MODULE_RARITY = ' + RARITY_STUB + ';\n' + quelle
   + '\nreturn equippedMindestensLegendaer;')();
