@@ -2,6 +2,24 @@
 
 Browserbasiertes Weltraum-Kolonie-Idle-Spiel, komplett in **einer Datei** `weltraum_kolonie.html` (~56.400 Zeilen: HTML + CSS + Vanilla-JS in `<script>`, kein Build-Schritt, kein Framework). Deployt auf Saschas Raspberry Pi (nginx), erreichbar unter `gamegeeeeek.de` / `www.gamegeeeeek.de` per DynDNS (Domain-Offensive) – **nicht** über GitHub Pages (dort ist Pages deaktiviert, Stand 20.07.2026).
 
+## Lokale KI-Infrastruktur (GameGeeeeek AI Hub)
+
+Seit 16.08.2026 ist der komplette Quelltext dieses Repos (plus Backend und Social Hub) in
+einer lokalen RAG-Wissensbasis auf Saschas M715q indexiert. Fragen wie „wo wird der
+Kampfbericht erzeugt?" lassen sich darüber beantworten, ohne die 60.000-Zeilen-Datei in
+einen Prompt zu kopieren – `POST /kepler/ask` gegen AI Core (`192.168.178.45:8000`),
+Antwort kommt mit Datei- und Zeilenangabe.
+
+**Wichtig:** Der Index veraltet mit jedem Release. Nach größeren Änderungen an
+`weltraum_kolonie.html` gehört ein erneuter Ingestion-Lauf dazu (Befehl in
+`gamegeeeeek-ai-core/README.md`) – eine Automatisierung dafür steht noch aus.
+
+Gesamtbild, Roadmap und was als Nächstes gebaut wird (Coding Agent, Test Agent, Game
+Designer, KI-Kampfberichte, Mission Generator, NPCs, Wiki-Assistent):
+**`gamegeeeeek-ai-core/docs/AI-HUB-ROADMAP.md`**. Die dort geplanten Kepler-Agenten
+verändern langfristig, wie an diesem Repo gearbeitet wird – vor größeren Vorhaben lohnt
+ein Blick.
+
 ## Kritische Regel: zwei Dateien synchron halten
 
 Der Pi-Deploy kopiert `weltraum_kolonie.html` (nicht `index.html`) ins Ausgabeverzeichnis. **Bei jeder Änderung müssen beide Dateien identisch sein** – am Ende jeder Session:
