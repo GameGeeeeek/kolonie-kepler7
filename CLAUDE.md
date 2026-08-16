@@ -583,6 +583,84 @@ Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:befor
 - **`setBoxHtml(box, schluessel, html)` – die Variante mit MARKUP-Signatur (seit v8.310.0)**, für große Listen, die im Haupt-Tick per `innerHTML` neu geschrieben werden. Statt einer Wertliste ist die Signatur das fertige Markup. Zwei Folgen: (a) Sie kann nicht unvollständig sein – kein neu hinzugekommenes Anzeigefeld kann sie stillschweigend veralten lassen, was bei einer Wertliste die typische Falle ist; (b) **die Countdown-Einschränkung von oben gilt hier NICHT** – läuft ein Countdown, ist das Markup jede Sekunde ein anderes und die Box wird neu geschrieben, läuft keiner, steht sie still. Die Prüfung ist selbstkorrigierend. Der Aufbau der Zeichenkette ist billig; teuer sind `innerHTML` und die anschließenden `querySelectorAll`-Verdrahtungsläufe, und genau die entfallen. Angewandt auf `#research` (73,9 kB), `#buildings` (27,7 kB), `#defenseBuildings` (21,3 kB), `#planetRoleBox` (3,9 kB) – zusammen rund 127 kB Markup pro Sekunde. `childElementCount` als zweite Bedingung im Helfer: Räumt irgendwer die Box von außen leer, muss der Neuaufbau trotz gleicher Signatur laufen. **Vor jeder neuen Anwendung prüfen, WO die Klick-Handler gesetzt werden**: Laufen sie im selben Zweig wie das Schreiben (wie bei den Modul-Boxen), sind sie nach einem übersprungenen Tick nicht neu gesetzt – das geht gut, weil die alten Knoten samt Handler stehen bleiben, muss aber getestet werden (`tests/test_modulbox_cache.js`, `tests/test_listen_cache.js` klicken beide nach mehreren übersprungenen Sekunden). **Messen statt schätzen**: Welche Box wirklich jeden Tick neu geschrieben wird, zeigt ein `MutationObserver` auf `document.body` mit `childList:true, subtree:true`, der die Treffer je Ziel-Element zählt – die statische Suche nach `render*`-Funktionen übersieht die großen Listen, weil die gar keine eigenen Funktionen sind, sondern inline im Haupt-Tick stehen.
 - **Sichtbarkeits-Gate für reines Anzeige-Polling**: `setInterval`s, die nur Daten zum ANZEIGEN nachladen (Bestenliste, Berichte, Nachrichten, Galaxie-Zustand, Allianzbasis-Kriegszustand/Spenden-Rangliste, Versions-Check), prüfen `document.visibilityState === 'visible'`, bevor sie feuern – spart Server-Anfragen/Akku im Hintergrund-Tab. **Bewusst NICHT** auf Timer mit echter Spielmechanik angewendet (`maybeScheduleRaid`, `maybeSchedulePirateDebrisRaid`, `maybeSpawnVoidRift`, `maybeSpawnTrader`, `refreshAllianceMusterAttack`) – deren Timing soll auch im Hintergrund-Tab real weiterlaufen.
 
+## Unterstützer, Kosmetik und Sternenstaub (Etappen 1–5, 15./16.08.2026)
+
+Das Premium-Programm hängt an einer Handvoll Stellen, die man kennen muss, bevor man daran etwas
+ändert oder etwas Neues danebenbaut. Die Reihenfolge hier ist die, in der es gebaut wurde.
+
+### Die EINE Liste der Vorteile
+
+`UNTERSTUETZER_VORTEILE` (nahe `automatikFreigeschaltet`) ist die einzige Quelle für das, was der
+Rang bringt. Der Spender-Bereich im Fortschritt-Tab zeichnet ausschließlich daraus. **Ein neuer
+Unterstützer-Vorteil gehört dorthin, sonst wirbt die Fläche weiter mit dem alten Stand** – genau der
+Fehlertyp aus Regel 6, nur an einer Stelle, die man beim Bauen nicht ansieht.
+
+Zwei Fallen darin, beide real aufgetreten:
+- **`desc` ist eine FUNKTION, keine Zeichenkette.** Die Kostenkonstanten (`AUTO_REPAIR_COST_KERNE`
+  &Co.) stehen zehntausende Zeilen WEITER UNTEN. Eine direkt zusammengebaute Zeichenkette erwischt
+  sie in ihrer Temporal Dead Zone, und das Spiel stirbt beim Laden mit `ReferenceError`. Im
+  Quelltext sehen beide Schreibweisen gleich aus – nur der Browser merkt den Unterschied
+  (`test_unterstuetzer_bereich.js` fängt es).
+- Die Zahlen in den Beschreibungen kommen aus Konstanten bzw. vom Server, nie eingetippt.
+
+### Kosmetik: Aussehen hier, Besitz beim Server
+
+`KOSMETIK_LOOK` im Frontend enthält **nur Aussehen und Beschreibung**. Wer ein Stück besitzt,
+entscheidet ausschließlich `KOSMETIK_DEFS` in `server.js` – eine Namensfarbe steht in der
+BESTENLISTE, also auf einer Fläche, die allen gehört, und wäre im Spielstand in fünf Sekunden
+gefälscht. Die Grenze ist dieselbe wie überall in diesem Projekt: „Kann ich etwas anfassen, das
+ANDEREN gehört oder allen gemeinsam?"
+
+**Die Freischaltbedingung steht bewusst NICHT im Frontend.** Sie kommt mit dem Katalog vom Server;
+`kosmetikBedingungText()` fasst sie nur in Worte. Eine zweite Liste hier wäre die Anzeigestelle, die
+eine Bedingung verspricht, die der Server anders durchsetzt – der Spieler spielt dann auf etwas hin,
+das ihm danach verweigert wird. `tests/test_kosmetik_paritaet.js` wacht über beide Richtungen und
+schlägt an, sobald der Server eine Bedingungsart einführt, die das Frontend nicht übersetzen kann.
+
+Gezeichnet wird an **fünf** Namensstellen (Bestenliste, Seitenmenü, FP-Rangliste, Freundesliste,
+Profilkarte), alle über `kosmetikFarbAttr()`/`kosmetikEmblem()`. Der globale Chat zeigt Kosmetik
+bewusst NICHT – seine Nachrichten führen die Auswahl nicht mit, und ein halb umgesetztes Feature
+wäre schlimmer als ein ehrlich begrenztes.
+
+### Was NICHT in `state` liegt – und warum
+
+`supporterAktiv`/`supporterStufe`/`supporterQuelle`, `kosmetikBesitz`/`kosmetikGetragen`,
+`staubStand`, `berichtsArchiv`: alles Modul-Variablen, die bei jedem Start frisch vom Server kommen.
+`state` gehört dem Spieler, liegt in localStorage und ist mit den Entwicklerwerkzeugen in fünf
+Sekunden umgeschrieben. Ein alter Spielstand kann diese Werte damit nicht mitbringen, und ein
+Ausloggen nimmt sie zuverlässig wieder mit. **Neue serverseitig verantwortete Größen gehören
+ebenfalls hierher, nicht in `state`.**
+
+### Komfort-Grenzen: eine Tabelle, und nichts löscht etwas
+
+`KOMFORT_GRENZEN` deckelt Warteschlangen, Notizlänge und Freundesliste; `komfortGrenze(key)` liest
+den aktuellen Rang. Vor dem Umbau stand die Freundeslisten-Grenze an DREI Stellen und die der
+Warteschlangen an zwei. Auch der Hilfetext zieht jetzt daraus (`HELP_SECTIONS` steht weit hinter der
+Tabelle und kann sie beim Aufbau auslesen).
+
+**Die Regel, die über allem steht: Gedeckelt wird nur das HINZUFÜGEN.** Läuft ein Rang aus, bleibt
+alles Eingereihte, jede gespeicherte Notiz und jeder Freund erhalten – es lässt sich nur nichts Neues
+mehr über die kleine Grenze hinaus anhängen. Beim Berichts-Archiv sorgt dafür eine Wachstumsregel im
+Backend. Ein Deckel, der beim Ablauf Daten wegwirft, bestraft das Aufhören statt das Unterstützen,
+und der Betroffene merkt es erst, wenn er nachsehen will. **Wer hier einen neuen Deckel einzieht,
+prüft zuerst, was er beim Ablauf anrichtet.**
+
+### Der Wochenpass wurde bewusst NICHT gebaut
+
+Er stand auf der Liste und ist nach der Analyse gestrichen worden – das steht hier, damit ihn nicht
+in drei Monaten jemand naiv neu vorschlägt. Ein Pass misst Fortschritt („5 Angriffe geflogen",
+„10 Forschungen abgeschlossen"), und **alle** diese Größen stehen im klientenautoritativen
+Spielstand. Ein Pass darauf ist eine Belohnungsmaschine mit Selbstbedienung. Beschränkt man ihn auf
+die zwei serverseitig belegbaren Quellen, ist er nur eine Fortschrittsleiste vor dem, was der
+Sternenstaub ohnehin tut. Statt einer Schauseite kamen deshalb zwei neue Freischaltwege dazu
+(Erfolge, Sektor-Bosse). Der Patchnote zu v8.525.0 sagt das den Spielern ausdrücklich – ein
+angekündigtes und dann still weggelassenes Feature ist schlimmer als eines, das nie erwähnt wurde.
+
+**Dieselbe Prüffrage gilt für jedes künftige Belohnungssystem:** Kann der Server die Bedingung
+SELBST beobachten? Wenn nein, ist die Belohnung faktisch für jeden frei verfügbar, der es darauf
+anlegt – dann entweder bewusst kosmetisch halten oder die Quelle wechseln.
+
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
