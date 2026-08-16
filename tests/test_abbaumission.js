@@ -120,8 +120,24 @@ function ereignisUhrenPinnen(st){
 
   // ---- 2-4) Der Kreislauf ------------------------------------------------------------------
   const zielSystem = systemeA[0];
-  const zielPlatz = Object.keys(feldA[zielSystem].plaetze).filter(k => !feldA[zielSystem].plaetze[k].frei)[0];
+  const belegt = Object.keys(feldA[zielSystem].plaetze).filter(k => !feldA[zielSystem].plaetze[k].frei);
+  /* Bevorzugt ein Vorkommen, das KEIN Splitter ist (16.08.2026). Splitter geben bewusst null
+     Protomaterie - der Abschnitt 7 unten waere an einem Splitter zwar gruen, aber ohne Aussage
+     (Arbeitsregel 37: eine Pruefung hinter einer Bedingung, die nicht eintrat). Alle uebrigen
+     Pruefungen dieses Tests sind groessenunabhaengig, die Wahl aendert an ihnen nichts.
+     Faellt zurueck auf den ersten belegten Platz, falls das Guertelsystem nur Splitter traegt -
+     dann sagt 7-vorab es ausdruecklich, statt still nichts zu pruefen. */
+  const zielPlatz = belegt.find(k => feldA[zielSystem].plaetze[k].groesse !== 'splitter') || belegt[0];
+  const zielGroesse = feldA[zielSystem].plaetze[zielPlatz].groesse;
   const vorratVorher = feldA[zielSystem].plaetze[zielPlatz].vorrat;
+  /* Die Sollmenge kommt aus der SPIELDATEI, nicht aus einer Tabelle im Test - sonst waere sie eine
+     zweite Wahrheitsquelle, die bei der naechsten Balance-Aenderung still veraltet (Arbeitsregel 3:
+     die Regel pruefen, nicht die Momentaufnahme). */
+  const protoTabelle = (() => {
+    const src = require('fs').readFileSync(require('./lib/umgebung').SPIELDATEI, 'utf8');
+    const m = src.match(/const PROTOMATERIE_JE_FUHRE = (\{[^}]*\});/);
+    try { return m ? new Function('return ' + m[1])() : null; } catch (e) { return null; }
+  })();
 
   async function aufKarte(t){
     await t.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
@@ -215,9 +231,78 @@ function ereignisUhrenPinnen(st){
   check('4d die Ladung besteht aus den Rohstoffen der Sorte',
     sortenRes.length > 0 && sortenRes.length <= 2 && sortenRes.every(r => ['erz','kristalle','deuterium','antimaterie'].indexOf(r) >= 0),
     { sortenRes });
+  /* ---- 7) Protomaterie (16.08.2026) -------------------------------------------------------
+     Der Rohstoff, den keine Fabrik herstellt - er faellt nur als Beifang heimkehrender Fuhren an
+     und ist der Grund, ueberhaupt zum Guertel zu fliegen. Geprueft wird hier, WEIL die
+     Messvorrichtung dieses Tests ohnehin steht: eine echte Mission, ein echter Bericht.
+     Die drei Aussagen bauen aufeinander auf: Die Menge haengt allein an der GROESSE (nicht an der
+     Ladung, nicht an der Flotte - sonst skalierte sie wieder mit dem Imperium), sie wird beim
+     START eingefroren (eine spaetere Balance-Aenderung darf keine Flotte treffen, die schon
+     unterwegs ist), und sie kommt bei der Rueckkehr wirklich an. */
+  check('7-vorab die Sollmenge wurde aus der Spieldatei gelesen und das Ziel gibt Protomaterie',
+    !!protoTabelle && protoTabelle[zielGroesse] > 0,
+    { zielGroesse, tabelle: protoTabelle, hinweis: 'bei 0: das Guertelsystem trug nur Splitter, 7a-7c sind dann ohne Aussage' });
+  if (protoTabelle && mission){
+    check('7a die Mission traegt die Menge ihrer GROESSE, beim Start eingefroren',
+      mission.proto === protoTabelle[zielGroesse],
+      { groesse: zielGroesse, erwartet: protoTabelle[zielGroesse], inDerMission: mission.proto });
+    check('7b der Bericht weist sie als angekommen aus, ohne Verfall bei leerem Speicher',
+      !!bericht && bericht.proto === mission.proto && !bericht.protoVerloren,
+      { imBericht: bericht && bericht.proto, verfallen: bericht && bericht.protoVerloren });
+    check('7c und sie liegt danach wirklich im Spielstand',
+      (stEnde.resources.protomaterie||0) - (stStart.resources.protomaterie||0) === mission.proto,
+      { vorher: stStart.resources.protomaterie, nachher: stEnde.resources.protomaterie, erwartet: mission.proto });
+  }
+
   const fehler = c.errs.filter(e => !/favicon|net::ERR|CORS|404/i.test(e));
   check('4c keine Konsolenfehler', fehler.length === 0, fehler.slice(0, 3));
   await c.ctx.close();
+
+  /* ---- 7d-7f) Die GEGENRICHTUNG: voller Speicher --------------------------------------------
+     Ohne diesen zweiten Lauf sagt "ohne Verfall bei leerem Speicher" (7b) nichts aus - er waere
+     auch dann gruen, wenn es den Ueberlauf-Zweig gar nicht gaebe. Und der Ueberlauf ist die
+     Zusage, auf die es hier ankommt: Eine Fuhre, fuer die jemand 45 Minuten geflogen ist, darf
+     nicht stillschweigend verfallen. Der Bericht MUSS sie beim Namen nennen.
+     Der Speicher wird auf seinen Deckel gesetzt statt auf eine erfundene Zahl - der Deckel steht
+     bei 500 + 100 je Stufe der Aufbereitungsanlage, und die ist im Fixture 0. */
+  {
+    const t = await tab(browser, abgewandelt(stA, st => {
+      st.research = st.research || {};
+      st.research.rminentechnik = 1;
+      st.fleet.schuerfschiff = 6;
+      st.fleet.frachter = 10;
+      st.buildings.lager = 120;
+      for (const g of ['solar','mine','raffinerie','synth','fusionsreaktor','labor']) st.buildings[g] = 0;
+      ereignisUhrenPinnen(st);
+      for (const r of ['energie','erz','kristalle','deuterium','antimaterie']) st.resources[r] = 4000;
+      st.resources.protomaterie = 500;   // Deckel ohne Aufbereitungsanlage - randvoll
+    }));
+    await aufKarte(t);
+    await oeffneMenue(t);
+    await t.page.evaluate(() => { const x = [...document.querySelectorAll('#fwahlOverlay button')].find(y => /Abbaumission starten/.test(y.textContent)); if (x) x.click(); });
+    await t.page.waitForTimeout(2000);
+    const stV = t.stand();
+    const mV = (stV.fleet.missions || []).find(m => m.type === 'mining');
+    check('7d-vorab der zweite Lauf hat eine Mission mit Protomaterie an Bord',
+      !!mV && mV.proto > 0, { proto: mV && mV.proto, bestandVorher: stV.resources.protomaterie });
+    if (mV){
+      await t.page.evaluate(ms => { const echt = Date.now; Date.now = () => echt.call(Date) + ms; }, mV.endTime - Date.now() + 5000);
+      await t.page.waitForTimeout(4000);
+      const stN = t.stand();
+      const bV = (t.store.__berichte || []).find(r => r.type === 'mining');
+      check('7d der Bericht nennt den Verfall ausdruecklich, statt ihn zu verschweigen',
+        !!bV && bV.protoVerloren === mV.proto && bV.proto === 0,
+        { angekommen: bV && bV.proto, verfallen: bV && bV.protoVerloren, ausDerMission: mV.proto });
+      check('7e und der Bestand steht weiterhin exakt am Deckel - kein Ueberlauf ins Lager',
+        stN.resources.protomaterie === 500, { bestand: stN.resources.protomaterie });
+      // Die Rohstoffe der Fuhre muessen davon voellig unberuehrt sein: zwei getrennte Deckel, und
+      // ein volles Protomaterie-Fass darf die Ladung nicht mitreissen.
+      check('7f die Rohstoffladung kommt trotzdem vollstaendig an (getrennte Deckel)',
+        !!bV && !bV.verloren && Object.keys(bV.angekommen || {}).length > 0,
+        { angekommen: bV && bV.angekommen, verloren: bV && bV.verloren });
+    }
+    await t.ctx.close();
+  }
 
   /* Die Oberflaeche zeigt Zahlen durch fmt(): ab 1.000 als "4.6k", ab 1.000.000 als "1.23M",
      darunter roh. Wer nur /([\d.]+)/ liest, bekommt aus "4.6k" die 46 - Faktor 100 daneben, und

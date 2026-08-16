@@ -6,7 +6,11 @@ Ressourcen, sodass man gar nicht die Asteroiden sucht, weil man eh viele generie
 — also eine neue Verarbeitungsstufe über Metamaterial und Singularitätskernen, nicht etwas quer
 Danebenliegendes.
 
-Dieses Konzept ist **noch nicht umgesetzt**. Es ist die Vorlage zur Abnahme.
+**Umsetzungsstand (16.08.2026): Phasen 1–3 sind ausgeliefert** — Protomaterie als Ressource, ihr
+Ertrag an der Abbaumission und ihr erster Abnehmer, alles in *einer* Auslieferung. Bewusst zusammen:
+Abschnitt 4 verlangt, dass kein Stoff vor seinem Verbraucher ausgeliefert wird, und genau daran ist
+Tier 2 gescheitert. Die Phasen 4 und 5 (die zwei Apex-Ressourcen und weitere Abnehmer) stehen noch
+aus. Zu den offenen Entscheidungen aus Abschnitt 8 siehe die Nachträge dort.
 
 ---
 
@@ -223,10 +227,44 @@ Aus `CLAUDE.md` und dem Tier-2-Konzept, hier ausdrücklich übernommen:
 
 1. **Die Zahlen in Abschnitt 2** (0/2/8/25 je Größe) sind ein Startpunkt, kein Ergebnis. Sie
    sollten an einem echten Spielstand gemessen werden: Wie viele Fuhren soll ein Superschiff kosten?
+
+   > **Entschieden 16.08.2026 — die Zahlen bleiben, jetzt aber gemessen statt geschätzt.**
+   > Erwartungswert bei zufälligem Anflug **2,96 je Fuhre** (Größengewichte 46/34/16/4), bei
+   > gezieltem Kern-Anflug 8, bei Schürfpeilungen **13,95** (immer Kern oder Koloss). Bei rund
+   > 45 Minuten je Fuhre ergibt das **11 je Stunde mit einer Schürfflotte, 32 mit dreien**.
+   > Gegengerechnet am Abnehmer: Ausbaustufe 6 kostet 20, also gut zwei Fuhren. Das ist spürbar,
+   > ohne zu blockieren — und es macht den Unterschied zwischen „drei Splitter abklappern" und
+   > „einen Koloss anfliegen" zum ersten Mal zu einer echten Entscheidung.
+
 2. **Reihenfolge der Verbraucher** aus Abschnitt 4 — welcher zuerst?
+
+   > **Entschieden 16.08.2026: die Ausbaustufen der Mega-Projekte, nicht die Superschiffe.**
+   > Das Konzept hatte die Superschiff-Rümpfe an erster Stelle. Beim Umsetzen fiel auf, dass das
+   > gegen Saschas Vorgabe „niemand soll blockiert werden" verstößt: Metamaterial-Titan und
+   > Singularitäts-Vernichter kann man **heute** bauen, ein Protomaterie-Anteil hätte sie bis zum
+   > ersten Flug gesperrt. Die Ausbaustufen nehmen dagegen niemandem etwas weg — betroffen sind
+   > nur Stufen ab 6, und die Stufen 1–5 bleiben unangetastet.
+   > Zwei Eigenschaften machen sie zum besseren ersten Abnehmer: Sie sind die einzige Senke des
+   > Spiels **ohne Ende**, und die Kette, die ein Blockieren ausschließt, steht bereits im Code —
+   > Ausbaustufen setzen alle drei Projekte voraus, der Forschungs-Nexus verlangt dafür
+   > `allResearchMaxed()`, und darin steckt Minentechnik. Wer eine Ausbaustufe erreichen kann,
+   > **kann zwangsläufig schürfen**. `tests/test_protomaterie.js` Abschnitt 5b hält das fest.
+   > Die Superschiffe bleiben als Abnehmer möglich — aber als *neues* Schiff, nicht als Umbau.
+
 3. **Bestandskonten:** Sollen die ersten Protomaterie-Funde rückwirkend gutgeschrieben werden
    (etwa nach abgeschlossenen Abbaumissionen), oder fängt jeder bei null an? Empfehlung: bei null —
    rückwirkende Gutschriften waren beim Deckel-Umbau die Quelle der meisten Rückfragen.
+
+   > **Umgesetzt wie empfohlen: jeder fängt bei null an.** Niemand verliert dadurch etwas, denn
+   > es gibt bis dahin nichts, wofür Protomaterie gebraucht würde. Dafür überlebt sie **beide**
+   > Resets vollständig (Prestige *und* Aufstieg), ohne Kryo-Archiv: Sie entsteht aus Flugzeit
+   > statt aus Wirtschaft, und mit zurückgesetztem Bestand käme niemand, der regelmäßig prestigt,
+   > je an ihre Abnehmer heran.
+
+4. **Neu offen, entstanden beim Umsetzen:** Ab Ausbaustufe 6 sind es 20 Protomaterie, danach 20 je
+   weitere Stufe, gedeckelt bei 400. Der Deckel ist **keine Balance-Wahl, sondern eine Notwendigkeit**
+   — Protomaterie hat einen Lagerdeckel von 2.500 bei Vollausbau, und ein Kostenposten darüber ließe
+   sich gar nicht erst ansparen. Wer die Kosten steigern will, muss vorher den Speicher heben.
 
 ---
 
@@ -234,13 +272,25 @@ Aus `CLAUDE.md` und dem Tier-2-Konzept, hier ausdrücklich übernommen:
 
 Jede Phase einzeln getestet und ausgeliefert, nach dem Muster des Asteroiden-Konzepts:
 
-| Phase | Inhalt | Warum in dieser Reihenfolge |
-|---|---|---|
-| **1** | Protomaterie als Ressource: Icon, Lager, Anzeige, Backend-Limits | Ohne Speicher kein Ertrag |
-| **2** | Ertrag an der Abbaumission + Bericht (inkl. Überlauf-Hinweis) | Ab hier lohnt sich Fliegen |
-| **3** | Der **erste Verbraucher** (Superschiff-Rümpfe) | Vor der Verarbeitungsstufe, damit Protomaterie sofort einen Zweck hat |
-| **4** | Tier-3-Kette: zwei Ressourcen, zwei Fabriken, zwei Forschungen | Erst jetzt, wenn Nachfrage besteht |
-| **5** | Weitere Verbraucher (Modulstufe, wiederholbare Groß-Projekte) | Langfristiger Sog |
+| Phase | Inhalt | Warum in dieser Reihenfolge | Stand |
+|---|---|---|---|
+| **1** | Protomaterie als Ressource: Icon, Lager, Anzeige, Backend-Limits | Ohne Speicher kein Ertrag | **fertig 16.08.2026** |
+| **2** | Ertrag an der Abbaumission + Bericht (inkl. Überlauf-Hinweis) | Ab hier lohnt sich Fliegen | **fertig 16.08.2026** |
+| **3** | Der **erste Verbraucher** — Ausbaustufen der Mega-Projekte statt Superschiff-Rümpfe (siehe Abschnitt 8) | Vor der Verarbeitungsstufe, damit Protomaterie sofort einen Zweck hat | **fertig 16.08.2026** |
+| **4** | Tier-3-Kette: zwei Ressourcen, zwei Fabriken, zwei Forschungen | Erst jetzt, wenn Nachfrage besteht | offen |
+| **5** | Weitere Verbraucher (Modulstufe, neues Apex-Schiff) | Langfristiger Sog | offen |
+
+**Phase 1–3 kamen in EINER Auslieferung**, nicht in dreien. Beim Umsetzen zeigte sich, dass die
+Aufteilung der eigenen Regel aus Abschnitt 4 widerspricht: Nach Phase 2 gäbe es einen Rohstoff, den
+man sammelt und für nichts ausgeben kann — für eine Auslieferung lang genau der Zustand, an dem
+Tier 2 gescheitert ist. Die Zwischenstände wären außerdem live gegangen, weil jeder Merge
+ausliefert.
+
+**Was das Backend angeht** (Leitplanke aus Abschnitt 6): Es brauchte **keine** Änderung. Protomaterie
+liegt in `state.resources` und fällt damit unter die generische Regel `maxResourceValue: 1e15` —
+gegen einen Lagerdeckel von 2.500 ist das reichlich Luft. Geprüft, nicht angenommen; ein eigenes
+Feld auf oberster Ebene hätte dagegen einen neuen Eintrag in `SAVE_SANITY_LIMITS` gebraucht, und ohne
+den lehnt der Server den **gesamten** Spielstand mit HTTP 400 ab.
 
 **Phase 3 steht bewusst vor Phase 4.** Genau diese Reihenfolge ist bei Tier 2 versäumt worden: Dort
 kam erst die Kette, dann — teilweise bis heute nicht — die Abnehmer. Das Ergebnis steht in
