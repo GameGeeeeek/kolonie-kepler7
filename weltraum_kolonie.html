@@ -6964,8 +6964,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.529.0';
+  const VERSION = '8.530.0';
   const PATCHNOTES = [
+    { version:'8.530.0', date:'16.08.2026', changes:[
+      '<strong>Die Sektoren-Karte hat jetzt ihre eigentliche Sektoransicht.</strong> Wer die Einstellung nutzt und eine Region antippt, sieht nicht mehr den gezoomten Freiflug-Ausschnitt, sondern eine eigene Karte des Sektors: jedes System auf einem festen, großzügigen Platz – nichts überlappt, jedes Ziel ist daumengroß, jeder Name lesbar. Die Sterne tragen ihre echten Sonnenfarben, die Heimat einen goldenen Ring, eigene Kolonien einen grünen, Gürtelsysteme einen gestrichelten; unter jedem System steht der Erkundungsstand.',
+      'Mit ‹ › oder einem Wisch geht es zum Nachbarsektor, ⌂ führt zur Galaxie-Übersicht. Ein Tipp auf ein System öffnet die gewohnte Systemansicht samt Detailtafel – deren Schließen bringt dich in den Sektor zurück, nicht ins Nirgendwo. Zweite Etappe des Karten-Modells B; als Nächstes bekommen die Asteroidenfelder ihren eigenen Platz frei im Sektor. Die Ebenen-Schalter sind in den Sektor-Ansichten vorerst ausgeblendet, bis sie dort wirken – ein sichtbarer Schalter ohne Wirkung wäre gelogen.'
+    ]},
     { version:'8.529.0', date:'16.08.2026', changes:[
       '<strong>Neue Einstellung „Sektoren-Karte": die Galaxie in festen Ansichten statt freiem Zoomen.</strong> Wer sie einschaltet (Einstellungen → Übersichtlichkeit), sieht im Karte-Tab zuerst eine Übersicht der ganzen Galaxie, aufgeteilt in acht benannte Sektorregionen – Kepler-Kern, Wispern-Drift, Solmark-Reichweite, Obsidian-Saum, Meridian-Weiten, Pulsar-Felder, Ilyra-Tiefen und Randmarken. Jede Region zeigt ihre Systeme als Punkte, ihren Namen und die Systemzahl; die Heimatregion trägt das 🏠. Ein Tipp auf die Region springt direkt in den passenden Kartenausschnitt, „Zurücksetzen" führt zur Übersicht zurück.',
       'Die Zuordnung der Systeme zu ihren Sektoren rechnet das Spiel selbst über die Sternpositionen aus – es gibt keine zweite gepflegte Liste, die beim nächsten neuen System veralten könnte; ein künftiges System gehört automatisch zur nächstgelegenen Region. Das ist die erste Etappe des abgenommenen Karten-Modells B („eine echte Sternkarte in festen Ansichten"): Als Nächstes bekommt der geöffnete Sektor seine eigene, kuratierte Ansicht mit daumengroßen Zielen und frei liegenden Asteroidenfeldern. Standardmäßig aus – am bisherigen Freiflug ändert sich ohne die Einstellung nichts.'
@@ -51691,6 +51695,113 @@
       g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); sektorOeffnenKB(g.getAttribute('data-sektor')); } };
     });
   }
+  // Kuratierte Sektoransicht (Etappe KB-2): 15 feste, gestreute Plätze im 400x560-Raum -
+  // genug für den größten Cluster (Kepler-Kern, 15 Systeme). Die Reihenfolge der Mitglieder ist
+  // deterministisch (Nord nach Süd, dann West nach Ost), damit dieselben Systeme immer auf
+  // denselben Plätzen liegen; ungerade Sektoren spiegeln die Vorlage für optische Abwechslung.
+  const SEKTOR_PLAETZE = [
+    [66,112],[198,96],[330,118],
+    [96,206],[230,198],[352,212],
+    [60,302],[196,292],[334,308],
+    [92,400],[224,392],[350,404],
+    [64,490],[196,500],[332,486]
+  ];
+  let kbWischStartX = null, kbWischStartY = null;
+  function sektorNachbarKB(richtung){
+    const idx = SEKTOR_DEFS.findIndex(sk => sk.key === karteSektorOffen);
+    if (idx < 0) return;
+    const ziel = SEKTOR_DEFS[(idx + richtung + SEKTOR_DEFS.length) % SEKTOR_DEFS.length];
+    sektorOeffnenKB(ziel.key);
+  }
+  function sektorAnsichtBauen(svg){
+    const sk = SEKTOR_DEFS.find(x => x.key === karteSektorOffen);
+    if (!sk){ karteSektorOffen = null; return sektorUebersichtBauen(svg); }
+    const idx = SEKTOR_DEFS.indexOf(sk);
+    const mg = (sektorMitglieder().get(sk.key) || []).slice()
+      .sort((a,b) => a.gy - b.gy || a.gx - b.gx);
+    const spiegel = idx % 2 === 1;
+    svg.setAttribute('viewBox', '0 0 400 560');
+    let defs = '';
+    for (const t of SUN_TYPES){
+      defs += '<radialGradient id="sekSun-' + t.key + '" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="' + t.core + '"/><stop offset="60%" stop-color="' + t.glow + '"/><stop offset="100%" stop-color="#20263f"/></radialGradient>'
+            + '<radialGradient id="sekGlow-' + t.key + '" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="' + t.glow + '" stop-opacity=".45"/><stop offset="100%" stop-color="' + t.glow + '" stop-opacity="0"/></radialGradient>';
+    }
+    defs += '<radialGradient id="sekTerrit" cx="50%" cy="45%" r="62%"><stop offset="0%" stop-color="' + sk.tint + '" stop-opacity=".09"/><stop offset="100%" stop-color="' + sk.tint + '" stop-opacity="0"/></radialGradient>';
+    // Sternenfeld deterministisch aus hashStringToFloat - dieselben Sterne bleiben, wo sie sind
+    // (dieselbe Regel wie beim Freiflug seit v8.498.0, sonst wäre das Markup nie zweimal gleich).
+    let sterne = '';
+    for (let i = 0; i < 70; i++){
+      const zx = hashStringToFloat(sk.key + ':sx' + i), zy = hashStringToFloat(sk.key + ':sy' + i);
+      const zr = hashStringToFloat(sk.key + ':sr' + i), zo = hashStringToFloat(sk.key + ':so' + i);
+      sterne += '<circle cx="' + (zx*400).toFixed(1) + '" cy="' + (zy*560).toFixed(1) + '" r="' + (0.5 + zr*1.1).toFixed(2) + '" fill="#cfd6f5" opacity="' + (0.2 + zo*0.55).toFixed(2) + '"/>';
+    }
+    let knoten = '';
+    mg.forEach(function(sy, k){
+      const p = SEKTOR_PLAETZE[k % SEKTOR_PLAETZE.length];
+      const x = spiegel ? 400 - p[0] : p[0], y = p[1];
+      const st = sunTypeFor(sy.id);
+      const r = Math.round(11 * (st.r || 1) * 10) / 10;
+      const planeten = PLANETS.filter(pl => pl.system === sy.id);
+      const entdeckt = planeten.filter(pl => state.discovered[pl.id]).length;
+      const eigene = planeten.some(pl => state.colonies[pl.id]);
+      const heim = sy.id === myHomeSystem;
+      const guertel = istGuertelSystem(sy.id);
+      let ringe = '';
+      if (heim) ringe += '<circle data-ring="heim" cx="' + x + '" cy="' + y + '" r="' + (r+8) + '" fill="none" stroke="#fac775" stroke-width="2"/>';
+      else if (eigene) ringe += '<circle data-ring="basis" cx="' + x + '" cy="' + y + '" r="' + (r+8) + '" fill="none" stroke="#5dcaa5" stroke-width="2"/>';
+      if (guertel) ringe += '<circle data-ring="guertel" cx="' + x + '" cy="' + y + '" r="' + (r+13) + '" fill="none" stroke="#fac775" stroke-width="1.3" stroke-dasharray="3 4"/>';
+      const meta = heim ? 'Heimat · ' + entdeckt + '/' + planeten.length
+        : eigene ? 'Eigene Basis · ' + entdeckt + '/' + planeten.length
+        : guertel ? 'Gürtelsystem · ' + entdeckt + '/' + planeten.length
+        : entdeckt + '/' + planeten.length + ' erkundet';
+      knoten += '<g class="sektor-sys" data-sektor-sys="' + sy.id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + sy.name + ' öffnen"' + (entdeckt === 0 && !heim ? ' opacity="0.6"' : '') + '>'
+        + '<circle cx="' + x + '" cy="' + y + '" r="26" fill="url(#sekGlow-' + st.key + ')"/>'
+        + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="url(#sekSun-' + st.key + ')"/>'
+        + ringe
+        + '<text x="' + x + '" y="' + (y+r+16) + '" text-anchor="middle" style="font:600 11px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + sy.name + '</text>'
+        + '<text x="' + x + '" y="' + (y+r+28) + '" text-anchor="middle" style="font:8.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + meta + '</text>'
+        + '</g>';
+    });
+    const li = SEKTOR_DEFS[(idx + SEKTOR_DEFS.length - 1) % SEKTOR_DEFS.length];
+    const re = SEKTOR_DEFS[(idx + 1) % SEKTOR_DEFS.length];
+    const knopf = function(id, x, glyph, label){
+      return '<g data-kb-knopf="' + id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + label + '">'
+        + '<rect x="' + (x-19) + '" y="14" width="38" height="38" rx="10" fill="rgba(18,23,41,0.88)" stroke="#39426b"/>'
+        + '<text x="' + x + '" y="40" text-anchor="middle" style="font:600 19px system-ui,sans-serif; fill:#d9ddf1;">' + glyph + '</text></g>';
+    };
+    const steuer = knopf('heimweg', 34, '⌂', 'Zur Sektoren-Übersicht')
+      + knopf('links', 80, '‹', li.name)
+      + knopf('rechts', 366, '›', re.name)
+      + '<text data-kb-titel="' + sk.key + '" x="222" y="31" text-anchor="middle" style="font:600 14px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;">' + sk.name + '</text>'
+      + '<text x="222" y="46" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + mg.length + ' Systeme · Sektor ' + (idx+1) + ' von ' + SEKTOR_DEFS.length + '</text>';
+    svg.innerHTML = '<defs>' + defs + '</defs>'
+      + sterne
+      + '<rect x="0" y="0" width="400" height="560" fill="url(#sekTerrit)"/>'
+      + knoten + steuer
+      + '<text x="200" y="548" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#8d92ae; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">System antippen · Wischen oder ‹ › für den Nachbarsektor</text>';
+    lastGalaxyMapMarkup = null;
+    svg.querySelectorAll('[data-sektor-sys]').forEach(function(g){
+      const oeffnen = function(){ galaxyOeffne(g.getAttribute('data-sektor-sys')); };
+      g.onclick = oeffnen;
+      g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); oeffnen(); } };
+    });
+    const aktionen = { heimweg: function(){ karteSektorOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); },
+                       links: function(){ sektorNachbarKB(-1); }, rechts: function(){ sektorNachbarKB(1); } };
+    svg.querySelectorAll('[data-kb-knopf]').forEach(function(g){
+      const f = aktionen[g.getAttribute('data-kb-knopf')];
+      g.onclick = f;
+      g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); f(); } };
+    });
+    // Wischen wechselt den Nachbarsektor - nur in DIESER Ansicht; die anderen Zweige räumen die
+    // Handler wieder ab, damit der Freiflug sein eigenes Pan-Verhalten behält.
+    svg.ontouchstart = function(e){ kbWischStartX = e.touches[0].clientX; kbWischStartY = e.touches[0].clientY; };
+    svg.ontouchend = function(e){
+      if (kbWischStartX === null) return;
+      const dx = e.changedTouches[0].clientX - kbWischStartX, dy = e.changedTouches[0].clientY - kbWischStartY;
+      kbWischStartX = kbWischStartY = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > 2*Math.abs(dy)) sektorNachbarKB(dx < 0 ? 1 : -1);
+    };
+  }
   function sektorOeffnenKB(key){
     const mg = sektorMitglieder().get(key) || [];
     if (!mg.length) return;
@@ -51719,7 +51830,19 @@
     // Sektoren-Karte (Modell B, Etappe KB-1): Mit aktiver Einstellung ersetzt die Sektoren-
     // Übersicht die Freiflug-Galaxie, solange kein Sektor geöffnet ist. Ein geöffneter Sektor
     // nutzt in KB-1 die bestehende Freiflug-Zeichnung auf den Sektor-Ausschnitt gezoomt.
-    if (state.uiSektorKarte && !karteSektorOffen){ sektorUebersichtBauen(svg); return; }
+    const kbLeiste = document.getElementById('karteEbenenLeiste');
+    if (state.uiSektorKarte && !galaxyOpenSystem){
+      if (kbLeiste) kbLeiste.style.display = 'none';
+      if (!karteSektorOffen){
+        svg.ontouchstart = svg.ontouchend = null;
+        sektorUebersichtBauen(svg);
+      } else {
+        sektorAnsichtBauen(svg);
+      }
+      return;
+    }
+    if (kbLeiste) kbLeiste.style.display = '';
+    svg.ontouchstart = svg.ontouchend = null;
     let inner = `<defs>
       ${SUN_TYPES.map(t => `<radialGradient id="miniSunGlow-${t.key}" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="${t.core}" stop-opacity="0.9"/>
@@ -61007,7 +61130,9 @@
     // das System hinter sich zuziehen.
     svg.addEventListener('click', (e) => {
       if (!galaxyOpenSystem || galaxyMapDidDrag) return;
-      if (e.target.closest('[data-system-node],[data-planet],[data-map-player],[data-map-npc],[data-map-moon],[data-map-debris],[data-alliance-base]')) return;
+      // [data-sektor-sys]: Systemknoten der kuratierten Sektoransicht (Etappe KB-2) - deren
+      // Klick ÖFFNET gerade das System, der Leerraum-Schließer darf ihn nicht zuziehen.
+      if (e.target.closest('[data-system-node],[data-planet],[data-map-player],[data-map-npc],[data-map-moon],[data-map-debris],[data-alliance-base],[data-sektor-sys]')) return;
       galaxySchliesse();
     });
   })();
