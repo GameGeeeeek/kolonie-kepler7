@@ -20925,9 +20925,44 @@
     labMult *= (1 - deckelWeich(moduleBonusTotal('research'), 0.4)); // imperiumsweites Forschungsmodul
     return Math.round(r.baseDuration * Math.pow(r.durationMult, targetLevel-1) * labMult);
   }
+  /* Tier-2-Kosten ab einer hohen Stufe (Wunsch Sascha, 15.08.2026): Forschung soll den Fortschritt
+     an die Tier-2-Kette binden, statt allein an Erz und Kristalle. Die Kette floss bisher fast nur
+     in Schiffe und Module.
+
+     WARUM AUSGERECHNET STUFE 11: Die Zahl ist nicht gegriffen, sie steht schon im Baum. rnanotech -
+     die Forschung, die mit den Nanolegierungen die ERSTE Tier-2-Kette freischaltet - verlangt
+     rbauplan STUFE 10; rquantenphysik verlangt rkristall2 STUFE 10. Zehn Stufen sind also das, was
+     das Spiel ohnehin verlangt, bevor es einen zu Tier 2 schickt. Ab der elften ist die Kette offen,
+     und genau ab da kostet sie mit.
+
+     EINE BLOCKADE IST AUSGESCHLOSSEN, nicht bloss unwahrscheinlich: Alle sieben Forschungen, die
+     eine Tier-2-Kette freischalten (rnanotech, rquantenphysik, rhochenergie, rfusionskerne,
+     rkitech, rmetamaterial, rsingularitaet), haben maxLevel 1 und erreichen die Schwelle damit nie.
+     Keine von ihnen kann sich selbst aussperren. tests/test_forschung_tier2.js prueft genau diese
+     Eigenschaft - gibt jemand einer davon spaeter mehr Stufen, faellt der Test, bevor das Spiel
+     jemanden in eine Sackgasse laufen laesst.
+
+     LINEAR, nicht exponentiell: Die Grundkosten wachsen bereits mit costMult je Stufe. Ein zweiter
+     exponentieller Term daneben waere genau die Art Aufschaukelung, vor der CLAUDE.md warnt. */
+  const FORSCHUNG_T2_AB_NANO = 11;         // ab dieser Stufe kostet eine Forschung Nanolegierungen
+  const FORSCHUNG_T2_AB_CHIPS = 16;        // ab dieser zusaetzlich Quantenchips
+  const FORSCHUNG_T2_NANO_JE_STUFE = 25;
+  const FORSCHUNG_T2_CHIPS_JE_STUFE = 15;
+  function forschungT2Kosten(targetLevel){
+    const k = {};
+    if (targetLevel >= FORSCHUNG_T2_AB_NANO)
+      k.nanolegierungen = (targetLevel - FORSCHUNG_T2_AB_NANO + 1) * FORSCHUNG_T2_NANO_JE_STUFE;
+    if (targetLevel >= FORSCHUNG_T2_AB_CHIPS)
+      k.quantenchips = (targetLevel - FORSCHUNG_T2_AB_CHIPS + 1) * FORSCHUNG_T2_CHIPS_JE_STUFE;
+    return k;
+  }
+  // Die EINE Kostenstelle: Alle acht Aufrufer (Karte, Vorschau, Start, Warteschlange, Planer,
+  // Allianzforschung) gehen hierueber - die Tier-2-Kosten erscheinen dadurch ueberall zugleich,
+  // statt an einer Anzeige zu fehlen (die Fehlerklasse aus CLAUDE.md Punkt 6).
   function researchCostFor(r, targetLevel){
     const c = {};
     for (const [res, base] of Object.entries(r.baseCost)) c[res] = Math.ceil(base * Math.pow(r.costMult, targetLevel-1));
+    for (const [res, amt] of Object.entries(forschungT2Kosten(targetLevel))) c[res] = (c[res]||0) + amt;
     return c;
   }
 
@@ -36257,6 +36292,7 @@
       { title:'Planetentypen', body:'Neben Aussehen geben einige Planetentypen echte Boni auf ihrem Standort: <strong>Vulkanwelt</strong> +15% Erz, <strong>Eiswelt</strong> +15% Deuterium, <strong>Kristallwelt</strong> +15% Kristalle, <strong>Wüstenwelt</strong> +15% Energie, <strong>Wasserwelt</strong> +20% Lagerkapazität. Die <strong>Todeswelt</strong> ist ein Sonderfall: +10% Verteidigung, aber −10% Produktion. Die <strong>Erdwelt</strong> ist der beste Generalist: +6% auf ALLE Ressourcen (kumuliert 30%), kostet aber 80% mehr als jeder Spezialist. Erdähnliche Welten, Gasriesen, Asteroiden und Superplaneten haben keinen Typ-Bonus. Der Typ eines Planeten steht in der Planetenliste (Sektorkarte-Tab).' },
     ]},
     { key:'forschung', icon:'ti-flask', title:'Forschung & Doktrin', entries:[
+      { title:'Was eine Forschungsstufe kostet', body:'Jede Stufe kostet <strong>Rohstoffe und Forschungspunkte</strong>; beides wächst je Stufe mit dem eigenen Faktor der jeweiligen Forschung. <strong>Ab Stufe '+FORSCHUNG_T2_AB_NANO+' kommen Tier-2-Ressourcen dazu</strong> – '+FORSCHUNG_T2_NANO_JE_STUFE+' Nanolegierungen je Stufe oberhalb der Schwelle, ab Stufe '+FORSCHUNG_T2_AB_CHIPS+' zusätzlich '+FORSCHUNG_T2_CHIPS_JE_STUFE+' Quantenchips. Eine Forschung auf Stufe 20 verlangt damit '+forschungT2Kosten(20).nanolegierungen+' Nanolegierungen und '+forschungT2Kosten(20).quantenchips+' Quantenchips obendrauf.<br><br><strong>Warum ausgerechnet Stufe '+FORSCHUNG_T2_AB_NANO+'?</strong> Weil das Spiel dich ohnehin genau dort zu Tier 2 schickt: <em>Nanotechnik</em>, die die erste Tier-2-Kette freischaltet, verlangt <em>Baupläne</em> auf Stufe 10, und <em>Quantenphysik</em> verlangt <em>Kristallveredelung II</em> auf Stufe 10. Die ersten zehn Stufen bleiben also frei von Tier 2; ab der elften bezahlt die Forschung mit dem, was du inzwischen selbst herstellst.<br><br><strong>In eine Sackgasse kann dich das nicht führen.</strong> Alle sieben Forschungen, die eine Tier-2-Kette freischalten, haben nur eine einzige Stufe und erreichen die Schwelle nie – keine von ihnen kann sich selbst aussperren. Auch die Allianzforschung ist nicht betroffen, sie ist bei Stufe '+ALLIANZ_FORSCHUNG_MAX+' gedeckelt.' },
       { title:'Weitere Verwendungen für Forschungspunkte', body:'Ist die Forschungskette weit ausgebaut, verpufft überschüssige Forschungspunkte-Produktion nicht mehr ungenutzt - vier unabhängige Verwendungen (unten im Forschung-Tab): <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% Produktion einer gewählten Ressource für 20 Min., nur einer gleichzeitig), <strong>Exotische Forschung</strong> (3 seltene, teure Einmal-Unlocks rein auf Forschungspunkte-Basis, Kosten fallen sofort an, Ergebnis erst nach 24 Std.: Quantenkommunikation 8.000 FP → +5% Forschungspunkte-Produktion, Adaptive Legierungen 15.000 FP → +3% alle Ressourcen, Tiefenraum-Kartierung 25.000 FP → -5% Missionsdauer - nur ein Vorhaben gleichzeitig), <strong>Veteranen-Ausbildung</strong> (3 gestaffelte Stufen, insgesamt +7% Angriffs-/Verteidigungspunkte, unabhängig vom XP-basierten Skillbaum, ebenfalls 24 Std. je Stufe: Gefechtsanalyse 6.000 FP, Erfahrene Besatzungen 12.000 FP, Legendäre Kommandeure 20.000 FP - nur eine Ausbildung gleichzeitig; alle FP-Angaben sind Basiswerte, die Imperiums-Skalierung von +25% je weiterem Standort kommt hinzu) und der <strong>Forschungs-Nexus</strong> (neues Mega-Projekt im Fortschritt-Tab, erst erreichbar wenn ALLE Forschungszweige ihre jeweilige Maximalstufe erreicht haben: +15% Forschungspunkte-Produktion, +5% alle Ressourcen).' },
       { title:'Forschungslabor: Tempo & Forschungspunkte', body:'Jedes Forschungslabor verkürzt die Forschungsdauer (spielerweit) und produziert Forschungspunkte, die sechste Ressource - beides zusammen macht Labore zum wichtigsten Gebäude fürs Tempo. Die Dauer-Verkürzung ist gedeckelt bei '+Math.round(LAB_TIME_CAP*100)+'% (ab '+Math.ceil(LAB_TIME_CAP/LAB_TIME_PER_LAB)+' Laboren erreicht). Anders als andere Ressourcen bekommen Forschungspunkte bewusst <strong>keine</strong> Prestige-, Kommandanten-, Allianz-, Skill- oder Aufstiegs-Boni - nur direkte, lokale Investitionen (mehr Labore, Habitat, Kolonie-Rolle, Module) erhöhen die Produktion. So bleiben Forschungspunkte auch im späten Spiel ein echter Engpass statt sich mit dem restlichen Wirtschaftswachstum aufzublähen.' },
       { title:'Kolonie aufgeben', body:'Im Basis-Tab jeder Kolonie (nicht der Heimatbasis) gibt es neben dem Umbenennen-Feld einen roten Warnknopf zum Aufgeben. Das gibt einen Kolonie-Slot frei - sinnvoll, um eine schwache Frühkolonie gegen einen besseren Planeten zu tauschen, sobald das Kolonie-Limit (Kolonial-Logistik) erreicht ist. Alle Gebäude und die dort stationierte Flotte gehen dabei unwiderruflich verloren (blockiert, solange noch Missionen von dort unterwegs sind); ein zugehöriger kolonisierter Mond geht automatisch mit verloren. Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.' },
