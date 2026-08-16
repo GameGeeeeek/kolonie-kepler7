@@ -463,6 +463,30 @@ Der Weg: GitHub ruft nach jedem Push den **Deploy-Webhook** des Backends auf (`P
 
 Der Webhook feuert bei **jedem** Push, auch auf Feature-Branches; dort findet der `git pull` auf dem ausgecheckten `main` schlicht nichts (`Deploy-Webhook erfolgreich für kolonie-kepler7: (keine Änderungen)`). Erst der Merge nach `main` liefert wirklich aus. **GitHub Pages** ist weiterhin nicht aktiviert (Settings → Pages: Source = „None") und deployt nichts.
 
+**Der Webhook ist seit dem 16.08.2026 die EINZIGE Auslieferung – vorher lief eine Cron-Kopie
+daneben.** In der root-crontab des Pi standen bis dahin drei Altlasten, die dasselbe taten wie der
+Webhook, nur zusätzlich und alle paar Minuten:
+
+```
+*/10 * * * * cd /DATA/kepler7/kolonie-kepler7 && git pull -q && cp weltraum_kolonie.html /DATA/kepler7/web/
+*/10 * * * * cd /DATA/kepler7/backend && git pull -q
+*/5  * * * * /DATA/kepler7/backend/deploy/autodeploy.sh >> …/autodeploy.log 2>&1
+```
+
+Für das Frontend war das nur Doppelarbeit (und eine ärmere: Die Cron-Zeile kopierte allein
+`weltraum_kolonie.html`, der Webhook seit dem 05.08. das komplette Set aus `*.html`, `*.png`,
+`robots.txt`, `sitemap.xml`, `manifest.json`, `service-worker.js`). **Im Backend hat es dreimal den
+Deploy zerlegt** – zwei git-Prozesse im selben Repo ergeben `index.lock`-Fehler, und weil Cron dort
+als root lief, entstanden alle paar Minuten root-eigene `.git`-Objekte. Details und Belege stehen in
+der Backend-CLAUDE.md. Die drei Zeilen sind entfernt; wer sie in einer Anleitung von früher
+wiederfindet, trägt sie **nicht** wieder ein.
+
+**Was daraus für Auskünfte folgt:** Wenn eine Änderung nach einem Merge nicht live ist, war früher
+plausibel „der Cron-Job kommt gleich". Das gilt nicht mehr – kommt sie nicht an, ist der Webhook
+selbst gescheitert, und sein Fehler steht ausschließlich im Container-Log
+(`docker logs --tail 60 kepler7-backend`, Zeilen `Deploy-Webhook Fehler für …`). Nichts holt das
+später von selbst nach.
+
 Zwei Folgen daraus, beide am 05.08.2026 als echte Probleme aufgetreten – und noch am selben Tag behoben (Backend-PR #78). Sie bleiben hier stehen, weil beide Male die Symptome schwer zuzuordnen waren:
 
 - **Die Kopierliste war von Hand gepflegt und deshalb unvollständig.** Kopiert wurden nur `weltraum_kolonie.html`, `manifest.json`, die Icons und `service-worker.js` – **nicht** `index.html`, **nicht** `patchnotes.html`, und keine der übrigen Seiten. Von den acht Seiten, die die Spieldatei verlinkt, war im Ausgabeverzeichnis keine einzige vorhanden; bei Impressum und Datenschutzerklärung ist das eine Pflichtangabe, kein Schönheitsfehler. **Behoben:** `DEPLOY_WEB_COPY` kopiert jetzt pauschal `*.html`, `*.png`, `robots.txt`, `sitemap.xml`, `manifest.json` und `service-worker.js`, statt eine Liste zu pflegen, die wieder veralten kann. Was wirklich ausgeliefert wird, zeigt `docker exec kepler7-nginx ls -la /usr/share/nginx/html/` (an den Zeitstempeln sieht man, welche Dateien stillstehen).
