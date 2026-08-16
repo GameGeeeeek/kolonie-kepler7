@@ -176,6 +176,27 @@ hier nach – mit dem konkreten Vorfall als Beleg, nicht als Allgemeinplatz.
     15/17/19). Kein Fehlschlag, nur eine Zeile – aber eine, die in Zeile fünf des Protokolls steht
     statt eine halbe Stunde später. Gegenprobe beidseitig gefahren: mit zurückgesetztem Klon meldet
     sie „ist 2 Commit(s) HINTER origin/master", danach ist sie still.
+
+    **Nachtrag 16.08.2026 – viertes Mal, und diesmal hat die Prüfung von oben ENTWARNUNG gegeben.**
+    Sie meldete „Backend-Klon auf Höhe von origin/master"; ein `git fetch` unmittelbar danach zeigte
+    den Klon **drei Commits zurück** (#108–#110). Der Grund steckt im bewussten Verzicht auf `git
+    fetch`: Verglichen wird gegen die zuletzt geholte Fernreferenz, und die war zehn Stunden alt.
+    „0 Commits hinterher" hieß also nie „aktuell", sondern nur „auf dem Stand des letzten Holens" –
+    und weil die Zeile das nicht dazusagte, las sie sich wie eine Freigabe. Damit gab ausgerechnet
+    das Werkzeug, das diese Regel maschinell absichern soll, in seinem eigenen Fehlerfall Entwarnung
+    (dieselbe Familie wie Regel 15/17/19: ein Messwerkzeug, das sich selbst im Weg steht – hier
+    besonders bitter, weil es genau gegen diesen Fehler gebaut wurde).
+    **Behoben:** Die Zeile nennt jetzt IMMER das Alter der Fernreferenz („geholt vor 2 Minuten") und
+    schlägt an, sobald es über einer Stunde liegt – auch wenn der Abstand 0 ist. Gemessen wird
+    `FETCH_HEAD`, weil git die Datei bei jedem `fetch` neu schreibt, auch wenn nichts Neues kam;
+    `refs/remotes/<fern>` und `packed-refs` sind nur Notnägel und höchstens zu alt, was die
+    ungefährliche Richtung ist (dann steht „mindestens" davor). Alle fünf Zweige einzeln
+    gegengeprüft: frisch still, 10 Std. laut, 61 Min. laut, 59 Min. still, fehlendes `FETCH_HEAD`
+    mit „mindestens", zurückgesetzter Klon weiterhin „ist 2 Commit(s) HINTER".
+    **Die übertragbare Lehre**, unabhängig von diesem Skript: Eine Prüfung, die auf einem
+    ZWISCHENGESPEICHERTEN Stand fußt, muss das Alter dieses Stands mitmelden. Sonst beantwortet sie
+    stillschweigend eine andere Frage als die gestellte – hier „stimmt mein Klon mit meiner letzten
+    Kopie überein?" statt „stimmt mein Klon mit dem Ursprung überein?".
 23. **Die Versionsnummer erst unmittelbar VOR dem Commit vergeben – und `main` in diesem Moment
     noch einmal ansehen.** Am 10.08.2026 wurde dieselbe Änderung FÜNFMAL umnummeriert (v8.472.0 →
     8.473 → 8.475 → 8.476 → 8.477 → 8.483), weil parallel ausgeliefert wurde und jede fremde

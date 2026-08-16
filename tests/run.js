@@ -94,7 +94,9 @@ try {
 //    Spielfehler (CLAUDE.md-Arbeitsregel 22). Die Antwort auf "warum ist das rot" soll nicht mehr
 //    eine halbe Stunde später kommen, sondern in Zeile drei des Protokolls stehen.
 //    Bewusst OHNE `git fetch`: Der Prüflauf soll nicht ans Netz. Verglichen wird gegen die zuletzt
-//    geholte Fernreferenz - fehlt die oder gibt es den Klon nicht, sagt die Zeile genau das.
+//    geholte Fernreferenz - fehlt die oder gibt es den Klon nicht, sagt die Zeile genau das. Und
+//    weil "zuletzt geholt" der wunde Punkt dieses Vergleichs ist, nennt die Zeile seit dem
+//    16.08.2026 IMMER das Alter der Fernreferenz und schlägt an, wenn es über einer Stunde liegt.
 try {
   const backend = path.resolve(WURZEL, '..', 'kolonie-kepler7-backend');
   if (!fs.existsSync(path.join(backend, 'server.js'))) {
@@ -109,14 +111,51 @@ try {
       .find(r => git('rev-parse', '--verify', '--quiet', r).status === 0);
     const zweig = (git('rev-parse', '--abbrev-ref', 'HEAD').stdout || '').trim();
     const hinten = fern ? (git('rev-list', '--count', 'HEAD..' + fern).stdout || '').trim() : '';
+    // Wie ALT ist die Fernreferenz, gegen die hier verglichen wird? Ohne diese Zahl ist ein
+    // "0 Commit(s) hinterher" wertlos - es sagt nur, dass HEAD auf dem Stand des LETZTEN Holens
+    // steht, und das kann Stunden her sein. Gemessen am 16.08.2026: FETCH_HEAD war zehn Stunden alt,
+    // die Zeile meldete "auf Höhe von origin/master", und der Klon stand in Wahrheit DREI Commits
+    // zurück (#108-#110). Damit gab ausgerechnet die Prüfung, die Arbeitsregel 22 maschinell
+    // absichern soll, in ihrem eigenen Fehlerfall Entwarnung - dieselbe Familie wie Regel 15/17/19:
+    // ein Messwerkzeug, das sich selbst im Weg steht.
+    // Gemessen wird FETCH_HEAD, weil git die Datei bei JEDEM `fetch` neu schreibt, auch wenn nichts
+    // Neues kam. Die beiden Notnägel darunter sind gröber: `refs/remotes/<fern>` bewegt sich erst,
+    // wenn die Fernreferenz wirklich vorrückt, und `packed-refs` erst recht selten (frisch geklonte
+    // Repos haben ihre Fernrefs gepackt, die Einzeldatei fehlt dann ganz). Beide sind also
+    // höchstens ZU ALT - sie melden lieber einmal zu viel als einmal zu wenig, und genau in diese
+    // Richtung soll ein Notnagel irren. Deshalb steht bei ihnen "mindestens" in der Ausgabe.
+    const HOLUNG_FRISCH_MS = 60 * 60 * 1000;
+    const mtime = (relativ) => {
+      const p = (git('rev-parse', '--git-path', relativ).stdout || '').trim();
+      if (!p) return 0;
+      try { return fs.statSync(path.resolve(backend, p)).mtimeMs; } catch (e) { return 0; }
+    };
+    const holung = mtime('FETCH_HEAD');
+    const grob = Math.max(fern ? mtime('refs/remotes/' + fern) : 0, mtime('packed-refs'));
+    const alterMs = holung ? Date.now() - holung : (grob ? Date.now() - grob : null);
+    const dauer = (ms) => ms < 90 * 60 * 1000
+      ? (Math.round(ms / 60000) === 1 ? '1 Minute' : Math.round(ms / 60000) + ' Minuten')
+      : (ms / 3600000).toFixed(1).replace('.', ',') + ' Stunden';
+    // Ein Satzteil, der in allen drei Meldungen unten ohne Nachbesserung passt - und der nie auf
+    // einen Punkt endet, damit der Satz drumherum keinen zweiten daneben setzt.
+    const seit = alterMs == null ? 'Zeitpunkt des letzten Holens unbekannt'
+      : 'geholt vor ' + (holung ? '' : 'mindestens ') + dauer(alterMs);
+    const nachholen = () => {
+      console.log('        Erst `cd ../kolonie-kepler7-backend && git fetch && git pull origin master`,');
+      console.log('        sonst prüfen die server.js-Tests gegen einen veralteten Nachbarn.');
+    };
     if (!fern || !/^\d+$/.test(hinten)) {
       console.log('  ----  Backend-Klon: ' + kopf + ' (kein Vergleich möglich - noch nie geholt?)');
     } else if (Number(hinten) > 0) {
-      console.log('  !!!!  Backend-Klon ist ' + hinten + ' Commit(s) HINTER ' + fern + ': ' + kopf);
-      console.log('        Erst `cd ../kolonie-kepler7-backend && git fetch && git pull origin master`,');
-      console.log('        sonst prüfen die server.js-Tests gegen einen veralteten Nachbarn.');
+      console.log('  !!!!  Backend-Klon ist ' + hinten + ' Commit(s) HINTER ' + fern + ' (' + seit + '): ' + kopf);
+      nachholen();
+    } else if (alterMs == null || alterMs > HOLUNG_FRISCH_MS) {
+      // Der Fall, für den diese Zeile 2026 dreimal gebraucht wurde - und zweimal Entwarnung gab.
+      console.log('  !!!!  Backend-Klon auf Höhe von ' + fern + ', aber ' + fern + ' ist alt (' + seit + ').');
+      console.log('        Der Vergleich sagt damit NICHTS über den echten Stand des Nachbarn.');
+      nachholen();
     } else {
-      console.log('  ----  Backend-Klon auf Höhe von ' + fern
+      console.log('  ----  Backend-Klon auf Höhe von ' + fern + ' (' + seit + ')'
         + (zweig && zweig !== 'master' && zweig !== 'main' ? ' (Zweig ' + zweig + ')' : '') + ': ' + kopf);
     }
   }
