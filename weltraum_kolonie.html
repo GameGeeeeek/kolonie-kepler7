@@ -4210,8 +4210,49 @@
     { key:'autoRepair', icon:'ti-refresh', name:'Automatische Reparatur',
       desc:()=>'Behebt eine Sabotage sofort gegen 300 Erz + 150 Kristalle + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne, statt sie 15 Minuten aussitzen zu müssen – gilt für gedrosselte Produktion ebenso wie für geschwächte Verteidigung.' },
     { key:'kiIntercept', icon:'ti-bolt', name:'KI-Abfangautomatik',
-      desc:()=>'Vertreibt Piraten-Trümmerräuber automatisch, wenn du nicht selbst rechtzeitig abfängst, und rettet damit das Trümmerfeld – '+KI_INTERCEPT_COST_KERNE+' KI-Kerne je Einsatz, bewusst ohne Kampfpunkte. Braucht die Forschung KI-Technologie.' }
+      desc:()=>'Vertreibt Piraten-Trümmerräuber automatisch, wenn du nicht selbst rechtzeitig abfängst, und rettet damit das Trümmerfeld – '+KI_INTERCEPT_COST_KERNE+' KI-Kerne je Einsatz, bewusst ohne Kampfpunkte. Braucht die Forschung KI-Technologie.' },
+    // Komfort & Ablage (16.08.2026). Die Zahlen kommen aus KOMFORT_GRENZEN bzw. vom Server - eine
+    // hier hineingetippte Zahl wäre die zweite Anzeigestelle, die beim nächsten Umbau veraltet.
+    { key:'warteschlangen', icon:'ti-list-details', name:'Längere Warteschlangen',
+      desc:()=>'Bau-Wunschliste und Forschungs-Warteschlange fassen '+KOMFORT_GRENZEN.warteschlange.unterstuetzer+' statt '+KOMFORT_GRENZEN.warteschlange.standard+' Einträge – du kannst weiter im Voraus planen, statt ständig nachzulegen. Läuft der Rang aus, bleibt alles Eingereihte stehen; es lässt sich nur nichts Neues mehr darüber hinaus anhängen.' },
+    { key:'berichtsarchiv', icon:'ti-message', name:'Größeres Berichts-Archiv',
+      desc:()=>'Dein Archiv fasst '+(berichtsArchiv&&berichtsArchiv.unterstuetzer||150)+' statt '+(berichtsArchiv&&berichtsArchiv.standard||40)+' Kampf- und Ereignisberichte. Was einmal drin ist, bleibt drin: Läuft der Rang aus, friert das Archiv auf seiner Größe ein, statt ältere Berichte zu löschen.' },
+    { key:'notizen', icon:'ti-flag', name:'Längere Kolonie-Notizen und mehr Freunde',
+      desc:()=>'Die Notiz je Standort fasst '+KOMFORT_GRENZEN.notizZeichen.unterstuetzer+' statt '+KOMFORT_GRENZEN.notizZeichen.standard+' Zeichen, und die Freundesliste '+KOMFORT_GRENZEN.freunde.unterstuetzer+' statt '+KOMFORT_GRENZEN.freunde.standard+' Einträge. Bereits gespeicherte Notizen und Freunde bleiben auch nach Ablauf erhalten.' }
   ];
+  // ===== Komfort-Grenzen (16.08.2026) =====
+  // Vier Listen im Spiel haben eine harte Obergrenze. Unterstützer bekommen mehr Platz - das ist
+  // reiner Komfort, keine Spielkraft: Eine längere Warteschlange baut nichts Zusätzliches, sie
+  // erspart das Nachlegen.
+  //
+  // ALLE Verwendungsstellen ziehen aus dieser Tabelle, auch die Hilfetexte weiter unten. Vorher
+  // stand die 30 der Freundesliste an DREI Stellen (Konstante, Fehlermeldung, Hilfe-Abschnitt) und
+  // die 10 der Warteschlangen an zwei - genau die Konstellation, in der beim nächsten Umbau eine
+  // Stelle zurückbleibt und den Spieler anlügt (Regel 6). HELP_SECTIONS steht in dieser Datei weit
+  // hinter dieser Tabelle, kann sie also gefahrlos beim Aufbau auslesen.
+  //
+  // WICHTIG BEIM ABLAUF EINES RANGS: Gedeckelt wird nur das HINZUFÜGEN. Wer mit Rang 25 Bauten
+  // eingereiht hat, verliert davon nichts, wenn der Rang ausläuft - die Liste wird abgearbeitet wie
+  // immer, es lässt sich nur nichts Neues mehr über 10 hinaus anhängen. Dasselbe gilt für Notizen
+  // (bereits gespeicherte bleiben) und Freunde. Nichts von dem, was hier steht, löscht jemals etwas.
+  const KOMFORT_GRENZEN = {
+    warteschlange: { standard: 10, unterstuetzer: 25 },
+    notizZeichen:  { standard: 48, unterstuetzer: 200 },
+    freunde:       { standard: 30, unterstuetzer: 60 }
+  };
+  function komfortGrenze(schluessel){
+    const g = KOMFORT_GRENZEN[schluessel];
+    if (!g) return 0;
+    return automatikFreigeschaltet() ? g.unterstuetzer : g.standard;
+  }
+  // Der Zusatz an einer Meldung „Liste ist voll" - nur für die, die noch nicht mehr Platz haben.
+  // Wer den Rang hat, braucht den Hinweis nicht und würde ihn als Werbung lesen.
+  function komfortMehrPlatzHinweis(schluessel){
+    if (automatikFreigeschaltet()) return '';
+    const g = KOMFORT_GRENZEN[schluessel];
+    return g ? ' Mit Unterstützer-Rang sind es '+g.unterstuetzer+' (Fortschritt-Tab unter „Unterstützer").' : '';
+  }
+
   // Wie der laufende Rang zustande kommt, in Worten. Der Server nennt die Quelle, damit hier nicht
   // aus `active` geraten werden muss - "aktiv" allein hätte einem Spender in der Testphase erzählt,
   // seine Spende sei angekommen.
@@ -4405,6 +4446,9 @@
   // Er ist eine Währung, und eine Währung im Spielstand wäre in fünf Sekunden gefälscht. Was hier
   // steht, ist eine Anzeige des Serverkontos - der Server rechnet, das Spiel zeigt.
   let staubStand = null;          // {menge, serie, heuteAngemeldet, abwehrHeute, saetze} | null
+  // Archivgrenzen aus /api/reports: {belegt, platz, standard, unterstuetzer}. Wie der Rang bewusst
+  // NICHT in `state` - der Server führt das Archiv, das Spiel zeigt nur an, was er meldet.
+  let berichtsArchiv = null;
   // Abrufbremse. OHNE DIE WÄRE DAS EIN ANFRAGE-STURM: renderKosmetikBox() läuft im Haupt-Tick, also
   // jede Sekunde, und stößt den Abruf an, solange der Katalog fehlt. Antwortet der Server einmal
   // nicht (Neustart, Netzabbruch), bliebe kosmetikKatalog null - und das Spiel fragte im
@@ -21123,7 +21167,7 @@
   }
   // Kolonie-Notiz (24.07.2026, Spieler-Feature): kurze freie Notiz je Standort (rein kosmetisch/organisatorisch).
   function renameColonyNote(planetKey, note){
-    const trimmed = (note||'').trim().slice(0,48);
+    const trimmed = (note||'').trim().slice(0, komfortGrenze('notizZeichen'));
     if (!state.colonyNotes) state.colonyNotes = {};
     if (!trimmed){ delete state.colonyNotes[planetKey]; log('Notiz entfernt.', 'ti-check'); }
     else { state.colonyNotes[planetKey] = trimmed; log('Notiz gespeichert.', 'ti-check'); }
@@ -27167,7 +27211,8 @@
   }
   function addToResearchQueue(key){
     state.researchQueue = state.researchQueue || [];
-    if (state.researchQueue.length >= 10){ log('Forschungs-Warteschlange ist voll (max. 10).', 'ti-alert-triangle'); return; }
+    const fwGrenze = komfortGrenze('warteschlange');
+    if (state.researchQueue.length >= fwGrenze){ log('Forschungs-Warteschlange ist voll (max. '+fwGrenze+').'+komfortMehrPlatzHinweis('warteschlange'), 'ti-alert-triangle'); return; }
     state.researchQueue.push(key);
     log('Zur Forschungs-Warteschlange hinzugefügt.', 'ti-list-details');
     render(); save();
@@ -28413,7 +28458,8 @@
 
   function addToQueue(planetKey, buildingKey){
     state.buildQueue = state.buildQueue || [];
-    if (state.buildQueue.length >= 10){ log('Warteschlange ist voll (max. 10).', 'ti-alert-triangle'); return; }
+    const bwGrenze = komfortGrenze('warteschlange');
+    if (state.buildQueue.length >= bwGrenze){ log('Warteschlange ist voll (max. '+bwGrenze+').'+komfortMehrPlatzHinweis('warteschlange'), 'ti-alert-triangle'); return; }
     state.buildQueue.push({ planet: planetKey, key: buildingKey });
     log('Zur Warteschlange hinzugefügt.', 'ti-list-details');
     render(); save();
@@ -29169,7 +29215,15 @@
     }
     try {
       const res = await backendFetch('/reports');
-      if (res.ok){ const data = await res.json(); reportsCache = data.reports||[]; renderReportsBox(); updateReportsBadge(); }
+      if (res.ok){
+        const data = await res.json();
+        reportsCache = data.reports||[];
+        // Der Server schickt seine Archivgrenzen mit - hier steht deshalb keine eigene Zahl, die
+        // beim nächsten Umbau am Server vorbeiveraltet. `platz` ist der TATSÄCHLICH gültige Deckel
+        // (bei einem eingefrorenen Archiv größer als der Standard), nicht der nominelle.
+        if (data.archiv) berichtsArchiv = data.archiv;
+        renderReportsBox(); updateReportsBadge();
+      }
     } catch(e){}
   }
   function updateReportsBadge(){
@@ -29523,14 +29577,17 @@
   // Persönliche Lesezeichen-Liste anderer Spieler - liegt im eigenen Spielstand (state.friends), rein
   // clientseitig. Direktnachrichten laufen über das bestehende /api/messages, der Online-Status über den
   // lastSeen-Wert der geteilten Bestenliste. Übersteht Prestige/Aufstieg (kein Wirtschaftswert, s. dort).
-  const FRIENDS_MAX = 30;
+  // Die Grenze folgt jetzt dem Unterstützer-Rang (siehe KOMFORT_GRENZEN). Bewusst eine FUNKTION
+  // statt einer Konstante: Der Rang kommt erst nach dem Laden vom Server, eine beim Start
+  // ausgerechnete Zahl wäre für die ganze Sitzung falsch.
+  const friendsMax = () => komfortGrenze('freunde');
   function isFriend(id){ return (state.friends||[]).some(f => f.id === id); }
   function toggleFriend(entry){
     if (!state.friends) state.friends = [];
     const idx = state.friends.findIndex(f => f.id === entry.id);
     if (idx >= 0){ state.friends.splice(idx, 1); log(entry.name+' aus der Freundesliste entfernt.', 'ti-star'); }
     else {
-      if (state.friends.length >= FRIENDS_MAX){ log('Freundesliste voll (max. '+FRIENDS_MAX+').', 'ti-alert-triangle'); return; }
+      if (state.friends.length >= friendsMax()){ log('Freundesliste voll (max. '+friendsMax()+').'+komfortMehrPlatzHinweis('freunde'), 'ti-alert-triangle'); return; }
       state.friends.push({ id: entry.id, name: entry.name||'Unbekannt', allianceTag: entry.allianceTag||'' });
       log(entry.name+' als Freund gemerkt.', 'ti-star', 'ok');
     }
@@ -36195,7 +36252,7 @@
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Freunde einladen', body:'Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.' },
       { title:'Kolonie teilen', body:'Der Button "Kolonie teilen" (Punktestand-Tab) erzeugt ein Bild mit Avatar, Level, Punktestand und den wichtigsten Eckdaten (Kolonien, Monde, Flotte, Kampfpunkte) - zum Teilen auf sozialen Netzwerken. Auf dem Handy öffnet sich meist direkt das Teilen-Menü des Betriebssystems, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser, ohne Server-Kontakt.' },
-      { title:'Freundesliste', body:'Du kannst andere Spieler als <strong>Freunde merken</strong>: Öffne ihr Profil (in der Bestenliste auf den Namen tippen) und wähle im „···"-Menü <strong>„Als Freund merken"</strong>. Deine Freunde erscheinen dann gebündelt im Galaxie-Tab unter <strong>Rangliste & Ruhm → Nachrichten → Freunde</strong> - mit Online-Status (grüner Punkt = in den letzten Minuten aktiv) und aktuellem Punktestand. Direkt daneben kannst du ihnen eine <strong>Nachricht schreiben</strong>, ihr <strong>Profil öffnen</strong> oder sie wieder <strong>entfernen</strong>. Die Liste ist eine persönliche Merkliste (max. 30), liegt in deinem Spielstand und übersteht Prestige und Aufstieg. Nur mit eigenem Server verfügbar.' },
+      { title:'Freundesliste', body:'Du kannst andere Spieler als <strong>Freunde merken</strong>: Öffne ihr Profil (in der Bestenliste auf den Namen tippen) und wähle im „···"-Menü <strong>„Als Freund merken"</strong>. Deine Freunde erscheinen dann gebündelt im Galaxie-Tab unter <strong>Rangliste & Ruhm → Nachrichten → Freunde</strong> - mit Online-Status (grüner Punkt = in den letzten Minuten aktiv) und aktuellem Punktestand. Direkt daneben kannst du ihnen eine <strong>Nachricht schreiben</strong>, ihr <strong>Profil öffnen</strong> oder sie wieder <strong>entfernen</strong>. Die Liste ist eine persönliche Merkliste (max. '+KOMFORT_GRENZEN.freunde.standard+', mit Unterstützer-Rang '+KOMFORT_GRENZEN.freunde.unterstuetzer+'), liegt in deinem Spielstand und übersteht Prestige und Aufstieg. Nur mit eigenem Server verfügbar.' },
       { title:'Rahmen-Stufen im Spielerprofil', body:'Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>Silber</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.' },
       { title:'Die Basis liefert die Grundlast – der Weg nach oben führt über die Asteroiden', body:'Seit dem Umbau der Basiswirtschaft haben die vier Rohstoff-Gebäude (<strong>Erzmine, Kristallraffinerie, Deuteriumsynthetisierer, Fusionsreaktor</strong>) einen Deckel: <strong>Ab Stufe 16 zählt jede weitere Stufe nur noch halb</strong>, und <strong>ab Stufe 25 lassen sie sich nicht mehr ausbauen</strong>. Ein harter Schnitt hätte Stufe 26 zu einem Knopf gemacht, der nichts tut; die Abflachung sagt dir stattdessen über zehn Stufen hinweg, dass hier die Luft raus ist.<br><br><strong>Stufen über dem Deckel entfallen.</strong> Wer beim Umbau Minen jenseits von 25 hatte, hat dafür einmalig <strong>60% der Baukosten dieser Stufen zurückbekommen</strong> und dazu sechs Minenschiffe als Starthilfe; seit v8.493.0 stehen sie auf Stufe 25. Ein zweiter Ausgleich kommt nicht – die Erstattung war der Ausgleich.<br><br>Der erste Durchgang erfasste allerdings <em>nur</em> diese vier Minen. Gebäude mit Deckel, aber ohne Abflachung – Solarkraftwerk (40), Habitat (20), Aufbereitungsanlage (20) und weitere – blieben auf ihren Altstufen stehen, der Deckel bedeutete für sie nichts. <strong>Seit v8.506.0 werden auch sie beim Laden auf ihre Maximalstufe gekappt.</strong> Für diese Stufen gab es <strong>keine Erstattung</strong>: Der Ausgleich vom Sommer-Umbau hatte denselben zu engen Zuschnitt, und eine nachträgliche Rückzahlung wäre bei den Größenordnungen (bei einem Solarkraftwerk auf Stufe 100 rechnerisch einige hundert Millionen Erz) am Lagerdeckel fast vollständig verpufft. Der Bericht kennzeichnet jedes betroffene Gebäude einzeln und sagt dazu, ob eine Erstattung gelaufen ist.<br><br><strong>Das Solarkraftwerk ist bewusst ausgenommen</strong> (Ausbau bis Stufe 40, volle Rate durchgehend): Energie ist der Betriebsstoff der Aufbereitungsanlage. Die Basis verliert also keine Aufgabe, sie tauscht eine gegen eine andere – <strong>Bergwerk war gestern, jetzt ist sie Kraftwerk und Hütte</strong>. Was darüber hinaus wachsen soll, kommt aus den Asteroidengürteln (siehe „Asteroiden und Abbaumissionen").<br><br>Zwei Dinge, die dabei gleich bleiben: Der Deckel wirkt <strong>je Standort</strong>, nicht imperiumsweit – neue Kolonien bringen weiterhin voll. Und alle Produktions-Multiplikatoren (Habitat, Rollen, Module, Planetentyp) wirken unverändert auf das, was übrig bleibt.' },
       { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Energie wird nicht gelagert (nur Momentanwert für Gebäude-Betrieb), alle anderen füllen sich über die Zeit und werden im Lager gespeichert. Dazu kommt ab dem Lategame eine erste Tier-2-Ressource, Nanolegierungen (siehe eigener Eintrag unten) - eigenes, kleineres Lager, getrennt von den sechs Basis-Ressourcen.' },
@@ -36757,14 +36814,27 @@
     // Signatur-Cache-Muster warnt: ein neu hinzugekommenes Anzeigefeld, das die Wertliste
     // stillschweigend veralten laesst.
     const bildSig = ((state && state.shipSkin) || 'std') + '|' + JSON.stringify((state && state.shipMarks) || {});
-    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig+'|'+bildSig;
+    // Archiv-Zeile (16.08.2026): Wie viele Berichte aufbewahrt werden, war bisher unsichtbar - der
+    // aelteste verschwand kommentarlos. Die Zahlen kommen vom Server; steht `berichtsArchiv` noch
+    // auf null (erster Aufruf, Server nicht erreichbar), bleibt die Zeile einfach weg, statt eine
+    // erfundene Grenze zu behaupten.
+    const archivHtml = berichtsArchiv
+      ? `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:4px;"></i>Archiv: ${berichtsArchiv.belegt} von ${berichtsArchiv.platz} Berichten${
+          berichtsArchiv.platz <= berichtsArchiv.standard
+            ? ' – mit Unterstützer-Rang sind es '+berichtsArchiv.unterstuetzer+'.'
+            : ''}</div>`
+      : '';
+    // Die Archiv-Zeile MUSS in die Signatur: Sie ist ein neu hinzugekommenes Anzeigefeld, und genau
+    // solche lassen eine Wertlisten-Signatur stillschweigend veralten (siehe die Kommentare oben -
+    // derselbe Fehler ist hier schon zweimal passiert).
+    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig+'|'+bildSig+'|'+archivHtml;
     if (reportsSig === lastReportsSig) return;
     lastReportsSig = reportsSig;
     if (!useBackend()){
       box.innerHTML = statsHtml + `<div class="bmeta">Berichte sind nur verfügbar, wenn das Spiel über einen eigenen Server läuft.</div>`;
       return;
     }
-    if (!reportsCache.length){ box.innerHTML = statsHtml + `<div class="bmeta">Noch keine Berichte.</div>`; return; }
+    if (!reportsCache.length){ box.innerHTML = statsHtml + archivHtml + `<div class="bmeta">Noch keine Berichte.</div>`; return; }
     // Kategorie-Pills zählen mit, wie viele Berichte JEWEILS dazu passen würden (unabhängig vom
     // Ergebnis-Filter) - macht auf einen Blick sichtbar, wo überhaupt etwas zu finden ist.
     const filterBarHtml = `
@@ -36786,7 +36856,7 @@
       (reportsFilterCategory==='all' || reportCategoryOf(r)===reportsFilterCategory) &&
       (reportsFilterResult==='all' || (reportsFilterResult==='win') === reportIsPositive(r))
     );
-    box.innerHTML = statsHtml + filterBarHtml + `<button id="clearAllReportsBtn" style="font-size:11px; padding:5px 10px; margin-bottom:10px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Alle Berichte löschen</button>` +
+    box.innerHTML = statsHtml + archivHtml + filterBarHtml + `<button id="clearAllReportsBtn" style="font-size:11px; padding:5px 10px; margin-bottom:10px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Alle Berichte löschen</button>` +
       (filteredReports.length ? filteredReports.map(r => {
       const when = new Date(r.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       const won = r.result === 'win' || r.result === 'destroyed';
@@ -55393,6 +55463,10 @@
       const colonyRenameSaveBtn = document.getElementById('colonyRenameSaveBtn');
       if (colonyRenameSaveBtn) colonyRenameSaveBtn.onclick = () => renameColony(state.activeBasePlanet, colonyRenameInput.value);
       const colonyNoteInput = document.getElementById('colonyNoteInput');
+      // Die Feldgrenze folgt dem Rang. Ohne diese Zeile bliebe das maxlength="48" aus dem Markup
+      // stehen, und ein Unterstützer könnte seine 200 Zeichen gar nicht erst eintippen - die
+      // Speicherfunktion würde großzügig kürzen, was das Feld nie durchgelassen hat.
+      if (colonyNoteInput) colonyNoteInput.maxLength = komfortGrenze('notizZeichen');
       if (colonyNoteInput && document.activeElement !== colonyNoteInput){
         colonyNoteInput.value = colonyNoteOf(state.activeBasePlanet);
       }
