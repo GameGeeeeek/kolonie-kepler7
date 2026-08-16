@@ -6964,8 +6964,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.530.0';
+  const VERSION = '8.531.0';
   const PATCHNOTES = [
+    { version:'8.531.0', date:'16.08.2026', changes:[
+      '<strong>Asteroidenfelder liegen jetzt frei im Sektor – und der Gürtel ist eine eigene Karte.</strong> In der Sektoransicht der Sektoren-Karte erscheint jeder Gürtel als eigenes, gut sichtbares Feld: eine Brockenwolke mit gestrichelter Umrandung, Name und Bestand („4 Vorkommen") direkt darunter – frei im Raum liegend, nicht um einen Stern kreisend. Ein Tipp aufs Feld öffnet den Gürtel als eigene Kartenebene: die zehn Plätze auf der Umlaufbahn, jeder Brocken nach seiner Größe gefärbt und skaliert (dieselbe Farbcodierung wie der Vorrats-Balken im Kartenmenü), mit Vorrats-Balken direkt am Fels; freie Plätze sind gestrichelt angedeutet.',
+      '<strong>Und die Karte füllt jetzt den Bildschirm.</strong> Direktes Feedback vom Live-Stand umgesetzt: Der Kartenkasten wächst im Sektoren-Modus auf die volle Sichthöhe (statt fester 420 Pixel), die Systeme verteilen sich über die GANZE Fläche – acht Systeme lassen keinen leeren Süden mehr übrig –, die Übersicht passt ihr Seitenverhältnis dem Kasten an, und die in den Sektor-Ansichten wirkungslosen Zoom-Knöpfe (+/−) sind dort ausgeblendet.',
+      'Schürfrechte stehen direkt am Brocken: ein grün gestrichelter Ring für dein eigenes Recht, ein roter für fremd besetzte Vorkommen. Der Tipp auf einen Fels öffnet das gewohnte Kartenmenü mit allem, was es dort schon gibt – Sorte samt Anteilen, Vorrat, Abbaumission, Schürfrecht anmelden. ‹ führt zum Sektor zurück, ⌂ zur Übersicht, „Zurücksetzen" schält wie überall von innen nach außen. Dritte Etappe des Karten-Modells B – der abgenommene Entwurf ist damit vollständig im Spiel.'
+    ]},
     { version:'8.530.0', date:'16.08.2026', changes:[
       '<strong>Die Sektoren-Karte hat jetzt ihre eigentliche Sektoransicht.</strong> Wer die Einstellung nutzt und eine Region antippt, sieht nicht mehr den gezoomten Freiflug-Ausschnitt, sondern eine eigene Karte des Sektors: jedes System auf einem festen, großzügigen Platz – nichts überlappt, jedes Ziel ist daumengroß, jeder Name lesbar. Die Sterne tragen ihre echten Sonnenfarben, die Heimat einen goldenen Ring, eigene Kolonien einen grünen, Gürtelsysteme einen gestrichelten; unter jedem System steht der Erkundungsstand.',
       'Mit ‹ › oder einem Wisch geht es zum Nachbarsektor, ⌂ führt zur Galaxie-Übersicht. Ein Tipp auf ein System öffnet die gewohnte Systemansicht samt Detailtafel – deren Schließen bringt dich in den Sektor zurück, nicht ins Nirgendwo. Zweite Etappe des Karten-Modells B; als Nächstes bekommen die Asteroidenfelder ihren eigenen Platz frei im Sektor. Die Ebenen-Schalter sind in den Sektor-Ansichten vorerst ausgeblendet, bis sie dort wirken – ein sichtbarer Schalter ohne Wirkung wäre gelogen.'
@@ -51355,7 +51360,7 @@
       // erschienen. Das Feld ist klein (wenige kB) - der stringify kostet Mikrosekunden.
       JSON.stringify(state.asteroidFeld||{}),
       JSON.stringify(state.peilungen||[]),
-      (state.uiSektorKarte ? 'S' : 'F') + (karteSektorOffen || '')
+      (state.uiSektorKarte ? 'S' : 'F') + (karteSektorOffen || '') + ':' + (karteGuertelOffen || '')
     ].join('§');
   }
   function galaxyBauNachGeste(){
@@ -51662,8 +51667,15 @@
     const gruppen = sektorMitglieder();
     const alle = STAR_SYSTEMS.filter(x => !x.hidden);
     const xs = alle.map(x => x.gx), ys = alle.map(x => x.gy);
-    const x0 = Math.min.apply(null, xs) - 45, x1 = Math.max.apply(null, xs) + 45;
-    const y0 = Math.min.apply(null, ys) - 45, y1 = Math.max.apply(null, ys) + 45;
+    let x0 = Math.min.apply(null, xs) - 45, x1 = Math.max.apply(null, xs) + 45;
+    let y0 = Math.min.apply(null, ys) - 45, y1 = Math.max.apply(null, ys) + 45;
+    // Ausschnitt ans Kasten-Seitenverhältnis anpassen: die schmalere Achse wird symmetrisch
+    // erweitert, damit die Galaxie den ganzen Kasten füllt statt zwischen Leerbändern zu hängen.
+    const uRect = svg.getBoundingClientRect();
+    const uVerh = (uRect.height || 500) / (uRect.width || 400);
+    const zielH = (x1 - x0) * uVerh;
+    if (zielH > (y1 - y0)){ const d = (zielH - (y1 - y0)) / 2; y0 -= d; y1 += d; }
+    else { const zielW = (y1 - y0) / uVerh, d = (zielW - (x1 - x0)) / 2; if (d > 0){ x0 -= d; x1 += d; } }
     svg.setAttribute('viewBox', x0.toFixed(1) + ' ' + y0.toFixed(1) + ' ' + (x1-x0).toFixed(1) + ' ' + (y1-y0).toFixed(1));
     let inner = '', gesamt = 0;
     for (const sk of SEKTOR_DEFS){
@@ -51699,15 +51711,95 @@
   // genug für den größten Cluster (Kepler-Kern, 15 Systeme). Die Reihenfolge der Mitglieder ist
   // deterministisch (Nord nach Süd, dann West nach Ost), damit dieselben Systeme immer auf
   // denselben Plätzen liegen; ungerade Sektoren spiegeln die Vorlage für optische Abwechslung.
-  const SEKTOR_PLAETZE = [
-    [66,112],[198,96],[330,118],
-    [96,206],[230,198],[352,212],
-    [60,302],[196,292],[334,308],
-    [92,400],[224,392],[350,404],
-    [64,490],[196,500],[332,486]
-  ];
   let kbWischStartX = null, kbWischStartY = null;
+  // Gürtelansicht (Etappe KB-3): karteGuertelOffen hält das System, dessen Gürtel als eigene
+  // Kartenebene offen ist. Unregelmäßige Fels-Umrisse deterministisch aus hashStringToFloat.
+  let karteGuertelOffen = null;
+  function kbBrockenPfad(x, y, r, seed){
+    const pts = [];
+    for (let a = 0; a < 8; a++){
+      const w = a/8*2*Math.PI, rr = r * (0.78 + hashStringToFloat(seed + ':' + a) * 0.4);
+      pts.push((x + rr*Math.cos(w)).toFixed(1) + ',' + (y + rr*Math.sin(w)).toFixed(1));
+    }
+    return 'M' + pts.join(' L') + ' Z';
+  }
+  const KB_FELS_RADIUS = { splitter: 8, brocken: 11, kern: 15, koloss: 20 };
+  function guertelAnsichtBauen(svg){
+    const sy = STAR_SYSTEMS.find(x => x.id === karteGuertelOffen);
+    if (!sy){ karteGuertelOffen = null; return sektorAnsichtBauen(svg); }
+    asteroidFeldSicherstellen();
+    ladeAsteroidfeld();   // selbst gedrosselt; mit Server führt ER das Feld
+    const feld = (state.asteroidFeld && state.asteroidFeld[sy.id]) || { plaetze: {} };
+    const kbRect = svg.getBoundingClientRect();
+    const H = Math.max(560, Math.min(960, Math.round(400 * ((kbRect.height || 560) / (kbRect.width || 400)))));
+    svg.setAttribute('viewBox', '0 0 400 ' + H);
+    const OCX = 200, OCY = Math.round(H/2 + 20), ORX = 148, ORY = Math.round(H/2 - 92);
+    let sterne = '';
+    for (let i = 0; i < 60; i++){
+      const zx = hashStringToFloat(sy.id + ':gx' + i), zy = hashStringToFloat(sy.id + ':gy' + i);
+      sterne += '<circle cx="' + (zx*400).toFixed(1) + '" cy="' + (zy*H).toFixed(1) + '" r="' + (0.5 + hashStringToFloat(sy.id + ':gr' + i)*1.0).toFixed(2) + '" fill="#cfd6f5" opacity="' + (0.2 + hashStringToFloat(sy.id + ':go' + i)*0.5).toFixed(2) + '"/>';
+    }
+    const st = sunTypeFor(sy.id);
+    let plaetze = '', belegt = 0;
+    for (let p = 0; p < PLAETZE_JE_GUERTEL; p++){
+      const a = -Math.PI/2 + p * (2*Math.PI/PLAETZE_JE_GUERTEL);
+      const x = OCX + ORX*Math.cos(a), y = OCY + ORY*Math.sin(a);
+      const e = asteroidAn(sy.id, p);
+      if (!e){
+        plaetze += '<g opacity="0.45"><circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="8" fill="none" stroke="#5a6180" stroke-dasharray="3 3"/>'
+          + '<text x="' + x.toFixed(0) + '" y="' + (y+22).toFixed(0) + '" text-anchor="middle" style="font:8.5px ui-monospace,monospace; fill:#8d92ae;">frei</text></g>';
+        continue;
+      }
+      belegt++;
+      const so = asteroidSorte(e.sorte), g = asteroidGroesse(e.groesse);
+      const r = KB_FELS_RADIUS[e.groesse] || 11;
+      const pct = Math.max(0, Math.min(1, (e.vorrat || 0) / (g.vorrat || 1)));
+      const mein = asteroidMeinRecht(e), fremd = asteroidFremdReserviert(e);
+      const ring = mein ? '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="' + (r+7) + '" fill="none" stroke="#5dcaa5" stroke-width="2" stroke-dasharray="4 4"/>'
+        : fremd ? '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="' + (r+7) + '" fill="none" stroke="#e05a58" stroke-width="2"/>' : '';
+      plaetze += '<g data-map-asteroid="' + p + '" data-kb-fels="' + p + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + so.name + ' (' + g.name + ')">'
+        + '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="' + (r+13) + '" fill="' + g.farbe + '" opacity="0.12"/>'
+        + '<path d="' + kbBrockenPfad(x, y, r, sy.id + ':fels:' + p) + '" fill="' + g.farbe + '" fill-opacity="0.88" stroke="#0b0e1a" stroke-width="1"/>'
+        + ring
+        + '<rect x="' + (x-19).toFixed(0) + '" y="' + (y+r+8).toFixed(0) + '" width="38" height="4" rx="2" fill="#252d4a"/>'
+        + '<rect x="' + (x-19).toFixed(0) + '" y="' + (y+r+8).toFixed(0) + '" width="' + (38*pct).toFixed(0) + '" height="4" rx="2" fill="' + g.farbe + '"/>'
+        + '<text x="' + x.toFixed(0) + '" y="' + (y+r+24).toFixed(0) + '" text-anchor="middle" style="font:600 10px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + so.name + '</text>'
+        + '<text x="' + x.toFixed(0) + '" y="' + (y+r+35).toFixed(0) + '" text-anchor="middle" style="font:8.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + g.name + (mein ? ' · dein Recht' : fremd ? ' · besetzt' : '') + '</text>'
+        + '</g>';
+    }
+    const knopfKB = function(id, x, glyph, label){
+      return '<g data-kb-knopf="' + id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + label + '">'
+        + '<rect x="' + (x-19) + '" y="14" width="38" height="38" rx="10" fill="rgba(18,23,41,0.88)" stroke="#39426b"/>'
+        + '<text x="' + x + '" y="40" text-anchor="middle" style="font:600 19px system-ui,sans-serif; fill:#d9ddf1;">' + glyph + '</text></g>';
+    };
+    svg.innerHTML = sterne
+      + '<ellipse cx="' + OCX + '" cy="' + OCY + '" rx="' + ORX + '" ry="' + ORY + '" fill="none" stroke="#39426b" stroke-width="1" stroke-dasharray="2 6"/>'
+      + '<circle cx="' + OCX + '" cy="' + OCY + '" r="17" fill="url(#sekSun-' + st.key + ')"/>'
+      + '<defs><radialGradient id="sekSun-' + st.key + '" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="' + st.core + '"/><stop offset="60%" stop-color="' + st.glow + '"/><stop offset="100%" stop-color="#20263f"/></radialGradient></defs>'
+      + '<text x="' + OCX + '" y="' + (OCY+34) + '" text-anchor="middle" style="font:9px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + sy.name + '</text>'
+      + plaetze
+      + knopfKB('guertelzu', 34, '‹', 'Zurück zum Sektor')
+      + knopfKB('heimweg', 366, '⌂', 'Zur Sektoren-Übersicht')
+      + '<text data-kb-guertel="' + sy.id + '" x="200" y="31" text-anchor="middle" style="font:600 14px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;">Gürtel · ' + sy.name + '</text>'
+      + '<text x="200" y="46" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + belegt + ' von ' + PLAETZE_JE_GUERTEL + ' Plätzen belegt</text>'
+      + '<text x="200" y="' + (H-10) + '" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#8d92ae; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">Brocken antippen – Sorte, Vorrat und Schürfrecht direkt am Fels</text>';
+    lastGalaxyMapMarkup = null;
+    svg.querySelectorAll('[data-kb-fels]').forEach(function(g){
+      const platz = +g.getAttribute('data-kb-fels');
+      g.onclick = function(ev){ asteroidMapMenu(ev, sy.id, platz); };
+      g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); asteroidMapMenu(e, sy.id, platz); } };
+    });
+    const aktionenKB = { guertelzu: function(){ karteGuertelOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); },
+                         heimweg: function(){ karteGuertelOffen = null; karteSektorOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); } };
+    svg.querySelectorAll('[data-kb-knopf]').forEach(function(g){
+      const f = aktionenKB[g.getAttribute('data-kb-knopf')];
+      g.onclick = f;
+      g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); f(); } };
+    });
+    svg.ontouchstart = svg.ontouchend = null;
+  }
   function sektorNachbarKB(richtung){
+    karteGuertelOffen = null;
     const idx = SEKTOR_DEFS.findIndex(sk => sk.key === karteSektorOffen);
     if (idx < 0) return;
     const ziel = SEKTOR_DEFS[(idx + richtung + SEKTOR_DEFS.length) % SEKTOR_DEFS.length];
@@ -51720,7 +51812,17 @@
     const mg = (sektorMitglieder().get(sk.key) || []).slice()
       .sort((a,b) => a.gy - b.gy || a.gx - b.gx);
     const spiegel = idx % 2 === 1;
-    svg.setAttribute('viewBox', '0 0 400 560');
+    // Höhe folgt dem echten Kasten-Seitenverhältnis - die Ansicht füllt den Bildschirm, statt
+    // in einem 400x640-Fenster zu schwimmen.
+    const kbRect = svg.getBoundingClientRect();
+    const H = Math.max(560, Math.min(960, Math.round(400 * ((kbRect.height || 560) / (kbRect.width || 400)))));
+    svg.setAttribute('viewBox', '0 0 400 ' + H);
+    // Asteroidenfelder liegen FREI im Sektor (Spieler-Wunsch am Entwurf: "nicht um den Planeten
+    // rumkreisen") - eine eigene Reihe unter den Systemplätzen, jedes Feld so groß und tippbar
+    // wie ein System. Höchstens drei; mehr gibt es je Sektor derzeit nicht (20 Gürtel auf 8
+    // Sektoren), und falls doch, nennt die Zeile die Zahl statt still zu kappen.
+    const KB_FELD_PLAETZE = [[96, H-56], [232, H-64], [344, H-52]];
+    const gFelder = mg.filter(function(x){ return istGuertelSystem(x.id); });
     let defs = '';
     for (const t of SUN_TYPES){
       defs += '<radialGradient id="sekSun-' + t.key + '" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="' + t.core + '"/><stop offset="60%" stop-color="' + t.glow + '"/><stop offset="100%" stop-color="#20263f"/></radialGradient>'
@@ -51733,11 +51835,28 @@
     for (let i = 0; i < 70; i++){
       const zx = hashStringToFloat(sk.key + ':sx' + i), zy = hashStringToFloat(sk.key + ':sy' + i);
       const zr = hashStringToFloat(sk.key + ':sr' + i), zo = hashStringToFloat(sk.key + ':so' + i);
-      sterne += '<circle cx="' + (zx*400).toFixed(1) + '" cy="' + (zy*560).toFixed(1) + '" r="' + (0.5 + zr*1.1).toFixed(2) + '" fill="#cfd6f5" opacity="' + (0.2 + zo*0.55).toFixed(2) + '"/>';
+      sterne += '<circle cx="' + (zx*400).toFixed(1) + '" cy="' + (zy*H).toFixed(1) + '" r="' + (0.5 + zr*1.1).toFixed(2) + '" fill="#cfd6f5" opacity="' + (0.2 + zo*0.55).toFixed(2) + '"/>';
     }
     let knoten = '';
+    // Plätze über die VOLLE Höhe verteilen: Zeilen zu 3 und 2 Spalten im Wechsel, Zeilenabstand
+    // aus Mitgliederzahl und Höhe - 8 Systeme füllen dieselbe Fläche wie 15. Mindestabstand
+    // bleibt konstruktiv gewahrt (schmalste Diagonale ~80px, test_sektoransicht misst >=60).
+    const kbSpalten = [[66, 200, 334], [130, 270]];
+    const kbPlaetze = [];
+    { let z = 0;
+      while (kbPlaetze.length < mg.length){
+        for (const px of kbSpalten[z % 2]){ if (kbPlaetze.length < mg.length) kbPlaetze.push([px, z]); }
+        z++;
+      }
+      const zeilen = kbPlaetze.length ? kbPlaetze[kbPlaetze.length - 1][1] + 1 : 1;
+      const oben = 112, unten = H - (gFelder.length ? 208 : 150);
+      kbPlaetze.forEach(function(q){
+        q[1] = zeilen === 1 ? Math.round((oben + unten) / 2)
+             : Math.round(oben + q[1] * (unten - oben) / (zeilen - 1));
+      });
+    }
     mg.forEach(function(sy, k){
-      const p = SEKTOR_PLAETZE[k % SEKTOR_PLAETZE.length];
+      const p = kbPlaetze[k];
       const x = spiegel ? 400 - p[0] : p[0], y = p[1];
       const st = sunTypeFor(sy.id);
       const r = Math.round(11 * (st.r || 1) * 10) / 10;
@@ -51774,18 +51893,48 @@
       + knopf('rechts', 366, '›', re.name)
       + '<text data-kb-titel="' + sk.key + '" x="222" y="31" text-anchor="middle" style="font:600 14px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;">' + sk.name + '</text>'
       + '<text x="222" y="46" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + mg.length + ' Systeme · Sektor ' + (idx+1) + ' von ' + SEKTOR_DEFS.length + '</text>';
+    let feldMarkup = '';
+    gFelder.slice(0, KB_FELD_PLAETZE.length).forEach(function(sy, k){
+      const fp = KB_FELD_PLAETZE[k];
+      const fx = spiegel ? 400 - fp[0] : fp[0], fy = fp[1];
+      asteroidFeldSicherstellen();
+      const anzahl = asteroidBelegt(sy.id);
+      const STREU = [[-34,-6],[-14,9],[5,-12],[23,7],[38,-3]];
+      let steine = '';
+      STREU.forEach(function(d, j){
+        const fr = 4.5 + hashStringToFloat(sy.id + ':feldr' + j) * 4;
+        const farbe = ASTEROID_GROESSEN[j % ASTEROID_GROESSEN.length].farbe;
+        steine += '<path d="' + kbBrockenPfad(fx + d[0], fy + d[1], fr, sy.id + ':feldstein:' + j) + '" fill="' + farbe + '" fill-opacity="0.85" stroke="#0b0e1a" stroke-width="1"/>';
+      });
+      feldMarkup += '<g data-sektor-feld="' + sy.id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="Gürtel von ' + sy.name + ' öffnen">'
+        + '<ellipse cx="' + fx + '" cy="' + fy + '" rx="54" ry="26" fill="#fac775" fill-opacity="0.06"/>'
+        + '<ellipse cx="' + fx + '" cy="' + fy + '" rx="54" ry="26" fill="none" stroke="#fac775" stroke-opacity="0.7" stroke-width="1.2" stroke-dasharray="4 5" transform="rotate(-8 ' + fx + ' ' + fy + ')"/>'
+        + steine
+        + '<text x="' + fx + '" y="' + (fy+40) + '" text-anchor="middle" style="font:600 10.5px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + sy.name.replace(/-System$/, '') + '-Gürtel</text>'
+        + '<text x="' + fx + '" y="' + (fy+52) + '" text-anchor="middle" style="font:8.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + anzahl + ' Vorkommen · antippen</text>'
+        + '</g>';
+    });
+    if (gFelder.length > KB_FELD_PLAETZE.length){
+      feldMarkup += '<text x="200" y="' + (H-24) + '" text-anchor="middle" style="font:9px ui-monospace,monospace; fill:#8d92ae;">+' + (gFelder.length - KB_FELD_PLAETZE.length) + ' weitere Gürtel über die Systemknoten erreichbar</text>';
+    }
     svg.innerHTML = '<defs>' + defs + '</defs>'
       + sterne
-      + '<rect x="0" y="0" width="400" height="560" fill="url(#sekTerrit)"/>'
-      + knoten + steuer
-      + '<text x="200" y="548" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#8d92ae; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">System antippen · Wischen oder ‹ › für den Nachbarsektor</text>';
+      + '<rect x="0" y="0" width="400" height="' + H + '" fill="url(#sekTerrit)"/>'
+      + knoten + feldMarkup + steuer
+      + '<text x="200" y="' + (H-10) + '" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#8d92ae; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">System antippen · Wischen oder ‹ › für den Nachbarsektor</text>';
     lastGalaxyMapMarkup = null;
     svg.querySelectorAll('[data-sektor-sys]').forEach(function(g){
       const oeffnen = function(){ galaxyOeffne(g.getAttribute('data-sektor-sys')); };
       g.onclick = oeffnen;
       g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); oeffnen(); } };
     });
-    const aktionen = { heimweg: function(){ karteSektorOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); },
+    svg.querySelectorAll('[data-sektor-feld]').forEach(function(g){
+      const sysId = g.getAttribute('data-sektor-feld');
+      const oeffnen = function(){ karteGuertelOffen = sysId; lastGalaxyMapMarkup = null; buildGalaxyMap(); };
+      g.onclick = oeffnen;
+      g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); oeffnen(); } };
+    });
+    const aktionen = { heimweg: function(){ karteSektorOffen = null; karteGuertelOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); },
                        links: function(){ sektorNachbarKB(-1); }, rechts: function(){ sektorNachbarKB(1); } };
     svg.querySelectorAll('[data-kb-knopf]').forEach(function(g){
       const f = aktionen[g.getAttribute('data-kb-knopf')];
@@ -51831,11 +51980,24 @@
     // Übersicht die Freiflug-Galaxie, solange kein Sektor geöffnet ist. Ein geöffneter Sektor
     // nutzt in KB-1 die bestehende Freiflug-Zeichnung auf den Sektor-Ausschnitt gezoomt.
     const kbLeiste = document.getElementById('karteEbenenLeiste');
+    // Bildschirm füllen (Spieler-Wunsch am Live-Stand): Im Sektoren-Modus wächst der Kasten auf
+    // die Sichthöhe; im Freiflug (und in der Systemebene) bleibt es bei den bewährten 420px.
+    // Die Zoom-Knöpfe sind in den Sektor-Ansichten wirkungslos und deshalb ausgeblendet.
+    const kbWrap = svg.closest('.map-wrap');
+    const kbSektorModus = state.uiSektorKarte && !galaxyOpenSystem;
+    if (kbWrap) kbWrap.style.height = kbSektorModus ? 'max(480px, calc(100dvh - 175px))' : '420px';
+    ['galaxyZoomInBtn','galaxyZoomOutBtn'].forEach(function(id){
+      const b = document.getElementById(id);
+      if (b) b.style.display = kbSektorModus ? 'none' : '';
+    });
     if (state.uiSektorKarte && !galaxyOpenSystem){
       if (kbLeiste) kbLeiste.style.display = 'none';
       if (!karteSektorOffen){
         svg.ontouchstart = svg.ontouchend = null;
+        karteGuertelOffen = null;
         sektorUebersichtBauen(svg);
+      } else if (karteGuertelOffen){
+        guertelAnsichtBauen(svg);
       } else {
         sektorAnsichtBauen(svg);
       }
@@ -60840,7 +61002,7 @@
     const uiSektorKarteToggleBtn = document.getElementById('uiSektorKarteToggleRow');
     if (uiSektorKarteToggleBtn) uiSektorKarteToggleBtn.onclick = () => {
       state.uiSektorKarte = !state.uiSektorKarte;
-      karteSektorOffen = null; lastGalaxyMapMarkup = null;
+      karteSektorOffen = null; karteGuertelOffen = null; lastGalaxyMapMarkup = null;
       render(); save();
     };
     const notifToggleBtn = document.getElementById('notifToggleRow');
@@ -61117,6 +61279,7 @@
     const zoomResetBtn = document.getElementById('galaxyZoomResetBtn');
     if (zoomResetBtn) zoomResetBtn.onclick = () => {
       if (galaxyOpenSystem){ galaxySchliesse(); return; }
+      if (state.uiSektorKarte && karteGuertelOffen){ karteGuertelOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); return; }
       if (state.uiSektorKarte && karteSektorOffen){ karteSektorOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); return; }
       // Der belegte Bereich statt des vollen Feldes: Von 277 Plätzen sind 69 vergeben, das volle
       // Feld zeigte die Galaxie deshalb als kleinen Fleck in der Bildmitte - ausgerechnet der Knopf,
