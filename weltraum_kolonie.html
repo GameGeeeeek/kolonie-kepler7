@@ -6921,8 +6921,12 @@
     protomaterie: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="15" cy="16" r="9" fill="#e0a548"/><circle cx="28" cy="18" r="7" fill="#e0a548"/><circle cx="20" cy="29" r="7.5" fill="#e0a548"/><circle cx="12.5" cy="13" r="3.2" fill="#f6dcae"/></svg>`
   };
 
-  const VERSION = '8.526.0';
+  const VERSION = '8.527.0';
   const PATCHNOTES = [
+    { version:'8.527.0', date:'16.08.2026', changes:[
+      '<strong>Werft- und Offizierskarten sind jetzt Kompaktkarten.</strong> Die langen Beschreibungs- und Antriebszeilen der Schiffskarten (bis zu fünf Zeilen je Schiff) und die Erklärzeile der Offiziere stehen hinter demselben „Details"-Griff, den Gebäude und Forschung seit dem Kompakt-Umbau tragen – die Werftliste ist damit auf einen Blick überschaubar. Statusbalken, Marken, Kosten, Baufortschritt und alle Knöpfe bleiben immer sichtbar, und ein aufgeklappter Griff bleibt offen, bis man ihn wieder schließt.',
+      '<strong>Die Galaxiekarte spart sich ihren blinden Sekundenaufbau.</strong> Bei offenem Karte-Tab wurde das komplette Karten-Markup jede Sekunde neu berechnet – fast immer nur, um festzustellen, dass sich nichts geändert hat (gemessen: rund 1,7 ms je Sekunde, auf Telefonen entsprechend mehr). Jetzt prüft eine billige Eingangs-Signatur (Missionen, Eroberungen, Entdeckungen, Ebenen, Ausschnitt), ob sich überhaupt etwas geändert hat; alles Direkte – Klicks, Ebenen-Schalter, Zoom, eintreffende Serverdaten – zeichnet unverändert sofort. Als Selbstkorrektur baut die Karte spätestens alle 5 Sekunden einmal voll auf, damit auch eine von der Signatur übersehene Änderung nie dauerhaft unsichtbar bleibt.'
+    ]},
     { version:'8.526.0', date:'16.08.2026', changes:[
       '<strong>Protomaterie – der erste Rohstoff, den keine Fabrik herstellen kann.</strong> Anlass war ein Bericht von Sascha: „man bekommt immer zu viele Ressourcen, sodass man gar nicht die Asteroiden sucht\u201c. Nachgemessen an einem echten Endstand stimmte das genau – die beste Abbaufuhre des Spiels brachte 177.840 Einheiten, und das sind bei ausgebauter Wirtschaft <em>73 Sekunden</em> Produktion für 45 Minuten Flug. Alle neun Asteroidensorten liefern nur Erz, Kristalle und Deuterium; am Gürtel gab es schlicht nichts, was zu Hause nicht bequemer entsteht. Protomaterie ändert das: Sie stammt aus der Zeit vor der Planetenbildung, Asteroiden sind die Reste, die nie ein Planet geworden sind – und nur in ihnen ist sie erhalten. Es gibt keinen zweiten Weg zu ihr.',
       '<strong>Wie viel es gibt:</strong> eine feste Menge je heimgekehrter Fuhre, allein nach Größe des Vorkommens – Splitter 0, Brocken 2, Kern 8, Koloss 25. Bewusst <em>nicht</em> an die Ladung gekoppelt: Sonst wüchse sie mit dem Laderaum und damit wieder mit der Größe des Imperiums, und der ganze Sinn wäre dahin. Am meisten bekommt, wer den größten Brocken anfliegt, nicht wer die größte Flotte hat. <strong>Schürfpeilungen sind damit die beste Quelle des Spiels</strong> – sie sind immer Kern oder Koloss.',
@@ -51182,6 +51186,34 @@
   // Beschriftungsdichte, also MUSS irgendwann neu gezeichnet werden - nur nicht bei jedem der
   // Dutzenden Ereignisse eines einzigen Rad- oder Kneif-Vorgangs.
   let galaxyBauTimer = 0;
+  // Eingangs-Signatur des Sekunden-Auffangnetzes (Etappe G-1): billig zu bauen (ein paar Joins,
+  // kein Markup), deckt die Eingaben ab, die sich ohne eigenen buildGalaxyMap-Aufruf ändern -
+  // Missionen (Routen-Ebene!), Eroberungen, Entdeckungen, Kolonien, Ebenen-Schalter, Ausschnitt,
+  // offenes System. Bewusst NICHT vollständig im strengen Sinn: Was hier fehlt, heilt der
+  // 5-Sekunden-Vollbau im Aufrufer - dieselbe Selbstkorrektur-Eigenschaft wie beim
+  // setBoxHtml-Markup-Vergleich, nur eine Stufe früher (vor dem teuren String-Aufbau).
+  let karteAuffangSig = null, karteVollbauZeit = 0;
+  function karteAuffangSignatur(){
+    let missionen = '';
+    for (const { fleet: sigFleet } of allFleetsWithPlanet()){
+      for (const sm of (sigFleet.missions||[])) missionen += (sm.id||'') + (sm.type||'') + (sm.endTime||0) + '|';
+    }
+    return [
+      galaxyOpenSystem||'', activeSystem||'',
+      JSON.stringify(state.karteEbenen||{}),
+      Math.round(galaxyMapViewBox.x)+','+Math.round(galaxyMapViewBox.y)+','+Math.round(galaxyMapViewBox.w),
+      missionen,
+      Object.keys(galaxyCache.controlledSystems||{}).join(','),
+      Object.keys(state.colonies||{}).length,
+      Object.keys(state.discovered||{}).length,
+      // Asteroidenfeld + Peilungen: beide zeichnen direkt auf der Karte (Vorkommen, Schürfrecht-
+      // Ringe, Peilungs-Marker). Befund test_geteiltes_asteroidfeld 6e: Nach einem Claim lief
+      // render(), aber ohne diesen Signatur-Anteil wäre der grüne Ring erst mit dem 5-s-Vollbau
+      // erschienen. Das Feld ist klein (wenige kB) - der stringify kostet Mikrosekunden.
+      JSON.stringify(state.asteroidFeld||{}),
+      JSON.stringify(state.peilungen||[])
+    ].join('§');
+  }
   function galaxyBauNachGeste(){
     if (galaxyBauTimer) clearTimeout(galaxyBauTimer);
     galaxyBauTimer = setTimeout(() => { galaxyBauTimer = 0; buildGalaxyMap(); }, 140);
@@ -51464,6 +51496,10 @@
   // einem Spielstand-Load, der NACH der Verdrahtung passiert.
   function karteEbeneAn(k){ const e = state.karteEbenen || {}; return e[k] !== false; }
   function buildGalaxyMap(){
+    // Messpunkt (Etappe G-1): zählt die String-Aufbauten. Von außen beobachtbar, weil der
+    // Markup-Vergleich am Ende eingesparte wie durchgeführte Aufbauten sonst unsichtbar macht -
+    // ein Test (test_karte_auffangnetz) kann nur so belegen, dass das Auffangnetz wirklich spart.
+    window.__karteAufbauten = (window.__karteAufbauten||0) + 1;
     document.querySelectorAll('#karteEbenenLeiste [data-karte-ebene]').forEach(b =>
       b.classList.toggle('active', karteEbeneAn(b.getAttribute('data-karte-ebene'))));
     const svg = document.getElementById('galaxyMapSvg');
@@ -56650,19 +56686,22 @@
             </div>
             <div>
               <div class="bname">${def.name} <span class="lvl-pill">${count}</span>${pendingQty?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">+${pendingQty} im Bau</span>`:''}</div>
-              ${meta ? `<div class="bmeta">${meta}</div>` : ''}
-              ${/* def.desc wurde bis v8.347.0 NIRGENDS gerendert. Die 30 gewöhnlichen Schiffe erklärt
-                    die meta-if/else-Kette oben, die 9 Tiefenschiffe tragen stattdessen ein desc – und
-                    hatten damit weder das eine noch das andere: sechs Karten mit vier Nullen in den
-                    Balken und keiner Zeile darüber, was das Schiff eigentlich bringt (Spieler-Report
-                    30.07.2026: „man sieht nicht welchen Vorteil die Schiffe bringen"). Die Regel 7
-                    war erfüllt – der Text war geschrieben –, es fehlte die Anzeigestelle.
-                    Bewusst generisch: Jedes künftige Schiff kann ein desc bekommen, ohne dass jemand
-                    die if/else-Kette anfassen muss. */''}
-              ${def.desc ? `<div class="bmeta" style="color:#9fe1cb;"><i class="ti ti-info-circle" aria-hidden="true"></i> ${def.desc}</div>` : ''}
-              ${def.nicheDesc ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${def.nicheDesc}</div>` : ''}
+              <details class="karten-info" data-keep-open="sinfo:${def.key}"${detailsOpenAttr('sinfo:'+def.key)}>
+                <summary>Details</summary>
+                ${meta ? `<div class="bmeta">${meta}</div>` : ''}
+                ${/* def.desc wurde bis v8.347.0 NIRGENDS gerendert. Die 30 gewöhnlichen Schiffe erklärt
+                      die meta-if/else-Kette oben, die 9 Tiefenschiffe tragen stattdessen ein desc – und
+                      hatten damit weder das eine noch das andere: sechs Karten mit vier Nullen in den
+                      Balken und keiner Zeile darüber, was das Schiff eigentlich bringt (Spieler-Report
+                      30.07.2026: „man sieht nicht welchen Vorteil die Schiffe bringen"). Die Regel 7
+                      war erfüllt – der Text war geschrieben –, es fehlte die Anzeigestelle.
+                      Bewusst generisch: Jedes künftige Schiff kann ein desc bekommen, ohne dass jemand
+                      die if/else-Kette anfassen muss. */''}
+                ${def.desc ? `<div class="bmeta" style="color:#9fe1cb;"><i class="ti ti-info-circle" aria-hidden="true"></i> ${def.desc}</div>` : ''}
+                ${def.nicheDesc ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${def.nicheDesc}</div>` : ''}
+                <div class="bmeta">${driveLine}</div>
+              </details>
               ${shipStatBarsHtml(def.atk, def.shield, perShipDefContrib, def.speed, def.key)}
-              <div class="bmeta">${driveLine}</div>
               ${unlocked ? shipMarkRowHtml(def.key) : ''}
               ${SPECIAL_UNIT_ITEMS[def.key] ? `<div class="bmeta" style="${(state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0)<shipQty?'color:#e24b4a;':''}"><i class="ti ti-diamond" aria-hidden="true"></i> Verbraucht ${shipQty}x ${(RARE_ITEMS.find(r=>r.key===SPECIAL_UNIT_ITEMS[def.key])||{}).name||''} (vorhanden: ${state.rareItems[SPECIAL_UNIT_ITEMS[def.key]]||0})</div>` : ''}
               ${allReqNames ? `<div class="bmeta" style="color:#6b6f85;"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${allReqNames}</div>` : ''}
@@ -57459,7 +57498,10 @@
                   <div class="bicon" style="background:${o.color}22; color:${o.color}; flex-shrink:0;">${iconHtmlFor(o.key, o.icon, o.color)}</div>
                   <div>
                     <div class="bname">${o.name} ${lvl>0?`<span class="lvl-pill" style="background:${o.color}22; color:${o.color};">Stufe ${lvl}</span>`:'<span class="lvl-pill">nicht angeheuert</span>'}${talent?` <span class="lvl-pill" style="background:${o.color}22; color:${o.color};"><i class="ti ti-sparkles" aria-hidden="true"></i> ${OFFICER_TALENTS[talent].name}</span>`:''}</div>
-                    <div class="bmeta">${o.detail}</div>
+                    <details class="karten-info" data-keep-open="oinfo:${o.key}"${detailsOpenAttr('oinfo:'+o.key)}>
+                      <summary>Details</summary>
+                      <div class="bmeta">${o.detail}</div>
+                    </details>
                     ${lvl>0?`<div class="bmeta" style="color:${o.color};">Aktuell: ${officerBonusDisplay(o.key)}</div>`:''}
                   </div>
                 </div>
@@ -60488,7 +60530,17 @@
     // Seit v8.349.0 nur noch EIN Aufruf: buildGalaxyMap() füllt die Systemebene selbst, sobald ein
     // System aufgeklappt ist. Ein zweiter buildMap()-Aufruf von hier würde die Gruppe ein zweites Mal
     // je Sekunde neu schreiben - dieselbe Arbeit doppelt, und im Grundzustand ins Leere.
-    if (activeTab === 'karte') buildGalaxyMap();
+    if (activeTab === 'karte'){
+      // Auffangnetz mit Eingangs-Signatur (Etappe G-1, Messung: ~1,7 ms String-Aufbau je Sekunde,
+      // der fast immer im "unverändert"-Vergleich endete). Direkte Aufrufe (Nutzeraktionen,
+      // Daten-Ankünfte) bleiben unangetastet; hier wird nur der blinde Sekundenaufbau gespart.
+      const kSig = karteAuffangSignatur();
+      const kJetzt = Date.now();
+      if (kSig !== karteAuffangSig || kJetzt - karteVollbauZeit > 5000){
+        karteAuffangSig = kSig; karteVollbauZeit = kJetzt;
+        buildGalaxyMap();
+      }
+    }
   }
 
   // Fester Chat-Tab am linken Bildschirmrand: unabhängig vom aktuell gewählten Spiel-Tab immer
