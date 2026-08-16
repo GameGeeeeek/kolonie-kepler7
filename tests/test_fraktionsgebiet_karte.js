@@ -4,7 +4,7 @@
 // Flächen- und Frontebene hängt an galaxyCache.factions, und ohne Server ist das Objekt leer -
 // ein Quelltexttest kann also nicht zeigen, dass am Ende etwas zu sehen ist.
 //
-// Gemessen wird deshalb am erzeugten SVG: Territoriumsflächen, Wappen, Frontsegment zwischen zwei
+// Gemessen wird deshalb am erzeugten SVG: Territoriumsflächen, Wappen und der Kontrollbalken zwischen zwei
 // verfeindeten Fraktionen, und der Farbwechsel (Legion muss auf der Karte den entsättigten Ton
 // tragen, nicht die Serverfarbe Blau).
 //
@@ -139,9 +139,10 @@ const GALAXIE = {
   check('Territoriumsflächen gezeichnet', /url\(#terrGlow-legion\)/.test(svg) && /url\(#terrGlow-void\)/.test(svg));
   check('drei Gebiete gleichzeitig', /url\(#terrGlow-kartell\)/.test(svg));
   check('Verläufe je Fraktion in den defs', /id="terrGlow-legion"/.test(svg));
-  check('Frontsegment vorhanden', /id="frontSeg-/.test(svg));
-  check('Frontsegment nennt beide Parteien', /Front: (Eisenlegion gegen Void-Marodeure|Void-Marodeure gegen Eisenlegion)/.test(svg));
-  check('Front bewegt sich per SMIL', /<animate attributeName="stroke-dashoffset"/.test(svg));
+  // KB-5b: Die Frontsegmente sind aus der Systemebene entfernt - sie muellten die hineingezoomte
+  // Ansicht zu (Spieler-Report mit Screenshot); die Front-Information traegt der Kontrollbalken
+  // der Sektoransicht (test_randkriege_balken misst ihn samt Werten).
+  check('Frontsegmente sind aus der Systemebene entfernt', !/id="frontSeg-/.test(svg));
 
   // ---- Der Farbkonflikt, an der Wirkung gemessen ------------------------------------------------
   // Die Legion muss auf der Karte den entsättigten Ton tragen, NICHT die Serverfarbe Blau.

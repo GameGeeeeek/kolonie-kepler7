@@ -24,6 +24,12 @@ function backend(store) {
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok: true });
     if (p === 'me') return j({ userId: 'u', username: 'A', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0 });
+    // KB-5-Fixture: Piratenbasis + Krieg in vega, damit die Übersicht dort aggregierte
+    // Hinweise zeigen MUSS (Aufklärung kommt aus dem Spielstand, siehe spyIntel).
+    if (p === 'galaxy') return j({ npcEmpireStrength: 1, marketTrend: 1,
+      activePirateFaction: { system: 'vega', name: 'Testpiraten' },
+      unlockedAlienRaces: [], activeWar: { system: 'vega', factionA: 'Kartell', factionB: 'Legion' },
+      collapsedSystems: {}, activeWormhole: null, news: [], controlledSystems: {}, factions: {} });
     if (p.startsWith('storage/')) {
       const k = decodeURIComponent(p.slice(8));
       if (req.method() === 'PUT') { try { store[k] = JSON.parse(req.postData() || '{}').value; } catch (e) {} return j({ ok: true }); }
@@ -47,6 +53,7 @@ function backend(store) {
     buildings: { solar: 18, mine: 17, kristallmine: 15, labor: 10, lager: 12, werft: 9 },
     research: {}, fleet: { jaeger: 100, ships: 3, missions: [] },
     discovered: { rhea: true, aion: true }, colonies: {}, activeBasePlanet: 'home',
+    spyIntel: { u2: { entry: { defensePower: 12345 }, capturedAt: now, detected: false, system: 'vega' } },
     player: { id: 'u', name: 'A' }, xp: 52000, credits: 184000, buffs: [], lastTick: now,
     colonyNames: {}, colonyNotes: {},
     nextPlanetEventCheck: now + 3600000
@@ -104,6 +111,32 @@ function backend(store) {
   await page.waitForTimeout(800);
   const zurueck = await page.evaluate(() => document.querySelectorAll('#galaxyMapSvg [data-sektor]').length);
   check('3: „Zurücksetzen" zeigt wieder die Sektoren-Übersicht', zurueck === 8, { regionen: zurueck });
+
+  // ---- 3b) Region-Hinweise (KB-5): Ereignisse und Aufklärung aggregiert an der Region ---------
+  // Die Übersicht braucht dafür den Galaxie-Zustand; kommt er NACH dem ersten Aufbau an, holt
+  // spätestens der 5-Sekunden-Vollbau die Icons nach - deshalb waitForFunction statt fester Wartezeit.
+  await page.waitForFunction(() => !!document.querySelector('#galaxyMapSvg [data-sektor-hinweise]'), null, { timeout: 12000 }).catch(() => {});
+  const hinweis = await page.evaluate(() => {
+    const t = document.querySelector('#galaxyMapSvg [data-sektor-hinweise]');
+    if (!t) return null;
+    return { text: t.textContent, region: t.closest('[data-sektor]').getAttribute('data-sektor') };
+  });
+  check('3b: die Übersicht zeigt aggregierte Hinweise an der Region (🏴 Piratenbasis, ⚔ Krieg, 🔎 Aufklärung)',
+    !!hinweis && /🏴/.test(hinweis.text) && /⚔/.test(hinweis.text) && /🔎/.test(hinweis.text), hinweis);
+
+  // ---- 3c) Sektoransicht: das 🔎-Abzeichen trägt die stärkste bekannte Verteidigung -----------
+  if (hinweis){
+    await page.evaluate(k => { document.querySelector('#galaxyMapSvg [data-sektor="' + k + '"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); }, hinweis.region);
+    await page.waitForTimeout(800);
+    const schild = await page.evaluate(() => {
+      const t = document.querySelector('#galaxyMapSvg [data-kb-intel-dp="vega"]');
+      return t ? { text: t.textContent, tip: (t.querySelector('title') || {}).textContent || '' } : null;
+    });
+    check('3c: das 🔎-Abzeichen der Sektoransicht trägt die stärkste bekannte Verteidigung (🛡)',
+      !!schild && /🛡/.test(schild.text) && /stärkste bekannte Verteidigung/.test(schild.tip), schild);
+    await page.evaluate(() => { const h = document.querySelector('#galaxyMapSvg [data-kb-knopf="heimweg"]'); if (h) h.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    await page.waitForTimeout(600);
+  }
 
   // ---- 4) Die Einstellung ist ersatzlos weg (KB-4): keine Schalter-Zeile mehr, und selbst ein
   //         ALTER Spielstand mit uiSektorKarte:false bekommt die Sektoren-Karte -----------------

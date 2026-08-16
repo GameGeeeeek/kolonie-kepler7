@@ -1,4 +1,4 @@
-// Fraktionsterritorium auf der Galaxiekarte: Fläche, Wappen, Frontsegmente, EINE Farbe.
+// Fraktionsterritorium auf der Galaxiekarte: Fläche, Wappen, EINE Farbe (Frontsegmente seit KB-5b entfernt).
 //
 // WARUM (Befund 09./10.08.2026): Territorium und gegenseitige Eroberung laufen serverseitig seit
 // Monaten - im Client war davon nur ein 16-px-Ring am Systemknoten zu sehen. Keine Fläche, keine
@@ -11,7 +11,7 @@
 //
 // GEGENPROBE, in beide Richtungen ausgeführt (10.08.2026):
 //   git show HEAD:weltraum_kolonie.html > /tmp/alt.html && KEPLER_SPIELDATEI=/tmp/alt.html node …
-//   → rot: keine terrGlow-Verläufe, kein Frontsegment, factionOwning ohne Farbabbildung.
+//   → rot: keine terrGlow-Verläufe, factionOwning ohne Farbabbildung.
 //   Am neuen Stand grün. Zusätzlich künstlich kaputtgemacht: mapColor der Legion auf #e24b4a
 //   zurückgesetzt → „Legion-Fläche kollidiert nicht mit --c-danger" schlägt an.
 
@@ -60,31 +60,13 @@ check('Verlauf je Fraktion in den Karten-defs', /id="terrGlow-\$\{fid\}"/.test(s
 check('Fläche je besessenem System wird gezeichnet', /fill="url\(#terrGlow-\$\{fid\}\)"/.test(src));
 check('Radius folgt der Knotenskala', /r="\$\{\(30\*galaxyNodeScale\(\)\)\.toFixed\(1\)\}"/.test(src));
 
-// ---- 4. Frontsegmente ---------------------------------------------------------------------------
-// Der Ausschnitt hat einen EXISTIERENDEN Endanker - fehlt er, liefe indexOf auf -1 und der Slice
-// bis fast ans Dateiende, womit jede Prüfung darin vacuous würde (CLAUDE.md-Testregel 6).
-const frontStart = src.indexOf('Frontsegmente zwischen verfeindeten Gebieten');
-check('Frontsegment-Block vorhanden', frontStart > 0);
-const frontEnde = src.indexOf('Die Systemebene: eine leere Gruppe', frontStart);
-check('Endanker des Frontsegment-Blocks vorhanden', frontEnde > frontStart, { frontStart, frontEnde });
-const frontBlock = frontEnde > frontStart ? src.slice(frontStart, frontEnde) : '';
-
-check('Front nutzt FACTION_RIVALS', /FACTION_RIVALS\[besitzer\[a\]\]/.test(frontBlock));
-// Der Punkt, an dem der Entwurf ausdrücklich hängt: Bildschirmabstände, nicht gx/gy.
-check('Front misst Bildschirmabstände (spiralPos), nicht gx/gy',
-  /Math\.hypot\(spiralPos\[a\]\.x-spiralPos\[b\]\.x/.test(frontBlock));
-check('Front greift NICHT auf gx/gy zu', !/\.gx\b/.test(frontBlock) && !/\.gy\b/.test(frontBlock));
-check('je System nur die engste Berührung', /if \(d < best\)\{ best = d; partner = b; \}/.test(frontBlock));
-check('Riegel entsteht je Paar nur einmal', /a < partner \? a\+'\|'\+partner : partner\+'\|'\+a/.test(frontBlock));
-check('Front hat einen dunklen Grat gegen die Territoriumsfarben', /stroke="#060812"/.test(frontBlock));
-
-// ---- 5. Bewegung nur per SMIL -------------------------------------------------------------------
-// Ein pro Tick gerechneter Wert würde das Markup jede Sekunde ändern und den Zwischenspeicher am
-// Ende von buildGalaxyMap dauerhaft ausser Kraft setzen - alle Knoten würden im Sekundentakt neu
-// gebaut. Deshalb: Animation ja, aber ausschliesslich als SMIL im Markup.
-check('Front animiert per SMIL', /<animate attributeName="stroke-dashoffset"/.test(frontBlock));
-check('kein Date.now im Frontsegment-Block', !/Date\.now\(\)/.test(frontBlock));
-check('kein Math.random im Frontsegment-Block', !/Math\.random\(\)/.test(frontBlock));
+// ---- 4. Frontsegmente: seit KB-5b ENTFERNT ------------------------------------------------------
+// Sie waren fuer die Galaxie-Uebersicht gebaut; in der hineingezoomten Systemebene (seit KB-4 der
+// einzige Freiflug-Zustand) muellten sie das Bild zu (Spieler-Report mit Screenshot: "die alte
+// Karte kam zum Vorschein"). Die Front-Information traegt der Randkriege-Kontrollbalken der
+// Sektoransicht - test_randkriege_balken misst ihn samt Werten, Kerben und Beteiligungslinie.
+check('Frontsegment-Block ist entfernt (Front lebt am Kontrollbalken der Sektoransicht)',
+  src.indexOf('frontSeg-') < 0 && src.indexOf('FRONT_NAH') < 0);
 
 // Dasselbe für die Flächenebene: Auch sie darf das Markup nicht sekündlich verändern.
 const flaechStart = src.indexOf('Fraktionsterritorium als FLÄCHE');

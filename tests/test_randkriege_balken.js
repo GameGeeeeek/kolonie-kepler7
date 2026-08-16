@@ -4,8 +4,8 @@
 // Flächen- und Frontebene hängt an galaxyCache.factions, und ohne Server ist das Objekt leer -
 // ein Quelltexttest kann also nicht zeigen, dass am Ende etwas zu sehen ist.
 //
-// Gemessen wird deshalb am erzeugten SVG: Territoriumsflächen, Wappen, Frontsegment zwischen zwei
-// verfeindeten Fraktionen, und der Farbwechsel (Legion muss auf der Karte den entsättigten Ton
+// Gemessen wird deshalb am Kontrollbalken der Sektoransicht (Frontsegmente sind seit KB-5b
+// entfernt), und am Farbwechsel (Legion muss auf der Karte den entsättigten Ton
 // tragen, nicht die Serverfarbe Blau).
 //
 // NACHTRAG v8.476.0: Das Fixture liefert jetzt die Form, die der Server nach galaxyFuerClient()
