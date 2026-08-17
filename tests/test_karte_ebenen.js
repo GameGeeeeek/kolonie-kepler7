@@ -1,7 +1,7 @@
 // Ebenen-Leiste der Sektorkarte (Etappe B-5, v8.502.0; seit KB-4b auch in der Sektoransicht):
-// schaltbare Zeichen-Ebenen - Fraktionen (Ring/Wappen in der Sektoransicht, Territorium-Flächen
-// in der Systemebene), Ereignisse (Piratenbasis/Aliens/Krieg), Aufklärung (Spähberichte/
-// Peilungen). Routen zeichnet nur die Systemebene, ihr Knopf ist in der Sektoransicht verborgen.
+// schaltbare Zeichen-Ebenen - Fraktionen (Ring/Wappen in der Sektoransicht; die Territorium-
+// Flächen sind seit KB-6 entfernt), Ereignisse (Piratenbasis/Aliens/Krieg), Aufklärung
+// (Spähberichte/Peilungen). Routen zeichnet nur die Systemebene, ihr Knopf ist dort verborgen.
 // Vorgabe alles an; die Auswahl wird im Spielstand gespeichert (state.karteEbenen).
 //
 // GEGENPROBE (beide Richtungen gefahren, Hausregel 1):
@@ -10,10 +10,10 @@
 //          KEPLER_TESTDATEI=file:///tmp/alt.html node tests/test_karte_ebenen.js
 //   Am alten Stand fällt 1 (keine Leiste) und damit alles Weitere.
 //
-// Fixture-Fakten aus dem Code abgelesen (Hausregel 4): factionOwning() rendert Territorium nur
-// für Fraktionen, deren id in FACTION_DIPLOMACY steht (kartell/void/legion/schatten); die Fläche
-// heißt <g class="terr-<fid>">. Piratenbasis-Abzeichen 🏴‍☠️ hängt an
-// galaxyCache.activePirateFaction.system, Krieg ⚔️ an activeWar.system.
+// Fixture-Fakten aus dem Code abgelesen (Hausregel 4): factionOwning() liefert Besitz nur für
+// Fraktionen, deren id in FACTION_DIPLOMACY steht (kartell/void/legion/schatten).
+// Piratenbasis-Abzeichen 🏴‍☠️ hängt an galaxyCache.activePirateFaction.system, Krieg ⚔️ an
+// activeWar.system.
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
 const { oeffneSektorMitSystem } = require('./lib/karte');
 const { check, ende } = pruefer();
@@ -145,16 +145,15 @@ function backend(store) {
     wiederAn.ring && wiederAn.pirat && wiederAn.krieg && wiederAn.ereignisse.an && wiederAn.fraktionen.an,
     wiederAn);
 
-  // ---- 6) Systemebene: Territorium-Fläche hängt weiter am Fraktionen-Schalter -----------------
+  // ---- 6) Systemebene: seit KB-6 OHNE Galaxie-Kulisse (keine Territoriums-Flächen mehr) ------
+  // Die terr-Flächen waren Übersichts-Kulisse und machten die Systemebene zur "alten Ansicht"
+  // (zweiter Spieler-Report); der Fraktionen-Schalter wirkt auf Ring/Wappen der Sektoransicht
+  // (Prüfungen 1b/3/5). Hier bleibt zu messen: keine Fläche, Leiste da, Routen-Knopf wieder an.
   await page.evaluate(() => { document.querySelector('#galaxyMapSvg [data-sektor-sys="vega"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); });
   await page.waitForTimeout(1200);
   const imSystem = await messung();
-  check('6: im geöffneten System ist die Territoriums-Fläche da und der Routen-Knopf wieder sichtbar',
-    imSystem.terr && imSystem.leisteSichtbar && imSystem.routen.sichtbar === true, imSystem);
-  await page.evaluate(() => document.querySelector('#karteEbenenLeiste [data-karte-ebene="fraktionen"]').click());
-  await page.waitForTimeout(600);
-  const systemOhneFrak = await messung();
-  check('6b: Fraktionen AUS nimmt die Territoriums-Fläche auch dort', !systemOhneFrak.terr, systemOhneFrak);
+  check('6: die Systemebene zeichnet keine Territoriums-Fläche mehr und der Routen-Knopf ist wieder sichtbar',
+    !imSystem.terr && imSystem.leisteSichtbar && imSystem.routen.sichtbar === true, imSystem);
 
   check('6: bis hierher keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
   await ende(async () => browser.close());

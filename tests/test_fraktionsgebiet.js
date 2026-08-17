@@ -55,10 +55,15 @@ for (const fid of ['kartell', 'void', 'legion', 'schatten']) {
   check(fid + ' hat mapColor', /mapColor:'#[0-9a-f]{6}'/.test(z));
 }
 
-// ---- 3. Territorium als Fläche ------------------------------------------------------------------
-check('Verlauf je Fraktion in den Karten-defs', /id="terrGlow-\$\{fid\}"/.test(src));
-check('Fläche je besessenem System wird gezeichnet', /fill="url\(#terrGlow-\$\{fid\}\)"/.test(src));
-check('Radius folgt der Knotenskala', /r="\$\{\(30\*galaxyNodeScale\(\)\)\.toFixed\(1\)\}"/.test(src));
+// ---- 3. Territorium: seit KB-6 keine FLAECHEN mehr ----------------------------------------------
+// Die weichen terrGlow-Verlaufskreise gehoerten zur Galaxie-Uebersicht; in der hineingezoomten
+// Systemebene (seit KB-4 der einzige Freiflug-Zustand) waren sie die "alte Ansicht"-Kulisse
+// (zweiter Spieler-Report mit Screenshot). NPC-Besitz zeigt die SEKTORANSICHT je System als
+// Ring + Wappen (data-ring="fraktion", karteSystemBadges/eigner) - test_fraktionsgebiet_karte
+// misst das am gerenderten Knoten samt Kartenfarbe.
+check('terrGlow-Flächen sind entfernt (Besitz = Ring + Wappen in der Sektoransicht)',
+  src.indexOf('terrGlow') < 0);
+check('die Sektoransicht kennt den Fraktions-Ring', src.indexOf('data-ring="fraktion"') >= 0);
 
 // ---- 4. Frontsegmente: seit KB-5b ENTFERNT ------------------------------------------------------
 // Sie waren fuer die Galaxie-Uebersicht gebaut; in der hineingezoomten Systemebene (seit KB-4 der
@@ -68,14 +73,11 @@ check('Radius folgt der Knotenskala', /r="\$\{\(30\*galaxyNodeScale\(\)\)\.toFix
 check('Frontsegment-Block ist entfernt (Front lebt am Kontrollbalken der Sektoransicht)',
   src.indexOf('frontSeg-') < 0 && src.indexOf('FRONT_NAH') < 0);
 
-// Dasselbe für die Flächenebene: Auch sie darf das Markup nicht sekündlich verändern.
-const flaechStart = src.indexOf('Fraktionsterritorium als FLÄCHE');
-check('Flächen-Block vorhanden', flaechStart > 0);
-const flaechEnde = src.indexOf('Wurmloch-Verbindungslinie', flaechStart);
-check('Endanker des Flächen-Blocks vorhanden', flaechEnde > flaechStart, { flaechStart, flaechEnde });
-const flaechBlock = flaechEnde > flaechStart ? src.slice(flaechStart, flaechEnde) : '';
-check('kein Date.now in der Flächenebene', !/Date\.now\(\)/.test(flaechBlock));
-check('kein Math.random in der Flächenebene', !/Math\.random\(\)/.test(flaechBlock));
+// Die Wurmloch-LINIE ist mit KB-6 ebenfalls von der Leinwand verschwunden - dafuer traegt jedes
+// Endpunkt-System in den Sektor-Ansichten ein 🌀-Abzeichen aus der gemeinsamen Badge-Quelle.
+check('Wurmloch lebt als Abzeichen in karteSystemBadges',
+  /galaxyCache\.activeWormhole && \(galaxyCache\.activeWormhole\.from === sysId \|\| galaxyCache\.activeWormhole\.to === sysId\)/.test(src)
+  && src.indexOf("icon:'🌀'") >= 0);
 
 // ---- 6. Wappen am Knoten ------------------------------------------------------------------------
 check('Wappen wird als verschachteltes SVG eingehängt', /ownerWappen/.test(src));
