@@ -437,6 +437,13 @@ function ereignisUhrenPinnen(st){
     });
     await aufKarte(t);
     await oeffneMenue(t);
+    /* Seit der Flottenvorwahl (17.08.2026) oeffnet das Overlay mit der PASSENDEN Flotte - und die
+       waehlt nur so viele Frachter, wie die Ladung braucht. Beide Laeufe konvergierten dadurch auf
+       denselben Laderaum (gemessen 25.600 = 25.600), und der Doppelt-so-viel-Vergleich mass die
+       Vorwahl statt der Frachtkapazitaet. Gemessen wird hier aber die KAPAZITAET aller Schiffe -
+       also erst "Komplette Flotte" klicken, der Spielerweg fuer genau diese Frage. */
+    await t.page.evaluate(() => { const b = document.querySelector('#fwahlOverlay [data-fwahl-alle]'); if (b) b.click(); });
+    await t.page.waitForTimeout(400);
     const txt = await t.page.evaluate(() => { const o = document.querySelector('#fwahlOverlay'); return o ? o.innerText : ''; });
     await t.ctx.close();
     const lz = txt.match(/Ladung\s+([\d.]+[kM]?) von ([\d.]+[kM]?) Laderaum/) || [];
