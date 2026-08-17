@@ -6984,8 +6984,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.541.0';
+  const VERSION = '8.542.0';
   const PATCHNOTES = [
+    { version:'8.542.0', date:'17.08.2026', changes:[
+      '<strong>Behoben: Wer sehr große Mengen im Markt verkaufte, wurde irgendwann mitten im Auftrag abgemeldet.</strong> Ein Spieler-Report mit 400 Millionen Erz hat es ausgelöst, und die Ursache war eine Kette aus zwei Teilen. Der Sammelauftrag zerlegt große Mengen in Tranchen zu je einer Million – bei 400 Millionen also 400 Anfragen – und schickte sie <em>ohne Pause</em> hintereinander. Der Server lässt aber nur eine begrenzte Zahl Anfragen pro Minute und Verbindung zu, und zwar für alles zusammen: Handel, Speichern, Marktdaten. Nach einer knappen halben Minute war das Kontingent aufgebraucht, und die Bremse traf auch das Speichern.',
+      '<strong>Der eigentliche Fehler saß danach:</strong> Wenn das Speichern die Versionsnummer des Servers nachladen wollte und dabei an dieselbe Bremse lief, wertete das Spiel das als <em>„du bist gerade auf einem anderen Gerät aktiv"</em>, löschte die Anmeldung und warf dich hinaus. Ein vorübergehender Fehler löste damit die härteste mögliche Reaktion aus. Ab jetzt gilt: Abgemeldet wird nur noch, wenn der Server wirklich antwortet und dreimal hintereinander einen fremden Stand meldet – dann schreibt tatsächlich ein zweites Gerät. Kommt die Antwort dagegen gar nicht erst an, bleibst du angemeldet und siehst stattdessen den Hinweis, dass gerade nicht gespeichert wird.',
+      '<strong>Und der Sammelauftrag bremst sich jetzt selbst</strong>, statt in die Server-Grenze zu rennen: kurze Pause zwischen den Tranchen, und wenn der Server doch einmal bremst, <em>wartet</em> der Auftrag und macht weiter, statt mittendrin abzubrechen. Ein sehr großer Verkauf dauert dadurch ein paar Minuten – er läuft aber vollständig durch, der Fortschritt ist sichtbar und lässt sich jederzeit abbrechen.'
+    ]},
     { version:'8.541.0', date:'17.08.2026', changes:[
       '<strong>Behoben: „Karte fährt nach unten" beim Öffnen eines Systems.</strong> Direkter Spieler-Report, am Messprotokoll nachvollzogen: Auf dem Handy scrollte die Seite beim Antippen eines Systems über 1.300 Pixel zur Detailtafel hinunter – die frisch geöffnete Karte stand danach komplett außerhalb des Bildes (gemessen: Oberkante bei −457 Pixeln). Dieses Scroll-Ziel stammte noch aus der Zeit, als die Karte immer 420 Pixel hoch war; mit der Vollbild-Sektoransicht scrollte es an ihr vorbei. Jetzt kommt beim Öffnen die <strong>Karte selbst</strong> nach oben ins Bild, und die Detailtafel beginnt direkt darunter – beides sichtbar, nichts fährt mehr weg.',
       'Dazu drei Kamera-Korrekturen aus derselben Messung: Die Anfahrt aufs System endete im Seitenverhältnis des noch vollhohen Sektor-Kastens und ruckte sich erst 1,4 Sekunden später zurecht (der Kasten wechselt jetzt VOR der Zielberechnung auf seine Systemhöhe); beim Öffnen aus einer Sektor-Ansicht startete die Kamerafahrt aus einem fremden Koordinatensystem und schwenkte eine halbe Sekunde beliebig durchs Bild (aus Sektor-Ansichten wird jetzt gesprungen, geflogen nur noch von System zu System); und der alte „fokussierte Start-Ausschnitt" der früheren Galaxie-Übersicht kaperte das erste geöffnete System und beschnitt es auf einen zu engen Ausschnitt (der Block ist entfernt – seine Aufgabe, den Einstieg zu ordnen, erledigt seit dem Umbau die Sektoren-Übersicht selbst). Beim Schließen läuft außerdem keine Kamerafahrt mehr in die Sektoransicht hinein, die dort nur die Anzeige überschrieben hätte.',
@@ -15741,6 +15746,10 @@
   // weiterer Klick ignoriert statt eine zweite, parallele Anfrage zu starten - zusätzlich zur
   // Größer-als-Absicherung bei gameSaveVersion (siehe unten) doppelt abgesichert.
   let marketTradeInFlight = false;
+  // Der Grund der letzten abgelehnten Markt-Anfrage ({ status, fehler }) - vom Sammelauftrag
+  // gelesen, um ein Rate-Limit (429) von einem echten Fehler zu unterscheiden. Wird bei jedem
+  // erfolgreichen Handel wieder auf null gesetzt.
+  let marktLetzteAbsage = null;
   // opts.viaLimit: Ausführung durch eine Limit-Order (v8.166.0) - unterdrückt die "läuft-noch"-/
   // "nicht-genug"-Hinweise (die Order wird einfach im nächsten Zyklus erneut geprüft) und protokolliert
   // mit eigenem Text. Rückgabe true bei erfolgreichem Handel, sonst false - damit processLimitOrders
@@ -15768,7 +15777,16 @@
         body: JSON.stringify({ action, resource, amount })
       });
       const data = await res.json();
-      if (!res.ok || !data.ok){ if (!opts.viaLimit) log('Handel fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return false; }
+      if (!res.ok || !data.ok){
+        // Warum der Handel scheiterte, festhalten (17.08.2026): Der Sammelauftrag muss ein
+        // Rate-Limit (429) von einem echten Fehler unterscheiden koennen - beim einen lohnt
+        // Warten, beim anderen waere Weitermachen sinnlos. Die Rueckgabe bleibt bewusst
+        // true/false, damit kein bestehender Aufrufer (Limit-Orders, Knoepfe) sich aendert.
+        marktLetzteAbsage = { status: res.status, fehler: (data && data.error) || '' };
+        if (!opts.viaLimit) log('Handel fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle');
+        return false;
+      }
+      marktLetzteAbsage = null;
       const label = resDefFor(resource).label;
       // Server ist jetzt die Autorität: neue Gesamtwerte direkt übernehmen statt selbst nachzurechnen.
       state.credits = data.newCredits;
@@ -15804,7 +15822,11 @@
       // (marketTradesDone, dailyQuests.tradeCount) ohnehin bald von selbst.
       render();
       return true;
-    } catch(e){ if (!opts.viaLimit) log('Marktverbindung fehlgeschlagen.', 'ti-alert-triangle'); return false; }
+    } catch(e){
+      marktLetzteAbsage = { status: 0, fehler: 'Verbindung' };
+      if (!opts.viaLimit) log('Marktverbindung fehlgeschlagen.', 'ti-alert-triangle');
+      return false;
+    }
     finally { marketTradeInFlight = false; }
   }
   // ===== Modulbörse: Spieler-zu-Spieler-Handel (25.07.2026) =====
@@ -15962,6 +15984,15 @@
   // als die Anfragen). Jede Tranche bewegt den Marktpreis, der Erlös sinkt also von Tranche zu
   // Tranche - genau wie bei einem manuell zerlegten Verkauf, nur ohne die Klickarbeit.
   const MARKET_MAX_PER_TRADE = 1000000;
+  /* Pause zwischen zwei Tranchen (17.08.2026). Der Server laesst 240 /api-Anfragen je Minute und
+     Verbindung zu - das sind vier pro Sekunde, und zwar fuer ALLES: Handel, Speichern, Marktdaten,
+     Bestenliste, Berichte. 400 ms Abstand ergeben zusammen mit der Laufzeit einer Anfrage rund zwei
+     Handelsanfragen je Sekunde und lassen damit reichlich Luft fuer den uebrigen Verkehr. Ein
+     grosser Auftrag dauert dadurch laenger (400 Tranchen ~ 3 Minuten), laeuft aber durch, statt
+     nach einer halben Minute das Limit zu reissen - und der Fortschritt ist sichtbar und jederzeit
+     abbrechbar. Wer die Zahl senkt, muss gegen das Limit im Backend nachrechnen. */
+  const MARKET_BULK_PAUSE_MS = 400;
+  const MARKET_BULK_LIMIT_WAIT_MS = 20000;   // Wartezeit nach einem 429, siehe Schleife unten
   let marketBulkRun = null; // { abort, done, total, resource, action } während eines Sammelauftrags
   async function doMarketTradeChunked(action, resource, amount, opts){
     amount = Math.max(0, Math.floor(Number(amount)||0));
@@ -15980,11 +16011,31 @@
       // Bauaufträge und Handelsrouten weiter, der Vorrat kann sich also verschoben haben.
       if (action === 'sell') part = Math.min(part, Math.floor(state.resources[resource]||0));
       if (part < 1) break;
-      const ok = await doMarketTrade(action, resource, part, opts);
+      let ok = await doMarketTrade(action, resource, part, opts);
+      /* Rate-Limit abwarten statt aufgeben (17.08.2026). Der Server deckelt ALLE /api-Anfragen
+         einer Verbindung auf 240 je Minute; ein grosser Auftrag kann das trotz der Drosselung
+         unten reissen, wenn nebenher viel laeuft. Ein 429 heisst "gleich wieder" und nicht
+         "Auftrag gescheitert" - also warten und dieselbe Tranche erneut versuchen. Das Fenster
+         des Servers ist eine Minute; drei Versuche mit 20 s Abstand decken es sicher ab. */
+      for (let versuch = 0; !ok && marktLetzteAbsage && marktLetzteAbsage.status === 429 && versuch < 3 && !marketBulkRun.abort; versuch++){
+        log('Der Server bremst gerade (zu viele Anfragen) – der Sammelauftrag wartet '+Math.round(MARKET_BULK_LIMIT_WAIT_MS/1000)+' s und macht dann weiter.', 'ti-clock', 'warn');
+        renderMarket();
+        await new Promise(r => setTimeout(r, MARKET_BULK_LIMIT_WAIT_MS));
+        if (marketBulkRun.abort) break;
+        ok = await doMarketTrade(action, resource, part, opts);
+      }
       if (!ok){ failed = true; break; }
       moved += part;
       marketBulkRun.done = i+1;
       renderMarket();
+      /* Selbstdrosselung: OHNE diese Pause feuerte die Schleife so schnell, wie das Netz erlaubt -
+         bei 400 Tranchen (400 Mio) war das serverseitige Limit von 240 Anfragen/Minute nach einer
+         knappen halben Minute gerissen. Weil es fuer ALLE /api-Routen gilt, traf es danach auch
+         das Speichern und dessen Versions-Nachladen; der Spieler wurde ausgeloggt (Spieler-Report
+         Sascha, 17.08.2026 - die Ursache dort ist mit derselben Auslieferung behoben). Mit der
+         Pause bleibt der Auftrag samt dem uebrigen Verkehr des Spiels klar unter dem Limit. Nach
+         der LETZTEN Tranche wird nicht mehr gewartet - das waere reine Wartezeit ohne Zweck. */
+      if (i < chunks - 1) await new Promise(r => setTimeout(r, MARKET_BULK_PAUSE_MS));
     }
     const aborted = marketBulkRun.abort;
     marketBulkRun = null;
@@ -42634,15 +42685,28 @@
         body: JSON.stringify({ value, expectedVersion: gameSaveVersion })
       });
       if (res.status === 409){
+        // DREI erfolglose Nachladeversuche heissen: Der Server hat jedes Mal geantwortet, seine
+        // Version war jedes Mal eine andere als unsere - da schreibt wirklich eine zweite Sitzung.
         if (retryCount >= 3) { handleSaveConflict(); return null; }
-        try {
-          const fresh = await storageGet(STORE_KEY, false);
-          if (fresh && fresh.version !== undefined){
-            gameSaveVersion = fresh.version;
-            return await saveGameStateVersioned(value, retryCount+1);
-          }
-        } catch(e){}
-        handleSaveConflict();
+        let fresh = null;
+        try { fresh = await storageGet(STORE_KEY, false); } catch(e){}
+        if (fresh && fresh.version !== undefined){
+          gameSaveVersion = fresh.version;
+          return await saveGameStateVersioned(value, retryCount+1);
+        }
+        /* HIER STAND `handleSaveConflict()` - und das war der Fehler (Spieler-Report Sascha
+           17.08.2026: "400 Mio im Markt verkaufen, irgendwann werde ich einfach ausgeloggt").
+           Ein GESCHEITERTES Nachladen ist kein Beleg fuer eine zweite Sitzung: storageGet faellt
+           bei Netzfehler ODER Rate-Limit (429) still auf den lokalen Speicher zurueck und liefert
+           dann einen Wert OHNE `version`. Genau dieser Fall trat beim Markt-Sammelauftrag ein -
+           400 Tranchen ohne Pause reissen das serverseitige Limit von 240 Anfragen/Minute, das
+           fuer ALLE /api-Routen gilt, also auch fuers Speichern und fuers Nachladen. Der Spieler
+           wurde daraufhin abgemeldet und sein Token geloescht - die haerteste denkbare Reaktion
+           auf einen voruebergehenden Fehler.
+           Jetzt: still aufgeben und es dem naechsten 10-Sekunden-Takt ueberlassen. Der Spieler
+           bleibt angemeldet; dass gerade nicht gespeichert wird, sagt ihm notifySaveRejected
+           laut und sichtbar (dieselbe Warnung wie bei einer Server-Ablehnung). */
+        notifySaveRejected('Serverstand gerade nicht abrufbar - wird gleich erneut versucht');
         return null;
       }
       if (res.ok){ const data = await res.json(); gameSaveVersion = data.version; return data; }
