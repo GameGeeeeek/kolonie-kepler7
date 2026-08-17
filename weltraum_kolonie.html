@@ -7019,8 +7019,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.553.0';
+  const VERSION = '8.554.0';
   const PATCHNOTES = [
+    { version:'8.554.0', date:'17.08.2026', changes:[
+      '<strong>Handelsrouten binden jetzt höchstens 15 Frachter je Route – und je Ressource läuft nur noch eine.</strong> Die Kredit-Route hat diese Grenze seit jeher (sonst wäre sie ein Selbstläufer); Verkaufs- und Veredelungsroute hatten als einzige gar keine. Nachgemessen an einem ausgebauten Konto: 1.000 Frachter auf der Strecke Energie→Erz wandeln 3,6 Millionen Energie pro Stunde in 3,46 Millionen Erz um – <em>mehr als die Hälfte</em> der gesamten Erz-Produktion, und das aus Frühspiel-Schiffen, die einmalig fast nichts kosten. Auf Erz→Kristalle wären es sogar +184% auf den Rohstoff, der bei fast jedem großen Ausbau der Engpass ist. Handelsrouten sind als <em>Komfort-Nebenverdienst</em> gebaut, nicht als zweiter Produktionszweig – die Grenze stellt das wieder her. <strong>Bestehende Routen darüber werden beim Laden auf 15 Frachter gestutzt; die überzähligen Frachter sind sofort wieder frei</strong> für Flotte und Lagerkapazität, es geht kein einziges Schiff verloren, und das Protokoll sagt es dir einmal an.',
+      '<strong>Und die Verkaufsroute rechnet ab jetzt höchstens zum Markt-Basispreis ab.</strong> Sie verkauft im Spiel gegen den zuletzt geladenen Preis – ohne den Preisverfall des echten Markts und ohne dass ihr Verkauf den Preis überhaupt bewegt. Lag der Preis gerade über dem Basiswert (etwa während einer Knappheit), war die Route damit ein stiller Umweg: unbegrenzte Mengen zum Spitzenpreis, den der echte Markt nach wenigen tausend Einheiten längst nicht mehr zahlt. Nach <em>unten</em> folgt sie dem Markt weiterhin ehrlich – wer Knappheits-Spitzen mitnehmen will, verkauft von Hand am Markt, wo der Preis auch reagiert. Der Hilfe-Abschnitt „Handelsrouten" nennt beide Regeln.'
+    ]},
     { version:'8.553.0', date:'17.08.2026', changes:[
       '<strong>Die Karte im geöffneten System ist am Handy jetzt wirklich groß.</strong> Direkter Screenshot-Report („die Karte ist wirklich extrem mini … ich brauch echt eine Lupe"). Die zwei Anläufe davor haben an der Kastenhöhe und am Vergrößerungs-Deckel gedreht – und konnten gar nicht helfen: Das System war als flacher, sehr breiter Streifen gezeichnet, und wer davon alle Planeten zeigen will, stößt auf einem schmalen Bildschirm an die BREITE, nicht an die Höhe. Deshalb liegen die Planetenbahnen am Handy jetzt <strong>enger beieinander und deutlich runder</strong> – aus dem Streifen wird ein fast quadratisches Feld, also die Form, die ein Hochformat-Bildschirm auch hergibt. Gemessen am Gerät aus dem Report: Die Planetenscheiben sind von 12 auf 20 Pixel gewachsen, und die zwei äußersten Planeten, die vorher am Kastenrand abgeschnitten waren, stehen jetzt samt Namen im Bild. Am PC bleibt die gewohnte Darstellung unverändert.',
       '<strong>Und der Ausschnitt richtet sich nach dem System, das gerade offen ist.</strong> Bisher zeigte die Kamera immer so viel Raum, wie das größte System bräuchte – ein System mit drei Planeten sah dadurch genauso klein aus wie eines mit acht. Jetzt wird auf die tatsächlich vorhandenen Umlaufbahnen eingezogen: Wer ein kleines System öffnet, sieht es entsprechend größer.'
@@ -15158,6 +15162,21 @@
   const ROUTE_CREDITS_EXPONENT = 0.65;
   const ROUTE_CREDITS_MAX_FRACHTER = 15;
   const ROUTE_CREDITS_UPKEEP_ERZ_PER_FRACHTER = 2;
+  // Etappe E1 des Wirtschafts-Rebalance-Konzepts (docs/wirtschaft-rebalance-konzept.md):
+  // Verkaufs- und Veredelungsroute hatten als einzige KEINEN Frachter-Deckel. Gemessen wandeln
+  // 1.000 Frachter (einmalig ~188k Erz) auf energie→erz 3,6M Energie/h in 3,46M Erz/h um (+56%
+  // auf die Erz-Einnahme des Messkontos), auf erz→kristalle sind es +184% auf den Engpass
+  // Kristalle - ein zweiter Produktionszweig aus Frühspiel-Schiffen, exakt das "Perpetuum
+  // mobile", gegen das die Kredit-Route ihren 15er-Deckel seit v7.89 trägt. Jetzt gilt derselbe
+  // Deckel für alle drei Routenarten, und je Verkaufsressource bzw. Umwandlungspaar gibt es
+  // höchstens EINE Route. Bestehende Routen darüber stutzt applyStateDefaults beim Laden auf den
+  // Deckel - die überzähligen Frachter sind sofort wieder frei (niemand verliert ein Schiff),
+  // das Protokoll meldet es. tests/test_routen_deckel.js hält beides fest.
+  const ROUTE_MAX_FRACHTER = 15;
+  // Basispreise des Backend-Markts (server.js MARKET_RESOURCES) - Kopie für die clientseitig
+  // abgerechnete Verkaufsroute (Etappe E2), synchron zum Backend halten wie MARKET_SELL_SPREAD
+  // oben. tests/test_routen_deckel.js vergleicht beide Seiten Wert für Wert.
+  const MARKET_BASE_PRICES = { erz: 2.0, kristalle: 3.2, deuterium: 4.8, energie: 2.4, antimaterie: 24.0 };
   function creditsRouteYield(n){ return Math.round(ROUTE_CREDITS_BASE * Math.pow(n, ROUTE_CREDITS_EXPONENT)); }
   const ROUTE_TRANSPORT_PER_FRACHTER = 60; // umgewandelte Menge pro Frachter je Zyklus (Veredelungsroute)
   const ROUTE_TYPES = {
@@ -15245,6 +15264,14 @@
       const maxCredits = maxCreditsRoutes();
       if (existingCredits >= maxCredits){ log('Es kann höchstens '+maxCredits+' Kredit-Route'+(maxCredits>1?'n':'')+' gleichzeitig geben. '+(maxCredits<2?'Erforsche Frachtlogistik für eine zweite.':'Löse eine bestehende zuerst auf, um eine weitere anzulegen.'), 'ti-alert-triangle'); return; }
       if (n > ROUTE_CREDITS_MAX_FRACHTER){ log('Eine Kredit-Route kann höchstens '+ROUTE_CREDITS_MAX_FRACHTER+' Frachter binden.', 'ti-alert-triangle'); return; }
+    }
+    // Etappe E1: Frachter-Deckel und Eine-Route-je-Ressource-Regel für Verkaufs-/Veredelungsroute
+    // (Begründung am ROUTE_MAX_FRACHTER-Kommentar). Bestehende Routen bleiben unangetastet -
+    // gedeckelt wird nur das Anlegen, gestutzt nur der Frachter-Überhang beim Laden.
+    if (type === 'sell' || type === 'transport'){
+      if (n > ROUTE_MAX_FRACHTER){ log('Eine '+def.label+' kann höchstens '+ROUTE_MAX_FRACHTER+' Frachter binden.', 'ti-alert-triangle'); return; }
+      const doppelt = (state.tradeRoutes||[]).some(r => r.type === type && r.resource === opts.resource);
+      if (doppelt){ log('Für diese Ressource läuft bereits eine '+def.label+' - erst auflösen, dann neu anlegen.', 'ti-alert-triangle'); return; }
     }
     let refinePair = null;
     if (type === 'transport'){
@@ -15373,7 +15400,15 @@
         const have = state.resources[route.resource]||0;
         const sellAmt = Math.min(amount, Math.floor(have));
         if (sellAmt > 0){
-          const price = (state.marketCache && state.marketCache[route.resource]) ? state.marketCache[route.resource].price : 2; // Fallback grob an neue Basispreise angepasst, greift nur bevor der Markt-Cache je geladen wurde
+          // Etappe E2 (Wirtschafts-Rebalance): höchstens der Basispreis. Die Route rechnet
+          // clientseitig ab - OHNE die Slippage des echten Markts und ohne dass der Marktpreis
+          // sich bewegt. Stand der Cache-Preis über dem Basispreis (Knappheits-Ereignis, hohe
+          // Nachfrage), war die Route ein slippagefreier Umweg am Backend vorbei: unbegrenzte
+          // Menge zum Spitzenpreis, den der echte Markt nach ~21.250 Einheiten längst nicht
+          // mehr zahlen würde. Nach unten folgt sie dem Cache weiterhin ehrlich.
+          const cachePreis = (state.marketCache && state.marketCache[route.resource]) ? state.marketCache[route.resource].price : null;
+          const basisPreis = MARKET_BASE_PRICES[route.resource] || 2;
+          const price = cachePreis === null ? basisPreis : Math.min(cachePreis, basisPreis);
           // Derselbe 20%-Verkaufsabschlag wie beim direkten Marktverkauf (siehe Backend) - sonst
           // wäre eine Verkaufsroute ein Umweg, um den Abschlag zu umgehen.
           const credits = Math.round(price * sellAmt * MARKET_SELL_SPREAD * protMult);
@@ -15914,7 +15949,7 @@
     const activeCreditsRoutes = (state.tradeRoutes||[]).filter(r=>r.type==='credits').length;
     const maxCredits = maxCreditsRoutes();
     const creditsRouteFull = activeCreditsRoutes >= maxCredits;
-    const maxForType = newRouteDraft.type==='credits' ? Math.min(avail, ROUTE_CREDITS_MAX_FRACHTER) : avail;
+    const maxForType = Math.min(avail, newRouteDraft.type==='credits' ? ROUTE_CREDITS_MAX_FRACHTER : ROUTE_MAX_FRACHTER);
     // Für die Veredelungsroute nur Quell-Ressourcen aus REFINE_PAIRS zur Auswahl anbieten (nicht alle
     // 5 Marktressourcen wie bei der Verkaufsroute) - antimaterie hat z.B. kein Ziel, ist also nicht
     // wählbar. Fällt newRouteDraft.resource nicht in REFINE_PAIRS (z.B. Wechsel von sell->transport
@@ -15927,8 +15962,8 @@
         <label class="bmeta">Routentyp
           <select data-route-type style="width:100%; margin-top:3px; padding:5px 8px;">
             <option value="credits" ${newRouteDraft.type==='credits'?'selected':''} ${creditsRouteFull?'disabled':''}>Kredit-Route (max. ${ROUTE_CREDITS_MAX_FRACHTER} Frachter, abnehmender Ertrag, kostet Erz-Unterhalt)${creditsRouteFull?' – Limit erreicht ('+activeCreditsRoutes+'/'+maxCredits+')':''}</option>
-            <option value="sell" ${newRouteDraft.type==='sell'?'selected':''}>Markt-Verkaufsroute (verkauft Ressource)</option>
-            <option value="transport" ${newRouteDraft.type==='transport'?'selected':''}>Veredelungsroute (wandelt Rohstoff in wertvolleren um)</option>
+            <option value="sell" ${newRouteDraft.type==='sell'?'selected':''}>Markt-Verkaufsroute (verkauft Ressource, max. ${ROUTE_MAX_FRACHTER} Frachter, 1 Route je Ressource)</option>
+            <option value="transport" ${newRouteDraft.type==='transport'?'selected':''}>Veredelungsroute (wandelt Rohstoff um, max. ${ROUTE_MAX_FRACHTER} Frachter, 1 Route je Paar)</option>
           </select>
         </label>
         ${newRouteDraft.type==='credits' ? `<div class="bmeta">Bis zu ${maxCredits} Kredit-Route${maxCredits>1?'n':''} gleichzeitig (${activeCreditsRoutes}/${maxCredits} aktiv)${maxCredits<2?' - Frachtlogistik erforschen für eine zweite':''}. Ertrag bei ${Math.min(newRouteDraft.frachter,maxForType)} Frachtern: ~${routeCreditsErtrag({ frachter: Math.min(newRouteDraft.frachter,maxForType) })} Kredite/min, kostet ${Math.min(newRouteDraft.frachter,maxForType)*ROUTE_CREDITS_UPKEEP_ERZ_PER_FRACHTER} Erz/min Unterhalt.</div>` : ''}
@@ -28587,6 +28622,21 @@
     if (!state.flagship || typeof state.flagship !== 'object') state.flagship = { level:0, name:null };
     if (state.credits === undefined) state.credits = 250;
     if (!state.tradeRoutes) state.tradeRoutes = [];
+    // Etappe E1 (Wirtschafts-Rebalance): Bestehende Verkaufs-/Veredelungsrouten über dem neuen
+    // 15er-Deckel werden auf den Deckel gestutzt - die überzähligen Frachter sind damit sofort
+    // wieder frei (frachterBoundToRoutes rechnet aus route.frachter), niemand verliert ein
+    // Schiff. Idempotent: Nach dem ersten Stutzen ändert sich nichts mehr, gemeldet wird nur,
+    // wenn wirklich gestutzt wurde.
+    {
+      let gestutzt = 0;
+      for (const r of state.tradeRoutes){
+        if ((r.type === 'sell' || r.type === 'transport') && (r.frachter||0) > ROUTE_MAX_FRACHTER){
+          gestutzt += r.frachter - ROUTE_MAX_FRACHTER;
+          r.frachter = ROUTE_MAX_FRACHTER;
+        }
+      }
+      if (gestutzt > 0) log('Handelsrouten-Umbau: Verkaufs- und Veredelungsrouten binden jetzt höchstens '+ROUTE_MAX_FRACHTER+' Frachter je Route - '+gestutzt+' Frachter sind wieder frei für Flotte und Lager.', 'ti-truck');
+    }
     if (!state.factionRep) state.factionRep = {};
     if (state.nextFactionGift === undefined) state.nextFactionGift = 0;
     if (!state.factionGiftClaimedAt) state.factionGiftClaimedAt = {};
@@ -37516,7 +37566,7 @@
       { title:'Keine Tier-2-Ressourcen am Markt', body:'Die <strong>Tier-2-Ressourcen</strong> sind bewusst NICHT handelbar (nach kurzem Test wieder entfernt): Sie kommen ausschließlich aus den eigenen Fabriken - ergänzt nur durch die hart gedeckelten Pakt-Geschenke. Der Markt handelt ausschließlich die fünf Basis-Ressourcen.' },
       { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
       { title:'Limit-Orders', body:'Statt selbst auf den richtigen Preis zu warten, kannst du im Markt-Tab <strong>Limit-Orders</strong> anlegen: „Verkaufe X, sobald der Preis ≥ Schwelle steigt" oder „Kaufe X, sobald er ≤ Schwelle fällt". Sobald der Marktpreis die Schwelle erreicht, wird die Order automatisch über den regulären Markthandel ausgeführt (mit der üblichen Slippage und Kartell-/Allianz-Rabatt) und danach entfernt. Orders werden geprüft, <strong>während du online bist</strong> - im Markt-Tab laufend, sonst im Hintergrund alle 30 Sekunden, solange offene Orders bestehen. Reichen Kredite bzw. Bestand im Moment der Ausführung nicht, wartet die Order einfach auf den nächsten Zyklus. Maximal 10 gleichzeitig; jederzeit stornierbar. Kombiniert mit den neuen Markt-Ereignissen (Knappheit/Schwemme) und der Preis-Verlaufskurve lassen sich so Kauf-/Verkaufsstrategien automatisieren.' },
-      { title:'Handelsrouten', body:'Binde Frachter (Kleine UND Große) dauerhaft an eine Route für passiven Ertrag. Gebundene Frachter stehen nicht mehr für Kämpfe/Missionen bereit und zählen nicht zur Lagerkapazität. Drei Typen: <strong>Kredit-Route</strong> (max. 15 Frachter je Route, Ertrag wächst mit abnehmendem Grenzertrag statt linear, kostet laufend Erz als Unterhalt; standardmäßig nur EINE gleichzeitig, die Forschung <strong>Frachtlogistik</strong> erhöht das auf bis zu 3), <strong>Markt-Verkaufsroute</strong> (verkauft automatisch eine Ressource am Markt, braucht Server) und <strong>Veredelungsroute</strong> (wandelt einen Rohstoff in einen wertvolleren um, feste Umwandlungskette Energie→Erz→Kristalle→Deuterium→Antimaterie mit Verlust, beliebig viele möglich). Die Forschung <strong>Routenoptimierung</strong> erhöht den Ertrag aller Routentypen zusätzlich. Ein Zyklus pro Minute, dabei besteht ein kleines <strong>Piratenrisiko</strong> (5% Chance auf null Ertrag diesen Zyklus) - "Routenschutz" pro Route senkt das Risiko auf 1%, kostet dafür 10% des Ertrags. Routen jederzeit auflösbar (Frachter werden wieder frei).' },
+      { title:'Handelsrouten', body:'Binde Frachter (Kleine UND Große) dauerhaft an eine Route für passiven Ertrag. Gebundene Frachter stehen nicht mehr für Kämpfe/Missionen bereit und zählen nicht zur Lagerkapazität. <strong>Jede Route bindet höchstens 15 Frachter</strong>, und je Verkaufsressource bzw. Umwandlungspaar läuft höchstens EINE Route - Routen sind ein Komfort-Nebenverdienst, kein zweiter Produktionszweig. Drei Typen: <strong>Kredit-Route</strong> (Ertrag wächst mit abnehmendem Grenzertrag statt linear, kostet laufend Erz als Unterhalt; standardmäßig nur EINE gleichzeitig, die Forschung <strong>Frachtlogistik</strong> erhöht das auf bis zu 3), <strong>Markt-Verkaufsroute</strong> (verkauft automatisch eine Ressource, braucht Server; abgerechnet wird höchstens zum Markt-<em>Basispreis</em> - wer Knappheits-Spitzenpreise mitnehmen will, verkauft von Hand am Markt) und <strong>Veredelungsroute</strong> (wandelt einen Rohstoff in einen wertvolleren um, feste Umwandlungskette Energie→Erz→Kristalle→Deuterium→Antimaterie mit Verlust). Die Forschung <strong>Routenoptimierung</strong> erhöht den Ertrag aller Routentypen zusätzlich. Ein Zyklus pro Minute, dabei besteht ein kleines <strong>Piratenrisiko</strong> (5% Chance auf null Ertrag diesen Zyklus) - "Routenschutz" pro Route senkt das Risiko auf 1%, kostet dafür 10% des Ertrags. Routen jederzeit auflösbar (Frachter werden wieder frei).' },
       { title:'Kredit-Shop', body:'Im Markt-Tab kannst du Kredite ausgeben für: <strong>Produktions-Schub</strong> (+25% alle Ressourcen, 1h, 400 Kr.) · <strong>Söldnerflotte</strong> (+20% Angriffskraft, 2h, 600 Kr.) · <strong>Schildgenerator-Miete</strong> (+25% Verteidigung, 2h, 500 Kr.) · <strong>Modul-Blaupause</strong> (zufälliges Standort-Modul, 10.000 Kr.) · <strong>Schiffsklassen-Blaupause</strong> (zufälliges klassenweites Modul, max. „Selten", 20.000 Kr.) · <strong>Elite-Schiffsklassen-Blaupause</strong> (bis „Legendär", 75.000 Kr.) · <strong>Modulfragment-Lieferung</strong> (10 Fragmente, 40.000 Kr.). Laufende Shop-Buffs können nicht gestapelt werden – erst nach Ablauf erneut kaufbar. Alles andere ist beliebig oft kaufbar, und zwar auch <strong>mehrfach auf einmal</strong>: die Mengenknöpfe ×1/×5/×10/Max an der Karte kaufen die gewählte Anzahl in einem Zug.' },
       { title:'Angebote des Tages', body:'Über den festen Shop-Einträgen stehen täglich <strong>zwei konkret benannte Module</strong> – eines für Standorte, eines für Schiffsklassen – mit voller Beschreibung und Seltenheit. Anders als bei den Blaupausen weißt du hier vorher genau, was du bekommst. Beide sind je einmal pro Tag kaufbar und wechseln um Mitternacht; das Angebot ist für alle Spieler dasselbe. Preise nach Seltenheit: 12.000 (Gewöhnlich), 36.000 (Selten), 100.000 (Episch), 260.000 Kr. (Legendär) – günstiger als der gezielte Weg über Fragmente, dafür kannst du das Modul nicht auswählen.' },
       { title:'Große Mengen handeln', body:'Der Handel nimmt pro Anfrage höchstens <strong>1.000.000 Einheiten</strong> an. Größere Mengen werden automatisch als <strong>Sammelauftrag</strong> in mehreren Tranchen nacheinander ausgeführt – du kannst also deinen kompletten Bestand eintragen, auch wenn er zweistellig in Millionen liegt. Oben im Markt zeigt ein Balken den Fortschritt und lässt sich jederzeit abbrechen; bereits gehandelte Tranchen bleiben natürlich verbucht. Zur schnellen Mengenwahl gibt es <strong>×10</strong> und <strong>×100</strong> sowie <strong>25% / 50% / 100%</strong> deines Bestands. Achtung: Jede Tranche drückt den Preis weiter – unter den Knöpfen siehst du den erwarteten Durchschnittspreis, den Preis danach und einen Hinweis, wenn Stückeln über mehrere Zeitpunkte mehr einbringt.' },

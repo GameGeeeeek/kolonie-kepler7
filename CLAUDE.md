@@ -629,6 +629,31 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     über einen Zahlenwert, den auch Hilfskonstrukte tragen – und ein Messwert, der auf dem
     UNVERÄNDERTEN Stand genauso ausfällt, ist ein Werkzeugfehler, kein Befund.
 
+49. **Die Happy Hour ist die ZWEITE ungepinnte Ereignis-Uhr – und sie lässt sich nicht über den
+    Spielstand pinnen.** Vorfall 17.08.2026: `test_kleine_luecken` fiel im Suite-Lauf an
+    `1c-vorab` (`{"vor":"4.72","nach":"5.55","abweichung":"17.6 %"}`) und blieb einzeln grün –
+    dasselbe Bild wie beim Planeten-Ereignis-Vorfall (Regel 20/21), nur mit einer anderen Uhr.
+    Das Fixture pinnt `nextPlanetEventCheck` und `nextTraderCheck`, weil beide IM Spielstand
+    stehen; die Happy Hour steht dort nicht. Sie läuft deterministisch **12:00–13:00 und
+    20:00–21:00 LOKALER Zeit** (`HAPPY_HOUR_WINDOWS`) und multipliziert in `ratesPerSecond` genau
+    die gemessene Erz-Rate (Typ `bergbau` +40 % Erz/Kristalle, `alle` +25 % auf alles). Dazu
+    liest `currentHappyHour()` **`new Date()`** – der übliche Test-Patch fasst nur `Date.now()`
+    an und schiebt sie deshalb nicht mit.
+    **Wie der Mechanismus belegt wurde (Regel 20: erst der Mechanismus, dann der Befund):** Zwei
+    Läufe um 20:23 und 20:27 UTC – also MITTEN im Fenster – standen beide stabil auf exakt 5,55.
+    Damit ist 5,55 die Rate MIT und 4,72 die ohne Happy Hour, und der Sprung lag exakt auf der
+    20:00-Grenze. Ohne diese zweite Messung hätte „+17,6 % Produktion" wie eine echte Regression
+    der gerade gebauten Änderung ausgesehen.
+    **Vorgehen für jeden Test, der eine Produktionsrate als Bezugsgröße nutzt:** (a) Damit rechnen,
+    dass die Rate an vier festen Uhrzeiten je Tag springt – ein Lauf über eine Fenstergrenze misst
+    zwei verschiedene Welten; (b) die Konstanz nicht nur PRÜFEN, sondern bei erkannter Wanderung
+    das Messfenster WIEDERHOLEN (`test_kleine_luecken` 1c: max. 3 Anläufe, alle Raten im
+    Fehlschlag protokolliert) – eine Fenstergrenze trifft höchstens einen Anlauf; (c) die Schranke
+    dabei NICHT lockern (Regel 26) – sie ist bei 1c die einzige Stelle, an der eine echte
+    Überzahlung auffällt, und die Gegenprobe gegen eine sabotierte Kopie
+    (`applyOfflineProgress(luecke)` statt `luecke-1`) muss weiterhin mit ~107 % anschlagen,
+    während `1c-vorab` grün bleibt.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
