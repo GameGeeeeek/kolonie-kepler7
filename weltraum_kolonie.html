@@ -4407,7 +4407,14 @@
     nf_chronik:  { art:'namensfarbe', name:'Chronik',     farbe:'#d8c9a3', desc:'Gealtertes Pergament – für Kommandanten, die das Erfolgsregister ernst nehmen.' },
     em_kranz:    { art:'emblem',      name:'Lorbeerkranz',icon:'ti-award',  desc:'Die Auszeichnung für eine weit gefüllte Erfolgsliste.' },
     nf_trophae:  { art:'namensfarbe', name:'Trophäe',     farbe:'#c98f4f', desc:'Mattes Bronzegold – die Farbe des Trophäensaals, für erlegte Sektor-Bosse.' },
-    em_schaedel: { art:'emblem',      name:'Bosstrophäe', icon:'ti-skull',  desc:'Der Schädel eines Wächters – nur für Jäger mit einer langen Liste.' }
+    em_schaedel: { art:'emblem',      name:'Bosstrophäe', icon:'ti-skull',  desc:'Der Schädel eines Wächters – nur für Jäger mit einer langen Liste.' },
+    // Meilenstein-Embleme (17.08.2026). Die Gegenstücke zu Kaffeetasse und Komet, und der
+    // Unterschied ist der ganze Zweck: Jene tragen den AKTUELLEN Rang und verschwinden, wenn er
+    // ausläuft. Diese bleiben - sie sagen nicht „unterstützt gerade", sondern „hat unterstützt",
+    // und das kann nicht falsch werden. Drei Stufen als eine Familie mit zunehmendem Licht.
+    em_funke:      { art:'emblem', name:'Funke',       icon:'ti-bolt',                desc:'Der erste Funke – bleibt dauerhaft neben deinem Namen, sobald du das Spiel einmal unterstützt hast, und verschwindet auch dann nicht wieder, wenn der Unterstützer-Rang später ausläuft.' },
+    em_leitstern:  { art:'emblem', name:'Leitstern',   icon:'ti-star',                desc:'Ein Stern, an dem andere sich ausrichten – dauerhaftes Zeichen für die Silber-Stufe, einmal erreicht und nie wieder verloren, unabhängig davon ob der Rang gerade läuft.' },
+    em_leuchtfeuer:{ art:'emblem', name:'Leuchtfeuer', icon:'ti-building-lighthouse', desc:'Ein Leuchtfeuer, das den Weg weist – die höchste dauerhafte Auszeichnung, für einmal erreichte Gold-Unterstützung. Sie bleibt für immer stehen, auch lange nachdem die letzte Spende abgelaufen ist.' }
   };
   // Die Bedingung des Servers in Worte fassen. Bewusst ohne eigene Zahlen: Jede Zahl hier kommt aus
   // dem `bedingung`-Objekt, das der Server mitschickt.
@@ -4415,6 +4422,9 @@
     if (!b) return 'Freischaltbedingung unbekannt.';
     if (b.typ === 'immer') return 'Von Anfang an verfügbar.';
     if (b.typ === 'spender') return 'Unterstützer-Rang '+({bronze:'Bronze',silver:'Silber',gold:'Gold'}[b.stufe]||b.stufe)+' (per Ko-fi-Spende; die kostenlose Testphase schaltet Kosmetik bewusst nicht frei).';
+    // Der Unterschied zu 'spender' ist die ganze Aussage des Typs und gehört deshalb ausdrücklich
+    // in den Text: nicht „hat gerade", sondern „hatte je" - und bleibt danach.
+    if (b.typ === 'spender_je') return 'Einmal Unterstützer-Rang '+({bronze:'Bronze',silver:'Silber',gold:'Gold'}[b.stufe]||b.stufe)+' erreicht. Bleibt dauerhaft freigeschaltet, auch wenn der Rang später ausläuft.';
     if (b.typ === 'prestige') return 'Prestige-Stufe '+b.wert+'.';
     if (b.typ === 'aufstieg') return b.wert+' Aufstieg'+(b.wert===1?'':'e')+'.';
     // Bewusst NICHT fmt(): Das rundet auf "5.0k" ab, und eine Freischaltschwelle ist genau der
@@ -4435,6 +4445,13 @@
     const look = key && KOSMETIK_LOOK[key];
     if (!look || look.art !== 'namensfarbe' || !look.farbe) return '';
     return ' style="color:'+look.farbe+';"';
+  }
+  // Kurzform der getragenen Kosmetik fuer Signatur-Caches. Eine Box, die Namensfarbe/Emblem
+  // ZEICHNET, muss sie auch in ihre Signatur aufnehmen - sonst behaelt sie das alte Aussehen, bis
+  // sich zufaellig ein anderer Signaturbestandteil bewegt (dieselbe Familie wie isSupporter).
+  function kosmetikSig(e){
+    const c = e && e.cosmetics;
+    return c ? (c.namensfarbe||'')+'/'+(c.emblem||'') : '';
   }
   function kosmetikEmblem(e){
     const key = e && e.cosmetics && e.cosmetics.emblem;
@@ -6967,8 +6984,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.538.0';
+  const VERSION = '8.539.0';
   const PATCHNOTES = [
+    { version:'8.539.0', date:'17.08.2026', changes:[
+      '<strong>Der globale Chat zeigt jetzt Namensfarben, Embleme und das Unterstützer-Abzeichen.</strong> Er war bislang die einzige Namensliste im Spiel ganz ohne Auszeichnung – jeder Name in derselben Farbe. Wichtig dabei: Die Kosmetik kommt <em>nicht</em> aus der Nachricht, sondern wird über die Absender-Kennung aus den Bestenlisten-Daten geholt, die der Server bei jedem Lesen selbst setzt. Eine in der Nachricht mitgeschickte Farbe bewirkt nichts – sonst könnte sich jeder die Goldspender-Farbe geben, und zwar auf einer Fläche, die allen gehört.',
+      '<strong>Behoben: Die Wochenliga zeigte überhaupt keine Kosmetik.</strong> Sie baute ihre Liste aus wenigen Feldern neu zusammen, und die Kosmetik war dabei nicht mit umgezogen – die Zeile fragte also nach einer Farbe, die es in ihren Daten gar nicht gab. Das ist derselbe Fehler, der im August schon einmal das Unterstützer-Abzeichen an dieser Stelle verschluckt hat. Jetzt trägt die Wochenliga Farbe und Emblem wie alle anderen Listen.',
+      '<strong>Neu: drei Meilenstein-Embleme für einmal erreichte Unterstützung</strong> – <em>Funke</em>, <em>Leitstern</em> und <em>Leuchtfeuer</em>, gestaffelt nach der höchsten je erreichten Stufe. Der Unterschied zu Kaffeetasse und Komet ist der ganze Punkt: Jene zeigen den <em>aktuellen</em> Rang und verschwinden, wenn er ausläuft. Diese bleiben für immer. Sie sagen nicht „unterstützt gerade", sondern „hat unterstützt" – und das soll niemandem wieder weggenommen werden, nur weil er irgendwann aufhört.',
+      'Auch eine Namensfarbe oder ein Emblem, das ein anderer Spieler wechselt, schlägt jetzt sofort durch: Bisher behielten Freundesliste und Seitenmenü das alte Aussehen, bis sich zufällig sein Punktestand bewegte. Und im Chat springt die Ansicht nicht mehr nach unten, während man ältere Nachrichten liest.'
+    ]},
     { version:'8.538.0', date:'17.08.2026', changes:[
       '<strong>Vierzig Anzeigen, die jede Sekunde dasselbe neu geschrieben haben, stehen jetzt still.</strong> Eine Messung über alle zwölf Reiter zeigte: 40 Elemente wurden im Sekundentakt komplett neu aufgebaut, obwohl sich ihr Inhalt Zeichen für Zeichen nicht unterschied – und zwar auf JEDEM Reiter, nicht nur dort, wo man sie sieht. Größter Einzelposten war die Handelsrouten-Box mit 1,45 kB pro Sekunde, dazu die Flotten-Statusleiste, die Doktrinen, die Missions- und Positionslisten, Inventar, Punkte-Protokoll, die drei Verlaufs-Diagramme und rund 25 kleine Status-Texte. Sie alle schreiben jetzt nur noch, wenn sich wirklich etwas ändert. Auf schwächeren Geräten und im Akkubetrieb macht das den Unterschied; laufende Countdowns zählen unverändert weiter.',
       '<strong>Behoben: Die Modulbörse ließ Kauf-Knöpfe zu lange ausgegraut.</strong> Ob ein Angebot bezahlbar ist, wurde nur in 1.000-Kredite-Schritten neu bewertet – wer knapp unter einem Preis stand und die fehlenden Kredite verdiente, sah den Knopf erst freiwerden, wenn der Kontostand zufällig die nächste Tausenderstufe überschritt. Jetzt entscheidet der tatsächliche Kontostand.',
@@ -30089,9 +30112,9 @@
       const score = e ? fmt(e.score||0)+' Pkt.' : 'offline gemerkt';
       const name = escapeHtml(e ? (e.name||f.name) : f.name);
       const tag = (e && e.allianceTag) || f.allianceTag || '';
-      // isSupporter in der Signatur, sonst friert ein ablaufender Rang hier fest (die Box zeichnet
-      // nur bei geänderter Signatur neu).
-      return { sig: f.id+':'+(online?'1':'0')+':'+(e?e.score:'-')+':'+((e&&e.isSupporter)?e.supporterTier||'b':''), html:
+      // isSupporter und cosmetics in der Signatur, sonst frieren ein ablaufender Rang bzw. ein
+      // gewechseltes Aussehen hier fest (die Box zeichnet nur bei geänderter Signatur neu).
+      return { sig: f.id+':'+(online?'1':'0')+':'+(e?e.score:'-')+':'+((e&&e.isSupporter)?e.supporterTier||'b':'')+':'+kosmetikSig(e), html:
         `<div class="card-row"><div class="left"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-right:6px;background:${online?'#5dcaa5':'#5a5f73'};box-shadow:${online?'0 0 6px #5dcaa5':'none'};"></span><div><span class="bname"><span${kosmetikFarbAttr(e)}>${name}</span>${tag?' ['+escapeHtml(tag)+']':''}${kosmetikEmblem(e)}${supporterPille(e)}</span><div class="bmeta">${online?'<span style="color:#5dcaa5;">online</span> · ':''}${score}</div></div></div><div style="display:flex; gap:4px;"><button data-friend-msg="${f.id}" data-friend-name="${escapeHtml(f.name)}" style="font-size:10px; padding:5px 7px;" title="Nachricht schreiben"><i class="ti ti-mail" aria-hidden="true"></i></button><button data-friend-profile="${f.id}" style="font-size:10px; padding:5px 7px;" title="Profil öffnen"><i class="ti ti-user" aria-hidden="true"></i></button><button data-friend-remove="${f.id}" style="font-size:10px; padding:5px 7px;" title="Entfernen"><i class="ti ti-x" aria-hidden="true"></i></button></div></div>` };
     });
     const sig = rows.map(r => r.sig).join('|');
@@ -38969,18 +38992,40 @@
       }));
       for (const m of loadedMsgs) if (m) msgs.push(m);
       msgs.sort((a,b) => (a.ts||0)-(b.ts||0));
-      if (!msgs.length){ box.innerHTML = `<div class="bmeta">Noch keine Nachrichten. Schreib die erste!</div>`; return; }
-      box.innerHTML = msgs.slice(-30).map(m => `
+      if (!msgs.length){ setBoxHtml(box, 'chatPanelGlobalBox', `<div class="bmeta">Noch keine Nachrichten. Schreib die erste!</div>`); return; }
+      // Kosmetik und Unterstuetzer-Abzeichen im Chat (17.08.2026). Bis hierher war der Chat die
+      // EINZIGE Namensliste ohne jede Auszeichnung - jeder Name in derselben festen Farbe.
+      //
+      // WOHER die Kosmetik kommt, ist die ganze Frage: NICHT aus der Nachricht. Die schreibt der
+      // Client selbst in den geteilten Speicher; eine mitgeschickte Farbe waere in fuenf Sekunden
+      // gefaelscht, und sie stuende auf einer Flaeche, die allen gehoert. Stattdessen derselbe Weg
+      // wie bei der Freundesliste: Zuordnung ueber die authorId zum Bestenlisten-Cache, den der
+      // Server bei JEDEM Lesen frisch anreichert (kosmetikGetragen im GET-Pfad). Die authorId
+      // wiederum prueft der Server beim Schreiben gegen den angemeldeten Nutzer
+      // (checkChatKeyPermission) - geprueft Identitaet, geprueft Aussehen.
+      //
+      // Nebenwirkung mit Ansage: Wer (noch) keinen Bestenlisten-Eintrag hat, erscheint schlicht
+      // ohne Auszeichnung. Das ist der ehrliche Ausfall - lieber nichts zeigen als etwas raten.
+      const chatById = {}; for (const e of (leaderboardCache||[])) chatById[e.id] = e;
+      const neu = setBoxHtml(box, 'chatPanelGlobalBox', msgs.slice(-30).map(m => {
+        const e = chatById[m.authorId];
+        return `
         <div style="padding:6px 0; border-top:var(--bw-1) solid rgba(255,255,255,0.06);">
           <div style="display:flex; justify-content:space-between; gap:8px;">
-            <span style="font-size:11.5px; font-weight:500; color:#5dcaa5;">${escapeHtml(m.authorName||'Unbekannt')}${m.authorAllianceTag?' <span style="color:#9296ac; font-weight:400;">['+escapeHtml(m.authorAllianceTag)+']</span>':''}</span>
+            <span style="font-size:11.5px; font-weight:500; color:#5dcaa5;"><span${kosmetikFarbAttr(e)}>${escapeHtml(m.authorName||'Unbekannt')}</span>${m.authorAllianceTag?' <span style="color:#9296ac; font-weight:400;">['+escapeHtml(m.authorAllianceTag)+']</span>':''}${kosmetikEmblem(e)}${supporterPilleKlein(e)}</span>
             <span class="bmeta">${formatRelativeTime(m.ts)}</span>
           </div>
           <div style="font-size:12.5px; color:#e2e4f0; margin-top:2px;">${escapeHtml(m.text||'')}</div>
         </div>
-      `).join('');
-      box.scrollTop = box.scrollHeight;
-    } catch(e){ box.innerHTML = `<div class="bmeta">Chat aktuell nicht verfügbar.</div>`; }
+      `;}).join(''));
+      // Nur ans Ende springen, wenn wirklich neu gezeichnet wurde: Wer hochgescrollt hat, um
+      // aeltere Nachrichten zu lesen, wurde vorher bei jedem Abruf wieder nach unten gerissen.
+      if (neu) box.scrollTop = box.scrollHeight;
+    // Auch der Fehlerzweig laeuft ueber DENSELBEN setBoxHtml-Schluessel: Ein Zweig, der daran
+    // vorbei schreibt, macht den Cache beim naechsten Zustandswechsel still falsch - die
+    // Stoerungsnotiz kaeme nie wieder durch, weil der Cache den Nachrichtenstand noch fuer
+    // gezeichnet haelt.
+    } catch(e){ setBoxHtml(box, 'chatPanelGlobalBox', `<div class="bmeta">Chat aktuell nicht verfügbar.</div>`); }
   }
   async function postGlobalChatMessage(text){
     if (!text || !text.trim()) return;
@@ -55414,7 +55459,11 @@
     // damit er noch regelmäßig auffrischt, aber nicht jede Sekunde einen vollen Neuaufbau auslöst.
     // isSupporter gehört in die Signatur: Läuft der Rang ab oder wird er vergeben, ändert sich
     // sonst kein Wert dieser Liste, und die Box bliebe mit dem alten Abzeichen stehen.
-    const fpLbSig = Math.floor(Date.now()/30000)+'|'+leaderboardCache.slice(0,5).map(e=>e.id+':'+e.score+':'+e.lastSeen+':'+(e.isSupporter?e.supporterTier||'b':'')).join(',');
+    // cosmetics gehoert aus demselben Grund in die Signatur wie isSupporter darueber (ergaenzt
+    // 17.08.2026): Wechselt jemand seine Namensfarbe oder sein Emblem, aendert sich sonst kein
+    // Signaturbestandteil - die Zeile behielte das alte Aussehen, bis sich zufaellig der
+    // Punktestand bewegt.
+    const fpLbSig = Math.floor(Date.now()/30000)+'|'+leaderboardCache.slice(0,5).map(e=>e.id+':'+e.score+':'+e.lastSeen+':'+(e.isSupporter?e.supporterTier||'b':'')+':'+kosmetikSig(e)).join(',');
     if (fpLbSig === lastFpLeaderboardSig) return;
     lastFpLeaderboardSig = fpLbSig;
     box.innerHTML = leaderboardCache.slice(0,5).map((e,i) => {
@@ -55527,16 +55576,20 @@
     const nowKey = weekKeyOf(Date.now());
     const myId = state.player.id;
     // Wochen-Rangliste: geteilte Einträge der laufenden Woche; eigener Eintrag notfalls lokal ergänzt.
-    // isSupporter/supporterTier MUESSEN hier mitkopiert werden: Die Liste wird auf drei Felder
-    // eingedampft, und was hier fehlt, kann die Zeile unten nicht zeichnen - das Abzeichen fehlte
-    // aus genau diesem Grund (05.08.2026).
+    // isSupporter/supporterTier/cosmetics MUESSEN hier mitkopiert werden: Die Liste wird auf wenige
+    // Felder eingedampft, und was hier fehlt, kann die Zeile unten nicht zeichnen - das Abzeichen
+    // fehlte aus genau diesem Grund (05.08.2026), und `cosmetics` fehlte danach noch einmal
+    // (behoben 17.08.2026): Die Zeile rief kosmetikFarbAttr/kosmetikEmblem auf, bekam aber ein
+    // Objekt ohne das Feld und zeichnete deshalb NIE eine Namensfarbe. Wer hier ein Feld ergaenzt,
+    // das die Zeile zeichnet, ergaenzt es in BEIDEN Projektionen (auch der eigenen darunter).
     let list = (leaderboardCache||[]).filter(e => e.weekKey === nowKey && typeof e.weekScore === 'number')
       .map(e => ({ id: e.id, name: e.name || 'Unbekannt', weekScore: e.weekScore,
-                   isSupporter: e.isSupporter, supporterTier: e.supporterTier }));
+                   isSupporter: e.isSupporter, supporterTier: e.supporterTier, cosmetics: e.cosmetics }));
     if (myId && !list.some(e => e.id === myId)){
       const mich = (leaderboardCache||[]).find(e => e.id === myId);
       list.push({ id: myId, name: state.player.name || 'Du', weekScore: myWeekScore(),
-                  isSupporter: mich && mich.isSupporter, supporterTier: mich && mich.supporterTier });
+                  isSupporter: mich && mich.isSupporter, supporterTier: mich && mich.supporterTier,
+                  cosmetics: mich && mich.cosmetics });
     }
     list.sort((a,b) => (b.weekScore||0) - (a.weekScore||0));
     const myIdx = myId ? list.findIndex(e => e.id === myId) : -1;

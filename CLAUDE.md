@@ -695,16 +695,44 @@ BESTENLISTE, also auf einer Fläche, die allen gehört, und wäre im Spielstand 
 gefälscht. Die Grenze ist dieselbe wie überall in diesem Projekt: „Kann ich etwas anfassen, das
 ANDEREN gehört oder allen gemeinsam?"
 
+**Meilenstein-Embleme (17.08.2026):** `em_funke`/`em_leitstern`/`em_leuchtfeuer` hängen an der
+Bedingungsart `spender_je` – der **höchsten je erreichten** Spendenstufe. Sie laufen bewusst nie ab
+(Details und der Messbefund dazu in der Backend-CLAUDE.md). Für das Frontend heißt das nur: Ihre
+`desc` muss diese Eigenschaft ausdrücklich nennen, sonst liest sich das Stück wie ein weiteres
+Spender-Abzeichen, das mit dem Rang verschwindet – und genau das tut es nicht.
+
 **Die Freischaltbedingung steht bewusst NICHT im Frontend.** Sie kommt mit dem Katalog vom Server;
 `kosmetikBedingungText()` fasst sie nur in Worte. Eine zweite Liste hier wäre die Anzeigestelle, die
 eine Bedingung verspricht, die der Server anders durchsetzt – der Spieler spielt dann auf etwas hin,
 das ihm danach verweigert wird. `tests/test_kosmetik_paritaet.js` wacht über beide Richtungen und
 schlägt an, sobald der Server eine Bedingungsart einführt, die das Frontend nicht übersetzen kann.
 
-Gezeichnet wird an **fünf** Namensstellen (Bestenliste, Seitenmenü, FP-Rangliste, Freundesliste,
-Profilkarte), alle über `kosmetikFarbAttr()`/`kosmetikEmblem()`. Der globale Chat zeigt Kosmetik
-bewusst NICHT – seine Nachrichten führen die Auswahl nicht mit, und ein halb umgesetztes Feature
-wäre schlimmer als ein ehrlich begrenztes.
+Gezeichnet wird an **sechs** Namensstellen (Bestenliste, Seitenmenü/FP-Rangliste, Wochenliga,
+Freundesliste, Profilkarte, globaler Chat), alle über `kosmetikFarbAttr()`/`kosmetikEmblem()`.
+
+**Der Chat kam am 17.08.2026 dazu – und die Art, wie, ist die eigentliche Aussage.** Hier stand
+vorher, er zeige Kosmetik bewusst nicht, weil seine Nachrichten die Auswahl nicht mitführen. Genau
+deshalb darf sie auch nicht aus der Nachricht kommen: Chatnachrichten schreibt der Client selbst in
+den geteilten Speicher, eine mitgeschickte Farbe wäre in fünf Sekunden gefälscht. Der Weg ist
+stattdessen derselbe wie bei der Freundesliste – Zuordnung über `authorId` zum
+`leaderboardCache`, den der Server bei jedem Lesen frisch anreichert. Die `authorId` wiederum prüft
+der Server beim Schreiben gegen den angemeldeten Nutzer (`checkChatKeyPermission`): geprüfte
+Identität, geprüftes Aussehen. Wer keinen Bestenlisten-Eintrag hat, erscheint schlicht ohne
+Auszeichnung – der ehrliche Ausfall statt eines geratenen Aussehens.
+`tests/test_kosmetik_flaechen.js` Abschnitt 3 ist die Probe darauf: eine Nachricht mit gefälschtem
+`cosmetics`-Feld darf nichts einfärben.
+
+**Zwei Fallen, beide real aufgetreten und beide von derselben Art:**
+- **Die Wochenliga zeigte nie Kosmetik.** Sie rief die Zeichen-Helfer korrekt auf, dampfte ihre
+  Liste vorher aber auf ein neues Objekt ein, in dem `cosmetics` fehlte – die Helfer bekamen ein
+  Objekt ohne das Feld und lieferten stumm `''`. Derselbe Fehler war dort am 05.08.2026 schon
+  einmal mit `isSupporter` passiert, und der Kommentar darüber beschrieb ihn bereits. **Wer eine
+  Projektion auf wenige Felder baut, muss JEDES Feld mitnehmen, das die Zeile zeichnet** – und es
+  gibt in `renderWeeklyLeague` zwei Projektionen (die Liste und den eigenen Nachtrag).
+- **Signatur-Caches müssen die Kosmetik enthalten.** `renderFpLeaderboard` und `renderFriendsBox`
+  zeichnen sie, führten sie aber nicht in ihrer Signatur – ein Farb- oder Emblemwechsel eines
+  anderen Spielers schlug erst durch, wenn sich zufällig dessen Punktestand bewegte. Dafür gibt es
+  jetzt `kosmetikSig(e)`; wer eine Box baut, die Kosmetik zeichnet, nimmt sie mit auf.
 
 ### Was NICHT in `state` liegt – und warum
 
