@@ -130,6 +130,7 @@ function ereignisUhrenPinnen(st){
      dann sagt 7-vorab es ausdruecklich, statt still nichts zu pruefen. */
   const zielPlatz = belegt.find(k => feldA[zielSystem].plaetze[k].groesse !== 'splitter') || belegt[0];
   const zielGroesse = feldA[zielSystem].plaetze[zielPlatz].groesse;
+  const zielSorte = feldA[zielSystem].plaetze[zielPlatz].sorte;
   const vorratVorher = feldA[zielSystem].plaetze[zielPlatz].vorrat;
   /* Die Sollmenge kommt aus der SPIELDATEI, nicht aus einer Tabelle im Test - sonst waere sie eine
      zweite Wahrheitsquelle, die bei der naechsten Balance-Aenderung still veraltet (Arbeitsregel 3:
@@ -139,6 +140,15 @@ function ereignisUhrenPinnen(st){
     const m = src.match(/const PROTOMATERIE_JE_FUHRE = (\{[^}]*\});/);
     try { return m ? new Function('return ' + m[1])() : null; } catch (e) { return null; }
   })();
+  // Seit dem 17.08.2026 haengt die Menge an der SORTE. Auch dieser Schluessel kommt aus der
+  // Spieldatei statt als Literal im Test - sonst waere er die zweite Wahrheitsquelle, vor der
+  // Arbeitsregel 3 warnt.
+  const protoSorte = (() => {
+    const src = require('fs').readFileSync(require('./lib/umgebung').SPIELDATEI, 'utf8');
+    return (src.match(/const PROTOMATERIE_SORTE = '([a-z]+)'/) || [])[1] || null;
+  })();
+  // Was dieser Fels hergeben MUSS - Null, wenn er nicht die tragende Sorte ist.
+  const protoSoll = (protoTabelle && protoSorte && zielSorte === protoSorte) ? protoTabelle[zielGroesse] : 0;
 
   async function aufKarte(t){
     await t.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
@@ -227,26 +237,56 @@ function ereignisUhrenPinnen(st){
   check('4b3 die Rohstoffe sind auch wirklich im Spielstand gelandet',
     Object.entries(soll).every(([r, v]) => (stEnde.resources[r]||0) - (stStart.resources[r]||0) >= v - 2),
     Object.fromEntries(Object.keys(soll).map(r => [r, (stEnde.resources[r]||0) - (stStart.resources[r]||0)])));
-  // Und die Sorte bestimmt, WELCHE Rohstoffe das sind - ein Eiskern darf kein Erz liefern.
+  /* Und die Sorte bestimmt, WELCHE Rohstoffe das sind - ein Eiskern darf kein Erz liefern.
+     Die Obergrenze stand hier bis zum 17.08.2026 fest bei zwei ("drei reine, sechs Legierungen
+     mit zweien"). Der Urmateriekern fuehrt DREI - dieser Test haette also irgendwann zufaellig
+     angeschlagen, sobald er ihn zieht, und zwar bei voellig korrektem Code. Die Zahl kommt
+     deshalb jetzt aus der Sortentabelle der Spieldatei statt als Literal (Arbeitsregel 3: die
+     Regel pruefen, nicht die Momentaufnahme). */
   const sortenRes = Object.keys(soll);
+  const maxResJeSorte = (() => {
+    const src = require('fs').readFileSync(require('./lib/umgebung').SPIELDATEI, 'utf8');
+    const v = src.indexOf('  const ASTEROID_SORTEN = [');
+    const b = v < 0 ? -1 : src.indexOf('\n  ];', v);
+    if (v < 0 || b < v) return 0;
+    // Gezaehlt wird je Sorte, wieviele Rohstoff-Schluessel in ihrem res-Objekt stehen. Der
+    // Doppelpunkt von "res:" selbst gehoert NICHT dazu - er wird vorher abgeschnitten, sonst
+    // meldete die Zahl eins zu viel und die Pruefung liesse mehr durch als es gibt.
+    return Math.max(...(src.slice(v, b).match(/res:\{[^}]*\}/g) || [])
+      .map(x => x.replace(/^res:/, '').split(':').length - 1));
+  })();
+  check('4d-vorab die groesste Rohstoffzahl je Sorte kam aus der Spieldatei', maxResJeSorte >= 2, { maxResJeSorte });
   check('4d die Ladung besteht aus den Rohstoffen der Sorte',
-    sortenRes.length > 0 && sortenRes.length <= 2 && sortenRes.every(r => ['erz','kristalle','deuterium','antimaterie'].indexOf(r) >= 0),
-    { sortenRes });
+    sortenRes.length > 0 && sortenRes.length <= maxResJeSorte && sortenRes.every(r => ['erz','kristalle','deuterium','antimaterie'].indexOf(r) >= 0),
+    { sortenRes, maxResJeSorte });
   /* ---- 7) Protomaterie (16.08.2026) -------------------------------------------------------
      Der Rohstoff, den keine Fabrik herstellt - er faellt nur als Beifang heimkehrender Fuhren an
      und ist der Grund, ueberhaupt zum Guertel zu fliegen. Geprueft wird hier, WEIL die
      Messvorrichtung dieses Tests ohnehin steht: eine echte Mission, ein echter Bericht.
-     Die drei Aussagen bauen aufeinander auf: Die Menge haengt allein an der GROESSE (nicht an der
+     Die Aussagen bauen aufeinander auf: Die Menge haengt an SORTE und GROESSE (nicht an der
      Ladung, nicht an der Flotte - sonst skalierte sie wieder mit dem Imperium), sie wird beim
      START eingefroren (eine spaetere Balance-Aenderung darf keine Flotte treffen, die schon
-     unterwegs ist), und sie kommt bei der Rueckkehr wirklich an. */
-  check('7-vorab die Sollmenge wurde aus der Spieldatei gelesen und das Ziel gibt Protomaterie',
-    !!protoTabelle && protoTabelle[zielGroesse] > 0,
-    { zielGroesse, tabelle: protoTabelle, hinweis: 'bei 0: das Guertelsystem trug nur Splitter, 7a-7c sind dann ohne Aussage' });
+     unterwegs ist), und sie kommt bei der Rueckkehr wirklich an.
+
+     UMGESTELLT AM 17.08.2026: Bis dahin trug jeder Brocken ab Groesse "Brocken" Protomaterie,
+     allein nach Groesse. Ein Spieler-Report brachte es auf den Punkt ("der asteroid sollte keine
+     protomaterie besitzen") - ein Klathratkern gab 8, obwohl in seiner Sorte nur Kristalle und
+     Deuterium stehen. Jetzt fuehrt sie allein der Urmateriekern.
+     DIESER TEST FLIEGT EINEN ECHTEN, ZUFAELLIG GEZOGENEN FELS an, und der ist fast nie die
+     seltene Sorte - 7a misst deshalb in aller Regel die NEUE Regel in ihrer strengen Richtung:
+     dass dieser Fels eben NICHTS mitbringt. Genau das ist die Aussage, die am alten Stand
+     gefallen waere. 7-vorab sagt an, welchen der beiden Faelle der Lauf gerade erwischt hat -
+     ohne diese Zeile wuesste beim Fehlschlag niemand, welche Sorte gezogen wurde
+     (Arbeitsregel 37). */
+  check('7-vorab die Sollwerte wurden aus der Spieldatei gelesen',
+    !!protoTabelle && !!protoSorte,
+    { zielSorte, zielGroesse, protoSorte, protoSoll,
+      fall: zielSorte === protoSorte ? 'die tragende Sorte - 7a misst die Menge'
+                                     : 'eine gewoehnliche Sorte - 7a misst, dass sie NICHTS gibt' });
   if (protoTabelle && mission){
-    check('7a die Mission traegt die Menge ihrer GROESSE, beim Start eingefroren',
-      mission.proto === protoTabelle[zielGroesse],
-      { groesse: zielGroesse, erwartet: protoTabelle[zielGroesse], inDerMission: mission.proto });
+    check('7a die Mission traegt genau das, was SORTE und GROESSE hergeben, beim Start eingefroren',
+      mission.proto === protoSoll,
+      { sorte: zielSorte, groesse: zielGroesse, erwartet: protoSoll, inDerMission: mission.proto });
     check('7b der Bericht weist sie als angekommen aus, ohne Verfall bei leerem Speicher',
       !!bericht && bericht.proto === mission.proto && !bericht.protoVerloren,
       { imBericht: bericht && bericht.proto, verfallen: bericht && bericht.protoVerloren });
@@ -277,6 +317,18 @@ function ereignisUhrenPinnen(st){
       ereignisUhrenPinnen(st);
       for (const r of ['energie','erz','kristalle','deuterium','antimaterie']) st.resources[r] = 4000;
       st.resources.protomaterie = 500;   // Deckel ohne Aufbereitungsanlage - randvoll
+      /* Seit dem 17.08.2026 fuehrt nur EINE Sorte Protomaterie, und die ist selten (Gewicht 3 von
+         103). Der zufaellig gezogene Fels dieses Guertels ist sie fast nie - der Ueberlauf-Zweig
+         haette sich damit still selbst abgeschaltet und 7d/7e waeren trivial gruen gewesen, ohne
+         irgendetwas zu belegen (genau der Fall, vor dem Arbeitsregel 28 warnt; 7d-vorab hat ihn
+         beim ersten Lauf nach der Umstellung auch sofort gemeldet).
+         Deshalb wird das Ziel hier GESETZT statt gehofft: derselbe Platz, den der Test ohnehin
+         anfliegt, bekommt die tragende Sorte. Der Schluessel kommt aus der Spieldatei, nicht als
+         Literal - sonst waere er die zweite Wahrheitsquelle (Arbeitsregel 3). */
+      if (protoSorte && st.asteroidFeld && st.asteroidFeld[zielSystem]){
+        const platz = st.asteroidFeld[zielSystem].plaetze[zielPlatz];
+        if (platz) platz.sorte = protoSorte;
+      }
     }));
     await aufKarte(t);
     await oeffneMenue(t);
@@ -285,7 +337,9 @@ function ereignisUhrenPinnen(st){
     const stV = t.stand();
     const mV = (stV.fleet.missions || []).find(m => m.type === 'mining');
     check('7d-vorab der zweite Lauf hat eine Mission mit Protomaterie an Bord',
-      !!mV && mV.proto > 0, { proto: mV && mV.proto, bestandVorher: stV.resources.protomaterie });
+      !!mV && mV.proto > 0,
+      { proto: mV && mV.proto, bestandVorher: stV.resources.protomaterie, gesetzteSorte: protoSorte,
+        hinweis: 'bei 0: die gesetzte Sorte kam nicht an - 7d/7e waeren ohne Aussage' });
     if (mV){
       await t.page.evaluate(ms => { const echt = Date.now; Date.now = () => echt.call(Date) + ms; }, mV.endTime - Date.now() + 5000);
       await t.page.waitForTimeout(4000);
