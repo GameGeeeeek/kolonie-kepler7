@@ -6984,8 +6984,11 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.544.0';
+  const VERSION = '8.545.0';
   const PATCHNOTES = [
+    { version:'8.545.0', date:'17.08.2026', changes:[
+      '<strong>Protomaterie steht jetzt auch dann in der Rohstoffleiste, wenn du sie noch nicht abbauen kannst</strong> – ausgegraut, mit Schloss und dem Hinweis „Benötigt Minentechnik". Bisher fehlte die Karte in dem Fall vollständig: Wer die Forschung noch nicht hatte, für den existierte der Rohstoff in der Oberfläche schlicht nicht, und die Mega-Ausbaustufen verlangten etwas, von dem nirgends stand, woher man es bekommt. Die gesperrte Karte sagt beides in einem Satz – dass es ihn gibt, und dass er der einzige Rohstoff ist, den keine Fabrik herstellt.'
+    ]},
     { version:'8.544.0', date:'17.08.2026', changes:[
       '<strong>Asteroiden findest du jetzt dort, wo sie hingehören: im System selbst.</strong> Die frei im Sektor liegenden Gürtel-Felder und die eigene Gürtel-Kartenebene sind entfernt (ausdrücklicher Wunsch: Wer Gürtel finden will, soll die Systeme durchklicken und sie sich anschauen, statt eine Abkürzung zu tippen). Ein Gürtelsystem erkennst du in der Sektoransicht weiter auf einen Blick am gestrichelten goldenen Ring und am Untertitel „Gürtelsystem" – aufgeklappt zeigt das System seine Brocken auf der Gürtelbahn, und ein Tipp auf den Brocken öffnet wie bisher das Kartenmenü mit Sorte, Vorrat, Schürfrecht und Abbaumission. Ehrlich dazugesagt: Die alte Gürtel-Ebene zeigte freie Plätze und den Vorrats-Balken dauerhaft am Fels – diese Zusammenfassung entfällt; Vorrat und Schürfrecht stehen jetzt im Menü des jeweiligen Brockens. Hilfe („Sektorkarte bedienen") und Tutorial beschreiben den neuen Weg.',
       '<strong>Und am PC nutzt die Sektoransicht endlich die volle Breite.</strong> Direkter Spieler-Report mit Screenshot („links und rechts genug Platz"): Die Ansicht war fest 400 Einheiten breit, auf einem breiten Monitor blieb dadurch über die Hälfte des Kastens links und rechts leer. Jetzt wächst der Ausschnitt mit dem echten Kasten-Seitenverhältnis in die Breite (mit Deckel, damit auf Ultrabreit-Monitoren die Systeme nicht kilometerweit auseinanderstehen) – die Systemplätze, Beschriftungen und Knöpfe verteilen sich über die volle Fläche. Auf dem Handy ändert sich nichts: Dort ist der Kasten höher als breit, und die Ansicht bleibt exakt wie bisher.'
@@ -22234,8 +22237,16 @@
   /* Sichtbar wird die Ressource, sobald sie im Spiel eine Rolle spielt: mit Bestand, oder sobald
      Minentechnik erforscht ist (die Forschung, die den Guertel ueberhaupt oeffnet). Wer nie
      schuerft, sieht die Karte nie - fuer ihn aendert sich die Oberflaeche nicht. */
+  /* Hat der Spieler ZUGANG zur Protomaterie - also die Forschung, die Abbaumission und Minenschiff
+     freischaltet? Seit dem 17.08.2026 getrennt von der Frage, ob die KARTE gezeigt wird: Die Karte
+     steht ab sofort immer da (ausgegraut, mit Hinweis auf die Forschung), damit neue Spieler ein
+     sichtbares Ziel haben statt eines leeren Flecks. Wer den Zugang wirklich braucht - etwa die
+     Abbau-Vorschau, die es ohne Minentechnik gar nicht gibt -, fragt weiterhin diese Funktion. */
+  function protomaterieFreigeschaltet(){
+    return !!(state.research && (state.research.rminentechnik||0) >= 1);
+  }
   function protomaterieSichtbar(){
-    return (state.resources && (state.resources.protomaterie||0) > 0) || (state.research && (state.research.rminentechnik||0) >= 1);
+    return (state.resources && (state.resources.protomaterie||0) > 0) || protomaterieFreigeschaltet();
   }
   // Ein Verarbeitungsschritt EINER Kette auf einem beliebigen resources-Objekt - gemeinsame
   // Wahrheitsquelle für den echten Tick (processTier2Factories auf state.resources) UND den
@@ -22352,7 +22363,12 @@
        WICHTIG: Die Abbruchbedingung darunter fragt ab sofort BEIDES ab. Vorher haette ein Spieler,
        der schuerft aber keine einzige Tier-2-Fabrik besitzt, seine Protomaterie nirgends gesehen -
        die Leiste haette sich vor der Karte weggeblendet. */
-    const proto = protomaterieSichtbar();
+    /* Die Protomaterie-Karte steht ab dem 17.08.2026 IMMER da (Wunsch Sascha) - ohne die Forschung
+       ausgegraut und mit dem Hinweis, was fehlt. Vorher blieb der Platz leer, und wer noch nie von
+       Asteroiden gehoert hatte, erfuhr an dieser Stelle auch nichts davon. Ein sichtbares Ziel ist
+       die bessere Auskunft als gar keins - zumal Minentechnik einstufig und billig ist. */
+    const proto = true;
+    const protoFrei = protomaterieSichtbar();
     if (!visible.length && !proto){
       if (lastTier2BadgeSig !== 'hidden'){ el.innerHTML = ''; el.style.marginBottom = '0'; lastTier2BadgeSig = 'hidden'; }
       return;
@@ -22381,12 +22397,29 @@
     // "kein neu hinzugekommenes Anzeigefeld darf sie stillschweigend veralten lassen").
     const protoStand = Math.floor((state.resources && state.resources.protomaterie) || 0);
     const protoDeckel = protomaterieCap();
-    const sig = (proto ? 'P:'+protoStand+':'+protoDeckel+'|' : '')
+    // protoFrei MUSS in die Signatur: Ohne die Forschung stehen Stand (0) und Deckel (500) fest -
+    // die Karte wuerde beim Abschluss der Minentechnik also NICHT neu gezeichnet und bliebe
+    // ausgegraut stehen, obwohl sie freigeschaltet ist. Genau die Wertlisten-Falle aus CLAUDE.md.
+    const sig = (proto ? 'P:'+protoStand+':'+protoDeckel+':'+(protoFrei?1:0)+'|' : '')
       + visible.map(d => d.key+':'+Math.floor(state.resources[d.key]||0)+':'+tier2StorageCap(d)+':'+fmtTier2Rate(rates[d.key]||0)+':'+((state.resources[d.key]||0) >= tier2StorageCap(d) - 1e-9 ? 1 : 0)).join('|');
     if (sig === lastTier2BadgeSig) return;
     lastTier2BadgeSig = sig;
     const protoVoll = protoStand >= protoDeckel - 1e-9;
-    const protoHtml = !proto ? '' : `<div class="rescard${protoVoll?' t2-full':''}" data-res="protomaterie" title="Faellt nur als Beifang heimkehrender Abbaumissionen an - keine Fabrik stellt sie her.">
+    /* Zwei Fassungen derselben Karte. Die GESPERRTE nennt die Bedingung beim Namen und sagt, wozu
+       das Zeug ueberhaupt gut ist - ein blosses "0 / 500" mit Schloss waere ein Raetsel statt eines
+       Ziels. Sie zeigt bewusst KEINEN Fuellstandsbalken und keinen Wert: Es gibt nichts zu fuellen,
+       und eine Null neben einem Deckel liest sich wie ein Mangel statt wie ein noch nicht
+       begonnener Weg. */
+    const protoHtml = !proto ? '' : (!protoFrei
+      ? `<div class="rescard" data-res="protomaterie" data-gesperrt="1" style="opacity:0.55;" title="Protomaterie gibt es nur an Asteroiden - keine Fabrik stellt sie her. Die Forschung Minentechnik schaltet Minenschiff und Abbaumission frei.">
+      <div class="icon-badge" style="background:rgba(224,165,72,0.10);">${RES_ICONS.protomaterie}</div>
+      <div class="rescard-info">
+        <div class="label" style="color:#7d8199;">Protomaterie</div>
+        <div class="value" style="font-size:12px; color:#7d8199; font-weight:500;"><i class="ti ti-lock" aria-hidden="true" style="margin-right:4px;"></i>Benötigt Minentechnik</div>
+        <div class="rate">Der einzige Rohstoff, den keine Fabrik herstellt</div>
+      </div>
+    </div>`
+      : `<div class="rescard${protoVoll?' t2-full':''}" data-res="protomaterie" title="Faellt nur als Beifang heimkehrender Abbaumissionen an - keine Fabrik stellt sie her.">
       <div class="icon-badge" style="background:rgba(224,165,72,0.18);">${RES_ICONS.protomaterie}</div>
       <div class="rescard-info">
         <div class="label">Protomaterie</div>
@@ -22394,7 +22427,7 @@
         <div class="rate">${protoVoll?'<span style="color:#e0a548;">Lager voll – Fuhren verfallen</span>':'nur aus dem Bergbau'}</div>
       </div>
       <div class="t2-fill" style="width:${(protoDeckel>0?Math.min(100, protoStand/protoDeckel*100):0).toFixed(1)}%; background:#e0a548;"></div>
-    </div>`;
+    </div>`);
     el.innerHTML = protoHtml + visible.map(d => {
       const cap = tier2StorageCap(d);
       const stock = state.resources[d.key]||0;
