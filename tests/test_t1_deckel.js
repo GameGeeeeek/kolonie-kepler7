@@ -203,7 +203,7 @@ async function karte(t, name){
     // Kappungs-Durchgang kam `deckelKappung2026b` dazu, blieb hier stehen, und die Kappung kehrte
     // beim Laden sofort zurueck - der Test meldete "nichts gekappt" und sah aus wie ein echter
     // Spielfehler. Wer einen dritten Durchgang baut, ergaenzt seine Marke HIER mit.
-    for (const marke of ['deckelAusgleich2026', 'deckelKappung2026', 'deckelKappung2026b']) delete st[marke];
+    for (const marke of ['deckelAusgleich2026', 'deckelKappung2026', 'deckelKappung2026b', 'deckelKappung2026c']) delete st[marke];
     const fern = Date.now() + 365*24*3600*1000;
     for (const k of ['nextPlanetEventCheck','lastEventTime','nextTraderCheck','nextRaidTime','nextFactionGift']) if (st[k] !== undefined) st[k] = fern;
     st.activeEvent = null; st.buffs = [];

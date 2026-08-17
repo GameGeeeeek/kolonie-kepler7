@@ -39,6 +39,16 @@ const save = () => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   buildings:{solar:30, mine:28, raffinerie:25, synth:20, labor:10, lager:5000, werft:10},
   research:{}, activeResearch:null, researchQueue:[], fleet:{missions:[]}, colonies:{},
   activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null},
+  // Ereignis-Uhren in die FERNE Zukunft pinnen (Arbeitsregel 18: bei 0 feuert der erste
+  // Planeten-Ereignis-Check GARANTIERT). Ohne die Pinnung feuerte beim 8-Stunden-Sprung eine
+  // Meldungs-Salve (Planeten-Ereignis, Haendler, Raid ...), und weil der Toast-Stapel nur drei
+  // Meldungen haelt, verdraengte sie je nach Salvengroesse genau die gepruefte Ruhezustand-Zeile -
+  // der Test war einzeln gruen und in der Suite rot (17.08.2026). Das Spiel schuetzt die Zeile
+  // seither zusaetzlich per toast-wichtig (tests/test_toast_verdraengung.js); die Pinnung bleibt
+  // trotzdem, damit dieser Test die NACHHOLUNG misst und nicht die Toast-Konkurrenz.
+  nextPlanetEventCheck: Date.now() + 365*24*3600*1000, lastEventTime: Date.now(),
+  nextTraderCheck: Date.now() + 365*24*3600*1000, nextRaidTime: Date.now() + 365*24*3600*1000,
+  nextFactionGift: Date.now() + 365*24*3600*1000,
   xp:1000, credits:1000, buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{} });
 
 // Der gespeicherte Stand ist die Wahrheit - state liegt nicht auf window.
@@ -135,8 +145,11 @@ const UHR_VORSTELLEN = (stunden) => {
   check('1: die Luecke wird ohne Neuladen gutgeschrieben', gutgeschrieben > 20000,
     { gutgeschrieben, vorher: vorSprung.resources.erz, nachher: nachSprung.resources.erz });
   const alleMeldungen = await page.evaluate(() => (window.__meldungen||[]).join(' | '));
+  // Im Fehlschlag ALLE mitgeschnittenen Meldungen ausgeben (Arbeitsregel 37): "(nicht gefunden)"
+  // allein liess am 17.08.2026 offen, WAS stattdessen zu sehen war - die Ursache (Toast-Salve
+  // verdraengt die Zeile) musste erst von Hand gesucht werden.
   check('1: und das Spiel sagt, was passiert ist', /Ruhezustand|nachgetragen/.test(alleMeldungen),
-    (alleMeldungen.match(/[^|]*(Ruhezustand|nachgetragen)[^|]*/)||['(nicht gefunden)'])[0].trim().slice(0,140));
+    (alleMeldungen.match(/[^|]*(Ruhezustand|nachgetragen)[^|]*/)||['(nicht gefunden) gesehen: '+alleMeldungen.slice(0,300)])[0].trim().slice(0,340));
   // Kein "Willkommen zurueck"-Fenster mitten im Spiel.
   const fenster = await page.evaluate(() => {
     const o = document.getElementById('welcomeBackOverlay');
