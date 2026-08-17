@@ -154,11 +154,15 @@ check('6: der Anker liegt NICHT in der allgemeinen Verteidigungssumme (defenseCo
   !/nullfeld/.test(fnAus('defenseCombatBonusRaw')));
 check('6: und nicht in defensePower() (die Zahl geht an Bestenliste und PvP)',
   !/nullfeld/.test(fnAus('defensePower')));
-// Er darf ueberhaupt nur an EINER Stelle verrechnet werden, und die ist die NPC-Abwehr.
+// Er darf nur in der NPC-Abwehr verrechnet werden. Seit der Phasen-Umstellung (17.08.2026)
+// sind das ZWEI benannte Stellen: die Aufloesung (executeRaid) und die Vorab-Chance des
+// Spaeh-Berichts (resolveRaidScout) - dieselbe Abwehr, einmal gewuerfelt, einmal angekuendigt.
+// Eine dritte, unbenannte Stelle laesst die Zaehlung weiterhin fallen.
 const schubAufrufe = (js.match(/nullfeldSchub\(/g)||[]).length;
-check('6: es gibt genau eine Verrechnungsstelle (Definition + ein Aufruf)',
-  schubAufrufe === 2, { vorkommen: schubAufrufe });
-check('6: und die liegt in executeRaid, der NPC-Abwehr', /nullfeldSchub\(/.test(fnAus('executeRaid')));
+check('6: es gibt genau zwei benannte Verrechnungsstellen (Definition + zwei Aufrufe)',
+  schubAufrufe === 3, { vorkommen: schubAufrufe });
+check('6: eine liegt in executeRaid, der NPC-Abwehr', /nullfeldSchub\(/.test(fnAus('executeRaid')));
+check('6: die andere in resolveRaidScout, der Vorab-Chance derselben Abwehr', /nullfeldSchub\(/.test(fnAus('resolveRaidScout')));
 // Der Bericht ist die EINZIGE Stelle, an der der Spieler den Anker je zu sehen bekommt.
 check('6: der Ueberfallbericht weist den Anker aus - auch wenn er nicht gegriffen hat',
   /Nullfeldanker: <strong>\+/.test(js) && /Nullfeldanker: ohne Wirkung/.test(js));

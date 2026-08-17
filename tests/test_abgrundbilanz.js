@@ -78,10 +78,16 @@ for (const fn of ['attackPowerRaw','defenseCombatBonusRaw','defensePower','shipD
 // darf ausschliesslich im NPC-Ueberfall wirken. Geprueft wird das an der Zahl der Anwendungsstellen:
 // Solange es genau eine gibt und die in executeRaid() liegt, kann er PvP gar nicht erreichen.
 {
-  const stellen = (js.match(/nullfeldSchub\(/g)||[]).length;   // 1x Definition + 1x Aufruf
-  check('B: der Nullfeldanker wird an genau EINER Stelle angewandt', stellen === 2, { vorkommen:stellen });
-  check('B: und diese Stelle liegt im NPC-Ueberfall (executeRaid)',
+  // Seit der Phasen-Umstellung (17.08.2026) gibt es ZWEI benannte Aufrufer: die Aufloesung
+  // (executeRaid) und die Vorab-Chance im Spaeh-Bericht (resolveRaidScout) - beides dieselbe
+  // NPC-Abwehr, einmal gewuerfelt, einmal angekuendigt. PvP erreicht der Anker weiterhin nicht.
+  // Ein DRITTER unbenannter Aufrufer laesst die Zaehlung fallen, genau wie vorher.
+  const stellen = (js.match(/nullfeldSchub\(/g)||[]).length;   // 1x Definition + 2x Aufruf
+  check('B: der Nullfeldanker wird an genau ZWEI benannten Stellen angewandt', stellen === 3, { vorkommen:stellen });
+  check('B: Stelle eins liegt im NPC-Ueberfall (executeRaid)',
     fnAus('executeRaid').includes('nullfeldSchub('));
+  check('B: Stelle zwei ist die Vorab-Chance des Spaeh-Berichts (resolveRaidScout)',
+    fnAus('resolveRaidScout').includes('nullfeldSchub('));
   const NS = new Function('moduleBonusAt, ABGRUND_NULLFELD_DECKEL',
     fnAus('nullfeldSchub')+'; return nullfeldSchub;')(() => 0.8, zahl('ABGRUND_NULLFELD_DECKEL'));
   check('B: er wirkt nur bei Unterzahl - in Ueberzahl gibt er nichts', NS('home', 100, 200) === 0);

@@ -538,6 +538,25 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Familie wie Regel 20, und der Fehlschlag muss ausgeben, was STATTDESSEN zu sehen war
     (Regel 37).
 
+    **Nachtrag 17.08.2026 – dieselbe Falle eine Etage tiefer: `#log`.** Noch am selben Tag fiel
+    `test_fundort_knopf` in der Suite und blieb einzeln grün. Er misst nicht den Toast, sondern
+    `#log` – und der hat gar keinen Stapel, er **überschreibt sich mit jeder Meldung selbst**. Der
+    Knopf hatte seine Auskunft korrekt erzeugt (die Prüfung davor, der Sprung auf die Karte, war
+    grün); eine beliebige spätere Zeile hatte sie nur ersetzt, bevor der Test 1,2 s danach ablas.
+    Der Fehlschlag meldete `""`, weil er nur den fehlenden Treffer ausgab – was dort STATTDESSEN
+    stand, verschwieg er. **Vorgehen:** Jede Prüfung auf eine Protokollzeile misst den
+    MITSCHNITT, nicht den Endstand – `MutationObserver` auf `#log` per `addInitScript`, der jede
+    Änderung in ein Array schiebt (läuft damit vor dem ersten Tick und sammelt lückenlos). Die
+    geprüfte Aussage ist „die Zeile ist ERSCHIENEN", nicht „sie steht am Ende noch da" – das sind
+    zwei verschiedene Fragen, und nur die erste gehört dem Knopf. Der Beleg im Fehlschlag zeigt
+    bei fehlendem Treffer die letzten Zeilen des Mitschnitts.
+    **Und zur Gegenprobe selbst, weil sie fast wertlos geblieben wäre:** Der erste Versuch stellte
+    den Fehlerfall mit `log('…')` her – die Funktion lebt im Modulscope der Spieldatei und ist von
+    außen nicht aufrufbar, der Aufruf lief stumm ins Leere, beide Lesarten sahen die Zeile, und
+    die Probe meldete „nicht aussagekräftig" statt eines Befunds. Wer eine Spielmeldung von außen
+    nachstellen will, schreibt `#log` direkt (`innerHTML =`) – also genau das, was `log()` intern
+    tut (dieselbe Familie wie Regel 15/17/19: nie ein Messwerkzeug, das sich selbst im Weg steht).
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die

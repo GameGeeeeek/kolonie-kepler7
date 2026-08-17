@@ -107,7 +107,11 @@ const ROH_ERLAUBT = [
   'previewPower',       // PvP-Vorschau
   'myFullAttack',       // PvP-Chance im Spionagebericht
   'riftPower',          // Leerenriss - keine Schwachstelle modelliert
-  'kraft'               // Abgrund - Vorschau und Auflösung, beide identisch roh
+  'kraft',              // Abgrund - Vorschau und Auflösung, beide identisch roh
+  // Überfall-Abwehr (Phasen-Umstellung 17.08.2026): Der NPC ist hier der ANGREIFER - eine
+  // Schwachstelle ist eine Eigenschaft verteidigender NPCs, es gibt hier keine auszunutzen.
+  'raiderPowerBase',    // Auflösung in executeRaid
+  'raiderPower'         // Vorab-Chance im Späh-Bericht (resolveRaidScout)
 ];
 // `function ` davor ausschließen: Sonst zählt die DEFINITION als Aufrufer und meldet ihren
 // eigenen Parameternamen (basePower) als Verstoß - eine Prüfung, die sich selbst im Weg steht.

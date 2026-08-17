@@ -77,6 +77,25 @@ async function spiel(browser, berichte, zusatz){
   page.on('console', m => { if (m.type()==='error' && !/Failed to load resource|CORS|ERR_|404/.test(m.text())) errs.push(m.text()); });
   await page.route('**/api/**', backend(store));
   await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
+  /* Alle Protokollzeilen MITSCHNEIDEN statt am Ende den Endstand von #log abzulesen
+     (Arbeitsregel 26: miss etwas, das BLEIBT). #log überschreibt sich mit JEDER Meldung selbst -
+     kam nach dem Klick irgendeine andere Zeile (Ereignis, Erkennung, Tagesbonus), stand die
+     geprüfte Auskunft nicht mehr da, obwohl der Knopf sie korrekt erzeugt hatte. Genau so ist
+     dieser Test am 17.08.2026 in der Suite rot geworden und einzeln grün geblieben; sein
+     Fehlschlag meldete nur den fehlenden Treffer ("") und verschwieg, was stattdessen dastand
+     (Arbeitsregel 37). Der Beobachter läuft vor dem ersten Tick und sammelt lückenlos. */
+  await page.addInitScript(() => {
+    window.__logZeilen = [];
+    const start = () => {
+      const box = document.getElementById('log');
+      if (!box) return false;
+      const merke = () => { const t = (box.innerText||'').trim(); if (t && window.__logZeilen[window.__logZeilen.length-1] !== t) window.__logZeilen.push(t); };
+      new MutationObserver(merke).observe(box, { childList:true, characterData:true, subtree:true });
+      merke();
+      return true;
+    };
+    if (!start()) document.addEventListener('DOMContentLoaded', start);
+  });
   await page.goto(SPIEL_URL);
   await page.waitForTimeout(3200);
   await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }); });
@@ -84,10 +103,24 @@ async function spiel(browser, berichte, zusatz){
 }
 
 // Das Protokoll ist die Stelle, an der der Spieler die Auskunft liest - dort wird gemessen.
+// Geliefert wird der MITSCHNITT aller Zeilen (siehe Beobachter in spiel()), nicht nur die zuletzt
+// stehende: Die Auskunft des Knopfes gilt als gegeben, wenn sie ERSCHIENEN ist - ob eine spätere
+// Meldung sie eine Sekunde danach überschreibt, ist eine andere Frage als die hier geprüfte.
 const protokoll = (page) => page.evaluate(() => {
   const box = document.getElementById('log');
-  return box ? box.innerText : '';
+  const jetzt = box ? (box.innerText||'').trim() : '';
+  const alle = (window.__logZeilen || []).slice();
+  if (jetzt && alle[alle.length-1] !== jetzt) alle.push(jetzt);
+  return alle.join('\n');
 });
+
+// Beleg fuer den Fehlschlag (Arbeitsregel 37): Passt das Muster, zeigt er die getroffene Zeile.
+// Passt es NICHT, zeigt er den ganzen Mitschnitt - dann steht im Protokoll, was das Spiel
+// stattdessen gemeldet hat, statt eines nichtssagenden Leerstrings.
+const beleg = (txt, muster) => {
+  const m = txt.match(muster);
+  return m ? m[0] : { keinTreffer: String(muster), gesehen: txt.split('\n').slice(-6) };
+};
 async function knopfDruecken(page){
   await page.evaluate(() => { const b = document.getElementById('headerReportsBtn'); if (b) b.click(); });
   await page.waitForTimeout(1200);
@@ -141,7 +174,7 @@ async function knopfDruecken(page){
     check('1b: er springt auf die Sektorkarte', reiter === 'karte', reiter);
     const txt = await protokoll(t.page);
     check('1c: und meldet, dass der Brocken noch dort liegt - mit Vorrat',
-      /liegt noch dort/.test(txt) && /Vorrat/.test(txt), (txt.match(/[^\n]*liegt noch dort[^\n]*/)||[''])[0]);
+      /liegt noch dort/.test(txt) && /Vorrat/.test(txt), beleg(txt, /[^\n]*liegt noch dort[^\n]*/));
     const f = t.errs.filter(e => !/favicon/i.test(e));
     check('1d: keine Konsolenfehler', f.length === 0, f.slice(0,3));
     await t.ctx.close();
@@ -157,7 +190,7 @@ async function knopfDruecken(page){
     await knopfDruecken(t.page);
     const txt = await protokoll(t.page);
     check('2: bei einem anderen Brocken sagt er das auch',
-      /nicht mehr der Brocken aus dem Bericht/.test(txt), (txt.match(/[^\n]*inzwischen[^\n]*/)||[''])[0]);
+      /nicht mehr der Brocken aus dem Bericht/.test(txt), beleg(txt, /[^\n]*inzwischen[^\n]*/));
     await t.ctx.close();
   }
 
@@ -170,7 +203,7 @@ async function knopfDruecken(page){
     await knopfDruecken(t.page);
     const txt = await protokoll(t.page);
     check('3: ein leergefoerdertes Vorkommen wird als solches gemeldet',
-      /inzwischen abgebaut/.test(txt), (txt.match(/[^\n]*abgebaut[^\n]*/)||[''])[0]);
+      /inzwischen abgebaut/.test(txt), beleg(txt, /[^\n]*abgebaut[^\n]*/));
     await t.ctx.close();
   }
 
@@ -182,7 +215,7 @@ async function knopfDruecken(page){
     check('4a: auch ohne Platznummer gibt es den Knopf (das System kennt er ja)', k.da === true);
     const txt = await protokoll(t.page);
     check('4b: und er sagt ehrlich, dass er nur das System kennt',
-      /kennt nur das System/.test(txt), (txt.match(/[^\n]*kennt nur das System[^\n]*/)||[''])[0]);
+      /kennt nur das System/.test(txt), beleg(txt, /[^\n]*kennt nur das System[^\n]*/));
     await t.ctx.close();
   }
 
