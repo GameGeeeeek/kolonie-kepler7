@@ -7019,8 +7019,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.552.0';
+  const VERSION = '8.553.0';
   const PATCHNOTES = [
+    { version:'8.553.0', date:'17.08.2026', changes:[
+      '<strong>Die Karte im geöffneten System ist am Handy jetzt wirklich groß.</strong> Direkter Screenshot-Report („die Karte ist wirklich extrem mini … ich brauch echt eine Lupe"). Die zwei Anläufe davor haben an der Kastenhöhe und am Vergrößerungs-Deckel gedreht – und konnten gar nicht helfen: Das System war als flacher, sehr breiter Streifen gezeichnet, und wer davon alle Planeten zeigen will, stößt auf einem schmalen Bildschirm an die BREITE, nicht an die Höhe. Deshalb liegen die Planetenbahnen am Handy jetzt <strong>enger beieinander und deutlich runder</strong> – aus dem Streifen wird ein fast quadratisches Feld, also die Form, die ein Hochformat-Bildschirm auch hergibt. Gemessen am Gerät aus dem Report: Die Planetenscheiben sind von 12 auf 20 Pixel gewachsen, und die zwei äußersten Planeten, die vorher am Kastenrand abgeschnitten waren, stehen jetzt samt Namen im Bild. Am PC bleibt die gewohnte Darstellung unverändert.',
+      '<strong>Und der Ausschnitt richtet sich nach dem System, das gerade offen ist.</strong> Bisher zeigte die Kamera immer so viel Raum, wie das größte System bräuchte – ein System mit drei Planeten sah dadurch genauso klein aus wie eines mit acht. Jetzt wird auf die tatsächlich vorhandenen Umlaufbahnen eingezogen: Wer ein kleines System öffnet, sieht es entsprechend größer.'
+    ]},
     { version:'8.552.0', date:'17.08.2026', changes:[
       '<strong>Behoben: Der ›-Knopf zum nächsten System war am Handy nicht zu treffen.</strong> Direkter Video-Report, und der Grund ist unangenehmer als „verdeckt": Seit der Kartenkasten kompakter ist, lag der senkrechte Zoom-Stapel (+ / – / ⟲) genau über dem Blätterknopf – wer auf „nächstes System" tippte, zoomte stattdessen hinein. Nachgemessen an der Knopfmitte: Der Tap landete tatsächlich auf dem Zoom-Knopf. Am Handy stehen die drei Zoom-Knöpfe jetzt <strong>nebeneinander</strong> statt übereinander; die ‹ ›-Knöpfe links und rechts sind damit frei. Am PC bleibt alles wie gewohnt.',
       '<strong>Die Karte im geöffneten System ist wieder größer.</strong> Zweiter Punkt desselben Reports: Der Ausschnitt zeigte am Handy mehr leeren Raum als System. Zwei Ursachen, beide behoben – der Kartenkasten war höher als sein Inhalt, und eine Schutzregel gegen zu starke Vergrößerung (eigentlich für breite PC-Bildschirme gedacht) wirkte auf schmalen Geräten genau verkehrt herum: Sie zog den Ausschnitt in die Breite und machte die Planeten dadurch noch kleiner. Jetzt begrenzt sie die Vergrößerung direkt, und der Ausschnitt endet dort, wo das System endet – Planeten und Beschriftungen sind spürbar größer, sichtbar bleibt alles.',
@@ -52481,13 +52485,19 @@
     const kbVerh = galaxyKastenVerhaeltnis();
     const kbRectCam = (document.querySelector('#tab-karte .map-wrap') || {}).getBoundingClientRect
       ? document.querySelector('#tab-karte .map-wrap').getBoundingClientRect() : null;
-    // Am schmalen Kasten (Handy) wird der Ausschnitt zusätzlich auf den TATSÄCHLICHEN
-    // Systeminhalt eingezogen: Die Planeten liegen zwischen 29 und 381 der 410 Einheiten
-    // (äußerster Orbit rx=300 um die Sonne bei 350, mal GALAXY_SYSTEM_SCALE) - die restlichen
-    // Einheiten sind Rand. 370 zeigt alles bis Orbit 6 und vergrößert die Darstellung um 11%
-    // (gemessen: Skala 0,85 -> 0,94), ohne dass etwas herausfällt.
-    const kbEng = kbRectCam && kbRectCam.width < 700;
-    let w = kbEng ? 370 : GALAXY_SYSTEM_VIEW_W, h = w*kbVerh;
+    // Am schmalen Kasten (Handy) richtet sich der Ausschnitt nach dem TATSÄCHLICHEN Inhalt
+    // dieses Systems statt nach dem Maximum (KB-12): Ein System mit drei Planeten braucht keinen
+    // Ausschnitt für sechs Orbits - es wird entsprechend stärker vergrößert. Gerechnet wird über
+    // dieselbe Geometrie-Quelle wie die Zeichnung (kbOrbitRx), plus Rand für Beschriftungen.
+    const kbEng = kbSchmalerKasten();
+    let w = GALAXY_SYSTEM_VIEW_W;
+    if (kbEng){
+      const kbOrbits = PLANETS.filter(pl => pl.system === galaxyOpenSystem).map(pl => pl.orbit || 3);
+      const kbMaxOrbit = kbOrbits.length ? Math.max.apply(null, kbOrbits) : 6;
+      // +34 Sektor-Einheiten Rand: Planetenscheibe (r=11..14) plus die zwei Beschriftungszeilen.
+      w = Math.max(150, (kbOrbitRx(kbMaxOrbit) + 34) * 2 * GALAXY_SYSTEM_SCALE);
+    }
+    let h = w*kbVerh;
     const kbBreitePx = kbRectCam ? kbRectCam.width : 0;
     if (kbBreitePx && kbBreitePx / w > GALAXY_SYSTEM_MAX_SCALE){
       w = kbBreitePx / GALAXY_SYSTEM_MAX_SCALE;
@@ -52540,10 +52550,16 @@
     const kbWrapEl = document.querySelector('#tab-karte .map-wrap');
     const breite = kbWrapEl ? kbWrapEl.getBoundingClientRect().width : 0;
     if (!breite) return '420px';
-    // 0,44 statt 0,6 (KB-11): Der Systeminhalt ist ~135 von 410 Kamera-Einheiten hoch, also ein
-    // Drittel der Breite. Mit 0,6 blieb die Hälfte des Kastens leer und die Detailtafel stand
-    // unnötig tief; 0,44 lässt Luft für die Blätter- und Zoomknöpfe, ohne Leerfläche zu zeigen.
-    return Math.round(Math.max(190, Math.min(420, breite * 0.44))) + 'px';
+    // Zwei Formen, weil es zwei Zeichnungen gibt (KB-12): Am schmalen Kasten liegen die Bahnen
+    // rund statt flach, der Systeminhalt ist dort fast quadratisch (364×262 Sektor-Einheiten statt
+    // 600×180) - ein flacher Kasten (0,44) würde ihn oben und unten beschneiden, statt ihn zu
+    // vergrößern. Am breiten Kasten gilt weiter die flache Zeichnung und damit 0,44 aus KB-11:
+    // 0,78 machte dort aus 325 px Kasten 480 px, also wieder toten Raum - und schob die Kastenmitte
+    // unter den Fensterrand, wodurch das Ziehen der Karte gar nicht mehr ankam (gemessen,
+    // test_kartenbedienung 2a/2b). Der Deckel 480 px hält auf großen Handys die Detailtafel im Bild.
+    return kbSchmalerKasten()
+      ? Math.round(Math.max(240, Math.min(480, breite * 0.78))) + 'px'
+      : Math.round(Math.max(190, Math.min(420, breite * 0.44))) + 'px';
   }
   function galaxyOeffne(systemId){
     // Vor dem Umschalten festhalten, ob schon ein System offen war: Nur dann liegt die aktuelle
@@ -53483,19 +53499,42 @@
 
   const SUN_X = 350, SUN_Y = 115;
   const ORBIT_ANGLES = [-60, 35, -160, 110, -15, 165];
+  // Orbit-Geometrie in EINER Quelle (KB-12, Spieler-Report "die Karte ist wirklich extrem mini"):
+  // Der Streifen aus 600x180 Einheiten (rx bis 300, ry = rx*0,3) ist für Querformat gebaut. Auf
+  // einem 348 px breiten Handy-Kasten deckelt er die Vergrößerung bei 0,85 - egal wie hoch der
+  // Kasten ist, denn begrenzend ist die BREITE. Am schmalen Kasten liegen die Bahnen deshalb
+  // enger und runder: aus dem Streifen wird ein 364x262-Feld, also fast die Form des
+  // Hochformat-Bildschirms, und die Kamera darf entsprechend näher heran (gemessen: Skala 0,94
+  // -> ~1,5). Alle Bahnen (Planeten, Gürtel, Peilringe, Orbit-Ringe) lesen aus dieser einen
+  // Funktion - zwei Kopien liefen sonst beim nächsten Umbau auseinander (Regel 43).
+  // Bewusst window.innerWidth statt getBoundingClientRect des Kastens: planetOrbitXY läuft je
+  // Planet und Zeichenvorgang, und ein getBoundingClientRect erzwingt dabei jedes Mal ein Layout.
+  // Dieselbe Schranke wie die .map-zoom-Media-Query und das Scroll-Gate - EINE Zahl, vier Stellen
+  // (Geometrie, Kamera-Ausschnitt, Kastenhöhe, CSS). Sie müssen zusammen umschalten: Die rundere
+  // Bahnform braucht einen höheren Kasten, ein höherer Kasten ohne rundere Bahnen ist nur toter
+  // Raum (gemessen am PC-Viewport: Kasten 325 -> 480 px, die Kastenmitte lag dadurch unterhalb des
+  // Fensters, elementFromPoint lieferte null und das Ziehen der Karte kam gar nicht mehr an -
+  // test_kartenbedienung 2a/2b, Treue 1 -> 0).
+  function kbSchmalerKasten(){ return window.innerWidth <= 700; }
+  function kbOrbitMass(){
+    return kbSchmalerKasten() ? { basis: 30, schritt: 18, ry: 0.85 } : { basis: 42, schritt: 43, ry: 0.3 };
+  }
+  function kbOrbitRx(orbit){ const m = kbOrbitMass(); return m.basis + orbit*m.schritt; }
   function planetOrbitXY(p){
     const orbit = p.orbit || 3;
-    const rx = 42 + orbit*43;
-    const ry = rx * 0.3;
+    const rx = kbOrbitRx(orbit);
+    const ry = rx * kbOrbitMass().ry;
     const rad = ORBIT_ANGLES[(orbit-1) % ORBIT_ANGLES.length] * Math.PI/180;
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
   }
   /* Die Guertelbahn liegt zwischen dem 3. und 4. Orbit - dieselbe Ellipsen-Formel wie oben, nur mit
      halbem Orbit-Schritt. Die zehn Plaetze sitzen gleichmaessig darauf und sind um 18 Grad versetzt,
      damit sie nicht auf denselben Winkeln landen wie die Planeten (ORBIT_ANGLES). */
-  const GUERTEL_RX = 42 + 3.5 * 43;
+  // Die Gürtelbahn liegt zwischen dem 3. und 4. Orbit - deshalb dieselbe Quelle wie die Planeten
+  // (KB-12: am Handy enger und runder, sonst unverändert).
+  function guertelRx(){ return kbOrbitRx(3.5); }
   function asteroidPlatzXY(platz){
-    const rx = GUERTEL_RX, ry = rx * 0.3;
+    const rx = guertelRx(), ry = rx * kbOrbitMass().ry;
     const rad = (((platz * 36) + 18) % 360) * Math.PI / 180;
     return { x: SUN_X + rx * Math.cos(rad), y: SUN_Y + ry * Math.sin(rad) };
   }
@@ -53812,14 +53851,14 @@
 
     // Orbit-Ringe
     for (const orbit of orbitsPresent){
-      const rx = 42 + orbit*43, ry = rx*0.3;
+      const rx = kbOrbitRx(orbit), ry = rx*kbOrbitMass().ry;
       inner += `<ellipse cx="${SUN_X}" cy="${SUN_Y}" rx="${rx}" ry="${ry}" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-dasharray="2,5"/>`;
     }
     // Asteroidenguertel (v8.478.0). Nur in den ~20 Guertelsystemen; die Bahn selbst wird immer
     // gezeichnet, damit ein leergefoerdertes System als solches erkennbar bleibt statt einfach
     // "kein Guertel" auszusehen.
     if (istGuertelSystem(activeSystem)){
-      const rxG = GUERTEL_RX, ryG = rxG * 0.3;
+      const rxG = guertelRx(), ryG = rxG * kbOrbitMass().ry;
       inner += `<ellipse cx="${SUN_X}" cy="${SUN_Y}" rx="${rxG}" ry="${ryG}" fill="none" stroke="#c9c7bd" stroke-opacity="0.16" stroke-dasharray="1,7"/>`;
       for (const a of asteroidenImSystem(activeSystem)){
         const pos = asteroidPlatzXY(a.platz);
@@ -53853,7 +53892,7 @@
     // liegen, deshalb ausserhalb des istGuertelSystem-Zweigs.
     for (const pe of peilungenImSystem(activeSystem)){
       const winkel = (hashStringToFloat('peil:' + pe.id) * 360) * Math.PI / 180;
-      const rxP = GUERTEL_RX * 1.28, ryP = rxP * 0.3;
+      const rxP = guertelRx() * 1.28, ryP = rxP * kbOrbitMass().ry;
       const px = SUN_X + rxP * Math.cos(winkel), py = SUN_Y + ryP * Math.sin(winkel);
       const g = asteroidGroesse(pe.groesse), so = asteroidSorte(pe.sorte);
       const r = asteroidMarkerR(pe.groesse);
