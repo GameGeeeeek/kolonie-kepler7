@@ -185,16 +185,37 @@ if (K) {
   const fehlend = groessen.filter(g => K.fuhre[g] === undefined);
   check('6a: jede Asteroidengröße hat einen Eintrag (eine ohne gäbe still 0)',
     groessen.length === 4 && fehlend.length === 0, { groessen, fehlend });
-  check('6b: der Splitter gibt bewusst nichts, und die Menge steigt mit jeder Größe',
-    K.fuhre.splitter === 0 && K.fuhre.brocken > 0 && K.fuhre.kern > K.fuhre.brocken && K.fuhre.koloss > K.fuhre.kern,
+  /* Seit dem 17.08.2026 gibt AUCH der Splitter etwas: Die Menge haengt nicht mehr an der Groesse
+     allein, sondern an der SORTE - und wer den seltensten Fels des Spiels findet, soll nicht
+     wegen dessen Groesse leer ausgehen. Die Staffelung nach Groesse bleibt. */
+  check('6b: jede Größe gibt etwas, und die Menge steigt mit jeder Größe',
+    K.fuhre.splitter > 0 && K.fuhre.brocken > K.fuhre.splitter && K.fuhre.kern > K.fuhre.brocken && K.fuhre.koloss > K.fuhre.kern,
     K.fuhre);
 }
 /* Vorschau und Missionsstart müssen DIESELBE Zahl nennen. Der Missionsstart friert sie ein (damit
    eine spätere Balance-Änderung keine Flotte trifft, die schon unterwegs ist), die Vorschau zeigt
    sie vorher an - zwei Stellen, eine Regel. Stünde in einer davon etwas anderes, verspräche die
-   Vorschau etwas, das der Start nicht hält. */
-const ausdruck = (S.match(/proto: PROTOMATERIE_JE_FUHRE\[a\.groesse\] \|\| 0/g) || []).length;
-check('6c: Vorschau und Missionsstart lesen denselben Ausdruck (2 Fundstellen)', ausdruck === 2, { gefunden: ausdruck });
+   Vorschau etwas, das der Start nicht hält.
+
+   SEIT DER SORTEN-UMSTELLUNG schaerfer geprueft als vorher (Arbeitsregel 43): Damals genuegte es,
+   dass zweimal derselbe AUSDRUCK dastand - zwei Kopien einer Rechnung, die auseinanderlaufen
+   koennen. Jetzt gibt es genau EINE Funktion, und beide Stellen muessen sie rufen. Eine dritte
+   Anzeigestelle, die wieder selbst rechnet, faellt damit auf. */
+const rufe = (S.match(/proto: protoJeFuhre\(a\)/g) || []).length;
+check('6c: Vorschau und Missionsstart rufen dieselbe Funktion (2 Fundstellen)', rufe === 2, { gefunden: rufe });
+const defs = (S.match(/function protoJeFuhre\(/g) || []).length;
+check('6c2: und es gibt genau eine Definition davon', defs === 1, { definitionen: defs });
+// Der Kern der Umstellung: Die Funktion fragt die SORTE, nicht nur die Groesse. Ohne diese
+// Pruefung waere 6c auch dann gruen, wenn protoJeFuhre die Sorte gar nicht ansieht.
+const rumpf = (() => { const v = S.indexOf('  function protoJeFuhre(a){'); const b = v < 0 ? -1 : S.indexOf('\n  }', v); return v >= 0 && b > v ? S.slice(v, b) : ''; })();
+check('6d-anker: protoJeFuhre ist auffindbar', rumpf.length > 0, { laenge: rumpf.length });
+check('6d: sie entscheidet an der SORTE, nicht an der Größe allein',
+  /a\.sorte === PROTOMATERIE_SORTE/.test(rumpf) && /PROTOMATERIE_JE_FUHRE\[a\.groesse\]/.test(rumpf), rumpf);
+// Und die Sorte, auf die sie zeigt, muss es in ASTEROID_SORTEN wirklich geben - ein Tippfehler
+// im Schluesselnamen ergaebe eine Ressource, die NIE anfaellt, und kein Test wuerde es merken.
+const sorteKey = (S.match(/const PROTOMATERIE_SORTE = '([a-z]+)'/) || [])[1];
+check('6e: PROTOMATERIE_SORTE zeigt auf eine Sorte, die es in ASTEROID_SORTEN gibt',
+  !!sorteKey && new RegExp("key:'" + sorteKey + "'").test(S), { sorteKey });
 
 // ---- 7) Der Überlauf wird ausgesprochen -------------------------------------------------------
 check('7a: die Rückkehr misst den Überlauf getrennt vom Basislager (eigener Deckel, eigene Zahl)',
@@ -256,7 +277,24 @@ check('7b: und Protokoll UND Bericht nennen ihn beim Namen',
   if (vonH >= 0 && bisH > vonH && vonBD >= 0 && bisBD > vonBD && K) {
     let txt = null, fehler = null;
     try {
+      /* Seit dem 17.08.2026 nennt der Hilfe-Eintrag auch die Abbauzeiten und formatiert sie mit
+         fmtDuration(). Beides wird ECHT aus der Spieldatei geschnitten statt nachgebaut: Eine
+         eigene Formatierfunktion im Test wuerde eine andere Schreibweise erzeugen als das Spiel,
+         und die Pruefung darunter maesse dann den Test statt die Anzeige (Arbeitsregel 36 - genau
+         so war test_kosmetik_paritaet einmal gruen, waehrend im Spiel "5.0k" stand).
+         fmtDuration ist eine Funktionsdeklaration und damit hochgezogen; im echten Spiel steht sie
+         beim Aufbau von HELP_SECTIONS also zur Verfuegung, auch wenn sie weiter unten definiert
+         ist. Fuer diesen Ausschnitt muss sie trotzdem mitgegeben werden. */
+      const schneide = (anfang) => {
+        const v = S.indexOf(anfang);
+        const b = v < 0 ? -1 : S.indexOf('\n  }', v);
+        return (v >= 0 && b > v) ? S.slice(v, b + 4) + '\n' : '';
+      };
+      const fmtDur = schneide('  function fmtDuration(');
+      const zeitTabellen = (S.match(/  const ABBAU_(MIND|DECKEL)_SEK = \{[^}]*\};/g) || []).join('\n') + '\n'
+        + (S.match(/  const ABBAU_BOHRUNG_JE_STUFE = [^;]*;/) || [''])[0] + '\n';
       const kopf = S.slice(vonBD, bisBD + 5) + '\n'
+        + fmtDur + zeitTabellen
         + '  const PROTOMATERIE_JE_FUHRE = ' + JSON.stringify(K.fuhre) + ';\n'
         + '  const PROTOMATERIE_LAGER_BASIS = ' + K.basis + ';\n'
         + '  const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = ' + K.jeStufe + ';\n';
