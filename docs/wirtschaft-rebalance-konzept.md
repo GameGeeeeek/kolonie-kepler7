@@ -54,7 +54,7 @@ gemessenen +46,4/s fast exakt. Den fünf Rohstoffen fehlt genau diese Ausklammer
 | Komplette Endgame-Flotte (1.000 Jäger, 500 Kreuzer, 100 Schlachtschiffe, 20 Superschlachtschiffe, 1 Mondzerstörer) | 300 k Erz / 104 k Kristalle | **6,4 MINUTEN** (Engpass Kristalle) |
 | Voller Verteidigungsgürtel St. 10, T1-Anteil, je Planet | 2,89 M Erz / 1,61 M Kristalle | 0,47 h / 1,65 h |
 | Mega-Ausbaustufe 10 (Dyson, ×2,6 je Stufe, ×3,5 Empire) | ~660 M Kristalle | 28,3 d — die einzige mitwachsende Senke, **aber über dem Lagerdeckel 497 M: real endet sie bei Stufe 9 (Lagerwand)** |
-| Energie: alle Baukosten, 11 Standorte | ~15 M | **40 Minuten**. Kein nennenswerter laufender Verbrauch (T2-Ketten-Inputs wären ungedrosselt ~0,1 % der Tageseinnahme — und stehen wegen voller Lager real bei 0). |
+| Energie: alle Baukosten, 11 Standorte | ~15 M | **40 Minuten**. Kein nennenswerter laufender Verbrauch (T2-Ketten-Inputs: ungedrosselt ~0,1 % der Tageseinnahme, im Lager-voll-Gleichgewicht nur der Abfluss-Ausgleich ≈ 0). |
 
 Leerlauf-Reihenfolge (wo hören die Abnehmer auf): **Energie sofort → FP nach ~1 Woche →
 Antimaterie → Deuterium → Erz → Kristalle zuletzt**. Kristalle sind der Engpass fast jeder
@@ -89,9 +89,12 @@ verbaut oder verkauft), während Energie, Antimaterie und FP sich stauen.
 Alle fünf Grundketten des Live-Kontos stehen auf „Lager voll". Die gemessenen Raten sind
 exakt der Verbrauch der jeweils NÄCHSTEN Kettenstufe (Rechnung mit gravInputMult 0,8 trifft
 vier der fünf Messwerte auf ±3 %, HEK auf ±7 % — Rundung der Messwerte): Das Konto produziert netto **nur Singularitätskerne (639/Tag)
-und eine Spur Hohlraumgitter** — die fünf Grundketten sind reiner Durchlauferhitzer. Und weil
-`tier2Step` bei vollem Lager auch die **Eingangsstoffe nicht mehr abbucht** (Z. 22298, Bugfix
-v8.117.0), konsumiert die gesamte Verarbeitungsschicht aktuell **weder T1 noch T2**.
+und eine Spur Hohlraumgitter** — die fünf Grundketten sind reiner Durchlauferhitzer. `tier2Step`
+bucht bei vollem Lager auch die **Eingangsstoffe nicht mehr ab** (Z. 22298, Bugfix v8.117.0);
+weil die Folgeketten laufend Platz freiräumen, laufen die Grundketten aber in genau dieser Höhe
+weiter und ziehen dabei T1 nach — **netto ~0,4 Erz/s und ~0,5 Kristalle/s, unter 0,5 % der
+Einnahme** (Präzisierung nach Review-Hinweis am PR: „exakt 0" wäre falsch — ohne jeden Abfluss
+stünde die Schicht komplett still, mit Abfluss konsumiert sie exakt den Abfluss).
 
 Dem Produktionspotenzial (rekonstruiert aus den Lagerständen: 188 Nano- / 130 Chip- /
 122 HEK- / 57 FK- / 40 KI-Fabrikstufen imperiumsweit) steht das GESAMTVOLUMEN aller
@@ -352,8 +355,13 @@ Kettenproduktion, unabhängig von der Kolonienzahl. Zusätzlich steigt der Antei
 **Stufe 20** (34,2 k Nano) und bleibt danach konstant — die Design-Begründung „muss unters
 Lager passen" (Z. 44527 ff.) gilt damit auch für die Stufen, die B4 erreichbar macht.
 
-**Singularitätskerne** kommen mit kleinem Satz in die Nexus-Stufen (300 × (Stufe−1)): Die
-Ausnahme-Begründung („einzige nicht-volle Kette", Z. 44532) stammt von VOR Tier 3 — heute
+**Singularitätskerne** kommen in die Nexus-Stufen — aber **ab Stufe 4 und flach 200 je Stufe**,
+nicht ab Stufe 2 mit steigendem Satz (Korrektur nach Review-Hinweis am PR: Ein gültiges
+Minimal-Konto hat mit Reaktor-Stufe 1 nur 32 Kerne Lagerdeckel — 300 ab Stufe 2 wäre nicht
+teuer, sondern unerreichbar, exakt die Lagerwand, die dieses Konzept vermeidet). Die 200 sind
+bewusst die Kapazität EINER voll ausgebauten Reaktor-Kette (20 + 15×12 = 200) — dieselbe
+„eine Vollfabrik"-Messlatte, mit der die Orbital-T3-Kosten kalibriert wurden (Z. 44785).
+Die Ausnahme-Begründung („einzige nicht-volle Kette", Z. 44532) stammt von VOR Tier 3 — heute
 läuft auch dieses Lager in ~13 Tagen voll, und alle T3-Bedarfe zusammen sind eine halbe
 Tagesproduktion (0.5). Wer das Kausalanker-Werk baut, hat den Dauerabnehmer; wer nicht,
 braucht diese Senke.
@@ -483,7 +491,8 @@ schließt nur die drei Löcher aus 0.7, die am regulären Deckelwerk vorbeilaufe
 3. **A4-Zielband:** Wie viel Energieproduktion soll ein voll verteidigtes Konto ins
    Schildnetz stecken? Vorschlag 25–40 %; die Sätze (1,0/2,0 je Stufe) werden vor der
    Auslieferung am Live-Konto darauf kalibriert.
-4. **B2:** Singularitätskerne in die Nexus-Stufen aufnehmen (300 je Stufe) — ja/nein?
+4. **B2:** Singularitätskerne in die Nexus-Stufen aufnehmen (ab Stufe 4, flach 200 je Stufe —
+   eine voll ausgebaute Reaktor-Kette deckt genau 200) — ja/nein?
 5. **E3-Kappung:** Bestands-Stufen von Bergungswerft/Urmateriereaktor über dem neuen Deckel
    kappen (wie v8.506, ohne Erstattung) — oder nur deckeln und Bestand stehen lassen?
 6. **Etappen-Reihenfolge:** Empfehlung A → E1/E2 → B1/B2 → D → C → B3 → B4 (Begründung in 9.).
