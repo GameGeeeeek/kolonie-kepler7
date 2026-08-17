@@ -132,7 +132,15 @@ const TABS = ['basis','verteidigung','forschung','flotte','expedition','karte',
     const bar = document.querySelector('.resbar');
     if (!bar) return null;
     const bb = bar.getBoundingClientRect();
-    const cards = [...document.querySelectorAll('.rescard')];
+    /* Auf den Container SCOPEN (Arbeitsregel 5): Es gibt zwei Leisten mit der Klasse .resbar -
+       die Hauptleiste #resbar und die Tier-2-/Protomaterie-Leiste #tier2ResBadges darunter. Ein
+       ungescoptes querySelectorAll zaehlte die Karten BEIDER Leisten, verglich sie aber gegen die
+       Grenzen von nur einer - und meldete jede Karte der zweiten Leiste als "nicht sichtbar".
+       Aufgefallen am 17.08.2026, als die Protomaterie-Karte dauerhaft sichtbar wurde (vorher war
+       die zweite Leiste in dieser Fixture zufaellig immer leer). Geprueft wird die Aussage
+       "alle Karten DIESER Leiste passen gleichzeitig hinein" - die zweite Leiste hat ihr eigenes
+       Layout und ihre eigene Zeile. */
+    const cards = [...bar.querySelectorAll('.rescard')];
     const ganz = cards.filter(c => { const r = c.getBoundingClientRect();
       return r.left >= bb.left - 1 && r.right <= bb.right + 1 && r.top >= bb.top - 1 && r.bottom <= bb.bottom + 1; }).length;
     return { ganz, alle: cards.length, anzeige: getComputedStyle(bar).display,
