@@ -125,9 +125,12 @@ const sichtbar = (alle, entdeckt) => alle.filter(s => !s.hidden || entdeckt);
   check('5: bei kleiner Galaxie ist der Belegungsgrad unter 1', klein < 1, Math.round(klein*1000)/1000);
   check('5: bei voller Galaxie ist er 1', Math.abs(voll-1) < 0.001, voll);
   check('5: er wächst mit dem Ausbaustand', layout([], galaxie(60)).ratio > klein);
-  // Ohne diese drei Stellen waere die Umstellung ein Rueckschritt: Start-Ausschnitt, Zoom-Grenze
-  // und Namens-Schwelle wuerden in der noch dichten Galaxie ein Gewimmel zeigen.
-  check('5: der Start-Ausschnitt skaliert mit', /const fw = 330\*galaxyFillRatio\(\), fh = 150\*galaxyFillRatio\(\);/.test(src));
+  // Ohne diese Stellen waere die Umstellung ein Rueckschritt: Zoom-Grenze und Namens-Schwelle
+  // wuerden in der noch dichten Galaxie ein Gewimmel zeigen. Der "fokussierte Start-Ausschnitt"
+  // (fw = 330*galaxyFillRatio) ist seit KB-7 ENTFERNT - er gehoerte zur frueheren
+  // Galaxie-Uebersicht und kaperte seit der Nur-Sektoren-Karte das erste geoeffnete System
+  // (gemessen: viewBox-Breite 176 statt 410). Der Einstieg laeuft ueber die Sektoren-Uebersicht.
+  check('5: der alte Start-Ausschnitt ist entfernt', !/330\*galaxyFillRatio/.test(src));
   check('5: die Namens-Schwelle skaliert mit', /const zoomedIn = galaxyMapViewBox\.w < 220\*galaxyFillRatio\(\);/.test(src));
   check('5: die Nachbarschafts-Schwelle skaliert mit', /< 110\*galaxyFillRatio\(\)/.test(src));
   check('5: die Zoom-Grenze skaliert mit', /Math\.max\(180\*galaxyFillRatio\(\), Math\.min\(950/.test(src));
