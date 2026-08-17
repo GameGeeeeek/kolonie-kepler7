@@ -1,10 +1,10 @@
-// Tick-Ruhe der Dauerlaeufer: die v8.534.0-Umstellungen auf setBoxHtml/setBoxText (16.08.2026).
+// Tick-Ruhe der Dauerlaeufer: die v8.538.0-Umstellungen auf setBoxHtml/setBoxText (16.08.2026).
 //
 // GEMESSEN, nicht geschaetzt (MutationObserver ueber alle zwoelf Reiter, Rohdaten der
 // Mess-Session): 40 Elemente schrieben auf JEDEM Reiter jede Sekunde byte-identisch neu -
 // darunter tradeRouteBox (1.449 B, der groesste Einzelposten), fleetStickyBar (368 B),
 // doctrineBox (328 B), die drei Verlaufs-SVGs, die Automatik-Labels (je 221 B) und ein Dutzend
-// kleiner Status-Texte. Seit v8.534.0 laufen die Boxen ueber setBoxHtml (Markup-Signatur) und
+// kleiner Status-Texte. Seit v8.538.0 laufen die Boxen ueber setBoxHtml (Markup-Signatur) und
 // die reinen Text-Labels ueber setBoxText (schreibt nur bei geaendertem textContent).
 //
 // GEPRUEFT WIRD IN BEIDE RICHTUNGEN - die Gefahr einer Bremse ist nicht, dass sie zu wenig

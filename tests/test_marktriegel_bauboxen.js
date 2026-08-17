@@ -31,7 +31,7 @@ const MARKUP = HTML.slice(0, HTML.indexOf('<script>'));
 
 // ---- statisch: Riegel und Splitboxen existieren an den richtigen Stellen
 // Regel statt Momentaufnahme (Hausregel 3): gefordert ist setzen, pruefen, IM FINALLY loesen -
-// was der catch nebenbei tut (seit v8.534.0 vermerkt er den Netzfehler fuer die Regel-35-
+// was der catch nebenbei tut (seit v8.538.0 vermerkt er den Netzfehler fuer die Regel-35-
 // Anzeige), ist nicht Teil dieser Regel und darf sich formen.
 check('1a: loadMarketState hat den In-Flight-Riegel (setzen, pruefen, im finally loesen)',
   JS.includes('if (!useBackend() || marketLoadLaeuft) return;') &&
@@ -120,7 +120,7 @@ function backend(store, zaehler){ return async r => {
       const o = document.getElementById(id); if (o) o.style.display = 'none'; });
   });
 
-  // ---- 2: Markt-Tab oeffnen, Anfragen zaehlen. Seit v8.534.0 gilt: der Lade-Zweig darf nur
+  // ---- 2: Markt-Tab oeffnen, Anfragen zaehlen. Seit v8.538.0 gilt: der Lade-Zweig darf nur
   // noch alle COOLDOWN_MS einen Versuch anstossen (Cooldown in loadMarketState, aus der
   // Spieldatei ABGELESEN statt eingetippt - Regel 2: sonst wird der Test wertlos, sobald
   // jemand den Wert aendert) - bis dahin galt "1x je Sekunde erneut" als gewollt, aber der
@@ -158,7 +158,7 @@ function backend(store, zaehler){ return async r => {
   const marktAnfragen = zaehler.market - marktStart;
   check('2a: /market bei ok-Antwort ohne market-Feld: gebremst auf den Cooldown, aber die Selbstheilung lebt',
     marktAnfragen >= 1 && marktAnfragen <= MAX_ANFRAGEN, { anfragenImFenster: marktAnfragen, cooldownMs: COOLDOWN_MS, maxErlaubt: MAX_ANFRAGEN });
-  // Seit v8.534.0 hat die Flaeche einen DRITTEN Zustand (Regel 35): Nach einem Versuch, der
+  // Seit v8.538.0 hat die Flaeche einen DRITTEN Zustand (Regel 35): Nach einem Versuch, der
   // keine Marktdaten brachte, steht der GRUND da statt eines ewigen "wird geladen…" - genau
   // die tote Flaeche vom 15.08.2026. Der Mock liefert 200 mit leerem Objekt, also muss hier
   // die "keine Marktdaten"-Ansage stehen, mit dem Versprechen, dass es von selbst weitergeht.

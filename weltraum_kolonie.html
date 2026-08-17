@@ -6967,8 +6967,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.537.0';
+  const VERSION = '8.538.0';
   const PATCHNOTES = [
+    { version:'8.538.0', date:'17.08.2026', changes:[
+      '<strong>Vierzig Anzeigen, die jede Sekunde dasselbe neu geschrieben haben, stehen jetzt still.</strong> Eine Messung über alle zwölf Reiter zeigte: 40 Elemente wurden im Sekundentakt komplett neu aufgebaut, obwohl sich ihr Inhalt Zeichen für Zeichen nicht unterschied – und zwar auf JEDEM Reiter, nicht nur dort, wo man sie sieht. Größter Einzelposten war die Handelsrouten-Box mit 1,45 kB pro Sekunde, dazu die Flotten-Statusleiste, die Doktrinen, die Missions- und Positionslisten, Inventar, Punkte-Protokoll, die drei Verlaufs-Diagramme und rund 25 kleine Status-Texte. Sie alle schreiben jetzt nur noch, wenn sich wirklich etwas ändert. Auf schwächeren Geräten und im Akkubetrieb macht das den Unterschied; laufende Countdowns zählen unverändert weiter.',
+      '<strong>Behoben: Die Modulbörse ließ Kauf-Knöpfe zu lange ausgegraut.</strong> Ob ein Angebot bezahlbar ist, wurde nur in 1.000-Kredite-Schritten neu bewertet – wer knapp unter einem Preis stand und die fehlenden Kredite verdiente, sah den Knopf erst freiwerden, wenn der Kontostand zufällig die nächste Tausenderstufe überschritt. Jetzt entscheidet der tatsächliche Kontostand.',
+      '<strong>Behoben: Ein stiller Anfragen-Sturm im Markt-Tab.</strong> Lieferte der Server keine Marktdaten, fragte das Spiel jede Sekunde erneut nach und zeichnete den Markt dabei doppelt – bei offenem Markt-Tab summierte sich das auf zehntausende Anfragen am Tag. Der Abruf ist jetzt auf einen Versuch alle 10 Sekunden gedeckelt, der reguläre 30-Sekunden-Abgleich läuft unverändert.',
+      '<strong>Und die Marktfläche sagt jetzt, wenn etwas klemmt.</strong> Vorher stand dort im Störungsfall für immer „Marktdaten werden geladen…" – eine Anzeige, die verspricht, dass es gleich weitergeht, auch wenn sie es nicht tut. Jetzt nennt sie den Grund (Server nicht erreichbar, Abruf abgelehnt oder keine Marktdaten vorhanden), sagt dass automatisch weiter versucht wird, und dass Ressourcen und Aufträge davon nicht betroffen sind.',
+      'Nebenbei: Getippte Mengen in der Verlege-Box überleben den Sekunden-Takt jetzt auch dann, wenn das Feld nicht mehr im Fokus steht.'
+    ]},
     { version:'8.537.0', date:'17.08.2026', changes:[
       '<strong>Das Forschungslabor endet jetzt bei Ausbau-Stufe 25 je Standort.</strong> Es war das letzte Dauer-Gebäude ohne Deckel – und es produziert mit den Forschungspunkten ausgerechnet die Ressource, die bewusst der Engpass des Spiels ist. Bewusst ohne Abflachung: Keine vorhandene Rate sinkt, nur der Ausbau endet. Bestandsstufen über 25 werden beim Laden auf den Deckel gesetzt; der Bericht nennt jedes betroffene Gebäude mit alter und neuer Stufe. Eine Erstattung gibt es dafür nicht – dieselbe Entscheidung wie beim Sommer-Umbau für Solarkraftwerk & Co., und der Bericht sagt das ausdrücklich, statt es zu verschweigen.',
       '<strong>Die zwei Tier-3-Forschungen kosten jetzt auch Tier-2-Material:</strong> <em>Hohlraum-Geometrie</em> zusätzlich 60 Metamaterial-Gewebe und 90 Hochenergiekristalle, <em>Kausalanker-Theorie</em> 30 Singularitätskerne und 45 KI-Kerne – jeweils die Zutaten der Ketten, auf denen ihre Fabriken aufbauen. Die allgemeine Tier-2-Regel (ab Forschungsstufe 11) erreicht diese Einmal-Forschungen nie, deshalb stehen die Kosten direkt an ihnen. Die Mengen liegen spätestens ab Fabrikstufe 2 unter dem Lagerdeckel, und beide Zutaten stammen aus Ketten, die ihre Voraussetzungs-Forschungen längst freigeschaltet haben – aussperren kann dich das nicht. Nebenbei behoben: Der Abbruch einer Forschung mit Tier-2-Kosten zeigte im Rückerstattungs-Text „undefined" statt des Materialnamens.',
@@ -15486,7 +15493,7 @@
   function renderModuleMarket(){
     const box = document.getElementById('moduleMarketBox');
     if (!box) return;
-    // Markup-Signatur (setBoxHtml) statt der frueheren Wertlisten-Signatur (v8.534.0). Die alte
+    // Markup-Signatur (setBoxHtml) statt der frueheren Wertlisten-Signatur (v8.538.0). Die alte
     // Liste buendelte die Kredite in 1000er-Schritten ('cr:'+Math.floor(credits/1000)) - kippte
     // die Bezahlbarkeit eines Angebots INNERHALB eines Buckets (Preis 1.500, Kredite 1.400 ->
     // 1.600), blieb die Signatur gleich und der Kauf-Knopf faelschlich ausgegraut, bis die
@@ -15630,7 +15637,7 @@
       </div>
     </div>`;
 
-    // setBoxHtml statt innerHTML (v8.534.0, Mess-Session: 1.449 B je Sekunde, 19 von 20
+    // setBoxHtml statt innerHTML (v8.538.0, Mess-Session: 1.449 B je Sekunde, 19 von 20
     // Schreibvorgaengen byte-identisch - der groesste einzelne Dauerlaeufer der Messung). Bei
     // uebersprungenem Tick entfaellt auch die Verdrahtung: die alten Knoten samt Handlern und
     // die Selects mit ihrem newRouteDraft-Zustand bleiben stehen.
@@ -15667,7 +15674,7 @@
   let marktDatenProblem = null;
   async function loadMarketState(){
     if (!useBackend() || marketLoadLaeuft) return;
-    // Cooldown (v8.534.0, MutationObserver-Mess-Session): Solange marketCache leer bleibt (Server
+    // Cooldown (v8.538.0, MutationObserver-Mess-Session): Solange marketCache leer bleibt (Server
     // antwortet 200, aber ohne Marktdaten - genau so stand es am 15.08.2026 live, als das Backend
     // hinter dem Frontend hing), stiess der Lade-Zweig von renderMarket() diesen Abruf bei JEDEM
     // Sekunden-Tick neu an - eine /market-Anfrage pro Sekunde, dauerhaft. Der 30s-Timer (unten bei
@@ -15782,7 +15789,7 @@
   // erzwingen=true umgeht den Cooldown: Nach Einstellen/Zurueckziehen/Kauf wird der Abruf
   // AWAITED, um den Treuhand-Stand sofort zu zeigen - ein Cooldown, der diese Refreshes
   // schluckt, wuerde nach jeder Aktion bis zu 10 s alte Angebote stehen lassen. Der Cooldown
-  // gilt nur fuer den passiven Lade-Zweig aus renderModuleMarket (Review-Fund v8.534.0: ohne
+  // gilt nur fuer den passiven Lade-Zweig aus renderModuleMarket (Review-Fund v8.538.0: ohne
   // ihn bliebe hier die Zwillingsschleife des /market-Vorfalls offen, falls der Server je ein
   // nacktes JSON-null liefert und der Cache damit dauerhaft leer bleibt).
   async function loadModuleMarket(erzwingen){
@@ -56632,7 +56639,7 @@
     const doctrineBox = document.getElementById('doctrineBox');
     if (doctrineBox){
       const unlocked = doctrineUnlocked();
-      // setBoxHtml in beiden Zweigen mit demselben Schluessel (v8.534.0, Mess-Session: 9 von 10
+      // setBoxHtml in beiden Zweigen mit demselben Schluessel (v8.538.0, Mess-Session: 9 von 10
       // Neuaufbauten byte-identisch, 328 B je Tick) - Verdrahtung wie bei stanceBox darunter
       // bewusst ausserhalb: auf uebersprungenen Ticks setzt sie dieselben Handler auf die
       // stehengebliebenen Knoten.
@@ -56804,7 +56811,7 @@
     // Unterreiter + Sticky-Statusleiste (Flotten-Tab-Umbau 24.07.2026, Vorschlag 1): drei kurze
     // Ansichten statt einer ~7.000px-Scrollsäule. state.fleetSubTab merkt sich die Auswahl (auch
     // über Reloads), Standard ist die Werft. Die Sticky-Leiste hält die Kernzahlen beim Scrollen
-    // sichtbar - seit v8.534.0 hinter setBoxHtml (Begruendung am Schreibort unten).
+    // sichtbar - seit v8.538.0 hinter setBoxHtml (Begruendung am Schreibort unten).
     {
       const fleetSub = state.fleetSubTab || 'werft';
       const subMap = { werft:'fleetSubWerft', flotte:'fleetSubFlotte', missionen:'fleetSubMissionen' };
@@ -56823,7 +56830,7 @@
       if (missionsNote) missionsNote.textContent = usedFlS ? usedFlS+' Flotte'+(usedFlS===1?'':'n')+' im Einsatz' : 'Keine Flotte im Einsatz';
       const stickyEl = document.getElementById('fleetStickyBar');
       if (stickyEl){
-        // setBoxHtml statt innerHTML (v8.534.0): Hier stand "bewusst KEIN Signatur-Cache, die
+        // setBoxHtml statt innerHTML (v8.538.0): Hier stand "bewusst KEIN Signatur-Cache, die
         // Werte aendern sich laufend" - das galt fuer eine WERTLISTEN-Signatur, die veralten kann.
         // Die Markup-Signatur ist selbstkorrigierend: aendert sich ein Wert (fmt() rundet, kleine
         // Treibstoff-Zuwaechse verschwinden darin), wird geschrieben; GEMESSEN waren 9 von 10
@@ -56878,7 +56885,7 @@
       if (e.originPlanet !== state.activeBasePlanet) continue;
       nonExpeditionMissions.push({ type:'allianz-verband', eintrag: e });
     }
-    // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session): Die Leer-Notiz wurde jede Sekunde
+    // setBoxHtml in beiden Zweigen (v8.538.0, Mess-Session): Die Leer-Notiz wurde jede Sekunde
     // byte-identisch neu geschrieben; mit laufenden Missionen aendert sich das Markup durch die
     // Countdowns ohnehin jede Sekunde, dann schreibt setBoxHtml wie bisher. Die Rueckruf-Knoepfe
     // verdrahtet der document-weite Lauf hinter dem Expeditions-Block jeden Tick neu.
@@ -57798,7 +57805,7 @@
     const relocateBox = document.getElementById('relocateBox');
     if (relocateBox && !isTypingIn('relocateBox')){
       const others = allFleetsWithPlanet().filter(x=>x.planet!==state.activeBasePlanet);
-      // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session). Nebeneffekt im vollen Zweig: Die
+      // setBoxHtml in beiden Zweigen (v8.538.0, Mess-Session). Nebeneffekt im vollen Zweig: Die
       // Mengenfelder (reloc-amount) leben nur im DOM - bisher setzte der Sekunden-Tick sie auf den
       // Vorgabewert zurueck, sobald der Fokus weg war (bekannte Fallstrick-Familie). Solange sich
       // am Markup nichts aendert, bleiben die getippten Mengen jetzt stehen.
@@ -57863,7 +57870,7 @@
         const relocNeu = setBoxHtml(relocateBox, 'relocateBox', relocHtml);
         // JEDEN Tick, nicht nur nach Neuaufbau: Der Aufruf setzt auch den Flotten-Skin-Filter
         // auf die Canvas-Icons - ein Skin-Wechsel aendert das relocateBox-Markup NICHT, die
-        // stehengebliebenen Canvases behielten sonst den alten Filter (Review-Fund v8.534.0).
+        // stehengebliebenen Canvases behielten sonst den alten Filter (Review-Fund v8.538.0).
         refreshShipMiniIcons(relocateBox);
         if (relocNeu){
         relocateBox.querySelectorAll('[data-reloc-source]').forEach(btn => btn.onclick = () => {
@@ -59101,7 +59108,7 @@
       for (const e of allianzVerbandEintraege()){
         allMissions.push({ originKey: e.originPlanet, m: { type:'allianz-verband', eintrag: e } });
       }
-      // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session): Ohne Missionen wurde die Notiz auf
+      // setBoxHtml in beiden Zweigen (v8.538.0, Mess-Session): Ohne Missionen wurde die Notiz auf
       // JEDEM Tab jede Sekunde byte-identisch neu geschrieben (das Seitenmenue steht ausserhalb
       // der Tab-Guards); mit laufenden Missionen zaehlen die Countdowns und das Markup aendert
       // sich ohnehin. Keine Klick-Handler in der Liste.
@@ -59540,7 +59547,7 @@
     const avatarEl = document.getElementById('avatarInitials');
     if (avatarEl){
       const av = avatarSvg(state.player.avatarKey);
-      // ACHTUNG Kopplung (Review v8.534.0, per ausgefuehrtem Mini-Fixture belegt): Der SVG-Zweig
+      // ACHTUNG Kopplung (Review v8.538.0, per ausgefuehrtem Mini-Fixture belegt): Der SVG-Zweig
       // laeuft ueber den setBoxHtml-Cache, der Initialen-Zweig per setBoxText am Cache VORBEI.
       // Das traegt nur, weil (a) die textContent-Zuweisung das SVG-Kind entfernt und die
       // childElementCount-Bedingung in setBoxHtml den Rueckweg zum SELBEN Avatar trotz
@@ -59637,7 +59644,7 @@
     if (scoreHistorySvg){
       const hist = state.scoreHistory||[];
       const note = document.getElementById('scoreChartNote');
-      // setBoxHtml statt innerHTML (v8.534.0, MutationObserver-Mess-Session): Der Verlauf bekommt
+      // setBoxHtml statt innerHTML (v8.538.0, MutationObserver-Mess-Session): Der Verlauf bekommt
       // alle 5 Minuten einen Snapshot, wurde aber jede Sekunde neu gezeichnet - auf JEDEM Tab,
       // die Charts stehen im reiterunabhaengigen Teil von render(). Gleiches Muster fuer die
       // beiden renderMiniChart-SVGs direkt darunter. innerHTML funktioniert auf SVG-Elementen
@@ -59746,7 +59753,7 @@
     const scoreLogBox = document.getElementById('scoreLogBox');
     if (scoreLogBox){
       const logEntries = (state.scoreLog||[]).slice().reverse().slice(0, 40);
-      // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session): Das Protokoll aendert sich nur bei
+      // setBoxHtml in beiden Zweigen (v8.538.0, Mess-Session): Das Protokoll aendert sich nur bei
       // einer Punktaenderung bzw. wenn formatRelativeTime in die naechste Minute springt - neu
       // geschrieben wurde es trotzdem jede Sekunde, auf jedem Tab. Keine Klick-Handler.
       if (!logEntries.length){
@@ -60029,7 +60036,7 @@
           }).join('');
         }
       }
-      // setBoxHtml statt innerHTML (v8.534.0, Mess-Session): aendert sich nur bei Fund/Aktivierung/
+      // setBoxHtml statt innerHTML (v8.538.0, Mess-Session): aendert sich nur bei Fund/Aktivierung/
       // Aufklappen, wurde aber jede Sekunde auf jedem Tab neu geschrieben. Verdrahtung darunter
       // bleibt bewusst unveraendert jeden Tick - auf uebersprungenen Ticks setzt sie dieselben
       // Handler auf die stehengebliebenen Knoten.
@@ -60146,7 +60153,7 @@
     renderKosmetikBox();
     const kofiBox = document.getElementById('kofiTopSupporterBox');
     if (kofiBox){
-      // setBoxHtml in allen drei Zweigen mit demselben Schluessel (v8.534.0, Mess-Session): rein
+      // setBoxHtml in allen drei Zweigen mit demselben Schluessel (v8.538.0, Mess-Session): rein
       // statische Inhalte, wurden trotzdem jede Sekunde auf jedem Tab neu geschrieben.
       if (kofiTopSupporterCache === undefined){
         setBoxHtml(kofiBox, 'kofiTopSupporterBox', `<div class="bmeta">Lädt…</div>`);
@@ -60455,7 +60462,7 @@
 
     const traderBox = document.getElementById('traderBox');
     if (traderBox){
-      // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session): Ohne Haendler stand jede Sekunde
+      // setBoxHtml in beiden Zweigen (v8.538.0, Mess-Session): Ohne Haendler stand jede Sekunde
       // dieselbe Notiz da; mit Haendler aendert sich das Markup nur, wenn die Bezahlbarkeit kippt
       // (ok steckt in Klasse und disabled-Attribut - die Signatur kann also nicht veralten).
       // Verdrahtung nur nach echtem Neuaufbau; auf uebersprungenen Ticks haelt der alte Knoten
