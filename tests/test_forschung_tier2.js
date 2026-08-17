@@ -111,4 +111,46 @@ const ueber = ALLI.filter(r => r.maxLevel >= schwelle).map(r => r.key + '(max' +
 check('4: keine Allianzforschung erreicht die Schwelle - sie bleibt ohne Tier-2-Kosten',
   ueber.length === 0, ueber);
 
+// ---- 5) Tier-2-Schlüssel DIREKT in der baseCost (16.08.2026, die zwei Tier-3-Forschungen) ----
+// Der Schwellen-Mechanismus oben erreicht maxLevel-1-Forschungen nie - rhohlraum und rkausalanker
+// tragen ihre Tier-2-Kosten deshalb direkt in der baseCost. Damit gilt die Sackgassen-Regel aus
+// Abschnitt 2 in einer zweiten Form, und sie wird hier aus den KOSTEN abgeleitet statt aus einer
+// Liste im Kopf: Wer eine Kette als Zutat verlangt, muss deren Freischalt-Forschung ECHT
+// (transitiv über requires) voraussetzen - und nie sich selbst. Eine künftige Forschung, die
+// z. B. Hohlraumgitter verlangt, ohne rhohlraum vorauszusetzen, fällt hier auf.
+{
+  const t2keys = new Set(T2.map(t => t.key));
+  const unlockVon = {};
+  for (const f of freischalter) unlockVon[f.kette] = f.forschung;
+  function requiresHuelle(f, gesehen){
+    gesehen = gesehen || new Set();
+    for (const req of f.requires || []){
+      const key = (typeof req === 'string') ? req : req.key;
+      if (gesehen.has(key)) continue;
+      gesehen.add(key);
+      const sub = FOR.find(x => x.key === key);
+      if (sub) requiresHuelle(sub, gesehen);
+    }
+    return gesehen;
+  }
+  const verstoesse = [];
+  let direkteKosten = 0;
+  for (const f of FOR){
+    const t2InCost = Object.keys(f.baseCost || {}).filter(k => t2keys.has(k));
+    if (!t2InCost.length) continue;
+    direkteKosten++;
+    const huelle = requiresHuelle(f);
+    for (const k of t2InCost){
+      const unlock = unlockVon[k];
+      if (!unlock || unlock === f.key || !huelle.has(unlock))
+        verstoesse.push({ forschung: f.key, zutat: k, freischalter: unlock || 'unbekannt' });
+    }
+  }
+  // Regel 37: erst belegen, dass der geprüfte Fall überhaupt existiert - sonst wäre 5b trivial grün.
+  check('5a: es GIBT Forschungen mit Tier-2-Kosten direkt in der baseCost (rhohlraum, rkausalanker)',
+    direkteKosten >= 2, { direkteKosten });
+  check('5b: jede Tier-2-Zutat einer baseCost wird von einer ECHT vorausgesetzten Forschung freigeschaltet - nie von der eigenen',
+    verstoesse.length === 0, verstoesse);
+}
+
 ende();
