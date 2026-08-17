@@ -87,15 +87,25 @@ function backend(store) {
     const t = document.getElementById('systemTafel');
     const r = t.getBoundingClientRect();
     const w = document.querySelector('#tab-karte .map-wrap').getBoundingClientRect();
+    // Die Sticky-Reiter-Leiste des kompakten Kopfs ist die OBERE Schranke des Scroll-Ziels
+    // (KB-10): Die Karte soll direkt UNTER ihr beginnen, nicht von ihr verdeckt werden. Die
+    // Schranke wird GEMESSEN, nicht eingetippt (Hausregel 2) - ohne Sticky-Leiste ist sie 0.
+    const tabs = document.querySelector('.tabs');
+    const leisteUnten = (tabs && getComputedStyle(tabs).position === 'sticky')
+      ? Math.round(tabs.getBoundingClientRect().bottom) : 0;
     return { sichtbar: !!(b && b.offsetParent), scrollY: Math.round(window.scrollY),
-             karteOben: Math.round(w.top), karteH: Math.round(w.height), tafelOben: Math.round(r.top) };
+             karteOben: Math.round(w.top), karteH: Math.round(w.height),
+             tafelOben: Math.round(r.top), leisteUnten };
   });
   check('2a: mit offenem System ist der ✕-Knopf sichtbar', offen.sichtbar, offen);
-  // Seit KB-7 scrollt das Öffnen zur KARTE, nicht zur Tafel: Das alte Tafel-Ziel schob die Karte
-  // mit der Vollhöhen-Sektoransicht komplett aus dem Bild ("Karte fährt nach unten"-Report,
-  // gemessen -457 px). Jetzt: Karte oben im Bild, Tafel beginnt direkt unter ihren 420 px.
-  check('2b: das Aufklappen holt die KARTE nach oben ins Bild, die Tafel beginnt direkt darunter',
-    offen.scrollY > vorab.scrollY && offen.karteOben >= -40 && offen.karteOben < 120
+  // Seit KB-7 scrollt das Öffnen zur KARTE, nicht zur Tafel ("Karte fährt nach unten"-Report,
+  // gemessen -457 px). Seit KB-10 ist das Ziel die Kante UNTER der Sticky-Leiste: vorher lag
+  // die Kastenoberkante bei 0 und die Leiste verdeckte die obere Kartenhälfte samt Sonne
+  // (gemessen 118 px am 390er-Viewport). Die Regel: Karte beginnt im Fenster [Leiste-40,
+  // Leiste+40], nichts verdeckt sie, und die Tafel folgt direkt unter dem Kasten.
+  check('2b: das Aufklappen holt die KARTE unter die Leiste ins Bild, die Tafel beginnt direkt darunter',
+    offen.scrollY > vorab.scrollY
+    && offen.karteOben >= offen.leisteUnten - 40 && offen.karteOben <= offen.leisteUnten + 40
     && offen.tafelOben >= offen.karteOben + offen.karteH - 40, offen);
 
   // ---- 3) ✕ schließt und scrollt zurück zur Karte ---------------------------------------------

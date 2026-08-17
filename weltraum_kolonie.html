@@ -7008,8 +7008,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.550.0';
+  const VERSION = '8.551.0';
   const PATCHNOTES = [
+    { version:'8.551.0', date:'17.08.2026', changes:[
+      '<strong>Das aufgeklappte System füllt am Handy jetzt seinen Kasten, statt als winziger Streifen darin zu schwimmen.</strong> Direkter Video-Report („Immernoch schlecht bedienbar am Handy"), am Messprotokoll nachvollzogen: Der Kartenkasten war fest 420 Pixel hoch, der Systeminhalt auf schmalen Bildschirmen aber nur gut 110 Pixel – rund 70 Prozent des Kastens waren leerer Raum, und die Detailtafel mit den großen, gut tippbaren Planeten-Knöpfen begann erst eine halbe Bildschirmhöhe tiefer. Die Kastenhöhe folgt jetzt der Bildschirmbreite: Am Handy ist der Kasten kompakt und Karte plus Planetenliste stehen zusammen auf einem Bildschirm; am PC ändert sich nichts.',
+      '<strong>Und die Karte versteckt sich nicht mehr unter der Reiter-Leiste.</strong> Aus derselben Messung: Beim Öffnen eines Systems scrollte die Seite die Kartenoberkante ganz nach oben – auf Handys liegt dort aber die angeheftete Reiter-Leiste, die damit die obere Kartenhälfte samt Sonne verdeckte (gemessen 118 Pixel). Das Scroll-Ziel liegt jetzt direkt <em>unter</em> der Leiste; ohne angeheftete Leiste ändert sich nichts. Zusammen heißt das fürs Handy: System antippen – und Karte, Blätterknöpfe und Planetenliste stehen komplett sichtbar da.'
+    ]},
     { version:'8.550.0', date:'17.08.2026', changes:[
       '<strong>Auch Verkaufsrouten zählen jetzt auf das Verkaufs-Tageskontingent</strong> – sie waren nach dem 5-Millionen-Deckel von heute Mittag der letzte Kanal daran vorbei: Eine Verkaufsroute setzt rund 63.000 Credits je gebundenem Frachter und Tag um, zum vollen Marktpreis und ohne Preisverfall – ab etwa 80 Frachtern hätte dieser stille Dauer-Tropf den Deckel überholt. Jetzt gilt: <strong>ein Kanal, eine Grenze.</strong> Ist das Tageskontingent erschöpft, <strong>pausiert die Route</strong>, statt weiterzuliefern – die Ressourcen bleiben im Lager, nichts verfällt, und sie liefert nach dem Tageswechsel von selbst weiter. Das Spiel sagt es einmal am Tag im Protokoll an, statt jede Minute zu nörgeln. Kredit- und Veredelungsrouten sind nicht betroffen – die verkaufen nichts am Markt.',
       'Das gilt auch im Solo-Spiel ohne Server – mit derselben Grenze, damit der Solo-Modus nicht der Umweg um den Deckel ist. Der Hilfe-Abschnitt „Verkaufs-Tageskontingent" erklärt das Zusammenspiel.'
@@ -52489,6 +52493,19 @@
     galaxyCamTo = ziel; galaxyCamStart = performance.now();
     requestAnimationFrame(galaxyCamStep);
   }
+  // Kastenhöhe der OFFENEN Systemebene (KB-10, Video-Report „Immernoch schlecht bedienbar am
+  // Handy"): Der Systeminhalt ist ~135 Einheiten hoch bei 410 Einheiten Kamerabreite. Auf einem
+  // schmalen Hochformat-Kasten war die feste 420px-Höhe zu ~70% toter Raum (gemessen: Kamera
+  // 410×495 Einheiten, Inhalt breitenbegrenzt ~115 px) - und die Detailtafel mit den großen
+  // Planeten-Chips lag erst eine halbe Bildschirmhöhe tiefer. Die Höhe folgt jetzt der Breite
+  // (0.6 ≈ Inhalt + Luft für Blätterknöpfe und Zoomstapel), gedeckelt auf die alten 420 px -
+  // am PC (breiter Kasten) ändert sich dadurch nichts.
+  function kbSystemKastenHoehe(){
+    const kbWrapEl = document.querySelector('#tab-karte .map-wrap');
+    const breite = kbWrapEl ? kbWrapEl.getBoundingClientRect().width : 0;
+    if (!breite) return '420px';
+    return Math.round(Math.max(230, Math.min(420, breite * 0.6))) + 'px';
+  }
   function galaxyOeffne(systemId){
     // Vor dem Umschalten festhalten, ob schon ein System offen war: Nur dann liegt die aktuelle
     // viewBox im Galaxie-Koordinatenraum und eine Kamerafahrt ergibt Sinn (KB-7).
@@ -52502,7 +52519,7 @@
     // nach dem Öffnen).
     const kbSvgOeffne = document.getElementById('galaxyMapSvg');
     const kbWrapOeffne = kbSvgOeffne ? kbSvgOeffne.closest('.map-wrap') : null;
-    if (kbWrapOeffne) kbWrapOeffne.style.height = '420px';
+    if (kbWrapOeffne) kbWrapOeffne.style.height = kbSystemKastenHoehe();
     // Nur-Sektoren-Karte (KB-4): Der Rückweg aus dem System führt immer in die Sektoransicht
     // SEINER Region - auch wenn das System nicht über die Karte geöffnet wurde (Suchfeld,
     // „Zeigen, wo das war", Allianz-Sprungknopf). Ohne diese Zeilen landete man beim Schließen
@@ -52521,7 +52538,14 @@
     // -457 px; Spieler-Report "Karte fährt nach unten"). Jetzt kommt die Karte oben ins Bild,
     // die Detailtafel beginnt direkt unter ihren 420 px - beides sichtbar, nichts fährt weg.
     if (window.innerWidth <= 700 && kbWrapOeffne){
-      kbWrapOeffne.scrollIntoView({ behavior:'smooth', block:'start' });
+      // Ziel ist die Kastenoberkante DIREKT UNTER der Reiter-Leiste (KB-10): Im kompakten Kopf
+      // ist .tabs position:sticky, und scrollIntoView(block:'start') legte die Leiste ÜBER die
+      // Karte - gemessen am 390er-Viewport: 118 px verdeckt, beim 230er-Kasten wäre das die
+      // halbe Karte samt Sonne. Ohne Sticky-Leiste ist der Versatz 0 und alles bleibt wie vorher.
+      const kbTabs = document.querySelector('.tabs');
+      const kbVersatz = (kbTabs && getComputedStyle(kbTabs).position === 'sticky')
+        ? kbTabs.getBoundingClientRect().height : 0;
+      window.scrollTo({ top: window.scrollY + kbWrapOeffne.getBoundingClientRect().top - kbVersatz, behavior: 'smooth' });
     }
   }
   function galaxySchliesse(){
@@ -52910,7 +52934,7 @@
     // Die Zoom-Knöpfe sind in den Sektor-Ansichten wirkungslos und deshalb ausgeblendet.
     const kbWrap = svg.closest('.map-wrap');
     const kbSektorModus = !galaxyOpenSystem;
-    if (kbWrap) kbWrap.style.height = kbSektorModus ? 'max(480px, calc(100dvh - 175px))' : '420px';
+    if (kbWrap) kbWrap.style.height = kbSektorModus ? 'max(480px, calc(100dvh - 175px))' : kbSystemKastenHoehe();
     ['galaxyZoomInBtn','galaxyZoomOutBtn'].forEach(function(id){
       const b = document.getElementById(id);
       if (b) b.style.display = kbSektorModus ? 'none' : '';
