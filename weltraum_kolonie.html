@@ -26620,7 +26620,7 @@
     // die Vorhersage zur tatsächlichen späteren Trümmerfeld-Größe passt.
     let debrisWeight = 0;
     for (const [k,v] of Object.entries(raiderFleet)) debrisWeight += Math.round((v||0)*raiderLossPct) * (SHIP_SCORE_WEIGHTS[k]||10);
-    const estDebris = Math.round(debrisWeight * 8);
+    const estDebris = truemmerMenge(debrisWeight);
     const existingField = state.debrisFields[targetPlanet] || {};
     const existingTotal = Object.values(existingField).reduce((a,b)=>a+b,0);
     const projectedTotal = existingTotal + estDebris;
@@ -27280,6 +27280,36 @@
     if (typeof document !== 'undefined' && document.hidden && state.notifOn && typeof Notification !== 'undefined' && Notification.permission === 'granted'){
       try { new Notification('Kolonie Kepler-7', { body: msg.replace(/<[^>]+>/g,'') }); } catch(e){}
     }
+  }
+
+  /* ===== Trümmerfeld: die EINE Rechenstelle (Etappe A3 des Wirtschafts-Rebalance-Konzepts) =====
+     Aus verlorenem Schiffsgewicht entsteht ein Trümmerfeld. Der Faktor stand als Literal an DREI
+     Stellen: applyCombatLosses (der Normalfall), der Allianzbasis-Angriff und - besonders heikel -
+     die Trümmer-VORSCHAU im Spähbericht, deren eigener Kommentar verspricht, sie passe "zur
+     tatsächlichen späteren Trümmerfeld-Größe". Wer nur zwei davon anfasst, macht ausgerechnet die
+     Vorschau zur Lüge (Hausregel 6). Deshalb jetzt eine gemeinsame Quelle; ein vierter Kampfausgang
+     kann den Faktor nicht mehr eigenständig führen.
+
+     WARUM 3 STATT 8. Gemessen am Kalibrierungs-Konto: Ein 15-%-Flottenverlust kostete im Nachbau
+     unter einer Minute Einnahme, und das Trümmerfeld erstattete davon 55 % des Erzes und 86 % der
+     Kristalle - netto kostete eine verlorene Schlacht rund 20 Sekunden Produktion. Ein gut
+     verteidigtes Konto machte mit abgewehrten Überfällen sogar GEWINN. Mit Faktor 3 sinkt die
+     Erstattung auf ~21 % / ~32 %: Verluste tun wieder weh, bleiben aber weit von "alles weg"
+     entfernt (die Rückzugsdämpfung ist unangetastet).
+
+     UND WARUM DIE MONDSCHWELLE MITWANDERT (im Konzept nicht bedacht, beim Umbau aufgefallen):
+     Monde entstehen aus großen Trümmerfeldern (MOON_FORMATION_THRESHOLD). Bliebe die Schwelle bei
+     4.000, dauerte eine Mondbildung schlagartig 2,67-mal so lange - eine INHALTS-Bremse, die diese
+     Wirtschafts-Änderung nie beabsichtigt hat. Die Schwelle sinkt deshalb im selben Verhältnis
+     (4.000 × 3/8 = 1.500), sodass die Mondbildung exakt gleich schnell bleibt wie vorher.
+     tests/test_truemmer_rueckfluss.js hält beides fest: den Faktor an allen drei Stellen und das
+     unveränderte Verhältnis von Schwelle zu Faktor. */
+  const TRUEMMER_JE_GEWICHT = 3;
+  function truemmerMenge(gewicht){ return Math.round((gewicht||0) * TRUEMMER_JE_GEWICHT); }
+  // Aufteilung 60 % Erz / 30 % Kristalle wie seit jeher - die restlichen 10 % verglühen bewusst.
+  function truemmerAus(gewicht){
+    const menge = truemmerMenge(gewicht);
+    return { erz: Math.round(menge*0.6), kristalle: Math.round(menge*0.3) };
   }
 
   // Überarbeitetes Punktevergabe-System (vorher: nur Erkundungsschiffe/Kreuzer zählten, Forschung nur
@@ -37475,8 +37505,13 @@
         + '<br><br><strong>Was das im Schnitt bedeutet:</strong> Wer aufs Geratewohl abbaut, sammelt weiterhin rund <strong>3 je Fuhre</strong> ein – nur eben nicht mehr überall ein bisschen, sondern fast nie etwas und dann einen großen Fund. <strong>Schürfpeilungen</strong> bleiben die beste gezielte Quelle: Sie sind immer Kern oder Koloss, und trifft die Peilung einen Urmateriekern, bringt sie <strong>' + PROTOMATERIE_JE_FUHRE.kern + ' bis ' + PROTOMATERIE_JE_FUHRE.koloss + '</strong> auf einmal. Die Vorschau nennt die Menge, bevor du startest, und sie wird beim Start eingefroren: Eine spätere Balance-Änderung trifft nie eine Flotte, die schon unterwegs ist.'
         + '<br><br><strong>Der Speicher</strong> ist eigen und klein: <strong>' + PROTOMATERIE_LAGER_BASIS + '</strong> plus <strong>' + PROTOMATERIE_LAGER_JE_AUFBEREITUNG + ' je Stufe der Aufbereitungsanlage</strong>, bei Vollausbau also ' + (PROTOMATERIE_LAGER_BASIS + PROTOMATERIE_LAGER_JE_AUFBEREITUNG * ((BUILDING_DEFS.find(b=>b.key==='aufbereitung')||{}).maxLevel||0)) + '. Ist er voll, <strong>verfällt</strong> was nicht mehr hineinpasst – Vorschau, Protokoll und Bericht sagen es ausdrücklich, damit dir das nicht stillschweigend nach 45 Minuten Flug passiert. <strong>Protomaterie überlebt Prestige und Aufstieg vollständig</strong>, ohne Kryo-Archiv: Sie entsteht aus Flugzeit statt aus Wirtschaft, und mit zurückgesetztem Bestand käme niemand, der regelmäßig prestigt, je an ihre Abnehmer heran.'
         + '<br><br><strong>Wofür man sie braucht:</strong> für die <strong>Ausbaustufen der Mega-Projekte ab Stufe 6</strong> – 20 für Stufe 6, danach 20 je weitere Stufe, gedeckelt bei 400. Die Stufen 1 bis 5 bleiben unangetastet, es wird dir also nichts weggenommen, was du heute schon bauen kannst. Und als einziger Kostenposten des Spiels wächst Protomaterie <strong>nicht</strong> mit der Zahl deiner Kolonien: Ein größeres Imperium produziert mehr, aber es schürft keine einzige Einheit mehr, also darf es auch nicht mehr zahlen müssen. Damit bekommen Schürfrechte, Eskorten, Anfechtungen, Peilungen und der Bergungsfrachter zum ersten Mal einen wirtschaftlichen Grund – gebaut waren sie längst, es lohnte nur nicht, hinzufliegen.' },
-      { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. <strong>Schickst du Recycler zu einem fremden Trümmerfeld, wird daraus ein Sammelauftrag:</strong> Er belegt einen Flottenslot, und sobald dort nichts mehr liegt, fliegen die Recycler von selbst zum Ausgangsort zurück – du musst sie nicht mehr von Hand einsammeln. Steht der Abbau still, weil dein Lager voll ist, sagt die Auftragszeile das ausdrücklich; über „Auftrag beenden" bleiben die Recycler dort und der Slot wird sofort frei. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus. <strong>Trümmerfelder entstehen immer an deinem Startplaneten</strong>, auch wenn du woanders angegriffen hast – greifst du also von einer Kolonie ohne Recycler aus an, bleibt die Beute dort liegen. Dafür steht im Kampfbericht jetzt ein Knopf <strong>„Recycler nach … schicken"</strong>: Er erscheint nur, wenn dort wirklich noch etwas liegt und kein Recycler vor Ort ist, und verlegt alle Recycler des Standorts, an dem du die meisten hast. Das ist eine normale Flottenverlegung – mit Flugzeit, Treibstoff und einem belegten Flottenslot.' },
-      { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
+      { title:'Trümmerfelder', body:'Entstehen nach verlorenen Schiffen (eigene wie fremde) bei Kämpfen – <strong>seit dem 17.08.2026 fällt dabei deutlich weniger an</strong> (rund ein Fünftel des Schiffswerts statt der Hälfte): Ein verlorener Kampf kostete vorher netto kaum etwas, weil das Trümmerfeld den Nachbau fast vollständig bezahlte. <strong>Ohne stationierten Recycler wird ein Trümmerfeld nicht abgebaut</strong> – kein passiver Selbstabbau. Jeder Recycler baut 8 Ressourcen/Sekunde ab. <strong>Schickst du Recycler zu einem fremden Trümmerfeld, wird daraus ein Sammelauftrag:</strong> Er belegt einen Flottenslot, und sobald dort nichts mehr liegt, fliegen die Recycler von selbst zum Ausgangsort zurück – du musst sie nicht mehr von Hand einsammeln. Steht der Abbau still, weil dein Lager voll ist, sagt die Auftragszeile das ausdrücklich; über „Auftrag beenden" bleiben die Recycler dort und der Slot wird sofort frei. Auf der Sektorkarte durch ein "T"-Symbol markiert – antippen zeigt Gesamtmenge und Abbaustatus. <strong>Trümmerfelder entstehen immer an deinem Startplaneten</strong>, auch wenn du woanders angegriffen hast – greifst du also von einer Kolonie ohne Recycler aus an, bleibt die Beute dort liegen. Dafür steht im Kampfbericht jetzt ein Knopf <strong>„Recycler nach … schicken"</strong>: Er erscheint nur, wenn dort wirklich noch etwas liegt und kein Recycler vor Ort ist, und verlegt alle Recycler des Standorts, an dem du die meisten hast. Das ist eine normale Flottenverlegung – mit Flugzeit, Treibstoff und einem belegten Flottenslot.' },
+      {/* Die 1.500 stehen hier als FESTE Zahl und nicht als ${MOON_FORMATION_THRESHOLD}: Die Konstante
+            wird erst weit unter HELP_SECTIONS deklariert, ein Zugriff beim Aufbau dieses Array-Literals
+            liefe in ihre temporale Todeszone und das Spiel startete gar nicht erst (Regel 38). Wer die
+            Schwelle ändert, ändert diesen Satz mit - tests/test_truemmer_rueckfluss.js hält beide
+            Seiten zusammen. */
+        title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>1.500 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Die Schwelle wurde am 17.08.2026 zusammen mit der kleineren Trümmermenge gesenkt (vorher 4.000) – im selben Verhältnis, damit Monde <em>genauso schnell</em> entstehen wie zuvor. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (mehr geht nicht: Stufe 4 ist die letzte). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
       { title:'Mondzerstörer & Mondbelagerung', body:'Endgame-Schiff (Flotte-Tab), das einen fremden, kolonisierten Mond dauerhaft zerstören kann. Voraussetzung: Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die höchste Forschungshürde im Spiel), danach ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Extrem teuer, extrem langsam (weit unter der Geschwindigkeit jedes anderen Schiffs, entsprechend lange Flugzeit und hoher Treibstoffverbrauch) und immer nur als einzelnes Exemplar besitzbar. Ein Ziel wählst du direkt über die Bestenliste (Schädel-Symbol bei einem fremden Spieler) - dort erscheinen dessen kolonisierte Monde zur Auswahl. Die Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes: eigene Gebäude/Flotte am Mond, der neue Mondschildgenerator (Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken sie zusätzlich; ein aktiver Allianz-Beitritt gibt dem Ziel ebenfalls einen kleinen Bonus. Nach jeder Belagerung - egal ob erfolgreich oder abgewehrt - braucht der Mondzerstörer 48 Std. Abklingzeit. Jeder Belagerungsschuss verbraucht zusätzlich eine <strong>Belagerungs-Ladung aus 25 Hochenergiekristallen</strong> (Tier-2-Ressource aus dem Kristalllabor) - sie wird bei der Ankunft serverseitig abgebucht; ohne ausreichende Ladung schlägt die Belagerung fehl. Erfolgschance und Ergebnis werden serverseitig berechnet.' },
       { title:'Sektorkarte bedienen', body:'Die Karte führt in <strong>festen Ansichten</strong> von der ganzen Galaxie bis zum einzelnen Planeten. Sie beginnt als <strong>Übersicht</strong>: die Galaxie, aufgeteilt in acht benannte Sektorregionen (die Heimatregion trägt das 🏠), jede mit ihren Systemen als Punkten und ihrer Systemzahl. Jede Region zeigt außerdem die <strong>Hinweise ihrer Systeme</strong> (Piratenbasis, Krieg, Alien-Sichtung, Allianzbasis, Aufklärung, Peilung) als kleine Symbole unter der Systemzahl - der Tooltip nennt das jeweilige System. Ein <strong>Tipp auf eine Region</strong> öffnet die <strong>Sektoransicht</strong>: jedes System auf einem festen, daumengroßen Platz mit Sonnenfarbe, Namen und Erkundungsstand - Heimat mit goldenem, eigene Kolonien mit grünem Ring; ein Gürtelsystem erkennst du am gestrichelten goldenen Ring und am Untertitel „Gürtelsystem" – seine Asteroiden liegen im aufgeklappten System auf ihrer Gürtelbahn. Mit <strong>‹ ›</strong> oder Wischen wechselst du zum Nachbarsektor, <strong>⌂</strong> führt zur Übersicht. Ein <strong>Tipp auf ein System</strong> klappt es auf: Die Planeten gehen an ihrer echten Position in der Galaxie auf, die Nachbarsysteme bleiben als schwache Punkte am Rand sichtbar. Mit den <strong>‹ ›-Knöpfen am linken und rechten Kartenrand</strong> blätterst du direkt zum nächsten System – Sektor für Sektor durch die ganze Galaxie, ohne den Umweg über den Zurück-Knopf. Ein Klick auf ein Objekt im aufgeklappten System – Planet, Mond, fremder Spieler, Gegner – öffnet ein <strong>kleines Menü</strong> mit den Aktionen, die dieses Objekt kennt (siehe „Das Kartenmenü"). <strong>Nur im aufgeklappten System</strong> gilt Zoomen und Verschieben: Ziehen zum Verschieben, Pinch-Geste zum Zoomen (am Rechner: Strg bzw. Cmd gedrückt halten und scrollen), alternativ die +/–-Knöpfe unten rechts; hier sitzt auch die <strong>Ebenen-Leiste</strong>: „Routen" (deine eigenen Missionslinien), „Fraktionen" (NPC-Territorium als Ring und Wappen am System), „Ereignisse" (Piratenbasis, Aliens, Krieg, Wurmloch) und „Aufklärung" (Spähberichte, Peilungen) lassen sich einzeln aus- und einschalten - die Auswahl wird im Spielstand gespeichert, Standard ist alles an. Zurück geht es Ebene für Ebene: aus dem System über <strong>„‹ Galaxie"</strong>, <strong>Esc</strong> oder einen Klick ins Leere in die Sektoransicht, von dort mit ⌂ zur Übersicht; der <strong>⟲-Knopf</strong> schält immer genau eine Ebene nach außen. Die geöffnete Ansicht wird bewusst nicht gespeichert - nach einem Neuladen beginnst du wieder in der Übersicht. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar als farbiger Stern in der Sektoransicht wie als große Sonne im aufgeklappten System.' },
@@ -41034,8 +41069,7 @@
     if (planetKey && (state.veteranXp||{})[planetKey]) addVeteranXp(planetKey, -Math.round(state.veteranXp[planetKey] * Math.min(0.95, Math.max(0, data.ownLossPct||0))));
     let debris = null;
     if (planetKey && debrisWeight > 0){
-      const debrisAmt = Math.round(debrisWeight*8);
-      debris = { erz: Math.round(debrisAmt*0.6), kristalle: Math.round(debrisAmt*0.3) };
+      debris = truemmerAus(debrisWeight);
       addDebris(planetKey, debris);
     }
     const ownLostText = lostCountsToText(data.lostShips||{});
@@ -50193,8 +50227,7 @@
     }
     let debris = null;
     if (debrisPlanetKey && debrisWeight > 0){
-      const debrisAmt = Math.round(debrisWeight * 8);
-      debris = { erz: Math.round(debrisAmt*0.6), kristalle: Math.round(debrisAmt*0.3) };
+      debris = truemmerAus(debrisWeight);
       addDebris(debrisPlanetKey, debris);
     }
     // Rückgabe bleibt wie gehabt direkt als Zähl-Objekt nutzbar (lostCountsToText etc.), trägt aber
@@ -50278,7 +50311,11 @@
     if (total <= 0) return '';
     return '<br><i class="ti ti-recycle" aria-hidden="true" style="color:#c9c7bd;"></i> Trümmerfeld: '+fmt(total)+' gesamt ('+rewardHtml(debris)+')';
   }
-  const MOON_FORMATION_THRESHOLD = 4000; // Summe aller Ressourcen im Trümmerfeld
+  // Summe aller Ressourcen im Trümmerfeld. Von 4.000 auf 1.500 gesenkt, als der Trümmer-Faktor von
+  // 8 auf 3 ging (siehe TRUEMMER_JE_GEWICHT): dasselbe Verhältnis, also exakt gleich schnelle
+  // Mondbildung wie vorher - die Wirtschafts-Änderung sollte Verluste teurer machen, nicht Monde
+  // seltener. 4.000 × 3/8 = 1.500.
+  const MOON_FORMATION_THRESHOLD = 1500;
   const MOON_FORMATION_CHANCE = 0.012; // pro Prüfung (bei jedem Trümmerfeld-Zuwachs über der Schwelle) – bewusst selten
   // Sehr große Trümmerfelder können sich (selten) zu einem Mond verdichten. Der Mond ist sofort
   // kolonisierbar (keine Erkundung nötig), produziert als Kolonie aber schwächer als ein normaler Planet.
