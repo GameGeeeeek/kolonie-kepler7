@@ -6984,8 +6984,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.542.0';
+  const VERSION = '8.543.0';
   const PATCHNOTES = [
+    { version:'8.543.0', date:'17.08.2026', changes:[
+      '<strong>Die Flottenposition zeigt bei Abbaumissionen jetzt, wie viel schon gefördert ist</strong> – und ein Antippen führt dich zum Gürtelplatz, an dem die Flotte gerade schürft. Statt einer nackten Restzeit steht dort nun der Asteroid mit Namen und System, darunter der laufende Fortschritt: <em>„21.2k von 40.0k gefördert (53%)"</em>. Während des Hinflugs steht dort ehrlich „im Anflug – Abbau hat noch nicht begonnen", nach dem Abbauende „voll beladen – auf dem Rückflug"; ein Balken, der nach getaner Arbeit weiterläuft, wäre gelogen. Der Wert wird aus Ankunfts- und Abbauzeit der Mission abgeleitet und nirgends zusätzlich gespeichert – er kann also nicht von der Wirklichkeit abweichen.',
+      '<strong>Dabei ist eine Falschaussage aufgefallen und mit behoben:</strong> Eine Abbaumission hatte in dieser Liste überhaupt keinen eigenen Eintrag. Sie fiel in den allgemeinen Fall, und der sucht nach einem Planeten – eine Abbaumission zeigt aber auf einen Gürtelplatz. In der Seitenleiste stand deshalb <em>„Erkundungsziel"</em>, während deine Schiffe an einem Asteroiden gruben. Jetzt steht dort, wo sie wirklich sind.',
+      'Der Sprung zur Karte teilt sich ab sofort eine gemeinsame Grundlage mit dem Knopf „Zeigen, wo das war" aus den Abbauberichten – zwei Wege, eine Mechanik, damit sie beim nächsten Umbau der Karte nicht auseinanderlaufen. Fliegt deine Flotte zu einem Brocken, der inzwischen leergefördert wurde, sagt die Anzeige auch das: Die Fuhre kommt trotzdem an, denn ihre Ladung stand beim Start fest.'
+    ]},
     { version:'8.542.0', date:'17.08.2026', changes:[
       '<strong>Behoben: Wer sehr große Mengen im Markt verkaufte, wurde irgendwann mitten im Auftrag abgemeldet.</strong> Ein Spieler-Report mit 400 Millionen Erz hat es ausgelöst, und die Ursache war eine Kette aus zwei Teilen. Der Sammelauftrag zerlegt große Mengen in Tranchen zu je einer Million – bei 400 Millionen also 400 Anfragen – und schickte sie <em>ohne Pause</em> hintereinander. Der Server lässt aber nur eine begrenzte Zahl Anfragen pro Minute und Verbindung zu, und zwar für alles zusammen: Handel, Speichern, Marktdaten. Nach einer knappen halben Minute war das Kontingent aufgebraucht, und die Bremse traf auch das Speichern.',
       '<strong>Der eigentliche Fehler saß danach:</strong> Wenn das Speichern die Versionsnummer des Servers nachladen wollte und dabei an dieselbe Bremse lief, wertete das Spiel das als <em>„du bist gerade auf einem anderen Gerät aktiv"</em>, löschte die Anmeldung und warf dich hinaus. Ein vorübergehender Fehler löste damit die härteste mögliche Reaktion aus. Ab jetzt gilt: Abgemeldet wird nur noch, wenn der Server wirklich antwortet und dreimal hintereinander einen fremden Stand meldet – dann schreibt tatsächlich ein zweites Gerät. Kommt die Antwort dagegen gar nicht erst an, bleibst du angemeldet und siehst stattdessen den Hinweis, dass gerade nicht gespeichert wird.',
@@ -38024,12 +38029,55 @@
      fremder Brocken. Diese Funktion sagt in allen drei Fällen die Wahrheit, statt wortlos auf eine
      leere Bahn zu springen. Unterschieden wird über Sorte UND Größe aus dem Bericht: Stimmen beide,
      ist es plausibel derselbe Brocken (bei großen Kernen bleibt nach einer Fuhre reichlich liegen). */
+  /* Sprung auf die Sektorkarte samt Hervorhebung des Guertelplatzes - die gemeinsame Quelle fuer
+     ALLE Aufrufer (17.08.2026). Bisher stand das nur im Berichts-Knopf; seit die Flottenposition
+     ebenfalls zum Asteroiden fuehrt, waere eine zweite Kopie genau die Stelle, die beim naechsten
+     Karten-Umbau auseinanderlaeuft. Die MELDUNGEN bleiben bewusst beim Aufrufer: Ein Bericht sagt
+     "hier lag", eine laufende Mission "hier baut deine Flotte gerade ab" - dieselbe Bewegung,
+     verschiedene Aussagen. Rueckgabe: ob der Platz hervorgehoben werden konnte. */
+  /* Wie weit ist eine laufende Abbaumission? (17.08.2026, Wunsch Sascha: "es soll bei
+     Flottenposition angezeigt werden, wieviel schon abgebaut worden ist")
+     ALLE drei Groessen stehen im Missionsobjekt und sind beim Start eingefroren (siehe
+     sendMiningMission): hinBis = Ankunft am Vorkommen, abbauBis = Ende des Abbaus, ladung = die
+     Menge, die diese Fuhre heimbringt. Der Anteil wird daraus ABGELEITET und nirgends zusaetzlich
+     gespeichert - eine zweite Zahl im Spielstand koennte von der Wahrheit abweichen, diese nicht.
+     Die drei Zustaende sind bewusst getrennt benannt: Waehrend des Hinflugs ist noch NICHTS
+     gefoerdert (0 anzuzeigen waere richtig, aber "im Anflug" sagt mehr), und nach abbauBis ist die
+     Fuhre voll - ein weiterlaufender Balken waere dort gelogen. */
+  function abbauFortschritt(m){
+    const jetzt = Date.now();
+    const ladung = Math.max(0, m.ladung || 0);
+    if (!m.hinBis || !m.abbauBis || jetzt < m.hinBis) return { phase:'anflug', gefoerdert:0, ladung, anteil:0 };
+    if (jetzt >= m.abbauBis) return { phase:'voll', gefoerdert:ladung, ladung, anteil:1 };
+    const spanne = Math.max(1, m.abbauBis - m.hinBis);
+    const anteil = Math.max(0, Math.min(1, (jetzt - m.hinBis) / spanne));
+    return { phase:'abbau', gefoerdert: Math.floor(ladung * anteil), ladung, anteil };
+  }
+  function abbauFortschrittText(m){
+    const f = abbauFortschritt(m);
+    if (f.phase === 'anflug') return 'im Anflug – Abbau hat noch nicht begonnen';
+    if (f.phase === 'voll') return 'voll beladen (' + fmt(f.ladung) + ') – auf dem Rückflug';
+    return fmt(f.gefoerdert) + ' von ' + fmt(f.ladung) + ' gefördert (' + Math.round(f.anteil*100) + '%)';
+  }
+  function springeZuAsteroid(system, platz){
+    if (!system) return false;
+    switchTab('karte');
+    galaxyOeffne(system);
+    render();
+    if (platz === undefined || platz === null) return false;
+    // Hervorheben statt nur hinspringen: Auf einer Bahn mit bis zu zehn Plaetzen findet man den
+    // richtigen sonst nicht. Die Marke haengt am DOM-Knoten und ueberlebt kein Neuzeichnen - das
+    // ist hier richtig so, sie soll ja nur kurz blinken.
+    setTimeout(() => {
+      const el = document.querySelector('[data-map-asteroid="' + platz + '"]');
+      if (el) el.classList.add('fundort-blink');
+    }, 260);
+    return true;
+  }
   function zeigeAsteroidFundort(reportId){
     const r = (reportsCache || []).find(x => x && x.id === reportId);
     if (!r || !r.system) return;
-    switchTab('karte');
-    galaxyOeffne(r.system);
-    render();
+    springeZuAsteroid(r.system, r.platz);
     const sysName = (STAR_SYSTEMS.find(x => x.id === r.system) || { name: r.system }).name;
     // Ältere Berichte kennen den Platz nicht - sie sind vor diesem Knopf entstanden. Dann bleibt es
     // beim Sprung ins System, und der Text sagt auch genau das, statt eine Genauigkeit vorzutäuschen.
@@ -38047,13 +38095,6 @@
       ? asteroidName({ sorte:r.sorte, groesse:r.groesse }) + ' in ' + sysName + ' liegt noch dort – Vorrat ' + fmt(jetzt.vorrat || 0) + '.'
       : 'An diesem Platz in ' + sysName + ' liegt inzwischen ' + asteroidName({ sorte:jetzt.sorte, groesse:jetzt.groesse }) + ' – nicht mehr der Brocken aus dem Bericht.',
       'ti-map-2');
-    // Hervorheben statt nur hinspringen: Auf einer Bahn mit bis zu zehn Plätzen findet man den
-    // richtigen sonst nicht. Die Marke haengt am DOM-Knoten und ueberlebt kein Neuzeichnen - das ist
-    // hier richtig so, sie soll ja nur kurz blinken.
-    setTimeout(() => {
-      const el = document.querySelector('[data-map-asteroid="' + r.platz + '"]');
-      if (el) el.classList.add('fundort-blink');
-    }, 260);
   }
   // Springt für den "Direkt Angriff"-Smart-Button aus einem Bericht in den Galaxie-Tab und filtert die
   // Bestenliste direkt auf den Zielspieler. Feuert bewusst KEINEN Angriff automatisch aus – der Spieler
@@ -59316,6 +59357,9 @@
           if (m.type === 'asteroid-eskorte') restText = 'stationiert';
           const ss = restText || fmtDuration(remain/1000);
           let icon = 'ti-rocket', color = '#378add', label, shipsTooltip;
+          // Nur die Abbaumission fuellt diese zwei: eine zweite Zeile mit dem Abbaufortschritt und
+          // das Klick-Attribut, das zum Guertelplatz fuehrt. Leer heisst "wie bisher".
+          let zusatzZeile = '', klickAttr = '';
           if (m.type === 'attack'){
             const target = NPCS.find(n=>n.id===m.targetId);
             icon = 'ti-sword'; color = '#e24b4a';
@@ -59396,6 +59440,24 @@
             icon = 'ti-sword'; color = '#e24b4a';
             label = 'Anfechtung → ' + (ca ? asteroidName(ca) : asteroidSorte(m.sorte).name);
             shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||{}) + ' – gegen ' + (m.halterName||'unbekannt') + '.';
+          } else if (m.type === 'mining'){
+            /* Eigener Zweig seit dem 17.08.2026 (Wunsch Sascha). Vorher fiel die Abbaumission in
+               den generischen Zweig ganz unten und stand dort als "Erkundungsziel": Der sucht
+               `PLANETS.find(p => p.id === m.targetId)`, und die Abbaumission traegt in targetId
+               "system:platz" statt einer Planeten-Id - die Suche lief also zwangslaeufig ins
+               Leere. Eine Falschaussage, keine bloss fehlende Zeile. */
+            const ma = asteroidAn(m.system, m.platz);
+            icon = 'ti-pick'; color = '#e0a548';
+            const sysName = (STAR_SYSTEMS.find(s => s.id === m.system) || { name:m.system }).name;
+            // Name aus der MISSION, nicht aus dem Feld: Der Brocken kann waehrend des Fluges
+            // leergefoerdert sein oder der Nachschub einen anderen an den Platz gesetzt haben -
+            // die Flotte fliegt aber zu dem, mit dem sie losgeflogen ist (Ladung eingefroren).
+            label = (m.fleetName ? m.fleetName+' → ' : '') + asteroidName({ sorte:m.sorte, groesse:m.groesse }) + ' in ' + sysName;
+            shipsTooltip = (m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition)+' – ' : '')
+                         + abbauFortschrittText(m) + '. Antippen öffnet die Karte an diesem Gürtelplatz.'
+                         + (ma ? '' : ' Das Vorkommen ist inzwischen erschöpft – die Fuhre kommt trotzdem an.');
+            zusatzZeile = abbauFortschrittText(m);
+            klickAttr = ' data-fp-asteroid="'+escapeHtml(String(m.system))+':'+escapeHtml(String(m.platz))+'" style="cursor:pointer;"';
           } else if (m.type === 'mining-escort' || m.type === 'mining-recall'){
             const ea = asteroidAn(m.system, m.platz);
             icon = 'ti-shield'; color = '#5dcaa5';
@@ -59408,11 +59470,31 @@
             label = (m.fleetName?m.fleetName+' → ':'')+(target?target.name:'Erkundungsziel');
             shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
           }
-          return `<div class="fleet-position-item" title="${shipsTooltip}">
+          return `<div class="fleet-position-item" title="${shipsTooltip}"${klickAttr}>
             <div class="fp-name"><i class="ti ${icon}" aria-hidden="true" style="color:${color};"></i>${label}</div>
             <div class="fp-timer">von ${planetDisplayName(originKey)} · ${ss}</div>
+            ${zusatzZeile ? `<div class="fp-timer" style="color:#e0a548;"><i class="ti ti-pick" aria-hidden="true" style="margin-right:3px;"></i>${zusatzZeile}</div>` : ''}
           </div>`;
         }).join(''));
+        /* Verdrahtung NACH dem Schreiben und bedingungslos: setBoxHtml schreibt nur bei geaendertem
+           Markup - bleibt es stehen, stehen auch die alten Knoten samt Handler (CLAUDE.md,
+           setBoxHtml-Muster). Der Fortschritt aendert sich ohnehin jede Sekunde, die Box wird also
+           regelmaessig neu geschrieben; ein erneutes querySelectorAll ueber eine Handvoll Zeilen
+           kostet nichts und kann nicht veralten. */
+        fpList.querySelectorAll('[data-fp-asteroid]').forEach(el => {
+          el.onclick = () => {
+            const roh = el.getAttribute('data-fp-asteroid') || '';
+            const trenner = roh.lastIndexOf(':');
+            if (trenner < 0) return;
+            const sys = roh.slice(0, trenner), platz = roh.slice(trenner+1);
+            const sysName = (STAR_SYSTEMS.find(s => s.id === sys) || { name:sys }).name;
+            springeZuAsteroid(sys, platz);
+            const da = asteroidAn(sys, platz);
+            log(da ? 'Hier baut deine Flotte gerade ab: ' + asteroidName(da) + ' in ' + sysName + '.'
+                   : 'Deine Flotte ist hier im Einsatz (' + sysName + ') – das Vorkommen ist inzwischen erschöpft, die Fuhre kommt trotzdem an.',
+                'ti-pick');
+          };
+        });
       }
     }
     const raidBadge = document.getElementById('heroRaidTimer');
