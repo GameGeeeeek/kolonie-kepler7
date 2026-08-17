@@ -65,19 +65,53 @@ const JS = S.match(/<script>([\s\S]*)<\/script>/)[1];
     { konst, descAnfang: descZeile.slice(0, 80) });
   check('1f: der Tages-Zähler steht in der Signatur von renderCreditShop',
     /\|fragTag:'\+fragmentLieferungenHeute\(\)/.test(JS));
+  // Routen-Anrechnung (17.08.2026, Entscheidung Sascha): Der sell-Zweig prueft das Kontingent
+  // VOR der Buchung und verbucht danach; die Meldung laeuft gebuendelt je Durchlauf.
+  const vonR = JS.indexOf('function processTradeRoutes(){');
+  const bisR = vonR < 0 ? -1 : JS.indexOf('\n  }', JS.indexOf('routenErloesMelden();', vonR));
+  const rumpfR = (vonR >= 0 && bisR > vonR) ? JS.slice(vonR, bisR) : '';
+  check('1g-anker: processTradeRoutes samt Meldungs-Aufruf ist abgegrenzt', rumpfR.length > 0, { laenge: rumpfR.length });
+  check('1g: der sell-Zweig prüft das Kontingent VOR der Buchung und verbucht den Erlös danach',
+    /routenKontingentRest\(\) < credits/.test(rumpfR) && /routenErloesVerbuchen\(credits\)/.test(rumpfR)
+    && rumpfR.indexOf('routenKontingentRest() < credits') < rumpfR.indexOf('state.credits = (state.credits||0) + credits'),
+    { pruefung: rumpfR.indexOf('routenKontingentRest() < credits'), buchung: rumpfR.indexOf('state.credits = (state.credits||0) + credits') });
+  // Die lokale Solo-Grenze MUSS der Server-Grenze entsprechen - zwei Zahlen, eine Regel. Gelesen
+  // wird der ECHTE server.js des Nachbar-Repos (wie die Randkriege-Tests); fehlt er, meldet die
+  // Pruefung das ausdruecklich, statt sich still zu ueberspringen (Regel 22-Familie).
+  const front = Number((JS.match(/const ROUTEN_KONTINGENT_LOKAL = (\d+);/) || [])[1]);
+  let back = null;
+  try {
+    const sjs = fs.readFileSync(require('path').join(__dirname, '..', '..', 'kolonie-kepler7-backend', 'server.js'), 'utf8');
+    back = Number((sjs.match(/const MARKT_TAGES_ERLOES_MAX = (\d+);/) || [])[1]);
+  } catch (e) {}
+  check('1h: die lokale Solo-Grenze entspricht der Server-Grenze (zwei Zahlen, eine Regel)',
+    front > 0 && back !== null && front === back,
+    { front, back, hinweis: back === null ? 'Backend-Repo nicht gefunden - Nachbar-Klon pruefen (Regel 22)' : '' });
 }
 
 // ================================================================== am laufenden Spiel
 const SAVE_KEY = 'kepler7-save-v3';
-function fixture(){
+function fixture(mitRouten){
   const jetzt = Date.now();
+  /* FUENF unprotected Verkaufsrouten statt einer: Jeder Zyklus kann mit 5% von Piraten gekapert
+     werden (ROUTE_PIRACY_CHANCE) - EINE Route waere ein eingebauter 5%-Flake, bei fuenf ist
+     P(alle gekapert) = 0.05^5 = 3e-7. Ziel-Ressource ist DEUTERIUM: Das Fixture hat keinen
+     Synthesizer, der Bestand bewegt sich also NUR durch die Routen - Erz waere von der
+     Minenproduktion ueberlagert (Regel 7: messen, was gemessen werden soll).
+     nextTick liegt ~8s in der Zukunft: Der erste Zyklus soll NACH dem Marktabruf laufen, damit
+     der marktTagesRest-Spiegel steht, bevor die Route ihn prueft. */
+  const routen = mitRouten ? [1,2,3,4,5].map(n => ({
+    id:'route-test-'+n, type:'sell', resource:'deuterium', frachter:1,
+    nextTick: jetzt + 8000, createdAt: jetzt, protected:false
+  })) : [];
   return JSON.stringify({
     tutorialSeen:true, newbieWelcomeSeen:true, lastTick:jetzt,
     nextPlanetEventCheck: jetzt+36e5, nextTraderCheck: jetzt+36e5, nextRaidTime: jetzt+36e5, nextFactionGift: jetzt+36e5,
     resources:{energie:5e5,erz:5e6,kristalle:3e5,deuterium:2e5,antimaterie:1e4,forschungspunkte:2e4},
     buildings:{solar:20,mine:12,labor:8,lager:120,werft:10},
     research:{}, activeResearch:null, researchQueue:[], buildQueue:[],
-    fleet:{ missions:[] }, colonies:{}, activeBasePlanet:'home',
+    fleet:{ missions:[], frachter:10 }, colonies:{}, activeBasePlanet:'home',
+    tradeRoutes: routen,
     xp:50000, credits:400000, buffs:[], colonyNames:{}, modules:{}, shipModules:{}, moduleFragments:0,
     player:{id:'u',name:'A',avatarKey:null}
   });
@@ -101,6 +135,12 @@ function backend(store, steuer){ return async r => {
     const basis = { market: marktDaten(), event: null };
     if (steuer.mitKontingent){ basis.tagesRest = steuer.tagesRest; basis.tagesMax = 5000000; }
     return j(basis);
+  }
+  if (p === 'market/routen-erloes'){
+    const body = JSON.parse(req.postData()||'{}');
+    store.__routenGemeldet = (store.__routenGemeldet||0) + (body.credits||0);
+    steuer.tagesRest = Math.max(0, steuer.tagesRest - (body.credits||0));
+    return j({ ok:true, tagesRest: steuer.tagesRest, tagesMax: 5000000 });
   }
   if (p === 'market/trade'){
     store.__trades = (store.__trades||0) + 1;
@@ -129,7 +169,7 @@ function backend(store, steuer){ return async r => {
   return j({});
 };}
 async function spiel(browser, steuer){
-  const store = {}; store[SAVE_KEY] = fixture();
+  const store = {}; store[SAVE_KEY] = fixture(!!steuer.mitRouten);
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.route('**/api/**', backend(store, steuer));
@@ -271,6 +311,37 @@ const mitschnitt = (page) => page.evaluate(() => window.__logMitschnitt || []);
     await t.ctx.close();
   }
 
+  // ---- 5) Verkaufsrouten und das Kontingent ---------------------------------------------------
+  {
+    // Fall A: Kontingent erschoepft -> die Route pausiert, nichts wird gebucht, der Grund steht da.
+    const t = await spiel(browser, { mitKontingent: true, tagesRest: 0, mitRouten: true });
+    await t.page.waitForTimeout(7000);   // nextTick der Routen liegt ~8s nach Fixture-Bau
+    const zeilen = await mitschnitt(t.page);
+    check('5a: am erschöpften Kontingent pausiert die Route und sagt warum',
+      zeilen.some(z => /Verkaufsroute pausiert/.test(z)), zeilen.slice(-4));
+    const bestand = await t.page.evaluate(() => {
+      const el = document.querySelector('#marketBox [data-market-amt="deuterium"]');
+      const karte = [...document.querySelectorAll('#marketBox .bmeta')].map(x => x.textContent).join(' ');
+      return karte.match(/Dein Bestand[^0-9]*([\d.,kM]+)/g) ? 'gelesen' : 'karte-nicht-gefunden';
+    });
+    check('5b: es wurde nichts gemeldet - der Sammler blieb leer',
+      !t.store.__routenGemeldet, { gemeldet: t.store.__routenGemeldet||0, bestandsanzeige: bestand });
+    await t.ctx.close();
+  }
+  {
+    // Fall B: Kontingent frei -> die Routen verkaufen, und die Erloese erreichen den Server
+    // GEBUENDELT (eine Meldung je Durchlauf). Je Route und Zyklus: 40 Deuterium x Preis 2,0 x
+    // Spread 0,55 = 44 Credits; bei 5 Routen also ein Vielfaches von 44 bis hoechstens 220
+    // (Piraten koennen einzelne Zyklen kapern - deshalb Vielfaches, nicht Festwert; Regel 3).
+    const t = await spiel(browser, { mitKontingent: true, tagesRest: 5000000, mitRouten: true });
+    await t.page.waitForTimeout(9000);
+    const gemeldet = t.store.__routenGemeldet || 0;
+    check('5c: die Routen-Erlöse wurden an den Server gemeldet - als Vielfaches des Zyklus-Erlöses',
+      gemeldet > 0 && gemeldet % 44 === 0 && gemeldet <= 220,
+      { gemeldet, hinweis: '44 je Route und Zyklus, 5 Routen, Piraten koennen einzelne kapern' });
+    await t.ctx.close();
+  }
+
   await browser.close();
   ende();
 })();
@@ -287,3 +358,8 @@ const mitschnitt = (page) => page.evaluate(() => window.__logMitschnitt || []);
 //     Kredite) ist der Knopf wegen 0 Krediten gesperrt, nicht wegen des Limits - das disabled-
 //     Attribut traegt keinen Grund (Regel 28). Der Diskriminator des Limits ist 4c: Die
 //     Kartenzeile "Tageslimit erreicht" existiert am alten Stand nicht ("(nicht gefunden)").
+//   - ROUTEN-Nachtrag (gemessen an v8.549.0): 1g/1h und 5a/5c fallen dort (5 rot, Prueflisten
+//     per diff identisch). 5b ("nichts gemeldet") bleibt am alten Stand aus dem falschen Grund
+//     gruen - der alte Code meldet ja nie; sein Diskriminator ist 5c, das am NEUEN Stand die
+//     angekommene Meldung als Vielfaches des Zyklus-Erloeses verlangt (gemessen 220 = 5x44,
+//     alle fuenf Routen unpiratisiert).

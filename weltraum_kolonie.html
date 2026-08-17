@@ -7008,8 +7008,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.549.0';
+  const VERSION = '8.550.0';
   const PATCHNOTES = [
+    { version:'8.550.0', date:'17.08.2026', changes:[
+      '<strong>Auch Verkaufsrouten zählen jetzt auf das Verkaufs-Tageskontingent</strong> – sie waren nach dem 5-Millionen-Deckel von heute Mittag der letzte Kanal daran vorbei: Eine Verkaufsroute setzt rund 63.000 Credits je gebundenem Frachter und Tag um, zum vollen Marktpreis und ohne Preisverfall – ab etwa 80 Frachtern hätte dieser stille Dauer-Tropf den Deckel überholt. Jetzt gilt: <strong>ein Kanal, eine Grenze.</strong> Ist das Tageskontingent erschöpft, <strong>pausiert die Route</strong>, statt weiterzuliefern – die Ressourcen bleiben im Lager, nichts verfällt, und sie liefert nach dem Tageswechsel von selbst weiter. Das Spiel sagt es einmal am Tag im Protokoll an, statt jede Minute zu nörgeln. Kredit- und Veredelungsrouten sind nicht betroffen – die verkaufen nichts am Markt.',
+      'Das gilt auch im Solo-Spiel ohne Server – mit derselben Grenze, damit der Solo-Modus nicht der Umweg um den Deckel ist. Der Hilfe-Abschnitt „Verkaufs-Tageskontingent" erklärt das Zusammenspiel.'
+    ]},
     { version:'8.549.0', date:'17.08.2026', changes:[
       '<strong>Verkaufserlöse am Markt sind jetzt auf 5 Millionen Credits je Tag gedeckelt.</strong> Anlass war ein Bericht mit Nachmessung: 400 Millionen Erz ließen sich in gut sechs Minuten für 66 Millionen Credits verkaufen – der Preisverfall beim Verkaufen bremst so etwas kaum, denn nach der ersten Tranche liegt der Preis am Boden, und der Bodenpreis ist bei solchen Mengen immer noch sehr viel Geld. 66 Millionen Credits waren im Kredit-Shop über 200 legendäre Module <em>auf einen Schlag</em>. Der Deckel macht daraus ein Projekt über mehrere Tage, lässt den Alltagshandel aber unberührt – 5 Millionen sind ein Vielfaches dessen, was normale Verkäufe an einem Tag einbringen. <strong>Käufe sind nicht betroffen</strong>, und der Zähler setzt sich mit dem Servertag zurück (die Markt-Box zeigt die verbleibende Zeit).',
       '<strong>Und man sieht jederzeit, wo man steht:</strong> Die Markt-Box zeigt das <strong>Restkontingent</strong> des Tages an, die Verkaufsvorschau warnt schon vor dem Klick, wenn ein Auftrag es übersteigen würde, und ein Sammelauftrag stoppt sauber an der Grenze – mit dem Grund in der Meldung und dem Hinweis, wie viel heute noch geht, statt mit einem nackten „fehlgeschlagen". Wer die Grenze erreicht, verliert nichts: Die Ressourcen bleiben im Lager und der Rest wartet auf morgen.',
@@ -15258,6 +15262,62 @@
   function routeSellMenge(route){ return Math.round((route.frachter||0) * ROUTE_SELL_PER_FRACHTER * routeHandelsMult()); }
   function routeVeredelungEinsatz(route){ return (route.frachter||0) * ROUTE_TRANSPORT_PER_FRACHTER; }
   function routeVeredelungGewinn(route, einsatz){ return Math.round(einsatz * (route.rate||0.5) * routeProtMult(route)); }
+  /* ===== Routen-Erloese und das Verkaufs-Tageskontingent (17.08.2026) =========================
+     Entscheidung Sascha: Verkaufsrouten zaehlen auf DASSELBE 5-Mio-Kontingent wie der direkte
+     Marktverkauf. Drei Teile:
+       - routenKontingentRest(): die Grenze, gegen die eine Route ihren Zyklus prueft. Mit Server
+         der Spiegel marktTagesRest (Autoritaet ist der Server; null = Server hat sich noch nicht
+         geaeussert, dann wird NICHT blockiert - eine Route, die am fehlenden Marktabruf verhungert,
+         waere ein Fehler, den niemand versteht). Ohne Server der lokale Tageszaehler mit derselben
+         Grenze - Solo darf nicht der Umweg um den Deckel sein.
+       - routenErloesVerbuchen(): senkt den Spiegel sofort (die naechste Zyklus-Pruefung stimmt
+         damit auch VOR der Serverantwort) und sammelt die Meldung fuer den Server.
+       - routenErloesMelden(): meldet gebuendelt an POST /market/routen-erloes - EINE Anfrage je
+         Minute statt eine je Route (das serverseitige 240/min-Limit gilt fuer alles, siehe den
+         Markt-Sammelauftrag-Vorfall). Die Missbrauchsrichtung ist selbstbegrenzend: Die Meldung
+         kann das Kontingent nur verkleinern; wer sie unterschlaegt, hat den Stand von vor der
+         Aenderung, wer zu viel meldet, sperrt sich selbst den Direktverkauf.
+     Der lokale Zaehler lebt in state.routenVerkaufTag (dayKeyOf, lazy Reset wie dailyModuleOffer)
+     und ueberlebt Neustarts; der ungemeldete Rest geht bei einem Reload schlimmstenfalls verloren
+     - in Richtung MEHR Kontingent fuer den Spieler, nie weniger, und hoechstens ein Minutenzyklus. */
+  const ROUTEN_KONTINGENT_LOKAL = 5000000;   // MUSS MARKT_TAGES_ERLOES_MAX im Backend entsprechen (test prueft)
+  let routenErloesUngemeldet = 0, routenMeldungLaeuft = false, routenPauseGemeldetTag = null;
+  function routenKontingentRest(){
+    if (useBackend()) return (typeof marktTagesRest === 'number') ? marktTagesRest : Infinity;
+    const t = state.routenVerkaufTag;
+    const heute = (t && t.tag === dayKeyOf(Date.now())) ? (t.erloes||0) : 0;
+    return Math.max(0, ROUTEN_KONTINGENT_LOKAL - heute);
+  }
+  function routenErloesVerbuchen(credits){
+    if (useBackend()){
+      if (typeof marktTagesRest === 'number') marktTagesRest = Math.max(0, marktTagesRest - credits);
+      routenErloesUngemeldet += credits;
+    } else {
+      const heute = dayKeyOf(Date.now());
+      if (!state.routenVerkaufTag || state.routenVerkaufTag.tag !== heute) state.routenVerkaufTag = { tag: heute, erloes: 0 };
+      state.routenVerkaufTag.erloes += credits;
+    }
+  }
+  async function routenErloesMelden(){
+    if (!useBackend() || routenMeldungLaeuft || routenErloesUngemeldet < 1) return;
+    routenMeldungLaeuft = true;
+    const menge = Math.floor(routenErloesUngemeldet);
+    routenErloesUngemeldet -= menge;
+    try {
+      const res = await backendFetch('/market/routen-erloes', {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ credits: menge })
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && typeof data.tagesRest === 'number'){
+        marktTagesRest = data.tagesRest; marktTagesMax = data.tagesMax || marktTagesMax;
+      } else if (!res.ok){
+        // Nicht angekommen: zurueck in den Sammler, der naechste Zyklus versucht es erneut.
+        routenErloesUngemeldet += menge;
+      }
+    } catch(e){ routenErloesUngemeldet += menge; }
+    finally { routenMeldungLaeuft = false; }
+  }
   function processTradeRoutes(){
     if (!state.tradeRoutes || !state.tradeRoutes.length) return;
     const now = Date.now();
@@ -15293,9 +15353,26 @@
           // Derselbe 20%-Verkaufsabschlag wie beim direkten Marktverkauf (siehe Backend) - sonst
           // wäre eine Verkaufsroute ein Umweg, um den Abschlag zu umgehen.
           const credits = Math.round(price * sellAmt * MARKET_SELL_SPREAD * protMult);
+          /* Tageskontingent (17.08.2026, Entscheidung Sascha: "Auf dasselbe Tageskontingent
+             anrechnen"). Verkaufsrouten liefen als einziger Kanal am 5-Mio-Deckel vorbei -
+             gemessen ~63k Credits je gebundenem Frachter und Tag, ohne Slippage; ab ~80
+             Frachtern ueberholte der Tropf den Deckel. Jetzt: Reicht das Restkontingent fuer
+             diesen Zyklus nicht, PAUSIERT die Route (Ressourcen bleiben liegen, kein
+             Teilverkauf - der Zyklus ist klein, der naechste Tag kommt). Die Meldung kommt
+             einmal je Tag, nicht jede Minute. Mit Server zaehlt der Spiegel marktTagesRest
+             (Meldung der Erloese siehe routenErloesMelden unten); ohne Server der lokale
+             Tageszaehler - dieselbe Grenze, damit Solo nicht der Umweg ist. */
+          if (routenKontingentRest() < credits){
+            if (routenPauseGemeldetTag !== dayKeyOf(Date.now())){
+              routenPauseGemeldetTag = dayKeyOf(Date.now());
+              log('Verkaufsroute pausiert: Das Verkaufs-Tageskontingent ist erschöpft – sie liefert weiter, sobald der Zähler zurückgesetzt ist. Die Ressourcen bleiben im Lager.', 'ti-clock', 'warn');
+            }
+            continue;
+          }
           state.resources[route.resource] -= sellAmt;
           state.credits = (state.credits||0) + credits;
           state.tradeRouteLifetimeCredits = (state.tradeRouteLifetimeCredits||0) + credits;
+          routenErloesVerbuchen(credits);
         }
       } else if (route.type === 'transport'){
         // Veredelungsroute (17.07.2026 umgebaut, vorher rein kosmetische "Transportroute" ohne echten
@@ -15312,6 +15389,8 @@
         }
       }
     }
+    // Gesammelte Routen-Erloese an den Server melden - EINE Anfrage je Durchlauf, fire-and-forget.
+    routenErloesMelden();
   }
 
   // ===== Geteilter Marktplatz (Backend) =====
@@ -37408,7 +37487,7 @@
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln. Der Knopf <strong>„Max Kauf"</strong> trägt die größtmögliche Menge nach deinem Kreditstand ins Mengenfeld ein, <strong>„100%"</strong> deinen kompletten Bestand - ausgelöst wird der Handel erst mit einem bewussten zweiten Klick auf Kaufen/Verkaufen. Neben jedem Preis zeigt eine kleine <strong>Verlaufskurve</strong> (Sparkline) die Preisentwicklung der letzten Stunden - so erkennst du auf einen Blick, ob ein Preis gerade steigt oder fällt, und kannst Ein-/Verkäufe besser timen.' },
       { title:'Markt-Ereignisse', body:'Gelegentlich erschüttert ein <strong>Angebots- oder Nachfrageschock</strong> eine einzelne Ressource: Eine <strong>Knappheit</strong> treibt ihre Preise deutlich hoch (teuer im Einkauf, lohnend im Verkauf), eine <strong>Schwemme</strong> drückt sie stark (günstig zum Einkaufen). Das Ereignis wird als Banner oben im Markt-Tab und in der Galaxie-News angekündigt, betrifft immer nur eine Ressource für 2-4 Stunden und lässt die Preise organisch zum Schockniveau driften (kein harter Sprung). Wer aufpasst, macht damit den besten Schnitt.' },
-      { title:'Verkaufs-Tageskontingent', body:'Verkaufserlöse sind auf <strong>5 Millionen Credits je Tag</strong> gedeckelt – Käufe sind davon nicht betroffen, und auch das Verkaufen selbst geht weiter, sobald der Tag wechselt (der Zähler läuft über den Servertag; die Markt-Box zeigt dir die verbleibende Zeit an). <strong>Warum:</strong> Ein einziger Massenverkauf von 400 Millionen Rohstoffen brachte vorher rund 66 Millionen Credits in wenigen Minuten – genug, um im Kredit-Shop auf einen Schlag über 200 legendäre Module zusammenzukaufen. Der Preisverfall beim Verkaufen bremst so etwas kaum: Der Bodenpreis ist bei riesigen Mengen immer noch sehr viel Geld. Der Deckel macht aus dem Alles-auf-einmal ein Projekt über mehrere Tage, lässt den Alltagshandel aber unberührt – 5 Millionen sind ein Vielfaches dessen, was normale Verkäufe an einem Tag einbringen. Die Markt-Box zeigt dein <strong>Restkontingent</strong> an, die Verkaufsvorschau warnt, bevor ein Auftrag es übersteigt, und ein Sammelauftrag stoppt sauber an der Grenze statt mit einem Fehler. Dazu passend ist die <strong>Modulfragment-Lieferung</strong> im Kredit-Shop auf <strong>5 Lieferungen je Tag</strong> begrenzt (50 Fragmente) – die Karte zeigt an, wie viele heute noch gehen.' },
+      { title:'Verkaufs-Tageskontingent', body:'Verkaufserlöse sind auf <strong>5 Millionen Credits je Tag</strong> gedeckelt – Käufe sind davon nicht betroffen, und auch das Verkaufen selbst geht weiter, sobald der Tag wechselt (der Zähler läuft über den Servertag; die Markt-Box zeigt dir die verbleibende Zeit an). <strong>Warum:</strong> Ein einziger Massenverkauf von 400 Millionen Rohstoffen brachte vorher rund 66 Millionen Credits in wenigen Minuten – genug, um im Kredit-Shop auf einen Schlag über 200 legendäre Module zusammenzukaufen. Der Preisverfall beim Verkaufen bremst so etwas kaum: Der Bodenpreis ist bei riesigen Mengen immer noch sehr viel Geld. Der Deckel macht aus dem Alles-auf-einmal ein Projekt über mehrere Tage, lässt den Alltagshandel aber unberührt – 5 Millionen sind ein Vielfaches dessen, was normale Verkäufe an einem Tag einbringen. Die Markt-Box zeigt dein <strong>Restkontingent</strong> an, die Verkaufsvorschau warnt, bevor ein Auftrag es übersteigt, und ein Sammelauftrag stoppt sauber an der Grenze statt mit einem Fehler. Dazu passend ist die <strong>Modulfragment-Lieferung</strong> im Kredit-Shop auf <strong>5 Lieferungen je Tag</strong> begrenzt (50 Fragmente) – die Karte zeigt an, wie viele heute noch gehen. <strong>Auch Verkaufsrouten zählen auf dasselbe Kontingent:</strong> Ist es erschöpft, pausiert die Route bis zum Tageswechsel – die Ressourcen bleiben im Lager, und sie liefert danach von selbst weiter. Ein Kanal, eine Grenze.' },
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen (mit 20% Abschlag auf den Durchschnittspreis) und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Wer viel verkauft, drückt den Preis spürbar - bis auf rund 15% des Normalwerts. Preise erholen sich mit der Zeit: durch Käufe erhöhte Preise recht zügig, durch Verkäufe gedrückte Preise dagegen sehr langsam (mehrere Tage statt Stunden bis zur fast vollständigen Erholung). Ein großer Verkauf hat also eine lange spürbare Wirkung auf den Preis, ein großer Kauf nicht.' },
       { title:'Keine Tier-2-Ressourcen am Markt', body:'Die <strong>Tier-2-Ressourcen</strong> sind bewusst NICHT handelbar (nach kurzem Test wieder entfernt): Sie kommen ausschließlich aus den eigenen Fabriken - ergänzt nur durch die hart gedeckelten Pakt-Geschenke. Der Markt handelt ausschließlich die fünf Basis-Ressourcen.' },
       { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
