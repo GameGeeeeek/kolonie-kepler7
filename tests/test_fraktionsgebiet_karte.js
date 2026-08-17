@@ -8,9 +8,9 @@
 // verfeindeten Fraktionen, und der Farbwechsel (Legion muss auf der Karte den entsättigten Ton
 // tragen, nicht die Serverfarbe Blau).
 //
-// GEGENPROBE (beide Richtungen, 10.08.2026): Gegen `git show HEAD:weltraum_kolonie.html` fallen
-// „Territoriumsflächen gezeichnet", „Wappen im Knoten", „Frontsegment vorhanden" und
-// „Legion trägt NICHT die Serverfarbe". Die Kontrollprüfungen („Karte überhaupt gezeichnet",
+// GEGENPROBE (beide Richtungen; zuletzt KB-6): Am Stand VOR KB-6 fällt „Territoriumsflächen
+// sind aus der Systemebene entfernt" (terrGlow noch da); am Stand vor KB-4b fallen „Wappen im
+// Knoten" und die Ring-Farbprüfungen. Die Kontrollprüfungen („Karte überhaupt gezeichnet",
 // „Knoten vorhanden") bleiben in beiden Läufen grün - der Test misst den Unterschied.
 
 const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
@@ -136,25 +136,21 @@ const GALAXIE = {
   check('Systemknoten vorhanden', /data-system-node=/.test(svg));
 
   // ---- Die eigentlichen Prüfungen ---------------------------------------------------------------
-  check('Territoriumsflächen gezeichnet', /url\(#terrGlow-legion\)/.test(svg) && /url\(#terrGlow-void\)/.test(svg));
-  check('drei Gebiete gleichzeitig', /url\(#terrGlow-kartell\)/.test(svg));
-  check('Verläufe je Fraktion in den defs', /id="terrGlow-legion"/.test(svg));
-  // KB-5b: Die Frontsegmente sind aus der Systemebene entfernt - sie muellten die hineingezoomte
-  // Ansicht zu (Spieler-Report mit Screenshot); die Front-Information traegt der Kontrollbalken
-  // der Sektoransicht (test_randkriege_balken misst ihn samt Werten).
+  // KB-6: Die Systemebene ist eine reine Systemansicht - Territoriums-Flächen, Frontsegmente und
+  // Wurmloch-Linie sind von der Leinwand verschwunden (zweiter Spieler-Report: "Immernoch die
+  // alte Ansicht"). NPC-Besitz zeigt die SEKTORANSICHT als Ring + Wappen; das misst dieser Test
+  // oben am echten Knoten (knotenA), unten die Farbregel am Ring.
+  check('Territoriumsflächen sind aus der Systemebene entfernt', !/terrGlow/.test(svg));
   check('Frontsegmente sind aus der Systemebene entfernt', !/id="frontSeg-/.test(svg));
 
   // ---- Der Farbkonflikt, an der Wirkung gemessen ------------------------------------------------
   // Die Legion muss auf der Karte den entsättigten Ton tragen, NICHT die Serverfarbe Blau.
-  const legionGrad = (svg.match(/<radialGradient id="terrGlow-legion"[\s\S]*?<\/radialGradient>/) || [''])[0];
-  const voidGrad = (svg.match(/<radialGradient id="terrGlow-void"[\s\S]*?<\/radialGradient>/) || [''])[0];
-  // Die beiden Negativpruefungen bestehen auf einem LEEREN Treffer trivial - deshalb erst
-  // sicherstellen, dass ueberhaupt ein Verlauf da ist, und die Pruefungen daran haengen.
-  const graeder = legionGrad.length > 40 && voidGrad.length > 40;
-  check('Verläufe für Legion und Void gefunden', graeder, { legion: legionGrad.length, void: voidGrad.length });
-  check('Legion trägt NICHT die Serverfarbe (#85b7eb)', graeder && !/85b7eb/i.test(legionGrad), legionGrad.slice(0, 120));
-  check('Legion trägt den entsättigten Kartenton (#c0504f)', graeder && /c0504f/i.test(legionGrad));
-  check('Void trägt NICHT --c-danger (#e24b4a)', graeder && !/e24b4a/i.test(voidGrad), voidGrad.slice(0, 120));
+  // Seit KB-6 lebt die Territoriumsfarbe am Fraktions-RING des Sektorknotens (mapColor aus
+  // factionOwning) - gemessen am oben eingesammelten Knoten des Legion-Systems (knotenA).
+  const legionRing = (knotenA.match(/<circle data-ring="fraktion"[^>]*>/) || [''])[0];
+  check('Fraktions-Ring am Legion-Knoten gefunden', legionRing.length > 40, legionRing.slice(0, 120));
+  check('Legion trägt NICHT die Serverfarbe (#85b7eb)', legionRing.length > 40 && !/85b7eb/i.test(legionRing), legionRing.slice(0, 160));
+  check('Legion trägt den entsättigten Kartenton (#c0504f)', legionRing.length > 40 && /c0504f/i.test(legionRing));
 
   // ---- Der Markup-Zwischenspeicher darf weiter greifen ------------------------------------------
   // Ohne stehende Uhr misst das Wanduhr-Glück statt der Regel (CLAUDE.md-Arbeitsregel 18): Läuft
