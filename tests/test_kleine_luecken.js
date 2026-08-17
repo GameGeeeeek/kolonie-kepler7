@@ -245,26 +245,53 @@ const UHR_VOR = (sek) => {
   // verglichen, waehrend ein zufaelliges Planeten-Ereignis sie mittendrin veraendert hatte.
   // Faellt 1c-vorab, weiss man sofort, dass die BEZUGSGROESSE gewandert ist und nicht die
   // Nachholung schuld ist - der Unterschied, der beim ersten Mal Tage gekostet hat.
+  /* NACHTRAG 17.08.2026 - die ZWEITE nicht gepinnte Ereignis-Uhr: die HAPPY HOUR.
+     Der Fixture-Kommentar oben pinnt Planeten-Ereignis und Haendler; die Happy Hour blieb offen,
+     weil sie nicht im Spielstand steht. Sie laeuft deterministisch 12:00-13:00 und 20:00-21:00
+     LOKALER Zeit (HAPPY_HOUR_WINDOWS) und multipliziert in ratesPerSecond genau die hier
+     gemessene Erz-Rate (Typ 'bergbau' +40% Erz/Kristalle, Typ 'alle' +25% auf alles).
+     `currentHappyHour()` liest dafuer `new Date()` - der UHR_VOR-Patch fasst nur `Date.now()` an
+     und kann sie deshalb nicht wegschieben.
+     GEMESSEN am 17.08.2026: In einem Suite-Lauf ueber die 20:00-Grenze meldete 1c-vorab
+     `{"vor":"4.72","nach":"5.55","abweichung":"17.6 %"}` und 1c daraufhin 114,1 %. Zwei Minuten
+     spaeter, MITTEN im Fenster gefahren, stand die Rate zweimal stabil auf exakt 5,55 (0,0 %) -
+     5,55 ist also die Rate MIT, 4,72 die ohne Happy Hour, und der Sprung lag exakt auf der
+     Fenstergrenze. Kein Spielfehler, keine Regression: eine gewanderte BEZUGSGROESSE, genau der
+     Fall, fuer den 1c-vorab gebaut wurde (Regel 20/21).
+     WARUM WIEDERHOLEN STATT SCHRANKE LOCKERN (Regel 26 - nicht nachbessern, bis es gruen ist):
+     Die 5-%-Schranke von 1c ist die einzige Stelle, an der eine echte Ueberzahlung auffaellt; sie
+     zu weiten wuerde genau die Aussage wegnehmen, wegen der es den Test gibt. Stattdessen wird
+     das Messfenster WIEDERHOLT, wenn die Bezugsgroesse nachweislich gewandert ist - bei stabiler
+     Rate prueft 1c unveraendert scharf. Erst wenn sie auch nach VERSUCHE Anlaeufen nicht steht,
+     ist es ein Fehlschlag, und der nennt dann alle gemessenen Raten. Eine Fenstergrenze trifft
+     hoechstens einen Anlauf; zwei Anlaeufe hintereinander koennen nicht beide darauf fallen. */
   {
-    const { rate: rateVor } = await messeRate();
-    const a = lies();
-    const N = 15, SPRUNG = 12;   // knapp ueber der Schwelle (10 s)
-    for (let i = 0; i < N; i++){
-      await page.evaluate(UHR_VOR, SPRUNG);
-      await page.waitForTimeout(1300);
+    const VERSUCHE = 3, N = 15, SPRUNG = 12;   // SPRUNG knapp ueber der Schwelle (10 s)
+    const protokoll = [];
+    let letzte = null;
+    for (let versuch = 1; versuch <= VERSUCHE; versuch++){
+      const { rate: rateVor } = await messeRate();
+      const a = lies();
+      for (let i = 0; i < N; i++){
+        await page.evaluate(UHR_VOR, SPRUNG);
+        await page.waitForTimeout(1300);
+      }
+      await page.waitForTimeout(2500);
+      const b = lies();
+      const { rate: rateNach } = await messeRate();
+      const spielzeit = (b.lastTick - a.lastTick) / 1000;
+      const anteil = (b.resources.erz - a.resources.erz) / (rateVor * spielzeit);
+      const abweichung = rateVor > 0 ? Math.abs(rateNach - rateVor) / rateVor : 1;
+      letzte = { rateVor, rateNach, abweichung, anteil, spielzeit };
+      protokoll.push({ versuch, vor: rateVor.toFixed(2), nach: rateNach.toFixed(2),
+                       abweichung: (abweichung*100).toFixed(1)+' %', anteil: (anteil*100).toFixed(1)+' %' });
+      if (abweichung < 0.02) break;   // Bezugsgroesse steht - dieser Anlauf zaehlt
     }
-    await page.waitForTimeout(2500);
-    const b = lies();
-    const { rate: rateNach } = await messeRate();
-    const spielzeit = (b.lastTick - a.lastTick) / 1000;
-    const anteil = (b.resources.erz - a.resources.erz) / (rateVor * spielzeit);
-    const abweichung = rateVor > 0 ? Math.abs(rateNach - rateVor) / rateVor : 1;
     check('1c-vorab: die Produktionsrate haelt sich ueber das Messfenster (sonst misst 1c sie mit)',
-      abweichung < 0.02, { vor: rateVor.toFixed(2), nach: rateNach.toFixed(2),
-                           abweichung: (abweichung*100).toFixed(1)+' %' });
+      letzte.abweichung < 0.02, { anlaeufe: protokoll.length, protokoll });
     check('1c: und nicht mehr, als Zeit vergangen ist (keine Sekunde je Nachholung obendrauf)',
-      anteil < 1.05, { nachholungen: N, spielzeit: Math.round(spielzeit),
-                       anteil: (anteil*100).toFixed(1)+' %' });
+      letzte.anteil < 1.05, { nachholungen: N, spielzeit: Math.round(letzte.spielzeit),
+                              anteil: (letzte.anteil*100).toFixed(1)+' %', anlaeufe: protokoll.length });
   }
 
   // ---- 2) DIE MELDUNGSFLUT
