@@ -15290,8 +15290,7 @@
       + (chunks ? ` <span style="color:#85b7eb;">· wird als Sammelauftrag in ${chunks} Tranchen ausgeführt</span>` : '');
   }
   function renderMarket(){
-    const cd = document.getElementById('creditsDisplay');
-    if (cd) cd.textContent = fmt(state.credits||0);
+    setBoxText(document.getElementById('creditsDisplay'), fmt(state.credits||0));
     renderTradeRoutes();
     renderCreditShop();
     renderModuleMarket();
@@ -15303,12 +15302,28 @@
     // weitere Tastatureingaben gingen ins Leere. isTypingIn() (gleiches Muster wie bei Allianz-Boxen,
     // Umsiedlung, Schiffskorb, Avatar) überspringt den Re-Render, solange im Mengenfeld getippt wird.
     if (bedienungLaeuft('marketBox')) return;
+    // Beide Notiz-Zweige und der Hauptpfad unten laufen ueber setBoxHtml mit DEMSELBEN Schluessel:
+    // Die Notizen sind statisch und wurden GEMESSEN jede Sekunde byte-identisch neu geschrieben;
+    // ein gemeinsamer Schluessel haelt den Cache ueber die Zustandswechsel (Notiz -> Markt -> Notiz)
+    // kohaerent - ein eigener Cache nur fuer die Notizen wuerde nach dem Rueckweg still veralten.
     if (!useBackend()){
-      box.innerHTML = '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Der Marktplatz ist nur mit Serververbindung verfügbar (im Gastmodus nicht nutzbar). Handelsrouten vom Typ Kredit/Transport funktionieren aber auch ohne Server.</div>';
+      setBoxHtml(box, 'marketBox', '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Der Marktplatz ist nur mit Serververbindung verfügbar (im Gastmodus nicht nutzbar). Handelsrouten vom Typ Kredit/Transport funktionieren aber auch ohne Server.</div>');
       return;
     }
     if (!state.marketCache){
-      box.innerHTML = '<div class="lb-note"><i class="ti ti-clock" aria-hidden="true"></i>Marktdaten werden geladen…</div>';
+      // Drei Zustaende statt zwei (Regel 35): Solange noch kein Versuch gescheitert ist, heisst es
+      // ehrlich "wird geladen"; danach steht der GRUND da, dass es von selbst weitergeht und dass
+      // nichts verloren ist. Ein ewiges "wird geladen…" war exakt die tote Flaeche vom 15.08.2026.
+      const problemText = marktDatenProblem === 'leer'
+          ? 'Der Server liefert gerade keine Marktdaten.'
+        : marktDatenProblem === 'server'
+          ? 'Der Server hat den Marktabruf abgelehnt.'
+        : marktDatenProblem === 'netz'
+          ? 'Der Server ist gerade nicht erreichbar.'
+        : null;
+      setBoxHtml(box, 'marketBox', problemText
+        ? '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>'+problemText+' Es wird automatisch weiter versucht – deine Ressourcen und Aufträge sind davon nicht betroffen.</div>'
+        : '<div class="lb-note"><i class="ti ti-clock" aria-hidden="true"></i>Marktdaten werden geladen…</div>');
       loadMarketState();
       return;
     }
@@ -15348,7 +15363,7 @@
         <button data-market-bulk-cancel="1" style="font-size:10.5px; white-space:nowrap;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Abbrechen</button>
       </div>`;
     }
-    box.innerHTML = eventBanner + bulkBanner + MARKET_RES_KEYS.map(key => {
+    setBoxHtml(box, 'marketBox', eventBanner + bulkBanner + MARKET_RES_KEYS.map(key => {
       // Bugfix (21.07.2026): RES_DEFS-Einträge haben das Farbfeld 'fg' (nicht 'color') - die Markt-
       // Anzeige nutzte aber durchgehend rd.color -> war überall undefined. Folge: Sparkline-Linie/Fläche
       // mit stroke/fill "undefined" komplett unsichtbar (nur Panel + schwarzer Default-Endpunkt zu sehen,
@@ -15391,8 +15406,11 @@
           <div class="bmeta" data-market-slip="${key}" style="margin-top:5px;">${marketSlippageHtml(key, amt)}</div>
         </div>
       `;
-    }).join('') + marketOrdersHtml();
-    // Limit-Order-Formular + offene Orders verdrahten
+    }).join('') + marketOrdersHtml());
+    // Limit-Order-Formular + offene Orders verdrahten. Bewusst AUSSERHALB des setBoxHtml-Zweigs:
+    // Der Hauptpfad aendert sich praktisch jede Sekunde ohnehin (Bestand laeuft mit der Produktion
+    // hoch), und auf den seltenen uebersprungenen Ticks setzt die Verdrahtung dieselben Handler
+    // auf die stehengebliebenen Knoten - harmlos, aber ein vergessener Zweig waere es nicht.
     const loResSel = box.querySelector('[data-lo-res]');
     if (loResSel) loResSel.onchange = () => {
       limitOrderDraft.resource = loResSel.value;
@@ -15465,32 +15483,35 @@
 
   // Modulbörse-Anzeige. Signatur-Cache (kein Live-Countdown, kein Eingabefeld in dieser Box - der
   // Preis wird im Offiziere-Tab an der Modulkarte eingegeben, nicht hier).
-  let lastModuleMarketSig = null;
   function renderModuleMarket(){
     const box = document.getElementById('moduleMarketBox');
     if (!box) return;
+    // Markup-Signatur (setBoxHtml) statt der frueheren Wertlisten-Signatur (v8.534.0). Die alte
+    // Liste buendelte die Kredite in 1000er-Schritten ('cr:'+Math.floor(credits/1000)) - kippte
+    // die Bezahlbarkeit eines Angebots INNERHALB eines Buckets (Preis 1.500, Kredite 1.400 ->
+    // 1.600), blieb die Signatur gleich und der Kauf-Knopf faelschlich ausgegraut, bis die
+    // Kredite zufaellig eine 1000er-Grenze kreuzten. Die Markup-Signatur kann nicht veralten:
+    // das disabled-Attribut steht im Markup selbst. Alle Zweige laufen ueber DENSELBEN
+    // Schluessel, damit der Cache die Zustandswechsel (Notiz -> Liste -> Notiz) mitmacht.
     if (!useBackend()){
-      box.innerHTML = '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Die Modulbörse ist nur mit Serververbindung verfügbar.</div>';
+      setBoxHtml(box, 'moduleMarketBox', '<div class="lb-note"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Die Modulbörse ist nur mit Serververbindung verfügbar.</div>');
       return;
     }
     if (!moduleMarketCache){
-      box.innerHTML = '<div class="lb-note"><i class="ti ti-clock" aria-hidden="true"></i>Modulbörse wird geladen…</div>';
+      setBoxHtml(box, 'moduleMarketBox', '<div class="lb-note"><i class="ti ti-clock" aria-hidden="true"></i>Modulbörse wird geladen…</div>');
       loadModuleMarket();
       return;
     }
     const listings = moduleMarketCache.listings || [];
     const lim = moduleMarketCache.limits || {};
-    const sig = listings.map(l => l.id+':'+l.price+':'+(l.mine?1:0)).join('|')+'|cr:'+Math.floor((state.credits||0)/1000);
-    if (sig === lastModuleMarketSig) return;
-    lastModuleMarketSig = sig;
     const mineCount = listings.filter(l => l.mine).length;
     if (!listings.length){
-      box.innerHTML = '<div class="bmeta"><i class="ti ti-box" aria-hidden="true"></i> Gerade bietet niemand ein Modul an. Stell selbst eins ein – im Offiziere-Tab hat jedes Modul im Inventar einen „Börse"-Knopf.</div>';
+      setBoxHtml(box, 'moduleMarketBox', '<div class="bmeta"><i class="ti ti-box" aria-hidden="true"></i> Gerade bietet niemand ein Modul an. Stell selbst eins ein – im Offiziere-Tab hat jedes Modul im Inventar einen „Börse"-Knopf.</div>');
       return;
     }
     // Günstigste zuerst - beim Stöbern ist der Preis das erste Kriterium.
     const sorted = listings.slice().sort((a,b) => (a.mine===b.mine) ? a.price-b.price : (a.mine?1:-1));
-    box.innerHTML = `<div class="bmeta" style="margin-bottom:0.5rem;">${listings.length} Angebot(e) · davon ${mineCount} von dir (max. ${lim.maxPerUser||5}) · Börsengebühr beim Verkauf: ${Math.round((lim.feePct||0.05)*100)}%</div>`
+    const mmHtml = `<div class="bmeta" style="margin-bottom:0.5rem;">${listings.length} Angebot(e) · davon ${mineCount} von dir (max. ${lim.maxPerUser||5}) · Börsengebühr beim Verkauf: ${Math.round((lim.feePct||0.05)*100)}%</div>`
       + sorted.map(l => {
       const info = l.isShip ? shipModuleInstanceInfo(l.instKey) : moduleInstanceInfo(l.instKey);
       const rar = info ? info.rar : { label:'?', color:'#9aa0b8' };
@@ -15512,8 +15533,10 @@
           : `<button data-mm-buy="${l.id}" ${afford?'':'disabled'} style="font-size:10.5px; white-space:nowrap;" title="${afford?'':'Nicht genug Kredite'}">${fmt(l.price)} Kr.</button>`}
       </div>`;
     }).join('');
-    box.querySelectorAll('[data-mm-buy]').forEach(btn => btn.onclick = () => buyModuleListing(btn.getAttribute('data-mm-buy')));
-    box.querySelectorAll('[data-mm-cancel]').forEach(btn => btn.onclick = () => cancelModuleListing(btn.getAttribute('data-mm-cancel')));
+    if (setBoxHtml(box, 'moduleMarketBox', mmHtml)){
+      box.querySelectorAll('[data-mm-buy]').forEach(btn => btn.onclick = () => buyModuleListing(btn.getAttribute('data-mm-buy')));
+      box.querySelectorAll('[data-mm-cancel]').forEach(btn => btn.onclick = () => cancelModuleListing(btn.getAttribute('data-mm-cancel')));
+    }
   }
   // UI-Zustand für das Anlegen einer neuen Route (nicht gespeichert).
   const newRouteDraft = { type:'credits', frachter:1, resource:'erz', fromPlanet:'home', toPlanet:'home' };
@@ -15607,7 +15630,11 @@
       </div>
     </div>`;
 
-    box.innerHTML = html;
+    // setBoxHtml statt innerHTML (v8.534.0, Mess-Session: 1.449 B je Sekunde, 19 von 20
+    // Schreibvorgaengen byte-identisch - der groesste einzelne Dauerlaeufer der Messung). Bei
+    // uebersprungenem Tick entfaellt auch die Verdrahtung: die alten Knoten samt Handlern und
+    // die Selects mit ihrem newRouteDraft-Zustand bleiben stehen.
+    if (!setBoxHtml(box, 'tradeRouteBox', html)) return;
     box.querySelectorAll('[data-remove-route]').forEach(btn => btn.onclick = () => removeTradeRoute(btn.getAttribute('data-remove-route')));
     box.querySelectorAll('[data-toggle-route-protect]').forEach(btn => btn.onclick = () => toggleRouteProtection(btn.getAttribute('data-toggle-route-protect')));
     const typeSel = box.querySelector('[data-route-type]');
@@ -15631,20 +15658,39 @@
   // den Pi mit Anfragen geflutet. Der Riegel faellt bewusst erst im finally, also NACH dem
   // renderMarket()-Aufruf: der verschachtelte loadMarketState()-Aufruf laeuft dadurch ins
   // Leere, und der naechste Versuch kommt fruehestens mit dem naechsten Sekunden-Tick.
-  let marketLoadLaeuft = false;
+  let marketLoadLaeuft = false, marketLetzterVersuch = 0;
+  // Ergebnis des letzten Abrufversuchs, solange der Cache leer ist: null = (noch) kein Problem,
+  // 'server' = Nicht-OK-Antwort, 'netz' = Anfrage kam nicht durch, 'leer' = OK-Antwort ohne
+  // Marktdaten. Der Lade-Zweig von renderMarket nennt damit den GRUND, statt fuer immer
+  // "wird geladen…" zu behaupten - Regel 35: ein Ladezustand ohne Ausgang ist eine
+  // Falschaussage, genau so stand die Flaeche am 15.08.2026 live tot.
+  let marktDatenProblem = null;
   async function loadMarketState(){
     if (!useBackend() || marketLoadLaeuft) return;
+    // Cooldown (v8.534.0, MutationObserver-Mess-Session): Solange marketCache leer bleibt (Server
+    // antwortet 200, aber ohne Marktdaten - genau so stand es am 15.08.2026 live, als das Backend
+    // hinter dem Frontend hing), stiess der Lade-Zweig von renderMarket() diesen Abruf bei JEDEM
+    // Sekunden-Tick neu an - eine /market-Anfrage pro Sekunde, dauerhaft. Der 30s-Timer (unten bei
+    // den Intervallen) deckt Wiederholungsversuche ohnehin ab; hier wird nur der Takt gedeckelt.
+    // Bewusst UNTER den 30s des Timers, damit der Cooldown dessen regulaere Abrufe nie schluckt.
+    if (Date.now() - marketLetzterVersuch < 10000) return;
+    marketLetzterVersuch = Date.now();
     marketLoadLaeuft = true;
     try {
       const res = await backendFetch('/market', { method:'GET' });
-      if (!res.ok) return;
+      if (!res.ok){ marktDatenProblem = 'server'; return; }
       const data = await res.json();
       state.marketCache = data.market || null;
       state.marketEvent = data.event || null; // aktiver Angebots-/Nachfrageschock (nur Anzeige, nicht gespeichert)
-      if (activeTab === 'markt') renderMarket();
+      marktDatenProblem = data.market ? null : 'leer';
+      // Nur bei tatsaechlich angekommenen Marktdaten neu zeichnen: bei leerer Antwort zeichnete
+      // dieser Rueckruf jede Sekunde ein zweites Mal die (identische) Ladenotiz - zusammen mit dem
+      // Tick-Aufruf aus render() waren das GEMESSEN zwei volle renderMarket-Laeufe pro Sekunde
+      // (tradeRouteBox 1449 B, marketBox, creditsDisplay, je 20 Schreibvorgaenge in 10 s).
+      if (activeTab === 'markt' && data.market) renderMarket();
       // Frische Preise -> fällige Limit-Orders prüfen/ausführen (fire-and-forget).
       processLimitOrders();
-    } catch(e){} finally { marketLoadLaeuft = false; }
+    } catch(e){ marktDatenProblem = 'netz'; } finally { marketLoadLaeuft = false; }
   }
   // Führt einen Handel über das Backend aus. Das Backend ist Autorität über den Preis; wir buchen erst
   // nach erfolgreicher Antwort die Ressourcen/Kredite lokal.
@@ -15732,9 +15778,17 @@
   // zuendet hier nur, wenn der Server je ein nacktes JSON-null liefert (jede andere ok-Antwort
   // macht den Cache truthy) - aber genau solche "kann eigentlich nie passieren"-Antworten
   // waren beim Markt der Ausloeser. Ein Riegel, beide Stellen, gleiches Muster.
-  let moduleMarketLoadLaeuft = false;
-  async function loadModuleMarket(){
+  let moduleMarketLoadLaeuft = false, moduleMarketLetzterVersuch = 0;
+  // erzwingen=true umgeht den Cooldown: Nach Einstellen/Zurueckziehen/Kauf wird der Abruf
+  // AWAITED, um den Treuhand-Stand sofort zu zeigen - ein Cooldown, der diese Refreshes
+  // schluckt, wuerde nach jeder Aktion bis zu 10 s alte Angebote stehen lassen. Der Cooldown
+  // gilt nur fuer den passiven Lade-Zweig aus renderModuleMarket (Review-Fund v8.534.0: ohne
+  // ihn bliebe hier die Zwillingsschleife des /market-Vorfalls offen, falls der Server je ein
+  // nacktes JSON-null liefert und der Cache damit dauerhaft leer bleibt).
+  async function loadModuleMarket(erzwingen){
     if (!useBackend() || moduleMarketLoadLaeuft) return;
+    if (!erzwingen && Date.now() - moduleMarketLetzterVersuch < 10000) return;
+    moduleMarketLetzterVersuch = Date.now();
     moduleMarketLoadLaeuft = true;
     try {
       const res = await backendFetch('/modulemarket', { method:'GET' });
@@ -15798,7 +15852,7 @@
       const info = isShip ? shipModuleInstanceInfo(instKey) : moduleInstanceInfo(instKey);
       log('Modul zur Börse gestellt: '+(info?info.rar.label+' '+info.def.name:'Modul')+' für '+fmt(p)+' Kredite. Bis zum Verkauf liegt es in der Treuhand und steht dir nicht zur Verfügung.', 'ti-diamond');
       moduleListDraft.instKey = null;
-      await loadModuleMarket();
+      await loadModuleMarket(true);
       render(); save();
     } catch(e){ log('Verbindung zur Modulbörse fehlgeschlagen.', 'ti-alert-triangle'); }
     finally { moduleMarketInFlight = false; }
@@ -15809,13 +15863,13 @@
     try {
       const res = await backendFetch('/modulemarket/cancel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
       const data = await res.json();
-      if (!res.ok || !data.ok){ log('Zurückziehen fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(); return; }
+      if (!res.ok || !data.ok){ log('Zurückziehen fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(true); return; }
       const inv = data.isShip ? state.shipModules : state.modules;
       inv[data.instKey] = (inv[data.instKey]||0) + 1;
       if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
       const info = data.isShip ? shipModuleInstanceInfo(data.instKey) : moduleInstanceInfo(data.instKey);
       log('Angebot zurückgezogen: '+(info?info.rar.label+' '+info.def.name:'Modul')+' liegt wieder in deinem Inventar.', 'ti-box');
-      await loadModuleMarket();
+      await loadModuleMarket(true);
       render(); save();
     } catch(e){ log('Verbindung zur Modulbörse fehlgeschlagen.', 'ti-alert-triangle'); }
     finally { moduleMarketInFlight = false; }
@@ -15843,7 +15897,7 @@
     try {
       const res = await backendFetch('/modulemarket/buy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
       const data = await res.json();
-      if (!res.ok || !data.ok){ log('Kauf fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(); return; }
+      if (!res.ok || !data.ok){ log('Kauf fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(true); return; }
       const inv = data.isShip ? state.shipModules : state.modules;
       inv[data.instKey] = (inv[data.instKey]||0) + 1;
       state.credits = data.newCredits;
@@ -15852,7 +15906,7 @@
       state.modulePurchases = (state.modulePurchases||0) + 1;
       log('Von der Börse gekauft: '+(info?info.rar.label+' '+info.def.name:'Modul')+' von '+(data.sellerName||'einem Spieler')+' für '+fmt(data.price)+' Kredite.', 'ti-diamond', 'ok');
       playSound('trade');
-      await loadModuleMarket();
+      await loadModuleMarket(true);
       render(); save();
     } catch(e){ log('Verbindung zur Modulbörse fehlgeschlagen.', 'ti-alert-triangle'); }
     finally { moduleMarketInFlight = false; }
@@ -47155,6 +47209,20 @@
     setHtmlPreservingScroll(box, html);
     return true;
   }
+  // Gegenstueck zu setBoxHtml fuer reine TEXT-Anzeigen (textContent statt innerHTML): schreibt nur,
+  // wenn sich der Text wirklich geaendert hat. Eine textContent-Zuweisung ersetzt den Textknoten
+  // naemlich auch bei identischem Inhalt - GEMESSEN (MutationObserver-Session 16.08.2026): von den
+  // 40 identisch neu schreibenden Dauerlaeufern waren rund 25 reine Text-Labels (Automatik-Zeilen,
+  // Hero-Leiste, Zaehler, An/Aus-Texte), die auf JEDEM Tab jede Sekunde denselben Text neu
+  // schrieben; der Rest waren innerHTML-Boxen und wanderte zu setBoxHtml. Der Vergleich liest
+  // textContent; das ist bei den kurzen Labels billig und im Gegensatz zu einer
+  // Wertlisten-Signatur nicht vergessbar-unvollstaendig.
+  function setBoxText(el, text){
+    if (!el) return false;
+    if (el.textContent === text) return false;
+    el.textContent = text;
+    return true;
+  }
   function setHtmlPreservingScroll(box, html){
     if (!box) return;
     const prev = {};
@@ -55072,9 +55140,9 @@
     if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceChronicle(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     // Modulbörse frisch laden, wenn der Markt geöffnet wird - sie ändert sich durch ANDERE Spieler
-    // und würde sonst einen veralteten Stand zeigen. Bewusst kein Dauer-Polling: der Signatur-Cache
-    // von renderModuleMarket zeichnet ohnehin nur bei echten Änderungen neu.
-    if (tab === 'markt'){ lastModuleMarketSig = null; loadModuleMarket(); }
+    // und würde sonst einen veralteten Stand zeigen. Bewusst kein Dauer-Polling: renderModuleMarket
+    // läuft über setBoxHtml und zeichnet ohnehin nur bei echten Änderungen neu.
+    if (tab === 'markt'){ loadModuleMarket(true); }
     if (tab === 'verteidigung'){ loadDetectedFleets(); checkIncomingMoonSieges(); }
     if (tab === 'berichte'){
       loadReports();
@@ -55692,16 +55760,16 @@
     if (psExp) psExp.innerHTML = planetSwitchHtml;
     }
 
-    const fpColonyCountEl = document.getElementById('fpColonyCount');
-    if (fpColonyCountEl) fpColonyCountEl.textContent = '('+currentColonyCount()+'/'+maxColoniesAllowed()+')';
+    setBoxText(document.getElementById('fpColonyCount'), '('+currentColonyCount()+'/'+maxColoniesAllowed()+')');
     // Flottenentsendelimit direkt im Seitenmenü sichtbar (Feature-Wunsch 16.07.2026) - Spieler sehen
     // auf einen Blick, wie viele Flottenmissionen aktuell laufen und wie viele noch möglich sind, ohne
     // extra in den Flotte-Tab wechseln zu müssen. Färbt sich bei Erreichen des Limits auffällig ein,
     // analog zu anderen "voll"-Zuständen im Spiel.
     const fpFleetCountEl = document.getElementById('fpFleetCount');
     if (fpFleetCountEl){
+      // Zaehler ueber setBoxText (unten), die Farbe bleibt eine direkte Style-Zuweisung.
       const usedFleets = activeFleetMissionCount(), maxFleets = maxConcurrentFleets();
-      fpFleetCountEl.textContent = '('+usedFleets+'/'+maxFleets+')';
+      setBoxText(fpFleetCountEl, '('+usedFleets+'/'+maxFleets+')');
       fpFleetCountEl.style.color = usedFleets >= maxFleets ? '#e24b4a' : '';
     }
     const fpColonyList = document.getElementById('fpColonyList');
@@ -56564,10 +56632,14 @@
     const doctrineBox = document.getElementById('doctrineBox');
     if (doctrineBox){
       const unlocked = doctrineUnlocked();
+      // setBoxHtml in beiden Zweigen mit demselben Schluessel (v8.534.0, Mess-Session: 9 von 10
+      // Neuaufbauten byte-identisch, 328 B je Tick) - Verdrahtung wie bei stanceBox darunter
+      // bewusst ausserhalb: auf uebersprungenen Ticks setzt sie dieselben Handler auf die
+      // stehengebliebenen Knoten.
       if (!unlocked){
-        doctrineBox.innerHTML = `<div class="card-row research-locked"><div class="left"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i><div><div class="bname">Doktrinen gesperrt</div><div class="bmeta">Benötigt: Zielerfassungssysteme (erweitert) Stufe ${DOCTRINE_UNLOCK_REQ.rkampf2} (aktuell ${state.research.rkampf2||0}), Schildmatrix Stufe ${DOCTRINE_UNLOCK_REQ.rschildmatrix} (aktuell ${state.research.rschildmatrix||0})</div></div></div>`;
+        setBoxHtml(doctrineBox, 'doctrineBox', `<div class="card-row research-locked"><div class="left"><i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i><div><div class="bname">Doktrinen gesperrt</div><div class="bmeta">Benötigt: Zielerfassungssysteme (erweitert) Stufe ${DOCTRINE_UNLOCK_REQ.rkampf2} (aktuell ${state.research.rkampf2||0}), Schildmatrix Stufe ${DOCTRINE_UNLOCK_REQ.rschildmatrix} (aktuell ${state.research.rschildmatrix||0})</div></div></div>`);
       } else {
-        doctrineBox.innerHTML = DOCTRINE_DEFS.map(d => {
+        setBoxHtml(doctrineBox, 'doctrineBox', DOCTRINE_DEFS.map(d => {
           const isActive = state.doctrine === d.key;
           const isSwitch = !!state.doctrine && !isActive;
           // Synergie-Zeile (01.08.2026): Sie steht auf JEDER Karte, auch auf den nicht gewählten -
@@ -56591,7 +56663,7 @@
               ${isActive ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Gewählt</span>` : `<button class="buy ${!isSwitch||canAfford(DOCTRINE_SWITCH_COST)?'affordable':''}" data-choose-doctrine="${d.key}" ${isSwitch&&!canAfford(DOCTRINE_SWITCH_COST)?'disabled':''}><i class="ti ${isSwitch?'ti-refresh':'ti-check'}" aria-hidden="true" style="margin-right:4px;"></i>${isSwitch?'Wechseln':'Wählen'}</button>`}
             </div>
           `;
-        }).join('');
+        }).join(''));
       }
       doctrineBox.querySelectorAll('[data-choose-doctrine]').forEach(btn => btn.onclick = () => chooseDoctrine(btn.getAttribute('data-choose-doctrine')));
     }
@@ -56732,7 +56804,7 @@
     // Unterreiter + Sticky-Statusleiste (Flotten-Tab-Umbau 24.07.2026, Vorschlag 1): drei kurze
     // Ansichten statt einer ~7.000px-Scrollsäule. state.fleetSubTab merkt sich die Auswahl (auch
     // über Reloads), Standard ist die Werft. Die Sticky-Leiste hält die Kernzahlen beim Scrollen
-    // sichtbar - bewusst KEIN Signatur-Cache (Angriff/Flotten/Werft/Treibstoff ändern sich laufend).
+    // sichtbar - seit v8.534.0 hinter setBoxHtml (Begruendung am Schreibort unten).
     {
       const fleetSub = state.fleetSubTab || 'werft';
       const subMap = { werft:'fleetSubWerft', flotte:'fleetSubFlotte', missionen:'fleetSubMissionen' };
@@ -56751,10 +56823,15 @@
       if (missionsNote) missionsNote.textContent = usedFlS ? usedFlS+' Flotte'+(usedFlS===1?'':'n')+' im Einsatz' : 'Keine Flotte im Einsatz';
       const stickyEl = document.getElementById('fleetStickyBar');
       if (stickyEl){
-        stickyEl.innerHTML = '<span><i class="ti ti-sword" aria-hidden="true"></i>Angriff <b>'+fmt(attackPower())+'</b></span>'
+        // setBoxHtml statt innerHTML (v8.534.0): Hier stand "bewusst KEIN Signatur-Cache, die
+        // Werte aendern sich laufend" - das galt fuer eine WERTLISTEN-Signatur, die veralten kann.
+        // Die Markup-Signatur ist selbstkorrigierend: aendert sich ein Wert (fmt() rundet, kleine
+        // Treibstoff-Zuwaechse verschwinden darin), wird geschrieben; GEMESSEN waren 9 von 10
+        // Neuaufbauten byte-identisch (368 B je Tick). Keine Handler in der Leiste.
+        setBoxHtml(stickyEl, 'fleetStickyBar', '<span><i class="ti ti-sword" aria-hidden="true"></i>Angriff <b>'+fmt(attackPower())+'</b></span>'
           +'<span><i class="ti ti-rocket" aria-hidden="true"></i>Flotten <b class="'+(usedFlS>=maxFlS?'warn':'')+'">'+usedFlS+'/'+maxFlS+'</b></span>'
           +'<span><i class="ti ti-ship" aria-hidden="true"></i>Werft <b class="'+(usedSqS>=SHIP_QUEUE_MAX?'warn':'')+'">'+usedSqS+'/'+SHIP_QUEUE_MAX+'</b></span>'
-          +'<span><i class="ti ti-droplet" aria-hidden="true"></i>Treibstoff <b>'+fmt(state.resources.deuterium||0)+'</b> Deuterium · <b>'+fmt(state.resources.antimaterie||0)+'</b> Antimaterie</span>';
+          +'<span><i class="ti ti-droplet" aria-hidden="true"></i>Treibstoff <b>'+fmt(state.resources.deuterium||0)+'</b> Deuterium · <b>'+fmt(state.resources.antimaterie||0)+'</b> Antimaterie</span>');
       }
     }
     renderWerftOverdriveBox();
@@ -56801,10 +56878,14 @@
       if (e.originPlanet !== state.activeBasePlanet) continue;
       nonExpeditionMissions.push({ type:'allianz-verband', eintrag: e });
     }
+    // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session): Die Leer-Notiz wurde jede Sekunde
+    // byte-identisch neu geschrieben; mit laufenden Missionen aendert sich das Markup durch die
+    // Countdowns ohnehin jede Sekunde, dann schreibt setBoxHtml wie bisher. Die Rueckruf-Knoepfe
+    // verdrahtet der document-weite Lauf hinter dem Expeditions-Block jeden Tick neu.
     if (!nonExpeditionMissions.length){
-      activeM.innerHTML = `<div class="bmeta" style="padding:0.5rem 0;">Keine aktiven Missionen von ${planetDisplayName(state.activeBasePlanet)}.</div>`;
+      setBoxHtml(activeM, 'missionsActive', `<div class="bmeta" style="padding:0.5rem 0;">Keine aktiven Missionen von ${planetDisplayName(state.activeBasePlanet)}.</div>`);
     } else {
-      activeM.innerHTML = nonExpeditionMissions.map(m => {
+      setBoxHtml(activeM, 'missionsActive', nonExpeditionMissions.map(m => {
         if (m.type === 'recycler-auftrag'){
           return recyclerAuftragZeile(m.zielKey, m.auftrag);
         }
@@ -57070,7 +57151,7 @@
             <div class="progress-outer"><div class="progress-inner ${isAttack?'attackbar':''}" style="width:${pct}%;"></div></div>
           </div>
         `;
-      }).join('');
+      }).join(''));
     }
     } // Ende Flotte-Missionen-Guard (Performance: nur im Flotte-Tab sichtbar)
 
@@ -57078,10 +57159,11 @@
     const expeditionsActiveEl = document.getElementById('expeditionsActive');
     if (expeditionsActiveEl){
       const expMissions = cf.missions.filter(m => m.type === 'expedition');
+      // setBoxHtml wie bei missionsActive oben - gleiche Begruendung, gleiche Verdrahtung.
       if (!expMissions.length){
-        expeditionsActiveEl.innerHTML = `<div class="bmeta" style="padding:0.5rem 0;">Keine aktiven Expeditionen von ${planetDisplayName(state.activeBasePlanet)}.</div>`;
+        setBoxHtml(expeditionsActiveEl, 'expeditionsActive', `<div class="bmeta" style="padding:0.5rem 0;">Keine aktiven Expeditionen von ${planetDisplayName(state.activeBasePlanet)}.</div>`);
       } else {
-        expeditionsActiveEl.innerHTML = expMissions.map(m => {
+        setBoxHtml(expeditionsActiveEl, 'expeditionsActive', expMissions.map(m => {
           const remaining = Math.max(0, m.endTime-now);
           const totalDur = missionDurationFor(EXPEDITION_BASE_DURATION, cf, EXPEDITION_SHIP_KEYS);
           const pct = 100 - (remaining/(totalDur*1000)*100);
@@ -57097,7 +57179,7 @@
               <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
             </div>
           `;
-        }).join('');
+        }).join(''));
       }
     }
     } // Ende Expedition-Missionen-Guard (Performance: nur im Expedition-Tab sichtbar)
@@ -57716,8 +57798,12 @@
     const relocateBox = document.getElementById('relocateBox');
     if (relocateBox && !isTypingIn('relocateBox')){
       const others = allFleetsWithPlanet().filter(x=>x.planet!==state.activeBasePlanet);
+      // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session). Nebeneffekt im vollen Zweig: Die
+      // Mengenfelder (reloc-amount) leben nur im DOM - bisher setzte der Sekunden-Tick sie auf den
+      // Vorgabewert zurueck, sobald der Fokus weg war (bekannte Fallstrick-Familie). Solange sich
+      // am Markup nichts aendert, bleiben die getippten Mengen jetzt stehen.
       if (!others.length){
-        relocateBox.innerHTML = `<div class="bmeta">Keine weiteren Standorte mit eigener Flotte vorhanden.</div>`;
+        setBoxHtml(relocateBox, 'relocateBox', `<div class="bmeta">Keine weiteren Standorte mit eigener Flotte vorhanden.</div>`);
         relocateSourcePlanet = null;
       } else {
         // Quelle validieren/auf ersten verfügbaren Standort zurückfallen
@@ -57733,7 +57819,7 @@
         // (Vorräte an einem künftigen Träger-Standort anzulegen ist eine legitime Strategie).
         const targetFleetForHangar = state.activeBasePlanet==='home' ? state.fleet : (state.colonies[state.activeBasePlanet] ? state.colonies[state.activeBasePlanet].fleet : null);
         const destHangarFree = targetFleetForHangar ? Math.max(0, hangarCapacity(targetFleetForHangar) - deployableFighters(targetFleetForHangar).jaeger - deployableFighters(targetFleetForHangar).bomber) : 0;
-        relocateBox.innerHTML = `
+        const relocHtml = `
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:10px;">
             <div class="bmeta">Schiffe nach <strong>${planetDisplayName(state.activeBasePlanet)}</strong> verlegen (braucht Flugzeit, abhängig von Antrieb & Entfernung). Erst Quelle wählen:</div>
             <div class="planet-switch" id="relocSourcePicker">
@@ -57774,7 +57860,12 @@
             `}
           </div>
         `;
+        const relocNeu = setBoxHtml(relocateBox, 'relocateBox', relocHtml);
+        // JEDEN Tick, nicht nur nach Neuaufbau: Der Aufruf setzt auch den Flotten-Skin-Filter
+        // auf die Canvas-Icons - ein Skin-Wechsel aendert das relocateBox-Markup NICHT, die
+        // stehengebliebenen Canvases behielten sonst den alten Filter (Review-Fund v8.534.0).
         refreshShipMiniIcons(relocateBox);
+        if (relocNeu){
         relocateBox.querySelectorAll('[data-reloc-source]').forEach(btn => btn.onclick = () => {
           relocateSourcePlanet = btn.getAttribute('data-reloc-source');
           render();
@@ -57802,6 +57893,7 @@
           });
           relocateFleetGroup(relocateSourcePlanet, state.activeBasePlanet, amounts);
         };
+        } // Ende setBoxHtml-Schreibzweig (Verdrahtung nur nach echtem Neuaufbau noetig)
       }
     }
     } // Ende Flotte-Verlegung-Guard (Performance: Verlegen-Box nur im Flotte-Tab sichtbar/relevant)
@@ -58918,12 +59010,10 @@
     }).join(''));
     } // Ende Galaxie-Tab-Guard
 
-    document.getElementById('heroAttack').textContent = attackPower();
-    const acv = document.getElementById('attackCentralValue');
-    if (acv) acv.textContent = attackPower();
-    document.getElementById('heroDefense').textContent = defensePower(state.activeBasePlanet);
-    const dcv = document.getElementById('defenseCentralValue');
-    if (dcv) dcv.textContent = defensePower(state.activeBasePlanet);
+    setBoxText(document.getElementById('heroAttack'), String(attackPower()));
+    setBoxText(document.getElementById('attackCentralValue'), String(attackPower()));
+    setBoxText(document.getElementById('heroDefense'), String(defensePower(state.activeBasePlanet)));
+    setBoxText(document.getElementById('defenseCentralValue'), String(defensePower(state.activeBasePlanet)));
     renderDefenseFormationBox();
     const dsb = document.getElementById('defenseSabotageBanner');
     if (dsb){
@@ -59011,11 +59101,15 @@
       for (const e of allianzVerbandEintraege()){
         allMissions.push({ originKey: e.originPlanet, m: { type:'allianz-verband', eintrag: e } });
       }
+      // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session): Ohne Missionen wurde die Notiz auf
+      // JEDEM Tab jede Sekunde byte-identisch neu geschrieben (das Seitenmenue steht ausserhalb
+      // der Tab-Guards); mit laufenden Missionen zaehlen die Countdowns und das Markup aendert
+      // sich ohnehin. Keine Klick-Handler in der Liste.
       if (!allMissions.length){
-        fpList.innerHTML = `<div class="fleet-position-item" style="color:#7d8199;">Alle Schiffe stationiert, keine Missionen unterwegs.</div>`;
+        setBoxHtml(fpList, 'fleetPositionList', `<div class="fleet-position-item" style="color:#7d8199;">Alle Schiffe stationiert, keine Missionen unterwegs.</div>`);
       } else {
         const nowT = Date.now();
-        fpList.innerHTML = allMissions.map(({m, originKey}) => {
+        setBoxHtml(fpList, 'fleetPositionList', allMissions.map(({m, originKey}) => {
           const remain = Math.max(0, m.endTime-nowT);
           // Ein Sammelauftrag hat KEIN endTime - er endet, wenn das Feld leer ist, nicht zu einem
           // festen Zeitpunkt. Ohne diesen eigenen Resttext stuende in der Fusszeile
@@ -59135,7 +59229,7 @@
             <div class="fp-name"><i class="ti ${icon}" aria-hidden="true" style="color:${color};"></i>${label}</div>
             <div class="fp-timer">von ${planetDisplayName(originKey)} · ${ss}</div>
           </div>`;
-        }).join('');
+        }).join(''));
       }
     }
     const raidBadge = document.getElementById('heroRaidTimer');
@@ -59402,7 +59496,7 @@
       if (active.length){
         seasonalBadge.style.display = 'inline-block';
         seasonalBadge.style.cursor = 'pointer';
-        seasonalBadge.textContent = active.map(e=>e.name).join(' · ');
+        setBoxText(seasonalBadge, active.map(e=>e.name).join(' · '));
         const descText = active.map(e=>e.desc).join(' · ');
         seasonalBadge.title = descText;
         // title/Hover funktioniert auf Touch-Geräten (iPad) nicht – Tap zeigt die Beschreibung deshalb
@@ -59446,16 +59540,22 @@
     const avatarEl = document.getElementById('avatarInitials');
     if (avatarEl){
       const av = avatarSvg(state.player.avatarKey);
-      if (av){ avatarEl.innerHTML = av; avatarEl.style.background = (AVATAR_DEFS.find(a=>a.key===state.player.avatarKey)||{}).bg || 'rgba(126,119,221,0.25)'; }
-      else { avatarEl.textContent = (state.player.name||'K').slice(0,2).toUpperCase(); avatarEl.style.background = 'rgba(126,119,221,0.25)'; }
+      // ACHTUNG Kopplung (Review v8.534.0, per ausgefuehrtem Mini-Fixture belegt): Der SVG-Zweig
+      // laeuft ueber den setBoxHtml-Cache, der Initialen-Zweig per setBoxText am Cache VORBEI.
+      // Das traegt nur, weil (a) die textContent-Zuweisung das SVG-Kind entfernt und die
+      // childElementCount-Bedingung in setBoxHtml den Rueckweg zum SELBEN Avatar trotz
+      // identischem Cache erzwingt, und (b) kein AVATAR_DEFS-SVG ein <text>-Element enthaelt
+      // (el.textContent ist im SVG-Zustand also immer leer und setBoxText schreibt garantiert).
+      // Wer Avatar-SVGs mit <text> einfuehrt, muss beide Zweige auf setBoxHtml umstellen.
+      if (av){ setBoxHtml(avatarEl, 'avatarInitials', av); avatarEl.style.background = (AVATAR_DEFS.find(a=>a.key===state.player.avatarKey)||{}).bg || 'rgba(126,119,221,0.25)'; }
+      else { setBoxText(avatarEl, (state.player.name||'K').slice(0,2).toUpperCase()); avatarEl.style.background = 'rgba(126,119,221,0.25)'; }
     }
-    document.getElementById('profileNameDisplay').textContent = state.player.name || 'Kommandant';
-    document.getElementById('profileBP').textContent = state.battlePoints;
-    document.getElementById('profileScore').textContent = computeScore();
+    setBoxText(document.getElementById('profileNameDisplay'), state.player.name || 'Kommandant');
+    setBoxText(document.getElementById('profileBP'), String(state.battlePoints));
+    setBoxText(document.getElementById('profileScore'), String(computeScore()));
 
-    const scoreTotalEl = document.getElementById('scoreTotalValue');
     renderShareCardBar();
-    if (scoreTotalEl) scoreTotalEl.textContent = fmt(computeScore());
+    setBoxText(document.getElementById('scoreTotalValue'), fmt(computeScore()));
     const scoreBreakdownBox = document.getElementById('scoreBreakdownBox');
     if (scoreBreakdownBox){
       const breakdown = computeScoreBreakdown();
@@ -59537,8 +59637,13 @@
     if (scoreHistorySvg){
       const hist = state.scoreHistory||[];
       const note = document.getElementById('scoreChartNote');
+      // setBoxHtml statt innerHTML (v8.534.0, MutationObserver-Mess-Session): Der Verlauf bekommt
+      // alle 5 Minuten einen Snapshot, wurde aber jede Sekunde neu gezeichnet - auf JEDEM Tab,
+      // die Charts stehen im reiterunabhaengigen Teil von render(). Gleiches Muster fuer die
+      // beiden renderMiniChart-SVGs direkt darunter. innerHTML funktioniert auf SVG-Elementen
+      // genauso, childElementCount ebenfalls (der Hinweis-Text ist ein <text>-Kindelement).
       if (hist.length < 2){
-        scoreHistorySvg.innerHTML = `<text x="350" y="70" text-anchor="middle" style="font-size:12px; fill:#7d8199;">Noch nicht genug Verlaufsdaten (Snapshot alle 5 Minuten).</text>`;
+        setBoxHtml(scoreHistorySvg, 'scoreHistorySvg', `<text x="350" y="70" text-anchor="middle" style="font-size:12px; fill:#7d8199;">Noch nicht genug Verlaufsdaten (Snapshot alle 5 Minuten).</text>`);
       } else {
         const W=700, H=140, PAD=10;
         const vals = hist.map(h=>h.score);
@@ -59551,7 +59656,7 @@
         });
         const line = pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
         const area = `${PAD},${H-PAD} ${line} ${(W-PAD).toFixed(1)},${H-PAD}`;
-        scoreHistorySvg.innerHTML = `
+        setBoxHtml(scoreHistorySvg, 'scoreHistorySvg', `
           <defs>
             <linearGradient id="scoreHistGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="#7f77dd" stop-opacity="0.45"/>
@@ -59563,9 +59668,9 @@
           <circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3.5" fill="#c3bef5"/>
           <text x="${PAD}" y="12" style="font-size:9px; fill:#7d8199;">${fmt(maxV)}</text>
           <text x="${PAD}" y="${H-PAD-2}" style="font-size:9px; fill:#7d8199;">${fmt(minV)}</text>
-        `;
+        `);
       }
-      if (note) note.innerHTML = `<i class="ti ti-info-circle" aria-hidden="true"></i>Snapshot alle 5 Minuten während des Spielens${hist.length?' · '+hist.length+' Datenpunkt'+(hist.length===1?'':'e'):''}.`;
+      if (note) setBoxHtml(note, 'scoreChartNote', `<i class="ti ti-info-circle" aria-hidden="true"></i>Snapshot alle 5 Minuten während des Spielens${hist.length?' · '+hist.length+' Datenpunkt'+(hist.length===1?'':'e'):''}.`);
     }
     // ===== Statistik-Dashboard (Punkte-Tab) =====
     // Generischer kleiner Linien-Chart nach demselben Muster wie der Punkteverlauf oben. Einträge ohne
@@ -59575,7 +59680,7 @@
       if (!svg) return;
       const hist = (state.scoreHistory||[]).filter(h => typeof h[field] === 'number');
       if (hist.length < 2){
-        svg.innerHTML = `<text x="350" y="55" text-anchor="middle" style="font-size:12px; fill:#7d8199;">Noch nicht genug Verlaufsdaten.</text>`;
+        setBoxHtml(svg, svgId, `<text x="350" y="55" text-anchor="middle" style="font-size:12px; fill:#7d8199;">Noch nicht genug Verlaufsdaten.</text>`);
         return;
       }
       const W=700, H=110, PAD=10;
@@ -59586,14 +59691,14 @@
       const line = pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
       const area = `${PAD},${H-PAD} ${line} ${(W-PAD).toFixed(1)},${H-PAD}`;
       const gradId = svgId+'Grad';
-      svg.innerHTML = `
+      setBoxHtml(svg, svgId, `
         <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.4"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
         <polygon points="${area}" fill="url(#${gradId})"/>
         <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         <circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3.5" fill="${color}"/>
         <text x="${PAD}" y="12" style="font-size:9px; fill:#7d8199;">${fmtFn(maxV)}</text>
         <text x="${PAD}" y="${H-PAD-2}" style="font-size:9px; fill:#7d8199;">${fmtFn(minV)}</text>
-      `;
+      `);
     }
     renderMiniChart('creditsHistorySvg', 'credits', '#fac775', v=>fmt(Math.round(v)));
     renderMiniChart('prodHistorySvg', 'prodErz', '#d9a06b', v=>v.toFixed(1)+'/s');
@@ -59641,10 +59746,13 @@
     const scoreLogBox = document.getElementById('scoreLogBox');
     if (scoreLogBox){
       const logEntries = (state.scoreLog||[]).slice().reverse().slice(0, 40);
+      // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session): Das Protokoll aendert sich nur bei
+      // einer Punktaenderung bzw. wenn formatRelativeTime in die naechste Minute springt - neu
+      // geschrieben wurde es trotzdem jede Sekunde, auf jedem Tab. Keine Klick-Handler.
       if (!logEntries.length){
-        scoreLogBox.innerHTML = `<div class="bmeta">Noch keine Punktänderungen protokolliert seit dem Öffnen dieses Spiels.</div>`;
+        setBoxHtml(scoreLogBox, 'scoreLogBox', `<div class="bmeta">Noch keine Punktänderungen protokolliert seit dem Öffnen dieses Spiels.</div>`);
       } else {
-        scoreLogBox.innerHTML = logEntries.map(e => `
+        setBoxHtml(scoreLogBox, 'scoreLogBox', logEntries.map(e => `
           <div class="card-row" style="padding:0.5rem 0.8rem; border-color:${e.delta>0?'rgba(29,158,117,0.4)':'rgba(226,75,74,0.4)'};">
             <div class="left" style="gap:8px;">
               <i class="ti ${e.icon}" aria-hidden="true" style="color:${e.delta>0?'#5dcaa5':'#e24b4a'};"></i>
@@ -59655,7 +59763,7 @@
               <span style="font-weight:600; font-size:13px; color:${e.delta>0?'#5dcaa5':'#e24b4a'};">${e.delta>0?'+':''}${e.delta}</span>
             </div>
           </div>
-        `).join('');
+        `).join(''));
       }
     }
     if (document.activeElement !== document.getElementById('nameInput')) document.getElementById('nameInput').value = state.player.name || '';
@@ -59719,19 +59827,17 @@
     const emailAlreadySetEl = document.getElementById('emailAlreadySet');
     if (emailAlreadySetEl){
       emailAlreadySetEl.style.display = (useBackend() && accountHasEmail) ? 'block' : 'none';
-      const textEl = document.getElementById('emailAlreadySetText');
-      if (textEl) textEl.innerHTML = '<i class="ti ti-check" aria-hidden="true"></i> Hinterlegt: <strong>'+(accountMaskedEmail||'—')+'</strong>';
+      setBoxHtml(document.getElementById('emailAlreadySetText'), 'emailAlreadySetText', '<i class="ti ti-check" aria-hidden="true"></i> Hinterlegt: <strong>'+(accountMaskedEmail||'—')+'</strong>');
       const pendingEl = document.getElementById('emailPendingNote');
       if (pendingEl){
         if (accountPendingEmail){
           pendingEl.style.display = 'block';
-          pendingEl.innerHTML = '<i class="ti ti-clock" aria-hidden="true"></i> Bestätigung ausstehend für <strong>'+accountPendingEmail+'</strong> — prüfe dein Postfach (Link 24h gültig).';
+          setBoxHtml(pendingEl, 'emailPendingNote', '<i class="ti ti-clock" aria-hidden="true"></i> Bestätigung ausstehend für <strong>'+accountPendingEmail+'</strong> — prüfe dein Postfach (Link 24h gültig).');
         } else pendingEl.style.display = 'none';
       }
       const ptToggle = document.getElementById('patchnotesToggleSwitch');
-      const ptLabel = document.getElementById('patchnotesStateLabel');
       if (ptToggle) ptToggle.classList.toggle('on', accountWantsPatchnotes);
-      if (ptLabel) ptLabel.textContent = accountWantsPatchnotes ? 'An' : 'Aus';
+      setBoxText(document.getElementById('patchnotesStateLabel'), accountWantsPatchnotes ? 'An' : 'Aus');
     }
     // Sitzung & Sicherheit: nur mit eigenem Server sinnvoll (im Solo-Modus gibt es keine Anmeldung).
     const sessionBox = document.getElementById('sessionBox');
@@ -59747,7 +59853,7 @@
         const when = accountLastLoginAt
           ? new Date(accountLastLoginAt).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
           : 'unbekannt (erst ab der nächsten Anmeldung verfügbar)';
-        lastEl.innerHTML = '<i class="ti ti-clock" aria-hidden="true"></i> Zuletzt angemeldet: <strong>'+when+'</strong>';
+        setBoxHtml(lastEl, 'lastLoginText', '<i class="ti ti-clock" aria-hidden="true"></i> Zuletzt angemeldet: <strong>'+when+'</strong>');
       }
     }
     updateReportsBadge();
@@ -59760,16 +59866,15 @@
     const allianceMetaEl = document.getElementById('allianceMetaLine');
     if (allianceNameEl && allianceMetaEl){
       const tag = myAllianceTag();
-      allianceMetaEl.textContent = tag ? 'Gemeinsame Technologien mit allen Mitgliedern des Tags' : 'Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen';
-      allianceNameEl.textContent = tag ? '['+tag+']' : 'Keine Allianz';
+      setBoxText(allianceMetaEl, tag ? 'Gemeinsame Technologien mit allen Mitgliedern des Tags' : 'Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen');
+      setBoxText(allianceNameEl, tag ? '['+tag+']' : 'Keine Allianz');
     }
 
     const soundIcon = document.getElementById('soundIcon');
     if (soundIcon) soundIcon.className = 'ti '+(state.soundOn?'ti-volume':'ti-volume');
     const soundSwitch = document.getElementById('soundToggleSwitch');
     if (soundSwitch) soundSwitch.classList.toggle('on', !!state.soundOn);
-    const soundLabel = document.getElementById('soundStateLabel');
-    if (soundLabel) soundLabel.textContent = state.soundOn ? 'An' : 'Aus';
+    setBoxText(document.getElementById('soundStateLabel'), state.soundOn ? 'An' : 'Aus');
 
     const uiJumpNavSwitch = document.getElementById('uiJumpNavSwitch');
     if (uiJumpNavSwitch) uiJumpNavSwitch.classList.toggle('on', !!state.uiJumpNav);
@@ -59780,8 +59885,7 @@
 
     const autoExploreSwitch = document.getElementById('autoExploreSwitch');
     if (autoExploreSwitch) autoExploreSwitch.classList.toggle('on', !!state.autoExploreOn || !!state.autoExploreTour);
-    const autoExploreLabel = document.getElementById('autoExploreLabel');
-    if (autoExploreLabel) autoExploreLabel.textContent = (state.autoExploreOn || state.autoExploreTour) ? 'An – nutzt '+totalExplorerShipsOwned()+' Erkundungsschiff(e) im Bestand' : 'Aus – benötigt 1 Erkundungsschiff';
+    setBoxText(document.getElementById('autoExploreLabel'), (state.autoExploreOn || state.autoExploreTour) ? 'An – nutzt '+totalExplorerShipsOwned()+' Erkundungsschiff(e) im Bestand' : 'Aus – benötigt 1 Erkundungsschiff');
     renderAutoExploreTourBox();
 
     // Unterstützer-Automatiken (05.08.2026): Ohne Rang bleibt die Zeile sichtbar - sie soll ja
@@ -59793,43 +59897,37 @@
     const autoReinforceRow = document.getElementById('autoReinforceRow');
     const autoReinforceSwitch = document.getElementById('autoReinforceSwitch');
     if (autoReinforceSwitch) autoReinforceSwitch.classList.toggle('on', automatikZeile(autoReinforceRow, !!state.autoReinforceOn));
-    const autoReinforceLabel = document.getElementById('autoReinforceLabel');
-    if (autoReinforceLabel) autoReinforceLabel.textContent = !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
-      : (state.autoReinforceOn ? 'An' : 'Aus') + ' – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten ('+AUTO_REINFORCE_COST_KERNE+' KI-Kerne je Einsatz; Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
+    setBoxText(document.getElementById('autoReinforceLabel'), !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
+      : (state.autoReinforceOn ? 'An' : 'Aus') + ' – verlegt bei erkanntem Überfall automatisch Kampfschiffe von der stärksten anderen Kolonie zum bedrohten Planeten ('+AUTO_REINFORCE_COST_KERNE+' KI-Kerne je Einsatz; Vorrat: '+Math.floor(state.resources.kikerne||0)+')');
 
     const kiInterceptRow = document.getElementById('kiInterceptRow');
     if (kiInterceptRow){
       kiInterceptRow.style.display = (state.research.rkitech||0) >= 1 ? '' : 'none';
       const kiInterceptSwitch = document.getElementById('kiInterceptSwitch');
       if (kiInterceptSwitch) kiInterceptSwitch.classList.toggle('on', automatikZeile(kiInterceptRow, !!state.kiInterceptOn));
-      const kiInterceptLabel = document.getElementById('kiInterceptLabel');
-      if (kiInterceptLabel) kiInterceptLabel.textContent = !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
-        : (state.kiInterceptOn ? 'An' : 'Aus') + ' – vertreibt Piraten-Trümmerräuber automatisch, falls du nicht selbst rechtzeitig abfängst ('+KI_INTERCEPT_COST_KERNE+' KI-Kerne je Einsatz, keine Kampfpunkte; Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
+      setBoxText(document.getElementById('kiInterceptLabel'), !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
+        : (state.kiInterceptOn ? 'An' : 'Aus') + ' – vertreibt Piraten-Trümmerräuber automatisch, falls du nicht selbst rechtzeitig abfängst ('+KI_INTERCEPT_COST_KERNE+' KI-Kerne je Einsatz, keine Kampfpunkte; Vorrat: '+Math.floor(state.resources.kikerne||0)+')');
     }
 
     const autoRepairRow = document.getElementById('autoRepairRow');
     const autoRepairSwitch = document.getElementById('autoRepairSwitch');
     if (autoRepairSwitch) autoRepairSwitch.classList.toggle('on', automatikZeile(autoRepairRow, !!state.autoRepairOn));
-    const autoRepairLabel = document.getElementById('autoRepairLabel');
-    if (autoRepairLabel) autoRepairLabel.textContent = !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
-      : (state.autoRepairOn ? 'An' : 'Aus') + ' – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne statt 15 Min. zu warten (Vorrat: '+Math.floor(state.resources.kikerne||0)+')';
+    setBoxText(document.getElementById('autoRepairLabel'), !automatikFrei ? AUTOMATIK_GESPERRT_TEXT
+      : (state.autoRepairOn ? 'An' : 'Aus') + ' – behebt Sabotage nach verlorenem Überfall sofort gegen 300 Erz + 150 Kristalle + '+AUTO_REPAIR_COST_KERNE+' KI-Kerne statt 15 Min. zu warten (Vorrat: '+Math.floor(state.resources.kikerne||0)+')');
     const autoWatchLiveRaidSwitch = document.getElementById('autoWatchLiveRaidSwitch');
     if (autoWatchLiveRaidSwitch) autoWatchLiveRaidSwitch.classList.toggle('on', !!state.autoWatchLiveRaid);
-    const autoWatchLiveRaidLabel = document.getElementById('autoWatchLiveRaidLabel');
-    if (autoWatchLiveRaidLabel) autoWatchLiveRaidLabel.textContent = state.autoWatchLiveRaid ? 'An – öffnet die Kampf-Wiedergabe automatisch, sobald ein Kampf abläuft (eigener Angriff oder eingehender Überfall), während du gerade im Spiel bist' : 'Aus – Kämpfe laufen im Hintergrund ab, Wiedergabe nur über den Bericht im Nachhinein';
+    setBoxText(document.getElementById('autoWatchLiveRaidLabel'), state.autoWatchLiveRaid ? 'An – öffnet die Kampf-Wiedergabe automatisch, sobald ein Kampf abläuft (eigener Angriff oder eingehender Überfall), während du gerade im Spiel bist' : 'Aus – Kämpfe laufen im Hintergrund ab, Wiedergabe nur über den Bericht im Nachhinein');
     const powerSaveSwitch = document.getElementById('powerSaveSwitch');
     if (powerSaveSwitch) powerSaveSwitch.classList.toggle('on', powerSaveActive());
-    const powerSaveLabel = document.getElementById('powerSaveLabel');
-    if (powerSaveLabel) powerSaveLabel.textContent = powerSaveActive()
+    setBoxText(document.getElementById('powerSaveLabel'), powerSaveActive()
       ? 'An – spart Akku und Leistung: Sternenhimmel steht still, Scanlinien und Deko-Puls-Effekte aus, Zahlen springen statt zu zählen. Warn-Hinweise (Überfall-Alarm) bleiben aktiv.'+(state.powerSave===undefined?' (automatisch, da Handy/Tablet erkannt)':'')
-      : 'Aus – alle Animationen aktiv (Sternenhimmel, Scanlinien, Puls-Effekte)'+(state.powerSave===undefined && isCoarsePointer===false?' (automatisch, da Desktop erkannt)':'');
+      : 'Aus – alle Animationen aktiv (Sternenhimmel, Scanlinien, Puls-Effekte)'+(state.powerSave===undefined && isCoarsePointer===false?' (automatisch, da Desktop erkannt)':''));
 
     const notifIcon = document.getElementById('notifIcon');
     if (notifIcon) notifIcon.className = 'ti '+(state.notifOn?'ti-bell':'ti-bell');
     const notifSwitch = document.getElementById('notifToggleSwitch');
     if (notifSwitch) notifSwitch.classList.toggle('on', !!state.notifOn);
-    const notifLabel = document.getElementById('notifStateLabel');
-    if (notifLabel) notifLabel.textContent = state.notifOn ? 'An' : 'Aus';
+    setBoxText(document.getElementById('notifStateLabel'), state.notifOn ? 'An' : 'Aus');
 
     const themePicker = document.getElementById('themePicker');
     if (themePicker){
@@ -59931,7 +60029,11 @@
           }).join('');
         }
       }
-      invBox.innerHTML = html;
+      // setBoxHtml statt innerHTML (v8.534.0, Mess-Session): aendert sich nur bei Fund/Aktivierung/
+      // Aufklappen, wurde aber jede Sekunde auf jedem Tab neu geschrieben. Verdrahtung darunter
+      // bleibt bewusst unveraendert jeden Tick - auf uebersprungenen Ticks setzt sie dieselben
+      // Handler auf die stehengebliebenen Knoten.
+      setBoxHtml(invBox, 'inventoryBox', html);
       if (owned.length){
         document.querySelectorAll('[data-item-toggle]').forEach(row => row.onclick = (e) => {
           if (e.target.closest('[data-item-activate]')) return;
@@ -60044,16 +60146,18 @@
     renderKosmetikBox();
     const kofiBox = document.getElementById('kofiTopSupporterBox');
     if (kofiBox){
+      // setBoxHtml in allen drei Zweigen mit demselben Schluessel (v8.534.0, Mess-Session): rein
+      // statische Inhalte, wurden trotzdem jede Sekunde auf jedem Tab neu geschrieben.
       if (kofiTopSupporterCache === undefined){
-        kofiBox.innerHTML = `<div class="bmeta">Lädt…</div>`;
+        setBoxHtml(kofiBox, 'kofiTopSupporterBox', `<div class="bmeta">Lädt…</div>`);
       } else if (!kofiTopSupporterCache){
-        kofiBox.innerHTML = `<div class="bmeta">Noch kein Top-Unterstützer – <a href="https://ko-fi.com/gamegeeeeek" target="_blank" rel="noopener" style="color:#c3bef5;">sei der/die Erste!</a></div>`;
+        setBoxHtml(kofiBox, 'kofiTopSupporterBox', `<div class="bmeta">Noch kein Top-Unterstützer – <a href="https://ko-fi.com/gamegeeeeek" target="_blank" rel="noopener" style="color:#c3bef5;">sei der/die Erste!</a></div>`);
       } else {
-        kofiBox.innerHTML = `<div class="card-row" style="border-color:rgba(250,199,117,0.4);">
+        setBoxHtml(kofiBox, 'kofiTopSupporterBox', `<div class="card-row" style="border-color:rgba(250,199,117,0.4);">
           <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.18); color:#fac775; font-size:18px;">☕</div>
             <div><div class="bname">${escapeHtml(kofiTopSupporterCache.name)}</div><div class="bmeta">Aktueller Top-Unterstützer – vielen Dank für die Unterstützung!</div></div>
           </div>
-        </div>`;
+        </div>`);
       }
       loadKofiTopSupporterIfNeeded();
     }
@@ -60141,9 +60245,9 @@
     if (rareItemsBox){
       const items = Object.entries(state.rareItems||{}).filter(([k,v])=>v>0);
       if (!items.length){
-        rareItemsBox.innerHTML = `<div class="bmeta">Noch keine seltenen Items gefunden. Sehr geringe Chance bei jeder Erkundungsmission.</div>`;
+        setBoxHtml(rareItemsBox, 'rareItemsBox', `<div class="bmeta">Noch keine seltenen Items gefunden. Sehr geringe Chance bei jeder Erkundungsmission.</div>`);
       } else {
-        rareItemsBox.innerHTML = items.map(([k,v]) => `<div class="card-row"><div class="left"><div class="bicon" style="background:rgba(126,119,221,0.2); color:#c3bef5;"><i class="ti ti-diamond" aria-hidden="true"></i></div><div><div class="bname">${k}</div><div class="bmeta">Für Spezialschiffe/-gebäude verwendbar</div></div></div><span class="lvl-pill">${v}x</span></div>`).join('');
+        setBoxHtml(rareItemsBox, 'rareItemsBox', items.map(([k,v]) => `<div class="card-row"><div class="left"><div class="bicon" style="background:rgba(126,119,221,0.2); color:#c3bef5;"><i class="ti ti-diamond" aria-hidden="true"></i></div><div><div class="bname">${k}</div><div class="bmeta">Für Spezialschiffe/-gebäude verwendbar</div></div></div><span class="lvl-pill">${v}x</span></div>`).join(''));
       }
     }
     const megaProjectsBox = document.getElementById('megaProjectsBox');
@@ -60351,12 +60455,17 @@
 
     const traderBox = document.getElementById('traderBox');
     if (traderBox){
+      // setBoxHtml in beiden Zweigen (v8.534.0, Mess-Session): Ohne Haendler stand jede Sekunde
+      // dieselbe Notiz da; mit Haendler aendert sich das Markup nur, wenn die Bezahlbarkeit kippt
+      // (ok steckt in Klasse und disabled-Attribut - die Signatur kann also nicht veralten).
+      // Verdrahtung nur nach echtem Neuaufbau; auf uebersprungenen Ticks haelt der alte Knoten
+      // seinen Handler.
       if (!state.trader){
-        traderBox.innerHTML = `<div class="bmeta">Kein Händler im Orbit. Schau später wieder vorbei.</div>`;
+        setBoxHtml(traderBox, 'traderBox', `<div class="bmeta">Kein Händler im Orbit. Schau später wieder vorbei.</div>`);
       } else {
         const t = state.trader;
         const ok = (state.resources[t.give]||0) >= t.giveAmt;
-        traderBox.innerHTML = `
+        if (setBoxHtml(traderBox, 'traderBox', `
           <div class="card-row">
             <div class="left">
               <div class="bicon" style="background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-truck" aria-hidden="true"></i></div>
@@ -60367,9 +60476,10 @@
             </div>
             <button class="buy ${ok?'affordable':''}" id="acceptTradeBtn" ${ok?'':'disabled'}>Handeln</button>
           </div>
-        `;
-        const tb = document.getElementById('acceptTradeBtn');
-        if (tb) tb.onclick = acceptTrade;
+        `)){
+          const tb = document.getElementById('acceptTradeBtn');
+          if (tb) tb.onclick = acceptTrade;
+        }
       }
     }
     } // Ende Fortschritt/Forschung/Galaxie-Perf-Guard
@@ -60538,13 +60648,12 @@
     // Zaehlt AUSDRUECKLICH nur RESEARCH_DEFS: Seit es die Allianzforschung gibt, stehen in
     // state.research auch ra_*-Schluessel - ein Object.values() ueber alles haette hier "45/42"
     // ergeben, sobald jemand drei Allianzzweige angefangen hat.
-    document.getElementById('heroResearch').textContent = RESEARCH_DEFS.filter(r=>state.research[r.key]).length+'/'+RESEARCH_DEFS.length;
-    document.getElementById('heroFleet').textContent = cf.ships+' Schiff'+(cf.ships===1?'':'e')+' · '+cf.cruisers+' Kreuzer ('+planetDisplayName(state.activeBasePlanet)+')';
-    const heroExp = document.getElementById('heroExpedition');
-    if (heroExp) heroExp.textContent = cf.missions.filter(m=>m.type==='expedition').length+'/'+(cf.forscher||0);
-    document.getElementById('heroLevel').textContent = commanderLevel(state.xp||0)+(state.prestige?' · P'+state.prestige:'');
-    document.getElementById('heroBP').textContent = state.battlePoints;
-    document.getElementById('heroScore').textContent = fmt(computeScore());
+    setBoxText(document.getElementById('heroResearch'), RESEARCH_DEFS.filter(r=>state.research[r.key]).length+'/'+RESEARCH_DEFS.length);
+    setBoxText(document.getElementById('heroFleet'), cf.ships+' Schiff'+(cf.ships===1?'':'e')+' · '+cf.cruisers+' Kreuzer ('+planetDisplayName(state.activeBasePlanet)+')');
+    setBoxText(document.getElementById('heroExpedition'), cf.missions.filter(m=>m.type==='expedition').length+'/'+(cf.forscher||0));
+    setBoxText(document.getElementById('heroLevel'), commanderLevel(state.xp||0)+(state.prestige?' · P'+state.prestige:''));
+    setBoxText(document.getElementById('heroBP'), String(state.battlePoints));
+    setBoxText(document.getElementById('heroScore'), fmt(computeScore()));
 
     document.querySelectorAll('[data-build]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-build');

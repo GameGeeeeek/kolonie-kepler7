@@ -30,13 +30,16 @@ const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 const MARKUP = HTML.slice(0, HTML.indexOf('<script>'));
 
 // ---- statisch: Riegel und Splitboxen existieren an den richtigen Stellen
+// Regel statt Momentaufnahme (Hausregel 3): gefordert ist setzen, pruefen, IM FINALLY loesen -
+// was der catch nebenbei tut (seit v8.534.0 vermerkt er den Netzfehler fuer die Regel-35-
+// Anzeige), ist nicht Teil dieser Regel und darf sich formen.
 check('1a: loadMarketState hat den In-Flight-Riegel (setzen, pruefen, im finally loesen)',
   JS.includes('if (!useBackend() || marketLoadLaeuft) return;') &&
   JS.includes('marketLoadLaeuft = true;') &&
-  JS.includes('} catch(e){} finally { marketLoadLaeuft = false; }'));
+  JS.includes('finally { marketLoadLaeuft = false; }'));
 check('1b: loadModuleMarket hat denselben Riegel',
   JS.includes('if (!useBackend() || moduleMarketLoadLaeuft) return;') &&
-  JS.includes('} catch(e){} finally { moduleMarketLoadLaeuft = false; }'));
+  JS.includes('finally { moduleMarketLoadLaeuft = false; }'));
 check('1c: fleetJobs- und defenseJobs-Box stehen im HTML-Markup (nicht nur im JS)',
   MARKUP.includes('<div id="fleetJobs"></div>') && MARKUP.includes('<div id="defenseJobs"></div>'));
 check('1d: der Tick schreibt Leerlaufkarte+Bauauftraege nach fleetJobs, und #fleet ohne sie',
@@ -117,19 +120,54 @@ function backend(store, zaehler){ return async r => {
       const o = document.getElementById(id); if (o) o.style.display = 'none'; });
   });
 
-  // ---- 2: Markt-Tab oeffnen, Anfragen zaehlen. Der Tick versucht es 1x je Sekunde erneut
-  // (gewollt, damit sich der Markt nach einem Serverschluckauf selbst faengt) - der Riegel
-  // verhindert nur die UNGEBREMSTE Rekursion innerhalb eines Versuchs.
+  // ---- 2: Markt-Tab oeffnen, Anfragen zaehlen. Seit v8.534.0 gilt: der Lade-Zweig darf nur
+  // noch alle COOLDOWN_MS einen Versuch anstossen (Cooldown in loadMarketState, aus der
+  // Spieldatei ABGELESEN statt eingetippt - Regel 2: sonst wird der Test wertlos, sobald
+  // jemand den Wert aendert) - bis dahin galt "1x je Sekunde erneut" als gewollt, aber der
+  // Vorfall vom 15.08.2026 (Backend hing tagelang hinter dem Frontend, /market lieferte
+  // dauerhaft nichts) machte daraus ~86.000 Anfragen je Tag und offenem Markt-Tab gegen den
+  // Pi. Gemessen wird die Regel in BEIDE Richtungen: gebremst (keine Flut) UND lebendig (die
+  // Selbstheilung stirbt nicht - nach Ablauf des Cooldowns kommt wieder ein Versuch;
+  // zusaetzlich deckt der 30s-Timer den Markt-Tab ab).
+  const cdm = JS.match(/Date\.now\(\) - marketLetzterVersuch < (\d+)\) return;/);
+  check('2-vorab: der Markt-Cooldown steht in der Spieldatei und laesst sich ablesen', !!cdm, { gefunden: !!cdm });
+  const COOLDOWN_MS = cdm ? Number(cdm[1]) : 10000;
+  const FENSTER_MS = 12000;
+  // Obergrenze aus dem Fenster hergeleitet statt eingetippt: hoechstens ceil(Fenster/Cooldown)
+  // Versuche passen hinein, plus 1 Toleranz fuer einen Versuch an der Fensterkante.
+  const MAX_ANFRAGEN = Math.ceil(FENSTER_MS / COOLDOWN_MS) + 1;
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="markt"]'); if (b) b.click(); });
   await page.waitForTimeout(1000);
   const marktStart = zaehler.market;
-  await page.waitForTimeout(6000);
+  // Beobachter fuer 2c VOR dem Messfenster setzen: im degenerierten Zustand ({}-Antwort) wurden
+  // marketBox/tradeRouteBox bis v8.533.0 ZWEIMAL je Sekunde byte-identisch neu geschrieben
+  // (Tick-Aufruf + renderMarket-Rueckruf aus der Antwort). 2c misst die WIRKUNG (kein
+  // sekuendliches Neuschreiben) - sie entsteht aus setBoxHtml UND dem data.market-Riegel im
+  // Rueckruf zusammen; der Riegel allein ist DOM-seitig nicht vom setBoxHtml-Effekt zu
+  // unterscheiden (auch ein durchgelassener Rueckruf schriebe die identische Notiz nicht neu)
+  // und bleibt bewusst Verteidigung in der Tiefe gegen die halbe CPU-Arbeit je Sekunde.
+  await page.evaluate(() => {
+    window.__marktSchreiber = { marketBox: 0, tradeRouteBox: 0 };
+    for (const id of ['marketBox', 'tradeRouteBox']){
+      const el = document.getElementById(id);
+      if (el) new MutationObserver(m => { window.__marktSchreiber[id] += m.length; })
+        .observe(el, { childList:true, subtree:true, characterData:true });
+    }
+  });
+  await page.waitForTimeout(FENSTER_MS);
   const marktAnfragen = zaehler.market - marktStart;
-  check('2a: /market wird bei ok-Antwort ohne market-Feld GEBREMST angefragt (~1/s, keine Flut)',
-    marktAnfragen >= 3 && marktAnfragen < 20, { anfragenIn6s: marktAnfragen });
+  check('2a: /market bei ok-Antwort ohne market-Feld: gebremst auf den Cooldown, aber die Selbstheilung lebt',
+    marktAnfragen >= 1 && marktAnfragen <= MAX_ANFRAGEN, { anfragenImFenster: marktAnfragen, cooldownMs: COOLDOWN_MS, maxErlaubt: MAX_ANFRAGEN });
+  // Seit v8.534.0 hat die Flaeche einen DRITTEN Zustand (Regel 35): Nach einem Versuch, der
+  // keine Marktdaten brachte, steht der GRUND da statt eines ewigen "wird geladen…" - genau
+  // die tote Flaeche vom 15.08.2026. Der Mock liefert 200 mit leerem Objekt, also muss hier
+  // die "keine Marktdaten"-Ansage stehen, mit dem Versprechen, dass es von selbst weitergeht.
   const marktNote = await page.evaluate(() => (document.getElementById('marketBox')||{}).textContent || '');
-  check('2b: die Markt-Box zeigt dabei den Lade-Hinweis statt zu crashen',
-    marktNote.includes('Marktdaten werden geladen'), { text: marktNote.slice(0, 60) });
+  check('2b: die Markt-Box BENENNT den Zustand (Server liefert keine Marktdaten, es geht von selbst weiter)',
+    marktNote.includes('keine Marktdaten') && marktNote.includes('automatisch'), { text: marktNote.slice(0, 90) });
+  const marktSchreiber = await page.evaluate(() => window.__marktSchreiber);
+  check('2c: marketBox und tradeRouteBox stehen im degenerierten Zustand still (kein sekuendliches Neuschreiben mehr)',
+    marktSchreiber.marketBox <= 2 && marktSchreiber.tradeRouteBox <= 2, marktSchreiber);
 
   // ---- 3: Waehrend der Schiffsbau laeuft, tickt der Countdown in fleetJobs - #fleet steht.
   // Der Haupt-Tick schreibt die Flotten-Boxen nur bei aktivem Flotten-Reiter (erster Anlauf
