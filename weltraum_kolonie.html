@@ -15465,11 +15465,20 @@
     // Ab spürbarer Preisbewegung warnend einfärben - das ist der Moment, in dem Stückeln lohnt.
     const warn = movePct >= 10;
     const chunks = amt > MARKET_MAX_PER_TRADE ? Math.ceil(amt/MARKET_MAX_PER_TRADE) : 0;
+    /* Kontingent-Warnung (17.08.2026): Uebersteigt der GESCHAETZTE Verkaufserloes das heutige
+       Restkontingent, sagt die Zeile es VOR dem Klick - sonst erfaehrt es der Spieler erst aus
+       der Server-Ablehnung mitten im Sammelauftrag. Bewusst hier in marketSlippageHtml: Die
+       Funktion fuellt sowohl die Erst-Renderung als auch die Live-Aktualisierung beim Tippen
+       (updateMarketRowEstimate) - EINE Stelle, beide Anzeigewege (Regel 6). */
+    const kontingentWarnung = (typeof marktTagesRest === 'number' && sellRaw > marktTagesRest)
+      ? ` <span style="color:#e0a548;">· Achtung: Erlös (~${fmt(sellRaw)}) übersteigt dein heutiges Restkontingent (${fmt(marktTagesRest)}) – der Verkauf stoppt dort</span>`
+      : '';
     return `<i class="ti ti-arrows-shuffle" aria-hidden="true" style="color:${warn?'#e0a548':'#7d8199'};"></i> `
       + `Kauf Ø <strong>${buyAvg.toFixed(2)}</strong> → Preis danach ${buyAfter.toFixed(2)} · `
       + `Verkauf Ø <strong>${sellAvg.toFixed(2)}</strong> → Preis danach ${sellAfter.toFixed(2)}`
       + (movePct >= 1 ? ` <span style="color:${warn?'#e0a548':'#7d8199'};">(bewegt den Preis um ~${movePct}%${warn?' – in mehreren kleineren Schritten bekommst du mehr':''})</span>` : '')
-      + (chunks ? ` <span style="color:#85b7eb;">· wird als Sammelauftrag in ${chunks} Tranchen ausgeführt</span>` : '');
+      + (chunks ? ` <span style="color:#85b7eb;">· wird als Sammelauftrag in ${chunks} Tranchen ausgeführt</span>` : '')
+      + kontingentWarnung;
   }
   function renderMarket(){
     setBoxText(document.getElementById('creditsDisplay'), fmt(state.credits||0));
@@ -15545,7 +15554,27 @@
         <button data-market-bulk-cancel="1" style="font-size:10.5px; white-space:nowrap;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Abbrechen</button>
       </div>`;
     }
-    setBoxHtml(box, 'marketBox', eventBanner + bulkBanner + MARKET_RES_KEYS.map(key => {
+    /* Tageskontingent-Zeile (17.08.2026). Erscheint NUR, wenn der Server das Feld geliefert hat -
+       ein aelterer Server bekommt keine erfundene Aussage. Die Restzeit bis zum Reset wird als
+       DAUER gezeigt, nicht als Uhrzeit: Der Reset liegt auf Mitternacht UTC, das waere fuer
+       deutsche Spieler "2 Uhr nachts" im Sommer und "1 Uhr" im Winter - eine Dauer stimmt in
+       jeder Zeitzone. Lebt im setBoxHtml-Markup der marketBox, die Signatur pflegt sich damit
+       von selbst (Markup-Signatur, CLAUDE.md). */
+    let kontingentZeile = '';
+    if (typeof marktTagesRest === 'number' && marktTagesMax){
+      const naechsterReset = new Date(); naechsterReset.setUTCHours(24, 0, 0, 0);
+      /* Auf MINUTEN gerundet, nicht fmtDuration: Die haette unter einer Stunde Sekunden gezeigt,
+         das Markup waere jede Sekunde ein anderes gewesen, und setBoxHtml haette die ganze
+         Markt-Box im Sekundentakt neu geschrieben - exakt die Tick-Unruhe, die v8.538.0 dort
+         beseitigt hat. Mit Minuten-Koernung schreibt die Zeile hoechstens einmal je Minute. */
+      const restMin = Math.max(1, Math.ceil((naechsterReset.getTime() - Date.now()) / 60000));
+      const resetText = restMin >= 60 ? Math.floor(restMin/60)+'h '+(restMin%60)+'m' : restMin+'m';
+      const knapp = marktTagesRest < marktTagesMax * 0.2;
+      kontingentZeile = `<div class="bmeta" style="margin-bottom:0.6rem;${knapp ? ' color:#e0a548;' : ''}">
+        <i class="ti ti-clock" aria-hidden="true"></i> Verkaufs-Tageskontingent: noch <strong>${fmt(marktTagesRest)}</strong> von ${fmt(marktTagesMax)} Credits Erlös frei
+        · setzt sich in ${resetText} zurück${marktTagesRest <= 0 ? ' – Verkäufe pausieren bis dahin, Käufe gehen weiter' : ''}</div>`;
+    }
+    setBoxHtml(box, 'marketBox', eventBanner + bulkBanner + kontingentZeile + MARKET_RES_KEYS.map(key => {
       // Bugfix (21.07.2026): RES_DEFS-Einträge haben das Farbfeld 'fg' (nicht 'color') - die Markt-
       // Anzeige nutzte aber durchgehend rd.color -> war überall undefined. Folge: Sparkline-Linie/Fläche
       // mit stroke/fill "undefined" komplett unsichtbar (nur Panel + schwarzer Default-Endpunkt zu sehen,
@@ -15841,6 +15870,10 @@
   // renderMarket()-Aufruf: der verschachtelte loadMarketState()-Aufruf laeuft dadurch ins
   // Leere, und der naechste Versuch kommt fruehestens mit dem naechsten Sekunden-Tick.
   let marketLoadLaeuft = false, marketLetzterVersuch = 0;
+  // Tagesumsatz-Deckel fuer Verkaufserloese (17.08.2026): Beide Werte kommen vom Server (GET
+  // /market und jede /market/trade-Antwort). null = Server hat sich noch nicht geaeussert (alter
+  // Server oder noch kein Abruf) - dann zeigt die Box NICHTS an, statt etwas zu raten.
+  let marktTagesRest = null, marktTagesMax = null;
   // Ergebnis des letzten Abrufversuchs, solange der Cache leer ist: null = (noch) kein Problem,
   // 'server' = Nicht-OK-Antwort, 'netz' = Anfrage kam nicht durch, 'leer' = OK-Antwort ohne
   // Marktdaten. Der Lade-Zweig von renderMarket nennt damit den GRUND, statt fuer immer
@@ -15864,6 +15897,12 @@
       const data = await res.json();
       state.marketCache = data.market || null;
       state.marketEvent = data.event || null; // aktiver Angebots-/Nachfrageschock (nur Anzeige, nicht gespeichert)
+      // Tagesumsatz-Deckel (17.08.2026): Restkontingent fuer Verkaufserloese, kommt vom Server
+      // mit. Bewusst NUR uebernehmen, wenn das Feld da ist - ein aelterer Server kennt es nicht,
+      // und null heisst fuer die Anzeige "nichts behaupten" statt "0 frei" (Regel 35-Familie:
+      // lieber keine Aussage als eine falsche). Lebt als Modul-Variable, nicht in state - der
+      // Server ist die Autoritaet, ein alter Spielstand darf keinen Stand mitbringen.
+      if (typeof data.tagesRest === 'number'){ marktTagesRest = data.tagesRest; marktTagesMax = data.tagesMax || marktTagesMax; }
       marktDatenProblem = data.market ? null : 'leer';
       // Nur bei tatsaechlich angekommenen Marktdaten neu zeichnen: bei leerer Antwort zeichnete
       // dieser Rueckruf jede Sekunde ein zweites Mal die (identische) Ladenotiz - zusammen mit dem
@@ -15913,6 +15952,9 @@
         body: JSON.stringify({ action, resource, amount })
       });
       const data = await res.json();
+      // Das Restkontingent des Verkaufs-Deckels reist in JEDER Antwort mit, auch in der Ablehnung
+      // (dort ist es die wichtigste Information). Nur uebernehmen, wenn das Feld da ist.
+      if (data && typeof data.tagesRest === 'number'){ marktTagesRest = data.tagesRest; marktTagesMax = data.tagesMax || marktTagesMax; }
       if (!res.ok || !data.ok){
         // Warum der Handel scheiterte, festhalten (17.08.2026): Der Sammelauftrag muss ein
         // Rate-Limit (429) von einem echten Fehler unterscheiden koennen - beim einen lohnt
@@ -16175,7 +16217,13 @@
     }
     const aborted = marketBulkRun.abort;
     marketBulkRun = null;
+    // Ein am TAGESKONTINGENT gestoppter Auftrag ist kein Fehler, sondern eine Regel - die
+    // Abschlussmeldung nennt sie beim Namen, statt ein nacktes "gestoppt" zu hinterlassen, bei
+    // dem der Spieler den Fehler bei sich suchte (dieselbe Ehrlichkeits-Linie wie Regel 35).
+    const amKontingent = failed && marktLetzteAbsage && marktLetzteAbsage.status === 400
+      && /Tageskontingent/.test(marktLetzteAbsage.fehler || '');
     if (aborted) log('Sammelauftrag abgebrochen – '+fmt(moved)+' von '+fmt(amount)+' '+label+' wurden gehandelt.', 'ti-info-circle');
+    else if (amKontingent) log('Sammelauftrag am Tageskontingent gestoppt – '+fmt(moved)+' von '+fmt(amount)+' '+label+' wurden verkauft. Der Rest wartet auf morgen'+(typeof marktTagesRest === 'number' && marktTagesRest > 0 ? ' (heute sind noch '+fmt(marktTagesRest)+' Credits Erlös frei – kleinere Mengen gehen noch durch)' : '')+'.', 'ti-clock', 'warn');
     else if (failed) log('Sammelauftrag gestoppt – '+fmt(moved)+' von '+fmt(amount)+' '+label+' wurden gehandelt.', 'ti-alert-triangle');
     else log('Sammelauftrag fertig: '+fmt(moved)+' '+label+' in '+chunks+' Tranchen gehandelt.', 'ti-check', 'ok');
     renderMarket();
@@ -16989,10 +17037,35 @@
     // 0,50*1 = 3,6 Fragmente Zerlegewert, also ~2.780 Kr. je Fragment. Hier kosten sie 4.000 Kr. -
     // rund 44% Aufschlag dafür, dass man nicht auf Glück angewiesen ist. Die Lotterie bleibt damit
     // der günstigere, das gezielte Fertigen der verlässliche Weg; keiner entwertet den anderen.
+    /* TAGESLIMIT 5 Lieferungen (17.08.2026, Auftrag Sascha - Teil 2 des Markt-Deckels): Ohne
+       Limit war diese Karte der Umtauschkanal von Rohstoffmasse in Modulmacht - 66 Mio Credits
+       aus einem 400-Mio-Verkauf waren 1.650 Lieferungen = 16.500 Fragmente = 206 legendaere
+       Module auf einen Schlag. Das Limit ist eine SPIELREGEL wie die Warteschlangen-Grenzen,
+       keine Sicherheitsgrenze: Der Credit-Shop ist klientenautoritativ wie die ganze
+       Solo-Wirtschaft. Der Zaehler folgt dem dailyModuleOffer-Muster (dayKeyOf, lazy Reset beim
+       Zugriff - kein zentraler Reset-Ort). Die "5" in der desc ist bewusst Literal: CREDIT_SHOP
+       wird beim Laden ausgewertet, eine weiter unten stehende Konstante laege in der temporalen
+       Todeszone (Regel 38) - test_markt_kontingent.js prueft Literal gegen Konstante. */
     { key:'fragmente', name:'Modulfragment-Lieferung', icon:'ti-atom-2', cost:40000, bulk:true,
-      desc:'10 Modulfragmente sofort. Aus Fragmenten fertigst du im Offiziere-Tab gezielt dein Wunschmodul (4/7/12/32/80 Fragmente je nach Seltenheit), statt auf einen Zufallsfund zu hoffen – oder setzt Sockel-Chips ein.',
-      buy(){ state.moduleFragments = (state.moduleFragments||0) + 10; return '+10 Fragmente'; } }
+      desc:'10 Modulfragmente sofort, höchstens 5 Lieferungen je Tag. Aus Fragmenten fertigst du im Offiziere-Tab gezielt dein Wunschmodul (4/7/12/32/80 Fragmente je nach Seltenheit), statt auf einen Zufallsfund zu hoffen – oder setzt Sockel-Chips ein.',
+      kaufbar(){ return fragmentLieferungenHeute() < FRAGMENT_LIEFERUNG_PRO_TAG; },
+      tagesRest(){ return Math.max(0, FRAGMENT_LIEFERUNG_PRO_TAG - fragmentLieferungenHeute()); },
+      buy(){
+        const heute = dayKeyOf(Date.now());
+        if (!state.fragmentLieferungen || state.fragmentLieferungen.tag !== heute) state.fragmentLieferungen = { tag: heute, anzahl: 0 };
+        state.fragmentLieferungen.anzahl += 1;
+        state.moduleFragments = (state.moduleFragments||0) + 10;
+        return '+10 Fragmente';
+      } }
   ];
+  const FRAGMENT_LIEFERUNG_PRO_TAG = 5;
+  // Wieviele Lieferungen heute schon gekauft wurden - lazy Tageswechsel wie beim Tagesangebot
+  // (state.dailyModuleOffer): Passt der Tag-Schluessel nicht mehr, zaehlt der Stand schlicht
+  // nicht mehr; zurueckgeschrieben wird erst beim naechsten Kauf.
+  function fragmentLieferungenHeute(){
+    const f = state.fragmentLieferungen;
+    return (f && f.tag === dayKeyOf(Date.now())) ? (f.anzahl||0) : 0;
+  }
   // Menge, die im Shop pro Karte gewählt ist (nur Sitzung, nicht gespeichert).
   const shopBuyQty = {};
   // Ein Shop-Buff derselben Art kann nicht gestapelt werden, solange er läuft (verhindert Mehrfachkauf-Stacking).
@@ -17028,6 +17101,19 @@
     // sichtbar()/kaufbar() werden hier ERNEUT geprüft, nicht nur beim Zeichnen: Zwischen dem letzten
     // Neuzeichnen und dem Klick kann sich der Vorrat geändert haben, und der Knopf ist dann veraltet.
     if (item.sichtbar && !item.sichtbar()) return;
+    /* Tageslimit-Kappung (17.08.2026): kaufbar() laeuft nur EINMAL vor der bulk-Schleife, buy()
+       danach qty-mal - ein x10-Kauf am Limit vorbei waere sonst moeglich (Erkundungs-Befund zum
+       Fragment-Limit). Deshalb wird qty hier auf den Tagesrest gekappt, mit ehrlicher Meldung -
+       dasselbe Muster wie der affordable-Trim weiter unten. Der Block steht VOR der kaufbar()-
+       Pruefung: Bei einem Item, dessen kaufbar() das Tageslimit IST (die Fragment-Lieferung),
+       kaeme sonst die generische "steht dir gerade nicht zur Verfuegung"-Meldung statt des
+       Grundes - und eine Meldung ohne Grund schickt den Spieler auf Fehlersuche (Regel 37). */
+    let tagesTrimmed = false;
+    if (item.tagesRest){
+      const rest = item.tagesRest();
+      if (rest < 1){ log(item.name+': das Tageslimit ist erreicht – morgen wieder.', 'ti-clock'); return; }
+      if (qty > rest){ qty = rest; tagesTrimmed = true; }
+    }
     if (item.kaufbar && !item.kaufbar()){ log(item.name+' steht dir gerade nicht zur Verfügung.', 'ti-alert-triangle'); return; }
     // Einträge mit eigener Gegenleistung (preisText) laufen an der Kredit-Preisrechnung vorbei –
     // sie kosten keine Kredite, sondern etwas anderes, das in buy() abgebucht wird.
@@ -17055,7 +17141,8 @@
     log(eigenerPreis
         ? item.name+': '+item.preisText+' abgegeben →'+(detail || ' erledigt')
         : (qty>1 ? qty+'× ' : '')+item.name+' gekauft ('+fmt(total)+' Kredite).'+detail
-          + (trimmed ? ' (Menge auf das bezahlbare Maximum gekürzt.)' : ''), item.icon);
+          + (trimmed ? ' (Menge auf das bezahlbare Maximum gekürzt.)' : '')
+          + (tagesTrimmed ? ' (Menge auf das heutige Tageslimit gekürzt.)' : ''), item.icon);
     playSound('build');
     checkAchievements();
     render(); save();
@@ -17182,11 +17269,18 @@
     const sig = 'deal:'+deal.key+':'+(dealClaimed?1:0)+':'+(dealAfford?1:0)
       + '|daily:'+dailyOffers.map(o => o.slot+':'+o.def.key+':'+o.rarity+':'+(dailyOfferClaimed(o.slot)?1:0)+':'+(((state.credits||0)>=o.cost)?1:0)).join(',')
       + '|frag:'+(state.moduleFragments||0)
+      // Der Tages-Zaehler der Fragment-Lieferung MUSS in die Signatur: Die "heute noch X von 5"-
+      // Zeile aendert sich mit jedem Kauf, waehrend kaufbar() bis zum letzten Kauf 1 bleibt -
+      // ohne den Zaehler fror die Anzeige ein (exakt die renderModuleMarket-Falle, CLAUDE.md).
+      + '|fragTag:'+fragmentLieferungenHeute()
       + '|'+sichtbare.map(item => {
       const buffKind = item.key==='boost_prod' ? 'prod_all' : (item.key==='soeldner' ? 'atk' : (item.key==='schild' ? 'def' : null));
       // Die gewählte Menge gehört in die Signatur: ohne sie bliebe die Gesamtpreis-Zeile stehen,
       // wenn der Spieler die Menge ändert, ohne dass sich Kredite oder Buffs ändern.
-      return item.key+':'+((item.kaufbar ? item.kaufbar() : (state.credits||0) >= item.cost)?1:0)+':'+((buffKind && shopBuffActive(buffKind))?1:0)+':'+(shopBuyQty[item.key]||1);
+      // kaufbar() UND Bezahlbarkeit, nicht entweder-oder: Ein Kredit-Item MIT kaufbar() (die
+      // Fragment-Lieferung) braucht beides - nur kaufbar() liesse den Knopf bei 0 Krediten aktiv.
+      // Items mit eigener Gegenleistung (preisText) zahlen keine Kredite, dort entfaellt der Teil.
+      return item.key+':'+(((item.kaufbar ? item.kaufbar() : true) && (item.preisText ? true : (state.credits||0) >= item.cost))?1:0)+':'+((buffKind && shopBuffActive(buffKind))?1:0)+':'+(shopBuyQty[item.key]||1);
     }).join('|');
     if (sig === lastCreditShopSig) return;
     lastCreditShopSig = sig;
@@ -17219,7 +17313,10 @@
     box.innerHTML = dealCard + dailyHead + dailyCards + fragLine + sichtbare.map(item => {
       const buffKind = item.key==='boost_prod' ? 'prod_all' : (item.key==='soeldner' ? 'atk' : (item.key==='schild' ? 'def' : null));
       const active = buffKind && shopBuffActive(buffKind);
-      const affordable = item.kaufbar ? item.kaufbar() : (state.credits||0) >= item.cost;
+      const affordable = (item.kaufbar ? item.kaufbar() : true) && (item.preisText ? true : (state.credits||0) >= item.cost);
+      // Tageslimit-Zeile (nur bei Items, die eines fuehren): nennt den Rest, und bei 0 den Grund.
+      const tagesNote = item.tagesRest
+        ? `<div class="bmeta" style="color:${item.tagesRest() > 0 ? '#7d8199' : '#e0a548'};">${item.tagesRest() > 0 ? 'Heute noch '+item.tagesRest()+' von '+FRAGMENT_LIEFERUNG_PRO_TAG+' Lieferungen' : 'Tageslimit erreicht – morgen wieder'}</div>` : '';
       const qty = Math.max(1, shopBuyQty[item.key] || 1);
       const maxQty = Math.max(1, Math.floor((state.credits||0) / item.cost));
       // Mengenleiste nur bei bulk-Items - die drei Buffs stapeln nicht, dort wäre sie sinnlos.
@@ -17241,6 +17338,7 @@
         <div class="left"><div class="bicon" style="background:rgba(250,199,117,0.16); color:#fac775;"><i class="ti ${item.icon}" aria-hidden="true"></i></div>
           <div style="min-width:0;"><div class="bname">${item.name}</div>
           <div class="bmeta">${item.desc}</div>
+          ${tagesNote}
           ${totalNote}
           ${qtyBar}
           ${jumpBtn}</div>
@@ -28765,6 +28863,9 @@
       // Funktionen abhaengt, ist keine Einmalzahlung. Hier steht sie ausdruecklich.
       deckelAusgleich2026: !!state.deckelAusgleich2026,
       deckelKappung2026: !!state.deckelKappung2026, deckelKappung2026b: !!state.deckelKappung2026b, deckelKappung2026c: !!state.deckelKappung2026c,
+      // Der Tages-Zaehler der Fragment-Lieferung ueberlebt beide Resets: Ein Prestige, das ihn
+      // nullte, waere ein (kleiner, aber unnoetiger) Umweg um das Tageslimit.
+      fragmentLieferungen: state.fragmentLieferungen || null,
       autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: 250 + prestigeStartLvl*100, claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
@@ -28997,6 +29098,9 @@
       // Funktionen abhaengt, ist keine Einmalzahlung. Hier steht sie ausdruecklich.
       deckelAusgleich2026: !!state.deckelAusgleich2026,
       deckelKappung2026: !!state.deckelKappung2026, deckelKappung2026b: !!state.deckelKappung2026b, deckelKappung2026c: !!state.deckelKappung2026c,
+      // Der Tages-Zaehler der Fragment-Lieferung ueberlebt beide Resets: Ein Prestige, das ihn
+      // nullte, waere ein (kleiner, aber unnoetiger) Umweg um das Tageslimit.
+      fragmentLieferungen: state.fragmentLieferungen || null,
       autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: startLvl*100,
       claimedBossKills: keepBossClaims,
@@ -37299,6 +37403,7 @@
     { key:'markt', icon:'ti-truck', title:'Galaktischer Markt', entries:[
       { title:'Geteilter Markt', body:'Der Markt ist für <strong>alle Spieler gemeinsam</strong> (läuft über den Server). Jede Ressource hat einen Preis in <strong>Krediten</strong>, der auf Angebot und Nachfrage reagiert: Kaufen treibt den Preis hoch, Verkaufen drückt ihn. Große Trades bekommen einen spürbar schlechteren Durchschnittspreis (Slippage), es lohnt sich also, in Etappen zu handeln. Der Knopf <strong>„Max Kauf"</strong> trägt die größtmögliche Menge nach deinem Kreditstand ins Mengenfeld ein, <strong>„100%"</strong> deinen kompletten Bestand - ausgelöst wird der Handel erst mit einem bewussten zweiten Klick auf Kaufen/Verkaufen. Neben jedem Preis zeigt eine kleine <strong>Verlaufskurve</strong> (Sparkline) die Preisentwicklung der letzten Stunden - so erkennst du auf einen Blick, ob ein Preis gerade steigt oder fällt, und kannst Ein-/Verkäufe besser timen.' },
       { title:'Markt-Ereignisse', body:'Gelegentlich erschüttert ein <strong>Angebots- oder Nachfrageschock</strong> eine einzelne Ressource: Eine <strong>Knappheit</strong> treibt ihre Preise deutlich hoch (teuer im Einkauf, lohnend im Verkauf), eine <strong>Schwemme</strong> drückt sie stark (günstig zum Einkaufen). Das Ereignis wird als Banner oben im Markt-Tab und in der Galaxie-News angekündigt, betrifft immer nur eine Ressource für 2-4 Stunden und lässt die Preise organisch zum Schockniveau driften (kein harter Sprung). Wer aufpasst, macht damit den besten Schnitt.' },
+      { title:'Verkaufs-Tageskontingent', body:'Verkaufserlöse sind auf <strong>5 Millionen Credits je Tag</strong> gedeckelt – Käufe sind davon nicht betroffen, und auch das Verkaufen selbst geht weiter, sobald der Tag wechselt (der Zähler läuft über den Servertag; die Markt-Box zeigt dir die verbleibende Zeit an). <strong>Warum:</strong> Ein einziger Massenverkauf von 400 Millionen Rohstoffen brachte vorher rund 66 Millionen Credits in wenigen Minuten – genug, um im Kredit-Shop auf einen Schlag über 200 legendäre Module zusammenzukaufen. Der Preisverfall beim Verkaufen bremst so etwas kaum: Der Bodenpreis ist bei riesigen Mengen immer noch sehr viel Geld. Der Deckel macht aus dem Alles-auf-einmal ein Projekt über mehrere Tage, lässt den Alltagshandel aber unberührt – 5 Millionen sind ein Vielfaches dessen, was normale Verkäufe an einem Tag einbringen. Die Markt-Box zeigt dein <strong>Restkontingent</strong> an, die Verkaufsvorschau warnt, bevor ein Auftrag es übersteigt, und ein Sammelauftrag stoppt sauber an der Grenze statt mit einem Fehler. Dazu passend ist die <strong>Modulfragment-Lieferung</strong> im Kredit-Shop auf <strong>5 Lieferungen je Tag</strong> begrenzt (50 Fragmente) – die Karte zeigt an, wie viele heute noch gehen.' },
       { title:'Kredite', body:'Kredite sind die Handelswährung. Du bekommst sie durch <strong>Verkaufen</strong> von Ressourcen (mit 20% Abschlag auf den Durchschnittspreis) und gibst sie fürs <strong>Kaufen</strong> aus. Die typische Schleife: eine Ressource, die du im Überfluss hast, verkaufen und dafür eine knappe Ressource kaufen. Wer viel verkauft, drückt den Preis spürbar - bis auf rund 15% des Normalwerts. Preise erholen sich mit der Zeit: durch Käufe erhöhte Preise recht zügig, durch Verkäufe gedrückte Preise dagegen sehr langsam (mehrere Tage statt Stunden bis zur fast vollständigen Erholung). Ein großer Verkauf hat also eine lange spürbare Wirkung auf den Preis, ein großer Kauf nicht.' },
       { title:'Keine Tier-2-Ressourcen am Markt', body:'Die <strong>Tier-2-Ressourcen</strong> sind bewusst NICHT handelbar (nach kurzem Test wieder entfernt): Sie kommen ausschließlich aus den eigenen Fabriken - ergänzt nur durch die hart gedeckelten Pakt-Geschenke. Der Markt handelt ausschließlich die fünf Basis-Ressourcen.' },
       { title:'Nur mit Server', body:'Der Markt braucht eine Serververbindung (im Gastmodus nicht verfügbar), da alle Spieler denselben Markt teilen.' },
