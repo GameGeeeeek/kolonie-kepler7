@@ -432,7 +432,7 @@
 
        z-index:0 zusammen mit #game-root{z-index:1} hält die Reihenfolge, die vorher die
        Verschachtelung erledigt hat: Himmel hinter allem, Inhalt davor. */
-    #bgstars { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+    #bgnebel, #bgstars { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
     /* Browser-Zoom der SEITE abgestellt (KB-4d): Das Spiel hat seinen eigenen Karten-Zoom, der
        Seiten-Pinch daneben zoomte versehentlich den ganzen Browser und die Vollbild-Karte
        (100dvh) passte danach nicht mehr ins Bild. manipulation laesst Scrollen zu, nimmt aber
@@ -3082,6 +3082,10 @@
 
   <!-- Der Sternenhimmel liegt seit dem 14.08.2026 am FENSTER, nicht mehr in der Hülle (siehe die
        Begründung bei #bgstars im CSS). Deshalb steht er hier vor .shell und nicht darin. -->
+  <!-- Nebel-Leinwand UNTER dem Sternenhimmel (KB-9a): Die Nebel driften ~2 px/s und werden nur
+       bei geändertem Versatz neu gemalt (~1x/s) - vorher komponierte der 30-FPS-Loop sie jedes
+       Frame als Vollbild-Verläufe und belegte damit gemessen ~89% des Hauptthreads. -->
+  <canvas id="bgnebel" aria-hidden="true"></canvas>
   <canvas id="bgstars" aria-hidden="true"></canvas>
 
   <div class="shell">
@@ -3375,6 +3379,11 @@
         <div class="map-wrap" style="height:420px; margin-bottom:1rem; position:relative; touch-action:none;">
           <svg id="galaxyMapSvg" viewBox="0 0 950 500" width="100%" height="100%" style="cursor:grab;"></svg>
           <button id="galaxyBackBtn" style="display:none; position:absolute; left:8px; top:8px; z-index:5; padding:5px 11px; font-size:12px; background:rgba(13,18,36,0.9);"><i class="ti ti-chevron-left" aria-hidden="true" style="margin-right:5px;"></i>Galaxie</button>
+          <!-- System-Blättern direkt auf der Karte (KB-9b): Die ◀/▶-Zeile der Tafel liegt unterhalb
+               des Sichtbereichs, sobald die Karte nach oben gescrollt ist - wer Systeme durchsucht,
+               musste deshalb je System über den Zurück-Knopf und den nächsten Knoten gehen. -->
+          <button id="galaxySysPrevBtn" title="Vorheriges System" aria-label="Vorheriges System" style="display:none; position:absolute; left:8px; top:50%; transform:translateY(-50%); z-index:5; width:36px; height:48px; padding:0; font-size:20px; font-weight:600; background:rgba(13,18,36,0.9);">‹</button>
+          <button id="galaxySysNextBtn" title="Nächstes System" aria-label="Nächstes System" style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); z-index:5; width:36px; height:48px; padding:0; font-size:20px; font-weight:600; background:rgba(13,18,36,0.9);">›</button>
           <div style="position:absolute; right:8px; bottom:8px; display:flex; flex-direction:column; gap:6px; z-index:5;">
             <button id="galaxyZoomInBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">+</button>
             <button id="galaxyZoomOutBtn" style="width:34px; height:34px; padding:0; font-size:17px; font-weight:600; background:rgba(13,18,36,0.9);">–</button>
@@ -6984,8 +6993,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.545.0';
+  const VERSION = '8.546.0';
   const PATCHNOTES = [
+    { version:'8.546.0', date:'17.08.2026', changes:[
+      '<strong>Die Karte ruckelt nicht mehr – und der Übeltäter war gar nicht die Karte.</strong> Direkter Spieler-Report („steckt im Zoom einige Sekunden"), am Messprotokoll nachvollzogen: Die zwei dekorativen Weltraum-Nebel im Seitenhintergrund haben sich dreißigmal pro Sekunde als bildschirmfüllende Farbverläufe neu zusammengesetzt und damit rund neun Zehntel der Rechenzeit der ganzen Seite belegt – auf schwächeren Rechnern musste sich jede Zoom-Geste dahinter anstellen. Die Nebel liegen jetzt auf einer eigenen Zeichenfläche, die nur noch alle paar Sekunden neu gemalt wird (sie driften ohnehin nur wenige Pixel pro Sekunde). Gemessen: Die Hintergrund-Last fällt um rund 88 Prozent, das Zoom-Zeitfenster von über vier Sekunden Rechenstau auf unter eine – optisch ändert sich nichts, funkelnde Sterne und Sternschnuppen bleiben.',
+      '<strong>System nach System durchsehen, ohne jedes Mal zurückzuspringen.</strong> Zweiter Teil desselben Reports: Wer Systeme durchsucht, musste bisher je System über den Zurück-Knopf in den Sektor und das nächste System antippen – die ◀/▶-Knöpfe der Detailtafel lagen unterhalb des Sichtbereichs und sprangen zudem in einer Reihenfolge kreuz und quer durch die Galaxie. Jetzt sitzen <strong>‹ ›-Blätterknöpfe direkt am linken und rechten Kartenrand</strong>, sobald ein System offen ist, und beide Knopfpaare blättern in derselben <strong>geografischen Reihenfolge</strong>: Sektor für Sektor, innerhalb des Sektors von Nord nach Süd – am Sektorrand geht es nahtlos im Nachbarsektor weiter, einmal rundherum durch die ganze Galaxie. Der Hilfe-Abschnitt „Sektorkarte bedienen" beschreibt den neuen Weg.'
+    ]},
     { version:'8.545.0', date:'17.08.2026', changes:[
       '<strong>Protomaterie steht jetzt auch dann in der Rohstoffleiste, wenn du sie noch nicht abbauen kannst</strong> – ausgegraut, mit Schloss und dem Hinweis „Benötigt Minentechnik". Bisher fehlte die Karte in dem Fall vollständig: Wer die Forschung noch nicht hatte, für den existierte der Rohstoff in der Oberfläche schlicht nicht, und die Mega-Ausbaustufen verlangten etwas, von dem nirgends stand, woher man es bekommt. Die gesperrte Karte sagt beides in einem Satz – dass es ihn gibt, und dass er der einzige Rohstoff ist, den keine Fabrik herstellt.'
     ]},
@@ -37007,7 +37020,7 @@
       { title:'Mondbildung', body:'Erreicht ein Trümmerfeld insgesamt <strong>4.000 Ressourcen</strong>, hat es bei jeder weiteren Prüfung eine <strong>1,2%-Chance</strong>, zu einem Mond heranzuwachsen. Bewusst selten – kein garantierter Automatismus. Ein Mond ist ein <strong>eigenständiges Ziel</strong> mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung, unabhängig von seinem Planeten - nur die Ressourcen (Lager, Produktion) bleiben wie bei jeder Kolonie ein gemeinsamer Imperiums-Pool. Auf der Sektorkarte hat der Mond ein eigenes, klickbares Symbol direkt am zugehörigen Planeten (nicht Teil des Planeten-Klicks); ebenso in der Sektorkarten-Planetenliste, wo die Mond-Karte direkt unter der Karte ihres Planeten erscheint. Zusätzlich überall erreichbar über das Mond-Symbol (Planeten-Umschalter, Status-Leiste, Sektorkarten-Schnellzugriffsleiste).' },
       { title:'Abhorchposten (exklusives Mondgebäude)', body:'Erstes Gebäude, das ausschließlich auf einem kolonisierten Mond errichtet werden kann (Verteidigung-Tab, sobald ein Mond als aktive Basis ausgewählt ist). Erkennt fremde Flottenbewegungen im Umkreis: Stufe 1 nur das eigene Sternsystem, Stufe 2/3/4 wachsend 1/2/3 Sektoren (mehr geht nicht: Stufe 4 ist die letzte). Zeigt für jede erfasste Flotte Spielername, Start- und Zielsystem sowie Restflugzeit; Missionsart erst ab Stufe 3, Schiffszusammensetzung erst ab Stufe 4. PvP-Angriffe/Spionage gegen andere Spieler bleiben unsichtbar (dafür gibt es im Spiel grundsätzlich keine echten Positionsdaten des Gegners) - erfasst werden Erkundung, Kolonisierung, Verlegungen und NPC-Angriffe. Kosten und Bauzeit steigen mit jeder Stufe deutlich stärker als bei anderen Gebäuden.' },
       { title:'Mondzerstörer & Mondbelagerung', body:'Endgame-Schiff (Flotte-Tab), das einen fremden, kolonisierten Mond dauerhaft zerstören kann. Voraussetzung: Leerentechnologie Stufe 10 UND Kampftechnik II Stufe 20 (die höchste Forschungshürde im Spiel), danach ein einmaliges Freischalten mit allen 4 seltenen Items gleichzeitig (Antimateriekern, Kristallherz, Alte Technologie, Leerensplitter). Extrem teuer, extrem langsam (weit unter der Geschwindigkeit jedes anderen Schiffs, entsprechend lange Flugzeit und hoher Treibstoffverbrauch) und immer nur als einzelnes Exemplar besitzbar. Ein Ziel wählst du direkt über die Bestenliste (Schädel-Symbol bei einem fremden Spieler) - dort erscheinen dessen kolonisierte Monde zur Auswahl. Die Erfolgschance ist grundsätzlich gedeckelt (nie garantiert, nie komplett wirkungslos) und sinkt mit der Verteidigung des Ziel-Mondes: eigene Gebäude/Flotte am Mond, der neue Mondschildgenerator (Verteidigungsgebäude, nur auf Monden baubar) und die Forschung Mondstabilität senken sie zusätzlich; ein aktiver Allianz-Beitritt gibt dem Ziel ebenfalls einen kleinen Bonus. Nach jeder Belagerung - egal ob erfolgreich oder abgewehrt - braucht der Mondzerstörer 48 Std. Abklingzeit. Jeder Belagerungsschuss verbraucht zusätzlich eine <strong>Belagerungs-Ladung aus 25 Hochenergiekristallen</strong> (Tier-2-Ressource aus dem Kristalllabor) - sie wird bei der Ankunft serverseitig abgebucht; ohne ausreichende Ladung schlägt die Belagerung fehl. Erfolgschance und Ergebnis werden serverseitig berechnet.' },
-      { title:'Sektorkarte bedienen', body:'Die Karte führt in <strong>festen Ansichten</strong> von der ganzen Galaxie bis zum einzelnen Planeten. Sie beginnt als <strong>Übersicht</strong>: die Galaxie, aufgeteilt in acht benannte Sektorregionen (die Heimatregion trägt das 🏠), jede mit ihren Systemen als Punkten und ihrer Systemzahl. Jede Region zeigt außerdem die <strong>Hinweise ihrer Systeme</strong> (Piratenbasis, Krieg, Alien-Sichtung, Allianzbasis, Aufklärung, Peilung) als kleine Symbole unter der Systemzahl - der Tooltip nennt das jeweilige System. Ein <strong>Tipp auf eine Region</strong> öffnet die <strong>Sektoransicht</strong>: jedes System auf einem festen, daumengroßen Platz mit Sonnenfarbe, Namen und Erkundungsstand - Heimat mit goldenem, eigene Kolonien mit grünem Ring; ein Gürtelsystem erkennst du am gestrichelten goldenen Ring und am Untertitel „Gürtelsystem" – seine Asteroiden liegen im aufgeklappten System auf ihrer Gürtelbahn. Mit <strong>‹ ›</strong> oder Wischen wechselst du zum Nachbarsektor, <strong>⌂</strong> führt zur Übersicht. Ein <strong>Tipp auf ein System</strong> klappt es auf: Die Planeten gehen an ihrer echten Position in der Galaxie auf, die Nachbarsysteme bleiben als schwache Punkte am Rand sichtbar. Ein Klick auf ein Objekt im aufgeklappten System – Planet, Mond, fremder Spieler, Gegner – öffnet ein <strong>kleines Menü</strong> mit den Aktionen, die dieses Objekt kennt (siehe „Das Kartenmenü"). <strong>Nur im aufgeklappten System</strong> gilt Zoomen und Verschieben: Ziehen zum Verschieben, Pinch-Geste zum Zoomen (am Rechner: Strg bzw. Cmd gedrückt halten und scrollen), alternativ die +/–-Knöpfe unten rechts; hier sitzt auch die <strong>Ebenen-Leiste</strong>: „Routen" (deine eigenen Missionslinien), „Fraktionen" (NPC-Territorium als Ring und Wappen am System), „Ereignisse" (Piratenbasis, Aliens, Krieg, Wurmloch) und „Aufklärung" (Spähberichte, Peilungen) lassen sich einzeln aus- und einschalten - die Auswahl wird im Spielstand gespeichert, Standard ist alles an. Zurück geht es Ebene für Ebene: aus dem System über <strong>„‹ Galaxie"</strong>, <strong>Esc</strong> oder einen Klick ins Leere in die Sektoransicht, von dort mit ⌂ zur Übersicht; der <strong>⟲-Knopf</strong> schält immer genau eine Ebene nach außen. Die geöffnete Ansicht wird bewusst nicht gespeichert - nach einem Neuladen beginnst du wieder in der Übersicht. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar als farbiger Stern in der Sektoransicht wie als große Sonne im aufgeklappten System.' },
+      { title:'Sektorkarte bedienen', body:'Die Karte führt in <strong>festen Ansichten</strong> von der ganzen Galaxie bis zum einzelnen Planeten. Sie beginnt als <strong>Übersicht</strong>: die Galaxie, aufgeteilt in acht benannte Sektorregionen (die Heimatregion trägt das 🏠), jede mit ihren Systemen als Punkten und ihrer Systemzahl. Jede Region zeigt außerdem die <strong>Hinweise ihrer Systeme</strong> (Piratenbasis, Krieg, Alien-Sichtung, Allianzbasis, Aufklärung, Peilung) als kleine Symbole unter der Systemzahl - der Tooltip nennt das jeweilige System. Ein <strong>Tipp auf eine Region</strong> öffnet die <strong>Sektoransicht</strong>: jedes System auf einem festen, daumengroßen Platz mit Sonnenfarbe, Namen und Erkundungsstand - Heimat mit goldenem, eigene Kolonien mit grünem Ring; ein Gürtelsystem erkennst du am gestrichelten goldenen Ring und am Untertitel „Gürtelsystem" – seine Asteroiden liegen im aufgeklappten System auf ihrer Gürtelbahn. Mit <strong>‹ ›</strong> oder Wischen wechselst du zum Nachbarsektor, <strong>⌂</strong> führt zur Übersicht. Ein <strong>Tipp auf ein System</strong> klappt es auf: Die Planeten gehen an ihrer echten Position in der Galaxie auf, die Nachbarsysteme bleiben als schwache Punkte am Rand sichtbar. Mit den <strong>‹ ›-Knöpfen am linken und rechten Kartenrand</strong> blätterst du direkt zum nächsten System – Sektor für Sektor durch die ganze Galaxie, ohne den Umweg über den Zurück-Knopf. Ein Klick auf ein Objekt im aufgeklappten System – Planet, Mond, fremder Spieler, Gegner – öffnet ein <strong>kleines Menü</strong> mit den Aktionen, die dieses Objekt kennt (siehe „Das Kartenmenü"). <strong>Nur im aufgeklappten System</strong> gilt Zoomen und Verschieben: Ziehen zum Verschieben, Pinch-Geste zum Zoomen (am Rechner: Strg bzw. Cmd gedrückt halten und scrollen), alternativ die +/–-Knöpfe unten rechts; hier sitzt auch die <strong>Ebenen-Leiste</strong>: „Routen" (deine eigenen Missionslinien), „Fraktionen" (NPC-Territorium als Ring und Wappen am System), „Ereignisse" (Piratenbasis, Aliens, Krieg, Wurmloch) und „Aufklärung" (Spähberichte, Peilungen) lassen sich einzeln aus- und einschalten - die Auswahl wird im Spielstand gespeichert, Standard ist alles an. Zurück geht es Ebene für Ebene: aus dem System über <strong>„‹ Galaxie"</strong>, <strong>Esc</strong> oder einen Klick ins Leere in die Sektoransicht, von dort mit ⌂ zur Übersicht; der <strong>⟲-Knopf</strong> schält immer genau eine Ebene nach außen. Die geöffnete Ansicht wird bewusst nicht gespeichert - nach einem Neuladen beginnst du wieder in der Übersicht. Jedes System hat außerdem einen eigenen, rein optischen Sonnentyp (u.a. Gelber Hauptreihenstern, Roter Zwerg, Blauer Riese, Weißer Zwerg, Doppelstern, Pulsar) - sichtbar als farbiger Stern in der Sektoransicht wie als große Sonne im aufgeklappten System.' },
       { title:'Das Kartenmenü – ein Klick löst nichts mehr sofort aus', body:'Ein Klick auf ein Objekt der Sektorkarte öffnet ein <strong>kleines Menü</strong>, statt wie früher direkt eine Mission loszuschicken. Das Menü zeigt nur die Aktionen, die das angeklickte Objekt wirklich kennt, und schreibt unter jeden Eintrag Flugzeit und Kosten – oder den Grund, warum er grau ist.<br><br><strong>Planet:</strong> Erkunden und, sobald er entdeckt ist, Kolonisieren. Ist es eine eigene Kolonie, steht ganz oben <em>Als aktive Basis wählen</em>.<br><strong>Mond:</strong> Kolonisieren bzw. Als aktive Basis wählen.<br><strong>Fremder Spieler:</strong> Spähen, Angreifen und Monde belagern.<br><strong>Gegner (NPC):</strong> Angreifen.<br><br><strong>Warum „angreifen" nicht beim Planeten steht:</strong> Andere Spieler wohnen im Spiel nicht auf den Planeten der Sektorkarte – sie haben ihren <strong>eigenen roten Marker</strong> nahe der Sonne des Systems. Ein Planet ist entweder unbewohnt oder deiner. Deshalb sitzt Angreifen im Menü des Spielermarkers, und beim eigenen Planeten steht dort, was dort sinnvoll ist. Ebenso heißt <em>Spähen</em> je nach Ziel etwas anderes: Beim Planeten ist es die <strong>Erkundung</strong> (Erkundungsschiff, deckt den Planeten auf), beim Spieler die <strong>Spionage</strong> (Spähschiff oder Spionagekreuzer, deckt Flotte und Verteidigung auf).<br><br>Das Menü schließt mit <strong>Esc</strong>, per Klick daneben oder sobald du die Karte verschiebst. Ein Klick, mit dem du die Karte nur ziehen wolltest, öffnet es nicht.' },
       { title:'Warum die Sterne kleiner werden, je größer die Galaxie wird', body:'Jedes System wird als kleiner Kern mit einem <strong>Leuchthof</strong> gezeichnet. Da die Karte anklickbar ist, müssen zwei Systeme weit genug auseinanderstehen, um getroffen werden zu können - im Spiel sind das <strong>mindestens 24 Pixel</strong>, die nach dem Setzen der Plätze einmalig erzwungen werden. Der Leuchthof schrumpft dabei mit der Größe der Galaxie: bei den heutigen 69 Systemen hat er seine volle Größe, im Vollausbau mit 277 nur noch die Hälfte. Bliebe er fest, bräuchten die Knoten 34 Pixel Abstand - und so viel Platz gibt die Karte nicht her; die Spiralarme würden zu einem gleichmäßigen Teppich. Ein Systemplatz <strong>verschiebt sich dadurch nie</strong>: Der Mindestabstand wird für alle 277 Plätze auf einmal hergestellt, auch für die noch leeren, sodass eine einmal gemerkte Stelle für immer stimmt.' },
       { title:'Die Galaxie wächst jede Woche', body:'Die Sternenkarte ist nicht fertig: Jeden <strong>Montag um 00:00 Uhr UTC</strong> kommen automatisch <strong>zwei weitere Sternsysteme</strong> am Außenrand der Galaxie dazu, jedes mit <strong>5 bis 10 Planeten</strong> nach denselben Regeln wie die bereits vorhandenen - eigene Namen, eigene Planetentypen, eigene Erkundungsdauern, Beute und Kolonisierungskosten in derselben Größenordnung wie die bestehenden Außensysteme. Es ist also dauerhaft neues Gebiet zu erkunden und zu besiedeln, ohne dass sich an irgendeinem bestehenden Planeten etwas ändert. Die Zeile unter der Galaxie-Übersicht zeigt, wie viele Systeme aktuell kartiert sind und wann die nächsten zwei erscheinen; sobald sie da sind, meldet das Log die neuen Namen. <strong>Bestehende Systeme rücken dabei nicht von der Stelle:</strong> Jedes System hat einen festen Platz auf der Karte, die neuen setzen sich weiter außen an. Alle Spieler sehen dieselben neuen Systeme zur selben Zeit - die Karte wird aus dem Kalender berechnet, nicht ausgewürfelt. <strong>Wichtig für Sammler:</strong> Erfolg „Grenzgänger" und die Kompendium-Kategorien „Sternenkarte"/„Sternensysteme" zählen ausdrücklich nur die fest eingetragene Kern-Galaxie - ein einmal abgeschlossenes Sammelziel reißt durch die wöchentlichen Neuzugänge also nicht wieder auf.' },
@@ -50723,9 +50736,11 @@
   // da reine Opazitätsänderung ohne Positionsänderung nicht unter "Bewegung" im Vestibular-Sinne fällt).
   function initBgCanvas(){
     const canvas = document.getElementById('bgstars');
+    const nebelCanvas = document.getElementById('bgnebel');
     const reduceMotion = typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let layers = [];
     let nebulae = [];
+    let lastNebelKey = '';   // Drift-Versatz des letzten Nebel-Malvorgangs (KB-9a)
     // Gelegentliche Sternschnuppen (rein dekorativ, on-theme fürs Weltraum-Setting). Bei
     // prefers-reduced-motion werden gar keine erzeugt (siehe Spawn-Gate unten). Leben im selben
     // requestAnimationFrame-Loop wie die Sterne - der pausiert im Hintergrund-Tab automatisch.
@@ -50736,6 +50751,7 @@
       // Fenstergröße, nicht Hüllenhöhe (siehe #bgstars im CSS): konstante Kosten, und die Bitmap
       // hat dieselben Maße wie ihre Darstellungsfläche - sonst wird der Himmel verzerrt.
       canvas.width = Math.max(1, window.innerWidth); canvas.height = Math.max(1, window.innerHeight);
+      nebelCanvas.width = canvas.width; nebelCanvas.height = canvas.height;
       const totalCount = Math.floor((canvas.width*canvas.height)/9000);
       const specs = [
         { share:0.5,  rMin:0.2, rMax:0.7, speed:0.3, drift:6 },
@@ -50755,6 +50771,21 @@
         { x:canvas.width*0.2, y:canvas.height*0.3, r:maxDim*0.35, color:'127,119,221', driftPhase:0 },
         { x:canvas.width*0.75, y:canvas.height*0.7, r:maxDim*0.3, color:'55,138,221', driftPhase:2.4 }
       ];
+      // Verlaufs-Kachel je Nebel einmal vorrendern (außerhalb des Radius ist der Verlauf ohnehin
+      // transparent, die 2r-Kachel zeigt exakt dasselbe Bild) - dasselbe Muster wie beim Planeten
+      // weiter unten: einmal zeichnen, danach nur noch kopieren.
+      for (const neb of nebulae){
+        const kachel = document.createElement('canvas');
+        kachel.width = kachel.height = Math.max(2, Math.ceil(neb.r*2));
+        const kctx = kachel.getContext('2d');
+        const kg = kctx.createRadialGradient(neb.r, neb.r, 0, neb.r, neb.r, neb.r);
+        kg.addColorStop(0, `rgba(${neb.color},0.05)`);
+        kg.addColorStop(1, `rgba(${neb.color},0)`);
+        kctx.fillStyle = kg;
+        kctx.fillRect(0, 0, kachel.width, kachel.height);
+        neb.kachel = kachel;
+      }
+      lastNebelKey = '';   // Größe geändert -> Nebel-Leinwand beim nächsten Frame neu malen
       planetSprite = null; // Größe geändert -> Planet neu bauen (siehe planetHolen)
     }
 
@@ -50848,15 +50879,29 @@
     window.addEventListener('resize', () => { resize(); staticDrawn = false; });
     resize();
     const ctx = canvas.getContext('2d');
+    // Malt die Nebel-Leinwand GENAU DANN neu, wenn sich der quantisierte Drift-Versatz
+    // geändert hat. Quantisierung 6 px: Bei einem hunderte Pixel weichen Verlauf mit Alpha 0,05
+    // ist ein 6-px-Schritt unsichtbar, und die Leinwand wird nur noch alle paar Sekunden gemalt
+    // (2 px ergaben je nach Driftphase bis zu ~3 Malvorgänge je Sekunde - nachgemessen).
+    function nebelZeichnen(t){
+      const teile = nebulae.map(function(neb){
+        const ndx = reduceMotion ? 0 : Math.round(Math.sin(t*0.00006 + neb.driftPhase)*30/6)*6;
+        const ndy = reduceMotion ? 0 : Math.round(Math.cos(t*0.00005 + neb.driftPhase)*20/6)*6;
+        return ndx + ':' + ndy;
+      });
+      const key = teile.join('|');
+      if (key === lastNebelKey) return;
+      lastNebelKey = key;
+      const nctx = nebelCanvas.getContext('2d');
+      nctx.clearRect(0, 0, nebelCanvas.width, nebelCanvas.height);
+      nebulae.forEach(function(neb, i){
+        const p = teile[i].split(':');
+        nctx.drawImage(neb.kachel, neb.x + (+p[0]) - neb.r, neb.y + (+p[1]) - neb.r);
+      });
+    }
     function drawStaticFrame(){
       ctx.clearRect(0,0,canvas.width,canvas.height);
-      for (const neb of nebulae){
-        const g = ctx.createRadialGradient(neb.x, neb.y, 0, neb.x, neb.y, neb.r);
-        g.addColorStop(0, `rgba(${neb.color},0.05)`);
-        g.addColorStop(1, `rgba(${neb.color},0)`);
-        ctx.fillStyle = g;
-        ctx.fillRect(0,0,canvas.width,canvas.height);
-      }
+      nebelZeichnen(0);
       for (const layer of layers){
         for (const s of layer.stars){
           const alpha = 0.25 + 0.55*Math.abs(Math.sin(s.phase)); // eingefrorene, aber pro Stern unterschiedliche Helligkeit
@@ -50878,15 +50923,7 @@
       lastFrameT = t;
       const dt = meteorLastT ? Math.min(50, t - meteorLastT) : 16; meteorLastT = t;
       ctx.clearRect(0,0,canvas.width,canvas.height);
-      for (const neb of nebulae){
-        const ndx = reduceMotion ? 0 : Math.sin(t*0.00006 + neb.driftPhase)*30;
-        const ndy = reduceMotion ? 0 : Math.cos(t*0.00005 + neb.driftPhase)*20;
-        const g = ctx.createRadialGradient(neb.x+ndx, neb.y+ndy, 0, neb.x+ndx, neb.y+ndy, neb.r);
-        g.addColorStop(0, `rgba(${neb.color},0.05)`);
-        g.addColorStop(1, `rgba(${neb.color},0)`);
-        ctx.fillStyle = g;
-        ctx.fillRect(0,0,canvas.width,canvas.height);
-      }
+      nebelZeichnen(t);
       for (const layer of layers){
         const dx = reduceMotion ? 0 : Math.sin(t*0.00008*layer.speed)*layer.drift;
         for (const s of layer.stars){
@@ -52108,6 +52145,12 @@
   function updateGalaxyBackButton(){
     const b = document.getElementById('galaxyBackBtn');
     if (b) b.style.display = galaxyOpenSystem ? '' : 'none';
+    // Die ‹ ›-Blätterknöpfe (KB-9b) folgen dem Zurück-Knopf: sichtbar genau dann, wenn ein
+    // System offen ist - in Übersicht und Sektoransicht wären sie eine Falschaussage.
+    for (const id of ['galaxySysPrevBtn', 'galaxySysNextBtn']){
+      const k = document.getElementById(id);
+      if (k) k.style.display = galaxyOpenSystem ? '' : 'none';
+    }
   }
   // Ebenen-Leiste (v8.502.0, Etappe B-5): Vorgabe an (e[k] !== false), damit alte Spielstände
   // ohne das Feld die Karte unverändert sehen. Die Leisten-Knöpfe werden hier jede Sekunde aus
@@ -53064,6 +53107,24 @@
     galaxyOeffne(id);
     render();
   }
+  // Geografische Blätter-Reihenfolge (KB-9b): Sektor für Sektor in SEKTOR_DEFS-Reihenfolge,
+  // innerhalb wie die Sektoransicht ihre Plätze vergibt (Nord->Süd, West->Ost). Die alte
+  // Reihenfolge war die des Spiral-Layouts - ▶ sprang damit kreuz und quer durch die Galaxie.
+  // visibleSystems() statt sektorMitglieder(), damit entdeckte versteckte Systeme (zenith/
+  // tiefsee) nicht aus der Blätter-Reihe fallen, obwohl Karte und Tafel sie zeigen.
+  function karteSystemReihenfolge(){
+    const ordnung = new Map(SEKTOR_DEFS.map((sk, i) => [sk.key, i]));
+    return visibleSystems().slice().sort(function(a, b){
+      return (ordnung.get(sektorVon(a).key) - ordnung.get(sektorVon(b).key))
+        || a.gy - b.gy || a.gx - b.gx;
+    });
+  }
+  function systemNachbarOeffnen(richtung){
+    const reihe = karteSystemReihenfolge();
+    const idx = reihe.findIndex(sy => sy.id === (galaxyOpenSystem || activeSystem));
+    if (idx < 0 || reihe.length < 2) return;
+    switchToSystem(reihe[(idx + richtung + reihe.length) % reihe.length].id);
+  }
   // Hervorhebung eines Kartenmarkers: wird als State gehalten statt einmalig ins DOM injiziert,
   // damit sie den periodischen Kartenaufbau (jede Sekunde) übersteht statt sofort wieder
   // überschrieben zu werden. buildMap() liest colonyHighlight bei jedem Aufbau selbst aus.
@@ -53244,10 +53305,13 @@
       }
       growthEl.textContent = txt;
     }
+    // Beide Knopfpaare (Tafel hier, ‹ ›-Overlay auf der Karte) blättern seit KB-9b in DERSELBEN
+    // geografischen Reihenfolge (karteSystemReihenfolge) - zwei verschiedene Reihenfolgen wären
+    // die "zweite Anzeigestelle mit der alten Annahme" in Knopfform.
     const prevBtn = document.getElementById('systemPrevBtn');
-    if (prevBtn) prevBtn.onclick = () => switchToSystem(visSys[(idx-1+visSys.length)%visSys.length].id);
+    if (prevBtn) prevBtn.onclick = () => systemNachbarOeffnen(-1);
     const nextBtn = document.getElementById('systemNextBtn');
-    if (nextBtn) nextBtn.onclick = () => switchToSystem(visSys[(idx+1)%visSys.length].id);
+    if (nextBtn) nextBtn.onclick = () => systemNachbarOeffnen(1);
     // Die ◀/▶-Zeile benennt das aufgeklappte System. Ist keines offen, hat sie nichts zu benennen und
     // würde den zuletzt geöffneten Namen unter einer Galaxie-Übersicht stehen lassen.
     const navRow = document.querySelector('#tab-karte .system-nav');
@@ -61714,6 +61778,10 @@
     };
     const backBtn = document.getElementById('galaxyBackBtn');
     if (backBtn) backBtn.onclick = (e) => { e.stopPropagation(); galaxySchliesse(); };
+    const sysPrevOverlay = document.getElementById('galaxySysPrevBtn');
+    if (sysPrevOverlay) sysPrevOverlay.onclick = (e) => { e.stopPropagation(); systemNachbarOeffnen(-1); };
+    const sysNextOverlay = document.getElementById('galaxySysNextBtn');
+    if (sysNextOverlay) sysNextOverlay.onclick = (e) => { e.stopPropagation(); systemNachbarOeffnen(1); };
     // Klick ins Leere schließt ebenfalls. Nur wenn nicht gerade gezogen wurde und der Klick nicht
     // einem Knoten, einem Planeten oder einem der Abzeichen galt - sonst würde jeder Planetenklick
     // das System hinter sich zuziehen.

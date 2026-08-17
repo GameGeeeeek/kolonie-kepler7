@@ -92,11 +92,12 @@ function backend(store) {
     chipsHeim.da && /Void-Marodeure/.test(chipsHeim.text) && /1 Trümmerfeld/.test(chipsHeim.text), chipsHeim);
 
   // ---- 3) Im fremden System: fremde Eroberung als Chip, Trümmerfeld verschwindet --------------
-  const chipsVega = await page.evaluate(async () => {
-    const btn = document.getElementById('systemNextBtn');
-    if (!btn) return null;
-    btn.click();
-    await new Promise(r => setTimeout(r, 1600));
+  // Seit KB-9b blättern die ◀/▶-Knöpfe in GEOGRAFISCHER Reihenfolge (Sektor für Sektor) - ein
+  // einzelner ▶-Klick landet von kepler aus nicht mehr zwangsläufig in vega. Der Test hing an
+  // dieser Momentaufnahme der alten Spiral-Reihenfolge (Hausregel 9: Erwartungen mitziehen);
+  // die geprüfte REGEL ist der Vega-Inhalt, also führt jetzt der Spielerweg direkt dorthin.
+  await oeffneSystemUeberSektoren(page, 'vega');
+  const chipsVega = await page.evaluate(() => {
     const el = document.getElementById('systemStatusChips');
     const name = document.getElementById('systemNavName');
     return { text: el ? el.textContent : null, name: name ? name.textContent : null };
