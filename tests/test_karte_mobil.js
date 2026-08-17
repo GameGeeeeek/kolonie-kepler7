@@ -86,12 +86,17 @@ function backend(store) {
     const b = document.getElementById('systemTafelZu');
     const t = document.getElementById('systemTafel');
     const r = t.getBoundingClientRect();
+    const w = document.querySelector('#tab-karte .map-wrap').getBoundingClientRect();
     return { sichtbar: !!(b && b.offsetParent), scrollY: Math.round(window.scrollY),
-             tafelOben: Math.round(r.top) };
+             karteOben: Math.round(w.top), karteH: Math.round(w.height), tafelOben: Math.round(r.top) };
   });
   check('2a: mit offenem System ist der ✕-Knopf sichtbar', offen.sichtbar, offen);
-  check('2b: das Aufklappen holt die Tafel ins Bild (Seite ist zur Tafel gescrollt)',
-    offen.scrollY > vorab.scrollY && offen.tafelOben >= -40 && offen.tafelOben < 400, offen);
+  // Seit KB-7 scrollt das Öffnen zur KARTE, nicht zur Tafel: Das alte Tafel-Ziel schob die Karte
+  // mit der Vollhöhen-Sektoransicht komplett aus dem Bild ("Karte fährt nach unten"-Report,
+  // gemessen -457 px). Jetzt: Karte oben im Bild, Tafel beginnt direkt unter ihren 420 px.
+  check('2b: das Aufklappen holt die KARTE nach oben ins Bild, die Tafel beginnt direkt darunter',
+    offen.scrollY > vorab.scrollY && offen.karteOben >= -40 && offen.karteOben < 120
+    && offen.tafelOben >= offen.karteOben + offen.karteH - 40, offen);
 
   // ---- 3) ✕ schließt und scrollt zurück zur Karte ---------------------------------------------
   const zu = await page.evaluate(async () => {

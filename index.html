@@ -6984,8 +6984,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.540.0';
+  const VERSION = '8.541.0';
   const PATCHNOTES = [
+    { version:'8.541.0', date:'17.08.2026', changes:[
+      '<strong>Behoben: „Karte fährt nach unten" beim Öffnen eines Systems.</strong> Direkter Spieler-Report, am Messprotokoll nachvollzogen: Auf dem Handy scrollte die Seite beim Antippen eines Systems über 1.300 Pixel zur Detailtafel hinunter – die frisch geöffnete Karte stand danach komplett außerhalb des Bildes (gemessen: Oberkante bei −457 Pixeln). Dieses Scroll-Ziel stammte noch aus der Zeit, als die Karte immer 420 Pixel hoch war; mit der Vollbild-Sektoransicht scrollte es an ihr vorbei. Jetzt kommt beim Öffnen die <strong>Karte selbst</strong> nach oben ins Bild, und die Detailtafel beginnt direkt darunter – beides sichtbar, nichts fährt mehr weg.',
+      'Dazu drei Kamera-Korrekturen aus derselben Messung: Die Anfahrt aufs System endete im Seitenverhältnis des noch vollhohen Sektor-Kastens und ruckte sich erst 1,4 Sekunden später zurecht (der Kasten wechselt jetzt VOR der Zielberechnung auf seine Systemhöhe); beim Öffnen aus einer Sektor-Ansicht startete die Kamerafahrt aus einem fremden Koordinatensystem und schwenkte eine halbe Sekunde beliebig durchs Bild (aus Sektor-Ansichten wird jetzt gesprungen, geflogen nur noch von System zu System); und der alte „fokussierte Start-Ausschnitt" der früheren Galaxie-Übersicht kaperte das erste geöffnete System und beschnitt es auf einen zu engen Ausschnitt (der Block ist entfernt – seine Aufgabe, den Einstieg zu ordnen, erledigt seit dem Umbau die Sektoren-Übersicht selbst). Beim Schließen läuft außerdem keine Kamerafahrt mehr in die Sektoransicht hinein, die dort nur die Anzeige überschrieben hätte.',
+      '<strong>Und am PC ist das geöffnete System nicht mehr riesig.</strong> Vierter Report derselben Runde („nur am PC"): Auf breiten Bildschirmen wurde der Kamera-Ausschnitt so flach, dass das System das Bild auf Anschlag füllte – Sonne und Namen in Übergröße, auf sehr breiten Fenstern sogar beschnitten. Der Ausschnitt hat jetzt eine Mindesthöhe: Ein breiter Kasten zeigt seitlich mehr Nachbarschaft, statt stärker zu vergrößern. Auf dem Handy ändert sich nichts.'
+    ]},
     { version:'8.540.0', date:'17.08.2026', changes:[
       '<strong>Die Überfall-Abwehr läuft jetzt in drei Kampfphasen – wie jeder andere Kampf im Spiel.</strong> Sie war der letzte Kampf, der noch mit einem einzigen Würfelwurf entschieden wurde, obwohl Startseite und Hilfe seit Langem „jedes Gefecht läuft in drei Phasen" versprechen. Ab jetzt gilt auch hier: <em>Anflug</em>, <em>Hauptgefecht</em>, <em>Rückzug</em> – der Angreifer muss zwei der drei gewinnen, um durchzukommen. Die Konterwirkung deiner stationierten Flotte zählt dabei im Anflug anderthalbfach, im Hauptgefecht normal, im Rückzug nur halb: Wer passend zusammenstellt, entscheidet die Abwehr früh.',
       '<strong>Und der Spielraum stimmt endlich.</strong> Der alte Wurf war bei 10–90% gedeckelt – das sind die engeren Grenzen für Kämpfe gegen <em>Mitspieler</em>, obwohl hier NPC-Flotten angreifen. Jetzt gilt der NPC-Spielraum von <strong>5% bis 95%</strong> wie überall sonst. Für dich heißt das: Eine deutlich überlegene Verteidigung hält verlässlicher, eine hoffnungslose bleibt hoffnungslos – der Zufallsanteil dazwischen ist derselbe wie bei jedem anderen Gefecht.',
@@ -51564,9 +51569,6 @@
   // Zoom/Pan-Zustand der Galaxie-Übersichtskarte – bleibt für die restliche Sitzung erhalten
   // (nicht dauerhaft gespeichert), damit man nicht bei jedem Tab-Wechsel wieder rauszoomt.
   let galaxyMapViewBox = { x:0, y:0, w:950, h:500 };
-  // Ob der fokussierte Start-Ausschnitt (Nachbarschaft des aktiven Systems) schon einmal gesetzt
-  // wurde - erst danach greift der volle 950×500-Ausschnitt nur noch über den "Zurücksetzen"-Knopf.
-  let galaxyMapFocused = false;
   // mapViewBox/clampMapViewBox/mapDidDrag sind mit v8.349.0 entfallen: Es gibt nur noch EINEN
   // Kartenausschnitt (galaxyMapViewBox), in dem die Systemansicht als skalierte Gruppe sitzt.
   let galaxyMapDidDrag = false; // unterdrückt einen Klick (Erkundungsmission!) nach dem Ziehen/Zoomen
@@ -51870,7 +51872,15 @@
     // Vierteln für künftige Systeme reserviert und zeigte die Galaxie als Fleck in der Mitte.
     if (!galaxyOpenSystem) return galaxyBelegterAusschnitt();
     const pos = galaxySpiralLayout(visibleSystems())[galaxyOpenSystem];
-    const w = GALAXY_SYSTEM_VIEW_W, h = w*galaxyKastenVerhaeltnis();
+    // Grundmaß: 410 breit im Kastenverhältnis. Auf sehr BREITEN Kästen (PC, volle Fensterbreite)
+    // ergäbe das weniger Höhe als die ~135 Einheiten der Systemebene - die Ansicht wäre massiv
+    // überzoomt und ggf. beschnitten (Spieler-Report "nur am PC": riesige Sonne und Beschriftung;
+    // gemessen bei 1258×420 px: 136,9 Einheiten, alles auf Anschlag vergrößert). Deshalb eine
+    // Mindesthöhe mit Rand: Der breite Kasten zeigt dann seitlich mehr Nachbarschaft statt
+    // stärker zu vergrößern.
+    const kbVerh = galaxyKastenVerhaeltnis();
+    let w = GALAXY_SYSTEM_VIEW_W, h = w*kbVerh;
+    if (h < 190){ h = 190; w = h/kbVerh; }
     // Die Sonne der Sektorkarte sitzt bei 115 von 230, also leicht oberhalb der Mitte ihres Feldes.
     // Der Ausschnitt wird deshalb auf den Knoten zentriert, nicht auf die Mitte des Systemfeldes.
     return pos ? { x: pos.x-w/2, y: pos.y-h/2, w, h } : { x:0, y:0, w:950, h:500 };
@@ -51889,11 +51899,15 @@
     if (svg) svg.setAttribute('viewBox', `${galaxyMapViewBox.x.toFixed(1)} ${galaxyMapViewBox.y.toFixed(1)} ${galaxyMapViewBox.w.toFixed(1)} ${galaxyMapViewBox.h.toFixed(1)}`);
     if (t < 1) requestAnimationFrame(galaxyCamStep); else galaxyCamTo = null;
   }
-  function galaxyCamFahre(){
+  function galaxyCamFahre(sofort){
     const ziel = galaxyCamTarget();
-    // Wer Bewegung abgestellt hat, bekommt keine Fahrt, sondern den fertigen Ausschnitt. Dieselbe
-    // Regel wie überall sonst im Spiel (prefers-reduced-motion).
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    // sofort=true springt ohne Fahrt (KB-7): Beim Öffnen aus einer Sektor-Ansicht liegt die
+    // aktuelle viewBox in einem FREMDEN Koordinatensystem ('0 0 400 H') - eine Fahrt von dort
+    // ist ein halbsekündiger beliebiger Kameraschwenk ("Karte fährt"-Report). Geflogen wird nur
+    // noch System -> System, wo beide Enden im selben Raum liegen.
+    // Wer Bewegung abgestellt hat, bekommt ebenfalls keine Fahrt, sondern den fertigen
+    // Ausschnitt - dieselbe Regel wie überall sonst im Spiel (prefers-reduced-motion).
+    if (sofort || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)){
       galaxyCamTo = null; galaxyMapViewBox = ziel;
       const svg = document.getElementById('galaxyMapSvg');
       if (svg) svg.setAttribute('viewBox', `${ziel.x.toFixed(1)} ${ziel.y.toFixed(1)} ${ziel.w.toFixed(1)} ${ziel.h.toFixed(1)}`);
@@ -51904,8 +51918,19 @@
     requestAnimationFrame(galaxyCamStep);
   }
   function galaxyOeffne(systemId){
+    // Vor dem Umschalten festhalten, ob schon ein System offen war: Nur dann liegt die aktuelle
+    // viewBox im Galaxie-Koordinatenraum und eine Kamerafahrt ergibt Sinn (KB-7).
+    const kbWarOffen = !!galaxyOpenSystem;
     galaxyOpenSystem = systemId;
     activeSystem = systemId;
+    // Der Kasten wechselt beim Öffnen von der Vollhöhe der Sektor-Ansichten auf die 420px der
+    // Systemebene. Die Kamerafahrt rechnet ihr Ziel aus dem KASTEN-Verhältnis - der Wechsel muss
+    // deshalb VOR der Zielberechnung passieren, sonst endet die Fahrt im Vollhöhen-Verhältnis
+    // und der nächste Aufbau ruckt sichtbar zurecht (gemessen: viewBox-Höhe 788 -> 495, 1,4 s
+    // nach dem Öffnen).
+    const kbSvgOeffne = document.getElementById('galaxyMapSvg');
+    const kbWrapOeffne = kbSvgOeffne ? kbSvgOeffne.closest('.map-wrap') : null;
+    if (kbWrapOeffne) kbWrapOeffne.style.height = '420px';
     // Nur-Sektoren-Karte (KB-4): Der Rückweg aus dem System führt immer in die Sektoransicht
     // SEINER Region - auch wenn das System nicht über die Karte geöffnet wurde (Suchfeld,
     // „Zeigen, wo das war", Allianz-Sprungknopf). Ohne diese Zeilen landete man beim Schließen
@@ -51914,25 +51939,28 @@
     if (kbSy) karteSektorOffen = sektorVon(kbSy).key;
     karteGuertelOffen = null;
     lastGalaxyMapMarkup = null;   // der Zustandswechsel MUSS neu zeichnen
-    galaxyCamFahre();
+    galaxyCamFahre(!kbWarOffen);
     buildGalaxyMap();
     loadPlayersInSystem();
     updateGalaxyBackButton();
-    // Mobiler Feinschliff (v8.505.0, Etappe B-7): Auf schmalen Bildschirmen liegt die Detailtafel
-    // unter dem 420px hohen Kartenkasten oft unterhalb der Falz - wer ein System antippt, will
-    // dessen Inhalt sehen. Die Tafel wird deshalb sanft ins Bild geholt ("die Lade" aus dem
-    // Zielbild, ohne Overlay-Architektur); das ✕ der Tafel führt zurück zur Karte. Auf breiten
-    // Bildschirmen passiert nichts - dort stehen Karte und Tafel ohnehin zusammen im Bild.
-    if (window.innerWidth <= 700){
-      const tafel = document.getElementById('systemTafel');
-      if (tafel) tafel.scrollIntoView({ behavior:'smooth', block:'start' });
+    // Mobiler Feinschliff (v8.505.0, Etappe B-7; Ziel seit KB-7 der KARTENKASTEN statt der
+    // Tafel): Das alte Tafel-Ziel stammte aus der Welt, in der die Karte immer 420 px hoch war -
+    // mit der Vollhöhen-Sektoransicht scrollte die Seite 1.300+ px an der Karte VORBEI und das
+    // frisch geöffnete System stand komplett außerhalb des Bildes (gemessen: Kastenoberkante
+    // -457 px; Spieler-Report "Karte fährt nach unten"). Jetzt kommt die Karte oben ins Bild,
+    // die Detailtafel beginnt direkt unter ihren 420 px - beides sichtbar, nichts fährt weg.
+    if (window.innerWidth <= 700 && kbWrapOeffne){
+      kbWrapOeffne.scrollIntoView({ behavior:'smooth', block:'start' });
     }
   }
   function galaxySchliesse(){
     if (!galaxyOpenSystem) return;
     galaxyOpenSystem = null;
     lastGalaxyMapMarkup = null;
-    galaxyCamFahre();
+    // KEINE Kamerafahrt beim Schließen (KB-7): Der Rückweg führt in die Sektoransicht, die ihre
+    // viewBox selbst setzt - eine noch laufende Fahrt würde sie per rAF eine halbe Sekunde lang
+    // Frame für Frame mit Galaxie-Koordinaten überschreiben ("Karte fährt").
+    galaxyCamTo = null;
     buildGalaxyMap();
     updateGalaxyBackButton();
   }
@@ -52472,21 +52500,11 @@
     }
     const visSys = visibleSystems();
     const spiralPos = galaxySpiralLayout(visSys);
-    // Fokussierter Start-Ausschnitt (Spieler-Wunsch: nicht von Anfang an mit der vollen, dichten
-    // Galaxie starten und erst zoomen müssen) - beim allerersten Kartenaufbau dieser Sitzung auf die
-    // Nachbarschaft des aktiven Systems zentrieren. "Zurücksetzen" bleibt die volle 950×500-Ansicht.
-    if (!galaxyMapFocused){
-      galaxyMapFocused = true;
-      const centerPos = spiralPos[activeSystem] || spiralPos[myHomeSystem];
-      if (centerPos){
-        // Breite mit dem Belegungsgrad skaliert: In einer noch nicht ausgewachsenen Galaxie stehen
-        // die Systeme enger, ein fester 330er-Ausschnitt zeigte dann ein Gewimmel statt der
-        // gemeinten Nachbarschaft.
-        const fw = 330*galaxyFillRatio(), fh = 150*galaxyFillRatio();
-        galaxyMapViewBox = { x: centerPos.x-fw/2, y: centerPos.y-fh/2, w: fw, h: fh };
-        clampGalaxyViewBox();
-      }
-    }
+    // Der "fokussierte Start-Ausschnitt" der alten Galaxie-Übersicht ist mit KB-7 entfernt: Er
+    // stammte aus der Welt, in der der ERSTE Freiflug-Aufbau die Übersicht war. Seit KB-4 ist der
+    // erste Freiflug-Aufbau das erste GEÖFFNETE System - der Block überschrieb dessen frisch
+    // gesetztes Kamera-Ziel mit einem 174er-Nachbarschafts-Ausschnitt (gemessen: viewBox-Breite
+    // 176 statt 410, das System stand beschnitten da).
     const activePos = spiralPos[activeSystem] || spiralPos[myHomeSystem];
     // Ab dieser Zoomstufe (halbe Standardbreite) gelten alle Labels als "nah genug dran", um immer
     // eingeblendet zu werden - kombiniert mit der Nähe zum aktiven System (siehe showLabel unten)
