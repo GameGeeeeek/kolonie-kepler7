@@ -1036,6 +1036,19 @@
        beschneidet outline UND box-shadow. Ein Ring mit outline-offset:2px läge außerhalb der Form und
        wäre für Tastatur-Bedienung danach unsichtbar - der Ring wandert deshalb nach innen. */
     .card-row[role="button"]:focus-visible { outline:none; box-shadow:inset 0 0 0 2px var(--c-info), inset 0 0 12px rgba(var(--info-rgb),0.35); }
+    /* Sichtbarer Fokus für die Kartenknoten (KB-15). Sie sind seit jeher tastaturerreichbar
+       (role="button" tabindex="0" aria-label) und tragen auch einen Ring - aber den des Browsers,
+       gemessen mit outline-color rgb(16,16,16). Auf dem dunklen Kartenhintergrund ist fast-schwarz
+       unsichtbar; wer mit Tab durch die Sektoransicht geht, sah nicht, wo er steht.
+       Es gilt für ALLE DREI Knotenarten - Regionen der Übersicht ([data-sektor]), Systemknoten
+       (.sektor-sys) und die Ebenen-Knöpfe ([data-kb-knopf]) -, deshalb der Selektor über
+       role="button" statt drei einzelne Regeln, die beim nächsten neuen Knotentyp auseinanderlaufen.
+       box-shadow scheidet hier aus (inset gibt es auf SVG-Elementen nicht), outline dagegen trägt
+       auf einem <g> nachweislich. :focus-visible statt :focus aus demselben Grund wie eine Zeile
+       höher: Sonst bekäme jeder MAUSKLICK auf ein System einen Ring, der bis zum nächsten Klick
+       stehen bliebe. */
+    #galaxyMapSvg [role="button"]:focus { outline:none; }
+    #galaxyMapSvg [role="button"]:focus-visible { outline:3px solid var(--c-info); outline-offset:2px; }
     /* Ersthinweis je Tab - unaufdringlich, aber nicht zu übersehen; verschwindet nach dem
        Wegklicken für immer (state.seenTabHints). */
     .tab-hint { display:flex; align-items:flex-start; gap:10px; margin:0 0 1rem 0; padding:10px 12px;
@@ -7029,8 +7042,11 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.563.0';
+  const VERSION = '8.564.0';
   const PATCHNOTES = [
+    { version:'8.564.0', date:'18.08.2026', changes:[
+      '<strong>Wer die Karte mit der Tastatur bedient, sieht jetzt, wo er steht.</strong> Regionen, Systeme und die Ebenen-Knöpfe der Karte lassen sich seit jeher mit der Tabulator-Taste ansteuern – nur war nicht zu erkennen, welcher Knoten gerade dran ist. Der Grund war kurios: Ein Rahmen wurde durchaus gezeichnet, aber in der Standardfarbe des Browsers, einem fast schwarzen Ton, der auf dem dunklen Sternenhintergrund schlicht verschwand. Jetzt liegt dort ein deutlich sichtbarer blauer Rahmen, in derselben Farbe wie bei den Schalter-Zeilen im Rest des Spiels. Er erscheint nur bei der <strong>Tastatur</strong>-Bedienung: Ein Mausklick hinterlässt weiterhin keinen Rahmen, der danach stehen bleibt.'
+    ]},
     { version:'8.563.0', date:'18.08.2026', changes:[
       '<strong>Abfangflotten und Leerenriss-Flotten fliegen jetzt hin UND zurück.</strong> Bisher endeten beide Missionen in dem Moment, in dem die Flotte am Ziel ankam – sie stand also schlagartig wieder zu Hause bereit, obwohl sie gerade erst eingetroffen war. Jetzt fällt der Kampf bei der <strong>Ankunft</strong>, danach ist die Flotte denselben Weg wieder unterwegs und steht dir erst zu Hause wieder zur Verfügung. Die Missionskarte im Flotte-Reiter zeigt dazu „Anflug" bzw. „Rückflug".',
       '<strong>Die Frist bleibt genau wie bisher:</strong> Es zählt weiterhin nur, ob der <em>Hinflug</em> rechtzeitig ankommt – vor dem Abzug der Piraten bzw. vor dem Kollaps des Risses. Weite Ziele werden also nicht unerreichbar, die Flotte ist nur länger gebunden.',
