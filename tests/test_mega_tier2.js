@@ -18,6 +18,19 @@
 // Nimmt jemand eine dieser vier Bedingungen heraus, reißt dieser Test - bevor jemand in eine
 // Sackgasse läuft. Genau dafür steht er hier.
 //
+// ERWEITERT AM 18.08.2026 (Etappe B2 des Wirtschafts-Rebalance): Der Tier-2-Anteil ist verdreifacht,
+// waechst nicht mehr mit der Imperiumsgroesse und hoert ab Ausbaustufe 13 auf zu wachsen; der
+// Forschungs-Nexus verlangt zusaetzlich einen FLACHEN Anteil Singularitaetskerne ab Stufe 4.
+// Die Kappung ist keine Vorsichtsmassnahme, sondern gemessen: Das Nanolegierungs-Lager fasst bei
+// vollem Ausbau (11 Standorte, Fabriken 15, Hochsicherheitslager 10) 33.750 Einheiten - ein
+// ungedeckelter Anteil waere bei Stufe 20 auf 34.200 gekommen und damit nicht teuer, sondern
+// unbezahlbar. Abschnitt 5 stand vorher auf der Umkehrung ("Kerne werden bewusst NICHT verlangt");
+// diese Begruendung stammte aus der Zeit vor Tier 3 und hat sich selbst ueberholt.
+//
+// GEGENPROBE (Arbeitsregel 1, beidseitig gefahren am Stand v8.556.0): 19 der 23 Pruefungen laufen
+// dort, 3b, 3b-gegen und 5b fallen. Die vier fehlenden (5c-5e) haengen am flatCost-Eintrag, den es
+// dort nicht gibt - ein roter Exit-Code allein ist deshalb kein vollstaendiger Beleg (Regel 34).
+//
 // GEPRUEFT WIRD ausserdem:
 //   2. Der Inhalt der Regel, ausgeführt: Stufe 1 ohne Tier 2, ab Stufe 2 linear.
 //   3. LINEAR und nicht exponentiell. Die Tier-2-Produktion hat eine harte Decke (Fabriken enden
@@ -107,6 +120,24 @@ if (f && PROJ) {
   const d2 = t2Anteil(f(p0, 12))[k] - t2Anteil(f(p0, 11))[k];
   check('3: der Tier-2-Anteil wächst LINEAR (gleicher Schritt früh wie spät)', d1 === d2,
     { ressource: k, frueh: d1, spaet: d2 });
+  /* ---- 3b) ... aber nicht unbegrenzt (Etappe B2, 18.08.2026).
+     Gemessen fasst das Nanolegierungs-Lager bei vollem Ausbau (11 Standorte, Fabriken 15,
+     Hochsicherheitslager 10) 33.750 Einheiten. Ein ungedeckelt weiterwachsender Anteil wäre bei
+     Ausbaustufe 20 auf 34.200 gekommen - also nicht teuer, sondern unbezahlbar, weil man ihn gar
+     nicht erst ansparen kann. Geprüft wird die REGEL "es gibt eine Stufe, ab der der Anteil
+     konstant bleibt" und ihre Gegenrichtung, nicht die konkrete Stufe (Arbeitsregel 3). */
+  const reihe = [];
+  for (let st = 2; st <= 30; st++) reihe.push(t2Anteil(f(p0, st))[k]);
+  const schritte = reihe.slice(1).map((v, i) => v - reihe[i]);
+  const ersterNullSchritt = schritte.findIndex(s => s === 0);
+  check('3b: der Tier-2-Anteil hört irgendwann auf zu wachsen (sonst wächst er über den Lagerdeckel)',
+    ersterNullSchritt >= 0, { schritte: schritte.slice(0, 20) });
+  check('3b-gegen: und er wächst davor wirklich (der Deckel greift nicht von Anfang an)',
+    ersterNullSchritt > 0 && schritte.slice(0, ersterNullSchritt).every(s => s > 0),
+    { abStufe: ersterNullSchritt + 3, schritteDavor: schritte.slice(0, ersterNullSchritt) });
+  check('3c: ab dem Deckel bleibt er konstant - kein späterer Wiederanstieg',
+    ersterNullSchritt < 0 || schritte.slice(ersterNullSchritt).every(s => s === 0),
+    { nachDemDeckel: schritte.slice(Math.max(0, ersterNullSchritt)) });
   // Gegenprobe im selben Test: Der BASIS-Anteil muss weiterhin exponentiell wachsen.
   const b1 = f(p0, 4).erz - f(p0, 3).erz, b2 = f(p0, 12).erz - f(p0, 11).erz;
   check('3-gegen: der Basisanteil wächst weiterhin exponentiell (er wurde nicht versehentlich mit umgestellt)',
@@ -122,10 +153,35 @@ if (f && PROJ) {
   for (const p of PROJ) for (const r of Object.keys(p.t2Cost || {})) if (echte.indexOf(r) < 0) unbekannt.push(p.key + ':' + r);
   check('4: jeder verwendete Schlüssel ist eine echte Tier-2-Ressource', unbekannt.length === 0, unbekannt);
 
-  // ---- 5) Die knappe Kette bleibt aussen vor -------------------------------------------------
-  const mitSing = PROJ.filter(p => (p.t2Cost || {}).singularitaetskern).map(p => p.key);
-  check('5: Singularitätskerne werden bewusst NICHT verlangt (die einzige knappe Kette)',
-    mitSing.length === 0, mitSing);
+  /* ---- 5) Singularitätskerne: seit Etappe B2 gefordert, aber FLACH ---------------------------
+     Bis v8.556.0 stand hier die Umkehrung ("werden bewusst NICHT verlangt"), begründet damit,
+     dass ihre Kette die einzige nicht volle sei. Diese Messung stammt aus der Zeit vor Tier 3;
+     heute läuft auch dieses Lager in rund 13 Tagen voll. Sie sitzen bewusst NICHT in t2Cost
+     (das wächst linear mit der Stufe), sondern in flatCost - ein fester Betrag je Stufe. */
+  const mitSingLinear = PROJ.filter(p => (p.t2Cost || {}).singularitaetskern).map(p => p.key);
+  check('5a: Singularitätskerne wachsen NICHT linear mit der Stufe (sie stehen nicht in t2Cost)',
+    mitSingLinear.length === 0, mitSingLinear);
+  const mitSingFlach = PROJ.filter(p => (p.flatCost || {}).singularitaetskern).map(p => p.key);
+  check('5b: genau EIN Projekt verlangt sie als festen Anteil', mitSingFlach.length === 1, mitSingFlach);
+  if (mitSingFlach.length === 1){
+    const pk = PROJ.find(p => p.key === mitSingFlach[0]);
+    const proben = [2, 4, 8, 20, 30].map(st => (f(pk, st).singularitaetskern) || 0);
+    check('5c: der Anteil setzt erst ab einer späteren Ausbaustufe ein', proben[0] === 0, { beiStufe2: proben[0] });
+    check('5d: und ist danach auf JEDER Stufe gleich hoch - er wächst nicht mit',
+      proben.slice(1).every(v => v > 0 && v === proben[1]), { proben });
+    /* Die Höhe ist bewusst die Kapazität EINER voll ausgebauten Kern-Kette an EINEM Standort.
+       Abgeleitet aus TIER2_DEFS statt eingetippt - wandert der Speicher, wandert die Erwartung
+       mit (Arbeitsregel 2/3). */
+    const vonD = S.indexOf('  const TIER2_DEFS = [');
+    const bisD = vonD < 0 ? -1 : S.indexOf('\n  ];', vonD);
+    const sk = (vonD >= 0 && bisD > vonD)
+      ? new Function(S.slice(vonD, bisD + 5) + "\nreturn TIER2_DEFS.find(t=>t.key==='singularitaetskern');")() : null;
+    const fabrikMax = sk ? Number((S.match(/key:'singularitaetsschmiede'[\s\S]{0,600}?maxLevel:(\d+)/) || [])[1] || 15) : 15;
+    check('5e-vorab: der Kern-Speicher liess sich lesen', !!sk, sk && { basis: sk.storageBase, jeStufe: sk.storagePerLevel });
+    if (sk) check('5e: der feste Anteil entspricht EINER voll ausgebauten Kette an EINEM Standort',
+      proben[1] === sk.storageBase + fabrikMax * sk.storagePerLevel,
+      { anteil: proben[1], eineKette: sk.storageBase + fabrikMax * sk.storagePerLevel, fabrikMax });
+  }
 }
 
 ende();
