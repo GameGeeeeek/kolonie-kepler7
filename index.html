@@ -7065,8 +7065,16 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.572.0';
+  const VERSION = '8.573.0';
   const PATCHNOTES = [
+    { version:'8.573.0', date:'18.08.2026', changes:[
+      '<strong>Neu: Asteroidenfestungen.</strong> Auf den Gürtelbahnen nistet sich gelegentlich eine <strong>Festung</strong> ein – auf der Sektorkarte eine gezackte Bastion mit pulsendem Ring, auf einem der Gürtelplätze. Sie gehört niemandem, sie steht einfach da, und sie ist <strong>angreifbar</strong>.',
+      '<strong>Solange sie steht, drosselt sie den Abbau im ganzen System</strong> – und zwar zweifach: die Ladung jeder Fuhre und, schwerer wiegend, die <strong>Protomaterie</strong>. Es gibt drei Stufen, und wie hart es trifft, hängt davon ab, wie weit draußen das System liegt: <strong>Schanze</strong> (heimatnah, −25% Ladung, −50% Protomaterie), <strong>Kastell</strong> (−40% / −75%) und <strong>Sternenfeste</strong> (−55% / −100%). Bei einer Sternenfeste bringt eine Fuhre also <em>gar keine</em> Protomaterie mehr mit.',
+      '<strong>Die Startvorschau sagt dir das vorher</strong>, mit Stufe und Prozentzahl. Eine stillschweigend kleinere Fuhre wäre kein Spielinhalt, sondern ein Ärgernis – du sollst wissen, warum die Zahl kleiner ist, bevor du losfliegst.',
+      '<strong>Angegriffen wird über das Kartenmenü der Bastion.</strong> Dein Verband fliegt hin und zurück (wie bei der Anfechtung), und der Server rechnet den Schaden am <strong>Kern</strong> aus deiner Flotte. Eine Festung fällt nicht in einem Schlag: Ihr Kern reicht von 30.000 bei der Schanze bis 1,2 Millionen bei der Sternenfeste – rechne mit vier bis sechs Schlägen, wenn du sie allein und mit einer Flotte angehst, die zu ihrer Stufe passt. Nach jedem Schlag gilt an <em>dieser</em> Festung eine <strong>Abklingzeit von 6 Stunden</strong>; Mitstreiter können in der Zwischenzeit weitermachen, und genau darauf ist sie ausgelegt.',
+      '<strong>Der Hort wird nach Schadensanteil geteilt.</strong> Wer ein Drittel des Kerns zerlegt hat, bekommt ein Drittel – auch wenn ein anderer den letzten Schlag geführt hat. Gezählt wird dabei, was <em>angekommen</em> ist: Ein Schlag gegen einen fast leeren Kern trägt nur den Rest bei, nicht seine volle Wucht. Sonst risse der Letzte den halben Hort an sich. Dein Anteil liegt danach unter den <strong>Belohnungen</strong>, auch wenn du beim Fall gerade offline warst.',
+      'Danach ist der Gürtel <strong>24 Stunden lang frei</strong> und sogar <strong>15% ergiebiger</strong> als sonst – das Aufräumen lohnt sich also auch für den, der nur einen kleinen Anteil hatte. Und der neue Hilfe-Abschnitt unter <em>Asteroiden und Abbaumissionen</em> schreibt alle Zahlen noch einmal auf.'
+    ]},
     { version:'8.572.0', date:'18.08.2026', changes:[
       '<strong>Modulbeschreibungen entschlackt.</strong> Vierzehn Texte haben ihre Ausschmückungen verloren – Sätze, die das Modul einordnen statt es zu erklären, und Erklärungen über das Spiel statt über den Gegenstand: woher Trümmerfelder kommen, was Prisengut ist, wie die Terraforming-Staffel läuft. Zusammen 5.752 → 4.627 Zeichen. Jede Zahl ist geblieben, jede Wirkung, jede Grenze und jede Fundchance.',
       '<strong>Die zwanzig Boss-Set-Beschreibungen bleiben, wie sie sind.</strong> Sie lesen sich fast gleich, und das war der erste Verdacht – aber jeder Satzteil trägt eine eigene Auskunft: welches Set, wo es fällt, was es tut, ab wann die Stufenboni greifen. Eine gleiche Form über zwanzig gleichartige Gegenstände ist Absicht, kein Füllwerk.'
@@ -13313,6 +13321,44 @@
     { key:'kern',     name:'Kern',     vorrat:500000,  plaetze:16, guete:2.0, gewicht:16, fernBonus:0.8,  farbe:'#e0a548', nachschubStd:20 },
     { key:'koloss',   name:'Koloss',   vorrat:1500000, plaetze:30, guete:3.0, gewicht:4,  fernBonus:2.0,  farbe:'#f3aec6', nachschubStd:48 }
   ];
+  /* ===== Asteroidenfestungen (Phase 1, 18.08.2026) =========================================
+     Konzept: docs/aliens-asteroidenfestungen-konzept.md.
+
+     DIESE TABELLE IST EINE KOPIE aus server.js (FESTUNG_STUFEN) - dieselbe Familie wie
+     ASTEROID_SORTEN/AST_SORTEN nebenan, und aus demselben Grund: Der SERVER besitzt die Festung
+     und entscheidet jede Wirkung; das Frontend braucht die Zahlen trotzdem, weil die VORSCHAU vor
+     dem Serveraufruf laeuft und sonst eine Zahl nennen wuerde, die die Mission nicht einhaelt.
+     tests/test_festung_paritaet.js haelt beide Seiten zusammen - ohne ihn driften sie beim ersten
+     Balance-Eingriff auseinander, und dann verspricht die Vorschau etwas anderes als der Server
+     bucht. Genau diesen Fall beschreibt die Hausregel bei den Kosmetik-Bedingungen.
+
+     Nur die Felder, die das Frontend WIRKLICH braucht: `blockade` und `proto` fuer die Vorschau,
+     `kern` fuer die Kartenanzeige, `name` fuer die Texte. Hort-Raten und Abklingzeiten bleiben
+     beim Server - was er allein entscheidet, gehoert nicht in eine zweite Tabelle. */
+  const FESTUNG_STUFEN = {
+    schanze:      { name:'Schanze',      kern:30000,   blockade:0.25, proto:0.50, farbe:'#c98f5a' },
+    kastell:      { name:'Kastell',      kern:250000,  blockade:0.40, proto:0.75, farbe:'#b06c9a' },
+    sternenfeste: { name:'Sternenfeste', kern:1200000, blockade:0.55, proto:1.00, farbe:'#e0a548' }
+  };
+  const FESTUNG_GERAEUMT_BONUS = 0.15;     // +15 % Ladung, 24 h nach dem Fall (Spiegel von server.js)
+  /* DIE EINE Stelle, die "was macht eine Festung mit meiner Fuhre" beantwortet - Vorschau,
+     Kartenmenue und Missionsstart rufen sie. Sie liefert BEIDE Faktoren zusammen, damit keine
+     Anzeigestelle nur den einen anwendet (Arbeitsregel 6: der wiederkehrende Fehler dieses
+     Projekts ist die zweite Stelle mit der alten Annahme).
+     `ladung` ist der Faktor auf die Abbaumenge, `proto` der auf die Protomaterie. Sie sind
+     ABSICHTLICH getrennt: Die Protomaterie haengt allein an der GROESSE des Vorkommens
+     (protoJeFuhre) und wird von der Ladungskuerzung gar nicht erreicht - ohne den zweiten Faktor
+     waere die Drosselung, die die Galaxie-Nachricht ankuendigt, schlicht nicht vorhanden. */
+  function festungFaktoren(sysId){
+    const feld = state.asteroidFeld && state.asteroidFeld[sysId];
+    const f = feld && feld.festung;
+    if (f){
+      const st = FESTUNG_STUFEN[f.stufe] || FESTUNG_STUFEN.schanze;
+      return { ladung: 1 - st.blockade, proto: 1 - st.proto, festung: f, stufe: st, geraeumt: 0 };
+    }
+    const geraeumt = feld && (feld.geraeumtBis||0) > Date.now() ? FESTUNG_GERAEUMT_BONUS : 0;
+    return { ladung: 1 + geraeumt, proto: 1, festung: null, stufe: null, geraeumt };
+  }
   const GUERTEL_SYSTEM_ZAHL = 20;          // von 69 - bei wachsender Spielerschaft erhoehen
   const PLAETZE_JE_GUERTEL = 10;           // feste Positionen auf der Guertelbahn
   const VORKOMMEN_JE_GUERTEL = [4, 6];     // Startbelegung
@@ -13964,6 +14010,81 @@
       start: () => sendAnfechtungsMission(sysId, platz)
     });
   }
+  /* ===== Angriff auf eine Asteroidenfestung (Phase 1, 18.08.2026) =====
+     Gebaut nach demselben Muster wie die Anfechtung direkt darunter, und aus denselben Gruenden:
+     Der Kampf wird SERVERSEITIG aufgeloest (POST /festung/angriff), der Client schickt keine
+     Staerke mit, sondern nur, welche seiner Missionen gemeint ist. Deshalb steht vor dem Aufruf
+     ein save() - waehrend des Fluges stehen die Schiffe nicht in state.fleet, sondern in der
+     Mission, und genau die muss der Server lesen koennen.
+
+     FORM A der Rundflug-Regel (kein hinBis): Eine Festung ist ortsfest und hat keine Frist. Das
+     hinBis-Muster braucht nur, wessen Ziel ablaufen kann - bei den Piraten und dem Riss ist das
+     so, hier nicht. Dieselbe Entscheidung wie bei der Anfechtung nebenan. */
+  function festungVorschauHtml(flotte, sysId){
+    const feld = state.asteroidFeld && state.asteroidFeld[sysId];
+    const fest = feld && feld.festung;
+    if (!fest) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Diese Festung steht nicht mehr.</div>';
+    const st = FESTUNG_STUFEN[fest.stufe] || FESTUNG_STUFEN.schanze;
+    const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
+    if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
+    const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId);
+    const fuel = missionFuelCostSplit(flug, flotte);
+    const kernMax = fest.kernMax || st.kern || 1;
+    const anteil = Math.max(0, Math.min(1, (fest.kern||0) / kernMax));
+    let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(flug/2)} · Beschuss · Rückflug (gesamt ${fmtDuration(flug)})</div>`;
+    html += `<div class="bmeta"><i class="ti ti-building-castle" aria-hidden="true"></i> Kern <strong>${fmt(Math.round(fest.kern||0))}</strong> von ${fmt(kernMax)} (${Math.round(anteil*100)}%) – eine Festung fällt über mehrere Schläge, nicht in einem.</div>`;
+    /* BEWUSST keine Schadens-Prozentzahl. Der Server rechnet die Kraft aus Werten, die der Client
+       nur teilweise kennt (Werftmarken, Gefechtsvorraete, Doktrin). Eine Zahl hier waere eine
+       Behauptung, die der Kampf danach widerlegt - dieselbe Begruendung steht an der
+       Anfechtungs-Vorschau, und sie gilt hier genauso. */
+    html += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> ${n} Schiffe im Verband. Was ankommt, zählt auf deinen Anteil am Hort – auch wenn andere die Festung stürzen.</div>`;
+    html += `<div class="bmeta"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Die Festung schießt zurück: rechne mit rund ${Math.round(st.blockade*40)}–${Math.round(st.blockade*40)+6}% Verlusten des Verbands.</div>`;
+    html += `<div class="bmeta"><i class="ti ti-droplet" aria-hidden="true"></i> Treibstoff ${fuelCostText(fuel)} · Danach 6 Stunden Abklingzeit an DIESER Festung.</div>`;
+    return html;
+  }
+  function oeffneFestungsangriff(sysId){
+    const feld = state.asteroidFeld && state.asteroidFeld[sysId];
+    const fest = feld && feld.festung;
+    if (!fest){ log('Diese Festung steht nicht mehr.', 'ti-alert-triangle'); return; }
+    const st = FESTUNG_STUFEN[fest.stufe] || FESTUNG_STUFEN.schanze;
+    oeffneFlottenwahl({
+      art: 'Festung',
+      titel: st.name + ' angreifen',
+      keys: ATTACK_SHIP_KEYS,
+      vorschau: (flotte) => festungVorschauHtml(flotte, sysId),
+      startLabel: 'Angriff starten',
+      sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
+      start: () => sendFestungsMission(sysId)
+    });
+  }
+  function sendFestungsMission(sysId){
+    const cf = currentFleet();
+    const feld = state.asteroidFeld && state.asteroidFeld[sysId];
+    const fest = feld && feld.festung;
+    if (!fest){ log('Diese Festung steht nicht mehr.', 'ti-alert-triangle'); return; }
+    const st = FESTUNG_STUFEN[fest.stufe] || FESTUNG_STUFEN.schanze;
+    const flotte = buildAttackFleet(state.activeBasePlanet, cf);
+    const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
+    if (n < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff.', 'ti-alert-triangle'); return; }
+    const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId);
+    const fuel = missionFuelCostSplit(flug, flotte);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für Hin- und Rückflug: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    pay(fuel);
+    const jetzt = Date.now();
+    const fleetName = resolveFleetName();
+    cf.missions.push({
+      id: nextMissionId(), type:'festung-angriff', targetId: sysId,
+      // Die KENNUNG der Festung reist mit: Faellt sie waehrend des Fluges und der galaxyTick setzt
+      // spaeter eine neue ins selbe System, schluege der Anflug sonst gegen ein Ziel ein, das es
+      // beim Start nicht gab. Der Server prueft sie und antwortet dann mit 409.
+      system: sysId, festungId: fest.id, stufe: fest.stufe, stufeName: st.name,
+      startTime: jetzt, endTime: jetzt + flug*1000,
+      fleetName, composition: flotte
+    });
+    log(fleetName+' fliegt zur '+st.name+' in '+(STAR_SYSTEMS.find(x=>x.id===sysId)||{name:sysId}).name+'. Ankunft in '+fmtDuration(flug/2)+', zurück in '+fmtDuration(flug)+'.', 'ti-sword');
+    render(); save();
+  }
   function sendAnfechtungsMission(sysId, platz){
     const cf = currentFleet();
     const a = asteroidAn(sysId, platz);
@@ -14044,6 +14165,57 @@
         ? 'Anfechtung gewonnen: Das Schürfrecht am '+asteroidName({sorte:m.sorte, groesse:m.groesse})+' gehört jetzt dir. Ohne eigene Eskorte ist es allerdings selbst anfechtbar.'
         : 'Anfechtung verloren: '+(daten.halterVorher||'Der Halter')+' behält das Schürfrecht.', daten.gewonnen ? 'ti-trophy' : 'ti-alert-triangle');
       ladeAsteroidfeld(true);
+    }
+    for (const [k, v] of Object.entries(zurueck)) fleet[k] = (fleet[k]||0) + v;
+    render(); save();
+  }
+  /* Der Festungsschlag kommt heim (Phase 1, 18.08.2026). Wortgleiches Muster wie
+     anfechtungAufloesen darueber - inklusive der wichtigsten Eigenschaft: Antwortet der Server
+     NICHT, kehrt die Flotte VOLLZAEHLIG zurueck. Der Server hat dann auch nichts gebucht, und
+     verschwundene Schiffe waeren der schlechteste denkbare Ausgang eines Verbindungsfehlers.
+     Das deckt ausdruecklich auch den Fall ab, dass der Server die Route noch gar nicht kennt
+     (404) - waehrend der Auslieferungsluecke zwischen Backend- und Frontend-Deploy ist das der
+     Normalfall, und er muss ohne Schaden durchlaufen. */
+  async function festungAufloesen(m, planetKey, fleet){
+    let daten = null, status = 0;
+    try {
+      await save();
+      const res = await backendFetch('/festung/angriff', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: m.system, missionId: String(m.id), festungId: String(m.festungId||'') })
+      });
+      status = res.status;
+      daten = await res.json().catch(() => null);
+      if (!res.ok) daten = null;
+    } catch(e){ daten = null; }
+    const zurueck = {};
+    const sysName = (STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system}).name;
+    if (!daten){
+      for (const [k, v] of Object.entries(m.composition||{})) if (v > 0) zurueck[k] = v;
+      log('Der Angriff auf die '+(m.stufeName||'Festung')+' bei '+sysName+' kam nicht zustande'
+        + (status === 409 ? ' – sie ist bereits gefallen' : status === 403 ? ' – Abklingzeit' : status === 404 ? ' – der Server kennt Festungen noch nicht' : '')
+        + ' – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
+    } else {
+      for (const [k, v] of Object.entries(m.composition||{})){
+        const weg = (daten.eigeneVerluste || {})[k] || 0;
+        const rest = Math.max(0, v - weg);
+        if (rest > 0) zurueck[k] = rest;
+      }
+      state.asteroidStats = state.asteroidStats || { missionen:0, geschuerft:0, anfechtungen:0 };
+      state.asteroidStats.festungsschlaege = (state.asteroidStats.festungsschlaege||0) + 1;
+      if (daten.gefallen) state.asteroidStats.festungenGestuerzt = (state.asteroidStats.festungenGestuerzt||0) + 1;
+      pushReport({ type:'festung-angriff', fleetName:m.fleetName, system:m.system, systemName:sysName,
+        targetPlanet:planetKey, stufe:m.stufe, stufeName:m.stufeName||'Festung',
+        schaden:daten.schaden||0, gefallen:!!daten.gefallen, kern:daten.kern||0, kernMax:daten.kernMax||0,
+        anteil:daten.anteil||0, teilnehmer:daten.teilnehmer||1, eigeneVerluste:daten.eigeneVerluste||{} });
+      log(daten.gefallen
+        ? 'Die '+(m.stufeName||'Festung')+' bei '+sysName+' ist gefallen! Dein Anteil am Hort: '+Math.round((daten.anteil||0)*100)+'%. Er wartet unter den Belohnungen.'
+        : (m.stufeName||'Festung')+' bei '+sysName+' beschossen: '+fmt(daten.schaden||0)+' Schaden, Kern noch '+fmt(daten.kern||0)+'.',
+        daten.gefallen ? 'ti-trophy' : 'ti-sword', daten.gefallen ? 'wichtig' : undefined);
+      // Das Felddokument nachziehen: Kern, Hort und Abklingzeit haben sich geaendert - und wenn sie
+      // gefallen ist, muss die Karte sie sofort loswerden statt bis zum naechsten 45-s-Takt zu warten.
+      ladeAsteroidfeld(true);
+      if (daten.gefallen) claimPendingRewards();
     }
     for (const [k, v] of Object.entries(zurueck)) fleet[k] = (fleet[k]||0) + v;
     render(); save();
@@ -21755,7 +21927,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -27925,6 +28097,37 @@
         const data = await res.json();
         if (!data.reward) break;
         const r = data.reward;
+        /* Der Hort einer gestuerzten Asteroidenfestung (Phase 1, 18.08.2026). Er kommt ueber die
+           WARTESCHLANGE und nicht ueber die Antwort des Angriffs - der Server reiht ihn fuer ALLE
+           Beitragenden ein, auch fuer den, dessen Schlag sie gestuerzt hat. Ein Weg statt zweier,
+           die auseinanderlaufen koennen; und wer beim Fall gerade offline war, findet seinen Anteil
+           beim naechsten Start vor.
+           Die SORTE bildet der Client auf seine T1-Ressourcen ab - der Server fuehrt in diesem
+           ganzen Modul nur Sorte und Menge (Kommentar bei AST_SORTEN). Damit laeuft der Hort durch
+           dieselbe Abbildung wie jede Abbaufuhre, statt einen zweiten Begriff einzufuehren. */
+        if (r.type === 'festung'){
+          const teile = [];
+          const menge = Math.max(0, Math.floor(r.menge||0));
+          if (menge > 0){
+            const liste = asteroidResListe({ sorte: r.sorte }, menge);
+            for (const [k, v] of Object.entries(liste)) if (v > 0){
+              state.resources[k] = (state.resources[k]||0) + v;
+              teile.push(fmt(v) + ' ' + resDefFor(k).label);
+            }
+          }
+          const proto = Math.max(0, Math.round(r.protomaterie||0));
+          if (proto > 0){
+            state.resources.protomaterie = (state.resources.protomaterie||0) + proto;
+            teile.push(fmt(proto) + ' Protomaterie');
+          }
+          const kp = Math.max(0, Math.round(r.kampfpunkte||0));
+          if (kp > 0){ state.battlePoints = (state.battlePoints||0) + kp; teile.push(kp + ' Kampfpunkte'); }
+          const sysName = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          log('Anteil am Hort der ' + (r.stufeName||'Festung') + ' bei ' + sysName + ' ('
+            + Math.round((r.anteil||0)*100) + '% deiner Arbeit): ' + (teile.join(', ') || 'nichts mehr übrig'),
+            'ti-trophy', 'wichtig');
+          continue;
+        }
         if (r.type === 'weekly-league'){
           // Serverautoritative Wochenliga (v8.203.0): Der Server hat Platzierung + Liga bestimmt, der
           // Client wendet nur noch die Belohnung der zugewiesenen Liga an (Kredite + anteilige Produktion
@@ -38369,7 +38572,7 @@
     { key:'kolonien', icon:'ti-planet', title:'Kolonien & Monde', entries:[
       { title:'Kolonisieren', body:'Erreichbare Planeten im System werden zunächst erkundet, dann mit einem Kolonieschiff besiedelt. Jede Kolonie hat eigene Gebäude, Forschung wird jedoch spielerweit geteilt.' },
       { title:'Automatische Erkundung', body:'Schalter auf der Sektorkarte (mindestens 1 Erkundungsschiff nötig): sobald aktiviert, reserviert genau <strong>ein</strong> Erkundungsschiff vom gerade aktiven Planeten und fliegt eine durchgehende Rundreise - erst das nächstgelegene unentdeckte Ziel, danach automatisch weiter zum jeweils nächsten, bis alle erreichbaren Planeten erkundet sind. Direkt unter dem Schalter zeigt eine eigene Box jederzeit den Ausgangsplaneten, das aktuelle Ziel mit Countdown, eine Vorschau des nächsten Ziels und den Gesamtfortschritt (z.B. "5/12"). Reicht der Treibstoff (Deuterium) für den nächsten Abschnitt nicht, wartet die Rundreise automatisch und versucht es beim nächsten Ressourcenzuwachs erneut - ohne manuelles Eingreifen. Sind alle Ziele erledigt, fliegt das Schiff zurück zum Ausgangsplaneten und die Rundreise endet automatisch. Der Schalter lässt sich jederzeit wieder ausschalten - eine laufende Rundreise wird dadurch nicht abrupt abgebrochen, sondern das aktuelle Ziel noch fertig angeflogen, bevor das Schiff zurückkehrt. Manuelles Erkunden einzelner Planeten bleibt parallel dazu möglich, solange noch ein freies Erkundungsschiff übrig ist.' },
-      { title:'Asteroiden und Abbaumissionen', body:'In etwa <strong>zwanzig der 69 Sternsysteme</strong> liegt ein <strong>Asteroidengürtel</strong>. Auf der Sektorkarte siehst du ihn als gestrichelte Bahn zwischen den Planeten-Orbits, darin die Vorkommen als gezeichnete Brocken – Farbe und Größe des Markers verraten die Größe, das Symbol die Sorte. Ein Klick öffnet das Kartenmenü mit <strong>Abbaumission</strong>.<br><br><strong>Zehn Sorten:</strong> drei reine (Eisenbrocken → Erz, Prismenbrocken → Kristalle, Eiskern → Deuterium) und sechs seltenere <strong>Legierungsasteroiden</strong> mit zwei Rohstoffen. Drei davon führen eine Spur <strong>Antimaterie</strong> – bewusst nur eine Spur, denn Antimaterie ist der Engpass, der die ganze Tier-2-Kette trägt. Die zehnte ist der <strong>Urmateriekern</strong>: die einzige Sorte mit <em>drei</em> Rohstoffen, und die einzige, die <strong>Protomaterie</strong> führt. Er ist mit Abstand der seltenste Fels – in der ganzen Galaxie liegen im Schnitt nur rund drei Stück gleichzeitig, und die gehören allen.<br><br><strong>Vier Größen:</strong> Splitter (50.000 Vorrat, Platz für 4 Minenschiffe), Brocken (150.000 / 8), Kern (500.000 / 16), Koloss (1.500.000 / 30). Die Plätze begrenzen, wie viele Minenschiffe gleichzeitig graben können – mehr mitzuschicken ist erlaubt, sie tragen Ladung, erhöhen aber die Rate nicht. Die Startvorschau sagt es dir.<br><br><strong>Je größer der Brocken, desto länger der Abbau.</strong> Jede Größe hat eine <strong>Mindest-Abbauzeit</strong> – ' + fmtDuration(ABBAU_MIND_SEK.splitter) + ' beim Splitter, ' + fmtDuration(ABBAU_MIND_SEK.brocken) + ' beim Brocken, ' + fmtDuration(ABBAU_MIND_SEK.kern) + ' beim Kern und ' + fmtDuration(ABBAU_MIND_SEK.koloss) + ' beim Koloss. Auch eine riesige Flotte holt einen Koloss nicht in zehn Minuten aus dem Fels; sie füllt nur mehr Laderaum in derselben Zeit. Nach oben gilt umgekehrt ein <strong>Deckel je Größe</strong> (' + fmtDuration(ABBAU_DECKEL_SEK.splitter) + ' bis ' + fmtDuration(ABBAU_DECKEL_SEK.koloss) + '): Was in dieser Zeit nicht ins Schiff passt, bleibt liegen und wartet auf die nächste Fuhre. Ein großer Brocken ist damit ein Vorhaben, das sich lohnt – und keines für zwischendurch.<br><br><strong>Tiefenbohrung</strong> (5 Stufen, Forschung <em>Fördertechnik</em> vorausgesetzt) verkürzt die Abbauzeit um ' + (ABBAU_BOHRUNG_JE_STUFE/60) + ' Minuten je Stufe, bei Vollausbau also um ' + (5*ABBAU_BOHRUNG_JE_STUFE/60) + ' Minuten. <strong>Die Ladung bleibt dabei gleich</strong> – du bist früher zurück, nicht mit weniger. Unter die halbe Mindestzeit der jeweiligen Größe geht es nie.<br><br><strong>So läuft eine Abbaumission:</strong> Du brauchst <strong>mindestens ein Minenschiff</strong> (Forschung <em>Minentechnik</em>); Frachter erweitern den Laderaum – für die großen Brocken weit draußen gibt es dafür den <strong>Bergungsfrachter</strong> mit 3.000 Frachtraum, der die Flotte allerdings auf Geschwindigkeit 25 ausbremst. Die Flotte fliegt hin, gräbt <strong>bis der Laderaum voll ist</strong>, und fliegt zurück. <strong>Die Rohstoffe bekommst du erst bei der Rückkehr</strong> – währenddessen ist die Ladung schon aus dem Vorkommen entnommen, damit derselbe Brocken nicht zweimal vergeben wird. Ist dein Lager bei der Ankunft voll, geht der Überschuss verloren wie bei jeder anderen Beute auch; der Bericht sagt dir, wie viel. Er trägt außerdem den Knopf <strong>„Zeigen, wo das war"</strong>: Er öffnet die Sektorkarte an genau dem Gürtelplatz und lässt ihn kurz blinken. Weil ein Vorkommen nach dem Abbau oft nicht mehr dasselbe ist, sagt er dir dabei, was dich dort erwartet – ob der Brocken noch liegt (mit Restvorrat), ob inzwischen ein anderer dort liegt oder ob er leergefördert ist. Der Anfechtungsbericht hat denselben Knopf.<br><br><strong>Fördertechnik</strong> (10 Stufen) hebt Abbaurate <em>und</em> Laderaum um je 4% pro Stufe. Beides zusammen heißt: gleiche Fahrtdauer, mehr Ladung.<br><br><strong>Die Aufbereitungsanlage</strong> (20 Stufen, Forschung <em>Minentechnik</em>) holt mehr aus dem heimgebrachten Gestein: <strong>+1,5% Ausbeute je Stufe</strong> auf jede eintreffende Ladung, bei Vollausbau also +30%. Bezahlt wird das beim Entladen mit <strong>12 Energie je zusätzlich gewonnener Einheit</strong> – bei einer durchgehend laufenden Abbaumission und voll ausgebauter Anlage sind das rund ein Fünftel deiner Energieproduktion, bei drei Flotten schon alles davon. Energie ist damit der Betriebsstoff des Bergbaus: Wer mehr verarbeiten will, baut Kraftwerke. Reicht die Energie nicht, fällt <em>nur der Zuschlag</em> kleiner aus – die geschürfte Ladung selbst kommt immer vollständig an. Es zählt die <strong>höchste Anlage im Imperium</strong>, nicht die Summe: eine genügt für alle Kolonien, eine zweite unterhalb der besten bringt nichts. Die Startvorschau nennt den Zuschlag und seine Energiekosten, bevor du losschickst.<br><br><strong>Die Gürtel gehören allen gemeinsam</strong> (seit v8.487.0): Solange du mit dem Server verbunden bist, führt <em>er</em> den Vorrat – alle Spieler sehen dieselben Vorkommen mit demselben Restbestand. Die Ladung wird beim <strong>Start</strong> der Mission entnommen; wer zuerst da ist, hat sie. War jemand schneller, startet deine Mission gar nicht erst, es wird kein Treibstoff fällig und die Karte aktualisiert sich sofort. Ohne Server (Solo-Modus oder Verbindungsabbruch) läuft alles lokal weiter – der Bergbau verschwindet nie, er ist dann nur nicht geteilt. <strong>Schürfpeilungen sind davon ausgenommen</strong> und bleiben privat.<br><br><strong>Ein leergefördertes Vorkommen kommt woanders wieder</strong> – nach 3 Stunden (Splitter) bis 48 Stunden (Koloss), auf einem anderen freien Platz, zu 30% sogar in einem anderen Gürtelsystem, mit neu gezogener Sorte und Größe. Der Gürtel ist also ein Revier, das man immer wieder absuchen muss, kein fester Fahrplan.<br><br><strong>Schürfpeilungen:</strong> Erfolgreiche <strong>Expeditionen</strong> finden gelegentlich die Koordinaten eines besonders seltenen und großen Asteroiden – immer Kern oder Koloss, meist eine Legierungssorte, oft mit Antimaterie. Die <strong>Schürfexpedition</strong> hat mit 3% die dreifache Chance darauf (Tiefenraum 2%, übrige 1%); der Risiko-Regler zieht mit. Eine Peilung erscheint als Marker mit <strong>gestricheltem grünen Ring</strong> in einem System, das du bereits kennst, gehört <strong>nur dir</strong> und ist nicht anfechtbar. Sie ist <strong>sieben Tage gültig</strong> und du kannst <strong>höchstens drei</strong> gleichzeitig offen haben – eine vierte wird in Rohstoffe gewandelt statt zu verfallen. Angeflogen wird sie mit derselben Abbaumission wie jedes andere Vorkommen; leergefördert verschwindet sie und wächst nicht nach.<br><br><strong>Schürfrechte</strong> (seit v8.489.0, nur mit Server): Ein Schürfrecht <strong>reserviert ein Vorkommen für dich allein</strong> – niemand sonst darf dort abbauen, bis du es aufgibst oder das Vorkommen erschöpft ist. Jeder hat einen <strong>Grundstock von 2 Rechten</strong>; die Forschung <em>Bergbaurecht</em> (3 Stufen) gibt je +1, insgesamt also höchstens 5. Angemeldet wird über das Kartenmenü des Vorkommens; auf der Karte trägt ein reserviertes Vorkommen einen <strong>Ring</strong> (grün = deins, rot = fremd). Es lohnt sich für die Brocken, die du dauerhaft bewirtschaften willst – für alles andere bleibt das offene Wettrennen.<br><br><strong>Die Eskorte hält das Recht:</strong> Über das Kartenmenü stationierst du <strong>Kampfschiffe dauerhaft am Vorkommen</strong>. Sie fliegen einmal hin (Flugzeit und Treibstoff wie üblich), bleiben dort stehen und belegen <strong>einen Flottenslot</strong>, bis du sie zurückrufst – der Rückruf kostet eigenen Treibstoff. Ein Recht <em>ohne</em> Eskorte hältst du trotzdem, aber es ist künftig anfechtbar, und man sieht es: Sein Ring ist <strong>gestrichelt</strong> statt durchgezogen. <strong>Die Anfechtung</strong> (seit v8.491.0): Ein fremdes Schürfrecht lässt sich mit einer Kampfflotte angreifen – im Kartenmenü des Vorkommens steht dafür der Eintrag <em>Schürfrecht anfechten</em>. Die Flotte fliegt hin, und <strong>bei Ankunft rechnet der Server den Kampf aus</strong>: deine Angriffskraft gegen die stationierte Eskorte. Gewinnst du, geht das Recht an dich über – <strong>der Vorrat bleibt dabei liegen</strong>, du eroberst die Quelle und nicht ihre Ladung. Verlierst du, behält der Halter sein Recht und du deine Überlebenden. <strong>Auch ein gewonnener Angriff kostet Schiffe</strong>, und die Erfolgsaussicht liegt wie im Spielerkampf zwischen 10 und 90% – Übermacht gewinnt meist, sicher ist es nie.<br><br>Drei Regeln schützen vor Dauerbeschuss: Nach jedem Besitzwechsel gilt eine <strong>Schutzfrist von 2 Stunden</strong>, jeder Angreifer hat je Vorkommen eine <strong>Abklingzeit von 4 Stunden</strong>, und <strong>Allianzmitglieder können sich ihre Rechte nicht gegenseitig abnehmen</strong>. Eine laufende Abbaumission des Halters wird nie abgefangen – ihre Ladung ist beim Start schon entnommen. Wer ein Recht erobert, gewinnt die Zukunft des Vorkommens, nicht die Fahrt, die gerade läuft.<br><br>Läuft dein Spiel ohne Server (Solo-Modus), gibt es keine Schürfrechte – dort bleibt jedes Vorkommen für jeden offen.'
+      { title:'Asteroiden und Abbaumissionen', body:'In etwa <strong>zwanzig der 69 Sternsysteme</strong> liegt ein <strong>Asteroidengürtel</strong>. Auf der Sektorkarte siehst du ihn als gestrichelte Bahn zwischen den Planeten-Orbits, darin die Vorkommen als gezeichnete Brocken – Farbe und Größe des Markers verraten die Größe, das Symbol die Sorte. Ein Klick öffnet das Kartenmenü mit <strong>Abbaumission</strong>.<br><br><strong>Zehn Sorten:</strong> drei reine (Eisenbrocken → Erz, Prismenbrocken → Kristalle, Eiskern → Deuterium) und sechs seltenere <strong>Legierungsasteroiden</strong> mit zwei Rohstoffen. Drei davon führen eine Spur <strong>Antimaterie</strong> – bewusst nur eine Spur, denn Antimaterie ist der Engpass, der die ganze Tier-2-Kette trägt. Die zehnte ist der <strong>Urmateriekern</strong>: die einzige Sorte mit <em>drei</em> Rohstoffen, und die einzige, die <strong>Protomaterie</strong> führt. Er ist mit Abstand der seltenste Fels – in der ganzen Galaxie liegen im Schnitt nur rund drei Stück gleichzeitig, und die gehören allen.<br><br><strong>Vier Größen:</strong> Splitter (50.000 Vorrat, Platz für 4 Minenschiffe), Brocken (150.000 / 8), Kern (500.000 / 16), Koloss (1.500.000 / 30). Die Plätze begrenzen, wie viele Minenschiffe gleichzeitig graben können – mehr mitzuschicken ist erlaubt, sie tragen Ladung, erhöhen aber die Rate nicht. Die Startvorschau sagt es dir.<br><br><strong>Je größer der Brocken, desto länger der Abbau.</strong> Jede Größe hat eine <strong>Mindest-Abbauzeit</strong> – ' + fmtDuration(ABBAU_MIND_SEK.splitter) + ' beim Splitter, ' + fmtDuration(ABBAU_MIND_SEK.brocken) + ' beim Brocken, ' + fmtDuration(ABBAU_MIND_SEK.kern) + ' beim Kern und ' + fmtDuration(ABBAU_MIND_SEK.koloss) + ' beim Koloss. Auch eine riesige Flotte holt einen Koloss nicht in zehn Minuten aus dem Fels; sie füllt nur mehr Laderaum in derselben Zeit. Nach oben gilt umgekehrt ein <strong>Deckel je Größe</strong> (' + fmtDuration(ABBAU_DECKEL_SEK.splitter) + ' bis ' + fmtDuration(ABBAU_DECKEL_SEK.koloss) + '): Was in dieser Zeit nicht ins Schiff passt, bleibt liegen und wartet auf die nächste Fuhre. Ein großer Brocken ist damit ein Vorhaben, das sich lohnt – und keines für zwischendurch.<br><br><strong>Tiefenbohrung</strong> (5 Stufen, Forschung <em>Fördertechnik</em> vorausgesetzt) verkürzt die Abbauzeit um ' + (ABBAU_BOHRUNG_JE_STUFE/60) + ' Minuten je Stufe, bei Vollausbau also um ' + (5*ABBAU_BOHRUNG_JE_STUFE/60) + ' Minuten. <strong>Die Ladung bleibt dabei gleich</strong> – du bist früher zurück, nicht mit weniger. Unter die halbe Mindestzeit der jeweiligen Größe geht es nie.<br><br><strong>So läuft eine Abbaumission:</strong> Du brauchst <strong>mindestens ein Minenschiff</strong> (Forschung <em>Minentechnik</em>); Frachter erweitern den Laderaum – für die großen Brocken weit draußen gibt es dafür den <strong>Bergungsfrachter</strong> mit 3.000 Frachtraum, der die Flotte allerdings auf Geschwindigkeit 25 ausbremst. Die Flotte fliegt hin, gräbt <strong>bis der Laderaum voll ist</strong>, und fliegt zurück. <strong>Die Rohstoffe bekommst du erst bei der Rückkehr</strong> – währenddessen ist die Ladung schon aus dem Vorkommen entnommen, damit derselbe Brocken nicht zweimal vergeben wird. Ist dein Lager bei der Ankunft voll, geht der Überschuss verloren wie bei jeder anderen Beute auch; der Bericht sagt dir, wie viel. Er trägt außerdem den Knopf <strong>„Zeigen, wo das war"</strong>: Er öffnet die Sektorkarte an genau dem Gürtelplatz und lässt ihn kurz blinken. Weil ein Vorkommen nach dem Abbau oft nicht mehr dasselbe ist, sagt er dir dabei, was dich dort erwartet – ob der Brocken noch liegt (mit Restvorrat), ob inzwischen ein anderer dort liegt oder ob er leergefördert ist. Der Anfechtungsbericht hat denselben Knopf.<br><br><strong>Fördertechnik</strong> (10 Stufen) hebt Abbaurate <em>und</em> Laderaum um je 4% pro Stufe. Beides zusammen heißt: gleiche Fahrtdauer, mehr Ladung.<br><br><strong>Die Aufbereitungsanlage</strong> (20 Stufen, Forschung <em>Minentechnik</em>) holt mehr aus dem heimgebrachten Gestein: <strong>+1,5% Ausbeute je Stufe</strong> auf jede eintreffende Ladung, bei Vollausbau also +30%. Bezahlt wird das beim Entladen mit <strong>12 Energie je zusätzlich gewonnener Einheit</strong> – bei einer durchgehend laufenden Abbaumission und voll ausgebauter Anlage sind das rund ein Fünftel deiner Energieproduktion, bei drei Flotten schon alles davon. Energie ist damit der Betriebsstoff des Bergbaus: Wer mehr verarbeiten will, baut Kraftwerke. Reicht die Energie nicht, fällt <em>nur der Zuschlag</em> kleiner aus – die geschürfte Ladung selbst kommt immer vollständig an. Es zählt die <strong>höchste Anlage im Imperium</strong>, nicht die Summe: eine genügt für alle Kolonien, eine zweite unterhalb der besten bringt nichts. Die Startvorschau nennt den Zuschlag und seine Energiekosten, bevor du losschickst.<br><br><strong>Die Gürtel gehören allen gemeinsam</strong> (seit v8.487.0): Solange du mit dem Server verbunden bist, führt <em>er</em> den Vorrat – alle Spieler sehen dieselben Vorkommen mit demselben Restbestand. Die Ladung wird beim <strong>Start</strong> der Mission entnommen; wer zuerst da ist, hat sie. War jemand schneller, startet deine Mission gar nicht erst, es wird kein Treibstoff fällig und die Karte aktualisiert sich sofort. Ohne Server (Solo-Modus oder Verbindungsabbruch) läuft alles lokal weiter – der Bergbau verschwindet nie, er ist dann nur nicht geteilt. <strong>Schürfpeilungen sind davon ausgenommen</strong> und bleiben privat.<br><br><strong>Ein leergefördertes Vorkommen kommt woanders wieder</strong> – nach 3 Stunden (Splitter) bis 48 Stunden (Koloss), auf einem anderen freien Platz, zu 30% sogar in einem anderen Gürtelsystem, mit neu gezogener Sorte und Größe. Der Gürtel ist also ein Revier, das man immer wieder absuchen muss, kein fester Fahrplan.<br><br><strong>Schürfpeilungen:</strong> Erfolgreiche <strong>Expeditionen</strong> finden gelegentlich die Koordinaten eines besonders seltenen und großen Asteroiden – immer Kern oder Koloss, meist eine Legierungssorte, oft mit Antimaterie. Die <strong>Schürfexpedition</strong> hat mit 3% die dreifache Chance darauf (Tiefenraum 2%, übrige 1%); der Risiko-Regler zieht mit. Eine Peilung erscheint als Marker mit <strong>gestricheltem grünen Ring</strong> in einem System, das du bereits kennst, gehört <strong>nur dir</strong> und ist nicht anfechtbar. Sie ist <strong>sieben Tage gültig</strong> und du kannst <strong>höchstens drei</strong> gleichzeitig offen haben – eine vierte wird in Rohstoffe gewandelt statt zu verfallen. Angeflogen wird sie mit derselben Abbaumission wie jedes andere Vorkommen; leergefördert verschwindet sie und wächst nicht nach.<br><br><strong>Schürfrechte</strong> (seit v8.489.0, nur mit Server): Ein Schürfrecht <strong>reserviert ein Vorkommen für dich allein</strong> – niemand sonst darf dort abbauen, bis du es aufgibst oder das Vorkommen erschöpft ist. Jeder hat einen <strong>Grundstock von 2 Rechten</strong>; die Forschung <em>Bergbaurecht</em> (3 Stufen) gibt je +1, insgesamt also höchstens 5. Angemeldet wird über das Kartenmenü des Vorkommens; auf der Karte trägt ein reserviertes Vorkommen einen <strong>Ring</strong> (grün = deins, rot = fremd). Es lohnt sich für die Brocken, die du dauerhaft bewirtschaften willst – für alles andere bleibt das offene Wettrennen.<br><br><strong>Die Eskorte hält das Recht:</strong> Über das Kartenmenü stationierst du <strong>Kampfschiffe dauerhaft am Vorkommen</strong>. Sie fliegen einmal hin (Flugzeit und Treibstoff wie üblich), bleiben dort stehen und belegen <strong>einen Flottenslot</strong>, bis du sie zurückrufst – der Rückruf kostet eigenen Treibstoff. Ein Recht <em>ohne</em> Eskorte hältst du trotzdem, aber es ist künftig anfechtbar, und man sieht es: Sein Ring ist <strong>gestrichelt</strong> statt durchgezogen. <strong>Die Anfechtung</strong> (seit v8.491.0): Ein fremdes Schürfrecht lässt sich mit einer Kampfflotte angreifen – im Kartenmenü des Vorkommens steht dafür der Eintrag <em>Schürfrecht anfechten</em>. Die Flotte fliegt hin, und <strong>bei Ankunft rechnet der Server den Kampf aus</strong>: deine Angriffskraft gegen die stationierte Eskorte. Gewinnst du, geht das Recht an dich über – <strong>der Vorrat bleibt dabei liegen</strong>, du eroberst die Quelle und nicht ihre Ladung. Verlierst du, behält der Halter sein Recht und du deine Überlebenden. <strong>Auch ein gewonnener Angriff kostet Schiffe</strong>, und die Erfolgsaussicht liegt wie im Spielerkampf zwischen 10 und 90% – Übermacht gewinnt meist, sicher ist es nie.<br><br>Drei Regeln schützen vor Dauerbeschuss: Nach jedem Besitzwechsel gilt eine <strong>Schutzfrist von 2 Stunden</strong>, jeder Angreifer hat je Vorkommen eine <strong>Abklingzeit von 4 Stunden</strong>, und <strong>Allianzmitglieder können sich ihre Rechte nicht gegenseitig abnehmen</strong>. Eine laufende Abbaumission des Halters wird nie abgefangen – ihre Ladung ist beim Start schon entnommen. Wer ein Recht erobert, gewinnt die Zukunft des Vorkommens, nicht die Fahrt, die gerade läuft.<br><br>Läuft dein Spiel ohne Server (Solo-Modus), gibt es keine Schürfrechte – dort bleibt jedes Vorkommen für jeden offen.<br><br><strong>Asteroidenfestungen</strong> (neu): Gelegentlich nistet sich auf einer Gürtelbahn eine <strong>Festung</strong> ein – auf der Karte eine gezackte Bastion mit pulsendem Ring, an der Stelle eines Gürtelplatzes. Solange sie steht, <strong>drosselt sie den Abbau im ganzen System</strong>, und zwar zweifach: die Ladung jeder Fuhre und – schwerer wiegend – die <strong>Protomaterie</strong>. Es gibt drei Ausbaustufen, und wie stark sie ausfällt, hängt davon ab, wie weit draußen das System liegt: <strong>' + FESTUNG_STUFEN.schanze.name + '</strong> (heimatnah, &minus;' + Math.round(FESTUNG_STUFEN.schanze.blockade*100) + '% Ladung, &minus;' + Math.round(FESTUNG_STUFEN.schanze.proto*100) + '% Protomaterie), <strong>' + FESTUNG_STUFEN.kastell.name + '</strong> (&minus;' + Math.round(FESTUNG_STUFEN.kastell.blockade*100) + '% / &minus;' + Math.round(FESTUNG_STUFEN.kastell.proto*100) + '%) und <strong>' + FESTUNG_STUFEN.sternenfeste.name + '</strong> (&minus;' + Math.round(FESTUNG_STUFEN.sternenfeste.blockade*100) + '% / &minus;' + Math.round(FESTUNG_STUFEN.sternenfeste.proto*100) + '%). Die Startvorschau der Abbaumission sagt dir das vorher – eine stillschweigend kleinere Fuhre wäre keine Mechanik, sondern ein Ärgernis.<br><br><strong>Sie lässt sich angreifen</strong>, über das Kartenmenü der Bastion. Der Verband fliegt hin und zurück (Form der Anfechtung), und der Server rechnet den Schaden am <strong>Kern</strong> aus deiner Flotte. Eine Festung fällt <em>nicht</em> in einem Schlag: Ihr Kern reicht von ' + fmt(FESTUNG_STUFEN.schanze.kern) + ' bei der ' + FESTUNG_STUFEN.schanze.name + ' bis ' + fmt(FESTUNG_STUFEN.sternenfeste.kern) + ' bei der ' + FESTUNG_STUFEN.sternenfeste.name + ' – rechne mit vier bis sieben Schlägen, wenn du allein arbeitest. Nach jedem Schlag gilt an <em>dieser</em> Festung eine <strong>Abklingzeit von 6 Stunden</strong>; Mitstreiter können in der Zwischenzeit weitermachen, und genau darauf ist sie ausgelegt.<br><br><strong>Der Hort</strong> wächst, solange die Festung steht. Fällt sie, wird er <strong>nach Schadensanteil</strong> unter allen Beitragenden geteilt – wer nur ein Drittel des Kerns zerlegt hat, bekommt ein Drittel, auch wenn ein anderer den letzten Schlag geführt hat. Gezählt wird dabei, was <em>angekommen</em> ist: Ein Schlag gegen einen fast leeren Kern trägt nur den Rest bei, nicht seine volle Wucht. Der Anteil landet unter den <strong>Belohnungen</strong>, auch wenn du beim Fall gerade offline warst. Danach ist der Gürtel <strong>24 Stunden lang frei</strong> und sogar <strong>+' + Math.round(FESTUNG_GERAEUMT_BONUS*100) + '% ergiebiger</strong> als sonst – das Aufräumen lohnt sich also auch für den, der nur einen kleinen Anteil hatte.'
         /* Protomaterie (16.08.2026). Die Mengen werden aus PROTOMATERIE_JE_FUHRE ABGELEITET, damit
            dieser Text bei einer Balance-Änderung nicht zur zweiten Anzeigestelle mit der alten
            Annahme wird (CLAUDE.md Punkt 6). Das geht hier, weil die Konstante WEITER OBEN in der
@@ -38711,7 +38914,7 @@
   // Filter-Buttons getrennt zu pflegen.
   const REPORT_CATEGORIES = [
     { key:'all', label:'Alle', icon:'ti-list-details' },
-    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest'] },
+    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff'] },
     { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered'] },
     { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout','sabotage-sent','sabotage-received'] },
     { key:'other', label:'Sonstiges', icon:'ti-sparkles', types:['item-found','weekly-reward','debris-cleared','random-event'] }
@@ -38731,6 +38934,11 @@
     // Ergebnis-Filter "Gewonnen" wuerde sie ausblenden - genau die zweite Anzeigestelle, die bei
     // 'destroyed' bis v8.430.0 dieselbe alte Annahme behielt (siehe Kommentar unten).
     if (r.type === 'asteroid-contest') return !!r.gewonnen;
+    /* Ein Festungsschlag ist IMMER ein Fortschritt - der Kern sinkt, der eigene Anteil waechst.
+       Ohne diese Zeile bekaeme jeder Schlag ausser dem letzten den roten Streifen samt Pille
+       "Verloren", weil `result` fehlt; genau die Falle, die der Kommentar darunter fuer
+       'destroyed' beschreibt. */
+    if (r.type === 'festung-angriff') return true;
     // 'destroyed' (zerstoerte gegnerische Basis - der beste Ausgang) galt hier bis v8.430.0 als
     // negativ: rote Karte, "Verloren"-Pille. battleCardData hatte den Fall laengst richtig, diese
     // Stelle war die zweite Anzeigestelle mit der alten Annahme (CLAUDE.md Pflicht 6).
@@ -39196,6 +39404,23 @@
         const evs = eskorteSchiffssumme(r.eigeneVerluste), gvs = eskorteSchiffssumme(r.gegnerVerluste);
         body += '<br><i class="ti ti-shield" aria-hidden="true"></i> Eigene Verluste: ' + (evs ? fleetBreakdownHtml(r.eigeneVerluste) : 'keine')
              + ' · Gegner: ' + (gvs ? fleetBreakdownHtml(r.gegnerVerluste) : 'keine');
+      } else if (r.type === 'festung-angriff'){
+        /* Der Festungsbericht nennt ausdruecklich, was ANGEKOMMEN ist (`schaden`) - nicht, was
+           gewuerfelt wurde. Der Server zaehlt genau das auf den Hortanteil, und ein Bericht, der
+           eine groessere Zahl nennt als die, die zaehlt, waere die zweite Anzeigestelle mit der
+           falschen Annahme (Pflicht 6). */
+        title = (r.gefallen ? 'Festung gestürzt: ' : 'Festung beschossen: ') + (r.stufeName || 'Asteroidenfestung');
+        body = '<i class="ti ti-building-fortress" aria-hidden="true" style="color:' + (r.gefallen ? '#5dcaa5' : '#e0a548') + ';"></i> '
+             + escapeHtml(r.systemName || r.system || '')
+             + ' · Schaden am Kern <strong>' + fmt(r.schaden||0) + '</strong>';
+        body += '<br>' + (r.gefallen
+          ? 'Die Festung ist gefallen. Dein Anteil am Hort: <strong>' + Math.round((r.anteil||0)*100) + '%</strong>'
+            + ((r.teilnehmer||1) > 1 ? ' (von ' + r.teilnehmer + ' Beitragenden)' : '')
+            + ' – er liegt unter den Belohnungen. Der Gürtel ist 24 Stunden lang frei und ergiebiger.'
+          : 'Kern noch <strong>' + fmt(r.kern||0) + '</strong>' + (r.kernMax ? ' von ' + fmt(r.kernMax) : '')
+            + '. Nächster Schlag an dieser Festung in 6 Stunden – Mitstreiter können in der Zwischenzeit weitermachen.');
+        const fvs = eskorteSchiffssumme(r.eigeneVerluste);
+        body += '<br><i class="ti ti-shield" aria-hidden="true"></i> Eigene Verluste: ' + (fvs ? fleetBreakdownHtml(r.eigeneVerluste) : 'keine');
       } else if (r.type === 'raid-scout'){
         title = 'Aufklärung: Anfliegende Flotte ('+(r.faction||'Unbekannt')+')';
         body = 'Ziel: <strong>'+planetDisplayName(r.targetPlanet)+'</strong>'+(r.fromPlanet?' · Spähschiff von: '+r.fromPlanet:'')+'<br>Angriffspunkte: '+fmt(r.attackPower)+' vs. deine Verteidigungs-Angriffskraft (Gebäude): '+fmt(r.defenseAttackPower);
@@ -39405,7 +39630,7 @@
         actionsHtml += `<div style="margin-top:8px;"><button data-send-recyclers="${r.id}"${ohneRecycler?' disabled':''} style="font-size:10.5px; padding:5px 9px;" title="${ohneRecycler?'Du hast an keinem anderen Standort Recycler':'Verlegt alle Recycler von '+escapeHtml(planetDisplayName(truemmerZiel.quelle.planet))+' dorthin'}"><i class="ti ti-recycle" aria-hidden="true" style="margin-right:3px;"></i>${ohneRecycler?'Keine Recycler vorhanden':'Recycler nach '+escapeHtml(planetDisplayName(truemmerZiel.key))+' schicken'}</button> <span class="bmeta" style="font-size:10px;">${fmt(Math.round(truemmerZiel.menge))} im Trümmerfeld${ohneRecycler?'':' · '+truemmerZiel.quelle.anzahl+' Recycler bereit'}</span></div>`;
       }
       // Fundort-Knopf: nur bei den zwei Berichtsarten, die ueberhaupt einen Guertelplatz meinen.
-      if ((r.type === 'mining' || r.type === 'asteroid-contest') && r.system){
+      if ((r.type === 'mining' || r.type === 'asteroid-contest' || r.type === 'festung-angriff') && r.system){
         actionsHtml += `<div style="margin-top:8px;"><button data-zeig-fundort="${r.id}" style="font-size:10.5px; padding:5px 9px;" title="Öffnet die Sektorkarte am Gürtelplatz dieses Berichts"><i class="ti ti-map-2" aria-hidden="true" style="margin-right:4px;"></i>Zeigen, wo das war</button></div>`;
       }
       const expeditionPositive = r.type==='expedition' && (r.result==='success' || r.result==='defended');
@@ -50053,6 +50278,11 @@
           anfechtungAufloesen(m, planetKey, fleet);
           continue;
         }
+        // Festungsschlag angekommen - derselbe Weg wie die Anfechtung darueber.
+        if (m.type === 'festung-angriff'){
+          festungAufloesen(m, planetKey, fleet);
+          continue;
+        }
         /* Rueckruf angekommen: Die Schiffe treten wieder in die Flotte ein. m.schiffe statt
            m.composition - siehe eskorteRueckruf. */
         if (m.type === 'mining-recall'){
@@ -55115,6 +55345,43 @@
           </g>`;
       }
     }
+    /* Die Asteroidenfestung sitzt auf einem Platz der GUERTELBAHN, genau wie ein Vorkommen - sie
+       belegt ihn ja auch (der Server haelt den Platz ueber astFreiePlaetze frei). Deshalb dieselbe
+       Positionsfunktion und kein zweites Bahnkonzept.
+       Gezeichnet als eckige Bastion statt als runder Brocken, damit sie sich auf den ersten Blick
+       von den Vorkommen unterscheidet: Ein Spieler, der auf die Karte sieht, muss erkennen koennen,
+       WAS ihm da die Ausbeute drosselt. Der pulsende Ring ist derselbe Kniff wie beim Weltboss -
+       er zieht den Blick auf ein Ziel, das man angreifen kann. */
+    if (istGuertelSystem(activeSystem)){
+      const feldF = state.asteroidFeld && state.asteroidFeld[activeSystem];
+      const fest = feldF && feldF.festung;
+      if (fest){
+        const st = FESTUNG_STUFEN[fest.stufe] || FESTUNG_STUFEN.schanze;
+        const pos = asteroidPlatzXY(fest.platz);
+        const r = 9;
+        const x = pos.x.toFixed(1), y = pos.y.toFixed(1);
+        const anteil = Math.max(0, Math.min(1, (fest.kern||0) / (fest.kernMax || st.kern || 1)));
+        // Eine Zinnenform: Rechteck mit drei Zacken oben. Handgezeichnet aus Punkten, damit sie
+        // keinen Icon-Font braucht und bei jedem Zoom scharf bleibt.
+        const b = r, h = r * 0.95;
+        const zinnen = [
+          [-b, h], [-b, -h*0.25], [-b*0.6, -h*0.25], [-b*0.6, -h*0.75], [-b*0.2, -h*0.75],
+          [-b*0.2, -h*0.25], [b*0.2, -h*0.25], [b*0.2, -h*0.75], [b*0.6, -h*0.75],
+          [b*0.6, -h*0.25], [b, -h*0.25], [b, h]
+        ].map(([dx,dy]) => (pos.x + dx).toFixed(1) + ',' + (pos.y + dy).toFixed(1)).join(' ');
+        inner += `
+          <g class="planet-node" data-map-festung="1" style="cursor:pointer;">
+            <title>${escapeHtml(st.name)} – Kern ${Math.round(anteil*100)}%, drosselt den Abbau im System um ${Math.round(st.blockade*100)}% (antippen für das Menü)</title>
+            <circle cx="${x}" cy="${y}" r="${(r*1.9).toFixed(1)}" fill="none" stroke="${st.farbe}" stroke-width="1.4" stroke-opacity="0.5">
+              <animate attributeName="r" values="${(r*1.6).toFixed(1)};${(r*2.2).toFixed(1)};${(r*1.6).toFixed(1)}" dur="2.6s" repeatCount="indefinite"/>
+              <animate attributeName="stroke-opacity" values="0.55;0.12;0.55" dur="2.6s" repeatCount="indefinite"/>
+            </circle>
+            <polygon points="${zinnen}" fill="${st.farbe}" stroke="#0a0d1a" stroke-width="1.3"/>
+            <rect x="${(pos.x - b).toFixed(1)}" y="${(pos.y + h*0.35).toFixed(1)}" width="${(b*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
+            <rect x="${(pos.x - b).toFixed(1)}" y="${(pos.y + h*0.35).toFixed(1)}" width="${(b*2*anteil).toFixed(1)}" height="2.6" fill="#e24b4a"/>
+          </g>`;
+      }
+    }
     // Schuerfpeilungen (v8.481.0). Eigene, weiter aussen liegende Bahn und ein gestrichelter Ring -
     // sie sind privat und gehoeren sichtbar NICHT zum Guertel. Koennen in JEDEM bekannten System
     // liegen, deshalb ausserhalb des istGuertelSystem-Zweigs.
@@ -55442,6 +55709,13 @@
         if (galaxyMapDidDrag) return;
         // Kein parseInt: Peilungen tragen eine ID wie 'p3', Guertelplaetze eine Zahl - asteroidAn routet.
         asteroidMapMenu(e, activeSystem, node.getAttribute('data-map-asteroid'));
+      });
+    });
+    svg.querySelectorAll('[data-map-festung]').forEach(node => {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (galaxyMapDidDrag) return;
+        festungMapMenu(e, activeSystem);
       });
     });
     svg.querySelectorAll('[data-map-moon]').forEach(node => {
@@ -55854,16 +56128,33 @@
        die Fahrt kuerzer, nicht die Fuhre kleiner. Deshalb wird `ladung` aus der Zeit VOR dem Abzug
        gebildet - andernfalls haette eine Forschung, die Zeit spart, heimlich den Ertrag gesenkt. */
     const abbauBasis = rate > 0 ? Math.min(abbauDeckelFuer(a.groesse), Math.max(abbauMindestFuer(a.groesse), wunsch / rate)) : 0;
-    const ladung = Math.floor(Math.min(wunsch, rate * abbauBasis));
+    const ladungRoh = Math.floor(Math.min(wunsch, rate * abbauBasis));
+    /* DIE FESTUNG KUERZT HIER, UND ZWAR IN DER ANZEIGE - gebucht wird trotzdem der Serverwert.
+       `ladungRoh` ist, was die Flotte tragen koennte; `ladung` ist, was nach der Blockade wirklich
+       ankommt. Der Missionsstart schickt bewusst die ROHE Zahl als `wunsch` an den Server: Der
+       rechnet den Faktor selbst (er besitzt die Festung), und schickte der Client die schon
+       gekuerzte Zahl, kuerzte der Server ein ZWEITES Mal. Die beiden Namen stehen genau deshalb
+       so da - wer hier spaeter `ladung` sendet, baut die Doppelkuerzung ein.
+       Nach oben gegen den Vorrat gedeckelt, weil der Geraeumt-Bonus (+15 %) einem Brocken sonst
+       mehr entnehmen wuerde, als er enthaelt - dieselbe Klammer wie im Server. */
+    const fest = festungFaktoren(a.system);
+    const ladung = Math.max(0, Math.min(a.vorrat, Math.round(ladungRoh * fest.ladung)));
     const abbau = Math.max(abbauMindestFuer(a.groesse) * ABBAU_BOHRUNG_BODEN, abbauBasis - tiefenbohrungSek());
     const flug = missionDurationFor(asteroidFlugBasis(a.system), flotte, MINE_SHIP_KEYS, a.system);
     return {
-      rate, raum, ladung, abbau, flug, gesamt: flug + abbau,
+      rate, raum, ladung, ladungRoh, abbau, flug, gesamt: flug + abbau,
+      // Was die Festung anrichtet, reist in der Vorschau MIT - sonst muesste jede Anzeigestelle
+      // sie erneut nachschlagen, und eine davon vergisst es (Arbeitsregel 6).
+      festung: fest.festung, festungStufe: fest.stufe,
+      festungLadungFaktor: fest.ladung, festungProtoFaktor: fest.proto, geraeumtBonus: fest.geraeumt,
       res: asteroidResListe(a, ladung),
       // Dieselbe Rechnung wie beim Start (oeffneAbbaumission schreibt sie in die Mission) - die
       // Vorschau darf nicht zweite Zahl neben der echten sein. Sie zeigt, was gutgeschrieben WIRD,
       // nicht was ankommt: Ob der Speicher in 45 Minuten noch Platz hat, weiss jetzt niemand.
-      proto: protoJeFuhre(a),
+      // Die Protomaterie traegt ihren EIGENEN Faktor: Sie haengt allein an der GROESSE des
+      // Vorkommens, die Ladungskuerzung erreicht sie also nie (Begruendung bei festungFaktoren).
+      proto: Math.round(protoJeFuhre(a) * fest.proto),
+      protoRoh: protoJeFuhre(a),
       ueberzaehlig: Math.max(0, anwesend - groesse.plaetze),
       gedeckelt: abbauBasis >= abbauDeckelFuer(a.groesse) - 0.5,
       // Die Mindestzeit greift, wenn die Flotte den Brocken schneller leerraeumen koennte, als er
@@ -55878,6 +56169,22 @@
     const fuel = missionFuelCostSplit(p.flug, flotte);
     let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(p.flug/2)} · Abbau ${fmtDuration(p.abbau)} · Rückflug ${fmtDuration(p.flug/2)} <strong>(gesamt ${fmtDuration(p.gesamt)})</strong></div>`;
     html += `<div class="bmeta"><i class="ti ti-box" aria-hidden="true"></i> Ladung <strong>${fmt(p.ladung)}</strong> von ${fmt(p.raum)} Laderaum · ${rewardHtml(p.res)}</div>`;
+    /* Die Blockade wird AUSGESPROCHEN, nicht nur eingerechnet. Eine stillschweigend kleinere Zahl
+       waere genau die Verschlechterung ohne Erklaerung, wegen der der Spawn-Schalter im Backend
+       ueberhaupt existiert: Der Spieler saehe weniger Ladung und wuesste nicht, warum.
+       Die Protomaterie steht eigens da, wenn dieser Fels welche fuehrt - sie ist der eigentliche
+       Zahn der Blockade und faellt bei der Sternenfeste auf null. */
+    if (p.festung){
+      const pct = n => Math.round(n * 100);
+      let warum = `Ladung um <strong>${pct(1 - p.festungLadungFaktor)}%</strong> gedrosselt`;
+      if (p.protoRoh > 0) warum += ` · Protomaterie ${p.festungProtoFaktor <= 0 ? '<strong>vollständig blockiert</strong>'
+        : `um <strong>${pct(1 - p.festungProtoFaktor)}%</strong> gedrosselt`}`;
+      html += `<div class="bmeta" style="color:#e0a548;"><i class="ti ti-building-fortress" aria-hidden="true"></i> `
+            + `${escapeHtml(p.festungStufe.name)} im System – ${warum}. Schlage sie, und der Gürtel ist wieder frei.</div>`;
+    } else if (p.geraeumtBonus > 0){
+      html += `<div class="bmeta" style="color:#7fd18c;"><i class="ti ti-sparkles" aria-hidden="true"></i> `
+            + `Geräumter Gürtel: <strong>+${Math.round(p.geraeumtBonus * 100)}%</strong> Ladung, solange die Trümmer frisch sind.</div>`;
+    }
     // Die Aufbereitung wird erst bei der Heimkehr abgerechnet - deshalb steht sie hier als Aussicht
     // und nicht als Rechnung. Konzept 5.4 verlangt die Energiekosten ausdruecklich VOR dem Start:
     // ein stiller Verlust hinterher waere unehrlich, eine Warnung vorher ist es nicht.
@@ -55998,12 +56305,17 @@
        Stunde Flug. Schlaegt der Aufruf fehl, startet nichts: Treibstoff wird erst danach gezahlt.
        Schuerfpeilungen laufen weiter lokal - sie gehoeren nur ihrem Finder (Konzept 3.7). */
     let echt = 0;
+    // Vorbelegt aus der lokalen Tabelle; der Serverwert ueberschreibt ihn gleich, wenn er kommt.
+    let protoFaktor = festungFaktoren(sysId).proto;
     if (asteroidFeldGeteilt() && String(platz).charAt(0) !== 'p'){
       let daten = null;
       try {
         const res = await backendFetch('/asteroid/mine', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ system: sysId, platz: String(platz), wunsch: plan.ladung })
+          // ROH und nicht `plan.ladung`: Der Server rechnet den Festungsfaktor selbst - er besitzt
+          // die Festung. Schickte der Client die schon gekuerzte Zahl, kuerzte der Server ein
+          // zweites Mal (Begruendung ausfuehrlich bei ladungRoh in abbauPlan).
+          body: JSON.stringify({ system: sysId, platz: String(platz), wunsch: plan.ladungRoh })
         });
         daten = await res.json().catch(() => null);
         if (!res.ok){
@@ -56025,6 +56337,9 @@
         return;
       }
       echt = daten.menge;
+      // Der Server ist Autoritaet ueber den Protomaterie-Faktor - er besitzt die Festung. Fehlt das
+      // Feld (alter Server), bleibt der lokale Wert stehen; dann verhaelt sich alles wie bisher.
+      if (typeof daten.protoBlockade === 'number') protoFaktor = daten.protoBlockade;
       // Die Anzeige sofort nachziehen, statt bis zum naechsten Abruf eine veraltete Karte zu zeigen.
       const feld = state.asteroidFeld && state.asteroidFeld[sysId];
       if (feld && feld.plaetze[platz]){
@@ -56032,6 +56347,9 @@
         else feld.plaetze[platz] = { frei: true };
       }
     } else {
+      // Solo-Betrieb: Hier gibt es keinen Server, der kuerzt - also nimmt der Client die schon
+      // gekuerzte Zahl. Ohne diese Unterscheidung waere die Blockade offline wirkungslos, und
+      // dieselbe Karte zeigte je nach Anmeldung zwei verschiedene Fuhren.
       echt = asteroidEntnehmen(sysId, platz, plan.ladung);
     }
     if (echt <= 0){ log('Das Vorkommen ist bereits erschöpft.', 'ti-alert-triangle'); return; }
@@ -56053,11 +56371,61 @@
          weiss aus der Vorschau, was er mitbringt, und das gilt dann auch.
          Sie haengt allein an der GROESSE des Vorkommens, nicht an der Ladung - siehe die
          Begruendung bei PROTOMATERIE_JE_FUHRE. */
-      proto: protoJeFuhre(a),
+      /* Der Festungs-Faktor gilt HIER genauso wie in der Vorschau - sonst verspricht die Vorschau
+         eine gedrosselte Menge und die Mission bringt die volle heim (oder umgekehrt). Genau das
+         hat test_protomaterie 6c beim Bau dieser Phase gefangen.
+         Vorrang hat der Wert des SERVERS (`protoBlockade` aus der mine-Antwort): Er besitzt die
+         Festung und kennt ihren Stand in dieser Sekunde. Der lokale Faktor ist der Rueckfall fuer
+         den Solo-Betrieb und fuer einen Server, der das Feld noch nicht kennt - dort ist er 1 und
+         aendert nichts. */
+      proto: Math.round(protoJeFuhre(a) * protoFaktor),
       fleetName, composition: flotte
     });
     log(fleetName+' fliegt zum '+asteroidName(a)+' ('+(STAR_SYSTEMS.find(s=>s.id===sysId)||{name:sysId}).name+'). Ladung '+fmt(echt)+', zurück in '+fmtDuration(plan.gesamt)+'. Treibstoff: '+fuelCostText(fuel)+'.', 'ti-pick');
     render(); save();
+  }
+  /* Das Menue der Festung. Bewusst NEBEN asteroidMapMenu und mit derselben Machart: Wer eines der
+     beiden anfasst, sieht das andere.
+     Es nennt die drei Zahlen, die eine Entscheidung tragen - Kern, Blockade, Hort - und sagt bei
+     einem gesperrten Eintrag den GRUND. Ein grauer Knopf ohne Begruendung ist in diesem Spiel die
+     haeufigste Quelle fuer "warum geht das nicht". */
+  function festungMapMenu(ev, sysId){
+    const feld = state.asteroidFeld && state.asteroidFeld[sysId];
+    const fest = feld && feld.festung;
+    if (!fest) return;
+    const st = FESTUNG_STUFEN[fest.stufe] || FESTUNG_STUFEN.schanze;
+    const cf = currentFleet();
+    const kernMax = fest.kernMax || st.kern || 1;
+    const anteil = Math.max(0, Math.min(1, (fest.kern||0) / kernMax));
+    const kampfschiffe = ATTACK_SHIP_KEYS.reduce((n,k) => n + (cf[k]||0), 0);
+    const schonUnterwegs = cf.missions.some(m => m.type === 'festung-angriff' && m.system === sysId);
+    /* Die Abklingzeit steht AN DER FESTUNG und kommt mit dem Felddokument - sie ist deshalb hier
+       ablesbar, ohne den Server zu fragen. Das ist genau der Vorteil des Ablageorts: Die Sperre
+       ist serverseitig durchgesetzt UND fuer den Spieler sichtbar, statt ihn in eine Ablehnung
+       laufen zu lassen. */
+    const meinLetzter = (fest.schlaege && state.player && fest.schlaege[state.player.id]) || 0;
+    const abklingBis = meinLetzter ? meinLetzter + 6*3600*1000 : 0;
+    const wartet = abklingBis > Date.now();
+
+    let grund = 'Öffnet die Flottenwahl.';
+    let gesperrt = false;
+    if (!useBackend()){ grund = 'Festungen gibt es nur mit Serververbindung.'; gesperrt = true; }
+    else if (schonUnterwegs){ grund = 'Ein Verband ist bereits zu dieser Festung unterwegs.'; gesperrt = true; }
+    else if (!kampfschiffe){ grund = 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.'; gesperrt = true; }
+    else if (wartet){ grund = 'Deine Verbände sammeln sich neu – nächster Schlag in ' + fmtDuration((abklingBis - Date.now())/1000) + '.'; gesperrt = true; }
+
+    const eintraege = [
+      { icon:'ti-sword', label:'Festung angreifen', grund, disabled: gesperrt,
+        fn: () => oeffneFestungsangriff(sysId) }
+    ];
+    const hort = [];
+    if ((fest.hort||0) > 0) hort.push(fmt(Math.floor(fest.hort)) + ' ' + (asteroidSorte(fest.sorte)||{name:'Rohstoff'}).name);
+    if ((fest.hortProto||0) > 0) hort.push(fmt(Math.floor(fest.hortProto)) + ' Protomaterie');
+    openKarteMenu(ev, st.name, 'Asteroidenfestung',
+      eintraege,
+      `<div class="bmeta"><i class="ti ti-building-castle" aria-hidden="true"></i> Kern <strong>${fmt(Math.round(fest.kern||0))}</strong> von ${fmt(kernMax)} (${Math.round(anteil*100)}%)</div>`
+      + `<div class="bmeta"><i class="ti ti-lock" aria-hidden="true"></i> Drosselt im ganzen System: Abbau &minus;${Math.round(st.blockade*100)}%, Protomaterie &minus;${Math.round(st.proto*100)}%</div>`
+      + (hort.length ? `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Hort: ${escapeHtml(hort.join(' · '))} – beim Fall nach Schadensanteil geteilt</div>` : ''));
   }
   function asteroidMapMenu(ev, sysId, platz){
     const a = asteroidAn(sysId, platz);
@@ -59137,6 +59505,25 @@
             </div>
           `;
         }
+        if (m.type === 'festung-angriff'){
+          // Wortgleich zur Anfechtung darunter aufgebaut. Der Countdown nennt "Rückflug", sobald
+          // die halbe Strecke um ist - sonst wechselte die Bedeutung des Balkens still, ohne dass
+          // der Spieler weiss, ob sein Verband noch hin- oder schon zurueckfliegt.
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          const sysName = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system || '?' }).name;
+          const phase = remaining > (totalDur*1000)/2 ? 'Anflug' : 'Rückflug';
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="Unterwegs: ${fleetBreakdownHtml(m.composition||{})}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ti-building-fortress" aria-hidden="true" style="color:#e0a548;"></i>${m.fleetName?escapeHtml(m.fleetName)+' → ':''}${escapeHtml(m.stufeName||'Festung')} (${escapeHtml(sysName)})</div>
+                <div class="bmeta">${phase} · ${fmtDuration(remaining/1000)}</div>
+              </div>
+              <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         if (m.type === 'asteroid-contest'){
           const remaining = Math.max(0, m.endTime-now);
           const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
@@ -59297,7 +59684,7 @@
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }
@@ -61334,6 +61721,13 @@
             icon = 'ti-sword'; color = '#e24b4a';
             label = 'Anfechtung → ' + (ca ? asteroidName(ca) : asteroidSorte(m.sorte).name);
             shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||{}) + ' – gegen ' + (m.halterName||'unbekannt') + '.';
+          } else if (m.type === 'festung-angriff'){
+            // Eigener Zweig aus demselben Grund wie bei 'mining' darunter: Ohne ihn faellt die
+            // Mission in den generischen Zweig und stuende dort als "Erkundungsziel" - er sucht
+            // PLANETS.find(p => p.id === m.targetId), und targetId ist hier eine System-ID.
+            icon = 'ti-building-fortress'; color = '#e0a548';
+            label = 'Festungsangriff → ' + (m.stufeName || 'Festung') + ' (' + ((STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system||'?'}).name) + ')';
+            shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||{}) + '.';
           } else if (m.type === 'mining'){
             /* Eigener Zweig seit dem 17.08.2026 (Wunsch Sascha). Vorher fiel die Abbaumission in
                den generischen Zweig ganz unten und stand dort als "Erkundungsziel": Der sucht
