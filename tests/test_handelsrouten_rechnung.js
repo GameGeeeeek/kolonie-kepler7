@@ -33,6 +33,19 @@ const { check, ende } = pruefer();
 
 const S = fs.readFileSync(SPIELDATEI, 'utf8');
 
+/* Der PATCHNOTES-Block wird fuer die verneinenden und die zaehlenden Pruefungen unten
+   herausgeschnitten (CLAUDE.md Regel 46). Grund: Ein Patchnote, der eine Behebung beschreibt,
+   ZITIERT die alte Formulierung - und reisst damit genau die Pruefung, die diese Behebung
+   festhaelt. Patchnotes sind unveraenderliche Historie, man kann den Wortlaut dort also nicht
+   anpassen; die Pruefung muss sich anpassen.
+   Die Regel gilt nicht nur fuer "steht NICHT mehr da": Auch ein ZAEHLER wird falsch, sobald ein
+   Patchnote den gesuchten Text erwaehnt - in beide Richtungen. */
+const S_OHNE_HISTORIE = (() => {
+  const v = S.indexOf('  const PATCHNOTES = [');
+  const b = v < 0 ? -1 : S.indexOf('\n  ];', v);
+  return (v >= 0 && b > v) ? S.slice(0, v) + S.slice(b) : S;
+})();
+
 // ---- 1) Jede Helferfunktion existiert genau einmal ------------------------------------------
 const HELFER = ['routeProtMult', 'routeHandelsMult', 'routeCreditsErtrag', 'routeSellMenge',
                 'routeVeredelungEinsatz', 'routeVeredelungGewinn'];
@@ -99,7 +112,7 @@ if (von >= 0 && bis > von) {
 // Rechenbaustein, dass er außerhalb seiner Deklaration NUR in seiner Helferfunktion vorkommt.
 // Kommentare vorher leeren (Arbeitsregel 33) - sonst zählt ein erklärender Kommentar, der die
 // Formel zitiert, als zweite Rechenstelle.
-const ohneKommentar = S
+const ohneKommentar = S_OHNE_HISTORIE
   .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
   .replace(/^([^\n]*?)\/\/[^\n]*$/gm, (m, vor) => vor);
 const zeilen = ohneKommentar.split('\n');
