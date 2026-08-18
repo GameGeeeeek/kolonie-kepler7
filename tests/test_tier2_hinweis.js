@@ -85,8 +85,8 @@ async function nanoZeile(browser, nano, arm){
     const { z, errs } = await nanoZeile(browser, DECKEL - WUNSCH/4);
     check('2: knapp unter dem Deckel steht ebenfalls „Lager voll"',
       z && /Lager voll/.test(z.rate), z);
-    check('2: bei Inputs von 900 Millionen fällt das Wort Rohstoffe nicht',
-      z && !/Rohstoffe/.test(z.rate), z);
+    check('2: bei Inputs von 900 Millionen fällt kein Mangel-Hinweis',
+      z && !/zu wenig|Rohstoffe/.test(z.rate), z);
     check('keine JS-Fehler (fast voll)', errs.length === 0, errs.slice(0,3));
   }
 
@@ -94,7 +94,7 @@ async function nanoZeile(browser, nano, arm){
   {
     const { z } = await nanoZeile(browser, DECKEL - 200);
     check('3: mit Platz und Rohstoffen läuft sie ohne Hinweis',
-      z && !/Lager voll|Rohstoffe knapp/.test(z.rate), z);
+      z && !/Lager voll|zu wenig|Rohstoffe knapp/.test(z.rate), z);
     check('3: und zwar mit der vollen Rate', z && /0\.09/.test(z.rate), z);
   }
 
@@ -102,8 +102,15 @@ async function nanoZeile(browser, nano, arm){
   // Ohne diesen Abschnitt wäre der Test auch dann grün, wenn überall „Lager voll" stünde.
   {
     const { z, errs } = await nanoZeile(browser, 500, true);
-    check('4: bei echtem Rohstoffmangel steht „Rohstoffe knapp"',
-      z && /Rohstoffe knapp/.test(z.rate), z);
+    /* Seit v8.556.0 (Etappe C des Wirtschafts-Rebalance) nennt die Zeile statt des pauschalen
+       „Rohstoffe knapp" die AUSLASTUNG und den knappsten Eingangsstoff - z.B. „+0/s (0 % – zu
+       wenig Energie)". Geprüft wird deshalb die Regel, nicht der alte Wortlaut: Der Mangel muss
+       benannt sein UND der Stoff, an dem es liegt. Ein bloßes /zu wenig/ wäre schwächer als
+       vorher; es würde eine Anzeige durchlassen, die den Engpass nicht mehr benennt. */
+    check('4: bei echtem Rohstoffmangel nennt die Zeile den Mangel und den knappsten Stoff',
+      z && /zu wenig \S/.test(z.rate), z);
+    check('4: und sie beziffert die Auslastung (0 %, <1 % oder n %)',
+      z && /(<1 %|\d+ %)/.test(z.rate), z);
     check('4: und NICHT „Lager voll" - das Lager ist ja bei 500 von 2450',
       z && !/Lager voll/.test(z.rate), z);
     check('keine JS-Fehler (Mangel)', errs.length === 0, errs.slice(0,3));

@@ -30,7 +30,15 @@
 //   - Am Stand v8.530.0 fallen 1, 2, 3, 4a, 5, 6 und 7 (nichts davon existiert dort).
 //   - Nimmt man die Sperre in fuseModules heraus, fällt GENAU 3.
 //   - Schiebt man primordial vor exotisch, fällt GENAU 1.
-//   - Setzt man protomaterie in PRIMORDIAL_CRAFT_COST, fällt GENAU 5c.
+//   - Setzt man protomaterie in PRIMORDIAL_CRAFT_BASE, fällt GENAU 5c (28 Prüfungen gelaufen).
+//   - Liest primordialCraftCost() den Zähler nicht mehr, fallen 5d und 5e.
+//   - Nimmt man das Math.min gegen PRIMORDIAL_CRAFT_MAX heraus, fällt GENAU 5e.
+//   - Streicht man primordialModulesForged aus dem Prestige-Zweig, fällt GENAU 5f.
+//   - Stellt man die alte, ungeschuetzte Kostenzeile wieder her UND traegt eine Ressource nur in
+//     PRIMORDIAL_CRAFT_BASE ein, fällt GENAU 5c2 (unsauber: protomaterie=NaN). Genau so ist der
+//     Fehler gefunden worden: Die Sabotage „protomaterie in die Kosten" lief am alten Code GRÜN
+//     durch, weil Math.min(undefined, x) NaN ergibt und `!NaN` wahr ist - eine Gegenprobe, die
+//     nicht anschlägt, ist der Befund, nicht der Beweis (Regel 26).
 const fs = require('fs');
 const path = require('path');
 const { SPIELDATEI, SERVER_JS, pruefer, ueberspringen } = require('./lib/umgebung');
@@ -107,11 +115,59 @@ check('4b: JEDE Stufe hat einen Zerlegewert (sonst liefert der ||1-Notnagel eine
 // ---- 5) Die Schmiede --------------------------------------------------------------------------
 check('5a: sie hängt an der zweiten Tier-3-Forschung',
   /function primordialForgeUnlocked\(\)\{ return \(state\.research\.rkausalanker\|\|0\) >= 1; \}/.test(S));
-const kosten = (S.match(/const PRIMORDIAL_CRAFT_COST = (\{[^}]*\})/) || [])[1];
-let kt = null; try { kt = kosten ? new Function('return ' + kosten + ';')() : null; } catch (e) {}
-check('5b: sie kostet BEIDE Tier-3-Ressourcen', !!kt && kt.hohlraumgitter > 0 && kt.kausalanker > 0, kt);
-check('5c: und KEINE Protomaterie - die steckt schon in den Baukosten der beiden Fabriken',
-  !!kt && !kt.protomaterie, kt);
+/* Seit v8.556.0 sind die Kosten PROGRESSIV (Etappe C des Wirtschafts-Rebalance): eine Funktion
+   ueber state.primordialModulesForged statt einer festen Tabelle. Geprueft wird deshalb der
+   AUSGEFUEHRTE Block (Regel 43) und die Regel an BEIDEN Enden - beim ersten Modul und am Deckel.
+   Ein Test, der nur den Anfangspreis liest, saehe eine spaeter eingeschleuste Protomaterie-
+   Forderung nicht, wenn sie erst mit der Stueckzahl dazukaeme. */
+let kostenApi = null;
+try {
+  const von = S.indexOf('const PRIMORDIAL_CRAFT_BASE');
+  const bis = S.indexOf('function primordialForgeUnlocked');
+  kostenApi = (von >= 0 && bis > von)
+    ? new Function('state', S.slice(von, bis) + '; return { primordialCraftCost, PRIMORDIAL_CRAFT_BASE, PRIMORDIAL_CRAFT_JE, PRIMORDIAL_CRAFT_MAX };')
+    : null;
+} catch (e) { kostenApi = null; }
+check('5-bau: der Kostenblock der Schmiede laesst sich ausfuehren', !!kostenApi);
+if (kostenApi){
+  const bei = n => { const st = { primordialModulesForged: n }; const api = kostenApi(st); return { api, kosten: api.primordialCraftCost() }; };
+  const erstes = bei(0), amDeckel = bei(500);
+  check('5b: sie kostet BEIDE Tier-3-Ressourcen',
+    erstes.kosten.hohlraumgitter > 0 && erstes.kosten.kausalanker > 0, erstes.kosten);
+  check('5c: und KEINE Protomaterie - die steckt schon in den Baukosten der beiden Fabriken',
+    !erstes.kosten.protomaterie && !amDeckel.kosten.protomaterie,
+    { erstes: erstes.kosten, amDeckel: amDeckel.kosten });
+  /* JEDER Posten muss eine endliche positive Zahl sein. Das ist keine Formalie: Beim Bau lieferte
+     eine Ressource, die nur in BASE steht, `Math.min(undefined, x)` = NaN - und `!NaN` ist wahr,
+     die Pruefung darueber haette das durchgewinkt. Ein NaN in den Kosten landet ueber
+     payPrimordialCraft() im Spielstand, und ein NaN im Spielstand laesst den Backend-Sanity-Check
+     den GANZEN Stand ablehnen (Vorfall 21.07.2026). Gefunden hat das die Gegenprobe, nicht der
+     Code-Blick. */
+  const unsauber = [...Object.entries(erstes.kosten), ...Object.entries(amDeckel.kosten)]
+    .filter(([k, v]) => !Number.isFinite(v) || v <= 0).map(([k, v]) => k + '=' + v);
+  check('5c2: jeder Kostenposten ist eine endliche positive Zahl (kein NaN in den Spielstand)',
+    unsauber.length === 0, { unsauber, erstes: erstes.kosten, amDeckel: amDeckel.kosten });
+  // Die neue Eigenschaft selbst: Der Preis STEIGT und ist GEDECKELT. Beide Richtungen, sonst
+  // waere ein versehentlich konstanter Preis (Zaehler nie gelesen) genauso gruen.
+  check('5d: der Preis steigt mit der Zahl der bereits gefertigten Module',
+    bei(6).kosten.hohlraumgitter > erstes.kosten.hohlraumgitter &&
+    bei(6).kosten.kausalanker > erstes.kosten.kausalanker,
+    { nach0: erstes.kosten, nach6: bei(6).kosten });
+  check('5e: und er ist gedeckelt - der Deckel wird erreicht und nicht ueberschritten',
+    amDeckel.kosten.hohlraumgitter === erstes.api.PRIMORDIAL_CRAFT_MAX.hohlraumgitter &&
+    amDeckel.kosten.kausalanker === erstes.api.PRIMORDIAL_CRAFT_MAX.kausalanker,
+    { amDeckel: amDeckel.kosten, deckel: erstes.api.PRIMORDIAL_CRAFT_MAX });
+  // Der Zaehler ist die Zahl der je GESCHMIEDETEN Module. Waere er der Inventarbestand, waere
+  // Ausruesten oder Verschmelzen eine Preissenkung - deshalb muss er das Prestige ueberleben,
+  // das die Module selbst behaelt (keepModules). Der Aufstieg-Zweig loescht beide, dort nicht.
+  const prestigeBlock = (() => {
+    const i = S.indexOf('credits: 250 + prestigeStartLvl*100');
+    return i < 0 ? '' : S.slice(Math.max(0, i - 3000), i);
+  })();
+  check('5f: der Zaehler ueberlebt das Prestige (sonst waere Prestige eine Preissenkung)',
+    /primordialModulesForged: state\.primordialModulesForged/.test(prestigeBlock),
+    { blockGefunden: prestigeBlock.length > 0 });
+}
 
 // ---- 6) Ein Weg, nicht vier -------------------------------------------------------------------
 /* Die vier Knöpfe (Standort/Schiff × mythisch/primordial) müssen durch DIESELBE Funktion laufen.
