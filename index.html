@@ -7029,8 +7029,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.562.0';
+  const VERSION = '8.563.0';
   const PATCHNOTES = [
+    { version:'8.563.0', date:'18.08.2026', changes:[
+      '<strong>Abfangflotten und Leerenriss-Flotten fliegen jetzt hin UND zurück.</strong> Bisher endeten beide Missionen in dem Moment, in dem die Flotte am Ziel ankam – sie stand also schlagartig wieder zu Hause bereit, obwohl sie gerade erst eingetroffen war. Jetzt fällt der Kampf bei der <strong>Ankunft</strong>, danach ist die Flotte denselben Weg wieder unterwegs und steht dir erst zu Hause wieder zur Verfügung. Die Missionskarte im Flotte-Reiter zeigt dazu „Anflug" bzw. „Rückflug".',
+      '<strong>Die Frist bleibt genau wie bisher:</strong> Es zählt weiterhin nur, ob der <em>Hinflug</em> rechtzeitig ankommt – vor dem Abzug der Piraten bzw. vor dem Kollaps des Risses. Weite Ziele werden also nicht unerreichbar, die Flotte ist nur länger gebunden.',
+      '<strong>Dafür kostet eine solche Mission jetzt doppelt so viel Treibstoff</strong>, weil sie auch wirklich die doppelte Strecke fliegt – dieselbe Rechnung wie beim Weltboss-Angriff. Der Abschuss-Dialog nennt deshalb ab sofort Hinflug, Rückflug, die gesamte Bindungsdauer und den Treibstoff; vorher stand dort nur, dass die Flotte rechtzeitig ankommen muss.',
+      '<strong>Behoben: Ein Rückruf sperrte den zweiten Versuch für immer.</strong> Wer eine Abfang- oder Riss-Flotte zurückrief, bekam danach nur noch „Es ist bereits eine Flotte unterwegs" – bis das Ereignis von selbst ablief. Die Ankunftsmarke am Ereignis wurde beim Rückruf nicht gelöscht.'
+    ]},
     { version:'8.562.0', date:'18.08.2026', changes:[
       '<strong>Behoben: Der Werft-Overdrive hielt nur die halbe Zusage.</strong> Auf dem Knopf und im Hilfetext stand „gilt für alle laufenden und neu eingereihten Schiffe“ – gekürzt wurden aber ausschließlich Aufträge, die du <em>nach</em> dem Zünden eingereiht hast. Wer seine Werft voll hatte und dann 12 Quantenchips ausgab, um genau diese Aufträge zu beschleunigen, zahlte für nichts. Ab sofort verkürzt der Overdrive im Moment des Zündens auch die <strong>Restzeit des gerade laufenden Auftrags</strong> und die Dauer aller <strong>wartenden Schiffs-Aufträge</strong> in der Schlange – um dieselben 25%. Die Meldung sagt dir jetzt, wie viele Aufträge davon betroffen waren.',
       'Zwei Dinge dazu, damit es keine Rechenrätsel gibt: Ein Auftrag, den du <em>während</em> des laufenden Fensters einreihst, bekommt den Rabatt <strong>genau einmal</strong> – er steckt dort schon in der berechneten Bauzeit, eine zweite Kürzung wäre ein stiller Doppelabzug. Und läuft das 30-Minuten-Fenster ab, während ein gekürzter Auftrag noch in der Schlange steht, <strong>bleibt die Kürzung erhalten</strong>: Eine bezahlte Wirkung nachträglich wieder einzukassieren sähe wie ein Fehler aus, auch wenn man es begründen könnte.',
@@ -27271,6 +27277,20 @@
   // Schickt eine Abfangflotte vom aktuell gewählten Standort los. Die Flugzeit muss innerhalb der
   // verbleibenden Zeit liegen, sonst wird der Versand abgelehnt (aktives, rechtzeitiges Reagieren ist
   // hier bewusst die eigentliche Hürde, nicht die Kampfkraft).
+  /* Vorschau fuer die beiden zeitkritischen Abschuss-Dialoge (v8.560.0). Sie muss den RUNDFLUG
+     zeigen: Die Frist haengt am Hinflug, die Flotte ist aber doppelt so lange weg und der
+     Treibstoff deckt beide Strecken. Vorher stand hier nur "die Flotte muss vorher ankommen" -
+     das war nicht falsch, verschwieg aber ab dem Rundflug-Umbau sowohl die Bindungsdauer als
+     auch die verdoppelten Kosten. Gerechnet wird mit derselben Formel wie im Versand, damit
+     Vorschau und Start nicht auseinanderlaufen koennen. */
+  function zeitkritischVorschau(flotte, zielKey, hinweis){
+    const relevant = ATTACK_SHIP_KEYS.filter(k => (flotte[k]||0) > 0);
+    if (!relevant.length) return '<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> '+hinweis+'</div>';
+    const dur = state.activeBasePlanet === zielKey ? 20 : relocationDuration(state.activeBasePlanet, zielKey, relevant[0]);
+    const fuel = missionFuelCostSplit(dur*2, flotte);
+    return '<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> '+hinweis+'</div>'
+      + '<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-rocket" aria-hidden="true"></i> Hinflug ~'+fmtDuration(dur)+' · Rückflug ~'+fmtDuration(dur)+' (Flotte '+fmtDuration(dur*2)+' gebunden) · Treibstoff '+fuelCostText(fuel)+'</div>';
+  }
   function sendInterceptPirateMission(){
     const raid = state.pirateDebrisRaid;
     if (!raid){ log('Keine Piratenflotte zum Abfangen vorhanden.', 'ti-alert-triangle'); return; }
@@ -27285,16 +27305,20 @@
     const dur = state.activeBasePlanet === raid.planetKey ? 20 : relocationDuration(state.activeBasePlanet, raid.planetKey, relevantKeys[0]);
     const remainMs = raid.endTime - Date.now();
     if (dur*1000 >= remainMs){ log('Die Flugzeit (~'+Math.round(dur)+'s) reicht nicht mehr, um die Piraten rechtzeitig abzufangen (nur noch '+Math.round(remainMs/1000)+'s bis sie abziehen).', 'ti-alert-triangle'); return; }
-    const fuel = missionFuelCostSplit(dur, attackFleet);
+    // Rundflug (v8.560.0): dur ist die EINWEG-Zeit - sie entscheidet weiterhin die Frist oben
+    // (rechtzeitig ANKOMMEN ist die Huerde). Unterwegs ist die Flotte danach doppelt so lange,
+    // und der Treibstoff folgt der wirklich geflogenen Strecke, wie beim Weltboss-Angriff auch.
+    const fuel = missionFuelCostSplit(dur*2, attackFleet);
     if (!canAfford(fuel)){ log('Nicht genug Treibstoff: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
     pay(fuel);
     const fleetName = resolveFleetName();
     const power = attackPower(attackFleet, state.activeBasePlanet);
-    cf.missions.push({ id: nextMissionId(), type:'intercept-pirates', targetId: raid.planetKey, startTime: Date.now(), endTime: Date.now()+dur*1000, power, fleetName, composition: attackFleet });
-    raid.interceptArrival = Date.now()+dur*1000;
+    const jetzt = Date.now();
+    cf.missions.push({ id: nextMissionId(), type:'intercept-pirates', targetId: raid.planetKey, startTime: jetzt, hinBis: jetzt+dur*1000, endTime: jetzt+dur*2000, power, fleetName, composition: attackFleet });
+    raid.interceptArrival = jetzt+dur*1000;
     raid.interceptSource = state.activeBasePlanet;
-    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' fängt die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' ab (Angriffskraft '+power+', Ankunft in ~'+Math.round(dur)+'s).', 'ti-sword');
+    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' fängt die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' ab (Angriffskraft '+power+', Ankunft in ~'+fmtDuration(dur)+', wieder zu Hause in ~'+fmtDuration(dur*2)+').', 'ti-sword');
     render(); save();
   }
 
@@ -27354,16 +27378,18 @@
     const dur = state.activeBasePlanet === rift.planetKey ? 20 : relocationDuration(state.activeBasePlanet, rift.planetKey, relevantKeys[0]);
     const remainMs = rift.endTime - Date.now();
     if (dur*1000 >= remainMs){ log('Die Flugzeit (~'+Math.round(dur)+'s) reicht nicht mehr, um den Riss rechtzeitig zu erreichen (kollabiert in '+Math.round(remainMs/1000)+'s).', 'ti-alert-triangle'); return; }
-    const fuel = missionFuelCostSplit(dur, attackFleet);
+    // Rundflug wie beim Abfangen (v8.560.0) - siehe sendInterceptPirateMission.
+    const fuel = missionFuelCostSplit(dur*2, attackFleet);
     if (!canAfford(fuel)){ log('Nicht genug Treibstoff: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
     pay(fuel);
     const fleetName = resolveFleetName();
     const power = attackPower(attackFleet, state.activeBasePlanet);
-    cf.missions.push({ id: nextMissionId(), type:'void-rift', targetId: rift.planetKey, startTime: Date.now(), endTime: Date.now()+dur*1000, power, fleetName, composition: attackFleet });
-    rift.attackArrival = Date.now()+dur*1000;
+    const jetzt = Date.now();
+    cf.missions.push({ id: nextMissionId(), type:'void-rift', targetId: rift.planetKey, startTime: jetzt, hinBis: jetzt+dur*1000, endTime: jetzt+dur*2000, power, fleetName, composition: attackFleet });
+    rift.attackArrival = jetzt+dur*1000;
     rift.attackSource = state.activeBasePlanet;
-    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' fliegt zum Leerenriss über '+planetDisplayName(rift.planetKey)+' (Angriffskraft '+power+', Ankunft in ~'+Math.round(dur)+'s).', 'ti-sword');
+    log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' fliegt zum Leerenriss über '+planetDisplayName(rift.planetKey)+' (Angriffskraft '+power+', Ankunft in ~'+fmtDuration(dur)+', wieder zu Hause in ~'+fmtDuration(dur*2)+').', 'ti-sword');
     render(); save();
   }
 
@@ -37782,7 +37808,7 @@
       { title:'Weltboss: fünf Namen, vier Archetypen', body:'<strong>Seit dem 02.08.2026 hat der Weltboss Varianten.</strong> Name und Archetyp leiten sich aus seiner Stufe ab, wiederholen sich also erst nach 20 Stufen: fünf Namen (Leviathan der Leere, Chronos-Verschlinger, Die Singularität, Wächter des Abgrunds, Nova-Titan) und vier Archetypen. <strong>Wandelnder Koloss</strong> ist der Normalfall. <strong>Panzer-Bastion</strong> lässt den Schwächen-Bonus kaum greifen (+15% statt +25%) und kostet rund ein Drittel mehr Schiffe. <strong>Schwarm-Titan</strong> trifft schlechter – ein Drittel weniger Verluste. <strong>Phasen-Phantom</strong> macht die Schwäche entscheidend: +50% statt +25%. Die <strong>Trefferschwäche</strong> (ein bestimmter Schiffstyp) steht jetzt <em>vor</em> dem Angriff in der Boss-Karte, samt Hinweis, ob deine Angriffsflotte sie überhaupt dabeihat – vorher erfuhr man sie erst aus dem Bericht danach. Die <strong>HP bleiben bewusst allein von der Stufe abhängig</strong>: Die Belohnung hängt an der Stufe, ein zäherer oder dünnerer Boss würde also still die Belohnungsrate verschieben.<br><br>Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
       { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
-      { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (die Flugzeit muss innerhalb der verbleibenden Zeit liegen), bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab. Ab Forschung <strong>KI-Technologie</strong> gibt es als Sicherheitsnetz die <strong>KI-Abfangautomatik</strong> (Schalter im Verteidigung-Tab, <strong>nur mit Unterstützer-Rang</strong> - siehe „Die drei Automatiken sind Unterstützern vorbehalten"): Ist sie an und fängst du nicht selbst ab, vertreiben KI-Abfangdrohnen die Piraten automatisch, sobald 60% der Zeit verstrichen sind - Kosten: 3 KI-Kerne je Einsatz. Der KI-Einsatz gelingt garantiert, bringt aber bewusst <strong>keine Kampfpunkte, keine Veteranen-Erfahrung und keine zerstörten Piratenschiffe</strong> - manuelles Abfangen bleibt immer lohnender, die KI verhindert nur den Beute-Verlust.' },
+      { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (der <strong>Hinflug</strong> muss innerhalb der verbleibenden Zeit liegen), fällt der Kampf im Moment der Ankunft - danach fliegt die Flotte denselben Weg wieder zurück und steht dir erst zu Hause wieder zur Verfügung. Die Mission dauert also doppelt so lange wie der Hinflug, und der Treibstoff deckt beide Strecken. Bei Erfolg bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab. Ab Forschung <strong>KI-Technologie</strong> gibt es als Sicherheitsnetz die <strong>KI-Abfangautomatik</strong> (Schalter im Verteidigung-Tab, <strong>nur mit Unterstützer-Rang</strong> - siehe „Die drei Automatiken sind Unterstützern vorbehalten"): Ist sie an und fängst du nicht selbst ab, vertreiben KI-Abfangdrohnen die Piraten automatisch, sobald 60% der Zeit verstrichen sind - Kosten: 3 KI-Kerne je Einsatz. Der KI-Einsatz gelingt garantiert, bringt aber bewusst <strong>keine Kampfpunkte, keine Veteranen-Erfahrung und keine zerstörten Piratenschiffe</strong> - manuelles Abfangen bleibt immer lohnender, die KI verhindert nur den Beute-Verlust.' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Kopfgeld', body:'Jede Woche liegt ein <strong>Kopfgeld auf dem aktuellen Bestenlisten-Ersten</strong> – dem stärksten Spieler der Galaxie. Wer ihn in dieser Woche als Erster im Kampf schlägt, kassiert eine <strong>Kredit-Prämie</strong> (die Belohnung wird beim nächsten Login gutgeschrieben). Danach ist das Kopfgeld für diese Woche vergeben; ein neues wird zum Wochenwechsel ausgesetzt. Auf sich selbst kann man kein Kopfgeld kassieren. Das aktuelle Kopfgeld siehst du oben im Galaxie-Tab unter „Nachrichten". Bist du selbst der Gejagte, weist dich ein roter Hinweis darauf hin – Zeit, die Verteidigung hochzufahren. Nur mit eigenem Server.' },
       { title:'Angriffs-Schutzschild (Anti-Ganking)', body:'Wirst du erfolgreich <strong>überfallen (mit Beute) oder sabotiert</strong>, erhältst du automatisch einen <strong>Angriffs-Schutzschild für 30 Minuten</strong>: In dieser Zeit prallen weitere Spieler-Angriffe und Störmanöver gegen dich ab (keine Beute, kein Schaden). Das gibt dir Zeit, wieder aufzubauen, statt im Minutentakt weitergefarmt zu werden. <strong>Anfängerschutz:</strong> Frisch registrierte Konten starten zusätzlich mit einem <strong>4 Tage langen Schild</strong>, damit du in Ruhe aufbauen kannst, bevor dich etablierte Spieler angreifen dürfen. Ein aktiver Schild wird oben im <strong>Verteidigung-Tab</strong> mit Countdown angezeigt. <strong>Wichtig:</strong> Sobald du selbst offensiv wirst (ein eigener Angriff oder ein eigenes Störmanöver), verfällt dein Schild sofort – der Schutz ist als Erholung/Startphase gedacht, nicht als Deckung, um selbst gefahrlos zuzuschlagen. Der Schild wird serverseitig vergeben und geprüft.' },
@@ -37891,7 +37917,7 @@
       { title:'Leerensplitter - die Endgame-Ressource', body:'Leerensplitter sind ein seltenes Material (Fortschritt-Tab, Seltene Items), das NICHT produzierbar ist. Quellen: Siege gegen die drei <strong>Leere-NPCs</strong> (2/4/7 Splitter), jeder <strong>Weltboss-Kill</strong> (+2) und der <strong>Piratenketten-Endboss</strong> (+5) - jeweils erst ab Leerentechnologie Stufe 1. Zusätzlich können bei Expeditionen Leerensplitter-<strong>Fragmente</strong> auftauchen (4 Fragmente = 1 Splitter). Der Aufstiegs-Zweig "Blick in die Leere" erhöht jede Ausbeute um +4% je Stufe. Verwendung: 1x je gebautem Leerenjäger, 3x für Orbitalstufe 4, 5x für Orbitalstufe 5.' },
       { title:'Die Leere-Gegner', body:'Drei hochstufige Gegner jenseits von Nyra: <strong>Leeren-Vorhut</strong> (Stufe 30, Verteidigung 8.000), <strong>Leeren-Armada</strong> (Stufe 35, 12.500) und der Endboss <strong>Das Herz der Leere</strong> (Stufe 40, 20.000). Sie folgen den normalen NPC-Regeln (Skalierung nach Siegen, Schwächen-System - zwei davon sind schwach gegen den Leerenjäger selbst, einer gegen das Superschlachtschiff) und tragen die höchste Beute des Spiels.' },
       { title:'Leerenjäger', body:'Zweite Endgame-Schiffsklasse zwischen Schlachtschiff (90) und Superschlachtschiff (220): <strong>140 Angriffspunkte</strong>, Hyperraumantrieb (Antimaterie-Treibstoff), Geschwindigkeit 75 - deutlich flinker als das Superschlachtschiff (35). Verbraucht beim Bau je <strong>1 Leerensplitter</strong> zusätzlich zu den Ressourcenkosten. Kein seltener Erkundungsfund nötig - der Weg führt über die Leere-Inhalte selbst.' },
-      { title:'Leerenriss-Ereignisse', body:'Ab Leerentechnologie 1 kann sich über einem deiner Planeten ein <strong>Leerenriss</strong> öffnen (Meldung + Box im Verteidigung-Tab). Du hast 45 Minuten, ihn mit einer Kampfflotte zu schließen - die Erfolgschance folgt der normalen Kampfformel gegen die Leere-Energie des Risses (skaliert mit Punktestand und Leerentechnologie-Stufe). <strong>Erfolg:</strong> 3-5 Leerensplitter (profitiert vom Aufstiegs-Zweig "Blick in die Leere"), dazu Antimaterie (40% der Leere-Energie, bis zur Lagergrenze) und +12 Kampfpunkte. <strong>Misserfolg:</strong> spürbare Flottenverluste, aber ein neuer Versuch bleibt möglich, solange der Riss offen ist. <strong>Kollabiert der Riss ungeschlossen</strong>, reißt er 10% deiner gelagerten Antimaterie mit sich.' },
+      { title:'Leerenriss-Ereignisse', body:'Ab Leerentechnologie 1 kann sich über einem deiner Planeten ein <strong>Leerenriss</strong> öffnen (Meldung + Box im Verteidigung-Tab). Du hast 45 Minuten, ihn mit einer Kampfflotte zu schließen - die Erfolgschance folgt der normalen Kampfformel gegen die Leere-Energie des Risses (skaliert mit Punktestand und Leerentechnologie-Stufe). Wie beim Abfangen muss der <strong>Hinflug</strong> vor dem Kollaps liegen; der Kampf fällt bei der Ankunft, danach ist die Flotte den gleichen Weg wieder heimwärts unterwegs. <strong>Erfolg:</strong> 3-5 Leerensplitter (profitiert vom Aufstiegs-Zweig "Blick in die Leere"), dazu Antimaterie (40% der Leere-Energie, bis zur Lagergrenze) und +12 Kampfpunkte. <strong>Misserfolg:</strong> spürbare Flottenverluste, aber ein neuer Versuch bleibt möglich, solange der Riss offen ist. <strong>Kollabiert der Riss ungeschlossen</strong>, reißt er 10% deiner gelagerten Antimaterie mit sich.' },
       { title:'Terraforming-Ziel Leerenwelt', body:'Ab Leerentechnologie 5 steht beim Terraforming das Ziel <strong>Leerenwelt</strong> zur Wahl (Kostenfaktor 2,5 - das teuerste Terraforming-Ziel): <strong>+25% Antimaterie- und +10% Forschungspunkte-Produktion</strong> auf dem umgeformten Planeten. Die erste eigene Leerenwelt bringt den Erfolg "Leerengestalter".' }
     ]},
     { key:'fraktionen', icon:'ti-flag', title:'NPC-Fraktionen', entries:[
@@ -49300,10 +49326,125 @@
     return m;
   }
 
+  /* Kampf bei der ANKUNFT einer Abfang- oder Leerenriss-Flotte (v8.560.0, Rundflug-Regel).
+     Bis hierher lagen diese beiden Bloecke in der endTime-Kette von checkMissions - also an dem
+     Zeitpunkt, an dem die Flotte wieder zu Hause ist. Solange die Missionsdauer die EINWEG-Zeit
+     war, fiel beides zusammen; mit dem Rundflug nicht mehr. Beide Missionen sind fristgebunden
+     (die Piraten ziehen ab, der Riss kollabiert), der Kampf gehoert deshalb an hinBis - sonst
+     waere das Ziel bei der Auswertung regelmaessig schon weg, und der Spieler haette einen Kampf
+     verloren, den er gewonnen hatte. Aufgerufen genau einmal je Mission (m.kampfErledigt).
+     Die Schiffe bleiben waehrend der ganzen Mission in fleet gezaehlt (nur der Slot ist belegt),
+     applyCombatLosses trifft also hier dieselben Schiffe wie vorher am Missionsende. */
+  function ankunftsKampf(m, planetKey, fleet, showLog){
+    if (m.type === 'intercept-pirates'){
+      // Abfangversuch gegen die Piraten-Trümmerräuber (siehe maybeSchedulePirateDebrisRaid).
+      const raid = state.pirateDebrisRaid;
+      if (!raid || raid.planetKey !== m.targetId){
+        if (showLog !== false) log('Die Piratenflotte war bei Ankunft bereits weg.', 'ti-anchor');
+        return;
+      }
+      const power = m.power || attackPower(fleet, planetKey);
+      // Begleitschutz ist bewusst schwach (siehe generatePirateDebrisFleet) - Mindestchance 55%,
+      // damit fast jede aktiv losgeschickte Kampfflotte gute Erfolgsaussichten hat.
+      const chance = Math.max(0.55, Math.min(0.97, power/(power+raid.power*0.6)));
+      const success = Math.random() < chance;
+      if (success){
+        const lostPirates = applyCombatLosses(raid.fleet, Object.keys(raid.fleet), Math.max(0.5, Math.min(1, power/(power+raid.power*0.3))), planetKey, null, true);
+        const lostPiratesText = lostCountsToText(lostPirates);
+        const bpGained = 8;
+        awardBattlePoints(bpGained);
+        logScoreChange(bpGained*3, 'Piraten-Trümmerräuber bei '+planetDisplayName(raid.planetKey)+' abgefangen (+'+bpGained+' Kampfpunkte)', 'ti-sword');
+        addVeteranXp(planetKey, 6);
+        if (showLog !== false) log('Piratenflotte bei '+planetDisplayName(raid.planetKey)+' abgefangen und vertrieben!'+(lostPiratesText?' Zerstört: '+lostPiratesText+'.':'')+' Das Trümmerfeld bleibt erhalten.', 'ti-sword');
+        playSound('win');
+        const __battleReport = { type:'pirate-debris-raid', result:'win', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, destroyedShips: lostPirates, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: bpGained };
+        pushReport(__battleReport);
+        state.pirateDebrisRaid = null;
+      } else {
+        const ownLostIntercept = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.10+Math.random()*0.1, planetKey, m.composition);
+        const ownLostInterceptText = lostCountsToText(ownLostIntercept);
+        addVeteranXp(planetKey, 2);
+        if (showLog !== false) log('Abfangversuch gegen die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' gescheitert - sie setzen die Plünderung fort.'+(ownLostInterceptText?' Verluste: '+ownLostInterceptText+'.':''), 'ti-shield');
+        playSound('lose');
+        const __battleReport = { type:'pirate-debris-raid', result:'loss', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, ownLostShips: ownLostIntercept, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: 0 };
+        pushReport(__battleReport);
+        // Ein neuer Versuch bleibt möglich, solange noch Zeit bis raid.endTime bleibt.
+        raid.interceptArrival = null;
+        raid.interceptSource = null;
+      }    } else if (m.type === 'void-rift'){
+      // Leerenriss schließen (siehe maybeSpawnVoidRift): echte Kampfhürde gegen die
+      // Leere-Energie des Risses.
+      //
+      // Drei Phasen statt eines einzelnen Wurfs (01.08.2026). Der Riss war der LETZTE
+      // Kampfpfad des Spiels, der noch mit Math.random() < chance entschieden wurde - der
+      // Kommentar hier behauptete "folgt der normalen Kraft-Formel", und genau das ist seit
+      // v8.295.0 die Drei-Phasen-Auflösung. Der Hilfe-Abschnitt "Leerenriss-Ereignisse" sagt
+      // dasselbe. v8.358.0 hat Spionagebericht und simuliertes Duell umgestellt; dieser hier
+      // war übersehen worden.
+      //
+      // VOID_RIFT_PHASE_MIN erhält die BEWUSSTE 15%-Untergrenze dieses Kampfes (die anderen
+      // Kämpfe liegen bei 5%). Sie ist aus der Zwei-von-drei-Formel zurückgerechnet:
+      // p_gesamt = 3p² - 2p³, und 3(0,2443²) - 2(0,2443³) = 0,1499. Ohne diese Umrechnung
+      // hätte die Umstellung die Untergrenze still von 15% auf 5% gesenkt - eine
+      // Balance-Änderung, die niemand beschlossen hat. Die Obergrenze übernimmt
+      // PHASE_CHANCE_MAX und liegt damit wie bisher bei rund 95%.
+      const rift = state.voidRift;
+      if (!rift || rift.planetKey !== m.targetId){
+        if (showLog !== false) log('Der Leerenriss war bei Ankunft bereits kollabiert.', 'ti-atom-2');
+        return;
+      }
+      const riftPower = m.power || attackPower(fleet, planetKey);
+      const riftPhasen = resolveBattlePhases(riftPower, rift.power, 1, VOID_RIFT_PHASE_MIN, PHASE_CHANCE_MAX);
+      const riftChance = battleWinChance(riftPower, rift.power, 1, VOID_RIFT_PHASE_MIN, PHASE_CHANCE_MAX);
+      const riftSuccess = riftPhasen.success;
+      const riftFlightTime = Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0);
+      if (riftSuccess){
+        const shardGain = Math.max(1, Math.round((3 + Math.floor(Math.random()*3)) * (1 + ascBonus('leere')*0.04)));
+        state.rareItems.leerensplitter = (state.rareItems.leerensplitter||0) + shardGain;
+        const amBefore = state.resources.antimaterie||0;
+        // Math.max: ein bereits über der Lagergrenze liegender Bestand darf durch die Beute-
+        // Deckelung nie SINKEN (die Klammer allein würde ihn sonst auf die Grenze stutzen).
+        state.resources.antimaterie = Math.max(amBefore, Math.min(storageCap(), amBefore + Math.round(rift.power*0.4)));
+        const amGained = state.resources.antimaterie - amBefore;
+        const bpGained = 12;
+        awardBattlePoints(bpGained);
+        logScoreChange(bpGained*3, 'Leerenriss über '+planetDisplayName(rift.planetKey)+' geschlossen (+'+bpGained+' Kampfpunkte)', 'ti-atom-2');
+        addVeteranXp(planetKey, 8);
+        const ownLostRift = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.07, planetKey, m.composition);
+        const ownLostRiftText = lostCountsToText(ownLostRift);
+        if (showLog !== false) log('Leerenriss über '+planetDisplayName(rift.planetKey)+' geschlossen! +'+shardGain+'x Leerensplitter (gesamt: '+state.rareItems.leerensplitter+')'+(amGained>0?', +'+fmt(amGained)+' Antimaterie':'')+'.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':''), 'ti-diamond');
+        playSound('win');
+        const __battleReport = { type:'void-rift', result:'win', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), phasen: riftPhasen.phasen, chancePct: Math.round(riftChance*100), shards: shardGain, loot: amGained>0?{ antimaterie: amGained }:null, fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: riftFlightTime, battlePoints: bpGained };
+        pushReport(__battleReport);
+        state.voidRift = null;
+      } else {
+        const ownLostRift = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.15+Math.random()*0.15).pct, planetKey, m.composition);
+        const ownLostRiftText = lostCountsToText(ownLostRift);
+        addVeteranXp(planetKey, 3);
+        if (showLog !== false) log('Die Flotte konnte den Leerenriss über '+planetDisplayName(rift.planetKey)+' nicht schließen - die Leere-Energie hat sie zurückgeschlagen.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':'')+' Ein neuer Versuch ist möglich, solange der Riss offen ist.', 'ti-alert-triangle');
+        playSound('lose');
+        const __battleReport = { type:'void-rift', result:'loss', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), phasen: riftPhasen.phasen, chancePct: Math.round(riftChance*100), fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: riftFlightTime, battlePoints: 0 };
+        pushReport(__battleReport);
+        rift.attackArrival = null;
+        rift.attackSource = null;
+      }    }
+  }
   function checkMissions(showLog){
     let any = false;
     for (const { planet: planetKey, fleet } of allFleetsWithPlanet()){
       const now = Date.now();
+      /* Rundflug-Regel (v8.560.0, Auftrag Sascha): Wer losfliegt, kommt nicht am Ziel zurueck,
+         sondern zu Hause. Abfangen und Leerenriss loesen ihren Kampf deshalb bei der ANKUNFT auf
+         (hinBis) und fliegen danach als Rueckflug weiter - Vorbild ist die Abbaumission. Dieser
+         Durchgang laeuft VOR dem endTime-Filter, weil die Mission zu diesem Zeitpunkt noch
+         laeuft. m.kampfErledigt sorgt dafuer, dass er genau einmal feuert. */
+      for (const m of fleet.missions){
+        if (m.type !== 'intercept-pirates' && m.type !== 'void-rift') continue;
+        if (!m.hinBis || m.kampfErledigt || now < m.hinBis) continue;
+        m.kampfErledigt = true;
+        any = true;
+        ankunftsKampf(m, planetKey, fleet, showLog);
+      }
       const done = fleet.missions.filter(m => now >= m.endTime);
       if (!done.length) continue;
       any = true;
@@ -49847,99 +49988,13 @@
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
           }
-        } else if (m.type === 'intercept-pirates'){
-          // Abfangversuch gegen die Piraten-Trümmerräuber (siehe maybeSchedulePirateDebrisRaid).
-          const raid = state.pirateDebrisRaid;
-          if (!raid || raid.planetKey !== m.targetId){
-            if (showLog !== false) log('Die Piratenflotte war bei Ankunft bereits weg.', 'ti-anchor');
-            continue;
-          }
-          const power = m.power || attackPower(fleet, planetKey);
-          // Begleitschutz ist bewusst schwach (siehe generatePirateDebrisFleet) - Mindestchance 55%,
-          // damit fast jede aktiv losgeschickte Kampfflotte gute Erfolgsaussichten hat.
-          const chance = Math.max(0.55, Math.min(0.97, power/(power+raid.power*0.6)));
-          const success = Math.random() < chance;
-          if (success){
-            const lostPirates = applyCombatLosses(raid.fleet, Object.keys(raid.fleet), Math.max(0.5, Math.min(1, power/(power+raid.power*0.3))), planetKey, null, true);
-            const lostPiratesText = lostCountsToText(lostPirates);
-            const bpGained = 8;
-            awardBattlePoints(bpGained);
-            logScoreChange(bpGained*3, 'Piraten-Trümmerräuber bei '+planetDisplayName(raid.planetKey)+' abgefangen (+'+bpGained+' Kampfpunkte)', 'ti-sword');
-            addVeteranXp(planetKey, 6);
-            if (showLog !== false) log('Piratenflotte bei '+planetDisplayName(raid.planetKey)+' abgefangen und vertrieben!'+(lostPiratesText?' Zerstört: '+lostPiratesText+'.':'')+' Das Trümmerfeld bleibt erhalten.', 'ti-sword');
-            playSound('win');
-            const __battleReport = { type:'pirate-debris-raid', result:'win', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, destroyedShips: lostPirates, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: bpGained };
-            pushReport(__battleReport);
-            state.pirateDebrisRaid = null;
-          } else {
-            const ownLostIntercept = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.10+Math.random()*0.1, planetKey, m.composition);
-            const ownLostInterceptText = lostCountsToText(ownLostIntercept);
-            addVeteranXp(planetKey, 2);
-            if (showLog !== false) log('Abfangversuch gegen die Piratenflotte bei '+planetDisplayName(raid.planetKey)+' gescheitert - sie setzen die Plünderung fort.'+(ownLostInterceptText?' Verluste: '+ownLostInterceptText+'.':''), 'ti-shield');
-            playSound('lose');
-            const __battleReport = { type:'pirate-debris-raid', result:'loss', targetPlanet: raid.planetKey, attackPower: Math.round(power), defensePower: Math.round(raid.power), fleet: raid.fleet, ownLostShips: ownLostIntercept, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0), battlePoints: 0 };
-            pushReport(__battleReport);
-            // Ein neuer Versuch bleibt möglich, solange noch Zeit bis raid.endTime bleibt.
-            raid.interceptArrival = null;
-            raid.interceptSource = null;
-          }
-        } else if (m.type === 'void-rift'){
-          // Leerenriss schließen (siehe maybeSpawnVoidRift): echte Kampfhürde gegen die
-          // Leere-Energie des Risses.
-          //
-          // Drei Phasen statt eines einzelnen Wurfs (01.08.2026). Der Riss war der LETZTE
-          // Kampfpfad des Spiels, der noch mit Math.random() < chance entschieden wurde - der
-          // Kommentar hier behauptete "folgt der normalen Kraft-Formel", und genau das ist seit
-          // v8.295.0 die Drei-Phasen-Auflösung. Der Hilfe-Abschnitt "Leerenriss-Ereignisse" sagt
-          // dasselbe. v8.358.0 hat Spionagebericht und simuliertes Duell umgestellt; dieser hier
-          // war übersehen worden.
-          //
-          // VOID_RIFT_PHASE_MIN erhält die BEWUSSTE 15%-Untergrenze dieses Kampfes (die anderen
-          // Kämpfe liegen bei 5%). Sie ist aus der Zwei-von-drei-Formel zurückgerechnet:
-          // p_gesamt = 3p² - 2p³, und 3(0,2443²) - 2(0,2443³) = 0,1499. Ohne diese Umrechnung
-          // hätte die Umstellung die Untergrenze still von 15% auf 5% gesenkt - eine
-          // Balance-Änderung, die niemand beschlossen hat. Die Obergrenze übernimmt
-          // PHASE_CHANCE_MAX und liegt damit wie bisher bei rund 95%.
-          const rift = state.voidRift;
-          if (!rift || rift.planetKey !== m.targetId){
-            if (showLog !== false) log('Der Leerenriss war bei Ankunft bereits kollabiert.', 'ti-atom-2');
-            continue;
-          }
-          const riftPower = m.power || attackPower(fleet, planetKey);
-          const riftPhasen = resolveBattlePhases(riftPower, rift.power, 1, VOID_RIFT_PHASE_MIN, PHASE_CHANCE_MAX);
-          const riftChance = battleWinChance(riftPower, rift.power, 1, VOID_RIFT_PHASE_MIN, PHASE_CHANCE_MAX);
-          const riftSuccess = riftPhasen.success;
-          const riftFlightTime = Math.round(((m.endTime-(m.startTime||m.endTime))/1000)||0);
-          if (riftSuccess){
-            const shardGain = Math.max(1, Math.round((3 + Math.floor(Math.random()*3)) * (1 + ascBonus('leere')*0.04)));
-            state.rareItems.leerensplitter = (state.rareItems.leerensplitter||0) + shardGain;
-            const amBefore = state.resources.antimaterie||0;
-            // Math.max: ein bereits über der Lagergrenze liegender Bestand darf durch die Beute-
-            // Deckelung nie SINKEN (die Klammer allein würde ihn sonst auf die Grenze stutzen).
-            state.resources.antimaterie = Math.max(amBefore, Math.min(storageCap(), amBefore + Math.round(rift.power*0.4)));
-            const amGained = state.resources.antimaterie - amBefore;
-            const bpGained = 12;
-            awardBattlePoints(bpGained);
-            logScoreChange(bpGained*3, 'Leerenriss über '+planetDisplayName(rift.planetKey)+' geschlossen (+'+bpGained+' Kampfpunkte)', 'ti-atom-2');
-            addVeteranXp(planetKey, 8);
-            const ownLostRift = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.07, planetKey, m.composition);
-            const ownLostRiftText = lostCountsToText(ownLostRift);
-            if (showLog !== false) log('Leerenriss über '+planetDisplayName(rift.planetKey)+' geschlossen! +'+shardGain+'x Leerensplitter (gesamt: '+state.rareItems.leerensplitter+')'+(amGained>0?', +'+fmt(amGained)+' Antimaterie':'')+'.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':''), 'ti-diamond');
-            playSound('win');
-            const __battleReport = { type:'void-rift', result:'win', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), phasen: riftPhasen.phasen, chancePct: Math.round(riftChance*100), shards: shardGain, loot: amGained>0?{ antimaterie: amGained }:null, fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: riftFlightTime, battlePoints: bpGained };
-            pushReport(__battleReport);
-            state.voidRift = null;
-          } else {
-            const ownLostRift = applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.15+Math.random()*0.15).pct, planetKey, m.composition);
-            const ownLostRiftText = lostCountsToText(ownLostRift);
-            addVeteranXp(planetKey, 3);
-            if (showLog !== false) log('Die Flotte konnte den Leerenriss über '+planetDisplayName(rift.planetKey)+' nicht schließen - die Leere-Energie hat sie zurückgeschlagen.'+(ownLostRiftText?' Verluste: '+ownLostRiftText+'.':'')+' Ein neuer Versuch ist möglich, solange der Riss offen ist.', 'ti-alert-triangle');
-            playSound('lose');
-            const __battleReport = { type:'void-rift', result:'loss', targetPlanet: rift.planetKey, attackPower: Math.round(riftPower), defensePower: Math.round(rift.power), phasen: riftPhasen.phasen, chancePct: Math.round(riftChance*100), fleet: m.composition||fleet, ownLostShips: ownLostRift, fromPlanet: planetDisplayName(planetKey), debrisPlanet:planetKey, flightTime: riftFlightTime, battlePoints: 0 };
-            pushReport(__battleReport);
-            rift.attackArrival = null;
-            rift.attackSource = null;
-          }
+        } else if (m.type === 'intercept-pirates' || m.type === 'void-rift'){
+          /* Rundflug (v8.560.0): Der Kampf ist bei der Ankunft gefallen (ankunftsKampf), hier
+             kommt nur noch die Flotte heim. Altbestand aus der Zeit vor der Umstellung hat kein
+             hinBis und damit nie einen Ankunfts-Durchgang gesehen - dessen Kampf wird hier
+             nachgeholt, damit keine Flotte, die schon unterwegs war, ergebnislos zurueckkommt. */
+          if (!m.kampfErledigt){ ankunftsKampf(m, planetKey, fleet, showLog); continue; }
+          if (showLog !== false) log((m.fleetName||'Die Flotte')+' ist von '+planetDisplayName(m.targetId)+' nach '+planetDisplayName(planetKey)+' zurückgekehrt.', m.type==='void-rift'?'ti-atom-2':'ti-anchor');
         } else if (m.type === 'defend-base'){
           // Ankunft an der eigenen Allianzbasis: Schiffe werden dort stationiert (waren beim
           // Losschicken bereits aus der Flotte entnommen, Verlegungs-Muster).
@@ -54798,6 +54853,20 @@
     if (!confirm((m.fleetName||'Diese Flotte')+' wirklich zurückrufen? Die Mission wird ohne Ergebnis abgebrochen, verbrauchter Treibstoff wird nicht erstattet.')) return;
     if (m.type === 'relocate'){
       fleet[m.shipKey] = (fleet[m.shipKey]||0) + m.qty;
+    } else if (m.type === 'intercept-pirates'){
+      /* Die Ankunftsmarke am Ereignis MUSS mit weg: sendInterceptPirateMission lehnt jeden
+         weiteren Versuch ab, solange raid.interceptArrival gesetzt ist. Ohne diese Zeile war ein
+         Rueckruf eine Sackgasse - die Piraten blieben bis zum Abzug unantastbar. Aufgefallen beim
+         Rundflug-Umbau (v8.560.0), weil der Rueckflug den Rueckruf ueberhaupt erst nahelegt. */
+      if (state.pirateDebrisRaid && state.pirateDebrisRaid.planetKey === m.targetId){
+        state.pirateDebrisRaid.interceptArrival = null;
+        state.pirateDebrisRaid.interceptSource = null;
+      }
+    } else if (m.type === 'void-rift'){
+      if (state.voidRift && state.voidRift.planetKey === m.targetId){
+        state.voidRift.attackArrival = null;
+        state.voidRift.attackSource = null;
+      }
     } else if (m.type === 'colonize' || m.type === 'colonize-moon'){
       // Das Kolonieschiff wurde beim Start real aus der Flotte abgezogen (wie bei einer Verlegung) –
       // bei Abbruch kehrt es unbeschädigt zurück, nur die bereits bezahlten Rohstoffe/Treibstoff
@@ -58364,10 +58433,14 @@
           const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
           const pct = 100 - (remaining/(totalDur*1000)*100);
           const shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          // Rundflug (v8.560.0): Der Kampf faellt bei der Ankunft, danach fliegt die Flotte heim -
+          // ohne diese Marke wuerde der blosse Countdown stillschweigend seine Bedeutung wechseln.
+          // Altbestand ohne hinBis ist per Definition noch im Anflug.
+          const phase = m.hinBis ? (now < m.hinBis ? 'Anflug' : 'Rückflug') : 'Anflug';
           return `
             <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div class="bname"><i class="ti ti-anchor" aria-hidden="true" style="color:#e24b4a;"></i>${m.fleetName?m.fleetName+' · ':''}Abfangen: Piraten-Trümmerräuber bei ${planetDisplayName(m.targetId)}</div>
+                <div class="bname"><i class="ti ti-anchor" aria-hidden="true" style="color:#e24b4a;"></i>${m.fleetName?m.fleetName+' · ':''}Abfangen: Piraten-Trümmerräuber bei ${planetDisplayName(m.targetId)} <span class="lvl-pill">${phase}</span></div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
                   ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
@@ -58440,10 +58513,14 @@
           const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
           const pct = 100 - (remaining/(totalDur*1000)*100);
           const shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
+          // Rundflug (v8.560.0): Der Kampf faellt bei der Ankunft, danach fliegt die Flotte heim -
+          // ohne diese Marke wuerde der blosse Countdown stillschweigend seine Bedeutung wechseln.
+          // Altbestand ohne hinBis ist per Definition noch im Anflug.
+          const phase = m.hinBis ? (now < m.hinBis ? 'Anflug' : 'Rückflug') : 'Anflug';
           return `
             <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div class="bname"><i class="ti ti-atom-2" aria-hidden="true" style="color:#a89ef0;"></i>${m.fleetName?m.fleetName+' · ':''}Leerenriss schließen bei ${planetDisplayName(m.targetId)}</div>
+                <div class="bname"><i class="ti ti-atom-2" aria-hidden="true" style="color:#a89ef0;"></i>${m.fleetName?m.fleetName+' · ':''}Leerenriss schließen bei ${planetDisplayName(m.targetId)} <span class="lvl-pill">${phase}</span></div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
                   ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
@@ -60795,7 +60872,7 @@
               titel: 'Piraten bei '+planetDisplayName(raid.planetKey)+' abfangen',
               keys: ATTACK_SHIP_KEYS,
               countdownBis: raid.endTime,
-              vorschau: () => `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Die Piraten ziehen ab in <strong data-fwahl-count>…</strong> – die Flotte muss vorher ankommen.</div>`,
+              vorschau: (flotte) => zeitkritischVorschau(flotte, raid.planetKey, 'Die Piraten ziehen ab in <strong data-fwahl-count>…</strong> – die Flotte muss vorher <em>ankommen</em>.'),
               startLabel: 'Abfangen',
               sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((n,k)=>n+(flotte[k]||0),0) > 0
                 ? null : 'Wähle mindestens ein Schiff aus.',
@@ -60843,7 +60920,7 @@
               titel: 'Leerenriss über '+planetDisplayName(rift.planetKey)+' schließen',
               keys: ATTACK_SHIP_KEYS,
               countdownBis: rift.endTime,
-              vorschau: () => `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Der Riss kollabiert in <strong data-fwahl-count>…</strong> – die Flotte muss vorher ankommen.</div>`,
+              vorschau: (flotte) => zeitkritischVorschau(flotte, rift.planetKey, 'Der Riss kollabiert in <strong data-fwahl-count>…</strong> – die Flotte muss vorher <em>ankommen</em>.'),
               startLabel: 'Riss schließen',
               sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((n,k)=>n+(flotte[k]||0),0) > 0
                 ? null : 'Wähle mindestens ein Schiff aus.',
