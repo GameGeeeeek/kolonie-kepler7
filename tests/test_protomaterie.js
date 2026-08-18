@@ -341,16 +341,19 @@ check('7b: und Protokoll UND Bericht nennen ihn beim Namen',
         + '  const PROTOMATERIE_JE_FUHRE = ' + JSON.stringify(K.fuhre) + ';\n'
         + '  const PROTOMATERIE_LAGER_BASIS = ' + K.basis + ';\n'
         + '  const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = ' + K.jeStufe + ';\n'
-        /* Seit den Asteroidenfestungen leitet der Hilfetext auch aus FESTUNG_STUFEN ab. Die
-           Tabelle wird deshalb AUS DER DATEI geschnitten und mitgegeben - nicht durch einen
-           Platzhalter ersetzt (Arbeitsregel 36): Ein nachgebauter Wert prueft nicht mehr das
-           Spiel, sondern den Nachbau. */
-        + (() => {
-            const v = S.indexOf('  const FESTUNG_STUFEN = {');
+        /* Seit den Asteroidenfestungen leitet der Hilfetext aus FESTUNG_STUFEN, FESTUNG_BAUTEILE
+           und FESTUNG_KERN_ROLLE ab. Alle drei werden AUS DER DATEI geschnitten und mitgegeben -
+           nicht durch einen Platzhalter ersetzt (Arbeitsregel 36): Ein nachgebauter Wert prueft
+           nicht mehr das Spiel, sondern den Nachbau. Die Liste ist bewusst eine Schleife: Kommt
+           eine weitere Tabelle dazu, ist es ein Name mehr und keine vierte Kopie desselben
+           Schnittmusters. */
+        + ['FESTUNG_STUFEN', 'FESTUNG_BAUTEILE'].map(n => {
+            const v = S.indexOf('  const ' + n + ' = {');
             const b = v < 0 ? -1 : S.indexOf('\n  };', v);
             return (v >= 0 && b > v) ? S.slice(v, b + 5) + '\n' : '';
-          })()
-        + ((S.match(/  const FESTUNG_GERAEUMT_BONUS = [^;]*;/) || [''])[0] + '\n');
+          }).join('')
+        + ['FESTUNG_GERAEUMT_BONUS', 'FESTUNG_KERN_ROLLE', 'FESTUNG_BAUTEIL_BEITRAG']
+            .map(n => (S.match(new RegExp('  const ' + n + ' = [^;]*;')) || [''])[0] + '\n').join('');
       const eintrag = S.slice(vonH, bisH + E.length).replace(/,\s*$/, '');
       txt = new Function(kopf + 'return (' + eintrag + ').body;')();
     } catch (e) { fehler = e.message; }

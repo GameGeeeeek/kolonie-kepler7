@@ -137,4 +137,74 @@ if (!F || !B) return ende();
     { fundstellen: protoStellen, hinweis: 'genau eine Stelle hiesse: nur der Ankuendigungstext' });
 }
 
+// ---- 5) Die BAUTEILE (Phase 2) -------------------------------------------------------------
+{
+  const fB = block(FRONT, '  const FESTUNG_BAUTEILE = {', '\n  };');
+  const bB = block(BACK, 'const FESTUNG_BAUTEILE = {', '\n};');
+  check('5-anker: beide Bauteil-Tabellen gefunden', !!fB && !!bB, { front: !!fB, back: !!bB });
+  if (fB && bB){
+    let F2 = null, B2 = null;
+    try { F2 = new Function(fB + '\nreturn FESTUNG_BAUTEILE;')(); } catch (e) { F2 = null; }
+    try { B2 = new Function(bB + '\nreturn FESTUNG_BAUTEILE;')(); } catch (e) { B2 = null; }
+    check('5a: beide lassen sich ausführen', !!F2 && !!B2, { front: !!F2, back: !!B2 });
+    if (F2 && B2){
+      const f = Object.keys(F2).sort(), b = Object.keys(B2).sort();
+      check('5b: dieselben Bauteile', JSON.stringify(f) === JSON.stringify(b), { front: f, back: b });
+      /* Die Zahlen, die BEIDE Seiten benutzen. `anteilKern` bestimmt die LP - läuft sie
+         auseinander, zeigt der Balken einen anderen Höchststand als der Server führt.
+         `rolle`/`min`/`max` bestimmen den Faktor, den die Vorschau NENNT und der Server ANWENDET;
+         eine Abweichung wäre genau die zweite Zahl neben der echten. */
+      const ab = [];
+      for (const k of Object.keys(B2)){
+        if (!F2[k]) continue;
+        for (const feld of ['anteilKern', 'rolle', 'min', 'max', 'regenProStd']){
+          if (F2[k][feld] !== B2[k][feld]) ab.push({ bauteil: k, feld, front: F2[k][feld], back: B2[k][feld] });
+        }
+      }
+      check('5c: anteilKern, rolle, min, max und regenProStd stimmen je Bauteil überein', ab.length === 0, ab);
+      check('5d: der Schild-Durchlass stimmt',
+        !!F2.schild && !!B2.schild && F2.schild.kernDurchlass === B2.schild.kernDurchlass,
+        { front: F2.schild && F2.schild.kernDurchlass, back: B2.schild && B2.schild.kernDurchlass });
+      check('5e: die Turm-Verlustquote stimmt',
+        !!F2.tuerme && !!B2.tuerme && F2.tuerme.verlustQuote === B2.tuerme.verlustQuote,
+        { front: F2.tuerme && F2.tuerme.verlustQuote, back: B2.tuerme && B2.tuerme.verlustQuote });
+    }
+  }
+  /* Und die Kern-Rolle, die als eigene Konstante danebensteht. VERGLICHEN WERDEN WERTE, nicht
+     Text: Der erste Entwurf verglich die normalisierten Quelltext-Zeilen und fiel an einem
+     Leerzeichen nach dem Doppelpunkt (`rolle:'kapital'` gegen `rolle: 'kapital'`) - eine
+     Schreibweise statt der Regel (Arbeitsregel 3). */
+  const wert = (quelle, praefix) => {
+    const b = block(quelle, praefix + 'const FESTUNG_KERN_ROLLE = {', '};');
+    if (!b) return null;
+    try { return new Function(b + '\nreturn FESTUNG_KERN_ROLLE;')(); } catch (e) { return null; }
+  };
+  const fK = wert(FRONT, '  '), bK = wert(BACK, '');
+  check('5f: die Kern-Rollenwerte stimmen überein',
+    !!fK && !!bK && fK.rolle === bK.rolle && fK.min === bK.min && fK.max === bK.max,
+    { front: fK, back: bK });
+  /* Und die Stufen-Verlustquote: Sie steht seit Phase 2 auch im Frontend (die Vorschau nennt die
+     Verlustspanne, und die haengt davon ab, ob die Tuerme stehen). Zwei Zahlen fuer dieselbe
+     Groesse - also gehoert sie hierher. */
+  const ab2 = [];
+  for (const k of Object.keys(B)){
+    if (!F[k]) continue;
+    if (F[k].verlust !== B[k].verlust) ab2.push({ stufe: k, front: F[k].verlust, back: B[k].verlust });
+  }
+  check('5g: die Verlustquote je Stufe stimmt überein', ab2.length === 0, ab2);
+  /* 5h: FESTUNG_BAUTEIL_BEITRAG steht im Frontend AUSSCHLIESSLICH, damit der Hilfetext die Zahl
+     ableiten kann statt sie zu behaupten - der Server rechnet damit. Genau deshalb gehoert sie
+     hierher: Eine Konstante, die nur eine ANZEIGE speist, faellt sonst nie auf, wenn der Server
+     seinen Wert aendert - der Hilfetext behauptete die alte Zahl weiter, und niemand merkte es
+     (dieselbe Familie wie die zweite Anzeigestelle in Pflichtpunkt 6). */
+  const zahlAus = (quelle, name) => {
+    const m = quelle.match(new RegExp('const ' + name + ' = ([0-9.]+);'));
+    return m ? parseFloat(m[1]) : null;
+  };
+  const fBei = zahlAus(FRONT, 'FESTUNG_BAUTEIL_BEITRAG');
+  const bBei = zahlAus(BACK, 'FESTUNG_BAUTEIL_BEITRAG');
+  check('5h: der Hortanteil für Bauteil-Schaden stimmt überein',
+    fBei !== null && bBei !== null && fBei === bBei, { front: fBei, back: bBei });
+}
+
 ende();

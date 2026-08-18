@@ -19,10 +19,18 @@
 //      die Ladungskürzung erreicht sie nie. Der Server schickt `protoBlockade`, und die Mission
 //      friert die gedrosselte Menge ein.
 //
-// GEGENPROBE (in beide Richtungen ausgeführt):
+//   6. Zielwahl und Bauteile (Phase 2): Die Zielknöpfe erscheinen nur, wenn die Festung Bauteile
+//      führt, ihre FAKTOREN folgen der Konterrolle des Verbands, und die Wahl reist in der Mission
+//      mit. Gemessen wird die Wirkung, nicht die Beschriftung (Arbeitsregel 61).
+//
+// GEGENPROBE (in beide Richtungen ausgeführt, überall dieselbe Anzahl gelaufener Prüfungen = 42):
 //   * Ohne Festung im Felddokument: kein Knoten, keine Drosselzeile, volle Ladung (Abschnitt 1b/3c).
 //   * Mit einer Kopie, die in abbauPlan den Faktor nicht anwendet, fällt 3a/3b.
 //   * Mit einer Kopie, die `plan.ladung` statt `plan.ladungRoh` sendet, fällt 4a.
+//   * Mit einer Kopie, in der festungRollenFaktor nur `spec.min` liefert, fallen 6c und 6e
+//     (gemessen 0.70 statt 1.60) - 6a/6b/6h bleiben grün, sie prüfen ja nur das Etikett.
+//   * Mit einer Kopie, die `ziel:'kern'` fest in die Mission schreibt, fällt 6k.
+//   * Mit einer Kopie ohne die Ziel-Zeile auf der Missionskarte fällt 6p.
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
@@ -41,15 +49,20 @@ const FEST_PLATZ = '3';
 const VORRAT = 480000;
 
 // Das Felddokument, wie es der Server liefert - mit oder ohne Festung.
-function feld(mitFestung){
+function feld(mitFestung, bauteile){
   const f = { plaetze: { [PLATZ]: { sorte:'urmaterie', groesse:'kern', vorrat:VORRAT } } };
   if (mitFestung){
     f.festung = { id:'fest-1', stufe:'sternenfeste', platz:FEST_PLATZ, sorte:'eisen',
       kernMax:1200000, kern:900000, hort:250000, hortProto:180,
       seit:Date.now(), letzteReifung:Date.now(), beitraege:{}, schlaege:{} };
+    /* Die Bauteile kommen wie vom Server: LP-Stand plus Hoechstwert, abgeleitet aus dem Kern
+       (anteilKern 0,40 bzw. 0,25 bei 1,2 Mio). Eine Festung OHNE dieses Feld ist eine aus
+       Phase 1 - und genau die ist die Gegenrichtung in Abschnitt 6f. */
+    if (bauteile) f.festung.bauteile = JSON.parse(JSON.stringify(bauteile));
   }
   return { systeme:[SYS], felder:{ [SYS]: f } };
 }
+const BAUTEILE_GANZ = { schild: { lp:480000, lpMax:480000 }, tuerme: { lp:300000, lpMax:300000 } };
 
 function backend(store, opt){
   opt = opt || {};
@@ -303,6 +316,187 @@ async function aufKarte(t){
   const ohne = await t3.page.evaluate(() => !!document.querySelector('[data-map-festung]'));
   check('5a: ohne Festung im Feld gibt es keinen Festungsknoten', ohne === false, { gefunden: ohne });
   await t3.ctx.close();
+
+  /* ---- 6) Zielwahl und Bauteile (Phase 2) ----------------------------------------------------
+     Gemessen wird die WIRKUNG, nicht die Beschriftung. Der Unterschied ist an diesem Test schon
+     einmal teuer gewesen (Arbeitsregel 61): Abschnitt 3 prueefte anfangs nur, dass das Wort
+     "gedrosselt" dasteht - die Gegenprobe mit ausgebautem Faktor blieb gruen, weil der Erklaertext
+     am Vorhandensein der Festung haengt und nicht an der Rechnung.
+     Hier heisst das: Es genuegt nicht, dass drei Zielknoepfe erscheinen. Ihre FAKTOREN muessen
+     sich nach der Konterrolle des Verbands unterscheiden, und die Wahl muss in der MISSION
+     ankommen. Der Verband besteht dafuer ausschliesslich aus Jaegern (Rolle `abfang`) - damit
+     steht der Tuerme-Faktor am oberen Anschlag und der Schild-Faktor am unteren, beide aus der
+     Tabelle der Spieldatei abgelesen statt eingetippt. */
+  const SPEC = (() => {
+    // Die Erwartung kommt aus der TABELLE der Spieldatei, nicht aus dem gerenderten Text - sonst
+    // bestaetigte die Pruefung sich selbst (Arbeitsregel 62).
+    const v = JS.indexOf('  const FESTUNG_BAUTEILE = {');
+    const b = v < 0 ? -1 : JS.indexOf('\n  };', v);
+    const kern = (JS.match(/  const FESTUNG_KERN_ROLLE = ([^;]*);/) || [])[1];
+    if (v < 0 || b <= v || !kern) return null;
+    try {
+      return new Function(JS.slice(v, b + 5) + '\nreturn { b: FESTUNG_BAUTEILE, kern: ' + kern + ' };')();
+    } catch (e){ return null; }
+  })();
+  check('6-tabelle: die Bauteil-Tabelle liess sich aus der Spieldatei lesen',
+    !!SPEC && !!SPEC.b && !!SPEC.b.schild && !!SPEC.kern, { SPEC });
+
+  function fixtureAbfang(){
+    const st = JSON.parse(fixture());
+    /* Ein REINER Abfangjaeger-Verband: Der Rollenanteil ist damit 1 fuer `abfang` und 0 fuer alles
+       andere - die drei Faktoren muessen sich deshalb maximal unterscheiden. Mit einer gemischten
+       Flotte laegen sie dicht beieinander, und die Pruefung koennte nicht mehr zwischen "wirkt"
+       und "wirkt nicht" trennen.
+       DIE TRAEGER SIND PFLICHT, und das war der erste Fehlschlag dieses Abschnitts: capFighterSelection
+       kappt Jaeger auf die Hangar-Kapazitaet der MITGESCHICKTEN Traeger (hangarCapacity: 6 je
+       Carrier). Ohne einen einzigen Traeger fiel die Auswahl auf 0 Jaeger zurueck, uebrig blieben
+       die Frachter - und alle drei Faktoren standen am unteren Anschlag. Der Test haette dann den
+       HANGARDECKEL gemessen statt der Rollenwirkung (Arbeitsregel 7). Der Carrier ist seit der
+       Umwidmung vom 02.08.2026 selbst `abfang`, der Verband bleibt also sortenrein. */
+    for (const k of Object.keys(st.fleet)){
+      if (typeof st.fleet[k] === 'number' && !/^(schuerfschiff|ships)$/.test(k)) st.fleet[k] = 0;
+    }
+    st.fleet.schuerfschiff = 6;
+    st.fleet.jaeger = 80;
+    st.fleet.carrier = 20;      // 20 x 6 = 120 Hangarplaetze, die 80 Jaeger passen alle hinein
+    return JSON.stringify(st);
+  }
+  async function angriffOeffnen(t){
+    await aufKarte(t);
+    await t.page.evaluate(() => {
+      const n = document.querySelector('[data-map-festung]');
+      if (n) n.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+    });
+    await t.page.waitForTimeout(400);
+    await t.page.evaluate(() => {
+      const btn = [...document.querySelectorAll('.kmenu button, .kmenu .card-row')].find(b => /Festung angreifen/.test(b.textContent));
+      if (btn) btn.click();
+    });
+    await t.page.waitForTimeout(800);
+  }
+  // Die Knoepfe werden ueber ihre SICHTBARE Flaeche gelesen, nicht ueber ihr Dasein
+  // (Arbeitsregel 55) - ein Knopf mit Hoehe 0 ist fuer den Spieler nicht da.
+  const zieleLesen = (page) => page.evaluate(() => {
+    const ov = document.getElementById('fwahlOverlay');
+    if (!ov) return { da:false, knoepfe:[] };
+    return {
+      da: ov.getBoundingClientRect().height > 0,
+      txt: ov.textContent,
+      knoepfe: [...ov.querySelectorAll('[data-fest-ziel]')].map(b => {
+        const r = b.getBoundingClientRect();
+        return { ziel: b.getAttribute('data-fest-ziel'), text: b.textContent.trim(),
+                 sichtbar: r.width > 4 && r.height > 4, aktiv: b.classList.contains('primary'),
+                 faktor: parseFloat((b.textContent.match(/×\s*([\d.]+)/) || [])[1] || 'NaN') };
+      })
+    };
+  });
+
+  const t6 = await tab(browser, fixtureAbfang(), { feld: feld(true, BAUTEILE_GANZ) });
+  await t6.page.waitForTimeout(2500);
+  await angriffOeffnen(t6);
+  const z = await zieleLesen(t6.page);
+  check('6-anker: die Flottenwahl der Festung ist offen', z.da, { da: z.da });
+  check('6a: es gibt drei SICHTBARE Zielknöpfe (Kern, Schild, Türme)',
+    z.knoepfe.length === 3 && z.knoepfe.every(k => k.sichtbar),
+    { knoepfe: z.knoepfe });
+  const zk = Object.fromEntries(z.knoepfe.map(k => [k.ziel, k]));
+  check('6b: jeder Knopf nennt seinen Faktor',
+    !!zk.kern && !!zk.schild && !!zk.tuerme && [zk.kern, zk.schild, zk.tuerme].every(k => isFinite(k.faktor)),
+    { knoepfe: z.knoepfe });
+  if (SPEC && zk.kern && zk.schild && zk.tuerme){
+    /* Das ist die Pruefung der WIRKUNG. Der Verband ist reiner Abfangjaeger-Verband:
+         Tuerme  (Rolle abfang)  -> Anteil 1 -> Faktor max
+         Schild  (Rolle bomber)  -> Anteil 0 -> Faktor min
+         Kern    (Rolle kapital) -> Anteil 0 -> Faktor min
+       Waeren die Faktoren fest verdrahtet oder der Rollenanteil kaputt, staenden hier drei
+       gleiche Zahlen - und genau das faengt diese Pruefung, waehrend 6a/6b es nicht koennen. */
+    check('6c: der Faktor gegen die Türme steht am OBEREN Anschlag (Abfangjäger-Verband)',
+      Math.abs(zk.tuerme.faktor - SPEC.b.tuerme.max) < 0.02,
+      { gemessen: zk.tuerme.faktor, erwartet: SPEC.b.tuerme.max });
+    check('6d: der Faktor gegen die Schildkuppel steht am UNTEREN Anschlag',
+      Math.abs(zk.schild.faktor - SPEC.b.schild.min) < 0.02,
+      { gemessen: zk.schild.faktor, erwartet: SPEC.b.schild.min });
+    check('6e: und die drei Ziele haben WIRKLICH verschiedene Faktoren',
+      zk.tuerme.faktor > zk.kern.faktor && zk.tuerme.faktor > zk.schild.faktor,
+      { tuerme: zk.tuerme.faktor, kern: zk.kern.faktor, schild: zk.schild.faktor,
+        hinweis: 'gleiche Zahlen heissen: der Rollenanteil wirkt nicht' });
+  }
+  check('6f: die Vorschau nennt die stehenden Bauteile und ihre Wirkung',
+    /Schildkuppel/.test(z.txt) && /Geschütztürme/.test(z.txt) && /35 %|35%/.test(z.txt),
+    { auszug: (z.txt||'').slice(0, 600) });
+  // Die Verlustspanne haengt an den TUERMEN, nicht an der Stufe - solange sie stehen, nennt die
+  // Vorschau die hoehere Quote. Eine feste Zahl waere die zweite Anzeigestelle mit der alten
+  // Annahme (Pflichtpunkt 6 der Checkliste).
+  check('6g: die Verlustspanne nennt die Türme als Grund',
+    /Geschütztürme sind der Grund/.test(z.txt), { auszug: (z.txt||'').slice(0, 600) });
+
+  // Ziel wechseln - und messen, dass sich die WIRKSAM-GEGEN-Zeile mitbewegt.
+  const vorher = (z.txt.match(/Wirksam gegen dieses Ziel:\s*([^–-]+)/) || [])[1] || '';
+  await t6.page.evaluate(() => {
+    const b = document.querySelector('#fwahlOverlay [data-fest-ziel="tuerme"]');
+    if (b) b.click();
+  });
+  await t6.page.waitForTimeout(500);
+  const z2 = await zieleLesen(t6.page);
+  const nachher = (z2.txt.match(/Wirksam gegen dieses Ziel:\s*([^–-]+)/) || [])[1] || '';
+  check('6h: der Klick setzt das Ziel um (aktiver Knopf wandert)',
+    (z2.knoepfe.find(k => k.ziel === 'tuerme') || {}).aktiv === true &&
+    (z2.knoepfe.find(k => k.ziel === 'kern') || {}).aktiv === false,
+    { knoepfe: z2.knoepfe });
+  check('6i: und die Zeile "Wirksam gegen" nennt eine ANDERE Rolle als vorher',
+    !!vorher && !!nachher && vorher.trim() !== nachher.trim(),
+    { vorher: vorher.trim(), nachher: nachher.trim() });
+
+  // Und der eigentliche Beweis: Die Wahl reist in der MISSION mit.
+  await t6.page.evaluate(() => {
+    const b = document.querySelector('#fwahlOverlay [data-fwahl-start]');
+    if (b && !b.disabled) b.click();
+  });
+  await t6.page.waitForTimeout(1500);
+  const m6 = ((t6.stand().fleet||{}).missions||[]).find(m => m.type === 'festung-angriff');
+  check('6j: der Angriff ist gestartet', !!m6, { missionen: ((t6.stand().fleet||{}).missions||[]).map(m=>m.type) });
+  check('6k: und die Mission trägt das GEWÄHLTE Ziel',
+    !!m6 && m6.ziel === 'tuerme', { ziel: m6 && m6.ziel });
+  /* Die Missionskarte muss das Ziel NENNEN. Es ist beim Start festgelegt und nicht mehr
+     aenderbar - eine Karte, die es verschweigt, laesst den Spieler im Unklaren, worauf sein
+     Verband gleich schiesst. Gemessen wird der gerenderte Text, nicht das Feld im Spielstand. */
+  await t6.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="flotte"]'); if (x) x.click(); });
+  await t6.page.waitForTimeout(1400);
+  const karte6 = await t6.page.evaluate(() => {
+    const b = document.getElementById('missionsActive');
+    return b ? b.textContent : '';
+  });
+  check('6p: die Missionskarte nennt das gewählte Ziel',
+    /Ziel:\s*Geschütztürme/.test(karte6), { auszug: (karte6||'').slice(0, 300) });
+  await t6.ctx.close();
+
+  // ---- 6l) Gegenrichtung: eine Festung aus Phase 1 hat keine Bauteile -------------------------
+  const t7 = await tab(browser, fixtureAbfang(), { feld: feld(true) });
+  await t7.page.waitForTimeout(2500);
+  await angriffOeffnen(t7);
+  const z7 = await zieleLesen(t7.page);
+  check('6l-anker: auch ohne Bauteile öffnet die Flottenwahl', z7.da, { da: z7.da });
+  check('6l: ohne Bauteile gibt es KEINE Zielwahl - und keinen leeren Abschnitt',
+    z7.knoepfe.length === 0 && !/Ziel wählen/.test(z7.txt || ''),
+    { knoepfe: z7.knoepfe.length, hatUeberschrift: /Ziel wählen/.test(z7.txt || '') });
+  check('6m: dann nennt die Verlustspanne die Stufe statt der Türme',
+    !/Geschütztürme sind der Grund/.test(z7.txt || '') && /Verlusten des Verbands/.test(z7.txt || ''),
+    { auszug: (z7.txt||'').slice(0, 400) });
+  await t7.ctx.close();
+
+  // ---- 6n) Ein zerstörtes Bauteil ist kein Ziel mehr ------------------------------------------
+  const t8 = await tab(browser, fixtureAbfang(),
+    { feld: feld(true, { schild: { lp:0, lpMax:480000 }, tuerme: { lp:300000, lpMax:300000 } }) });
+  await t8.page.waitForTimeout(2500);
+  await angriffOeffnen(t8);
+  const z8 = await zieleLesen(t8.page);
+  check('6n: das zerstörte Schild steht nicht mehr zur Wahl',
+    z8.knoepfe.length === 2 && !z8.knoepfe.some(k => k.ziel === 'schild'),
+    { knoepfe: z8.knoepfe });
+  check('6o: es wird aber weiterhin als zerstört AUSGEWIESEN - nicht stillschweigend verschwiegen',
+    /Schildkuppel/.test(z8.txt || '') && /zerstört/.test(z8.txt || ''),
+    { auszug: (z8.txt||'').slice(0, 600) });
+  await t8.ctx.close();
 
   await browser.close();
   ende();
