@@ -132,15 +132,46 @@ if (K && M && aufbMax > 0) {
    ist deshalb der einzige ausgenommene Posten, und der Grund ist inhaltlich: Sie fällt als feste
    Menge je Fuhre an, eine zwanzigste Kolonie bringt davon keine einzige Einheit mehr.
    Ausgeführt statt gelesen, und die GEGENRICHTUNG gleich mit - sonst bliebe die Prüfung grün, wenn
-   jemand die Skalierung versehentlich ganz abschaltet. */
-const SC = block('4c', '  function scaleCostByEmpire(cost){', '\n  }',
-  'function empireCostFactor(){ return 1 + 25*0.25; }\n', 'scaleCostByEmpire');
+   jemand die Skalierung versehentlich ganz abschaltet.
+   Seit dem 18.08.2026 sind AUSSERDEM alle veredelten Ressourcen ausgenommen (Etappe B2): Der
+   verdreifachte Tier-2-Anteil der Mega-Ausbaustufen wäre mit Imperiumsfaktor über dem Lagerdeckel
+   gelandet - dieselbe Sackgasse wie bei Protomaterie, nur eine Etage höher. Die Entscheidung
+   darüber liegt in empireFesterPosten(); der Helfer und TIER2_DEFS werden deshalb AUS DER DATEI
+   geschnitten und nicht nachgebaut - ein nachgebauter Helfer würde eine andere Regel messen als
+   die, die im Spiel läuft (Arbeitsregel 36). empireCostFactor bleibt bewusst gesetzt: Der Faktor
+   ist der EINGABEWERT dieser Messung, nicht ihr Messgegenstand. */
+const HELFER = (() => {
+  const teil = (von, bis) => { const a = S.indexOf(von), b = a < 0 ? -1 : S.indexOf(bis, a);
+    return (a >= 0 && b > a) ? S.slice(a, b + bis.length) : null; };
+  const defs = teil('  const TIER2_DEFS = [', '\n  ];');
+  const fest = teil('  function empireFesterPosten(res){', '\n  }');
+  return { defs, fest, kopf: 'function empireCostFactor(){ return 1 + 25*0.25; }\n' + (defs||'') + '\n' + (fest||'') + '\n' };
+})();
+check('4c-vorab: TIER2_DEFS und empireFesterPosten liessen sich aus der Datei schneiden',
+  !!HELFER.defs && !!HELFER.fest, { defs: !!HELFER.defs, fest: !!HELFER.fest });
+const SC = block('4c', '  function scaleCostByEmpire(cost){', '\n  }', HELFER.kopf, 'scaleCostByEmpire');
 if (SC && M && K && aufbMax > 0) {
   const skaliert = SC({ erz: 1000, protomaterie: M.max });
   check('4c: Protomaterie wächst NICHT mit dem Imperium (sonst 2.900 gegen 2.500 Speicher = Sackgasse)',
     skaliert.protomaterie === M.max, { erwartet: M.max, bekommen: skaliert.protomaterie });
   check('4c-gegen: alles andere wird weiterhin skaliert (die Ausnahme ist gezielt, nicht global)',
     skaliert.erz === 7250, { erz: skaliert.erz });
+  /* Etappe B2: JEDE veredelte Ressource ist ausgenommen, nicht nur eine handverlesene Liste -
+     geprüft über TIER2_DEFS selbst, damit eine künftige zehnte Kette automatisch mit abgedeckt
+     ist und nicht stillschweigend durchs Raster fällt (Arbeitsregel 3: die Regel, nicht die
+     Momentaufnahme). */
+  const T2KEYS = (() => {
+    const a = S.indexOf('  const TIER2_DEFS = ['), b = a < 0 ? -1 : S.indexOf('\n  ];', a);
+    if (a < 0 || b <= a) return [];
+    try { return new Function(S.slice(a, b) + '\n  ]; return TIER2_DEFS.map(d => d.key);')(); }
+    catch (e) { return []; }
+  })();
+  check('4d-vorab: die Ketten-Schlüssel liessen sich lesen', T2KEYS.length >= 6, { anzahl: T2KEYS.length });
+  const probe = {}; T2KEYS.forEach(k => probe[k] = 1000);
+  const t2skaliert = SC(probe);
+  const mitgewachsen = T2KEYS.filter(k => t2skaliert[k] !== 1000);
+  check('4d: kein veredelter Posten wächst mit dem Imperium (sonst über dem Lagerdeckel)',
+    mitgewachsen.length === 0, { mitgewachsen, beispiel: t2skaliert[T2KEYS[0]] });
 }
 
 // ---- 5) Niemand wird blockiert ----------------------------------------------------------------
