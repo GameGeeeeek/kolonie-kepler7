@@ -1487,6 +1487,64 @@ Autorität ist. Zwei Quellen für dieselbe Zahl heißt: **eine Paritätsprüfung
 bei `test_asteroid_paritaet.js` für `AST_SORTEN`. Ohne sie driften Vorschau und Buchung auseinander,
 sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mission nicht einhält.
 
+## Die Klappen weichen der Reiterleiste aus (18.08.2026)
+
+**Der Fund kam aus einem Fehlschlag, den zwei Sitzungen vorher als Wackeln abgehakt hatten.**
+`test_reiterleiste.js` fiel im vollen Prüflauf und war einzeln grün – auf 390x844 mit
+`["galaxie","fortschritt"]`, auf 360x740 mit `["basis","karte","galaxie","fortschritt"]`. Die
+naheliegende Erklärung („unter Suite-Last zu früh gemessen") war schon zweimal angenommen und
+hatte je eine Verstärkung der Wartelogik nach sich gezogen. Sie ist **gemessen falsch**: zwölf
+Läufe, sechs davon unter vier CPU-Lasterzeugern, 0 Fehlschläge.
+
+**Der Mechanismus, deterministisch reproduziert:** `.edge-tab` hängt am VIEWPORT (am Handy
+`bottom:8%`), `.tabs` am INHALT darüber. Wird `#eventBanner` sichtbar – ein Zufallsereignis, 138
+bis 164 px hoch –, rutscht die Leiste in das feste Band der Klappen. Weil die Klappen `z-index:50`
+tragen und die Leiste `25`, ist der Reiter darunter nicht bloß verdeckt, sondern **nicht
+antippbar**. Gemessen am Stand davor, mit `state.activeEvent` im Spielstand:
+
+| Größe | Leiste | Klappen | verdeckt |
+|---|---|---|---|
+| 390x844 | 600..717 | 685..776 | `galaxie`, `fortschritt` |
+| 360x740 | 570..687 | 589..681 | `basis`, `karte`, `galaxie`, `fortschritt` |
+| 360x640 | 570..687 | 497..589 | `basis`, `karte` |
+
+Die ersten beiden Zeilen sind **zeichengleich** mit dem, was der Prüflauf gemeldet hatte. Damit war
+der Fehlschlag reproduziert statt weiter als Zufall verbucht – vier von zwölf Reitern tot, darunter
+der, auf dem der Spieler startet.
+
+**Behoben durch Ausweichen, nicht durch eine dritte Zahl.** Zwei frühere Behebungen (`top:64%` →
+`bottom:8%`) haben je eine Bildschirmgröße freigeräumt und eine andere zugestellt; ein dritter
+fester Prozentwert hätte dasselbe getan, denn es gibt keinen richtigen: Die Leiste kann jede Höhe
+annehmen, die der Inhalt über ihr hergibt. `klappenFrei()` ist deshalb **die EINE Quelle für beide
+Klappen** (Vorbild `kbMarkerFrei`, Regel 52): Es misst die Leiste, weicht bevorzugt nach unten aus,
+sonst nach oben, und lässt die Klappe stehen, wenn nirgends Platz ist – eine überlappende Klappe ist
+ehrlicher als eine, die halb aus dem Bild hängt (dieselbe Abwägung wie beim Label-Deckel von KB-16).
+
+**Drei Dinge, die man beim Anfassen wissen muss:**
+
+- **Der Aufruf steht HINTER dem `#eventBanner`-Block in `render()`, nicht am Kopf.** Am Anfang des
+  Takts gemessen kennt `klappenFrei` die Bannerhöhe dieses Takts noch nicht und wiche erst eine
+  Sekunde später aus – für den Spieler eine Sekunde lang tote Reiter, für einen Test ein Rennen.
+  Genau dieser Reihenfolgefehler war der erste Anlauf, und er fiel nur an der wiederholten Messung
+  auf (Regel 48).
+- **Die natürliche Lage wird GEMESSEN, nicht aus `8%` nachgerechnet.** Ein nachgerechneter Wert
+  wäre eine zweite Wahrheit neben dem CSS und liefe beim nächsten Media-Query-Umbau auseinander.
+- **Die Gegenrichtung gehört dazu:** Am PC (>700 px) wird ein gesetzter Versatz ausdrücklich
+  zurückgenommen, sonst bliebe dort eine Verschiebung stehen, die niemand erklären könnte.
+
+**Und die Lehre über den Einzelfall hinaus – sie ist die eigentliche:** Ein Test, der „gelegentlich
+fällt", meldet unter Umständen einen ECHTEN Befund, den man nur nicht deterministisch stellen kann.
+Wer die Wartelogik verstärkt, bis er grün ist, hat das Signal weggedämpft, nicht die Ursache
+behoben – das ist Regel 26, angewandt auf eine wiederkehrende Flanke statt auf eine Gegenprobe.
+Richtig ist, den auslösenden Zustand zu SUCHEN (hier: was steht über der Leiste, das nur manchmal da
+ist?) und ihn dann deterministisch zu stellen. Wächter: `tests/test_klappen_kollision.js`
+(16 Prüfungen, drei Bildschirmgrößen × mit/ohne Ereignis, dazu `elementFromPoint` auf die
+ausgewichenen Klappen selbst – Regel 53: wer etwas verschiebt, misst die neue Stelle mit – und die
+PC-Gegenrichtung). Beidseitig gegengeprüft: am Stand davor fallen genau die drei „mit
+Ereignis"-Prüfungen, bei identischer Prüfungszahl.
+`test_reiterleiste.js` pinnt seither seine Ereignis-Uhren (Regel 18) und misst wieder nur seinen
+eigenen Gegenstand; der Bannerfall hat jetzt seinen eigenen, deterministischen Wächter.
+
 ## Sektor-Eigenschaften (Etappe 3, 18.08.2026)
 
 Die acht Regionen der Karte trugen bis dahin nur `cx/cy/tint/desc`. `sektorVon` wurde

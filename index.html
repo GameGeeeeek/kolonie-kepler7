@@ -58079,6 +58079,76 @@
   const COMPACT_HEAD_MAX_WIDTH = 1000;
   function compactHeadAuto(){ return (typeof window!=='undefined') && window.innerWidth <= COMPACT_HEAD_MAX_WIDTH; }
   function compactHeadActive(){ return state.compactHead !== undefined ? !!state.compactHead : compactHeadAuto(); }
+  /* Die seitlichen Klappen weichen der Reiterleiste aus (18.08.2026).
+
+     Das Problem ist eine BAUART, keine Zahl: `.edge-tab` haengt am VIEWPORT (am Handy
+     `bottom:8%`), die Reiterleiste `.tabs` dagegen am INHALT ueber ihr - Kopfzeile,
+     Ressourcenleiste, Tagesaufgaben und die zwei Banner, die nur MANCHMAL da sind
+     (`#eventBanner`, `#heroRaidTimer`). Zwei voneinander unabhaengige Groessen koennen sich
+     treffen, und wo sie es tun, ist der Reiter nicht bloss verdeckt, sondern wegen z-index 50
+     gegen 25 auch nicht antippbar.
+
+     Gemessen am 18.08.2026 mit sichtbarem Ereignis-Banner (115 px hoch, schiebt die Leiste um
+     135 px nach unten):
+        390x844   Leiste 577..694, Klappen 685..776   -> "fortschritt" verdeckt
+        360x740   Leiste 521..638, Klappen 589..681   -> "galaxie", "fortschritt"
+        360x640   Leiste 521..638, Klappen 497..589   -> "basis", "karte", "galaxie", "fortschritt"
+     Vier von zwoelf Reitern, darunter der, auf dem der Spieler startet. Ohne Banner ist auf allen
+     drei Groessen nichts verdeckt - deshalb ist der Fehler nie jemandem aufgefallen, der gerade
+     kein Ereignis laufen hatte.
+
+     ZWEI fruehere Behebungen haben je EINE Bildschirmgroesse freigeraeumt und eine andere wieder
+     zugestellt (`top:64%` -> `bottom:8%`, siehe die Kommentare an der Media-Query). Ein dritter
+     fester Prozentwert wuerde dasselbe tun, denn es gibt keinen richtigen: Die Leiste kann jede
+     Hoehe annehmen, die der Inhalt ueber ihr hergibt. Deshalb WEICHT die Klappe jetzt aus, statt
+     an einer Zahl zu haengen - dieselbe Antwort wie `kbMarkerFrei` auf der Karte, und aus
+     demselben Grund EINE Quelle fuer beide Klappen statt zweier Kopien.
+
+     Ausweichrichtung: bevorzugt nach UNTEN (die Leiste steht meist darueber, und unten ist der
+     Daumen ohnehin naeher). Passt es dort nicht, nach oben. Passt es nirgends, bleibt die Klappe,
+     wo sie ist - eine ueberlappende Klappe ist ehrlicher als eine, die halb aus dem Bild haengt
+     (dieselbe Abwaegung wie beim Label-Deckel von KB-16). */
+  const KLAPPE_LUFT = 6;        // Mindestabstand zur Leiste in px
+  const KLAPPE_MIN_UNTEN = 8;   // so nah darf eine Klappe hoechstens an die Fensterunterkante
+  let _klappenLage = '';
+  function klappenFrei(){
+    const klappen = document.querySelectorAll('.edge-tab');
+    if (!klappen.length) return;
+    const bar = document.querySelector('.tabs');
+    /* Am PC gilt die Regel nicht - dort ist die Leiste einreihig und steht weit oben. Ein
+       zurueckgelassener Versatz waere da ein Fehler, den niemand erklaeren koennte, also wird
+       beim Wechsel ausdruecklich zurueckgesetzt (die Gegenrichtung mitzupruefen ist Hausregel 33). */
+    if (window.innerWidth > 700 || !bar){
+      if (_klappenLage !== ''){ klappen.forEach(k => { k.style.bottom = ''; }); _klappenLage = ''; }
+      return;
+    }
+    const H = window.innerHeight;
+    const bb = bar.getBoundingClientRect();
+    if (!bb.height) return;
+    /* Signatur zuerst: Steht die Leiste, wo sie beim letzten Takt stand, ist auch das Ergebnis
+       dasselbe. Der Haupt-Tick laeuft jede Sekunde; ein Schreibzugriff je Sekunde auf zwei
+       Elemente waere unnoetige Layout-Arbeit (dasselbe Muster wie setBoxHtml). */
+    const sig = H + ':' + Math.round(bb.top) + ':' + Math.round(bb.bottom);
+    if (sig === _klappenLage) return;
+    _klappenLage = sig;
+    klappen.forEach(k => {
+      if (getComputedStyle(k).display === 'none') return;
+      /* Die natuerliche Lage wird gemessen, nicht aus dem Prozentwert nachgerechnet: Ein
+         nachgerechneter Wert waere eine zweite Wahrheit neben dem CSS und liefe beim naechsten
+         Media-Query-Umbau auseinander. */
+      k.style.bottom = '';
+      const r = k.getBoundingClientRect();
+      const h = r.height;
+      const natuerlich = H - r.bottom;
+      const stoert = r.top < bb.bottom && r.bottom > bb.top;
+      if (!stoert) return;
+      const unten = H - h - bb.bottom - KLAPPE_LUFT;   // Klappe komplett UNTER der Leiste
+      const oben  = H - bb.top + KLAPPE_LUFT;          // Klappe komplett UEBER der Leiste
+      if (unten >= KLAPPE_MIN_UNTEN)      k.style.bottom = Math.round(unten) + 'px';
+      else if (oben <= H - h)             k.style.bottom = Math.round(oben) + 'px';
+      else                                k.style.bottom = Math.round(natuerlich) + 'px';
+    });
+  }
   function applyCompactHeadClass(){
     if (!document.body) return;
     const on = compactHeadActive();
@@ -62435,6 +62505,12 @@
         eventBanner.style.display = 'none';
       }
     }
+    /* ERST HIER, nicht am Kopf von render(): Die zwei Banner darueber sind genau das, was die
+       Reiterleiste verschiebt. Am Anfang des Takts gemessen, kennt klappenFrei die Bannerhoehe
+       DIESES Takts noch nicht und wiche erst eine Sekunde spaeter aus - fuer den Spieler eine
+       Sekunde lang tote Reiter, fuer einen Test ein Rennen. Der Aufruf ist billig: Er faellt
+       ueber seine Signatur sofort wieder heraus, solange die Leiste steht, wo sie stand. */
+    klappenFrei();
 
     const avatarEl = document.getElementById('avatarInitials');
     if (avatarEl){
