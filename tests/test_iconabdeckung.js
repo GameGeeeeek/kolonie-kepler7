@@ -178,8 +178,11 @@ check('6: kein neu angelegtes Icon wird von einer Canvas-Grafik verdeckt', totes
 // VERSCHIEDENE Icons haben; gleiche Icons wären hier schlimmer als gar keine.
 const dokKeys = [...arrBlock('DOCTRINE_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
 const formKeys = [...arrBlock('DEFENSE_FORMATIONS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+// Die feste 3 ist am 18.08.2026 gefallen: Es sind sechs Doktrinen, und die naechste soll nicht
+// daran scheitern, dass hier eine Zahl steht. Geprueft wird die REGEL (jede Doktrin hat eines),
+// plus eine Untergrenze, damit die Schleife nicht auf einer leeren Liste trivial gruen wird.
 check('7: jede Doktrin hat ein eigenes gezeichnetes Icon',
-  dokKeys.length === 3 && dokKeys.every(k => ICONS.has(k)), dokKeys.filter(k=>!ICONS.has(k)));
+  dokKeys.length >= 3 && dokKeys.every(k => ICONS.has(k)), dokKeys.filter(k=>!ICONS.has(k)));
 // Aufstellungs-Schlüssel sind sehr generisch ('schilde','ausgewogen') - Präfix form_ wie mod_/ship_,
 // damit sie nicht irgendwann still ein fremdes Icon erwischen.
 check('7: jede Aufstellung hat ein eigenes gezeichnetes Icon (Präfix form_)',
@@ -191,7 +194,8 @@ check('7: die Doktrin-Karte holt es über den Schlüssel ab',
 // Drei gleiche Icons in einer Auswahl wären der eigentliche Fehler - deshalb ausdrücklich geprüft.
 const dokSvgs = dokKeys.map(k => (ICONS_BLOCK.match(new RegExp('\\b'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"))||[])[1]);
 const formSvgs = formKeys.map(k => (ICONS_BLOCK.match(new RegExp('\\bform_'+k+":\\s*`(<svg[\\s\\S]*?<\\/svg>)`"))||[])[1]);
-check('7: die drei Doktrin-Icons sind wirklich verschieden', new Set(dokSvgs).size === 3);
+check('7: alle Doktrin-Icons sind wirklich verschieden', new Set(dokSvgs).size === dokKeys.length,
+  { doktrinen: dokKeys.length, verschiedene: new Set(dokSvgs).size });
 check('7: die drei Aufstellungs-Icons sind wirklich verschieden', new Set(formSvgs).size === 3);
 for (const [name, liste] of [['Doktrin',dokSvgs],['Aufstellung',formSvgs]])
   check('7: '+name+'-Icons nach Hausstil', liste.every(v => v

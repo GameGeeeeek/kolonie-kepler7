@@ -81,6 +81,117 @@ const vrufe = (OHNE_HISTORIE.match(/(?<!function )zeitkritischVorschau\(flotte,/
 check('1h: beide Abschuss-Dialoge nutzen sie', vrufe === 2, { vrufe });
 check('1i: die Vorschau rechnet mit der doppelten Strecke', /missionFuelCostSplit\(dur\*2, flotte\)/.test(OHNE_HISTORIE));
 
+/* ---- 1j) DATENGETRIEBEN ueber ALLE Missionsarten (18.08.2026) -----------------------------
+   Der Anlass: Die Faelle 1a-1d oben sind HANDGEPFLEGT und kannten genau zwei Arten. Beim Entwurf
+   der Asteroidenfestungen fiel ein DRITTER Verstoss auf, den weder dieser Test noch die Hausregel
+   kannte - `asteroid-contest` endete bei `jetzt + (flug/2)*1000`, obwohl `flug` die RUNDREISE ist
+   (die Abbaumission daneben bildet aus derselben Zahl hinBis = flug/2 und endTime = flug + abbau).
+   Die Flotte focht das Schuerfrecht an und stand in derselben Sekunde wieder zu Hause.
+
+   Eine namensbasierte Liste findet nur, woran jemand schon gedacht hat (Arbeitsregel 40). Diese
+   Pruefung kennt deshalb KEINE Namen, sondern das MUSTER: Wer eine Mission anlegt, deren endTime
+   aus einer HALBIERTEN Flugzeit stammt, ist einwegig - und das ist nur fuer die ausdruecklich
+   dafuer gebauten Arten erlaubt. Neue Missionsarten sind damit automatisch abgedeckt.
+
+   Die erlaubten Stellen stehen NAMENTLICH da und nicht als Zahl (Arbeitsregel 33): Verschwindet
+   eine, ist das genauso ein Befund wie eine neue. */
+const EINWEGIG_ERLAUBT = {
+  // Die Schiffe bleiben wirklich am Ziel bzw. sind schon dort - der Rueckweg ist eine EIGENE Mission.
+  'mining-escort':      'Eskorte bleibt am Vorkommen stationiert (Rueckweg: mining-recall)',
+  'mining-recall':      'IST der Rueckweg der Eskorte',
+  'defend-base':        'Schiffe bleiben an der Allianzbasis (Rueckweg: defend-base-return)',
+  'defend-base-return': 'IST der Rueckweg von der Allianzbasis',
+  'relocate':           'Verlegung zwischen eigenen Standorten - die Schiffe bleiben dort',
+  'colonize':           'das Kolonieschiff wird zur Kolonie',
+  'colonize-moon':      'dito, Mondlandung'
+};
+const missionsBloecke = [];
+for (const m of OHNE_HISTORIE.matchAll(/missions\.push\(\{/g)){
+  const seg = OHNE_HISTORIE.slice(m.index, m.index + 900);
+  const typ = /type:\s*'([^']+)'/.exec(seg);
+  const et  = /endTime:\s*([^,\n]+)/.exec(seg);
+  // Der Text VOR dem push traegt die Dauerquelle. Ohne ihn sieht die Pruefung nur den
+  // endTime-Ausdruck - und genau daran ist der erste Entwurf gescheitert, siehe unten.
+  const vor = OHNE_HISTORIE.slice(Math.max(0, m.index - 2500), m.index);
+  if (typ && et) missionsBloecke.push({ typ: typ[1], endTime: et[1].trim(), vor, hinBis: /hinBis:/.test(seg) });
+}
+check('1j-vorab: die Missionsarten liessen sich aus der Datei lesen',
+  missionsBloecke.length >= 20, { gefunden: missionsBloecke.length });
+
+/* EINE MISSION KANN AUF ZWEI WEGEN EINWEGIG SEIN, und der erste Entwurf dieser Pruefung kannte
+   nur einen davon (Befund eines Review-Bots am PR #432, nachgemessen und bestaetigt):
+
+   (a) Sie HALBIERT eine Rundreise-Dauer:  endTime: jetzt + flug/2*1000  bzw. ...*500
+       -> steht als /2 oder *500 im endTime-Ausdruck, `halbiert()` findet das.
+
+   (b) Sie nimmt eine Dauer, die schon EINWEG IST:  dur = relocationDuration(...) und dann
+       endTime: jetzt + dur*1000
+       -> im endTime-Ausdruck steht dann WEDER /2 noch *500. Der erste Entwurf sah das nicht.
+
+   Und (b) ist ausgerechnet die Form, die `intercept-pirates` und `void-rift` kaputt gemacht hat -
+   also genau die Regressionsklasse, gegen die diese Pruefung gebaut wurde. Sie war damit eine
+   Pruefung, die ihre eigene Anlassfamilie nicht gefangen haette (Arbeitsregel 28 in Reinform).
+
+   `relocationDuration()` ist die einzige EINWEG-Dauerquelle des Spiels; `missionDurationFor()`
+   liefert die Rundreise, dort ist `dur*1000` also richtig. Ein Block, dessen Dauer aus
+   relocationDuration kommt, muss sie deshalb verdoppeln (`*2000`) - oder ausdruecklich einwegig
+   sein. */
+const halbiert     = b => /\/\s*2\b/.test(b.endTime) || /\*\s*500\b/.test(b.endTime);
+const einwegQuelle = b => /relocationDuration\s*\(/.test(b.vor);
+const verdoppelt   = b => /\*\s*2000\b/.test(b.endTime) || /\*\s*2\b/.test(b.endTime) || /\b2\s*\*/.test(b.endTime);
+
+// Der Detektor muss zuerst BEWEISEN, dass er die Quelle ueberhaupt erkennt. Wird
+// relocationDuration je umbenannt, faellt diese Zeile - statt dass die Pruefung still erblindet
+// (dieselbe Familie wie Arbeitsregel 15/17/19: nie ein Messwerkzeug, das sich selbst im Weg steht).
+const ausEinwegQuelle = missionsBloecke.filter(einwegQuelle);
+check('1j-quelle: die Einweg-Dauerquelle wird im Quelltext ueberhaupt gefunden',
+  ausEinwegQuelle.length >= 2, { gefunden: ausEinwegQuelle.map(b => b.typ) });
+
+const verdaechtig = missionsBloecke.filter(b => !EINWEGIG_ERLAUBT[b.typ] &&
+  (halbiert(b) || (einwegQuelle(b) && !verdoppelt(b))));
+check('1j: keine Missionsart endet bei der halben Flugzeit, ausser den ausdruecklich einwegigen',
+  verdaechtig.length === 0, verdaechtig.map(b => b.typ + ': ' + b.endTime +
+    (einwegQuelle(b) ? ' (Dauer aus relocationDuration, nicht verdoppelt)' : ' (halbierter Ausdruck)')));
+// Und die beiden, die aus der Einweg-Quelle schoepfen, muessen sie weiterhin verdoppeln.
+for (const b of ausEinwegQuelle){
+  if (EINWEGIG_ERLAUBT[b.typ]) continue;
+  check('1j-doppelt-' + b.typ + ': verdoppelt seine Einweg-Dauer', verdoppelt(b), b.endTime);
+}
+// Gegenrichtung: verschwindet eine erlaubte Stelle, ist das ebenfalls ein Befund.
+const fehlend = Object.keys(EINWEGIG_ERLAUBT).filter(t => !missionsBloecke.some(b => b.typ === t));
+check('1j-gegen: alle als einwegig gefuehrten Arten gibt es noch', fehlend.length === 0, { fehlend });
+// Und die zwei, die es wirklich sind, muessen es auch bleiben.
+for (const t of ['mining-escort', 'mining-recall']){
+  const b = missionsBloecke.find(x => x.typ === t);
+  check('1j-' + t + ': ist weiterhin einwegig gebaut', !!b && halbiert(b), b && b.endTime);
+}
+// Und der Fall, der diese Pruefung ausgeloest hat, namentlich - damit die Regression benannt ist.
+const anfechtung = missionsBloecke.find(b => b.typ === 'asteroid-contest');
+check('1k: die Anfechtung fliegt hin UND zurueck', !!anfechtung && !halbiert(anfechtung),
+  anfechtung && anfechtung.endTime);
+/* Die Treibstoff-Pruefung ist auf die STARTFUNKTION gescopt, nicht auf die ganze Datei.
+   Ungescopt war sie wertlos (Befund eines Review-Bots am PR #432, nachgemessen): Denselben Aufruf
+   `missionFuelCostSplit(flug, flotte)` enthaelt auch `anfechtungVorschauHtml()` - die Vorschau.
+   Faellt `sendAnfechtungsMission()` auf `flug/2` zurueck, wuerde der Dialog also weiter die
+   Rundreise ankuendigen, tatsaechlich nur die Haelfte abbuchen, und die Pruefung blieb gruen: Der
+   Treffer kam aus der Vorschau. Das ist Arbeitsregel 39 (derselbe Ausdruck an zwei Stellen, eine
+   ungescopte Suche greift die falsche) - hier an einem Test, der eine ZAHLUNG schuetzen soll. */
+const START_ANFECHTUNG = (() => {
+  const a = OHNE_HISTORIE.indexOf('function sendAnfechtungsMission');
+  if (a < 0) return '';
+  const b = OHNE_HISTORIE.indexOf("missions.push({", a);
+  const c = OHNE_HISTORIE.indexOf('\n  }', b < 0 ? a : b);
+  return OHNE_HISTORIE.slice(a, c > a ? c : a + 4000);
+})();
+// Erst der Anker selbst - fehlt er, waere jede Aussage darunter vacuous (Arbeitsregel 6).
+check('1k-bereich: die Startfunktion der Anfechtung liess sich abgrenzen',
+  START_ANFECHTUNG.length > 200 && /missions\.push\(\{/.test(START_ANFECHTUNG),
+  { laenge: START_ANFECHTUNG.length });
+check('1k-treibstoff: die STARTFUNKTION bezahlt beide Strecken',
+  /missionFuelCostSplit\(flug, flotte\)/.test(START_ANFECHTUNG) &&
+  !/missionFuelCostSplit\(\s*flug\s*\/\s*2/.test(START_ANFECHTUNG),
+  (START_ANFECHTUNG.match(/missionFuelCostSplit\([^)]*\)/g) || []));
+
 // ---- 2-4) im Browser ausgefuehrt ---------------------------------------------------------
 const SAVE_KEY = 'kepler7-save-v3';
 function backend(store){ return async r => {

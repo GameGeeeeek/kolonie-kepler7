@@ -86,8 +86,16 @@ const GROESSEN = ['splitter', 'brocken', 'kern', 'koloss'];
   const bis = von < 0 ? -1 : S.indexOf('\n  }', von);
   const rumpf = (von >= 0 && bis > von) ? S.slice(von, bis) : '';
   check('3-anker: abbauPlan ist auffindbar', rumpf.length > 0, { laenge: rumpf.length });
+  /* Der Name ist seit den Asteroidenfestungen `ladungRoh` - die Festung kuerzt danach, und die
+     Vorschau zeigt beide Zahlen. Die gepruefte REGEL ist unveraendert und der eigentliche Punkt:
+     Die Ladung entsteht aus `abbauBasis`, also der Zeit VOR dem Forschungsabzug. Waere sie aus
+     `abbau` gebildet, senkte eine Forschung, die Zeit spart, heimlich den Ertrag.
+     Geprueft wird deshalb der Term, nicht die Schreibweise (Arbeitsregel 3). */
   check('3a: die Ladung entsteht aus der Zeit VOR dem Forschungsabzug',
-    /const ladung = Math\.floor\(Math\.min\(wunsch, rate \* abbauBasis\)\)/.test(rumpf), rumpf.slice(0, 400));
+    /const ladungRoh = Math\.floor\(Math\.min\(wunsch, rate \* abbauBasis\)\)/.test(rumpf), rumpf.slice(0, 400));
+  // Gegenrichtung: Sie darf NICHT aus der schon gekuerzten Zeit stammen.
+  check('3a-gegen: und nicht aus der Zeit nach dem Abzug',
+    !/const ladungRoh = Math\.floor\(Math\.min\(wunsch, rate \* abbau\)\)/.test(rumpf));
   check('3b: und der Abzug kommt danach, mit Boden an der Mindestzeit',
     /const abbau = Math\.max\(abbauMindestFuer\(a\.groesse\) \* ABBAU_BOHRUNG_BODEN, abbauBasis - tiefenbohrungSek\(\)\)/.test(rumpf),
     rumpf.slice(0, 400));

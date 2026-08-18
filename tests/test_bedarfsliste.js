@@ -21,9 +21,27 @@
 // Die Liste selbst wird ECHT ausgefuehrt: sie ist reine Zustandsauswertung.
 const fs = require('fs');
 const path = require('path');
-const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
+/* Der Pfad kommt aus lib/umgebung, nicht fest verdrahtet. Aufgefallen bei der Gegenprobe zur
+   Historien-Ausblendung unten: Mit KEPLER_SPIELDATEI auf eine praeparierte Kopie umgeleitet las
+   dieser Test unbeirrt die ECHTE Datei, und die Gegenprobe war in BEIDE Richtungen gruen - sie
+   sah aus wie bestanden und belegte nichts. Genau davor warnt CLAUDE.md: Eine still ignorierte
+   Env-Variable sieht aus wie eine bestandene Gegenprobe. */
+const { SPIELDATEI } = require('./lib/umgebung');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
+
+/* Der PATCHNOTES-Block wird fuer die verneinenden und die zaehlenden Pruefungen unten
+   herausgeschnitten (CLAUDE.md Regel 46). Grund: Ein Patchnote, der eine Behebung beschreibt,
+   ZITIERT die alte Formulierung - und reisst damit genau die Pruefung, die diese Behebung
+   festhaelt. Patchnotes sind unveraenderliche Historie, man kann den Wortlaut dort also nicht
+   anpassen; die Pruefung muss sich anpassen.
+   Die Regel gilt nicht nur fuer "steht NICHT mehr da": Auch ein ZAEHLER wird falsch, sobald ein
+   Patchnote den gesuchten Text erwaehnt - in beide Richtungen. */
+const JS_OHNE_HISTORIE = (() => {
+  const v = js.indexOf('  const PATCHNOTES = [');
+  const b = v < 0 ? -1 : js.indexOf('\n  ];', v);
+  return (v >= 0 && b > v) ? js.slice(0, v) + js.slice(b) : js;
+})();
 
 let fail=false;
 const check=(n,c,x)=>{ console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail=fail||!c; };
@@ -260,7 +278,7 @@ check('6: der Knopf erscheint anhand des gespeicherten Stands',
   /\$\{letzteExpedition\(\) \? `<button id="resendExpeditionBtn"/.test(js));
 // Die Meldung darf nicht mehr von „dieser Sitzung" sprechen - sie waere jetzt falsch.
 check('6: die Fehlermeldung spricht nicht mehr von der Sitzung',
-  !/Noch keine vorherige Expedition in dieser Sitzung/.test(js));
+  !/Noch keine vorherige Expedition in dieser Sitzung/.test(JS_OHNE_HISTORIE));
 // Eine veraltete Zusammenstellung (nach einem Prestige) muss gekappt werden, nicht die Sendung
 // blockieren. Das leistet getEscortSelection, das beim Bauen der Flotte erneut laeuft.
 check('6: eine veraltete Zusammenstellung wird beim Senden auf das Vorhandene gekappt',

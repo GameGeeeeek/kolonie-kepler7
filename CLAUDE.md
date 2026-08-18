@@ -443,6 +443,32 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Rutsch sichtbar gemacht, die sonst über drei 25-Minuten-Läufe einzeln hereingetröpfelt wären
     (jeder Lauf war nach dem ersten Fehlschlag ohnehin wertlos). Der volle Lauf bleibt Pflicht – er
     ist die Absicherung, nicht das Suchwerkzeug.
+    **Nachtrag 18.08.2026 – ein musterbasierter Test ist nur so gut wie sein Muster, und mein
+    eigener hat seine ANLASSFAMILIE nicht gefangen.** Der datengetriebene Rundflug-Wächter (Regel
+    oben zur Rundflug-Regel) suchte nach `/2` oder `*500` im `endTime`-Ausdruck. Zwei Review-Bot-
+    Befunde am PR #432 haben nachgewiesen – und ich habe beide am Code gegengemessen –, dass er
+    damit genau die Form übersieht, die `intercept-pirates` und `void-rift` kaputt gemacht hatte:
+    `dur = relocationDuration(...)` (schon einweg) und dann `endTime: jetzt + dur*1000`. In dem
+    Ausdruck steht weder `/2` noch `*500`. Gemessen an einer eingefügten, frei erfundenen
+    Missionsart: der neue Detektor schlägt an, **der alte hätte sie stillschweigend durchgelassen**.
+    **Die Ursache war, dass das Muster das SYMPTOM beschrieb statt der URSACHE.** „Halbiert den
+    Ausdruck" ist eine von zwei Arten, einwegig zu sein; „schöpft aus einer Einweg-Dauerquelle" ist
+    die andere und die eigentliche. Ein Muster, das eine einzelne Schreibweise kodiert, ist eine
+    namensbasierte Suche in Verkleidung – mit genau deren Schwäche (Regel 40). **Vorgehen:** Beim
+    Bau eines musterbasierten Wächters die Frage stellen, welche Größe die Regel wirklich verletzt,
+    und nach DER suchen; danach die eigene Anlassfamilie als Gegenprobe einspeisen – schlägt der
+    Wächter am ursprünglichen Vorfall nicht an, ist er keiner. Und der Detektor muss **belegen, dass
+    er seine Quelle findet** (`1j-quelle`: mindestens zwei Blöcke leiten aus `relocationDuration`
+    ab), sonst erblindet er still, sobald die Quelle umbenannt wird.
+    **Zweite Hälfte desselben Vorfalls, und sie ist Regel 39 an einem Test, der eine ZAHLUNG
+    schützt:** `1k-treibstoff` prüfte `missionFuelCostSplit(flug, flotte)` über die GANZE Datei.
+    Denselben Aufruf enthält auch die Vorschau. Fällt die Startfunktion auf `flug/2` zurück, kündigt
+    der Dialog weiter die Rundreise an, abgebucht wird die Hälfte – und die Prüfung bleibt grün, weil
+    der Treffer aus der Vorschau kommt (an einer sabotierten Kopie gemessen: genau so). Jede Prüfung,
+    deren Suchbegriff auch an einer ANZEIGE-Stelle vorkommt, muss auf die Stelle gescopt werden,
+    deren VERHALTEN sie schützt – und der Anker dieses Bereichs gehört selbst geprüft (`1k-bereich`),
+    sonst ist die Aussage vacuous (Regel 6).
+
 41. **Ein Konzept ist kein Messergebnis. Bevor eine Konzept-Zahl umgesetzt wird, wird sie
     nachgerechnet – auch wenn das Konzept aus derselben Feder stammt.** Vorfall 16.08.2026: Das
     Tier-3-Konzept sah Protomaterie als laufenden Eingangsstoff der beiden neuen Fabriken vor
@@ -744,6 +770,71 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     reiner Lagerraum ist. Das ist eine Balance-Entscheidung und gehört zur Schiffskosten-Reform,
     nicht in eine stille Korrektur.
 
+59. **Ein Konstantenfeld, das nur der ANKÜNDIGUNGSTEXT liest, ist keine umgesetzte Mechanik – und
+    ein `grep` nach dem Namen behauptet das Gegenteil.** Vorfall 18.08.2026 (Asteroidenfestungen,
+    Backend): Die Stufentabelle führte neben `blockade` (Abbauladung) ein Feld `proto` mit
+    0,50/0,75/1,00 für die Protomaterie-Drosselung – im Konzept der eigentliche Zahn der ganzen
+    Blockade, weil Protomaterie die einzige Größe ist, die im Endspiel nicht in der Eigenproduktion
+    untergeht. `grep "st.proto"` fand einen Treffer, sah also benutzt aus. Der einzige Treffer war
+    die **Galaxie-Nachricht, die die Drosselung ankündigt** („drosselt … die Protomaterie um
+    100 %"). Die Mechanik selbst existierte nicht: Die Protomaterie je Fuhre hängt im Frontend
+    allein an der GRÖSSE des Vorkommens (`proto: protoJeFuhre(a)`), nicht an der Ladung – die
+    Ladungskürzung erreicht sie nie. Der Server versprach dem Spieler also etwas, was kein Code
+    einlöste. **Vorgehen:** Wer prüfen will, ob eine Tabellenspalte wirklich wirkt, sieht die
+    Fundstellen einzeln an und fragt bei jeder, ob sie etwas BERECHNET oder nur etwas BEHAUPTET.
+    Ein Treffer in einem Text-, Log- oder Tooltip-Bauteil zählt als „nicht benutzt". Das ist die
+    Gegenrichtung zu Regel 32: Dort existiert eine Zahl nur zur Laufzeit und wird beim Suchen
+    übersehen, hier existiert sie nur im Versprechen und wird beim Suchen fälschlich für vorhanden
+    gehalten – und ein zu Unrecht für vorhanden gehaltener Mechanismus fällt nie wieder auf.
+60. **Eine Backend-Phase, die eine spielersichtbare ZAHL ändert, darf nicht vor ihrem Frontend live
+    gehen – und „jede Phase ist für sich auslieferbar" ist eine Behauptung, die man je Phase
+    nachprüft.** Vorfall 18.08.2026: Das Konzept versprach für alle sechs Phasen „für sich
+    auslieferbar und lässt das Spiel in einem sinnvollen Zustand zurück". Für Phase 1 stimmte das
+    nicht: Ein Merge des Backends allein hätte binnen Stunden eine Festung entstehen lassen, deren
+    Blockade die Abbauladung um bis zu 55 % kürzt, während das Frontend die ungekürzte Vorschau
+    zeigt und den Grund nicht kennt – gemessen an `echt = daten.menge`, der Client verbucht
+    kommentarlos den kleineren Serverwert. Eine stille Verschlechterung, für die ein Spieler zu
+    Recht einen Fehlerbericht schreibt, und obendrein eine Galaxie-Nachricht, die eine Wirkung
+    ankündigt, die es noch nicht gibt. **Dass der Merge die Auslieferung IST und beide Repos über
+    getrennte fest verdrahtete Befehle desselben Webhooks live gehen, macht das zur Regel und nicht
+    zur Vorsichtsmaßnahme** – dieselbe Asymmetrie hat den Deploy schon dreimal auseinanderlaufen
+    lassen. **Vorgehen:** (a) Vor dem Merge einer Backend-Phase durchgehen, welche Zahl ein Spieler
+    ohne das zugehörige Frontend anders sieht als vorher; ist es eine, gehört der auslösende Teil
+    hinter einen benannten Schalter (`FESTUNG_SPAWN_AKTIV = false`), der im Frontend-PR umgelegt
+    wird; (b) den Schalter in den Test aufnehmen, sonst kippt er unbemerkt früher
+    (`test_festung_http.js` Abschnitt 10); (c) alles andere trotzdem sofort mergen – Endpunkte,
+    Härtungen und Tests, die ohne Auslöser nichts tun, sind live besser als im Zweig.
+
+61. **Ein Test, der das ETIKETT prüft statt der WIRKUNG, ist bei der Gegenprobe grün – und merkt
+    es nicht.** Vorfall 18.08.2026 (Asteroidenfestungen, Frontend): `test_festung_ui` prüfte, dass
+    die Abbau-Vorschau das Wort „gedrosselt" und den Stufennamen zeigt. Beides hängt am
+    VORHANDENSEIN der Festung, nicht an der Rechnung. Die Gegenprobe – der Festungsfaktor aus
+    `abbauPlan` entfernt – blieb deshalb **grün**: Der Erklärtext stand weiter da, die Ladung war
+    unverändert voll, und der Test bemerkte nichts. Der Spieler hätte genau das erlebt, was diese
+    ganze Phase verhindern soll: eine Zeile, die eine Drosselung ankündigt, und eine Zahl, die
+    keine zeigt.
+    **Vorgehen:** Zu jeder Prüfung „der Text sagt X" gehört eine, die X **misst**. Hier: dieselbe
+    Flotte, dasselbe Vorkommen, einmal mit und einmal ohne Festung, und die angezeigte Ladung muss
+    sich unterscheiden (gemessen 2,4k gegen 5,4k). Erst damit fällt die Gegenprobe – und zwar mit
+    dem sprechenden Beleg `{"mitFestung":"5.4k","ohneFestung":"5.4k"}`. Das ist dieselbe Familie wie
+    Regel 3 (die REGEL prüfen, nicht die Momentaufnahme), nur eine Stufe grundsätzlicher: nicht die
+    Beschriftung der Regel prüfen, sondern die Regel.
+62. **Eine Prüfung, die ihren Erwartungswert aus derselben Größe ableitet, die sie prüft, kann nicht
+    fehlschlagen.** Aus derselben Etappe: `4b` prüfte, dass die Mission die vom Server gebuchte
+    Menge trägt – `mission.ladung === round(gesendeterWunsch * 0,45)`. Schickt der Client
+    versehentlich die schon gekürzte Zahl (Doppelkürzung, der Spieler bekäme 0,45 × 0,45 = 20 %
+    statt 45 %), stimmt das Verhältnis **weiterhin**: 2430 → 1094 ist genauso „45 % des Gesendeten"
+    wie 5400 → 2430. Die Gegenprobe lief grün durch.
+    Aufgelöst hat es erst ein **absoluter Anker von außerhalb der Rechnung**: der Wunsch aus einem
+    zweiten Lauf OHNE Festung. Er ist die Kapazität der Flotte, und die hängt nicht davon ab, ob
+    eine Festung im System steht – beide Läufe müssen dieselbe Zahl senden. Damit fällt die
+    Gegenprobe mit `{"mitFestung":2430,"ohneFestung":5400}`.
+    **Vorgehen:** Bei jeder Prüfung der Form „Ergebnis == f(Eingabe)" fragen, ob ein Fehler BEIDE
+    Seiten gleichzeitig verschiebt. Wenn ja, ist eine Bezugsgröße nötig, die der fehlerhafte Pfad
+    nicht berührt – ein zweiter Lauf mit geänderter Bedingung, ein fester Erwartungswert aus dem
+    Spiel, oder eine Invariante („diese Größe darf sich dadurch gar nicht ändern"). Das ist die
+    Gegenrichtung zu Regel 2: Dort verrottet ein eingetippter Erwartungswert, hier fehlt einer.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
@@ -825,6 +916,28 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Beides zusammen ist immer eine Ebene zu viel. Und wer sich nicht sicher ist, prüft die
     Zeilenzahl des Protokolls gegen die angekündigte Testzahl, bevor er der Meldung glaubt: Ein
     voller Lauf hat gut zweihundert Zeilen, nicht fünf.
+
+    **Nachtrag 18.08.2026 – die Variante, bei der die Werkzeugmeldung nicht zu FRÜH, sondern
+    einfach FALSCH ist.** Ein voller Lauf lief diesmal wirklich durch (52 Minuten, alle 265 Tests
+    im Protokoll), und die Abschlussmeldung des Werkzeugs lautete „completed (exit code 0)". Im
+    Protokoll stand:
+
+    ```
+    === Ergebnis ===
+    270 Prüfungen, 1 fehlgeschlagen
+    EXIT=1
+    ```
+
+    Die Null der Meldung war der Exit des äußeren Shell-Befehls (`node … > log 2>&1; echo EXIT=$? >> log`),
+    dessen letztes Glied das `echo` ist – und ein `echo` gelingt immer. Das ist derselbe
+    Mechanismus wie Regel 19 (`echo EXIT=$?` hinter einer Pipe), nur eine Ebene höher: Nicht die
+    Pipe verdeckt den Test, sondern das Kommando, das den Marker schreibt. Der Fehlschlag war hier
+    harmlos (die absichtlich zurückgestellte `index.html`-Gleichheit, Regel 23), aber die Meldung
+    hätte genauso einen echten verdeckt.
+    **Es gilt ausschliesslich die Marker-Zeile IM PROTOKOLL, nie das Exit-Feld der
+    Werkzeugmeldung** – auch dann nicht, wenn der Lauf nachweislich vollständig durchgelaufen ist.
+    Wer den Marker per `;` anhängt, macht die Werkzeugmeldung strukturell nutzlos; das ist in
+    Ordnung, solange man sie auch nicht liest.
 19. **`echo EXIT=$?` hinter einer Pipe misst das LETZTE Pipe-Glied, nie den Test** – `node
     test.js | grep FAIL; echo EXIT=$?` meldet den grep-Status (0 = Treffer gefunden!). Vorfall
     09.08.2026: Ein roter Test schien dadurch grün gemeldet. Exit-Codes immer ohne Pipe messen
@@ -913,6 +1026,33 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     CSS-Bezugsfarbe GIBT, ist eine absolute, begründete Schranke ehrlicher als ein Differenzwert
     gegen Nichts – und die Vorab-Prüfung hält fest, dass die Fläche wirklich transparent ist, damit
     die Wahl nachvollziehbar bleibt.
+59. **Ein Schlüssel kann ein zweites Mal in DERSELBEN Tabelle stehen – als Rückverweis.** Vorfall
+    18.08.2026 (TX-1): Der Ersetzer suchte die Zeile einer Forschung über
+    `zeile.includes("key:'rmodultechnik'")` und fand ZWEI. Die zweite war der Nachbareintrag
+    `rmodulslots`, der `requires:[{key:'rmodultechnik',level:5}]` trägt – und der hat selbst ein
+    `desc:'`, hätte also ohne die `count !== 1`-Wache (Hausregel 16) den Text der falschen
+    Forschung bekommen. Das ist Regel 39 eine Ebene tiefer: dort eine zweite TABELLE mit demselben
+    Schlüssel, hier ein Rückverweis INNERHALB der Tabelle, den kein Scoping auf den Tabellenblock
+    findet. **Vorgehen:** Den Schlüssel am EINTRAGSANFANG verankern (`/^\s*\{ ?key:'X',/`), nie
+    irgendwo in der Zeile suchen. Und die Wache ist der Grund, warum es auffiel – ein Ersetzer ohne
+    Trefferzahl-Prüfung hätte still den Nachbartext überschrieben, und `node --check` wäre grün
+    geblieben, weil ein falscher Text syntaktisch einwandfrei ist.
+60. **Wer Anzeigetexte umschreibt, muss vorher wissen, welche ZAHL welcher Test aus ihnen liest –
+    und dass manche Prüfung eine SCHREIBWEISE festnagelt statt einer Regel.** Aus derselben Etappe,
+    drei Befunde in einem Durchgang: (a) `rsingularitaet` muss jedes daran hängende Tor benennen,
+    inklusive der „neun Tiefenschiffe" mit der HEUTIGEN Zahl als Zahlwort
+    (`test_forschungsmeilensteine` 5b, bewusst streng, damit beim zehnten Schiff nicht weiter
+    „neun" durchgeht) – beim Kürzen war sie mit rausgeflogen; (b) `autonomiekern` muss neben den
+    Konstanten (45 Minuten, +6 Stunden, 8 Stufen) auch das ABGELEITETE Gesamtfenster „14 Stunden"
+    nennen, also genau die Zahl, die der Spieler sonst selbst ausrechnen müsste; (c)
+    `test_levelfortschritt` verlangt die Wortfolge „8 summierten Stufen" – das ist eine
+    Momentaufnahme im Sinne von Regel 3 und blockiert eine Umformulierung. **Die Entscheidung dazu
+    gehört zur Regel:** Der Text wurde an die Wortfolge angepasst, NICHT die Prüfung gelockert. Eine
+    Etappe, die Texte umschreibt, darf nicht nebenbei die Wächter aufweichen, die genau diese Texte
+    bewachen – sonst ist am Ende weder der Text noch die Prüfung belegt (Regel 26 in der
+    Anwendung). Gefunden hat alle drei der Betroffenheits-Durchgang VOR dem vollen Lauf
+    (`grep -ln "RESEARCH_DEFS\|BUILDING_DEFS\|effectDesc" tests/*.js`, dann jeden Treffer einzeln),
+    Kosten zwei Minuten statt zweier 25-Minuten-Läufe – Regel 40 zum zweiten Mal bestätigt.
 
 ## Icon-Font ist ein SUBSET (seit v8.296.0)
 
@@ -936,7 +1076,10 @@ Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:befor
 - **BUILDING_DEFS mit `category:'defense'`**: `defVal`/`atkVal` müssen explizit gesetzt sein (mind. `0`), sonst kippt die globale Verteidigungsberechnung auf `NaN` (kein `||0`-Fallback an der Summierstelle).
 - **Wer einem BESTANDS-Gebäude nachträglich ein `maxLevel` gibt, braucht eine NEUE Kappungs-Marke** (16.08.2026, Labor-Deckel): `deckelKappung()` läuft einmalig je Marke; Bestandskonten tragen `deckelKappung2026`/`2026b` längst, mit einer alten Marke als Wache liefe die Kappung für das neue Gebäude dort nie – der Deckel „bedeutete für Bestandskonten nichts“, exakt der Spieler-Report, der zum zweiten Durchgang führte. Ablauf: nächste Marke (`2026c` → `2026d` …) als Wache setzen, alle älteren mitsetzen, die neue Marke in BEIDEN Reset-Bewahrlisten ergänzen (Suchbegriff `deckelKappung2026`) UND in der Abstreif-Liste von `tests/test_t1_deckel.js` (der Kommentar dort verlangt es wörtlich; vergessen = Test fälschlich rot, weil die Kappung im Fixture sofort zurückkehrt). Die Schleife selbst ist generisch und idempotent – neuer Code ist nicht nötig. Das Labor bekam bewusst maxLevel 25 OHNE `flachAb`: Abflachung senkt vorhandene Raten (das war Teil des Minen-Umbaus), ein reiner Deckel nicht.
 - **Ein temporärer Fehler darf NIE zur Abmeldung führen – und das serverseitige Rate-Limit gilt für ALLE `/api`-Routen** (Spieler-Report Sascha 17.08.2026: „400 Mio im Markt verkaufen, irgendwann werde ich einfach ausgeloggt"). Die Kette, komplett gemessen: Der Markt-Sammelauftrag zerlegt in Tranchen zu `MARKET_MAX_PER_TRADE` (1 Mio) und feuerte sie **ohne Pause** – bei 400 Mio also 400 Anfragen in einer knappen halben Minute. `app.use('/api', globalApiRateLimit)` im Backend deckelt aber **240 Anfragen/Minute je Verbindung**, und zwar für alles: Handel, Speichern, Marktdaten, Bestenliste. Der 429 traf danach auch den 409-Zweig von `saveGameStateVersioned`, dessen Versions-Nachladen (`storageGet`) still auf localStorage zurückfällt und einen Wert **ohne** `version` liefert – dort stand `handleSaveConflict()`, also Token löschen und Abmelde-Dialog. **Zwei Lehren:** (a) Wer eine Schleife baut, die den Server anspricht, rechnet sie gegen dieses Limit (jetzt `MARKET_BULK_PAUSE_MS`, und ein 429 lässt warten statt abbrechen); (b) `handleSaveConflict()` gehört ausschließlich an den Fall „Server hat geantwortet und nennt beharrlich eine fremde Version" (drei erfolglose Nachladeversuche) – ein *gescheitertes* Nachladen ist kein Beleg für eine zweite Sitzung, dort meldet jetzt nur `notifySaveRejected`. `tests/test_marktlimit_abmeldung.js` prüft beide Richtungen; am Stand v8.540.0 fällt es mit `{"token":"WEG"}` und gemessenen 56 ms Anfrage-Abstand.
-- **Jede Flotte, die irgendwohin fliegt und wiederkommt, ist HIN UND ZURÜCK unterwegs – die Missionsdauer deckt beide Wege** (Auftrag Sascha, 17.08.2026). Die Regel gilt ab sofort für jede neue Missionsart, ohne Ausnahme: Wer eine Flotte losschickt, bekommt sie nicht am Ziel zurück, sondern zu Hause. Sauber gebaut ist das an der **Abbaumission** – sie ist das Vorbild: `flug` ist die Rundreise, `hinBis = jetzt + flug/2` die Ankunft, `abbauBis` das Ende der Arbeit, `endTime = flug + abbau` die Heimkehr; die Vorschau zeigt „Hinflug · Abbau · Rückflug (gesamt …)". Ebenso in Ordnung sind alle Arten, bei denen die Flotte für die volle `dur` weg ist und erst am `endTime` wieder zur Verfügung steht (Erkundung, Kolonisierung, NPC-Angriff, Spielerangriff, Spionage, Weltboss, Expedition). **Bewusst einwegig und deshalb KEIN Verstoß** sind Verlegungen (`relocate`) und das Stationieren an der Allianzbasis (`defend-base`, mit eigener `defend-base-return`-Mission für den Rückweg) sowie die Eskorte am Vorkommen – dort bleiben die Schiffe wirklich am Ziel. **Am 17.08.2026 verletzten genau zwei Arten die Regel – `intercept-pirates` und `void-rift`; beide sind seit v8.563.0 (18.08.2026) umgebaut und gelten jetzt als Vorbild für zeitkritische Missionen.** Der Befund und die Lösung stehen hier, weil er sich wiederholen kann: Sie setzten Beide setzen `dur = relocationDuration(...)`, also die EINWEG-Verlegezeit, schreiben sie zusätzlich als `raid.interceptArrival` bzw. `rift.attackArrival` – nennen sie also selbst „Ankunft" – und beenden die Mission trotzdem an genau diesem Zeitpunkt. Die Flotte ist damit in dem Moment wieder zu Hause, in dem sie am Ziel ankommt; der Rückflug fehlt ersatzlos. Der Grund dafür ist nachvollziehbar und muss beim Umbau erhalten bleiben: Beide Missionen sind **fristgebunden** (`if (dur*1000 >= remainMs)` – die Flotte muss vor dem Abzug der Piraten bzw. dem Kollaps des Risses da sein), und dafür braucht der Code die Ankunftszeit. Richtig ist deshalb nicht, die Dauer zu verdoppeln, sondern das **Muster der Abbaumission** zu übernehmen: Kampf bei `hinBis` auflösen, `endTime` auf `2×dur` setzen. Wer eine neue zeitkritische Mission baut, macht es von Anfang an so.
+- **Jede Flotte, die irgendwohin fliegt und wiederkommt, ist HIN UND ZURÜCK unterwegs – die Missionsdauer deckt beide Wege** (Auftrag Sascha, 17.08.2026). Die Regel gilt ab sofort für jede neue Missionsart, ohne Ausnahme: Wer eine Flotte losschickt, bekommt sie nicht am Ziel zurück, sondern zu Hause. Sauber gebaut ist das an der **Abbaumission** – sie ist das Vorbild: `flug` ist die Rundreise, `hinBis = jetzt + flug/2` die Ankunft, `abbauBis` das Ende der Arbeit, `endTime = flug + abbau` die Heimkehr; die Vorschau zeigt „Hinflug · Abbau · Rückflug (gesamt …)". Ebenso in Ordnung sind alle Arten, bei denen die Flotte für die volle `dur` weg ist und erst am `endTime` wieder zur Verfügung steht (Erkundung, Kolonisierung, NPC-Angriff, Spielerangriff, Spionage, Weltboss, Expedition). **Bewusst einwegig und deshalb KEIN Verstoß** sind Verlegungen (`relocate`) und das Stationieren an der Allianzbasis (`defend-base`, mit eigener `defend-base-return`-Mission für den Rückweg) sowie die Eskorte am Vorkommen – dort bleiben die Schiffe wirklich am Ziel. **Am 17.08.2026 verletzten genau zwei Arten die Regel – `intercept-pirates` und `void-rift`; beide sind seit v8.563.0 (18.08.2026) umgebaut und gelten jetzt als Vorbild für zeitkritische Missionen.**
+
+**KORREKTUR 18.08.2026 – es war ein DRITTER dabei, und dieser Absatz hat ihn übersehen: `asteroid-contest`.** Gefunden beim Entwurf der Asteroidenfestungen, weil die neue Angriffsmission sich am nächsten Nachbarn orientieren sollte – und der Nachbar war falsch. Die Anfechtung setzte `endTime: jetzt + (flug/2)*1000`, also die halbe Rundreise: Die Flotte war zu Hause, sobald sie am Vorkommen ankam. Bezeichnend ist, WARUM die Aufzählung oben ihn nicht nannte: Sie entstand aus einer Suche nach `relocationDuration(` und nach `*Arrival`-Feldern – die Anfechtung benutzt beides nicht, sie halbiert eine schon fertige Rundreise. **Eine namensbasierte Suche findet nur, woran man schon gedacht hat** (Regel 40), und hier war die Folge eine Liste, die sich vollständig LAS („genau zwei Arten") und es nicht war. Deshalb prüft `tests/test_rundflug.js` seit dem 18.08.2026 **datengetrieben**: Abschnitt 1j liest ALLE `missions.push({`-Blöcke aus der Spieldatei, filtert die mit halbierter Dauer (`/2` oder `*500` im `endTime`) und hält sie gegen eine **namentliche Erlaubnisliste** der bewusst einwegigen Arten (`EINWEGIG_ERLAUBT`). Eine neue Missionsart mit halbierter Dauer fällt damit auf, ohne dass jemand an sie gedacht haben muss – und verschwindet eine erlaubte Art, ist das genauso ein Befund (Regel 33, Gegenrichtung mitprüfen).
+  Die Behebung selbst folgt **Form A**, nicht dem `hinBis`-Muster der beiden zeitkritischen Missionen: Ein Vorkommen läuft nicht ab, es gibt also keine Frist, für die der Code eine Ankunftszeit bräuchte. `endTime = jetzt + flug*1000`, Kampf bei der Heimkehr, Treibstoff über `missionFuelCostSplit(flug, flotte)`. **Die Wahl zwischen den zwei Formen hängt allein daran, ob das Ziel eine Frist hat** – nicht daran, welches Muster gerade nebenan steht. Der Befund und die Lösung stehen hier, weil er sich wiederholen kann: Sie setzten Beide setzen `dur = relocationDuration(...)`, also die EINWEG-Verlegezeit, schreiben sie zusätzlich als `raid.interceptArrival` bzw. `rift.attackArrival` – nennen sie also selbst „Ankunft" – und beenden die Mission trotzdem an genau diesem Zeitpunkt. Die Flotte ist damit in dem Moment wieder zu Hause, in dem sie am Ziel ankommt; der Rückflug fehlt ersatzlos. Der Grund dafür ist nachvollziehbar und muss beim Umbau erhalten bleiben: Beide Missionen sind **fristgebunden** (`if (dur*1000 >= remainMs)` – die Flotte muss vor dem Abzug der Piraten bzw. dem Kollaps des Risses da sein), und dafür braucht der Code die Ankunftszeit. Richtig ist deshalb nicht, die Dauer zu verdoppeln, sondern das **Muster der Abbaumission** zu übernehmen: Kampf bei `hinBis` auflösen, `endTime` auf `2×dur` setzen. Wer eine neue zeitkritische Mission baut, macht es von Anfang an so.
   **So gebaut (v8.563.0):** Der Kampf liegt in `ankunftsKampf()` und wird aus einem eigenen Durchgang in `checkMissions` ausgelöst, der VOR dem `endTime`-Filter läuft – die Mission läuft zu diesem Zeitpunkt ja noch. `m.kampfErledigt` sorgt dafür, dass er genau einmal feuert; ohne diese Marke löst ihn jeder Tick des Rückflugs erneut aus. Der `endTime`-Zweig holt den Kampf für **Altbestand ohne `hinBis`** nach, sonst käme jede beim Update fliegende Flotte ergebnislos heim. Drei Dinge, die dabei nur mitgedacht auffielen: (a) Die Schiffe bleiben während der ganzen Mission in `fleet` gezählt (nur der Slot ist belegt) – `applyCombatLosses` trifft bei der Ankunft also dieselben Schiffe wie vorher am Missionsende; (b) der bloße Countdown auf der Missionskarte hätte still seine Bedeutung gewechselt, deshalb steht dort jetzt „Anflug"/„Rückflug"; (c) der **Rückruf** löschte `raid.interceptArrival`/`rift.attackArrival` nicht – ein zweiter Versuch blieb bis zum Ablauf des Ereignisses gesperrt. Diese Sackgasse gab es schon vorher, sie fiel nur nie auf, weil es ohne Rückflug kaum einen Grund zum Zurückrufen gab. Wächter: `tests/test_rundflug.js` – es misst die Regel als **Paar** (bei der Ankunft liegt ein Bericht vor UND die Mission läuft noch), denn jede Hälfte allein wäre auch am alten Stand erfüllbar.
 - **Der Markt hat einen serverseitigen Tagesumsatz-Deckel für VERKAUFSERLÖSE** (17.08.2026, Auftrag Sascha; `MARKT_TAGES_ERLOES_MAX` = 5 Mio Credits je Konto und UTC-Tag in `server.js`). Anlass, komplett durchgemessen: 400 Mio Erz brachten in ~6 Minuten 66 Mio Credits – die Slippage schützt nur die ERSTE Tranche (eine 1-Mio-Tranche drückt den Preis auf den Boden 0,30, wo er für alle weiteren bleibt), und 66 Mio Credits waren im Kredit-Shop 206 legendäre Module. Das Strukturproblem ist dasselbe wie bei der Protomaterie (Regel 41): Rohstoffe skalieren mit dem Imperium, die Modulwirtschaft nicht – jeder ungedeckelte Kanal dazwischen bricht. **Vier Dinge, die man beim Anfassen wissen muss:** (a) Die Ablehnung ist ein **400, bewusst kein 429** – den 429 deutet der Sammelauftrag als vorübergehend und wiederholt dieselbe Tranche dreimal mit je 20 s Wartezeit; (b) `tagesRest`/`tagesMax` reisen in JEDER Antwort mit (GET /market und /market/trade, auch in der Ablehnung), das Frontend zeigt die Kontingent-Zeile NUR, wenn das Feld da ist – ein alter Server bekommt keine erfundene Aussage; (c) die Restzeit bis zum Reset wird als DAUER auf Minuten gerundet angezeigt, nie sekundengenau – sonst schriebe `setBoxHtml` die Markt-Box im Sekundentakt neu (die Tick-Unruhe von v8.538.0), und nie als Uhrzeit („Mitternacht" wäre für deutsche Spieler 1–2 Uhr nachts gelogen); (d) die **Modulfragment-Lieferung** im Kredit-Shop ist auf 5/Tag begrenzt (`FRAGMENT_LIEFERUNG_PRO_TAG`, `dailyModuleOffer`-Muster, Zähler überlebt beide Resets über die Bewahrlisten) – klientenseitige Spielregel wie die Warteschlangen-Grenzen, keine Sicherheitsgrenze. **Entschieden am 17.08.2026 (Sascha): Verkaufsrouten zählen auf DASSELBE Kontingent.** Der `sell`-Zweig von `processTradeRoutes` prüft `routenKontingentRest()` VOR der Buchung (Pause mit Ein-Mal-je-Tag-Meldung statt Teilverkauf), `routenErloesVerbuchen()` senkt den Spiegel sofort und sammelt, `routenErloesMelden()` meldet GEBÜNDELT je Durchlauf an `POST /market/routen-erloes` (eine Anfrage je Minute statt eine je Route – das 240/min-Limit gilt für alles). Solo nutzt den lokalen Zähler `state.routenVerkaufTag` mit `ROUTEN_KONTINGENT_LOKAL` = derselben Grenze (test_markt_kontingent 1h prüft die Paritaet gegen server.js). WICHTIG: `marktTagesRest === null` (Server hat sich noch nicht geäußert) blockiert NICHT – eine Route, die am fehlenden Marktabruf verhungert, wäre ein unverständlicher Fehler; deshalb liegt der Fixture-`nextTick` im Test ~8s in der Zukunft, damit der Spiegel vor dem ersten Zyklus steht. Tests: `tests/test_markt_kontingent.js` (Frontend) und `tests/test_marktdeckel_http.js` (Backend-Repo, deren erster Markt-HTTP-Test überhaupt).
 - **Ein MutationObserver-Mitschnitt braucht die RECORDS, nicht den Endstand des Callbacks** (17.08.2026, beim Markt-Kontingent-Test doppelt gemessen – Verschärfung von Regel 47): (a) Wer den `#log`-KNOTEN direkt beobachtet, sitzt nach dem Boot am verwaisten Original – der Boot ersetzt den Container einmal per innerHTML; beobachtet wird `document.body`, und `#log` wird je Mutation frisch per id gelesen. (b) Der Callback läuft als Microtask NACH einem synchronen Block – ein Shop-Kauf schreibt seine Meldung und löst im SELBEN Block eine Erfolgs-Salve aus (drei weitere `log()`-Aufrufe); wer im Callback den aktuellen Text liest, sieht nur die letzte Zeile der Salve. Die MutationRECORDS (`addedNodes` je Record) enthalten dagegen jeden einzelnen Schreibvorgang. Muster in `test_markt_kontingent.js`.
@@ -1159,6 +1302,259 @@ Wächter: `tests/test_bastionsmarken.js` (48 Prüfungen, Quelltext + Backend-Par
 ausgeführtem Funktionsvergleich) und `tests/test_bastionsmarken_ui.js` (26 Prüfungen am
 gerenderten Spiel — Sichtbarkeit statt Existenz, Kauf, Abbruch, Wirkung je Anlagenklasse).
 
+## Aliens und Asteroidenfestungen (Konzept 18.08.2026, Phase 0 fertig, Phase 1 im Bau)
+
+Auftrag Sascha: „Ich würde gerne noch aliens und asteroidenfestungen einführen die soll man auf der
+karte sehen und angreifen können entwickle ein detailiertes konzept", danach „Alles umsetzten".
+
+**Das Konzept liegt in `docs/aliens-asteroidenfestungen-konzept.md`** (1.530 Zeilen) und ist die
+Quelle für alles Weitere – Ziele, Zahlen, Anzeigestellen, Testplan, offene Entscheidungen. Wer daran
+arbeitet, liest es zuerst. Hier steht nur der **Stand** und was beim Umsetzen anders entschieden
+wurde als dort.
+
+### Die sechs Phasen und wo sie stehen
+
+| Phase | Inhalt | Stand |
+|---|---|---|
+| **0a** | Schreibsperre für `asteroids:*` im geteilten Speicher | **fertig**, Backend #124 |
+| **0b** | `asteroid-contest` bekommt seinen Rückflug, `test_rundflug.js` datengetrieben | **fertig**, #432 (v8.568.0) |
+| **0c** | den vestigialen `db.galaxy.worldBoss` entfernen | **fertig**, Backend #125 |
+| **1** | Festungen ohne Bauteile: Entstehen, Blockade, Hort, Angriffsmission, Karte | **fertig** – Backend #126/#131/#132, Frontend v8.569.0 |
+| **2** | die drei Bauteile (Schild/Türme/Kern), Zielwahl, Rollenfaktoren | offen |
+| **3** | Nester Stufe 1–4: Reifen, Ausbreiten, Völker-Eigenarten | offen |
+| **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | offen |
+| **5** | die Königin, Musterangriff-Zielart | offen |
+| **6** | Feinschliff: Embleme, Kompendium, `belagerungsplan`, Vorbote | offen |
+
+### Was beim Umsetzen ANDERS entschieden wurde als im Konzept
+
+Das Konzept ist älter als der Code. Jede dieser Abweichungen ist eine Entscheidung mit Grund – wer
+sie für ein Versehen hält und „repariert", baut den jeweiligen Fehler wieder ein. Die
+Backend-Einzelheiten stehen in der Backend-CLAUDE.md unter „Asteroidenfestungen".
+
+- **Die Abklingzeit liegt an der Festung, nicht im Spielstand.** Der Entwurf sah
+  `save.festungLetzterSchlag[sysId]` vor – der Spielstand ist klientenautoritativ, ein gelöschtes
+  Feld hätte die einzige Bremse der Mechanik per Entwicklerkonsole abschaltbar gemacht.
+- **Gezählt wird der angekommene Schaden, nicht der volle Wurf.** Gemessen: Mit dem vollen Wurf
+  stünde der letzte Angreifer bei 84,2 % des Hortes statt bei den 40 %, die seiner Arbeit
+  entsprechen.
+- **Die Kern-Lebenspunkte sind neu gerechnet** (30.000/250.000/1,2 Mio statt 120.000/450.000/1,5
+  Mio). Die Konzeptzahl hätte für die Schanze **neunzehn** Schläge bedeutet – fast fünf Tage allein,
+  ausgerechnet am Einsteigerziel. Wieder Regel 41: ein Konzept ist kein Messergebnis.
+- **Die Angriffsmission folgt Form A** (kein `hinBis`), weil eine Festung keine Frist hat.
+- **Phase 1 hat bewusst keine Bauteile und keine Zielwahl** – die sind Phase 2. Der Grundverlust je
+  Schlag (6/9/12 %) ist deshalb absichtlich niedrig: Die Geschütztürme sollen ihn später vervielfachen,
+  und der Wert, den man sich mit dem Turmbeschuss erkauft, ist der ganze Zweck der Bauteile.
+
+### Was die Frontend-Phase 1 gebracht hat – und die drei Funde dabei
+
+Gebaut wurde: der Kartenknoten (gezackte Bastion mit Puls-Ring auf dem Gürtelplatz, `data-map-festung`),
+das Kartenmenü (`festungMapMenu` – Kern, Blockade, Hort, Angriffs-Eintrag mit Grund bei Sperre), die
+Angriffsmission (`oeffneFestungsangriff`/`sendFestungsMission`, **Form A**), ihre Auflösung
+(`festungAufloesen` – wortgleich zu `anfechtungAufloesen`), der Bericht, der Belohnungstyp `festung`
+in `claimPendingRewards` und der Hilfetext. Wächter: `tests/test_festung_ui.js` (23 Prüfungen am
+gerenderten Spiel) und `tests/test_festung_paritaet.js` (Tabellen-Parität gegen `server.js`).
+
+**Die Stufentabelle liegt jetzt in BEIDEN Repos** – `FESTUNG_STUFEN` im Frontend führt nur, was die
+Vorschau wirklich braucht (`blockade`, `proto`, `kern`, `name`). Sie muss dort liegen, weil
+`abbauPlan()` **vor** dem Serveraufruf läuft; ohne sie nennt die Vorschau eine Ladung, die die
+Mission nicht einhält. `test_festung_paritaet.js` hält beide Seiten zusammen. Dieselbe Kopie-Familie
+wie `ASTEROID_SORTEN`/`AST_SORTEN`.
+
+**Drei Funde, jeder von einem Test gefangen, keiner beim Lesen des Codes:**
+
+1. **Die Blockade war komplett wirkungslos** (Backend, behoben in #131). Sie kürzte die
+   Anti-Betrugs-Obergrenze, und die hat per Konstruktion „Faktor 3,5 Luft" – gemessen für vier
+   typische Flotten band sie **in keinem Fall**. Aufgefallen erst beim Nachrechnen der beiden
+   Kapazitäten gegeneinander für die Vorschau. Einzelheiten in der Backend-CLAUDE.md.
+2. **Der Missionsstart fror die UNGEDROSSELTE Protomaterie ein**, während die Vorschau drosselte –
+   gefangen von `test_protomaterie` 6c, der genau diese Doppelung seit der Sorten-Umstellung prüft.
+   Der Kommentar dort sagt es wörtlich: „die Vorschau darf nicht zweite Zahl neben der echten sein".
+   Behoben, indem beide Stellen `protoJeFuhre(a) * faktor` rechnen, mit dem SERVERWERT
+   (`protoBlockade`) als Vorrang und dem lokalen Faktor als Rückfall für den Solo-Betrieb.
+3. **Die Missionstyp-Liste steht ZWEIMAL in der Datei** (`m.type==='asteroid-contest' || …`, Zeilen
+   ~21855 und ~59543). Ein Ersetzer mit `count==1` bricht dort ab – und wer nur eine Stelle pflegt,
+   hat die klassische zweite Anzeigestelle. Dazu kommen ein eigener Zweig in der Missionskarte und
+   einer in der Flottenleiste: Ohne sie fällt eine neue Missionsart in den generischen Zweig und
+   steht dort als **„Erkundungsziel"**, weil der `PLANETS.find(p => p.id === m.targetId)` sucht.
+
+**Zwei Lehren für TESTS, beide aus Gegenproben dieser Etappe** – sie stehen unten als Arbeitsregeln
+61 und 62, weil sie über diesen Fall hinausgehen.
+
+### Der Fund, der die Auslieferungsreihenfolge festlegt
+
+`FESTUNG_SPAWN_AKTIV` steht im Backend auf **`false`** und wird erst im **Frontend-PR der Phase 1**
+umgelegt. Der Grund ist gemessen: Ginge das Backend allein live, entstünde binnen Stunden eine
+Festung, deren Blockade die Abbauladung um bis zu 55 % kürzt – während `abbauPlan()` die
+ungekürzte Vorschau zeigt und `echt = daten.menge` still den kleineren Serverwert verbucht. Der
+Spieler bekäme weniger, als die Vorschau ihm versprach, ohne einen Hinweis worauf. Dazu käme eine
+ausdrückliche Falschaussage: Die Galaxie-Nachricht beim Entstehen kündigt die
+Protomaterie-Drosselung an, und die kann ohne das Frontend gar nicht wirken.
+
+### Was die Frontend-Phase 1 an der Protomaterie beachten muss (vorab gemessen)
+
+Die Ladungskürzung erledigt der Server allein – `echt = daten.menge`, das Frontend verbucht seine
+Zahl. Die **Protomaterie dagegen erreicht der Server nicht**: Sie hängt allein an der GRÖSSE des
+Vorkommens und wird an **zwei** Stellen gebildet, die im Gleichschritt bleiben müssen:
+
+- `abbauPlan()` (Z. 55722) – die **Vorschau**, läuft VOR dem Serveraufruf.
+- `oeffneAbbaumission()` (Z. 55912) – der **Missionsstart**, friert den Wert in die Mission ein.
+
+Der Kommentar an der zweiten Stelle sagt es selbst: „die Vorschau darf nicht zweite Zahl neben der
+echten sein". Genau das ist hier die Falle. **Die Vorschau kann den Faktor nicht aus der
+Serverantwort nehmen** – die kommt erst nach dem Start. Sie muss ihn aus dem Felddokument lesen
+(`state.asteroidFeld[sys].festung.stufe`) und mit einer **Frontend-Kopie der Stufentabelle**
+rechnen; der Missionsstart nimmt dagegen `protoBlockade` aus der Antwort, weil dort der Server
+Autorität ist. Zwei Quellen für dieselbe Zahl heißt: **eine Paritätsprüfung ist Pflicht**, genau wie
+bei `test_asteroid_paritaet.js` für `AST_SORTEN`. Ohne sie driften Vorschau und Buchung auseinander,
+sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mission nicht einhält.
+
+## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
+
+Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
+Belohnungen die es nur dort gibt vielleicht macht es Sinn eine item Struktur einzubauen."
+Ausgearbeitet in **`docs/beute-und-instanzen-konzept.md`**.
+
+**Verhältnis zu den Asteroidenfestungen (Abschnitt darüber):** Die beiden Projekte treffen sich
+bei Teil C (Instanzen). Die Festungen bringen angreifbare PvE-Ziele auf die Karte und haben mit
+dem Hort bereits eine eigene Beutequelle; dieses Konzept liefert dazu die Frage, WAS dort fällt
+und wie es sich von regulärer Beute unterscheidet (Herkunfts-Schloss). Wer an einem der beiden
+arbeitet, liest den jeweils anderen Abschnitt mit – sonst entstehen zwei Beutetische nebeneinander.
+
+**Der Satz, der hier stehen muss, damit ihn niemand übersieht: Ein großer Teil davon ist bereits
+gebaut.** Wer das nicht nachmisst, stellt ein zweites System neben ein vorhandenes — genau der
+Fehler, den dieses Projekt bei den Bonusgruppen schon einmal gemacht hat. Gemessen am 18.08.2026:
+
+- **Set-Boni gibt es.** `MODULE_SET_DEFS` führt neun Sets: vier benannte (alles oder nichts) und
+  fünf **Boss-Sets** mit je vier Teilen und gestaffelten Stufen (2/3/4 Teile, additiv). Gerechnet
+  in `setBonusAt(planetKey, effect)`, additiv, unter denselben nachgelagerten Deckeln wie alles
+  andere. Dazu Sockel (2 je Standort, `SOCKET_POOL` bewusst ohne `raidloss`/`atk` — client-only,
+  keine PvP-Parität nötig).
+- **„Nur hier zu bekommen" gibt es als Mechanik.** Das Feld `quelle` an einem Modul ist ein
+  Herkunfts-Schloss mit vier Werten (`normal`/`abgrund`/`boss`/`unikat`); `fundPool` filtert
+  danach, und es hält Boss-Set-Teile und Unikate aus **jedem** regulären Fundtopf, aus **beiden**
+  Schmieden und aus der **Modulbörse** heraus. Vergeben wird ausschließlich über
+  `grantBossSetModule()` bzw. `grantUnikatModul()`. Wer neue exklusive Beute baut, benutzt dieses
+  Schloss — es ist erprobt und braucht kein neues System.
+- **Raids gibt es.** `ALLIANCE_RAID_BOSSE` führt fünf Gegner mit eigenen KAMPFREGELN, nicht nur
+  anderen Zahlen: Schwäche (Schiffsklasse), Malus ohne sie (0,75–0,80), eigener Verlust- und
+  Beutefaktor, Beute-Schwerpunkt. Jeder lässt sein eigenes Vier-Teile-Set fallen.
+- **Ein Dungeon gibt es — er heißt Abgrund.** Tiefenläufe, Mutatoren, Wächter, zwölf Reliquien mit
+  gestaffelten Satz-Boni (`ABGRUND_RELIKT_SATZ`), eigene Währungen, eigene Werkstatt, eigene Rolle.
+
+**Die vier gemessenen Lücken** (das ist das eigentliche Projekt):
+
+1. `SHIP_MODULE_DEFS` (44 Module) hat **keinen einzigen** Set-Bonus — 0 Treffer. Die direkteste
+   Umsetzung des Auftrags, auf einem System, das die Mechanik noch nicht hat.
+2. Alle 20 Boss-Set-Teile fallen **ausschließlich** nach einer Allianz-Raid-Welle. Solo ist keines
+   davon je erreichbar — die größte inhaltliche Sperre im Modulsystem.
+3. Keine gestufte Schwierigkeit mit **eigenem** Beutetisch: Ein Boss lässt dieselben Teile fallen,
+   egal wie stark die Allianz ist; die Abgrund-Reliquien enden bei Tiefe 120.
+4. **Fünf parallele Gegenstands-Systeme** (`MODULE_DEFS` 182, `SHIP_MODULE_DEFS` 44, `ITEM_DEFS` 30,
+   `RARE_ITEMS` 6, `ABGRUND_RELIKTE` 12) ohne gemeinsame Auskunft.
+
+**Zur „Item-Struktur" die Entscheidung, die im Konzept begründet ist: KEIN Umbau der Speicherform.**
+Der Modul-Schlüssel (`typ:seltenheit:…`) ist tragend; der Kommentar an den Sockeln hält fest, dass
+schon ein fünftes Schlüssel-Segment „genau die Fehlerklasse aus dem Schmelze-Bugfix" gewesen wäre.
+Vorgeschlagen ist stattdessen eine **abgeleitete Beschreibungs-Schicht** über die fünf Listen
+(key/name/icon/art/seltenheit/herkunft/desc) — sie liest sie, statt eine sechste Liste zu führen,
+und trägt zugleich die automatische `desc`-Prüfung, die Hausregel 7 bisher von Hand absichert.
+## Beschreibungstexte: was gekürzt wird und was nie (TX-Etappen, ab 18.08.2026)
+
+Auftrag Sascha: „alle texte von gebäuden schiffen forschung etc überarbeiten teilweise zu viele
+infos und man merkt das es ki inhalt ist". Gemessener Ausgangsstand, block-gescopt gelesen (nicht
+per loser Regex – ein erster Anlauf zählte Schiffe zu den Gebäuden):
+
+| Tabelle | Texte | Median | max | über 250 |
+|---|---|---|---|---|
+| `MODULE_DEFS.desc` | 47 | 262 | 612 | 30 |
+| `RESEARCH_DEFS.desc` | 53 | 205 | 630 | 16 |
+| `SHIP_MODULE_DEFS.desc` | 44 | 108 | 446 | 10 |
+| `SHIP_DEFS.desc` | 9 | 264 | 369 | 5 |
+| `BUILDING_DEFS.effectDesc` | 46 | 26 | 435 | 5 |
+
+**Die vier Muster, an denen der KI-Duktus hängt** – und nur die fliegen raus: (1) Selbstlob und
+Einordnung statt Information („Das Tor zum Endspiel", „Der Abschluss der Verarbeitungskette");
+(2) Entwickler-Historie im Spielertext („zählen seit dem 17.07.2026 mit", „war bisher ausschließlich
+über das Goldrausch-Event erreichbar"); (3) Klammern in Klammern und nachgeschobene Halbsätze mit
+Gedankenstrich; (4) Erklärungen zweiter Ordnung – was die Forschung freischaltet, was daran
+wiederum hängt, und was ohne sie alles verschlossen bleibt.
+
+**Was unangetastet bleibt: jede Zahl.** Mehrere Tests lesen Werte aus diesen Texten und vergleichen
+sie gegen die Konstanten (`test_forschungstexte` gegen `effectPerLevel`/`maxLevel`,
+`test_levelfortschritt` gegen das Offline-Fenster, `test_forschungsmeilensteine` gegen die Zahl der
+Tiefenschiffe). Auch ABGELEITETE Zahlen bleiben – das Gesamtfenster „14 Stunden" ist 8 + 6, und
+genau deshalb steht es da: Der Spieler soll es nicht selbst ausrechnen müssen. Ebenso bleibt die
+Mindestlänge von 50 Zeichen gewahrt (Spieler-Report 22.07.2026: ein Kürzel las sich wie eine
+fehlende Beschreibung).
+
+**Stand der Etappen:**
+- **TX-1** (v8.570.0): 14 Forschungs-`desc` und 4 Gebäude-`effectDesc`, zusammen 6.412 → 3.821
+  Zeichen. Danach stehen in `RESEARCH_DEFS` nur noch zwei Texte über 250 Zeichen (`rewig_prod`,
+  `rewig_lager`) – beide lang, weil sie echte Zahlenreihen nennen, und deshalb unverändert.
+  **`rflottenkoord` ist die Ausnahme, die die Regel zeigt:** Der Text bleibt mit ~520 Zeichen lang,
+  weil DREI Tests je eine eigene Zusage daraus einfordern – „Parallelkommando"
+  (`test_faehigkeitsbaum` 4b), „Recycler-Gruppe" (`test_recycler_sammelauftrag` 5), die
+  Verlegungs-Aussage samt Verband-Ausnahme (`test_pvp_bericht`). Der erste, kurze Entwurf hatte alle
+  vier weggekürzt und genau diese drei Tests gerissen. Länge ist hier kein Ballast, sondern vier
+  belegte Zusagen; gestrichen wurde nur, was nichts zusagt.
+  **Ein Zielkonflikt musste dabei zugunsten des Auftrags entschieden werden.** `test_pvp_bericht`
+  verlangte wörtlich „Flottenverlegungen zwischen eigenen Planeten zählen **seit dem 17.07.2026**
+  mit" – ein Auslieferungsdatum im SPIELERTEXT, also Muster 2. Bequem wäre gewesen, es stehen zu
+  lassen. Stattdessen ist das Datum aus BEIDEN Fundorten raus (Forschungsbeschreibung und
+  HELP_SECTIONS – ein Fundort allein hätte zwei Anzeigestellen mit unterschiedlicher Aussage
+  ergeben, Punkt 6), und im Test ist das Datum im Muster **optional**
+  (`zählen (?:seit dem \d{2}\.\d{2}\.\d{4} )?mit`). Die geprüften Eigenschaften sind unverändert:
+  beide Stellen müssen die Aussage tragen (Gegenprobe gefahren – mit einer entfernten Aussage meldet
+  der Test `beide Stellen sagen jetzt das Richtige | 1`), die alte Falschaussage „zählen nicht mit"
+  trifft das Muster nachweislich NICHT (gemessen 0), und die datierte Altform würde weiterhin
+  akzeptiert (gemessen 1). **Das ist der Unterschied zwischen einer festgenagelten SCHREIBWEISE
+  lösen und eine Prüfung aufweichen** – Regel 3 gegen Regel 26, und hier lag der Fall auf der Seite
+  von Regel 3.
+- **`SHIP_DEFS` bleibt unverändert.** Hier stand zwischenzeitlich, die Tabelle habe gar kein
+  `desc` – das war eine zu enge Prüfung (angesehen wurde nur der ERSTE Eintrag). Die neun
+  Tiefenschiffe haben eines, `test_schiffstexte.js` existiert eigens dafür, dass es auch gerendert
+  wird, und alle neun Texte nennen Wirkung, Grenze und Gegenbeispiel, ohne eines der vier Muster
+  zu tragen (Regel 32 in der Gegenrichtung: ein zu Unrecht verworfener Fund fällt nie wieder auf).
+- **TX-2** (v8.572.0): `MODULE_DEFS`, 14 Texte, 5.752 → 4.627 Zeichen. Der Block hat 56 `desc`-Texte
+  (block-gescopt zwischen `const MODULE_DEFS = [` und `const SHIP_MODULE_DEFS`), Median 262.
+
+  **Die wichtigste Entscheidung ist eine Nicht-Änderung: die 20 BOSS-SET-Texte bleiben.** Sie waren
+  der erste Verdacht, weil sie einander fast wortgleich lesen („Teil des Boss-Sets X (droppt nur bei
+  Y): <Bild> – <Wirkung>. Ab 2 Set-Teilen am selben Standort kommen die X-Stufenboni dazu."). Beim
+  Durchlesen ist das kein KI-Duktus: Jeder Satzteil trägt eine eigene Auskunft (welches Set, wo es
+  fällt, was es tut, ab wann die Stufenboni greifen), und eine gleichförmige Struktur über zwanzig
+  gleichartige Gegenstände ist Gestaltung, keine Wiederholung. Wer sie „entschlackt", nimmt
+  Information weg. **Wiederholung ist erst dann ein Befund, wenn der wiederholte Teil nichts sagt.**
+
+  Gekürzt wurde stattdessen Muster 1 und 4: Rangaussagen („als einziges Modul im Spiel"),
+  Spielempfehlungen („ideal, um Angriffe zu Ketten zu verbinden", „wer von Kampf zu Kampf zieht,
+  hält ihn dauerhaft aufrecht"), Einordnungen („Damit ist er die Brücke nach oben") und Erklärungen
+  über das SPIEL statt über den Gegenstand (woher Trümmerfelder kommen, was Prisengut ist, wie die
+  Terraforming-Staffel läuft).
+
+  **Drei Testbedingungen, vorher gemessen und teils GEGENLÄUFIG – wer hier etwas ändert, prüft sie
+  zuerst:**
+  - `test_bonibilanz` 6 verbietet `/gedeckelt|Obergrenze/` in JEDEM Modultext, **case-sensitiv**.
+    Die Bestandstexte kommen nur durch, weil dort „**G**edeckelt bei +45%" am SATZANFANG steht. Wer
+    denselben Satz in einen längeren einbettet und klein schreibt, reißt den Test – und zwar an
+    einer Stelle, die mit der eigenen Änderung nichts zu tun zu haben scheint.
+  - `test_abgrund_module2` verlangt bei Abgrund-Modulen umgekehrt
+    `/gedeckelt|deckel|bis −|bis \+|stapelt nicht/i` und `desc.length >= 140`;
+    `test_abgrundmodule` und `test_abgrund_gegenstaende` verlangen `>= 180`. Der Ersetzer führt
+    deshalb eine Untergrenze von 190 Zeichen für alle geänderten Texte.
+  - `test_vorschau_konsistenz` verbietet Funktionsaufrufe in einer `desc`.
+
+  **Der Ersetzer prüft selbst, dass JEDE ZAHL des alten Textes im neuen wieder vorkommt** – die
+  einzige Wache dieser Etappe, die den INHALT statt der Form absichert. Alles andere (Apostroph,
+  Mindestlänge, verbotene Wortform, Datum, Anführungszeichen) prüft nur, dass der neue Text die
+  Umgebung nicht sprengt.
+
+  **Und eine Form-Falle, die TX-1 nicht hatte:** Die Modul-Einträge sind ZWEIZEILIG – Kopfzeile mit
+  `key`/`effect`/`base`, `desc` auf der Folgezeile. Der TX-1-Ersetzer suchte Anker und `desc` in
+  DERSELBEN Zeile und fand hier null Treffer. Richtig ist, vom Eintragsanfang bis zum NÄCHSTEN
+  Eintragsanfang zu suchen – dann kann der Treffer nie aus einem fremden Eintrag stammen
+  (Hausregel 39/59 in der mehrzeiligen Variante).
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
@@ -1221,6 +1617,31 @@ dem Stand des letzten Holens"). Cron-Zeilen können in fünf Ablagen stehen: der
 der von root, `/etc/crontab`, `/etc/cron.d/` und als systemd-Timer. Und Datei-Eigentümer sind
 dabei kein Beweis – root darf in eine sascha-eigene Logdatei anhängen, ohne dass sich der
 Eigentümer ändert.
+
+**Nachtrag 18.08.2026, abends – fünftes Mal, gemessen unmittelbar nach einer eigenen Auslieferung.**
+Nach dem Merge von v8.569.0 (Frontend) und #127 (Backend) stand das Frontend binnen Sekunden live auf
+`8.569.0`, während der Backend-Deploy hing: `/api/festung/angriff` aus #126 antwortete **404**, und
+zwar auch mehrere Minuten später noch. Dem Pi fehlten damit #126 und #127. Dieselbe Asymmetrie wie
+am 14./15./16./18.08. – der Frontend-Deploy beweist weiterhin nichts über den Backend-Deploy.
+
+**Der Schaden war diesmal die harmlose Sorte, und das ist kein Zufall, sondern Bauart:** Der
+Kosmetik-Katalog kommt VOM SERVER. Ein alter Server liefert die neuen Stücke einfach nicht, das
+Spiel zeigt sie also nicht an – kein toter Ladezustand, keine Falschaussage (das ist Schadensklasse
+(a) aus dem Kopfkommentar von `test_kosmetik_paritaet.js`). Die clientseitige Hälfte derselben
+Lieferung – Erfolge und Titel – lief sofort. Wer eine Lieferung auf beide Repos verteilt, sollte
+diese Richtung bewusst wählen: **Der Server darf hinterherhinken, das Frontend nicht.**
+
+**Und ein Messfehler, der beinahe zu einer falschen Diagnose geführt hätte.** Als Marker für #126
+wurden zwei Routen genommen, beide über `git log -S '<route>' -- server.js` gefunden, beide
+scheinbar aus #126. Sie antworteten unterschiedlich (401 und 404), was aussah, als sei ein einzelner
+Commit halb ausgeliefert – unmöglich, und genau deshalb der Hinweis auf einen Werkzeugfehler.
+Ursache: **`git log -S` findet den Commit, der die Zeile zuletzt ANGEFASST hat, nicht den, der die
+Route ANGELEGT hat.** `/api/asteroid/contest` existierte längst und wurde von #126 nur geändert.
+**Vorgehen:** Eine Marker-Route wird gegen die ALTE Datei geprüft
+(`git show <commit-davor>:server.js | grep "app.post('/api/…"`) – fehlt sie dort, ist sie ein
+gültiger Marker. Dazu weiterhin beide Kontrollen im selben Lauf: eine erfundene Route muss 404
+liefern, eine alte 401 (dieselbe Familie wie Regel 15/17/19 – nie ein Messwerkzeug, das sich selbst
+im Weg steht).
 
 **Was daraus für Auskünfte folgt:** Wenn eine Änderung nach einem Merge nicht live ist, war früher
 plausibel „der Cron-Job kommt gleich". Das gilt nicht mehr – kommt sie nicht an, ist der Webhook

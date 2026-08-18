@@ -19,6 +19,19 @@ let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
+
+/* Der PATCHNOTES-Block wird fuer die verneinenden und die zaehlenden Pruefungen unten
+   herausgeschnitten (CLAUDE.md Regel 46). Grund: Ein Patchnote, der eine Behebung beschreibt,
+   ZITIERT die alte Formulierung - und reisst damit genau die Pruefung, die diese Behebung
+   festhaelt. Patchnotes sind unveraenderliche Historie, man kann den Wortlaut dort also nicht
+   anpassen; die Pruefung muss sich anpassen.
+   Die Regel gilt nicht nur fuer "steht NICHT mehr da": Auch ein ZAEHLER wird falsch, sobald ein
+   Patchnote den gesuchten Text erwaehnt - in beide Richtungen. */
+const SRC_OHNE_HISTORIE = (() => {
+  const v = src.indexOf('  const PATCHNOTES = [');
+  const b = v < 0 ? -1 : src.indexOf('\n  ];', v);
+  return (v >= 0 && b > v) ? src.slice(0, v) + src.slice(b) : src;
+})();
 const whitelist = new Set([...src.matchAll(/^\s*\.(ti-[a-z0-9-]+):before/gm)].map(m => m[1]));
 
 // ---------------------------------------------------------------- Block ausführbar machen
@@ -215,7 +228,7 @@ check('7: die Hilfe erklärt die fraktionseigenen Pools und die drei Stufen',
 check('7: und den Unterschied zwischen Lieferung und Standprüfung',
   /die werden beim Abschließen abgebucht/.test(src) && /kosten dich nichts/.test(src));
 check('7: die alte Hilfe-Beschreibung ist weg',
-  !/Ressourcen liefern, Kämpfe gewinnen oder Expeditionen abschließen\. Abschluss bringt/.test(src));
+  !/Ressourcen liefern, Kämpfe gewinnen oder Expeditionen abschließen\. Abschluss bringt/.test(SRC_OHNE_HISTORIE));
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);
