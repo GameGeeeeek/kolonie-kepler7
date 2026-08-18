@@ -325,6 +325,21 @@ if (!SERVER_JS || !fs.existsSync(SERVER_JS)){
   check('10d: der Server deckelt den Wert selbst - der Spielstand ist klientenautoritativ',
     /Math\.min\(BASTION_MARK_MAX, Math\.floor\(v\)\)/.test(srv));
 
+  /* Die Sanity-Grenze ist eine EIGENE Absicherung neben dem Deckel in 10d - und sie fehlte im
+     ersten Anlauf, obwohl shipMarks sie seit dem 31.07.2026 hat. Ohne sie waere bastionMarks das
+     einzige Markenfeld ohne Pruefung. Wichtig ist dabei die RICHTUNG: Die Grenze muss deutlich
+     UEBER dem Spieldeckel liegen. Ein zu enges Limit sperrt im Zweifel einen echten Spieler
+     komplett vom Speichern aus (Vorfall 21.07.2026, mehrere Stunden Fehlersuche - eine Ablehnung
+     friert das Speichern KOMPLETT ein), ein grosszuegiges faengt Faelschungen trotzdem ab. */
+  const sanity = Number((srv.match(/maxBastionMark:\s*(\d+)/) || [])[1]);
+  check('10f: der Server hat eine Sanity-Grenze fuer das neue Feld - wie fuer die Werftmarken',
+    !!sanity, { maxBastionMark: sanity });
+  check('10g: und sie liegt klar ueber dem Spieldeckel, sperrt also keinen echten Spielstand aus',
+    sanity >= API.BASTION_MARK_MAX * 10,
+    { maxBastionMark: sanity, spieldeckel: API.BASTION_MARK_MAX });
+  check('10h: und die Pruefschleife liest wirklich save.bastionMarks',
+    /Object\.entries\(save\.bastionMarks \|\| \{\}\)/.test(srv));
+
   // Der eigentliche Beweis: BEIDE Funktionen ausfuehren und ueber alle Stufen vergleichen.
   // "Der Code sieht gleich aus" ist kein Beleg (CLAUDE.md Regel 43).
   let srvMult = null;
