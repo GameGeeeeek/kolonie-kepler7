@@ -29989,7 +29989,7 @@
       e *= (1 - officerBonus('ingenieur'));
       const werftkernLvl = allBuildingSets().reduce((a,b)=>a+(b.werftkern||0)+(b.quantenwerft||0),0);
       if (werftkernLvl > 0) e *= (1 - deckelWeich(werftkernLvl*0.015, 0.20));
-      if (werftOverdriveActive()) e *= 0.75;
+      if (werftOverdriveActive()) e *= WERFT_OVERDRIVE_MULT;
     }
     if (kind === 'building'){
       e *= (1 - officerBonus('ingenieur'));
@@ -56193,11 +56193,20 @@
   }
   // Werft-Overdrive (Spieler-Wunsch "Flottenbau mit T2-Material boosten") - zweiter Quantenchip-
   // Verbrauchs-Sink neben dem Quantensensor, gleiches state.buffs-Zeitfenster-Muster. Zahlt Quantenchips
-  // -> 30-Minuten-Fenster -> währenddessen -25% Schiffsbauzeit imperiumsweit (greift in queueConstruction
-  // über werftOverdriveActive(), gilt für ALLE in diesem Fenster gestarteten Schiffs-Bauaufträge). Bewusst
+  // -> 30-Minuten-Fenster -> währenddessen -25% Schiffsbauzeit imperiumsweit. Greift an ZWEI Stellen:
+  // beim Einreihen über effectiveBuildTimeEach (alle im Fenster gestarteten Aufträge) UND beim
+  // Aktivieren auf die Restzeit der bereits eingereihten (siehe activateWerftOverdrive). Bis zum
+  // 18.08.2026 gab es nur die erste Hälfte, während die Box "für alle laufenden und neu
+  // eingereihten Schiffe" versprach - dieser Kommentar beschrieb den Fehler korrekt und
+  // widersprach damit dem Text, den der Spieler las. Bewusst
   // KEINE Produktions-Belohnung, harte 30-Min.-Deckelung - kein aufschaukelnder Dauereffekt.
   const WERFT_OVERDRIVE_COST_CHIPS = 12;
   const WERFT_OVERDRIVE_DURATION_MS = 30*60000;
+  /* Der Faktor steht als EINE Konstante da, seit er an zwei Stellen wirkt: beim Einreihen
+     (effectiveBuildTimeEach) und beim Aktivieren auf die bereits laufenden Auftraege. Zwei
+     getrennte 0,75 waeren genau die zweite Stelle, die beim naechsten Balance-Schritt
+     zurueckbleibt. */
+  const WERFT_OVERDRIVE_MULT = 0.75;
   function werftOverdriveActive(){ return (state.buffs||[]).some(b => b.kind==='werftoverdrive' && b.expiresAt > Date.now()); }
   function activateWerftOverdrive(){
     if (werftOverdriveActive()){ log('Der Werft-Overdrive läuft bereits.', 'ti-alert-triangle'); return; }
@@ -56206,7 +56215,44 @@
     state.buffs = state.buffs||[];
     state.buffs.push({ kind:'werftoverdrive', expiresAt: Date.now()+WERFT_OVERDRIVE_DURATION_MS, source:'werftoverdrive' });
     state.tier2ConsumablesUsed = (state.tier2ConsumablesUsed||0) + 1; // Erfolg "Verbrauchsstratege"
-    log('Werft-Overdrive aktiviert ('+WERFT_OVERDRIVE_COST_CHIPS+' Quantenchips): -25% Schiffsbauzeit für 30 Minuten (imperiumsweit).', 'ti-bolt');
+    /* SPIELER-REPORT 18.08.2026: Die Box versprach "fuer alle laufenden und neu eingereihten
+       Schiffe", die Wirkung traf aber nur neu eingereihte. Der Grund steckte in der Bauart:
+       effectiveBuildTimeEach wird beim EINREIHEN gerufen und backt das Ergebnis in job.totalDur;
+       beim Start rechnet niemand nach (job.endTime = now + job.totalDur*1000). Wer schon baute,
+       merkte nichts - der Code-Kommentar an der Konstante sagte das sogar selbst ("gilt fuer ALLE
+       in diesem Fenster GESTARTETEN"), nur widersprach er dem Werbetext.
+       Behoben wird die MECHANIK, nicht der Text: Der Text beschreibt, was das Ding leisten soll.
+
+       KEIN DOPPELRABATT: Angefasst wird ausschliesslich, was JETZT schon in der Warteschlange
+       steht. Was waehrend des Fensters eingereiht wird, traegt den Rabatt bereits aus
+       effectiveBuildTimeEach - eine zweite Kuerzung waere ein stiller Doppelabzug.
+
+       Bei laufenden Auftraegen wandert totalDur mit: Der Fortschrittsbalken rechnet
+       100 - (endTime-now)/(totalDur*1000)*100; ohne Mitziehen spraenge er. Muster wie
+       boostTerraformJob, das eine laufende Terraforming-Stufe genauso verkuerzt.
+
+       Laeuft das Fenster ab, waehrend ein gekuerzter Auftrag noch wartet, BLEIBT die Kuerzung.
+       Sie zurueckzurechnen waere machbar, hiesse aber, dass eine bezahlte Wirkung nachtraeglich
+       verschwindet - das liest sich wie ein Fehler, auch wenn es "korrekt" waere. */
+    const jetzt = Date.now();
+    let gekuerztLaufend = 0, gekuerztWartend = 0;
+    for (const job of (state.constructionQueue||[])){
+      if (job.kind !== 'ship') continue;
+      if (job.endTime && job.endTime > jetzt){
+        const rest = job.endTime - jetzt;
+        job.endTime = jetzt + Math.round(rest * WERFT_OVERDRIVE_MULT);
+        if (job.startTime) job.totalDur = Math.max(1, Math.round((job.endTime - job.startTime)/1000));
+        gekuerztLaufend++;
+      } else if (!job.endTime && job.totalDur > 0){
+        job.totalDur = Math.max(1, Math.round(job.totalDur * WERFT_OVERDRIVE_MULT));
+        gekuerztWartend++;
+      }
+    }
+    const rabatt = Math.round((1 - WERFT_OVERDRIVE_MULT) * 100);
+    const wieViele = (gekuerztLaufend + gekuerztWartend) > 0
+      ? ' Bereits eingereiht verkürzt: ' + gekuerztLaufend + ' laufend, ' + gekuerztWartend + ' wartend.'
+      : '';
+    log('Werft-Overdrive aktiviert ('+WERFT_OVERDRIVE_COST_CHIPS+' Quantenchips): -'+rabatt+'% Schiffsbauzeit für 30 Minuten (imperiumsweit).' + wieViele, 'ti-bolt');
     playSound('build');
     render(); save();
   }
