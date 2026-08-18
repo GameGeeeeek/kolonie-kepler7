@@ -144,13 +144,21 @@ for (const [name, muster] of [['KRYOARCHIV_KEEP_PER_LEVEL', /const KRYOARCHIV_KE
 }
 
 // ---- 7) Niemand wird blockiert ---------------------------------------------------------------
-// Die beiden vorhandenen Apex-Schiffe bleiben unverändert. Ein nachträglicher Tier-3-Anteil hätte
-// sie bis zum ersten Flug gesperrt - genau das schließt die Vorgabe "niemand soll blockiert werden"
-// aus, und genau deshalb ist der Kausalitätsbrecher ein NEUES Schiff.
-for (const [fn, erwartet] of [['metamaterialtitanCost', '{ metamaterial: 40, hochenergiekristalle: 30 }'],
-                              ['singularitaetsvernichterCost', '{ singularitaetskern: 25, fusionskerne: 40 }']]) {
-  check('7a: ' + fn + ' ist unverändert - das vorhandene Apex-Schiff bleibt genau so baubar wie bisher',
-    S.indexOf('function ' + fn + '(n){ return scaledShipCost(' + erwartet) >= 0);
+/* Die geprüfte Eigenschaft ist "niemand wird durch die Tier-3-Kette blockiert": Ein nachträglicher
+   Tier-3-Anteil an den beiden VORHANDENEN Apex-Schiffen hätte sie bis zum ersten Flug in den
+   Abgrund gesperrt - genau deshalb ist der Kausalitätsbrecher ein NEUES Schiff.
+   Bis zum 18.08.2026 stand hier dafür ein Literal-Vergleich auf die damaligen Kostenzahlen. Das
+   war eine Momentaufnahme, keine Regel (CLAUDE.md Regel 3): Die Schiffskosten-Reform hat alle
+   Kosten neu gesetzt, und der Test fiel auf korrektem Code durch. Geprüft wird jetzt die
+   Eigenschaft selbst - die beiden Apex-Schiffe dürfen KEINE Tier-3-Ressource verlangen -, und die
+   hält jede künftige Umpreisung aus. */
+const TIER3_RES = ['hohlraumgitter', 'kausalanker'];
+for (const fn of ['metamaterialtitanCost', 'singularitaetsvernichterCost']) {
+  const m = S.match(new RegExp('function ' + fn + '\\(n\\)\\{ return scaledShipCost\\(\\{ ([^}]+) \\}'));
+  check('7a-vorab: ' + fn + ' ist auffindbar und lesbar', !!m, m && m[1]);
+  const t3 = m ? TIER3_RES.filter(r => m[1].includes(r)) : ['(nicht gelesen)'];
+  check('7a: ' + fn + ' verlangt keine Tier-3-Ressource - das vorhandene Apex-Schiff bleibt baubar',
+    t3.length === 0, { kosten: m && m[1], tier3Anteil: t3 });
 }
 check('7b: das neue Schiff ist zusätzlich da, nicht an ihrer Stelle',
   /key:'metamaterialtitan'/.test(S) && /key:'singularitaetsvernichter'/.test(S) && /key:'kausalitaetsbrecher'/.test(S));

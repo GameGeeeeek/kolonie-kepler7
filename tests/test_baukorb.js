@@ -36,7 +36,10 @@ function backend(store){ return async r => {
 const stand = (res) => JSON.stringify({
   tutorialSeen:true, newbieWelcomeSeen:true,
   resources: res || {energie:9e6,erz:9e6,kristalle:6e6,deuterium:4e6,antimaterie:2e4,forschungspunkte:3e4},
-  buildings:{solar:20,mine:18,lager:24,werft:14,labor:12}, research:{}, colonies:{},
+  buildings:{solar:20,mine:18,lager:24,werft:14,labor:12},
+  // rkampf schaltet den Kreuzer frei - er traegt ab 250 Stueck Tier-2-Komponenten und ist damit
+  // der Traeger von Pruefung 3c. Ohne ihn liefe sie nie (Arbeitsregel 37).
+  research:{rkampf:1}, colonies:{},
   activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null},
   fleet:{ jaeger:120, frachter:20, missions:[] },
   battleStats:{wins:9,losses:2}, xp:20000, credits:50000, buffs:[], lastTick:Date.now(), colonyNames:{}
@@ -125,9 +128,16 @@ async function starte(browser, res){
       { jaeger:zJ, frachter:zF, summe:zS, abweichung });
     check('2: keine Konsolenfehler', errs.length === 0, errs);
 
-    // ---- 3) Preisstaffelung wird beruecksichtigt ----
-    // Schiff Nummer 1000 kostet mehr als Schiff Nummer 1. Eine naive Rechnung "Menge x Grundpreis"
-    // wuerde das uebersehen - und genau die waere beim Nachbauen die naheliegende Abkuerzung.
+    // ---- 3) Der Korb rechnet den FLACHEN Grundpreis, aber die T2-Komponenten trotzdem mit ----
+    // Bis zur Kostenreform (18.08.2026, Auftrag Sascha "Nimm das wieder raus") stand hier das
+    // Gegenteil: "300 Schiffe kosten MEHR als das 300-fache des ersten". Der Stueckpreis haengt
+    // seither nicht mehr am Bestand, also ist die naive Rechnung "Menge x Grundpreis" fuer die
+    // GRUNDKOSTEN jetzt richtig - und der Test verlangt sie ausdruecklich.
+    //
+    // Die Pruefung wird dadurch aber nicht schwaecher, sondern verschiebt sich auf den Teil, der
+    // WEITERHIN nicht naiv ist: Ab einer Stueckzahl verlangen grosse Klassen zusaetzlich
+    // Tier-2-Material (SHIP_T2_KOMPONENTEN, A2 der Wirtschaftsreform). Ein Korb, der das
+    // uebersieht, nennt einen zu billigen Preis - und genau das faellt hier auf.
     await jaeger.click({clickCount:3}); await jaeger.type('1',{delay:25});
     await page.waitForTimeout(250);
     const einzeln = zahlen(await lies(page,'[data-korb-kosten="jaeger"]'));
@@ -135,11 +145,32 @@ async function starte(browser, res){
     await page.waitForTimeout(250);
     const dreihundert = zahlen(await lies(page,'[data-korb-kosten="jaeger"]'));
     const feld = Object.keys(einzeln)[0];
-    check('3: es gibt eine messbare Ressource zum Vergleich', !!feld, { einzeln });
+    check('3a: es gibt eine messbare Ressource zum Vergleich', !!feld, { einzeln });
     if (feld){
-      check('3: 300 Schiffe kosten MEHR als das 300-fache des ersten (Staffelung greift)',
-        dreihundert[feld] > einzeln[feld] * 300,
-        { proStueck:einzeln[feld], fuer300:dreihundert[feld], naiv:einzeln[feld]*300 });
+      // Der Jaeger traegt KEINE Tier-2-Komponenten - bei ihm muss die Rechnung exakt aufgehen.
+      check('3b: 300 Jaeger kosten exakt das 300-fache des ersten (flacher Stueckpreis)',
+        dreihundert[feld] === einzeln[feld] * 300,
+        { proStueck:einzeln[feld], fuer300:dreihundert[feld], erwartet:einzeln[feld]*300 });
+    }
+    // Der Schlachtschiff-Korb ab 100 Stueck MUSS eine Ressource zeigen, die ein einzelnes
+    // Schlachtschiff nicht kostet. Welche das ist, liest der Test nicht aus einer Liste ab,
+    // sondern vergleicht die Ressourcen-SCHLUESSEL beider Koerbe - eine umbenannte Tier-2-
+    // Ressource laesst die Pruefung damit weiterhin gelten (Arbeitsregel 3).
+    const kreuzer = page.locator('[data-basket-ship="cruisers"]');
+    check('3c-vorab: der Kreuzer ist im Korb auffindbar', await kreuzer.count() > 0,
+      { hinweis:'ohne ihn bliebe die Tier-2-Zuschlagspruefung ungefahren' });
+    if (await kreuzer.count()){
+      await jaeger.click({clickCount:3}); await jaeger.type('0',{delay:25});
+      await kreuzer.click({clickCount:3}); await kreuzer.type('1',{delay:25});
+      await page.waitForTimeout(250);
+      const einKreuzer = zahlen(await lies(page,'[data-korb-kosten="cruisers"]'));
+      await kreuzer.click({clickCount:3}); await kreuzer.type('300',{delay:25});
+      await page.waitForTimeout(250);
+      const vieleKreuzer = zahlen(await lies(page,'[data-korb-kosten="cruisers"]'));
+      const neueStoffe = Object.keys(vieleKreuzer).filter(k => !(k in einKreuzer));
+      check('3c: ab 250 Kreuzern verlangt der Korb zusaetzliches Tier-2-Material',
+        neueStoffe.length > 0,
+        { beiEinem:Object.keys(einKreuzer), bei300:Object.keys(vieleKreuzer), neu:neueStoffe });
     }
     await ctx.close();
   }

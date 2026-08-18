@@ -25,7 +25,7 @@
 // behauptet, sondern baulich unmoeglich zu verletzen, und sie braucht keine Backend-Aenderung.
 const fs = require('fs');
 const path = require('path');
-const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
+const { SPIELDATEI } = require('./lib/umgebung');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
@@ -154,8 +154,18 @@ check('4: jedes der neun hat einen Preis > 0', ALLE.every(k => TK(k,1) > 0), ALL
 check('4: das billigste Schiff der Staffel II kostet mehr als das teuerste der Staffel I',
   Math.min(...DREI_II.map(k=>TK(k,1))) > Math.max(...DREI.map(k=>TK(k,1))),
   { staffelI:DREI.map(k=>TK(k,1)), staffelII:DREI_II.map(k=>TK(k,1)) });
-check('4: 100 Stueck kosten mehr als das 100-fache des ersten (Staffelung greift)',
-  TK('kessel',100) > TK('kessel',1)*100, { einzeln:TK('kessel',1), hundert:TK('kessel',100) });
+/* Bis zum 18.08.2026 stand hier "100 Stueck kosten mehr als das 100-fache des ersten
+   (Staffelung greift)". Die Tiefenflotte hatte eine EIGENE Mengenskalierung, die scaledShipCost
+   gar nicht kannte: `basis * n * (1 + 0,004*(n-1))`. Weil costFn JE STUECK mit der laufenden
+   Nummer gerufen wird, multiplizierte das `* n` den STUECKPREIS mit dem Bestand - das 25.
+   Lotsenboot kostete 19.161 statt 750, der 25. Nullkiel 239.550, und das bei einem Schiff, das
+   seine Wirkung ueberhaupt erst ab 25 Stueck entfaltet. Der Kommentar daneben behauptete
+   "dieselbe Staffelung wie bei allen anderen Schiffen"; sie war um Groessenordnungen haerter.
+   Jetzt gilt der Basiswert je Stueck. Geprueft wird die neue Regel schaerfer als die alte:
+   nicht "steigt kaum", sondern ueber den ganzen Bereich IDENTISCH. */
+check('4: der Stueckpreis haengt nicht mehr vom Bestand ab - ueber den ganzen Bereich identisch',
+  [1,2,25,100,1000].every(n => TK('kessel',n) === TK('kessel',1)),
+  { gemessen: [1,2,25,100,1000].map(n => n+':'+TK('kessel',n)) });
 check('4: ein unbekanntes Schiff kostet 0 statt NaN', TK('gibtsnicht',5) === 0);
 
 // ---- 5) Die drei Wirkungen, ausgefuehrt ----
