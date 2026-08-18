@@ -118,6 +118,36 @@ function backend(store) {
   const kasten = await page.locator('#galaxyMapSvg').boundingBox();
   const vor = await knotenPunkt();
   check('2-vorab: ein Systemknoten ist messbar', !!vor, vor);
+  /* WAS DER ZEIGER TRIFFT - und warum das hier steht (CLAUDE.md Regel 50, zweite Haelfte):
+     Faellt 2a/2b, meldeten sie bisher nur "bewegt: 0". Das sagt NICHT, ob die Karte den Zug
+     verschluckt hat oder ob der Zeiger ueberhaupt nichts getroffen hat - und genau der zweite Fall
+     war der Vorfall vom 17.08.2026: Die Kastenmitte lag unterhalb des Fensters, elementFromPoint
+     lieferte null, und die Fehlersuche lief zuerst in die falsche Richtung.
+     Die Luft ist duenn: Bei 900x1000 liegt die Kastenmitte gemessen bei y=948, also 52 px ueber
+     der Fensterkante. Waechst irgendetwas OBERHALB der Karte - eine zweite Zeile in der
+     Ressourcenleiste, ein Banner, eine breitere Ebenen-Leiste -, rutscht der Zielpunkt heraus.
+     Deshalb ist der Treffpunkt jetzt eine eigene, benannte Pruefung und keine Fussnote. */
+  const zielpunkt = kasten ? { x: kasten.x + kasten.width / 2, y: kasten.y + kasten.height / 2 } : null;
+  const umfeld = zielpunkt ? await page.evaluate(p => {
+    const el = document.elementFromPoint(p.x, p.y);
+    const svg = document.getElementById('galaxyMapSvg');
+    const name = el ? (el.tagName.toLowerCase()
+      + (el.id ? '#' + el.id : '')
+      + (el.getAttribute && el.getAttribute('class') ? '.' + el.getAttribute('class') : '')) : 'NICHTS';
+    return {
+      getroffen: name,
+      imKartenkasten: !!(el && svg && svg.contains(el)),
+      offeneOverlays: [...document.querySelectorAll('[id$="Overlay"]')]
+        .filter(o => getComputedStyle(o).display !== 'none').map(o => o.id),
+      fensterhoehe: window.innerHeight, scrollY: Math.round(window.scrollY)
+    };
+  }, zielpunkt) : null;
+  check('2-vorab: der Zieh-Punkt liegt IM Kartenkasten und wird von nichts verdeckt',
+    !!(umfeld && umfeld.imKartenkasten),
+    { zielpunkt: zielpunkt && { x: Math.round(zielpunkt.x), y: Math.round(zielpunkt.y) },
+      kasten: kasten && { y: Math.round(kasten.y), h: Math.round(kasten.height) },
+      luftBisFensterkante: (umfeld && zielpunkt) ? Math.round(umfeld.fensterhoehe - zielpunkt.y) : null,
+      umfeld });
   if (vor) {
     const ZIEH_X = 120, ZIEH_Y = 70;
     await page.mouse.move(kasten.x + kasten.width / 2, kasten.y + kasten.height / 2);
