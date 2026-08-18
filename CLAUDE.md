@@ -805,6 +805,36 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     (`test_festung_http.js` Abschnitt 10); (c) alles andere trotzdem sofort mergen – Endpunkte,
     Härtungen und Tests, die ohne Auslöser nichts tun, sind live besser als im Zweig.
 
+61. **Ein Test, der das ETIKETT prüft statt der WIRKUNG, ist bei der Gegenprobe grün – und merkt
+    es nicht.** Vorfall 18.08.2026 (Asteroidenfestungen, Frontend): `test_festung_ui` prüfte, dass
+    die Abbau-Vorschau das Wort „gedrosselt" und den Stufennamen zeigt. Beides hängt am
+    VORHANDENSEIN der Festung, nicht an der Rechnung. Die Gegenprobe – der Festungsfaktor aus
+    `abbauPlan` entfernt – blieb deshalb **grün**: Der Erklärtext stand weiter da, die Ladung war
+    unverändert voll, und der Test bemerkte nichts. Der Spieler hätte genau das erlebt, was diese
+    ganze Phase verhindern soll: eine Zeile, die eine Drosselung ankündigt, und eine Zahl, die
+    keine zeigt.
+    **Vorgehen:** Zu jeder Prüfung „der Text sagt X" gehört eine, die X **misst**. Hier: dieselbe
+    Flotte, dasselbe Vorkommen, einmal mit und einmal ohne Festung, und die angezeigte Ladung muss
+    sich unterscheiden (gemessen 2,4k gegen 5,4k). Erst damit fällt die Gegenprobe – und zwar mit
+    dem sprechenden Beleg `{"mitFestung":"5.4k","ohneFestung":"5.4k"}`. Das ist dieselbe Familie wie
+    Regel 3 (die REGEL prüfen, nicht die Momentaufnahme), nur eine Stufe grundsätzlicher: nicht die
+    Beschriftung der Regel prüfen, sondern die Regel.
+62. **Eine Prüfung, die ihren Erwartungswert aus derselben Größe ableitet, die sie prüft, kann nicht
+    fehlschlagen.** Aus derselben Etappe: `4b` prüfte, dass die Mission die vom Server gebuchte
+    Menge trägt – `mission.ladung === round(gesendeterWunsch * 0,45)`. Schickt der Client
+    versehentlich die schon gekürzte Zahl (Doppelkürzung, der Spieler bekäme 0,45 × 0,45 = 20 %
+    statt 45 %), stimmt das Verhältnis **weiterhin**: 2430 → 1094 ist genauso „45 % des Gesendeten"
+    wie 5400 → 2430. Die Gegenprobe lief grün durch.
+    Aufgelöst hat es erst ein **absoluter Anker von außerhalb der Rechnung**: der Wunsch aus einem
+    zweiten Lauf OHNE Festung. Er ist die Kapazität der Flotte, und die hängt nicht davon ab, ob
+    eine Festung im System steht – beide Läufe müssen dieselbe Zahl senden. Damit fällt die
+    Gegenprobe mit `{"mitFestung":2430,"ohneFestung":5400}`.
+    **Vorgehen:** Bei jeder Prüfung der Form „Ergebnis == f(Eingabe)" fragen, ob ein Fehler BEIDE
+    Seiten gleichzeitig verschiebt. Wenn ja, ist eine Bezugsgröße nötig, die der fehlerhafte Pfad
+    nicht berührt – ein zweiter Lauf mit geänderter Bedingung, ein fester Erwartungswert aus dem
+    Spiel, oder eine Invariante („diese Größe darf sich dadurch gar nicht ändern"). Das ist die
+    Gegenrichtung zu Regel 2: Dort verrottet ein eingetippter Erwartungswert, hier fehlt einer.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
@@ -1227,9 +1257,9 @@ wurde als dort.
 | Phase | Inhalt | Stand |
 |---|---|---|
 | **0a** | Schreibsperre für `asteroids:*` im geteilten Speicher | **fertig**, Backend #124 |
-| **0b** | `asteroid-contest` bekommt seinen Rückflug, `test_rundflug.js` datengetrieben | Code fertig, Prüflauf läuft |
+| **0b** | `asteroid-contest` bekommt seinen Rückflug, `test_rundflug.js` datengetrieben | **fertig**, #432 (v8.568.0) |
 | **0c** | den vestigialen `db.galaxy.worldBoss` entfernen | **fertig**, Backend #125 |
-| **1** | Festungen ohne Bauteile: Entstehen, Blockade, Hort, Angriffsmission, Karte | Backend fertig (#126), **Frontend offen** |
+| **1** | Festungen ohne Bauteile: Entstehen, Blockade, Hort, Angriffsmission, Karte | **fertig** – Backend #126/#131/#132, Frontend v8.569.0 |
 | **2** | die drei Bauteile (Schild/Türme/Kern), Zielwahl, Rollenfaktoren | offen |
 | **3** | Nester Stufe 1–4: Reifen, Ausbreiten, Völker-Eigenarten | offen |
 | **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | offen |
@@ -1255,6 +1285,41 @@ Backend-Einzelheiten stehen in der Backend-CLAUDE.md unter „Asteroidenfestunge
 - **Phase 1 hat bewusst keine Bauteile und keine Zielwahl** – die sind Phase 2. Der Grundverlust je
   Schlag (6/9/12 %) ist deshalb absichtlich niedrig: Die Geschütztürme sollen ihn später vervielfachen,
   und der Wert, den man sich mit dem Turmbeschuss erkauft, ist der ganze Zweck der Bauteile.
+
+### Was die Frontend-Phase 1 gebracht hat – und die drei Funde dabei
+
+Gebaut wurde: der Kartenknoten (gezackte Bastion mit Puls-Ring auf dem Gürtelplatz, `data-map-festung`),
+das Kartenmenü (`festungMapMenu` – Kern, Blockade, Hort, Angriffs-Eintrag mit Grund bei Sperre), die
+Angriffsmission (`oeffneFestungsangriff`/`sendFestungsMission`, **Form A**), ihre Auflösung
+(`festungAufloesen` – wortgleich zu `anfechtungAufloesen`), der Bericht, der Belohnungstyp `festung`
+in `claimPendingRewards` und der Hilfetext. Wächter: `tests/test_festung_ui.js` (23 Prüfungen am
+gerenderten Spiel) und `tests/test_festung_paritaet.js` (Tabellen-Parität gegen `server.js`).
+
+**Die Stufentabelle liegt jetzt in BEIDEN Repos** – `FESTUNG_STUFEN` im Frontend führt nur, was die
+Vorschau wirklich braucht (`blockade`, `proto`, `kern`, `name`). Sie muss dort liegen, weil
+`abbauPlan()` **vor** dem Serveraufruf läuft; ohne sie nennt die Vorschau eine Ladung, die die
+Mission nicht einhält. `test_festung_paritaet.js` hält beide Seiten zusammen. Dieselbe Kopie-Familie
+wie `ASTEROID_SORTEN`/`AST_SORTEN`.
+
+**Drei Funde, jeder von einem Test gefangen, keiner beim Lesen des Codes:**
+
+1. **Die Blockade war komplett wirkungslos** (Backend, behoben in #131). Sie kürzte die
+   Anti-Betrugs-Obergrenze, und die hat per Konstruktion „Faktor 3,5 Luft" – gemessen für vier
+   typische Flotten band sie **in keinem Fall**. Aufgefallen erst beim Nachrechnen der beiden
+   Kapazitäten gegeneinander für die Vorschau. Einzelheiten in der Backend-CLAUDE.md.
+2. **Der Missionsstart fror die UNGEDROSSELTE Protomaterie ein**, während die Vorschau drosselte –
+   gefangen von `test_protomaterie` 6c, der genau diese Doppelung seit der Sorten-Umstellung prüft.
+   Der Kommentar dort sagt es wörtlich: „die Vorschau darf nicht zweite Zahl neben der echten sein".
+   Behoben, indem beide Stellen `protoJeFuhre(a) * faktor` rechnen, mit dem SERVERWERT
+   (`protoBlockade`) als Vorrang und dem lokalen Faktor als Rückfall für den Solo-Betrieb.
+3. **Die Missionstyp-Liste steht ZWEIMAL in der Datei** (`m.type==='asteroid-contest' || …`, Zeilen
+   ~21855 und ~59543). Ein Ersetzer mit `count==1` bricht dort ab – und wer nur eine Stelle pflegt,
+   hat die klassische zweite Anzeigestelle. Dazu kommen ein eigener Zweig in der Missionskarte und
+   einer in der Flottenleiste: Ohne sie fällt eine neue Missionsart in den generischen Zweig und
+   steht dort als **„Erkundungsziel"**, weil der `PLANETS.find(p => p.id === m.targetId)` sucht.
+
+**Zwei Lehren für TESTS, beide aus Gegenproben dieser Etappe** – sie stehen unten als Arbeitsregeln
+61 und 62, weil sie über diesen Fall hinausgehen.
 
 ### Der Fund, der die Auslieferungsreihenfolge festlegt
 
