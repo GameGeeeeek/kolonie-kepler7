@@ -7042,8 +7042,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.565.0';
+  const VERSION = '8.566.0';
   const PATCHNOTES = [
+    { version:'8.566.0', date:'18.08.2026', changes:[
+      '<strong>Beschriftungen auf der Systemkarte liegen nicht mehr auf fremden Planeten.</strong> Vor allem am Handy lagen lange Gegner-Namen quer über einer Nachbarwelt – „Drachenmark-Horde" auf Drachenmark-3, „Void-Marodeure" auf Aion. Über alle 77 Systeme nachgemessen waren es elf solcher Stellen; jetzt ist es noch eine. Die Karte prüft nach dem Zeichnen, ob eine Beschriftung auf einer belegten Fläche liegt, und rückt sie ein Stück von ihrem eigenen Planeten weg, bis der Platz frei ist – am PC ebenso wie am Handy.',
+      '<strong>Dabei bleibt die Zuordnung erhalten:</strong> Ein Name darf nur ein begrenztes Stück wandern. Findet sich in diesem Rahmen kein freier Platz, bleibt er lieber an seinem Planeten stehen, auch wenn er dort etwas überlappt – ein Name, der so weit gewandert ist, dass er beim Nachbarplaneten steht, wäre die schlechtere Lösung. Genau das war beim Bauen der erste Versuch, und es fiel nur am Bild auf: „Deine Basis" stand plötzlich unter Rhea.'
+    ]},
     { version:'8.565.0', date:'18.08.2026', changes:[
       '<strong>Der Weltboss hat einen fünften Archetyp: den Piratenboss.</strong> Angriffslustige Freibeuter – sie schlagen härter zurück (rund ein Fünftel mehr Verluste), sind dafür schlecht gepanzert: Mit dem richtigen Schiffstyp wiegt die Trefferschwäche <strong>+40% statt +25%</strong>. Wie die vier bestehenden Varianten fasst er die HP nicht an und bleibt damit ertragsneutral – die Belohnung hängt weiterhin allein an der Stufe.',
       '<strong>Warum das kein einzeiliger Nachtrag war:</strong> Der Bossname wechselt im Fünferzyklus, der Archetyp lief im Viererzyklus – die Kombination aus beidem wiederholte sich deshalb erst nach <strong>20 Stufen</strong>. Ein fünfter Archetyp in derselben Tabelle hätte beide Zyklen auf fünf zusammenfallen lassen: Stufe 6 hätte wieder ausgesehen wie Stufe 1, die Abwechslung wäre auf ein Viertel geschrumpft – obwohl eine Variante DAZUKOMMT. Die Reihenfolge steht jetzt in einer eigenen Tabelle mit 20 Positionen: jeder Archetyp genau viermal, nie zweimal hintereinander, und die Stufen 1–4 behalten ihre bisherige Zuordnung.',
@@ -54241,6 +54245,84 @@
   // Vorbelegt mit einer wirkungslosen Funktion, damit ein Tastendruck vor dem Aufbau der Karte
   // nichts wirft.
   let galaxyTastenZoom = function(){};
+  // Schiebt Beschriftungen aus belegten Flächen heraus (KB-16). Läuft NACH dem Einfügen des
+  // Markups, weil erst dann die echte Textbreite feststeht - sie aus der Zeichenzahl zu schätzen
+  // wäre bei einer Proportionalschrift geraten, und ein falsch geschobenes Label erzeugt genau die
+  // Folge-Kollisionen aus Regel 53.
+  //
+  // Gemessen wird mit getBBox() in SVG-Nutzerkoordinaten: unabhängig von Zoom und Kamerastand,
+  // und damit auch stabil, wenn der Spieler gerade hineingezoomt hat.
+  //
+  // Jedes Label weicht WEITER WEG von seinem eigenen Objekt aus (Planetennamen stehen unter ihrer
+  // Scheibe und wandern nach unten, Marker-Namen stehen darüber und wandern nach oben) - so bleibt
+  // die Zuordnung Label->Objekt erhalten. Die eigene Scheibe ist ausgenommen, sonst schöbe sich
+  // jedes Label endlos von sich selbst weg.
+  function kbLabelsEntflechten(svg){
+    if (!svg) return;
+    let texte;
+    try { texte = [...svg.querySelectorAll('text.planet-label')]; } catch (e) { return; }
+    if (!texte.length) return;
+    // Belegte Flächen: die Planetenscheiben und die Marker-Kreise. Beide über ihre BENANNTE Rolle
+    // greifen, nie über den Radius - die clipPath-Maske texturierter Planeten trägt denselben
+    // Radius und liefert eine leere Box (Regel 51).
+    const flaechen = [];
+    svg.querySelectorAll('.planet-node[data-planet], [data-map-npc], [data-map-player]').forEach(g => {
+      let el = g.querySelector('image') || g.querySelector('circle.body');
+      if (!el){
+        const kreise = [...g.querySelectorAll('circle')];
+        if (kreise.length) el = kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a));
+      }
+      if (!el) return;
+      let b; try { b = el.getBBox(); } catch (e) { return; }
+      if (!b || !b.width) return;
+      flaechen.push({ g, x: b.x, y: b.y, w: b.width, h: b.height, mx: b.x + b.width/2, my: b.y + b.height/2 });
+    });
+    if (!flaechen.length) return;
+    const schneidet = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    const gesetzt = [];   // schon platzierte Labels - damit das Ausweichen keine Text-Text-Kollision erzeugt
+    for (const t of texte){
+      let b; try { b = t.getBBox(); } catch (e) { continue; }
+      if (!b || !b.width) continue;
+      const eigen = t.closest('.planet-node[data-planet], [data-map-npc], [data-map-player]');
+      const eigenF = eigen ? flaechen.find(f => f.g === eigen) : null;
+      // Richtung: weg vom eigenen Objekt. Ohne eigenes Objekt (freistehende Beschriftung) nach unten.
+      const richtung = eigenF ? (b.y + b.height/2 >= eigenF.my ? 1 : -1) : 1;
+      let kasten = { x: b.x, y: b.y, w: b.width, h: b.height };
+      let versatz = 0, frei = false;
+      // HÖCHSTENS 21 Einheiten (3 Schritte). Der erste Entwurf erlaubte 42 - damit fand zwar jedes
+      // Label einen freien Platz, aber "Deine Basis" landete unter dem NACHBARPLANETEN Rhea und
+      // gehörte optisch zu ihm. Die Kollision war weg, die Zuordnung Label->Planet kaputt; gesehen
+      // nur am Screenshot, nicht an der Zahl (Regel 42/53). Findet sich in diesem Rahmen kein
+      // freier Platz, bleibt das Label lieber an seinem Objekt - eine überlappende Beschriftung ist
+      // ehrlicher als eine, die beim falschen Planeten steht.
+      let seitlich = 0;
+      const belegt = k => flaechen.some(f => f.g !== eigen && schneidet(k, f)) || gesetzt.some(g => schneidet(k, g));
+      for (let versuch = 0; versuch < 3; versuch++){
+        if (!belegt(kasten)) { frei = true; break; }
+        versatz += richtung * 7;
+        kasten = { x: b.x, y: b.y + versatz, w: b.width, h: b.height };
+      }
+      // Reicht der senkrechte Rahmen nicht, wird SEITLICH ausgewichen - höchstens 12 Einheiten, und
+      // erst nachdem senkrecht nichts frei war. Ein kleiner seitlicher Versatz behält die Zuordnung
+      // (das Label steht weiter direkt an seinem Objekt), ein großer nicht.
+      if (!frei){
+        for (const s of [8, -8, 12, -12]){
+          const k = { x: b.x + s, y: b.y, w: b.width, h: b.height };
+          if (!belegt(k)) { frei = true; versatz = 0; seitlich = s; kasten = k; break; }
+        }
+      }
+      if (!frei) { versatz = 0; seitlich = 0; kasten = { x: b.x, y: b.y, w: b.width, h: b.height }; }
+      if (versatz){
+        const y0 = parseFloat(t.getAttribute('y'));
+        if (!isNaN(y0)) t.setAttribute('y', (y0 + versatz).toFixed(1));
+      }
+      if (seitlich){
+        const x0 = parseFloat(t.getAttribute('x'));
+        if (!isNaN(x0)) t.setAttribute('x', (x0 + seitlich).toFixed(1));
+      }
+      gesetzt.push(kasten);
+    }
+  }
   function systemNachbarOeffnen(richtung){
     const reihe = karteSystemReihenfolge();
     const idx = reihe.findIndex(sy => sy.id === (galaxyOpenSystem || activeSystem));
@@ -54800,6 +54882,10 @@
     if (inner === lastSystemLayerMarkup && svg.childElementCount) return;
     lastSystemLayerMarkup = inner;
     svg.innerHTML = inner;
+    // Beschriftungen aus belegten Flächen schieben (KB-16). Steht bewusst HINTER dem Cache-Riegel:
+    // Wird der Neuaufbau übersprungen, stehen die bereits entflochtenen Texte ohnehin noch da -
+    // ein zweiter Durchgang je Tick wäre reine Layout-Arbeit ohne Wirkung.
+    kbLabelsEntflechten(svg);
     svg.querySelectorAll('[data-planet]').forEach(node => {
       const pid = node.getAttribute('data-planet');
       if (pid === '__home__') return;
