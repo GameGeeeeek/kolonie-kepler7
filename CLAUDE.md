@@ -973,6 +973,34 @@ als root lief, entstanden alle paar Minuten root-eigene `.git`-Objekte. Details 
 der Backend-CLAUDE.md. Die drei Zeilen sind entfernt; wer sie in einer Anleitung von früher
 wiederfindet, trägt sie **nicht** wieder ein.
 
+**KORREKTUR 18.08.2026 – der Satz oben stimmte nur zur Hälfte, und das hat den Backend-Deploy
+49 Stunden lahmgelegt.** Entfernt waren die drei Zeilen aus der **root**-crontab. Sie standen
+ZUSÄTZLICH in Saschas **Nutzer-crontab** (`/var/spool/cron/crontabs/sascha`) und liefen dort
+unverändert weiter – am 18.08. um 10:40 alle drei wortgleich nachgemessen, zwei Tage nach der
+angeblichen Behebung. Am 16.08. um 09:13:16 kollidierte einer dieser Läufe mit dem Webhook-Pull,
+hinterließ `.git/index.lock`, und ab da scheiterte jeder weitere Backend-Pull: Der Pi stand auf
+#109, während elf Commits (#110–#120) aufliefen.
+
+**Für dieses Repo sind daran zwei Dinge wichtig:**
+
+- **Der Frontend-Deploy lief die ganze Zeit sauber** – zum dritten Mal dieselbe Asymmetrie: im
+  Frontend lief nur EIN Cron-Konkurrent, im Backend zwei. Ein grüner Frontend-Deploy beweist
+  weiterhin nichts über den Backend-Deploy. Nach jedem Merge, der beide Repos betrifft, gehört die
+  401/404-Routenmessung dazu (Einzelheiten in der Backend-CLAUDE.md).
+- **Die Frontend-Cron-Zeile ist am 18.08. mit entfernt worden.** Sie war reine Doppelarbeit: Der
+  Webhook kopiert seit dem 05.08. das komplette Set (`*.html`, `*.png`, `robots.txt`,
+  `sitemap.xml`, `manifest.json`, `service-worker.js`), die Cron-Zeile nur
+  `weltraum_kolonie.html`. Seither ist der Webhook wirklich die einzige Auslieferung – vorher war
+  dieser Satz eine Behauptung.
+
+**Die übertragbare Lehre, unabhängig vom Pi:** Eine Prüfung, die nur an EINEM Ort nachsieht,
+beantwortet stillschweigend eine andere Frage als die gestellte. Das ist dieselbe Familie wie die
+Fernreferenz-Falle in `tests/run.js` („0 Commits hinterher" hieß nie „aktuell", sondern nur „auf
+dem Stand des letzten Holens"). Cron-Zeilen können in fünf Ablagen stehen: der eigenen crontab,
+der von root, `/etc/crontab`, `/etc/cron.d/` und als systemd-Timer. Und Datei-Eigentümer sind
+dabei kein Beweis – root darf in eine sascha-eigene Logdatei anhängen, ohne dass sich der
+Eigentümer ändert.
+
 **Was daraus für Auskünfte folgt:** Wenn eine Änderung nach einem Merge nicht live ist, war früher
 plausibel „der Cron-Job kommt gleich". Das gilt nicht mehr – kommt sie nicht an, ist der Webhook
 selbst gescheitert, und sein Fehler steht ausschließlich im Container-Log
