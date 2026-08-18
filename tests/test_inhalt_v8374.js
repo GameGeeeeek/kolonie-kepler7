@@ -180,8 +180,32 @@ function schnitt(text, von, bis, ohneEnde){
   check('4: der Signalring liest den STARTPLANETEN, nicht den angezeigten',
     /function expeditionRewardMult\(rewardMult, planetKey\)\{/.test(src)
     && /const ring = planetKey \? orbitalStationOf\(planetKey\) : null;/.test(src));
+  // Geprueft wird die REGEL, nicht die Momentaufnahme (Hausregel 3): `signal` muss ein SUMMAND
+  // derselben Gruppe sein wie die uebrigen Expeditions-Boni. Vorher stand hier die exakte
+  // Zeichenfolge "+ codexExpeditionBonus() + signal)" - am 18.08.2026 kam mit der
+  // Aufklaerungs-Doktrin ein weiterer, voellig regelkonformer Summand DAZWISCHEN, und der Test
+  // fiel auf korrektem Code durch. Genau der Fall, den test_recycler_sammelauftrag schon einmal
+  // hatte: Ein weiterer Summand ist kein Regelbruch, sondern der Beleg, dass die Gruppe benutzt
+  // wird.
+  // KLAMMERZAEHLUNG statt Regex. Der erste Anlauf nahm "(1 + ascBonus('expedition') ... ) *
+  // seasonalLootMult" nicht-gierig - und spannte damit ueber die Multiplikations-Grenze hinweg:
+  // Eine Gegenprobe, die `signal` bewusst als EIGENE Multiplikation herausloeste, blieb gruen,
+  // weil der Ausschnitt einfach bis in "(1 + signal)" weiterlief. Eine gruene Gegenprobe ist der
+  // Befund, nicht der Beweis (Hausregel 26).
+  const expGruppe = (() => {
+    const start = src.indexOf("(1 + ascBonus('expedition')");
+    if (start < 0) return '';
+    let tiefe = 0;
+    for (let i = start; i < src.length; i++){
+      if (src[i] === '(') tiefe++;
+      else if (src[i] === ')'){ tiefe--; if (!tiefe) return src.slice(start, i + 1); }
+    }
+    return '';
+  })();
+  check('4-vorab: die Expeditions-Bonusgruppe wurde im Quelltext gefunden', expGruppe.length > 0);
   check('4: er zahlt additiv in die vorhandene gedeckelte Gruppe ein',
-    /\+ codexExpeditionBonus\(\) \+ signal\)/.test(src));
+    /\+\s*signal\b/.test(expGruppe) && /codexExpeditionBonus\(\)/.test(expGruppe),
+    expGruppe.slice(0, 200));
   check('4: die Aufloesung reicht den Startplaneten durch',
     /expeditionRewardMult\(m\.rewardMult !== undefined \? m\.rewardMult : 1, planetKey\)/.test(src));
   check('4: und die Vorschau ebenfalls',

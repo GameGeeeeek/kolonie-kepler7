@@ -283,14 +283,23 @@ function arrAus(name){
   // Starthafen-Welt und ein Buendnis mit den Void-Marodeuren. Beide werden hier injiziert - so
   // prueft der Test weiterhin NUR den Tiefenhafen und faellt nicht darauf herein, dass eine der
   // beiden neuen Quellen den Unterschied macht.
-  const SF = new Function('state, abgrundKanalBonus, tiefenschiffBonus, planetRoleOf, veteranRoleExtra, factionOutsideBonus',
+  // doctrineBonusOf (18.08.2026) ist der vierte Summand derselben Gruppe (Bergungs-Doktrin) und
+  // wird aus demselben Grund wie die zwei davor mit 0 injiziert: Der Abschnitt misst den
+  // TIEFENHAFEN, nicht die Doktrin. Ohne die Injektion stuerzt der Block mit einem ReferenceError
+  // ab - und ein Absturz beim Aufbau der Messvorrichtung nimmt alle folgenden Pruefungen mit,
+  // waehrend der rote Exit-Code aussieht wie ein echter Befund (Hausregel 34).
+  const SF = new Function('state, abgrundKanalBonus, tiefenschiffBonus, planetRoleOf, veteranRoleExtra, factionOutsideBonus, doctrineBonusOf',
     'const PLANET_ROLE_TIEFENHAFEN = '+(js.match(/const PLANET_ROLE_TIEFENHAFEN = ([\d.]+);/)||[])[1]+';\n'
     + fak + '; return abgrundSplitterFaktor;');
-  const baue = (rolle, vet, voidB) => SF({}, ()=>0, ()=>0, ()=>(rolle?{key:rolle}:null), ()=>vet||0, ()=>voidB||0);
+  const baue = (rolle, vet, voidB, dok) => SF({}, ()=>0, ()=>0, ()=>(rolle?{key:rolle}:null), ()=>vet||0, ()=>voidB||0, ()=>dok||0);
   const ohne = baue(null, 0, 0)({}, 'home');
   const mit  = baue('deepport', 0, 0)({}, 'home');
   check('11: mit Hafen faellt mehr ab als ohne', mit > ohne, { ohne, mit });
   check('11: eine ANDERE Rolle bringt nichts', baue('mining', 0, 0)({}, 'home') === ohne);
+  // Und die Bergungs-Doktrin als vierter Summand derselben Gruppe - additiv, nicht multiplikativ.
+  check('11: die Doktrin zahlt additiv in dieselbe Gruppe ein',
+    Math.abs(baue('deepport', 0, 0, 0.21)({}, 'home') - (mit + 0.21)) < 1e-9,
+    { mitDoktrin: baue('deepport', 0, 0, 0.21)({}, 'home'), ohneDoktrin: mit });
   // Die beiden neuen Quellen (v8.372.0) muessen ebenfalls SUMMANDEN derselben Gruppe sein - eine
   // eigene Multiplikation waere genau das aufschaukelnde Muster, vor dem CLAUDE.md warnt.
   check('11: der Veteranenrang des Starthafens zahlt additiv in dieselbe Gruppe ein',
