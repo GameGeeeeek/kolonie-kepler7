@@ -6094,6 +6094,9 @@
     // Wirkungs-Vorschau für eine gesperrte Verteidigungsanlage. Bisher stand auf gesperrten Karten nur
     // die fehlende Voraussetzung - was die Anlage überhaupt leistet, sah man erst nach dem Freischalten.
     // Zeigt die echten Werte je Stufe aus der Def, damit die Zahlen nicht auseinanderlaufen können.
+    // Hinweis: Die Balken zur Vorschau hängen an derselben Stelle wie dieser Text (siehe die drei
+    // Aufrufstellen in buildingRowHtml) - so steht auf einer gesperrten Karte dieselbe Bildsprache
+    // wie auf einer gebauten, nur mit Stufe 0.
     function defenseLockedPreview(def){
       if (def.category !== 'defense') return '';
       // Zwei Anlagen tragen ihre Wirkung nicht in atkVal/defVal (beide stehen dort auf 0), sondern in
@@ -7026,8 +7029,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.560.0';
+  const VERSION = '8.561.0';
   const PATCHNOTES = [
+    { version:'8.561.0', date:'18.08.2026', changes:[
+      '<strong>Die Verteidigungsanlagen haben jetzt Kennwert-Balken – wie die Schiffe in der Werft.</strong> Jede Anlage zeigt <strong>Angriff</strong>, <strong>Verteidigung</strong> und <strong>Schild</strong> als kleine Balken direkt unter dem Namen, jeder im Verhältnis zur stärksten Anlage. Damit sieht man auf einen Blick, dass ein Schildgenerator zäh und ein Lasergeschütz offensiv ist, ohne Zahlen zu vergleichen – vorher stand dort nur eine Textzeile mit Mitteldots, in der sich zwei Anlagen nicht gegenüberstellen ließen. Die Balken zeigen den Wert <em>je Stufe</em>; was deine aktuelle Stufe daraus macht, nennt der Tooltip, und die gewohnte Zeile „aktuell → nach Ausbau" bleibt daneben stehen. <strong>Der Schild-Balken ist dabei keine neue Zahl:</strong> Jede Verteidigungsanlage trägt zusätzlich 40% ihres Verteidigungswerts als Schild bei – das floss längst in deine Verteidigungsstärke ein, war aber nirgends zu sehen.',
+      '<strong>Zwei Anlagen zeigen bewusst keine Balken:</strong> Abhorchposten und Mondschildgenerator wirken nicht über Angriff und Verteidigung, sondern über eigene Regeln (Vorwarnzeit bzw. Schutz vor Mondzerstörern). Drei leere Balken hätten dort nur so ausgesehen, als wären die Anlagen wertlos – ihre Wirkung steht wie gehabt im Text.'
+    ]},
     { version:'8.560.0', date:'18.08.2026', changes:[
       '<strong>Neu: Gefechtsvorräte – du kannst deine Kämpfe mit Tier-2-Material verstärken.</strong> Zwei Vorräte stehen im Flotte-Tab bei den übrigen Tier-2-Verbrauchsgegenständen: <strong>Nano-Gefechtsköpfe</strong> (40 Nanolegierungen je Kampf, +8 % Angriffskraft) und <strong>Schildkondensatoren</strong> (25 Hochenergiekristalle je Kampf, +8 % Verteidigung). Beide sind Schalter, keine Einmal-Aktionen: Steht ein Vorrat auf „aktiv", wird er bei jedem passenden Kampf eingesetzt und dabei bezahlt.',
       '<strong>Im Neuzustand sind beide ausgeschaltet</strong> – ein Vorrat, der sich von selbst einschaltet, würde Material verbrauchen, das du nie freigegeben hast, und zwar auch in Kämpfen, die du gar nicht mitbekommst. Bezahlt wird im Moment des Kampfes, aus dem Bestand von genau diesem Moment. Reicht er nicht, entfällt der Vorrat für diesen Kampf und du bekommst es gesagt – der Kampf findet trotzdem statt. Ein Angriff, der an fehlenden Nanolegierungen scheitert, wäre eine Falle statt einer Entscheidung.',
@@ -20252,6 +20259,48 @@
     m.def = Math.max(m.def, Math.round(220*0.4) + (SUPERSCHLACHTSCHIFF_SHIELD||0));
     shipStatMaxCache = m;
     return m;
+  }
+  // Dasselbe für VERTEIDIGUNGSANLAGEN (VT-1, Auftrag Sascha "bei verteidigung auch wie bei flotte
+  // die balken"). Bewusst dieselbe CSS-Klasse .sstat und dieselben Farben wie bei den Schiffen:
+  // Angriff rot, Schild cyan, Verteidigung violett - eine zweite Bildsprache für dieselbe Aussage
+  // wäre genau die Art zweiter Anzeigestelle, die in diesem Projekt regelmäßig auseinanderläuft.
+  let defenseStatMaxCache = null;
+  function defenseStatMax(){
+    if (defenseStatMaxCache) return defenseStatMaxCache;
+    const m = { atk:1, def:1, shield:1 };
+    for (const d of BUILDING_DEFS){
+      if (d.category !== 'defense') continue;
+      m.atk = Math.max(m.atk, d.atkVal||0);
+      m.def = Math.max(m.def, d.defVal||0);
+      m.shield = Math.max(m.shield, d.shield||0);
+    }
+    defenseStatMaxCache = m;
+    return m;
+  }
+  // Die Balken zeigen den Wert JE STUFE - die zwischen Anlagen vergleichbare Größe, genau wie die
+  // Schiffsbalken "je Schiff" zeigen. Der Titel nennt zusätzlich, was die eigene Stufe daraus macht.
+  //
+  // Rückgabe '' für Anlagen ohne Kampfwerte (Abhorchposten, Mondschild): Sie tragen ihre Wirkung in
+  // eigenen Regeln, drei Nullbalken wären dort nichtssagend - dieselbe Ausnahme, die auch
+  // defenseLockedPreview() macht.
+  function defenseStatBarsHtml(def, lvl){
+    if (!def || def.category !== 'defense') return '';
+    const atk = def.atkVal||0, dv = def.defVal||0, sh = def.shield||0;
+    if (!atk && !dv) return '';
+    const m = defenseStatMax();
+    const stufe = lvl||0;
+    const row = (k, val, max, color, tip) => {
+      const pct = max>0 ? Math.max(0, Math.min(100, (val/max)*100)) : 0;
+      const gesamt = stufe>0 ? ' – bei deiner Stufe ' + stufe + ': ' + fmt(val*stufe) : ' – noch nicht gebaut';
+      return '<div class="sstat" title="' + tip + gesamt + ' – Balken im Verhältnis zur stärksten Anlage (' + max + ').">'
+        + '<span class="k">' + k + '</span><span class="tr"><i style="width:' + pct.toFixed(1) + '%; background:' + color + ';"></i></span>'
+        + '<span class="v">' + val + '</span></div>';
+    };
+    return '<div class="ship-stats">'
+      + row('Angriff', atk, m.atk, '#e24b4a', 'Angriffspunkte je Stufe (Gegenschlag der Anlage)')
+      + row('Vert.', dv, m.def, '#7f77dd', 'Verteidigungspunkte je Stufe')
+      + row('Schild', sh, m.shield, '#5ce1ff', 'Schildpunkte je Stufe (40% der Verteidigung, zählt zusätzlich)')
+      + '</div>';
   }
   // Vier Kennwerte als beschriftete Mikro-Balken statt einer Fliesstext-Zeile mit Mitteldots.
   //
@@ -57223,6 +57272,7 @@
                 <div class="bname">${def.name} <span class="lvl-pill">nur auf Monden</span></div>
                 <div class="bmeta">Dieses Gebäude kann nur auf einem kolonisierten Mond errichtet werden - zum Mond wechseln (☾-Symbol), falls vorhanden.</div>
                 ${defenseLockedPreview(def) ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${defenseLockedPreview(def)}</div>` : ''}
+                ${defenseStatBarsHtml(def, 0)}
               </div>
             </div>
           </div>
@@ -57239,6 +57289,7 @@
                 <div class="bname">${def.name} <span class="lvl-pill">gesperrt</span></div>
                 <div class="bmeta">Benötigt 1x ${def.unlockItem} (du hast: ${have}) · sehr seltener Fund bei Erkundungsmissionen</div>
                 ${defenseLockedPreview(def) ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${defenseLockedPreview(def)}</div>` : ''}
+                ${defenseStatBarsHtml(def, 0)}
               </div>
             </div>
             <button class="buy ${canUnlock?'affordable':''}" data-unlock="${def.key}" ${canUnlock?'':'disabled'}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>Freischalten</button>
@@ -57255,6 +57306,7 @@
                 <div class="bname">${def.name} <span class="lvl-pill">gesperrt</span></div>
                 <div class="bmeta">Benötigt Forschung: ${reqNames}</div>
                 ${defenseLockedPreview(def) ? `<div class="bmeta" style="color:#c3bef5;"><i class="ti ti-star" aria-hidden="true"></i> ${defenseLockedPreview(def)}</div>` : ''}
+                ${defenseStatBarsHtml(def, 0)}
               </div>
             </div>
           </div>
@@ -57436,6 +57488,7 @@
             <div style="min-width:0;">
               <div class="bname">${def.name} <span class="lvl-pill">Lv. ${lvl}</span>${maxed?` <span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max</span>`:''}</div>
               ${malusLine}
+              ${defenseStatBarsHtml(def, lvl)}
               <details class="karten-info" data-keep-open="binfo:${def.key}"${detailsOpenAttr('binfo:'+def.key)}>
                 <summary>Details</summary>
                 <div class="prodline">${prodLine}</div>
