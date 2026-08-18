@@ -42,8 +42,13 @@ function funktionsBlock(name){
   check('1-anker: executeRaid ist auffindbar und nicht leer', block.length > 500, block.length);
   check('1a: die Aufloesung wuerfelt die drei Phasen mit der Kraft OHNE Konter (kein Doppelzaehlen)',
     /resolveBattlePhases\(raiderPowerBase,/.test(block), (block.match(/resolveBattlePhases\([^)]*/) || [])[0]);
+  /* Geprueft wird die REGEL "genau drei Argumente, also NPC-Voreinstellung", nicht der Name des
+     zweiten (Arbeitsregel 3). Er hiess bis v8.557.0 dpMitAufstellung und heisst seit den
+     Gefechtsvorraeten dpMitVorrat - die gepruefte Eigenschaft hat sich dabei nicht geaendert,
+     der Test fiel trotzdem durch. */
   check('1b: die NPC-Deckel sind die Voreinstellung - keine eigenen Grenzen uebergeben',
-    /resolveBattlePhases\(raiderPowerBase, dpMitAufstellung, konterMult\)/.test(block));
+    /resolveBattlePhases\(raiderPowerBase,\s*\w+,\s*konterMult\)/.test(block),
+    (block.match(/resolveBattlePhases\([^)]*\)/) || ['-'])[0]);
   check('1c: der alte Ein-Wurf-Deckel 10-90% ist aus der ENTSCHEIDUNG verschwunden',
     !/repelChance/.test(block), (block.match(/repelChance[^\n]*/) || ['-'])[0]);
   const berichte = (block.match(/phasen:kampf\.phasen/g) || []).length;

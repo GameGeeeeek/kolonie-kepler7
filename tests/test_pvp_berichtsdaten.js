@@ -82,10 +82,15 @@ function schnitt(von, bis){
   // Der Solo-Pfad wuerfelte die Phasen schon, warf sie aber weg.
   check('2: Solo-Pfad haelt das Phasenergebnis fest, statt nur .success zu lesen',
     /const phasenSim = resolveBattlePhases\(/.test(src) && /phasen: phasenSim\.phasen/.test(src));
+  /* Der erste Parameter wird ueber \w+ gematcht statt woertlich als `myPower`: Seit den
+     Gefechtsvorraeten (v8.558.0) heisst er myPowerVorrat, weil der Vorrat vor dem Wurf
+     eingerechnet wird. Die geprueften Eigenschaften - dieselbe Chancen-Funktion, dieselben
+     PvP-Deckel wie der Server - sind davon unberuehrt (Arbeitsregel 3: die Regel pruefen,
+     nicht die Momentaufnahme). */
   check('2: Solo-Pfad nennt dieselbe Chance wie die Vorschau (battleWinChance, nicht selbst gerechnet)',
-    /chancePct: Math\.round\(battleWinChance\(myPower, theirDefenseEstimate, konterSim, PVP_PHASE_MIN, PVP_PHASE_MAX\) \* 100\)/.test(src));
+    /chancePct: Math\.round\(battleWinChance\(\w+, theirDefenseEstimate, konterSim, PVP_PHASE_MIN, PVP_PHASE_MAX\) \* 100\)/.test(src));
   check('2: Solo-Pfad nutzt dieselben PvP-Deckel wie der Server',
-    /resolveBattlePhases\(myPower, theirDefenseEstimate, konterSim, PVP_PHASE_MIN, PVP_PHASE_MAX\)/.test(src));
+    /resolveBattlePhases\(\w+, theirDefenseEstimate, konterSim, PVP_PHASE_MIN, PVP_PHASE_MAX\)/.test(src));
   // Ohne Zielflotte (Gegner ohne Bestenlisten-Eintrag) darf kein leeres Feld entstehen.
   check('2: Solo-Pfad setzt defenderFleet nur, wenn es wirklich eine gibt',
     /if \(Object\.keys\(zielFlotteSim\)\.length\) simDetails\.defenderFleet = zielFlotteSim;/.test(src));

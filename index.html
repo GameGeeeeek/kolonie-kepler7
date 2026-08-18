@@ -30518,15 +30518,22 @@
       // die der Server-Pfad liefert, damit sich Solo- und Server-Modus auch im Bericht gleichen.
       // KEIN `defenseBefore`: Der Bestenlisten-Eintrag fuehrt keine Gebaeudeaufstellung des Ziels
       // mit; hier ist sie schlicht unbekannt und wird deshalb nicht behauptet.
-      const phasenSim = resolveBattlePhases(myPower, theirDefenseEstimate, konterSim, PVP_PHASE_MIN, PVP_PHASE_MAX);
+      /* Gefechtsvorrat auch im SOLO-Pfad (Etappe B1). Ohne diese Zeilen haette derselbe Angriff je
+         nach Serververfuegbarkeit zwei verschiedene Ergebnisse - und der Vorrat waere im Solo-Modus
+         eine Einstellung ohne Wirkung, die trotzdem im Schalter "aktiv" steht. Die Abbuchung
+         geschieht hier genau einmal, wie im Server-Pfad. */
+      const vorratSim = gefechtsvorratEinsetzen('angriff');
+      const myPowerVorrat = Math.round(myPower * vorratSim.mult);
+      const phasenSim = resolveBattlePhases(myPowerVorrat, theirDefenseEstimate, konterSim, PVP_PHASE_MIN, PVP_PHASE_MAX);
       const success = phasenSim.success;
       const simDetails = {
         phasen: phasenSim.phasen,
-        chancePct: Math.round(battleWinChance(myPower, theirDefenseEstimate, konterSim, PVP_PHASE_MIN, PVP_PHASE_MAX) * 100),
-        counterMult: konterSim
+        chancePct: Math.round(battleWinChance(myPowerVorrat, theirDefenseEstimate, konterSim, PVP_PHASE_MIN, PVP_PHASE_MAX) * 100),
+        counterMult: konterSim,
+        vorratAngriff: vorratSim.eingesetzt
       };
       if (Object.keys(zielFlotteSim).length) simDetails.defenderFleet = zielFlotteSim;
-      const statLine = ' (Angriffspunkte '+myPower+' vs. geschätzte Verteidigungspunkte von '+name+': '+theirDefenseEstimate+')';
+      const statLine = ' (Angriffspunkte '+myPowerVorrat+' vs. geschätzte Verteidigungspunkte von '+name+': '+theirDefenseEstimate+')';
       if (success){
         const gained = Math.round((15 + Math.floor(Math.random()*20)) * (warTag?1.5:1));
         awardBattlePoints(gained);
@@ -30538,7 +30545,7 @@
           log((m.fleetName||'Flotte')+': Duell gegen '+name+' gewonnen! +'+gained+' Kampfpunkte'+statLine+'.'+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' Kein echter Ressourcenverlust für den Gegner (kein eigener Server aktiv).'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
-        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostWinSim, debris:combatDebrisOf(ownLostWinSim), fleet:m.composition||fleet, ...simDetails };
+        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:myPowerVorrat, vorratAngriff:vorratSim.eingesetzt, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostWinSim, debris:combatDebrisOf(ownLostWinSim), fleet:m.composition||fleet, ...simDetails };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       } else {
@@ -30547,7 +30554,7 @@
         const ownLostLossSim = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossSim);
         if (showLog !== false) log((m.fleetName||'Flotte')+': Duell gegen '+name+' verloren. +3 Kampfpunkte für den Versuch'+statLine+'.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':''), 'ti-shield');
-        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:myPower, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostLossSim, debris:combatDebrisOf(ownLostLossSim), fleet:m.composition||fleet, ...simDetails };
+        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:myPowerVorrat, vorratAngriff:vorratSim.eingesetzt, defensePower:theirDefenseEstimate, simulated:true, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostLossSim, debris:combatDebrisOf(ownLostLossSim), fleet:m.composition||fleet, ...simDetails };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       }
@@ -31088,9 +31095,10 @@
     // eigene Flotte. Der Server wendet ihn in resolveAttack an derselben Stelle an (auf die rohe
     // Angriffskraft, vor den Phasen), damit Vorschau und Kampfergebnis dieselbe Zahl meinen.
     const spyEdge = isMeForCompare ? 0 : spyIntelEdge(entry.id);
+    const vorschauVorrat = gefechtsvorratVorschau('angriff');
     if (!isMeForCompare && useBackend()){
       const previewFleet = buildAttackFleet(state.activeBasePlanet, currentFleet());
-      previewPower = Math.round(attackPower(previewFleet, state.activeBasePlanet) * (1 + spyEdge));
+      previewPower = Math.round(attackPower(previewFleet, state.activeBasePlanet) * (1 + spyEdge) * vorschauVorrat.mult);
     }
     // Echte Siegchance statt eines Ja/Nein-Urteils (25.07.2026). Vorher stand hier "erfolgversprechend"
     // bzw. "aussichtslos", rein aus dem Vergleich Angriffskraft >= Verteidigung. Seit v8.295.0 löst der
@@ -31124,6 +31132,16 @@
           + Object.entries(pmSnapshot).sort((x,y)=>y[1]-x[1]).map(([k,mk])=>shipDisplayName(k)+' Mk '+SHIP_MARK_ROMAN[mk-1]).join(' · ')
           + (pmAnteil>0?` – davon +${pmAnteil}% Angriffskraft (bereits eingerechnet)`:'') + `</div>`;
       }
+    }
+    /* Gefechtsvorrat in der Vorschau (Etappe B1). Er steckt seit der Zeile oben in previewPower;
+       ohne diese Zeile waere die hoehere Zahl unerklaerlich - exakt die Begruendung, mit der die
+       Werftmarken hier gelandet sind. Angezeigt wird nur, was auch WIRKLICH bezahlbar ist:
+       gefechtsvorratVorschau filtert auf den Bestand, der Kampf tut es gleich noch einmal. */
+    let previewVorratHtml = '';
+    if (vorschauVorrat.bereit.length && !isMeForCompare){
+      previewVorratHtml = `<div class="bmeta" style="color:#e08a6a;margin-top:5px;font-size:10.5px;"><i class="ti ti-arrow-up" aria-hidden="true"></i> Gefechtsvorrat: `
+        + vorschauVorrat.bereit.map(v => escapeHtml(v.name) + ' (' + v.menge + ' ' + escapeHtml(resLabel(v.res)) + ')').join(' · ')
+        + ` – zusammen +${Math.round((vorschauVorrat.mult - 1) * 100)}% Angriffskraft, bereits eingerechnet · wird beim Kampf verbraucht</div>`;
     }
     // Aufklärungsdaten (Spionage): gespeichertes Intel zum Ziel, mit Frische-Einstufung. Macht die
     // eigene Spionage endlich nutzbar - vorher wurde state.spyIntel nur geschrieben, nie gelesen.
@@ -31220,7 +31238,7 @@
           preEl.innerHTML = `<div class="pp-h">⚔ Angriffs-Vorschau</div>`+ intelLine +
             `<div class="pp-gauge-row"><span>Deine Angriffskraft <b style="color:#6fb2ee;">${fmt(previewPower)}</b></span><span>Verteidigung <b style="color:${good?'#7fe0be':'#ff9d8f'};">${fmt(defVal)}</b></span></div>`+
             `<div class="pp-gauge"><div class="fill" style="width:${fill}%;"></div></div>`+
-            `<div class="pp-verdict">${verdict}</div>` + previewMarkHtml;
+            `<div class="pp-verdict">${verdict}</div>` + previewMarkHtml + previewVorratHtml;
         }
       } else preEl.style.display = 'none';
     }
@@ -37690,6 +37708,15 @@
       { title:'Exklusive Event-Module', body:'Jedes der sechs Sammel-Events hat zusätzlich ein <strong>eigenes Schiffsklassen-Modul</strong>, das es AUSSCHLIESSLICH während der Eventlaufzeit gibt: „Kometenschild-Projektor" (Meteoritensturm), „Verstärkte Enterhaken" (Piratenüberfall), „Phasenfeld-Stabilisator" (Void-Anomalie), „Stabilisierter Riss-Kern" (Leerenriss-Welle), „Depeschen-Relais" (Fraktionskonflikt) und „Erzgreifer-Ausleger" (Goldrausch). Sie werden wie die Event-Teile auf erfolgreichen <strong>Expeditionen</strong> gefunden, aber seltener (2,5% statt 5%) – vom Bauteil brauchst du sechs, vom Modul reicht eines. Im normalen Modul-Fundpool tauchen sie nie auf: Läuft das Event aus, ist das Modul bis zur nächsten Kalenderrunde nicht mehr erhältlich. Dafür starten sie erst bei Seltenheit „Selten" (30% Episch, 10% Legendär). Jedes Modul wirkt auf die Schiffsklasse seines Event-Schiffs – fünf davon auf die neue Klasse <strong>„Event-Schiffe"</strong> (Enterschiff, Phantomschiff, Riftwächter, Gesandtenschiff, Schürfschiff), die bis dahin überhaupt keine Klassen-Module tragen konnte; das Meteoritensturm-Modul wirkt auf das Jäger-Geschwader, wo der Kometenjäger einsortiert ist. Wer alle sechs besitzt, schaltet den Erfolg <strong>„Zeitzeuge"</strong> frei.' }
     ]},
     { key:'kampf', icon:'ti-sword', title:'Kampf', entries:[
+      /* Zahlen aus GEFECHTSVORRAETE ABGELEITET, nicht eingetippt - die Tabelle steht weiter oben in
+         der Datei, der Zugriff ist hier also sicher (Reihenfolge gemessen, Arbeitsregel 38). Damit
+         kann dieser Text bei einer Balance-Aenderung nicht zur zweiten Anzeigestelle mit der alten
+         Annahme werden. */
+      { title:'Gefechtsvorräte', body:'Seit dem 18.08.2026 kannst du deine Kämpfe mit <strong>Tier-2-Material verstärken</strong>. Ein Vorrat ist keine einmalige Aktion, sondern ein <strong>Schalter</strong>: Steht er auf „aktiv", wird er bei jedem passenden Kampf eingesetzt und dabei bezahlt. Die Schalter liegen im Flotte-Tab bei den übrigen Tier-2-Verbrauchsgegenständen und stehen im Neuzustand <strong>aus</strong> – ein Vorrat, der sich von selbst einschaltet, würde Material verbrauchen, das du nie freigegeben hast.<br><br>'
+        + GEFECHTSVORRAETE.map(v => '<strong>' + v.name + '</strong>: ' + v.menge + ' ' + resLabel(v.res)
+            + ' je Kampf, +' + Math.round(v.bonus*100) + '% '
+            + (v.seite === 'angriff' ? 'Angriffskraft bei deinen Angriffen' : 'Verteidigung, wenn du angegriffen wirst')).join('<br>')
+        + '<br><br><strong>Bezahlt wird im Moment des Kampfes</strong>, nicht beim Absenden der Flotte – und aus dem Bestand von genau diesem Moment. Reicht er nicht, entfällt der Vorrat für diesen Kampf; der Kampf findet trotzdem statt. Ein Angriff, der an fehlenden Nanolegierungen scheitert, wäre eine Falle statt einer Entscheidung.<br><br><strong>Der Verteidigungs-Vorrat wirkt auch, während du offline bist</strong> – er wird beim Angriff auf dich verbraucht. Genau deshalb steht er im Neuzustand aus: Er greift in Kämpfe ein, die du gar nicht mitbekommst.<br><br><strong>Gegen echte Spieler rechnet der Server.</strong> Er liest deine Einstellung aus deinem Spielstand, prüft deinen Bestand und bucht selbst ab – die Angriffsvorschau zeigt deshalb dieselbe Zahl, die im Kampf gilt. Beide Kampfberichte weisen aus, was eingesetzt wurde, deins wie das des Gegners.<br><br><strong>Warum es sie gibt:</strong> Die Veredelungsketten hatten zu wenig laufende Abnehmer. Eine volle Kette hört auf, ihre Eingangsstoffe zu verbrauchen – die größte Senke des Spiels stand ausgerechnet dann still, wenn du viel hattest. Gefechtsvorräte skalieren mit deiner <em>Aktivität</em> statt mit deiner Kontogröße: Wer nicht kämpft, zahlt nichts.' },
       { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.<br><br><strong>Seit dem 01.08.2026 hängt am Rang mehr als eine Kampfzahl</strong> – was genau, entscheidet die <strong>Rolle</strong> der Welt. Auf einer <strong>Festungs-Welt</strong> zählt der Rang auf die Verteidigung ein zweites Mal (bei „Legende" also +8% zusätzlich zu den +8%, die er ohnehin gibt). Auf einer <strong>Werft-Welt</strong> verkürzt er zusätzlich die Schiffsbauzeit dieser Welt (bis −12%). Auf einem <strong>Tiefenhafen</strong> bringt er zusätzlich Abgrundsplitter aus Tauchgängen, die von dort starten (bis +16%). Die übrigen vier Rollen bekommen bewusst nichts: Sie haben ihre eigene Wirkung, und Kampferfahrung, die Forschung beschleunigt, wäre eine Zahl ohne Geschichte. Welche Zusatzwirkung deine aktuelle Basis hat, steht direkt unter dem Veteranenrang.<br><br><strong>Seit dem 02.08.2026 zieht die Erfahrung mit um.</strong> Vorher klebte sie am Boden: Eine Flotte, die fünfzig Gefechte überstanden hatte und dann verlegt wurde, kam als Rekrut an, und der Rang blieb auf der alten Welt liegen – auch wenn dort kein Schiff mehr stand. Jetzt wandert sie <strong>anteilig</strong> mit: Wer die halbe Kampfflotte verlegt, nimmt die halbe Erfahrung mit. Sie wird beim Abflug abgezogen und reist mit; geht das Ziel unterwegs verloren, kehrt sie mit den Schiffen zurück. Gerechnet wird nur mit <em>Kampfschiffen</em> – ein Konvoi aus Frachtern hat keine Gefechtserfahrung zu vergeben.' },
       { title:'Weltboss: fünf Namen, vier Archetypen', body:'<strong>Seit dem 02.08.2026 hat der Weltboss Varianten.</strong> Name und Archetyp leiten sich aus seiner Stufe ab, wiederholen sich also erst nach 20 Stufen: fünf Namen (Leviathan der Leere, Chronos-Verschlinger, Die Singularität, Wächter des Abgrunds, Nova-Titan) und vier Archetypen. <strong>Wandelnder Koloss</strong> ist der Normalfall. <strong>Panzer-Bastion</strong> lässt den Schwächen-Bonus kaum greifen (+15% statt +25%) und kostet rund ein Drittel mehr Schiffe. <strong>Schwarm-Titan</strong> trifft schlechter – ein Drittel weniger Verluste. <strong>Phasen-Phantom</strong> macht die Schwäche entscheidend: +50% statt +25%. Die <strong>Trefferschwäche</strong> (ein bestimmter Schiffstyp) steht jetzt <em>vor</em> dem Angriff in der Boss-Karte, samt Hinweis, ob deine Angriffsflotte sie überhaupt dabeihat – vorher erfuhr man sie erst aus dem Bericht danach. Die <strong>HP bleiben bewusst allein von der Stufe abhängig</strong>: Die Belohnung hängt an der Stufe, ein zäherer oder dünnerer Boss würde also still die Belohnungsrate verschieben.<br><br>Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
       { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
@@ -38632,6 +38659,7 @@
         // attackPowerRaw hier). Die Zeile erklaert also die Zahl, die oben steht - sie erfindet sie
         // nicht nachtraeglich.
         body += markReportLine(r.marken, r.markAtkShare);
+        body += vorratReportLine(r.vorratAngriff);
         // Kampfverlauf und Gegnerseite (02.08.2026). Bis hierher war der PvP-Bericht der einzige
         // Kampfbericht ohne Phasenurteile, ohne Konterzeile und ohne die Gegenseite - obwohl der
         // Server all das ausrechnete. Die Helfer geben bei aelteren Berichten (und gegen ein noch
