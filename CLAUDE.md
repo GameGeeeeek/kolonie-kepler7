@@ -1371,6 +1371,31 @@ der von root, `/etc/crontab`, `/etc/cron.d/` und als systemd-Timer. Und Datei-Ei
 dabei kein Beweis – root darf in eine sascha-eigene Logdatei anhängen, ohne dass sich der
 Eigentümer ändert.
 
+**Nachtrag 18.08.2026, abends – fünftes Mal, gemessen unmittelbar nach einer eigenen Auslieferung.**
+Nach dem Merge von v8.569.0 (Frontend) und #127 (Backend) stand das Frontend binnen Sekunden live auf
+`8.569.0`, während der Backend-Deploy hing: `/api/festung/angriff` aus #126 antwortete **404**, und
+zwar auch mehrere Minuten später noch. Dem Pi fehlten damit #126 und #127. Dieselbe Asymmetrie wie
+am 14./15./16./18.08. – der Frontend-Deploy beweist weiterhin nichts über den Backend-Deploy.
+
+**Der Schaden war diesmal die harmlose Sorte, und das ist kein Zufall, sondern Bauart:** Der
+Kosmetik-Katalog kommt VOM SERVER. Ein alter Server liefert die neuen Stücke einfach nicht, das
+Spiel zeigt sie also nicht an – kein toter Ladezustand, keine Falschaussage (das ist Schadensklasse
+(a) aus dem Kopfkommentar von `test_kosmetik_paritaet.js`). Die clientseitige Hälfte derselben
+Lieferung – Erfolge und Titel – lief sofort. Wer eine Lieferung auf beide Repos verteilt, sollte
+diese Richtung bewusst wählen: **Der Server darf hinterherhinken, das Frontend nicht.**
+
+**Und ein Messfehler, der beinahe zu einer falschen Diagnose geführt hätte.** Als Marker für #126
+wurden zwei Routen genommen, beide über `git log -S '<route>' -- server.js` gefunden, beide
+scheinbar aus #126. Sie antworteten unterschiedlich (401 und 404), was aussah, als sei ein einzelner
+Commit halb ausgeliefert – unmöglich, und genau deshalb der Hinweis auf einen Werkzeugfehler.
+Ursache: **`git log -S` findet den Commit, der die Zeile zuletzt ANGEFASST hat, nicht den, der die
+Route ANGELEGT hat.** `/api/asteroid/contest` existierte längst und wurde von #126 nur geändert.
+**Vorgehen:** Eine Marker-Route wird gegen die ALTE Datei geprüft
+(`git show <commit-davor>:server.js | grep "app.post('/api/…"`) – fehlt sie dort, ist sie ein
+gültiger Marker. Dazu weiterhin beide Kontrollen im selben Lauf: eine erfundene Route muss 404
+liefern, eine alte 401 (dieselbe Familie wie Regel 15/17/19 – nie ein Messwerkzeug, das sich selbst
+im Weg steht).
+
 **Was daraus für Auskünfte folgt:** Wenn eine Änderung nach einem Merge nicht live ist, war früher
 plausibel „der Cron-Job kommt gleich". Das gilt nicht mehr – kommt sie nicht an, ist der Webhook
 selbst gescheitert, und sein Fehler steht ausschließlich im Container-Log
