@@ -77,7 +77,17 @@ check('kein Text behauptet mehr, Verlegungen zaehlten nicht mit', alteBehauptung
 
 // Die beiden korrigierten Stellen muessen es auch wirklich SAGEN - "nichts Falsches mehr da" ist
 // nur die halbe Pruefung, sonst waere auch ein ersatzloses Streichen gruen.
-const neu = (src.match(/Flottenverlegungen zwischen eigenen Planeten zählen seit dem 17\.07\.2026 mit/g) || []);
+//
+// Das Datum ist im Muster OPTIONAL (18.08.2026, TX-1). Vorher stand hier
+// `zählen seit dem 17\.07\.2026 mit` fest verdrahtet - damit verlangte die Pruefung nicht die
+// Aussage, sondern eine Schreibweise, und zwar ausgerechnet eine mit einem Auslieferungsdatum im
+// SPIELERTEXT. Fuer den Spieler sagt "seit dem 17.07.2026" nichts ueber das Spiel, nur darueber,
+// dass hier einmal etwas geaendert wurde; TX-1 raeumt genau dieses Muster aus allen
+// Beschreibungstexten. Die geprueften Eigenschaften sind unveraendert: die Aussage muss an BEIDEN
+// Stellen stehen (ein ersatzloses Streichen faellt weiterhin durch), die alte Falschaussage
+// nirgends, und die Verband-Ausnahme wieder an beiden. Nur das Datum darf fehlen - oder dastehen,
+// falls es je zurueckkehrt.
+const neu = (src.match(/Flottenverlegungen zwischen eigenen Planeten zählen (?:seit dem \d{2}\.\d{2}\.\d{4} )?mit/g) || []);
 check('beide Stellen sagen jetzt das Richtige', neu.length === 2, neu.length);
 // Und sie nennen die Verband-Ausnahme - ohne sie waere die neue Aussage zwar wahr, aber
 // irrefuehrend: Ein Verband aus acht Schiffstypen kostet EINEN Slot, nicht acht.
