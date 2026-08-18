@@ -1462,6 +1462,81 @@ Autorität ist. Zwei Quellen für dieselbe Zahl heißt: **eine Paritätsprüfung
 bei `test_asteroid_paritaet.js` für `AST_SORTEN`. Ohne sie driften Vorschau und Buchung auseinander,
 sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mission nicht einhält.
 
+## Sektor-Eigenschaften (Etappe 3, 18.08.2026)
+
+Die acht Regionen der Karte trugen bis dahin nur `cx/cy/tint/desc`. `sektorVon` wurde
+**ausschließlich zum Zeichnen** benutzt – der Sektor eines Planeten hatte auf nichts im Spiel eine
+Auswirkung. Ihre Beschreibungen versprachen aber seit jeher welche („ergiebige Gürtelbahnen",
+„reich an Anomalien", „voller Passagen").
+
+**Der Befund, der die Etappe geprägt hat, ist die Gegenrichtung zu Regel 59:** Dort existiert eine
+Zahl nur im Ankündigungstext und wird beim `grep` fälschlich für vorhanden gehalten. Hier existierte
+die Ankündigung, aber **die `desc` wurde nirgends gerendert** – gemessen, nachdem ich selbst zuvor
+behauptet hatte, sie erscheine auf der Übersichts-Tafel (der Kommentar über `SEKTOR_DEFS` sagte das
+sogar wörtlich, und er war falsch). Ein Versprechen, das nur im Quelltext steht, ist für den Spieler
+weder ein Versprechen noch ein Bruch – es ist gar nichts. **Deshalb gehörte zu dieser Etappe die
+Anzeigestelle genauso zwingend wie die Mechanik.**
+
+**Vier Regeln, nach denen die Belegung entstanden ist** (sie stehen als Kommentar über
+`SEKTOR_DEFS`, hier nur die Kurzform):
+
+1. **Nur Boni, keine Mali.** Die Wirkung greift rückwirkend für jede bestehende Kolonie; wer vorher
+   dort gesiedelt hat, darf dafür nicht bestraft werden. Der **Kepler-Kern bleibt neutral** – wo
+   jeder anfängt, soll nichts locken und nichts abschrecken.
+2. **Jede Wirkung löst den Text ein, der schon dastand**, und jede Beschreibung nennt jetzt ihre
+   Zahl (`test_sektoreigenschaften` 1d prüft die REGEL, nicht die Formulierung).
+3. **Nur Kanäle, die der Server NICHT nachrechnet** – Produktion, Expeditions-Ausbeute,
+   Abgrundsplitter, Flugzeit (für Flugzeit gemessen: 0 Treffer in `server.js`). Angriff und
+   Verteidigung sind bewusst außen vor: Sie entscheiden PvP, und eine Sektor-Tabelle im Backend wäre
+   eine zweite Kopie, die auseinanderlaufen kann. **Das ist dieselbe Wahl wie bei den drei neuen
+   Doktrinen (Etappe 2) und aus demselben Grund** – ein hängender Backend-Deploy kann so keine
+   Abweichung erzeugen.
+4. **Additiv in die jeweils vorhandene, gedeckelte Gruppe**, nie eine eigene Multiplikation. Die
+   Flugzeit ist die Ausnahme und dort schon die Hausform (`allianceBaseFlightMult`).
+
+Belegung: `wispern` +8 % Produktion · `solmark` +12 % Expeditionen · `obsidian` +12 % Produktion ·
+`meridian` −10 % Flugzeit · `pulsar` +10 % Expeditionen · `ilyra` −12 % Flugzeit · `rand` +15 %
+Splitter · `kepler` neutral.
+
+**Die vier Rechenstellen** (`sektorBonus` ist Summand, `sektorFlugMult` Faktor):
+`ratesPerSecond` (nur der ROHSTOFF-Zweig – der Laborzweig bleibt frei, weil „ergiebige
+Gürtelbahnen" eine Aussage über Rohstoffe ist, nicht über Laborarbeit), die additive
+Expeditions-Gruppe, `abgrundSplitterFaktor` und `missionDurationFor` direkt neben
+`allianceBaseFlightMult`.
+
+**Woran was hängt** – das ist die Frage, die ein Spieler stellt, und sie steht deshalb im
+Hilfetext: Produktion und Splitter am **Standort**, Expedition am **Startpunkt**, Flugzeit am
+**Ziel**. Ein Mond zählt zum Sektor seines Planeten (`sektorVonPlanet` löst `moon_<planet>` über
+`moonParentKey` auf; ohne diesen Zwischenschritt bekäme JEDER Mond des Spiels den Bonus 0).
+`_sektorCache` ist eine dauerhafte `Map` – die Zuordnung Planet→Sektor ändert sich zur Laufzeit nie.
+
+**Fünf Anzeigestellen**, alle aus `sektorEffektKurz()`/`sektorEffektLang()` – EINE Quelle für Karte,
+Tooltip, Hilfe und Standort-Zeile: (a) eigene Textzeile am Regionsknoten der Übersicht plus
+`<title>`/`aria-label` mit der Langform; (b) eine dritte Kopfzeile in der Sektoransicht; (c) der
+Hilfe-Eintrag „Sektoren haben Eigenschaften", **aus `SEKTOR_DEFS` abgeleitet** (Reihenfolge vorher
+gemessen, nicht geschätzt – `SEKTOR_DEFS` steht weit vor `HELP_SECTIONS`, Regel 38); (d) die
+Beschreibung jedes Sektors; (e) eine Zeile am AKTUELLEN Standort im Basis-Reiter, **bewusst auch im
+Mond-Zweig** von `planetRoleBox` – ein Mond bekommt den Bonus wirklich, und eine Zeile, die dort
+schweigt, wäre die klassische zweite Anzeigestelle (Punkt 6).
+
+**`SEKTOR_KANAL_TEXT` ist der Angelpunkt für alles Künftige.** Wer einen neuen Kanal in `mod`
+einträgt, ergänzt ihn dort – sonst zeigt die Karte den Bonus nicht an. `test_sektoreigenschaften`
+1a/1e prüfen beides **datengetrieben**: Jeder benutzte Kanal braucht einen Anzeigetext UND eine
+Rechenstelle; 1e2 prüft die Gegenrichtung (ein Aufruf für einen Kanal, den keine Tabelle mehr führt,
+liest dauerhaft 0 und sieht im Quelltext trotzdem nach Wirkung aus). Wächter:
+`tests/test_sektoreigenschaften.js` (28 Prüfungen – Tabelle, Verdrahtung, ausgeführte Helfer,
+gerendertes Spiel und eine gemessene Produktionswirkung von +12 % über zwei Läufe mit
+unterschiedlichem Heimatsystem).
+
+**Ein Werkzeugfehler bei der Gegenprobe, und er ist die Wiederholung eines dokumentierten:**
+`test_abgrundbezug` hatte den Pfad zur Spieldatei FEST verdrahtet (`path.join(__dirname, '..',
+'weltraum_kolonie.html')`). Die Gegenprobe mit `KEPLER_SPIELDATEI=/tmp/alt.html` las damit die echte
+Datei und meldete 84 von 84 grün – also scheinbar „die neue Prüfung belegt nichts", während sie in
+Wahrheit nie am alten Stand gelaufen war. Genau die Falle aus „Korrektur 15.08.2026". Behoben, indem
+der Pfad aus `tests/lib/umgebung` kommt; danach fällt am alten Stand exakt die eine neue Prüfung,
+bei identischer Prüfungszahl. **Wer eine Gegenprobe per Env-Umleitung fährt, prüft am Messergebnis,
+dass sie gegriffen hat** – „alles grün" ist hier kein Ergebnis, sondern ein Verdacht.
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
