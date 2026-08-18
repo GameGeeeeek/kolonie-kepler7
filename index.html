@@ -7019,8 +7019,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.557.0';
+  const VERSION = '8.558.0';
   const PATCHNOTES = [
+    { version:'8.558.0', date:'18.08.2026', changes:[
+      '<strong>Behoben: Gegner-Marker lagen direkt auf den Planeten.</strong> Mit der größeren Systemkarte von gestern sind die Planetenbahnen enger zusammengerückt – die Marker für Piraten, Bosse und fremde Spieler saßen aber weiterhin auf ihren eigenen, fest eingestellten Positionen aus der alten, flachen Darstellung. Nachgemessen über alle 77 Systeme: In <strong>jedem</strong> System mit einem Gegner klebte dessen Marker auf einer Planetenscheibe. Jetzt richten sich alle Marker nach denselben Bahnen wie die Planeten, und wenn es an einer Stelle trotzdem eng wird, rückt der Marker automatisch ein Stück nach außen – dieselbe Ausweich-Regel, die es bisher nur für die eigene Heimatbasis gab.',
+      '<strong>Und die Gegner-Namen stehen jetzt über dem Marker statt darunter.</strong> Unter dem Marker trafen sie auf die Planetennamen, die dort ebenfalls stehen – in 11 von 15 Systemen überlappten beide Zeilen. Über dem Marker ist der Platz frei.'
+    ]},
     { version:'8.557.0', date:'18.08.2026', changes:[
       '<strong>Die Ausbaustufen der Mega-Projekte verlangen dreimal so viel Tier-2-Material – wachsen dafür nicht mehr mit der Größe deines Imperiums.</strong> Bisher wurde der Tier-2-Anteil wie die Basiskosten mit der Kolonienzahl hochskaliert. Zusammen mit dem höheren Satz wäre eine Ausbaustufe 8 damit auf 44.100 Nanolegierungen gekommen – bei einem Lager, das im Vollausbau 33.750 fasst. Das wäre nicht teuer gewesen, sondern unbezahlbar: Man hätte den Betrag gar nicht erst ansparen können. Jetzt gilt für jede veredelte Ressource ein fester Betrag, unabhängig von der Standortzahl; eine Stufe 8 kostet planbare 12.600 Nanolegierungen.',
       '<strong>Ab Ausbaustufe 13 wächst der Tier-2-Anteil nicht mehr weiter.</strong> Der größte Anteil liegt dann bei rund zwei Dritteln dessen, was ein voll ausgebautes Lager fasst – genug Platz, um beim Sparen weiterzuproduzieren. Teurer werden die Stufen darüber weiterhin über den Basisanteil, der sich je Stufe verzweieinhalbfacht.',
@@ -53779,6 +53783,43 @@
   function asteroidMarkerR(groesseKey){
     return ({ splitter:4.5, brocken:6, kern:7.5, koloss:9.5 })[groesseKey] || 5;
   }
+  // Mindestabstand und Schrittweite des Kollisionsschiebers hängen an der Bahn-Geometrie (KB-13):
+  // 34 bzw. 12 waren auf die alte Streifen-Geometrie mit 43 Einheiten Bahnabstand gemünzt. Am Handy
+  // liegen die Bahnen 18 Einheiten auseinander - mit 34 fände der Schieber nie eine freie Stelle und
+  // schöbe den Marker über das halbe System hinaus, statt ihn danebenzusetzen.
+  function kbMarkerAbstand(){ return Math.min(34, kbOrbitMass().schritt * 1.45); }
+  function kbMarkerSchritt(){ return Math.max(5, kbOrbitMass().schritt * 0.28); }
+  // Der EINE Kollisionsschieber für alle Marker in der Systemebene (KB-13).
+  //
+  // Er stammt aus dem Bugfix an der Heimatbasis (Spieler-Report mit Screenshot: "Prime direkt auf
+  // der Heimatbasis") und stand dort als einzige Kopie - NPCs, Bosse und fremde Spieler hatten ihn
+  // nie. Solange Marker- und Planetenbahnen sich nur selten kreuzten, fiel das nicht auf; seit die
+  // Bahnen am Handy enger liegen (KB-12), traf es JEDES System mit NPC. Deshalb hier eine Funktion
+  // statt einer zweiten Kopie: Ein vierter Markertyp erbt das Verhalten automatisch (Regel 43).
+  //
+  // Der Winkel bleibt erhalten, nur der Radius wächst - fremde Spieler stehen also weiterhin an
+  // ihrem eigenen, aus dem Slot abgeleiteten Platz und sind voneinander unterscheidbar.
+  // markerR ist der SICHTBARE Radius des Markers - Bosse tragen einen pulsierenden Ring bis r=19,
+  // gewöhnliche NPCs und Spieler r=11. Ohne ihn blieb genau ein System übrig, in dem der Boss-Ring
+  // noch die Scheibe berührte (gemessen: nyra, 26,3 von nötigen 27,7 Einheiten).
+  function kbMarkerFrei(pos, planeten, sonnenR, markerR){
+    const minSonne = 34*(sonnenR||1) + 20, schritt = kbMarkerSchritt();
+    const minPlanet = Math.max(kbMarkerAbstand(), (markerR||11) + 14);
+    const winkel = Math.atan2(pos.y-SUN_Y, pos.x-SUN_X);
+    let radius = Math.hypot(pos.x-SUN_X, pos.y-SUN_Y);
+    let p = pos;
+    for (let versuch=0; versuch<14; versuch++){
+      const zuNahSonne = radius < minSonne;
+      const zuNahPlanet = (planeten||[]).some(pl => {
+        const pp = planetOrbitXY(pl);
+        return Math.hypot(p.x-pp.x, p.y-pp.y) < minPlanet;
+      });
+      if (!zuNahSonne && !zuNahPlanet) break;
+      radius += schritt;
+      p = { x: SUN_X + radius*Math.cos(winkel), y: SUN_Y + radius*Math.sin(winkel) };
+    }
+    return p;
+  }
   function homeSlotXY(slot){
     // Bugfix (danke an den Bug-Report mit Screenshot): war vorher eine sehr flache Ellipse
     // (rx:58, ry:17) - bei senkrechten Slot-Winkeln (90°/270°) landete die Heimatbasis dadurch nur
@@ -53788,7 +53829,9 @@
     // einer Ellipse - garantiert bei JEDEM Slot-Winkel denselben, ausreichenden Sicherheitsabstand zum
     // Glow (50-10 Basis-Radius = 40px Rand, 6px Puffer zum Glow), bleibt aber weiterhin deutlich
     // näher an der Sonne als der erste echte Planeten-Orbit (rx:85).
-    const r = 50;
+    // 0,588 der ersten Planetenbahn - am PC sind das exakt die bisherigen 50 Einheiten (85*0,588),
+    // am Handy zieht der Marker-Kreis mit den engeren Bahnen mit, statt auf ihnen zu liegen (KB-13).
+    const r = kbOrbitRx(1) * 0.588;
     const rad = ((slot||0) * 45) * Math.PI/180;
     return { x: SUN_X + r*Math.cos(rad), y: SUN_Y + r*Math.sin(rad) };
   }
@@ -53832,7 +53875,9 @@
     return { system: p.system, pos: planetOrbitXY(p), planet: p };
   }
   function npcMarkerXY(){
-    const rx = 78, ry = 24;
+    // Knapp INNERHALB der ersten Planetenbahn, in deren Form - am PC ergibt das die bisherigen
+    // 78/24 Einheiten (85*0,918 und davon 0,3), am Handy die engere, rundere Bahn (KB-13).
+    const rx = kbOrbitRx(1) * 0.918, ry = rx * kbOrbitMass().ry;
     const rad = 200 * Math.PI/180;
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
   }
@@ -54189,22 +54234,10 @@
       // jedem tatsächlich vorhandenen Planeten genug Abstand hat. homeMarkerPos wird unten (Missions-
       // Flugbahnen) wiederverwendet, damit die "Auto-Erkunder"-Linie exakt am selben Punkt startet
       // wie der sichtbare Marker, statt an der unverschobenen Rohposition.
-      const MIN_SEP_FROM_PLANET = 34, MIN_SEP_FROM_SUN = 34*activeSunType.r + 20;
-      let hc = homeSlotXY(myHomeSlot);
-      {
-        const homeAngle = Math.atan2(hc.y-SUN_Y, hc.x-SUN_X);
-        let homeRadius = Math.hypot(hc.x-SUN_X, hc.y-SUN_Y);
-        for (let attempt=0; attempt<10; attempt++){
-          const tooCloseToSun = homeRadius < MIN_SEP_FROM_SUN;
-          const tooCloseToPlanet = sysPlanets.some(p => {
-            const pp = planetOrbitXY(p);
-            return Math.hypot(hc.x-pp.x, hc.y-pp.y) < MIN_SEP_FROM_PLANET;
-          });
-          if (!tooCloseToSun && !tooCloseToPlanet) break;
-          homeRadius += 12;
-          hc = { x: SUN_X + homeRadius*Math.cos(homeAngle), y: SUN_Y + homeRadius*Math.sin(homeAngle) };
-        }
-      }
+      // Der Schieber steht seit KB-13 als kbMarkerFrei() weiter oben und gilt für ALLE Marker -
+      // die frühere Kopie an dieser Stelle war die einzige, und genau deshalb lagen NPC-Marker
+      // nach KB-12 auf den Planeten.
+      const hc = kbMarkerFrei(homeSlotXY(myHomeSlot), sysPlanets, activeSunType.r);
       homeMarkerPos = hc;
       const homeHasMoon = state.moons && state.moons.home;
       const hcx = hc.x.toFixed(1), hcy = hc.y.toFixed(1);
@@ -54307,7 +54340,7 @@
       `;
     }
     for (const pl of otherPlayersInSystem){
-      const coord = homeSlotXY(pl.slot);
+      const coord = kbMarkerFrei(homeSlotXY(pl.slot), sysPlanets, activeSunType.r);
       const cx = coord.x.toFixed(1), cy = coord.y.toFixed(1);
       // Spionage-Verzahnung (20.07.2026, "Fog-of-War-Layer"): liegt zu diesem Spieler eigene Aufklärung
       // vor, wird sie direkt am Kartenmarker eingeblendet (Intel-Ring + bekannter Verteidigungswert) -
@@ -54338,14 +54371,14 @@
       `;
     }
     for (const npc of NPCS.filter(n=>n.system===activeSystem && (!n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1))){
-      const coord = npcMarkerXY();
+      const coord = kbMarkerFrei(npcMarkerXY(), sysPlanets, activeSunType.r, npc.boss ? 19 : 11);
       const npcColor = npc.boss ? '#f3aec6' : '#791f1f';
       inner += `
         <g class="planet-node" data-map-npc="${npc.id}" data-map-npcname="${npc.name.replace(/"/g,'')}">
           ${npc.boss ? `<circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="16" fill="none" stroke="${npcColor}" stroke-opacity="0.5"><animate attributeName="r" values="14;19;14" dur="2.2s" repeatCount="indefinite"/></circle>` : ''}
           <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="11" fill="rgba(121,31,31,0.35)" stroke="${npcColor}" stroke-width="1.5"/>
           <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="4" fill="${npcColor}"/>
-          <text class="planet-label" x="${coord.x.toFixed(1)}" y="${(coord.y+21).toFixed(1)}" text-anchor="middle" style="fill:${npcColor};">${npc.name}</text>
+          <text class="planet-label" x="${coord.x.toFixed(1)}" y="${(coord.y-(npc.boss?24:17)).toFixed(1)}" text-anchor="middle" style="fill:${npcColor};">${npc.name}</text>
         </g>
       `;
     }
