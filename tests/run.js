@@ -86,6 +86,38 @@ try {
   melde('VERSION passt zum obersten Patchnotes-Eintrag', false, String(e.message).slice(0, 80));
 }
 
+// 4b. Hausstil der Anführungszeichen. Die REGEL selbst gehört tests/test_forschungstexte.js
+//     (Zeile mit `!roh.includes(...)`); hier steht nur eine zweite AUSFÜHRUNGSSTELLE derselben
+//     Prüfung - kein zweiter Maßstab, sondern ein früherer Zeitpunkt.
+//
+//     Warum das nötig ist (Vorfall 18.08.2026): v8.562.0 ging mit einem typografischen
+//     Schlusszeichen im Patchnote LIVE. Der volle Lauf war grün gewesen - aber er lief, BEVOR der
+//     Patchnote geschrieben war. Danach läuft nur noch `--nummer`, und dessen Testliste wurde per
+//     `grep -l "PATCHNOTES|const VERSION" tests/*.js` hergeleitet; test_forschungstexte hat mit
+//     Patchnotes nichts zu tun und steht dort zu Recht nicht drin.
+//
+//     Die Liste zu verlängern wäre die falsche Reparatur gewesen: Nachgemessen kommt das verbotene
+//     Zeichen in 6,17 MB Datei und 986 Patchnote-Einträgen NULL Mal vor - es entsteht nicht durch
+//     Patchnotes, sondern durch eine typografische Autokorrektur oder einen Fremd-Paste, und das
+//     kann JEDE Stelle der Datei treffen. Eine Prüfung, die an jeder Stelle greifen muss, gehört
+//     deshalb in die Pflichtprüfungen, wo sie in ALLEN drei Modi läuft - auch in `--nummer`,
+//     also im letzten Moment vor dem Merge. Sie kostet einen Substring-Scan über eine ohnehin
+//     gelesene Datei.
+try {
+  const html = fs.readFileSync(path.join(WURZEL, 'weltraum_kolonie.html'), 'utf8');
+  // Öffnend „ (U+201E), schließend das GERADE " - so steht es im ganzen Spiel. Verboten ist damit
+  // U+201C, das im Deutschen als schließendes und im Englischen als öffnendes Zeichen auftritt.
+  const treffer = html.indexOf('“');
+  let wo = '';
+  if (treffer >= 0) {
+    const zeile = html.slice(0, treffer).split('\n').length;
+    wo = 'Zeile ' + zeile + ': …' + html.slice(Math.max(0, treffer - 45), treffer + 25).replace(/\s+/g, ' ') + '…';
+  }
+  melde('Anführungszeichen im Hausstil („…")', treffer < 0, wo);
+} catch (e) {
+  melde('Anführungszeichen im Hausstil („…")', false, String(e.message).slice(0, 80));
+}
+
 // 5. Steht der Backend-Klon nebenan auf dem Stand seines Ursprungs? KEIN Fehlschlag, nur eine
 //    Meldung - aber eine, die drei verlorene Prüfläufe erklärt hätte. Mehrere Tests lesen
 //    `server.js` aus `../kolonie-kepler7-backend` (Randkriege, PvP-Deckel, ausbaubarer Deckel).
