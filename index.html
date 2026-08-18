@@ -2,6 +2,33 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<!-- Sicherheits-Kopfzeilen als meta (18.08.2026, Sicherheits-Audit Punkt 5).
+     connect-src 'self': Das Sitzungs-Token liegt in localStorage und ist damit in JS-Reichweite -
+     eine XSS-Luecke koennte es auslesen. Diese Regel sorgt dafuer, dass es NIRGENDWOHIN geschickt
+     werden kann: Das Spiel spricht ausschliesslich mit dem eigenen /api (gemessen - 11 fetch-Aufrufe,
+     alle auf /api/..., dazu kein XHR, kein WebSocket, kein sendBeacon, kein EventSource). Die Regel
+     kostet also nichts und ist die zweite Verteidigungslinie, solange das Token noch nicht in einem
+     HttpOnly-Cookie liegt.
+     BEWUSST OHNE default-src und ohne script-src/style-src/font-src: Nicht genannte Direktiven
+     fallen nur dann auf default-src zurueck, wenn es eines GIBT. Ohne default-src bleiben Schrift
+     (Base64-Datei-URI), Inline-Stile und der grosse Inline-Skriptblock also unberuehrt - eine
+     script-src-Regel braeuchte hier zwingend 'unsafe-inline' (die ganze Spiellogik ist EIN
+     Inline-Block) und waere damit wirkungslos. Das ist eine eigene, groessere Etappe.
+     ACHTUNG beim Erweitern dieses Kommentars: Der Pflicht-Syntax-Check schneidet den Skriptblock
+     per Regex ab dem ERSTEN Vorkommen des oeffnenden Skript-Tags aus. Steht dieses Tag als Literal
+     in einem Kommentar HIER OBEN, schneidet er den Kommentar statt des Programmtextes aus und
+     meldet einen Syntaxfehler, den es gar nicht gibt (beim Bauen dieser Zeilen genau passiert).
+     Also nie das woertliche Tag hineinschreiben - "Inline-Skriptblock" umschreibt es gefahrlos.
+     frame-ancestors, HSTS und nosniff wirken in einem meta-Tag NICHT und gehoeren in die nginx.conf
+     des Pi - der Block dafuer steht in docs/sicherheits-audit-2026-08-18.md im ai-core-Repo. -->
+<meta http-equiv="Content-Security-Policy" content="connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<!-- Verify- und Reset-Links tragen ihren Token in der URL (?verify=..., ?reset=...). Ohne diese
+     Zeile reist er beim Klick auf einen Aussenlink (Discord, Ko-fi, TikTok - alle im Spiel verlinkt)
+     im Referer-Header zum fremden Server mit. strict-origin-when-cross-origin statt no-referrer:
+     Es entfernt Pfad UND Abfrage bei fremden Zielen (der Token ist damit vollstaendig geschuetzt),
+     laesst aber die blosse Herkunft stehen - Ko-fi sieht also weiterhin, dass der Besucher aus dem
+     Spiel kam. Ist heute Browser-Standard; explizit gesetzt gilt es auch dort, wo es das nicht ist. -->
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="google-site-verification" content="m68y_ThdsrVt0aZZ-mbl8GeqNOAh5AhWKQgv7xgahDI" />
 <meta name="description" content="Kolonie Kepler-7 ist ein kostenloses browserbasiertes Weltraum-Idle-Spiel: baue deine Kolonie auf, erforsche Technologien, baue eine Flotte, erkunde die Galaxie und kämpfe gemeinsam mit Allianzen gegen den Weltboss. Direkt im Browser spielbar, kein Download nötig.">
