@@ -1,9 +1,13 @@
-// Etappe A1+A2 des Wirtschafts-Rebalance-Konzepts (docs/wirtschaft-rebalance-konzept.md):
-// (A1) Die Schiffs-Mengenskalierung hat oberhalb von 250 Stück einen exponentiellen Schwanz
-//      (2 × 1,002^(nth−250)) statt des alten harten +100%-Deckels; bis 250 bleibt die Kurve
-//      exakt die alte (1 + nth·0,004).
-// (A2) Acht Klassen kosten oberhalb einer Bestands-Schwelle je weiterem Schiff eine
-//      Tier-2-Komponente (SHIP_T2_KOMPONENTEN), mit demselben Faktor skaliert.
+// Schiffskosten: FLACHER Stückpreis (18.08.2026) + Tier-2-Komponenten ab einer Bestands-Schwelle.
+//
+// (1) Der Stückpreis einer Klasse haengt NICHT mehr vom Bestand ab. Bis zum 18.08.2026 stand hier
+//     eine Mengenskalierung (+0,4% je vorhandenem Schiff, oberhalb 250 exponentiell bis zum
+//     66-fachen); sie ist auf Wunsch von Sascha entfernt. Dieser Test hielt frueher genau diese
+//     Kurve fest - jetzt haelt er ihre ABWESENHEIT fest, und zwar schaerfer: Es genuegt nicht,
+//     dass der Preis "kaum" steigt, er muss ueber den ganzen Bereich IDENTISCH sein.
+// (2) Acht Klassen kosten oberhalb einer Bestands-Schwelle je weiterem Schiff eine
+//     Tier-2-Komponente (SHIP_T2_KOMPONENTEN) - zum TABELLENWERT, ohne Faktor. Das ist eine
+//     Schwelle, keine Preisstaffel, und war nicht Gegenstand der Aenderung.
 //
 // Der Test schneidet SHIP_T2_KOMPONENTEN und scaledShipCost/shipCostForRange als ECHTE Blöcke
 // aus der Spieldatei und führt sie mit einem Mini-Fixture aus (Regel 36: fehlende Abhängigkeiten
@@ -11,9 +15,8 @@
 // ihre Werte der Messgegenstand sind; keine Spiel-HILFSFUNKTION wird durch etwas Ähnliches
 // ersetzt). Erwartungswerte werden, wo möglich, aus der ALTEN Kurve abgeleitet statt eingetippt.
 //
-// Gegenprobe (beidseitig gefahren, 17.08.2026): Am alten Stand (v8.547.0) fällt der Test mit
-// "1-bau" (SHIP_T2_KOMPONENTEN existiert nicht) - und mit von Hand entferntem A2-Block fällt
-// 4a/4b, mit zurückgebautem Faktor fällt 2b/3a.
+// Gegenprobe (beidseitig gefahren, 18.08.2026): Mit wieder eingebauter Mengenskalierung fallen
+// 2a/2b/3a; mit entferntem A2-Block fallen 4a/4b.
 const fs = require('fs');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 
@@ -70,29 +73,32 @@ if (api) {
   // (global - lokal) + n - so misst der Test auch, dass Verteilen auf Kolonien nichts umgeht.
   const kostenBei = (bestand, key, basis) => mit(bestand, key).scaledShipCost(basis, key, 0);
 
-  // ---------- 2: A1-Kurve - unter/auf 250 exakt die alte, darüber stetig steigend ----------
-  const B = { erz: 100000 }; // große Basis, damit ceil-Rundung die Vergleiche nicht verschmiert
-  const alteKurve = (nth) => Math.ceil(100000 * (1 + Math.min(1.0, nth * 0.004)));
-  let unter250Gleich = true;
-  for (const nth of [0, 1, 100, 249, 250]) {
-    if (kostenBei(nth, 'cruisers', B).erz !== alteKurve(nth)) unter250Gleich = false;
-  }
-  check('2a: bis einschließlich 250 exakt die alte Kurve (gemessen, nicht eingetippt)', unter250Gleich);
-  const bei250 = kostenBei(250, 'cruisers', B).erz;
-  const bei251 = kostenBei(251, 'cruisers', B).erz;
-  const bei500 = kostenBei(500, 'cruisers', B).erz;
-  const bei1000 = kostenBei(1000, 'cruisers', B).erz;
-  const bei2000 = kostenBei(2000, 'cruisers', B).erz;
-  check('2b: oberhalb 250 steigt der Preis weiter (alter Stand: konstant 2×)',
-    bei251 > bei250 && bei500 > bei251 && bei1000 > bei500 && bei2000 > bei1000,
-    { bei250, bei251, bei500, bei1000, bei2000 });
-  // Die REGEL des Schwanzes, nicht die Momentaufnahme: je +250 Schiffe multipliziert sich der
-  // Faktor um denselben Wert (1,002^250) - gemessen als Verhältnis zweier Messpunkte.
-  const q1 = bei500 / bei250, q2 = bei1000 / bei500 * 1; // 1000-500 sind 500 Schritte = q1²
-  check('3a: exponentielle Regel - Verhältnis je 250 Schritte konstant (±1% Rundung)',
-    Math.abs(q2 - q1 * q1) / (q1 * q1) < 0.01, { q1, q2 });
-  check('3b: weiche Wand - Schiff 2000 kostet mehr als das 30-fache von Schiff 250',
-    bei2000 > 30 * bei250, { faktor: bei2000 / bei250 });
+  /* ---------- 2/3: FLACHER Stückpreis - die Kernaussage der Änderung ----------
+     Gemessen wird ueber den ganzen frueher betroffenen Bereich, einschliesslich der beiden
+     Stellen, an denen die alte Kurve ihre Knicke hatte (250 = alter Deckel, 251 = Beginn des
+     exponentiellen Schwanzes). Die Basis ist bewusst gross, damit eine Rundung einen echten
+     Unterschied nicht verstecken koennte. */
+  const B = { erz: 100000 };
+  const messpunkte = [0, 1, 100, 249, 250, 251, 500, 1000, 2000, 10000];
+  const werte = messpunkte.map(nth => ({ nth, erz: kostenBei(nth, 'cruisers', B).erz }));
+  const abweichend = werte.filter(w => w.erz !== B.erz);
+  check('2a: der Stückpreis ist über den ganzen Bestandsbereich IDENTISCH mit der Grundzahl',
+    abweichend.length === 0, { grundzahl: B.erz, abweichend });
+  check('2b: insbesondere an den alten Knickstellen 250/251 - dort sass der alte Deckel',
+    kostenBei(250, 'cruisers', B).erz === kostenBei(251, 'cruisers', B).erz
+      && kostenBei(0, 'cruisers', B).erz === kostenBei(250, 'cruisers', B).erz,
+    { bei0: kostenBei(0, 'cruisers', B).erz, bei250: kostenBei(250, 'cruisers', B).erz, bei251: kostenBei(251, 'cruisers', B).erz });
+  /* Die Gegenrichtung, ohne die 2a nichts belegt: Der Bestandszaehler MUSS weiterhin gelesen
+     werden - die Tier-2-Schwelle haengt daran. Ein `scaledShipCost`, das n ignoriert, waere an
+     2a nicht zu unterscheiden, wuerde aber die Komponenten abschalten. */
+  const kompKlasse = Object.keys(api(fixture).SHIP_T2_KOMPONENTEN)[0];
+  const kompRes = Object.keys(api(fixture).SHIP_T2_KOMPONENTEN[kompKlasse].kosten)[0];
+  const schwelle = api(fixture).SHIP_T2_KOMPONENTEN[kompKlasse].ab;
+  check('3a: der Bestand wird weiterhin gelesen - er entscheidet die Tier-2-Schwelle',
+    kostenBei(schwelle - 1, kompKlasse, B)[kompRes] === undefined
+      && kostenBei(schwelle, kompKlasse, B)[kompRes] > 0,
+    { klasse: kompKlasse, schwelle, unter: kostenBei(schwelle - 1, kompKlasse, B)[kompRes],
+      auf: kostenBei(schwelle, kompKlasse, B)[kompRes] });
 
   // ---------- 4: A2-Komponenten ----------
   const T = api(fixture).SHIP_T2_KOMPONENTEN;
@@ -106,16 +112,15 @@ if (api) {
     const unter = kostenBei(T[k].ab - 1, k, { erz: 1000 });
     if (t2Keys.some(r => unter[r] !== undefined)) unterSchwelleSauber = false;
     const auf = kostenBei(T[k].ab, k, { erz: 1000 });
-    // Erwartung aus der Tabelle UND der Faktor-Formel abgeleitet, nicht eingetippt:
-    const nth = T[k].ab;
-    const faktor = nth <= 250 ? 1 + nth * 0.004 : 2 * Math.pow(1.002, nth - 250);
+    // Erwartung aus der TABELLE, nicht eingetippt - und ohne Faktor: Die Komponente ist eine
+    // Schwelle, keine Preisstaffel. Bis zum 18.08.2026 stand hier der Mengenfaktor mit drin.
     for (const r of t2Keys) {
-      if (auf[r] !== Math.ceil(T[k].kosten[r] * faktor)) skaliert = false;
+      if (auf[r] !== Math.ceil(T[k].kosten[r])) skaliert = false;
       if (!(auf[r] > 0)) ueberSchwelleDa = false;
     }
   }
   check('4a: unterhalb der Schwelle keine T2-Kosten (alle Klassen)', unterSchwelleSauber);
-  check('4b: ab der Schwelle T2-Kosten vorhanden und mit dem Faktor skaliert', ueberSchwelleDa && skaliert);
+  check('4b: ab der Schwelle T2-Kosten vorhanden, und zwar zum reinen Tabellenwert', ueberSchwelleDa && skaliert);
   // Klassen OHNE Tabelleneintrag bleiben komplett T2-frei - auch bei riesigem Bestand.
   const jaegerHoch = kostenBei(5000, 'jaeger', { erz: 50, energie: 30 });
   check('4c: Klassen ohne Eintrag (Jäger) bekommen nie T2-Kosten',
@@ -129,7 +134,7 @@ if (api) {
     const batch = teile.shipCostForRange({ costFn: (n) => teile.scaledShipCost({ erz: 400 }, 'schlachtschiff', n) }, 95, 10);
     // Einheiten 95..99 ohne, 100..104 mit Komponente - erwartete Nano-Summe aus Tabelle+Formel:
     let nanoErwartet = 0;
-    for (let nth = 100; nth <= 104; nth++) nanoErwartet += Math.ceil(T.schlachtschiff.kosten.nanolegierungen * (1 + nth * 0.004));
+    for (let nth = 100; nth <= 104; nth++) nanoErwartet += Math.ceil(T.schlachtschiff.kosten.nanolegierungen);
     check('5: Batch über die Schwelle - nur die Einheiten oberhalb zahlen die Komponente',
       batch.nanolegierungen === nanoErwartet, { ist: batch.nanolegierungen, nanoErwartet });
   } else {
@@ -147,12 +152,16 @@ const OHNE_HISTORIE = (() => {
 })();
 check('6a: die Werft-Karte kündigt die Komponente an (t2KompLine wird gerendert)',
   S.includes('${t2KompLine}') && S.includes('${superKompLine}'));
-check('6b: der Hilfetext nennt den exponentiellen Schwanz statt des alten Deckels',
-  S.includes('wächst der Stückpreis exponentiell weiter'));
+check('6b: der Hilfetext sagt, dass der Stückpreis NICHT mehr mit der Flottengröße steigt',
+  S.includes('kostet jedes Schiff einer Klasse denselben Preis'));
 // Bewusst der SPEZIFISCHE alte Schiffs-Wortlaut, nicht "gedeckelt bei +100%" allgemein - den
 // Deckel gibt es bei anderen Mechaniken (Abgrund-Offiziere) völlig zu Recht weiterhin.
 check('6c: die alte Schiffs-Aussage "kostet also das Doppelte" (Fixpreis-Deckel) ist aus den Live-Texten verschwunden',
   !OHNE_HISTORIE.includes('Schiff eines Typs kostet also das Doppelte'));
+// Und die Aussage der Zwischenstufe ebenso - sie war von August bis zum 18.08.2026 wahr und ist
+// es seit dem flachen Stückpreis nicht mehr.
+check('6c2: auch die exponentielle Zwischen-Aussage steht nicht mehr in den Live-Texten',
+  !OHNE_HISTORIE.includes('wächst der Stückpreis exponentiell weiter'));
 // Paritätswache: Jede Klasse der Tabelle muss im Hilfetext namentlich auftauchen - eine neue
 // Klasse ohne Hilfetext-Erwähnung (oder umgekehrt) fällt hier auf. Die Namen kommen aus
 // SHIP_DEFS (bzw. dem Superschlachtschiff-Sonderfall), nie aus einer zweiten Liste im Test.

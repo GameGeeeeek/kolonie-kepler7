@@ -1512,6 +1512,104 @@ schon ein fünftes Schlüssel-Segment „genau die Fehlerklasse aus dem Schmelze
 Vorgeschlagen ist stattdessen eine **abgeleitete Beschreibungs-Schicht** über die fünf Listen
 (key/name/icon/art/seltenheit/herkunft/desc) — sie liest sie, statt eine sechste Liste zu führen,
 und trägt zugleich die automatische `desc`-Prüfung, die Hausregel 7 bisher von Hand absichert.
+## Schiffskosten: die Mengenskalierung ist raus, und wonach die Preise jetzt gesetzt sind (18.08.2026)
+
+Auftrag Sascha: „Es ist doch 'n bisschen blöd, dass die Schlachtschiffe beziehungsweise alle
+Schiffe, dass das ja weiterproduzierten immer teurer wird. Nimm das wieder raus. Passe aber alle
+alle Kosten für alle Schiffe neu an."
+
+**Entfernt ist der Mengenfaktor an ZWEI Stellen**, nicht nur an der offensichtlichen:
+`scaledShipCost` (`factor = nth <= 250 ? 1 + nth*0.004 : 2*Math.pow(1.002, nth-250)`) und
+`tiefenschiffKosten` (`basis * (n||1) * (1 + 0.004*(n-1))`). Die zweite war die schlimmere: Weil
+die Werft `costFn(startCount+i)` **je Stück** aufruft, multiplizierte das `basis*n` den Stückpreis
+mit dem Bestand — das 25. Lotsenboot kostete 19.161 statt 750. Wer nur die erste Stelle sucht,
+findet sie nicht (Regel 6, zweite Anzeigestelle).
+
+**Was der Bestand weiterhin entscheidet:** die Tier-2-Komponenten (`SHIP_T2_KOMPONENTEN`, „ab dem
+250. Kreuzer kosten sie zusätzlich Nanolegierungen"). Das ist A2 der Wirtschaftsreform und war nie
+gemeint — ein Ersetzer, der beides in einem Zug wegräumt, nimmt still eine ganze Etappe mit.
+
+### Wonach die 36 neuen Preise gesetzt sind — und der Fehler, den das erst sichtbar gemacht hat
+
+Der Massstab ist **T1-Äquivalent je Angriffspunkt**, und beide Hälften kommen aus Tabellen des
+Spiels, nicht aus dem Gefühl: Der Rohstoffwert wird **rekursiv aus `TIER2_DEFS`** entwickelt (die
+echten Fabrikrezepte — wer ein Rezept ändert, verschiebt damit automatisch die Erwartung), der
+Angriffswert ist `COUNTER_ROLE_ATK`. Gemessen: **Spreizung 91,1× → 22,1×.**
+
+Der Rest ist bewusst nicht 1×: Grosskampfschiffe bündeln Wirkung in EINEM Flottenplatz, und
+Flottenplätze sind knapp. Ein Unikat wie der Mondzerstörer (`maxOwned:1`) darf teuer sein.
+
+**Zwei meiner eigenen 36 Zahlen waren falsch, und BEIDE fielen erst beim Nachmessen auf** — nicht
+beim Lesen des Codes, nicht in zwölf betroffenen Bestandstests:
+
+- **Hyperjäger: 210 Nanolegierungen für 30 Angriff**, während die **Nanoklinge** daneben 140 für
+  55 Angriff kostet. Strikt dominiert — 1,5× der Preis für 55 % der Wirkung. Ein Schiff, das
+  niemand je baut, ist so tot wie ein nicht gebautes. Bezeichnend: Der ALTE Wert (70) war
+  richtig, meine Verdreifachung war der Fehler.
+- **Bergungsfrachter: 180/75/35** — faktisch derselbe Preis wie der Grosse Frachter (391 gegen
+  373 T1-Äquivalent), aber doppelter Frachtraum UND **doppeltes Punktegewicht** (80 gegen 40).
+  Damit war er die billigste Punktequelle des Spiels, also eine Ranglisten-Verzerrung — genau die
+  Sorte Fehler, die dieses Projekt nicht rückwirkend korrigieren kann.
+
+Korrigiert auf 75 Nanolegierungen bzw. 340/145/70. Der Hyperjäger liegt damit bei 48,0 je
+Angriffspunkt, genau zwischen Nanoklinge (48,9) und Quantenkreuzer (49,2); die beiden grossen
+Frachter liegen auf **beiden unabhängigen Bezugsgrössen** gleichauf (0,25 je Frachteinheit, ~9,3
+je Punktegewicht). **Die Ursache war beide Male dieselbe: eine Zahl aus der ABSICHT gesetzt statt
+gegen die Nachbarn gemessen** (Regel 41).
+
+### `tests/test_schiffskosten.js` — und die drei Entwürfe, die es NICHT geworden ist
+
+Der Wächter kennt keine Sollpreise, er prüft Verhältnisse (Regel 3) und ist musterbasiert, findet
+also auch ein Schiff, an das niemand gedacht hat (Regel 40). Drei Entwürfe sind unterwegs
+gescheitert, und die Gründe sind übertragbar:
+
+1. **Dominanz über den ANGRIFFSWERT** meldete sofort Carrier (atk 15), Wächter (8) und
+   Enterschiff (25) — Schiffe, deren Wert absichtlich woanders liegt (Trägerkapazität, Abwehr,
+   Entern). Die Prüfung unterstellte, Angriff sei der einzige Wert.
+2. **Dominanz über das PUNKTEGEWICHT bei gleicher Rohstoffbasis** meldete elf Paare, von denen
+   keines ein Fehler war: `erz+kristalle+deuterium` teilen sich Frachter, Enterschiff, Recycler,
+   Gesandtenschiff und Paktkorvette. **„Gleiche Rohstoffe" ist keine Austauschbeziehung** — und
+   eine echte steht nirgends in den Daten. Der Dominanz-Vergleich ist deshalb **ersatzlos
+   gestrichen**: Eine Prüfung, die vom ersten Tag an rot ist, wird zu einem dauerhaft ignorierten
+   Fehlschlag und entwertet den ganzen Lauf (Regel 53).
+3. **Die Ausreisser-Schranke MIT Unikaten** war wertlos: Der Mondzerstörer steht legitim beim
+   3,79-fachen des Medians, der kaputte Hyperjäger stand beim 4,09-fachen — dazwischen passt keine
+   vertrauenswürdige Schranke. Erst das Ausnehmen der `maxOwned`-Schiffe schafft Abstand (legitimes
+   Maximum 2,91×, Schranke 3,5×).
+
+**Und eine Prüfung war vacuous, obwohl sie am neuen Stand grün und plausibel aussah:** 3b suchte
+nach der WORTFORM der alten Skalierung (`base*(1+0.004*(n-1))`) und lief an der Gegenprobe vorbei,
+weil die sie als `a * factor` mit vorher berechnetem `factor` schreibt. Ein Muster, das eine
+einzelne Schreibweise kodiert, ist eine namensbasierte Suche in Verkleidung (Regel 40). Geprüft
+wird jetzt die URSACHE: Die Schleife über `base` muss ihren Betrag unverändert durchreichen
+(`c[r] = Math.ceil(a)`) — das fängt jede Faktor-Form.
+
+Drei Gegenproben, alle beidseitig gefahren, alle 18 Prüfungen in JEDER Richtung gelaufen
+(Regel 34): Hyperjäger zurück → 1b mit Faktor 4,09; Bergungsfrachter zurück → 2c/2d mit Faktor
+1,91; beide Skalierungen zurück → zusätzlich 3b und 3d.
+
+### Der Werkzeugfehler, der die ganze Etappe fast entwertet hätte
+
+Die erste Gegenprobe zu `test_tiefenflotte` blieb am ALTEN Stand **grün** — nach Regel 26 also ein
+Befund. Er lag nicht am Test, sondern am Messwerkzeug: `test_tiefenflotte.js` las die Spieldatei
+über einen **fest verdrahteten Pfad** statt über `lib/umgebung`, und `KEPLER_SPIELDATEI` wurde
+still ignoriert. Beide Läufe lasen dieselbe echte Datei. Das ist wörtlich die Falle aus der
+Korrektur zu Regel 14 — „eine still ignorierte Env-Variable sieht aus wie eine bestandene
+Gegenprobe".
+
+**Gemessen: 19 weitere Tests haben denselben Defekt** — sie binden `lib/umgebung` nicht ein und
+lesen `weltraum_kolonie.html` über einen eigenen Pfad
+(`grep -Ln "lib/umgebung" tests/test_*.js | xargs grep -l weltraum_kolonie.html`). Sie
+sind nicht falsch, aber sie sind gegen eine Kopie nicht prüfbar — wer dort eine Gegenprobe fährt,
+bekommt eine Bestätigung geschenkt. Behoben ist bisher nur `test_tiefenflotte.js`; der Rest ist
+offen und lohnt einen eigenen Durchgang.
+
+**Dazu ein Fehler im eigenen Mess-Skript, gleiche Familie:** Die Gegenproben-Schleife schrieb
+`node … > log; ok=$(grep -c OK log); fl=$(grep -c FAIL log); echo "EXIT=$?"` — und `$?` war der
+Status des letzten `grep`, nicht des Tests. Alle drei Gegenproben meldeten „EXIT=0", während sie in
+Wahrheit korrekt rot waren. Das ist Regel 19 eine Ebene höher: nicht die Pipe verdeckt den
+Exit-Code, sondern das Kommando, das man zwischen Test und Auswertung stellt.
+
 ## Beschreibungstexte: was gekürzt wird und was nie (TX-Etappen, ab 18.08.2026)
 
 Auftrag Sascha: „alle texte von gebäuden schiffen forschung etc überarbeiten teilweise zu viele
