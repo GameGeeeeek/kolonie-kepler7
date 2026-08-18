@@ -1,7 +1,7 @@
 # Konzept: Aliens und Asteroidenfestungen – zwei angreifbare Ziele auf der Karte
 
 Stand: 18.08.2026 · Zeilennummern geprüft gegen **v8.565.0** (Commit `6d0bdd5`) bzw.
-`kolonie-kepler7-backend` Commit `0019a37` · Zielversion: ab v8.570.0, sechs Phasen
+`kolonie-kepler7-backend` Commit `ea090dd` · Zielversion: ab v8.570.0, sechs Phasen
 
 Auftrag (Sascha, 18.08.2026): *„Ich würde gerne noch Aliens und Asteroidenfestungen einführen, die
 soll man auf der Karte sehen und angreifen können."*
@@ -22,8 +22,8 @@ verwandeln den Auftrag von „etwas Neues bauen" in „etwas Halbfertiges endlic
 ### 0.1 Die Aliens gibt es schon. Als Deko – und der Hilfetext sagt es selbst.
 
 Vier Völker sind seit Monaten im Spiel: `ALIEN_RACE_NAMES = ['Kryll-Schwarm', 'Xantheer-Kollektiv',
-'Nomaden von Vex', 'Die Verglühten']` (server.js:4097). Der `galaxyTick` würfelt alle 15 Minuten mit
-6 % Chance ein weiteres Volk hinzu (server.js:5186–5190), gibt ihm ein freies System und schreibt
+'Nomaden von Vex', 'Die Verglühten']` (server.js:4140). Der `galaxyTick` würfelt alle 15 Minuten mit
+6 % Chance ein weiteres Volk hinzu (server.js:5229–5233), gibt ihm ein freies System und schreibt
 eine Galaxie-Nachricht. Das Frontend zeichnet daraus ein 👽-Abzeichen am Systemknoten
 (Z. 53335–53336).
 
@@ -48,7 +48,7 @@ kein hängender Ladezustand, sondern ein hängendes Versprechen.
 ```js
 g.npcEmpireStrength = Math.min(2.5, g.npcEmpireStrength * (1 + 0.002 + Math.random() * 0.003));
 ```
-(server.js:5088). Der Wert **wächst monoton und fällt nie**. Bei ~0,35 % je Tick und 96 Ticks am Tag
+(server.js:5131). Der Wert **wächst monoton und fällt nie**. Bei ~0,35 % je Tick und 96 Ticks am Tag
 ist der Deckel 2,5 nach **rund 2,8 Tagen** erreicht – und bleibt dort, solange der Prozess läuft.
 
 Er ist kein Zierrat: `npcEffectiveDefense()` (Z. 19448) multipliziert **jeden** NPC-Gegner damit.
@@ -73,10 +73,10 @@ Es gibt im Backend **zwei** Weltbosse, und das ist bisher niemandem aufgefallen:
 
 | | `db.galaxy.worldBoss` | `db.shared['worldboss:current']` |
 |---|---|---|
-| erzeugt von | `spawnWorldBoss()` im galaxyTick (server.js:4220–4235) | dem **Client** (Z. 48890), serverseitig gehärtet |
-| hat einen Ort | **ja** – `system: pickRandomFreeSystem()` (server.js:4229) | nein |
+| erzeugt von | `spawnWorldBoss()` im galaxyTick (server.js:4263–4278) | dem **Client** (Z. 48890), serverseitig gehärtet |
+| hat einen Ort | **ja** – `system: pickRandomFreeSystem()` (server.js:4272) | nein |
 | HP | `40000 * (1 + users*0.4) * arch.hpMult` | `WORLDBOSS_BASE_HP * 1.6^(level-1)` |
-| angreifbar | **nein** | ja, über `/api/worldboss/resolve` (server.js:5948) |
+| angreifbar | **nein** | ja, über `/api/worldboss/resolve` (server.js:5991) |
 | gelesen von | **niemandem** | dem ganzen Weltboss-Feature |
 
 `g.worldBoss` wird an genau vier Stellen berührt: Initialisierung (4194), Spawn (4224), die
@@ -84,13 +84,13 @@ Erscheinungs-Nachricht (4234) und der Ablauf samt Rückzugs-Nachricht (5304–53
 Lesezugriff darüber hinaus.** Sein gesamter Effekt ist eine Zeile in den Galaxie-Nachrichten.
 
 **Und es ist nicht bloß toter Code, sondern für Spieler sichtbar falsch.** Beide Bosse ziehen ihre
-Namen aus derselben Fünferliste (`WORLD_BOSS_NAMES`, server.js:4208 – im Frontend `WORLDBOSS_NAMEN`,
+Namen aus derselben Fünferliste (`WORLD_BOSS_NAMES`, server.js:4251 – im Frontend `WORLDBOSS_NAMEN`,
 Z. 48810, wortgleich). Im Galaxie-Tab steht deshalb nebeneinander:
 
 - die Nachricht *„WELTBOSS (Panzer-Bastion): Leviathan der Leere ist bei nyra erschienen! …
   **Gemeinsam bekämpfbar** (… HP, Rückzug in 96h)"* – für ein Objekt, das **niemand angreifen kann**
   und das die Karte nicht zeigt. Seine HP hängen an der Zahl registrierter Konten
-  (`40000 * (1 + users*0.4) * arch.hpMult`, server.js:4223), also an einer Größe, die mit dem
+  (`40000 * (1 + users*0.4) * arch.hpMult`, server.js:4266), also an einer Größe, die mit dem
   angreifbaren Boss nichts zu tun hat;
 - die Boss-Karte mit *„Leviathan der Leere – Stufe 7"*, 838.860 HP (`WORLDBOSS_BASE_HP = 50000`
   × 1,6⁶, Z. 48790/48793), ohne Ort und mit einem anderen Archetyp.
@@ -166,10 +166,42 @@ die Regel"* – das stimmt nicht, es waren drei. Auch der Ankunfts-Durchgang in 
 (Z. 49485–49491) filtert nur auf die zwei bekannten Arten, und `tests/test_rundflug.js` prüft in
 seiner Falltabelle (Z. 138–139) ebenfalls nur diese zwei.
 
-**Folge für dieses Konzept:** Die vier neuen Angriffsmissionen (Abschnitt 4.4 und 5.5) werden von
-Anfang an nach dem Abbaumissions-Muster gebaut – Kampf bei `hinBis`, `endTime` auf die volle
-Rundreise. Und `test_rundflug.js` bekommt seine Falltabelle **datengetrieben** statt handgepflegt,
-damit ein vierter Fall nicht wieder ein Jahr unbemerkt bleibt (Abschnitt 10, Regel-40-Muster).
+**Die Behebung ist klein und heißt nicht `hinBis`.** Die Rundflug-Regel hat **zwei** zulässige
+Bauformen, und der Code sagt selbst, wann welche gilt (Kommentar bei `ankunftsKampf`,
+Z. 49373–49381):
+
+| | **Form A** – Kampf am Missionsende | **Form B** – Kampf bei `hinBis` |
+|---|---|---|
+| Dauer | `endTime = jetzt + rundreise` | `hinBis = jetzt + dur`, `endTime = jetzt + 2·dur` |
+| Wann | das Ziel ist **ortsfest** | das Ziel ist **fristgebunden** |
+| Wer nutzt sie | NPC-Angriff, PvP, Weltboss, Piratenversteck, Abgrund, Erkundung, Expedition | nur `intercept-pirates` und `void-rift` |
+
+Der Kommentar begründet Form B ausdrücklich damit, dass beide Missionen fristgebunden sind: *„die
+Piraten ziehen ab, der Riss kollabiert … sonst wäre das Ziel bei der Auswertung regelmäßig schon
+weg."* Ein Asteroid mit einem Schürfrecht läuft nicht davon. Für `asteroid-contest` ist deshalb
+**Form A** richtig, und die Behebung ist genau eine Zeile plus eine zweite:
+
+```js
+endTime: jetzt + flug*1000,                       // statt flug/2 – flug IST die Rundreise
+const fuel = missionFuelCostSplit(flug, flotte);  // statt flug/2 – wie die Abbaumission nebenan (Z. 55379)
+```
+
+`anfechtungAufloesen()` bleibt, wo es ist (im `endTime`-Zweig) – es muss gar nicht angefasst werden.
+**Das ist zugleich eine Balance-Änderung** und gehört so in den Patchnote: Eine Anfechtung dauert
+danach doppelt so lange und kostet doppelt so viel Treibstoff. Beides ist die Wahrheit, die vorher
+nicht gezahlt wurde.
+
+**Folge für dieses Konzept:** Festung und Nest sind **ortsfeste** Ziele. Ihre Angriffsmissionen
+werden deshalb nach **Form A** gebaut – nicht nach dem Abbaumissions-Muster mit `hinBis`, das der
+erste Entwurf vorsah. Das ist nicht nur einfacher, sondern vermeidet drei konkrete Fallen: Der
+Kartenzeichner kennt `hinBis` gar nicht und halbiert die Flugbahn stur bei `frac >= 0.5`
+(Z. 54755–54758); `test_rundflug.js` verlangt **genau zwei** Aufrufstellen von `ankunftsKampf`
+(Z. 76–78 dort), eine dritte reißt ihn auf korrektem Code; und der Ankunfts-Durchgang filtert auf
+eine **Typ-Whitelist**, nicht auf das Vorhandensein von `hinBis` (Z. 49486) – eine Mission, die
+`hinBis` setzt und dort fehlt, kommt stumm und ergebnislos heim.
+
+Und `test_rundflug.js` bekommt seine Falltabelle **datengetrieben** statt handgepflegt, damit ein
+vierter Fall nicht wieder unbemerkt bleibt (Abschnitt 10, Regel-40-Muster).
 
 ### 0.7 Zweiter Nebenbefund, gemessen: `asteroids:*` ist im geteilten Speicher **ungeschützt**
 
@@ -203,7 +235,7 @@ FAIL  5 Schuerfrecht des Opfers ueberlebt  {"halterVorher":"opfer","plaetzeNachh
 
 Ein beliebiges zweites Konto schreibt mit **einer** Anfrage die Zeichenkette `"kaputt"` auf
 `asteroids:abyss` und bekommt **HTTP 200**. Danach ist das Feld weg: `astAlleFelder()`
-(server.js:7871) prüft `typeof feld !== 'object'`, findet eine Zeichenkette und erzeugt das
+(server.js:7914) prüft `typeof feld !== 'object'`, findet eine Zeichenkette und erzeugt das
 Gürtelfeld **komplett neu** – mit anderen Plätzen, anderen Sorten, anderen Größen. **Alle
 Schürfrechte aller Spieler in diesem System sind damit gelöscht**, ihre stationierten Eskorten
 stehen als „gestrandet" da (den Fall kennt das Kartenmenü bereits, Z. 55523). Zwanzig Anfragen
@@ -291,21 +323,21 @@ Client-Meldung fortgeschrieben werden.
 | **Marker im System** | `data-map-npc` Z. 54717, Kollisionsschieber `kbMarkerFrei()` Z. 54141 | Ein vierter/fünfter Markertyp erbt den Schieber, wie es der Kommentar dort ausdrücklich vorsieht. |
 | **Gürtelbahn** | `guertelRx()` Z. 54113, `asteroidPlatzXY(platz)` Z. 54114, `asteroidMarkerR()` Z. 54119 | Die Festung sitzt auf einem freien der zehn Plätze – ohne eine Zeile neue Geometrie. |
 | **Kartenmenü** | `asteroidMapMenu()` Z. 55453, `npcMapMenu()` Z. 54059, `openKarteMenu()` Z. 53907 | Zwei neue Menüs nach demselben Muster: Einträge mit `icon`/`label`/`grund`/`disabled`/`fn`. |
-| **Ebenen-Leiste** | `karteEbeneAn('ereignisse')` Z. 53213, Knopf Z. 3397 („Piratenbasis, Aliens, Krieg") | Nester gehören in die vorhandene Ebene – ihr Knopf **wirbt schon heute mit „Aliens"**. Festungen bekommen einen eigenen Schalter (Abschnitt 4.8). |
+| **Ebenen-Leiste** | `karteEbeneAn('ereignisse')` Z. 53213, Knopf Z. 3397 („Piratenbasis, Aliens, Krieg") | Nester **und** Festungen gehören in die vorhandene Ebene – ihr Knopf **wirbt schon heute mit „Aliens"**. Kein fünfter Schalter (Begründung in 4.8). |
 | **Flottenwahl** | `oeffneFlottenwahl({art, titel, keys, vorschau, startLabel, sperre, start})` Z. 21461 | Alle vier neuen Angriffe nutzen genau dieses Feld – es ist seit v8.421.0 an allen zwölf Startstellen. |
 | **Missionsführung** | `cf.missions.push({type, targetId, startTime, hinBis, endTime, composition})`, Auflösung in `checkMissions()` | Vier neue `type`-Werte, kein neuer Mechanismus. |
 | **Rundflug** | Ankunfts-Durchgang Z. 49480–49491, `ankunftsKampf()`, `m.kampfErledigt` | Wird um die neuen Arten erweitert – **datengetrieben** statt mit einer vierten `\|\|`-Bedingung (0.6). |
 | **Flugzeit / Treibstoff** | `missionDurationFor()`, `missionFuelCostSplit()`, `asteroidFlugBasis(sysId)` Z. 55219 | unverändert; Navigator, Allianzforschung und Treibstoffdepot wirken damit automatisch mit |
-| **Serverautoritativer Kampf** | `/api/worldboss/resolve` server.js:5948, `computeAttackPowerFromComposition()` server.js:5935 | Das fertige Muster: Mission aus dem **gespeicherten** Spielstand lesen, Kraft selbst rechnen, Abklingzeit selbst durchsetzen, nur den eigenen Spielstand schreiben. |
-| **Beitragsverbuchung** | `boss.contributions[userId] = {name, dmg}` server.js:5999–6004 | Identisch für Festung und Nest – Belohnung nach Schadensanteil. |
-| **Verortetes galaktisches Objekt** | `spawnWorldBoss()` + `pickRandomFreeSystem()` server.js:4801, `pushGalaxyNews()` | 0.3: fertig geschrieben und unbenutzt. |
-| **Feld-Dokument je System** | `astFeldKey(sysId) = 'asteroids:' + sysId` server.js:7739, `/api/asteroid/field` 7890 | Die Festung lebt **im selben Dokument** wie der Gürtel dieses Systems – ein Abruf, ein Zustand. |
+| **Serverautoritativer Kampf** | `/api/worldboss/resolve` server.js:5991, `computeAttackPowerFromComposition()` server.js:5978 | Das fertige Muster: Mission aus dem **gespeicherten** Spielstand lesen, Kraft selbst rechnen, Abklingzeit selbst durchsetzen, nur den eigenen Spielstand schreiben. |
+| **Beitragsverbuchung** | `boss.contributions[userId] = {name, dmg}` server.js:6042–6047 | Identisch für Festung und Nest – Belohnung nach Schadensanteil. |
+| **Verortetes galaktisches Objekt** | `spawnWorldBoss()` + `pickRandomFreeSystem()` server.js:4844, `pushGalaxyNews()` | 0.3: fertig geschrieben und unbenutzt. |
+| **Feld-Dokument je System** | `astFeldKey(sysId) = 'asteroids:' + sysId` server.js:7782, `/api/asteroid/field` 7890 | Die Festung lebt **im selben Dokument** wie der Gürtel dieses Systems – ein Abruf, ein Zustand. |
 | **Rechteprüfung** | `checkAllianceKeyPermission()` server.js:685, aufgerufen aus der Storage-PUT-Route | Muster für die Schreibsperre auf die neuen Schlüssel. |
 | **Konterrollen** | `COUNTER_ROLE_DEFS` Z. 23149 (abfang / bomber / kapital), `COUNTER_ROLE_OF` Z. 23154 | **Der Kern des Festungskampfes** (4.4) – drei Rollen, drei Bauteile, keine neue Mechanik. |
 | **Gefechtsvorräte** | `GEFECHTSVORRAETE` Z. 23350, serverseitig gebucht (Backend-CLAUDE.md, 18.08.2026) | wirken unverändert mit, weil die Kraftberechnung dieselbe bleibt |
-| **Koordinierter Angriff** | `/api/musterattack/*` server.js:6931–7216 | 0.4: das PvE-Ziel für die Königin |
+| **Koordinierter Angriff** | `/api/musterattack/*` server.js:6974–7259 | 0.4: das PvE-Ziel für die Königin |
 | **Boss-Modulsets** | `MODULE_SET_DEFS` Z. 24508, `bossKey:'schwarmmutter'` Z. 24535 | Das Alien-Set existiert bereits – es bekommt eine zweite, verortete Quelle statt eines neuen Sets |
-| **Galaxie-Nachrichten** | `pushGalaxyNews(icon, text)` server.js:4280 | Erscheinen, Reifen, Ausbreiten und Fall jedes Objekts sind Weltgeschichte |
+| **Galaxie-Nachrichten** | `pushGalaxyNews(icon, text)` server.js:4323 | Erscheinen, Reifen, Ausbreiten und Fall jedes Objekts sind Weltgeschichte |
 | **Nachbarschaft der Systeme** | `SYSTEM_NEIGHBORS` server.js:1495 (k=4, euklidisch, in `rebuildSystemTables()` server.js:1501 aufgebaut) | Die Ausbreitung der Nester nutzt dieselbe Tabelle wie die Fraktions-Expansion – keine zweite Distanzrechnung |
 | **Vorboten** | `VORBOTEN` Z. 28088 (vier Einträge, level-gebunden) | Ein fünfter Eintrag führt neue Spieler an die Festungen heran |
 
@@ -334,7 +366,7 @@ der Blockade-Malus wäre keine Bedrohung, sondern eine Steuer. Bei sechs bleibt 
 „woanders schürfen oder die Festung schleifen" – und genau diese Wahl ist der Inhalt.
 
 Der Platz wird beim Entstehen **zufällig aus den freien** gewählt. Weil `astNachschub()`
-(server.js:7830–7866) neue Vorkommen ebenfalls auf zufällige freie Plätze setzt, gibt es hier eine
+(server.js:7873–7909) neue Vorkommen ebenfalls auf zufällige freie Plätze setzt, gibt es hier eine
 echte Kollisionsgefahr – Abschnitt 4.7 nennt die eine Zeile, die sie verhindert, und den Test dazu.
 
 ### 4.2 Drei Ausbaustufen, gewählt nach Entfernung
@@ -347,13 +379,22 @@ erfunden.**
 
 | Stufe | `ferne` | Gesamt-LP | Schild (25 %) | Türme (20 %) | Blockade | Hort/Std. | Hort-Deckel |
 |---|---|---|---|---|---|---|---|
-| **Vorposten** | < 0,40 | 120.000 | 30.000 | 24.000 | −25 % | 2.000 | 120.000 |
-| **Bastion** | 0,40–0,74 | 450.000 | 112.500 | 90.000 | −40 % | 6.000 | 400.000 |
-| **Zitadelle** | ≥ 0,75 | 1.500.000 | 375.000 | 300.000 | −55 % | 15.000 | 900.000 |
+| **Schanze** | < 0,40 | 120.000 | 30.000 | 24.000 | −25 % | 2.000 | 120.000 |
+| **Kastell** | 0,40–0,74 | 450.000 | 112.500 | 90.000 | −40 % | 6.000 | 400.000 |
+| **Sternenfeste** | ≥ 0,75 | 1.500.000 | 375.000 | 300.000 | −55 % | 15.000 | 900.000 |
+
+**Warum die Namen so heißen und nicht „Vorposten/Bastion/Zitadelle".** Der erste Entwurf hatte
+genau diese drei – und alle drei sind vergeben. Die zehn Stufennamen des **Piratennests** (Z. 45790)
+lauten unter anderem „**Vorposten** der Aschepiraten", „**Bastion** der Roten Flotte" und
+„**Zitadelle** des Schwarms"; die letzte kollidiert sogar doppelt, weil dieses Konzept den Schwarm
+als Alien-Volk führt. Und seit dem 18.08.2026 gibt es zusätzlich **Bastionsmarken** für
+Verteidigungsanlagen (`BASTION_MARK_MAX`, server.js:2272) – „Bastion" ist damit im Spiel bereits
+ein Begriff für etwas ganz anderes. `Schanze`, `Kastell` und `Sternenfeste` kommen in beiden Repos
+**null**-mal vor (gemessen mit `grep -ci`).
 
 **Woher die Lebenspunkte kommen – nachgerechnet, nicht geschätzt.** Maßstab ist die
 Angriffskraft, die der Server aus einer echten Flotte rechnet
-(`computeAttackPowerFromComposition()`, server.js:5935 → `rawFleetPower()`, server.js:2830). Die
+(`computeAttackPowerFromComposition()`, server.js:5978 → `rawFleetPower()`, server.js:2869). Die
 Gewichte dort: Jäger 10, Kreuzer 20, Zerstörer 45, Bomber 60, Schlachtschiff 90,
 Superschlachtschiff 220, Leerenjäger 140, Singularitäts-Vernichter 280.
 
@@ -364,16 +405,16 @@ Superschlachtschiff 220, Leerenjäger 140, Singularitäts-Vernichter 280.
   `200·220 + 100·140 + 50·280 = 72.000`, mit Werftmarken und Forschung auf **90.000 bis 120.000**.
 
 Bei einem Schaden von Kraft × 0,8–1,2 je Schlag (dieselbe Streuung wie beim Weltboss,
-server.js:5985) und **sechs Stunden Abklingzeit je Festung und Spieler**:
+server.js:6028) und **sechs Stunden Abklingzeit je Festung und Spieler**:
 
 | | Mittelfeld allein | Endspiel allein | drei Endspiel-Konten |
 |---|---|---|---|
-| Vorposten (120k) | 17 Schläge ≈ 4 Tage | 1–2 Schläge ≈ 6 Std. | 1 Runde |
-| Bastion (450k) | 64 Schläge – unrealistisch | 5 Schläge ≈ 1,2 Tage | 2 Runden ≈ 12 Std. |
-| Zitadelle (1,5 Mio) | aussichtslos | 15 Schläge ≈ 3,8 Tage | 5 Runden ≈ 1,3 Tage |
+| Schanze (120k) | 17 Schläge ≈ 4 Tage | 1–2 Schläge ≈ 6 Std. | 1 Runde |
+| Kastell (450k) | 64 Schläge – unrealistisch | 5 Schläge ≈ 1,2 Tage | 2 Runden ≈ 12 Std. |
+| Sternenfeste (1,5 Mio) | aussichtslos | 15 Schläge ≈ 3,8 Tage | 5 Runden ≈ 1,3 Tage |
 
-Das ist die beabsichtigte Staffelung: **Der Vorposten ist ein Solo-Ziel, die Bastion eine Frage von
-zwei bis drei Tagen oder zwei Mitspielern, die Zitadelle ohne Allianz eine Zumutung.** Die Zahlen
+Das ist die beabsichtigte Staffelung: **Die Schanze ist ein Solo-Ziel, das Kastell eine Frage von zwei bis drei Tagen oder zwei
+Mitspielern, die Sternenfeste ohne Allianz eine Zumutung.** Die Zahlen
 sind bewusst so gewählt, dass eine Festung **nicht** an einem Nachmittag verschwindet – sie soll
 lange genug stehen, dass die Blockade spürbar ist und der Hort wächst.
 
@@ -384,7 +425,7 @@ Zeitgeschehen zusammen und verhindert zugleich, dass eine einzige Abklingzeit al
 sperrt – wer weit fliegt, soll das dürfen. Gespeichert wird sie wie beim Weltboss **im eigenen
 Spielstand** (`save.festungLetzterSchlag[<sys>]`), nicht am Festungsobjekt: So überlebt die Sperre
 den Fall und den Neuaufbau einer Festung, und der Server setzt sie durch, statt ihr zu glauben
-(Vorbild: `save.worldBossLastAttack`, server.js:5971–5978, samt der Begründung im Kommentar dort).
+(Vorbild: `save.worldBossLastAttack`, server.js:6014–6021, samt der Begründung im Kommentar dort).
 
 ### 4.3 Was sie tut, solange sie steht – Blockade und Hort
 
@@ -403,9 +444,9 @@ Fuhre nach längerem Warten – eine Blockade, die man aussitzen kann, ist keine
 
 **Und sie steht auf beiden Seiten – das ist der wichtigere Teil.** `abbauPlan()` läuft im Client;
 eine Blockade, die nur dort rechnet, ist eine Anzeige und keine Regel. Der Server hat die passende
-Stelle aber schon: `/api/asteroid/mine` (server.js:7909) begrenzt die entnommene Menge auf
+Stelle aber schon: `/api/asteroid/mine` (server.js:7952) begrenzt die entnommene Menge auf
 `obergrenze`, eine Kapazität, die er aus den Minenschiffen und Frachtern des **gespeicherten**
-Spielstands selbst ausrechnet (server.js:7929–7947), und der Kommentar dort nennt die Haltung
+Spielstands selbst ausrechnet (server.js:7973–7990), und der Kommentar dort nennt die Haltung
 ausdrücklich: *„Ehrliche Grenze … Der Server prüft BESITZ im gespeicherten Stand – mehr nicht, und
 mehr behauptet das Konzept auch nicht."* Der Blockade-Faktor gehört genau dorthin, als eine Zeile:
 
@@ -418,28 +459,68 @@ Damit ist die Blockade **serverseitig durchgesetzt** und nicht nur angezeigt –
 denselben Faktor führen, gehört sie in die Paritäts-Familie (`test_festung_paritaet.js`,
 Abschnitt 10), genau wie `SHIP_SCORE_WEIGHTS` oder die Kosmetik-Definitionen.
 
-**(2) Hort.** Was die Festung dem Gürtel entnimmt, häuft sie an. Je Stunde wachsen 2.000 / 6.000 /
-15.000 Einheiten an, gedeckelt bei 120.000 / 400.000 / 900.000. Die Zusammensetzung folgt den
-**Sorten, die in diesem Gürtelsystem tatsächlich liegen** (`AST_SORTEN`-Anteile der belegten Plätze,
-server.js:7704) – eine Festung im Eiskern-Revier hortet Deuterium, eine im Prismen-Revier
-Kristalle. Der Deckel ist nach 60 / 67 / 60 Stunden erreicht.
+**(1b) Und die Blockade trifft vor allem die EINE Sache, die man zu Hause nicht bekommt.** Der
+erste Entwurf deckelte nur die Tonnage – nachgerechnet ist das für ein gewachsenes Konto fast
+nichts. Der Kommentar bei `PROTOMATERIE_SORTE` (Z. 13249–13253) hält den gemessenen Stand fest:
 
-**Woher der Deckel kommt – nachgerechnet.** Der Hort soll ungefähr das zurückgeben, was die
-Blockade gekostet hat, sonst ist er entweder eine Strafe oder ein Geschenk. Ein Gürtelsystem trägt
-drei bis acht Vorkommen (`AST_GRENZE_MIN/MAX = 3/8`, server.js:7698) mit Vorräten von 50.000
-(Splitter) bis 1,5 Mio (Koloss, Z. 13205–13209). Wird ein solches System aktiv beschürft, wandern
-grob 200.000 bis 400.000 Einheiten am Tag heraus. Bei −55 % über die 60 Stunden bis zum
-Zitadellen-Deckel entgehen den Spielern also rund **275.000 bis 550.000** Einheiten. Der Hort von
-900.000 liegt oberhalb davon – und das ist Absicht: Er wird unter **allen** Angreifern nach
-Schadensanteil aufgeteilt, während die Blockade nur die trifft, die dort schürfen. Für den
-einzelnen Angreifer bleibt der Anteil damit deutlich unter dem, was er ohne Festung gefördert
-hätte. **Der Hort belohnt das Schleifen, er bezahlt es nicht.**
+> „die beste Abbaufuhre des Spiels brachte 177.840 Einheiten, das sind bei **8,81 Mio.
+> Basisproduktion je Stunde** ganze **73 SEKUNDEN** Produktion für 45 Minuten Flug."
+
+Bei 8,81 Mio. Erz je Stunde ist **eine Million T1-Rohstoff rund 6,8 Minuten Produktion**. Ein
+Blockade-Malus auf die Tonnage ist für ein junges Konto spürbar und für ein altes unsichtbar. Die
+Festung deckelt deshalb zusätzlich – und vor allem – die **Protomaterie**:
+
+| Stufe | T1-Ladung | **Protomaterie** |
+|---|---|---|
+| Schanze | −25 % | **−50 %** |
+| Kastell | −40 % | **−75 %** |
+| Sternenfeste | −55 % | **−100 %** |
+
+Protomaterie ist der einzige Rohstoff, den **keine Fabrik herstellen kann** (Z. 13255–13257), sie
+fällt ausschließlich am `urmateriekern` an (Gewicht 3 von 103, also 2,91 % aller Vorkommen,
+Z. 13203) und bringt gemessen **2,93 je zufälliger Fuhre**, was bei ~45 Minuten je Fuhre
+**11 Protomaterie je Stunde mit einer Schürfflotte und 32 mit dreien** ergibt
+(`docs/tier3-protomaterie-konzept.md`, Abschnitt 8, gemessen 16.08.2026). Eine **Sternenfeste legt
+diese Quelle in ihrem Gürtelsystem vollständig still** – und das ist die Wirkung, wegen der ein
+Endspiel-Konto überhaupt hinfliegt. Angewandt wird der Malus in `protoJeFuhre()` (Z. 13285), der
+**einen** Stelle, die „wieviel Protomaterie bringt dieser Fels" beantwortet und die Vorschau, Start
+und Bericht gemeinsam rufen – der Kommentar dort sagt ausdrücklich, dass genau deshalb keine zweite
+Kopie entstehen darf.
+
+**(2) Hort.** Was die Festung dem Gürtel entnimmt, häuft sie an – in **beiden** Größen:
+
+| Stufe | Protomaterie/Std. | Protomaterie-Deckel | T1/Std. | T1-Deckel |
+|---|---|---|---|---|
+| **Schanze** | 1,5 | **90** | 2.000 | 120.000 |
+| **Kastell** | 4 | **240** | 6.000 | 400.000 |
+| **Sternenfeste** | 8 | **480** | 15.000 | 900.000 |
+
+Alle Deckel sind nach **60 Stunden** erreicht. Die T1-Zusammensetzung folgt den Sorten, die im
+betreffenden Gürtelsystem tatsächlich liegen (`AST_SORTEN`-Anteile der belegten Plätze,
+server.js:7747) – eine Festung im Eiskern-Revier hortet Deuterium, eine im Prismen-Revier Kristalle.
+
+**Woher die Protomaterie-Deckel kommen – nachgerechnet.** Der Sternenfesten-Hort von 480 entspricht
+**44 Stunden** Förderung einer einzelnen Schürfflotte (11/Std.) bzw. 15 Stunden bei drei Flotten.
+Aufgeteilt unter vier Angreifern sind das 120 je Kopf, also gut elf Stunden Schürfarbeit für eine
+Belagerung, die drei bis vier Tage gedauert hat. Gegengerechnet am Abnehmer: Eine Mega-Ausbaustufe
+kostet 20 Protomaterie (`tier3-protomaterie-konzept.md`, Abschnitt 8), ein Sternenfesten-Anteil trägt
+also rund sechs Stufen. Und der eigene Lagerdeckel bremst zusätzlich: `PROTOMATERIE_LAGER_BASIS`
+500 + 100 je Aufbereitungsstufe, bei Vollausbau **2.500** (Z. 13297–13298) – wer hortet, muss
+ausbauen.
+
+**Die T1-Zahlen bleiben bewusst klein, und das Konzept sagt warum.** 900.000 Einheiten sind für ein
+Konto mit 8,81 Mio./Std. rund **sechs Minuten Produktion**. Sie sind die Belohnung für das junge
+und mittlere Konto, das die **Schanze** in Heimatnähe schleift – dort sind 120.000 Einheiten
+tatsächlich Geld. Für das Endspiel-Konto ist die Protomaterie der Grund, und die T1-Beute ein
+Nebenprodukt. Eine T1-Beute, die auch im Endspiel „weh tut", müsste in die zweistelligen Millionen
+gehen und wäre über den Markt (Verkaufsdeckel 5 Mio. Kredite je Tag) direkt ein Inflationskanal –
+genau das Strukturproblem, das am 17.08.2026 zum Tagesumsatz-Deckel geführt hat.
 
 **Was eine Festung ausdrücklich NICHT tut: sie zerstört keine Schiffe außerhalb eines Kampfes.**
 Der naheliegende Einfall wäre, dass sie stationierte Eskorten (`state.asteroidEskorten`) beschießt.
 Das geht nicht, und der Grund ist keine Bequemlichkeit: Diese Schiffe stehen im **Spielstand des
 Halters**, und der Server schreibt grundsätzlich keine fremden Spielstände – der Weltboss-Code sagt
-das ausdrücklich (server.js:4205–4207: *„keine Schreibzugriffe auf fremde Spielstände – die würden
+das ausdrücklich (server.js:4249–4251: *„keine Schreibzugriffe auf fremde Spielstände – die würden
 mit dem Autosave online spielender Nutzer kollidieren"*). Eine Lösung über „der Client bucht die
 Verluste beim nächsten Laden selbst ab" wäre eine clientautoritative Schadensmeldung an einer
 Stelle, an der es etwas zu holen gibt. Deshalb: **Die Festung kostet Ertrag, niemals Besitz.**
@@ -459,6 +540,13 @@ Vor dem Abflug wählt man im Flottenwahl-Feld ein **Ziel** (`ziel: 'schild' | 't
 ein Auswahlfeld neben der Schiffswahl, technisch dasselbe Muster wie die Doktrin-Auswahl. Der
 Schaden geht auf dieses Bauteil; ist es schon zerstört, geht er ohne Rollenfaktor auf den Kern (die
 Flotte wird nicht bestraft, wenn ein Mitspieler schneller war).
+
+**Wenn eine Vorschau je eine Trefferwahrscheinlichkeit nennen sollte** (dieses Konzept sieht das
+ausdrücklich nicht vor, siehe unten), muss sie `weaknessPhasenBasis()` rufen und darf nicht selbst
+multiplizieren: Die Schwäche wirkt in **zwei** Schritten – ×1,25 auf die angezeigte Kraft und
+zusätzlich ×1,1 auf die Phasenbasis, zusammen ×1,375 auf die Chance (Z. 23239–23251). Bis zum
+15.08.2026 rechneten die Vorschauen ohne den zweiten Schritt und nannten am Titan-Wächter 50 %,
+während der Kampf mit 62 % würfelte.
 
 **Warum diese Zuordnung und keine andere:** Sie steht bereits in den Rollentexten des Spiels.
 „Bomber: schwere Waffen gegen große Ziele – reißt Großkampfschiffe auf" – eine Schildkuppel ist das
@@ -483,25 +571,36 @@ Belagerung. Zerstört ist zerstört: Ein gefallener Schild kommt nicht wieder. T
 nie – sonst wäre der Verlust-Vorteil, den man sich erkämpft hat, wieder weg, bevor die zweite Welle
 da ist.
 
-**Der Ablauf einer Angriffsmission** (Missionstyp `festung-angriff`), gebaut nach dem Muster der
-Abbaumission und **nicht** nach dem der Anfechtung (siehe 0.6):
+**Der Ablauf einer Angriffsmission** (Missionstyp `festung-angriff`), gebaut nach **Form A** der
+Rundflug-Regel (0.6) – also wie der NPC-Angriff, nicht wie die Abbaumission:
 
 1. `oeffneFlottenwahl()` mit Zielwahl → Vorschau nennt Flugzeit, Treibstoff, Rollenanteile und die
    erwartete Verlustspanne. **Keine Schadens-Prozentzahl** – der Server rechnet mit Werten, die der
    Client nur teilweise kennt (Werftmarken, Gefechtsvorräte, Doktrin des Servers). Eine Zahl hier
    wäre eine Behauptung, die der Kampf danach widerlegt; genau diese Begründung steht schon an der
    Anfechtungs-Vorschau (Z. 13840–13842).
-2. `startTime: jetzt`, `hinBis: jetzt + (flug/2)*1000`, `endTime: jetzt + flug*1000`.
-3. Bei `hinBis` löst der Ankunfts-Durchgang in `checkMissions()` den Kampf aus (`m.kampfErledigt`
-   verhindert das zweite Feuern), ruft `POST /api/festung/angriff` und bucht die zurückgemeldeten
-   eigenen Verluste ab.
-4. Die Flotte fliegt weiter und ist bei `endTime` zu Hause. Die Missionskarte zeigt „Anflug" bzw.
-   „Rückflug" (Z. 58483-Muster).
+2. `dur = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId)` – die
+   **Rundreise**, durch die zentrale Formel, damit Navigator, Prestige-Perk, Aszension,
+   Logistik-Zweig, Allianz-Tempo-Techs, Speed-Booster und Tempomodule wirken. Eine handgerechnete
+   Dauer hat am 24.07.2026 genau diese acht Quellen stillschweigend ausgehebelt (Kommentar bei
+   `relocationDuration`, Z. 51049–51057). Treibstoff: `missionFuelCostSplit(dur, flotte)`.
+3. `startTime: jetzt`, `endTime: jetzt + dur*1000`, **kein `hinBis`**.
+4. Bei `endTime` löst `checkMissions()` auf: `POST /api/festung/angriff`, dann die zurückgemeldeten
+   eigenen Verluste abbuchen und den Bericht schreiben – exakt der Weg, den `anfechtungAufloesen()`
+   heute schon geht (Z. 13886–13928).
+
+**Warum die Flugzeit über `asteroidFlugBasis(sysId)` (Z. 55219) läuft und nicht über eine neue
+Formel:** Es gibt im Spiel **keine** distanzabhängige Flugzeit – `relocationDuration()` kennt nur
+„gleiches System" (90 s) und „anderes System" (420 s), obwohl `systemDistance` und
+`SECTOR_UNIT_DISTANCE` (Z. 14032) existieren. `asteroidFlugBasis` mittelt dagegen die `duration`
+aller Planeten des Zielsystems und ist damit die einzige vorhandene Größe, die „weiter draußen
+dauert länger" wirklich abbildet. Genau deshalb sind die **Schanzen** in Heimatnähe nicht nur
+schwächer, sondern auch schneller erreichbar – ohne dass dafür eine Zahl erfunden wird.
 
 ### 4.5 Belohnung
 
 **Beim Fall der Festung** wird der Hort nach **Schadensanteil am Kern** aufgeteilt – dieselbe
-Mathematik wie beim Weltboss (`contributions`, server.js:5999–6004). Wer nur Schild oder Türme
+Mathematik wie beim Weltboss (`contributions`, server.js:6042–6047). Wer nur Schild oder Türme
 bearbeitet hat, geht damit nicht leer aus: Schaden an Schild und Türmen zählt zu **60 %** auf den
 Anteil. Das ist der Ausgleich dafür, dass diese Arbeit dem Verband nützt und nicht dem eigenen
 Zähler – ohne ihn würde niemand den Schild angreifen, und die ganze Rollen-Mechanik wäre tot.
@@ -510,7 +609,7 @@ Dazu, fest je Stufe und **unabhängig von der eigenen Wirtschaft** (die Belohnun
 eigene Produktion" ist in diesem Projekt mehrfach explodiert und steht als bekannter Fallstrick in
 der CLAUDE.md):
 
-| | Vorposten | Bastion | Zitadelle |
+| | Schanze | Kastell | Sternenfeste |
 |---|---|---|---|
 | Hort (Rohstoffe, geteilt) | bis 120.000 | bis 400.000 | bis 900.000 |
 | Kampfpunkte | 40 | 120 | 350 |
@@ -524,12 +623,12 @@ der CLAUDE.md):
 halten fest, dass Protomaterie **flugzeitgebunden** bleiben muss – eine Dauerfabrik skaliert mit
 Standorten und Stufen, eine flugzeitgebundene Quelle nicht, und genau daran ist der erste
 Tier-3-Entwurf gescheitert (*„eine EINZIGE voll ausgebaute Kette frisst rund 16 Protomaterie je
-Stunde, über zehn Standorte 162 – gegen eine Einnahme von 11 bis 32"*). Eine Zitadelle ist die
+Stunde, über zehn Standorte 162 – gegen eine Einnahme von 11 bis 32"*). Eine Sternenfeste ist die
 flugzeitgebundene Quelle in Reinform: Sie steht weit draußen, fällt selten, und die Ausbeute teilen
 sich alle Beteiligten. Heute kommt Protomaterie ausschließlich aus dem `urmateriekern`
 (Gewicht 3 von 103, also 2,91 % aller Vorkommen, Z. 13203) und pauschal aus großen Fuhren –
 eine zweite Quelle mit anderem Rhythmus ist der Sache dienlich, ohne die Knappheit aufzuheben.
-Nachgerechnet: Bei sechs Festungen, davon im Mittel zwei Zitadellen, und einer Falldauer von rund
+Nachgerechnet: Bei sechs Festungen, davon im Mittel zwei Sternenfesten, und einer Falldauer von rund
 drei Tagen sind das **etwa 14 Protomaterie je Tag für die gesamte Spielerschaft** – gegen eine
 Einnahme von 11 bis 32 je Konto und Tag aus dem Gürtel also ein Zuschlag, kein Dammbruch.
 
@@ -544,7 +643,7 @@ Schleife eröffnen, in der man Festungen anschlägt, statt sie zu schleifen.
 |---|---|---|---|
 | `festungerst` | Brecher | Erste Asteroidenfestung geschleift | `ti-building-fortress` |
 | `festung25` | Belagerungsmeister der Gürtel | 25 Festungen geschleift | `ti-shield-lock` |
-| `zitadelle` | Zitadellenstürmer | Eine Zitadelle geschleift | `ti-building-castle` |
+| `sternenfeste` | Sternenfesten-Stürmer | Eine Sternenfeste geschleift | `ti-building-castle` |
 | `dreiteile` | Systematisch | In EINEM Kampf Schild, Türme und Kern getroffen | `ti-target` |
 
 **Alle vier Zeichen stehen bereits im eingebetteten Font.** Nachgezählt am Stand v8.565.0 enthält er
@@ -555,7 +654,7 @@ wird das trotzdem mit `node check-icons.js` – die Whitelist ist die Instanz, n
 
 ### 4.6 Entstehen und Vergehen
 
-Im `galaxyTick` (alle 15 Minuten, server.js:4095):
+Im `galaxyTick` (alle 15 Minuten, server.js:4138):
 
 - **Entstehen:** mit 8 % Chance je Tick, solange weniger als `FESTUNG_MAX_AKTIV = 6` stehen und ein
   Gürtelsystem ohne Festung mit mindestens einem freien Platz existiert. Erwartungswert: eine neue
@@ -574,13 +673,13 @@ Im `galaxyTick` (alle 15 Minuten, server.js:4095):
 ### 4.7 Datenmodell und Endpunkte
 
 Die Festung lebt **im selben Dokument wie der Gürtel ihres Systems**: `db.shared['asteroids:<sys>']`
-(`astFeldKey()`, server.js:7739). Ein Abruf, ein Zustand, keine zweite Ladequelle – `/api/asteroid/field`
-(server.js:7890) liefert sie ohne neuen Endpunkt mit aus.
+(`astFeldKey()`, server.js:7782). Ein Abruf, ein Zustand, keine zweite Ladequelle – `/api/asteroid/field`
+(server.js:7933) liefert sie ohne neuen Endpunkt mit aus.
 
 ```js
 feld.festung = {
   id: '<uuid>',            // wechselt bei jedem Neuentstehen; Missionen prüfen dagegen
-  stufe: 'vorposten' | 'bastion' | 'zitadelle',
+  stufe: 'schanze' | 'kastell' | 'sternenfeste',
   platz: '7',              // einer der zehn Gürtelplätze
   kernMax, kern,           // Lebenspunkte
   schildMax, schild,       // 25 % von kernMax; regeneriert 2 %/h
@@ -595,7 +694,7 @@ feld.geraeumtBis = 0;      // 24 h Bonusfenster nach dem Fall
 ```
 
 **Die eine Zeile, die die Kollision mit dem Nachschub verhindert.** `astNachschub()`
-(server.js:7830–7866) sucht an **zwei** Stellen freie Plätze (Zeilen 7846–7852 und 7858–7864) und
+(server.js:7873–7909) sucht an **zwei** Stellen freie Plätze (Zeilen 7846–7852 und 7858–7864) und
 setzt dort neue Vorkommen. Ohne Änderung würde ein Vorkommen auf der Festung erscheinen und sie
 still überschreiben. Beide Schleifen werden deshalb durch **eine** gemeinsame Funktion ersetzt:
 
@@ -641,7 +740,7 @@ Client meldet keine Wirkung, er meldet eine Absicht, und die stand schon vor dem
 
 - **Sektor-Übersicht:** Das Abzeichen fließt über `karteSystemBadges()` in die
   `data-sektor-hinweise`-Aggregation – wer über eine Region fährt, sieht „Asteroidenfestung
-  (Zitadelle) bei Chronos-Gürtel" im Tooltip.
+  (Sternenfeste) bei Chronos-Gürtel" im Tooltip.
 - **Sektoransicht:** 🛡-Abzeichen am Systemknoten, Titel nennt Stufe und den Blockade-Malus.
 - **Offene Systemebene:** eigene SVG-Gruppe `data-map-festung` auf `asteroidPlatzXY(platz)` –
   ein sechseckiger Rumpf statt einer Scheibe, damit sie sich auf einen Blick von einem Vorkommen
@@ -682,7 +781,7 @@ Ohne Backend (`useBackend() === false`) gibt es kein geteiltes Feld – `asteroi
   Anderen.
 - **Kein Hort-Wachstum in Echtzeit**, sondern eine feste Beute je Stufe (der Mittelwert der
   geteilten Variante), damit Offline-Zeit keine Belohnung erzeugt.
-- **Keine Protomaterie** aus der Solo-Zitadelle. Sie ist eine Endgame-Ressource der geteilten
+- **Keine Protomaterie** aus der Solo-Sternenfeste. Sie ist eine Endgame-Ressource der geteilten
   Wirtschaft; eine private, beliebig wiederholbare Quelle dafür wäre genau die Selbstbedienung, vor
   der der gestrichene Wochenpass warnt.
 
@@ -714,7 +813,7 @@ die Neuerung nur sinken, nie steigen – und Zusammensetzung zählt zum ersten M
 Der Nomade ist dabei der bewusste Ausreißer: Ein wanderndes Nest ist ein Ziel, das man **verlieren**
 kann, wenn man zu lange zögert – der Angriff fliegt ins Leere, und die Flotte kommt ohne Kampf
 zurück (die Mission meldet das ehrlich, statt still nichts zu tun; vgl. das Verhalten bei
-`arrivedTooLate` im Weltboss, server.js:5994).
+`arrivedTooLate` im Weltboss, server.js:6037).
 
 ### 5.2 Das Nest: vier Stufen und eine Königin
 
@@ -750,7 +849,7 @@ Gegensatz zu ihr davonläuft.
   mitgezogen. Der Kommentar dort sagt, wofür es gedacht war: *„Wird für Fraktions-Expansion (nur in
   benachbarte Systeme) genutzt."* Der Schwarm breitet sich damit **nach derselben Nachbarschaft aus,
   nach der die vier NPC-Fraktionen expandieren** – eine Tabelle, zwei Nutzer. Ist kein Nachbar frei
-  („frei" nach derselben Regel wie `pickRandomFreeSystem()`, server.js:4801 – also **nie** in einem
+  („frei" nach derselben Regel wie `pickRandomFreeSystem()`, server.js:4844 – also **nie** in einem
   System, in dem ein Spieler zu Hause ist), verfällt der Wurf.
 - Galaxieweit sind höchstens **`NEST_MAX = 12`** Nester gleichzeitig aktiv. Ist der Deckel erreicht,
   verfallen weitere Würfe.
@@ -811,9 +910,17 @@ demselben Ergebnis).
 ### 5.5 Der Kampf – allein, im Verband, gegen die Königin
 
 Ein Nest wird angegriffen wie ein NPC: Kartenmenü → „Nest angreifen" → Flottenwahl → Mission
-`nest-angriff` mit `hinBis`/`endTime` nach dem Abbaumissions-Muster → bei Ankunft
+`nest-angriff` nach **Form A** (Rundreise als `endTime`, kein `hinBis` – 0.6) → bei Rückkehr
 `POST /api/alien/nest-angriff`. Der Server rechnet die Kraft aus dem gespeicherten Spielstand,
 zieht Lebenspunkte ab, verbucht den Beitrag und meldet die eigenen Verluste zurück.
+
+**Die eine Ausnahme, bei der Form B doch richtig wäre**, ist das wandernde Nest der **Nomaden von
+Vex**: Es verlässt sein System alle 12 Stunden, ist also fristgebunden wie der Leerenriss. Damit
+das keine zweite Bauform in den Code holt, ist die Wanderung bewusst **an die volle Missionsdauer
+gekoppelt**: Der Server prüft beim Auflösen, ob das Nest noch dort ist, und meldet sonst
+`zielWeg: true` – die Flotte kommt ohne Kampf und ohne Verluste heim, die Meldung sagt es. Das ist
+derselbe Weg, den der Weltboss mit `arrivedTooLate` geht (server.js:6037), und er kostet keine
+einzige neue Zeile in `checkMissions()`.
 
 Drei Unterschiede zur Festung, alle mit Absicht:
 
@@ -879,7 +986,7 @@ verortete Quelle. Das ist billiger als ein neues Set **und** repariert nebenbei 
 ### 5.7 Datenmodell und Endpunkte
 
 Der Nestbestand liegt in `db.galaxy` – dort, wo die verortete Weltgeschichte ohnehin lebt, und
-damit automatisch in `/api/galaxy` (`galaxyFuerClient()`, server.js:5480) und in `galaxyCache`
+damit automatisch in `/api/galaxy` (`galaxyFuerClient()`, server.js:5523) und in `galaxyCache`
 (Z. 15220):
 
 ```js
@@ -920,10 +1027,18 @@ den Alien-Namen.
 - **Sektor-Übersicht und Sektoransicht:** Das vorhandene 👽-Abzeichen bleibt – aber es sagt jetzt
   etwas: „Kryll-Schwarm · Schwarmstock (Stufe 3) · breitet sich aus". Bei einer Königin wird es 👑
   und trägt eine eigene, auffällige Färbung.
-- **Offene Systemebene:** eigene Gruppe `data-map-nest` auf `npcMarkerXY()`-Höhe, aber um 140° im
-  Winkel versetzt, damit Nest und NPC nicht denselben Fleck belegen – gerechnet über denselben
-  `kbMarkerFrei()` (Z. 54141) mit `markerR = 12` bzw. 20 für die Königin (die einen Pulsring wie
-  ein Boss trägt, siehe Z. 54718).
+- **Offene Systemebene:** eigene Gruppe `data-map-nest`. **Achtung auf den Winkel:**
+  `npcMarkerXY()` (Z. 54213–54219) hat einen **fest verdrahteten Winkel von 200°** – ein zweiter
+  Marker mit ebenfalls festem Winkel landet auf demselben Punkt und wird nur zufällig durch den
+  Kollisionsschieber getrennt. Das Nest bekommt deshalb 340°, die Festung sitzt ohnehin auf ihrem
+  Gürtelplatz. Beide laufen durch `kbMarkerFrei()` (Z. 54141), Nest mit `markerR = 12`, Königin mit
+  20 (sie trägt einen Pulsring wie ein Boss, Z. 54718).
+- **Und das Abzeichen allein genügt nicht.** Ein Eintrag aus `karteSystemBadges()` ist im
+  **geöffneten** System unsichtbar: Der offene Knoten wird beim Zeichnen übersprungen, die Nachbarn
+  erscheinen nur als 1,3-px-Punkte (Z. 53688, 53694–53701). „Auf der Karte sehen" heißt hier also
+  zwingend **zwei** Zeichnungen – Abzeichen in der Sektoransicht **und** ein eigener Marker in der
+  Systemebene. Genau dieser Punkt ist der Grund, warum NPC-Marker heute nur im geöffneten System
+  leben und in der Sektoransicht gar nicht auftauchen.
 - **Ebene:** „Ereignisse", wie heute. Der Knopf wirbt bereits mit „Aliens" (Z. 3397).
 - **Kartenmenü:** `nestMapMenu()` mit „Nest angreifen" und – für Allianz-Offiziere – „Koordinierten
   Angriff ausrufen". Der Info-Block zeigt Volk, Stufe, Lebenspunkte-Balken, Schwäche und den
@@ -975,13 +1090,13 @@ Explosion erzeugen würde wie überall sonst.
 ### Gebäude
 
 **Keine.** Der naheliegende Einfall wäre ein „Belagerungshafen", der Festungsangriffe verbilligt.
-Das Spiel hat 48 Gebäude, und der Ort, an dem so ein Effekt hingehört, existiert bereits: die
+Das Spiel hat 51 Gebäude (`BUILDING_DEFS`, nachgezählt), und der Ort, an dem so ein Effekt hingehört, existiert bereits: die
 Planeten-Rolle. Ein neues Gebäude wäre ein Eintrag mehr in einer ohnehin langen Liste, ohne eine
 Frage zu beantworten, die nicht schon beantwortet ist.
 
 ### Schiffe
 
-**Keine.** `SHIP_DEFS` hat 42 Einträge, und der Festungskampf ist gerade deshalb interessant, weil
+**Keine.** `SHIP_DEFS` hat 44 Einträge (nachgezählt), und der Festungskampf ist gerade deshalb interessant, weil
 er die **vorhandenen** Klassen neu bewertet: Wer nie Abfangjäger gebaut hat, merkt an den Türmen
 zum ersten Mal, was ihm fehlt. Ein „Belagerungsschiff" würde genau diese Frage wieder zuschütten.
 
@@ -1000,7 +1115,7 @@ zum ersten Mal, was ihm fehlt. Ein „Belagerungsschiff" würde genau diese Frag
 
 ### Gegenstände
 
-**Ein** neuer Verbrauchsgegenstand (`ITEM_DEFS`, 30 Einträge):
+**Ein** neuer Verbrauchsgegenstand (`ITEM_DEFS`, 30 Einträge, nachgezählt):
 
 | Schlüssel | Name | Icon | Seltenheit | Wirkung | `desc` |
 |---|---|---|---|---|---|
@@ -1069,7 +1184,7 @@ sobald er beweglich wird, wird sie zur Pflicht.
 | Missionskarte „Anflug/Rückflug" | 58483, 58563 | die neuen Typen aufnehmen |
 | `MISSION_LINIEN` / `missionMapZiel()` | 54190 / 54200 | neue Typen eintragen **und** ihre Zielposition abbilden |
 
-**Sonstige Pflichtstellen:**
+### 7.1 Weitere Pflichtstellen
 
 - `HELP_SECTIONS` (Z. 37738): zwei neue Abschnitte, **und** die Korrektur des heutigen Satzes
   „Aktuell ohne tiefe mechanische Kopplung ans eigentliche Spiel" (Z. 38049) – ab dem Tag der
@@ -1078,25 +1193,136 @@ sobald er beweglich wird, wird sie zur Pflicht.
 - `VORBOTEN` (Z. 28088): ein fünfter Eintrag auf Level 12 („Auf den Gürtelbahnen stehen Anlagen,
   die dort niemand gebaut hat …"), der neue Spieler an die Festungen heranführt.
 - `COMPENDIUM_CATS` (Z. 16825): Festungen und Völker als Kompendium-Einträge, damit die
-  Weltgeschichte nachlesbar ist.
+  Weltgeschichte nachlesbar ist. **Zwei Fallen dabei:** (a) Die Kategorie `bosses` zählt **hart**
+  gegen `['boss1','boss2','boss3']` mit `total: 3` (Z. 16851) – ein Königinnen-Kill zählt dort
+  automatisch **nicht** mit; wer ihn dazunimmt, muss die Liste und das Total mitziehen. (b)
+  `tests/test_kompendium.js` verlangt die Kategorienzahl als **blanke Zahl** (11, Z. 95) und
+  zusätzlich, dass der Hilfetext „acht Kategorien" nennt (Z. 167) – der Hilfetext hinkt also heute
+  schon drei Kategorien hinterher, und jede neue Kategorie reißt beide Prüfungen. Vier Kategorien
+  (`achievements`, `ships`, `modules`, `buildings`) wachsen dagegen automatisch mit
+  `ACHIEVEMENTS.length` &Co. – neue Erfolge sind dort gratis abgedeckt (Z. 16856).
+- `MILESTONE_GROUPS` (Z. 12248): Die zwei neuen Forschungen brauchen eine Zuordnung. Der Bestand
+  zeigt ein klares Muster: Für neue Forschungen wurde bisher eine **eigene** Gruppe angelegt statt
+  sie einer bestehenden anzuhängen – die acht Gruppen heißen heute `wirtschaft`, `krieg`,
+  `logistik`, `diplomatie`, `bergbau`, `revier`, `bohrung`, `tier3`, und die letzten vier sind
+  genau so entstanden. Die Begründung steht jedes Mal daneben: Ein fast erreichter Meilenstein darf
+  durch den Zuwachs nicht wegrücken (Z. 12260–12272). `rbelagerung` und `rxenobiologie` bekommen
+  deshalb eine gemeinsame neue Gruppe `bedrohung`. Nebenbei: Die Gruppe `revier` hat dort bereits
+  einen **vorgemerkten, aber nie gebauten** Bewohner – der Tiefenscan aus Phase 5 des
+  Asteroiden-Konzepts (Kommentar Z. 12266).
+- **Benachrichtigungen:** Ein neues Postfach-/Push-Ereignis („eine Festung ist in deinem
+  Schürfrecht-System entstanden", „die Königin ist geschlüpft") braucht **vier** Einträge:
+  `NOTIF_EVENT_INFO` im Frontend (Z. 30844–30873), `pushNotificationText` (server.js:1000–1030),
+  `notificationTarget` (server.js:1078–1100) und eine Kategorie in `getNotifPrefs`
+  (server.js:929–954). `tests/test_pushziele.js` prüft jeden dort genannten Reiter-Namen gegen die
+  Spieldatei – ein Tippfehler wäre sonst ein Klick ins Leere. Sprungziel ist in beiden Fällen
+  `karte`, dasselbe, das die Asteroiden-Anfechtung bereits nutzt (server.js:1088).
 - Bestenlisten-/Statistik-Zähler: `festungKills`, `nestKills`, `koeniginKills` gehören in die
   Statistik-Anzeige, sonst sind es Felder ohne Anzeigestelle.
-- **Prestige- und Aufstiegs-Bewahrlisten:** Die fünf neuen Spielstand-Felder müssen ausdrücklich
-  entschieden werden. Vorschlag: Die drei **Lebenszeit-Zähler** (`festungKills`, `nestKills`,
-  `koeniginKills`) bleiben über Prestige und Aufstieg erhalten, die zwei **Abklingzeit-Stempel**
-  werden zurückgesetzt.
-  **Achtung, hier gibt es ein warnendes Beispiel:** `state.piratennesterGeraeumt` (angelegt in
-  `applyStateDefaults()`, Z. 28832) ist ausdrücklich als *Lebenszeit-Zähler* gedacht – die
-  Randkriege-Handlung „geräumte Piratennester" (Z. 18740) rechnet die Differenz gegen einen
-  serverseitig gemerkten Basiswert. Im Prestige-Reset (Z. 29377) taucht das Feld **nicht** auf, und
-  der Kommentar bei Z. 28828–28831 sagt selbst, dass es danach `undefined` wäre und auf 0
-  zurückfällt. Ob der serverseitige Basiswert dabei mitwandert, ist **nicht geprüft** und gehört vor
-  der Umsetzung nachgemessen – ein Zähler, der bei jedem Prestige auf null fällt, während der
-  Server seinen alten Stand behält, liefert danach dauerhaft keine Kriegspunkte mehr. Die neuen
-  Zähler werden von Anfang an in beide Bewahrlisten eingetragen (Suchbegriff `deckelKappung2026`,
-  CLAUDE.md, „Wer einem BESTANDS-Gebäude nachträglich …").
+- **Prestige und Aufstieg: es gibt keine „Bewahrliste".** Beide Resets sind ein vollständiger
+  **Neuaufbau** von `state` (`state = { … }`, Z. 29369–29420 bzw. 29613–29655). Was dort nicht
+  **namentlich** steht, ist danach weg – auch Felder, die `applyStateDefaults()` anschließend nur
+  wieder auf ihren Nullwert setzt. Das ist ein anderer Mechanismus als eine Streichliste, und wer
+  ihn verwechselt, verliert einen Zähler still.
+  Zwei Präzedenzfälle zeigen beide Richtungen: **`npcScaling` wird in BEIDEN Zweigen ausdrücklich
+  auf `{}` gesetzt** (Z. 29377, 29621) – der Härtegrad wiederholbarer Gegner überlebt keinen
+  Reset. **`state.asteroidStats`** (`{missionen, geschuerft, anfechtungen}`) überlebt dagegen
+  beide, mit ausführlicher Begründung im Code: nicht Großzügigkeit, sondern die Erreichbarkeit der
+  Langzeit-Erfolge (Z. 29411–29418, 29648–29653).
+  **Vorschlag hier:** Die drei Lebenszeit-Zähler kommen in ein Objekt `state.festungStats`
+  (`{festungen, nester, koeniginnen}`) und werden in **beiden** Neuaufbau-Objekten namentlich
+  aufgeführt – dieselbe Behandlung wie `asteroidStats`, und aus demselben Grund: An ihnen hängen
+  die Erfolge `festung25` und `nest50`. Die zwei Abklingzeit-Stempel werden **nicht** aufgeführt
+  und damit zurückgesetzt; das ist folgenlos, weil der Server sie ohnehin selbst führt (4.2).
+  **Und es gibt drei Textstellen, die das mitmelden müssen:** der `confirm()`-Text des Prestiges
+  (Z. 28790), der des Aufstiegs (Z. 29569) und der HELP-Abschnitt „Prestige" (Z. 38025) – alle drei
+  zählen im Klartext auf, was einen Reset überlebt, und die Asteroiden-Bilanz steht dort bereits
+  wörtlich drin.
 
 ---
+
+### 7.2 Die Handlisten, die ein neuer Missionstyp mitpflegen muss
+
+Das ist der Teil, an dem dieses Projekt erfahrungsgemäß Zeit verliert – nicht an der Mechanik. Ein
+neuer `type`-Wert steht nicht in einer Tabelle, sondern in **mehreren handgeführten
+`||`-Ketten**, und die sind untereinander bereits uneinheitlich. Gemessen am Stand v8.565.0:
+`grep -n "piratelair" weltraum_kolonie.html | grep "m.type"` findet **17 Zeilen** (21294, 27323,
+27396, 30448, 41406, 47588, 48974, 49718, 55551, 55582, 55584, 58457, 58674, 58679, 60414, 60440,
+60679) – mal mit `intercept-pirates`/`void-rift`, mal ohne, die NPC-Listenzeile 60440 sogar ohne
+beides.
+
+| Liste | Wofür | Was passiert, wenn sie fehlt |
+|---|---|---|
+| Slot-Zähler (`activeFleetMissionCount` u. a., ~8 Kopien) | belegte Flottenslots | von diesem Einstieg aus lässt sich eine **zweite** Flotte mit denselben Schiffen starten |
+| `computeAwayByType()` Z. 21294 | „unterwegs"-Anzeige | die Schiffe gelten gleichzeitig als zu Hause und sind doppelt verplanbar |
+| `MISSION_LINIEN` Z. 54190 | Flugbahn auf der Karte | die Mission ist auf der Karte unsichtbar |
+| `missionMapZiel()` Z. 54200 | Zielposition | liefert `null`, die Linie wird still weggelassen |
+| Menü-Schließliste Z. 53939 | `closest()`-Prüfung | das Kartenmenü klappt beim Öffnen sofort wieder zu |
+| Karten-Ziehliste Z. 63085 | `closest()`-Prüfung | ein Tap auf das Objekt startet stattdessen ein Karten-Ziehen |
+| `REPORT_CATEGORIES` Z. 38187 | Berichtsfilter | der Bericht existiert, taucht aber unter „Kämpfe" nicht auf |
+| `applyStateDefaults()` + **beide** Reset-Listen | Spielstand-Felder | Feld ist nach Prestige/Aufstieg `undefined` oder verschwindet |
+| `SAVE_SANITY_LIMITS` (Backend) | neue Zahlenfelder | `PUT /kepler7-save-v3` lehnt den **gesamten** Spielstand mit 400 ab – das Speichern friert ein |
+
+**Der Vorschlag dieses Konzepts:** Die Slot-Zähler-Ketten werden im Zuge von Phase 1 durch **eine**
+Konstante ersetzt (`SLOT_MISSIONSARTEN`), die alle Stellen lesen – dieselbe Behandlung, die
+`kbMarkerFrei` in KB-13 und die Schmiede-Funktion am 16.08.2026 bekommen haben (Regel 43). Das ist
+kein Nebenprodukt, sondern der Grund, warum Phase 1 im Frontend mit „groß" veranschlagt ist.
+
+### 7.3 Der Sekunden-Cache der Karte – die Falle, die schon einmal zugeschnappt ist
+
+`karteAuffangSignatur()` (Z. 52814–52834) entscheidet, ob die Karte zwischen den
+Fünf-Sekunden-Vollbauten neu gezeichnet wird. Aus `galaxyCache` liest sie **ausschließlich**
+`Object.keys(galaxyCache.controlledSystems)`. Der Kommentar dort hält den Vorfall fest, der zur
+Aufnahme des Asteroidenfeldes geführt hat:
+
+> „Befund `test_geteiltes_asteroidfeld` 6e: Nach einem Claim lief `render()`, aber ohne diesen
+> Signatur-Anteil wäre der grüne Ring erst mit dem 5-s-Vollbau erschienen."
+
+Für dieses Konzept folgt daraus zweierlei:
+
+- **Die Festung ist gratis abgedeckt.** Sie lebt in `feld.festung` innerhalb von
+  `state.asteroidFeld`, und `JSON.stringify(state.asteroidFeld||{})` steht bereits in der Signatur
+  (Z. 52831). Das ist ein Nebeneffekt der Ablage-Entscheidung aus 4.7 – und ein Argument mehr dafür.
+- **Die Nester sind es NICHT.** Sie liegen in `db.galaxy` und damit in `galaxyCache`, von dem die
+  Signatur nur die Kontrollsysteme liest. Ohne einen zusätzlichen Anteil erschiene ein gefallenes
+  Nest bis zu fünf Sekunden lang weiter auf der Karte. Aufgenommen wird deshalb ein **schlanker**
+  Anteil – nicht der ganze `JSON.stringify` des Nestbestands, sondern
+  `(galaxyCache.alienNester||[]).map(n => n.id + n.stufe + Math.round(n.hp/1000)).join(',')`. Die
+  Lebenspunkte in Tausenderschritten, damit ein fremder Schlag die Karte bewegt, aber kein
+  Sekundentakt entsteht.
+
+### 7.4 Zwei Kleinigkeiten, die man beim Bauen übersieht
+
+**Die Kartensuche kennt nur Systeme und Planeten.** `performSectorSearch()` (Z. 56624) sucht in
+`visibleSystems()` und `PLANETS`, je acht Treffer – NPCs, Asteroiden und Aliens sind heute **nicht
+suchbar** (Z. 56629, 56635). Für ein Konzept, dessen Ziele quer über die Galaxie verstreut sind
+und ein Zeitfenster haben, ist das eine echte Lücke: Wer von der Ansage „die Königin ist bei
+Vega geschlüpft" zur Karte will, tippt „Vega" und findet das System – aber nichts sagt ihm, wo die
+sechs Festungen stehen. **Vorschlag:** Festungen und Nester als dritte und vierte Trefferart, mit
+Stufe im Untertitel. Kosten: ein Filter und ein Ergebnisblock, dieselbe Bauform wie die zwei
+vorhandenen. Ein Objekt in einem versteckten System (`s.hidden`, Z. 14020) bleibt dabei außen vor,
+solange `state.discoveredSystems` es nicht kennt – sonst verriete die Suche Endgame-Anomalien.
+
+**Abzeichen-Titel gehen unescaped ins SVG.** `karteSystemBadges`-Titel und die dp-Zeile werden roh
+zwischen `<title>`-Tags geschrieben (Z. 53459, 53461), der NPC-Name ebenso als Textinhalt
+(Z. 54717–54721, nur `"` wird aus dem Attribut entfernt). Heute ist das unkritisch, weil **alle**
+Quellen serverseitige Konstanten sind (`ALIEN_RACE_NAMES`, server.js:4140). Es bleibt es nur,
+solange das so ist: Sobald in einem Abzeichen-Titel je ein **Spielername** steht – etwa „zuletzt
+angegriffen von …" –, ist das eine Einschleusstelle. Dieses Konzept führt deshalb **keinen**
+Spielernamen in einen Kartentitel; wer das später ändert, escapt vorher.
+
+### 7.5 Zwei Tests, deren Erwartung eine blanke Zahl ist
+
+Beide werden von diesem Konzept **auf korrektem Code rot** – und beide müssen mitgezogen werden,
+nicht abgeschwächt (Regel 33: eine Zählprüfung führt ihre erlaubten Stellen namentlich, nicht als
+Zahl):
+
+- `tests/test_kartenmarker.js` 3b (Z. 221–222) verlangt **genau drei** Aufrufe von `kbMarkerFrei`
+  („Heimatbasis, fremde Spieler, NPC"). Festung und Nest machen daraus fünf.
+- `tests/test_rundflug.js` 1f (Z. 76–78) verlangt **genau zwei** Aufrufstellen von `ankunftsKampf`.
+  Weil Festung und Nest nach Form A gebaut werden (0.6), bleibt diese Zahl unverändert – das ist
+  ein weiteres Argument für Form A und **keine** Selbstverständlichkeit.
+
 
 ## 8. Wo es im Spiel auftaucht
 
@@ -1166,6 +1392,7 @@ Statuscode.
 | `test_festung_blockade.js` | `abbauPlan()` liefert bei stehender Festung 40 % weniger `ladung`; die Vorschau **nennt** den Malus (nicht nur die kleinere Zahl) | am alten Stand voller Ertrag |
 | `test_rundflug.js` (**Umbau**) | die Falltabelle kommt aus **derselben Quelle** wie der Ankunfts-Durchgang; alle Rundflug-Missionsarten haben `hinBis` **und** `endTime > hinBis` | am alten Stand fällt `asteroid-contest` durch – das ist zugleich der Beleg für Befund 0.6 |
 | `test_kartenmarker.js` (**Erweiterung**) | Festungs- und Nest-Marker kollidieren auf **beiden** Formfaktoren nicht mit Planetenscheiben; die Knöpfe sind per `elementFromPoint` auf ihrer **Mitte** erreichbar (Regel 49) | mit ausgeschaltetem `kbMarkerFrei`: Überlappung messbar |
+| `test_kartenoverlays.js` (**neu**) | die Marker auf den äußeren Bahnen liegen nicht unter den ‹ ›-Knöpfen (`left/right:8px`, `top:50%`, 36×48 px, `z-index:5`, Z. 3406–3411) und nicht unter dem Zoomstapel – gemessen per `elementFromPoint` auf die Markermitte, auf beiden Formfaktoren | am Stand ohne den Schieber: `elementFromPoint` liefert den Knopf statt des Markers |
 | `test_nest_reifung.js` | ein Nest wechselt seine Stufe erst nach der Reifezeit; die Anzeige nennt die Stufe; die Restzeit wird **gerundet** ausgegeben (keine Sekundenanzeige, sonst Tick-Unruhe) | am alten Stand keine Stufenanzeige |
 | `test_festung_paritaet.js` | die Stufen-, Lebenspunkte- und Blockade-Tabellen im Frontend stimmen mit `server.js` überein – dieselbe Familie wie `test_kosmetik_paritaet.js`, `test_asteroid_paritaet.js` und `SHIP_SCORE_WEIGHTS` | Wert im Backend verändern → rot |
 | `test_anzeigestellen_gegnerstaerke.js` | die NPC-Vorschau, die Gegnerkarte und der Kampf rufen **dieselbe** Funktion für die effektive Verteidigung | eine Kopie der Formel einsetzen → rot |
@@ -1180,8 +1407,17 @@ Statuscode.
 | `test_gegnerstaerke_drift.js` | der Zielwert folgt der Stufensumme, die Drift ist gedämpft, der Deckel 2,5 hält, und **0 Nester führen wirklich auf 1,0** (heute unerreichbar) |
 | `test_festung_schreibschutz.js` | ein `PUT /api/storage/asteroids:<sys>` eines gewöhnlichen Nutzers wird abgewiesen – der geteilte Speicher ist ohne ausdrückliche Regel für jeden offen |
 
-**Zwei Fallen, die bei diesen Tests konkret drohen** (beide sind in diesem Projekt schon einmal
-teuer gewesen):
+**Die Falle, die den Marker-Test STILL wertlos machen würde.** `tests/test_kartenmarker.js` misst
+Kollisionen ausschließlich über die Selektoren `[data-map-npc], [data-map-player]` (Marker),
+`.planet-node[data-planet]` (Scheiben) und `text.planet-label` (Beschriftungen), Z. 89–100. Ein
+neuer Markertyp mit eigenem `data-`-Attribut wird von der Messung **gar nicht erfasst** – der Test
+bliebe grün und hätte nichts geprüft. Das ist kein roter Test, den man bemerkt, sondern ein
+vacuous grüner (Regel 28). Beide neuen Selektoren gehören deshalb in dieselbe Liste, und die
+Beschriftungen brauchen `class="planet-label"`, weil nur damit die Text×Text- und
+Text×Scheibe-Messung sie sieht (Z. 54721).
+
+**Zwei weitere Fallen, die bei diesen Tests konkret drohen** (beide sind in diesem Projekt schon
+einmal teuer gewesen):
 
 - **Der Anfängerschutz muss für Angriffstests weg** (`db.private[<id>].__attackShieldUntil = 0`) –
   sonst antwortet der Angriffs-Endpunkt mit 403, und ganze Abschnitte werden aus dem falschen Grund
@@ -1207,7 +1443,7 @@ geräumten Nester der Stufen 1–2 geht gegen null.
 eine flachere Belohnungskurve nur seine Spitze.
 
 **(2) Die Blockade trifft die Falschen.** Wer sein Schürfrecht in einem Gürtelsystem hat, in dem
-eine Zitadelle steht, verliert 55 % Ertrag – auch wenn er die Festung gar nicht schleifen kann.
+eine Sternenfeste steht, verliert 55 % Ertrag – auch wenn er die Festung gar nicht schleifen kann.
 Das Konzept mildert das über die Wahlfreiheit (nur sechs von zwanzig Systemen sind je betroffen,
 Schürfrechte lassen sich aufgeben und neu anmelden) und über den 24-Stunden-Bonus nach dem Fall.
 Es bleibt trotzdem der Punkt, an dem ein Spieler-Report zuerst kommen wird.
@@ -1221,7 +1457,7 @@ nicht der Vorschlag, weil sie die Festung für Rechtehalter unsichtbar macht.
 einen Slot für die volle Rundreise. Für ein junges Konto mit zwei Slots ist das die Wahl zwischen
 Belagerung und Expedition – für ein Endspiel-Konto ist es nichts. Das ist eher Feature als Fehler
 (die Slots sind seit jeher die Währung, in der dieses Spiel Entscheidungen einfordert), aber es ist
-der Grund, warum die **Vorposten** in Heimatnähe stehen und kurze Flugzeiten haben: Der Slot soll
+der Grund, warum die **Schanzen** in Heimatnähe stehen und kurze Flugzeiten haben: Der Slot soll
 für einen Anfänger nicht drei Stunden gebunden sein.
 
 **(3) Zwei neue Angriffsziele verdünnen die vorhandenen.** Wer sechs Stunden Abklingzeit auf
@@ -1252,6 +1488,15 @@ in den ersten Prüflauf nach der Auslieferung.
 - **Kein neues `ti-*`-Icon und kein Font-Neubau.** Alle Zeichen stehen im Bestand.
 - **Keine Festung auf einem Planeten oder in einem Nicht-Gürtelsystem.** Der Reiz ist gerade, dass
   sie dort steht, wo der Spieler ohnehin arbeitet.
+- **Keine Tagesaufgaben auf Festungen oder Nester.** Der Code hat diese Frage schon einmal
+  entschieden und die Begründung dazugeschrieben (Z. 28282–28286): Aufgaben auf Schürfrechte und
+  Anfechtungen gibt es ausdrücklich **nicht**, weil sie den Server brauchen und im Solo-Modus
+  unerfüllbar wären – ein `available`-Prädikat auf `useBackend()` hätte den Tag genau dem verdorben,
+  der gerade seine Sitzung verloren hat (Vorfall 14.08.2026). Dasselbe gilt hier.
+- **Keine vierte Unterstützer-Automatik.** Es gibt heute genau drei (`AUTO_REINFORCE_COST_KERNE`,
+  `KI_INTERCEPT_COST_KERNE`, `AUTO_REPAIR_COST_KERNE`, je 3 KI-Kerne, Z. 26971 / 27270 / 51587),
+  jede mit doppelter Sperre. Eine „Belagerungs-Automatik", die selbständig zuschlägt, würde
+  ausgerechnet die Entscheidung wegnehmen, die dieses Konzept einführt.
 - **Keine Änderung an `/api/attack`.** Der Endpunkt nimmt weiterhin keinen einzigen Kampfparameter
   aus dem Request entgegen; das ist eine Eigenschaft, die erhalten bleiben soll.
 
