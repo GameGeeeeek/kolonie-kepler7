@@ -1257,6 +1257,57 @@ Autorität ist. Zwei Quellen für dieselbe Zahl heißt: **eine Paritätsprüfung
 bei `test_asteroid_paritaet.js` für `AST_SORTEN`. Ohne sie driften Vorschau und Buchung auseinander,
 sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mission nicht einhält.
 
+## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
+
+Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
+Belohnungen die es nur dort gibt vielleicht macht es Sinn eine item Struktur einzubauen."
+Ausgearbeitet in **`docs/beute-und-instanzen-konzept.md`**.
+
+**Verhältnis zu den Asteroidenfestungen (Abschnitt darüber):** Die beiden Projekte treffen sich
+bei Teil C (Instanzen). Die Festungen bringen angreifbare PvE-Ziele auf die Karte und haben mit
+dem Hort bereits eine eigene Beutequelle; dieses Konzept liefert dazu die Frage, WAS dort fällt
+und wie es sich von regulärer Beute unterscheidet (Herkunfts-Schloss). Wer an einem der beiden
+arbeitet, liest den jeweils anderen Abschnitt mit – sonst entstehen zwei Beutetische nebeneinander.
+
+**Der Satz, der hier stehen muss, damit ihn niemand übersieht: Ein großer Teil davon ist bereits
+gebaut.** Wer das nicht nachmisst, stellt ein zweites System neben ein vorhandenes — genau der
+Fehler, den dieses Projekt bei den Bonusgruppen schon einmal gemacht hat. Gemessen am 18.08.2026:
+
+- **Set-Boni gibt es.** `MODULE_SET_DEFS` führt neun Sets: vier benannte (alles oder nichts) und
+  fünf **Boss-Sets** mit je vier Teilen und gestaffelten Stufen (2/3/4 Teile, additiv). Gerechnet
+  in `setBonusAt(planetKey, effect)`, additiv, unter denselben nachgelagerten Deckeln wie alles
+  andere. Dazu Sockel (2 je Standort, `SOCKET_POOL` bewusst ohne `raidloss`/`atk` — client-only,
+  keine PvP-Parität nötig).
+- **„Nur hier zu bekommen" gibt es als Mechanik.** Das Feld `quelle` an einem Modul ist ein
+  Herkunfts-Schloss mit vier Werten (`normal`/`abgrund`/`boss`/`unikat`); `fundPool` filtert
+  danach, und es hält Boss-Set-Teile und Unikate aus **jedem** regulären Fundtopf, aus **beiden**
+  Schmieden und aus der **Modulbörse** heraus. Vergeben wird ausschließlich über
+  `grantBossSetModule()` bzw. `grantUnikatModul()`. Wer neue exklusive Beute baut, benutzt dieses
+  Schloss — es ist erprobt und braucht kein neues System.
+- **Raids gibt es.** `ALLIANCE_RAID_BOSSE` führt fünf Gegner mit eigenen KAMPFREGELN, nicht nur
+  anderen Zahlen: Schwäche (Schiffsklasse), Malus ohne sie (0,75–0,80), eigener Verlust- und
+  Beutefaktor, Beute-Schwerpunkt. Jeder lässt sein eigenes Vier-Teile-Set fallen.
+- **Ein Dungeon gibt es — er heißt Abgrund.** Tiefenläufe, Mutatoren, Wächter, zwölf Reliquien mit
+  gestaffelten Satz-Boni (`ABGRUND_RELIKT_SATZ`), eigene Währungen, eigene Werkstatt, eigene Rolle.
+
+**Die vier gemessenen Lücken** (das ist das eigentliche Projekt):
+
+1. `SHIP_MODULE_DEFS` (44 Module) hat **keinen einzigen** Set-Bonus — 0 Treffer. Die direkteste
+   Umsetzung des Auftrags, auf einem System, das die Mechanik noch nicht hat.
+2. Alle 20 Boss-Set-Teile fallen **ausschließlich** nach einer Allianz-Raid-Welle. Solo ist keines
+   davon je erreichbar — die größte inhaltliche Sperre im Modulsystem.
+3. Keine gestufte Schwierigkeit mit **eigenem** Beutetisch: Ein Boss lässt dieselben Teile fallen,
+   egal wie stark die Allianz ist; die Abgrund-Reliquien enden bei Tiefe 120.
+4. **Fünf parallele Gegenstands-Systeme** (`MODULE_DEFS` 182, `SHIP_MODULE_DEFS` 44, `ITEM_DEFS` 30,
+   `RARE_ITEMS` 6, `ABGRUND_RELIKTE` 12) ohne gemeinsame Auskunft.
+
+**Zur „Item-Struktur" die Entscheidung, die im Konzept begründet ist: KEIN Umbau der Speicherform.**
+Der Modul-Schlüssel (`typ:seltenheit:…`) ist tragend; der Kommentar an den Sockeln hält fest, dass
+schon ein fünftes Schlüssel-Segment „genau die Fehlerklasse aus dem Schmelze-Bugfix" gewesen wäre.
+Vorgeschlagen ist stattdessen eine **abgeleitete Beschreibungs-Schicht** über die fünf Listen
+(key/name/icon/art/seltenheit/herkunft/desc) — sie liest sie, statt eine sechste Liste zu führen,
+und trägt zugleich die automatische `desc`-Prüfung, die Hausregel 7 bisher von Hand absichert.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
