@@ -6121,9 +6121,12 @@
       if (def.key === 'mondschild'){
         return `Senkt die Zerstörungschance durch einen gegnerischen Mondzerstörer um ${Math.round((def.siegeDefensePerLevel||0)*100)}% je Stufe${def.maxLevel?` · max. Stufe ${def.maxLevel}`:''}`;
       }
+      /* Mit Bastionsmarke steht hier der Wert, den die Anlage bei DIESEM Spieler haette - nicht
+         der Auslieferungswert. Eine gesperrte Karte, die weniger verspricht als die Anlage nach
+         dem Bau leistet, waere dieselbe zweite Anzeigestelle wie ueberall sonst. */
       const parts = [];
-      if (def.atkVal) parts.push(`+${def.atkVal} Angriff`);
-      if (def.defVal) parts.push(`+${def.defVal} Verteidigung`);
+      if (def.atkVal) parts.push(`+${bastionAtkVal(def)} Angriff`);
+      if (def.defVal) parts.push(`+${bastionDefVal(def)} Verteidigung`);
       let text = parts.length ? parts.join(' · ') + ' je Stufe' : '';
       // effectDesc nur anhängen, wenn er mehr sagt als die Zahlen selbst - bei den älteren Anlagen
       // steht dort teils nur das Wort "Verteidigung", das wäre neben "+65 Verteidigung je Stufe" leer.
@@ -20325,12 +20328,21 @@
     if (!atk && !dv) return '';
     const m = defenseStatMax();
     const stufe = lvl||0;
+    /* Die BALKEN bleiben auf den Auslieferungswerten - sie beantworten die Frage "welche Anlage ist
+       wofuer gut", und dafuer muessen alle an derselben Latte gemessen werden. Wuerde die Marke sie
+       heben, muesste auch defenseStatMax() sie kennen, und dessen Zwischenspeicher wuerde bei jeder
+       Markenaenderung still veralten - ein Balken, der laenger als sein Maximum ist. Die MARKE steht
+       stattdessen in der Zahl rechts und in der Stufenzeile des Tooltips: dort geht es um DEINE
+       Anlage, nicht um den Vergleich. */
+    const mk = bastionMarkOf(def.key), mult = bastionMarkMult(def.key);
     const row = (k, val, max, color, tip) => {
       const pct = max>0 ? Math.max(0, Math.min(100, (val/max)*100)) : 0;
-      const gesamt = stufe>0 ? ' – bei deiner Stufe ' + stufe + ': ' + fmt(val*stufe) : ' – noch nicht gebaut';
-      return '<div class="sstat" title="' + tip + gesamt + ' – Balken im Verhältnis zur stärksten Anlage (' + max + ').">'
+      const eigen = Math.round(val * mult);
+      const markeTxt = mk > 1 ? ' – mit Bastionsmarke ' + SHIP_MARK_ROMAN[mk-1] + ': ' + eigen + ' je Stufe' : '';
+      const gesamt = stufe>0 ? ' – bei deiner Stufe ' + stufe + ': ' + fmt(eigen*stufe) : ' – noch nicht gebaut';
+      return '<div class="sstat" title="' + tip + markeTxt + gesamt + ' – Balken im Verhältnis zur stärksten Anlage (' + max + ').">'
         + '<span class="k">' + k + '</span><span class="tr"><i style="width:' + pct.toFixed(1) + '%; background:' + color + ';"></i></span>'
-        + '<span class="v">' + val + '</span></div>';
+        + '<span class="v">' + eigen + (mk > 1 ? '<span style="color:#c3bef5;">*</span>' : '') + '</span></div>';
     };
     return '<div class="ship-stats">'
       + row('Angriff', atk, m.atk, '#e24b4a', 'Angriffspunkte je Stufe (Gegenschlag der Anlage)')
@@ -21078,6 +21090,314 @@
       <div class="mark-buy">
         <span class="bcost" style="margin:0;">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dauer)}</span>
         <button class="buy ${kaufbar?'affordable':''}" data-shipmark="${shipKey}" ${kaufbar?'':'disabled'}><i class="ti ti-arrow-up" aria-hidden="true" style="margin-right:4px;"></i>Aufrüsten</button>
+      </div>
+    </div>`;
+  }
+
+  // ===== Bastionsmarken (18.08.2026, V2a des Verteidigungs-Konzepts) =====
+  // Das Werftmarken-Muster fuer VERTEIDIGUNGSANLAGEN. Der Anlass steht gemessen in
+  // docs/verteidigung-flotte-konzept.md, Abschnitt 1.3: Verteidigung zahlt auf keiner
+  // Fortschrittsachse ein. Kampfpunkte gibt es nur fuers Angreifen (bewusst so, der Backend-
+  // Kommentar begruendet es), es gibt keine Kosmetik und keinen Erfolg dafuer - und vor allem ist
+  // Verteidigung als EINZIGE grosse Investition des Spiels nicht haltbar: Werftmarken, Module,
+  // Offiziere und Veteranen ueberleben das Prestige, Verteidigungsgebaeude nicht. Beim Aufstieg
+  // verkauft das Spiel sogar drei bezahlte Erhaltungspfade - Werftregister, Ruestkammer,
+  // Offiziersstab - und alle drei sind Flottenpfade.
+  //
+  // Eine Bastionsmarke gilt fuer die ganze ANLAGENKLASSE an ALLEN Standorten - genau wie eine
+  // Werftmarke fuer die ganze Schiffsklasse. Das ist der eigentliche Hebel: defensePower() zaehlt
+  // je Standort, und eine Anlagenstufe hilft nur dort, wo sie steht. Eine Marke wirkt ueberall.
+  //
+  // WAS SIE AUSDRUECKLICH NICHT TUT: Sie schliesst den gemessenen Abstand zu Schiffen NICHT
+  // (Abschnitt 1.1 des Konzepts: Faktor 7,2 bei einem Tag Einkommen, 21,6 bei einem Jahr - eine
+  // Verdopplung aller defVal wuerde daran nichts Wesentliches aendern, weil die Kostenkurve
+  // exponentiell und der Nutzen linear ist). Sie macht Verteidigung HALTBAR und gibt ihr eine
+  // eigene Achse. Wer etwas anderes verspricht, schreibt eine Zusage hin, die die Zahlen nicht
+  // decken.
+  //
+  // Und sie aendert den PUNKTESTAND NICHT. Werftmarken tun das (v8.355.0), aber der Punktestand
+  // wird serverseitig nachgerechnet (computeScoreServer); ein Eingriff dort ist der Vorschlag V3
+  // des Konzepts und ausdruecklich als rueckwirkender Ranglisten-Eingriff gekennzeichnet. Beides
+  // in einem Zug waere zwei Entscheidungen in einer Lieferung.
+  const BASTION_MARK_MAX = 10;
+  // +3% je Stufe auf Verteidigungswert UND Angriffswert der Anlage - auf Bastion X also +27%,
+  // exakt derselbe Deckel wie bei den Werftmarken. Der Schildanteil (def.shield = 40% des
+  // Verteidigungswerts) laeuft automatisch mit, weil er aus demselben Wert abgeleitet wird.
+  const BASTION_MARK_PER_STEP = 0.03;
+  // Klassenfaktor aus dem Verteidigungswert, der in BUILDING_DEFS ohnehin steht - eine zweite,
+  // handgepflegte Preisliste waere die naechste Stelle, die daneben veraltet (dieselbe Begruendung
+  // wie bei shipMarkClassFactor, das die Bauzeit nutzt). Die Marke hebt einen PROZENTSATZ, ihr
+  // absoluter Nutzen waechst also mit dem Verteidigungswert - der Preis muss mitwachsen, sonst
+  // waere die staerkste Anlage immer die billigste Marke je Punkt.
+  //
+  // Der Deckel bei 7 ist KEINE Rundung, sondern die Lagerschranke. Gerechnet: Der groesste
+  // Einzelschritt verlangt 1.507 Nanolegierungen mal Klassenfaktor, das Tier-2-Lager fasst
+  // 200 + 150 je Fabrikstufe (imperiumsweit summiert).
+  //
+  //   Faktor 7    ->  10.549 Nanolegierungen  ->  ab 69 Fabrikstufen bezahlbar
+  //   Faktor 8,4  ->  12.659                  ->  ab 84   (der ungedeckelte Resonanzschild-Emitter)
+  //
+  // Der Deckel senkt also die noetige Kettengroesse von 84 auf 69 Stufen - er macht den
+  // Unterschied fuer Konten in der Mitte, nicht fuer alle. Das ist die ehrliche Groessenordnung;
+  // "sonst unbezahlbar" waere zu stark. Der eigentliche Waechter gegen eine unerfuellbare Zahlung
+  // ist nicht diese Konstante, sondern die KOSTENTABELLE darunter: Der rohe Faktor des staerksten
+  // Gebaeudes ist 8,4, ein hoeherer Deckel kann die Schranke also gar nicht reissen - eine
+  // angehobene Tier-2-Menge sehr wohl. Genau dort setzt tests/test_bastionsmarken.js 4d an
+  // (gegengeprueft: Nano-Endschritt 1.507 -> 6.000 laesst die Pruefung anschlagen).
+  const BASTION_MARK_CLASS_CAP = 7;
+  function bastionMarkClassFactor(buildingKey){
+    const def = BUILDING_DEFS.find(d => d.key === buildingKey);
+    const dv = (def && def.defVal) || 0;
+    return Math.min(BASTION_MARK_CLASS_CAP, Math.max(0.4, dv / 50));
+  }
+  // Welche Anlagen ueberhaupt eine Marke tragen koennen. Abhorchposten und Mondschildgenerator
+  // haben defVal 0 und tragen ihre Wirkung in eigenen Regeln (Vorwarnzeit, Mondzerstoerer-Abwehr) -
+  // ein Prozentsatz auf null waere dort eine Marke, die nichts tut. Dieselbe Ausnahme machen
+  // defenseStatBarsHtml und defenseLockedPreview, und sie wird hier aus DENSELBEN Feldern
+  // abgeleitet statt als dritte Namensliste danebengeschrieben.
+  function bastionMarkFaehig(def){
+    return !!(def && def.category === 'defense' && ((def.defVal||0) > 0 || (def.atkVal||0) > 0));
+  }
+  function bastionMarkKeys(){
+    return BUILDING_DEFS.filter(bastionMarkFaehig).map(d => d.key);
+  }
+  // Kostentabelle fuer die Spruenge Bastion II .. Bastion X, bei Klassenfaktor 1,0.
+  //
+  // KALIBRIERT GEGEN DEN LAGERDECKEL, nicht gegen den Zufluss - und das ist der Kern der Sache.
+  //
+  // Der erste Entwurf rechnete nach der Konvention aus docs/verteidigung-flotte-konzept.md
+  // Abschnitt 0 ("ein Posten kostet so viele Sekunden, wie sein knappster Rohstoff braucht") und
+  // kam auf 11,6 Mio Erz fuer den Endschritt. GEMESSEN im Browser, an einem ambitionierten
+  // Endausbau (11 Standorte, Lagerkomplex 45, Kryolager auf der Maximalstufe 15, 500 Frachter),
+  // fasst das Basis-Lager aber nur **803.800**. Die Zahlung war also nicht teuer, sondern um den
+  // Faktor 100 unbezahlbar - und der Kaufknopf waere fuer immer grau geblieben.
+  //
+  // Die Konvention war nicht falsch, sie beantwortet nur eine andere Frage: Sie misst, wie lange
+  // man auf eine Menge WARTET. Eine EINMALZAHLUNG muss zusaetzlich in den Speicher passen, und
+  // der ist in beiden Stufen gedeckelt - in Tier 1 ueber storageCap(), in Tier 2 ueber
+  // tier2StorageCap(). Das ist derselbe Strukturbefund wie bei der Protomaterie (CLAUDE.md
+  // Regel 41), nur mit der anderen Schranke: dort begrenzt der FLUSS, hier der SPEICHER.
+  //
+  // Was daraus folgt, und was diese Tabelle deshalb ist:
+  //   TIER 1 ist ein Anerkennungsbetrag. Der groesste Einzelschritt liegt beim hoechsten
+  //     Klassenfaktor bei 401.800 Erz - genau der Haelfte des gemessenen Deckels. Mehr ginge
+  //     schlicht nicht. Die ganze Leiter sind 2 Minuten Erz-Zufluss; Tier 1 ist fuer niemanden
+  //     knapp, der Verteidigungsanlagen baut.
+  //   TIER 2 ist das eigentliche Tor und die eigentliche Senke. Jeder Endschritt beansprucht 42 %
+  //     des jeweiligen Tier-2-Lagers, und ueber alle 20 Anlagen summiert sind das 76 Stunden
+  //     KI-Kern- und 51 Stunden Metamaterial-Produktion. Wer eine Anlage auf die Endstufe bringen
+  //     will, muss alle sechs Fabrikketten laufen haben.
+  //   DIE ZEIT ist der Hauptpreis: 28 Stunden je Leiter beim Klassenfaktor 1, 56 Stunden bei 7,
+  //     rund 31 Tage reine Ausbauzeit fuer das komplette Set. Zeit hat als einzige Groesse des
+  //     Spiels keinen Lagerdeckel.
+  //
+  // WER DIESE TABELLE ANFASST, rechnet beide Deckel nach - tests/test_bastionsmarken.js prueft
+  // 4d (Tier 2) und 4g (Tier 1) genau darauf, jeweils gegen den groessten Einzelschritt beim
+  // hoechsten Klassenfaktor.
+  const BASTION_MARK_COST_BASE = [
+    [     5200,    2100,    0,   0,   0,   0,   0,   0],  // Bastion II  - reine Grundstoffe
+    [     7000,    2800,    0,   0,   0,   0,   0,   0],  // Bastion III
+    [     9500,    3800,   90,   0,   0,   0,   0,   0],  // Bastion IV   - erste Nanolegierungen
+    [    12800,    5100,  144,  76,   0,   0,   0,   0],  // Bastion V    - erste Quantenchips
+    [    17300,    6900,  230, 122,  91,   0,   0,   0],  // Bastion VI   - erste Hochenergiekristalle
+    [    23300,    9300,  368, 195, 146,  97,   0,   0],  // Bastion VII  - erste Fusionskerne
+    [    31500,   12600,  589, 312, 234, 155, 116,   0],  // Bastion VIII - erste KI-Kerne
+    [    42500,   17000,  942, 499, 374, 248, 186, 124],  // Bastion IX   - erstes Metamaterial
+    [    57400,   23000, 1507, 798, 598, 397, 298, 198]   // Bastion X
+  ];
+  const BASTION_MARK_COST_KEYS = ['erz','kristalle','nanolegierungen','quantenchips','hochenergiekristalle','fusionskerne','kikerne','metamaterial'];
+  // Forschungstore: Schluessel ist die ZIELMARKE. Jedes Tor ist genau die Forschung, die das auf
+  // dieser Stufe ERSTMALS verlangte Material freischaltet - ein Tor ohne neues Material waere eine
+  // zusaetzliche Huerde, ein neues Material ohne Tor eine unsichtbare Sperre. Alle sechs
+  // Forschungen haben maxLevel >= 1 (bei den Werftmarken standen im ersten Entwurf zwei Tore auf
+  // Stufen, die es gar nicht gibt - die waeren NIE aufgegangen).
+  const BASTION_MARK_GATES = {
+    4:  { key:'rnanotech',      level:1 },
+    5:  { key:'rquantenphysik', level:1 },
+    6:  { key:'rhochenergie',   level:1 },
+    7:  { key:'rfusionskerne',  level:1 },
+    8:  { key:'rkitech',        level:1 },
+    9:  { key:'rmetamaterial',  level:1 }
+  };
+  // Aufruestzeit. Dieselbe Bauart wie bei den Werftmarken und aus demselben Grund: Eine Marke, die
+  // sofort fertig ist, macht den Materialpreis zur einzigen Schranke - wer genug im Lager hat,
+  // klickt die ganze Klasse in einem Zug hoch, und zehn Stufen fuehlen sich an wie ein Kauf mit
+  // zehn Klicks (so war es bis v8.352.0, und genau deshalb wurde es geaendert).
+  //
+  // Die KOSTEN skalieren voll mit der Klasse, die ZEIT nur gedaempft (Faktor hoch 0,35) - sonst
+  // waere die Endstufe der staerksten Anlagen tagelang blockiert.
+  //
+  // Bewusst OHNE Gebaeude-, Offiziers- oder Modulrabatt: Es gibt keine "Werft fuer Verteidigung",
+  // und den Schiffsbau-Rabatt hier anzuwenden waere eine Zahl, die niemand nachrechnen kann. Die
+  // Dauer haengt nur an Anlage und Zielstufe und laesst sich damit isoliert pruefen.
+  // 900 s statt der urspruenglichen 600: Nachdem der Lagerdeckel die Materialmenge gedeckelt hat
+  // (siehe Kostentabelle), ist die ZEIT der Hauptpreis dieser Leiter - 28 h bei Faktor 1, 56 h
+  // bei 7, der groesste Einzelschritt 21 h und damit noch unter dem 36-h-Deckel.
+  const BASTION_MARK_TIME_BASE = 900;      // Sekunden fuer Bastion II beim Klassenfaktor 1,0
+  const BASTION_MARK_TIME_STEP = 1.60;     // je weitere Stufe
+  const BASTION_MARK_TIME_CLASS_EXP = 0.35;
+  const BASTION_MARK_TIME_CAP = 36*3600;   // kein Einzelschritt laenger als 36 Stunden
+  function bastionMarkDuration(buildingKey, ziel){
+    return Math.max(10, Math.round(Math.min(BASTION_MARK_TIME_CAP,
+      BASTION_MARK_TIME_BASE * Math.pow(BASTION_MARK_TIME_STEP, ziel-2)
+        * Math.pow(bastionMarkClassFactor(buildingKey), BASTION_MARK_TIME_CLASS_EXP))));
+  }
+  function bastionMarkTotalDuration(buildingKey){
+    let sum = 0;
+    for (let z = 2; z <= BASTION_MARK_MAX; z++) sum += bastionMarkDuration(buildingKey, z);
+    return sum;
+  }
+  function bastionMarkRound(v){
+    if (v >= 100000) return Math.round(v/1000)*1000;
+    if (v >= 10000)  return Math.round(v/100)*100;
+    if (v >= 1000)   return Math.round(v/10)*10;
+    return Math.max(1, Math.round(v));
+  }
+  function bastionMarkCost(buildingKey, ziel){
+    const zeile = BASTION_MARK_COST_BASE[ziel-2];
+    if (!zeile) return null;
+    const f = bastionMarkClassFactor(buildingKey);
+    const cost = {};
+    zeile.forEach((v,i) => { if (v > 0) cost[BASTION_MARK_COST_KEYS[i]] = bastionMarkRound(v*f); });
+    return cost;
+  }
+  // Aktuelle Marke einer Anlage. Fehlender Schluessel = Bastion I, damit alte Spielstaende ohne
+  // Migration weiterlaufen.
+  //
+  // DER DECKEL STEHT HIER, nicht nur in der Kaufstelle. Das ist die Lehre aus shipMarkOf, deren
+  // Kommentar sie woertlich festhaelt: Ein manipulierter Spielstand mit bastionMarks.flak = 900
+  // liefe sonst durch JEDE Rechenstelle - Vorschau, Kampf, Anzeige - und loeste am Ende die
+  // Backend-Sanity-Pruefung aus, die den GESAMTEN Spielstand ablehnt (CLAUDE.md,
+  // saveSanityViolation: mehrere Stunden Fehlersuche am 21.07.2026).
+  function bastionMarkOf(buildingKey){
+    const v = ((state && state.bastionMarks) || {})[buildingKey];
+    if (typeof v !== 'number' || !isFinite(v)) return 1;
+    return Math.max(1, Math.min(BASTION_MARK_MAX, Math.floor(v)));
+  }
+  // DIE eine Stelle, an der die Marke zu einem Faktor wird. Jede Rechen- und Anzeigestelle geht
+  // hier durch; eine zweite Herleitung waere genau die zweite Anzeigestelle aus CLAUDE.md Punkt 6.
+  function bastionMarkMult(buildingKey){
+    return 1 + (bastionMarkOf(buildingKey) - 1) * BASTION_MARK_PER_STEP;
+  }
+  /* Der Wert JE STUFE, wie ihn der Spieler tatsaechlich bekommt - Grundwert mal Marke. Jede
+     Anzeigestelle zieht daraus, damit es nicht wieder eine zweite Wahrheit gibt: Bei den
+     Werftmarken war genau das der Vorfall, den der Kommentar an shipStatBarsHtml festhaelt
+     ("Ohne ihn zeigt das Datenblatt den Auslieferungswert, waehrend attackPowerRaw laengst mit
+     dem Markenwert rechnet"). Gerundet, weil eine Anlage mit 15 Verteidigung auf Bastion X
+     19,05 ergaebe und "+19,05 je Stufe" niemandem hilft. */
+  function bastionDefVal(def){ return Math.round((def && def.defVal || 0) * bastionMarkMult(def && def.key)); }
+  function bastionAtkVal(def){ return Math.round((def && def.atkVal || 0) * bastionMarkMult(def && def.key)); }
+  function bastionMarkGateOpen(ziel){
+    const gate = BASTION_MARK_GATES[ziel];
+    if (!gate) return true;
+    return ((state.research||{})[gate.key]||0) >= gate.level;
+  }
+  function bastionMarkGateName(ziel){
+    const gate = BASTION_MARK_GATES[ziel];
+    if (!gate) return '';
+    const def = RESEARCH_DEFS.find(r => r.key === gate.key);
+    return (def ? def.name : gate.key) + ' ' + gate.level;
+  }
+  function bastionMarkJob(){
+    const j = state.bastionMarkJob;
+    if (!j || typeof j !== 'object' || !j.key || typeof j.endsAt !== 'number') return null;
+    return j;
+  }
+  function bastionMarkJobRest(){
+    const j = bastionMarkJob();
+    return j ? Math.max(0, j.endsAt - Date.now()) : 0;
+  }
+  // Faellige Aufruestung abschliessen. Eigene Funktion und nicht inline im Tick, weil sie AUCH vom
+  // Offline-Nachholpfad gebraucht wird - sonst griffe eine ueber Nacht faellige Marke erst beim
+  // ersten sichtbaren Tick, und die Zeit dazwischen waere verschenkt (genau so gebaut wie
+  // processShipMarkJob).
+  function processBastionMarkJob(){
+    const j = bastionMarkJob();
+    if (!j || Date.now() < j.endsAt) return false;
+    const def = BUILDING_DEFS.find(d => d.key === j.key) || { name: j.key };
+    state.bastionMarks = state.bastionMarks || {};
+    state.bastionMarks[j.key] = Math.max(bastionMarkOf(j.key), Math.min(BASTION_MARK_MAX, j.ziel));
+    state.bastionMarkJob = null;
+    addXp(15);
+    const pct = Math.round((j.ziel - 1) * BASTION_MARK_PER_STEP * 100);
+    log(def.name + ' traegt jetzt Bastionsmarke ' + SHIP_MARK_ROMAN[j.ziel-1] + ' - +' + pct
+      + '% Verteidigung und Angriff dieser Anlage an allen Standorten.', 'ti-arrow-up');
+    pushToast(def.name + ': Bastionsmarke ' + SHIP_MARK_ROMAN[j.ziel-1] + ' fertig', 'ti-arrow-up', 'ok');
+    return true;
+  }
+  // Reicht der LAGERDECKEL fuer diese Zahlung? Tier 2 laesst sich nicht stapeln - eine Forderung
+  // ueber dem Deckel ist nicht teuer, sondern unerfuellbar, und der Knopf waere fuer immer grau
+  // ohne dass die Karte den Grund nennt (CLAUDE.md Regel 35: ein Zustand ohne Ausweg ist eine
+  // Falschaussage). Gibt den Namen des ersten nicht lagerbaren Stoffes zurueck, sonst null.
+  function bastionMarkLagerProblem(buildingKey, ziel){
+    const cost = bastionMarkCost(buildingKey, ziel);
+    if (!cost) return null;
+    for (const res of Object.keys(cost)){
+      const t2 = TIER2_DEFS.find(t => t.key === res);
+      if (!t2) continue;
+      const cap = tier2StorageCap(t2);
+      if (cap > 0 && cost[res] > cap) return { res: res, noetig: cost[res], cap: cap };
+    }
+    return null;
+  }
+
+  // Die Markenzeile der Verteidigungskarte. Bewusst dieselben CSS-Klassen wie die Werftmarken-Zeile
+  // (.mark-row/.mark-head/.mark-bar/.mark-eff/.mark-buy/.mark-fortschritt) - dieselbe Mechanik soll
+  // auch gleich aussehen, und eine zweite Klassenfamilie waere eine zweite Stelle zum Pflegen.
+  function bastionMarkRowHtml(buildingKey){
+    const def = BUILDING_DEFS.find(d => d.key === buildingKey);
+    if (!bastionMarkFaehig(def)) return '';
+    const mk = bastionMarkOf(buildingKey);
+    const balken = SHIP_MARK_ROMAN.map((rz,i) =>
+      `<i style="background:${i < mk ? (mk>=BASTION_MARK_MAX?'#9fe1cb':'#5dcaa5') : 'rgba(255,255,255,0.12)'};"></i>`).join('');
+    const kopf = `<div class="mark-head"><span class="mark-mk">Bastionsmarke ${SHIP_MARK_ROMAN[mk-1]}</span><span class="mark-bar">${balken}</span></div>`;
+    const pctJetzt = Math.round((mk-1) * BASTION_MARK_PER_STEP * 100);
+    const wirkung = mk > 1
+      ? `<div class="mark-eff">+${pctJetzt}% Verteidigung und Angriff dieser Anlage – an allen Standorten</div>` : '';
+    if (mk >= BASTION_MARK_MAX){
+      return `<div class="mark-row done">${kopf}${wirkung}<div class="mark-eff" style="color:#5dcaa5;"><i class="ti ti-check" aria-hidden="true"></i> Endausbau erreicht – höher geht es nicht.</div></div>`;
+    }
+    const job = bastionMarkJob();
+    if (job && job.key === buildingKey){
+      const rest = bastionMarkJobRest();
+      const ganz = Math.max(1, job.endsAt - (job.startedAt || job.endsAt - 1));
+      const pct = Math.max(0, Math.min(100, 100 * (1 - rest/ganz)));
+      return `<div class="mark-row laeuft">${kopf}${wirkung}
+        <div class="mark-eff"><i class="ti ti-clock" aria-hidden="true"></i> Ausbau auf Bastionsmarke ${SHIP_MARK_ROMAN[job.ziel-1]} · noch ${fmtDuration(rest/1000)}</div>
+        <div class="mark-fortschritt"><i style="width:${pct.toFixed(1)}%;"></i></div>
+        <div class="mark-buy">
+          <span class="mark-eff" style="margin:0;">Material ist bereits abgebucht – ein Abbruch gibt es vollständig zurück.</span>
+          <button data-bastionmark-cancel="1" style="font-size:10.5px; padding:4px 10px;"><i class="ti ti-x" aria-hidden="true" style="margin-right:3px;"></i>Abbrechen</button>
+        </div>
+      </div>`;
+    }
+    const ziel = mk + 1;
+    const cost = bastionMarkCost(buildingKey, ziel);
+    const gateOk = bastionMarkGateOpen(ziel);
+    const lager = bastionMarkLagerProblem(buildingKey, ziel);
+    const bezahlbar = canAfford(cost);
+    const belegt = !!job;
+    const kaufbar = gateOk && !lager && bezahlbar && !belegt;
+    const dauer = bastionMarkDuration(buildingKey, ziel);
+    const pctZiel = Math.round((ziel-1) * BASTION_MARK_PER_STEP * 100);
+    const gateZeile = gateOk ? ''
+      : `<div class="mark-eff" style="color:#f0997b;"><i class="ti ti-lock" aria-hidden="true"></i> Benötigt ${bastionMarkGateName(ziel)}</div>`;
+    /* Der Lagerdeckel als eigene, benannte Zeile - nicht als grauer Knopf ohne Grund. Tier 2 laesst
+       sich nicht stapeln; wer die Fabrikkette nicht weit genug ausgebaut hat, kann diese Stufe
+       nicht bezahlen, egal wie lange er wartet. Ohne diese Zeile waere das ein Zustand ohne
+       Ausweg und ohne Erklaerung (CLAUDE.md Regel 35). */
+    const lagerZeile = lager
+      ? `<div class="mark-eff" style="color:#f0997b;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ${fmt(lager.noetig)} ${resLabel(lager.res)} passen nicht in dein Lager (Deckel ${fmt(lager.cap)}) – bau die ${resLabel(lager.res)}-Kette weiter aus.</div>`
+      : '';
+    const belegtZeile = belegt
+      ? `<div class="mark-eff" style="color:#e0a548;"><i class="ti ti-clock" aria-hidden="true"></i> Es läuft bereits ein Bastions-Ausbau – es geht immer nur einer.</div>`
+      : '';
+    return `<div class="mark-row">${kopf}${wirkung}
+      <div class="mark-eff"><i class="ti ti-arrow-up" aria-hidden="true"></i> Bastionsmarke ${SHIP_MARK_ROMAN[ziel-1]}: +${pctZiel}% Verteidigung und Angriff dieser Anlage, an allen Standorten</div>
+      ${gateZeile}${lagerZeile}${belegtZeile}
+      <div class="mark-buy">
+        <span class="bcost" style="margin:0;">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dauer)}</span>
+        <button class="buy ${kaufbar?'affordable':''}" data-bastionmark="${buildingKey}" ${kaufbar?'':'disabled'}><i class="ti ti-arrow-up" aria-hidden="true" style="margin-right:4px;"></i>Ausbauen</button>
       </div>
     </div>`;
   }
@@ -26378,7 +26698,11 @@
     let power = 0;
     for (const { planet, buildings: b } of setsWithPlanet){
       let sub = 0;
-      for (const def of BUILDING_DEFS) if (def.category==='defense') sub += (b[def.key]||0) * ((def.defVal||0) + (def.shield||0));
+      /* Bastionsmarke: der Prozentaufschlag der Anlagenklasse. Er steht HIER an der Summierstelle
+         und nicht als Mutation an def.defVal - eine veraenderte Definition wuerde von jeder
+         Anzeige, jedem Test und dem Punktestand mitgelesen, und der Server kennt sie nicht.
+         def.shield ist aus defVal abgeleitet und laeuft deshalb automatisch mit. */
+      for (const def of BUILDING_DEFS) if (def.category==='defense') sub += (b[def.key]||0) * ((def.defVal||0) + (def.shield||0)) * bastionMarkMult(def.key);
       const role = planetRoleOf(planet);
       if (role && role.key==='fortress') sub *= 1.30;
       const orbG = orbitalStationOf(planet);
@@ -26462,7 +26786,10 @@
   function defenseAttackPower(planetKey){
     const b = buildingSetFor(planetKey);
     let power = 0;
-    for (const def of BUILDING_DEFS) if (def.category==='defense') power += (b[def.key]||0) * (def.atkVal||0);
+    /* Die Marke hebt Verteidigungs- UND Angriffswert. Nur den Verteidigungswert zu heben haette
+       reine Schildbauten (Void-Barriere, Resonanzschild, Panzerwall) still zur besten Marke
+       gemacht, weil ihr ganzer Wert in dem einen Zweig steckt. */
+    for (const def of BUILDING_DEFS) if (def.category==='defense') power += (b[def.key]||0) * (def.atkVal||0) * bastionMarkMult(def.key);
     const role = planetRoleOf(planetKey);
     if (role && role.key==='fortress') power *= 1.30;
     power *= moonPenalty(planetKey);
@@ -29051,6 +29378,17 @@
       if (typeof v !== 'number' || !isFinite(v) || v <= 1) delete state.shipMarks[k];
       else state.shipMarks[k] = Math.min(SHIP_MARK_MAX, Math.floor(v));
     }
+    /* Bastionsmarken - dieselbe Behandlung wie die Werftmarken daneben, und aus demselben Grund:
+       Der Deckel steht ZUSAETZLICH hier, nicht nur in bastionMarkOf(). Das Lesen ist gegen einen
+       manipulierten Stand abgesichert, das Speichern muss es auch sein - sonst reist eine 900 im
+       Spielstand mit und die Backend-Sanity-Pruefung lehnt irgendwann den GANZEN Stand ab. */
+    if (state.bastionMarkJob === undefined) state.bastionMarkJob = null;
+    if (!state.bastionMarks || typeof state.bastionMarks !== 'object') state.bastionMarks = {};
+    for (const k of Object.keys(state.bastionMarks)){
+      const v = state.bastionMarks[k];
+      if (typeof v !== 'number' || !isFinite(v) || v <= 1) delete state.bastionMarks[k];
+      else state.bastionMarks[k] = Math.min(BASTION_MARK_MAX, Math.floor(v));
+    }
     if (!state.levelRewardsClaimed) state.levelRewardsClaimed = {};
     if (!state.rareItems) state.rareItems = {};
     if (!state.inventory) state.inventory = {};
@@ -29326,6 +29664,11 @@
     // erarbeiteter Dauerfortschritt, keine Wirtschaft; ein Reset wuerde die Materialsenke zur Falle
     // machen ("bloss nicht in Marken investieren, ich will ja prestigen").
     const keepShipMarks = state.shipMarks;
+    /* Bastionsmarken ueberleben das Prestige aus demselben Grund wie die Werftmarken - und das ist
+       bei ihnen nicht ein Detail, sondern der ZWECK. Der gemessene Befund war, dass Verteidigung
+       als einzige grosse Investition des Spiels nicht haltbar ist (Konzept 1.3). Eine Marke, die
+       der Reset frisst, waere genau die Falle, die sie beheben soll. */
+    const keepBastionMarks = state.bastionMarks;
     // Bugfix: skillTree wurde bisher ebenfalls bei jedem Prestige geleert, obwohl HELP_SECTIONS
     // 'fortschritt' wörtlich verspricht "Bleibt dauerhaft erhalten, auch über einen Prestige-Reset
     // hinweg" - dieselbe Fehlerart wie der schon behobene state.ascension-Bug direkt darüber. Da
@@ -29407,7 +29750,7 @@
       officers:keepOfficers||{}, officerTalents:keepOfficerTalents||{}, commandPoints:keepCommandPoints||0, flagship:keepFlagship||{level:0,name:null},
       modules:keepModules||{}, moduleSlotLevel:keepModuleSlotLevel||{}, equippedModules:keepEquippedModules||{},
       shipModules:keepShipModules||{}, shipModuleSlotLevel:keepShipModuleSlotLevel||{}, equippedShipModules:keepEquippedShipModules||{},
-      shipMarks:keepShipMarks||{},
+      shipMarks:keepShipMarks||{}, bastionMarks:keepBastionMarks||{},
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
       friends: keepFriends||[], compendiumClaimed: keepCompendium||{}, codexClaimed: keepCodex||{},
       /* Die Asteroiden-Lebenszaehler ueberleben BEIDE Resets, wie der Abgrund darunter. Grund ist
@@ -29541,6 +29884,15 @@
     { key:'ruestkammer', name:'Rüstkammer', icon:'ti-box', kosten:0.35,
       desc:'Beide Modul-Inventare bleiben – Standort-Module wie Schiffsmodule, eingebaute wie eingelagerte. Kostet 35% der Sternenessenz dieses Aufstiegs.',
       behalte:['modules','shipModules','equippedModules','equippedShipModules'] },
+    /* Bastionsregister (18.08.2026, V2a): der erste Erhaltungspfad, der KEIN Flottenpfad ist.
+       Genau das war der Befund - Werftregister, Rüstkammer und Offiziersstab sind alle drei
+       Flotte, und Verteidigung hatte beim härtesten Reset des Spiels nichts anzubieten. 40%
+       liegen zwischen Rüstkammer und Werftregister: Die Bastionsleiter eines kompletten Sets
+       kostet rund 25 Tage Zufluss, ist damit teurer als die Modulkisten und billiger als die
+       vierzig Werftmarken-Leitern. */
+    { key:'bastionen', name:'Bastionsregister', icon:'ti-building-fortress', kosten:0.40,
+      desc:'Alle Bastionsmarken bleiben, jede Verteidigungsanlage startet auf ihrer erreichten Stufe. Der einzige Pfad, der nicht die Flotte betrifft. Kostet 40% der Sternenessenz dieses Aufstiegs.',
+      behalte:['bastionMarks'] },
     { key:'keiner', name:'Reiner Aufstieg', icon:'ti-sparkles', kosten:0,
       desc:'Du nimmst nichts mit und bekommst die volle Sternenessenz. Der schnellste Weg zurück in den Aufstiegsbaum.',
       behalte:[] }
@@ -37989,6 +38341,11 @@
       { title:'Standort-Module', body:'Ausrüstbare Module mit ' + Object.keys(MODULE_RARITY).length + ' Seltenheitsstufen (' + Object.values(MODULE_RARITY).map(r => r.label + (r.mult > 1 ? ' +' + Math.round((r.mult-1)*100) + '%' : '')).join(', ') + ' Wirkung). '+MODULE_DEFS.length+' Typen, darunter: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Je Typ nur EIN Modul gleichzeitig:</strong> Du kannst an einem Standort nicht zweimal Panzerung einbauen – auch nicht in unterschiedlichen Seltenheitsstufen. Wer Slots füllen will, muss also <strong>verschiedene</strong> Typen kombinieren, statt den stärksten Bonus einfach zu stapeln. Genau deshalb lohnen sich die benannten Set-Boni weiter unten: Sie belohnen ausgerechnet die Vielfalt, die diese Regel erzwingt. <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Boss-Sets:</strong> Jeder der fünf Allianz-Raid-Bosse droppt exklusiv die vier Teile seines eigenen Sets (Fresserherz, Panzerschale, Schwarmgeflecht, Phasengitter, Glutkern) – schon 2 Teile desselben Sets an einem Standort schalten die erste Bonusstufe frei, 3 die zweite, alle 4 die volle Wirkung (Stufen zählen zusammen; die Standort-Ansicht zeigt den Fortschritt, z.B. „2/4"). Boss-Teile fallen in keinem anderen Fundtopf, lassen sich aber normal aufwerten, verschmelzen und zerlegen. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente <em>oder</em> 60.000 Kredite je Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Unter jeder gespeicherten Vorlage steht eine <strong>Wechselvorschau</strong>: welche Boni sich beim Anwenden je Effekt ändern würden („vorher → nachher", grün = mehr, orange = weniger, die größten Änderungen zuerst) – gerechnet mit derselben Bonus-Funktion wie das Spiel, inklusive Sets und Sockeln; inzwischen verschmolzene oder zerlegte Module weist sie als „nicht mehr im Besitz" aus. Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen) und hochstufige Allianzmissionen. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (Level und Substats bleiben dabei erhalten); fehlt nur noch eines, zeigt die Inventar-Karte „2/3 zum Verschmelzen". Der Sprung <em>nach</em> Mythisch bleibt der Schmiede und den Allianzmissionen vorbehalten – aber <strong>3 Mythische verschmelzen zu einem Exotischen</strong>, der einzigen Quelle der höchsten Stufe. Überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Ungewöhnlich 2, Selten 3, Episch 8, Legendär 20, Mythisch 50, Exotisch 120) und fertigst daraus gezielt dein Wunschmodul (4/7/12/32/80 Fragmente je nach Seltenheit; Exotisch ist nicht fertigbar). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Modul-Schloss:</strong> Das Schloss-Symbol an jeder Inventar-Karte sperrt ein Modul gegen Zerlegen, Schnell-Verschrotten, Kredit-Verkauf, Börse <em>und</em> das stille Verheizen als Schmelz-Futter – gesperrte Stapel zählen nicht als Verschmelz-Geschwister, der 3→1-Knopf rechnet automatisch ohne sie. Aufwerten und Neuwürfeln bleiben möglich; das Schloss wandert dabei auf den neuen Stand mit. Gilt in beiden Modulsystemen, ein Klick entsperrt jederzeit. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. <strong>Durchbruch:</strong> Bei den Stufen 4, 7 und 10 gewinnt das Modul einen zusätzlichen, zufällig gewürfelten Zweitwert – höchstens bis zur Zweitwert-Obergrenze seiner Seltenheit; ist sie schon erreicht, wird stattdessen der schwächste Zweitwert um 0,2 Prozentpunkte verstärkt (nie über die Bestmarke von +2,5% hinaus). Ein Durchbruch erreicht also nur, was ein perfekter Fund auch könnte – Aufwerten ist ein zweiter Weg zum Spitzen-Build, kein Weg darüber hinaus. Gewöhnliche Module (ohne Zweitwerte) haben keinen Durchbruch; Angriffskraft würfelt nie mit. Aufwerten geht sowohl im Inventar als auch <strong>direkt am eingebauten Modul</strong> – es bleibt dabei im Slot, du musst es nicht erst abnehmen. <strong>Substats:</strong> Gefundene Module ab Ungewöhnlich haben zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Ungewöhnlich und Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2, Exotisch 2–3. <strong>Hauptwert-Streuung:</strong> Jedes <em>gefundene</em> Modul würfelt zusätzlich seinen Hauptwert zwischen <strong>90% und 110%</strong> des Normwerts – der Wurf steht an der Karte in den Güte-Farben. Gefertigte Module liegen immer exakt bei 100%, Module aus der Zeit vor der Streuung ebenfalls – beide lassen sich aber neu schmieden (siehe unten). Die <strong>Schmelze</strong> verlangt seither nur noch denselben Typ in derselben Seltenheit und Stufe (Zweitwerte und Wurf dürfen abweichen), verbraucht zuerst das angeklickte Modul und übernimmt den <strong>besten Hauptwert-Wurf der drei</strong>; der Substat-Reroll lässt den Hauptwert unangetastet. Dafür gibt es das <strong>Hauptwert-Neuschmieden</strong>: Der Knopf „Wurf" am Inventar-Modul würfelt <em>ausschließlich</em> den Hauptwert neu (90–110%; Substats und Stufe bleiben; 5× Fragment-Wert der Seltenheit, also teurer als der Substat-Reroll) – und das Ergebnis ersetzt den alten Wurf, auch wenn es schlechter ausfällt. Gilt für beide Modulsysteme. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln – oder ab 2 Zweitwerten gezielt mit <strong>Reroll+</strong>: die beste Zeile bleibt erhalten, nur die übrigen werden neu gewürfelt, die Anzahl bleibt stehen (mehr Zeilen kann nur der normale Reroll bringen). Reroll+ kostet das Dreifache des normalen Rerolls; der gesperrte Effekt kann beim Nachwürfeln nicht doppelt fallen. <strong>Jeder Zweit-Bonus würfelt zwischen +1,0 % und +2,5 %</strong> – seit dem 05.08.2026 steht neben dem Wert, wie gut der Wurf ausgefallen ist (<em>Spitzenwurf</em>, <em>guter Wurf</em>, <em>mittel</em>, <em>schwach</em>) und dahinter die Gesamtgüte des Moduls in Prozent. Vorher stand dort nur die nackte Zahl, und man konnte nicht beurteilen, ob sich das Neu-Würfeln überhaupt lohnt – die Einordnung beantwortet genau diese Frage. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
       { title:'Kampf-Nachwirkungen (Sieges-Module)', body:'Drei Standort-Module belohnen den <strong>Sieg selbst</strong> statt eines Dauerwerts: <strong>Siegesschmiede</strong> (+Produktion aller Ressourcen), <strong>Kampfrausch-Verstärker</strong> (+Angriffskraft) und <strong>Siegesschirm</strong> (+Verteidigung). Nach jedem gewonnenen <strong>NPC-Kampf</strong> zünden sie einen Schub für <strong>10 Minuten</strong> – als Sieg zählen Angriffe auf Piraten, Fraktionen und Nester, abgewehrte Überfälle, abgefangene Trümmerräuber, geschlossene Leerenrisse, verteidigte Expeditionen, Abgrund- und Weltboss-Gefechte. <strong>Spieler- und Allianzkämpfe lösen nichts aus.</strong> Die Wirkung summiert sich imperiumsweit über alle Standorte, je Art gedeckelt (+25% Produktion, +15% Angriff, +25% Verteidigung). Ein neuer Sieg <em>erneuert</em> den Schub, er stapelt nicht – wer von Kampf zu Kampf zieht, hält ihn dauerhaft aufrecht. Aktive Nachwirkungen stehen als „Sieges-Nachwirkung" in der Effekte-Leiste im Fortschritt-Tab; die Angriffskraft-Nachwirkung wirkt dort wie jeder Angriffs-Effekt auch in PvP-Kämpfen mit, weil der Server aktive Effekte aus dem Spielstand mitrechnet.' },
       { title:'Unikate – benannte Jagdstücke', body:'Drei Standort-Module gibt es nur an je <strong>einem</strong> Ort der Galaxis: Das <strong>Leviathanherz</strong> (Produktion + fester Unikat-Bonus +3% Erfahrung) fällt ausschließlich mit der <strong>Weltboss-Belohnung</strong> – 4% Grundchance, dazu bis zu 10% je nach eigenem Schadensanteil, Top-Schädiger +6% obendrauf. Das <strong>Wächterauge</strong> (Verteidigung + fester Unikat-Bonus +3% Expeditions-Ausbeute) fällt ab <strong>Tiefe 40</strong> mit 7% Chance bei jedem <strong>Wiederholungssieg</strong> über einen Abgrund-Wächter – <strong>zusätzlich</strong> zu dessen garantiertem Modul, nicht an seiner Stelle (der Erstsieg bringt weiter die Reliquie). Die <strong>Korsarenkrone</strong> (Handelsrouten-Ertrag + fester Unikat-Bonus +3% Treibstoff-Ersparnis) fällt mit 15% Chance beim Sieg über den <strong>Piraten-Endboss</strong> – Stufe 10 der Piratenkette –, ebenfalls zusätzlich zu dessen garantiertem Modul. Alle drei kommen immer als <strong>Exotisch mit festem Spitzenwurf (110%)</strong>; der Unikat-Bonus würfelt nie und übersteht jede Werkbank-Aktion. Unikate sind von <strong>Börse und allen Schmieden ausgeschlossen</strong> und liegen nach dem Fund <strong>automatisch gesperrt</strong> im Inventar (ein Klick aufs Schloss entsperrt). Aufwerten samt Durchbruch und der Substat-Reroll funktionieren normal – nur das Hauptwert-Neuschmieden ist gesperrt, denn 110% ist bereits die Bestmarke. Welche Unikate es gibt, welche dir noch fehlen und wo sie liegen, steht im <strong>Galaktischen Kompendium</strong> (Fortschritt-Tab) unter „Unikate" – die vollständige Sammlung gibt dort einmalig Sternenessenz und Kredite, und der Erfolg <strong>„Kronjuwelen"</strong> belohnt sie zusätzlich im Erfolgsregister.' },
+      /* Der Hilfetext leitet JEDE Zahl aus den Konstanten ab (Reihenfolge vorher gemessen: die
+         BASTION_*-Konstanten stehen weit vor HELP_SECTIONS, ein Zugriff liegt also nicht in der
+         temporalen Todeszone - CLAUDE.md Regel 38). Eingetippte Zahlen waeren beim ersten
+         Balance-Schritt still falsch. */
+      { title:'Bastionsmarken – zehn Ausbaustufen je Verteidigungsanlage', body:'Jede Verteidigungsanlage lässt sich über '+BASTION_MARK_MAX+' Stufen ausbauen – <strong>Bastionsmarke I</strong> ist der Auslieferungszustand, darüber liegen '+(BASTION_MARK_MAX-1)+' bezahlte Schritte. Jede Stufe gibt <strong>+'+Math.round(BASTION_MARK_PER_STEP*100)+'% Verteidigungswert und Angriffswert</strong> dieser Anlagenklasse, auf der Endstufe also <strong>+'+Math.round((BASTION_MARK_MAX-1)*BASTION_MARK_PER_STEP*100)+'%</strong>. Der Schildanteil (40% des Verteidigungswerts) wächst automatisch mit, weil er daraus abgeleitet wird.<br><br><strong>Der eigentliche Hebel ist nicht der Prozentsatz, sondern die Reichweite:</strong> Eine Marke gilt für die ganze Anlagenklasse an <em>allen</em> Standorten – eine Anlagenstufe dagegen nur dort, wo sie steht. Und genau darauf kommt es an: Deine Verteidigung wird je Standort gerechnet, und ein Überfall sucht sich seinen Standort selbst aus. Wer elf Standorte hat, bekommt für eine Marke also den Zuwachs elfmal.<br><br><strong>Warum es sie gibt (ehrlich gesagt):</strong> Verteidigung war die einzige große Investition des Spiels, die nichts überdauert. Werftmarken, Module, Offiziere und Veteranen überleben den Prestige-Reset, Verteidigungsanlagen nicht – und beim Aufstieg waren alle drei bezahlten Erhaltungspfade Flottenpfade. <strong>Bastionsmarken überleben das Prestige</strong> und haben mit dem <strong>Bastionsregister</strong> einen eigenen Aufstiegspfad. Das ist ihr Zweck.<br><br><strong>Was sie ausdrücklich NICHT tun:</strong> Sie machen Verteidigungsanlagen nicht stärker als Schiffe. Gemessen kaufst du für dasselbe Einkommen über Schiffe ein Vielfaches an Verteidigung, und das liegt an der Kostenkurve (die Kosten einer Anlage wachsen exponentiell, ihr Nutzen linear) – daran ändert ein Prozentaufschlag nichts. Bastionsmarken machen die Verteidigung, die du <em>hast</em>, dauerhaft und ausbaufähig. Sie ändern auch <strong>deinen Punktestand nicht</strong>: Anders als Werftmarken zählen sie im Score nicht mit.<br><br><strong>Kosten:</strong> Der Preis richtet sich nach dem Verteidigungswert der Anlage (Wert ÷ 50, gedeckelt bei '+BASTION_MARK_CLASS_CAP+') und steigt je Stufe um rund das 1,6-Fache. Eine Flak-Batterie ist damit deutlich billiger als ein Resonanzschild-Emitter – die Marke hebt einen Prozentsatz, ihr absoluter Nutzen wächst also mit der Anlage, und der Preis wächst mit. <strong>Ab Bastionsmarke IV kommt auf jeder Stufe eine weitere Tier-2-Ressource dazu</strong>, in der Reihenfolge ihrer Forschungskette: Nanolegierungen (IV), Quantenchips (V), Hochenergiekristalle (VI), Fusionskerne (VII), KI-Kerne (VIII), Metamaterial (IX). Die zugehörige Forschung ist jeweils die Voraussetzung der Stufe.<br><br><strong>Ein Hinweis, der dich sonst irgendwann kalt erwischt:</strong> Tier-2-Ressourcen lassen sich nicht beliebig stapeln – dein Lager dafür hat einen Deckel, der mit den Fabrikstufen wächst. Eine späte Bastionsmarke an einer starken Anlage kann mehr verlangen, als in dein Lager passt. Die Karte sagt dir das dann und nennt die Kette, die du ausbauen musst; der Knopf bleibt nicht grundlos grau.<br><br><strong>Ein Ausbau braucht Zeit</strong>, und sie steigt je Stufe um das '+BASTION_MARK_TIME_STEP.toString().replace('.',',')+'-Fache: Beim Plasmawerfer ist Bastionsmarke II nach '+fmtDuration(bastionMarkDuration('plasma',2))+' fertig, die Endstufe dauert '+fmtDuration(bastionMarkDuration('plasma',BASTION_MARK_MAX))+'; der ganze Weg kostet dort '+fmtDuration(bastionMarkTotalDuration('plasma'))+', bei einer Flak-Batterie '+fmtDuration(bastionMarkTotalDuration('flak'))+' und beim Resonanzschild-Emitter '+fmtDuration(bastionMarkTotalDuration('resonanzschild'))+'. Die <em>Kosten</em> skalieren voll mit der Anlage, die <em>Zeit</em> nur gedämpft. Es läuft immer nur <strong>ein Bastions-Ausbau gleichzeitig</strong>, damit die Reihenfolge eine echte Entscheidung bleibt – aber er hat einen eigenen Platz und blockiert deinen Werftmarken-Umbau nicht. Gebäude-, Offiziers- und Modulboni verkürzen ihn bewusst nicht: Es gibt keine „Werft für Verteidigung“, und ein Rabatt aus dem Schiffsbau wäre eine Zahl, die niemand nachrechnen kann. <strong>Abbrechen geht jederzeit und gibt alles zurück</strong>; ein Fehlklick kostet dich nur die verstrichene Zeit. Wird ein Ausbau fällig, während du offline bist, ist er beim nächsten Einloggen erledigt.<br><br><strong>Wo du sie findest:</strong> auf der Karte jeder Verteidigungsanlage im Verteidigung-Tab, direkt unter den Kennwert-Balken – sobald du mindestens eine Stufe der Anlage gebaut hast. <strong>Zwei Anlagen tragen keine Marke:</strong> Abhorchposten und Mondschildgenerator haben keinen Angriffs- und keinen Verteidigungswert, ein Prozentsatz darauf wäre wirkungslos. Der Server rechnet die Marken im PvP genauso nach wie deine Anzeige – Vorschau und Kampfergebnis bleiben synchron.' },
       { title:'Werftmarken – zehn Ausbaustufen je Schiffsklasse', body:'Jede Schiffsklasse lässt sich in der <strong>Werft</strong> über zehn Stufen ausbauen. <strong>Mk I</strong> ist der Auslieferungszustand, darüber liegen neun bezahlte Schritte. Eine Marke gilt für die <strong>ganze Klasse</strong> – für jedes Schiff, das du schon hast, und für jedes künftig gebaute. Deshalb sind die Zuwächse bewusst klein. <strong>Und sie richten sich seit dem 01.08.2026 nach der Schiffsfamilie</strong> – vorher bekam jede der 40 Klassen dieselbe Zeile, ein Spähschiff ohne Angriffswert wurde also für „mehr Angriff" aufgerüstet. Je Stufe gilt jetzt: '+shipMarkFamilienText()+'. Der Schwerpunkt jeder Familie ist der Zweig, der zu ihr passt; <strong>gesunken ist dabei nichts</strong> – jeder Wert liegt auf oder über dem vorherigen. Angriff und Schild gelten für alle Klassen mit Kampfwert, <strong>Tempo und Treibstoff für jede der 40 Klassen</strong> – auch Frachter, Aufklärer und die Tiefenflotte haben also etwas davon. <strong>Wichtig beim Tempo:</strong> Die Flugzeit einer Mission bestimmt immer das <strong>langsamste</strong> beteiligte Schiff (wie ein Konvoi) – ein aufgerüsteter Jäger neben einem unaufgerüsteten Kolonieschiff bringt beim Tempo nichts. Wer schneller fliegen will, rüstet gezielt den Bremser auf. <strong>Kosten:</strong> Der Preis richtet sich nach der Bauzeit der Klasse (Bauzeit ÷ 50, gedeckelt bei 20) und steigt je Stufe um rund das 1,6-Fache. Der komplette Weg Mk I → Mk X kostet einen Jäger rund 2,3 Mio Erz, ein Schlachtschiff etwa 14,5 Mio, einen Fusionsdreadnought gut 40 Mio – eine echte Senke für spätes Material. <strong>Ab Mk V kommt auf jeder Stufe eine weitere Tier-2-Ressource dazu</strong>, in der Reihenfolge ihrer eigenen Forschungskette: Nanolegierungen (Mk V), Quantenchips (Mk VI), Hochenergiekristalle (Mk VII), Fusionskerne (Mk VIII), KI-Kerne (Mk IX), Metamaterial (Mk X). Die zugehörige Forschung ist jeweils die Voraussetzung der Stufe – wer ein Schiff auf Mk X bringen will, muss also alle sechs Tier-2-Fabrikketten laufen haben. Der Singularitätskern bleibt bewusst draußen; er ist die Währung der Tiefenflotte. <strong>Die drei obersten Marken verlangen zusätzlich je einen Expeditionsfund</strong>, der sich nicht produzieren lässt: 1x Kristallherz (Mk VIII), 1x Alte Technologie (Mk IX), 1x Resonanzkristall (Mk X). Diese Mengen sind fest und wachsen <em>nicht</em> mit der Klasse – ein Fusionsdreadnought braucht genauso ein Stück wie ein Jäger. Damit hängen die letzten Stufen nicht am Lagerbestand, sondern daran, dass man tatsächlich rausfliegt. <strong>Ein Umbau braucht Zeit</strong>, und die steigt je Stufe um das '+SHIP_MARK_TIME_STEP.toString().replace('.',',')+'-Fache: Mk II ist beim Jäger nach '+fmtDuration(shipMarkDuration('jaeger',2))+' fertig, Mk X dauert '+fmtDuration(shipMarkDuration('jaeger',SHIP_MARK_MAX))+'; der ganze Weg Mk I → Mk X kostet einen Jäger '+shipMarkTotalDurationText('jaeger')+', ein Schlachtschiff '+shipMarkTotalDurationText('schlachtschiff')+', einen Fusionsdreadnought '+shipMarkTotalDurationText('fusionsdreadnought')+'. Die <em>Kosten</em> skalieren voll mit der Klasse, die <em>Zeit</em> nur gedämpft – sonst wäre die Endstufe der schwersten Klassen tagelang blockiert. Es läuft immer nur <strong>ein Umbau gleichzeitig</strong> (wie bei der Forschung), damit die Reihenfolge eine echte Entscheidung bleibt; der Umbau belegt aber <em>keinen</em> der zehn Werftplätze, du kannst also nebenher weiterbauen. Werft-Boni verkürzen ihn genau wie den Schiffsbau – der Bauzeit-Rabatt der Marke selbst allerdings bewusst nicht, eine Stufe soll sich nicht selbst beschleunigen. <strong>Abbrechen geht jederzeit und gibt alles zurück</strong>, Ressourcen wie Expeditionsfund; ein Fehlklick kostet dich nur die bereits verstrichene Zeit. Fällt ein Umbau fertig, während du offline bist, ist er beim nächsten Einloggen erledigt. <strong>Sichtbar</strong> wird jede Stufe auch am Schiff selbst: Blechhaut, Panzerkante, längere Geschützrohre, ein Turm mehr, Sensormast, Systemlichter, stärkerer Antrieb, Silbersaum und zuletzt die goldene Zierlinie mit Bugscheinwerfer. Der Umriss bleibt über alle zehn Marken gleich, damit du deine Flotte weiter auf einen Blick erkennst; die Stufe steht als römische Ziffer auf der Plakette am Schiffssymbol. Marken <strong>überleben das Prestige</strong> (wie Offiziere und Schiffsmodule), und der Server rechnet sie im PvP genauso nach wie die Vorschau – Anzeige und Kampfergebnis bleiben synchron. <strong>Marken zählen im Punktestand mit:</strong> Ein Schiff bringt seine Grundpunkte <em>mal</em> dem Markenzuschlag – auf Mk X also +27%, genau derselbe Anteil, um den es auch stärker ist. Der Punktestand-Tab zeigt die Marke in der Detailzeile mit (z.B. „Jäger (Mk V): 400 × 13,4 = 5.360"), damit die Summe nachrechenbar bleibt, und ein fertiger Umbau erscheint als eigene Zeile im Punkteprotokoll. Der Server rechnet denselben Zuschlag nach – die Bestenliste zeigt also dieselbe Zahl wie dein Spiel. <strong>Im Kampf sind sie ausgewiesen:</strong> Die NPC-Angriffsvorschau nennt die Marken deiner gewählten Flotte samt dem Prozentanteil, den sie an deiner Angriffskraft haben, und jeder Kampfbericht – NPC-Angriff, Spielerangriff, Angriff auf eine Allianzbasis und abgewehrter Überfall – führt sie in einer eigenen Zeile. Der Bericht zeigt dabei den Markenstand <em>zum Zeitpunkt des Kampfes</em>, nicht den heutigen: Eine mit Mk III gewonnene Schlacht bleibt eine Mk-III-Schlacht, auch wenn du danach weiter aufrüstest. Beim abgewehrten Überfall steht dort der Anteil an der <em>Flottenverteidigung</em> statt an der Angriffskraft – dort wirkt die Marke über den Angriffswert <em>und</em> den Schild, der reine Angriffsanteil wäre die falsche Zahl.<br><br><strong>Zivilschiffe haben seit dem 02.08.2026 einen sechsten Zweig: Laderaum.</strong> Der Anlass war ein Missverhältnis – 18 der 39 Schiffsklassen haben gar keinen Angriffswert, für sie waren zwei der fünf Zweige (Angriff, Schild) schlicht tot. Ein Frachter wurde auf dem Weg Mk I bis Mk X zwar schneller und sparsamer, aber <em>nie größer</em>, obwohl Laderaum das Einzige ist, wofür er existiert. Jetzt bringt jede Marke <strong>+4% Ladekapazität</strong>, auf Mk X also +36% – auf den Missions-Frachtraum UND auf den Lager-Beitrag der Frachter (+250/+1000 je Schiff), beides je Klasse getrennt. Das gilt für die beiden Frachterklassen, bei denen es etwas bewirkt – auf einem Späher oder Kolonieschiff wird der Zweig gar nicht erst beworben.' },
             { title:'Die beiden Schmieden: Mythisch und Primordial', body:'Zwei Seltenheitsstufen fallen nie und lassen sich auch nicht aus Fragmenten fertigen - sie kommen ausschließlich aus einer Schmiede.<br><br><strong>Die Mythische Modulschmiede</strong> (ab <em>Singularitätsphysik</em>) fertigt mythische Module gegen Apex-Ressourcen: ' + mythicCostText() + ' je Stück. Daneben gibt es Mythisch noch aus hochstufigen Allianzmissionen.<br><br><strong>Die Urmaterie-Schmiede</strong> (ab <em>Kausalanker-Theorie</em>) fertigt <strong>primordiale</strong> Module, die höchste Stufe des Spiels. <strong>Ihr Preis steigt mit jedem Modul, das du dort geschmiedet hast</strong>: Das erste kostet ' + Object.entries(PRIMORDIAL_CRAFT_BASE).map(([k,v])=>v+' '+resDefFor(k).label).join(' + ') + ', danach kommt je ' + PRIMORDIAL_CRAFT_JE.hohlraumgitter + ' bereits gefertigten Modulen ein ' + resDefFor('hohlraumgitter').label + ' dazu und je ' + PRIMORDIAL_CRAFT_JE.kausalanker + ' ein ' + resDefFor('kausalanker').label + '. Bei ' + PRIMORDIAL_CRAFT_MAX.hohlraumgitter + ' + ' + PRIMORDIAL_CRAFT_MAX.kausalanker + ' ist Schluss - die Schmiede soll teurer werden, nicht unerreichbar. Den jeweils aktuellen Preis nennt die Schmiede selbst. Sie ist der einzige Weg dorthin - kein Fund erreicht sie, und <em>Verschmelzen führt ausdrücklich nicht hin</em>, auch nicht mit drei Exotischen. Wer ein primordiales Modul will, muss die Tier-3-Kette stehen haben, und die hängt am Bergbau: Beide Fabriken kosten Protomaterie, und die gibt es nur an Asteroiden.<br><br>Beide Schmieden respektieren dieselben Sperren wie jeder andere Weg: <strong>Abgrund-Ausrüstung</strong> lässt sich nicht schmieden (sie fällt nur bei Tauchgängen), und <strong>Unikate</strong> auch nicht - die fallen nur bei ihrer jeweiligen Jagd.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. '+SHIP_CLASS_DEFS.length+' Klassen mit eigenen Slots (bis zu 3, und wie bei den Standort-Modulen <strong>je Typ nur eines gleichzeitig</strong> – unabhängig von der Seltenheit): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen (Stufe und Substats des <em>angeklickten</em> Moduls bleiben erhalten, der beste Hauptwert-Wurf der drei zählt), überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module. <strong>Synergien:</strong> Sechs benannte Modul-Kombinationen über die Klassen hinweg (z.B. Konvoi-Doktrin: Verbesserte Triebwerke + Langstreckensensoren) geben zusätzliche Boni, sobald beide Teile eingebaut sind – ausschließlich Tempo, Treibstoff-Ersparnis und Frachtraum, nie Kampfwerte (die liest der Server direkt, eine Client-Zulage dort wäre eine leere Behauptung). Aktive Synergien stehen grün über der Klassen-Auswahl, fast fertige nennen das fehlende Teil. <strong>Ausrüstungs-Vorlagen:</strong> auch je Schiffsklasse drei speicherbare Profile (A/B/C) mit 1-Klick-Wechsel und automatischem Namen aus der Modul-Zusammensetzung (z.B. „Verteidigung"/„Logistik"/„Abgrund") – samt <strong>Wechselvorschau</strong> unter jeder gespeicherten Vorlage: welche Klassen-Boni sich beim Anwenden ändern würden („vorher → nachher", grün = mehr, orange = weniger, die größten Änderungen zuerst), gerechnet mit derselben Bonus-Funktion wie das Spiel inklusive Substats und Synergien; inzwischen verschmolzene oder zerlegte Module weist sie als „nicht mehr im Besitz" aus.' }
@@ -44262,6 +44619,7 @@
     // beim ersten sichtbaren Tick da - und die Werft haette in der Zwischenzeit stillgestanden,
     // obwohl der Umbau laengst durch war.
     if (processShipMarkJob()) summe.markenUmbauten = (summe.markenUmbauten||0) + 1;
+    if (processBastionMarkJob()) summe.markenUmbauten = (summe.markenUmbauten||0) + 1;
     let schutz = 60; // Warteschlange fasst höchstens 10 Einträge - der Deckel ist reine Vorsicht
     while (t < now && schutz-- > 0 && !state.activeResearch && state.researchQueue && state.researchQueue.length){
       const vorher = state.researchQueue.length;
@@ -57705,7 +58063,12 @@
       } else if (def.category==='defense'){
         // "Schild"-Wert war zuvor immer NaN (def.shield war nirgends gesetzt) und wurde entfernt.
         // Angriff zeigt jetzt den echten atkVal statt einer fest auf 0 kodierten Zahl.
-        prodLine = `<i class="ti ti-sword" aria-hidden="true"></i> Angriff: ${lvl*(def.atkVal||0)} → <span style="color:#5dcaa5;">${(lvl+qty)*(def.atkVal||0)}</span> · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigung: ${lvl*(def.defVal||0)} → <span style="color:#5dcaa5;">${(lvl+qty)*(def.defVal||0)}</span>`;
+        /* Mit Bastionsmarke gerechnet - das ist die Zahl, die auch defensePower() summiert. Stuenden
+           hier die Auslieferungswerte, waere die Karte der einzige Ort im Spiel, an dem die Marke
+           nicht ankommt. */
+        const bAtk = bastionAtkVal(def), bDef = bastionDefVal(def), bMk = bastionMarkOf(def.key);
+        prodLine = `<i class="ti ti-sword" aria-hidden="true"></i> Angriff: ${lvl*bAtk} → <span style="color:#5dcaa5;">${(lvl+qty)*bAtk}</span> · <i class="ti ti-shield-lock" aria-hidden="true"></i> Verteidigung: ${lvl*bDef} → <span style="color:#5dcaa5;">${(lvl+qty)*bDef}</span>`
+          + (bMk > 1 ? ` · <span style="color:#c3bef5;">Bastionsmarke ${SHIP_MARK_ROMAN[bMk-1]} (+${Math.round((bMk-1)*BASTION_MARK_PER_STEP*100)}%) ist eingerechnet</span>` : '');
       } else if (def.effectDesc){
         // Generischer Sicherheitsnetz-Fall: jede Def hat effectDesc, aber bisher wurde es nur an
         // dieser einen Stelle nie gelesen - fängt jetzt auch künftige Nutzgebäude ohne eigenen Zweig ab.
@@ -57739,6 +58102,13 @@
               <div class="bname">${def.name} <span class="lvl-pill">Lv. ${lvl}</span>${maxed?` <span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max</span>`:''}</div>
               ${malusLine}
               ${defenseStatBarsHtml(def, lvl)}
+              ${/* Die Markenzeile - an derselben Stelle wie die Werftmarken-Zeile in der Werft, direkt
+                    unter den Kennwert-Balken. Sie erscheint, sobald die Anlage GEBAUT ist: 22 leere
+                    Markenblöcke auf einem frischen Konto wären nur Wand. Die zwei Ausnahmen sind
+                    Absicht - eine bereits erworbene Marke und ein laufender Ausbau müssen sichtbar
+                    bleiben, auch wenn gerade alle Stufen der Anlage abgerissen wurden. Die Marke
+                    selbst bleibt in dem Fall bestehen, sie wirkt nur auf nichts. */''}
+              ${(def.category==='defense' && (lvl>0 || bastionMarkOf(def.key)>1 || (bastionMarkJob()||{}).key===def.key)) ? bastionMarkRowHtml(def.key) : ''}
               <details class="karten-info" data-keep-open="binfo:${def.key}"${detailsOpenAttr('binfo:'+def.key)}>
                 <summary>Details</summary>
                 <div class="prodline">${prodLine}</div>
@@ -62327,6 +62697,58 @@
     // EIGENER Auftrag neben der Bauwarteschlange, nicht darin: Die Marke rüstet die BESTEHENDE
     // Flotte um, es entsteht kein neues Schiff. Ein Warteschlangeneintrag hätte einen der zehn
     // Werftplätze belegt, ohne dass am Ende etwas gebaut worden wäre.
+    document.querySelectorAll('[data-bastionmark]').forEach(btn => btn.onclick = () => {
+      const key = btn.getAttribute('data-bastionmark');
+      const def = BUILDING_DEFS.find(d => d.key === key) || { name: key };
+      const mk = bastionMarkOf(key);
+      if (mk >= BASTION_MARK_MAX){ log(def.name+': Bastionsmarke '+SHIP_MARK_ROMAN[BASTION_MARK_MAX-1]+' ist bereits die Endstufe.', 'ti-alert-triangle'); return; }
+      const ziel = mk + 1;
+      if (!bastionMarkGateOpen(ziel)){ log(def.name+': Bastionsmarke '+SHIP_MARK_ROMAN[ziel-1]+' benötigt '+bastionMarkGateName(ziel)+'.', 'ti-flask'); return; }
+      /* Lagerdeckel VOR der Bezahlung - canAfford waere hier keine Absicherung: Wer den Stoff
+         gerade zufaellig knapp im Lager hat, koennte zahlen, und beim naechsten Mal nie wieder.
+         Die Meldung nennt den Stoff und den Deckel, nicht nur "geht nicht". */
+      const lager = bastionMarkLagerProblem(key, ziel);
+      if (lager){
+        log(def.name+': Bastionsmarke '+SHIP_MARK_ROMAN[ziel-1]+' verlangt '+fmt(lager.noetig)+' '+resLabel(lager.res)
+          +', dein Lager fasst aber nur '+fmt(lager.cap)+'. Bau die '+resLabel(lager.res)+'-Kette weiter aus.', 'ti-alert-triangle');
+        return;
+      }
+      // Nur EIN Ausbau gleichzeitig - dieselbe Begruendung wie bei den Werftmarken. Bewusst ein
+      // EIGENER Auftragsplatz und nicht der der Werft: Verteidigung und Flotte sind zwei Achsen,
+      // und ein Bastions-Ausbau, der den Werftmarken-Umbau blockiert, waere eine Kopplung, die
+      // niemand erwartet.
+      const laeuft = bastionMarkJob();
+      if (laeuft){
+        const ldef = BUILDING_DEFS.find(d => d.key === laeuft.key) || { name: laeuft.key };
+        log('Es läuft gerade der Ausbau von '+ldef.name+' auf Bastionsmarke '+SHIP_MARK_ROMAN[laeuft.ziel-1]
+          +' (noch '+fmtDuration(bastionMarkJobRest()/1000)+'). Es geht immer nur einer.', 'ti-clock');
+        return;
+      }
+      const cost = bastionMarkCost(key, ziel);
+      if (!canAfford(cost)) return;
+      pay(cost);
+      const dauer = bastionMarkDuration(key, ziel);
+      state.bastionMarkJob = { key, ziel, startedAt: Date.now(), endsAt: Date.now() + dauer*1000, cost };
+      log(def.name+': Ausbau auf Bastionsmarke '+SHIP_MARK_ROMAN[ziel-1]+' begonnen – fertig in '+fmtDuration(dauer)+'.', 'ti-arrow-up');
+      playSound('build');
+      render(); save();
+    });
+    // Abbrechen mit VOLLER Rueckerstattung - wie bei den Werftmarken, und aus demselben Grund:
+    // Ein Fehlklick bei einem mehrstuendigen Ausbau waere sonst eine Strafe, die nichts lehrt.
+    document.querySelectorAll('[data-bastionmark-cancel]').forEach(btn => btn.onclick = () => {
+      const j = bastionMarkJob();
+      if (!j) return;
+      const def = BUILDING_DEFS.find(d => d.key === j.key) || { name: j.key };
+      // Exaktes Gegenstueck zu pay(): credits und bergung liegen NICHT in state.resources.
+      if (j.cost) for (const [r, v] of Object.entries(j.cost)){
+        if (r === 'credits') state.credits = (state.credits||0) + v;
+        else if (r === 'bergung'){ const a = ensureAbgrund(); a.bergung = (a.bergung||0) + v; }
+        else state.resources[r] = (state.resources[r]||0) + v;
+      }
+      state.bastionMarkJob = null;
+      log(def.name+': Bastions-Ausbau abgebrochen – Material vollständig zurück.', 'ti-x');
+      render(); save();
+    });
     document.querySelectorAll('[data-shipmark]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-shipmark');
       const mk = shipMarkOf(key);
@@ -63574,6 +63996,7 @@
     const recyclerHeim = processRecyclerAuftraege();
     const researchDone = processResearch();
     const markDone = processShipMarkJob();
+    const bastionDone = processBastionMarkJob();
     const researchQueued = tryStartQueuedResearch();
     const autoExplored = tryAutoExplore();
     syncCompletionReminders();
@@ -63583,7 +64006,7 @@
     // Leiste schon gesetzt oder der Hinweis weggeklickt, steigt maybeShowTabHint sofort wieder aus.
     if (tabVisible) maybeShowTabHint(activeTab);
     if (tabVisible) render();
-    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || recyclerHeim || researchDone || markDone || researchQueued || autoExplored || rufVerfallen || neueSysteme) save();
+    if (missionsResolved || queueProgressed || jobsActivated || constructionDone || roleChangeDone || debrisCollected || recyclerHeim || researchDone || markDone || bastionDone || researchQueued || autoExplored || rufVerfallen || neueSysteme) save();
   }, 1000);
   // Nachhol-Render beim Zurückkehren in den Tab (Gegenstück zum tabVisible-Gate im Haupt-Tick):
   // der erste sichtbare Frame zeigt sofort den aktuellen Stand statt bis zu 1s alte Werte.

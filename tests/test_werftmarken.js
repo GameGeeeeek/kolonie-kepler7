@@ -28,8 +28,16 @@ const src = fs.readFileSync(SPIELDATEI, 'utf8');
 
 // ---------------------------------------------------------------- Markenblock ausfuehrbar machen
 const von = src.indexOf('const SHIP_MARK_MAX = ');
-const bis = src.indexOf('const EXPLORE_SHIP_KEYS', von);
+// Endanker: seit den Bastionsmarken (18.08.2026) steht deren Block ZWISCHEN dem Werftmarken-Block
+// und EXPLORE_SHIP_KEYS. Mit dem alten Endanker schnitt dieser Test den fremden Block still mit -
+// er lief zwar weiter, mass aber nicht mehr nur das, was er zu messen behauptet. Der neue Anker
+// ist der Beginn der Bastionsmarken, MIT Rueckfall auf den alten: Ein fehlender Anker ergaebe -1
+// und der Slice liefe fast bis zum Dateiende (CLAUDE.md Regel 6).
+const bastionAnker = src.indexOf('const BASTION_MARK_MAX = ', von);
+const bis = bastionAnker > von ? bastionAnker : src.indexOf('const EXPLORE_SHIP_KEYS', von);
 check('Markenblock in der Spieldatei gefunden', von > 0 && bis > von);
+check('Endanker liegt vor dem Bastionsmarken-Block - der Slice misst nur die Werftmarken',
+  bastionAnker > von, { bastionAnker, bis });
 if (von < 0 || bis < von){ console.log('\nFAIL'); process.exit(1); }
 
 // SHIP_DEFS wird fuer shipMarkClassFactor() gebraucht (buildTime je Klasse). Statt die ganze
