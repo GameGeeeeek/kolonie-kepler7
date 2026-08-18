@@ -103,7 +103,9 @@ check('3f: die Nest-Box nennt die Schwachstelle ihrer Stufe',
 // benannt, nicht stillschweigend übergangen: PvP kennt keine Schwachstellen (dort entscheidet das
 // Kontersystem), Leerenriss und Abgrund haben keine modellierte Gegnerflotte.
 const ROH_ERLAUBT = [
-  'myPower',            // PvP-Simulation (Solo-Pfad)
+  'myPowerVorrat',      // PvP-Simulation (Solo-Pfad) - seit v8.558.0 mit eingerechnetem
+                        // Gefechtsvorrat. Die Schwaechen-Basis ist hier bewusst NICHT im Spiel:
+                        // Schwaechen sind eine NPC-Eigenschaft, ein Spieler hat keine.
   'previewPower',       // PvP-Vorschau
   'myFullAttack',       // PvP-Chance im Spionagebericht
   'riftPower',          // Leerenriss - keine Schwachstelle modelliert
