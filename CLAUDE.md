@@ -1042,6 +1042,63 @@ SELBST beobachten? Wenn nein, ist die Belohnung faktisch für jeden frei verfüg
 anlegt – dann entweder bewusst kosmetisch halten oder die Quelle wechseln.
 
 
+## Bastionsmarken (V2a, 18.08.2026, v8.567.0)
+
+Das Werftmarken-Muster für Verteidigungsanlagen: zehn Stufen je Anlage, +3 % Verteidigungs- **und**
+Angriffswert je Stufe, gültig für die ganze Anlagenklasse an **allen** Standorten. Der Schildanteil
+läuft mit, weil er aus `defVal` abgeleitet ist.
+
+**Der Hebel ist die Reichweite, nicht der Prozentsatz.** `defensePower(planetKey)` zählt je
+Standort, und `pickRaidTargetPlanet` zieht gleichverteilt. Eine Anlagenstufe hilft nur dort, wo sie
+steht; eine Marke wirkt überall. Bei elf Standorten ist das der elffache Zuwachs.
+
+**Was sie ausdrücklich NICHT tut**, und das steht so auch im Hilfetext und im Patchnote: den
+gemessenen Abstand zu Schiffen schließen (`docs/verteidigung-flotte-konzept.md` 1.1 — Faktor 7,2 bei
+einem Tag Einkommen, 21,6 bei einem Jahr). Und sie ändert den **Punktestand nicht** — das wäre
+Vorschlag V3 des Konzepts und ein rückwirkender Ranglisten-Eingriff.
+
+**Die EINE Stelle, an der die Marke zu einem Faktor wird, ist `bastionMarkMult()`.** Jede Rechen-
+und Anzeigestelle geht dort durch: `defensePower`, `defenseAttackPower`, `bastionDefVal`/
+`bastionAtkVal` (Kartenzeile, gesperrte Vorschau), die Kennwert-Balken. Sie wirkt **nie** durch
+Mutation an `def.defVal`/`def.atkVal` — eine veränderte Definition würde von jeder Anzeige, jedem
+Test und dem Punktestand mitgelesen, und der Server kennt sie nicht.
+
+**Fünf Dinge, die man beim Anfassen wissen muss:**
+
+- **Der Deckel steht in `bastionMarkOf()`, der LESE-Funktion** — nicht nur an der Kaufstelle.
+  Dieselbe Lehre wie bei `shipMarkOf`, deren Kommentar sie wörtlich festhält: Ein manipulierter
+  Stand liefe sonst durch jede Rechenstelle und löste die Backend-Sanity-Prüfung aus, die den
+  GANZEN Spielstand ablehnt.
+- **Backend-Parität ist Pflicht.** `computeDefensePower()` entscheidet jedes PvP und wendet
+  `bastionMarkMultServer()` an BEIDEN Summierstellen an (Heimat und Kolonien). Dazu
+  `SAVE_SANITY_LIMITS.maxBastionMark` = 1000 (großzügig, aus demselben Grund wie `maxShipMark`:
+  ein zu enges Limit sperrt einen echten Spieler vom Speichern aus, und das ist der teurere
+  Fehler).
+- **Die Kostentabelle ist gegen BEIDE Lagerdeckel kalibriert, nicht gegen den Zufluss** — siehe
+  Regel 57. Tier 1 ist Anerkennungsbetrag (50 % des gemessenen Deckels beim höchsten
+  Klassenfaktor), Tier 2 ist Tor und Senke (42 % des jeweiligen T2-Lagers je Endschritt), die
+  ZEIT ist der Hauptpreis (28 h je Leiter bei Faktor 1, 56 h bei 7, ~31 Tage fürs komplette Set).
+- **`BASTION_MARK_CLASS_CAP` = 7 ist die Lagerschranke, keine Rundung.** Er senkt die nötige
+  Kettengröße von 84 auf 69 Fabrikstufen. Der eigentliche Wächter gegen eine unerfüllbare Zahlung
+  ist aber die KOSTENTABELLE: Der rohe Faktor des stärksten Gebäudes ist 8,4, ein höherer Deckel
+  kann die Schranke gar nicht reißen — eine angehobene Tier-2-Menge sehr wohl.
+- **Zwei Anlagen tragen keine Marke** (Abhorchposten, Mondschildgenerator): `defVal` und `atkVal`
+  beide 0, ein Prozentsatz darauf wäre wirkungslos. Die Ausnahme wird über `bastionMarkFaehig()`
+  aus den WERTEN abgeleitet, nicht als Namensliste geführt — dieselbe Ausnahme kennen
+  `defenseStatBarsHtml` und `defenseLockedPreview` schon.
+
+**Der Ausbau hat einen EIGENEN Auftragsplatz** (`state.bastionMarkJob`), nicht den der Werft: Ein
+Bastions-Ausbau, der den Werftmarken-Umbau blockiert, wäre eine Kopplung, die niemand erwartet.
+Bewusst ohne Gebäude-, Offiziers- oder Modulrabatt — es gibt keine „Werft für Verteidigung", und
+ein Rabatt aus dem Schiffsbau wäre eine Zahl, die niemand nachrechnen kann.
+
+**Prestige-Erhalt ist der ZWECK, nicht ein Detail** (`keepBastionMarks`), und der Aufstieg hat mit
+dem **Bastionsregister** (40 % Essenz) den ersten Erhaltungspfad, der nicht die Flotte betrifft.
+
+Wächter: `tests/test_bastionsmarken.js` (48 Prüfungen, Quelltext + Backend-Parität mit
+ausgeführtem Funktionsvergleich) und `tests/test_bastionsmarken_ui.js` (26 Prüfungen am
+gerenderten Spiel — Sichtbarkeit statt Existenz, Kauf, Abbruch, Wirkung je Anlagenklasse).
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
