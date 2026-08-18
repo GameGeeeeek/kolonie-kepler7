@@ -1391,11 +1391,45 @@ fehlende Beschreibung).
   Tiefenschiffe haben eines, `test_schiffstexte.js` existiert eigens dafür, dass es auch gerendert
   wird, und alle neun Texte nennen Wirkung, Grenze und Gegenbeispiel, ohne eines der vier Muster
   zu tragen (Regel 32 in der Gegenrichtung: ein zu Unrecht verworfener Fund fällt nie wieder auf).
-- **TX-2** (offen): `MODULE_DEFS`. Größter Block, und mit einem eigenen Duktus-Fehler, den die
-  Forschungstexte nicht haben – die Unikat-Bausteine stehen wortgleich in mehreren Einträgen
-  („würfelt nie und übersteht jede Werkbank-Aktion" 5×, „Kommt immer als Exotisch mit festem
-  Spitzenwurf" 3×). 14 Tests lesen aus diesen Texten; bewusst eine eigene Etappe, weil 47
-  Umschreibungen in einem Zug einen Fehlschlag ergäben, der nichts eingrenzt.
+- **TX-2** (v8.572.0): `MODULE_DEFS`, 14 Texte, 5.752 → 4.627 Zeichen. Der Block hat 56 `desc`-Texte
+  (block-gescopt zwischen `const MODULE_DEFS = [` und `const SHIP_MODULE_DEFS`), Median 262.
+
+  **Die wichtigste Entscheidung ist eine Nicht-Änderung: die 20 BOSS-SET-Texte bleiben.** Sie waren
+  der erste Verdacht, weil sie einander fast wortgleich lesen („Teil des Boss-Sets X (droppt nur bei
+  Y): <Bild> – <Wirkung>. Ab 2 Set-Teilen am selben Standort kommen die X-Stufenboni dazu."). Beim
+  Durchlesen ist das kein KI-Duktus: Jeder Satzteil trägt eine eigene Auskunft (welches Set, wo es
+  fällt, was es tut, ab wann die Stufenboni greifen), und eine gleichförmige Struktur über zwanzig
+  gleichartige Gegenstände ist Gestaltung, keine Wiederholung. Wer sie „entschlackt", nimmt
+  Information weg. **Wiederholung ist erst dann ein Befund, wenn der wiederholte Teil nichts sagt.**
+
+  Gekürzt wurde stattdessen Muster 1 und 4: Rangaussagen („als einziges Modul im Spiel"),
+  Spielempfehlungen („ideal, um Angriffe zu Ketten zu verbinden", „wer von Kampf zu Kampf zieht,
+  hält ihn dauerhaft aufrecht"), Einordnungen („Damit ist er die Brücke nach oben") und Erklärungen
+  über das SPIEL statt über den Gegenstand (woher Trümmerfelder kommen, was Prisengut ist, wie die
+  Terraforming-Staffel läuft).
+
+  **Drei Testbedingungen, vorher gemessen und teils GEGENLÄUFIG – wer hier etwas ändert, prüft sie
+  zuerst:**
+  - `test_bonibilanz` 6 verbietet `/gedeckelt|Obergrenze/` in JEDEM Modultext, **case-sensitiv**.
+    Die Bestandstexte kommen nur durch, weil dort „**G**edeckelt bei +45%" am SATZANFANG steht. Wer
+    denselben Satz in einen längeren einbettet und klein schreibt, reißt den Test – und zwar an
+    einer Stelle, die mit der eigenen Änderung nichts zu tun zu haben scheint.
+  - `test_abgrund_module2` verlangt bei Abgrund-Modulen umgekehrt
+    `/gedeckelt|deckel|bis −|bis \+|stapelt nicht/i` und `desc.length >= 140`;
+    `test_abgrundmodule` und `test_abgrund_gegenstaende` verlangen `>= 180`. Der Ersetzer führt
+    deshalb eine Untergrenze von 190 Zeichen für alle geänderten Texte.
+  - `test_vorschau_konsistenz` verbietet Funktionsaufrufe in einer `desc`.
+
+  **Der Ersetzer prüft selbst, dass JEDE ZAHL des alten Textes im neuen wieder vorkommt** – die
+  einzige Wache dieser Etappe, die den INHALT statt der Form absichert. Alles andere (Apostroph,
+  Mindestlänge, verbotene Wortform, Datum, Anführungszeichen) prüft nur, dass der neue Text die
+  Umgebung nicht sprengt.
+
+  **Und eine Form-Falle, die TX-1 nicht hatte:** Die Modul-Einträge sind ZWEIZEILIG – Kopfzeile mit
+  `key`/`effect`/`base`, `desc` auf der Folgezeile. Der TX-1-Ersetzer suchte Anker und `desc` in
+  DERSELBEN Zeile und fand hier null Treffer. Richtig ist, vom Eintragsanfang bis zum NÄCHSTEN
+  Eintragsanfang zu suchen – dann kann der Treffer nie aus einem fremden Eintrag stammen
+  (Hausregel 39/59 in der mehrzeiligen Variante).
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
