@@ -200,12 +200,37 @@ if (be) {
 {
   const pfade = schnitt(src, 'const ASCENSION_PATHS = [', '\n  ];');
   const keys = [...pfade.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);
-  check('4: es gibt vier Aufstiegs-Pfade', keys.length === 4, keys);
+  /* Bis zum 18.08.2026 stand hier `keys.length === 4`. Das war eine MOMENTAUFNAHME, keine Regel
+     (CLAUDE.md Regel 3): Mit den Bastionsmarken kam ein fuenfter Pfad dazu, und der Test fiel auf
+     voellig korrektem Code durch. Die bequeme Antwort waere gewesen, die 4 auf eine 5 zu setzen -
+     dann faellt er beim sechsten Pfad wieder.
+     Was hier wirklich gilt und jetzt geprueft wird, ist STAERKER als die alte Zahl:
+       - die vier urspruenglichen Pfade existieren weiterhin (ein VERSCHWUNDENER Pfad ist genauso
+         ein Befund wie ein neuer - die alte Zaehlung haette einen Tausch nicht bemerkt),
+       - die Schluessel sind eindeutig (ein kopierter Eintrag faellt auf),
+       - JEDER Pfad nennt seinen Preis, egal wie viele es sind. */
+  const PFLICHT_PFADE = ['offiziere', 'marken', 'ruestkammer', 'keiner'];
+  const fehlend = PFLICHT_PFADE.filter(k => !keys.includes(k));
+  check('4: die vier urspruenglichen Aufstiegs-Pfade sind alle noch da',
+    fehlend.length === 0, { fehlend, alle: keys });
+  check('4: die Pfad-Schluessel sind eindeutig',
+    new Set(keys).size === keys.length, keys);
   check('4: "nichts mitnehmen" ist eine vollwertige Wahl mit voller Essenz',
     /key:'keiner'[\s\S]{0,400}?kosten:0,/.test(pfade));
+  const preise = pfade.match(/kosten:[\d.]+/g) || [];
   check('4: jeder Pfad nennt seinen Preis in Sternenessenz',
-    (pfade.match(/kosten:[\d.]+/g) || []).length === 4, pfade.match(/kosten:[\d.]+/g));
-  check('4: der teuerste Pfad sind die Werftmarken', /key:'marken'[\s\S]{0,200}?kosten:0\.50/.test(pfade));
+    preise.length === keys.length, { pfade: keys.length, preise });
+  /* Auch das war vorher ein Literal-Treffer auf 'marken' + 0,50 und haette einen NEUEN, teureren
+     Pfad stillschweigend durchgelassen - die Aussage "der teuerste Pfad sind die Werftmarken"
+     waere dann unwahr gewesen, ohne dass irgendetwas anschlaegt. Jetzt wird der Hoechstpreis
+     gemessen statt geraten. */
+  const proPfad = [...pfade.matchAll(/\{ key:'(\w+)'[\s\S]{0,600}?kosten:([\d.]+)/g)]
+    .map(m => ({ key: m[1], kosten: Number(m[2]) }));
+  const teuerster = proPfad.reduce((a, b) => (b.kosten > a.kosten ? b : a), { key: null, kosten: -1 });
+  check('4: alle Pfade wurden mit ihrem Preis gelesen',
+    proPfad.length === keys.length, { gelesen: proPfad });
+  check('4: der teuerste Pfad sind die Werftmarken',
+    teuerster.key === 'marken', { teuerster, alle: proPfad });
   // Jeder Pfad muss echte state-Felder retten - ein Tippfehler im Feldnamen wäre sonst unsichtbar.
   const felder = [...pfade.matchAll(/behalte:\[([^\]]*)\]/g)].flatMap(m => (m[1].match(/'(\w+)'/g)||[]).map(s => s.replace(/'/g,'')));
   check('4: die Pfade retten insgesamt mehrere Felder', felder.length >= 6, felder);
