@@ -232,8 +232,16 @@ if (K) {
    dass zweimal derselbe AUSDRUCK dastand - zwei Kopien einer Rechnung, die auseinanderlaufen
    koennen. Jetzt gibt es genau EINE Funktion, und beide Stellen muessen sie rufen. Eine dritte
    Anzeigestelle, die wieder selbst rechnet, faellt damit auf. */
-const rufe = (S.match(/proto: protoJeFuhre\(a\)/g) || []).length;
-check('6c: Vorschau und Missionsstart rufen dieselbe Funktion (2 Fundstellen)', rufe === 2, { gefunden: rufe });
+/* SEIT DEN ASTEROIDENFESTUNGEN traegt der Ausdruck an beiden Stellen einen FAKTOR - die Festung
+   drosselt die Protomaterie, und zwar an beiden Stellen gleich. Die gepruefte Regel ist dieselbe
+   geblieben und sogar wichtiger geworden: Beide Stellen muessen `protoJeFuhre(a)` rufen UND den
+   Faktor anwenden. Genau hier hat diese Pruefung beim Bau der Phase 1 einen echten Fehler
+   gefangen - die Vorschau drosselte, der Missionsstart fror die volle Menge ein. */
+const rufe = (S.match(/protoJeFuhre\(a\)/g) || []).length;
+check('6c: Vorschau und Missionsstart rufen dieselbe Funktion (mind. 2 Fundstellen)', rufe >= 2, { gefunden: rufe });
+const mitFaktor = (S.match(/Math\.round\(protoJeFuhre\(a\) \* [\w.]+\)/g) || []);
+check('6c-faktor: und BEIDE wenden den Festungs-Faktor an', mitFaktor.length === 2,
+  { gefunden: mitFaktor, hinweis: 'eine Stelle ohne Faktor heisst: Vorschau und Buchung laufen auseinander' });
 const defs = (S.match(/function protoJeFuhre\(/g) || []).length;
 check('6c2: und es gibt genau eine Definition davon', defs === 1, { definitionen: defs });
 // Der Kern der Umstellung: Die Funktion fragt die SORTE, nicht nur die Groesse. Ohne diese
@@ -322,13 +330,27 @@ check('7b: und Protokoll UND Bericht nennen ihn beim Namen',
         return (v >= 0 && b > v) ? S.slice(v, b + 4) + '\n' : '';
       };
       const fmtDur = schneide('  function fmtDuration(');
+      // `fmt` ebenfalls AUS DER DATEI, nicht durch String ersetzt (Arbeitsregel 36): Es rundet auf
+      // "1.2M"/"30.0k", und genau diese Schreibweise steht im Hilfetext. Ein Platzhalter wuerde
+      // andere Zeichen liefern und die Textpruefungen darunter wertlos machen.
+      const fmtZahl = schneide('  function fmt(');
       const zeitTabellen = (S.match(/  const ABBAU_(MIND|DECKEL)_SEK = \{[^}]*\};/g) || []).join('\n') + '\n'
         + (S.match(/  const ABBAU_BOHRUNG_JE_STUFE = [^;]*;/) || [''])[0] + '\n';
       const kopf = S.slice(vonBD, bisBD + 5) + '\n'
-        + fmtDur + zeitTabellen
+        + fmtDur + fmtZahl + zeitTabellen
         + '  const PROTOMATERIE_JE_FUHRE = ' + JSON.stringify(K.fuhre) + ';\n'
         + '  const PROTOMATERIE_LAGER_BASIS = ' + K.basis + ';\n'
-        + '  const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = ' + K.jeStufe + ';\n';
+        + '  const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = ' + K.jeStufe + ';\n'
+        /* Seit den Asteroidenfestungen leitet der Hilfetext auch aus FESTUNG_STUFEN ab. Die
+           Tabelle wird deshalb AUS DER DATEI geschnitten und mitgegeben - nicht durch einen
+           Platzhalter ersetzt (Arbeitsregel 36): Ein nachgebauter Wert prueft nicht mehr das
+           Spiel, sondern den Nachbau. */
+        + (() => {
+            const v = S.indexOf('  const FESTUNG_STUFEN = {');
+            const b = v < 0 ? -1 : S.indexOf('\n  };', v);
+            return (v >= 0 && b > v) ? S.slice(v, b + 5) + '\n' : '';
+          })()
+        + ((S.match(/  const FESTUNG_GERAEUMT_BONUS = [^;]*;/) || [''])[0] + '\n');
       const eintrag = S.slice(vonH, bisH + E.length).replace(/,\s*$/, '');
       txt = new Function(kopf + 'return (' + eintrag + ').body;')();
     } catch (e) { fehler = e.message; }

@@ -14,6 +14,31 @@ ausdrücklich dabei (Abschnitt 11.2).
 
 ---
 
+## Umsetzungsstand (18.08.2026)
+
+**Dieses Dokument beschreibt die ABSICHT und wird bewusst nicht umgeschrieben, wenn die Umsetzung
+abweicht.** Es ist damit älter als der Code, und das ist gewollt: Wer nachlesen will, warum etwas
+so gebaut wurde, braucht beides – den Entwurf und die Abweichung. **Wo die Umsetzung anders
+entschieden hat, steht das in der CLAUDE.md** (Frontend: „Was beim Umsetzen ANDERS entschieden
+wurde als im Konzept"; Backend: „Asteroidenfestungen"). Wer eine Abweichung für ein Versehen hält
+und „repariert", baut den jeweiligen Fehler wieder ein.
+
+| Phase | Stand |
+|---|---|
+| **0a** Schreibsperre `asteroids:*` | fertig – Backend #124 |
+| **0b** Rückflug der Anfechtung, `test_rundflug.js` datengetrieben | fertig – #432 (v8.568.0), nachgeschärft in #437 |
+| **0c** vestigialer `db.galaxy.worldBoss` entfernt | fertig – Backend #125 |
+| **1** Festungen ohne Bauteile | fertig – Backend #126/#131/#132, Frontend v8.569.0 |
+| **2–6** | offen |
+
+**Die drei Zahlen, die gegenüber diesem Dokument neu gerechnet wurden** (Begründungen in der
+CLAUDE.md): Die Kern-Lebenspunkte stehen bei 30.000 / 250.000 / 1.200.000 statt 120.000 / 450.000 /
+1.500.000 – die Konzeptzahl hätte für die Schanze neunzehn Schläge bedeutet, fast fünf Tage allein,
+ausgerechnet am Einsteigerziel. Die Abklingzeit liegt an der Festung statt im Spielstand. Und
+gezählt wird der angekommene Schaden, nicht der volle Wurf.
+
+---
+
 ## 0. Die sieben Befunde, die das Konzept geformt haben
 
 Vor den Zahlen sieben Dinge aus dem Bestand. Sie erklären jede spätere Entscheidung – und zwei davon
