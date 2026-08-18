@@ -1371,7 +1371,7 @@ Wächter: `tests/test_bastionsmarken.js` (48 Prüfungen, Quelltext + Backend-Par
 ausgeführtem Funktionsvergleich) und `tests/test_bastionsmarken_ui.js` (26 Prüfungen am
 gerenderten Spiel — Sichtbarkeit statt Existenz, Kauf, Abbruch, Wirkung je Anlagenklasse).
 
-## Aliens und Asteroidenfestungen (Konzept 18.08.2026, Phasen 0–2 fertig)
+## Aliens und Asteroidenfestungen (Konzept 18.08.2026, Phasen 0–3 fertig)
 
 Auftrag Sascha: „Ich würde gerne noch aliens und asteroidenfestungen einführen die soll man auf der
 karte sehen und angreifen können entwickle ein detailiertes konzept", danach „Alles umsetzten".
@@ -1390,7 +1390,7 @@ wurde als dort.
 | **0c** | den vestigialen `db.galaxy.worldBoss` entfernen | **fertig**, Backend #125 |
 | **1** | Festungen ohne Bauteile: Entstehen, Blockade, Hort, Angriffsmission, Karte | **fertig** – Backend #126/#131/#132, Frontend v8.569.0 |
 | **2** | Schildkuppel, Geschütztürme, Zielwahl, Rollenfaktoren | **fertig** – Backend #133, Frontend siehe unten |
-| **3** | Nester Stufe 1–4: Reifen, Ausbreiten, Völker-Eigenarten | offen |
+| **3** | Nester Stufe 1–5: Reifen, Ausbreiten, Königin, Angriff | **fertig** – Backend #137, Frontend siehe unten |
 | **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | offen |
 | **5** | die Königin, Musterangriff-Zielart | offen |
 | **6** | Feinschliff: Embleme, Kompendium, `belagerungsplan`, Vorbote | offen |
@@ -1502,6 +1502,48 @@ Verband 20 Träger mitbekommt (der Carrier ist seit der Umwidmung vom 02.08.2026
 der Verband bleibt also sortenrein): danach 1,60 gegen die Türme, 0,70 gegen den Schild, 0,85 gegen
 den Kern. **Übertragbar: Wer eine Flotte für eine Messung zusammenstellt, prüft, ob sie in dieser
 Form überhaupt fliegen darf** – die Auswahl-UI sagt es, wenn man sie liest.
+
+### Was die Frontend-Phase 3 gebracht hat (Alien-Nester)
+
+Gebaut wurde: die **Frontend-Kopie** von `ALIEN_VOELKER`/`NEST_STUFEN`, der **Kartenknoten**
+(pulsierende Zellform, `data-map-nest`), `nestMapMenu()`, die **Angriffsmission**
+(`oeffneNestAngriff`/`sendNestMission`/`nestVorschauHtml`, **Form A**), ihre Auflösung
+(`nestAufloesen`), der Bericht, der Belohnungstyp `alien-nest` in `claimPendingRewards`, die
+Missionslinie und ein eigener Hilfe-Abschnitt. Wächter: `tests/test_nest_ui.js` (20 Prüfungen am
+gerenderten Spiel, zwei Gegenproben) und `tests/test_nest_paritaet.js` (11 Prüfungen).
+
+Vier Entscheidungen, die man kennen muss:
+
+- **Der Nest-Marker hat einen EIGENEN Winkel (340°), `npcMarkerXY()` hat 200° fest verdrahtet.**
+  Zwei Marker mit demselben festen Winkel lägen exakt aufeinander, und nur der Kollisionsschieber
+  trennte sie zufällig – genau die Fehlerklasse, die KB-13 behoben hat. Mehrere Nester im selben
+  System fächern über den Index auf; beide laufen durch `kbMarkerFrei()`.
+- **`missionMapZiel()` braucht einen eigenen Zweig.** Ein Nest ist kein Planet; die generische
+  Suche (`PLANETS.find`) fiele ins Leere und die Missionslinie bliebe aus. Derselbe Grund wie bei
+  den eigenen Zweigen in Missionskarte und Flottenleiste, wo die Mission sonst als
+  **„Erkundungsziel"** stünde.
+- **`system` reist in der Mission mit** – nicht als Schmuck: Der Server erkennt daran, dass ein
+  Nest der Nomaden **weitergezogen** ist. Ohne das Feld liefe der Anflug gegen das neue System, als
+  wäre nichts geschehen. `test_nest_ui.js` 4c prüft es, die Gegenprobe ohne das Feld fällt.
+- **Der Ausgang `verpasst` kostet nichts und nennt den Grund.** Vollzählig zurück, keine Verluste,
+  keine Abklingzeit, und die Meldung sagt, was passiert ist. Ein stilles `ok` wäre hier die
+  Falschaussage, vor der dieses Projekt seine Anzeigestellen schützt.
+
+**Die Vorschau MISST die Schwäche, statt sie zu benennen** – das ist Arbeitsregel 61 in der
+Anwendung. Eine Prüfung auf „das Wort Jäger steht da" wäre grün, egal was die Flotte trägt.
+`test_nest_ui.js` fährt deshalb ZWEI Läufe mit identischer Fixture bis auf einen Punkt (Jäger dabei
+oder nicht) und verlangt eine **andere Aussage**; die Gegenprobe mit fest auf `true` gesetztem
+Treffer fällt genau daran.
+
+**Zwei Fallen, beide beim Bauen aufgetreten:**
+
+- **`loadGalaxy` heißt `loadGalaxyState`.** Der erste Entwurf hatte den Namen geraten und ihn hinter
+  `typeof loadGalaxy === 'function'` versteckt – der Wächter hätte den Fehler **still** gemacht: Der
+  Galaxie-Zustand wäre nach einem Schlag nie nachgezogen worden, und niemand hätte es gemerkt
+  (Arbeitsregel 4, verschärft: ein `typeof`-Wächter über einem geratenen Namen ist schlimmer als
+  der nackte Aufruf, weil er den Absturz verschluckt, der ihn verraten hätte).
+- **Zwei Icons waren nicht im Subset-Font** (`ti-crown`, `ti-arrows-right-left`). `check-icons.js`
+  hat sie vor dem Commit gefangen; ersetzt durch vorhandene, statt den Font zu vergrößern.
 
 ### Der Fund, der die Auslieferungsreihenfolge festlegt
 

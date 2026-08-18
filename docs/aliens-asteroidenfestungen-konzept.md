@@ -29,8 +29,9 @@ und „repariert", baut den jeweiligen Fehler wieder ein.
 | **0b** Rückflug der Anfechtung, `test_rundflug.js` datengetrieben | fertig – #432 (v8.568.0), nachgeschärft in #437 |
 | **0c** vestigialer `db.galaxy.worldBoss` entfernt | fertig – Backend #125 |
 | **1** Festungen ohne Bauteile | fertig – Backend #126/#131/#132, Frontend v8.573.0 |
-| **2** Schildkuppel, Geschütztürme, Zielwahl, Rollenfaktoren | fertig – Backend #133, Frontend siehe CLAUDE.md |
-| **3–6** | offen |
+| **2** Schildkuppel, Geschütztürme, Zielwahl, Rollenfaktoren | fertig – Backend #133, Frontend v8.575.0 |
+| **3** Alien-Nester: Reifen, Ausbreiten, Königin, Angriff | fertig – Backend #137, Frontend siehe CLAUDE.md |
+| **4–6** | offen |
 
 **Die drei Zahlen, die gegenüber diesem Dokument neu gerechnet wurden** (Begründungen in der
 CLAUDE.md): Die Kern-Lebenspunkte stehen bei 30.000 / 250.000 / 1.200.000 statt 120.000 / 450.000 /
@@ -43,6 +44,12 @@ gebaut sind **zwei**. Der Kern ist kein Bauteil, sondern die Festung selbst: Er 
 Lebenspunkte neben `fest.kern` und kann nicht zerstört werden, ohne dass sie fällt. Er trägt nur
 eine Rolle (`FESTUNG_KERN_ROLLE`, `kapital`, 0,85–1,30, also flacher als die 0,70–1,60 der beiden
 echten Bauteile – er ist das Ziel, das man auch ohne Spezialisierung sinnvoll angreifen kann).
+
+**Und eine fünfte, in Phase 3:** Das Konzept sagt zur Königin, sie sei „mit 40 Endspiel-Schlägen
+ausgelegt". **Gemessen sind es 16,7.** Die LP-Zahlen selbst halten alle stand – sie sind gegen die
+bereits kalibrierten Festungen verankert (Sporenherd ≈ Schanze, Hochnest = Sternenfeste, Königin
+= 3,33 × Sternenfeste); falsch war nur der Satz daneben. Bei 4 Stunden Abklingzeit je Spieler heißt
+das drei Kommandanten an einem Tag oder eine Allianz an einem Abend.
 
 ---
 
