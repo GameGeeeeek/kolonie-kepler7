@@ -1302,7 +1302,7 @@ Wächter: `tests/test_bastionsmarken.js` (48 Prüfungen, Quelltext + Backend-Par
 ausgeführtem Funktionsvergleich) und `tests/test_bastionsmarken_ui.js` (26 Prüfungen am
 gerenderten Spiel — Sichtbarkeit statt Existenz, Kauf, Abbruch, Wirkung je Anlagenklasse).
 
-## Aliens und Asteroidenfestungen (Konzept 18.08.2026, Phase 0 fertig, Phase 1 im Bau)
+## Aliens und Asteroidenfestungen (Konzept 18.08.2026, Phasen 0–2 fertig)
 
 Auftrag Sascha: „Ich würde gerne noch aliens und asteroidenfestungen einführen die soll man auf der
 karte sehen und angreifen können entwickle ein detailiertes konzept", danach „Alles umsetzten".
@@ -1320,7 +1320,7 @@ wurde als dort.
 | **0b** | `asteroid-contest` bekommt seinen Rückflug, `test_rundflug.js` datengetrieben | **fertig**, #432 (v8.568.0) |
 | **0c** | den vestigialen `db.galaxy.worldBoss` entfernen | **fertig**, Backend #125 |
 | **1** | Festungen ohne Bauteile: Entstehen, Blockade, Hort, Angriffsmission, Karte | **fertig** – Backend #126/#131/#132, Frontend v8.569.0 |
-| **2** | die drei Bauteile (Schild/Türme/Kern), Zielwahl, Rollenfaktoren | offen |
+| **2** | Schildkuppel, Geschütztürme, Zielwahl, Rollenfaktoren | **fertig** – Backend #133, Frontend siehe unten |
 | **3** | Nester Stufe 1–4: Reifen, Ausbreiten, Völker-Eigenarten | offen |
 | **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | offen |
 | **5** | die Königin, Musterangriff-Zielart | offen |
@@ -1345,6 +1345,11 @@ Backend-Einzelheiten stehen in der Backend-CLAUDE.md unter „Asteroidenfestunge
 - **Phase 1 hat bewusst keine Bauteile und keine Zielwahl** – die sind Phase 2. Der Grundverlust je
   Schlag (6/9/12 %) ist deshalb absichtlich niedrig: Die Geschütztürme sollen ihn später vervielfachen,
   und der Wert, den man sich mit dem Turmbeschuss erkauft, ist der ganze Zweck der Bauteile.
+- **Phase 2 hat ZWEI Bauteile, nicht drei.** Das Konzept sprach von Schild, Türmen und Kern als drei
+  Bauteilen – der Kern ist aber kein Bauteil, sondern die Festung selbst: Er hat keine eigenen LP
+  neben `fest.kern`, kann nicht zerstört werden, ohne dass die Festung fällt, und braucht deshalb
+  keinen Eintrag in `FESTUNG_BAUTEILE`. Er trägt nur eine ROLLE (`FESTUNG_KERN_ROLLE`, `kapital`,
+  0,85–1,30). Ein dritter Tabelleneintrag hätte eine LP-Leiste versprochen, die es nicht gibt.
 
 ### Was die Frontend-Phase 1 gebracht hat – und die drei Funde dabei
 
@@ -1380,6 +1385,54 @@ wie `ASTEROID_SORTEN`/`AST_SORTEN`.
 
 **Zwei Lehren für TESTS, beide aus Gegenproben dieser Etappe** – sie stehen unten als Arbeitsregeln
 61 und 62, weil sie über diesen Fall hinausgehen.
+
+### Was die Frontend-Phase 2 gebracht hat – und die Falle beim Messen
+
+Gebaut wurde: die **Zielwahl** in der Angriffs-Vorschau (`data-fest-ziel`-Knöpfe für jedes stehende
+Bauteil plus immer den Kern), die **Rollenfaktoren** je Ziel, die **Bauteil-Balken** in Vorschau und
+Kartenmenü, das Ziel in Missionskarte, Flottenleiste und Bericht, und der erweiterte Hilfetext.
+Wächter: `tests/test_festung_ui.js` Abschnitt 6 (42 Prüfungen insgesamt, vier Gegenproben) und
+`tests/test_festung_paritaet.js` 5-anker…5g.
+
+Vier Entscheidungen, die man kennen muss:
+
+- **`festungZiel` ist eine MODULVARIABLE, nicht im DOM.** Der Flottendialog zeichnet sich bei jeder
+  Änderung neu; ein `<select>` oder ein `data-`-Attribut darin verlöre seinen Wert. Genau dieser
+  Fehler hat beim Allianz-Raid dazu geführt, dass still mit der Vorgabedauer gestartet wurde (siehe
+  „Jeder Bedienzustand, der NUR im DOM steckt").
+- **Der Rollenanteil wird EXAKT wie im Backend gerechnet** (`festungRohkraft`: Grundwert je
+  Schiffsklasse aus `SHIP_DEFS` mal `diminishingShipCount`), **nicht** über `attackPowerRaw`. Der
+  Unterschied ist der Punkt: `attackPowerRaw` trägt klassenspezifische Modulboni, die sich beim
+  Bilden eines ANTEILS nicht herauskürzen – die Vorschau nennte dann einen anderen Faktor als den,
+  mit dem der Server rechnet. Die zweite Zahl neben der echten.
+- **Das Ziel reist in der MISSION mit, nicht im Request.** `/api/festung/angriff` nimmt weiterhin
+  keinen einzigen Kampfparameter aus dem Body entgegen – dieselbe Eigenschaft wie `/api/attack` und
+  derselbe Weg wie beim Gefechtsvorrat.
+- **Ohne Bauteile sieht der Spieler genau das, was er vorher sah.** Eine Festung aus Phase 1 (oder
+  jede, solange `FESTUNG_BAUTEILE_AKTIV` aus ist) trägt kein `bauteile`-Feld; `festungZiele()`
+  liefert dann nur `['kern']`, und der ganze Abschnitt fällt weg – kein leerer Kasten, keine Wahl
+  ohne Wirkung. Gegenrichtung als Prüfung: `test_festung_ui.js` 6l.
+
+**Die Namen kollidieren mit zwei Verteidigungsgebäuden – geprüft und bewusst so gelassen.**
+`Schildkuppel` und `Geschütztürme` heißen fast wie die Gebäude **Hochenergie-Schildkuppel** und
+**Singularitäts-Geschützturm**. Beide Gebäude tragen einen unterscheidenden Vorsatz, die Schlüssel
+sind verschieden (`schild`/`tuerme` gegen `schildkuppel`/`singularitaetsturm`), und die Flächen
+liegen weit auseinander: eigener Verteidigungs-Reiter gegen Kartenmenü einer fremden Festung. Wer
+hier prüft oder greppt, muss die Suche trotzdem auf ihren Block scopen (Regel 39) – eine Suche nach
+`Schildkuppel` über die ganze Datei trifft zuerst das Gebäude.
+
+**Die Falle beim Messen, und sie ist Arbeitsregel 7 in neuem Gewand:** Der erste Entwurf von
+Abschnitt 6 gab dem Verband 80 Jäger und sonst nichts – ein reiner Abfangjäger-Verband, damit die
+drei Faktoren maximal auseinanderliegen. Gemessen kam für ALLE drei Ziele der untere Anschlag
+heraus (0,70/0,70/0,85). Der Grund stand in der Auswahlzeile daneben: „nur 0 passen in den
+Hangar". `capFighterSelection()` kappt Jäger und Bomber auf die Hangar-Kapazität der
+**mitgeschickten** Träger (`hangarCapacity`: 6 je Carrier) – ohne einen einzigen Träger fiel die
+Auswahl auf 0 Jäger zurück, übrig blieben die Frachter, und der Rollenanteil war für jede Rolle 0.
+Der Test hätte damit den **Hangardeckel** gemessen statt der Rollenwirkung. Behoben, indem der
+Verband 20 Träger mitbekommt (der Carrier ist seit der Umwidmung vom 02.08.2026 selbst `abfang`,
+der Verband bleibt also sortenrein): danach 1,60 gegen die Türme, 0,70 gegen den Schild, 0,85 gegen
+den Kern. **Übertragbar: Wer eine Flotte für eine Messung zusammenstellt, prüft, ob sie in dieser
+Form überhaupt fliegen darf** – die Auswahl-UI sagt es, wenn man sie liest.
 
 ### Der Fund, der die Auslieferungsreihenfolge festlegt
 

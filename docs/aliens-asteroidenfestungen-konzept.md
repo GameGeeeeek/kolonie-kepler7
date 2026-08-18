@@ -28,14 +28,21 @@ und „repariert", baut den jeweiligen Fehler wieder ein.
 | **0a** Schreibsperre `asteroids:*` | fertig – Backend #124 |
 | **0b** Rückflug der Anfechtung, `test_rundflug.js` datengetrieben | fertig – #432 (v8.568.0), nachgeschärft in #437 |
 | **0c** vestigialer `db.galaxy.worldBoss` entfernt | fertig – Backend #125 |
-| **1** Festungen ohne Bauteile | fertig – Backend #126/#131/#132, Frontend v8.569.0 |
-| **2–6** | offen |
+| **1** Festungen ohne Bauteile | fertig – Backend #126/#131/#132, Frontend v8.573.0 |
+| **2** Schildkuppel, Geschütztürme, Zielwahl, Rollenfaktoren | fertig – Backend #133, Frontend siehe CLAUDE.md |
+| **3–6** | offen |
 
 **Die drei Zahlen, die gegenüber diesem Dokument neu gerechnet wurden** (Begründungen in der
 CLAUDE.md): Die Kern-Lebenspunkte stehen bei 30.000 / 250.000 / 1.200.000 statt 120.000 / 450.000 /
 1.500.000 – die Konzeptzahl hätte für die Schanze neunzehn Schläge bedeutet, fast fünf Tage allein,
 ausgerechnet am Einsteigerziel. Die Abklingzeit liegt an der Festung statt im Spielstand. Und
 gezählt wird der angekommene Schaden, nicht der volle Wurf.
+
+**Und eine vierte, in Phase 2:** Das Konzept spricht von „drei Bauteilen" (Schild, Türme, Kern) –
+gebaut sind **zwei**. Der Kern ist kein Bauteil, sondern die Festung selbst: Er hat keine eigenen
+Lebenspunkte neben `fest.kern` und kann nicht zerstört werden, ohne dass sie fällt. Er trägt nur
+eine Rolle (`FESTUNG_KERN_ROLLE`, `kapital`, 0,85–1,30, also flacher als die 0,70–1,60 der beiden
+echten Bauteile – er ist das Ziel, das man auch ohne Spezialisierung sinnvoll angreifen kann).
 
 ---
 
