@@ -4474,7 +4474,22 @@
     // und das kann nicht falsch werden. Drei Stufen als eine Familie mit zunehmendem Licht.
     em_funke:      { art:'emblem', name:'Funke',       icon:'ti-bolt',                desc:'Der erste Funke – bleibt dauerhaft neben deinem Namen, sobald du das Spiel einmal unterstützt hast, und verschwindet auch dann nicht wieder, wenn der Unterstützer-Rang später ausläuft.' },
     em_leitstern:  { art:'emblem', name:'Leitstern',   icon:'ti-star',                desc:'Ein Stern, an dem andere sich ausrichten – dauerhaftes Zeichen für die Silber-Stufe, einmal erreicht und nie wieder verloren, unabhängig davon ob der Rang gerade läuft.' },
-    em_leuchtfeuer:{ art:'emblem', name:'Leuchtfeuer', icon:'ti-building-lighthouse', desc:'Ein Leuchtfeuer, das den Weg weist – die höchste dauerhafte Auszeichnung, für einmal erreichte Gold-Unterstützung. Sie bleibt für immer stehen, auch lange nachdem die letzte Spende abgelaufen ist.' }
+    em_leuchtfeuer:{ art:'emblem', name:'Leuchtfeuer', icon:'ti-building-lighthouse', desc:'Ein Leuchtfeuer, das den Weg weist – die höchste dauerhafte Auszeichnung, für einmal erreichte Gold-Unterstützung. Sie bleibt für immer stehen, auch lange nachdem die letzte Spende abgelaufen ist.' },
+    // Verteidigungs-Kosmetik (18.08.2026, Gegenstueck zum serverseitigen Abwehr-Zaehler aus
+    // Backend-#127). Der Fortschritts-Zweig deckte bis dahin ausnahmslos Groessen ab, die beim
+    // ANGREIFEN und Aufbauen wachsen - Prestige, Aufstieg, Kampfpunkte, Rekordtiefe, Erfolge,
+    // Bosse. Wer sich vor allem verteidigt, hatte gar keinen Weg zu einem eigenen Stueck.
+    //
+    // Die Farbe ist NICHT frei gewaehlt: #5ce1ff ist exakt das Cyan, in dem defenseStatBarsHtml
+    // den Schildbalken zeichnet - das Spiel hat fuer Schilde bereits eine Farbe, und eine zweite
+    // daneben waere die typische zweite Anzeigestelle, die beim naechsten Umbau auseinanderlaeuft.
+    // Gemessen ist sie ausserdem klar von den vorhandenen unterscheidbar (Abstand 71 zur naechsten,
+    // Stahl) und liegt mit Helligkeit 189 mitten im Bereich der uebrigen (150-205).
+    //
+    // Die BEDINGUNG steht wie bei allen Stuecken bewusst NICHT hier, sondern kommt mit dem Katalog
+    // vom Server - siehe kosmetikBedingungText direkt darunter.
+    nf_bastion:  { art:'namensfarbe', name:'Bastion', farbe:'#5ce1ff', desc:'Das Cyan der Schildbalken - dieselbe Farbe, in der das Spiel Schilde durchgehend zeichnet. Fuer Kommandanten, deren Verteidigung wiederholt gehalten hat.' },
+    em_zinne:    { art:'emblem',      name:'Zinne',   icon:'ti-building-fortress',    desc:'Die Mauerkrone einer Bastion - fuer eine lange Reihe abgewehrter Angriffe. Wie alle Fortschritts-Stuecke laeuft es nicht ab.' }
   };
   // Die Bedingung des Servers in Worte fassen. Bewusst ohne eigene Zahlen: Jede Zahl hier kommt aus
   // dem `bedingung`-Objekt, das der Server mitschickt.
@@ -4495,6 +4510,13 @@
     if (b.typ === 'kauf') return 'Für '+b.preis.toLocaleString('de-DE')+' Sternenstaub zu kaufen.';
     if (b.typ === 'erfolge') return b.wert+' freigeschaltete Erfolge.';
     if (b.typ === 'bosse') return b.wert+' besiegte Sektor-Bosse.';
+    // Der Tagesriegel gehoert in den Text, sonst raetselt der Spieler, warum sein Zaehler
+    // langsamer steigt als die Zahl der abgewehrten Angriffe. `proTag` haengt der Server beim
+    // Ausliefern des Katalogs an (GET /api/cosmetics) - im KOSMETIK_DEFS-Literal steht es bewusst
+    // nicht, weil zwei Tests dieses Array als reines Literal auswerten. Deshalb der Zweig ohne
+    // proTag: ein aelterer Server (oder ein Testfixture) liefert die Bedingung ohne das Feld, und
+    // dann ist eine erfundene Zahl schlimmer als keine.
+    if (b.typ === 'abgewehrt') return b.wert+' abgewehrte Angriffe.'+(b.proTag ? ' Hoechstens '+b.proTag+' zaehlen je Tag, und je Angreifer nur einer - abgesprochene Angriffe bringen also nichts.' : '');
     return 'Freischaltbedingung unbekannt.';
   }
   // --- Was ein Spieler TRÄGT, gezeichnet ---
