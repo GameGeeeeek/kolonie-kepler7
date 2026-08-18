@@ -711,6 +711,39 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     (`applyOfflineProgress(luecke)` statt `luecke-1`) muss weiterhin mit ~107 % anschlagen,
     während `1c-vorab` grün bleibt.
 
+57. **Eine EINMALZAHLUNG muss in den SPEICHER passen, nicht nur in den Zufluss — und der Speicher
+    ist in beiden Stufen gedeckelt.** Vorfall 18.08.2026 beim Bau der Bastionsmarken: Die
+    Kostentabelle war sauber nach der Messkonvention aus `docs/verteidigung-flotte-konzept.md`
+    kalibriert („ein Posten kostet so viele Sekunden, wie sein knappster Rohstoff braucht") und
+    landete beim Endschritt bei **11,6 Mio Erz**. Gemessen im Browser an einem ambitionierten
+    Endausbau (11 Standorte, Lagerkomplex 45, Kryolager auf der Maximalstufe 15, 500 Frachter)
+    fasst das Basis-Lager aber **803.800**. Die Zahlung war also nicht teuer, sondern um den Faktor
+    100 unbezahlbar; im Browser-Test stand der Kaufknopf grau, und zwar völlig zu Recht.
+    **Die Konvention war nicht falsch — sie beantwortet eine andere Frage.** Sie misst, wie lange
+    man auf eine Menge WARTET. Ob man sie im Moment der Zahlung überhaupt BESITZEN kann, ist eine
+    zweite, unabhängige Schranke: `storageCap()` für Tier 1, `tier2StorageCap()` für Tier 2. Das
+    ist dieselbe Familie wie Regel 41 (Protomaterie), nur mit der anderen Schranke — dort begrenzt
+    der FLUSS, hier der SPEICHER.
+    **Vorgehen für jede neue Einmalzahlung** (Marke, Freischaltung, Mega-Stufe, Shop-Posten):
+    (a) Den größten Einzelposten gegen BEIDE Deckel rechnen, nicht gegen den Zufluss;
+    (b) den Deckel MESSEN statt zu schätzen — er hängt an Gebäudestufen UND an der Frachterflotte
+    (`LAGER_PER_SHIP`), eine Rechnung im Kopf trifft ihn nicht; (c) die Prüfung in den Test
+    aufnehmen (`tests/test_bastionsmarken.js` 4d für Tier 2, 4g/4h für Tier 1, jeweils gegen den
+    größten Schritt beim höchsten Klassenfaktor — beidseitig gegengeprüft: die alte Tabelle lässt
+    beide anschlagen); (d) wenn der Deckel die Menge erdrückt, ist die richtige Antwort **Zeit**,
+    nicht Material — Zeit ist die einzige Größe des Spiels ohne Lagerdeckel.
+
+    **Befund am BESTEHENDEN Spiel, der dabei aufgefallen ist** (gemessen, nicht behauptet, und auf
+    `SHIP_DEFS` gescopt — der erste Anlauf hatte Gebäude mitgegriffen, Regel 39): Bei **40 von 44
+    Schiffsklassen** liegt der Mk-X-Schritt der Werftmarken über diesem gemessenen Deckel — vom
+    Spionagekreuzer (860.000 Erz) bis zum Sternenbanner (17,2 Mio, 21× Lager). Der Deckel ist
+    allerdings **nicht hart**: Jeder Großfrachter trägt +1.000 bei. Für den Jäger fehlen also nur
+    57 weitere Großfrachter, fürs Schlachtschiff 4.701, fürs Sternenbanner 16.397 — der Weg über
+    den Lagerkomplex ist dagegen tot (Stufe 46 kostet 1,9 Mio Erz, Stufe 56 schon 18 Mio). Die
+    obersten Werftmarken der schweren Klassen verlangen damit faktisch eine Frachterflotte, die
+    reiner Lagerraum ist. Das ist eine Balance-Entscheidung und gehört zur Schiffskosten-Reform,
+    nicht in eine stille Korrektur.
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
