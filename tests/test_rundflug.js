@@ -81,6 +81,60 @@ const vrufe = (OHNE_HISTORIE.match(/(?<!function )zeitkritischVorschau\(flotte,/
 check('1h: beide Abschuss-Dialoge nutzen sie', vrufe === 2, { vrufe });
 check('1i: die Vorschau rechnet mit der doppelten Strecke', /missionFuelCostSplit\(dur\*2, flotte\)/.test(OHNE_HISTORIE));
 
+/* ---- 1j) DATENGETRIEBEN ueber ALLE Missionsarten (18.08.2026) -----------------------------
+   Der Anlass: Die Faelle 1a-1d oben sind HANDGEPFLEGT und kannten genau zwei Arten. Beim Entwurf
+   der Asteroidenfestungen fiel ein DRITTER Verstoss auf, den weder dieser Test noch die Hausregel
+   kannte - `asteroid-contest` endete bei `jetzt + (flug/2)*1000`, obwohl `flug` die RUNDREISE ist
+   (die Abbaumission daneben bildet aus derselben Zahl hinBis = flug/2 und endTime = flug + abbau).
+   Die Flotte focht das Schuerfrecht an und stand in derselben Sekunde wieder zu Hause.
+
+   Eine namensbasierte Liste findet nur, woran jemand schon gedacht hat (Arbeitsregel 40). Diese
+   Pruefung kennt deshalb KEINE Namen, sondern das MUSTER: Wer eine Mission anlegt, deren endTime
+   aus einer HALBIERTEN Flugzeit stammt, ist einwegig - und das ist nur fuer die ausdruecklich
+   dafuer gebauten Arten erlaubt. Neue Missionsarten sind damit automatisch abgedeckt.
+
+   Die erlaubten Stellen stehen NAMENTLICH da und nicht als Zahl (Arbeitsregel 33): Verschwindet
+   eine, ist das genauso ein Befund wie eine neue. */
+const EINWEGIG_ERLAUBT = {
+  // Die Schiffe bleiben wirklich am Ziel bzw. sind schon dort - der Rueckweg ist eine EIGENE Mission.
+  'mining-escort':      'Eskorte bleibt am Vorkommen stationiert (Rueckweg: mining-recall)',
+  'mining-recall':      'IST der Rueckweg der Eskorte',
+  'defend-base':        'Schiffe bleiben an der Allianzbasis (Rueckweg: defend-base-return)',
+  'defend-base-return': 'IST der Rueckweg von der Allianzbasis',
+  'relocate':           'Verlegung zwischen eigenen Standorten - die Schiffe bleiben dort',
+  'colonize':           'das Kolonieschiff wird zur Kolonie',
+  'colonize-moon':      'dito, Mondlandung'
+};
+const missionsBloecke = [];
+for (const m of OHNE_HISTORIE.matchAll(/missions\.push\(\{/g)){
+  const seg = OHNE_HISTORIE.slice(m.index, m.index + 900);
+  const typ = /type:\s*'([^']+)'/.exec(seg);
+  const et  = /endTime:\s*([^,\n]+)/.exec(seg);
+  if (typ && et) missionsBloecke.push({ typ: typ[1], endTime: et[1].trim(), hinBis: /hinBis:/.test(seg) });
+}
+check('1j-vorab: die Missionsarten liessen sich aus der Datei lesen',
+  missionsBloecke.length >= 20, { gefunden: missionsBloecke.length });
+// "Halbiert" heisst: /2 oder *500 (die haelfte von *1000) im endTime-Ausdruck.
+const halbiert = b => /\/\s*2\b/.test(b.endTime) || /\*\s*500\b/.test(b.endTime);
+const verdaechtig = missionsBloecke.filter(b => halbiert(b) && !EINWEGIG_ERLAUBT[b.typ]);
+check('1j: keine Missionsart endet bei der halben Flugzeit, ausser den ausdruecklich einwegigen',
+  verdaechtig.length === 0, verdaechtig.map(b => b.typ + ': ' + b.endTime));
+// Gegenrichtung: verschwindet eine erlaubte Stelle, ist das ebenfalls ein Befund.
+const fehlend = Object.keys(EINWEGIG_ERLAUBT).filter(t => !missionsBloecke.some(b => b.typ === t));
+check('1j-gegen: alle als einwegig gefuehrten Arten gibt es noch', fehlend.length === 0, { fehlend });
+// Und die zwei, die es wirklich sind, muessen es auch bleiben.
+for (const t of ['mining-escort', 'mining-recall']){
+  const b = missionsBloecke.find(x => x.typ === t);
+  check('1j-' + t + ': ist weiterhin einwegig gebaut', !!b && halbiert(b), b && b.endTime);
+}
+// Und der Fall, der diese Pruefung ausgeloest hat, namentlich - damit die Regression benannt ist.
+const anfechtung = missionsBloecke.find(b => b.typ === 'asteroid-contest');
+check('1k: die Anfechtung fliegt hin UND zurueck', !!anfechtung && !halbiert(anfechtung),
+  anfechtung && anfechtung.endTime);
+check('1k-treibstoff: und bezahlt beide Strecken',
+  /missionFuelCostSplit\(flug, flotte\)/.test(OHNE_HISTORIE),
+  (OHNE_HISTORIE.match(/missionFuelCostSplit\(flug[^)]*\)/g) || []).slice(0, 4));
+
 // ---- 2-4) im Browser ausgefuehrt ---------------------------------------------------------
 const SAVE_KEY = 'kepler7-save-v3';
 function backend(store){ return async r => {

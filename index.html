@@ -7045,8 +7045,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.567.0';
+  const VERSION = '8.568.0';
   const PATCHNOTES = [
+    { version:'8.568.0', date:'18.08.2026', changes:[
+      '<strong>Behoben: Beim Anfechten eines Schürfrechts fehlte der Rückflug.</strong> Deine Flotte war bisher in dem Moment wieder zu Hause, in dem sie am Vorkommen ankam – die Missionsdauer deckte nur den Hinflug. Jetzt deckt sie <strong>Hin- und Rückflug</strong>, und das Ergebnis des Kampfes steht bei der Heimkehr fest. Die Vorschau nennt beide Wege getrennt („Hinflug · Kampf · Rückflug"), und der Treibstoff wird für die ganze Strecke berechnet.',
+      'Das ist dieselbe Regel, die seit v8.563.0 für das Abfangen von Piraten und den Leerenriss gilt: <strong>Wer eine Flotte losschickt, bekommt sie zu Hause zurück, nicht am Ziel.</strong> Die Anfechtung war die letzte Missionsart, die sich nicht daran hielt – sie ist beim Vorbereiten der Asteroidenfestungen aufgefallen. Anfechtungen dauern damit doppelt so lange wie vorher; dafür stimmt die Anzeige, und eine zurückkehrende Flotte steht nicht schon wieder bereit, während sie rechnerisch noch fliegt.'
+    ]},
     { version:'8.567.0', date:'18.08.2026', changes:[
       '<strong>Neu: Bastionsmarken – deine Verteidigungsanlagen lassen sich jetzt dauerhaft ausbauen.</strong> Jede Anlage hat zehn Stufen; jede gibt <strong>+3% Verteidigungs- und Angriffswert</strong> dieser Anlagenklasse, auf der Endstufe also +27%. Der Schildanteil wächst automatisch mit. Du findest die Zeile auf jeder Verteidigungskarte direkt unter den Kennwert-Balken, sobald du mindestens eine Stufe der Anlage gebaut hast.',
       '<strong>Der eigentliche Hebel ist die Reichweite, nicht der Prozentsatz.</strong> Eine Marke gilt für die ganze Anlagenklasse an <em>allen</em> Standorten – eine Anlagenstufe dagegen nur dort, wo sie steht. Und genau darauf kommt es an: Deine Verteidigung wird je Standort gerechnet, und ein Überfall sucht sich den Standort selbst aus. Wer elf Standorte hat, bekommt den Zuwachs also elfmal.',
@@ -13847,10 +13851,10 @@
     const n = ATTACK_SHIP_KEYS.reduce((s, k) => s + (flotte[k]||0), 0);
     if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
     const flug = missionDurationFor(asteroidFlugBasis(a.system), flotte, ATTACK_SHIP_KEYS, a.system);
-    const fuel = missionFuelCostSplit(flug/2, flotte);
+    const fuel = missionFuelCostSplit(flug, flotte);
     const eskorte = a.eskorte || {};
     const wache = eskorteSchiffssumme(eskorte);
-    let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Anflug ${fmtDuration(flug/2)} · der Kampf wird bei Ankunft ausgefochten</div>`;
+    let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(flug/2)} · Kampf · Rückflug (gesamt ${fmtDuration(flug)})</div>`;
     html += `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Dort steht: <strong>${wache ? wache + ' Schiff(e)' : 'keine Eskorte'}</strong>${wache ? ' – ' + fleetBreakdownHtml(eskorte) : ' – das Recht ist unbewacht'}</div>`;
     // BEWUSST keine Prozentzahl: Die Chance rechnet der SERVER aus Werten, die der Client nur
     // teilweise kennt (Werftmarken, Module des Halters). Eine Zahl hier waere eine Behauptung, die
@@ -13882,8 +13886,24 @@
     const n = ATTACK_SHIP_KEYS.reduce((s, k) => s + (flotte[k]||0), 0);
     if (n < 1){ log('Wähle mindestens ein Kampfschiff für die Anfechtung.', 'ti-alert-triangle'); return; }
     const flug = missionDurationFor(asteroidFlugBasis(a.system), flotte, ATTACK_SHIP_KEYS, a.system);
-    const fuel = missionFuelCostSplit(flug/2, flotte);
-    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für den Anflug: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    /* RUNDFLUG (18.08.2026, Phase 0 des Festungs-Konzepts): `flug` ist die RUNDREISE - genau wie
+       bei der Abbaumission daneben, die daraus hinBis = flug/2 und endTime = flug + abbau bildet.
+       Bis hierher endete die Anfechtung bei flug/2, also im Moment der ANKUNFT: Die Flotte focht
+       das Recht an und stand in derselben Sekunde wieder zu Hause. Der Rueckflug fehlte ersatzlos.
+       Das ist derselbe Fehler, der am 17.08.2026 fuer intercept-pirates und void-rift gefunden und
+       in v8.563.0 behoben wurde - nur war er der DRITTE Fall, den weder die Hausregel noch
+       tests/test_rundflug.js kannten.
+       Die Behebung ist Form A der Regel und nicht das hinBis-Muster: Das Ziel ist ORTSFEST, ein
+       Asteroid laeuft nicht davon. hinBis braucht nur, wessen Ziel eine Frist hat (der Kommentar
+       bei ankunftsKampf sagt das ausdruecklich) - und es haette hier drei Fallen mitgebracht:
+       Der Kartenzeichner kennt hinBis nicht und halbiert stur bei frac>=0.5, test_rundflug
+       verlangt genau zwei ankunftsKampf-Aufrufstellen, und der Ankunfts-Durchgang filtert auf
+       eine Typ-Whitelist statt auf das Vorhandensein von hinBis.
+       Der Treibstoff zahlt jetzt die WIRKLICH geflogene Strecke (flug statt flug/2) - dieselbe
+       Rechnung wie die Abbaumission. Beides zusammen ist eine Balance-Aenderung und steht so im
+       Patchnote: Eine Anfechtung dauert doppelt so lange und kostet doppelt so viel. */
+    const fuel = missionFuelCostSplit(flug, flotte);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für Hin- und Rückflug: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
     pay(fuel);
     const jetzt = Date.now();
@@ -13891,10 +13911,10 @@
     cf.missions.push({
       id: nextMissionId(), type:'asteroid-contest', targetId: sysId + ':' + platz,
       system: sysId, platz: platz, halterName: a.halterName || '', sorte: a.sorte, groesse: a.groesse,
-      startTime: jetzt, endTime: jetzt + (flug/2)*1000,
+      startTime: jetzt, endTime: jetzt + flug*1000,
       fleetName, composition: flotte
     });
-    log(fleetName+' fliegt zum '+asteroidName(a)+', um das Schürfrecht von '+(a.halterName||'unbekannt')+' anzufechten. Ankunft in '+fmtDuration(flug/2)+'.', 'ti-sword');
+    log(fleetName+' fliegt zum '+asteroidName(a)+', um das Schürfrecht von '+(a.halterName||'unbekannt')+' anzufechten. Ankunft in '+fmtDuration(flug/2)+', zurück in '+fmtDuration(flug)+'.', 'ti-sword');
     render(); save();
   }
   // Bei Ankunft: Der Server entscheidet. Erst speichern (er liest die Mission aus dem GESPEICHERTEN
@@ -58988,7 +59008,7 @@
                 <div class="bname"><i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i>${m.fleetName?escapeHtml(m.fleetName)+' · ':''}Anfechtung → ${escapeHtml(asteroidSorte(m.sorte).name)}</div>
                 <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
               </div>
-              <div class="bmeta">${escapeHtml(sysName)} · gegen ${escapeHtml(m.halterName||'unbekannt')} – der Kampf wird bei Ankunft ausgefochten</div>
+              <div class="bmeta">${escapeHtml(sysName)} · gegen ${escapeHtml(m.halterName||'unbekannt')} – Hin- und Rückflug, das Ergebnis steht bei der Rückkehr fest</div>
               <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
             </div>
           `;
