@@ -65,6 +65,34 @@ dass es kein **Modul** hat, nirgends.
 
 ---
 
+## 2a. Das nächste Projekt: Beute, Sets und Instanzen
+
+**Auftrag Sascha, 18.08.2026:** „Findbare Module die zusammen set Bonus geben sowie Dungeons und
+raids mit Belohnungen die es nur dort gibt vielleicht macht es Sinn eine item Struktur einzubauen."
+
+Ausgearbeitet in **`docs/beute-und-instanzen-konzept.md`**. Der Kern der Bestandsaufnahme gehört
+hierher, weil er die Ideenliste an mehreren Stellen berührt:
+
+**Ein großer Teil davon ist bereits gebaut** — `MODULE_SET_DEFS` führt neun Sets, davon fünf
+Boss-Sets mit gestaffelten Stufen (2/3/4 Teile); das Feld `quelle` ist ein fertiges
+**Herkunfts-Schloss**, das Boss- und Unikat-Module aus jedem regulären Fundtopf, jeder Schmiede und
+der Börse heraushält; `ALLIANCE_RAID_BOSSE` führt fünf Raid-Gegner mit eigenen Kampfregeln; und der
+Abgrund ist ein Dungeon mit Mutatoren, Wächtern und zwölf Reliquien samt Satz-Boni.
+
+**Die vier gemessenen Lücken:**
+
+1. `SHIP_MODULE_DEFS` (44 Module) hat **keinen einzigen** Set-Bonus (gemessen: 0 Treffer für
+   `shipModuleSet`/`shipSetBonus`). Das ist die direkteste Umsetzung des Auftrags.
+2. Alle 20 Boss-Set-Teile fallen **ausschließlich** nach einer Allianz-Raid-Welle — solo ist keines
+   davon je erreichbar.
+3. Keine gestufte Schwierigkeit mit eigenem Beutetisch: Ein Boss lässt dieselben Teile fallen,
+   egal wie stark die Allianz ist.
+4. Fünf parallele Gegenstands-Systeme (182 + 44 + 30 + 6 + 12 Einträge) ohne gemeinsame Auskunft.
+   Das Konzept schlägt dafür eine **abgeleitete Beschreibungs-Schicht** vor, ausdrücklich **keinen**
+   Umbau der Speicherform — und sie ist zugleich der Träger für die `desc`-Prüfung aus Abschnitt 8.
+
+---
+
 ## 3. Offene Posten aus den Konzeptdokumenten
 
 Diese stehen bereits ausgearbeitet in `docs/`. Sie gehören hierher, damit die Ideenliste nicht
@@ -161,7 +189,15 @@ den vier gekoppelten. Wer heute auf Wirtschaft spielt, hat **keine** Doktrin, di
 Der **Umschulungsbefehl** (Doktrin-Wechsel als Fundstück) existiert bereits – der Wechsel ist also
 schon bezahlbar gemacht.
 
-### 4.3 Verteidigung: 0 von 102 Erfolgen, 0 von 28 Kosmetikstücken
+### 4.3 Verteidigung: 0 von 102 Erfolgen, 0 von 28 Kosmetikstücken — ausgeliefert
+
+> **Erledigt am 18.08.2026** (Etappe 1, PR #436 im Frontend und #127 im Backend): Bollwerk-Reihe
+> (fünf Erfolge, rückwirkend), zwei Titel, zwei Kosmetikstücke. **Mit einer Korrektur am Befund
+> unten:** `pvpDefended` ist NICHT fälschungssicher — der Server schreibt es zwar, aber in den
+> *Spielstand*, und der ist klientenautoritativ. Für die Erfolge ist das in Ordnung, für eine Farbe
+> in der Bestenliste nicht; sie hängt deshalb an einem neuen, serverseitigen Zähler
+> (`staub.abwehrGesamt`) hinter dem vorhandenen Absprache-Riegel. Die Erfolgszahl steigt damit von
+> 102 auf 107; die Zahlen weiter unten beziehen sich auf den Stand davor.
 
 **Gemessen:**
 - `ACHIEVEMENTS` (Z. 19545) hat **102** Einträge. Zeilen mit Verteidigungsbezug (`pvpDefended`,
