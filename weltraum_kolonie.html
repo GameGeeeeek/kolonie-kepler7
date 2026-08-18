@@ -7019,8 +7019,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.555.0';
+  const VERSION = '8.556.0';
   const PATCHNOTES = [
+    { version:'8.556.0', date:'18.08.2026', changes:[
+      '<strong>Die Veredelungsketten sagen jetzt, WIE stark sie gedrosselt sind und WORAN es liegt.</strong> An einer gebremsten Kette stand bisher nur „Rohstoffe knapp" – das sagte weder, ob sie auf 5 % oder auf 95 % läuft, noch welcher Eingangsstoff fehlt. Jetzt steht dort „+0,0003/s (40 % – zu wenig KI-Kerne)", und der Tooltip erklärt dazu, dass die Kette nicht pausiert, sondern laufend verarbeitet, was ankommt. Der knappste Stoff wird am <em>Verhältnis</em> von Bestand zu Bedarf bestimmt, nicht am kleinsten Bestand: Wovon viel da ist, kann trotzdem das Knappste sein, wenn die Kette viel davon braucht.',
+      'Dieselbe Auskunft steht ab sofort auch auf der Fabrikkarte im Basis-Tab – also genau dort, wo du über den Ausbau entscheidest. Sie warb bisher nur mit dem theoretischen Durchsatz; ein Ausbau bei bestehendem Engpass verschiebt aber nur die Zahl, nicht die Produktion.',
+      '<strong>Die Urmaterie-Schmiede wird mit jedem primordialen Modul teurer.</strong> Das erste kostet unverändert 4 Hohlraumgitter + 3 Kausalanker; danach kommt je 2 gefertigten Modulen ein Gitter dazu und je 3 ein Anker, gedeckelt bei 12 + 9. Der Grund: Der bisherige Festpreis fußte auf einer Rechnung, die nur für eine Hohlraumweberei auf Gesamtstufe 1 stimmt – dort sind vier Gitter tatsächlich rund vierzehn Stunden Produktion, bei Gesamtstufe 15 aber nur noch rund 22 Minuten. Ein fester Preis kann für beide Enden eines Ausbaupfads mit Faktor 165 nicht gleichzeitig stimmen. Der Deckel ist Absicht: Die Schmiede soll teurer werden, nicht unerreichbar.',
+      'Bereits geschmiedete Module bleiben unberührt, und der Zähler überlebt das Prestige – sonst wäre Zurücksetzen ein Weg, dauerhaft den Anfangspreis zu zahlen und die Module trotzdem zu behalten. Beim Aufstieg, der die Module selbst mitnimmt, beginnt auch der Preis wieder von vorn.'
+    ]},
     { version:'8.555.0', date:'17.08.2026', changes:[
       '<strong>Ein verlorener Kampf kostet jetzt wieder etwas: Aus zerstörten Schiffen entsteht deutlich weniger Trümmergut.</strong> Nachgemessen war es bisher so, dass ein Flottenverlust sich praktisch selbst bezahlte – das Trümmerfeld gab rund 55% des Erzes und 86% der Kristalle zurück, die der Nachbau kostete. Unterm Strich kostete eine verlorene Schlacht etwa <em>zwanzig Sekunden</em> Produktion, und ein gut verteidigtes Konto machte mit abgewehrten Überfällen sogar Gewinn. Ab jetzt bleiben rund <strong>ein Fünftel des Erzes und ein Drittel der Kristalle</strong> übrig. Schiffe zu verlieren tut damit wieder weh, ohne dass gleich alles weg ist: Die Rückzugs-Dämpfung bei schweren Niederlagen bleibt unverändert, und wer gewinnt, verliert wie bisher nur 5–15% seiner Flotte.',
       '<strong>Monde entstehen dabei genauso schnell wie vorher.</strong> Sie wachsen aus großen Trümmerfeldern heran – bliebe die nötige Feldgröße unverändert, hätte die kleinere Trümmermenge sie stillschweigend fast dreimal so selten gemacht. Das war nicht beabsichtigt: Die Änderung soll Flottenverluste teurer machen, nicht Monde seltener. Die Schwelle sinkt deshalb im selben Verhältnis mit, von 4.000 auf <strong>1.500 Ressourcen</strong> im Feld. Der Hilfe-Abschnitt „Mondbildung" nennt die neue Zahl.',
@@ -22708,8 +22714,15 @@
     // gemeinsamen Wahrheitsquelle, damit echter Tick und Anzeige-Trockenlauf identisch bleiben.
     const want = totalLevel * def.ratePerLevel * seconds * tier2DurchsatzMult();
     const inMult = gravInputMult(); // effektiver Input je Einheit (<=1)
-    let maxByStock = want;
-    for (const res of Object.keys(def.inputs)) maxByStock = Math.min(maxByStock, (resources[res]||0) / (def.inputs[res]*inMult));
+    // Der ENGPASS wird gleich HIER mitgenommen und nicht spaeter aus den Bestaenden geraten:
+    // Nur an dieser Stelle steht neben jedem Bestand auch der Bedarf je Einheit, und erst ihr
+    // Verhaeltnis entscheidet, welcher Eingangsstoff die Kette wirklich bremst. Der groesste
+    // Bestand kann der knappste Stoff sein (Etappe C des Wirtschafts-Rebalance, 17.08.2026).
+    let maxByStock = want, engpass = null;
+    for (const res of Object.keys(def.inputs)){
+      const moeglich = (resources[res]||0) / (def.inputs[res]*inMult);
+      if (moeglich < maxByStock){ maxByStock = moeglich; engpass = res; }
+    }
     // Bugfix v8.117.0: zusätzlich am freien Lagerplatz deckeln - vorher wurden bei vollem Tier-2-
     // Lager die Inputs weiter verbraucht und der Überschuss verworfen (Rohstoff-Verbrennung).
     // Jetzt pausiert die Fabrik stattdessen, analog zur Basis-Produktion bei vollem Lager
@@ -22721,8 +22734,13 @@
       // und "Lager voll" ist die Auskunft, die dem Spieler sagt, was zu tun ist (ausbauen oder
       // verbrauchen). Der Vergleich läuft gegen `want`, nicht gegen die Basisrate - `want` ist
       // das, was diese Fabrik hier und jetzt schaffen wollte, inklusive aller Boni.
+      // Die AUSLASTUNG als Anteil dessen, was diese Fabrik hier und jetzt schaffen WOLLTE. Sie
+      // ist die eigentliche Auskunft: "gedrosselt" sagt nicht, ob es um 5 % oder 95 % geht - und
+      // genau diese stille Drossel ist der groesste Tier-2-Abnehmer des Spiels, sobald Tier 3
+      // laeuft. Sichtbar gemacht wird sie zur Planungsgroesse statt zum unsichtbaren Zufall.
+      grund.anteil = want > 1e-12 ? Math.max(0, Math.min(1, produced / want)) : 1;
       if (maxBySpace <= maxByStock && maxBySpace < want - 1e-9) grund.art = 'lager';
-      else if (maxByStock < want - 1e-9) grund.art = 'rohstoffe';
+      else if (maxByStock < want - 1e-9){ grund.art = 'rohstoffe'; grund.engpass = engpass; }
       else grund.art = 'voll';
     }
     if (produced <= 0) return 0;
@@ -22753,7 +22771,10 @@
     for (const def of TIER2_DEFS){
       const g = {};
       rates[def.key] = tier2Step(def, sim, 1, g);
-      if (gruende) gruende[def.key] = g.art || 'voll';
+      // Das GANZE Objekt weitergeben (Art, Auslastung, Engpass) statt nur der Art: Die Anzeige
+      // soll den Grund NENNEN koennen, ohne ihn ein zweites Mal aus der Rate herzuleiten - genau
+      // dieser zweite Herleitungsweg lag bis zum 05.08.2026 falsch (Kommentar an tier2Step).
+      if (gruende) gruende[def.key] = { art: g.art || 'voll', anteil: g.anteil, engpass: g.engpass };
     }
     return rates;
   }
@@ -22764,6 +22785,16 @@
     if (v >= 0.1) return v.toFixed(2);
     if (v >= 0.01) return v.toFixed(3);
     return v.toFixed(4);
+  }
+  /* Auslastung als Prozenttext. Drei Faelle, weil zwei nicht reichen: Ein voellig ausgehungerter
+     Betrieb ist ehrlich "0 %", ein Rinnsal unter einem halben Prozent ist "<1 %" - ein pauschales
+     Math.max(1, ...) haette die stehende Kette mit "1 %" beschoenigt (gemessen an einer Kette
+     ohne jede Energie: sie zeigte 1 %, produzierte aber nichts). */
+  function tier2AuslastungText(anteil){
+    const a = Math.max(0, Math.min(1, anteil || 0));
+    if (a <= 0) return '0 %';
+    const pct = Math.round(a * 100);
+    return pct < 1 ? '<1 %' : pct + ' %';
   }
   // Eigene kleine Anzeige-Badges statt Aufnahme in den generischen #resbar-Loop (der geht über
   // RES_DEFS mit gemeinsamem storageCap() für alle Karten - Tier-2-Ressourcen haben eigene, kleinere
@@ -22804,11 +22835,20 @@
       // Der Grund kommt aus tier2Step, wird also nicht mehr aus der Rate geraten. Vorher stand
       // bei einem vollen Lager "Rohstoffe knapp", solange die Fabrik noch den letzten Rest Platz
       // füllte - und das ist der Normalzustand eines vollen Lagers, nicht die Ausnahme.
-      const art = gruende[d.key];
+      const g = gruende[d.key] || {};
+      const art = g.art;
       // Steht die Fabrik wirklich still, ist "+0/s" die klarere Auskunft als "+0.0000/s".
       const rateTxt = eff > 1e-9 ? fmtTier2Rate(eff) : '0';
       if (art === 'lager') return `<div class="rate"><span style="color:#e0a548;">+${rateTxt}/s (Lager voll)</span></div>`;
-      if (art === 'rohstoffe') return `<div class="rate"><span style="color:#e0a548;">+${rateTxt}/s (Rohstoffe knapp)</span></div>`;
+      /* "Rohstoffe knapp" sagte bis hierher nur DASS gedrosselt wird. Jetzt steht daneben, wie
+         stark (Anteil am moeglichen Durchsatz) und WORAN es liegt - der knappste Eingangsstoff
+         kommt aus derselben Rechnung, die auch den echten Tick begrenzt. Die Formulierung
+         "zu wenig <Stoff>" passt bewusst fuer Einzahl wie Mehrzahl ("zu wenig Metamaterial",
+         "zu wenig KI-Kerne"); "<Stoff> fehlen" waere bei der Haelfte der Labels falsches Deutsch. */
+      if (art === 'rohstoffe'){
+        const woran = g.engpass ? ' \u2013 zu wenig ' + resLabel(g.engpass) : '';
+        return `<div class="rate"><span style="color:#e0a548;">+${rateTxt}/s (${tier2AuslastungText(g.anteil)}${woran})</span></div>`;
+      }
       return `<div class="rate">+${fmtTier2Rate(eff)}/s</div>`;
     };
     // Protomaterie gehoert in die Signatur, sonst friert ihre Karte ein, solange sich sonst nichts
@@ -22820,7 +22860,15 @@
     // die Karte wuerde beim Abschluss der Minentechnik also NICHT neu gezeichnet und bliebe
     // ausgegraut stehen, obwohl sie freigeschaltet ist. Genau die Wertlisten-Falle aus CLAUDE.md.
     const sig = (proto ? 'P:'+protoStand+':'+protoDeckel+':'+(protoFrei?1:0)+'|' : '')
-      + visible.map(d => d.key+':'+Math.floor(state.resources[d.key]||0)+':'+tier2StorageCap(d)+':'+fmtTier2Rate(rates[d.key]||0)+':'+((state.resources[d.key]||0) >= tier2StorageCap(d) - 1e-9 ? 1 : 0)).join('|');
+      /* Art, Auslastung und Engpass MUESSEN in die Signatur: Sie stehen ab sofort im Markup, und
+         eine Signatur, die ein angezeigtes Feld nicht kennt, friert genau dieses Feld ein (die
+         Wertlisten-Falle aus CLAUDE.md). Konkret koennen sie sich aendern, ohne dass Bestand,
+         Deckel oder gerundete Rate sich bewegen - z.B. wenn ein zweiter Eingangsstoff zum
+         knappsten wird oder die Auslastung von 41 auf 39 % faellt. */
+      + visible.map(d => { const g = gruende[d.key] || {};
+          return d.key+':'+Math.floor(state.resources[d.key]||0)+':'+tier2StorageCap(d)+':'+fmtTier2Rate(rates[d.key]||0)
+            +':'+((state.resources[d.key]||0) >= tier2StorageCap(d) - 1e-9 ? 1 : 0)
+            +':'+(g.art||'')+':'+Math.round((g.anteil||0)*100)+':'+(g.engpass||''); }).join('|');
     if (sig === lastTier2BadgeSig) return;
     lastTier2BadgeSig = sig;
     const protoVoll = protoStand >= protoDeckel - 1e-9;
@@ -22852,7 +22900,16 @@
       const stock = state.resources[d.key]||0;
       const full = cap > 0 && stock >= cap - 1e-9;
       const fillPct = cap > 0 ? Math.min(100, stock/cap*100) : 0;
-      return `<div class="rescard${full?' t2-full':''}" data-res="${d.key}">
+      /* Der Kurztext in der Zeile hat wenig Platz; die ganze Auskunft steht im Tooltip - inklusive
+         des Satzes, was ein gedrosselter Betrieb bedeutet: Die Kette IST der Dauerabnehmer ihrer
+         Vorstufen, sie holt sich das Material zurueck, sobald welches da ist. */
+      const gT = gruende[d.key] || {};
+      const titel = gT.art === 'rohstoffe'
+        ? 'Die Kette laeuft auf ' + tier2AuslastungText(gT.anteil) + ' ihres moeglichen Durchsatzes.'
+          + (gT.engpass ? ' Knappster Eingangsstoff: ' + resLabel(gT.engpass) + '.' : '')
+          + ' Sie pausiert nicht, sondern verarbeitet laufend so viel, wie ankommt.'
+        : (gT.art === 'lager' ? 'Lager voll - die Fabrik pausiert und verbraucht solange keine Eingangsstoffe.' : '');
+      return `<div class="rescard${full?' t2-full':''}" data-res="${d.key}"${titel?` title="${escapeHtml(titel)}"`:''}>
       <div class="icon-badge" style="background:${d.bg};"><i class="ti ${d.icon}" aria-hidden="true" style="color:${d.fg};"></i></div>
       <div class="rescard-info">
         <div class="label">${d.label}</div>
@@ -25617,15 +25674,53 @@
      Tier-3-Material, nicht in Protomaterie: Die steckt schon in den Baukosten der beiden Fabriken,
      die Hohlraumgitter und Kausalanker ueberhaupt erst herstellen. Ein Protomaterie-Anteil hier
      waere derselbe Rohstoff zweimal berechnet.
-     Die Mengen sind bewusst klein: Die beiden Tier-3-Ketten sind die langsamsten des Spiels
-     (0,0002 bzw. 0,00015 je Stufe und Sekunde). Vier Hohlraumgitter sind bei einer voll
-     ausgebauten Weberei rund vierzehn Stunden Produktion - ein einzelnes Modul ist damit ein
-     Wochenprojekt, und das soll es auch sein. */
-  const PRIMORDIAL_CRAFT_COST = { hohlraumgitter: 4, kausalanker: 3 };
+
+     DER PREIS WAECHST MIT DER ZAHL DER BEREITS GESCHMIEDETEN MODULE (17.08.2026, Etappe C des
+     Wirtschafts-Rebalance). Hier stand vorher, vier Hohlraumgitter seien "bei einer voll
+     ausgebauten Weberei rund vierzehn Stunden Produktion" und ein Modul damit ein Wochenprojekt.
+     Nachgemessen stimmt das nur fuer Weberei-GESAMTstufe 1. Bei Gesamtstufe 15 liefert die Kette
+     15 x 0,0002/s = 0,003/s, vier Gitter sind also rund 22 MINUTEN - die Begruendung lag um
+     Faktor ~38 daneben, und die Kosten fussten auf ihr. Ein fester Preis kann fuer beide Enden
+     des Ausbaupfads nicht gleichzeitig stimmen (der Pfad ist Faktor ~165: 15 Stufen mal 11
+     Standorte). Deshalb steigt er jetzt mit dem eigenen Ausbau mit.
+
+     Gedeckelt wird bewusst: Die Schmiede soll teurer werden, nicht unerreichbar. Beim Deckel
+     kostet ein Modul das Dreifache des ersten - danach bleibt es dabei. */
+  const PRIMORDIAL_CRAFT_BASE = { hohlraumgitter: 4, kausalanker: 3 };
+  const PRIMORDIAL_CRAFT_JE   = { hohlraumgitter: 2, kausalanker: 3 }; // +1 je N bereits gefertigte
+  const PRIMORDIAL_CRAFT_MAX  = { hohlraumgitter: 12, kausalanker: 9 };
+  /* Zaehlgroesse ist state.primordialModulesForged - die Zahl der je geschmiedeten Module, NICHT
+     der Bestand im Inventar. Sonst waere Ausruesten oder Verschmelzen eine Preissenkung. */
+  function primordialCraftCost(){
+    const n = Math.max(0, Math.floor(state.primordialModulesForged || 0));
+    const c = {};
+    /* Fehlende Schrittweite oder fehlender Deckel duerfen NIE NaN ergeben. Gemessen an einer
+       sabotierten Kopie: Traegt jemand eine dritte Ressource nur in BASE ein, lieferte die alte
+       Zeile `Math.min(undefined, ...)` = NaN. Der Schaden waere nicht die falsche Zahl, sondern
+       payPrimordialCraft() - es haette `state.resources[k] -= NaN` geschrieben, und ein NaN im
+       Spielstand laesst den Backend-Sanity-Check den GANZEN Stand mit 400 ablehnen; danach wird
+       gar nichts mehr gespeichert (Vorfall 21.07.2026, siehe CLAUDE.md). Ohne Schrittweite
+       waechst die Ressource also einfach nicht, ohne Deckel wird sie nicht gedeckelt. */
+    for (const k of Object.keys(PRIMORDIAL_CRAFT_BASE)){
+      const je = PRIMORDIAL_CRAFT_JE[k];
+      const roh = PRIMORDIAL_CRAFT_BASE[k] + (je > 0 ? Math.floor(n / je) : 0);
+      const deckel = PRIMORDIAL_CRAFT_MAX[k];
+      c[k] = (typeof deckel === 'number') ? Math.min(deckel, roh) : roh;
+    }
+    return c;
+  }
   function primordialForgeUnlocked(){ return (state.research.rkausalanker||0) >= 1; }
-  function primordialCraftAffordable(){ return Object.entries(PRIMORDIAL_CRAFT_COST).every(([k,v]) => (state.resources[k]||0) >= v); }
-  function payPrimordialCraft(){ for (const [k,v] of Object.entries(PRIMORDIAL_CRAFT_COST)) state.resources[k] -= v; }
-  const primordialCostText = () => Object.entries(PRIMORDIAL_CRAFT_COST).map(([k,v])=>v+' '+resDefFor(k).label).join(' + ');
+  function primordialCraftAffordable(){ return Object.entries(primordialCraftCost()).every(([k,v]) => (state.resources[k]||0) >= v); }
+  function payPrimordialCraft(){ for (const [k,v] of Object.entries(primordialCraftCost())) state.resources[k] -= v; }
+  const primordialCostText = () => Object.entries(primordialCraftCost()).map(([k,v])=>v+' '+resDefFor(k).label).join(' + ');
+  function primordialPreisHinweis(){
+    const jetzt = primordialCraftCost();
+    const amDeckel = Object.keys(PRIMORDIAL_CRAFT_MAX).every(k => jetzt[k] >= PRIMORDIAL_CRAFT_MAX[k]);
+    const n = Math.max(0, Math.floor(state.primordialModulesForged || 0));
+    if (amDeckel) return ' – Höchstpreis erreicht, teurer wird es nicht mehr';
+    return ' – steigt mit jedem gefertigten Modul (bisher ' + n + '), gedeckelt bei '
+      + Object.keys(PRIMORDIAL_CRAFT_MAX).map(k => PRIMORDIAL_CRAFT_MAX[k]+' '+resDefFor(k).label).join(' + ');
+  }
   /* EINE Schmiede-Funktion fuer alle vier Knoepfe (16.08.2026). Vorher standen hier zwei fast
      wortgleiche Funktionen nebeneinander, und der Kommentar in einer davon beschrieb genau den
      Schaden dieser Dopplung: Das Herkunfts-Schloss aus v8.356.0 war "fuer alle vier Schmieden"
@@ -25642,12 +25737,16 @@
     if (quelle === HERKUNFT_ABGRUND){ log('Ausrüstung aus dem Abgrund lässt sich nicht schmieden – sie fällt ausschließlich bei Tauchgängen.', isShip ? 'ti-infinity' : 'ti-pick'); return; }
     if (quelle === HERKUNFT_UNIKAT){ log('Unikate lassen sich nicht schmieden – sie fallen nur bei ihrer Jagd (Weltboss bzw. Wächter).', 'ti-star'); return; }
     if (!plan.bezahlbar()){ log('Nicht genug ' + plan.rohstoffwort + ' für die Fertigung (' + plan.kostenText() + ' benötigt).', 'ti-alert-triangle'); return; }
+    /* Der Kostentext wird VOR dem Bezahlen und VOR dem Zaehlen abgelesen. Seit die Primordial-
+       Kosten mit der Zahl der gefertigten Module steigen, liefert kostenText() nach plan.zaehlen()
+       den NAECHSTEN Preis - die Erfolgsmeldung nannte sonst einen Preis, den niemand bezahlt hat. */
+    const bezahlterPreis = plan.kostenText();
     plan.bezahlen();
     const instKey = def.key + ':' + plan.seltenheit;
     const inv = isShip ? state.shipModules : state.modules;
     inv[instKey] = (inv[instKey] || 0) + 1;
     plan.zaehlen();
-    log(MODULE_RARITY[plan.seltenheit].label + 'es \u201e' + def.name + '\u201c geschmiedet (' + plan.kostenText() + ') - liegt im '
+    log(MODULE_RARITY[plan.seltenheit].label + 'es \u201e' + def.name + '\u201c geschmiedet (' + bezahlterPreis + ') - liegt im '
       + (isShip ? 'Schiffsklassen-Modul-Inventar' : 'Standort-Modul-Inventar') + '.', def.icon);
     playSound('achieve'); checkAchievements(); render(); save();
   }
@@ -29059,6 +29158,13 @@
       // Der Tages-Zaehler der Fragment-Lieferung ueberlebt beide Resets: Ein Prestige, das ihn
       // nullte, waere ein (kleiner, aber unnoetiger) Umweg um das Tageslimit.
       fragmentLieferungen: state.fragmentLieferungen || null,
+      /* Aus demselben Grund wie die Zeile darueber, seit dem 17.08.2026: Der Preis eines
+         primordialen Moduls haengt an diesem Zaehler. Beim PRESTIGE ueberleben die Module selbst
+         (keepModules/keepShipModules) - ein zurueckgesetzter Zaehler waere hier also kein
+         Neuanfang, sondern ein Weg, dauerhaft den Anfangspreis zu zahlen und die Module trotzdem
+         zu behalten. Im Aufstieg-Zweig steht die Zeile bewusst NICHT: Dort gehen die Module mit,
+         also ist der Anfangspreis dort die ehrliche Auskunft. */
+      primordialModulesForged: state.primordialModulesForged || 0,
       autoRepairOn:false, autoReinforceOn:false, expeditionsCompleted:0,
       credits: 250 + prestigeStartLvl*100, claimedBossKills: keepBossClaims,
       referredBy: keepReferredBy, referralRedeemed: keepReferralRedeemed,
@@ -37621,7 +37727,7 @@
       { title:'Kampf-Nachwirkungen (Sieges-Module)', body:'Drei Standort-Module belohnen den <strong>Sieg selbst</strong> statt eines Dauerwerts: <strong>Siegesschmiede</strong> (+Produktion aller Ressourcen), <strong>Kampfrausch-Verstärker</strong> (+Angriffskraft) und <strong>Siegesschirm</strong> (+Verteidigung). Nach jedem gewonnenen <strong>NPC-Kampf</strong> zünden sie einen Schub für <strong>10 Minuten</strong> – als Sieg zählen Angriffe auf Piraten, Fraktionen und Nester, abgewehrte Überfälle, abgefangene Trümmerräuber, geschlossene Leerenrisse, verteidigte Expeditionen, Abgrund- und Weltboss-Gefechte. <strong>Spieler- und Allianzkämpfe lösen nichts aus.</strong> Die Wirkung summiert sich imperiumsweit über alle Standorte, je Art gedeckelt (+25% Produktion, +15% Angriff, +25% Verteidigung). Ein neuer Sieg <em>erneuert</em> den Schub, er stapelt nicht – wer von Kampf zu Kampf zieht, hält ihn dauerhaft aufrecht. Aktive Nachwirkungen stehen als „Sieges-Nachwirkung" in der Effekte-Leiste im Fortschritt-Tab; die Angriffskraft-Nachwirkung wirkt dort wie jeder Angriffs-Effekt auch in PvP-Kämpfen mit, weil der Server aktive Effekte aus dem Spielstand mitrechnet.' },
       { title:'Unikate – benannte Jagdstücke', body:'Drei Standort-Module gibt es nur an je <strong>einem</strong> Ort der Galaxis: Das <strong>Leviathanherz</strong> (Produktion + fester Unikat-Bonus +3% Erfahrung) fällt ausschließlich mit der <strong>Weltboss-Belohnung</strong> – 4% Grundchance, dazu bis zu 10% je nach eigenem Schadensanteil, Top-Schädiger +6% obendrauf. Das <strong>Wächterauge</strong> (Verteidigung + fester Unikat-Bonus +3% Expeditions-Ausbeute) fällt ab <strong>Tiefe 40</strong> mit 7% Chance bei jedem <strong>Wiederholungssieg</strong> über einen Abgrund-Wächter – <strong>zusätzlich</strong> zu dessen garantiertem Modul, nicht an seiner Stelle (der Erstsieg bringt weiter die Reliquie). Die <strong>Korsarenkrone</strong> (Handelsrouten-Ertrag + fester Unikat-Bonus +3% Treibstoff-Ersparnis) fällt mit 15% Chance beim Sieg über den <strong>Piraten-Endboss</strong> – Stufe 10 der Piratenkette –, ebenfalls zusätzlich zu dessen garantiertem Modul. Alle drei kommen immer als <strong>Exotisch mit festem Spitzenwurf (110%)</strong>; der Unikat-Bonus würfelt nie und übersteht jede Werkbank-Aktion. Unikate sind von <strong>Börse und allen Schmieden ausgeschlossen</strong> und liegen nach dem Fund <strong>automatisch gesperrt</strong> im Inventar (ein Klick aufs Schloss entsperrt). Aufwerten samt Durchbruch und der Substat-Reroll funktionieren normal – nur das Hauptwert-Neuschmieden ist gesperrt, denn 110% ist bereits die Bestmarke. Welche Unikate es gibt, welche dir noch fehlen und wo sie liegen, steht im <strong>Galaktischen Kompendium</strong> (Fortschritt-Tab) unter „Unikate" – die vollständige Sammlung gibt dort einmalig Sternenessenz und Kredite, und der Erfolg <strong>„Kronjuwelen"</strong> belohnt sie zusätzlich im Erfolgsregister.' },
       { title:'Werftmarken – zehn Ausbaustufen je Schiffsklasse', body:'Jede Schiffsklasse lässt sich in der <strong>Werft</strong> über zehn Stufen ausbauen. <strong>Mk I</strong> ist der Auslieferungszustand, darüber liegen neun bezahlte Schritte. Eine Marke gilt für die <strong>ganze Klasse</strong> – für jedes Schiff, das du schon hast, und für jedes künftig gebaute. Deshalb sind die Zuwächse bewusst klein. <strong>Und sie richten sich seit dem 01.08.2026 nach der Schiffsfamilie</strong> – vorher bekam jede der 40 Klassen dieselbe Zeile, ein Spähschiff ohne Angriffswert wurde also für „mehr Angriff" aufgerüstet. Je Stufe gilt jetzt: '+shipMarkFamilienText()+'. Der Schwerpunkt jeder Familie ist der Zweig, der zu ihr passt; <strong>gesunken ist dabei nichts</strong> – jeder Wert liegt auf oder über dem vorherigen. Angriff und Schild gelten für alle Klassen mit Kampfwert, <strong>Tempo und Treibstoff für jede der 40 Klassen</strong> – auch Frachter, Aufklärer und die Tiefenflotte haben also etwas davon. <strong>Wichtig beim Tempo:</strong> Die Flugzeit einer Mission bestimmt immer das <strong>langsamste</strong> beteiligte Schiff (wie ein Konvoi) – ein aufgerüsteter Jäger neben einem unaufgerüsteten Kolonieschiff bringt beim Tempo nichts. Wer schneller fliegen will, rüstet gezielt den Bremser auf. <strong>Kosten:</strong> Der Preis richtet sich nach der Bauzeit der Klasse (Bauzeit ÷ 50, gedeckelt bei 20) und steigt je Stufe um rund das 1,6-Fache. Der komplette Weg Mk I → Mk X kostet einen Jäger rund 2,3 Mio Erz, ein Schlachtschiff etwa 14,5 Mio, einen Fusionsdreadnought gut 40 Mio – eine echte Senke für spätes Material. <strong>Ab Mk V kommt auf jeder Stufe eine weitere Tier-2-Ressource dazu</strong>, in der Reihenfolge ihrer eigenen Forschungskette: Nanolegierungen (Mk V), Quantenchips (Mk VI), Hochenergiekristalle (Mk VII), Fusionskerne (Mk VIII), KI-Kerne (Mk IX), Metamaterial (Mk X). Die zugehörige Forschung ist jeweils die Voraussetzung der Stufe – wer ein Schiff auf Mk X bringen will, muss also alle sechs Tier-2-Fabrikketten laufen haben. Der Singularitätskern bleibt bewusst draußen; er ist die Währung der Tiefenflotte. <strong>Die drei obersten Marken verlangen zusätzlich je einen Expeditionsfund</strong>, der sich nicht produzieren lässt: 1x Kristallherz (Mk VIII), 1x Alte Technologie (Mk IX), 1x Resonanzkristall (Mk X). Diese Mengen sind fest und wachsen <em>nicht</em> mit der Klasse – ein Fusionsdreadnought braucht genauso ein Stück wie ein Jäger. Damit hängen die letzten Stufen nicht am Lagerbestand, sondern daran, dass man tatsächlich rausfliegt. <strong>Ein Umbau braucht Zeit</strong>, und die steigt je Stufe um das '+SHIP_MARK_TIME_STEP.toString().replace('.',',')+'-Fache: Mk II ist beim Jäger nach '+fmtDuration(shipMarkDuration('jaeger',2))+' fertig, Mk X dauert '+fmtDuration(shipMarkDuration('jaeger',SHIP_MARK_MAX))+'; der ganze Weg Mk I → Mk X kostet einen Jäger '+shipMarkTotalDurationText('jaeger')+', ein Schlachtschiff '+shipMarkTotalDurationText('schlachtschiff')+', einen Fusionsdreadnought '+shipMarkTotalDurationText('fusionsdreadnought')+'. Die <em>Kosten</em> skalieren voll mit der Klasse, die <em>Zeit</em> nur gedämpft – sonst wäre die Endstufe der schwersten Klassen tagelang blockiert. Es läuft immer nur <strong>ein Umbau gleichzeitig</strong> (wie bei der Forschung), damit die Reihenfolge eine echte Entscheidung bleibt; der Umbau belegt aber <em>keinen</em> der zehn Werftplätze, du kannst also nebenher weiterbauen. Werft-Boni verkürzen ihn genau wie den Schiffsbau – der Bauzeit-Rabatt der Marke selbst allerdings bewusst nicht, eine Stufe soll sich nicht selbst beschleunigen. <strong>Abbrechen geht jederzeit und gibt alles zurück</strong>, Ressourcen wie Expeditionsfund; ein Fehlklick kostet dich nur die bereits verstrichene Zeit. Fällt ein Umbau fertig, während du offline bist, ist er beim nächsten Einloggen erledigt. <strong>Sichtbar</strong> wird jede Stufe auch am Schiff selbst: Blechhaut, Panzerkante, längere Geschützrohre, ein Turm mehr, Sensormast, Systemlichter, stärkerer Antrieb, Silbersaum und zuletzt die goldene Zierlinie mit Bugscheinwerfer. Der Umriss bleibt über alle zehn Marken gleich, damit du deine Flotte weiter auf einen Blick erkennst; die Stufe steht als römische Ziffer auf der Plakette am Schiffssymbol. Marken <strong>überleben das Prestige</strong> (wie Offiziere und Schiffsmodule), und der Server rechnet sie im PvP genauso nach wie die Vorschau – Anzeige und Kampfergebnis bleiben synchron. <strong>Marken zählen im Punktestand mit:</strong> Ein Schiff bringt seine Grundpunkte <em>mal</em> dem Markenzuschlag – auf Mk X also +27%, genau derselbe Anteil, um den es auch stärker ist. Der Punktestand-Tab zeigt die Marke in der Detailzeile mit (z.B. „Jäger (Mk V): 400 × 13,4 = 5.360"), damit die Summe nachrechenbar bleibt, und ein fertiger Umbau erscheint als eigene Zeile im Punkteprotokoll. Der Server rechnet denselben Zuschlag nach – die Bestenliste zeigt also dieselbe Zahl wie dein Spiel. <strong>Im Kampf sind sie ausgewiesen:</strong> Die NPC-Angriffsvorschau nennt die Marken deiner gewählten Flotte samt dem Prozentanteil, den sie an deiner Angriffskraft haben, und jeder Kampfbericht – NPC-Angriff, Spielerangriff, Angriff auf eine Allianzbasis und abgewehrter Überfall – führt sie in einer eigenen Zeile. Der Bericht zeigt dabei den Markenstand <em>zum Zeitpunkt des Kampfes</em>, nicht den heutigen: Eine mit Mk III gewonnene Schlacht bleibt eine Mk-III-Schlacht, auch wenn du danach weiter aufrüstest. Beim abgewehrten Überfall steht dort der Anteil an der <em>Flottenverteidigung</em> statt an der Angriffskraft – dort wirkt die Marke über den Angriffswert <em>und</em> den Schild, der reine Angriffsanteil wäre die falsche Zahl.<br><br><strong>Zivilschiffe haben seit dem 02.08.2026 einen sechsten Zweig: Laderaum.</strong> Der Anlass war ein Missverhältnis – 18 der 39 Schiffsklassen haben gar keinen Angriffswert, für sie waren zwei der fünf Zweige (Angriff, Schild) schlicht tot. Ein Frachter wurde auf dem Weg Mk I bis Mk X zwar schneller und sparsamer, aber <em>nie größer</em>, obwohl Laderaum das Einzige ist, wofür er existiert. Jetzt bringt jede Marke <strong>+4% Ladekapazität</strong>, auf Mk X also +36% – auf den Missions-Frachtraum UND auf den Lager-Beitrag der Frachter (+250/+1000 je Schiff), beides je Klasse getrennt. Das gilt für die beiden Frachterklassen, bei denen es etwas bewirkt – auf einem Späher oder Kolonieschiff wird der Zweig gar nicht erst beworben.' },
-            { title:'Die beiden Schmieden: Mythisch und Primordial', body:'Zwei Seltenheitsstufen fallen nie und lassen sich auch nicht aus Fragmenten fertigen - sie kommen ausschließlich aus einer Schmiede.<br><br><strong>Die Mythische Modulschmiede</strong> (ab <em>Singularitätsphysik</em>) fertigt mythische Module gegen Apex-Ressourcen: ' + mythicCostText() + ' je Stück. Daneben gibt es Mythisch noch aus hochstufigen Allianzmissionen.<br><br><strong>Die Urmaterie-Schmiede</strong> (ab <em>Kausalanker-Theorie</em>) fertigt <strong>primordiale</strong> Module, die höchste Stufe des Spiels: ' + primordialCostText() + ' je Stück. Sie ist der einzige Weg dorthin - kein Fund erreicht sie, und <em>Verschmelzen führt ausdrücklich nicht hin</em>, auch nicht mit drei Exotischen. Wer ein primordiales Modul will, muss die Tier-3-Kette stehen haben, und die hängt am Bergbau: Beide Fabriken kosten Protomaterie, und die gibt es nur an Asteroiden.<br><br>Beide Schmieden respektieren dieselben Sperren wie jeder andere Weg: <strong>Abgrund-Ausrüstung</strong> lässt sich nicht schmieden (sie fällt nur bei Tauchgängen), und <strong>Unikate</strong> auch nicht - die fallen nur bei ihrer jeweiligen Jagd.' },
+            { title:'Die beiden Schmieden: Mythisch und Primordial', body:'Zwei Seltenheitsstufen fallen nie und lassen sich auch nicht aus Fragmenten fertigen - sie kommen ausschließlich aus einer Schmiede.<br><br><strong>Die Mythische Modulschmiede</strong> (ab <em>Singularitätsphysik</em>) fertigt mythische Module gegen Apex-Ressourcen: ' + mythicCostText() + ' je Stück. Daneben gibt es Mythisch noch aus hochstufigen Allianzmissionen.<br><br><strong>Die Urmaterie-Schmiede</strong> (ab <em>Kausalanker-Theorie</em>) fertigt <strong>primordiale</strong> Module, die höchste Stufe des Spiels. <strong>Ihr Preis steigt mit jedem Modul, das du dort geschmiedet hast</strong>: Das erste kostet ' + Object.entries(PRIMORDIAL_CRAFT_BASE).map(([k,v])=>v+' '+resDefFor(k).label).join(' + ') + ', danach kommt je ' + PRIMORDIAL_CRAFT_JE.hohlraumgitter + ' bereits gefertigten Modulen ein ' + resDefFor('hohlraumgitter').label + ' dazu und je ' + PRIMORDIAL_CRAFT_JE.kausalanker + ' ein ' + resDefFor('kausalanker').label + '. Bei ' + PRIMORDIAL_CRAFT_MAX.hohlraumgitter + ' + ' + PRIMORDIAL_CRAFT_MAX.kausalanker + ' ist Schluss - die Schmiede soll teurer werden, nicht unerreichbar. Den jeweils aktuellen Preis nennt die Schmiede selbst. Sie ist der einzige Weg dorthin - kein Fund erreicht sie, und <em>Verschmelzen führt ausdrücklich nicht hin</em>, auch nicht mit drei Exotischen. Wer ein primordiales Modul will, muss die Tier-3-Kette stehen haben, und die hängt am Bergbau: Beide Fabriken kosten Protomaterie, und die gibt es nur an Asteroiden.<br><br>Beide Schmieden respektieren dieselben Sperren wie jeder andere Weg: <strong>Abgrund-Ausrüstung</strong> lässt sich nicht schmieden (sie fällt nur bei Tauchgängen), und <strong>Unikate</strong> auch nicht - die fallen nur bei ihrer jeweiligen Jagd.' },
       { title:'Schiffsklassen-Module (klassenweit)', body:'Ein zweites, komplett getrenntes Modulsystem – wirkt anders als die Standort-Module NICHT ortsgebunden, sondern auf <strong>jedes Schiff einer Klasse</strong>, egal wo in der Flotte es steht. '+SHIP_CLASS_DEFS.length+' Klassen mit eigenen Slots (bis zu 3, und wie bei den Standort-Modulen <strong>je Typ nur eines gleichzeitig</strong> – unabhängig von der Seltenheit): <strong>Schlachtschiffe</strong> (Verbesserte Panzerung: +Verteidigungsbeitrag, Zielcomputer: +Angriffskraft, Schildverstärker: +Schildpunkte, Nachbrenner: +Geschwindigkeit), <strong>Frachter</strong> (Erweiterter Frachtraum: +Kapazität, Treibstoffoptimierung: −Verbrauch, Verbesserte Triebwerke: +Geschwindigkeit, Not-Panzerung: +Verteidigungsbeitrag), <strong>Aufklärungsschiffe</strong> (Langstreckensensoren: +Geschwindigkeit, Tarnmodul: −Treibstoffverbrauch, Verbesserte Scanner: +Verteidigungsbeitrag, Deflektorschild: +Schild), <strong>Mondzerstörer</strong> (Reaktorkern-Upgrade: +Schaden bei Belagerungen, Präzisionslaser: +Erfolgschance – beide wirken serverseitig direkt in der Belagerungs-Auflösung, Verstärkte Hülle: +Verteidigungsbeitrag, Antriebsoptimierung: +Geschwindigkeit, Schildmatrix: +Schild) sowie neu: <strong>Jäger-Geschwader</strong> (Jäger, Hyperjäger, Leerenjäger, Kometenjäger – Leichtbau-Zelle: +Tempo, Staffel-Panzerung: +Verteidigungsbeitrag, Geschwader-Deflektor: +Schild, Effizienz-Düsen: −Treibstoff) und <strong>Schwere Linie</strong> (Kreuzer, Zerstörer, Bomber, Hyperbomber – Komposit-Panzerung, Schildgitter-Projektor, Marschtriebwerke, Hochdruck-Treibstoffzellen). Dazu die Klasse <strong>Tier-2-Schiffe</strong> mit Sondermodulen aus der <strong>Tier-2-Modulfertigung</strong> (Nanophasen-Antrieb, Quantenfeld-Kondensator, Kristallmatrix-Hülle, Metamaterial-Panzerplatte, Singularitäts-Fokusarray: +14% Angriffskraft der Tier-2-Schiffe – wirkt in Vorschau UND server-entschiedenem PvP). Kampfmodule (Zielcomputer, Reaktorkern, Fokusarray) liest der Server direkt aus deinem Spielstand – Vorschau und echter Kampf bleiben synchron. <strong>Bezugsquellen:</strong> Schiffsklassen-Blaupause (3500 Kr., bis Selten), Elite-Blaupause (14000 Kr., bis Legendär), Allianzmissionen (bis Mythisch), Mythische Modulschmiede (Apex-Ressourcen). Auch hier gilt die <strong>Modul-Schmelze</strong>: 3 gleiche verschmelzen (Stufe und Substats des <em>angeklickten</em> Moduls bleiben erhalten, der beste Hauptwert-Wurf der drei zählt), überzählige zerlegen, aus Fragmenten Wunschmodule fertigen (außer Tier-2-Sondermodule – die haben ihre eigene Fertigung). Verwaltung im Offiziere-Tab, unterhalb der Standort-Module. <strong>Synergien:</strong> Sechs benannte Modul-Kombinationen über die Klassen hinweg (z.B. Konvoi-Doktrin: Verbesserte Triebwerke + Langstreckensensoren) geben zusätzliche Boni, sobald beide Teile eingebaut sind – ausschließlich Tempo, Treibstoff-Ersparnis und Frachtraum, nie Kampfwerte (die liest der Server direkt, eine Client-Zulage dort wäre eine leere Behauptung). Aktive Synergien stehen grün über der Klassen-Auswahl, fast fertige nennen das fehlende Teil. <strong>Ausrüstungs-Vorlagen:</strong> auch je Schiffsklasse drei speicherbare Profile (A/B/C) mit 1-Klick-Wechsel und automatischem Namen aus der Modul-Zusammensetzung (z.B. „Verteidigung"/„Logistik"/„Abgrund") – samt <strong>Wechselvorschau</strong> unter jeder gespeicherten Vorlage: welche Klassen-Boni sich beim Anwenden ändern würden („vorher → nachher", grün = mehr, orange = weniger, die größten Änderungen zuerst), gerechnet mit derselben Bonus-Funktion wie das Spiel inklusive Substats und Synergien; inzwischen verschmolzene oder zerlegte Module weist sie als „nicht mehr im Besitz" aus.' }
     ]},
     // Eigener Abschnitt (v8.326.0). Vorher stand der gesamte Abgrund als EIN Absatz mit 581 Woertern
@@ -56996,6 +57102,19 @@
         const rateNext = totalNext*t2def.ratePerLevel*t2Durchsatz;
         const inputsText = rate => Object.entries(t2def.inputs).map(([res,amt]) => `${fmtTier2Rate(rate*amt*t2InMult)} ${resLabel(res)}/s`).join(', ');
         prodLine = `Produktion: +${fmtTier2Rate(rateNow)}/s ${t2def.label} → <span style="color:#5dcaa5;">+${fmtTier2Rate(rateNext)}/s</span> nach Ausbau (imperiumsweit) · Verbraucht dafür: ${inputsText(rateNow)} → <span style="color:#5dcaa5;">${inputsText(rateNext)}</span>`;
+        /* Die Zeile darueber ist der THEORETISCHE Durchsatz. Steht die Kette gerade unter ihrer
+           Moeglichkeit, gehoert das genau hierhin - hier entscheidet der Spieler ueber den Ausbau,
+           und ein Ausbau bei bestehendem Engpass verschiebt nur die Zahl, nicht die Produktion.
+           Der Grund kommt aus derselben Rechnung wie der echte Tick (tier2Step), nicht aus einer
+           zweiten Herleitung. */
+        if (totalNow > 0){
+          const gF = {}; tier2Step(t2def, Object.assign({}, state.resources), 1, gF);
+          if (gF.art === 'rohstoffe')
+            prodLine += ` · <span style="color:#e0a548;">Läuft derzeit auf ${tier2AuslastungText(gF.anteil)}`
+              + (gF.engpass ? ` – zu wenig ${resLabel(gF.engpass)}` : '') + `</span>`;
+          else if (gF.art === 'lager')
+            prodLine += ` · <span style="color:#e0a548;">Lager voll – die Fabrik pausiert</span>`;
+        }
       } else if (def.key==='hochsicherheitslager'){
         const hsNow = allBuildingSets().reduce((a,b)=>a+(b.hochsicherheitslager||0),0);
         const hsNext = hsNow - lvl + (lvl+qty);
@@ -59346,7 +59465,7 @@
           const affP = primordialCraftAffordable();
           const pc = MODULE_RARITY.primordial.color;
           html += `<div class="section-title" style="margin-top:1rem; font-size:13px;"><i class="ti ti-box" aria-hidden="true" style="color:${pc};"></i>Urmaterie-Schmiede</div>`;
-          html += `<div class="bmeta" style="margin-bottom:6px;">Fertige <strong>primordiale</strong> Standort-Module – die höchste Stufe des Spiels (+${Math.round((MODULE_RARITY.primordial.mult-1)*100)}% Wirkung). Kosten je Modul: ${primordialCostText()}. Sie entstehen <em>nur</em> hier: weder ein Fund noch das Verschmelzen von drei Exotischen führt dorthin.</div>`;
+          html += `<div class="bmeta" style="margin-bottom:6px;">Fertige <strong>primordiale</strong> Standort-Module – die höchste Stufe des Spiels (+${Math.round((MODULE_RARITY.primordial.mult-1)*100)}% Wirkung). Kosten für das nächste: ${primordialCostText()}${primordialPreisHinweis()}. Sie entstehen <em>nur</em> hier: weder ein Fund noch das Verschmelzen von drei Exotischen führt dorthin.</div>`;
           html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + fundPool(MODULE_DEFS).map(def => `<button data-craft-primordial-loc="${def.key}" ${affP?'':'disabled'} style="font-size:10px; padding:5px 9px; border-color:${pc}66;${affP?' color:'+pc+';':''}"><i class="ti ${def.icon}" aria-hidden="true" style="margin-right:3px;"></i>${def.name}</button>`).join('') + `</div>`;
         }
         // Modul-Schmelze: Fragment-Vorrat + gezielte Wunschmodul-Fertigung (deterministischer
@@ -59601,7 +59720,7 @@
               const affP = primordialCraftAffordable();
               const pc = MODULE_RARITY.primordial.color;
               html += `<div class="section-title" style="margin-top:1rem; font-size:13px;"><i class="ti ti-box" aria-hidden="true" style="color:${pc};"></i>Urmaterie-Schmiede (${klasse})</div>`;
-              html += `<div class="bmeta" style="margin-bottom:6px;">Fertige <strong>primordiale</strong> Module dieser Klasse – die höchste Stufe des Spiels (+${Math.round((MODULE_RARITY.primordial.mult-1)*100)}% Wirkung). Kosten je Modul: ${primordialCostText()}.</div>`;
+              html += `<div class="bmeta" style="margin-bottom:6px;">Fertige <strong>primordiale</strong> Module dieser Klasse – die höchste Stufe des Spiels (+${Math.round((MODULE_RARITY.primordial.mult-1)*100)}% Wirkung). Kosten für das nächste: ${primordialCostText()}${primordialPreisHinweis()}.</div>`;
               html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + classMods.map(def => `<button data-craft-primordial-ship="${def.key}" ${affP?'':'disabled'} style="font-size:10px; padding:5px 9px; border-color:${pc}66;${affP?' color:'+pc+';':''}"><i class="ti ${def.icon}" aria-hidden="true" style="margin-right:3px;"></i>${def.name}</button>`).join('') + `</div>`;
             }
           }
