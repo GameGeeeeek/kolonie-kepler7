@@ -44,7 +44,12 @@ function schnitt(text, von, bis, ohneEnde){
   const tab = schnitt(src, 'const WORLDBOSS_ARCHETYPEN = [', '\n  ];');
   check('1: der angreifbare Weltboss hat eine Archetypen-Tabelle', tab.length > 200);
   const arten = [...tab.matchAll(/key:'(\w+)'/g)].map(m => m[1]);
-  check('1: vier Archetypen', arten.length === 4, arten);
+  // Bewusst KEINE feste Anzahl mehr (frueher: === 4). Eine Zahl im Test ist eine Momentaufnahme -
+  // sie schlaegt an, sobald ein Archetyp dazukommt, obwohl die geprueften Eigenschaften weiter
+  // gelten (CLAUDE.md, Arbeitsregel 3). Geprueft wird stattdessen, was wirklich gelten MUSS:
+  // mindestens die vier Gruender, keine Doppelung, und jeder Eintrag mit eigenen Kampfwerten.
+  check('1: die Archetypen-Tabelle hat mindestens die vier Gruender', arten.length >= 4, arten);
+  check('1: kein Archetyp-Schluessel doppelt', new Set(arten).size === arten.length, arten);
   const namen = schnitt(src, 'const WORLDBOSS_NAMEN = [', '];');
   check('1: fünf Namen', (namen.match(/'/g) || []).length / 2 === 5, namen);
   // Die alte, feste Benennung darf nicht zurückkehren.
@@ -57,8 +62,12 @@ function schnitt(text, von, bis, ohneEnde){
     /function worldBossHpFor\(level\)\{ return Math\.round\(WORLDBOSS_BASE_HP \* Math\.pow\(1\.6, Math\.max\(0, level-1\)\)\); \}/.test(src));
   // Ableitung aus der Stufe statt Zufall - sonst könnten zwei Clients denselben Boss verschieden
   // benennen und sich gegenseitig überschreiben (der Boss lebt im geteilten Speicher).
+  // Frueher stand hier die Modulo-Formel als woertlicher Regex. Das war zu eng: Die Ableitung laeuft
+  // seit dem fuenften Archetyp ueber eine Reihenfolge-Tabelle, die Formel sieht also anders aus -
+  // die gepruefte EIGENSCHAFT ("aus der Stufe, nicht gewuerfelt") gilt unveraendert. Geprueft wird
+  // sie jetzt am Verhalten und daran, dass in der Ableitung keine Zufallsquelle steht.
   check('1: Name und Archetyp werden aus der Stufe abgeleitet, nicht gewürfelt',
-    /WORLDBOSS_ARCHETYPEN\[\(Math\.max\(1, level\|0\) - 1\) % WORLDBOSS_ARCHETYPEN\.length\]/.test(src)
+    !/Math\.random/.test(schnitt(src, 'function worldBossArchetype(level)', '\n  const WORLDBOSS_SCHWAECHE', true))
     && !/WORLDBOSS_NAMEN\[Math\.floor\(Math\.random/.test(src));
   // Die Schwäche muss VOR dem Angriff sichtbar sein - vorher stand sie nur im Backend.
   check('1: die Trefferschwäche ist im Frontend gespiegelt und wird angezeigt',
@@ -68,22 +77,62 @@ function schnitt(text, von, bis, ohneEnde){
     const beTab = schnitt(be, 'const WORLDBOSS_ARCHETYPES_PLAYABLE = [', '\n];');
     check('1: Backend hat die Archetypen des ANGREIFBAREN Bosses', beTab.length > 100);
     // Die eigentliche Prüfung: gleiche Zahlen, Stufe für Stufe, über einen ganzen Zyklus hinaus.
-    const feCtx = {}; new Function('ctx', schnitt(src, 'const WORLDBOSS_ARCHETYPEN = [', '\n  ];')
-      + '\n' + schnitt(src, 'function worldBossArchetype(level){', '\n') + ';ctx.f=worldBossArchetype;')(feCtx);
-    const beCtx = {}; new Function('ctx', beTab
-      + '\n' + schnitt(be, 'function worldBossArchetypeOf(level)', '\n') + ';ctx.f=worldBossArchetypeOf;')(beCtx);
+    // Geschnitten wird bis zur NAECHSTEN Konstante, nicht bis zum ersten Zeilenumbruch: Die
+    // Ableitungsfunktion ist mehrzeilig, seit die Reihenfolge in einer eigenen Tabelle steht, und
+    // ein Schnitt bis '\n' haette nur ihre erste Zeile erwischt.
+    const feBlock = schnitt(src, 'const WORLDBOSS_ARCHETYPEN = [', '\n  const WORLDBOSS_SCHWAECHE', true);
+    const beBlock = schnitt(be, 'const WORLDBOSS_ARCHETYPES_PLAYABLE = [', '\nfunction fleetHasShipType', true);
+    check('1-bau: beide Archetyp-Bloecke liessen sich schneiden', feBlock.length > 300 && beBlock.length > 200,
+      { fe: feBlock.length, be: beBlock.length });
+    // Der Aufbau der Messvorrichtung ist eine eigene, benannte Pruefung: Wirft new Function hier,
+    // bricht sonst der ganze Test ab und die restlichen Pruefungen laufen NIE - ein roter Exit sieht
+    // dann aus wie eine gelungene Gegenprobe, obwohl niemand gesehen hat, was die anderen gesagt
+    // haetten (CLAUDE.md, Arbeitsregel 34).
+    let feCtx = {}, beCtx = {}, baufehler = '';
+    try {
+      new Function('ctx', feBlock + '\n;ctx.f=worldBossArchetype;ctx.t=WORLDBOSS_ARCHETYPEN;')(feCtx);
+      new Function('ctx', beBlock + '\n;ctx.f=worldBossArchetypeOf;')(beCtx);
+    } catch (e) { baufehler = String(e && e.message || e); }
+    check('1-bau: beide Bloecke lassen sich ausführen', !baufehler && !!feCtx.f && !!beCtx.f, baufehler);
     const abweichung = [];
-    for (let lvl = 1; lvl <= 25; lvl++){
+    for (let lvl = 1; baufehler === '' && lvl <= 60; lvl++){
       const a = feCtx.f(lvl), b = beCtx.f(lvl);
       if (a.key !== b.key || a.schwaecheMult !== b.schwaecheMult || a.verlustMult !== b.verlustMult){
         abweichung.push({ lvl, frontend:[a.key,a.schwaecheMult,a.verlustMult], backend:[b.key,b.schwaecheMult,b.verlustMult] });
       }
     }
-    check('1: Frontend und Backend ergeben für jede Stufe 1-25 denselben Archetyp und dieselben Faktoren',
-      abweichung.length === 0, abweichung.slice(0,3));
-    // Gegenbeweis, dass die Schleife etwas messen kann: die vier Archetypen müssen sich unterscheiden.
-    const verschieden = new Set([1,2,3,4].map(l => feCtx.f(l).schwaecheMult + '/' + feCtx.f(l).verlustMult));
-    check('1: die vier Archetypen unterscheiden sich wirklich voneinander', verschieden.size === 4, [...verschieden]);
+    check('1: Frontend und Backend ergeben für jede Stufe 1-60 denselben Archetyp und dieselben Faktoren',
+      !baufehler && abweichung.length === 0, abweichung.slice(0,3));
+    // Gegenbeweis, dass die Schleife etwas messen kann: die Archetypen müssen sich unterscheiden.
+    const gezeigt = baufehler ? [] : Array.from({length:40}, (_,i) => feCtx.f(i+1).key);
+    const verschieden = new Set(gezeigt.map(k => {
+      const a = (feCtx.t || []).find(x => x.key === k); return a ? a.schwaecheMult + '/' + a.verlustMult : k;
+    }));
+    check('1: die Archetypen unterscheiden sich wirklich voneinander', verschieden.size === new Set(gezeigt).size,
+      [...verschieden]);
+    // JEDER Eintrag der Tabelle muss auch wirklich vorkommen. Ohne diese Prüfung könnte ein
+    // Archetyp in der Tabelle stehen, ohne dass ihn je ein Spieler zu sehen bekommt - toter Inhalt,
+    // der keinen Test reißt.
+    check('1: jeder Archetyp der Tabelle kommt im Stufenlauf auch vor',
+      !baufehler && arten.every(k => gezeigt.includes(k)),
+      { fehlend: arten.filter(k => !gezeigt.includes(k)) });
+    // DIE Eigenschaft, die der fünfte Archetyp beinahe zerstört hätte: Name (% 5) und Archetyp
+    // laufen unabhängig, die KOMBINATION wiederholt sich erst nach 20 Stufen - genau das versprechen
+    // Patchnote v8.211.0 und der Hilfe-Abschnitt. Wäre die Reihenfolge einfach die Tabelle selbst,
+    // fielen beide Perioden auf 5 zusammen und die Abwechslung bräche auf ein Viertel ein.
+    const paar = l => feCtx.f(l).key + '@' + ((l - 1) % 5);
+    let ersteWiederholung = 0;
+    for (let n = 1; n <= 40 && !ersteWiederholung; n++){
+      let gleich = true;
+      for (let l = 1; l <= 20 && gleich; l++) if (paar(l) !== paar(l + n)) gleich = false;
+      if (gleich) ersteWiederholung = n;
+    }
+    // MINDESTENS 20, nicht genau 20: Ein sechster Archetyp mit passender Folge würde den Zyklus
+    // verlängern - das wäre eine Verbesserung, und ein Test, der darauf anschlägt, wäre ein
+    // Falschalarm gegen die eigene Absicht. Ein Wert von 0 heißt "keine Wiederholung im geprüften
+    // Fenster gefunden" und ist ebenfalls in Ordnung.
+    check('1: Bossname und Archetyp wiederholen sich als Paar frühestens nach 20 Stufen',
+      !baufehler && (ersteWiederholung === 0 || ersteWiederholung >= 20), { ersteWiederholung });
     check('1: der Server wendet den Archetyp-Faktor auf den Schwächen-Bonus an',
       /power \*= worldBossArchetypeOf\(bossLevel\)\.schwaecheMult/.test(be));
     check('1: ... und auf die Verlustquote, mit dem alten 50%-Deckel davor',
