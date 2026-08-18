@@ -970,6 +970,33 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     CSS-Bezugsfarbe GIBT, ist eine absolute, begründete Schranke ehrlicher als ein Differenzwert
     gegen Nichts – und die Vorab-Prüfung hält fest, dass die Fläche wirklich transparent ist, damit
     die Wahl nachvollziehbar bleibt.
+59. **Ein Schlüssel kann ein zweites Mal in DERSELBEN Tabelle stehen – als Rückverweis.** Vorfall
+    18.08.2026 (TX-1): Der Ersetzer suchte die Zeile einer Forschung über
+    `zeile.includes("key:'rmodultechnik'")` und fand ZWEI. Die zweite war der Nachbareintrag
+    `rmodulslots`, der `requires:[{key:'rmodultechnik',level:5}]` trägt – und der hat selbst ein
+    `desc:'`, hätte also ohne die `count !== 1`-Wache (Hausregel 16) den Text der falschen
+    Forschung bekommen. Das ist Regel 39 eine Ebene tiefer: dort eine zweite TABELLE mit demselben
+    Schlüssel, hier ein Rückverweis INNERHALB der Tabelle, den kein Scoping auf den Tabellenblock
+    findet. **Vorgehen:** Den Schlüssel am EINTRAGSANFANG verankern (`/^\s*\{ ?key:'X',/`), nie
+    irgendwo in der Zeile suchen. Und die Wache ist der Grund, warum es auffiel – ein Ersetzer ohne
+    Trefferzahl-Prüfung hätte still den Nachbartext überschrieben, und `node --check` wäre grün
+    geblieben, weil ein falscher Text syntaktisch einwandfrei ist.
+60. **Wer Anzeigetexte umschreibt, muss vorher wissen, welche ZAHL welcher Test aus ihnen liest –
+    und dass manche Prüfung eine SCHREIBWEISE festnagelt statt einer Regel.** Aus derselben Etappe,
+    drei Befunde in einem Durchgang: (a) `rsingularitaet` muss jedes daran hängende Tor benennen,
+    inklusive der „neun Tiefenschiffe" mit der HEUTIGEN Zahl als Zahlwort
+    (`test_forschungsmeilensteine` 5b, bewusst streng, damit beim zehnten Schiff nicht weiter
+    „neun" durchgeht) – beim Kürzen war sie mit rausgeflogen; (b) `autonomiekern` muss neben den
+    Konstanten (45 Minuten, +6 Stunden, 8 Stufen) auch das ABGELEITETE Gesamtfenster „14 Stunden"
+    nennen, also genau die Zahl, die der Spieler sonst selbst ausrechnen müsste; (c)
+    `test_levelfortschritt` verlangt die Wortfolge „8 summierten Stufen" – das ist eine
+    Momentaufnahme im Sinne von Regel 3 und blockiert eine Umformulierung. **Die Entscheidung dazu
+    gehört zur Regel:** Der Text wurde an die Wortfolge angepasst, NICHT die Prüfung gelockert. Eine
+    Etappe, die Texte umschreibt, darf nicht nebenbei die Wächter aufweichen, die genau diese Texte
+    bewachen – sonst ist am Ende weder der Text noch die Prüfung belegt (Regel 26 in der
+    Anwendung). Gefunden hat alle drei der Betroffenheits-Durchgang VOR dem vollen Lauf
+    (`grep -ln "RESEARCH_DEFS\|BUILDING_DEFS\|effectDesc" tests/*.js`, dann jeden Treffer einzeln),
+    Kosten zwei Minuten statt zweier 25-Minuten-Läufe – Regel 40 zum zweiten Mal bestätigt.
 
 ## Icon-Font ist ein SUBSET (seit v8.296.0)
 
@@ -1307,7 +1334,68 @@ schon ein fünftes Schlüssel-Segment „genau die Fehlerklasse aus dem Schmelze
 Vorgeschlagen ist stattdessen eine **abgeleitete Beschreibungs-Schicht** über die fünf Listen
 (key/name/icon/art/seltenheit/herkunft/desc) — sie liest sie, statt eine sechste Liste zu führen,
 und trägt zugleich die automatische `desc`-Prüfung, die Hausregel 7 bisher von Hand absichert.
+## Beschreibungstexte: was gekürzt wird und was nie (TX-Etappen, ab 18.08.2026)
 
+Auftrag Sascha: „alle texte von gebäuden schiffen forschung etc überarbeiten teilweise zu viele
+infos und man merkt das es ki inhalt ist". Gemessener Ausgangsstand, block-gescopt gelesen (nicht
+per loser Regex – ein erster Anlauf zählte Schiffe zu den Gebäuden):
+
+| Tabelle | Texte | Median | max | über 250 |
+|---|---|---|---|---|
+| `MODULE_DEFS.desc` | 47 | 262 | 612 | 30 |
+| `RESEARCH_DEFS.desc` | 53 | 205 | 630 | 16 |
+| `SHIP_MODULE_DEFS.desc` | 44 | 108 | 446 | 10 |
+| `SHIP_DEFS.desc` | 9 | 264 | 369 | 5 |
+| `BUILDING_DEFS.effectDesc` | 46 | 26 | 435 | 5 |
+
+**Die vier Muster, an denen der KI-Duktus hängt** – und nur die fliegen raus: (1) Selbstlob und
+Einordnung statt Information („Das Tor zum Endspiel", „Der Abschluss der Verarbeitungskette");
+(2) Entwickler-Historie im Spielertext („zählen seit dem 17.07.2026 mit", „war bisher ausschließlich
+über das Goldrausch-Event erreichbar"); (3) Klammern in Klammern und nachgeschobene Halbsätze mit
+Gedankenstrich; (4) Erklärungen zweiter Ordnung – was die Forschung freischaltet, was daran
+wiederum hängt, und was ohne sie alles verschlossen bleibt.
+
+**Was unangetastet bleibt: jede Zahl.** Mehrere Tests lesen Werte aus diesen Texten und vergleichen
+sie gegen die Konstanten (`test_forschungstexte` gegen `effectPerLevel`/`maxLevel`,
+`test_levelfortschritt` gegen das Offline-Fenster, `test_forschungsmeilensteine` gegen die Zahl der
+Tiefenschiffe). Auch ABGELEITETE Zahlen bleiben – das Gesamtfenster „14 Stunden" ist 8 + 6, und
+genau deshalb steht es da: Der Spieler soll es nicht selbst ausrechnen müssen. Ebenso bleibt die
+Mindestlänge von 50 Zeichen gewahrt (Spieler-Report 22.07.2026: ein Kürzel las sich wie eine
+fehlende Beschreibung).
+
+**Stand der Etappen:**
+- **TX-1** (v8.570.0): 14 Forschungs-`desc` und 4 Gebäude-`effectDesc`, zusammen 6.412 → 3.821
+  Zeichen. Danach stehen in `RESEARCH_DEFS` nur noch zwei Texte über 250 Zeichen (`rewig_prod`,
+  `rewig_lager`) – beide lang, weil sie echte Zahlenreihen nennen, und deshalb unverändert.
+  **`rflottenkoord` ist die Ausnahme, die die Regel zeigt:** Der Text bleibt mit ~520 Zeichen lang,
+  weil DREI Tests je eine eigene Zusage daraus einfordern – „Parallelkommando"
+  (`test_faehigkeitsbaum` 4b), „Recycler-Gruppe" (`test_recycler_sammelauftrag` 5), die
+  Verlegungs-Aussage samt Verband-Ausnahme (`test_pvp_bericht`). Der erste, kurze Entwurf hatte alle
+  vier weggekürzt und genau diese drei Tests gerissen. Länge ist hier kein Ballast, sondern vier
+  belegte Zusagen; gestrichen wurde nur, was nichts zusagt.
+  **Ein Zielkonflikt musste dabei zugunsten des Auftrags entschieden werden.** `test_pvp_bericht`
+  verlangte wörtlich „Flottenverlegungen zwischen eigenen Planeten zählen **seit dem 17.07.2026**
+  mit" – ein Auslieferungsdatum im SPIELERTEXT, also Muster 2. Bequem wäre gewesen, es stehen zu
+  lassen. Stattdessen ist das Datum aus BEIDEN Fundorten raus (Forschungsbeschreibung und
+  HELP_SECTIONS – ein Fundort allein hätte zwei Anzeigestellen mit unterschiedlicher Aussage
+  ergeben, Punkt 6), und im Test ist das Datum im Muster **optional**
+  (`zählen (?:seit dem \d{2}\.\d{2}\.\d{4} )?mit`). Die geprüften Eigenschaften sind unverändert:
+  beide Stellen müssen die Aussage tragen (Gegenprobe gefahren – mit einer entfernten Aussage meldet
+  der Test `beide Stellen sagen jetzt das Richtige | 1`), die alte Falschaussage „zählen nicht mit"
+  trifft das Muster nachweislich NICHT (gemessen 0), und die datierte Altform würde weiterhin
+  akzeptiert (gemessen 1). **Das ist der Unterschied zwischen einer festgenagelten SCHREIBWEISE
+  lösen und eine Prüfung aufweichen** – Regel 3 gegen Regel 26, und hier lag der Fall auf der Seite
+  von Regel 3.
+- **`SHIP_DEFS` bleibt unverändert.** Hier stand zwischenzeitlich, die Tabelle habe gar kein
+  `desc` – das war eine zu enge Prüfung (angesehen wurde nur der ERSTE Eintrag). Die neun
+  Tiefenschiffe haben eines, `test_schiffstexte.js` existiert eigens dafür, dass es auch gerendert
+  wird, und alle neun Texte nennen Wirkung, Grenze und Gegenbeispiel, ohne eines der vier Muster
+  zu tragen (Regel 32 in der Gegenrichtung: ein zu Unrecht verworfener Fund fällt nie wieder auf).
+- **TX-2** (offen): `MODULE_DEFS`. Größter Block, und mit einem eigenen Duktus-Fehler, den die
+  Forschungstexte nicht haben – die Unikat-Bausteine stehen wortgleich in mehreren Einträgen
+  („würfelt nie und übersteht jede Werkbank-Aktion" 5×, „Kommt immer als Exotisch mit festem
+  Spitzenwurf" 3×). 14 Tests lesen aus diesen Texten; bewusst eine eigene Etappe, weil 47
+  Umschreibungen in einem Zug einen Fehlschlag ergäben, der nichts eingrenzt.
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
