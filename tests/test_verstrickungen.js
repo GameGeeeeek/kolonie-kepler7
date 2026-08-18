@@ -24,7 +24,7 @@
 // Dazu der FRONTEND/BACKEND-GLEICHSTAND: Zwei der Verbindungen (Legion-Bündnis, Doktrin-Synergie)
 // und der Aufklärungsvorteil werden im PvP vom Server nachgerechnet. Genau dafür gibt es in
 // CLAUDE.md den Fallstrick "Backend hat teils eigene Kopien von Frontend-Formeln".
-const { starteBrowser, SPIELDATEI, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, SPIELDATEI, SPIEL_URL, SERVER_JS } = require('./lib/umgebung');
 const fs = require('fs');
 const path = require('path');
 
@@ -122,6 +122,12 @@ function doktrin(key, rollen){
   )(ctx, { doctrine: key }, r => rollen.includes(r));
   return ctx;
 }
+// Die Paarliste wird aus DOCTRINE_DEFS ABGELEITET, nicht eingetippt. Vorher stand hier dreimal
+// eine feste Dreierliste - eine vierte Doktrin waere damit still durchgerutscht, und genau das
+// ist der teuerste Fehlertyp dieses Tests: Er haette weiter gruen gemeldet, waehrend Frontend und
+// Backend im PvP auseinanderlaufen. Die Ableitung steht HINTER der Funktion `doktrin`, weil sie
+// deren Rueckgabe braucht (Hausregel 3: die REGEL pruefen, nicht die Momentaufnahme).
+const DOKTRIN_PAARE = doktrin(null, []).d.map(d => [d.key, (d.syn||{}).rolle]);
 check('jede Doktrin hat eine Synergie mit einer Rolle',
   doktrin(null, []).d.every(d => d.syn && d.syn.rolle && d.syn.text), doktrin(null, []).d.map(d => d.key + '→' + (d.syn||{}).rolle));
 check('Offensiv-Doktrin ohne Werft-Welt: nur der Grundwert 1,20',
@@ -142,6 +148,51 @@ check('ohne Doktrin ist jeder Multiplikator neutral',
 check('die Synergie einer Doktrin fasst nur ihre eigene Seite an',
   doktrin('doc_offensive', ['shipyard']).m('defMult') === 0.85
   && doktrin('doc_defensive', ['fortress']).m('atkMult') === 0.85);
+
+// --- E2: die additiven Doktrin-Kanaele (18.08.2026) ---------------------------------------------
+// Drei wirtschaftliche Doktrinen kamen dazu. Ihre Kanaele sind SUMMANDEN, nicht Faktoren - der
+// Neutralwert ist also 0 und nicht 1. Ein gemeinsamer Helfer haette bei fehlender Angabe entweder
+// die Produktion halbiert oder den Faktor auf 0 gezogen; dass es zwei getrennte gibt, wird hier
+// als Eigenschaft geprueft und nicht nur behauptet.
+function doktrinB(key, rollen){
+  const ctx = {};
+  new Function('ctx', 'state', 'hasRoleAnywhere',
+    blockDoktrin + ';' + blockDokFn
+    + '\n  function activeDoctrine(){ return state.doctrine ? DOCTRINE_DEFS.find(d=>d.key===state.doctrine) : null; }'
+    + '\n  function doctrineBonusOf(kanal){ const doc = activeDoctrine(); if (!doc) return 0; const grund = doc[kanal] || 0;'
+    + '\n    return doctrineSynActive(doc) ? grund + ((doc.syn||{})[kanal] || 0) : grund; }'
+    + ';ctx.b=doctrineBonusOf;ctx.d=DOCTRINE_DEFS;'
+  )(ctx, { doctrine: key }, r => rollen.includes(r));
+  return ctx;
+}
+check('E2-vorab: es gibt Doktrinen mit additiven Kanaelen',
+  doktrinB(null, []).d.some(d => d.prodBonus || d.expBonus || d.splitterBonus),
+  doktrinB(null, []).d.filter(d => d.prodBonus || d.expBonus || d.splitterBonus).map(d => d.key));
+check('E2: ohne Doktrin ist jeder additive Kanal 0 (nicht 1)',
+  doktrinB(null, []).b('prodBonus') === 0 && doktrinB(null, []).b('expBonus') === 0);
+check('E2: Erschliessung ohne Bergbau-Welt gibt nur den Grundwert',
+  Math.abs(doktrinB('doc_erschliessung', []).b('prodBonus') - 0.10) < 1e-9,
+  { wert: doktrinB('doc_erschliessung', []).b('prodBonus') });
+check('E2: MIT Bergbau-Welt kommt die Synergie ADDITIV dazu (nicht multiplikativ)',
+  Math.abs(doktrinB('doc_erschliessung', ['mining']).b('prodBonus') - 0.15) < 1e-9,
+  { wert: doktrinB('doc_erschliessung', ['mining']).b('prodBonus'), erwartet: 0.15 });
+check('E2: die falsche Rolle bringt ihr nichts',
+  Math.abs(doktrinB('doc_erschliessung', ['fortress','trade']).b('prodBonus') - 0.10) < 1e-9);
+check('E2: Aufklaerung zahlt auf Expedition, nicht auf Produktion',
+  doktrinB('doc_aufklaerung', ['science']).b('expBonus') > 0
+  && doktrinB('doc_aufklaerung', ['science']).b('prodBonus') === 0);
+check('E2: Bergung zahlt auf Splitter und kostet Produktion',
+  doktrinB('doc_bergung', ['deepport']).b('splitterBonus') > 0
+  && doktrinB('doc_bergung', ['deepport']).b('prodBonus') < 0,
+  { splitter: doktrinB('doc_bergung', ['deepport']).b('splitterBonus'), prod: doktrinB('doc_bergung', ['deepport']).b('prodBonus') });
+// Die eigentliche Sicherheitsaussage: kampfneutral. Solange das gilt, kann eine dieser Doktrinen
+// im PvP gar nicht auseinanderlaufen - selbst gegen einen Server, der sie noch nicht kennt.
+check('E2: alle Doktrinen mit additiven Kanaelen sind im Kampf NEUTRAL',
+  doktrinB(null, []).d.filter(d => d.prodBonus || d.expBonus || d.splitterBonus)
+    .every(d => (d.atkMult||1) === 1 && (d.defMult||1) === 1
+             && ((d.syn||{}).atkMult||1) === 1 && ((d.syn||{}).defMult||1) === 1),
+  doktrinB(null, []).d.filter(d => d.prodBonus || d.expBonus || d.splitterBonus)
+    .map(d => d.key + ':atk' + (d.atkMult||1) + '/def' + (d.defMult||1)));
 
 // --- D: Aufklärungsvorteil -----------------------------------------------------------------------
 function spyEdge(intel){
@@ -206,12 +257,30 @@ for (const alt of ['if (doc) power *= doc.atkMult;', 'if (doc) power *= doc.defM
                    'if (doc) cost *= doc.fuelMult;', 'if (doc) cap *= doc.cargoMult;']){
   check('alte Doktrin-Zeile ist weg: ' + alt, !src.includes(alt));
 }
+// Die additiven Kanaele brauchen ihre Verbrauchsstelle genauso wie die multiplikativen: Ein
+// richtig rechnender Helfer nuetzt nichts, wenn ihn niemand aufruft. Geprueft wird, dass jeder
+// Kanal in der jeweils vorhandenen, gedeckelten Gruppe landet - nicht als eigener Faktor.
+check('der Produktions-Kanal landet in der additiven Gruppe',
+  /globalBonus \+= doctrineBonusOf\('prodBonus'\)/.test(src));
+check('der Expeditions-Kanal landet in der Ausbeute-Summe',
+  /\+ doctrineBonusOf\('expBonus'\)/.test(src));
+check('der Splitter-Kanal landet in abgrundSplitterFaktor',
+  /\+ doctrineBonusOf\('splitterBonus'\)/.test(src));
+check('kein additiver Kanal wird als FAKTOR multipliziert',
+  !/\*=\s*doctrineBonusOf\(/.test(src));
 check('alle vier Doktrin-Seiten laufen über doctrineMultOf()',
   ["doctrineMultOf('atkMult')", "doctrineMultOf('defMult')",
    "doctrineMultOf('fuelMult')", "doctrineMultOf('cargoMult')"].every(s => src.includes(s)));
 
 // ================================================================= 3. FRONTEND/BACKEND-GLEICHSTAND
-const BE_PFAD = path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js');
+// Der Backend-Pfad kommt aus umgebung.js (SERVER_JS) und nicht mehr aus einem hier gebauten
+// path.join. Grund, am 18.08.2026 schmerzhaft gemessen: Eine Gegenprobe mit
+// KEPLER_BACKEND_SERVER auf eine sabotierte Kopie lief ins LEERE - der Test las weiter das echte
+// server.js und meldete gruen, obwohl der Kopie eine ganze Doktrin fehlte. Die Sabotage hatte
+// gegriffen, die Umleitung nicht; verraten hat es erst der Blick, ob die Kopie ueberhaupt gelesen
+// wurde. Genau die Falle aus CLAUDE.md (Korrektur 15.08.2026 zu KEPLER_SPIELDATEI): eine still
+// ignorierte Env-Variable sieht aus wie eine bestandene Gegenprobe.
+const BE_PFAD = SERVER_JS || path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js');
 // Fehlt das Backend, SCHLÄGT der Test fehl statt still zwanzig Prüfungen zu überspringen
 // (Fehlerbehebung 01.08.2026). Vorher stand hier ein 'HINWEIS - '-Text, den tests/run.js nicht
 // auswertet: Der Ausfall des kompletten Gleichstands-Abschnitts wäre im Prüflauf unsichtbar
@@ -241,7 +310,7 @@ if (!fs.existsSync(BE_PFAD)){
     && /computeAttackPower\(attacker, null\) \* spyEdgeMult/.test(be));
   const beSynVon = be.indexOf('const DOCTRINE_SYN = {');
   const beSyn = beSynVon > 0 ? be.slice(beSynVon, be.indexOf('};', beSynVon)) : '';
-  for (const [dk, rolle] of [['doc_offensive','shipyard'], ['doc_defensive','fortress'], ['doc_logistics','trade']]){
+  for (const [dk, rolle] of DOKTRIN_PAARE){
     const feHat = new RegExp("key:'" + dk + "'[\\s\\S]{0,1200}?syn:\\{ rolle:'" + rolle + "'").test(src);
     const beHat = new RegExp(dk + ":\\s*\\{\\s*rolle:\\s*'" + rolle + "'").test(beSyn);
     check('Doktrin-Synergie ' + dk + ' → ' + rolle + ': beide Seiten einig', feHat && beHat, { feHat, beHat });
@@ -288,7 +357,7 @@ if (!fs.existsSync(BE_PFAD)){
   // Doktrin wird BEIDE Seiten geprüft (atk UND def) - eine einzelne Seite zu vergleichen wäre bei
   // doc_logistics eine Zeile gewesen, die konstruktionsbedingt immer 1===1 lautet und damit nie
   // fehlschlagen kann (Fehlerbehebung 01.08.2026).
-  for (const [dk, rolle] of [['doc_offensive','shipyard'], ['doc_defensive','fortress'], ['doc_logistics','trade']]){
+  for (const [dk, rolle] of DOKTRIN_PAARE){
     for (const seite of ['atk','def']){
       const feWert = doktrin(dk, [rolle]).m(seite + 'Mult');
       const beWert = beCtx.doc({ doctrine:dk, planetSpecialization:{ a:rolle } }, seite);
@@ -298,7 +367,7 @@ if (!fs.existsSync(BE_PFAD)){
   }
   // Und der Gegenbeweis, dass diese Schleife überhaupt etwas messen KANN: mindestens eine der sechs
   // Zahlen muss von 1 abweichen. Wären alle 1, verglichen die Zeilen oben nur Neutralwerte.
-  const abweichend = [['doc_offensive','shipyard'], ['doc_defensive','fortress'], ['doc_logistics','trade']]
+  const abweichend = DOKTRIN_PAARE
     .flatMap(([dk, rolle]) => ['atk','def'].map(s => beCtx.doc({ doctrine:dk, planetSpecialization:{ a:rolle } }, s)))
     .filter(v => Math.abs(v - 1) > 1e-9);
   check('die Gleichstands-Schleife vergleicht echte Werte, nicht lauter Neutralwerte',
@@ -454,6 +523,21 @@ function backendStub(store){ return async r => {
   check('Doktrin-Karte nennt die Synergie', /Synergie/.test(sicht.doktrin), sicht.doktrin.slice(0, 160));
   check('Doktrin-Karte weist aus, dass die Werft-Welt fehlt',
     /keine Werft-Welt/.test(sicht.doktrin), sicht.doktrin.slice(0, 200));
+  // Die drei wirtschaftlichen Doktrinen (18.08.2026) muessen in der Auswahl WIRKLICH auftauchen -
+  // eine Zeile in DOCTRINE_DEFS, die keine Karte erzeugt, waere fuer den Spieler nicht vorhanden.
+  // Geprueft wird gegen die Namen AUS DEM ARRAY, nicht gegen eingetippte (Hausregel 4/3).
+  const wirtschaftlich = doktrinB(null, []).d.filter(d => d.prodBonus || d.expBonus || d.splitterBonus);
+  const fehlendeKarten = wirtschaftlich.filter(d => !d.abgrund && sicht.doktrin.indexOf(d.name) === -1).map(d => d.name);
+  check('jede wirtschaftliche Doktrin hat eine Karte in der Auswahl', fehlendeKarten.length === 0,
+    { fehlend: fehlendeKarten, gefunden: wirtschaftlich.map(d => d.name) });
+  // Und die Gegenrichtung, die diese Pruefung erst aussagekraeftig macht: Die Bergungs-Doktrin ist
+  // an den Abgrund gebunden und darf im Fixture (ohne Abgrund) GERADE NICHT dastehen - sonst waere
+  // "taucht auf" auch mit einer Auswahl gruen, die stur alles anzeigt.
+  const nurMitAbgrund = wirtschaftlich.filter(d => d.abgrund).map(d => d.name);
+  check('E2-vorab: es gibt eine abgrundgebundene Doktrin', nurMitAbgrund.length > 0, nurMitAbgrund);
+  check('die abgrundgebundene Doktrin fehlt ohne freigeschalteten Abgrund',
+    nurMitAbgrund.every(n => sicht.doktrin.indexOf(n) === -1),
+    { gesucht: nurMitAbgrund, ausschnitt: sicht.doktrin.slice(0, 200) });
 
   // Veteranenkarte: der Rollen-Zusatz muss dastehen (Festungs-Welt mit Höchstrang im Spielstand).
   check('Veteranenkarte nennt die Rollen-Zusatzwirkung',
