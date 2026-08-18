@@ -1,193 +1,342 @@
 # Inhalts-Ideen – belegter Rückstand
 
-Aufgenommen am 09.08.2026 auf Wunsch von Sascha („merke dir das alles, wir gehen es ein anderes
-Mal an"). Alle Einträge sind **am Code belegt**, nicht ausgedacht: Jede Zeilennummer bezieht sich
-auf `weltraum_kolonie.html` (Stand v8.466.0, 57.242 Zeilen) bzw. auf `server.js` des Backends.
+**Zweiter Durchgang, Stand v8.567.0 (18.08.2026).** Der erste Durchgang entstand am 09.08.2026
+(Stand v8.466.0) auf Wunsch von Sascha („merke dir das alles, wir gehen es ein anderes Mal an").
+Seitdem sind gut hundert Versionen ausgeliefert worden – diese Fassung ist deshalb **nachgemessen**,
+nicht fortgeschrieben: Jeder Posten wurde am aktuellen Quelltext geprüft, erledigte sind als erledigt
+markiert, alle Zeilennummern beziehen sich auf `weltraum_kolonie.html` in der Fassung v8.567.0
+(64.808 Zeilen) bzw. auf `server.js` des Backends.
 
-Die Liste entstand aus fünf parallelen Lese-Durchgängen über die Spieldatei mit den Fragen: Wo läuft
-das Spiel aus? Welche Systeme sind gebaut, aber dünn befüllt? Was haben Spieler laut Kommentaren
-tatsächlich gewünscht? Was ist technisch da, aber inhaltlich leer?
+**Was diese Liste ist:** ein Vorrat an Inhalten, die sich am Code begründen lassen – keine
+Wunschliste. Was hier steht, ist entweder eine Zusage, die das Spiel sich selbst gegeben hat, ein
+Topf ohne Abfluss, ein System, das trockenläuft, oder eine Fläche, die etwas verspricht, das es
+nicht gibt.
 
-**Warum diese Datei existiert:** Das Projekt hat schon einmal alle Tests im Sitzungs-Scratchpad
-verloren (CLAUDE.md). Eine Ideenliste, die nur im Chatverlauf steht, ist beim nächsten Mal weg.
-
----
-
-## 1. Zusagen, die das Spiel sich selbst gegeben hat
-
-Diese drei stehen als Absicht im Quelltext und wurden nie eingelöst. Sie haben deshalb Vorrang: Es
-sind keine neuen Ideen, sondern offene Posten.
-
-### 1.1 Symbolpaket für die 36 Schiffsklassen-Module
-**Beleg:** Z. 7252 („Offen bleiben die Schiffsklassen-Module (36 Stück)"), Z. 7259 („bekommen ihr
-eigenes Paket"), Z. 7265 („ausdrücklich vorgemerkt") – dreimal schriftlich zugesagt.
-**Ist-Zustand:** `SHIP_MODULE_DEFS` (Z. 21739–21830) hat 44 Einträge; nur die acht Abgrund-Module
-(`sm_ab_*`) tragen handgezeichnete SVG-Symbole, die übrigen 36 flache `ti-*`-Zeichen.
-**Aufwand:** reine Handarbeit, kein Balancing, kein Test. Betrifft eine Ansicht, die ständig offen ist.
-
-### 1.2 Drittes mondexklusives Gebäude – wirtschaftlich statt militärisch
-**Beleg:** Z. 4382 formuliert den Wunsch im Plural („Monde um einzigartige Gebäude erweitern").
-Umgesetzt sind zwei, beide `category:'defense'`: `abhorchposten` (Z. 4391) und `mondschild` (Z. 4395).
-**Ist-Zustand:** Ein Mond hat bis heute **kein einziges eigenes Wirtschaftsgebäude**.
-**Vorschlag:** „Massentreiber-Schleuder" – senkt die Flugzeit aller Missionen, die von diesem Mond
-starten. Das Muster „Startort entscheidet" existiert bereits beim Tiefenhafen (`PLANET_ROLE_TIEFENHAFEN`,
-Z. 40935). `moonOnly` ist ein rein deklaratives Flag und an genau drei Stellen ausgewertet.
-
-### 1.3 Event-Modul für die Raffineriekrise
-**Beleg:** `EVENT_CALENDAR` (Z. 11534) hat 7 Events. Die sechs älteren haben je ein Event-Schiff
-(`unlockEventParts`, Z. 17134–17158) **und** je ein Event-Modul (`ev_kometenschild` … `ev_erzgreifer`,
-Z. 21790–21800). `raffineriekrise` (Z. 11564, `buffOnly:true`) hat weder noch.
-**Besonderheit:** Dass es kein Schiff bekam, ist bei Z. 11559–11563 ausdrücklich begründet – dass es
-kein Modul hat, nirgends. Ein einzelner Eintrag schließt die Lücke.
+**Was diese Liste NICHT ist:** eine Reihenfolge. Abschnitt 8 nennt eine Empfehlung, entschieden
+wird sie von Sascha.
 
 ---
 
-## 2. Wo Langzeitspieler aufhören
+## 1. Erledigt seit dem ersten Durchgang (nachgemessen)
 
-Der Code enthält die Diagnose selbst. Zum **alten** Aufstiegsbaum steht bei Z. 25256–25262:
+Damit niemand zweimal dasselbe vorschlägt:
 
-> „Sternenessenz häufte sich an, ohne dass es noch etwas zu kaufen gab. Genau das ist die Stelle, an
-> der Langzeitspieler aufhören."
+| Posten (1. Durchgang) | Stand heute |
+|---|---|
+| 2.1 Zweite Reihe im Aufstiegsbaum | **teilweise** – `ASCENSION_TREE_DEFS` 6 → 7 („Verschobene Grenzen", Z. 29796). Kein `abAufstieg`-Gating. |
+| 4. `WORLDBOSS_ARCHETYPEN` 4 | **erledigt** – 5 seit v8.565.0 (Piratenboss, Z. 49185) |
+| 4. `ALLIANCE_TITLE_DEFS` 5 | **erledigt (knapp)** – 6 (Z. 41378); der Vorrat läuft weiterhin trocken |
+| Wirtschaft: Töpfe ohne Senke | **weit vorangekommen** – Gefechtsvorräte (v8.560.0), Mega-T2-Anteil (v8.557.0), Tier-3-Kette (v8.556.0), Trümmer-Rückfluss (v8.555.0), Markt- und Routendeckel (v8.549.0/8.550.0/8.554.0) |
+| Verteidigung zählt nirgends | **halb** – Bastionsmarken (v8.567.0) geben ihr eine Fortschrittsachse. Erfolge, Kosmetik und Punkteachse fehlen weiter (siehe 4.3) |
 
-Genau das wiederholt sich eine Ebene höher, nur langsamer.
-
-### 2.1 Zweite Reihe im Aufstiegsbaum
-`ASCENSION_TREE_DEFS` (Z. 25248–25255) hat **sechs Zweige und hatte nie mehr**. Jenseits Stufe 10
-kostet ein Prozentpunkt das Fünfundzwanzigfache (`ASCENSION_LATE_RATE`, Z. 25273).
-**Vorschlag:** 3–4 neue Zweige mit Feld `abAufstieg:3/6/10`, die erst ab einer Aufstiegszahl
-erscheinen (`state.ascension.count`, Z. 25399). Alle zahlen in bereits gedeckelte Bonusgruppen ein.
-
-### 2.2 Der Aufstieg eskaliert nicht
-`ASCENSION_MIN_PRESTIGE = 3` und `ASCENSION_MIN_SCORE = 50000` (Z. 25246–25247) sind **konstant** –
-der zehnte Aufstieg verlangt exakt so viel wie der erste. Eine Schleife mit gleichbleibender Länge.
-
-### 2.3 Der Abgrund hört bei Tiefe 120 auf, Neues zu zeigen
-- Letzte Reliquie in Tiefe 120 (`abgrundReliktDef`, Z. 42449–42455), danach zyklische Wiederholung
-- Wächternamen wiederholen sich mit „(n. Wiederkehr)" (Z. 41417–41422)
-- Die Chronik endet bei Tiefe 150 (Z. 42595) wörtlich mit: *„Es gibt nichts mehr zu entdecken … Was
-  bleibt, ist die Zahl."*
-
-**Vorschlag:** zweite Reliquienreihe (6 Stück) ab Tiefe 130, zwölf weitere Wächternamen
-(`ABGRUND_WAECHTER_NAMEN`, Z. 41393–41406), vier bis sechs neue Chronik-Einträge.
-
-### 2.4 Tiefen-Meilensteine, die Sternenessenz zahlen
-Der Abgrund zahlt heute nur in den Punktestand (50 je Tiefe, `ABGRUND_SCORE_JE_TIEFE`, Z. 23860) und
-in einen logarithmischen Produktionsbonus. Marken bei Tiefe 25/50/75/100/125/150 nach dem Vorbild
-von `RESEARCH_MILESTONES` (Z. 10831 ff.) würden ihn an die einzige resetfeste Währung anbinden.
-
-### 2.5 Die Lagerwand
-Kommentarblock Z. 24673–24701 rechnet vor, dass Forschungen teurer werden können, als das Lager
-fasst – und damit **dauerhaft unbezahlbar** sind. Nachgerechnet und bestätigt: Lagerdeckel 1 Mio →
-Wand ab Stufe 16–18; 100 Mio → Stufe 30–35. Ursache: Kosten wachsen mit ×1,32–1,38 je Stufe,
-`storageCap()` (Z. 19142) wächst linear plus logarithmisch.
-
-**Zwei Auflösungen, beide tragfähig:**
-- *Baustellen-Konto:* Warteschlangen-Einträge bekommen ein Feld `eingezahlt:{res:menge}`; ein neues
-  Gebäude erlaubt, je Tick einen Anteil der Produktion direkt in den Auftrag zu buchen, statt ihn im
-  Lager zu sammeln. Löst die Wand grundsätzlich.
-- *Raumfaltungs-Silo:* Lagergebäude, dessen Beitrag mit `basis * 1.25^Stufe` wächst statt mit einem
-  festen Summanden – dieselbe Kurvenform wie der Preis.
-
-**Zweite Baustelle derselben Wand, die im Kommentar fehlt:** `megaStageCost()` (Z. 40795) mit
-`MEGA_STAGE_COST_MULT = 2.6` – die 10. Dyson-Stufe kostet 268 Mio Erz. Für Bauaufträge gibt es
-keinen „dauerhaft unmöglich"-Zweig wie bei der Forschung (`tryStartQueuedResearch`, Z. 24733).
+Alles Übrige aus dem ersten Durchgang ist **unverändert offen** und unten neu belegt.
 
 ---
 
-## 3. Töpfe ohne Senke, Senken ohne Nachschub
+## 2. Zusagen, die das Spiel sich selbst gegeben hat
 
-### 3.1 Bergungsgut hat genau einen Abnehmer
-Z. 7002 nennt die Bergungswerft ausdrücklich „das erste Gebäude, dessen Bau Bergungsgut verlangt".
-Geprüft ist sie bis heute das **einzige** (`bergung:` findet als Nicht-Schiff-Verbraucher nur
-`bergungswerft`, Z. 4337; alle übrigen Treffer sind die neun Tiefenschiffe).
+Drei Posten, die als Absicht im Quelltext stehen und nie eingelöst wurden. Sie haben Vorrang, weil
+sie keine neuen Ideen sind, sondern offene Rechnungen. **Alle drei am 18.08.2026 nachgemessen und
+weiterhin offen.**
 
-### 3.2 Splitter nach ausgebauter Werkstatt
-Einzige verbleibende Senke: 200 Splitter → 500 Kredite (`ABGRUND_SPLITTER_VERKAUF`, Z. 14555).
+### 2.1 Symbolpaket für die 36 Schiffsklassen-Module
+**Gemessen:** `SHIP_MODULE_DEFS` (Z. 25812) hat 44 Einträge, **36 davon tragen ein flaches `ti-*`**
+(`ss_panzerung` = `ti-shield`, `fr_frachtraum` = `ti-truck`, `au_tarnmodul` = `ti-atom-2` …). Nur
+die acht Abgrund-Module haben handgezeichnete Symbole. Drei Stellen im Quelltext sagen ein eigenes
+Paket ausdrücklich zu.
+**Aufwand:** reine Handarbeit, kein Balancing, kein Test. Betrifft eine Ansicht, die ständig offen
+ist. **Nebenwirkung:** Dieselben `ti-*` doppeln sich (zweimal `ti-shield`), die Karten sind also
+nicht nur flach, sondern teils nicht unterscheidbar.
 
-### 3.3 Kommandopunkte
-Haben genau eine unbegrenzte Senke (Tagesaufgaben-Neuwurf). **Vorschlag:** „Offiziersstab" – nach
-`OFFICER_MAX_LEVEL = 10` (Z. 22242) eine unbegrenzte, stark abflachende Stufe, Kosten weiter mit
-1.6^n (`officerUpgradeCost()`, Z. 22299), Wirkung +0,25 Punkte je Stufe, gedeckelt bei +5.
+### 2.2 Drittes mondexklusives Gebäude – wirtschaftlich statt militärisch
+**Gemessen:** `moonOnly` tragen genau zwei Gebäude, beide `category:'defense'` – `abhorchposten`
+(Z. 5128) und `mondschild` (Z. 5132). Ein Mond hat bis heute **kein einziges eigenes
+Wirtschaftsgebäude**, obwohl der Kommentar bei Z. 5120 den Plural benutzt.
+**Vorschlag (unverändert tragfähig):** „Massentreiber-Schleuder" – senkt die Flugzeit aller
+Missionen, die von diesem Mond starten. Das Muster „Startort entscheidet" gibt es bereits beim
+Tiefenhafen (`PLANET_ROLE_TIEFENHAFEN`, Z. 45989); `moonOnly` ist ein deklaratives Flag und wird an
+genau drei Stellen ausgewertet (Z. 44956, 57879, 62660).
 
-### 3.4 Prisengut
-Der Prisenhof ist die einzige Senke und endlich (Enterhaken, 5 Stufen, Z. 19709).
-**Vorschlag:** „Prisenwerft" – ein Gebäude, das je Stufe N gekaperte Schiffe pro Kampf in die eigene
-Flotte übernimmt statt in Prisengut, begrenzt auf die Klassen, die `isBoardable()` (Z. 19720)
-ohnehin zulässt.
+### 2.3 Event-Modul für die Raffineriekrise
+**Gemessen:** `EVENT_CALENDAR` (Z. 13002) hat 7 Events. `raffineriekrise` (Z. 13032, `buffOnly:true`)
+ist das einzige ohne Event-Modul. Dass es kein Event-**Schiff** bekam, ist direkt daneben begründet –
+dass es kein **Modul** hat, nirgends.
+**Aufwand:** ein Eintrag.
 
 ---
 
-## 4. Dünn befüllte Systeme (Zählung vom 09.08.2026)
+## 3. Offene Posten aus den Konzeptdokumenten
 
-Gut gefüllt und ohne Handlungsbedarf: `ACHIEVEMENTS` 97 · `EXPEDITION_SPECIAL_EVENTS` 63 ·
-`RANDOM_EVENTS` 60 · `BUILDING_DEFS` 48 · `RESEARCH_DEFS` 47 · `MODULE_DEFS` 47 (davon 20 Boss-Set-Teile,
-also 27 normale) · `SHIP_MODULE_DEFS` 44 · `SHIP_DEFS` 42 · `ITEM_DEFS` 30.
+Diese stehen bereits ausgearbeitet in `docs/`. Sie gehören hierher, damit die Ideenliste nicht
+danebenher ein zweites Bild zeichnet.
 
-**Auffällig dünn im Verhältnis zur Sichtbarkeit:**
+| Posten | Quelle | Warum er wichtig ist |
+|---|---|---|
+| **B4 – Baustellen-Konto** | `wirtschaft-rebalance-konzept.md` §3 | Die **Lagerwand**: Kosten wachsen mit ×1,32–1,38 je Stufe, `storageCap()` linear+logarithmisch. Ab einem Punkt ist eine Forschung *dauerhaft* unbezahlbar. Das Konzept nennt sie an Z. 45806 des Spiels selbst beim Namen. **Das ist die einzige Stelle, an der das Spiel wirklich endet.** |
+| **D – Protomaterie-Abnehmer** | `wirtschaft-rebalance-konzept.md` §5 | Alle heutigen Proto-Senken sind einmalig. Enthält den fertig durchgerechneten **Urmaterie-Koloss** (Apex-Schiff mit direktem Proto-Anteil). |
+| **V1 – Kostenkurve der Verteidigung brechen** | `verteidigung-flotte-konzept.md` §3 | `costMult` 1,18–1,4 bei linearem Nutzen. Ohne Deckel gibt es keine Obergrenze, an der Balance überhaupt festmachen könnte. **Achtung Bestandsschutz** (Kappungs-Marke, siehe CLAUDE.md). |
+| **V3 – Punkteachse begradigen** | `verteidigung-flotte-konzept.md` §3 | 10 Punkte je Stufe unabhängig vom Gebäude belohnt die schwächsten Bauten am stärksten. Eingriff in `computeScore()` – rückwirkend, deshalb heikel. |
+
+**A4 (Schildnetz / laufende Energiekosten für Verteidigung) ist bewusst gestrichen** –
+`verteidigung-flotte-konzept.md` §4 begründet das; nicht neu vorschlagen.
+
+---
+
+## 4. Neue Befunde dieses Durchgangs
+
+Alles hier ist am 18.08.2026 gemessen worden und stand im ersten Durchgang noch nicht drin.
+
+### 4.1 Die Sektoren versprechen Mechanik, die es nicht gibt
+
+**Gemessen:** `SEKTOR_DEFS` (Z. 13328) hat 8 Einträge mit den Feldern `key`, `name`, `cx`, `cy`,
+`tint`, `desc` – **kein einziges Wirkungsfeld**. `sektorVon()` (Z. 13338) wird an zwölf Stellen
+benutzt, **alle** im Kartenzeichnen und in der Blätter-Reihenfolge (Z. 53528–54603). Der Sektor
+eines Planeten hat auf nichts im Spiel eine Auswirkung.
+
+**Die `desc`-Texte behaupten aber etwas anderes** – wörtlich:
+
+- Wispern-Drift: „weite Wege, **ergiebige Gürtelbahnen**"
+- Solmark-Reichweite: „umkämpft, aber **reich an Anomalien**"
+- Pulsar-Felder: „**Navigation verlangt Erfahrung, belohnt sie aber**"
+- Ilyra-Tiefen: „dünn kartiert, **voller Passagen**"
+- Meridian-Weiten: „**alte Handelspfade**, verstreute Höfe"
+
+Das ist derselbe Fehlertyp wie in Abschnitt 2, nur an einer Fläche, die seit KB-4 bis KB-16 die
+meistbeachtete des Spiels ist: Der Spieler liest eine Eigenschaft und sucht sie vergeblich.
+
+**Vorschlag:** Je Sektor **genau eine** Wirkung, die den vorhandenen Text einlöst – klein (10–20 %),
+additiv in eine bereits gedeckelte Gruppe, nie eine eigene Multiplikation:
+
+| Sektor | Wirkung, die der Text schon verspricht |
+|---|---|
+| Kepler-Kern | bewusst neutral (Heimatcluster – hier soll nichts locken oder abschrecken) |
+| Wispern-Drift | + Vorrat/Ausbeute der Asteroidenvorkommen im Sektor |
+| Solmark-Reichweite | + Wahrscheinlichkeit für Expeditions-Sonderereignisse von hier |
+| Obsidian-Saum | + Beute aus NPC-Kämpfen, dafür längere Anflugzeit dorthin |
+| Meridian-Weiten | + Handelsrouten-Ertrag für Routen mit Endpunkt im Sektor |
+| Pulsar-Felder | − Spionage-Sichtweite (**beidseitig**), + Verteidigung hier stationierter Flotten |
+| Ilyra-Tiefen | − Flugzeit **innerhalb** des Sektors |
+| Randmarken | + Abgrundsplitter für Tauchgänge, die von hier starten |
+
+**Warum das mehr ist als ein Prozentwert:** Die Wahl des Koloniestandorts hat heute genau zwei
+Dimensionen (Planetentyp und Entfernung). Mit Sektor-Eigenschaften bekommt die Karte zum ersten Mal
+eine **geografische Strategie** – und die acht Sektoren, die KB-4 bis KB-16 mühsam bedienbar gemacht
+haben, bekommen einen Grund, sie anzusehen.
+
+**Aufwand:** mittel. Eine Nachschlagefunktion (`sektorMod(planetKey, kanal)`), Einhängen in die
+vorhandenen additiven Gruppen. **Risiken, die dazugehören:** (a) Regel 6 – die Wirkung muss an der
+Sektoransicht, am Systemknoten, auf der Planetenkarte, im Kolonisierungs-Dialog und in
+`HELP_SECTIONS` stehen, sonst ist sie unsichtbar; (b) **Bestandsschutz** – vorhandene Kolonien
+bekommen die Wirkung rückwirkend geschenkt oder entzogen. Deshalb nur Boni, keine Mali (der
+Obsidian-Anflug und die Pulsar-Sicht sind bewusst als beidseitige/örtliche Eigenschaften formuliert,
+nicht als Strafe).
+
+### 4.2 Drei Doktrinen für acht Planetenrollen
+
+**Gemessen:** `DOCTRINE_DEFS` (Z. 12451) hat **3** Einträge – das dünnste System des Spiels, und
+zugleich die einzige imperiumsweite Identitätsentscheidung. `PLANET_ROLES` (Z. 45990) hat **8**
+Rollen. Nur drei davon sind an eine Doktrin gekoppelt (`shipyard`, `fortress`, `trade`).
+**Ohne Doktrin-Synergie: `mining`, `science`, `logistics`, `deepport`.**
+
+Das ist ein fertiger Aufhänger: Die Kopplung ist schon gebaut (Feld `syn` mit `rolle`/`rolleName`
+und denselben vier Kanälen), die Rollentexte nennen ihre Doktrin-Synergie bereits im `detail` – bei
+den vier gekoppelten. Wer heute auf Wirtschaft spielt, hat **keine** Doktrin, die zu ihm passt.
+
+**Vorschlag – drei neue Doktrinen, je eine auf eine bisher unbenutzte Rolle:**
+
+- **Erschließungs-Doktrin** (syn: Bergbau-Welt) – der Wirtschaftsspieler bekommt zum ersten Mal eine
+  eigene Doktrin.
+- **Aufklärungs-Doktrin** (syn: Forschungs-Welt) – zahlt auf Expedition und Spionage, zahlt mit
+  Kampfkraft.
+- **Bergungs-Doktrin** (syn: Tiefenhafen) – die erste Doktrin, die auf den Abgrund zeigt; ebenso wie
+  der Tiefenhafen selbst nur sichtbar, wenn der Abgrund freigeschaltet ist.
+
+**Zwei Ausbaustufen, die man vorher entscheiden muss:**
+- *klein:* nur die vier vorhandenen Kanäle (`atkMult`, `defMult`, `fuelMult`, `cargoMult`) benutzen
+  – dann sind es reine Einträge, kein neuer Code, kein Backend.
+- *groß:* neue Kanäle (Produktion, Expeditionsausbeute, Splitter) – dann ist es echter Code, und
+  jeder Kanal braucht seine Anzeigestellen. **Und die Backend-Parität ist Pflicht**, sobald ein
+  Kanal einen PvP-Kampf berührt.
+
+Der **Umschulungsbefehl** (Doktrin-Wechsel als Fundstück) existiert bereits – der Wechsel ist also
+schon bezahlbar gemacht.
+
+### 4.3 Verteidigung: 0 von 102 Erfolgen, 0 von 28 Kosmetikstücken
+
+**Gemessen:**
+- `ACHIEVEMENTS` (Z. 19545) hat **102** Einträge. Zeilen mit Verteidigungsbezug (`pvpDefended`,
+  „abgewehrt", „Verteidig", `defensePower`, `bastion`): **null**.
+- `KOSMETIK_DEFS` im Backend hat 28 Stücke; die Bedingungsarten sind `namensfarbe`, `immer`,
+  `spender`, `spender_je`, `prestige`, `aufstieg`, `kampfpunkte`, `abgrund`, `emblem`, `kauf`,
+  `erfolge`, `bosse` – **keine einzige Verteidigungsgröße**. Kampfpunkte gibt es ausschließlich
+  fürs Angreifen (`verteidigung-flotte-konzept.md` §1.3).
+- `state.pvpDefended` wird **server-seitig** hochgezählt (`server.js:3413`) und im Frontend an
+  **genau einer** Stelle angezeigt (Z. 38082).
+
+**Warum ausgerechnet das sauber ist:** Die Prüffrage dieses Projekts für jedes Belohnungssystem
+lautet „Kann der Server die Bedingung SELBST beobachten?" – an ihr ist der Wochenpass gescheitert
+(CLAUDE.md). Der abgewehrte Angriff ist eine der ganz wenigen Fortschrittsgrößen, die der Server
+selbst würfelt und selbst zählt. Eine Verteidigungs-Kosmetik ist damit **fälschungssicher**, während
+fast jede andere es nicht wäre.
+
+**Vorschlag, drei Teile, unabhängig lieferbar:**
+1. Erfolgsreihe „Bollwerk" I–V auf `pvpDefended` (Zähler existiert, Frontend-Arbeit).
+2. Kosmetik-Bedingungsart `abgewehrt` mit zwei bis drei Stücken. `test_kosmetik_paritaet.js`
+   Abschnitt 1f prüft **jede** Bedingungsart automatisch mit – die Absicherung ist also schon da.
+3. Ein bis zwei Einträge in `TITLE_MAP` – die hat **11** Einträge gegen 102 Erfolge (Z. 19809), und
+   ihre Reihenfolge ist die Rangfolge.
+
+Damit hätte Verteidigung nach den Bastionsmarken (Fortschritt) auch **Anerkennung** – die zweite
+Hälfte des Befunds aus §1.3 des Verteidigungskonzepts.
+
+### 4.4 Gefechtsvorräte: zwei Einträge, beide dieselbe Zahl
+
+**Gemessen:** `GEFECHTSVORRAETE` (Z. 23679) hat **2** Einträge – einen für Angriff, einen für
+Verteidigung, **beide +8 %**. Das System ist der einzige *wiederkehrende* Tier-2-Abnehmer des
+Spiels (Etappe B1a, v8.560.0), und die Auslieferung heißt selbst „B1a", setzt ein B1b also voraus.
+
+**Der Befund dahinter:** Solange jeder Vorrat dieselbe flache Prozentzahl gibt, ist die Wahl keine
+Entscheidung, sondern ein Häkchen. Der PvP-Kampf läuft aber in **drei Phasen mit 10–90 %-Deckel** –
+darin steckt Raum für Vorräte, die etwas anderes tun als addieren:
+
+- **Störfeld-Emitter** – senkt die Gegnerchance in der **ersten** Phase. Wirkt gegen überlegene
+  Gegner stärker als eine flache Zahl, gegen schwächere gar nicht.
+- **Reparaturdrohnen-Schwarm** – senkt die eigenen Schiffsverluste, **unabhängig vom Ausgang**. Der
+  erste Vorrat, der auch eine Niederlage verbessert.
+- **Enterprämie** – erhöht die Kaperchance. Verbindet die Vorräte mit dem Prisengut (siehe 5.4).
+
+**Pflicht dabei:** Backend-Parität. Ein Vorrat verändert den Ausgang eines Kampfes gegen einen
+echten Spieler – die Regeln dafür stehen ausformuliert in der Backend-CLAUDE.md („warum der Server
+sie rechnet UND abbucht"), inklusive der Falle, dass `attackPower` an sechs Stellen ausgegeben wird.
+
+### 4.5 Der Abgrund sagt selbst, dass er zu Ende ist
+
+**Gemessen und unverändert:** `abgrundReliktDef()` (Z. 47537) rechnet zyklisch – der Kommentar
+darin sagt ausdrücklich, die Sammlung sei „mit Tiefe 120 vollstaendig". `ABGRUND_WAECHTER_NAMEN`
+(Z. 46481) hat 12 Namen und wiederholt sie mit „(n. Wiederkehr)". Der letzte Chronik-Eintrag
+(Z. 47683, Tiefe 150) lautet wörtlich:
+
+> „Es gibt nichts mehr zu entdecken, was sich in Berichte fassen ließe. Was bleibt, ist die Zahl,
+> die größer wird, und die Gewissheit, dass sie das immer tun wird."
+
+Das ist ehrlich geschrieben und trotzdem die Stelle, an der ein Langzeitspieler aufhört. **Vorschlag
+unverändert:** zweite Reliquienreihe ab Tiefe 130, zwölf weitere Wächternamen, vier bis sechs neue
+Chronik-Einträge – und **Tiefen-Meilensteine, die Sternenessenz zahlen** (25/50/75/100/125/150, nach
+dem Vorbild von `RESEARCH_MILESTONES`). Heute zahlt der Abgrund nur in Punkte und einen
+logarithmischen Produktionsbonus, also in nichts, was den Aufstieg überlebt.
+
+### 4.6 Der Aufstieg verlangt beim zehnten Mal genau so viel wie beim ersten
+
+**Gemessen, unverändert:** `ASCENSION_MIN_PRESTIGE = 3` (Z. 29794) und `ASCENSION_MIN_SCORE = 50000`
+(Z. 29795) sind Konstanten. Der Baum hat inzwischen 7 Zweige und keine Maximalstufe mehr, aber der
+**Weg dorthin** ist eine Schleife mit gleichbleibender Länge.
+**Vorschlag:** Schwelle wächst mit `state.ascension.count` (z. B. Punktschwelle ×1,6 je Aufstieg,
+Prestige-Schwelle +1 alle drei) – und dafür eine sichtbare **Aufstiegs-Chronik**, die jeden Aufstieg
+mit Datum, Punktestand und gerettetem Bestand festhält. Wer den zwanzigsten Aufstieg macht, soll die
+neunzehn davor sehen können.
+
+### 4.7 Die Musterangriff-Maschinerie hat kein PvE-Ziel
+
+**Unverändert aus dem ersten Durchgang, hier nur bestätigt:** Sammelfenster, Beitritt, gemeinsamer
+Abflug, serverseitige Auflösung, Berichtskarte, Benachrichtigungskategorie und Flottenwahl-Feld sind
+alle gebaut und getestet (der Prüflauf richtet dafür eigens einen laufenden Musterangriff ein).
+Es fehlt ausschließlich ein **Ziel, das keine fremde Allianz ist** – ein Fraktions-Bollwerk, das
+eine Allianz gemeinsam knackt. Das ist der billigste große Mehrspieler-Inhalt, den dieses Repo
+hergibt: eine Zielart auf einer fertigen Maschine.
+
+---
+
+## 5. Töpfe ohne Senke (alle vier nachgemessen, alle vier offen)
+
+| Topf | Gemessener Stand |
+|---|---|
+| **Bergungsgut** | Einziger Nicht-Schiff-Abnehmer bleibt die **Bergungswerft** (Z. 5074), die sich selbst „das einzige Gebäude" nennt. Alle übrigen Treffer sind die neun Tiefenschiffe. |
+| **Abgrundsplitter** | Nach ausgebauter Werkstatt bleibt genau eine Senke: 200 Splitter → Kredite (`ABGRUND_SPLITTER_VERKAUF`, Z. 17220), bewusst schlecht verzinst. |
+| **Kommandopunkte** | Eine unbegrenzte Senke (Tagesaufgaben-Neuwurf). Vorschlag „Offiziersstab" (unbegrenzte, stark abflachende Stufe über `OFFICER_MAX_LEVEL`) unverändert tragfähig. |
+| **Prisengut** | Der Prisenhof (Z. 24009 ff.) ist die einzige Senke und endlich. Vorschlag „Prisenwerft" – je Stufe N gekaperte Schiffe pro Kampf direkt in die Flotte statt in Prisengut, begrenzt auf die Klassen, die `isBoardable()` ohnehin zulässt. Verbindet sich mit der **Enterprämie** aus 4.4. |
+
+---
+
+## 6. Dünn befüllte Systeme (Zählung 18.08.2026, maschinell)
+
+Gut gefüllt, kein Handlungsbedarf: `MODULE_DEFS` 182 · `EXPEDITION_SPECIAL_EVENTS` 63 ·
+`RANDOM_EVENTS` 60 (mit Wahl A/B – ein reifes System) · `RESEARCH_DEFS` 53 · `BUILDING_DEFS` 51 ·
+`SHIP_DEFS` 46 · `SHIP_MODULE_DEFS` 44 · `ITEM_DEFS` 30 · `KOSMETIK_LOOK` 28 · `SKILL_TREE` 23 ·
+`ACHIEVEMENTS` 102.
+
+Auffällig dünn **im Verhältnis zu ihrer Sichtbarkeit**:
 
 | System | Zeile | Anzahl | Anmerkung |
-|---|---|---|---|
-| `DOCTRINE_DEFS` | 10983 | **3** | dünnstes System überhaupt |
-| `ALLIANCE_PROJECT_DEFS` | 12733 | **2** | Allianzpunkte laufen laut Z. 12736–12752 leer |
-| `ALLIANCE_MISSION_TYPES` | 36273 | **5** | speist **alle drei** Kadenzen (`allianceMissionFor`, 36324) |
-| `ALLIANCE_SKIN_DEFS` | 36519 | **4** | `grantAllianceMissionSkin` gibt ab dem 5. Großprojekt null |
-| `ALLIANCE_TITLE_DEFS` | 36433 | **5** | dito ab dem 6. |
-| `HAPPY_HOUR_TYPES` | 18943 | **4** | Antimaterie nur im 25-%-Sammeltyp |
-| `WORLDBOSS_ARCHETYPEN` | 44083 | **4** | Name/Archetyp/Schwäche werden unabhängig gezogen |
-| `SIGNAL_TYPES` | 49663 | **5** | keines zeigt auf die Fraktionen |
-| `EXPEDITION_TYPES` | 49191 | **6** | `derelict`-Band nur von `salvage` bedient |
-| `SHIP_SYNERGY_DEFS` | 21841 | **6** | zwei Klassen ganz ohne Synergie |
-| `TITLE_MAP` | 16624 | **11** | gegen 97 Erfolge – die Reihenfolge ist die Rangfolge |
+|---|---|---:|---|
+| `GEFECHTSVORRAETE` | 23679 | **2** | siehe 4.4 – beide mit derselben Zahl |
+| `ALLIANCE_PROJECT_DEFS` | 15058 | **2** | Kriegsrat (endlich) + Werftkonvoi (unendlich) |
+| `DOCTRINE_DEFS` | 12451 | **3** | siehe 4.2 – dünnstes Wahlsystem des Spiels |
+| `MEGA_PROJECTS` | 45749 | **3** | drei Projekte tragen den kompletten Endausbau |
+| `ALLIANCE_SKIN_DEFS` | 41464 | **4** | Vorrat läuft ab dem 5. Großprojekt trocken |
+| `HAPPY_HOUR_TYPES` | 22656 | **4** | Antimaterie nur im 25-%-Sammeltyp |
+| `FACTION_DIPLOMACY` | 18023 | **4** | ohne `lore`, ohne `motto` (gemessen: 0 Felder) |
+| `ALLIANCE_MISSION_TYPES` | 41218 | **5** | speist alle drei Kadenzen |
+| `SIGNAL_TYPES` | 56533 | **5** | keines zeigt auf die Fraktionen |
+| `ALLIANCE_TITLE_DEFS` | 41378 | **6** | Vorrat läuft ab dem 7. Großprojekt trocken |
+| `EXPEDITION_TYPES` | 56061 | **6** | `derelict`-Band nur von `salvage` bedient |
+| `SHIP_SYNERGY_DEFS` | 25914 | **6** | zwei Klassen ganz ohne Synergie |
+| `ASCENSION_TREE_DEFS` | 29796 | **7** | siehe 4.6 |
+| `TITLE_MAP` | 19809 | **11** | gegen 102 Erfolge |
 
-Die Allianz-Einträge stechen heraus: Der Ehrentitel- und Anstrichvorrat **läuft nachweislich trocken**
-(Belohnungszeilen 36609/36611 vergeben dann nichts mehr).
-
----
-
-## 5. Mehrspieler – Maschinerie steht, Inhalt fehlt
-
-Alle folgenden docken an **vorhandene, server-autoritative** Systeme an und respektieren die
-Backend-Grenzen (kein WebSocket, 240 Anfragen/Minute je IP, Server-Tick alle 15 Minuten).
-
-- **„Mitglied unter Beschuss"** – `postAllianceBaseNews()` (Z. 35952) schreibt bereits genau solche
-  Systemzeilen; beim Angriff auf die *Basis* wird das genutzt, beim Angriff auf ein *Mitglied* nicht.
-- **Mitgliederliste mit Aktivität** – `loadAllianceMembers()` (Z. 35254–35263) zeigt nur Name und
-  Rolle, obwohl Punktestand und „zuletzt gesehen" im selben Reiter längst geladen sind und in
-  `renderFriendsBox` genau so verwendet werden.
-- **Spieler setzen Kopfgelder aus** – das System ist vollständig, aber auf einen Fall festgenagelt:
-  `resolveBountyServer` (server.js:4081) setzt wöchentlich 2.000 Kredite auf den Bestenlisten-Ersten.
-- **Allianz gegen ein Fraktions-Bollwerk** – die Musterangriff-Maschinerie (Sammelfenster, Beitritt,
-  gemeinsamer Abflug, serverseitige Auflösung) steht komplett; ihr fehlt nur ein PvE-Ziel.
-- **Beistandsflotte** – `state.shipsAtAllianceBase` mit Ein-Autor-Dokument
-  `alliance:<TAG>:basedef:<playerId>` ist das fertige Muster, heute nur auf die Basis beschränkt.
-- **Allianz-Diplomatie** – zwischen Allianzen gibt es heute nur `declareWar` (Z. 35387) und
-  `makePeace` (Z. 35410). Ein Nichtangriffspakt mit Laufzeit fehlt.
-- **Ruhmeshalle mit Kategorien** – `updateHallOfFameServer` (server.js:3834) schreibt genau ein
-  Objekt je Monat. Vier Kategorien statt einer kosten kaum mehr.
+Die drei Allianz-Zeilen stechen weiter heraus: **Ehrentitel und Anstriche laufen nachweislich
+trocken** – ab dem 7. bzw. 5. Großprojekt vergeben die Belohnungszeilen nichts mehr.
 
 ---
 
-## 6. Welt statt Zahlen (der billigste Inhalt)
+## 7. Welt statt Zahlen (der billigste Inhalt)
 
-- **Sektorarchiv:** Die rund 102 handgeschriebenen `PLANETS`-Einträge (Z. 11798–11900) haben Namen
-  wie „Verlorene Hoffnung" – und keine Zeile Text. Ein Feld `lore`, aufgedeckt beim Erkunden. Die
-  ~400 generierten `gx*`-Welten bleiben bewusst außen vor.
-- **Fraktions-Dossiers:** `FACTION_DIPLOMACY` (Z. 15304) um `lore`, `motto` und drei Rang-Splitter
-  erweitern, die sich mit steigendem Ruf aufdecken – Rang 1 nennt Gerüchte, Rang 8 die Wahrheit.
-- **Konvoi-Zwischenfälle:** `ROUTE_PIRACY_CHANCE = 0.05` (Z. 12946) ist heute ein stiller Ausfall.
-  Sechs bis acht benannte Zwischenfälle mit Text und Ausgang machen daraus ein Ereignis.
+Kein Balancing, kein Test, kein Backend – nur Schreiben. **Alle drei nachgemessen:**
 
-Kein Balancing, kein Test, nur Schreiben.
+- **Sektorarchiv:** `PLANETS` (Z. 14123) hat 499 Einträge, davon **185 handgeschrieben** und 314
+  generierte `gx*`-Welten. **`lore:`-Felder: 0.** Namen wie „Verlorene Hoffnung" tragen keine Zeile
+  Text. Ein Feld `lore`, aufgedeckt beim Erkunden – die generierten Welten bleiben bewusst außen vor.
+- **Fraktions-Dossiers:** `FACTION_DIPLOMACY` (Z. 18023) hat 4 Fraktionen, **0 `lore`- und
+  0 `motto`-Felder**. Drei Rang-Splitter, die sich mit steigendem Ruf aufdecken – Rang 1 nennt
+  Gerüchte, Rang 8 die Wahrheit.
+- **Konvoi-Zwischenfälle:** `ROUTE_PIRACY_CHANCE = 0.05` (Z. 15287) ist heute ein stiller Ausfall.
+  Sechs bis acht benannte Zwischenfälle mit Text und Ausgang machen daraus ein Ereignis, das man
+  bemerkt – und geben `ROUTE_PIRACY_CHANCE_PROTECTED` (Z. 15288) endlich eine spürbare Bedeutung.
 
 ---
 
-## 7. Werkzeug, das über allem steht
+## 8. Werkzeug, das über allem steht
 
-**Automatische Beschreibungs-Prüfung als Anhang an `check-icons.js`.** Der meistgemeldete
-Nicht-Bug des Projekts ist eine fehlende oder abgekürzte Beschreibung – belegt bei Z. 19254 und
-Z. 51041 („keine Beschreibung was sie verbessern jede Stufe"), Z. 7524 („14 Forschungen hatten als
-Beschreibung nur ein Stichwort"), Z. 7788, Z. 8632, Z. 52203. Hausregel 7 verlangt zu jedem Inhalt
-eine vollständige `desc`; geprüft wird das bis heute nur von Hand.
+**Automatische Beschreibungs-Prüfung.** `check-icons.js` enthält (gemessen) **null** Vorkommen von
+`desc`; es prüft ausschließlich Symbole. Der meistgemeldete Nicht-Bug des Projekts ist aber eine
+fehlende oder abgekürzte Beschreibung – Hausregel 7 verlangt zu jedem Inhalt eine vollständige
+`desc`, geprüft wird das bis heute von Hand.
 
-Ein Prüfschritt, der alle DEFS-Arrays auf leere oder zu kurze `desc`-Felder abklopft, würde jede der
-Ideen oben absichern, statt den Fehler ein siebtes Mal zu wiederholen.
+Ein Prüfschritt, der alle DEFS-Arrays auf leere oder zu kurze `desc`/`effectDesc`-Felder abklopft,
+sichert **jede** Idee dieser Liste ab, statt den Fehler ein siebtes Mal zu wiederholen. Er gehört
+neben `check-icons.js` in die Pflichtprüfungen von `tests/run.js`.
+
+---
+
+## 9. Empfehlung
+
+Keine Reihenfolge, sondern drei Körbe – Sascha entscheidet, was daraus wird.
+
+**Korb A – schreiben, nicht bauen (Wirkung sofort, Risiko praktisch null):**
+2.1 Modulsymbole · 2.3 Raffineriekrise-Modul · 7. Sektorarchiv, Fraktions-Dossiers,
+Konvoi-Zwischenfälle · 4.5 Abgrund-Chronik und Wächternamen.
+
+**Korb B – Inhalt auf fertiger Maschine (mittlerer Aufwand, hoher Ertrag):**
+4.3 Verteidigungs-Erfolge und -Kosmetik (die Bedingung beobachtet der Server bereits selbst) ·
+4.2 drei neue Doktrinen in der *kleinen* Ausbaustufe · 4.4 zwei bis drei weitere Gefechtsvorräte ·
+4.7 Fraktions-Bollwerk als Musterangriff-Ziel · 2.2 Massentreiber-Schleuder.
+
+**Korb C – Struktur (groß, verändert das Spiel dauerhaft):**
+B4 Baustellen-Konto (die Lagerwand – der einzige Posten, bei dem das Spiel wirklich endet) ·
+4.1 Sektor-Eigenschaften · 4.6 eskalierender Aufstieg mit Chronik · V1/V3 aus dem
+Verteidigungskonzept.
+
+**Wenn nur eine Sache passiert:** das **Baustellen-Konto** (B4). Alles andere fügt Inhalt hinzu; B4
+entfernt die einzige Wand, hinter der kein Inhalt mehr hilft.
+
+**Wenn nur eine kleine Sache passiert:** die **Verteidigungs-Erfolge** (4.3). Null von 102 ist eine
+Lücke, die jeder Verteidiger spürt, und die Zähler dafür laufen seit Monaten mit.
