@@ -938,6 +938,31 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Werkzeugmeldung** – auch dann nicht, wenn der Lauf nachweislich vollständig durchgelaufen ist.
     Wer den Marker per `;` anhängt, macht die Werkzeugmeldung strukturell nutzlos; das ist in
     Ordnung, solange man sie auch nicht liest.
+61. **Ein Prüflauf, der bei einem Fehlschlag nur GEFILTERTE Zeilen zeigt, verschweigt im
+    Ernstfall genau die Zeile, die der Testautor für diesen Fall hinterlegt hat.** Vorfall
+    18.08.2026: `test_reiterleiste.js` fiel im vollen Lauf, einzeln war er grün. Für exakt diesen
+    Fall schreibt er eine Diagnosezeile – „WARNUNG - die Reiterleiste kam in 6 s nicht zur Ruhe,
+    gemessen wird trotzdem". Im Protokoll stand sie nicht: `tests/run.js` zeigte bei einem
+    Fehlschlag nur Zeilen, die auf `/^FAIL|Error|Cannot find/` passen, gekappt bei sechs. Die
+    Antwort auf „hat die Wartelogik aufgegeben?" war damit weg, und die Fehlersuche begann bei
+    null. Es ist der **einzige** Test im Repo, der so eine Zeile schreibt – und ausgerechnet der
+    ist gefallen.
+    Das ist dieselbe Familie wie Regel 25/37: Ein Messwerkzeug, das nur einen Teil der möglichen
+    Ausgaben kennt, verschweigt im Fehlerfall die Ursache. **Die Lehre ist aber nicht „das Muster
+    erweitern"** – ein Muster deckt immer nur den einen Fall ab, an den man gerade gedacht hat.
+    Seit dem 18.08.2026 schreibt `run.js` bei jedem Fehlschlag die **vollständige** Ausgabe nach
+    `<tmp>/kepler7-fehlschlaege/<test>.log` und nennt den Pfad im Protokoll; die sechs gefilterten
+    Zeilen bleiben zusätzlich für die Lesbarkeit (`WARNUNG` gehört jetzt mit ins Muster).
+    Beidseitig gegengeprüft an einem Wegwerf-Test, der eine WARNUNG-Zeile, eine FAIL-Zeile und
+    eine musterlose Zeile schreibt: Der alte Stand zeigt **nur** die FAIL-Zeile, der neue alle
+    drei bzw. die Datei mit allen dreien. **Wer eine neue Diagnosezeile in einen Test schreibt,
+    muss sich seither nicht mehr fragen, ob das Muster sie kennt.**
+    Nebenbei ein Werkzeugfehler bei genau dieser Gegenprobe, der die Regel bestätigt: Der erste
+    Versuch fuhr den alten `run.js` aus dem Scratchpad – dort zeigt `__dirname` woandershin, der
+    Lauf fand keinen einzigen Test und meldete stattdessen einen ENOENT auf die Spieldatei. Ein
+    Prüflauf, der aus dem falschen Verzeichnis gestartet wird, misst nicht den alten Stand,
+    sondern gar nichts (dieselbe Familie wie Regel 56).
+
 19. **`echo EXIT=$?` hinter einer Pipe misst das LETZTE Pipe-Glied, nie den Test** – `node
     test.js | grep FAIL; echo EXIT=$?` meldet den grep-Status (0 = Treffer gefunden!). Vorfall
     09.08.2026: Ein roter Test schien dadurch grün gemeldet. Exit-Codes immer ohne Pipe messen
