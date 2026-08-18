@@ -982,6 +982,32 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     **Vorgehen:** Nach einem Rebase mindestens `node tests/run.js --nur-pflicht` fahren; das kostet
     Sekunden und deckt genau die dateiweiten Prüfungen ab, die ein fremder Commit reißen kann.
     Der `--nummer`-Modus genügt dafür NICHT – er fährt nur die vier Tests am Patchnotes-Block.
+59. **Ein Kommentar im Kopf der Datei darf das Trennzeichen NICHT wörtlich enthalten, an dem ein
+    Werkzeug die Datei zerlegt.** Vorfall 18.08.2026 beim Einbau der CSP-meta-Zeilen: Der
+    erklärende Kommentar darüber beschrieb, dass die ganze Spiellogik ein einziger
+    Inline-Skriptblock ist – und schrieb das öffnende Skript-Tag dabei wörtlich hin. Der
+    Pflicht-Syntax-Check (Punkt 1 der Checkliste) schneidet den Programmtext aber per
+    `match(/<script>([\s\S]*)<\/script>/)` aus, also **ab dem ersten Vorkommen**. Der stand
+    ab da im Kommentar, 56.000 Zeilen vor dem echten Block; der Check parste den Kommentartext
+    und meldete `SyntaxError: Unexpected identifier 'also'` – einen Fehler, den es im Spiel gar
+    nicht gab. Wer dem folgt, sucht im Programmtext nach einem Fehler, der im Kommentar steht.
+    **Das ist Regel 6/33/46 eine Etage höher:** Dort zitiert ein Kommentar den TEXT, nach dem ein
+    Werkzeug sucht; hier zitiert er das TRENNZEICHEN, an dem es die Datei zerteilt – die Wirkung
+    ist ungleich größer, weil danach jede Aussage des Werkzeugs auf den falschen Ausschnitt geht.
+    **Vorgehen:** Im Kopfbereich der Datei nie `<script>`/`</script>` wörtlich schreiben –
+    „Inline-Skriptblock" umschreibt es gefahrlos. Und wenn der Syntax-Check nach einer reinen
+    KOMMENTAR-Änderung anschlägt, ist der erste Verdacht nicht der Code, sondern der Ausschnitt:
+    `node -e "const s=…; console.log(s.indexOf('<'+'script>'))"` gegen die erwartete Zeile halten.
+60. **Ein `grep`-Zähler über ein Testprotokoll zählt auch dessen SCHLUSSZEILE mit.** Aus derselben
+    Etappe: Zum Vergleich der Prüfungszahl zwischen grünem Lauf und Gegenprobe (Regel 34) wurde
+    `grep -cE '^(OK  |FAIL)'` benutzt. Ergebnis: 7 gegen 8 – also scheinbar eine unvollständige
+    Gegenprobe, mit genau dem Alarm, den Regel 34 verlangt. In Wahrheit endet ein roter Lauf mit
+    der Zusammenfassungszeile `FAIL`, ein grüner mit `PASS`; nur die eine passte auf das Muster.
+    Die Prüfungen waren beide Male dieselben sieben. **Vorgehen:** Auf das Trennzeichen der
+    Prüfzeilen mitmatchen (`'^(OK|FAIL) +- '`), und die Prüf-NAMEN beider Läufe per `diff`
+    vergleichen statt nur ihre Anzahl – das beantwortet die eigentliche Frage („liefen dieselben
+    Prüfungen?") direkt, statt sie über eine Zahl zu erraten. Dieselbe Familie wie Regel 15/17/19:
+    ein Messwerkzeug, das sich selbst im Weg steht.
 57. **„Es fehlt" und „es ist unsichtbar" sind zwei verschiedene Befunde – und nur die Messung
     unterscheidet sie.** Vorfall 18.08.2026 (KB-15, Fokusring der Kartenknoten): Der Verdacht
     lautete „die Knoten haben keinen Fokusstil", belegt durch ein fehlendes CSS – es gibt keinen
@@ -1077,6 +1103,40 @@ Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:befor
   - **Alle Zweige einer Box laufen über DENSELBEN `setBoxHtml`-Schlüssel** (Gastmodus-Notiz, Ladenotiz, Hauptinhalt – Beispiele `marketBox`, `moduleMarketBox`, `traderBox`, `doctrineBox`): Ein Zweig, der am Schlüssel vorbei direkt `innerHTML` schreibt, macht den Cache beim nächsten Zustandswechsel still falsch (die Notiz käme nie wieder durch, weil der Cache sie noch für gezeichnet hält).
   - **`renderModuleMarket` war das Lehrstück gegen Wertlisten-Buckets**: Seine Signatur bündelte die Kredite in 1000er-Schritten – kippte die Bezahlbarkeit eines Angebots INNERHALB eines Buckets, blieb der Kauf-Knopf fälschlich ausgegraut. Ersetzt durch die Markup-Signatur; das `disabled`-Attribut steht im Markup und kann nicht veralten. Wer eine Wertlisten-Signatur über einen abgeleiteten/gerundeten Wert bildet, prüfe, ob die ROHGRÖSSE unterhalb der Rundung sichtbare Zustände kippen kann.
   Umgestellt in dieser Runde außerdem: `tradeRouteBox` (1,45 kB/s, größter Einzelposten), `fleetStickyBar`, `missionsActive`/`expeditionsActive`/`fleetPositionList` (Leer-Notizen; mit Countdown schreiben sie weiter), `relocateBox`, `inventoryBox`, `scoreLogBox`, `rareItemsBox`, `kofiTopSupporterBox`, die drei Verlaufs-SVGs (`scoreHistorySvg`/`creditsHistorySvg`/`prodHistorySvg` – `innerHTML` und `childElementCount` funktionieren auf SVG-Elementen genauso). Dazu ein 10s-Cooldown in `loadMarketState`: Liefert der Server dauerhaft eine ok-Antwort ohne Marktdaten (real passiert 15.08.2026, Backend hing hinter dem Frontend), fragte der Lade-Zweig 1×/s an UND zeichnete je Antwort ein zweites Mal – gemessen 2 volle renderMarket-Läufe und 86.000 Anfragen/Tag je offenem Markt-Tab. Wächter: `tests/test_tickruhe.js` (eingefrorene Uhr nach Regel 18 für „steht still", laufende Mission für „friert nicht ein", Klicks nach übersprungenen Ticks für die Verdrahtung im Schreibzweig) und `tests/test_marktriegel_bauboxen.js` 2a–2c (Cooldown gebremst UND Selbstheilung lebt).
+- **Content-Security-Policy: `connect-src 'self'` als zweite Linie um das Sitzungs-Token**
+  (18.08.2026, Sicherheits-Audit Punkt 5). Der Token liegt in `localStorage['kepler7_token']` und
+  ist damit in JS-Reichweite; eine XSS-Lücke könnte ihn mit einer Zeile auslesen. Beim Audit wurde
+  **keine** gefunden (Chat, Nachrichten und Allianz-Tags laufen durch `escapeHtml`, Allianznamen
+  über `setBoxText`, und Spielernamen können bauartbedingt kein Markup enthalten – `server.js`
+  erlaubt nur `[a-zA-Z0-9_\-äöüÄÖÜß]{3,18}`). Die CSP ändert daran nichts, sondern die FOLGE:
+  Auslesen ja, **wegschicken nein**.
+  Tragfähig ist das, weil das Spiel ausschließlich mit dem eigenen `/api` spricht – gemessen 9
+  `fetch`-Ziele, alle relativ, dazu kein `XMLHttpRequest`, kein `WebSocket`, kein `sendBeacon`,
+  kein `EventSource`. Die fremden Hosts (Discord, Ko-fi, Instagram, TikTok, YouTube) stehen
+  ausschließlich in `<a href>`-Links, und die begrenzt `connect-src` nicht.
+  **Drei Dinge, die man beim Anfassen wissen muss:**
+  (a) **Kein `default-src`, und das ist eine Entscheidung.** Nicht genannte Direktiven fallen nur
+  dann auf `default-src` zurück, wenn es eines GIBT. Ohne bleiben Schrift (Base64-Datei-URI),
+  Inline-Stile und der Inline-Skriptblock unberührt. Ein `script-src` bräuchte hier zwingend
+  `'unsafe-inline'` (die ganze Spiellogik ist EIN Block) und wäre damit wirkungslos – das ist eine
+  eigene, größere Etappe. `tests/test_csp_verbindung.js` 1b hält das fest.
+  (b) **`frame-ancestors`, HSTS und `nosniff` wirken in einem meta-Tag NICHT** – sie müssen als
+  echte Kopfzeilen aus der nginx.conf des Pi kommen. An der Produktion gemessen fehlten dort am
+  18.08.2026 **alle** Sicherheits-Kopfzeilen; der kopierfertige Block steht in
+  `gamegeeeeek-ai-core/docs/sicherheits-audit-2026-08-18.md`. Eine Kopfzeilen-CSP ERSETZT die
+  meta-Zeile übrigens nicht, sie gilt zusätzlich – beide zusammen sind so streng wie die strengere.
+  (c) **`strict-origin-when-cross-origin` statt `no-referrer`**: Verify- und Reset-Links tragen
+  ihren Token in der URL (`?verify=…`). Der gewählte Wert entfernt Pfad UND Abfrage bei fremden
+  Zielen – der Token ist damit vollständig geschützt –, lässt aber die bloße Herkunft stehen, so
+  dass Ko-fi weiterhin sieht, dass der Besucher aus dem Spiel kam. `no-referrer` hätte auch das
+  genommen, ohne zusätzlichen Schutz.
+  Wächter: `tests/test_csp_verbindung.js` – misst an einem echten Browser über HTTP (unter
+  `file://` ist `'self'` eine undurchsichtige Herkunft, „gleiche Herkunft erlaubt" ließe sich dort
+  gar nicht messen; eigener Port 3241). Das PAAR ist der Beleg: fremde Herkunft blockiert UND
+  eigene erlaubt – 2b allein wäre ohne jede CSP trivial grün, 2a allein auch bei einer viel zu
+  strengen CSP, die das Spiel lahmlegt. Gemessen wird das `securitypolicyviolation`-Ereignis, nicht
+  „der Aufruf ist gescheitert": Ein CSP-Block und eine nicht auflösbare Adresse werfen BEIDE einen
+  `TypeError`, das allein belegt also nichts (Regel 28).
 - **Sichtbarkeits-Gate für reines Anzeige-Polling**: `setInterval`s, die nur Daten zum ANZEIGEN nachladen (Bestenliste, Berichte, Nachrichten, Galaxie-Zustand, Allianzbasis-Kriegszustand/Spenden-Rangliste, Versions-Check), prüfen `document.visibilityState === 'visible'`, bevor sie feuern – spart Server-Anfragen/Akku im Hintergrund-Tab. **Bewusst NICHT** auf Timer mit echter Spielmechanik angewendet (`maybeScheduleRaid`, `maybeSchedulePirateDebrisRaid`, `maybeSpawnVoidRift`, `maybeSpawnTrader`, `refreshAllianceMusterAttack`) – deren Timing soll auch im Hintergrund-Tab real weiterlaufen.
 
 ## Unterstützer, Kosmetik und Sternenstaub (Etappen 1–5, 15./16.08.2026)
