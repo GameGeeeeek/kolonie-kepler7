@@ -443,6 +443,32 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Rutsch sichtbar gemacht, die sonst über drei 25-Minuten-Läufe einzeln hereingetröpfelt wären
     (jeder Lauf war nach dem ersten Fehlschlag ohnehin wertlos). Der volle Lauf bleibt Pflicht – er
     ist die Absicherung, nicht das Suchwerkzeug.
+    **Nachtrag 18.08.2026 – ein musterbasierter Test ist nur so gut wie sein Muster, und mein
+    eigener hat seine ANLASSFAMILIE nicht gefangen.** Der datengetriebene Rundflug-Wächter (Regel
+    oben zur Rundflug-Regel) suchte nach `/2` oder `*500` im `endTime`-Ausdruck. Zwei Review-Bot-
+    Befunde am PR #432 haben nachgewiesen – und ich habe beide am Code gegengemessen –, dass er
+    damit genau die Form übersieht, die `intercept-pirates` und `void-rift` kaputt gemacht hatte:
+    `dur = relocationDuration(...)` (schon einweg) und dann `endTime: jetzt + dur*1000`. In dem
+    Ausdruck steht weder `/2` noch `*500`. Gemessen an einer eingefügten, frei erfundenen
+    Missionsart: der neue Detektor schlägt an, **der alte hätte sie stillschweigend durchgelassen**.
+    **Die Ursache war, dass das Muster das SYMPTOM beschrieb statt der URSACHE.** „Halbiert den
+    Ausdruck" ist eine von zwei Arten, einwegig zu sein; „schöpft aus einer Einweg-Dauerquelle" ist
+    die andere und die eigentliche. Ein Muster, das eine einzelne Schreibweise kodiert, ist eine
+    namensbasierte Suche in Verkleidung – mit genau deren Schwäche (Regel 40). **Vorgehen:** Beim
+    Bau eines musterbasierten Wächters die Frage stellen, welche Größe die Regel wirklich verletzt,
+    und nach DER suchen; danach die eigene Anlassfamilie als Gegenprobe einspeisen – schlägt der
+    Wächter am ursprünglichen Vorfall nicht an, ist er keiner. Und der Detektor muss **belegen, dass
+    er seine Quelle findet** (`1j-quelle`: mindestens zwei Blöcke leiten aus `relocationDuration`
+    ab), sonst erblindet er still, sobald die Quelle umbenannt wird.
+    **Zweite Hälfte desselben Vorfalls, und sie ist Regel 39 an einem Test, der eine ZAHLUNG
+    schützt:** `1k-treibstoff` prüfte `missionFuelCostSplit(flug, flotte)` über die GANZE Datei.
+    Denselben Aufruf enthält auch die Vorschau. Fällt die Startfunktion auf `flug/2` zurück, kündigt
+    der Dialog weiter die Rundreise an, abgebucht wird die Hälfte – und die Prüfung bleibt grün, weil
+    der Treffer aus der Vorschau kommt (an einer sabotierten Kopie gemessen: genau so). Jede Prüfung,
+    deren Suchbegriff auch an einer ANZEIGE-Stelle vorkommt, muss auf die Stelle gescopt werden,
+    deren VERHALTEN sie schützt – und der Anker dieses Bereichs gehört selbst geprüft (`1k-bereich`),
+    sonst ist die Aussage vacuous (Regel 6).
+
 41. **Ein Konzept ist kein Messergebnis. Bevor eine Konzept-Zahl umgesetzt wird, wird sie
     nachgerechnet – auch wenn das Konzept aus derselben Feder stammt.** Vorfall 16.08.2026: Das
     Tier-3-Konzept sah Protomaterie als laufenden Eingangsstoff der beiden neuen Fabriken vor
