@@ -69,7 +69,7 @@ try {
     + '\nreturn { BASTION_MARK_MAX, BASTION_MARK_PER_STEP, BASTION_MARK_CLASS_CAP, BASTION_MARK_COST_BASE,'
     + ' BASTION_MARK_COST_KEYS, BASTION_MARK_GATES, BASTION_MARK_TIME_BASE, BASTION_MARK_TIME_STEP,'
     + ' bastionMarkClassFactor, bastionMarkCost, bastionMarkOf, bastionMarkMult, bastionMarkFaehig,'
-    + ' bastionMarkKeys, bastionMarkDuration, bastionMarkTotalDuration, bastionDefVal, bastionAtkVal,'
+    + ' bastionMarkDuration, bastionMarkTotalDuration, bastionDefVal, bastionAtkVal,'
     + ' state: () => state, setMark: (k,v) => { state.bastionMarks[k] = v; } };';
   // Nur die Teile ausschneiden, die ohne Browser laufen: bastionMarkRowHtml und
   // bastionMarkLagerProblem brauchen DOM-/Spielhelfer und werden weiter unten am Quelltext
@@ -124,7 +124,11 @@ if (!API){ console.log('\nFEHLGESCHLAGEN'); process.exit(1); }
 
 // ============================================================ 3) Wer traegt ueberhaupt eine Marke
 {
-  const faehig = API.bastionMarkKeys();
+  /* Die Liste wird hier ueber bastionMarkFaehig() gebildet, nicht ueber eine eigene Hilfsfunktion
+     im Spiel. Der erste Anlauf hatte dafuer ein bastionMarkKeys() angelegt - das rief aber NUR
+     dieser Test auf, das Spiel nie, und tests/test_tote_funktionen.js hat es zu Recht als tote
+     Funktion gemeldet. Eine Funktion, die es nur fuer den Test gibt, gehoert in den Test. */
+  const faehig = buildingDefs.filter(d => API.bastionMarkFaehig(d)).map(d => d.key);
   const ohneWert = buildingDefs.filter(d => !d.defVal && !d.atkVal).map(d => d.key);
   check('3a: jede Anlage mit Kampfwerten kann eine Marke tragen',
     buildingDefs.filter(d => d.defVal || d.atkVal).every(d => faehig.includes(d.key)),
