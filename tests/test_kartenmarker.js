@@ -43,6 +43,19 @@ const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 const S = fs.readFileSync(SPIELDATEI, 'utf8');
 
+/* Der PATCHNOTES-Block wird fuer die verneinenden und die zaehlenden Pruefungen unten
+   herausgeschnitten (CLAUDE.md Regel 46). Grund: Ein Patchnote, der eine Behebung beschreibt,
+   ZITIERT die alte Formulierung - und reisst damit genau die Pruefung, die diese Behebung
+   festhaelt. Patchnotes sind unveraenderliche Historie, man kann den Wortlaut dort also nicht
+   anpassen; die Pruefung muss sich anpassen.
+   Die Regel gilt nicht nur fuer "steht NICHT mehr da": Auch ein ZAEHLER wird falsch, sobald ein
+   Patchnote den gesuchten Text erwaehnt - in beide Richtungen. */
+const S_OHNE_HISTORIE = (() => {
+  const v = S.indexOf('  const PATCHNOTES = [');
+  const b = v < 0 ? -1 : S.indexOf('\n  ];', v);
+  return (v >= 0 && b > v) ? S.slice(0, v) + S.slice(b) : S;
+})();
+
 // Welche Systeme einen NPC haben, wird aus dem NPCS-Array GELESEN, nicht geraten (Hausregel 4) -
 // und auf den Block dieses Arrays gescopt, damit kein gleichnamiger Schlüssel anderswo hereinredet
 // (Regel 39). Geprüft werden die ersten Systeme daraus plus alle Boss-Systeme: Bosse tragen den
@@ -214,7 +227,7 @@ async function laufe(browser, store, viewport, mobil, systeme) {
   // dass alle drei Markerarten sie benutzen; ein vierter Markertyp ohne Schieber fällt damit auf
   // (Regel 43). Kommentare werden vorher geleert, weil die Erklärtexte den Aufruf zitieren
   // (Regel 33).
-  const OHNE_KOMMENTARE = S.replace(/^\s*\/\/.*$/gm, '');
+  const OHNE_KOMMENTARE = S_OHNE_HISTORIE.replace(/^\s*\/\/.*$/gm, '');
   const definitionen = OHNE_KOMMENTARE.split('function kbMarkerFrei').length - 1;
   const aufrufe = (OHNE_KOMMENTARE.split('kbMarkerFrei(').length - 1) - definitionen;
   check('3a: der Kollisionsschieber existiert genau einmal', definitionen === 1, { definitionen });

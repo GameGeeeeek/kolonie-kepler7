@@ -23,6 +23,19 @@ const { check, ende } = pruefer();
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 
+/* Der PATCHNOTES-Block wird fuer die verneinenden und die zaehlenden Pruefungen unten
+   herausgeschnitten (CLAUDE.md Regel 46). Grund: Ein Patchnote, der eine Behebung beschreibt,
+   ZITIERT die alte Formulierung - und reisst damit genau die Pruefung, die diese Behebung
+   festhaelt. Patchnotes sind unveraenderliche Historie, man kann den Wortlaut dort also nicht
+   anpassen; die Pruefung muss sich anpassen.
+   Die Regel gilt nicht nur fuer "steht NICHT mehr da": Auch ein ZAEHLER wird falsch, sobald ein
+   Patchnote den gesuchten Text erwaehnt - in beide Richtungen. */
+const JS_OHNE_HISTORIE = (() => {
+  const v = JS.indexOf('  const PATCHNOTES = [');
+  const b = v < 0 ? -1 : JS.indexOf('\n  ];', v);
+  return (v >= 0 && b > v) ? JS.slice(0, v) + JS.slice(b) : JS;
+})();
+
 // ---- 1) Extraktion + Verdrahtung
 const von = JS.indexOf('function moduleInvVergleich(a, b){');
 const bis = von < 0 ? -1 : JS.indexOf('\n  }', von);
@@ -32,7 +45,7 @@ const quelle = JS.slice(von, bis + 4);
 const nutzungen = (JS.match(/invKeys\.sort\(moduleInvVergleich\)/g) || []).length;
 check('1b: BEIDE Inventare (Standort + Klasse) nutzen denselben Vergleich', nutzungen === 2, nutzungen);
 check('1c: die alten Inline-Kopien sind weg (kein Drift-Risiko)',
-  !JS.includes('rarityRankDesc') && !JS.includes('rarityRankShip'));
+  !JS_OHNE_HISTORIE.includes('rarityRankDesc') && !JS_OHNE_HISTORIE.includes('rarityRankShip'));
 
 // ---- Sandbox mit den ECHTEN Helfern aus der Spieldatei
 // MODULE_RARITY-Reihenfolge aus der Datei ziehen (nie aus dem Gedaechtnis, Regel 4). Der
