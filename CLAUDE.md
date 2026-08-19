@@ -1748,6 +1748,78 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     ist ihr ausgesetzt, weil das Banner 138–164 px hoch ist und alles darunter verschiebt (Regel 63
     zählt für die verwandte Reiterleisten-Flanke 88 von 147 betroffenen Tests).
 
+## Sektorkarte E1: Landmarken (19.08.2026)
+
+Auftrag Sascha: „entwerfe mehr tiefgründigen Content für die Sektorkarte", danach „okay e 1 weiter".
+Konzept mit allen fünf Etappen, sieben begründeten Ablehnungen und den offenen Messfragen:
+**`docs/sektorkarte-konzept.md`**. Hier steht nur, was E1 gebaut hat.
+
+**Der Befund, aus dem E1 entstand:** `karteSystemBadges` führte sieben Abzeichen (🏰 🏴‍☠️ 👽 ⚔️ 🌀
+🔎 📡) – **kein einziges für eine Asteroidenfestung oder ein Alien-Nest**. Beide lebten
+ausschliesslich im aufgeklappten System; `festungFaktoren` hatte genau zwei Aufrufer, beide in der
+Abbaurechnung. Wer eine Festung finden wollte, musste jedes der 67 Systeme einzeln durchklicken –
+genau der Zustand, gegen den KB-8 gebaut wurde.
+
+**`karteSystemBadges` speist DREI Anzeigestellen, nicht zwei.** Das Konzept nannte die
+Regionsübersicht (aggregiert) und die Sektoransicht; gemessen gibt es einen dritten Aufrufer in
+`buildGalaxyMap` für die **Nachbarpunkte der offenen Systemebene**. Ein Eintrag dort versorgt alle
+drei – und deshalb steht neuer Karteninhalt dort und nicht in den Renderern.
+
+**Drei neue Abzeichen:** 🛡 Festung (Stufenname, Kernstand in Prozent, Blockade), 👾/👑 Nest (Volk,
+stärkste Stufe, Schwäche; mehrere im selben System bekommen EIN Abzeichen mit Zahl), 🎯 Gegner
+(Name und Stufe). **🎯 und nicht ⚔️** – das Schwerter-Zeichen ist an den Fraktionskrieg vergeben,
+zwei Bedeutungen für dasselbe Symbol wären die zweite Anzeigestelle in Reinform.
+
+**Das 👽 schweigt jetzt, wo ein Nest steht.** Der Backend-Kommentar an `nestOrteNachfuehren` sagt
+es selbst: Der Server führt den Ort des „Volk entdeckt"-Eintrags auf das **stärkste Nest** nach,
+damit ein Frontend ohne Nest-Kenntnis „weiterhin ein sinnvolles Alien-Abzeichen am richtigen Ort"
+zeigt. Es war also der Notnagel für genau die Zeit vor E1; mit dem 👾 daneben stünden zwei
+Abzeichen für dieselbe Sache am selben Ort. **Gemessen wird das als PAAR** (mit Nest kein 👽, ohne
+Nest eines) – jede Hälfte allein wäre auch dann erfüllt, wenn das 👽 ganz verschwunden wäre, und
+dann hätte die Entdopplung eine Auskunft gelöscht statt sie zu entdoppeln.
+
+**Ein ausgelieferter Bestandsfehler nebenbei behoben:** `MISSION_LINIEN` führte sechs Missionsarten
+– `festung-angriff` fehlte. Der Leser filtert mit `filter(mm => MISSION_LINIEN[mm.type])`, ein
+unbekannter Typ verschwindet also **stillschweigend**. Der Nest-Angriff (v8.582.0) hatte beide
+Zweige bekommen, der ältere Festungsschlag (v8.569.0) nicht: Man sah seinen Nest-Verband über die
+Karte fliegen, seinen Festungsverband nicht. `missionMapZiel` braucht dafür einen eigenen Zweig –
+eine Festung ist kein Planet, die generische `PLANETS.find`-Suche fällt ins Leere.
+
+**Vier Dinge, die man beim Anfassen wissen muss:**
+
+- **Die Nester gehören in `karteAuffangSignatur`, aber SCHLANK.** Ohne Anteil stünde ein gefallenes
+  Nest bis zum 5-Sekunden-Vollbau weiter auf der Karte; mit `JSON.stringify` der ganzen Liste
+  erzwänge die beim Reifen wandernde LP einen Kartenneubau je Tick. Deshalb `id:stufe:lp/1000`.
+  `state.asteroidFeld` ist längst drin – die Festung reist damit ohnehin mit.
+- **Kein Vorhang vor den Daten.** `ladeAsteroidfeld` ersetzt `state.asteroidFeld` in EINEM Abruf
+  durch alle Felder des Servers, `galaxyCache.alienNester` reist vollständig mit. Eine Sperre wäre
+  eine, die jede Entwicklerkonsole in fünf Sekunden aufzieht.
+- **Zwei geratene Namen hat erst die Prüfung gefangen:** `NEST_KOENIGIN_STUFE` existiert nicht (der
+  Bestandscode erkennt die Königin an `stufe >= 5`), und die drei Renderer lesen an einem Abzeichen
+  **nur** `icon` und `title` – ein `farbe`-Feld wäre toter Code gewesen. Der Syntax-Check hätte den
+  ersten Fall NICHT gefangen: `new Function` parst nur und führt nie aus (Arbeitsregel 4/38).
+- **`ti-bug` ist nicht im Subset-Font**, `check-icons.js` hat es vor dem Commit gefangen. Ersetzt
+  durch `ti-alien` – das ist im Subset UND wird vom Nest-Kartenmenü bereits benutzt, also dieselbe
+  Bildsprache statt einer zweiten daneben.
+
+**Die `sk.desc` wird endlich gerendert.** Sie stand seit jeher in `SEKTOR_DEFS` und war nirgends zu
+sehen (`grep -c "Der stille Norden"` lieferte 1, nur die Definition) – siehe die Korrektur im
+Abschnitt „Sektor-Eigenschaften". Sie steht jetzt im `<title>` des Regionsknotens, bewusst **nicht**
+als vierte Textzeile: Die Zeile darunter trägt schon die Abzeichen, und acht Regionen mit je einem
+Satz würden die Übersicht zumüllen.
+
+**Was E1 ausdrücklich NICHT gebaut hat** (steht als E1b im Konzept): die antippbare Abzeichenzeile
+mit namentlicher Systemliste, den `npcMapMenu`-Infoblock mit gemessener Gegnerstärke aus
+`state.npcIntel`, Kopf/Fuss/Legende der Übersicht und das fehlende `system`-Feld in
+`shareIntelWithAlliance`. E1 beantwortet „was steht wo" – „wie stark ist es" ist die nächste Frage.
+
+Wächter: `tests/test_landmarken.js` (19 Prüfungen auf allen drei Kartenebenen, Sichtbarkeit statt
+Existenz gemessen). Gegenprobe gegen den Stand vor E1: 13 rot bei identischen Prüfnamen. **Zwei
+Prüfungen waren dabei zunächst aus dem falschen Grund grün** – die Kartensuche fiel auf ihren
+eigenen Suchbegriff herein (die leere Box antwortet `Keine Treffer für "Sternenfeste".` und
+ZITIERT ihn damit), und der Übersichts-Tooltip nannte sein System schon vorher namentlich, weil das
+👽 dort stand. Beide sind seither auf eine echte Trefferzeile bzw. auf die neuen Auskünfte gescopt.
+
 ## Eine PvE-Auflösung ZIEHT AB (19.08.2026) – der Fehler, der drei Auslieferungen überlebt hat
 
 **Die Schiffe eines Verbandes bleiben während der ganzen Mission in `fleet` gezählt.** Nur der
