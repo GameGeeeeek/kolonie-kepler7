@@ -152,13 +152,14 @@ async function starte(browser, res){
         dreihundert[feld] === einzeln[feld] * 300,
         { proStueck:einzeln[feld], fuer300:dreihundert[feld], erwartet:einzeln[feld]*300 });
     }
-    // Der Schlachtschiff-Korb ab 100 Stueck MUSS eine Ressource zeigen, die ein einzelnes
-    // Schlachtschiff nicht kostet. Welche das ist, liest der Test nicht aus einer Liste ab,
-    // sondern vergleicht die Ressourcen-SCHLUESSEL beider Koerbe - eine umbenannte Tier-2-
-    // Ressource laesst die Pruefung damit weiterhin gelten (Arbeitsregel 3).
+    // Die Gegenrichtung, seit die Massenflotten-Komponente entfernt ist (18.08.2026, Auftrag
+    // Sascha "Massenflotte muss noch raus"): Hier stand die Umkehrung - ab 250 Kreuzern MUSSTE
+    // zusaetzliches Tier-2-Material im Korb auftauchen. Genau das gibt es nicht mehr, also
+    // prueft der Korb jetzt, dass er auch bei grosser Menge KEINEN neuen Rohstoff erfindet.
+    // Der Kreuzer ist weiterhin der richtige Traeger: Er lag mit Schwelle 250 am hoechsten.
     const kreuzer = page.locator('[data-basket-ship="cruisers"]');
     check('3c-vorab: der Kreuzer ist im Korb auffindbar', await kreuzer.count() > 0,
-      { hinweis:'ohne ihn bliebe die Tier-2-Zuschlagspruefung ungefahren' });
+      { hinweis:'ohne ihn bliebe die Mengen-Pruefung ungefahren' });
     if (await kreuzer.count()){
       await jaeger.click({clickCount:3}); await jaeger.type('0',{delay:25});
       await kreuzer.click({clickCount:3}); await kreuzer.type('1',{delay:25});
@@ -168,9 +169,13 @@ async function starte(browser, res){
       await page.waitForTimeout(250);
       const vieleKreuzer = zahlen(await lies(page,'[data-korb-kosten="cruisers"]'));
       const neueStoffe = Object.keys(vieleKreuzer).filter(k => !(k in einKreuzer));
-      check('3c: ab 250 Kreuzern verlangt der Korb zusaetzliches Tier-2-Material',
-        neueStoffe.length > 0,
+      check('3c: auch bei 300 Kreuzern verlangt der Korb keinen zusaetzlichen Rohstoff',
+        neueStoffe.length === 0,
         { beiEinem:Object.keys(einKreuzer), bei300:Object.keys(vieleKreuzer), neu:neueStoffe });
+      const feldK = Object.keys(einKreuzer)[0];
+      check('3d: und 300 Kreuzer kosten exakt das 300-fache des ersten',
+        vieleKreuzer[feldK] === einKreuzer[feldK] * 300,
+        { proStueck:einKreuzer[feldK], fuer300:vieleKreuzer[feldK], erwartet:einKreuzer[feldK]*300 });
     }
     await ctx.close();
   }

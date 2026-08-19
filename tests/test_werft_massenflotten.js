@@ -1,47 +1,45 @@
-// Schiffskosten: FLACHER Stückpreis (18.08.2026) + Tier-2-Komponenten ab einer Bestands-Schwelle.
+// Schiffskosten: der Stückpreis haengt in KEINER Weise vom Bestand ab (Stand 18.08.2026).
 //
-// (1) Der Stückpreis einer Klasse haengt NICHT mehr vom Bestand ab. Bis zum 18.08.2026 stand hier
-//     eine Mengenskalierung (+0,4% je vorhandenem Schiff, oberhalb 250 exponentiell bis zum
-//     66-fachen); sie ist auf Wunsch von Sascha entfernt. Dieser Test hielt frueher genau diese
-//     Kurve fest - jetzt haelt er ihre ABWESENHEIT fest, und zwar schaerfer: Es genuegt nicht,
-//     dass der Preis "kaum" steigt, er muss ueber den ganzen Bereich IDENTISCH sein.
-// (2) Acht Klassen kosten oberhalb einer Bestands-Schwelle je weiterem Schiff eine
-//     Tier-2-Komponente (SHIP_T2_KOMPONENTEN) - zum TABELLENWERT, ohne Faktor. Das ist eine
-//     Schwelle, keine Preisstaffel, und war nicht Gegenstand der Aenderung.
+// Der Test hat zwei Umbauten hinter sich, und beide haben ihn schaerfer gemacht:
 //
-// Der Test schneidet SHIP_T2_KOMPONENTEN und scaledShipCost/shipCostForRange als ECHTE Blöcke
-// aus der Spieldatei und führt sie mit einem Mini-Fixture aus (Regel 36: fehlende Abhängigkeiten
-// - currentFleet/allFleets/prestigePerkCount - sind hier bewusst Teil des Fixtures, weil genau
-// ihre Werte der Messgegenstand sind; keine Spiel-HILFSFUNKTION wird durch etwas Ähnliches
-// ersetzt). Erwartungswerte werden, wo möglich, aus der ALTEN Kurve abgeleitet statt eingetippt.
+// (1) Bis zum 18.08.2026 hielt er eine MENGENSKALIERUNG fest (+0,4% je vorhandenem Schiff,
+//     oberhalb 250 exponentiell bis zum 66-fachen). Auftrag Sascha: "Nimm das wieder raus."
+//     Seither haelt er ihre ABWESENHEIT fest - und zwar strenger, als die alte Kurve geprueft
+//     war: Es genuegt nicht, dass der Preis "kaum" steigt, er muss ueber den ganzen
+//     Bestandsbereich IDENTISCH sein.
+// (2) Danach blieb noch die MASSENFLOTTEN-KOMPONENTE (SHIP_T2_KOMPONENTEN, Etappe A2): Oberhalb
+//     einer Bestands-Schwelle kostete jedes weitere Schiff einer Klasse zusaetzlich
+//     Tier-2-Material. Sie war als Schwelle gedacht und nicht als Preisstaffel - fuer den Spieler
+//     war sie aber dasselbe: Weiterbauen wurde ab einer Stueckzahl teurer. Auftrag Sascha:
+//     "Massenflotte muss noch raus." Seither prueft dieser Test, dass der Bestand den Preis
+//     ueberhaupt nicht mehr beruehrt, weder ueber einen Faktor noch ueber eine Schwelle.
+//
+// Die geprueften Bloecke werden als ECHTE Bloecke aus der Spieldatei geschnitten und mit einem
+// Mini-Fixture ausgefuehrt (Regel 36: keine Spiel-Hilfsfunktion wird durch etwas Aehnliches
+// ersetzt). currentFleet/allFleets/prestigePerkCount stellt das Fixture, weil genau ihre Werte
+// frueher der Messgegenstand waren - dass sie jetzt WIRKUNGSLOS sind, ist die neue Aussage.
 //
 // Gegenprobe (beidseitig gefahren, 18.08.2026): Mit wieder eingebauter Mengenskalierung fallen
-// 2a/2b/3a; mit entferntem A2-Block fallen 4a/4b.
+// 2a/2b; mit wieder eingebauter Komponenten-Tabelle fallen 3a/3b/4a und 6a.
 const fs = require('fs');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 
 const { check, ende } = pruefer();
 const S = fs.readFileSync(SPIELDATEI, 'utf8');
 
-// ---------- 1: Blöcke ausschneiden und ausführen (Regel 34: Aufbau als eigene Prüfung) ----------
-// Der Slice beginnt bei shipCostPerkMult (damit shipCostForRange mit im Block liegt) und endet
-// an der jaegerCost-Definition; beide existieren genau einmal. Die dazwischen liegenden
-// maxAffordable*-Funktionen werden nie AUFGERUFEN - ihre Abhängigkeiten (costFor, state)
-// braucht das Fixture deshalb nicht.
+// ---------- 1: Block ausschneiden und ausfuehren (Regel 34: Aufbau als eigene Pruefung) ----------
+// Der Slice beginnt bei shipCostPerkMult (damit shipCostForRange mit im Block liegt) und endet an
+// der jaegerCost-Definition. Der Mittelanker ist jetzt scaledShipCost selbst - frueher stand hier
+// SHIP_T2_KOMPONENTEN, und genau die gibt es nicht mehr.
 const anfang = S.indexOf('function shipCostPerkMult()');
+const mitte = S.indexOf('function scaledShipCost(');
 const endeAnker = S.indexOf('function jaegerCost(');
-const tabelleDa = S.indexOf('const SHIP_T2_KOMPONENTEN = {');
-check('1-anker: shipCostPerkMult, SHIP_T2_KOMPONENTEN und jaegerCost existieren in dieser Reihenfolge',
-  anfang >= 0 && tabelleDa > anfang && endeAnker > tabelleDa, { anfang, tabelleDa, endeAnker });
+check('1-anker: shipCostPerkMult, scaledShipCost und jaegerCost existieren in dieser Reihenfolge',
+  anfang >= 0 && mitte > anfang && endeAnker > mitte, { anfang, mitte, endeAnker });
 
 let api = null;
 try {
   const block = S.slice(Math.max(0, anfang), endeAnker > anfang ? endeAnker : anfang);
-  // Das Fixture stellt die drei Abhängigkeiten des Blocks: eine Flotte am aktiven Standort,
-  // alle Flotten des Imperiums, und den (hier neutralen) Werft-Perk. Alle Rückgaben sind mit
-  // typeof-Wachen versehen (Regel 34): Am ALTEN Stand fehlt SHIP_T2_KOMPONENTEN - die
-  // Gegenprobe soll dann mit benannten FAILs durchlaufen, nicht mit einem ReferenceError
-  // abstürzen und die übrigen Prüfungen verdecken.
   const bauer = new Function('fixture', `
     const currentFleet = () => fixture.lokal;
     const allFleets = () => fixture.flotten;
@@ -54,12 +52,11 @@ try {
     };
   `);
   const probe = bauer({ lokal: {}, flotten: [] });
-  check('1-bau: der Block lässt sich ausführen', !!probe.scaledShipCost, Object.keys(probe).filter(k=>!probe[k]));
-  check('1c: SHIP_T2_KOMPONENTEN existiert im Block', !!probe.SHIP_T2_KOMPONENTEN);
-  if (probe.scaledShipCost && probe.SHIP_T2_KOMPONENTEN) api = bauer;
+  check('1-bau: der Block laesst sich ausfuehren', !!probe.scaledShipCost,
+    Object.keys(probe).filter(k => !probe[k]));
+  if (probe.scaledShipCost) api = bauer;
 } catch (e) {
-  check('1-bau: der Block lässt sich ausführen', false, String(e).slice(0, 200));
-  check('1c: SHIP_T2_KOMPONENTEN existiert im Block', false);
+  check('1-bau: der Block laesst sich ausfuehren', false, String(e).slice(0, 200));
 }
 
 if (api) {
@@ -69,119 +66,110 @@ if (api) {
     fixture.flotten = [{ [key]: bestand }];
     return api(fixture);
   };
-  // Der Bestand liegt bewusst auf einer ANDEREN Flotte als der lokalen: scaledShipCost zählt
+  // Der Bestand liegt bewusst auf einer ANDEREN Flotte als der lokalen: Die alte Rechnung war
   // (global - lokal) + n - so misst der Test auch, dass Verteilen auf Kolonien nichts umgeht.
   const kostenBei = (bestand, key, basis) => mit(bestand, key).scaledShipCost(basis, key, 0);
 
-  /* ---------- 2/3: FLACHER Stückpreis - die Kernaussage der Änderung ----------
-     Gemessen wird ueber den ganzen frueher betroffenen Bereich, einschliesslich der beiden
-     Stellen, an denen die alte Kurve ihre Knicke hatte (250 = alter Deckel, 251 = Beginn des
-     exponentiellen Schwanzes). Die Basis ist bewusst gross, damit eine Rundung einen echten
-     Unterschied nicht verstecken koennte. */
+  /* ---------- 2: FLACHER Stueckpreis ueber den ganzen Bereich ---------- */
   const B = { erz: 100000 };
   const messpunkte = [0, 1, 100, 249, 250, 251, 500, 1000, 2000, 10000];
   const werte = messpunkte.map(nth => ({ nth, erz: kostenBei(nth, 'cruisers', B).erz }));
   const abweichend = werte.filter(w => w.erz !== B.erz);
-  check('2a: der Stückpreis ist über den ganzen Bestandsbereich IDENTISCH mit der Grundzahl',
+  check('2a: der Stueckpreis ist ueber den ganzen Bestandsbereich IDENTISCH mit der Grundzahl',
     abweichend.length === 0, { grundzahl: B.erz, abweichend });
   check('2b: insbesondere an den alten Knickstellen 250/251 - dort sass der alte Deckel',
     kostenBei(250, 'cruisers', B).erz === kostenBei(251, 'cruisers', B).erz
       && kostenBei(0, 'cruisers', B).erz === kostenBei(250, 'cruisers', B).erz,
-    { bei0: kostenBei(0, 'cruisers', B).erz, bei250: kostenBei(250, 'cruisers', B).erz, bei251: kostenBei(251, 'cruisers', B).erz });
-  /* Die Gegenrichtung, ohne die 2a nichts belegt: Der Bestandszaehler MUSS weiterhin gelesen
-     werden - die Tier-2-Schwelle haengt daran. Ein `scaledShipCost`, das n ignoriert, waere an
-     2a nicht zu unterscheiden, wuerde aber die Komponenten abschalten. */
-  const kompKlasse = Object.keys(api(fixture).SHIP_T2_KOMPONENTEN)[0];
-  const kompRes = Object.keys(api(fixture).SHIP_T2_KOMPONENTEN[kompKlasse].kosten)[0];
-  const schwelle = api(fixture).SHIP_T2_KOMPONENTEN[kompKlasse].ab;
-  check('3a: der Bestand wird weiterhin gelesen - er entscheidet die Tier-2-Schwelle',
-    kostenBei(schwelle - 1, kompKlasse, B)[kompRes] === undefined
-      && kostenBei(schwelle, kompKlasse, B)[kompRes] > 0,
-    { klasse: kompKlasse, schwelle, unter: kostenBei(schwelle - 1, kompKlasse, B)[kompRes],
-      auf: kostenBei(schwelle, kompKlasse, B)[kompRes] });
+    { bei0: kostenBei(0, 'cruisers', B).erz, bei250: kostenBei(250, 'cruisers', B).erz,
+      bei251: kostenBei(251, 'cruisers', B).erz });
 
-  // ---------- 4: A2-Komponenten ----------
-  const T = api(fixture).SHIP_T2_KOMPONENTEN;
-  const klassen = Object.keys(T);
-  check('4-vorab: die Tabelle führt Klassen mit ab-Schwelle und Kosten',
-    klassen.length >= 5 && klassen.every(k => T[k].ab > 0 && Object.keys(T[k].kosten).length > 0),
-    { klassen });
-  let unterSchwelleSauber = true, ueberSchwelleDa = true, skaliert = true;
-  for (const k of klassen) {
-    const t2Keys = Object.keys(T[k].kosten);
-    const unter = kostenBei(T[k].ab - 1, k, { erz: 1000 });
-    if (t2Keys.some(r => unter[r] !== undefined)) unterSchwelleSauber = false;
-    const auf = kostenBei(T[k].ab, k, { erz: 1000 });
-    // Erwartung aus der TABELLE, nicht eingetippt - und ohne Faktor: Die Komponente ist eine
-    // Schwelle, keine Preisstaffel. Bis zum 18.08.2026 stand hier der Mengenfaktor mit drin.
-    for (const r of t2Keys) {
-      if (auf[r] !== Math.ceil(T[k].kosten[r])) skaliert = false;
-      if (!(auf[r] > 0)) ueberSchwelleDa = false;
+  /* ---------- 3: die Massenflotten-Komponente ist WEG ----------
+     3a prueft die Tabelle, 3b den ausgefuehrten Code. Beide braucht es: Die Tabelle koennte
+     stehenbleiben, ohne gelesen zu werden (dann waere sie tot, aber harmlos), und der Preis
+     koennte auch ohne Tabelle irgendwoher einen Bestandszuschlag beziehen. */
+  check('3a: SHIP_T2_KOMPONENTEN existiert nicht mehr',
+    api(fixture).SHIP_T2_KOMPONENTEN === null);
+  // Die ACHT Klassen, die frueher eine Komponente trugen, samt ihrer alten Schwelle. Bewusst als
+  // historische Regressionsliste im Test und NICHT aus einer Tabelle gelesen - die Tabelle gibt es
+  // ja gerade nicht mehr. Erwartet wird fuer jede: kein einziger Tier-2-Posten, bei keinem Bestand.
+  const FRUEHERE_KOMPONENTEN = [
+    ['cruisers', 250], ['waechter', 250], ['destroyers', 200], ['bomber', 200],
+    ['schlachtschiff', 100], ['carrier', 100], ['leerenjaeger', 50], ['superschlachtschiff', 25]
+  ];
+  const T2_STOFFE = ['nanolegierungen', 'quantenchips', 'hochenergiekristalle', 'fusionskerne',
+    'kikerne', 'metamaterial', 'singularitaetskern'];
+  const verstoesse = [];
+  for (const [k, alteSchwelle] of FRUEHERE_KOMPONENTEN) {
+    for (const bestand of [alteSchwelle - 1, alteSchwelle, alteSchwelle + 1, alteSchwelle * 10]) {
+      const c = kostenBei(bestand, k, { erz: 1000 });
+      for (const r of T2_STOFFE) if (c[r] !== undefined) verstoesse.push(k + '@' + bestand + ':' + r);
+      if (c.erz !== 1000) verstoesse.push(k + '@' + bestand + ':erz=' + c.erz);
     }
   }
-  check('4a: unterhalb der Schwelle keine T2-Kosten (alle Klassen)', unterSchwelleSauber);
-  check('4b: ab der Schwelle T2-Kosten vorhanden, und zwar zum reinen Tabellenwert', ueberSchwelleDa && skaliert);
-  // Klassen OHNE Tabelleneintrag bleiben komplett T2-frei - auch bei riesigem Bestand.
-  const jaegerHoch = kostenBei(5000, 'jaeger', { erz: 50, energie: 30 });
-  check('4c: Klassen ohne Eintrag (Jäger) bekommen nie T2-Kosten',
-    !('nanolegierungen' in jaegerHoch) && !('quantenchips' in jaegerHoch), jaegerHoch);
+  check('3b: keine der acht frueheren Komponenten-Klassen bekommt bei irgendeinem Bestand einen Zuschlag',
+    verstoesse.length === 0, { verstoesse: verstoesse.slice(0, 8) });
 
-  // ---------- 5: Batch über die Schwelle hinweg (shipCostForRange preist je Einheit) ----------
+  /* ---------- 4: der Bestand wird gar nicht mehr GELESEN ----------
+     Die Gegenrichtung zu 2a/3b: Selbst eine Basis mit ungewoehnlichen Schluesseln darf sich
+     zwischen leerem und riesigem Bestand nicht unterscheiden - und zwar identisch im ganzen
+     zurueckgegebenen Objekt, nicht nur in einem Feld. */
+  const basisMix = { erz: 777, kristalle: 333, antimaterie: 11 };
+  const leer = JSON.stringify(kostenBei(0, 'schlachtschiff', basisMix));
+  const voll = JSON.stringify(kostenBei(99999, 'schlachtschiff', basisMix));
+  check('4a: derselbe Preis bei Bestand 0 und 99.999 - vollstaendig, nicht nur je Feld',
+    leer === voll, { leer, voll });
+
+  /* ---------- 5: Batch ueber die alte Schwelle hinweg ----------
+     shipCostForRange preist je Einheit. Frueher zahlten nur die Einheiten oberhalb der Schwelle
+     die Komponente; heute muss ein Batch exakt Menge x Stueckpreis kosten. */
   if (api(fixture).shipCostForRange) {
     fixture.lokal = { schlachtschiff: 95 };
     fixture.flotten = [fixture.lokal];
     const teile = api(fixture);
-    const batch = teile.shipCostForRange({ costFn: (n) => teile.scaledShipCost({ erz: 400 }, 'schlachtschiff', n) }, 95, 10);
-    // Einheiten 95..99 ohne, 100..104 mit Komponente - erwartete Nano-Summe aus Tabelle+Formel:
-    let nanoErwartet = 0;
-    for (let nth = 100; nth <= 104; nth++) nanoErwartet += Math.ceil(T.schlachtschiff.kosten.nanolegierungen);
-    check('5: Batch über die Schwelle - nur die Einheiten oberhalb zahlen die Komponente',
-      batch.nanolegierungen === nanoErwartet, { ist: batch.nanolegierungen, nanoErwartet });
+    const batch = teile.shipCostForRange(
+      { costFn: (n) => teile.scaledShipCost({ erz: 400 }, 'schlachtschiff', n) }, 95, 10);
+    const fremdeStoffe = T2_STOFFE.filter(r => batch[r] !== undefined);
+    check('5a: ein Batch ueber die alte Schwelle kostet exakt Menge x Stueckpreis',
+      batch.erz === 400 * 10, { ist: batch.erz, erwartet: 4000 });
+    check('5b: und er zieht dabei keinen Tier-2-Posten heran', fremdeStoffe.length === 0,
+      { fremdeStoffe, batch });
   } else {
-    check('5: shipCostForRange im Block gefunden', false);
+    check('5-vorab: shipCostForRange im Block gefunden', false);
   }
 }
 
-// ---------- 6: Anzeigestellen (Regel 6: die zweite Stelle, die die alte Annahme behält) ----------
-// Der PATCHNOTES-Block bleibt bewusst drin (positive Prüfungen); verneinende Prüfungen schneiden
-// ihn heraus (Regel 46).
+// ---------- 6: Anzeigestellen (Regel 6: die zweite Stelle, die die alte Annahme behaelt) ----------
+// Verneinende Pruefungen schneiden den PATCHNOTES-Block heraus (Regel 46) - die Historie zitiert
+// die alten Formulierungen und darf das auch.
 const OHNE_HISTORIE = (() => {
   const v = S.indexOf('  const PATCHNOTES = [');
   const b = v < 0 ? -1 : S.indexOf('\n  ];', v);
   return (v >= 0 && b > v) ? S.slice(0, v) + S.slice(b) : S;
 })();
-check('6a: die Werft-Karte kündigt die Komponente an (t2KompLine wird gerendert)',
-  S.includes('${t2KompLine}') && S.includes('${superKompLine}'));
-check('6b: der Hilfetext sagt, dass der Stückpreis NICHT mehr mit der Flottengröße steigt',
+check('6-vorab: der PATCHNOTES-Block liess sich herausschneiden',
+  OHNE_HISTORIE.length < S.length && OHNE_HISTORIE.length > S.length * 0.3,
+  { ganz: S.length, ohne: OHNE_HISTORIE.length });
+check('6a: keine Werft-Karte kuendigt noch eine Massenflotten-Komponente an',
+  !OHNE_HISTORIE.includes('${t2KompLine}') && !OHNE_HISTORIE.includes('${superKompLine}')
+    && !OHNE_HISTORIE.includes('Massenflotten-Komponente aktiv'));
+check('6b: der Hilfetext sagt, dass der Stueckpreis NICHT mehr mit der Flottengroesse steigt',
   S.includes('kostet jedes Schiff einer Klasse denselben Preis'));
 // Bewusst der SPEZIFISCHE alte Schiffs-Wortlaut, nicht "gedeckelt bei +100%" allgemein - den
-// Deckel gibt es bei anderen Mechaniken (Abgrund-Offiziere) völlig zu Recht weiterhin.
-check('6c: die alte Schiffs-Aussage "kostet also das Doppelte" (Fixpreis-Deckel) ist aus den Live-Texten verschwunden',
+// Deckel gibt es bei anderen Mechaniken (Abgrund-Offiziere) voellig zu Recht weiterhin.
+check('6c: die alte Aussage "kostet also das Doppelte" ist aus den Live-Texten verschwunden',
   !OHNE_HISTORIE.includes('Schiff eines Typs kostet also das Doppelte'));
-// Und die Aussage der Zwischenstufe ebenso - sie war von August bis zum 18.08.2026 wahr und ist
-// es seit dem flachen Stückpreis nicht mehr.
 check('6c2: auch die exponentielle Zwischen-Aussage steht nicht mehr in den Live-Texten',
   !OHNE_HISTORIE.includes('wächst der Stückpreis exponentiell weiter'));
-// Paritätswache: Jede Klasse der Tabelle muss im Hilfetext namentlich auftauchen - eine neue
-// Klasse ohne Hilfetext-Erwähnung (oder umgekehrt) fällt hier auf. Die Namen kommen aus
-// SHIP_DEFS (bzw. dem Superschlachtschiff-Sonderfall), nie aus einer zweiten Liste im Test.
+// 6d ist die Umkehrung der frueheren Paritaetswache: Der Hilfetext darf keine Klasse mehr mit
+// einer Bestands-Schwelle bewerben. Geprueft wird der Hilfe-Abschnitt selbst, auf seinen
+// title:-Anker gescopt - der nackte Titel wird auch in Kommentaren zitiert (Regel 6/39).
 {
-  const tabellenBlock = (S.match(/const SHIP_T2_KOMPONENTEN = \{[\s\S]*?\n  \};/) || [''])[0];
-  const keys = [...tabellenBlock.matchAll(/^\s{4}(\w+):/gm)].map(m => m[1]);
-  // title:-Anker statt des nackten Titels: Der Titel wird auch in Kommentaren und im
-  // Grenznutzen-Hilfetext ZITIERT - der nackte indexOf traf zuerst den Kommentar an
-  // scaledShipCost und prüfte dann 3000 Zeichen Quelltext statt des Hilfe-Eintrags (Regel 6).
   const hilfeStart = OHNE_HISTORIE.indexOf("title:'Imperiums-Skalierung der Kosten'");
+  check('6d-vorab: der Hilfe-Abschnitt ist auffindbar', hilfeStart >= 0);
   const hilfe = hilfeStart >= 0 ? OHNE_HISTORIE.slice(hilfeStart, hilfeStart + 3000) : '';
-  check('6d-vorab: Tabelle und Hilfe-Abschnitt gefunden', keys.length >= 5 && hilfeStart >= 0, { keys });
-  const fehlend = keys.filter(k => {
-    const name = k === 'superschlachtschiff' ? 'Superschlachtschiff'
-      : ((S.match(new RegExp(`key:'${k}', name:'([^']+)'`)) || [])[1] || k);
-    // "Trägerschiff" heißt in SHIP_DEFS so, der Hilfetext darf den Namen beliebig flektieren -
-    // geprüft wird der Wortstamm.
-    return !hilfe.includes(name.slice(0, Math.min(name.length, 9)));
-  });
-  check('6d: jede Komponenten-Klasse steht namentlich im Hilfetext', fehlend.length === 0, { fehlend });
+  const wirbt = /ab \d+ Stück|oberhalb einer Bestands-Schwelle je weiterem Schiff eine/.test(hilfe);
+  check('6d: der Hilfetext verspricht keine Bestands-Schwelle mehr', !wirbt,
+    { ausschnitt: hilfe.slice(0, 0) || undefined });
 }
 
 ende();
