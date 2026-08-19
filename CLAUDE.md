@@ -1516,6 +1516,52 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     Inhalt darüber danach, driftet das Ziel unter dem Spieler weg. Und **88 von 147** Tests, die das
     Spiel mit Spielstand booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
 
+63. **Die Tab-Hinweisleiste ist 166 px hoch, steht ÜBER dem Tab-Inhalt, und ihr Erscheinen ist ein
+    RENNEN gegen die Test-Vorbereitung.** Vorfall 19.08.2026, drei Prüfläufe hintereinander mit je
+    einem einzelnen Fehlschlag, jeder einzeln grün: `test_reiterleiste`, dann `test_sprungleiste`,
+    dann `test_kartenbedienung` – und beim Nachstellen sprang er auf `test_kartengroesse` über.
+    Alle vier melden dasselbe: „Element sitzt tiefer als erwartet" bzw. „Mitte liegt außerhalb des
+    Fensters".
+    **Der Mechanismus:** `maybeShowTabHint` blendet die Leiste aus, solange ein Overlay steht
+    (`tabHintBlocked()`). Jeder Test blendet in seiner Vorbereitung genau diese Overlays aus –
+    läuft danach noch ein Haupt-Tick, erscheint die Leiste und schiebt **alles darunter um 166 px**;
+    misst der Test vorher, nicht. Gemessen an der Zerlegung des Abstands über dem Kartenkasten:
+    `#tabHintBar=166` neben `div.tabs=108`, `#resbar=86`, `div.hero=138`.
+    **`test_reiterleiste` macht es seit jeher richtig** und setzt `seenTabHints` für alle zwölf
+    Reiter; den drei anderen fehlte es. Seit dem 19.08.2026 setzen sie es ebenfalls.
+    **Vorgehen für jeden Test, der FENSTERLAGE misst** (Mitte im Bild, Element nicht verdeckt,
+    Sprungziel oben): Die Fixture muss die Möbel abschalten, die nur manchmal da sind –
+    `seenTabHints` für alle Reiter, `nextPlanetEventCheck`/`nextTraderCheck` gepinnt. Gemessen sind
+    **88 von 147** Tests, die das Spiel mit Spielstand booten und `nextPlanetEventCheck` nicht
+    pinnen; die Flanke wartet dort weiter.
+    **Und die Lehre über die Fixture hinaus:** Ein Fehlschlag, der bei jedem Lauf ein anderes Opfer
+    sucht, ist kein Wackeln von drei Tests, sondern EIN Zustand, der drei Tests trifft. Wer ihn je
+    Test „stabilisiert", baut drei Pflaster über eine Ursache (genau das war hier zweimal passiert).
+
+64. **Ein Grenzwert für eine Scroll-Lage muss die Frage stellen: Kann die Seite überhaupt weiter?**
+    Aus demselben Vorfall, und es hat mich zwei Anläufe gekostet. `test_sprungleiste` prüfte
+    „zielOben < 300", dann in meiner ersten Korrektur „oberes Bilddrittel". Beide Male war die Zahl
+    auf eine zufällige Seitenlänge kalibriert: Die geprüfte Überschrift ist der **letzte** Abschnitt
+    der Seite. Wie weit sie nach oben kommt, hängt allein daran, wie viel Seite unter ihr liegt –
+    nach dem Abschalten der 166-px-Hinweisleiste war die Seite kürzer, die Seite lief auf ihren
+    Anschlag (`scrollY 1225 = maxScroll`), und das Ziel blieb bei 508. Kein Fehler, sondern Physik.
+    Geprüft wird deshalb die EIGENSCHAFT (die Überschrift ist vollständig im Bild und nicht hinter
+    der klebenden Leiste) plus die Zusatzbedingung „im oberen Drittel, **solange die Seite noch
+    scrollen kann**".
+    **Zwei Beifunde, beide gemessen:**
+    (a) Meine eigene Ruhe-Wartung war zuerst falsch gebaut: Sie beobachtete die **Dokument**-Lage
+    des Ziels – und die ändert sich beim Scrollen überhaupt nicht. Die Schleife meldete sofort
+    „ruhig", mitten in der weichen Scroll-Animation, und lieferte je nach Zufall 270, 508 oder
+    628 px. **Ein Messwerkzeug, das die falsche Größe beobachtet, ist schlimmer als ein fester
+    Schlaf – es sieht nach Sorgfalt aus.** Beobachtet werden jetzt Fensterlage UND Scroll-Position.
+    (b) Mit korrekter Wartung landete das Ziel bei `zielOben: 0` – also **vollständig hinter der
+    klebenden Reiterleiste** (`leisteUnten: 108`). `scrollIntoView({block:'start'})` setzt es exakt
+    auf die Fensterkante. Das ist ein echter Bedienfehler derselben Klasse wie KB-10 und seit dem
+    19.08.2026 behoben: `body.compact-head [data-acc-key] { scroll-margin-top: 128px; }` – die dafür
+    gebaute CSS-Eigenschaft, kein JS, keine zweite Rechnung, und sie wirkt auf jedes künftige
+    Sprungziel automatisch. Beide Gegenproben getrennt gefahren und jede fällt spezifisch: ohne
+    `scroll-margin` genau `2b`, ohne `scrollIntoView` genau `2`.
+
 ## Die Klappen weichen der Reiterleiste aus (18.08.2026)
 
 **Der Fund kam aus einem Fehlschlag, den zwei Sitzungen vorher als Wackeln abgehakt hatten.**
