@@ -3072,7 +3072,7 @@
           <div class="login-title">Neues Passwort setzen</div>
         </div>
       </div>
-      <input type="password" id="resetNewPassword" placeholder="Neues Passwort (mind. 6 Zeichen)" autocomplete="new-password"/>
+      <input type="password" id="resetNewPassword" placeholder="Neues Passwort (mind. 8 Zeichen)" autocomplete="new-password"/>
       <button id="resetSubmitBtn" class="login-submit"><i class="ti ti-check" aria-hidden="true" style="margin-right:6px;"></i>Passwort setzen</button>
       <div id="resetError" class="login-error"></div>
     </div>
@@ -7104,8 +7104,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.578.0';
+  const VERSION = '8.579.0';
   const PATCHNOTES = [
+    { version:'8.579.0', date:'19.08.2026', changes:[
+      '<strong>Neue Passwörter brauchen jetzt mindestens acht Zeichen</strong> – und dürfen nicht zu den paar tausend Passwörtern gehören, die weltweit am häufigsten benutzt werden. Der Server führt dafür eine Liste; er prüft außerdem, dass ein Passwort nicht nur aus Ziffern besteht, nicht aus lauter gleichen Zeichen, und weder deinen Spielernamen noch den Namen des Spiels enthält. Wird eines abgelehnt, sagt die Meldung dir genau, welche der Regeln greift.',
+      '<strong>Dein bestehendes Passwort bleibt gültig.</strong> Die neuen Regeln gelten nur, wenn ein Passwort neu gesetzt wird – bei der Anmeldung ändert sich nichts. Wer sein Konto vor heute angelegt hat, meldet sich weiter genau wie bisher an, auch mit einem kürzeren Passwort. Eine Regel, die den Bestand aussperrt, statt nur Neues zu begrenzen, wäre der größere Schaden gewesen.',
+      'Beim Registrieren steht die Mindestlänge jetzt direkt im Eingabefeld, und zu kurze Passwörter meldet das Spiel sofort – vorher erfuhrst du es erst, nachdem du auf „Konto erstellen" geklickt hattest. Beim Anmelden steht die Angabe bewusst <strong>nicht</strong> da: Sie wäre für alle bestehenden Konten schlicht falsch.',
+      'Hintergrund: Das ist der letzte offene Punkt aus dem Sicherheits-Durchgang, den wir nach einem Video über typische Login-Schwachstellen gemacht haben. Vier der fünf dort genannten Punkte waren hier schon vorher sauber gelöst; die Passwortstärke lag noch auf dem Stand von sechs Zeichen, und ein Abgleich gegen bekannte Passwörter fehlte ganz.'
+    ]},
     { version:'8.578.0', date:'18.08.2026', changes:[
       '<strong>Nachjustiert: die Schiffspreise steigen wieder.</strong> Mit v8.576.0 fiel die Mengenstaffelung weg – und große Flotten schwerer Schiffe wurden dadurch deutlich billiger, als beabsichtigt war. Die Grundpreise sind jetzt so gesetzt, dass eine Flotte in etwa das kostet, was sie vorher gekostet hat.',
       'Konkret: <strong>100 Stück kosten 1,04-fach, 250 Stück 0,83-fach und 500 Stück 0,61-fach</strong> des früheren Gesamtpreises – gemessen als Median über alle 36 Schiffsklassen. Kleine Flotten bleiben also praktisch gleich teuer, große werden moderat günstiger. Genau das ist der Zweck des Wegfalls: Weiterbauen wird nicht mehr bestraft.',
@@ -65409,6 +65415,11 @@
       document.getElementById('loginSubmitBtn').innerHTML = '<i class="ti ti-login" aria-hidden="true" style="margin-right:6px;"></i>'+(loginMode==='login'?'Anmelden':'Konto erstellen');
       const unameEl = document.getElementById('loginUsername');
       if (unameEl) unameEl.placeholder = loginMode==='register' ? 'Spielername (3-18 Zeichen, kein @) – z.B. Sternenjäger_7' : 'Kommandantenname';
+      const pwEl = document.getElementById('loginPassword');
+      // Die Laengenangabe steht NUR im Registrier-Modus. Beim Anmelden waere sie eine
+      // Falschaussage: Konten von vor dem 19.08.2026 duerfen ihr 6-Zeichen-Passwort behalten
+      // und melden sich damit weiter an - die neue Regel begrenzt das Setzen, nicht den Bestand.
+      if (pwEl) pwEl.placeholder = loginMode==='register' ? 'Passwort (mind. 8 Zeichen)' : 'Passwort';
       document.getElementById('loginEmail').style.display = loginMode==='register' ? 'block' : 'none';
       const tosRow = document.getElementById('loginTosRow');
       if (tosRow) tosRow.style.display = loginMode==='register' ? 'flex' : 'none';
@@ -65461,7 +65472,7 @@
       const newPassword = document.getElementById('resetNewPassword').value;
       const errEl = document.getElementById('resetError');
       errEl.textContent = '';
-      if (String(newPassword).length < 6){ errEl.textContent = 'Passwort muss mindestens 6 Zeichen haben.'; return; }
+      if (String(newPassword).length < 8){ errEl.textContent = 'Passwort muss mindestens 8 Zeichen haben.'; return; }
       const btn = document.getElementById('resetSubmitBtn');
       btn.disabled = true;
       try {
@@ -65506,6 +65517,12 @@
       if (loginMode === 'register'){
         if (username.includes('@')){ errEl.textContent = 'Das erste Feld ist dein Spielername im Spiel (kein @-Zeichen) – deine E-Mail-Adresse gehört ins zweite Feld. Beispiel-Name: Sternenjäger_7'; btn.disabled = false; return; }
         if (!/^[a-zA-Z0-9_\-äöüÄÖÜß]{3,18}$/.test(username)){ errEl.textContent = 'Bitte wähle einen Spielernamen mit 3 bis 18 Zeichen. Erlaubt sind Buchstaben, Zahlen sowie _ und - (keine Leer- oder Sonderzeichen). Beispiel: Sternenjäger_7'; btn.disabled = false; return; }
+        // Vorpruefung der Passwortlaenge. Sie fehlte hier bisher ganz - geprueft hat nur der
+        // Server, und der Spieler erfuhr es erst nach dem Absenden. BEWUSST nur die LAENGE:
+        // Die Liste der bekannten Passwoerter (2.122 Eintraege) bleibt beim Server, sonst gaebe
+        // es eine zweite Wahrheit, die auseinanderlaufen kann - und 19 kB Liste in der Spieldatei
+        // waeren ein schlechter Tausch. Der Server nennt in dem Fall den Grund.
+        if (password.length < 8){ errEl.textContent = 'Passwort muss mindestens 8 Zeichen haben.'; btn.disabled = false; return; }
       }
       const body = { username, password };
       if (loginMode === 'register' && email) body.email = email;

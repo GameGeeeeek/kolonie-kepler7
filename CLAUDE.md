@@ -981,6 +981,20 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     gegen `HEAD` bilden; (b) `wc -c` auf den Patch, bevor irgendetwas zurückgesetzt wird – 0 Bytes
     heißt, es gibt keine Sicherung; (c) bei Dateien, die nicht aus einem Skript reproduzierbar
     sind (CLAUDE.md, neue Tests), lieber eine echte Kopie ablegen als einen Patch.
+
+    **Nachtrag 19.08.2026 – die Regel steht da, und ich bin trotzdem hineingelaufen.** Beim
+    Neuaufsetzen für P5 (Nummernkollision, zweimal hintereinander) habe ich vor dem
+    `git checkout -f -B` sauber gesichert: den Patch der Spieldatei, `wc -c` geprüft, die neue
+    Testdatei als echte Kopie. Die CLAUDE.md-Ergänzung, die ich eine halbe Stunde vorher
+    geschrieben hatte, war in der Sicherung **nicht dabei** – sie war zu dem Zeitpunkt längst
+    fertig und damit aus dem Blick. Der harte Checkout hat sie verworfen; aufgefallen ist es erst,
+    weil `git status --short` unmittelbar vor dem Commit vier statt fünf Dateien zeigte.
+    **Die Lücke ist nicht die Regel, sondern ihre Anwendung: Gesichert wird, woran man GERADE
+    arbeitet – verloren geht, was schon fertig war.** Deshalb vor jedem `checkout -f`/`reset --hard`
+    nicht überlegen, was zu sichern ist, sondern `git status --short` lesen und JEDE Zeile darin
+    versorgen. Zwei Sekunden, und die Frage „habe ich an alles gedacht?" stellt sich nicht mehr.
+    Bezeichnend: Die Backend-CLAUDE.md desselben Vorhabens überlebte, weil es dort keinen Checkout
+    gab – der Unterschied war reines Glück, nicht Umsicht.
 56. **Ein `cd` in den Nachbar-Klon und ein Testaufruf gehören NIE in denselben Befehl.** Vorfall
     18.08.2026, dreimal an einem Tag: `cd ../kolonie-kepler7-backend && git pull; for t in …; do
     node tests/$t.js; done` – der `cd` gilt für den Rest der Zeile, die Tests liefen also im
@@ -2021,6 +2035,47 @@ fehlende Beschreibung).
   DERSELBEN Zeile und fand hier null Treffer. Richtig ist, vom Eintragsanfang bis zum NÄCHSTEN
   Eintragsanfang zu suchen – dann kann der Treffer nie aus einem fremden Eintrag stammen
   (Hausregel 39/59 in der mehrzeiligen Variante).
+## Passwort-Mindestlänge 8 (19.08.2026, Sicherheits-Audit P5, v8.579.0)
+
+Die Regel selbst steht im Backend (`PASSWORT_MIN`, sechs Prüfungen inklusive einer Liste von 2.122
+bekannten Passwörtern). Das Frontend prüft **nur die Länge** vorab – die Liste dort zu spiegeln wäre
+eine zweite Wahrheit und 19 kB in einer Datei, die jeder Spieler bei jedem Aufruf lädt.
+
+**Vier Anzeigestellen, und die vierte ist die, die man übersieht:**
+
+1. Der `#resetNewPassword`-Platzhalter – eigenes Feld, eigener Text.
+2. Die Reset-Prüfung im Skriptblock.
+3. **Die Registrier-Vorprüfung, die es vorher gar nicht gab.** Bis hierher prüfte das Frontend beim
+   Registrieren keine Passwortlänge; nur der Server tat es, und der Spieler erfuhr es erst nach dem
+   Absenden. Sicherheitlich war das harmlos – die Richtung ist die umgekehrte der Videolücke.
+4. Der Platzhalter des Passwortfelds, **modusabhängig**: Das Feld ist DASSELBE für Anmelden und
+   Registrieren. Ein festes „mind. 8 Zeichen" wäre im Anmelde-Modus eine Falschaussage gegenüber
+   genau den Bestandskonten, die die Änderung schützt.
+
+**Ein Fund, der die Suche selbst betrifft (Regel 32 in Reinform):** Der Audit-Bericht nannte eine
+Frontend-Prüfung, die es für die Registrierung nie gab, und `grep "api/register"` findet in der
+Spieldatei **null** Treffer – der Pfad entsteht erst zur Laufzeit als `fetch('/api/'+loginMode)`.
+Wer nach dem Literal sucht, schließt daraus, das Spiel registriere gar nicht. Beim Nachprüfen einer
+Route also immer auch nach der ZUSAMMENSETZUNG suchen, nicht nur nach dem fertigen Pfad.
+
+Wächter: `tests/test_passwortregeln.js` (10 Prüfungen). Sein Kern ist die **Parität** gegen
+`PASSWORT_MIN` in `server.js` – zwei Repos, die über getrennte Befehle desselben Webhooks live
+gehen, und der Fehler, vor dem das Auslöser-Video warnt, ist genau „zwei Zahlen, die auseinander
+laufen". Gemessen statt behauptet wird auch die WIRKUNG: Bei sieben Zeichen darf **keine Anfrage**
+an den Server rausgehen (am alten Stand ging sie mit `["file:///api/register"]` wirklich raus).
+
+**Es braucht ZWEI Gegenproben**, weil der Test zwei verschiedene Dateien misst – eine über die
+Spieldatei allein hätte die Paritätsprüfung nie bewegt (`KEPLER_SPIELDATEI` → 4 rot;
+`KEPLER_BACKEND_SERVER` auf eine Kopie mit `PASSWORT_MIN = 6` → 1 rot, mit dem sprechenden Beleg
+`{"backend":6,"frontendErwartet":8}`).
+
+**Die Auslieferungsreihenfolge ist hier ausnahmsweise gleichgültig** – anders als bei den Festungen
+(Regel 60) gibt es keine still verschlechterte Zahl: Geht das Backend zuerst live, lehnt der Server
+ein 7-Zeichen-Passwort mit klarem Grund ab; geht das Frontend zuerst, blockt die Vorprüfung etwas,
+das der Server genommen hätte. Beides ist verständlich, keines ist still. Ein Schalter ist deshalb
+nicht nötig – die zwei PRs gehören trotzdem zusammen gemerged, damit die Paritätsprüfung nicht gegen
+die alte Zahl läuft.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
