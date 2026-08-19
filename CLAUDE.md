@@ -2540,6 +2540,122 @@ dem Server bzw. mit dem Bestand und werden nicht eingedeutscht – neue EIGENE B
 schon (`pveVerlusteBuchen`, `baustelleRestKosten`, `kbMarkerFrei`), so wie es dieses Projekt seit
 jeher hält.
 
+## Das Sitzungs-Token liegt nicht mehr in localStorage (19.08.2026, Audit P3 Etappe b)
+
+Bis hierher stand der Token in `localStorage['kepler7_token']`. Beim Audit wurde **keine** XSS-Lücke
+gefunden, aber bei 56.400 Zeilen mit direktem `innerHTML`-Rendern ist die Frage nicht, ob je eine
+entsteht – und die erste wäre mit **einer Zeile** eine vollständige Kontoübernahme gewesen. Seit
+Etappe b trägt die Sitzung ein HttpOnly-Cookie (`kepler7_sid`), das JavaScript gar nicht erst lesen
+kann. Die Backend-Hälfte (`POST /api/logout`, Cookie-Nachreichung) steht in der Backend-CLAUDE.md.
+
+**Die eine Zeile, die jeden Spieler gleichzeitig ausgesperrt hätte** – im Browser gemessen, bevor
+etwas gebaut wurde: `'Bearer '+authToken` ergibt bei `authToken === null` wörtlich den Header
+`Bearer null`. Die Wache des Servers sieht damit einen Bearer-Header und schaut das Cookie **gar
+nicht mehr an**; jede frische Anmeldung wäre in einen 401 gelaufen. `backendFetch` setzt den Header
+deshalb nur noch bei wirklich vorhandenem Token. Dieselbe Messung hat nebenbei gezeigt, dass
+`credentials: 'include'` **nicht gebraucht** wird: Ein nacktes `fetch()` schickt das Cookie bei
+gleicher Herkunft von selbst mit (Gegenprobe `credentials:'omit'` – dann nicht).
+
+**`authToken` taugt nicht mehr als „bin ich angemeldet?" – dafür gibt es `sitzungAktiv`.** Bei einer
+frischen Anmeldung bleibt `authToken` bewusst `null`; er ist nur noch der **Altbestand**. Zwei
+Stellen lasen ihn als Flagge, und beide wären zu Falschaussagen geworden: `useBackend()` hätte das
+ganze Mehrspieler-Spiel abgeschaltet, und `asteroidClaim` hätte einem angemeldeten Spieler „Dafür
+musst du angemeldet sein" gesagt (Punkt 6, die klassische zweite Anzeigestelle – gefunden per
+`grep`, nicht beim Lesen).
+
+**Die Reihenfolge im Boot IST der Migrationsweg**, und sie ist bewusst so herum: erst `/me` **ohne**
+Bearer (dann entscheidet das Cookie), erst danach ein noch gespeicherter Token. Greift das Cookie,
+wird der gespeicherte Token weggeräumt – ohne Neuanmeldung. Greift es nicht, spielt der Spieler
+exakt wie vorher weiter. **Niemand wird durch diese Auslieferung ausgesperrt**, und genau das ist
+die Prüffrage, an der die Auslieferbarkeit hängt – nicht die Behebung selbst.
+
+**Abmelden braucht seit dem eine Server-Route.** Ein HttpOnly-Cookie kann JavaScript nicht löschen;
+ohne `POST /api/logout` hätte ein Klick auf „Abmelden" den localStorage-Rest weggeräumt, neu
+geladen – und das Cookie hätte den Spieler stillschweigend **wieder angemeldet** (gemessen, siehe
+unten). Das `await` vor dem `location.reload()` ist deshalb keine Höflichkeit: Lädt die Seite neu,
+bevor die Antwort da ist, kommt die Lösch-Kopfzeile nie an.
+
+**Und `sitzungBeenden()` prüft den STATUS, nicht nur, dass der Aufruf nicht geworfen hat.** Ein 404
+wirft nicht. Kennt der Server die Route nicht – weil sein Deploy hängt, und das ist diesem Projekt
+**sechsmal** passiert, zuletzt genau mit dem Commit dieser Etappe –, käme sonst ein stilles
+„abgemeldet" heraus, während die Sitzung weiterlebt. Auf einem geteilten Gerät ist das genau der
+Fall, den ein Abmeldeknopf verhindern soll. Bei `false` wird deshalb **nicht** neu geladen, der
+lokale Zustand **nicht** abgebaut (sonst stünde das Spiel halb angemeldet da – außen lebendig,
+innen tot), und der Fehlschlag wird benannt. Dasselbe Muster kennt „Alle Sitzungen beenden" schon,
+das den 404 eines veralteten Servers seit jeher ausspricht statt ihn zu verschlucken.
+Die zwei Verlust-Pfade (`handleSaveConflict`, `handleSessionSuperseded`) rufen dagegen
+`sitzungLokalAbraeumen()` **unbedingt** auf: Dort ist die Sitzung ohnehin verloren, und es gibt
+nichts, was der Spieler stattdessen tun könnte.
+
+### Drei Funde aus den Gegenproben, jeder über den Einzelfall hinaus
+
+1. **Eine Prüfung, die die ANZEIGE misst statt des Mechanismus, war gegen einen kaputten Server
+   grün.** Der erste Entwurf von `test_sitzungscookie_front.js` fragte nach dem Abmelden nur, ob
+   wieder der Anmeldebildschirm steht. Gegen einen Server, dessen `/api/logout` das Cookie **nicht**
+   löscht, blieb das grün. Isoliert nachgemessen ist der Unterschied eindeutig – echter Server:
+   Kekse `[]`, `/api/me` 401; ohne Löschung: Cookie bleibt, `/api/me` **200**. Geprüft wird deshalb
+   zuerst der Cookie-Bestand des Browsers und die Antwort des Servers, erst danach die Anzeige.
+   (Arbeitsregel 61, hier an einer Sicherheitsfrage.)
+2. **Ein verwaister Prozess aus einem abgebrochenen Lauf entwertet jede spätere Gegenprobe.** Zwei
+   frühe Läufe waren an einem Playwright-Timeout gestorben und hatten ihr Backend nicht abgeräumt.
+   Die „sabotierte" Gegenprobe sprach danach mit dem **echten** Server von vorhin – sie war grün und
+   belegte nichts, und ich habe eine ganze Runde lang die falsche Erklärung gesucht. Behoben in
+   beide Richtungen: Der äußere Fehlerausgang räumt jetzt auf, **und** der Test prüft vor dem Start,
+   ob der Port schon belegt ist. Dieselbe Familie wie Regel 15/17/19 – nie ein Messwerkzeug, das
+   sich selbst im Weg steht. **Übertragbar: Wer einen Test schreibt, der einen Serverprozess
+   startet, muss beide Enden versorgen – Aufräumen im Fehlerfall UND eine Wache gegen einen fremden
+   Prozess auf demselben Port.**
+3. **Ein Test, der die REPRÄSENTATION einer Sache misst, veraltet mit jedem Umbau daran.**
+   `test_marktlimit_abmeldung` prüfte „die Sitzung besteht" am Token in `localStorage` – nach dem
+   Umbau meldete es für JEDEN Lauf „abgemeldet", auch für einen völlig gesunden. Die bequeme Lösung
+   wäre gewesen, die Prüfung zu streichen; die geschützte Eigenschaft („ein temporärer Fehler darf
+   NIE zur Abmeldung führen") gilt ja unverändert. Sie misst jetzt die **Wirkung** und ist dadurch
+   schärfer als vorher: Ein abgemeldetes Spiel setzt `saveConflictDetected` und stellt das Speichern
+   **komplett** ein – `2a2` verlangt also, dass nach dem Rate-Limit weiter Speicherversuche
+   ankommen (gemessen 3 → 4), und `3b` als Gegenstück, dass sie beim ECHTEN Konflikt aufhören
+   (4 → 4). Erst das Paar sagt etwas aus. Nebenbei war `3b` vorher „das Token ist entfernt" – seit
+   dem Umbau trivial erfüllt, weil nie eines geschrieben wird (Regel 28).
+
+### Der Wächter
+
+`tests/test_sitzungscookie_front.js` (22 Prüfungen) startet den **echten** `server.js` aus dem
+Nachbar-Repo und legt einen winzigen Proxy davor, damit Spieldatei und `/api` aus Browser-Sicht
+dieselbe Herkunft haben – sonst schickt der Browser das Cookie gar nicht erst mit. Liegt das
+Backend-Repo nicht daneben, überspringt er sich mit klarer Meldung. Ein Test gegen einen
+nachgebauten Server hätte genau das gemessen, was ich beim Nachbauen angenommen habe.
+
+**Die entscheidende Prüfung ist 5/6, nicht 1.** Dass nach einer frischen Anmeldung nichts mehr in
+`localStorage` steht, ist die Behebung. Ob sie ausgeliefert werden DARF, entscheidet 5: ob eine
+BESTEHENDE Anmeldung von vor heute noch hereinkommt. 6 misst dazu, dass so ein Spieler auch wirklich
+migriert – ohne das wäre die Behebung für den Bestand 180 Tage lang wirkungslos.
+
+**Drei** Gegenproben, alle beidseitig gefahren, alle **22** Prüfungen in jeder Richtung gelaufen:
+alte Spieldatei → **9 rot**; Server ohne Cookie-Löschung → **3 rot**, darunter der Beleg
+`{"anmeldeflaeche":false,"abmeldeknopf":true}` (ohne die Route meldet „Abmelden" wieder an);
+Spieldatei ohne die Statusprüfung → **2 rot** mit `{"markeUeberlebt":false}`.
+
+**Prüfung 8 hat die Gegenprobe zweimal gebraucht, und der erste Entwurf ist die eigentliche Lehre:**
+Er fragte „steht der Spieler noch im Spiel?" – und blieb grün, obwohl die Seite neu geladen hatte,
+weil das lebende Cookie ihn sofort wieder anmeldete. **Beide Fälle sehen danach identisch aus.**
+Gemessen wird deshalb das Neuladen SELBST, über eine Marke im `window`, die es zerstört. Regel 28 an
+einer Stelle, an der der Unterschied zwischen „behoben" und „sieht behoben aus" ein
+Sicherheitsunterschied ist.
+
+**Ein Nebenbefund, der ohne die Cookie-Messung untergegangen wäre:** Das ALTE Frontend lässt gegen
+den neuen Server nach dem „Abmelden" ein **gültiges** Sitzungs-Cookie auf dem Gerät zurück (gemessen:
+`kekse ["kepler7_sid"]`, `/api/me` 200). Es meldet den Spieler nicht wieder an – das alte Frontend
+sieht das Cookie ja gar nicht –, aber die Sitzung lebt weiter. Das ist der Grund, diese Etappe zügig
+auszuliefern statt sie liegen zu lassen.
+
+### Auslieferungsreihenfolge: das Backend MUSS zuerst
+
+Anders als bei P5 ist die Reihenfolge hier nicht gleichgültig. Ein Frontend, das auf das Cookie
+setzt, wäre gegen einen Server ohne `POST /api/logout` und ohne Cookie-Nachreichung sofort im
+Fehlerfall – der Abmeldeknopf meldete nicht ab, und Bestandssitzungen migrierten nie. Der
+Backend-PR gehört deshalb **vor** diesem gemerged, und danach die 401/404-Routenmessung gefahren
+(`POST /api/logout` muss 401 oder 200 liefern, nicht 404; mit einer erfundenen Route als
+Negativkontrolle und einer alten als Gegenkontrolle).
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).

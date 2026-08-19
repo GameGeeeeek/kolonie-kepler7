@@ -155,11 +155,23 @@ async function spiel(browser, steuer){
   await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => { const o=document.getElementById(id); if(o) o.style.display='none'; }); });
   return { ctx, page, store, errs };
 }
-const sitzung = (page) => page.evaluate(k => ({
-  token: localStorage.getItem(k),
-  overlay: !!(document.getElementById('conflictOverlay') && document.getElementById('conflictOverlay').style.display === 'flex'),
-  logText: ((window.__logZeilen||[]).join('\n') + '\n' + ((document.getElementById('log')||{}).innerText||''))
-}), TOKEN_KEY);
+/* Woran man sieht, ob die Sitzung noch steht.
+   Bis zum 19.08.2026 war das der Token in localStorage. Seit dem Sitzungs-Cookie (Audit P3,
+   Etappe b) liegt er dort nicht mehr - die Pruefung haette also fuer JEDEN Lauf "abgemeldet"
+   gemeldet, auch fuer einen voellig gesunden. Ein Marker, der die REPRAESENTATION der Sitzung
+   abfragt statt ihres Bestands, veraltet mit jedem Umbau daran.
+   Gemessen wird deshalb, was der SPIELER merkt: Steht der Anmeldebildschirm wieder da? Kommt der
+   "anderes Geraet"-Dialog? Das ist zugleich schaerfer als vorher - ein liegengebliebener Token
+   haette auch dann noch dagelegen, wenn das Spiel ihn gar nicht mehr benutzt. */
+const sitzung = (page) => page.evaluate(() => {
+  const anmelde = document.getElementById('loginOverlay');
+  const konflikt = document.getElementById('conflictOverlay');
+  return {
+    angemeldet: !(anmelde && getComputedStyle(anmelde).display !== 'none'),
+    overlay: !!(konflikt && konflikt.style.display === 'flex'),
+    logText: ((window.__logZeilen||[]).join('\n') + '\n' + ((document.getElementById('log')||{}).innerText||''))
+  };
+});
 
 (async () => {
   const browser = await starteBrowser();
@@ -168,15 +180,25 @@ const sitzung = (page) => page.evaluate(k => ({
   {
     const t = await spiel(browser, { saveStatus: 409, getStatus: 429 });
     const vorher = await sitzung(t.page);
-    check('2-vorab: die Sitzung steht vor dem Speicherversuch', !!vorher.token && vorher.overlay === false, vorher.token ? 'Token da' : 'KEIN Token');
+    check('2-vorab: die Sitzung steht vor dem Speicherversuch', vorher.angemeldet && vorher.overlay === false,
+      { angemeldet: vorher.angemeldet, konfliktDialog: vorher.overlay });
     // Auf mindestens einen abgelehnten Speicherversuch warten (das Spiel speichert im 10s-Takt).
     for (let i = 0; i < 50 && t.store.__saveVersuche === 0; i++) await t.page.waitForTimeout(500);
     check('2-vorab2: der Server hat einen Speicherversuch mit 409 abgelehnt', t.store.__saveVersuche > 0,
       { saveVersuche: t.store.__saveVersuche, getVersuche: t.store.__getVersuche });
     await t.page.waitForTimeout(2500);
+    const versucheVorher = t.store.__saveVersuche;
+    await t.page.waitForTimeout(11000);   // ein voller Speicher-Takt (10 s) plus Luft
     const nachher = await sitzung(t.page);
     check('2a: die Sitzung bleibt bestehen - ein Rate-Limit meldet niemanden ab',
-      !!nachher.token, { token: nachher.token ? 'da' : 'WEG' });
+      nachher.angemeldet, { angemeldet: nachher.angemeldet });
+    /* Und die WIRKUNG dazu (Hausregel 61): Ein abgemeldetes Spiel setzt saveConflictDetected und
+       stellt das Speichern KOMPLETT ein. Dass weiter Versuche ankommen, belegt also den Bestand
+       der Sitzung - waehrend "der Anmeldebildschirm steht nicht da" allein auch bei einem still
+       eingefrorenen Spiel gruen waere. */
+    check('2a2: und das Spiel versucht weiter zu speichern (ein abgemeldetes hoert ganz auf)',
+      t.store.__saveVersuche > versucheVorher,
+      { vorher: versucheVorher, nachher: t.store.__saveVersuche });
     check('2b: und es erscheint kein "anderes Geraet"-Dialog', nachher.overlay === false, nachher.overlay);
     check('2c: dass gerade nicht gespeichert wird, steht aber sichtbar im Protokoll',
       /NICHT gespeichert/.test(nachher.logText), nachher.logText.slice(0, 160));
@@ -192,7 +214,16 @@ const sitzung = (page) => page.evaluate(k => ({
     const s = await sitzung(t.page);
     check('3a: bei einem ECHTEN Konflikt wird weiterhin abgemeldet', s.overlay === true,
       { overlay: s.overlay, saveVersuche: t.store.__saveVersuche, getVersuche: t.store.__getVersuche });
-    check('3b: und das Token ist dabei entfernt', !s.token, { token: s.token ? 'noch da' : 'weg' });
+    /* Frueher: "das Token ist entfernt". Seit dem Sitzungs-Cookie steht dort ohnehin nie eines -
+       die Pruefung waere trivial gruen und damit wertlos (Hausregel 28). Geprueft wird stattdessen,
+       was den echten Konflikt vom Rate-Limit UNTERSCHEIDET: Hier stellt das Spiel das Speichern
+       wirklich ein (saveConflictDetected), waehrend 2a2 den Gegenfall misst - dort laeuft es
+       weiter. Erst das Paar sagt etwas aus. */
+    const versucheBeimDialog = t.store.__saveVersuche;
+    await t.page.waitForTimeout(11000);
+    check('3b: und das Speichern hoert dabei wirklich auf (Gegenstueck zu 2a2)',
+      t.store.__saveVersuche === versucheBeimDialog,
+      { beimDialog: versucheBeimDialog, elfSekundenSpaeter: t.store.__saveVersuche });
     check('3c: es wurde wirklich mehrfach nachgeladen, bevor aufgegeben wurde',
       t.store.__getVersuche >= 3, { getVersuche: t.store.__getVersuche });
     await t.ctx.close();
