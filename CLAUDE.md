@@ -1680,6 +1680,37 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     Sprungziel automatisch. Beide Gegenproben getrennt gefahren und jede fällt spezifisch: ohne
     `scroll-margin` genau `2b`, ohne `scrollIntoView` genau `2`.
 
+65. **Es gibt eine Ereignisquelle, die man GAR NICHT pinnen kann – und die Regel „Ereignis-Uhren
+    pinnen" verleitet dazu, das Gegenteil zu glauben.** Vorfall 19.08.2026:
+    `test_klappen_kollision` fiel im vollen Lauf an seiner „ohne Ereignis"-Vorabprüfung mit einem
+    **152 px hohen Fremd-Banner** bei 360×740, während 390×844 und 360×640 im selben Lauf sauber
+    waren; die vier Kollisionsprüfungen derselben Größe blieben grün. Der Kommentar im Test sagte
+    ausdrücklich, die zwei gepinnten Uhren (`nextPlanetEventCheck`, `nextTraderCheck`) sorgten
+    dafür, dass das Banner „AUSSCHLIESSLICH dann steht, wenn dieser Test es setzt". **Das war
+    falsch, und zwar messbar:** Das Banner hängt an `state.activeEvent`, und das setzt
+    `maybeSpawnRandomEvent()` – eine Funktion **ohne jede Uhr**, die je Tick mit 0,25 % würfelt.
+    `state.lastEventTime` wird zwar geschrieben, aber **nirgends als Sperre gelesen** (der
+    Kommentar an der Funktion sagt es selbst: „keine feste Mindestpause mehr"); wer sie pinnt,
+    pinnt nichts. Über acht Boots à ~4 s Tickzeit sind das rund 8 % je Testlauf – genau die
+    Größenordnung von „meistens grün, gelegentlich rot".
+    **Vorgehen:** (a) Wer eine Ereignisquelle stilllegen will, prüft, ob sie überhaupt eine
+    Zustandsgröße HAT, an der man drehen kann – ein `grep` nach dem Feld genügt nicht, es muss
+    auch GELESEN werden (Regel 59 in der Anwendung auf eine Testvorbereitung); (b) lässt sie sich
+    nicht stilllegen, wird die Störung über den **Spielerweg** weggeräumt und das Wegräumen
+    **gemeldet** – hier der „Ignorieren"-Knopf des Banners, bis zu drei Anläufe, und
+    `streuEreignisWeggeklickt` steht im Beleg jeder Prüfung. Ein Griff in den Modulscope scheidet
+    aus, der ist von außen nicht erreichbar (Regel 47), und ein Test, der Spielinternes nachbaut,
+    misst nicht mehr das Spiel (Regel 36). (c) Die Schranke selbst bleibt unangetastet – sonst ist
+    „Störung entfernt" nicht von „Test entschärft" zu unterscheiden (Regel 26).
+    **Gegenprobe in beide Richtungen an einer Kopie mit 0,25 statt 0,0025 je Tick:** alter Stand
+    5 rote Prüfungen, neuer Stand 0 – bei identischen 16 Prüfnamen in beiden Läufen (per `diff`
+    verglichen, nicht gezählt – Regel 60). Und der Beleg, dass die Behebung wirklich gegriffen hat
+    statt zufällig ruhig geblieben zu sein: `streuEreignisWeggeklickt` stand im grünen Lauf auf
+    1/2/1, gegen die echte Spieldatei auf 0/0/0.
+    **Die Flanke ist nicht geschlossen, nur an dieser Stelle:** Jeder Test, der FENSTERLAGE misst,
+    ist ihr ausgesetzt, weil das Banner 138–164 px hoch ist und alles darunter verschiebt (Regel 63
+    zählt für die verwandte Reiterleisten-Flanke 88 von 147 betroffenen Tests).
+
 ## Die Klappen weichen der Reiterleiste aus (18.08.2026)
 
 **Der Fund kam aus einem Fehlschlag, den zwei Sitzungen vorher als Wackeln abgehakt hatten.**
