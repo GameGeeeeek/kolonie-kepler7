@@ -15,7 +15,7 @@
 //
 // Die Gegenprobe mit vollständigem Server gehört dazu: Ohne sie wäre der Test auch dann grün, wenn
 // die Meldung IMMER käme - und dann wäre sie wertlos.
-const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, logMitschnitt, logZeilen, ruhigeUhren } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -41,7 +41,9 @@ const save = () => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:9e4,forschungspunkte:3e4},
   buildings:{solar:22,mine:20,labor:14,lager:30,werft:14}, research:{}, fleet:{missions:[]},
   colonies:{}, activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null,allianceTag:'TST'},
-  xp:9e5, credits:5e5, buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{} });
+  xp:9e5, credits:5e5, buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{},
+  // Zwei der drei Stoerquellen weg (Arbeitsregel 18) - die dritte faengt der Mitschnitt.
+  ...ruhigeUhren() });
 
 async function lade(browser, kennt){
   const ctx = await browser.newContext({ viewport:{width:1400,height:1000} });
@@ -50,15 +52,24 @@ async function lade(browser, kennt){
   page.on('console', m => { if (m.type()==='error' && !/Failed to load resource|CORS|ERR_/.test(m.text())) errs.push(m.text()); });
   await page.route('**/api/**', backend({ 'kepler7-save-v3': save() }, kennt));
   await page.addInitScript(() => localStorage.setItem('kepler7_token','tok'));
+  await logMitschnitt(page);
   await page.goto(SPIEL_URL); await page.waitForTimeout(4200);
   await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id); if(o)o.style.display='none';}));
   return { page, ctx, errs };
 }
-const zustand = (page, cat) => page.evaluate((c) => {
-  const el = document.querySelector('[data-notif-cat="'+c+'"]');
-  return { an: el ? el.classList.contains('on') : null,
-           protokoll: (document.getElementById('log')||{}).textContent || '' };
-}, cat);
+/* Gemessen 19.08.2026: `protokoll` war der ENDSTAND von #log - und #log ueberschreibt sich mit
+   jeder Meldung selbst. Die verneinende Pruefung unten las dadurch woertlich "Planeten-Ereignis
+   auf Heimatbasis: Sonnenflaute (-25% Energieproduktion, 10 Min.)" und war trivial gruen: Sie
+   haette dieselbe Farbe gezeigt, wenn die Warnung gekommen UND danach ueberschrieben worden
+   waere - also genau in dem Fall, gegen den dieser Test gebaut ist. Seither wird der MITSCHNITT
+   gelesen (Arbeitsregel 47/65). */
+const zustand = async (page, cat) => {
+  const an = await page.evaluate((c) => {
+    const el = document.querySelector('[data-notif-cat="'+c+'"]');
+    return el ? el.classList.contains('on') : null;
+  }, cat);
+  return { an, zeilen: await logZeilen(page) };
+};
 async function klick(page, cat){
   await page.evaluate((c) => { const el = document.querySelector('[data-notif-cat="'+c+'"]'); if (el) el.click(); }, cat);
   await page.waitForTimeout(900);
@@ -76,10 +87,12 @@ async function klick(page, cat){
     await klick(page, 'allianceraid');
     const nach = await zustand(page, 'allianceraid');
     check('1: er springt auch nach dem Klick zurueck - der Server speichert es wirklich nicht', nach.an === false, { an: nach.an });
-    check('1: ABER das Spiel sagt jetzt, woran es liegt',
-      /Server kennt diese Benachrichtigungs-Einstellung noch nicht/.test(nach.protokoll), nach.protokoll.slice(0,160));
+    const warnung = nach.zeilen.filter(z => /Server kennt diese Benachrichtigungs-Einstellung noch nicht/.test(z));
+    check('1: ABER das Spiel sagt jetzt, woran es liegt', warnung.length > 0, nach.zeilen.slice(-4));
+    /* Gescopt auf DIE Warnzeile, nicht auf den ganzen Mitschnitt: sonst genuegte irgendeine
+       andere Zeile, in der das Wort vorkommt (Arbeitsregel 39). */
     check('1: und nennt die betroffene Kategorie beim Namen',
-      /allianceraid/.test(nach.protokoll), nach.protokoll.slice(0,160));
+      warnung.some(z => /allianceraid/.test(z)), warnung.slice(0,2));
     check('keine JS-Fehler (alter Server)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
@@ -93,7 +106,14 @@ async function klick(page, cat){
     await klick(page, 'allianceraid');
     const aus = await zustand(page, 'allianceraid');
     check('2: der Klick schaltet ihn wirklich aus', aus.an === false, { an: aus.an });
-    check('2: und es kommt KEINE Warnung', !/Server kennt diese Benachrichtigungs-Einstellung/.test(aus.protokoll), aus.protokoll.slice(0,160));
+    /* Diese Pruefung traegt den ganzen Abschnitt (siehe Dateikopf) - und war bis zum 19.08.2026
+       wertlos, weil sie den Endstand las. Jetzt betrachtet sie NUR die seit dem Klick neu
+       erschienenen Zeilen: Ein Fremdereignis haengt sich dort an, loescht aber nichts mehr, und
+       eine kurz aufblitzende Warnung faellt auf. */
+    const neuSeitKlick = aus.zeilen.slice(vor.zeilen.length);
+    check('2: und es kommt KEINE Warnung',
+      !neuSeitKlick.some(z => /Server kennt diese Benachrichtigungs-Einstellung/.test(z)),
+      { neuSeitKlick: neuSeitKlick.slice(0,5), gesamt: aus.zeilen.length });
     await klick(page, 'allianceraid');
     const an = await zustand(page, 'allianceraid');
     check('2: und wieder ein', an.an === true, { an: an.an });

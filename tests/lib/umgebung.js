@@ -87,10 +87,70 @@ function pruefer() {
 }
 
 // Überspringen mit Aussage: Exit-Code 0, aber im Protokoll klar als übersprungen erkennbar.
+// --- Mitschnitt der Spielmeldungen ------------------------------------------------------------
+// WARUM ES DIESEN HELFER GIBT (gemessen 19.08.2026). `#log` hat keinen Stapel - `log()` schreibt
+// per innerHTML und ueberschreibt sich mit jeder Meldung selbst. Wer den ENDSTAND abliest, misst
+// deshalb nicht "die Zeile ist erschienen", sondern "sie stand am Ende noch da" - zwei
+// verschiedene Fragen, und nur die erste gehoert dem Knopf, den ein Test gerade drueckt.
+//
+// Der Unterschied ist keine Theorie, er hat an einem Tag zweimal zugeschlagen:
+//   * test_beitrag_strikt fiel im vollen Lauf, weil "Neues Ereignis: Alte Bake sendet
+//     Koordinaten" die geprueste Zeile ueberschrieben hatte. Die MECHANIK war gruen (kein
+//     contrib-Dokument, Ressourcen zurueckgebucht) - nur die Anzeige war schon weitergezogen.
+//   * test_benachrichtigung_abgleich war schlimmer, weil STILL: Seine verneinende Pruefung
+//     ("es kommt KEINE Warnung") las gemessen "Planeten-Ereignis auf Heimatbasis: Sonnenflaute
+//     ..." und war deshalb trivial gruen. Sie haette dieselbe Farbe gezeigt, wenn die Warnung
+//     gekommen UND danach ueberschrieben worden waere - also genau in dem Fall, gegen den der
+//     Test gebaut ist.
+//
+// Pinnen hilft nur zur Haelfte: nextPlanetEventCheck und nextTraderCheck lassen sich im
+// Spielstand in die Zukunft legen, maybeSpawnRandomEvent hat aber GAR KEINE Uhr (es wuerfelt je
+// Tick mit 0,25 % und liest state.lastEventTime nirgends als Sperre). Gegen diese Quelle ist der
+// Mitschnitt die einzige Antwort - siehe CLAUDE.md, Arbeitsregel 65.
+//
+// DREI DINGE, DIE BEIM BAU JE EINEN ANLAUF GEKOSTET HABEN:
+//   (a) Beobachtet wird `document`, NICHT `document.documentElement`. Beim addInitScript ist die
+//       Wurzel noch nicht da; observe() wirft dann "parameter 1 is not of type 'Node'", der
+//       Mitschnitt bleibt fuer den ganzen Lauf leer, und die Pruefungen fallen aus dem falschen
+//       Grund. `document` existiert immer und deckt mit subtree:true alles ab, was spaeter
+//       darunter entsteht.
+//   (b) Der Beobachter darf nicht am #log-KNOTEN haengen: Der Boot ersetzt den Container einmal
+//       per innerHTML, man saesse danach am verwaisten Original. Deshalb je Mutation frisch per
+//       id lesen.
+//   (c) addInitScript statt eines Aufrufs nach dem goto - nur so laeuft der Beobachter VOR dem
+//       ersten Tick und sammelt lueckenlos.
+async function logMitschnitt(page) {
+  await page.addInitScript(() => {
+    window.__logMitschnitt = [];
+    new MutationObserver(() => {
+      const el = document.getElementById('log');
+      const t = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      const a = window.__logMitschnitt;
+      if (t && t !== a[a.length - 1]) a.push(t);
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+}
+
+// Liefert den bisherigen Mitschnitt. Eine Pruefung fragt damit "ist die Zeile ERSCHIENEN" statt
+// "steht sie noch da", und ihr Beleg im Fehlschlag nennt, was STATTDESSEN zu sehen war
+// (Arbeitsregel 37) - statt einer leeren Zeichenkette, aus der niemand etwas ableiten kann.
+async function logZeilen(page) {
+  return page.evaluate(() => (window.__logMitschnitt || []).slice());
+}
+
+// Die zwei Ereignis-Uhren, die sich SEHR WOHL pinnen lassen. Bei 0 - dem Wert, den ein frischer
+// Spielstand traegt - feuert der erste Check GARANTIERT (Arbeitsregel 18). Das nimmt zwei der drei
+// Stoerquellen weg und macht den Mitschnitt lesbar; die dritte (maybeSpawnRandomEvent) faengt nur
+// der Mitschnitt selbst. In einen Fixture-Spielstand einstreuen: Object.assign(stand, ruhigeUhren())
+function ruhigeUhren(stunden) {
+  const weit = Date.now() + (stunden || 1) * 3600 * 1000;
+  return { nextPlanetEventCheck: weit, nextTraderCheck: weit };
+}
+
 function ueberspringen(grund) {
   console.log('SKIP - ' + grund);
   console.log('\nPASS (übersprungen)');
   process.exit(0);
 }
 
-module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen };
+module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, ruhigeUhren };

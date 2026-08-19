@@ -7104,8 +7104,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.583.0';
+  const VERSION = '8.584.0';
   const PATCHNOTES = [
+    { version:'8.584.0', date:'19.08.2026', changes:[
+      '<strong>Behoben: Angriffe auf Asteroiden, Festungen und Alien-Nester haben deine Flotte vermehrt.</strong> Kam ein solcher Verband heim, wurden die überlebenden Schiffe ein zweites Mal gutgeschrieben. Nachgemessen: 20 Kreuzer im Bestand, 20 davon im Verband, 4 Verluste – danach standen <strong>36</strong> da statt 16. Wer mit der voreingestellten Auswahl angegriffen hat, hat seine Flotte also bei jedem Schlag fast verdoppelt.',
+      '<strong>Der Grund war eine falsche Annahme, nicht ein Rechenfehler.</strong> Die Schiffe eines Verbandes verlassen deine Flotte gar nicht – sie sind nur als <em>unterwegs</em> markiert und dadurch für andere Aufträge gesperrt. Beim Auflösen werden jetzt die Verluste abgezogen, statt die Überlebenden zurückzugeben. Genau so macht es der NPC-Angriff seit jeher.',
+      '<strong>Kommt kein Kampf zustande, ändert sich nichts:</strong> Ist der Server nicht erreichbar, ist das Nest weitergezogen oder die Festung bereits gefallen, steht dein Verband weiterhin vollzählig da – ohne Verluste und ohne Abklingzeit.',
+      '<strong>Warum es drei Angriffsarten gleichzeitig betraf.</strong> Der Fehler kam am 14.08.2026 mit der Asteroiden-Anfechtung ins Spiel und ist von dort beim Bau der Asteroidenfestungen (18.08.) und der Alien-Nester (19.08.) mitgewandert – jede neue Angriffsart hat ihn vom Nachbarn geerbt. Die drei Stellen laufen deshalb ab jetzt über <em>eine</em> gemeinsame Funktion, und ein neuer Prüflauf schlägt an, sobald eine künftige Angriffsart wieder eigene Wege geht.',
+      '<strong>Was das für deinen Punktestand heißt:</strong> Wer diese Angriffe geflogen ist, hat dabei Schiffe erhalten, die es nie gab. Rückwirkend korrigiert wird nichts – ein nachträglicher Eingriff in Flotten und Ranglisten wäre schlimmer als der Fehler selbst. Ab jetzt zählt wieder, was wirklich gebaut wurde.'
+    ]},
     { version:'8.583.0', date:'19.08.2026', changes:[
       '<strong>Behoben: Eine Flugbahn startete an einer Heimatbasis, die es im gezeigten System gar nicht gibt.</strong> Wer eine Flotte von der Heimatbasis losschickte und danach ein anderes System ansah, bekam dort eine Linie zu sehen, die aus dem Nichts neben der Sonne kam – als stünde die Heimatbasis in diesem System. Gemessen lag der Startpunkt exakt 50 Einheiten neben der fremden Sonne, also genau auf der Bahn, auf der die Heimatbasis im eigenen System sitzt. Jetzt beginnt die Linie in diesem Fall an der Sonne, dem Platzhalter für „kommt von ausserhalb" – genauso, wie es für Flotten von einer Kolonie schon immer war. Danke für den Bug-Report mit Screenshot.',
       '<strong>Im Heimatsystem ändert sich nichts:</strong> Dort startet die Flugbahn weiterhin genau am Marker deiner Basis. Das war beim Beheben der eigentliche Punkt – der naheliegende Weg hätte die Linie auch dort von der Basis losgelöst.'
@@ -14584,6 +14591,23 @@
     log(fleetName+' fliegt zum '+asteroidName(a)+', um das Schürfrecht von '+(a.halterName||'unbekannt')+' anzufechten. Ankunft in '+fmtDuration(flug/2)+', zurück in '+fmtDuration(flug)+'.', 'ti-sword');
     render(); save();
   }
+  /* DIE SCHIFFE BLEIBEN WAEHREND EINER MISSION IN `fleet` GEZAEHLT - nur der Flottenplatz ist
+     belegt, und computeAwayByType() haelt sie als "unterwegs" von einer zweiten Verplanung
+     zurueck. Beim Aufloesen werden deshalb die VERLUSTE ABGEZOGEN; die Ueberlebenden wieder
+     hinzuzufuegen wuerde die Flotte verdoppeln.
+     GEMESSEN am Stand v8.582.0: 20 Kreuzer im Bestand, 20 davon im Verband, 4 Verluste - danach
+     standen 36 da. Betroffen waren ALLE DREI PvE-Aufloesungen: die Anfechtung (seit v8.491.0),
+     der Festungsschlag (v8.569.0) und der Nest-Schlag (v8.582.0). Der Fehler ist durch KOPIEREN
+     gewandert - jede neue Missionsart hat ihn vom Nachbarn geerbt. Der NPC-Angriff macht es seit
+     jeher richtig: applyCombatLosses ZIEHT AB und gibt nichts zurueck.
+     Deshalb EINE Funktion fuer alle PvE-Aufloesungen (Hausregel 43) statt dreier Kopien, die
+     wieder auseinanderlaufen koennen.
+     Kein Kampf (Server nicht erreichbar, Ziel weitergezogen oder schon gefallen) heisst leeres
+     `verluste` - die Flotte kommt dann wirklich vollzaehlig heim, ohne dass irgendetwas gebucht
+     werden muesste. Waechter: tests/test_flotte_rueckkehr.js */
+  function pveVerlusteBuchen(fleet, verluste){
+    for (const [k, weg] of Object.entries(verluste || {})) if (weg > 0) fleet[k] = Math.max(0, (fleet[k]||0) - weg);
+  }
   // Bei Ankunft: Der Server entscheidet. Erst speichern (er liest die Mission aus dem GESPEICHERTEN
   // Stand), dann fragen, dann die eigenen Verluste buchen - der Server fasst den Spielstand nie an.
   async function anfechtungAufloesen(m, planetKey, fleet){
@@ -14598,19 +14622,19 @@
       daten = await res.json().catch(() => null);
       if (!res.ok) daten = null;
     } catch(e){ daten = null; }
-    const zurueck = {};
+    const verluste = {};
     if (!daten){
-      // Abgewiesen oder Verbindung weg: Die Flotte kommt vollstaendig heim. Lieber ein Rueckflug
-      // ohne Kampf als verschwundene Schiffe - der Server hat in diesem Fall auch nichts gebucht.
-      for (const [k, v] of Object.entries(m.composition||{})) if (v > 0) zurueck[k] = v;
+      /* Abgewiesen oder Verbindung weg: Die Flotte kommt vollstaendig heim. Lieber ein Rueckflug
+         ohne Kampf als verschwundene Schiffe - der Server hat in diesem Fall auch nichts gebucht.
+         HIER FEHLT KEIN CODE: Die Schiffe stehen die ganze Mission ueber in `fleet`, ein leeres
+         `verluste` ist also genau die vollzaehlige Rueckkehr (siehe pveVerlusteBuchen). */
       log('Die Anfechtung bei '+asteroidName({sorte:m.sorte, groesse:m.groesse})+' kam nicht zustande'
         + (status === 403 ? ' (Schutzfrist, Abklingzeit oder Allianz)' : status === 404 ? ' – der Server kennt Anfechtungen noch nicht' : '')
         + ' – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
     } else {
       for (const [k, v] of Object.entries(m.composition||{})){
         const weg = (daten.eigeneVerluste || {})[k] || 0;
-        const rest = Math.max(0, v - weg);
-        if (rest > 0) zurueck[k] = rest;
+        if (weg > 0) verluste[k] = Math.min(v, weg);
       }
       if (daten.gewonnen){
         state.asteroidStats = state.asteroidStats || { missionen:0, geschuerft:0, anfechtungen:0 };
@@ -14626,7 +14650,7 @@
         : 'Anfechtung verloren: '+(daten.halterVorher||'Der Halter')+' behält das Schürfrecht.', daten.gewonnen ? 'ti-trophy' : 'ti-alert-triangle');
       ladeAsteroidfeld(true);
     }
-    for (const [k, v] of Object.entries(zurueck)) fleet[k] = (fleet[k]||0) + v;
+    pveVerlusteBuchen(fleet, verluste);
     render(); save();
   }
   /* Der Festungsschlag kommt heim (Phase 1, 18.08.2026). Wortgleiches Muster wie
@@ -14652,24 +14676,22 @@
       daten = await res.json().catch(() => null);
       if (!res.ok) daten = null;
     } catch(e){ daten = null; }
-    const zurueck = {};
+    const verluste = {};
     const sysName = (STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system}).name;
     const v = nestVolk(m.volk);
     if (!daten){
-      for (const [k, val] of Object.entries(m.composition||{})) if (val > 0) zurueck[k] = val;
       log('Der Angriff auf das Nest der '+v.name+' bei '+sysName+' kam nicht zustande'
         + (status === 403 ? ' – Abklingzeit' : status === 404 ? ' – der Server kennt Alien-Nester noch nicht' : '')
         + ' – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
     } else if (daten.verpasst){
-      // Vollzaehlig zurueck, keine Verluste, keine Abklingzeit - und der Grund steht in der Meldung.
-      for (const [k, val] of Object.entries(m.composition||{})) if (val > 0) zurueck[k] = val;
+      /* Vollzaehlig zurueck, keine Verluste, keine Abklingzeit - und der Grund steht in der Meldung.
+         Auch hier fehlt kein Code: leeres `verluste` heisst unversehrte Rueckkehr. */
       log(daten.text || ('Das Nest bei '+sysName+' war nicht mehr da – dein Verband kehrt vollzählig zurück.'),
         'ti-arrows-shuffle', 'wichtig');
     } else {
       for (const [k, val] of Object.entries(m.composition||{})){
         const weg = (daten.eigeneVerluste || {})[k] || 0;
-        const rest = Math.max(0, val - weg);
-        if (rest > 0) zurueck[k] = rest;
+        if (weg > 0) verluste[k] = Math.min(val, weg);
       }
       state.alienStats = state.alienStats || { schlaege:0, nesterGefallen:0, koeniginnen:0 };
       state.alienStats.schlaege = (state.alienStats.schlaege||0) + 1;
@@ -14696,7 +14718,7 @@
       loadGalaxyState();
       if (daten.gefallen) claimPendingRewards();
     }
-    for (const [k, val] of Object.entries(zurueck)) fleet[k] = (fleet[k]||0) + val;
+    pveVerlusteBuchen(fleet, verluste);
     render(); save();
   }
   async function festungAufloesen(m, planetKey, fleet){
@@ -14711,18 +14733,16 @@
       daten = await res.json().catch(() => null);
       if (!res.ok) daten = null;
     } catch(e){ daten = null; }
-    const zurueck = {};
+    const verluste = {};
     const sysName = (STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system}).name;
     if (!daten){
-      for (const [k, v] of Object.entries(m.composition||{})) if (v > 0) zurueck[k] = v;
       log('Der Angriff auf die '+(m.stufeName||'Festung')+' bei '+sysName+' kam nicht zustande'
         + (status === 409 ? ' – sie ist bereits gefallen' : status === 403 ? ' – Abklingzeit' : status === 404 ? ' – der Server kennt Festungen noch nicht' : '')
         + ' – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
     } else {
       for (const [k, v] of Object.entries(m.composition||{})){
         const weg = (daten.eigeneVerluste || {})[k] || 0;
-        const rest = Math.max(0, v - weg);
-        if (rest > 0) zurueck[k] = rest;
+        if (weg > 0) verluste[k] = Math.min(v, weg);
       }
       state.asteroidStats = state.asteroidStats || { missionen:0, geschuerft:0, anfechtungen:0 };
       state.asteroidStats.festungsschlaege = (state.asteroidStats.festungsschlaege||0) + 1;
@@ -14749,7 +14769,7 @@
       ladeAsteroidfeld(true);
       if (daten.gefallen) claimPendingRewards();
     }
-    for (const [k, v] of Object.entries(zurueck)) fleet[k] = (fleet[k]||0) + v;
+    pveVerlusteBuchen(fleet, verluste);
     render(); save();
   }
   function asteroidResListe(a, menge){

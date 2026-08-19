@@ -5,7 +5,7 @@
 // und das Spiel meldet "beigetragen".
 //
 // Der Test erzwingt die Ablehnung, indem das Backend fuer den contrib-Schluessel 500 liefert.
-const { starteBrowser, SPIEL_URL, SPIELDATEI, SERVER_JS, ueberspringen } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, SERVER_JS, ueberspringen, logMitschnitt, logZeilen } = require('./lib/umgebung');
 const path = require('path');
 
 const FILE = SPIEL_URL;
@@ -67,27 +67,13 @@ async function lauf(browser, schreibfehler){
     'alliance:TST:base': JSON.stringify({ foundedAt: jetzt - 86400000, level: 2, system: 'kepler', tag: 'TST', announcedLevel: 2 })
   };
   await page.route('**/api/**', backend(store, schreibfehler));
-  await page.addInitScript(() => {
-    localStorage.setItem('kepler7_token', 'tok');
-    // MITSCHNITT statt Endstand (Hausregel 47, Nachtrag "#log"): #log hat keinen Stapel, es
-    // ueberschreibt sich mit jeder Meldung selbst. Die geprueften Aussagen lauten "die Zeile ist
-    // ERSCHIENEN" bzw. "sie ist NIE erschienen" - nicht "sie steht am Ende noch da". Beobachtet
-    // wird document.body, weil der Boot den Container einmal per innerHTML ersetzt; #log wird je
-    // Mutation frisch per id gelesen.
-    // addInitScript laeuft, BEVOR das Dokument existiert - ein sofortiges observe() wirft
-    // "parameter 1 is not of type 'Node'", der Mitschnitt bliebe leer und die Pruefung waere aus
-    // dem falschen Grund rot. Deshalb scharfstellen, sobald documentElement da ist; das passiert
-    // im ersten Tick und damit lange vor dem Spiel-Boot, der Mitschnitt bleibt also lueckenlos.
-    window.__logMit = [];
-    (function scharf(){
-      if (!document.documentElement) { setTimeout(scharf, 0); return; }
-      new MutationObserver(() => {
-        const el = document.getElementById('log');
-        const t = el ? (el.textContent || '').trim() : '';
-        if (t && window.__logMit[window.__logMit.length - 1] !== t) window.__logMit.push(t);
-      }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
-    })();
-  });
+  await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); });
+  /* Der Mitschnitt kam am 19.08.2026 aus zwei Sitzungen gleichzeitig - einmal hier inline
+     (v8.583.0) und einmal als Helfer in lib/umgebung.js, den zwei weitere Tests brauchen. Zwei
+     Kopien derselben Mechanik koennen auseinanderlaufen; deshalb steht sie jetzt an EINER Stelle
+     (Hausregel 43), samt der Begruendung, warum `document` und nicht `document.documentElement`
+     beobachtet wird. Die Uhren-Pins oben bleiben davon unberuehrt. */
+  await logMitschnitt(page);
   await page.goto(FILE); await page.waitForTimeout(2600);
   await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }); });
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="allianz"]'); if (b) b.click(); });
@@ -108,9 +94,10 @@ async function lauf(browser, schreibfehler){
 
   const erg = await page.evaluate(() => {
     const raw = localStorage.getItem('kepler7_kepler7-save-v3');
-    return { log: (document.getElementById('log') || {}).textContent || '',
-             logMit: (window.__logMit || []).join(' || ') };
+    return { log: (document.getElementById('log') || {}).textContent || '' };
   });
+  erg.logMit = (await logZeilen(page)).join(' || ');
+
   // Der Erz-Stand kommt aus dem GESPEICHERTEN Spielstand im Mock-Store: state ist nicht global,
   // und die Kopfzeilen-Anzeige waere nur indirekt. save() laeuft nach jedem Beitrag, der Wert im
   // Store ist also der massgebliche.
