@@ -696,6 +696,38 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     überlappende Beschriftung ist ehrlicher als eine, die beim falschen Planeten steht.
     `test_kartenbeschriftung` prüft deshalb NEBEN der Kollisionsfreiheit den Abstand jedes Labels zu
     SEINEM Objekt; die Gegenprobe an einer Kopie ohne Deckel fällt genau daran (56,8 statt max. 48).
+    **Nachtrag 19.08.2026 – KB-17, und die übersehene Paarung war diesmal MARKER×MARKER.** Phase 3
+    setzt bis zu drei Nester in dasselbe System. Alle drei liefen durch `kbMarkerFrei()`, also durch
+    genau den Schieber, den KB-13 gegen diese Fehlerklasse gebaut hat – und lagen im gerenderten
+    Bild trotzdem übereinander. Der Grund: Der Schieber kannte Sonne und Planeten, aber **nicht die
+    anderen Marker**. Er schob jeden von ihnen auf dieselbe freie Stelle. Kein Test sah es;
+    `test_kartenmarker` prüfte Marker×Scheibe und Text×Text, nicht Marker×Marker. Gefunden allein am
+    Screenshot (Regel 42).
+    **Drei Ursachen steckten dahinter, jede allein hätte gereicht:**
+    (a) **Mehr WINKEL trennt auf einer flachen Bahn nicht.** Die Nestbahn übernahm `ry` aus
+    `kbOrbitMass()` – am PC 0,30. Gemessen: 44° Schritt = 41 Einheiten (nötig 43), 60° = 27 bei
+    vieren, und erst `ry` 0,60 mit 72° = 60 Einheiten. Auf einer flachen Ellipse entsteht der
+    Abstand fast nur aus der X-Differenz, und der Kosinus ist symmetrisch – das vierte Nest landet
+    wieder neben dem ersten. **Wer Marker auf einer Bahn auffächert, rechnet den ABSTAND nach, nicht
+    den Winkel.** `homeSlotXY` benutzt aus genau diesem Grund seit jeher einen KREIS; die Einsicht
+    war da und stand nur an der falschen Stelle.
+    (b) **`markerR` muss der SICHTBARE Radius sein, nicht der gezeichnete.** Der Nest-Knoten pulst
+    auf das Doppelte, übergeben wurde zuerst `r`. Das ist dieselbe Ursache wie beim Boss-Puls in (b)
+    oben, zum zweiten Mal – weil der AUFRUFER den Wert liefert und der Schieber ihn nicht selbst
+    ermitteln kann. Wer eine neue Markerart anmeldet, gibt ihren sichtbaren Hof an, nicht ihren
+    Zeichenradius.
+    (c) **Eine Schieber-Schleife kann an den VERSUCHEN scheitern statt am Platz.** 14 Anläufe mal
+    5 Einheiten Schrittweite am schmalen Kasten reichen für 70 Einheiten; die Königin mit ihrem
+    30-Einheiten-Hof blieb dadurch bei 32,1 statt 41 stehen und gab auf – sie lieferte also genau
+    die Kollision zurück, gegen die sie gebaut ist, ohne ein einziges Anzeichen. Ein Schieber, der
+    aufgibt, muss das entweder melden oder genug Anläufe haben (jetzt 24).
+    **Übertragbar über die Karte hinaus: Wer einen Kollisionsschieber um eine neue Objektart
+    erweitert, muss ihm die schon PLATZIERTEN Objekte bekannt machen** – ein Schieber, der nur den
+    festen Untergrund kennt, schiebt alle Beweglichen auf denselben Fleck, und je mehr Arten
+    dazukommen, desto sicherer. `buildMap` führt deshalb `platzierteMarker`; Festung, Asteroiden,
+    Nester, Heimatbasis, fremde Spieler und NPCs melden sich dort an. `test_kartenmarker` prüft die
+    Paarung seither als eigene Zeile (1b); die Gegenprobe am Stand vor KB-17 fällt mit vier
+    Fehlschlägen, darunter 18,6 statt der nötigen 42,4 Einheiten zwischen zwei Nestern am PC.
 55. **Wer einer KOMPAKTKARTE etwas hinzufügt, muss nachsehen, ob es hinter dem „Details"-Griff
     landet – „im DOM vorhanden" ist nicht „für den Spieler sichtbar".** Vorfall 18.08.2026 (VT-1,
     Kennwert-Balken der Verteidigungsanlagen): Die Balken wurden an `prodLine` angehängt, weil dort
