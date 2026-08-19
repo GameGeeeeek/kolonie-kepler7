@@ -1790,6 +1790,88 @@ Frachter liegen auf **beiden unabhängigen Bezugsgrössen** gleichauf (0,25 je F
 je Punktegewicht). **Die Ursache war beide Male dieselbe: eine Zahl aus der ABSICHT gesetzt statt
 gegen die Nachbarn gemessen** (Regel 41).
 
+### Nachtrag 18.08.2026 (v8.577.0): die Preise mussten wieder hoch — und warum
+
+Auftrag Sascha nach der Auslieferung: „Ändere das" — zur gemeldeten Folge, dass grosse Flotten
+schwerer Schiffe deutlich billiger wurden (300 Leerenjäger 201.000 statt 1,25 Mio Erz).
+
+**Die Ursache war gemessen und strukturell, nicht eine Frage einzelner Zahlen.** Der alte Stand
+trug einen **systematischen Aufschlag für schwere Schiffe**: Aufwand je Angriffspunkt wächst mit
+der Schiffsgrösse, gefittet `∝ atk^0,540`. Für die Schiffe OHNE Angriffswert ergibt derselbe Fit
+über das Punktegewicht `∝ gw^0,547` bei praktisch gleichem Vorfaktor (4,58 gegen 4,53) — **ein und
+dasselbe Gesetz über beide Gruppen**. Meine Reform hatte den Exponenten auf 0 gesetzt, also den
+Aufschlag ersatzlos eingeebnet. Genau das liess die schweren Flotten kollabieren.
+
+**Und ein Rechenfehler in meiner ersten Korrektur, der sie fast wertlos gemacht hätte:** Ich hatte
+den Boden mit `Anteil × Staffelfaktor` kalibriert. Richtig ist `Anteil / Staffelfaktor` — die alte
+Staffelung machte spätere Stücke ja teurer, ein flacher Preis muss also HÖHER liegen als der alte
+ERSTPREIS, um dieselbe Flotte zu kosten. Mit dem falschen Vorzeichen landete der erste Anlauf bei
+0,35–0,6× statt der beabsichtigten 0,83×. Aufgefallen ist es erst beim Nachmessen der
+Flottenkosten — die Rechnung sah beim Hinschreiben richtig aus (Regel 48: nach dem Fix DIESELBE
+Messung wiederholen, „plausibel behoben" ist kein Messwert).
+
+**Umgesetzt als Boden: kein Schiff unter 1,25× seines ALTEN Grundpreises.** Damit kostet eine
+Flotte gegenüber früher 1,04× bei 100 Stück, 0,83× bei 250 und 0,61× bei 500 — Median über alle
+36 Schiffe. Kleine Flotten also unverändert, grosse moderat billiger, weil genau das der Zweck des
+Wegfalls der Strafe ist. **Der Preis dafür ist arithmetisch unvermeidbar und gehört benannt:** Wer
+die Staffelung entfernt UND die Flottenkosten halten will, muss den Stückpreis über den alten
+Erstpreis heben. Beides zugleich gibt es nicht.
+
+Der **Jäger** bleibt die bewusste Ausnahme (1,79× bei 250 Stück) — er war die billigste Quelle von
+Flottenpunkten.
+
+### Der Fund, der die Anhebung fast unbrauchbar gemacht hätte: die MISCHUNG war verrutscht
+
+Nach der Anhebung stimmte das T1-Äquivalent jedes Schiffs auf 1,25× — und trotzdem war das
+Ergebnis falsch. Gemessen je EINZELNEM Rohstoff: Beim Mondzerstörer stieg das Erz auf das
+3,80-fache, während die Kristalle auf 0,57 FIELEN; beim Sternenbanner 2,69 gegen 0,82; beim
+Leerenjäger stieg Erz auf 2,56, während die Antimaterie auf 0,67 fiel. Die Ursache war meine
+eigene Reform: Sie hatte nicht nur die Höhe, sondern auch die MISCHUNGSVERHÄLTNISSE neu gesetzt,
+und die Anhebung skalierte dann diese neuen Vektoren.
+
+**Damit ändert sich, welcher Rohstoff ein Schiff überhaupt begrenzt** — und das hat niemand
+bestellt. Eine Aggregatgrösse wie „T1-Äquivalent" schützt davor gerade nicht: Sie ist eine
+gewichtete Summe, und Gewichte, die ich selbst gewählt habe, können eine Verschiebung zwischen
+den Posten exakt ausgleichen, während sich im Spiel der Engpass verschiebt.
+
+**Behoben, indem jedes Schiff seinen ALTEN Rohstoff-Vektor zurückbekommt und nur skaliert wird**
+(`neu = alt × Skala`), statt die neu erfundenen Vektoren zu skalieren. Gemessene Mischungs-Drift
+danach: höchstens Faktor 1,267, und das ist reines Rundungsrauschen auf kleinen Ganzzahlen
+(Antimaterie 10 → 12,5 → 15).
+
+**Vorgehen, unabhängig von diesem Fall:** Wer eine Grösse anhebt, die aus MEHREREN Posten besteht,
+prüft die Posten EINZELN und nicht nur ihre Summe. Und wenn nur die Höhe geändert werden soll,
+skaliert man den Originalvektor — jede Neuerfindung der Zusammensetzung ist eine zweite,
+unbestellte Änderung, die sich hinter einer stimmenden Summe versteckt.
+
+### Die Lehre, die über diesen Fall hinausgeht: eine Schranke relativ zum MEDIAN wandert mit
+
+`1b` verlangte ursprünglich „nicht mehr als das 3,5-fache des **Medians**". Das funktionierte genau
+so lange, wie die Preise flach lagen. Mit dem wiederhergestellten Aufschlag stieg der Median von
+32,9 auf 48 — und **derselbe kaputte Hyperjäger, der vorher beim 4,09-fachen anschlug, stand danach
+beim 2,8-fachen und wäre stillschweigend durchgelaufen.** Die Prüfung war nicht falsch, sie war
+durch eine legitime Balance-Entscheidung entschärft worden, ohne dass jemand sie angefasst hätte.
+
+**Vorgehen:** Eine Schranke, die sich auf eine Kennzahl der eigenen Population bezieht (Median,
+Mittelwert, Maximum), entschärft sich selbst, sobald die ganze Population wandert. Wer eine solche
+Schranke setzt, prüft sie nach JEDER Änderung, die alle Werte gemeinsam verschiebt — oder bezieht
+sie besser auf das GESETZ, dem die Werte folgen. `1b` misst deshalb jetzt die Abweichung von einer
+bei jedem Lauf neu gefitteten Potenzkurve: Der Exponent kommt aus den Daten, ein einzelnes Schiff
+kann ihn kaum verschieben, und eine gemeinsame Anhebung aller Preise lässt ihn unberührt.
+
+Zwei weitere Entscheidungen an diesem Test, beide aus Fehlschlägen entstanden:
+
+- **Die Kurve lässt Wächter und Carrier aus** — datengetrieben über das Verhältnis Punktegewicht zu
+  Angriffswert (2,50 und 2,00; der nächste ist der Kreuzer bei 1,25, die Schranke liegt bei 1,5),
+  nicht als Namensliste. Ihr Wert liegt in Abwehr bzw. Trägerkapazität; der Carrier lag schon im
+  ALTEN Spiel beim 5,07-fachen jeder Angriffs-Kurve. Ohne diese Abgrenzung meldete `1b` ihn als
+  Ausreisser — ein Fehlschlag, der vom ersten Tag an dagestanden hätte (Regel 53).
+- **Die Prüfung auf die Gesamtspreizung ist ersatzlos gestrichen.** Sie ist zweimal gewandert, ohne
+  dass ein Fehler vorlag: 16,3× nach der Einebnung, 22,5× nach der Wiederherstellung, 28,5× im
+  alten Spiel. Eine Zahl, deren Schranke bei jeder legitimen Balance-Entscheidung nachgezogen
+  werden muss, misst die Entscheidung und nicht den Fehler. Was sie fangen sollte, fängt `1b`
+  schärfer.
+
 ### `tests/test_schiffskosten.js` — und die drei Entwürfe, die es NICHT geworden ist
 
 Der Wächter kennt keine Sollpreise, er prüft Verhältnisse (Regel 3) und ist musterbasiert, findet
